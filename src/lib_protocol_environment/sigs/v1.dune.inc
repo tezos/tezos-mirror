@@ -7,12 +7,13 @@
    v1/list.mli
    v1/string.mli
    v1/hex.mli
+   v1/bytes.mli
    v1/int32.mli
    v1/int64.mli
    v1/format.mli
 
    ;; Part of external libraries
-   v1/mBytes.mli
+   v1/tzEndian.mli
    v1/z.mli
    v1/lwt.mli
    v1/lwt_list.mli

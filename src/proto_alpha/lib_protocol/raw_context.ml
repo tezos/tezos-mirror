@@ -400,7 +400,7 @@ let set_first_level ctxt level =
   in
   Context.set ctxt first_level_key bytes >>= fun ctxt -> return ctxt
 
-type error += Failed_to_parse_parameter of MBytes.t
+type error += Failed_to_parse_parameter of bytes
 
 type error += Failed_to_decode_parameter of Data_encoding.json * string
 
@@ -414,7 +414,7 @@ let () =
       Format.fprintf
         ppf
         "@[<v 2>Cannot parse the protocol parameter:@ %s@]"
-        (MBytes.to_string bytes))
+        (Bytes.to_string bytes))
     Data_encoding.(obj1 (req "contents" bytes))
     (function Failed_to_parse_parameter data -> Some data | _ -> None)
     (fun data -> Failed_to_parse_parameter data) ;
@@ -492,7 +492,7 @@ let check_inited ctxt =
   | None ->
       failwith "Internal error: un-initialized context."
   | Some bytes ->
-      let s = MBytes.to_string bytes in
+      let s = Bytes.to_string bytes in
       if Compare.String.(s = version_value) then return_unit
       else storage_error (Incompatible_protocol_version s)
 
@@ -552,7 +552,7 @@ let check_and_update_protocol_version ctxt =
             failwith
               "Internal error: un-initialized context in check_first_block."
         | Some bytes ->
-            let s = MBytes.to_string bytes in
+            let s = Bytes.to_string bytes in
             if Compare.String.(s = version_value) then
               failwith "Internal error: previously initialized context."
             else if Compare.String.(s = "genesis") then
@@ -564,7 +564,7 @@ let check_and_update_protocol_version ctxt =
               return (Carthage_006, ctxt)
             else storage_error (Incompatible_protocol_version s))
   >>=? fun (previous_proto, ctxt) ->
-  Context.set ctxt version_key (MBytes.of_string version_value)
+  Context.set ctxt version_key (Bytes.of_string version_value)
   >>= fun ctxt -> return (previous_proto, ctxt)
 
 let prepare_first_block ~level ~timestamp ~fitness ctxt =
@@ -605,7 +605,7 @@ let fork_test_chain ({context = c; _} as s) protocol expiration =
 
 type key = string list
 
-type value = MBytes.t
+type value = bytes
 
 module type T = sig
   type t

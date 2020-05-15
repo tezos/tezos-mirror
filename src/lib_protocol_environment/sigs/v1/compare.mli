@@ -73,6 +73,8 @@ module Float : S with type t = float
 
 module String : S with type t = string
 
+module Bytes : S with type t = bytes
+
 module Z : S with type t = Z.t
 
 module List (P : COMPARABLE) : S with type t = P.t list

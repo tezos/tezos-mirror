@@ -79,7 +79,7 @@ let bytes_node_size_of_length s =
   (* approx cost of indirection to the C heap *)
   (2, 1 + ((s + 7) / 8) + 12)
 
-let bytes_node_size s = bytes_node_size_of_length (MBytes.length s)
+let bytes_node_size s = bytes_node_size_of_length (Bytes.length s)
 
 let prim_node_size_nonrec_of_lengths n_args annots =
   let annots_length =
@@ -162,7 +162,7 @@ let deserialized_cost expr = cost_of_size (expr_size expr)
 
 let serialized_cost bytes =
   let open Gas_limit_repr in
-  alloc_mbytes_cost (MBytes.length bytes)
+  alloc_mbytes_cost (Bytes.length bytes)
 
 let force_decode lexpr =
   let account_deserialization_cost =
@@ -219,7 +219,7 @@ let is_unit_parameter =
           true
       | _ ->
           false)
-    ~fun_bytes:(fun b -> MBytes.( = ) b unit_bytes)
+    ~fun_bytes:(fun b -> Compare.Bytes.equal b unit_bytes)
     ~fun_combine:(fun res _ -> res)
 
 let rec strip_annotations node =

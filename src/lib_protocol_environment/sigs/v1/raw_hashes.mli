@@ -23,8 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val blake2b : MBytes.t -> MBytes.t
+val blake2b : bytes -> bytes
 
-val sha256 : MBytes.t -> MBytes.t
+val sha256 : bytes -> bytes
 
-val sha512 : MBytes.t -> MBytes.t
+val sha512 : bytes -> bytes

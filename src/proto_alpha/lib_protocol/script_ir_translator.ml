@@ -553,7 +553,7 @@ let rec compare_comparable : type a. a comparable_ty -> a -> a -> int =
       let lres = Contract.compare x y in
       if Compare.Int.(lres = 0) then Compare.String.compare ex ey else lres
   | Bytes_key _ ->
-      wrap_compare MBytes.compare
+      wrap_compare Compare.Bytes.compare
   | Pair_key ((tl, _), (tr, _), _) ->
       fun (lx, rx) (ly, ry) ->
         let lres = compare_comparable tl lx ly in
@@ -2309,7 +2309,7 @@ let rec parse_data :
       traced (fail (Invalid_kind (location expr, [String_kind], kind expr)))
   (* Byte sequences *)
   | (Bytes_t _, Bytes (_, v)) ->
-      Lwt.return (Gas.consume ctxt (Typecheck_costs.string (MBytes.length v)))
+      Lwt.return (Gas.consume ctxt (Typecheck_costs.string (Bytes.length v)))
       >>=? fun ctxt -> return (v, ctxt)
   | (Bytes_t _, expr) ->
       traced (fail (Invalid_kind (location expr, [Bytes_kind], kind expr)))
@@ -5694,7 +5694,7 @@ let pack_data ctxt typ data =
   in
   Lwt.return @@ Gas.consume ctxt (Script.serialized_cost bytes)
   >>=? fun ctxt ->
-  let bytes = MBytes.concat "" [MBytes.of_string "\005"; bytes] in
+  let bytes = Bytes.concat Bytes.empty [Bytes.of_string "\005"; bytes] in
   Lwt.return @@ Gas.consume ctxt (Script.serialized_cost bytes)
   >>=? fun ctxt -> return (bytes, ctxt)
 

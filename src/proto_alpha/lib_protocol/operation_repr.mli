@@ -55,7 +55,7 @@ module Kind : sig
     | Delegation_manager_kind : delegation manager
 end
 
-type raw = Operation.t = {shell : Operation.shell_header; proto : MBytes.t}
+type raw = Operation.t = {shell : Operation.shell_header; proto : bytes}
 
 val raw_encoding : raw Data_encoding.t
 

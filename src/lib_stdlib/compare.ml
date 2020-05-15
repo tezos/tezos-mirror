@@ -180,4 +180,5 @@ module Float = Make (struct
 end)
 
 module String = Make (String)
+module Bytes = Make (Bytes)
 module Z = Make (Z)

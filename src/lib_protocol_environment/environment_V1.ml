@@ -44,7 +44,6 @@ module type V1 = sig
        and type Context_hash.t = Context_hash.t
        and type Protocol_hash.t = Protocol_hash.t
        and type Time.t = Time.Protocol.t
-       and type MBytes.t = Tezos_protocol_environment_structs.V0.M.MBytes.t
        and type Operation.shell_header = Operation.shell_header
        and type Operation.t = Operation.t
        and type Block_header.shell_header = Block_header.shell_header
@@ -107,21 +106,10 @@ struct
   module Pervasives = Stdlib
   module Compare = Compare
   module List = List
-
-  module Bytes = struct
-    include Bytes
-    include EndianBytes.BigEndian
-    module LE = EndianBytes.LittleEndian
-  end
-
+  module Bytes = Bytes
   module Hex = Hex
-
-  module String = struct
-    include String
-    include EndianString.BigEndian
-    module LE = EndianString.LittleEndian
-  end
-
+  module String = String
+  module TzEndian = TzEndian
   module Set = Set
   module Map = Map
   module Int32 = Int32
@@ -130,7 +118,6 @@ struct
   module Buffer = Buffer
   module Format = Format
   module Option = Tezos_protocol_environment_structs.V0.M.Option
-  module MBytes = Tezos_protocol_environment_structs.V0.M.MBytes
 
   module Raw_hashes = struct
     let sha256 = Hacl.Hash.SHA256.digest
@@ -147,14 +134,14 @@ struct
       let bits = to_bits z in
       let len = Pervasives.((numbits z + 7) / 8) in
       let full_len = Tezos_stdlib.Compare.Int.max pad_to len in
-      if full_len = 0 then MBytes.create 0
+      if full_len = 0 then Bytes.create 0
       else
-        let res = MBytes.create full_len in
+        let res = Bytes.create full_len in
         Bytes.fill res 0 full_len '\000' ;
-        MBytes.blit_of_string bits 0 res 0 len ;
+        Bytes.blit_string bits 0 res 0 len ;
         res
 
-    let of_bits bytes = of_bits (MBytes.to_string bytes)
+    let of_bits bytes = of_bits (Bytes.to_string bytes)
   end
 
   module Lwt_sequence = Lwt_sequence
@@ -365,11 +352,11 @@ struct
 
       val size : int (* in bytes *)
 
-      val to_bytes : t -> MBytes.t
+      val to_bytes : t -> Bytes.t
 
-      val of_bytes_opt : MBytes.t -> t option
+      val of_bytes_opt : Bytes.t -> t option
 
-      val of_bytes_exn : MBytes.t -> t
+      val of_bytes_exn : Bytes.t -> t
     end
 
     module type ENCODER = sig
@@ -492,7 +479,7 @@ struct
       type watermark
 
       (** Check a signature *)
-      val check : ?watermark:watermark -> Public_key.t -> t -> MBytes.t -> bool
+      val check : ?watermark:watermark -> Public_key.t -> t -> Bytes.t -> bool
     end
   end
 

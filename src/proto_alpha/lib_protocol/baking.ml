@@ -313,7 +313,7 @@ let first_baking_priorities ctxt ?(max_priority = 32) delegate level =
 
 let check_hash hash stamp_threshold =
   let bytes = Block_hash.to_bytes hash in
-  let word = MBytes.get_int64 bytes 0 in
+  let word = TzEndian.get_int64 bytes 0 in
   Compare.Uint64.(word <= stamp_threshold)
 
 let check_header_proof_of_work_stamp shell contents stamp_threshold =

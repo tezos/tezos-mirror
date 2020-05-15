@@ -741,22 +741,21 @@ let rec step :
       logged_return ((Script_int.(abs (of_int (String.length s))), rest), ctxt)
   (* bytes operations *)
   | (Concat_bytes_pair, (x, (y, rest))) ->
-      let s = MBytes.concat "" [x; y] in
+      let s = Bytes.concat Bytes.empty [x; y] in
       logged_return ((s, rest), ctxt)
   | (Concat_bytes, (ss, rest)) ->
-      let s = MBytes.concat "" ss.elements in
+      let s = Bytes.concat Bytes.empty ss.elements in
       logged_return ((s, rest), ctxt)
   | (Slice_bytes, (offset, (length, (s, rest)))) ->
-      let s_length = Z.of_int (MBytes.length s) in
+      let s_length = Z.of_int (Bytes.length s) in
       let offset = Script_int.to_zint offset in
       let length = Script_int.to_zint length in
       if Compare.Z.(offset < s_length && Z.add offset length <= s_length) then
         logged_return
-          ( (Some (MBytes.sub s (Z.to_int offset) (Z.to_int length)), rest),
-            ctxt )
+          ((Some (Bytes.sub s (Z.to_int offset) (Z.to_int length)), rest), ctxt)
       else logged_return ((None, rest), ctxt)
   | (Bytes_size, (s, rest)) ->
-      logged_return ((Script_int.(abs (of_int (MBytes.length s))), rest), ctxt)
+      logged_return ((Script_int.(abs (of_int (Bytes.length s))), rest), ctxt)
   (* currency operations *)
   | (Add_tez, (x, (y, rest))) ->
       Lwt.return Tez.(x +? y) >>=? fun res -> logged_return ((res, rest), ctxt)
@@ -1014,10 +1013,10 @@ let rec step :
       Lwt.return (Gas.check_enough ctxt (Script.serialized_cost bytes))
       >>=? fun () ->
       if
-        Compare.Int.(MBytes.length bytes >= 1)
-        && Compare.Int.(MBytes.get_uint8 bytes 0 = 0x05)
+        Compare.Int.(Bytes.length bytes >= 1)
+        && Compare.Int.(TzEndian.get_uint8 bytes 0 = 0x05)
       then
-        let bytes = MBytes.sub bytes 1 (MBytes.length bytes - 1) in
+        let bytes = Bytes.sub bytes 1 (Bytes.length bytes - 1) in
         match Data_encoding.Binary.of_bytes Script.expr_encoding bytes with
         | None ->
             Lwt.return (Gas.consume ctxt (Interp_costs.unpack_failed bytes))

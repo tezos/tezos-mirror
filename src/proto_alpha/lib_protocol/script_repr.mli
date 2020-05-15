@@ -49,7 +49,7 @@ val encoding : t Data_encoding.encoding
 
 val deserialized_cost : expr -> Gas_limit_repr.cost
 
-val serialized_cost : MBytes.t -> Gas_limit_repr.cost
+val serialized_cost : bytes -> Gas_limit_repr.cost
 
 val traversal_cost : node -> Gas_limit_repr.cost
 
@@ -63,7 +63,7 @@ val string_node_cost : string -> Gas_limit_repr.cost
 
 val string_node_cost_of_length : int -> Gas_limit_repr.cost
 
-val bytes_node_cost : MBytes.t -> Gas_limit_repr.cost
+val bytes_node_cost : bytes -> Gas_limit_repr.cost
 
 val bytes_node_cost_of_length : int -> Gas_limit_repr.cost
 
@@ -77,7 +77,7 @@ val seq_node_cost_nonrec_of_length : int -> Gas_limit_repr.cost
 
 val force_decode : lazy_expr -> (expr * Gas_limit_repr.cost) tzresult
 
-val force_bytes : lazy_expr -> (MBytes.t * Gas_limit_repr.cost) tzresult
+val force_bytes : lazy_expr -> (bytes * Gas_limit_repr.cost) tzresult
 
 val minimal_deserialize_cost : lazy_expr -> Gas_limit_repr.cost
 

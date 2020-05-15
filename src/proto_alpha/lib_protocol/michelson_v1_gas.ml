@@ -58,7 +58,7 @@ module Cost_of = struct
     | (String_key _, _) ->
         String.length v
     | (Bytes_key _, _) ->
-        MBytes.length v
+        Bytes.length v
     | (Bool_key _, _) ->
         1
     | (Key_hash_key _, _) ->
@@ -91,7 +91,7 @@ module Cost_of = struct
 
     let z_to_int64 = step_cost 2 +@ alloc_cost 1
 
-    let hash data len = (10 *@ step_cost (MBytes.length data)) +@ bytes len
+    let hash data len = (10 *@ step_cost (Bytes.length data)) +@ bytes len
 
     let set_access : type elt. elt -> elt Script_typed_ir.set -> int =
      fun _key (module Box) -> log2 @@ Box.size
@@ -265,8 +265,8 @@ module Cost_of = struct
       atomic_step_cost (30 + (Compare.Int.min bytes1 bytes2 / 123))
 
     let compare_bytes b1 b2 =
-      let bytes1 = MBytes.length b1 in
-      let bytes2 = MBytes.length b2 in
+      let bytes1 = Bytes.length b1 in
+      let bytes2 = Bytes.length b2 in
       atomic_step_cost (30 + (Compare.Int.min bytes1 bytes2 / 123))
 
     let compare_tez _ _ = atomic_step_cost 30
@@ -289,7 +289,7 @@ module Cost_of = struct
     let unpack_failed bytes =
       (* We cannot instrument failed deserialization,
          so we take worst case fees: a set of size 1 bytes values. *)
-      let len = MBytes.length bytes in
+      let len = Bytes.length bytes in
       (len *@ alloc_mbytes_cost 1)
       +@ (len *@ (log2 len *@ (alloc_cost 3 +@ step_cost 1)))
 
@@ -320,20 +320,20 @@ module Cost_of = struct
     let check_signature (pkey : Signature.public_key) bytes =
       match pkey with
       | Ed25519 _ ->
-          check_signature_ed25519 (MBytes.length bytes)
+          check_signature_ed25519 (Bytes.length bytes)
       | Secp256k1 _ ->
-          check_signature_secp256k1 (MBytes.length bytes)
+          check_signature_secp256k1 (Bytes.length bytes)
       | P256 _ ->
-          check_signature_p256 (MBytes.length bytes)
+          check_signature_p256 (Bytes.length bytes)
 
     let hash_key = atomic_step_cost 30
 
-    let hash_blake2b b = atomic_step_cost (102 + (MBytes.length b / 5))
+    let hash_blake2b b = atomic_step_cost (102 + (Bytes.length b / 5))
 
-    let hash_sha256 b = atomic_step_cost (409 + MBytes.length b)
+    let hash_sha256 b = atomic_step_cost (409 + Bytes.length b)
 
     let hash_sha512 b =
-      let bytes = MBytes.length b in
+      let bytes = Bytes.length b in
       atomic_step_cost (409 + ((bytes lsr 1) + (bytes lsr 4)))
 
     let steps_to_quota = atomic_step_cost 10

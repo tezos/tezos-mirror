@@ -46,7 +46,7 @@ module Make_encoder (V : VALUE) = struct
     | Some b ->
         b
     | None ->
-        MBytes.create 0
+        Bytes.create 0
 end
 
 let len_name = "len"
@@ -54,7 +54,7 @@ let len_name = "len"
 let data_name = "data"
 
 let encode_len_value bytes =
-  let length = MBytes.length bytes in
+  let length = Bytes.length bytes in
   Data_encoding.(Binary.to_bytes_exn int31) length
 
 let decode_len_value key len =
@@ -233,7 +233,7 @@ module Make_data_set_storage (C : Raw_context.T) (I : INDEX) :
 
   type elt = I.t
 
-  let inited = MBytes.of_string "inited"
+  let inited = Bytes.of_string "inited"
 
   let mem s i = C.mem s (I.to_path i [])
 
@@ -441,7 +441,7 @@ module Make_indexed_carbonated_data_storage
 
   let consume_serialize_write_gas set c i v =
     let bytes = to_bytes v in
-    let len = MBytes.length bytes in
+    let len = Bytes.length bytes in
     Lwt.return (C.consume_gas c (Gas_limit_repr.alloc_mbytes_cost len))
     >>=? fun c ->
     Lwt.return
@@ -481,7 +481,7 @@ module Make_indexed_carbonated_data_storage
     >>=? fun (s, bytes) ->
     C.set s (data_key i) bytes
     >>=? fun t ->
-    let size_diff = MBytes.length bytes - prev_size in
+    let size_diff = Bytes.length bytes - prev_size in
     return (C.project t, size_diff)
 
   let init s i v =
@@ -489,7 +489,7 @@ module Make_indexed_carbonated_data_storage
     >>=? fun (s, bytes) ->
     C.init s (data_key i) bytes
     >>=? fun t ->
-    let size = MBytes.length bytes in
+    let size = Bytes.length bytes in
     return (C.project t, size)
 
   let init_set s i v =
@@ -500,7 +500,7 @@ module Make_indexed_carbonated_data_storage
     >>=? fun (s, bytes) ->
     init_set s (data_key i) bytes
     >>=? fun t ->
-    let size_diff = MBytes.length bytes - prev_size in
+    let size_diff = Bytes.length bytes - prev_size in
     return (C.project t, size_diff, existed)
 
   let remove s i =
@@ -806,7 +806,7 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
 
     type elt = I.t
 
-    let inited = MBytes.of_string "inited"
+    let inited = Bytes.of_string "inited"
 
     let mem s i = Raw_context.mem (pack s i) N.name
 
@@ -993,7 +993,7 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
 
     let consume_write_gas set c v =
       let bytes = to_bytes v in
-      let len = MBytes.length bytes in
+      let len = Bytes.length bytes in
       Lwt.return
         (Raw_context.consume_gas
            c
@@ -1037,7 +1037,7 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
       >>=? fun (c, bytes) ->
       Raw_context.set c data_name bytes
       >>=? fun c ->
-      let size_diff = MBytes.length bytes - prev_size in
+      let size_diff = Bytes.length bytes - prev_size in
       return (Raw_context.project c, size_diff)
 
     let init s i v =
@@ -1045,7 +1045,7 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
       >>=? fun (c, bytes) ->
       Raw_context.init c data_name bytes
       >>=? fun c ->
-      let size = MBytes.length bytes in
+      let size = Bytes.length bytes in
       return (Raw_context.project c, size)
 
     let init_set s i v =
@@ -1056,7 +1056,7 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
       >>=? fun (c, bytes) ->
       init_set c data_name bytes
       >>=? fun c ->
-      let size_diff = MBytes.length bytes - prev_size in
+      let size_diff = Bytes.length bytes - prev_size in
       return (Raw_context.project c, size_diff, existed)
 
     let remove s i =

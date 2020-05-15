@@ -146,7 +146,7 @@ let freeze_rolls_for_cycle ctxt cycle =
   >>=? fun max_index ->
   Storage.Seed.For_cycle.get ctxt cycle
   >>=? fun seed ->
-  let rd = Seed_repr.initialize_new seed [MBytes.of_string "roll_snapshot"] in
+  let rd = Seed_repr.initialize_new seed [Bytes.of_string "roll_snapshot"] in
   let seq = Seed_repr.sequence rd 0l in
   let selected_index =
     Seed_repr.take_int32 seq (Int32.of_int max_index) |> fst |> Int32.to_int
@@ -168,14 +168,14 @@ let freeze_rolls_for_cycle ctxt cycle =
 (* Roll selection *)
 module Random = struct
   let int32_to_bytes i =
-    let b = MBytes.create 4 in
-    MBytes.set_int32 b 0 i ; b
+    let b = Bytes.create 4 in
+    TzEndian.set_int32 b 0 i ; b
 
   let level_random seed use level =
     let position = level.Level_repr.cycle_position in
     Seed_repr.initialize_new
       seed
-      [MBytes.of_string ("level " ^ use ^ ":"); int32_to_bytes position]
+      [Bytes.of_string ("level " ^ use ^ ":"); int32_to_bytes position]
 
   let owner c kind level offset =
     let cycle = level.Level_repr.cycle in

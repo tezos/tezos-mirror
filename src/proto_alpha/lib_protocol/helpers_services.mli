@@ -90,7 +90,7 @@ module Scripts : sig
     'a #RPC_context.simple ->
     'a ->
     Script.expr * Script.expr * Z.t option ->
-    (MBytes.t * Gas.t) shell_tzresult Lwt.t
+    (bytes * Gas.t) shell_tzresult Lwt.t
 
   val run_operation :
     'a #RPC_context.simple ->
@@ -128,7 +128,7 @@ module Forge : sig
       gas_limit:Z.t ->
       storage_limit:Z.t ->
       packed_manager_operation list ->
-      MBytes.t shell_tzresult Lwt.t
+      bytes shell_tzresult Lwt.t
 
     val reveal :
       'a #RPC_context.simple ->
@@ -139,7 +139,7 @@ module Forge : sig
       counter:counter ->
       fee:Tez.t ->
       unit ->
-      MBytes.t shell_tzresult Lwt.t
+      bytes shell_tzresult Lwt.t
 
     val transaction :
       'a #RPC_context.simple ->
@@ -156,7 +156,7 @@ module Forge : sig
       storage_limit:Z.t ->
       fee:Tez.t ->
       unit ->
-      MBytes.t shell_tzresult Lwt.t
+      bytes shell_tzresult Lwt.t
 
     val origination :
       'a #RPC_context.simple ->
@@ -172,7 +172,7 @@ module Forge : sig
       storage_limit:Z.t ->
       fee:Tez.t ->
       unit ->
-      MBytes.t shell_tzresult Lwt.t
+      bytes shell_tzresult Lwt.t
 
     val delegation :
       'a #RPC_context.simple ->
@@ -183,7 +183,7 @@ module Forge : sig
       counter:counter ->
       fee:Tez.t ->
       public_key_hash option ->
-      MBytes.t shell_tzresult Lwt.t
+      bytes shell_tzresult Lwt.t
   end
 
   val endorsement :
@@ -192,7 +192,7 @@ module Forge : sig
     branch:Block_hash.t ->
     level:Raw_level.t ->
     unit ->
-    MBytes.t shell_tzresult Lwt.t
+    bytes shell_tzresult Lwt.t
 
   val proposals :
     'a #RPC_context.simple ->
@@ -202,7 +202,7 @@ module Forge : sig
     period:Voting_period.t ->
     proposals:Protocol_hash.t list ->
     unit ->
-    MBytes.t shell_tzresult Lwt.t
+    bytes shell_tzresult Lwt.t
 
   val ballot :
     'a #RPC_context.simple ->
@@ -213,7 +213,7 @@ module Forge : sig
     proposal:Protocol_hash.t ->
     ballot:Vote.ballot ->
     unit ->
-    MBytes.t shell_tzresult Lwt.t
+    bytes shell_tzresult Lwt.t
 
   val seed_nonce_revelation :
     'a #RPC_context.simple ->
@@ -222,7 +222,7 @@ module Forge : sig
     level:Raw_level.t ->
     nonce:Nonce.t ->
     unit ->
-    MBytes.t shell_tzresult Lwt.t
+    bytes shell_tzresult Lwt.t
 
   val double_baking_evidence :
     'a #RPC_context.simple ->
@@ -231,7 +231,7 @@ module Forge : sig
     bh1:Block_header.t ->
     bh2:Block_header.t ->
     unit ->
-    MBytes.t shell_tzresult Lwt.t
+    bytes shell_tzresult Lwt.t
 
   val double_endorsement_evidence :
     'a #RPC_context.simple ->
@@ -240,16 +240,16 @@ module Forge : sig
     op1:Kind.endorsement operation ->
     op2:Kind.endorsement operation ->
     unit ->
-    MBytes.t shell_tzresult Lwt.t
+    bytes shell_tzresult Lwt.t
 
   val protocol_data :
     'a #RPC_context.simple ->
     'a ->
     priority:int ->
     ?seed_nonce_hash:Nonce_hash.t ->
-    ?proof_of_work_nonce:MBytes.t ->
+    ?proof_of_work_nonce:bytes ->
     unit ->
-    MBytes.t shell_tzresult Lwt.t
+    bytes shell_tzresult Lwt.t
 end
 
 module Parse : sig
@@ -264,7 +264,7 @@ module Parse : sig
     'a #RPC_context.simple ->
     'a ->
     Block_header.shell_header ->
-    MBytes.t ->
+    bytes ->
     Block_header.protocol_data shell_tzresult Lwt.t
 end
 

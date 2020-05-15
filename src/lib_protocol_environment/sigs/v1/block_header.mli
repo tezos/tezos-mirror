@@ -34,12 +34,12 @@ type shell_header = {
   timestamp : Time.t;
   validation_passes : int;
   operations_hash : Operation_list_list_hash.t;
-  fitness : MBytes.t list;
+  fitness : Bytes.t list;
   context : Context_hash.t;
 }
 
 val shell_header_encoding : shell_header Data_encoding.t
 
-type t = {shell : shell_header; protocol_data : MBytes.t}
+type t = {shell : shell_header; protocol_data : bytes}
 
 include S.HASHABLE with type t := t and type hash := Block_hash.t

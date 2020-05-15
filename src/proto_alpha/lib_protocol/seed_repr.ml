@@ -31,13 +31,13 @@ type t = T of State_hash.t
 
 type sequence = S of State_hash.t
 
-type nonce = MBytes.t
+type nonce = bytes
 
 let nonce_encoding = Data_encoding.Fixed.bytes Constants_repr.nonce_length
 
 let init = "Laissez-faire les proprietaires."
 
-let zero_bytes = MBytes.of_string (String.make Nonce_hash.size '\000')
+let zero_bytes = Bytes.of_string (String.make Nonce_hash.size '\000')
 
 let state_hash_encoding =
   let open Data_encoding in
@@ -50,7 +50,7 @@ let seed_encoding =
   let open Data_encoding in
   conv (fun (B b) -> b) (fun b -> B b) state_hash_encoding
 
-let empty = B (State_hash.hash_bytes [MBytes.of_string init])
+let empty = B (State_hash.hash_bytes [Bytes.of_string init])
 
 let nonce (B state) nonce =
   B (State_hash.hash_bytes [State_hash.to_bytes state; nonce])
@@ -59,10 +59,10 @@ let initialize_new (B state) append =
   T (State_hash.hash_bytes (State_hash.to_bytes state :: zero_bytes :: append))
 
 let xor_higher_bits i b =
-  let higher = MBytes.get_int32 b 0 in
+  let higher = TzEndian.get_int32 b 0 in
   let r = Int32.logxor higher i in
-  let res = MBytes.copy b in
-  MBytes.set_int32 res 0 r ; res
+  let res = Bytes.copy b in
+  TzEndian.set_int32 res 0 r ; res
 
 let sequence (T state) n =
   State_hash.to_bytes state |> xor_higher_bits n
@@ -79,7 +79,7 @@ let take_int32 s bound =
   else
     let rec loop s =
       let (bytes, s) = take s in
-      let r = Int32.abs (MBytes.get_int32 bytes 0) in
+      let r = Int32.abs (TzEndian.get_int32 bytes 0) in
       let drop_if_over =
         Int32.sub Int32.max_int (Int32.rem Int32.max_int bound)
       in
@@ -108,14 +108,14 @@ let () =
     (fun () -> Unexpected_nonce_length)
 
 let make_nonce nonce =
-  if Compare.Int.(MBytes.length nonce <> Constants_repr.nonce_length) then
+  if Compare.Int.(Bytes.length nonce <> Constants_repr.nonce_length) then
     error Unexpected_nonce_length
   else ok nonce
 
 let hash nonce = Nonce_hash.hash_bytes [nonce]
 
 let check_hash nonce hash =
-  Compare.Int.(MBytes.length nonce = Constants_repr.nonce_length)
+  Compare.Int.(Bytes.length nonce = Constants_repr.nonce_length)
   && Nonce_hash.equal (Nonce_hash.hash_bytes [nonce]) hash
 
 let nonce_hash_key_part = Nonce_hash.to_path

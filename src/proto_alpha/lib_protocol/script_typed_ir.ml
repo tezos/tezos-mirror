@@ -50,7 +50,7 @@ type _ comparable_ty =
   | Int_key : type_annot option -> z num comparable_ty
   | Nat_key : type_annot option -> n num comparable_ty
   | String_key : type_annot option -> string comparable_ty
-  | Bytes_key : type_annot option -> MBytes.t comparable_ty
+  | Bytes_key : type_annot option -> bytes comparable_ty
   | Mutez_key : type_annot option -> Tez.t comparable_ty
   | Bool_key : type_annot option -> bool comparable_ty
   | Key_hash_key : type_annot option -> public_key_hash comparable_ty
@@ -124,7 +124,7 @@ and 'ty ty =
   | Nat_t : type_annot option -> n num ty
   | Signature_t : type_annot option -> signature ty
   | String_t : type_annot option -> string ty
-  | Bytes_t : type_annot option -> MBytes.t ty
+  | Bytes_t : type_annot option -> bytes ty
   | Mutez_t : type_annot option -> Tez.t ty
   | Key_hash_t : type_annot option -> public_key_hash ty
   | Key_t : type_annot option -> public_key ty
@@ -255,11 +255,11 @@ and ('bef, 'aft) instr =
       : (n num * (n num * (string * 'rest)), string option * 'rest) instr
   | String_size : (string * 'rest, n num * 'rest) instr
   (* bytes operations *)
-  | Concat_bytes : (MBytes.t boxed_list * 'rest, MBytes.t * 'rest) instr
-  | Concat_bytes_pair : (MBytes.t * (MBytes.t * 'rest), MBytes.t * 'rest) instr
+  | Concat_bytes : (bytes boxed_list * 'rest, bytes * 'rest) instr
+  | Concat_bytes_pair : (bytes * (bytes * 'rest), bytes * 'rest) instr
   | Slice_bytes
-      : (n num * (n num * (MBytes.t * 'rest)), MBytes.t option * 'rest) instr
-  | Bytes_size : (MBytes.t * 'rest, n num * 'rest) instr
+      : (n num * (n num * (bytes * 'rest)), bytes option * 'rest) instr
+  | Bytes_size : (bytes * 'rest, n num * 'rest) instr
   (* timestamp operations *)
   | Add_seconds_to_timestamp
       : ( z num * (Script_timestamp.t * 'rest),
@@ -385,13 +385,13 @@ and ('bef, 'aft) instr =
   | Balance : ('rest, Tez.t * 'rest) instr
   | Level : ('rest, n num * 'rest) instr
   | Check_signature
-      : (public_key * (signature * (MBytes.t * 'rest)), bool * 'rest) instr
+      : (public_key * (signature * (bytes * 'rest)), bool * 'rest) instr
   | Hash_key : (public_key * 'rest, public_key_hash * 'rest) instr
-  | Pack : 'a ty -> ('a * 'rest, MBytes.t * 'rest) instr
-  | Unpack : 'a ty -> (MBytes.t * 'rest, 'a option * 'rest) instr
-  | Blake2b : (MBytes.t * 'rest, MBytes.t * 'rest) instr
-  | Sha256 : (MBytes.t * 'rest, MBytes.t * 'rest) instr
-  | Sha512 : (MBytes.t * 'rest, MBytes.t * 'rest) instr
+  | Pack : 'a ty -> ('a * 'rest, bytes * 'rest) instr
+  | Unpack : 'a ty -> (bytes * 'rest, 'a option * 'rest) instr
+  | Blake2b : (bytes * 'rest, bytes * 'rest) instr
+  | Sha256 : (bytes * 'rest, bytes * 'rest) instr
+  | Sha512 : (bytes * 'rest, bytes * 'rest) instr
   | Steps_to_quota
       : (* TODO: check that it always returns a nat *)
       ('rest, n num * 'rest) instr

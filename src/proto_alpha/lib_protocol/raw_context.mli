@@ -36,7 +36,7 @@ type storage_error =
 
 type error += Storage_error of storage_error
 
-type error += Failed_to_parse_parameter of MBytes.t
+type error += Failed_to_parse_parameter of bytes
 
 type error += Failed_to_decode_parameter of Data_encoding.json * string
 
@@ -162,7 +162,7 @@ val unset_origination_nonce : t -> t
 
 type key = string list
 
-type value = MBytes.t
+type value = bytes
 
 (** All context manipulation functions. This signature is included
     as-is for direct context accesses, and used in {!Storage_functors}

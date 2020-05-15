@@ -31,7 +31,7 @@ module Cost_of : sig
   module Legacy : sig
     val z_to_int64 : Gas.cost
 
-    val hash : MBytes.t -> int -> Gas.cost
+    val hash : bytes -> int -> Gas.cost
 
     val set_update : 'a -> bool -> 'a Script_typed_ir.set -> Gas.cost
   end
@@ -138,7 +138,7 @@ module Cost_of : sig
 
     val compare_res : Gas.cost
 
-    val unpack_failed : MBytes.t -> Gas.cost
+    val unpack_failed : bytes -> Gas.cost
 
     val address : Gas.cost
 
@@ -160,15 +160,15 @@ module Cost_of : sig
 
     val now : Gas.cost
 
-    val check_signature : public_key -> MBytes.t -> Gas.cost
+    val check_signature : public_key -> bytes -> Gas.cost
 
     val hash_key : Gas.cost
 
-    val hash_blake2b : MBytes.t -> Gas.cost
+    val hash_blake2b : bytes -> Gas.cost
 
-    val hash_sha256 : MBytes.t -> Gas.cost
+    val hash_sha256 : bytes -> Gas.cost
 
-    val hash_sha512 : MBytes.t -> Gas.cost
+    val hash_sha512 : bytes -> Gas.cost
 
     val steps_to_quota : Gas.cost
 
@@ -272,7 +272,7 @@ module Cost_of : sig
 
     val string : string -> Gas.cost
 
-    val bytes : MBytes.t -> Gas.cost
+    val bytes : bytes -> Gas.cost
 
     val timestamp : Script_timestamp.t -> Gas.cost
 
@@ -282,9 +282,9 @@ module Cost_of : sig
 
     val signature : Gas.cost
 
-    val operation : MBytes.t -> Gas.cost
+    val operation : bytes -> Gas.cost
 
-    val chain_id : MBytes.t -> Gas.cost
+    val chain_id : bytes -> Gas.cost
 
     val contract : Gas.cost
 

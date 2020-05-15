@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,24 +23,26 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type public_key_hash =
-  | Ed25519 of Ed25519.Public_key_hash.t
-  | Secp256k1 of Secp256k1.Public_key_hash.t
-  | P256 of P256.Public_key_hash.t
+val get_int32 : bytes -> int -> int32
 
-type public_key =
-  | Ed25519 of Ed25519.Public_key.t
-  | Secp256k1 of Secp256k1.Public_key.t
-  | P256 of P256.Public_key.t
+val set_int32 : bytes -> int -> int32 -> unit
 
-type watermark =
-  | Block_header of Chain_id.t
-  | Endorsement of Chain_id.t
-  | Generic_operation
-  | Custom of bytes
+val set_int8 : bytes -> int -> int -> unit
 
-include
-  S.SIGNATURE
-    with type Public_key_hash.t = public_key_hash
-     and type Public_key.t = public_key
-     and type watermark := watermark
+val get_int8 : bytes -> int -> int
+
+val set_int16 : bytes -> int -> int -> unit
+
+val get_int16 : bytes -> int -> int
+
+val set_int64 : bytes -> int -> int64 -> unit
+
+val get_int64 : bytes -> int -> int64
+
+val get_uint8 : bytes -> int -> int
+
+val get_uint16 : bytes -> int -> int
+
+val set_double : bytes -> int -> float -> unit
+
+val get_double : bytes -> int -> float

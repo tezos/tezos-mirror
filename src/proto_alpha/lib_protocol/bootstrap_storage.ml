@@ -57,7 +57,7 @@ let init_contract ~typecheck ctxt
 
 let init ctxt ~typecheck ?ramp_up_cycles ?no_reward_cycles accounts contracts =
   let nonce =
-    Operation_hash.hash_bytes [MBytes.of_string "Un festival de GADT."]
+    Operation_hash.hash_bytes [Bytes.of_string "Un festival de GADT."]
   in
   let ctxt = Raw_context.init_origination_nonce ctxt nonce in
   fold_left_s init_account ctxt accounts

@@ -289,7 +289,7 @@ val list_entrypoints :
   tzresult
 
 val pack_data :
-  context -> 'a Script_typed_ir.ty -> 'a -> (MBytes.t * context) tzresult Lwt.t
+  context -> 'a Script_typed_ir.ty -> 'a -> (bytes * context) tzresult Lwt.t
 
 val hash_data :
   context ->
