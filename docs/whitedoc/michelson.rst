@@ -1907,6 +1907,13 @@ Cryptographic primitives
 
     :: bytes : 'S   ->   bytes : 'S
 
+-  ``KECCAK``: Compute a cryptographic hash of the value contents using the
+   Keccak-256 cryptographic hash function.
+
+::
+
+    :: bytes : 'S   ->   bytes : 'S
+
 -  ``SHA256``: Compute a cryptographic hash of the value contents using the
    Sha256 cryptographic hash function.
 
@@ -1916,6 +1923,13 @@ Cryptographic primitives
 
 -  ``SHA512``: Compute a cryptographic hash of the value contents using the
    Sha512 cryptographic hash function.
+
+::
+
+    :: bytes : 'S   ->   bytes : 'S
+
+-  ``SHA3``: Compute a cryptographic hash of the value contents using the
+   SHA3-256 cryptographic hash function.
 
 ::
 
@@ -3227,6 +3241,8 @@ Full grammar
       | BALANCE
       | CHECK_SIGNATURE
       | BLAKE2B
+      | KECCAK
+      | SHA3
       | SHA256
       | SHA512
       | HASH_KEY
