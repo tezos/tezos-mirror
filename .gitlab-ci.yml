@@ -384,12 +384,6 @@ integration:contract_baker:
     - poetry run pytest tests/test_contract_baker.py -s --log-dir=tmp
   stage: test
 
-integration:contract_legacy:
-  <<: *integration_python_definition
-  script:
-    - poetry run pytest tests/test_contract_legacy.py -s --log-dir=tmp
-  stage: test
-
 integration:contract_macros:
   <<: *integration_python_definition
   script:
