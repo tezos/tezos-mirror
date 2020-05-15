@@ -90,6 +90,7 @@ class Sandbox:
         self.p2p = p2p
         self.num_peers = num_peers
         self.clients = {}  # type: Dict[int, Client]
+        self.mockup_client = None
         self.nodes = {}  # type: Dict[int, Node]
         # bakers for each protocol
         self.bakers = {}  # type: Dict[str, Dict[int, Baker]]
@@ -318,6 +319,23 @@ class Sandbox:
                                       client_factory)
 
         self.init_client(client, node, config_client)
+
+    def add_mockup_client(self,
+                          branch: str = "",
+                          client_factory: Callable = Client) -> None:
+        """ Set up new mockup client
+
+        Args:
+            branch (str): sub-dir where to lookup the node and client
+                          binary, default = "". Allows execution of different
+                          versions of nodes.
+            client_factory (Callable): the constructor of clients. Defaults to
+                                       Client. Allows e.g. regression testing.
+        """
+        local_admin_client = self._wrap_path(CLIENT_ADMIN, branch)
+        local_client = self._wrap_path(CLIENT, branch)
+        self.mockup_client = client_factory(local_client, local_admin_client,
+                                            mode="mockup")
 
     def add_baker(self,
                   node_id: int,

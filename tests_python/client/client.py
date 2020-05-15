@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 import time
 import sys
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Tuple
 
 from . import client_output
 
@@ -48,7 +48,8 @@ class Client:
                  base_dir: Optional[str] = None,
                  rpc_port: int = 8732,
                  use_tls: bool = False,
-                 disable_disclaimer: bool = True):
+                 disable_disclaimer: bool = True,
+                 mode: str = None):
         """
         Args:
             client (str): path to the client executable file
@@ -59,6 +60,7 @@ class Client:
             rpc_port (int): port of the server
             use_tls (bool): use TLS
             disable_disclaimer (bool): disable disclaimer
+            mode (str): the mode to use, one of "client" or "mockup"
         Returns:
             A Client instance.
         """
@@ -77,8 +79,17 @@ class Client:
             assert base_dir
         self.base_dir = base_dir
 
-        client = [client_path] + ['-base-dir', base_dir, '-addr', host,
-                                  '-port', str(rpc_port)]
+        client = [client_path]
+        if mode is None or mode == "client":
+            client.extend(['-base-dir', base_dir,
+                           '-addr', host,
+                           '-port', str(rpc_port)])
+        elif mode == "mockup":
+            client.extend(['-mode', mode])
+        else:
+            msg = f"Unexpected mode: {mode}." + \
+                  "Expected one of 'client' or 'mockup'."
+            assert False, msg
         admin_client = [admin_client_path, '-base-dir', base_dir, '-addr',
                         host, '-port', str(rpc_port)]
 
@@ -90,11 +101,11 @@ class Client:
         self._admin_client = admin_client
         self.rpc_port = rpc_port
 
-    def run(self,
-            params: List[str],
-            admin: bool = False,
-            check: bool = True,
-            trace: bool = False) -> str:
+    def run_generic(self,
+                    params: List[str],
+                    admin: bool = False,
+                    check: bool = True,
+                    trace: bool = False) -> Tuple[str, str, int]:
         """Run an arbitrary command
 
         Args:
@@ -104,15 +115,16 @@ class Client:
             check (bool): raises an exception if client call fails
             trace (bool): use '-l' option to trace RPCs
         Returns:
-            stdout of client command.
+            (stdout of command, stderr of command, return code)
 
         The actual command will be displayed according to 'format_command'.
         Client output (stdout, stderr) will be displayed unprocessed.
         Fails with `CalledProcessError` if command fails
         """
         client = self._admin_client if admin else self._client
+        base_dir_arg = ['-base-dir', self.base_dir]
         trace_opt = ['-l'] if trace else []
-        cmd = client + trace_opt + params
+        cmd = client + base_dir_arg + trace_opt + params
 
         print(format_command(cmd))
 
@@ -132,9 +144,18 @@ class Client:
             print(stderr, file=sys.stderr)
         if check:
             completed_process.check_returncode()
-        # `+ ""` makes pylint happy. It can't infer stdout can't
+        # `+ ""` makes pylint happy. It can't infer stdout/stderr can't
         # be `None` thanks to the `capture_output=True` option.
-        return stdout + ""
+        return (stdout + "", stderr + "", completed_process.returncode)
+
+    def run(self,
+            params: List[str],
+            admin: bool = False,
+            check: bool = True,
+            trace: bool = False) -> str:
+        """Like 'run_generic' but returns just stdout."""
+        (stdout, _, _) = self.run_generic(params, admin, check, trace)
+        return stdout
 
     def rpc(self,
             verb: str,
@@ -298,10 +319,10 @@ class Client:
 
     def transfer(self,
                  amount: float,
-                 account1: str,
-                 account2: str,
+                 giver: str,
+                 receiver: str,
                  args: List[str] = None) -> client_output.TransferResult:
-        cmd = ['transfer', str(amount), 'from', account1, 'to', account2]
+        cmd = ['transfer', str(amount), 'from', giver, 'to', receiver]
         if args is None:
             args = []
         cmd += args
@@ -318,6 +339,14 @@ class Client:
         cmd += args
         res = self.run(cmd)
         return client_output.TransferResult(res)
+
+    def set_base_dir(self, base_dir: str):
+        """
+        Args:
+            base_dir(str): The new base directory to use (--base-dir arg)
+        """
+        assert base_dir is not None
+        self.base_dir = base_dir
 
     def set_delegate(self,
                      account1: str,
@@ -717,3 +746,22 @@ class Client:
     def expand_macros(self, src: str) -> str:
         cmd = ['expand', 'macros', 'in', src]
         return self.run(cmd)
+
+    def list_mockup_protocols(self) -> client_output.ListMockupProtocols:
+        cmd = ['list', 'mockup', 'protocols']
+        return client_output.ListMockupProtocols(self.run(cmd))
+
+    def create_mockup(self,
+                      protocol: str,
+                      check: bool = True,
+                      protocol_constants_file: str = None,
+                      bootstrap_accounts_file: str = None)\
+            -> client_output.CreateMockup:
+        cmd = ['--protocol', protocol, 'create', 'mockup']
+        if protocol_constants_file is not None:
+            cmd += ["--protocol-constants", protocol_constants_file]
+        if bootstrap_accounts_file is not None:
+            cmd += ["--bootstrap-accounts", bootstrap_accounts_file]
+        (stdout, stderr, exit_code) = self.run_generic(cmd,
+                                                       check=check)
+        return client_output.CreateMockup(stdout, stderr, exit_code)
