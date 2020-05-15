@@ -7,32 +7,32 @@ emitted operations
 big_map diff
   
 trace
-  - location: 9 (remaining gas: 133068288 units remaining)
+  - location: 9 (remaining gas: 1039596000 units remaining)
     [ (Pair (Pair "1970-01-01T00:00:00Z" 0) None)  	 ]
-  - location: 10 (remaining gas: 133068228 units remaining)
+  - location: 10 (remaining gas: 1039595940 units remaining)
     [ (Pair "1970-01-01T00:00:00Z" 0)  	@parameter ]
-  - location: 11 (remaining gas: 133068168 units remaining)
+  - location: 11 (remaining gas: 1039595880 units remaining)
     [ (Pair "1970-01-01T00:00:00Z" 0)  	@parameter
       (Pair "1970-01-01T00:00:00Z" 0)  	@parameter ]
-  - location: 12 (remaining gas: 133068108 units remaining)
+  - location: 12 (remaining gas: 1039595820 units remaining)
     [ "1970-01-01T00:00:00Z"  	
       (Pair "1970-01-01T00:00:00Z" 0)  	@parameter ]
-  - location: 15 (remaining gas: 133067988 units remaining)
+  - location: 15 (remaining gas: 1039595700 units remaining)
     [ 0  	 ]
-  - location: 14 (remaining gas: 133067968 units remaining)
+  - location: 14 (remaining gas: 1039595680 units remaining)
     [ 0  	 ]
-  - location: 13 (remaining gas: 133067968 units remaining)
+  - location: 13 (remaining gas: 1039595680 units remaining)
     [ "1970-01-01T00:00:00Z"  	
       0  	 ]
-  - location: 16 (remaining gas: 133067826 units remaining)
+  - location: 16 (remaining gas: 1039595538 units remaining)
     [ "1970-01-01T00:00:00Z"  	 ]
-  - location: 17 (remaining gas: 133067766 units remaining)
+  - location: 17 (remaining gas: 1039595478 units remaining)
     [ (Some "1970-01-01T00:00:00Z")  	 ]
-  - location: 18 (remaining gas: 133067706 units remaining)
+  - location: 18 (remaining gas: 1039595418 units remaining)
     [ {}  	
       (Some "1970-01-01T00:00:00Z")  	 ]
-  - location: 20 (remaining gas: 133067646 units remaining)
+  - location: 20 (remaining gas: 1039595358 units remaining)
     [ (Pair {} (Some "1970-01-01T00:00:00Z"))  	 ]
-  - location: -1 (remaining gas: 133067626 units remaining)
+  - location: -1 (remaining gas: 1039595338 units remaining)
     [ (Pair {} (Some "1970-01-01T00:00:00Z"))  	 ]
 

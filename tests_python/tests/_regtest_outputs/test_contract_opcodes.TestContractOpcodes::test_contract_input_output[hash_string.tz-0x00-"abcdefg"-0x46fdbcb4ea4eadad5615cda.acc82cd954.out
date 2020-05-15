@@ -7,19 +7,19 @@ emitted operations
 big_map diff
   
 trace
-  - location: 6 (remaining gas: 133091456 units remaining)
+  - location: 6 (remaining gas: 1039777000 units remaining)
     [ (Pair "abcdefg" 0x00)  	 ]
-  - location: 7 (remaining gas: 133091396 units remaining)
+  - location: 7 (remaining gas: 1039776940 units remaining)
     [ "abcdefg"  	@parameter ]
-  - location: 8 (remaining gas: 133082140 units remaining)
+  - location: 8 (remaining gas: 1039704900 units remaining)
     [ 0x05010000000761626364656667  	@parameter.packed ]
-  - location: 9 (remaining gas: 133081892 units remaining)
+  - location: 9 (remaining gas: 1039704652 units remaining)
     [ 0x46fdbcb4ea4eadad5615cdaa17d67f783e01e21149ce2b27de497600b4cd8f4e  	 ]
-  - location: 10 (remaining gas: 133081832 units remaining)
+  - location: 10 (remaining gas: 1039704592 units remaining)
     [ {}  	
       0x46fdbcb4ea4eadad5615cdaa17d67f783e01e21149ce2b27de497600b4cd8f4e  	 ]
-  - location: 12 (remaining gas: 133081772 units remaining)
+  - location: 12 (remaining gas: 1039704532 units remaining)
     [ (Pair {} 0x46fdbcb4ea4eadad5615cdaa17d67f783e01e21149ce2b27de497600b4cd8f4e)  	 ]
-  - location: -1 (remaining gas: 133081752 units remaining)
+  - location: -1 (remaining gas: 1039704512 units remaining)
     [ (Pair {} 0x46fdbcb4ea4eadad5615cdaa17d67f783e01e21149ce2b27de497600b4cd8f4e)  	 ]
 
