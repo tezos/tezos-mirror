@@ -63,27 +63,6 @@ let run_script ctx ?(step_constants = default_step_constants) contract
     ~parameter:parameter_expr
   >>=?? fun res -> return res
 
-(** Runs a script using the STEPS_TO_QUOTA instruction. As no gas metering is
-   enabled, it is verified that the placeholer value 99999999 is returned *)
-let test_unaccounted_steps_to_quota () =
-  test_context ()
-  >>=? fun ctx ->
-  run_script
-    ctx
-    "{parameter unit; storage nat; code { DROP; STEPS_TO_QUOTA; NIL \
-     operation; PAIR }}"
-    ~storage:"0"
-    ~parameter:"Unit"
-    ()
-  >>=? fun res ->
-  expression_from_string "99999999"
-  >>=? fun expected_storage ->
-  Test_services.(check Testable.script_expr)
-    "Expected remaining steps  99999999 in unmetered mode"
-    res.storage
-    expected_storage ;
-  return ()
-
 (** Runs a script with an ill-typed parameter and verifies that a
    Bad_contract_parameter error is returned *)
 let test_bad_contract_parameter () =
@@ -151,9 +130,5 @@ let error_encoding_tests =
       ("Cannot_serialize_storage", Cannot_serialize_storage) ]
 
 let tests =
-  [ Test.tztest "test bad contract error" `Quick test_bad_contract_parameter;
-    Test.tztest
-      "test unaccounted steps to quota"
-      `Quick
-      test_unaccounted_steps_to_quota ]
+  [Test.tztest "test bad contract error" `Quick test_bad_contract_parameter]
   @ error_encoding_tests
