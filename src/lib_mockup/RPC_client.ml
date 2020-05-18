@@ -65,7 +65,10 @@ class local_ctxt (base_dir : string) (mem_only : bool)
         mem_only
         write_context
     in
-    Directory.merge shell_directory proto_directory
+    let base = Directory.merge shell_directory proto_directory in
+    RPC_directory.register_describe_directory_service
+      base
+      RPC_service.description_service
   in
   let call_service_local (type p q i o)
       (service : (_, _, p, q, i, o, _) Service.t) (params : p) (query : q)
