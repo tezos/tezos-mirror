@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Error_monad
+
 type limits = {backlog_size : int; backlog_level : Internal_event.level}
 
 type worker_status =

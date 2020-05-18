@@ -16,6 +16,7 @@
             tezos-workers
             tezos-validation)
  (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_base
                    -open Tezos_storage
                    -open Tezos_shell_context
                    -open Tezos_p2p

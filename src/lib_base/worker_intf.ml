@@ -26,6 +26,8 @@
 
 (** {2 Parameters to build a worker group} *)
 
+open Error_monad
+
 (** The name of the group of workers corresponding to an instantiation
     of {!Make}, as well as the name of each worker in that group. *)
 module type NAME = sig

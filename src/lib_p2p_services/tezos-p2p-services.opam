@@ -9,7 +9,6 @@ depends: [
   "tezos-tooling" { with-test }
   "dune" { >= "1.11" }
   "tezos-base"
-  "tezos-workers"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Error_monad
+
 (** Some memory and time limits. *)
 type limits = {
   backlog_size : int;

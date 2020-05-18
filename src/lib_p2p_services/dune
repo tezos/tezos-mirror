@@ -1,11 +1,11 @@
 (library
  (name tezos_p2p_services)
  (public_name tezos-p2p-services)
- (libraries tezos-base
-            tezos-workers)
+ (libraries tezos-base )
  (flags (:standard -linkall
                    -open Tezos_base__TzPervasives
-                   -open Tezos_workers)))
+                   ))
+ )
 
 (alias
  (name runtest_lint)

@@ -68,6 +68,7 @@
             cmdliner
             tls)
  (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_base
                    -open Tezos_stdlib_unix
                    -open Tezos_shell_services
                    -open Tezos_rpc_http
