@@ -1,5 +1,0 @@
-(library
- (name            blake2)
- (public_name     blake2)
- (c_names         blake2b-ref)
- (c_flags         (-O3)))

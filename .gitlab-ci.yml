@@ -201,11 +201,6 @@ unit:ocaml-lmdb:
   script:
     - dune build @vendors/ocaml-lmdb/runtest
 
-unit:ocaml-blake2:
-  <<: *test_definition
-  script:
-    - dune build @vendors/ocaml-blake2/runtest
-
 
 ##END_UNITEST##
 
@@ -518,11 +513,6 @@ documentation:linkcheck:
 
 ##BEGIN_OPAM##
 # this section is updated using the script scripts/update_opam_test.sh
-
-opam:blake2:
-  <<: *opam_definition
-  variables:
-    package: blake2
 
 opam:flextesa:
   <<: *opam_definition
