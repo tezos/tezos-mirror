@@ -15,6 +15,7 @@ depends: [
   "tezos-clic"
   "lwt"
   "blake2"
+  "hacl-star"
   "hacl"
   "zarith"
   "secp256k1-internal"
