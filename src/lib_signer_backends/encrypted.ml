@@ -41,8 +41,8 @@ module Raw = struct
   (* Fixed zero nonce *)
   let nonce = Crypto_box.zero_nonce
 
-  (* Secret keys for Ed25519, secp256k1, P256 are 32 bytes long. *)
-  let encrypted_size = Crypto_box.boxzerobytes + 32
+  (* Secret keys for Ed25519, secp256k1, P256 have the same size. *)
+  let encrypted_size = Crypto_box.tag_length + Hacl.Sign.skbytes
 
   let pbkdf ~salt ~password =
     Pbkdf.SHA512.pbkdf2 ~count:32768 ~dk_len:32l ~salt ~password
@@ -59,13 +59,15 @@ module Raw = struct
       | P256 sk ->
           Data_encoding.Binary.to_bytes_exn P256.Secret_key.encoding sk
     in
-    Bytes.cat salt (Crypto_box.Secretbox.box key msg nonce)
+    Bytes.cat salt (Crypto_box.Secretbox.secretbox key msg nonce)
 
   let decrypt algo ~password ~encrypted_sk =
     let salt = Bytes.sub encrypted_sk 0 salt_len in
     let encrypted_sk = Bytes.sub encrypted_sk salt_len encrypted_size in
     let key = Crypto_box.Secretbox.unsafe_of_bytes (pbkdf ~salt ~password) in
-    match (Crypto_box.Secretbox.box_open key encrypted_sk nonce, algo) with
+    match
+      (Crypto_box.Secretbox.secretbox_open key encrypted_sk nonce, algo)
+    with
     | (None, _) ->
         return_none
     | (Some bytes, Signature.Ed25519) -> (
@@ -101,7 +103,7 @@ end
 
 module Encodings = struct
   let ed25519 =
-    let length = Hacl.Sign.skbytes + Crypto_box.boxzerobytes + Raw.salt_len in
+    let length = Hacl.Sign.skbytes + Crypto_box.tag_length + Raw.salt_len in
     Base58.register_encoding
       ~prefix:Base58.Prefix.ed25519_encrypted_seed
       ~length
@@ -113,7 +115,7 @@ module Encodings = struct
 
   let secp256k1 =
     let open Libsecp256k1.External in
-    let length = Key.secret_bytes + Crypto_box.boxzerobytes + Raw.salt_len in
+    let length = Key.secret_bytes + Crypto_box.tag_length + Raw.salt_len in
     Base58.register_encoding
       ~prefix:Base58.Prefix.secp256k1_encrypted_secret_key
       ~length
@@ -125,7 +127,7 @@ module Encodings = struct
 
   let p256 =
     let length =
-      Uecc.(sk_size secp256r1) + Crypto_box.boxzerobytes + Raw.salt_len
+      Uecc.(sk_size secp256r1) + Crypto_box.tag_length + Raw.salt_len
     in
     Base58.register_encoding
       ~prefix:Base58.Prefix.p256_encrypted_secret_key

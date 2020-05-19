@@ -1,3 +1,5 @@
+open Tezos_crypto
+
 (* PBKDF2 *)
 let test_pbkdf2 (module A : Hacl.Hash.S) ~password ~salt ~count ~dk_len ~dk =
   let module P = Pbkdf.Make (A) in

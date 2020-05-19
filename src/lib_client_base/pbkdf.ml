@@ -30,7 +30,7 @@ module Make (H : Hacl.Hash.S) : S = struct
     if count <= 0 then invalid_arg "count must be a positive integer" ;
     if dk_len <= 0l then
       invalid_arg "derived key length must be a positive integer" ;
-    let h_len = H.bytes and dk_len = Int32.to_int dk_len in
+    let h_len = H.size and dk_len = Int32.to_int dk_len in
     let l = cdiv dk_len h_len in
     let r = dk_len - ((l - 1) * h_len) in
     let block i =

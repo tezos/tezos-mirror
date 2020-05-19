@@ -186,11 +186,6 @@ unit:ocaml-uecc:
   script:
     - dune build @vendors/ocaml-uecc/runtest
 
-unit:ocaml-hacl:
-  <<: *test_definition
-  script:
-    - dune build @vendors/ocaml-hacl/runtest
-
 unit:ocaml-ledger-wallet:
   <<: *test_definition
   script:
@@ -533,11 +528,6 @@ opam:flextesa:
   <<: *opam_definition
   variables:
     package: flextesa
-
-opam:hacl:
-  <<: *opam_definition
-  variables:
-    package: hacl
 
 opam:index:
   <<: *opam_definition

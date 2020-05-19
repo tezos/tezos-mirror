@@ -23,6 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let check_bytes =
+  Alcotest.testable (fun fmt x -> Hex.pp fmt (Hex.of_bytes x)) Bytes.equal
+
 let (sk, pk, pkh) = Crypto_box.random_keypair ()
 
 let zero_nonce = Crypto_box.zero_nonce
@@ -53,27 +56,29 @@ let test_hash pk pkh () =
     (Crypto_box.hash pk)
     pkh
 
-let test_fast_box msg () =
-  let msglen = Bytes.length msg in
-  let buf_length = msglen + Crypto_box.zerobytes in
-  let buf = Bytes.make buf_length '\x00' in
-  Bytes.blit msg 0 buf Crypto_box.zerobytes msglen ;
+let test_fast_box_noalloc msg () =
+  let buf = Bytes.copy msg in
+  let tag = Bytes.make Crypto_box.tag_length '\x00' in
   (* encryption / decryption *)
-  Crypto_box.fast_box_noalloc chkey zero_nonce buf ;
-  ignore (Crypto_box.fast_box_open_noalloc chkey zero_nonce buf) ;
-  let res =
-    Bytes.sub buf Crypto_box.zerobytes (buf_length - Crypto_box.zerobytes)
-  in
-  Alcotest.check
-    Alcotest.(testable (fun fmt x -> Hex.pp fmt (Hex.of_bytes x)) Bytes.equal)
-    "test_fastbox enc/dec"
-    res
-    msg
+  Crypto_box.fast_box_noalloc chkey zero_nonce tag buf ;
+  assert (Crypto_box.fast_box_open_noalloc chkey zero_nonce tag buf) ;
+  Alcotest.check check_bytes "test_fast_box_noalloc" buf msg
+
+let test_fast_box msg () =
+  let cmsg = Crypto_box.fast_box chkey zero_nonce msg in
+  match Crypto_box.fast_box_open chkey zero_nonce cmsg with
+  | Some decrypted_msg ->
+      Alcotest.check check_bytes "test_fast_box" msg decrypted_msg
+  | None ->
+      Alcotest.fail "Box: Decryption error"
 
 let tests =
   [ ("Neuterize Secret roundtrip", `Quick, test_neuterize sk pk);
     ("Public Key Hash roundtrip", `Quick, test_hash pk pkh);
     ("Check PoW", `Slow, test_check_pow);
-    ("Test hacl fastbox", `Quick, test_fast_box (Bytes.of_string "test")) ]
+    ( "HACL* box (noalloc)",
+      `Quick,
+      test_fast_box_noalloc (Bytes.of_string "test") );
+    ("HACL* box", `Quick, test_fast_box (Bytes.of_string "test")) ]
 
 let () = Alcotest.run "tezos-crypto" [("crypto_box", tests)]

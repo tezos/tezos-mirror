@@ -4,6 +4,7 @@
   ---------------------------------------------------------------------------*)
 
 open StdLabels
+open Tezos_crypto
 
 let acceptable_num_words = [12; 15; 18; 21; 24]
 

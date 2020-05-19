@@ -2,7 +2,8 @@
  (name tezos_signer_backends_unix)
  (public_name tezos-signer-backends.unix)
  (modules (:standard \ no_ledger with_ledger))
- (libraries tezos-signer-backends
+ (libraries ocplib-endian.bigstring
+            tezos-signer-backends
             tezos-stdlib-unix
             tezos-rpc-http-client-unix
             (select ledger.ml from

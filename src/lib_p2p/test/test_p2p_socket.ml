@@ -193,13 +193,13 @@ module Crypto_test = struct
 
   let header_length = 2
 
-  let max_content_length = bufsize - Crypto_box.zerobytes
-
   (* The size of extra data added by encryption. *)
-  let boxextrabytes = Crypto_box.zerobytes - Crypto_box.boxzerobytes
+  let tag_length = Crypto_box.tag_length
 
   (* The number of bytes added by encryption + header *)
-  let extrabytes = header_length + boxextrabytes
+  let extrabytes = header_length + tag_length
+
+  let max_content_length = bufsize - extrabytes
 
   type data = {
     channel_key : Crypto_box.channel_key;
@@ -207,27 +207,28 @@ module Crypto_test = struct
     mutable remote_nonce : Crypto_box.nonce;
   }
 
-  let () = assert (Crypto_box.boxzerobytes >= header_length)
+  let () = assert (tag_length >= header_length)
 
   let write_chunk fd cryptobox_data msg =
-    let msglen = Bytes.length msg in
+    let msg_length = Bytes.length msg in
     fail_unless
-      (msglen <= max_content_length)
+      (msg_length <= max_content_length)
       Tezos_p2p_services.P2p_errors.Invalid_message_size
     >>=? fun () ->
-    let buf_length = msglen + Crypto_box.zerobytes in
-    let buf = Bytes.make buf_length '\x00' in
-    Bytes.blit msg 0 buf Crypto_box.zerobytes msglen ;
+    let encrypted_length = tag_length + msg_length in
+    let payload_length = header_length + encrypted_length in
+    let tag = Bytes.make tag_length '\x00' in
+    let cmsg = Bytes.copy msg in
     let local_nonce = cryptobox_data.local_nonce in
     cryptobox_data.local_nonce <- Crypto_box.increment_nonce local_nonce ;
-    Crypto_box.fast_box_noalloc cryptobox_data.channel_key local_nonce buf ;
-    let encrypted_length = buf_length - Crypto_box.boxzerobytes in
-    let header_pos = Crypto_box.boxzerobytes - header_length in
-    TzEndian.set_int16 buf header_pos encrypted_length ;
-    let payload = Bytes.sub buf header_pos (buf_length - header_pos) in
-    return (Unix.write fd payload 0 (buf_length - header_pos))
+    Crypto_box.fast_box_noalloc cryptobox_data.channel_key local_nonce tag cmsg ;
+    let payload = Bytes.make payload_length '\x00' in
+    TzEndian.set_int16 payload 0 encrypted_length ;
+    Bytes.blit tag 0 payload header_length tag_length ;
+    Bytes.blit cmsg 0 payload extrabytes msg_length ;
+    return (Unix.write fd payload 0 payload_length)
     >>=? fun i ->
-    _assert (buf_length - header_pos = i) __LOC__ "" >>=? fun () -> return_unit
+    _assert (payload_length = i) __LOC__ "" >>=? fun () -> return_unit
 
   let read_chunk fd cryptobox_data =
     let header_buf = Bytes.create header_length in
@@ -236,11 +237,18 @@ module Crypto_test = struct
     _assert (header_length = i) __LOC__ ""
     >>=? fun () ->
     let encrypted_length = TzEndian.get_uint16 header_buf 0 in
-    let buf_length = encrypted_length + Crypto_box.boxzerobytes in
-    let buf = Bytes.make buf_length '\x00' in
-    return (Unix.read fd buf Crypto_box.boxzerobytes encrypted_length)
+    assert (encrypted_length >= tag_length) ;
+    let msg_length = encrypted_length - tag_length in
+    let tag = Bytes.make tag_length '\x00' in
+    return (Unix.read fd tag 0 tag_length)
     >>=? fun i ->
-    _assert (encrypted_length = i) __LOC__ ""
+    _assert (tag_length = i) __LOC__ ""
+    >>=? fun () ->
+    let msg = Bytes.make msg_length '\x00' in
+    ( if msg_length > 0 then return (Unix.read fd msg 0 msg_length)
+    else return 0 )
+    >>=? fun i ->
+    _assert (msg_length = i) __LOC__ ""
     >>=? fun () ->
     let remote_nonce = cryptobox_data.remote_nonce in
     cryptobox_data.remote_nonce <- Crypto_box.increment_nonce remote_nonce ;
@@ -248,16 +256,13 @@ module Crypto_test = struct
       Crypto_box.fast_box_open_noalloc
         cryptobox_data.channel_key
         remote_nonce
-        buf
+        tag
+        msg
     with
     | false ->
         fail Tezos_p2p_services.P2p_errors.Decipher_error
     | true ->
-        return
-          (Bytes.sub
-             buf
-             Crypto_box.zerobytes
-             (buf_length - Crypto_box.zerobytes))
+        return msg
 
   let (sk, pk, pkh) = Crypto_box.random_keypair ()
 

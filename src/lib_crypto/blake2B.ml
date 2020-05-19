@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Error_monad
+open Hacl
 
 (*-- Type specific Hash builder ---------------------------------------------*)
 
@@ -42,8 +43,6 @@ module type PrefixedName = sig
 end
 
 module Make_minimal (K : Name) = struct
-  open Blake2
-
   type t = Blake2b.hash
 
   include K

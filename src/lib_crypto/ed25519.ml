@@ -270,7 +270,7 @@ let name = "Ed25519"
 
 let title = "An Ed25519 signature"
 
-let size = Sign.bytes
+let size = Sign.size
 
 let of_bytes_opt s = if Bytes.length s = size then Some s else None
 
@@ -343,7 +343,7 @@ let sign ?watermark sk msg =
     Blake2B.to_bytes @@ Blake2B.hash_bytes
     @@ match watermark with None -> [msg] | Some prefix -> [prefix; msg]
   in
-  let signature = Bytes.create Sign.bytes in
+  let signature = Bytes.create Sign.size in
   Sign.sign ~sk ~msg ~signature ;
   signature
 

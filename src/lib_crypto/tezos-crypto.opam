@@ -14,13 +14,14 @@ depends: [
   "tezos-rpc"
   "tezos-clic"
   "lwt"
-  "blake2"
   "hacl-star"
-  "hacl"
   "zarith"
   "secp256k1-internal"
   "uecc"
   "alcotest" { with-test & >= "1.1.0" }
+]
+conflicts: [
+  "hacl_x25519"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

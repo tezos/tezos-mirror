@@ -10,8 +10,7 @@
             tezos-error-monad
             tezos-rpc
             lwt
-            blake2
-            hacl
+            hacl-star
             secp256k1-internal
             uecc
             zarith))

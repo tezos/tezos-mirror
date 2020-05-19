@@ -38,28 +38,22 @@ type nonce = Bytes.t
 type target = Z.t
 
 module Secretbox = struct
-  include Secretbox
+  include Hacl.Secretbox
 
-  let box_noalloc key nonce msg = box ~key ~nonce ~msg ~cmsg:msg
-
-  let box_open_noalloc key nonce cmsg = box_open ~key ~nonce ~cmsg ~msg:cmsg
-
-  let box key msg nonce =
+  let secretbox key msg nonce =
     let msglen = Bytes.length msg in
-    let cmsg = Bytes.make (msglen + zerobytes) '\x00' in
-    Bytes.blit msg 0 cmsg zerobytes msglen ;
-    box ~key ~nonce ~msg:cmsg ~cmsg ;
-    Bytes.sub cmsg boxzerobytes (msglen + zerobytes - boxzerobytes)
+    let cmsg = Bytes.create (msglen + tagbytes) in
+    secretbox ~key ~nonce ~msg ~cmsg ;
+    cmsg
 
-  let box_open key cmsg nonce =
+  let secretbox_open key cmsg nonce =
     let cmsglen = Bytes.length cmsg in
-    let msg = Bytes.make (cmsglen + boxzerobytes) '\x00' in
-    Bytes.blit cmsg 0 msg boxzerobytes cmsglen ;
-    match box_open ~key ~nonce ~cmsg:msg ~msg with
+    let msg = Bytes.create (cmsglen - tagbytes) in
+    match secretbox_open ~key ~nonce ~cmsg ~msg with
     | false ->
         None
     | true ->
-        Some (Bytes.sub msg zerobytes (cmsglen - boxzerobytes))
+        Some msg
 end
 
 module Public_key_hash =
@@ -79,15 +73,13 @@ let () = Base58.check_encoded_prefix Public_key_hash.b58check_encoding "id" 30
 
 let hash pk = Public_key_hash.hash_bytes [Box.unsafe_to_bytes pk]
 
-let zerobytes = Box.zerobytes
-
-let boxzerobytes = Box.boxzerobytes
+let tag_length = Box.tagbytes
 
 let random_keypair () =
   let (pk, sk) = Box.keypair () in
   (sk, pk, hash pk)
 
-let zero_nonce = Bytes.make Nonce.bytes '\x00'
+let zero_nonce = Bytes.make Nonce.size '\x00'
 
 let random_nonce = Nonce.gen
 
@@ -96,7 +88,7 @@ let increment_nonce = Nonce.increment
 let generate_nonce bytes_list =
   let hash = Blake2B.hash_bytes bytes_list in
   let s = Blake2B.to_bytes hash in
-  Nonce.of_bytes_exn @@ Bytes.sub s 0 Nonce.bytes
+  Nonce.of_bytes_exn @@ Bytes.sub s 0 Nonce.size
 
 let init_to_resp_seed = Bytes.of_string "Init -> Resp"
 
@@ -117,33 +109,21 @@ let generate_nonces ~incoming ~sent_msg ~recv_msg =
 
 let precompute sk pk = Box.dh pk sk
 
-let fast_box_noalloc k nonce bmsg =
-  let msg = Bytes.copy bmsg in
-  Box.box ~k ~nonce ~msg ~cmsg:msg ;
-  Bytes.blit msg 0 bmsg 0 (Bytes.length bmsg)
+let fast_box_noalloc k nonce tag buf = Box.box_noalloc ~k ~nonce ~buf ~tag
 
-let fast_box_open_noalloc k nonce bcmsg =
-  let cmsg = Bytes.copy bcmsg in
-  if Box.box_open ~k ~nonce ~cmsg ~msg:cmsg then (
-    Bytes.blit cmsg 0 bcmsg 0 (Bytes.length bcmsg) ;
-    true )
-  else false
+let fast_box_open_noalloc k nonce tag buf =
+  Box.box_open_noalloc ~k ~nonce ~buf ~tag
 
-let fast_box k msg nonce =
-  let msglen = Bytes.length msg in
-  let cmsg = Bytes.make (msglen + zerobytes) '\x00' in
-  Bytes.blit msg 0 cmsg zerobytes msglen ;
-  Box.box ~k ~nonce ~msg:cmsg ~cmsg ;
+let fast_box k nonce msg =
+  let cmsg = Bytes.create (Bytes.length msg + tag_length) in
+  Box.box ~k ~nonce ~msg ~cmsg ;
   cmsg
 
-let fast_box_open k cmsg nonce =
+let fast_box_open k nonce cmsg =
   let cmsglen = Bytes.length cmsg in
-  let msg = Bytes.make cmsglen '\x00' in
-  match Box.box_open ~k ~nonce ~cmsg ~msg with
-  | false ->
-      None
-  | true ->
-      Some (Bytes.sub msg zerobytes (cmsglen - zerobytes))
+  assert (cmsglen >= tag_length) ;
+  let msg = Bytes.create (cmsglen - tag_length) in
+  if Box.box_open ~k ~nonce ~cmsg ~msg then Some msg else None
 
 let compare_target hash target =
   let hash = Z.of_bits (Blake2B.to_string hash) in
@@ -198,7 +178,7 @@ let secret_key_of_bytes buf = Box.unsafe_sk_of_bytes (Bytes.copy buf)
 
 let secret_key_size = Box.skbytes
 
-let nonce_size = Nonce.bytes
+let nonce_size = Nonce.size
 
 let public_key_encoding =
   let open Data_encoding in
