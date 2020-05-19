@@ -68,7 +68,7 @@ module Crypto = struct
     Crypto_box.fast_box_noalloc cryptobox_data.channel_key local_nonce buf ;
     let encrypted_length = buf_length - Crypto_box.boxzerobytes in
     let header_pos = Crypto_box.boxzerobytes - header_length in
-    TzEndian.set_int16 buf header_pos encrypted_length ;
+    TzEndian.set_uint16 buf header_pos encrypted_length ;
     let payload = Bytes.sub buf header_pos (buf_length - header_pos) in
     P2p_io_scheduler.write ?canceler fd payload
 
