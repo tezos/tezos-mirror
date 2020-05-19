@@ -1307,7 +1307,7 @@ let commands version () =
              ~name:"nays_per_roll"
              ~desc:
                (Printf.sprintf
-                  "number of yays per roll (total number of yays/nays/passes \
+                  "number of nays per roll (total number of yays/nays/passes \
                    must be equal to %d)"
                   Constants.fixed.votes_per_roll)
              int_parameter
@@ -1315,8 +1315,8 @@ let commands version () =
              ~name:"passes_per_roll"
              ~desc:
                (Printf.sprintf
-                  "number of nays per roll (yays, nays and passes must add up \
-                   to %d)"
+                  "number of passes per roll (yays, nays and passes must add \
+                   up to %d)"
                   Constants.fixed.votes_per_roll)
              int_parameter
         @@ stop )
@@ -1337,13 +1337,22 @@ let commands version () =
               >>=? fun info ->
               ( match info.current_period_kind with
               | Testing_vote | Promotion_vote ->
-                  if
+                  if number_of_yays < 0 then
+                    cctxt#error
+                      "Number of yays has to be a non-negative integer"
+                  else if number_of_nays < 0 then
+                    cctxt#error
+                      "Number of nays has to be a non-negative integer"
+                  else if number_of_passes < 0 then
+                    cctxt#error
+                      "Number of passes has to be a non-negative integer"
+                  else if
                     number_of_yays + number_of_nays + number_of_passes
                     <> Alpha_context.Constants.fixed.votes_per_roll
                   then
                     cctxt#error
-                      "Total number of yays/nays/passes differs from \
-                       votes_per_roll"
+                      "Total number of yays/nays/passes differs from %d"
+                      Alpha_context.Constants.fixed.votes_per_roll
                   else return_unit
               | _ ->
                   cctxt#error "Not in a Testing_vote or Promotion_vote period"

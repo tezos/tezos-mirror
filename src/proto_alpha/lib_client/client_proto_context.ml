@@ -458,9 +458,11 @@ let get_ballots_info (cctxt : #full) ~chain ~block =
   >>=? fun listings ->
   let max_participation =
     (* Multiply the weight by votes_per_roll before accummulating it *)
+    let int_votes_per_roll =
+      Int32.of_int Constants_repr.fixed.votes_per_roll
+    in
     List.fold_left
-      (fun acc (_, w) ->
-        Int32.(add (mul (of_int Constants_repr.fixed.votes_per_roll) w) acc))
+      (fun acc (_, w) -> Int32.(add (mul int_votes_per_roll w) acc))
       0l
       listings
   in
