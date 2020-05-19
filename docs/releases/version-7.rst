@@ -29,7 +29,7 @@ our releases. Each release is now named "Version X.Y" where X is the major
 version number and Y is the minor version number. Minor releases mostly
 backport bug fixes into previous major releases.
 
-Before releasing a new version, we publish release candidates.
+Before releasing a new major version, we publish release candidates.
 For instance, before releasing 7.0 we published 7.0~rc1, the first release
 candidate for version 7.0. Once release candidates have been out
 long enough to be sufficiently tested and are considered stable,
