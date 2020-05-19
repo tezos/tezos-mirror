@@ -80,15 +80,17 @@ let get_ballots ctxt =
       (* Assuming the same listings is used at votings *)
       Storage.Vote.Listings.get ctxt delegate
       >>=? fun weight ->
-      let allocate fraction total = Int32.(add (mul weight fraction) total) in
+      let allocate fraction total =
+        Int32.(add (mul weight (of_int fraction)) total)
+      in
       Lwt.return
         ( ballots
         >>? fun ballots ->
         ok
           {
-            yay = allocate (Int32.of_int ballot.yays_per_roll) ballots.yay;
-            nay = allocate (Int32.of_int ballot.nays_per_roll) ballots.nay;
-            pass = allocate (Int32.of_int ballot.passes_per_roll) ballots.pass;
+            yay = allocate ballot.yays_per_roll ballots.yay;
+            nay = allocate ballot.nays_per_roll ballots.nay;
+            pass = allocate ballot.passes_per_roll ballots.pass;
           } ))
     ~init:(ok {yay = 0l; nay = 0l; pass = 0l})
 

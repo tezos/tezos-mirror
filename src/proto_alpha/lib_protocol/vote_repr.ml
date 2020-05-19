@@ -36,9 +36,12 @@ let ballot_encoding =
     (fun (yays_per_roll, nays_per_roll, passes_per_roll) ->
       let open Constants_repr in
       if
-        Compare.Int.( = )
-          (yays_per_roll + nays_per_roll + passes_per_roll)
-          fixed.votes_per_roll
+        Compare.Int.( >= ) yays_per_roll 0
+        && Compare.Int.( >= ) nays_per_roll 0
+        && Compare.Int.( >= ) passes_per_roll 0
+        && Compare.Int.( = )
+             (yays_per_roll + nays_per_roll + passes_per_roll)
+             fixed.votes_per_roll
       then {yays_per_roll; nays_per_roll; passes_per_roll}
       else invalid_arg "ballot_encoding")
   @@ obj3
