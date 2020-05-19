@@ -40,14 +40,27 @@ let bootstrap_accounts_arg =
     ~placeholder:"FILE"
     (Clic.parameter (fun _ x -> return x))
 
+let load_json_file (cctxt : Protocol_client_context.full) json_file =
+  match json_file with
+  | None ->
+      return None
+  | Some filename ->
+      cctxt#read_file filename
+      >>=? fun json_string ->
+      return (Some (Ezjsonm.from_string json_string :> Data_encoding.json))
+
 let create_mockup_command_handler
     (constants_overrides_file, bootstrap_accounts_file)
     (cctxt : Protocol_client_context.full) =
+  load_json_file cctxt constants_overrides_file
+  >>=? fun constants_overrides_json ->
+  load_json_file cctxt bootstrap_accounts_file
+  >>=? fun bootstrap_accounts_json ->
   Tezos_mockup.Persistence.create_mockup
     ~cctxt:(cctxt :> Tezos_client_base.Client_context.full)
     ~protocol_hash:Protocol.hash
-    ~constants_overrides_file
-    ~bootstrap_accounts_file
+    ~constants_overrides_json
+    ~bootstrap_accounts_json
   >>=? fun () ->
   Tezos_mockup_commands.Mockup_wallet.populate cctxt bootstrap_accounts_file
 

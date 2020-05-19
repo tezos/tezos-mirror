@@ -85,25 +85,25 @@ let default_mockup_context :
       let (module Mockup) = mockup in
       Mockup.init
         ~parameters:Mockup.default_parameters
-        ~constants_overrides_file:None
-        ~bootstrap_accounts_file:None
+        ~constants_overrides_json:None
+        ~bootstrap_accounts_json:None
       >>=? fun rpc_context -> return (mockup, rpc_context)
 
 let init_mockup_context_by_protocol_hash :
     protocol_hash:Protocol_hash.t ->
-    constants_overrides_file:string option ->
-    bootstrap_accounts_file:string option ->
+    constants_overrides_json:Data_encoding.json option ->
+    bootstrap_accounts_json:Data_encoding.json option ->
     (Registration.mockup_environment * Tezos_protocol_environment.rpc_context)
     tzresult
     Lwt.t =
- fun ~protocol_hash ~constants_overrides_file ~bootstrap_accounts_file ->
+ fun ~protocol_hash ~constants_overrides_json ~bootstrap_accounts_json ->
   get_mockup_by_hash protocol_hash
   >>=? fun mockup ->
   let (module Mockup) = mockup in
   Mockup.init
     ~parameters:Mockup.default_parameters
-    ~constants_overrides_file
-    ~bootstrap_accounts_file
+    ~constants_overrides_json
+    ~bootstrap_accounts_json
   >>=? fun rpc_context -> return (mockup, rpc_context)
 
 let mockup_context_from_persisted {protocol_hash; rpc_context} =
@@ -171,7 +171,7 @@ let classify_base_dir base_dir =
     else Base_dir_is_nonempty
 
 let create_mockup ~(cctxt : Tezos_client_base.Client_context.full)
-    ~protocol_hash ~constants_overrides_file ~bootstrap_accounts_file =
+    ~protocol_hash ~constants_overrides_json ~bootstrap_accounts_json =
   let base_dir = cctxt#get_base_dir in
   let create_base_dir () =
     Tezos_stdlib_unix.Lwt_utils_unix.create_dir base_dir
@@ -193,8 +193,8 @@ let create_mockup ~(cctxt : Tezos_client_base.Client_context.full)
   >>=? fun () ->
   init_mockup_context_by_protocol_hash
     ~protocol_hash
-    ~constants_overrides_file
-    ~bootstrap_accounts_file
+    ~constants_overrides_json
+    ~bootstrap_accounts_json
   >>=? fun (_mockup_env, rpc_context) ->
   let mockup_dir = Filename.concat base_dir mockup_dirname in
   Tezos_stdlib_unix.Lwt_utils_unix.create_dir mockup_dir

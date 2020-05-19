@@ -50,8 +50,8 @@ module type Mockup_sig = sig
 
   val init :
     parameters:parameters ->
-    constants_overrides_file:string option ->
-    bootstrap_accounts_file:string option ->
+    constants_overrides_json:Data_encoding.json option ->
+    bootstrap_accounts_json:Data_encoding.json option ->
     Tezos_protocol_environment.rpc_context tzresult Lwt.t
 end
 

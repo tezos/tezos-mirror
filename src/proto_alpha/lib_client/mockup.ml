@@ -246,10 +246,10 @@ let initial_context (header : Block_header.shell_header)
 
 let mem_init :
     parameters:mockup_protocol_parameters ->
-    constants_overrides_file:string option ->
-    bootstrap_accounts_file:string option ->
+    constants_overrides_json:Data_encoding.json option ->
+    bootstrap_accounts_json:Data_encoding.json option ->
     Tezos_protocol_environment.rpc_context tzresult Lwt.t =
- fun ~parameters ~constants_overrides_file ~bootstrap_accounts_file ->
+ fun ~parameters ~constants_overrides_json ~bootstrap_accounts_json ->
   let hash =
     Block_hash.of_b58check_exn
       "BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU"
@@ -262,36 +262,34 @@ let mem_init :
       ~fitness:(Protocol.Fitness_repr.from_int64 0L)
       ~operations_hash:Operation_list_list_hash.zero
   in
-  ( match constants_overrides_file with
+  ( match constants_overrides_json with
   | None ->
       return protocol_constants_no_overrides
-  | Some overrides_file -> (
-      Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file overrides_file
-      >>=? fun json ->
-      match
-        Data_encoding.Json.destruct protocol_constants_overrides_encoding json
-      with
-      | x ->
-          return x
-      | exception _e ->
-          failwith
-            "cannot read protocol constants overrides in %s"
-            overrides_file ) )
+  | Some json -> (
+    match
+      Data_encoding.Json.destruct protocol_constants_overrides_encoding json
+    with
+    | x ->
+        return x
+    | exception error ->
+        failwith
+          "cannot read protocol constants overrides: %a"
+          (Data_encoding.Json.print_error ?print_unknown:None)
+          error ) )
   >>=? fun protocol_overrides ->
-  ( match bootstrap_accounts_file with
+  ( match bootstrap_accounts_json with
   | None ->
       return None
-  | Some accounts_file -> (
-      Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file accounts_file
-      >>=? fun json ->
-      match Data_encoding.Json.destruct parsed_accounts_reprs json with
-      | accounts ->
-          Tezos_base.TzPervasives.map_s to_bootstrap_account accounts
-          >>=? fun r -> return (Some r)
-      | exception _e ->
-          failwith
-            "cannot read definitions of bootstrap accounts in %s"
-            accounts_file ) )
+  | Some json -> (
+    match Data_encoding.Json.destruct parsed_accounts_reprs json with
+    | accounts ->
+        Tezos_base.TzPervasives.map_s to_bootstrap_account accounts
+        >>=? fun r -> return (Some r)
+    | exception error ->
+        failwith
+          "cannot read definitions of bootstrap accounts: %a"
+          (Data_encoding.Json.print_error ?print_unknown:None)
+          error ) )
   >>=? fun bootstrap_accounts_custom ->
   initial_context
     shell
