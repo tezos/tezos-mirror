@@ -1,7 +1,7 @@
 """ Utility functions to check time-dependent assertions in the tests.
 Assertions are retried to avoid using arbitrary time constants in test.
 """
-from typing import Any, List, Pattern
+from typing import Any, List
 import hashlib
 import contextlib
 import json
@@ -184,7 +184,7 @@ def pprint(json_data: dict) -> None:
     print(json.dumps(json_data, indent=4, sort_keys=True))
 
 
-def rpc(server: str, port: int, verb: str, path: str, data: dict = None,
+def rpc(server: str, port: int, verb: str, path: str, data: Any = None,
         headers: dict = None):
     """Calls a REST API
 
@@ -302,7 +302,7 @@ def mutez_of_tez(tez: float):
 
 
 @contextlib.contextmanager
-def assert_run_failure(pattern: Pattern[Any],
+def assert_run_failure(pattern: str,
                        mode: str = 'stderr'):
     """Context manager that checks enclosed code fails with expected error.
 
@@ -395,7 +395,7 @@ def assert_run_script_failwith(client: Client,
                                param: str,
                                storage: str) -> None:
 
-    pattern = re.compile(r'script reached FAILWITH instruction')
+    pattern = 'script reached FAILWITH instruction'
     with assert_run_failure(pattern):
         client.run_script(contract, param, storage, None, True)
 
@@ -404,7 +404,7 @@ def assert_typecheck_data_failure(
         client: Client,
         data: str,
         typ: str,
-        err: Pattern[Any] = re.compile(r'ill-typed data')) -> None:
+        err: str = 'ill-typed data') -> None:
     with assert_run_failure(err):
         client.typecheck_data(data, typ)
 
@@ -468,6 +468,6 @@ def assert_transfer_failwith(client: Client,
                              sender: str,
                              receiver: str,
                              args) -> None:
-    pattern = re.compile(r'script reached FAILWITH instruction')
+    pattern = 'script reached FAILWITH instruction'
     with assert_run_failure(pattern):
         client.transfer(amount, sender, receiver, args)

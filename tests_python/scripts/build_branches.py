@@ -6,6 +6,7 @@ import pathlib
 import os
 import re
 import argparse
+from typing import List, Any
 
 
 def print_log(log, color=True):
@@ -34,7 +35,7 @@ TERM_REGEX = r'''(?mx)
 
 def parse_sexp(sexp):
     stack = []
-    out = []
+    out: List[Any] = []
     for termtypes in re.finditer(TERM_REGEX, sexp):
         term, value = [(t, v)
                        for t, v in termtypes.groupdict().items() if v][0]
@@ -65,8 +66,8 @@ def opam_env(tezos_build):
                                stdout=subprocess.PIPE,
                                cwd=tezos_build)
     out, _err = process.communicate()
-    out = out.decode('utf-8')
-    env = {x[0]: x[1] for x in parse_sexp(out)}
+    out_str = out.decode('utf-8')
+    env = {x[0]: x[1] for x in parse_sexp(out_str)}
     return env
 
 

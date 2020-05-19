@@ -5,11 +5,14 @@
     call client.py's set_base_dir method prior to doing
     queries.
 """
+from typing import Tuple, Iterator
 import json
 import os
 import re
 import tempfile
 import pytest
+from launchers.sandbox import Sandbox
+from client.client import Client
 
 from tools.constants import ALPHA
 
@@ -17,13 +20,15 @@ _PROTO = ALPHA
 
 
 @pytest.fixture
-def mockup_client(sandbox):
+def mockup_client(sandbox: Sandbox) -> Client:
     sandbox.add_mockup_client()
-    return sandbox.mockup_client
+    client = sandbox.mockup_client
+    assert client is not None
+    return client
 
 
 @pytest.fixture
-def base_dir_n_mockup(mockup_client):
+def base_dir_n_mockup(mockup_client: Client) -> Iterator[Tuple[str, Client]]:
     with tempfile.TemporaryDirectory(prefix='tezos-client.') as base_dir:
         mockup_client.set_base_dir(base_dir)
         res = mockup_client.create_mockup(protocol=_PROTO).create_mockup_result
@@ -34,7 +39,7 @@ def base_dir_n_mockup(mockup_client):
 
 
 @pytest.mark.client
-def test_list_mockup_protocols(mockup_client):
+def test_list_mockup_protocols(mockup_client: Client):
     """ Executes `tezos-client list mockup protocols`
         The call must succeed and return a non empty list.
     """
@@ -43,7 +48,7 @@ def test_list_mockup_protocols(mockup_client):
 
 
 @pytest.mark.client
-def test_create_mockup_file_exists(mockup_client):
+def test_create_mockup_file_exists(mockup_client: Client):
     """ Executes `tezos-client --base-dir /tmp/mdir create mockup`
         when /tmp/mdir is a file, whereas a directory is expected.
         The call must fail.
@@ -56,7 +61,7 @@ def test_create_mockup_file_exists(mockup_client):
 
 
 @pytest.mark.client
-def test_create_mockup_dir_exists_nonempty(mockup_client):
+def test_create_mockup_dir_exists_nonempty(mockup_client: Client):
     """ Executes `tezos-client --base-dir /tmp/mdir create mockup`
         when /tmp/mdir is a non empty directory which is NOT a mockup
         directory. The call must fail.
@@ -72,7 +77,7 @@ def test_create_mockup_dir_exists_nonempty(mockup_client):
 
 
 @pytest.mark.client
-def test_create_mockup_fresh_dir(mockup_client):
+def test_create_mockup_fresh_dir(mockup_client: Client):
     """ Executes `tezos-client --base-dir /tmp/mdir create mockup`
         when /tmp/mdir is fresh and retrieves known addresses.
         Calls must succeed.
@@ -90,7 +95,7 @@ def test_create_mockup_fresh_dir(mockup_client):
 
 
 @pytest.mark.client
-def test_create_mockup_already_initialized(mockup_client):
+def test_create_mockup_already_initialized(mockup_client: Client):
     """ Executes `tezos-client --base-dir /tmp/mdir create mockup`
         when /tmp/mdir is not fresh.
         The call must fail.
@@ -103,7 +108,7 @@ def test_create_mockup_already_initialized(mockup_client):
 
 
 @pytest.mark.client
-def test_transfer(base_dir_n_mockup):
+def test_transfer(base_dir_n_mockup: Tuple[str, Client]):
     """ Executes `tezos-client --base-dir /tmp/mdir -M mockup
                   transfer 1 from bootstrap1 to bootstrap2`
         in a valid mockup environment.
@@ -125,7 +130,7 @@ def test_transfer(base_dir_n_mockup):
 
 
 @pytest.mark.client
-def test_create_mockup_custom_constants(mockup_client):
+def test_create_mockup_custom_constants(mockup_client: Client):
     """ Tests `tezos-client create mockup` --protocols-constants  argument
         The call must succeed.
     """
@@ -144,17 +149,17 @@ def test_create_mockup_custom_constants(mockup_client):
 
 
 @pytest.mark.client
-def test_create_mockup_custom_bootstrap_accounts(mockup_client):
+def test_create_mockup_custom_bootstrap_accounts(mockup_client: Client):
     """ Tests `tezos-client create mockup` --bootstrap-accounts argument
         The call must succeed.
     """
     accounts_list = []
 
-    def add_account(name: str, sk_uri: str, amount: int):
+    def add_account(name: str, sk_uri: str, amount: str):
         entry = {
             "name": name,
             "sk_uri": "unencrypted:" + sk_uri,
-            "amount": str(amount)
+            "amount": amount
         }
         accounts_list.append(entry)
 
@@ -185,7 +190,7 @@ def test_create_mockup_custom_bootstrap_accounts(mockup_client):
 
 
 @pytest.mark.client
-def test_transfer_bad_base_dir(mockup_client):
+def test_transfer_bad_base_dir(mockup_client: Client):
     """ Executes `tezos-client --base-dir /tmp/mdir create mockup`
         when /tmp/mdir looks like a dubious base directory.
         Checks that a warning is printed.

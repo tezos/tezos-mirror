@@ -1,5 +1,6 @@
 import pytest
 from tools import constants
+from launchers.sandbox import Sandbox
 
 
 NUM_NODES = 5
@@ -13,25 +14,25 @@ class TestTrustedRing:
         trusted ring relationship, and checks that points are advertised
         correctly to the whole network. """
 
-    def test_init(self, sandbox):
+    def test_init(self, sandbox: Sandbox):
         for i in range(NUM_NODES):
             sandbox.add_node(i, private=False, peers=[],
                              params=constants.NODE_PARAMS, config_client=False)
 
-    def test_no_peers(self, sandbox):
+    def test_no_peers(self, sandbox: Sandbox):
         """ Initially, nobody knows other peers. """
         for client in sandbox.all_clients():
             res = client.p2p_stat()
             assert not res.peers
 
-    def test_add_peers(self, sandbox):
+    def test_add_peers(self, sandbox: Sandbox):
         """ Set up a trusted ring topology. """
         base_p2p = sandbox.p2p
         for i in range(NUM_NODES):
             client = sandbox.client(i)
             client.trust_peer(base_p2p + ((i + 1) % NUM_NODES))
 
-    def test_check_stat(self, sandbox):
+    def test_check_stat(self, sandbox: Sandbox):
         """ All nodes, are public, everyone should be connected. But
             Only one neighbor should be trusted.  """
         base_p2p = sandbox.p2p

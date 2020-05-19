@@ -73,11 +73,11 @@ def scenario():
 
         # Hard-coded but we could get the protocol hash using an RPC
         operation_json['protocol'] = constants.ALPHA
-        operation_json = [operation_json]
+        operation_json_list = [operation_json]
 
         preapply_path = '/chains/main/blocks/head/helpers/preapply/operations'
         preapply_res = utils.rpc('localhost', port, 'post', preapply_path,
-                                 data=operation_json).json()
+                                 data=operation_json_list).json()
 
         preapply_status = (preapply_res[0]['contents'][0]['metadata']
                            ['operation_result']['status'])

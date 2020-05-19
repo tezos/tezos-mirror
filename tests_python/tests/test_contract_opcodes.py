@@ -4,6 +4,7 @@ from tools.paths import OPCODES_CONTRACT_PATH, \
     MINI_SCENARIOS_CONTRACT_PATH
 from tools.utils import assert_run_failure, assert_run_script_success, \
     assert_run_script_failwith
+from tools.client_regression import ClientRegression
 
 
 @pytest.mark.slow
@@ -611,11 +612,11 @@ class TestContractOpcodes:
             ('self_with_default_entrypoint.tz', 'Unit', 'Unit', 'Unit')
         ])
     def test_contract_input_output(self,
-                                   client_regtest,
-                                   contract,
-                                   param,
-                                   storage,
-                                   expected):
+                                   client_regtest: ClientRegression,
+                                   contract: str,
+                                   param: str,
+                                   storage: str,
+                                   expected: str):
         client = client_regtest
         assert contract.endswith('.tz'), \
             "test contract should have .tz extension"
@@ -687,12 +688,12 @@ class TestContractOpcodes:
               ['Set map(0)["2"] to "two"']])
         ])
     def test__big_map_contract_io(self,
-                                  client_regtest,
-                                  contract,
-                                  param,
-                                  storage,
-                                  expected,
-                                  big_map_diff):
+                                  client_regtest: ClientRegression,
+                                  contract: str,
+                                  param: str,
+                                  storage: str,
+                                  expected: str,
+                                  big_map_diff: str):
         client = client_regtest
         contract = path.join(OPCODES_CONTRACT_PATH, contract)
         run_script_res = client.run_script(contract, param, storage,
@@ -752,11 +753,11 @@ class TestContractOpcodes:
               ['Unset map(0)["1"]']])
         ])
     def test_big_map_magic(self,
-                           client_regtest,
-                           storage,
-                           param,
-                           expected,
-                           big_map_diff):
+                           client_regtest: ClientRegression,
+                           storage: str,
+                           param: str,
+                           expected: str,
+                           big_map_diff: str):
         client = client_regtest
         contract = path.join(MINI_SCENARIOS_CONTRACT_PATH,
                              'big_map_magic.tz')
@@ -765,7 +766,7 @@ class TestContractOpcodes:
         assert run_script_res.storage == expected
         assert run_script_res.big_map_diff == big_map_diff
 
-    def test_packunpack(self, client_regtest):
+    def test_packunpack(self, client_regtest: ClientRegression):
         """Test PACK/UNPACK and binary format."""
         client = client_regtest
         assert_run_script_success(
@@ -785,7 +786,7 @@ class TestContractOpcodes:
             '0070009000102000000060001000200030004)'
         )
 
-    def test_check_signature(self, client_regtest):
+    def test_check_signature(self, client_regtest: ClientRegression):
         client = client_regtest
         sig = 'edsigu3QszDjUpeqYqbvhyRxMpVFamEnvm9FYnt7YiiNt' \
               + '9nmjYfh8ZTbsybZ5WnBkhA7zfHsRVyuTnRsGLR6fNHt1Up1FxgyRtF'
@@ -802,7 +803,8 @@ class TestContractOpcodes:
             '"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"'
         )
 
-    def test_hash_consistency_michelson_cli(self, client_regtest):
+    def test_hash_consistency_michelson_cli(self,
+                                            client_regtest: ClientRegression):
         client = client_regtest
         hash_result = client.hash(
             '(Pair 22220000000 (Pair "2017-12-13T04:49:00Z" 034))',
@@ -831,10 +833,10 @@ class TestContractOpcodes:
             ('mul_overflow.tz', 'Unit', 'Right Unit')
         ])
     def test_arithmetic_overflow(self,
-                                 client_regtest_scrubbed,
-                                 contract,
-                                 param,
-                                 storage):
+                                 client_regtest_scrubbed: ClientRegression,
+                                 contract: str,
+                                 param: str,
+                                 storage: str):
         client = client_regtest_scrubbed
         contract = path.join(OPCODES_CONTRACT_PATH, contract)
 
@@ -842,7 +844,8 @@ class TestContractOpcodes:
             client.run_script(contract, param, storage)
 
     @pytest.mark.skip(reason="Bug in annotation system")
-    def test_fails_annotated_set_car_cdr(self, client_regtest):
+    def test_fails_annotated_set_car_cdr(self,
+                                         client_regtest: ClientRegression):
         """Tests the SET_CAR and SET_CDR instructions."""
         client = client_regtest
 
@@ -865,11 +868,11 @@ class TestContractOpcodes:
              '(Pair { Elt "bar" 20 ; Elt "foo" 16 } 36)')
         ])
     def test_map_map_sideeffect(self,
-                                client_regtest,
-                                contract,
-                                param,
-                                storage,
-                                expected):
+                                client_regtest: ClientRegression,
+                                contract: str,
+                                param: str,
+                                storage: str,
+                                expected: str):
         client = client_regtest
         contract = path.join(OPCODES_CONTRACT_PATH, contract)
         run_script_res = client.run_script(contract, param, storage)

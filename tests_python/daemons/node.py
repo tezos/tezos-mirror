@@ -1,4 +1,4 @@
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 import sys
 import subprocess
 import os
@@ -120,7 +120,7 @@ class Node:
             new_env['TEZOS_LOG'] = lwt_log
         self._new_env = new_env
         self._node_run = node_run
-        self._process = None
+        self._process = None  # type: Optional[subprocess.Popen]
 
     def run(self):
         node_run_str = utils.format_command(self._node_run)

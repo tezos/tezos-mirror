@@ -35,7 +35,7 @@ def main():
         protocols = client.list_protocols()
         assert PROTO_DEMO in protocols
 
-        parameters = {}
+        parameters = {}  # type: dict
         client.activate_protocol_json(PROTO_DEMO, parameters, key='activator',
                                       fitness='1')
 

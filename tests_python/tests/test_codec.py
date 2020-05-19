@@ -1,3 +1,4 @@
+from typing import Any
 import pytest
 from codec.codec import Codec
 from tools import paths
@@ -13,7 +14,7 @@ ENCODINGS = [("network_version", {"p2p_version": 0,
 class TestCodec:
 
     @pytest.mark.parametrize("encoding_name, data", ENCODINGS)
-    def test_codec_encode_decode(self, encoding_name, data):
+    def test_codec_encode_decode(self, encoding_name: str, data: Any):
         codec = Codec(CODEC_BIN)
         data_encoded = codec.encode(encoding_name, data_json=data)
         data_decoded = codec.decode(encoding_name, data=data_encoded)

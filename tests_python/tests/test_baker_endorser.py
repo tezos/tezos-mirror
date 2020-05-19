@@ -4,6 +4,7 @@ import time
 import subprocess
 import pytest
 from tools import utils, constants
+from launchers.sandbox import Sandbox
 
 random.seed(42)
 KEYS = [f'bootstrap{i}' for i in range(1, 6)]
@@ -33,7 +34,7 @@ class TestAllDaemonsWithOperations:
        add (or replace) new nodes dynamically. After a little while,
        we kill the bakers and check everyone synchronize to the same head. '''
 
-    def test_setup_network(self, sandbox):
+    def test_setup_network(self, sandbox: Sandbox):
         parameters = dict(constants.PARAMETERS)
         # each priority has a delay of 1 sec
         parameters["time_between_blocks"] = ["1"]
@@ -47,13 +48,14 @@ class TestAllDaemonsWithOperations:
         sandbox.add_endorser(1, account='bootstrap2', endorsement_delay=1,
                              proto=constants.ALPHA_DAEMON)
 
-    def test_wait_for_alpha(self, sandbox):
+    def test_wait_for_alpha(self, sandbox: Sandbox):
         clients = sandbox.all_clients()
         for client in clients:
             proto = constants.ALPHA
             assert utils.check_protocol(client, proto)
 
-    def test_network_gen_operations_and_add_nodes(self, sandbox, session):
+    def test_network_gen_operations_and_add_nodes(self, sandbox: Sandbox,
+                                                  session):
         node_add_period = NUM_CYCLES // NEW_NODES
         for cycle in range(NUM_CYCLES):
             i = random.randrange(NUM_NODES)
@@ -80,18 +82,18 @@ class TestAllDaemonsWithOperations:
                 assert utils.check_protocol(sandbox.client(new_node), proto)
             time.sleep(TIME_BETWEEN_CYCLE)
 
-    def test_kill_baker(self, sandbox):
+    def test_kill_baker(self, sandbox: Sandbox):
         sandbox.rm_baker(0, proto=constants.ALPHA_DAEMON)
         sandbox.rm_baker(1, proto=constants.ALPHA_DAEMON)
 
-    def test_synchronize(self, sandbox):
+    def test_synchronize(self, sandbox: Sandbox):
         utils.synchronize(sandbox.all_clients())
 
-    def test_progress(self, sandbox):
+    def test_progress(self, sandbox: Sandbox):
         level = sandbox.client(0).get_level()
         assert level >= 5
 
-    def test_check_operations(self, sandbox):
+    def test_check_operations(self, sandbox: Sandbox):
         min_level = min([client.get_level()
                          for client in sandbox.all_clients()])
         heads_hash = set()
@@ -102,7 +104,7 @@ class TestAllDaemonsWithOperations:
         assert len(heads_hash) == 1
         # TODO check for operations inclusion
 
-    def test_check_logs(self, sandbox):
+    def test_check_logs(self, sandbox: Sandbox):
         if not sandbox.log_dir:
             pytest.skip()
         assert sandbox.logs

@@ -1,5 +1,6 @@
 import pytest
 from tools import utils, constants
+from launchers.sandbox import Sandbox
 
 
 BAKE_ARGS = ['--max-priority', '512', '--minimal-timestamp']
@@ -11,28 +12,28 @@ NUM_NODES = 3
 class TestDoubleEndorsement:
     """Constructs a double endorsement, and build evidence."""
 
-    def test_init(self, sandbox):
+    def test_init(self, sandbox: Sandbox):
         for i in range(NUM_NODES):
             sandbox.add_node(i, params=constants.NODE_PARAMS)
         utils.activate_alpha(sandbox.client(0))
         sandbox.client(0).bake('bootstrap1', BAKE_ARGS)
 
-    def test_level(self, sandbox):
+    def test_level(self, sandbox: Sandbox):
         level = 2
         for client in sandbox.all_clients():
             assert utils.check_level(client, level)
 
-    def test_terminate_nodes_1_and_2(self, sandbox):
+    def test_terminate_nodes_1_and_2(self, sandbox: Sandbox):
         sandbox.node(1).terminate()
         sandbox.node(2).terminate()
 
-    def test_bake_node_0(self, sandbox):
+    def test_bake_node_0(self, sandbox: Sandbox):
         """Client 0 bakes block A at level 3, not communicated to 1 and 2
            Inject an endorsement to ensure a different hash"""
         sandbox.client(0).endorse('bootstrap1')
         sandbox.client(0).bake('bootstrap1', BAKE_ARGS)
 
-    def test_endorse_node_0(self, sandbox, session):
+    def test_endorse_node_0(self, sandbox: Sandbox, session: dict):
         """bootstrap1 builds an endorsement for block A"""
         client = sandbox.client(0)
         client.endorse('bootstrap1')
@@ -40,18 +41,18 @@ class TestDoubleEndorsement:
         endorsement = mempool['applied'][0]
         session['endorsement1'] = endorsement
 
-    def test_terminate_node_0(self, sandbox):
+    def test_terminate_node_0(self, sandbox: Sandbox):
         sandbox.node(0).terminate()
 
-    def test_restart_node_2(self, sandbox):
+    def test_restart_node_2(self, sandbox: Sandbox):
         sandbox.node(2).run()
         assert sandbox.client(2).check_node_listening()
 
-    def test_bake_node_2(self, sandbox):
+    def test_bake_node_2(self, sandbox: Sandbox):
         """Client 2 bakes block B at level 3, not communicated to 0 and 1"""
         sandbox.client(2).bake('bootstrap1', BAKE_ARGS)
 
-    def test_endorse_node_2(self, sandbox, session):
+    def test_endorse_node_2(self, sandbox: Sandbox, session: dict):
         """bootstrap1 builds an endorsement for block B"""
         client = sandbox.client(2)
         client.endorse('bootstrap1')
@@ -60,19 +61,19 @@ class TestDoubleEndorsement:
         session['endorsement2'] = endorsement
         sandbox.client(2).endorse('bootstrap2')
 
-    def test_restart_all(self, sandbox):
+    def test_restart_all(self, sandbox: Sandbox):
         sandbox.node(0).run()
         sandbox.node(1).run()
         sandbox.client(0).check_node_listening()
         sandbox.client(1).check_node_listening()
 
-    def test_check_level(self, sandbox):
+    def test_check_level(self, sandbox: Sandbox):
         """All nodes are at level 3, head is either block A or B"""
         level = 3
         for client in sandbox.all_clients():
             assert utils.check_level(client, level)
 
-    def test_forge_accusation(self, sandbox, session):
+    def test_forge_accusation(self, sandbox: Sandbox, session: dict):
         """Forge and inject a double endorsement evidence operation"""
         client = sandbox.client(1)
         head_hash = client.get_head()['hash']
@@ -101,7 +102,7 @@ class TestDoubleEndorsement:
         assert isinstance(op_hash, str)
         session['operation'] = op_hash
 
-    def test_operation_applied(self, sandbox, session):
+    def test_operation_applied(self, sandbox: Sandbox, session: dict):
         """Check operation is in mempool"""
         client = sandbox.client(1)
         assert utils.check_mempool_contains_operations(client,

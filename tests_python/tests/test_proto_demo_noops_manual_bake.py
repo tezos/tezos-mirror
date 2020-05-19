@@ -1,5 +1,6 @@
 import time
 import pytest
+from client.client import Client
 
 PROTO = 'ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp'
 PROTO_GENESIS = 'ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im'
@@ -38,27 +39,27 @@ class TestProtoDemo:
     sandboxed node.
     """
 
-    def test_proto_known(self, client):
+    def test_proto_known(self, client: Client):
         res = client.list_protocols()
         assert PROTO in res
 
-    def test_first_protocol(self, client):
+    def test_first_protocol(self, client: Client):
         proto = 'PrihK96nBAFSxVL1GLJTVhu9YnzkMFiBeuJRPA8NwuZVZCE1L6i'
         assert client.get_protocol() == proto
 
-    def test_activate_proto(self, client):
-        parameters = {}
+    def test_activate_proto(self, client: Client):
+        parameters = {}  # type: dict
         res = client.activate_protocol_json(PROTO, parameters, key='activator',
                                             fitness='1')
         assert res.block_hash
 
-    def test_level1(self, client):
+    def test_level1(self, client: Client):
         assert client.get_level(params=PARAMS) == 1
 
-    def test_protocol_genesis(self, client):
+    def test_protocol_genesis(self, client: Client):
         assert client.get_protocol(params=PARAMS) == PROTO_GENESIS
 
-    def test_manual_bake(self, client):
+    def test_manual_bake(self, client: Client):
         time.sleep(1)
         message = "hello world"
 
@@ -87,7 +88,7 @@ class TestProtoDemo:
         client.rpc('post', '/injection/block', data=inject,
                    params=PARAMS)
 
-    def test_level2(self, client):
+    def test_level2(self, client: Client):
         head = client.rpc('get', '/chains/main/blocks/head/',
                           params=PARAMS)
         assert head['header']['level'] == 2

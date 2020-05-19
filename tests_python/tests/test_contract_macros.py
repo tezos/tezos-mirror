@@ -4,6 +4,9 @@ from tools.paths import MACROS_CONTRACT_PATH, CONTRACT_PATH, all_contracts
 from tools.utils import assert_run_script_failwith, \
     assert_transfer_failwith, init_with_transfer, bake, \
     assert_storage_contains
+from tools.client_regression import ClientRegression
+from client.client import Client
+
 
 BAKE_ARGS = ['--minimal-timestamp']
 
@@ -83,8 +86,8 @@ class TestContractMacros:
             ('compare_bytes.tz', '{}', '(Pair 0x34 0x33)',
              '{ False ; True ; False ; True ; False }'),
         ])
-    def test_contract_input_output(self, client, contract, param, storage,
-                                   expected):
+    def test_contract_input_output(self, client: Client, contract: str,
+                                   param: str, storage: str, expected: str):
         assert contract.endswith('.tz'), \
             "test contract should have .tz extension"
         contract = path.join(MACROS_CONTRACT_PATH, contract)
@@ -113,7 +116,7 @@ class TestContractMacros:
             ('assert_cmpgt.tz', 'Unit', '(Pair -1 0)'),
             ('assert_cmpge.tz', 'Unit', '(Pair -1 0)')
         ])
-    def test_contract_failures(self, client, contract, param, storage):
+    def test_contract_failures(self, client: Client, contract, param, storage):
         contract = path.join(MACROS_CONTRACT_PATH, contract)
         assert_run_script_failwith(client, contract, param, storage)
 
@@ -122,7 +125,7 @@ class TestContractMacros:
 @pytest.mark.contract
 class TestGuestBook:
     """Test on the guestbook contract."""
-    def test_guestbook(self, client):
+    def test_guestbook(self, client: Client):
         contract = path.join(MACROS_CONTRACT_PATH, 'guestbook.tz')
 
         init_with_transfer(
@@ -151,7 +154,7 @@ class TestGuestBook:
 @pytest.mark.contract
 class TestBigmap:
     """Tests on the big_map_mem contract."""
-    def test_bigmap(self, client):
+    def test_bigmap(self, client: Client):
         contract = path.join(MACROS_CONTRACT_PATH, 'big_map_mem.tz')
 
         init_with_transfer(
@@ -203,7 +206,7 @@ class TestBigmap:
 @pytest.mark.contract
 class TestBigmapGetAdd:
     """Tests on the big_map_get_add contract."""
-    def test_bigmap(self, client):
+    def test_bigmap(self, client: Client):
         contract = path.join(MACROS_CONTRACT_PATH, 'big_map_get_add.tz')
 
         init_with_transfer(client, contract,
@@ -251,7 +254,8 @@ class TestMacroExpansion:
     """Test expanding macros"""
 
     @pytest.mark.parametrize("contract", all_contracts(['macros']))
-    def test_macro_expansion(self, client_regtest, contract):
+    def test_macro_expansion(self, client_regtest: ClientRegression,
+                             contract: str):
         """This test expands macros in all macro test contracts, with
         regression detection enabled. This test should fail if the definition
         of any macros change.

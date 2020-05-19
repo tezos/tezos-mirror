@@ -1,4 +1,5 @@
 import itertools
+from client.client import Client
 
 BAKE_ARGS = ['--minimal-timestamp']
 CONVERT_INPUT_FORMATS = ["michelson", "json", "binary"]
@@ -67,7 +68,7 @@ CONVERT_DATA = {
 
 
 class TestProgramsCommands:
-    def test_convert_script(self, client):
+    def test_convert_script(self, client: Client):
         for (input_, output) in itertools.product(
                 CONVERT_INPUT_FORMATS,
                 CONVERT_OUTPUT_FORMATS):
@@ -77,7 +78,7 @@ class TestProgramsCommands:
             ])
             assert result.strip() == f"{CONVERT_SCRIPT[output]}"
 
-    def test_convert_data(self, client):
+    def test_convert_data(self, client: Client):
         for (input_, output, typecheck) in itertools.product(
                 CONVERT_INPUT_FORMATS,
                 CONVERT_OUTPUT_FORMATS,

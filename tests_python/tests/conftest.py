@@ -6,7 +6,7 @@ in the test function, and the yielded values is then accessible with this
 parameter.
 """
 import os
-from typing import Optional
+from typing import Optional, Iterator, List
 import pytest
 from pytest_regtest import register_converter_pre, deregister_converter_pre, \
     _std_conversion
@@ -17,7 +17,7 @@ from client.client import Client
 
 
 @pytest.fixture(scope="session", autouse=True)
-def sanity_check(request):
+def sanity_check(request) -> None:
     """Sanity checks before running the tests."""
     log_dir = request.config.getoption("--log-dir")
     if not (log_dir is None or os.path.isdir(log_dir)):
@@ -26,24 +26,24 @@ def sanity_check(request):
 
 
 @pytest.fixture(scope="session")
-def log_dir(request):
+def log_dir(request) -> Iterator[str]:
     """Retrieve user-provided logging directory on the command line."""
     yield request.config.getoption("--log-dir")
 
 
 @pytest.fixture(scope="session")
-def singleprocess(request):
+def singleprocess(request) -> Iterator[bool]:
     """Retrieve user-provided single process mode on the command line."""
     yield request.config.getoption("--singleprocess")
 
 
 @pytest.fixture(scope="class")
-def session():
+def session() -> Iterator[dict]:
     """Dictionary to store data between tests."""
     yield {}
 
 
-def pytest_runtest_makereport(item, call):
+def pytest_runtest_makereport(item, call) -> None:
     # hook for incremental test
     # from https://docs.pytest.org/en/latest/example/simple.html
     if "incremental" in item.keywords:
@@ -53,14 +53,14 @@ def pytest_runtest_makereport(item, call):
             parent._previousfailed = item  # pylint: disable=protected-access
 
 
-def pytest_runtest_setup(item):
+def pytest_runtest_setup(item) -> None:
     if "incremental" in item.keywords:
         previousfailed = getattr(item.parent, "_previousfailed", None)
         if previousfailed is not None:
             pytest.xfail("previous test failed (%s)" % previousfailed.name)
 
 
-def pytest_addoption(parser):
+def pytest_addoption(parser) -> None:
     parser.addoption(
         "--log-dir", action="store", help="specify log directory"
     )
@@ -77,7 +77,7 @@ You can investigate daemon logs by running this test using the
 
 
 @pytest.fixture(scope="class")
-def sandbox(log_dir, singleprocess):
+def sandbox(log_dir: Optional[str], singleprocess: bool) -> Iterator[Sandbox]:
     """Sandboxed network of nodes.
 
     Nodes, bakers and endorsers are added/removed dynamically."""
@@ -92,7 +92,7 @@ def sandbox(log_dir, singleprocess):
 
 
 @pytest.fixture(scope="class")
-def client(sandbox):
+def client(sandbox: Sandbox) -> Iterator[Client]:
     """One node with protocol alpha."""
     sandbox.add_node(0, params=constants.NODE_PARAMS)
     client = sandbox.client(0)
@@ -101,7 +101,7 @@ def client(sandbox):
 
 
 @pytest.fixture(scope="class")
-def client_regtest_bis(sandbox):
+def client_regtest_bis(sandbox: Sandbox) -> Iterator[Client]:
     """One node with protocol alpha, regression test enabled."""
     def reg_client_factory(client_path: str,
                            admin_client_path: str,
@@ -109,7 +109,8 @@ def client_regtest_bis(sandbox):
                            base_dir: Optional[str] = None,
                            rpc_port: int = 8732,
                            use_tls: bool = False,
-                           disable_disclaimer: bool = True):
+                           disable_disclaimer: bool = True
+                           ) -> ClientRegression:
         client = ClientRegression(client_path,
                                   admin_client_path,
                                   host,
@@ -127,7 +128,8 @@ def client_regtest_bis(sandbox):
 
 
 @pytest.fixture(scope="function")
-def client_regtest(client_regtest_bis, regtest):
+def client_regtest(client_regtest_bis: ClientRegression,
+                   regtest) -> Iterator[Client]:
     """The client for one node with protocol alpha, with a function level
 regression test fixture."""
     deregister_converter_pre(_std_conversion)
@@ -138,7 +140,8 @@ regression test fixture."""
 
 
 @pytest.fixture(scope="function")
-def client_regtest_scrubbed(client_regtest):
+def client_regtest_scrubbed(client_regtest:
+                            ClientRegression) -> Iterator[Client]:
     """One node with protocol alpha, regression test and scrubbing enabled."""
     register_converter_pre(utils.client_output_converter)
     yield client_regtest
@@ -146,7 +149,7 @@ def client_regtest_scrubbed(client_regtest):
 
 
 @pytest.fixture(scope="class")
-def clients(sandbox, request):
+def clients(sandbox: Sandbox, request) -> Iterator[List[Client]]:
     """N node with protocol alpha. Parameterized by the number of nodes.
 
     Number of nodes is specified as a class annotation.
@@ -166,7 +169,7 @@ def clients(sandbox, request):
 
 
 @pytest.fixture(scope="class")
-def sandbox_multibranch(log_dir, request):
+def sandbox_multibranch(log_dir, request) -> Iterator[SandboxMultiBranch]:
     """Multi-branch sandbox fixture. Parameterized by map of branches.
 
     This fixture is identical to `sandbox` except that each node_id is
@@ -192,6 +195,7 @@ def sandbox_multibranch(log_dir, request):
     assert branch_map is not None
     num_peers = max(branch_map) + 1
 
+    assert paths.TEZOS_BINARIES is not None  # helps `mypy`
     with SandboxMultiBranch(paths.TEZOS_BINARIES,
                             constants.IDENTITIES,
                             num_peers=num_peers,

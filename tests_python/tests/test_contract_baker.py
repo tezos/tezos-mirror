@@ -1,6 +1,7 @@
 import os
 import pytest
 from tools import paths, utils, constants
+from client.client import Client
 
 BAKE_ARGS = ['--minimal-timestamp']
 
@@ -19,7 +20,7 @@ def client(sandbox):
 class TestOriginationCall:
     """Test a simple contract origination and call"""
 
-    def test_originate(self, client, session):
+    def test_originate(self, client: Client, session: dict):
         initial_storage = 'Unit'
         contract = os.path.join(paths.OPCODES_CONTRACT_PATH,
                                 'transfer_tokens.tz')
@@ -38,7 +39,7 @@ class TestOriginationCall:
         assert utils.check_block_contains_operations(
             client, [origination.operation_hash])
 
-    def test_call(self, client, session):
+    def test_call(self, client: Client, session: dict):
         contract = session['contract']
         bootstrap3 = '"tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU"'
         transfer = client.call('bootstrap2', contract,
@@ -47,10 +48,10 @@ class TestOriginationCall:
         assert utils.check_block_contains_operations(client,
                                                      [transfer.operation_hash])
 
-    def test_balance(self, client):
+    def test_balance(self, client: Client):
         assert client.get_balance("bootstrap3") == 4000100
 
-    def test_query_storage(self, client, session):
+    def test_query_storage(self, client: Client, session: dict):
         contract = session['contract']
         url = f'/chains/main/blocks/head/context/contracts/{contract}/storage'
         res = client.rpc('get', url)
