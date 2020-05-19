@@ -5,8 +5,8 @@ Version 7.1
 
 Version 7.0 notably introduces the multinetwork node.
 
-Version 7.1 fixes a few compilation issues that users encountered with version 7.0.
-If you are already running version 7.0, there is no need to update to version 7.1.
+Version 7.1 fixes a few compilation issues that users encountered with version 7.0,
+and fixes a few client commands.
 
 Update Instructions
 -------------------
