@@ -25,7 +25,7 @@
 
 (** Tezos - X25519/XSalsa20-Poly1305 cryptography *)
 
-type nonce = Bigstring.t
+type nonce
 
 val nonce_size : int
 
