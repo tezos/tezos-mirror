@@ -61,18 +61,4 @@ let commands () =
         no_options
         (prefixes ["bootstrapped"] @@ stop)
         (fun () (cctxt : #Client_context.full) ->
-          Monitor_services.bootstrapped cctxt
-          >>=? fun (stream, _) ->
-          Lwt_stream.iter_s
-            (fun (hash, time) ->
-              cctxt#message
-                "Current head: %a (timestamp: %a, validation: %a)"
-                Block_hash.pp_short
-                hash
-                Time.System.pp_hum
-                (Time.System.of_protocol_exn time)
-                Time.System.pp_hum
-                (Tezos_stdlib_unix.Systime_os.now ()))
-            stream
-          >>= fun () -> cctxt#answer "Bootstrapped." >>= fun () -> return_unit)
-    ]
+          Client_confirmations.wait_for_bootstrapped cctxt) ]

@@ -45,19 +45,6 @@ let rec retry (cctxt : #Protocol_client_context.full) ~delay ~tries f x =
   | Error _ as err ->
       Lwt.return err
 
-let await_bootstrapped_node (cctxt : #Protocol_client_context.full) =
-  (* Waiting for the node to be synchronized *)
-  cctxt#message "Waiting for the node to be synchronized with its peers..."
-  >>= fun () ->
-  retry cctxt ~tries:5 ~delay:1. Shell_services.Monitor.bootstrapped cctxt
-  >>=? fun (block_stream, _stopper) ->
-  let rec waiting_loop () =
-    Lwt_stream.get block_stream
-    >>= function None -> Lwt.return_unit | Some _ -> waiting_loop ()
-  in
-  waiting_loop ()
-  >>= fun () -> cctxt#message "Node synchronized." >>= fun () -> return_unit
-
 let monitor_fork_testchain (cctxt : #Protocol_client_context.full)
     ~cleanup_nonces =
   (* Waiting for the node to be synchronized *)
@@ -117,7 +104,9 @@ let monitor_fork_testchain (cctxt : #Protocol_client_context.full)
 
 module Endorser = struct
   let run (cctxt : #Protocol_client_context.full) ~chain ~delay delegates =
-    await_bootstrapped_node cctxt
+    Client_confirmations.wait_for_bootstrapped
+      ~retry:(retry cctxt ~tries:5 ~delay:1.)
+      cctxt
     >>=? fun _ ->
     ( if chain = `Test then monitor_fork_testchain cctxt ~cleanup_nonces:false
     else return_unit )
@@ -136,7 +125,9 @@ module Baker = struct
   let run (cctxt : #Protocol_client_context.full) ?minimal_fees
       ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?max_priority
       ~chain ~context_path delegates =
-    await_bootstrapped_node cctxt
+    Client_confirmations.wait_for_bootstrapped
+      ~retry:(retry cctxt ~tries:5 ~delay:1.)
+      cctxt
     >>=? fun _ ->
     Config_services.user_activated_upgrades cctxt
     >>=? fun user_activated_upgrades ->
@@ -165,7 +156,9 @@ end
 
 module Accuser = struct
   let run (cctxt : #Protocol_client_context.full) ~chain ~preserved_levels =
-    await_bootstrapped_node cctxt
+    Client_confirmations.wait_for_bootstrapped
+      ~retry:(retry cctxt ~tries:5 ~delay:1.)
+      cctxt
     >>=? fun _ ->
     ( if chain = `Test then monitor_fork_testchain cctxt ~cleanup_nonces:true
     else return_unit )

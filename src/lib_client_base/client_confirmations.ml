@@ -250,19 +250,19 @@ let lookup_operation_in_previous_blocks (ctxt : #Client_context.full) ~chain
   in
   loop 0
 
-let wait_for_bootstrapped (ctxt : #Client_context.full) =
+let wait_for_bootstrapped ?(retry = fun f x -> f x)
+    (ctxt : #Client_context.full) =
   let display = ref false in
   Lwt.async (fun () ->
       ctxt#sleep 0.3
       >>= fun () ->
       if not !display then (
-        ctxt#answer
-          "Waiting for the node to be bootstrapped before injection..."
+        ctxt#answer "Waiting for the node to be bootstrapped..."
         >>= fun () ->
         display := true ;
         Lwt.return_unit )
       else Lwt.return_unit) ;
-  Monitor_services.bootstrapped ctxt
+  retry Monitor_services.bootstrapped ctxt
   >>=? fun (stream, _stop) ->
   Lwt_stream.iter_s
     (fun (hash, time) ->
@@ -279,5 +279,4 @@ let wait_for_bootstrapped (ctxt : #Client_context.full) =
     stream
   >>= fun () ->
   display := true ;
-  ctxt#answer "Node is bootstrapped, ready for injecting operations."
-  >>= fun () -> return_unit
+  ctxt#answer "Node is bootstrapped." >>= fun () -> return_unit
