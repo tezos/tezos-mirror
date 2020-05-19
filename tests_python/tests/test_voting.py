@@ -1,7 +1,10 @@
 import shutil
+import random
 import pytest
 from tools import paths, constants, utils
 from client.client import Client
+
+random.seed(42)
 
 BAKE_ARGS = ['--minimal-fees', '0', '--minimal-nanotez-per-byte', '0',
              '--minimal-nanotez-per-gas-unit', '0', '--max-priority', '512',
@@ -119,8 +122,61 @@ class TestManualBaking:
             client.submit_ballot(f'bootstrap{i}', proto,
                                  str(yay_fraction), str(nay_fraction),
                                  str(pass_fraction))
-        client.submit_ballot(f'bootstrap{4}', proto, '0',
-                             str(VOTES_PER_ROLL), '0')
+
+    def test_submit_ballot_negative_yays(self, client, session):
+        with utils.assert_run_failure('Number of yays has to be a ' +
+                                      'non-negative integer'):
+            yay_fraction = int(random.uniform(-0.4, -0.2) * VOTES_PER_ROLL)
+            nay_fraction = int(random.uniform(0.4, 0.6) * VOTES_PER_ROLL)
+            pass_fraction = int(random.uniform(0.4, 0.6) * VOTES_PER_ROLL)
+            proto = session['protos'][1]
+            client.submit_ballot(f'bootstrap1', proto,
+                                 str(yay_fraction), str(nay_fraction),
+                                 str(pass_fraction))
+
+    def test_submit_ballot_negative_nays(self, client, session):
+        with utils.assert_run_failure('Number of nays has to be a ' +
+                                      'non-negative integer'):
+            yay_fraction = int(random.uniform(0.4, 0.6) * VOTES_PER_ROLL)
+            nay_fraction = int(random.uniform(-0.4, -0.2) * VOTES_PER_ROLL)
+            pass_fraction = int(random.uniform(0.4, 0.6) * VOTES_PER_ROLL)
+            proto = session['protos'][1]
+            client.submit_ballot(f'bootstrap1', proto,
+                                 str(yay_fraction), str(nay_fraction),
+                                 str(pass_fraction))
+
+    def test_submit_ballot_negative_passes(self, client, session):
+        with utils.assert_run_failure('Number of passes has to be a ' +
+                                      'non-negative integer'):
+            yay_fraction = int(random.uniform(0.4, 0.6) * VOTES_PER_ROLL)
+            nay_fraction = int(random.uniform(0.4, 0.6) * VOTES_PER_ROLL)
+            pass_fraction = int(random.uniform(-0.4, -0.2) * VOTES_PER_ROLL)
+            proto = session['protos'][1]
+            client.submit_ballot(f'bootstrap1', proto,
+                                 str(yay_fraction), str(nay_fraction),
+                                 str(pass_fraction))
+
+    def test_submit_ballot_bigger_votes_per_roll(self, client, session):
+        with utils.assert_run_failure('Total number of yays/nays/passes ' +
+                                      f'differs from {VOTES_PER_ROLL}'):
+            yay_fraction = int(random.uniform(0.4, 0.6) * VOTES_PER_ROLL)
+            nay_fraction = int(random.uniform(0.4, 0.6) * VOTES_PER_ROLL)
+            pass_fraction = int(random.uniform(0.4, 0.6) * VOTES_PER_ROLL)
+            proto = session['protos'][1]
+            client.submit_ballot(f'bootstrap1', proto,
+                                 str(yay_fraction), str(nay_fraction),
+                                 str(pass_fraction))
+
+    def test_submit_ballot_smaller_votes_per_roll(self, client, session):
+        with utils.assert_run_failure('Total number of yays/nays/passes ' +
+                                      f'differs from {VOTES_PER_ROLL}'):
+            yay_fraction = int(random.uniform(0.1, 0.3) * VOTES_PER_ROLL)
+            nay_fraction = int(random.uniform(0.1, 0.3) * VOTES_PER_ROLL)
+            pass_fraction = int(random.uniform(0.1, 0.3) * VOTES_PER_ROLL)
+            proto = session['protos'][1]
+            client.submit_ballot(f'bootstrap1', proto,
+                                 str(yay_fraction), str(nay_fraction),
+                                 str(pass_fraction))
 
     def test_bake_four_blocks(self, client: Client):
         client.bake('bootstrap1', BAKE_ARGS)
