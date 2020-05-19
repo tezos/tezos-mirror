@@ -1,6 +1,6 @@
 tests/test_contract_onchain_opcodes.py::TestContractOnchainOpcodes::test_transfer_tokens
 
-Node is bootstrapped, ready for injecting operations.
+Node is bootstrapped.
 Estimated gas: 10911 units (will add 100 for safety)
 Estimated storage: 295 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
@@ -41,7 +41,7 @@ This sequence of operations was run:
 New contract [CONTRACT_HASH] originated.
 Contract memorized as test_transfer_account1.
 Injected block [BLOCK_HASH]
-Node is bootstrapped, ready for injecting operations.
+Node is bootstrapped.
 Estimated gas: 10911 units (will add 100 for safety)
 Estimated storage: 295 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
@@ -82,7 +82,7 @@ This sequence of operations was run:
 New contract [CONTRACT_HASH] originated.
 Contract memorized as test_transfer_account2.
 Injected block [BLOCK_HASH]
-Node is bootstrapped, ready for injecting operations.
+Node is bootstrapped.
 Estimated gas: 11747 units (will add 100 for safety)
 Estimated storage: 323 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
@@ -136,7 +136,7 @@ Injected block [BLOCK_HASH]
 100 ꜩ
 [CONTRACT_HASH]
 
-Node is bootstrapped, ready for injecting operations.
+Node is bootstrapped.
 Estimated gas: 23905 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
@@ -184,7 +184,7 @@ Injected block [BLOCK_HASH]
 200 ꜩ
 [CONTRACT_HASH]
 
-Node is bootstrapped, ready for injecting operations.
+Node is bootstrapped.
 Estimated gas: 23905 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.

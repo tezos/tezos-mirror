@@ -1,6 +1,6 @@
 tests/test_contract_onchain_opcodes.py::TestContractOnchainOpcodes::test_slice
 
-Node is bootstrapped, ready for injecting operations.
+Node is bootstrapped.
 Estimated gas: 24420 units (will add 100 for safety)
 Estimated storage: 835 bytes added (will add 20 for safety)
 Operation successfully injected in the node.

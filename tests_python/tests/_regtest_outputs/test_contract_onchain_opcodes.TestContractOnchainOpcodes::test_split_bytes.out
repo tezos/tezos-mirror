@@ -1,6 +1,6 @@
 tests/test_contract_onchain_opcodes.py::TestContractOnchainOpcodes::test_split_bytes
 
-Node is bootstrapped, ready for injecting operations.
+Node is bootstrapped.
 Estimated gas: 18309 units (will add 100 for safety)
 Estimated storage: 574 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
@@ -65,7 +65,7 @@ This sequence of operations was run:
 New contract [CONTRACT_HASH] originated.
 Contract memorized as split_bytes.
 Injected block [BLOCK_HASH]
-Node is bootstrapped, ready for injecting operations.
+Node is bootstrapped.
 Estimated gas: 17873 units (will add 100 for safety)
 Estimated storage: 18 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
@@ -99,7 +99,7 @@ This sequence of operations was run:
 
 Injected block [BLOCK_HASH]
 { 0xaa ; 0xbb ; 0xcc }
-Node is bootstrapped, ready for injecting operations.
+Node is bootstrapped.
 Estimated gas: 18626 units (will add 100 for safety)
 Estimated storage: 18 bytes added (will add 20 for safety)
 Operation successfully injected in the node.

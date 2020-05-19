@@ -1,6 +1,6 @@
 tests/test_contract_onchain_opcodes.py::TestContractOnchainOpcodes::test_set_delegate
 
-Node is bootstrapped, ready for injecting operations.
+Node is bootstrapped.
 Estimated gas: 11839 units (will add 100 for safety)
 Estimated storage: 329 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
@@ -45,7 +45,7 @@ Contract memorized as set_delegate.
 Injected block [BLOCK_HASH]
 Injected block [BLOCK_HASH]
 none
-Node is bootstrapped, ready for injecting operations.
+Node is bootstrapped.
 Estimated gas: 22123 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
@@ -82,7 +82,7 @@ This sequence of operations was run:
 
 Injected block [BLOCK_HASH]
 [CONTRACT_HASH] (known as bootstrap5)
-Node is bootstrapped, ready for injecting operations.
+Node is bootstrapped.
 Estimated gas: 22093 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
