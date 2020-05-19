@@ -166,12 +166,37 @@ let hmac_sha512 () =
       Alcotest.(check check_bytes "hmac_sha512" resp digest))
     vectors
 
+let sha3_256 () =
+  let resp =
+    of_hex "c0bc8a6fc1d24c6d8aba95294d86159807aacb95eff450367e807c76fdf98037"
+  in
+  let digest = Hash.SHA3_256.digest msg in
+  Alcotest.(check check_bytes "sha3_256" resp digest)
+
+let sha3_512 () =
+  let resp =
+    of_hex
+      "5d64d3ef8598612744af86fb24d9ad792e0064544a97c149ff8aaedf35c2717d105a2ae191aa11e08c525c28433687c044a8e81271ab9a668ba531091823dfe7"
+  in
+  let digest = Hash.SHA3_512.digest msg in
+  Alcotest.(check check_bytes "sha3_512" resp digest)
+
+let keccak_256 () =
+  let resp =
+    of_hex "9f3afe7d35d9bbc4efd98252357e73e85ce1234a48603a063bb7079174aafa68"
+  in
+  let digest = Hash.Keccak_256.digest msg in
+  Alcotest.(check check_bytes "keccak_256" resp digest)
+
 let hash =
   [ ("hmac_sha256", `Quick, hmac_sha256);
     ("hmac_sha512", `Quick, hmac_sha512);
     ("sha256", `Quick, sha256);
     ("sha256_seq", `Quick, sha256_seq);
-    ("sha512", `Quick, sha512) ]
+    ("sha512", `Quick, sha512);
+    ("sha3_256", `Quick, sha3_256);
+    ("sha3_512", `Quick, sha3_512);
+    ("keccak_256", `Quick, keccak_256) ]
 
 let test_blake2b_direct {data_in; data_key; data_out} =
   let (Blake2b.Hash h) =

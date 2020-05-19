@@ -76,6 +76,12 @@ module Hash : sig
   module SHA256 : S
 
   module SHA512 : S
+
+  module SHA3_256 : DIRECT_HASH
+
+  module SHA3_512 : DIRECT_HASH
+
+  module Keccak_256 : DIRECT_HASH
 end
 
 module Blake2b : sig

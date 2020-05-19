@@ -117,6 +117,33 @@ module Hash = struct
 
     include H
   end
+
+  module SHA3_256 = struct
+    let size = 32
+
+    let digest msg =
+      let output = Bytes.create size in
+      Hacl.SHA3_256.hash msg output ;
+      output
+  end
+
+  module SHA3_512 = struct
+    let size = 64
+
+    let digest msg =
+      let output = Bytes.create size in
+      Hacl.SHA3_512.hash msg output ;
+      output
+  end
+
+  module Keccak_256 = struct
+    let size = 32
+
+    let digest msg =
+      let output = Bytes.create size in
+      let keccak_256 = Hacl.Keccak.keccak 1088 512 1 in
+      keccak_256 msg output ; output
+  end
 end
 
 module Blake2b = struct
