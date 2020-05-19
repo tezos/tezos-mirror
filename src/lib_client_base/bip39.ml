@@ -8,14 +8,14 @@ open StdLabels
 let acceptable_num_words = [12; 15; 18; 21; 24]
 
 type entropy = {
-  bytes : Bigstring.t;
+  bytes : Bytes.t;
   length : int;
   digest_length : int;
   num_words : int;
 }
 
 let entropy_of_bytes bytes =
-  match Bigstring.length bytes with
+  match Bytes.length bytes with
   | 16 ->
       Some {bytes; length = 16; digest_length = 4; num_words = 12}
   | 20 ->
@@ -121,15 +121,15 @@ let of_entropy entropy =
   | None ->
       invalid_arg "Bip39.of_entropy: wrong entropy length"
   | Some {bytes; digest_length; _} ->
-      let digest = Bigstring.get (Hacl.Hash.SHA256.digest entropy) 0 in
+      let digest = Bytes.get (Hacl.Hash.SHA256.digest entropy) 0 in
       let digest = list_sub (bits_of_char digest) digest_length in
-      let entropy = bits_of_bytes (Bigstring.to_string bytes) @ digest in
+      let entropy = bits_of_bytes (Bytes.to_string bytes) @ digest in
       List.map (pack entropy 11) ~f:int_of_bits
 
-let to_seed ?(passphrase = Bigstring.empty) t =
+let to_seed ?(passphrase = Bytes.empty) t =
   let words = to_words t in
-  let password = Bigstring.of_string (String.concat ~sep:" " words) in
-  let salt = Bigstring.(concat "" [of_string "mnemonic"; passphrase]) in
+  let password = Bytes.of_string (String.concat ~sep:" " words) in
+  let salt = Bytes.(cat (of_string "mnemonic") passphrase) in
   Pbkdf.SHA512.pbkdf2 ~password ~salt ~count:2048 ~dk_len:64l
 
 (*---------------------------------------------------------------------------

@@ -48,15 +48,15 @@ val generate_nonces :
 module Secretbox : sig
   type key
 
-  val unsafe_of_bytes : Bigstring.t -> key
+  val unsafe_of_bytes : Bytes.t -> key
 
-  val box_noalloc : key -> nonce -> Bigstring.t -> unit
+  val box_noalloc : key -> nonce -> Bytes.t -> unit
 
-  val box_open_noalloc : key -> nonce -> Bigstring.t -> bool
+  val box_open_noalloc : key -> nonce -> Bytes.t -> bool
 
-  val box : key -> Bytes.t -> nonce -> Bigstring.t
+  val box : key -> Bytes.t -> nonce -> Bytes.t
 
-  val box_open : key -> Bigstring.t -> nonce -> Bytes.t option
+  val box_open : key -> Bytes.t -> nonce -> Bytes.t option
 end
 
 type target
@@ -83,9 +83,9 @@ val random_keypair : unit -> secret_key * public_key * Public_key_hash.t
 
 val precompute : secret_key -> public_key -> channel_key
 
-val fast_box : channel_key -> Bigstring.t -> nonce -> Bigstring.t
+val fast_box : channel_key -> Bytes.t -> nonce -> Bytes.t
 
-val fast_box_open : channel_key -> Bigstring.t -> nonce -> Bigstring.t option
+val fast_box_open : channel_key -> Bytes.t -> nonce -> Bytes.t option
 
 val fast_box_noalloc : channel_key -> nonce -> Bytes.t -> unit
 

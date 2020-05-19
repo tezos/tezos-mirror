@@ -138,11 +138,9 @@ struct
   module MBytes = MBytes
 
   module Raw_hashes = struct
-    let conv f x = Bigstring.to_bytes (f (Bigstring.of_bytes x))
+    let sha256 = Hacl.Hash.SHA256.digest
 
-    let sha256 msg = conv Hacl.Hash.SHA256.digest msg
-
-    let sha512 msg = conv Hacl.Hash.SHA512.digest msg
+    let sha512 = Hacl.Hash.SHA512.digest
 
     let blake2b msg = Blake2B.to_bytes (Blake2B.hash_bytes [msg])
   end

@@ -59,11 +59,11 @@ module Raw = struct
       | P256 sk ->
           Data_encoding.Binary.to_bytes_exn P256.Secret_key.encoding sk
     in
-    Bigstring.concat "" [salt; Crypto_box.Secretbox.box key msg nonce]
+    Bytes.cat salt (Crypto_box.Secretbox.box key msg nonce)
 
   let decrypt algo ~password ~encrypted_sk =
-    let salt = Bigstring.sub encrypted_sk 0 salt_len in
-    let encrypted_sk = Bigstring.sub encrypted_sk salt_len encrypted_size in
+    let salt = Bytes.sub encrypted_sk 0 salt_len in
+    let encrypted_sk = Bytes.sub encrypted_sk salt_len encrypted_size in
     let key = Crypto_box.Secretbox.unsafe_of_bytes (pbkdf ~salt ~password) in
     match (Crypto_box.Secretbox.box_open key encrypted_sk nonce, algo) with
     | (None, _) ->
@@ -169,7 +169,7 @@ let password_file_load ctxt =
   match ctxt#load_passwords with
   | Some stream ->
       Lwt_stream.iter
-        (fun p -> passwords := Bigstring.of_string p :: !passwords)
+        (fun p -> passwords := Bytes.of_string p :: !passwords)
         stream
       >>= fun () -> return_unit
   | None ->
@@ -197,7 +197,6 @@ let decrypt_payload cctxt ?name encrypted_sk =
   | _ ->
       failwith "Not a Base58Check-encoded encrypted key" )
   >>=? fun (algo, encrypted_sk) ->
-  let encrypted_sk = Bigstring.of_bytes encrypted_sk in
   noninteractive_decrypt_loop algo ~encrypted_sk !passwords
   >>=? function
   | Some sk ->
@@ -242,7 +241,7 @@ let rec read_password (cctxt : #Client_context.io) =
   >>=? fun password ->
   cctxt#prompt_password "Confirm password: "
   >>=? fun confirm ->
-  if not (Bigstring.equal password confirm) then
+  if not (Bytes.equal password confirm) then
     cctxt#message "Passwords do not match." >>= fun () -> read_password cctxt
   else return password
 
@@ -259,7 +258,6 @@ let encrypt cctxt sk =
     | P256 _ ->
         Encodings.p256
   in
-  let payload = Bigstring.to_bytes payload in
   let path = Base58.simple_encode encoding payload in
   let sk_uri = Client_keys.make_sk_uri (Uri.make ~scheme ~path ()) in
   Hashtbl.replace decrypted sk_uri sk ;

@@ -285,11 +285,9 @@ module type SIGNATURE = sig
   val check : ?watermark:watermark -> Public_key.t -> t -> Bytes.t -> bool
 
   val generate_key :
-    ?seed:Bigstring.t ->
-    unit ->
-    Public_key_hash.t * Public_key.t * Secret_key.t
+    ?seed:Bytes.t -> unit -> Public_key_hash.t * Public_key.t * Secret_key.t
 
-  val deterministic_nonce : Secret_key.t -> Bytes.t -> Bigstring.t
+  val deterministic_nonce : Secret_key.t -> Bytes.t -> Bytes.t
 
   val deterministic_nonce_hash : Secret_key.t -> Bytes.t -> Bytes.t
 end

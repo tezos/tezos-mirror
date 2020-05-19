@@ -112,7 +112,7 @@ module type SIGNER = sig
 
   (** [deterministic_nonce sk data] is a nonce obtained
       deterministically from [data] and [sk]. *)
-  val deterministic_nonce : sk_uri -> Bytes.t -> Bigstring.t tzresult Lwt.t
+  val deterministic_nonce : sk_uri -> Bytes.t -> Bytes.t tzresult Lwt.t
 
   (** [deterministic_nonce_hash sk data] is a nonce hash obtained
       deterministically from [data] and [sk]. *)
@@ -163,7 +163,7 @@ val check :
   Bytes.t ->
   bool tzresult Lwt.t
 
-val deterministic_nonce : sk_uri -> Bytes.t -> Bigstring.t tzresult Lwt.t
+val deterministic_nonce : sk_uri -> Bytes.t -> Bytes.t tzresult Lwt.t
 
 val deterministic_nonce_hash : sk_uri -> Bytes.t -> Bytes.t tzresult Lwt.t
 

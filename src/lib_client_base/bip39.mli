@@ -33,12 +33,12 @@ val to_words : t -> string list
 
     @raise [Invalid_argument] is [List.length bytes] is not in [ 16,
     20, 24, 28, 32 ]. *)
-val of_entropy : Bigstring.t -> t
+val of_entropy : Bytes.t -> t
 
 (** [to_seed ?passphrase mnemonic] is 64 bytes derived from a BIP39
     mnemonic [mnemonic], using the optional passphrase [passphrase] if
     provided. *)
-val to_seed : ?passphrase:Bigstring.t -> t -> Bigstring.t
+val to_seed : ?passphrase:Bytes.t -> t -> Bytes.t
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2017 Vincent Bernardoff

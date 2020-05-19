@@ -99,9 +99,9 @@ module Step : sig
 end = struct
   (* (step, counter, seed) .
      The seed is stored in a bigstring and should be mlocked *)
-  type state = Int32.t * int * Bigstring.t
+  type state = Int32.t * int * Bytes.t
 
-  let update st b = Hacl.Hash.SHA256.update st (Bigstring.of_bytes b)
+  let update st b = Hacl.Hash.SHA256.update st b
 
   let init seed head =
     let open Hacl.Hash in
@@ -114,8 +114,7 @@ end = struct
     (1l, 9, SHA256.finish st)
 
   let draw seed n =
-    ( Int32.rem (TzEndian.get_int32 (Bigstring.to_bytes seed) 0) n,
-      Hacl.Hash.SHA256.digest seed )
+    (Int32.rem (TzEndian.get_int32 seed 0) n, Hacl.Hash.SHA256.digest seed)
 
   let next (step, counter, seed) =
     let (random_gap, seed) =

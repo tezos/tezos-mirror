@@ -43,7 +43,7 @@ class type prompter =
   object
     method prompt : ('a, string tzresult) lwt_format -> 'a
 
-    method prompt_password : ('a, Bigstring.t tzresult) lwt_format -> 'a
+    method prompt_password : ('a, Bytes.t tzresult) lwt_format -> 'a
   end
 
 class type io =
@@ -192,8 +192,7 @@ class proxy_context (obj : full) =
 
     method prompt : type a. (a, string tzresult) lwt_format -> a = obj#prompt
 
-    method prompt_password : type a. (a, Bigstring.t tzresult) lwt_format -> a
-        =
+    method prompt_password : type a. (a, Bytes.t tzresult) lwt_format -> a =
       obj#prompt_password
 
     method sleep : float -> unit Lwt.t = obj#sleep

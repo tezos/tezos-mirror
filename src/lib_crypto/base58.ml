@@ -130,10 +130,8 @@ let raw_decode ?(alphabet = Alphabet.default) s =
          ^ String.init len (fun i -> res.[len - i - 1]))
 
 let checksum s =
-  let hash = Hacl.Hash.SHA256.(digest (digest (Bigstring.of_string s))) in
-  let res = Bytes.make 4 '\000' in
-  Bigstring.blit_to_bytes hash 0 res 0 4 ;
-  Bytes.to_string res
+  let hash = Hacl.Hash.SHA256.(digest (digest (Bytes.of_string s))) in
+  Bytes.sub_string hash 0 4
 
 (* Append a 4-bytes cryptographic checksum before encoding string s *)
 let safe_encode ?alphabet s = raw_encode ?alphabet (s ^ checksum s)

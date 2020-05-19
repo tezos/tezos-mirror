@@ -54,24 +54,16 @@ module Public_key = struct
 
   let title = "Ed25519 public key"
 
-  let to_string s = Bigstring.to_string (Sign.unsafe_to_bytes s)
-
-  let of_string_opt s =
-    if String.length s < Sign.pkbytes then None
-    else
-      let pk = Bigstring.create Sign.pkbytes in
-      Bigstring.blit_of_string s 0 pk 0 Sign.pkbytes ;
-      Some (Sign.unsafe_pk_of_bytes pk)
-
-  let to_bytes pk = Bigstring.to_bytes (Sign.unsafe_to_bytes pk)
+  let to_bytes pk = Bytes.copy (Sign.unsafe_to_bytes pk)
 
   let of_bytes_opt buf =
-    let buflen = Bytes.length buf in
-    if buflen < Sign.pkbytes then None
-    else
-      let pk = Bigstring.create Sign.pkbytes in
-      Bigstring.blit_of_bytes buf 0 pk 0 Sign.pkbytes ;
-      Some (Sign.unsafe_pk_of_bytes pk)
+    if Bytes.length buf = Sign.pkbytes then
+      Some (Sign.unsafe_pk_of_bytes (Bytes.copy buf))
+    else None
+
+  let to_string s = Bytes.to_string (Sign.unsafe_to_bytes s)
+
+  let of_string_opt s = of_bytes_opt (Bytes.of_string s)
 
   let size = Sign.pkbytes
 
@@ -87,14 +79,13 @@ module Public_key = struct
 
   let () = Base58.check_encoded_prefix b58check_encoding "edpk" 54
 
-  let hash v =
-    Public_key_hash.hash_bytes [Bigstring.to_bytes (Sign.unsafe_to_bytes v)]
+  let hash v = Public_key_hash.hash_bytes [Sign.unsafe_to_bytes v]
 
   include Compare.Make (struct
     type nonrec t = t
 
     let compare a b =
-      Bigstring.compare (Sign.unsafe_to_bytes a) (Sign.unsafe_to_bytes b)
+      Bytes.compare (Sign.unsafe_to_bytes a) (Sign.unsafe_to_bytes b)
   end)
 
   include Helpers.MakeRaw (struct
@@ -151,16 +142,12 @@ module Secret_key = struct
 
   let size = Sign.skbytes
 
-  let to_bigstring sk = Sign.unsafe_to_bytes sk
-
-  let to_bytes sk = Bigstring.to_bytes (to_bigstring sk)
+  let to_bytes sk = Bytes.copy (Sign.unsafe_to_bytes sk)
 
   let of_bytes_opt s =
-    if Bytes.length s > 64 then None
-    else
-      let sk = Bigstring.create Sign.skbytes in
-      Bigstring.blit_of_bytes s 0 sk 0 Sign.skbytes ;
-      Some (Sign.unsafe_sk_of_bytes sk)
+    if Bytes.length s = Sign.skbytes then
+      Some (Sign.unsafe_sk_of_bytes (Bytes.copy s))
+    else None
 
   let to_string s = Bytes.to_string (to_bytes s)
 
@@ -174,10 +161,10 @@ module Secret_key = struct
     Base58.register_encoding
       ~prefix:Base58.Prefix.ed25519_seed
       ~length:size
-      ~to_raw:(fun sk -> Bigstring.to_string (Sign.unsafe_to_bytes sk))
+      ~to_raw:(fun sk -> Bytes.to_string (Sign.unsafe_to_bytes sk))
       ~of_raw:(fun buf ->
         if String.length buf <> Sign.skbytes then None
-        else Some (Sign.unsafe_sk_of_bytes (Bigstring.of_string buf)))
+        else Some (Sign.unsafe_sk_of_bytes (Bytes.of_string buf)))
       ~wrap:(fun sk -> Data sk)
 
   (* Legacy NaCl secret key encoding. Used to store both sk and pk. *)
@@ -187,15 +174,14 @@ module Secret_key = struct
       ~length:Sign.(skbytes + pkbytes)
       ~to_raw:(fun sk ->
         let pk = Sign.neuterize sk in
-        let buf = Bigstring.create Sign.(skbytes + pkbytes) in
+        let buf = Bytes.create Sign.(skbytes + pkbytes) in
         Sign.blit_to_bytes sk buf ;
         Sign.blit_to_bytes pk ~pos:Sign.skbytes buf ;
-        Bigstring.to_string buf)
+        Bytes.to_string buf)
       ~of_raw:(fun buf ->
         if String.length buf <> Sign.(skbytes + pkbytes) then None
         else
-          let sk = Bigstring.create Sign.skbytes in
-          Bigstring.blit_of_string buf 0 sk 0 Sign.skbytes ;
+          let sk = Bytes.(sub (of_string buf) 0 Sign.skbytes) in
           Some (Sign.unsafe_sk_of_bytes sk))
       ~wrap:(fun x -> Data x)
 
@@ -236,7 +222,7 @@ module Secret_key = struct
     type nonrec t = t
 
     let compare a b =
-      Bigstring.compare (Sign.unsafe_to_bytes a) (Sign.unsafe_to_bytes b)
+      Bytes.compare (Sign.unsafe_to_bytes a) (Sign.unsafe_to_bytes b)
   end)
 
   include Helpers.MakeRaw (struct
@@ -276,7 +262,7 @@ module Secret_key = struct
   let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
 end
 
-type t = Bigstring.t
+type t = Bytes.t
 
 type watermark = Bytes.t
 
@@ -286,10 +272,9 @@ let title = "An Ed25519 signature"
 
 let size = Sign.bytes
 
-let of_bytes_opt s =
-  if Bytes.length s = size then Some (Bigstring.of_bytes s) else None
+let of_bytes_opt s = if Bytes.length s = size then Some s else None
 
-let to_bytes x = Bigstring.to_bytes x
+let to_bytes x = x
 
 let to_string s = Bytes.to_string (to_bytes s)
 
@@ -301,8 +286,8 @@ let b58check_encoding =
   Base58.register_encoding
     ~prefix:Base58.Prefix.ed25519_signature
     ~length:size
-    ~to_raw:Bigstring.to_string
-    ~of_raw:(fun s -> Some (Bigstring.of_string s))
+    ~to_raw:Bytes.to_string
+    ~of_raw:(fun s -> Some (Bytes.of_string s))
     ~wrap:(fun x -> Data x)
 
 let () = Base58.check_encoded_prefix b58check_encoding "edsig" 99
@@ -351,15 +336,15 @@ end)
 
 let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
 
-let zero = Bigstring.make size '\000'
+let zero = Bytes.make size '\000'
 
 let sign ?watermark sk msg =
   let msg =
     Blake2B.to_bytes @@ Blake2B.hash_bytes
     @@ match watermark with None -> [msg] | Some prefix -> [prefix; msg]
   in
-  let signature = Bigstring.create Sign.bytes in
-  Sign.sign ~sk ~msg:(Bigstring.of_bytes msg) ~signature ;
+  let signature = Bytes.create Sign.bytes in
+  Sign.sign ~sk ~msg ~signature ;
   signature
 
 let check ?watermark pk signature msg =
@@ -367,7 +352,7 @@ let check ?watermark pk signature msg =
     Blake2B.to_bytes @@ Blake2B.hash_bytes
     @@ match watermark with None -> [msg] | Some prefix -> [prefix; msg]
   in
-  Sign.verify ~pk ~signature ~msg:(Bigstring.of_bytes msg)
+  Sign.verify ~pk ~signature ~msg
 
 let generate_key ?seed () =
   match seed with
@@ -375,7 +360,7 @@ let generate_key ?seed () =
       let (pk, sk) = Sign.keypair () in
       (Public_key.hash pk, pk, sk)
   | Some seed ->
-      let seedlen = Bigstring.length seed in
+      let seedlen = Bytes.length seed in
       if seedlen < Sign.skbytes then
         invalid_arg
           (Printf.sprintf
@@ -383,23 +368,19 @@ let generate_key ?seed () =
               %d)"
              Sign.skbytes
              seedlen) ;
-      let sk = Bigstring.create Sign.skbytes in
-      Bigstring.blit seed 0 sk 0 Sign.skbytes ;
-      let sk = Sign.unsafe_sk_of_bytes sk in
+      let sk = Sign.unsafe_sk_of_bytes (Bytes.sub seed 0 Sign.skbytes) in
       let pk = Sign.neuterize sk in
       (Public_key.hash pk, pk, sk)
 
 let deterministic_nonce sk msg =
-  let msg = Bigstring.of_bytes msg in
-  let key = Secret_key.to_bigstring sk in
-  Hash.SHA256.HMAC.digest ~key ~msg
+  let key = Secret_key.to_bytes sk in
+  Hacl.Hash.SHA256.HMAC.digest ~key ~msg
 
 let deterministic_nonce_hash sk msg =
-  Blake2B.to_bytes
-    (Blake2B.hash_bytes [Bigstring.to_bytes (deterministic_nonce sk msg)])
+  Blake2B.to_bytes (Blake2B.hash_bytes [deterministic_nonce sk msg])
 
 include Compare.Make (struct
   type nonrec t = t
 
-  let compare = Bigstring.compare
+  let compare = Bytes.compare
 end)

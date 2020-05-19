@@ -119,15 +119,13 @@ module Make_minimal (K : Name) = struct
   let to_bytes (Blake2b.Hash h) = h
 
   let hash_bytes ?key l =
-    let state = Blake2b.init ?key size in
-    List.iter (fun b -> Blake2b.update state b) l ;
-    Blake2b.final state
+    let input = Bytes.concat Bytes.empty l in
+    Blake2b.direct ?key input size
 
   let hash_string ?key l =
     let key = Option.map ~f:Bytes.of_string key in
-    let state = Blake2b.init ?key size in
-    List.iter (fun s -> Blake2b.update state (Bytes.of_string s)) l ;
-    Blake2b.final state
+    let input = String.concat "" l in
+    Blake2b.direct ?key (Bytes.of_string input) size
 
   let path_length = 6
 

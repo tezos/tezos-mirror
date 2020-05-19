@@ -765,12 +765,11 @@ module Signer_implementation : Client_keys.SIGNER = struct
       ~ledger_uri
       (fun hidapi (_version, _git_commit) _device_info _ledger_id ->
         Ledger_commands.get_deterministic_nonce hidapi curve path msg
-        >>=? fun bytes -> return_some bytes)
+        >>=? fun bytes -> return_some (Bigstring.to_bytes bytes))
 
   let deterministic_nonce_hash (sk : sk_uri) msg =
     deterministic_nonce sk msg
-    >>=? fun nonce ->
-    return (Blake2B.to_bytes (Blake2B.hash_bytes [Bigstring.to_bytes nonce]))
+    >>=? fun nonce -> return (Blake2B.to_bytes (Blake2B.hash_bytes [nonce]))
 
   let supports_deterministic_nonces _ = return_true
 end

@@ -47,7 +47,7 @@ open Libsecp256k1.External
 
 let context =
   let ctx = Context.create () in
-  match Context.randomize ctx (Hacl.Rand.gen 32) with
+  match Context.randomize ctx (Bigstring.of_bytes (Hacl.Rand.gen 32)) with
   | false ->
       failwith "Secp256k1 context randomization failed. Aborting."
   | true ->
@@ -331,16 +331,15 @@ let check ?watermark public_key signature msg =
     ~signature
 
 let generate_key ?(seed = Hacl.Rand.gen 32) () =
-  let sk = Key.read_sk_exn context seed in
+  let sk = Key.read_sk_exn context (Bigstring.of_bytes seed) in
   let pk = Key.neuterize_exn context sk in
   let pkh = Public_key.hash pk in
   (pkh, pk, sk)
 
 let deterministic_nonce sk msg =
-  let msg = Bigstring.of_bytes msg in
-  let key = Secret_key.to_bigstring sk in
+  let key = Secret_key.to_bytes sk in
   Hacl.Hash.SHA256.HMAC.digest ~key ~msg
 
 let deterministic_nonce_hash sk msg =
   let nonce = deterministic_nonce sk msg in
-  Blake2B.to_bytes (Blake2B.hash_bytes [Bigstring.to_bytes nonce])
+  Blake2B.to_bytes (Blake2B.hash_bytes [nonce])

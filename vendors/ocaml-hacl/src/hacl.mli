@@ -20,10 +20,10 @@
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. *)
 
 module Rand : sig
-  val write : Bigstring.t -> unit
+  val write : Bytes.t -> unit
   (** [write buf] writes random bytes on [buf]. *)
 
-  val gen : int -> Bigstring.t
+  val gen : int -> Bytes.t
   (** [gen len] is a random buffer of length [len]. *)
 end
 
@@ -38,20 +38,20 @@ module Hash : sig
     (** Incremental Interface *)
 
     val init : unit -> state
-    val update : state -> Bigstring.t -> unit
-    val finish : state -> Bigstring.t
+    val update : state -> Bytes.t -> unit
+    val finish : state -> Bytes.t
 
     (** Direct Interface *)
 
-    val digest : Bigstring.t -> Bigstring.t
+    val digest : Bytes.t -> Bytes.t
 
     module HMAC : sig
       val write :
-        key:Bigstring.t -> msg:Bigstring.t -> Bigstring.t -> unit
+        key:Bytes.t -> msg:Bytes.t -> Bytes.t -> unit
       (** @raise [Invalid_argument] if argument is less than 32 bytes long *)
 
       val digest :
-        key:Bigstring.t -> msg:Bigstring.t -> Bigstring.t
+        key:Bytes.t -> msg:Bytes.t -> Bytes.t
     end
   end
 
@@ -60,12 +60,12 @@ module Hash : sig
 end
 
 module Nonce : sig
-  type t = Bigstring.t
+  type t = Bytes.t
   val bytes : int
   val gen : unit -> t
   val increment : ?step:int -> t -> t
-  val of_bytes : Bigstring.t -> t option
-  val of_bytes_exn : Bigstring.t -> t
+  val of_bytes : Bytes.t -> t option
+  val of_bytes_exn : Bytes.t -> t
 end
 
 module Secretbox : sig
@@ -75,21 +75,21 @@ module Secretbox : sig
   val zerobytes : int
   val boxzerobytes : int
 
-  val unsafe_of_bytes : Bigstring.t -> key
+  val unsafe_of_bytes : Bytes.t -> key
   (** @raise Invalid_argument if argument is not [keybytes] bytes long *)
 
-  val blit_of_bytes : Bigstring.t -> int -> key
+  val blit_of_bytes : Bytes.t -> int -> key
   (** @raise Invalid_argument if argument is not [keybytes] bytes long *)
 
   val genkey : unit -> key
 
   val box :
-    key:key -> nonce:Bigstring.t ->
-    msg:Bigstring.t -> cmsg:Bigstring.t -> unit
+    key:key -> nonce:Bytes.t ->
+    msg:Bytes.t -> cmsg:Bytes.t -> unit
 
   val box_open :
-    key:key -> nonce:Bigstring.t ->
-    cmsg:Bigstring.t -> msg:Bigstring.t -> bool
+    key:key -> nonce:Bytes.t ->
+    cmsg:Bytes.t -> msg:Bytes.t -> bool
 end
 
 type secret
@@ -107,22 +107,22 @@ module Box : sig
 
   val equal : 'a key -> 'a key -> bool
 
-  val unsafe_to_bytes : _ key -> Bigstring.t
-  (** [unsafe_to_bytes k] is the internal [Bigstring.t] where the key
+  val unsafe_to_bytes : _ key -> Bytes.t
+  (** [unsafe_to_bytes k] is the internal [Bytes.t] where the key
       is stored. DO NOT MODIFY. *)
 
-  val blit_to_bytes : _ key -> ?pos:int -> Bigstring.t -> unit
+  val blit_to_bytes : _ key -> ?pos:int -> Bytes.t -> unit
 
-  val unsafe_sk_of_bytes : Bigstring.t -> secret key
+  val unsafe_sk_of_bytes : Bytes.t -> secret key
   (** @raise Invalid_argument if argument is not [skbytes] bytes long *)
 
-  val unsafe_pk_of_bytes : Bigstring.t -> public key
+  val unsafe_pk_of_bytes : Bytes.t -> public key
   (** @raise Invalid_argument if argument is not [pkbytes] bytes long *)
 
-  val unsafe_ck_of_bytes : Bigstring.t -> combined key
+  val unsafe_ck_of_bytes : Bytes.t -> combined key
   (** @raise Invalid_argument if argument is not [ckbytes] bytes long *)
 
-  val of_seed : ?pos:int -> Bigstring.t -> secret key
+  val of_seed : ?pos:int -> Bytes.t -> secret key
   (** @raise Invalid_argument if [pos] is outside the buffer or the buffer
       is less than [skbytes] bytes long *)
 
@@ -131,12 +131,12 @@ module Box : sig
   val dh : public key -> secret key -> combined key
 
   val box :
-    k:combined key -> nonce:Bigstring.t ->
-    msg:Bigstring.t -> cmsg:Bigstring.t -> unit
+    k:combined key -> nonce:Bytes.t ->
+    msg:Bytes.t -> cmsg:Bytes.t -> unit
 
   val box_open :
-    k:combined key -> nonce:Bigstring.t ->
-    cmsg:Bigstring.t -> msg:Bigstring.t -> bool
+    k:combined key -> nonce:Bytes.t ->
+    cmsg:Bytes.t -> msg:Bytes.t -> bool
 end
 
 module Sign : sig
@@ -148,23 +148,23 @@ module Sign : sig
 
   val equal : 'a key -> 'a key -> bool
 
-  val unsafe_sk_of_bytes : Bigstring.t -> secret key
+  val unsafe_sk_of_bytes : Bytes.t -> secret key
   (** @raise Invalid_argument if argument is less than [skbytes] bytes long *)
 
-  val unsafe_pk_of_bytes : Bigstring.t -> public key
+  val unsafe_pk_of_bytes : Bytes.t -> public key
   (** @raise Invalid_argument if argument is less than [pkbytes] bytes long *)
 
-  val unsafe_to_bytes : _ key -> Bigstring.t
-  (** [unsafe_to_bytes k] is the internal [Bigstring.t] where the key
+  val unsafe_to_bytes : _ key -> Bytes.t
+  (** [unsafe_to_bytes k] is the internal [Bytes.t] where the key
       is stored. DO NOT MODIFY. *)
 
-  val blit_to_bytes : _ key -> ?pos:int -> Bigstring.t -> unit
+  val blit_to_bytes : _ key -> ?pos:int -> Bytes.t -> unit
 
   val neuterize : _ key -> public key
   val keypair : unit -> public key * secret key
 
   val sign :
-    sk:secret key -> msg:Bigstring.t -> signature:Bigstring.t -> unit
+    sk:secret key -> msg:Bytes.t -> signature:Bytes.t -> unit
   (** [sign sk msg buf] writes the signature of [msg] with [sk] at
       [buf].
 
@@ -172,5 +172,5 @@ module Sign : sig
       bytes long. *)
 
   val verify :
-    pk:public key -> msg:Bigstring.t -> signature:Bigstring.t -> bool
+    pk:public key -> msg:Bytes.t -> signature:Bytes.t -> bool
 end

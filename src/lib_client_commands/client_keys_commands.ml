@@ -192,7 +192,7 @@ let rec input_fundraiser_params (cctxt : #Client_context.io_wallet) =
     else
       cctxt#prompt_password "Enter word %d: " i
       >>=? fun word ->
-      match Bip39.index_of_word (Bigstring.to_string word) with
+      match Bip39.index_of_word (Bytes.to_string word) with
       | None ->
           loop_words acc i
       | Some wordidx ->
@@ -207,9 +207,9 @@ let rec input_fundraiser_params (cctxt : #Client_context.io_wallet) =
       cctxt#prompt_password "Enter the password used for the paper wallet: "
       >>=? fun password ->
       (* TODO: unicode normalization (NFKD)... *)
-      let passphrase = Bigstring.(concat "" [of_string email; password]) in
+      let passphrase = Bytes.(cat (of_string email) password) in
       let sk = Bip39.to_seed ~passphrase t in
-      let sk = Bigstring.sub_bytes sk 0 32 in
+      let sk = Bytes.sub sk 0 32 in
       let sk : Signature.Secret_key.t =
         Ed25519
           (Data_encoding.Binary.of_bytes_exn Ed25519.Secret_key.encoding sk)
@@ -368,7 +368,7 @@ let commands version : Client_context.full Clic.command list =
       (fun () (cctxt : Client_context.full) ->
         cctxt#prompt_password "Enter unencrypted secret key: "
         >>=? fun sk_uri ->
-        let sk_uri = Uri.of_string (Bigstring.to_string sk_uri) in
+        let sk_uri = Uri.of_string (Bytes.to_string sk_uri) in
         ( match Uri.scheme sk_uri with
         | None | Some "unencrypted" ->
             return_unit
@@ -599,7 +599,7 @@ let commands version : Client_context.full Clic.command list =
           >>=? fun sk_uri ->
           Client_keys.deterministic_nonce sk_uri data
           >>=? fun nonce ->
-          cctxt#message "%a" Hex.pp (Hex.of_bytes (Bigstring.to_bytes nonce))
+          cctxt#message "%a" Hex.pp (Hex.of_bytes nonce)
           >>= fun () -> return_unit);
       command
         ~group

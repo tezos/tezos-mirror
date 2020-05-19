@@ -50,7 +50,7 @@ val deterministic_nonce :
   #Client_context.wallet ->
   Signer_messages.Deterministic_nonce.Request.t ->
   require_auth:bool ->
-  Bigstring.t tzresult Lwt.t
+  Bytes.t tzresult Lwt.t
 
 (** [deterministic_nonce_hash cctxt req ~require_auth] generates
     deterministically a nonce from [req.data] and returns the hash of

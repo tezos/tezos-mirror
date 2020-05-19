@@ -312,13 +312,13 @@ let check ?watermark public_key signature msg =
   verify public_key ~msg:(Bigstring.of_bytes msg) ~signature
 
 let generate_key ?(seed = Hacl.Rand.gen 32) () =
-  let seedlen = Bigstring.length seed in
+  let seedlen = Bytes.length seed in
   if seedlen < 32 then
     invalid_arg
       (Printf.sprintf
          "P256.generate_key: seed must be at least 32 bytes long (was %d)"
          seedlen) ;
-  match sk_of_bytes secp256r1 seed with
+  match sk_of_bytes secp256r1 (Bigstring.of_bytes seed) with
   | None ->
       invalid_arg "P256.generate_key: invalid seed (very rare!)"
   | Some (sk, pk) ->
@@ -326,13 +326,12 @@ let generate_key ?(seed = Hacl.Rand.gen 32) () =
       (pkh, pk, sk)
 
 let deterministic_nonce sk msg =
-  let msg = Bigstring.of_bytes msg in
-  let key = Secret_key.to_bigstring sk in
+  let key = Secret_key.to_bytes sk in
   Hacl.Hash.SHA256.HMAC.digest ~key ~msg
 
 let deterministic_nonce_hash sk msg =
   let nonce = deterministic_nonce sk msg in
-  Blake2B.to_bytes (Blake2B.hash_bytes [Bigstring.to_bytes nonce])
+  Blake2B.to_bytes (Blake2B.hash_bytes [nonce])
 
 include Compare.Make (struct
   type nonrec t = t

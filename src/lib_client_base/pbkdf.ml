@@ -2,11 +2,11 @@
 (* Distributed under the BSD2 license, see terms at the end of the file.     *)
 
 let xorbuf a b =
-  let alen = Bigstring.length a in
-  if Bigstring.length b <> alen then
+  let alen = Bytes.length a in
+  if Bytes.length b <> alen then
     invalid_arg "xor: both buffers must be of same size" ;
   for i = 0 to alen - 1 do
-    Bigstring.(set a i Char.(chr (code (get a i) lxor code (get b i))))
+    Bytes.(set a i Char.(chr (code (get a i) lxor code (get b i))))
   done ;
   a
 
@@ -22,11 +22,7 @@ let cdiv x y =
 
 module type S = sig
   val pbkdf2 :
-    password:Bigstring.t ->
-    salt:Bigstring.t ->
-    count:int ->
-    dk_len:int32 ->
-    Bigstring.t
+    password:Bytes.t -> salt:Bytes.t -> count:int -> dk_len:int32 -> Bytes.t
 end
 
 module Make (H : Hacl.Hash.S) : S = struct
@@ -45,11 +41,9 @@ module Make (H : Hacl.Hash.S) : S = struct
             let u = H.HMAC.digest ~key:password ~msg:u in
             f u (xorbuf xor u) (j - 1)
       in
-      let int_i = Bigstring.create 4 in
-      EndianBigstring.BigEndian.set_int32 int_i 0 (Int32.of_int i) ;
-      let u_1 =
-        H.HMAC.digest ~key:password ~msg:(Bigstring.concat "" [salt; int_i])
-      in
+      let int_i = Bytes.create 4 in
+      TzEndian.set_int32 int_i 0 (Int32.of_int i) ;
+      let u_1 = H.HMAC.digest ~key:password ~msg:(Bytes.cat salt int_i) in
       f u_1 u_1 (count - 1)
     in
     let rec loop blocks = function
@@ -58,7 +52,7 @@ module Make (H : Hacl.Hash.S) : S = struct
       | i ->
           loop (block i :: blocks) (i - 1)
     in
-    Bigstring.concat "" (loop [Bigstring.sub (block l) 0 r] (l - 1))
+    Bytes.concat Bytes.empty (loop [Bytes.sub (block l) 0 r] (l - 1))
 end
 
 module SHA256 = Make (Hacl.Hash.SHA256)

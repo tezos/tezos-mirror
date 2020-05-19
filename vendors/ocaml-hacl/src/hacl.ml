@@ -19,14 +19,12 @@
  * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. *)
 
-open EndianBigstring
-
 module Rand = struct
-  external write : Bigstring.t -> unit =
+  external write : Bytes.t -> unit =
     "ml_randombytes" [@@noalloc]
 
   let gen len =
-    let buf = Bigstring.create len in
+    let buf = Bytes.create len in
     write buf ;
     buf
 end
@@ -34,9 +32,9 @@ end
 module Hash = struct
   module type HASH = sig
     val init : Bigstring.t -> unit
-    val update : Bigstring.t -> Bigstring.t -> unit
-    val update_last : Bigstring.t -> Bigstring.t -> int -> unit
-    val finish : Bigstring.t -> Bigstring.t -> unit
+    val update : Bigstring.t -> Bytes.t -> unit
+    val update_last : Bigstring.t -> Bytes.t -> int -> unit
+    val finish : Bigstring.t -> Bytes.t -> unit
 
     val bytes : int
     val blockbytes : int
@@ -46,7 +44,7 @@ module Hash = struct
   module Make(S: HASH) = struct
     type state = {
       state : Bigstring.t ;
-      buf : Bigstring.t ;
+      buf : Bytes.t ;
       mutable pos : int ;
     }
 
@@ -56,30 +54,30 @@ module Hash = struct
 
     let init () =
       let state = Bigstring.create S.statebytes in
-      let buf = Bigstring.create S.blockbytes in
+      let buf = Bytes.create S.blockbytes in
       S.init state ;
       { state ; buf ; pos = 0 }
 
     let rec update ({ state ; buf ; pos } as st) m p l =
       if pos + l < S.blockbytes then begin
-        Bigstring.blit m p buf pos l ;
+        Bytes.blit m p buf pos l ;
         st.pos <- st.pos + l
       end
       else begin
         let nb_consumed = S.blockbytes - pos in
-        Bigstring.blit m p buf pos nb_consumed ;
+        Bytes.blit m p buf pos nb_consumed ;
         S.update state buf ;
         st.pos <- 0 ;
         update st m (p + nb_consumed) (l - nb_consumed)
       end
 
     let update st msg =
-      update st msg 0 (Bigstring.length msg)
+      update st msg 0 (Bytes.length msg)
 
     let finish { state ; buf ; pos } =
       S.update_last state buf pos ;
       S.finish state buf ;
-      Bigstring.sub buf 0 S.bytes
+      Bytes.sub buf 0 S.bytes
 
     let digest msg =
       let st = init () in
@@ -97,20 +95,20 @@ module Hash = struct
     (** Incremental Interface *)
 
     val init : unit -> state
-    val update : state -> Bigstring.t -> unit
-    val finish : state -> Bigstring.t
+    val update : state -> Bytes.t -> unit
+    val finish : state -> Bytes.t
 
     (** Direct Interface *)
 
-    val digest : Bigstring.t -> Bigstring.t
+    val digest : Bytes.t -> Bytes.t
 
     module HMAC : sig
       val write :
-        key:Bigstring.t -> msg:Bigstring.t -> Bigstring.t -> unit
+        key:Bytes.t -> msg:Bytes.t -> Bytes.t -> unit
       (** @raise [Invalid_argument] if argument is less than 32 bytes long *)
 
       val digest :
-        key:Bigstring.t -> msg:Bigstring.t -> Bigstring.t
+        key:Bytes.t -> msg:Bytes.t -> Bytes.t
     end
   end
 
@@ -121,15 +119,15 @@ module Hash = struct
           "ml_Hacl_SHA2_256_init" [@@noalloc]
 
         (* state -> data -> unit *)
-        external update : Bigstring.t -> Bigstring.t -> unit =
+        external update : Bigstring.t -> Bytes.t -> unit =
           "ml_Hacl_SHA2_256_update" [@@noalloc]
 
         (* state -> data -> datalen -> unit *)
-        external update_last : Bigstring.t -> Bigstring.t -> int -> unit =
+        external update_last : Bigstring.t -> Bytes.t -> int -> unit =
           "ml_Hacl_SHA2_256_update_last" [@@noalloc]
 
         (* state -> hash *)
-        external finish : Bigstring.t -> Bigstring.t -> unit =
+        external finish : Bigstring.t -> Bytes.t -> unit =
           "ml_Hacl_SHA2_256_finish" [@@noalloc]
 
         let bytes = 32
@@ -141,18 +139,18 @@ module Hash = struct
     module HMAC = struct
       (* mac -> key -> data *)
       external hmac :
-        Bigstring.t -> Bigstring.t -> Bigstring.t -> unit =
+        Bytes.t -> Bytes.t -> Bytes.t -> unit =
         "ml_Hacl_HMAC_SHA2_256_hmac" [@@noalloc]
 
       let write ~key ~msg buf =
-        let buflen = Bigstring.length buf in
+        let buflen = Bytes.length buf in
         if buflen < 32 then
           invalid_arg (Printf.sprintf "Hash.SHA256.HMAC.write: invalid \
                                        len (%d), expected %d" buflen bytes) ;
         hmac buf key msg
 
       let digest ~key ~msg =
-        let buf = Bigstring.create 32 in
+        let buf = Bytes.create 32 in
         write ~key ~msg buf ;
         buf
     end
@@ -165,15 +163,15 @@ module Hash = struct
           "ml_Hacl_SHA2_512_init" [@@noalloc]
 
         (* state -> data -> unit *)
-        external update : Bigstring.t -> Bigstring.t -> unit =
+        external update : Bigstring.t -> Bytes.t -> unit =
           "ml_Hacl_SHA2_512_update" [@@noalloc]
 
         (* state -> data -> datalen -> unit *)
-        external update_last : Bigstring.t -> Bigstring.t -> int -> unit =
+        external update_last : Bigstring.t -> Bytes.t -> int -> unit =
           "ml_Hacl_SHA2_512_update_last" [@@noalloc]
 
         (* state -> hash *)
-        external finish : Bigstring.t -> Bigstring.t -> unit =
+        external finish : Bigstring.t -> Bytes.t -> unit =
           "ml_Hacl_SHA2_512_finish" [@@noalloc]
 
         let bytes = 64
@@ -184,62 +182,61 @@ module Hash = struct
 
     module HMAC = struct
       let derive_key k =
-        let buf = Bigstring.create blockbytes in
-        Bigstring.fill buf '\x00' ;
-        let keylen = Bigstring.length k in
+        let buf = Bytes.make blockbytes '\x00' in
+        let keylen = Bytes.length k in
         let k, keylen =
           if keylen > blockbytes then H.digest k, bytes else k, keylen in
-        Bigstring.blit k 0 buf 0 keylen ;
+        Bytes.blit k 0 buf 0 keylen ;
         buf
 
       let xor_ipad =
-        Bigstring.map ~f:(fun c -> Char.(chr ((code c) lxor 0x36)))
+        Bytes.map (fun c -> Char.(chr ((code c) lxor 0x36)))
       let xor_opad =
-        Bigstring.map ~f:(fun c -> Char.(chr ((code c) lxor 0x5c)))
+        Bytes.map (fun c -> Char.(chr ((code c) lxor 0x5c)))
 
       let digest ~key ~msg =
         let key = derive_key key in
         let preimage =
-          Bigstring.concat "" [
-            xor_opad key ;
-            digest (Bigstring.concat "" [xor_ipad key ; msg])
-          ] in
+          Bytes.cat
+            (xor_opad key)
+            (digest (Bytes.cat (xor_ipad key) msg))
+           in
         digest preimage
 
       let write ~key ~msg buf =
-        let buflen = Bigstring.length buf in
+        let buflen = Bytes.length buf in
         if buflen < bytes then
           invalid_arg (Printf.sprintf "Hash.SHA512.HMAC.write: invalid \
                                        len (%d), expected %d" buflen bytes) ;
         let d = digest ~key ~msg in
-        Bigstring.blit d 0 buf 0 bytes
+        Bytes.blit d 0 buf 0 bytes
     end
   end
 end
 
 module Nonce = struct
-  type t = Bigstring.t
+  type t = Bytes.t
   let bytes = 24
 
   let gen () =
     Rand.gen bytes
 
   let rec incr_byte b step byteno =
-    let res = BigEndian.get_uint16 b byteno + step in
+    let res = Bytes.get_uint16_be b byteno + step in
     let lo = res land 0xffff in
     let hi = res asr 16 in
-    BigEndian.set_int16 b byteno lo ;
+    Bytes.set_uint16_be b byteno lo ;
     if hi = 0 || byteno = 0 then ()
     else incr_byte b hi (byteno - 2)
 
   let increment ?(step = 1) nonce =
-    let new_nonce = Bigstring.create 24 in
-    Bigstring.blit nonce 0 new_nonce 0 24 ;
+    let new_nonce = Bytes.create 24 in
+    Bytes.blit nonce 0 new_nonce 0 24 ;
     incr_byte new_nonce step 22 ;
     new_nonce
 
   let of_bytes buf =
-    if Bigstring.length buf <> bytes then None else Some buf
+    if Bytes.length buf <> bytes then None else Some buf
 
   let of_bytes_exn buf =
     match of_bytes buf with
@@ -249,48 +246,48 @@ module Nonce = struct
 end
 
 module Secretbox = struct
-  type key = Bigstring.t
+  type key = Bytes.t
 
   let keybytes = 32
   let zerobytes = 32
   let boxzerobytes = 16
 
   let unsafe_of_bytes buf =
-    if Bigstring.length buf <> keybytes then
+    if Bytes.length buf <> keybytes then
       invalid_arg (Printf.sprintf "Secretbox.unsafe_of_bytes: buffer \
                                    must be %d bytes long" keybytes) ;
     buf
 
   let blit_of_bytes buf pos =
-    if Bigstring.length buf < keybytes then
+    if Bytes.length buf < keybytes then
       invalid_arg (Printf.sprintf "Secretbox.blit_of_bytes: buffer \
                                    must be at least %d bytes long" keybytes) ;
-    let key = Bigstring.create keybytes in
-    Bigstring.blit buf pos key 0 keybytes ;
+    let key = Bytes.create keybytes in
+    Bytes.blit buf pos key 0 keybytes ;
     key
 
   let genkey () = Rand.gen 32
 
   (* c -> m -> n -> k -> unit *)
   external box :
-    Bigstring.t -> Bigstring.t -> Bigstring.t -> Bigstring.t -> unit =
+    Bytes.t -> Bytes.t -> Bytes.t -> Bytes.t -> unit =
     "ml_NaCl_crypto_secretbox_easy" [@@noalloc]
 
   (* m -> c -> mac -> n -> k -> int *)
   external box_open :
-    Bigstring.t -> Bigstring.t -> Bigstring.t ->
-    Bigstring.t -> Bigstring.t -> int =
+    Bytes.t -> Bytes.t -> Bytes.t ->
+    Bytes.t -> Bytes.t -> int =
     "ml_NaCl_crypto_secretbox_open_detached" [@@noalloc]
 
   let box ~key ~nonce ~msg ~cmsg =
-    if Bigstring.length msg < 32 then
+    if Bytes.length msg < 32 then
       invalid_arg "Secretbox.box: msg must be at least 32 bytes long";
     box cmsg msg nonce key
 
   let box_open ~key ~nonce ~cmsg ~msg =
-    if Bigstring.length cmsg < 32 then
+    if Bytes.length cmsg < 32 then
       invalid_arg "Secretbox.box_open: cmsg must be at least 32 bytes long";
-    let mac = Bigstring.sub cmsg boxzerobytes boxzerobytes in
+    let mac = Bytes.sub cmsg boxzerobytes boxzerobytes in
     match box_open msg cmsg mac nonce key with
     | 0 -> true
     | _ -> false
@@ -302,9 +299,9 @@ type public
 module Box = struct
   type combined
   type _ key =
-    | Sk : Bigstring.t -> secret key
-    | Pk : Bigstring.t -> public key
-    | Ck : Bigstring.t -> combined key
+    | Sk : Bytes.t -> secret key
+    | Pk : Bytes.t -> public key
+    | Ck : Bytes.t -> combined key
 
   let skbytes = 32
   let pkbytes = 32
@@ -312,61 +309,61 @@ module Box = struct
   let zerobytes = 32
   let boxzerobytes = 16
 
-  let unsafe_to_bytes : type a. a key -> Bigstring.t = function
+  let unsafe_to_bytes : type a. a key -> Bytes.t = function
     | Pk buf -> buf
     | Sk buf -> buf
     | Ck buf -> buf
 
   let blit_to_bytes :
-    type a. a key -> ?pos:int -> Bigstring.t -> unit = fun key ?(pos=0) buf ->
+    type a. a key -> ?pos:int -> Bytes.t -> unit = fun key ?(pos=0) buf ->
     match key with
-    | Pk pk -> Bigstring.blit pk 0 buf pos pkbytes
-    | Sk sk -> Bigstring.blit sk 0 buf pos skbytes
-    | Ck ck -> Bigstring.blit ck 0 buf pos ckbytes
+    | Pk pk -> Bytes.blit pk 0 buf pos pkbytes
+    | Sk sk -> Bytes.blit sk 0 buf pos skbytes
+    | Ck ck -> Bytes.blit ck 0 buf pos ckbytes
 
   let equal :
     type a. a key -> a key -> bool = fun a b -> match a, b with
-    | Pk a, Pk b -> Bigstring.equal a b
-    | Sk a, Sk b -> Bigstring.equal a b
-    | Ck a, Ck b -> Bigstring.equal a b
+    | Pk a, Pk b -> Bytes.equal a b
+    | Sk a, Sk b -> Bytes.equal a b
+    | Ck a, Ck b -> Bytes.equal a b
 
   let unsafe_sk_of_bytes buf =
-    if Bigstring.length buf <> skbytes then
+    if Bytes.length buf <> skbytes then
       invalid_arg (Printf.sprintf "Box.unsafe_sk_of_bytes: buffer must \
                                    be %d bytes long" skbytes) ;
     Sk buf
 
   let unsafe_pk_of_bytes buf =
-    if Bigstring.length buf <> pkbytes then
+    if Bytes.length buf <> pkbytes then
       invalid_arg (Printf.sprintf "Box.unsafe_pk_of_bytes: buffer must \
                                    be %d bytes long" pkbytes) ;
     Pk buf
 
   let unsafe_ck_of_bytes buf =
-    if Bigstring.length buf <> ckbytes then
+    if Bytes.length buf <> ckbytes then
       invalid_arg (Printf.sprintf "Box.unsafe_ck_of_bytes: buffer must \
                                    be %d bytes long" ckbytes) ;
     Ck buf
 
   let of_seed ?(pos=0) buf =
-    let buflen = Bigstring.length buf in
+    let buflen = Bytes.length buf in
     if pos < 0 || pos + skbytes > buflen then
       invalid_arg (Printf.sprintf "Box.of_seed: invalid pos (%d) or \
                                    buffer size (%d)" pos buflen) ;
-    let sk = Bigstring.create skbytes in
-    Bigstring.blit buf pos sk 0 skbytes ;
+    let sk = Bytes.create skbytes in
+    Bytes.blit buf pos sk 0 skbytes ;
     Sk sk
 
   let basepoint =
-    Bigstring.init 32 (function 0 -> '\x09' | _ -> '\x00')
+    Bytes.init 32 (function 0 -> '\x09' | _ -> '\x00')
 
   (* pk -> sk -> basepoint -> unit *)
   external scalarmult :
-    Bigstring.t -> Bigstring.t -> Bigstring.t -> unit =
+    Bytes.t -> Bytes.t -> Bytes.t -> unit =
     "ml_Hacl_Curve25519_crypto_scalarmult" [@@noalloc]
 
   let neuterize (Sk sk) =
-    let pk = Bigstring.create pkbytes in
+    let pk = Bytes.create pkbytes in
     scalarmult pk sk basepoint ;
     Pk pk
 
@@ -376,32 +373,32 @@ module Box = struct
 
   (* ck -> pk -> sk -> unit *)
   external box_beforenm :
-    Bigstring.t -> Bigstring.t -> Bigstring.t -> unit =
+    Bytes.t -> Bytes.t -> Bytes.t -> unit =
     "ml_NaCl_crypto_box_beforenm" [@@noalloc]
 
   let dh (Pk pk) (Sk sk) =
-    let combined = Bigstring.create ckbytes in
+    let combined = Bytes.create ckbytes in
     box_beforenm combined pk sk ;
     Ck combined
 
   (* cmsg -> msg -> nonce -> k -> unit *)
   external box_easy_afternm :
-    Bigstring.t -> Bigstring.t -> Bigstring.t -> Bigstring.t -> unit =
+    Bytes.t -> Bytes.t -> Bytes.t -> Bytes.t -> unit =
     "ml_NaCl_crypto_box_easy_afternm" [@@noalloc]
 
   let box ~k:(Ck k) ~nonce ~msg ~cmsg =
-    if Bigstring.length msg < 32 then
+    if Bytes.length msg < 32 then
       invalid_arg "Box.box: msg must be at least 32 bytes long";
     box_easy_afternm cmsg msg nonce k
 
   (* msg -> cmsg -> n -> k -> int *)
   external box_open_easy_afternm :
-    Bigstring.t -> Bigstring.t -> Bigstring.t -> Bigstring.t -> int =
+    Bytes.t -> Bytes.t -> Bytes.t -> Bytes.t -> int =
     "ml_NaCl_crypto_box_open_easy_afternm" [@@noalloc]
 
   let box_open ~k:(Ck k) ~nonce ~cmsg ~msg =
     (* Ciphertext must contain 16 padding bytes + 16 hmac bytes. *)
-    if Bigstring.length cmsg < 32 then
+    if Bytes.length cmsg < 32 then
       invalid_arg "Box.box_open: cmsg must be at least 32 bytes long";
     match box_open_easy_afternm msg cmsg nonce k with
     | 0 -> true
@@ -410,49 +407,49 @@ end
 
 module Sign = struct
   type _ key =
-    | Sk : Bigstring.t -> secret key
-    | Pk : Bigstring.t -> public key
+    | Sk : Bytes.t -> secret key
+    | Pk : Bytes.t -> public key
 
   let bytes = 64
   let pkbytes = 32
   let skbytes = 32
 
-  let unsafe_to_bytes : type a. a key -> Bigstring.t = function
+  let unsafe_to_bytes : type a. a key -> Bytes.t = function
     | Pk buf -> buf
     | Sk buf -> buf
 
   let unsafe_sk_of_bytes seed =
-    if Bigstring.length seed <> skbytes then
+    if Bytes.length seed <> skbytes then
       invalid_arg (Printf.sprintf "Sign.unsafe_sk_of_bytes: sk must \
                                    be at least %d bytes long" skbytes) ;
     Sk seed
 
   let unsafe_pk_of_bytes pk =
-    if Bigstring.length pk <> pkbytes then
+    if Bytes.length pk <> pkbytes then
       invalid_arg (Printf.sprintf "Sign.unsafe_pk_of_bytes: pk must be \
                                    at least %d bytes long" pkbytes) ;
     Pk pk
 
   let blit_to_bytes :
-    type a. a key -> ?pos:int -> Bigstring.t -> unit = fun key ?(pos=0) buf ->
+    type a. a key -> ?pos:int -> Bytes.t -> unit = fun key ?(pos=0) buf ->
     match key with
-    | Pk pk -> Bigstring.blit pk 0 buf pos pkbytes
-    | Sk sk -> Bigstring.blit sk 0 buf pos skbytes
+    | Pk pk -> Bytes.blit pk 0 buf pos pkbytes
+    | Sk sk -> Bytes.blit sk 0 buf pos skbytes
 
   let equal :
     type a. a key -> a key -> bool = fun a b -> match a, b with
-    | Pk a, Pk b -> Bigstring.equal a b
-    | Sk a, Sk b -> Bigstring.equal a b
+    | Pk a, Pk b -> Bytes.equal a b
+    | Sk a, Sk b -> Bytes.equal a b
 
   (* pk -> sk -> unit *)
   external neuterize :
-    Bigstring.t -> Bigstring.t -> unit =
+    Bytes.t -> Bytes.t -> unit =
     "ml_Hacl_Ed25519_secret_to_public" [@@noalloc]
 
   let neuterize : type a. a key -> public key = function
     | Pk pk -> Pk pk
     | Sk sk ->
-        let pk = Bigstring.create pkbytes in
+        let pk = Bytes.create pkbytes in
         neuterize pk sk ;
         Pk pk
 
@@ -462,18 +459,18 @@ module Sign = struct
 
   (* sig -> sk -> m -> unit *)
   external sign :
-    Bigstring.t -> Bigstring.t -> Bigstring.t -> unit =
+    Bytes.t -> Bytes.t -> Bytes.t -> unit =
     "ml_Hacl_Ed25519_sign" [@@noalloc]
 
   let sign ~sk:(Sk sk) ~msg ~signature =
-    if Bigstring.length signature < bytes then
+    if Bytes.length signature < bytes then
       invalid_arg (Printf.sprintf "Sign.write_sign: output buffer must \
                                    be at least %d bytes long" bytes) ;
     sign signature sk msg
 
   (* pk -> m -> sig -> bool *)
   external verify :
-    Bigstring.t -> Bigstring.t -> Bigstring.t -> bool =
+    Bytes.t -> Bytes.t -> Bytes.t -> bool =
     "ml_Hacl_Ed25519_verify" [@@noalloc]
 
   let verify ~pk:(Pk pk) ~msg ~signature =

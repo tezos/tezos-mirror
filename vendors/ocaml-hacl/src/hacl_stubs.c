@@ -25,18 +25,18 @@
 
 #include "Hacl_Unverified_Random.h"
 CAMLprim value ml_randombytes(value buf) {
-    randombytes(Caml_ba_data_val(buf),
-                Caml_ba_array_val(buf)->dim[0]);
+    randombytes(Bytes_val(buf),
+                caml_string_length(buf));
     return Val_unit;
 }
 
 #include "Hacl_HMAC_SHA2_256.h"
 CAMLprim value ml_Hacl_HMAC_SHA2_256_hmac(value mac, value key, value data) {
-    Hacl_HMAC_SHA2_256_hmac(Caml_ba_data_val(mac),
-                            Caml_ba_data_val(key),
-                            Caml_ba_array_val(key)->dim[0],
-                            Caml_ba_data_val(data),
-                            Caml_ba_array_val(data)->dim[0]);
+    Hacl_HMAC_SHA2_256_hmac(Bytes_val(mac),
+                            Bytes_val(key),
+                            caml_string_length(key),
+                            Bytes_val(data),
+                            caml_string_length(data));
     return Val_unit;
 }
 
@@ -48,20 +48,20 @@ CAMLprim value ml_Hacl_SHA2_256_init(value state) {
 
 CAMLprim value ml_Hacl_SHA2_256_update(value state, value data) {
     Hacl_SHA2_256_update(Caml_ba_data_val(state),
-                         Caml_ba_data_val(data));
+                         Bytes_val(data));
     return Val_unit;
 }
 
 CAMLprim value ml_Hacl_SHA2_256_update_last(value state, value data, value datalen) {
     Hacl_SHA2_256_update_last(Caml_ba_data_val(state),
-                              Caml_ba_data_val(data),
+                              Bytes_val(data),
                               Int_val(datalen));
     return Val_unit;
 }
 
 CAMLprim value ml_Hacl_SHA2_256_finish(value state, value hash) {
     Hacl_SHA2_256_finish(Caml_ba_data_val(state),
-                         Caml_ba_data_val(hash));
+                         Bytes_val(hash));
     return Val_unit;
 }
 
@@ -73,93 +73,93 @@ CAMLprim value ml_Hacl_SHA2_512_init(value state) {
 
 CAMLprim value ml_Hacl_SHA2_512_update(value state, value data) {
     Hacl_SHA2_512_update(Caml_ba_data_val(state),
-                         Caml_ba_data_val(data));
+                         Bytes_val(data));
     return Val_unit;
 }
 
 CAMLprim value ml_Hacl_SHA2_512_update_last(value state, value data, value datalen) {
     Hacl_SHA2_512_update_last(Caml_ba_data_val(state),
-                              Caml_ba_data_val(data),
+                              Bytes_val(data),
                               Int_val(datalen));
     return Val_unit;
 }
 
 CAMLprim value ml_Hacl_SHA2_512_finish(value state, value hash) {
     Hacl_SHA2_512_finish(Caml_ba_data_val(state),
-                         Caml_ba_data_val(hash));
+                         Bytes_val(hash));
     return Val_unit;
 }
 
 #include "Hacl_Curve25519.h"
 CAMLprim value ml_Hacl_Curve25519_crypto_scalarmult(value pk, value sk, value basepoint) {
-    Hacl_Curve25519_crypto_scalarmult(Caml_ba_data_val(pk),
-                                      Caml_ba_data_val(sk),
-                                      Caml_ba_data_val(basepoint));
+    Hacl_Curve25519_crypto_scalarmult(Bytes_val(pk),
+                                      Bytes_val(sk),
+                                      Bytes_val(basepoint));
     return Val_unit;
 }
 
 #include "NaCl.h"
 CAMLprim value ml_NaCl_crypto_secretbox_easy(value c, value m, value n, value k) {
-    NaCl_crypto_secretbox_easy(Caml_ba_data_val(c),
-			       Caml_ba_data_val(m),
-			       Caml_ba_array_val(m)->dim[0] - 32,
-			       Caml_ba_data_val(n),
-			       Caml_ba_data_val(k));
+    NaCl_crypto_secretbox_easy(Bytes_val(c),
+			       Bytes_val(m),
+			       caml_string_length(m) - 32,
+			       Bytes_val(n),
+			       Bytes_val(k));
     return Val_unit;
 }
 
 CAMLprim value ml_NaCl_crypto_secretbox_open_detached(value m, value c, value mac,
 						      value n, value k) {
-    return Val_int(NaCl_crypto_secretbox_open_detached(Caml_ba_data_val(m),
-						       Caml_ba_data_val(c),
-						       Caml_ba_data_val(mac),
-						       Caml_ba_array_val(c)->dim[0] - 32,
-						       Caml_ba_data_val(n),
-						       Caml_ba_data_val(k)));
+    return Val_int(NaCl_crypto_secretbox_open_detached(Bytes_val(m),
+						       Bytes_val(c),
+						       Bytes_val(mac),
+						       caml_string_length(c) - 32,
+						       Bytes_val(n),
+						       Bytes_val(k)));
 }
 
 CAMLprim value ml_NaCl_crypto_box_beforenm(value k, value pk, value sk) {
-    NaCl_crypto_box_beforenm(Caml_ba_data_val(k),
-                             Caml_ba_data_val(pk),
-                             Caml_ba_data_val(sk));
+    NaCl_crypto_box_beforenm(Bytes_val(k),
+                             Bytes_val(pk),
+                             Bytes_val(sk));
     return Val_unit;
 }
 
 CAMLprim value ml_NaCl_crypto_box_easy_afternm(value c, value m, value n, value k) {
-    NaCl_crypto_box_easy_afternm(Caml_ba_data_val(c),
-				 Caml_ba_data_val(m),
-				 Caml_ba_array_val(m)->dim[0] - 32,
-				 Caml_ba_data_val(n),
-				 Caml_ba_data_val(k));
+    NaCl_crypto_box_easy_afternm(Bytes_val(c),
+				 Bytes_val(m),
+				 caml_string_length(m) - 32,
+				 Bytes_val(n),
+				 Bytes_val(k));
     return Val_unit;
 }
 
 CAMLprim value ml_NaCl_crypto_box_open_easy_afternm(value m, value c, value n, value k) {
-    return Val_int(NaCl_crypto_box_open_easy_afternm(Caml_ba_data_val(m),
-						     Caml_ba_data_val(c),
-						     Caml_ba_array_val(c)->dim[0] - 32,
-						     Caml_ba_data_val(n),
-						     Caml_ba_data_val(k)));
+    return Val_int(NaCl_crypto_box_open_easy_afternm(Bytes_val(m),
+						     Bytes_val(c),
+						     caml_string_length(c) - 32,
+						     Bytes_val(n),
+						     Bytes_val(k)));
 }
 
 #include "Hacl_Ed25519.h"
 CAMLprim value ml_Hacl_Ed25519_secret_to_public(value pk, value sk) {
-    Hacl_Ed25519_secret_to_public(Caml_ba_data_val(pk),
-                                  Caml_ba_data_val(sk));
+    Hacl_Ed25519_secret_to_public(Bytes_val(pk),
+                                  Bytes_val(sk));
     return Val_unit;
 }
 
 CAMLprim value ml_Hacl_Ed25519_sign(value sig, value sk, value m) {
-    Hacl_Ed25519_sign(Caml_ba_data_val(sig),
-                      Caml_ba_data_val(sk),
-                      Caml_ba_data_val(m),
-                      Caml_ba_array_val(m)->dim[0]);
+    Hacl_Ed25519_sign(Bytes_val(sig),
+                      Bytes_val(sk),
+                      Bytes_val(m),
+                      caml_string_length(m));
     return Val_unit;
 }
 
 CAMLprim value ml_Hacl_Ed25519_verify(value pk, value m, value sig) {
-    return Val_bool(Hacl_Ed25519_verify(Caml_ba_data_val(pk),
-                                        Caml_ba_data_val(m),
-                                        Caml_ba_array_val(m)->dim[0],
-                                        Caml_ba_data_val(sig)));
+    return Val_bool(Hacl_Ed25519_verify(Bytes_val(pk),
+                                        Bytes_val(m),
+                                        caml_string_length(m),
+                                        Bytes_val(sig)));
 }

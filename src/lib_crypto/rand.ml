@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let generate len = Bigstring.to_bytes (Hacl.Rand.gen len)
+let generate len = Hacl.Rand.gen len
 
 let generate_into ?(pos = 0) ?len buf =
   let buflen = Bytes.length buf in
@@ -34,5 +34,4 @@ let generate_into ?(pos = 0) ?len buf =
          "Rand.generate_into: invalid slice (pos=%d len=%d)"
          pos
          len) ;
-  let rand = Hacl.Rand.gen len in
-  Bigstring.blit_to_bytes rand 0 buf pos len
+  Hacl.Rand.write buf

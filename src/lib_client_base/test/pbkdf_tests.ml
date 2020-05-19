@@ -1,13 +1,13 @@
 (* PBKDF2 *)
 let test_pbkdf2 (module A : Hacl.Hash.S) ~password ~salt ~count ~dk_len ~dk =
   let module P = Pbkdf.Make (A) in
-  let salt = Cstruct.to_bigarray (Hex.to_cstruct (`Hex salt)) in
-  let dk = Cstruct.to_bigarray (Hex.to_cstruct (`Hex dk)) in
-  let password = Bigstring.of_string password in
+  let salt = Hex.to_bytes (`Hex salt) in
+  let dk = Hex.to_bytes (`Hex dk) in
+  let password = Bytes.of_string password in
   fun () ->
     let edk = P.pbkdf2 ~password ~salt ~count ~dk_len in
-    let sedk = Bigstring.to_string edk in
-    let sdk = Bigstring.to_string dk in
+    let sedk = Bytes.to_string edk in
+    let sdk = Bytes.to_string dk in
     Alcotest.check Alcotest.string "PBKDF2 test" sedk sdk
 
 (* let test_pbkdf2_invalid_arg ~prf ~password ~salt ~count ~dk_len ~msg () =
