@@ -162,35 +162,32 @@ let preapply (mockup_env : Registration.mockup_environment)
        Directory.empty
        Mockup_environment.Block_services.S.Helpers.Preapply.operations
        (fun _prefix () op_list ->
-         let outcome =
-           Lwt_main.run
-             (let predecessor = rpc_context.block_hash in
-              let header = rpc_context.block_header in
-              let predecessor_context = rpc_context.context in
-              let chain_id = Chain_id.zero in
-              Mockup_environment.Protocol.begin_construction
-                ~chain_id
-                ~predecessor_context
-                ~predecessor_timestamp:header.timestamp
-                ~predecessor_level:header.level
-                ~predecessor_fitness:header.fitness
-                ~predecessor
-                ~timestamp:
-                  (Time.System.to_protocol
-                     (Tezos_stdlib_unix.Systime_os.now ()))
-                ()
-              >>=? fun state ->
-              fold_left_s
-                (fun (state, acc) op ->
-                  Mockup_environment.Protocol.apply_operation state op
-                  >>=? fun (state, result) ->
-                  return (state, (op.protocol_data, result) :: acc))
-                (state, [])
-                op_list
-              >>=? fun (state, acc) ->
-              Mockup_environment.Protocol.finalize_block state
-              >>=? fun _ -> return (List.rev acc))
-         in
+         (let predecessor = rpc_context.block_hash in
+          let header = rpc_context.block_header in
+          let predecessor_context = rpc_context.context in
+          let chain_id = Chain_id.zero in
+          Mockup_environment.Protocol.begin_construction
+            ~chain_id
+            ~predecessor_context
+            ~predecessor_timestamp:header.timestamp
+            ~predecessor_level:header.level
+            ~predecessor_fitness:header.fitness
+            ~predecessor
+            ~timestamp:
+              (Time.System.to_protocol (Tezos_stdlib_unix.Systime_os.now ()))
+            ()
+          >>=? fun state ->
+          fold_left_s
+            (fun (state, acc) op ->
+              Mockup_environment.Protocol.apply_operation state op
+              >>=? fun (state, result) ->
+              return (state, (op.protocol_data, result) :: acc))
+            (state, [])
+            op_list
+          >>=? fun (state, acc) ->
+          Mockup_environment.Protocol.finalize_block state
+          >>=? fun _ -> return (List.rev acc))
+         >>= fun outcome ->
          match outcome with
          | Ok result ->
              RPC_answer.return result
@@ -234,26 +231,24 @@ let inject_operation (mockup_env : Registration.mockup_environment)
                 let header = rpc_context.block_header in
                 let predecessor_context = rpc_context.context in
                 let chain_id = Chain_id.zero in
-                let result =
-                  Lwt_main.run
-                    ( Mockup_environment.Protocol.begin_construction
-                        ~chain_id
-                        ~predecessor_context
-                        ~predecessor_timestamp:header.timestamp
-                        ~predecessor_level:header.level
-                        ~predecessor_fitness:header.fitness
-                        ~predecessor
-                        ~timestamp:
-                          (Time.System.to_protocol
-                             (Tezos_stdlib_unix.Systime_os.now ()))
-                        ()
-                    >>=? fun state ->
-                    Mockup_environment.Protocol.apply_operation state op
-                    >>=? fun (state, receipt) ->
-                    Mockup_environment.Protocol.finalize_block state
-                    >>=? fun (validation_result, _block_header_metadata) ->
-                    return (validation_result, receipt) )
-                in
+                Mockup_environment.Protocol.begin_construction
+                  ~chain_id
+                  ~predecessor_context
+                  ~predecessor_timestamp:header.timestamp
+                  ~predecessor_level:header.level
+                  ~predecessor_fitness:header.fitness
+                  ~predecessor
+                  ~timestamp:
+                    (Time.System.to_protocol
+                       (Tezos_stdlib_unix.Systime_os.now ()))
+                  ()
+                >>=? (fun state ->
+                       Mockup_environment.Protocol.apply_operation state op
+                       >>=? fun (state, receipt) ->
+                       Mockup_environment.Protocol.finalize_block state
+                       >>=? fun (validation_result, _block_header_metadata) ->
+                       return (validation_result, receipt))
+                >>= fun result ->
                 match result with
                 | Ok ({context; _}, _receipt) ->
                     let rpc_context = {rpc_context with context} in
