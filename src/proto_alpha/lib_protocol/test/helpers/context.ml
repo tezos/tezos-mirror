@@ -115,6 +115,8 @@ let get_endorser ctxt =
 
 let get_voting_power = Alpha_services.Delegate.voting_power rpc_ctxt
 
+let get_total_voting_power = Alpha_services.Voting.total_voting_power rpc_ctxt
+
 let get_bakers ctxt =
   Alpha_services.Delegate.Baking_rights.get ~max_priority:256 rpc_ctxt ctxt
   >>=? fun bakers ->

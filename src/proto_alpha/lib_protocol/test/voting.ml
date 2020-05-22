@@ -1136,6 +1136,10 @@ let get_voting_power block pkhash =
   let ctxt = Context.B block in
   Context.get_voting_power ctxt pkhash
 
+(** Test that the voting power changes if the balance between bakers changes
+    and the blockchain moves to the next voting period. It also checks that
+    the total voting power coincides with the addition of the voting powers
+    of bakers *)
 let test_voting_power_updated_each_voting_period () =
   let open Test_tez.Tez in
   (* Create three accounts with different amounts *)
@@ -1145,7 +1149,7 @@ let test_voting_power_updated_each_voting_period () =
   >>=? fun (block, contracts) ->
   let con1 = List.nth contracts 0 in
   let con2 = List.nth contracts 1 in
-  let _con3 = List.nth contracts 2 in
+  let con3 = List.nth contracts 2 in
   (* Retrieve balance of con1 *)
   Context.Contract.balance (B block) con1
   >>=? fun balance1 ->
@@ -1156,6 +1160,9 @@ let test_voting_power_updated_each_voting_period () =
   >>=? fun balance2 ->
   Assert.equal_tez ~loc:__LOC__ balance2 (of_mutez_exn 48_000_000_000L)
   >>=? fun _ ->
+  (* Retrieve balance of con3 *)
+  Context.Contract.balance (B block) con3
+  >>=? fun balance3 ->
   (* Retrieve constants blocks_per_voting_period and tokens_per_roll *)
   Context.get_constants (B block)
   >>=? fun {parametric = {blocks_per_voting_period; tokens_per_roll; _}; _} ->
@@ -1164,24 +1171,42 @@ let test_voting_power_updated_each_voting_period () =
   >>=? fun bakers ->
   let baker1 = List.nth bakers 2 in
   let baker2 = List.nth bakers 1 in
-  let _baker3 = List.nth bakers 0 in
+  let baker3 = List.nth bakers 0 in
   (* Auxiliary assert_voting_power *)
-  let assert_voting_power n block baker =
+  let assert_voting_power ~loc n block baker =
     get_voting_power block baker
     >>=? fun voting_power ->
-    Assert.equal_int ~loc:__LOC__ n (Int32.to_int voting_power)
+    Assert.equal_int ~loc n (Int32.to_int voting_power)
+  in
+  (* Auxiliary assert_total_voting_power *)
+  let assert_total_voting_power ~loc n block =
+    Context.get_total_voting_power (B block)
+    >>=? fun total_voting_power ->
+    Assert.equal_int ~loc n (Int32.to_int total_voting_power)
   in
   (* Assert voting power is equal to the balance divided by tokens_per_roll *)
-  let power1 =
+  let expected_power_of_baker_1 =
     Int64.(to_int (div (to_mutez balance1) (to_mutez tokens_per_roll)))
   in
-  assert_voting_power power1 block baker1
+  assert_voting_power ~loc:__LOC__ expected_power_of_baker_1 block baker1
   >>=? fun _ ->
   (* Assert voting power is equal to the balance divided by tokens_per_roll *)
-  let power2 =
+  let expected_power_of_baker_2 =
     Int64.(to_int (div (to_mutez balance2) (to_mutez tokens_per_roll)))
   in
-  assert_voting_power power2 block baker2
+  assert_voting_power ~loc:__LOC__ expected_power_of_baker_2 block baker2
+  >>=? fun _ ->
+  (* Assert total voting power *)
+  let expected_power_of_baker_3 =
+    Int64.(to_int (div (to_mutez balance3) (to_mutez tokens_per_roll)))
+  in
+  assert_total_voting_power
+    ~loc:__LOC__
+    Int.(
+      add
+        (add expected_power_of_baker_1 expected_power_of_baker_2)
+        expected_power_of_baker_3)
+    block
   >>=? fun _ ->
   (* Create policy that excludes baker1 and baker2 from baking *)
   let policy = Block.Excluding [baker1; baker2] in
@@ -1212,14 +1237,52 @@ let test_voting_power_updated_each_voting_period () =
   of_mutez_exn 48_000_000_000L +? rolls
   >>?= Assert.equal_tez ~loc:__LOC__ balance2
   >>=? fun _ ->
-  (*  Bake until next voting period (init block and one block baked already) *)
-  Block.bake_n ~policy Int32.(to_int (sub blocks_per_voting_period 2l)) block
+  (* Bake blocks_per_voting_period - 3, i.e., right before next voting period,
+     since 2 blocks have been baked already *)
+  Block.bake_n ~policy Int32.(to_int (sub blocks_per_voting_period 3l)) block
   >>=? fun block ->
-  (* Assert voting power has changed by num_rolls *)
-  assert_voting_power (Int.sub power1 (Int64.to_int num_rolls)) block baker1
+  (* Assert voting power (and total) remains the same before next voting period *)
+  assert_voting_power ~loc:__LOC__ expected_power_of_baker_1 block baker1
   >>=? fun _ ->
-  (* Assert voting power has changed by num_rolls *)
-  assert_voting_power (Int.add power2 (Int64.to_int num_rolls)) block baker2
+  assert_voting_power ~loc:__LOC__ expected_power_of_baker_2 block baker2
+  >>=? fun _ ->
+  assert_voting_power ~loc:__LOC__ expected_power_of_baker_3 block baker3
+  >>=? fun _ ->
+  assert_total_voting_power
+    ~loc:__LOC__
+    Int.(
+      add
+        (add expected_power_of_baker_1 expected_power_of_baker_2)
+        expected_power_of_baker_3)
+    block
+  >>=? fun _ ->
+  (* Bake one more block to move to next voting period *)
+  Block.bake ~policy block
+  >>=? fun block ->
+  (* Assert voting power of baker1 has decreased by num_rolls *)
+  let expected_power_of_baker_1 =
+    Int.sub expected_power_of_baker_1 (Int64.to_int num_rolls)
+  in
+  assert_voting_power ~loc:__LOC__ expected_power_of_baker_1 block baker1
+  >>=? fun _ ->
+  (* Assert voting power of baker2 has increased by num_rolls *)
+  let expected_power_of_baker_2 =
+    Int.add expected_power_of_baker_2 (Int64.to_int num_rolls)
+  in
+  assert_voting_power ~loc:__LOC__ expected_power_of_baker_2 block baker2
+  >>=? fun _ ->
+  (* Retrieve voting power of baker3 *)
+  get_voting_power block baker3
+  >>=? fun power ->
+  let power_of_baker_3 = Int32.to_int power in
+  (* Assert total voting power *)
+  assert_total_voting_power
+    ~loc:__LOC__
+    Int.(
+      add
+        (add expected_power_of_baker_1 expected_power_of_baker_2)
+        power_of_baker_3)
+    block
 
 let tests =
   [ Test.tztest "voting successful_vote" `Quick (test_successful_vote 137);
