@@ -375,7 +375,7 @@ type multisig_contract_description = {
 }
 
 let script_hash_of_hex_string s =
-  Script_expr_hash.of_bytes_exn @@ MBytes.of_hex @@ `Hex s
+  Script_expr_hash.of_bytes_exn @@ Hex.to_bytes @@ `Hex s
 
 (* List of known multisig contracts hashes with their kinds *)
 let known_multisig_contracts : multisig_contract_description list =

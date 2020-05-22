@@ -139,7 +139,7 @@ module Forge = struct
   }
 
   let default_proof_of_work_nonce =
-    MBytes.create Constants.proof_of_work_nonce_size
+    Bytes.create Constants.proof_of_work_nonce_size
 
   let make_contents ?(proof_of_work_nonce = default_proof_of_work_nonce)
       ~priority ~seed_nonce_hash () =
@@ -265,7 +265,7 @@ let initial_context ?(with_commitments = false) constants header
   in
   Tezos_protocol_environment.Context.(
     let empty = Memory_context.empty in
-    set empty ["version"] (MBytes.of_string "genesis")
+    set empty ["version"] (Bytes.of_string "genesis")
     >>= fun ctxt -> set ctxt protocol_param_key proto_params)
   >>= fun ctxt ->
   Main.init ctxt header >|= Environment.wrap_error
@@ -292,7 +292,7 @@ let genesis_with_parameters parameters =
   in
   Tezos_protocol_environment.Context.(
     let empty = Memory_context.empty in
-    set empty ["version"] (MBytes.of_string "genesis")
+    set empty ["version"] (Bytes.of_string "genesis")
     >>= fun ctxt -> set ctxt protocol_param_key proto_params)
   >>= fun ctxt ->
   Main.init ctxt shell >|= Environment.wrap_error

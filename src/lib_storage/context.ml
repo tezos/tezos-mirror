@@ -474,7 +474,7 @@ let commit_test_chain_genesis ctxt (forked_header : Block_header.t) =
   let genesis_header : Block_header.t =
     {
       shell = {faked_shell_header with predecessor = genesis_hash};
-      protocol_data = MBytes.create 0;
+      protocol_data = Bytes.create 0;
     }
   in
   let branch = get_branch chain_id in
@@ -789,12 +789,9 @@ let validate_context_hash_consistency_and_commit ~data_hash
     Data_encoding.Binary.to_bytes_exn Test_chain_status.encoding test_chain
   in
   let tree = Store.Tree.empty in
-  Store.Tree.add tree current_protocol_key (MBytes.to_string protocol_value)
+  Store.Tree.add tree current_protocol_key (Bytes.to_string protocol_value)
   >>= fun tree ->
-  Store.Tree.add
-    tree
-    current_test_chain_key
-    (MBytes.to_string test_chain_value)
+  Store.Tree.add tree current_test_chain_key (Bytes.to_string test_chain_value)
   >>= fun tree ->
   let info =
     Irmin.Info.v ~date:(Time.Protocol.to_seconds timestamp) ~author message

@@ -183,7 +183,7 @@ let build_lambda_for_originated ~destination ~entrypoint ~amount
     Data_encoding.Binary.to_bytes_exn Contract.encoding destination
   in
   let amount = Tez.to_mutez amount in
-  let (`Hex destination) = MBytes.to_hex destination in
+  let (`Hex destination) = Hex.of_bytes destination in
   let entrypoint = match entrypoint with "default" -> "" | s -> "%" ^ s in
   if parameter_type = t_unit then
     Format.asprintf

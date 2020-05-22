@@ -70,7 +70,7 @@ open Tezos_stdlib ;;
 let sk_of_pk (pk_s : string) : string =
   let pk = Public_key.of_b58check_exn pk_s in
   let pk_b = Data_encoding.Binary.to_bytes_exn Public_key.encoding pk in
-  let sk_b = MBytes.sub pk_b 0 33 in
+  let sk_b = Bytes.sub pk_b 0 33 in
   let sk = Data_encoding.Binary.of_bytes_exn Secret_key.encoding sk_b in
   let sk_s = Secret_key.to_b58check sk in
   sk_s

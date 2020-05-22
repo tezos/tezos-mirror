@@ -164,7 +164,7 @@ clarity):
       | Bool : bool desc
       | Int64 : Int64.t desc
       | Float : float desc
-      | Bytes : Kind.length -> MBytes.t desc
+      | Bytes : Kind.length -> Bytes.t desc
       | String : Kind.length -> string desc
       | String_enum : Kind.length * (string * 'a) list -> 'a desc
       | Array : 'a t -> 'a array desc

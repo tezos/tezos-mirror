@@ -216,7 +216,7 @@ let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     let destination =
       Data_encoding.Binary.to_bytes_exn Contract.encoding destination
     in
-    let (`Hex destination) = MBytes.to_hex destination in
+    let (`Hex destination) = Hex.of_bytes destination in
     Format.asprintf
       "{ DROP ; NIL operation ;PUSH address 0x%s; CONTRACT %s %a; \
        ASSERT_SOME;PUSH mutez %a ;PUSH %a %a;TRANSFER_TOKENS ; CONS }"

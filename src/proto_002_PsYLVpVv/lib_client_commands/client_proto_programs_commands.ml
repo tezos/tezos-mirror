@@ -97,7 +97,7 @@ let commands () =
                raise Exit
              else
                return
-                 (MBytes.of_hex (`Hex (String.sub s 2 (String.length s - 2))))
+                 (Hex.to_bytes (`Hex (String.sub s 2 (String.length s - 2))))
            with _ ->
              failwith
                "Invalid bytes, expecting hexadecimal notation (e.g. 0x1234abcd)"))

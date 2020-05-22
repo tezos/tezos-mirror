@@ -51,7 +51,7 @@ type request =
 
 val request_pp : Format.formatter -> request -> unit
 
-val magic : MBytes.t
+val magic : Bytes.t
 
 val parameters_encoding : parameters Data_encoding.t
 

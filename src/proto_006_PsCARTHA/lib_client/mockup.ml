@@ -204,7 +204,7 @@ let block_encoding : block Data_encoding.t =
 
 module Forge = struct
   let default_proof_of_work_nonce =
-    MBytes.create Protocol.Alpha_context.Constants.proof_of_work_nonce_size
+    Bytes.create Protocol.Alpha_context.Constants.proof_of_work_nonce_size
 
   let make_shell ~level ~predecessor ~timestamp ~fitness ~operations_hash =
     Tezos_base.Block_header.
@@ -239,7 +239,7 @@ let initial_context (header : Block_header.shell_header)
   in
   Tezos_protocol_environment.Context.(
     let empty = Memory_context.empty in
-    set empty ["version"] (MBytes.of_string "genesis")
+    set empty ["version"] (Bytes.of_string "genesis")
     >>= fun ctxt -> set ctxt ["protocol_parameters"] proto_params)
   >>= fun ctxt ->
   Protocol.Main.init ctxt header

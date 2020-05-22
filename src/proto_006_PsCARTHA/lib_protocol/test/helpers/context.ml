@@ -211,11 +211,11 @@ module Vote = struct
   let get_participation_ema (b : Block.t) =
     Environment.Context.get b.context ["votes"; "participation_ema"]
     >>= function
-    | None -> assert false | Some bytes -> return (MBytes.get_int32 bytes 0)
+    | None -> assert false | Some bytes -> return (TzEndian.get_int32 bytes 0)
 
   let set_participation_ema (b : Block.t) ema =
     let bytes = Bytes.make 4 '\000' in
-    MBytes.set_int32 bytes 0 ema ;
+    TzEndian.set_int32 bytes 0 ema ;
     Environment.Context.set b.context ["votes"; "participation_ema"] bytes
     >>= fun context -> Lwt.return {b with context}
 end
