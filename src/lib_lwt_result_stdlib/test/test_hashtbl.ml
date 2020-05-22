@@ -23,19 +23,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Lwt.Infix
+open Tezos_error_monad.Error_monad
 
-module IntErrorTable = Error_table.Make (Hashtbl.Make (struct
+module IntLwtHashtbl = Lwtreslib.Hashtbl.Make_Lwt (struct
   type t = int
 
   let equal x y = x = y
 
   let hash x = x
-end))
+end)
 
 let test_add_remove _ _ =
-  let t = IntErrorTable.create 2 in
-  IntErrorTable.find_or_make t 0 (fun () -> Error_monad.return 0)
+  let t = IntLwtHashtbl.create 2 in
+  IntLwtHashtbl.find_or_make t 0 (fun () -> return 0)
   >>= function
   | Error _ ->
       Assert.fail "Ok 0" "Error _" "find_or_make"
@@ -43,89 +43,88 @@ let test_add_remove _ _ =
       if not (n = 0) then
         Assert.fail "Ok 0" (Format.asprintf "Ok %d" n) "find_or_make"
       else
-        match IntErrorTable.find_opt t 0 with
+        match IntLwtHashtbl.find t 0 with
         | None ->
-            Assert.fail "Some (Ok 0)" "None" "find_opt"
+            Assert.fail "Some (Ok 0)" "None" "find"
         | Some p -> (
             p
             >>= function
             | Error _ ->
-                Assert.fail "Some (Ok 0)" "Some (Error _)" "find_opt"
+                Assert.fail "Some (Ok 0)" "Some (Error _)" "find"
             | Ok n ->
                 if not (n = 0) then
                   Assert.fail
                     "Some (Ok 0)"
                     (Format.asprintf "Some (Ok %d)" n)
-                    "find_opt"
+                    "find"
                 else (
-                  IntErrorTable.remove t 0 ;
-                  match IntErrorTable.find_opt t 0 with
+                  IntLwtHashtbl.remove t 0 ;
+                  match IntLwtHashtbl.find t 0 with
                   | Some _ ->
-                      Assert.fail "None" "Some _" "remove;find_opt"
+                      Assert.fail "None" "Some _" "remove;find"
                   | None ->
                       Lwt.return_unit ) ) )
 
 let test_add_add _ _ =
-  let t = IntErrorTable.create 2 in
-  IntErrorTable.find_or_make t 0 (fun () -> Error_monad.return 0)
+  let t = IntLwtHashtbl.create 2 in
+  IntLwtHashtbl.find_or_make t 0 (fun () -> return 0)
   >>= fun _ ->
-  IntErrorTable.find_or_make t 0 (fun () -> Error_monad.return 1)
+  IntLwtHashtbl.find_or_make t 0 (fun () -> return 1)
   >>= fun _ ->
-  match IntErrorTable.find_opt t 0 with
+  match IntLwtHashtbl.find t 0 with
   | None ->
-      Assert.fail "Some (Ok 0)" "None" "find_opt"
+      Assert.fail "Some (Ok 0)" "None" "find"
   | Some p -> (
       p
       >>= function
       | Error _ ->
-          Assert.fail "Some (Ok 0)" "Some (Error _)" "find_opt"
+          Assert.fail "Some (Ok 0)" "Some (Error _)" "find"
       | Ok n ->
           if not (n = 0) then
-            Assert.fail
-              "Some (Ok 0)"
-              (Format.asprintf "Some (Ok %d)" n)
-              "find_opt"
+            Assert.fail "Some (Ok 0)" (Format.asprintf "Some (Ok %d)" n) "find"
           else Lwt.return_unit )
 
 let test_length _ _ =
-  let t = IntErrorTable.create 2 in
-  IntErrorTable.find_or_make t 0 (fun () -> Error_monad.return 0)
+  let t = IntLwtHashtbl.create 2 in
+  IntLwtHashtbl.find_or_make t 0 (fun () -> return 0)
   >>= fun _ ->
-  IntErrorTable.find_or_make t 1 (fun () -> Error_monad.return 1)
+  IntLwtHashtbl.find_or_make t 1 (fun () -> return 1)
   >>= fun _ ->
-  IntErrorTable.find_or_make t 2 (fun () -> Error_monad.return 2)
+  IntLwtHashtbl.find_or_make t 2 (fun () -> return 2)
   >>= fun _ ->
-  IntErrorTable.find_or_make t 3 (fun () -> Error_monad.return 3)
+  IntLwtHashtbl.find_or_make t 3 (fun () -> return 3)
   >>= fun _ ->
-  let l = IntErrorTable.length t in
+  let l = IntLwtHashtbl.length t in
   if not (l = 4) then Assert.fail "4" (Format.asprintf "%d" l) "length"
   else Lwt.return_unit
 
 let test_self_clean _ _ =
-  let t = IntErrorTable.create 2 in
-  IntErrorTable.find_or_make t 0 (fun () -> Lwt.return (Ok 0))
+  let t = IntLwtHashtbl.create 2 in
+  IntLwtHashtbl.find_or_make t 0 (fun () -> Lwt.return (Ok 0))
   >>= fun _ ->
-  IntErrorTable.find_or_make t 1 (fun () -> Lwt.return (Error []))
+  IntLwtHashtbl.find_or_make t 1 (fun () -> Lwt.return (Error []))
   >>= fun _ ->
-  IntErrorTable.find_or_make t 2 (fun () -> Lwt.return (Error []))
+  IntLwtHashtbl.find_or_make t 2 (fun () -> Lwt.return (Error []))
   >>= fun _ ->
-  IntErrorTable.find_or_make t 3 (fun () -> Lwt.return (Ok 3))
+  IntLwtHashtbl.find_or_make t 3 (fun () -> Lwt.return (Ok 3))
   >>= fun _ ->
-  IntErrorTable.find_or_make t 4 (fun () -> Lwt.return (Ok 4))
+  IntLwtHashtbl.find_or_make t 4 (fun () -> Lwt.return (Ok 4))
   >>= fun _ ->
-  IntErrorTable.find_or_make t 5 (fun () -> Lwt.return (Error []))
+  IntLwtHashtbl.find_or_make t 5 (fun () -> Lwt.return (Error []))
   >>= fun _ ->
-  let l = IntErrorTable.length t in
+  IntLwtHashtbl.find_or_make t 6 (fun () -> Lwt.fail Not_found)
+  >>= fun _ ->
+  let l = IntLwtHashtbl.length t in
   if not (l = 3) then Assert.fail "3" (Format.asprintf "%d" l) "length"
   else Lwt.return_unit
 
 let test_order _ _ =
-  let t = IntErrorTable.create 2 in
+  let t = IntLwtHashtbl.create 2 in
   let (wter, wker) = Lwt.task () in
   let world = ref [] in
   (* PROMISE A *)
   let p_a =
-    IntErrorTable.find_or_make t 0 (fun () ->
+    IntLwtHashtbl.find_or_make t 0 (fun () ->
         wter
         >>= fun r ->
         world := "a_inner" :: !world ;
@@ -138,7 +137,7 @@ let test_order _ _ =
   >>= fun () ->
   (* PROMISE B *)
   let p_b =
-    IntErrorTable.find_or_make t 0 (fun () ->
+    IntLwtHashtbl.find_or_make t 0 (fun () ->
         world := "b_inner" :: !world ;
         Lwt.return (Ok 1024))
     >>= fun r_b ->
@@ -185,5 +184,4 @@ let tests =
     Alcotest_lwt.test_case "self_clean" `Quick test_length;
     Alcotest_lwt.test_case "order" `Quick test_order ]
 
-let () =
-  Alcotest_lwt.run "error_tables" [("error_tables", tests)] |> Lwt_main.run
+let () = Alcotest_lwt.run "hashtbl" [("hashtbl-lwt", tests)] |> Lwt_main.run

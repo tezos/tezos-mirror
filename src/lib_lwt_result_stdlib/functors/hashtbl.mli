@@ -23,32 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [Error_monad]-aware replacements for parts of the Stdlib.
+module Make (Seq : Sigs.Seq.S) : sig
+  module type S = Sigs.Hashtbl.S with type error := Seq.Monad.out_error
 
-    This library aims to provide replacements to some parts of the Stdlib that:
+  module Make (H : Stdlib.Hashtbl.HashedType) : S with type key = H.t
 
-    - do not raise exceptions (e.g., it shadows [Map.find] with [Map.find_opt]),
-    - include traversal functions for Lwt (think [Lwt_list] for [List]),
-      [tzresult], and the combined [tzresult]-Lwt monad (think the
-      list-traversal functions from [Error_monad].
+  module type S_LWT = Sigs.Hashtbl.S_LWT with type error := Seq.Monad.out_error
 
-    The aim is to allow the use of the standard OCaml data-structures within the
-    context of Lwt and the Error monad. This is already somewhat available for
-    [List] through the combination of {!Stdlib.List} (for basic functionality),
-    {!Lwt_list} (for the Lwt-aware traversals), and {!Error_monad} (for the
-    error-aware and combined-error-lwt-aware traversal).
-
-    More and more modules will be added to this Library. In particular [List]
-    (to avoid splitting the functionality from three distinct libraries and to
-    provide more consistent coverage), [Array], and [Option] will be made
-    available.
-
-*)
-
-module Seq : module type of Lib.Seq
-
-module Set : module type of Lib.Set
-
-module Map : module type of Lib.Map
-
-module Hashtbl : module type of Lib.Hashtbl
+  module Make_Lwt (H : Stdlib.Hashtbl.HashedType) : S_LWT with type key = H.t
+end

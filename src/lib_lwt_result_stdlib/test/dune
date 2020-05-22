@@ -1,0 +1,20 @@
+(executables
+ (names test_hashtbl)
+ (libraries tezos-lwt-result-stdlib
+            tezos-error-monad
+            lwt.unix
+            alcotest-lwt)
+ (flags (:standard -open Tezos_lwt_result_stdlib)))
+
+(alias
+ (name buildtest)
+ (deps test_hashtbl.exe))
+
+(alias
+ (name runtest_hashtbl)
+ (action (run %{exe:test_hashtbl.exe})))
+
+(alias
+ (name runtest)
+ (package tezos-lwt-result-stdlib)
+ (deps (alias runtest_hashtbl)))
