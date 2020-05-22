@@ -641,7 +641,8 @@ class TestContractOpcodes:
             ('unpair.tz', 'Unit', 'Unit', 'Unit'),
 
             # Test VOTING_POWER
-            ('voting_power.tz', '0', f'"{PUBLIC_KEY}"', '500')
+            ('voting_power.tz', '(Pair 0 0)', f'"{PUBLIC_KEY}"',
+             '(Pair 500 2500)')
         ])
     def test_contract_input_output(self,
                                    client_regtest: ClientRegression,
