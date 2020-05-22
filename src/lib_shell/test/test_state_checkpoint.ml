@@ -419,13 +419,7 @@ let test_reach_checkpoint s =
   >>= fun () ->
   State.Chain.checkpoint s.chain
   >>= fun checkpoint_header ->
-  let time_now = Time.System.to_protocol (Systime_os.now ()) in
-  if
-    Time.Protocol.compare
-      (Time.Protocol.add time_now 15L)
-      header.shell.timestamp
-    >= 0
-  then
+  if Clock_drift.is_not_too_far_in_the_future header.shell.timestamp then
     let checkpoint_hash = Block_header.hash checkpoint_header in
     if
       Int32.equal header.shell.level checkpoint_header.shell.level

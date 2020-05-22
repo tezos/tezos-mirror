@@ -134,14 +134,6 @@ let deactivate gid chain_db =
   chain_db.active_peers := P2p_peer.Set.remove gid !(chain_db.active_peers) ;
   P2p_peer.Table.remove chain_db.active_connections gid
 
-let soon () =
-  let now = Systime_os.now () in
-  match Ptime.add_span now (Ptime.Span.of_int_s 15) with
-  | Some s ->
-      s
-  | None ->
-      invalid_arg "Distributed_db.handle_msg: end of time"
-
 (* Active the chain_id for the remote peer. Is a nop if it is already activated. *)
 let activate state chain_id chain_db =
   let meta = P2p.get_peer_metadata state.p2p state.gid in
@@ -192,7 +184,9 @@ let handle_msg state msg =
         >>= fun () ->
         P2p.greylist_peer state.p2p state.gid ;
         Lwt.return_unit )
-      else if Time.System.(soon () < of_protocol_exn head.shell.timestamp) then (
+      else if
+        not (Clock_drift.is_not_too_far_in_the_future head.shell.timestamp)
+      then (
         Peer_metadata.incr meta Future_block ;
         P2p_reader_event.(emit received_future_block)
           (Block_header.hash head, state.gid) )
@@ -245,7 +239,8 @@ let handle_msg state msg =
         >>= fun () ->
         P2p.greylist_peer state.p2p state.gid ;
         Lwt.return_unit )
-      else if Time.System.(soon () < of_protocol_exn header.shell.timestamp)
+      else if
+        not (Clock_drift.is_not_too_far_in_the_future header.shell.timestamp)
       then (
         Peer_metadata.incr meta Future_block ;
         P2p_reader_event.(emit received_future_block) (head, state.gid) )
