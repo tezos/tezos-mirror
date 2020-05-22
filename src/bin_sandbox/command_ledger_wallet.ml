@@ -1,6 +1,8 @@
 open Flextesa
 open Internal_pervasives
 
+(********************* TEST UTILS **********************)
+
 let client_async_cmd state ~client args ~f =
   Running_processes.Async.run_cmdf
     ~id_base:"client_async_cmd"
@@ -66,21 +68,6 @@ module MFmt = More_fmt
 
 let failf ?attach fmt =
   ksprintf (fun s -> fail ?attach (`Scenario_error s)) fmt
-
-let process_should_fail msg f =
-  Asynchronous_result.bind_on_error
-    ( f ()
-    >>= fun (proc : Process_result.t) ->
-    match proc#status with
-    | Unix.WEXITED 0 ->
-        failf
-          "Process should have failed: %s"
-          msg
-          ~attach:
-            [("stdout", `Verbatim proc#out); ("stderr", `Verbatim proc#err)]
-    | _ ->
-        return () )
-    ~f:(fun ~result:_ _ -> return ())
 
 let ledger_prompt_notice state ~msgs ?(button = `Checkmark) () =
   let button_str =
@@ -151,41 +138,6 @@ let please_check_the_hash ppf () =
   tag "prompt" ppf (fun ppf ->
       wf ppf "The ledger cannot parse this operation, please verify the hash.")
 
-let forge_batch_transactions state ~client ~src ~dest:_ ~n ?(fee = 0.00126) ()
-    =
-  get_head_block_hash state ~client ()
-  >>= fun branch ->
-  let json =
-    `O
-      [ ("branch", `String branch);
-        ( "contents",
-          `A
-            (List.map (List.range 0 n) ~f:(fun i ->
-                 `O
-                   [ ("kind", `String "transaction");
-                     ("source", `String src);
-                     ( "destination",
-                       `String "tz2KZPgf2rshxNUBXFcTaCemik1LH1v9qz3F" );
-                     ("amount", `String (Int.to_string 100));
-                     ( "fee",
-                       `String (Int.to_string (Float.to_int (fee *. 1000000.)))
-                     );
-                     ("counter", `String (Int.to_string i));
-                     ("gas_limit", `String (Int.to_string 127));
-                     ("storage_limit", `String (Int.to_string 277)) ])) ) ]
-  in
-  Tezos_client.rpc
-    state
-    ~client
-    ~path:"/chains/main/blocks/head/helpers/forge/operations"
-    (`Post (Ezjsonm.to_string json))
-  >>= function
-  | `String operation_bytes ->
-      let magic_byte = "03" in
-      return (magic_byte ^ operation_bytes)
-  | _ ->
-      failf "Failed to forge operation or parse result"
-
 let expect_from_output ~expectation ~message (proc_res : Process_result.t) =
   (* let expect_rejection msg (success, (stdout, stderr)) = *)
   let exp =
@@ -233,6 +185,8 @@ let expect_from_output ~expectation ~message (proc_res : Process_result.t) =
           nope "cannot find the right error message"
       | (true, _) ->
           nope "command succeeded??" )
+
+(********************* TEST SECTIONS ***************************)
 
 let voting_tests state ~client ~src ~with_rejections ~protocol_kind
     ~ledger_account ~tested_proposal ~go_to_next_period () =
@@ -308,7 +262,7 @@ let voting_tests state ~client ~src ~with_rejections ~protocol_kind
   >>= fun () ->
   go_to_next_period ()
   >>= fun () ->
-  List_sequential.iteri ["yea"; "nay"] ~f:(fun n vote ->
+  List_sequential.iter ["yea"; "nay"] ~f:(fun vote ->
       test_reject_and_accept
         (Fmt.strf "vote-%s" vote)
         ~messages:
@@ -328,8 +282,8 @@ let voting_tests state ~client ~src ~with_rejections ~protocol_kind
                       "Accept this prompt, regardless of below, then continue.");
               (fun ppf () -> wf ppf "Voting %s for %s" vote tested_proposal);
               (fun ppf () -> wf ppf "Source: `%s`" source_display);
-              (fun ppf () -> wf ppf "Period: `%i`" (n + 1));
-              (fun ppf () -> wf ppf "Protocol: `%s`" tested_proposal) ]
+              (fun ppf () -> wf ppf "Protocol: `%s`" tested_proposal);
+              (fun ppf () -> wf ppf "Period: `%i`" 1) ]
         (fun () ->
           Tezos_client.client_cmd
             state
@@ -337,10 +291,12 @@ let voting_tests state ~client ~src ~with_rejections ~protocol_kind
             ["submit"; "ballot"; "for"; src; tested_proposal; vote]
           >>= fun (_, proc) -> return proc))
 
-let ledger_should_display ppf l =
+let ledger_should_display ?title ppf l =
   let open MFmt in
   vertical_box ~indent:4 ppf (fun ppf ->
       wf ppf "Ledger should display:" ;
+      cut ppf () ;
+      (match title with None -> () | Some t -> wf ppf t) ;
       List.iter l ~f:(fun (s, f) -> cut ppf () ; pf ppf "* %s: %a." s f ()))
 
 let show_command_message command =
@@ -354,12 +310,6 @@ let show_command_message command =
             ("<tezos-client>" :: command |> List.map ~f:Caml.Filename.quote)
             ppf
             ()))
-
-let sign state ~client ~bytes =
-  Tezos_client.client_cmd
-    state
-    ~client:client.Tezos_client.Keyed.client
-    ["sign"; "bytes"; "0x" ^ bytes; "for"; client.Tezos_client.Keyed.key_name]
 
 let originate_manager_tz_script state ~client ~name ~from ~bake ~protocol_kind
     ~ledger_account =
@@ -407,7 +357,11 @@ let originate_manager_tz_script state ~client ~name ~from ~bake ~protocol_kind
     let origination =
       let opt = Option.value_map ~default:[] in
       ["--wait"; "none"; "originate"; "contract"; name]
-      @ (match protocol_kind with `Athens -> ["for"; from] | `Babylon | `Carthage -> [])
+      @ ( match protocol_kind with
+        | `Athens ->
+            ["for"; from]
+        | `Babylon | `Carthage ->
+            [] )
       @ [ "transferring";
           "350";
           "from";
@@ -455,9 +409,10 @@ let manager_tz_delegation_tests state ~client ~ledger_key ~ledger_account
             wf
               ppf
               "The ledger should be prompting for acknowledgment to provide a \
-               signature of an unknown operation. This is not an actual test, and \
-               is only part of the test setup. There is no need for a verification \
-               of this hash. Please accept this Unrecognized Operation.") ]
+               signature of an unknown operation. This is not an actual test, \
+               and is only part of the test setup. There is no need for a \
+               verification of this hash. Please accept this Unrecognized \
+               Operation.") ]
     (fun ~user_answer:_ ->
       originate_manager_tz_script
         state
@@ -563,7 +518,9 @@ let manager_tz_delegation_tests state ~client ~ledger_key ~ledger_account
             ("Fee", const string "0.00XXX");
             ("Source", const string contract_address);
             ("Delegate", const string "None");
-            ("Storage Limit", const int 500) ]
+            ("Storage Limit", const int 500);
+            ( "Delegate Name",
+              const string "Custom Delegate: please verify the addresss" ) ]
       ~output_msg:"delegate-removal"
   in
   let manager_tz_to_implicit () =
@@ -650,9 +607,8 @@ let manager_tz_delegation_tests state ~client ~ledger_key ~ledger_account
     contract_address
     random_contract_pkh
 
-
 let delegation_tests state ~client ~src ~with_rejections ~protocol_kind
-    ~ledger_account ~delegate ~bake () =
+    ~ledger_account ~delegate ~delegate_pkh ~bake () =
   let ledger_pkh = Tezos_protocol.Account.pubkey_hash ledger_account in
   let only_success = not with_rejections in
   let self_delegation () =
@@ -682,6 +638,7 @@ let delegation_tests state ~client ~src ~with_rejections ~protocol_kind
                  between runs");
             (fun ppf () ->
               ledger_should_display
+                ~title:"Confirm Delegation"
                 ppf
                 [ ("Fee", const string "0.00XXX");
                   ("Source", const string ledger_pkh);
@@ -737,11 +694,15 @@ let delegation_tests state ~client ~src ~with_rejections ~protocol_kind
                  between runs");
             (fun ppf () ->
               ledger_should_display
+                ~title:"Confirm Delegation"
                 ppf
                 [ ("Fee", const string "0.00XXX");
                   ("Source", const string ledger_pkh);
-                  ("Delegate", const string delegate);
-                  ("Storage", const int 0) ]) ]
+                  ("Delegate", const string delegate_pkh);
+                  ( "Delegate Name",
+                    const string "Custom Delegate: please verify the address"
+                  );
+                  ("Storage Limit", const int 0) ]) ]
       (fun ~user_answer ->
         client_async_cmd
           state
@@ -765,153 +726,9 @@ let delegation_tests state ~client ~src ~with_rejections ~protocol_kind
     >>= fun _ -> ksprintf bake "setting delegate of %s" src
     (* Self-delegate deletion is forbidden for both Athens and Babylon *)
   in
-  let run_command_and_check state ~client ~command ~message ~user_answer =
-    Tezos_client.client_cmd state ~client command
-    >>= fun (_, res) ->
-    expect_from_output
-      ~message
-      res
-      ~expectation:
-        ( match user_answer with
-        | `Reject ->
-            `Ledger_reject_or_timeout
-        | `Accept ->
-            `Success )
-  in
-  let delegate_with_scriptless_account () =
-    let originated_account_name = "ledginated" in
-    let amount = "200" in
-    let burn_cap = "0.257" in
-    let command =
-      [ "--wait";
-        "none";
-        "originate";
-        "account";
-        originated_account_name;
-        "for";
-        src;
-        "transferring";
-        "200";
-        "from";
-        src;
-        "--delegatable";
-        "--burn-cap";
-        burn_cap;
-        "--force" ]
-    in
-    with_ledger_test_reject_and_accept
-      state
-      ~only_success
-      ~messages:
-        MFmt.
-          [ (fun ppf () ->
-              wf ppf "Originating account `%s`" originated_account_name);
-            (fun ppf () ->
-              ledger_should_display
-                ppf
-                [ ("Amount", const string amount);
-                  ("Fee", const string (strf "≤ %S" burn_cap));
-                  ("Source", const string ledger_pkh);
-                  ("Manager", const string ledger_pkh);
-                  ("Delegation", const string "Any");
-                  ("Storage", const int 277) ]) ]
-      (fun ~user_answer ->
-        run_command_and_check
-          state
-          ~client
-          ~command
-          ~message:"account origination"
-          ~user_answer)
-    >>= fun _ ->
-    ksprintf bake "origination of %s" originated_account_name
-    >>= fun () ->
-    Tezos_client.client_cmd
-      state
-      ~client
-      ["show"; "known"; "contract"; originated_account_name]
-    >>= fun (_, proc_result) ->
-    let contract_address = proc_result#out |> String.concat ~sep:"" in
-    Tezos_client.client_cmd state ~client ["show"; "address"; delegate]
-    >>= fun (_, proc_result) ->
-    let delegate_address =
-      List.hd_exn proc_result#out
-      |> String.split ~on:' ' |> List.last
-      |> Option.value ~default:delegate
-    in
-    let command =
-      [ "--wait";
-        "none";
-        "set";
-        "delegate";
-        "for";
-        originated_account_name;
-        "to";
-        delegate ]
-    in
-    with_ledger_test_reject_and_accept
-      state
-      ~only_success
-      ~messages:
-        MFmt.
-          [ (fun ppf () ->
-              wf
-                ppf
-                "Setting `%s` as delegate for `%s`"
-                delegate
-                originated_account_name);
-            (fun ppf () ->
-              ledger_should_display
-                ppf
-                [ ("Source", const string contract_address);
-                  ("Fee", const string "≤ 0.001");
-                  ("Delegate", const string delegate_address);
-                  ("Storage", const int 0) ]) ]
-      (fun ~user_answer ->
-        run_command_and_check
-          state
-          ~client
-          ~command
-          ~message:"setting delegate of KT1"
-          ~user_answer)
-    >>= fun () ->
-    ksprintf bake "setting delegate of %s" originated_account_name
-    >>= fun () ->
-    let withdraw_command =
-      [ "--wait";
-        "none";
-        "withdraw";
-        "delegate";
-        "from";
-        originated_account_name ]
-    in
-    with_ledger_test_reject_and_accept
-      state
-      ~only_success
-      ~messages:
-        MFmt.
-          [ (fun ppf () ->
-              wf ppf "Withdrawing delegate from `%s`" originated_account_name);
-            show_command_message withdraw_command;
-            (fun ppf () ->
-              ledger_should_display
-                ppf
-                [ ("Source", const string contract_address);
-                  ("Fee", const string "≤ 0.001");
-                  ("Delegate", const string "None");
-                  ("Storage", const int 0) ]) ]
-      (fun ~user_answer ->
-        run_command_and_check
-          state
-          ~client
-          ~command:withdraw_command
-          ~message:"withdrawing delegate from originated account"
-          ~user_answer)
-    >>= fun () ->
-    ksprintf bake "withdrawing delegate of %s" originated_account_name
-  in
   match protocol_kind with
   | `Athens ->
-      self_delegation () >>= fun () -> delegate_with_scriptless_account ()
+      self_delegation ()
   | `Babylon | `Carthage ->
       tz_account_delegation () >>= fun () -> self_delegation ()
 
@@ -923,9 +740,12 @@ let transaction_tests state ~client ~src ~with_rejections ~protocol_kind
       ?entrypoint ?(amount = 15) ?fee () =
     let command =
       let opt = Option.value_map ~default:[] in
-      let storage = match storage_limit with
-          None -> []
-        | Some limit -> ["--storage-limit"; (sprintf "%d" limit)]
+      let storage =
+        match storage_limit with
+        | None ->
+            []
+        | Some limit ->
+            ["--storage-limit"; sprintf "%d" limit]
       in
       [ "--wait";
         "none";
@@ -936,9 +756,9 @@ let transaction_tests state ~client ~src ~with_rejections ~protocol_kind
         "to";
         dst_name ]
       @ Option.value_map ~default:[] arguments ~f:(fun a -> ["--arg"; a])
-      @ Option.value_map ~default:[] fee ~f:(fun f -> ["--fee"; (sprintf "%d" f)])
-      @ storage
-      @ ["--fee-cap"; "10"]
+      @ Option.value_map ~default:[] fee ~f:(fun f ->
+            ["--fee"; sprintf "%d" f])
+      @ storage @ ["--fee-cap"; "10"]
       @ opt entrypoint ~f:(fun e -> ["--entrypoint"; e])
       @ ["--burn-cap"; "100"; "--verbose-signing"]
     in
@@ -960,10 +780,18 @@ let transaction_tests state ~client ~src ~with_rejections ~protocol_kind
                   ledger_should_display
                     ppf
                     [ ("Amount", const int amount);
-                      ("Fee", const string @@ Option.value_map ~default:"0.00XXX" fee ~f:(sprintf "%d"));
+                      ( "Fee",
+                        const string
+                        @@ Option.value_map
+                             ~default:"0.00XXX"
+                             fee
+                             ~f:(sprintf "%d") );
                       ("Source", const string ledger_pkh);
                       ("Destination", const string dst_pkh);
-                      ("Storage Limit", const int @@ match storage_limit with None -> 0 | Some s -> s) ]
+                      ( "Storage Limit",
+                        const int
+                        @@ match storage_limit with None -> 0 | Some s -> s )
+                    ]
               | _ (* some arguments *) ->
                   please_check_the_hash ppf ()) ]
       (fun ~user_answer ->
@@ -1491,6 +1319,43 @@ let run state ~pp_error ~protocol ~protocol_kind ~node_exec ~client_exec
   in
   let batch_test ~with_rejections =
     let n = 50 in
+    let forge_batch_transactions state ~client ~src ~dest:_ ~n ?(fee = 0.00126)
+        () =
+      get_head_block_hash state ~client ()
+      >>= fun branch ->
+      let json =
+        `O
+          [ ("branch", `String branch);
+            ( "contents",
+              `A
+                (List.map (List.range 0 n) ~f:(fun i ->
+                     `O
+                       [ ("kind", `String "transaction");
+                         ("source", `String src);
+                         ( "destination",
+                           `String "tz2KZPgf2rshxNUBXFcTaCemik1LH1v9qz3F" );
+                         ("amount", `String (Int.to_string 100));
+                         ( "fee",
+                           `String
+                             (Int.to_string (Float.to_int (fee *. 1000000.)))
+                         );
+                         ("counter", `String (Int.to_string i));
+                         ("gas_limit", `String (Int.to_string 127));
+                         ("storage_limit", `String (Int.to_string 277)) ])) )
+          ]
+      in
+      Tezos_client.rpc
+        state
+        ~client
+        ~path:"/chains/main/blocks/head/helpers/forge/operations"
+        (`Post (Ezjsonm.to_string json))
+      >>= function
+      | `String operation_bytes ->
+          let magic_byte = "03" in
+          return (magic_byte ^ operation_bytes)
+      | _ ->
+          failf "Failed to forge operation or parse result"
+    in
     forge_batch_transactions
       state
       ~client:(client 0)
@@ -1504,6 +1369,16 @@ let run state ~pp_error ~protocol ~protocol_kind ~node_exec ~client_exec
         `Hex batch_transaction_bytes |> Hex.to_bytes
         |> (fun x -> [x])
         |> Blake2B.hash_bytes |> Blake2B.to_string |> Base58.raw_encode)
+    in
+    let sign state ~client ~bytes =
+      Tezos_client.client_cmd
+        state
+        ~client:client.Tezos_client.Keyed.client
+        [ "sign";
+          "bytes";
+          "0x" ^ bytes;
+          "for";
+          client.Tezos_client.Keyed.key_name ]
     in
     with_ledger_test_reject_and_accept
       state
@@ -1536,6 +1411,7 @@ let run state ~pp_error ~protocol ~protocol_kind ~node_exec ~client_exec
       ~client:client_0
       ~ledger_account
       ~delegate:baker_0.Tezos_client.Keyed.key_name
+      ~delegate_pkh:(Tezos_protocol.Account.pubkey_hash baker_0_account)
       ~src:signer.key_name
       ()
       ~bake
@@ -1649,7 +1525,14 @@ let run state ~pp_error ~protocol ~protocol_kind ~node_exec ~client_exec
                   run manager_tz_delegation_tests
               | Some `All ->
                   run delegation_tests
-                  >>= fun () -> run batch_test >>= fun () -> run voting_test
+                  >>= fun () ->
+                  run manager_tz_delegation_tests
+                  >>= fun () ->
+                  run batch_test
+                  >>= fun () ->
+                  run transactions_test
+                  >>= fun () ->
+                  run voting_test >>= fun () -> run contracts_test
               | Some `Batch_transactions ->
                   run batch_test
               | Some `Transactions ->
