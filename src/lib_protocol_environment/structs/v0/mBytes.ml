@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,62 +24,66 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module type CONTEXT = sig
-  type t
+type t = bytes
 
-  type key = string list
+let create = Bytes.create
 
-  type value = Bytes.t
+let length = Bytes.length
 
-  val mem : t -> key -> bool Lwt.t
+let copy = Bytes.copy
 
-  val dir_mem : t -> key -> bool Lwt.t
+let sub = Bytes.sub
 
-  val get : t -> key -> value option Lwt.t
+let blit = Bytes.blit
 
-  val set : t -> key -> value -> t Lwt.t
+let blit_of_string = Bytes.blit_string
 
-  val copy : t -> from:key -> to_:key -> t option Lwt.t
+let blit_to_bytes = Bytes.blit
 
-  val del : t -> key -> t Lwt.t
+let of_string = Bytes.of_string
 
-  val remove_rec : t -> key -> t Lwt.t
+let to_string = Bytes.to_string
 
-  val fold :
-    t ->
-    key ->
-    init:'a ->
-    f:([`Key of key | `Dir of key] -> 'a -> 'a Lwt.t) ->
-    'a Lwt.t
+let sub_string = Bytes.sub_string
 
-  val set_protocol : t -> Protocol_hash.t -> t Lwt.t
+let get_char = Bytes.get
 
-  val fork_test_chain :
-    t -> protocol:Protocol_hash.t -> expiration:Time.Protocol.t -> t Lwt.t
+let set_char = Bytes.set
+
+include Tezos_stdlib.TzEndian
+
+module LE = struct
+  let get_uint16 = Bytes.get_uint16_le
+
+  let get_int16 = Bytes.get_int16_le
+
+  let get_int32 = Bytes.get_int32_le
+
+  let get_int64 = Bytes.get_int64_le
+
+  let set_int16 = Bytes.set_int16_le
+
+  let set_int32 = Bytes.set_int32_le
+
+  let set_int64 = Bytes.set_int64_le
 end
 
-module Context : sig
-  type 'ctxt ops = (module CONTEXT with type t = 'ctxt)
+let ( = ) = Stdlib.( = )
 
-  type _ kind = ..
+let ( <> ) = Stdlib.( <> )
 
-  type t = Context : {kind : 'a kind; ctxt : 'a; ops : 'a ops} -> t
+let ( < ) = Stdlib.( < )
 
-  include CONTEXT with type t := t
-end
+let ( <= ) = Stdlib.( <= )
 
-type validation_result = {
-  context : Context.t;
-  fitness : Fitness.t;
-  message : string option;
-  max_operations_ttl : int;
-  last_allowed_fork_level : Int32.t;
-}
+let ( >= ) = Stdlib.( >= )
 
-type quota = {max_size : int; max_op : int option}
+let ( > ) = Stdlib.( > )
 
-type rpc_context = {
-  block_hash : Block_hash.t;
-  block_header : Block_header.shell_header;
-  context : Context.t;
-}
+let compare = Bytes.compare
+
+let concat s bs = Bytes.concat (Bytes.of_string s) bs
+
+let to_hex t = Hex.of_bytes t
+
+let of_hex hex = Hex.to_bytes hex

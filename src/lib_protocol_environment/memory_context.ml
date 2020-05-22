@@ -28,7 +28,7 @@ module M = struct
 
   type key = string list
 
-  type value = MBytes.t
+  type value = Bytes.t
 
   type t = Dir of t StringMap.t | Key of value
 

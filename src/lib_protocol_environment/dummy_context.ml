@@ -28,7 +28,7 @@ module M = struct
 
   type key = string list
 
-  type value = MBytes.t
+  type value = Bytes.t
 
   let mem _ _ = assert false
 

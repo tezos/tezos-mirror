@@ -44,7 +44,7 @@ module type V0 = sig
        and type Context_hash.t = Context_hash.t
        and type Protocol_hash.t = Protocol_hash.t
        and type Time.t = Time.Protocol.t
-       and type MBytes.t = MBytes.t
+       and type MBytes.t = Tezos_protocol_environment_structs.V0.M.MBytes.t
        and type Operation.shell_header = Operation.shell_header
        and type Operation.t = Operation.t
        and type Block_header.shell_header = Block_header.shell_header
@@ -135,7 +135,7 @@ struct
     let try_with f = try Some (f ()) with _ -> None
   end
 
-  module MBytes = MBytes
+  module MBytes = Tezos_protocol_environment_structs.V0.M.MBytes
 
   module Raw_hashes = struct
     let sha256 = Hacl.Hash.SHA256.digest

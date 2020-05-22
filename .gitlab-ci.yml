@@ -990,6 +990,11 @@ opam:tezos-protocol-environment-sigs:
   variables:
     package: tezos-protocol-environment-sigs
 
+opam:tezos-protocol-environment-structs:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-environment-structs
+
 opam:tezos-protocol-genesis:
   <<: *opam_definition
   variables:

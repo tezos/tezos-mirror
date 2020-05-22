@@ -3,6 +3,7 @@
  (public_name tezos-protocol-environment)
  (libraries tezos-base
             tezos-protocol-environment-sigs
+            tezos-protocol-environment-structs
             tezos-micheline)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_micheline))

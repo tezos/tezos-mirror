@@ -30,7 +30,7 @@ module type CONTEXT = sig
 
   type key = string list
 
-  type value = MBytes.t
+  type value = Bytes.t
 
   val mem : t -> key -> bool Lwt.t
 
@@ -62,7 +62,7 @@ end
 module Context = struct
   type key = string list
 
-  type value = MBytes.t
+  type value = Bytes.t
 
   type 'ctxt ops = (module CONTEXT with type t = 'ctxt)
 

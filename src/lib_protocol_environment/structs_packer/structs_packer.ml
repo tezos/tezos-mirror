@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,62 +23,41 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module type CONTEXT = sig
-  type t
+let dump_file oc file =
+  let ic = open_in file in
+  let buflen = 8096 in
+  let buf = Bytes.create buflen in
+  let rec loop () =
+    let len = input ic buf 0 buflen in
+    if len <> 0 then (
+      Printf.fprintf
+        oc
+        "%s"
+        (Bytes.to_string (if len = buflen then buf else Bytes.sub buf 0 len)) ;
+      loop () )
+  in
+  loop () ; close_in ic
 
-  type key = string list
+let opened_modules = ["Pervasives"; "Error_monad"]
 
-  type value = Bytes.t
+let include_ml oc file =
+  let unit =
+    String.capitalize_ascii (Filename.chop_extension (Filename.basename file))
+  in
+  Printf.fprintf oc "module %s = struct\n" unit ;
+  Printf.fprintf oc "# 1 %S\n" file ;
+  dump_file oc file ;
+  Printf.fprintf oc "end\n" ;
+  if unit = "Result" then
+    Printf.fprintf
+      oc
+      "type ('a, 'b) result = ('a, 'b) Result.result =  Ok of 'a | Error of 'b\n" ;
+  if List.mem unit opened_modules then Printf.fprintf oc "open %s\n" unit
 
-  val mem : t -> key -> bool Lwt.t
-
-  val dir_mem : t -> key -> bool Lwt.t
-
-  val get : t -> key -> value option Lwt.t
-
-  val set : t -> key -> value -> t Lwt.t
-
-  val copy : t -> from:key -> to_:key -> t option Lwt.t
-
-  val del : t -> key -> t Lwt.t
-
-  val remove_rec : t -> key -> t Lwt.t
-
-  val fold :
-    t ->
-    key ->
-    init:'a ->
-    f:([`Key of key | `Dir of key] -> 'a -> 'a Lwt.t) ->
-    'a Lwt.t
-
-  val set_protocol : t -> Protocol_hash.t -> t Lwt.t
-
-  val fork_test_chain :
-    t -> protocol:Protocol_hash.t -> expiration:Time.Protocol.t -> t Lwt.t
-end
-
-module Context : sig
-  type 'ctxt ops = (module CONTEXT with type t = 'ctxt)
-
-  type _ kind = ..
-
-  type t = Context : {kind : 'a kind; ctxt : 'a; ops : 'a ops} -> t
-
-  include CONTEXT with type t := t
-end
-
-type validation_result = {
-  context : Context.t;
-  fitness : Fitness.t;
-  message : string option;
-  max_operations_ttl : int;
-  last_allowed_fork_level : Int32.t;
-}
-
-type quota = {max_size : int; max_op : int option}
-
-type rpc_context = {
-  block_hash : Block_hash.t;
-  block_header : Block_header.shell_header;
-  context : Context.t;
-}
+let () =
+  Printf.fprintf stdout "module M = struct\n" ;
+  for i = 1 to Array.length Sys.argv - 1 do
+    let file = Sys.argv.(i) in
+    include_ml stdout file
+  done ;
+  Printf.fprintf stdout "end\n%!"
