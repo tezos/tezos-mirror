@@ -11,6 +11,7 @@ depends: [
   "tezos-stdlib"
   "data-encoding" { = "0.2" }
   "tezos-error-monad"
+  "tezos-lwt-result-stdlib"
   "tezos-rpc"
   "tezos-clic"
   "lwt"

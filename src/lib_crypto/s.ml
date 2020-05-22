@@ -169,7 +169,7 @@ module type INDEXES = sig
   end
 
   module Error_table : sig
-    include Error_table.S with type key = t
+    include Tezos_lwt_result_stdlib.Lwtreslib.Hashtbl.S_LWT with type key = t
   end
 
   module WeakRingTable : sig

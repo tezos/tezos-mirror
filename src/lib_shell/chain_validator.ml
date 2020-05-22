@@ -653,7 +653,7 @@ let on_launch start_prevalidator w _ parameters =
                 trace)
             (fun () ->
               let nv = Worker.state w in
-              match P2p_peer.Error_table.find_opt nv.active_peers peer_id with
+              match P2p_peer.Error_table.find nv.active_peers peer_id with
               | None ->
                   return_unit
               | Some pv ->

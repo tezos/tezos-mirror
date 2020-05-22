@@ -8,6 +8,7 @@
  (libraries tezos-stdlib
             data-encoding
             tezos-error-monad
+            tezos-lwt-result-stdlib
             tezos-rpc
             lwt
             hacl-star

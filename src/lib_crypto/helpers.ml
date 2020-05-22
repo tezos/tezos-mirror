@@ -257,7 +257,7 @@ struct
   end
 
   module Error_table = struct
-    include Error_table.Make (Table)
+    include Tezos_lwt_result_stdlib.Lwtreslib.Hashtbl.Make_Lwt (H)
   end
 
   module WeakRingTable = struct
