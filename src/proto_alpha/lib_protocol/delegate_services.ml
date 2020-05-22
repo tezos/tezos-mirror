@@ -238,7 +238,7 @@ let register () =
       >>=? fun deactivated ->
       Delegate.grace_period ctxt pkh
       >>=? fun grace_period ->
-      Vote.get_voting_power ctxt pkh
+      Vote.get_voting_power_free ctxt pkh
       >|=? fun voting_power ->
       {
         balance;
@@ -266,7 +266,7 @@ let register () =
   register1 S.grace_period (fun ctxt pkh () () ->
       Delegate.grace_period ctxt pkh) ;
   register1 S.voting_power (fun ctxt pkh () () ->
-      Vote.get_voting_power ctxt pkh)
+      Vote.get_voting_power_free ctxt pkh)
 
 let list ctxt block ?(active = true) ?(inactive = false) () =
   RPC_context.make_call0 S.list_delegate ctxt block {active; inactive} ()

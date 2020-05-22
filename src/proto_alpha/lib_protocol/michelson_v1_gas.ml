@@ -441,6 +441,9 @@ module Cost_of = struct
     (* model N_Swap *)
     let cost_N_Swap = Z.of_int 70
 
+    (* model N_Total_voting_power *)
+    let cost_N_Total_voting_power = Z.of_int 400
+
     (* model N_Unpair *)
     let cost_N_Unpair = Z.of_int 80
 
@@ -842,6 +845,8 @@ module Cost_of = struct
     let dropn n = atomic_step_cost (cost_N_DropN n)
 
     let voting_power = atomic_step_cost cost_N_Voting_power
+
+    let total_voting_power = atomic_step_cost cost_N_Total_voting_power
 
     let neq = atomic_step_cost cost_N_Neq
 

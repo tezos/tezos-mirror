@@ -135,6 +135,7 @@ type prim =
   | I_DUG
   | I_NEVER
   | I_VOTING_POWER
+  | I_TOTAL_VOTING_POWER
   | T_bool
   | T_contract
   | T_int
@@ -262,6 +263,7 @@ let namespace = function
   | I_STEPS_TO_QUOTA
   | I_SUB
   | I_SWAP
+  | I_TOTAL_VOTING_POWER
   | I_TRANSFER_TOKENS
   | I_UNIT
   | I_UNPACK
@@ -511,6 +513,8 @@ let string_of_prim = function
       "NEVER"
   | I_VOTING_POWER ->
       "VOTING_POWER"
+  | I_TOTAL_VOTING_POWER ->
+      "TOTAL_VOTING_POWER"
   | T_bool ->
       "bool"
   | T_contract ->
@@ -761,6 +765,8 @@ let prim_of_string = function
       ok I_NEVER
   | "VOTING_POWER" ->
       ok I_VOTING_POWER
+  | "TOTAL_VOTING_POWER" ->
+      ok I_TOTAL_VOTING_POWER
   | "bool" ->
       ok T_bool
   | "contract" ->
@@ -985,7 +991,8 @@ let prim_encoding =
          ("never", T_never);
          ("NEVER", I_NEVER);
          ("UNPAIR", I_UNPAIR);
-         ("VOTING_POWER", I_VOTING_POWER)
+         ("VOTING_POWER", I_VOTING_POWER);
+         ("TOTAL_VOTING_POWER", I_TOTAL_VOTING_POWER)
          (* New instructions must be added here, for backward compatibility of the encoding. *)
         ]
 

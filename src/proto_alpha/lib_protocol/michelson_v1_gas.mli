@@ -193,6 +193,8 @@ module Cost_of : sig
 
     val voting_power : Gas.cost
 
+    val total_voting_power : Gas.cost
+
     val neq : Gas.cost
 
     val nop : Gas.cost

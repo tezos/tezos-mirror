@@ -52,3 +52,6 @@ val current_proposal :
   'a #RPC_context.simple -> 'a -> Protocol_hash.t option shell_tzresult Lwt.t
 
 val register : unit -> unit
+
+val total_voting_power :
+  'a #RPC_context.simple -> 'a -> Int32.t shell_tzresult Lwt.t
