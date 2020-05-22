@@ -367,6 +367,8 @@ module Cost_of = struct
 
     let get_voting_power = step_cost 1
 
+    let get_total_voting_power = step_cost 1
+
     let stack_n_op n =
       atomic_step_cost (20 + ((n lsr 1) + (n lsr 2) + (n lsr 4)))
 
@@ -761,6 +763,8 @@ module Cost_of = struct
       | Never ->
           alloc_cost 0
       | Voting_power ->
+          alloc_cost 1
+      | Total_voting_power ->
           alloc_cost 1
   end
 

@@ -103,7 +103,7 @@ let listings_encoding =
     list
       (obj2 (req "pkh" Signature.Public_key_hash.encoding) (req "rolls" int32)))
 
-let freeze_listings ctxt =
+let update_listings ctxt =
   Storage.Vote.Listings.clear ctxt
   >>= fun ctxt ->
   Roll_storage.fold ctxt (ctxt, 0l) ~f:(fun _roll delegate (ctxt, total) ->
@@ -123,8 +123,43 @@ let in_listings = Storage.Vote.Listings.mem
 
 let get_listings = Storage.Vote.Listings.bindings
 
-let get_voting_power ctxt owner =
+let get_voting_power_free ctxt owner =
   Storage.Vote.Listings.get_option ctxt owner >>|? Option.unopt ~default:0l
+
+(* This function bypases the carbonated functors to account for gas consumption.
+   This is a temporary situation intended to be fixed by adding the right
+   carbonated functors in version 008 *)
+let get_voting_power ctxt owner =
+  let open Raw_context in
+  let open Gas_limit_repr in
+  (* Always consume read access to memory *)
+  Lwt.return (consume_gas ctxt (read_bytes_cost Z.zero))
+  >>=? fun ctxt ->
+  Storage.Vote.Listings.get_option ctxt owner
+  >>=? function
+  | None ->
+      return (ctxt, 0l)
+  | Some power ->
+      (* If some power is returned, consume read size_of(int32) = 4 bytes *)
+      Lwt.return (consume_gas ctxt (read_bytes_cost (Z.of_int 4)))
+      >>=? fun ctxt -> return (ctxt, power)
+
+let get_total_voting_power_free = listing_size
+
+(* This function bypases the carbonated functors to account for gas consumption.
+   This is a temporary situation intended to be fixed by adding the right
+   carbonated functors in version 008 *)
+let get_total_voting_power ctxt =
+  let open Raw_context in
+  let open Gas_limit_repr in
+  listing_size ctxt
+  >>=? fun total_power ->
+  (* Consume access to memory and read size_of(int32) = 4 bytes *)
+  Lwt.return
+    ( consume_gas ctxt (read_bytes_cost Z.zero)
+    >>? fun ctxt ->
+    consume_gas ctxt (read_bytes_cost (Z.of_int 4))
+    >>? fun ctxt -> ok (ctxt, total_power) )
 
 let get_current_period_kind = Storage.Vote.Current_period_kind.get
 

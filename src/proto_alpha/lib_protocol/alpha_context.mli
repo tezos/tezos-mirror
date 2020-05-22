@@ -350,6 +350,7 @@ module Script : sig
     | I_DUG
     | I_NEVER
     | I_VOTING_POWER
+    | I_TOTAL_VOTING_POWER
     | T_bool
     | T_contract
     | T_int
@@ -912,7 +913,7 @@ module Vote : sig
   val listings_encoding :
     (Signature.Public_key_hash.t * int32) list Data_encoding.t
 
-  val freeze_listings : context -> context tzresult Lwt.t
+  val update_listings : context -> context tzresult Lwt.t
 
   val listing_size : context -> int32 tzresult Lwt.t
 
@@ -926,8 +927,15 @@ module Vote : sig
     passes_per_roll : int;
   }
 
-  val get_voting_power :
+  val get_voting_power_free :
     context -> Signature.Public_key_hash.t -> int32 tzresult Lwt.t
+
+  val get_voting_power :
+    context -> Signature.Public_key_hash.t -> (context * int32) tzresult Lwt.t
+
+  val get_total_voting_power_free : context -> int32 tzresult Lwt.t
+
+  val get_total_voting_power : context -> (context * int32) tzresult Lwt.t
 
   val ballot_encoding : ballot Data_encoding.t
 

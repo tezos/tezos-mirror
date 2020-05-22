@@ -560,6 +560,8 @@ let cost_of_instr : type b a. (b, a) descr -> b -> Gas.cost =
         .
     | (Voting_power, _) ->
         Interp_costs.get_voting_power
+    | (Total_voting_power, _) ->
+        Interp_costs.get_total_voting_power
   in
   Gas.(cycle_cost +@ instr_cost)
 
@@ -1222,7 +1224,11 @@ let rec step :
       .
   | (Voting_power, (key_hash, rest)) ->
       Vote.get_voting_power ctxt key_hash
-      >>=? fun rolls ->
+      >>=? fun (ctxt, rolls) ->
+      logged_return ((Script_int.(abs (of_int32 rolls)), rest), ctxt)
+  | (Total_voting_power, rest) ->
+      Vote.get_total_voting_power ctxt
+      >>=? fun (ctxt, rolls) ->
       logged_return ((Script_int.(abs (of_int32 rolls)), rest), ctxt)
 
 and interp :

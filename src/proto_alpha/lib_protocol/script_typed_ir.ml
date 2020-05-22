@@ -400,6 +400,7 @@ and ('bef, 'aft) instr =
   | ChainId : ('rest, Chain_id.t * 'rest) instr
   | Never : (never * 'rest, 'aft) instr
   | Voting_power : (public_key_hash * 'rest, n num * 'rest) instr
+  | Total_voting_power : ('rest, n num * 'rest) instr
 
 (* Type witness for operations that work deep in the stack ignoring
    (and preserving) a prefix.

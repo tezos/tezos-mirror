@@ -82,6 +82,14 @@ module S = struct
       ~query:RPC_query.empty
       ~output:(Data_encoding.option Protocol_hash.encoding)
       RPC_path.(path / "current_proposal")
+
+  let total_voting_power =
+    RPC_service.get_service
+      ~description:
+        "Total number of rolls for the delegates in the voting listings."
+      ~query:RPC_query.empty
+      ~output:Data_encoding.int32
+      RPC_path.(path / "total_voting_power")
 end
 
 let register () =
@@ -102,7 +110,9 @@ let register () =
       | Error (Raw_context.Storage_error (Missing_key _) :: _) ->
           return_none
       | Error _ as e ->
-          Lwt.return e)
+          Lwt.return e) ;
+  register0 S.total_voting_power (fun ctxt () () ->
+      Vote.get_total_voting_power_free ctxt)
 
 let ballots ctxt block = RPC_context.make_call0 S.ballots ctxt block () ()
 
@@ -121,3 +131,6 @@ let proposals ctxt block = RPC_context.make_call0 S.proposals ctxt block () ()
 
 let current_proposal ctxt block =
   RPC_context.make_call0 S.current_proposal ctxt block () ()
+
+let total_voting_power ctxt block =
+  RPC_context.make_call0 S.total_voting_power ctxt block () ()

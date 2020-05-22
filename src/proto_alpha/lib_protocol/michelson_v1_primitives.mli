@@ -134,6 +134,7 @@ type prim =
   | I_DUG
   | I_NEVER
   | I_VOTING_POWER
+  | I_TOTAL_VOTING_POWER
   | T_bool
   | T_contract
   | T_int
