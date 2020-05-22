@@ -70,7 +70,7 @@ val listings_encoding :
 
 (** Populates [!Storage.Vote.Listings] using the currently existing rolls and
     sets Listings_size. Delegates without rolls are not included in the listing. *)
-val freeze_listings : Raw_context.t -> Raw_context.t tzresult Lwt.t
+val update_listings : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
 (** Returns the sum of all rolls of all delegates. *)
 val listing_size : Raw_context.t -> int32 tzresult Lwt.t
@@ -81,8 +81,18 @@ val in_listings : Raw_context.t -> Signature.Public_key_hash.t -> bool Lwt.t
 val get_listings :
   Raw_context.t -> (Signature.Public_key_hash.t * int32) list Lwt.t
 
-val get_voting_power :
+val get_voting_power_free :
   Raw_context.t -> Signature.public_key_hash -> int32 tzresult Lwt.t
+
+val get_voting_power :
+  Raw_context.t ->
+  Signature.public_key_hash ->
+  (Raw_context.t * int32) tzresult Lwt.t
+
+val get_total_voting_power_free : Raw_context.t -> int32 tzresult Lwt.t
+
+val get_total_voting_power :
+  Raw_context.t -> (Raw_context.t * int32) tzresult Lwt.t
 
 val get_current_quorum : Raw_context.t -> int32 tzresult Lwt.t
 

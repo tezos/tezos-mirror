@@ -50,8 +50,7 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
       Vote_storage.init ctxt
       >>=? fun ctxt ->
       Storage.Block_priority.init ctxt 0
-      >>=? fun ctxt ->
-      Vote_storage.freeze_listings ctxt >>=? fun ctxt -> return ctxt
+      >>=? fun ctxt -> Vote_storage.update_listings ctxt
   | Carthage_006 ->
       return ctxt
 

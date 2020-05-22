@@ -98,7 +98,7 @@ let check_approval_and_update_participation_ema ctxt =
   >|=? fun ctxt -> (ctxt, outcome)
 
 (** Implements the state machine of the amendment procedure.
-    Note that [freeze_listings], that computes the vote weight of each delegate,
+    Note that [update_listings], that computes the vote weight of each delegate,
     is run at the beginning of each voting period.
 *)
 let start_new_voting_period ctxt =
@@ -151,10 +151,8 @@ let start_new_voting_period ctxt =
       Vote.clear_ballots ctxt
       >>= fun ctxt ->
       Vote.clear_current_proposal ctxt
-      >>=? fun ctxt ->
-      Vote.set_current_period_kind ctxt Proposal >>=? fun ctxt -> return ctxt
-  )
-  >>=? fun ctxt -> Vote.freeze_listings ctxt
+      >>=? fun ctxt -> Vote.set_current_period_kind ctxt Proposal )
+  >>=? fun ctxt -> Vote.update_listings ctxt
 
 type error +=
   | (* `Branch *)
