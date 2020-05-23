@@ -75,7 +75,7 @@ Build from sources
 
 ::
 
-   sudo apt install -y rsync git m4 build-essential patch unzip bubblewrap wget pkg-config libgmp-dev libev-dev libhidapi-dev which
+   sudo apt install -y rsync git m4 build-essential patch unzip bubblewrap wget pkg-config libgmp-dev libev-dev libhidapi-dev libffi-dev  which
    wget https://github.com/ocaml/opam/releases/download/2.0.3/opam-2.0.3-x86_64-linux
    sudo cp opam-2.0.3-x86_64-linux /usr/local/bin/opam
    sudo chmod a+x /usr/local/bin/opam
