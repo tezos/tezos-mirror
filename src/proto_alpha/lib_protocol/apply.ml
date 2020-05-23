@@ -729,11 +729,13 @@ let apply_manager_operation_content :
             {consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt},
           [] )
 
+type success_or_failure = Success of context | Failure
+
 let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
   let rec apply ctxt applied worklist =
     match worklist with
     | [] ->
-        Lwt.return (`Success ctxt, List.rev applied)
+        Lwt.return (Success ctxt, List.rev applied)
     | Internal_operation ({source; operation; nonce} as op) :: rest -> (
         ( if internal_nonce_already_recorded ctxt nonce then
           fail (Internal_operation_replay (Internal_operation op))
@@ -760,7 +762,7 @@ let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
                     (op, Skipped (manager_kind op.operation)))
                 rest
             in
-            Lwt.return (`Failure, List.rev (skipped @ (result :: applied)))
+            Lwt.return (Failure, List.rev (skipped @ (result :: applied)))
         | Ok (ctxt, result, emitted) ->
             apply
               ctxt
@@ -831,7 +833,7 @@ let precheck_manager_contents (type kind) ctxt chain_id raw_operation
 
 let apply_manager_contents (type kind) ctxt mode chain_id
     (op : kind Kind.manager contents) :
-    ( [`Success of context | `Failure]
+    ( success_or_failure
     * kind manager_operation_result
     * packed_internal_operation_result list )
     Lwt.t =
@@ -856,25 +858,24 @@ let apply_manager_contents (type kind) ctxt mode chain_id
         ~chain_id
         internal_operations
       >>= function
-      | (`Success ctxt, internal_operations_results) -> (
+      | (Success ctxt, internal_operations_results) -> (
           Fees.burn_storage_fees ctxt ~storage_limit ~payer:source
           >>= function
           | Ok ctxt ->
               Lwt.return
-                ( `Success ctxt,
+                ( Success ctxt,
                   Applied operation_results,
                   internal_operations_results )
           | Error errors ->
               Lwt.return
-                ( `Failure,
+                ( Failure,
                   Backtracked (operation_results, Some errors),
                   internal_operations_results ) )
-      | (`Failure, internal_operations_results) ->
+      | (Failure, internal_operations_results) ->
           Lwt.return
-            (`Failure, Applied operation_results, internal_operations_results)
-      )
+            (Failure, Applied operation_results, internal_operations_results) )
   | Error errors ->
-      Lwt.return (`Failure, Failed (manager_kind operation, errors), [])
+      Lwt.return (Failure, Failed (manager_kind operation, errors), [])
 
 let skipped_operation_result :
     type kind. kind manager_operation -> kind manager_operation_result =
@@ -944,8 +945,7 @@ let rec apply_manager_contents_list_rec :
     public_key_hash ->
     Chain_id.t ->
     kind Kind.manager contents_list ->
-    ([`Success of context | `Failure] * kind Kind.manager contents_result_list)
-    Lwt.t =
+    (success_or_failure * kind Kind.manager contents_result_list) Lwt.t =
  fun ctxt mode baker chain_id contents_list ->
   let level = Level.current ctxt in
   match contents_list with
@@ -969,7 +969,7 @@ let rec apply_manager_contents_list_rec :
       let source = Contract.implicit_contract source in
       apply_manager_contents ctxt mode chain_id op
       >>= function
-      | (`Failure, operation_result, internal_operation_results) ->
+      | (Failure, operation_result, internal_operation_results) ->
           let result =
             Manager_operation_result
               {
@@ -982,8 +982,8 @@ let rec apply_manager_contents_list_rec :
               }
           in
           Lwt.return
-            (`Failure, Cons_result (result, mark_skipped ~baker level rest))
-      | (`Success ctxt, operation_result, internal_operation_results) ->
+            (Failure, Cons_result (result, mark_skipped ~baker level rest))
+      | (Success ctxt, operation_result, internal_operation_results) ->
           let result =
             Manager_operation_result
               {
@@ -1048,9 +1048,9 @@ let apply_manager_contents_list ctxt mode baker chain_id contents_list =
   apply_manager_contents_list_rec ctxt mode baker chain_id contents_list
   >>= fun (ctxt_result, results) ->
   match ctxt_result with
-  | `Failure ->
+  | Failure ->
       Lwt.return (ctxt (* backtracked *), mark_backtracked results)
-  | `Success ctxt ->
+  | Success ctxt ->
       Big_map.cleanup_temporary ctxt >>= fun ctxt -> Lwt.return (ctxt, results)
 
 let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
