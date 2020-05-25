@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -827,6 +828,59 @@ module Delegates_with_frozen_balance =
   Make_data_set_storage
     (Delegates_with_frozen_balance_index.Raw_context)
     (Make_index (Signature.Public_key_hash))
+
+module Baker = struct
+  module Raw_context =
+    Make_subcontext (Registered) (Raw_context)
+      (struct
+        let name = ["baker"]
+      end)
+
+  module Indexed_context =
+    Make_indexed_subcontext
+      (Make_subcontext (Registered) (Raw_context)
+         (struct
+           let name = ["index"]
+         end))
+         (Make_index (Baker_hash))
+
+  module Pending_consensus_key =
+    Indexed_context.Make_map
+      (struct
+        let name = ["pending_consensus_key"]
+      end)
+      (struct
+        type t = Signature.Public_key.t * Cycle_repr.t
+
+        let encoding =
+          Data_encoding.tup2 Signature.Public_key.encoding Cycle_repr.encoding
+      end)
+
+  module Consensus_key =
+    Make_indexed_data_snapshotable_storage
+      (Make_subcontext (Storage_functors.Registered) (Raw_context)
+         (struct
+           let name = ["consensus_key"]
+         end))
+         (Make_index (Cycle_repr.Index))
+         (Make_index (Baker_hash))
+         (Signature.Public_key)
+
+  module Consensus_key_rev_index =
+    Make_indexed_subcontext
+      (Make_subcontext (Storage_functors.Registered) (Raw_context)
+         (struct
+           let name = ["consensus_key_rev_index"]
+         end))
+         (Make_index (Signature.Public_key_hash))
+
+  module Consensus_key_rev =
+    Consensus_key_rev_index.Make_map
+      (struct
+        let name = ["consensus_key_rev"]
+      end)
+      (Baker_hash)
+end
 
 (** Rolls *)
 
