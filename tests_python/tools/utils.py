@@ -392,8 +392,11 @@ def init_with_transfer(client: Client,
                        contract: str,
                        initial_storage: str,
                        amount: float,
-                       sender: str):
-    client.originate(contract_name_of_file(contract), amount,
+                       sender: str,
+                       contract_name: str = None):
+    if contract_name is None:
+        contract_name = contract_name_of_file(contract)
+    client.originate(contract_name, amount,
                      sender, contract,
                      ['-init', initial_storage, '--burn-cap', '10'])
     bake(client)
