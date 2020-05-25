@@ -94,6 +94,8 @@ let rec comparable_type_size : type t. t comparable_ty -> int =
       1
   | Key_key _ ->
       1
+  | Baker_hash_key _ ->
+      1
   | Timestamp_key _ ->
       1
   | Chain_id_key _ ->
@@ -127,6 +129,8 @@ let rec type_size : type t. t ty -> int =
   | Key_hash_t _ ->
       1
   | Key_t _ ->
+      1
+  | Baker_hash_t _ ->
       1
   | Timestamp_t _ ->
       1
@@ -609,6 +613,8 @@ let rec compare_comparable : type a. a comparable_ty -> a -> a -> int =
       wrap_compare Signature.Public_key_hash.compare
   | Key_key _ ->
       wrap_compare Signature.Public_key.compare
+  | Baker_hash_key _ ->
+      wrap_compare Baker_hash.compare
   | Int_key _ ->
       wrap_compare Script_int.compare
   | Nat_key _ ->
@@ -820,6 +826,8 @@ let rec ty_of_comparable_ty : type a. a comparable_ty -> a ty = function
       Key_hash_t tname
   | Key_key tname ->
       Key_t tname
+  | Baker_hash_key tname ->
+      Baker_hash_t tname
   | Timestamp_key tname ->
       Timestamp_t tname
   | Address_key tname ->
@@ -860,6 +868,8 @@ let rec comparable_ty_of_ty_no_gas : type a. a ty -> a comparable_ty option =
       Some (Key_hash_key tname)
   | Key_t tname ->
       Some (Key_key tname)
+  | Baker_hash_t tname ->
+      Some (Baker_hash_key tname)
   | Timestamp_t tname ->
       Some (Timestamp_key tname)
   | Address_t tname ->
@@ -947,6 +957,8 @@ let rec unparse_comparable_ty : type a. a comparable_ty -> Script.node =
       Prim (-1, T_key_hash, [], unparse_type_annot tname)
   | Key_key tname ->
       Prim (-1, T_key, [], unparse_type_annot tname)
+  | Baker_hash_key tname ->
+      Prim (-1, T_baker_hash, [], unparse_type_annot tname)
   | Timestamp_key tname ->
       Prim (-1, T_timestamp, [], unparse_type_annot tname)
   | Address_key tname ->
@@ -995,6 +1007,8 @@ let rec unparse_ty :
       return ctxt (T_key_hash, [], unparse_type_annot tname)
   | Key_t tname ->
       return ctxt (T_key, [], unparse_type_annot tname)
+  | Baker_hash_t tname ->
+      return ctxt (T_baker_hash, [], unparse_type_annot tname)
   | Timestamp_t tname ->
       return ctxt (T_timestamp, [], unparse_type_annot tname)
   | Address_t tname ->
@@ -1112,6 +1126,8 @@ let name_of_ty : type a. a ty -> type_annot option = function
       tname
   | Key_t tname ->
       tname
+  | Baker_hash_t tname ->
+      tname
   | Timestamp_t tname ->
       tname
   | Address_t tname ->
@@ -1215,6 +1231,9 @@ let rec merge_comparable_types :
   | (Key_key annot_a, Key_key annot_b) ->
       merge_type_annot ~legacy annot_a annot_b
       >|? fun annot -> (Eq, Key_key annot, ctxt)
+  | (Baker_hash_key annot_a, Baker_hash_key annot_b) ->
+      merge_type_annot ~legacy annot_a annot_b
+      >|? fun annot -> (Eq, Baker_hash_key annot, ctxt)
   | (Timestamp_key annot_a, Timestamp_key annot_b) ->
       merge_type_annot ~legacy annot_a annot_b
       >|? fun annot -> (Eq, Timestamp_key annot, ctxt)
@@ -1334,6 +1353,10 @@ let merge_types :
         consume ctxt 0
         >>? fun ctxt ->
         merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Key_hash_t tname, ctxt)
+    | (Baker_hash_t tn1, Baker_hash_t tn2) ->
+        consume ctxt 0
+        >>? fun ctxt ->
+        merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Baker_hash_t tname, ctxt)
     | (String_t tn1, String_t tn2) ->
         consume ctxt 0
         >>? fun ctxt ->
@@ -1639,6 +1662,9 @@ let rec parse_comparable_ty :
   | Prim (loc, T_address, [], annot) ->
       parse_type_annot loc annot
       >|? fun tname -> (Ex_comparable_ty (Address_key tname), ctxt)
+  | Prim (loc, T_baker_hash, [], annot) ->
+      parse_type_annot loc annot
+      >|? fun tname -> (Ex_comparable_ty (Baker_hash_key tname), ctxt)
   | Prim
       ( loc,
         ( ( T_unit
@@ -1654,7 +1680,8 @@ let rec parse_comparable_ty :
           | T_address
           | T_chain_id
           | T_signature
-          | T_key ) as prim ),
+          | T_key
+          | T_baker_hash ) as prim ),
         l,
         _ ) ->
       error (Invalid_arity (loc, prim, 0, List.length l))
@@ -1724,7 +1751,8 @@ let rec parse_comparable_ty :
              T_option;
              T_chain_id;
              T_signature;
-             T_key ]
+             T_key;
+             T_baker_hash ]
 
 and parse_packable_ty :
     context -> legacy:bool -> Script.node -> (ex_ty * context) tzresult =
@@ -1870,6 +1898,11 @@ and parse_ty :
       >>? fun ty_name ->
       Gas.consume ctxt (Typecheck_costs.type_ 0)
       >|? fun ctxt -> (Ex_ty (Bls12_381_fr_t ty_name), ctxt)
+  | Prim (loc, T_baker_hash, [], annot) ->
+      parse_type_annot loc annot
+      >>? fun ty_name ->
+      Gas.consume ctxt (Typecheck_costs.type_ 0)
+      >|? fun ctxt -> (Ex_ty (Baker_hash_t ty_name), ctxt)
   | Prim (loc, T_contract, [utl], annot) ->
       if allow_contract then
         parse_parameter_ty ctxt ~legacy utl
@@ -2019,7 +2052,8 @@ and parse_ty :
           | T_address
           | T_chain_id
           | T_never
-          | T_operation ) as prim ),
+          | T_operation
+          | T_baker_hash ) as prim ),
         l,
         _ ) ->
       error (Invalid_arity (loc, prim, 0, List.length l))
@@ -2057,7 +2091,8 @@ and parse_ty :
              T_never;
              T_bls12_381_g1;
              T_bls12_381_g2;
-             T_bls12_381_fr ]
+             T_bls12_381_fr;
+             T_baker_hash ]
 
 and parse_big_map_ty ctxt ~legacy big_map_loc args map_annot =
   Gas.consume ctxt Typecheck_costs.cycle
@@ -2136,6 +2171,8 @@ let check_packable ~legacy loc root =
     | Key_hash_t _ ->
         ok_unit
     | Key_t _ ->
+        ok_unit
+    | Baker_hash_t _ ->
         ok_unit
     | Timestamp_t _ ->
         ok_unit
@@ -2565,6 +2602,26 @@ let rec parse_data :
       | None ->
           fail_parse_data () )
   | (Key_hash_t _, expr) ->
+      traced_fail
+        (Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr))
+  | (Baker_hash_t _, Bytes (_, bytes)) -> (
+      (* As unparsed with [Optimized]. *)
+      Gas.consume ctxt Typecheck_costs.baker_hash
+      >>?= fun ctxt ->
+      match Data_encoding.Binary.of_bytes Baker_hash.encoding bytes with
+      | Some k ->
+          return (k, ctxt)
+      | None ->
+          fail_parse_data () )
+  | (Baker_hash_t _, String (_, s)) (* As unparsed with [Readable]. *) -> (
+      Gas.consume ctxt Typecheck_costs.baker_hash
+      >>?= fun ctxt ->
+      match Baker_hash.of_b58check_opt s with
+      | Some k ->
+          return (k, ctxt)
+      | None ->
+          fail_parse_data () )
+  | (Baker_hash_t _, expr) ->
       traced_fail
         (Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr))
   (* Signatures *)
@@ -5677,6 +5734,18 @@ let rec unparse_data :
             (Bytes (-1, bytes), ctxt)
         | Readable ->
             (String (-1, Signature.Public_key_hash.to_b58check k), ctxt) )
+  | (Baker_hash_t _, k) ->
+      Lwt.return
+        ( Gas.consume ctxt Unparse_costs.baker_hash
+        >|? fun ctxt ->
+        match mode with
+        | Optimized ->
+            let bytes =
+              Data_encoding.Binary.to_bytes_exn Baker_hash.encoding k
+            in
+            (Bytes (-1, bytes), ctxt)
+        | Readable ->
+            (String (-1, Baker_hash.to_b58check k), ctxt) )
   | (Operation_t _, (op, _big_map_diff)) ->
       let bytes =
         Data_encoding.Binary.to_bytes_exn
@@ -6086,6 +6155,8 @@ let rec has_lazy_storage : type t. t ty -> t has_lazy_storage =
   | Key_hash_t _ ->
       False_f
   | Key_t _ ->
+      False_f
+  | Baker_hash_t _ ->
       False_f
   | Timestamp_t _ ->
       False_f

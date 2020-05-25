@@ -70,6 +70,8 @@ module Cost_of = struct
         Signature.Public_key.size k
     | (Timestamp_key _, _) ->
         timestamp_bytes v
+    | (Baker_hash_key _, _) ->
+        Baker_hash.size
     | (Address_key _, _) ->
         Signature.Public_key_hash.size
     | (Mutez_key _, _) ->
@@ -290,6 +292,8 @@ module Cost_of = struct
 
     let compare_key _ _ = atomic_step_cost 92
 
+    let compare_baker_hash _ _ = atomic_step_cost 92
+
     let compare_timestamp t1 t2 =
       let bytes1 = timestamp_bytes t1 in
       let bytes2 = timestamp_bytes t2 in
@@ -461,6 +465,8 @@ module Cost_of = struct
           compare_key_hash x y
       | Key_key _ ->
           compare_key x y
+      | Baker_hash_key _ ->
+          compare_baker_hash x y
       | Timestamp_key _ ->
           compare_timestamp x y
       | Address_key _ ->
@@ -529,6 +535,8 @@ module Cost_of = struct
     let bls12_381_g2 = step_cost 1 +@ alloc_cost 1
 
     let bls12_381_fr = step_cost 1 +@ alloc_cost 1
+
+    let baker_hash = step_cost 1 +@ alloc_cost 1
 
     let chain_id = step_cost 1 +@ alloc_cost 1
 
@@ -900,6 +908,8 @@ module Cost_of = struct
     let key = string_cost 54
 
     let key_hash = string_cost 36
+
+    let baker_hash = string_cost 36
 
     let signature = string_cost 128
 

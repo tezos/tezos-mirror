@@ -166,6 +166,7 @@ type prim =
   | T_bls12_381_g1
   | T_bls12_381_g2
   | T_bls12_381_fr
+  | T_baker_hash
 
 (* Auxiliary types for error documentation.
    All the prim constructor prefixes must match their namespace. *)
@@ -282,6 +283,7 @@ let namespace = function
   | I_XOR ->
       Instr_namespace
   | T_address
+  | T_baker_hash
   | T_big_map
   | T_bool
   | T_bytes
@@ -587,6 +589,8 @@ let string_of_prim = function
       "bls12_381_g2"
   | T_bls12_381_fr ->
       "bls12_381_fr"
+  | T_baker_hash ->
+      "baker_hash"
 
 let prim_of_string = function
   | "parameter" ->
@@ -851,6 +855,8 @@ let prim_of_string = function
       ok T_bls12_381_g2
   | "bls12_381_fr" ->
       ok T_bls12_381_fr
+  | "baker_hash" ->
+      ok T_baker_hash
   | n ->
       if valid_case n then error (Unknown_primitive_name n)
       else error (Invalid_case n)
@@ -1038,8 +1044,9 @@ let prim_encoding =
          ("PAIRING_CHECK", I_PAIRING_CHECK);
          ("bls12_381_g1", T_bls12_381_g1);
          ("bls12_381_g2", T_bls12_381_g2);
-         ("bls12_381_fr", T_bls12_381_fr)
-         (* /!\ NEW INSTRUCTIONS MUST BE ADDED AT THE END OF THE STRING_ENUM, FOR BACKWARD COMPATIBILITY OF THE ENCODING. *)
+         ("bls12_381_fr", T_bls12_381_fr);
+         ("baker_hash", T_baker_hash)
+         (* New instructions must be added here, for backward compatibility of the encoding. *)
         ]
 
 let () =
