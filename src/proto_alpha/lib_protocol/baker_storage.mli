@@ -198,3 +198,14 @@ val set_consensus_key :
   Baker_hash.t ->
   Signature.Public_key.t ->
   Raw_context.t tzresult Lwt.t
+
+val init_set_pvss_key :
+  Raw_context.t ->
+  Baker_hash.t ->
+  Pvss_secp256k1.Public_key.t ->
+  Raw_context.t Lwt.t
+
+val get_pvss_key :
+  Raw_context.t ->
+  Baker_hash.t ->
+  Pvss_secp256k1.Public_key.t option tzresult Lwt.t

@@ -746,3 +746,7 @@ let set_consensus_key ctxt baker key =
     baker
     (key, activation_cycle)
   >>= fun ctxt -> return ctxt
+
+let init_set_pvss_key = Storage.Baker.Pvss_key.init_set
+
+let get_pvss_key = Storage.Baker.Pvss_key.get_option

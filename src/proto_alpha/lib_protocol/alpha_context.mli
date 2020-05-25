@@ -999,6 +999,12 @@ module Baker : sig
     context -> public_key_hash -> baker_hash option tzresult Lwt.t
 
   val is_pending_consensus_key : context -> Contract.t -> bool tzresult Lwt.t
+
+  val get_pvss_key :
+    context -> baker_hash -> Pvss_secp256k1.Public_key.t option tzresult Lwt.t
+
+  val init_set_pvss_key :
+    context -> baker_hash -> Pvss_secp256k1.Public_key.t -> context Lwt.t
 end
 
 module Vote : sig

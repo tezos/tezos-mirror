@@ -568,6 +568,13 @@ module Baker = struct
         let name = ["consensus_key_rev"]
       end)
       (Baker_hash)
+
+  module Pvss_key =
+    Indexed_context.Make_map
+      (struct
+        let name = ["pvss_key"]
+      end)
+      (Pvss_secp256k1.Public_key)
 end
 
 (** Rolls *)

@@ -320,6 +320,12 @@ module Baker : sig
       with type key = Signature.Public_key_hash.t
        and type value = Baker_hash.t
        and type t := Raw_context.t
+
+  module Pvss_key :
+    Indexed_data_storage
+      with type key = Baker_hash.t
+       and type value = Pvss_secp256k1.Public_key.t
+       and type t := Raw_context.t
 end
 
 (** Votes *)
