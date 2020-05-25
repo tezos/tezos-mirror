@@ -1,7 +1,6 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -24,65 +23,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = private
-  | Implicit of Signature.Public_key_hash.t
-  | Originated of Contract_hash.t
-  | Baker of Baker_hash.t
+(* 20 *)
+let baker_hash = "\003\056\226" (* SG1(36) *)
 
-type contract = t
+module H =
+  Blake2B.Make
+    (Base58)
+    (struct
+      let name = "Baker_hash"
 
-include Compare.S with type t := contract
+      let title = "A baker ID"
 
-module Map : S.MAP with type key = t
+      let b58check_prefix = baker_hash
 
-(** {2 Implicit contracts} *)
+      let size = Some 20
+    end)
 
-val implicit_contract : Signature.Public_key_hash.t -> contract
+include H
 
-val baker_contract : Baker_hash.t -> contract
-
-val is_implicit : contract -> Signature.Public_key_hash.t option
-
-val is_baker : contract -> Baker_hash.t option
-
-(** {2 Originated contracts} *)
-
-(** Originated contracts handles are crafted from the hash of the
-    operation that triggered their origination (and nothing else).
-    As a single operation can trigger several originations, the
-    corresponding handles are forged from a deterministic sequence of
-    nonces, initialized with the hash of the operation. *)
-type origination_nonce
-
-val originated_contract : origination_nonce -> contract
-
-val originated_contracts :
-  since:origination_nonce -> until:origination_nonce -> contract list
-
-val initial_origination_nonce : Operation_hash.t -> origination_nonce
-
-val incr_origination_nonce : origination_nonce -> origination_nonce
-
-val is_originated : contract -> Contract_hash.t option
-
-(** {2 Human readable notation} *)
-
-type error += Invalid_contract_notation of string (* `Permanent *)
-
-val to_b58check : contract -> string
-
-val of_b58check : string -> contract tzresult
-
-val pp : Format.formatter -> contract -> unit
-
-val pp_short : Format.formatter -> contract -> unit
-
-(** {2 Serializers} *)
-
-val encoding : contract Data_encoding.t
-
-val origination_nonce_encoding : origination_nonce Data_encoding.t
-
-val rpc_arg : contract RPC_arg.arg
-
-module Index : Storage_description.INDEX with type t = t
+let () = Base58.check_encoded_prefix b58check_encoding "SG1" 36

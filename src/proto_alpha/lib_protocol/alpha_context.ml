@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -109,6 +110,8 @@ type public_key = Signature.Public_key.t
 type public_key_hash = Signature.Public_key_hash.t
 
 type signature = Signature.t
+
+type baker_hash = Baker_hash.t
 
 module Constants = struct
   include Constants_repr

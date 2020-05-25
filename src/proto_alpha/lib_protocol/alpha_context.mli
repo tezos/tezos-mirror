@@ -44,6 +44,8 @@ type public_key_hash = Signature.Public_key_hash.t
 
 type signature = Signature.t
 
+type baker_hash = Baker_hash.t
+
 module Tez : sig
   include BASIC_DATA
 
@@ -767,7 +769,11 @@ module Contract : sig
 
   val implicit_contract : public_key_hash -> contract
 
+  val baker_contract : baker_hash -> contract
+
   val is_implicit : contract -> public_key_hash option
+
+  val is_baker : contract -> baker_hash option
 
   val exists : context -> contract -> bool tzresult Lwt.t
 
