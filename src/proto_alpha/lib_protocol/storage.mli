@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -291,6 +292,41 @@ module Delegates_with_frozen_balance :
   Data_set_storage
     with type t = Raw_context.t * Cycle_repr.t
      and type elt = Signature.Public_key_hash.t
+
+module Baker : sig
+  (** Baker's possible pending consensus key and its activation cycle.
+      The pending key will become active on the start of activation cycle *)
+  module Pending_consensus_key :
+    Indexed_data_storage
+      with type key = Baker_hash.t
+       and type value = Signature.Public_key.t * Cycle_repr.t
+       and type t := Raw_context.t
+
+  (** Consensus key is authorized to transfer directly from a baker account,
+      participate in consensus and governance. *)
+  module Consensus_key :
+    Indexed_data_snapshotable_storage
+      with type key = Baker_hash.t
+       and type snapshot = Cycle_repr.t
+       and type value = Signature.Public_key.t
+       and type t := Raw_context.t
+
+  (** Consensus key to a baker for reverse lookup. Deliberately redundant, it
+      contains the same bindings as [Consensus_key.Snapshot] storage for
+      the current cycle, alas the keys and values are flipped and the consensus
+      key is stored as a hash of public key instead of public key itself. *)
+  module Consensus_key_rev :
+    Indexed_data_storage
+      with type key = Signature.Public_key_hash.t
+       and type value = Baker_hash.t
+       and type t := Raw_context.t
+
+  module Pvss_key :
+    Indexed_data_storage
+      with type key = Baker_hash.t
+       and type value = Pvss_secp256k1.Public_key.t
+       and type t := Raw_context.t
+end
 
 (** Votes *)
 
