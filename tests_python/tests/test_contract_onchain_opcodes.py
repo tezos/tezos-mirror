@@ -348,6 +348,42 @@ class TestContractOnchainOpcodes:
         bake(client)
 
 
+FAILWITH_BIG_MAP_FILE = path.join(OPCODES_CONTRACT_PATH, 'failwith_big_map.tz')
+
+
+@pytest.mark.incremental
+@pytest.mark.contract
+@pytest.mark.regression
+class TestContractBigMapOrigination:
+
+    def test_big_map_origination_literal(self, client_regtest_scrubbed):
+        client = client_regtest_scrubbed
+        # originate a first version of the contract from a literal so
+        # that a big_map with id 0 exists
+        init_with_transfer(client,
+                           FAILWITH_BIG_MAP_FILE,
+                           '{Elt 0 0}', 1000, 'bootstrap1',
+                           contract_name='failwith_big_map_literal')
+
+    def test_big_map_origination_id(self, client_regtest_scrubbed):
+        client = client_regtest_scrubbed
+        # originate again the same script from the big-map id 0
+        init_with_transfer(client,
+                           FAILWITH_BIG_MAP_FILE,
+                           '0', 1000, 'bootstrap1',
+                           contract_name='failwith_big_map_id')
+
+    @pytest.mark.xfail("Not yet implemented.")
+    def test_big_map_origination_diff(self, client_regtest_scrubbed):
+        client = client_regtest_scrubbed
+
+        # originate again the same script from a big-diff
+        init_with_transfer(client,
+                           FAILWITH_BIG_MAP_FILE,
+                           'Pair 0 {Elt 1 (Some 4)}', 1000, 'bootstrap1',
+                           contract_name='failwith_big_map_diff')
+
+
 @pytest.mark.incremental
 @pytest.mark.slow
 @pytest.mark.contract
