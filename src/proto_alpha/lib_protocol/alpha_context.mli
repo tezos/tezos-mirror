@@ -1012,42 +1012,48 @@ module Delegation : sig
 end
 
 module Baker : sig
-  val fold :
-    context -> init:'a -> f:(public_key_hash -> 'a -> 'a Lwt.t) -> 'a Lwt.t
+  val register :
+    ?baker_hash:baker_hash ->
+    ?prepaid_bootstrap_storage:bool ->
+    context ->
+    balance:Tez.t ->
+    threshold:int ->
+    owner_keys:public_key list ->
+    consensus_key:public_key ->
+    (context * baker_hash) tzresult Lwt.t
 
-  val list : context -> public_key_hash list Lwt.t
+  val set_active : context -> baker_hash -> bool -> context tzresult Lwt.t
 
-  val freeze_deposit :
-    context -> public_key_hash -> Tez.t -> context tzresult Lwt.t
+  val fold : context -> init:'a -> f:(baker_hash -> 'a -> 'a Lwt.t) -> 'a Lwt.t
 
-  val freeze_rewards :
-    context -> public_key_hash -> Tez.t -> context tzresult Lwt.t
+  val list : context -> baker_hash list Lwt.t
 
-  val freeze_fees :
-    context -> public_key_hash -> Tez.t -> context tzresult Lwt.t
+  val freeze_deposit : context -> baker_hash -> Tez.t -> context tzresult Lwt.t
+
+  val freeze_rewards : context -> baker_hash -> Tez.t -> context tzresult Lwt.t
+
+  val freeze_fees : context -> baker_hash -> Tez.t -> context tzresult Lwt.t
 
   val cycle_end :
     context ->
     Cycle.t ->
     Nonce.unrevealed list ->
-    (context * Receipt.balance_updates * Signature.Public_key_hash.t list)
-    tzresult
-    Lwt.t
+    (context * Receipt.balance_updates * baker_hash list) tzresult Lwt.t
 
   type frozen_balance = {deposit : Tez.t; fees : Tez.t; rewards : Tez.t}
 
   val punish :
     context ->
-    public_key_hash ->
+    baker_hash ->
     Cycle.t ->
     (context * frozen_balance) tzresult Lwt.t
 
-  val full_balance : context -> public_key_hash -> Tez.t tzresult Lwt.t
+  val full_balance : context -> baker_hash -> Tez.t tzresult Lwt.t
 
   val has_frozen_balance :
-    context -> public_key_hash -> Cycle.t -> bool tzresult Lwt.t
+    context -> baker_hash -> Cycle.t -> bool tzresult Lwt.t
 
-  val frozen_balance : context -> public_key_hash -> Tez.t tzresult Lwt.t
+  val frozen_balance : context -> baker_hash -> Tez.t tzresult Lwt.t
 
   val frozen_balance_encoding : frozen_balance Data_encoding.t
 
@@ -1055,22 +1061,32 @@ module Baker : sig
     frozen_balance Cycle.Map.t Data_encoding.t
 
   val frozen_balance_by_cycle :
-    context -> Signature.Public_key_hash.t -> frozen_balance Cycle.Map.t Lwt.t
+    context -> baker_hash -> frozen_balance Cycle.Map.t Lwt.t
 
-  val staking_balance :
-    context -> Signature.Public_key_hash.t -> Tez.t tzresult Lwt.t
+  val staking_balance : context -> baker_hash -> Tez.t tzresult Lwt.t
 
-  val delegated_contracts :
-    context -> Signature.Public_key_hash.t -> Contract.t list Lwt.t
+  val delegated_contracts : context -> baker_hash -> Contract.t list Lwt.t
 
-  val delegated_balance :
-    context -> Signature.Public_key_hash.t -> Tez.t tzresult Lwt.t
+  val delegated_balance : context -> baker_hash -> Tez.t tzresult Lwt.t
 
-  val deactivated :
-    context -> Signature.Public_key_hash.t -> bool tzresult Lwt.t
+  val deactivated : context -> baker_hash -> bool tzresult Lwt.t
 
-  val grace_period :
-    context -> Signature.Public_key_hash.t -> Cycle.t tzresult Lwt.t
+  val grace_period : context -> baker_hash -> Cycle.t tzresult Lwt.t
+
+  val get_consensus_key :
+    ?level:Raw_level.t ->
+    ?offset:int32 ->
+    context ->
+    baker_hash ->
+    public_key tzresult Lwt.t
+
+  val set_consensus_key :
+    context -> baker_hash -> public_key -> context tzresult Lwt.t
+
+  val is_consensus_key :
+    context -> public_key_hash -> baker_hash option tzresult Lwt.t
+
+  val is_pending_consensus_key : context -> Contract.t -> bool tzresult Lwt.t
 end
 
 module Voting_period : sig
@@ -1122,25 +1138,24 @@ module Vote : sig
   type proposal = Protocol_hash.t
 
   val record_proposal :
-    context -> Protocol_hash.t -> public_key_hash -> context tzresult Lwt.t
+    context -> Protocol_hash.t -> baker_hash -> context tzresult Lwt.t
 
   val get_proposals : context -> int32 Protocol_hash.Map.t tzresult Lwt.t
 
   val clear_proposals : context -> context Lwt.t
 
-  val recorded_proposal_count_for_delegate :
-    context -> public_key_hash -> int tzresult Lwt.t
+  val recorded_proposal_count_for_baker :
+    context -> baker_hash -> int tzresult Lwt.t
 
-  val listings_encoding :
-    (Signature.Public_key_hash.t * int32) list Data_encoding.t
+  val listings_encoding : (baker_hash * int32) list Data_encoding.t
 
   val update_listings : context -> context tzresult Lwt.t
 
   val listing_size : context -> int32 tzresult Lwt.t
 
-  val in_listings : context -> public_key_hash -> bool Lwt.t
+  val in_listings : context -> baker_hash -> bool Lwt.t
 
-  val get_listings : context -> (public_key_hash * int32) list Lwt.t
+  val get_listings : context -> (baker_hash * int32) list Lwt.t
 
   type ballot = Yay | Nay | Pass
 
