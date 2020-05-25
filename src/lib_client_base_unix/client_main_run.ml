@@ -306,6 +306,8 @@ let main (module C : M) ~select_commands =
                        port =
                          parsed_config_file.Client_config.Cfg_file.node_port;
                        tls = parsed_config_file.Client_config.Cfg_file.tls;
+                       endpoint =
+                         parsed_config_file.Client_config.Cfg_file.endpoint;
                      }
                in
                match parsed_args with

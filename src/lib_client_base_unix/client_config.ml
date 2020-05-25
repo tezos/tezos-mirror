@@ -26,6 +26,8 @@
 
 (* Tezos Command line interface - Configuration and Arguments Parsing *)
 
+type error += Invalid_endpoint_arg of string
+
 type error += Invalid_chain_argument of string
 
 type error += Invalid_block_argument of string
@@ -41,6 +43,15 @@ type error += Invalid_wait_arg of string
 type error += Invalid_mockup_arg of string
 
 let () =
+  register_error_kind
+    `Branch
+    ~id:"badEndpointArgument"
+    ~title:"Bad Endpoint Argument"
+    ~description:"Endpoint argument could not be parsed"
+    ~pp:(fun ppf s -> Format.pp_print_string ppf s)
+    Data_encoding.(obj1 (req "value" string))
+    (function Invalid_endpoint_arg s -> Some s | _ -> None)
+    (fun s -> Invalid_endpoint_arg s) ;
   register_error_kind
     `Branch
     ~id:"badChainArgument"
@@ -132,6 +143,7 @@ module Cfg_file = struct
     node_addr : string;
     node_port : int;
     tls : bool;
+    endpoint : Uri.t option;
     web_port : int;
     remote_signer : Uri.t option;
     confirmations : int option;
@@ -144,6 +156,7 @@ module Cfg_file = struct
       node_addr = "localhost";
       node_port = 8732;
       tls = false;
+      endpoint = None;
       web_port = 8080;
       remote_signer = None;
       confirmations = Some 0;
@@ -158,6 +171,7 @@ module Cfg_file = struct
              node_addr;
              node_port;
              tls;
+             endpoint;
              web_port;
              remote_signer;
              confirmations;
@@ -166,6 +180,7 @@ module Cfg_file = struct
           Some node_addr,
           Some node_port,
           Some tls,
+          endpoint,
           Some web_port,
           remote_signer,
           confirmations,
@@ -174,6 +189,7 @@ module Cfg_file = struct
              node_addr,
              node_port,
              tls,
+             endpoint,
              web_port,
              remote_signer,
              confirmations,
@@ -187,16 +203,18 @@ module Cfg_file = struct
           node_addr;
           node_port;
           tls;
+          endpoint;
           web_port;
           remote_signer;
           confirmations;
           password_filename;
         })
-      (obj8
+      (obj9
          (req "base_dir" string)
          (opt "node_addr" string)
          (opt "node_port" int16)
          (opt "tls" bool)
+         (opt "endpoint" RPC_encoding.uri_encoding)
          (opt "web_port" int16)
          (opt "remote_signer" RPC_encoding.uri_encoding)
          (opt "confirmations" int8)
@@ -242,6 +260,25 @@ open Clic
 
 let string_parameter () : (string, #Client_context.full) parameter =
   parameter (fun _ x -> return x)
+
+let endpoint_parameter () =
+  parameter (fun _ x ->
+      let parsed = Uri.of_string x in
+      ( match Uri.scheme parsed with
+      | Some "http" | Some "https" ->
+          return ()
+      | _ ->
+          fail
+            (Invalid_endpoint_arg
+               ("only http and https endpoints are supported: " ^ x)) )
+      >>=? fun _ ->
+      match (Uri.query parsed, Uri.fragment parsed) with
+      | ([], None) ->
+          return parsed
+      | _ ->
+          fail
+            (Invalid_endpoint_arg
+               ("endpoint uri should not have query string or fragment: " ^ x)))
 
 let chain_parameter () =
   parameter (fun _ chain ->
@@ -367,6 +404,16 @@ let port_arg () =
 
 let tls_switch () =
   switch ~long:"tls" ~short:'S' ~doc:"use TLS to connect to node." ()
+
+let endpoint_arg () =
+  arg
+    ~long:"endpoint"
+    ~short:'E'
+    ~placeholder:"uri"
+    ~doc:
+      "HTTP endpoint of the node RPC interface; giving this argument will \
+       make the client ignore --addr --port --tls"
+    (endpoint_parameter ())
 
 let remote_signer_arg () =
   arg
@@ -610,7 +657,7 @@ let commands config_file cfg (protocol_hash_opt : Protocol_hash.t option) =
         >>= return) ]
 
 let global_options () =
-  args14
+  args15
     (base_dir_arg ())
     (config_file_arg ())
     (timings_switch ())
@@ -622,6 +669,7 @@ let global_options () =
     (addr_arg ())
     (port_arg ())
     (tls_switch ())
+    (endpoint_arg ())
     (remote_signer_arg ())
     (password_filename_arg ())
     (client_mode_arg ())
@@ -704,6 +752,7 @@ let parse_config_args (ctx : #Client_context.full) argv =
                node_addr,
                node_port,
                tls,
+               endpoint,
                remote_signer,
                password_filename,
                client_mode ),
@@ -761,6 +810,7 @@ let parse_config_args (ctx : #Client_context.full) argv =
       tls;
       node_port;
       node_addr;
+      endpoint;
       remote_signer;
       confirmations;
       password_filename;
@@ -807,6 +857,7 @@ type t =
   * string option
   * int option
   * bool
+  * Uri.t option
   * Uri.t option
   * string option
   * client_mode

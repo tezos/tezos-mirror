@@ -54,7 +54,13 @@ module type S = sig
 
   val full_logger : Format.formatter -> logger
 
-  type config = {host : string; port : int; tls : bool; logger : logger}
+  type config = {
+    host : string;
+    port : int;
+    tls : bool;
+    logger : logger;
+    endpoint : Uri.t option;
+  }
 
   val config_encoding : config Data_encoding.t
 
@@ -376,25 +382,47 @@ module Make (Client : Cohttp_lwt.S.Client) = struct
     Client.call_service ?logger ?headers ~base accept service params query body
     >>= fun ans -> handle accept ans
 
-  type config = {host : string; port : int; tls : bool; logger : logger}
+  type config = {
+    host : string;
+    port : int;
+    tls : bool;
+    logger : logger;
+    endpoint : Uri.t option;
+  }
 
   let config_encoding =
     let open Data_encoding in
     conv
-      (fun {host; port; tls; logger = _} -> (host, port, tls))
-      (fun (host, port, tls) -> {host; port; tls; logger = null_logger})
-      (obj3 (req "host" string) (req "port" uint16) (req "tls" bool))
+      (fun {host; port; tls; logger = _; endpoint} ->
+        (host, port, tls, endpoint))
+      (fun (host, port, tls, endpoint) ->
+        {host; port; tls; logger = null_logger; endpoint})
+      (obj4
+         (req "host" string)
+         (req "port" uint16)
+         (req "tls" bool)
+         (opt "endpoint" RPC_encoding.uri_encoding))
 
   let default_config =
-    {host = "localhost"; port = 8732; tls = false; logger = null_logger}
+    {
+      host = "localhost";
+      port = 8732;
+      tls = false;
+      logger = null_logger;
+      endpoint = None;
+    }
 
   class http_ctxt config media_types : RPC_context.json =
     let base =
-      Uri.make
-        ~scheme:(if config.tls then "https" else "http")
-        ~host:config.host
-        ~port:config.port
-        ()
+      match config.endpoint with
+      | Some url ->
+          url
+      | _ ->
+          Uri.make
+            ~scheme:(if config.tls then "https" else "http")
+            ~host:config.host
+            ~port:config.port
+            ()
     in
     let logger = config.logger in
     object
