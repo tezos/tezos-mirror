@@ -482,12 +482,14 @@ Core data types and notations
    of type ``(t)`` that we write ``{ Elt key value ; ... }``, with keys
    sorted.
 
--  ``big_map (k) (t)``: Lazily deserialized maps from keys of type
-   ``(k)`` of values of type ``(t)`` that we write ``{ Elt key value ; ... }``,
-   with keys sorted.  These maps should be used if one intends to store
-   large amounts of data in a map. They have higher gas costs than
-   standard maps as data is lazily deserialized. A ``big_map`` cannot
-   appear inside another ``big_map``.
+- ``big_map (k) (t)``: Lazily deserialized maps from keys of type
+   ``(k)`` of values of type ``(t)``. These maps should be used if one
+   intends to store large amounts of data in a map. They have higher
+   gas costs than standard maps as data is lazily deserialized. A
+   ``big_map`` cannot appear inside another ``big_map``. See the
+   section on :ref:``operations on big maps <OperationsOnBigMaps>``
+   for a description of the syntax of values of type ``big_map (k)
+   (t)`` and available operations.
 
 Core instructions
 -----------------
@@ -1292,8 +1294,20 @@ Operations on maps
 
 Operations on ``big_maps``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. _OperationsOnBigMaps:
 
-The behavior of these operations is the same as if they were normal
+Big maps have three possible representations. A map literal is always
+a valid representation for a big map. Big maps can also be represented
+by integers called big-map identifiers. Finally, big maps can be
+represented as pairs of a big-map identifier (an integer) and a
+big-map diff (written in the same syntax as a map whose values are
+options).
+
+So for example, ``{ Elt "bar" True ; Elt "foo" False }``, ``42``, and
+``Pair 42 { Elt "foo" (Some False) }`` are all valid representations
+of type ``big_map string bool``.
+
+The behavior of big-map operations is the same as if they were normal
 maps, except that under the hood, the elements are loaded and
 deserialized on demand.
 
