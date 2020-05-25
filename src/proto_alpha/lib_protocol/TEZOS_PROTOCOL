@@ -52,6 +52,7 @@
         "Nonce_storage",
         "Seed_storage",
         "Roll_storage",
+        "Baker_storage",
         "Delegate_storage",
         "Sapling_storage",
         "Lazy_storage_diff",
