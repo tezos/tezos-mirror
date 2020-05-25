@@ -25,181 +25,105 @@
 (*****************************************************************************)
 
 type error +=
-  | (* `Permanent *) No_deletion of Signature.Public_key_hash.t
-  | (* `Temporary *) Active_delegate
-  | (* `Temporary *) Current_delegate
+  | (* `Permanent *) No_baker_delegation of Baker_hash.t
   | (* `Temporary *)
-      Empty_delegate_account of Signature.Public_key_hash.t
+      Current_delegate
+  | (* `Temporary *)
+      Inactive_baker of Baker_hash.t
 
 let () =
   register_error_kind
     `Permanent
-    ~id:"delegate.no_deletion"
-    ~title:"Forbidden delegate deletion"
-    ~description:"Tried to unregister a delegate"
+    ~id:"delegation.no_baker_delegation"
+    ~title:"Forbidden baker delegation change"
+    ~description:"Tried to change a baker contract delegation"
     ~pp:(fun ppf delegate ->
       Format.fprintf
         ppf
-        "Delegate deletion is forbidden (%a)"
-        Signature.Public_key_hash.pp
+        "Change of delegation status of a baker contract is forbidden (%a)"
+        Baker_hash.pp
         delegate)
-    Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
-    (function No_deletion c -> Some c | _ -> None)
-    (fun c -> No_deletion c) ;
+    Data_encoding.(obj1 (req "baker" Baker_hash.encoding))
+    (function No_baker_delegation c -> Some c | _ -> None)
+    (fun c -> No_baker_delegation c) ;
   register_error_kind
     `Temporary
-    ~id:"delegate.already_active"
-    ~title:"Delegate already active"
-    ~description:"Useless delegate reactivation"
-    ~pp:(fun ppf () ->
-      Format.fprintf ppf "The delegate is still active, no need to refresh it")
-    Data_encoding.empty
-    (function Active_delegate -> Some () | _ -> None)
-    (fun () -> Active_delegate) ;
-  register_error_kind
-    `Temporary
-    ~id:"delegate.unchanged"
+    ~id:"delegation.unchanged"
     ~title:"Unchanged delegated"
-    ~description:"Contract already delegated to the given delegate"
+    ~description:"Contract already delegated to the given baker"
     ~pp:(fun ppf () ->
-      Format.fprintf
-        ppf
-        "The contract is already delegated to the same delegate")
+      Format.fprintf ppf "The contract is already delegated to the same baker")
     Data_encoding.empty
     (function Current_delegate -> Some () | _ -> None)
     (fun () -> Current_delegate) ;
   register_error_kind
-    `Permanent
-    ~id:"delegate.empty_delegate_account"
-    ~title:"Empty delegate account"
-    ~description:
-      "Cannot register a delegate when its implicit account is empty"
-    ~pp:(fun ppf delegate ->
+    `Temporary
+    ~id:"delegation.inactive_baker"
+    ~title:"Delegate is inactive baker"
+    ~description:"The given delegate is an inactive baker"
+    ~pp:(fun ppf hash ->
       Format.fprintf
         ppf
-        "Delegate registration is forbidden when the delegate\n\
-        \           implicit account is empty (%a)"
-        Signature.Public_key_hash.pp
-        delegate)
-    Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
-    (function Empty_delegate_account c -> Some c | _ -> None)
-    (fun c -> Empty_delegate_account c)
+        "The given delegate %a is an inactive baker"
+        Baker_hash.pp
+        hash)
+    Data_encoding.(obj1 (req "hash" Baker_hash.encoding))
+    (function Inactive_baker k -> Some k | _ -> None)
+    (fun k -> Inactive_baker k)
 
-let link c contract delegate =
-  Storage.Contract.Balance.get c contract
+let link ctxt contract delegate =
+  Storage.Contract.Balance.get ctxt contract
   >>=? fun balance ->
-  Roll_storage.Delegate.add_amount c delegate balance
-  >>=? fun c ->
-  Storage.Contract.Delegated.add
-    (c, Contract_repr.implicit_contract delegate)
-    contract
-  >|= ok
+  Roll_storage.Delegate.add_amount ctxt delegate balance
+  >>=? fun ctxt ->
+  Storage.Contract.Delegate.init ctxt contract delegate
+  >>=? fun ctxt ->
+  Storage.Baker.Delegators.add (ctxt, delegate) contract >|= ok
 
-let unlink c contract =
-  Storage.Contract.Balance.get c contract
-  >>=? fun balance ->
-  Storage.Contract.Delegate.find c contract
+let unlink ctxt contract =
+  Storage.Contract.Delegate.find ctxt contract
   >>=? function
   | None ->
-      return c
+      return ctxt
   | Some delegate ->
-      (* Removes the balance of the contract from the delegate *)
-      Roll_storage.Delegate.remove_amount c delegate balance
-      >>=? fun c ->
-      Storage.Contract.Delegated.remove
-        (c, Contract_repr.implicit_contract delegate)
-        contract
-      >|= ok
-
-let known c delegate =
-  Storage.Contract.Manager.find c (Contract_repr.implicit_contract delegate)
-  >>=? function
-  | None | Some (Manager_repr.Hash _) ->
-      return_false
-  | Some (Manager_repr.Public_key _) ->
-      return_true
-
-(* A delegate is registered if its "implicit account" delegates to itself. *)
-let registered c delegate =
-  Storage.Contract.Delegate.find c (Contract_repr.implicit_contract delegate)
-  >|=? function
-  | Some current_delegate ->
-      Signature.Public_key_hash.equal delegate current_delegate
-  | None ->
-      false
+      Storage.Contract.Balance.get ctxt contract
+      >>=? fun balance ->
+      (* Removes the delegate and the balance of the contract from the delegate *)
+      Roll_storage.Delegate.remove_amount ctxt delegate balance
+      >>=? fun ctxt ->
+      Storage.Contract.Delegate.remove ctxt contract
+      >>= fun ctxt ->
+      Storage.Baker.Delegators.remove (ctxt, delegate) contract >|= ok
 
 let get = Roll_storage.get_contract_delegate
 
-let set c contract delegate =
-  match delegate with
-  | None -> (
-      let delete () =
-        unlink c contract
-        >>=? fun c -> Storage.Contract.Delegate.remove c contract >|= ok
-      in
-      match Contract_repr.is_implicit contract with
-      | Some pkh ->
-          (* check if contract is a registered delegate *)
-          registered c pkh
-          >>=? fun is_registered ->
-          if is_registered then fail (No_deletion pkh) else delete ()
-      | None ->
-          delete () )
-  | Some delegate ->
-      known c delegate
-      >>=? fun known_delegate ->
-      registered c delegate
-      >>=? fun registered_delegate ->
-      let self_delegation =
-        match Contract_repr.is_implicit contract with
-        | Some pkh ->
-            Signature.Public_key_hash.equal pkh delegate
-        | None ->
-            false
-      in
-      if (not known_delegate) || not (registered_delegate || self_delegation)
-      then fail (Roll_storage.Unregistered_delegate delegate)
-      else
-        Storage.Contract.Delegate.find c contract
-        >>=? (function
-               | Some current_delegate
-                 when Signature.Public_key_hash.equal delegate current_delegate
-                 ->
-                   if self_delegation then
-                     Roll_storage.Delegate.is_inactive c delegate
-                     >>=? function
-                     | true -> return_unit | false -> fail Active_delegate
-                   else fail Current_delegate
-               | None | Some _ ->
-                   return_unit)
-        >>=? fun () ->
-        (* check if contract is a registered delegate *)
-        ( match Contract_repr.is_implicit contract with
-        | Some pkh ->
-            registered c pkh
-            >>=? fun is_registered ->
-            (* allow self-delegation to re-activate *)
-            if (not self_delegation) && is_registered then
-              fail (No_deletion pkh)
-            else return_unit
-        | None ->
-            return_unit )
-        >>=? fun () ->
-        Storage.Contract.Balance.mem c contract
-        >>= fun exists ->
-        error_when
-          (self_delegation && not exists)
-          (Empty_delegate_account delegate)
-        >>?= fun () ->
-        unlink c contract
-        >>=? fun c ->
-        Storage.Contract.Delegate.add c contract delegate
-        >>= fun c ->
-        link c contract delegate
-        >>=? fun c ->
-        if self_delegation then
-          Storage.Delegates.add c delegate
-          >>= fun c -> Roll_storage.Delegate.set_active c delegate
-        else return c
+let set_delegate ctxt contract delegate =
+  (* check that the delegate is a registered baker *)
+  Baker_storage.must_be_registered ctxt delegate
+  >>=? fun () ->
+  (* check that the delegate is an active baker *)
+  Baker_storage.deactivated ctxt delegate
+  >>=? fun deactivated ->
+  fail_when deactivated (Inactive_baker delegate)
+  >>=? fun () ->
+  Storage.Contract.Delegate.find ctxt contract
+  >>=? (function
+         | Some current_delegate
+           when Baker_hash.equal delegate current_delegate ->
+             fail Current_delegate
+         | Some _ ->
+             unlink ctxt contract
+         | None ->
+             return ctxt)
+  >>=? fun ctxt -> link ctxt contract delegate
 
-let remove ctxt contract = unlink ctxt contract
+let set ctxt contract delegate =
+  match Contract_repr.is_baker contract with
+  | Some baker ->
+      fail (No_baker_delegation baker)
+  | None -> (
+    match delegate with
+    | Some delegate ->
+        set_delegate ctxt contract delegate
+    | None ->
+        unlink ctxt contract )
