@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -26,6 +27,7 @@
 type t =
   | Implicit of Signature.Public_key_hash.t
   | Originated of Contract_hash.t
+  | Baker of Baker_hash.t
 
 include Compare.Make (struct
   type nonrec t = t
@@ -34,12 +36,18 @@ include Compare.Make (struct
     match (l1, l2) with
     | (Implicit pkh1, Implicit pkh2) ->
         Signature.Public_key_hash.compare pkh1 pkh2
+    | (Implicit _, _) ->
+        -1
+    | (_, Implicit _) ->
+        1
     | (Originated h1, Originated h2) ->
         Contract_hash.compare h1 h2
-    | (Implicit _, Originated _) ->
+    | (Originated _, _) ->
         -1
-    | (Originated _, Implicit _) ->
+    | (_, Originated _) ->
         1
+    | (Baker h1, Baker h2) ->
+        Baker_hash.compare h1 h2
 end)
 
 type contract = t
@@ -51,6 +59,8 @@ let to_b58check = function
       Signature.Public_key_hash.to_b58check pbk
   | Originated h ->
       Contract_hash.to_b58check h
+  | Baker h ->
+      Baker_hash.to_b58check h
 
 let of_b58check s =
   match Base58.decode s with
@@ -62,6 +72,8 @@ let of_b58check s =
       ok (Implicit (Signature.P256 h))
   | Some (Contract_hash.Data h) ->
       ok (Originated h)
+  | Some (Baker_hash.Data h) ->
+      ok (Baker h)
   | _ ->
       error (Invalid_contract_notation s)
 
@@ -70,12 +82,16 @@ let pp ppf = function
       Signature.Public_key_hash.pp ppf pbk
   | Originated h ->
       Contract_hash.pp ppf h
+  | Baker h ->
+      Baker_hash.pp ppf h
 
 let pp_short ppf = function
   | Implicit pbk ->
       Signature.Public_key_hash.pp_short ppf pbk
   | Originated h ->
       Contract_hash.pp_short ppf h
+  | Baker h ->
+      Baker_hash.pp_short ppf h
 
 let encoding =
   let open Data_encoding in
@@ -84,7 +100,8 @@ let encoding =
     ~title:"A contract handle"
     ~description:
       "A contract notation as given to an RPC or inside scripts. Can be a \
-       base58 implicit contract hash or a base58 originated contract hash."
+       base58 implicit contract hash, a base58 originated contract hash, or a \
+       base58 baker contract hash."
   @@ splitted
        ~binary:
          (union
@@ -97,10 +114,18 @@ let encoding =
                 (fun k -> Implicit k);
               case
                 (Tag 1)
+                (* Padded for fixed-length encoding *)
                 (Fixed.add_padding Contract_hash.encoding 1)
                 ~title:"Originated"
                 (function Originated k -> Some k | _ -> None)
-                (fun k -> Originated k) ])
+                (fun k -> Originated k);
+              case
+                (Tag 2)
+                (* Padded for fixed-length encoding *)
+                (Fixed.add_padding Baker_hash.encoding 1)
+                ~title:"Baker"
+                (function Baker k -> Some k | _ -> None)
+                (fun k -> Baker k) ])
        ~json:
          (conv
             to_b58check
@@ -127,9 +152,13 @@ let () =
 
 let implicit_contract id = Implicit id
 
-let is_implicit = function Implicit m -> Some m | Originated _ -> None
+let baker_contract id = Baker id
 
-let is_originated = function Implicit _ -> None | Originated h -> Some h
+let is_implicit = function Implicit m -> Some m | _ -> None
+
+let is_baker = function Baker h -> Some h | _ -> None
+
+let is_originated = function Originated h -> Some h | _ -> None
 
 type origination_nonce = {
   operation_hash : Operation_hash.t;

@@ -8,6 +8,7 @@
         "Nonce_hash",
         "Script_expr_hash",
         "Contract_hash",
+        "Baker_hash",
         "Blinded_public_key_hash",
 
         "Tez_repr",
