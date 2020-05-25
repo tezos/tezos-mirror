@@ -316,6 +316,10 @@ module Cost_of : sig
 
     val key_hash_readable : Gas.cost
 
+    val baker_hash_optimized : Gas.cost
+
+    val baker_hash_readable : Gas.cost
+
     val signature_optimized : Gas.cost
 
     val signature_readable : Gas.cost
@@ -371,6 +375,10 @@ module Cost_of : sig
     val key_hash_optimized : Gas.cost
 
     val key_hash_readable : Gas.cost
+
+    val baker_hash_optimized : Gas.cost
+
+    val baker_hash_readable : Gas.cost
 
     val signature_optimized : Gas.cost
 

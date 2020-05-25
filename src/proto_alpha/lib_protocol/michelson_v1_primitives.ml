@@ -176,6 +176,7 @@ type prim =
   | T_bls12_381_g2
   | T_bls12_381_fr
   | T_ticket
+  | T_baker_hash
 
 (* Auxiliary types for error documentation.
    All the prim constructor prefixes must match their namespace. *)
@@ -299,6 +300,7 @@ let namespace = function
   | I_XOR ->
       Instr_namespace
   | T_address
+  | T_baker_hash
   | T_big_map
   | T_bool
   | T_bytes
@@ -627,6 +629,8 @@ let string_of_prim = function
       "bls12_381_fr"
   | T_ticket ->
       "ticket"
+  | T_baker_hash ->
+      "baker_hash"
 
 let prim_of_string = function
   | "parameter" ->
@@ -911,6 +915,8 @@ let prim_of_string = function
       ok T_bls12_381_fr
   | "ticket" ->
       ok T_ticket
+  | "baker_hash" ->
+      ok T_baker_hash
   | n ->
       if valid_case n then error (Unknown_primitive_name n)
       else error (Invalid_case n)
@@ -1111,7 +1117,9 @@ let prim_encoding =
          ("READ_TICKET", I_READ_TICKET);
          ("SPLIT_TICKET", I_SPLIT_TICKET);
          ("JOIN_TICKETS", I_JOIN_TICKETS);
-         ("GET_AND_UPDATE", I_GET_AND_UPDATE)
+         ("GET_AND_UPDATE", I_GET_AND_UPDATE);
+         (* Alpha_009 addition *)
+         ("baker_hash", T_baker_hash)
          (* New instructions must be added here, for backward compatibility of the encoding. *)
          (* Keep the comment above at the end of the list *)
         ]
