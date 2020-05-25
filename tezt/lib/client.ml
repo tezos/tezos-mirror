@@ -89,6 +89,10 @@ module Admin = struct
       client
       ?node
       ["connect"; "address"; "[::1]:" ^ string_of_int (Node.net_port peer)]
+
+  let kick_peer ?node ~peer client =
+    let* identity = Node.wait_for_identity peer in
+    run_command client ?node ["kick"; "peer"; identity]
 end
 
 let import_secret_key ?node client (key : Constant.key) =

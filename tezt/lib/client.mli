@@ -55,6 +55,9 @@ module Admin : sig
 
   (** Connect a node to another peer. *)
   val connect_address : ?node:Node.t -> peer:Node.t -> t -> unit Lwt.t
+
+  (** Kick a peer *)
+  val kick_peer : ?node:Node.t -> peer:Node.t -> t -> unit Lwt.t
 end
 
 (** {2 Regular Client Commands} *)
