@@ -23,16 +23,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Only delegates with at least one roll take part in the amendment
+(** Only bakers with at least one roll take part in the amendment
    procedure.  It works as follows:
 
-   - Proposal period: delegates can submit protocol amendment
+   - Proposal period: bakers can submit protocol amendment
    proposals using the proposal operation. At the end of a proposal
    period, the proposal with most supporters is selected and we move
    to an exploration period. If there are no proposals, or a tie
    between proposals, a new proposal period starts.
 
-   - Exploration period: delegates can cast votes to test or not the
+   - Exploration period: bakers can cast votes to test or not the
    winning proposal using the ballot operation.  At the end of an
    exploration period if participation reaches the quorum and the
    proposal has a supermajority in favor, we proceed to a cooldown
@@ -43,7 +43,7 @@
    between exploration and promotion periods. At the end of a cooldown
    period we move to a promotion period.
 
-   - Promotion period: delegates can cast votes to promote or not the
+   - Promotion period: bakers can cast votes to promote or not the
    proposal using the ballot operation.  At the end of a promotion
    period if participation reaches the quorum and the proposal has a
    supermajority in favor, we move to an adoption period. Otherwise we
@@ -65,17 +65,17 @@ type error +=
   | Too_many_proposals
   | Empty_proposal
 
-(** Records a list of proposals for a delegate.
+(** Records a list of proposals for a baker.
     @raise Unexpected_proposal if [ctxt] is not in a proposal period.
-    @raise Unauthorized_proposal if [delegate] is not in the listing. *)
+    @raise Unauthorized_proposal if [baker] is not in the listing. *)
 val record_proposals :
-  context -> public_key_hash -> Protocol_hash.t list -> context tzresult Lwt.t
+  context -> baker_hash -> Protocol_hash.t list -> context tzresult Lwt.t
 
 type error += Invalid_proposal | Unexpected_ballot | Unauthorized_ballot
 
 val record_ballot :
   context ->
-  public_key_hash ->
+  baker_hash ->
   Protocol_hash.t ->
   Vote.ballot ->
   context tzresult Lwt.t

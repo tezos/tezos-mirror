@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -52,6 +53,13 @@ module Roll : sig
     Indexed_data_snapshotable_storage
       with type key = Roll_repr.t
        and type snapshot = Cycle_repr.t * int
+       and type value = Baker_hash.t
+       and type t := Raw_context.t
+
+  module Owner_008 :
+    Indexed_data_snapshotable_storage
+      with type key = Roll_repr.t
+       and type snapshot = Cycle_repr.t * int
        and type value = Signature.Public_key.t
        and type t := Raw_context.t
 
@@ -72,8 +80,15 @@ module Roll : sig
       with type value = Roll_repr.t
        and type t := Raw_context.t
 
+  (** Rolls associated to bakers, a linked list per baker *)
+  module Baker_roll_list :
+    Indexed_data_storage
+      with type key = Baker_hash.t
+       and type value = Roll_repr.t
+       and type t := Raw_context.t
+
   (** Rolls associated to contracts, a linked list per contract *)
-  module Delegate_roll_list :
+  module Delegate_roll_list_008 :
     Indexed_data_storage
       with type key = Signature.Public_key_hash.t
        and type value = Roll_repr.t
@@ -86,8 +101,15 @@ module Roll : sig
        and type value = Roll_repr.t
        and type t := Raw_context.t
 
+  (** The tez of a baker that are not assigned to rolls *)
+  module Baker_change :
+    Indexed_data_storage
+      with type key = Baker_hash.t
+       and type value = Tez_repr.t
+       and type t := Raw_context.t
+
   (** The tez of a contract that are not assigned to rolls *)
-  module Delegate_change :
+  module Delegate_change_008 :
     Indexed_data_storage
       with type key = Signature.Public_key_hash.t
        and type value = Tez_repr.t
@@ -138,19 +160,19 @@ module Contract : sig
 
   (** Frozen balance, see 'delegate_storage.mli' for more explanation.
       Always update `Delegates_with_frozen_balance` accordingly. *)
-  module Frozen_deposits :
+  module Frozen_deposits_008 :
     Indexed_data_storage
       with type key = Cycle_repr.t
        and type value = Tez_repr.t
        and type t = Raw_context.t * Contract_repr.t
 
-  module Frozen_fees :
+  module Frozen_fees_008 :
     Indexed_data_storage
       with type key = Cycle_repr.t
        and type value = Tez_repr.t
        and type t = Raw_context.t * Contract_repr.t
 
-  module Frozen_rewards :
+  module Frozen_rewards_008 :
     Indexed_data_storage
       with type key = Cycle_repr.t
        and type value = Tez_repr.t
@@ -167,20 +189,25 @@ module Contract : sig
   module Delegate :
     Indexed_data_storage
       with type key = Contract_repr.t
+       and type value = Baker_hash.t
+       and type t := Raw_context.t
+
+  module Delegate_008 :
+    Indexed_data_storage
+      with type key = Contract_repr.t
        and type value = Signature.Public_key_hash.t
        and type t := Raw_context.t
 
   (** All contracts (implicit and originated) that are delegated, if any  *)
-  module Delegated :
+  module Delegated_008 :
     Data_set_storage
       with type elt = Contract_repr.t
        and type t = Raw_context.t * Contract_repr.t
 
-  module Inactive_delegate :
+  module Inactive_delegate_008 :
     Data_set_storage with type elt = Contract_repr.t and type t = Raw_context.t
 
-  (** The cycle where the delegate should be deactivated. *)
-  module Delegate_desactivation :
+  module Delegate_desactivation_008 :
     Indexed_data_storage
       with type key = Contract_repr.t
        and type value = Cycle_repr.t
@@ -192,11 +219,13 @@ module Contract : sig
        and type value = Z.t
        and type t := Raw_context.t
 
-  module Code :
-    Non_iterable_indexed_carbonated_data_storage
-      with type key = Contract_repr.t
-       and type value = Script_repr.lazy_expr
-       and type t := Raw_context.t
+  module Code : sig
+    include
+      Non_iterable_indexed_carbonated_data_storage
+        with type key = Contract_repr.t
+         and type value = Script_repr.lazy_expr
+         and type t := Raw_context.t
+  end
 
   module Storage :
     Non_iterable_indexed_carbonated_data_storage
@@ -348,23 +377,116 @@ module Sapling : sig
        and type value = Raw_level_repr.t
 end
 
-(** Set of all registered delegates. *)
-module Delegates :
+module Delegates_008 :
   Data_set_storage
     with type t := Raw_context.t
      and type elt = Signature.Public_key_hash.t
 
-(** Set of all active delegates with rolls. *)
-module Active_delegates_with_rolls :
+module Active_delegates_with_rolls_008 :
   Data_set_storage
     with type t := Raw_context.t
      and type elt = Signature.Public_key_hash.t
 
-(** Set of all the delegates with frozen rewards/bonds/fees for a given cycle. *)
-module Delegates_with_frozen_balance :
+module Delegates_with_frozen_balance_008 :
   Data_set_storage
     with type t = Raw_context.t * Cycle_repr.t
      and type elt = Signature.Public_key_hash.t
+
+module Baker : sig
+  (** Set of all registered bakers. *)
+  module Registered :
+    Data_set_storage with type t := Raw_context.t and type elt = Baker_hash.t
+
+  (** All contracts that are delegated to a given baker, if any. *)
+  module Delegators :
+    Data_set_storage
+      with type elt = Contract_repr.t
+       and type t = Raw_context.t * Baker_hash.t
+
+  (** Set of all active bakers with rolls. *)
+  module Active_with_rolls :
+    Data_set_storage with type t := Raw_context.t and type elt = Baker_hash.t
+
+  (** Set of all the bakers with frozen rewards/bonds/fees for a given cycle. *)
+  module With_frozen_balance :
+    Data_set_storage
+      with type t = Raw_context.t * Cycle_repr.t
+       and type elt = Baker_hash.t
+
+  (** Inactive bakers **)
+  module Inactive :
+    Data_set_storage with type elt = Baker_hash.t and type t = Raw_context.t
+
+  (** Bakers that decline any new delegation **)
+  module Delegation_decliners :
+    Data_set_storage with type elt = Baker_hash.t and type t = Raw_context.t
+
+  (** The cycle where the baker should be deactivated. *)
+  module Deactivation :
+    Indexed_data_storage
+      with type key = Baker_hash.t
+       and type value = Cycle_repr.t
+       and type t := Raw_context.t
+
+  (** Frozen balance, see 'baker_storage.mli' for more explanation.
+      Always update `Bakers_with_frozen_balance` accordingly. *)
+  module Frozen_deposits :
+    Indexed_data_storage
+      with type key = Cycle_repr.t
+       and type value = Tez_repr.t
+       and type t = Raw_context.t * Baker_hash.t
+
+  module Frozen_fees :
+    Indexed_data_storage
+      with type key = Cycle_repr.t
+       and type value = Tez_repr.t
+       and type t = Raw_context.t * Baker_hash.t
+
+  module Frozen_rewards :
+    Indexed_data_storage
+      with type key = Cycle_repr.t
+       and type value = Tez_repr.t
+       and type t = Raw_context.t * Baker_hash.t
+
+  (** Baker's possible pending consensus key and its activation cycle.
+      The pending key will become active on the start of activation cycle *)
+  module Pending_consensus_key :
+    Indexed_data_storage
+      with type key = Baker_hash.t
+       and type value = Signature.Public_key.t * Cycle_repr.t
+       and type t := Raw_context.t
+
+  (** Set of all pending consensus keys. *)
+  module Pending_consensus_keys :
+    Data_set_storage
+      with type t := Raw_context.t
+       and type elt = Signature.Public_key_hash.t
+
+  (** Consensus key is authorized to transfer directly from a baker account,
+      participate in consensus and governance. *)
+  module Consensus_key :
+    Indexed_data_snapshotable_storage
+      with type key = Baker_hash.t
+       and type snapshot = Cycle_repr.t
+       and type value = Signature.Public_key.t
+       and type t := Raw_context.t
+
+  (** Consensus key to a baker for reverse lookup. Deliberately redundant, it
+      contains the same bindings as [Consensus_key.Snapshot] storage for
+      the current cycle, alas the keys and values are flipped and the consensus
+      key is stored as a hash of public key instead of public key itself. *)
+  module Consensus_key_rev :
+    Indexed_data_storage
+      with type key = Signature.Public_key_hash.t
+       and type value = Baker_hash.t
+       and type t := Raw_context.t
+
+  module Pvss_key :
+    Indexed_data_storage
+      with type key = Baker_hash.t
+       and type value = Pvss_secp256k1.Public_key.t
+       and type t := Raw_context.t
+end
 
 (** Votes *)
 
@@ -395,6 +517,12 @@ module Vote : sig
   (** Contains all delegates with their assigned number of rolls. *)
   module Listings :
     Indexed_data_storage
+      with type key = Baker_hash.t
+       and type value = int32
+       and type t := Raw_context.t
+
+  module Listings_008 :
+    Indexed_data_storage
       with type key = Signature.Public_key_hash.t
        and type value = int32
        and type t := Raw_context.t
@@ -402,11 +530,22 @@ module Vote : sig
   (** Set of protocol proposal with corresponding proposer delegate *)
   module Proposals :
     Data_set_storage
+      with type elt = Protocol_hash.t * Baker_hash.t
+       and type t := Raw_context.t
+
+  module Proposals_008 :
+    Data_set_storage
       with type elt = Protocol_hash.t * Signature.Public_key_hash.t
        and type t := Raw_context.t
 
   (** Keeps for each delegate the number of proposed protocols *)
   module Proposals_count :
+    Indexed_data_storage
+      with type key = Baker_hash.t
+       and type value = int
+       and type t := Raw_context.t
+
+  module Proposals_count_008 :
     Indexed_data_storage
       with type key = Signature.Public_key_hash.t
        and type value = int
@@ -414,6 +553,12 @@ module Vote : sig
 
   (** Contains for each delegate its ballot *)
   module Ballots :
+    Indexed_data_storage
+      with type key = Baker_hash.t
+       and type value = Vote_repr.ballot
+       and type t := Raw_context.t
+
+  module Ballots_008 :
     Indexed_data_storage
       with type key = Signature.Public_key_hash.t
        and type value = Vote_repr.ballot
@@ -428,7 +573,7 @@ module Seed : sig
 
   type unrevealed_nonce = {
     nonce_hash : Nonce_hash.t;
-    delegate : Signature.Public_key_hash.t;
+    baker : Baker_hash.t;
     rewards : Tez_repr.t;
     fees : Tez_repr.t;
   }
@@ -487,3 +632,42 @@ module Pending_migration_balance_updates :
   Single_data_storage
     with type value = Receipt_repr.balance_updates
      and type t := Raw_context.t
+
+(* only exposed for 008 migration *)
+module Cycle : sig
+  type unrevealed_nonce = {
+    nonce_hash : Nonce_hash.t;
+    baker : Baker_hash.t;
+    rewards : Tez_repr.t;
+    fees : Tez_repr.t;
+  }
+
+  type nonce_status =
+    | Unrevealed of unrevealed_nonce
+    | Revealed of Seed_repr.nonce
+
+  module Nonce :
+    Indexed_data_storage
+      with type key := Raw_level_repr.t
+       and type value := nonce_status
+       and type t := Raw_context.t * Cycle_repr.t
+end
+
+module Cycle_008 : sig
+  type unrevealed_nonce = {
+    nonce_hash : Nonce_hash.t;
+    delegate : Signature.Public_key_hash.t;
+    rewards : Tez_repr.t;
+    fees : Tez_repr.t;
+  }
+
+  type nonce_status =
+    | Unrevealed of unrevealed_nonce
+    | Revealed of Seed_repr.nonce
+
+  module Nonce :
+    Indexed_data_storage
+      with type key := Raw_level_repr.t
+       and type value := nonce_status
+       and type t := Raw_context.t * Cycle_repr.t
+end

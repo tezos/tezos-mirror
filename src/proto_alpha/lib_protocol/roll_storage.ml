@@ -27,10 +27,12 @@
 open Misc
 
 type error +=
-  | (* `Permanent *) Consume_roll_change
-  | (* `Permanent *) No_roll_for_delegate
-  | (* `Permanent *) No_roll_snapshot_for_cycle of Cycle_repr.t
-  | (* `Permanent *) Unregistered_delegate of Signature.Public_key_hash.t
+  | (* `Permanent *)
+      Consume_roll_change
+  | (* `Permanent *)
+      No_roll_for_baker
+  | (* `Permanent *)
+      No_roll_snapshot_for_cycle of Cycle_repr.t
 
 let () =
   let open Data_encoding in
@@ -45,16 +47,16 @@ let () =
     empty
     (function Consume_roll_change -> Some () | _ -> None)
     (fun () -> Consume_roll_change) ;
-  (* No roll for delegate *)
+  (* No roll for baker *)
   register_error_kind
     `Permanent
-    ~id:"contract.manager.no_roll_for_delegate"
-    ~title:"No roll for delegate"
-    ~description:"Delegate has no roll."
-    ~pp:(fun ppf () -> Format.fprintf ppf "Delegate has no roll.")
+    ~id:"contract.manager.no_roll_for_baker"
+    ~title:"No roll for baker"
+    ~description:"Baker has no roll."
+    ~pp:(fun ppf () -> Format.fprintf ppf "Baker has no roll.")
     empty
-    (function No_roll_for_delegate -> Some () | _ -> None)
-    (fun () -> No_roll_for_delegate) ;
+    (function No_roll_for_baker -> Some () | _ -> None)
+    (fun () -> No_roll_for_baker) ;
   (* No roll snapshot for cycle *)
   register_error_kind
     `Permanent
@@ -70,34 +72,16 @@ let () =
         c)
     (obj1 (req "cycle" Cycle_repr.encoding))
     (function No_roll_snapshot_for_cycle c -> Some c | _ -> None)
-    (fun c -> No_roll_snapshot_for_cycle c) ;
-  (* Unregistered delegate *)
-  register_error_kind
-    `Permanent
-    ~id:"contract.manager.unregistered_delegate"
-    ~title:"Unregistered delegate"
-    ~description:"A contract cannot be delegated to an unregistered delegate"
-    ~pp:(fun ppf k ->
-      Format.fprintf
-        ppf
-        "The provided public key (with hash %a) is not registered as valid \
-         delegate key."
-        Signature.Public_key_hash.pp
-        k)
-    (obj1 (req "hash" Signature.Public_key_hash.encoding))
-    (function Unregistered_delegate k -> Some k | _ -> None)
-    (fun k -> Unregistered_delegate k)
+    (fun c -> No_roll_snapshot_for_cycle c)
 
 let get_contract_delegate ctxt contract =
-  Storage.Contract.Delegate.find ctxt contract
-
-let delegate_pubkey ctxt delegate =
-  Storage.Contract.Manager.find ctxt (Contract_repr.implicit_contract delegate)
-  >>=? function
-  | None | Some (Manager_repr.Hash _) ->
-      fail (Unregistered_delegate delegate)
-  | Some (Manager_repr.Public_key pk) ->
-      return pk
+  (* If the contract is a baker, treat it as if it was self-delegated
+     to ensure the baker's total delegated amount is properly counted. *)
+  match Contract_repr.is_baker contract with
+  | Some baker ->
+      return_some baker
+  | None ->
+      Storage.Contract.Delegate.find ctxt contract
 
 let clear_cycle ctxt cycle =
   Storage.Roll.Snapshot_for_cycle.get ctxt cycle
@@ -118,9 +102,8 @@ let fold ctxt ~f init =
       >>=? function
       | None ->
           loop ctxt (Roll_repr.succ roll) acc
-      | Some delegate ->
-          f roll delegate acc
-          >>=? fun acc -> loop ctxt (Roll_repr.succ roll) acc
+      | Some baker ->
+          f roll baker acc >>=? fun acc -> loop ctxt (Roll_repr.succ roll) acc
   in
   loop ctxt Roll_repr.first init
 
@@ -182,7 +165,7 @@ module Random = struct
     let rec loop sequence =
       let (roll, sequence) = Roll_repr.random sequence ~bound in
       Storage.Roll.Owner.Snapshot.find c ((cycle, index), roll)
-      >>=? function None -> loop sequence | Some delegate -> return delegate
+      >>=? function None -> loop sequence | Some baker -> return baker
     in
     Storage.Roll.Owner.snapshot_exists c (cycle, index)
     >>= fun snapshot_exists ->
@@ -196,8 +179,8 @@ let baking_rights_owner c level ~priority =
 let endorsement_rights_owner c level ~slot =
   Random.owner c "endorsement" level slot
 
-let count_rolls ctxt delegate =
-  Storage.Roll.Delegate_roll_list.find ctxt delegate
+let count_rolls ctxt baker =
+  Storage.Roll.Baker_roll_list.find ctxt baker
   >>=? function
   | None ->
       return 0
@@ -208,8 +191,8 @@ let count_rolls ctxt delegate =
       in
       loop 1 head_roll
 
-let get_change ctxt delegate =
-  Storage.Roll.Delegate_change.find ctxt delegate
+let get_change ctxt baker =
+  Storage.Roll.Baker_change.find ctxt baker
   >|=? Option.value ~default:Tez_repr.zero
 
 module Delegate = struct
@@ -229,107 +212,100 @@ module Delegate = struct
     | Some roll ->
         return (roll, ctxt)
 
-  let consume_roll_change ctxt delegate =
+  let consume_roll_change ctxt baker =
     let tokens_per_roll = Constants_storage.tokens_per_roll ctxt in
-    Storage.Roll.Delegate_change.get ctxt delegate
+    Storage.Roll.Baker_change.get ctxt baker
     >>=? fun change ->
     record_trace Consume_roll_change Tez_repr.(change -? tokens_per_roll)
     >>?= fun new_change ->
-    Storage.Roll.Delegate_change.update ctxt delegate new_change
+    Storage.Roll.Baker_change.update ctxt baker new_change
 
-  let recover_roll_change ctxt delegate =
+  let recover_roll_change ctxt baker =
     let tokens_per_roll = Constants_storage.tokens_per_roll ctxt in
-    Storage.Roll.Delegate_change.get ctxt delegate
+    Storage.Roll.Baker_change.get ctxt baker
     >>=? fun change ->
     Tez_repr.(change +? tokens_per_roll)
     >>?= fun new_change ->
-    Storage.Roll.Delegate_change.update ctxt delegate new_change
+    Storage.Roll.Baker_change.update ctxt baker new_change
 
-  let pop_roll_from_delegate ctxt delegate =
-    recover_roll_change ctxt delegate
+  let pop_roll_from_baker ctxt baker =
+    recover_roll_change ctxt baker
     >>=? fun ctxt ->
     (* beginning:
-       delegate : roll -> successor_roll -> ...
+       baker : roll -> successor_roll -> ...
        limbo : limbo_head -> ...
     *)
     Storage.Roll.Limbo.find ctxt
     >>=? fun limbo_head ->
-    Storage.Roll.Delegate_roll_list.find ctxt delegate
+    Storage.Roll.Baker_roll_list.find ctxt baker
     >>=? function
     | None ->
-        fail No_roll_for_delegate
+        fail No_roll_for_baker
     | Some roll ->
         Storage.Roll.Owner.remove_existing ctxt roll
         >>=? fun ctxt ->
         Storage.Roll.Successor.find ctxt roll
         >>=? fun successor_roll ->
-        Storage.Roll.Delegate_roll_list.add_or_remove
-          ctxt
-          delegate
-          successor_roll
+        Storage.Roll.Baker_roll_list.add_or_remove ctxt baker successor_roll
         >>= fun ctxt ->
-        (* delegate : successor_roll -> ...
+        (* baker : successor_roll -> ...
            roll ------^
            limbo : limbo_head -> ... *)
         Storage.Roll.Successor.add_or_remove ctxt roll limbo_head
         >>= fun ctxt ->
-        (* delegate : successor_roll -> ...
+        (* baker : successor_roll -> ...
            roll ------v
            limbo : limbo_head -> ... *)
         Storage.Roll.Limbo.add ctxt roll
         >|= fun ctxt ->
-        (* delegate : successor_roll -> ...
+        (* baker : successor_roll -> ...
            limbo : roll -> limbo_head -> ... *)
         ok (roll, ctxt)
 
-  let create_roll_in_delegate ctxt delegate delegate_pk =
-    consume_roll_change ctxt delegate
+  let create_roll_in_baker ctxt baker =
+    consume_roll_change ctxt baker
     >>=? fun ctxt ->
     (* beginning:
-       delegate : delegate_head -> ...
+       baker : baker_head -> ...
        limbo : roll -> limbo_successor -> ...
     *)
-    Storage.Roll.Delegate_roll_list.find ctxt delegate
-    >>=? fun delegate_head ->
+    Storage.Roll.Baker_roll_list.find ctxt baker
+    >>=? fun baker_head ->
     get_limbo_roll ctxt
     >>=? fun (roll, ctxt) ->
-    Storage.Roll.Owner.init ctxt roll delegate_pk
+    Storage.Roll.Owner.init ctxt roll baker
     >>=? fun ctxt ->
     Storage.Roll.Successor.find ctxt roll
     >>=? fun limbo_successor ->
     Storage.Roll.Limbo.add_or_remove ctxt limbo_successor
     >>= fun ctxt ->
-    (* delegate : delegate_head -> ...
+    (* baker : baker_head -> ...
        roll ------v
        limbo : limbo_successor -> ... *)
-    Storage.Roll.Successor.add_or_remove ctxt roll delegate_head
+    Storage.Roll.Successor.add_or_remove ctxt roll baker_head
     >>= fun ctxt ->
-    (* delegate : delegate_head -> ...
+    (* baker : baker_head -> ...
        roll ------^
        limbo : limbo_successor -> ... *)
-    Storage.Roll.Delegate_roll_list.add ctxt delegate roll
-    (* delegate : roll -> delegate_head -> ...
+    Storage.Roll.Baker_roll_list.add ctxt baker roll
+    (* baker : roll -> baker_head -> ...
        limbo : limbo_successor -> ... *)
     >|= ok
 
-  let ensure_inited ctxt delegate =
-    Storage.Roll.Delegate_change.mem ctxt delegate
+  let ensure_inited ctxt baker =
+    Storage.Roll.Baker_change.mem ctxt baker
     >>= function
     | true ->
         return ctxt
     | false ->
-        Storage.Roll.Delegate_change.init ctxt delegate Tez_repr.zero
+        Storage.Roll.Baker_change.init ctxt baker Tez_repr.zero
 
-  let is_inactive ctxt delegate =
-    Storage.Contract.Inactive_delegate.mem
-      ctxt
-      (Contract_repr.implicit_contract delegate)
+  let is_inactive ctxt baker =
+    Storage.Baker.Inactive.mem ctxt baker
     >>= fun inactive ->
     if inactive then return inactive
     else
-      Storage.Contract.Delegate_desactivation.find
-        ctxt
-        (Contract_repr.implicit_contract delegate)
+      Storage.Baker.Deactivation.find ctxt baker
       >|=? function
       | Some last_active_cycle ->
           let ({Level_repr.cycle = current_cycle} : Level_repr.t) =
@@ -341,110 +317,103 @@ module Delegate = struct
              a contract. *)
           false
 
-  let add_amount ctxt delegate amount =
-    ensure_inited ctxt delegate
+  let add_amount ctxt baker amount =
+    ensure_inited ctxt baker
     >>=? fun ctxt ->
     let tokens_per_roll = Constants_storage.tokens_per_roll ctxt in
-    Storage.Roll.Delegate_change.get ctxt delegate
+    Storage.Roll.Baker_change.get ctxt baker
     >>=? fun change ->
     Tez_repr.(amount +? change)
     >>?= fun change ->
-    Storage.Roll.Delegate_change.update ctxt delegate change
+    Storage.Roll.Baker_change.update ctxt baker change
     >>=? fun ctxt ->
-    delegate_pubkey ctxt delegate
-    >>=? fun delegate_pk ->
     let rec loop ctxt change =
       if Tez_repr.(change < tokens_per_roll) then return ctxt
       else
         Tez_repr.(change -? tokens_per_roll)
         >>?= fun change ->
-        create_roll_in_delegate ctxt delegate delegate_pk
-        >>=? fun ctxt -> loop ctxt change
+        create_roll_in_baker ctxt baker >>=? fun ctxt -> loop ctxt change
     in
-    is_inactive ctxt delegate
+    is_inactive ctxt baker
     >>=? fun inactive ->
     if inactive then return ctxt
     else
       loop ctxt change
       >>=? fun ctxt ->
-      Storage.Roll.Delegate_roll_list.find ctxt delegate
+      Storage.Roll.Baker_roll_list.find ctxt baker
       >>=? fun rolls ->
       match rolls with
       | None ->
           return ctxt
       | Some _ ->
-          Storage.Active_delegates_with_rolls.add ctxt delegate >|= ok
+          Storage.Baker.Active_with_rolls.add ctxt baker >|= ok
 
-  let remove_amount ctxt delegate amount =
+  let remove_amount ctxt baker amount =
     let tokens_per_roll = Constants_storage.tokens_per_roll ctxt in
     let rec loop ctxt change =
       if Tez_repr.(amount <= change) then return (ctxt, change)
       else
-        pop_roll_from_delegate ctxt delegate
+        pop_roll_from_baker ctxt baker
         >>=? fun (_, ctxt) ->
         Tez_repr.(change +? tokens_per_roll)
         >>?= fun change -> loop ctxt change
     in
-    Storage.Roll.Delegate_change.get ctxt delegate
+    Storage.Roll.Baker_change.get ctxt baker
     >>=? fun change ->
-    is_inactive ctxt delegate
+    is_inactive ctxt baker
     >>=? fun inactive ->
     ( if inactive then return (ctxt, change)
     else
       loop ctxt change
       >>=? fun (ctxt, change) ->
-      Storage.Roll.Delegate_roll_list.find ctxt delegate
+      Storage.Roll.Baker_roll_list.find ctxt baker
       >>=? fun rolls ->
       match rolls with
       | None ->
-          Storage.Active_delegates_with_rolls.remove ctxt delegate
+          Storage.Baker.Active_with_rolls.remove ctxt baker
           >|= fun ctxt -> ok (ctxt, change)
       | Some _ ->
           return (ctxt, change) )
     >>=? fun (ctxt, change) ->
     Tez_repr.(change -? amount)
-    >>?= fun change -> Storage.Roll.Delegate_change.update ctxt delegate change
+    >>?= fun change -> Storage.Roll.Baker_change.update ctxt baker change
 
-  let set_inactive ctxt delegate =
-    ensure_inited ctxt delegate
+  let set_inactive ctxt baker =
+    ensure_inited ctxt baker
     >>=? fun ctxt ->
     let tokens_per_roll = Constants_storage.tokens_per_roll ctxt in
-    Storage.Roll.Delegate_change.get ctxt delegate
+    Storage.Roll.Baker_change.get ctxt baker
     >>=? fun change ->
-    Storage.Contract.Inactive_delegate.add
-      ctxt
-      (Contract_repr.implicit_contract delegate)
+    Storage.Baker.Inactive.add ctxt baker
     >>= fun ctxt ->
-    Storage.Active_delegates_with_rolls.remove ctxt delegate
+    Storage.Baker.Active_with_rolls.remove ctxt baker
     >>= fun ctxt ->
     let rec loop ctxt change =
-      Storage.Roll.Delegate_roll_list.find ctxt delegate
+      Storage.Roll.Baker_roll_list.find ctxt baker
       >>=? function
       | None ->
           return (ctxt, change)
       | Some _roll ->
-          pop_roll_from_delegate ctxt delegate
+          pop_roll_from_baker ctxt baker
           >>=? fun (_, ctxt) ->
           Tez_repr.(change +? tokens_per_roll)
           >>?= fun change -> loop ctxt change
     in
     loop ctxt change
     >>=? fun (ctxt, change) ->
-    Storage.Roll.Delegate_change.update ctxt delegate change
+    Storage.Roll.Baker_change.update ctxt baker change
 
-  let set_active ctxt delegate =
-    is_inactive ctxt delegate
+  let set_active ctxt baker =
+    is_inactive ctxt baker
     >>=? fun inactive ->
     let current_cycle = (Raw_context.current_level ctxt).cycle in
     let preserved_cycles = Constants_storage.preserved_cycles ctxt in
-    (* When the delegate is new or inactive, she will become active in
+    (* When the baker is new or inactive, she will become active in
        `1+preserved_cycles`, and we allow `preserved_cycles` for the
-       delegate to start baking. When the delegate is active, we only
+       baker to start baking. When the baker is active, we only
        give her at least `preserved_cycles` after the current cycle
        before to be deactivated.  *)
-    Storage.Contract.Delegate_desactivation.find
-      ctxt
-      (Contract_repr.implicit_contract delegate)
+    Storage.Baker.Deactivation.find ctxt baker
     >>=? fun current_expiration ->
     let expiration =
       match current_expiration with
@@ -458,41 +427,33 @@ module Delegate = struct
           let updated = Cycle_repr.add current_cycle delay in
           Cycle_repr.max current_expiration updated
     in
-    Storage.Contract.Delegate_desactivation.add
-      ctxt
-      (Contract_repr.implicit_contract delegate)
-      expiration
+    Storage.Baker.Deactivation.add ctxt baker expiration
     >>= fun ctxt ->
     if not inactive then return ctxt
     else
-      ensure_inited ctxt delegate
+      ensure_inited ctxt baker
       >>=? fun ctxt ->
       let tokens_per_roll = Constants_storage.tokens_per_roll ctxt in
-      Storage.Roll.Delegate_change.get ctxt delegate
+      Storage.Roll.Baker_change.get ctxt baker
       >>=? fun change ->
-      Storage.Contract.Inactive_delegate.remove
-        ctxt
-        (Contract_repr.implicit_contract delegate)
+      Storage.Baker.Inactive.remove ctxt baker
       >>= fun ctxt ->
-      delegate_pubkey ctxt delegate
-      >>=? fun delegate_pk ->
       let rec loop ctxt change =
         if Tez_repr.(change < tokens_per_roll) then return ctxt
         else
           Tez_repr.(change -? tokens_per_roll)
           >>?= fun change ->
-          create_roll_in_delegate ctxt delegate delegate_pk
-          >>=? fun ctxt -> loop ctxt change
+          create_roll_in_baker ctxt baker >>=? fun ctxt -> loop ctxt change
       in
       loop ctxt change
       >>=? fun ctxt ->
-      Storage.Roll.Delegate_roll_list.find ctxt delegate
+      Storage.Roll.Baker_roll_list.find ctxt baker
       >>=? fun rolls ->
       match rolls with
       | None ->
           return ctxt
       | Some _ ->
-          Storage.Active_delegates_with_rolls.add ctxt delegate >|= ok
+          Storage.Baker.Active_with_rolls.add ctxt baker >|= ok
 end
 
 module Contract = struct
@@ -567,7 +528,7 @@ let update_tokens_per_roll ctxt new_tokens_per_roll =
   ( if decrease then Tez_repr.(old_tokens_per_roll -? new_tokens_per_roll)
   else Tez_repr.(new_tokens_per_roll -? old_tokens_per_roll) )
   >>?= fun abs_diff ->
-  Storage.Delegates.fold ctxt (Ok ctxt) (fun pkh ctxt_opt ->
+  Storage.Baker.Registered.fold ctxt (Ok ctxt) (fun pkh ctxt_opt ->
       ctxt_opt
       >>?= fun ctxt ->
       count_rolls ctxt pkh

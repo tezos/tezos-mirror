@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,36 +23,29 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type error +=
-  | Too_late_revelation
-  | Too_early_revelation
-  | Previously_revealed_nonce
-  | Unexpected_nonce
+(* 20 *)
+let baker_hash = "\003\056\226" (* SG1(36) *)
 
-type t = Seed_repr.nonce
+(*
+  Generated with:
+    cd scripts/b58_prefix
+    poetry install
+    poetry run python b58_prefix.py --prefix SG1 --length 20
+*)
 
-type nonce = t
+module H =
+  Blake2B.Make
+    (Base58)
+    (struct
+      let name = "Baker_hash"
 
-val encoding : nonce Data_encoding.t
+      let title = "A baker ID"
 
-type unrevealed = Storage.Seed.unrevealed_nonce = {
-  nonce_hash : Nonce_hash.t;
-  baker : Baker_hash.t;
-  rewards : Tez_repr.t;
-  fees : Tez_repr.t;
-}
+      let b58check_prefix = baker_hash
 
-type status = Unrevealed of unrevealed | Revealed of Seed_repr.nonce
+      let size = Some 20
+    end)
 
-val get : Raw_context.t -> Level_repr.t -> status tzresult Lwt.t
+include H
 
-val record_hash : Raw_context.t -> unrevealed -> Raw_context.t tzresult Lwt.t
-
-val reveal :
-  Raw_context.t -> Level_repr.t -> nonce -> Raw_context.t tzresult Lwt.t
-
-val of_bytes : bytes -> nonce tzresult
-
-val hash : nonce -> Nonce_hash.t
-
-val check_hash : nonce -> Nonce_hash.t -> bool
+let () = Base58.check_encoded_prefix b58check_encoding "SG1" 36

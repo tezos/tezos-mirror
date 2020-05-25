@@ -31,3 +31,7 @@ type proposal = Protocol_hash.t
 type ballot = Yay | Nay | Pass
 
 val ballot_encoding : ballot Data_encoding.t
+
+val of_string : string -> ballot option
+
+val to_string : ballot -> string

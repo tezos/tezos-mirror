@@ -1025,6 +1025,7 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
       let len = Bytes.length bytes in
       Raw_context.consume_gas c (Storage_costs.write_access ~written_bytes:len)
       >>?= fun c ->
+      (* DLjp: This updates /len to the bytes of the data *)
       set c len_name (encode_len_value bytes) >|=? fun c -> (c, bytes)
 
     let consume_remove_gas del c =

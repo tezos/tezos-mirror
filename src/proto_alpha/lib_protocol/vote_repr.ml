@@ -44,3 +44,15 @@ let ballot_encoding =
   splitted
     ~binary:(conv to_int8 of_int8 int8)
     ~json:(string_enum [("yay", Yay); ("nay", Nay); ("pass", Pass)])
+
+let of_string = function
+  | "y" | "Y" | "yay" ->
+      Some Yay
+  | "n" | "N" | "nay" ->
+      Some Nay
+  | "p" | "P" | "pass" ->
+      Some Pass
+  | _ ->
+      None
+
+let to_string = function Yay -> "Y" | Nay -> "N" | Pass -> "P"

@@ -58,6 +58,10 @@ type _ comparable_ty =
   | Timestamp_key : type_annot option -> Script_timestamp.t comparable_ty
   | Chain_id_key : type_annot option -> Chain_id.t comparable_ty
   | Address_key : type_annot option -> address comparable_ty
+  | Baker_hash_key : type_annot option -> baker_hash comparable_ty
+  | Pvss_key_key :
+      type_annot option
+      -> Pvss_secp256k1.Public_key.t comparable_ty
   | Pair_key :
       ('a comparable_ty * field_annot option)
       * ('b comparable_ty * field_annot option)
@@ -114,15 +118,26 @@ type ('key, 'value) big_map_overlay = {
 
 type operation = packed_internal_operation * Lazy_storage.diffs option
 
+type baker_operation = packed_internal_operation
+
 type 'a ticket = {ticketer : address; contents : 'a; amount : n num}
 
-type ('arg, 'storage) script = {
-  code : (('arg, 'storage) pair, (operation boxed_list, 'storage) pair) lambda;
+type ('arg, 'storage, 'ret) script = {
+  code : (('arg, 'storage) pair, ('ret, 'storage) pair) lambda;
   arg_type : 'arg ty;
   storage : 'storage;
   storage_type : 'storage ty;
   root_name : field_annot option;
 }
+
+and ('arg, 'storage) originated_script =
+  ('arg, 'storage, operation boxed_list) script
+
+and ('arg, 'storage) baker_script =
+  ( 'arg,
+    'storage,
+    (operation boxed_list, baker_operation boxed_list) pair )
+  script
 
 and end_of_stack = unit
 
@@ -144,6 +159,8 @@ and 'ty ty =
   | Mutez_t : type_annot option -> Tez.t ty
   | Key_hash_t : type_annot option -> public_key_hash ty
   | Key_t : type_annot option -> public_key ty
+  | Baker_hash_t : type_annot option -> baker_hash ty
+  | Pvss_key_t : type_annot option -> Pvss_secp256k1.Public_key.t ty
   | Timestamp_t : type_annot option -> Script_timestamp.t ty
   | Address_t : type_annot option -> address ty
   | Bool_t : type_annot option -> bool ty
@@ -173,6 +190,7 @@ and 'ty ty =
       Sapling.Memo_size.t * type_annot option
       -> Sapling.state ty
   | Operation_t : type_annot option -> operation ty
+  | Baker_operation_t : type_annot option -> baker_operation ty
   | Chain_id_t : type_annot option -> Chain_id.t ty
   | Never_t : type_annot option -> never ty
   | Bls12_381_g1_t : type_annot option -> Bls12_381.G1.t ty
@@ -396,7 +414,7 @@ and ('bef, 'aft) instr =
         instr
   | Implicit_account
       : (public_key_hash * 'rest, unit typed_contract * 'rest) instr
-  | Create_contract :
+  | Create_contract_legacy :
       'g ty
       * 'p ty
       * ('p * 'g, operation boxed_list * 'g) lambda
@@ -404,7 +422,17 @@ and ('bef, 'aft) instr =
       -> ( public_key_hash option * (Tez.t * ('g * 'rest)),
            operation * (address * 'rest) )
          instr
-  | Set_delegate : (public_key_hash option * 'rest, operation * 'rest) instr
+  | Create_contract :
+      'g ty
+      * 'p ty
+      * ('p * 'g, operation boxed_list * 'g) lambda
+      * field_annot option
+      -> ( baker_hash option * (Tez.t * ('g * 'rest)),
+           operation * (address * 'rest) )
+         instr
+  | Set_delegate_legacy
+      : (public_key_hash option * 'rest, operation * 'rest) instr
+  | Set_delegate : (baker_hash option * 'rest, operation * 'rest) instr
   | Now : ('rest, Script_timestamp.t * 'rest) instr
   | Balance : ('rest, Tez.t * 'rest) instr
   | Level : ('rest, n num * 'rest) instr
@@ -445,7 +473,8 @@ and ('bef, 'aft) instr =
       -> ('bef, 'rest) instr
   | ChainId : ('rest, Chain_id.t * 'rest) instr
   | Never : (never * 'rest, 'aft) instr
-  | Voting_power : (public_key_hash * 'rest, n num * 'rest) instr
+  | Voting_power_legacy : (public_key_hash * 'rest, n num * 'rest) instr
+  | Voting_power : (baker_hash * 'rest, n num * 'rest) instr
   | Total_voting_power : ('rest, n num * 'rest) instr
   | Keccak : (bytes * 'rest, bytes * 'rest) instr
   | Sha3 : (bytes * 'rest, bytes * 'rest) instr
@@ -510,6 +539,15 @@ and ('bef, 'aft) instr =
   | Join_tickets :
       'a comparable_ty
       -> (('a ticket * 'a ticket) * 'rest, 'a ticket option * 'rest) instr
+  | Submit_proposals
+      : (string boxed_list * 'rest, baker_operation * 'rest) instr
+  | Submit_ballot : (string * (string * 'rest), baker_operation * 'rest) instr
+  | Set_baker_active : (bool * 'rest, baker_operation * 'rest) instr
+  | Toggle_baker_delegations : (bool * 'rest, baker_operation * 'rest) instr
+  | Set_baker_consensus_key
+      : (public_key * (signature * 'rest), baker_operation * 'rest) instr
+  | Set_baker_pvss_key
+      : (Pvss_secp256k1.Public_key.t * 'rest, baker_operation * 'rest) instr
 
 and ('before, 'after) comb_gadt_witness =
   | Comb_one : ('a * 'before, 'a * 'before) comb_gadt_witness

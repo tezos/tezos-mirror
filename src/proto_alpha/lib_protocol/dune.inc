@@ -25,6 +25,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    nonce_hash.mli nonce_hash.ml
    script_expr_hash.mli script_expr_hash.ml
    contract_hash.mli contract_hash.ml
+   baker_hash.mli baker_hash.ml
    blinded_public_key_hash.mli blinded_public_key_hash.ml
    tez_repr.mli tez_repr.ml
    period_repr.mli period_repr.ml
@@ -46,6 +47,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    contract_repr.mli contract_repr.ml
    roll_repr.mli roll_repr.ml
    vote_repr.mli vote_repr.ml
+   baker_script_repr.mli baker_script_repr.ml
    block_header_repr.mli block_header_repr.ml
    operation_repr.mli operation_repr.ml
    manager_repr.mli manager_repr.ml
@@ -65,7 +67,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    nonce_storage.mli nonce_storage.ml
    seed_storage.mli seed_storage.ml
    roll_storage.mli roll_storage.ml
-   delegate_storage.mli delegate_storage.ml
+   baker_storage.mli baker_storage.ml
+   delegation_storage.mli delegation_storage.ml
    sapling_storage.ml
    lazy_storage_diff.mli lazy_storage_diff.ml
    contract_storage.mli contract_storage.ml
@@ -94,6 +97,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    sapling_services.ml
    contract_services.mli contract_services.ml
    delegate_services.mli delegate_services.ml
+   baker_services.mli baker_services.ml
    helpers_services.mli helpers_services.ml
    voting_services.mli voting_services.ml
    alpha_services.mli alpha_services.ml
@@ -112,6 +116,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    nonce_hash.mli nonce_hash.ml
    script_expr_hash.mli script_expr_hash.ml
    contract_hash.mli contract_hash.ml
+   baker_hash.mli baker_hash.ml
    blinded_public_key_hash.mli blinded_public_key_hash.ml
    tez_repr.mli tez_repr.ml
    period_repr.mli period_repr.ml
@@ -133,6 +138,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    contract_repr.mli contract_repr.ml
    roll_repr.mli roll_repr.ml
    vote_repr.mli vote_repr.ml
+   baker_script_repr.mli baker_script_repr.ml
    block_header_repr.mli block_header_repr.ml
    operation_repr.mli operation_repr.ml
    manager_repr.mli manager_repr.ml
@@ -152,7 +158,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    nonce_storage.mli nonce_storage.ml
    seed_storage.mli seed_storage.ml
    roll_storage.mli roll_storage.ml
-   delegate_storage.mli delegate_storage.ml
+   baker_storage.mli baker_storage.ml
+   delegation_storage.mli delegation_storage.ml
    sapling_storage.ml
    lazy_storage_diff.mli lazy_storage_diff.ml
    contract_storage.mli contract_storage.ml
@@ -181,6 +188,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    sapling_services.ml
    contract_services.mli contract_services.ml
    delegate_services.mli delegate_services.ml
+   baker_services.mli baker_services.ml
    helpers_services.mli helpers_services.ml
    voting_services.mli voting_services.ml
    alpha_services.mli alpha_services.ml
@@ -199,6 +207,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    nonce_hash.mli nonce_hash.ml
    script_expr_hash.mli script_expr_hash.ml
    contract_hash.mli contract_hash.ml
+   baker_hash.mli baker_hash.ml
    blinded_public_key_hash.mli blinded_public_key_hash.ml
    tez_repr.mli tez_repr.ml
    period_repr.mli period_repr.ml
@@ -220,6 +229,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    contract_repr.mli contract_repr.ml
    roll_repr.mli roll_repr.ml
    vote_repr.mli vote_repr.ml
+   baker_script_repr.mli baker_script_repr.ml
    block_header_repr.mli block_header_repr.ml
    operation_repr.mli operation_repr.ml
    manager_repr.mli manager_repr.ml
@@ -239,7 +249,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    nonce_storage.mli nonce_storage.ml
    seed_storage.mli seed_storage.ml
    roll_storage.mli roll_storage.ml
-   delegate_storage.mli delegate_storage.ml
+   baker_storage.mli baker_storage.ml
+   delegation_storage.mli delegation_storage.ml
    sapling_storage.ml
    lazy_storage_diff.mli lazy_storage_diff.ml
    contract_storage.mli contract_storage.ml
@@ -268,6 +279,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    sapling_services.ml
    contract_services.mli contract_services.ml
    delegate_services.mli delegate_services.ml
+   baker_services.mli baker_services.ml
    helpers_services.mli helpers_services.ml
    voting_services.mli voting_services.ml
    alpha_services.mli alpha_services.ml
@@ -306,6 +318,7 @@ include Tezos_raw_protocol_alpha.Main
    Nonce_hash
    Script_expr_hash
    Contract_hash
+   Baker_hash
    Blinded_public_key_hash
    Tez_repr
    Period_repr
@@ -327,6 +340,7 @@ include Tezos_raw_protocol_alpha.Main
    Contract_repr
    Roll_repr
    Vote_repr
+   Baker_script_repr
    Block_header_repr
    Operation_repr
    Manager_repr
@@ -346,7 +360,8 @@ include Tezos_raw_protocol_alpha.Main
    Nonce_storage
    Seed_storage
    Roll_storage
-   Delegate_storage
+   Baker_storage
+   Delegation_storage
    Sapling_storage
    Lazy_storage_diff
    Contract_storage
@@ -375,6 +390,7 @@ include Tezos_raw_protocol_alpha.Main
    Sapling_services
    Contract_services
    Delegate_services
+   Baker_services
    Helpers_services
    Voting_services
    Alpha_services
@@ -429,6 +445,7 @@ include Tezos_raw_protocol_alpha.Main
    nonce_hash.mli nonce_hash.ml
    script_expr_hash.mli script_expr_hash.ml
    contract_hash.mli contract_hash.ml
+   baker_hash.mli baker_hash.ml
    blinded_public_key_hash.mli blinded_public_key_hash.ml
    tez_repr.mli tez_repr.ml
    period_repr.mli period_repr.ml
@@ -450,6 +467,7 @@ include Tezos_raw_protocol_alpha.Main
    contract_repr.mli contract_repr.ml
    roll_repr.mli roll_repr.ml
    vote_repr.mli vote_repr.ml
+   baker_script_repr.mli baker_script_repr.ml
    block_header_repr.mli block_header_repr.ml
    operation_repr.mli operation_repr.ml
    manager_repr.mli manager_repr.ml
@@ -469,7 +487,8 @@ include Tezos_raw_protocol_alpha.Main
    nonce_storage.mli nonce_storage.ml
    seed_storage.mli seed_storage.ml
    roll_storage.mli roll_storage.ml
-   delegate_storage.mli delegate_storage.ml
+   baker_storage.mli baker_storage.ml
+   delegation_storage.mli delegation_storage.ml
    sapling_storage.ml
    lazy_storage_diff.mli lazy_storage_diff.ml
    contract_storage.mli contract_storage.ml
@@ -498,6 +517,7 @@ include Tezos_raw_protocol_alpha.Main
    sapling_services.ml
    contract_services.mli contract_services.ml
    delegate_services.mli delegate_services.ml
+   baker_services.mli baker_services.ml
    helpers_services.mli helpers_services.ml
    voting_services.mli voting_services.ml
    alpha_services.mli alpha_services.ml

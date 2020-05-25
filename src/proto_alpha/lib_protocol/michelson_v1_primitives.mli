@@ -145,6 +145,12 @@ type prim =
   | I_READ_TICKET
   | I_SPLIT_TICKET
   | I_JOIN_TICKETS
+  | I_SUBMIT_PROPOSALS
+  | I_SUBMIT_BALLOT
+  | I_SET_BAKER_ACTIVE
+  | I_TOGGLE_BAKER_DELEGATIONS
+  | I_SET_BAKER_CONSENSUS_KEY
+  | I_SET_BAKER_PVSS_KEY
   | T_bool
   | T_contract
   | T_int
@@ -175,6 +181,9 @@ type prim =
   | T_bls12_381_g2
   | T_bls12_381_fr
   | T_ticket
+  | T_baker_hash
+  | T_baker_operation
+  | T_pvss_key
 
 (** Auxiliary types for error documentation.
     All the prim constructor prefixes must match their namespace. *)

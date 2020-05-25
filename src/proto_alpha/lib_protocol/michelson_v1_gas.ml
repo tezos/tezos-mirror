@@ -79,6 +79,10 @@ module Cost_of = struct
         S.safe_int @@ Signature.Public_key.size k
     | (Timestamp_key _, _) ->
         S.safe_int @@ timestamp_bytes v
+    | (Baker_hash_key _, _) ->
+        S.safe_int Baker_hash.size
+    | (Pvss_key_key _, _) ->
+        S.safe_int Pvss_secp256k1.Public_key.size
     | (Address_key _, _) ->
         S.safe_int Signature.Public_key_hash.size
     | (Mutez_key _, _) ->
@@ -97,6 +101,8 @@ module Cost_of = struct
         S.add (S.safe_int 1) (size_of_comparable t x)
 
   let manager_operation = step_cost @@ S.safe_int 1_000
+
+  let baker_operation = step_cost @@ S.safe_int 1_000
 
   (* FIXME: hardcoded constant, available in next environment version.
      Set to a reasonable upper bound. *)
@@ -569,6 +575,12 @@ module Cost_of = struct
     (* model B58CHECK_DECODING_PUBLIC_KEY_HASH_secp256k1 *)
     let cost_B58CHECK_DECODING_PUBLIC_KEY_HASH_secp256k1 = S.safe_int 3_300
 
+    (* model B58CHECK_DECODING_BAKER_HASH *)
+    let cost_B58CHECK_DECODING_BAKER_HASH = S.safe_int 2_500
+
+    (* model B58CHECK_DECODING_PVSS_KEY *)
+    let cost_B58CHECK_DECODING_PVSS_KEY = S.safe_int 8_600
+
     (* model B58CHECK_DECODING_PUBLIC_KEY_ed25519 *)
     let cost_B58CHECK_DECODING_PUBLIC_KEY_ed25519 = S.safe_int 4_300
 
@@ -611,6 +623,12 @@ module Cost_of = struct
     (* model B58CHECK_ENCODING_PUBLIC_KEY_HASH_secp256k1 *)
     let cost_B58CHECK_ENCODING_PUBLIC_KEY_HASH_secp256k1 = S.safe_int 3_300
 
+    (* model B58CHECK_ENCODING_BAKER_HASH *)
+    let cost_B58CHECK_ENCODING_BAKER_HASH = S.safe_int 3_000
+
+    (* model B58CHECK_ENCODING_PVSS_KEY *)
+    let cost_B58CHECK_ENCODING_PVSS_KEY = S.safe_int 9_300
+
     (* model B58CHECK_ENCODING_PUBLIC_KEY_ed25519 *)
     let cost_B58CHECK_ENCODING_PUBLIC_KEY_ed25519 = S.safe_int 4_500
 
@@ -641,6 +659,16 @@ module Cost_of = struct
     (* model DECODING_PUBLIC_KEY_HASH_secp256k1 *)
     let cost_DECODING_PUBLIC_KEY_HASH_secp256k1 = S.safe_int 60
 
+    (* model DECODING_BAKER_HASH *)
+    let cost_DECODING_BAKER_HASH = S.safe_int 30
+
+    (* model DECODING_PVSS_KEY *)
+    let cost_DECODING_PVSS_KEY =
+      (* This high cost likely stems from mistakenly using the base58
+         encoding instead of the optimized one in the environment.
+         To be fixed. *)
+      S.safe_int 5200
+
     (* model DECODING_PUBLIC_KEY_ed25519 *)
     let cost_DECODING_PUBLIC_KEY_ed25519 = S.safe_int 60
 
@@ -670,6 +698,12 @@ module Cost_of = struct
 
     (* model ENCODING_PUBLIC_KEY_HASH_secp256k1 *)
     let cost_ENCODING_PUBLIC_KEY_HASH_secp256k1 = S.safe_int 70
+
+    (* model ENCODING_BAKER_HASH *)
+    let cost_ENCODING_BAKER_HASH = S.safe_int 35
+
+    (* model ENCODING_PVSS_KEY *)
+    let cost_ENCODING_PVSS_KEY = S.safe_int 5_000
 
     (* model ENCODING_PUBLIC_KEY_ed25519 *)
     let cost_ENCODING_PUBLIC_KEY_ed25519 = S.safe_int 80
@@ -1071,6 +1105,10 @@ module Cost_of = struct
 
     let compare_key = atomic_step_cost (S.safe_int 92)
 
+    let compare_baker_hash = atomic_step_cost (S.safe_int 92)
+
+    let compare_pvss_key = atomic_step_cost (S.safe_int 92)
+
     let compare_timestamp t1 t2 =
       atomic_step_cost
         (cost_N_Compare_timestamp
@@ -1109,6 +1147,10 @@ module Cost_of = struct
           compare_key_hash
       | Key_key _ ->
           compare_key
+      | Baker_hash_key _ ->
+          compare_baker_hash
+      | Pvss_key_key _ ->
+          compare_pvss_key
       | Timestamp_key _ ->
           compare_timestamp x y
       | Address_key _ ->
@@ -1268,6 +1310,26 @@ module Cost_of = struct
       ticket +@ compare_address
       +@ add_bigint ticket_a.amount ticket_b.amount
       +@ compare ty ticket_a.contents ticket_b.contents
+
+    (* Read access to /votes/current_period
+       We neglect interpretation costs. *)
+    let submit_proposals =
+      Gas.cost_of_repr
+      @@ Storage_costs.read_access ~path_length:2 ~read_bytes:8
+
+    (* Read access to /votes/current_period
+       We neglect interpretation costs. *)
+    let submit_ballot =
+      Gas.cost_of_repr
+      @@ Storage_costs.read_access ~path_length:2 ~read_bytes:8
+
+    let set_baker_active = Gas.(push +@ push)
+
+    let set_baker_consensus_key = Gas.(push +@ push)
+
+    let set_baker_pvss_key = Gas.(push +@ push)
+
+    let toggle_baker_delegations = Gas.(push +@ push)
   end
 
   module Typechecking = struct
@@ -1308,6 +1370,15 @@ module Cost_of = struct
              (max
                 cost_B58CHECK_DECODING_PUBLIC_KEY_HASH_secp256k1
                 cost_B58CHECK_DECODING_PUBLIC_KEY_HASH_p256))
+
+    let baker_hash_optimized = atomic_step_cost cost_DECODING_BAKER_HASH
+
+    let baker_hash_readable =
+      atomic_step_cost cost_B58CHECK_DECODING_BAKER_HASH
+
+    let pvss_key_optimized = atomic_step_cost cost_DECODING_PVSS_KEY
+
+    let pvss_key_readable = atomic_step_cost cost_B58CHECK_DECODING_PVSS_KEY
 
     let signature_optimized =
       atomic_step_cost
@@ -1422,6 +1493,15 @@ module Cost_of = struct
              (max
                 cost_B58CHECK_ENCODING_PUBLIC_KEY_HASH_secp256k1
                 cost_B58CHECK_ENCODING_PUBLIC_KEY_HASH_p256))
+
+    let baker_hash_optimized = atomic_step_cost cost_ENCODING_BAKER_HASH
+
+    let baker_hash_readable =
+      atomic_step_cost cost_B58CHECK_ENCODING_BAKER_HASH
+
+    let pvss_key_optimized = atomic_step_cost cost_ENCODING_PVSS_KEY
+
+    let pvss_key_readable = atomic_step_cost cost_B58CHECK_ENCODING_PVSS_KEY
 
     let signature_optimized =
       atomic_step_cost

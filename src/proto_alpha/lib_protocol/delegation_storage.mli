@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,36 +24,25 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Reading the current delegate of a contract. *)
+val get :
+  Raw_context.t -> Contract_repr.t -> Baker_hash.t option tzresult Lwt.t
+
+(** Updating the delegate of a contract.
+
+    Fails with [No_baker_delegation] when trying to update the delegate of a
+    "baker contract". One cannot unregister or re-delegate a baker. *)
+val set :
+  Raw_context.t ->
+  Contract_repr.t ->
+  Baker_hash.t option ->
+  Raw_context.t tzresult Lwt.t
+
 type error +=
-  | Too_late_revelation
-  | Too_early_revelation
-  | Previously_revealed_nonce
-  | Unexpected_nonce
-
-type t = Seed_repr.nonce
-
-type nonce = t
-
-val encoding : nonce Data_encoding.t
-
-type unrevealed = Storage.Seed.unrevealed_nonce = {
-  nonce_hash : Nonce_hash.t;
-  baker : Baker_hash.t;
-  rewards : Tez_repr.t;
-  fees : Tez_repr.t;
-}
-
-type status = Unrevealed of unrevealed | Revealed of Seed_repr.nonce
-
-val get : Raw_context.t -> Level_repr.t -> status tzresult Lwt.t
-
-val record_hash : Raw_context.t -> unrevealed -> Raw_context.t tzresult Lwt.t
-
-val reveal :
-  Raw_context.t -> Level_repr.t -> nonce -> Raw_context.t tzresult Lwt.t
-
-val of_bytes : bytes -> nonce tzresult
-
-val hash : nonce -> Nonce_hash.t
-
-val check_hash : nonce -> Nonce_hash.t -> bool
+  | (* `Permanent *) No_baker_delegation of Baker_hash.t
+  | (* `Temporary *)
+      Current_delegate
+  | (* `Temporary *)
+      Inactive_baker of Baker_hash.t
+  | (* `Temporary *)
+      Baker_declines_delegations of Baker_hash.t

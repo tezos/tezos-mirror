@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -46,6 +47,15 @@ let error_encoding =
 
 let trace_encoding = make_trace_encoding error_encoding
 
+type origination_result = {
+  lazy_storage_diff : Lazy_storage.diffs option;
+  balance_updates : Receipt.balance_updates;
+  originated_contracts : Contract.t list;
+  consumed_gas : Gas.Arith.fp;
+  storage_size : Z.t;
+  paid_storage_size_diff : Z.t;
+}
+
 type _ successful_manager_operation_result =
   | Reveal_result : {
       consumed_gas : Gas.Arith.fp;
@@ -62,46 +72,154 @@ type _ successful_manager_operation_result =
       allocated_destination_contract : bool;
     }
       -> Kind.transaction successful_manager_operation_result
-  | Origination_result : {
-      lazy_storage_diff : Lazy_storage.diffs option;
-      balance_updates : Receipt.balance_updates;
-      originated_contracts : Contract.t list;
-      consumed_gas : Gas.Arith.fp;
-      storage_size : Z.t;
-      paid_storage_size_diff : Z.t;
-    }
+  | Origination_legacy_result :
+      origination_result
+      -> Kind.origination_legacy successful_manager_operation_result
+  | Origination_result :
+      origination_result
       -> Kind.origination successful_manager_operation_result
+  | Delegation_legacy_result : {
+      consumed_gas : Gas.Arith.fp;
+    }
+      -> Kind.delegation_legacy successful_manager_operation_result
   | Delegation_result : {
       consumed_gas : Gas.Arith.fp;
     }
       -> Kind.delegation successful_manager_operation_result
+  | Baker_registration_result : {
+      balance_updates : Receipt.balance_updates;
+      registered_baker : Baker_hash.t;
+      consumed_gas : Gas.Arith.fp;
+      storage_size : Z.t;
+      paid_storage_size_diff : Z.t;
+    }
+      -> Kind.baker_registration successful_manager_operation_result
+
+type _ successful_baker_operation_result =
+  | Baker_proposals_result : {
+      consumed_gas : Gas.Arith.fp;
+    }
+      -> Kind.proposals successful_baker_operation_result
+  | Baker_ballot_result : {
+      consumed_gas : Gas.Arith.fp;
+    }
+      -> Kind.ballot successful_baker_operation_result
+  | Set_baker_active_result : {
+      active : bool;
+      consumed_gas : Gas.Arith.fp;
+    }
+      -> Kind.set_baker_active successful_baker_operation_result
+  | Toggle_baker_delegations_result : {
+      accept : bool;
+      consumed_gas : Gas.Arith.fp;
+    }
+      -> Kind.toggle_baker_delegations successful_baker_operation_result
+  | Set_baker_consensus_key_result : {
+      consumed_gas : Gas.Arith.fp;
+    }
+      -> Kind.set_baker_consensus_key successful_baker_operation_result
+  | Set_baker_pvss_key_result : {
+      consumed_gas : Gas.Arith.fp;
+    }
+      -> Kind.set_baker_pvss_key successful_baker_operation_result
 
 type packed_successful_manager_operation_result =
   | Successful_manager_result :
       'kind successful_manager_operation_result
       -> packed_successful_manager_operation_result
 
-type 'kind manager_operation_result =
-  | Applied of 'kind successful_manager_operation_result
-  | Backtracked of
-      'kind successful_manager_operation_result * error trace option
-  | Failed : 'kind Kind.manager * error trace -> 'kind manager_operation_result
-  | Skipped : 'kind Kind.manager -> 'kind manager_operation_result
+type packed_successful_baker_operation_result =
+  | Successful_baker_result :
+      'kind successful_baker_operation_result
+      -> packed_successful_baker_operation_result
 
-type packed_internal_operation_result =
-  | Internal_operation_result :
-      'kind internal_operation * 'kind manager_operation_result
+type ('kind, 'successful_result) internal_operation_result =
+  | Applied of 'successful_result
+  | Backtracked of 'successful_result * error trace option
+  | Failed :
+      'kind * error trace
+      -> ('kind, 'successful_result) internal_operation_result
+  | Skipped : 'kind -> ('kind, 'successful_result) internal_operation_result
+
+type 'kind manager_operation_result =
+  ( 'kind Kind.manager,
+    'kind successful_manager_operation_result )
+  internal_operation_result
+
+type 'kind baker_operation_result =
+  ( 'kind Kind.baker,
+    'kind successful_baker_operation_result )
+  internal_operation_result
+
+and packed_internal_operation_result =
+  | Internal_manager_operation_result :
+      'kind internal_manager_operation * 'kind manager_operation_result
       -> packed_internal_operation_result
+  | Internal_baker_operation_result :
+      'kind internal_baker_operation * 'kind baker_operation_result
+      -> packed_internal_operation_result
+
+let make_internal_operation_case ~name ~result_encoding ~kind ~select ~proj
+    ~inj =
+  def (Format.asprintf "operation.alpha.operation_result.%s" name)
+  @@ union
+       ~tag_size:`Uint8
+       [ case
+           (Tag 0)
+           ~title:"Applied"
+           (merge_objs
+              (obj1 (req "status" (constant "applied")))
+              result_encoding)
+           (fun o ->
+             match o with
+             | Skipped _ | Failed _ | Backtracked _ ->
+                 None
+             | Applied o -> (
+               match select o with None -> None | Some o -> Some ((), proj o) ))
+           (fun ((), x) -> Applied (inj x));
+         case
+           (Tag 1)
+           ~title:"Failed"
+           (obj2
+              (req "status" (constant "failed"))
+              (req "errors" trace_encoding))
+           (function Failed (_, errs) -> Some ((), errs) | _ -> None)
+           (fun ((), errs) -> Failed (kind, errs));
+         case
+           (Tag 2)
+           ~title:"Skipped"
+           (obj1 (req "status" (constant "skipped")))
+           (function Skipped _ -> Some () | _ -> None)
+           (fun () -> Skipped kind);
+         case
+           (Tag 3)
+           ~title:"Backtracked"
+           (merge_objs
+              (obj2
+                 (req "status" (constant "backtracked"))
+                 (opt "errors" trace_encoding))
+              result_encoding)
+           (fun o ->
+             match o with
+             | Skipped _ | Failed _ | Applied _ ->
+                 None
+             | Backtracked (o, errs) -> (
+               match select o with
+               | None ->
+                   None
+               | Some o ->
+                   Some (((), errs), proj o) ))
+           (fun (((), errs), x) -> Backtracked (inj x, errs)) ]
 
 module Manager_result = struct
   type 'kind case =
     | MCase : {
         op_case : 'kind Operation.Encoding.Manager_operations.case;
-        encoding : 'a Data_encoding.t;
         kind : 'kind Kind.manager;
         iselect :
           packed_internal_operation_result ->
-          ('kind internal_operation * 'kind manager_operation_result) option;
+          ('kind internal_manager_operation * 'kind manager_operation_result)
+          option;
         select :
           packed_successful_manager_operation_result ->
           'kind successful_manager_operation_result option;
@@ -111,62 +229,23 @@ module Manager_result = struct
       }
         -> 'kind case
 
-  let make ~op_case ~encoding ~kind ~iselect ~select ~proj ~inj =
+  let make (type kind) ?(legacy = false)
+      ~(op_case : kind Operation.Encoding.Manager_operations.case) ~encoding
+      ~kind ~iselect ~select ~proj ~inj () =
     let (Operation.Encoding.Manager_operations.MCase {name; _}) = op_case in
-    let t =
-      def (Format.asprintf "operation.alpha.operation_result.%s" name)
-      @@ union
-           ~tag_size:`Uint8
-           [ case
-               (Tag 0)
-               ~title:"Applied"
-               (merge_objs (obj1 (req "status" (constant "applied"))) encoding)
-               (fun o ->
-                 match o with
-                 | Skipped _ | Failed _ | Backtracked _ ->
-                     None
-                 | Applied o -> (
-                   match select (Successful_manager_result o) with
-                   | None ->
-                       None
-                   | Some o ->
-                       Some ((), proj o) ))
-               (fun ((), x) -> Applied (inj x));
-             case
-               (Tag 1)
-               ~title:"Failed"
-               (obj2
-                  (req "status" (constant "failed"))
-                  (req "errors" trace_encoding))
-               (function Failed (_, errs) -> Some ((), errs) | _ -> None)
-               (fun ((), errs) -> Failed (kind, errs));
-             case
-               (Tag 2)
-               ~title:"Skipped"
-               (obj1 (req "status" (constant "skipped")))
-               (function Skipped _ -> Some () | _ -> None)
-               (fun () -> Skipped kind);
-             case
-               (Tag 3)
-               ~title:"Backtracked"
-               (merge_objs
-                  (obj2
-                     (req "status" (constant "backtracked"))
-                     (opt "errors" trace_encoding))
-                  encoding)
-               (fun o ->
-                 match o with
-                 | Skipped _ | Failed _ | Applied _ ->
-                     None
-                 | Backtracked (o, errs) -> (
-                   match select (Successful_manager_result o) with
-                   | None ->
-                       None
-                   | Some o ->
-                       Some (((), errs), proj o) ))
-               (fun (((), errs), x) -> Backtracked (inj x, errs)) ]
+    (* The name has to be different for legacy operations to avoid
+       "Duplicate definition" error *)
+    let name = if legacy then name ^ ".legacy" else name in
+    let t : kind manager_operation_result Data_encoding.t =
+      make_internal_operation_case
+        ~name
+        ~result_encoding:encoding
+        ~kind
+        ~select:(fun x -> select (Successful_manager_result x))
+        ~proj
+        ~inj
     in
-    MCase {op_case; encoding; kind; iselect; select; proj; inj; t}
+    MCase {op_case; kind; iselect; select; proj; inj; t}
 
   let reveal_case =
     make
@@ -177,7 +256,8 @@ module Manager_result = struct
             (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
       ~iselect:(function
-        | Internal_operation_result (({operation = Reveal _; _} as op), res) ->
+        | Internal_manager_operation_result
+            (({operation = Reveal _; _} as op), res) ->
             Some (op, res)
         | _ ->
             None)
@@ -193,6 +273,7 @@ module Manager_result = struct
       ~inj:(fun (consumed_gas, consumed_milligas) ->
         assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
         Reveal_result {consumed_gas = consumed_milligas})
+      ()
 
   let transaction_case =
     make
@@ -215,7 +296,7 @@ module Manager_result = struct
            (dft "allocated_destination_contract" bool false)
            (opt "lazy_storage_diff" Lazy_storage.encoding))
       ~iselect:(function
-        | Internal_operation_result
+        | Internal_manager_operation_result
             (({operation = Transaction _; _} as op), res) ->
             Some (op, res)
         | _ ->
@@ -272,27 +353,86 @@ module Manager_result = struct
             paid_storage_size_diff;
             allocated_destination_contract;
           })
+      ()
+
+  let origination_result_encoding =
+    conv
+      (fun { lazy_storage_diff;
+             balance_updates;
+             originated_contracts;
+             consumed_gas;
+             storage_size;
+             paid_storage_size_diff } ->
+        ( lazy_storage_diff,
+          balance_updates,
+          originated_contracts,
+          Gas.Arith.ceil consumed_gas,
+          consumed_gas,
+          storage_size,
+          paid_storage_size_diff,
+          lazy_storage_diff ))
+      (fun ( legacy_lazy_storage_diff,
+             balance_updates,
+             originated_contracts,
+             consumed_gas,
+             consumed_milligas,
+             storage_size,
+             paid_storage_size_diff,
+             lazy_storage_diff ) ->
+        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
+        let lazy_storage_diff =
+          Option.either lazy_storage_diff legacy_lazy_storage_diff
+        in
+        {
+          lazy_storage_diff;
+          balance_updates;
+          originated_contracts;
+          consumed_gas = consumed_milligas;
+          storage_size;
+          paid_storage_size_diff;
+        })
+      (obj8
+         (opt
+            (* The field [big_map_diff] is deprecated since 008, use [lazy_storage_diff] instead.
+      Is it kept here for a transition period, for tool like indexers to update.
+      TODO(010): remove it. *)
+            "big_map_diff"
+            Lazy_storage.legacy_big_map_diff_encoding)
+         (dft "balance_updates" Receipt.balance_updates_encoding [])
+         (dft "originated_contracts" (list Contract.encoding) [])
+         (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
+         (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
+         (dft "storage_size" z Z.zero)
+         (dft "paid_storage_size_diff" z Z.zero)
+         (opt "lazy_storage_diff" Lazy_storage.encoding))
+
+  let origination_legacy_case =
+    make
+      ~legacy:true
+      ~op_case:Operation.Encoding.Manager_operations.origination_legacy_case
+      ~encoding:origination_result_encoding
+      ~iselect:(function
+        | Internal_manager_operation_result
+            (({operation = Origination_legacy _; _} as op), res) ->
+            Some (op, res)
+        | _ ->
+            None)
+      ~select:(function
+        | Successful_manager_result (Origination_legacy_result _ as op) ->
+            Some op
+        | _ ->
+            None)
+      ~proj:(function Origination_legacy_result res -> res)
+      ~kind:Kind.Origination_legacy_manager_kind
+      ~inj:(fun res -> Origination_legacy_result res)
+      ()
 
   let origination_case =
     make
       ~op_case:Operation.Encoding.Manager_operations.origination_case
-      ~encoding:
-        (obj8
-           (opt
-              (* The field [big_map_diff] is deprecated since 008, use [lazy_storage_diff] instead.
-                 Is it kept here for a transition period, for tool like indexers to update.
-                 TODO(009): remove it. *)
-              "big_map_diff"
-              Lazy_storage.legacy_big_map_diff_encoding)
-           (dft "balance_updates" Receipt.balance_updates_encoding [])
-           (dft "originated_contracts" (list Contract.encoding) [])
-           (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
-           (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
-           (dft "storage_size" z Z.zero)
-           (dft "paid_storage_size_diff" z Z.zero)
-           (opt "lazy_storage_diff" Lazy_storage.encoding))
+      ~encoding:origination_result_encoding
       ~iselect:(function
-        | Internal_operation_result
+        | Internal_manager_operation_result
             (({operation = Origination _; _} as op), res) ->
             Some (op, res)
         | _ ->
@@ -302,45 +442,39 @@ module Manager_result = struct
             Some op
         | _ ->
             None)
-      ~proj:(function
-        | Origination_result
-            { lazy_storage_diff;
-              balance_updates;
-              originated_contracts;
-              consumed_gas;
-              storage_size;
-              paid_storage_size_diff } ->
-            ( lazy_storage_diff,
-              balance_updates,
-              originated_contracts,
-              Gas.Arith.ceil consumed_gas,
-              consumed_gas,
-              storage_size,
-              paid_storage_size_diff,
-              lazy_storage_diff ))
+      ~proj:(function Origination_result res -> res)
       ~kind:Kind.Origination_manager_kind
-      ~inj:
-        (fun ( legacy_lazy_storage_diff,
-               balance_updates,
-               originated_contracts,
-               consumed_gas,
-               consumed_milligas,
-               storage_size,
-               paid_storage_size_diff,
-               lazy_storage_diff ) ->
+      ~inj:(fun res -> Origination_result res)
+      ()
+
+  let delegation_legacy_case =
+    make
+      ~legacy:true
+      ~op_case:Operation.Encoding.Manager_operations.delegation_legacy_case
+      ~encoding:
+        Data_encoding.(
+          obj2
+            (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
+            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
+      ~iselect:(function
+        | Internal_manager_operation_result
+            (({operation = Delegation_legacy _; _} as op), res) ->
+            Some (op, res)
+        | _ ->
+            None)
+      ~select:(function
+        | Successful_manager_result (Delegation_legacy_result _ as op) ->
+            Some op
+        | _ ->
+            None)
+      ~kind:Kind.Delegation_legacy_manager_kind
+      ~proj:(function
+        | Delegation_legacy_result {consumed_gas} ->
+            (Gas.Arith.ceil consumed_gas, consumed_gas))
+      ~inj:(fun (consumed_gas, consumed_milligas) ->
         assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
-        let lazy_storage_diff =
-          Option.either lazy_storage_diff legacy_lazy_storage_diff
-        in
-        Origination_result
-          {
-            lazy_storage_diff;
-            balance_updates;
-            originated_contracts;
-            consumed_gas = consumed_milligas;
-            storage_size;
-            paid_storage_size_diff;
-          })
+        Delegation_legacy_result {consumed_gas = consumed_milligas})
+      ()
 
   let delegation_case =
     make
@@ -351,8 +485,8 @@ module Manager_result = struct
             (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
       ~iselect:(function
-        | Internal_operation_result (({operation = Delegation _; _} as op), res)
-          ->
+        | Internal_manager_operation_result
+            (({operation = Delegation _; _} as op), res) ->
             Some (op, res)
         | _ ->
             None)
@@ -368,45 +502,353 @@ module Manager_result = struct
       ~inj:(fun (consumed_gas, consumed_milligas) ->
         assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
         Delegation_result {consumed_gas = consumed_milligas})
+      ()
+
+  let baker_registration_case =
+    make
+      ~op_case:Operation.Encoding.Manager_operations.baker_registration_case
+      ~encoding:
+        (obj5
+           (dft "balance_updates" Receipt.balance_updates_encoding [])
+           (req "registered_baker" Baker_hash.encoding)
+           (dft "consumed_gas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
+           (dft "storage_size" z Z.zero)
+           (dft "paid_storage_size_diff" z Z.zero))
+      ~iselect:(function
+        | Internal_manager_operation_result
+            (({operation = Baker_registration _; _} as op), res) ->
+            Some (op, res)
+        | _ ->
+            None)
+      ~select:(function
+        | Successful_manager_result (Baker_registration_result _ as op) ->
+            Some op
+        | _ ->
+            None)
+      ~proj:(function
+        | Baker_registration_result
+            { balance_updates;
+              registered_baker;
+              consumed_gas;
+              storage_size;
+              paid_storage_size_diff } ->
+            ( balance_updates,
+              registered_baker,
+              consumed_gas,
+              storage_size,
+              paid_storage_size_diff ))
+      ~kind:Kind.Baker_registration_manager_kind
+      ~inj:
+        (fun ( balance_updates,
+               registered_baker,
+               consumed_gas,
+               storage_size,
+               paid_storage_size_diff ) ->
+        Baker_registration_result
+          {
+            balance_updates;
+            registered_baker;
+            consumed_gas;
+            storage_size;
+            paid_storage_size_diff;
+          })
+      ()
+
+  let encoding =
+    let make_manager (type kind) (MCase res_case : kind case) =
+      let (Operation.Encoding.Manager_operations.MCase op_case) =
+        res_case.op_case
+      in
+      case
+        (Tag op_case.tag)
+        ~title:op_case.name
+        (merge_objs
+           (obj3
+              (req "kind" (constant op_case.name))
+              (req "source" Contract.encoding)
+              (req "nonce" uint16))
+           (merge_objs op_case.encoding (obj1 (req "result" res_case.t))))
+        (fun op ->
+          match res_case.iselect op with
+          | Some (op, res) ->
+              Some (((), op.source, op.nonce), (op_case.proj op.operation, res))
+          | None ->
+              None)
+        (fun (((), source, nonce), (op, res)) ->
+          let op = {source; operation = op_case.inj op; nonce} in
+          Internal_manager_operation_result (op, res))
+    in
+    def "operation.alpha.internal_manager_operation_result"
+    @@ union
+         [ make_manager reveal_case;
+           make_manager transaction_case;
+           make_manager origination_legacy_case;
+           make_manager origination_case;
+           make_manager delegation_legacy_case;
+           make_manager delegation_case;
+           make_manager baker_registration_case ]
 end
+
+module Baker_result = struct
+  type 'kind case =
+    | BCase : {
+        op_case : 'kind Operation.Encoding.Baker_operations.case;
+        kind : 'kind Kind.baker;
+        iselect :
+          packed_internal_operation_result ->
+          ('kind internal_baker_operation * 'kind baker_operation_result)
+          option;
+        select :
+          packed_successful_baker_operation_result ->
+          'kind successful_baker_operation_result option;
+        proj : 'kind successful_baker_operation_result -> 'a;
+        inj : 'a -> 'kind successful_baker_operation_result;
+        t : 'kind baker_operation_result Data_encoding.t;
+      }
+        -> 'kind case
+
+  let make (type kind)
+      ~(op_case : kind Operation.Encoding.Baker_operations.case) ~encoding
+      ~kind ~iselect ~select ~proj ~inj =
+    let (Operation.Encoding.Baker_operations.BCase {name; _}) = op_case in
+    let t : kind baker_operation_result Data_encoding.t =
+      make_internal_operation_case
+        ~name
+        ~result_encoding:encoding
+        ~kind
+        ~select:(fun x -> select (Successful_baker_result x))
+        ~proj
+        ~inj
+    in
+    BCase {op_case; kind; iselect; select; proj; inj; t}
+
+  let baker_proposals_case =
+    make
+      ~op_case:Operation.Encoding.Baker_operations.baker_proposals_case
+      ~encoding:
+        Data_encoding.(
+          obj1 (dft "consumed_gas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
+      ~iselect:(function
+        | Internal_baker_operation_result
+            (({operation = Baker_proposals _; _} as op), res) ->
+            Some (op, res)
+        | _ ->
+            None)
+      ~select:(function
+        | Successful_baker_result (Baker_proposals_result _ as op) ->
+            Some op
+        | _ ->
+            None)
+      ~proj:(function Baker_proposals_result {consumed_gas} -> consumed_gas)
+      ~kind:Kind.Baker_proposals_kind
+      ~inj:(fun consumed_gas -> Baker_proposals_result {consumed_gas})
+
+  let baker_ballot_case =
+    make
+      ~op_case:Operation.Encoding.Baker_operations.baker_ballot_case
+      ~encoding:
+        Data_encoding.(
+          obj1 (dft "consumed_gas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
+      ~iselect:(function
+        | Internal_baker_operation_result
+            (({operation = Baker_ballot _; _} as op), res) ->
+            Some (op, res)
+        | _ ->
+            None)
+      ~select:(function
+        | Successful_baker_result (Baker_ballot_result _ as op) ->
+            Some op
+        | _ ->
+            None)
+      ~proj:(function Baker_ballot_result {consumed_gas} -> consumed_gas)
+      ~kind:Kind.Baker_ballot_kind
+      ~inj:(fun consumed_gas -> Baker_ballot_result {consumed_gas})
+
+  let set_baker_active_case =
+    make
+      ~op_case:Operation.Encoding.Baker_operations.set_baker_active_case
+      ~encoding:
+        Data_encoding.(
+          obj2
+            (req "active" bool)
+            (dft "consumed_gas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
+      ~iselect:(function
+        | Internal_baker_operation_result
+            (({operation = Set_baker_active _; _} as op), res) ->
+            Some (op, res)
+        | _ ->
+            None)
+      ~select:(function
+        | Successful_baker_result (Set_baker_active_result _ as op) ->
+            Some op
+        | _ ->
+            None)
+      ~proj:(function
+        | Set_baker_active_result {active; consumed_gas} ->
+            (active, consumed_gas))
+      ~kind:Kind.Set_baker_active_baker_kind
+      ~inj:(fun (active, consumed_gas) ->
+        Set_baker_active_result {active; consumed_gas})
+
+  let toggle_baker_delegations_case =
+    make
+      ~op_case:
+        Operation.Encoding.Baker_operations.toggle_baker_delegations_case
+      ~encoding:
+        Data_encoding.(
+          obj2
+            (req "accept" bool)
+            (dft "consumed_gas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
+      ~iselect:(function
+        | Internal_baker_operation_result
+            (({operation = Toggle_baker_delegations _; _} as op), res) ->
+            Some (op, res)
+        | _ ->
+            None)
+      ~select:(function
+        | Successful_baker_result (Toggle_baker_delegations_result _ as op) ->
+            Some op
+        | _ ->
+            None)
+      ~proj:(function
+        | Toggle_baker_delegations_result {accept; consumed_gas} ->
+            (accept, consumed_gas))
+      ~kind:Kind.Toggle_baker_delegations_baker_kind
+      ~inj:(fun (accept, consumed_gas) ->
+        Toggle_baker_delegations_result {accept; consumed_gas})
+
+  let set_baker_consensus_key_case =
+    make
+      ~op_case:Operation.Encoding.Baker_operations.set_baker_consensus_key_case
+      ~encoding:
+        Data_encoding.(
+          obj1 (dft "consumed_gas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
+      ~iselect:(function
+        | Internal_baker_operation_result
+            (({operation = Set_baker_consensus_key _; _} as op), res) ->
+            Some (op, res)
+        | _ ->
+            None)
+      ~select:(function
+        | Successful_baker_result (Set_baker_consensus_key_result _ as op) ->
+            Some op
+        | _ ->
+            None)
+      ~proj:(function
+        | Set_baker_consensus_key_result {consumed_gas} -> consumed_gas)
+      ~kind:Kind.Set_baker_consensus_key_baker_kind
+      ~inj:(fun consumed_gas -> Set_baker_consensus_key_result {consumed_gas})
+
+  let set_baker_pvss_key_case =
+    make
+      ~op_case:Operation.Encoding.Baker_operations.set_baker_pvss_key_case
+      ~encoding:
+        Data_encoding.(
+          obj1 (dft "consumed_gas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
+      ~iselect:(function
+        | Internal_baker_operation_result
+            (({operation = Set_baker_pvss_key _; _} as op), res) ->
+            Some (op, res)
+        | _ ->
+            None)
+      ~select:(function
+        | Successful_baker_result (Set_baker_pvss_key_result _ as op) ->
+            Some op
+        | _ ->
+            None)
+      ~proj:(function
+        | Set_baker_pvss_key_result {consumed_gas} -> consumed_gas)
+      ~kind:Kind.Set_baker_pvss_key_baker_kind
+      ~inj:(fun consumed_gas -> Set_baker_pvss_key_result {consumed_gas})
+
+  let encoding =
+    let make_baker (type kind) (BCase res_case : kind case) =
+      let (Operation.Encoding.Baker_operations.BCase op_case) =
+        res_case.op_case
+      in
+      case
+        (Tag op_case.tag)
+        ~title:op_case.name
+        (merge_objs
+           (obj3
+              (req "kind" (constant op_case.name))
+              (req "baker" Baker_hash.encoding)
+              (req "nonce" uint16))
+           (merge_objs op_case.encoding (obj1 (req "result" res_case.t))))
+        (fun op ->
+          match res_case.iselect op with
+          | Some (op, res) ->
+              Some (((), op.baker, op.nonce), (op_case.proj op.operation, res))
+          | None ->
+              None)
+        (fun (((), baker, nonce), (op, res)) ->
+          let op = {baker; operation = op_case.inj op; nonce} in
+          Internal_baker_operation_result (op, res))
+    in
+    def "operation.alpha.internal_baker_operation_result"
+    @@ union
+         [ make_baker baker_proposals_case;
+           make_baker baker_ballot_case;
+           make_baker set_baker_active_case;
+           make_baker toggle_baker_delegations_case;
+           make_baker set_baker_consensus_key_case;
+           make_baker set_baker_pvss_key_case ]
+end
+
+type 'a icase =
+  | ICase : {
+      tag : int;
+      name : string;
+      encoding : 'a Data_encoding.t;
+      select : 'a -> 'a option;
+    }
+      -> 'a icase
+
+let manager_case =
+  ICase
+    {
+      tag = 0;
+      name = "internal_manager_operation";
+      encoding = Manager_result.encoding;
+      select =
+        (function
+        | Internal_manager_operation_result _ as result ->
+            Some result
+        | _ ->
+            None);
+    }
+
+let baker_case =
+  ICase
+    {
+      tag = 1;
+      name = "internal_baker_operation";
+      encoding = Baker_result.encoding;
+      select =
+        (function
+        | Internal_baker_operation_result _ as result ->
+            Some result
+        | _ ->
+            None);
+    }
 
 let internal_operation_result_encoding :
     packed_internal_operation_result Data_encoding.t =
-  let make (type kind)
-      (Manager_result.MCase res_case : kind Manager_result.case) =
-    let (Operation.Encoding.Manager_operations.MCase op_case) =
-      res_case.op_case
-    in
-    case
-      (Tag op_case.tag)
-      ~title:op_case.name
-      (merge_objs
-         (obj3
-            (req "kind" (constant op_case.name))
-            (req "source" Contract.encoding)
-            (req "nonce" uint16))
-         (merge_objs op_case.encoding (obj1 (req "result" res_case.t))))
-      (fun op ->
-        match res_case.iselect op with
-        | Some (op, res) ->
-            Some (((), op.source, op.nonce), (op_case.proj op.operation, res))
-        | None ->
-            None)
-      (fun (((), source, nonce), (op, res)) ->
-        let op = {source; operation = op_case.inj op; nonce} in
-        Internal_operation_result (op, res))
+  let make (ICase {tag; name; encoding; select}) =
+    Data_encoding.case
+      (Tag tag)
+      ~title:name
+      encoding
+      (fun x -> match select x with None -> None | Some x -> Some x)
+      (fun x -> x)
   in
   def "operation.alpha.internal_operation_result"
-  @@ union
-       [ make Manager_result.reveal_case;
-         make Manager_result.transaction_case;
-         make Manager_result.origination_case;
-         make Manager_result.delegation_case ]
+  @@ union [make manager_case; make baker_case]
 
 type 'kind contents_result =
   | Endorsement_result : {
       balance_updates : Receipt.balance_updates;
-      delegate : Signature.Public_key_hash.t;
+      baker : Baker_hash.t;
       slots : int list;
     }
       -> Kind.endorsement contents_result
@@ -456,13 +898,28 @@ let equal_manager_kind :
       Some Eq
   | (Kind.Transaction_manager_kind, _) ->
       None
+  | (Kind.Origination_legacy_manager_kind, Kind.Origination_legacy_manager_kind)
+    ->
+      Some Eq
+  | (Kind.Origination_legacy_manager_kind, _) ->
+      None
   | (Kind.Origination_manager_kind, Kind.Origination_manager_kind) ->
       Some Eq
   | (Kind.Origination_manager_kind, _) ->
       None
+  | (Kind.Delegation_legacy_manager_kind, Kind.Delegation_legacy_manager_kind)
+    ->
+      Some Eq
+  | (Kind.Delegation_legacy_manager_kind, _) ->
+      None
   | (Kind.Delegation_manager_kind, Kind.Delegation_manager_kind) ->
       Some Eq
   | (Kind.Delegation_manager_kind, _) ->
+      None
+  | (Kind.Baker_registration_manager_kind, Kind.Baker_registration_manager_kind)
+    ->
+      Some Eq
+  | (Kind.Baker_registration_manager_kind, _) ->
       None
 
 module Encoding = struct
@@ -495,7 +952,7 @@ module Encoding = struct
         encoding =
           obj3
             (req "balance_updates" Receipt.balance_updates_encoding)
-            (req "delegate" Signature.Public_key_hash.encoding)
+            (req "baker" Baker_hash.encoding)
             (req "slots" (list uint16));
         select =
           (function
@@ -508,11 +965,11 @@ module Encoding = struct
               None);
         proj =
           (function
-          | Endorsement_result {balance_updates; delegate; slots} ->
-              (balance_updates, delegate, slots));
+          | Endorsement_result {balance_updates; baker; slots} ->
+              (balance_updates, baker, slots));
         inj =
-          (fun (balance_updates, delegate, slots) ->
-            Endorsement_result {balance_updates; delegate; slots});
+          (fun (balance_updates, baker, slots) ->
+            Endorsement_result {balance_updates; baker; slots});
       }
 
   let seed_nonce_revelation_case =
@@ -544,7 +1001,7 @@ module Encoding = struct
         encoding =
           obj3
             (req "balance_updates" Receipt.balance_updates_encoding)
-            (req "delegate" Signature.Public_key_hash.encoding)
+            (req "baker" Baker_hash.encoding)
             (req "slots" (list uint16));
         select =
           (function
@@ -561,12 +1018,12 @@ module Encoding = struct
         proj =
           (function
           | Endorsement_with_slot_result
-              (Endorsement_result {balance_updates; delegate; slots}) ->
-              (balance_updates, delegate, slots));
+              (Endorsement_result {balance_updates; baker; slots}) ->
+              (balance_updates, baker, slots));
         inj =
-          (fun (balance_updates, delegate, slots) ->
+          (fun (balance_updates, baker, slots) ->
             Endorsement_with_slot_result
-              (Endorsement_result {balance_updates; delegate; slots}));
+              (Endorsement_result {balance_updates; baker; slots}));
       }
 
   let double_endorsement_evidence_case =
@@ -783,6 +1240,18 @@ module Encoding = struct
         | _ ->
             None)
 
+  let origination_legacy_case =
+    make_manager_case
+      Operation.Encoding.origination_legacy_case
+      Manager_result.origination_legacy_case
+      (function
+        | Contents_and_result
+            ( (Manager_operation {operation = Origination_legacy _; _} as op),
+              res ) ->
+            Some (op, res)
+        | _ ->
+            None)
+
   let origination_case =
     make_manager_case
       Operation.Encoding.origination_case
@@ -794,6 +1263,18 @@ module Encoding = struct
         | _ ->
             None)
 
+  let delegation_legacy_case =
+    make_manager_case
+      Operation.Encoding.delegation_legacy_case
+      Manager_result.delegation_legacy_case
+      (function
+        | Contents_and_result
+            ( (Manager_operation {operation = Delegation_legacy _; _} as op),
+              res ) ->
+            Some (op, res)
+        | _ ->
+            None)
+
   let delegation_case =
     make_manager_case
       Operation.Encoding.delegation_case
@@ -801,6 +1282,18 @@ module Encoding = struct
       (function
         | Contents_and_result
             ((Manager_operation {operation = Delegation _; _} as op), res) ->
+            Some (op, res)
+        | _ ->
+            None)
+
+  let baker_registration_case =
+    make_manager_case
+      Operation.Encoding.baker_registration_case
+      Manager_result.baker_registration_case
+      (function
+        | Contents_and_result
+            ( (Manager_operation {operation = Baker_registration _; _} as op),
+              res ) ->
             Some (op, res)
         | _ ->
             None)
@@ -834,8 +1327,11 @@ let contents_result_encoding =
          make ballot_case;
          make reveal_case;
          make transaction_case;
+         make origination_legacy_case;
          make origination_case;
-         make delegation_case ]
+         make delegation_legacy_case;
+         make delegation_case;
+         make baker_registration_case ]
 
 let contents_and_result_encoding =
   let open Encoding in
@@ -870,8 +1366,11 @@ let contents_and_result_encoding =
          make ballot_case;
          make reveal_case;
          make transaction_case;
+         make origination_legacy_case;
          make origination_case;
-         make delegation_case ]
+         make delegation_legacy_case;
+         make delegation_case;
+         make baker_registration_case ]
 
 type 'kind contents_result_list =
   | Single_result : 'kind contents_result -> 'kind contents_result_list
@@ -952,11 +1451,28 @@ let contents_and_result_list_encoding =
   in
   conv to_list of_list (Variable.list contents_and_result_encoding)
 
-type 'kind operation_metadata = {contents : 'kind contents_result_list}
+type mapped_key = {
+  consensus_key : Signature.Public_key_hash.t;
+  baker : Baker_hash.t;
+}
+
+type 'kind operation_metadata = {
+  contents : 'kind contents_result_list;
+  mapped_keys : mapped_key list;
+}
 
 type packed_operation_metadata =
   | Operation_metadata : 'kind operation_metadata -> packed_operation_metadata
   | No_operation_metadata : packed_operation_metadata
+
+let mapped_key_encoding =
+  def "mapped_key"
+  @@ conv
+       (fun {consensus_key; baker} -> (consensus_key, baker))
+       (fun (consensus_key, baker) -> {consensus_key; baker})
+  @@ obj2
+       (req "consensus_key" Signature.Public_key_hash.encoding)
+       (req "baker" Baker_hash.encoding)
 
 let operation_metadata_encoding =
   def "operation.alpha.result"
@@ -964,14 +1480,16 @@ let operation_metadata_encoding =
        [ case
            (Tag 0)
            ~title:"Operation_metadata"
-           contents_result_list_encoding
+           (obj2
+              (req "contents" contents_result_list_encoding)
+              (dft "mapped_keys" (list mapped_key_encoding) []))
            (function
-             | Operation_metadata {contents} ->
-                 Some (Contents_result_list contents)
+             | Operation_metadata {contents; mapped_keys} ->
+                 Some (Contents_result_list contents, mapped_keys)
              | _ ->
                  None)
-           (fun (Contents_result_list contents) ->
-             Operation_metadata {contents});
+           (fun (Contents_result_list contents, mapped_keys) ->
+             Operation_metadata {contents; mapped_keys});
          case
            (Tag 1)
            ~title:"No_operation_metadata"
@@ -1060,6 +1578,29 @@ let kind_equal :
       Some Eq
   | (Manager_operation {operation = Transaction _; _}, _) ->
       None
+  | ( Manager_operation {operation = Origination_legacy _; _},
+      Manager_operation_result
+        {operation_result = Applied (Origination_legacy_result _); _} ) ->
+      Some Eq
+  | ( Manager_operation {operation = Origination_legacy _; _},
+      Manager_operation_result
+        {operation_result = Backtracked (Origination_legacy_result _, _); _} )
+    ->
+      Some Eq
+  | ( Manager_operation {operation = Origination_legacy _; _},
+      Manager_operation_result
+        { operation_result =
+            Failed (Alpha_context.Kind.Origination_legacy_manager_kind, _);
+          _ } ) ->
+      Some Eq
+  | ( Manager_operation {operation = Origination_legacy _; _},
+      Manager_operation_result
+        { operation_result =
+            Skipped Alpha_context.Kind.Origination_legacy_manager_kind;
+          _ } ) ->
+      Some Eq
+  | (Manager_operation {operation = Origination_legacy _; _}, _) ->
+      None
   | ( Manager_operation {operation = Origination _; _},
       Manager_operation_result
         {operation_result = Applied (Origination_result _); _} ) ->
@@ -1081,6 +1622,29 @@ let kind_equal :
       Some Eq
   | (Manager_operation {operation = Origination _; _}, _) ->
       None
+  | ( Manager_operation {operation = Delegation_legacy _; _},
+      Manager_operation_result
+        {operation_result = Applied (Delegation_legacy_result _); _} ) ->
+      Some Eq
+  | ( Manager_operation {operation = Delegation_legacy _; _},
+      Manager_operation_result
+        {operation_result = Backtracked (Delegation_legacy_result _, _); _} )
+    ->
+      Some Eq
+  | ( Manager_operation {operation = Delegation_legacy _; _},
+      Manager_operation_result
+        { operation_result =
+            Failed (Alpha_context.Kind.Delegation_legacy_manager_kind, _);
+          _ } ) ->
+      Some Eq
+  | ( Manager_operation {operation = Delegation_legacy _; _},
+      Manager_operation_result
+        { operation_result =
+            Skipped Alpha_context.Kind.Delegation_legacy_manager_kind;
+          _ } ) ->
+      Some Eq
+  | (Manager_operation {operation = Delegation_legacy _; _}, _) ->
+      None
   | ( Manager_operation {operation = Delegation _; _},
       Manager_operation_result
         {operation_result = Applied (Delegation_result _); _} ) ->
@@ -1101,6 +1665,29 @@ let kind_equal :
           _ } ) ->
       Some Eq
   | (Manager_operation {operation = Delegation _; _}, _) ->
+      None
+  | ( Manager_operation {operation = Baker_registration _; _},
+      Manager_operation_result
+        {operation_result = Applied (Baker_registration_result _); _} ) ->
+      Some Eq
+  | ( Manager_operation {operation = Baker_registration _; _},
+      Manager_operation_result
+        {operation_result = Backtracked (Baker_registration_result _, _); _} )
+    ->
+      Some Eq
+  | ( Manager_operation {operation = Baker_registration _; _},
+      Manager_operation_result
+        { operation_result =
+            Failed (Alpha_context.Kind.Baker_registration_manager_kind, _);
+          _ } ) ->
+      Some Eq
+  | ( Manager_operation {operation = Baker_registration _; _},
+      Manager_operation_result
+        { operation_result =
+            Skipped Alpha_context.Kind.Baker_registration_manager_kind;
+          _ } ) ->
+      Some Eq
+  | (Manager_operation {operation = Baker_registration _; _}, _) ->
       None
 
 let rec kind_equal_list :
@@ -1193,9 +1780,10 @@ let operation_data_and_metadata_encoding =
        [ case
            (Tag 0)
            ~title:"Operation_with_metadata"
-           (obj2
+           (obj3
               (req "contents" (dynamic_size contents_and_result_list_encoding))
-              (opt "signature" Signature.encoding))
+              (opt "signature" Signature.encoding)
+              (dft "mapped_keys" (list mapped_key_encoding) []))
            (function
              | (Operation_data _, No_operation_metadata) ->
                  None
@@ -1208,11 +1796,12 @@ let operation_data_and_metadata_encoding =
                    Some
                      ( Contents_and_result_list
                          (pack_contents_list op.contents res.contents),
-                       op.signature ) ))
-           (fun (Contents_and_result_list contents, signature) ->
+                       op.signature,
+                       res.mapped_keys ) ))
+           (fun (Contents_and_result_list contents, signature, mapped_keys) ->
              let (op_contents, res_contents) = unpack_contents_list contents in
              ( Operation_data {contents = op_contents; signature},
-               Operation_metadata {contents = res_contents} ));
+               Operation_metadata {contents = res_contents; mapped_keys} ));
          case
            (Tag 1)
            ~title:"Operation_without_metadata"
@@ -1228,14 +1817,14 @@ let operation_data_and_metadata_encoding =
              (Operation_data {contents; signature}, No_operation_metadata)) ]
 
 type block_metadata = {
-  baker : Signature.Public_key_hash.t;
+  baker : Baker_hash.t;
   level : Level.compat_t;
   level_info : Level.t;
   voting_period_kind : Voting_period.kind;
   voting_period_info : Voting_period.info;
   nonce_hash : Nonce_hash.t option;
   consumed_gas : Gas.Arith.fp;
-  deactivated : Signature.Public_key_hash.t list;
+  deactivated : Baker_hash.t list;
   balance_updates : Receipt.balance_updates;
 }
 
@@ -1282,7 +1871,7 @@ let block_metadata_encoding =
            balance_updates;
          })
        (obj9
-          (req "baker" Signature.Public_key_hash.encoding)
+          (req "baker" Baker_hash.encoding)
           (req
              ~description:"This field is DEPRECATED: use level_info instead"
              "level"
@@ -1296,5 +1885,5 @@ let block_metadata_encoding =
           (req "voting_period_info" Voting_period.info_encoding)
           (req "nonce_hash" (option Nonce_hash.encoding))
           (req "consumed_gas" Gas.Arith.n_fp_encoding)
-          (req "deactivated" (list Signature.Public_key_hash.encoding))
+          (req "deactivated" (list Baker_hash.encoding))
           (req "balance_updates" Receipt.balance_updates_encoding))

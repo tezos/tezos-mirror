@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -113,6 +114,14 @@ module Contract = struct
          end))
          (Make_index (Contract_repr.Index))
 
+  module Indexed_context_008 =
+    Make_indexed_subcontext
+      (Make_subcontext (Ghost) (Raw_context)
+         (struct
+           let name = ["index"]
+         end))
+         (Make_index (Contract_repr.Index))
+
   let fold = Indexed_context.fold_keys
 
   let list = Indexed_context.keys
@@ -124,30 +133,30 @@ module Contract = struct
       end)
       (Tez_repr)
 
-  module Frozen_balance_index =
+  module Frozen_balance_index_008 =
     Make_indexed_subcontext
-      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+      (Make_subcontext (Ghost) (Indexed_context.Raw_context)
          (struct
            let name = ["frozen_balance"]
          end))
          (Make_index (Cycle_repr.Index))
 
-  module Frozen_deposits =
-    Frozen_balance_index.Make_map
+  module Frozen_deposits_008 =
+    Frozen_balance_index_008.Make_map
       (struct
         let name = ["deposits"]
       end)
       (Tez_repr)
 
-  module Frozen_fees =
-    Frozen_balance_index.Make_map
+  module Frozen_fees_008 =
+    Frozen_balance_index_008.Make_map
       (struct
         let name = ["fees"]
       end)
       (Tez_repr)
 
-  module Frozen_rewards =
-    Frozen_balance_index.Make_map
+  module Frozen_rewards_008 =
+    Frozen_balance_index_008.Make_map
       (struct
         let name = ["rewards"]
       end)
@@ -160,34 +169,41 @@ module Contract = struct
       end)
       (Manager_repr)
 
-  module Delegate =
-    Indexed_context.Make_map
-      (struct
-        let name = ["delegate"]
-      end)
-      (Signature.Public_key_hash)
-
-  module Inactive_delegate =
-    Indexed_context.Make_set
+  module Inactive_delegate_008 =
+    Indexed_context_008.Make_set
       (Registered)
       (struct
         let name = ["inactive_delegate"]
       end)
 
-  module Delegate_desactivation =
-    Indexed_context.Make_map
+  module Delegate_desactivation_008 =
+    Indexed_context_008.Make_map
       (struct
         let name = ["delegate_desactivation"]
       end)
       (Cycle_repr)
 
-  module Delegated =
+  module Delegated_008 =
     Make_data_set_storage
-      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+      (Make_subcontext (Ghost) (Indexed_context.Raw_context)
          (struct
            let name = ["delegated"]
          end))
          (Make_index (Contract_repr.Index))
+
+  module Delegate =
+    Indexed_context.Make_map
+      (struct
+        let name = ["delegate"]
+      end)
+      (Baker_hash)
+
+  module Delegate_008 =
+    Indexed_context_008.Make_map
+      (struct
+        let name = ["delegate"]
+      end)
+      (Signature.Public_key_hash)
 
   module Counter =
     Indexed_context.Make_map
@@ -799,34 +815,193 @@ module Sapling = struct
       (Raw_level_repr)
 end
 
-module Delegates =
-  Make_data_set_storage
-    (Make_subcontext (Registered) (Raw_context)
-       (struct
-         let name = ["delegates"]
-       end))
-       (Make_index (Signature.Public_key_hash))
-
-module Active_delegates_with_rolls =
-  Make_data_set_storage
-    (Make_subcontext (Registered) (Raw_context)
-       (struct
-         let name = ["active_delegates_with_rolls"]
-       end))
-       (Make_index (Signature.Public_key_hash))
-
-module Delegates_with_frozen_balance_index =
+module Delegates_with_frozen_balance_index_008 =
   Make_indexed_subcontext
-    (Make_subcontext (Registered) (Raw_context)
+    (Make_subcontext (Ghost) (Raw_context)
        (struct
          let name = ["delegates_with_frozen_balance"]
        end))
        (Make_index (Cycle_repr.Index))
 
-module Delegates_with_frozen_balance =
+module Delegates_008 =
   Make_data_set_storage
-    (Delegates_with_frozen_balance_index.Raw_context)
+    (Make_subcontext (Ghost) (Raw_context)
+       (struct
+         let name = ["delegates"]
+       end))
+       (Make_index (Signature.Public_key_hash))
+
+module Active_delegates_with_rolls_008 =
+  Make_data_set_storage
+    (Make_subcontext (Ghost) (Raw_context)
+       (struct
+         let name = ["active_delegates_with_rolls"]
+       end))
+       (Make_index (Signature.Public_key_hash))
+
+module Delegates_with_frozen_balance_008 =
+  Make_data_set_storage
+    (Delegates_with_frozen_balance_index_008.Raw_context)
     (Make_index (Signature.Public_key_hash))
+
+module Baker = struct
+  module Raw_context =
+    Make_subcontext (Registered) (Raw_context)
+      (struct
+        let name = ["baker"]
+      end)
+
+  module Indexed_context =
+    Make_indexed_subcontext
+      (Make_subcontext (Registered) (Raw_context)
+         (struct
+           let name = ["index"]
+         end))
+         (Make_index (Baker_hash))
+
+  module Registered =
+    Make_data_set_storage
+      (Make_subcontext (Storage_functors.Registered) (Raw_context)
+         (struct
+           let name = ["registered"]
+         end))
+         (Make_index (Baker_hash))
+
+  module Delegators =
+    Make_data_set_storage
+      (Make_subcontext
+         (Storage_functors.Registered)
+         (Indexed_context.Raw_context)
+         (struct
+           let name = ["delegators"]
+         end))
+         (Make_index (Contract_repr.Index))
+
+  module Active_with_rolls =
+    Make_data_set_storage
+      (Make_subcontext (Storage_functors.Registered) (Raw_context)
+         (struct
+           let name = ["active_with_rolls"]
+         end))
+         (Make_index (Baker_hash))
+
+  module With_frozen_balance_index =
+    Make_indexed_subcontext
+      (Make_subcontext (Storage_functors.Registered) (Raw_context)
+         (struct
+           let name = ["with_frozen_balance"]
+         end))
+         (Make_index (Cycle_repr.Index))
+
+  module With_frozen_balance =
+    Make_data_set_storage
+      (With_frozen_balance_index.Raw_context)
+      (Make_index (Baker_hash))
+
+  module Inactive =
+    Indexed_context.Make_set
+      (Storage_functors.Registered)
+      (struct
+        let name = ["inactive"]
+      end)
+
+  module Delegation_decliners =
+    Indexed_context.Make_set
+      (Storage_functors.Registered)
+      (struct
+        let name = ["Delegation_decliners"]
+      end)
+
+  module Deactivation =
+    Indexed_context.Make_map
+      (struct
+        let name = ["deactivation"]
+      end)
+      (Cycle_repr)
+
+  module Frozen_balance_index =
+    Make_indexed_subcontext
+      (Make_subcontext
+         (Storage_functors.Registered)
+         (Indexed_context.Raw_context)
+         (struct
+           let name = ["frozen_balance"]
+         end))
+         (Make_index (Cycle_repr.Index))
+
+  module Frozen_deposits =
+    Frozen_balance_index.Make_map
+      (struct
+        let name = ["deposits"]
+      end)
+      (Tez_repr)
+
+  module Frozen_fees =
+    Frozen_balance_index.Make_map
+      (struct
+        let name = ["fees"]
+      end)
+      (Tez_repr)
+
+  module Frozen_rewards =
+    Frozen_balance_index.Make_map
+      (struct
+        let name = ["rewards"]
+      end)
+      (Tez_repr)
+
+  module Pending_consensus_key =
+    Indexed_context.Make_map
+      (struct
+        let name = ["pending_consensus_key"]
+      end)
+      (struct
+        type t = Signature.Public_key.t * Cycle_repr.t
+
+        let encoding =
+          Data_encoding.tup2 Signature.Public_key.encoding Cycle_repr.encoding
+      end)
+
+  module Pending_consensus_keys =
+    Make_data_set_storage
+      (Make_subcontext (Storage_functors.Registered) (Raw_context)
+         (struct
+           let name = ["pending_consensus_keys"]
+         end))
+         (Make_index (Signature.Public_key_hash))
+
+  module Consensus_key =
+    Make_indexed_data_snapshotable_storage
+      (Make_subcontext (Storage_functors.Registered) (Raw_context)
+         (struct
+           let name = ["consensus_key"]
+         end))
+         (Make_index (Cycle_repr.Index))
+         (Make_index (Baker_hash))
+         (Signature.Public_key)
+
+  module Consensus_key_rev_index =
+    Make_indexed_subcontext
+      (Make_subcontext (Storage_functors.Registered) (Raw_context)
+         (struct
+           let name = ["consensus_key_rev_index"]
+         end))
+         (Make_index (Signature.Public_key_hash))
+
+  module Consensus_key_rev =
+    Consensus_key_rev_index.Make_map
+      (struct
+        let name = ["consensus_key_rev"]
+      end)
+      (Baker_hash)
+
+  module Pvss_key =
+    Indexed_context.Make_map
+      (struct
+        let name = ["pvss_key"]
+      end)
+      (Pvss_secp256k1.Public_key)
+end
 
 (** Rolls *)
 
@@ -857,7 +1032,7 @@ module Cycle = struct
 
   type unrevealed_nonce = {
     nonce_hash : Nonce_hash.t;
-    delegate : Signature.Public_key_hash.t;
+    baker : Baker_hash.t;
     rewards : Tez_repr.t;
     fees : Tez_repr.t;
   }
@@ -874,16 +1049,16 @@ module Cycle = struct
           ~title:"Unrevealed"
           (tup4
              Nonce_hash.encoding
-             Signature.Public_key_hash.encoding
+             Baker_hash.encoding
              Tez_repr.encoding
              Tez_repr.encoding)
           (function
-            | Unrevealed {nonce_hash; delegate; rewards; fees} ->
-                Some (nonce_hash, delegate, rewards, fees)
+            | Unrevealed {nonce_hash; baker; rewards; fees} ->
+                Some (nonce_hash, baker, rewards, fees)
             | _ ->
                 None)
-          (fun (nonce_hash, delegate, rewards, fees) ->
-            Unrevealed {nonce_hash; delegate; rewards; fees});
+          (fun (nonce_hash, baker, rewards, fees) ->
+            Unrevealed {nonce_hash; baker; rewards; fees});
         case
           (Tag 1)
           ~title:"Revealed"
@@ -945,7 +1120,18 @@ module Roll = struct
       end)
       (Roll_repr)
 
-  module Delegate_roll_list =
+  module Baker_roll_list =
+    Wrap_indexed_data_storage
+      (Contract.Roll_list)
+      (struct
+        type t = Baker_hash.t
+
+        let wrap = Contract_repr.baker_contract
+
+        let unwrap = Contract_repr.is_baker
+      end)
+
+  module Delegate_roll_list_008 =
     Wrap_indexed_data_storage
       (Contract.Roll_list)
       (struct
@@ -963,7 +1149,18 @@ module Roll = struct
       end)
       (Roll_repr)
 
-  module Delegate_change =
+  module Baker_change =
+    Wrap_indexed_data_storage
+      (Contract.Change)
+      (struct
+        type t = Baker_hash.t
+
+        let wrap = Contract_repr.baker_contract
+
+        let unwrap = Contract_repr.is_baker
+      end)
+
+  module Delegate_change_008 =
     Wrap_indexed_data_storage
       (Contract.Change)
       (struct
@@ -1016,6 +1213,16 @@ module Roll = struct
   module Owner =
     Make_indexed_data_snapshotable_storage
       (Make_subcontext (Registered) (Raw_context)
+         (struct
+           let name = ["owner"]
+         end))
+         (Snapshoted_owner_index)
+      (Make_index (Roll_repr.Index))
+      (Baker_hash)
+
+  module Owner_008 =
+    Make_indexed_data_snapshotable_storage
+      (Make_subcontext (Ghost) (Raw_context)
          (struct
            let name = ["owner"]
          end))
@@ -1087,12 +1294,29 @@ module Vote = struct
          (struct
            let name = ["listings"]
          end))
+         (Make_index (Baker_hash))
+         (Int32)
+
+  module Listings_008 =
+    Make_indexed_data_storage
+      (Make_subcontext (Ghost) (Raw_context)
+         (struct
+           let name = ["listings"]
+         end))
          (Make_index (Signature.Public_key_hash))
          (Int32)
 
   module Proposals =
     Make_data_set_storage
       (Make_subcontext (Registered) (Raw_context)
+         (struct
+           let name = ["proposals"]
+         end))
+         (Pair (Make_index (Protocol_hash)) (Make_index (Baker_hash)))
+
+  module Proposals_008 =
+    Make_data_set_storage
+      (Make_subcontext (Ghost) (Raw_context)
          (struct
            let name = ["proposals"]
          end))
@@ -1107,12 +1331,34 @@ module Vote = struct
          (struct
            let name = ["proposals_count"]
          end))
+         (Make_index (Baker_hash))
+         (UInt16)
+
+  module Proposals_count_008 =
+    Make_indexed_data_storage
+      (Make_subcontext (Ghost) (Raw_context)
+         (struct
+           let name = ["proposals_count"]
+         end))
          (Make_index (Signature.Public_key_hash))
          (UInt16)
 
   module Ballots =
     Make_indexed_data_storage
       (Make_subcontext (Registered) (Raw_context)
+         (struct
+           let name = ["ballots"]
+         end))
+         (Make_index (Baker_hash))
+         (struct
+           type t = Vote_repr.ballot
+
+           let encoding = Vote_repr.ballot_encoding
+         end)
+
+  module Ballots_008 =
+    Make_indexed_data_storage
+      (Make_subcontext (Ghost) (Raw_context)
          (struct
            let name = ["ballots"]
          end))
@@ -1129,7 +1375,7 @@ end
 module Seed = struct
   type unrevealed_nonce = Cycle.unrevealed_nonce = {
     nonce_hash : Nonce_hash.t;
-    delegate : Signature.Public_key_hash.t;
+    baker : Baker_hash.t;
     rewards : Tez_repr.t;
     fees : Tez_repr.t;
   }
@@ -1227,3 +1473,62 @@ module Pending_migration_balance_updates =
 
       let encoding = Receipt_repr.balance_updates_encoding
     end)
+
+module Cycle_008 = struct
+  module Indexed_context =
+    Make_indexed_subcontext
+      (Make_subcontext (Ghost) (Raw_context)
+         (struct
+           let name = ["cycle"]
+         end))
+         (Make_index (Cycle_repr.Index))
+
+  type unrevealed_nonce = {
+    nonce_hash : Nonce_hash.t;
+    delegate : Signature.Public_key_hash.t;
+    rewards : Tez_repr.t;
+    fees : Tez_repr.t;
+  }
+
+  type nonce_status =
+    | Unrevealed of unrevealed_nonce
+    | Revealed of Seed_repr.nonce
+
+  let nonce_status_encoding =
+    let open Data_encoding in
+    union
+      [ case
+          (Tag 0)
+          ~title:"Unrevealed"
+          (tup4
+             Nonce_hash.encoding
+             Signature.Public_key_hash.encoding
+             Tez_repr.encoding
+             Tez_repr.encoding)
+          (function
+            | Unrevealed {nonce_hash; delegate; rewards; fees} ->
+                Some (nonce_hash, delegate, rewards, fees)
+            | _ ->
+                None)
+          (fun (nonce_hash, delegate, rewards, fees) ->
+            Unrevealed {nonce_hash; delegate; rewards; fees});
+        case
+          (Tag 1)
+          ~title:"Revealed"
+          Seed_repr.nonce_encoding
+          (function Revealed nonce -> Some nonce | _ -> None)
+          (fun nonce -> Revealed nonce) ]
+
+  module Nonce =
+    Make_indexed_data_storage
+      (Make_subcontext (Ghost) (Indexed_context.Raw_context)
+         (struct
+           let name = ["nonces"]
+         end))
+         (Make_index (Raw_level_repr.Index))
+         (struct
+           type t = nonce_status
+
+           let encoding = nonce_status_encoding
+         end)
+end

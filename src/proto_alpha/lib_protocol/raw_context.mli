@@ -104,15 +104,15 @@ val add_fees : t -> Tez_repr.t -> t tzresult
     frozen_fees account at finalize_application *)
 val add_rewards : t -> Tez_repr.t -> t tzresult
 
-(** Increment the current block deposit stash for a specific delegate. All the
-    delegates' frozen_deposit accounts are credited at finalize_application *)
-val add_deposit : t -> Signature.Public_key_hash.t -> Tez_repr.t -> t tzresult
+(** Increment the current block deposit stash for a specific baker. All the
+    bakers' frozen_deposit accounts are credited at finalize_application *)
+val add_deposit : t -> Baker_hash.t -> Tez_repr.t -> t tzresult
 
 val get_fees : t -> Tez_repr.t
 
 val get_rewards : t -> Tez_repr.t
 
-val get_deposits : t -> Tez_repr.t Signature.Public_key_hash.Map.t
+val get_deposits : t -> Tez_repr.t Baker_hash.Map.t
 
 type error += Gas_limit_too_high (* `Permanent *)
 
@@ -177,24 +177,19 @@ val record_internal_nonce : t -> int -> t
 (** Check is the internal operation nonce has been taken. *)
 val internal_nonce_already_recorded : t -> int -> bool
 
-(** Returns a map where to each endorser's pkh is associated the list of its
-    endorsing slots (in increasing order) for a given level. *)
-val allowed_endorsements :
-  t ->
-  (Signature.Public_key.t * int list * bool) Signature.Public_key_hash.Map.t
+(** Returns a map where to each endorser's baker hash is associated the list of
+    its endorsing slots (in increasing order) for a given level. *)
+val allowed_endorsements : t -> (int list * bool) Baker_hash.Map.t
 
 (** Keep track of the number of endorsements that are included in a block *)
 val included_endorsements : t -> int
 
 (** Initializes the map of allowed endorsements, this function must only be
     called once. *)
-val init_endorsements :
-  t ->
-  (Signature.Public_key.t * int list * bool) Signature.Public_key_hash.Map.t ->
-  t
+val init_endorsements : t -> (int list * bool) Baker_hash.Map.t -> t
 
 (** Marks an endorsement in the map as used. *)
-val record_endorsement : t -> Signature.Public_key_hash.t -> t
+val record_endorsement : t -> Baker_hash.t -> t
 
 val fold_map_temporary_lazy_storage_ids :
   t ->

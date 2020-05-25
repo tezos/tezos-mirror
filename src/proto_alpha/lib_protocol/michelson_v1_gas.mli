@@ -28,6 +28,8 @@ open Alpha_context
 module Cost_of : sig
   val manager_operation : Gas.cost
 
+  val baker_operation : Gas.cost
+
   module Interpreter : sig
     val drop : Gas.cost
 
@@ -314,6 +316,18 @@ module Cost_of : sig
       'a Script_typed_ir.ticket ->
       'a Script_typed_ir.ticket ->
       Gas.cost
+
+    val submit_proposals : Gas.cost
+
+    val submit_ballot : Gas.cost
+
+    val set_baker_active : Gas.cost
+
+    val set_baker_consensus_key : Gas.cost
+
+    val set_baker_pvss_key : Gas.cost
+
+    val toggle_baker_delegations : Gas.cost
   end
 
   module Typechecking : sig
@@ -324,6 +338,14 @@ module Cost_of : sig
     val key_hash_optimized : Gas.cost
 
     val key_hash_readable : Gas.cost
+
+    val baker_hash_optimized : Gas.cost
+
+    val baker_hash_readable : Gas.cost
+
+    val pvss_key_optimized : Gas.cost
+
+    val pvss_key_readable : Gas.cost
 
     val signature_optimized : Gas.cost
 
@@ -380,6 +402,14 @@ module Cost_of : sig
     val key_hash_optimized : Gas.cost
 
     val key_hash_readable : Gas.cost
+
+    val baker_hash_optimized : Gas.cost
+
+    val baker_hash_readable : Gas.cost
+
+    val pvss_key_optimized : Gas.cost
+
+    val pvss_key_readable : Gas.cost
 
     val signature_optimized : Gas.cost
 
