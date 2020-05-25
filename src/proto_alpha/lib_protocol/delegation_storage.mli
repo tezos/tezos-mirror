@@ -29,25 +29,23 @@ val remove : Raw_context.t -> Contract_repr.t -> Raw_context.t tzresult Lwt.t
 
 (** Reading the current delegate of a contract. *)
 val get :
-  Raw_context.t ->
-  Contract_repr.t ->
-  Signature.Public_key_hash.t option tzresult Lwt.t
+  Raw_context.t -> Contract_repr.t -> Baker_hash.t option tzresult Lwt.t
 
 (** Updating the delegate of a contract.
 
     When calling this function on an "implicit contract" and setting
-    the delegate to the contract manager registers it as a delegate. One
-    cannot unregister a delegate for now. The associate contract is now
+    the delegate to the contract manager registers it as a baker. One
+    cannot unregister a baker for now. The associated contract is now
     'undeletable'. *)
 val set :
   Raw_context.t ->
   Contract_repr.t ->
-  Signature.Public_key_hash.t option ->
+  Baker_hash.t option ->
   Raw_context.t tzresult Lwt.t
 
 type error +=
-  | (* `Permanent *) No_deletion of Signature.Public_key_hash.t
-  | (* `Temporary *) Active_delegate
-  | (* `Temporary *) Current_delegate
+  | (* `Permanent *) No_baker_delegation of Baker_hash.t
   | (* `Temporary *)
-      Empty_delegate_account of Signature.Public_key_hash.t
+      Current_delegate
+  | (* `Temporary *)
+      Inactive_baker of Baker_hash.t

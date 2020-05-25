@@ -907,10 +907,10 @@ module Receipt : sig
 end
 
 module Delegation : sig
-  val get : context -> Contract.t -> public_key_hash option tzresult Lwt.t
+  val get : context -> Contract.t -> baker_hash option tzresult Lwt.t
 
   val set :
-    context -> Contract.t -> public_key_hash option -> context tzresult Lwt.t
+    context -> Contract.t -> baker_hash option -> context tzresult Lwt.t
 end
 
 module Baker : sig
