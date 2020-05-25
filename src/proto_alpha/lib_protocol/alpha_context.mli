@@ -911,7 +911,9 @@ module Delegate : sig
 
   val set :
     context -> Contract.t -> public_key_hash option -> context tzresult Lwt.t
+end
 
+module Baker : sig
   val fold :
     context -> init:'a -> f:(public_key_hash -> 'a -> 'a Lwt.t) -> 'a Lwt.t
 

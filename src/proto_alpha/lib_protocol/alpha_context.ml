@@ -193,6 +193,7 @@ end
 
 module Receipt = Receipt_repr
 module Delegate = Delegate_storage
+module Baker = Baker_storage
 
 module Roll = struct
   include Roll_repr
