@@ -714,3 +714,7 @@ let set_consensus_key ctxt baker key =
   let preserved = Constants_storage.preserved_cycles ctxt in
   let activation_cycle = Cycle_repr.add level.cycle (preserved + 2) in
   Storage.Baker.Pending_consensus_key.update ctxt baker (key, activation_cycle)
+
+let init_set_pvss_key = Storage.Baker.Pvss_key.add
+
+let get_pvss_key = Storage.Baker.Pvss_key.find
