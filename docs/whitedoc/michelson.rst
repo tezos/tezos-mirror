@@ -494,13 +494,15 @@ Control structures
 
 -  ``FAILWITH``: Explicitly abort the current program.
 
-   'a :: \_ -> \_
+::
 
-   This special instruction aborts the current program exposing the top
-   element of the stack in its error message (first rule below). It makes the
-   output useless since all subsequent instructions will simply ignore
-   their usual semantics to propagate the failure up to the main result
-   (second rule below). Its type is thus completely generic.
+    :: 'a : \_   ->   \_
+
+This special instruction aborts the current program exposing the top
+element of the stack in its error message (first rule below). It makes
+the output useless since all subsequent instructions will simply
+ignore their usual semantics to propagate the failure up to the main
+result (second rule below). Its type is thus completely generic.
 
 ::
 
