@@ -55,20 +55,38 @@ let parse_expression arg =
     (Micheline_parser.no_parsing_error
        (Michelson_v1_parser.parse_expression arg))
 
-let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
-    ?verbose_signing ?branch ~source ~src_pk ~src_sk ~destination
-    ?(entrypoint = "default") ?arg ~amount ?fee ?gas_limit ?storage_limit
-    ?counter ~fee_parameter () =
+let parse_arg_transfer arg =
   ( match arg with
   | Some arg ->
       parse_expression arg >>=? fun {expanded = arg; _} -> return_some arg
   | None ->
       return_none )
   >>=? fun parameters ->
-  let parameters =
-    Option.fold ~some:Script.lazy_expr ~none:Script.unit_parameter parameters
+  return
+    (Option.fold ~some:Script.lazy_expr ~none:Script.unit_parameter parameters)
+
+let build_transaction_operation ~amount ~parameters ?(entrypoint = "default")
+    ?fee ?gas_limit ?storage_limit destination =
+  let operation = Transaction {amount; parameters; destination; entrypoint} in
+  Injection.prepare_manager_operation ?fee ?gas_limit ?storage_limit operation
+
+let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
+    ?verbose_signing ?branch ~source ~src_pk ~src_sk ~destination
+    ?(entrypoint = "default") ?arg ~amount ?fee ?gas_limit ?storage_limit
+    ?counter ~fee_parameter () =
+  parse_arg_transfer arg
+  >>=? fun parameters ->
+  let contents =
+    build_transaction_operation
+      ~amount
+      ~parameters
+      ~entrypoint
+      ?fee
+      ?gas_limit
+      ?storage_limit
+      destination
   in
-  let contents = Transaction {amount; parameters; destination; entrypoint} in
+  let contents = Injection.Single_manager contents in
   Injection.inject_manager_operation
     cctxt
     ~chain
@@ -86,57 +104,57 @@ let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ~src_sk
     ~fee_parameter
     contents
-  >>=? fun ((_oph, _op, result) as res) ->
-  Lwt.return (Injection.originated_contracts (Single_result result))
-  >>=? fun contracts -> return (res, contracts)
+  >>=? fun (oph, op, result) ->
+  Lwt.return (Injection.originated_contracts result)
+  >>=? fun contracts ->
+  match Apply_results.pack_contents_list op result with
+  | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
+      return ((oph, op, result), contracts)
+
+let build_reveal_operation ?fee ?gas_limit ?storage_limit pk =
+  let operation = Reveal pk in
+  Injection.prepare_manager_operation ?fee ?gas_limit ?storage_limit operation
 
 let reveal cctxt ~chain ~block ?confirmations ?dry_run ?verbose_signing ?branch
     ~source ~src_pk ~src_sk ?fee ~fee_parameter () =
-  let (compute_fee, fee) =
-    match fee with None -> (true, Tez.zero) | Some fee -> (false, fee)
+  let contents =
+    Injection.Single_manager
+      (build_reveal_operation
+         ?fee
+         ~gas_limit:(Z.of_int ~-1)
+         ~storage_limit:Z.zero
+         src_pk)
   in
-  Alpha_services.Contract.counter cctxt (chain, block) source
-  >>=? fun pcounter ->
-  let counter = Z.succ pcounter in
-  Alpha_services.Contract.manager_key cctxt (chain, block) source
-  >>=? fun key ->
-  match key with
-  | Some _ ->
-      failwith "The manager key was previously revealed."
-  | None -> (
-      let contents =
-        Single
-          (Manager_operation
-             {
-               source;
-               fee;
-               counter;
-               gas_limit = Z.of_int ~-1;
-               storage_limit = Z.zero;
-               operation = Reveal src_pk;
-             })
-      in
-      Injection.inject_operation
-        cctxt
-        ~chain
-        ~block
-        ?confirmations
-        ?dry_run
-        ?verbose_signing
-        ?branch
-        ~src_sk
-        ~compute_fee
-        ~fee_parameter
-        contents
-      >>=? fun (oph, op, result) ->
-      match Apply_results.pack_contents_list op result with
-      | Apply_results.Single_and_result ((Manager_operation _ as op), result)
-        ->
-          return (oph, op, result) )
+  Injection.inject_manager_operation
+    cctxt
+    ~chain
+    ~block
+    ?confirmations
+    ?dry_run
+    ?verbose_signing
+    ?branch
+    ~source
+    ?fee
+    ~src_pk
+    ~src_sk
+    ~fee_parameter
+    contents
+  >>=? fun (oph, op, result) ->
+  match Apply_results.pack_contents_list op result with
+  | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
+      return (oph, op, result)
+
+let build_delegate_operation ?fee ?gas_limit ?(storage_limit = Z.zero)
+    delegate_opt =
+  let operation = Delegation delegate_opt in
+  Injection.prepare_manager_operation ?fee ?gas_limit ~storage_limit operation
 
 let delegate_contract cctxt ~chain ~block ?branch ?confirmations ?dry_run
     ?verbose_signing ~source ~src_pk ~src_sk ?fee ~fee_parameter delegate_opt =
-  let operation = Delegation delegate_opt in
+  let operation =
+    Injection.Single_manager
+      (build_delegate_operation ?fee ~storage_limit:Z.zero delegate_opt)
+  in
   Injection.inject_manager_operation
     cctxt
     ~chain
@@ -152,7 +170,10 @@ let delegate_contract cctxt ~chain ~block ?branch ?confirmations ?dry_run
     ~src_sk
     ~fee_parameter
     operation
-  >>=? fun res -> return res
+  >>=? fun (oph, op, result) ->
+  match Apply_results.pack_contents_list op result with
+  | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
+      return (oph, op, result)
 
 let list_contract_labels cctxt ~chain ~block =
   Alpha_services.Contract.list cctxt (chain, block)
@@ -231,9 +252,8 @@ let save_contract ~force cctxt alias_name contract =
   >>=? fun () ->
   message_added_contract cctxt alias_name >>= fun () -> return_unit
 
-let originate_contract (cctxt : #full) ~chain ~block ?confirmations ?dry_run
-    ?verbose_signing ?branch ?fee ?gas_limit ?storage_limit ~delegate
-    ~initial_storage ~balance ~source ~src_pk ~src_sk ~code ~fee_parameter () =
+let build_origination_operation ?fee ?gas_limit ?storage_limit ~initial_storage
+    ~code ~delegate ~balance () =
   (* With the change of making implicit accounts delegatable, the following
      3 arguments are being defaulted before they can be safely removed. *)
   Lwt.return (Michelson_v1_parser.parse_expression initial_storage)
@@ -250,6 +270,27 @@ let originate_contract (cctxt : #full) ~chain ~block ?confirmations ?dry_run
         preorigination = None;
       }
   in
+  return
+    (Injection.prepare_manager_operation
+       ?fee
+       ?gas_limit
+       ?storage_limit
+       origination)
+
+let originate_contract (cctxt : #full) ~chain ~block ?confirmations ?dry_run
+    ?verbose_signing ?branch ?fee ?gas_limit ?storage_limit ~delegate
+    ~initial_storage ~balance ~source ~src_pk ~src_sk ~code ~fee_parameter () =
+  build_origination_operation
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~initial_storage
+    ~code
+    ~delegate
+    ~balance
+    ()
+  >>=? fun origination ->
+  let origination = Injection.Single_manager origination in
   Injection.inject_manager_operation
     cctxt
     ~chain
@@ -266,8 +307,12 @@ let originate_contract (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ~src_sk
     ~fee_parameter
     origination
-  >>=? fun ((_oph, _op, result) as res) ->
-  Lwt.return (Injection.originated_contracts (Single_result result))
+  >>=? fun (oph, op, result) ->
+  ( match Apply_results.pack_contents_list op result with
+  | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
+      return (oph, op, result) )
+  >>=? fun res ->
+  Lwt.return (Injection.originated_contracts result)
   >>=? function
   | [contract] ->
       return (res, contract)

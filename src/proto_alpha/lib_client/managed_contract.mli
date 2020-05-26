@@ -32,6 +32,16 @@ open Protocol_client_context
 val get_contract_manager :
   #full -> Contract.t -> public_key_hash tzresult Lwt.t
 
+(** Builds a delegation operation ready for injection *)
+val build_delegate_operation :
+  #Protocol_client_context.full ->
+  chain:Chain_services.chain ->
+  block:Block_services.block ->
+  ?fee:Tez.t ->
+  Contract.t ->
+  public_key_hash option ->
+  Kind.transaction Injection.annotated_manager_operation tzresult Lwt.t
+
 (** Set the delegate of a manageable contract.
     For a contract with a `do`entrypoint, it builds the lambda that set
     the provided delegate.
@@ -53,6 +63,22 @@ val set_delegate :
   Contract.t ->
   public_key_hash option ->
   Kind.transaction Kind.manager Injection.result tzresult Lwt.t
+
+(** Builds a transaction operation ready for injection *)
+val build_transaction_operation :
+  #Protocol_client_context.full ->
+  chain:Chain_services.chain ->
+  block:Block_services.block ->
+  contract:Contract.t ->
+  destination:Contract.t ->
+  ?entrypoint:string ->
+  ?arg:string ->
+  amount:Tez.t ->
+  ?fee:Tez.t ->
+  ?gas_limit:counter ->
+  ?storage_limit:counter ->
+  unit ->
+  Kind.transaction Injection.annotated_manager_operation tzresult Lwt.t
 
 (** Perform a transfer on behalf of a managed contract .
     For a contract with a `do`entrypoint, it builds the lambda that

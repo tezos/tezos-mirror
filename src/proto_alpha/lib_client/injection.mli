@@ -112,6 +112,13 @@ val inject_operation :
 
 type 'kind result = Operation_hash.t * 'kind contents * 'kind contents_result
 
+val prepare_manager_operation :
+  ?fee:Tez.t ->
+  ?gas_limit:Z.t ->
+  ?storage_limit:Z.t ->
+  'kind manager_operation ->
+  'kind annotated_manager_operation
+
 val inject_manager_operation :
   #Protocol_client_context.full ->
   chain:Shell_services.chain ->
@@ -128,8 +135,8 @@ val inject_manager_operation :
   ?storage_limit:Z.t ->
   ?counter:Z.t ->
   fee_parameter:fee_parameter ->
-  'kind manager_operation ->
-  'kind Kind.manager result tzresult Lwt.t
+  'kind annotated_manager_operation_list ->
+  'kind Kind.manager result_list tzresult Lwt.t
 
 val originated_contracts :
   'kind contents_result_list -> Contract.t list tzresult

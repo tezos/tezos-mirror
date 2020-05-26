@@ -531,7 +531,8 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
   let may_need_patching_single :
       type kind. kind contents -> kind contents option = function
     | Manager_operation c
-      when compute_fee || c.gas_limit < Z.zero || gas_limit <= c.gas_limit
+      when (compute_fee && c.fee = Tez.zero)
+           || c.gas_limit < Z.zero || gas_limit <= c.gas_limit
            || c.storage_limit < Z.zero
            || storage_limit <= c.storage_limit ->
         let gas_limit =
@@ -649,8 +650,9 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
             return (Z.min (Z.add storage (Z.of_int 20)) storage_limit)
         else return c.storage_limit )
         >>=? fun storage_limit ->
-        let c = Manager_operation {c with gas_limit; storage_limit} in
-        if compute_fee then return (patch_fee first c) else return c
+        let cm = Manager_operation {c with gas_limit; storage_limit} in
+        if compute_fee && c.fee = Tez.zero then return (patch_fee first cm)
+        else return cm
     | (c, _) ->
         return c
   in
@@ -849,13 +851,17 @@ let inject_operation (type kind) cctxt ~chain ~block ?confirmations
             op.shell.branch )
     >>= fun () -> return (oph, op.protocol_data.contents, result.contents)
 
+let prepare_manager_operation ?fee ?gas_limit ?storage_limit operation =
+  Manager_info {fee; gas_limit; storage_limit; operation}
+
 let inject_manager_operation cctxt ~chain ~block ?branch ?confirmations
     ?dry_run ?verbose_signing ~source ~src_pk ~src_sk ?fee
     ?(gas_limit = Z.minus_one) ?(storage_limit = Z.of_int (-1)) ?counter
-    ~fee_parameter (type kind) (operation : kind manager_operation) :
+    ~fee_parameter (type kind)
+    (operations : kind annotated_manager_operation_list) :
     ( Operation_hash.t
-    * kind Kind.manager contents
-    * kind Kind.manager contents_result )
+    * kind Kind.manager contents_list
+    * kind Kind.manager contents_result_list )
     tzresult
     Lwt.t =
   ( match counter with
@@ -869,8 +875,12 @@ let inject_manager_operation cctxt ~chain ~block ?branch ?confirmations
   >>=? fun counter ->
   Alpha_services.Contract.manager_key cctxt (chain, block) source
   >>=? fun key ->
-  let is_reveal : type kind. kind manager_operation -> bool = function
-    | Reveal _ ->
+  (* [is_reveal] assumes that a Reveal operation only appears as the first of a batch *)
+  let is_reveal : type kind. kind annotated_manager_operation_list -> bool =
+    function
+    | Single_manager (Manager_info {operation = Reveal _; _}) ->
+        true
+    | Cons_manager (Manager_info {operation = Reveal _; _}, _) ->
         true
     | _ ->
         false
@@ -878,8 +888,45 @@ let inject_manager_operation cctxt ~chain ~block ?branch ?confirmations
   let (compute_fee, fee) =
     match fee with None -> (true, Tez.zero) | Some fee -> (false, fee)
   in
+  let contents_of_manager ~source ~fee ~counter ~gas_limit ~storage_limit
+      operation =
+    let (Manager_info {fee = f; gas_limit = g; storage_limit = s; operation}) =
+      operation
+    in
+    let fee = Option.value ~default:fee f in
+    let gas_limit = Option.value ~default:gas_limit g in
+    let storage_limit = Option.value ~default:storage_limit s in
+    Manager_operation
+      {source; fee; counter; gas_limit; storage_limit; operation}
+  in
+  let rec build_contents :
+      type kind.
+      Z.t ->
+      kind annotated_manager_operation_list ->
+      kind Kind.manager contents_list =
+   fun counter -> function
+    | Single_manager operation ->
+        Single
+          (contents_of_manager
+             ~source
+             ~fee
+             ~counter
+             ~gas_limit
+             ~storage_limit
+             operation)
+    | Cons_manager (operation, rest) ->
+        Cons
+          ( contents_of_manager
+              ~source
+              ~fee
+              ~counter
+              ~gas_limit
+              ~storage_limit
+              operation,
+            build_contents (Z.succ counter) rest )
+  in
   match key with
-  | None when not (is_reveal operation) -> (
+  | None when not (is_reveal operations) -> (
       let contents =
         Cons
           ( Manager_operation
@@ -891,16 +938,7 @@ let inject_manager_operation cctxt ~chain ~block ?branch ?confirmations
                 storage_limit = Z.zero;
                 operation = Reveal src_pk;
               },
-            Single
-              (Manager_operation
-                 {
-                   source;
-                   fee;
-                   counter = Z.succ counter;
-                   gas_limit;
-                   storage_limit;
-                   operation;
-                 }) )
+            build_contents (Z.succ counter) operations )
       in
       inject_operation
         cctxt
@@ -916,36 +954,24 @@ let inject_manager_operation cctxt ~chain ~block ?branch ?confirmations
         contents
       >>=? fun (oph, op, result) ->
       match pack_contents_list op result with
-      | Cons_and_result (_, _, Single_and_result (op, result)) ->
-          return (oph, op, result)
-      | Single_and_result (Manager_operation _, _) ->
-          .
-      | _ ->
-          assert false
-      (* Grrr... *) )
-  | _ -> (
-      let contents =
-        Single
-          (Manager_operation
-             {source; fee; counter; gas_limit; storage_limit; operation})
-      in
-      inject_operation
-        cctxt
-        ~chain
-        ~block
-        ?confirmations
-        ?dry_run
-        ?verbose_signing
-        ~compute_fee
-        ~fee_parameter
-        ?branch
-        ~src_sk
-        contents
-      >>=? fun (oph, op, result) ->
-      match pack_contents_list op result with
-      | Single_and_result ((Manager_operation _ as op), result) ->
+      | Cons_and_result (_, _, rest) ->
+          let (op, result) = unpack_contents_list rest in
           return (oph, op, result)
       | _ ->
           assert false )
-
-(* Grrr... *)
+  | Some _ when is_reveal operations ->
+      failwith "The manager key was previously revealed."
+  | _ ->
+      let contents = build_contents counter operations in
+      inject_operation
+        cctxt
+        ~chain
+        ~block
+        ?confirmations
+        ?dry_run
+        ?verbose_signing
+        ~compute_fee
+        ~fee_parameter
+        ?branch
+        ~src_sk
+        contents
