@@ -802,6 +802,32 @@ let apply_manager_operation_content :
         Delegation_result
           {consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt},
         [] )
+  | Baker_registration {credit; consensus_key; threshold; owner_keys} ->
+      Contract.spend ctxt source credit
+      >>=? fun ctxt ->
+      Baker.register ctxt ~balance:credit ~threshold ~owner_keys ~consensus_key
+      >>=? fun (ctxt, baker) ->
+      let contract = Contract.baker_contract baker in
+      Fees.origination_burn ctxt
+      >>?= fun (ctxt, origination_burn) ->
+      Fees.record_paid_storage_space ctxt contract
+      >|=? fun (ctxt, size, paid_storage_size_diff, fees) ->
+      let result =
+        Baker_registration_result
+          {
+            balance_updates =
+              Receipt.cleanup_balance_updates
+                [ (Contract payer, Debited fees, Block_application);
+                  (Contract payer, Debited origination_burn, Block_application);
+                  (Contract source, Debited credit, Block_application);
+                  (Contract contract, Credited credit, Block_application) ];
+            registered_baker = baker;
+            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+            storage_size = size;
+            paid_storage_size_diff;
+          }
+      in
+      (ctxt, result, [])
 
 type success_or_failure = Success of context | Failure
 

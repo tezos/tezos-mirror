@@ -126,6 +126,14 @@ and _ successful_manager_operation_result =
       consumed_gas : Gas.Arith.fp;
     }
       -> Kind.delegation successful_manager_operation_result
+  | Baker_registration_result : {
+      balance_updates : Baker.balance_updates;
+      registered_baker : Baker_hash.t;
+      consumed_gas : Gas.Arith.fp;
+      storage_size : Z.t;
+      paid_storage_size_diff : Z.t;
+    }
+      -> Kind.baker_registration successful_manager_operation_result
 
 and packed_successful_manager_operation_result =
   | Successful_manager_result :

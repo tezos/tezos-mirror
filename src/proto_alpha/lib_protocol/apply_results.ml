@@ -75,6 +75,14 @@ type _ successful_manager_operation_result =
       consumed_gas : Gas.Arith.fp;
     }
       -> Kind.delegation successful_manager_operation_result
+  | Baker_registration_result : {
+      balance_updates : Baker.balance_updates;
+      registered_baker : Baker_hash.t;
+      consumed_gas : Gas.Arith.fp;
+      storage_size : Z.t;
+      paid_storage_size_diff : Z.t;
+    }
+      -> Kind.baker_registration successful_manager_operation_result
 
 type packed_successful_manager_operation_result =
   | Successful_manager_result :
@@ -368,6 +376,55 @@ module Manager_result = struct
       ~inj:(fun (consumed_gas, consumed_milligas) ->
         assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
         Delegation_result {consumed_gas = consumed_milligas})
+
+  let baker_registration_case =
+    make
+      ~op_case:Operation.Encoding.Manager_operations.baker_registration_case
+      ~encoding:
+        (obj5
+           (dft "balance_updates" Baker.balance_updates_encoding [])
+           (req "registered_baker" Baker_hash.encoding)
+           (dft "consumed_gas" Gas.Arith.z_fp_encoding Gas.Arith.zero)
+           (dft "storage_size" z Z.zero)
+           (dft "paid_storage_size_diff" z Z.zero))
+      ~iselect:(function
+        | Internal_manager_operation_result
+            (({operation = Baker_registration _; _} as op), res) ->
+            Some (op, res)
+        | _ ->
+            None)
+      ~select:(function
+        | Successful_manager_result (Baker_registration_result _ as op) ->
+            Some op
+        | _ ->
+            None)
+      ~proj:(function
+        | Baker_registration_result
+            { balance_updates;
+              registered_baker;
+              consumed_gas;
+              storage_size;
+              paid_storage_size_diff } ->
+            ( balance_updates,
+              registered_baker,
+              consumed_gas,
+              storage_size,
+              paid_storage_size_diff ))
+      ~kind:Kind.Baker_registration_manager_kind
+      ~inj:
+        (fun ( balance_updates,
+               registered_baker,
+               consumed_gas,
+               storage_size,
+               paid_storage_size_diff ) ->
+        Baker_registration_result
+          {
+            balance_updates;
+            registered_baker;
+            consumed_gas;
+            storage_size;
+            paid_storage_size_diff;
+          })
 end
 
 let internal_operation_result_encoding :
@@ -401,7 +458,8 @@ let internal_operation_result_encoding :
        [ make Manager_result.reveal_case;
          make Manager_result.transaction_case;
          make Manager_result.origination_case;
-         make Manager_result.delegation_case ]
+         make Manager_result.delegation_case;
+         make Manager_result.baker_registration_case ]
 
 type 'kind contents_result =
   | Endorsement_result : {
@@ -463,6 +521,11 @@ let equal_manager_kind :
   | (Kind.Delegation_manager_kind, Kind.Delegation_manager_kind) ->
       Some Eq
   | (Kind.Delegation_manager_kind, _) ->
+      None
+  | (Kind.Baker_registration_manager_kind, Kind.Baker_registration_manager_kind)
+    ->
+      Some Eq
+  | (Kind.Baker_registration_manager_kind, _) ->
       None
 
 module Encoding = struct
@@ -804,6 +867,18 @@ module Encoding = struct
             Some (op, res)
         | _ ->
             None)
+
+  let baker_registration_case =
+    make_manager_case
+      Operation.Encoding.baker_registration_case
+      Manager_result.baker_registration_case
+      (function
+        | Contents_and_result
+            ( (Manager_operation {operation = Baker_registration _; _} as op),
+              res ) ->
+            Some (op, res)
+        | _ ->
+            None)
 end
 
 let contents_result_encoding =
@@ -835,7 +910,8 @@ let contents_result_encoding =
          make reveal_case;
          make transaction_case;
          make origination_case;
-         make delegation_case ]
+         make delegation_case;
+         make baker_registration_case ]
 
 let contents_and_result_encoding =
   let open Encoding in
@@ -871,7 +947,8 @@ let contents_and_result_encoding =
          make reveal_case;
          make transaction_case;
          make origination_case;
-         make delegation_case ]
+         make delegation_case;
+         make baker_registration_case ]
 
 type 'kind contents_result_list =
   | Single_result : 'kind contents_result -> 'kind contents_result_list
@@ -1101,6 +1178,29 @@ let kind_equal :
           _ } ) ->
       Some Eq
   | (Manager_operation {operation = Delegation _; _}, _) ->
+      None
+  | ( Manager_operation {operation = Baker_registration _; _},
+      Manager_operation_result
+        {operation_result = Applied (Baker_registration_result _); _} ) ->
+      Some Eq
+  | ( Manager_operation {operation = Baker_registration _; _},
+      Manager_operation_result
+        {operation_result = Backtracked (Baker_registration_result _, _); _} )
+    ->
+      Some Eq
+  | ( Manager_operation {operation = Baker_registration _; _},
+      Manager_operation_result
+        { operation_result =
+            Failed (Alpha_context.Kind.Baker_registration_manager_kind, _);
+          _ } ) ->
+      Some Eq
+  | ( Manager_operation {operation = Baker_registration _; _},
+      Manager_operation_result
+        { operation_result =
+            Skipped Alpha_context.Kind.Baker_registration_manager_kind;
+          _ } ) ->
+      Some Eq
+  | (Manager_operation {operation = Baker_registration _; _}, _) ->
       None
 
 let rec kind_equal_list :

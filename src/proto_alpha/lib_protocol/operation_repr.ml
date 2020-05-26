@@ -52,11 +52,14 @@ module Kind = struct
 
   type failing_noop = Failing_noop_kind
 
+  type baker_registration = Baker_registration_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
     | Origination_manager_kind : origination manager
     | Delegation_manager_kind : delegation manager
+    | Baker_registration_manager_kind : baker_registration manager
 end
 
 type raw = Operation.t = {shell : Operation.shell_header; proto : bytes}
@@ -150,6 +153,13 @@ and _ manager_operation =
   | Delegation :
       Signature.Public_key_hash.t option
       -> Kind.delegation manager_operation
+  | Baker_registration : {
+      credit : Tez_repr.tez;
+      consensus_key : Signature.Public_key.t;
+      threshold : int;
+      owner_keys : Signature.Public_key.t list;
+    }
+      -> Kind.baker_registration manager_operation
 
 and counter = Z.t
 
@@ -163,6 +173,8 @@ let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
       Kind.Origination_manager_kind
   | Delegation _ ->
       Kind.Delegation_manager_kind
+  | Baker_registration _ ->
+      Kind.Baker_registration_manager_kind
 
 type 'kind internal_operation = {
   source : Contract_repr.contract;
@@ -358,6 +370,30 @@ module Encoding = struct
           inj = (fun key -> Delegation key);
         }
 
+    let baker_registration_case =
+      MCase
+        {
+          tag = 4;
+          name = "baker_registration";
+          encoding =
+            obj4
+              (req "credit" Tez_repr.encoding)
+              (req "consensus_key" Signature.Public_key.encoding)
+              (req "threshold" uint16)
+              (req "owner_keys" (list Signature.Public_key.encoding));
+          select =
+            (function
+            | Manager (Baker_registration _ as op) -> Some op | _ -> None);
+          proj =
+            (function
+            | Baker_registration {credit; consensus_key; threshold; owner_keys}
+              ->
+                (credit, consensus_key, threshold, owner_keys));
+          inj =
+            (fun (credit, consensus_key, threshold, owner_keys) ->
+              Baker_registration {credit; consensus_key; threshold; owner_keys});
+        }
+
     let encoding =
       let make (MCase {tag; name; encoding; select; proj; inj}) =
         case
@@ -373,7 +409,8 @@ module Encoding = struct
         [ make reveal_case;
           make transaction_case;
           make origination_case;
-          make delegation_case ]
+          make delegation_case;
+          make baker_registration_case ]
   end
 
   type 'b case =
@@ -628,6 +665,9 @@ module Encoding = struct
   let delegation_case =
     make_manager_case 110 Manager_operations.delegation_case
 
+  let baker_registration_case =
+    make_manager_case 111 Manager_operations.baker_registration_case
+
   let contents_encoding =
     let make (Case {tag; name; encoding; select; proj; inj}) =
       case
@@ -651,7 +691,8 @@ module Encoding = struct
            make transaction_case;
            make origination_case;
            make delegation_case;
-           make failing_noop_case ]
+           make failing_noop_case;
+           make baker_registration_case ]
 
   let contents_list_encoding =
     conv to_list of_list (Variable.list contents_encoding)
@@ -834,6 +875,10 @@ let equal_manager_operation_kind :
   | (Delegation _, Delegation _) ->
       Some Eq
   | (Delegation _, _) ->
+      None
+  | (Baker_registration _, Baker_registration _) ->
+      Some Eq
+  | (Baker_registration _, _) ->
       None
 
 let equal_contents_kind :
