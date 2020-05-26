@@ -106,7 +106,7 @@ exception Closed
 let rec push ({closed; queue; current_size; max_size; compute_size; _} as q)
     elt =
   let elt_size = compute_size elt in
-  if closed then Lwt.fail Closed
+  if closed then raise Closed
   else if current_size + elt_size < max_size || Queue.is_empty queue then (
     Queue.push (elt_size, elt) queue ;
     q.current_size <- current_size + elt_size ;
@@ -125,12 +125,6 @@ let push_now ({closed; queue; compute_size; current_size; max_size; _} as q)
     notify_push q ;
     true )
 
-exception Full
-
-let push_now_exn q elt = if not (push_now q elt) then raise Full
-
-let safe_push_now q elt = try push_now_exn q elt with Full | Closed -> ()
-
 let rec pop ({closed; queue; empty; current_size; _} as q) =
   if not (Queue.is_empty queue) then (
     let (elt_size, elt) = Queue.pop queue in
@@ -138,7 +132,7 @@ let rec pop ({closed; queue; empty; current_size; _} as q) =
     q.current_size <- current_size - elt_size ;
     if Queue.length queue = 0 then Lwt_condition.signal empty () ;
     Lwt.return elt )
-  else if closed then Lwt.fail Closed
+  else if closed then raise Closed
   else wait_push q >>= fun () -> pop q
 
 let rec pop_with_timeout timeout q =
@@ -146,7 +140,7 @@ let rec pop_with_timeout timeout q =
     Lwt.cancel timeout ;
     pop q >>= Lwt.return_some )
   else if Lwt.is_sleeping timeout then
-    if q.closed then (Lwt.cancel timeout ; Lwt.fail Closed)
+    if q.closed then (Lwt.cancel timeout ; raise Closed)
     else
       let waiter = wait_push q in
       Lwt.pick [timeout; Lwt.protected waiter]
@@ -157,25 +151,24 @@ let rec peek ({closed; queue; _} as q) =
   if not (Queue.is_empty queue) then
     let (_elt_size, elt) = Queue.peek queue in
     Lwt.return elt
-  else if closed then Lwt.fail Closed
+  else if closed then raise Closed
   else wait_push q >>= fun () -> peek q
 
 let peek_all {queue; closed; _} =
   if closed then []
   else List.rev (Queue.fold (fun acc (_, e) -> e :: acc) [] queue)
 
-exception Empty
-
-let pop_now_exn ({closed; queue; empty; current_size; _} as q) =
-  if Queue.is_empty queue then if closed then raise Closed else raise Empty ;
-  let (elt_size, elt) = Queue.pop queue in
-  if Queue.length queue = 0 then Lwt_condition.signal empty () ;
-  q.current_size <- current_size - elt_size ;
-  notify_pop q ;
-  elt
-
-let pop_now q =
-  match pop_now_exn q with exception Empty -> None | elt -> Some elt
+let pop_now ({closed; queue; empty; current_size; _} as q) =
+  (* We only check for closed-ness when the queue is empty to allow reading from
+     a closed pipe. This is because closing is just closing the write-end of the
+     pipe. *)
+  if Queue.is_empty queue && closed then raise Closed ;
+  Queue.take_opt queue
+  |> Stdlib.Option.map (fun (elt_size, elt) ->
+         if Queue.length queue = 0 then Lwt_condition.signal empty () ;
+         q.current_size <- current_size - elt_size ;
+         notify_pop q ;
+         elt)
 
 let rec values_available q =
   if is_empty q then
@@ -184,10 +177,10 @@ let rec values_available q =
   else Lwt.return_unit
 
 let rec pop_all_loop q acc =
-  match pop_now_exn q with
-  | exception Empty ->
+  match pop_now q with
+  | None ->
       List.rev acc
-  | e ->
+  | Some e ->
       pop_all_loop q (e :: acc)
 
 let pop_all q = pop q >>= fun e -> Lwt.return (pop_all_loop q [e])
@@ -203,4 +196,4 @@ let close q =
 let rec iter q ~f =
   Lwt.catch
     (fun () -> pop q >>= fun elt -> f elt >>= fun () -> iter q ~f)
-    (function Closed -> Lwt.return_unit | exn -> Lwt.fail exn)
+    (function Closed -> Lwt.return_unit | exn -> raise exn)
