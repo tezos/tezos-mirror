@@ -140,6 +140,8 @@ let rec type_size : type t. t ty -> int =
       1
   | Operation_t _ ->
       1
+  | Baker_operation_t _ ->
+      1
   | Chain_id_t _ ->
       1
   | Never_t _ ->
@@ -934,6 +936,8 @@ let rec unparse_ty :
       return ctxt (T_address, [], unparse_type_annot tname)
   | Operation_t tname ->
       return ctxt (T_operation, [], unparse_type_annot tname)
+  | Baker_operation_t tname ->
+      return ctxt (T_baker_operation, [], unparse_type_annot tname)
   | Chain_id_t tname ->
       return ctxt (T_chain_id, [], unparse_type_annot tname)
   | Never_t tname ->
@@ -1093,6 +1097,7 @@ let rec comparable_ty_of_ty :
   | Big_map_t _
   | Contract_t _
   | Operation_t _
+  | Baker_operation_t _
   | Bls12_381_fr_t _
   | Bls12_381_g1_t _
   | Bls12_381_g2_t _
@@ -1147,6 +1152,8 @@ let name_of_ty : type a. a ty -> type_annot option = function
   | Signature_t tname ->
       tname
   | Operation_t tname ->
+      tname
+  | Baker_operation_t tname ->
       tname
   | Chain_id_t tname ->
       tname
@@ -1245,6 +1252,8 @@ let rec check_dupable_ty :
   | Contract_t (_, _) ->
       ok ctxt
   | Operation_t _ ->
+      ok ctxt
+  | Baker_operation_t _ ->
       ok ctxt
   | Chain_id_t _ ->
       ok ctxt
@@ -1493,6 +1502,9 @@ let merge_types :
         merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Never_t tname, ctxt)
     | (Operation_t tn1, Operation_t tn2) ->
         merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Operation_t tname, ctxt)
+    | (Baker_operation_t tn1, Baker_operation_t tn2) ->
+        merge_type_annot tn1 tn2
+        >|? fun tname -> (Eq, Baker_operation_t tname, ctxt)
     | (Bls12_381_g1_t tn1, Bls12_381_g1_t tn2) ->
         merge_type_annot tn1 tn2
         >|? fun tname -> (Eq, Bls12_381_g1_t tname, ctxt)
@@ -1965,6 +1977,11 @@ and parse_ty :
         parse_type_annot loc annot
         >>? fun ty_name -> ok (Ex_ty (Operation_t ty_name), ctxt)
       else error (Unexpected_operation loc)
+  | Prim (loc, T_baker_operation, [], annot) ->
+      if allow_operation then
+        parse_type_annot loc annot
+        >>? fun ty_name -> ok (Ex_ty (Baker_operation_t ty_name), ctxt)
+      else error (Unexpected_operation loc)
   | Prim (loc, T_chain_id, [], annot) ->
       parse_type_annot loc annot
       >>? fun ty_name -> ok (Ex_ty (Chain_id_t ty_name), ctxt)
@@ -2266,6 +2283,8 @@ let check_packable ~legacy loc root =
     | Sapling_state_t _ ->
         error (Unexpected_lazy_storage loc)
     | Operation_t _ ->
+        error (Unexpected_operation loc)
+    | Baker_operation_t _ ->
         error (Unexpected_operation loc)
     | Unit_t _ ->
         ok_unit
@@ -3133,6 +3152,10 @@ let rec parse_data :
   | (Signature_t _, expr) ->
       Lwt.return @@ traced_no_lwt @@ parse_signature ctxt expr
   | (Operation_t _, _) ->
+      (* operations cannot appear in parameters or storage,
+         the protocol should never parse the bytes of an operation *)
+      assert false
+  | (Baker_operation_t _, _) ->
       (* operations cannot appear in parameters or storage,
          the protocol should never parse the bytes of an operation *)
       assert false
@@ -6484,6 +6507,13 @@ let unparse_operation ctxt (op, _big_map_diff) =
   Gas.consume ctxt (Unparse_costs.operation bytes)
   >|? fun ctxt -> (Bytes (-1, bytes), ctxt)
 
+let unparse_baker_operation ctxt op =
+  let bytes =
+    Data_encoding.Binary.to_bytes_exn Operation.internal_operation_encoding op
+  in
+  Gas.consume ctxt (Unparse_costs.operation bytes)
+  >|? fun ctxt -> (Bytes (-1, bytes), ctxt)
+
 let unparse_chain_id ctxt mode chain_id =
   match mode with
   | Optimized | Optimized_legacy ->
@@ -6699,6 +6729,8 @@ let rec unparse_data :
       Lwt.return @@ unparse_baker_hash ctxt mode k
   | (Operation_t _, operation) ->
       Lwt.return @@ unparse_operation ctxt operation
+  | (Baker_operation_t _, baker_operation) ->
+      Lwt.return @@ unparse_baker_operation ctxt baker_operation
   | (Chain_id_t _, chain_id) ->
       Lwt.return @@ unparse_chain_id ctxt mode chain_id
   | (Bls12_381_g1_t _, x) ->
@@ -7162,6 +7194,8 @@ let rec has_lazy_storage : type t. t ty -> t has_lazy_storage =
   | Contract_t (_, _) ->
       False_f
   | Operation_t _ ->
+      False_f
+  | Baker_operation_t _ ->
       False_f
   | Chain_id_t _ ->
       False_f

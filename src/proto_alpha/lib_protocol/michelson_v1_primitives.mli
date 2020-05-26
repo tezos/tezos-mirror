@@ -176,6 +176,7 @@ type prim =
   | T_bls12_381_fr
   | T_ticket
   | T_baker_hash
+  | T_baker_operation
 
 (** Auxiliary types for error documentation.
     All the prim constructor prefixes must match their namespace. *)
