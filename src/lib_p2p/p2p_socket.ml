@@ -451,7 +451,10 @@ module Reader = struct
     | Error (Canceled :: _) | Error (Exn Lwt_pipe.Closed :: _) ->
         lwt_debug "connection closed to %a" P2p_peer.Id.pp st.conn.info.peer_id
     | Error _ as err ->
-        Lwt_pipe.safe_push_now st.messages err ;
+        if Lwt_pipe.is_closed st.messages then ()
+        else
+          (* best-effort push to the messages, we ignore failures *)
+          (ignore : bool -> unit) @@ Lwt_pipe.push_now st.messages err ;
         Lwt_canceler.cancel st.canceler
 
   let run ?size conn encoding canceler =
@@ -611,10 +614,13 @@ module Writer = struct
     Lwt_canceler.on_cancel st.canceler (fun () ->
         Lwt_pipe.close st.messages ;
         while not (Lwt_pipe.is_empty st.messages) do
-          let (_, w) = Lwt_pipe.pop_now_exn st.messages in
-          Option.iter
-            (fun u -> Lwt.wakeup_later u (error (Exn Lwt_pipe.Closed)))
-            w
+          match Lwt_pipe.pop_now st.messages with
+          | None ->
+              assert false
+          | Some (_, None) ->
+              ()
+          | Some (_, Some w) ->
+              Lwt.wakeup_later w (error (Exn Lwt_pipe.Closed))
         done ;
         Lwt.return_unit) ;
     st.worker <-

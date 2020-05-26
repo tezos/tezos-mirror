@@ -36,6 +36,8 @@ type 'a t = {
   empty : unit Lwt_condition.t;
 }
 
+let is_closed {closed; _} = closed
+
 let push_overhead = 4 * (Sys.word_size / 8)
 
 let create ?size () =

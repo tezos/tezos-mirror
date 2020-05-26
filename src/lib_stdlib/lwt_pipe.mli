@@ -131,5 +131,7 @@ exception Closed
 *)
 val close : 'a t -> unit
 
+val is_closed : 'a t -> bool
+
 (** The allocated size in bytes when pushing in the queue. *)
 val push_overhead : int

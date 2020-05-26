@@ -397,7 +397,10 @@ struct
 
     let push_request_now (w : infinite queue t) request =
       let (Queue_buffer message_queue) = w.buffer in
-      Lwt_pipe.push_now_exn message_queue (queue_item request)
+      if Lwt_pipe.is_closed message_queue then ()
+      else
+        (* Queues are infinite so the push always succeeds *)
+        assert (Lwt_pipe.push_now message_queue (queue_item request))
 
     let try_push_request_now (w : bounded queue t) request =
       let (Bounded_buffer message_queue) = w.buffer in
