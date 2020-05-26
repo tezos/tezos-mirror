@@ -187,3 +187,8 @@ let rec fold_left_s_n ~n f acc l =
     | x :: l ->
         f acc x
         >>= fun acc -> (fold_left_s_n [@ocaml.tailcall]) f ~n:(n - 1) acc l
+
+let dont_wait handler f =
+  let open Lwt in
+  let p = apply f () in
+  on_failure p handler

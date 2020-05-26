@@ -47,3 +47,10 @@ val unless : bool -> (unit -> unit Lwt.t) -> unit Lwt.t
     containing the result of the first batch and the unprocessed elements *)
 val fold_left_s_n :
   n:int -> ('a -> 'b -> 'a Lwt.t) -> 'a -> 'b list -> ('a * 'b list) Lwt.t
+
+(** [dont_wait handler f] calls [f ()] and essentially ignores the returned
+    promise. In particular it does not wait for the promise to resolve.
+
+    This is meant as an alternative to [Lwt.async] which we make use of for
+    [Lwt_exit] and that, as a result, we shouldn't use for other purpose. *)
+val dont_wait : (exn -> unit) -> (unit -> unit Lwt.t) -> unit
