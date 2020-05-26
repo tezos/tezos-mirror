@@ -27,6 +27,47 @@ open Protocol
 open Alpha_context
 open Apply_results
 
+type _ annotated_manager_operation =
+  | Manager_info : {
+      fee : Tez.t option;
+      operation : 'kind manager_operation;
+      gas_limit : Z.t option;
+      storage_limit : Z.t option;
+    }
+      -> 'kind annotated_manager_operation
+
+type packed_annotated_manager_operation =
+  | Annotated_manager_operation :
+      'kind annotated_manager_operation
+      -> packed_annotated_manager_operation
+
+(** The [annotated_manager_operation_list] type helps making
+    [contents_list] from a list of [manager_operation]s.
+    Its construction mimics [contents_list] in order to keep
+    consistent types when calling [inject_manager_operation]
+    and [inject_operation].*)
+type _ annotated_manager_operation_list =
+  | Single_manager :
+      'kind annotated_manager_operation
+      -> 'kind annotated_manager_operation_list
+  | Cons_manager :
+      'kind annotated_manager_operation
+      * 'rest annotated_manager_operation_list
+      -> ('kind * 'rest) annotated_manager_operation_list
+
+type packed_annotated_manager_operation_list =
+  | Manager_list :
+      'kind annotated_manager_operation_list
+      -> packed_annotated_manager_operation_list
+
+val manager_of_list :
+  packed_annotated_manager_operation list ->
+  packed_annotated_manager_operation_list
+
+val manager_to_list :
+  packed_annotated_manager_operation_list ->
+  packed_annotated_manager_operation list
+
 type 'kind preapply_result =
   Operation_hash.t * 'kind operation * 'kind operation_metadata
 

@@ -58,6 +58,49 @@ type 'kind result_list =
 
 type 'kind result = Operation_hash.t * 'kind contents * 'kind contents_result
 
+type _ annotated_manager_operation =
+  | Manager_info : {
+      fee : Tez.t option;
+      operation : 'kind manager_operation;
+      gas_limit : Z.t option;
+      storage_limit : Z.t option;
+    }
+      -> 'kind annotated_manager_operation
+
+type packed_annotated_manager_operation =
+  | Annotated_manager_operation :
+      'kind annotated_manager_operation
+      -> packed_annotated_manager_operation
+
+type _ annotated_manager_operation_list =
+  | Single_manager :
+      'kind annotated_manager_operation
+      -> 'kind annotated_manager_operation_list
+  | Cons_manager :
+      'kind annotated_manager_operation
+      * 'rest annotated_manager_operation_list
+      -> ('kind * 'rest) annotated_manager_operation_list
+
+type packed_annotated_manager_operation_list =
+  | Manager_list :
+      'kind annotated_manager_operation_list
+      -> packed_annotated_manager_operation_list
+
+let rec manager_to_list = function
+  | Manager_list (Single_manager o) ->
+      [Annotated_manager_operation o]
+  | Manager_list (Cons_manager (o, os)) ->
+      Annotated_manager_operation o :: manager_to_list (Manager_list os)
+
+let rec manager_of_list = function
+  | [] ->
+      assert false
+  | [Annotated_manager_operation o] ->
+      Manager_list (Single_manager o)
+  | Annotated_manager_operation o :: os ->
+      let (Manager_list os) = manager_of_list os in
+      Manager_list (Cons_manager (o, os))
+
 let get_manager_operation_gas_and_fee contents =
   let open Operation in
   let l = to_list (Contents_list contents) in
