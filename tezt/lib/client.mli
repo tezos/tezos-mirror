@@ -48,6 +48,36 @@ val create :
   unit ->
   t
 
+(** {2 RPC calls} *)
+
+(** Paths for RPCs.
+
+    For instance, [["chains"; "main"; "blocks"; "head"]]
+    denotes [/chains/main/blocks/head]. *)
+type path = string list
+
+(** Query strings for RPCs.
+
+    For instance, [["key1", "value1"; "key2", "value2"]]
+    denotes [?key1=value1&key2=value2]. *)
+type query_string = (string * string) list
+
+(** HTTP methods for RPCs. *)
+type meth = GET | PUT | POST
+
+(** Use the client to call an RPC.
+
+    Run [tezos-client rpc meth path?query_string with data].
+    Fail the test if the RPC call failed. *)
+val rpc :
+  ?node:Node.t ->
+  ?data:JSON.u ->
+  ?query_string:query_string ->
+  meth ->
+  path ->
+  t ->
+  JSON.t Lwt.t
+
 (** {2 Admin Client Commands} *)
 
 module Admin : sig

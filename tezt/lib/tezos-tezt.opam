@@ -8,6 +8,7 @@ license: "MIT"
 depends: [
   "dune" { >= "1.11" }
   "re"
+  "hex"
   "lwt"
   "ezjsonm"
 ]

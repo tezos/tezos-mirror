@@ -81,6 +81,56 @@ let run_command ?(needs_node = true) ?(admin = false) ?node client command =
     (if admin then Constant.tezos_admin_client else Constant.tezos_client)
     (base_args ?node client @ command)
 
+let url_encode str =
+  let buffer = Buffer.create (String.length str * 3) in
+  for i = 0 to String.length str - 1 do
+    match str.[i] with
+    | ('a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '.' | '_' | '-' | '/') as c ->
+        Buffer.add_char buffer c
+    | c ->
+        Buffer.add_char buffer '%' ;
+        let (c1, c2) = Hex.of_char c in
+        Buffer.add_char buffer c1 ; Buffer.add_char buffer c2
+  done ;
+  let result = Buffer.contents buffer in
+  Buffer.reset buffer ; result
+
+type meth = GET | PUT | POST
+
+let string_of_meth = function GET -> "get" | PUT -> "put" | POST -> "post"
+
+type path = string list
+
+let string_of_path path = "/" ^ String.concat "/" (List.map url_encode path)
+
+type query_string = (string * string) list
+
+let string_of_query_string = function
+  | [] ->
+      ""
+  | qs ->
+      let qs' = List.map (fun (k, v) -> (url_encode k, url_encode v)) qs in
+      "?" ^ String.concat "&" @@ List.map (fun (k, v) -> k ^ "=" ^ v) qs'
+
+let rpc ?node ?data ?query_string meth path client : JSON.t Lwt.t =
+  check_node_is_specified ?node ["rpc"] client ;
+  let data =
+    Option.fold ~none:[] ~some:(fun x -> ["with"; JSON.encode_u x]) data
+  in
+  let query_string =
+    Option.fold ~none:"" ~some:string_of_query_string query_string
+  in
+  let path = string_of_path path in
+  let full_path = path ^ query_string in
+  let* output =
+    Process.run_and_read_stdout
+      ~name:client.name
+      ~color:client.color
+      Constant.tezos_client
+      (base_args ?node client @ ["rpc"; string_of_meth meth; full_path] @ data)
+  in
+  return (JSON.parse ~origin:(path ^ " response") output)
+
 module Admin = struct
   let run_command = run_command ~admin:true
 

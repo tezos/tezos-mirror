@@ -324,3 +324,22 @@ let stdout process = get_echo_lwt_channel process.stdout
 let stderr process = get_echo_lwt_channel process.stderr
 
 let name process = process.name
+
+let run_and_read_stdout ?log_status_on_exit ?name ?color ?env command arguments
+    =
+  let process =
+    spawn ?log_status_on_exit ?name ?color ?env command arguments
+  in
+  let* status = wait process
+  and* output =
+    let stream = Lwt_io.read_lines (stdout process) in
+    let buffer = Buffer.create 1024 in
+    let* () = Lwt_stream.iter (Buffer.add_string buffer) stream in
+    let result = Buffer.contents buffer in
+    Buffer.reset buffer ; return result
+  in
+  match status with
+  | WEXITED 0 ->
+      return output
+  | _ ->
+      raise (Failed {name = process.name; command; arguments; status})

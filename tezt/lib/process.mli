@@ -101,3 +101,14 @@ val stderr : t -> Lwt_io.input_channel
 
 (** Get the name which was given to {!spawn}. *)
 val name : t -> string
+
+(** Spawn a process such as [run]. If the exit code is 0,
+    it also returns the output of the command.  *)
+val run_and_read_stdout :
+  ?log_status_on_exit:bool ->
+  ?name:string ->
+  ?color:Log.Color.t ->
+  ?env:(string * string) list ->
+  string ->
+  string list ->
+  string Lwt.t
