@@ -29,6 +29,8 @@ open Alpha_context
 module Cost_of : sig
   val manager_operation : Gas.cost
 
+  val baker_operation : Gas.cost
+
   module Legacy : sig
     val z_to_int64 : Gas.cost
 
@@ -224,6 +226,8 @@ module Cost_of : sig
     val compare : 'a Script_typed_ir.comparable_ty -> 'a -> 'a -> Gas.cost
 
     val apply : Gas.cost
+
+    val baker_operation : Gas.cost
   end
 
   module Typechecking : sig

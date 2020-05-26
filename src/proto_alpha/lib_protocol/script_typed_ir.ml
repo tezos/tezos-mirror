@@ -104,6 +104,8 @@ type ('key, 'value) map =
 
 type operation = packed_internal_operation * Lazy_storage.diffs option
 
+type baker_operation = packed_internal_operation
+
 type ('arg, 'storage) script = {
   code : (('arg, 'storage) pair, (operation boxed_list, 'storage) pair) lambda;
   arg_type : 'arg ty;
@@ -156,6 +158,7 @@ and 'ty ty =
       -> ('k, 'v) big_map ty
   | Contract_t : 'arg ty * type_annot option -> 'arg typed_contract ty
   | Operation_t : type_annot option -> operation ty
+  | Baker_operation_t : type_annot option -> baker_operation ty
   | Chain_id_t : type_annot option -> Chain_id.t ty
   | Never_t : type_annot option -> never ty
   | Bls12_381_g1_t : type_annot option -> Bls12_381.G1.t ty

@@ -95,6 +95,8 @@ module Cost_of = struct
 
   let manager_operation = step_cost 10_000
 
+  let baker_operation = manager_operation
+
   module Legacy = struct
     let zint z = alloc_bits_cost (Z.numbits z)
 
@@ -438,6 +440,8 @@ module Cost_of = struct
       atomic_step_cost (20 + ((n lsr 1) + (n lsr 2) + (n lsr 4)))
 
     let apply = alloc_cost 8 +@ step_cost 1
+
+    let baker_operation = step_cost 10
 
     let rec compare : type a. a Script_typed_ir.comparable_ty -> a -> a -> cost
         =

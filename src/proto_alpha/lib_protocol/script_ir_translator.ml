@@ -140,6 +140,8 @@ let rec type_size : type t. t ty -> int =
       1
   | Operation_t _ ->
       1
+  | Baker_operation_t _ ->
+      1
   | Chain_id_t _ ->
       1
   | Never_t _ ->
@@ -922,6 +924,8 @@ let rec comparable_ty_of_ty_no_gas : type a. a ty -> a comparable_ty option =
       None
   | Bls12_381_g2_t _ ->
       None
+  | Baker_operation_t _ ->
+      None
 
 let add_field_annot a var = function
   | Prim (loc, prim, args, annots) ->
@@ -1015,6 +1019,8 @@ let rec unparse_ty :
       return ctxt (T_address, [], unparse_type_annot tname)
   | Operation_t tname ->
       return ctxt (T_operation, [], unparse_type_annot tname)
+  | Baker_operation_t tname ->
+      return ctxt (T_baker_operation, [], unparse_type_annot tname)
   | Chain_id_t tname ->
       return ctxt (T_chain_id, [], unparse_type_annot tname)
   | Never_t tname ->
@@ -1135,6 +1141,8 @@ let name_of_ty : type a. a ty -> type_annot option = function
   | Signature_t tname ->
       tname
   | Operation_t tname ->
+      tname
+  | Baker_operation_t tname ->
       tname
   | Chain_id_t tname ->
       tname
@@ -1412,6 +1420,11 @@ let merge_types :
         >>? fun ctxt ->
         merge_type_annot tn1 tn2
         >|? fun tname -> (Eq, Bls12_381_fr_t tname, ctxt)
+    | (Baker_operation_t tn1, Baker_operation_t tn2) ->
+        consume ctxt 0
+        >>? fun ctxt ->
+        merge_type_annot tn1 tn2
+        >|? fun tname -> (Eq, Baker_operation_t tname, ctxt)
     | (Map_t (tal, tar, tn1), Map_t (tbl, tbr, tn2)) ->
         consume ctxt 2
         >>? fun ctxt ->
@@ -1873,6 +1886,13 @@ and parse_ty :
         Gas.consume ctxt (Typecheck_costs.type_ 0)
         >|? fun ctxt -> (Ex_ty (Operation_t ty_name), ctxt)
       else error (Unexpected_operation loc)
+  | Prim (loc, T_baker_operation, [], annot) ->
+      if allow_operation then
+        parse_type_annot loc annot
+        >>? fun ty_name ->
+        Gas.consume ctxt (Typecheck_costs.type_ 0)
+        >|? fun ctxt -> (Ex_ty (Baker_operation_t ty_name), ctxt)
+      else error (Unexpected_operation loc)
   | Prim (loc, T_chain_id, [], annot) ->
       parse_type_annot loc annot
       >>? fun ty_name ->
@@ -2153,6 +2173,8 @@ let check_packable ~legacy loc root =
     | Big_map_t _ ->
         error (Unexpected_big_map loc)
     | Operation_t _ ->
+        error (Unexpected_operation loc)
+    | Baker_operation_t _ ->
         error (Unexpected_operation loc)
     | Unit_t _ ->
         ok_unit
@@ -2645,7 +2667,7 @@ let rec parse_data :
       traced_fail
         (Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr))
   (* Operations *)
-  | (Operation_t _, _) ->
+  | (Operation_t _, _) | (Baker_operation_t _, _) ->
       (* operations cannot appear in parameters or storage,
            the protocol should never parse the bytes of an operation *)
       assert false
@@ -5767,6 +5789,15 @@ let rec unparse_data :
             (Bytes (-1, bytes), ctxt)
         | Readable ->
             (String (-1, Chain_id.to_b58check chain_id), ctxt) )
+  | (Baker_operation_t _, op) ->
+      let bytes =
+        Data_encoding.Binary.to_bytes_exn
+          Operation.internal_operation_encoding
+          op
+      in
+      Lwt.return
+        ( Gas.consume ctxt (Unparse_costs.operation bytes)
+        >|? fun ctxt -> (Bytes (-1, bytes), ctxt) )
   | (Bls12_381_g1_t _, x) ->
       let bytes = Bls12_381.G1.to_bytes x in
       Lwt.return
@@ -6171,6 +6202,8 @@ let rec has_lazy_storage : type t. t ty -> t has_lazy_storage =
   | Contract_t (_, _) ->
       False_f
   | Operation_t _ ->
+      False_f
+  | Baker_operation_t _ ->
       False_f
   | Chain_id_t _ ->
       False_f
