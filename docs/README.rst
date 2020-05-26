@@ -12,7 +12,8 @@ To build the documentation, you can use the main Makefile target ``doc-html``
 
 .. code-block:: bash
 
-    make html
+    # in the project root directory
+    make doc-html
 
 The documentation is built by Sphinx, and uses the Read The Docs theme.
 
