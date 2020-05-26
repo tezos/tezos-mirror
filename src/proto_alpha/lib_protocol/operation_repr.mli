@@ -50,11 +50,14 @@ module Kind : sig
 
   type failing_noop = Failing_noop_kind
 
+  type baker_registration = Baker_registration_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
     | Origination_manager_kind : origination manager
     | Delegation_manager_kind : delegation manager
+    | Baker_registration_manager_kind : baker_registration manager
 end
 
 type raw = Operation.t = {shell : Operation.shell_header; proto : bytes}
@@ -142,6 +145,13 @@ and _ manager_operation =
   | Delegation :
       Signature.Public_key_hash.t option
       -> Kind.delegation manager_operation
+  | Baker_registration : {
+      credit : Tez_repr.tez;
+      consensus_key : Signature.Public_key.t;
+      threshold : int;
+      owner_keys : Signature.Public_key.t list;
+    }
+      -> Kind.baker_registration manager_operation
 
 and counter = Z.t
 
@@ -248,6 +258,8 @@ module Encoding : sig
 
   val delegation_case : Kind.delegation Kind.manager case
 
+  val baker_registration_case : Kind.baker_registration Kind.manager case
+
   module Manager_operations : sig
     type 'b case =
       | MCase : {
@@ -267,5 +279,7 @@ module Encoding : sig
     val origination_case : Kind.origination case
 
     val delegation_case : Kind.delegation case
+
+    val baker_registration_case : Kind.baker_registration case
   end
 end

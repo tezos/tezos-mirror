@@ -1096,7 +1096,7 @@ let rec step :
       fresh_internal_nonce ctxt
       >>?= fun (ctxt, nonce) ->
       logged_return
-        ( ( ( Internal_operation
+        ( ( ( Internal_manager_operation
                 {source = step_constants.self; operation; nonce},
               lazy_storage_diff ),
             rest ),
@@ -1155,7 +1155,7 @@ let rec step :
       fresh_internal_nonce ctxt
       >>?= fun (ctxt, nonce) ->
       logged_return
-        ( ( ( Internal_operation
+        ( ( ( Internal_manager_operation
                 {source = step_constants.self; operation; nonce},
               lazy_storage_diff ),
             ((contract, "default"), rest) ),
@@ -1165,7 +1165,7 @@ let rec step :
       fresh_internal_nonce ctxt
       >>?= fun (ctxt, nonce) ->
       logged_return
-        ( ( ( Internal_operation
+        ( ( ( Internal_manager_operation
                 {source = step_constants.self; operation; nonce},
               None ),
             rest ),
