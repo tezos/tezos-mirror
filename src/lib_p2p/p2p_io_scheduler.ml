@@ -86,7 +86,11 @@ module Scheduler (IO : IO) = struct
   let waiter st conn =
     assert (Lwt.state conn.current_pop <> Sleep) ;
     conn.current_pop <- IO.pop conn.in_param ;
-    Lwt.async (fun () ->
+    Lwt_utils.dont_wait
+      (fun exc ->
+        Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc) ;
+        Lwt_exit.exit 1)
+      (fun () ->
         conn.current_pop
         >>= fun res ->
         conn.current_push
@@ -375,7 +379,11 @@ let write_size bytes =
 
 let register st fd =
   if st.closed then (
-    Lwt.async (fun () -> P2p_fd.close fd) ;
+    Lwt_utils.dont_wait
+      (fun exc ->
+        Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc) ;
+        Lwt_exit.exit 1)
+      (fun () -> P2p_fd.close fd) ;
     raise Closed )
   else
     let id = P2p_fd.id fd in

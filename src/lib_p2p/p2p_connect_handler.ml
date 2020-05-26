@@ -253,7 +253,10 @@ let is_acceptable t connection_point_info peer_info incoming version =
     && not (P2p_peer_state.Info.trusted peer_info)
   in
   if unexpected then (
-    Lwt.async (fun () -> Events.(emit peer_rejected) ()) ;
+    Lwt_utils.dont_wait
+      (fun exc ->
+        Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
+      (fun () -> Events.(emit peer_rejected) ()) ;
     error P2p_errors.Private_mode )
   else
     (* checking if point is acceptable *)
@@ -532,11 +535,20 @@ let accept t fd point =
     t.config.max_incoming_connections <= P2p_point.Table.length t.incoming
     (* silently ignore banned points *)
     || P2p_pool.Points.banned t.pool point
-  then Lwt.async (fun () -> P2p_fd.close fd)
+  then
+    Lwt_utils.dont_wait
+      (fun exc ->
+        Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc) ;
+        Lwt_exit.exit 1)
+      (fun () -> P2p_fd.close fd)
   else
     let canceler = Lwt_canceler.create () in
     P2p_point.Table.add t.incoming point canceler ;
-    Lwt.async (fun () ->
+    Lwt_utils.dont_wait
+      (fun exc ->
+        Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc) ;
+        Lwt_exit.exit 1)
+      (fun () ->
         with_timeout
           ~canceler
           (Systime_os.sleep t.config.authentication_timeout)

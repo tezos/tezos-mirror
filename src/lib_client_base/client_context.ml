@@ -121,6 +121,8 @@ class type ui =
   object
     method sleep : float -> unit Lwt.t
 
+    method exit : 'a. int -> 'a
+
     method now : unit -> Ptime.t
   end
 
@@ -196,6 +198,8 @@ class proxy_context (obj : full) =
       obj#prompt_password
 
     method sleep : float -> unit Lwt.t = obj#sleep
+
+    method exit : 'a. int -> 'a = obj#exit
 
     method now : unit -> Ptime.t = obj#now
 

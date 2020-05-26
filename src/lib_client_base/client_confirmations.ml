@@ -253,7 +253,11 @@ let lookup_operation_in_previous_blocks (ctxt : #Client_context.full) ~chain
 let wait_for_bootstrapped ?(retry = fun f x -> f x)
     (ctxt : #Client_context.full) =
   let display = ref false in
-  Lwt.async (fun () ->
+  Lwt_utils.dont_wait
+    (fun exc ->
+      Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc) ;
+      ctxt#exit 1)
+    (fun () ->
       ctxt#sleep 0.3
       >>= fun () ->
       if not !display then (

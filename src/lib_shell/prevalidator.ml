@@ -327,7 +327,12 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
             }
     | `None ->
         pv.advertisement <- `Pending mempool ;
-        Lwt.async (fun () ->
+        Lwt_utils.dont_wait
+          (fun exc ->
+            Format.eprintf
+              "Uncaught exception: %s\n%!"
+              (Printexc.to_string exc))
+          (fun () ->
             Lwt_unix.sleep 0.01
             >>= fun () ->
             Worker.Queue.push_request_now w Advertise ;

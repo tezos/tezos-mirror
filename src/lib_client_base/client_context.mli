@@ -104,6 +104,8 @@ class type ui =
   object
     method sleep : float -> unit Lwt.t
 
+    method exit : int -> 'a
+
     method now : unit -> Ptime.t
   end
 

@@ -115,7 +115,11 @@ let run ?magic_bytes ?timeout ~check_high_watermark ~require_auth
   let rec loop fd =
     Lwt_unix.accept fd
     >>= fun (cfd, _) ->
-    Lwt.async (fun () ->
+    Lwt_utils.dont_wait
+      (fun exc ->
+        Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc) ;
+        Lwt_exit.exit 1)
+      (fun () ->
         protect
           ~on_error:(function
             | Exn End_of_file :: _ ->

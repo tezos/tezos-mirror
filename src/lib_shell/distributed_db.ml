@@ -214,7 +214,13 @@ let activate
             }
         in
         P2p.iter_connections p2p (fun _peer_id conn ->
-            Lwt.async (fun () ->
+            Lwt_utils.dont_wait
+              (fun exc ->
+                Format.eprintf
+                  "Uncaught exception: %s\n%!"
+                  (Printexc.to_string exc) ;
+                Lwt_exit.exit 1)
+              (fun () ->
                 P2p.send p2p conn (Get_current_branch chain_id)
                 >>= fun _ -> Lwt.return_unit)) ;
         Chain_id.Table.add active_chains chain_id local_db ;
@@ -234,7 +240,11 @@ let deactivate chain_db =
     chain_db.reader_chain_db.active_peers :=
       P2p_peer.Set.remove gid !(chain_db.reader_chain_db.active_peers) ;
     P2p_peer.Table.remove chain_db.reader_chain_db.active_connections gid ;
-    Lwt.async (fun () ->
+    Lwt_utils.dont_wait
+      (fun exc ->
+        Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc) ;
+        Lwt_exit.exit 1)
+      (fun () ->
         P2p.send p2p conn (Deactivate chain_id) >>= fun _ -> Lwt.return_unit)
   in
   P2p_peer.Table.iter f chain_db.reader_chain_db.active_connections ;
