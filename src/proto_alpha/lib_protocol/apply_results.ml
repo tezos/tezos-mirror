@@ -96,32 +96,126 @@ type _ successful_manager_operation_result =
     }
       -> Kind.baker_registration successful_manager_operation_result
 
+type _ successful_baker_operation_result =
+  | Baker_proposals_result : {
+      consumed_gas : Z.t;
+    }
+      -> Kind.proposals successful_baker_operation_result
+  | Baker_ballot_result : {
+      consumed_gas : Z.t;
+    }
+      -> Kind.ballot successful_baker_operation_result
+  | Set_baker_active_result : {
+      active : bool;
+      consumed_gas : Z.t;
+    }
+      -> Kind.set_baker_active successful_baker_operation_result
+  | Set_baker_consensus_key_result : {
+      consumed_gas : Z.t;
+    }
+      -> Kind.set_baker_consensus_key successful_baker_operation_result
+  | Set_baker_pvss_key_result : {
+      consumed_gas : Z.t;
+    }
+      -> Kind.set_baker_pvss_key successful_baker_operation_result
+
 type packed_successful_manager_operation_result =
   | Successful_manager_result :
       'kind successful_manager_operation_result
       -> packed_successful_manager_operation_result
 
-type 'kind manager_operation_result =
-  | Applied of 'kind successful_manager_operation_result
-  | Backtracked of
-      'kind successful_manager_operation_result * error list option
-  | Failed : 'kind Kind.manager * error list -> 'kind manager_operation_result
-  | Skipped : 'kind Kind.manager -> 'kind manager_operation_result
+type packed_successful_baker_operation_result =
+  | Successful_baker_result :
+      'kind successful_baker_operation_result
+      -> packed_successful_baker_operation_result
 
-type packed_internal_operation_result =
-  | Internal_operation_result :
-      'kind internal_operation * 'kind manager_operation_result
+type ('kind, 'successful_result) internal_operation_result =
+  | Applied of 'successful_result
+  | Backtracked of 'successful_result * error list option
+  | Failed :
+      'kind * error list
+      -> ('kind, 'successful_result) internal_operation_result
+  | Skipped : 'kind -> ('kind, 'successful_result) internal_operation_result
+
+type 'kind manager_operation_result =
+  ( 'kind Kind.manager,
+    'kind successful_manager_operation_result )
+  internal_operation_result
+
+type 'kind baker_operation_result =
+  ( 'kind Kind.baker,
+    'kind successful_baker_operation_result )
+  internal_operation_result
+
+and packed_internal_operation_result =
+  | Internal_manager_operation_result :
+      'kind internal_manager_operation * 'kind manager_operation_result
       -> packed_internal_operation_result
+  | Internal_baker_operation_result :
+      'kind internal_baker_operation * 'kind baker_operation_result
+      -> packed_internal_operation_result
+
+let make_internal_operation_case ~name ~result_encoding ~kind ~select ~proj
+    ~inj =
+  def (Format.asprintf "operation.alpha.operation_result.%s" name)
+  @@ union
+       ~tag_size:`Uint8
+       [ case
+           (Tag 0)
+           ~title:"Applied"
+           (merge_objs
+              (obj1 (req "status" (constant "applied")))
+              result_encoding)
+           (fun o ->
+             match o with
+             | Skipped _ | Failed _ | Backtracked _ ->
+                 None
+             | Applied o -> (
+               match select o with None -> None | Some o -> Some ((), proj o) ))
+           (fun ((), x) -> Applied (inj x));
+         case
+           (Tag 1)
+           ~title:"Failed"
+           (obj2
+              (req "status" (constant "failed"))
+              (req "errors" (list error_encoding)))
+           (function Failed (_, errs) -> Some ((), errs) | _ -> None)
+           (fun ((), errs) -> Failed (kind, errs));
+         case
+           (Tag 2)
+           ~title:"Skipped"
+           (obj1 (req "status" (constant "skipped")))
+           (function Skipped _ -> Some () | _ -> None)
+           (fun () -> Skipped kind);
+         case
+           (Tag 3)
+           ~title:"Backtracked"
+           (merge_objs
+              (obj2
+                 (req "status" (constant "backtracked"))
+                 (opt "errors" (list error_encoding)))
+              result_encoding)
+           (fun o ->
+             match o with
+             | Skipped _ | Failed _ | Applied _ ->
+                 None
+             | Backtracked (o, errs) -> (
+               match select o with
+               | None ->
+                   None
+               | Some o ->
+                   Some (((), errs), proj o) ))
+           (fun (((), errs), x) -> Backtracked (inj x, errs)) ]
 
 module Manager_result = struct
   type 'kind case =
     | MCase : {
         op_case : 'kind Operation.Encoding.Manager_operations.case;
-        encoding : 'a Data_encoding.t;
         kind : 'kind Kind.manager;
         iselect :
           packed_internal_operation_result ->
-          ('kind internal_operation * 'kind manager_operation_result) option;
+          ('kind internal_manager_operation * 'kind manager_operation_result)
+          option;
         select :
           packed_successful_manager_operation_result ->
           'kind successful_manager_operation_result option;
@@ -131,69 +225,28 @@ module Manager_result = struct
       }
         -> 'kind case
 
-  let make ~op_case ~encoding ~kind ~iselect ~select ~proj ~inj =
+  let make (type kind)
+      ~(op_case : kind Operation.Encoding.Manager_operations.case) ~encoding
+      ~kind ~iselect ~select ~proj ~inj =
     let (Operation.Encoding.Manager_operations.MCase {name; _}) = op_case in
-    let t =
-      def (Format.asprintf "operation.alpha.operation_result.%s" name)
-      @@ union
-           ~tag_size:`Uint8
-           [ case
-               (Tag 0)
-               ~title:"Applied"
-               (merge_objs (obj1 (req "status" (constant "applied"))) encoding)
-               (fun o ->
-                 match o with
-                 | Skipped _ | Failed _ | Backtracked _ ->
-                     None
-                 | Applied o -> (
-                   match select (Successful_manager_result o) with
-                   | None ->
-                       None
-                   | Some o ->
-                       Some ((), proj o) ))
-               (fun ((), x) -> Applied (inj x));
-             case
-               (Tag 1)
-               ~title:"Failed"
-               (obj2
-                  (req "status" (constant "failed"))
-                  (req "errors" (list error_encoding)))
-               (function Failed (_, errs) -> Some ((), errs) | _ -> None)
-               (fun ((), errs) -> Failed (kind, errs));
-             case
-               (Tag 2)
-               ~title:"Skipped"
-               (obj1 (req "status" (constant "skipped")))
-               (function Skipped _ -> Some () | _ -> None)
-               (fun () -> Skipped kind);
-             case
-               (Tag 3)
-               ~title:"Backtracked"
-               (merge_objs
-                  (obj2
-                     (req "status" (constant "backtracked"))
-                     (opt "errors" (list error_encoding)))
-                  encoding)
-               (fun o ->
-                 match o with
-                 | Skipped _ | Failed _ | Applied _ ->
-                     None
-                 | Backtracked (o, errs) -> (
-                   match select (Successful_manager_result o) with
-                   | None ->
-                       None
-                   | Some o ->
-                       Some (((), errs), proj o) ))
-               (fun (((), errs), x) -> Backtracked (inj x, errs)) ]
+    let t : kind manager_operation_result Data_encoding.t =
+      make_internal_operation_case
+        ~name
+        ~result_encoding:encoding
+        ~kind
+        ~select:(fun x -> select (Successful_manager_result x))
+        ~proj
+        ~inj
     in
-    MCase {op_case; encoding; kind; iselect; select; proj; inj; t}
+    MCase {op_case; kind; iselect; select; proj; inj; t}
 
   let reveal_case =
     make
       ~op_case:Operation.Encoding.Manager_operations.reveal_case
       ~encoding:Data_encoding.(obj1 (dft "consumed_gas" z Z.zero))
       ~iselect:(function
-        | Internal_operation_result (({operation = Reveal _; _} as op), res) ->
+        | Internal_manager_operation_result
+            (({operation = Reveal _; _} as op), res) ->
             Some (op, res)
         | _ ->
             None)
@@ -227,7 +280,7 @@ module Manager_result = struct
            (dft "allocated_destination_contract" bool false)
            (opt "lazy_storage_diff" Lazy_storage.encoding))
       ~iselect:(function
-        | Internal_operation_result
+        | Internal_manager_operation_result
             (({operation = Transaction _; _} as op), res) ->
             Some (op, res)
         | _ ->
@@ -492,48 +545,263 @@ module Manager_result = struct
             storage_size;
             paid_storage_size_diff;
           })
+
+  let encoding =
+    let make_manager (type kind) (MCase res_case : kind case) =
+      let (Operation.Encoding.Manager_operations.MCase op_case) =
+        res_case.op_case
+      in
+      case
+        (Tag op_case.tag)
+        ~title:op_case.name
+        (merge_objs
+           (obj3
+              (req "kind" (constant op_case.name))
+              (req "source" Contract.encoding)
+              (req "nonce" uint16))
+           (merge_objs op_case.encoding (obj1 (req "result" res_case.t))))
+        (fun op ->
+          match res_case.iselect op with
+          | Some (op, res) ->
+              Some (((), op.source, op.nonce), (op_case.proj op.operation, res))
+          | None ->
+              None)
+        (fun (((), source, nonce), (op, res)) ->
+          let op = {source; operation = op_case.inj op; nonce} in
+          Internal_manager_operation_result (op, res))
+    in
+    def "operation.alpha.internal_manager_operation_result"
+    @@ union
+         [ make_manager reveal_case;
+           make_manager transaction_case;
+           make_manager origination_legacy_case;
+           make_manager origination_case;
+           make_manager delegation_legacy_case;
+           make_manager delegation_case;
+           make_manager baker_registration_case ]
 end
+
+module Baker_result = struct
+  type 'kind case =
+    | BCase : {
+        op_case : 'kind Operation.Encoding.Baker_operations.case;
+        kind : 'kind Kind.baker;
+        iselect :
+          packed_internal_operation_result ->
+          ('kind internal_baker_operation * 'kind baker_operation_result)
+          option;
+        select :
+          packed_successful_baker_operation_result ->
+          'kind successful_baker_operation_result option;
+        proj : 'kind successful_baker_operation_result -> 'a;
+        inj : 'a -> 'kind successful_baker_operation_result;
+        t : 'kind baker_operation_result Data_encoding.t;
+      }
+        -> 'kind case
+
+  let make (type kind)
+      ~(op_case : kind Operation.Encoding.Baker_operations.case) ~encoding
+      ~kind ~iselect ~select ~proj ~inj =
+    let (Operation.Encoding.Baker_operations.BCase {name; _}) = op_case in
+    let t : kind baker_operation_result Data_encoding.t =
+      make_internal_operation_case
+        ~name
+        ~result_encoding:encoding
+        ~kind
+        ~select:(fun x -> select (Successful_baker_result x))
+        ~proj
+        ~inj
+    in
+    BCase {op_case; kind; iselect; select; proj; inj; t}
+
+  let baker_proposals_case =
+    make
+      ~op_case:Operation.Encoding.Baker_operations.baker_proposals_case
+      ~encoding:Data_encoding.(obj1 (dft "consumed_gas" z Z.zero))
+      ~iselect:(function
+        | Internal_baker_operation_result
+            (({operation = Baker_proposals _; _} as op), res) ->
+            Some (op, res)
+        | _ ->
+            None)
+      ~select:(function
+        | Successful_baker_result (Baker_proposals_result _ as op) ->
+            Some op
+        | _ ->
+            None)
+      ~proj:(function Baker_proposals_result {consumed_gas} -> consumed_gas)
+      ~kind:Kind.Baker_proposals_kind
+      ~inj:(fun consumed_gas -> Baker_proposals_result {consumed_gas})
+
+  let baker_ballot_case =
+    make
+      ~op_case:Operation.Encoding.Baker_operations.baker_ballot_case
+      ~encoding:Data_encoding.(obj1 (dft "consumed_gas" z Z.zero))
+      ~iselect:(function
+        | Internal_baker_operation_result
+            (({operation = Baker_ballot _; _} as op), res) ->
+            Some (op, res)
+        | _ ->
+            None)
+      ~select:(function
+        | Successful_baker_result (Baker_ballot_result _ as op) ->
+            Some op
+        | _ ->
+            None)
+      ~proj:(function Baker_ballot_result {consumed_gas} -> consumed_gas)
+      ~kind:Kind.Baker_ballot_kind
+      ~inj:(fun consumed_gas -> Baker_ballot_result {consumed_gas})
+
+  let set_baker_active_case =
+    make
+      ~op_case:Operation.Encoding.Baker_operations.set_baker_active_case
+      ~encoding:
+        Data_encoding.(obj2 (req "active" bool) (dft "consumed_gas" z Z.zero))
+      ~iselect:(function
+        | Internal_baker_operation_result
+            (({operation = Set_baker_active _; _} as op), res) ->
+            Some (op, res)
+        | _ ->
+            None)
+      ~select:(function
+        | Successful_baker_result (Set_baker_active_result _ as op) ->
+            Some op
+        | _ ->
+            None)
+      ~proj:(function
+        | Set_baker_active_result {active; consumed_gas} ->
+            (active, consumed_gas))
+      ~kind:Kind.Set_baker_active_baker_kind
+      ~inj:(fun (active, consumed_gas) ->
+        Set_baker_active_result {active; consumed_gas})
+
+  let set_baker_consensus_key_case =
+    make
+      ~op_case:Operation.Encoding.Baker_operations.set_baker_consensus_key_case
+      ~encoding:Data_encoding.(obj1 (dft "consumed_gas" z Z.zero))
+      ~iselect:(function
+        | Internal_baker_operation_result
+            (({operation = Set_baker_consensus_key _; _} as op), res) ->
+            Some (op, res)
+        | _ ->
+            None)
+      ~select:(function
+        | Successful_baker_result (Set_baker_consensus_key_result _ as op) ->
+            Some op
+        | _ ->
+            None)
+      ~proj:(function
+        | Set_baker_consensus_key_result {consumed_gas} -> consumed_gas)
+      ~kind:Kind.Set_baker_consensus_key_baker_kind
+      ~inj:(fun consumed_gas -> Set_baker_consensus_key_result {consumed_gas})
+
+  let set_baker_pvss_key_case =
+    make
+      ~op_case:Operation.Encoding.Baker_operations.set_baker_pvss_key_case
+      ~encoding:Data_encoding.(obj1 (dft "consumed_gas" z Z.zero))
+      ~iselect:(function
+        | Internal_baker_operation_result
+            (({operation = Set_baker_pvss_key _; _} as op), res) ->
+            Some (op, res)
+        | _ ->
+            None)
+      ~select:(function
+        | Successful_baker_result (Set_baker_pvss_key_result _ as op) ->
+            Some op
+        | _ ->
+            None)
+      ~proj:(function
+        | Set_baker_pvss_key_result {consumed_gas} -> consumed_gas)
+      ~kind:Kind.Set_baker_pvss_key_baker_kind
+      ~inj:(fun consumed_gas -> Set_baker_pvss_key_result {consumed_gas})
+
+  let encoding =
+    let make_baker (type kind) (BCase res_case : kind case) =
+      let (Operation.Encoding.Baker_operations.BCase op_case) =
+        res_case.op_case
+      in
+      case
+        (Tag op_case.tag)
+        ~title:op_case.name
+        (merge_objs
+           (obj3
+              (req "kind" (constant op_case.name))
+              (req "baker" Baker_hash.encoding)
+              (req "nonce" uint16))
+           (merge_objs op_case.encoding (obj1 (req "result" res_case.t))))
+        (fun op ->
+          match res_case.iselect op with
+          | Some (op, res) ->
+              Some (((), op.baker, op.nonce), (op_case.proj op.operation, res))
+          | None ->
+              None)
+        (fun (((), baker, nonce), (op, res)) ->
+          let op = {baker; operation = op_case.inj op; nonce} in
+          Internal_baker_operation_result (op, res))
+    in
+    def "operation.alpha.internal_baker_operation_result"
+    @@ union
+         [ make_baker baker_proposals_case;
+           make_baker baker_ballot_case;
+           make_baker set_baker_active_case;
+           make_baker set_baker_consensus_key_case;
+           make_baker set_baker_pvss_key_case ]
+end
+
+type 'a icase =
+  | ICase : {
+      tag : int;
+      name : string;
+      encoding : 'a Data_encoding.t;
+      select : 'a -> 'a option;
+    }
+      -> 'a icase
+
+let manager_case =
+  ICase
+    {
+      tag = 0;
+      name = "internal_manager_operation";
+      encoding = Manager_result.encoding;
+      select =
+        (function
+        | Internal_manager_operation_result _ as result ->
+            Some result
+        | _ ->
+            None);
+    }
+
+let baker_case =
+  ICase
+    {
+      tag = 1;
+      name = "internal_baker_operation";
+      encoding = Baker_result.encoding;
+      select =
+        (function
+        | Internal_baker_operation_result _ as result ->
+            Some result
+        | _ ->
+            None);
+    }
 
 let internal_operation_result_encoding :
     packed_internal_operation_result Data_encoding.t =
-  let make (type kind)
-      (Manager_result.MCase res_case : kind Manager_result.case) =
-    let (Operation.Encoding.Manager_operations.MCase op_case) =
-      res_case.op_case
-    in
-    case
-      (Tag op_case.tag)
-      ~title:op_case.name
-      (merge_objs
-         (obj3
-            (req "kind" (constant op_case.name))
-            (req "source" Contract.encoding)
-            (req "nonce" uint16))
-         (merge_objs op_case.encoding (obj1 (req "result" res_case.t))))
-      (fun op ->
-        match res_case.iselect op with
-        | Some (op, res) ->
-            Some (((), op.source, op.nonce), (op_case.proj op.operation, res))
-        | None ->
-            None)
-      (fun (((), source, nonce), (op, res)) ->
-        let op = {source; operation = op_case.inj op; nonce} in
-        Internal_operation_result (op, res))
+  let make (ICase {tag; name; encoding; select}) =
+    Data_encoding.case
+      (Tag tag)
+      ~title:name
+      (merge_objs (obj1 (req "kind" (constant name))) encoding)
+      (fun x -> match select x with None -> None | Some x -> Some ((), x))
+      snd
   in
   def "operation.alpha.internal_operation_result"
-  @@ union
-       [ make Manager_result.reveal_case;
-         make Manager_result.transaction_case;
-         make Manager_result.origination_legacy_case;
-         make Manager_result.origination_case;
-         make Manager_result.delegation_legacy_case;
-         make Manager_result.delegation_case;
-         make Manager_result.baker_registration_case ]
+  @@ union [make manager_case; make baker_case]
 
 type 'kind contents_result =
   | Endorsement_result : {
       balance_updates : Receipt.balance_updates;
-      delegate : Signature.Public_key_hash.t;
+      baker : Baker_hash.t;
       slots : int list;
     }
       -> Kind.endorsement contents_result

@@ -85,16 +85,26 @@ and packed_contents_result =
 
 (** The result of an operation in the queue. [Skipped] ones should
     always be at the tail, and after a single [Failed]. *)
-and 'kind manager_operation_result =
-  | Applied of 'kind successful_manager_operation_result
-  | Backtracked of
-      'kind successful_manager_operation_result * error list option
-  | Failed : 'kind Kind.manager * error list -> 'kind manager_operation_result
-  | Skipped : 'kind Kind.manager -> 'kind manager_operation_result
+and ('kind, 'successful_result) internal_operation_result =
+  | Applied of 'successful_result
+  | Backtracked of 'successful_result * error list option
+  | Failed :
+      'kind * error list
+      -> ('kind, 'successful_result) internal_operation_result
+  | Skipped : 'kind -> ('kind, 'successful_result) internal_operation_result
 [@@coq_force_gadt]
 
-(** Result of applying a {!manager_operation_content}, either internal
-    or external. *)
+and 'kind manager_operation_result =
+  ( 'kind Kind.manager,
+    'kind successful_manager_operation_result )
+  internal_operation_result
+
+and 'kind baker_operation_result =
+  ( 'kind Kind.baker,
+    'kind successful_baker_operation_result )
+  internal_operation_result
+
+(** Result of applying a {!manager_operation}, either internal or external. *)
 and _ successful_manager_operation_result =
   | Reveal_result : {
       consumed_gas : Z.t;
@@ -147,14 +157,46 @@ and _ successful_manager_operation_result =
     }
       -> Kind.baker_registration successful_manager_operation_result
 
+(** Result of applying a {!baker_operation}, only internal. *)
+and _ successful_baker_operation_result =
+  | Baker_proposals_result : {
+      consumed_gas : Z.t;
+    }
+      -> Kind.proposals successful_baker_operation_result
+  | Baker_ballot_result : {
+      consumed_gas : Z.t;
+    }
+      -> Kind.ballot successful_baker_operation_result
+  | Set_baker_active_result : {
+      active : bool;
+      consumed_gas : Z.t;
+    }
+      -> Kind.set_baker_active successful_baker_operation_result
+  | Set_baker_consensus_key_result : {
+      consumed_gas : Z.t;
+    }
+      -> Kind.set_baker_consensus_key successful_baker_operation_result
+  | Set_baker_pvss_key_result : {
+      consumed_gas : Z.t;
+    }
+      -> Kind.set_baker_pvss_key successful_baker_operation_result
+
 and packed_successful_manager_operation_result =
   | Successful_manager_result :
       'kind successful_manager_operation_result
       -> packed_successful_manager_operation_result
 
+and packed_successful_baker_operation_result =
+  | Successful_baker_result :
+      'kind successful_baker_operation_result
+      -> packed_successful_baker_operation_result
+
 and packed_internal_operation_result =
-  | Internal_operation_result :
-      'kind internal_operation * 'kind manager_operation_result
+  | Internal_manager_operation_result :
+      'kind internal_manager_operation * 'kind manager_operation_result
+      -> packed_internal_operation_result
+  | Internal_baker_operation_result :
+      'kind internal_baker_operation * 'kind baker_operation_result
       -> packed_internal_operation_result
 
 (** Serializer for {!packed_operation_result}. *)
