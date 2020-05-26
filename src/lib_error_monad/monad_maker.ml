@@ -413,4 +413,13 @@ struct
   let _assert b loc fmt =
     if b then Format.ikfprintf (fun _ -> return_unit) Format.str_formatter fmt
     else Format.kasprintf (fun msg -> fail (Assert_error (loc, msg))) fmt
+
+  let dont_wait exc_handler err_handler f =
+    Lwt_utils.dont_wait exc_handler (fun () ->
+        f ()
+        >>= function
+        | Ok () ->
+            Lwt.return_unit
+        | Error trace ->
+            err_handler trace ; Lwt.return_unit)
 end

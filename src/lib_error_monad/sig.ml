@@ -249,6 +249,10 @@ module type MONAD = sig
     ('a, Format.formatter, unit, unit tzresult Lwt.t) format4 ->
     'a
 
+  (** Wrapper around [Lwt_utils.dont_wait] *)
+  val dont_wait :
+    (exn -> unit) -> (trace -> unit) -> (unit -> unit tzresult Lwt.t) -> unit
+
   (** {2 In-monad list iterators} *)
 
   (** A {!List.iter} in the monad *)
