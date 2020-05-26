@@ -61,6 +61,15 @@ type _ successful_manager_operation_result =
       allocated_destination_contract : bool;
     }
       -> Kind.transaction successful_manager_operation_result
+  | Origination_legacy_result : {
+      lazy_storage_diff : Lazy_storage.diffs option;
+      balance_updates : Receipt.balance_updates;
+      originated_contracts : Contract.t list;
+      consumed_gas : Z.t;
+      storage_size : Z.t;
+      paid_storage_size_diff : Z.t;
+    }
+      -> Kind.origination_legacy successful_manager_operation_result
   | Origination_result : {
       lazy_storage_diff : Lazy_storage.diffs option;
       balance_updates : Receipt.balance_updates;
@@ -70,12 +79,16 @@ type _ successful_manager_operation_result =
       paid_storage_size_diff : Z.t;
     }
       -> Kind.origination successful_manager_operation_result
+  | Delegation_legacy_result : {
+      consumed_gas : Z.t;
+    }
+      -> Kind.delegation_legacy successful_manager_operation_result
   | Delegation_result : {
       consumed_gas : Z.t;
     }
       -> Kind.delegation successful_manager_operation_result
   | Baker_registration_result : {
-      balance_updates : Baker.balance_updates;
+      balance_updates : Receipt.balance_updates;
       registered_baker : Baker_hash.t;
       consumed_gas : Z.t;
       storage_size : Z.t;
@@ -273,9 +286,9 @@ module Manager_result = struct
             allocated_destination_contract;
           })
 
-  let origination_case =
+  let origination_legacy_case =
     make
-      ~op_case:Operation.Encoding.Manager_operations.origination_case
+      ~op_case:Operation.Encoding.Manager_operations.origination_legacy_case
       ~encoding:
         (obj7
            (opt
@@ -291,7 +304,66 @@ module Manager_result = struct
            (dft "paid_storage_size_diff" z Z.zero)
            (opt "lazy_storage_diff" Lazy_storage.encoding))
       ~iselect:(function
-        | Internal_operation_result
+        | Internal_manager_operation_result
+            (({operation = Origination_legacy _; _} as op), res) ->
+            Some (op, res)
+        | _ ->
+            None)
+      ~select:(function
+        | Successful_manager_result (Origination_legacy_result _ as op) ->
+            Some op
+        | _ ->
+            None)
+      ~proj:(function
+        | Origination_legacy_result
+            { lazy_storage_diff;
+              balance_updates;
+              originated_contracts;
+              consumed_gas;
+              storage_size;
+              paid_storage_size_diff } ->
+            ( lazy_storage_diff,
+              balance_updates,
+              originated_contracts,
+              consumed_gas,
+              storage_size,
+              paid_storage_size_diff,
+              lazy_storage_diff ))
+      ~kind:Kind.Origination_legacy_manager_kind
+      ~inj:
+        (fun ( legacy_lazy_storage_diff,
+               balance_updates,
+               originated_contracts,
+               consumed_gas,
+               storage_size,
+               paid_storage_size_diff,
+               lazy_storage_diff ) ->
+        let lazy_storage_diff =
+          Option.first_some lazy_storage_diff legacy_lazy_storage_diff
+        in
+        Origination_legacy_result
+          {
+            lazy_storage_diff;
+            balance_updates;
+            originated_contracts;
+            consumed_gas;
+            storage_size;
+            paid_storage_size_diff;
+          })
+
+  let origination_case =
+    make
+      ~op_case:Operation.Encoding.Manager_operations.origination_case
+      ~encoding:
+        (obj6
+           (dft "balance_updates" Receipt.balance_updates_encoding [])
+           (dft "originated_contracts" (list Contract.encoding) [])
+           (dft "consumed_gas" z Z.zero)
+           (dft "storage_size" z Z.zero)
+           (dft "paid_storage_size_diff" z Z.zero)
+           (opt "lazy_storage_diff" Lazy_storage.encoding))
+      ~iselect:(function
+        | Internal_manager_operation_result
             (({operation = Origination _; _} as op), res) ->
             Some (op, res)
         | _ ->
@@ -309,8 +381,7 @@ module Manager_result = struct
               consumed_gas;
               storage_size;
               paid_storage_size_diff } ->
-            ( lazy_storage_diff,
-              balance_updates,
+            ( balance_updates,
               originated_contracts,
               consumed_gas,
               storage_size,
@@ -318,16 +389,12 @@ module Manager_result = struct
               lazy_storage_diff ))
       ~kind:Kind.Origination_manager_kind
       ~inj:
-        (fun ( legacy_lazy_storage_diff,
-               balance_updates,
+        (fun ( balance_updates,
                originated_contracts,
                consumed_gas,
                storage_size,
                paid_storage_size_diff,
                lazy_storage_diff ) ->
-        let lazy_storage_diff =
-          Option.first_some lazy_storage_diff legacy_lazy_storage_diff
-        in
         Origination_result
           {
             lazy_storage_diff;
@@ -338,13 +405,33 @@ module Manager_result = struct
             paid_storage_size_diff;
           })
 
+  let delegation_legacy_case =
+    make
+      ~op_case:Operation.Encoding.Manager_operations.delegation_legacy_case
+      ~encoding:Data_encoding.(obj1 (dft "consumed_gas" z Z.zero))
+      ~iselect:(function
+        | Internal_manager_operation_result
+            (({operation = Delegation_legacy _; _} as op), res) ->
+            Some (op, res)
+        | _ ->
+            None)
+      ~select:(function
+        | Successful_manager_result (Delegation_legacy_result _ as op) ->
+            Some op
+        | _ ->
+            None)
+      ~kind:Kind.Delegation_legacy_manager_kind
+      ~proj:(function
+        | Delegation_legacy_result {consumed_gas} -> consumed_gas)
+      ~inj:(fun consumed_gas -> Delegation_legacy_result {consumed_gas})
+
   let delegation_case =
     make
       ~op_case:Operation.Encoding.Manager_operations.delegation_case
       ~encoding:Data_encoding.(obj1 (dft "consumed_gas" z Z.zero))
       ~iselect:(function
-        | Internal_operation_result (({operation = Delegation _; _} as op), res)
-          ->
+        | Internal_manager_operation_result
+            (({operation = Delegation _; _} as op), res) ->
             Some (op, res)
         | _ ->
             None)
@@ -362,7 +449,7 @@ module Manager_result = struct
       ~op_case:Operation.Encoding.Manager_operations.baker_registration_case
       ~encoding:
         (obj5
-           (dft "balance_updates" Baker.balance_updates_encoding [])
+           (dft "balance_updates" Receipt.balance_updates_encoding [])
            (req "registered_baker" Baker_hash.encoding)
            (dft "consumed_gas" z Z.zero)
            (dft "storage_size" z Z.zero)
@@ -437,7 +524,9 @@ let internal_operation_result_encoding :
   @@ union
        [ make Manager_result.reveal_case;
          make Manager_result.transaction_case;
+         make Manager_result.origination_legacy_case;
          make Manager_result.origination_case;
+         make Manager_result.delegation_legacy_case;
          make Manager_result.delegation_case;
          make Manager_result.baker_registration_case ]
 
@@ -492,9 +581,19 @@ let equal_manager_kind :
       Some Eq
   | (Kind.Transaction_manager_kind, _) ->
       None
+  | (Kind.Origination_legacy_manager_kind, Kind.Origination_legacy_manager_kind)
+    ->
+      Some Eq
+  | (Kind.Origination_legacy_manager_kind, _) ->
+      None
   | (Kind.Origination_manager_kind, Kind.Origination_manager_kind) ->
       Some Eq
   | (Kind.Origination_manager_kind, _) ->
+      None
+  | (Kind.Delegation_legacy_manager_kind, Kind.Delegation_legacy_manager_kind)
+    ->
+      Some Eq
+  | (Kind.Delegation_legacy_manager_kind, _) ->
       None
   | (Kind.Delegation_manager_kind, Kind.Delegation_manager_kind) ->
       Some Eq
@@ -810,6 +909,18 @@ module Encoding = struct
         | _ ->
             None)
 
+  let origination_legacy_case =
+    make_manager_case
+      Operation.Encoding.origination_legacy_case
+      Manager_result.origination_legacy_case
+      (function
+        | Contents_and_result
+            ( (Manager_operation {operation = Origination_legacy _; _} as op),
+              res ) ->
+            Some (op, res)
+        | _ ->
+            None)
+
   let origination_case =
     make_manager_case
       Operation.Encoding.origination_case
@@ -817,6 +928,18 @@ module Encoding = struct
       (function
         | Contents_and_result
             ((Manager_operation {operation = Origination _; _} as op), res) ->
+            Some (op, res)
+        | _ ->
+            None)
+
+  let delegation_legacy_case =
+    make_manager_case
+      Operation.Encoding.delegation_legacy_case
+      Manager_result.delegation_legacy_case
+      (function
+        | Contents_and_result
+            ( (Manager_operation {operation = Delegation_legacy _; _} as op),
+              res ) ->
             Some (op, res)
         | _ ->
             None)
@@ -872,7 +995,9 @@ let contents_result_encoding =
          make ballot_case;
          make reveal_case;
          make transaction_case;
+         make origination_legacy_case;
          make origination_case;
+         make delegation_legacy_case;
          make delegation_case;
          make failing_noop_case;
          make baker_registration_case ]
@@ -909,7 +1034,9 @@ let contents_and_result_encoding =
          make ballot_case;
          make reveal_case;
          make transaction_case;
+         make origination_legacy_case;
          make origination_case;
+         make delegation_legacy_case;
          make delegation_case;
          make failing_noop_case;
          make baker_registration_case ]
@@ -1098,6 +1225,29 @@ let kind_equal :
       Some Eq
   | (Manager_operation {operation = Transaction _; _}, _) ->
       None
+  | ( Manager_operation {operation = Origination_legacy _; _},
+      Manager_operation_result
+        {operation_result = Applied (Origination_legacy_result _); _} ) ->
+      Some Eq
+  | ( Manager_operation {operation = Origination_legacy _; _},
+      Manager_operation_result
+        {operation_result = Backtracked (Origination_legacy_result _, _); _} )
+    ->
+      Some Eq
+  | ( Manager_operation {operation = Origination_legacy _; _},
+      Manager_operation_result
+        { operation_result =
+            Failed (Alpha_context.Kind.Origination_legacy_manager_kind, _);
+          _ } ) ->
+      Some Eq
+  | ( Manager_operation {operation = Origination_legacy _; _},
+      Manager_operation_result
+        { operation_result =
+            Skipped Alpha_context.Kind.Origination_legacy_manager_kind;
+          _ } ) ->
+      Some Eq
+  | (Manager_operation {operation = Origination_legacy _; _}, _) ->
+      None
   | ( Manager_operation {operation = Origination _; _},
       Manager_operation_result
         {operation_result = Applied (Origination_result _); _} ) ->
@@ -1118,6 +1268,29 @@ let kind_equal :
           _ } ) ->
       Some Eq
   | (Manager_operation {operation = Origination _; _}, _) ->
+      None
+  | ( Manager_operation {operation = Delegation_legacy _; _},
+      Manager_operation_result
+        {operation_result = Applied (Delegation_legacy_result _); _} ) ->
+      Some Eq
+  | ( Manager_operation {operation = Delegation_legacy _; _},
+      Manager_operation_result
+        {operation_result = Backtracked (Delegation_legacy_result _, _); _} )
+    ->
+      Some Eq
+  | ( Manager_operation {operation = Delegation_legacy _; _},
+      Manager_operation_result
+        { operation_result =
+            Failed (Alpha_context.Kind.Delegation_legacy_manager_kind, _);
+          _ } ) ->
+      Some Eq
+  | ( Manager_operation {operation = Delegation_legacy _; _},
+      Manager_operation_result
+        { operation_result =
+            Skipped Alpha_context.Kind.Delegation_legacy_manager_kind;
+          _ } ) ->
+      Some Eq
+  | (Manager_operation {operation = Delegation_legacy _; _}, _) ->
       None
   | ( Manager_operation {operation = Delegation _; _},
       Manager_operation_result

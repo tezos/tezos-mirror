@@ -44,7 +44,11 @@ module Kind : sig
 
   type transaction = Transaction_kind
 
+  type origination_legacy = Origination_legacy_kind
+
   type origination = Origination_kind
+
+  type delegation_legacy = Delegation_legacy_kind
 
   type delegation = Delegation_kind
 
@@ -55,7 +59,9 @@ module Kind : sig
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
+    | Origination_legacy_manager_kind : origination_legacy manager
     | Origination_manager_kind : origination manager
+    | Delegation_legacy_manager_kind : delegation_legacy manager
     | Delegation_manager_kind : delegation manager
     | Baker_registration_manager_kind : baker_registration manager
 end
@@ -135,16 +141,28 @@ and _ manager_operation =
       destination : Contract_repr.contract;
     }
       -> Kind.transaction manager_operation
-  | Origination : {
+  | Origination_legacy : {
       delegate : Signature.Public_key_hash.t option;
       script : Script_repr.t;
       credit : Tez_repr.tez;
       preorigination : Contract_repr.t option;
     }
+      -> Kind.origination_legacy manager_operation
+  (* Changed the type of delegate from [public_key_hash option] to
+     [baker_hash option] *)
+  | Origination : {
+      delegate : Baker_hash.t option;
+      script : Script_repr.t;
+      credit : Tez_repr.tez;
+      preorigination : Contract_repr.t option;
+    }
       -> Kind.origination manager_operation
-  | Delegation :
+  | Delegation_legacy :
       Signature.Public_key_hash.t option
-      -> Kind.delegation manager_operation
+      -> Kind.delegation_legacy manager_operation
+  (* Changed the type of delegate from [public_key_hash option] to
+     [baker_hash option] *)
+  | Delegation : Baker_hash.t option -> Kind.delegation manager_operation
   | Baker_registration : {
       credit : Tez_repr.tez;
       consensus_key : Signature.Public_key.t;
@@ -254,7 +272,11 @@ module Encoding : sig
 
   val transaction_case : Kind.transaction Kind.manager case
 
+  val origination_legacy_case : Kind.origination_legacy Kind.manager case
+
   val origination_case : Kind.origination Kind.manager case
+
+  val delegation_legacy_case : Kind.delegation_legacy Kind.manager case
 
   val delegation_case : Kind.delegation Kind.manager case
 
@@ -276,7 +298,11 @@ module Encoding : sig
 
     val transaction_case : Kind.transaction case
 
+    val origination_legacy_case : Kind.origination_legacy case
+
     val origination_case : Kind.origination case
+
+    val delegation_legacy_case : Kind.delegation_legacy case
 
     val delegation_case : Kind.delegation case
 

@@ -112,6 +112,15 @@ and _ successful_manager_operation_result =
       allocated_destination_contract : bool;
     }
       -> Kind.transaction successful_manager_operation_result
+  | Origination_legacy_result : {
+      lazy_storage_diff : Lazy_storage.diffs option;
+      balance_updates : Receipt.balance_updates;
+      originated_contracts : Contract.t list;
+      consumed_gas : Z.t;
+      storage_size : Z.t;
+      paid_storage_size_diff : Z.t;
+    }
+      -> Kind.origination_legacy successful_manager_operation_result
   | Origination_result : {
       lazy_storage_diff : Lazy_storage.diffs option;
       balance_updates : Receipt.balance_updates;
@@ -121,12 +130,16 @@ and _ successful_manager_operation_result =
       paid_storage_size_diff : Z.t;
     }
       -> Kind.origination successful_manager_operation_result
+  | Delegation_legacy_result : {
+      consumed_gas : Z.t;
+    }
+      -> Kind.delegation_legacy successful_manager_operation_result
   | Delegation_result : {
       consumed_gas : Z.t;
     }
       -> Kind.delegation successful_manager_operation_result
   | Baker_registration_result : {
-      balance_updates : Baker.balance_updates;
+      balance_updates : Receipt.balance_updates;
       registered_baker : Baker_hash.t;
       consumed_gas : Z.t;
       storage_size : Z.t;
