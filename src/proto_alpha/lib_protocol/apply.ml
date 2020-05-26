@@ -131,6 +131,8 @@ type error +=
 
 type error += (* `Permanent *) Failing_noop_error
 
+type error += Not_an_active_consensus_key of Signature.Public_key_hash.t
+
 let () =
   register_error_kind
     `Temporary
@@ -552,7 +554,31 @@ let () =
         "The failing_noop operation cannot be executed by the protocol")
     Data_encoding.empty
     (function Failing_noop_error -> Some () | _ -> None)
-    (fun () -> Failing_noop_error)
+    (fun () -> Failing_noop_error) ;
+  register_error_kind
+    `Temporary
+    ~id:"operation.not_an_active_consensus_key"
+    ~title:"Not an active baker consensus key"
+    ~description:"The given key is not an active baker consensus key."
+    ~pp:(fun ppf key ->
+      Format.fprintf
+        ppf
+        "The given key %a is not an active baker consensus key."
+        Signature.Public_key_hash.pp
+        key)
+    Data_encoding.(obj1 (req "key" Signature.Public_key_hash.encoding))
+    (function Not_an_active_consensus_key k -> Some k | _ -> None)
+    (fun k -> Not_an_active_consensus_key k)
+
+(* Try to map the given key to a baker consensus key. Fails with
+   [Not_an_active_consensus_key] when no matching consensus key is found. *)
+let map_delegate ctxt delegate =
+  Baker.is_consensus_key ctxt delegate
+  >>=? function
+  | None ->
+      fail @@ Not_an_active_consensus_key delegate
+  | Some baker_hash ->
+      return baker_hash
 
 open Apply_results
 
@@ -580,6 +606,86 @@ let apply_manager_operation_content :
   >>=? fun () ->
   Gas.consume ctxt Michelson_v1_gas.Cost_of.manager_operation
   >>?= fun ctxt ->
+  let apply_origination ctxt ~(delegate : Baker_hash.t option)
+      ~(script : Script.t) ~(preorigination : Contract.t option)
+      ~(credit : Tez.t) =
+    Script.force_decode_in_context ctxt script.storage
+    >>?= fun (unparsed_storage, ctxt) ->
+    (* see [note] *)
+    Gas.consume ctxt (Script.deserialized_cost unparsed_storage)
+    >>?= fun ctxt ->
+    Script.force_decode_in_context ctxt script.code
+    >>?= fun (unparsed_code, ctxt) ->
+    (* see [note] *)
+    Gas.consume ctxt (Script.deserialized_cost unparsed_code)
+    >>?= fun ctxt ->
+    Script_ir_translator.parse_script
+      ctxt
+      ~legacy:false
+      ~allow_forged_in_storage:internal
+      script
+    >>=? fun (Ex_script parsed_script, ctxt) ->
+    Script_ir_translator.collect_lazy_storage
+      ctxt
+      parsed_script.storage_type
+      parsed_script.storage
+    >>?= fun (to_duplicate, ctxt) ->
+    let to_update = Script_ir_translator.no_lazy_storage_id in
+    Script_ir_translator.extract_lazy_storage_diff
+      ctxt
+      Optimized
+      parsed_script.storage_type
+      parsed_script.storage
+      ~to_duplicate
+      ~to_update
+      ~temporary:false
+    >>=? fun (storage, lazy_storage_diff, ctxt) ->
+    Script_ir_translator.unparse_data
+      ctxt
+      Optimized
+      parsed_script.storage_type
+      storage
+    >>=? fun (storage, ctxt) ->
+    let storage = Script.lazy_expr (Micheline.strip_locations storage) in
+    let script = {script with storage} in
+    Contract.spend ctxt source credit
+    >>=? fun ctxt ->
+    ( match preorigination with
+    | Some contract ->
+        assert internal ;
+        (* The preorigination field is only used to early return
+                 the address of an originated contract in Michelson.
+                 It cannot come from the outside. *)
+        ok (ctxt, contract)
+    | None ->
+        Contract.fresh_contract_from_current_nonce ctxt )
+    >>?= fun (ctxt, contract) ->
+    Contract.originate
+      ctxt
+      contract
+      ~delegate
+      ~balance:credit
+      ~script:(script, lazy_storage_diff)
+    >>=? fun ctxt ->
+    Fees.origination_burn ctxt
+    >>?= fun (ctxt, origination_burn) ->
+    Fees.record_paid_storage_space ctxt contract
+    >|=? fun (ctxt, storage_size, paid_storage_size_diff, fees) ->
+    let balance_updates =
+      Receipt.cleanup_balance_updates
+        [ (Contract payer, Debited fees, Block_application);
+          (Contract payer, Debited origination_burn, Block_application);
+          (Contract source, Debited credit, Block_application);
+          (Contract contract, Credited credit, Block_application) ]
+    in
+    let originated_contracts = [contract] in
+    ( ctxt,
+      lazy_storage_diff,
+      balance_updates,
+      originated_contracts,
+      storage_size,
+      paid_storage_size_diff )
+  in
   match operation with
   | Reveal _ ->
       return
@@ -715,93 +821,74 @@ let apply_manager_operation_content :
               }
           in
           (ctxt, result, operations) )
-  | Origination {delegate; script; preorigination; credit} ->
-      Script.force_decode_in_context ctxt script.storage
-      >>?= fun (unparsed_storage, ctxt) ->
-      (* see [note] *)
-      Gas.consume ctxt (Script.deserialized_cost unparsed_storage)
-      >>?= fun ctxt ->
-      Script.force_decode_in_context ctxt script.code
-      >>?= fun (unparsed_code, ctxt) ->
-      (* see [note] *)
-      Gas.consume ctxt (Script.deserialized_cost unparsed_code)
-      >>?= fun ctxt ->
-      Script_ir_translator.parse_script
-        ctxt
-        ~legacy:false
-        ~allow_forged_in_storage:internal
-        script
-      >>=? fun (Ex_script parsed_script, ctxt) ->
-      Script_ir_translator.collect_lazy_storage
-        ctxt
-        parsed_script.storage_type
-        parsed_script.storage
-      >>?= fun (to_duplicate, ctxt) ->
-      let to_update = Script_ir_translator.no_lazy_storage_id in
-      Script_ir_translator.extract_lazy_storage_diff
-        ctxt
-        Optimized
-        parsed_script.storage_type
-        parsed_script.storage
-        ~to_duplicate
-        ~to_update
-        ~temporary:false
-      >>=? fun (storage, lazy_storage_diff, ctxt) ->
-      Script_ir_translator.unparse_data
-        ctxt
-        Optimized
-        parsed_script.storage_type
-        storage
-      >>=? fun (storage, ctxt) ->
-      let storage = Script.lazy_expr (Micheline.strip_locations storage) in
-      let script = {script with storage} in
-      Contract.spend ctxt source credit
-      >>=? fun ctxt ->
-      ( match preorigination with
-      | Some contract ->
-          assert internal ;
-          (* The preorigination field is only used to early return
-                 the address of an originated contract in Michelson.
-                 It cannot come from the outside. *)
-          ok (ctxt, contract)
+  | Origination_legacy {delegate; script; preorigination; credit} ->
+      ( match delegate with
       | None ->
-          Contract.fresh_contract_from_current_nonce ctxt )
-      >>?= fun (ctxt, contract) ->
-      Contract.originate
-        ctxt
-        contract
-        ~delegate
-        ~balance:credit
-        ~script:(script, lazy_storage_diff)
-      >>=? fun ctxt ->
-      Fees.origination_burn ctxt
-      >>?= fun (ctxt, origination_burn) ->
-      Fees.record_paid_storage_space ctxt contract
-      >|=? fun (ctxt, size, paid_storage_size_diff, fees) ->
+          return_none
+      | Some delegate ->
+          map_delegate ctxt delegate >|=? Option.some )
+      >>=? fun delegate ->
+      apply_origination ctxt ~delegate ~script ~preorigination ~credit
+      >|=? fun ( ctxt,
+                 lazy_storage_diff,
+                 balance_updates,
+                 originated_contracts,
+                 storage_size,
+                 paid_storage_size_diff ) ->
       let result =
-        Origination_result
+        Origination_legacy_result
           {
             lazy_storage_diff;
-            balance_updates =
-              Receipt.cleanup_balance_updates
-                [ (Contract payer, Debited fees, Block_application);
-                  (Contract payer, Debited origination_burn, Block_application);
-                  (Contract source, Debited credit, Block_application);
-                  (Contract contract, Credited credit, Block_application) ];
-            originated_contracts = [contract];
+            balance_updates;
+            originated_contracts;
             consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
-            storage_size = size;
+            storage_size;
             paid_storage_size_diff;
           }
       in
       (ctxt, result, [])
+  | Origination {delegate; script; preorigination; credit} ->
+      apply_origination ctxt ~delegate ~script ~preorigination ~credit
+      >|=? fun ( ctxt,
+                 lazy_storage_diff,
+                 balance_updates,
+                 originated_contracts,
+                 storage_size,
+                 paid_storage_size_diff ) ->
+      let result =
+        Origination_result
+          {
+            lazy_storage_diff;
+            balance_updates;
+            originated_contracts;
+            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+            storage_size;
+            paid_storage_size_diff;
+          }
+      in
+      (ctxt, result, [])
+  | Delegation_legacy delegate ->
+      ( match delegate with
+      | None ->
+          return_none
+      | Some delegate ->
+          map_delegate ctxt delegate >|=? Option.some )
+      >>=? fun delegate ->
+      Delegation.set ctxt source delegate
+      >>=? fun ctxt ->
+      return
+        ( ctxt,
+          Delegation_legacy_result
+            {consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt},
+          [] )
   | Delegation delegate ->
-      Delegate.set ctxt source delegate
-      >|=? fun ctxt ->
-      ( ctxt,
-        Delegation_result
-          {consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt},
-        [] )
+      Delegation.set ctxt source delegate
+      >>=? fun ctxt ->
+      return
+        ( ctxt,
+          Delegation_result
+            {consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt},
+          [] )
   | Baker_registration {credit; consensus_key; threshold; owner_keys} ->
       Contract.spend ctxt source credit
       >>=? fun ctxt ->
@@ -886,6 +973,22 @@ let precheck_manager_contents (type kind) ctxt
   >>=? fun () ->
   Contract.check_counter_increment ctxt source counter
   >>=? fun () ->
+  let precheck_origination ~(script : Script.t) =
+    Lwt.return
+    @@ record_trace Gas_quota_exceeded_init_deserialize
+    @@ (* Fail quickly if not enough gas for minimal deserialization cost *)
+       ( Gas.(
+           check_enough
+             ctxt
+             ( Script.minimal_deserialize_cost script.code
+             +@ Script.minimal_deserialize_cost script.storage ))
+       >>? fun () ->
+       (* Fail if not enough gas for complete deserialization cost *)
+       Script.force_decode_in_context ctxt script.code
+       >>? fun (_code, ctxt) ->
+       Script.force_decode_in_context ctxt script.storage
+       >|? fun (_storage, ctxt) -> ctxt )
+  in
   ( match operation with
   | Reveal pk ->
       Contract.reveal_manager_key ctxt source pk
@@ -898,21 +1001,10 @@ let precheck_manager_contents (type kind) ctxt
          (* Fail if not enough gas for complete deserialization cost *)
          Script.force_decode_in_context ctxt parameters
          >|? fun (_arg, ctxt) -> ctxt )
+  | Origination_legacy {script; _} ->
+      precheck_origination ~script
   | Origination {script; _} ->
-      Lwt.return
-      @@ record_trace Gas_quota_exceeded_init_deserialize
-      @@ (* Fail quickly if not enough gas for minimal deserialization cost *)
-         ( Gas.(
-             check_enough
-               ctxt
-               ( Script.minimal_deserialize_cost script.code
-               +@ Script.minimal_deserialize_cost script.storage ))
-         >>? fun () ->
-         (* Fail if not enough gas for complete deserialization cost *)
-         Script.force_decode_in_context ctxt script.code
-         >>? fun (_code, ctxt) ->
-         Script.force_decode_in_context ctxt script.storage
-         >|? fun (_storage, ctxt) -> ctxt )
+      precheck_origination ~script
   | _ ->
       return ctxt )
   >>=? fun ctxt ->

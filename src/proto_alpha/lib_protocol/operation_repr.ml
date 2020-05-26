@@ -46,7 +46,11 @@ module Kind = struct
 
   type transaction = Transaction_kind
 
+  type origination_legacy = Origination_legacy_kind
+
   type origination = Origination_kind
+
+  type delegation_legacy = Delegation_legacy_kind
 
   type delegation = Delegation_kind
 
@@ -57,7 +61,9 @@ module Kind = struct
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
+    | Origination_legacy_manager_kind : origination_legacy manager
     | Origination_manager_kind : origination manager
+    | Delegation_legacy_manager_kind : delegation_legacy manager
     | Delegation_manager_kind : delegation manager
     | Baker_registration_manager_kind : baker_registration manager
 end
@@ -143,16 +149,24 @@ and _ manager_operation =
       destination : Contract_repr.contract;
     }
       -> Kind.transaction manager_operation
-  | Origination : {
+  | Origination_legacy : {
       delegate : Signature.Public_key_hash.t option;
       script : Script_repr.t;
       credit : Tez_repr.tez;
       preorigination : Contract_repr.t option;
     }
+      -> Kind.origination_legacy manager_operation
+  | Origination : {
+      delegate : Baker_hash.t option;
+      script : Script_repr.t;
+      credit : Tez_repr.tez;
+      preorigination : Contract_repr.t option;
+    }
       -> Kind.origination manager_operation
-  | Delegation :
+  | Delegation_legacy :
       Signature.Public_key_hash.t option
-      -> Kind.delegation manager_operation
+      -> Kind.delegation_legacy manager_operation
+  | Delegation : Baker_hash.t option -> Kind.delegation manager_operation
   | Baker_registration : {
       credit : Tez_repr.tez;
       consensus_key : Signature.Public_key.t;
@@ -169,8 +183,12 @@ let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
       Kind.Reveal_manager_kind
   | Transaction _ ->
       Kind.Transaction_manager_kind
+  | Origination_legacy _ ->
+      Kind.Origination_legacy_manager_kind
   | Origination _ ->
       Kind.Origination_manager_kind
+  | Delegation_legacy _ ->
+      Kind.Delegation_legacy_manager_kind
   | Delegation _ ->
       Kind.Delegation_manager_kind
   | Baker_registration _ ->
@@ -328,7 +346,7 @@ module Encoding = struct
               Transaction {amount; destination; parameters; entrypoint});
         }
 
-    let origination_case =
+    let origination_legacy_case =
       MCase
         {
           tag = 2;
@@ -338,6 +356,40 @@ module Encoding = struct
               (req "balance" Tez_repr.encoding)
               (opt "delegate" Signature.Public_key_hash.encoding)
               (req "script" Script_repr.encoding);
+          select =
+            (function
+            | Manager (Origination_legacy _ as op) -> Some op | _ -> None);
+          proj =
+            (function
+            | Origination_legacy
+                { credit;
+                  delegate;
+                  script;
+                  preorigination =
+                    _
+                    (* the hash is only used internally
+                               when originating from smart
+                               contracts, don't serialize it *)
+                } ->
+                (credit, delegate, script));
+          inj =
+            (fun (credit, delegate, script) ->
+              Origination_legacy
+                {credit; delegate; script; preorigination = None});
+        }
+
+    let origination_case =
+      MCase
+        {
+          tag = 202;
+          name = "origination";
+          encoding =
+            obj4
+              (req "balance" Tez_repr.encoding)
+              (opt "delegate" Baker_hash.encoding)
+              (req "script" Script_repr.encoding)
+              (* version to disambiguate from [origination_legacy_case] *)
+              (req "version" (constant "1"));
           select =
             (function Manager (Origination _ as op) -> Some op | _ -> None);
           proj =
@@ -352,22 +404,39 @@ module Encoding = struct
                                when originating from smart
                                contracts, don't serialize it *)
                 } ->
-                (credit, delegate, script));
+                (credit, delegate, script, ()));
           inj =
-            (fun (credit, delegate, script) ->
+            (fun (credit, delegate, script, ()) ->
               Origination {credit; delegate; script; preorigination = None});
         }
 
-    let delegation_case =
+    let delegation_legacy_case =
       MCase
         {
           tag = 3;
           name = "delegation";
           encoding = obj1 (opt "delegate" Signature.Public_key_hash.encoding);
           select =
+            (function
+            | Manager (Delegation_legacy _ as op) -> Some op | _ -> None);
+          proj = (function Delegation_legacy key -> key);
+          inj = (fun key -> Delegation_legacy key);
+        }
+
+    let delegation_case =
+      MCase
+        {
+          tag = 203;
+          name = "delegation";
+          encoding =
+            obj2
+              (opt "delegate" Baker_hash.encoding)
+              (* version to disambiguate from [delegation_legacy_case] *)
+              (req "version" (constant "1"));
+          select =
             (function Manager (Delegation _ as op) -> Some op | _ -> None);
-          proj = (function Delegation key -> key);
-          inj = (fun key -> Delegation key);
+          proj = (function Delegation key -> (key, ()));
+          inj = (fun (key, ()) -> Delegation key);
         }
 
     let baker_registration_case =
@@ -408,7 +477,9 @@ module Encoding = struct
         ~tag_size:`Uint8
         [ make reveal_case;
           make transaction_case;
+          make origination_legacy_case;
           make origination_case;
+          make delegation_legacy_case;
           make delegation_case;
           make baker_registration_case ]
   end
@@ -659,11 +730,17 @@ module Encoding = struct
   let transaction_case =
     make_manager_case 108 Manager_operations.transaction_case
 
+  let origination_legacy_case =
+    make_manager_case 109 Manager_operations.origination_legacy_case
+
   let origination_case =
-    make_manager_case 109 Manager_operations.origination_case
+    make_manager_case 209 Manager_operations.origination_case
+
+  let delegation_legacy_case =
+    make_manager_case 110 Manager_operations.delegation_legacy_case
 
   let delegation_case =
-    make_manager_case 110 Manager_operations.delegation_case
+    make_manager_case 210 Manager_operations.delegation_case
 
   let baker_registration_case =
     make_manager_case 111 Manager_operations.baker_registration_case
@@ -689,7 +766,9 @@ module Encoding = struct
            make ballot_case;
            make reveal_case;
            make transaction_case;
+           make origination_legacy_case;
            make origination_case;
+           make delegation_legacy_case;
            make delegation_case;
            make failing_noop_case;
            make baker_registration_case ]
@@ -868,9 +947,17 @@ let equal_manager_operation_kind :
       Some Eq
   | (Transaction _, _) ->
       None
+  | (Origination_legacy _, Origination_legacy _) ->
+      Some Eq
+  | (Origination_legacy _, _) ->
+      None
   | (Origination _, Origination _) ->
       Some Eq
   | (Origination _, _) ->
+      None
+  | (Delegation_legacy _, Delegation_legacy _) ->
+      Some Eq
+  | (Delegation_legacy _, _) ->
       None
   | (Delegation _, Delegation _) ->
       Some Eq

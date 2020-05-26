@@ -1268,7 +1268,11 @@ module Kind : sig
 
   type transaction = Transaction_kind
 
+  type origination_legacy = Origination_legacy_kind
+
   type origination = Origination_kind
+
+  type delegation_legacy = Delegation_legacy_kind
 
   type delegation = Delegation_kind
 
@@ -1279,7 +1283,9 @@ module Kind : sig
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
+    | Origination_legacy_manager_kind : origination_legacy manager
     | Origination_manager_kind : origination manager
+    | Delegation_legacy_manager_kind : delegation_legacy manager
     | Delegation_manager_kind : delegation manager
     | Baker_registration_manager_kind : baker_registration manager
 end
@@ -1361,16 +1367,24 @@ and _ manager_operation =
       destination : Contract.contract;
     }
       -> Kind.transaction manager_operation
+  | Origination_legacy : {
+      delegate : public_key_hash option;
+      script : Script.t;
+      credit : Tez.tez;
+      preorigination : Contract.t option;
+    }
+      -> Kind.origination_legacy manager_operation
   | Origination : {
-      delegate : Signature.Public_key_hash.t option;
+      delegate : baker_hash option;
       script : Script.t;
       credit : Tez.tez;
       preorigination : Contract.t option;
     }
       -> Kind.origination manager_operation
-  | Delegation :
-      Signature.Public_key_hash.t option
-      -> Kind.delegation manager_operation
+  | Delegation_legacy :
+      public_key_hash option
+      -> Kind.delegation_legacy manager_operation
+  | Delegation : baker_hash option -> Kind.delegation manager_operation
   | Baker_registration : {
       credit : Tez.tez;
       consensus_key : public_key;
@@ -1519,7 +1533,11 @@ module Operation : sig
 
     val transaction_case : Kind.transaction Kind.manager case
 
+    val origination_legacy_case : Kind.origination_legacy Kind.manager case
+
     val origination_case : Kind.origination Kind.manager case
+
+    val delegation_legacy_case : Kind.delegation_legacy Kind.manager case
 
     val delegation_case : Kind.delegation Kind.manager case
 
@@ -1542,7 +1560,11 @@ module Operation : sig
 
       val transaction_case : Kind.transaction case
 
+      val origination_legacy_case : Kind.origination_legacy case
+
       val origination_case : Kind.origination case
+
+      val delegation_legacy_case : Kind.delegation_legacy case
 
       val delegation_case : Kind.delegation case
 
