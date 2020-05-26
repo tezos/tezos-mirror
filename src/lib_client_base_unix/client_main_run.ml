@@ -298,16 +298,16 @@ let main (module C : M) ~select_commands =
                  match parsed_config_file with
                  | None ->
                      RPC_client_unix.default_config
-                 | Some parsed_config_file ->
+                 | Some cfg ->
                      {
                        RPC_client_unix.default_config with
-                       host =
-                         parsed_config_file.Client_config.Cfg_file.node_addr;
-                       port =
-                         parsed_config_file.Client_config.Cfg_file.node_port;
-                       tls = parsed_config_file.Client_config.Cfg_file.tls;
                        endpoint =
-                         parsed_config_file.Client_config.Cfg_file.endpoint;
+                         Client_config.(
+                           decide_endpoint
+                             cfg.endpoint
+                             cfg.node_addr
+                             cfg.node_port
+                             cfg.tls);
                      }
                in
                match parsed_args with

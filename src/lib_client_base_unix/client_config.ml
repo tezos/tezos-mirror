@@ -28,6 +28,8 @@
 
 type error += Invalid_endpoint_arg of string
 
+type error += Suppressed_arg of {args : string list; by : string}
+
 type error += Invalid_chain_argument of string
 
 type error += Invalid_block_argument of string
@@ -52,6 +54,20 @@ let () =
     Data_encoding.(obj1 (req "value" string))
     (function Invalid_endpoint_arg s -> Some s | _ -> None)
     (fun s -> Invalid_endpoint_arg s) ;
+  register_error_kind
+    `Branch
+    ~id:"suppressedArgument"
+    ~title:"Suppressed Argument"
+    ~description:"Certain arguments are suppressed by some other"
+    ~pp:(fun ppf (args, by) ->
+      Format.fprintf
+        ppf
+        "certain arguments are suppressed by %s: %s."
+        by
+        (String.concat ", " args))
+    Data_encoding.(obj2 (req "suppressed" (list string)) (req "by" string))
+    (function Suppressed_arg e -> Some (e.args, e.by) | _ -> None)
+    (fun (args, by) -> Suppressed_arg {args; by}) ;
   register_error_kind
     `Branch
     ~id:"badChainArgument"
@@ -135,14 +151,16 @@ let default_chain = `Main
 
 let default_block = `Head 0
 
+let default_endpoint = Uri.of_string "http://localhost:8732"
+
 let ( // ) = Filename.concat
 
 module Cfg_file = struct
   type t = {
     base_dir : string;
-    node_addr : string;
-    node_port : int;
-    tls : bool;
+    node_addr : string option;
+    node_port : int option;
+    tls : bool option;
     endpoint : Uri.t option;
     web_port : int;
     remote_signer : Uri.t option;
@@ -153,10 +171,10 @@ module Cfg_file = struct
   let default =
     {
       base_dir = default_base_dir;
-      node_addr = "localhost";
-      node_port = 8732;
-      tls = false;
       endpoint = None;
+      node_addr = None;
+      node_port = None;
+      tls = None;
       web_port = 8080;
       remote_signer = None;
       confirmations = Some 0;
@@ -177,9 +195,9 @@ module Cfg_file = struct
              confirmations;
              password_filename } ->
         ( base_dir,
-          Some node_addr,
-          Some node_port,
-          Some tls,
+          node_addr,
+          node_port,
+          tls,
           endpoint,
           Some web_port,
           remote_signer,
@@ -194,9 +212,6 @@ module Cfg_file = struct
              remote_signer,
              confirmations,
              password_filename ) ->
-        let node_addr = Option.value ~default:default.node_addr node_addr in
-        let node_port = Option.value ~default:default.node_port node_port in
-        let tls = Option.value ~default:default.tls tls in
         let web_port = Option.value ~default:default.web_port web_port in
         {
           base_dir;
@@ -384,26 +399,38 @@ let log_requests_switch () =
   switch ~long:"log-requests" ~short:'l' ~doc:"log all requests to the node" ()
 
 (* Command-line args which can be set in config file as well *)
+let addr_confdesc = "-A|-addr|<cfgfile>node_addr"
+
 let addr_arg () =
   arg
     ~long:"addr"
     ~short:'A'
     ~placeholder:"IP addr|host"
-    ~doc:"IP address of the node"
+    ~doc:"[DEPRECATED: use --endpoint instead] IP address of the node"
     (string_parameter ())
+
+let port_confdesc = "-P|--port|<cfgfile>node_port"
 
 let port_arg () =
   arg
     ~long:"port"
     ~short:'P'
     ~placeholder:"number"
-    ~doc:"RPC port of the node"
+    ~doc:"[DEPRECATED: use --endpoint instead] RPC port of the node"
     (parameter (fun _ x ->
          try return (int_of_string x)
          with Failure _ -> fail (Invalid_port_arg x)))
 
+let tls_confdesc = "-S|--tls|<cfgfile>tls"
+
 let tls_switch () =
-  switch ~long:"tls" ~short:'S' ~doc:"use TLS to connect to node." ()
+  switch
+    ~long:"tls"
+    ~short:'S'
+    ~doc:"[DEPRECATED: use --endpoint instead] use TLS to connect to node."
+    ()
+
+let endpoint_confdesc = "-E|--endpoint|<cfgfile>endpoint"
 
 let endpoint_arg () =
   arg
@@ -411,8 +438,7 @@ let endpoint_arg () =
     ~short:'E'
     ~placeholder:"uri"
     ~doc:
-      "HTTP endpoint of the node RPC interface; giving this argument will \
-       make the client ignore --addr --port --tls"
+      "HTTP endpoint of the node RPC interface; e.g. 'http://localhost:8732'"
     (endpoint_parameter ())
 
 let remote_signer_arg () =
@@ -739,6 +765,22 @@ let check_base_dir_for_mode (ctx : #Client_context.full) client_mode base_dir =
     | Base_dir_is_mockup ->
         return_unit )
 
+let decide_endpoint endpoint addr port tls =
+  match endpoint with
+  | Some k ->
+      k
+  | None ->
+      let updatecomp updatef ov uri =
+        match ov with Some x -> updatef uri (Some x) | None -> uri
+      in
+      let url = default_endpoint in
+      url
+      |> updatecomp Uri.with_host addr
+      |> updatecomp Uri.with_port port
+      |> updatecomp
+           Uri.with_scheme
+           Option.(tls >>| function true -> "https" | false -> "http")
+
 let parse_config_args (ctx : #Client_context.full) argv =
   parse_global_options (global_options ()) ctx argv
   >>=? fun ( ( base_dir,
@@ -794,9 +836,55 @@ let parse_config_args (ctx : #Client_context.full) argv =
     return {Cfg_file.default with base_dir}
   else read_config_file config_file )
   >>=? fun cfg ->
-  let tls = cfg.tls || tls in
-  let node_addr = Option.value ~default:cfg.node_addr node_addr in
-  let node_port = Option.value ~default:cfg.node_port node_port in
+  (* endpoint logic:
+   *   1) when --endpoint provided as argument,
+   *      use it but check no presence of --addr, --port, or --tls
+   *   2) otherwise, merge --addr, --port, and --tls with config file; then
+   *        2a) --endpoint exists in config file,
+   *            use it but check no presence of merged --addr, --port, or --tls
+   *        2b) synthesize --endpoint from --addr, --port, and --tls *)
+  let check_absence addr port tls =
+    let (id, ap) = ((fun x -> x), fun x l -> l @ [x]) in
+    let checkabs argdesc = function None -> id | _ -> ap argdesc in
+    let superr =
+      []
+      |> checkabs addr_confdesc addr
+      |> checkabs port_confdesc port
+      |> checkabs tls_confdesc tls
+    in
+    if superr <> [] then
+      fail (Suppressed_arg {args = superr; by = endpoint_confdesc})
+    else return ()
+  in
+  let tls = if tls then Some true else None in
+  ( match endpoint with
+  | Some _ ->
+      check_absence node_addr node_port tls
+      >>=? fun _ -> return (endpoint, node_addr, node_port, tls)
+  | None -> (
+      let merge = Option.first_some in
+      let node_addr = merge node_addr cfg.node_addr in
+      let node_port = merge node_port cfg.node_port in
+      let tls = merge tls cfg.tls in
+      match cfg.endpoint with
+      | Some _ ->
+          check_absence node_addr node_port tls
+          >>=? fun _ -> return (cfg.endpoint, node_addr, node_port, tls)
+      | None ->
+          return (None, node_addr, node_port, tls) ) )
+  >>=? fun (endpoint, node_addr', node_port', tls') ->
+  (* give a kind warning when any of -A -P -S exists *)
+  (let got = function Some _ -> true | None -> false in
+   let gotany =
+     got node_addr || got node_port || got tls || got cfg.node_addr
+     || got cfg.node_port || got cfg.tls
+   in
+   if gotany then (
+     Format.(
+       eprintf
+         "@{<warning>Warning:@}  the --addr --port --tls options are now \
+          deprecated; use --endpoint instead\n" ;
+       pp_print_flush err_formatter ()) )) ;
   Tezos_signer_backends_unix.Remote.read_base_uri_from_env ()
   >>=? fun remote_signer_env ->
   let remote_signer =
@@ -807,9 +895,9 @@ let parse_config_args (ctx : #Client_context.full) argv =
   let cfg =
     {
       cfg with
-      tls;
-      node_port;
-      node_addr;
+      node_addr = node_addr';
+      node_port = node_port';
+      tls = tls';
       endpoint;
       remote_signer;
       confirmations;

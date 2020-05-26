@@ -54,13 +54,7 @@ module type S = sig
 
   val full_logger : Format.formatter -> logger
 
-  type config = {
-    host : string;
-    port : int;
-    tls : bool;
-    logger : logger;
-    endpoint : Uri.t option;
-  }
+  type config = {endpoint : Uri.t; logger : logger}
 
   val config_encoding : config Data_encoding.t
 
@@ -382,48 +376,20 @@ module Make (Client : Cohttp_lwt.S.Client) = struct
     Client.call_service ?logger ?headers ~base accept service params query body
     >>= fun ans -> handle accept ans
 
-  type config = {
-    host : string;
-    port : int;
-    tls : bool;
-    logger : logger;
-    endpoint : Uri.t option;
-  }
+  type config = {endpoint : Uri.t; logger : logger}
 
   let config_encoding =
     let open Data_encoding in
     conv
-      (fun {host; port; tls; logger = _; endpoint} ->
-        (host, port, tls, endpoint))
-      (fun (host, port, tls, endpoint) ->
-        {host; port; tls; logger = null_logger; endpoint})
-      (obj4
-         (req "host" string)
-         (req "port" uint16)
-         (req "tls" bool)
-         (opt "endpoint" RPC_encoding.uri_encoding))
+      (fun {endpoint; logger = _} -> endpoint)
+      (fun endpoint -> {endpoint; logger = null_logger})
+      (obj1 (req "endpoint" RPC_encoding.uri_encoding))
 
   let default_config =
-    {
-      host = "localhost";
-      port = 8732;
-      tls = false;
-      logger = null_logger;
-      endpoint = None;
-    }
+    {endpoint = Uri.of_string "http://localhost:8732"; logger = null_logger}
 
   class http_ctxt config media_types : RPC_context.json =
-    let base =
-      match config.endpoint with
-      | Some url ->
-          url
-      | _ ->
-          Uri.make
-            ~scheme:(if config.tls then "https" else "http")
-            ~host:config.host
-            ~port:config.port
-            ()
-    in
+    let base = config.endpoint in
     let logger = config.logger in
     object
       method generic_json_call meth ?body uri =

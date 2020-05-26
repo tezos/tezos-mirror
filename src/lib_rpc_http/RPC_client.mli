@@ -54,13 +54,7 @@ module type S = sig
 
   val full_logger : Format.formatter -> logger
 
-  type config = {
-    host : string;
-    port : int;
-    tls : bool;
-    logger : logger;
-    endpoint : Uri.t option;
-  }
+  type config = {endpoint : Uri.t; logger : logger}
 
   val config_encoding : config Data_encoding.t
 
