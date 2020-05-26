@@ -235,58 +235,52 @@ type step_constants = {
   chain_id : Chain_id.t;
 }
 
+type log_element =
+  | Log :
+      context * Script.location * 'a * 'a Script_typed_ir.stack_ty
+      -> log_element
+
 module type STEP_LOGGER = sig
   val log_interp :
-    context ->
-    ('bef, 'aft) Script_typed_ir.descr ->
-    'bef ->
-    unit tzresult Lwt.t
+    context -> ('bef, 'aft) Script_typed_ir.descr -> 'bef -> unit
 
-  val log_entry :
-    context ->
-    ('bef, 'aft) Script_typed_ir.descr ->
-    'bef ->
-    unit tzresult Lwt.t
+  val log_entry : context -> ('bef, 'aft) Script_typed_ir.descr -> 'bef -> unit
 
-  val log_exit :
-    context ->
-    ('bef, 'aft) Script_typed_ir.descr ->
-    'aft ->
-    unit tzresult Lwt.t
+  val log_exit : context -> ('bef, 'aft) Script_typed_ir.descr -> 'aft -> unit
 
-  val get_log : unit -> execution_trace option
+  val get_log : unit -> execution_trace option tzresult Lwt.t
 end
 
 type logger = (module STEP_LOGGER)
 
 module Trace_logger () = struct
-  let log = ref []
+  let log : log_element list ref = ref []
 
   let log_interp ctxt descr stack =
-    trace Cannot_serialize_log (unparse_stack ctxt (stack, descr.bef))
-    >>=? fun stack ->
-    log := (descr.loc, Gas.level ctxt, stack) :: !log ;
-    return_unit
+    log := Log (ctxt, descr.loc, stack, descr.bef) :: !log
 
-  let log_entry _ctxt _descr _stack = return_unit
+  let log_entry _ctxt _descr _stack = ()
 
   let log_exit ctxt descr stack =
-    trace Cannot_serialize_log (unparse_stack ctxt (stack, descr.aft))
-    >>=? fun stack ->
-    log := (descr.loc, Gas.level ctxt, stack) :: !log ;
-    return_unit
+    log := Log (ctxt, descr.loc, stack, descr.aft) :: !log
 
-  let get_log () = Some (List.rev !log)
+  let get_log () =
+    map_s
+      (fun (Log (ctxt, loc, stack, stack_ty)) ->
+        trace Cannot_serialize_log (unparse_stack ctxt (stack, stack_ty))
+        >>=? fun stack -> return (loc, Gas.level ctxt, stack))
+      !log
+    >>=? fun res -> return (Some (List.rev res))
 end
 
 module No_trace : STEP_LOGGER = struct
-  let log_interp _ctxt _descr _stack = return_unit
+  let log_interp _ctxt _descr _stack = ()
 
-  let log_entry _ctxt _descr _stack = return_unit
+  let log_entry _ctxt _descr _stack = ()
 
-  let log_exit _ctxt _descr _stack = return_unit
+  let log_exit _ctxt _descr _stack = ()
 
-  let get_log () = None
+  let get_log () = return_none
 end
 
 let cost_of_instr : type b a. (b, a) descr -> b -> Gas.cost =
@@ -582,11 +576,11 @@ let rec step :
   Lwt.return (Gas.consume ctxt gas)
   >>=? fun ctxt ->
   let module Log = (val logger) in
-  Log.log_entry ctxt descr stack
-  >>=? fun () ->
+  Log.log_entry ctxt descr stack ;
   let logged_return : a * context -> (a * context) tzresult Lwt.t =
    fun (ret, ctxt) ->
-    Log.log_exit ctxt descr ret >>=? fun () -> return (ret, ctxt)
+    Log.log_exit ctxt descr ret ;
+    return (ret, ctxt)
   in
   match (instr, stack) with
   (* stack ops *)
@@ -771,14 +765,14 @@ let rec step :
   | (Mul_teznat, (x, (y, rest))) -> (
     match Script_int.to_int64 y with
     | None ->
-        fail (Overflow (loc, Log.get_log ()))
+        Log.get_log () >>=? fun log -> fail (Overflow (loc, log))
     | Some y ->
         Lwt.return Tez.(x *? y)
         >>=? fun res -> logged_return ((res, rest), ctxt) )
   | (Mul_nattez, (y, (x, rest))) -> (
     match Script_int.to_int64 y with
     | None ->
-        fail (Overflow (loc, Log.get_log ()))
+        Log.get_log () >>=? fun log -> fail (Overflow (loc, log))
     | Some y ->
         Lwt.return Tez.(x *? y)
         >>=? fun res -> logged_return ((res, rest), ctxt) )
@@ -870,13 +864,13 @@ let rec step :
   | (Lsl_nat, (x, (y, rest))) -> (
     match Script_int.shift_left_n x y with
     | None ->
-        fail (Overflow (loc, Log.get_log ()))
+        Log.get_log () >>=? fun log -> fail (Overflow (loc, log))
     | Some x ->
         logged_return ((x, rest), ctxt) )
   | (Lsr_nat, (x, (y, rest))) -> (
     match Script_int.shift_right_n x y with
     | None ->
-        fail (Overflow (loc, Log.get_log ()))
+        Log.get_log () >>=? fun log -> fail (Overflow (loc, log))
     | Some r ->
         logged_return ((r, rest), ctxt) )
   | (Or_nat, (x, (y, rest))) ->
@@ -978,7 +972,7 @@ let rec step :
       trace Cannot_serialize_failure (unparse_data ctxt Optimized tv v)
       >>=? fun (v, _ctxt) ->
       let v = Micheline.strip_locations v in
-      fail (Reject (loc, v, Log.get_log ()))
+      Log.get_log () >>=? fun log -> fail (Reject (loc, v, log))
   | (Nop, stack) ->
       logged_return (stack, ctxt)
   (* comparison *)
@@ -1252,8 +1246,7 @@ and interp :
  fun logger ctxt step_constants (Lam (code, _)) arg ->
   let stack = (arg, ()) in
   let module Log = (val logger) in
-  Log.log_interp ctxt code stack
-  >>=? fun () ->
+  Log.log_interp ctxt code stack ;
   step logger ctxt step_constants code stack
   >>=? fun ((ret, ()), ctxt) -> return (ret, ctxt)
 
@@ -1331,13 +1324,9 @@ let trace ctxt mode step_constants ~script ~entrypoint ~parameter =
     script
     (Micheline.root parameter)
   >>=? fun (code, storage, operations, ctxt, big_map_diff) ->
-  let trace =
-    match Logger.get_log () with
-    | None ->
-        (* absurd *) []
-    | Some trace ->
-        trace
-  in
+  Logger.get_log ()
+  >>=? fun trace ->
+  let trace = Option.unopt ~default:[] trace in
   return ({ctxt; code; storage; big_map_diff; operations}, trace)
 
 let execute ctxt mode step_constants ~script ~entrypoint ~parameter =

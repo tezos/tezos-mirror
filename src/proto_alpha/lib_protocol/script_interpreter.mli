@@ -69,31 +69,20 @@ module type STEP_LOGGER = sig
       the interpretation of a script and subsequently
       at each [Exec] instruction. *)
   val log_interp :
-    context ->
-    ('bef, 'aft) Script_typed_ir.descr ->
-    'bef ->
-    unit tzresult Lwt.t
+    context -> ('bef, 'aft) Script_typed_ir.descr -> 'bef -> unit
 
   (** [log_entry] is called {i before} executing
       each instruction but {i after} gas for
       this instruction has been successfully consumed. *)
-  val log_entry :
-    context ->
-    ('bef, 'aft) Script_typed_ir.descr ->
-    'bef ->
-    unit tzresult Lwt.t
+  val log_entry : context -> ('bef, 'aft) Script_typed_ir.descr -> 'bef -> unit
 
   (** [log_exit] is called {i after} executing each
       instruction. *)
-  val log_exit :
-    context ->
-    ('bef, 'aft) Script_typed_ir.descr ->
-    'aft ->
-    unit tzresult Lwt.t
+  val log_exit : context -> ('bef, 'aft) Script_typed_ir.descr -> 'aft -> unit
 
   (** [get_log] allows to obtain an execution trace, if
       any was produced. *)
-  val get_log : unit -> execution_trace option
+  val get_log : unit -> execution_trace option tzresult Lwt.t
 end
 
 type logger = (module STEP_LOGGER)
