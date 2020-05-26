@@ -1280,6 +1280,12 @@ module Kind : sig
 
   type baker_registration = Baker_registration_kind
 
+  type set_baker_active = Set_baker_active_kind
+
+  type set_baker_consensus_key = Set_baker_consensus_key_kind
+
+  type set_baker_pvss_key = Set_baker_pvss_key_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
@@ -1288,6 +1294,13 @@ module Kind : sig
     | Delegation_legacy_manager_kind : delegation_legacy manager
     | Delegation_manager_kind : delegation manager
     | Baker_registration_manager_kind : baker_registration manager
+
+  type 'a baker =
+    | Baker_proposals_kind : proposals baker
+    | Baker_ballot_kind : ballot baker
+    | Set_baker_active_baker_kind : set_baker_active baker
+    | Set_baker_consensus_key_baker_kind : set_baker_consensus_key baker
+    | Set_baker_pvss_key_baker_kind : set_baker_pvss_key baker
 end
 
 type 'kind operation = {
@@ -1335,13 +1348,13 @@ and _ contents =
     }
       -> Kind.activate_account contents
   | Proposals : {
-      source : Signature.Public_key_hash.t;
+      source : public_key_hash;
       period : int32;
       proposals : Protocol_hash.t list;
     }
       -> Kind.proposals contents
   | Ballot : {
-      source : Signature.Public_key_hash.t;
+      source : public_key_hash;
       period : int32;
       proposal : Protocol_hash.t;
       ballot : Vote.ballot;
@@ -1349,7 +1362,7 @@ and _ contents =
       -> Kind.ballot contents
   | Failing_noop : string -> Kind.failing_noop contents
   | Manager_operation : {
-      source : Signature.Public_key_hash.t;
+      source : public_key_hash;
       fee : Tez.tez;
       counter : counter;
       operation : 'kind manager_operation;
@@ -1393,16 +1406,45 @@ and _ manager_operation =
     }
       -> Kind.baker_registration manager_operation
 
+and _ baker_operation =
+  | Baker_proposals : {
+      period : int32;
+      proposals : string list;
+    }
+      -> Kind.proposals baker_operation
+  | Baker_ballot : {
+      period : int32;
+      proposal : string;
+      ballot : Vote.ballot;
+    }
+      -> Kind.ballot baker_operation
+  | Set_baker_active : bool -> Kind.set_baker_active baker_operation
+  | Set_baker_consensus_key :
+      public_key
+      -> Kind.set_baker_consensus_key baker_operation
+  | Set_baker_pvss_key :
+      Pvss_secp256k1.Public_key.t
+      -> Kind.set_baker_pvss_key baker_operation
+
 and counter = Z.t
 
-type 'kind internal_operation = {
+type 'kind internal_manager_operation = {
   source : Contract.contract;
   operation : 'kind manager_operation;
   nonce : int;
 }
 
+type 'kind internal_baker_operation = {
+  baker : Baker_hash.t;
+  operation : 'kind baker_operation;
+  nonce : int;
+}
+
 type packed_manager_operation =
   | Manager : 'kind manager_operation -> packed_manager_operation
+
+type packed_baker_operation =
+  | Baker : 'kind baker_operation -> packed_baker_operation
 
 type packed_contents = Contents : 'kind contents -> packed_contents
 
@@ -1418,9 +1460,16 @@ type packed_operation = {
 }
 
 type packed_internal_operation =
-  | Internal_operation : 'kind internal_operation -> packed_internal_operation
+  | Internal_manager_operation :
+      'kind internal_manager_operation
+      -> packed_internal_operation
+  | Internal_baker_operation :
+      'kind internal_baker_operation
+      -> packed_internal_operation
 
 val manager_kind : 'kind manager_operation -> 'kind Kind.manager
+
+val baker_kind : 'kind baker_operation -> 'kind Kind.baker
 
 module Fees : sig
   val origination_burn : context -> (context * Tez.t) tzresult
@@ -1569,6 +1618,29 @@ module Operation : sig
       val delegation_case : Kind.delegation case
 
       val baker_registration_case : Kind.baker_registration case
+    end
+
+    module Baker_operations : sig
+      type 'b case =
+        | BCase : {
+            tag : int;
+            name : string;
+            encoding : 'a Data_encoding.t;
+            select : packed_baker_operation -> 'kind baker_operation option;
+            proj : 'kind baker_operation -> 'a;
+            inj : 'a -> 'kind baker_operation;
+          }
+            -> 'kind case
+
+      val baker_proposals_case : Kind.proposals case
+
+      val baker_ballot_case : Kind.ballot case
+
+      val set_baker_active_case : Kind.set_baker_active case
+
+      val set_baker_consensus_key_case : Kind.set_baker_consensus_key case
+
+      val set_baker_pvss_key_case : Kind.set_baker_pvss_key case
     end
   end
 

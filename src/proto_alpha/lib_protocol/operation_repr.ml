@@ -58,6 +58,12 @@ module Kind = struct
 
   type baker_registration = Baker_registration_kind
 
+  type set_baker_active = Set_baker_active_kind
+
+  type set_baker_consensus_key = Set_baker_consensus_key_kind
+
+  type set_baker_pvss_key = Set_baker_pvss_key_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
@@ -66,6 +72,13 @@ module Kind = struct
     | Delegation_legacy_manager_kind : delegation_legacy manager
     | Delegation_manager_kind : delegation manager
     | Baker_registration_manager_kind : baker_registration manager
+
+  type 'a baker =
+    | Baker_proposals_kind : proposals baker
+    | Baker_ballot_kind : ballot baker
+    | Set_baker_active_baker_kind : set_baker_active baker
+    | Set_baker_consensus_key_baker_kind : set_baker_consensus_key baker
+    | Set_baker_pvss_key_baker_kind : set_baker_pvss_key baker
 end
 
 type raw = Operation.t = {shell : Operation.shell_header; proto : bytes}
@@ -175,6 +188,26 @@ and _ manager_operation =
     }
       -> Kind.baker_registration manager_operation
 
+and _ baker_operation =
+  | Baker_proposals : {
+      period : int32;
+      proposals : string list;
+    }
+      -> Kind.proposals baker_operation
+  | Baker_ballot : {
+      period : int32;
+      proposal : string;
+      ballot : Vote_repr.ballot;
+    }
+      -> Kind.ballot baker_operation
+  | Set_baker_active : bool -> Kind.set_baker_active baker_operation
+  | Set_baker_consensus_key :
+      Signature.Public_key.t
+      -> Kind.set_baker_consensus_key baker_operation
+  | Set_baker_pvss_key :
+      Pvss_secp256k1.Public_key.t
+      -> Kind.set_baker_pvss_key baker_operation
+
 and counter = Z.t
 
 let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
@@ -194,14 +227,35 @@ let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
   | Baker_registration _ ->
       Kind.Baker_registration_manager_kind
 
-type 'kind internal_operation = {
+let baker_kind : type kind. kind baker_operation -> kind Kind.baker = function
+  | Baker_proposals _ ->
+      Kind.Baker_proposals_kind
+  | Baker_ballot _ ->
+      Kind.Baker_ballot_kind
+  | Set_baker_active _ ->
+      Kind.Set_baker_active_baker_kind
+  | Set_baker_consensus_key _ ->
+      Kind.Set_baker_consensus_key_baker_kind
+  | Set_baker_pvss_key _ ->
+      Kind.Set_baker_pvss_key_baker_kind
+
+type 'kind internal_manager_operation = {
   source : Contract_repr.contract;
   operation : 'kind manager_operation;
   nonce : int;
 }
 
+type 'kind internal_baker_operation = {
+  baker : Baker_hash.t;
+  operation : 'kind baker_operation;
+  nonce : int;
+}
+
 type packed_manager_operation =
   | Manager : 'kind manager_operation -> packed_manager_operation
+
+type packed_baker_operation =
+  | Baker : 'kind baker_operation -> packed_baker_operation
 
 type packed_contents = Contents : 'kind contents -> packed_contents
 
@@ -220,7 +274,12 @@ let pack ({shell; protocol_data} : _ operation) : packed_operation =
   {shell; protocol_data = Operation_data protocol_data}
 
 type packed_internal_operation =
-  | Internal_operation : 'kind internal_operation -> packed_internal_operation
+  | Internal_manager_operation :
+      'kind internal_manager_operation
+      -> packed_internal_operation
+  | Internal_baker_operation :
+      'kind internal_baker_operation
+      -> packed_internal_operation
 
 let rec to_list = function
   | Contents_list (Single o) ->
@@ -691,18 +750,18 @@ module Encoding = struct
       (req "gas_limit" (check_size 10 Gas_limit_repr.Arith.n_integral_encoding))
       (req "storage_limit" (check_size 10 n))
 
-  let extract (type kind)
-      (Manager_operation
-         {source; fee; counter; gas_limit; storage_limit; operation = _} :
-        kind Kind.manager contents) =
-    (source, fee, counter, gas_limit, storage_limit)
-
-  let rebuild (source, fee, counter, gas_limit, storage_limit) operation =
-    Manager_operation
-      {source; fee; counter; gas_limit; storage_limit; operation}
-
   let make_manager_case tag (type kind)
       (Manager_operations.MCase mcase : kind Manager_operations.case) =
+    let extract (type kind)
+        (Manager_operation
+           {source; fee; counter; gas_limit; storage_limit; operation = _} :
+          kind Kind.manager contents) =
+      (source, fee, counter, gas_limit, storage_limit)
+    in
+    let rebuild (source, fee, counter, gas_limit, storage_limit) operation =
+      Manager_operation
+        {source; fee; counter; gas_limit; storage_limit; operation}
+    in
     Case
       {
         tag;
@@ -805,16 +864,176 @@ module Encoding = struct
          Operation.shell_header_encoding
          (obj1 (req "contents" contents_list_encoding))
 
-  let internal_operation_encoding =
-    def "operation.alpha.internal_operation"
-    @@ conv
-         (fun (Internal_operation {source; operation; nonce}) ->
-           ((source, nonce), Manager operation))
-         (fun ((source, nonce), Manager operation) ->
-           Internal_operation {source; operation; nonce})
-         (merge_objs
+  module Baker_operations = struct
+    type 'kind case =
+      | BCase : {
+          tag : int;
+          name : string;
+          encoding : 'a Data_encoding.t;
+          select : packed_baker_operation -> 'kind baker_operation option;
+          proj : 'kind baker_operation -> 'a;
+          inj : 'a -> 'kind baker_operation;
+        }
+          -> 'kind case
+
+    let baker_proposals_case =
+      BCase
+        {
+          tag = 0;
+          name = "baker_proposals";
+          encoding = obj2 (req "period" int32) (req "proposals" (list string));
+          select =
+            (function Baker (Baker_proposals _ as op) -> Some op | _ -> None);
+          proj =
+            (fun (Baker_proposals {period; proposals}) -> (period, proposals));
+          inj =
+            (fun (period, proposals) -> Baker_proposals {period; proposals});
+        }
+
+    let baker_ballot_case =
+      BCase
+        {
+          tag = 1;
+          name = "baker_ballot";
+          encoding =
+            obj3
+              (req "period" int32)
+              (req "proposal" string)
+              (req "ballot" Vote_repr.ballot_encoding);
+          select =
+            (function Baker (Baker_ballot _ as op) -> Some op | _ -> None);
+          proj =
+            (function
+            | Baker_ballot {period; proposal; ballot} ->
+                (period, proposal, ballot));
+          inj =
+            (fun (period, proposal, ballot) ->
+              Baker_ballot {period; proposal; ballot});
+        }
+
+    let set_baker_active_case =
+      BCase
+        {
+          tag = 2;
+          name = "set_baker_active";
+          encoding = obj1 (req "active" bool);
+          select =
+            (function
+            | Baker (Set_baker_active _ as op) -> Some op | _ -> None);
+          proj = (function Set_baker_active active -> active);
+          inj = (fun active -> Set_baker_active active);
+        }
+
+    let set_baker_consensus_key_case =
+      BCase
+        {
+          tag = 3;
+          name = "set_baker_consensus_key";
+          encoding = obj1 (req "key" Signature.Public_key.encoding);
+          select =
+            (function
+            | Baker (Set_baker_consensus_key _ as op) -> Some op | _ -> None);
+          proj = (function Set_baker_consensus_key key -> key);
+          inj = (fun key -> Set_baker_consensus_key key);
+        }
+
+    let set_baker_pvss_key_case =
+      BCase
+        {
+          tag = 4;
+          name = "set_baker_pvss_key";
+          encoding = obj1 (req "key" Pvss_secp256k1.Public_key.encoding);
+          select =
+            (function
+            | Baker (Set_baker_pvss_key _ as op) -> Some op | _ -> None);
+          proj = (function Set_baker_pvss_key key -> key);
+          inj = (fun key -> Set_baker_pvss_key key);
+        }
+
+    let encoding =
+      let make (BCase {tag; name; encoding; select; proj; inj}) =
+        case
+          (Tag tag)
+          name
+          encoding
+          (fun o ->
+            match select o with None -> None | Some o -> Some (proj o))
+          (fun x -> Baker (inj x))
+      in
+      union
+        ~tag_size:`Uint8
+        [ make baker_proposals_case;
+          make baker_ballot_case;
+          make set_baker_active_case;
+          make set_baker_consensus_key_case;
+          make set_baker_pvss_key_case ]
+  end
+
+  type 'b icase =
+    | ICase : {
+        tag : int;
+        name : string;
+        encoding : 'a Data_encoding.t;
+        proj : 'b -> 'a option;
+        inj : 'a -> 'b;
+      }
+        -> 'b icase
+
+  let icase tag name args proj inj =
+    let open Data_encoding in
+    case
+      tag
+      ~title:(String.capitalize_ascii name)
+      args
+      (fun x -> match proj x with None -> None | Some x -> Some x)
+      (fun x -> inj x)
+
+  let manager_case =
+    ICase
+      {
+        tag = 0;
+        name = "internal_manager_operation";
+        encoding =
+          merge_objs
             (obj2 (req "source" Contract_repr.encoding) (req "nonce" uint16))
-            Manager_operations.encoding)
+            Manager_operations.encoding;
+        proj =
+          (function
+          | Internal_manager_operation {source; operation; nonce} ->
+              Some ((source, nonce), Manager operation)
+          | _ ->
+              None);
+        inj =
+          (fun ((source, nonce), Manager operation) ->
+            Internal_manager_operation {source; operation; nonce});
+      }
+
+  let baker_case =
+    ICase
+      {
+        tag = 1;
+        name = "internal_baker_operation";
+        encoding =
+          merge_objs
+            (obj2 (req "baker" Baker_hash.encoding) (req "nonce" uint16))
+            Baker_operations.encoding;
+        proj =
+          (function
+          | Internal_baker_operation {baker; operation; nonce} ->
+              Some ((baker, nonce), Baker operation)
+          | _ ->
+              None);
+        inj =
+          (fun ((baker, nonce), Baker operation) ->
+            Internal_baker_operation {baker; operation; nonce});
+      }
+
+  let internal_operation_encoding =
+    let make (ICase {tag; name; encoding; proj; inj}) =
+      icase (Tag tag) name encoding proj inj
+    in
+    def "operation.alpha.internal_operation"
+    @@ union [make manager_case; make baker_case]
 end
 
 let encoding = Encoding.operation_encoding

@@ -243,7 +243,10 @@ let () =
     ~id:"internal_operation_replay"
     ~title:"Internal operation replay"
     ~description:"An internal operation was emitted twice by a script"
-    ~pp:(fun ppf (Internal_operation {nonce; _}) ->
+    ~pp:
+      (fun ppf
+           ( Internal_manager_operation {nonce; _}
+           | Internal_baker_operation {nonce; _} ) ->
       Format.fprintf
         ppf
         "Internal operation %d was emitted twice by a script"
@@ -923,9 +926,10 @@ let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
     match worklist with
     | [] ->
         Lwt.return (Success ctxt, List.rev applied)
-    | Internal_operation ({source; operation; nonce} as op) :: rest -> (
+    | Internal_manager_operation ({source; operation; nonce} as op) :: rest
+      -> (
         ( if internal_nonce_already_recorded ctxt nonce then
-          fail (Internal_operation_replay (Internal_operation op))
+          fail (Internal_operation_replay (Internal_manager_operation op))
         else
           let ctxt = record_internal_nonce ctxt nonce in
           apply_manager_operation_content
@@ -944,7 +948,7 @@ let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
             in
             let skipped =
               List.rev_map
-                (fun (Internal_operation op) ->
+                (fun (Internal_manager_operation op) ->
                   Internal_operation_result
                     (op, Skipped (manager_kind op.operation)))
                 rest
