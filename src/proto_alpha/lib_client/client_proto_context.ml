@@ -373,6 +373,32 @@ let activation_key_encoding =
                 (fun _ -> None)
                 (fun x -> x) ])
 
+type batch_transfer_operation = {
+  destination : string;
+  fee : string option;
+  gas_limit : Z.t option;
+  storage_limit : Z.t option;
+  amount : string;
+  arg : string option;
+  entrypoint : string option;
+}
+
+let batch_transfer_operation_encoding =
+  let open Data_encoding in
+  conv
+    (fun {destination; fee; gas_limit; storage_limit; amount; arg; entrypoint} ->
+      (destination, fee, gas_limit, storage_limit, amount, arg, entrypoint))
+    (fun (destination, fee, gas_limit, storage_limit, amount, arg, entrypoint) ->
+      {destination; fee; gas_limit; storage_limit; amount; arg; entrypoint})
+    (obj7
+       (req "destination" string)
+       (opt "fee" string)
+       (opt "gas-limit" z)
+       (opt "storage-limit" z)
+       (req "amount" string)
+       (opt "arg" string)
+       (opt "entrypoint" string))
+
 let read_key key =
   match Bip39.of_words key.mnemonic with
   | None ->

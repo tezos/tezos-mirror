@@ -203,6 +203,19 @@ type activation_key = {
 
 val activation_key_encoding : activation_key Data_encoding.t
 
+type batch_transfer_operation = {
+  destination : string;
+  fee : string option;
+  gas_limit : Z.t option;
+  storage_limit : Z.t option;
+  amount : string;
+  arg : string option;
+  entrypoint : string option;
+}
+
+val batch_transfer_operation_encoding :
+  batch_transfer_operation Data_encoding.t
+
 val activate_account :
   #Protocol_client_context.full ->
   chain:Shell_services.chain ->

@@ -99,6 +99,26 @@ module ContractAlias = struct
         (parameter ~autocomplete (fun cctxt p -> get_contract cctxt p))
         next)
 
+  let find_destination cctxt s =
+    match String.split ~limit:1 ':' s with
+    | ["alias"; alias] ->
+        find cctxt alias
+    | ["key"; text] ->
+        Client_keys.Public_key_hash.find cctxt text
+        >>=? fun v -> return (s, Contract.implicit_contract v)
+    | _ -> (
+        find cctxt s
+        >>= function
+        | Ok v ->
+            return v
+        | Error k_errs -> (
+            ContractEntity.of_source s
+            >>= function
+            | Ok v ->
+                return (s, v)
+            | Error c_errs ->
+                Lwt.return_error (k_errs @ c_errs) ) )
+
   let destination_parameter () =
     Clic.parameter
       ~autocomplete:(fun cctxt ->
@@ -106,25 +126,7 @@ module ContractAlias = struct
         >>=? fun list1 ->
         Client_keys.Public_key_hash.autocomplete cctxt
         >>=? fun list2 -> return (list1 @ list2))
-      (fun cctxt s ->
-        match String.split ~limit:1 ':' s with
-        | ["alias"; alias] ->
-            find cctxt alias
-        | ["key"; text] ->
-            Client_keys.Public_key_hash.find cctxt text
-            >>=? fun v -> return (s, Contract.implicit_contract v)
-        | _ -> (
-            find cctxt s
-            >>= function
-            | Ok v ->
-                return v
-            | Error k_errs -> (
-                ContractEntity.of_source s
-                >>= function
-                | Ok v ->
-                    return (s, v)
-                | Error c_errs ->
-                    Lwt.return_error (k_errs @ c_errs) ) ))
+      find_destination
 
   let destination_param ?(name = "dst") ?(desc = "destination contract") next =
     let desc =

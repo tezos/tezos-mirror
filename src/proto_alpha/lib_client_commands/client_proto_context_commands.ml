@@ -190,6 +190,67 @@ let transfer_command amount source destination cctxt
         cctxt
   >>= function None -> return_unit | Some (_res, _contracts) -> return_unit
 
+let tez_of_string_exn index field s =
+  match Tez.of_string s with
+  | Some t ->
+      return t
+  | None ->
+      failwith
+        "Invalid \xEA\x9C\xA9 notation at entry %i, field \"%s\": %s"
+        index
+        field
+        s
+
+let tez_of_opt_string_exn index field s =
+  match s with
+  | None ->
+      return None
+  | Some s ->
+      tez_of_string_exn index field s >>=? fun s -> return (Some s)
+
+let prepare_batch_operation cctxt ?arg ?fee ?gas_limit ?storage_limit
+    ?entrypoint source index batch =
+  Client_proto_contracts.ContractAlias.find_destination cctxt batch.destination
+  >>=? fun (_, destination) ->
+  tez_of_string_exn index "amount" batch.amount
+  >>=? fun amount ->
+  tez_of_opt_string_exn index "fee" batch.fee
+  >>=? fun batch_fee ->
+  let fee = Option.first_some batch_fee fee in
+  let arg = Option.first_some batch.arg arg in
+  let gas_limit = Option.first_some batch.gas_limit gas_limit in
+  let storage_limit = Option.first_some batch.storage_limit storage_limit in
+  let entrypoint = Option.first_some batch.entrypoint entrypoint in
+  parse_arg_transfer arg
+  >>=? fun parameters ->
+  ( match Contract.is_implicit source with
+  | None ->
+      Managed_contract.build_transaction_operation
+        cctxt
+        ~chain:cctxt#chain
+        ~block:cctxt#block
+        ~contract:source
+        ~destination
+        ?entrypoint
+        ?arg
+        ~amount
+        ?fee
+        ?gas_limit
+        ?storage_limit
+        ()
+  | Some _ ->
+      return
+        (build_transaction_operation
+           ~amount
+           ~parameters
+           ?entrypoint
+           ?fee
+           ?gas_limit
+           ?storage_limit
+           destination) )
+  >>=? fun operation ->
+  return (Injection.Annotated_manager_operation operation)
+
 let commands version () =
   let open Clic in
   [ command
@@ -683,6 +744,152 @@ let commands version () =
                 else
                   save_contract ~force cctxt alias_name contract
                   >>=? fun () -> return_unit ));
+    command
+      ~group
+      ~desc:
+        "Execute multiple transfers from a single source account.\n\
+         If one of the transfers fails, none of them get executed."
+      (args15
+         default_fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         default_gas_limit_arg
+         default_storage_limit_arg
+         counter_arg
+         default_arg_arg
+         no_print_source_flag
+         minimal_fees_arg
+         minimal_nanotez_per_byte_arg
+         minimal_nanotez_per_gas_unit_arg
+         force_low_fee_arg
+         fee_cap_arg
+         burn_cap_arg
+         default_entrypoint_arg)
+      ( prefixes ["multiple"; "transfers"; "from"]
+      @@ ContractAlias.destination_param
+           ~name:"src"
+           ~desc:"name of the source contract"
+      @@ prefix "using"
+      @@ param
+           ~name:"transfers.json"
+           ~desc:
+             "List of operations originating from the source contract in JSON \
+              format (from a file or directly inlined). The input JSON must \
+              be an array of objects of the form: '[ {\"destination\": dst, \
+              \"amount\": qty (, <field>: <val> ...) } (, ...) ]', where an \
+              optional <field> can either be \"fee\", \"gas-limit\", \
+              \"storage-limit\", \"arg\", or \"entrypoint\"."
+           json_file_or_text_parameter
+      @@ stop )
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             gas_limit,
+             storage_limit,
+             counter,
+             arg,
+             no_print_source,
+             minimal_fees,
+             minimal_nanotez_per_byte,
+             minimal_nanotez_per_gas_unit,
+             force_low_fee,
+             fee_cap,
+             burn_cap,
+             entrypoint )
+           (_, source)
+           operations_json
+           cctxt ->
+        let fee_parameter =
+          {
+            Injection.minimal_fees;
+            minimal_nanotez_per_byte;
+            minimal_nanotez_per_gas_unit;
+            force_low_fee;
+            fee_cap;
+            burn_cap;
+          }
+        in
+        let prepare i =
+          prepare_batch_operation
+            cctxt
+            ?arg
+            ?fee
+            ?gas_limit
+            ?storage_limit
+            ?entrypoint
+            source
+            i
+        in
+        match
+          Data_encoding.Json.destruct
+            (Data_encoding.list
+               Client_proto_context.batch_transfer_operation_encoding)
+            operations_json
+        with
+        | [] ->
+            failwith "Empty operation list"
+        | operations ->
+            ( match Contract.is_implicit source with
+            | None ->
+                Managed_contract.get_contract_manager cctxt source
+                >>=? fun source ->
+                Client_keys.get_key cctxt source
+                >>=? fun (_, src_pk, src_sk) -> return (source, src_pk, src_sk)
+            | Some source ->
+                Client_keys.get_key cctxt source
+                >>=? fun (_, src_pk, src_sk) -> return (source, src_pk, src_sk)
+            )
+            >>=? fun (source, src_pk, src_sk) ->
+            mapi_p prepare operations
+            >>=? fun contents ->
+            let (Manager_list contents) = Injection.manager_of_list contents in
+            Injection.inject_manager_operation
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ?confirmations:cctxt#confirmations
+              ~dry_run
+              ~verbose_signing
+              ~source
+              ?fee
+              ?gas_limit
+              ?storage_limit
+              ?counter
+              ~src_pk
+              ~src_sk
+              ~fee_parameter
+              contents
+            >>= report_michelson_errors
+                  ~no_print_source
+                  ~msg:"multiple transfers simulation failed"
+                  cctxt
+            >>= fun _ -> return_unit
+        | exception (Data_encoding.Json.Cannot_destruct (path, exn2) as exn)
+          -> (
+          match (path, operations_json) with
+          | ([`Index n], `A lj) -> (
+            match List.nth_opt lj n with
+            | Some j ->
+                failwith
+                  "Invalid transfer at index %i: %a %a"
+                  n
+                  (fun ppf -> Data_encoding.Json.print_error ppf)
+                  exn2
+                  Data_encoding.Json.pp
+                  j
+            | _ ->
+                failwith
+                  "Invalid transfer at index %i: %a"
+                  n
+                  (fun ppf -> Data_encoding.Json.print_error ppf)
+                  exn2 )
+          | _ ->
+              failwith
+                "Invalid transfer file: %a %a"
+                (fun ppf -> Data_encoding.Json.print_error ppf)
+                exn
+                Data_encoding.Json.pp
+                operations_json ));
     command
       ~group
       ~desc:"Transfer tokens / call a smart contract."

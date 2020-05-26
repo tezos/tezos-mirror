@@ -155,6 +155,13 @@ let arg_arg =
     ~doc:"argument passed to the contract's script, if needed"
     string_parameter
 
+let default_arg_arg =
+  arg
+    ~long:"default-arg"
+    ~placeholder:"data"
+    ~doc:"default argument passed to each contract's script, if needed"
+    string_parameter
+
 let delegate_arg =
   Client_keys.Public_key_hash.source_arg
     ~long:"delegate"
@@ -174,6 +181,13 @@ let entrypoint_arg =
     ~long:"entrypoint"
     ~placeholder:"name"
     ~doc:"entrypoint of the smart contract"
+    string_parameter
+
+let default_entrypoint_arg =
+  arg
+    ~long:"default-entrypoint"
+    ~placeholder:"name"
+    ~doc:"default entrypoint of the smart contracts"
     string_parameter
 
 let force_switch =
@@ -229,6 +243,21 @@ let fee_arg =
     ~doc:"fee in \xEA\x9C\xA9 to pay to the baker"
     (tez_parameter "--fee")
 
+let default_fee_arg =
+  arg
+    ~long:"default-fee"
+    ~placeholder:"amount"
+    ~doc:"default fee in \xEA\x9C\xA9 to pay to the baker for each transaction"
+    (tez_parameter "--default-fee")
+
+let gas_limit_kind =
+  parameter (fun _ s ->
+      try
+        let v = Z.of_string s in
+        assert (Compare.Z.(v >= Z.zero)) ;
+        return v
+      with _ -> failwith "invalid gas limit (must be a positive number)")
+
 let gas_limit_arg =
   arg
     ~long:"gas-limit"
@@ -237,12 +266,26 @@ let gas_limit_arg =
     ~doc:
       "Set the gas limit of the transaction instead of letting the client \
        decide based on a simulation"
-    (parameter (fun _ s ->
-         try
-           let v = Z.of_string s in
-           assert (Compare.Z.(v >= Z.zero)) ;
-           return v
-         with _ -> failwith "invalid gas limit (must be a positive number)"))
+    gas_limit_kind
+
+let default_gas_limit_arg =
+  arg
+    ~long:"default-gas-limit"
+    ~short:'G'
+    ~placeholder:"amount"
+    ~doc:
+      "Set the default gas limit for each transaction instead of letting the \
+       client decide based on a simulation"
+    gas_limit_kind
+
+let storage_limit_kind =
+  parameter (fun _ s ->
+      try
+        let v = Z.of_string s in
+        assert (Compare.Z.(v >= Z.zero)) ;
+        return v
+      with _ ->
+        failwith "invalid storage limit (must be a positive number of bytes)")
 
 let storage_limit_arg =
   arg
@@ -252,14 +295,17 @@ let storage_limit_arg =
     ~doc:
       "Set the storage limit of the transaction instead of letting the client \
        decide based on a simulation"
-    (parameter (fun _ s ->
-         try
-           let v = Z.of_string s in
-           assert (Compare.Z.(v >= Z.zero)) ;
-           return v
-         with _ ->
-           failwith
-             "invalid storage limit (must be a positive number of bytes)"))
+    storage_limit_kind
+
+let default_storage_limit_arg =
+  arg
+    ~long:"default-storage-limit"
+    ~short:'S'
+    ~placeholder:"amount"
+    ~doc:
+      "Set the default storage limit for each transaction instead of letting \
+       the client decide based on a simulation"
+    storage_limit_kind
 
 let counter_arg =
   arg
