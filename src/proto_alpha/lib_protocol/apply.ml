@@ -67,6 +67,8 @@ type error += Not_a_baker_contract
 
 type error += Invalid_protocols of string list
 
+type error += Forbidden_pending_consensus_key_destination of Contract.t
+
 type error += Not_an_active_consensus_key of Signature.Public_key_hash.t
 
 let () =
@@ -308,6 +310,24 @@ let () =
     (fun () -> Not_a_baker_contract) ;
   register_error_kind
     `Temporary
+    ~id:"operation.forbidden_pending_consensus_key_destination"
+    ~title:"Forbidden pending consensus key destination"
+    ~description:
+      "Forbidden transaction to a destination that is being used as pending \
+       consensus key."
+    ~pp:(fun ppf contract ->
+      Format.fprintf
+        ppf
+        "Forbidden transaction to a destination %a that is being used as a \
+         pending consensus key."
+        Contract.pp
+        contract)
+    Data_encoding.(obj1 (req "contract" Contract.encoding))
+    (function
+      | Forbidden_pending_consensus_key_destination c -> Some c | _ -> None)
+    (fun c -> Forbidden_pending_consensus_key_destination c) ;
+  register_error_kind
+    `Temporary
     ~id:"operation.not_an_active_consensus_key"
     ~title:"Not an active baker consensus key"
     ~description:"The given key is not an active baker consensus key."
@@ -443,6 +463,13 @@ let apply_manager_operation_content :
             : kind successful_manager_operation_result ),
           [] )
   | Transaction {amount; parameters; destination; entrypoint} -> (
+      Baker.is_pending_consensus_key ctxt destination
+      >>=? fun is_source_pending_consensus_key ->
+      fail_when is_source_pending_consensus_key
+      @@ Forbidden_pending_consensus_key_destination destination
+      >>=? fun () ->
+      map_contract ctxt destination
+      >>=? fun destination ->
       Contract.spend ctxt source amount
       >>=? fun ctxt ->
       ( match Contract.is_implicit destination with
