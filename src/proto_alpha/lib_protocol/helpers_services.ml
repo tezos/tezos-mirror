@@ -69,6 +69,18 @@ module Scripts = struct
         (opt "gas" z)
         (dft "entrypoint" string "default")
 
+    let run_baker_code_input_encoding =
+      obj9
+        (req "storage" Script.expr_encoding)
+        (req "input" Script.expr_encoding)
+        (req "amount" Tez.encoding)
+        (req "balance" Tez.encoding)
+        (req "chain_id" Chain_id.encoding)
+        (opt "source" Contract.encoding)
+        (opt "payer" Contract.encoding)
+        (opt "gas" z)
+        (dft "entrypoint" string "default")
+
     let trace_encoding =
       def "scripted.trace" @@ list
       @@ obj3
@@ -133,6 +145,41 @@ module Scripts = struct
                 (opt "big_map_diff" Lazy_storage.legacy_big_map_diff_encoding)
                 (opt "lazy_storage_diff" Lazy_storage.encoding)))
         RPC_path.(path / "trace_code")
+
+    let run_baker_code =
+      RPC_service.post_service
+        ~description:"Run a piece of baker code in the current context"
+        ~query:RPC_query.empty
+        ~input:run_baker_code_input_encoding
+        ~output:
+          (obj3
+             (req "storage" Script.expr_encoding)
+             (req "operations" (list Operation.internal_operation_encoding))
+             (opt "lazy_storage_diff" Lazy_storage.encoding))
+        RPC_path.(path / "run_baker_code")
+
+    let run_baker_code_contract =
+      RPC_service.get_service
+        ~description:
+          "Get the contract on which a piece baker code is ran, which \
+           corresponds to `SELF` or `SELF_ADDRESS` in Michelson"
+        ~query:RPC_query.empty
+        ~output:Contract.encoding
+        RPC_path.(path / "run_baker_code_contract")
+
+    let trace_baker_code =
+      RPC_service.post_service
+        ~description:
+          "Run a piece of baker code in the current context, keeping a trace"
+        ~query:RPC_query.empty
+        ~input:run_baker_code_input_encoding
+        ~output:
+          (obj4
+             (req "storage" Script.expr_encoding)
+             (req "operations" (list Operation.internal_operation_encoding))
+             (req "trace" trace_encoding)
+             (opt "lazy_storage_diff" Lazy_storage.encoding))
+        RPC_path.(path / "trace_baker_code")
 
     let typecheck_code =
       RPC_service.post_service
@@ -233,6 +280,17 @@ module Scripts = struct
         ~delegate:None
         ~script:(script, None)
       >|=? fun ctxt -> (ctxt, dummy_contract)
+    in
+    let originate_dummy_baker_contract ctxt balance =
+      let ctxt = Contract.init_origination_nonce ctxt Operation_hash.zero in
+      Baker.register
+        ctxt
+        ~balance
+        ~threshold:0
+        ~owner_keys:[]
+        ~consensus_key:
+          (Signature.Public_key.of_b58check_exn
+             "edpktgryq3xTkxyBXsbevHu1cFU8ZY9u9VqKsWtctjuqvt3hLQHNEW")
     in
     register0
       S.run_code
@@ -340,6 +398,115 @@ module Scripts = struct
                      _ },
                    trace ) ->
         (storage, operations, trace, lazy_storage_diff)) ;
+    register0
+      S.run_baker_code
+      (fun ctxt
+           ()
+           ( storage,
+             parameter,
+             amount,
+             balance,
+             chain_id,
+             source,
+             payer,
+             gas,
+             entrypoint )
+           ->
+        let storage = Script.lazy_expr storage in
+        let code = Script.lazy_expr Baker_script_repr.code in
+        originate_dummy_baker_contract ctxt balance
+        >>=? fun (ctxt, baker_hash) ->
+        let dummy_contract = Contract.baker_contract baker_hash in
+        let (source, payer) =
+          match (source, payer) with
+          | (Some source, Some payer) ->
+              (source, payer)
+          | (Some source, None) ->
+              (source, source)
+          | (None, Some payer) ->
+              (payer, payer)
+          | (None, None) ->
+              (dummy_contract, dummy_contract)
+        in
+        let gas =
+          match gas with
+          | Some gas ->
+              gas
+          | None ->
+              Constants.hard_gas_limit_per_operation ctxt
+        in
+        let ctxt = Gas.set_limit ctxt gas in
+        let step_constants =
+          let open Script_interpreter in
+          {source; payer; self = dummy_contract; amount; chain_id}
+        in
+        Script_interpreter.execute_baker
+          ctxt
+          Readable
+          step_constants
+          ~script:{storage; code}
+          ~entrypoint
+          ~parameter
+        >|=? fun {Script_interpreter.storage; operations; lazy_storage_diff; _} ->
+        (storage, operations, lazy_storage_diff)) ;
+    register0 S.run_baker_code_contract (fun ctxt () () ->
+        originate_dummy_baker_contract ctxt Tez.one
+        >|=? fun (_ctxt, baker_hash) -> Contract.baker_contract baker_hash) ;
+    register0
+      S.trace_baker_code
+      (fun ctxt
+           ()
+           ( storage,
+             parameter,
+             amount,
+             balance,
+             chain_id,
+             source,
+             payer,
+             gas,
+             entrypoint )
+           ->
+        let storage = Script.lazy_expr storage in
+        let code = Script.lazy_expr Baker_script_repr.code in
+        originate_dummy_baker_contract ctxt balance
+        >>=? fun (ctxt, baker_hash) ->
+        let dummy_contract = Contract.baker_contract baker_hash in
+        let (source, payer) =
+          match (source, payer) with
+          | (Some source, Some payer) ->
+              (source, payer)
+          | (Some source, None) ->
+              (source, source)
+          | (None, Some payer) ->
+              (payer, payer)
+          | (None, None) ->
+              (dummy_contract, dummy_contract)
+        in
+        let gas =
+          match gas with
+          | Some gas ->
+              gas
+          | None ->
+              Constants.hard_gas_limit_per_operation ctxt
+        in
+        let ctxt = Gas.set_limit ctxt gas in
+        let step_constants =
+          let open Script_interpreter in
+          {source; payer; self = dummy_contract; amount; chain_id}
+        in
+        Script_interpreter.trace_baker
+          ctxt
+          Readable
+          step_constants
+          ~script:{storage; code}
+          ~entrypoint
+          ~parameter
+        >>=? fun ( { Script_interpreter.storage;
+                     operations;
+                     lazy_storage_diff;
+                     _ },
+                   trace ) ->
+        return (storage, operations, trace, lazy_storage_diff)) ;
     register0 S.typecheck_code (fun ctxt () (expr, maybe_gas, legacy) ->
         let legacy = Option.value ~default:false legacy in
         let ctxt =
@@ -571,6 +738,43 @@ module Scripts = struct
       ()
       ( script,
         storage,
+        input,
+        amount,
+        balance,
+        chain_id,
+        source,
+        payer,
+        gas,
+        entrypoint )
+
+  let run_baker_code ctxt block ?gas ?(entrypoint = "default") ~storage ~input
+      ~amount ~balance ~chain_id ~source ~payer =
+    RPC_context.make_call0
+      S.run_baker_code
+      ctxt
+      block
+      ()
+      ( storage,
+        input,
+        amount,
+        balance,
+        chain_id,
+        source,
+        payer,
+        gas,
+        entrypoint )
+
+  let run_baker_code_contract ctxt block =
+    RPC_context.make_call0 S.run_baker_code_contract ctxt block () ()
+
+  let trace_baker_code ctxt block ?gas ?(entrypoint = "default") ~storage
+      ~input ~amount ~balance ~chain_id ~source ~payer =
+    RPC_context.make_call0
+      S.trace_baker_code
+      ctxt
+      block
+      ()
+      ( storage,
         input,
         amount,
         balance,
