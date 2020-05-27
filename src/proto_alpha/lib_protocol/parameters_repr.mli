@@ -30,7 +30,7 @@ type bootstrap_account = {
 }
 
 type bootstrap_contract = {
-  delegate : Signature.Public_key_hash.t;
+  delegate : Baker_hash.t;
   amount : Tez_repr.t;
   script : Script_repr.t;
 }

@@ -33,10 +33,12 @@
 *)
 
 type error +=
-  | (* `Permanent *) Consume_roll_change
-  | (* `Permanent *) No_roll_for_delegate
-  | (* `Permanent *) No_roll_snapshot_for_cycle of Cycle_repr.t
-  | (* `Permanent *) Unregistered_delegate of Signature.Public_key_hash.t
+  | (* `Permanent *)
+      Consume_roll_change
+  | (* `Permanent *)
+      No_roll_for_baker
+  | (* `Permanent *)
+      No_roll_snapshot_for_cycle of Cycle_repr.t
 
 val init : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
@@ -48,47 +50,30 @@ val snapshot_rolls : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
 val fold :
   Raw_context.t ->
-  f:(Roll_repr.roll -> Signature.Public_key.t -> 'a -> 'a tzresult Lwt.t) ->
+  f:(Roll_repr.roll -> Baker_hash.t -> 'a -> 'a tzresult Lwt.t) ->
   'a ->
   'a tzresult Lwt.t
 
 val baking_rights_owner :
-  Raw_context.t ->
-  Level_repr.t ->
-  priority:int ->
-  Signature.Public_key.t tzresult Lwt.t
+  Raw_context.t -> Level_repr.t -> priority:int -> Baker_hash.t tzresult Lwt.t
 
 val endorsement_rights_owner :
-  Raw_context.t ->
-  Level_repr.t ->
-  slot:int ->
-  Signature.Public_key.t tzresult Lwt.t
+  Raw_context.t -> Level_repr.t -> slot:int -> Baker_hash.t tzresult Lwt.t
 
 module Delegate : sig
-  val is_inactive :
-    Raw_context.t -> Signature.Public_key_hash.t -> bool tzresult Lwt.t
+  val is_inactive : Raw_context.t -> Baker_hash.t -> bool tzresult Lwt.t
 
   val add_amount :
-    Raw_context.t ->
-    Signature.Public_key_hash.t ->
-    Tez_repr.t ->
-    Raw_context.t tzresult Lwt.t
+    Raw_context.t -> Baker_hash.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t
 
   val remove_amount :
-    Raw_context.t ->
-    Signature.Public_key_hash.t ->
-    Tez_repr.t ->
-    Raw_context.t tzresult Lwt.t
+    Raw_context.t -> Baker_hash.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t
 
   val set_inactive :
-    Raw_context.t ->
-    Signature.Public_key_hash.t ->
-    Raw_context.t tzresult Lwt.t
+    Raw_context.t -> Baker_hash.t -> Raw_context.t tzresult Lwt.t
 
   val set_active :
-    Raw_context.t ->
-    Signature.Public_key_hash.t ->
-    Raw_context.t tzresult Lwt.t
+    Raw_context.t -> Baker_hash.t -> Raw_context.t tzresult Lwt.t
 end
 
 module Contract : sig
@@ -105,18 +90,10 @@ module Contract : sig
     Raw_context.t tzresult Lwt.t
 end
 
-val delegate_pubkey :
-  Raw_context.t ->
-  Signature.Public_key_hash.t ->
-  Signature.Public_key.t tzresult Lwt.t
-
 val get_rolls :
-  Raw_context.t ->
-  Signature.Public_key_hash.t ->
-  Roll_repr.t list tzresult Lwt.t
+  Raw_context.t -> Baker_hash.t -> Roll_repr.t list tzresult Lwt.t
 
-val get_change :
-  Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
+val get_change : Raw_context.t -> Baker_hash.t -> Tez_repr.t tzresult Lwt.t
 
 val update_tokens_per_roll :
   Raw_context.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t
@@ -124,6 +101,4 @@ val update_tokens_per_roll :
 (**/**)
 
 val get_contract_delegate :
-  Raw_context.t ->
-  Contract_repr.t ->
-  Signature.Public_key_hash.t option tzresult Lwt.t
+  Raw_context.t -> Contract_repr.t -> Baker_hash.t option tzresult Lwt.t

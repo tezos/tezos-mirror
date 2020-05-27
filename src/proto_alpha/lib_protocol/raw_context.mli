@@ -110,16 +110,15 @@ val add_fees : context -> Tez_repr.t -> context tzresult
     frozen_fees account at finalize_application *)
 val add_rewards : context -> Tez_repr.t -> context tzresult
 
-(** Increment the current block deposit stash for a specific delegate. All the
-    delegates' frozen_deposit accounts are credited at finalize_application *)
-val add_deposit :
-  context -> Signature.Public_key_hash.t -> Tez_repr.t -> context tzresult
+(** Increment the current block deposit stash for a specific baker. All the
+    bakers' frozen_deposit accounts are credited at finalize_application *)
+val add_deposit : context -> Baker_hash.t -> Tez_repr.t -> context tzresult
 
 val get_fees : context -> Tez_repr.t
 
 val get_rewards : context -> Tez_repr.t
 
-val get_deposits : context -> Tez_repr.t Signature.Public_key_hash.Map.t
+val get_deposits : context -> Tez_repr.t Baker_hash.Map.t
 
 type error += Gas_limit_too_high (* `Permanent *)
 
@@ -275,9 +274,7 @@ val internal_nonce_already_recorded : context -> int -> bool
 
 (** Returns a map where to each endorser's pkh is associated the list of its
     endorsing slots (in decreasing order) for a given level. *)
-val allowed_endorsements :
-  context ->
-  (Signature.Public_key.t * int list * bool) Signature.Public_key_hash.Map.t
+val allowed_endorsements : context -> (int list * bool) Baker_hash.Map.t
 
 (** Keep track of the number of endorsements that are included in a block *)
 val included_endorsements : context -> int
@@ -285,12 +282,10 @@ val included_endorsements : context -> int
 (** Initializes the map of allowed endorsements, this function must only be
     called once. *)
 val init_endorsements :
-  context ->
-  (Signature.Public_key.t * int list * bool) Signature.Public_key_hash.Map.t ->
-  context
+  context -> (int list * bool) Baker_hash.Map.t -> context
 
 (** Marks an endorsement in the map as used. *)
-val record_endorsement : context -> Signature.Public_key_hash.t -> context
+val record_endorsement : context -> Baker_hash.t -> context
 
 val fold_map_temporary_lazy_storage_ids :
   context ->

@@ -51,30 +51,28 @@ type error += Invalid_stamp (* `Permanent *)
 val minimal_time : context -> int -> Time.t -> Time.t tzresult
 
 (** [check_baking_rights ctxt block pred_timestamp] verifies that:
-    * the contract that owned the roll at cycle start has the block signer as delegate.
+    * the contract that owned the roll at cycle start has the block signer as baker.
     * the timestamp is coherent with the announced slot.
 *)
 val check_baking_rights :
   context ->
   Block_header.contents ->
   Time.t ->
-  (public_key * Period.t) tzresult Lwt.t
+  (baker_hash * Period.t) tzresult Lwt.t
 
 (** For a given level computes who has the right to
     include an endorsement in the next block.
     The result can be stored in Alpha_context.allowed_endorsements *)
 val endorsement_rights :
-  context ->
-  Level.t ->
-  (public_key * int list * bool) Signature.Public_key_hash.Map.t tzresult Lwt.t
+  context -> Level.t -> (int list * bool) Baker_hash.Map.t tzresult Lwt.t
 
-(** Check that the operation was signed by a delegate allowed
+(** Check that the operation was signed by a baker allowed
     to endorse at the level specified by the endorsement. *)
 val check_endorsement_rights :
   context ->
   Chain_id.t ->
   Kind.endorsement Operation.t ->
-  (public_key_hash * int list * bool) tzresult Lwt.t
+  (baker_hash * int list * bool) tzresult Lwt.t
 
 (** Returns the baking reward calculated w.r.t a given priority [p] and a
     number [e] of included endorsements *)
@@ -86,24 +84,24 @@ val endorsing_reward : context -> block_priority:int -> int -> Tez.t tzresult
 
 (** [baking_priorities ctxt level] is the lazy list of contract's
     public key hashes that are allowed to bake for [level]. *)
-val baking_priorities : context -> Level.t -> public_key lazy_list
+val baking_priorities : context -> Level.t -> baker_hash lazy_list
 
 (** [first_baking_priorities ctxt ?max_priority contract_hash level]
     is a list of priorities of max [?max_priority] elements, where the
-    delegate of [contract_hash] is allowed to bake for [level]. If
+    baker of [baker_hash] is allowed to bake for [level]. If
     [?max_priority] is [None], a sensible number of priorities is
     returned. *)
 val first_baking_priorities :
   context ->
   ?max_priority:int ->
-  public_key_hash ->
+  baker_hash ->
   Level.t ->
   int list tzresult Lwt.t
 
 (** [check_signature ctxt chain_id block id] check if the block is
-    signed with the given key, and belongs to the given [chain_id] *)
+    signed with the key of given baker, and belongs to the given [chain_id] *)
 val check_signature :
-  Block_header.t -> Chain_id.t -> public_key -> unit tzresult Lwt.t
+  context -> Block_header.t -> Chain_id.t -> baker_hash -> unit tzresult Lwt.t
 
 (** Checks if the header that would be built from the given components
     is valid for the given difficulty. The signature is not passed as it

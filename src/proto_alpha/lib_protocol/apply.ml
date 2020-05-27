@@ -35,17 +35,13 @@ type error += Wrong_endorsement_predecessor of Block_hash.t * Block_hash.t
 
 (* `Temporary *)
 
-type error += Duplicate_endorsement of Signature.Public_key_hash.t
-
-(* `Branch *)
+type error += Duplicate_endorsement of Baker_hash.t (* `Branch *)
 
 type error += Invalid_endorsement_level
 
 type error += Invalid_commitment of {expected : bool}
 
 type error += Internal_operation_replay of packed_internal_operation
-
-(* `Permanent *)
 
 type error += Invalid_activation of {pkh : Ed25519.Public_key_hash.t}
 
@@ -116,14 +112,14 @@ let () =
     `Branch
     ~id:"operation.duplicate_endorsement"
     ~title:"Duplicate endorsement"
-    ~description:"Two endorsements received from same delegate"
+    ~description:"Two endorsements received from same baker"
     ~pp:(fun ppf k ->
       Format.fprintf
         ppf
-        "Duplicate endorsement from delegate %a (possible replay attack)."
-        Signature.Public_key_hash.pp_short
+        "Duplicate endorsement from baker %a (possible replay attack)."
+        Baker_hash.pp_short
         k)
-    Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
+    Data_encoding.(obj1 (req "baker" Baker_hash.encoding))
     (function Duplicate_endorsement k -> Some k | _ -> None)
     (fun k -> Duplicate_endorsement k) ;
   register_error_kind
@@ -795,7 +791,7 @@ let skipped_operation_result :
 
 let rec mark_skipped :
     type kind.
-    baker:Signature.Public_key_hash.t ->
+    baker:Baker_hash.t ->
     Level.t ->
     kind Kind.manager contents_list ->
     kind Kind.manager contents_result_list =
@@ -846,7 +842,7 @@ let rec apply_manager_contents_list_rec :
     type kind.
     Alpha_context.t ->
     Script_ir_translator.unparsing_mode ->
-    public_key_hash ->
+    baker_hash ->
     Chain_id.t ->
     kind Kind.manager contents_list ->
     (success_or_failure * kind Kind.manager contents_result_list) Lwt.t =
@@ -974,20 +970,20 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
         Invalid_endorsement_level
       >>?= fun () ->
       Baking.check_endorsement_rights ctxt chain_id operation
-      >>=? fun (delegate, slots, used) ->
-      if used then fail (Duplicate_endorsement delegate)
+      >>=? fun (baker, slots, used) ->
+      if used then fail (Duplicate_endorsement baker)
       else
-        let ctxt = record_endorsement ctxt delegate in
+        let ctxt = record_endorsement ctxt baker in
         let gap = List.length slots in
         Tez.(Constants.endorsement_security_deposit ctxt *? Int64.of_int gap)
         >>?= fun deposit ->
-        Delegate.freeze_deposit ctxt delegate deposit
+        Baker.freeze_deposit ctxt baker deposit
         >>=? fun ctxt ->
         Global.get_block_priority ctxt
         >>=? fun block_priority ->
         Baking.endorsing_reward ctxt ~block_priority gap
         >>?= fun reward ->
-        Delegate.freeze_rewards ctxt delegate reward
+        Baker.freeze_rewards ctxt baker reward
         >|=? fun ctxt ->
         let level = Level.from_raw ctxt level in
         ( ctxt,
@@ -996,11 +992,11 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
                {
                  balance_updates =
                    Receipt.cleanup_balance_updates
-                     [ ( Contract (Contract.implicit_contract delegate),
+                     [ ( Contract (Contract.baker_contract baker),
                          Debited deposit );
-                       (Deposits (delegate, level.cycle), Credited deposit);
-                       (Rewards (delegate, level.cycle), Credited reward) ];
-                 delegate;
+                       (Deposits (baker, level.cycle), Credited deposit);
+                       (Rewards (baker, level.cycle), Credited reward) ];
+                 baker;
                  slots;
                }) )
   | Single (Seed_nonce_revelation {level; nonce}) ->
@@ -1020,16 +1016,16 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
                    Credited seed_nonce_revelation_tip ) ]) ) )
   | Single (Double_endorsement_evidence _ as evidence) ->
       Cheating_proofs.prove_double_endorsement ctxt chain_id evidence
-      >>=? fun (level, delegate) ->
-      Delegate.Proof.mem ctxt delegate level.level
+      >>=? fun (level, convicted_baker) ->
+      Baker.Proof.mem ctxt convicted_baker level.level
       >>=? fun already_exists ->
       error_when already_exists Double_injection_of_evidence
       >>?= fun () ->
-      Delegate.has_frozen_balance ctxt delegate level.cycle
+      Baker.has_frozen_balance ctxt convicted_baker level.cycle
       >>=? fun valid ->
       error_unless valid Unrequired_evidence
       >>?= fun () ->
-      Delegate.punish ctxt delegate level.cycle
+      Baker.punish ctxt convicted_baker level.cycle
       >>=? fun (ctxt, balance) ->
       Tez.(balance.deposit +? balance.fees)
       >>?= fun burned ->
@@ -1038,29 +1034,31 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
       in
       add_rewards ctxt reward
       >>?= fun ctxt ->
-      Delegate.Proof.add ctxt delegate level.level
+      Baker.Proof.add ctxt convicted_baker level.level
       >|=? fun ctxt ->
       let current_cycle = (Level.current ctxt).cycle in
       ( ctxt,
         Single_result
           (Double_endorsement_evidence_result
              (Receipt.cleanup_balance_updates
-                [ (Deposits (delegate, level.cycle), Debited balance.deposit);
-                  (Fees (delegate, level.cycle), Debited balance.fees);
-                  (Rewards (delegate, level.cycle), Debited balance.rewards);
+                [ ( Deposits (convicted_baker, level.cycle),
+                    Debited balance.deposit );
+                  (Fees (convicted_baker, level.cycle), Debited balance.fees);
+                  ( Rewards (convicted_baker, level.cycle),
+                    Debited balance.rewards );
                   (Rewards (baker, current_cycle), Credited reward) ])) )
   | Single (Double_baking_evidence _ as evidence) ->
       Cheating_proofs.prove_double_baking ctxt chain_id evidence
-      >>=? fun (level, delegate) ->
-      Delegate.Proof.mem ctxt delegate level.level
+      >>=? fun (level, convicted_baker) ->
+      Baker.Proof.mem ctxt convicted_baker level.level
       >>=? fun already_exists ->
       error_when already_exists Double_injection_of_evidence
       >>?= fun () ->
-      Delegate.has_frozen_balance ctxt delegate level.cycle
+      Baker.has_frozen_balance ctxt convicted_baker level.cycle
       >>=? fun valid ->
       error_unless valid Unrequired_evidence
       >>?= fun () ->
-      Delegate.punish ctxt delegate level.cycle
+      Baker.punish ctxt convicted_baker level.cycle
       >>=? fun (ctxt, balance) ->
       Tez.(balance.deposit +? balance.fees)
       >>?= fun burned ->
@@ -1069,16 +1067,18 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
       in
       add_rewards ctxt reward
       >>?= fun ctxt ->
-      Delegate.Proof.add ctxt delegate level.level
+      Baker.Proof.add ctxt convicted_baker level.level
       >|=? fun ctxt ->
       let current_cycle = (Level.current ctxt).cycle in
       ( ctxt,
         Single_result
           (Double_baking_evidence_result
              (Receipt.cleanup_balance_updates
-                [ (Deposits (delegate, level.cycle), Debited balance.deposit);
-                  (Fees (delegate, level.cycle), Debited balance.fees);
-                  (Rewards (delegate, level.cycle), Debited balance.rewards);
+                [ ( Deposits (convicted_baker, level.cycle),
+                    Debited balance.deposit );
+                  (Fees (convicted_baker, level.cycle), Debited balance.fees);
+                  ( Rewards (convicted_baker, level.cycle),
+                    Debited balance.rewards );
                   (Rewards (baker, current_cycle), Credited reward) ])) )
   | Single (Activate_account {id = pkh; activation_code}) -> (
       let blinded_pkh =
@@ -1169,7 +1169,7 @@ let may_start_new_cycle ctxt =
       >>=? fun (ctxt, unrevealed) ->
       Roll.cycle_end ctxt last_cycle
       >>=? fun ctxt ->
-      Delegate.cycle_end ctxt last_cycle unrevealed
+      Baker.cycle_end ctxt last_cycle unrevealed
       >>=? fun (ctxt, update_balances, deactivated) ->
       Bootstrap.cycle_end ctxt last_cycle
       >|=? fun ctxt -> (ctxt, update_balances, deactivated)
@@ -1180,7 +1180,7 @@ let begin_full_construction ctxt pred_timestamp protocol_data =
     protocol_data.Block_header.priority
   >>=? fun ctxt ->
   Baking.check_baking_rights ctxt protocol_data pred_timestamp
-  >>=? fun (delegate_pk, block_delay) ->
+  >>=? fun (baker, block_delay) ->
   let ctxt = Fitness.increase ctxt in
   match Level.pred ctxt (Level.current ctxt) with
   | None ->
@@ -1189,7 +1189,7 @@ let begin_full_construction ctxt pred_timestamp protocol_data =
       Baking.endorsement_rights ctxt pred_level
       >|=? fun rights ->
       let ctxt = init_endorsements ctxt rights in
-      (ctxt, protocol_data, delegate_pk, block_delay)
+      (ctxt, protocol_data, baker, block_delay)
 
 let begin_partial_construction ctxt =
   let ctxt = Fitness.increase ctxt in
@@ -1214,8 +1214,8 @@ let begin_application ctxt chain_id block_header pred_timestamp =
     ctxt
     block_header.protocol_data.contents
     pred_timestamp
-  >>=? fun (delegate_pk, block_delay) ->
-  Baking.check_signature block_header chain_id delegate_pk
+  >>=? fun (baker, block_delay) ->
+  Baking.check_signature ctxt block_header chain_id baker
   >>=? fun () ->
   let has_commitment =
     match block_header.protocol_data.contents.seed_nonce_hash with
@@ -1236,7 +1236,7 @@ let begin_application ctxt chain_id block_header pred_timestamp =
       Baking.endorsement_rights ctxt pred_level
       >|=? fun rights ->
       let ctxt = init_endorsements ctxt rights in
-      (ctxt, delegate_pk, block_delay)
+      (ctxt, baker, block_delay)
 
 let check_minimum_endorsements ctxt protocol_data block_delay
     included_endorsements =
@@ -1252,7 +1252,7 @@ let check_minimum_endorsements ctxt protocol_data block_delay
          timestamp;
        })
 
-let finalize_application ctxt protocol_data delegate ~block_delay
+let finalize_application ctxt protocol_data baker ~block_delay
     migration_balance_updates =
   let included_endorsements = included_endorsements ctxt in
   check_minimum_endorsements
@@ -1262,7 +1262,7 @@ let finalize_application ctxt protocol_data delegate ~block_delay
     included_endorsements
   >>?= fun () ->
   let deposit = Constants.block_security_deposit ctxt in
-  add_deposit ctxt delegate deposit
+  add_deposit ctxt baker deposit
   >>?= fun ctxt ->
   Baking.baking_reward
     ctxt
@@ -1271,24 +1271,24 @@ let finalize_application ctxt protocol_data delegate ~block_delay
   >>?= fun reward ->
   add_rewards ctxt reward
   >>?= fun ctxt ->
-  Signature.Public_key_hash.Map.fold
-    (fun delegate deposit ctxt ->
-      ctxt >>=? fun ctxt -> Delegate.freeze_deposit ctxt delegate deposit)
+  Baker_hash.Map.fold
+    (fun baker deposit ctxt ->
+      ctxt >>=? fun ctxt -> Baker.freeze_deposit ctxt baker deposit)
     (get_deposits ctxt)
     (return ctxt)
   >>=? fun ctxt ->
   (* end of level (from this point nothing should fail) *)
   let fees = Alpha_context.get_fees ctxt in
-  Delegate.freeze_fees ctxt delegate fees
+  Baker.freeze_fees ctxt baker fees
   >>=? fun ctxt ->
   let rewards = Alpha_context.get_rewards ctxt in
-  Delegate.freeze_rewards ctxt delegate rewards
+  Baker.freeze_rewards ctxt baker rewards
   >>=? fun ctxt ->
   ( match protocol_data.Block_header.seed_nonce_hash with
   | None ->
       return ctxt
   | Some nonce_hash ->
-      Nonce.record_hash ctxt {nonce_hash; delegate; rewards; fees} )
+      Nonce.record_hash ctxt {nonce_hash; baker; rewards; fees} )
   >>=? fun ctxt ->
   (* end of cycle *)
   may_snapshot_roll ctxt
@@ -1302,9 +1302,9 @@ let finalize_application ctxt protocol_data delegate ~block_delay
   let balance_updates =
     Receipt.(
       cleanup_balance_updates
-        ( [ (Contract (Contract.implicit_contract delegate), Debited deposit);
-            (Deposits (delegate, cycle), Credited deposit);
-            (Rewards (delegate, cycle), Credited reward) ]
+        ( [ (Contract (Contract.baker_contract baker), Debited deposit);
+            (Deposits (baker, cycle), Credited deposit);
+            (Rewards (baker, cycle), Credited reward) ]
         @ balance_updates ))
   in
   let consumed_gas =
@@ -1317,7 +1317,7 @@ let finalize_application ctxt protocol_data delegate ~block_delay
   let receipt =
     Apply_results.
       {
-        baker = delegate;
+        baker;
         level = Level.current ctxt;
         voting_period_kind;
         nonce_hash = protocol_data.seed_nonce_hash;

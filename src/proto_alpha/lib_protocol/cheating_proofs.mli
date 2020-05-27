@@ -35,8 +35,8 @@ open Alpha_context
 type error +=
   | (* `Permanent *)
       Inconsistent_evidence of {
-      delegate1 : Signature.Public_key_hash.t;
-      delegate2 : Signature.Public_key_hash.t;
+      baker1 : Baker_hash.t;
+      baker2 : Baker_hash.t;
     }
   | (* `Permanent *)
       Outdated_evidence of {
@@ -67,10 +67,10 @@ val prove_double_baking :
   context ->
   Chain_id.t ->
   Kind.double_baking_evidence contents ->
-  (Level.t * Signature.public_key_hash) tzresult Lwt.t
+  (Level.t * baker_hash) tzresult Lwt.t
 
 val prove_double_endorsement :
   context ->
   Chain_id.t ->
   Kind.double_endorsement_evidence contents ->
-  (Level.t * Signature.public_key_hash) tzresult Lwt.t
+  (Level.t * baker_hash) tzresult Lwt.t

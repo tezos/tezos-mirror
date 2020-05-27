@@ -91,19 +91,19 @@ let rpc_services =
 type validation_mode =
   | Application of {
       block_header : Alpha_context.Block_header.t;
-      baker : Alpha_context.public_key_hash;
+      baker : Alpha_context.baker_hash;
       block_delay : Alpha_context.Period.t;
     }
   | Partial_application of {
       block_header : Alpha_context.Block_header.t;
-      baker : Alpha_context.public_key_hash;
+      baker : Alpha_context.baker_hash;
       block_delay : Alpha_context.Period.t;
     }
   | Partial_construction of {predecessor : Block_hash.t}
   | Full_construction of {
       predecessor : Block_hash.t;
       protocol_data : Alpha_context.Block_header.contents;
-      baker : Alpha_context.public_key_hash;
+      baker : Alpha_context.baker_hash;
       block_delay : Alpha_context.Period.t;
     }
 
@@ -127,10 +127,7 @@ let begin_partial_application ~chain_id ~ancestor_context:ctxt
   >>=? fun (ctxt, migration_balance_updates) ->
   Apply.begin_application ctxt chain_id block_header predecessor_timestamp
   >|=? fun (ctxt, baker, block_delay) ->
-  let mode =
-    Partial_application
-      {block_header; baker = Signature.Public_key.hash baker; block_delay}
-  in
+  let mode = Partial_application {block_header; baker; block_delay} in
   {mode; chain_id; ctxt; op_count = 0; migration_balance_updates}
 
 let begin_application ~chain_id ~predecessor_context:ctxt
@@ -143,10 +140,7 @@ let begin_application ~chain_id ~predecessor_context:ctxt
   >>=? fun (ctxt, migration_balance_updates) ->
   Apply.begin_application ctxt chain_id block_header predecessor_timestamp
   >|=? fun (ctxt, baker, block_delay) ->
-  let mode =
-    Application
-      {block_header; baker = Signature.Public_key.hash baker; block_delay}
-  in
+  let mode = Application {block_header; baker; block_delay} in
   {mode; chain_id; ctxt; op_count = 0; migration_balance_updates}
 
 let begin_construction ~chain_id ~predecessor_context:ctxt
@@ -170,7 +164,6 @@ let begin_construction ~chain_id ~predecessor_context:ctxt
         proto_header.contents
       >|=? fun (ctxt, protocol_data, baker, block_delay) ->
       let mode =
-        let baker = Signature.Public_key.hash baker in
         Full_construction {predecessor; baker; protocol_data; block_delay}
       in
       (mode, ctxt) )
@@ -199,7 +192,7 @@ let apply_operation ({mode; chain_id; ctxt; op_count; _} as data)
         | Full_construction {predecessor; baker; _} ->
             (predecessor, baker)
         | Partial_construction {predecessor} ->
-            (predecessor, Signature.Public_key_hash.zero)
+            (predecessor, Baker_hash.zero)
       in
       Apply.apply_operation
         ctxt
@@ -219,12 +212,12 @@ let finalize_block {mode; ctxt; op_count; migration_balance_updates} =
       let level = Alpha_context.Level.current ctxt in
       Alpha_context.Vote.get_current_period_kind ctxt
       >>=? fun voting_period_kind ->
-      let baker = Signature.Public_key_hash.zero in
-      Signature.Public_key_hash.Map.fold
-        (fun delegate deposit ctxt ->
+      let baker = Baker_hash.zero in
+      Baker_hash.Map.fold
+        (fun baker deposit ctxt ->
           ctxt
           >>=? fun ctxt ->
-          Alpha_context.Delegate.freeze_deposit ctxt delegate deposit)
+          Alpha_context.Baker.freeze_deposit ctxt baker deposit)
         (Alpha_context.get_deposits ctxt)
         (return ctxt)
       >|=? fun ctxt ->

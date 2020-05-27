@@ -903,7 +903,7 @@ module Encoding = struct
         encoding =
           obj3
             (req "balance_updates" Receipt.balance_updates_encoding)
-            (req "delegate" Signature.Public_key_hash.encoding)
+            (req "baker" Baker_hash.encoding)
             (req "slots" (list uint8));
         select =
           (function
@@ -916,11 +916,11 @@ module Encoding = struct
               None);
         proj =
           (function
-          | Endorsement_result {balance_updates; delegate; slots} ->
-              (balance_updates, delegate, slots));
+          | Endorsement_result {balance_updates; baker; slots} ->
+              (balance_updates, baker, slots));
         inj =
-          (fun (balance_updates, delegate, slots) ->
-            Endorsement_result {balance_updates; delegate; slots});
+          (fun (balance_updates, baker, slots) ->
+            Endorsement_result {balance_updates; baker; slots});
       }
 
   let seed_nonce_revelation_case =
@@ -1730,12 +1730,12 @@ let operation_data_and_metadata_encoding =
              (Operation_data {contents; signature}, No_operation_metadata)) ]
 
 type block_metadata = {
-  baker : Signature.Public_key_hash.t;
+  baker : Baker_hash.t;
   level : Level.t;
   voting_period_kind : Voting_period.kind;
   nonce_hash : Nonce_hash.t option;
   consumed_gas : Z.t;
-  deactivated : Signature.Public_key_hash.t list;
+  deactivated : Baker_hash.t list;
   balance_updates : Receipt.balance_updates;
 }
 
@@ -1774,10 +1774,10 @@ let block_metadata_encoding =
            balance_updates;
          })
        (obj7
-          (req "baker" Signature.Public_key_hash.encoding)
+          (req "baker" Baker_hash.encoding)
           (req "level" Level.encoding)
           (req "voting_period_kind" Voting_period.kind_encoding)
           (req "nonce_hash" (option Nonce_hash.encoding))
           (req "consumed_gas" (check_size 10 n))
-          (req "deactivated" (list Signature.Public_key_hash.encoding))
+          (req "deactivated" (list Baker_hash.encoding))
           (req "balance_updates" Receipt.balance_updates_encoding))

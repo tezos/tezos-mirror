@@ -28,8 +28,8 @@ open Alpha_context
 type error +=
   | (* `Permanent *)
       Inconsistent_evidence of {
-      delegate1 : Signature.Public_key_hash.t;
-      delegate2 : Signature.Public_key_hash.t;
+      baker1 : Baker_hash.t;
+      baker2 : Baker_hash.t;
     }
   | (* `Permanent *)
       Outdated_evidence of {
@@ -85,24 +85,21 @@ let prove_double_baking ctxt chain_id (Double_baking_evidence {bh1; bh2}) =
     ctxt
     level
     ~priority:bh1.protocol_data.contents.priority
-  >>=? fun delegate1 ->
-  Baking.check_signature bh1 chain_id delegate1
+  >>=? fun baker1 ->
+  Baking.check_signature ctxt bh1 chain_id baker1
   >>=? fun () ->
   Roll.baking_rights_owner
     ctxt
     level
     ~priority:bh2.protocol_data.contents.priority
-  >>=? fun delegate2 ->
-  Baking.check_signature bh2 chain_id delegate2
+  >>=? fun baker2 ->
+  Baking.check_signature ctxt bh2 chain_id baker2
   >>=? fun () ->
-  let (delegate1, delegate2) =
-    (Signature.Public_key.hash delegate1, Signature.Public_key.hash delegate2)
-  in
   Lwt.return
     ( error_unless
-        (Signature.Public_key_hash.equal delegate1 delegate2)
-        (Inconsistent_evidence {delegate1; delegate2})
-    >|? fun () -> (level, delegate1) )
+        (Baker_hash.equal baker1 baker2)
+        (Inconsistent_evidence {baker1; baker2})
+    >|? fun () -> (level, baker1) )
 
 let prove_double_endorsement ctxt chain_id
     (Double_endorsement_evidence {op1; op2}) =
@@ -122,40 +119,39 @@ let prove_double_endorsement ctxt chain_id
   check_level_bounds ctxt level
   >>?= fun () ->
   Baking.check_endorsement_rights ctxt chain_id op1
-  >>=? fun (delegate1, _, _) ->
+  >>=? fun (baker1, _, _) ->
   Baking.check_endorsement_rights ctxt chain_id op2
-  >>=? fun (delegate2, _, _) ->
+  >>=? fun (baker2, _, _) ->
   Lwt.return
     ( error_unless
-        (Signature.Public_key_hash.equal delegate1 delegate2)
-        (Inconsistent_evidence {delegate1; delegate2})
-    >|? fun () -> (level, delegate1) )
+        (Baker_hash.equal baker1 baker2)
+        (Inconsistent_evidence {baker1; baker2})
+    >|? fun () -> (level, baker1) )
 
 let () =
   register_error_kind
     `Permanent
     ~id:"proving.inconsistent_evidence"
     ~title:"Inconsistent evidence"
-    ~description:"The evidence is inconsistent (two distinct delegates)"
-    ~pp:(fun ppf (delegate1, delegate2) ->
+    ~description:"The evidence is inconsistent (two distinct bakers)"
+    ~pp:(fun ppf (baker1, baker2) ->
       Format.fprintf
         ppf
-        "Inconsistent evidence (distinct delegate: %a and %a)"
-        Signature.Public_key_hash.pp_short
-        delegate1
-        Signature.Public_key_hash.pp_short
-        delegate2)
+        "Inconsistent evidence (distinct baker: %a and %a)"
+        Baker_hash.pp_short
+        baker1
+        Baker_hash.pp_short
+        baker2)
     Data_encoding.(
       obj2
-        (req "delegate1" Signature.Public_key_hash.encoding)
-        (req "delegate2" Signature.Public_key_hash.encoding))
+        (req "baker1" Baker_hash.encoding)
+        (req "baker2" Baker_hash.encoding))
     (function
-      | Inconsistent_evidence {delegate1; delegate2} ->
-          Some (delegate1, delegate2)
+      | Inconsistent_evidence {baker1; baker2} ->
+          Some (baker1, baker2)
       | _ ->
           None)
-    (fun (delegate1, delegate2) ->
-      Inconsistent_evidence {delegate1; delegate2}) ;
+    (fun (baker1, baker2) -> Inconsistent_evidence {baker1; baker2}) ;
   register_error_kind
     `Temporary
     ~id:"proving.too_early_evidence"

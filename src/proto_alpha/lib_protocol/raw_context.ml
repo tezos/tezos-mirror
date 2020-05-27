@@ -33,10 +33,9 @@ type t = {
   predecessor_timestamp : Time.t;
   timestamp : Time.t;
   fitness : Int64.t;
-  deposits : Tez_repr.t Signature.Public_key_hash.Map.t;
+  deposits : Tez_repr.t Baker_hash.Map.t;
   included_endorsements : int;
-  allowed_endorsements :
-    (Signature.Public_key.t * int list * bool) Signature.Public_key_hash.Map.t;
+  allowed_endorsements : (int list * bool) Baker_hash.Map.t;
   fees : Tez_repr.t;
   rewards : Tez_repr.t;
   block_gas : Z.t;
@@ -70,26 +69,23 @@ let constants ctxt = ctxt.constants
 let recover ctxt = ctxt.context
 
 let record_endorsement ctxt k =
-  match Signature.Public_key_hash.Map.find_opt k ctxt.allowed_endorsements with
+  match Baker_hash.Map.find_opt k ctxt.allowed_endorsements with
   | None ->
       assert false
-  | Some (_, _, true) ->
+  | Some (_, true) ->
       assert false (* right already used *)
-  | Some (d, s, false) ->
+  | Some (s, false) ->
       {
         ctxt with
         included_endorsements = ctxt.included_endorsements + List.length s;
         allowed_endorsements =
-          Signature.Public_key_hash.Map.add
-            k
-            (d, s, true)
-            ctxt.allowed_endorsements;
+          Baker_hash.Map.add k (s, true) ctxt.allowed_endorsements;
       }
 
 let init_endorsements ctxt allowed_endorsements =
-  if Signature.Public_key_hash.Map.is_empty allowed_endorsements then
-    assert false (* can't initialize to empty *)
-  else if Signature.Public_key_hash.Map.is_empty ctxt.allowed_endorsements then
+  if Baker_hash.Map.is_empty allowed_endorsements then assert false
+    (* can't initialize to empty *)
+  else if Baker_hash.Map.is_empty ctxt.allowed_endorsements then
     {ctxt with allowed_endorsements}
   else assert false
 
@@ -138,9 +134,9 @@ let add_fees ctxt fees =
 let add_rewards ctxt rewards =
   Tez_repr.(ctxt.rewards +? rewards) >|? fun rewards -> {ctxt with rewards}
 
-let add_deposit ctxt delegate deposit =
+let add_deposit ctxt baker deposit =
   let previous =
-    match Signature.Public_key_hash.Map.find_opt delegate ctxt.deposits with
+    match Baker_hash.Map.find_opt baker ctxt.deposits with
     | Some tz ->
         tz
     | None ->
@@ -148,9 +144,7 @@ let add_deposit ctxt delegate deposit =
   in
   Tez_repr.(previous +? deposit)
   >|? fun deposit ->
-  let deposits =
-    Signature.Public_key_hash.Map.add delegate deposit ctxt.deposits
-  in
+  let deposits = Baker_hash.Map.add baker deposit ctxt.deposits in
   {ctxt with deposits}
 
 let get_deposits ctxt = ctxt.deposits
@@ -552,11 +546,11 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
     timestamp;
     fitness;
     first_level;
-    allowed_endorsements = Signature.Public_key_hash.Map.empty;
+    allowed_endorsements = Baker_hash.Map.empty;
     included_endorsements = 0;
     fees = Tez_repr.zero;
     rewards = Tez_repr.zero;
-    deposits = Signature.Public_key_hash.Map.empty;
+    deposits = Baker_hash.Map.empty;
     operation_gas = Unaccounted;
     storage_space_to_pay = None;
     allocated_contracts = None;

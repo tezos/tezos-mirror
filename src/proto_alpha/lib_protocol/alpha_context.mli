@@ -650,7 +650,7 @@ module Nonce : sig
 
   type unrevealed = {
     nonce_hash : Nonce_hash.t;
-    delegate : public_key_hash;
+    baker : baker_hash;
     rewards : Tez.t;
     fees : Tez.t;
   }
@@ -859,7 +859,7 @@ module Contract : sig
     contract ->
     balance:Tez.t ->
     script:Script.t * Lazy_storage.diffs option ->
-    delegate:public_key_hash option ->
+    delegate:baker_hash option ->
     context tzresult Lwt.t
 
   type error += Balance_too_low of contract * Tez.t * Tez.t
@@ -895,9 +895,9 @@ end
 module Receipt : sig
   type balance =
     | Contract of Contract.t
-    | Rewards of Signature.Public_key_hash.t * Cycle.t
-    | Fees of Signature.Public_key_hash.t * Cycle.t
-    | Deposits of Signature.Public_key_hash.t * Cycle.t
+    | Rewards of baker_hash * Cycle.t
+    | Fees of baker_hash * Cycle.t
+    | Deposits of baker_hash * Cycle.t
 
   type balance_update = Debited of Tez.t | Credited of Tez.t
 
@@ -1038,11 +1038,10 @@ module Vote : sig
     passes_per_roll : int;
   }
 
-  val get_voting_power_free :
-    context -> Signature.Public_key_hash.t -> int32 tzresult Lwt.t
+  val get_voting_power_free : context -> baker_hash -> int32 tzresult Lwt.t
 
   val get_voting_power :
-    context -> Signature.Public_key_hash.t -> (context * int32) tzresult Lwt.t
+    context -> baker_hash -> (context * int32) tzresult Lwt.t
 
   val get_total_voting_power_free : context -> int32 tzresult Lwt.t
 
@@ -1054,15 +1053,13 @@ module Vote : sig
 
   val ballots_encoding : ballots Data_encoding.t
 
-  val has_recorded_ballot : context -> public_key_hash -> bool Lwt.t
+  val has_recorded_ballot : context -> baker_hash -> bool Lwt.t
 
-  val record_ballot :
-    context -> public_key_hash -> ballot -> context tzresult Lwt.t
+  val record_ballot : context -> baker_hash -> ballot -> context tzresult Lwt.t
 
   val get_ballots : context -> ballots tzresult Lwt.t
 
-  val get_ballot_list :
-    context -> (Signature.Public_key_hash.t * ballot) list Lwt.t
+  val get_ballot_list : context -> (baker_hash * ballot) list Lwt.t
 
   val clear_ballots : context -> context Lwt.t
 
@@ -1527,18 +1524,14 @@ module Roll : sig
   val cycle_end : context -> Cycle.t -> context tzresult Lwt.t
 
   val baking_rights_owner :
-    context -> Level.t -> priority:int -> public_key tzresult Lwt.t
+    context -> Level.t -> priority:int -> baker_hash tzresult Lwt.t
 
   val endorsement_rights_owner :
-    context -> Level.t -> slot:int -> public_key tzresult Lwt.t
+    context -> Level.t -> slot:int -> baker_hash tzresult Lwt.t
 
-  val delegate_pubkey : context -> public_key_hash -> public_key tzresult Lwt.t
+  val get_rolls : context -> baker_hash -> roll list tzresult Lwt.t
 
-  val get_rolls :
-    context -> Signature.Public_key_hash.t -> roll list tzresult Lwt.t
-
-  val get_change :
-    context -> Signature.Public_key_hash.t -> Tez.t tzresult Lwt.t
+  val get_change : context -> baker_hash -> Tez.t tzresult Lwt.t
 end
 
 module Commitment : sig
@@ -1587,16 +1580,12 @@ val activate : context -> Protocol_hash.t -> context Lwt.t
 
 val fork_test_chain : context -> Protocol_hash.t -> Time.t -> context Lwt.t
 
-val record_endorsement : context -> Signature.Public_key_hash.t -> context
+val record_endorsement : context -> Baker_hash.t -> context
 
-val allowed_endorsements :
-  context ->
-  (Signature.Public_key.t * int list * bool) Signature.Public_key_hash.Map.t
+val allowed_endorsements : context -> (int list * bool) Baker_hash.Map.t
 
 val init_endorsements :
-  context ->
-  (Signature.Public_key.t * int list * bool) Signature.Public_key_hash.Map.t ->
-  context
+  context -> (int list * bool) Baker_hash.Map.t -> context
 
 val included_endorsements : context -> int
 
@@ -1612,13 +1601,12 @@ val add_fees : context -> Tez.t -> context tzresult
 
 val add_rewards : context -> Tez.t -> context tzresult
 
-val add_deposit :
-  context -> Signature.Public_key_hash.t -> Tez.t -> context tzresult
+val add_deposit : context -> baker_hash -> Tez.t -> context tzresult
 
 val get_fees : context -> Tez.t
 
 val get_rewards : context -> Tez.t
 
-val get_deposits : context -> Tez.t Signature.Public_key_hash.Map.t
+val get_deposits : context -> Tez.t Baker_hash.Map.t
 
 val description : context Storage_description.t
