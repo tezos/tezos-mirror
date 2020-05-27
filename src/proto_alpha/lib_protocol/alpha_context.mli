@@ -391,6 +391,7 @@ module Script : sig
     | T_bls12_381_fr
     | T_baker_hash
     | T_baker_operation
+    | T_pvss_key
 
   type location = Micheline.canonical_location
 

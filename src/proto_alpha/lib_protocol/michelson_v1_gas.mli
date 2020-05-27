@@ -255,6 +255,8 @@ module Cost_of : sig
 
     val baker_hash : Gas.cost
 
+    val pvss_key : Gas.cost
+
     val signature : Gas.cost
 
     val bls12_381_g1 : Gas.cost
@@ -332,6 +334,8 @@ module Cost_of : sig
     val key_hash : Gas.cost
 
     val baker_hash : Gas.cost
+
+    val pvss_key : Gas.cost
 
     val signature : Gas.cost
 

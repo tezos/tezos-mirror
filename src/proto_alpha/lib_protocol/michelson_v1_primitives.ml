@@ -168,6 +168,7 @@ type prim =
   | T_bls12_381_fr
   | T_baker_hash
   | T_baker_operation
+  | T_pvss_key
 
 (* Auxiliary types for error documentation.
    All the prim constructor prefixes must match their namespace. *)
@@ -304,6 +305,7 @@ let namespace = function
   | T_option
   | T_or
   | T_pair
+  | T_pvss_key
   | T_set
   | T_signature
   | T_string
@@ -595,6 +597,8 @@ let string_of_prim = function
       "baker_hash"
   | T_baker_operation ->
       "baker_operation"
+  | T_pvss_key ->
+      "pvss_key"
 
 let prim_of_string = function
   | "parameter" ->
@@ -863,6 +867,8 @@ let prim_of_string = function
       ok T_baker_hash
   | "baker_operation" ->
       ok T_baker_operation
+  | "pvss_key" ->
+      ok T_pvss_key
   | n ->
       if valid_case n then error (Unknown_primitive_name n)
       else error (Invalid_case n)
@@ -1052,7 +1058,8 @@ let prim_encoding =
          ("bls12_381_g2", T_bls12_381_g2);
          ("bls12_381_fr", T_bls12_381_fr);
          ("baker_hash", T_baker_hash);
-         ("baker_operation", T_baker_operation)
+         ("baker_operation", T_baker_operation);
+         ("pvss_key", T_pvss_key)
          (* New instructions must be added here, for backward compatibility of the encoding. *)
         ]
 
