@@ -129,6 +129,10 @@ type error +=
 
 type error += (* `Permanent *) Failing_noop_error
 
+type error += Not_a_baker_contract
+
+type error += Invalid_protocols of string list
+
 type error += Not_an_active_consensus_key of Signature.Public_key_hash.t
 
 let () =
@@ -558,6 +562,31 @@ let () =
     (fun () -> Failing_noop_error) ;
   register_error_kind
     `Temporary
+    ~id:"operation.invalid_protocols"
+    ~title:"Invalid protocol(s)"
+    ~description:"One or more submitted proposals is not a valid protocol hash"
+    ~pp:(fun ppf protocols ->
+      Format.(
+        fprintf
+          ppf
+          "One or more submitted proposals is not a valid protocol hash: %a"
+          (pp_print_list pp_print_string)
+          protocols))
+    Data_encoding.(obj1 (req "protocols" (list string)))
+    (function Invalid_protocols protocols -> Some protocols | _ -> None)
+    (fun protocols -> Invalid_protocols protocols) ;
+  register_error_kind
+    `Permanent
+    ~id:"operation.not_a_baker_contract"
+    ~title:"Not a baker contract"
+    ~description:"Operation is only valid for baker contracts"
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "Operation is only valid for baker contracts")
+    Data_encoding.empty
+    (function Not_a_baker_contract -> Some () | _ -> None)
+    (fun () -> Not_a_baker_contract) ;
+  register_error_kind
+    `Temporary
     ~id:"operation.not_an_active_consensus_key"
     ~title:"Not an active baker consensus key"
     ~description:"The given key is not an active baker consensus key."
@@ -919,7 +948,120 @@ let apply_manager_operation_content :
 
 type success_or_failure = Success of context | Failure
 
-let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
+let apply_baker_operation_content :
+    type kind.
+    Alpha_context.t ->
+    baker:baker_hash ->
+    kind baker_operation ->
+    ( context
+    * kind successful_baker_operation_result
+    * packed_internal_operation list )
+    tzresult
+    Lwt.t =
+ fun ctxt ~baker operation ->
+  let before_operation =
+    (* This context is not used for backtracking. Only to compute
+         gas consumption and originations for the operation result. *)
+    ctxt
+  in
+  Contract.(must_exist ctxt @@ baker_contract baker)
+  >>=? fun () ->
+  Gas.consume ctxt Michelson_v1_gas.Cost_of.baker_operation
+  >>?= fun ctxt ->
+  match operation with
+  | Baker_proposals {period; proposals} ->
+      Voting_period.get_current ctxt
+      >>=? fun {index = current_period; _} ->
+      error_unless
+        Compare.Int32.(current_period = period)
+        (Wrong_voting_period (current_period, period))
+      >>?= fun () ->
+      (* try to convert proposals to protocol hashes *)
+      List.fold_left
+        (fun acc proposal ->
+          match (acc, Protocol_hash.of_b58check_opt proposal) with
+          | (Ok acc, Some proposal) ->
+              Ok (proposal :: acc)
+          | (Ok _, None) ->
+              Error [proposal]
+          | (Error acc, None) ->
+              Error (proposal :: acc)
+          | (Error _, Some _) ->
+              acc)
+        (Ok [])
+        proposals
+      |> (function
+           | Error invalid_proposals ->
+               fail (Invalid_protocols invalid_proposals)
+           | Ok p ->
+               return p)
+      >>=? fun proposals ->
+      Amendment.record_proposals ctxt baker proposals
+      >>=? fun ctxt ->
+      return
+        ( ctxt,
+          ( Baker_proposals_result
+              {consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt}
+            : kind successful_baker_operation_result ),
+          [] )
+  | Baker_ballot {period; proposal; ballot} ->
+      Voting_period.get_current ctxt
+      >>=? fun {index = current_period; _} ->
+      error_unless
+        Compare.Int32.(current_period = period)
+        (Wrong_voting_period (current_period, period))
+      >>?= fun () ->
+      ( match Protocol_hash.of_b58check_opt proposal with
+      | None ->
+          fail (Invalid_protocols [proposal])
+      | Some proposal ->
+          return proposal )
+      >>=? fun proposal ->
+      Amendment.record_ballot ctxt baker proposal ballot
+      >>=? fun ctxt ->
+      return
+        ( ctxt,
+          Baker_ballot_result
+            {consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt},
+          [] )
+  | Set_baker_active active ->
+      Baker.set_active ctxt baker active
+      >>=? fun ctxt ->
+      return
+        ( ctxt,
+          Set_baker_active_result
+            {
+              active;
+              consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+            },
+          [] )
+  | Set_baker_consensus_key key ->
+      Baker.set_consensus_key ctxt baker key
+      >>=? fun ctxt ->
+      return
+        ( ctxt,
+          Set_baker_consensus_key_result
+            {consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt},
+          [] )
+  | Set_baker_pvss_key key ->
+      Baker.init_set_pvss_key ctxt baker key
+      >>= fun ctxt ->
+      return
+        ( ctxt,
+          Set_baker_pvss_key_result
+            {consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt},
+          [] )
+
+let apply_internal_operations ctxt mode ~payer ~chain_id ops =
+  let skip =
+    List.rev_map (function
+        | Internal_manager_operation op ->
+            Internal_manager_operation_result
+              (op, Skipped (manager_kind op.operation))
+        | Internal_baker_operation op ->
+            Internal_baker_operation_result
+              (op, Skipped (baker_kind op.operation)))
+  in
   let rec apply ctxt applied worklist =
     match worklist with
     | [] ->
@@ -941,21 +1083,35 @@ let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
         >>= function
         | Error errors ->
             let result =
-              Internal_operation_result
+              Internal_manager_operation_result
                 (op, Failed (manager_kind op.operation, errors))
             in
-            let skipped =
-              List.rev_map
-                (fun (Internal_manager_operation op) ->
-                  Internal_operation_result
-                    (op, Skipped (manager_kind op.operation)))
-                rest
-            in
+            let skipped = skip rest in
             Lwt.return (Failure, List.rev (skipped @ (result :: applied)))
         | Ok (ctxt, result, emitted) ->
             apply
               ctxt
-              (Internal_operation_result (op, Applied result) :: applied)
+              ( Internal_manager_operation_result (op, Applied result)
+              :: applied )
+              (rest @ emitted) )
+    | Internal_baker_operation ({baker; operation; nonce} as op) :: rest -> (
+        ( if internal_nonce_already_recorded ctxt nonce then
+          fail (Internal_operation_replay (Internal_baker_operation op))
+        else
+          let ctxt = record_internal_nonce ctxt nonce in
+          apply_baker_operation_content ctxt ~baker operation )
+        >>= function
+        | Error errors ->
+            let result =
+              Internal_baker_operation_result
+                (op, Failed (baker_kind op.operation, errors))
+            in
+            let skipped = skip rest in
+            Lwt.return (Failure, List.rev (skipped @ (result :: applied)))
+        | Ok (ctxt, result, emitted) ->
+            apply
+              ctxt
+              (Internal_baker_operation_result (op, Applied result) :: applied)
               (rest @ emitted) )
   in
   apply ctxt [] ops
@@ -1235,6 +1391,32 @@ let rec apply_manager_contents_list_rec :
           (ctxt_result, Cons_result (result, results)) )
 
 let mark_backtracked results =
+  let mark_manager_operation_result :
+      type kind. kind manager_operation_result -> kind manager_operation_result
+      = function
+    | (Failed _ | Skipped _ | Backtracked _) as result ->
+        result
+    | Applied (Reveal_result _) as result ->
+        result
+    | Applied result ->
+        Backtracked (result, None)
+  in
+  let mark_baker_operation_result :
+      type kind. kind baker_operation_result -> kind baker_operation_result =
+    function
+    | (Failed _ | Skipped _ | Backtracked _) as result ->
+        result
+    | Applied result ->
+        Backtracked (result, None)
+  in
+  let mark_internal_operation_results = function
+    | Internal_manager_operation_result (kind, result) ->
+        Internal_manager_operation_result
+          (kind, mark_manager_operation_result result)
+    | Internal_baker_operation_result (kind, result) ->
+        Internal_baker_operation_result
+          (kind, mark_baker_operation_result result)
+  in
   let rec mark_contents_list :
       type kind.
       kind Kind.manager contents_result_list ->
@@ -1264,18 +1446,6 @@ let mark_backtracked results =
                     op.internal_operation_results;
               },
             mark_contents_list rest )
-  and mark_internal_operation_results
-      (Internal_operation_result (kind, result)) =
-    Internal_operation_result (kind, mark_manager_operation_result result)
-  and mark_manager_operation_result :
-      type kind. kind manager_operation_result -> kind manager_operation_result
-      = function
-    | (Failed _ | Skipped _ | Backtracked _) as result ->
-        result
-    | Applied (Reveal_result _) as result ->
-        result
-    | Applied result ->
-        Backtracked (result, None)
   in
   mark_contents_list results
   [@@coq_axiom "non-top-level mutual recursion"]

@@ -28,6 +28,8 @@ open Alpha_context
 module Cost_of : sig
   val manager_operation : Gas.cost
 
+  val baker_operation : Gas.cost
+
   module Interpreter : sig
     val drop : Gas.cost
 

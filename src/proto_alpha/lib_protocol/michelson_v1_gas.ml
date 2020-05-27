@@ -102,6 +102,8 @@ module Cost_of = struct
 
   let manager_operation = step_cost @@ S.safe_int 1_000
 
+  let baker_operation = (* TODO how much *) step_cost @@ S.safe_int 1_000
+
   (* FIXME: hardcoded constant, available in next environment version.
      Set to a reasonable upper bound. *)
   let public_key_size = 64
@@ -578,7 +580,7 @@ module Cost_of = struct
       (* TODO how much *) S.safe_int 3_300
 
     (* model B58CHECK_DECODING_PVSS_KEY *)
-    let cost_B58CHECK_DECODING_PVSS_KEY = (* TODO how much *) Z.of_int 4_300
+    let cost_B58CHECK_DECODING_PVSS_KEY = (* TODO how much *) S.safe_int 4_300
 
     (* model B58CHECK_DECODING_PUBLIC_KEY_ed25519 *)
     let cost_B58CHECK_DECODING_PUBLIC_KEY_ed25519 = S.safe_int 4_300
@@ -627,7 +629,7 @@ module Cost_of = struct
       (* TODO how much? *) S.safe_int 3_300
 
     (* model B58CHECK_ENCODING_PVSS_KEY *)
-    let cost_B58CHECK_ENCODING_PVSS_KEY = (* TODO how much? *) Z.of_int 4_500
+    let cost_B58CHECK_ENCODING_PVSS_KEY = (* TODO how much? *) S.safe_int 4_500
 
     (* model B58CHECK_ENCODING_PUBLIC_KEY_ed25519 *)
     let cost_B58CHECK_ENCODING_PUBLIC_KEY_ed25519 = S.safe_int 4_500
@@ -660,10 +662,10 @@ module Cost_of = struct
     let cost_DECODING_PUBLIC_KEY_HASH_secp256k1 = S.safe_int 60
 
     (* model DECODING_BAKER_HASH *)
-    let cost_DECODING_BAKER_HASH = (* TODO how much? *) Z.of_int 50
+    let cost_DECODING_BAKER_HASH = (* TODO how much? *) S.safe_int 50
 
     (* model DECODING_PVSS_KEY *)
-    let cost_DECODING_PVSS_KEY = (* TODO how much *) Z.of_int 60
+    let cost_DECODING_PVSS_KEY = (* TODO how much *) S.safe_int 60
 
     (* model DECODING_PUBLIC_KEY_ed25519 *)
     let cost_DECODING_PUBLIC_KEY_ed25519 = S.safe_int 60
@@ -696,10 +698,10 @@ module Cost_of = struct
     let cost_ENCODING_PUBLIC_KEY_HASH_secp256k1 = S.safe_int 70
 
     (* model ENCODING_BAKER_HASH *)
-    let cost_ENCODING_BAKER_HASH = (* TODO how much? *) Z.of_int 70
+    let cost_ENCODING_BAKER_HASH = (* TODO how much? *) S.safe_int 70
 
     (* model ENCODING_PVSS_KEY *)
-    let cost_ENCODING_PVSS_KEY = (* TODO how much? *) Z.of_int 80
+    let cost_ENCODING_PVSS_KEY = (* TODO how much? *) S.safe_int 80
 
     (* model ENCODING_PUBLIC_KEY_ed25519 *)
     let cost_ENCODING_PUBLIC_KEY_ed25519 = S.safe_int 80
@@ -1080,9 +1082,9 @@ module Cost_of = struct
 
     let compare_key = atomic_step_cost (S.safe_int 92)
 
-    let compare_baker_hash = atomic_step_cost (Z.of_int 92)
+    let compare_baker_hash = atomic_step_cost (S.safe_int 92)
 
-    let compare_pvss_key = atomic_step_cost (Z.of_int 92)
+    let compare_pvss_key = atomic_step_cost (S.safe_int 92)
 
     let compare_timestamp t1 t2 =
       atomic_step_cost
