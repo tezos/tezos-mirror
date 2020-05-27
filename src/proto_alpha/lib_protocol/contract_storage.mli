@@ -25,14 +25,14 @@
 (*****************************************************************************)
 
 type error +=
-  | Balance_too_low of Contract_repr.contract * Tez_repr.t * Tez_repr.t
   | (* `Temporary *)
-      Counter_in_the_past of Contract_repr.contract * Z.t * Z.t
+      Balance_too_low of
+      Contract_repr.contract * Tez_repr.t * Tez_repr.t
   | (* `Branch *)
+      Counter_in_the_past of Contract_repr.contract * Z.t * Z.t
+  | (* `Temporary *)
       Counter_in_the_future of Contract_repr.contract * Z.t * Z.t
   | (* `Temporary *)
-      Unspendable_contract of Contract_repr.contract
-  | (* `Permanent *)
       Non_existing_contract of Contract_repr.contract
   | (* `Temporary *)
       Empty_implicit_contract of Signature.Public_key_hash.t
@@ -40,8 +40,9 @@ type error +=
       Empty_implicit_delegated_contract of
       Signature.Public_key_hash.t
   | (* `Temporary *)
-      Empty_transaction of Contract_repr.t (* `Temporary *)
-  | Inconsistent_hash of
+      Empty_transaction of Contract_repr.t
+  | (* `Permanent *)
+      Inconsistent_hash of
       Signature.Public_key.t
       * Signature.Public_key_hash.t
       * Signature.Public_key_hash.t
@@ -49,11 +50,11 @@ type error +=
       Inconsistent_public_key of
       Signature.Public_key.t * Signature.Public_key.t
   | (* `Permanent *)
-      Failure of string (* `Permanent *)
-  | Previously_revealed_key of Contract_repr.t (* `Permanent *)
-  | Unrevealed_manager_key of Contract_repr.t
-
-(* `Permanent *)
+      Failure of string
+  | (* `Permanent *)
+      Previously_revealed_key of Contract_repr.t
+  | (* `Permanent *)
+      Unrevealed_public_key of Contract_repr.t
 
 val exists : Raw_context.t -> Contract_repr.t -> bool tzresult Lwt.t
 
