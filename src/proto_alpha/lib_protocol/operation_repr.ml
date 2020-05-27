@@ -351,6 +351,7 @@ module Encoding = struct
           builtin_case 2 "do";
           builtin_case 3 "set_delegate";
           builtin_case 4 "remove_delegate";
+          builtin_case 5 "main";
           Data_encoding.case
             (Tag 255)
             ~title:"named"
