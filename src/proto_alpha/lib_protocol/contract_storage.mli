@@ -66,20 +66,18 @@ val must_be_allocated : Raw_context.t -> Contract_repr.t -> unit tzresult Lwt.t
 val list : Raw_context.t -> Contract_repr.t list Lwt.t
 
 val check_counter_increment :
-  Raw_context.t -> Signature.Public_key_hash.t -> Z.t -> unit tzresult Lwt.t
+  Raw_context.t -> Contract_repr.t -> Z.t -> unit tzresult Lwt.t
 
 val increment_counter :
-  Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t tzresult Lwt.t
+  Raw_context.t -> Contract_repr.t -> Raw_context.t tzresult Lwt.t
 
-val get_manager_key :
-  Raw_context.t ->
-  Signature.Public_key_hash.t ->
-  Signature.Public_key.t tzresult Lwt.t
+val get_public_key :
+  Raw_context.t -> Contract_repr.t -> Signature.Public_key.t tzresult Lwt.t
 
-val is_manager_key_revealed :
-  Raw_context.t -> Signature.Public_key_hash.t -> bool tzresult Lwt.t
+val is_public_key_revealed :
+  Raw_context.t -> Contract_repr.t -> bool tzresult Lwt.t
 
-val reveal_manager_key :
+val reveal_public_key :
   Raw_context.t ->
   Signature.Public_key_hash.t ->
   Signature.Public_key.t ->
@@ -87,8 +85,7 @@ val reveal_manager_key :
 
 val get_balance : Raw_context.t -> Contract_repr.t -> Tez_repr.t tzresult Lwt.t
 
-val get_counter :
-  Raw_context.t -> Signature.Public_key_hash.t -> Z.t tzresult Lwt.t
+val get_counter : Raw_context.t -> Contract_repr.t -> Z.t tzresult Lwt.t
 
 val get_global_counter : Raw_context.t -> Z.t tzresult Lwt.t
 

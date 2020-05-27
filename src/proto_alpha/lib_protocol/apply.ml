@@ -700,7 +700,7 @@ let precheck_manager_contents (type kind) ctxt chain_id raw_operation
   in
   ( match operation with
   | Reveal pk ->
-      Contract.reveal_manager_key ctxt source pk
+      Contract.reveal_public_key ctxt source pk
   | Transaction {parameters; _} ->
       Lwt.return
       (* Fail quickly if not enough gas for minimal deserialization cost *)
@@ -717,7 +717,7 @@ let precheck_manager_contents (type kind) ctxt chain_id raw_operation
   | _ ->
       return ctxt )
   >>=? fun ctxt ->
-  Contract.get_manager_key ctxt source
+  Contract.get_public_key ctxt source_contract
   >>=? fun public_key ->
   (* Currently, the `raw_operation` only contains one signature, so
      all operations are required to be from the same manager. This may

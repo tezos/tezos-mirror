@@ -51,9 +51,8 @@ type error +=
   | (* `Permanent *)
       Failure of string (* `Permanent *)
   | Previously_revealed_key of Contract_repr.t (* `Permanent *)
-  | Unrevealed_manager_key of Contract_repr.t
-
-(* `Permanent *)
+  | (* `Permanent *)
+      Unrevealed_public_key of Contract_repr.t
 
 let () =
   register_error_kind
@@ -202,7 +201,7 @@ let () =
     (fun s -> Failure s) ;
   register_error_kind
     `Branch
-    ~id:"contract.unrevealed_key"
+    ~id:"contract.unrevealed_public_key"
     ~title:"Manager operation precedes key revelation"
     ~description:
       "One tried to apply a manager operation without revealing the manager \
@@ -210,12 +209,12 @@ let () =
     ~pp:(fun ppf s ->
       Format.fprintf
         ppf
-        "Unrevealed manager key for contract %a."
+        "Unrevealed public key for contract %a."
         Contract_repr.pp
         s)
     Data_encoding.(obj1 (req "contract" Contract_repr.encoding))
-    (function Unrevealed_manager_key s -> Some s | _ -> None)
-    (fun s -> Unrevealed_manager_key s) ;
+    (function Unrevealed_public_key s -> Some s | _ -> None)
+    (fun s -> Unrevealed_public_key s) ;
   register_error_kind
     `Branch
     ~id:"contract.previously_revealed_key"
@@ -615,9 +614,8 @@ let originated_from_current_nonce ~since:ctxt_since ~until:ctxt_until =
     (fun contract -> exists ctxt_until contract)
     (Contract_repr.originated_contracts ~since ~until)
 
-let check_counter_increment c manager counter =
-  let contract = Contract_repr.implicit_contract manager in
-  Storage.Contract.Counter.get c contract
+let check_counter_increment ctxt contract counter =
+  Storage.Contract.Counter.get ctxt contract
   >>=? fun contract_counter ->
   let expected = Z.succ contract_counter in
   if Compare.Z.(expected = counter) then return_unit
@@ -625,15 +623,14 @@ let check_counter_increment c manager counter =
     fail (Counter_in_the_past (contract, expected, counter))
   else fail (Counter_in_the_future (contract, expected, counter))
 
-let increment_counter c manager =
-  let contract = Contract_repr.implicit_contract manager in
-  Storage.Contract.Global_counter.get c
+let increment_counter ctxt contract =
+  Storage.Contract.Global_counter.get ctxt
   >>=? fun global_counter ->
-  Storage.Contract.Global_counter.set c (Z.succ global_counter)
-  >>=? fun c ->
-  Storage.Contract.Counter.get c contract
+  Storage.Contract.Global_counter.set ctxt (Z.succ global_counter)
+  >>=? fun ctxt ->
+  Storage.Contract.Counter.get ctxt contract
   >>=? fun contract_counter ->
-  Storage.Contract.Counter.set c contract (Z.succ contract_counter)
+  Storage.Contract.Counter.set ctxt contract (Z.succ contract_counter)
 
 let get_script_code c contract = Storage.Contract.Code.get_option c contract
 
@@ -696,38 +693,74 @@ let init_set_storage_cached = Raw_context.init_set_cached_storage
 
 let clear_storage_cached = Raw_context.clear_cached_storage
 
-let get_counter ctxt manager =
-  let contract = Contract_repr.implicit_contract manager in
+let get_counter ctxt contract =
   must_be_allocated ctxt contract
   >>=? fun () -> Storage.Contract.Counter.get ctxt contract
 
 let get_global_counter c = Storage.Contract.Global_counter.get c
 
-let get_manager_key c manager =
-  let contract = Contract_repr.implicit_contract manager in
-  Storage.Contract.Manager.get_option c contract
-  >>=? function
-  | None ->
-      failwith "get_manager_key"
-  | Some (Manager_repr.Hash _) ->
-      fail (Unrevealed_manager_key contract)
-  | Some (Manager_repr.Public_key v) ->
-      return v
+let get_public_key ctxt contract =
+  (* For baker contracts, consensus key can act as a manager *)
+  let get_baker_key ctxt baker_hash =
+    Baker_storage.get_consensus_key ctxt baker_hash
+  in
+  match Contract_repr.is_implicit contract with
+  | Some pkh -> (
+      Baker_storage.is_consensus_key ctxt pkh
+      >>=? function
+      | None -> (
+          Storage.Contract.Manager.get_option ctxt contract
+          >>=? function
+          | None ->
+              failwith "get_public_key"
+          | Some (Manager_repr.Hash _) ->
+              fail (Unrevealed_public_key contract)
+          | Some (Manager_repr.Public_key v) ->
+              return v )
+      | Some baker_hash ->
+          get_baker_key ctxt baker_hash )
+  | None -> (
+    match Contract_repr.is_baker contract with
+    | Some baker_hash ->
+        get_baker_key ctxt baker_hash
+    | None ->
+        Format.kasprintf
+          failwith
+          "Unexpected: get public key for an originated contract %a"
+          Contract_repr.pp
+          contract )
 
-let is_manager_key_revealed c manager =
-  let contract = Contract_repr.implicit_contract manager in
-  Storage.Contract.Manager.get_option c contract
-  >>=? function
-  | None ->
-      return_false
-  | Some (Manager_repr.Hash _) ->
-      return_false
-  | Some (Manager_repr.Public_key _) ->
-      return_true
+let is_public_key_revealed ctxt contract =
+  let is_baker_key_revealed ctxt baker_hash =
+    (* For baker contracts, consensus key can act as a manager. Every
+         registered baker has a public consensus key. *)
+    Baker_storage.registered ctxt baker_hash >>= return
+  in
+  match Contract_repr.is_implicit contract with
+  | Some pkh -> (
+      Baker_storage.is_consensus_key ctxt pkh
+      >>=? function
+      | None -> (
+          Storage.Contract.Manager.get_option ctxt contract
+          >>=? function
+          | None ->
+              return_false
+          | Some (Manager_repr.Hash _) ->
+              return_false
+          | Some (Manager_repr.Public_key _) ->
+              return_true )
+      | Some baker_hash ->
+          is_baker_key_revealed ctxt baker_hash )
+  | None -> (
+    match Contract_repr.is_baker contract with
+    | Some baker_hash ->
+        is_baker_key_revealed ctxt baker_hash
+    | None ->
+        return_false )
 
-let reveal_manager_key c manager public_key =
+let reveal_public_key ctxt manager public_key =
   let contract = Contract_repr.implicit_contract manager in
-  Storage.Contract.Manager.get c contract
+  Storage.Contract.Manager.get ctxt contract
   >>=? function
   | Public_key _ ->
       fail (Previously_revealed_key contract)
@@ -735,7 +768,7 @@ let reveal_manager_key c manager public_key =
       let actual_hash = Signature.Public_key.hash public_key in
       if Signature.Public_key_hash.equal actual_hash v then
         let v = Manager_repr.Public_key public_key in
-        Storage.Contract.Manager.set c contract v
+        Storage.Contract.Manager.set ctxt contract v
       else fail (Inconsistent_hash (public_key, v, actual_hash))
 
 let get_balance c contract =
