@@ -557,18 +557,54 @@ module Scripts = struct
                 {source; fee; counter; operation; gas_limit; storage_limit}) =
             op
           in
+          Baker.is_consensus_key ctxt source
+          >|=? (function
+                 | None ->
+                     Contract.implicit_contract source
+                 | Some baker ->
+                     Contract.baker_contract baker)
+          >>=? fun source_contract ->
           Gas.check_limit ctxt gas_limit
           >>?= fun () ->
           let ctxt = Gas.set_limit ctxt gas_limit in
           Fees.check_storage_limit ctxt storage_limit
           >>?= fun () ->
-          Contract.must_be_allocated ctxt (Contract.implicit_contract source)
+          Contract.must_be_allocated ctxt source_contract
           >>=? fun () ->
-          Contract.check_counter_increment ctxt source counter
+          Contract.check_counter_increment ctxt source_contract counter
           >>=? fun () ->
+          let apply_origination ~script =
+            (* Here the data comes already deserialized, so we need to fake the deserialization to mimic apply *)
+            let script_bytes =
+              Data_encoding.Binary.to_bytes_exn Script.encoding script
+            in
+            let script =
+              match
+                Data_encoding.Binary.of_bytes Script.encoding script_bytes
+              with
+              | Some script ->
+                  script
+              | None ->
+                  assert false
+            in
+            (* Fail quickly if not enough gas for minimal deserialization cost *)
+            Lwt.return
+            @@ record_trace Apply.Gas_quota_exceeded_init_deserialize
+            @@ ( Gas.consume ctxt (Script.minimal_deserialize_cost script.code)
+               >>? fun ctxt ->
+               Gas.check_enough
+                 ctxt
+                 (Script.minimal_deserialize_cost script.storage)
+               >>? fun () ->
+               (* Fail if not enough gas for complete deserialization cost *)
+               Script.force_decode_in_context ctxt script.code
+               >>? fun (_code, ctxt) ->
+               Script.force_decode_in_context ctxt script.storage
+               >|? fun (_storage, ctxt) -> ctxt )
+          in
           ( match operation with
           | Reveal pk ->
-              Contract.reveal_manager_key ctxt source pk
+              Contract.reveal_public_key ctxt source pk
           | Transaction {parameters; _} ->
               (* Here the data comes already deserialized, so we need to fake the deserialization to mimic apply *)
               let arg_bytes =
@@ -595,45 +631,16 @@ module Scripts = struct
                  (* Fail if not enough gas for complete deserialization cost *)
                  Script.force_decode_in_context ctxt arg
                  >|? fun (_arg, ctxt) -> ctxt )
+          | Origination_legacy {script; _} ->
+              apply_origination ~script
           | Origination {script; _} ->
-              (* Here the data comes already deserialized, so we need to fake the deserialization to mimic apply *)
-              let script_bytes =
-                Data_encoding.Binary.to_bytes_exn Script.encoding script
-              in
-              let script =
-                match
-                  Data_encoding.Binary.of_bytes Script.encoding script_bytes
-                with
-                | Some script ->
-                    script
-                | None ->
-                    assert false
-              in
-              (* Fail quickly if not enough gas for minimal deserialization cost *)
-              Lwt.return
-              @@ record_trace Apply.Gas_quota_exceeded_init_deserialize
-              @@ ( Gas.consume
-                     ctxt
-                     (Script.minimal_deserialize_cost script.code)
-                 >>? fun ctxt ->
-                 Gas.check_enough
-                   ctxt
-                   (Script.minimal_deserialize_cost script.storage)
-                 >>? fun () ->
-                 (* Fail if not enough gas for complete deserialization cost *)
-                 Script.force_decode_in_context ctxt script.code
-                 >>? fun (_code, ctxt) ->
-                 Script.force_decode_in_context ctxt script.storage
-                 >|? fun (_storage, ctxt) -> ctxt )
+              apply_origination ~script
           | _ ->
               return ctxt )
           >>=? fun ctxt ->
-          Contract.get_manager_key ctxt source
-          >>=? fun _public_key ->
           (* signature check unplugged from here *)
-          Contract.increment_counter ctxt source
-          >>=? fun ctxt ->
-          Contract.spend ctxt (Contract.implicit_contract source) fee
+          Contract.increment_counter ctxt source_contract
+          >>=? fun ctxt -> Contract.spend ctxt source_contract fee
         in
         let rec partial_precheck_manager_contents_list :
             type kind.
@@ -655,18 +662,18 @@ module Scripts = struct
         let operation : _ operation = {shell; protocol_data} in
         let hash = Operation.hash {shell; protocol_data} in
         let ctxt = Contract.init_origination_nonce ctxt hash in
-        let baker = Signature.Public_key_hash.zero in
+        let baker = Baker_hash.zero in
         match protocol_data.contents with
         | Single (Manager_operation _) as op ->
             partial_precheck_manager_contents_list ctxt op
             >>=? fun ctxt ->
             Apply.apply_manager_contents_list ctxt Optimized baker chain_id op
-            >|= fun (_ctxt, result) -> ok @@ ret result
+            >|=? fun (_ctxt, result) -> ret result
         | Cons (Manager_operation _, _) as op ->
             partial_precheck_manager_contents_list ctxt op
             >>=? fun ctxt ->
             Apply.apply_manager_contents_list ctxt Optimized baker chain_id op
-            >|= fun (_ctxt, result) -> ok @@ ret result
+            >|=? fun (_ctxt, result) -> ret result
         | _ ->
             Apply.apply_contents_list
               ctxt
@@ -859,7 +866,10 @@ module Forge = struct
   module Manager = struct
     let operations ctxt block ~branch ~source ?sourcePubKey ~counter ~fee
         ~gas_limit ~storage_limit operations =
-      Contract_services.manager_key ctxt block source
+      Contract_services.public_key
+        ctxt
+        block
+        (Contract.implicit_contract source)
       >>= function
       | Error _ as e ->
           Lwt.return e
