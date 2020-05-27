@@ -889,6 +889,8 @@ module Contract : sig
   val initial_origination_nonce : Operation_hash.t -> origination_nonce
 
   val originated_contract : origination_nonce -> contract
+
+  val baker_from_nonce : origination_nonce -> baker_hash
 end
 
 module Receipt : sig

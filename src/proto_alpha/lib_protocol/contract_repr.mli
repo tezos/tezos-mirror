@@ -56,6 +56,8 @@ type origination_nonce
 
 val originated_contract : origination_nonce -> contract
 
+val baker_from_nonce : origination_nonce -> Baker_hash.t
+
 val originated_contracts :
   since:origination_nonce -> until:origination_nonce -> contract list
 
