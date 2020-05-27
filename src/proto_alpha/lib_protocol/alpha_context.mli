@@ -896,12 +896,11 @@ module Contract : sig
 
   val list : context -> contract list Lwt.t
 
-  val get_manager_key : context -> public_key_hash -> public_key tzresult Lwt.t
+  val get_public_key : context -> contract -> public_key tzresult Lwt.t
 
-  val is_manager_key_revealed :
-    context -> public_key_hash -> bool tzresult Lwt.t
+  val is_public_key_revealed : context -> contract -> bool tzresult Lwt.t
 
-  val reveal_manager_key :
+  val reveal_public_key :
     context -> public_key_hash -> public_key -> context tzresult Lwt.t
 
   val get_script_code :
@@ -913,7 +912,7 @@ module Contract : sig
   val get_storage :
     context -> contract -> (context * Script.expr option) tzresult Lwt.t
 
-  val get_counter : context -> public_key_hash -> Z.t tzresult Lwt.t
+  val get_counter : context -> contract -> Z.t tzresult Lwt.t
 
   val get_balance : context -> contract -> Tez.t tzresult Lwt.t
 
@@ -973,10 +972,10 @@ module Contract : sig
 
   val used_storage_space : context -> t -> Z.t tzresult Lwt.t
 
-  val increment_counter : context -> public_key_hash -> context tzresult Lwt.t
+  val increment_counter : context -> contract -> context tzresult Lwt.t
 
   val check_counter_increment :
-    context -> public_key_hash -> Z.t -> unit tzresult Lwt.t
+    context -> contract -> Z.t -> unit tzresult Lwt.t
 
   (**/**)
 

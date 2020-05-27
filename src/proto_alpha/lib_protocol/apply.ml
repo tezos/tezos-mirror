@@ -993,7 +993,7 @@ let precheck_manager_contents (type kind) ctxt
   in
   ( match operation with
   | Reveal pk ->
-      Contract.reveal_manager_key ctxt source pk
+      Contract.reveal_public_key ctxt source pk
   | Transaction {parameters; _} ->
       Lwt.return
       (* Fail quickly if not enough gas for minimal deserialization cost *)
@@ -1164,7 +1164,7 @@ let check_manager_signature ctxt chain_id (op : _ Kind.manager contents_list)
   | Some key ->
       return key
   | None ->
-      Contract.get_manager_key ctxt source )
+      Contract.get_public_key ctxt (Contract.implicit_contract source) )
   >>=? fun public_key ->
   Lwt.return (Operation.check_signature public_key chain_id raw_operation)
 
