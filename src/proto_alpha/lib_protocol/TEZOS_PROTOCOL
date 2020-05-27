@@ -80,6 +80,7 @@
         "Constants_services",
         "Contract_services",
         "Delegate_services",
+        "Baker_services",
         "Helpers_services",
         "Voting_services",
         "Alpha_services",

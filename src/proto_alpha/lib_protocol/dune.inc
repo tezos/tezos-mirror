@@ -90,6 +90,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    constants_services.mli constants_services.ml
    contract_services.mli contract_services.ml
    delegate_services.mli delegate_services.ml
+   baker_services.mli baker_services.ml
    helpers_services.mli helpers_services.ml
    voting_services.mli voting_services.ml
    alpha_services.mli alpha_services.ml
@@ -173,6 +174,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    constants_services.mli constants_services.ml
    contract_services.mli contract_services.ml
    delegate_services.mli delegate_services.ml
+   baker_services.mli baker_services.ml
    helpers_services.mli helpers_services.ml
    voting_services.mli voting_services.ml
    alpha_services.mli alpha_services.ml
@@ -256,6 +258,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    constants_services.mli constants_services.ml
    contract_services.mli contract_services.ml
    delegate_services.mli delegate_services.ml
+   baker_services.mli baker_services.ml
    helpers_services.mli helpers_services.ml
    voting_services.mli voting_services.ml
    alpha_services.mli alpha_services.ml
@@ -359,6 +362,7 @@ include Tezos_raw_protocol_alpha.Main
    Constants_services
    Contract_services
    Delegate_services
+   Baker_services
    Helpers_services
    Voting_services
    Alpha_services
