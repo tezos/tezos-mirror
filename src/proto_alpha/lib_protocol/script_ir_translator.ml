@@ -441,6 +441,8 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int =
       0
   | Implicit_account ->
       0
+  | Create_contract_legacy _ ->
+      0
   | Create_contract _ ->
       0
   | Now ->
@@ -470,6 +472,8 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int =
   | Sapling_empty_state _ ->
       0
   | Sapling_verify_update ->
+      0
+  | Set_delegate_legacy ->
       0
   | Set_delegate ->
       0
@@ -5275,6 +5279,20 @@ and parse_instr :
       typed ctxt loc Transfer_tokens (Item_t (Operation_t None, rest, annot))
   | ( Prim (loc, I_SET_DELEGATE, [], annot),
       Item_t (Option_t (Key_hash_t _, _), rest, _) ) ->
+      if legacy then
+        parse_var_annot loc annot
+        >>?= fun annot ->
+        typed
+          ctxt
+          loc
+          Set_delegate_legacy
+          (Item_t (Operation_t None, rest, annot))
+      else
+        (* For new contracts this instruction is not allowed anymore *)
+        fail (Deprecated_instruction I_SET_DELEGATE)
+  | ( Prim (loc, I_SET_DELEGATE, [], annot),
+      (* Changed the type of delegate from [key_hash option] to [baker_hash option] *)
+    Item_t (Option_t (Baker_hash_t _, _), rest, _) ) ->
       parse_var_annot loc annot
       >>?= fun annot ->
       typed ctxt loc Set_delegate (Item_t (Operation_t None, rest, annot))
@@ -5294,6 +5312,94 @@ and parse_instr :
         ( Option_t (Key_hash_t _, _),
           Item_t (Mutez_t _, Item_t (ginit, rest, _), _),
           _ ) ) ->
+      if legacy then
+        (* For existing contracts, this instruction is still allowed *)
+        parse_two_var_annot loc annot
+        >>?= fun (op_annot, addr_annot) ->
+        let cannonical_code = fst @@ Micheline.extract_locations code in
+        parse_toplevel ~legacy cannonical_code
+        >>?= fun (arg_type, storage_type, code_field, root_name) ->
+        record_trace
+          (Ill_formed_type
+             (Some "parameter", cannonical_code, location arg_type))
+          (parse_parameter_ty ctxt ~legacy arg_type)
+        >>?= fun (Ex_ty arg_type, ctxt) ->
+        ( if legacy then ok_unit
+        else well_formed_entrypoints ~root_name arg_type )
+        >>?= fun () ->
+        record_trace
+          (Ill_formed_type
+             (Some "storage", cannonical_code, location storage_type))
+          (parse_storage_ty ctxt ~legacy storage_type)
+        >>?= fun (Ex_ty storage_type, ctxt) ->
+        let arg_annot =
+          default_annot
+            (type_to_var_annot (name_of_ty arg_type))
+            ~default:default_param_annot
+        in
+        let storage_annot =
+          default_annot
+            (type_to_var_annot (name_of_ty storage_type))
+            ~default:default_storage_annot
+        in
+        let arg_type_full =
+          Pair_t
+            ( (arg_type, None, arg_annot),
+              (storage_type, None, storage_annot),
+              None )
+        in
+        let ret_type_full =
+          Pair_t
+            ( (List_t (Operation_t None, None), None, None),
+              (storage_type, None, None),
+              None )
+        in
+        trace
+          (Ill_typed_contract (cannonical_code, []))
+          (parse_returning
+             (Toplevel
+                {
+                  storage_type;
+                  param_type = arg_type;
+                  root_name;
+                  legacy_create_contract_literal = false;
+                })
+             ctxt
+             ~legacy
+             ?type_logger
+             ~stack_depth
+             (arg_type_full, None)
+             ret_type_full
+             code_field)
+        >>=? fun ( ( Lam
+                       ( { bef = Item_t (arg, Empty_t, _);
+                           aft = Item_t (ret, Empty_t, _);
+                           _ },
+                         _ ) as lambda ),
+                   ctxt ) ->
+        merge_types ~legacy ctxt loc arg arg_type_full
+        >>?= fun (Eq, _, ctxt) ->
+        merge_types ~legacy ctxt loc ret ret_type_full
+        >>?= fun (Eq, _, ctxt) ->
+        merge_types ~legacy ctxt loc storage_type ginit
+        >>?= fun (Eq, _, ctxt) ->
+        typed
+          ctxt
+          loc
+          (Create_contract_legacy (storage_type, arg_type, lambda, root_name))
+          (Item_t
+             ( Operation_t None,
+               Item_t (Address_t None, rest, addr_annot),
+               op_annot ))
+      else
+        (* For new contracts this instruction is not allowed anymore *)
+        fail (Deprecated_instruction I_CREATE_CONTRACT)
+  | ( Prim (loc, I_CREATE_CONTRACT, [(Seq _ as code)], annot),
+      (* Changed the type of delegate from [key_hash option] to [baker_hash option] *)
+    Item_t
+      ( Option_t (Baker_hash_t _, _),
+        Item_t (Mutez_t _, Item_t (ginit, rest, _), _),
+        _ ) ) ->
       parse_two_var_annot loc annot
       >>?= fun (op_annot, addr_annot) ->
       let canonical_code = fst @@ Micheline.extract_locations code in
@@ -5303,7 +5409,7 @@ and parse_instr :
         (Ill_formed_type (Some "parameter", canonical_code, location arg_type))
         (parse_parameter_ty ctxt ~legacy arg_type)
       >>?= fun (Ex_ty arg_type, ctxt) ->
-      (if legacy then ok_unit else well_formed_entrypoints ~root_name arg_type)
+      well_formed_entrypoints ~root_name arg_type
       >>?= fun () ->
       record_trace
         (Ill_formed_type (Some "storage", canonical_code, location storage_type))

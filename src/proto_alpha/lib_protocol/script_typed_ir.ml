@@ -403,7 +403,7 @@ and ('bef, 'aft) instr =
         instr
   | Implicit_account
       : (public_key_hash * 'rest, unit typed_contract * 'rest) instr
-  | Create_contract :
+  | Create_contract_legacy :
       'g ty
       * 'p ty
       * ('p * 'g, operation boxed_list * 'g) lambda
@@ -411,7 +411,17 @@ and ('bef, 'aft) instr =
       -> ( public_key_hash option * (Tez.t * ('g * 'rest)),
            operation * (address * 'rest) )
          instr
-  | Set_delegate : (public_key_hash option * 'rest, operation * 'rest) instr
+  | Create_contract :
+      'g ty
+      * 'p ty
+      * ('p * 'g, operation boxed_list * 'g) lambda
+      * field_annot option
+      -> ( baker_hash option * (Tez.t * ('g * 'rest)),
+           operation * (address * 'rest) )
+         instr
+  | Set_delegate_legacy
+      : (public_key_hash option * 'rest, operation * 'rest) instr
+  | Set_delegate : (baker_hash option * 'rest, operation * 'rest) instr
   | Now : ('rest, Script_timestamp.t * 'rest) instr
   | Balance : ('rest, Tez.t * 'rest) instr
   | Level : ('rest, n num * 'rest) instr

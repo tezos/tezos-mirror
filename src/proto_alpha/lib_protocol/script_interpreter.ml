@@ -451,6 +451,8 @@ let cost_of_instr : type b a. (b, a) descr -> b -> Gas.cost =
       Interp_costs.transfer_tokens
   | (Implicit_account, _) ->
       Interp_costs.implicit_account
+  | (Set_delegate_legacy, _) ->
+      Interp_costs.set_delegate
   | (Set_delegate, _) ->
       Interp_costs.set_delegate
   | (Balance, _) ->
@@ -489,6 +491,8 @@ let cost_of_instr : type b a. (b, a) descr -> b -> Gas.cost =
       Interp_costs.dropn n
   | (ChainId, _) ->
       Interp_costs.chain_id
+  | (Create_contract_legacy _, _) ->
+      Interp_costs.create_contract
   | (Create_contract _, _) ->
       Interp_costs.create_contract
   | (Never, (_, _)) ->
@@ -1096,6 +1100,7 @@ let rec step_bounded :
         logged_return ((maybe_contract, rest), ctxt)
     | _ ->
         logged_return ((None, rest), ctxt) )
+  (* operations *)
   | (Transfer_tokens, (p, (amount, ((tp, (destination, entrypoint)), rest))))
     ->
       collect_lazy_storage ctxt tp p
@@ -1134,7 +1139,8 @@ let rec step_bounded :
   | (Implicit_account, (key, rest)) ->
       let contract = Contract.implicit_contract key in
       logged_return (((Unit_t None, (contract, "default")), rest), ctxt)
-  | ( Create_contract (storage_type, param_type, Lam (_, code), root_name),
+  | ( Create_contract_legacy
+        (storage_type, param_type, Lam (_, code), root_name),
       (* Removed the instruction's arguments manager, spendable and delegatable *)
     (delegate, (credit, (init, rest))) ) ->
       unparse_ty ctxt param_type
@@ -1172,6 +1178,63 @@ let rec step_bounded :
       Contract.fresh_contract_from_current_nonce ctxt
       >>?= fun (ctxt, contract) ->
       let operation =
+        Origination_legacy
+          {
+            credit;
+            delegate;
+            preorigination = Some contract;
+            script =
+              {
+                code = Script.lazy_expr code;
+                storage = Script.lazy_expr storage;
+              };
+          }
+      in
+      Lwt.return (fresh_internal_nonce ctxt)
+      >>=? fun (ctxt, nonce) ->
+      logged_return
+        ( ( ( Internal_manager_operation
+                {source = step_constants.self; operation; nonce},
+              lazy_storage_diff ),
+            ((contract, "default"), rest) ),
+          ctxt )
+  | ( Create_contract (storage_type, param_type, Lam (_, code), root_name),
+      (* Changed the type of delegate from [public_key_hash option] to
+        [baker_hash option] *)
+    (delegate, (credit, (init, rest))) ) ->
+      unparse_ty ctxt param_type
+      >>?= fun (unparsed_param_type, ctxt) ->
+      let unparsed_param_type =
+        Script_ir_translator.add_field_annot root_name None unparsed_param_type
+      in
+      unparse_ty ctxt storage_type
+      >>?= fun (unparsed_storage_type, ctxt) ->
+      let code =
+        Micheline.strip_locations
+          (Seq
+             ( 0,
+               [ Prim (0, K_parameter, [unparsed_param_type], []);
+                 Prim (0, K_storage, [unparsed_storage_type], []);
+                 Prim (0, K_code, [code], []) ] ))
+      in
+      collect_lazy_storage ctxt storage_type init
+      >>?= fun (to_duplicate, ctxt) ->
+      let to_update = no_lazy_storage_id in
+      extract_lazy_storage_diff
+        ctxt
+        Optimized
+        storage_type
+        init
+        ~to_duplicate
+        ~to_update
+        ~temporary:true
+      >>=? fun (init, lazy_storage_diff, ctxt) ->
+      unparse_data ctxt Optimized storage_type init
+      >>=? fun (storage, ctxt) ->
+      let storage = Micheline.strip_locations storage in
+      Contract.fresh_contract_from_current_nonce ctxt
+      >>?= fun (ctxt, contract) ->
+      let operation =
         Origination
           {
             credit;
@@ -1192,7 +1255,19 @@ let rec step_bounded :
               lazy_storage_diff ),
             ((contract, "default"), rest) ),
           ctxt )
+  | (Set_delegate_legacy, (delegate, rest)) ->
+      let operation = Delegation_legacy delegate in
+      Lwt.return (fresh_internal_nonce ctxt)
+      >>=? fun (ctxt, nonce) ->
+      logged_return
+        ( ( ( Internal_manager_operation
+                {source = step_constants.self; operation; nonce},
+              None ),
+            rest ),
+          ctxt )
   | (Set_delegate, (delegate, rest)) ->
+      (* Changed the type of delegate from [public_key_hash option] to
+        [baker_hash option] *)
       let operation = Delegation delegate in
       fresh_internal_nonce ctxt
       >>?= fun (ctxt, nonce) ->
