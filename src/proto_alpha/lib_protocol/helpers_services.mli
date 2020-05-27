@@ -82,6 +82,46 @@ module Scripts : sig
     shell_tzresult
     Lwt.t
 
+  val run_baker_code :
+    'a #RPC_context.simple ->
+    'a ->
+    ?unparsing_mode:Script_ir_translator.unparsing_mode ->
+    ?gas:Gas.Arith.integral ->
+    ?entrypoint:string ->
+    storage:Script.expr ->
+    input:Script.expr ->
+    amount:Tez.t ->
+    balance:Tez.t ->
+    chain_id:Chain_id.t ->
+    source:Contract.t option ->
+    payer:Contract.t option ->
+    (Script.expr * packed_internal_operation list * Lazy_storage.diffs option)
+    shell_tzresult
+    Lwt.t
+
+  val run_baker_code_contract :
+    'a #RPC_context.simple -> 'a -> Contract.t shell_tzresult Lwt.t
+
+  val trace_baker_code :
+    'a #RPC_context.simple ->
+    'a ->
+    ?unparsing_mode:Script_ir_translator.unparsing_mode ->
+    ?gas:Gas.Arith.integral ->
+    ?entrypoint:string ->
+    storage:Script.expr ->
+    input:Script.expr ->
+    amount:Tez.t ->
+    balance:Tez.t ->
+    chain_id:Chain_id.t ->
+    source:Contract.t option ->
+    payer:Contract.t option ->
+    ( Script.expr
+    * packed_internal_operation list
+    * Script_interpreter.execution_trace
+    * Lazy_storage.diffs option )
+    shell_tzresult
+    Lwt.t
+
   val typecheck_code :
     'a #RPC_context.simple ->
     'a ->
