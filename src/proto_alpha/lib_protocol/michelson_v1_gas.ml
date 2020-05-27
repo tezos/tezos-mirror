@@ -882,6 +882,16 @@ module Cost_of = struct
           alloc_cost 1
       | Pairing_check_bls12_381 ->
           alloc_cost 1
+      | Submit_proposals ->
+          alloc_cost 1
+      | Submit_ballot ->
+          alloc_cost 1
+      | Set_baker_active ->
+          alloc_cost 1
+      | Set_baker_consensus_key ->
+          alloc_cost 1
+      | Set_baker_pvss_key ->
+          alloc_cost 1
   end
 
   module Unparse = struct

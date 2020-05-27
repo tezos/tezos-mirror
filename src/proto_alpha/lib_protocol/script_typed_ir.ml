@@ -464,6 +464,17 @@ and ('bef, 'aft) instr =
       : ( (Bls12_381.G1.t, Bls12_381.G2.t) pair boxed_list * 'rest,
           bool * 'rest )
         instr
+  | Submit_proposals
+      : (string boxed_list * 'rest, baker_operation * 'rest) instr
+  | Submit_ballot
+      : ( string * (n num * (n num * (n num * 'rest))),
+          baker_operation * 'rest )
+        instr
+  | Set_baker_active : (bool * 'rest, baker_operation * 'rest) instr
+  | Set_baker_consensus_key
+      : (public_key * 'rest, baker_operation * 'rest) instr
+  | Set_baker_pvss_key
+      : (Pvss_secp256k1.Public_key.t * 'rest, baker_operation * 'rest) instr
 
 (* Type witness for operations that work deep in the stack ignoring
    (and preserving) a prefix.

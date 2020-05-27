@@ -49,6 +49,8 @@ type error += Cannot_serialize_failure
 
 type error += Cannot_serialize_storage
 
+type error += Not_a_baker_contract
+
 let () =
   let open Data_encoding in
   let trace_encoding =
@@ -141,7 +143,16 @@ let () =
       "The returned storage was too big to be serialized with the provided gas"
     Data_encoding.empty
     (function Cannot_serialize_storage -> Some () | _ -> None)
-    (fun () -> Cannot_serialize_storage)
+    (fun () -> Cannot_serialize_storage) ;
+  (* Not a baker contract *)
+  register_error_kind
+    `Permanent
+    ~id:"michelson_v1.not_a_baker_contract"
+    ~title:"Not a baker contract"
+    ~description:"Instruction is only valid for baker contracts"
+    Data_encoding.empty
+    (function Not_a_baker_contract -> Some () | _ -> None)
+    (fun () -> Not_a_baker_contract)
 
 (* ---- interpreter ---------------------------------------------------------*)
 
@@ -583,6 +594,16 @@ let cost_of_instr : type b a. (b, a) descr -> b -> Gas.cost =
         Interp_costs.neg_bls12_381_fr
     | (Pairing_check_bls12_381, (pairs, _)) ->
         Interp_costs.pairing_check_bls12_381 pairs.length
+    | (Submit_proposals, _) ->
+        Interp_costs.baker_operation
+    | (Submit_ballot, _) ->
+        Interp_costs.baker_operation
+    | (Set_baker_active, _) ->
+        Interp_costs.baker_operation
+    | (Set_baker_consensus_key, _) ->
+        Interp_costs.baker_operation
+    | (Set_baker_pvss_key, _) ->
+        Interp_costs.baker_operation
   in
   Gas.(cycle_cost +@ instr_cost)
 
@@ -604,6 +625,13 @@ let rec step :
    fun (ret, ctxt) ->
     Log.log_exit ctxt descr ret ;
     return (ret, ctxt)
+  in
+  let is_self_baker : baker_hash tzresult Lwt.t =
+    match Contract.is_baker step_constants.self with
+    | None ->
+        fail Not_a_baker_contract
+    | Some baker ->
+        return baker
   in
   match (instr, stack) with
   (* stack ops *)
@@ -1245,6 +1273,71 @@ let rec step :
               None ),
             rest ),
           ctxt )
+  (* baker operations *)
+  | (Submit_proposals, (proposals, rest)) ->
+      is_self_baker
+      >>=? fun baker ->
+      let period = Level.(current ctxt).voting_period in
+      let operation =
+        Baker_proposals {period; proposals = proposals.elements}
+      in
+      Lwt.return (fresh_internal_nonce ctxt)
+      >>=? fun (ctxt, nonce) ->
+      logged_return
+        ((Internal_baker_operation {baker; operation; nonce}, rest), ctxt)
+  | (Submit_ballot, (proposal, (yays, (nays, (passes, rest))))) ->
+      is_self_baker
+      >>=? fun baker ->
+      let period = Level.(current ctxt).voting_period in
+      let convert_vote v =
+        match Script_int.to_int v with
+        | None ->
+            Log.get_log () >>=? fun log -> fail (Overflow (loc, log))
+        | Some vote ->
+            return vote
+      in
+      convert_vote yays
+      >>=? fun yays_per_roll ->
+      convert_vote nays
+      >>=? fun nays_per_roll ->
+      convert_vote passes
+      >>=? fun passes_per_roll ->
+      let ballot = Vote.{yays_per_roll; nays_per_roll; passes_per_roll} in
+      let operation = Baker_ballot {period; proposal; ballot} in
+      Lwt.return (fresh_internal_nonce ctxt)
+      >>=? fun (ctxt, nonce) ->
+      logged_return
+        ((Internal_baker_operation {baker; operation; nonce}, rest), ctxt)
+  | (Set_baker_active, (active, rest)) ->
+      is_self_baker
+      >>=? fun baker ->
+      Lwt.return (fresh_internal_nonce ctxt)
+      >>=? fun (ctxt, nonce) ->
+      let operation : _ Alpha_context.baker_operation =
+        Set_baker_active active
+      in
+      logged_return
+        ((Internal_baker_operation {baker; operation; nonce}, rest), ctxt)
+  | (Set_baker_consensus_key, (key, rest)) ->
+      is_self_baker
+      >>=? fun baker ->
+      Lwt.return (fresh_internal_nonce ctxt)
+      >>=? fun (ctxt, nonce) ->
+      let operation : _ Alpha_context.baker_operation =
+        Set_baker_consensus_key key
+      in
+      logged_return
+        ((Internal_baker_operation {baker; operation; nonce}, rest), ctxt)
+  | (Set_baker_pvss_key, (key, rest)) ->
+      is_self_baker
+      >>=? fun baker ->
+      Lwt.return (fresh_internal_nonce ctxt)
+      >>=? fun (ctxt, nonce) ->
+      let operation : _ Alpha_context.baker_operation =
+        Set_baker_pvss_key key
+      in
+      logged_return
+        ((Internal_baker_operation {baker; operation; nonce}, rest), ctxt)
   | (Balance, rest) ->
       Contract.get_balance ctxt step_constants.self
       >>=? fun balance -> logged_return ((balance, rest), ctxt)

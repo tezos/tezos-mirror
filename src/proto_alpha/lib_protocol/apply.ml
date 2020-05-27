@@ -468,8 +468,6 @@ let apply_manager_operation_content :
       fail_when is_source_pending_consensus_key
       @@ Forbidden_pending_consensus_key_destination destination
       >>=? fun () ->
-      map_contract ctxt destination
-      >>=? fun destination ->
       Contract.spend ctxt source amount
       >>=? fun ctxt ->
       ( match Contract.is_implicit destination with

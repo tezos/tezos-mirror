@@ -139,6 +139,11 @@ type prim =
   | I_KECCAK
   | I_SHA3
   | I_PAIRING_CHECK
+  | I_SUBMIT_PROPOSALS
+  | I_SUBMIT_BALLOT
+  | I_SET_BAKER_ACTIVE
+  | I_SET_BAKER_CONSENSUS_KEY
+  | I_SET_BAKER_PVSS_KEY
   | T_bool
   | T_contract
   | T_int
@@ -264,6 +269,9 @@ let namespace = function
   | I_SELF
   | I_SELF_ADDRESS
   | I_SENDER
+  | I_SET_BAKER_ACTIVE
+  | I_SET_BAKER_CONSENSUS_KEY
+  | I_SET_BAKER_PVSS_KEY
   | I_SET_DELEGATE
   | I_SHA256
   | I_SHA512
@@ -274,14 +282,16 @@ let namespace = function
   | I_SOURCE
   | I_STEPS_TO_QUOTA
   | I_SUB
+  | I_SUBMIT_BALLOT
+  | I_SUBMIT_PROPOSALS
   | I_SWAP
+  | I_TOTAL_VOTING_POWER
   | I_TRANSFER_TOKENS
   | I_UNIT
   | I_UNPACK
   | I_UNPAIR
   | I_UPDATE
   | I_VOTING_POWER
-  | I_TOTAL_VOTING_POWER
   | I_XOR ->
       Instr_namespace
   | T_address
@@ -539,6 +549,16 @@ let string_of_prim = function
       "SHA3"
   | I_PAIRING_CHECK ->
       "PAIRING_CHECK"
+  | I_SUBMIT_PROPOSALS ->
+      "SUBMIT_PROPOSALS"
+  | I_SUBMIT_BALLOT ->
+      "SUBMIT_BALLOT"
+  | I_SET_BAKER_ACTIVE ->
+      "SET_BAKER_ACTIVE"
+  | I_SET_BAKER_CONSENSUS_KEY ->
+      "SET_BAKER_CONSENSUS_KEY"
+  | I_SET_BAKER_PVSS_KEY ->
+      "SET_BAKER_PVSS_KEY"
   | T_bool ->
       "bool"
   | T_contract ->
@@ -809,6 +829,16 @@ let prim_of_string = function
       ok I_VOTING_POWER
   | "TOTAL_VOTING_POWER" ->
       ok I_TOTAL_VOTING_POWER
+  | "SUBMIT_PROPOSALS" ->
+      ok I_SUBMIT_PROPOSALS
+  | "SUBMIT_BALLOT" ->
+      ok I_SUBMIT_BALLOT
+  | "SET_BAKER_ACTIVE" ->
+      ok I_SET_BAKER_ACTIVE
+  | "SET_BAKER_CONSENSUS_KEY" ->
+      ok I_SET_BAKER_CONSENSUS_KEY
+  | "SET_BAKER_PVSS_KEY" ->
+      ok I_SET_BAKER_PVSS_KEY
   | "bool" ->
       ok T_bool
   | "contract" ->
@@ -1059,7 +1089,13 @@ let prim_encoding =
          ("bls12_381_fr", T_bls12_381_fr);
          ("baker_hash", T_baker_hash);
          ("baker_operation", T_baker_operation);
-         ("pvss_key", T_pvss_key)
+         ("pvss_key", T_pvss_key);
+         (* /!\ NEW INSTRUCTIONS MUST BE ADDED AT THE END OF THE STRING_ENUM, FOR BACKWARD COMPATIBILITY OF THE ENCODING. *)
+         ("SUBMIT_PROPOSALS", I_SUBMIT_PROPOSALS);
+         ("SUBMIT_BALLOT", I_SUBMIT_BALLOT);
+         ("SET_BAKER_ACTIVE", I_SET_BAKER_ACTIVE);
+         ("SET_BAKER_CONSENSUS_KEY", I_SET_BAKER_CONSENSUS_KEY);
+         ("SET_BAKER_PVSS_KEY", I_SET_BAKER_PVSS_KEY)
          (* New instructions must be added here, for backward compatibility of the encoding. *)
         ]
 
