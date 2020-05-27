@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -109,6 +110,19 @@ module Scripts = struct
            (dft "entrypoint" string "default"))
         (obj1 (opt "unparsing_mode" unparsing_mode_encoding))
 
+    let run_baker_code_input_encoding =
+      obj10
+        (req "storage" Script.expr_encoding)
+        (req "input" Script.expr_encoding)
+        (req "amount" Tez.encoding)
+        (req "balance" Tez.encoding)
+        (req "chain_id" Chain_id.encoding)
+        (opt "source" Contract.encoding)
+        (opt "payer" Contract.encoding)
+        (opt "gas" Gas.Arith.z_integral_encoding)
+        (dft "entrypoint" string "default")
+        (opt "unparsing_mode" unparsing_mode_encoding)
+
     let trace_encoding =
       def "scripted.trace" @@ list
       @@ obj3
@@ -173,6 +187,41 @@ module Scripts = struct
                 (opt "big_map_diff" Lazy_storage.legacy_big_map_diff_encoding)
                 (opt "lazy_storage_diff" Lazy_storage.encoding)))
         RPC_path.(path / "trace_code")
+
+    let run_baker_code =
+      RPC_service.post_service
+        ~description:"Run the baker code in the current context"
+        ~query:RPC_query.empty
+        ~input:run_baker_code_input_encoding
+        ~output:
+          (obj3
+             (req "storage" Script.expr_encoding)
+             (req "operations" (list Operation.internal_operation_encoding))
+             (opt "lazy_storage_diff" Lazy_storage.encoding))
+        RPC_path.(path / "run_baker_code")
+
+    let run_baker_code_contract =
+      RPC_service.get_service
+        ~description:
+          "Get the contract on which the baker code is ran, which corresponds \
+           to `SELF` or `SELF_ADDRESS` in Michelson"
+        ~query:RPC_query.empty
+        ~output:Contract.encoding
+        RPC_path.(path / "run_baker_code_contract")
+
+    let trace_baker_code =
+      RPC_service.post_service
+        ~description:
+          "Run the baker code in the current context, keeping a trace"
+        ~query:RPC_query.empty
+        ~input:run_baker_code_input_encoding
+        ~output:
+          (obj4
+             (req "storage" Script.expr_encoding)
+             (req "operations" (list Operation.internal_operation_encoding))
+             (req "trace" trace_encoding)
+             (opt "lazy_storage_diff" Lazy_storage.encoding))
+        RPC_path.(path / "trace_baker_code")
 
     let typecheck_code =
       RPC_service.post_service
@@ -366,6 +415,25 @@ module Scripts = struct
       >|=? fun trace ->
       let trace = Option.value ~default:[] trace in
       ({ctxt; storage; lazy_storage_diff; operations}, trace)
+
+    let execute_baker ctxt mode step_constants ~script ~entrypoint ~parameter =
+      let module Logger = Trace_logger () in
+      let open Script_interpreter in
+      let logger = (module Logger : STEP_LOGGER) in
+      execute_baker
+        ~logger
+        ctxt
+        mode
+        step_constants
+        ~script
+        ~entrypoint
+        ~parameter
+        ~internal:true
+      >>=? fun {ctxt; storage; lazy_storage_diff; operations} ->
+      Logger.get_log ()
+      >|=? fun trace ->
+      let trace = Option.value ~default:[] trace in
+      ({ctxt; storage; lazy_storage_diff; operations}, trace)
   end
 
   let typecheck_data :
@@ -412,6 +480,17 @@ module Scripts = struct
         ~delegate:None
         ~script:(script, None)
       >>=? fun ctxt -> return (ctxt, dummy_contract)
+    in
+    let originate_dummy_baker_contract ctxt balance =
+      let ctxt = Contract.init_origination_nonce ctxt Operation_hash.zero in
+      Baker.register
+        ctxt
+        ~balance
+        ~threshold:0
+        ~owner_keys:[]
+        ~consensus_key:
+          (Signature.Public_key.of_b58check_exn
+             "edpktgryq3xTkxyBXsbevHu1cFU8ZY9u9VqKsWtctjuqvt3hLQHNEW")
     in
     register0
       S.run_code
@@ -527,6 +606,124 @@ module Scripts = struct
                      _ },
                    trace ) ->
         (storage, operations, trace, lazy_storage_diff)) ;
+    register0
+      S.run_baker_code
+      (fun ctxt
+           ()
+           ( storage,
+             parameter,
+             amount,
+             balance,
+             chain_id,
+             source,
+             payer,
+             gas,
+             entrypoint,
+             unparsing_mode )
+           ->
+        let unparsing_mode = Option.value ~default:Readable unparsing_mode in
+        let storage = Script.lazy_expr storage in
+        let code = Script.lazy_expr Baker_script_repr.code in
+        originate_dummy_baker_contract ctxt balance
+        >>=? fun (ctxt, baker_hash) ->
+        let dummy_contract = Contract.baker_contract baker_hash in
+        let (source, payer) =
+          match (source, payer) with
+          | (Some source, Some payer) ->
+              (source, payer)
+          | (Some source, None) ->
+              (source, source)
+          | (None, Some payer) ->
+              (payer, payer)
+          | (None, None) ->
+              (dummy_contract, dummy_contract)
+        in
+        let gas =
+          match gas with
+          | Some gas ->
+              gas
+          | None ->
+              Constants.hard_gas_limit_per_operation ctxt
+        in
+        let ctxt = Gas.set_limit ctxt gas in
+        let step_constants =
+          let open Script_interpreter in
+          {source; payer; self = dummy_contract; amount; chain_id}
+        in
+        Script_interpreter.execute_baker
+          ctxt
+          unparsing_mode
+          step_constants
+          ~script:{storage; code}
+          ~entrypoint
+          ~parameter
+          ~internal:true
+        >|=? fun {Script_interpreter.storage; operations; lazy_storage_diff; _} ->
+        (storage, operations, lazy_storage_diff)) ;
+    register0 S.run_baker_code_contract (fun ctxt () () ->
+        originate_dummy_baker_contract ctxt Tez.one
+        >|=? fun (_ctxt, baker_hash) -> Contract.baker_contract baker_hash) ;
+    register0
+      S.trace_baker_code
+      (fun ctxt
+           ()
+           ( storage,
+             parameter,
+             amount,
+             balance,
+             chain_id,
+             source,
+             payer,
+             gas,
+             entrypoint,
+             unparsing_mode )
+           ->
+        let unparsing_mode = Option.value ~default:Readable unparsing_mode in
+        let storage = Script.lazy_expr storage in
+        let code = Script.lazy_expr Baker_script_repr.code in
+        originate_dummy_baker_contract ctxt balance
+        >>=? fun (ctxt, baker_hash) ->
+        let dummy_contract = Contract.baker_contract baker_hash in
+        let (source, payer) =
+          match (source, payer) with
+          | (Some source, Some payer) ->
+              (source, payer)
+          | (Some source, None) ->
+              (source, source)
+          | (None, Some payer) ->
+              (payer, payer)
+          | (None, None) ->
+              (dummy_contract, dummy_contract)
+        in
+        let gas =
+          match gas with
+          | Some gas ->
+              gas
+          | None ->
+              Constants.hard_gas_limit_per_operation ctxt
+        in
+        let ctxt = Gas.set_limit ctxt gas in
+        let step_constants =
+          let open Script_interpreter in
+          {source; payer; self = dummy_contract; amount; chain_id}
+        in
+        let module Unparsing_mode = struct
+          let unparsing_mode = unparsing_mode
+        end in
+        let module Interp = Traced_interpreter (Unparsing_mode) in
+        Interp.execute_baker
+          ctxt
+          Readable
+          step_constants
+          ~script:{storage; code}
+          ~entrypoint
+          ~parameter
+        >|=? fun ( { Script_interpreter.storage;
+                     operations;
+                     lazy_storage_diff;
+                     _ },
+                   trace ) ->
+        (storage, operations, trace, lazy_storage_diff)) ;
     register0 S.typecheck_code (fun ctxt () (expr, maybe_gas, legacy) ->
         let legacy = Option.value ~default:false legacy in
         let ctxt =
@@ -600,18 +797,54 @@ module Scripts = struct
                 {source; fee; counter; operation; gas_limit; storage_limit}) =
             op
           in
+          Baker.is_consensus_key ctxt source
+          >|=? (function
+                 | None ->
+                     Contract.implicit_contract source
+                 | Some baker ->
+                     Contract.baker_contract baker)
+          >>=? fun source_contract ->
           Gas.check_limit ctxt gas_limit
           >>?= fun () ->
           let ctxt = Gas.set_limit ctxt gas_limit in
           Fees.check_storage_limit ctxt storage_limit
           >>?= fun () ->
-          Contract.must_be_allocated ctxt (Contract.implicit_contract source)
+          Contract.must_be_allocated ctxt source_contract
           >>=? fun () ->
-          Contract.check_counter_increment ctxt source counter
+          Contract.check_counter_increment ctxt source_contract counter
           >>=? fun () ->
+          let apply_origination ~script =
+            (* Here the data comes already deserialized, so we need to fake the deserialization to mimic apply *)
+            let script_bytes =
+              Data_encoding.Binary.to_bytes_exn Script.encoding script
+            in
+            let script =
+              match
+                Data_encoding.Binary.of_bytes Script.encoding script_bytes
+              with
+              | Some script ->
+                  script
+              | None ->
+                  assert false
+            in
+            Lwt.return
+            @@ record_trace Apply.Gas_quota_exceeded_init_deserialize
+            @@ ( Gas.(
+                   check_enough
+                     (* Fail quickly if not enough gas for minimal deserialization cost *)
+                     ctxt
+                     ( Script.minimal_deserialize_cost script.code
+                     +@ Script.minimal_deserialize_cost script.storage ))
+               >>? fun () ->
+               (* Fail if not enough gas for complete deserialization cost *)
+               Script.force_decode_in_context ctxt script.code
+               >>? fun (_code, ctxt) ->
+               Script.force_decode_in_context ctxt script.storage
+               >|? fun (_stoRage, ctxt) -> ctxt )
+          in
           ( match operation with
           | Reveal pk ->
-              Contract.reveal_manager_key ctxt source pk
+              Contract.reveal_public_key ctxt source pk
           | Transaction {parameters; _} ->
               (* Here the data comes already deserialized, so we need to fake the deserialization to mimic apply *)
               let arg_bytes =
@@ -638,43 +871,16 @@ module Scripts = struct
                  (* Fail if not enough gas for complete deserialization cost *)
                  Script.force_decode_in_context ctxt arg
                  >|? fun (_arg, ctxt) -> ctxt )
+          | Origination_legacy {script; _} ->
+              apply_origination ~script
           | Origination {script; _} ->
-              (* Here the data comes already deserialized, so we need to fake the deserialization to mimic apply *)
-              let script_bytes =
-                Data_encoding.Binary.to_bytes_exn Script.encoding script
-              in
-              let script =
-                match
-                  Data_encoding.Binary.of_bytes Script.encoding script_bytes
-                with
-                | Some script ->
-                    script
-                | None ->
-                    assert false
-              in
-              Lwt.return
-              @@ record_trace Apply.Gas_quota_exceeded_init_deserialize
-              @@ ( Gas.(
-                     check_enough
-                       (* Fail quickly if not enough gas for minimal deserialization cost *)
-                       ctxt
-                       ( Script.minimal_deserialize_cost script.code
-                       +@ Script.minimal_deserialize_cost script.storage ))
-                 >>? fun () ->
-                 (* Fail if not enough gas for complete deserialization cost *)
-                 Script.force_decode_in_context ctxt script.code
-                 >>? fun (_code, ctxt) ->
-                 Script.force_decode_in_context ctxt script.storage
-                 >|? fun (_storage, ctxt) -> ctxt )
+              apply_origination ~script
           | _ ->
               return ctxt )
           >>=? fun ctxt ->
-          Contract.get_manager_key ctxt source
-          >>=? fun _public_key ->
           (* signature check unplugged from here *)
-          Contract.increment_counter ctxt source
-          >>=? fun ctxt ->
-          Contract.spend ctxt (Contract.implicit_contract source) fee
+          Contract.increment_counter ctxt source_contract
+          >>=? fun ctxt -> Contract.spend ctxt source_contract fee
         in
         let rec partial_precheck_manager_contents_list :
             type kind.
@@ -689,25 +895,26 @@ module Scripts = struct
               partial_precheck_manager_contents ctxt op
               >>=? fun ctxt -> partial_precheck_manager_contents_list ctxt rest
         in
-        let ret contents =
+        let ret contents mapped_keys =
+          let mapped_keys = Apply.Mapped_key_set.elements mapped_keys in
           ( Operation_data protocol_data,
-            Apply_results.Operation_metadata {contents} )
+            Apply_results.Operation_metadata {contents; mapped_keys} )
         in
         let operation : _ operation = {shell; protocol_data} in
         let hash = Operation.hash {shell; protocol_data} in
         let ctxt = Contract.init_origination_nonce ctxt hash in
-        let baker = Signature.Public_key_hash.zero in
+        let baker = Baker_hash.zero in
         match protocol_data.contents with
         | Single (Manager_operation _) as op ->
             partial_precheck_manager_contents_list ctxt op
             >>=? fun ctxt ->
             Apply.apply_manager_contents_list ctxt Optimized baker chain_id op
-            >|= fun (_ctxt, result) -> ok @@ ret result
+            >|=? fun (_ctxt, result, mapped_keys) -> ret result mapped_keys
         | Cons (Manager_operation _, _) as op ->
             partial_precheck_manager_contents_list ctxt op
             >>=? fun ctxt ->
             Apply.apply_manager_contents_list ctxt Optimized baker chain_id op
-            >|= fun (_ctxt, result) -> ok @@ ret result
+            >|=? fun (_ctxt, result, mapped_keys) -> ret result mapped_keys
         | _ ->
             Apply.apply_contents_list
               ctxt
@@ -717,7 +924,7 @@ module Scripts = struct
               baker
               operation
               operation.protocol_data.contents
-            >|=? fun (_ctxt, result) -> ret result) ;
+            >|=? fun (_ctxt, result, mapped_keys) -> ret result mapped_keys) ;
     register0 S.entrypoint_type (fun ctxt () (expr, entrypoint) ->
         let ctxt = Gas.set_unlimited ctxt in
         let legacy = false in
@@ -788,6 +995,46 @@ module Scripts = struct
           payer,
           gas,
           entrypoint ),
+        unparsing_mode )
+
+  let run_baker_code ctxt block ?unparsing_mode ?gas ?(entrypoint = "default")
+      ~storage ~input ~amount ~balance ~chain_id ~source ~payer =
+    RPC_context.make_call0
+      S.run_baker_code
+      ctxt
+      block
+      ()
+      ( storage,
+        input,
+        amount,
+        balance,
+        chain_id,
+        source,
+        payer,
+        gas,
+        entrypoint,
+        unparsing_mode )
+
+  let run_baker_code_contract ctxt block =
+    RPC_context.make_call0 S.run_baker_code_contract ctxt block () ()
+
+  let trace_baker_code ctxt block ?unparsing_mode ?gas
+      ?(entrypoint = "default") ~storage ~input ~amount ~balance ~chain_id
+      ~source ~payer =
+    RPC_context.make_call0
+      S.trace_baker_code
+      ctxt
+      block
+      ()
+      ( storage,
+        input,
+        amount,
+        balance,
+        chain_id,
+        source,
+        payer,
+        gas,
+        entrypoint,
         unparsing_mode )
 
   let typecheck_code ctxt block ?gas ?legacy ~script =
@@ -881,7 +1128,10 @@ module Forge = struct
   module Manager = struct
     let operations ctxt block ~branch ~source ?sourcePubKey ~counter ~fee
         ~gas_limit ~storage_limit operations =
-      Contract_services.manager_key ctxt block source
+      Contract_services.public_key
+        ctxt
+        block
+        (Contract.implicit_contract source)
       >>= function
       | Error _ as e ->
           Lwt.return e
@@ -961,7 +1211,7 @@ module Forge = struct
         [Manager (Transaction {amount; parameters; destination; entrypoint})]
 
     let origination ctxt block ~branch ~source ?sourcePubKey ~counter ~balance
-        ?delegatePubKey ~script ~gas_limit ~storage_limit ~fee () =
+        ?delegate ~script ~gas_limit ~storage_limit ~fee () =
       operations
         ctxt
         block
@@ -974,12 +1224,7 @@ module Forge = struct
         ~storage_limit
         [ Manager
             (Origination
-               {
-                 delegate = delegatePubKey;
-                 script;
-                 credit = balance;
-                 preorigination = None;
-               }) ]
+               {delegate; script; credit = balance; preorigination = None}) ]
 
     let delegation ctxt block ~branch ~source ?sourcePubKey ~counter ~fee
         delegate =
@@ -1134,6 +1379,16 @@ module S = struct
       ~output:
         (obj2 (req "first" Raw_level.encoding) (req "last" Raw_level.encoding))
       RPC_path.(path / "levels_in_current_cycle")
+
+  let is_baker_consensus_key =
+    RPC_service.get_service
+      ~description:
+        "Find the baker hash for a baker that uses the given key as consensus \
+         key, if any."
+      ~query:RPC_query.empty
+      ~output:Baker_hash.encoding
+      RPC_path.(
+        path / "is_baker_consensus_key" /: Signature.Public_key_hash.rpc_arg)
 end
 
 let register () =
@@ -1177,10 +1432,19 @@ let register () =
       | _ ->
           let first = List.hd (List.rev levels) in
           let last = List.hd levels in
-          return (first.level, last.level))
+          return (first.level, last.level)) ;
+  register1 S.is_baker_consensus_key (fun ctxt pkh () () ->
+      Baker.is_consensus_key ctxt pkh
+      >>=? function None -> raise Not_found | Some baker -> return baker)
 
 let current_level ctxt ?(offset = 0l) block =
   RPC_context.make_call0 S.current_level ctxt block {offset} ()
 
 let levels_in_current_cycle ctxt ?(offset = 0l) block =
   RPC_context.make_call0 S.levels_in_current_cycle ctxt block {offset} ()
+
+let is_baker_consensus_key ctxt block pkh =
+  RPC_context.make_call1 S.is_baker_consensus_key ctxt block pkh () ()
+
+let is_baker_consensus_key_opt ctxt block pkh =
+  RPC_context.make_opt_call1 S.is_baker_consensus_key ctxt block pkh () ()

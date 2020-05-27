@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -67,6 +68,46 @@ module Scripts : sig
     ?gas:Gas.Arith.integral ->
     ?entrypoint:string ->
     script:Script.expr ->
+    storage:Script.expr ->
+    input:Script.expr ->
+    amount:Tez.t ->
+    balance:Tez.t ->
+    chain_id:Chain_id.t ->
+    source:Contract.t option ->
+    payer:Contract.t option ->
+    ( Script.expr
+    * packed_internal_operation list
+    * Script_interpreter.execution_trace
+    * Lazy_storage.diffs option )
+    shell_tzresult
+    Lwt.t
+
+  val run_baker_code :
+    'a #RPC_context.simple ->
+    'a ->
+    ?unparsing_mode:Script_ir_translator.unparsing_mode ->
+    ?gas:Gas.Arith.integral ->
+    ?entrypoint:string ->
+    storage:Script.expr ->
+    input:Script.expr ->
+    amount:Tez.t ->
+    balance:Tez.t ->
+    chain_id:Chain_id.t ->
+    source:Contract.t option ->
+    payer:Contract.t option ->
+    (Script.expr * packed_internal_operation list * Lazy_storage.diffs option)
+    shell_tzresult
+    Lwt.t
+
+  val run_baker_code_contract :
+    'a #RPC_context.simple -> 'a -> Contract.t shell_tzresult Lwt.t
+
+  val trace_baker_code :
+    'a #RPC_context.simple ->
+    'a ->
+    ?unparsing_mode:Script_ir_translator.unparsing_mode ->
+    ?gas:Gas.Arith.integral ->
+    ?entrypoint:string ->
     storage:Script.expr ->
     input:Script.expr ->
     amount:Tez.t ->
@@ -198,7 +239,7 @@ module Forge : sig
       ?sourcePubKey:public_key ->
       counter:counter ->
       balance:Tez.t ->
-      ?delegatePubKey:public_key_hash ->
+      ?delegate:baker_hash ->
       script:Script.t ->
       gas_limit:Gas.Arith.integral ->
       storage_limit:Z.t ->
@@ -214,7 +255,7 @@ module Forge : sig
       ?sourcePubKey:public_key ->
       counter:counter ->
       fee:Tez.t ->
-      public_key_hash option ->
+      baker_hash option ->
       bytes shell_tzresult Lwt.t
   end
 
@@ -310,3 +351,15 @@ module Parse : sig
 end
 
 val register : unit -> unit
+
+val is_baker_consensus_key :
+  'a #RPC_context.simple ->
+  'a ->
+  public_key_hash ->
+  baker_hash shell_tzresult Lwt.t
+
+val is_baker_consensus_key_opt :
+  'a #RPC_context.simple ->
+  'a ->
+  public_key_hash ->
+  baker_hash option shell_tzresult Lwt.t

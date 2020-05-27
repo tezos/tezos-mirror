@@ -104,6 +104,7 @@ end
 module Contract = Contract_services
 module Constants = Constants_services
 module Delegate = Delegate_services
+module Baker = Baker_services
 module Helpers = Helpers_services
 module Forge = Helpers_services.Forge
 module Parse = Helpers_services.Parse
@@ -114,6 +115,7 @@ let register () =
   Contract.register () ;
   Constants.register () ;
   Delegate.register () ;
+  Baker.register () ;
   Helpers.register () ;
   Nonce.register () ;
   Voting.register () ;
