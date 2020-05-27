@@ -36,7 +36,7 @@ let big_map_root =
 
 type info = {
   balance : Tez.t;
-  delegate : public_key_hash option;
+  delegate : baker_hash option;
   counter : counter option;
   script : Script.t option;
 }
@@ -50,7 +50,7 @@ let info_encoding =
       {balance; delegate; script; counter})
   @@ obj4
        (req "balance" Tez.encoding)
-       (opt "delegate" Signature.Public_key_hash.encoding)
+       (opt "delegate" Baker_hash.encoding)
        (opt "script" Script.encoding)
        (opt "counter" n)
 
@@ -66,16 +66,28 @@ module S = struct
 
   let manager_key =
     RPC_service.get_service
-      ~description:"Access the manager of a contract."
+      ~description:
+        "DEPRECATED: use `public_key` instead. Access the manager of a \
+         contract."
       ~query:RPC_query.empty
       ~output:(option Signature.Public_key.encoding)
       RPC_path.(custom_root /: Contract.rpc_arg / "manager_key")
+
+  let public_key =
+    RPC_service.get_service
+      ~description:
+        "Access the public key of a contract, if any. For implicit contracts, \
+         this may be their revealed key and for baker contracts it's their \
+         consensus key"
+      ~query:RPC_query.empty
+      ~output:(option Signature.Public_key.encoding)
+      RPC_path.(custom_root /: Contract.rpc_arg / "public_key")
 
   let delegate =
     RPC_service.get_service
       ~description:"Access the delegate of a contract, if any."
       ~query:RPC_query.empty
-      ~output:Signature.Public_key_hash.encoding
+      ~output:Baker_hash.encoding
       RPC_path.(custom_root /: Contract.rpc_arg / "delegate")
 
   let counter =
@@ -195,25 +207,39 @@ let register () =
             unparse_data ctxt Readable value_type value
             >|=? fun (value, _ctxt) -> Micheline.strip_locations value )
   in
+  let get_public_key ctxt contract =
+    match Contract.is_implicit contract with
+    | None ->
+        raise Not_found
+    | Some _manager -> (
+        Contract.is_public_key_revealed ctxt contract
+        >>=? function
+        | false ->
+            return_none
+        | true ->
+            Contract.get_public_key ctxt contract >>=? return_some )
+  in
   register_field S.balance Contract.get_balance ;
   register1 S.manager_key (fun ctxt contract () () ->
-      match Contract.is_implicit contract with
-      | None ->
-          raise Not_found
-      | Some mgr -> (
-          Contract.is_manager_key_revealed ctxt mgr
-          >>=? function
-          | false ->
-              return_none
-          | true ->
-              Contract.get_manager_key ctxt mgr >>=? return_some )) ;
-  register_opt_field S.delegate Delegate.get ;
+      get_public_key ctxt contract) ;
+  register1 S.public_key (fun ctxt contract () () ->
+      get_public_key ctxt contract) ;
+  register_opt_field S.delegate Delegation.get ;
   register1 S.counter (fun ctxt contract () () ->
       match Contract.is_implicit contract with
-      | None ->
-          raise Not_found
-      | Some mgr ->
-          Contract.get_counter ctxt mgr) ;
+      | Some pkh -> (
+          Baker.is_consensus_key ctxt pkh
+          >>=? function
+          | None ->
+              Contract.get_counter ctxt contract
+          | Some baker_hash ->
+              Contract.get_counter ctxt (Contract.baker_contract baker_hash) )
+      | None -> (
+        match Contract.is_baker contract with
+        | Some _ ->
+            Contract.get_counter ctxt contract
+        | None ->
+            raise Not_found )) ;
   register_opt_field S.script (fun c v ->
       Contract.get_script c v >|=? fun (_, v) -> v) ;
   register_opt_field S.storage (fun ctxt contract ->
@@ -222,15 +248,24 @@ let register () =
       match script with
       | None ->
           return_none
-      | Some script ->
+      | Some script -> (
           let ctxt = Gas.set_unlimited ctxt in
           let open Script_ir_translator in
-          parse_script ctxt ~legacy:true script
-          >>=? fun (Ex_script script, ctxt) ->
-          unparse_script ctxt Readable script
-          >>=? fun (script, ctxt) ->
-          Script.force_decode_in_context ctxt script.storage
-          >>?= fun (storage, _ctxt) -> return_some storage) ;
+          match Contract.is_baker contract with
+          | None ->
+              parse_script ctxt ~legacy:true script
+              >>=? fun (Ex_originated_script script, ctxt) ->
+              unparse_script ctxt Readable script
+              >>=? fun (script, ctxt) ->
+              Script.force_decode_in_context ctxt script.storage
+              >>?= fun (storage, _ctxt) -> return_some storage
+          | Some _ ->
+              parse_baker_script ctxt ~legacy:true script
+              >>=? fun (Ex_baker_script script, ctxt) ->
+              unparse_script ctxt Readable script
+              >>=? fun (script, ctxt) ->
+              Script.force_decode_in_context ctxt script.storage
+              >>?= fun (storage, _ctxt) -> return_some storage )) ;
   register2 S.entrypoint_type (fun ctxt v entrypoint () () ->
       Contract.get_script_code ctxt v
       >>=? fun (_, expr) ->
@@ -309,7 +344,7 @@ let register () =
           let ctxt = Gas.set_unlimited ctxt in
           let open Script_ir_translator in
           parse_script ctxt ~legacy:true script
-          >>=? fun (Ex_script script, ctxt) ->
+          >>=? fun (Ex_originated_script script, ctxt) ->
           Script_ir_translator.find_big_map_unaccounted
             ctxt
             script.storage_type
@@ -321,32 +356,43 @@ let register () =
   register_field S.info (fun ctxt contract ->
       Contract.get_balance ctxt contract
       >>=? fun balance ->
-      Delegate.get ctxt contract
+      Delegation.get ctxt contract
       >>=? fun delegate ->
       ( match Contract.is_implicit contract with
-      | Some manager -> (
+      | Some _ -> (
           Contract.allocated ctxt contract
           >>=? function
           | true ->
-              Contract.get_counter ctxt manager
+              Contract.get_counter ctxt contract
               >>=? fun counter -> return_some counter
           | false ->
               return_none )
-      | None ->
-          return_none )
+      | None -> (
+        match Contract.is_baker contract with
+        | Some _ ->
+            Contract.get_counter ctxt contract >>=? return_some
+        | _ ->
+            return_none ) )
       >>=? fun counter ->
       Contract.get_script ctxt contract
       >>=? fun (ctxt, script) ->
       ( match script with
       | None ->
           return (None, ctxt)
-      | Some script ->
+      | Some script -> (
           let ctxt = Gas.set_unlimited ctxt in
           let open Script_ir_translator in
-          parse_script ctxt ~legacy:true script
-          >>=? fun (Ex_script script, ctxt) ->
-          unparse_script ctxt Readable script
-          >|=? fun (script, ctxt) -> (Some script, ctxt) )
+          match Contract.is_baker contract with
+          | None ->
+              parse_script ctxt ~legacy:true script
+              >>=? fun (Ex_originated_script script, ctxt) ->
+              unparse_script ctxt Readable script
+              >|=? fun (script, ctxt) -> (Some script, ctxt)
+          | Some _ ->
+              parse_baker_script ctxt ~legacy:true script
+              >>=? fun (Ex_baker_script script, ctxt) ->
+              unparse_script ctxt Readable script
+              >|=? fun (script, ctxt) -> (Some script, ctxt) ) )
       >|=? fun (script, _ctxt) -> {balance; delegate; script; counter})
 
 let list ctxt block = RPC_context.make_call0 S.list ctxt block () ()
@@ -357,14 +403,8 @@ let info ctxt block contract =
 let balance ctxt block contract =
   RPC_context.make_call1 S.balance ctxt block contract () ()
 
-let manager_key ctxt block mgr =
-  RPC_context.make_call1
-    S.manager_key
-    ctxt
-    block
-    (Contract.implicit_contract mgr)
-    ()
-    ()
+let public_key ctxt block contract =
+  RPC_context.make_call1 S.public_key ctxt block contract () ()
 
 let delegate ctxt block contract =
   RPC_context.make_call1 S.delegate ctxt block contract () ()
