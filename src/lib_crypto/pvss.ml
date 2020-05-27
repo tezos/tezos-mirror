@@ -176,15 +176,31 @@ module MakeDleq (G : CYCLIC_GROUP) :
     if not same_sizes then false
     else
       let a1_n =
+        (* Original, non-optimized form
         List.map2
           G.( * )
           (List.map (G.pow b1) r_n)
           (List.map (fun h1 -> G.pow h1 c) h1_n)
+        *)
+        List.map2
+          (fun r h1 ->
+            let open G in
+            pow b1 r * pow h1 c)
+          r_n
+          h1_n
       and a2_n =
+        (* Original, non-optimized form
         List.map2
           G.( * )
           (List.map2 G.pow b2_n r_n)
           (List.map (fun h2 -> G.pow h2 c) h2_n)
+        *)
+        List.map2
+          (fun b2r h2 ->
+            let open G in
+            b2r * pow h2 c)
+          (List.map2 G.pow b2_n r_n)
+          h2_n
       in
       G.Z_m.(c = fiat_shamir (List.concat [h1_n; h2_n; a1_n; a2_n]))
 end
@@ -350,8 +366,17 @@ module MakePvss (G : CYCLIC_GROUP) : PVSS = struct
     let x_i =
       (* prod_C_j_to_the__i_to_the_j = i ↦ Πⱼ₌₀ᵗ⁻¹ Cⱼ^(iʲ) *)
       let prod_C_j_to_the__i_to_the_j i =
+        (* Original, non-optimized form
         List.mapi (fun j cC -> G.pow cC (G.Z_m.pow i (Z.of_int j))) cC_j
         |> List.fold_left G.( * ) G.e
+        *)
+        List.fold_left
+          (fun (j, acc) cC ->
+            let open G in
+            (j + 1, acc * pow cC (G.Z_m.pow i (Z.of_int j))))
+          (0, G.e)
+          cC_j
+        |> snd
       in
       List.mapi
         (fun i _ -> prod_C_j_to_the__i_to_the_j (i + 1 |> G.Z_m.of_int))
@@ -382,6 +407,7 @@ module MakePvss (G : CYCLIC_GROUP) : PVSS = struct
     (* check that there enough reveals *)
     let indices = List.map (fun x -> G.Z_m.of_int (1 + x)) int_indices in
     let lagrange i =
+      (* Original, non-optimized form
       List.fold_left
         G.Z_m.( * )
         G.Z_m.one
@@ -395,7 +421,29 @@ module MakePvss (G : CYCLIC_GROUP) : PVSS = struct
                | Some inverse ->
                    G.Z_m.(j * inverse))
            indices)
+      *)
+      List.fold_left
+        (fun acc indice ->
+          let open G.Z_m in
+          if indice = i then acc
+          else
+            match inv (indice - i) with
+            | None ->
+                failwith "Unexpected error inverting scalar."
+            | Some inverse ->
+                acc * indice * inverse)
+        G.Z_m.one
+        indices
     in
+    (* Original, non-optimized form
     let lagrange = List.map lagrange indices in
     List.fold_left G.( * ) G.e (List.map2 G.pow reveals lagrange)
+    *)
+    List.fold_left2
+      (fun acc reveal indice ->
+        let open G in
+        acc * pow reveal (lagrange indice))
+      G.e
+      reveals
+      indices
 end
