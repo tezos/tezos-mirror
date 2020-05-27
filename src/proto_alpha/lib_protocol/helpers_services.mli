@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -198,7 +199,7 @@ module Forge : sig
       ?sourcePubKey:public_key ->
       counter:counter ->
       balance:Tez.t ->
-      ?delegatePubKey:public_key_hash ->
+      ?delegate:baker_hash ->
       script:Script.t ->
       gas_limit:Gas.Arith.integral ->
       storage_limit:Z.t ->
@@ -214,7 +215,7 @@ module Forge : sig
       ?sourcePubKey:public_key ->
       counter:counter ->
       fee:Tez.t ->
-      public_key_hash option ->
+      baker_hash option ->
       bytes shell_tzresult Lwt.t
   end
 
