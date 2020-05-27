@@ -4806,7 +4806,8 @@ and parse_instr :
       parse_var_annot loc annot ~default:default_level_annot
       >>?= fun annot ->
       typed ctxt loc Level (Item_t (Nat_t None, stack, annot))
-  | (Prim (loc, I_VOTING_POWER, [], annot), Item_t (Key_hash_t _, rest, _)) ->
+  | (Prim (loc, I_VOTING_POWER, [], annot), Item_t (Baker_hash_t _, rest, _))
+    ->
       parse_var_annot loc annot
       >>?= fun annot ->
       typed ctxt loc Voting_power (Item_t (Nat_t None, rest, annot))

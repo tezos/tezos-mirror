@@ -429,7 +429,7 @@ and ('bef, 'aft) instr =
       -> ('bef, 'rest) instr
   | ChainId : ('rest, Chain_id.t * 'rest) instr
   | Never : (never * 'rest, 'aft) instr
-  | Voting_power : (public_key_hash * 'rest, n num * 'rest) instr
+  | Voting_power : (baker_hash * 'rest, n num * 'rest) instr
   | Total_voting_power : ('rest, n num * 'rest) instr
   | Keccak : (bytes * 'rest, bytes * 'rest) instr
   | Sha3 : (bytes * 'rest, bytes * 'rest) instr

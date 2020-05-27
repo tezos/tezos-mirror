@@ -1309,8 +1309,8 @@ let rec step :
       logged_return ((step_constants.chain_id, rest), ctxt)
   | (Never, (_, _)) ->
       .
-  | (Voting_power, (key_hash, rest)) ->
-      Vote.get_voting_power ctxt key_hash
+  | (Voting_power, (baker_hash, rest)) ->
+      Vote.get_voting_power ctxt baker_hash
       >>=? fun (ctxt, rolls) ->
       logged_return ((Script_int.(abs (of_int32 rolls)), rest), ctxt)
   | (Total_voting_power, rest) ->
