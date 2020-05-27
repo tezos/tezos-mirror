@@ -1366,6 +1366,16 @@ module S = struct
       ~output:
         (obj2 (req "first" Raw_level.encoding) (req "last" Raw_level.encoding))
       RPC_path.(path / "levels_in_current_cycle")
+
+  let is_baker_consensus_key =
+    RPC_service.get_service
+      ~description:
+        "Find the baker hash for a baker that uses the given key as consensus \
+         key, if any."
+      ~query:RPC_query.empty
+      ~output:Baker_hash.encoding
+      RPC_path.(
+        path / "is_baker_consensus_key" /: Signature.Public_key_hash.rpc_arg)
 end
 
 let register () =
@@ -1409,10 +1419,19 @@ let register () =
       | _ ->
           let first = List.hd (List.rev levels) in
           let last = List.hd levels in
-          return (first.level, last.level))
+          return (first.level, last.level)) ;
+  register1 S.is_baker_consensus_key (fun ctxt pkh () () ->
+      Baker.is_consensus_key ctxt pkh
+      >>=? function None -> raise Not_found | Some baker -> return baker)
 
 let current_level ctxt ?(offset = 0l) block =
   RPC_context.make_call0 S.current_level ctxt block {offset} ()
 
 let levels_in_current_cycle ctxt ?(offset = 0l) block =
   RPC_context.make_call0 S.levels_in_current_cycle ctxt block {offset} ()
+
+let is_baker_consensus_key ctxt block pkh =
+  RPC_context.make_call1 S.is_baker_consensus_key ctxt block pkh () ()
+
+let is_baker_consensus_key_opt ctxt block pkh =
+  RPC_context.make_opt_call1 S.is_baker_consensus_key ctxt block pkh () ()
