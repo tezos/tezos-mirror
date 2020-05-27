@@ -195,11 +195,22 @@ module MakeDleq (G : CYCLIC_GROUP) :
           (List.map2 G.pow b2_n r_n)
           (List.map (fun h2 -> G.pow h2 c) h2_n)
         *)
-        List.map2
-          (fun b2r h2 ->
+        let rec map3 f xs ys zs =
+          match (xs, ys, zs) with
+          | ([], [], []) ->
+              []
+          | (x :: xs, y :: ys, z :: zs) ->
+              let r = f x y z in
+              r :: map3 f xs ys zs
+          | _ ->
+              invalid_arg "Pvss: List.map3"
+        in
+        map3
+          (fun b2 r h2 ->
             let open G in
-            b2r * pow h2 c)
-          (List.map2 G.pow b2_n r_n)
+            pow b2 r * pow h2 c)
+          b2_n
+          r_n
           h2_n
       in
       G.Z_m.(c = fiat_shamir (List.concat [h1_n; h2_n; a1_n; a2_n]))
