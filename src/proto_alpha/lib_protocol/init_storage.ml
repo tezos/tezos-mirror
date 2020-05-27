@@ -45,8 +45,11 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
         ?no_reward_cycles:param.no_reward_cycles
         param.bootstrap_accounts
         param.bootstrap_contracts
+        param.bootstrap_bakers
       >>=? fun ctxt ->
       Roll_storage.init_first_cycles ctxt
+      >>=? fun ctxt ->
+      Baker_storage.init_first_cycles ctxt
       >>=? fun ctxt ->
       Vote_storage.init
         ctxt
