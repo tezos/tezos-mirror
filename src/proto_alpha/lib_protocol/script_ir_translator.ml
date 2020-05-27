@@ -491,6 +491,8 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int =
       0
   | Never ->
       0
+  | Voting_power_legacy ->
+      0
   | Voting_power ->
       0
   | Total_voting_power ->
@@ -5495,6 +5497,15 @@ and parse_instr :
       >>?= fun annot ->
       typed ctxt loc Level (Item_t (Nat_t None, stack, annot))
   | (Prim (loc, I_VOTING_POWER, [], annot), Item_t (Key_hash_t _, rest, _)) ->
+      if legacy then
+        parse_var_annot loc annot
+        >>?= fun annot ->
+        typed ctxt loc Voting_power_legacy (Item_t (Nat_t None, rest, annot))
+      else
+        (* For new contracts this instruction is not allowed anymore *)
+        fail (Deprecated_instruction I_VOTING_POWER)
+  | (Prim (loc, I_VOTING_POWER, [], annot), Item_t (Baker_hash_t _, rest, _))
+    ->
       parse_var_annot loc annot
       >>?= fun annot ->
       typed ctxt loc Voting_power (Item_t (Nat_t None, rest, annot))

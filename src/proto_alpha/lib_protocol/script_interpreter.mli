@@ -44,6 +44,8 @@ type error += Cannot_serialize_storage
 
 type error += Michelson_too_many_recursive_calls
 
+type error += Not_an_active_consensus_key of Signature.Public_key_hash.t
+
 type execution_result = {
   ctxt : context;
   storage : Script.expr;

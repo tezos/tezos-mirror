@@ -50,6 +50,8 @@ type error += Cannot_serialize_storage
 
 type error += Michelson_too_many_recursive_calls
 
+type error += Not_an_active_consensus_key of Signature.Public_key_hash.t
+
 let () =
   let open Data_encoding in
   let trace_encoding =
@@ -142,7 +144,21 @@ let () =
        script"
     Data_encoding.empty
     (function Michelson_too_many_recursive_calls -> Some () | _ -> None)
-    (fun () -> Michelson_too_many_recursive_calls)
+    (fun () -> Michelson_too_many_recursive_calls) ;
+  register_error_kind
+    `Temporary
+    ~id:"michelson_v1.not_an_active_consensus_key"
+    ~title:"Not an active baker consensus key"
+    ~description:"The given key is not an active baker consensus key."
+    ~pp:(fun ppf key ->
+      Format.fprintf
+        ppf
+        "The given key %a is not an active baker consensus key."
+        Signature.Public_key_hash.pp
+        key)
+    Data_encoding.(obj1 (req "key" Signature.Public_key_hash.encoding))
+    (function Not_an_active_consensus_key k -> Some k | _ -> None)
+    (fun k -> Not_an_active_consensus_key k)
 
 (* ---- interpreter ---------------------------------------------------------*)
 
@@ -497,6 +513,8 @@ let cost_of_instr : type b a. (b, a) descr -> b -> Gas.cost =
       Interp_costs.create_contract
   | (Never, (_, _)) ->
       .
+  | (Voting_power_legacy, _) ->
+      Interp_costs.voting_power
   | (Voting_power, _) ->
       Interp_costs.voting_power
   | (Total_voting_power, _) ->
@@ -1363,8 +1381,17 @@ let rec step_bounded :
       logged_return ((step_constants.chain_id, rest), ctxt)
   | (Never, (_, _)) ->
       .
-  | (Voting_power, (key_hash, rest)) ->
-      Vote.get_voting_power ctxt key_hash
+  | (Voting_power_legacy, (key_hash, rest)) -> (
+      Baker.is_consensus_key ctxt key_hash
+      >>=? function
+      | None ->
+          fail @@ Not_an_active_consensus_key key_hash
+      | Some baker_hash ->
+          Vote.get_voting_power ctxt baker_hash
+          >>=? fun (ctxt, rolls) ->
+          logged_return ((Script_int.(abs (of_int32 rolls)), rest), ctxt) )
+  | (Voting_power, (baker_hash, rest)) ->
+      Vote.get_voting_power ctxt baker_hash
       >>=? fun (ctxt, rolls) ->
       logged_return ((Script_int.(abs (of_int32 rolls)), rest), ctxt)
   | (Total_voting_power, rest) ->
