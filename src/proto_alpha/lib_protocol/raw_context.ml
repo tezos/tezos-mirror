@@ -86,10 +86,9 @@ type back = {
   predecessor_timestamp : Time.t;
   timestamp : Time.t;
   fitness : Int64.t;
-  deposits : Tez_repr.t Signature.Public_key_hash.Map.t;
+  deposits : Tez_repr.t Baker_hash.Map.t;
   included_endorsements : int;
-  allowed_endorsements :
-    (Signature.Public_key.t * int list * bool) Signature.Public_key_hash.Map.t;
+  allowed_endorsements : (int list * bool) Baker_hash.Map.t;
   fees : Tez_repr.t;
   rewards : Tez_repr.t;
   storage_space_to_pay : Z.t option;
@@ -214,14 +213,12 @@ let[@inline] update_temporary_lazy_storage_ids ctxt temporary_lazy_storage_ids
   update_back ctxt {ctxt.back with temporary_lazy_storage_ids}
 
 let record_endorsement ctxt k =
-  match
-    Signature.Public_key_hash.Map.find_opt k (allowed_endorsements ctxt)
-  with
+  match Baker_hash.Map.find_opt k (allowed_endorsements ctxt) with
   | None ->
       assert false
-  | Some (_, _, true) ->
+  | Some (_, true) ->
       assert false (* right already used *)
-  | Some (d, s, false) ->
+  | Some (s, false) ->
       let ctxt =
         update_included_endorsements
           ctxt
@@ -229,16 +226,13 @@ let record_endorsement ctxt k =
       in
       update_allowed_endorsements
         ctxt
-        (Signature.Public_key_hash.Map.add
-           k
-           (d, s, true)
-           (allowed_endorsements ctxt))
+        (Baker_hash.Map.add k (s, true) (allowed_endorsements ctxt))
 
 let init_endorsements ctxt allowed_endorsements' =
-  if Signature.Public_key_hash.Map.is_empty allowed_endorsements' then
-    assert false (* can't initialize to empty *)
-  else if Signature.Public_key_hash.Map.is_empty (allowed_endorsements ctxt)
-  then update_allowed_endorsements ctxt allowed_endorsements'
+  if Baker_hash.Map.is_empty allowed_endorsements' then assert false
+    (* can't initialize to empty *)
+  else if Baker_hash.Map.is_empty (allowed_endorsements ctxt) then
+    update_allowed_endorsements ctxt allowed_endorsements'
   else assert false
 
 type error += Too_many_internal_operations (* `Permanent *)
@@ -304,10 +298,10 @@ let add_fees ctxt fees' = Tez_repr.(fees ctxt +? fees') >|? update_fees ctxt
 let add_rewards ctxt rewards' =
   Tez_repr.(rewards ctxt +? rewards') >|? update_rewards ctxt
 
-let add_deposit ctxt delegate deposit =
-  let open Signature.Public_key_hash.Map in
+let add_deposit ctxt baker deposit =
+  let open Baker_hash.Map in
   let previous =
-    match find_opt delegate (deposits ctxt) with
+    match find_opt baker (deposits ctxt) with
     | Some tz ->
         tz
     | None ->
@@ -315,7 +309,7 @@ let add_deposit ctxt delegate deposit =
   in
   Tez_repr.(previous +? deposit)
   >|? fun deposit ->
-  let deposits = add delegate deposit (deposits ctxt) in
+  let deposits = add baker deposit (deposits ctxt) in
   update_deposits ctxt deposits
 
 let get_deposits = deposits
@@ -739,11 +733,11 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
         timestamp;
         fitness;
         first_level;
-        allowed_endorsements = Signature.Public_key_hash.Map.empty;
+        allowed_endorsements = Baker_hash.Map.empty;
         included_endorsements = 0;
         fees = Tez_repr.zero;
         rewards = Tez_repr.zero;
-        deposits = Signature.Public_key_hash.Map.empty;
+        deposits = Baker_hash.Map.empty;
         storage_space_to_pay = None;
         allocated_contracts = None;
         origination_nonce = None;

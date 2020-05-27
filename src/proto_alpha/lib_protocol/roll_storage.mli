@@ -33,10 +33,12 @@
 *)
 
 type error +=
-  | (* `Permanent *) Consume_roll_change
-  | (* `Permanent *) No_roll_for_delegate
-  | (* `Permanent *) No_roll_snapshot_for_cycle of Cycle_repr.t
-  | (* `Permanent *) Unregistered_delegate of Signature.Public_key_hash.t
+  | (* `Permanent *)
+      Consume_roll_change
+  | (* `Permanent *)
+      No_roll_for_baker
+  | (* `Permanent *)
+      No_roll_snapshot_for_cycle of Cycle_repr.t
 
 (**
    [init ctxt] returns a new context initialized from [ctxt] where the next
@@ -96,7 +98,7 @@ val snapshot_rolls : Raw_context.t -> Raw_context.t tzresult Lwt.t
 *)
 val fold :
   Raw_context.t ->
-  f:(Roll_repr.roll -> Signature.Public_key.t -> 'a -> 'a tzresult Lwt.t) ->
+  f:(Roll_repr.roll -> Baker_hash.t -> 'a -> 'a tzresult Lwt.t) ->
   'a ->
   'a tzresult Lwt.t
 
@@ -104,23 +106,16 @@ val fold :
    May return a [No_roll_snapshot_for_cycle] error.
 *)
 val baking_rights_owner :
-  Raw_context.t ->
-  Level_repr.t ->
-  priority:int ->
-  Signature.Public_key.t tzresult Lwt.t
+  Raw_context.t -> Level_repr.t -> priority:int -> Baker_hash.t tzresult Lwt.t
 
 (**
    May return a [No_roll_snapshot_for_cycle] error.
 *)
 val endorsement_rights_owner :
-  Raw_context.t ->
-  Level_repr.t ->
-  slot:int ->
-  Signature.Public_key.t tzresult Lwt.t
+  Raw_context.t -> Level_repr.t -> slot:int -> Baker_hash.t tzresult Lwt.t
 
 module Delegate : sig
-  val is_inactive :
-    Raw_context.t -> Signature.Public_key_hash.t -> bool tzresult Lwt.t
+  val is_inactive : Raw_context.t -> Baker_hash.t -> bool tzresult Lwt.t
 
   (**
      [add_amount ctxt dlg am] performs the following actions:
@@ -131,10 +126,7 @@ module Delegate : sig
         to [nr * tokens_per_roll + chg], where [chg < tokens_per_roll].
   *)
   val add_amount :
-    Raw_context.t ->
-    Signature.Public_key_hash.t ->
-    Tez_repr.t ->
-    Raw_context.t tzresult Lwt.t
+    Raw_context.t -> Baker_hash.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t
 
   (**
      [remove_amount ctxt dlg am] performs the following actions:
@@ -145,10 +137,7 @@ module Delegate : sig
      [nr * tokens_per_roll + chg], where [chg < tokens_per_roll].
   *)
   val remove_amount :
-    Raw_context.t ->
-    Signature.Public_key_hash.t ->
-    Tez_repr.t ->
-    Raw_context.t tzresult Lwt.t
+    Raw_context.t -> Baker_hash.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t
 
   (**
      [set_inactive ctxt dlg] renders delegate [dlg] inactive and performs the
@@ -159,9 +148,7 @@ module Delegate : sig
         [dlg]'s number of rolls prior to inactivation.
   *)
   val set_inactive :
-    Raw_context.t ->
-    Signature.Public_key_hash.t ->
-    Raw_context.t tzresult Lwt.t
+    Raw_context.t -> Baker_hash.t -> Raw_context.t tzresult Lwt.t
 
   (**
      If the delegate [dlg] is already active then [set_active ctxt dlg]
@@ -187,9 +174,7 @@ module Delegate : sig
         [(nr * tokens_per_roll) + chg], where [chg < tokens_per_roll].
   *)
   val set_active :
-    Raw_context.t ->
-    Signature.Public_key_hash.t ->
-    Raw_context.t tzresult Lwt.t
+    Raw_context.t -> Baker_hash.t -> Raw_context.t tzresult Lwt.t
 end
 
 module Contract : sig
@@ -215,21 +200,10 @@ module Contract : sig
 end
 
 (**
-   [delegate_pubkey ctxt delegate] returns the public key of
-   [delegate] found in context [ctxt] if there exists a registered
-   contract.
-*)
-val delegate_pubkey :
-  Raw_context.t ->
-  Signature.Public_key_hash.t ->
-  Signature.Public_key.t tzresult Lwt.t
-
-(**
    [count_rolls ctxt delegate] returns the number of rolls held by
    [delegate] in context [ctxt].
 *)
-val count_rolls :
-  Raw_context.t -> Signature.Public_key_hash.t -> int tzresult Lwt.t
+val count_rolls : Raw_context.t -> Baker_hash.t -> int tzresult Lwt.t
 
 (**
    [get_change ctxt delegate] returns the amount of change held by
@@ -238,12 +212,11 @@ val count_rolls :
    of staking balance (smaller than the value of a roll) not being
    taken into account for baking rights computation.
 *)
-val get_change :
-  Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
+val get_change : Raw_context.t -> Baker_hash.t -> Tez_repr.t tzresult Lwt.t
 
 (**
    [update_tokens_per_roll ctxt am] performs the following actions:
-   
+
    1. set the constant [tokens_per_roll] to [am],
    2. if the constant was increased by [tpram], then add the amount
       [nr * tpram] to each delegate, where [nr] is the delegate's
@@ -259,6 +232,4 @@ val update_tokens_per_roll :
    of the delegate whose contract is [contract] in context [ctxt].
 *)
 val get_contract_delegate :
-  Raw_context.t ->
-  Contract_repr.t ->
-  Signature.Public_key_hash.t option tzresult Lwt.t
+  Raw_context.t -> Contract_repr.t -> Baker_hash.t option tzresult Lwt.t

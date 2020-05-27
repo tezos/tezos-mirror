@@ -118,13 +118,13 @@ let () =
   register_error_kind
     `Permanent
     ~id:"baking.unexpected_endorsement"
-    ~title:"Endorsement from unexpected delegate"
+    ~title:"Endorsement from unexpected baker"
     ~description:
-      "The operation is signed by a delegate without endorsement rights."
+      "The operation is signed by a baker without endorsement rights."
     ~pp:(fun ppf () ->
       Format.fprintf
         ppf
-        "The endorsement is signed by a delegate without endorsement rights.")
+        "The endorsement is signed by a baker without endorsement rights.")
     Data_encoding.unit
     (function Unexpected_endorsement -> Some () | _ -> None)
     (fun () -> Unexpected_endorsement) ;
@@ -198,10 +198,10 @@ let check_timestamp c priority pred_timestamp =
 let check_baking_rights c {Block_header.priority; _} pred_timestamp =
   let level = Level.current c in
   Roll.baking_rights_owner c level ~priority
-  >>=? fun delegate ->
+  >>=? fun baker ->
   Lwt.return
     ( check_timestamp c priority pred_timestamp
-    >|? fun block_delay -> (delegate, block_delay) )
+    >|? fun block_delay -> (baker, block_delay) )
 
 type error += Incorrect_priority (* `Permanent *)
 
@@ -272,7 +272,7 @@ let endorsing_reward ctxt ~block_priority num_slots =
 let baking_priorities c level =
   let rec f priority =
     Roll.baking_rights_owner c level ~priority
-    >|=? fun delegate -> LCons (delegate, fun () -> f (succ priority))
+    >|=? fun baker -> LCons (baker, fun () -> f (succ priority))
   in
   f 0
 
@@ -280,18 +280,17 @@ let endorsement_rights ctxt level =
   fold_right_s
     (fun slot acc ->
       Roll.endorsement_rights_owner ctxt level ~slot
-      >|=? fun pk ->
-      let pkh = Signature.Public_key.hash pk in
+      >|=? fun baker ->
       let right =
-        match Signature.Public_key_hash.Map.find_opt pkh acc with
+        match Baker_hash.Map.find_opt baker acc with
         | None ->
-            (pk, [slot], false)
-        | Some (pk, slots, used) ->
-            (pk, slot :: slots, used)
+            ([slot], false)
+        | Some (slots, used) ->
+            (slot :: slots, used)
       in
-      Signature.Public_key_hash.Map.add pkh right acc)
+      Baker_hash.Map.add baker right acc)
     (0 --> (Constants.endorsers_per_block ctxt - 1))
-    Signature.Public_key_hash.Map.empty
+    Baker_hash.Map.empty
 
 let check_endorsement_rights ctxt chain_id ~slot
     (op : Kind.endorsement Operation.t) =
@@ -303,9 +302,10 @@ let check_endorsement_rights ctxt chain_id ~slot
     let current_level = Level.current ctxt in
     let (Single (Endorsement {level; _})) = op.protocol_data.contents in
     Roll.endorsement_rights_owner ctxt (Level.from_raw ctxt level) ~slot
-    >>=? fun pk ->
-    let pkh = Signature.Public_key.hash pk in
-    match Operation.check_signature pk chain_id op with
+    >>=? fun baker ->
+    Baker.get_consensus_key ~level ctxt baker
+    >>=? fun key ->
+    match Operation.check_signature key chain_id op with
     | Error _ ->
         fail Unexpected_endorsement
     | Ok () -> (
@@ -313,35 +313,28 @@ let check_endorsement_rights ctxt chain_id ~slot
           return (Alpha_context.allowed_endorsements ctxt)
         else endorsement_rights ctxt (Level.from_raw ctxt level) )
         >>=? fun endorsements ->
-        match Signature.Public_key_hash.Map.find_opt pkh endorsements with
+        match Baker_hash.Map.find_opt baker endorsements with
         | None ->
             fail Unexpected_endorsement (* unexpected *)
-        | Some (_pk, slots, v) ->
+        | Some (slots, v) ->
             error_unless
               Compare.Int.(slot = List.hd slots)
               (Unexpected_endorsement_slot slot)
-            >>?= fun () -> return (pkh, slots, v) )
+            >>?= fun () -> return (baker, slots, v) )
 
-let select_delegate delegate delegate_list max_priority =
+let select_baker baker baker_list max_priority =
   let rec loop acc l n =
     if Compare.Int.(n >= max_priority) then return (List.rev acc)
     else
-      let (LCons (pk, t)) = l in
-      let acc =
-        if
-          Signature.Public_key_hash.equal
-            delegate
-            (Signature.Public_key.hash pk)
-        then n :: acc
-        else acc
-      in
+      let (LCons (hd_baker, t)) = l in
+      let acc = if Baker_hash.equal baker hd_baker then n :: acc else acc in
       t () >>=? fun t -> loop acc t (succ n)
   in
-  loop [] delegate_list 0
+  loop [] baker_list 0
 
-let first_baking_priorities ctxt ?(max_priority = 32) delegate level =
+let first_baking_priorities ctxt ?(max_priority = 32) baker level =
   baking_priorities ctxt level
-  >>=? fun delegate_list -> select_delegate delegate delegate_list max_priority
+  >>=? fun baker_list -> select_baker baker baker_list max_priority
 
 let check_hash hash stamp_threshold =
   let bytes = Block_hash.to_bytes hash in
@@ -365,9 +358,9 @@ let check_proof_of_work_stamp ctxt block =
   then ok_unit
   else error Invalid_stamp
 
-let check_signature block chain_id key =
-  let check_signature key
-      {Block_header.shell; protocol_data = {contents; signature}} =
+let check_signature ctxt block chain_id baker =
+  let {Block_header.shell; protocol_data = {contents; signature}} = block in
+  let check_signature key =
     let unsigned_header =
       Data_encoding.Binary.to_bytes_exn
         Block_header.unsigned_encoding
@@ -379,7 +372,11 @@ let check_signature block chain_id key =
       signature
       unsigned_header
   in
-  if check_signature key block then return_unit
+  Lwt.return (Raw_level.of_int32 shell.level)
+  >>=? fun level ->
+  Baker.get_consensus_key ~level ctxt baker
+  >>=? fun key ->
+  if check_signature key then return_unit
   else
     fail
       (Invalid_block_signature

@@ -26,9 +26,9 @@
 
 type balance =
   | Contract of Contract_repr.t
-  | Rewards of Signature.Public_key_hash.t * Cycle_repr.t
-  | Fees of Signature.Public_key_hash.t * Cycle_repr.t
-  | Deposits of Signature.Public_key_hash.t * Cycle_repr.t
+  | Rewards of Baker_hash.t * Cycle_repr.t
+  | Fees of Baker_hash.t * Cycle_repr.t
+  | Deposits of Baker_hash.t * Cycle_repr.t
 
 let balance_encoding =
   let open Data_encoding in
@@ -48,7 +48,7 @@ let balance_encoding =
            (obj4
               (req "kind" (constant "freezer"))
               (req "category" (constant "rewards"))
-              (req "delegate" Signature.Public_key_hash.encoding)
+              (req "baker" Baker_hash.encoding)
               (req "cycle" Cycle_repr.encoding))
            (function Rewards (d, l) -> Some ((), (), d, l) | _ -> None)
            (fun ((), (), d, l) -> Rewards (d, l));
@@ -58,7 +58,7 @@ let balance_encoding =
            (obj4
               (req "kind" (constant "freezer"))
               (req "category" (constant "fees"))
-              (req "delegate" Signature.Public_key_hash.encoding)
+              (req "baker" Baker_hash.encoding)
               (req "cycle" Cycle_repr.encoding))
            (function Fees (d, l) -> Some ((), (), d, l) | _ -> None)
            (fun ((), (), d, l) -> Fees (d, l));
@@ -68,7 +68,7 @@ let balance_encoding =
            (obj4
               (req "kind" (constant "freezer"))
               (req "category" (constant "deposits"))
-              (req "delegate" Signature.Public_key_hash.encoding)
+              (req "baker" Baker_hash.encoding)
               (req "cycle" Cycle_repr.encoding))
            (function Deposits (d, l) -> Some ((), (), d, l) | _ -> None)
            (fun ((), (), d, l) -> Deposits (d, l)) ]

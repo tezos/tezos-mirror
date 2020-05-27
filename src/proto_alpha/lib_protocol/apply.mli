@@ -29,7 +29,7 @@ open Apply_results
 
 type error += Wrong_endorsement_predecessor of Block_hash.t * Block_hash.t
 
-type error += Duplicate_endorsement of Signature.Public_key_hash.t
+type error += Duplicate_endorsement of baker_hash
 
 type error += Invalid_endorsement_level
 
@@ -43,8 +43,8 @@ type error += Invalid_double_endorsement_evidence
 
 type error +=
   | Inconsistent_double_endorsement_evidence of {
-      delegate1 : Signature.Public_key_hash.t;
-      delegate2 : Signature.Public_key_hash.t;
+      delegate1 : baker_hash;
+      delegate2 : baker_hash;
     }
 
 type error +=
@@ -69,8 +69,8 @@ type error +=
 
 type error +=
   | Inconsistent_double_baking_evidence of {
-      delegate1 : Signature.Public_key_hash.t;
-      delegate2 : Signature.Public_key_hash.t;
+      delegate1 : baker_hash;
+      delegate2 : baker_hash;
     }
 
 type error +=
@@ -107,21 +107,21 @@ val begin_full_construction :
   t ->
   Time.t ->
   Block_header.contents ->
-  (t * Block_header.contents * public_key * Period.t, error trace) result Lwt.t
+  (t * Block_header.contents * baker_hash * Period.t, error trace) result Lwt.t
 
 val begin_application :
   t ->
   Chain_id.t ->
   Block_header.t ->
   Time.t ->
-  (t * public_key * Period.t, error trace) result Lwt.t
+  (t * baker_hash * Period.t, error trace) result Lwt.t
 
 val apply_operation :
   t ->
   Chain_id.t ->
   Script_ir_translator.unparsing_mode ->
   Block_hash.t ->
-  public_key_hash ->
+  baker_hash ->
   Operation_list_hash.elt ->
   'a operation ->
   (t * 'a operation_metadata, error trace) result Lwt.t
@@ -129,7 +129,7 @@ val apply_operation :
 val finalize_application :
   t ->
   Block_header.contents ->
-  public_key_hash ->
+  baker_hash ->
   block_delay:Period.t ->
   Receipt.balance_updates ->
   (t * block_metadata, error trace) result Lwt.t
@@ -137,7 +137,7 @@ val finalize_application :
 val apply_manager_contents_list :
   t ->
   Script_ir_translator.unparsing_mode ->
-  public_key_hash ->
+  baker_hash ->
   Chain_id.t ->
   'a Kind.manager contents_list ->
   (t * 'a Kind.manager contents_result_list) Lwt.t
@@ -147,7 +147,7 @@ val apply_contents_list :
   Chain_id.t ->
   Script_ir_translator.unparsing_mode ->
   Block_hash.t ->
-  public_key_hash ->
+  baker_hash ->
   'kind operation ->
   'kind contents_list ->
   (t * 'kind contents_result_list) tzresult Lwt.t

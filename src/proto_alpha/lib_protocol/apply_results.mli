@@ -54,7 +54,7 @@ and packed_contents_result_list =
 and 'kind contents_result =
   | Endorsement_result : {
       balance_updates : Receipt.balance_updates;
-      delegate : Signature.Public_key_hash.t;
+      baker : Baker_hash.t;
       slots : int list;
     }
       -> Kind.endorsement contents_result
@@ -245,14 +245,14 @@ val kind_equal_list :
   ('kind, 'kind2) eq option
 
 type block_metadata = {
-  baker : Signature.Public_key_hash.t;
+  baker : Baker_hash.t;
   level : Level.compat_t;
   level_info : Level.t;
   voting_period_kind : Voting_period.kind;
   voting_period_info : Voting_period.info;
   nonce_hash : Nonce_hash.t option;
   consumed_gas : Gas.Arith.fp;
-  deactivated : Signature.Public_key_hash.t list;
+  deactivated : Baker_hash.t list;
   balance_updates : Receipt.balance_updates;
 }
 
