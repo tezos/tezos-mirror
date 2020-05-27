@@ -30,6 +30,7 @@
         "Contract_repr",
         "Roll_repr",
         "Vote_repr",
+        "Baker_script_repr",
         "Block_header_repr",
         "Operation_repr",
         "Manager_repr",
