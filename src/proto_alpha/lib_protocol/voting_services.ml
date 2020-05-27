@@ -43,7 +43,7 @@ module S = struct
         Data_encoding.(
           list
             (obj2
-               (req "pkh" Signature.Public_key_hash.encoding)
+               (req "baker" Baker_hash.encoding)
                (req "ballot" Vote.ballot_encoding)))
       RPC_path.(path / "ballot_list")
 
@@ -84,7 +84,7 @@ module S = struct
   let listings =
     RPC_service.get_service
       ~description:
-        "List of delegates with their voting weight, in number of rolls."
+        "List of bakers with their voting weight, in number of rolls."
       ~query:RPC_query.empty
       ~output:Vote.listings_encoding
       RPC_path.(path / "listings")

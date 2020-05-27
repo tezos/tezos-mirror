@@ -30,7 +30,7 @@ val ballots : 'a #RPC_context.simple -> 'a -> Vote.ballots shell_tzresult Lwt.t
 val ballot_list :
   'a #RPC_context.simple ->
   'a ->
-  (Signature.Public_key_hash.t * Vote.ballot) list shell_tzresult Lwt.t
+  (Baker_hash.t * Vote.ballot) list shell_tzresult Lwt.t
 
 val current_period :
   'a #RPC_context.simple -> 'a -> Voting_period.info shell_tzresult Lwt.t
@@ -44,7 +44,7 @@ val current_quorum :
 val listings :
   'a #RPC_context.simple ->
   'a ->
-  (Signature.Public_key_hash.t * int32) list shell_tzresult Lwt.t
+  (Baker_hash.t * int32) list shell_tzresult Lwt.t
 
 val proposals :
   'a #RPC_context.simple ->
