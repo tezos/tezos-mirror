@@ -30,7 +30,7 @@ val list : 'a #RPC_context.simple -> 'a -> Contract.t list shell_tzresult Lwt.t
 
 type info = {
   balance : Tez.t;
-  delegate : public_key_hash option;
+  delegate : baker_hash option;
   counter : counter option;
   script : Script.t option;
 }
@@ -43,23 +43,20 @@ val info :
 val balance :
   'a #RPC_context.simple -> 'a -> Contract.t -> Tez.t shell_tzresult Lwt.t
 
-val manager_key :
-  'a #RPC_context.simple ->
-  'a ->
-  public_key_hash ->
-  public_key option shell_tzresult Lwt.t
-
-val delegate :
+val public_key :
   'a #RPC_context.simple ->
   'a ->
   Contract.t ->
-  public_key_hash shell_tzresult Lwt.t
+  public_key option shell_tzresult Lwt.t
+
+val delegate :
+  'a #RPC_context.simple -> 'a -> Contract.t -> baker_hash shell_tzresult Lwt.t
 
 val delegate_opt :
   'a #RPC_context.simple ->
   'a ->
   Contract.t ->
-  public_key_hash option shell_tzresult Lwt.t
+  baker_hash option shell_tzresult Lwt.t
 
 val counter :
   'a #RPC_context.simple ->
