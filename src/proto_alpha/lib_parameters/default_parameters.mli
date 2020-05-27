@@ -35,9 +35,14 @@ val make_bootstrap_account :
   Signature.public_key_hash * Signature.public_key * Tez_repr.t ->
   Parameters_repr.bootstrap_account
 
+val make_bootstrap_baker :
+  Baker_hash.t * Tez_repr.t * Signature.public_key ->
+  Parameters_repr.bootstrap_baker
+
 val parameters_of_constants :
   ?bootstrap_accounts:Parameters_repr.bootstrap_account list ->
   ?bootstrap_contracts:Parameters_repr.bootstrap_contract list ->
+  ?bootstrap_bakers:Parameters_repr.bootstrap_baker list ->
   ?with_commitments:bool ->
   Constants_repr.parametric ->
   Parameters_repr.t
