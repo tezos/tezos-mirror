@@ -35,9 +35,18 @@ type bootstrap_contract = {
   script : Script_repr.t;
 }
 
+(** A baker is bootstrapped with its hash, initial balance and a key serving as
+    its consensus and owner key at the same time. *)
+type bootstrap_baker = {
+  hash : Baker_hash.t;
+  amount : Tez_repr.t;
+  key : Signature.Public_key.t;
+}
+
 type t = {
   bootstrap_accounts : bootstrap_account list;
   bootstrap_contracts : bootstrap_contract list;
+  bootstrap_bakers : bootstrap_baker list;
   commitments : Commitment_repr.t list;
   constants : Constants_repr.parametric;
   security_deposit_ramp_up_cycles : int option;

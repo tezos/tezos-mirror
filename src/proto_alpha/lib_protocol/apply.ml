@@ -627,7 +627,7 @@ let apply_manager_operation_content :
       ~legacy:false
       ~allow_forged_in_storage:internal
       script
-    >>=? fun (Ex_script parsed_script, ctxt) ->
+    >>=? fun (Ex_originated_script parsed_script, ctxt) ->
     Script_ir_translator.collect_lazy_storage
       ctxt
       parsed_script.storage_type

@@ -108,13 +108,22 @@ type baker_operation = packed_internal_operation
 
 type 'a ticket = {ticketer : address; contents : 'a; amount : n num}
 
-type ('arg, 'storage) script = {
-  code : (('arg, 'storage) pair, (operation boxed_list, 'storage) pair) lambda;
+type ('arg, 'storage, 'ret) script = {
+  code : (('arg, 'storage) pair, ('ret, 'storage) pair) lambda;
   arg_type : 'arg ty;
   storage : 'storage;
   storage_type : 'storage ty;
   root_name : field_annot option;
 }
+
+and ('arg, 'storage) originated_script =
+  ('arg, 'storage, operation boxed_list) script
+
+and ('arg, 'storage) baker_script =
+  ( 'arg,
+    'storage,
+    (operation boxed_list, baker_operation boxed_list) pair )
+  script
 
 and end_of_stack = unit
 

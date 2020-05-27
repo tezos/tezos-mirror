@@ -181,7 +181,7 @@ module S = struct
             script
           >|= fun tzresult ->
           tzresult
-          >>? fun (Ex_script script, ctxt) ->
+          >>? fun (Ex_originated_script script, ctxt) ->
           Script_ir_translator.get_single_sapling_state
             ctxt
             script.storage_type
@@ -278,7 +278,7 @@ let register () =
           let ctxt = Gas.set_unlimited ctxt in
           let open Script_ir_translator in
           parse_script ctxt ~legacy:true ~allow_forged_in_storage:true script
-          >>=? fun (Ex_script script, ctxt) ->
+          >>=? fun (Ex_originated_script script, ctxt) ->
           unparse_script ctxt Readable script
           >>=? fun (script, ctxt) ->
           Script.force_decode_in_context ctxt script.storage
@@ -357,7 +357,7 @@ let register () =
           let ctxt = Gas.set_unlimited ctxt in
           let open Script_ir_translator in
           parse_script ctxt ~legacy:true ~allow_forged_in_storage:true script
-          >>=? fun (Ex_script script, ctxt) ->
+          >>=? fun (Ex_originated_script script, ctxt) ->
           Script_ir_translator.collect_lazy_storage
             ctxt
             script.storage_type
@@ -391,7 +391,7 @@ let register () =
           let ctxt = Gas.set_unlimited ctxt in
           let open Script_ir_translator in
           parse_script ctxt ~legacy:true ~allow_forged_in_storage:true script
-          >>=? fun (Ex_script script, ctxt) ->
+          >>=? fun (Ex_originated_script script, ctxt) ->
           unparse_script ctxt Readable script
           >|=? fun (script, ctxt) -> (Some script, ctxt) )
       >|=? fun (script, _ctxt) -> {balance; delegate; script; counter}) ;
