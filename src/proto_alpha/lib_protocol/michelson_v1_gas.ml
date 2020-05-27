@@ -1287,6 +1287,16 @@ module Cost_of = struct
       ticket +@ compare_address
       +@ add_bigint ticket_a.amount ticket_b.amount
       +@ compare ty ticket_a.contents ticket_b.contents
+
+    let submit_proposals = (* TODO how much *) Gas.(push +@ push)
+
+    let submit_ballot = (* TODO how much *) Gas.(push +@ push)
+
+    let set_baker_active = (* TODO how much *) Gas.(push +@ push)
+
+    let set_baker_consensus_key = (* TODO how much *) Gas.(push +@ push)
+
+    let set_baker_pvss_key = (* TODO how much *) Gas.(push +@ push)
   end
 
   module Typechecking = struct

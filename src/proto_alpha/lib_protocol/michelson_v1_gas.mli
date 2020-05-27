@@ -307,6 +307,16 @@ module Cost_of : sig
       'a Script_typed_ir.ticket ->
       'a Script_typed_ir.ticket ->
       Gas.cost
+
+    val submit_proposals : Gas.cost
+
+    val submit_ballot : Gas.cost
+
+    val set_baker_active : Gas.cost
+
+    val set_baker_consensus_key : Gas.cost
+
+    val set_baker_pvss_key : Gas.cost
   end
 
   module Typechecking : sig

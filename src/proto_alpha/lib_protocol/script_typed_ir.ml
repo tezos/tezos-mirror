@@ -528,6 +528,14 @@ and ('bef, 'aft) instr =
   | Join_tickets :
       'a comparable_ty
       -> (('a ticket * 'a ticket) * 'rest, 'a ticket option * 'rest) instr
+  | Submit_proposals
+      : (string boxed_list * 'rest, baker_operation * 'rest) instr
+  | Submit_ballot : (string * (string * 'rest), baker_operation * 'rest) instr
+  | Set_baker_active : (bool * 'rest, baker_operation * 'rest) instr
+  | Set_baker_consensus_key
+      : (public_key * 'rest, baker_operation * 'rest) instr
+  | Set_baker_pvss_key
+      : (Pvss_secp256k1.Public_key.t * 'rest, baker_operation * 'rest) instr
 
 and ('before, 'after) comb_gadt_witness =
   | Comb_one : ('a * 'before, 'a * 'before) comb_gadt_witness

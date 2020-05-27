@@ -145,6 +145,11 @@ type prim =
   | I_READ_TICKET
   | I_SPLIT_TICKET
   | I_JOIN_TICKETS
+  | I_SUBMIT_PROPOSALS
+  | I_SUBMIT_BALLOT
+  | I_SET_BAKER_ACTIVE
+  | I_SET_BAKER_CONSENSUS_KEY
+  | I_SET_BAKER_PVSS_KEY
   | T_bool
   | T_contract
   | T_int

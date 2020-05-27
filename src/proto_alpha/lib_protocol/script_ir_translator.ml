@@ -497,6 +497,16 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int =
       0
   | Total_voting_power ->
       0
+  | Submit_proposals ->
+      0
+  | Submit_ballot ->
+      0
+  | Set_baker_active ->
+      0
+  | Set_baker_consensus_key ->
+      0
+  | Set_baker_pvss_key ->
+      0
   | Keccak ->
       0
   | Sha3 ->
@@ -5779,6 +5789,50 @@ and parse_instr :
             (Item_t (Option_t (ty, None), rest, annot))
       | _ ->
           (* TODO: fix injectivity of types *) assert false )
+  | ( Prim (loc, I_SUBMIT_PROPOSALS, [], annot),
+      Item_t (List_t (String_t _, _), rest, _) ) ->
+      parse_var_annot loc annot
+      >>?= fun annot ->
+      typed
+        ctxt
+        loc
+        Submit_proposals
+        (Item_t (Baker_operation_t None, rest, annot))
+  | ( Prim (loc, I_SUBMIT_BALLOT, [], annot),
+      Item_t (String_t _, Item_t (String_t _, rest, _), _) ) ->
+      parse_var_annot loc annot
+      >>?= fun annot ->
+      typed
+        ctxt
+        loc
+        Submit_ballot
+        (Item_t (Baker_operation_t None, rest, annot))
+  | (Prim (loc, I_SET_BAKER_ACTIVE, [], annot), Item_t (Bool_t _, rest, _)) ->
+      parse_var_annot loc annot
+      >>?= fun annot ->
+      typed
+        ctxt
+        loc
+        Set_baker_active
+        (Item_t (Baker_operation_t None, rest, annot))
+  | ( Prim (loc, I_SET_BAKER_CONSENSUS_KEY, [], annot),
+      Item_t (Key_t _, rest, _) ) ->
+      parse_var_annot loc annot
+      >>?= fun annot ->
+      typed
+        ctxt
+        loc
+        Set_baker_consensus_key
+        (Item_t (Baker_operation_t None, rest, annot))
+  | ( Prim (loc, I_SET_BAKER_PVSS_KEY, [], annot),
+      Item_t (Pvss_key_t _, rest, _) ) ->
+      parse_var_annot loc annot
+      >>?= fun annot ->
+      typed
+        ctxt
+        loc
+        Set_baker_pvss_key
+        (Item_t (Baker_operation_t None, rest, annot))
   (* Primitive parsing errors *)
   | ( Prim
         ( loc,
@@ -5848,7 +5902,12 @@ and parse_instr :
             | I_TICKET
             | I_READ_TICKET
             | I_SPLIT_TICKET
-            | I_JOIN_TICKETS ) as name ),
+            | I_JOIN_TICKETS
+            | I_SUBMIT_PROPOSALS
+            | I_SUBMIT_BALLOT
+            | I_SET_BAKER_ACTIVE
+            | I_SET_BAKER_CONSENSUS_KEY
+            | I_SET_BAKER_PVSS_KEY ) as name ),
           (_ :: _ as l),
           _ ),
       _ ) ->
@@ -6117,7 +6176,12 @@ and parse_instr :
              I_TICKET;
              I_READ_TICKET;
              I_SPLIT_TICKET;
-             I_JOIN_TICKETS ]
+             I_JOIN_TICKETS;
+             I_SUBMIT_PROPOSALS;
+             I_SUBMIT_BALLOT;
+             I_SET_BAKER_ACTIVE;
+             I_SET_BAKER_CONSENSUS_KEY;
+             I_SET_BAKER_PVSS_KEY ]
 
 and parse_contract :
     type arg.
