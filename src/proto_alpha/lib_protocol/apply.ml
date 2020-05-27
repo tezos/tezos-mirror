@@ -548,13 +548,14 @@ let apply_manager_operation_content :
             let open Script_interpreter in
             {source; payer; self = destination; amount; chain_id}
           in
-          Script_interpreter.execute
-            ctxt
-            mode
-            step_constants
-            ~script
-            ~parameter
-            ~entrypoint
+          let execute =
+            match Contract.is_baker destination with
+            | Some _ ->
+                Script_interpreter.execute_baker
+            | None ->
+                Script_interpreter.execute
+          in
+          execute ctxt mode step_constants ~script ~parameter ~entrypoint
           >>=? fun {ctxt; code; storage; lazy_storage_diff; operations} ->
           Contract.update_script_storage
             ctxt
