@@ -59,6 +59,9 @@ type _ comparable_ty =
   | Chain_id_key : type_annot option -> Chain_id.t comparable_ty
   | Address_key : type_annot option -> address comparable_ty
   | Baker_hash_key : type_annot option -> baker_hash comparable_ty
+  | Pvss_key_key :
+      type_annot option
+      -> Pvss_secp256k1.Public_key.t comparable_ty
   | Pair_key :
       ('a comparable_ty * field_annot option)
       * ('b comparable_ty * field_annot option)
@@ -146,6 +149,7 @@ and 'ty ty =
   | Key_hash_t : type_annot option -> public_key_hash ty
   | Key_t : type_annot option -> public_key ty
   | Baker_hash_t : type_annot option -> baker_hash ty
+  | Pvss_key_t : type_annot option -> Pvss_secp256k1.Public_key.t ty
   | Timestamp_t : type_annot option -> Script_timestamp.t ty
   | Address_t : type_annot option -> address ty
   | Bool_t : type_annot option -> bool ty

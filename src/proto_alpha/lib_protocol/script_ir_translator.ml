@@ -96,6 +96,8 @@ let rec comparable_type_size : type t. t comparable_ty -> int =
       1
   | Baker_hash_key _ ->
       1
+  | Pvss_key_key _ ->
+      1
   | Timestamp_key _ ->
       1
   | Chain_id_key _ ->
@@ -131,6 +133,8 @@ let rec type_size : type t. t ty -> int =
   | Key_t _ ->
       1
   | Baker_hash_t _ ->
+      1
+  | Pvss_key_t _ ->
       1
   | Timestamp_t _ ->
       1
@@ -631,6 +635,8 @@ let rec compare_comparable : type a. a comparable_ty -> a -> a -> int =
       wrap_compare Signature.Public_key.compare
   | Baker_hash_key _ ->
       wrap_compare Baker_hash.compare
+  | Pvss_key_key _ ->
+      wrap_compare Pvss_secp256k1.Public_key.compare
   | Int_key _ ->
       wrap_compare Script_int.compare
   | Nat_key _ ->
@@ -818,6 +824,8 @@ let rec ty_of_comparable_ty : type a. a comparable_ty -> a ty = function
       Key_t tname
   | Baker_hash_key tname ->
       Baker_hash_t tname
+  | Pvss_key_key tname ->
+      Pvss_key_t tname
   | Timestamp_key tname ->
       Timestamp_t tname
   | Address_key tname ->
@@ -870,6 +878,8 @@ let rec unparse_comparable_ty : type a. a comparable_ty -> Script.node =
       Prim (-1, T_key, [], unparse_type_annot tname)
   | Baker_hash_key tname ->
       Prim (-1, T_baker_hash, [], unparse_type_annot tname)
+  | Pvss_key_key tname ->
+      Prim (-1, T_pvss_key, [], unparse_type_annot tname)
   | Timestamp_key tname ->
       Prim (-1, T_timestamp, [], unparse_type_annot tname)
   | Address_key tname ->
@@ -930,6 +940,8 @@ let rec unparse_ty :
       return ctxt (T_key, [], unparse_type_annot tname)
   | Baker_hash_t tname ->
       return ctxt (T_baker_hash, [], unparse_type_annot tname)
+  | Pvss_key_t tname ->
+      return ctxt (T_pvss_key, [], unparse_type_annot tname)
   | Timestamp_t tname ->
       return ctxt (T_timestamp, [], unparse_type_annot tname)
   | Address_t tname ->
@@ -1070,6 +1082,8 @@ let rec comparable_ty_of_ty :
       ok (Key_key tname, ctxt)
   | Baker_hash_t tname ->
       ok (Baker_hash_key tname, ctxt)
+  | Pvss_key_t tname ->
+      ok (Pvss_key_key tname, ctxt)
   | Timestamp_t tname ->
       ok (Timestamp_key tname, ctxt)
   | Address_t tname ->
@@ -1145,6 +1159,8 @@ let name_of_ty : type a. a ty -> type_annot option = function
       tname
   | Baker_hash_t tname ->
       tname
+  | Pvss_key_t tname ->
+      tname
   | Timestamp_t tname ->
       tname
   | Address_t tname ->
@@ -1209,6 +1225,7 @@ let check_dupable_comparable_ty : type a. a comparable_ty -> unit = function
   | Key_hash_key _
   | Key_key _
   | Baker_hash_key _
+  | Pvss_key_key _
   | Timestamp_key _
   | Chain_id_key _
   | Address_key _
@@ -1242,6 +1259,8 @@ let rec check_dupable_ty :
   | Key_t _ ->
       ok ctxt
   | Baker_hash_t _ ->
+      ok ctxt
+  | Pvss_key_t _ ->
       ok ctxt
   | Timestamp_t _ ->
       ok ctxt
@@ -1370,6 +1389,9 @@ let rec merge_comparable_types :
   | (Baker_hash_key annot_a, Baker_hash_key annot_b) ->
       merge_type_annot ~legacy annot_a annot_b
       >|? fun annot -> (Eq, Baker_hash_key annot, ctxt)
+  | (Pvss_key_key annot_a, Pvss_key_key annot_b) ->
+      merge_type_annot ~legacy annot_a annot_b
+      >|? fun annot -> (Eq, Pvss_key_key annot, ctxt)
   | (Timestamp_key annot_a, Timestamp_key annot_b) ->
       merge_type_annot ~legacy annot_a annot_b
       >|? fun annot -> (Eq, Timestamp_key annot, ctxt)
@@ -1482,6 +1504,8 @@ let merge_types :
         merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Key_hash_t tname, ctxt)
     | (Baker_hash_t tn1, Baker_hash_t tn2) ->
         merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Baker_hash_t tname, ctxt)
+    | (Pvss_key_t tn1, Pvss_key_t tn2) ->
+        merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Pvss_key_t tname, ctxt)
     | (String_t tn1, String_t tn2) ->
         merge_type_annot tn1 tn2 >|? fun tname -> (Eq, String_t tname, ctxt)
     | (Bytes_t tn1, Bytes_t tn2) ->
@@ -1776,6 +1800,9 @@ let rec parse_comparable_ty :
   | Prim (loc, T_baker_hash, [], annot) ->
       parse_type_annot loc annot
       >|? fun tname -> (Ex_comparable_ty (Baker_hash_key tname), ctxt)
+  | Prim (loc, T_pvss_key, [], annot) ->
+      parse_type_annot loc annot
+      >|? fun tname -> (Ex_comparable_ty (Pvss_key_key tname), ctxt)
   | Prim
       ( loc,
         ( ( T_unit
@@ -1792,7 +1819,8 @@ let rec parse_comparable_ty :
           | T_chain_id
           | T_signature
           | T_key
-          | T_baker_hash ) as prim ),
+          | T_baker_hash
+          | T_pvss_key ) as prim ),
         l,
         _ ) ->
       error (Invalid_arity (loc, prim, 0, List.length l))
@@ -1868,7 +1896,8 @@ let rec parse_comparable_ty :
              T_chain_id;
              T_signature;
              T_key;
-             T_baker_hash ]
+             T_baker_hash;
+             T_pvss_key ]
 
 and parse_packable_ty :
     context -> legacy:bool -> Script.node -> (ex_ty * context) tzresult =
@@ -1963,6 +1992,9 @@ and parse_ty :
   | Prim (loc, T_baker_hash, [], annot) ->
       parse_type_annot loc annot
       >>? fun ty_name -> ok (Ex_ty (Baker_hash_t ty_name), ctxt)
+  | Prim (loc, T_pvss_key, [], annot) ->
+      parse_type_annot loc annot
+      >>? fun ty_name -> ok (Ex_ty (Pvss_key_t ty_name), ctxt)
   | Prim (loc, T_timestamp, [], annot) ->
       parse_type_annot loc annot
       >>? fun ty_name -> ok (Ex_ty (Timestamp_t ty_name), ctxt)
@@ -2167,7 +2199,8 @@ and parse_ty :
           | T_chain_id
           | T_operation
           | T_never
-          | T_baker_hash ) as prim ),
+          | T_baker_hash
+          | T_pvss_key ) as prim ),
         l,
         _ ) ->
       error (Invalid_arity (loc, prim, 0, List.length l))
@@ -2209,7 +2242,8 @@ and parse_ty :
              T_bls12_381_g2;
              T_bls12_381_fr;
              T_ticket;
-             T_baker_hash ]
+             T_baker_hash;
+             T_pvss_key ]
 
 and parse_big_map_ty ctxt ~legacy big_map_loc args map_annot =
   Gas.consume ctxt Typecheck_costs.parse_type_cycle
@@ -2305,6 +2339,8 @@ let check_packable ~legacy loc root =
     | Key_t _ ->
         ok_unit
     | Baker_hash_t _ ->
+        ok_unit
+    | Pvss_key_t _ ->
         ok_unit
     | Timestamp_t _ ->
         ok_unit
@@ -2795,6 +2831,34 @@ let parse_baker_hash ctxt = function
       error
       @@ Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr)
 
+let parse_pvss_key ctxt = function
+  | Bytes (loc, bytes) as expr -> (
+      (* As unparsed with [Optimized]. *)
+      Gas.consume ctxt Typecheck_costs.pvss_key_optimized
+      >>? fun ctxt ->
+      match
+        Data_encoding.Binary.of_bytes Pvss_secp256k1.Public_key.encoding bytes
+      with
+      | Some k ->
+          ok (k, ctxt)
+      | None ->
+          error
+          @@ Invalid_syntactic_constant
+               (loc, strip_locations expr, "a valid PVSS public key") )
+  | String (loc, s) as expr (* As unparsed with [Readable]. *) -> (
+      Gas.consume ctxt Typecheck_costs.pvss_key_readable
+      >>? fun ctxt ->
+      match Pvss_secp256k1.Public_key.of_b58check_opt s with
+      | Some k ->
+          ok (k, ctxt)
+      | None ->
+          error
+          @@ Invalid_syntactic_constant
+               (loc, strip_locations expr, "a valid PVSS public key") )
+  | expr ->
+      error
+      @@ Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr)
+
 let parse_signature ctxt = function
   | Bytes (loc, bytes) as expr (* As unparsed with [Optimized]. *) -> (
       Gas.consume ctxt Typecheck_costs.signature_optimized
@@ -3020,6 +3084,8 @@ let rec parse_comparable_data :
       Lwt.return @@ traced_no_lwt @@ parse_key_hash ctxt expr
   | (Baker_hash_key _, expr) ->
       Lwt.return @@ traced_no_lwt @@ parse_baker_hash ctxt expr
+  | (Pvss_key_key _, expr) ->
+      Lwt.return @@ traced_no_lwt @@ parse_pvss_key ctxt expr
   | (Signature_key _, expr) ->
       Lwt.return @@ traced_no_lwt @@ parse_signature ctxt expr
   | (Chain_id_key _, expr) ->
@@ -3171,6 +3237,8 @@ let rec parse_data :
       Lwt.return @@ traced_no_lwt @@ parse_key_hash ctxt expr
   | (Baker_hash_t _, expr) ->
       Lwt.return @@ traced_no_lwt @@ parse_baker_hash ctxt expr
+  | (Pvss_key_t _, expr) ->
+      Lwt.return @@ traced_no_lwt @@ parse_pvss_key ctxt expr
   | (Signature_t _, expr) ->
       Lwt.return @@ traced_no_lwt @@ parse_signature ctxt expr
   | (Operation_t _, _) ->
@@ -6572,6 +6640,20 @@ let unparse_baker_hash ctxt mode k =
       Gas.consume ctxt Unparse_costs.baker_hash_readable
       >|? fun ctxt -> (String (-1, Baker_hash.to_b58check k), ctxt)
 
+let unparse_pvss_key ctxt mode k =
+  match mode with
+  | Optimized | Optimized_legacy ->
+      Gas.consume ctxt Unparse_costs.pvss_key_optimized
+      >|? fun ctxt ->
+      let bytes =
+        Data_encoding.Binary.to_bytes_exn Pvss_secp256k1.Public_key.encoding k
+      in
+      (Bytes (-1, bytes), ctxt)
+  | Readable ->
+      Gas.consume ctxt Unparse_costs.pvss_key_readable
+      >|? fun ctxt ->
+      (String (-1, Pvss_secp256k1.Public_key.to_b58check k), ctxt)
+
 let unparse_operation ctxt (op, _big_map_diff) =
   let bytes =
     Data_encoding.Binary.to_bytes_exn Operation.internal_operation_encoding op
@@ -6726,6 +6808,8 @@ let rec unparse_comparable_data :
       Lwt.return @@ unparse_key_hash ctxt mode k
   | (Baker_hash_key _, k) ->
       Lwt.return @@ unparse_baker_hash ctxt mode k
+  | (Pvss_key_key _, k) ->
+      Lwt.return @@ unparse_pvss_key ctxt mode k
   | (Chain_id_key _, chain_id) ->
       Lwt.return @@ unparse_chain_id ctxt mode chain_id
   | (Pair_key ((tl, _), (tr, _), _), pair) ->
@@ -6799,6 +6883,8 @@ let rec unparse_data :
       Lwt.return @@ unparse_key_hash ctxt mode k
   | (Baker_hash_t _, k) ->
       Lwt.return @@ unparse_baker_hash ctxt mode k
+  | (Pvss_key_t _, k) ->
+      Lwt.return @@ unparse_pvss_key ctxt mode k
   | (Operation_t _, operation) ->
       Lwt.return @@ unparse_operation ctxt operation
   | (Baker_operation_t _, baker_operation) ->
@@ -7252,6 +7338,8 @@ let rec has_lazy_storage : type t. t ty -> t has_lazy_storage =
   | Key_t _ ->
       False_f
   | Baker_hash_t _ ->
+      False_f
+  | Pvss_key_t _ ->
       False_f
   | Timestamp_t _ ->
       False_f

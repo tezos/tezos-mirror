@@ -409,6 +409,7 @@ module Script : sig
     | T_ticket
     | T_baker_hash
     | T_baker_operation
+    | T_pvss_key
 
   type location = Micheline.canonical_location
 
