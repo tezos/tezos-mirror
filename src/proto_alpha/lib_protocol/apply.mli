@@ -140,7 +140,7 @@ val apply_manager_contents_list :
   baker_hash ->
   Chain_id.t ->
   'a Kind.manager contents_list ->
-  (t * 'a Kind.manager contents_result_list) Lwt.t
+  (t * 'a Kind.manager contents_result_list) tzresult Lwt.t
 
 val apply_contents_list :
   t ->
