@@ -2233,16 +2233,38 @@ let check_packable ~legacy loc root =
   in
   check root
 
-type ('arg, 'storage) code = {
-  code : (('arg, 'storage) pair, (operation boxed_list, 'storage) pair) lambda;
+type ('arg, 'storage, 'ret) code = {
+  code : (('arg, 'storage) pair, ('ret, 'storage) pair) lambda;
   arg_type : 'arg ty;
   storage_type : 'storage ty;
   root_name : field_annot option;
 }
 
-type ex_script = Ex_script : ('a, 'c) script -> ex_script
+type ('arg, 'storage) originated_code =
+  ('arg, 'storage, operation Script_typed_ir.boxed_list) code
 
-type ex_code = Ex_code : ('a, 'c) code -> ex_code
+type ('arg, 'storage) baker_code =
+  ( 'arg,
+    'storage,
+    ( operation Script_typed_ir.boxed_list,
+      baker_operation Script_typed_ir.boxed_list )
+    pair )
+  code
+
+type 'ret ex_script = Ex_script : ('a, 'b, 'ret) script -> 'ret ex_script
+
+type ex_originated_script =
+  | Ex_originated_script : ('a, 'b) originated_script -> ex_originated_script
+
+type ex_baker_script =
+  | Ex_baker_script : ('a, 'b) baker_script -> ex_baker_script
+
+type 'ret ex_code = Ex_code : ('a, 'b, 'ret) code -> 'ret ex_code
+
+type ex_originated_code =
+  | Ex_originated_code : ('a, 'b) originated_code -> ex_originated_code
+
+type ex_baker_code = Ex_baker_code : ('a, 'b) baker_code -> ex_baker_code
 
 type _ dig_proof_argument =
   | Dig_proof_argument :
@@ -5376,13 +5398,15 @@ and parse_toplevel :
             Script_ir_annot.error_unexpected_annot sloc sannot
             >>? fun () -> ok (p, s, c, root_name) )
 
-let parse_code :
+let parse_code_returning :
+    type ret.
     ?type_logger:type_logger ->
     context ->
     legacy:bool ->
     code:lazy_expr ->
-    (ex_code * context) tzresult Lwt.t =
- fun ?type_logger ctxt ~legacy ~code ->
+    ret ty ->
+    (ret ex_code * context) tzresult Lwt.t =
+ fun ?type_logger ctxt ~legacy ~code ret_type ->
   Script.force_decode_in_context ctxt code
   >>?= fun (code, ctxt) ->
   parse_toplevel ~legacy code
@@ -5412,10 +5436,7 @@ let parse_code :
       ((arg_type, None, arg_annot), (storage_type, None, storage_annot), None)
   in
   let ret_type_full =
-    Pair_t
-      ( (List_t (Operation_t None, None), None, None),
-        (storage_type, None, None),
-        None )
+    Pair_t ((ret_type, None, None), (storage_type, None, None), None)
   in
   trace
     (Ill_typed_contract (code, []))
@@ -5435,6 +5456,35 @@ let parse_code :
        code_field)
   >|=? fun (code, ctxt) ->
   (Ex_code {code; arg_type; storage_type; root_name}, ctxt)
+
+let parse_code :
+    ?type_logger:type_logger ->
+    context ->
+    legacy:bool ->
+    code:lazy_expr ->
+    (ex_originated_code * context) tzresult Lwt.t =
+ fun ?type_logger ctxt ~legacy ~code ->
+  let ret_type = List_t (Operation_t None, None) in
+  parse_code_returning ?type_logger ctxt ~legacy ~code ret_type
+  >|=? fun (Ex_code {code; arg_type; storage_type; root_name}, ctxt) ->
+  (Ex_originated_code {code; arg_type; storage_type; root_name}, ctxt)
+
+let parse_baker_code :
+    ?type_logger:type_logger ->
+    context ->
+    legacy:bool ->
+    code:lazy_expr ->
+    (ex_baker_code * context) tzresult Lwt.t =
+ fun ?type_logger ctxt ~legacy ~code ->
+  let ret_type =
+    Pair_t
+      ( (List_t (Operation_t None, None), None, None),
+        (List_t (Baker_operation_t None, None), None, None),
+        None )
+  in
+  parse_code_returning ?type_logger ctxt ~legacy ~code ret_type
+  >|=? fun (Ex_code {code; arg_type; storage_type; root_name}, ctxt) ->
+  (Ex_baker_code {code; arg_type; storage_type; root_name}, ctxt)
 
 let parse_storage :
     ?type_logger:type_logger ->
@@ -5459,13 +5509,28 @@ let parse_script :
     context ->
     legacy:bool ->
     Script.t ->
-    (ex_script * context) tzresult Lwt.t =
+    (ex_originated_script * context) tzresult Lwt.t =
  fun ?type_logger ctxt ~legacy {code; storage} ->
   parse_code ~legacy ctxt ?type_logger ~code
-  >>=? fun (Ex_code {code; arg_type; storage_type; root_name}, ctxt) ->
+  >>=? fun (Ex_originated_code {code; arg_type; storage_type; root_name}, ctxt) ->
+  parse_storage ?type_logger ctxt ~legacy storage_type ~storage
+  >>=? fun (storage, ctxt) ->
+  return
+    ( Ex_originated_script {code; arg_type; storage; storage_type; root_name},
+      ctxt )
+
+let parse_baker_script :
+    ?type_logger:type_logger ->
+    context ->
+    legacy:bool ->
+    Script.t ->
+    (ex_baker_script * context) tzresult Lwt.t =
+ fun ?type_logger ctxt ~legacy {code; storage} ->
+  parse_baker_code ~legacy ctxt ?type_logger ~code
+  >>=? fun (Ex_baker_code {code; arg_type; storage_type; root_name}, ctxt) ->
   parse_storage ?type_logger ctxt ~legacy storage_type ~storage
   >|=? fun (storage, ctxt) ->
-  (Ex_script {code; arg_type; storage; storage_type; root_name}, ctxt)
+  (Ex_baker_script {code; arg_type; storage; storage_type; root_name}, ctxt)
 
 let typecheck_code :
     legacy:bool ->

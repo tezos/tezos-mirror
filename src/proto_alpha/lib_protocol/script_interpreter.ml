@@ -1295,16 +1295,27 @@ and interp :
   >|=? fun ((ret, ()), ctxt) -> (ret, ctxt)
 
 (* ---- contract handling ---------------------------------------------------*)
-let execute logger ctxt mode step_constants ~entrypoint unparsed_script arg :
-    ( Script.expr
-    * Script.expr
-    * packed_internal_operation list
-    * context
-    * Lazy_storage.diffs option )
-    tzresult
-    Lwt.t =
-  parse_script ctxt unparsed_script ~legacy:true
-  >>=? fun (Ex_script {code; arg_type; storage; storage_type; root_name}, ctxt) ->
+
+type execution_result = {
+  ctxt : context;
+  code : Script.expr;
+  storage : Script.expr;
+  lazy_storage_diff : Lazy_storage.diffs option;
+  operations : packed_internal_operation list;
+}
+
+let execute_with_result
+    ~(f :
+       'ret ->
+       Lazy_storage.diffs option ->
+       packed_internal_operation list * Lazy_storage.diffs option) logger ctxt
+    mode step_constants ~entrypoint unparsed_code
+    (parsed_script : 'ret ex_script) parameter :
+    execution_result tzresult Lwt.t =
+  let arg = Micheline.root parameter in
+  let (Ex_script {code; arg_type; storage; storage_type; root_name}) =
+    parsed_script
+  in
   record_trace
     (Bad_contract_parameter step_constants.self)
     (find_entrypoint arg_type ~root_name entrypoint)
@@ -1313,7 +1324,7 @@ let execute logger ctxt mode step_constants ~entrypoint unparsed_script arg :
     (Bad_contract_parameter step_constants.self)
     (parse_data ctxt ~legacy:false arg_type (box arg))
   >>=? fun (arg, ctxt) ->
-  Script.force_decode_in_context ctxt unparsed_script.code
+  Script.force_decode_in_context ctxt unparsed_code
   >>?= fun (script_code, ctxt) ->
   Script_ir_translator.collect_lazy_storage ctxt arg_type arg
   >>?= fun (to_duplicate, ctxt) ->
@@ -1322,7 +1333,7 @@ let execute logger ctxt mode step_constants ~entrypoint unparsed_script arg :
   trace
     (Runtime_contract_error (step_constants.self, script_code))
     (interp logger ctxt step_constants code (arg, storage))
-  >>=? fun ((ops, storage), ctxt) ->
+  >>=? fun ((output, storage), ctxt) ->
   Script_ir_translator.extract_lazy_storage_diff
     ctxt
     mode
@@ -1334,54 +1345,94 @@ let execute logger ctxt mode step_constants ~entrypoint unparsed_script arg :
   >>=? fun (storage, lazy_storage_diff, ctxt) ->
   trace Cannot_serialize_storage (unparse_data ctxt mode storage_type storage)
   >|=? fun (storage, ctxt) ->
-  let (ops, op_diffs) = List.split ops.elements in
-  let lazy_storage_diff =
-    match
-      List.flatten
-        (List.map (Option.value ~default:[]) (op_diffs @ [lazy_storage_diff]))
-    with
-    | [] ->
-        None
-    | diff ->
-        Some diff
-  in
-  let storage = Micheline.strip_locations storage in
-  (script_code, storage, ops, ctxt, lazy_storage_diff)
+  let (operations, lazy_storage_diff) = f output lazy_storage_diff in
+  {
+    ctxt;
+    code = script_code;
+    storage = Micheline.strip_locations storage;
+    lazy_storage_diff;
+    operations;
+  }
 
-type execution_result = {
-  ctxt : context;
-  code : Script.expr;
-  storage : Script.expr;
-  lazy_storage_diff : Lazy_storage.diffs option;
-  operations : packed_internal_operation list;
-}
+let extract_lazy_storage_diffs op_diffs lazy_storage_diff =
+  match
+    List.flatten
+      (List.map (Option.value ~default:[]) (op_diffs @ [lazy_storage_diff]))
+  with
+  | [] ->
+      None
+  | diff ->
+      Some diff
+
+let execute logger ctxt mode step_constants ~entrypoint script parameter :
+    execution_result tzresult Lwt.t =
+  parse_script ctxt script ~legacy:true
+  >>=? fun (Ex_originated_script parsed_script, ctxt) ->
+  let f output lazy_storage_diff =
+    let (ops, op_diffs) = List.split output.elements in
+    let lazy_storage_diff =
+      extract_lazy_storage_diffs op_diffs lazy_storage_diff
+    in
+    (ops, lazy_storage_diff)
+  in
+  execute_with_result
+    ~f
+    logger
+    ctxt
+    mode
+    step_constants
+    ~entrypoint
+    script.code
+    (Ex_script parsed_script)
+    parameter
+
+let execute_baker logger ctxt mode step_constants ~entrypoint script parameter
+    : execution_result tzresult Lwt.t =
+  parse_baker_script ctxt script ~legacy:true
+  >>=? fun (Ex_baker_script parsed_script, ctxt) ->
+  let f (ops, baker_ops) lazy_storage_diff =
+    let (ops, op_diffs) = List.split ops.elements in
+    let baker_ops = baker_ops.elements in
+    let lazy_storage_diff =
+      extract_lazy_storage_diffs op_diffs lazy_storage_diff
+    in
+    (ops @ baker_ops, lazy_storage_diff)
+  in
+  execute_with_result
+    ~f
+    logger
+    ctxt
+    mode
+    step_constants
+    ~entrypoint
+    script.code
+    (Ex_script parsed_script)
+    parameter
 
 let trace ctxt mode step_constants ~script ~entrypoint ~parameter =
   let module Logger = Trace_logger () in
   let logger = (module Logger : STEP_LOGGER) in
-  execute
-    logger
-    ctxt
-    mode
-    step_constants
-    ~entrypoint
-    script
-    (Micheline.root parameter)
-  >>=? fun (code, storage, operations, ctxt, lazy_storage_diff) ->
+  execute logger ctxt mode step_constants ~entrypoint script parameter
+  >>=? fun result ->
   Logger.get_log ()
   >|=? fun trace ->
   let trace = Option.value ~default:[] trace in
-  ({ctxt; code; storage; lazy_storage_diff; operations}, trace)
+  (result, trace)
+
+let trace_baker ctxt mode step_constants ~script ~entrypoint ~parameter =
+  let module Logger = Trace_logger () in
+  let logger = (module Logger : STEP_LOGGER) in
+  execute_baker logger ctxt mode step_constants ~entrypoint script parameter
+  >>=? fun result ->
+  Logger.get_log ()
+  >|=? fun trace ->
+  let trace = Option.value ~default:[] trace in
+  (result, trace)
 
 let execute ctxt mode step_constants ~script ~entrypoint ~parameter =
   let logger = (module No_trace : STEP_LOGGER) in
-  execute
-    logger
-    ctxt
-    mode
-    step_constants
-    ~entrypoint
-    script
-    (Micheline.root parameter)
-  >|=? fun (code, storage, operations, ctxt, lazy_storage_diff) ->
-  {ctxt; code; storage; lazy_storage_diff; operations}
+  execute logger ctxt mode step_constants ~entrypoint script parameter
+
+let execute_baker ctxt mode step_constants ~script ~entrypoint ~parameter =
+  let logger = (module No_trace : STEP_LOGGER) in
+  execute_baker logger ctxt mode step_constants ~entrypoint script parameter

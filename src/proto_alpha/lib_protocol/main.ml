@@ -361,7 +361,7 @@ let init ctxt block_header =
   let typecheck (ctxt : Alpha_context.context)
       (script : Alpha_context.Script.t) =
     Script_ir_translator.parse_script ctxt ~legacy:false script
-    >>=? fun (Ex_script parsed_script, ctxt) ->
+    >>=? fun (Ex_originated_script parsed_script, ctxt) ->
     Script_ir_translator.extract_lazy_storage_diff
       ctxt
       Optimized
