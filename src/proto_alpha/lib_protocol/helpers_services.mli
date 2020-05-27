@@ -325,3 +325,15 @@ module Parse : sig
 end
 
 val register : unit -> unit
+
+val is_baker_consensus_key :
+  'a #RPC_context.simple ->
+  'a ->
+  public_key_hash ->
+  baker_hash shell_tzresult Lwt.t
+
+val is_baker_consensus_key_opt :
+  'a #RPC_context.simple ->
+  'a ->
+  public_key_hash ->
+  baker_hash option shell_tzresult Lwt.t
