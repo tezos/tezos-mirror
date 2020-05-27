@@ -180,6 +180,12 @@ let originated_contract nonce =
   in
   Originated (Contract_hash.hash_bytes [data])
 
+let baker_from_nonce nonce =
+  let data =
+    Data_encoding.Binary.to_bytes_exn origination_nonce_encoding nonce
+  in
+  Baker_hash.hash_bytes [data]
+
 let originated_contracts
     ~since:{origination_index = first; operation_hash = first_hash}
     ~until:( {origination_index = last; operation_hash = last_hash} as
