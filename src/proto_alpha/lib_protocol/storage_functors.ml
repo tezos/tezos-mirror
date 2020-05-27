@@ -1050,6 +1050,18 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
     let set_option s i v =
       match v with None -> remove s i | Some v -> init_set s i v
 
+    let set_free s i v =
+      let c = pack s i in
+      let bytes = to_bytes v in
+      existing_size c
+      >>=? fun (prev_size, _) ->
+      Raw_context.set c len_name (encode_len_value bytes)
+      >>=? fun c ->
+      Raw_context.set c data_name bytes
+      >>=? fun c ->
+      let size_diff = Bytes.length bytes - prev_size in
+      return (Raw_context.project c, size_diff)
+
     let () =
       let open Storage_description in
       let unpack = unpack I.args in

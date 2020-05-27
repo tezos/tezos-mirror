@@ -372,6 +372,16 @@ module type REGISTER = sig
   val ghost : bool
 end
 
+module type Non_iterable_indexed_carbonated_data_storage_with_free = sig
+  include Non_iterable_indexed_carbonated_data_storage
+
+  (** Only used for 007 migration to avoid gas cost.
+      Updates the content of a bucket ; returns A {!Storage_Error
+      Missing_key} if the value does not exists. *)
+  val set_free :
+    context -> key -> value -> (Raw_context.t * int) tzresult Lwt.t
+end
+
 module type Indexed_raw_context = sig
   type t
 
@@ -403,7 +413,7 @@ module type Indexed_raw_context = sig
        and type value = V.t
 
   module Make_carbonated_map (N : NAME) (V : VALUE) :
-    Non_iterable_indexed_carbonated_data_storage
+    Non_iterable_indexed_carbonated_data_storage_with_free
       with type t = t
        and type key = key
        and type value = V.t
