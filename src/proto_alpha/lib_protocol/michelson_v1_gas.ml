@@ -804,8 +804,12 @@ module Cost_of = struct
           alloc_cost 1
       | Implicit_account ->
           alloc_cost 1
+      | Create_contract_legacy _ ->
+          alloc_cost 7
       | Create_contract _ ->
           alloc_cost 7
+      | Set_delegate_legacy ->
+          alloc_cost 1
       | Set_delegate ->
           alloc_cost 1
       | Now ->
