@@ -703,6 +703,10 @@ let get_consensus_key ?level ?offset ctxt baker =
   >>=? fun () ->
   Storage.Baker.Consensus_key.Snapshot.get ctxt (level.cycle, baker)
 
+let get_pending_consensus_key ctxt baker =
+  must_be_registered ctxt baker
+  >>=? fun () -> Storage.Baker.Pending_consensus_key.find ctxt baker
+
 (* Set a pending consensus key to be activated on the beginning of the
    [preserved_cycles + 2] cycle from the current cycle. If there already is a
    pending consensus key for the given baker, it will be overridden and the

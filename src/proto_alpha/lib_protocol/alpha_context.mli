@@ -1094,6 +1094,9 @@ module Baker : sig
   val is_consensus_key :
     context -> public_key_hash -> baker_hash option tzresult Lwt.t
 
+  val get_pending_consensus_key :
+    context -> baker_hash -> (public_key * Cycle.t) option tzresult Lwt.t
+
   val is_pending_consensus_key : context -> Contract.t -> bool tzresult Lwt.t
 
   val get_pvss_key :
