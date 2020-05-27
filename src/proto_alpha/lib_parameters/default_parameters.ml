@@ -87,6 +87,8 @@ let constants_test =
       delay_per_missing_endorsement = Period.of_seconds_exn 1L;
     }
 
+let bootstrap_balance = Tez.of_mutez_exn 4_000_000_000_000L
+
 let bootstrap_accounts_strings =
   [ "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav";
     "edpktzNbDAUjUk697W7gYg2CRuBQjyPxbEg8dLccYYwKSKvkPvjtV9";
@@ -94,12 +96,23 @@ let bootstrap_accounts_strings =
     "edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU";
     "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n" ]
 
-let bootstrap_balance = Tez.of_mutez_exn 4_000_000_000_000L
+(** Pairs of public keys and baker hashes *)
+let bootstrap_bakers_strings =
+  [ ( "edpkuDjETsuw7Tve4hczaEiDd5q8q5CnzppnoENpvf3hSt2g2N6fy5",
+      "SG1fpFaowYY8G7PfkYdKkGmsMziHKUfrHRHW" );
+    ( "edpkuDDr1FWd79GdjtcRAYJ7zufsxHUpCbtjPvQ2SGzp5QGBV6jFXo",
+      "SG1TLmKJHVJxQosY6iN21AW77HsAapdupxnR" );
+    ( "edpkuxfqVAGvJegMn8h4Qsrfc6ncLYQsAWKaAx2SieFn2Mz5QxNSmL",
+      "SG1hExdK69Z2RZkkQjKtLG6H4L4FGTZeGKHu" );
+    ( "edpku5MdpRkypXjBpyQ5vEbf3iUkRbt7iVjKvyx7RrkWSXpHS4fSck",
+      "SG1mHgeWHGMnCUMJ8jZ1Cdh3DkWEcQ88tziJ" );
+    ( "edpkvFYoA3cwPyVMAheyX29pQFw9gwfxDHJgbthG3caZNuQFNzrwkM",
+      "SG1jfZeHRzeWAM1T4zrwunEyUpwWc82D4tbv" ) ]
 
-let bootstrap_accounts =
+let bootstrap_accounts : Parameters.bootstrap_account list =
   List.map
-    (fun s ->
-      let public_key = Signature.Public_key.of_b58check_exn s in
+    (fun pk ->
+      let public_key = Signature.Public_key.of_b58check_exn pk in
       let public_key_hash = Signature.Public_key.hash public_key in
       Parameters.
         {
@@ -108,6 +121,18 @@ let bootstrap_accounts =
           amount = bootstrap_balance;
         })
     bootstrap_accounts_strings
+
+let bootstrap_bakers : Parameters.bootstrap_baker list =
+  List.map
+    (fun (pk, baker_hash) ->
+      let public_key = Signature.Public_key.of_b58check_exn pk in
+      Parameters.
+        {
+          hash = Baker_hash.of_b58check_exn baker_hash;
+          amount = bootstrap_balance;
+          key = public_key;
+        })
+    bootstrap_bakers_strings
 
 (* TODO this could be generated from OCaml together with the faucet
    for now these are hardcoded values in the tests *)
@@ -137,13 +162,17 @@ let commitments =
 let make_bootstrap_account (pkh, pk, amount) =
   Parameters.{public_key_hash = pkh; public_key = Some pk; amount}
 
+let make_bootstrap_baker (hash, amount, key) = Parameters.{hash; amount; key}
+
 let parameters_of_constants ?(bootstrap_accounts = bootstrap_accounts)
-    ?(bootstrap_contracts = []) ?(with_commitments = false) constants =
+    ?(bootstrap_contracts = []) ?(bootstrap_bakers = bootstrap_bakers)
+    ?(with_commitments = false) constants =
   let commitments = if with_commitments then commitments else [] in
   Parameters.
     {
       bootstrap_accounts;
       bootstrap_contracts;
+      bootstrap_bakers;
       commitments;
       constants;
       security_deposit_ramp_up_cycles = None;
