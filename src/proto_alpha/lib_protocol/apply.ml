@@ -341,6 +341,33 @@ let () =
     (function Not_an_active_consensus_key k -> Some k | _ -> None)
     (fun k -> Not_an_active_consensus_key k)
 
+(* Operation sources and destinations that refer to an active baker consensus
+   key are mapped to the baker account that owns the key. *)
+type mapped_key = Consensus_key of Baker_hash.t | Original of Contract.t
+
+(* Try to find if the given contract is being used as an active consensus key.
+   If so, find the baker with this key. *)
+let map_consensus_key ctxt contract =
+  match Contract.is_implicit contract with
+  | None ->
+      return @@ Original contract
+  | Some pkh -> (
+      Baker.is_consensus_key ctxt pkh
+      >>=? function
+      | None ->
+          return @@ Original contract
+      | Some baker_hash ->
+          return @@ Consensus_key baker_hash )
+
+let contract_of_mapped_key : mapped_key -> Contract.t = function
+  | Consensus_key baker ->
+      Contract.baker_contract baker
+  | Original contract ->
+      contract
+
+let map_contract ctxt contract =
+  map_consensus_key ctxt contract >|=? contract_of_mapped_key
+
 (* Try to map the given key to a baker consensus key. Fails with
    [Not_an_active_consensus_key] when no matching consensus key is found. *)
 let map_delegate ctxt delegate =
@@ -357,8 +384,8 @@ let apply_manager_operation_content :
     type kind.
     Alpha_context.t ->
     Script_ir_translator.unparsing_mode ->
-    payer:Contract.t ->
-    source:Contract.t ->
+    payer:mapped_key ->
+    source:mapped_key ->
     chain_id:Chain_id.t ->
     internal:bool ->
     kind manager_operation ->
@@ -373,6 +400,8 @@ let apply_manager_operation_content :
          gas consumption and originations for the operation result. *)
     ctxt
   in
+  let source = contract_of_mapped_key source in
+  let payer = contract_of_mapped_key payer in
   Contract.must_exist ctxt source
   >>=? fun () ->
   Gas.consume ctxt Michelson_v1_gas.Cost_of.manager_operation
@@ -468,6 +497,8 @@ let apply_manager_operation_content :
       fail_when is_source_pending_consensus_key
       @@ Forbidden_pending_consensus_key_destination destination
       >>=? fun () ->
+      map_contract ctxt destination
+      >>=? fun destination ->
       Contract.spend ctxt source amount
       >>=? fun ctxt ->
       ( match Contract.is_implicit destination with
@@ -808,6 +839,8 @@ let apply_internal_operations ctxt mode ~payer ~chain_id ops =
         ( if internal_nonce_already_recorded ctxt nonce then
           fail (Internal_operation_replay (Internal_manager_operation op))
         else
+          map_consensus_key ctxt source
+          >>=? fun source ->
           let ctxt = record_internal_nonce ctxt nonce in
           apply_manager_operation_content
             ctxt
@@ -859,14 +892,16 @@ let precheck_manager_contents (type kind) ctxt chain_id raw_operation
         {source; fee; counter; operation; gas_limit; storage_limit}) =
     op
   in
+  map_contract ctxt (Contract.implicit_contract source)
+  >>=? fun source_contract ->
   Gas.check_limit ctxt gas_limit
   >>?= fun () ->
   let ctxt = Gas.set_limit ctxt gas_limit in
   Fees.check_storage_limit ctxt storage_limit
   >>?= fun () ->
-  Contract.must_be_allocated ctxt (Contract.implicit_contract source)
+  Contract.must_be_allocated ctxt source_contract
   >>=? fun () ->
-  Contract.check_counter_increment ctxt source counter
+  Contract.check_counter_increment ctxt source_contract counter
   >>=? fun () ->
   let precheck_origination ~(script : Script.t) =
     (* Fail quickly if not enough gas for minimal deserialization cost *)
@@ -909,9 +944,9 @@ let precheck_manager_contents (type kind) ctxt chain_id raw_operation
      sequence of transactions.  *)
   Operation.check_signature public_key chain_id raw_operation
   >>?= fun () ->
-  Contract.increment_counter ctxt source
+  Contract.increment_counter ctxt source_contract
   >>=? fun ctxt ->
-  Contract.spend ctxt (Contract.implicit_contract source) fee
+  Contract.spend ctxt source_contract fee
   >>=? fun ctxt -> Lwt.return @@ add_fees ctxt fee
 
 let apply_manager_contents (type kind) ctxt mode chain_id
@@ -923,21 +958,23 @@ let apply_manager_contents (type kind) ctxt mode chain_id
   let (Manager_operation {source; operation; gas_limit; storage_limit}) = op in
   let ctxt = Gas.set_limit ctxt gas_limit in
   let ctxt = Fees.start_counting_storage_fees ctxt in
-  let source = Contract.implicit_contract source in
   Contract.clear_script_code_cached ctxt
   |> Contract.clear_storage_cached
   |> fun ctxt ->
-  apply_manager_operation_content
-    ctxt
-    mode
-    ~source
-    ~payer:source
-    ~internal:false
-    ~chain_id
-    operation
+  map_consensus_key ctxt (Contract.implicit_contract source)
+  >>=? (fun source ->
+         apply_manager_operation_content
+           ctxt
+           mode
+           ~source
+           ~payer:source
+           ~internal:false
+           ~chain_id
+           operation
+         >>=? fun apply_result -> return (source, apply_result))
   >>= function
-  | Ok (ctxt, operation_results, internal_operations) -> (
-      apply_internal_manager_operations
+  | Ok (source, (ctxt, operation_results, internal_operations)) -> (
+      apply_internal_operations
         ctxt
         mode
         ~payer:source
@@ -945,7 +982,10 @@ let apply_manager_contents (type kind) ctxt mode chain_id
         internal_operations
       >>= function
       | (Success ctxt, internal_operations_results) -> (
-          Fees.burn_storage_fees ctxt ~storage_limit ~payer:source
+          Fees.burn_storage_fees
+            ctxt
+            ~storage_limit
+            ~payer:(contract_of_mapped_key source)
           >|= function
           | Ok ctxt ->
               ( Success ctxt,
@@ -975,36 +1015,45 @@ let skipped_operation_result :
 
 let rec mark_skipped :
     type kind.
+    Alpha_context.t ->
     baker:Baker_hash.t ->
     Level.t ->
     kind Kind.manager contents_list ->
-    kind Kind.manager contents_result_list =
- fun ~baker level -> function
+    kind Kind.manager contents_result_list tzresult Lwt.t =
+ fun ctxt ~baker level -> function
   | Single (Manager_operation {source; fee; operation}) ->
       let source = Contract.implicit_contract source in
-      Single_result
-        (Manager_operation_result
-           {
-             balance_updates =
-               Receipt.cleanup_balance_updates
-                 [ (Contract source, Debited fee);
-                   (Fees (baker, level.cycle), Credited fee) ];
-             operation_result = skipped_operation_result operation;
-             internal_operation_results = [];
-           })
+      map_contract ctxt source
+      >>=? fun source ->
+      return
+      @@ Single_result
+           (Manager_operation_result
+              {
+                balance_updates =
+                  Receipt.cleanup_balance_updates
+                    [ (Contract source, Debited fee);
+                      (Fees (baker, level.cycle), Credited fee) ];
+                operation_result = skipped_operation_result operation;
+                internal_operation_results = [];
+              })
   | Cons (Manager_operation {source; fee; operation}, rest) ->
       let source = Contract.implicit_contract source in
-      Cons_result
-        ( Manager_operation_result
-            {
-              balance_updates =
-                Receipt.cleanup_balance_updates
-                  [ (Contract source, Debited fee);
-                    (Fees (baker, level.cycle), Credited fee) ];
-              operation_result = skipped_operation_result operation;
-              internal_operation_results = [];
-            },
-          mark_skipped ~baker level rest )
+      map_contract ctxt source
+      >>=? fun source ->
+      mark_skipped ctxt ~baker level rest
+      >>=? fun skipped_rest ->
+      return
+      @@ Cons_result
+           ( Manager_operation_result
+               {
+                 balance_updates =
+                   Receipt.cleanup_balance_updates
+                     [ (Contract source, Debited fee);
+                       (Fees (baker, level.cycle), Credited fee) ];
+                 operation_result = skipped_operation_result operation;
+                 internal_operation_results = [];
+               },
+             skipped_rest )
 
 let rec precheck_manager_contents_list :
     type kind.
@@ -1029,12 +1078,15 @@ let rec apply_manager_contents_list_rec :
     baker_hash ->
     Chain_id.t ->
     kind Kind.manager contents_list ->
-    (success_or_failure * kind Kind.manager contents_result_list) Lwt.t =
+    (success_or_failure * kind Kind.manager contents_result_list) tzresult
+    Lwt.t =
  fun ctxt mode baker chain_id contents_list ->
   let level = Level.current ctxt in
   match contents_list with
   | Single (Manager_operation {source; fee; _} as op) ->
       let source = Contract.implicit_contract source in
+      map_contract ctxt source
+      >>=? fun source ->
       apply_manager_contents ctxt mode chain_id op
       >|= fun (ctxt_result, operation_result, internal_operation_results) ->
       let result =
@@ -1048,9 +1100,11 @@ let rec apply_manager_contents_list_rec :
             internal_operation_results;
           }
       in
-      (ctxt_result, Single_result result)
+      ok (ctxt_result, Single_result result)
   | Cons ((Manager_operation {source; fee; _} as op), rest) -> (
       let source = Contract.implicit_contract source in
+      map_contract ctxt source
+      >>=? fun source ->
       apply_manager_contents ctxt mode chain_id op
       >>= function
       | (Failure, operation_result, internal_operation_results) ->
@@ -1065,8 +1119,8 @@ let rec apply_manager_contents_list_rec :
                 internal_operation_results;
               }
           in
-          Lwt.return
-            (Failure, Cons_result (result, mark_skipped ~baker level rest))
+          mark_skipped ctxt ~baker level rest
+          >|=? fun skipped -> (Failure, Cons_result (result, skipped))
       | (Success ctxt, operation_result, internal_operation_results) ->
           let result =
             Manager_operation_result
@@ -1080,7 +1134,7 @@ let rec apply_manager_contents_list_rec :
               }
           in
           apply_manager_contents_list_rec ctxt mode baker chain_id rest
-          >|= fun (ctxt_result, results) ->
+          >|=? fun (ctxt_result, results) ->
           (ctxt_result, Cons_result (result, results)) )
 
 let mark_backtracked results =
@@ -1145,12 +1199,12 @@ let mark_backtracked results =
 
 let apply_manager_contents_list ctxt mode baker chain_id contents_list =
   apply_manager_contents_list_rec ctxt mode baker chain_id contents_list
-  >>= fun (ctxt_result, results) ->
+  >>=? fun (ctxt_result, results) ->
   match ctxt_result with
   | Failure ->
-      Lwt.return (ctxt (* backtracked *), mark_backtracked results)
+      return (ctxt (* backtracked *), mark_backtracked results)
   | Success ctxt ->
-      Lazy_storage.cleanup_temporaries ctxt >|= fun ctxt -> (ctxt, results)
+      Lazy_storage.cleanup_temporaries ctxt >|= fun ctxt -> ok (ctxt, results)
 
 let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
     (operation : kind operation) (contents_list : kind contents_list) :
@@ -1329,12 +1383,10 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
       fail Failing_noop_error
   | Single (Manager_operation _) as op ->
       precheck_manager_contents_list ctxt chain_id operation op
-      >>=? fun ctxt ->
-      apply_manager_contents_list ctxt mode baker chain_id op >|= ok
+      >>=? fun ctxt -> apply_manager_contents_list ctxt mode baker chain_id op
   | Cons (Manager_operation _, _) as op ->
       precheck_manager_contents_list ctxt chain_id operation op
-      >>=? fun ctxt ->
-      apply_manager_contents_list ctxt mode baker chain_id op >|= ok
+      >>=? fun ctxt -> apply_manager_contents_list ctxt mode baker chain_id op
 
 let apply_operation ctxt chain_id mode pred_block baker hash operation =
   let ctxt = Contract.init_origination_nonce ctxt hash in
