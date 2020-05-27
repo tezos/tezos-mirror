@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -734,7 +735,7 @@ module Forge = struct
         [Manager (Transaction {amount; parameters; destination; entrypoint})]
 
     let origination ctxt block ~branch ~source ?sourcePubKey ~counter ~balance
-        ?delegatePubKey ~script ~gas_limit ~storage_limit ~fee () =
+        ?delegate ~script ~gas_limit ~storage_limit ~fee () =
       operations
         ctxt
         block
@@ -747,12 +748,7 @@ module Forge = struct
         ~storage_limit
         [ Manager
             (Origination
-               {
-                 delegate = delegatePubKey;
-                 script;
-                 credit = balance;
-                 preorigination = None;
-               }) ]
+               {delegate; script; credit = balance; preorigination = None}) ]
 
     let delegation ctxt block ~branch ~source ?sourcePubKey ~counter ~fee
         delegate =
