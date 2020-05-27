@@ -987,6 +987,8 @@ module Contract : sig
   (* Only for testing *)
   type origination_nonce
 
+  val incr_origination_nonce : origination_nonce -> origination_nonce
+
   val initial_origination_nonce : Operation_hash.t -> origination_nonce
 
   val originated_contract : origination_nonce -> contract
