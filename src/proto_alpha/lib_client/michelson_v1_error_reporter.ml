@@ -415,7 +415,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
               got
         | Invalid_namespace (loc, name, exp, got) ->
             let human_namespace = function
-              | Instr_namespace ->
+              | Michelson_v1_primitives.Instr_namespace ->
                   ("an", "instruction")
               | Type_namespace ->
                   ("a", "type name")
