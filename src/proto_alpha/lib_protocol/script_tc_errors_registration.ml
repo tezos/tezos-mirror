@@ -59,7 +59,7 @@ let () =
         "One of the three possible namespaces of primitive (data constructor, \
          type name or instruction)."
     @@ string_enum
-         [ ("type", Type_namespace);
+         [ ("type", Michelson_v1_primitives.Type_namespace);
            ("constant", Constant_namespace);
            ("instruction", Instr_namespace) ]
   in

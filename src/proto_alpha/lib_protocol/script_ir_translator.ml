@@ -444,128 +444,6 @@ let kind = function
   | Seq _ ->
       Seq_kind
 
-let namespace = function
-  | K_parameter | K_storage | K_code ->
-      Keyword_namespace
-  | D_False
-  | D_Elt
-  | D_Left
-  | D_None
-  | D_Pair
-  | D_Right
-  | D_Some
-  | D_True
-  | D_Unit ->
-      Constant_namespace
-  | I_PACK
-  | I_UNPACK
-  | I_BLAKE2B
-  | I_SHA256
-  | I_SHA512
-  | I_ABS
-  | I_ADD
-  | I_AMOUNT
-  | I_AND
-  | I_BALANCE
-  | I_CAR
-  | I_CDR
-  | I_CHAIN_ID
-  | I_CHECK_SIGNATURE
-  | I_COMPARE
-  | I_CONCAT
-  | I_CONS
-  | I_CREATE_ACCOUNT
-  | I_CREATE_CONTRACT
-  | I_IMPLICIT_ACCOUNT
-  | I_DIP
-  | I_DROP
-  | I_DUP
-  | I_EDIV
-  | I_EMPTY_BIG_MAP
-  | I_EMPTY_MAP
-  | I_EMPTY_SET
-  | I_EQ
-  | I_EXEC
-  | I_APPLY
-  | I_FAILWITH
-  | I_GE
-  | I_GET
-  | I_GT
-  | I_HASH_KEY
-  | I_IF
-  | I_IF_CONS
-  | I_IF_LEFT
-  | I_IF_NONE
-  | I_INT
-  | I_LAMBDA
-  | I_LE
-  | I_LEFT
-  | I_LOOP
-  | I_LSL
-  | I_LSR
-  | I_LT
-  | I_MAP
-  | I_MEM
-  | I_MUL
-  | I_NEG
-  | I_NEQ
-  | I_NIL
-  | I_NONE
-  | I_NOT
-  | I_NOW
-  | I_OR
-  | I_PAIR
-  | I_PUSH
-  | I_RIGHT
-  | I_SIZE
-  | I_SOME
-  | I_SOURCE
-  | I_SENDER
-  | I_SELF
-  | I_SLICE
-  | I_STEPS_TO_QUOTA
-  | I_SUB
-  | I_SWAP
-  | I_TRANSFER_TOKENS
-  | I_SET_DELEGATE
-  | I_UNIT
-  | I_UPDATE
-  | I_XOR
-  | I_ITER
-  | I_LOOP_LEFT
-  | I_ADDRESS
-  | I_CONTRACT
-  | I_ISNAT
-  | I_CAST
-  | I_RENAME
-  | I_DIG
-  | I_DUG ->
-      Instr_namespace
-  | T_bool
-  | T_contract
-  | T_int
-  | T_key
-  | T_key_hash
-  | T_lambda
-  | T_list
-  | T_map
-  | T_big_map
-  | T_nat
-  | T_option
-  | T_or
-  | T_pair
-  | T_set
-  | T_signature
-  | T_string
-  | T_bytes
-  | T_mutez
-  | T_timestamp
-  | T_unit
-  | T_operation
-  | T_address
-  | T_chain_id ->
-      Type_namespace
-
 let unexpected expr exp_kinds exp_ns exp_prims =
   match expr with
   | Int (loc, _) ->
@@ -577,13 +455,14 @@ let unexpected expr exp_kinds exp_ns exp_prims =
   | Seq (loc, _) ->
       Invalid_kind (loc, Prim_kind :: exp_kinds, Seq_kind)
   | Prim (loc, name, _, _) -> (
-    match (namespace name, exp_ns) with
-    | (Type_namespace, Type_namespace)
-    | (Instr_namespace, Instr_namespace)
-    | (Constant_namespace, Constant_namespace) ->
-        Invalid_primitive (loc, exp_prims, name)
-    | (ns, _) ->
-        Invalid_namespace (loc, name, exp_ns, ns) )
+      let open Michelson_v1_primitives in
+      match (namespace name, exp_ns) with
+      | (Type_namespace, Type_namespace)
+      | (Instr_namespace, Instr_namespace)
+      | (Constant_namespace, Constant_namespace) ->
+          Invalid_primitive (loc, exp_prims, name)
+      | (ns, _) ->
+          Invalid_namespace (loc, name, exp_ns, ns) )
 
 let check_kind kinds expr =
   let kind = kind expr in
