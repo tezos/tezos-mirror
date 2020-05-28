@@ -510,12 +510,6 @@ integration:proto_demo_noops_manual_bake:
     - poetry run pytest tests/test_proto_demo_noops_manual_bake.py -s --log-dir=tmp
   stage: test
 
-integration:voting_power_opcode:
-  <<: *integration_definition
-  script:
-    - pytest tests_python/tests/test_voting_power_opcode.py
-  stage: test
-
 integration:rpc:
   <<: *integration_python_definition
   script:
