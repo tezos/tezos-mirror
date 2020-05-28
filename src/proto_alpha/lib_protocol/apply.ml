@@ -45,68 +45,6 @@ type error += Invalid_commitment of {expected : bool}
 
 type error += Internal_operation_replay of packed_internal_operation
 
-type error += Invalid_double_endorsement_evidence (* `Permanent *)
-
-type error +=
-  | Inconsistent_double_endorsement_evidence of {
-      delegate1 : Signature.Public_key_hash.t;
-      delegate2 : Signature.Public_key_hash.t;
-    }
-
-(* `Permanent *)
-
-type error += Unrequired_double_endorsement_evidence (* `Branch*)
-
-type error +=
-  | Too_early_double_endorsement_evidence of {
-      level : Raw_level.t;
-      current : Raw_level.t;
-    }
-
-(* `Temporary *)
-
-type error +=
-  | Outdated_double_endorsement_evidence of {
-      level : Raw_level.t;
-      last : Raw_level.t;
-    }
-
-(* `Permanent *)
-
-type error +=
-  | Invalid_double_baking_evidence of {
-      hash1 : Block_hash.t;
-      level1 : Int32.t;
-      hash2 : Block_hash.t;
-      level2 : Int32.t;
-    }
-
-(* `Permanent *)
-
-type error +=
-  | Inconsistent_double_baking_evidence of {
-      delegate1 : Signature.Public_key_hash.t;
-      delegate2 : Signature.Public_key_hash.t;
-    }
-
-(* `Permanent *)
-
-type error += Unrequired_double_baking_evidence (* `Branch*)
-
-type error +=
-  | Too_early_double_baking_evidence of {
-      level : Raw_level.t;
-      current : Raw_level.t;
-    }
-
-(* `Temporary *)
-
-type error +=
-  | Outdated_double_baking_evidence of {
-      level : Raw_level.t;
-      last : Raw_level.t;
-    }
-
 (* `Permanent *)
 
 type error += Invalid_activation of {pkh : Ed25519.Public_key_hash.t}
@@ -122,6 +60,10 @@ type error +=
       endorsements : int;
       timestamp : Time.t;
     }
+
+type error += (* `Branch *) Double_injection_of_evidence
+
+type error += (* `Branch *) Unrequired_evidence
 
 let () =
   register_error_kind
@@ -221,211 +163,6 @@ let () =
     (fun op -> Internal_operation_replay op) ;
   register_error_kind
     `Permanent
-    ~id:"block.invalid_double_endorsement_evidence"
-    ~title:"Invalid double endorsement evidence"
-    ~description:"A double-endorsement evidence is malformed"
-    ~pp:(fun ppf () ->
-      Format.fprintf ppf "Malformed double-endorsement evidence")
-    Data_encoding.empty
-    (function Invalid_double_endorsement_evidence -> Some () | _ -> None)
-    (fun () -> Invalid_double_endorsement_evidence) ;
-  register_error_kind
-    `Permanent
-    ~id:"block.inconsistent_double_endorsement_evidence"
-    ~title:"Inconsistent double endorsement evidence"
-    ~description:
-      "A double-endorsement evidence is inconsistent  (two distinct delegates)"
-    ~pp:(fun ppf (delegate1, delegate2) ->
-      Format.fprintf
-        ppf
-        "Inconsistent double-endorsement evidence  (distinct delegate: %a and \
-         %a)"
-        Signature.Public_key_hash.pp_short
-        delegate1
-        Signature.Public_key_hash.pp_short
-        delegate2)
-    Data_encoding.(
-      obj2
-        (req "delegate1" Signature.Public_key_hash.encoding)
-        (req "delegate2" Signature.Public_key_hash.encoding))
-    (function
-      | Inconsistent_double_endorsement_evidence {delegate1; delegate2} ->
-          Some (delegate1, delegate2)
-      | _ ->
-          None)
-    (fun (delegate1, delegate2) ->
-      Inconsistent_double_endorsement_evidence {delegate1; delegate2}) ;
-  register_error_kind
-    `Branch
-    ~id:"block.unrequired_double_endorsement_evidence"
-    ~title:"Unrequired double endorsement evidence"
-    ~description:"A double-endorsement evidence is unrequired"
-    ~pp:(fun ppf () ->
-      Format.fprintf
-        ppf
-        "A valid double-endorsement operation cannot  be applied: the \
-         associated delegate  has previously been denounced in this cycle.")
-    Data_encoding.empty
-    (function Unrequired_double_endorsement_evidence -> Some () | _ -> None)
-    (fun () -> Unrequired_double_endorsement_evidence) ;
-  register_error_kind
-    `Temporary
-    ~id:"block.too_early_double_endorsement_evidence"
-    ~title:"Too early double endorsement evidence"
-    ~description:"A double-endorsement evidence is in the future"
-    ~pp:(fun ppf (level, current) ->
-      Format.fprintf
-        ppf
-        "A double-endorsement evidence is in the future  (current level: %a, \
-         endorsement level: %a)"
-        Raw_level.pp
-        current
-        Raw_level.pp
-        level)
-    Data_encoding.(
-      obj2 (req "level" Raw_level.encoding) (req "current" Raw_level.encoding))
-    (function
-      | Too_early_double_endorsement_evidence {level; current} ->
-          Some (level, current)
-      | _ ->
-          None)
-    (fun (level, current) ->
-      Too_early_double_endorsement_evidence {level; current}) ;
-  register_error_kind
-    `Permanent
-    ~id:"block.outdated_double_endorsement_evidence"
-    ~title:"Outdated double endorsement evidence"
-    ~description:"A double-endorsement evidence is outdated."
-    ~pp:(fun ppf (level, last) ->
-      Format.fprintf
-        ppf
-        "A double-endorsement evidence is outdated  (last acceptable level: \
-         %a, endorsement level: %a)"
-        Raw_level.pp
-        last
-        Raw_level.pp
-        level)
-    Data_encoding.(
-      obj2 (req "level" Raw_level.encoding) (req "last" Raw_level.encoding))
-    (function
-      | Outdated_double_endorsement_evidence {level; last} ->
-          Some (level, last)
-      | _ ->
-          None)
-    (fun (level, last) -> Outdated_double_endorsement_evidence {level; last}) ;
-  register_error_kind
-    `Permanent
-    ~id:"block.invalid_double_baking_evidence"
-    ~title:"Invalid double baking evidence"
-    ~description:
-      "A double-baking evidence is inconsistent  (two distinct level)"
-    ~pp:(fun ppf (hash1, level1, hash2, level2) ->
-      Format.fprintf
-        ppf
-        "Invalid double-baking evidence (hash: %a and %a, levels: %ld and %ld)"
-        Block_hash.pp
-        hash1
-        Block_hash.pp
-        hash2
-        level1
-        level2)
-    Data_encoding.(
-      obj4
-        (req "hash1" Block_hash.encoding)
-        (req "level1" int32)
-        (req "hash2" Block_hash.encoding)
-        (req "level2" int32))
-    (function
-      | Invalid_double_baking_evidence {hash1; level1; hash2; level2} ->
-          Some (hash1, level1, hash2, level2)
-      | _ ->
-          None)
-    (fun (hash1, level1, hash2, level2) ->
-      Invalid_double_baking_evidence {hash1; level1; hash2; level2}) ;
-  register_error_kind
-    `Permanent
-    ~id:"block.inconsistent_double_baking_evidence"
-    ~title:"Inconsistent double baking evidence"
-    ~description:
-      "A double-baking evidence is inconsistent  (two distinct delegates)"
-    ~pp:(fun ppf (delegate1, delegate2) ->
-      Format.fprintf
-        ppf
-        "Inconsistent double-baking evidence  (distinct delegate: %a and %a)"
-        Signature.Public_key_hash.pp_short
-        delegate1
-        Signature.Public_key_hash.pp_short
-        delegate2)
-    Data_encoding.(
-      obj2
-        (req "delegate1" Signature.Public_key_hash.encoding)
-        (req "delegate2" Signature.Public_key_hash.encoding))
-    (function
-      | Inconsistent_double_baking_evidence {delegate1; delegate2} ->
-          Some (delegate1, delegate2)
-      | _ ->
-          None)
-    (fun (delegate1, delegate2) ->
-      Inconsistent_double_baking_evidence {delegate1; delegate2}) ;
-  register_error_kind
-    `Branch
-    ~id:"block.unrequired_double_baking_evidence"
-    ~title:"Unrequired double baking evidence"
-    ~description:"A double-baking evidence is unrequired"
-    ~pp:(fun ppf () ->
-      Format.fprintf
-        ppf
-        "A valid double-baking operation cannot  be applied: the associated \
-         delegate  has previously been denounced in this cycle.")
-    Data_encoding.empty
-    (function Unrequired_double_baking_evidence -> Some () | _ -> None)
-    (fun () -> Unrequired_double_baking_evidence) ;
-  register_error_kind
-    `Temporary
-    ~id:"block.too_early_double_baking_evidence"
-    ~title:"Too early double baking evidence"
-    ~description:"A double-baking evidence is in the future"
-    ~pp:(fun ppf (level, current) ->
-      Format.fprintf
-        ppf
-        "A double-baking evidence is in the future  (current level: %a, \
-         baking level: %a)"
-        Raw_level.pp
-        current
-        Raw_level.pp
-        level)
-    Data_encoding.(
-      obj2 (req "level" Raw_level.encoding) (req "current" Raw_level.encoding))
-    (function
-      | Too_early_double_baking_evidence {level; current} ->
-          Some (level, current)
-      | _ ->
-          None)
-    (fun (level, current) -> Too_early_double_baking_evidence {level; current}) ;
-  register_error_kind
-    `Permanent
-    ~id:"block.outdated_double_baking_evidence"
-    ~title:"Outdated double baking evidence"
-    ~description:"A double-baking evidence is outdated."
-    ~pp:(fun ppf (level, last) ->
-      Format.fprintf
-        ppf
-        "A double-baking evidence is outdated  (last acceptable level: %a, \
-         baking level: %a)"
-        Raw_level.pp
-        last
-        Raw_level.pp
-        level)
-    Data_encoding.(
-      obj2 (req "level" Raw_level.encoding) (req "last" Raw_level.encoding))
-    (function
-      | Outdated_double_baking_evidence {level; last} ->
-          Some (level, last)
-      | _ ->
-          None)
-    (fun (level, last) -> Outdated_double_baking_evidence {level; last}) ;
-  register_error_kind
-    `Permanent
     ~id:"operation.invalid_activation"
     ~title:"Invalid activation"
     ~description:
@@ -495,7 +232,34 @@ let () =
           None)
     (fun (required, endorsements, priority, timestamp) ->
       Not_enough_endorsements_for_priority
-        {required; endorsements; priority; timestamp})
+        {required; endorsements; priority; timestamp}) ;
+  register_error_kind
+    `Branch
+    ~id:"block.double_injection"
+    ~title:"Double injection of evidence is not permitted"
+    ~description:
+      "This evidence has already been used against that delegate and cannot \
+       be re-injected"
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "This evidence has already been used and cannot be re-injected")
+    Data_encoding.empty
+    (function Double_injection_of_evidence -> Some () | _ -> None)
+    (fun () -> Double_injection_of_evidence) ;
+  register_error_kind
+    `Temporary
+    ~id:"block.unrequired_evidence"
+    ~title:"Unrequired evidence"
+    ~description:"An evidence is unrequired"
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "A valid evidence operation cannot be applied: the associated \
+         delegate has previously been denunciated in this cycle.")
+    Data_encoding.empty
+    (function Unrequired_evidence -> Some () | _ -> None)
+    (fun () -> Unrequired_evidence)
 
 open Apply_results
 
@@ -1122,107 +886,16 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
             (Seed_nonce_revelation_result
                [ ( Rewards (baker, level.cycle),
                    Credited seed_nonce_revelation_tip ) ]) )
-  | Single (Double_endorsement_evidence {op1; op2}) -> (
-    match (op1.protocol_data.contents, op2.protocol_data.contents) with
-    | (Single (Endorsement e1), Single (Endorsement e2))
-      when Raw_level.(e1.level = e2.level)
-           && not (Block_hash.equal op1.shell.branch op2.shell.branch) ->
-        let level = Level.from_raw ctxt e1.level in
-        let oldest_level = Level.last_allowed_fork_level ctxt in
-        fail_unless
-          Level.(level < Level.current ctxt)
-          (Too_early_double_endorsement_evidence
-             {level = level.level; current = (Level.current ctxt).level})
-        >>=? fun () ->
-        fail_unless
-          Raw_level.(oldest_level <= level.level)
-          (Outdated_double_endorsement_evidence
-             {level = level.level; last = oldest_level})
-        >>=? fun () ->
-        Baking.check_endorsement_rights ctxt chain_id op1
-        >>=? fun (delegate1, _, _) ->
-        Baking.check_endorsement_rights ctxt chain_id op2
-        >>=? fun (delegate2, _, _) ->
-        fail_unless
-          (Signature.Public_key_hash.equal delegate1 delegate2)
-          (Inconsistent_double_endorsement_evidence {delegate1; delegate2})
-        >>=? fun () ->
-        Delegate.has_frozen_balance ctxt delegate1 level.cycle
-        >>=? fun valid ->
-        fail_unless valid Unrequired_double_endorsement_evidence
-        >>=? fun () ->
-        Delegate.punish ctxt delegate1 level.cycle
-        >>=? fun (ctxt, balance) ->
-        Lwt.return Tez.(balance.deposit +? balance.fees)
-        >>=? fun burned ->
-        let reward =
-          match Tez.(burned /? 2L) with Ok v -> v | Error _ -> Tez.zero
-        in
-        add_rewards ctxt reward
-        >>=? fun ctxt ->
-        let current_cycle = (Level.current ctxt).cycle in
-        return
-          ( ctxt,
-            Single_result
-              (Double_endorsement_evidence_result
-                 (Delegate.cleanup_balance_updates
-                    [ ( Deposits (delegate1, level.cycle),
-                        Debited balance.deposit );
-                      (Fees (delegate1, level.cycle), Debited balance.fees);
-                      ( Rewards (delegate1, level.cycle),
-                        Debited balance.rewards );
-                      (Rewards (baker, current_cycle), Credited reward) ])) )
-    | (_, _) ->
-        fail Invalid_double_endorsement_evidence )
-  | Single (Double_baking_evidence {bh1; bh2}) ->
-      let hash1 = Block_header.hash bh1 in
-      let hash2 = Block_header.hash bh2 in
-      fail_unless
-        ( Compare.Int32.(bh1.shell.level = bh2.shell.level)
-        && not (Block_hash.equal hash1 hash2) )
-        (Invalid_double_baking_evidence
-           {hash1; level1 = bh1.shell.level; hash2; level2 = bh2.shell.level})
+  | Single (Double_endorsement_evidence _ as evidence) ->
+      Cheating_proofs.prove_double_endorsement ctxt chain_id evidence
+      >>=? fun (level, delegate) ->
+      Delegate.Proof.mem ctxt delegate level.level
+      >>=? fun already_exists ->
+      fail_when already_exists Double_injection_of_evidence
       >>=? fun () ->
-      Lwt.return (Raw_level.of_int32 bh1.shell.level)
-      >>=? fun raw_level ->
-      let oldest_level = Level.last_allowed_fork_level ctxt in
-      fail_unless
-        Raw_level.(raw_level < (Level.current ctxt).level)
-        (Too_early_double_baking_evidence
-           {level = raw_level; current = (Level.current ctxt).level})
-      >>=? fun () ->
-      fail_unless
-        Raw_level.(oldest_level <= raw_level)
-        (Outdated_double_baking_evidence
-           {level = raw_level; last = oldest_level})
-      >>=? fun () ->
-      let level = Level.from_raw ctxt raw_level in
-      Roll.baking_rights_owner
-        ctxt
-        level
-        ~priority:bh1.protocol_data.contents.priority
-      >>=? fun delegate1 ->
-      Baking.check_signature bh1 chain_id delegate1
-      >>=? fun () ->
-      Roll.baking_rights_owner
-        ctxt
-        level
-        ~priority:bh2.protocol_data.contents.priority
-      >>=? fun delegate2 ->
-      Baking.check_signature bh2 chain_id delegate2
-      >>=? fun () ->
-      fail_unless
-        (Signature.Public_key.equal delegate1 delegate2)
-        (Inconsistent_double_baking_evidence
-           {
-             delegate1 = Signature.Public_key.hash delegate1;
-             delegate2 = Signature.Public_key.hash delegate2;
-           })
-      >>=? fun () ->
-      let delegate = Signature.Public_key.hash delegate1 in
       Delegate.has_frozen_balance ctxt delegate level.cycle
       >>=? fun valid ->
-      fail_unless valid Unrequired_double_baking_evidence
+      fail_unless valid Unrequired_evidence
       >>=? fun () ->
       Delegate.punish ctxt delegate level.cycle
       >>=? fun (ctxt, balance) ->
@@ -1232,6 +905,40 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
         match Tez.(burned /? 2L) with Ok v -> v | Error _ -> Tez.zero
       in
       add_rewards ctxt reward
+      >>=? fun ctxt ->
+      Delegate.Proof.add ctxt delegate level.level
+      >>=? fun ctxt ->
+      let current_cycle = (Level.current ctxt).cycle in
+      return
+        ( ctxt,
+          Single_result
+            (Double_endorsement_evidence_result
+               (Delegate.cleanup_balance_updates
+                  [ (Deposits (delegate, level.cycle), Debited balance.deposit);
+                    (Fees (delegate, level.cycle), Debited balance.fees);
+                    (Rewards (delegate, level.cycle), Debited balance.rewards);
+                    (Rewards (baker, current_cycle), Credited reward) ])) )
+  | Single (Double_baking_evidence _ as evidence) ->
+      Cheating_proofs.prove_double_baking ctxt chain_id evidence
+      >>=? fun (level, delegate) ->
+      Delegate.Proof.mem ctxt delegate level.level
+      >>=? fun already_exists ->
+      fail_when already_exists Double_injection_of_evidence
+      >>=? fun () ->
+      Delegate.has_frozen_balance ctxt delegate level.cycle
+      >>=? fun valid ->
+      fail_unless valid Unrequired_evidence
+      >>=? fun () ->
+      Delegate.punish ctxt delegate level.cycle
+      >>=? fun (ctxt, balance) ->
+      Lwt.return Tez.(balance.deposit +? balance.fees)
+      >>=? fun burned ->
+      let reward =
+        match Tez.(burned /? 2L) with Ok v -> v | Error _ -> Tez.zero
+      in
+      add_rewards ctxt reward
+      >>=? fun ctxt ->
+      Delegate.Proof.add ctxt delegate level.level
       >>=? fun ctxt ->
       let current_cycle = (Level.current ctxt).cycle in
       return

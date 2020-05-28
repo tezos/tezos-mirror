@@ -96,3 +96,18 @@ module Index = struct
 
   let compare = compare
 end
+
+module LSet = struct
+  include Set.Make (struct
+    type t = raw_level
+
+    let compare = compare
+  end)
+
+  let encoding =
+    Data_encoding.def "level_set" ~title:"A set of levels"
+    @@ Data_encoding.conv
+         (fun set -> elements set)
+         of_list
+         (Data_encoding.list encoding)
+end

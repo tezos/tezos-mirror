@@ -36,6 +36,7 @@ type info = {
   deactivated : bool;
   grace_period : Cycle.t;
   voting_power : int32;
+  proof_levels : Raw_level.LSet.t;
 }
 
 let info_encoding =
@@ -49,7 +50,8 @@ let info_encoding =
            delegated_balance;
            deactivated;
            grace_period;
-           voting_power } ->
+           voting_power;
+           proof_levels } ->
       ( balance,
         frozen_balance,
         frozen_balance_by_cycle,
@@ -58,7 +60,8 @@ let info_encoding =
         delegated_balance,
         deactivated,
         grace_period,
-        voting_power ))
+        voting_power,
+        proof_levels ))
     (fun ( balance,
            frozen_balance,
            frozen_balance_by_cycle,
@@ -67,7 +70,8 @@ let info_encoding =
            delegated_balance,
            deactivated,
            grace_period,
-           voting_power ) ->
+           voting_power,
+           proof_levels ) ->
       {
         balance;
         frozen_balance;
@@ -78,8 +82,9 @@ let info_encoding =
         deactivated;
         grace_period;
         voting_power;
+        proof_levels;
       })
-    (obj9
+    (obj10
        (req "balance" Tez.encoding)
        (req "frozen_balance" Tez.encoding)
        (req "frozen_balance_by_cycle" Delegate.frozen_balance_by_cycle_encoding)
@@ -88,7 +93,8 @@ let info_encoding =
        (req "delegated_balance" Tez.encoding)
        (req "deactivated" bool)
        (req "grace_period" Cycle.encoding)
-       (req "voting_power" int32))
+       (req "voting_power" int32)
+       (req "proof_levels" Raw_level.LSet.encoding))
 
 module S = struct
   let path = RPC_path.(open_root / "context" / "delegates")
@@ -205,6 +211,15 @@ module S = struct
       ~query:RPC_query.empty
       ~output:Data_encoding.int32
       RPC_path.(path / "voting_power")
+
+  let proof_levels =
+    RPC_service.get_service
+      ~description:
+        "Returns the list of levels where a proof has been made against a \
+         given delegate."
+      ~query:RPC_query.empty
+      ~output:Raw_level.LSet.encoding
+      RPC_path.(path / "proof_levels")
 end
 
 let register () =
@@ -246,6 +261,8 @@ let register () =
       >>=? fun grace_period ->
       Vote.get_voting_power_free ctxt pkh
       >>=? fun voting_power ->
+      Delegate.Proof.all ctxt pkh
+      >>=? fun proof_levels ->
       return
         {
           balance;
@@ -257,6 +274,7 @@ let register () =
           deactivated;
           grace_period;
           voting_power;
+          proof_levels;
         }) ;
   register1 S.balance (fun ctxt pkh () () -> Delegate.full_balance ctxt pkh) ;
   register1 S.frozen_balance (fun ctxt pkh () () ->
@@ -273,7 +291,8 @@ let register () =
   register1 S.grace_period (fun ctxt pkh () () ->
       Delegate.grace_period ctxt pkh) ;
   register1 S.voting_power (fun ctxt pkh () () ->
-      Vote.get_voting_power_free ctxt pkh)
+      Vote.get_voting_power_free ctxt pkh) ;
+  register1 S.proof_levels (fun ctxt pkh () () -> Delegate.Proof.all ctxt pkh)
 
 let list ctxt block ?(active = true) ?(inactive = false) () =
   RPC_context.make_call0 S.list_delegate ctxt block {active; inactive} ()
@@ -306,6 +325,9 @@ let grace_period ctxt block pkh =
 
 let voting_power ctxt block pkh =
   RPC_context.make_call1 S.voting_power ctxt block pkh () ()
+
+let proof_levels ctxt block pkh =
+  RPC_context.make_call1 S.proof_levels ctxt block pkh () ()
 
 let requested_levels ~default ctxt cycles levels =
   match (levels, cycles) with

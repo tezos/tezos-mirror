@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.ch>                      *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,39 +23,54 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The shell's notion of a level: an integer indicating the number of blocks
-    since genesis: genesis is 0, all other blocks have increasing levels from
-    there. *)
-type t
+open Alpha_context
 
-type raw_level = t
+(* A proof is a valid and verified Double_X_evidence operation.
 
-val encoding : raw_level Data_encoding.t
+   No distinction is make between proof created from a double_baking_evidence
+   and double_endorsement evidence because the penalty is the same and only the
+   proof level is stored in Storage.Contract.Proof_level.
 
-val rpc_arg : raw_level RPC_arg.arg
+ *)
+type error +=
+  | (* `Permanent *)
+      Inconsistent_evidence of {
+      delegate1 : Signature.Public_key_hash.t;
+      delegate2 : Signature.Public_key_hash.t;
+    }
+  | (* `Permanent *)
+      Outdated_evidence of {
+      level : Raw_level.t;
+      last : Raw_level.t;
+    }
+  | (* `Temporary *)
+      Too_early_evidence of {
+      level : Raw_level.t;
+      current : Raw_level.t;
+    }
+  | (* `Permanent *)
+      Invalid_double_baking_evidence of {
+      hash1 : Block_hash.t;
+      level1 : Raw_level.t;
+      hash2 : Block_hash.t;
+      level2 : Raw_level.t;
+    }
+  | (* `Permanent *)
+      Invalid_double_endorsement_evidence of {
+      hash1 : Operation_hash.t;
+      level1 : Raw_level.t;
+      hash2 : Operation_hash.t;
+      level2 : Raw_level.t;
+    }
 
-val pp : Format.formatter -> raw_level -> unit
+val prove_double_baking :
+  context ->
+  Chain_id.t ->
+  Kind.double_baking_evidence contents ->
+  (Level.t * Signature.public_key_hash) tzresult Lwt.t
 
-include Compare.S with type t := raw_level
-
-val to_int32 : raw_level -> int32
-
-val of_int32_exn : int32 -> raw_level
-
-val of_int32 : int32 -> raw_level tzresult
-
-val diff : raw_level -> raw_level -> int32
-
-val root : raw_level
-
-val succ : raw_level -> raw_level
-
-val pred : raw_level -> raw_level option
-
-module Index : Storage_description.INDEX with type t = raw_level
-
-module LSet : sig
-  include S.SET with type elt = raw_level
-
-  val encoding : t Data_encoding.t
-end
+val prove_double_endorsement :
+  context ->
+  Chain_id.t ->
+  Kind.double_endorsement_evidence contents ->
+  (Level.t * Signature.public_key_hash) tzresult Lwt.t

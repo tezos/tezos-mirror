@@ -189,3 +189,27 @@ val deactivated :
 
 val grace_period :
   Raw_context.t -> Signature.Public_key_hash.t -> Cycle_repr.t tzresult Lwt.t
+
+module Proof : sig
+  (** Has any proof ever been used at this level for this delegate*)
+  val mem :
+    Raw_context.t ->
+    Signature.Public_key_hash.t ->
+    Raw_level_repr.t ->
+    bool tzresult Lwt.t
+
+  (** add a level to already known proofs level for this delegate*)
+  val add :
+    Raw_context.t ->
+    Signature.Public_key_hash.t ->
+    Raw_level_repr.t ->
+    Raw_context.t tzresult Lwt.t
+
+  (** clean proof*)
+  val cleanup : Raw_context.t -> Raw_context.t tzresult Lwt.t
+
+  val all :
+    Raw_context.t ->
+    Signature.Public_key_hash.t ->
+    Raw_level_repr.LSet.t tzresult Lwt.t
+end

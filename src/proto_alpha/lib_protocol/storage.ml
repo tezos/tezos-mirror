@@ -300,6 +300,13 @@ module Contract = struct
         let name = ["change"]
       end)
       (Tez_repr)
+
+  module Proof_level =
+    Indexed_context.Make_map
+      (struct
+        let name = ["proof_level"]
+      end)
+      (Raw_level_repr.LSet)
 end
 
 (** Big maps handling *)

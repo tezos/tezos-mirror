@@ -176,6 +176,13 @@ module Contract : sig
       with type elt = Contract_repr.t
        and type t = Raw_context.t * Contract_repr.t
 
+  (** All evidence that as been used against a delegate, if any *)
+  module Proof_level :
+    Indexed_data_storage
+      with type key = Contract_repr.t
+       and type value = Raw_level_repr.LSet.t
+       and type t := Raw_context.t
+
   module Inactive_delegate :
     Data_set_storage with type elt = Contract_repr.t and type t = Raw_context.t
 

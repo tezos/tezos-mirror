@@ -76,6 +76,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_tc_errors_registration.ml
    script_interpreter.mli script_interpreter.ml
    baking.mli baking.ml
+   cheating_proofs.mli cheating_proofs.ml
    amendment.mli amendment.ml
    apply_results.mli apply_results.ml
    apply.ml
@@ -152,6 +153,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_tc_errors_registration.ml
    script_interpreter.mli script_interpreter.ml
    baking.mli baking.ml
+   cheating_proofs.mli cheating_proofs.ml
    amendment.mli amendment.ml
    apply_results.mli apply_results.ml
    apply.ml
@@ -228,6 +230,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_tc_errors_registration.ml
    script_interpreter.mli script_interpreter.ml
    baking.mli baking.ml
+   cheating_proofs.mli cheating_proofs.ml
    amendment.mli amendment.ml
    apply_results.mli apply_results.ml
    apply.ml
@@ -324,6 +327,7 @@ include Tezos_raw_protocol_alpha.Main
    Script_tc_errors_registration
    Script_interpreter
    Baking
+   Cheating_proofs
    Amendment
    Apply_results
    Apply

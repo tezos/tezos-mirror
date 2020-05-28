@@ -44,6 +44,7 @@ type info = {
   deactivated : bool;
   grace_period : Cycle.t;
   voting_power : int32;
+  proof_levels : Raw_level.LSet.t;
 }
 
 val info_encoding : info Data_encoding.t
@@ -104,6 +105,12 @@ val grace_period :
 
 val voting_power :
   'a #RPC_context.simple -> 'a -> public_key_hash -> int32 shell_tzresult Lwt.t
+
+val proof_levels :
+  'a #RPC_context.simple ->
+  'a ->
+  Signature.Public_key_hash.t ->
+  Raw_level.LSet.t shell_tzresult Lwt.t
 
 module Baking_rights : sig
   type t = {
