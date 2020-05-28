@@ -52,8 +52,10 @@ The voting procedure works as follows:
 - `Adoption period`: at the end of the period the proposal is activated
   as the new protocol and we go back to a proposal period.
 
-It is important to note that the stake of each delegate is computed
-at the beginning of each period.
+Each of the periods above are called a `voting period`. It is important to note
+that the stake of each delegate is computed at the beginning of each voting
+period, and if the delegate owns one roll or more, its stake in number of rolls is
+stored in a list called the `voting listings`.
 
 Super-majority and Quorum
 -------------------------

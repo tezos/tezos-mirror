@@ -1791,7 +1791,7 @@ Special operations
 
     :: 'S   ->   timestamp : 'S
 
-- ``CHAIN_ID``: Push the chain identifier.
+-  ``CHAIN_ID``: Push the chain identifier.
 
 ::
 
@@ -1810,12 +1810,19 @@ Special operations
     > COMPARE / x : y : S  =>  1 : S
         iff x > y
 
-- ``LEVEL``: Push the current block level.
+-  ``LEVEL``: Push the current block level.
 
 ::
 
     :: 'S   ->   nat : 'S
 
+-  ``TOTAL_VOTING_POWER``: Return the total voting power of all contracts. The total
+   voting power coincides with the sum of the rolls count of every contract in the voting
+   listings. The voting listings is calculated at the beginning of every voting period.
+
+::
+
+    :: 'S   ->   nat : 'S
 
 Operations on bytes
 ~~~~~~~~~~~~~~~~~~~
@@ -3232,6 +3239,7 @@ Full grammar
       | SENDER
       | ADDRESS
       | CHAIN_ID
+      | TOTAL_VOTING_POWER
     <type> ::=
       | <comparable type>
       | option <type>
