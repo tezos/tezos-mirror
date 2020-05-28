@@ -152,6 +152,16 @@ type prim =
   | T_address
   | T_chain_id
 
+(** Auxiliary types for error documentation.
+    All the prim constructor prefixes must match their namespace. *)
+type namespace =
+  | (* prefix "T" *) Type_namespace
+  | (* prefix "D" *) Constant_namespace
+  | (* prefix "I" *) Instr_namespace
+  | (* prefix "K" *) Keyword_namespace
+
+val namespace : prim -> namespace
+
 val prim_encoding : prim Data_encoding.encoding
 
 val string_of_prim : prim -> string
@@ -162,3 +172,7 @@ val prims_of_strings :
   string Micheline.canonical -> prim Micheline.canonical tzresult
 
 val strings_of_prims : prim Micheline.canonical -> string Micheline.canonical
+
+(** The string corresponds to the constructor prefix from the given namespace
+    (i.e. "T", "D", "I" or "K") *)
+val string_of_namespace : namespace -> string

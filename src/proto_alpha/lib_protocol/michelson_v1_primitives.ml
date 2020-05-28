@@ -153,6 +153,136 @@ type prim =
   | T_address
   | T_chain_id
 
+(* Auxiliary types for error documentation.
+   All the prim constructor prefixes must match their namespace. *)
+type namespace =
+  | (* prefix "T" *) Type_namespace
+  | (* prefix "D" *) Constant_namespace
+  | (* prefix "I" *) Instr_namespace
+  | (* prefix "K" *) Keyword_namespace
+
+let namespace = function
+  | K_code | K_parameter | K_storage ->
+      Keyword_namespace
+  | D_Elt
+  | D_False
+  | D_Left
+  | D_None
+  | D_Pair
+  | D_Right
+  | D_Some
+  | D_True
+  | D_Unit ->
+      Constant_namespace
+  | I_ABS
+  | I_ADD
+  | I_ADDRESS
+  | I_AMOUNT
+  | I_AND
+  | I_APPLY
+  | I_BALANCE
+  | I_BLAKE2B
+  | I_CAR
+  | I_CAST
+  | I_CDR
+  | I_CHAIN_ID
+  | I_CHECK_SIGNATURE
+  | I_COMPARE
+  | I_CONCAT
+  | I_CONS
+  | I_CONTRACT
+  | I_CREATE_ACCOUNT
+  | I_CREATE_CONTRACT
+  | I_DIG
+  | I_DIP
+  | I_DROP
+  | I_DUG
+  | I_DUP
+  | I_EDIV
+  | I_EMPTY_BIG_MAP
+  | I_EMPTY_MAP
+  | I_EMPTY_SET
+  | I_EQ
+  | I_EXEC
+  | I_FAILWITH
+  | I_GE
+  | I_GET
+  | I_GT
+  | I_HASH_KEY
+  | I_IF
+  | I_IF_CONS
+  | I_IF_LEFT
+  | I_IF_NONE
+  | I_IMPLICIT_ACCOUNT
+  | I_INT
+  | I_ISNAT
+  | I_ITER
+  | I_LAMBDA
+  | I_LE
+  | I_LEFT
+  | I_LOOP
+  | I_LOOP_LEFT
+  | I_LSL
+  | I_LSR
+  | I_LT
+  | I_MAP
+  | I_MEM
+  | I_MUL
+  | I_NEG
+  | I_NEQ
+  | I_NIL
+  | I_NONE
+  | I_NOT
+  | I_NOW
+  | I_OR
+  | I_PACK
+  | I_PAIR
+  | I_PUSH
+  | I_RENAME
+  | I_RIGHT
+  | I_SELF
+  | I_SENDER
+  | I_SET_DELEGATE
+  | I_SHA256
+  | I_SHA512
+  | I_SIZE
+  | I_SLICE
+  | I_SOME
+  | I_SOURCE
+  | I_STEPS_TO_QUOTA
+  | I_SUB
+  | I_SWAP
+  | I_TRANSFER_TOKENS
+  | I_UNIT
+  | I_UNPACK
+  | I_UPDATE
+  | I_XOR ->
+      Instr_namespace
+  | T_address
+  | T_big_map
+  | T_bool
+  | T_bytes
+  | T_chain_id
+  | T_contract
+  | T_int
+  | T_key
+  | T_key_hash
+  | T_lambda
+  | T_list
+  | T_map
+  | T_mutez
+  | T_nat
+  | T_operation
+  | T_option
+  | T_or
+  | T_pair
+  | T_set
+  | T_signature
+  | T_string
+  | T_timestamp
+  | T_unit ->
+      Type_namespace
+
 let valid_case name =
   let is_lower = function '_' | 'a' .. 'z' -> true | _ -> false in
   let is_upper = function '_' | 'A' .. 'Z' -> true | _ -> false in
@@ -862,3 +992,13 @@ let () =
     (function
       | Invalid_primitive_name (expr, loc) -> Some (expr, loc) | _ -> None)
     (fun (expr, loc) -> Invalid_primitive_name (expr, loc))
+
+let string_of_namespace = function
+  | Type_namespace ->
+      "T"
+  | Constant_namespace ->
+      "D"
+  | Instr_namespace ->
+      "I"
+  | Keyword_namespace ->
+      "K"
