@@ -172,6 +172,105 @@ let sign state ~client ~bytes () =
     ["sign"; "bytes"; "0x" ^ bytes; "for"; client.Tezos_client.Keyed.key_name]
   >>= fun _ -> return ()
 
+(* let prepare_origination_of_id_script ?(spendable = false) *)
+(*     ?(delegatable = false) ?delegate ?(push_drops = 0) ?(amount = "2") state *)
+(*     ~client:_ ~name ~from ~protocol_kind ~parameter ~init_storage = *)
+(*   let id_script parameter = *)
+(*     Fmt.strf *)
+(*       "parameter %s;\n\ *)
+(*        storage %s;\n\ *)
+(*        code\n\ *)
+(*       \  {\n\ *)
+(*       \    %s\n\ *)
+(*       \    { CAR; NIL operation; PAIR }\n\ *)
+(*       \  };\n" *)
+(*       parameter *)
+(*       parameter *)
+(*       ( match push_drops with *)
+(*       | 0 -> *)
+(*           "# No push-drops" *)
+(*       | n -> *)
+(*           Fmt.strf *)
+(*             "# %d push-drop%s\n    %s" *)
+(*             n *)
+(*             (if n > 1 then "s" else "") *)
+(*             ( List.init push_drops ~f:(fun ith -> *)
+(*                   Fmt.strf *)
+(*                     "{ PUSH string %S ; DROP } ;" *)
+(*                     (Fmt.strf *)
+(*                        "push-dropping %d adds stupid bytes to the contract" *)
+(*                        ith)) *)
+(*             |> String.concat ~sep:"\n    " ) ) *)
+(*   in *)
+(*   let tmp = Caml.Filename.temp_file "little-id-script" ".tz" in *)
+(*   System.write_file state tmp ~content:(id_script parameter) *)
+(*   >>= fun () -> *)
+(*   Dbg.e EF.(wf "id_script %s: %s" parameter tmp) ; *)
+(*   let origination = *)
+(*     let opt = Option.value_map ~default:[] in *)
+(*     ["--wait"; "none"; "originate"; "contract"; name] *)
+(*     @ ( match protocol_kind with *)
+(*       | `Athens -> *)
+(*           ["for"; from] *)
+(*       | `Babylon | `Carthage -> *)
+(*           [] ) *)
+(*     @ [ "transferring"; *)
+(*         amount; *)
+(*         "from"; *)
+(*         from; *)
+(*         "running"; *)
+(*         tmp; *)
+(*         "--init"; *)
+(*         init_storage; *)
+(*         "--force"; *)
+(*         "--burn-cap"; *)
+(*         "300000000000"; *)
+(*         (1* ; "--fee-cap" ; "20000000000000" *1) *)
+(*         "--gas-limit"; *)
+(*         "1000000000000000"; *)
+(*         "--storage-limit"; *)
+(*         "20000000000000"; *)
+(*         "--verbose-signing" ] *)
+(*     @ opt delegate ~f:(fun s -> (1* Baby & Aths *1) ["--delegate"; s]) *)
+(*     @ (if delegatable then [(1* Aths *1) "--delegatable"] else []) *)
+(*     @ if spendable then [(1* Aths *1) "--spendable"] else [] *)
+(*   in *)
+let originate_account_from state ~client ~account =
+  let orig_account_name = "-originated-account" in
+  let id_script parameter =
+    Fmt.strf
+      "parameter %s;\n\
+       storage %s;\n\
+       code\n\
+      \  {\n\
+      \    %s\n\
+      \    { CAR; NIL operation; PAIR }\n\
+      \  };\n"
+      parameter
+      parameter
+      "# No push-drops"
+  in
+  let tmp = Caml.Filename.temp_file "little-id-script" ".tz" in
+  System.write_file state tmp ~content:(id_script "unit")
+  >>= fun () ->
+  Tezos_client.successful_client_cmd
+    state
+    ~client
+    [ "originate";
+      "contract";
+      orig_account_name;
+      "transferring";
+      Int.to_string 1000;
+      "from";
+      Tezos_protocol.Account.pubkey_hash account;
+      "running";
+      tmp;
+      "--init";
+      "Unit";
+      "--burn-cap";
+      Float.to_string 0.257 ]
+  >>= fun _ -> return orig_account_name
+
 let setup_baking_ledger state uri ~client ~protocol =
   Console.say state EF.(wf "Setting up the ledger device %S" uri)
   >>= fun () ->
@@ -388,6 +487,14 @@ let run state ~protocol ~node_exec ~client_exec ~admin_exec ~size ~base_port
     assert_eq (fun x -> x) ~expected:thatNonce1 ~actual:thatNonce2
     >>= fun () -> assert_ Poly.(thisNonce1 <> thatNonce1)
   else return () )
+  >>= fun () ->
+  assert_failure
+    state
+    "originating an account from the Tezos Baking app should fail"
+    (fun () ->
+      originate_account_from state ~client:(client 0) ~account:ledger_account
+      >>= fun _ -> return ())
+    ()
   >>= fun () ->
   let fee = 0.00126 in
   let ledger_pkh = Tezos_protocol.Account.pubkey_hash ledger_account in
