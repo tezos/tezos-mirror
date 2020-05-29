@@ -2,18 +2,6 @@ open Protocol
 open Alpha_context
 open Script_interpreter
 
-exception Expression_from_string
-
-let expression_from_string str : Script.expr tzresult Lwt.t =
-  let (ast, errs) = Michelson_v1_parser.parse_expression ~check:false str in
-  ( match errs with
-  | [] ->
-      ()
-  | lst ->
-      Format.printf "expr_from_string: %a\n" Error_monad.pp_print_error lst ;
-      raise Expression_from_string ) ;
-  return ast.expanded
-
 let ( >>=?? ) x y =
   x
   >>= function
@@ -45,12 +33,9 @@ let default_step_constants =
    and parameter and returns the result. *)
 let run_script ctx ?(step_constants = default_step_constants) contract
     ?(entrypoint = "default") ~storage ~parameter () =
-  expression_from_string contract
-  >>=? fun contract_expr ->
-  expression_from_string storage
-  >>=? fun storage_expr ->
-  expression_from_string parameter
-  >>=? fun parameter_expr ->
+  let contract_expr = Expr.from_string contract in
+  let storage_expr = Expr.from_string storage in
+  let parameter_expr = Expr.from_string parameter in
   let script =
     Script.{code = lazy_expr contract_expr; storage = lazy_expr storage_expr}
   in
