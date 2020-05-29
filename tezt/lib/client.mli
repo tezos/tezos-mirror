@@ -41,6 +41,8 @@ type t
     to a node. Most commands require a node to be specified (either with [create]
     or with the command itself). *)
 val create :
+  ?path:string ->
+  ?admin_path:string ->
   ?name:string ->
   ?color:Log.Color.t ->
   ?base_dir:string ->
@@ -121,6 +123,8 @@ val bake_for :
 
 (** Create a client and import all secret keys listed in {!Constant.all_secret_keys}. *)
 val init :
+  ?path:string ->
+  ?admin_path:string ->
   ?name:string ->
   ?color:Log.Color.t ->
   ?base_dir:string ->

@@ -26,6 +26,8 @@
 open Base
 
 type t = {
+  path : string;
+  admin_path : string;
   name : string;
   color : Log.Color.t;
   base_dir : string;
@@ -41,12 +43,14 @@ let fresh_name () =
 
 let () = Test.declare_reset_function @@ fun () -> next_name := 1
 
-let create ?name ?(color = Log.Color.FG.blue) ?base_dir ?node () =
+let create ?(path = Constant.tezos_client)
+    ?(admin_path = Constant.tezos_admin_client) ?name
+    ?(color = Log.Color.FG.blue) ?base_dir ?node () =
   let name = match name with None -> fresh_name () | Some name -> name in
   let base_dir =
     match base_dir with None -> Temp.dir name | Some dir -> dir
   in
-  {name; color; base_dir; node}
+  {path; admin_path; name; color; base_dir; node}
 
 let check_node_is_specified ?node command client =
   match (node, client.node) with
@@ -78,7 +82,7 @@ let run_command ?(needs_node = true) ?(admin = false) ?node client command =
   Process.run
     ~name:client.name
     ~color:client.color
-    (if admin then Constant.tezos_admin_client else Constant.tezos_client)
+    (if admin then client.admin_path else client.path)
     (base_args ?node client @ command)
 
 let url_encode str =
@@ -126,7 +130,7 @@ let rpc ?node ?data ?query_string meth path client : JSON.t Lwt.t =
     Process.run_and_read_stdout
       ~name:client.name
       ~color:client.color
-      Constant.tezos_client
+      client.path
       (base_args ?node client @ ["rpc"; string_of_meth meth; full_path] @ data)
   in
   return (JSON.parse ~origin:(path ^ " response") output)
@@ -196,8 +200,8 @@ let bake_for ?node ?(key = Constant.bootstrap1.alias)
     ( "bake" :: "for" :: key
     :: (if minimal_timestamp then ["--minimal-timestamp"] else []) )
 
-let init ?name ?color ?base_dir ?node () =
-  let client = create ?name ?color ?base_dir ?node () in
+let init ?path ?admin_path ?name ?color ?base_dir ?node () =
+  let client = create ?path ?admin_path ?name ?color ?base_dir ?node () in
   let* () =
     Lwt_list.iter_s (import_secret_key client) Constant.all_secret_keys
   in
