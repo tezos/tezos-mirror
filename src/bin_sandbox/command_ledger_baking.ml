@@ -205,7 +205,7 @@ let originate_account_from state ~client ~account =
       "--init";
       "Unit";
       "--burn-cap";
-      Float.to_string 0.257 ]
+      Float.to_string 0.300 ]
   >>= fun _ -> return orig_account_name
 
 let setup_baking_ledger state uri ~client ~protocol =
@@ -296,19 +296,6 @@ let setup_baking_ledger state uri ~client ~protocol =
           "0";
           "--test-hwm";
           "0" ])
-  >>= assert_failure
-        state
-        "signing a 'Withdraw delegate' operation in Baking App should fail"
-        (fun () ->
-          Tezos_client.successful_client_cmd
-            state
-            ~client
-            [ "--wait";
-              "none";
-              "withdraw";
-              "delegate";
-              "from";
-              Tezos_protocol.Account.pubkey_hash account ])
   >>= assert_baking_key (Some uri)
   >>= test_invalid_delegations
   >>= fun () -> return (baker, account)
