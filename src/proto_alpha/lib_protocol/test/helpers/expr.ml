@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,25 +23,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let () =
-  Alcotest_lwt.run
-    "protocol_alpha"
-    [ ("transfer", Transfer.tests);
-      ("origination", Origination.tests);
-      ("activation", Activation.tests);
-      ("endorsement", Endorsement.tests);
-      ("double endorsement", Double_endorsement.tests);
-      ("double baking", Double_baking.tests);
-      ("seed", Seed.tests);
-      ("baking", Baking.tests);
-      ("delegation", Delegation.tests);
-      ("rolls", Rolls.tests);
-      ("combined", Combined_operations.tests);
-      ("qty", Qty.tests);
-      ("voting", Voting.tests);
-      ("interpretation", Interpretation.tests);
-      ("gas properties", Gas_properties.tests);
-      ("Storage description", Storage.tests);
-      ("Failing_noop", Failing_noop.tests);
-      ("lazy storage diff", Lazy_storage_diff.tests) ]
-  |> Lwt_main.run
+open Protocol
+open Alpha_context
+open Tezos_client_alpha
+
+exception Expression_from_string
+
+let from_string str : Script.expr =
+  let (ast, errs) = Michelson_v1_parser.parse_expression ~check:false str in
+  ( match errs with
+  | [] ->
+      ()
+  | lst ->
+      Format.printf "expr_from_string: %a\n" Error_monad.pp_print_error lst ;
+      raise Expression_from_string ) ;
+  ast.expanded
