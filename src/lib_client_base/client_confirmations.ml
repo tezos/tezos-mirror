@@ -255,7 +255,9 @@ let wait_for_bootstrapped ?(retry = fun f x -> f x)
   let display = ref false in
   Lwt_utils.dont_wait
     (fun exc ->
-      Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc) ;
+      let (_ : unit Lwt.t) =
+        ctxt#error "Uncaught exception: %s\n%!" (Printexc.to_string exc)
+      in
       ctxt#exit 1)
     (fun () ->
       ctxt#sleep 0.3
