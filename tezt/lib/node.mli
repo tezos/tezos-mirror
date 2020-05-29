@@ -68,6 +68,7 @@ type t
     so if you do not call [config_init] or generate the configuration file
     through some other means, your node will not listen. *)
 val create :
+  ?path:string ->
   ?name:string ->
   ?color:Log.Color.t ->
   ?data_dir:string ->
@@ -199,6 +200,7 @@ val on_event : t -> (event -> unit) -> unit
     This {!create}s a node, runs {!identity_generate}, {!config_init} and {!run},
     then waits for the node to be ready, and finally returns the node. *)
 val init :
+  ?path:string ->
   ?name:string ->
   ?color:Log.Color.t ->
   ?data_dir:string ->

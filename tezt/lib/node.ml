@@ -53,6 +53,7 @@ type event = {name : string; value : JSON.t}
    registered with [wait_for] functions. *)
 type t = {
   name : string;
+  path : string;
   color : Log.Color.t;
   data_dir : string;
   mutable net_port : int;
@@ -114,7 +115,8 @@ let () =
   next_port := 19732 ;
   next_color := 0
 
-let create ?name ?color ?data_dir ?event_pipe ?net_port ?rpc_port () =
+let create ?(path = Constant.tezos_node) ?name ?color ?data_dir ?event_pipe
+    ?net_port ?rpc_port () =
   let name = match name with None -> fresh_name () | Some name -> name in
   let color =
     match color with None -> get_next_color () | Some color -> color
@@ -137,6 +139,7 @@ let create ?name ?color ?data_dir ?event_pipe ?net_port ?rpc_port () =
   in
   {
     name;
+    path;
     color;
     data_dir;
     net_port;
@@ -150,8 +153,7 @@ let create ?name ?color ?data_dir ?event_pipe ?net_port ?rpc_port () =
     pending_custom = String_map.empty;
   }
 
-let run_command node =
-  Process.run ~name:node.name ~color:node.color Constant.tezos_node
+let run_command node = Process.run ~name:node.name ~color:node.color node.path
 
 let identity_generate ?(expected_pow = 0) node =
   run_command
@@ -334,7 +336,7 @@ let run ?(expected_pow = 0) ?(single_process = false) ?bootstrap_threshold
       ~color:node.color
       ~env:
         [("TEZOS_EVENTS_CONFIG", "file-descriptor-path://" ^ node.event_pipe)]
-      Constant.tezos_node
+      node.path
       args
   in
   node.status <-
@@ -457,10 +459,10 @@ let wait_for ?where node name filter =
 let on_event node handler =
   node.raw_event_handlers <- handler :: node.raw_event_handlers
 
-let init ?name ?color ?data_dir ?event_pipe ?expected_pow ?network ?net_port
-    ?rpc_port ?history_mode ?single_process ?bootstrap_threshold ?connections
-    () =
-  let node = create ?name ?color ?data_dir ?event_pipe () in
+let init ?path ?name ?color ?data_dir ?event_pipe ?expected_pow ?network
+    ?net_port ?rpc_port ?history_mode ?single_process ?bootstrap_threshold
+    ?connections () =
+  let node = create ?path ?name ?color ?data_dir ?event_pipe () in
   let* () = identity_generate ?expected_pow node in
   let* () = config_init ?network ?net_port ?rpc_port ?history_mode node in
   run ?expected_pow ?single_process ?bootstrap_threshold ?connections node ;
