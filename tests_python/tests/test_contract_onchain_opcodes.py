@@ -373,7 +373,6 @@ class TestContractBigMapOrigination:
                            '0', 1000, 'bootstrap1',
                            contract_name='failwith_big_map_id')
 
-    @pytest.mark.xfail("Not yet implemented.")
     def test_big_map_origination_diff(self, client_regtest_scrubbed):
         client = client_regtest_scrubbed
 

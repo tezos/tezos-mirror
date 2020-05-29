@@ -1,0 +1,55 @@
+tests/test_contract_onchain_opcodes.py::TestContractBigMapOrigination::test_big_map_origination_diff
+
+Node is bootstrapped.
+Estimated gas: 12717000 units (will add 100000 for safety)
+Estimated storage: 500 bytes added (will add 20 for safety)
+Operation successfully injected in the node.
+Operation hash is '[BLOCK_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [BLOCK_HASH] to be included --confirmations 30 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [CONTRACT_HASH]
+    Fee to the baker: ꜩ0.001606
+    Expected counter: [EXPECTED_COUNTER]
+    Gas limit: 12817000
+    Storage limit: 520 bytes
+    Balance updates:
+      [CONTRACT_HASH] ................ -ꜩ0.001606
+      fees(the baker who will include this operation,0) ... +ꜩ0.001606
+    Origination:
+      From: [CONTRACT_HASH]
+      Credit: ꜩ1000
+      Script:
+        { parameter (big_map int int) ;
+          storage (big_map int int) ;
+          code { CAR ;
+                 PUSH (option int) (Some 1) ;
+                 PUSH int 1 ;
+                 UPDATE ;
+                 PUSH (option int) None ;
+                 PUSH int 2 ;
+                 UPDATE ;
+                 FAILWITH } }
+        Initial storage: (Pair 0 { Elt 1 (Some 4) })
+        No delegate for this contract
+        This origination was successfully applied
+        Originated contracts:
+          [CONTRACT_HASH]
+        Storage size: 243 bytes
+        Updated big_maps:
+          Copy map(0) to map(2)
+          Set map(2)[1] to 4
+        Paid storage size diff: 243 bytes
+        Consumed gas: 12717000
+        Balance updates:
+          [CONTRACT_HASH] ... -ꜩ0.243
+          [CONTRACT_HASH] ... -ꜩ0.257
+          [CONTRACT_HASH] ... -ꜩ1000
+          [CONTRACT_HASH] ... +ꜩ1000
+
+New contract [CONTRACT_HASH] originated.
+Contract memorized as failwith_big_map_diff.
+Injected block [BLOCK_HASH]
