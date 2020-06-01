@@ -533,6 +533,17 @@ coq:lint:
   retry: 0
 
 ############################################################
+## Stage: run tests written using Tezt                    ##
+############################################################
+
+tezt:main:
+  <<: *test_definition
+  before_script:
+    - make
+  script:
+    - dune exec tezt/tests/main.exe -- -v --color
+
+############################################################
 ## Stage: run doc integration tests                       ##
 ############################################################
 

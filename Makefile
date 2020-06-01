@@ -139,6 +139,16 @@ test: test_protocol_compile
 	@dune build @runtest_dune_template @runtest @runtest_flextesa @runtest_out_of_opam
 	@./scripts/check_opam_test.sh
 
+.PHONY: tezt tezt-i tezt-c tezt-v
+tezt:
+	@dune exec tezt/tests/main.exe
+tezt-i:
+	@dune exec tezt/tests/main.exe -- --info
+tezt-c:
+	@dune exec tezt/tests/main.exe -- --commands
+tezt-v:
+	@dune exec tezt/tests/main.exe -- --verbose
+
 .PHONY: check-linting check-python-linting
 
 check-linting:
