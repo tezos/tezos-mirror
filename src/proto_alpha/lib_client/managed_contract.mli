@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -51,7 +52,7 @@ val set_delegate :
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
   Contract.t ->
-  public_key_hash option ->
+  baker_hash option ->
   Kind.transaction Kind.manager Injection.result tzresult Lwt.t
 
 (** Perform a transfer on behalf of a managed contract .
