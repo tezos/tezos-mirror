@@ -190,7 +190,7 @@ let expect_from_output ~expectation ~message (proc_res : Process_result.t) =
 
 let voting_tests state ~client ~src ~with_rejections ~protocol_kind
     ~ledger_account ~tested_proposal ~go_to_next_period () =
-  let expect_success message v =
+  let expect_failure message v =
     expect_from_output ~expectation:`Not_a_delegate ~message v
   in
   let expect_rejection message v =
@@ -203,7 +203,7 @@ let voting_tests state ~client ~src ~with_rejections ~protocol_kind
     else return () )
     >>= fun () ->
     ledger_prompt_notice_expectation state ~messages ~user_answer:`Accept
-    >>= fun () -> action () >>= fun res -> expect_success name res
+    >>= fun () -> action () >>= fun res -> expect_failure name res
   in
   let source_display = Tezos_protocol.Account.pubkey_hash ledger_account in
   let submit_proposals ~display_expectation proposals () =
@@ -243,6 +243,8 @@ let voting_tests state ~client ~src ~with_rejections ~protocol_kind
                   Tezos_protocol.Protocol_kind.pp
                   protocol_kind ;
                 cut ppf () ;
+                wf ppf "* Confirm Proposal" ;
+                cut ppf () ;
                 wf ppf "* Source: `%s`" source_display ;
                 cut ppf () ;
                 wf ppf "* Period: `0`" ;
@@ -263,6 +265,8 @@ let voting_tests state ~client ~src ~with_rejections ~protocol_kind
   go_to_next_period ()
   >>= fun () ->
   List_sequential.iter ["yea"; "nay"] ~f:(fun vote ->
+      Console.say state EF.(haf "EXPECTING THE NEXT COMMAND TO FAIL")
+      >>= fun _ ->
       test_reject_and_accept
         (Fmt.strf "vote-%s" vote)
         ~messages:
@@ -506,7 +510,8 @@ let manager_tz_delegation_tests state ~client ~ledger_key ~ledger_account
             ("Fee", const string "0.00XXX");
             ("Source", const string contract_address);
             ("Delegate", const string delegate_pkh);
-            ("Delegate Name", const string "Custom Delegate: please verify the addresss");
+            ( "Delegate Name",
+              const string "Custom Delegate: please verify the addresss" );
             ("Storage Limit", const int 500) ]
       ~output_msg:"delegation"
   in
@@ -522,7 +527,7 @@ let manager_tz_delegation_tests state ~client ~ledger_key ~ledger_account
             ("Delegate", const string "None");
             ( "Delegate Name",
               const string "Custom Delegate: please verify the address" );
-            ("Storage Limit", const int 500); ]
+            ("Storage Limit", const int 500) ]
       ~output_msg:"delegate-removal"
   in
   let manager_tz_to_implicit () =
@@ -702,7 +707,7 @@ let delegation_tests state ~client ~src ~with_rejections ~protocol_kind
                 [ ("Fee", const string "0.00XXX");
                   ("Source", const string ledger_pkh);
                   ("Delegate", const string delegate_pkh);
-                  ("Delegate Name",
+                  ( "Delegate Name",
                     const string "Custom Delegate: please verify the address"
                   );
                   ("Storage Limit", const int 0) ]) ]
