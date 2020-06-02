@@ -96,7 +96,6 @@ For development, numerous shell scripts also rely on jq:
 
    sudo apt install -y jq
 
-
 Environment
 ~~~~~~~~~~~
 
@@ -113,6 +112,10 @@ A Windows port is feasible and might be developed in the future.
 
 If ``bubblewrap`` is not available in your distribution you can also
 skip it and init opam with ``--disable-sandbox``.
+
+Additionally, the ``master`` branch requires the Rust compiler and
+the Cargo package manager to be installed. You can use
+`the rustup script<https://github.com/rust-lang/rustup>`_ to install both.
 
 Get the sources
 ~~~~~~~~~~~~~~~
