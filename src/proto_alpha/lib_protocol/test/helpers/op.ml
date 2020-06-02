@@ -36,15 +36,15 @@ let sign ?(watermark = Signature.Generic_operation) sk ctxt contents =
   let signature = Some (Signature.sign ~watermark sk unsigned) in
   ({shell = {branch}; protocol_data = {contents; signature}} : _ Operation.t)
 
-let endorsement ?delegate ?level ctxt ?(signing_context = ctxt) () =
-  ( match delegate with
+let endorsement ?baker ?level ctxt ?(signing_context = ctxt) () =
+  ( match baker with
   | None ->
-      Context.get_endorser ctxt >|=? fun (delegate, _slots) -> delegate
-  | Some delegate ->
-      return delegate )
-  >>=? fun delegate_pkh ->
-  Account.find delegate_pkh
-  >>=? fun delegate ->
+      Context.get_endorser ctxt >|=? fun (baker, _slots) -> baker
+  | Some baker ->
+      return baker )
+  >>=? fun baker ->
+  Account.find_baker baker
+  >>=? fun account ->
   Lwt.return
     ( ( match level with
       | None ->
@@ -55,16 +55,16 @@ let endorsement ?delegate ?level ctxt ?(signing_context = ctxt) () =
     let op = Single (Endorsement {level}) in
     sign
       ~watermark:Signature.(Endorsement Chain_id.zero)
-      delegate.sk
+      account.key.sk
       signing_context
       op )
 
-let endorsement_with_slot ?delegate ?level ctxt ?(signing_context = ctxt) () =
-  (match delegate with None -> Context.get_endorser ctxt | Some v -> return v)
-  >>=? fun (delegate_pkh, slots) ->
+let endorsement_with_slot ?baker ?level ctxt ?(signing_context = ctxt) () =
+  (match baker with None -> Context.get_endorser ctxt | Some v -> return v)
+  >>=? fun (baker, slots) ->
   let slot = WithExceptions.Option.get ~loc:__LOC__ (List.hd slots) in
-  Account.find delegate_pkh
-  >>=? fun delegate ->
+  Account.find_baker baker
+  >>=? fun baker_account ->
   Lwt.return
     ( ( match level with
       | None ->
@@ -76,7 +76,7 @@ let endorsement_with_slot ?delegate ?level ctxt ?(signing_context = ctxt) () =
     let endorsement =
       sign
         ~watermark:Signature.(Endorsement Chain_id.zero)
-        delegate.sk
+        baker_account.key.sk
         signing_context
         op
     in
@@ -128,10 +128,10 @@ let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
   >>=? fun counter ->
   (* We increment the counter *)
   let counter = Z.succ counter in
-  Context.Contract.manager ctxt source
+  Context.Contract.find_account ctxt source
   >>=? fun account ->
   let public_key = Option.value ~default:account.pk public_key in
-  Context.Contract.is_manager_key_revealed ctxt source
+  Context.Contract.is_public_key_revealed ctxt source
   >|=? (function
          | false ->
              let reveal_op =
@@ -206,11 +206,11 @@ let manager_operation ?counter ?(fee = Tez.zero) ?gas_limit ?storage_limit
       ~default:c.parametric.hard_storage_limit_per_operation
       storage_limit
   in
-  Context.Contract.manager ctxt source
+  Context.Contract.find_account ctxt source
   >>=? fun account ->
   let public_key = Option.value ~default:account.pk public_key in
   let counter = Z.succ counter in
-  Context.Contract.is_manager_key_revealed ctxt source
+  Context.Contract.is_public_key_revealed ctxt source
   >|=? function
   | true ->
       let op =
@@ -255,7 +255,7 @@ let revelation ?(fee = Tez.zero) ctxt public_key =
   let source = Contract.implicit_contract pkh in
   Context.Contract.counter ctxt source
   >>=? fun counter ->
-  Context.Contract.manager ctxt source
+  Context.Contract.find_account ctxt source
   >|=? fun account ->
   let counter = Z.succ counter in
   let sop =
@@ -285,7 +285,7 @@ exception Impossible
 
 let origination ?counter ?delegate ~script ?(preorigination = None) ?public_key
     ?credit ?fee ?gas_limit ?storage_limit ctxt source =
-  Context.Contract.manager ctxt source
+  Context.Contract.find_account ctxt source
   >>=? fun account ->
   let default_credit = Tez.of_mutez @@ Int64.of_int 1000001 in
   let default_credit =
@@ -306,18 +306,68 @@ let origination ?counter ?delegate ~script ?(preorigination = None) ?public_key
   let op = sign account.sk ctxt sop in
   (op, originated_contract op)
 
+let baker_contract op =
+  let nonce = Contract.initial_origination_nonce (Operation.hash_packed op) in
+  Contract.baker_from_nonce nonce
+
+let baker_registration ?counter ~consensus_key ~threshold ~owner_keys ?credit
+    ?fee ?gas_limit ?storage_limit ctxt source =
+  Context.Contract.find_account ctxt source
+  >>=? fun account ->
+  let default_credit = Tez.of_mutez @@ Int64.of_int 1000001 in
+  let default_credit =
+    WithExceptions.Option.to_exn ~none:Impossible default_credit
+  in
+  let credit = Option.value ~default:default_credit credit in
+  let operation =
+    Baker_registration {credit; consensus_key; threshold; owner_keys}
+  in
+  let public_key = Some account.pk in
+  manager_operation
+    ?counter
+    ?public_key
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~source
+    ctxt
+    operation
+  >>=? fun sop ->
+  let op = sign account.sk ctxt sop in
+  let baker_hash = baker_contract op in
+  let account =
+    Account.
+      {
+        key = {pkh = account.pkh; pk = account.pk; sk = account.sk};
+        baker = baker_hash;
+      }
+  in
+  Account.add_baker account ;
+  return (op, baker_hash)
+
 let miss_signed_endorsement ?level ctxt =
   (match level with None -> Context.get_level ctxt | Some level -> ok level)
   >>?= fun level ->
   Context.get_endorser ctxt
-  >>=? fun (real_delegate_pkh, _slots) ->
-  let delegate = Account.find_alternate real_delegate_pkh in
-  endorsement ~delegate:delegate.pkh ~level ctxt ()
+  >>=? fun (real_baker, _slots) ->
+  let baker = Account.find_alternate_baker real_baker in
+  endorsement ~baker ~level ctxt ()
 
 let transaction ?counter ?fee ?gas_limit ?storage_limit
     ?(parameters = Script.unit_parameter) ?(entrypoint = "default") ctxt
     (src : Contract.t) (dst : Contract.t) (amount : Tez.t) =
   let top = Transaction {amount; parameters; destination = dst; entrypoint} in
+  (* for bakers, send the transaction from the consensus key *)
+  ( match Contract.is_baker src with
+  | None ->
+      return src
+  | Some baker ->
+      Context.Baker.consensus_key ctxt baker
+      >>=? fun consensus_key ->
+      return
+        (Contract.implicit_contract @@ Signature.Public_key.hash consensus_key)
+  )
+  >>=? fun src ->
   manager_operation
     ?counter
     ?fee
@@ -327,14 +377,56 @@ let transaction ?counter ?fee ?gas_limit ?storage_limit
     ctxt
     top
   >>=? fun sop ->
-  Context.Contract.manager ctxt src
+  Context.Contract.find_account ctxt src
   >|=? fun account -> sign account.sk ctxt sop
+
+let get_baker_contract_info ctxt contract =
+  Context.Contract.storage ctxt contract
+  >>=? Client_proto_multisig.multisig_contract_information_of_storage contract
+
+let baker_action ?counter ?fee ?gas_limit ?storage_limit ctxt ~action
+    (source : Contract.t) (baker : Baker_hash.t) =
+  let contract = Contract.baker_contract baker in
+  get_baker_contract_info ctxt contract
+  >>=? fun info ->
+  let payload =
+    Client_proto_baker.mk_payload ~stored_counter:info.counter ~action
+  in
+  (* Make parameters bytes, used to create a signature *)
+  let bytes =
+    Client_proto_baker.mk_bytes_to_sign
+      ~chain_id:Chain_id.zero
+      ~payload
+      contract
+  in
+  Account.find_baker baker
+  >>=? fun account ->
+  (* Sign the parameter bytes with the owner key *)
+  let signature = Signature.sign account.key.sk bytes in
+  (* Turn action into transaction parameters *)
+  let parameters =
+    Client_proto_baker.mk_singlesig_script_param ~payload ~signature
+    |> Script.lazy_expr
+  in
+  let top =
+    Transaction
+      {
+        amount = Tez.zero;
+        parameters;
+        destination = contract;
+        entrypoint = Client_proto_baker.generic_entrypoint;
+      }
+  in
+  manager_operation ?counter ?fee ?gas_limit ?storage_limit ~source ctxt top
+  >>=? fun sop ->
+  Context.Contract.find_account ctxt source
+  >>=? fun manager -> return @@ sign manager.sk ctxt sop
 
 let delegation ?fee ctxt source dst =
   let top = Delegation dst in
   manager_operation ?fee ~source ctxt top
   >>=? fun sop ->
-  Context.Contract.manager ctxt source
+  Context.Contract.find_account ctxt source
   >|=? fun account -> sign account.sk ctxt sop
 
 let activation ctxt (pkh : Signature.Public_key_hash.t) activation_code =
@@ -382,18 +474,20 @@ let seed_nonce_revelation ctxt level nonce =
         };
   }
 
-let proposals ctxt (pkh : Contract.t) proposals =
-  Context.Contract.pkh pkh
+let proposals ctxt baker proposals =
+  Context.Baker.consensus_key ctxt baker
   >>=? fun source ->
+  let source = Signature.Public_key.hash source in
   Context.Vote.get_current_period ctxt
   >>=? fun {voting_period = {index; _}; _} ->
   let op = Proposals {source; period = index; proposals} in
   Account.find source
   >|=? fun account -> sign account.sk ctxt (Contents_list (Single op))
 
-let ballot ctxt (pkh : Contract.t) proposal ballot =
-  Context.Contract.pkh pkh
+let ballot ctxt baker proposal ballot =
+  Context.Baker.consensus_key ctxt baker
   >>=? fun source ->
+  let source = Signature.Public_key.hash source in
   Context.Vote.get_current_period ctxt
   >>=? fun {voting_period = {index; _}; _} ->
   let op = Ballot {source; period = index; proposal; ballot} in
