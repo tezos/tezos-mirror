@@ -49,11 +49,12 @@ class ClientRegression(client.Client):
         admin: bool = False,
         check: bool = True,
         trace: bool = False,
-    ):
+        stdin: str = "",
+    ) -> str:
         stderr_output = ''
         caught_exc = None
         try:
-            output = super().run(params, admin, check, trace)
+            output = super().run(params, admin, check, trace, stdin)
         except subprocess.CalledProcessError as exc:
             output = exc.args[2]
             stderr_output = exc.args[3]

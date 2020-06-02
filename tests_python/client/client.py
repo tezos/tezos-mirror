@@ -178,9 +178,10 @@ class Client:
         admin: bool = False,
         check: bool = True,
         trace: bool = False,
+        stdin: str = "",
     ) -> str:
         """Like 'run_generic' but returns just stdout."""
-        (stdout, _, _) = self.run_generic(params, admin, check, trace)
+        (stdout, _, _) = self.run_generic(params, admin, check, trace, stdin)
         return stdout
 
     def rpc(
@@ -552,6 +553,38 @@ class Client:
     def register_delegate(self, delegate: str) -> str:
         return self.run(['register', 'key', delegate, 'as', 'delegate'])
 
+    def register_baker(
+        self,
+        alias: str,
+        amount: float,
+        source: str,
+        consensus_key: str,
+        owner_keys: list,
+        threshold: int = 1,
+        burn_cap: str = '0.078',
+    ) -> client_output.OriginationResult:
+        cmd = [
+            'register',
+            'baker',
+            alias,
+            'transferring',
+            str(amount),
+            'from',
+            source,
+            'with',
+            'consensus',
+            'key',
+            consensus_key,
+            'and',
+            'threshold',
+            str(threshold),
+            'and',
+            'owner',
+            'keys',
+        ] + owner_keys
+        cmd += ['--burn-cap', burn_cap]
+        return client_output.OriginationResult(self.run(cmd))
+
     def p2p_stat(self) -> client_output.P2pStatResult:
         res = self.run(['p2p', 'stat'], admin=True)
         return client_output.P2pStatResult(res)
@@ -656,6 +689,9 @@ class Client:
 
     def get_current_period(self) -> dict:
         return self.rpc('get', 'chains/main/blocks/head/votes/current_period')
+
+    def get_period_index(self) -> int:
+        return self.get_current_period()['voting_period']['index']
 
     def get_current_period_kind(self) -> dict:
         return self.rpc(
@@ -769,6 +805,36 @@ class Client:
 
     def submit_ballot(self, account: str, proto: str, vote: str) -> str:
         return self.run(['submit', 'ballot', 'for', account, proto, vote])
+
+    def baker_submit_proposals(
+        self, account: str, protos: List[str]
+    ) -> client_output.SubmitProposalsResult:
+        cmd = [
+            'from',
+            'baker',
+            'contract',
+            account,
+            'submit',
+            'proposals',
+            'for',
+            'protocols',
+        ] + protos
+        return client_output.SubmitProposalsResult(self.run(cmd))
+
+    def baker_submit_ballot(self, account: str, proto: str, vote: str) -> str:
+        cmd = [
+            'from',
+            'baker',
+            'contract',
+            account,
+            'submit',
+            'ballot',
+            'for',
+            'protocol',
+            proto,
+            vote,
+        ]
+        return self.run(cmd)
 
     def bootstrapped(self) -> str:
         return self.run(['bootstrapped'])
@@ -1405,3 +1471,136 @@ class Client:
     def sapling_list_keys(self) -> List[str]:
         cmd = ['sapling', 'list', 'keys']
         return self.run(cmd).strip().split("\n")
+
+    def set_baker_consensus_key(
+        self, baker: str, key: str, burn_cap: str = '0.038'
+    ) -> str:
+        cmd = [
+            'set',
+            'baker',
+            baker,
+            'consensus',
+            'key',
+            'to',
+            key,
+            '--burn-cap',
+            burn_cap,
+        ]
+        return self.run(cmd)
+
+    def get_baker_consensus_key(
+        self, baker_hash: str, offset: int = None, params: List[str] = None
+    ) -> dict:
+        query = ''
+        if offset is not None:
+            query = f'?offset={offset}'
+        path = (
+            f'/chains/main/blocks/head/context/bakers/{baker_hash}/'
+            f'consensus_key{query}'
+        )
+        rpc_res = self.rpc('get', path, params=params)
+        return rpc_res
+
+    def get_baker_pending_consensus_key(
+        self, baker_hash: str, offset: int = None, params: List[str] = None
+    ) -> dict:
+        query = ''
+        if offset is not None:
+            query = f'?offset={offset}'
+        path = (
+            f'/chains/main/blocks/head/context/bakers/{baker_hash}/'
+            f'pending_consensus_key{query}'
+        )
+        rpc_res = self.rpc('get', path, params=params)
+        return rpc_res
+
+    def set_baker_threshold_and_owner_keys(
+        self,
+        baker: str,
+        threshold: int,
+        keys: List[str],
+        burn_cap: str = '0.038',
+    ) -> str:
+        cmd = [
+            'set',
+            'baker',
+            baker,
+            'threshold',
+            'to',
+            str(threshold),
+            'and',
+            'owner',
+            'keys',
+            'to',
+        ]
+        cmd += keys
+        cmd += ['--burn-cap', burn_cap]
+        return self.run(cmd)
+
+    def run_baker_script(
+        self,
+        storage: str,
+        inp: str,
+        source: str = None,
+        entrypoint: str = None,
+        amount: float = None,
+        trace_stack: bool = False,
+    ) -> client_output.RunScriptResult:
+        cmd = [
+            'run',
+            'baker',
+            'script',
+            'on',
+            'storage',
+            storage,
+            'and',
+            'input',
+            inp,
+        ]
+        if source is not None:
+            cmd += ['--source', source]
+        if entrypoint is not None:
+            cmd += ['--entrypoint', entrypoint]
+        if amount is not None:
+            cmd += ['-z', str(amount)]
+        if trace_stack:
+            cmd += ['--trace-stack']
+        return client_output.RunScriptResult(self.run(cmd))
+
+    def find_baker_with_consensus_key(self, pkh: str) -> str:
+        cmd = ['find', 'baker', 'with', 'consensus', 'key', pkh]
+        res = client_output.FindBakerWithConsensusKeyResult(self.run(cmd))
+        return res.baker
+
+    def toggle_baker_delegations(self, account: str, accept: bool) -> str:
+        accept_str = 'accepting' if accept else 'declining'
+        cmd = ['set', 'baker', account, accept_str, 'new', 'delegations']
+        return self.run(cmd)
+
+    def gen_pvss_keys(self, alias: str, pwd: str = 'password') -> str:
+        cmd = ['pvss', 'gen', 'keys', alias]
+        # password and password confirmation
+        stdin = f'{pwd}\n{pwd}\n'
+        return self.run(cmd, stdin=stdin)
+
+    def list_pvss_keys(self) -> dict:
+        cmd = ['pvss', 'list', 'keys']
+        return client_output.ListPvssKeysResult(self.run(cmd)).keys
+
+    def forget_pvss_keys(self, alias: str, args: List[str] = None) -> str:
+        cmd = ['pvss', 'forget', 'keys', alias]
+        if args is None:
+            args = ['--force']
+        cmd += args
+        return self.run(cmd)
+
+    def forget_all_pvss_keys(self, args: List[str] = None) -> str:
+        cmd = ['pvss', 'forget', 'all', 'keys']
+        if args is None:
+            args = ['--force']
+        cmd += args
+        return self.run(cmd)
+
+    def set_baker_pvss(self, account: str, key_alias: str) -> str:
+        cmd = ['set', 'baker', account, 'pvss', 'to', key_alias]
+        return self.run(cmd)
