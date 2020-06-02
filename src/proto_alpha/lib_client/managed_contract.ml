@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -88,9 +89,8 @@ let parse code =
     >>? fun exp ->
     Error_monad.ok @@ Script.lazy_expr Michelson_v1_parser.(exp.expanded) )
 
-let build_delegate_operation (cctxt : #full) ~chain ~block ?fee
-    contract (* the KT1 to delegate *)
-    (delegate : Signature.public_key_hash option) =
+let build_delegate_operation (cctxt : #full) ~chain ~block ?fee contract
+    (* the KT1 to delegate *) (delegate : Baker_hash.t option) =
   let entrypoint = "do" in
   Michelson_v1_entrypoints.contract_entrypoint_type
     cctxt
@@ -105,14 +105,14 @@ let build_delegate_operation (cctxt : #full) ~chain ~block ?fee
                match delegate with
                | Some delegate ->
                    let (`Hex delegate) =
-                     Signature.Public_key_hash.to_hex delegate
+                     Baker_hash.to_bytes delegate |> Hex.of_bytes
                    in
                    Format.asprintf
-                     "{ DROP ; NIL operation ; PUSH key_hash 0x%s ; SOME ; \
+                     "{ DROP ; NIL operation ; PUSH baker_hash 0x%s ; SOME ; \
                       SET_DELEGATE ; CONS }"
                      delegate
                | None ->
-                   "{ DROP ; NIL operation ; NONE key_hash ; SET_DELEGATE ; \
+                   "{ DROP ; NIL operation ; NONE baker_hash ; SET_DELEGATE ; \
                     CONS }"
              in
              parse lambda >>=? fun param -> return (param, entrypoint)
@@ -138,7 +138,7 @@ let build_delegate_operation (cctxt : #full) ~chain ~block ?fee
                    match delegate with
                    | Some delegate ->
                        let (`Hex delegate) =
-                         Signature.Public_key_hash.to_hex delegate
+                         Baker_hash.to_bytes delegate |> Hex.of_bytes
                        in
                        "0x" ^ delegate
                    | None ->
@@ -161,8 +161,7 @@ let build_delegate_operation (cctxt : #full) ~chain ~block ?fee
 
 let set_delegate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?branch ~fee_parameter ?fee ~source ~src_pk ~src_sk
-    contract (* the KT1 to delegate *)
-    (delegate : Signature.public_key_hash option) =
+    contract (* the KT1 to delegate *) (delegate : Baker_hash.t option) =
   build_delegate_operation cctxt ~chain ~block ?fee contract delegate
   >>=? fun operation ->
   let operation = Injection.Single_manager operation in
@@ -183,12 +182,6 @@ let set_delegate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     operation
   >>=? return_single_manager_result
 
-let d_unit =
-  Micheline.strip_locations (Prim (0, Michelson_v1_primitives.D_Unit, [], []))
-
-let t_unit =
-  Micheline.strip_locations (Prim (0, Michelson_v1_primitives.T_unit, [], []))
-
 let build_lambda_for_implicit ~delegate ~amount =
   let (`Hex delegate) = Signature.Public_key_hash.to_hex delegate in
   Format.asprintf
@@ -205,7 +198,10 @@ let build_lambda_for_originated ~destination ~entrypoint ~amount
   let amount = Tez.to_mutez amount in
   let (`Hex destination) = Hex.of_bytes destination in
   let entrypoint = match entrypoint with "default" -> "" | s -> "%" ^ s in
-  if parameter_type = t_unit then
+  if
+    parameter_type
+    = (Michelson_v1_helpers.t_unit ~loc:0 |> Micheline.strip_locations)
+  then
     Format.asprintf
       "{ DROP ; NIL operation ;PUSH address 0x%s; CONTRACT %s %a; \
        ASSERT_SOME;PUSH mutez %Ld ;UNIT;TRANSFER_TOKENS ; CONS }"
@@ -266,7 +262,12 @@ let build_transaction_operation (cctxt : #full) ~chain ~block ~contract
       | None ->
           return_none )
       >>=? fun parameter ->
-      let parameter = Option.value ~default:d_unit parameter in
+      let parameter =
+        Option.value
+          ~default:
+            (Michelson_v1_helpers.d_unit ~loc:0 |> Micheline.strip_locations)
+          parameter
+      in
       return
       @@ build_lambda_for_originated
            ~destination
