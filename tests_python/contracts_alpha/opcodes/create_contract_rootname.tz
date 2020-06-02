@@ -4,7 +4,7 @@ storage (option address);
 code { DROP;
        UNIT; # starting storage for contract
        AMOUNT;                   # Push the starting balance
-       NONE key_hash;                 # No delegate
+       NONE baker_hash;               # No delegate
        CREATE_CONTRACT          # Create the contract
          { parameter %root unit ;
            storage unit ;
