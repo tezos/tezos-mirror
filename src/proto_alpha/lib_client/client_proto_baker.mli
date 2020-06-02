@@ -1,7 +1,6 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -28,10 +27,25 @@ open Protocol
 open Alpha_context
 open Protocol_client_context
 
-type multisig_action =
-  | Transfer of Tez.t * Contract.t
-  | Change_delegate of baker_hash option
-  | Change_keys of Z.t * public_key list
+type transfer_to_scripted = {
+  amount : Tez.t;
+  destination : Contract.t;
+  entrypoint : string;
+  parameter : Script.expr;
+  parameter_type : Script.expr;
+}
+
+type action =
+  | Transfer_to_implicit of Tez.t * Signature.Public_key_hash.t
+  | Transfer_to_scripted of transfer_to_scripted
+  | Submit_proposals of Protocol_hash.t list
+  | Submit_ballot of Protocol_hash.t * Vote.ballot
+  | Set_active of bool
+  | Toggle_delegations of bool
+  | Set_consensus_key of Signature.Public_key.t * Signature.t
+  | Set_owner_keys of Z.t * Signature.Public_key.t list
+  | Set_pvss_key of Pvss_secp256k1.Public_key.t
+  | Generic of Script.expr
 
 type multisig_prepared_action = {
   bytes : Bytes.t;
@@ -40,68 +54,68 @@ type multisig_prepared_action = {
   counter : Z.t;
 }
 
-(* The relevant information that we can get about a multisig smart contract *)
-type multisig_contract_information = {
-  counter : Z.t;
-  threshold : Z.t;
-  keys : Signature.Public_key.t list;
-}
+type error += More_than_one_key
 
-val multisig_contract_information_of_storage :
-  Contract.t -> Script.expr -> multisig_contract_information tzresult Lwt.t
+val generic_entrypoint : string
 
-val multisig_get_information :
+val generic_lambda_type : string
+
+val prepare_set_consensus_key_proof :
   full ->
-  chain:Shell_services.chain ->
-  block:Shell_services.block ->
-  Contract.t ->
-  multisig_contract_information tzresult Lwt.t
+  chain_id:Tezos_protocol_environment_alpha.Environment.Chain_id.t ->
+  baker:Tezos_raw_protocol_alpha.Alpha_context.Baker_hash.t ->
+  Tezos_base__TzPervasives.Signature.Public_key.t ->
+  Signature.t tzresult Lwt.t
 
-val known_multisig_hashes : Script_expr_hash.t list
+val prepare_set_consensus_key_action :
+  full ->
+  chain_id:Chain_id.t ->
+  baker:Baker_hash.t ->
+  public_key ->
+  action tzresult Lwt.t
 
-val check_threshold :
-  threshold:Z.t ->
-  keys:Signature.Public_key.t list ->
-  unit ->
-  unit tzresult Lwt.t
+val prepare_transfer_action :
+  ?arg:string ->
+  ?entrypoint:string ->
+  full ->
+  amount:Tez.t ->
+  destination:Contract.contract ->
+  action tzresult Lwt.t
 
-val check_multisig_signatures :
-  bytes:Bytes.t ->
-  threshold:Z.t ->
-  keys:Signature.Public_key.t list ->
-  Signature.t list ->
-  Signature.t option list tzresult Lwt.t
+val prepare_generic_action :
+  full -> Michelson_v1_parser.parsed -> action tzresult Lwt.t
 
-val originate_multisig :
+val mk_payload : stored_counter:Z.t -> action:action -> Script.node
+
+val mk_bytes_to_sign :
+  chain_id:Chain_id.t -> payload:Script.node -> Contract.t -> bytes
+
+val mk_singlesig_script_param :
+  payload:Script.node -> signature:Signature.t -> Script.expr
+
+val mk_multisig_script_param :
+  payload:Script.node -> signatures:Signature.t option list -> Script.expr
+
+val call_singlesig :
   full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?confirmations:int ->
   ?dry_run:bool ->
   ?branch:int ->
-  ?fee:Tez.t ->
-  ?gas_limit:Gas.Arith.integral ->
-  ?storage_limit:Z.t ->
-  ?verbose_signing:bool ->
-  delegate:baker_hash option ->
-  threshold:Z.t ->
-  keys:public_key list ->
-  balance:Tez.t ->
   source:public_key_hash ->
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
+  baker:Baker_hash.t ->
+  action:action ->
+  ?fee:Tez.t ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:Z.t ->
+  ?counter:Z.t ->
   fee_parameter:Injection.fee_parameter ->
   unit ->
-  (Kind.origination Kind.manager Injection.result * Contract.t) tzresult Lwt.t
-
-val prepare_multisig_transaction :
-  full ->
-  chain:Shell_services.chain ->
-  block:Shell_services.block ->
-  multisig_contract:Contract.t ->
-  action:multisig_action ->
-  unit ->
-  multisig_prepared_action tzresult Lwt.t
+  (Kind.transaction Kind.manager Injection.result * Contract.t list) tzresult
+  Lwt.t
 
 val call_multisig :
   full ->
@@ -109,15 +123,13 @@ val call_multisig :
   block:Shell_services.block ->
   ?confirmations:int ->
   ?dry_run:bool ->
-  ?verbose_signing:bool ->
   ?branch:int ->
   source:public_key_hash ->
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
-  multisig_contract:Contract.t ->
-  action:multisig_action ->
+  baker:Baker_hash.t ->
   signatures:Signature.t list ->
-  amount:Tez.t ->
+  action:action ->
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
@@ -127,26 +139,11 @@ val call_multisig :
   (Kind.transaction Kind.manager Injection.result * Contract.t list) tzresult
   Lwt.t
 
-val call_multisig_on_bytes :
+val prepare_multisig_transaction :
   full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
-  ?confirmations:int ->
-  ?dry_run:bool ->
-  ?verbose_signing:bool ->
-  ?branch:int ->
-  source:public_key_hash ->
-  src_pk:public_key ->
-  src_sk:Client_keys.sk_uri ->
-  multisig_contract:Contract.t ->
-  bytes:Bytes.t ->
-  signatures:Signature.t list ->
-  amount:Tez.t ->
-  ?fee:Tez.t ->
-  ?gas_limit:Gas.Arith.integral ->
-  ?storage_limit:Z.t ->
-  ?counter:Z.t ->
-  fee_parameter:Injection.fee_parameter ->
+  baker:Baker_hash.t ->
+  action:action ->
   unit ->
-  (Kind.transaction Kind.manager Injection.result * Contract.t list) tzresult
-  Lwt.t
+  multisig_prepared_action tzresult Lwt.t

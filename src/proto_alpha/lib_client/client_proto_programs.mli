@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -51,6 +52,24 @@ val run :
   tzresult
   Lwt.t
 
+val run_baker :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  ?amount:Tez.t ->
+  balance:Tez.t ->
+  storage:Michelson_v1_parser.parsed ->
+  input:Michelson_v1_parser.parsed ->
+  unparsing_mode:Script_ir_translator.unparsing_mode ->
+  ?source:Contract.t ->
+  ?payer:Contract.t ->
+  ?gas:Gas.Arith.integral ->
+  ?entrypoint:string ->
+  unit ->
+  (Script.expr * packed_internal_operation list * Lazy_storage.diffs option)
+  tzresult
+  Lwt.t
+
 val trace :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
@@ -73,10 +92,31 @@ val trace :
   tzresult
   Lwt.t
 
+val trace_baker :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  ?amount:Tez.t ->
+  balance:Tez.t ->
+  storage:Michelson_v1_parser.parsed ->
+  input:Michelson_v1_parser.parsed ->
+  unparsing_mode:Script_ir_translator.unparsing_mode ->
+  ?source:Contract.t ->
+  ?payer:Contract.t ->
+  ?gas:Gas.Arith.integral ->
+  ?entrypoint:string ->
+  unit ->
+  ( Script.expr
+  * packed_internal_operation list
+  * Script_interpreter.execution_trace
+  * Lazy_storage.diffs option )
+  tzresult
+  Lwt.t
+
 val print_run_result :
+  ?parsed:Michelson_v1_parser.parsed ->
   #Client_context.printer ->
   show_source:bool ->
-  parsed:Michelson_v1_parser.parsed ->
   ( Script_repr.expr
   * packed_internal_operation list
   * Lazy_storage.diffs option )
@@ -84,9 +124,9 @@ val print_run_result :
   unit tzresult Lwt.t
 
 val print_trace_result :
+  ?parsed:Michelson_v1_parser.parsed ->
   #Client_context.printer ->
   show_source:bool ->
-  parsed:Michelson_v1_parser.parsed ->
   ( Script_repr.expr
   * packed_internal_operation list
   * Script_interpreter.execution_trace

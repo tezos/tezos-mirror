@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,13 +25,45 @@
 
 open Protocol
 open Alpha_context
+open Tezos_micheline.Micheline
 
-val pp_internal_operation :
-  Format.formatter -> packed_internal_operation -> unit
+val seq : loc:'a -> ('a, Script.prim) node list -> ('a, Script.prim) node
 
-val pp_operation_result :
-  Format.formatter ->
-  'kind contents_list * 'kind Apply_results.contents_result_list ->
-  unit
+val pair :
+  loc:'a ->
+  ('a, Script.prim) node ->
+  ('a, Script.prim) node ->
+  ('a, Script.prim) node
 
-val pp_mapped_keys : Format.formatter -> Apply_results.mapped_key list -> unit
+val none : loc:'a -> unit -> ('a, Script.prim) node
+
+val some : loc:'a -> ('a, Script.prim) node -> ('a, Script.prim) node
+
+val left : loc:'a -> ('a, Script.prim) node -> ('a, Script.prim) node
+
+val right : loc:'a -> ('a, Script.prim) node -> ('a, Script.prim) node
+
+val int : loc:'a -> Z.t -> ('a, Script.prim) node
+
+val bytes : loc:'a -> bytes -> ('a, Script.prim) node
+
+val string : loc:'a -> string -> ('a, Script.prim) node
+
+val bool : loc:'a -> bool -> ('a, Script.prim) node
+
+val protocol_hash : loc:'a -> Protocol_hash.t -> ('a, Script.prim) node
+
+val public_key : loc:'a -> Signature.Public_key.t -> ('a, Script.prim) node
+
+val signature : loc:'a -> Signature.t -> ('a, Script.prim) node
+
+val pvss_public_key :
+  loc:'a -> Pvss_secp256k1.Public_key.t -> ('a, Script.prim) node
+
+val d_unit : loc:'a -> ('a, Script.prim) node
+
+val t_unit : loc:'a -> ('a, Script.prim) node
+
+(** No-op lambda expression of type
+    [lambda unit (pair (list operation) (list baker_operation))] *)
+val generic_baker_noop : loc:'a -> ('a, Script.prim) node
