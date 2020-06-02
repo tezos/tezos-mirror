@@ -90,7 +90,7 @@ a transfer operation.
             sandbox.add_node(1)
             # Launch a baker associated to node 0, baking on behalf of delegate
             # bootstrap5
-            sandbox.add_baker(0, 'bootstrap5', proto=constants.ALPHA_DAEMON)
+            sandbox.add_baker(0, 'baker5', proto=constants.ALPHA_DAEMON)
             # first client tells node 0 to transfer money for an account to another
             # receipt is an object representing the client answer
             receipt = sandbox.client(0).transfer(500, 'bootstrap1', 'bootstrap3')
@@ -257,7 +257,7 @@ The following ``test_example.py`` is the ``pytest`` counterpart of the first exa
             sandbox.add_node(0, params=constants.NODE_PARAMS)
             utils.activate_alpha(sandbox.client(0))
             sandbox.add_node(1, params=constants.NODE_PARAMS)
-            sandbox.add_baker(0, 'bootstrap5', proto=constants.ALPHA_DAEMON)
+            sandbox.add_baker(0, 'baker5', proto=constants.ALPHA_DAEMON)
             yield sandbox
             assert sandbox.are_daemons_alive()
 

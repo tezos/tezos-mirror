@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -26,6 +27,44 @@
 open Protocol
 open Alpha_context
 open Apply_results
+
+let pp_origination ppf ~pp_result ~result ~source ~internal pp_delegate
+    ~delegate ~credit ~script =
+  let Script.{code; storage} = script in
+  Format.fprintf
+    ppf
+    "@[<v 2>%s:@,From: %a@,Credit: %s%a"
+    (if internal then "Internal origination" else "Origination")
+    Contract.pp
+    source
+    Client_proto_args.tez_sym
+    Tez.pp
+    credit ;
+  let code =
+    Option.unopt_exn
+      (Failure "ill-serialized code")
+      (Data_encoding.force_decode code)
+  and storage =
+    Option.unopt_exn
+      (Failure "ill-serialized storage")
+      (Data_encoding.force_decode storage)
+  in
+  let {Michelson_v1_parser.source; _} =
+    Michelson_v1_printer.unparse_toplevel code
+  in
+  Format.fprintf
+    ppf
+    "@,@[<hv 2>Script:@ @[<h>%a@]@,@[<hv 2>Initial storage:@ %a@]"
+    Format.pp_print_text
+    source
+    Michelson_v1_printer.print_expr
+    storage ;
+  ( match delegate with
+  | None ->
+      Format.fprintf ppf "@,No delegate for this contract"
+  | Some delegate ->
+      Format.fprintf ppf "@,Delegate: %a" pp_delegate delegate ) ;
+  pp_result ppf result ; Format.fprintf ppf "@]"
 
 let pp_manager_operation_content (type kind) source internal pp_result ppf
     ((operation, result) : kind manager_operation * _) =
@@ -60,46 +99,41 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
           Michelson_v1_printer.print_expr
           expr ) ;
       pp_result ppf result ; Format.fprintf ppf "@]"
-  | Origination {delegate; credit; script = {code; storage}; preorigination = _}
-    ->
+  | Origination_legacy {delegate; credit; script; preorigination = _} ->
+      pp_origination
+        ppf
+        ~pp_result
+        ~result
+        ~source
+        ~internal
+        Signature.Public_key_hash.pp
+        ~delegate
+        ~credit
+        ~script
+  | Origination {delegate; credit; script; preorigination = _} ->
+      pp_origination
+        ppf
+        ~pp_result
+        ~result
+        ~source
+        ~internal
+        Baker_hash.pp
+        ~delegate
+        ~credit
+        ~script
+  | Baker_registration {credit; _} ->
       Format.fprintf
         ppf
         "@[<v 2>%s:@,From: %a@,Credit: %s%a"
-        (if internal then "Internal origination" else "Origination")
+        ( if internal then "Internal baker registration"
+        else "Baker registration" )
         Contract.pp
         source
         Client_proto_args.tez_sym
         Tez.pp
         credit ;
-      let code =
-        Option.unopt_exn
-          (Failure "ill-serialized code")
-          (Data_encoding.force_decode code)
-      and storage =
-        Option.unopt_exn
-          (Failure "ill-serialized storage")
-          (Data_encoding.force_decode storage)
-      in
-      let {Michelson_v1_parser.source; _} =
-        Michelson_v1_printer.unparse_toplevel code
-      in
-      Format.fprintf
-        ppf
-        "@,@[<hv 2>Script:@ @[<h>%a@]@,@[<hv 2>Initial storage:@ %a@]"
-        Format.pp_print_text
-        source
-        Michelson_v1_printer.print_expr
-        storage ;
-      ( match delegate with
-      | None ->
-          Format.fprintf ppf "@,No delegate for this contract"
-      | Some delegate ->
-          Format.fprintf
-            ppf
-            "@,Delegate: %a"
-            Signature.Public_key_hash.pp
-            delegate ) ;
-      pp_result ppf result ; Format.fprintf ppf "@]"
+      pp_result ppf result ;
+      Format.fprintf ppf "@]"
   | Reveal key ->
       Format.fprintf
         ppf
@@ -109,6 +143,26 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
         source
         Signature.Public_key.pp
         key
+        pp_result
+        result
+  | Delegation_legacy None ->
+      Format.fprintf
+        ppf
+        "@[<v 2>%s:@,Contract: %a@,To: nobody%a@]"
+        (if internal then "Internal Delegation" else "Delegation")
+        Contract.pp
+        source
+        pp_result
+        result
+  | Delegation_legacy (Some delegate) ->
+      Format.fprintf
+        ppf
+        "@[<v 2>%s:@,Contract: %a@,To: %a%a@]"
+        (if internal then "Internal Delegation" else "Delegation")
+        Contract.pp
+        source
+        Signature.Public_key_hash.pp
+        delegate
         pp_result
         result
   | Delegation None ->
@@ -127,8 +181,74 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
         (if internal then "Internal Delegation" else "Delegation")
         Contract.pp
         source
-        Signature.Public_key_hash.pp
+        Baker_hash.pp
         delegate
+        pp_result
+        result ) ;
+  Format.fprintf ppf "@]"
+
+let pp_baker_operation_content (type kind) baker pp_result ppf
+    ((operation, result) : kind baker_operation * _) =
+  Format.fprintf ppf "@[<v 0>" ;
+  ( match operation with
+  | Baker_proposals {period; proposals} ->
+      Format.fprintf
+        ppf
+        "@[<v 2>Proposals:@,\
+         Baker: %a@,\
+         Period: %a@,\
+         Protocols:@,\
+        \  @[<v 0>%a@]%a@]"
+        Baker_hash.pp
+        baker
+        Voting_period.pp
+        period
+        Format.(pp_print_list pp_print_string)
+        proposals
+        pp_result
+        result
+  | Baker_ballot {period; proposal; ballot} ->
+      Format.fprintf
+        ppf
+        "@[<v 2>Ballot:@,Baker: %a@,Period: %a@,Protocol: %a@,Vote: %a%a@]"
+        Baker_hash.pp
+        baker
+        Voting_period.pp
+        period
+        Format.pp_print_string
+        proposal
+        Data_encoding.Json.pp
+        (Data_encoding.Json.construct Vote.ballot_encoding ballot)
+        pp_result
+        result
+  | Set_baker_active active ->
+      Format.fprintf
+        ppf
+        "@[<v 2>Set baker active:@,Baker: %a@,Active: %a%a@]"
+        Baker_hash.pp
+        baker
+        Format.pp_print_bool
+        active
+        pp_result
+        result
+  | Set_baker_consensus_key key ->
+      Format.fprintf
+        ppf
+        "@[<v 2>Set baker consensus key:@,Baker: %a@,Key: %a%a@]"
+        Baker_hash.pp
+        baker
+        Signature.Public_key.pp
+        key
+        pp_result
+        result
+  | Set_baker_pvss_key key ->
+      Format.fprintf
+        ppf
+        "@[<v 2>Set baker pvss key:@,Baker: %a@,Key: %a%a@]"
+        Baker_hash.pp
+        baker
+        Pvss_secp256k1.Public_key.pp
+        key
         pp_result
         result ) ;
   Format.fprintf ppf "@]"
@@ -138,13 +258,12 @@ let pp_balance_updates ppf = function
       ()
   | balance_updates ->
       let open Receipt in
-      (* For dry runs, the baker's key is zero
-         (tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU). Instead of printing this
-         key hash, we want to make the result more informative. *)
-      let pp_baker ppf baker =
-        if Signature.Public_key_hash.equal baker Signature.Public_key_hash.zero
-        then Format.fprintf ppf "the baker who will include this operation"
-        else Signature.Public_key_hash.pp ppf baker
+      (* For dry runs, the baker's key is zero. Instead of printing this baker
+         hash, we want to make the result more informative. *)
+      let pp_baker ppf baker_hash =
+        if Baker_hash.equal baker_hash Baker_hash.zero then
+          Format.fprintf ppf "the baker who will include this operation"
+        else Baker_hash.pp ppf baker_hash
       in
       let balance_updates =
         List.map
@@ -153,12 +272,12 @@ let pp_balance_updates ppf = function
               match balance with
               | Contract c ->
                   Format.asprintf "%a" Contract.pp c
-              | Rewards (pkh, l) ->
-                  Format.asprintf "rewards(%a,%a)" pp_baker pkh Cycle.pp l
-              | Fees (pkh, l) ->
-                  Format.asprintf "fees(%a,%a)" pp_baker pkh Cycle.pp l
-              | Deposits (pkh, l) ->
-                  Format.asprintf "deposits(%a,%a)" pp_baker pkh Cycle.pp l
+              | Rewards (baker, l) ->
+                  Format.asprintf "rewards(%a,%a)" pp_baker baker Cycle.pp l
+              | Fees (baker, l) ->
+                  Format.asprintf "fees(%a,%a)" pp_baker baker Cycle.pp l
+              | Deposits (baker, l) ->
+                  Format.asprintf "deposits(%a,%a)" pp_baker baker Cycle.pp l
             in
             (balance, update))
           balance_updates
@@ -257,14 +376,8 @@ let pp_manager_operation_contents_and_result ppf
           pp_balance_updates
           balance_updates
   in
-  let pp_origination_result
-      (Origination_result
-        { lazy_storage_diff;
-          balance_updates;
-          consumed_gas;
-          originated_contracts;
-          storage_size;
-          paid_storage_size_diff }) =
+  let pp_origination_result ~lazy_storage_diff ~balance_updates ~consumed_gas
+      ~originated_contracts ~storage_size ~paid_storage_size_diff =
     ( match originated_contracts with
     | [] ->
         ()
@@ -293,7 +406,38 @@ let pp_manager_operation_contents_and_result ppf
           pp_balance_updates
           balance_updates
   in
-  let pp_result (type kind) ppf (result : kind manager_operation_result) =
+  let pp_baker_registration_result
+      (Baker_registration_result
+        { balance_updates;
+          consumed_gas;
+          registered_baker;
+          storage_size;
+          paid_storage_size_diff }) =
+    Format.fprintf
+      ppf
+      "@,@[<v 2>Registered baker:@,%a@]"
+      Baker_hash.pp
+      registered_baker ;
+    if storage_size <> Z.zero then
+      Format.fprintf ppf "@,Storage size: %s bytes" (Z.to_string storage_size) ;
+    if paid_storage_size_diff <> Z.zero then
+      Format.fprintf
+        ppf
+        "@,Paid storage size diff: %s bytes"
+        (Z.to_string paid_storage_size_diff) ;
+    Format.fprintf ppf "@,Consumed gas: %s" (Z.to_string consumed_gas) ;
+    match balance_updates with
+    | [] ->
+        ()
+    | balance_updates ->
+        Format.fprintf
+          ppf
+          "@,Balance updates:@,  %a"
+          pp_balance_updates
+          balance_updates
+  in
+  let pp_manager_result (type kind) ppf
+      (result : kind manager_operation_result) =
     Format.fprintf ppf "@," ;
     match result with
     | Skipped _ ->
@@ -308,9 +452,17 @@ let pp_manager_operation_contents_and_result ppf
           ppf
           "@[<v 0>This revelation was BACKTRACKED, its expected effects were \
            NOT applied.@]"
+    | Applied (Delegation_legacy_result {consumed_gas}) ->
+        Format.fprintf ppf "This delegation was successfully applied" ;
+        Format.fprintf ppf "@,Consumed gas: %s" (Z.to_string consumed_gas)
     | Applied (Delegation_result {consumed_gas}) ->
         Format.fprintf ppf "This delegation was successfully applied" ;
         Format.fprintf ppf "@,Consumed gas: %s" (Z.to_string consumed_gas)
+    | Backtracked (Delegation_legacy_result _, _) ->
+        Format.fprintf
+          ppf
+          "@[<v 0>This delegation was BACKTRACKED, its expected effects were \
+           NOT applied.@]"
     | Backtracked (Delegation_result _, _) ->
         Format.fprintf
           ppf
@@ -325,15 +477,139 @@ let pp_manager_operation_contents_and_result ppf
           "@[<v 0>This transaction was BACKTRACKED, its expected effects (as \
            follow) were NOT applied.@]" ;
         pp_transaction_result tx
-    | Applied (Origination_result _ as op) ->
+    | Applied
+        (Origination_legacy_result
+          { lazy_storage_diff;
+            balance_updates;
+            consumed_gas;
+            originated_contracts;
+            storage_size;
+            paid_storage_size_diff }) ->
         Format.fprintf ppf "This origination was successfully applied" ;
-        pp_origination_result op
-    | Backtracked ((Origination_result _ as op), _errs) ->
+        pp_origination_result
+          ~lazy_storage_diff
+          ~balance_updates
+          ~consumed_gas
+          ~originated_contracts
+          ~storage_size
+          ~paid_storage_size_diff
+    | Applied
+        (Origination_result
+          { lazy_storage_diff;
+            balance_updates;
+            consumed_gas;
+            originated_contracts;
+            storage_size;
+            paid_storage_size_diff }) ->
+        Format.fprintf ppf "This origination was successfully applied" ;
+        pp_origination_result
+          ~lazy_storage_diff
+          ~balance_updates
+          ~consumed_gas
+          ~originated_contracts
+          ~storage_size
+          ~paid_storage_size_diff
+    | Backtracked
+        ( Origination_legacy_result
+            { lazy_storage_diff;
+              balance_updates;
+              consumed_gas;
+              originated_contracts;
+              storage_size;
+              paid_storage_size_diff },
+          _errs ) ->
         Format.fprintf
           ppf
           "@[<v 0>This origination was BACKTRACKED, its expected effects (as \
            follow) were NOT applied.@]" ;
-        pp_origination_result op
+        pp_origination_result
+          ~lazy_storage_diff
+          ~balance_updates
+          ~consumed_gas
+          ~originated_contracts
+          ~storage_size
+          ~paid_storage_size_diff
+    | Backtracked
+        ( Origination_result
+            { lazy_storage_diff;
+              balance_updates;
+              consumed_gas;
+              originated_contracts;
+              storage_size;
+              paid_storage_size_diff },
+          _errs ) ->
+        Format.fprintf
+          ppf
+          "@[<v 0>This origination was BACKTRACKED, its expected effects (as \
+           follow) were NOT applied.@]" ;
+        pp_origination_result
+          ~lazy_storage_diff
+          ~balance_updates
+          ~consumed_gas
+          ~originated_contracts
+          ~storage_size
+          ~paid_storage_size_diff
+    | Applied (Baker_registration_result _ as op) ->
+        Format.fprintf ppf "This baker registration was successfully applied" ;
+        pp_baker_registration_result op
+    | Backtracked ((Baker_registration_result _ as op), _errs) ->
+        Format.fprintf
+          ppf
+          "@[<v 0>This baker registration was BACKTRACKED, its expected \
+           effects (as follow) were NOT applied.@]" ;
+        pp_baker_registration_result op
+  in
+  let pp_baker_result (type kind) ppf (result : kind baker_operation_result) =
+    Format.fprintf ppf "@," ;
+    match result with
+    | Skipped _ ->
+        Format.fprintf ppf "This operation was skipped"
+    | Failed (_, _errs) ->
+        Format.fprintf ppf "This operation FAILED."
+    | Applied (Baker_proposals_result {consumed_gas}) ->
+        Format.fprintf ppf "The proposals were successfully submitted" ;
+        Format.fprintf ppf "@,Consumed gas: %s" (Z.to_string consumed_gas)
+    | Backtracked (Baker_proposals_result _, _) ->
+        Format.fprintf
+          ppf
+          "@[<v 0>The proposals submission was BACKTRACKED, its expected \
+           effects were NOT applied.@]"
+    | Applied (Baker_ballot_result {consumed_gas}) ->
+        Format.fprintf ppf "The ballot was successfully submitted" ;
+        Format.fprintf ppf "@,Consumed gas: %s" (Z.to_string consumed_gas)
+    | Backtracked (Baker_ballot_result _, _) ->
+        Format.fprintf
+          ppf
+          "@[<v 0>The ballot submission was BACKTRACKED, its expected effects \
+           were NOT applied.@]"
+    | Applied (Set_baker_active_result {active; consumed_gas}) ->
+        Format.fprintf
+          ppf
+          "The baker was successfully %s"
+          (if active then "activated" else "deactivated") ;
+        Format.fprintf ppf "@,Consumed gas: %s" (Z.to_string consumed_gas)
+    | Backtracked (Set_baker_active_result {active; _}, _) ->
+        Format.fprintf
+          ppf
+          "@[<v 0>The baker %s was BACKTRACKED, its expected effects were NOT \
+           applied.@]"
+          (if active then "activation" else "deactivation")
+    | Applied (Set_baker_consensus_key_result {consumed_gas}) ->
+        Format.fprintf ppf "The baker consensus key was successfully set" ;
+        Format.fprintf ppf "@,Consumed gas: %s" (Z.to_string consumed_gas)
+    | Backtracked (Set_baker_consensus_key_result _, _) ->
+        Format.fprintf
+          ppf
+          "@[<v 0>The operation to set baker consensus key was BACKTRACKED, \
+           its expected effects were NOT applied.@]"
+    | Applied (Set_baker_pvss_key_result {consumed_gas}) ->
+        Format.fprintf ppf "The baker PVSS key was successfully set" ;
+        Format.fprintf ppf "@,Consumed gas: %s" (Z.to_string consumed_gas)
+    | Backtracked (Set_baker_pvss_key_result _, _) ->
+        Format.fprintf
+          ppf
+          "@[<v 0>The operation to set baker PVSS key was BACKTRACKED, its \
+           expected effects were NOT applied.@]"
   in
   Format.fprintf
     ppf
@@ -366,7 +642,7 @@ let pp_manager_operation_contents_and_result ppf
     (pp_manager_operation_content
        (Contract.implicit_contract source)
        false
-       pp_result)
+       pp_manager_result)
     (operation, operation_result) ;
   ( match internal_operation_results with
   | [] ->
@@ -375,13 +651,21 @@ let pp_manager_operation_contents_and_result ppf
       Format.fprintf
         ppf
         "@,@[<v 2>Internal operations:@ %a@]"
-        (Format.pp_print_list (fun ppf (Internal_operation_result (op, res)) ->
-             pp_manager_operation_content
-               op.source
-               false
-               pp_result
-               ppf
-               (op.operation, res)))
+        (Format.pp_print_list (fun ppf ->
+           function
+           | Internal_manager_operation_result (op, res) ->
+               pp_manager_operation_content
+                 op.source
+                 false
+                 pp_manager_result
+                 ppf
+                 (op.operation, res)
+           | Internal_baker_operation_result (op, res) ->
+               pp_baker_operation_content
+                 op.baker
+                 pp_baker_result
+                 ppf
+                 (op.operation, res)))
         internal_operation_results ) ;
   Format.fprintf ppf "@]"
 
@@ -448,21 +732,21 @@ let rec pp_contents_and_result_list :
         pp_balance_updates
         bus
   | Single_and_result
-      ( Endorsement {level},
-        Endorsement_result {balance_updates; delegate; slots} ) ->
+      (Endorsement {level}, Endorsement_result {balance_updates; baker; slots})
+    ->
       Format.fprintf
         ppf
         "@[<v 2>Endorsement:@,\
          Level: %a@,\
          Balance updates:%a@,\
-         Delegate: %a@,\
+         Baker: %a@,\
          Slots: %a@]"
         Raw_level.pp
         level
         pp_balance_updates
         balance_updates
-        Signature.Public_key_hash.pp
-        delegate
+        Baker_hash.pp
+        baker
         (Format.pp_print_list ~pp_sep:Format.pp_print_space Format.pp_print_int)
         slots
   | Single_and_result (Proposals {source; period; proposals}, Proposals_result)
@@ -512,11 +796,13 @@ let pp_operation_result ppf
   pp_contents_and_result_list ppf contents_and_result_list ;
   Format.fprintf ppf "@]@."
 
-let pp_internal_operation ppf
-    (Internal_operation {source; operation; nonce = _}) =
-  pp_manager_operation_content
-    source
-    true
-    (fun _ppf () -> ())
-    ppf
-    (operation, ())
+let pp_internal_operation ppf = function
+  | Internal_manager_operation {source; operation; nonce = _} ->
+      pp_manager_operation_content
+        source
+        true
+        (fun _ppf () -> ())
+        ppf
+        (operation, ())
+  | Internal_baker_operation {baker; operation; nonce = _} ->
+      pp_baker_operation_content baker (fun _ppf () -> ()) ppf (operation, ())
