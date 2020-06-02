@@ -415,6 +415,12 @@ integration:double_endorsement:
     - pytest tests_python/tests/test_double_endorsement.py -s --log-dir=tmp
   stage: test
 
+integration:double_baking:
+  <<: *integration_python_definition
+  script:
+    - pytest tests_python/tests/test_double_baking.py -s --log-dir=tmp
+  stage: test
+
 integration:fork:
   <<: *integration_python_definition
   script:
