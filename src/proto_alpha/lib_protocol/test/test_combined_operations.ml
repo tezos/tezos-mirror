@@ -48,10 +48,10 @@ let ten_tez = Tez.of_int 10
 
 (** Groups ten transactions between the same parties. *)
 let test_multiple_transfers () =
-  Context.init 3
-  >>=? fun (blk, contracts) ->
-  let (c1, c2, c3) =
-    match contracts with [c1; c2; c3] -> (c1, c2, c3) | _ -> assert false
+  Context.init 2
+  >>=? fun (blk, contracts, _bakers) ->
+  let (c1, c2) =
+    match contracts with [c1; c2] -> (c1, c2) | _ -> assert false
   in
   List.map_es (fun _ -> Op.transaction (B blk) c1 c2 Tez.one) (1 -- 10)
   >>=? fun ops ->
@@ -61,9 +61,7 @@ let test_multiple_transfers () =
   >>=? fun c1_old_balance ->
   Context.Contract.balance (B blk) c2
   >>=? fun c2_old_balance ->
-  Context.Contract.pkh c3
-  >>=? fun baker_pkh ->
-  Block.bake ~policy:(By_account baker_pkh) ~operation blk
+  Block.bake ~operation blk
   >>=? fun blk ->
   Assert.balance_was_debited
     ~loc:__LOC__
@@ -82,21 +80,18 @@ let test_multiple_transfers () =
 
 (** Groups ten delegated originations. *)
 let test_multiple_origination_and_delegation () =
-  Context.init 2
-  >>=? fun (blk, contracts) ->
-  let (c1, c2) =
-    match contracts with [c1; c2] -> (c1, c2) | _ -> assert false
-  in
+  Context.init 1
+  >>=? fun (blk, contracts, bakers) ->
+  let c1 = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
   let n = 10 in
   Context.get_constants (B blk)
   >>=? fun {parametric = {origination_size; cost_per_byte; _}; _} ->
-  Context.Contract.pkh c2
-  >>=? fun delegate_pkh ->
+  let delegate = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bakers in
   (* Deploy n smart contracts with dummy scripts from c1 *)
   List.map_es
     (fun i ->
       Op.origination
-        ~delegate:delegate_pkh
+        ~delegate
         ~counter:(Z.of_int i)
         ~fee:Tez.zero
         ~script:Op.dummy_script
@@ -124,7 +119,7 @@ let test_multiple_origination_and_delegation () =
   let tickets =
     List.fold_left
       (fun acc -> function No_operation_metadata -> assert false
-        | Operation_metadata {contents} ->
+        | Operation_metadata {contents; mapped_keys = _} ->
             to_list (Contents_result_list contents) @ acc)
       []
       tickets
@@ -171,7 +166,7 @@ let expect_balance_too_low = function
     Variant without fees. *)
 let test_failing_operation_in_the_middle () =
   Context.init 2
-  >>=? fun (blk, contracts) ->
+  >>=? fun (blk, contracts, _bakers) ->
   let (c1, c2) =
     match contracts with [c1; c2] -> (c1, c2) | _ -> assert false
   in
@@ -200,7 +195,7 @@ let test_failing_operation_in_the_middle () =
   let tickets =
     List.fold_left
       (fun acc -> function No_operation_metadata -> assert false
-        | Operation_metadata {contents} ->
+        | Operation_metadata {contents; mapped_keys = _} ->
             to_list (Contents_result_list contents) @ acc)
       []
       tickets
@@ -232,7 +227,7 @@ let test_failing_operation_in_the_middle () =
     Variant with fees, that should be spent even in case of failure. *)
 let test_failing_operation_in_the_middle_with_fees () =
   Context.init 2
-  >>=? fun (blk, contracts) ->
+  >>=? fun (blk, contracts, _bakers) ->
   let (c1, c2) =
     match contracts with [c1; c2] -> (c1, c2) | _ -> assert false
   in
@@ -261,7 +256,7 @@ let test_failing_operation_in_the_middle_with_fees () =
   let tickets =
     List.fold_left
       (fun acc -> function No_operation_metadata -> assert false
-        | Operation_metadata {contents} ->
+        | Operation_metadata {contents; mapped_keys = _} ->
             to_list (Contents_result_list contents) @ acc)
       []
       tickets
@@ -312,9 +307,7 @@ let expect_wrong_signature list =
 let test_wrong_signature_in_the_middle () =
   Context.init 2
   >>=? function
-  | (_, []) | (_, [_]) ->
-      assert false
-  | (blk, c1 :: c2 :: _) ->
+  | (blk, c1 :: c2 :: _, _) ->
       Op.transaction ~fee:Tez.one (B blk) c1 c2 Tez.one
       >>=? fun op1 ->
       Op.transaction ~fee:Tez.one (B blk) c2 c1 Tez.one
@@ -343,6 +336,8 @@ let test_wrong_signature_in_the_middle () =
         inc
         operation
       >>=? fun _inc -> return_unit
+  | _ ->
+      assert false
 
 let tests =
   [ Test_services.tztest "multiple transfers" `Quick test_multiple_transfers;

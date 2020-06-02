@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -42,9 +43,7 @@ let get_hd_hd = function x :: y :: _ -> (x, y) | _ -> assert false
 
 let get_first_different_baker baker bakers =
   WithExceptions.Option.get ~loc:__LOC__
-  @@ List.find
-       (fun baker' -> Signature.Public_key_hash.( <> ) baker baker')
-       bakers
+  @@ List.find (fun baker' -> Baker_hash.( <> ) baker baker') bakers
 
 let get_first_different_bakers ctxt =
   Context.get_bakers ctxt
@@ -55,7 +54,17 @@ let get_first_different_bakers ctxt =
       (baker_1, get_first_different_baker baker_1 other_bakers)
 
 let get_first_different_endorsers ctxt =
-  Context.get_endorsers ctxt >|=? fun endorsers -> get_hd_hd endorsers
+  Context.get_endorsers ctxt
+  >|=? fun endorsers ->
+  let endorser_1 =
+    (WithExceptions.Option.get ~loc:__LOC__ @@ List.hd endorsers).baker
+  in
+  let endorser_2 =
+    ( WithExceptions.Option.get ~loc:__LOC__
+    @@ List.hd (WithExceptions.Option.get ~loc:__LOC__ @@ List.tl endorsers) )
+      .baker
+  in
+  (endorser_1, endorser_2)
 
 (** Bake two block at the same level using the same policy (i.e. same
     baker). *)
@@ -74,9 +83,7 @@ let block_fork ?policy contracts b =
     exposed by a double baking evidence operation. *)
 let test_valid_double_baking_evidence () =
   Context.init 2
-  >>=? fun (b, contracts) ->
-  Context.get_bakers (B b)
-  >>=? fun bakers ->
+  >>=? fun (b, contracts, bakers) ->
   let priority_0_baker =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bakers
   in
@@ -89,9 +96,7 @@ let test_valid_double_baking_evidence () =
   (* Check that the frozen deposit, the fees and rewards are removed *)
   List.iter_es
     (fun kind ->
-      let contract =
-        Alpha_context.Contract.implicit_contract priority_0_baker
-      in
+      let contract = Alpha_context.Contract.baker_contract priority_0_baker in
       Assert.balance_is ~loc:__LOC__ (B blk) contract ~kind Tez.zero)
     [Deposit; Fees; Rewards]
 
@@ -103,7 +108,7 @@ let test_valid_double_baking_evidence () =
     blocks. *)
 let test_same_blocks () =
   Context.init 2
-  >>=? fun (b, _contracts) ->
+  >>=? fun (b, _contracts, _) ->
   Block.bake b
   >>=? fun ba ->
   Op.double_baking (B ba) ba.header ba.header
@@ -121,7 +126,7 @@ let test_same_blocks () =
     different levels fails. *)
 let test_different_levels () =
   Context.init 2
-  >>=? fun (b, contracts) ->
+  >>=? fun (b, contracts, _) ->
   block_fork ~policy:(By_priority 0) contracts b
   >>=? fun (blk_a, blk_b) ->
   Block.bake blk_b
@@ -140,7 +145,7 @@ let test_different_levels () =
     blocks fails. *)
 let test_too_early_double_baking_evidence () =
   Context.init 2
-  >>=? fun (b, contracts) ->
+  >>=? fun (b, contracts, _) ->
   block_fork ~policy:(By_priority 0) contracts b
   >>=? fun (blk_a, blk_b) ->
   Op.double_baking (B b) blk_a.header blk_b.header
@@ -157,7 +162,7 @@ let test_too_early_double_baking_evidence () =
     create a double baking operation anymore. *)
 let test_too_late_double_baking_evidence () =
   Context.init 2
-  >>=? fun (b, contracts) ->
+  >>=? fun (b, contracts, _) ->
   Context.get_constants (B b)
   >>=? fun Constants.{parametric = {preserved_cycles; _}; _} ->
   block_fork ~policy:(By_priority 0) contracts b
@@ -177,11 +182,11 @@ let test_too_late_double_baking_evidence () =
       | _ ->
           false)
 
-(** Check that an invalid double baking evidence that exposes two
-    block baking with same level made by different bakers fails. *)
-let test_different_delegates () =
+(** Check that an invalid double baking evidence that exposes two block
+    baking with same level made by different bakers fails. *)
+let test_different_bakers () =
   Context.init 2
-  >>=? fun (b, _) ->
+  >>=? fun (b, _, _) ->
   get_first_different_bakers (B b)
   >>=? fun (baker_1, baker_2) ->
   Block.bake ~policy:(By_account baker_1) b
@@ -203,10 +208,11 @@ let test_wrong_signer () =
   let header_custom_signer baker baker_2 b =
     Block.Forge.forge_header ~policy:(By_account baker_2) b
     >>=? fun header ->
-    Block.Forge.set_baker baker header |> Block.Forge.sign_header
+    let baker = Block.Forge.set_baker baker header in
+    Block.Forge.sign_header baker
   in
   Context.init 2
-  >>=? fun (b, _) ->
+  >>=? fun (b, _, _) ->
   get_first_different_bakers (B b)
   >>=? fun (baker_1, baker_2) ->
   Block.bake ~policy:(By_account baker_1) b
@@ -239,5 +245,5 @@ let tests =
       "too late double baking evidence"
       `Quick
       test_too_late_double_baking_evidence;
-    Test_services.tztest "different delegates" `Quick test_different_delegates;
-    Test_services.tztest "wrong delegate" `Quick test_wrong_signer ]
+    Test_services.tztest "different bakers" `Quick test_different_bakers;
+    Test_services.tztest "wrong baker" `Quick test_wrong_signer ]
