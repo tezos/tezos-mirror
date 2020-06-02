@@ -12,7 +12,6 @@ from tools import constants, paths
 # futur protocol. To do that it runs the same test twice, first with delphi
 # activated then with alpha activated.
 
-BAKER = 'bootstrap1'
 BAKE_ARGS = [
     '--minimal-fees',
     '0',
@@ -50,7 +49,8 @@ BLOCKS_PER_VOTING_PERIOD = BLOCKS_PER_CYCLE * CYCLE_PER_VOTING_PERIOD
 
 
 @pytest.fixture(scope="class")
-def client(sandbox, protocol, parameters, node_id):
+def client(sandbox, protocol, parameters, node_id, baker):
+    # pylint: disable=unused-argument
     # Scenarios run one after the other. To be able to create a new node with a
     # different protocol on the second scenario we need to delete the previous
     # node before.
@@ -81,11 +81,21 @@ def pytest_generate_tests(metafunc):
 
 SCENARIO_PROTO_A = (
     PROTO_A,
-    {"node_id": 0, "protocol": PROTO_A, "parameters": PROTO_A_PARAMETERS},
+    {
+        "node_id": 0,
+        "protocol": PROTO_A,
+        "parameters": PROTO_A_PARAMETERS,
+        "baker": "bootstrap1",
+    },
 )
 SCENARIO_PROTO_B = (
     PROTO_B,
-    {"node_id": 1, "protocol": PROTO_B, "parameters": PROTO_B_PARAMETERS},
+    {
+        "node_id": 1,
+        "protocol": PROTO_B,
+        "parameters": PROTO_B_PARAMETERS,
+        "baker": constants.BOOTSTRAP_BAKERS[0]["hash"],
+    },
 )
 
 
@@ -93,8 +103,8 @@ SCENARIO_PROTO_B = (
 class TestRpc:
     scenarios = [SCENARIO_PROTO_A, SCENARIO_PROTO_B]
 
-    def test_activate(self, client, protocol):
-        client.bake(BAKER, BAKE_ARGS)
+    def test_activate(self, client, protocol, baker):
+        client.bake(baker, BAKE_ARGS)
         assert client.get_protocol() == protocol
 
     def test_rpc(self, client):
@@ -113,9 +123,9 @@ class TestRpc:
         assert current_level["voting_period_position"] == 1
         assert current_period_kind == "proposal"
 
-    def test_bake_last_block(self, client):
+    def test_bake_last_block(self, client, baker):
         for _i in range(BLOCKS_PER_VOTING_PERIOD - 2):
-            client.bake(BAKER, BAKE_ARGS)
+            client.bake(baker, BAKE_ARGS)
 
     def test_rpc_test_last_block(self, client):
         current_period_kind = client.get_current_period_kind()
@@ -134,8 +144,8 @@ class TestRpc:
         assert current_lvl_voting_position == BLOCKS_PER_VOTING_PERIOD - 1
         assert current_period_kind == "proposal"
 
-    def test_rpc_next_period(self, client):
-        client.bake(BAKER, BAKE_ARGS)
+    def test_rpc_next_period(self, client, baker):
+        client.bake(baker, BAKE_ARGS)
         current_period_kind = client.get_current_period_kind()
         current_level = client.get_current_level()
         metadata = client.get_metadata()

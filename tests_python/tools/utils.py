@@ -487,6 +487,7 @@ def init_with_transfer(
     amount: float,
     sender: str,
     contract_name: str = None,
+    baker='bootstrap1',
 ):
     if contract_name is None:
         contract_name = contract_name_of_file(contract)
@@ -497,7 +498,7 @@ def init_with_transfer(
         contract,
         ['-init', initial_storage, '--burn-cap', '10'],
     )
-    bake(client)
+    bake(client, baker)
 
 
 def assert_balance(

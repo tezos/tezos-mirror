@@ -46,7 +46,7 @@ def _update_node_to_protocol(sandbox, node_idx):
     protocol.activate(node_client)
     time.sleep(2)
     # step 2
-    node_client.bake("bootstrap1")
+    node_client.bake("baker1")
     metadata_json = node_client.rpc(
         verb="get", path="/chains/main/blocks/head/metadata"
     )

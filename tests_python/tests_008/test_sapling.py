@@ -833,7 +833,7 @@ class TestSaplingDifferentMemosize:
     @pytest.fixture
     def contract_path(self):
         return (
-            f'{paths.TEZOS_HOME}/src/proto_alpha/lib_protocol/test/'
+            f'{paths.TEZOS_HOME}/src/proto_008_PtEdoTez/lib_protocol/test/'
             'contracts/sapling_contract.tz'
         )
 
@@ -873,7 +873,7 @@ class TestSaplingRightMemosize:
     @pytest.fixture
     def contract_path(self):
         return (
-            f'{paths.TEZOS_HOME}/src/proto_alpha/lib_protocol/test/'
+            f'{paths.TEZOS_HOME}/src/proto_008_PtEdoTez/lib_protocol/test/'
             'contracts/sapling_contract.tz'
         )
 

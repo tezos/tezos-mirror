@@ -1,8 +1,10 @@
 import random
 import time
+
 import pytest
-from tools import utils, constants
+
 from launchers.sandbox import Sandbox
+from tools import constants, utils
 from . import protocol
 
 NUM_NODES = 2
@@ -23,13 +25,16 @@ class TestManyNodesBootstrap:
         parameters = dict(protocol.PARAMETERS)
         parameters["time_between_blocks"] = ["1", "0"]
         protocol.activate(sandbox.client(0), parameters)
-        sandbox.add_baker(0, 'bootstrap1', proto=protocol.DAEMON)
+        sandbox.add_baker(0, 'baker1', proto=protocol.DAEMON)
         sandbox.add_node(1, params=constants.NODE_PARAMS)
-        sandbox.add_baker(1, 'bootstrap2', proto=protocol.DAEMON)
+        utils.remember_baker_contracts(sandbox.client(1))
+        sandbox.add_baker(1, 'baker2', proto=protocol.DAEMON)
 
     def test_add_nodes(self, sandbox: Sandbox):
         for i in range(2, NUM_NODES):
             sandbox.add_node(i, params=constants.NODE_PARAMS)
+            utils.synchronize(sandbox.all_clients())
+            utils.remember_baker_contracts(sandbox.client(i))
 
     def test_sleep_10s(self):
         time.sleep(10)

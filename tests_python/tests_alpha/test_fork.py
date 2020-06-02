@@ -1,8 +1,7 @@
 import pytest
-from tools import utils, constants
 from launchers.sandbox import Sandbox
+from tools import constants, utils
 from . import protocol
-
 
 BAKE_ARGS = ['--max-priority', '512', '--minimal-timestamp']
 NUM_NODES = 3
@@ -19,6 +18,8 @@ class TestFork:
         for i in range(NUM_NODES):
             sandbox.add_node(i, params=constants.NODE_PARAMS)
         protocol.activate(sandbox.client(0))
+        for i in range(1, NUM_NODES):
+            utils.remember_baker_contracts(sandbox.client(i))
 
     def test_level(self, sandbox: Sandbox):
         level = 1
@@ -31,19 +32,19 @@ class TestFork:
 
     def test_bake_node_0(self, sandbox: Sandbox):
         """Client 0 bakes block A at level 2, not communicated to 1 and 2"""
-        sandbox.client(0).bake('bootstrap1', BAKE_ARGS)
+        sandbox.client(0).bake('baker1', BAKE_ARGS)
 
     def test_endorse_node_0(self, sandbox: Sandbox, session: dict):
         """bootstrap1 builds an endorsement for block A"""
         client = sandbox.client(0)
-        client.endorse('bootstrap1')
+        client.endorse('baker1')
         mempool = client.get_mempool()
         endorsement = mempool['applied'][0]
         session['endorsement1'] = endorsement
 
     def test_bake_node_0_again(self, sandbox: Sandbox):
         """Client 0 bakes block A' at level 3, not communicated to 1 and 2"""
-        sandbox.client(0).bake('bootstrap1', BAKE_ARGS)
+        sandbox.client(0).bake('baker1', BAKE_ARGS)
 
     def test_first_branch(self, sandbox: Sandbox, session: dict):
         head = sandbox.client(0).get_head()
@@ -60,11 +61,11 @@ class TestFork:
 
     def test_bake_node_2(self, sandbox: Sandbox):
         """Client 2 bakes block B at level 2, not communicated to 0 and 1"""
-        sandbox.client(2).bake('bootstrap1', BAKE_ARGS)
+        sandbox.client(2).bake('baker1', BAKE_ARGS)
 
     def test_bake_node_2_again(self, sandbox: Sandbox):
         """Client 2 bakes block B' at level 3, not communicated to 0 and 1"""
-        sandbox.client(2).bake('bootstrap1', BAKE_ARGS)
+        sandbox.client(2).bake('baker1', BAKE_ARGS)
 
     def test_second_branch(self, sandbox: Sandbox, session: dict):
         head = sandbox.client(2).get_head()

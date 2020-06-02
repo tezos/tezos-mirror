@@ -44,7 +44,7 @@ def sandbox(request, sandbox: Sandbox, contract_name, session: dict):
     sandbox.add_node(2, params=constants.NODE_PARAMS, mode=request.param)
     client = sandbox.client(1)
     protocol.activate(sandbox.client(1), activate_in_the_past=True)
-    client.bake("bootstrap1", BAKE_ARGS)
+    client.bake("baker1", BAKE_ARGS)
     time.sleep(2)
     # Deploy a contract
     contract = os.path.join(contract_paths.CONTRACT_PATH, 'attic', 'id.tz')
@@ -53,7 +53,7 @@ def sandbox(request, sandbox: Sandbox, contract_name, session: dict):
         contract_name, 10.0, "bootstrap1", contract, args
     )
     session['originated_accounts'] = [origination.contract]
-    client.bake("bootstrap1", ["--minimal-timestamp"])
+    client.bake("baker1", ["--minimal-timestamp"])
     assert utils.check_block_contains_operations(
         client, [origination.operation_hash]
     )
@@ -80,7 +80,7 @@ class TestRPCsExistence:
 
     def test_constants(self, sandbox: Sandbox):
         sandbox.client(2).rpc('get', '/network/self')
-        sandbox.client(1).bake('bootstrap1', BAKE_ARGS)
+        sandbox.client(1).bake('baker1', BAKE_ARGS)
         time.sleep(3)
 
     def test_chain_blocks(self, sandbox: Sandbox):
@@ -94,7 +94,7 @@ class TestRPCsExistence:
 
     @pytest.mark.skip(reason="TODO")
     def test_chain_invalid_blocks_block_hash(self, sandbox: Sandbox):
-        res = sandbox.client(1).bake('bootstrap1', BAKE_ARGS)
+        res = sandbox.client(1).bake('baker1', BAKE_ARGS)
         sandbox.client(1).rpc(
             'get', f'/chains/{CHAIN_ID}/invalid_blocks/' f'{res.block_hash}'
         )
@@ -281,10 +281,9 @@ class TestRPCsExistence:
                 f'context/contracts/{contract_id}/counter',
             )
 
-    def test_chain_block_context_contract_delegate(
-        self, sandbox: Sandbox, session: dict
-    ):
-        for contract_id in session["implicit_accounts"]:
+    def test_chain_block_context_contract_delegate(self, sandbox: Sandbox):
+        for baker in constants.BOOTSTRAP_BAKERS:
+            contract_id = baker['hash']
             sandbox.client(1).rpc(
                 'get',
                 f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
@@ -594,7 +593,7 @@ class TestRPCsExistence:
         )
 
     def test_chain_block_helpers_complete_prefix2(self, sandbox: Sandbox):
-        res = sandbox.client(1).bake('bootstrap1', BAKE_ARGS)
+        res = sandbox.client(1).bake('baker1', BAKE_ARGS)
         prefix = res.block_hash[:5]
         sandbox.client(1).rpc(
             'get',
@@ -641,8 +640,8 @@ class TestRPCsExistence:
     def test_add_transactions(self, sandbox: Sandbox):
         sandbox.client(1).transfer(1.000, 'bootstrap1', 'bootstrap2')
         sandbox.client(2).transfer(1.000, 'bootstrap3', 'bootstrap4')
-        sandbox.client(1).endorse('bootstrap1')
-        sandbox.client(1).bake('bootstrap1', BAKE_ARGS)
+        sandbox.client(1).endorse('baker1')
+        sandbox.client(1).bake('baker1', BAKE_ARGS)
         time.sleep(3)
 
     def test_chain_block_operation_hashes_list_offset(self, sandbox: Sandbox):

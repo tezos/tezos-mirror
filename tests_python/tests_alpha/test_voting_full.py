@@ -2,6 +2,7 @@ import time
 
 import pytest
 
+from client import client_output
 from launchers.sandbox import Sandbox
 from client.client import Client
 from tools import utils, constants
@@ -20,7 +21,6 @@ PROTO_A_DAEMON = protocol.PREV_DAEMON
 PROTO_A_PATH = f"proto_{PROTO_A_DAEMON.replace('-','_')}"
 PROTO_B = protocol.HASH
 PROTO_B_DAEMON = protocol.DAEMON
-
 
 def client_get_current_period_kind(client) -> dict:
     res = client.get_current_period()
