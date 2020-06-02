@@ -3,6 +3,34 @@ open Flextesa
 open Internal_pervasives
 module Counter_log = Helpers.Counter_log
 
+let register_baker state ~client ~alias ~consensus_key ~owner_key ~balance ~src
+    =
+  Tezos_client.successful_client_cmd
+    state
+    ~client
+    [ "--wait";
+      "none";
+      "register";
+      "baker";
+      alias;
+      "transferring";
+      sprintf "%Ld" balance;
+      "from";
+      src;
+      "with";
+      "consensus";
+      "key";
+      consensus_key;
+      "and";
+      "threshold";
+      "1";
+      "and";
+      "owner";
+      "keys";
+      owner_key;
+      "--burn-cap";
+      "0.078" ]
+
 let ledger_prompt_notice state ef =
   Console.say
     state
@@ -11,7 +39,7 @@ let ledger_prompt_notice state ef =
         (shout "Ledger-prompt")
         (list [ef; wf "Please hit “✔” on the ledger."]))
 
-let setup_baking_ledger state uri ~client =
+let setup_baking_ledger state uri ~client ~src =
   Interactive_test.Pauser.generic
     state
     EF.
@@ -22,13 +50,36 @@ let setup_baking_ledger state uri ~client =
     ~force:true
   >>= fun () ->
   let key_name = "ledgered" in
-  let baker = Tezos_client.Keyed.make client ~key_name ~secret_key:uri in
+  let baker_key_name = "ledgered-baker" in
+  register_baker
+    state
+    ~client
+    ~alias:baker_key_name
+    ~consensus_key:("text:" ^ uri)
+    ~owner_key:baker_key_name
+    ~balance:2_000_000L
+    ~src
+  >>= fun res ->
+  let re =
+    Re.(
+      compile
+        (seq [str " New contract "; group (rep1 alnum); str " originated."]))
+  in
+  let matches = Re.exec re (String.concat ~sep:" " res#out) in
+  let baker_hash = Re.Group.get matches 1 in
+  let baker =
+    Tezos_client.Keyed.make client ~key_name ~secret_key:uri ~baker_hash
+  in
+  Console.say
+    state
+    EF.(wf "Registered \"%s\" baker %s" baker.baker_name baker_hash)
+  >>= fun () ->
   ledger_prompt_notice
     state
     EF.(
       wf
-        "Importing %S in client `%s`. The ledger should be prompting for \
-         acknowledgment to provide the public key."
+        "Registering baker for %S in client `%s`. The ledger should be \
+         prompting for acknowledgment to provide the public key."
         uri
         client.Tezos_client.id)
   >>= fun () ->
@@ -76,19 +127,38 @@ let transfer state ~client ~src ~dst ~amount =
       "--burn-cap";
       "0.3" ]
 
-let register state ~client ~dst =
+let baker_transfer state ~client ~src ~dst ~amount ~owner_key =
   Tezos_client.successful_client_cmd
     state
     ~client
     [ "--wait";
       "none";
-      "register";
-      "key";
+      "from";
+      "baker";
+      "contract";
+      src;
+      "transfer";
+      sprintf "%Ld" amount;
+      "to";
       dst;
-      "as";
-      "delegate";
+      "with";
+      "key";
+      owner_key;
       "--fee";
-      "0.05" ]
+      "0.05";
+      "--burn-cap";
+      "1.846" ]
+
+let set_baker_active state ~client ~(keyed : Tezos_client.Keyed.t) =
+  match keyed.baker_hash with
+  | None ->
+      failf "No baker known for Keyed.key_name=%s" keyed.key_name
+  | Some _ ->
+      (* This command may fail when the baker is already active *)
+      Tezos_client.client_cmd
+        state
+        ~client
+        ["--wait"; "none"; "set"; "baker"; keyed.baker_name; "active"]
 
 let bake_until_voting_period ?keep_alive_delegate state ~baker ~attempts period
     =
@@ -104,8 +174,8 @@ let bake_until_voting_period ?keep_alive_delegate state ~baker ~attempts period
       | `String p when String.equal p period_name ->
           return (`Done (nth - 1))
       | _ ->
-          Asynchronous_result.map_option keep_alive_delegate ~f:(fun dst ->
-              register state ~client ~dst)
+          Asynchronous_result.map_option keep_alive_delegate ~f:(fun keyed ->
+              set_baker_active state ~client ~keyed)
           >>= fun _ ->
           ksprintf
             (Tezos_client.Keyed.bake state baker)
@@ -157,19 +227,14 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
     state
     EF.[af "Ready to start"; af "Root path deleted."]
   >>= fun () ->
-  let (protocol, baker_0_account, baker_0_balance) =
-    let open Tezos_protocol in
-    let baker = List.nth_exn protocol.bootstrap_accounts 0 in
-    ( {
-        protocol with
-        time_between_blocks = [1; 0];
-        bootstrap_accounts =
-          List.map protocol.bootstrap_accounts ~f:(fun (n, v) ->
-              if Poly.(fst baker = n) then (n, v) else (n, 1_000L));
-      },
-      fst baker,
-      snd baker )
+  let open Tezos_protocol in
+  let (bootstrap_0_account, _balance) =
+    List.nth_exn protocol.bootstrap_accounts 0
   in
+  let (baker_0_hash, _balance, baker_0_key_account) =
+    List.nth_exn protocol.bootstrap_bakers 0
+  in
+  let protocol = {protocol with time_between_blocks = [1; 0]} in
   Test_scenario.network_with_protocol
     ~protocol
     ~size
@@ -196,10 +261,19 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
   let baker_0 =
     Tezos_client.Keyed.make
       (client 0)
+      ~baker_hash:baker_0_hash
       ~key_name:"baker-0"
-      ~secret_key:(Tezos_protocol.Account.private_key baker_0_account)
+      ~secret_key:(Tezos_protocol.Account.private_key baker_0_key_account)
   in
   Tezos_client.Keyed.initialize state baker_0
+  >>= fun _ ->
+  let bootstrap_0 =
+    Tezos_client.Keyed.make
+      (client 0)
+      ~key_name:"bootstrap-0"
+      ~secret_key:(Tezos_protocol.Account.private_key bootstrap_0_account)
+  in
+  Tezos_client.Keyed.initialize state bootstrap_0
   >>= fun _ ->
   let level_counter = Counter_log.create () in
   let first_bakes = 5 in
@@ -212,16 +286,45 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
   | None ->
       Console.say state EF.(wf "No ledger.")
       >>= fun () ->
-      let account = Tezos_protocol.Account.of_name "special-baker" in
-      let baker =
-        Tezos_client.Keyed.make
-          (client 0)
-          ~key_name:(Tezos_protocol.Account.name account)
-          ~secret_key:(Tezos_protocol.Account.private_key account)
+      let client = client 0 in
+      let key_alias = "special-baker-key" in
+      Tezos_client.successful_client_cmd
+        state
+        ~client
+        ["gen"; "keys"; key_alias]
+      >>= fun _ ->
+      let alias = "special-baker" in
+      register_baker
+        state
+        ~client
+        ~alias
+        ~consensus_key:key_alias
+        ~owner_key:key_alias
+        ~balance:2_000_000L
+        ~src:baker_0.key_name
+      >>= fun res ->
+      let re =
+        Re.(
+          compile
+            (seq [str " New contract "; group (rep1 alnum); str " originated."]))
       in
-      Tezos_client.Keyed.initialize state baker >>= fun _ -> return baker
+      let matches = Re.exec re (String.concat ~sep:" " res#out) in
+      let baker_hash = Re.Group.get matches 1 in
+      Console.say state EF.(wf "Registered \"special-baker\" %s" baker_hash)
+      >>= fun () ->
+      return
+      @@ Tezos_client.Keyed.make
+           client
+           ~baker_hash
+           ~key_name:baker_0.key_name
+           ~baker_name:alias
+           ~secret_key:(Tezos_protocol.Account.private_key baker_0_key_account)
   | Some uri ->
-      setup_baking_ledger state ~client:(client 0) uri )
+      setup_baking_ledger
+        state
+        ~client:(client 0)
+        ~src:bootstrap_0.key_name
+        uri )
   >>= fun special_baker ->
   let winner_client = {baker_0.client with exec = winner_client_exec} in
   let winner_baker_0 =
@@ -252,28 +355,17 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
           ~command_names:["baker"]
           ~make_admin
           ~clients:[special_baker.Tezos_client.Keyed.client] ] ;
-  transfer
-    state (* Tezos_client.successful_client_cmd state *)
-    ~client:(client 0)
-    ~amount:(Int64.( / ) baker_0_balance 2_000_000L)
-    ~src:"baker-0"
-    ~dst:special_baker.Tezos_client.Keyed.key_name
-  >>= fun res ->
-  Console.say
-    state
-    EF.(
-      desc
-        (wf "Successful transfer baker-0 -> special:")
-        (ocaml_string_list res#out))
-  >>= fun () ->
-  let after_transfer_bakes = 2 in
-  Loop.n_times after_transfer_bakes (fun nth ->
+  let after_registration_bakes = 2 in
+  Loop.n_times after_registration_bakes (fun nth ->
       ksprintf
         (Tezos_client.Keyed.bake state baker_0)
-        "after-transfer-bake %d"
+        "after-registration-bake %d"
         nth)
   >>= fun () ->
-  Counter_log.add level_counter "after-transfer-bakes" after_transfer_bakes ;
+  Counter_log.add
+    level_counter
+    "after-registration-bakes"
+    after_registration_bakes ;
   Test_scenario.Queries.wait_for_all_levels_to_be
     state
     ~attempts:default_attempts
@@ -281,22 +373,6 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
     nodes
     (`At_least (Counter_log.sum level_counter))
   >>= fun () ->
-  Asynchronous_result.map_option with_ledger ~f:(fun _ ->
-      ledger_prompt_notice state EF.(wf "Registering as delegate."))
-  >>= fun (_ : unit option) ->
-  Tezos_client.successful_client_cmd
-    state
-    ~client:(client 0)
-    [ "--wait";
-      "none";
-      "register";
-      "key";
-      special_baker.Tezos_client.Keyed.key_name;
-      "as";
-      "delegate";
-      "--fee";
-      "0.5" ]
-  >>= fun _ ->
   let activation_bakes =
     let open Tezos_protocol in
     protocol.blocks_per_cycle * (protocol.preserved_cycles + 2)
@@ -335,7 +411,7 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
     ~baker:special_baker
     ~attempts
     `Proposal
-    ~keep_alive_delegate:baker_0.key_name
+    ~keep_alive_delegate:baker_0
   >>= fun extra_bakes_waiting_for_proposal_period ->
   Counter_log.add
     level_counter
@@ -430,31 +506,32 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
               (if List.length props = 1 then "" else "s")
               (String.concat ~sep:", " props)))
     >>= fun _ ->
-    Tezos_client.successful_client_cmd
-      state
-      ~client:baker.Tezos_client.Keyed.client
-      (["submit"; "proposals"; "for"; baker.key_name] @ props)
+    Tezos_client.Keyed.submit_proposals state baker props
     >>= fun _ -> return ()
   in
   let to_submit_first = [winner_hash; demo_hash] in
   ( match serialize_proposals with
   | false ->
       submit_proposals special_baker to_submit_first
+      >>= fun () ->
+      Tezos_client.Keyed.bake state baker_0 "bake-submit-proposals"
   | true ->
-      List_sequential.iter to_submit_first ~f:(fun one ->
-          submit_proposals special_baker [one]) )
+      List_sequential.iteri to_submit_first ~f:(fun i one ->
+          submit_proposals special_baker [one]
+          >>= fun () ->
+          ksprintf
+            (Tezos_client.Keyed.bake state baker_0)
+            "bake-submit-proposals-%d"
+            i) )
   >>= fun () ->
-  Tezos_client.successful_client_cmd
-    state
-    ~client:baker_0.client
-    ["submit"; "proposals"; "for"; baker_0.key_name; winner_hash]
+  Tezos_client.Keyed.submit_proposals state baker_0 [winner_hash]
   >>= fun _ ->
   bake_until_voting_period
     state
     ~baker:baker_0
     ~attempts:protocol.blocks_per_voting_period
     `Exploration
-    ~keep_alive_delegate:special_baker.key_name
+    ~keep_alive_delegate:special_baker
   >>= fun extra_bakes_waiting_for_exploration_period ->
   Counter_log.add
     level_counter
@@ -483,20 +560,16 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
                Ezjsonm.(to_string (wrap current_proposal_json))))
       else return (`Done ()))
   >>= fun () ->
-  Tezos_client.successful_client_cmd
-    state
-    ~client:baker_0.client
-    ["submit"; "ballot"; "for"; baker_0.key_name; winner_hash; "yay"]
+  Tezos_client.Keyed.submit_ballot state baker_0 winner_hash "yay"
   >>= fun _ ->
   Asynchronous_result.map_option with_ledger ~f:(fun _ ->
       ledger_prompt_notice
         state
         EF.(wf "Submitting “Yes” ballot for %S" winner_hash))
   >>= fun (_ : unit option) ->
-  Tezos_client.successful_client_cmd
-    state
-    ~client:special_baker.client
-    ["submit"; "ballot"; "for"; special_baker.key_name; winner_hash; "yay"]
+  Tezos_client.Keyed.bake state baker_0 "bake-submit-ballot-1"
+  >>= fun () ->
+  Tezos_client.Keyed.submit_ballot state special_baker winner_hash "yay"
   >>= fun _ ->
   Interactive_test.Pauser.generic
     state
@@ -506,7 +579,7 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
     state
     ~baker:baker_0
     ~attempts:(1 + protocol.blocks_per_voting_period)
-    ~keep_alive_delegate:special_baker.key_name
+    ~keep_alive_delegate:special_baker
     `Cooldown
   >>= fun extra_bakes_waiting_for_cooldown_period ->
   Counter_log.add
@@ -542,7 +615,7 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
     state
     ~baker:baker_0
     ~attempts:(1 + protocol.blocks_per_voting_period)
-    ~keep_alive_delegate:special_baker.key_name
+    ~keep_alive_delegate:special_baker
     `Promotion
   >>= fun extra_bakes_waiting_for_promotion_period ->
   Counter_log.add
@@ -558,10 +631,7 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
   >>= fun () ->
   Interactive_test.Pauser.generic state EF.[haf "Before ballots"]
   >>= fun () ->
-  Tezos_client.successful_client_cmd
-    state
-    ~client:baker_0.client
-    ["submit"; "ballot"; "for"; baker_0.key_name; winner_hash; "yay"]
+  Tezos_client.Keyed.submit_ballot state baker_0 winner_hash "yay"
   >>= fun _ ->
   Asynchronous_result.map_option with_ledger ~f:(fun _ ->
       Interactive_test.Pauser.generic
@@ -577,10 +647,9 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
         state
         EF.(wf "Submitting “Yes” ballot for %S" winner_hash))
   >>= fun (_ : unit option) ->
-  Tezos_client.successful_client_cmd
-    state
-    ~client:special_baker.client
-    ["submit"; "ballot"; "for"; special_baker.key_name; winner_hash; "yay"]
+  Tezos_client.Keyed.bake state baker_0 "bake-submit-ballot-2"
+  >>= fun () ->
+  Tezos_client.Keyed.submit_ballot state special_baker winner_hash "yay"
   >>= fun _ ->
   Interactive_test.Pauser.generic
     state

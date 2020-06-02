@@ -292,7 +292,14 @@ let voting_tests state ~client ~src ~with_rejections ~protocol_kind
           Tezos_client.client_cmd
             state
             ~client:(client 0)
-            ["submit"; "ballot"; "for"; src; tested_proposal; vote]
+            [ "submit";
+              "ballot";
+              "for";
+              src;
+              "for";
+              "protocol";
+              tested_proposal;
+              vote ]
           >>= fun (_, proc) -> return proc))
 
 let ledger_should_display ?title ppf l =
@@ -1212,6 +1219,7 @@ let run state ~pp_error ~protocol ~protocol_kind ~node_exec ~client_exec
   let baker_0 =
     Tezos_client.Keyed.make
       client_0
+      ?baker_hash:(Tezos_protocol.Account.baker_hash baker_0_account)
       ~key_name:"baker-0"
       ~secret_key:(Tezos_protocol.Account.private_key baker_0_account)
   in
