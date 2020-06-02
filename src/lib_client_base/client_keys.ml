@@ -130,9 +130,9 @@ let sk_uri_param ?name ?desc params =
 module Secret_key = Client_aliases.Alias (struct
   let name = "secret_key"
 
-  type t = Uri.t
+  type t = sk_uri
 
-  let of_source s = return (Uri.of_string s)
+  let of_source s = make_sk_uri @@ Uri.of_string s
 
   let to_source t = return (Uri.to_string t)
 
@@ -142,9 +142,10 @@ end)
 module Public_key = Client_aliases.Alias (struct
   let name = "public_key"
 
-  type t = Uri.t * Signature.Public_key.t option
+  type t = pk_uri * Signature.Public_key.t option
 
-  let of_source s = return (Uri.of_string s, None)
+  let of_source s =
+    make_pk_uri @@ Uri.of_string s >>=? fun pk_uri -> return (pk_uri, None)
 
   let to_source (t, _) = return (Uri.to_string t)
 
