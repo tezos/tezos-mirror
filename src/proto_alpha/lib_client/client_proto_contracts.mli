@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -27,9 +28,9 @@ open Protocol
 open Alpha_context
 open Clic
 
-module RawContractAlias : Client_aliases.Alias with type t = Contract.t
+module Raw_contract_alias : Client_aliases.Alias with type t = Contract.t
 
-module ContractAlias : sig
+module Contract_alias : sig
   val get_contract :
     #Client_context.wallet -> string -> (string * Contract.t) tzresult Lwt.t
 

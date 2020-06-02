@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -135,7 +136,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
            Client_proto_context_commands.verbose_signing_switch
            Client_proto_args.burn_cap_arg)
         ( prefixes ["deploy"; "multisig"]
-        @@ Client_proto_contracts.RawContractAlias.fresh_alias_param
+        @@ Client_proto_contracts.Raw_contract_alias.fresh_alias_param
              ~name:"new_multisig"
              ~desc:"name of the new multisig contract"
         @@ prefix "transferring"
@@ -143,7 +144,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
              ~name:"qty"
              ~desc:"amount taken from source"
         @@ prefix "from"
-        @@ Client_proto_contracts.ContractAlias.destination_param
+        @@ Client_proto_contracts.Contract_alias.destination_param
              ~name:"src"
              ~desc:"name of the source contract"
         @@ prefixes ["with"; "threshold"]
@@ -170,7 +171,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
              threshold
              keys
              (cctxt : #Protocol_client_context.full) ->
-          Client_proto_contracts.RawContractAlias.of_fresh
+          Client_proto_contracts.Raw_contract_alias.of_fresh
             cctxt
             force
             alias_name
@@ -238,7 +239,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
            a multisigned transfer."
         (args1 bytes_only_switch)
         ( prefixes ["prepare"; "multisig"; "transaction"; "on"]
-        @@ Client_proto_contracts.ContractAlias.destination_param
+        @@ Client_proto_contracts.Contract_alias.destination_param
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
         @@ prefix "transferring"
@@ -246,7 +247,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
              ~name:"qty"
              ~desc:"amount taken from source"
         @@ prefix "to"
-        @@ Client_proto_contracts.ContractAlias.destination_param
+        @@ Client_proto_contracts.Contract_alias.destination_param
              ~name:"dst"
              ~desc:"name/literal of the destination contract"
         @@ stop )
@@ -271,7 +272,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
            a multisigned delegate change."
         (args1 bytes_only_switch)
         ( prefixes ["prepare"; "multisig"; "transaction"; "on"]
-        @@ Client_proto_contracts.ContractAlias.destination_param
+        @@ Client_proto_contracts.Contract_alias.destination_param
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
         @@ prefixes ["setting"; "delegate"; "to"]
@@ -299,7 +300,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
            a multisigned delegate withdraw."
         (args1 bytes_only_switch)
         ( prefixes ["prepare"; "multisig"; "transaction"; "on"]
-        @@ Client_proto_contracts.ContractAlias.destination_param
+        @@ Client_proto_contracts.Contract_alias.destination_param
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
         @@ prefixes ["withdrawing"; "delegate"]
@@ -323,7 +324,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
            a multisigned change of keys and threshold."
         (args1 bytes_only_switch)
         ( prefixes ["prepare"; "multisig"; "transaction"; "on"]
-        @@ Client_proto_contracts.ContractAlias.destination_param
+        @@ Client_proto_contracts.Contract_alias.destination_param
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
         @@ prefixes ["setting"; "threshold"; "to"]
@@ -352,7 +353,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
         ~desc:"Sign a transaction for a multisig contract."
         no_options
         ( prefixes ["sign"; "multisig"; "transaction"; "on"]
-        @@ Client_proto_contracts.ContractAlias.destination_param
+        @@ Client_proto_contracts.Contract_alias.destination_param
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
         @@ prefix "transferring"
@@ -360,7 +361,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
              ~name:"qty"
              ~desc:"amount taken from source"
         @@ prefix "to"
-        @@ Client_proto_contracts.ContractAlias.destination_param
+        @@ Client_proto_contracts.Contract_alias.destination_param
              ~name:"dst"
              ~desc:"name/literal of the destination contract"
         @@ prefixes ["using"; "secret"; "key"]
@@ -387,7 +388,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
         ~desc:"Sign a delegate change for a multisig contract."
         no_options
         ( prefixes ["sign"; "multisig"; "transaction"; "on"]
-        @@ Client_proto_contracts.ContractAlias.destination_param
+        @@ Client_proto_contracts.Contract_alias.destination_param
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
         @@ prefixes ["setting"; "delegate"; "to"]
@@ -417,7 +418,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
         ~desc:"Sign a delegate withdraw for a multisig contract."
         no_options
         ( prefixes ["sign"; "multisig"; "transaction"; "on"]
-        @@ Client_proto_contracts.ContractAlias.destination_param
+        @@ Client_proto_contracts.Contract_alias.destination_param
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
         @@ prefixes ["withdrawing"; "delegate"]
@@ -444,7 +445,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
           "Sign a change of public keys and threshold for a multisig contract."
         no_options
         ( prefixes ["sign"; "multisig"; "transaction"; "on"]
-        @@ Client_proto_contracts.ContractAlias.destination_param
+        @@ Client_proto_contracts.Contract_alias.destination_param
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
         @@ prefixes ["using"; "secret"; "key"]
@@ -478,7 +479,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
         ~desc:"Transfer tokens using a multisig contract."
         transfer_options
         ( prefixes ["from"; "multisig"; "contract"]
-        @@ Client_proto_contracts.ContractAlias.destination_param
+        @@ Client_proto_contracts.Contract_alias.destination_param
              ~name:"multisig"
              ~desc:"name/literal of the multisig contract"
         @@ prefix "transfer"
@@ -486,11 +487,11 @@ let commands () : #Protocol_client_context.full Clic.command list =
              ~name:"qty"
              ~desc:"amount taken from the multisig contract"
         @@ prefix "to"
-        @@ Client_proto_contracts.ContractAlias.destination_param
+        @@ Client_proto_contracts.Contract_alias.destination_param
              ~name:"dst"
              ~desc:"name/literal of the destination contract"
         @@ prefixes ["on"; "behalf"; "of"]
-        @@ Client_proto_contracts.ContractAlias.destination_param
+        @@ Client_proto_contracts.Contract_alias.destination_param
              ~name:"src"
              ~desc:"source calling the multisig contract"
         @@ prefixes ["with"; "signatures"]
@@ -562,7 +563,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
         ~desc:"Change the delegate of a multisig contract."
         transfer_options
         ( prefixes ["set"; "delegate"; "of"; "multisig"; "contract"]
-        @@ Client_proto_contracts.ContractAlias.destination_param
+        @@ Client_proto_contracts.Contract_alias.destination_param
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
         @@ prefix "to"
@@ -570,7 +571,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
              ~name:"dlgt"
              ~desc:"new delegate of the new multisig contract"
         @@ prefixes ["on"; "behalf"; "of"]
-        @@ Client_proto_contracts.ContractAlias.destination_param
+        @@ Client_proto_contracts.Contract_alias.destination_param
              ~name:"src"
              ~desc:"source calling the multisig contract"
         @@ prefixes ["with"; "signatures"]
@@ -641,11 +642,11 @@ let commands () : #Protocol_client_context.full Clic.command list =
         ~desc:"Withdraw the delegate of a multisig contract."
         transfer_options
         ( prefixes ["withdraw"; "delegate"; "of"; "multisig"; "contract"]
-        @@ Client_proto_contracts.ContractAlias.destination_param
+        @@ Client_proto_contracts.Contract_alias.destination_param
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
         @@ prefixes ["on"; "behalf"; "of"]
-        @@ Client_proto_contracts.ContractAlias.destination_param
+        @@ Client_proto_contracts.Contract_alias.destination_param
              ~name:"src"
              ~desc:"source calling the multisig contract"
         @@ prefixes ["with"; "signatures"]
@@ -731,11 +732,11 @@ let commands () : #Protocol_client_context.full Clic.command list =
                 can be obtained by one of the \"prepare multisig \
                 transaction\" commands"
         @@ prefixes ["on"; "multisig"; "contract"]
-        @@ Client_proto_contracts.ContractAlias.destination_param
+        @@ Client_proto_contracts.Contract_alias.destination_param
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
         @@ prefixes ["on"; "behalf"; "of"]
-        @@ Client_proto_contracts.ContractAlias.destination_param
+        @@ Client_proto_contracts.Contract_alias.destination_param
              ~name:"src"
              ~desc:"source calling the multisig contract"
         @@ prefixes ["with"; "signatures"]

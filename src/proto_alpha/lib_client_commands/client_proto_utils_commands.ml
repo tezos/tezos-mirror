@@ -65,7 +65,7 @@ let commands () =
       ( prefixes ["sign"; "message"]
       @@ string_parameter ~name:"message" ~desc:"message to sign"
       @@ prefixes ["for"]
-      @@ ContractAlias.alias_param
+      @@ Contract_alias.alias_param
            ~name:"src"
            ~desc:"name of the signer contract"
       @@ stop )
@@ -98,7 +98,7 @@ let commands () =
       ( prefixes ["check"; "that"; "message"]
       @@ string_parameter ~name:"message" ~desc:"signed message"
       @@ prefixes ["was"; "signed"; "by"]
-      @@ ContractAlias.destination_param
+      @@ Contract_alias.destination_param
            ~name:"signer"
            ~desc:"name of the signer contract"
       @@ prefixes ["to"; "produce"]

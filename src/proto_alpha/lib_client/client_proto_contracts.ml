@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -26,7 +27,7 @@
 open Protocol
 open Alpha_context
 
-module ContractEntity = struct
+module Contract_entity = struct
   type t = Contract.t
 
   let encoding = Contract.encoding
@@ -44,11 +45,11 @@ module ContractEntity = struct
   let name = "contract"
 end
 
-module RawContractAlias = Client_aliases.Alias (ContractEntity)
+module Raw_contract_alias = Client_aliases.Alias (Contract_entity)
 
-module ContractAlias = struct
+module Contract_alias = struct
   let find cctxt s =
-    RawContractAlias.find_opt cctxt s
+    Raw_contract_alias.find_opt cctxt s
     >>=? function
     | Some v ->
         return (s, v)
@@ -71,7 +72,7 @@ module ContractAlias = struct
         >>=? function
         | Some name -> return_some ("key:" ^ name) | None -> return_none )
     | None ->
-        RawContractAlias.rev_find cctxt c
+        Raw_contract_alias.rev_find cctxt c
 
   let get_contract cctxt s =
     match String.split ~limit:1 ':' s with
@@ -83,7 +84,7 @@ module ContractAlias = struct
   let autocomplete cctxt =
     Client_keys.Public_key_hash.autocomplete cctxt
     >>=? fun keys ->
-    RawContractAlias.autocomplete cctxt
+    Raw_contract_alias.autocomplete cctxt
     >>=? fun contracts -> return (List.map (( ^ ) "key:") keys @ contracts)
 
   let alias_param ?(name = "name") ?(desc = "existing contract alias") next =
@@ -119,7 +120,7 @@ module ContractAlias = struct
             | Ok v ->
                 return v
             | Error k_errs -> (
-                ContractEntity.of_source s
+                Contract_entity.of_source s
                 >>= function
                 | Ok v ->
                     return (s, v)

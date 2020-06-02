@@ -167,14 +167,14 @@ let list_contract_labels cctxt ~chain ~block =
           | None ->
               return ""
           | Some nm -> (
-              RawContractAlias.find_opt cctxt nm
+              Raw_contract_alias.find_opt cctxt nm
               >>=? function
               | None ->
                   return (" (known as " ^ nm ^ ")")
               | Some _ ->
                   return (" (known as key:" ^ nm ^ ")") ) )
       | None -> (
-          RawContractAlias.rev_find cctxt h
+          Raw_contract_alias.rev_find cctxt h
           >>=? function
           | None -> return "" | Some nm -> return (" (known as " ^ nm ^ ")") )
       )
@@ -228,7 +228,7 @@ let register_as_delegate cctxt ~chain ~block ?confirmations ?dry_run
     (Some source)
 
 let save_contract ~force cctxt alias_name contract =
-  RawContractAlias.add ~force cctxt alias_name contract
+  Raw_contract_alias.add ~force cctxt alias_name contract
   >>=? fun () ->
   message_added_contract cctxt alias_name >>= fun () -> return_unit
 
