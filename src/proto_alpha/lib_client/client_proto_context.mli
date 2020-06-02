@@ -165,6 +165,29 @@ val build_transaction_operation :
   Contract.t ->
   Kind.transaction Injection.annotated_manager_operation
 
+val register_baker :
+  #Protocol_client_context.full ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  ?confirmations:int ->
+  ?dry_run:bool ->
+  ?verbose_signing:bool ->
+  ?branch:int ->
+  ?fee:Tez.t ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:Z.t ->
+  balance:Tez.t ->
+  source:public_key_hash ->
+  src_pk:public_key ->
+  src_sk:Client_keys.sk_uri ->
+  fee_parameter:Injection.fee_parameter ->
+  consensus_key:public_key ->
+  threshold:int ->
+  owner_keys:public_key list ->
+  unit ->
+  (Kind.baker_registration Kind.manager Injection.result * Contract.t) tzresult
+  Lwt.t
+
 val transfer :
   #Protocol_client_context.full ->
   chain:Shell_services.chain ->
