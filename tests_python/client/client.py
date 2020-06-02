@@ -432,8 +432,14 @@ class Client:
         res = self.run(cmd)
         return res
 
-    def register_delegate(self, delegate: str) -> str:
-        return self.run(['register', 'key', delegate, 'as', 'delegate'])
+    def register_baker(self, alias: str, amount: float, source: str,
+                       consensus_key: str, owner_keys: list, threshold: int = 1
+                       ) -> client_output.OriginationResult:
+        cmd = ['register', 'baker', alias, 'transferring', str(amount),
+               'from', source, 'with', 'consensus', 'key', consensus_key,
+               'and', 'threshold', str(threshold),
+               'and', 'owner', 'keys', '--burn-cap', '0.312'] + owner_keys
+        return client_output.OriginationResult(self.run(cmd))
 
     def p2p_stat(self) -> client_output.P2pStatResult:
         res = self.run(['p2p', 'stat'], admin=True)
@@ -607,17 +613,23 @@ class Client:
                          account: str,
                          protos: List[str]
                          ) -> client_output.SubmitProposalsResult:
-        cmd = ['submit', 'proposals', 'for', account] + protos
+        cmd = ['from', 'baker', 'contract', account, 'submit', 'proposals',
+               'for', 'protocols'] + protos
+        cmd += ['--burn-cap', '0.194']
         return client_output.SubmitProposalsResult(self.run(cmd))
 
     def submit_ballot(self,
                       account: str,
                       proto: str,
-                      fraction_yays: str,
-                      fraction_nays: str,
-                      fraction_passes: str) -> str:
-        return self.run(['submit', 'ballot', 'for', account, proto,
-                         fraction_yays, fraction_nays, fraction_passes])
+                      fraction_yays: int,
+                      fraction_nays: int,
+                      fraction_passes: int) -> str:
+        yays = str(fraction_yays)
+        nays = str(fraction_nays)
+        passes = str(fraction_passes)
+        cmd = ['from', 'baker', 'contract', account, 'submit', 'ballot', 'for',
+               'protocol', proto, yays, nays, passes]
+        return self.run(cmd)
 
     def bootstrapped(self) -> str:
         return self.run(['bootstrapped'])
@@ -838,3 +850,50 @@ class Client:
     def get_operations_metadata_hash(self) -> str:
         return self.rpc('get',
                         '/chains/main/blocks/head/operations_metadata_hash')
+
+    def set_baker_consensus_key(self, baker: str, key: str) -> str:
+        cmd = ['set', 'baker', baker, 'consensus', 'key', 'to', key,
+               '--burn-cap', '0.038']
+        return self.run(cmd)
+
+    def get_baker_consensus_key(self,
+                                baker_hash: str,
+                                offset: int = None,
+                                params: List[str] = None) -> dict:
+        query = ''
+        if offset is not None:
+            query = f'?offset={offset}'
+        path = (f'/chains/main/blocks/head/context/bakers/{baker_hash}/'
+                f'consensus_key{query}')
+        rpc_res = self.rpc('get', path, params=params)
+        return rpc_res
+
+    def set_baker_threshold_and_owner_keys(
+            self, baker: str,
+            threshold: int,
+            keys: List[str]) -> str:
+        cmd = ['set', 'baker', baker, 'threshold', 'to', str(threshold), 'and',
+               'owner', 'keys', 'to']
+        cmd += keys
+        cmd += ['--burn-cap', '0.038']
+        return self.run(cmd)
+
+    def run_baker_script(self,
+                         storage: str,
+                         inp: str,
+                         source: str = None,
+                         entrypoint: str = None,
+                         amount: float = None,
+                         trace_stack: bool = False
+                         ) -> client_output.RunScriptResult:
+        cmd = ['run', 'baker', 'script', 'on', 'storage', storage,
+               'and', 'input', inp]
+        if source is not None:
+            cmd += ['--source', source]
+        if entrypoint is not None:
+            cmd += ['--entrypoint', entrypoint]
+        if amount is not None:
+            cmd += ['-z', str(amount)]
+        if trace_stack:
+            cmd += ['--trace-stack']
+        return client_output.RunScriptResult(self.run(cmd))

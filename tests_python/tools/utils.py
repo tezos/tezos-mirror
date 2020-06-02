@@ -8,7 +8,7 @@ import os
 import re
 import subprocess
 import time
-from typing import Any, List
+from typing import Any, List, Optional
 
 import base58check
 import ed25519
@@ -105,7 +105,7 @@ def check_operation_in_receipt(client: Client,
 
 
 @retry(timeout=5, attempts=20)
-def synchronize(clients: List[Client], max_diff: int = 2) -> bool:
+def synchronize(clients: List[Client], max_diff: int = 0) -> bool:
     """Return when nodes head levels are within max_diff units"""
     levels = [client.get_level() for client in clients]
     return max(levels) - min(levels) <= max_diff
@@ -198,6 +198,20 @@ def activate_alpha(client, parameters=None, timestamp=None,
     if parameters is None:
         parameters = constants.PARAMETERS
     client.activate_protocol_json(proto, parameters, timestamp=timestamp)
+    remember_baker_contracts(client)
+
+
+def remember_baker_contracts(client):
+    client.remember_contract(
+        'baker1', constants.BOOTSTRAP_BAKERS[0]["hash"])
+    client.remember_contract(
+        'baker2', constants.BOOTSTRAP_BAKERS[1]["hash"])
+    client.remember_contract(
+        'baker3', constants.BOOTSTRAP_BAKERS[2]["hash"])
+    client.remember_contract(
+        'baker4', constants.BOOTSTRAP_BAKERS[3]["hash"])
+    client.remember_contract(
+        'baker5', constants.BOOTSTRAP_BAKERS[4]["hash"])
 
 
 def pprint(json_data: dict) -> None:
@@ -380,12 +394,48 @@ def contract_name_of_file(contract_path: str) -> str:
 
 
 def bake(client: Client) -> BakeForResult:
-    return client.bake('bootstrap1',
+    return client.bake('baker1',
                        ['--max-priority', '512',
                         '--minimal-timestamp',
                         '--minimal-fees', '0',
                         '--minimal-nanotez-per-byte', '0',
                         '--minimal-nanotez-per-gas-unit', '0'])
+
+
+def bake_many(times: int,
+              client: Client,
+              baker: str,
+              args: List[str] = None) -> Optional[BakeForResult]:
+    result = None
+    while times > 0:
+        result = client.bake(baker, args)
+        times -= 1
+    return result
+
+
+def bake_until_cycle_end(
+        client: Client,
+        baker: str,
+        args: List[str] = None,
+        blocks_per_cycle=constants.PARAMETERS['blocks_per_cycle']
+) -> Optional[BakeForResult]:
+    current_level = client.get_level() % blocks_per_cycle
+    delta = blocks_per_cycle - current_level
+    return bake_many(delta, client, baker, args)
+
+
+def bake_until_nth_cycle_end(
+        cycles: int,
+        client: Client,
+        baker: str,
+        args: List[str] = None,
+        blocks_per_cycle=constants.PARAMETERS['blocks_per_cycle']
+) -> Optional[BakeForResult]:
+    result = None
+    while cycles > 0:
+        result = bake_until_cycle_end(client, baker, args, blocks_per_cycle)
+        cycles -= 1
+    return result
 
 
 def init_with_transfer(client: Client,

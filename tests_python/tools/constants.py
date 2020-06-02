@@ -48,6 +48,31 @@ IDENTITIES = {
         'secret': ("unencrypted:"
                    "edsk4QLrcijEffxV31gGdN2HU7UpyJjA8drFoNcmnB28n89YjPNRFm")
     },
+    'baker1_key': {
+        'public': 'edpkuDjETsuw7Tve4hczaEiDd5q8q5CnzppnoENpvf3hSt2g2N6fy5',
+        'secret': ('unencrypted:'
+                   'edsk432L71B91i1sE8rQxPDMo2Yxo4qaYqhktvpt8yovaMpo1NUbBt')
+    },
+    'baker2_key': {
+        'public': 'edpkuDDr1FWd79GdjtcRAYJ7zufsxHUpCbtjPvQ2SGzp5QGBV6jFXo',
+        'secret': ('unencrypted:'
+                   'edsk3jjD4cLvE1t3SiZKCRiH9SXnJ4jHEsVpfcuRwfe7sfbnsMGX6f')
+    },
+    'baker3_key': {
+        'public': 'edpkuxfqVAGvJegMn8h4Qsrfc6ncLYQsAWKaAx2SieFn2Mz5QxNSmL',
+        'secret': ('unencrypted:'
+                   'edsk3EVDFeDsefk1UoWWhDhnBpERhAwqHbVzWnBwA4tdUL8aBhw7RC')
+    },
+    'baker4_key': {
+        'public': 'edpku5MdpRkypXjBpyQ5vEbf3iUkRbt7iVjKvyx7RrkWSXpHS4fSck',
+        'secret': ('unencrypted:'
+                   'edsk2rAmeBDrQ5d1FhDoTdifMvBsqSosmPSBhxL74huszZhfMFtiKb')
+    },
+    'baker5_key': {
+        'public': 'edpkvFYoA3cwPyVMAheyX29pQFw9gwfxDHJgbthG3caZNuQFNzrwkM',
+        'secret': ('unencrypted:'
+                   'edsk4Ssc63dnYJUptVMaKfmHLJNMBYv9piYiRCiYjcH3gacKWP1z3v')
+    },
     'activator': {
         'secret': "unencrypted:" + GENESIS_SK
     }
@@ -60,6 +85,32 @@ IDENTITIES_SHORT = {
     }
 }
 
+BOOTSTRAP_BAKERS = [
+    {
+        'hash': 'SG1fpFaowYY8G7PfkYdKkGmsMziHKUfrHRHW',
+        'amount': '4000000000000',
+        'key': IDENTITIES['baker1_key']['public']
+    },
+    {
+        'hash': 'SG1TLmKJHVJxQosY6iN21AW77HsAapdupxnR',
+        'amount': '4000000000000',
+        'key': IDENTITIES['baker2_key']['public']
+    },
+    {
+        'hash': 'SG1hExdK69Z2RZkkQjKtLG6H4L4FGTZeGKHu',
+        'amount': '4000000000000',
+        'key': IDENTITIES['baker3_key']['public']
+    },
+    {
+        'hash': 'SG1mHgeWHGMnCUMJ8jZ1Cdh3DkWEcQ88tziJ',
+        'amount': '4000000000000',
+        'key': IDENTITIES['baker4_key']['public']
+    },
+    {
+        'hash': 'SG1jfZeHRzeWAM1T4zrwunEyUpwWc82D4tbv',
+        'amount': '4000000000000',
+    }
+]
 
 ALPHA = "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
 ALPHA_DAEMON = "alpha"  # tezos-baker-alpha

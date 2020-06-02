@@ -165,6 +165,8 @@ def clients(sandbox: Sandbox, request) -> Iterator[List[Client]]:
         # Large number may increases peers connection time
         sandbox.add_node(i, params=constants.NODE_PARAMS)
     utils.activate_alpha(sandbox.client(0))
+    for i in range(1, num_nodes):
+        utils.remember_baker_contracts(sandbox.client(i))
     clients = sandbox.all_clients()
     for client in clients:
         proto = constants.ALPHA
