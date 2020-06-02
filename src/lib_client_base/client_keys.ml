@@ -68,6 +68,17 @@ module Logging = struct
   let tag = Tag.def ~doc:"Identity" "pk_alias" Format.pp_print_text
 end
 
+let uri_encoding =
+  let to_uri s =
+    let o = Uri.of_string s in
+    match Uri.scheme o with
+    | None ->
+        Stdlib.failwith "Key URI needs a scheme"
+    | Some _ ->
+        o
+  in
+  Data_encoding.(conv Uri.to_string to_uri string)
+
 type pk_uri = Uri.t
 
 let make_pk_uri (x : Uri.t) : pk_uri =
@@ -129,7 +140,7 @@ module Secret_key = Client_aliases.Alias (struct
 
   let to_source t = return (Uri.to_string t)
 
-  let encoding = RPC_encoding.uri_encoding
+  let encoding = uri_encoding
 end)
 
 module Public_key = Client_aliases.Alias (struct
@@ -147,14 +158,14 @@ module Public_key = Client_aliases.Alias (struct
       [ case
           Json_only
           ~title:"Locator_only"
-          RPC_encoding.uri_encoding
+          uri_encoding
           (function (uri, None) -> Some uri | (_, Some _) -> None)
           (fun uri -> (uri, None));
         case
           Json_only
           ~title:"Locator_and_full_key"
           (obj2
-             (req "locator" RPC_encoding.uri_encoding)
+             (req "locator" uri_encoding)
              (req "key" Signature.Public_key.encoding))
           (function (uri, Some key) -> Some (uri, key) | (_, None) -> None)
           (fun (uri, key) -> (uri, Some key)) ]
@@ -225,7 +236,7 @@ let () =
         "The signer for %a produced an invalid signature"
         Uri.pp_hum
         sk)
-    Data_encoding.(obj1 (req "locator" RPC_encoding.uri_encoding))
+    Data_encoding.(obj1 (req "locator" uri_encoding))
     (function Signature_mismatch sk -> Some sk | _ -> None)
     (fun sk -> Signature_mismatch sk)
 
