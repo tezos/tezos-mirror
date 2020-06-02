@@ -73,9 +73,9 @@ let init ?lwt_log_sink ?(configuration = Configuration.default) () =
   | Some s ->
       let uris =
         TzString.split ' ' s
-        |> List.map (TzString.split '\n' ?dup:None ?limit:None)
+        |> List.map (TzString.split '\n')
         |> List.concat
-        |> List.map (TzString.split '\t' ?dup:None ?limit:None)
+        |> List.map (TzString.split '\t')
         |> List.concat
         |> List.filter (( <> ) "")
         |> List.map Uri.of_string
