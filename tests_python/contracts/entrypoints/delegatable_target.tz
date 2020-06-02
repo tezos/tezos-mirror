@@ -8,7 +8,7 @@
   # to:
 parameter
   (or
-     (or (key_hash %set_delegate)
+     (or (baker_hash %set_delegate)
          (unit %remove_delegate))
      (or %default string nat)
   ) ;
@@ -51,7 +51,7 @@ code {
                  }
                  { # 'remove_delegate' entrypoint
                    DROP ;
-                   NONE key_hash ;
+                   NONE baker_hash ;
                    SET_DELEGATE ;
                    CONS ;
                    PAIR ;

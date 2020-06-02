@@ -19,7 +19,7 @@ storage unit ;
 code { CAR ;
        IF_NONE
          { PUSH string "dummy" ;
-           PUSH mutez 100000000 ; NONE key_hash ;
+           PUSH mutez 100000000 ; NONE baker_hash ;
            CREATE_CONTRACT
              { parameter string ;
                storage string ;

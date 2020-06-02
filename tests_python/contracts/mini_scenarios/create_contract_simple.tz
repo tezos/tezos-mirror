@@ -3,7 +3,7 @@ storage unit;
 code { CAR;
        PUSH string "foo";
        PUSH mutez 0;
-       NONE key_hash;
+       NONE baker_hash;
        CREATE_CONTRACT
          { parameter string ;
            storage string ;

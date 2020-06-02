@@ -2,7 +2,7 @@ parameter unit;
 storage address;
 code { DROP; NIL int; # starting storage for contract
        AMOUNT;                   # Push the starting balance
-       NONE key_hash;                 # No delegate
+       NONE baker_hash;                 # No delegate
        CREATE_CONTRACT          # Create the contract
          { parameter (list int) ;
            storage (list int) ;

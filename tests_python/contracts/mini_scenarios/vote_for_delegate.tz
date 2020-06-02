@@ -1,7 +1,7 @@
-parameter (option key_hash) ;
+parameter (option baker_hash) ;
 storage (pair
-           (pair %mgr1 (address %addr) (option %key key_hash))
-           (pair %mgr2 (address %addr) (option %key key_hash))) ;
+           (pair %mgr1 (address %addr) (option %key baker_hash))
+           (pair %mgr2 (address %addr) (option %key baker_hash))) ;
 code { # Update the storage
        DUP ; CDAAR %addr @%; SENDER ; PAIR %@ %@; UNPAIR;
        IFCMPEQ
@@ -15,7 +15,7 @@ code { # Update the storage
        DIP { DUP ; CDDR } ;
        IF_NONE
          { IF_NONE
-             { NONE key_hash ;
+             { NONE baker_hash ;
                SET_DELEGATE ; NIL operation ; SWAP ; CONS }
              { DROP ; NIL operation } }
          { SWAP ;

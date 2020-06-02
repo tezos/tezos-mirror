@@ -3,7 +3,7 @@ storage unit;
 code { DROP;
        UNIT; # starting storage for contract
        AMOUNT;                   # Push the starting balance
-       NONE key_hash;                 # No delegate
+       NONE baker_hash;               # No delegate
        CREATE_CONTRACT          # Create the contract
          { parameter unit ;
            storage unit ;
