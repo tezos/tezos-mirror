@@ -89,11 +89,11 @@ let add_bootstrap_secret cctxt {name; sk_uri} =
 let bootstrap_secret_encoding =
   let open Data_encoding in
   conv
-    (fun p -> (p.name, (p.sk_uri :> Uri.t), ""))
-    (fun (name, sk_uri, _) -> {name; sk_uri = Client_keys.make_sk_uri sk_uri})
+    (fun p -> (p.name, p.sk_uri, ""))
+    (fun (name, sk_uri, _) -> {name; sk_uri})
     (obj3
        (req "name" string)
-       (req "sk_uri" RPC_encoding.uri_encoding)
+       (req "sk_uri" Client_keys.Secret_key.encoding)
        (req "amount" string))
 
 let bootstrap_secrets_encoding = Data_encoding.list bootstrap_secret_encoding

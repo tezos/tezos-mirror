@@ -157,12 +157,11 @@ let apply_protocol_overrides (o : protocol_constants_overrides)
 let parsed_account_repr_encoding =
   let open Data_encoding in
   conv
-    (fun p -> (p.name, (p.sk_uri :> Uri.t), p.amount))
-    (fun (name, sk_uri, amount) ->
-      {name; sk_uri = Client_keys.make_sk_uri sk_uri; amount})
+    (fun p -> (p.name, p.sk_uri, p.amount))
+    (fun (name, sk_uri, amount) -> {name; sk_uri; amount})
     (obj3
        (req "name" string)
-       (req "sk_uri" RPC_encoding.uri_encoding)
+       (req "sk_uri" Client_keys.Secret_key.encoding)
        (req "amount" Protocol.Tez_repr.encoding))
 
 let parsed_accounts_reprs = Data_encoding.list parsed_account_repr_encoding
