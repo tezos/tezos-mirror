@@ -305,7 +305,7 @@ let secrets () =
 
 let activation_init () =
   Context.init ~with_commitments:true 1
-  >|=? fun (b, cs) -> secrets () |> fun ss -> (b, cs, ss)
+  >|=? fun (b, cs, _) -> secrets () |> fun ss -> (b, cs, ss)
 
 let simple_init_with_commitments () =
   activation_init ()
@@ -449,7 +449,7 @@ let transfer_to_unactivated_then_activate () =
     contain any commitment *)
 let invalid_activation_with_no_commitments () =
   Context.init 1
-  >>=? fun (blk, _) ->
+  >>=? fun (blk, _, _) ->
   let secrets = secrets () in
   let ({account; activation_code; _} as _first_one) = List.hd secrets in
   Op.activation (B blk) account activation_code

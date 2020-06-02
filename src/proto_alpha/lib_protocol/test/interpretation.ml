@@ -13,7 +13,7 @@ let ( >>=?? ) x y =
 
 let test_context () =
   Context.init 3
-  >>=? fun (b, _cs) ->
+  >>=? fun (b, _cs, _) ->
   Incremental.begin_construction b
   >>=? fun v -> return (Incremental.alpha_ctxt v)
 

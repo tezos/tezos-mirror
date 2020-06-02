@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -34,9 +35,7 @@ open Alpha_context
 (****************************************************************)
 
 let get_first_different_baker baker bakers =
-  List.find
-    (fun baker' -> Signature.Public_key_hash.( <> ) baker baker')
-    bakers
+  List.find (fun baker' -> Baker_hash.( <> ) baker baker') bakers
 
 let get_first_different_bakers ctxt =
   Context.get_bakers ctxt
@@ -48,8 +47,8 @@ let get_first_different_bakers ctxt =
 let get_first_different_endorsers ctxt =
   Context.get_endorsers ctxt
   >|=? fun endorsers ->
-  let endorser_1 = (List.hd endorsers).delegate in
-  let endorser_2 = (List.hd (List.tl endorsers)).delegate in
+  let endorser_1 = (List.hd endorsers).baker in
+  let endorser_2 = (List.hd (List.tl endorsers)).baker in
   (endorser_1, endorser_2)
 
 (** Bake two block at the same level using the same policy (i.e. same
@@ -71,9 +70,7 @@ let block_fork ?policy contracts b =
     exposed by a double baking evidence operation *)
 let valid_double_baking_evidence () =
   Context.init 2
-  >>=? fun (b, contracts) ->
-  Context.get_bakers (B b)
-  >>=? fun bakers ->
+  >>=? fun (b, contracts, bakers) ->
   let priority_0_baker = List.hd bakers in
   block_fork ~policy:(By_priority 0) contracts b
   >>=? fun (blk_a, blk_b) ->
@@ -84,9 +81,7 @@ let valid_double_baking_evidence () =
   (* Check that the frozen deposit, the fees and rewards are removed *)
   iter_s
     (fun kind ->
-      let contract =
-        Alpha_context.Contract.implicit_contract priority_0_baker
-      in
+      let contract = Alpha_context.Contract.baker_contract priority_0_baker in
       Assert.balance_is ~loc:__LOC__ (B blk) contract ~kind Tez.zero)
     [Deposit; Fees; Rewards]
 
@@ -97,7 +92,7 @@ let valid_double_baking_evidence () =
 (** Check that a double baking operation fails if it exposes the same two blocks *)
 let same_blocks () =
   Context.init 2
-  >>=? fun (b, _contracts) ->
+  >>=? fun (b, _contracts, _) ->
   Block.bake b
   >>=? fun ba ->
   Op.double_baking (B ba) ba.header ba.header
@@ -115,7 +110,7 @@ let same_blocks () =
     different levels fails *)
 let different_levels () =
   Context.init 2
-  >>=? fun (b, contracts) ->
+  >>=? fun (b, contracts, _) ->
   block_fork ~policy:(By_priority 0) contracts b
   >>=? fun (blk_a, blk_b) ->
   Block.bake blk_b
@@ -134,7 +129,7 @@ let different_levels () =
     blocks fails *)
 let too_early_double_baking_evidence () =
   Context.init 2
-  >>=? fun (b, contracts) ->
+  >>=? fun (b, contracts, _) ->
   block_fork ~policy:(By_priority 0) contracts b
   >>=? fun (blk_a, blk_b) ->
   Op.double_baking (B b) blk_a.header blk_b.header
@@ -151,7 +146,7 @@ let too_early_double_baking_evidence () =
     create a double baking operation anymore *)
 let too_late_double_baking_evidence () =
   Context.init 2
-  >>=? fun (b, contracts) ->
+  >>=? fun (b, contracts, _) ->
   Context.get_constants (B b)
   >>=? fun Constants.{parametric = {preserved_cycles; _}; _} ->
   block_fork ~policy:(By_priority 0) contracts b
@@ -170,9 +165,9 @@ let too_late_double_baking_evidence () =
 
 (** Check that an invalid double baking evidence that exposes two block
     baking with same level made by different bakers fails *)
-let different_delegates () =
+let different_bakers () =
   Context.init 2
-  >>=? fun (b, _) ->
+  >>=? fun (b, _, _) ->
   get_first_different_bakers (B b)
   >>=? fun (baker_1, baker_2) ->
   Block.bake ~policy:(By_account baker_1) b
@@ -194,10 +189,11 @@ let wrong_signer () =
   let header_custom_signer baker baker_2 b =
     Block.Forge.forge_header ~policy:(By_account baker_2) b
     >>=? fun header ->
-    Block.Forge.set_baker baker header |> Block.Forge.sign_header
+    let baker = Block.Forge.set_baker baker header in
+    Block.Forge.sign_header baker
   in
   Context.init 2
-  >>=? fun (b, _) ->
+  >>=? fun (b, _, _) ->
   get_first_different_bakers (B b)
   >>=? fun (baker_1, baker_2) ->
   Block.bake ~policy:(By_account baker_1) b
@@ -217,9 +213,7 @@ let wrong_signer () =
 (** Detect when an evidence is injected twice in two different cycles *)
 let double_injection_double_baking_evidence () =
   Context.init 2
-  >>=? fun (blk, contracts) ->
-  Context.get_bakers (B blk)
-  >>=? fun bakers ->
+  >>=? fun (blk, contracts, bakers) ->
   let baker = List.hd bakers in
   block_fork ~policy:(By_account baker) contracts blk
   >>=? fun (blk_a, blk_b) ->
@@ -244,9 +238,7 @@ let double_injection_double_baking_evidence () =
 (** Previously unrequired evidence can be re-injected and slash the baker *)
 let unrequired_evidence_injected () =
   Context.init 2
-  >>=? fun (blk, contracts) ->
-  Context.get_bakers (B blk)
-  >>=? fun bakers ->
+  >>=? fun (blk, contracts, bakers) ->
   let baker = List.hd bakers in
   block_fork ~policy:(By_account baker) contracts blk
   >>=? fun (blk_a, blk_b) ->
@@ -273,22 +265,18 @@ let unrequired_evidence_injected () =
   Block.bake ~policy:(Excluding [baker]) ~operation:evidence_2 blk
   >>=? fun _blk -> return_unit
 
-let assert_proof_exists ~loc ?(exists = true) cheat_level delegate blk =
-  Context.Delegate.info (B blk) delegate
-  >>=? fun delegate_info ->
-  let proof_exists =
-    Raw_level.LSet.mem cheat_level delegate_info.proof_levels
-  in
+let assert_proof_exists ~loc ?(exists = true) cheat_level baker blk =
+  Context.Baker.info (B blk) baker
+  >>=? fun baker_info ->
+  let proof_exists = Raw_level.LSet.mem cheat_level baker_info.proof_levels in
   Assert.equal_bool ~loc proof_exists exists
 
 (** Outdated proof is deleted from storage *)
 let outdated_proof_has_been_cleaned () =
   Context.init 2
-  >>=? fun (blk, contracts) ->
+  >>=? fun (blk, contracts, bakers) ->
   Context.get_constants (B blk)
   >>=? fun Constants.{parametric = {preserved_cycles; blocks_per_cycle; _}; _} ->
-  Context.get_bakers (B blk)
-  >>=? fun bakers ->
   let baker = List.hd bakers in
   block_fork ~policy:(By_account baker) contracts blk
   >>=? fun (blk_a, blk_b) ->
@@ -339,8 +327,8 @@ let tests =
       "too late double baking evidence"
       `Quick
       too_late_double_baking_evidence;
-    Test.tztest "different delegates" `Quick different_delegates;
-    Test.tztest "wrong delegate" `Quick wrong_signer;
+    Test.tztest "different bakers" `Quick different_bakers;
+    Test.tztest "wrong baker" `Quick wrong_signer;
     Test.tztest
       "reject double injection of an evidence"
       `Quick
@@ -352,8 +340,4 @@ let tests =
     Test.tztest
       "outdated proof has been cleaned from storage"
       `Quick
-      outdated_proof_has_been_cleaned
-    (* Test.tztest
-     *   "evidence is valid until last block of preserved_cycle "
-     *   `Quick
-     *   evidence_is_valid_or_too_old *) ]
+      outdated_proof_has_been_cleaned ]

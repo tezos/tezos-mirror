@@ -42,10 +42,10 @@ let ten_tez = Tez.of_int 10
 (** Groups ten transactions between the same parties. *)
 let multiple_transfers () =
   Context.init 3
-  >>=? fun (blk, contracts) ->
+  >>=? fun (blk, contracts, bakers) ->
   let c1 = List.nth contracts 0 in
   let c2 = List.nth contracts 1 in
-  let c3 = List.nth contracts 2 in
+  let baker = List.hd bakers in
   map_s (fun _ -> Op.transaction (B blk) c1 c2 Tez.one) (1 -- 10)
   >>=? fun ops ->
   Op.combine_operations ~source:c1 (B blk) ops
@@ -54,9 +54,7 @@ let multiple_transfers () =
   >>=? fun c1_old_balance ->
   Context.Contract.balance (B blk) c2
   >>=? fun c2_old_balance ->
-  Context.Contract.pkh c3
-  >>=? fun baker_pkh ->
-  Block.bake ~policy:(By_account baker_pkh) ~operation blk
+  Block.bake ~policy:(By_account baker) ~operation blk
   >>=? fun blk ->
   Assert.balance_was_debited
     ~loc:__LOC__
@@ -76,19 +74,17 @@ let multiple_transfers () =
 (** Groups ten delegated originations. *)
 let multiple_origination_and_delegation () =
   Context.init 2
-  >>=? fun (blk, contracts) ->
+  >>=? fun (blk, contracts, bakers) ->
   let c1 = List.nth contracts 0 in
-  let c2 = List.nth contracts 1 in
+  let baker = List.hd bakers in
   let n = 10 in
   Context.get_constants (B blk)
   >>=? fun {parametric = {origination_size; cost_per_byte; _}; _} ->
-  Context.Contract.pkh c2
-  >>=? fun delegate_pkh ->
   (* Deploy n smart contracts with dummy scripts from c1 *)
   map_s
     (fun i ->
       Op.origination
-        ~delegate:delegate_pkh
+        ~delegate:baker
         ~counter:(Z.of_int i)
         ~fee:Tez.zero
         ~script:Op.dummy_script
@@ -163,7 +159,7 @@ let expect_balance_too_low = function
     Variant without fees. *)
 let failing_operation_in_the_middle () =
   Context.init 2
-  >>=? fun (blk, contracts) ->
+  >>=? fun (blk, contracts, _) ->
   let c1 = List.nth contracts 0 in
   let c2 = List.nth contracts 1 in
   Op.transaction ~fee:Tez.zero (B blk) c1 c2 Tez.one
@@ -219,7 +215,7 @@ let failing_operation_in_the_middle () =
     Variant with fees, that should be spent even in case of failure. *)
 let failing_operation_in_the_middle_with_fees () =
   Context.init 2
-  >>=? fun (blk, contracts) ->
+  >>=? fun (blk, contracts, _) ->
   let c1 = List.nth contracts 0 in
   let c2 = List.nth contracts 1 in
   Op.transaction ~fee:Tez.one (B blk) c1 c2 Tez.one
