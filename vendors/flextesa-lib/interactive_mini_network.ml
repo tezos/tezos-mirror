@@ -221,15 +221,6 @@ let run state ~protocol ~size ~base_port ~clear_root ~no_daemons_for ?hard_fork
         let key_name = kc.Tezos_client.Keyed.key_name in
         say state
           EF.(
-            desc_list
-              (haf "Registration-as-delegate:")
-              [ desc (af "Client:") (af "%S" client.Tezos_client.id)
-              ; desc (af "Key:") (af "%S" key_name) ])
-        >>= fun () ->
-        Tezos_client.register_as_delegate state client ~key_name
-        >>= fun () ->
-        say state
-          EF.(
             desc_list (haf "Starting daemons:")
               [ desc (af "Client:") (af "%S" client.Tezos_client.id)
               ; desc (af "Key:") (af "%S" key_name) ])
@@ -239,11 +230,19 @@ let run state ~protocol ~size ~base_port ~clear_root ~no_daemons_for ?hard_fork
             >>= fun {process= _; lwt= _} -> return ()))
   else
     List.fold ~init:(return []) keys_and_daemons
-      ~f:(fun prev_m (_acc, client, keyed, _) ->
+      ~f:(fun prev_m (acc, client, keyed, _) ->
         prev_m
         >>= fun prev ->
         Tezos_client.wait_for_node_bootstrap state client
-        >>= fun () -> return (keyed :: prev))
+        >>= fun () ->
+        let key, priv, baker_hash =
+          Tezos_protocol.Account.(name acc, private_key acc, baker_hash acc)
+        in
+        let keyed_client =
+          Tezos_client.Keyed.make client ?baker_hash ~key_name:key
+            ~secret_key:priv in
+        Tezos_client.Keyed.initialize state keyed_client
+        >>= fun _ -> return (keyed_client :: prev))
     >>= fun clients ->
     Interactive_test.Pauser.add_commands state
       Interactive_test.Commands.[bake_command state ~clients] ;
