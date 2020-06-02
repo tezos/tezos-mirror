@@ -23,8 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let rec retry (cctxt : #Protocol_client_context.full) ~delay ~factor ~tries f x
-    =
+let rec retry (cctxt : #Protocol_client_context.full) ?max_delay ~delay ~factor
+    ~tries f x =
   f x
   >>= function
   | Ok _ as r ->
@@ -42,7 +42,14 @@ let rec retry (cctxt : #Protocol_client_context.full) ~delay ~factor ~tries f x
       | `Killed ->
           Lwt.return err
       | `Continue ->
-          retry cctxt ~delay:(delay *. factor) ~factor ~tries:(tries - 1) f x )
+          let next_delay = delay *. factor in
+          let delay =
+            Option.unopt_map
+              ~default:next_delay
+              ~f:(fun max_delay -> Float.min next_delay max_delay)
+              max_delay
+          in
+          retry cctxt ?max_delay ~delay ~factor ~tries:(tries - 1) f x )
   | Error _ as err ->
       Lwt.return err
 
@@ -57,7 +64,8 @@ let rec retry_on_disconnection (cctxt : #Protocol_client_context.full) f =
       >>= fun () ->
       (* Wait forever when the node stops responding... *)
       Client_confirmations.wait_for_bootstrapped
-        ~retry:(retry cctxt ~delay:1. ~factor:1.5 ~tries:max_int)
+        ~retry:
+          (retry cctxt ~max_delay:10. ~delay:1. ~factor:1.5 ~tries:max_int)
         cctxt
       >>=? fun () -> retry_on_disconnection cctxt f
   | Error err ->
