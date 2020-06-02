@@ -316,10 +316,7 @@ To instrument all the code in ``src/``, use:
 
 ::
 
-    ./scripts/instrument_dune_bisect.sh src/ --except "src/proto_0*"
-
-Previous protocols (``proto_0*``) have to be excluded because they contain
-code that is not well instrumented by bisect_ppx2 and cannot be changed.
+    ./scripts/instrument_dune_bisect.sh src/ --except "src/lib_crypto"
 
 Then, compile the code using ``make``, ignoring warnings such as
 ``.merlin generated is inaccurate.`` which
@@ -358,17 +355,7 @@ Or
 Known issues
 ~~~~~~~~~~~~
 
-1. The instrumentation by ``bisect_ppx`` of OCaml code containing `partial
-   applications with missing optional arguments generate code that fails
-   typechecking <https://github.com/aantron/bisect_ppx/issues/319>`_. For those
-   pretty rare cases, either: change the order of arguments (``fun ?x y z``
-   rather than ``fun y ?x z``), add an explicit parameter at call site
-   (``f y ?x:None`` rather than ``f y``), or add a wrapper function
-   (``fun z -> f y z``). A more drastic solution is to exclude the problematic
-   packages from instrumentation. In the CI script ``.gitlab-ci.yml``, packages
-   to be excluded are defined in ``COVERAGE_EXCLUDE``.
-
-2. Report generation may fail spuriously.
+1. Report generation may fail spuriously.
 
    ::
 
