@@ -138,14 +138,11 @@ let gen_keys_containing ?(encrypted = false) ?(prefix = false) ?(force = false)
                 @@ Signature.Public_key.hash public_key
               in
               if matches hash then
-                let pk_uri =
-                  Tezos_signer_backends.Unencrypted.make_pk public_key
-                in
+                Tezos_signer_backends.Unencrypted.make_pk public_key
+                >>=? fun pk_uri ->
                 ( if encrypted then
                   Tezos_signer_backends.Encrypted.encrypt cctxt secret_key
-                else
-                  return (Tezos_signer_backends.Unencrypted.make_sk secret_key)
-                )
+                else Tezos_signer_backends.Unencrypted.make_sk secret_key )
                 >>=? fun sk_uri ->
                 register_key
                   cctxt
@@ -279,7 +276,8 @@ let commands version : Client_context.full Clic.command list =
             Secret_key.of_fresh cctxt force name
             >>=? fun name ->
             let (pkh, pk, sk) = Signature.generate_key ~algo () in
-            let pk_uri = Tezos_signer_backends.Unencrypted.make_pk pk in
+            Tezos_signer_backends.Unencrypted.make_pk pk
+            >>=? fun pk_uri ->
             Tezos_signer_backends.Encrypted.encrypt cctxt sk
             >>=? fun sk_uri ->
             register_key cctxt ~force (pkh, pk_uri, sk_uri) name)
@@ -296,9 +294,10 @@ let commands version : Client_context.full Clic.command list =
             Secret_key.of_fresh cctxt force name
             >>=? fun name ->
             let (pkh, pk, sk) = Signature.generate_key ~algo () in
-            let pk_uri = Tezos_signer_backends.Unencrypted.make_pk pk in
+            Tezos_signer_backends.Unencrypted.make_pk pk
+            >>=? fun pk_uri ->
             ( if encrypted then Tezos_signer_backends.Encrypted.encrypt cctxt sk
-            else return (Tezos_signer_backends.Unencrypted.make_sk sk) )
+            else Tezos_signer_backends.Unencrypted.make_sk sk )
             >>=? fun sk_uri ->
             register_key cctxt ~force (pkh, pk_uri, sk_uri) name) );
     ( match version with

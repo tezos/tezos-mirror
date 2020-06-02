@@ -81,26 +81,24 @@ let uri_encoding =
 
 type pk_uri = Uri.t
 
-let make_pk_uri (x : Uri.t) : pk_uri =
+let make_pk_uri (x : Uri.t) : pk_uri tzresult Lwt.t =
   match Uri.scheme x with
   | None ->
-      Stdlib.failwith "PK_URI needs a scheme"
+      failwith "Error while parsing URI: PK_URI needs a scheme"
   | Some _ ->
-      x
+      return x
 
 type sk_uri = Uri.t
 
-let make_sk_uri (x : Uri.t) : sk_uri =
+let make_sk_uri (x : Uri.t) : sk_uri tzresult Lwt.t =
   match Uri.scheme x with
   | None ->
-      Stdlib.failwith "SK_URI needs a scheme"
+      failwith "Error while parsing URI: SK_URI needs a scheme"
   | Some _ ->
-      x
+      return x
 
 let pk_uri_parameter () =
-  Clic.parameter (fun _ s ->
-      try return (make_pk_uri @@ Uri.of_string s)
-      with Failure s -> failwith "Error while parsing URI: %s" s)
+  Clic.parameter (fun _ s -> make_pk_uri @@ Uri.of_string s)
 
 let pk_uri_param ?name ?desc params =
   let name = Option.unopt ~default:"uri" name in
@@ -115,9 +113,7 @@ let pk_uri_param ?name ?desc params =
   Clic.param ~name ~desc (pk_uri_parameter ()) params
 
 let sk_uri_parameter () =
-  Clic.parameter (fun _ s ->
-      try return (make_sk_uri @@ Uri.of_string s)
-      with Failure s -> failwith "Error while parsing URI: %s" s)
+  Clic.parameter (fun _ s -> make_sk_uri @@ Uri.of_string s)
 
 let sk_uri_param ?name ?desc params =
   let name = Option.unopt ~default:"uri" name in

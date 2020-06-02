@@ -56,7 +56,7 @@ let make_pk pk =
 
 let neuterize sk_uri =
   secret_key sk_uri
-  >>=? fun sk -> return (make_pk (Signature.Secret_key.to_public_key sk))
+  >>=? fun sk -> make_pk (Signature.Secret_key.to_public_key sk)
 
 let public_key_hash pk_uri =
   public_key pk_uri

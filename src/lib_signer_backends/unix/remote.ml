@@ -95,37 +95,32 @@ struct
         assert false
 
   let public_key pk_uri =
-    Remote.public_key
-      (Client_keys.make_pk_uri (key (pk_uri : pk_uri :> Uri.t)))
+    Client_keys.make_pk_uri (key (pk_uri : pk_uri :> Uri.t))
+    >>=? Remote.public_key
 
   let public_key_hash pk_uri =
-    Remote.public_key_hash
-      (Client_keys.make_pk_uri (key (pk_uri : pk_uri :> Uri.t)))
+    Client_keys.make_pk_uri (key (pk_uri : pk_uri :> Uri.t))
+    >>=? Remote.public_key_hash
 
   let import_secret_key ~io:_ = public_key_hash
 
-  let neuterize sk_uri =
-    return (Client_keys.make_pk_uri (sk_uri : sk_uri :> Uri.t))
+  let neuterize sk_uri = Client_keys.make_pk_uri (sk_uri : sk_uri :> Uri.t)
 
   let sign ?watermark sk_uri msg =
-    Remote.sign
-      ?watermark
-      (Client_keys.make_sk_uri (key (sk_uri : sk_uri :> Uri.t)))
-      msg
+    Client_keys.make_sk_uri (key (sk_uri : sk_uri :> Uri.t))
+    >>=? fun sk_uri -> Remote.sign ?watermark sk_uri msg
 
   let deterministic_nonce sk_uri msg =
-    Remote.deterministic_nonce
-      (Client_keys.make_sk_uri (key (sk_uri : sk_uri :> Uri.t)))
-      msg
+    Client_keys.make_sk_uri (key (sk_uri : sk_uri :> Uri.t))
+    >>=? fun sk_uri -> Remote.deterministic_nonce sk_uri msg
 
   let deterministic_nonce_hash sk_uri msg =
-    Remote.deterministic_nonce_hash
-      (Client_keys.make_sk_uri (key (sk_uri : sk_uri :> Uri.t)))
-      msg
+    Client_keys.make_sk_uri (key (sk_uri : sk_uri :> Uri.t))
+    >>=? fun sk_uri -> Remote.deterministic_nonce_hash sk_uri msg
 
   let supports_deterministic_nonces sk_uri =
-    Remote.supports_deterministic_nonces
-      (Client_keys.make_sk_uri (key (sk_uri : sk_uri :> Uri.t)))
+    Client_keys.make_sk_uri (key (sk_uri : sk_uri :> Uri.t))
+    >>=? Remote.supports_deterministic_nonces
 end
 
 let make_sk sk =

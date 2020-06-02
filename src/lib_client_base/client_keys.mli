@@ -210,6 +210,6 @@ val force_switch : unit -> (bool, 'ctx) Clic.arg
 
 (**/**)
 
-val make_pk_uri : Uri.t -> pk_uri
+val make_pk_uri : Uri.t -> pk_uri tzresult Lwt.t
 
-val make_sk_uri : Uri.t -> sk_uri
+val make_sk_uri : Uri.t -> sk_uri tzresult Lwt.t

@@ -169,8 +169,7 @@ struct
     let public_key uri =
       parse (uri : pk_uri :> Uri.t) >>=? fun (path, pkh) -> public_key path pkh
 
-    let neuterize uri =
-      return (Client_keys.make_pk_uri (uri : sk_uri :> Uri.t))
+    let neuterize uri = Client_keys.make_pk_uri (uri : sk_uri :> Uri.t)
 
     let public_key_hash uri =
       public_key uri
@@ -226,8 +225,7 @@ struct
     let public_key uri =
       parse (uri : pk_uri :> Uri.t) >>=? fun (path, pkh) -> public_key path pkh
 
-    let neuterize uri =
-      return (Client_keys.make_pk_uri (uri : sk_uri :> Uri.t))
+    let neuterize uri = Client_keys.make_pk_uri (uri : sk_uri :> Uri.t)
 
     let public_key_hash uri =
       public_key uri

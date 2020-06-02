@@ -261,7 +261,8 @@ let encrypt cctxt sk =
         Encodings.p256
   in
   let path = Base58.simple_encode encoding payload in
-  let sk_uri = Client_keys.make_sk_uri (Uri.make ~scheme ~path ()) in
+  Client_keys.make_sk_uri (Uri.make ~scheme ~path ())
+  >>=? fun sk_uri ->
   Hashtbl.replace decrypted sk_uri sk ;
   return sk_uri
 
@@ -290,8 +291,7 @@ struct
 
   let neuterize sk_uri =
     decrypt C.cctxt sk_uri
-    >>=? fun sk ->
-    return (Unencrypted.make_pk (Signature.Secret_key.to_public_key sk))
+    >>=? fun sk -> Unencrypted.make_pk (Signature.Secret_key.to_public_key sk)
 
   let sign ?watermark sk_uri buf =
     decrypt C.cctxt sk_uri

@@ -28,41 +28,32 @@ open Tezos_client_base
 type bootstrap_secret = {name : string; sk_uri : Client_keys.sk_uri}
 
 let default_bootstrap_accounts =
-  [ {
-      name = "bootstrap1";
-      sk_uri =
-        Client_keys.make_sk_uri
-        @@ Uri.of_string
-             "unencrypted:edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh";
-    };
-    {
-      name = "bootstrap2";
-      sk_uri =
-        Client_keys.make_sk_uri
-        @@ Uri.of_string
-             "unencrypted:edsk39qAm1fiMjgmPkw1EgQYkMzkJezLNewd7PLNHTkr6w9XA2zdfo";
-    };
-    {
-      name = "bootstrap3";
-      sk_uri =
-        Client_keys.make_sk_uri
-        @@ Uri.of_string
-             "unencrypted:edsk4ArLQgBTLWG5FJmnGnT689VKoqhXwmDPBuGx3z4cvwU9MmrPZZ";
-    };
-    {
-      name = "bootstrap4";
-      sk_uri =
-        Client_keys.make_sk_uri
-        @@ Uri.of_string
-             "unencrypted:edsk2uqQB9AY4FvioK2YMdfmyMrer5R8mGFyuaLLFfSRo8EoyNdht3";
-    };
-    {
-      name = "bootstrap5";
-      sk_uri =
-        Client_keys.make_sk_uri
-        @@ Uri.of_string
-             "unencrypted:edsk4QLrcijEffxV31gGdN2HU7UpyJjA8drFoNcmnB28n89YjPNRFm";
-    } ]
+  Client_keys.make_sk_uri
+  @@ Uri.of_string
+       "unencrypted:edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh"
+  >>=? fun sk_uri1 ->
+  Client_keys.make_sk_uri
+  @@ Uri.of_string
+       "unencrypted:edsk39qAm1fiMjgmPkw1EgQYkMzkJezLNewd7PLNHTkr6w9XA2zdfo"
+  >>=? fun sk_uri2 ->
+  Client_keys.make_sk_uri
+  @@ Uri.of_string
+       "unencrypted:edsk4ArLQgBTLWG5FJmnGnT689VKoqhXwmDPBuGx3z4cvwU9MmrPZZ"
+  >>=? fun sk_uri3 ->
+  Client_keys.make_sk_uri
+  @@ Uri.of_string
+       "unencrypted:edsk2uqQB9AY4FvioK2YMdfmyMrer5R8mGFyuaLLFfSRo8EoyNdht3"
+  >>=? fun sk_uri4 ->
+  Client_keys.make_sk_uri
+  @@ Uri.of_string
+       "unencrypted:edsk4QLrcijEffxV31gGdN2HU7UpyJjA8drFoNcmnB28n89YjPNRFm"
+  >>=? fun sk_uri5 ->
+  return
+    [ {name = "bootstrap1"; sk_uri = sk_uri1};
+      {name = "bootstrap2"; sk_uri = sk_uri2};
+      {name = "bootstrap3"; sk_uri = sk_uri3};
+      {name = "bootstrap4"; sk_uri = sk_uri4};
+      {name = "bootstrap5"; sk_uri = sk_uri5} ]
 
 let add_bootstrap_secret cctxt {name; sk_uri} =
   let force = false in
@@ -102,7 +93,7 @@ let populate (cctxt : #Tezos_client_base.Client_context.io_wallet)
     bootstrap_accounts_file =
   ( match bootstrap_accounts_file with
   | None ->
-      return default_bootstrap_accounts
+      default_bootstrap_accounts
   | Some accounts_file -> (
       Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file accounts_file
       >>=? fun json ->

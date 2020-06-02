@@ -69,7 +69,7 @@ let fake_ctx () =
   end
 
 let make_sk_uris =
-  List.map (fun path ->
+  map_p (fun path ->
       Client_keys.make_sk_uri (Uri.make ~scheme:"encrypted" ~path ()))
 
 let ed25519_sks =
@@ -117,7 +117,8 @@ let test_vectors () =
     (fun (sks, encrypted_sks) ->
       let ctx = fake_ctx () in
       let sks = List.map Signature.Secret_key.of_b58check_exn sks in
-      map_s (decrypt ctx) encrypted_sks
+      encrypted_sks
+      >>=? map_s (decrypt ctx)
       >>=? fun decs ->
       assert (decs = sks) ;
       return_unit)
