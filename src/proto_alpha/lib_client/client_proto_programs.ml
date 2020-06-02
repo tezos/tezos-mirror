@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -45,17 +46,17 @@ module Program = Client_aliases.Alias (struct
   let name = "script"
 end)
 
-let print_errors (cctxt : #Client_context.printer) errs ~show_source ~parsed =
+let print_errors ?parsed (cctxt : #Client_context.printer) errs ~show_source =
   cctxt#warning
     "%a"
     (Michelson_v1_error_reporter.report_errors
        ~details:false
        ~show_source
-       ~parsed)
+       ?parsed)
     errs
   >>= fun () -> cctxt#error "error running script" >>= fun () -> return_unit
 
-let print_run_result (cctxt : #Client_context.printer) ~show_source ~parsed =
+let print_run_result ?parsed (cctxt : #Client_context.printer) ~show_source =
   function
   | Ok (storage, operations, maybe_lazy_storage_diff) ->
       cctxt#message
@@ -74,9 +75,9 @@ let print_run_result (cctxt : #Client_context.printer) ~show_source ~parsed =
         maybe_lazy_storage_diff
       >>= fun () -> return_unit
   | Error errs ->
-      print_errors cctxt errs ~show_source ~parsed
+      print_errors ?parsed cctxt errs ~show_source
 
-let print_trace_result (cctxt : #Client_context.printer) ~show_source ~parsed =
+let print_trace_result ?parsed (cctxt : #Client_context.printer) ~show_source =
   function
   | Ok (storage, operations, trace, maybe_lazy_storage_diff) ->
       cctxt#message
@@ -99,7 +100,7 @@ let print_trace_result (cctxt : #Client_context.printer) ~show_source ~parsed =
         trace
       >>= fun () -> return_unit
   | Error errs ->
-      print_errors cctxt errs ~show_source ~parsed
+      print_errors ?parsed cctxt errs ~show_source
 
 let run (cctxt : #Protocol_client_context.rpc_context)
     ~(chain : Chain_services.chain) ~block ?(amount = Tez.fifty_cents) ~balance
@@ -122,6 +123,25 @@ let run (cctxt : #Protocol_client_context.rpc_context)
     ~source
     ~payer
 
+let run_baker (cctxt : #Protocol_client_context.rpc_context)
+    ~(chain : Chain_services.chain) ~block ?(amount = Tez.zero) ~balance
+    ~(storage : Michelson_v1_parser.parsed)
+    ~(input : Michelson_v1_parser.parsed) ?source ?payer ?gas ?entrypoint () =
+  Chain_services.chain_id cctxt ~chain ()
+  >>=? fun chain_id ->
+  Alpha_services.Helpers.Scripts.run_baker_code
+    cctxt
+    (chain, block)
+    ?gas
+    ?entrypoint
+    ~storage:storage.expanded
+    ~input:input.expanded
+    ~amount
+    ~balance
+    ~chain_id
+    ~source
+    ~payer
+
 let trace (cctxt : #Protocol_client_context.rpc_context)
     ~(chain : Chain_services.chain) ~block ?(amount = Tez.fifty_cents) ~balance
     ~(program : Michelson_v1_parser.parsed)
@@ -135,6 +155,25 @@ let trace (cctxt : #Protocol_client_context.rpc_context)
     ?gas
     ?entrypoint
     ~script:program.expanded
+    ~storage:storage.expanded
+    ~input:input.expanded
+    ~amount
+    ~balance
+    ~chain_id
+    ~source
+    ~payer
+
+let trace_baker (cctxt : #Protocol_client_context.rpc_context)
+    ~(chain : Chain_services.chain) ~block ?(amount = Tez.fifty_cents) ~balance
+    ~(storage : Michelson_v1_parser.parsed)
+    ~(input : Michelson_v1_parser.parsed) ?source ?payer ?gas ?entrypoint () =
+  Chain_services.chain_id cctxt ~chain ()
+  >>=? fun chain_id ->
+  Alpha_services.Helpers.Scripts.trace_baker_code
+    cctxt
+    (chain, block)
+    ?gas
+    ?entrypoint
     ~storage:storage.expanded
     ~input:input.expanded
     ~amount

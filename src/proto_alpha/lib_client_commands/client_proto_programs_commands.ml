@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -65,11 +66,12 @@ let commands () =
       ~doc:"typecheck in legacy mode as if the data was taken from the chain"
       ()
   in
-  let amount_arg =
+  let amount_arg ?default () =
+    let default = Option.value ~default:"0.05" default in
     Client_proto_args.tez_arg
       ~parameter:"amount"
       ~doc:"amount of the transfer in \xEA\x9C\xA9"
-      ~default:"0.05"
+      ~default
   in
   let source_arg =
     Contract_alias.destination_arg
@@ -222,7 +224,7 @@ let commands () =
       ~desc:"Ask the node to run a script."
       (args8
          trace_stack_switch
-         amount_arg
+         (amount_arg ())
          balance_arg
          source_arg
          payer_arg
@@ -287,6 +289,67 @@ let commands () =
             ()
           >>= fun res ->
           print_run_result cctxt ~show_source ~parsed:program res);
+    command
+      ~group
+      ~desc:"Ask the node to run a baker script."
+      (args8
+         trace_stack_switch
+         (amount_arg ~default:"0" ())
+         balance_arg
+         source_arg
+         payer_arg
+         no_print_source_flag
+         custom_gas_flag
+         entrypoint_arg)
+      ( prefixes ["run"; "baker"; "script"; "on"; "storage"]
+      @@ Clic.param ~name:"storage" ~desc:"the storage data" data_parameter
+      @@ prefixes ["and"; "input"]
+      @@ Clic.param ~name:"input" ~desc:"the input data" data_parameter
+      @@ stop )
+      (fun ( trace_exec,
+             amount,
+             balance,
+             source,
+             payer,
+             no_print_source,
+             gas,
+             entrypoint )
+           storage
+           input
+           cctxt ->
+        let source = Option.map snd source in
+        let payer = Option.map snd payer in
+        let show_source = not no_print_source in
+        if trace_exec then
+          trace_baker
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            ~amount
+            ~balance
+            ~storage
+            ~input
+            ?source
+            ?payer
+            ?gas
+            ?entrypoint
+            ()
+          >>= fun res -> print_trace_result cctxt ~show_source res
+        else
+          run_baker
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            ~amount
+            ~balance
+            ~storage
+            ~input
+            ?source
+            ?payer
+            ?gas
+            ?entrypoint
+            ()
+          >>= fun res -> print_run_result cctxt ~show_source res);
     command
       ~group
       ~desc:"Ask the node to typecheck a script."
