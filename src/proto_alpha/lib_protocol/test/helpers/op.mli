@@ -28,7 +28,7 @@ open Protocol
 open Alpha_context
 
 val endorsement :
-  ?delegate:public_key_hash ->
+  ?baker:baker_hash ->
   ?level:Raw_level.t ->
   Context.t ->
   ?signing_context:Context.t ->
@@ -53,12 +53,46 @@ val transaction :
   Tez.t ->
   Operation.packed tzresult Lwt.t
 
+val sign :
+  ?watermark:Signature.watermark ->
+  Signature.secret_key ->
+  Context.t ->
+  packed_contents_list ->
+  packed_operation
+
+val manager_operation :
+  ?counter:counter ->
+  ?fee:Tez.t ->
+  ?gas_limit:counter ->
+  ?storage_limit:counter ->
+  ?public_key:public_key ->
+  source:Contract.t ->
+  Context.t ->
+  'a manager_operation ->
+  packed_contents_list tzresult Lwt.t
+
+val get_baker_contract_info :
+  Context.t ->
+  Contract.t ->
+  Client_proto_multisig.multisig_contract_information tzresult Lwt.t
+
+val baker_action :
+  ?counter:Z.t ->
+  ?fee:Tez.tez ->
+  ?gas_limit:Z.t ->
+  ?storage_limit:Z.t ->
+  Context.t ->
+  action:Client_proto_baker.action ->
+  Contract.t ->
+  Baker_hash.t ->
+  Operation.packed tzresult Lwt.t
+
 val delegation :
   ?counter:Z.t ->
   ?fee:Tez.tez ->
   Context.t ->
   Contract.t ->
-  public_key_hash option ->
+  baker_hash option ->
   Operation.packed tzresult Lwt.t
 
 val revelation : Context.t -> public_key -> Operation.packed tzresult Lwt.t
@@ -68,7 +102,7 @@ val failing_noop :
 
 val origination :
   ?counter:Z.t ->
-  ?delegate:public_key_hash ->
+  ?delegate:baker_hash ->
   script:Script.t ->
   ?preorigination:Contract.contract option ->
   ?public_key:public_key ->
@@ -81,6 +115,19 @@ val origination :
   (Operation.packed * Contract.contract) tzresult Lwt.t
 
 val originated_contract : Operation.packed -> Contract.contract
+
+val baker_registration :
+  ?counter:Z.t ->
+  consensus_key:public_key ->
+  threshold:int ->
+  owner_keys:public_key list ->
+  ?credit:Tez.tez ->
+  ?fee:Tez.tez ->
+  ?gas_limit:Z.t ->
+  ?storage_limit:Z.t ->
+  Context.t ->
+  Contract.contract ->
+  (Operation.packed * baker_hash) tzresult Lwt.t
 
 val double_endorsement :
   Context.t ->
@@ -111,21 +158,6 @@ val combine_operations :
 (** Reveals a seed_nonce that was previously committed at a certain level *)
 val seed_nonce_revelation :
   Context.t -> Raw_level.t -> Nonce.t -> Operation.packed
-
-(** Propose a list of protocol hashes during the approval voting *)
-val proposals :
-  Context.t ->
-  Contract.t ->
-  Protocol_hash.t list ->
-  Operation.packed tzresult Lwt.t
-
-(** Cast a vote yay, nay or pass *)
-val ballot :
-  Context.t ->
-  Contract.t ->
-  Protocol_hash.t ->
-  Vote.ballot ->
-  Operation.packed tzresult Lwt.t
 
 val dummy_script : Script.t
 

@@ -78,12 +78,26 @@ let not_equal_bool ~loc (a : bool) (b : bool) =
 let equal_pkh ~loc (a : Signature.Public_key_hash.t)
     (b : Signature.Public_key_hash.t) =
   let module PKH = Signature.Public_key_hash in
-  equal ~loc PKH.equal "Public key hashes  aren't equal" PKH.pp a b
+  equal ~loc PKH.equal "Public key hashes aren't equal" PKH.pp a b
+
+(* pk *)
+let equal_pk ~loc (a : Signature.Public_key.t) (b : Signature.Public_key.t) =
+  let module PK = Signature.Public_key in
+  equal ~loc PK.equal "Public key hashes aren't equal" PK.pp a b
 
 let not_equal_pkh ~loc (a : Signature.Public_key_hash.t)
     (b : Signature.Public_key_hash.t) =
   let module PKH = Signature.Public_key_hash in
   not_equal ~loc PKH.equal "Public key hashes are equal" PKH.pp a b
+
+(* baker *)
+let equal_baker ~loc (a : Baker_hash.t) (b : Baker_hash.t) =
+  let module BAKER = Baker_hash in
+  equal ~loc BAKER.equal "Baker hashes aren't equal" BAKER.pp a b
+
+let not_equal_baker ~loc (a : Baker_hash.t) (b : Baker_hash.t) =
+  let module BAKER = Baker_hash in
+  not_equal ~loc BAKER.equal "Baker hashes are equal" BAKER.pp a b
 
 open Context
 

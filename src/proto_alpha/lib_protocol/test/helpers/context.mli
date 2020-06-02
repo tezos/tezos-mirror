@@ -35,17 +35,17 @@ val branch : t -> Block_hash.t
 val get_level : t -> Raw_level.t tzresult
 
 val get_endorsers :
-  t -> Alpha_services.Delegate.Endorsing_rights.t list tzresult Lwt.t
+  t -> Alpha_services.Baker.Endorsing_rights.t list tzresult Lwt.t
 
-val get_endorser : t -> (public_key_hash * int list) tzresult Lwt.t
+val get_endorser : t -> (baker_hash * int list) tzresult Lwt.t
 
 val get_voting_power :
-  t -> public_key_hash -> int32 Environment.Error_monad.shell_tzresult Lwt.t
+  t -> baker_hash -> int32 Environment.Error_monad.shell_tzresult Lwt.t
 
 val get_total_voting_power :
   t -> int32 Environment.Error_monad.shell_tzresult Lwt.t
 
-val get_bakers : t -> public_key_hash list tzresult Lwt.t
+val get_bakers : t -> baker_hash list tzresult Lwt.t
 
 val get_seed_nonce_hash : t -> Nonce_hash.t tzresult Lwt.t
 
@@ -67,8 +67,7 @@ val get_endorsing_reward :
 module Vote : sig
   val get_ballots : t -> Vote.ballots tzresult Lwt.t
 
-  val get_ballot_list :
-    t -> (Signature.Public_key_hash.t * Vote.ballot) list tzresult Lwt.t
+  val get_ballot_list : t -> (baker_hash * Vote.ballot) list tzresult Lwt.t
 
   val get_voting_period : t -> Voting_period.t tzresult Lwt.t
 
@@ -80,8 +79,7 @@ module Vote : sig
 
   val get_participation_ema : Block.t -> Int32.t tzresult Lwt.t
 
-  val get_listings :
-    t -> (Signature.Public_key_hash.t * int32) list tzresult Lwt.t
+  val get_listings : t -> (baker_hash * int32) list tzresult Lwt.t
 
   val get_proposals : t -> Int32.t Protocol_hash.Map.t tzresult Lwt.t
 
@@ -97,6 +95,8 @@ module Contract : sig
 
   val pkh : Contract.t -> public_key_hash tzresult Lwt.t
 
+  val baker : Contract.t -> baker_hash tzresult Lwt.t
+
   type balance_kind = Main | Deposit | Fees | Rewards
 
   (** Returns the balance of a contract, by default the main balance.
@@ -108,39 +108,52 @@ module Contract : sig
 
   val global_counter : t -> Z.t tzresult Lwt.t
 
-  val manager : t -> Contract.t -> Account.t tzresult Lwt.t
+  val find_account : t -> Contract.t -> Account.t tzresult Lwt.t
 
-  val is_manager_key_revealed : t -> Contract.t -> bool tzresult Lwt.t
+  val is_public_key_revealed : t -> Contract.t -> bool tzresult Lwt.t
 
-  val delegate : t -> Contract.t -> public_key_hash tzresult Lwt.t
+  val delegate : t -> Contract.t -> baker_hash tzresult Lwt.t
 
-  val delegate_opt : t -> Contract.t -> public_key_hash option tzresult Lwt.t
+  val delegate_opt : t -> Contract.t -> baker_hash option tzresult Lwt.t
+
+  val storage : t -> Contract.t -> Script.expr tzresult Lwt.t
 end
 
-module Delegate : sig
-  type info = Delegate_services.info = {
+module Baker : sig
+  type info = Baker_services.info = {
     balance : Tez.t;
     frozen_balance : Tez.t;
-    frozen_balance_by_cycle : Delegate.frozen_balance Cycle.Map.t;
+    frozen_balance_by_cycle : Baker.frozen_balance Cycle.Map.t;
     staking_balance : Tez.t;
     delegated_contracts : Contract_repr.t list;
     delegated_balance : Tez.t;
     deactivated : bool;
     grace_period : Cycle.t;
+    consensus_key : Signature.Public_key.t;
     voting_power : int32;
     proof_levels : Raw_level.LSet.t;
   }
 
-  val info : t -> public_key_hash -> Delegate_services.info tzresult Lwt.t
+  val info : t -> baker_hash -> Baker_services.info tzresult Lwt.t
+
+  val consensus_key :
+    ?level:Raw_level.t ->
+    ?offset:int32 ->
+    t ->
+    baker_hash ->
+    Signature.Public_key.t tzresult Lwt.t
 end
 
 (** [init n] : returns an initial block with [n] initialized accounts
-    and the associated implicit contracts *)
+    and the associated implicit and baker contracts *)
 val init :
   ?endorsers_per_block:int ->
   ?with_commitments:bool ->
-  ?initial_balances:int64 list ->
+  ?initial_implicit_balances:int64 list ->
+  ?initial_baker_balances:int64 list ->
   ?initial_endorsers:int ->
   ?min_proposal_quorum:int32 ->
   int ->
-  (Block.t * Alpha_context.Contract.t list) tzresult Lwt.t
+  (Block.t * Alpha_context.Contract.t list * Alpha_context.baker_hash list)
+  tzresult
+  Lwt.t

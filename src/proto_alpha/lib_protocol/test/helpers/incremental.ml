@@ -32,7 +32,7 @@ type t = {
   rev_operations : Operation.packed list;
   rev_tickets : operation_receipt list;
   header : Block_header.t;
-  delegate : Account.t;
+  baker : Account.baker;
 }
 
 type incremental = t
@@ -63,15 +63,15 @@ let alpha_ctxt st = st.state.ctxt
 let begin_construction ?(priority = 0) ?timestamp ?seed_nonce_hash
     ?(policy = Block.By_priority priority) (predecessor : Block.t) =
   Block.get_next_baker ~policy predecessor
-  >>=? fun (delegate, priority, _timestamp) ->
-  Alpha_services.Delegate.Minimal_valid_time.get
+  >>=? fun (baker, priority, _timestamp) ->
+  Alpha_services.Baker.Minimal_valid_time.get
     Block.rpc_ctxt
     predecessor
     priority
     0
   >>=? fun real_timestamp ->
-  Account.find delegate
-  >>=? fun delegate ->
+  Account.find_baker baker
+  >>=? fun baker ->
   let timestamp = Option.value ~default:real_timestamp timestamp in
   let contents = Block.Forge.contents ~priority ?seed_nonce_hash () in
   let protocol_data = {Block_header.contents; signature = Signature.zero} in
@@ -104,7 +104,7 @@ let begin_construction ?(priority = 0) ?timestamp ?seed_nonce_hash
   >|= fun state ->
   Environment.wrap_error state
   >|? fun state ->
-  {predecessor; state; rev_operations = []; rev_tickets = []; header; delegate}
+  {predecessor; state; rev_operations = []; rev_tickets = []; header; baker}
 
 let detect_script_failure :
     type kind. kind Apply_results.operation_metadata -> _ =
@@ -115,8 +115,7 @@ let detect_script_failure :
         (Manager_operation_result
            {operation_result; internal_operation_results; _} :
           kind Kind.manager Apply_results.contents_result) =
-      let detect_script_failure (type kind)
-          (result : kind manager_operation_result) =
+      let detect_script_failure result =
         match result with
         | Applied _ ->
             Ok ()
@@ -131,8 +130,10 @@ let detect_script_failure :
             Environment.wrap_error (Error errs)
       in
       List.fold_left
-        (fun acc (Internal_operation_result (_, r)) ->
-          acc >>? fun () -> detect_script_failure r)
+        (fun acc -> function Internal_manager_operation_result (_, r) ->
+              acc >>? fun () -> detect_script_failure r
+          | Internal_baker_operation_result (_, r) ->
+              acc >>? fun () -> detect_script_failure r)
         (detect_script_failure operation_result)
         internal_operation_results
     in
@@ -204,4 +205,10 @@ let finalize_block st =
     }
   in
   let hash = Block_header.hash header in
-  {Block.hash; header; operations; context = result.context}
+  {
+    Block.hash;
+    header;
+    operations;
+    context = result.context;
+    origination_nonce = st.predecessor.origination_nonce;
+  }
