@@ -30,10 +30,68 @@ type rpc_error =
   | Rpc_not_found of string option
   | Rpc_unauthorized
   | Rpc_unexpected_type_of_failure
+  | Rpc_cannot_parse_path
+  | Rpc_cannot_parse_query
+  | Rpc_cannot_parse_body
+  | Rpc_streams_not_handled
 
 type error += Not_implemented_in_local_RPC_mode of Uri.t
 
 type error += Local_RPC_error of rpc_error
+
+let rpc_error_encoding =
+  let open Data_encoding in
+  union
+    [ case
+        (Tag 0)
+        ~title:"Rpc_generic_error"
+        (obj1 (req "kind" (constant "generic_error")))
+        (function Rpc_generic_error -> Some () | _ -> None)
+        (fun () -> Rpc_generic_error);
+      case
+        (Tag 1)
+        ~title:"Rpc_not_found"
+        (obj2
+           (req "kind" (constant "rpc_not_found"))
+           (opt "description" string))
+        (function Rpc_not_found m -> Some ((), m) | _ -> None)
+        (fun ((), m) -> Rpc_not_found m);
+      case
+        (Tag 2)
+        ~title:"Rpc_unauthorized"
+        (obj1 (req "kind" (constant "rpc_unauthorized")))
+        (function Rpc_unauthorized -> Some () | _ -> None)
+        (fun () -> Rpc_unauthorized);
+      case
+        (Tag 3)
+        ~title:"Rpc_unexpected_type_of_failure"
+        (obj1 (req "kind" (constant "rpc_unexpected_failure")))
+        (function Rpc_unexpected_type_of_failure -> Some () | _ -> None)
+        (fun () -> Rpc_unexpected_type_of_failure);
+      case
+        (Tag 4)
+        ~title:"Rpc_cannot_parse_path"
+        (obj1 (req "kind" (constant "rpc_cannot_parse")))
+        (function Rpc_cannot_parse_path -> Some () | _ -> None)
+        (fun () -> Rpc_cannot_parse_path);
+      case
+        (Tag 5)
+        ~title:"Rpc_cannot_parse_query"
+        (obj1 (req "kind" (constant "rpc_cannot_query")))
+        (function Rpc_cannot_parse_query -> Some () | _ -> None)
+        (fun () -> Rpc_cannot_parse_query);
+      case
+        (Tag 6)
+        ~title:"Rpc_cannot_parse_body"
+        (obj1 (req "kind" (constant "rpc_cannot_body")))
+        (function Rpc_cannot_parse_body -> Some () | _ -> None)
+        (fun () -> Rpc_cannot_parse_body);
+      case
+        (Tag 7)
+        ~title:"Rpc_streams_not_handled"
+        (obj1 (req "kind" (constant "rpc_streams_not_handled")))
+        (function Rpc_streams_not_handled -> Some () | _ -> None)
+        (fun () -> Rpc_streams_not_handled) ]
 
 class local_ctxt (base_dir : string) (mem_only : bool)
   (mockup_env : Registration.mockup_environment)
@@ -113,8 +171,76 @@ class local_ctxt (base_dir : string) (mem_only : bool)
       (Data_encoding.json, Data_encoding.json option) RPC_context.rest_result
       Lwt.t =
    fun meth ?body uri ->
-    ignore (meth, body) ;
-    Error_monad.fail (Not_implemented_in_local_RPC_mode uri)
+    (* This code is a ripoff of resto-cohttp-server/server.ml/callback *)
+    (* let uri = Cohttp.Request.uri req in *)
+    let path = Uri.pct_decode (Uri.path uri) in
+    let path = Resto_cohttp.Utils.split_path path in
+    Directory.lookup directory () meth path
+    >>= fun result ->
+    match result with
+    | Error (`Cannot_parse_path _) ->
+        Error_monad.fail (Local_RPC_error Rpc_cannot_parse_path)
+    | Error (`Method_not_allowed _) ->
+        Error_monad.fail (Local_RPC_error Rpc_unauthorized)
+    | Error `Not_found ->
+        Error_monad.fail (Local_RPC_error (Rpc_not_found None)) (*TODO*)
+    | Ok (Directory.Service s) -> (
+        ( match
+            Resto.Query.parse
+              s.types.query
+              (List.map
+                 (fun (k, l) -> (k, String.concat "," l))
+                 (Uri.query uri))
+          with
+        | exception Resto.Query.Invalid _s ->
+            Error_monad.fail (Local_RPC_error Rpc_cannot_parse_query)
+        | query ->
+            return query )
+        >>=? fun query ->
+        let output_encoding = s.types.output in
+        let output = Data_encoding.Json.construct output_encoding in
+        let error =
+          Option.map ~f:(Data_encoding.Json.construct s.types.error)
+        in
+        ( match s.types.input with
+        | Service.No_input ->
+            s.handler query () >>= return
+        | Service.Input input -> (
+            let body =
+              Option.map body ~f:(fun b ->
+                  Cohttp_lwt.Body.of_string (Data_encoding.Json.to_string b))
+            in
+            let body = Option.unopt ~default:Cohttp_lwt.Body.empty body in
+            Cohttp_lwt.Body.to_string body
+            >>= fun body ->
+            match Tezos_rpc_http.Media_type.json.destruct input body with
+            | Error _s ->
+                Error_monad.fail (Local_RPC_error Rpc_cannot_parse_body)
+            | Ok body ->
+                s.handler query body >>= return ) )
+        >>=? function
+        | `Ok o ->
+            let body = output o in
+            return (`Ok body)
+        | `Error e ->
+            let body = error e in
+            return (`Error body)
+        | `Not_found e ->
+            let body = error e in
+            return (`Not_found body)
+        | `Unauthorized e ->
+            let body = error e in
+            return (`Unauthorized body)
+        | `Forbidden e ->
+            let body = error e in
+            return (`Forbidden body)
+        | `Conflict e ->
+            let body = error e in
+            return (`Conflict body)
+        | `OkStream _ostream ->
+            Error_monad.fail (Local_RPC_error Rpc_streams_not_handled)
+        | `Created _ | `No_content | `Gone _ ->
+            Error_monad.fail (Local_RPC_error Rpc_generic_error) )
   in
   object
     method base = Uri.empty
@@ -143,36 +269,6 @@ class local_ctxt (base_dir : string) (mem_only : bool)
     method generic_json_call = generic_json_call_stub
   end
 
-let rpc_error_encoding =
-  let open Data_encoding in
-  union
-    [ case
-        (Tag 0)
-        ~title:"Rpc_generic_error"
-        (obj1 (req "kind" (constant "generic_error")))
-        (function Rpc_generic_error -> Some () | _ -> None)
-        (fun () -> Rpc_generic_error);
-      case
-        (Tag 1)
-        ~title:"Rpc_not_found"
-        (obj2
-           (req "kind" (constant "rpc_not_found"))
-           (opt "description" string))
-        (function Rpc_not_found m -> Some ((), m) | _ -> None)
-        (fun ((), m) -> Rpc_not_found m);
-      case
-        (Tag 2)
-        ~title:"Rpc_unauthorized"
-        (obj1 (req "kind" (constant "rpc_unauthorized")))
-        (function Rpc_unauthorized -> Some () | _ -> None)
-        (fun () -> Rpc_unauthorized);
-      case
-        (Tag 3)
-        ~title:"Rpc_unexpected_type_of_failure"
-        (obj1 (req "kind" (constant "rpc_unexpected_failure")))
-        (function Rpc_unexpected_type_of_failure -> Some () | _ -> None)
-        (fun () -> Rpc_unexpected_type_of_failure) ]
-
 let () =
   register_error_kind
     `Permanent
@@ -191,7 +287,15 @@ let () =
       | Rpc_unauthorized ->
           Format.fprintf ppf ": RPC unauthorized"
       | Rpc_unexpected_type_of_failure ->
-          Format.fprintf ppf ": unexpected type of failure")
+          Format.fprintf ppf ": unexpected type of failure"
+      | Rpc_cannot_parse_path ->
+          Format.fprintf ppf ": cannot parse path"
+      | Rpc_cannot_parse_query ->
+          Format.fprintf ppf ": cannot parse query"
+      | Rpc_cannot_parse_body ->
+          Format.fprintf ppf ": cannot parse body"
+      | Rpc_streams_not_handled ->
+          Format.fprintf ppf ": streamed RPCs not handled yet")
     (let open Data_encoding in
     obj1 (req "rpc_error" rpc_error_encoding))
     (function Local_RPC_error rpc_error -> Some rpc_error | _ -> None)

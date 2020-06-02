@@ -21,6 +21,7 @@
    tezos-p2p ; for registering the relevant RPCs
    tezos-protocol-environment
    tezos-stdlib-unix
+   tezos-rpc-http
    tezos-mockup-registration)
  (flags (:standard
   -open Tezos_base__TzPervasives
