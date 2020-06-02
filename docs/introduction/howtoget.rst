@@ -171,6 +171,15 @@ It is recommended to also run the command ``opam remove -a`` in order
 to remove the dependencies installed automatically and not needed
 anymore. Beware to not uninstall too much though.
 
+Identified situations where it will be more tricky are
+
+* When the OCaml compiler version requirement changes. In this case,
+  be explicit about the "upgrade" and do ``opam upgrade --unlock-base
+  ocaml.$new_version tezos``.
+
+* When there are Rust dependencies involved. The way to go is still
+  unclear.
+
 
 Set up the development environment
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
