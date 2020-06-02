@@ -1,12 +1,14 @@
-from os import path
 import subprocess
+from os import path
+
 import pytest
-from tools.client_regression import ClientRegression
+
 from tools import paths
+from tools.client_regression import ClientRegression
+from tools.constants import BOOTSTRAP_BAKERS, IDENTITIES
 from tools.paths import OPCODES_CONTRACT_PATH
-from tools.utils import assert_run_failure, assert_storage_contains, bake, \
-    init_with_transfer, assert_balance
-from tools.constants import IDENTITIES
+from tools.utils import (assert_balance, assert_run_failure,
+                         assert_storage_contains, bake, init_with_transfer)
 
 KEY1 = 'foo'
 KEY2 = 'bar'
@@ -299,7 +301,7 @@ class TestContractOnchainOpcodes:
 
         assert client.get_delegate('set_delegate').delegate is None
 
-        addr = IDENTITIES['bootstrap5']['identity']
+        addr = BOOTSTRAP_BAKERS[4]['hash']
         client.transfer(0, 'bootstrap1', 'set_delegate',
                         ['-arg', f'(Some "{addr}")'])
         bake(client)

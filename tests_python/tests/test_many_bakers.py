@@ -1,8 +1,9 @@
 import time
-import pytest
-from tools import utils, constants
-from launchers.sandbox import Sandbox
 
+import pytest
+
+from launchers.sandbox import Sandbox
+from tools import constants, utils
 
 # TODO parameterize test
 
@@ -18,8 +19,11 @@ class TestManyBakers:
         for i in range(10):
             sandbox.add_node(i, params=constants.NODE_PARAMS)
         utils.activate_alpha(sandbox.client(0))
+        utils.synchronize(sandbox.all_clients())
+        for i in range(1, 10):
+            utils.remember_baker_contracts(sandbox.client(i))
         for i in range(5):
-            sandbox.add_baker(i, f'bootstrap{i + 1}',
+            sandbox.add_baker(i, f'baker{i + 1}',
                               proto=constants.ALPHA_DAEMON)
 
     def test_wait(self):

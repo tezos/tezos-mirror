@@ -24,12 +24,13 @@ TODO this test is a copy and paste from tests/test_baker_endorser.py
 
 import itertools
 import random
-import time
 import subprocess
-import pytest
-from tools import utils, constants
-from launchers.sandbox import SandboxMultiBranch
+import time
 
+import pytest
+
+from launchers.sandbox import SandboxMultiBranch
+from tools import constants, utils
 
 random.seed(42)
 KEYS = [f'bootstrap{i}' for i in range(1, 6)]
@@ -85,14 +86,14 @@ class TestAllDaemonsWithOperations:
         parameters = dict(constants.PARAMETERS)
         parameters["time_between_blocks"] = ["10", "0"]
         sandbox_multibranch.client(0).activate_protocol_json(ALPHA, parameters)
-        sandbox_multibranch.add_baker(0, 'bootstrap5',
+        sandbox_multibranch.add_baker(0, 'baker5',
                                       proto=ALPHA_DAEMON)
-        sandbox_multibranch.add_baker(1, 'bootstrap4',
+        sandbox_multibranch.add_baker(1, 'baker4',
                                       proto=ALPHA_DAEMON)
-        sandbox_multibranch.add_endorser(0, account='bootstrap1',
+        sandbox_multibranch.add_endorser(0, account='baker1',
                                          endorsement_delay=1,
                                          proto=ALPHA_DAEMON)
-        sandbox_multibranch.add_endorser(1, account='bootstrap2',
+        sandbox_multibranch.add_endorser(1, account='baker2',
                                          endorsement_delay=1,
                                          proto=ALPHA_DAEMON)
 

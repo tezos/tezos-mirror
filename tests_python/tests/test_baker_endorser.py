@@ -1,10 +1,12 @@
 import itertools
 import random
-import time
 import subprocess
+import time
+
 import pytest
-from tools import utils, constants
+
 from launchers.sandbox import Sandbox
+from tools import constants, utils
 
 random.seed(42)
 KEYS = [f'bootstrap{i}' for i in range(1, 6)]
@@ -41,11 +43,14 @@ class TestAllDaemonsWithOperations:
         for i in range(NUM_NODES):
             sandbox.add_node(i, params=constants.NODE_PARAMS)
         utils.activate_alpha(sandbox.client(0), parameters)
-        sandbox.add_baker(0, 'bootstrap5', proto=constants.ALPHA_DAEMON)
-        sandbox.add_baker(1, 'bootstrap4', proto=constants.ALPHA_DAEMON)
-        sandbox.add_endorser(0, account='bootstrap1', endorsement_delay=1,
+        utils.synchronize(sandbox.all_clients())
+        for i in range(1, NUM_NODES):
+            utils.remember_baker_contracts(sandbox.client(i))
+        sandbox.add_baker(0, 'baker5', proto=constants.ALPHA_DAEMON)
+        sandbox.add_baker(1, 'baker4', proto=constants.ALPHA_DAEMON)
+        sandbox.add_endorser(0, account='baker1', endorsement_delay=1,
                              proto=constants.ALPHA_DAEMON)
-        sandbox.add_endorser(1, account='bootstrap2', endorsement_delay=1,
+        sandbox.add_endorser(1, account='baker2', endorsement_delay=1,
                              proto=constants.ALPHA_DAEMON)
 
     def test_wait_for_alpha(self, sandbox: Sandbox):

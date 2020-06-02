@@ -4,13 +4,15 @@ the test chain in the testing phase of the voting process, and the
 bootstrap heuristics.
 """
 
-import time
-import os
 import json
-import pytest
-from tools import utils, constants, paths
-from launchers.sandbox import Sandbox
+import os
+import time
 
+import pytest
+
+from client import client_output
+from launchers.sandbox import Sandbox
+from tools import constants, paths, utils
 
 ERROR_PATTERN = r"Uncaught|registered|error"
 BLOCKS_PER_VOTING_PERIOD = 20
@@ -106,7 +108,8 @@ class TestVotingFull:
 
     def test_submit_proto_b_proposal(self, sandbox, session):
         client = sandbox.client(0)
-        proposals = client.submit_proposals('bootstrap1', [PROTO_B])
+        cmd = ['submit', 'proposals', 'for', 'bootstrap1', PROTO_B]
+        proposals = client_output.SubmitProposalsResult(client.run(cmd))
         session['prop_hash'] = proposals.operation_hash
 
     def test_wait_for_operation_inclusion(self, sandbox, session):

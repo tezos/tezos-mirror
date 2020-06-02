@@ -1,8 +1,10 @@
 import time
 from datetime import datetime, timedelta
+
 import pytest
-from tools import utils, constants
+
 from launchers.sandbox import Sandbox
+from tools import constants, utils
 
 BAKE_ARGS = ['--max-priority', '512', '--minimal-timestamp']
 PARAMS = constants.NODE_PARAMS + ['--history-mode', 'full']
@@ -24,7 +26,7 @@ class TestMultiNodeStorageReconstruction:
 
     def test_bake_node0_level_a(self, sandbox: Sandbox, session: dict):
         for _ in range(BATCH - 1):
-            sandbox.client(0).bake('bootstrap1', BAKE_ARGS)
+            sandbox.client(0).bake('baker1', BAKE_ARGS)
             # time.sleep(2)
         session['head_hash'] = sandbox.client(0).get_head()['hash']
         session['head_level'] = sandbox.client(0).get_head()['header']['level']
@@ -62,7 +64,7 @@ class TestMultiNodeStorageReconstruction:
     # Bake a few blocks
     def test_bake_node0_level_b(self, sandbox: Sandbox, session: dict):
         for _ in range(BATCH):
-            sandbox.client(0).bake('bootstrap1', BAKE_ARGS)
+            sandbox.client(0).bake('baker1', BAKE_ARGS)
             # time.sleep(2)
         session['head_hash'] = sandbox.client(0).get_head()['hash']
         session['head_level'] = sandbox.client(0).get_head()['header']['level']

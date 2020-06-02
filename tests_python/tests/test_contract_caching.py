@@ -40,14 +40,14 @@ class TestContractCaching:
         session['addresses'] = {}
         for i in range(3):
             client.originate(f'no_op_{i}', 1, pubkey, session['no_op'], args)
-            client.bake('bootstrap1', BAKE_ARGS)
+            client.bake('baker1', BAKE_ARGS)
             address = client.get_contract_address(f'no_op_{i}')
             session['addresses'][f'no_op_{i}'] = address
         client.originate('transfer_all',
                          1000, pubkey,
                          session['transfer_all'],
                          args)
-        client.bake('bootstrap1', BAKE_ARGS)
+        client.bake('baker1', BAKE_ARGS)
 
     def transfer_all(self, client, destinations):
         # quote the addresses
@@ -58,7 +58,7 @@ class TestContractCaching:
                                  "bootstrap1",
                                  "transfer_all",
                                  args)
-        client.bake('bootstrap1', BAKE_ARGS)
+        client.bake('baker1', BAKE_ARGS)
         return result
 
     def test_repeat_contract_2_of_2(self, client, session):

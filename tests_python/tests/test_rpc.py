@@ -1,7 +1,9 @@
 import time
+
 import pytest
-from tools import utils, constants
+
 from launchers.sandbox import Sandbox
+from tools import constants, utils
 
 BAKE_ARGS = ['--max-priority', '512', '--minimal-timestamp']
 CHAIN_ID = "main"
@@ -29,14 +31,14 @@ class TestRPCs:
         time.sleep(2)
 
     def test_bake_for(self, sandbox: Sandbox):
-        sandbox.client(1).bake('bootstrap1', BAKE_ARGS)
+        sandbox.client(1).bake('baker1', BAKE_ARGS)
 
     def test_network_self(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get', f'/network/self')
 
     def test_constants(self, sandbox: Sandbox):
         sandbox.client(2).rpc('get', '/network/self')
-        sandbox.client(1).bake('bootstrap1', BAKE_ARGS)
+        sandbox.client(1).bake('baker1', BAKE_ARGS)
         time.sleep(3)
 
     def test_chain_blocks(self, sandbox: Sandbox):
@@ -51,7 +53,7 @@ class TestRPCs:
 
     @pytest.mark.skip
     def test_chain_invalid_blocks_block_hash(self, sandbox: Sandbox):
-        res = sandbox.client(1).bake('bootstrap1', BAKE_ARGS)
+        res = sandbox.client(1).bake('baker1', BAKE_ARGS)
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/invalid_blocks/'
                               f'{res.block_hash}')
@@ -352,6 +354,11 @@ class TestRPCs:
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
                               'context/delegates/{PKH}/staking_balance')
 
+    def test_chain_block_context_bakers(self, sandbox: Sandbox):
+        sandbox.client(1).rpc('get',
+                              f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
+                              f'context/bakers')
+
     def test_chain_block_context_nonces_block_level(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
@@ -408,7 +415,7 @@ class TestRPCs:
                               f'helpers/complete/{prefix}')
 
     def test_chain_block_helpers_complete_prefix2(self, sandbox: Sandbox):
-        res = sandbox.client(1).bake('bootstrap1', BAKE_ARGS)
+        res = sandbox.client(1).bake('baker1', BAKE_ARGS)
         prefix = res.block_hash[:5]
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
@@ -448,8 +455,8 @@ class TestRPCs:
     def test_add_transactions(self, sandbox: Sandbox):
         sandbox.client(1).transfer(1.000, 'bootstrap1', 'bootstrap2')
         sandbox.client(2).transfer(1.000, 'bootstrap3', 'bootstrap4')
-        sandbox.client(1).endorse('bootstrap1')
-        sandbox.client(1).bake('bootstrap1', BAKE_ARGS)
+        sandbox.client(1).endorse('baker1')
+        sandbox.client(1).bake('baker1', BAKE_ARGS)
         time.sleep(3)
 
     def test_chain_block_operation_hashes_list_offset(self, sandbox: Sandbox):

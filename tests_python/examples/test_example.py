@@ -1,7 +1,8 @@
 from typing import Iterator
 import pytest
-from tools import constants, paths, utils
+
 from launchers.sandbox import Sandbox
+from tools import constants, paths, utils
 
 
 @pytest.fixture(scope="class")
@@ -11,7 +12,7 @@ def sandbox() -> Iterator[Sandbox]:
         sandbox.add_node(0, params=constants.NODE_PARAMS)
         utils.activate_alpha(sandbox.client(0))
         sandbox.add_node(1, params=constants.NODE_PARAMS)
-        sandbox.add_baker(0, 'bootstrap5', proto=constants.ALPHA_DAEMON)
+        sandbox.add_baker(0, 'baker5', proto=constants.ALPHA_DAEMON)
         yield sandbox
         assert sandbox.are_daemons_alive()
 

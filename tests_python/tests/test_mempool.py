@@ -1,6 +1,7 @@
 import pytest
-from tools import utils, constants
+
 from launchers.sandbox import Sandbox
+from tools import constants, utils
 
 BAKE_ARGS = ['--max-priority', '512', '--minimal-timestamp']
 
@@ -46,7 +47,7 @@ class TestMempool:
         assert sandbox.client(3).mempool_is_empty()
 
     def test_bake_for1(self, sandbox: Sandbox):
-        sandbox.client(1).bake('bootstrap1', BAKE_ARGS)
+        sandbox.client(1).bake('baker1', BAKE_ARGS)
 
     def test_level2(self, sandbox: Sandbox):
         level = 2
