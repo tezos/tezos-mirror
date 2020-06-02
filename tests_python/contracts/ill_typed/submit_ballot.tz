@@ -1,0 +1,10 @@
+parameter unit;
+storage unit;
+code {
+       NIL baker_operation ;
+       PUSH nat 0 ; PUSH nat 0 ; PUSH nat 0 ;
+       PUSH string "PsCARTHAGazKbHtnKfLzQg3kms52kSRpgnDY982a9oYsSXRLQEb" ;
+       SUBMIT_BALLOT ;
+       CONS ;
+       PAIR
+     }

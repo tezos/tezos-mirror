@@ -1,0 +1,9 @@
+parameter unit;
+storage unit;
+code {
+       NIL baker_operation ;
+       PUSH (list string) { "PsCARTHAGazKbHtnKfLzQg3kms52kSRpgnDY982a9oYsSXRLQEb" } ;
+       SUBMIT_PROPOSALS ;
+       CONS ;
+       PAIR
+     }

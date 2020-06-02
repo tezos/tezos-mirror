@@ -1,0 +1,9 @@
+parameter unit;
+storage unit;
+code {
+       NIL baker_operation ;
+       PUSH bool True ;
+       SET_BAKER_ACTIVE ;
+       CONS ;
+       PAIR
+     }
