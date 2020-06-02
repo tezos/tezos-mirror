@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -26,6 +27,7 @@
 open Protocol_client_context
 open Protocol
 open Alpha_context
+open Michelson_v1_helpers
 
 type error += Contract_has_no_script of Contract.t
 
@@ -34,7 +36,7 @@ type error +=
 
 type error += Contract_has_no_storage of Contract.t
 
-type error += Contract_has_unexpected_storage of Contract.t
+type error += Contract_has_unexpected_storage of (Contract.t * Script.expr)
 
 type error += Invalid_signature of signature
 
@@ -52,7 +54,12 @@ type error += Non_positive_threshold of int
 
 type error += Threshold_too_high of int * int
 
+let storage_type = "\"pair nat (pair nat (list key))\""
+
 let () =
+  let received_expected_encoding encoding =
+    Data_encoding.(obj2 (req "received" encoding) (req "expected" encoding))
+  in
   register_error_kind
     `Permanent
     ~id:"contractHasNoScript"
@@ -93,11 +100,8 @@ let () =
   register_error_kind
     `Permanent
     ~id:"contractHasNoStorage"
-    ~title:
-      "The given contract is not a multisig contract because it has no storage"
-    ~description:
-      "A multisig command has referenced a smart contract without storage \
-       instead of a multisig smart contract."
+    ~title:"The given contract has no storage"
+    ~description:"Unexpected error: The given contract has no storage."
     ~pp:(fun ppf contract ->
       Format.fprintf ppf "Contract has no storage %a." Contract.pp contract)
     Data_encoding.(obj1 (req "contract" Contract.encoding))
@@ -106,21 +110,28 @@ let () =
   register_error_kind
     `Permanent
     ~id:"contractHasUnexpectedStorage"
-    ~title:
-      "The storage of the given contract is not of the shape expected for a \
-       multisig contract"
+    ~title:"The storage of the given contract is not of the expected shape"
     ~description:
-      "A multisig command has referenced a smart contract whose storage is of \
-       a different shape than the expected one."
-    ~pp:(fun ppf contract ->
+      (Format.asprintf
+         "A command has referenced a smart contract whose storage is of a \
+          different shape than the expected one. Expected %s"
+         storage_type)
+    ~pp:(fun ppf (contract, storage) ->
       Format.fprintf
         ppf
-        "Contract has unexpected storage %a."
+        "Contract %a has unexpected storage: %a.@\nExpected: %s, "
         Contract.pp
-        contract)
-    Data_encoding.(obj1 (req "contract" Contract.encoding))
-    (function Contract_has_unexpected_storage c -> Some c | _ -> None)
-    (fun c -> Contract_has_unexpected_storage c) ;
+        contract
+        Michelson_v1_printer.print_expr
+        storage
+        storage_type)
+    Data_encoding.(
+      obj2
+        (req "contract" Contract.encoding)
+        (req "storage" Script.expr_encoding))
+    (function
+      | Contract_has_unexpected_storage (c, s) -> Some (c, s) | _ -> None)
+    (fun (c, s) -> Contract_has_unexpected_storage (c, s)) ;
   register_error_kind
     `Permanent
     ~id:"invalidSignature"
@@ -150,7 +161,7 @@ let () =
          threshold is currently %d"
         nsigs
         threshold)
-    Data_encoding.(obj1 (req "threshold_nsigs" (tup2 int31 int31)))
+    Data_encoding.(obj2 (req "threshold" int31) (req "nsigs" int31))
     (function
       | Not_enough_signatures (threshold, nsigs) ->
           Some (threshold, nsigs)
@@ -200,8 +211,7 @@ let () =
         received
         Contract.pp
         expected)
-    Data_encoding.(
-      obj1 (req "received_expected" (tup2 Contract.encoding Contract.encoding)))
+    (received_expected_encoding Contract.encoding)
     (function Bad_deserialized_contract b -> Some b | _ -> None)
     (fun b -> Bad_deserialized_contract b) ;
   register_error_kind
@@ -217,7 +227,7 @@ let () =
         "Bad deserialized counter, received %d expected %d."
         received
         expected)
-    Data_encoding.(obj1 (req "received_expected" (tup2 int31 int31)))
+    (received_expected_encoding Data_encoding.int31)
     (function
       | Bad_deserialized_counter (c1, c2) ->
           Some (Z.to_int c1, Z.to_int c2)
@@ -234,10 +244,10 @@ let () =
     ~pp:(fun ppf (threshold, nkeys) ->
       Format.fprintf
         ppf
-        "Threshold too high: %d expected at most %d."
+        "Threshold too high: %d; at most %d expected."
         threshold
         nkeys)
-    Data_encoding.(obj1 (req "received_expected" (tup2 int31 int31)))
+    (received_expected_encoding Data_encoding.int31)
     (function Threshold_too_high (c1, c2) -> Some (c1, c2) | _ -> None)
     (fun (c1, c2) -> Threshold_too_high (c1, c2)) ;
   register_error_kind
@@ -253,7 +263,8 @@ let () =
 
 (* The multisig contract script written by Arthur Breitman
      https://github.com/murbard/smart-contracts/blob/master/multisig/michelson/multisig.tz *)
-(* Updated to take the chain id into account *)
+(* Updated to reflect the introduction of Baker contract type
+     ('key_hash' changed to 'baker_hash') *)
 let multisig_script_string =
   "parameter (pair\n\
   \             (pair :payload\n\
@@ -264,8 +275,8 @@ let multisig_script_string =
   \                      (mutez %amount) # amount to transfer\n\
   \                      (contract %dest unit)) # destination to transfer to\n\
   \                   (or\n\
-  \                      (option %delegate key_hash) # change the delegate to \
-   this address\n\
+  \                      (option %delegate baker_hash) # change the delegate \
+   to this address\n\
   \                      (pair %change_keys          # change the keys \
    controlling the multisig\n\
   \                         (nat %threshold)         # new threshold\n\
@@ -369,9 +380,12 @@ type multisig_contract_description = {
   requires_chain_id : bool;
   (* The signatures should contain the chain identifier *)
   generic : bool;
-      (* False means that the contract uses a custom action type, true
+  (* False means that the contract uses a custom action type, true
                        means that the contract expects the action as a (lambda unit
                        (list operation)). *)
+  baker_hash : bool;
+      (* Does the contract use the new delegate contract
+                            type *)
 }
 
 let script_hash_of_hex_string s =
@@ -380,13 +394,28 @@ let script_hash_of_hex_string s =
 (* List of known multisig contracts hashes with their kinds *)
 let known_multisig_contracts : multisig_contract_description list =
   let hash = multisig_script_hash in
-  [ {hash; requires_chain_id = true; generic = false};
+  [ {
+      (* "46b53d31db8902aa65e9618d97f8981f63039cdd926982627d41e65590115173" *)
+      hash;
+      requires_chain_id = true;
+      generic = false;
+      baker_hash = true;
+    };
+    {
+      hash =
+        script_hash_of_hex_string
+          "a59ea55f38e1bcdde29e72a7f3608faf4314165d07083383efadfcf023e4c1e2";
+      requires_chain_id = true;
+      generic = false;
+      baker_hash = false;
+    };
     {
       hash =
         script_hash_of_hex_string
           "36cf0b376c2d0e21f0ed42b2974fedaafdcafb9b7f8eb9254ef811b37cb46d94";
       requires_chain_id = true;
       generic = false;
+      baker_hash = false;
     };
     {
       hash =
@@ -394,6 +423,7 @@ let known_multisig_contracts : multisig_contract_description list =
           "475e37a6386d0b85890eb446db1faad67f85fc814724ad07473cac8c0a124b31";
       requires_chain_id = false;
       generic = false;
+      baker_hash = false;
     } ]
 
 let known_multisig_hashes =
@@ -433,28 +463,11 @@ let check_multisig_contract (cctxt : #Protocol_client_context.full) ~chain
       fail (Contract_has_no_script contract) )
   >>=? check_multisig_script
 
-let seq ~loc l = Tezos_micheline.Micheline.Seq (loc, l)
-
-let pair ~loc a b =
-  Tezos_micheline.Micheline.Prim (loc, Script.D_Pair, [a; b], [])
-
-let none ~loc () = Tezos_micheline.Micheline.Prim (loc, Script.D_None, [], [])
-
-let some ~loc a = Tezos_micheline.Micheline.Prim (loc, Script.D_Some, [a], [])
-
-let left ~loc a = Tezos_micheline.Micheline.Prim (loc, Script.D_Left, [a], [])
-
-let right ~loc b = Tezos_micheline.Micheline.Prim (loc, Script.D_Right, [b], [])
-
-let int ~loc i = Tezos_micheline.Micheline.Int (loc, i)
-
-let bytes ~loc s = Tezos_micheline.Micheline.Bytes (loc, s)
-
 (** * Actions *)
 
 type multisig_action =
   | Transfer of Tez.t * Contract.t
-  | Change_delegate of public_key_hash option
+  | Change_delegate of baker_hash option
   | Change_keys of Z.t * public_key list
 
 let action_to_expr ~loc = function
@@ -481,7 +494,7 @@ let action_to_expr ~loc = function
                  (bytes
                     ~loc
                     (Data_encoding.Binary.to_bytes_exn
-                       Signature.Public_key_hash.encoding
+                       Baker_hash.encoding
                        delegate)) ))
   | Change_keys (threshold, keys) ->
       right
@@ -551,10 +564,7 @@ let action_of_expr e =
         [] ) ->
       return
       @@ Change_delegate
-           (Some
-              (Data_encoding.Binary.of_bytes_exn
-                 Signature.Public_key_hash.encoding
-                 s))
+           (Some (Data_encoding.Binary.of_bytes_exn Baker_hash.encoding s))
   | Tezos_micheline.Micheline.Prim
       ( _,
         Script.D_Right,
@@ -583,41 +593,42 @@ let action_of_expr e =
   | _ ->
       fail ()
 
-type key_list = Signature.Public_key.t list
-
 (* The relevant information that we can get about a multisig smart contract *)
 type multisig_contract_information = {
   counter : Z.t;
   threshold : Z.t;
-  keys : key_list;
+  keys : Signature.Public_key.t list;
 }
+
+let multisig_contract_information_of_storage contract storage =
+  let open Tezos_micheline.Micheline in
+  match root storage with
+  | Prim
+      ( _,
+        Script.D_Pair,
+        [Int (_, counter); Int (_, threshold); Seq (_, key_nodes)],
+        _ ) ->
+      List.map_es
+        (function
+          | String (_, key_str) ->
+              return @@ Signature.Public_key.of_b58check_exn key_str
+          | _ ->
+              fail (Contract_has_unexpected_storage (contract, storage)))
+        key_nodes
+      >>=? fun keys -> return {counter; threshold; keys}
+  | _ ->
+      fail (Contract_has_unexpected_storage (contract, storage))
 
 let multisig_get_information (cctxt : #Protocol_client_context.full) ~chain
     ~block contract =
   let open Client_proto_context in
-  let open Tezos_micheline.Micheline in
   get_storage cctxt ~chain ~block contract
   >>=? fun storage_opt ->
   match storage_opt with
   | None ->
       fail (Contract_has_no_storage contract)
-  | Some storage -> (
-    match root storage with
-    | Prim
-        ( _,
-          D_Pair,
-          [Int (_, counter); Int (_, threshold); Seq (_, key_nodes)],
-          _ ) ->
-        List.map_es
-          (function
-            | String (_, key_str) ->
-                return @@ Signature.Public_key.of_b58check_exn key_str
-            | _ ->
-                fail (Contract_has_unexpected_storage contract))
-          key_nodes
-        >>=? fun keys -> return {counter; threshold; keys}
-    | _ ->
-        fail (Contract_has_unexpected_storage contract) )
+  | Some storage ->
+      multisig_contract_information_of_storage contract storage
 
 let multisig_create_storage ~counter ~threshold ~keys () :
     Script.expr tzresult Lwt.t =

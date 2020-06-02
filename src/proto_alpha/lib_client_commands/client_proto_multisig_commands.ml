@@ -26,6 +26,7 @@
 
 open Protocol
 open Alpha_context
+open Client_proto_contracts
 
 let group =
   {
@@ -197,6 +198,12 @@ let commands () : #Protocol_client_context.full Clic.command list =
                 (fun (pk_uri, _) -> Client_keys.public_key pk_uri)
                 keys
               >>=? fun keys ->
+              ( match delegate with
+              | Some delegate ->
+                  baker_of_contract cctxt delegate >>=? return_some
+              | None ->
+                  return_none )
+              >>=? fun delegate ->
               Client_proto_multisig.originate_multisig
                 cctxt
                 ~chain:cctxt#chain
@@ -278,7 +285,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
         @@ prefixes ["setting"; "delegate"; "to"]
-        @@ Client_keys.Public_key_hash.source_param
+        @@ Baker_alias.source_param
              ~name:"dlgt"
              ~desc:"new delegate of the new multisig contract"
         @@ stop )
@@ -396,7 +403,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
         @@ prefixes ["setting"; "delegate"; "to"]
-        @@ Client_keys.Public_key_hash.source_param
+        @@ Baker_alias.source_param
              ~name:"dlgt"
              ~desc:"new delegate of the new multisig contract"
         @@ prefixes ["using"; "secret"; "key"]
@@ -573,7 +580,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
         @@ prefix "to"
-        @@ Client_keys.Public_key_hash.source_param
+        @@ Baker_alias.source_param
              ~name:"dlgt"
              ~desc:"new delegate of the new multisig contract"
         @@ prefixes ["on"; "behalf"; "of"]

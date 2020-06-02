@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -29,7 +30,7 @@ open Protocol_client_context
 
 type multisig_action =
   | Transfer of Tez.t * Contract.t
-  | Change_delegate of public_key_hash option
+  | Change_delegate of baker_hash option
   | Change_keys of Z.t * public_key list
 
 type multisig_prepared_action = {
@@ -39,7 +40,37 @@ type multisig_prepared_action = {
   counter : Z.t;
 }
 
+(* The relevant information that we can get about a multisig smart contract *)
+type multisig_contract_information = {
+  counter : Z.t;
+  threshold : Z.t;
+  keys : Signature.Public_key.t list;
+}
+
+val multisig_contract_information_of_storage :
+  Contract.t -> Script.expr -> multisig_contract_information tzresult Lwt.t
+
+val multisig_get_information :
+  full ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  Contract.t ->
+  multisig_contract_information tzresult Lwt.t
+
 val known_multisig_hashes : Script_expr_hash.t list
+
+val check_threshold :
+  threshold:Z.t ->
+  keys:Signature.Public_key.t list ->
+  unit ->
+  unit tzresult Lwt.t
+
+val check_multisig_signatures :
+  bytes:Bytes.t ->
+  threshold:Z.t ->
+  keys:Signature.Public_key.t list ->
+  Signature.t list ->
+  Signature.t option list tzresult Lwt.t
 
 val originate_multisig :
   full ->
@@ -52,7 +83,7 @@ val originate_multisig :
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?verbose_signing:bool ->
-  delegate:public_key_hash option ->
+  delegate:baker_hash option ->
   threshold:Z.t ->
   keys:public_key list ->
   balance:Tez.t ->
