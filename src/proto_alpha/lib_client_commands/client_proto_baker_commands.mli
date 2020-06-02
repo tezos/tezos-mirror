@@ -1,8 +1,6 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -25,15 +23,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let () =
-  Client_commands.register Protocol.hash
-  @@ fun network ->
-  List.map (Clic.map_command (new Protocol_client_context.wrap_full))
-  @@ Client_proto_programs_commands.commands ()
-  @ Client_proto_contracts_commands.commands ()
-  @ Client_proto_context_commands.commands network ()
-  @ Client_proto_multisig_commands.commands ()
-  @ Client_proto_mockup_commands.commands ()
-  @ Client_sapling_commands.commands ()
-  @ Client_proto_utils_commands.commands ()
-  @ Client_proto_baker_commands.commands ()
+val commands : unit -> Protocol_client_context.full Clic.command list
