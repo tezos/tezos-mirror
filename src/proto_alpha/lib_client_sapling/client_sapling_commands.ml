@@ -151,13 +151,13 @@ let shield_cmd =
          ~name:"qty"
          ~desc:"Amount taken from transparent wallet of source."
     @@ prefix "from"
-    @@ ContractAlias.destination_param
+    @@ Contract_alias.destination_param
          ~name:"src-tz"
          ~desc:"Transparent source account."
     @@ prefix "to"
     @@ Clic.string ~name:"dst-sap" ~desc:"Sapling address of destination."
     @@ prefix "using"
-    @@ ContractAlias.destination_param
+    @@ Contract_alias.destination_param
          ~name:"sapling contract"
          ~desc:"Smart contract to submit this transaction to."
     @@ stop )
@@ -263,11 +263,11 @@ let unshield_cmd =
          ~name:"src-sap"
          ~desc:"Sapling account of source."
     @@ prefix "to"
-    @@ ContractAlias.destination_param
+    @@ Contract_alias.destination_param
          ~name:"dst-tz"
          ~desc:"Transparent destination account."
     @@ prefix "using"
-    @@ ContractAlias.destination_param
+    @@ Contract_alias.destination_param
          ~name:"sapling contract"
          ~desc:"Smart contract to submit this transaction to."
     @@ stop )
@@ -390,7 +390,7 @@ let forge_shielded_cmd =
     @@ prefix "to"
     @@ Clic.string ~name:"dst-sap" ~desc:"Sapling address of destination."
     @@ prefix "using"
-    @@ ContractAlias.destination_param
+    @@ Contract_alias.destination_param
          ~name:"sapling contract"
          ~desc:"Smart contract to submit this transaction to."
     @@ stop )
@@ -465,11 +465,11 @@ let submit_shielded_cmd =
       potentially using Sys.file_exists *)
     @@ Clic.string ~name:"file" ~desc:"Filename of the forged transaction."
     @@ prefix "from"
-    @@ ContractAlias.destination_param
+    @@ Contract_alias.destination_param
          ~name:"alias-tz"
          ~desc:"Transparent account paying the fees."
     @@ prefix "using"
-    @@ ContractAlias.destination_param
+    @@ Contract_alias.destination_param
          ~name:"sapling contract"
          ~desc:"Smart contract to submit this transaction to."
     @@ stop )
@@ -558,7 +558,7 @@ let submit_shielded_cmd =
       | None -> return_unit | Some (_res, _contracts) -> return_unit)
 
 let for_contract_arg =
-  Client_proto_contracts.ContractAlias.destination_arg
+  Client_proto_contracts.Contract_alias.destination_arg
     ~name:"for-contract"
     ~doc:"name of the contract to associate new key with"
     ()
@@ -602,7 +602,7 @@ let use_key_for_contract_cmd =
          ~name:"sapling-key"
          ~desc:"Sapling key to use for the contract."
     @@ prefixes ["for"; "contract"]
-    @@ Client_proto_contracts.ContractAlias.destination_param
+    @@ Client_proto_contracts.Contract_alias.destination_param
          ~name:"contract"
          ~desc:"Contract the key will be used on."
     @@ stop )
@@ -771,7 +771,7 @@ let commands () =
            ~name:"sapling-key"
            ~desc:"Sapling key we get balance for."
       @@ prefixes ["in"; "contract"]
-      @@ Client_proto_contracts.ContractAlias.destination_param
+      @@ Client_proto_contracts.Contract_alias.destination_param
            ~name:"contract"
            ~desc:"Contract we get balance from."
       @@ stop )
