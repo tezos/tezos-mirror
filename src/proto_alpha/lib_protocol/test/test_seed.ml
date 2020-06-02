@@ -39,7 +39,7 @@ open Test_tez
     commitment fails with [Invalid_commitment]. *)
 let test_no_commitment () =
   Context.init 5
-  >>=? fun (b, _) ->
+  >>=? fun (b, _, _) ->
   Context.get_constants (B b)
   >>=? fun {parametric = {blocks_per_commitment; _}; _} ->
   let blocks_per_commitment = Int32.to_int blocks_per_commitment in
@@ -49,8 +49,8 @@ let test_no_commitment () =
   (* Forge a block with empty commitment and apply it *)
   Block.Forge.forge_header b
   >>=? fun header ->
-  Block.Forge.set_seed_nonce_hash None header
-  |> Block.Forge.sign_header
+  let baker = Block.Forge.set_seed_nonce_hash None header in
+  Block.Forge.sign_header baker
   >>=? fun header ->
   Block.apply header b
   >>= fun e ->
@@ -79,7 +79,7 @@ let baking_reward ctxt (b : Block.t) =
 let test_revelation_early_wrong_right_twice () =
   let open Assert in
   Context.init 5
-  >>=? fun (b, _) ->
+  >>=? fun (b, _, _) ->
   Context.get_constants (B b)
   >>=? fun csts ->
   let bond = csts.parametric.block_security_deposit in
@@ -88,11 +88,11 @@ let test_revelation_early_wrong_right_twice () =
     Int32.to_int csts.parametric.blocks_per_commitment
   in
   let preserved_cycles = csts.parametric.preserved_cycles in
-  (* get the pkh of a baker *)
+  (* get the baker *)
   Block.get_next_baker b
-  >>=? fun (pkh, _, _) ->
-  let id = Alpha_context.Contract.implicit_contract pkh in
-  let policy = Block.Excluding [pkh] in
+  >>=? fun (baker, _, _) ->
+  let id = Alpha_context.Contract.baker_contract baker in
+  let policy = Block.Excluding [baker] in
   (* bake until commitment, excluding id *)
   Block.bake_n ~policy (blocks_per_commitment - 2) b
   >>=? fun b ->
@@ -103,7 +103,7 @@ let test_revelation_early_wrong_right_twice () =
   Context.Contract.balance ~kind:Rewards (B b) id
   >>=? fun bal_rewards ->
   (* the baker [id] will include a seed_nonce commitment *)
-  Block.bake ~policy:(Block.By_account pkh) b
+  Block.bake ~policy:(Block.By_account baker) b
   >>=? fun b ->
   Context.get_level (B b)
   >>?= fun level_commitment ->
@@ -159,8 +159,8 @@ let test_revelation_early_wrong_right_twice () =
     (WithExceptions.Option.to_exn ~none:Not_found @@ Nonce.get committed_hash)
   |> fun operation ->
   Block.get_next_baker ~policy b
-  >>=? fun (baker_pkh, _, _) ->
-  let baker = Alpha_context.Contract.implicit_contract baker_pkh in
+  >>=? fun (baker, _, _) ->
+  let baker = Alpha_context.Contract.baker_contract baker in
   Context.Contract.balance ~kind:Main (B b) baker
   >>=? fun baker_bal_main ->
   Context.Contract.balance ~kind:Deposit (B b) baker
@@ -228,7 +228,7 @@ let test_revelation_missing_and_late () =
   let open Context in
   let open Assert in
   Context.init 5
-  >>=? fun (b, _) ->
+  >>=? fun (b, _, _) ->
   get_constants (B b)
   >>=? fun csts ->
   baking_reward (B b) b
@@ -241,8 +241,8 @@ let test_revelation_missing_and_late () =
   >>=? fun b ->
   (* the next baker [id] will include a seed_nonce commitment *)
   Block.get_next_baker b
-  >>=? fun (pkh, _, _) ->
-  let id = Alpha_context.Contract.implicit_contract pkh in
+  >>=? fun (baker, _, _) ->
+  let id = Alpha_context.Contract.baker_contract baker in
   Block.bake b
   >>=? fun b ->
   Context.get_level (B b)
@@ -256,7 +256,7 @@ let test_revelation_missing_and_late () =
   Context.Contract.balance ~kind:Rewards (B b) id
   >>=? fun bal_rewards ->
   (* finish cycle 0 excluding the committing baker [id] *)
-  let policy = Block.Excluding [pkh] in
+  let policy = Block.Excluding [baker] in
   Block.bake_until_cycle_end ~policy b
   >>=? fun b ->
   (* finish cycle 1 excluding the committing baker [id] *)

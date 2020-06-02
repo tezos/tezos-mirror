@@ -31,15 +31,14 @@
 *)
 
 open Protocol
-open Alpha_context
 
 (* Test the baking_rights RPC.
    Future levels or cycles are not tested because it's hard in this framework,
    using only RPCs, to fabricate them. *)
 let test_baking_rights () =
   Context.init 2
-  >>=? fun (b, contracts) ->
-  let open Alpha_services.Delegate.Baking_rights in
+  >>=? fun (b, _implicit_contracts, bakers) ->
+  let open Alpha_services.Baker.Baking_rights in
   (* default max_priority returns 65 results *)
   get Block.rpc_ctxt b ~all:true
   >>=? fun rights ->
@@ -49,14 +48,14 @@ let test_baking_rights () =
   get Block.rpc_ctxt b ~all:true ~max_priority
   >>=? fun rights ->
   assert (List.length rights = max_priority + 1) ;
-  (* filtering by delegate *)
-  let d =
-    Option.bind (List.nth contracts 0) Contract.is_implicit
-    |> WithExceptions.Option.get ~loc:__LOC__
-  in
-  get Block.rpc_ctxt b ~all:true ~delegates:[d]
+  (* filtering by baker *)
+  let baker = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bakers in
+  get Block.rpc_ctxt b ~all:true ~bakers:[baker]
   >>=? fun rights ->
-  assert (List.for_all (fun {delegate; _} -> delegate = d) rights) ;
+  assert (
+    List.for_all
+      (fun {baker = baking_rights_owner; _} -> baking_rights_owner = baker)
+      rights ) ;
   (* filtering by cycle *)
   Alpha_services.Helpers.current_level Block.rpc_ctxt b
   >>=? fun {cycle; _} ->

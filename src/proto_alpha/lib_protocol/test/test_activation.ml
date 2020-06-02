@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -311,7 +312,7 @@ let secrets () =
     accounts and balances. *)
 let activation_init () =
   Context.init ~with_commitments:true 1
-  >|=? fun (b, cs) -> secrets () |> fun ss -> (b, cs, ss)
+  >|=? fun (b, cs, _) -> secrets () |> fun ss -> (b, cs, ss)
 
 (** Verify the genesis block created by [activation_init] can be
     baked. *)
@@ -465,7 +466,7 @@ let test_transfer_to_unactivated_then_activate () =
     contain any commitment. *)
 let test_invalid_activation_with_no_commitments () =
   Context.init 1
-  >>=? fun (blk, _) ->
+  >>=? fun (blk, _, _) ->
   let secrets = secrets () in
   let ({account; activation_code; _} as _first_one) =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.hd secrets

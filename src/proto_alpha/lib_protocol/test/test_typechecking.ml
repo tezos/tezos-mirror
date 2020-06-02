@@ -35,13 +35,13 @@ let wrap_error_lwt x = x >>= fun x -> Lwt.return @@ Environment.wrap_tzresult x
 
 let test_context () =
   Context.init 3
-  >>=? fun (b, _cs) ->
+  >>=? fun (b, _cs, _bakers) ->
   Incremental.begin_construction b
   >>=? fun v -> return (Incremental.alpha_ctxt v)
 
 let test_context_with_nat_nat_big_map () =
   Context.init 3
-  >>=? fun (b, contracts) ->
+  >>=? fun (b, contracts, _bakers) ->
   let source = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
   Op.origination (B b) source ~script:Op.dummy_script
   >>=? fun (operation, originated) ->

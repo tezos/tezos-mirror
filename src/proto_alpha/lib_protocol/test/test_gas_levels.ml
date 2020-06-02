@@ -48,7 +48,7 @@ let failed x = not (succeed x)
 
 let dummy_context () =
   Context.init 1
-  >>=? fun (block, _) ->
+  >>=? fun (block, _, _) ->
   Raw_context.prepare
     ~level:Int32.zero
     ~predecessor_timestamp:Time.Protocol.epoch
