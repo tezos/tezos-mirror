@@ -152,6 +152,268 @@ module Contract_alias = struct
     | None -> return (Contract.to_b58check contract) | Some name -> return name
 end
 
+module Baker_alias = struct
+  open Clic
+  open Client_context
+
+  type t = Baker_hash.t
+
+  let entity_name = "baker contract"
+
+  let of_source s =
+    Contract_entity.of_source s
+    >>=? fun c ->
+    match Contract.is_baker c with
+    | Some s ->
+        return s
+    | None ->
+        failwith "bad baker notation"
+
+  let load wallet =
+    Raw_contract_alias.load wallet
+    >>=? fun contracts ->
+    return
+    @@ List.filter_map
+         (fun (alias, contract) ->
+           Option.map (fun baker -> (alias, baker))
+           @@ Contract.is_baker contract)
+         contracts
+
+  let autocomplete wallet =
+    load wallet
+    >>= function
+    | Error _ -> return_nil | Ok list -> return (List.map fst list)
+
+  let find (wallet : #wallet) name =
+    load wallet
+    >>=? fun list ->
+    match List.assoc name list with
+    | Some s ->
+        return s
+    | None ->
+        failwith "no %s alias named %s" entity_name name
+
+  let rev_find wallet baker =
+    Raw_contract_alias.rev_find wallet @@ Contract.baker_contract baker
+
+  let name wallet baker =
+    Raw_contract_alias.name wallet @@ Contract.baker_contract baker
+
+  let to_source baker =
+    Raw_contract_alias.to_source @@ Contract.baker_contract baker
+
+  let alias_parameter () =
+    parameter ~autocomplete (fun cctxt s ->
+        find cctxt s >>=? fun v -> return (s, v))
+
+  let alias_param ?(name = "name")
+      ?(desc = "existing " ^ entity_name ^ " alias") next =
+    param ~name ~desc (alias_parameter ()) next
+
+  let parse_source_string cctxt s =
+    match String.split ~limit:1 ':' s with
+    | ["alias"; alias] ->
+        find cctxt alias
+    | ["text"; text] ->
+        of_source text
+    | ["file"; path] ->
+        cctxt#read_file path >>=? of_source
+    | _ -> (
+        find cctxt s
+        >>= function
+        | Ok v ->
+            return v
+        | Error a_errs -> (
+            cctxt#read_file s >>=? of_source
+            >>= function
+            | Ok v ->
+                return v
+            | Error r_errs -> (
+                of_source s
+                >>= function
+                | Ok v ->
+                    return v
+                | Error s_errs ->
+                    let all_errs = List.flatten [a_errs; r_errs; s_errs] in
+                    Lwt.return_error all_errs ) ) )
+
+  let source_param ?(name = "bkr") ?(desc = "source " ^ entity_name) next =
+    let desc =
+      Format.asprintf
+        "%s\n\
+         Can be a %s name, a file or a raw %s literal. If the parameter is \
+         not the name of an existing %s, the client will look for a file \
+         containing a %s, and if it does not exist, the argument will be read \
+         as a raw %s.\n\
+         Use 'alias:name', 'file:path' or 'text:literal' to disable autodetect."
+        desc
+        entity_name
+        entity_name
+        entity_name
+        entity_name
+        entity_name
+    in
+    param ~name ~desc (parameter parse_source_string) next
+
+  let source_arg ?(long = "source " ^ entity_name) ?(placeholder = "bkr")
+      ?(doc = "") () =
+    let doc =
+      Format.asprintf
+        "%s\n\
+         Can be a %s name, a file or a raw %s literal. If the parameter is \
+         not the name of an existing %s, the client will look for a file \
+         containing a %s, and if it does not exist, the argument will be read \
+         as a raw %s.\n\
+         Use 'alias:name', 'file:path' or 'text:literal' to disable autodetect."
+        doc
+        entity_name
+        entity_name
+        entity_name
+        entity_name
+        entity_name
+    in
+    arg ~long ~placeholder ~doc (parameter parse_source_string)
+end
+
+module Baker_or_pkh_alias = struct
+  open Clic
+  open Client_context
+
+  type t = Contract.t
+
+  let entity_name = "baker contract"
+
+  let name wallet contract =
+    match Contract.is_baker contract with
+    | Some baker ->
+        Raw_contract_alias.name wallet @@ Contract.baker_contract baker
+    | None -> (
+      match Contract.is_implicit contract with
+      | Some pkh ->
+          Client_keys.Public_key_hash.name wallet pkh
+      | None ->
+          return (Contract.to_b58check contract) )
+
+  let of_source s =
+    Contract_entity.of_source s
+    >>=? fun c ->
+    match Contract.is_baker c with
+    | Some _ ->
+        return c
+    | None -> (
+        Client_keys.Public_key_hash.of_source s
+        >>= function
+        | Ok pkh ->
+            return (Contract.implicit_contract pkh)
+        | _ ->
+            failwith "bad baker notation" )
+
+  let load wallet =
+    Client_keys.Public_key_hash.load wallet
+    >>=? fun pkh_contracts ->
+    Raw_contract_alias.load wallet
+    >>=? fun baker_contracts ->
+    let pkh_contracts =
+      List.map
+        (fun (alias, pkh) -> (alias, Contract.implicit_contract pkh))
+        pkh_contracts
+    in
+    let baker_contracts =
+      List.filter_map
+        (fun (alias, contract) ->
+          Option.map (fun _baker -> (alias, contract))
+          @@ Contract.is_baker contract)
+        baker_contracts
+    in
+    return @@ baker_contracts @ pkh_contracts
+
+  let autocomplete wallet =
+    load wallet
+    >>= function
+    | Error _ -> return_nil | Ok list -> return (List.map fst list)
+
+  let find (wallet : #wallet) name =
+    load wallet
+    >>=? fun list ->
+    match List.assoc name list with
+    | Some s ->
+        return s
+    | None ->
+        failwith "no %s alias named %s" entity_name name
+
+  let alias_parameter () =
+    parameter ~autocomplete (fun cctxt s ->
+        find cctxt s >>=? fun v -> return (s, v))
+
+  let alias_param ?(name = "name")
+      ?(desc = "existing " ^ entity_name ^ " alias") next =
+    param ~name ~desc (alias_parameter ()) next
+
+  let parse_source_string cctxt s =
+    match String.split ~limit:1 ':' s with
+    | ["alias"; alias] ->
+        find cctxt alias
+    | ["text"; text] ->
+        of_source text
+    | ["file"; path] ->
+        cctxt#read_file path >>=? of_source
+    | _ -> (
+        find cctxt s
+        >>= function
+        | Ok v ->
+            return v
+        | Error a_errs -> (
+            cctxt#read_file s >>=? of_source
+            >>= function
+            | Ok v ->
+                return v
+            | Error r_errs -> (
+                of_source s
+                >>= function
+                | Ok v ->
+                    return v
+                | Error s_errs ->
+                    let all_errs = List.flatten [a_errs; r_errs; s_errs] in
+                    Lwt.return_error all_errs ) ) )
+
+  let source_param ?(name = "bkr") ?(desc = "source " ^ entity_name) next =
+    let desc =
+      Format.asprintf
+        "%s\n\
+         Can be a %s name, a file or a raw %s literal. If the parameter is \
+         not the name of an existing %s, the client will look for a file \
+         containing a %s, and if it does not exist, the argument will be read \
+         as a raw %s.\n\
+         Use 'alias:name', 'file:path' or 'text:literal' to disable autodetect."
+        desc
+        entity_name
+        entity_name
+        entity_name
+        entity_name
+        entity_name
+    in
+    param ~name ~desc (parameter parse_source_string) next
+
+  let source_arg ?(long = "source " ^ entity_name) ?(placeholder = "src")
+      ?(doc = "") () =
+    let doc =
+      Format.asprintf
+        "%s\n\
+         Can be a %s name, a file or a raw %s literal. If the parameter is \
+         not the name of an existing %s, the client will look for a file \
+         containing a %s, and if it does not exist, the argument will be read \
+         as a raw %s.\n\
+         Use 'alias:name', 'file:path' or 'text:literal' to disable autodetect."
+        doc
+        entity_name
+        entity_name
+        entity_name
+        entity_name
+        entity_name
+    in
+    arg ~long ~placeholder ~doc (parameter parse_source_string)
+end
+
 let list_contracts cctxt =
   Raw_contract_alias.load cctxt
   >>=? fun raw_contracts ->
@@ -172,3 +434,40 @@ let list_contracts cctxt =
 
 let get_delegate cctxt ~chain ~block source =
   Alpha_services.Contract.delegate_opt cctxt (chain, block) source
+
+let get_baker_consensus_key ?level ?offset cctxt ~chain baker =
+  Alpha_services.Baker.consensus_key
+    ?level
+    ?offset
+    cctxt
+    (chain, `Head 0)
+    baker
+  >>=? fun pk ->
+  let pkh = Signature.Public_key.hash pk in
+  Client_keys.get_key cctxt pkh
+  >>=? fun (name, _, sk_uri) ->
+  Tezos_signer_backends.Encrypted.decrypt_list cctxt [name]
+  >>=? fun () -> return (name, pkh, pk, sk_uri)
+
+let baker_of_contract cctxt contract =
+  let not_a_baker () =
+    failwith
+      "The provided contract %a is not baker or an active consensus key of a \
+       baker"
+      Contract.pp
+      contract
+  in
+  match Alpha_context.Contract.is_baker contract with
+  | None -> (
+    match Alpha_context.Contract.is_implicit contract with
+    | Some pkh -> (
+        Alpha_services.Helpers.is_baker_consensus_key_opt
+          cctxt
+          (cctxt#chain, cctxt#block)
+          pkh
+        >>=? function
+        | Some baker_hash -> return baker_hash | None -> not_a_baker () )
+    | None ->
+        not_a_baker () )
+  | Some baker_hash ->
+      return baker_hash

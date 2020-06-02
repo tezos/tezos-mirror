@@ -406,7 +406,10 @@ let raw_get_key (cctxt : #Client_context.wallet) pkh =
            names
          >>=? function
          | None ->
-             failwith "no keys for the source contract manager"
+             failwith
+               "no keys for the source contract %a"
+               Signature.Public_key_hash.pp
+               pkh
          | Some keys ->
              return keys)
   >>= function
