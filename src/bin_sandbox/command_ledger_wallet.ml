@@ -405,11 +405,12 @@ let manager_tz_delegation_tests state ~client ~ledger_key ~ledger_account
     ~messages:
       MFmt.
         [ (fun ppf () -> wf ppf "Originating manager.tz contract ");
+          (fun ppf () -> wf ppf "Sign Hash");
           (fun ppf () ->
             wf
               ppf
               "The ledger should be prompting for acknowledgment to provide a \
-               signature of an unknown operation. This is not an actual test, \
+               signature of an unknown operation. THIS IS NOT AN ACTUAL TEST, \
                and is only part of the test setup. There is no need for a \
                verification of this hash. Please accept this Unrecognized \
                Operation.") ]
@@ -505,6 +506,7 @@ let manager_tz_delegation_tests state ~client ~ledger_key ~ledger_account
             ("Fee", const string "0.00XXX");
             ("Source", const string contract_address);
             ("Delegate", const string delegate_pkh);
+            ("Delegate Name", const string "Custom Delegate: please verify the addresss");
             ("Storage Limit", const int 500) ]
       ~output_msg:"delegation"
   in
@@ -518,9 +520,9 @@ let manager_tz_delegation_tests state ~client ~ledger_key ~ledger_account
             ("Fee", const string "0.00XXX");
             ("Source", const string contract_address);
             ("Delegate", const string "None");
-            ("Storage Limit", const int 500);
             ( "Delegate Name",
-              const string "Custom Delegate: please verify the addresss" ) ]
+              const string "Custom Delegate: please verify the address" );
+            ("Storage Limit", const int 500); ]
       ~output_msg:"delegate-removal"
   in
   let manager_tz_to_implicit () =
@@ -643,6 +645,7 @@ let delegation_tests state ~client ~src ~with_rejections ~protocol_kind
                 [ ("Fee", const string "0.00XXX");
                   ("Source", const string ledger_pkh);
                   ("Delegate", const string ledger_pkh);
+                  ("Delegate Name", const string "Obsidian");
                   ("Storage", const int 0) ]) ]
       (fun ~user_answer ->
         client_async_cmd
@@ -699,7 +702,7 @@ let delegation_tests state ~client ~src ~with_rejections ~protocol_kind
                 [ ("Fee", const string "0.00XXX");
                   ("Source", const string ledger_pkh);
                   ("Delegate", const string delegate_pkh);
-                  ( "Delegate Name",
+                  ("Delegate Name",
                     const string "Custom Delegate: please verify the address"
                   );
                   ("Storage Limit", const int 0) ]) ]
