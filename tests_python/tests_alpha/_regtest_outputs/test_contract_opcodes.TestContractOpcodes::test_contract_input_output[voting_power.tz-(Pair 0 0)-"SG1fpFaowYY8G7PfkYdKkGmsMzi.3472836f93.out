@@ -1,0 +1,32 @@
+tests_alpha/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[voting_power.tz-(Pair 0 0)-"SG1fpFaowYY8G7PfkYdKkGmsMziHKUfrHRHW"-(Pair 500 2500)]
+
+storage
+  (Pair 500 2500)
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 8 (remaining gas: 1039988.110 units remaining)
+    [ (Pair "SG1fpFaowYY8G7PfkYdKkGmsMziHKUfrHRHW" 0 0)  	 ]
+  - location: 9 (remaining gas: 1039987.970 units remaining)
+    [ "SG1fpFaowYY8G7PfkYdKkGmsMziHKUfrHRHW"  	@parameter ]
+  - location: 10 (remaining gas: 1039772.502 units remaining)
+    [ 500  	 ]
+  - location: 13 (remaining gas: 1039561.874 units remaining)
+    [ 2500  	 ]
+  - location: 12 (remaining gas: 1039561.804 units remaining)
+    [ 2500  	 ]
+  - location: 11 (remaining gas: 1039561.804 units remaining)
+    [ 500  	
+      2500  	 ]
+  - location: 14 (remaining gas: 1039561.664 units remaining)
+    [ (Pair 500 2500)  	 ]
+  - location: 15 (remaining gas: 1039561.524 units remaining)
+    [ {}  	
+      (Pair 500 2500)  	 ]
+  - location: 17 (remaining gas: 1039561.384 units remaining)
+    [ (Pair {} 500 2500)  	 ]
+  - location: -1 (remaining gas: 1039561.314 units remaining)
+    [ (Pair {} 500 2500)  	 ]
+
