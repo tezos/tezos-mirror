@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -41,13 +42,13 @@ module HLevel = Hashtbl.Make (struct
   let hash (c, lvl) = Hashtbl.hash (c, lvl)
 end)
 
-module Delegate_Map = Map.Make (Signature.Public_key_hash)
+module Baker_map = Map.Make (Baker_hash)
 
 type state = {
   (* Endorsements seen so far *)
-  endorsements_table : Kind.endorsement operation Delegate_Map.t HLevel.t;
+  endorsements_table : Kind.endorsement operation Baker_map.t HLevel.t;
   (* Blocks received so far *)
-  blocks_table : Block_hash.t Delegate_Map.t HLevel.t;
+  blocks_table : Block_hash.t Baker_map.t HLevel.t;
   (* Maximum delta of level to register *)
   preserved_levels : int;
   (* Highest level seen in a block *)
@@ -90,8 +91,8 @@ let process_endorsements (cctxt : #Protocol_client_context.full) state
           Some
             Apply_results.(
               Operation_metadata
-                {contents = Single_result (Endorsement_result {delegate; _})})
-        ) -> (
+                {contents = Single_result (Endorsement_result {baker; _})}) )
+        -> (
           let new_endorsement : Kind.endorsement Alpha_context.operation =
             {shell; protocol_data}
           in
@@ -100,19 +101,19 @@ let process_endorsements (cctxt : #Protocol_client_context.full) state
               HLevel.find_opt state.endorsements_table (chain_id, level)
             with
             | None ->
-                Delegate_Map.empty
+                Baker_map.empty
             | Some x ->
                 x
           in
           (* If a previous endorsement made by this pkh is found for
              the same level we inject a double_endorsement *)
-          match Delegate_Map.find_opt delegate map with
+          match Baker_map.find_opt baker map with
           | None ->
               return
               @@ HLevel.add
                    state.endorsements_table
                    (chain_id, level)
-                   (Delegate_Map.add delegate new_endorsement map)
+                   (Baker_map.add baker new_endorsement map)
           | Some existing_endorsement
             when Block_hash.(
                    existing_endorsement.shell.branch
@@ -154,7 +155,7 @@ let process_endorsements (cctxt : #Protocol_client_context.full) state
               @@ HLevel.replace
                    state.endorsements_table
                    (chain_id, level)
-                   (Delegate_Map.add delegate new_endorsement map)
+                   (Baker_map.add baker new_endorsement map)
           | Some _ ->
               (* This endorsement is already present in another
                    block but endorse the same predecessor *)
@@ -189,17 +190,17 @@ let process_block (cctxt : #Protocol_client_context.full) state
       let map =
         match HLevel.find_opt state.blocks_table (chain_id, level) with
         | None ->
-            Delegate_Map.empty
+            Baker_map.empty
         | Some x ->
             x
       in
-      match Delegate_Map.find_opt baker map with
+      match Baker_map.find_opt baker map with
       | None ->
           return
           @@ HLevel.add
                state.blocks_table
                (chain_id, level)
-               (Delegate_Map.add baker hash map)
+               (Baker_map.add baker hash map)
       | Some existing_hash when Block_hash.( = ) existing_hash hash ->
           (* This case should never happen *)
           lwt_debug
@@ -214,7 +215,7 @@ let process_block (cctxt : #Protocol_client_context.full) state
           @@ HLevel.replace
                state.blocks_table
                (chain_id, level)
-               (Delegate_Map.add baker hash map)
+               (Baker_map.add baker hash map)
       | Some existing_hash ->
           (* If a previous endorsement made by this pkh is found for
            the same level we inject a double_endorsement *)
@@ -264,7 +265,7 @@ let process_block (cctxt : #Protocol_client_context.full) state
           @@ HLevel.replace
                state.blocks_table
                (chain_id, level)
-               (Delegate_Map.add baker hash map) )
+               (Baker_map.add baker hash map) )
 
 (* Remove levels that are lower than the [highest_level_encountered] minus [preserved_levels] *)
 let cleanup_old_operations state =

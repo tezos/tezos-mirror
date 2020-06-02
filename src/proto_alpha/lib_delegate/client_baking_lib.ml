@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -28,15 +29,10 @@ open Alpha_context
 
 let bake_block (cctxt : #Protocol_client_context.full) ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?force
-    ?max_priority ?(minimal_timestamp = false) ?mempool ?context_path ?src_sk
-    ~chain ~head delegate =
-  ( match src_sk with
-  | None ->
-      Client_keys.get_key cctxt delegate
-      >>=? fun (_, _, src_sk) -> return src_sk
-  | Some sk ->
-      return sk )
-  >>=? fun src_sk ->
+    ?max_priority ?(minimal_timestamp = false) ?mempool ?context_path ~chain
+    ~head baker =
+  Client_proto_contracts.get_baker_consensus_key cctxt ~chain ~offset:1l baker
+  >>=? fun (_name, _pkh, _pk, sk) ->
   Alpha_services.Helpers.current_level cctxt ~offset:1l (chain, head)
   >>=? fun level ->
   let (seed_nonce, seed_nonce_hash) =
@@ -61,9 +57,9 @@ let bake_block (cctxt : #Protocol_client_context.full) ?minimal_fees
     ?mempool
     ?context_path
     ~chain
-    ~priority:(`Auto (delegate, max_priority))
-    ~delegate_pkh:delegate
-    ~delegate_sk:src_sk
+    ~priority:(`Auto (baker, max_priority))
+    ~baker
+    ~baker_sk:sk
     head
   >>=? fun block_hash ->
   ( match seed_nonce with
@@ -83,15 +79,9 @@ let bake_block (cctxt : #Protocol_client_context.full) ?minimal_fees
   cctxt#message "Injected block %a" Block_hash.pp_short block_hash
   >>= fun () -> return_unit
 
-let endorse_block cctxt ~chain delegate =
-  Client_keys.get_key cctxt delegate
-  >>=? fun (_src_name, src_pk, src_sk) ->
-  Client_baking_endorsement.forge_endorsement
-    cctxt
-    ~chain
-    ~block:cctxt#block
-    ~src_sk
-    src_pk
+let endorse_block cctxt ~chain baker =
+  let block = cctxt#block in
+  Client_baking_endorsement.forge_endorsement cctxt ~chain ~block baker
   >>=? fun oph ->
   cctxt#answer "Operation successfully injected in the node."
   >>= fun () ->

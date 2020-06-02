@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -128,7 +129,7 @@ let monitor_fork_testchain (cctxt : #Protocol_client_context.full)
 
 module Endorser = struct
   let run (cctxt : #Protocol_client_context.full) ~chain ~delay ~keep_alive
-      delegates =
+      bakers =
     let process () =
       ( if chain = `Test then monitor_fork_testchain cctxt ~cleanup_nonces:false
       else return_unit )
@@ -140,7 +141,7 @@ module Endorser = struct
       >>=? fun block_stream ->
       cctxt#message "Endorser started."
       >>= fun () ->
-      Client_baking_endorsement.create cctxt ~delay delegates block_stream
+      Client_baking_endorsement.create cctxt ~delay bakers block_stream
     in
     Client_confirmations.wait_for_bootstrapped
       ~retry:(retry cctxt ~delay:1. ~factor:1.5 ~tries:5)
@@ -152,7 +153,7 @@ end
 module Baker = struct
   let run (cctxt : #Protocol_client_context.full) ?minimal_fees
       ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?max_priority
-      ~chain ~context_path ~keep_alive delegates =
+      ~chain ~context_path ~keep_alive bakers =
     let process () =
       Config_services.user_activated_upgrades cctxt
       >>=? fun user_activated_upgrades ->
@@ -175,7 +176,7 @@ module Baker = struct
         ?max_priority
         ~chain
         ~context_path
-        delegates
+        ~bakers
         block_stream
     in
     Client_confirmations.wait_for_bootstrapped
