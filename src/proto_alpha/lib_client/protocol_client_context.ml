@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -168,7 +169,7 @@ let () =
   register
   @@ def
        (stamp_proto "delegate" ["frozen_balance"])
-       Protocol.Alpha_context.Delegate.frozen_balance_encoding ;
+       Protocol.Alpha_context.Baker.frozen_balance_encoding ;
   register
   @@ def
        (stamp_proto "delegate" ["balance_updates"])
@@ -176,7 +177,7 @@ let () =
   register
   @@ def
        (stamp_proto "delegate" ["frozen_balance_by_cycles"])
-       Protocol.Alpha_context.Delegate.frozen_balance_by_cycle_encoding ;
+       Protocol.Alpha_context.Baker.frozen_balance_by_cycle_encoding ;
   register ~pp:Protocol.Alpha_context.Level.pp_full
   @@ def (stamp_proto "level" []) Protocol.Alpha_context.Level.encoding ;
   register
