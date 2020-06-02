@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -82,7 +83,7 @@ let bootstrap_contract_encoding : Parameters.bootstrap_contract Data_encoding.t
     (fun {delegate; amount; script} -> (delegate, amount, script))
     (fun (delegate, amount, script) -> {delegate; amount; script})
     (obj3
-       (req "delegate" Signature.Public_key_hash.encoding)
+       (req "delegate" Baker_hash.encoding)
        (req "amount" Tez.encoding)
        (req "script" Script.encoding))
 
