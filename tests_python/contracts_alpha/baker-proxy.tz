@@ -1,0 +1,38 @@
+parameter (pair
+             address
+             (or (unit %default)
+                 (pair %main
+                    (pair :payload
+                        (nat %counter) # counter, used to prevent replay attacks
+                        (or :action    # payload to sign, represents the requested action
+                          (lambda %operation unit (pair (list operation) (list baker_operation)))
+                          (pair %change_keys          # change the keys controlling the multisig
+                              (nat %threshold)         # new threshold
+                              (list %keys key))))     # new list of keys
+                    (list %sigs (option signature)))));    # signatures
+
+storage unit ;
+code
+  {
+    UNPAIR ;
+    UNPAIR ;
+    CONTRACT %root
+             (or (unit %default)
+                 (pair %main
+                    (pair :payload
+                       (nat %counter) # counter, used to prevent replay attacks
+                       (or :action    # payload to sign, represents the requested action
+                          (lambda %operation unit (pair (list operation) (list baker_operation)))
+                          (pair %change_keys          # change the keys controlling the multisig
+                             (nat %threshold)         # new threshold
+                             (list %keys key))))     # new list of keys
+                    (list %sigs (option signature)))) ;
+    ASSERT_SOME ;
+    SWAP ;
+    AMOUNT ;
+    SWAP ;
+    TRANSFER_TOKENS ;
+    DIP { NIL operation } ;
+    CONS ;
+    PAIR
+  }
