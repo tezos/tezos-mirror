@@ -164,7 +164,7 @@ class ShowAddressResult:
             self.public_key = None
         else:
             self.public_key = match.groups()[0]
-        pattern = r"Secret Key: ?(\w*)"
+        pattern = r"Secret Key: ?(\w+:\w+)"
         match = re.search(pattern, client_output)
         if match is None:
             self.secret_key = None
