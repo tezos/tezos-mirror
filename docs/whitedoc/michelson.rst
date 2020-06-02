@@ -1957,12 +1957,12 @@ Cryptographic primitives
         iff x > y
 
 
-Deprecated instructions
-~~~~~~~~~~~~~~~~~~~~~~~
+Removed instructions
+~~~~~~~~~~~~~~~~~~~~
 
-The following instructions are deprecated. The Michelson type-checker
-will reject any contract using them but contracts already originated
-on the blockchain using them will continue to work as before.
+:ref:`005_babylon` deprecated the following instructions. Because no smart
+contract used these on Mainnet before they got deprecated, they have been
+removed. The Michelson type-checker will reject any contract using them.
 
 -  ``CREATE_CONTRACT { storage 'g ; parameter 'p ; code ... }``:
    Forge a new contract from a literal.
