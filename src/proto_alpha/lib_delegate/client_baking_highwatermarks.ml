@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -74,13 +75,12 @@ let save_highwatermarks (cctxt : #Protocol_client_context.full) filename
 
 let retrieve_highwatermark cctxt filename = load_highwatermarks cctxt filename
 
-let may_inject (cctxt : #Protocol_client_context.full) location ~delegate level
-    =
+let may_inject (cctxt : #Protocol_client_context.full) location ~baker level =
   retrieve_highwatermark cctxt (Client_baking_files.filename location)
   >>=? fun highwatermark ->
-  let delegate = Signature.Public_key_hash.to_short_b58check delegate in
+  let baker = Baker_hash.to_short_b58check baker in
   List.find_opt
-    (fun (delegate', _) -> String.compare delegate delegate' = 0)
+    (fun (baker', _) -> String.compare baker baker' = 0)
     highwatermark
   |> function
   | None ->
@@ -92,13 +92,13 @@ let may_inject_block = may_inject
 
 let may_inject_endorsement = may_inject
 
-let record (cctxt : #Protocol_client_context.full) location ~delegate level =
+let record (cctxt : #Protocol_client_context.full) location ~baker level =
   let filename = Client_baking_files.filename location in
-  let delegate = Signature.Public_key_hash.to_short_b58check delegate in
+  let baker = Baker_hash.to_short_b58check baker in
   load_highwatermarks cctxt filename
   >>=? fun highwatermarks ->
   let level =
-    match List.assoc_opt delegate highwatermarks with
+    match List.assoc_opt baker highwatermarks with
     | None ->
         level
     | Some lower_prev_level when level >= lower_prev_level ->
@@ -110,9 +110,9 @@ let record (cctxt : #Protocol_client_context.full) location ~delegate level =
   save_highwatermarks
     cctxt
     filename
-    ( (delegate, level)
+    ( (baker, level)
     :: List.filter
-         (fun (delegate', _) -> String.compare delegate delegate' <> 0)
+         (fun (baker', _) -> String.compare baker baker' <> 0)
          highwatermarks )
 
 let record_block = record

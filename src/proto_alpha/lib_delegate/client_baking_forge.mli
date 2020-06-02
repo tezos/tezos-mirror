@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -44,8 +45,8 @@ val inject_block :
   chain:Chain_services.chain ->
   shell_header:Block_header.shell_header ->
   priority:int ->
-  delegate_pkh:Signature.Public_key_hash.t ->
-  delegate_sk:Client_keys.sk_uri ->
+  baker:baker_hash ->
+  baker_sk:Client_keys.sk_uri ->
   level:Raw_level.t ->
   Operation.raw list list ->
   Block_hash.t tzresult Lwt.t
@@ -86,9 +87,9 @@ val forge_block :
   ?context_path:string ->
   ?seed_nonce_hash:Nonce_hash.t ->
   chain:Chain_services.chain ->
-  priority:[`Set of int | `Auto of public_key_hash * int option] ->
-  delegate_pkh:Signature.Public_key_hash.t ->
-  delegate_sk:Client_keys.sk_uri ->
+  priority:[`Set of int | `Auto of baker_hash * int option] ->
+  baker:baker_hash ->
+  baker_sk:Client_keys.sk_uri ->
   Block_services.block ->
   Block_hash.t tzresult Lwt.t
 
@@ -101,6 +102,6 @@ val create :
   ?max_priority:int ->
   chain:Chain_services.chain ->
   context_path:string ->
-  public_key_hash list ->
+  bakers:Contract.t list ->
   Client_baking_blocks.block_info tzresult Lwt_stream.t ->
   unit tzresult Lwt.t

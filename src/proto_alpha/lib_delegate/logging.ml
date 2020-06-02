@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -152,3 +153,6 @@ let conflicting_endorsements_tag =
           (Operation.hash a)
           Operation_hash.pp
           (Operation.hash b))
+
+let baker_hash_tag =
+  Tag.def ~doc:Baker_hash.title Baker_hash.name Baker_hash.pp
