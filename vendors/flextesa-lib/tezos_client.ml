@@ -89,11 +89,6 @@ let import_secret_key state client ~name ~key =
     ["import"; "secret"; "key"; name; key; "--force"]
   >>= fun _ -> return ()
 
-let register_as_delegate state client ~key_name =
-  successful_client_cmd state ~client
-    ["register"; "key"; key_name; "as"; "delegate"]
-  >>= fun _ -> return ()
-
 let rpc state ~client meth ~path =
   let args =
     match meth with
@@ -302,8 +297,8 @@ module Ledger = struct
         | None -> ""
         | Some (alias, _) -> alias in
       return
-        (Tezos_protocol.Account.key_pair name ~pubkey ~pubkey_hash
-           ~private_key:uri)
+        (Tezos_protocol.Account.key_pair name ?baker_hash:None ~pubkey
+           ~pubkey_hash ~private_key:uri)
     with e ->
       failf "Couldn't understand result of 'show ledger %S': error %S: from %S"
         uri (Exn.to_string e)
@@ -331,40 +326,105 @@ module Ledger = struct
 end
 
 module Keyed = struct
-  type t = {client: client; key_name: string; secret_key: string}
+  type t =
+    { client: client
+    ; key_name: string
+    ; baker_name: string
+    ; baker_hash: string option
+    ; secret_key: string }
 
-  let make client ~key_name ~secret_key = {client; key_name; secret_key}
+  let make ?baker_hash ?baker_name client ~key_name ~secret_key =
+    let baker_name = Option.value ~default:("baker-" ^ key_name) baker_name in
+    {client; key_name; baker_name; baker_hash; secret_key}
 
-  let initialize state {client; key_name; secret_key} =
+  let initialize state {client; key_name; baker_name; baker_hash; secret_key} =
     successful_client_cmd state ~client
       ["import"; "secret"; "key"; key_name; secret_key; "--force"]
-
-  let bake ?chain state baker msg =
-    let chain_arg =
-      Option.value_map chain ~default:[] ~f:(fun c -> ["--chain"; c]) in
-    successful_client_cmd state ~client:baker.client
-      ( chain_arg
-      @ ["bake"; "for"; baker.key_name; "--force"; "--minimal-timestamp"] )
     >>= fun res ->
-    Log_recorder.Operations.bake state ~client:baker.client.id ~output:res#out
-      msg ;
-    say state
-      EF.(
-        desc
-          (af "Successful bake (%s: %s):" baker.client.id msg)
-          (ocaml_string_list res#out))
+    match baker_hash with
+    | None -> return res
+    | Some baker_hash ->
+        successful_client_cmd state ~client
+          ["remember"; "contract"; baker_name; baker_hash; "--force"]
 
-  let endorse state baker msg =
-    successful_client_cmd state ~client:baker.client
-      ["endorse"; "for"; baker.key_name]
-    >>= fun res ->
-    Log_recorder.Operations.endorse state ~client:baker.client.id
-      ~output:res#out msg ;
-    say state
-      EF.(
-        desc
-          (af "Successful bake (%s: %s):" baker.client.id msg)
-          (ocaml_string_list res#out))
+  let bake ?chain state keyed msg =
+    match keyed.baker_hash with
+    | None -> failf "Bake: No baker known for Keyed.key_name=%s" keyed.key_name
+    | Some _ ->
+        let chain_arg =
+          Option.value_map chain ~default:[] ~f:(fun c -> ["--chain"; c]) in
+        successful_client_cmd state ~client:keyed.client
+          ( chain_arg
+          @ ["bake"; "for"; keyed.baker_name; "--force"; "--minimal-timestamp"]
+          )
+        >>= fun res ->
+        Log_recorder.Operations.bake state ~client:keyed.client.id
+          ~output:res#out msg ;
+        say state
+          EF.(
+            desc
+              (af "Successful bake (%s: %s):" keyed.client.id msg)
+              (ocaml_string_list res#out))
+
+  let endorse state keyed msg =
+    match keyed.baker_hash with
+    | None ->
+        failf "Endorse: No baker known for Keyed.key_name=%s" keyed.key_name
+    | Some _ ->
+        successful_client_cmd state ~client:keyed.client
+          ["endorse"; "for"; keyed.baker_name]
+        >>= fun res ->
+        Log_recorder.Operations.endorse state ~client:keyed.client.id
+          ~output:res#out msg ;
+        say state
+          EF.(
+            desc
+              (af "Successful bake (%s: %s):" keyed.client.id msg)
+              (ocaml_string_list res#out))
+
+  let submit_proposals ?chain state keyed proposals =
+    match keyed.baker_hash with
+    | None ->
+        failf "Submit proposals: No baker known for Keyed.key_name=%s"
+          keyed.key_name
+    | Some _ ->
+        let chain_arg =
+          Option.value_map chain ~default:[] ~f:(fun c -> ["--chain"; c]) in
+        successful_client_cmd state ~client:keyed.client
+          ( chain_arg
+          @ [ "from"; "baker"; "contract"; keyed.baker_name; "submit"
+            ; "proposals"; "for"; "protocols" ]
+          @ proposals @ ["--burn-cap"; "1.194"] )
+        >>= fun res ->
+        say state
+          EF.(
+            desc
+              (af "Successfullly submitted proposals: (%s): %s" keyed.client.id
+                 (String.concat proposals))
+              (ocaml_string_list res#out))
+
+  let submit_ballot ?chain state keyed proposal yays nays passes =
+    match keyed.baker_hash with
+    | None ->
+        failf "Submit ballot: No baker known for Keyed.key_name=%s"
+          keyed.key_name
+    | Some _ ->
+        let chain_arg =
+          Option.value_map chain ~default:[] ~f:(fun c -> ["--chain"; c]) in
+        let yays = string_of_int yays in
+        let nays = string_of_int nays in
+        let passes = string_of_int passes in
+        successful_client_cmd state ~client:keyed.client
+          ( chain_arg
+          @ [ "from"; "baker"; "contract"; keyed.baker_name; "submit"; "ballot"
+            ; "for"; "protocol"; proposal; yays; nays; passes ] )
+        >>= fun res ->
+        say state
+          EF.(
+            desc
+              (af "Successfullly submitted ballot (%s; %s; %s): %s - %s"
+                 keyed.client.id yays nays passes proposal)
+              (ocaml_string_list res#out))
 
   let generate_nonce state {client; key_name; _} data =
     successful_client_cmd state ~client

@@ -57,17 +57,6 @@ val import_secret_key :
   -> key:string
   -> (unit, [> System_error.t | Process_result.Error.t]) Asynchronous_result.t
 
-val register_as_delegate :
-     < application_name: string
-     ; console: Console.t
-     ; paths: Paths.t
-     ; runner: Running_processes.State.t
-     ; env_config: Environment_configuration.t
-     ; .. >
-  -> client
-  -> key_name:string
-  -> (unit, [> System_error.t | Process_result.Error.t]) Asynchronous_result.t
-
 val activate_protocol :
      < application_name: string
      ; console: Console.t
@@ -260,9 +249,20 @@ module Ledger : sig
 end
 
 module Keyed : sig
-  type t = {client: client; key_name: string; secret_key: string}
+  type t =
+    { client: client
+    ; key_name: string
+    ; baker_name: string
+    ; baker_hash: string option
+    ; secret_key: string }
 
-  val make : client -> key_name:string -> secret_key:string -> t
+  val make :
+       ?baker_hash:string
+    -> ?baker_name:string
+    -> client
+    -> key_name:string
+    -> secret_key:string
+    -> t
 
   val initialize :
        < application_name: string
@@ -302,6 +302,39 @@ module Keyed : sig
        ; .. >
     -> t
     -> string
+    -> ( unit
+       , [> Process_result.Error.t | System_error.t] )
+       Asynchronous_result.t
+
+  val submit_proposals :
+       ?chain:string
+    -> < application_name: string
+       ; console: Console.t
+       ; env_config: Environment_configuration.t
+       ; operations_log: Log_recorder.Operations.t
+       ; paths: Paths.t
+       ; runner: Running_processes.State.t
+       ; .. >
+    -> t
+    -> string list
+    -> ( unit
+       , [> Process_result.Error.t | System_error.t] )
+       Asynchronous_result.t
+
+  val submit_ballot :
+       ?chain:string
+    -> < application_name: string
+       ; console: Console.t
+       ; env_config: Environment_configuration.t
+       ; operations_log: Log_recorder.Operations.t
+       ; paths: Paths.t
+       ; runner: Running_processes.State.t
+       ; .. >
+    -> t
+    -> string
+    -> int
+    -> int
+    -> int
     -> ( unit
        , [> Process_result.Error.t | System_error.t] )
        Asynchronous_result.t

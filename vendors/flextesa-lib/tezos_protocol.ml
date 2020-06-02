@@ -29,14 +29,18 @@ module Account = struct
   type t =
     | Of_name of string
     | Key_pair of
-        {name: string; pubkey: string; pubkey_hash: string; private_key: string}
+        { name: string
+        ; pubkey: string
+        ; pubkey_hash: string
+        ; private_key: string
+        ; baker_hash: string option }
 
   let of_name s = Of_name s
   let of_namef fmt = ksprintf of_name fmt
   let name = function Of_name n -> n | Key_pair k -> k.name
 
-  let key_pair name ~pubkey ~pubkey_hash ~private_key =
-    Key_pair {name; pubkey; pubkey_hash; private_key}
+  let key_pair name ?baker_hash ~pubkey ~pubkey_hash ~private_key =
+    Key_pair {name; pubkey; pubkey_hash; private_key; baker_hash}
 
   let pubkey = function
     | Of_name n -> Key.Of_name.pubkey n
@@ -49,6 +53,8 @@ module Account = struct
   let private_key = function
     | Of_name n -> Key.Of_name.private_key n
     | Key_pair k -> k.private_key
+
+  let baker_hash = function Of_name _ -> None | Key_pair k -> k.baker_hash
 end
 
 module Voting_period = struct
@@ -94,6 +100,7 @@ type t =
   ; bootstrap_accounts: (Account.t * Int64.t) list
   ; dictator: Account.t
         (* ; bootstrap_contracts: (Account.t * int * Script.origin) list *)
+  ; bootstrap_bakers: (string * Int64.t * Account.t) list
   ; expected_pow: int
   ; name: string (* e.g. alpha *)
   ; hash: string
@@ -113,13 +120,30 @@ let compare a b = String.compare a.id b.id
 let make_bootstrap_accounts ~balance n =
   List.init n ~f:(fun n -> (Account.of_namef "bootacc-%d" n, balance))
 
+let make_bootstrap_bakers ~balance n =
+  List.init n ~f:(fun n -> (Account.of_namef "bakeacc-%d" n, balance))
+  |> List.mapi ~f:(fun n (account, _) ->
+         let baker_hash =
+           List.nth_exn
+             [ "SG1fpFaowYY8G7PfkYdKkGmsMziHKUfrHRHW"
+             ; "SG1TLmKJHVJxQosY6iN21AW77HsAapdupxnR"
+             ; "SG1hExdK69Z2RZkkQjKtLG6H4L4FGTZeGKHu"
+             ; "SG1mHgeWHGMnCUMJ8jZ1Cdh3DkWEcQ88tziJ"
+             ; "SG1jfZeHRzeWAM1T4zrwunEyUpwWc82D4tbv" ]
+             n in
+         (baker_hash, 4_000_000_000_000L, account))
+
 let default () =
   let dictator = Account.of_name "dictator-default" in
+  let bootstrap_accounts =
+    make_bootstrap_accounts ~balance:4_000_000_000_000L 4 in
+  let bootstrap_bakers = make_bootstrap_bakers ~balance:4_000_000_000_000L 4 in
   { id= "default-bootstrap"
   ; kind= Protocol_kind.default
-  ; bootstrap_accounts= make_bootstrap_accounts ~balance:4_000_000_000_000L 4
+  ; bootstrap_accounts
   ; dictator
     (* ; bootstrap_contracts= [(dictator, 10_000_000, `Sandbox_faucet)] *)
+  ; bootstrap_bakers
   ; expected_pow= 1
   ; name= "alpha"
   ; hash= "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
@@ -138,6 +162,11 @@ let protocol_parameters_json t : Ezjsonm.t =
   let open Ezjsonm in
   let make_account (account, amount) =
     strings [Account.pubkey account; sprintf "%Ld" amount] in
+  let make_baker (baker_hash, amount, key_account) =
+    Ezjsonm.dict
+      [ ("hash", string baker_hash)
+      ; ("amount", string @@ sprintf "%Ld" amount)
+      ; ("key", string @@ Account.pubkey key_account) ] in
   let extra_post_babylon_stuff subkind =
     (* `src/proto_005_PsBabyM1/lib_protocol/parameters_repr.ml`
        `src/proto_006_PsCARTHA/lib_parameters/default_parameters.ml` *)
@@ -170,11 +199,13 @@ let protocol_parameters_json t : Ezjsonm.t =
     ; ("hard_storage_limit_per_operation", string (Int.to_string 60_000))
     ; ("cost_per_byte", string (Int.to_string 1_000))
     ; ("test_chain_duration", string (Int.to_string 1_966_080))
-    ; ("quorum_min", int 3_000)
-    ; ("quorum_max", int 7_000)
+    ; ("quorum_min", int 15_00)
+    ; ("quorum_max", int 70_00)
     ; ("min_proposal_quorum", int 500)
     ; ("initial_endorsers", int 1)
     ; ("delay_per_missing_endorsement", string (Int.to_string 1)) ] in
+  let extra_alpha =
+    [("bootstrap_bakers", list make_baker t.bootstrap_bakers)] in
   let common =
     [ ( "bootstrap_accounts"
       , list make_account (t.bootstrap_accounts @ [(t.dictator, 10_000_000L)])
@@ -192,8 +223,8 @@ let protocol_parameters_json t : Ezjsonm.t =
   | None ->
       dict
         ( match t.kind with
-        | (`Babylon | `Carthage | `Alpha) as sk ->
-            common @ extra_post_babylon_stuff sk
+        | (`Babylon | `Carthage) as sk -> common @ extra_post_babylon_stuff sk
+        | `Alpha as sk -> common @ extra_post_babylon_stuff sk @ extra_alpha
         | `Athens -> common )
 
 let sandbox {dictator; _} =
@@ -299,7 +330,9 @@ let cli_term state =
           pure (fun l ->
               List.map l
                 ~f:(fun ((name, pubkey, pubkey_hash, private_key), tez) ->
-                  (Account.key_pair name ~pubkey ~pubkey_hash ~private_key, tez)))
+                  ( Account.key_pair ?baker_hash:None name ~pubkey ~pubkey_hash
+                      ~private_key
+                  , tez )))
           $ value
               (opt_all
                  (pair ~sep:'@' (t4 ~sep:',' string string string string) int64)
