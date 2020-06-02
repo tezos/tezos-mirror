@@ -13,20 +13,19 @@ let little_mesh_with_bakers ?base_port ?generate_kiln_config state ~protocol
     EF.[af "Ready to start"; af "Root path deleted."]
   >>= fun () ->
   let block_interval = 1 in
-  let (protocol, baker_list) =
-    let d = protocol in
-    let open Tezos_protocol in
-    let bakers = List.take d.bootstrap_accounts bakers in
-    ( {
-        d with
-        time_between_blocks = [block_interval; 0];
-        bootstrap_accounts =
-          List.map d.bootstrap_accounts ~f:(fun (n, v) ->
-              if List.exists bakers ~f:(fun baker -> Poly.equal n (fst baker))
-              then (n, v)
-              else (n, 1_000L));
-      },
-      bakers )
+  let open Tezos_protocol in
+  let baker_list = List.take protocol.bootstrap_bakers bakers in
+  let protocol =
+    {
+      protocol with
+      time_between_blocks = [block_interval; 0];
+      bootstrap_accounts =
+        List.map protocol.bootstrap_accounts ~f:(fun (n, v) ->
+            if
+              List.exists baker_list ~f:(fun (_, _, baker) -> Poly.(n = baker))
+            then (n, v)
+            else (n, 1_000L));
+    }
   in
   let net_size = 3 in
   let topology = Test_scenario.Topology.(mesh "Simple" net_size) in
@@ -58,12 +57,15 @@ let little_mesh_with_bakers ?base_port ?generate_kiln_config state ~protocol
     let key_name = sprintf "b%d" nth_baker in
     let node = List.nth_exn all_nodes nth_node in
     let client = Tezos_client.of_node node ~exec:client_exec in
-    let baker_account = List.nth_exn baker_list nth_baker in
+    let (baker_hash, _balance, key_account) =
+      List.nth_exn baker_list nth_baker
+    in
     let bak =
       Tezos_client.Keyed.make
         client
+        ~baker_hash
         ~key_name
-        ~secret_key:(Tezos_protocol.Account.private_key (fst baker_account))
+        ~secret_key:(Tezos_protocol.Account.private_key key_account)
     in
     Tezos_client.Keyed.initialize state bak >>= fun _ -> return (client, bak)
   in
@@ -347,11 +349,11 @@ let simple_double_endorsement ~starting_level ?generate_kiln_config ~state
   let node_2 = List.nth_exn all_nodes 2 in
   let baker_1_n0 =
     let open Tezos_client.Keyed in
-    let {key_name; secret_key; _} = baker_1 in
-    make client_0 ~key_name ~secret_key
+    let {key_name; secret_key; baker_hash; _} = baker_1 in
+    make client_0 ?baker_hash ~key_name ~secret_key
   in
   Tezos_client.Keyed.initialize state baker_1_n0
-  >>= fun _ ->
+  >>= fun _res ->
   Helpers.kill_node state node_1
   >>= fun () ->
   Helpers.kill_node state node_2
@@ -495,18 +497,18 @@ let with_accusers ~state ~protocol ~base_port node_exec accuser_exec
   Helpers.clear_root state
   >>= fun () ->
   let block_interval = 2 in
-  let (protocol, baker_0_account) =
-    let d = protocol in
-    let open Tezos_protocol in
-    let baker = List.hd_exn d.bootstrap_accounts in
-    ( {
-        d with
-        time_between_blocks = [block_interval; block_interval * 2];
-        bootstrap_accounts =
-          List.map d.bootstrap_accounts ~f:(fun (n, v) ->
-              if Poly.(n = fst baker) then (n, v) else (n, 1_000L));
-      },
-      baker )
+  let open Tezos_protocol in
+  let (baker_0_hash, _balance, baker_0_key_account) =
+    List.nth_exn protocol.bootstrap_bakers 0
+  in
+  let protocol =
+    {
+      protocol with
+      time_between_blocks = [block_interval; block_interval * 2];
+      bootstrap_accounts =
+        List.map protocol.bootstrap_accounts ~f:(fun (n, v) ->
+            if Poly.(n = baker_0_key_account) then (n, v) else (n, 1_000L));
+    }
   in
   let topology =
     Test_scenario.Topology.(
@@ -546,8 +548,9 @@ let with_accusers ~state ~protocol ~base_port node_exec accuser_exec
     let bak =
       Tezos_client.Keyed.make
         client
+        ~baker_hash:baker_0_hash
         ~key_name
-        ~secret_key:(Tezos_protocol.Account.private_key (fst baker_0_account))
+        ~secret_key:(Tezos_protocol.Account.private_key baker_0_key_account)
     in
     Tezos_client.Keyed.initialize state bak >>= fun _ -> return (client, bak)
   in

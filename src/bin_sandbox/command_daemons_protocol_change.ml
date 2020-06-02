@@ -172,16 +172,6 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
         state
         EF.(
           desc_list
-            (haf "Registration-as-delegate:")
-            [ desc (af "Client:") (af "%S" client.Tezos_client.id);
-              desc (af "Key:") (af "%S" key) ])
-      >>= fun () ->
-      Tezos_client.register_as_delegate state client ~key_name:key
-      >>= fun () ->
-      say
-        state
-        EF.(
-          desc_list
             (haf "Starting daemons:")
             [ desc (af "Client:") (af "%S" client.Tezos_client.id);
               desc (af "Key:") (af "%S" key) ])
