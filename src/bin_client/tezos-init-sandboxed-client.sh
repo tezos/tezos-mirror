@@ -66,7 +66,7 @@ wait_for_the_node_to_be_bootstrapped() {
 
 ## Sandboxed client ########################################################
 
-# key pairs from $src_dir/test/sandbox.json
+# values from $src_dir/src/proto_alpha/lib_parameters/default_parameters.ml
 
 BOOTSTRAP1_IDENTITY="tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
 BOOTSTRAP1_PUBLIC="edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
@@ -88,6 +88,26 @@ BOOTSTRAP5_IDENTITY="tz1ddb9NMYHZi5UzPdzTZMYQQZoMub195zgv"
 BOOTSTRAP5_PUBLIC="edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n"
 BOOTSTRAP5_SECRET="unencrypted:edsk4QLrcijEffxV31gGdN2HU7UpyJjA8drFoNcmnB28n89YjPNRFm"
 
+BAKER1_IDENTITY="SG1fpFaowYY8G7PfkYdKkGmsMziHKUfrHRHW"
+BAKER1_PUBLIC="edpkuDjETsuw7Tve4hczaEiDd5q8q5CnzppnoENpvf3hSt2g2N6fy5"
+BAKER1_SECRET="unencrypted:edsk432L71B91i1sE8rQxPDMo2Yxo4qaYqhktvpt8yovaMpo1NUbBt"
+
+BAKER2_IDENTITY="SG1TLmKJHVJxQosY6iN21AW77HsAapdupxnR"
+BAKER2_PUBLIC="edpkuDDr1FWd79GdjtcRAYJ7zufsxHUpCbtjPvQ2SGzp5QGBV6jFXo"
+BAKER2_SECRET="unencrypted:edsk3jjD4cLvE1t3SiZKCRiH9SXnJ4jHEsVpfcuRwfe7sfbnsMGX6f"
+
+BAKER3_IDENTITY="SG1hExdK69Z2RZkkQjKtLG6H4L4FGTZeGKHu"
+BAKER3_PUBLIC="edpkuxfqVAGvJegMn8h4Qsrfc6ncLYQsAWKaAx2SieFn2Mz5QxNSmL"
+BAKER3_SECRET="unencrypted:edsk3EVDFeDsefk1UoWWhDhnBpERhAwqHbVzWnBwA4tdUL8aBhw7RC"
+
+BAKER4_IDENTITY="SG1mHgeWHGMnCUMJ8jZ1Cdh3DkWEcQ88tziJ"
+BAKER4_PUBLIC="edpku5MdpRkypXjBpyQ5vEbf3iUkRbt7iVjKvyx7RrkWSXpHS4fSck"
+BAKER4_SECRET="unencrypted:edsk2rAmeBDrQ5d1FhDoTdifMvBsqSosmPSBhxL74huszZhfMFtiKb"
+
+BAKER5_IDENTITY="SG1jfZeHRzeWAM1T4zrwunEyUpwWc82D4tbv"
+BAKER5_PUBLIC="edpkvFYoA3cwPyVMAheyX29pQFw9gwfxDHJgbthG3caZNuQFNzrwkM"
+BAKER5_SECRET="unencrypted:edsk4Ssc63dnYJUptVMaKfmHLJNMBYv9piYiRCiYjcH3gacKWP1z3v"
+
 ACTIVATOR_SECRET="unencrypted:edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6"
 
 add_sandboxed_bootstrap_identities() {
@@ -98,7 +118,31 @@ add_sandboxed_bootstrap_identities() {
     ${client} import secret key bootstrap4 ${BOOTSTRAP4_SECRET}
     ${client} import secret key bootstrap5 ${BOOTSTRAP5_SECRET}
 
+    ${client} import secret key baker1_key ${BAKER1_SECRET}
+    ${client} import secret key baker2_key ${BAKER2_SECRET}
+    ${client} import secret key baker3_key ${BAKER3_SECRET}
+    ${client} import secret key baker4_key ${BAKER4_SECRET}
+    ${client} import secret key baker5_key ${BAKER5_SECRET}
+
     ${client} import secret key activator ${ACTIVATOR_SECRET}
+}
+
+client_remember_baker_contracts() {
+
+    $1 remember contract baker1 ${BAKER1_IDENTITY};
+    $1 remember contract baker2 ${BAKER2_IDENTITY};
+    $1 remember contract baker3 ${BAKER3_IDENTITY};
+    $1 remember contract baker4 ${BAKER4_IDENTITY};
+    $1 remember contract baker5 ${BAKER5_IDENTITY};
+}
+
+remember_baker_contracts() {
+
+    # skip the last client, which activates alpha protocol
+    clients=("${client_instances[@]::${#client_instances[@]}-1}")
+    for client in "${clients[@]}"; do
+        client_remember_baker_contracts "$client"
+    done
 }
 
 activate_alpha() {
@@ -110,6 +154,8 @@ activate_alpha() {
         and key activator \
         and parameters "${parameters_file}" \
         --timestamp $(TZ='AAA+1' date +%FT%TZ)
+
+    client_remember_baker_contracts "$client"
 }
 
 usage() {
@@ -190,10 +236,17 @@ main () {
     echo "exec $signer \"\$@\""  >> $client_dir/bin/tezos-signer
     chmod +x $client_dir/bin/tezos-signer
 
+    # we can 'remember contract' only after protocol has been activated
+    ADD_BAKER_CONTRACTS="${client} remember contract baker1 ${BAKER1_IDENTITY};\
+                         ${client} remember contract baker2 ${BAKER2_IDENTITY};\
+                         ${client} remember contract baker3 ${BAKER3_IDENTITY};\
+                         ${client} remember contract baker4 ${BAKER4_IDENTITY};\
+                         ${client} remember contract baker5 ${BAKER5_IDENTITY};"
+
     cat <<EOF
 if type tezos-client-reset >/dev/null 2>&1 ; then tezos-client-reset; fi ;
 PATH="$client_dir/bin:\$PATH" ; export PATH ;
-alias tezos-activate-alpha="$client  -block genesis activate protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK with fitness 1 and key activator and parameters $parameters_file --timestamp $(TZ='AAA+1' date +%FT%TZ)" ;
+alias tezos-activate-alpha="$client  -block genesis activate protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK with fitness 1 and key activator and parameters $parameters_file --timestamp $(TZ='AAA+1' date +%FT%TZ); ${ADD_BAKER_CONTRACTS}" ;
 alias tezos-client-reset="rm -rf \"$client_dir\"; unalias tezos-activate-alpha tezos-client-reset" ;
 alias tezos-autocomplete="if [ \$ZSH_NAME ] ; then autoload bashcompinit ; bashcompinit ; fi ; source \"$bin_dir/bash-completion.sh\"" ;
 trap tezos-client-reset EXIT ;
