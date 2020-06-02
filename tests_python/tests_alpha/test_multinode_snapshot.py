@@ -25,8 +25,8 @@ class TestMultiNodeSnapshot:
 
     def test_bake_group1_level_a(self, sandbox: Sandbox):
         for _ in range(LEVEL_A - 1):
-            sandbox.client(GROUP1[0]).bake('bootstrap1', BAKE_ARGS)
-            sandbox.client(GROUP1[0]).endorse('bootstrap2')
+            sandbox.client(GROUP1[0]).bake('baker1', BAKE_ARGS)
+            sandbox.client(GROUP1[0]).endorse('baker2')
 
     def test_group1_level_a(self, sandbox: Sandbox, session: dict):
         for i in GROUP1:
@@ -46,6 +46,7 @@ class TestMultiNodeSnapshot:
 
         for i in GROUP2:
             sandbox.add_node(i, snapshot=file, params=PARAMS)
+            utils.remember_baker_contracts(sandbox.client(i))
 
     def test_rerun_group1(self, sandbox: Sandbox):
         for i in GROUP1:
@@ -58,8 +59,8 @@ class TestMultiNodeSnapshot:
 
     def test_bake_group2_level_b(self, sandbox: Sandbox):
         for _ in range(LEVEL_B - LEVEL_A):
-            sandbox.client(GROUP2[0]).bake('bootstrap1', BAKE_ARGS)
-            sandbox.client(GROUP2[0]).endorse('bootstrap2')
+            sandbox.client(GROUP2[0]).bake('baker1', BAKE_ARGS)
+            sandbox.client(GROUP2[0]).endorse('baker2')
 
     def test_all_level_c(self, sandbox: Sandbox):
         for client in sandbox.all_clients():

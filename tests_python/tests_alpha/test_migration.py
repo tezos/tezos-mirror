@@ -26,7 +26,7 @@ PROTO_A_PATH = f"proto_{PROTO_A_DAEMON.replace('-','_')}"
 PROTO_B = constants.ALPHA
 
 PARAMETERS_FILE = (
-    f'{paths.TEZOS_HOME}src/{PROTO_A_PATH}/parameters/' 'test-parameters.json'
+    f'{paths.TEZOS_HOME}src/{PROTO_A_PATH}/parameters/test-parameters.json'
 )
 assert os.path.isfile(PARAMETERS_FILE), (
     f'{PARAMETERS_FILE}'
@@ -49,23 +49,7 @@ DEPOSIT_RECEIPTS = [
         "change": "512000000",
     },
 ]
-# in Alpha protocol, the "origin" field is added
-ALPHA_DEPOSIT_RECEIPTS = [
-    {
-        "kind": "contract",
-        "contract": BAKER_PKH,
-        "change": "-512000000",
-        "origin": "block",
-    },
-    {
-        "kind": "freezer",
-        "category": "deposits",
-        "delegate": BAKER_PKH,
-        "cycle": 0,
-        "change": "512000000",
-        "origin": "block",
-    },
-]
+# Invoice in Alpha protocol
 MIGRATION_RECEIPTS: List[object] = [
     {
         "kind": "contract",
@@ -95,8 +79,108 @@ NODE_CONFIG = {
 }
 
 
+def sort(list_of_dicts):
+    # convert the dictionaries in the list to tuples
+    return sorted(tuple(sorted(d.items())) for d in list_of_dicts)
+
+
+DEPOSIT_RECEIPTS = sort(
+    [
+        {"kind": "contract", "contract": BAKER_PKH, "change": "-512000000"},
+        {
+            "kind": "freezer",
+            "category": "deposits",
+            "delegate": BAKER_PKH,
+            "cycle": 0,
+            "change": "512000000",
+        },
+    ]
+)
+# configure user-activate-upgrade at MIGRATION_LEVEL to test migration
+NODE_CONFIG = {
+    'network': {
+        'genesis': {
+            'timestamp': '2018-06-30T16:07:32Z',
+            'block': 'BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2',
+            'protocol': 'ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im',
+        },
+        'genesis_parameters': {
+            'values': {'genesis_pubkey': constants.GENESIS_PK}
+        },
+        'chain_name': 'TEZOS',
+        'sandboxed_chain_name': 'SANDBOXED_TEZOS',
+        'user_activated_upgrades': [
+            {'level': MIGRATION_LEVEL, 'replacement_protocol': PROTO_B}
+        ],
+    }
+}
+
+
+def proto_b_deposit_receipts(baker_hash):
+    return [
+        {
+            "kind": "contract",
+            "contract": baker_hash,
+            "change": "-512000000",
+            "origin": "block",
+        },
+        {
+            "kind": "freezer",
+            "category": "deposits",
+            "baker": baker_hash,
+            "cycle": 0,
+            "change": "512000000",
+            "origin": "block",
+        },
+    ]
+
+
+# Get the receipts for expected moved balances from the original implicit
+# baker contracts to SG1 baker contracts
+def baker_migration_receipts(client, baker_hash):
+    # the baker has the bootstrap balance minus 2 deposits
+    bootstrap_balance = 4_000_000_000_000
+    deposits = 2
+    change = bootstrap_balance - deposits * 512_000_000
+    receipts = [
+        {
+            "kind": "contract",
+            "contract": BAKER_PKH,
+            "change": str(-change),
+            "origin": "migration",
+        },
+        {
+            "kind": "contract",
+            "contract": baker_hash,
+            "change": str(change),
+            "origin": "migration",
+        },
+    ]
+
+    for i in range(2, 6):
+        proto_a_name = f'bootstrap{i}'
+        pkh = constants.IDENTITIES[proto_a_name]['identity']
+        baker = client.find_baker_with_consensus_key(proto_a_name)
+        receipts += [
+            {
+                "kind": "contract",
+                "contract": pkh,
+                "change": str(-bootstrap_balance),
+                "origin": "migration",
+            },
+            {
+                "kind": "contract",
+                "contract": baker,
+                "change": str(bootstrap_balance),
+                "origin": "migration",
+            },
+        ]
+    return receipts
+
+
 @pytest.fixture(scope="class")
-def client(sandbox):
+def client(sandbox: Sandbox):
+
     sandbox.add_node(0, node_config=NODE_CONFIG)
     delay = datetime.timedelta(seconds=3600 * 24 * 365)
     sandbox.client(0).activate_protocol_json(PROTO_A, PARAMETERS, delay=delay)
@@ -106,7 +190,16 @@ def client(sandbox):
 
 @pytest.mark.incremental
 class TestMigration:
-    """Test migration from PROTO_A to PROTO_B."""
+    """Test migration from PROTO_A to PROTO_B.
+
+    After migration, test snapshots:
+        - node0: activate 007, migrate to alpha, bake, export snapshot full
+                 and rolling and terminate
+        - node1: import full, bake
+        - node2: import rolling, sync, bake
+        - node3: reconstruct full, sync, bake
+        - all 4 are synced
+    """
 
     def test_init(self, client):
         # 1: genesis block
@@ -119,7 +212,8 @@ class TestMigration:
         assert client.get_protocol() == PROTO_A
         assert sandbox.client(0).get_head()['header']['proto'] == 1
         metadata = client.get_metadata()
-        assert metadata['balance_updates'] == DEPOSIT_RECEIPTS
+        balance_updates = sort(metadata['balance_updates'])
+        assert balance_updates == DEPOSIT_RECEIPTS
         # PROTO_A is using env. V1, metadata hashes should be present
         _ops_metadata_hash = client.get_operations_metadata_hash()
         _block_metadata_hash = client.get_block_metadata_hash()
@@ -129,7 +223,8 @@ class TestMigration:
         client.bake(BAKER, BAKE_ARGS)
         metadata = client.get_metadata()
         assert metadata['next_protocol'] == PROTO_B
-        assert metadata['balance_updates'] == DEPOSIT_RECEIPTS
+        balance_updates = sort(metadata['balance_updates'])
+        assert balance_updates == DEPOSIT_RECEIPTS
         # PROTO_B is using env. V1, metadata hashes should be present
         _ops_metadata_hash = client.get_operations_metadata_hash()
         _block_metadata_hash = client.get_block_metadata_hash()
@@ -143,9 +238,15 @@ class TestMigration:
 
         # check that migration balance update appears in receipts
         metadata = client.get_metadata()
-        assert metadata['balance_updates'] == (
-            MIGRATION_RECEIPTS + ALPHA_DEPOSIT_RECEIPTS
+        baker_hash = client.find_baker_with_consensus_key(BAKER)
+        balance_updates = sort(metadata['balance_updates'])
+        expected_receipts = sort(
+            MIGRATION_RECEIPTS
+            + baker_migration_receipts(client, baker_hash)
+            + proto_b_deposit_receipts(baker_hash)
         )
+        msg = f"expected:\n{expected_receipts}\n\ngot:\n{balance_updates}"
+        assert expected_receipts == balance_updates, msg
         _ops_metadata_hash = client.get_operations_metadata_hash()
         _block_metadata_hash = client.get_block_metadata_hash()
 
@@ -153,7 +254,11 @@ class TestMigration:
         # 5: second block of PROTO_B
         client.bake(BAKER, BAKE_ARGS)
         metadata = client.get_metadata()
-        assert metadata['balance_updates'] == ALPHA_DEPOSIT_RECEIPTS
+        baker_hash = client.find_baker_with_consensus_key(BAKER)
+        balance_updates = sort(metadata['balance_updates'])
+        expected_receipts = sort(proto_b_deposit_receipts(baker_hash))
+        msg = f"expected:\n{expected_receipts}\n\ngot:\n{balance_updates}"
+        assert expected_receipts == balance_updates, msg
 
     def test_terminate_node0(self, client, sandbox: Sandbox, session: dict):
         # # to export rolling snapshot, we need to be at level > 60

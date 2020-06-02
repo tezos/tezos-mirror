@@ -35,6 +35,7 @@ def node(sandbox):
 @pytest.fixture(scope="class")
 def client(sandbox, node):
     client = sandbox.get_new_client(node)
+    utils.remember_baker_contracts(client)
     return client
 
 
@@ -81,18 +82,6 @@ def non_originated_contract_name():
 @pytest.fixture
 def key_name():
     return "test_key_name"
-
-
-# here baker 'account' has baked a block and has sent 'tx_amount'
-def check_baker_balance(client, account, tx_amount):
-    parameters = dict(protocol.PARAMETERS)
-    initial_amount = float(parameters["bootstrap_accounts"][0][1])
-    deposit = float(parameters["block_security_deposit"])
-    # sender's balance without fees
-    expected_baker_balance = (initial_amount - deposit) / 1000000 - tx_amount
-    baker_balance = client.get_balance(account)
-    # the fees are assumed to be at most 1 tez
-    assert expected_baker_balance - 1 <= baker_balance <= expected_baker_balance
 
 
 @pytest.mark.client
@@ -284,7 +273,7 @@ class TestSaplingShieldedTez:
             args=["--init", "{ }", "--burn-cap", "3.0"],
         )
         session["contract_address"] = origination.contract
-        client.bake(sender, ["--minimal-timestamp"])
+        client.bake("baker1", ["--minimal-timestamp"])
         assert utils.check_block_contains_operations(
             client,
             [origination.operation_hash],
@@ -345,8 +334,10 @@ class TestSaplingShieldedTez:
             contract=contract_name,
             args=["--burn-cap", "3.0"],
         )
-        client.bake("bootstrap2", ["--minimal-timestamp"])
-        check_baker_balance(client, "bootstrap2", TX_AMOUNT)
+        client.bake("baker2", ["--minimal-timestamp"])
+        bootstrap2_balance = client.get_balance("bootstrap2")
+        # Fees
+        assert 3999899 <= bootstrap2_balance <= 3999900
         bob_balance = client.sapling_get_balance(
             key_name="bob", contract_name=contract_name
         ).balance
@@ -413,8 +404,10 @@ class TestSaplingShieldedTez:
                 "3.0",
             ],
         )
-        client.bake("bootstrap3", ["--minimal-timestamp"])
-        check_baker_balance(client, "bootstrap3", TX_AMOUNT)
+        client.bake("baker3", ["--minimal-timestamp"])
+        bootstrap3_balance = client.get_balance("bootstrap3")
+        assert bootstrap3_balance >= 3999899
+        assert bootstrap3_balance <= 3999900
         alice_balance = client.sapling_get_balance(
             key_name="alice", contract_name=contract_name
         ).balance
@@ -496,7 +489,7 @@ class TestSaplingShieldedTez:
             contract=contract_name,
             args=additional_args,
         )
-        client.bake("bootstrap2", ["--minimal-timestamp"])
+        client.bake("baker2", ["--minimal-timestamp"])
 
     @pytest.mark.parametrize(
         "key_name,expected_balance", [("alice", 50.0), ("bob", 150.0)]
@@ -548,7 +541,7 @@ class TestSaplingShieldedTez:
             contract=contract_name,
             args=additional_args,
         )
-        client.bake("bootstrap2", ["--minimal-timestamp"])
+        client.bake("baker2", ["--minimal-timestamp"])
 
     @pytest.mark.parametrize(
         "key_name,expected_balance", [("alice", 0.0), ("bob", 200.0)]
@@ -619,7 +612,7 @@ class TestSaplingShieldedTez:
             contract=contract_name,
             args=["--burn-cap", "3.0"],
         )
-        client.bake("bootstrap2", ['--minimal-timestamp'])
+        client.bake("baker2", ['--minimal-timestamp'])
         bob_balance = client.sapling_get_balance(
             key_name="bob", contract_name=contract_name
         ).balance
@@ -651,7 +644,7 @@ class TestSaplingShieldedTez:
         assert bob_balance == 110.0
 
     @pytest.mark.parametrize(
-        "transparent_signer,baker", [("bootstrap4", "bootstrap2")]
+        "transparent_signer,baker", [("bootstrap4", "baker2")]
     )
     def test_shielded_transfer_using_non_sapling_transfer_method(
         self, client, contract_name, session, transparent_signer, baker, tmpdir
@@ -730,14 +723,14 @@ code {
             contract=str(contract_path),
             args=["--init", '{ }', "--burn-cap", "3.0", "--force"],
         )
-        client.bake("bootstrap1", ["--minimal-timestamp"])
+        client.bake("baker1", ["--minimal-timestamp"])
         client.transfer(
             0,
             giver="bootstrap1",
             receiver=contract_name,
             args=["--arg", "Unit", "--burn-cap", "3.0"],
         )
-        client.bake("bootstrap1", ["--minimal-timestamp"])
+        client.bake("baker1", ["--minimal-timestamp"])
 
     @pytest.mark.parametrize("memo_size", [-1, 65536, 65598909, 908923434])
     def test_originate_with_invalid_size(
@@ -808,7 +801,7 @@ class TestSaplingStateCorruption:
             contract_name="sapling_empty_state",
             args=["--init", "{}", "--burn-cap", "3.0"],
         )
-        client.bake("bootstrap1")
+        client.bake("baker1")
 
     def test_originate_with_id_is_forbidden(self, client):
         contract = path.join(
@@ -847,7 +840,7 @@ class TestSaplingDifferentMemosize:
             contract=contract_path,
             args=["--init", "{ }", "--burn-cap", "3.0"],
         ).contract
-        client.bake(implicit_account, ["--minimal-timestamp"])
+        client.bake("baker1", ["--minimal-timestamp"])
         client.sapling_gen_key(key_name='alice')
         client.sapling_use_key_for_contract(
             'alice', contract_name, memo_size=16
@@ -887,7 +880,7 @@ class TestSaplingRightMemosize:
             contract=contract_path,
             args=["--init", "{ }", "--burn-cap", "3.0"],
         ).contract
-        client.bake(implicit_account, ["--minimal-timestamp"])
+        client.bake("baker1", ["--minimal-timestamp"])
         client.sapling_gen_key(key_name='alice')
         client.sapling_use_key_for_contract('alice', contract_name, memo_size=8)
         address = client.sapling_gen_address(key_name='alice').address
@@ -900,7 +893,7 @@ class TestSaplingRightMemosize:
             contract=contract_address,
             args=["--burn-cap", "3.0"],
         )
-        client.bake("bootstrap2", ["--minimal-timestamp"])
+        client.bake("baker2", ["--minimal-timestamp"])
         # Deriving a new key should work as well since
         # the memo-size is kept
         client.sapling_derive_key(
@@ -917,7 +910,7 @@ class TestSaplingRightMemosize:
             contract=contract_address,
             args=["--burn-cap", "3.0"],
         )
-        client.bake("bootstrap2", ["--minimal-timestamp"])
+        client.bake("baker2", ["--minimal-timestamp"])
         # Now with a too short message
         client.sapling_shield(
             amount=TX_AMOUNT,
@@ -926,7 +919,7 @@ class TestSaplingRightMemosize:
             contract=contract_address,
             args=["--burn-cap", "3.0", "--message", "aB"],
         )
-        client.bake("bootstrap2", ["--minimal-timestamp"])
+        client.bake("baker2", ["--minimal-timestamp"])
         # Now with a right length message
         client.sapling_shield(
             amount=TX_AMOUNT,
@@ -935,7 +928,7 @@ class TestSaplingRightMemosize:
             contract=contract_address,
             args=["--burn-cap", "3.0", "--message", "aBbf19F00a"],
         )
-        client.bake("bootstrap2", ["--minimal-timestamp"])
+        client.bake("baker2", ["--minimal-timestamp"])
         # Now with a too long message
         client.sapling_shield(
             amount=TX_AMOUNT,
@@ -944,4 +937,4 @@ class TestSaplingRightMemosize:
             contract=contract_address,
             args=["--burn-cap", "3.0", "--message", "aBbf19F00aaBbf19F00aC"],
         )
-        client.bake("bootstrap2", ["--minimal-timestamp"])
+        client.bake("baker2", ["--minimal-timestamp"])

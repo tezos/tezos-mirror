@@ -15,3 +15,4 @@ def activate(
     utils.activate_protocol(
         client, HASH, parameters, timestamp, activate_in_the_past
     )
+    utils.remember_baker_contracts(client)

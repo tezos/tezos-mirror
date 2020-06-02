@@ -8,7 +8,7 @@ BAKE_ARGS = ['--minimal-timestamp', '--max-priority', '1024']
 
 ENDORSING_SLOTS_PER_BLOCK = 2048
 NUM_ACCOUNTS = 256
-ACCOUNTS = [f'bootstrap{i}' for i in range(1, NUM_ACCOUNTS + 1)]
+ACCOUNTS = [f'baker{i}' for i in range(1, NUM_ACCOUNTS + 1)]
 MAX_VALIDATION_TIME_MS = 1000
 
 
@@ -20,13 +20,18 @@ def client(sandbox):
         'activator',
         'unencrypted:edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6',
     )
-    bootstrap_accounts = []
+    bootstrap_bakers = []
     for account in ACCOUNTS:
         client.gen_key(account)
         address = sandbox.client(0).show_address(account, show_secret=True)
-        bootstrap_accounts.append([address.public_key, "4000000000000"])
+        bootstrap_bakers.append(
+            {
+                "key": address.public_key,
+                "amount": "4000000000000",
+            }
+        )
     parameters = dict(protocol.PARAMETERS)
-    parameters["bootstrap_accounts"] = bootstrap_accounts
+    parameters["bootstrap_bakers"] = bootstrap_bakers
     parameters["endorsers_per_block"] = ENDORSING_SLOTS_PER_BLOCK
     protocol.activate(client, parameters, activate_in_the_past=True)
     client.logs = sandbox.logs
@@ -44,10 +49,10 @@ class TestManualBaking:
     spurious fails due to slow CI."""
 
     def test_endorse(self, client: Client):
-        client.bake('bootstrap1', BAKE_ARGS)
+        client.bake('baker1', BAKE_ARGS)
         for account in ACCOUNTS:
             client.endorse(account)
-        client.bake('bootstrap1', BAKE_ARGS)
+        client.bake('baker1', BAKE_ARGS)
 
     def test_check_baking_time_from_log(self, client):
         assert client.logs, 'test must be run with "--log-dir LOG_DIR: option'

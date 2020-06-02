@@ -62,6 +62,11 @@ def test_retrieve_addresses(mockup_client: Client):
     """
     addresses = mockup_client.get_known_addresses().wallet
     assert addresses == {
+        'baker1': 'tz1UJbFsTQfdpa1qYrqHG9Ykw834AXi5WqRR',
+        'baker2': 'tz1fWJ2oeeG6h2r61XY1wen2sV87AvCqGjAU',
+        'baker3': 'tz1SERFDUknkjJTas8sUco7dskxWrUWhTc2s',
+        'baker4': 'tz1eJ9yR95LmJgVrGLvgt56T6ngCFcgjLo2S',
+        'baker5': 'tz1cwoRFe3BzJv9nZZBA5fk8uV6w9AVVrBF9',
         'bootstrap1': 'tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx',
         'bootstrap2': 'tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN',
         'bootstrap3': 'tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU',
