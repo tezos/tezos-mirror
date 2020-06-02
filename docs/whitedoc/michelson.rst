@@ -1526,6 +1526,8 @@ Domain specific data types
 
 -  ``key_hash``: The hash of a public cryptographic key.
 
+-  ``baker_hash``: A baker's identifier hash.
+
 -  ``signature``: A cryptographic signature.
 
 -  ``chain_id``: An identifier for a chain, used to distinguish the test and the main chains.
@@ -1654,7 +1656,7 @@ Operations on contracts
 
 ::
 
-    :: option key_hash : mutez : 'g : 'S
+    :: option baker_hash : mutez : 'g : 'S
        -> operation : address : 'S
 
 Originate a contract based on a literal. The parameters are the
@@ -1679,15 +1681,15 @@ contract, unit for an account.
 
 ::
 
-    :: option key_hash : 'S   ->   operation : 'S
+    :: option baker_hash : 'S   ->   operation : 'S
 
 Using this instruction is the only way to modify the delegation of a
 smart contract. If the parameter is `None` then the delegation of the
-current contract is withdrawn; if it is `Some kh` where `kh` is the
-key hash of a registered delegate that is not the current delegate of
+current contract is withdrawn; if it is `Some baker` where `baker` is the
+baker hash of a registered delegate that is not the current delegate of
 the contract, then this operation sets the delegate of the contract to
-this registered delegate. The operation fails if `kh` is the current
-delegate of the contract or if `kh` is not a registered delegate.
+this registered delegate. The operation fails if `baker` is the current
+delegate of the contract or if `baker` is not a registered baker.
 
 -  ``BALANCE``: Push the current amount of mutez held by the executing
     contract, including any mutez added by the calling transaction.
@@ -1776,13 +1778,13 @@ of the contract in which the ``SELF_ADDRESS`` instruction is written.
 
     :: key_hash : 'S   ->   contract unit : 'S
 
-- ``VOTING_POWER``: Return the voting power of a given contract. This voting power
+- ``VOTING_POWER``: Return the voting power of a given baker. This voting power
    coincides with the weight of the contract in the voting listings (i.e., the rolls
    count) which is calculated at the beginning of every voting period.
 
 ::
 
-    :: key_hash : 'S   ->   nat : 'S
+    :: baker_hash : 'S   ->   nat : 'S
 
 Special operations
 ~~~~~~~~~~~~~~~~~~
@@ -2034,6 +2036,27 @@ parameter if the sender is the contract's manager.
 ::
 
     :: 'S   ->   nat : 'S
+
+-  ``CREATE_CONTRACT { storage 'g ; parameter 'p ; code ... }``:
+   Forge a new contract from a literal.
+
+::
+
+    :: option key_hash : mutez : 'g : 'S
+       -> operation : address : 'S
+
+Originate a contract based on a literal. The parameters are the
+optional delegate, the initial amount taken from the current
+contract, and the initial storage of the originated contract.
+The contract is returned as a first class value (to be dropped, passed
+as parameter or stored). The ``CONTRACT 'p`` instruction will fail
+until it is actually originated.
+
+-  ``SET_DELEGATE``: Set or withdraw the contract's delegation.
+
+::
+
+    :: option key_hash : 'S   ->   operation : 'S
 
 
 Macros
@@ -3083,11 +3106,11 @@ using the Coq proof assistant.
                          (mutez %amount) # amount to transfer
                          (contract %dest unit)) # destination to transfer to
                       (or
-                         (option %delegate key_hash) # change the delegate to this address
-                         (pair %change_keys          # change the keys controlling the multisig
-                            (nat %threshold)         # new threshold
-                            (list %keys key)))))     # new list of keys
-                (list %sigs (option signature)));    # signatures
+                         (option %delegate baker_hash) # change the delegate to this address
+                         (pair %change_keys            # change the keys controlling the multisig
+                            (nat %threshold)           # new threshold
+                            (list %keys key)))))       # new list of keys
+                (list %sigs (option signature)));      # signatures
 
    storage (pair (nat %stored_counter) (pair (nat %threshold) (list %keys key))) ;
 
