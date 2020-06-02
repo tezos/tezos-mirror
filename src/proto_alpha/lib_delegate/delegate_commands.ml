@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,7 +24,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Protocol
+open Alpha_context
 open Client_proto_args
+open Client_proto_contracts
 open Client_baking_lib
 
 let group =
@@ -86,6 +90,16 @@ let keep_alive_arg =
     ~long:"keep-alive"
     ()
 
+let preload_baker_keys_arg =
+  Clic.switch
+    ~doc:
+      "When at least one baker contract is specified that is using an \
+       encrypted consensus key, prompt for password at start-up, rather than \
+       when baking a block."
+    ~short:'P'
+    ~long:"preload-keys"
+    ()
+
 let delegate_commands () =
   let open Clic in
   [ command
@@ -101,9 +115,9 @@ let delegate_commands () =
          mempool_arg
          context_path_arg)
       ( prefixes ["bake"; "for"]
-      @@ Client_keys.Public_key_hash.source_param
+      @@ Baker_or_pkh_alias.source_param
            ~name:"baker"
-           ~desc:"name of the delegate owning the baking right"
+           ~desc:"name of the baker owning the baking right"
       @@ stop )
       (fun ( max_priority,
              minimal_fees,
@@ -113,8 +127,10 @@ let delegate_commands () =
              minimal_timestamp,
              mempool,
              context_path )
-           delegate
+           baker_contract
            cctxt ->
+        baker_of_contract cctxt baker_contract
+        >>=? fun baker_hash ->
         bake_block
           cctxt
           ~minimal_fees
@@ -127,7 +143,7 @@ let delegate_commands () =
           ?context_path
           ~chain:cctxt#chain
           ~head:cctxt#block
-          delegate);
+          baker_hash);
     command
       ~group
       ~desc:"Forge and inject a seed-nonce revelation operation."
@@ -152,12 +168,14 @@ let delegate_commands () =
       ~desc:"Forge and inject an endorsement operation."
       no_options
       ( prefixes ["endorse"; "for"]
-      @@ Client_keys.Public_key_hash.source_param
+      @@ Baker_or_pkh_alias.source_param
            ~name:"baker"
-           ~desc:"name of the delegate owning the endorsement right"
+           ~desc:"name of the baker owning the endorsement right"
       @@ stop )
-      (fun () delegate cctxt ->
-        endorse_block cctxt ~chain:cctxt#chain delegate);
+      (fun () baker_contract cctxt ->
+        baker_of_contract cctxt baker_contract
+        >>=? fun baker_hash ->
+        endorse_block cctxt ~chain:cctxt#chain baker_hash);
     command
       ~group
       ~desc:
@@ -234,7 +252,67 @@ let delegate_commands () =
               (Block_hash.Map.cardinal orphan_nonces)
               (Format.pp_print_list ~pp_sep:Format.pp_print_cut Block_hash.pp)
               block_hashes
-            >>= fun () -> return_unit)) ]
+            >>= fun () -> return_unit));
+    command
+      ~group
+      ~desc:
+        "Find baker with the given hash of consensus key. Note that the \
+         consensus key has to be active."
+      no_options
+      ( prefixes ["find"; "baker"; "with"; "consensus"; "key"]
+      @@ Client_keys.Public_key_hash.source_param @@ stop )
+      (fun () baker_pkh (cctxt : #Protocol_client_context.full) ->
+        baker_of_contract cctxt (Contract.implicit_contract baker_pkh)
+        >>=? fun baker_hash ->
+        cctxt#message "Found baker: %a" Baker_hash.pp baker_hash
+        >>= fun () -> return_unit) ]
+
+let remove_duplicates :
+    #Protocol_client_context.full ->
+    Contract.t list ->
+    Contract.t list tzresult Lwt.t =
+ fun cctxt bakers ->
+  let module Contract_set = Set.Make (Contract) in
+  let unique_bakers = Contract_set.(bakers |> of_list |> elements) in
+  ( if List.length bakers <> List.length unique_bakers then
+    cctxt#message
+      "Warning: the list of bakers contains duplicates, which are ignored"
+  else Lwt.return () )
+  >>= fun () -> return unique_bakers
+
+let preload_keys :
+    #Protocol_client_context.full -> Contract.t list -> unit tzresult Lwt.t =
+ fun cctxt contracts ->
+  List.fold_left_es
+    (fun acc contract ->
+      match Contract.is_baker contract with
+      | Some baker -> (
+          Alpha_services.Baker.consensus_key cctxt (cctxt#chain, `Head 0) baker
+          >>=? fun consensus_pk ->
+          Client_keys.get_key cctxt (Signature.Public_key.hash consensus_pk)
+          >>=? fun (consensus_key_name, _pk, _sk_uri) ->
+          Alpha_services.Baker.pending_consensus_key
+            cctxt
+            (cctxt#chain, `Head 0)
+            baker
+          >>=? function
+          | None ->
+              return @@ (consensus_key_name :: acc)
+          | Some (pending_pk, _cycle) ->
+              Client_keys.get_key cctxt (Signature.Public_key.hash pending_pk)
+              >|=? fun (pending_key_name, _pk, _sk_uri) ->
+              consensus_key_name :: pending_key_name :: acc )
+      | None -> (
+        match Contract.is_implicit contract with
+        | Some pkh ->
+            Client_keys.Public_key_hash.name cctxt pkh
+            >|=? fun name -> name :: acc
+        | None ->
+            return acc ))
+    []
+    contracts
+  >>=? fun key_names ->
+  Tezos_signer_backends.Encrypted.decrypt_list cctxt key_names
 
 let baker_commands () =
   let open Clic in
@@ -247,33 +325,35 @@ let baker_commands () =
   [ command
       ~group
       ~desc:"Launch the baker daemon."
-      (args6
+      (args7
          pidfile_arg
          max_priority_arg
          minimal_fees_arg
          minimal_nanotez_per_gas_unit_arg
          minimal_nanotez_per_byte_arg
-         keep_alive_arg)
+         keep_alive_arg
+         preload_baker_keys_arg)
       ( prefixes ["run"; "with"; "local"; "node"]
       @@ param
            ~name:"context_path"
            ~desc:"Path to the node data directory (e.g. $HOME/.tezos-node)"
            directory_parameter
-      @@ seq_of_param Client_keys.Public_key_hash.alias_param )
+      @@ seq_of_param Baker_or_pkh_alias.source_param )
       (fun ( pidfile,
              max_priority,
              minimal_fees,
              minimal_nanotez_per_gas_unit,
              minimal_nanotez_per_byte,
-             keep_alive )
+             keep_alive,
+             preload_baker_keys )
            node_path
-           delegates
+           bakers
            cctxt ->
         may_lock_pidfile pidfile
         >>=? fun () ->
-        Tezos_signer_backends.Encrypted.decrypt_list
-          cctxt
-          (List.map fst delegates)
+        remove_duplicates cctxt bakers
+        >>=? fun bakers ->
+        (if preload_baker_keys then preload_keys cctxt bakers else return_unit)
         >>=? fun () ->
         Client_daemon.Baker.run
           cctxt
@@ -284,7 +364,7 @@ let baker_commands () =
           ?max_priority
           ~context_path:(Filename.concat node_path "context")
           ~keep_alive
-          (List.map snd delegates)) ]
+          bakers) ]
 
 let endorser_commands () =
   let open Clic in
@@ -297,31 +377,27 @@ let endorser_commands () =
   [ command
       ~group
       ~desc:"Launch the endorser daemon"
-      (args3 pidfile_arg endorsement_delay_arg keep_alive_arg)
-      (prefixes ["run"] @@ seq_of_param Client_keys.Public_key_hash.alias_param)
-      (fun (pidfile, endorsement_delay, keep_alive) delegates cctxt ->
+      (args4
+         pidfile_arg
+         endorsement_delay_arg
+         keep_alive_arg
+         preload_baker_keys_arg)
+      (prefixes ["run"] @@ seq_of_param Baker_or_pkh_alias.source_param)
+      (fun (pidfile, endorsement_delay, keep_alive, preload_baker_keys)
+           bakers
+           cctxt ->
         may_lock_pidfile pidfile
         >>=? fun () ->
-        Tezos_signer_backends.Encrypted.decrypt_list
-          cctxt
-          (List.map fst delegates)
+        remove_duplicates cctxt bakers
+        >>=? fun bakers ->
+        (if preload_baker_keys then preload_keys cctxt bakers else return_unit)
         >>=? fun () ->
-        let delegates = List.map snd delegates in
-        let delegates_no_duplicates =
-          Signature.Public_key_hash.Set.(delegates |> of_list |> elements)
-        in
-        ( if List.length delegates <> List.length delegates_no_duplicates then
-          cctxt#message
-            "Warning: the list of public key hash aliases contains duplicate \
-             hashes, which are ignored"
-        else Lwt.return () )
-        >>= fun () ->
         Client_daemon.Endorser.run
           cctxt
           ~chain:cctxt#chain
           ~delay:endorsement_delay
           ~keep_alive
-          delegates_no_duplicates) ]
+          bakers) ]
 
 let accuser_commands () =
   let open Clic in
