@@ -90,18 +90,18 @@ let rec t : type a. a t -> a size_of =
   | Custom c -> c.size_of ?headers e
   | Map b -> map ?headers b e
   | Prim t -> prim ?headers t e
-  | List l -> list (t l.v ?headers:None) l.len e
-  | Array a -> array (t a.v ?headers:None) a.len e
+  | List l -> list (t l.v) l.len e
+  | Array a -> array (t a.v) a.len e
   | Tuple t -> tuple ?headers t e
-  | Option x -> option (t x ?headers:None) e
+  | Option x -> option (t x) e
   | Record r -> record ?headers r e
   | Variant v -> variant ?headers v e
 
 and tuple : type a. a tuple -> a size_of =
  fun ty ?headers:_ ->
   match ty with
-  | Pair (x, y) -> pair (t x ?headers:None) (t y ?headers:None)
-  | Triple (x, y, z) -> triple (t x ?headers:None) (t y ?headers:None) (t z ?headers:None)
+  | Pair (x, y) -> pair (t x) (t y)
+  | Triple (x, y, z) -> triple (t x) (t y) (t z)
 
 and map : type a b. (a, b) map -> b size_of =
  fun { x; g; _ } ?headers u -> t ?headers x (g u)
