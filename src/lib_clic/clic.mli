@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -409,6 +410,19 @@ val seq_of_param :
   (('ctx -> unit tzresult Lwt.t, 'ctx) params ->
   ('a -> 'ctx -> unit tzresult Lwt.t, 'ctx) params) ->
   ('a list -> 'ctx -> unit tzresult Lwt.t, 'ctx) params
+
+(** Take a sequence of parameters followed by suffix keywords and further
+    parameters. On execution, the suffix will be attempted to be matched before
+    the sequence's parameters. Because of this, care must be taken that the
+    sequence's parameters cannot be interpreted as the suffix keywords. For
+    example, it shouldn't be used with parameters that can be arbitrary strings
+    such as aliases. *)
+val non_terminal_seq :
+  suffix:string list ->
+  (('ctx -> unit tzresult Lwt.t, 'ctx) params ->
+  ('a -> 'ctx -> unit tzresult Lwt.t, 'ctx) params) ->
+  ('b -> 'c, 'ctx) params ->
+  ('a list -> 'b -> 'c, 'ctx) params
 
 (** Parameter that expects a string *)
 val string :
