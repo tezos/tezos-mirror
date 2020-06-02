@@ -977,64 +977,125 @@ let commands version () =
             >>=? fun _res -> return_unit);
     command
       ~group
-      ~desc:"Register the public key hash as a delegate."
-      (args9
+      ~desc:"Register a new baker contract."
+      (args13
          fee_arg
          dry_run_switch
          verbose_signing_switch
+         gas_limit_arg
+         storage_limit_arg
+         (Client_keys.force_switch ())
+         no_print_source_flag
          minimal_fees_arg
          minimal_nanotez_per_byte_arg
          minimal_nanotez_per_gas_unit_arg
          force_low_fee_arg
          fee_cap_arg
          burn_cap_arg)
-      ( prefixes ["register"; "key"]
-      @@ Public_key_hash.source_param ~name:"mgr" ~desc:"the delegate key"
-      @@ prefixes ["as"; "delegate"]
-      @@ stop )
+      ( prefixes ["register"; "baker"]
+      @@ Raw_contract_alias.fresh_alias_param
+           ~name:"alias"
+           ~desc:"name of the new contract"
+      @@ prefix "transferring"
+      @@ tez_param ~name:"qty" ~desc:"amount taken from source"
+      @@ prefix "from"
+      @@ Contract_alias.destination_param
+           ~name:"src"
+           ~desc:"name of the source contract"
+      @@ prefixes ["with"; "consensus"; "key"]
+      @@ Client_keys.Public_key.source_param
+           ~name:"key"
+           ~desc:"consensus key, used for baking and endorsing"
+      @@ prefixes ["and"; "threshold"]
+      @@ Clic.param
+           ~name:"threshold"
+           ~desc:"Number of required signatures for calling baker contract"
+           Client_proto_args.int_parameter
+      @@ prefixes ["and"; "owner"; "keys"]
+      @@ seq_of_param
+           (Client_keys.Public_key.source_param
+              ~name:"key"
+              ~desc:"Each signer of the baker contract") )
       (fun ( fee,
              dry_run,
              verbose_signing,
+             gas_limit,
+             storage_limit,
+             force,
+             no_print_source,
              minimal_fees,
              minimal_nanotez_per_byte,
              minimal_nanotez_per_gas_unit,
              force_low_fee,
              fee_cap,
              burn_cap )
-           src_pkh
+           alias_name
+           balance
+           (_, source)
+           (consensus_key_uri, consensus_key)
+           threshold
+           owner_keys
            cctxt ->
-        Client_keys.get_key cctxt src_pkh
-        >>=? fun (_, src_pk, src_sk) ->
-        let fee_parameter =
-          {
-            Injection.minimal_fees;
-            minimal_nanotez_per_byte;
-            minimal_nanotez_per_gas_unit;
-            force_low_fee;
-            fee_cap;
-            burn_cap;
-          }
-        in
-        register_as_delegate
-          cctxt
-          ~chain:cctxt#chain
-          ~block:cctxt#block
-          ?confirmations:cctxt#confirmations
-          ~dry_run
-          ~fee_parameter
-          ~verbose_signing
-          ?fee
-          ~manager_sk:src_sk
-          src_pk
-        >>= function
-        | Ok _ ->
-            return_unit
-        | Error [Environment.Ecoproto_error Delegate_storage.Active_delegate]
-          ->
-            cctxt#message "Delegate already activated."
-            >>= fun () -> return_unit
-        | Error el ->
-            Lwt.return_error el) ]
+        match Contract.is_implicit source with
+        | None ->
+            failwith
+              "only implicit accounts can be the source of a baker registration"
+        | Some source -> (
+            Raw_contract_alias.of_fresh cctxt force alias_name
+            >>=? fun alias_name ->
+            Client_keys.get_key cctxt source
+            >>=? fun (_, src_pk, src_sk) ->
+            let fee_parameter =
+              {
+                Injection.minimal_fees;
+                minimal_nanotez_per_byte;
+                minimal_nanotez_per_gas_unit;
+                force_low_fee;
+                fee_cap;
+                burn_cap;
+              }
+            in
+            map_s (fun (pk_uri, _) -> Client_keys.public_key pk_uri) owner_keys
+            >>=? fun owner_keys ->
+            ( match consensus_key with
+            | None ->
+                Client_keys.public_key consensus_key_uri
+            | Some consensus_key ->
+                return consensus_key )
+            >>=? fun consensus_key ->
+            register_baker
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ?confirmations:cctxt#confirmations
+              ~dry_run
+              ~verbose_signing
+              ?fee
+              ?gas_limit
+              ?storage_limit
+              ~balance
+              ~source
+              ~src_pk
+              ~src_sk
+              ~fee_parameter
+              ~consensus_key
+              ~threshold
+              ~owner_keys
+              ()
+            >>= fun errors ->
+            report_michelson_errors
+              ~no_print_source
+              ~msg:"baker registration simulation failed"
+              cctxt
+              errors
+            >>= function
+            | None ->
+                return_unit
+            | Some (_res, contract) ->
+                if dry_run then return_unit
+                else
+                  save_contract ~force cctxt alias_name contract
+                  >>=? fun () -> return_unit )) ]
   @ ( if version = Some `Mainnet then []
     else
       [ command

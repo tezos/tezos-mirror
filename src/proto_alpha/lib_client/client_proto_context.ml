@@ -309,6 +309,38 @@ let originate_contract (cctxt : #full) ~chain ~block ?confirmations ?dry_run
         "The origination introduced %d contracts instead of one."
         (List.length contracts)
 
+let register_baker (cctxt : #full) ~chain ~block ?confirmations ?dry_run
+    ?verbose_signing ?branch ?fee ?gas_limit ?storage_limit ~balance ~source
+    ~src_pk ~src_sk ~fee_parameter ~consensus_key ~threshold ~owner_keys () =
+  let origination =
+    Baker_registration {credit = balance; consensus_key; threshold; owner_keys}
+  in
+  Injection.inject_manager_operation
+    cctxt
+    ~chain
+    ~block
+    ?confirmations
+    ?dry_run
+    ?verbose_signing
+    ?branch
+    ~source
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~src_pk
+    ~src_sk
+    ~fee_parameter
+    origination
+  >>=? fun ((_oph, _op, result) as res) ->
+  Lwt.return (Injection.originated_contracts (Single_result result))
+  >>=? function
+  | [contract] ->
+      return (res, contract)
+  | contracts ->
+      failwith
+        "The baker registration introduced %d contracts instead of one."
+        (List.length contracts)
+
 type activation_key = {
   pkh : Ed25519.Public_key_hash.t;
   amount : Tez.t;
