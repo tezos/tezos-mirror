@@ -41,6 +41,7 @@ type action =
   | Submit_proposals of Protocol_hash.t list
   | Submit_ballot of Protocol_hash.t * Vote.ballot
   | Set_active of bool
+  | Toggle_delegations of bool
   | Set_consensus_key of Signature.Public_key.t
   | Set_owner_keys of Z.t * Signature.Public_key.t list
   | Set_pvss_key of Pvss_secp256k1.Public_key.t

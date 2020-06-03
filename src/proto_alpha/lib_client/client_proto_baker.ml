@@ -43,6 +43,7 @@ type action =
   | Submit_proposals of Protocol_hash.t list
   | Submit_ballot of Protocol_hash.t * Vote.ballot
   | Set_active of bool
+  | Toggle_delegations of bool
   | Set_consensus_key of Signature.Public_key.t
   | Set_owner_keys of Z.t * Signature.Public_key.t list
   | Set_pvss_key of Pvss_secp256k1.Public_key.t
@@ -313,6 +314,19 @@ let mk_payload ~stored_counter ~action =
                  Prim (0, I_NIL, [Prim (0, T_baker_operation, [], [])], []);
                  Prim (0, I_PUSH, [Prim (0, T_bool, [], []); active], []);
                  Prim (0, I_SET_BAKER_ACTIVE, [], []);
+                 Prim (0, I_CONS, [], []);
+                 Prim (0, I_NIL, [Prim (0, T_operation, [], [])], []);
+                 Prim (0, I_PAIR, [], []) ] )
+    | Toggle_delegations accept ->
+        let accept = bool ~loc accept in
+        left ~loc
+        @@ (* [tezos-client convert data '{ DROP ; NIL baker_operation ; PUSH bool True ; SET_BAKER_ACCEPT_DELEGATIONS ; CONS ; NIL operation ; PAIR }' from michelson to ocaml --type 'lambda unit (pair (list operation) (list baker_operation))' --zero-loc] *)
+           Seq
+             ( 0,
+               [ Prim (0, I_DROP, [], []);
+                 Prim (0, I_NIL, [Prim (0, T_baker_operation, [], [])], []);
+                 Prim (0, I_PUSH, [Prim (0, T_bool, [], []); accept], []);
+                 Prim (0, I_TOGGLE_BAKER_DELEGATIONS, [], []);
                  Prim (0, I_CONS, [], []);
                  Prim (0, I_NIL, [Prim (0, T_operation, [], [])], []);
                  Prim (0, I_PAIR, [], []) ] )
