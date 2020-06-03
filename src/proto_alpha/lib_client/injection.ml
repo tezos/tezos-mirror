@@ -396,6 +396,8 @@ let estimated_gas_single (type kind)
         Ok consumed_gas
     | Applied (Set_baker_active_result {consumed_gas; _}) ->
         Ok consumed_gas
+    | Applied (Toggle_baker_delegations_result {consumed_gas; _}) ->
+        Ok consumed_gas
     | Applied (Set_baker_consensus_key_result {consumed_gas; _}) ->
         Ok consumed_gas
     | Applied (Set_baker_pvss_key_result {consumed_gas; _}) ->
@@ -462,6 +464,8 @@ let estimated_storage_single (type kind) origination_size
     | Applied (Baker_ballot_result _) ->
         Ok Z.zero
     | Applied (Set_baker_active_result _) ->
+        Ok Z.zero
+    | Applied (Toggle_baker_delegations_result _) ->
         Ok Z.zero
     | Applied (Set_baker_consensus_key_result _) ->
         Ok Z.zero
