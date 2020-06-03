@@ -613,16 +613,19 @@ module Writer = struct
     in
     Lwt_canceler.on_cancel st.canceler (fun () ->
         Lwt_pipe.close st.messages ;
-        while not (Lwt_pipe.is_empty st.messages) do
+        let rec loop () =
           match Lwt_pipe.pop_now st.messages with
-          | None ->
-              assert false
-          | Some (_, None) ->
+          | exception Lwt_pipe.Closed ->
               ()
+          | None ->
+              ()
+          | Some (_, None) ->
+              loop ()
           | Some (_, Some w) ->
-              Lwt.wakeup_later w (error (Exn Lwt_pipe.Closed))
-        done ;
-        Lwt.return_unit) ;
+              Lwt.wakeup_later w (error (Exn Lwt_pipe.Closed)) ;
+              loop ()
+        in
+        loop () ; Lwt.return_unit) ;
     st.worker <-
       Lwt_utils.worker
         "writer"
