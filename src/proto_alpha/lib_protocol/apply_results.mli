@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -173,6 +174,11 @@ and _ successful_baker_operation_result =
       consumed_gas : Gas.Arith.fp;
     }
       -> Kind.set_baker_active successful_baker_operation_result
+  | Toggle_baker_delegations_result : {
+      accept : bool;
+      consumed_gas : Gas.Arith.fp;
+    }
+      -> Kind.toggle_baker_delegations successful_baker_operation_result
   | Set_baker_consensus_key_result : {
       consumed_gas : Gas.Arith.fp;
     }
