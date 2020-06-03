@@ -628,7 +628,11 @@ class TestContractOpcodes:
             ('pexec_2.tz', "{ 0 ; 1 ; 2 ; 3}", '4', "{ 0 ; 7 ; 14 ; 21 }"),
 
             # Test CHAIN_ID
-            ('chain_id_store.tz', 'None', 'Unit', '(Some 0x7a06a770)'),
+            ('chain_id_store.tz', 'None', 'Unit', '(Some "NetXdQprcVkpaWU")'),
+            ('chain_id_store.tz', '(Some 0x7a06a770)', 'Unit',
+             '(Some "NetXdQprcVkpaWU")'),
+            ('chain_id_store.tz', '(Some "NetXdQprcVkpaWU")', 'Unit',
+             '(Some "NetXdQprcVkpaWU")'),
 
             # Test SELF
             ('self_with_entrypoint.tz', 'Unit', 'Left (Left 0)', 'Unit'),
