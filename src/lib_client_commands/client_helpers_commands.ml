@@ -61,4 +61,32 @@ let commands () =
         no_options
         (prefixes ["bootstrapped"] @@ stop)
         (fun () (cctxt : #Client_context.full) ->
-          Client_confirmations.wait_for_bootstrapped cctxt) ]
+          Client_confirmations.wait_for_bootstrapped cctxt);
+      command
+        ~desc:"Computes the chain id corresponding to a block hash."
+        no_options
+        ( prefixes ["compute"; "chain"; "id"; "from"; "block"; "hash"]
+        @@ string
+             ~name:"hash"
+             ~desc:"the block hash from which to compute the chain id"
+        @@ stop )
+        (fun () block_hash_str (cctxt : #Client_context.full) ->
+          Lwt.return (Tezos_crypto.Block_hash.of_b58check block_hash_str)
+          >>=? fun block_hash ->
+          let chain_id = Tezos_crypto.Chain_id.of_block_hash block_hash in
+          cctxt#message "%a" Tezos_crypto.Chain_id.pp chain_id
+          >>= fun () -> return_unit);
+      command
+        ~desc:"Computes a chain id from a seed"
+        no_options
+        ( prefixes ["compute"; "chain"; "id"; "from"; "seed"]
+        @@ string
+             ~name:"string"
+             ~desc:"the seed from which to compute the chain id"
+        @@ stop )
+        (fun () seed_str (cctxt : #Client_context.full) ->
+          let chain_id =
+            Tezos_crypto.Chain_id.hash_bytes [Bytes.of_string seed_str]
+          in
+          cctxt#message "%a" Tezos_crypto.Chain_id.pp chain_id
+          >>= fun () -> return_unit) ]
