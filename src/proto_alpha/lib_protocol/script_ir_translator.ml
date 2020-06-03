@@ -5146,12 +5146,17 @@ let rec unparse_data :
       in
       Lwt.return (Gas.consume ctxt (Unparse_costs.operation bytes))
       >>=? fun ctxt -> return (Bytes (-1, bytes), ctxt)
-  | (Chain_id_t _, chain_id) ->
-      let bytes =
-        Data_encoding.Binary.to_bytes_exn Chain_id.encoding chain_id
-      in
-      Lwt.return (Gas.consume ctxt (Unparse_costs.chain_id bytes))
-      >>=? fun ctxt -> return (Bytes (-1, bytes), ctxt)
+  | (Chain_id_t _, chain_id) -> (
+      Lwt.return (Gas.consume ctxt Unparse_costs.chain_id)
+      >>=? fun ctxt ->
+      match mode with
+      | Optimized ->
+          let bytes =
+            Data_encoding.Binary.to_bytes_exn Chain_id.encoding chain_id
+          in
+          return (Bytes (-1, bytes), ctxt)
+      | Readable ->
+          return (String (-1, Chain_id.to_b58check chain_id), ctxt) )
   | (Pair_t ((tl, _, _), (tr, _, _), _), (l, r)) ->
       Lwt.return (Gas.consume ctxt Unparse_costs.pair)
       >>=? fun ctxt ->
