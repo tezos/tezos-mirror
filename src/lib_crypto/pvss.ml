@@ -435,13 +435,13 @@ module MakePvss (G : CYCLIC_GROUP) : PVSS = struct
       *)
       List.fold_left
         (fun acc indice ->
-          let open G.Z_m in
-          if indice = i then acc
+          if G.Z_m.( = ) indice i then acc
           else
-            match inv (indice - i) with
+            match G.Z_m.(inv (indice - i)) with
             | None ->
                 failwith "Unexpected error inverting scalar."
             | Some inverse ->
+                let open G.Z_m in
                 acc * indice * inverse)
         G.Z_m.one
         indices
