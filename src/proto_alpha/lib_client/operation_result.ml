@@ -231,6 +231,16 @@ let pp_baker_operation_content (type kind) baker pp_result ppf
         active
         pp_result
         result
+  | Toggle_baker_delegations accept ->
+      Format.fprintf
+        ppf
+        "@[<v 2>Toggle baker delegations:@,Baker: %a@,Accept: %a%a@]"
+        Baker_hash.pp
+        baker
+        Format.pp_print_bool
+        accept
+        pp_result
+        result
   | Set_baker_consensus_key key ->
       Format.fprintf
         ppf
@@ -594,6 +604,18 @@ let pp_manager_operation_contents_and_result ppf
           "@[<v 0>The baker %s was BACKTRACKED, its expected effects were NOT \
            applied.@]"
           (if active then "activation" else "deactivation")
+    | Applied (Toggle_baker_delegations_result {accept; consumed_gas}) ->
+        Format.fprintf
+          ppf
+          "The baker was successfully set to %s new delegations"
+          (if accept then "accept" else "decline") ;
+        Format.fprintf ppf "@,Consumed gas: %s" (Z.to_string consumed_gas)
+    | Backtracked (Toggle_baker_delegations_result {accept; _}, _) ->
+        Format.fprintf
+          ppf
+          "@[<v 0>The baker set to %s new delegations was BACKTRACKED, its \
+           expected effects were NOT applied.@]"
+          (if accept then "accept" else "decline")
     | Applied (Set_baker_consensus_key_result {consumed_gas}) ->
         Format.fprintf ppf "The baker consensus key was successfully set" ;
         Format.fprintf ppf "@,Consumed gas: %s" (Z.to_string consumed_gas)
