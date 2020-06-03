@@ -721,7 +721,7 @@ module Cost_of = struct
 
     let operation bytes = Script.bytes_node_cost bytes
 
-    let chain_id bytes = Script.bytes_node_cost bytes
+    let chain_id = string_cost 15
 
     let key = string_cost 54
 

@@ -282,7 +282,7 @@ module Cost_of : sig
 
     val operation : MBytes.t -> Gas.cost
 
-    val chain_id : MBytes.t -> Gas.cost
+    val chain_id : Gas.cost
 
     val contract : Gas.cost
 
