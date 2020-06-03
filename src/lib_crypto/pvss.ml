@@ -382,10 +382,10 @@ module MakePvss (G : CYCLIC_GROUP) : PVSS = struct
         |> List.fold_left G.( * ) G.e
         *)
         List.fold_left
-          (fun (j, acc) cC ->
+          (fun (power, acc) cC ->
             let open G in
-            (j + 1, acc * pow cC (G.Z_m.pow i (Z.of_int j))))
-          (0, G.e)
+            (Z_m.( * ) power i, acc * pow cC power))
+          (G.Z_m.one, G.e)
           cC_j
         |> snd
       in
