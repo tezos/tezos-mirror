@@ -1164,6 +1164,8 @@ module Kind : sig
 
   type set_baker_active = Set_baker_active_kind
 
+  type toggle_baker_delegations = Toggle_baker_delegations_kind
+
   type set_baker_consensus_key = Set_baker_consensus_key_kind
 
   type set_baker_pvss_key = Set_baker_pvss_key_kind
@@ -1181,6 +1183,7 @@ module Kind : sig
     | Baker_proposals_kind : proposals baker
     | Baker_ballot_kind : ballot baker
     | Set_baker_active_baker_kind : set_baker_active baker
+    | Toggle_baker_delegations_baker_kind : toggle_baker_delegations baker
     | Set_baker_consensus_key_baker_kind : set_baker_consensus_key baker
     | Set_baker_pvss_key_baker_kind : set_baker_pvss_key baker
 end
@@ -1295,6 +1298,9 @@ and _ baker_operation =
     }
       -> Kind.ballot baker_operation
   | Set_baker_active : bool -> Kind.set_baker_active baker_operation
+  | Toggle_baker_delegations :
+      bool
+      -> Kind.toggle_baker_delegations baker_operation
   | Set_baker_consensus_key :
       public_key
       -> Kind.set_baker_consensus_key baker_operation
@@ -1511,6 +1517,8 @@ module Operation : sig
       val baker_ballot_case : Kind.ballot case
 
       val set_baker_active_case : Kind.set_baker_active case
+
+      val toggle_baker_delegations_case : Kind.toggle_baker_delegations case
 
       val set_baker_consensus_key_case : Kind.set_baker_consensus_key case
 

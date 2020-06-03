@@ -58,6 +58,8 @@ module Kind = struct
 
   type set_baker_active = Set_baker_active_kind
 
+  type toggle_baker_delegations = Toggle_baker_delegations_kind
+
   type set_baker_consensus_key = Set_baker_consensus_key_kind
 
   type set_baker_pvss_key = Set_baker_pvss_key_kind
@@ -75,6 +77,7 @@ module Kind = struct
     | Baker_proposals_kind : proposals baker
     | Baker_ballot_kind : ballot baker
     | Set_baker_active_baker_kind : set_baker_active baker
+    | Toggle_baker_delegations_baker_kind : toggle_baker_delegations baker
     | Set_baker_consensus_key_baker_kind : set_baker_consensus_key baker
     | Set_baker_pvss_key_baker_kind : set_baker_pvss_key baker
 end
@@ -193,6 +196,9 @@ and _ baker_operation =
     }
       -> Kind.ballot baker_operation
   | Set_baker_active : bool -> Kind.set_baker_active baker_operation
+  | Toggle_baker_delegations :
+      bool
+      -> Kind.toggle_baker_delegations baker_operation
   | Set_baker_consensus_key :
       Signature.Public_key.t
       -> Kind.set_baker_consensus_key baker_operation
@@ -226,6 +232,8 @@ let baker_kind : type kind. kind baker_operation -> kind Kind.baker = function
       Kind.Baker_ballot_kind
   | Set_baker_active _ ->
       Kind.Set_baker_active_baker_kind
+  | Toggle_baker_delegations _ ->
+      Kind.Toggle_baker_delegations_baker_kind
   | Set_baker_consensus_key _ ->
       Kind.Set_baker_consensus_key_baker_kind
   | Set_baker_pvss_key _ ->
@@ -888,10 +896,27 @@ module Encoding = struct
           inj = (fun active -> Set_baker_active active);
         }
 
-    let set_baker_consensus_key_case =
+    let toggle_baker_delegations_case =
       BCase
         {
           tag = 3;
+          name = "toggle_baker_delegations";
+          encoding = obj1 (req "accept_delegations" bool);
+          select =
+            (function
+            | Baker (Toggle_baker_delegations _ as op) -> Some op | _ -> None);
+          proj =
+            (function
+            | Toggle_baker_delegations accept_delegations -> accept_delegations);
+          inj =
+            (fun accept_delegations ->
+              Toggle_baker_delegations accept_delegations);
+        }
+
+    let set_baker_consensus_key_case =
+      BCase
+        {
+          tag = 4;
           name = "set_baker_consensus_key";
           encoding = obj1 (req "key" Signature.Public_key.encoding);
           select =
@@ -904,7 +929,7 @@ module Encoding = struct
     let set_baker_pvss_key_case =
       BCase
         {
-          tag = 4;
+          tag = 5;
           name = "set_baker_pvss_key";
           encoding = obj1 (req "key" Pvss_secp256k1.Public_key.encoding);
           select =
@@ -929,6 +954,7 @@ module Encoding = struct
         [ make baker_proposals_case;
           make baker_ballot_case;
           make set_baker_active_case;
+          make toggle_baker_delegations_case;
           make set_baker_consensus_key_case;
           make set_baker_pvss_key_case ]
   end

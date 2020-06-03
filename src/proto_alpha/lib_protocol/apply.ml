@@ -803,6 +803,17 @@ let apply_baker_operation_content :
               consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
             },
           [] )
+  | Toggle_baker_delegations accept ->
+      Baker.toggle_delegations ctxt baker accept
+      >>=? fun ctxt ->
+      return
+        ( ctxt,
+          Toggle_baker_delegations_result
+            {
+              accept;
+              consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+            },
+          [] )
   | Set_baker_consensus_key key ->
       Baker.set_consensus_key ctxt baker key
       >>=? fun ctxt ->
