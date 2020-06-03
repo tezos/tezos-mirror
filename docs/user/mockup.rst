@@ -24,6 +24,7 @@ In the current state the mockup mode can:
 * perform transactions, originations, contract calls in a purely local fashion;
   mimicking the sandboxed mode but without a node. These features
   require a persistent state.
+* Perform some RPCs locally via `tezos-client rpc {get,post}`.
 
 We recommend that beginners *always* use the persistent state, for simplicity.
 
@@ -108,6 +109,25 @@ You can now use standard commands, such as:
 
     $ mockup-client get balance for bootstrap1
     3999898.997437 ꜩ
+
+One can also originate contracts:
+
+::
+    $ mockup-client originate contract foo transferring 100 from bootstrap1 running 'parameter unit; storage unit; code { CAR; NIL operation; PAIR}' --burn-cap 10
+    [...]
+    New contract KT1DieU51jzXLerQx5AqMCiLC1SsCeM8yRat originated.
+
+The client can be used to display the state of the contract, eg its storage:
+
+::
+    $ mockup-client get contract storage for foo
+    Unit
+
+The RPC mechanism can also be conveniently used to access the state of the contract in JSON format:
+
+::
+    $ mockup-client rpc get /chains/main/blocks/head/context/contracts/KT1DieU51jzXLerQx5AqMCiLC1SsCeM8yRat/storage
+    { "prim": "Unit" }
 
 Run a mockup client without persistent state
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
