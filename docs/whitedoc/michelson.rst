@@ -2477,7 +2477,6 @@ The instructions which accept at most one variable annotation are:
    HASH_KEY
    CHECK_SIGNATURE
    BLAKE2B
-   STEPS_TO_QUOTA
    SOURCE
    SENDER
    SELF
@@ -2491,7 +2490,6 @@ The instructions which accept at most two variable annotations are:
 ::
 
    UNPAIR
-   CREATE_ACCOUNT
    CREATE_CONTRACT
 
 Annotations on instructions that produce multiple elements on the stack
@@ -2502,13 +2500,13 @@ annotations will see only their top-most stack type elements annotated.
 
 ::
 
-   CREATE_ACCOUNT @op @addr
-   :: key_hash : option key_hash : bool : mutez : 'S
-      ->  @op operation : @addr address : 'S
+   UNPAIR @fist @second
+   :: pair 'a 'b : 'S
+      ->  @first 'a : @second 'b : 'S
 
-   CREATE_ACCOUNT @op
-   :: key_hash : option key_hash : bool : mutez : 'S
-      ->  @op operation : address : 'S
+   UNPAIR @first
+   :: pair 'a 'b : 'S
+      ->  @first 'a : 'b : 'S
 
 A no-op instruction ``RENAME`` allows to rename variables in the stack
 or to erase variable annotations in the stack.
@@ -2740,8 +2738,6 @@ A similar mechanism is used for context dependent instructions:
    SELF_ADDRESS  :: 'S   ->   @self address : 'S
 
    AMOUNT  :: 'S   ->   @amount mutez : 'S
-
-   STEPS_TO_QUOTA  :: 'S   ->  @steps nat : 'S
 
    NOW  :: 'S   ->   @now timestamp : 'S
 
@@ -3235,7 +3231,6 @@ Full grammar
       | CONTRACT <type>
       | TRANSFER_TOKENS
       | SET_DELEGATE
-      | CREATE_ACCOUNT
       | CREATE_CONTRACT { <instruction> ... }
       | IMPLICIT_ACCOUNT
       | VOTING_POWER
@@ -3250,7 +3245,6 @@ Full grammar
       | SHA256
       | SHA512
       | HASH_KEY
-      | STEPS_TO_QUOTA
       | SOURCE
       | SENDER
       | ADDRESS
