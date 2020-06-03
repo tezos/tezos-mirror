@@ -61,4 +61,4 @@
 
  )
  (action (with-stdout-to %{targets} (chdir %{workspace_root}}
-          (run %{exe:../sigs_packer/sigs_packer.exe} %{deps})))))
+          (run %{exe:../s_packer/s_packer.exe} "sigs" %{deps})))))

@@ -985,6 +985,11 @@ opam:tezos-protocol-environment:
   variables:
     package: tezos-protocol-environment
 
+opam:tezos-protocol-environment-packer:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-environment-packer
+
 opam:tezos-protocol-environment-sigs:
   <<: *opam_definition
   variables:

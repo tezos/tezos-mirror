@@ -5,4 +5,4 @@
  )
 
 (action (with-stdout-to %{targets} (chdir %{workspace_root}}
- (run %{exe:../structs_packer/structs_packer.exe} %{deps})))))
+ (run %{exe:../s_packer/s_packer.exe} "structs" %{deps})))))

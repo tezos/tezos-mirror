@@ -1,7 +1,7 @@
 (executable
- (name sigs_packer)
- (public_name tezos-protocol-environment-sigs.packer)
- (package tezos-protocol-environment-sigs))
+ (name s_packer)
+ (public_name tezos-protocol-environment-packer)
+ (package tezos-protocol-environment-packer))
 
 (alias
  (name runtest_lint)
