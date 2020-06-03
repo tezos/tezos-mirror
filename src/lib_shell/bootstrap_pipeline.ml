@@ -166,7 +166,7 @@ let headers_fetch_worker_loop pipeline =
    match steps with
    | [] ->
        fail (Too_short_locator (sender_id, pipeline.locator))
-   | {Block_locator.predecessor; _} :: _ ->
+   | {Block_locator.predecessor; _} :: _ -> (
        State.Block.known chain_state predecessor
        >>= fun predecessor_known ->
        (* Check that the locator is anchored in a block locally known *)
@@ -186,32 +186,25 @@ let headers_fetch_worker_loop pipeline =
          | _ ->
              process_headers remaining_headers
        in
-       let rec pipe ?pred = function
-         | [] ->
-             return_unit
-         | first :: (second :: _ as rest) ->
-             let fetch =
-               match pred with
-               | None ->
-                   fetch_step pipeline first
-               | Some fetch ->
-                   fetch
-             in
-             let pred = fetch_step pipeline second in
-             fetch
-             >>=? fun headers ->
-             process_headers headers >>=? fun () -> pipe ~pred rest
-         | [last] ->
-             let fetch =
-               match pred with
-               | None ->
-                   fetch_step pipeline last
-               | Some fetch ->
-                   fetch
-             in
-             fetch >>=? process_headers
-       in
-       pipe steps)
+       match steps with
+       | [] ->
+           return_unit
+       | [single] ->
+           fetch_step pipeline single >>=? process_headers
+       | first :: (_ :: _ as rest) ->
+           (* With respect to concurrency, [pipe] sits between [iter_s] and
+              [iter_p]: it keeps up to two promises pending. This is acheived by
+              passing the promise started at the current step as argument in
+              the next recursive call. *)
+           let first = fetch_step pipeline first in
+           let rec pipe previous = function
+             | [] ->
+                 previous >>=? process_headers
+             | current :: rest ->
+                 let current = fetch_step pipeline current in
+                 previous >>=? process_headers >>=? fun () -> pipe current rest
+           in
+           pipe first rest ))
   >>= function
   | Ok () ->
       Bootstrap_pipeline_event.(emit fetching_all_steps_from_peer)
