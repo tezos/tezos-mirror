@@ -37,6 +37,7 @@
         "Parameters_repr",
         "Sapling_repr",
         "Lazy_storage_kind",
+        "Receipt_repr",
 
         "Raw_context",
         "Storage_costs",

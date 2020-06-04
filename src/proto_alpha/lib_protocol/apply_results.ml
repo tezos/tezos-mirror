@@ -54,7 +54,7 @@ type _ successful_manager_operation_result =
   | Transaction_result : {
       storage : Script.expr option;
       lazy_storage_diff : Lazy_storage.diffs option;
-      balance_updates : Delegate.balance_updates;
+      balance_updates : Receipt.balance_updates;
       originated_contracts : Contract.t list;
       consumed_gas : Gas.Arith.fp;
       storage_size : Z.t;
@@ -64,7 +64,7 @@ type _ successful_manager_operation_result =
       -> Kind.transaction successful_manager_operation_result
   | Origination_result : {
       lazy_storage_diff : Lazy_storage.diffs option;
-      balance_updates : Delegate.balance_updates;
+      balance_updates : Receipt.balance_updates;
       originated_contracts : Contract.t list;
       consumed_gas : Gas.Arith.fp;
       storage_size : Z.t;
@@ -206,7 +206,7 @@ module Manager_result = struct
                  TODO(009): remove it. *)
               "big_map_diff"
               Lazy_storage.legacy_big_map_diff_encoding)
-           (dft "balance_updates" Delegate.balance_updates_encoding [])
+           (dft "balance_updates" Receipt.balance_updates_encoding [])
            (dft "originated_contracts" (list Contract.encoding) [])
            (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
@@ -284,7 +284,7 @@ module Manager_result = struct
                  TODO(009): remove it. *)
               "big_map_diff"
               Lazy_storage.legacy_big_map_diff_encoding)
-           (dft "balance_updates" Delegate.balance_updates_encoding [])
+           (dft "balance_updates" Receipt.balance_updates_encoding [])
            (dft "originated_contracts" (list Contract.encoding) [])
            (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
@@ -405,27 +405,27 @@ let internal_operation_result_encoding :
 
 type 'kind contents_result =
   | Endorsement_result : {
-      balance_updates : Delegate.balance_updates;
+      balance_updates : Receipt.balance_updates;
       delegate : Signature.Public_key_hash.t;
       slots : int list;
     }
       -> Kind.endorsement contents_result
   | Seed_nonce_revelation_result :
-      Delegate.balance_updates
+      Receipt.balance_updates
       -> Kind.seed_nonce_revelation contents_result
   | Double_endorsement_evidence_result :
-      Delegate.balance_updates
+      Receipt.balance_updates
       -> Kind.double_endorsement_evidence contents_result
   | Double_baking_evidence_result :
-      Delegate.balance_updates
+      Receipt.balance_updates
       -> Kind.double_baking_evidence contents_result
   | Activate_account_result :
-      Delegate.balance_updates
+      Receipt.balance_updates
       -> Kind.activate_account contents_result
   | Proposals_result : Kind.proposals contents_result
   | Ballot_result : Kind.ballot contents_result
   | Manager_operation_result : {
-      balance_updates : Delegate.balance_updates;
+      balance_updates : Receipt.balance_updates;
       operation_result : 'kind manager_operation_result;
       internal_operation_results : packed_internal_operation_result list;
     }
@@ -491,7 +491,7 @@ module Encoding = struct
         op_case = Operation.Encoding.endorsement_case;
         encoding =
           obj3
-            (req "balance_updates" Delegate.balance_updates_encoding)
+            (req "balance_updates" Receipt.balance_updates_encoding)
             (req "delegate" Signature.Public_key_hash.encoding)
             (req "slots" (list uint8));
         select =
@@ -517,7 +517,7 @@ module Encoding = struct
       {
         op_case = Operation.Encoding.seed_nonce_revelation_case;
         encoding =
-          obj1 (req "balance_updates" Delegate.balance_updates_encoding);
+          obj1 (req "balance_updates" Receipt.balance_updates_encoding);
         select =
           (function
           | Contents_result (Seed_nonce_revelation_result _ as op) ->
@@ -539,7 +539,7 @@ module Encoding = struct
       {
         op_case = Operation.Encoding.double_endorsement_evidence_case;
         encoding =
-          obj1 (req "balance_updates" Delegate.balance_updates_encoding);
+          obj1 (req "balance_updates" Receipt.balance_updates_encoding);
         select =
           (function
           | Contents_result (Double_endorsement_evidence_result _ as op) ->
@@ -561,7 +561,7 @@ module Encoding = struct
       {
         op_case = Operation.Encoding.double_baking_evidence_case;
         encoding =
-          obj1 (req "balance_updates" Delegate.balance_updates_encoding);
+          obj1 (req "balance_updates" Receipt.balance_updates_encoding);
         select =
           (function
           | Contents_result (Double_baking_evidence_result _ as op) ->
@@ -583,7 +583,7 @@ module Encoding = struct
       {
         op_case = Operation.Encoding.activate_account_case;
         encoding =
-          obj1 (req "balance_updates" Delegate.balance_updates_encoding);
+          obj1 (req "balance_updates" Receipt.balance_updates_encoding);
         select =
           (function
           | Contents_result (Activate_account_result _ as op) ->
@@ -645,7 +645,7 @@ module Encoding = struct
         op_case = Operation.Encoding.Case op_case;
         encoding =
           obj3
-            (req "balance_updates" Delegate.balance_updates_encoding)
+            (req "balance_updates" Receipt.balance_updates_encoding)
             (req "operation_result" res_case.t)
             (dft
                "internal_operation_results"
@@ -1190,7 +1190,7 @@ type block_metadata = {
   nonce_hash : Nonce_hash.t option;
   consumed_gas : Gas.Arith.fp;
   deactivated : Signature.Public_key_hash.t list;
-  balance_updates : Delegate.balance_updates;
+  balance_updates : Receipt.balance_updates;
 }
 
 let block_metadata_encoding =
@@ -1251,4 +1251,4 @@ let block_metadata_encoding =
           (req "nonce_hash" (option Nonce_hash.encoding))
           (req "consumed_gas" Gas.Arith.n_fp_encoding)
           (req "deactivated" (list Signature.Public_key_hash.encoding))
-          (req "balance_updates" Delegate.balance_updates_encoding))
+          (req "balance_updates" Receipt.balance_updates_encoding))
