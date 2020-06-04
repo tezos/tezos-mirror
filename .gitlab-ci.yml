@@ -517,10 +517,21 @@ documentation:linkcheck:
   image: ${build_deps_image_name}:opam--${build_deps_image_version}
   stage: packaging
   dependencies: []
-  only:
-    - master
-    - /^.*opam.*$/
-    - /-release$/
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master"'
+      when: on_success
+    - if: '$CI_COMMIT_BRANCH =~ /opam/'
+      when: on_success
+    - if: '$CI_COMMIT_BRANCH =~ /-release$/'
+      when: on_success
+    - changes:
+      - /**/*.opam
+      - /**/dune
+      - /**/dune.inc
+      - /**/*.dune.inc
+      - /scripts/version.sh
+      - /.gitlab-ci.yml
+      when: on_success
   script:
     - ./scripts/opam-pin.sh
     - opam depext --yes ${package}
