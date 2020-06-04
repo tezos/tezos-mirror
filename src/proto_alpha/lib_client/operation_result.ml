@@ -137,7 +137,7 @@ let pp_balance_updates ppf = function
   | [] ->
       ()
   | balance_updates ->
-      let open Delegate in
+      let open Receipt in
       (* For dry runs, the baker's key is zero
          (tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU). Instead of printing this
          key hash, we want to make the result more informative. *)

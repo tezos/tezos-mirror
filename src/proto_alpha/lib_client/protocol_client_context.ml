@@ -170,7 +170,7 @@ let () =
   register
   @@ def
        (stamp_proto "delegate" ["balance_updates"])
-       Protocol.Alpha_context.Delegate.balance_updates_encoding ;
+       Protocol.Alpha_context.Receipt.balance_updates_encoding ;
   register
   @@ def
        (stamp_proto "delegate" ["frozen_balance_by_cycles"])
