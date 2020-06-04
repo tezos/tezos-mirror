@@ -200,6 +200,9 @@ let create_connection t p2p_conn id_point point_info peer_info
             (Sys.word_size / 8 * 11) + size + Lwt_pipe.push_overhead ))
   in
   let messages = Lwt_pipe.create ?size () in
+  let greylister () =
+    P2p_pool.greylist_peer t.pool (P2p_peer_state.Info.peer_id peer_info)
+  in
   let conn =
     P2p_conn.create
       p2p_conn
@@ -207,6 +210,7 @@ let create_connection t p2p_conn id_point point_info peer_info
       peer_info
       messages
       canceler
+      ~greylister
       (Lazy.force t.answerer)
       negotiated_version
   in

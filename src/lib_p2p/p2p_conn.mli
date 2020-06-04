@@ -40,6 +40,7 @@ val create :
   (('msg, 'peer, 'conn) t, 'peer, 'conn) P2p_peer_state.Info.t ->
   (int * 'msg) Lwt_pipe.t ->
   Lwt_canceler.t ->
+  greylister:(unit -> unit) ->
   'msg P2p_answerer.t ->
   Network_version.t ->
   ('msg, 'peer, 'conn) t
