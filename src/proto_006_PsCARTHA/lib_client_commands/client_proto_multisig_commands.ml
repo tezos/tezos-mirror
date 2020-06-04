@@ -91,11 +91,7 @@ let prepare_command_display prepared_command bytes_only =
     Format.printf
       "%a@.%a@.%a@.%a@."
       (fun ppf x ->
-        Format.fprintf
-          ppf
-          "Bytes to sign: '0x%a'"
-          Hex.pp
-          (Hex.of_bytes x))
+        Format.fprintf ppf "Bytes to sign: '0x%a'" Hex.pp (Hex.of_bytes x))
       prepared_command.Client_proto_multisig.bytes
       (fun ppf x ->
         Format.fprintf
@@ -267,8 +263,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
             ~action:(Client_proto_multisig.Transfer (amount, destination))
             ()
           >>=? fun prepared_command ->
-          return
-          @@ (prepare_command_display prepared_command bytes_only));
+          return @@ prepare_command_display prepared_command bytes_only);
       command
         ~group
         ~desc:
@@ -296,8 +291,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
             ~action:(Client_proto_multisig.Change_delegate (Some new_delegate))
             ()
           >>=? fun prepared_command ->
-          return
-          @@ (prepare_command_display prepared_command bytes_only));
+          return @@ prepare_command_display prepared_command bytes_only);
       command
         ~group
         ~desc:
@@ -321,8 +315,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
             ~action:(Client_proto_multisig.Change_delegate None)
             ()
           >>=? fun prepared_command ->
-          return
-          @@ (prepare_command_display prepared_command bytes_only));
+          return @@ prepare_command_display prepared_command bytes_only);
       command
         ~group
         ~desc:
@@ -353,8 +346,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
               (Client_proto_multisig.Change_keys (Z.of_int new_threshold, keys))
             ()
           >>=? fun prepared_command ->
-          return
-          @@ (prepare_command_display prepared_command bytes_only));
+          return @@ prepare_command_display prepared_command bytes_only);
       command
         ~group
         ~desc:"Sign a transaction for a multisig contract."
