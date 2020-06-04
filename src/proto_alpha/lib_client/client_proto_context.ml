@@ -191,7 +191,7 @@ let list_contract_labels cctxt ~chain ~block =
       let h_b58 = Contract.to_b58check h in
       return (nm, h_b58, kind))
     contracts
-  >>|? List.rev
+  >|=? List.rev
 
 let message_added_contract (cctxt : #full) name =
   cctxt#message "Contract memorized as %s." name

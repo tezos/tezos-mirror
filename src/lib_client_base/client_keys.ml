@@ -288,7 +288,7 @@ let sign cctxt ?watermark sk_uri buf =
 
 let append cctxt ?watermark loc buf =
   sign cctxt ?watermark loc buf
-  >>|? fun signature -> Signature.concat buf signature
+  >|=? fun signature -> Signature.concat buf signature
 
 let check ?watermark pk_uri signature buf =
   public_key pk_uri

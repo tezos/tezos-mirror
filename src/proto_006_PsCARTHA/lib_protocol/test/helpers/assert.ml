@@ -123,7 +123,7 @@ let print_balances ctxt id =
   Contract.balance ~kind:Fees ctxt id
   >>=? fun fees ->
   Contract.balance ~kind:Rewards ctxt id
-  >>|? fun rewards ->
+  >|=? fun rewards ->
   Format.printf
     "\nMain: %s\nDeposit: %s\nFees: %s\nRewards: %s\n"
     (Alpha_context.Tez.to_string main)

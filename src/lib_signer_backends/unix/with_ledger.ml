@@ -179,7 +179,7 @@ module Ledger_commands = struct
               ~main_chain_id
               ~main_hwm
               ~test_hwm) )
-    >>|? fun pk ->
+    >|=? fun pk ->
     match curve with
     | Ed25519 | Bip32_ed25519 ->
         let pk = Cstruct.to_bytes pk in
@@ -239,7 +239,7 @@ module Ledger_commands = struct
     let open Ledgerwallet_tezos.Version in
     if version.major < 2 then
       wrap_ledger_cmd (fun pp -> Ledgerwallet_tezos.get_authorized_key ~pp hid)
-      >>|? fun path -> `Legacy_path path
+      >|=? fun path -> `Legacy_path path
     else
       wrap_ledger_cmd (fun pp ->
           Ledgerwallet_tezos.get_authorized_path_and_curve ~pp hid)

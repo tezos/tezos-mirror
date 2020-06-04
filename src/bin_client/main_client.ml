@@ -151,7 +151,7 @@ let select_commands ctxt {chain; block; protocol; _} =
   check_network ctxt
   >>= fun network ->
   get_commands_for_version ctxt network chain block protocol
-  >>|? fun (_, commands_for_version) ->
+  >|=? fun (_, commands_for_version) ->
   Client_rpc_commands.commands
   @ Tezos_signer_backends_unix.Ledger.commands ()
   @ Client_keys_commands.commands network

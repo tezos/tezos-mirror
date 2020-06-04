@@ -455,7 +455,7 @@ module Make (I : Dump_interface) = struct
     Buffer.add_bytes buf b
 
   let get_mbytes rbuf =
-    get_int64 rbuf >>|? Int64.to_int
+    get_int64 rbuf >|=? Int64.to_int
     >>=? fun l ->
     let b = Bytes.create l in
     read_mbytes rbuf b >>=? fun () -> return b
@@ -464,7 +464,7 @@ module Make (I : Dump_interface) = struct
 
   let get_command rbuf =
     get_mbytes rbuf
-    >>|? fun bytes -> Data_encoding.Binary.of_bytes_exn command_encoding bytes
+    >|=? fun bytes -> Data_encoding.Binary.of_bytes_exn command_encoding bytes
 
   let set_root buf block_header info parents block_data =
     let root = Root {block_header; info; parents; block_data} in
@@ -523,7 +523,7 @@ module Make (I : Dump_interface) = struct
 
   let read_snapshot_metadata rbuf =
     get_mbytes rbuf
-    >>|? fun bytes ->
+    >|=? fun bytes ->
     Data_encoding.(Binary.of_bytes_exn snapshot_metadata_encoding) bytes
 
   let check_version v =

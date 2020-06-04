@@ -126,7 +126,7 @@ struct
   let ( >|?= ) v f =
     match v with Error _ as e -> Lwt.return e | Ok v -> f v >>= Lwt.return_ok
 
-  let ( >>|? ) v f = v >>=? fun v -> Lwt.return_ok (f v)
+  let ( >|=? ) v f = v >>=? fun v -> Lwt.return_ok (f v)
 
   let ( >|= ) = Lwt.( >|= )
 

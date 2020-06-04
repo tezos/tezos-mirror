@@ -223,10 +223,6 @@ module type MONAD = sig
       - the next character is [=] for Lwt or [?] for Error
       - the next character (if present) is [=] for Lwt or [?] for Error, it is
       only used for operator that are within both monads.
-
-      There is an exception to this pattern: [>>|?]. It is a combined map
-      operator and it should be [>|=?] according to the pattern. This is kept
-      as-is for backwards compatibility.
   *)
 
   (** Lwt's bind reexported. Following Lwt's convention, in this operator and
@@ -249,7 +245,7 @@ module type MONAD = sig
     'a tzresult Lwt.t -> ('a -> 'b tzresult Lwt.t) -> 'b tzresult Lwt.t
 
   (** Combined map operator. *)
-  val ( >>|? ) : 'a tzresult Lwt.t -> ('a -> 'b) -> 'b tzresult Lwt.t
+  val ( >|=? ) : 'a tzresult Lwt.t -> ('a -> 'b) -> 'b tzresult Lwt.t
 
   (** Injecting bind operator. This is for transitioning from the simple Error
       monad to the combined Error-Lwt monad.

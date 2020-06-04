@@ -83,7 +83,7 @@ let list_contract_labels cctxt ~chain ~block =
       let h_b58 = Contract.to_b58check h in
       return (nm, h_b58, kind))
     contracts
-  >>|? List.rev
+  >|=? List.rev
 
 type period_info = {
   current_period_kind : Voting_period.kind;

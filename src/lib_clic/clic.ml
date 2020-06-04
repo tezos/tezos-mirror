@@ -55,7 +55,7 @@ let compose_parameters {converter = c1; autocomplete = a1'}
   }
 
 let map_parameter ~f {converter; autocomplete} =
-  {converter = (fun ctx s -> converter ctx s >>|? f); autocomplete}
+  {converter = (fun ctx s -> converter ctx s >|=? f); autocomplete}
 
 type label = {long : string; short : char option}
 
@@ -846,7 +846,7 @@ let parse_arg :
         return_none
     | Some [s] ->
         trace (Bad_option_argument ("--" ^ long, command)) (converter ctx s)
-        >>|? fun x -> Some x
+        >|=? fun x -> Some x
     | Some (_ :: _) ->
         fail (Multiple_occurrences ("--" ^ long, command)) )
   | DefArg {label = {long; short = _}; kind = {converter; _}; default; _} -> (
@@ -895,7 +895,7 @@ let rec parse_args :
   | AddArg (arg, rest) ->
       parse_arg ?command arg args_dict ctx
       >>=? fun arg ->
-      parse_args ?command rest args_dict ctx >>|? fun rest -> (arg, rest)
+      parse_args ?command rest args_dict ctx >|=? fun rest -> (arg, rest)
 
 let empty_args_dict = TzString.Map.empty
 
@@ -1024,7 +1024,7 @@ let make_args_dict_filter ?command spec args =
     (make_arities_dict spec TzString.Map.empty)
     (TzString.Map.empty, [])
     args
-  >>|? fun (dict, remaining) -> (dict, List.rev remaining)
+  >|=? fun (dict, remaining) -> (dict, List.rev remaining)
 
 let ( >> ) arg1 arg2 = AddArg (arg1, arg2)
 
@@ -1732,7 +1732,7 @@ let find_command tree initial_arguments =
         then fail (Help (Some command))
         else
           make_args_dict_filter ~command spec remaining
-          >>|? fun (dict, remaining) ->
+          >|=? fun (dict, remaining) ->
           (command, dict, List.rev_append acc remaining)
     | (TPrefix {stop = Some cmd; _}, []) ->
         return (cmd, empty_args_dict, initial_arguments)
@@ -1830,7 +1830,7 @@ let complete_options (type ctx) continuation args args_spec ind (ctx : ctx) =
     match args with
     | _ when ind = 0 ->
         continuation args 0
-        >>|? fun cont_args -> cont_args @ remaining_spec seen args_spec
+        >|=? fun cont_args -> cont_args @ remaining_spec seen args_spec
     | [] ->
         Stdlib.failwith "cli_entries internal autocomplete error"
     | arg :: tl ->
@@ -1840,7 +1840,7 @@ let complete_options (type ctx) continuation args args_spec ind (ctx : ctx) =
           match (arity, tl) with
           | (0, args) when ind = 0 ->
               continuation args 0
-              >>|? fun cont_args -> remaining_spec seen args_spec @ cont_args
+              >|=? fun cont_args -> remaining_spec seen args_spec @ cont_args
           | (0, args) ->
               help args (ind - 1) seen
           | (1, _) when ind = 1 ->
@@ -1864,7 +1864,7 @@ let complete_next_tree cctxt = function
         @ List.map fst prefix )
   | TSeq (command, autocomplete) ->
       complete_func autocomplete cctxt
-      >>|? fun completions -> completions @ list_command_args command
+      >|=? fun completions -> completions @ list_command_args command
   | TParam {autocomplete; _} ->
       complete_func autocomplete cctxt
   | TStop command ->
@@ -1904,7 +1904,7 @@ let autocompletion ~script ~cur_arg ~prev_arg ~args ~global_options commands
   in
   ( if prev_arg = script then
     complete_next_tree cctxt tree
-    >>|? fun command_completions ->
+    >|=? fun command_completions ->
     let (Argument {spec; _}) = global_options in
     list_args spec @ command_completions
   else
@@ -1919,7 +1919,7 @@ let autocompletion ~script ~cur_arg ~prev_arg ~args ~global_options commands
           spec
           index
           cctxt )
-  >>|? fun completions ->
+  >|=? fun completions ->
   List.filter
     (fun completion ->
       Re.Str.(string_match (regexp_string cur_arg) completion 0))

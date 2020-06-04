@@ -196,7 +196,7 @@ module Forge = struct
         assert false )
     >>=? fun fitness ->
     Alpha_services.Helpers.current_level ~offset:1l rpc_ctxt pred
-    >>|? (function
+    >|=? (function
            | {expected_commitment = true; _} ->
                Some (fst (Proto_Nonce.generate ()))
            | {expected_commitment = false; _} ->
@@ -392,7 +392,7 @@ let apply header ?(operations = []) pred =
   Main.finalize_block vstate
   >>=? fun (validation, _result) -> return validation.context)
   >|= Environment.wrap_error
-  >>|? fun context ->
+  >|=? fun context ->
   let hash = Block_header.hash header in
   {hash; header; operations; context}
 

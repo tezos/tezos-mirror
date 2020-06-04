@@ -243,7 +243,7 @@ let step gen_state blk : Block.t tzresult Lwt.t =
   in
   (* Nonce *)
   Alpha_services.Helpers.current_level ~offset:1l Block.rpc_ctxt blk
-  >>|? (function
+  >|=? (function
          | Level.{expected_commitment = true; cycle; level; _} ->
              if_debug (fun () ->
                  Format.printf "[DEBUG] Committing a nonce\n%!") ;
@@ -277,7 +277,7 @@ let step gen_state blk : Block.t tzresult Lwt.t =
   (* Revelations *)
   (* TODO debug cycle *)
   Alpha_services.Helpers.current_level ~offset:1l Incremental.rpc_ctxt inc
-  >>|? (function
+  >|=? (function
          | {cycle; level; _} -> (
              if_debug (fun () ->
                  Format.printf "[DEBUG] Current cycle : %a\n%!" Cycle.pp cycle) ;
