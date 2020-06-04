@@ -235,13 +235,19 @@ let commands () : #Protocol_client_context.full Clic.command list =
               (Hex.of_bytes prepared_command.Client_proto_multisig.bytes)
           else
             Format.printf
-              "%a@.%a@.%a@."
+              "%a@.%a@.%a@.%a@."
               (fun ppf x ->
                 Format.fprintf
                   ppf
                   "Bytes to sign: '0x%a'"
                   Hex.pp
                   (Hex.of_bytes x))
+              prepared_command.Client_proto_multisig.bytes
+              (fun ppf x ->
+                Format.fprintf
+                  ppf
+                  "Blake 2B Hash: '%s'"
+                  (Base58.raw_encode Blake2B.(hash_bytes [x] |> to_string)))
               prepared_command.Client_proto_multisig.bytes
               (fun ppf z ->
                 Format.fprintf
@@ -293,13 +299,19 @@ let commands () : #Protocol_client_context.full Clic.command list =
               (Hex.of_bytes prepared_command.Client_proto_multisig.bytes)
           else
             Format.printf
-              "%a@.%a@.%a@."
+              "%a@.%a@.%a@.%a@."
               (fun ppf x ->
                 Format.fprintf
                   ppf
                   "Bytes to sign: '0x%a'"
                   Hex.pp
                   (Hex.of_bytes x))
+              prepared_command.Client_proto_multisig.bytes
+              (fun ppf x ->
+                Format.fprintf
+                  ppf
+                  "Blake 2B Hash: '%s'"
+                  (Base58.raw_encode Blake2B.(hash_bytes [x] |> to_string)))
               prepared_command.Client_proto_multisig.bytes
               (fun ppf z ->
                 Format.fprintf
@@ -347,13 +359,19 @@ let commands () : #Protocol_client_context.full Clic.command list =
               (Hex.of_bytes prepared_command.Client_proto_multisig.bytes)
           else
             Format.printf
-              "%a@.%a@.%a@."
+              "%a@.%a@.%a@.%a@."
               (fun ppf x ->
                 Format.fprintf
                   ppf
                   "Bytes to sign: '0x%a'"
                   Hex.pp
                   (Hex.of_bytes x))
+              prepared_command.Client_proto_multisig.bytes
+              (fun ppf x ->
+                Format.fprintf
+                  ppf
+                  "Blake 2B Hash: '%s'"
+                  (Base58.raw_encode Blake2B.(hash_bytes [x] |> to_string)))
               prepared_command.Client_proto_multisig.bytes
               (fun ppf z ->
                 Format.fprintf
@@ -408,13 +426,19 @@ let commands () : #Protocol_client_context.full Clic.command list =
               (Hex.of_bytes prepared_command.Client_proto_multisig.bytes)
           else
             Format.printf
-              "%a@.%a@.%a@."
+              "%a@.%a@.%a@.%a@."
               (fun ppf x ->
                 Format.fprintf
                   ppf
                   "Bytes to sign: '0x%a'"
                   Hex.pp
                   (Hex.of_bytes x))
+              prepared_command.Client_proto_multisig.bytes
+              (fun ppf x ->
+                Format.fprintf
+                  ppf
+                  "Blake 2B Hash: '%s'"
+                  (Base58.raw_encode Blake2B.(hash_bytes [x] |> to_string)))
               prepared_command.Client_proto_multisig.bytes
               (fun ppf z ->
                 Format.fprintf
