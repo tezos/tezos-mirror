@@ -5,4 +5,4 @@
  )
 
 (action (with-stdout-to %{targets} (chdir %{workspace_root}}
- (run %{exe:../s_packer/s_packer.exe} "structs" %{deps})))))
+ (run %{libexec:tezos-protocol-environment-packer:s_packer} "structs" %{deps})))))

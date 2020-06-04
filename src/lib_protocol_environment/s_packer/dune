@@ -1,7 +1,15 @@
-(executable
- (name s_packer)
+(library
+ (name tezos_protocol_environment_packer)
  (public_name tezos-protocol-environment-packer)
- (package tezos-protocol-environment-packer))
+ (modules))
+
+(executable
+ (name s_packer))
+
+(install
+  (section libexec)
+  (package tezos-protocol-environment-packer)
+  (files (s_packer.exe as s_packer)))
 
 (alias
  (name runtest_lint)

@@ -9,6 +9,7 @@ depends: [
   "tezos-tooling" { with-test }
   "dune" { >= "1.11" }
   "tezos-stdlib" { with-test }
+  "tezos-protocol-environment-packer"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
