@@ -31,7 +31,7 @@ update_compose_file() {
 
     update_active_protocol_version
 
-    if [ "$#" -ge 2 ] && [ "$1" = "--rpc-port" ] ; then
+    if [ "$#" -ge 4 ] && [ "$1" = "--rpc-port" ] ; then
         export_rpc="
       - \"$2:8732\""
         shift 2
@@ -746,7 +746,7 @@ case "$command" in
     ## Main
 
     start)
-        start --network $network "$@"
+        start "$@" --network $network
         ;;
     restart)
         stop
@@ -774,7 +774,7 @@ case "$command" in
         if [ "$#" -eq 0 ] ; then usage ; exit 1;  else shift ; fi
         case "$subcommand" in
             start)
-                start_node --network $network "$@"
+                start_node "$@" --network $network
                 ;;
             status)
                 status_node
