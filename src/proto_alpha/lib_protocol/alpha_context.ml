@@ -189,6 +189,7 @@ module Big_map = struct
         >>=? fun kv -> return (c, Some (kt, kv))
 end
 
+module Receipt = Receipt_repr
 module Delegate = Delegate_storage
 
 module Roll = struct

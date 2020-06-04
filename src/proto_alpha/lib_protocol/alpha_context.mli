@@ -825,7 +825,7 @@ module Contract : sig
   val originated_contract : origination_nonce -> contract
 end
 
-module Delegate : sig
+module Receipt : sig
   type balance =
     | Contract of Contract.t
     | Rewards of Signature.Public_key_hash.t * Cycle.t
@@ -839,7 +839,9 @@ module Delegate : sig
   val balance_updates_encoding : balance_updates Data_encoding.t
 
   val cleanup_balance_updates : balance_updates -> balance_updates
+end
 
+module Delegate : sig
   val get : context -> Contract.t -> public_key_hash option tzresult Lwt.t
 
   val set :
@@ -863,7 +865,8 @@ module Delegate : sig
     context ->
     Cycle.t ->
     Nonce.unrevealed list ->
-    (context * balance_updates * Signature.Public_key_hash.t list) tzresult
+    (context * Receipt.balance_updates * Signature.Public_key_hash.t list)
+    tzresult
     Lwt.t
 
   type frozen_balance = {deposit : Tez.t; fees : Tez.t; rewards : Tez.t}

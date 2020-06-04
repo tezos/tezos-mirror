@@ -34,6 +34,7 @@
         "Manager_repr",
         "Commitment_repr",
         "Parameters_repr",
+        "Receipt_repr",
 
         "Raw_context",
         "Storage_sigs",
