@@ -51,6 +51,7 @@ val originate_multisig :
   ?fee:Tez.t ->
   ?gas_limit:Z.t ->
   ?storage_limit:Z.t ->
+  ?verbose_signing:bool ->
   delegate:public_key_hash option ->
   threshold:Z.t ->
   keys:public_key list ->

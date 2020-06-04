@@ -85,7 +85,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
     [ command
         ~group
         ~desc:"Originate a new multisig contract."
-        (args13
+        (args14
            Client_proto_args.fee_arg
            Client_proto_context_commands.dry_run_switch
            Client_proto_args.gas_limit_arg
@@ -98,6 +98,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
            Client_proto_args.minimal_nanotez_per_gas_unit_arg
            Client_proto_args.force_low_fee_arg
            Client_proto_args.fee_cap_arg
+           Client_proto_context_commands.verbose_signing_switch
            Client_proto_args.burn_cap_arg)
         ( prefixes ["deploy"; "multisig"]
         @@ Client_proto_contracts.RawContractAlias.fresh_alias_param
@@ -127,6 +128,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
                minimal_nanotez_per_gas_unit,
                force_low_fee,
                fee_cap,
+               verbose_signing,
                burn_cap )
              alias_name
              balance
@@ -167,6 +169,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
                 ?fee
                 ?gas_limit
                 ?storage_limit
+                ~verbose_signing
                 ~delegate
                 ~threshold:(Z.of_int threshold)
                 ~keys

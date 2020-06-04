@@ -698,7 +698,7 @@ let check_threshold ~threshold ~keys () =
   else return_unit
 
 let originate_multisig (cctxt : #Protocol_client_context.full) ~chain ~block
-    ?confirmations ?dry_run ?branch ?fee ?gas_limit ?storage_limit ~delegate
+    ?confirmations ?dry_run ?branch ?fee ?gas_limit ?storage_limit ?verbose_signing ~delegate
     ~threshold ~keys ~balance ~source ~src_pk ~src_sk ~fee_parameter () =
   multisig_storage_string ~counter:Z.zero ~threshold ~keys ()
   >>=? fun initial_storage ->
@@ -714,6 +714,7 @@ let originate_multisig (cctxt : #Protocol_client_context.full) ~chain ~block
     ?fee
     ?gas_limit
     ?storage_limit
+    ?verbose_signing
     ~delegate
     ~initial_storage
     ~balance
