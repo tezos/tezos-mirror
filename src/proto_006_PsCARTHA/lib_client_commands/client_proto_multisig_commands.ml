@@ -80,6 +80,43 @@ let transfer_options =
     Client_proto_args.fee_cap_arg
     Client_proto_args.burn_cap_arg
 
+let prepare_command_display prepared_command bytes_only =
+  if bytes_only then
+    Format.printf
+      "0x%a@."
+      Hex.pp
+      (Hex.of_bytes prepared_command.Client_proto_multisig.bytes)
+  else
+    Format.printf
+      "%a@.%a@.%a@.%a@."
+      (fun ppf x ->
+        Format.fprintf
+          ppf
+          "Bytes to sign: '0x%a'"
+          Hex.pp
+          (Hex.of_bytes x))
+      prepared_command.Client_proto_multisig.bytes
+      (fun ppf x ->
+        Format.fprintf
+          ppf
+          "Blake 2B Hash: '%s'"
+          (Base58.raw_encode Blake2B.(hash_bytes [x] |> to_string)))
+      prepared_command.Client_proto_multisig.bytes
+      (fun ppf z ->
+        Format.fprintf
+          ppf
+          "Threshold (number of signatures required): %s"
+          (Z.to_string z))
+      prepared_command.Client_proto_multisig.threshold
+      (fun ppf ->
+        Format.fprintf
+          ppf
+          "@[<2>Public keys of the signers:@ %a@]"
+          (Format.pp_print_list
+             ~pp_sep:(fun ppf () -> Format.fprintf ppf "@ ")
+             Signature.Public_key.pp))
+      prepared_command.Client_proto_multisig.keys
+
 let commands () : #Protocol_client_context.full Clic.command list =
   Clic.
     [ command
@@ -230,42 +267,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
             ()
           >>=? fun prepared_command ->
           return
-          @@
-          if bytes_only then
-            Format.printf
-              "0x%a@."
-              Hex.pp
-              (Hex.of_bytes prepared_command.Client_proto_multisig.bytes)
-          else
-            Format.printf
-              "%a@.%a@.%a@.%a@."
-              (fun ppf x ->
-                Format.fprintf
-                  ppf
-                  "Bytes to sign: '0x%a'"
-                  Hex.pp
-                  (Hex.of_bytes x))
-              prepared_command.Client_proto_multisig.bytes
-              (fun ppf x ->
-                Format.fprintf
-                  ppf
-                  "Blake 2B Hash: '%s'"
-                  (Base58.raw_encode Blake2B.(hash_bytes [x] |> to_string)))
-              prepared_command.Client_proto_multisig.bytes
-              (fun ppf z ->
-                Format.fprintf
-                  ppf
-                  "Threshold (number of signatures required): %s"
-                  (Z.to_string z))
-              prepared_command.Client_proto_multisig.threshold
-              (fun ppf ->
-                Format.fprintf
-                  ppf
-                  "@[<2>Public keys of the signers:@ %a@]"
-                  (Format.pp_print_list
-                     ~pp_sep:(fun ppf () -> Format.fprintf ppf "@ ")
-                     Signature.Public_key.pp))
-              prepared_command.Client_proto_multisig.keys);
+          @@ (prepare_command_display prepared_command bytes_only));
       command
         ~group
         ~desc:
@@ -294,42 +296,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
             ()
           >>=? fun prepared_command ->
           return
-          @@
-          if bytes_only then
-            Format.printf
-              "0x%a@."
-              Hex.pp
-              (Hex.of_bytes prepared_command.Client_proto_multisig.bytes)
-          else
-            Format.printf
-              "%a@.%a@.%a@.%a@."
-              (fun ppf x ->
-                Format.fprintf
-                  ppf
-                  "Bytes to sign: '0x%a'"
-                  Hex.pp
-                  (Hex.of_bytes x))
-              prepared_command.Client_proto_multisig.bytes
-              (fun ppf x ->
-                Format.fprintf
-                  ppf
-                  "Blake 2B Hash: '%s'"
-                  (Base58.raw_encode Blake2B.(hash_bytes [x] |> to_string)))
-              prepared_command.Client_proto_multisig.bytes
-              (fun ppf z ->
-                Format.fprintf
-                  ppf
-                  "Threshold (number of signatures required): %s"
-                  (Z.to_string z))
-              prepared_command.Client_proto_multisig.threshold
-              (fun ppf ->
-                Format.fprintf
-                  ppf
-                  "@[<2>Public keys of the signers:@ %a@]"
-                  (Format.pp_print_list
-                     ~pp_sep:(fun ppf () -> Format.fprintf ppf "@ ")
-                     Signature.Public_key.pp))
-              prepared_command.Client_proto_multisig.keys);
+          @@ (prepare_command_display prepared_command bytes_only));
       command
         ~group
         ~desc:
@@ -354,42 +321,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
             ()
           >>=? fun prepared_command ->
           return
-          @@
-          if bytes_only then
-            Format.printf
-              "0x%a@."
-              Hex.pp
-              (Hex.of_bytes prepared_command.Client_proto_multisig.bytes)
-          else
-            Format.printf
-              "%a@.%a@.%a@.%a@."
-              (fun ppf x ->
-                Format.fprintf
-                  ppf
-                  "Bytes to sign: '0x%a'"
-                  Hex.pp
-                  (Hex.of_bytes x))
-              prepared_command.Client_proto_multisig.bytes
-              (fun ppf x ->
-                Format.fprintf
-                  ppf
-                  "Blake 2B Hash: '%s'"
-                  (Base58.raw_encode Blake2B.(hash_bytes [x] |> to_string)))
-              prepared_command.Client_proto_multisig.bytes
-              (fun ppf z ->
-                Format.fprintf
-                  ppf
-                  "Threshold (number of signatures required): %s"
-                  (Z.to_string z))
-              prepared_command.Client_proto_multisig.threshold
-              (fun ppf ->
-                Format.fprintf
-                  ppf
-                  "@[<2>Public keys of the signers:@ %a@]"
-                  (Format.pp_print_list
-                     ~pp_sep:(fun ppf () -> Format.fprintf ppf "@ ")
-                     Signature.Public_key.pp))
-              prepared_command.Client_proto_multisig.keys);
+          @@ (prepare_command_display prepared_command bytes_only));
       command
         ~group
         ~desc:
@@ -421,42 +353,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
             ()
           >>=? fun prepared_command ->
           return
-          @@
-          if bytes_only then
-            Format.printf
-              "0x%a@."
-              Hex.pp
-              (Hex.of_bytes prepared_command.Client_proto_multisig.bytes)
-          else
-            Format.printf
-              "%a@.%a@.%a@.%a@."
-              (fun ppf x ->
-                Format.fprintf
-                  ppf
-                  "Bytes to sign: '0x%a'"
-                  Hex.pp
-                  (Hex.of_bytes x))
-              prepared_command.Client_proto_multisig.bytes
-              (fun ppf x ->
-                Format.fprintf
-                  ppf
-                  "Blake 2B Hash: '%s'"
-                  (Base58.raw_encode Blake2B.(hash_bytes [x] |> to_string)))
-              prepared_command.Client_proto_multisig.bytes
-              (fun ppf z ->
-                Format.fprintf
-                  ppf
-                  "Threshold (number of signatures required): %s"
-                  (Z.to_string z))
-              prepared_command.Client_proto_multisig.threshold
-              (fun ppf ->
-                Format.fprintf
-                  ppf
-                  "@[<2>Public keys of the signers:@ %a@]"
-                  (Format.pp_print_list
-                     ~pp_sep:(fun ppf () -> Format.fprintf ppf "@ ")
-                     Signature.Public_key.pp))
-              prepared_command.Client_proto_multisig.keys);
+          @@ (prepare_command_display prepared_command bytes_only));
       command
         ~group
         ~desc:"Sign a transaction for a multisig contract."
