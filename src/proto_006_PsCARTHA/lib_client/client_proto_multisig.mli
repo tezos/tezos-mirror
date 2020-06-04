@@ -78,6 +78,7 @@ val call_multisig :
   block:Shell_services.block ->
   ?confirmations:int ->
   ?dry_run:bool ->
+  ?verbose_signing:bool ->
   ?branch:int ->
   source:public_key_hash ->
   src_pk:public_key ->
@@ -101,6 +102,7 @@ val call_multisig_on_bytes :
   block:Shell_services.block ->
   ?confirmations:int ->
   ?dry_run:bool ->
+  ?verbose_signing:bool ->
   ?branch:int ->
   source:public_key_hash ->
   src_pk:public_key ->

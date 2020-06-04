@@ -66,9 +66,10 @@ let bytes_param ~name ~desc =
   Clic.param ~name ~desc Client_proto_args.bytes_parameter
 
 let transfer_options =
-  Clic.args12
+  Clic.args13
     Client_proto_args.fee_arg
     Client_proto_context_commands.dry_run_switch
+    Client_proto_context_commands.verbose_signing_switch
     Client_proto_args.gas_limit_arg
     Client_proto_args.storage_limit_arg
     Client_proto_args.counter_arg
@@ -90,11 +91,7 @@ let prepare_command_display prepared_command bytes_only =
     Format.printf
       "%a@.%a@.%a@.%a@."
       (fun ppf x ->
-        Format.fprintf
-          ppf
-          "Bytes to sign: '0x%a'"
-          Hex.pp
-          (Hex.of_bytes x))
+        Format.fprintf ppf "Bytes to sign: '0x%a'" Hex.pp (Hex.of_bytes x))
       prepared_command.Client_proto_multisig.bytes
       (fun ppf x ->
         Format.fprintf
@@ -266,8 +263,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
             ~action:(Client_proto_multisig.Transfer (amount, destination))
             ()
           >>=? fun prepared_command ->
-          return
-          @@ (prepare_command_display prepared_command bytes_only));
+          return @@ prepare_command_display prepared_command bytes_only);
       command
         ~group
         ~desc:
@@ -295,8 +291,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
             ~action:(Client_proto_multisig.Change_delegate (Some new_delegate))
             ()
           >>=? fun prepared_command ->
-          return
-          @@ (prepare_command_display prepared_command bytes_only));
+          return @@ prepare_command_display prepared_command bytes_only);
       command
         ~group
         ~desc:
@@ -320,8 +315,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
             ~action:(Client_proto_multisig.Change_delegate None)
             ()
           >>=? fun prepared_command ->
-          return
-          @@ (prepare_command_display prepared_command bytes_only));
+          return @@ prepare_command_display prepared_command bytes_only);
       command
         ~group
         ~desc:
@@ -352,8 +346,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
               (Client_proto_multisig.Change_keys (Z.of_int new_threshold, keys))
             ()
           >>=? fun prepared_command ->
-          return
-          @@ (prepare_command_display prepared_command bytes_only));
+          return @@ prepare_command_display prepared_command bytes_only);
       command
         ~group
         ~desc:"Sign a transaction for a multisig contract."
@@ -504,6 +497,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
         @@ seq_of_param (signature_param ()) )
         (fun ( fee,
                dry_run,
+               verbose_signing,
                gas_limit,
                storage_limit,
                counter,
@@ -543,6 +537,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
                 ~block:cctxt#block
                 ?confirmations:cctxt#confirmations
                 ~dry_run
+                ~verbose_signing
                 ~fee_parameter
                 ~source
                 ?fee
@@ -582,6 +577,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
         @@ seq_of_param (signature_param ()) )
         (fun ( fee,
                dry_run,
+               verbose_signing,
                gas_limit,
                storage_limit,
                counter,
@@ -620,6 +616,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
                 ~block:cctxt#block
                 ?confirmations:cctxt#confirmations
                 ~dry_run
+                ~verbose_signing
                 ~fee_parameter
                 ~source
                 ?fee
@@ -655,6 +652,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
         @@ seq_of_param (signature_param ()) )
         (fun ( fee,
                dry_run,
+               verbose_signing,
                gas_limit,
                storage_limit,
                counter,
@@ -692,6 +690,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
                 ~block:cctxt#block
                 ?confirmations:cctxt#confirmations
                 ~dry_run
+                ~verbose_signing
                 ~fee_parameter
                 ~source
                 ?fee
@@ -743,6 +742,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
         @@ seq_of_param (signature_param ()) )
         (fun ( fee,
                dry_run,
+               verbose_signing,
                gas_limit,
                storage_limit,
                counter,
@@ -781,6 +781,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
                 ~block:cctxt#block
                 ?confirmations:cctxt#confirmations
                 ~dry_run
+                ~verbose_signing
                 ~fee_parameter
                 ~source
                 ?fee

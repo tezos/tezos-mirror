@@ -698,8 +698,9 @@ let check_threshold ~threshold ~keys () =
   else return_unit
 
 let originate_multisig (cctxt : #Protocol_client_context.full) ~chain ~block
-    ?confirmations ?dry_run ?branch ?fee ?gas_limit ?storage_limit ?verbose_signing ~delegate
-    ~threshold ~keys ~balance ~source ~src_pk ~src_sk ~fee_parameter () =
+    ?confirmations ?dry_run ?branch ?fee ?gas_limit ?storage_limit
+    ?verbose_signing ~delegate ~threshold ~keys ~balance ~source ~src_pk
+    ~src_sk ~fee_parameter () =
   multisig_storage_string ~counter:Z.zero ~threshold ~keys ()
   >>=? fun initial_storage ->
   check_threshold ~threshold ~keys ()
@@ -782,9 +783,9 @@ let check_multisig_signatures ~bytes ~threshold ~keys signatures =
   else fail (Not_enough_signatures (threshold_int, signature_count))
 
 let call_multisig (cctxt : #Protocol_client_context.full) ~chain ~block
-    ?confirmations ?dry_run ?branch ~source ~src_pk ~src_sk ~multisig_contract
-    ~action ~signatures ~amount ?fee ?gas_limit ?storage_limit ?counter
-    ~fee_parameter () =
+    ?confirmations ?dry_run ?verbose_signing ?branch ~source ~src_pk ~src_sk
+    ~multisig_contract ~action ~signatures ~amount ?fee ?gas_limit
+    ?storage_limit ?counter ~fee_parameter () =
   prepare_multisig_transaction
     cctxt
     ~chain
@@ -815,6 +816,7 @@ let call_multisig (cctxt : #Protocol_client_context.full) ~chain ~block
     ?storage_limit
     ?counter
     ~fee_parameter
+    ?verbose_signing
     ()
 
 let action_of_bytes ~multisig_contract ~stored_counter ~descr ~chain_id bytes =
@@ -878,8 +880,8 @@ let action_of_bytes ~multisig_contract ~stored_counter ~descr ~chain_id bytes =
   else fail (Bytes_deserialisation_error bytes)
 
 let call_multisig_on_bytes (cctxt : #Protocol_client_context.full) ~chain
-    ~block ?confirmations ?dry_run ?branch ~source ~src_pk ~src_sk
-    ~multisig_contract ~bytes ~signatures ~amount ?fee ?gas_limit
+    ~block ?confirmations ?dry_run ?verbose_signing ?branch ~source ~src_pk
+    ~src_sk ~multisig_contract ~bytes ~signatures ~amount ?fee ?gas_limit
     ?storage_limit ?counter ~fee_parameter () =
   multisig_get_information cctxt ~chain ~block multisig_contract
   >>=? fun info ->
@@ -913,4 +915,5 @@ let call_multisig_on_bytes (cctxt : #Protocol_client_context.full) ~chain
     ?storage_limit
     ?counter
     ~fee_parameter
+    ?verbose_signing
     ()
