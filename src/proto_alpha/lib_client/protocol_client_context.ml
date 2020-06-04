@@ -165,13 +165,13 @@ let () =
   register
   @@ def
        "delegate"
-       ["balance_updates"]
-       Protocol.Alpha_context.Delegate.balance_updates_encoding ;
-  register
-  @@ def
-       "delegate"
        ["frozen_balance_by_cycles"]
        Protocol.Alpha_context.Delegate.frozen_balance_by_cycle_encoding ;
+  register
+  @@ def
+       "receipt"
+       ["balance_updates"]
+       Protocol.Alpha_context.Receipt.balance_updates_encoding ;
   register ~pp:Protocol.Alpha_context.Level.pp_full
   @@ def "level" [] Protocol.Alpha_context.Level.encoding ;
   register @@ def "operation" [] Protocol.Alpha_context.Operation.encoding ;
