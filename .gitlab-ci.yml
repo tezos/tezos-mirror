@@ -316,6 +316,12 @@ integration:bootstrap:
     - pytest tests_python/tests/test_bootstrap.py -s --log-dir=tmp
   stage: test
 
+integration:codec:
+  <<: *integration_python_definition
+  script:
+    - pytest tests_python/tests/test_codec.py -s --log-dir=tmp
+  stage: test
+
 integration:contract:
   <<: *integration_python_definition
   script:
@@ -398,6 +404,12 @@ integration:mempool:
   <<: *integration_python_definition
   script:
     - pytest tests_python/tests/test_mempool.py -s --log-dir=tmp
+  stage: test
+
+integration:mockup:
+  <<: *integration_python_definition
+  script:
+    - pytest tests_python/tests/test_mockup.py -s --log-dir=tmp
   stage: test
 
 integration:multinode:
