@@ -40,6 +40,9 @@ echo '#!/usr/bin/env bash' > pre-commit
 echo './scripts/pre_commit/pre_commit.py --lint-only "$@"' >> pre-commit
 chmod +x pre-commit
 ```
+
+You can pass "--test-itself" for the precommit to test itself. This is
+used in the CI.
 """
 
 import os
@@ -47,6 +50,7 @@ import subprocess
 import sys
 from typing import List, Optional, Tuple
 _LINT_ONLY = "--lint-only"
+_TEST_ITSELF = "--test-itself"
 _UNSTAGED = "--unstaged"
 
 
@@ -317,16 +321,41 @@ def _main_py_files(staged_or_modified: bool, adjective: str,
     return return_code
 
 
-# I don't use argsparse to avoid adding a non-system dependency
-def _parse_arguments() -> Tuple[bool, bool]:
+def _main_test_itself() -> int:
     """
-    Returns: A tuple with two Booleans:
+    Test this hook itself, instead of doing its usual operations.
+
+    Returns: A return code
+    """
+    tests_python_path = _get_tests_python_path()
+    if not tests_python_path:
+        return 1
+    py_data = _find_python_data(tests_python_path)
+    py_tools = None if py_data is None else py_data[0]
+    if py_tools is None:
+        return 1  # Error has been logged in _find_python_data
+    py_packages = py_data[1]
+    if py_packages is None:
+        return 1  # Error has been logged in _find_python_data
+    # Success case
+    print(f"All {len(py_tools)} python tools found")
+    print(f"{len(py_packages)} python packages to lint found")
+    return 0
+
+
+# I don't use argsparse to avoid adding a non-system dependency
+def _parse_arguments() -> Tuple[bool, bool, bool]:
+    """
+    Returns: A tuple with three Booleans:
         1/ Whether staged (True) or modified (False) files should be considered
         2/ Whether pytest should be called
+        3/ Whether the hook should test itself instead of doing its normal
+           operations
     """
     staged = _UNSTAGED not in sys.argv
     pytest = _LINT_ONLY not in sys.argv
-    return (staged, pytest)
+    test_itself = _TEST_ITSELF in sys.argv
+    return (staged, pytest, test_itself)
 
 
 def _print_help():
@@ -335,12 +364,14 @@ def _print_help():
         return
     print("Usage: ./scripts/pre_commit/pre_commit.py [-h|--help]"
           f" [{_LINT_ONLY}]"
+          f" [{_TEST_ITSELF}]"
           f" [{_UNSTAGED}]")
     print(f"""This hooks does the following:
 1/ Executes python tests of staged *.py files (disable by passing {_LINT_ONLY})
 2/ Lints staged *.py files
 3/ Formats staged *{{ml,mli}} files
    (and update the commit if possible with formatting changes)
+Pass {_TEST_ITSELF} for the hook to test itself (used by CI)
 Pass {_UNSTAGED} to do all this on unstaged files""")
     sys.exit(0)
 
@@ -349,7 +380,10 @@ def main() -> int:
     """ The main """
     _print_help()
 
-    staged, pytest = _parse_arguments()
+    staged, pytest, test_itself = _parse_arguments()
+    if test_itself:
+        print(f"Recognized {_TEST_ITSELF}")
+        return _main_test_itself()
     adjective = "staged" if staged else "modified"
 
     return_code = _main_py_files(staged, adjective, pytest)

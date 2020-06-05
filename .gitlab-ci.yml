@@ -68,6 +68,11 @@ check_python_types:
   script:
     - make -C tests_python typecheck
 
+check_precommit_hook:
+  <<: *build_definition
+  script:
+    - ./scripts/pre_commit/pre_commit.py --test-itself
+
 build:
   <<: *build_definition
   script:
