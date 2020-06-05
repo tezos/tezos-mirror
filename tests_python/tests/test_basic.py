@@ -216,9 +216,7 @@ class TestRememberContract:
             non_originated_contract_address,
     ):
         expected_error = f"The contract alias {contract_name} already exists"
-
-        def cmd():
+        with assert_run_failure(re.compile(expected_error)):
             client.remember_contract(contract_name,
                                      non_originated_contract_address,
                                      force=False)
-        assert_run_failure(cmd, re.compile(expected_error))
