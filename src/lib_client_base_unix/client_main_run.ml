@@ -414,12 +414,10 @@ let main (module C : M) ~select_commands =
   Internal_event_unix.close () >>= fun () -> Lwt.return retcode
 
 (* Where all the user friendliness starts *)
-let run ?log (module M : M)
+let run (module M : M)
     ~(select_commands :
        RPC_client_unix.http_ctxt ->
        Client_config.cli_args ->
        Client_context.full Clic.command list tzresult Lwt.t) =
-  Lwt_exit.exit_on ?log Sys.sigint ;
-  Lwt_exit.exit_on ?log Sys.sigterm ;
-  Stdlib.exit @@ Lwt_main.run @@ Lwt_exit.wrap_promise
+  Stdlib.exit @@ Lwt_main.run @@ Lwt_exit.wrap_and_forward
   @@ main (module M) ~select_commands

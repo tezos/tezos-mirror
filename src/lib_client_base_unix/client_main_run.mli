@@ -78,7 +78,6 @@ sig
 end
 
 val run :
-  ?log:(string -> unit) ->
   (module M) ->
   select_commands:(RPC_client_unix.http_ctxt ->
                   Client_config.cli_args ->

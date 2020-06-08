@@ -1,0 +1,57 @@
+(executables
+ (names
+   test_lwt_exit_exit
+   test_lwt_exit_return
+   test_lwt_exit_signal
+   test_lwt_exit_clean_up
+   )
+ (libraries tezos-stdlib-unix
+            tezos-stdlib
+            lwt.unix)
+ (flags (:standard -open Tezos_stdlib_unix)))
+
+(alias
+ (name buildtest)
+ (deps test_lwt_exit_exit.exe))
+
+(alias
+ (name runtest_lwt_exit_exit)
+ (action (run %{exe:test_lwt_exit_exit.exe})))
+
+(alias
+ (name buildtest)
+ (deps test_lwt_exit_return.exe))
+
+(alias
+ (name runtest_lwt_exit_return)
+ (action (run %{exe:test_lwt_exit_return.exe})))
+
+(alias
+ (name buildtest)
+ (deps test_lwt_exit_signal.exe))
+
+(alias
+ (name runtest_lwt_exit_signal)
+ (action (run %{exe:test_lwt_exit_signal.exe})))
+
+(alias
+ (name buildtest)
+ (deps test_lwt_exit_clean_up.exe))
+
+(alias
+ (name runtest_lwt_exit_clean_up)
+ (action (run %{exe:test_lwt_exit_clean_up.exe})))
+
+(alias
+ (name runtest)
+ (package tezos-stdlib-unix)
+ (deps (alias runtest_lwt_exit_exit)
+       (alias runtest_lwt_exit_return)
+       (alias runtest_lwt_exit_signal)
+       (alias runtest_lwt_exit_clean_up)
+ ))
+
+(alias
+ (name runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

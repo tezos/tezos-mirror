@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,36 +23,88 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-exception Exit
+open Lwt.Infix
 
-let (termination_thread, exit_wakener) = Lwt.wait ()
+(* 1. clean-up callback registration/unregistration *)
 
-let exit x = Lwt.wakeup exit_wakener x ; raise Exit
+(* Identifiers are used for unregistering clean-up callbacks *)
+type clean_up_callback_id = int
 
-let () =
-  Lwt.async_exception_hook :=
-    function
-    | Exit ->
-        ()
-    | e ->
-        let backtrace = Printexc.get_backtrace () in
-        let pp_exn_trace ppf backtrace =
-          if String.length backtrace <> 0 then
-            Format.fprintf
-              ppf
-              "@,Backtrace:@,  @[<h>%a@]"
-              Format.pp_print_text
-              backtrace
-        in
-        (* TODO Improve this *)
-        Format.eprintf
-          "@[<v 2>@[Uncaught (asynchronous) exception (%d):@ %s@]%a@]@.%!"
-          (Unix.getpid ())
-          (Printexc.to_string e)
-          pp_exn_trace
-          backtrace ;
-        Lwt.wakeup exit_wakener 1
+let clean_up_callback_id_counter = ref min_int
 
+let new_clean_up_callback_id () =
+  incr clean_up_callback_id_counter ;
+  !clean_up_callback_id_counter
+
+(* clean-up callbacks are stored in a reference to a map *)
+module Callbacks_map = Map.Make (Int)
+
+let clean_up_callbacks : (int -> unit Lwt.t) Callbacks_map.t ref =
+  ref Callbacks_map.empty
+
+(* adding and removing clean-up callbacks affects the global reference map *)
+let register_clean_up_callback f =
+  let id = new_clean_up_callback_id () in
+  clean_up_callbacks := Callbacks_map.add id f !clean_up_callbacks ;
+  id
+
+let unregister_clean_up_callback id =
+  clean_up_callbacks := Callbacks_map.remove id !clean_up_callbacks
+
+(* 2. clean-up *)
+
+(* cleaning-up is just calling all the clean-up callbacks, note that the
+   function is not exported: it cannot be called directly, it can only be
+   triggered as a side effect to calling [exit_and_raise] or [exit_and_wait] *)
+let clean_up status =
+  let callbacks = List.of_seq @@ Callbacks_map.to_seq !clean_up_callbacks in
+  clean_up_callbacks := Callbacks_map.empty ;
+  Lwt_list.iter_p
+    (fun (_, c) ->
+      Lwt.catch
+        (fun () -> c status)
+        (fun exc ->
+          Format.eprintf
+            "Exit: uncaught exception during clean-up: %s\n%!"
+            (Printexc.to_string exc) ;
+          Lwt.return_unit))
+    callbacks
+
+(* 3. synchronisation primitives *)
+
+(* [clean_up_starts] an exported promise that resolves when the clean-up starts.
+   [start_exiting] a non-exported resolver for the promise *)
+let (clean_up_starts, start_clean_up) = Lwt.wait ()
+
+(* [clean_up_ends] is a promise that resolves once the clean-up is finished. *)
+let clean_up_ends =
+  clean_up_starts
+  >>= fun status -> clean_up status >>= fun () -> Lwt.return status
+
+(* 4. exiting *)
+
+(* simple exit is not exported, it is just to factor out exiting *)
+let exit n =
+  match Lwt.state clean_up_starts with
+  | Sleep ->
+      Lwt.wakeup start_clean_up n
+  | Return _ ->
+      ()
+  | Fail _ ->
+      assert false
+
+(* [exit_and_raise] is meant to be used deep inside the program after having
+   witnessed, say, a fatal error. It raises an exception so that it can be used
+   anywhere in the program. *)
+let exit_and_raise n = exit n ; raise Exit
+
+(* [exit_and_wait] is meant to be used near the main invocation of the program,
+   right inside of [Lwt_main.run] but presumably after [wrap_and_error]. *)
+let exit_and_wait n = exit n ; clean_up_ends
+
+(* 5. signals *)
+
+(** Known signals and their names *)
 let signals =
   let open Sys in
   [ (sigabrt, "ABRT");
@@ -84,65 +136,147 @@ let signals =
     (sigxcpu, "XCPU");
     (sigxfsz, "XFSZ") ]
 
-let string_of_signal sig_num =
-  Option.value
-    ~default:(Format.sprintf "%d" sig_num)
-    (List.assoc_opt sig_num signals)
-
-let set_exit_handler ?(log = Format.eprintf "%s\n%!") signal =
+(** recovering the name of a signal *)
+let signal_name signal =
   match List.assoc_opt signal signals with
-  | None ->
-      Format.kasprintf
-        invalid_arg
-        "Killable.set_exit_handler: unknown signal %d"
-        signal
   | Some name ->
-      let handler signal =
-        try
-          Format.kasprintf
-            log
-            "Received the %s signal, triggering shutdown."
-            name ;
-          exit signal
-        with _ -> ()
-      in
-      ignore (Lwt_unix.on_signal signal handler : Lwt_unix.signal_handler_id)
+      name
+  | None ->
+      Format.asprintf "%d" signal
 
-(* Which signals is the program meant to exit on *)
-let signals_to_exit_on = ref []
+(* soft handling: trigger an exit on first signal, immediately terminate
+   process on second signal *)
+let set_soft_handler signal =
+  let name = signal_name signal in
+  let already_received_once = ref false in
+  Lwt_unix.on_signal signal (fun _signal ->
+      if !already_received_once then (
+        Format.eprintf
+          "%s: signal received again, forcing immediate termination.\n%!"
+          name ;
+        Stdlib.exit 1 )
+      else
+        match Lwt.state clean_up_starts with
+        | Sleep ->
+            Format.eprintf "%s: triggering shutdown.\n%!" name ;
+            Format.eprintf "%s: send signal again to force-quit.\n%!" name ;
+            already_received_once := true ;
+            exit 1
+        | Return _ ->
+            Format.eprintf "%s: already in shutdown.\n%!" name ;
+            Format.eprintf "%s: send signal again to force-quit.\n%!" name ;
+            already_received_once := true
+        | Fail _ ->
+            assert false)
 
-let exit_on ?log signal =
-  if List.mem signal !signals_to_exit_on then
-    Format.kasprintf
-      Stdlib.failwith
-      "Killable.exit_on: already registered signal %d"
-      signal
-  else (
-    signals_to_exit_on := signal :: !signals_to_exit_on ;
-    set_exit_handler ?log signal )
+(* hard handling: immediately terminate process *)
+let set_hard_handler signal =
+  let name = signal_name signal in
+  Lwt_unix.on_signal signal (fun _signal ->
+      Format.eprintf "%s: force-quiting.\n%!" name ;
+      Stdlib.exit 1)
 
-type outcome = Resolved of int | Exited of int
+let unset_handler = Lwt_unix.disable_signal_handler
 
-let retcode_of_unit_result_lwt p =
-  let open Lwt.Infix in
-  p
-  >>= function
-  | Error e ->
-      (* TODO: print *) ignore e ; Lwt.return 1
-  | Ok () ->
-      Lwt.return 0
+(* 6. internal synchronisation *)
 
-let wrap_promise (p : int Lwt.t) =
-  let open Lwt.Infix in
-  Lwt.choose
-    [(p >|= fun v -> Resolved v); (termination_thread >|= fun s -> Exited s)]
-  >>= function
-  | Resolved r ->
-      Lwt.return r
-  | Exited s ->
-      (*TODO: what are the correct expected behaviour here?*)
-      if List.mem s !signals_to_exit_on then (
-        (* Exit because of signal *)
-        Lwt.cancel p ; Lwt.return 2 )
-      else (* Other exit *)
-        Stdlib.exit 3
+let sleep_span s = Lwt_unix.sleep (Ptime.Span.to_float_s s)
+
+let wait_for_clean_up max_clean_up_time =
+  (match Lwt.state clean_up_starts with Return _ -> () | _ -> assert false) ;
+  match Lwt.state clean_up_ends with
+  | Fail _ ->
+      assert false
+  | Return _ ->
+      Lwt.pause ()
+  | Sleep ->
+      ( match max_clean_up_time with
+      | None ->
+          (* without timeout: just wait *)
+          clean_up_ends >>= fun _ -> Lwt.return_unit
+      | Some s ->
+          (* with timeout: pick first to finish *)
+          Lwt.pick [(clean_up_ends >>= fun _ -> Lwt.return_unit); sleep_span s]
+      )
+      (* pause in case timeout and clean-up needs to deal with cancellation *)
+      >>= Lwt.pause
+
+(* 7. main interface: wrapping promises *)
+
+(* take a promise and wrap it in `Ok` but also watch for exiting and wrap that
+   in `Error` *)
+let wrap_and_error ?max_clean_up_time p =
+  (* set signal handling (TODO: provide parameter to customise that) *)
+  let int_handler = set_soft_handler Sys.sigint in
+  let term_handler = set_hard_handler Sys.sigterm in
+  Lwt.try_bind
+    (fun () ->
+      (* Watch out for both [p] and the start of clean-up *)
+      Lwt.choose [p >>= Lwt.return_ok; clean_up_starts >>= Lwt.return_error])
+    (function
+      | Ok v ->
+          ( match Lwt.state clean_up_starts with
+          | Sleep ->
+              ()
+          | _ ->
+              assert false ) ;
+          unset_handler int_handler ;
+          unset_handler term_handler ;
+          Lwt.return (Ok v)
+      | Error status ->
+          ( match Lwt.state clean_up_starts with
+          | Return s ->
+              assert (s = status)
+          | _ ->
+              assert false ) ;
+          Lwt.cancel p ;
+          wait_for_clean_up max_clean_up_time
+          >>= fun () ->
+          unset_handler int_handler ;
+          unset_handler term_handler ;
+          Lwt.return (Error status))
+    (function
+      | Exit -> (
+          (* When [Exit] bubbles from the wrapped promise, maybe it called
+                [exit_and_raise] *)
+          Lwt.pause ()
+          >>= fun () ->
+          match Lwt.state clean_up_starts with
+          | Return status ->
+              wait_for_clean_up max_clean_up_time
+              >>= fun () ->
+              unset_handler int_handler ;
+              unset_handler term_handler ;
+              Lwt.return (Error status)
+          | Fail _ ->
+              assert false
+          | Sleep ->
+              exit 2 ;
+              Format.eprintf
+                "Exit: exit because of uncaught exception: %s\n%!"
+                (Printexc.to_string Exit) ;
+              wait_for_clean_up max_clean_up_time
+              >>= fun () ->
+              unset_handler int_handler ;
+              unset_handler term_handler ;
+              Lwt.return (Error 2) )
+      | exc ->
+          exit 2 ;
+          Format.eprintf
+            "Exit: exit because of uncaught exception: %s\n%!"
+            (Printexc.to_string exc) ;
+          wait_for_clean_up max_clean_up_time
+          >>= fun () ->
+          unset_handler int_handler ;
+          unset_handler term_handler ;
+          Lwt.return (Error 2))
+
+(* same but exit on error *)
+let wrap_and_exit ?max_clean_up_time p =
+  wrap_and_error ?max_clean_up_time p
+  >>= function Ok v -> Lwt.return v | Error status -> Stdlib.exit status
+
+(* same but just return exit status *)
+let wrap_and_forward ?max_clean_up_time p =
+  wrap_and_error ?max_clean_up_time p
+  >>= function Ok v -> Lwt.return v | Error status -> Lwt.return status

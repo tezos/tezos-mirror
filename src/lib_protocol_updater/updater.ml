@@ -35,7 +35,7 @@ let get_datadir () =
   match !datadir with
   | None ->
       fatal_error "Node not initialized" ;
-      Lwt_exit.exit 1
+      Lwt_exit.exit_and_raise 1
   | Some m ->
       m
 

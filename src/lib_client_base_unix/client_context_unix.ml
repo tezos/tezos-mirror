@@ -158,7 +158,7 @@ class unix_ui : Client_context.ui =
   object
     method sleep f = Lwt_unix.sleep f
 
-    method exit : 'a. int -> 'a = fun i -> Lwt_exit.exit i
+    method exit : 'a. int -> 'a = fun i -> Lwt_exit.exit_and_raise i
 
     method now = Tezos_stdlib_unix.Systime_os.now
   end
