@@ -45,6 +45,7 @@ say () {
 make_dot_ocamlformat () {
     local path="$1"
     cat > "$path" <<EOF
+version=0.10
 wrap-fun-args=false
 let-binding-spacing=compact
 field-space=loose
