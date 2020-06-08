@@ -72,14 +72,11 @@ can be executed using ``./carthagenet.sh admin-client``.
 Build from sources
 ------------------
 
-**TL;DR**: Typically you want to do:
+**TL;DR**: Typically from a Debian Buster x86_64 you want to do:
 
 ::
 
-   sudo apt install -y rsync git m4 build-essential patch unzip bubblewrap wget pkg-config libgmp-dev libev-dev libhidapi-dev libffi-dev  which
-   wget https://github.com/ocaml/opam/releases/download/2.0.3/opam-2.0.3-x86_64-linux
-   sudo cp opam-2.0.3-x86_64-linux /usr/local/bin/opam
-   sudo chmod a+x /usr/local/bin/opam
+   sudo apt install -y rsync git m4 build-essential patch unzip bubblewrap wget pkg-config libgmp-dev libev-dev libhidapi-dev libffi-dev opam jq
    git clone https://gitlab.com/tezos/tezos.git
    cd tezos
    git checkout latest-release
@@ -91,11 +88,6 @@ Build from sources
    source ./src/bin_client/bash-completion.sh
    export TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER=Y
 
-For development, numerous shell scripts also rely on jq:
-
-::
-
-   sudo apt install -y jq
 
 Environment
 ~~~~~~~~~~~
@@ -116,7 +108,7 @@ skip it and init opam with ``--disable-sandbox``.
 
 Additionally, the ``master`` branch requires the Rust compiler and
 the Cargo package manager to be installed. You can use
-`the rustup script<https://github.com/rust-lang/rustup>`_ to install both.
+`rustup <https://github.com/rust-lang/rustup>`_ to install both.
 
 Get the sources
 ~~~~~~~~~~~~~~~
