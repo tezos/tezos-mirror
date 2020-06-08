@@ -128,7 +128,7 @@ check_scripts () {
 if [ -f "$1" ] ; then
     action=check.dune
     files="$@"
-else
+elif [ ! -z "${1+set}" ]; then
     action="$1"
     shift
     files="$@"
