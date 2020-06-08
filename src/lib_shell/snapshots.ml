@@ -774,10 +774,8 @@ let reconstruct_storage store context_index chain_id ~user_activated_upgrades
   let rec reconstruct_chunks level =
     Store.with_atomic_rw store (fun () ->
         let rec reconstruct_chunks level =
-          Tezos_stdlib_unix.Utils.display_progress
-            "Reconstructing contexts: %i/%i"
-            level
-            limit ;
+          Tezos_stdlib_unix.Utils.display_progress (fun m ->
+              m "Reconstructing contexts: %i/%i" level limit) ;
           if level = limit then return level
           else
             let block_hash = history.(level) in
@@ -1014,8 +1012,8 @@ let import ?(reconstruct = false) ?patch_context ~data_dir
         (fun (cpt, to_write) current_hash ->
           Tezos_stdlib_unix.Utils.display_progress
             ~refresh_rate:(cpt, 1_000)
-            "Computing predecessors table %dK elements%!"
-            (cpt / 1_000) ;
+            (fun f ->
+              f "Computing predecessors table %dK elements%!" (cpt / 1_000)) ;
           ( if (cpt + 1) mod 5_000 = 0 then
             write_predecessors_table to_write >>= fun () -> Lwt.return_nil
           else Lwt.return to_write )

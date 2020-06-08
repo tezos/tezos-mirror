@@ -567,9 +567,11 @@ module Make (I : Dump_interface) = struct
                 else (
                   Tezos_stdlib_unix.Utils.display_progress
                     ~refresh_rate:(!cpt, 1_000)
-                    "Context: %dK elements, %dMiB written%!"
-                    (!cpt / 1_000)
-                    (!written / 1_048_576) ;
+                    (fun m ->
+                      m
+                        "Context: %dK elements, %dMiB written%!"
+                        (!cpt / 1_000)
+                        (!written / 1_048_576)) ;
                   incr cpt ;
                   set_visit hash ;
                   (* There cannot be a cycle *)
@@ -608,9 +610,11 @@ module Make (I : Dump_interface) = struct
             let dump_pruned cpt pruned =
               Tezos_stdlib_unix.Utils.display_progress
                 ~refresh_rate:(cpt, 1_000)
-                "History: %dK block, %dMiB written"
-                (cpt / 1_000)
-                (!written / 1_048_576) ;
+                (fun m ->
+                  m
+                    "History: %dK block, %dMiB written"
+                    (cpt / 1_000)
+                    (!written / 1_048_576)) ;
               set_proot buf pruned ;
               maybe_flush ()
             in
@@ -668,9 +672,11 @@ module Make (I : Dump_interface) = struct
       let rec first_pass batch ctxt cpt =
         Tezos_stdlib_unix.Utils.display_progress
           ~refresh_rate:(cpt, 1_000)
-          "Context: %dK elements, %dMiB read"
-          (cpt / 1_000)
-          (!read / 1_048_576) ;
+          (fun m ->
+            m
+              "Context: %dK elements, %dMiB read"
+              (cpt / 1_000)
+              (!read / 1_048_576)) ;
         get_command rbuf
         >>=? function
         | Root {block_header; info; parents; block_data} -> (
@@ -695,9 +701,11 @@ module Make (I : Dump_interface) = struct
           cpt =
         Tezos_stdlib_unix.Utils.display_progress
           ~refresh_rate:(cpt, 1_000)
-          "Store: %dK elements, %dMiB read"
-          (cpt / 1_000)
-          (!read / 1_048_576) ;
+          (fun m ->
+            m
+              "Store: %dK elements, %dMiB read"
+              (cpt / 1_000)
+              (!read / 1_048_576)) ;
         get_command rbuf
         >>=? function
         | Proot pruned_block ->
