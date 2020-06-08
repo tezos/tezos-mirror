@@ -23,6 +23,29 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Invoice a contract at given address with a given amount. Returns updated
+   context and a  balance update receipt (singleton list). The address must be
+   a valid base58 hash and its contract must be allocated, otherwise this is
+   no-op and returns empty receipts list. *)
+let invoice_contract :
+    Raw_context.t ->
+    address:string ->
+    amount:Tez_repr.t ->
+    (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t =
+ fun ctxt ~address ~amount ->
+  match Contract_repr.of_b58check address with
+  | Ok recipient -> (
+      Contract_storage.allocated ctxt recipient
+      >>=? function
+      | false ->
+          return (ctxt, [])
+      | true ->
+          Contract_storage.credit ctxt recipient amount
+          >>=? fun ctxt ->
+          return (ctxt, Receipt_repr.[(Contract recipient, Credited amount)]) )
+  | Error _ ->
+      return (ctxt, [])
+
 (* This is the genesis protocol: initialise the state *)
 let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
   Raw_context.prepare_first_block ~level ~timestamp ~fitness ctxt
@@ -53,7 +76,14 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
       >>=? fun ctxt ->
       Vote_storage.update_listings ctxt >>=? fun ctxt -> return ctxt
   | Alpha_previous | Carthage_006 ->
-      let balance_updates = [] in
+      let amount = Tez_repr.of_mutez_exn 662_607_015L in
+      invoice_contract
+        ctxt
+        ~address:
+          (* NOTE: change this address (sandbox 'bootstrap1') *)
+          "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+        ~amount
+      >>=? fun (ctxt, balance_updates) ->
       (* Add balance updates receipts to be attached on the first block of this
          protocol - see [[prepare]] function below *)
       Storage.Pending_migration_balance_updates.init ctxt balance_updates
