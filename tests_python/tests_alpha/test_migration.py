@@ -66,7 +66,15 @@ ALPHA_DEPOSIT_RECEIPTS = [
         "origin": "block",
     },
 ]
-MIGRATION_RECEIPTS: List[object] = []
+MIGRATION_RECEIPTS: List[object] = [
+    # invoice for bootstrap1 contract
+    {
+        "kind": "contract",
+        "contract": constants.IDENTITIES['bootstrap1']['identity'],
+        "change": str(662_607_015),
+        "origin": "migration",
+    }
+]
 
 # configure user-activate-upgrade at MIGRATION_LEVEL to test migration
 NODE_CONFIG = {
