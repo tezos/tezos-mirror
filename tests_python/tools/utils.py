@@ -131,6 +131,14 @@ def get_block_header_at_level(client: Client, level: int) -> dict:
     return block
 
 
+def get_block_metadata_at_level(client: Client, level: int) -> dict:
+    """ Return the block metadata at a given level, level must be less
+        or equal than the current head. If the level is higher than
+        the current, it will fail"""
+    block = client.rpc('get', f'/chains/main/blocks/{level}/metadata')
+    return block
+
+
 def get_block_hash(client: Client, level: int) -> str:
     """Return block hash at given level, level must be less or equal
        than the current head"""
