@@ -13,6 +13,7 @@ from pytest_regtest import register_converter_pre, deregister_converter_pre, \
 from launchers.sandbox import Sandbox, SandboxMultiBranch
 from tools import constants, paths, utils
 from tools.client_regression import ClientRegression
+from client.client import Client
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -210,3 +211,22 @@ def pytest_collection_modifyitems(config, items):
     for item in items:
         if 'regtest' in item.fixturenames:
             item.add_marker('regression')
+
+
+def _wrap_path(binary: str) -> str:
+    res = os.path.join(paths.TEZOS_HOME, binary)
+    assert os.path.isfile(res), f'{res} is not a file'
+    return res
+
+
+CLIENT = 'tezos-client'
+CLIENT_ADMIN = 'tezos-admin-client'
+
+
+@pytest.fixture(scope="class")
+def simple_client():
+    client_path = _wrap_path(CLIENT)
+    client_admin_path = _wrap_path(CLIENT_ADMIN)
+    client = Client(client_path, client_admin_path)
+    yield client
+    client.cleanup()
