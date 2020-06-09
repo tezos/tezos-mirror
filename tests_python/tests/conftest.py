@@ -65,8 +65,9 @@ def pytest_addoption(parser):
         "--log-dir", action="store", help="specify log directory"
     )
     parser.addoption(
-        "--singleprocess", action='store_true', help="the node validates \
-        blocks using only one process, useful for debugging")
+        "--singleprocess", action='store_true', default=False,
+        help="the node validates blocks using only one process,\
+        useful for debugging")
 
 
 DEAD_DAEMONS_WARN = '''
@@ -76,7 +77,7 @@ You can investigate daemon logs by running this test using the
 
 
 @pytest.fixture(scope="class")
-def sandbox(log_dir):
+def sandbox(log_dir, singleprocess):
     """Sandboxed network of nodes.
 
     Nodes, bakers and endorsers are added/removed dynamically."""
