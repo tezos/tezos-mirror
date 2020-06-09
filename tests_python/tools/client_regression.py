@@ -28,14 +28,14 @@ class ClientRegression(client.Client):
     ):
         self.regtest = None
         super().__init__(
-            client_path,
-            admin_client_path,
-            host,
-            base_dir,
-            rpc_port,
-            use_tls,
-            endpoint,
-            disable_disclaimer,
+            client_path=client_path,
+            admin_client_path=admin_client_path,
+            host=host,
+            base_dir=base_dir,
+            rpc_port=rpc_port,
+            use_tls=use_tls,
+            endpoint=endpoint,
+            disable_disclaimer=disable_disclaimer,
         )
 
     def set_regtest(self, regtest):

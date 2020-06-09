@@ -159,7 +159,7 @@ class Sandbox:
         self.nodes[node_id] = node
         return node
 
-    def _instanciate_client(
+    def instanciate_client(
         self,
         rpc_port: int,
         use_tls: Tuple[str, str] = None,
@@ -222,8 +222,11 @@ class Sandbox:
               a given node, so that the sandbox context manager can properly
               clean up all resources.
         """
-        client = self._instanciate_client(
-            node.rpc_port, use_tls, branch, client_factory
+        client = self.instanciate_client(
+            rpc_port=node.rpc_port,
+            use_tls=use_tls,
+            branch=branch,
+            client_factory=client_factory,
         )
         self.init_client(client, node, config_client)
         return client
@@ -239,8 +242,11 @@ class Sandbox:
         """Instantiate a Client and add it to the sandbox manager"""
         error_msg = f'Already a client for id={node_id}'
         assert node_id not in self.clients, error_msg
-        client = self._instanciate_client(
-            rpc_port, use_tls, branch, client_factory
+        client = self.instanciate_client(
+            rpc_port=rpc_port,
+            use_tls=use_tls,
+            branch=branch,
+            client_factory=client_factory,
         )
         self.clients[node_id] = client
         return client
@@ -337,7 +343,11 @@ class Sandbox:
 
         rpc_port = node.rpc_port
         client = self.register_client(
-            node_id, rpc_port, use_tls, branch, client_factory
+            node_id=node_id,
+            rpc_port=rpc_port,
+            use_tls=use_tls,
+            branch=branch,
+            client_factory=client_factory,
         )
 
         self.init_client(client, node, config_client)
