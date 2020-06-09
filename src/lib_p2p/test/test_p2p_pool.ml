@@ -225,9 +225,8 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
 let detach_nodes ?prefix ?timeout ?min_connections ?max_connections
     ?max_incoming_connections ?p2p_versions ?msg_config run_node
     ?(trusted = fun _ points -> points) points =
-  let clients = List.length points in
-  Lwt_list.map_p
-    (fun n ->
+  Lwt_list.mapi_p
+    (fun n _ ->
       let prefix = Option.map (fun f -> f n) prefix in
       let p2p_versions = Option.map (fun f -> f n) p2p_versions in
       let msg_config = Option.map (fun f -> f n) msg_config in
@@ -250,7 +249,7 @@ let detach_nodes ?prefix ?timeout ?min_connections ?max_connections
         other_points
         addr
         port)
-    (0 -- (clients - 1))
+    points
   >>= fun nodes ->
   Lwt.ignore_result (sync_nodes nodes) ;
   Process.wait_all nodes
