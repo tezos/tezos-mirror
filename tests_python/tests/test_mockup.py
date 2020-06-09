@@ -484,3 +484,31 @@ def test_create_mockup_config_show_init_roundtrip(mockup_client,
     _test_create_mockup_init_show_roundtrip(mockup_client, read_initial_state,
                                             read_final_state,
                                             initial_bootstrap_accounts)
+
+
+def test_transfer_rpc(base_dir_n_mockup):
+    """ Variant of test_transfer that uses RPCs to get the balances.
+    """
+    _, mockup_client = base_dir_n_mockup
+    giver = "bootstrap1"
+    receiver = "bootstrap2"
+    transferred = 1.0
+    transferred_mutz = transferred * 1000000
+
+    def get_balance(tz1):
+        res = mockup_client.rpc('get',
+                                f'chains/main/blocks/head/'
+                                f'context/contracts/{tz1}/balance')
+        return float(res)
+
+    addresses = mockup_client.get_known_addresses()
+    giver_tz1 = addresses.wallet[giver]
+    recvr_tz1 = addresses.wallet[receiver]
+    giver_balance_before = get_balance(giver_tz1)
+    receiver_balance_before = get_balance(recvr_tz1)
+    mockup_client.transfer(transferred, giver, receiver)
+    giver_balance_after = get_balance(giver_tz1)
+    receiver_balance_after = get_balance(recvr_tz1)
+
+    assert giver_balance_after < giver_balance_before - transferred_mutz
+    assert receiver_balance_after == receiver_balance_before + transferred_mutz
