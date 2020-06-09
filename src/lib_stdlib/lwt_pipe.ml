@@ -106,7 +106,7 @@ exception Closed
 let rec push ({closed; queue; current_size; max_size; compute_size; _} as q)
     elt =
   let elt_size = compute_size elt in
-  if closed then raise Closed
+  if closed then Lwt.fail Closed
   else if current_size + elt_size < max_size || Queue.is_empty queue then (
     Queue.push (elt_size, elt) queue ;
     q.current_size <- current_size + elt_size ;
@@ -132,7 +132,7 @@ let rec pop ({closed; queue; empty; current_size; _} as q) =
     q.current_size <- current_size - elt_size ;
     if Queue.length queue = 0 then Lwt_condition.signal empty () ;
     Lwt.return elt )
-  else if closed then raise Closed
+  else if closed then Lwt.fail Closed
   else wait_push q >>= fun () -> pop q
 
 let rec pop_with_timeout timeout q =
@@ -140,7 +140,7 @@ let rec pop_with_timeout timeout q =
     Lwt.cancel timeout ;
     pop q >>= Lwt.return_some )
   else if Lwt.is_sleeping timeout then
-    if q.closed then (Lwt.cancel timeout ; raise Closed)
+    if q.closed then (Lwt.cancel timeout ; Lwt.fail Closed)
     else
       let waiter = wait_push q in
       Lwt.pick [timeout; Lwt.protected waiter]
@@ -151,7 +151,7 @@ let rec peek ({closed; queue; _} as q) =
   if not (Queue.is_empty queue) then
     let (_elt_size, elt) = Queue.peek queue in
     Lwt.return elt
-  else if closed then raise Closed
+  else if closed then Lwt.fail Closed
   else wait_push q >>= fun () -> peek q
 
 let peek_all {queue; closed; _} =
