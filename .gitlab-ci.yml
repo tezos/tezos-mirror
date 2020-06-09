@@ -316,16 +316,16 @@ integration:bootstrap:
     - pytest tests_python/tests/test_bootstrap.py -s --log-dir=tmp
   stage: test
 
+integration:client_without_node:
+  <<: *integration_python_definition
+  script:
+    - pytest tests_python/tests/test_client_without_node.py -s --log-dir=tmp
+  stage: test
+
 integration:codec:
   <<: *integration_python_definition
   script:
     - pytest tests_python/tests/test_codec.py -s --log-dir=tmp
-  stage: test
-
-integration:contract:
-  <<: *integration_python_definition
-  script:
-    - pytest tests_python/tests/test_contract.py -s --log-dir=tmp
   stage: test
 
 integration:contract_annotations:
@@ -362,6 +362,12 @@ integration:contract_opcodes:
   <<: *integration_python_definition
   script:
     - pytest tests_python/tests/test_contract_opcodes.py -s --log-dir=tmp
+  stage: test
+
+integration:contract:
+  <<: *integration_python_definition
+  script:
+    - pytest tests_python/tests/test_contract.py -s --log-dir=tmp
   stage: test
 
 integration:cors:
@@ -472,16 +478,16 @@ integration:tls:
     - pytest tests_python/tests/test_tls.py -s --log-dir=tmp
   stage: test
 
-integration:voting:
-  <<: *integration_python_definition
-  script:
-    - pytest tests_python/tests/test_voting.py -s --log-dir=tmp
-  stage: test
-
 integration:voting_full:
   <<: *integration_python_definition
   script:
     - pytest tests_python/tests/test_voting_full.py -s --log-dir=tmp
+  stage: test
+
+integration:voting:
+  <<: *integration_python_definition
+  script:
+    - pytest tests_python/tests/test_voting.py -s --log-dir=tmp
   stage: test
 
 integration:examples_forge_transfer:
