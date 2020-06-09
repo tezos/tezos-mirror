@@ -44,7 +44,7 @@ val push : 'a t -> 'a -> unit Lwt.t
 (** [pop q] is a promise that blocks while [q] is empty, then
     removes and returns the first element in [q].
 
-    fails with [Closed] if [q] has been {!close}d *)
+    The promise is rejected with [Closed] if [q] has been {!close}d *)
 val pop : 'a t -> 'a Lwt.t
 
 (** [pop_with_timeout t q] is a promise that blocks while [q] is empty, then
@@ -56,7 +56,7 @@ val pop : 'a t -> 'a Lwt.t
 
     [t] is canceled (i.e., it fails with [Canceled]) if an element is returned.
 
-    fails with [Closed] if [q] has been {!close}d
+    The promise is rejected with [Closed] if [q] has been {!close}d
 *)
 val pop_with_timeout : unit Lwt.t -> 'a t -> 'a option Lwt.t
 
@@ -79,7 +79,7 @@ val peek_all : 'a t -> 'a list
 
 (** [values_available q] is a promise that blocks while [q] is empty.
 
-    @raise [Closed] if [q] has been {!close}d *)
+    The promise is rejected with [Closed] if [q] has been {!close}d *)
 val values_available : 'a t -> unit Lwt.t
 
 (** [push_now q v] either
