@@ -471,7 +471,7 @@ let commands () =
       @@ param ~name:"type" ~desc:"type of the data expression" data_parameter
       @@ stop )
       (fun (unparsing_mode, legacy) data typ cctxt ->
-        Plugin.RPC.normalize_data
+        Alpha_services.Helpers.Scripts.normalize_data
           cctxt
           (cctxt#chain, cctxt#block)
           ~legacy

@@ -106,6 +106,15 @@ module Scripts : sig
     ty:Script.expr ->
     (bytes * Gas.t) shell_tzresult Lwt.t
 
+  val normalize_data :
+    'a #RPC_context.simple ->
+    'a ->
+    ?legacy:bool ->
+    data:Script.expr ->
+    ty:Script.expr ->
+    unparsing_mode:Script_ir_translator.unparsing_mode ->
+    Script.expr shell_tzresult Lwt.t
+
   val run_operation :
     'a #RPC_context.simple ->
     'a ->
