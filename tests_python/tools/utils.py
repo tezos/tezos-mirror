@@ -2,6 +2,7 @@
 Assertions are retried to avoid using arbitrary time constants in test.
 """
 from typing import Any, List
+import datetime
 import hashlib
 import contextlib
 import json
@@ -193,10 +194,12 @@ def check_logs_counts(logs: List[str], pattern: str) -> int:
 
 
 def activate_alpha(client, parameters=None, timestamp=None,
+                   delay=datetime.timedelta(seconds=3600 * 24 * 365),
                    proto=constants.ALPHA):
     if parameters is None:
         parameters = constants.PARAMETERS
-    client.activate_protocol_json(proto, parameters, timestamp=timestamp)
+    client.activate_protocol_json(proto, parameters, timestamp=timestamp,
+                                  delay=delay)
 
 
 def pprint(json_data: dict) -> None:

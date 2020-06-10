@@ -257,12 +257,15 @@ class Client:
                           parameter_file: str,
                           fitness: str = '1',
                           key: str = 'activator',
-                          timestamp: str = None
+                          timestamp: str = None,
+                          delay: datetime.timedelta =
+                          datetime.timedelta(seconds=3600 * 24 * 365)
                           ) -> client_output.ActivationResult:
         assert os.path.isfile(parameter_file), f'{parameter_file} not a file'
         if timestamp is None:
-            utc_now = datetime.datetime.utcnow()
+            utc_now = datetime.datetime.utcnow() - delay
             timestamp = utc_now.strftime("%Y-%m-%dT%H:%M:%SZ")
+
         cmd = ['-block', 'genesis', 'activate', 'protocol', protocol, 'with',
                'fitness', str(fitness), 'and', 'key', key, 'and', 'parameters',
                parameter_file, '--timestamp', timestamp]
@@ -273,14 +276,16 @@ class Client:
                                parameters: dict,
                                fitness: str = '1',
                                key: str = 'activator',
-                               timestamp: str = None
+                               timestamp: str = None,
+                               delay: datetime.timedelta =
+                               datetime.timedelta(seconds=3600 * 24 * 365)
                                ) -> client_output.ActivationResult:
         with tempfile.NamedTemporaryFile(mode='w+', delete=False) as params:
             param_json = json.dumps(parameters)
             params.write(param_json)
             params.close()
             return self.activate_protocol(protocol, params.name, fitness,
-                                          key, timestamp)
+                                          key, timestamp, delay)
 
     def show_voting_period(self) -> str:
         return self.run(['show', 'voting', 'period'])

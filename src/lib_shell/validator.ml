@@ -103,38 +103,41 @@ let validate_block v ?(force = false) ?chain_id bytes operations =
   | None ->
       failwith "Cannot parse block header."
   | Some block ->
-      ( match chain_id with
-      | None -> (
-          Distributed_db.read_block_header v.db block.shell.predecessor
-          >>= function
-          | None ->
-              failwith
-                "Unknown predecessor (%a), cannot inject the block."
-                Block_hash.pp_short
-                block.shell.predecessor
-          | Some (chain_id, _bh) ->
-              Lwt.return (get v chain_id) )
-      | Some chain_id -> (
-          Lwt.return (get v chain_id)
-          >>=? fun nv ->
-          if force then return nv
-          else
-            Distributed_db.Block_header.known
-              (Chain_validator.chain_db nv)
-              block.shell.predecessor
+      if not (Clock_drift.is_not_too_far_in_the_future block.shell.timestamp)
+      then failwith "Block in the future."
+      else
+        ( match chain_id with
+        | None -> (
+            Distributed_db.read_block_header v.db block.shell.predecessor
             >>= function
-            | true ->
-                return nv
-            | false ->
+            | None ->
                 failwith
                   "Unknown predecessor (%a), cannot inject the block."
                   Block_hash.pp_short
-                  block.shell.predecessor ) )
-      >>=? fun nv ->
-      let validation =
-        Chain_validator.validate_block nv ~force hash block operations
-      in
-      return (hash, validation)
+                  block.shell.predecessor
+            | Some (chain_id, _bh) ->
+                Lwt.return (get v chain_id) )
+        | Some chain_id -> (
+            Lwt.return (get v chain_id)
+            >>=? fun nv ->
+            if force then return nv
+            else
+              Distributed_db.Block_header.known
+                (Chain_validator.chain_db nv)
+                block.shell.predecessor
+              >>= function
+              | true ->
+                  return nv
+              | false ->
+                  failwith
+                    "Unknown predecessor (%a), cannot inject the block."
+                    Block_hash.pp_short
+                    block.shell.predecessor ) )
+        >>=? fun nv ->
+        let validation =
+          Chain_validator.validate_block nv ~force hash block operations
+        in
+        return (hash, validation)
 
 let shutdown {active_chains; block_validator; _} =
   let block_validator_job =

@@ -4,6 +4,7 @@ the test chain in the testing phase of the voting process, and the
 bootstrap heuristics.
 """
 
+import datetime
 import time
 import os
 import json
@@ -52,7 +53,9 @@ class TestVotingFull:
         sandbox.add_node(11, params=node_params(0))
 
     def test_activate_proto_a(self, sandbox: Sandbox):
-        sandbox.client(10).activate_protocol_json(PROTO_A, PARAMETERS)
+        delay = datetime.timedelta(seconds=0)
+        sandbox.client(10).activate_protocol_json(PROTO_A, PARAMETERS,
+                                                  delay=delay)
 
     def test_add_tmp_bootstrap_baker(self, sandbox: Sandbox):
         """ Launch a temporary baker so that 10 and 11 keep broadcasting
@@ -75,6 +78,7 @@ class TestVotingFull:
     def test_bootstrap(self, sandbox: Sandbox):
         clients = sandbox.all_clients()
         for client in clients:
+            print(client.sync_state())
             client.bootstrapped()
 
     def test_remove_tmp_bootstrap_nodes(self, sandbox: Sandbox):

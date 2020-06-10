@@ -42,6 +42,7 @@
          --current-client-binary %{bin:tezos-client}
          --current-admin-client-binary %{bin:tezos-admin-client}
          --current-node-binary %{bin:tezos-node}
+         --timestamp-delay=-600
          )))
 
 (rule
