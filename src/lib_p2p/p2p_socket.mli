@@ -117,11 +117,11 @@ val authenticate :
   'meta P2p_params.conn_meta_config ->
   ('meta P2p_connection.Info.t * 'meta authenticated_connection) tzresult Lwt.t
 
-(** [kick ac motive alts] sends a [Nack] message with the rejection
+(** [nack ac motive alts] sends a [Nack] message with the rejection
     [motive] and a list of proposed
     alternative points to the remote peer, notifying it
     that its connection is rejected. It then closes the connection. *)
-val kick :
+val nack :
   'meta authenticated_connection ->
   P2p_rejection.t ->
   P2p_point.Id.t list ->
@@ -129,7 +129,7 @@ val kick :
 
 (** [Accepts] sends an [Ack message] to the remote peer and wait for an [Ack]
     from the remote peer to complete session set up. This can fail with errors:
-    - [P2p_errors.Rejected_socket_connection] on connection closed 
+    - [P2p_errors.Rejected_socket_connection] on connection closed
     - [P2p_errors.Rejected_by_nack] if [Nack] is received
     - [P2p_errors.Invalid_auth] thrown if [P2p_error.Decipher_error] *)
 val accept :

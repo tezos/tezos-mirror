@@ -308,7 +308,7 @@ type 'meta authenticated_connection = {
   cryptobox_data : Crypto.data;
 }
 
-let kick {fd; cryptobox_data; info} motive potential_peers_to_connect =
+let nack {fd; cryptobox_data; info} motive potential_peers_to_connect =
   let nack =
     if
       P2p_version.feature_available

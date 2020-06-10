@@ -315,7 +315,7 @@ module Low_level = struct
   let run _dir = run_nodes client server
 end
 
-module Kick = struct
+module Nack = struct
   let encoding = Data_encoding.bytes
 
   let is_rejected = function
@@ -334,7 +334,7 @@ module Kick = struct
     >>=? fun () ->
     _assert (P2p_peer.Id.compare info.peer_id id2.peer_id = 0) __LOC__ ""
     >>=? fun () ->
-    P2p_socket.kick auth_fd P2p_rejection.No_motive []
+    P2p_socket.nack auth_fd P2p_rejection.No_motive []
     >>= fun () -> return_unit
 
   let client _ch sched addr port =
@@ -347,7 +347,7 @@ module Kick = struct
   let run _dir = run_nodes client server
 end
 
-module Kicked = struct
+module Nacked = struct
   let encoding = Data_encoding.bytes
 
   let server _ch sched socket =
@@ -355,12 +355,12 @@ module Kicked = struct
     >>=? fun (_info, auth_fd) ->
     P2p_socket.accept ~canceler auth_fd encoding
     >>= fun conn ->
-    _assert (Kick.is_rejected conn) __LOC__ "" >>=? fun () -> return_unit
+    _assert (Nack.is_rejected conn) __LOC__ "" >>=? fun () -> return_unit
 
   let client _ch sched addr port =
     connect sched addr port id2
     >>=? fun auth_fd ->
-    P2p_socket.kick auth_fd P2p_rejection.No_motive []
+    P2p_socket.nack auth_fd P2p_rejection.No_motive []
     >>= fun () -> return_unit
 
   (* This test is skipped because its result on the CI is not deterministic *)
@@ -621,8 +621,8 @@ let main () =
     "tezos-p2p"
     [ ( "p2p-connection.",
         [ wrap "low-level" Low_level.run;
-          wrap "kick" Kick.run;
-          wrap "kicked" Kicked.run;
+          wrap "nack" Nack.run;
+          wrap "nacked" Nacked.run;
           wrap "simple-message" Simple_message.run;
           wrap "chunked-message" Chunked_message.run;
           wrap "oversized-message" Oversized_message.run;

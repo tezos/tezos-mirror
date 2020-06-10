@@ -409,13 +409,13 @@ let raw_authenticate t ?point_info canceler fd point =
              | Deprecated_distributed_db_version
              | Already_connected ) as motive }
       :: _) -> (
-      (* non-acceptable point, kicking it. *)
+      (* non-acceptable point, nack-ing it. *)
       t.log (Rejecting_request (point, info.id_point, info.peer_id)) ;
-      Events.(emit authenticate_status ("kick", point, info.peer_id))
+      Events.(emit authenticate_status ("nack", point, info.peer_id))
       >>= fun () ->
       P2p_pool.list_known_points ~ignore_private:true t.pool
       >>= fun point_list ->
-      P2p_socket.kick auth_fd motive point_list
+      P2p_socket.nack auth_fd motive point_list
       >>= fun () ->
       if not incoming then
         Option.iter
