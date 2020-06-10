@@ -584,9 +584,9 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
         {
           constants with
           hard_gas_limit_per_operation =
-            Z.(of_int 128 |> mul constants.hard_gas_limit_per_operation);
+            Z.(of_int 1000 |> mul constants.hard_gas_limit_per_operation);
           hard_gas_limit_per_block =
-            Z.(of_int 128 |> mul constants.hard_gas_limit_per_block);
+            Z.(of_int 1000 |> mul constants.hard_gas_limit_per_block);
         }
       in
       set_constants ctxt constants >>= fun ctxt -> return ctxt )
