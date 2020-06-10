@@ -92,9 +92,8 @@ class Client:
         if endpoint is not None:
             connectivity_options += ['-endpoint', endpoint]
 
-        client = [client_path]
+        client = [client_path, '-base-dir', base_dir]
         if mode is None or mode == "client":
-            client.extend(['-base-dir', base_dir])
             client.extend(connectivity_options)
         elif mode == "mockup":
             client.extend(['-mode', mode])
@@ -131,9 +130,8 @@ class Client:
         Fails with `CalledProcessError` if command fails
         """
         client = self._admin_client if admin else self._client
-        base_dir_arg = ['-base-dir', self.base_dir]
         trace_opt = ['-l'] if trace else []
-        cmd = client + base_dir_arg + trace_opt + params
+        cmd = client + trace_opt + params
 
         print(format_command(cmd))
 
