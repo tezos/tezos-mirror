@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+val hash : 'a -> int
+
 module type S = Sigs.Hashtbl.S with type error := Error_monad.error list
 
 module Make (H : Stdlib.Hashtbl.HashedType) : S with type key = H.t

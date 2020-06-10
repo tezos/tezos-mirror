@@ -24,6 +24,8 @@
 (*****************************************************************************)
 
 module Make (Seq : Sigs.Seq.S) = struct
+  let hash = Stdlib.Hashtbl.hash
+
   module type S = Sigs.Hashtbl.S with type error := Seq.Monad.out_error
 
   module Make (H : Stdlib.Hashtbl.HashedType) : S with type key = H.t = struct
