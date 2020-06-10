@@ -227,6 +227,12 @@ module Scripts = struct
 
     let path = RPC_path.(path / "scripts")
 
+    let other_contracts_encoding =
+      list
+        (obj2
+           (req "address" Script.expr_encoding)
+           (req "type" Script.expr_encoding))
+
     let run_code_input_encoding =
       merge_objs
         (obj10
@@ -325,10 +331,11 @@ module Scripts = struct
         (obj1 (opt "level" Script_int.n_encoding))
 
     let normalize_stack_input_encoding =
-      obj3
+      obj4
         (req "input" stack_encoding)
         (req "unparsing_mode" unparsing_mode_encoding)
         (opt "legacy" bool)
+        (opt "other_contracts" other_contracts_encoding)
 
     let normalize_stack_output_encoding = obj1 (req "output" stack_encoding)
 
@@ -1175,6 +1182,32 @@ module Scripts = struct
       in
       (ctxt, dummy_contract_hash)
     in
+    let originate_dummy_contracts ctxt =
+      List.fold_left_es
+        (fun ctxt (address, ty) ->
+          let* address =
+            Script_ir_translator.parse_data
+              ctxt
+              ~elab_conf:(Script_ir_translator_config.make ~legacy:false ())
+              ~allow_forged:false
+              Script_typed_ir.address_t
+              (Micheline.root address)
+          in
+          match address with
+          | {destination = Contract (Originated address); entrypoint = _}, _ctxt
+            ->
+              Contract.raw_originate
+                ctxt
+                ~prepaid_bootstrap_storage:false
+                address
+                (* We reuse the default script from View_helpers because
+                   the purpose is the same; we only care about having a
+                   script declaring the correct parameter type but we will
+                   never actually run the script. *)
+                ~script:(View_helpers.make_tzip4_viewer_script ty, None)
+          | _ -> return ctxt)
+        ctxt
+    in
     let sender_and_payer ~sender_opt ~payer_opt ~default_sender =
       match (sender_opt, payer_opt) with
       | None, None ->
@@ -1681,12 +1714,14 @@ module Scripts = struct
     Registration.register0
       ~chunked:true
       S.normalize_stack
-      (fun ctxt () (stack, unparsing_mode, legacy) ->
+      (fun ctxt () (stack, unparsing_mode, legacy, other_contracts) ->
         let legacy = Option.value ~default:false legacy in
         let ctxt = Gas.set_unlimited ctxt in
         let nodes =
           List.map (fun (a, b) -> (Micheline.root a, Micheline.root b)) stack
         in
+        let other_contracts = Option.value ~default:[] other_contracts in
+        let* ctxt = originate_dummy_contracts ctxt other_contracts in
         let* Normalize_stack.Ex_stack (st_ty, x, st), ctxt =
           Normalize_stack.parse_stack ctxt ~legacy nodes
         in
@@ -1871,13 +1906,14 @@ module Scripts = struct
       ()
       (data, ty, unparsing_mode, legacy)
 
-  let normalize_stack ?legacy ~stack ~unparsing_mode ctxt block =
+  let normalize_stack ?legacy ~other_contracts ~stack ~unparsing_mode ctxt block
+      =
     RPC_context.make_call0
       S.normalize_stack
       ctxt
       block
       ()
-      (stack, unparsing_mode, legacy)
+      (stack, unparsing_mode, legacy, other_contracts)
 
   let normalize_script ~script ~unparsing_mode ctxt block =
     RPC_context.make_call0

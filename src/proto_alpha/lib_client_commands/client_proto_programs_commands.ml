@@ -759,6 +759,7 @@ let commands () =
             ~legacy
             ~stack
             ~unparsing_mode
+            ~other_contracts:None
         in
         match r with
         | Ok expr ->
