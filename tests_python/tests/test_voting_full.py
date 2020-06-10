@@ -188,9 +188,9 @@ class TestVotingFull:
         sandbox.add_baker(1, 'bootstrap3', proto=PROTO_B_DAEMON)
 
     @pytest.mark.timeout(60)
-    def test_wait_for_new_proposal_period(self, sandbox: Sandbox):
+    def test_wait_for_proto_b(self, sandbox: Sandbox):
         client = sandbox.client(1)
-        while client.get_level() <= 5 * BLOCKS_PER_VOTING_PERIOD:
+        while client.get_level() < 5 * BLOCKS_PER_VOTING_PERIOD:
             client.rpc('get', '/chains/main/blocks/head/header/shell')
             time.sleep(POLLING_TIME)
 
@@ -199,7 +199,7 @@ class TestVotingFull:
         all_have_proto = False
         while not all_have_proto:
             clients = sandbox.all_clients()
-            all_have_proto = all(client.get_protocol() == PROTO_B
+            all_have_proto = all(client.get_next_protocol() == PROTO_B
                                  for client in clients)
             time.sleep(POLLING_TIME)
 
