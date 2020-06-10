@@ -172,7 +172,7 @@ let get_forced_protocol_upgrade ~user_activated_upgrades =
       LevelMap.empty
       user_activated_upgrades
   in
-  fun ~level -> LevelMap.find_opt level table
+  fun ~level -> LevelMap.find level table
 
 let get_voted_protocol_overrides ~user_activated_protocol_overrides proto_hash
     =

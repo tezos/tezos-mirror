@@ -38,6 +38,10 @@ include module type of Tezos_clic
 include module type of Tezos_crypto
 
 module Data_encoding = Data_encoding
+module Seq = Tezos_lwt_result_stdlib.Lwtreslib.Seq
+module Map = Tezos_lwt_result_stdlib.Lwtreslib.Map
+module Set = Tezos_lwt_result_stdlib.Lwtreslib.Set
+module Hashtbl = Tezos_lwt_result_stdlib.Lwtreslib.Hashtbl
 
 module Option : sig
   include module type of Option

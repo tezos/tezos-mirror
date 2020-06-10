@@ -30,6 +30,10 @@ include Tezos_clic
 include Tezos_crypto
 include Tezos_micheline
 module Data_encoding = Data_encoding
+module Seq = Tezos_lwt_result_stdlib.Lwtreslib.Seq
+module Map = Tezos_lwt_result_stdlib.Lwtreslib.Map
+module Set = Tezos_lwt_result_stdlib.Lwtreslib.Set
+module Hashtbl = Tezos_lwt_result_stdlib.Lwtreslib.Hashtbl
 
 module Option = struct
   include Option
