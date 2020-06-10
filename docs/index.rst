@@ -136,6 +136,7 @@ in the :ref:`introduction <howtoget>`.
    developer/testing
    developer/flextesa
    developer/python_testing_framework
+   developer/tezt
    developer/proposal_testing
    developer/profiling
    developer/contributing

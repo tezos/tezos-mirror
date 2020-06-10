@@ -23,12 +23,29 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* This module runs the tests implemented in all other modules of this directory.
-   Each module defines tests which are thematically related,
-   as functions to be called here. *)
+(* This example is included in the documentation (docs/developers/tezt.rst).
+   It is part of the tests to ensure we keep it up-to-date. *)
 
-(* Note: it is a good idea to have each module tag all of its tests with
-   the module name. For instance, all tests implemented in [bootstrap.ml]
-   have tag ["bootstrap"]. This allows to run only those tests easily. *)
+let check_node_initialization history_mode =
+  Test.run
+    ~title:
+      (sf "node initialization (%s mode)" (Node.show_history_mode history_mode))
+    ~tags:["basic"; "node"; Node.show_history_mode history_mode]
+  @@ fun () ->
+  let* node = Node.init ~history_mode () in
+  let* client = Client.init ~node () in
+  let* () = Client.activate_protocol client in
+  Log.info "Activated protocol." ;
+  let* () = repeat 10 (fun () -> Client.bake_for client) in
+  Log.info "Baked 10 blocks." ;
+  let* level = Node.wait_for_level node 11 in
+  Log.info "Level is now %d." level ;
+  let* identity = Node.wait_for_identity node in
+  if identity = "" then Test.fail "identity is empty" ;
+  Log.info "Identity is not empty." ;
+  return ()
 
-let () = Basic.run () ; Bootstrap.run ()
+let run () =
+  check_node_initialization Archive ;
+  check_node_initialization Full ;
+  check_node_initialization Rolling
