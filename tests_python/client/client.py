@@ -518,10 +518,17 @@ class Client:
     def get_proposals(self) -> dict:
         return self.rpc('get', '/chains/main/blocks/head/votes/proposals')
 
+    def get_metadata(self, params: List[str] = None) -> dict:
+        return self.rpc('get', '/chains/main/blocks/head/metadata',
+                        params=params)
+
     def get_protocol(self, params: List[str] = None) -> str:
-        rpc_res = self.rpc('get', '/chains/main/blocks/head/metadata',
-                           params=params)
-        return rpc_res['protocol']
+        metadata = self.get_metadata(params=params)
+        return metadata['protocol']
+
+    def get_next_protocol(self, params: List[str] = None) -> str:
+        metadata = self.get_metadata(params=params)
+        return metadata['next_protocol']
 
     def get_period_position(self) -> str:
         rpc_res = self.rpc(
