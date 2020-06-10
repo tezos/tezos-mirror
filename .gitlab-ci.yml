@@ -118,6 +118,11 @@ unit:crypto:
   script:
     - dune build @src/lib_crypto/runtest
 
+unit:stdlib_unix:
+  <<: *test_definition
+  script:
+    - dune build @src/lib_stdlib_unix/runtest
+
 unit:protocol_environment:
   <<: *test_definition
   script:
@@ -132,6 +137,11 @@ unit:shell:
   <<: *test_definition
   script:
     - dune build @src/lib_shell/runtest
+
+unit:protocol_compiler:
+  <<: *test_definition
+  script:
+    - dune build @src/lib_protocol_compiler/runtest
 
 unit:src/bin_client:
   <<: *test_definition
