@@ -144,8 +144,6 @@ module Encodings = struct
     Base58.check_encoded_prefix p256 "p2esk" 88
 end
 
-let decrypted = Hashtbl.create 13
-
 (* we cache the password in this list to avoid
    asking the user all the time *)
 let passwords = ref []
@@ -209,9 +207,6 @@ let decrypt_payload cctxt ?name encrypted_sk =
 let decrypt (cctxt : #Client_context.prompter) ?name sk_uri =
   let payload = Uri.path (sk_uri : sk_uri :> Uri.t) in
   decrypt_payload cctxt ?name payload
-  >>=? fun sk ->
-  Hashtbl.replace decrypted sk_uri sk ;
-  return sk
 
 let decrypt_all (cctxt : #Client_context.io_wallet) =
   Secret_key.load cctxt
@@ -262,9 +257,6 @@ let encrypt cctxt sk =
   in
   let path = Base58.simple_encode encoding payload in
   Client_keys.make_sk_uri (Uri.make ~scheme ~path ())
-  >>=? fun sk_uri ->
-  Hashtbl.replace decrypted sk_uri sk ;
-  return sk_uri
 
 module Make (C : sig
   val cctxt : Client_context.prompter
