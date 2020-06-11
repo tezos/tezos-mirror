@@ -31,6 +31,11 @@ include Tezos_crypto
 include Tezos_micheline
 module Data_encoding = Data_encoding
 
+module Option = struct
+  include Option
+  include Tezos_stdlib.TzOption
+end
+
 module List = struct
   include List
   include Tezos_stdlib.TzList

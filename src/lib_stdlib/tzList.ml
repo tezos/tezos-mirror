@@ -55,7 +55,7 @@ let rec last_exn = function
       last_exn xs
 
 let merge_filter2 ?(finalize = List.rev) ?(compare = compare)
-    ?(f = Option.first_some) l1 l2 =
+    ?(f = TzOption.first_some) l1 l2 =
   let sort = List.sort compare in
   let rec merge_aux acc = function
     | ([], []) ->

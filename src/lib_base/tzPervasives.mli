@@ -45,6 +45,16 @@ end
 
 module Data_encoding = Data_encoding
 
+module Option : sig
+  include module type of struct
+    include Option
+  end
+
+  include module type of struct
+    include Tezos_stdlib.TzOption
+  end
+end
+
 module List : sig
   include module type of struct
     include List
