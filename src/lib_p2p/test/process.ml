@@ -226,37 +226,37 @@ let detach ?(prefix = "") ?canceler ?input_encoding ?output_encoding
               ~channel:Lwt_io.stderr
               () ;
           Random.self_init () ;
-          Lwt_main.run
-            (let template = Format.asprintf "%s$(message)" prefix in
-             Lwt_io.close main_in
-             >>= fun () ->
-             Lwt_io.close main_out
-             >>= fun () ->
-             Lwt_io.close main_result
-             >>= fun () ->
-             Lwt_log.default :=
-               Lwt_log.channel
-                 ~template
-                 ~close_mode:`Keep
-                 ~channel:Lwt_io.stderr
-                 () ;
-             lwt_log_notice "PID: %d" (Unix.getpid ())
-             >>= fun () ->
-             handle_result
-               ~value_encoding
-               ~flags
-               canceler
-               (fun () ->
-                 let chans =
-                   Channel.make
-                     ?input_encoding
-                     ?output_encoding
-                     child_in
-                     child_out
-                 in
-                 f chans)
-               child_exit)
-          |> exit
+          (* Lwt_main.run *)
+          (let template = Format.asprintf "%s$(message)" prefix in
+           Lwt_io.close main_in
+           >>= fun () ->
+           Lwt_io.close main_out
+           >>= fun () ->
+           Lwt_io.close main_result
+           >>= fun () ->
+           Lwt_log.default :=
+             Lwt_log.channel
+               ~template
+               ~close_mode:`Keep
+               ~channel:Lwt_io.stderr
+               () ;
+           lwt_log_notice "PID: %d" (Unix.getpid ())
+           >>= fun () ->
+           handle_result
+             ~value_encoding
+             ~flags
+             canceler
+             (fun () ->
+               let chans =
+                 Channel.make
+                   ?input_encoding
+                   ?output_encoding
+                   child_in
+                   child_out
+               in
+               f chans)
+             child_exit)
+          >>= exit
       | pid ->
           Lwt_canceler.on_cancel canceler (fun () ->
               terminate pid ; Lwt.return_unit) ;

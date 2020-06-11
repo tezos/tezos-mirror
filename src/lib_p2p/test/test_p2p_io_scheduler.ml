@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -189,7 +190,7 @@ let run ?display_client_stat ?max_download_speed ?max_upload_speed
         >>= fun () ->
         client ?max_upload_speed ?write_queue_size addr port time n)
   in
-  Error_monad.map_p client (1 -- n)
+  Error_monad.map_s client (1 -- n)
   >>=? fun client_nodes -> Process.wait_all (server_node :: client_nodes)
 
 let () = Random.self_init ()

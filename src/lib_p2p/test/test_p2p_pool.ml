@@ -235,7 +235,7 @@ let detach_nodes ?prefix ?timeout ?min_connections ?max_connections
     ?max_incoming_connections ?p2p_versions ?msg_config run_node
     ?(trusted = fun _ points -> points) points =
   let canceler = Lwt_canceler.create () in
-  Lwt_list.mapi_p
+  Lwt_list.mapi_s
     (fun n _ ->
       let prefix = Option.map (fun f -> f n) prefix in
       let p2p_versions = Option.map (fun f -> f n) p2p_versions in
