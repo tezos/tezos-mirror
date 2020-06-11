@@ -159,8 +159,4 @@ let select_commands ctxt {chain; block; protocol; _} =
   @ Mockup_commands.commands ()
   @ commands_for_version
 
-let () =
-  Client_main_run.run
-    ~log:(Log.fatal_error "%s")
-    (module Client_config)
-    ~select_commands
+let () = Client_main_run.run (module Client_config) ~select_commands

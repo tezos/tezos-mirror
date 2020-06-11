@@ -32,11 +32,6 @@ let () =
     exit 1 )
 
 let () =
-  let log s = Node_logging.fatal_error "%s" s in
-  Lwt_exit.exit_on ~log Sys.sigint ;
-  Lwt_exit.exit_on ~log Sys.sigterm
-
-let () =
   if Filename.basename Sys.argv.(0) = Updater.compiler_name then (
     try
       Tezos_protocol_compiler.Compiler.main
@@ -59,7 +54,9 @@ let () =
         invalid_arg
           "Invalid arguments provided for the validator: expected \
            'tezos-validator --socket-dir <dir>'." ;
-      Stdlib.exit (Lwt_main.run @@ Validator.main ~socket_dir:Sys.argv.(2) ())
+      Stdlib.exit
+        ( Lwt_main.run @@ Lwt_exit.wrap_and_forward
+        @@ Validator.main ~socket_dir:Sys.argv.(2) () )
     with exn ->
       Format.eprintf "%a\n%!" Opterrors.report_error exn ;
       Stdlib.exit 1 )

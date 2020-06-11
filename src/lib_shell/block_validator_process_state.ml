@@ -157,12 +157,12 @@ module External_validator_events = struct
           Format.fprintf
             ppf
             "The process was killed by signal %s"
-            (Lwt_exit.string_of_signal i)
+            (Lwt_exit.signal_name i)
       | WSTOPPED i ->
           Format.fprintf
             ppf
             "The process was stopped by signal %s"
-            (Lwt_exit.string_of_signal i) )
+            (Lwt_exit.signal_name i) )
     | Validator_started pid ->
         Format.fprintf ppf "Block validator started with pid %i" pid
     | Request r ->

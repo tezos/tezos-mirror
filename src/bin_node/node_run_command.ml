@@ -364,33 +364,37 @@ let run ?verbosity ?sandbox ?checkpoint ~singleprocess
         | Error _ as err ->
             Lwt.return err)
   >>=? fun node ->
+  let node_downer =
+    Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
+        Event.(emit shutting_down_node) () >>= fun () -> Node.shutdown node)
+  in
   init_rpc config.rpc node
   >>=? fun rpc ->
+  let rpc_downer =
+    Lwt_exit.register_clean_up_callback
+      ~loc:__LOC__
+      ~after:node_downer
+      (fun _ ->
+        Event.(emit shutting_down_rpc_server) ()
+        >>= fun () -> Lwt_list.iter_p RPC_server.shutdown rpc)
+  in
   Event.(emit node_is_ready) ()
   >>= fun () ->
-  Lwt_exit.(
-    wrap_promise @@ retcode_of_unit_result_lwt @@ Lwt_utils.never_ending ())
-  >>= fun retcode ->
-  (* Clean-shutdown code *)
-  Lwt_exit.termination_thread
-  >>= fun exit_code ->
-  Event.(emit shutting_down_node) ()
-  >>= fun () ->
-  Node.shutdown node
-  >>= fun () ->
-  Event.(emit shutting_down_rpc_server) ()
-  >>= fun () ->
-  Lwt_list.iter_p RPC_server.shutdown rpc
-  >>= fun () ->
-  Event.(emit bye) exit_code
-  >>= fun () -> Internal_event_unix.close () >>= fun () -> return retcode
+  let _ =
+    Lwt_exit.register_clean_up_callback
+      ~loc:__LOC__
+      ~after:rpc_downer
+      (fun exit_status ->
+        Event.(emit bye) exit_status >>= fun () -> Internal_event_unix.close ())
+  in
+  Lwt_utils.never_ending ()
 
 let process sandbox verbosity checkpoint singleprocess args =
   let verbosity =
     let open Internal_event in
     match verbosity with [] -> None | [_] -> Some Info | _ -> Some Debug
   in
-  let run =
+  let main_promise =
     Node_shared_arg.read_and_patch_config_file
       ~ignore_bootstrap_peers:
         (match sandbox with Some _ -> true | None -> false)
@@ -435,14 +439,17 @@ let process sandbox verbosity checkpoint singleprocess args =
     | true ->
         failwith "Data directory is locked by another process"
   in
-  match Lwt_main.run run with
-  | Ok (0 | 2) ->
-      (* 2 means that we exit by a signal that was handled *)
-      `Ok ()
-  | Ok _ ->
-      `Error (false, "")
-  | Error err ->
-      `Error (false, Format.asprintf "%a" pp_print_error err)
+  Lwt_main.run
+    ( Lwt_exit.wrap_and_error main_promise
+    >>= function
+    | Ok (Ok _) ->
+        Lwt_exit.exit_and_wait 0 >>= fun _ -> Lwt.return (`Ok ())
+    | Ok (Error err) ->
+        Lwt_exit.exit_and_wait 2
+        >>= fun _ ->
+        Lwt.return (`Error (false, Format.asprintf "%a" pp_print_error err))
+    | Error exit_status ->
+        Lwt.return (`Error (false, Format.asprintf "Exited %d" exit_status)) )
 
 module Term = struct
   let verbosity =
