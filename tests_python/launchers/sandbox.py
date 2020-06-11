@@ -150,13 +150,11 @@ class Sandbox:
                             use_tls: Tuple[str, str] = None,
                             branch: str = "",
                             client_factory: Callable = Client):
-        local_admin_client = self._wrap_path(CLIENT_ADMIN, branch)
-        local_client = self._wrap_path(CLIENT, branch)
         scheme = 'https' if use_tls else 'http'
         endpoint = f'{scheme}://localhost:{rpc_port}'
-        client = client_factory(local_client, local_admin_client,
-                                endpoint=endpoint)
-        return client
+        return self.create_client(branch=branch,
+                                  client_factory=client_factory,
+                                  endpoint=endpoint)
 
     def create_client(self,
                       branch: str = "",
