@@ -194,10 +194,12 @@ let create_connection t p2p_conn id_point point_info peer_info
   let peer_id = P2p_peer_state.Info.peer_id peer_info in
   let canceler = Lwt_canceler.create () in
   let size =
-    Option.map t.config.incoming_app_message_queue_size ~f:(fun qs ->
+    Option.map
+      (fun qs ->
         ( qs,
           fun (size, _) ->
             (Sys.word_size / 8 * 11) + size + Lwt_pipe.push_overhead ))
+      t.config.incoming_app_message_queue_size
   in
   let messages = Lwt_pipe.create ?size () in
   let greylister () =
@@ -216,10 +218,12 @@ let create_connection t p2p_conn id_point point_info peer_info
   in
   let conn_meta = P2p_socket.remote_metadata p2p_conn in
   let timestamp = Systime_os.now () in
-  Option.iter point_info ~f:(fun point_info ->
+  Option.iter
+    (fun point_info ->
       let point = P2p_point_state.Info.point point_info in
       P2p_point_state.set_running ~timestamp point_info peer_id conn ;
-      P2p_pool.Points.add_connected t.pool point point_info) ;
+      P2p_pool.Points.add_connected t.pool point point_info)
+    point_info ;
   t.log (Connection_established (id_point, peer_id)) ;
   P2p_peer_state.set_running ~timestamp peer_info id_point conn conn_meta ;
   P2p_pool.Peers.add_connected t.pool peer_id peer_info ;
@@ -229,15 +233,15 @@ let create_connection t p2p_conn id_point point_info peer_info
       >>= fun () ->
       let timestamp = Systime_os.now () in
       Option.iter
-        ~f:
-          (P2p_point_state.set_disconnected
-             ~timestamp
-             t.config.greylisting_config)
+        (P2p_point_state.set_disconnected
+           ~timestamp
+           t.config.greylisting_config)
         point_info ;
       t.log (Disconnection peer_id) ;
       P2p_peer_state.set_disconnected ~timestamp peer_info ;
-      Option.iter point_info ~f:(fun point_info ->
-          P2p_pool.Points.remove_connected t.pool point_info) ;
+      Option.iter
+        (fun point_info -> P2p_pool.Points.remove_connected t.pool point_info)
+        point_info ;
       P2p_pool.Peers.remove_connected t.pool peer_id ;
       if t.config.max_connections <= P2p_pool.active_connections t.pool then (
         P2p_trigger.broadcast_too_many_connections t.triggers ;
@@ -255,9 +259,9 @@ let is_acceptable t connection_point_info peer_info incoming version =
   let unexpected =
     t.config.private_mode
     && (not
-          (Option.unopt_map
-             ~default:false
-             ~f:P2p_point_state.Info.trusted
+          (Option.fold
+             ~none:false
+             ~some:P2p_point_state.Info.trusted
              connection_point_info))
     && not (P2p_peer_state.Info.trusted peer_info)
   in
@@ -269,10 +273,10 @@ let is_acceptable t connection_point_info peer_info incoming version =
     error P2p_errors.Private_mode )
   else
     (* checking if point is acceptable *)
-    Option.unopt_map
+    Option.fold
       connection_point_info
-      ~default:(ok version)
-      ~f:(fun connection_point_info ->
+      ~none:(ok version)
+      ~some:(fun connection_point_info ->
         match P2p_point_state.get connection_point_info with
         | Accepted _ | Running _ ->
             P2p_rejection.(rejecting Already_connected)
@@ -345,10 +349,9 @@ let raw_authenticate t ?point_info canceler fd point =
       else
         let timestamp = Systime_os.now () in
         Option.iter
-          ~f:
-            (P2p_point_state.set_disconnected
-               ~timestamp
-               t.config.greylisting_config)
+          (P2p_point_state.set_disconnected
+             ~timestamp
+             t.config.greylisting_config)
           point_info ) ;
       Lwt.return_error err)
   >>=? fun (info, auth_fd) ->
@@ -404,10 +407,12 @@ let raw_authenticate t ?point_info canceler fd point =
      by giving late Nack.
   *)
   if incoming then P2p_point.Table.remove t.incoming point ;
-  Option.iter connection_point_info ~f:(fun point_info ->
+  Option.iter
+    (fun point_info ->
       (* set the point to private or not, depending on the [info] gathered
            during authentication *)
-      P2p_point_state.set_private point_info info.private_node) ;
+      P2p_point_state.set_private point_info info.private_node)
+    connection_point_info ;
   match acceptable with
   | Error
       (P2p_rejection.Rejecting
@@ -429,11 +434,10 @@ let raw_authenticate t ?point_info canceler fd point =
       ( if not incoming then
         let timestamp = Systime_os.now () in
         Option.iter
-          ~f:
-            (P2p_point_state.set_disconnected
-               ~timestamp
-               ~requested:true
-               t.config.greylisting_config)
+          (P2p_point_state.set_disconnected
+             ~timestamp
+             ~requested:true
+             t.config.greylisting_config)
           point_info ) ;
       match motive with
       | Unknown_chain_name
@@ -462,12 +466,14 @@ let raw_authenticate t ?point_info canceler fd point =
   | Ok version ->
       t.log (Accepting_request (point, info.id_point, info.peer_id)) ;
       let timestamp = Systime_os.now () in
-      Option.iter connection_point_info ~f:(fun point_info ->
+      Option.iter
+        (fun point_info ->
           P2p_point_state.set_accepted
             ~timestamp
             point_info
             info.peer_id
-            canceler) ;
+            canceler)
+        connection_point_info ;
       P2p_peer_state.set_accepted ~timestamp peer_info info.id_point canceler ;
       Events.(emit authenticate_status) ("accept", point, info.peer_id)
       >>= fun () ->
@@ -508,17 +514,16 @@ let raw_authenticate t ?point_info canceler fd point =
           >>= fun () ->
           let timestamp = Systime_os.now () in
           Option.iter
-            connection_point_info
-            ~f:
-              (P2p_point_state.set_disconnected
-                 ~timestamp
-                 t.config.greylisting_config) ;
+            (P2p_point_state.set_disconnected
+               ~timestamp
+               t.config.greylisting_config)
+            connection_point_info ;
           P2p_peer_state.set_disconnected ~timestamp peer_info ;
           Lwt.return_error err)
       >>=? fun conn ->
       let id_point =
         match
-          (info.id_point, Option.map ~f:P2p_point_state.Info.point point_info)
+          (info.id_point, Option.map P2p_point_state.Info.point point_info)
         with
         | ((addr, _), Some (_, port)) ->
             (addr, Some port)
@@ -593,7 +598,7 @@ let connect ?timeout t point =
     (P2p_pool.Points.banned t.pool point)
     (P2p_errors.Point_banned point)
   >>=? fun () ->
-  let timeout = Option.unopt ~default:t.config.connection_timeout timeout in
+  let timeout = Option.value ~default:t.config.connection_timeout timeout in
   fail_unless
     (P2p_pool.active_connections t.pool <= t.config.max_connections)
     P2p_errors.Too_many_connections

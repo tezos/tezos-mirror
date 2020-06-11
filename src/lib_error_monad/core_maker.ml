@@ -272,7 +272,7 @@ end = struct
           description;
           from_error;
           encoding_case;
-          pp = Option.unopt ~default:(json_pp name description encoding) pp;
+          pp = Option.value ~default:(json_pp name description encoding) pp;
         }
       :: !error_kinds
 

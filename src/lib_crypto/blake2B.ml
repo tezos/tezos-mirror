@@ -122,7 +122,7 @@ module Make_minimal (K : Name) = struct
     Blake2b.direct ?key input size
 
   let hash_string ?key l =
-    let key = Option.map ~f:Bytes.of_string key in
+    let key = Option.map Bytes.of_string key in
     let input = String.concat "" l in
     Blake2b.direct ?key (Bytes.of_string input) size
 

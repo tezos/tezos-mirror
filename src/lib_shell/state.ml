@@ -1460,7 +1460,7 @@ module Block = struct
     else protocol_hash_exn pred )
     >>= fun protocol ->
     let map =
-      Option.unopt
+      Option.value
         ~default:Protocol_hash.Map.empty
         (Protocol_hash.Table.find_opt
            chain_state.block_rpc_directories
@@ -1507,7 +1507,7 @@ module Block = struct
             Chain.get_level_indexed_protocol chain_state pred
             >>= fun protocol ->
             let map =
-              Option.unopt
+              Option.value
                 ~default:Protocol_hash.Map.empty
                 (Protocol_hash.Table.find_opt
                    chain_state.header_rpc_directories
@@ -1809,7 +1809,7 @@ let init ?patch_context ?commit_genesis ?(store_mapsize = 40_960_000_000L)
   Store.Configuration.History_mode.read_opt global_store
   >>= (function
         | None ->
-            let mode = Option.unopt ~default:History_mode.Full history_mode in
+            let mode = Option.value ~default:History_mode.Full history_mode in
             Store.Configuration.History_mode.store global_store mode
             >>= fun () -> return mode
         | Some previous_history_mode -> (

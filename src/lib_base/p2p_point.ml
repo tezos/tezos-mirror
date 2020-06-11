@@ -100,7 +100,7 @@ module Id = struct
     let (addr, port) = parse_addr_port str in
     let port =
       if port = "" then
-        Option.unopt_exn
+        TzOption.unopt_exn
           (Invalid_argument "P2p_point.of_string_exn: no port")
           default_port
       else int_of_string port

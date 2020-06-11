@@ -230,7 +230,7 @@ let ask_for_more_contacts t =
         Lwt_unix.sleep time_between_looking_for_peers >>= fun () -> return_unit)
   else (
     broadcast_bootstrap_msg t ;
-    Option.iter ~f:P2p_discovery.wakeup t.discovery ;
+    Option.iter P2p_discovery.wakeup t.discovery ;
     protect ~canceler:t.canceler (fun () ->
         Lwt.pick
           [ P2p_trigger.wait_new_peer t.triggers;
@@ -364,7 +364,7 @@ let activate t =
       ~on_event:Internal_event.Lwt_worker_event.on_event
       ~run:(fun () -> worker_loop t)
       ~cancel:(fun () -> Lwt_canceler.cancel t.canceler) ;
-  Option.iter t.discovery ~f:P2p_discovery.activate
+  Option.iter P2p_discovery.activate t.discovery
 
 let maintain t =
   let wait = Lwt_condition.wait t.just_maintained in

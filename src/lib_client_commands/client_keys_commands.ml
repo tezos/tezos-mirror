@@ -495,7 +495,7 @@ let commands version : Client_context.full Clic.command list =
                   cctxt#message "%s: %s" name v
               | (_, Some uri) ->
                   let scheme =
-                    Option.unopt ~default:"unencrypted"
+                    Option.value ~default:"unencrypted"
                     @@ Uri.scheme (uri : sk_uri :> Uri.t)
                   in
                   cctxt#message "%s: %s (%s sk known)" name v scheme

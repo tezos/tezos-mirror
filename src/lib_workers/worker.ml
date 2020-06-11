@@ -457,7 +457,7 @@ struct
     | Bounded_buffer message_queue ->
         close_queue message_queue
     | Dropbox_buffer message_box ->
-        ( try Option.iter ~f:wakeup (Lwt_dropbox.peek message_box)
+        ( try Option.iter wakeup (Lwt_dropbox.peek message_box)
           with Lwt_dropbox.Closed -> () ) ;
         Lwt_dropbox.close message_box
 

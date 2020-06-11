@@ -255,7 +255,7 @@ let init_node ?sandbox ?checkpoint ~singleprocess (config : Node_config_file.t)
   in
   Node.create
     ~sandboxed:(sandbox <> None)
-    ?sandbox_parameters:(Option.map ~f:snd sandbox_param)
+    ?sandbox_parameters:(Option.map snd sandbox_param)
     ~singleprocess
     node_config
     config.shell.peer_validator_limits

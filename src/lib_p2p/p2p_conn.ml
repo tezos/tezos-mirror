@@ -120,10 +120,7 @@ let create conn point_info peer_info messages canceler ~greylister callback
   let private_node = P2p_socket.private_node conn in
   let trusted_node =
     P2p_peer_state.Info.trusted peer_info
-    || Option.unopt_map
-         ~default:false
-         ~f:P2p_point_state.Info.trusted
-         point_info
+    || Option.fold ~none:false ~some:P2p_point_state.Info.trusted point_info
   in
   let peer_id = peer_info |> P2p_peer_state.Info.peer_id in
   let t =

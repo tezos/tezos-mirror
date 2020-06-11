@@ -199,18 +199,18 @@ class local_ctxt (base_dir : string) (mem_only : bool)
         >>=? fun query ->
         let output_encoding = s.types.output in
         let output = Data_encoding.Json.construct output_encoding in
-        let error =
-          Option.map ~f:(Data_encoding.Json.construct s.types.error)
-        in
+        let error = Option.map (Data_encoding.Json.construct s.types.error) in
         ( match s.types.input with
         | Service.No_input ->
             s.handler query () >>= return
         | Service.Input input -> (
             let body =
-              Option.map body ~f:(fun b ->
+              Option.map
+                (fun b ->
                   Cohttp_lwt.Body.of_string (Data_encoding.Json.to_string b))
+                body
             in
-            let body = Option.unopt ~default:Cohttp_lwt.Body.empty body in
+            let body = Option.value ~default:Cohttp_lwt.Body.empty body in
             Cohttp_lwt.Body.to_string body
             >>= fun body ->
             match Tezos_rpc_http.Media_type.json.destruct input body with

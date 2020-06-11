@@ -190,7 +190,7 @@ let commands () =
         let protocol_parameters =
           Data_encoding.Binary.to_bytes_exn Data_encoding.json json
         in
-        let timestamp = Option.map ~f:Time.System.to_protocol timestamp in
+        let timestamp = Option.map Time.System.to_protocol timestamp in
         bake
           cctxt
           ?timestamp

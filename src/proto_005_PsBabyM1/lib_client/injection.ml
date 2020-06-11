@@ -31,7 +31,7 @@ open Protocol_client_context
 
 let get_branch (rpc_config : #Protocol_client_context.full) ~chain
     ~(block : Block_services.block) branch =
-  let branch = Option.unopt ~default:0 branch in
+  let branch = Option.value ~default:0 branch in
   (* TODO export parameter *)
   ( match block with
   | `Head n ->

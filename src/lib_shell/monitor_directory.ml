@@ -51,7 +51,7 @@ let build_rpc_directory validator mainchain_validator =
         else
           Lwt.pick
             [ Lwt_stream.get block_stream
-              >|= Option.map ~f:(fun b ->
+              >|= Option.map (fun b ->
                       ( State.Block.hash b,
                         (State.Block.header b).shell.timestamp ));
               ( Chain_validator.bootstrapped mainchain_validator

@@ -44,9 +44,9 @@ let rec retry (cctxt : #Protocol_client_context.full) ?max_delay ~delay ~factor
       | `Continue ->
           let next_delay = delay *. factor in
           let delay =
-            Option.unopt_map
-              ~default:next_delay
-              ~f:(fun max_delay -> Float.min next_delay max_delay)
+            Option.fold
+              ~none:next_delay
+              ~some:(fun max_delay -> Float.min next_delay max_delay)
               max_delay
           in
           retry cctxt ?max_delay ~delay ~factor ~tries:(tries - 1) f x )

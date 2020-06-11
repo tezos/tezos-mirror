@@ -101,9 +101,9 @@ let pk_uri_parameter () =
   Clic.parameter (fun _ s -> make_pk_uri @@ Uri.of_string s)
 
 let pk_uri_param ?name ?desc params =
-  let name = Option.unopt ~default:"uri" name in
+  let name = Option.value ~default:"uri" name in
   let desc =
-    Option.unopt
+    Option.value
       ~default:
         "public key\n\
          Varies from one scheme to the other.\n\
@@ -116,9 +116,9 @@ let sk_uri_parameter () =
   Clic.parameter (fun _ s -> make_sk_uri @@ Uri.of_string s)
 
 let sk_uri_param ?name ?desc params =
-  let name = Option.unopt ~default:"uri" name in
+  let name = Option.value ~default:"uri" name in
   let desc =
-    Option.unopt
+    Option.value
       ~default:
         "secret key\n\
          Varies from one scheme to the other.\n\

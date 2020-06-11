@@ -41,7 +41,7 @@ module Protocol = struct
   let to_ptime t =
     let days = Int64.to_int (Int64.div t 86_400L) in
     let ps = Int64.mul (Int64.rem t 86_400L) 1_000_000_000_000L in
-    match Option.apply ~f:Ptime.of_span (Ptime.Span.of_d_ps (days, ps)) with
+    match Option.bind (Ptime.Span.of_d_ps (days, ps)) Ptime.of_span with
     | None ->
         invalid_arg "Time.Protocol.to_ptime"
     | Some ptime ->
@@ -137,7 +137,7 @@ module System = struct
 
     let multiply_exn f s =
       let open Ptime.Span in
-      Option.unopt_exn
+      TzOption.unopt_exn
         (Failure "Time.System.Span.multiply_exn")
         (of_float_s (f *. Ptime.Span.to_float_s s))
 
@@ -184,7 +184,7 @@ module System = struct
   let of_seconds_opt x =
     let days = Int64.to_int (Int64.div x 86_400L) in
     let ps = Int64.mul (Int64.rem x 86_400L) 1_000_000_000_000L in
-    Option.apply ~f:Ptime.of_span (Ptime.Span.of_d_ps (days, ps))
+    Option.bind (Ptime.Span.of_d_ps (days, ps)) Ptime.of_span
 
   let of_seconds_exn x =
     match of_seconds_opt x with

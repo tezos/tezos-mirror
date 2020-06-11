@@ -1399,7 +1399,7 @@ let compute_best_slot_on_current_level ?max_priority
         Tag.DSL.(
           fun f ->
             let max_priority =
-              Option.unopt ~default:default_max_priority max_priority
+              Option.value ~default:default_max_priority max_priority
             in
             f "No slot found at level %a (max_priority = %d)"
             -% t event "no_slot_found" -% a level_tag level

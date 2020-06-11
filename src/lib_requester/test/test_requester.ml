@@ -73,9 +73,9 @@ module Test_disk_table_hash = struct
 
   let read st k =
     Lwt.return
-      (Option.unopt_map
-         ~f:(fun v -> Ok v)
-         ~default:(Error_monad.error_exn Not_found)
+      (Option.fold
+         ~some:(fun v -> Ok v)
+         ~none:(Error_monad.error_exn Not_found)
          (find_opt st k))
 
   let read_opt st k = Lwt.return (find_opt st k)

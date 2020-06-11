@@ -186,7 +186,7 @@ module Forge = struct
     >>=? fun (pkh, priority, _timestamp) ->
     Alpha_services.Delegate.Minimal_valid_time.get rpc_ctxt pred priority 0
     >>=? fun expected_timestamp ->
-    let timestamp = Option.unopt ~default:expected_timestamp timestamp in
+    let timestamp = Option.value ~default:expected_timestamp timestamp in
     let level = Int32.succ pred.header.shell.level in
     ( match Fitness_repr.to_int64 pred.header.shell.fitness with
     | Ok old_fitness ->
@@ -316,13 +316,13 @@ let genesis ?with_commitments ?endorsers_per_block ?initial_endorsers
   let open Tezos_protocol_006_PsCARTHA_parameters in
   let constants = Default_parameters.constants_test in
   let endorsers_per_block =
-    Option.unopt ~default:constants.endorsers_per_block endorsers_per_block
+    Option.value ~default:constants.endorsers_per_block endorsers_per_block
   in
   let initial_endorsers =
-    Option.unopt ~default:constants.initial_endorsers initial_endorsers
+    Option.value ~default:constants.initial_endorsers initial_endorsers
   in
   let min_proposal_quorum =
-    Option.unopt ~default:constants.min_proposal_quorum min_proposal_quorum
+    Option.value ~default:constants.min_proposal_quorum min_proposal_quorum
   in
   let constants =
     {

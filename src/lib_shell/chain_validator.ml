@@ -127,12 +127,14 @@ let shutdown_child nv active_chains =
 
 let notify_new_block w block =
   let nv = Worker.state w in
-  Option.iter nv.parameters.parent ~f:(fun (id, _) ->
+  Option.iter
+    (fun (id, _) ->
       try
         let w = List.assoc id (Worker.list table) in
         let nv = Worker.state w in
         Lwt_watcher.notify nv.valid_block_input block
-      with Not_found -> ()) ;
+      with Not_found -> ())
+    nv.parameters.parent ;
   Lwt_watcher.notify nv.valid_block_input block ;
   Lwt_watcher.notify nv.parameters.global_valid_block_input block ;
   Worker.Queue.push_request_now w (Validated block)

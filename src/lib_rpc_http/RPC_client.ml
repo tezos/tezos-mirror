@@ -147,7 +147,7 @@ module Make (Client : Cohttp_lwt.S.Client) = struct
       | `Gone _ ) as v ->
         return v
     | `Unexpected_status_code (code, (content, _, media_type)) ->
-        let media_type = Option.map media_type ~f:Media_type.name in
+        let media_type = Option.map Media_type.name media_type in
         Cohttp_lwt.Body.to_string content
         >>= fun content ->
         request_failed
@@ -158,11 +158,11 @@ module Make (Client : Cohttp_lwt.S.Client) = struct
         let allowed = List.filter_map RPC_service.meth_of_string allowed in
         request_failed meth uri (Method_not_allowed allowed)
     | `Unsupported_media_type ->
-        let media = Option.map media ~f:Media_type.name in
+        let media = Option.map Media_type.name media in
         request_failed meth uri (Unsupported_media_type media)
     | `Not_acceptable acceptable ->
         let proposed =
-          Option.unopt_map accept ~default:"" ~f:Media_type.accept_header
+          Option.fold accept ~none:"" ~some:Media_type.accept_header
         in
         request_failed meth uri (Not_acceptable {proposed; acceptable})
     | `Bad_request msg ->
@@ -213,8 +213,9 @@ module Make (Client : Cohttp_lwt.S.Client) = struct
       (Data_encoding.json, Data_encoding.json option) RPC_context.rest_result
       Lwt.t =
     let body =
-      Option.map body ~f:(fun b ->
-          Cohttp_lwt.Body.of_string (Data_encoding.Json.to_string b))
+      Option.map
+        (fun b -> Cohttp_lwt.Body.of_string (Data_encoding.Json.to_string b))
+        body
     in
     let media = Media_type.json in
     generic_call meth ?headers ~accept:Media_type.[bson; json] ?body ~media uri
@@ -303,7 +304,7 @@ module Make (Client : Cohttp_lwt.S.Client) = struct
     | `Conflict None | `Error None | `Forbidden None | `Unauthorized None ->
         fail (RPC_context.Generic_error {meth; uri})
     | `Unexpected_status_code (code, (content, _, media_type)) ->
-        let media_type = Option.map media_type ~f:Media_type.name in
+        let media_type = Option.map Media_type.name media_type in
         Cohttp_lwt.Body.to_string content
         >>= fun content ->
         request_failed
@@ -323,12 +324,7 @@ module Make (Client : Cohttp_lwt.S.Client) = struct
         in
         request_failed meth uri (Unsupported_media_type name)
     | `Not_acceptable acceptable ->
-        let proposed =
-          Option.unopt_map
-            (Some accept)
-            ~default:""
-            ~f:Media_type.accept_header
-        in
+        let proposed = Media_type.accept_header accept in
         request_failed meth uri (Not_acceptable {proposed; acceptable})
     | `Bad_request msg ->
         request_failed meth uri (Bad_request msg)
@@ -344,7 +340,7 @@ module Make (Client : Cohttp_lwt.S.Client) = struct
         Cohttp_lwt.Body.to_string body
         >>= fun body ->
         let received =
-          Option.unopt_map media ~default:"" ~f:(fun (l, r) -> l ^ "/" ^ r)
+          Option.fold media ~none:"" ~some:(fun (l, r) -> l ^ "/" ^ r)
         in
         request_failed
           meth

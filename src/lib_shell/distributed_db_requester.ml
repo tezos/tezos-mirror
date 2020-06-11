@@ -177,7 +177,7 @@ module Block_header_storage = struct
 
   let read_opt chain_state h =
     State.Block.read_opt chain_state h
-    >>= fun b -> Lwt.return (Option.map ~f:State.Block.header b)
+    >>= fun b -> Lwt.return (Option.map State.Block.header b)
 end
 
 module Raw_block_header =

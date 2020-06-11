@@ -249,7 +249,7 @@ let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
       | None ->
           return_none )
       >>=? fun parameter ->
-      let parameter = Option.unopt ~default:d_unit parameter in
+      let parameter = Option.value ~default:d_unit parameter in
       return
       @@ build_lambda_for_originated
            ~destination

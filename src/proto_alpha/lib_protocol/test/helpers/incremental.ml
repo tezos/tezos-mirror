@@ -70,7 +70,7 @@ let begin_construction ?(priority = 0) ?timestamp ?seed_nonce_hash
   >>=? fun real_timestamp ->
   Account.find delegate
   >>=? fun delegate ->
-  let timestamp = Option.unopt ~default:real_timestamp timestamp in
+  let timestamp = Option.value ~default:real_timestamp timestamp in
   let contents = Block.Forge.contents ~priority ?seed_nonce_hash () in
   let protocol_data = {Block_header.contents; signature = Signature.zero} in
   let header =

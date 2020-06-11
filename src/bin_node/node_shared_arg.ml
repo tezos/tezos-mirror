@@ -66,15 +66,15 @@ let wrap data_dir config_file network connections max_download_speed
     cors_origins cors_headers log_output history_mode max_latency
     chain_stuck_delay sync_polling_period =
   let actual_data_dir =
-    Option.unopt ~default:Node_config_file.default_data_dir data_dir
+    Option.value ~default:Node_config_file.default_data_dir data_dir
   in
   let config_file =
-    Option.unopt
+    Option.value
       ~default:(actual_data_dir // Node_data_version.default_config_file_name)
       config_file
   in
   let rpc_tls =
-    Option.map ~f:(fun (cert, key) -> {Node_config_file.cert; key}) rpc_tls
+    Option.map (fun (cert, key) -> {Node_config_file.cert; key}) rpc_tls
   in
   (* when `--connections` is used,
      override all the bounds defined in the configuration file. *)
@@ -466,7 +466,7 @@ let read_data_dir args =
   read_config_file args
   >>=? fun cfg ->
   let {data_dir; _} = args in
-  let data_dir = Option.unopt ~default:cfg.data_dir data_dir in
+  let data_dir = Option.value ~default:cfg.data_dir data_dir in
   return data_dir
 
 type error +=

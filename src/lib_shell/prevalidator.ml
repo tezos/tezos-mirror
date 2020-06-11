@@ -383,10 +383,10 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
   let handle_branch_refused pv op oph errors =
     notify_operation pv `Branch_refused op ;
     Option.iter
-      (Ringo.Ring.add_and_return_erased pv.branch_refused oph)
-      ~f:(fun e ->
+      (fun e ->
         pv.branch_refusals <- Operation_hash.Map.remove e pv.branch_refusals ;
-        pv.in_mempool <- Operation_hash.Set.remove e pv.in_mempool) ;
+        pv.in_mempool <- Operation_hash.Set.remove e pv.in_mempool)
+      (Ringo.Ring.add_and_return_erased pv.branch_refused oph) ;
     pv.in_mempool <- Operation_hash.Set.add oph pv.in_mempool ;
     pv.branch_refusals <-
       Operation_hash.Map.add oph (op, errors) pv.branch_refusals
@@ -397,11 +397,11 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
         Operation_hash.Map.iter
           (fun h op ->
             Option.iter
-              (Ringo.Ring.add_and_return_erased pv.branch_delayed h)
-              ~f:(fun e ->
+              (fun e ->
                 pv.branch_delays <-
                   Operation_hash.Map.remove e pv.branch_delays ;
-                pv.in_mempool <- Operation_hash.Set.remove e pv.in_mempool) ;
+                pv.in_mempool <- Operation_hash.Set.remove e pv.in_mempool)
+              (Ringo.Ring.add_and_return_erased pv.branch_delayed h) ;
             pv.in_mempool <- Operation_hash.Set.add h pv.in_mempool ;
             pv.branch_delays <-
               Operation_hash.Map.add h (op, err) pv.branch_delays)
@@ -430,9 +430,9 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
                     }
                 in
                 Option.iter
-                  (Ringo.Ring.add_and_return_erased pv.refused hash)
-                  ~f:(fun e ->
-                    pv.refusals <- Operation_hash.Map.remove e pv.refusals) ;
+                  (fun e ->
+                    pv.refusals <- Operation_hash.Map.remove e pv.refusals)
+                  (Ringo.Ring.add_and_return_erased pv.refused hash) ;
                 pv.refusals <-
                   Operation_hash.Map.add hash (raw, errors) pv.refusals ;
                 Distributed_db.Operation.clear_or_cancel pv.chain_db hash ;
@@ -489,14 +489,14 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
                         else acc_mempool
                       in
                       Option.iter
-                        (Ringo.Ring.add_and_return_erased
-                           pv.branch_delayed
-                           op.hash)
-                        ~f:(fun e ->
+                        (fun e ->
                           pv.branch_delays <-
                             Operation_hash.Map.remove e pv.branch_delays ;
                           pv.in_mempool <-
-                            Operation_hash.Set.remove e pv.in_mempool) ;
+                            Operation_hash.Set.remove e pv.in_mempool)
+                        (Ringo.Ring.add_and_return_erased
+                           pv.branch_delayed
+                           op.hash) ;
                       pv.in_mempool <-
                         Operation_hash.Set.add op.hash pv.in_mempool ;
                       pv.branch_delays <-

@@ -178,10 +178,10 @@ module Cfg_file = struct
              remote_signer,
              confirmations,
              password_filename ) ->
-        let node_addr = Option.unopt ~default:default.node_addr node_addr in
-        let node_port = Option.unopt ~default:default.node_port node_port in
-        let tls = Option.unopt ~default:default.tls tls in
-        let web_port = Option.unopt ~default:default.web_port web_port in
+        let node_addr = Option.value ~default:default.node_addr node_addr in
+        let node_port = Option.value ~default:default.node_port node_port in
+        let tls = Option.value ~default:default.tls tls in
+        let web_port = Option.value ~default:default.web_port web_port in
         {
           base_dir;
           node_addr;
@@ -746,16 +746,15 @@ let parse_config_args (ctx : #Client_context.full) argv =
   else read_config_file config_file )
   >>=? fun cfg ->
   let tls = cfg.tls || tls in
-  let node_addr = Option.unopt ~default:cfg.node_addr node_addr in
-  let node_port = Option.unopt ~default:cfg.node_port node_port in
+  let node_addr = Option.value ~default:cfg.node_addr node_addr in
+  let node_port = Option.value ~default:cfg.node_port node_port in
   Tezos_signer_backends_unix.Remote.read_base_uri_from_env ()
   >>=? fun remote_signer_env ->
   let remote_signer =
-    Option.first_some
-      remote_signer
-      (Option.first_some remote_signer_env cfg.remote_signer)
+    let open Option in
+    first_some remote_signer @@ first_some remote_signer_env cfg.remote_signer
   in
-  let confirmations = Option.unopt ~default:cfg.confirmations confirmations in
+  let confirmations = Option.value ~default:cfg.confirmations confirmations in
   let cfg =
     {
       cfg with
@@ -822,15 +821,16 @@ end
 let other_registrations : (_ -> (module Remote_params) -> _) option =
   Some
     (fun parsed_config_file (module Remote_params) ->
-      Option.iter parsed_config_file.Cfg_file.remote_signer ~f:(fun signer ->
-          Client_keys.register_signer
-            ( module Tezos_signer_backends_unix.Remote.Make
-                       (Tezos_rpc_http_client_unix.RPC_client_unix)
-                       (struct
-                         let default = signer
+      parsed_config_file.Cfg_file.remote_signer
+      |> Option.iter (fun signer ->
+             Client_keys.register_signer
+               ( module Tezos_signer_backends_unix.Remote.Make
+                          (Tezos_rpc_http_client_unix.RPC_client_unix)
+                          (struct
+                            let default = signer
 
-                         include Remote_params
-                       end) )))
+                            include Remote_params
+                          end) )))
 
 let clic_commands ~base_dir:_ ~config_commands ~builtin_commands
     ~other_commands ~require_auth:_ =

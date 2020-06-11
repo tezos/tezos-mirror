@@ -63,8 +63,8 @@ let make_blockchain_network ~alias ~chain_name ?old_chain_name
     genesis;
     genesis_parameters;
     chain_name = of_string chain_name;
-    old_chain_name = Option.map old_chain_name ~f:of_string;
-    incompatible_chain_name = Option.map incompatible_chain_name ~f:of_string;
+    old_chain_name = Option.map of_string old_chain_name;
+    incompatible_chain_name = Option.map of_string incompatible_chain_name;
     sandboxed_chain_name = of_string sandboxed_chain_name;
     user_activated_upgrades =
       List.map
@@ -1057,24 +1057,22 @@ let update ?data_dir ?min_connections ?expected_connections ?max_connections
     ?(enable_testchain = false) ?(cors_origins = []) ?(cors_headers = [])
     ?rpc_tls ?log_output ?bootstrap_threshold ?history_mode ?network
     ?max_latency ?chain_stuck_delay ?sync_polling_period cfg =
-  let data_dir = Option.unopt ~default:cfg.data_dir data_dir in
+  let data_dir = Option.value ~default:cfg.data_dir data_dir in
   Node_data_version.ensure_data_dir data_dir
   >>=? fun () ->
-  let peer_table_size =
-    Option.map peer_table_size ~f:(fun i -> (i, i / 4 * 3))
-  in
+  let peer_table_size = Option.map (fun i -> (i, i / 4 * 3)) peer_table_size in
   let unopt_list ~default = function [] -> default | l -> l in
   let limits : P2p.limits =
     {
       cfg.p2p.limits with
       min_connections =
-        Option.unopt ~default:cfg.p2p.limits.min_connections min_connections;
+        Option.value ~default:cfg.p2p.limits.min_connections min_connections;
       expected_connections =
-        Option.unopt
+        Option.value
           ~default:cfg.p2p.limits.expected_connections
           expected_connections;
       max_connections =
-        Option.unopt ~default:cfg.p2p.limits.max_connections max_connections;
+        Option.value ~default:cfg.p2p.limits.max_connections max_connections;
       max_download_speed =
         Option.first_some max_download_speed cfg.p2p.limits.max_download_speed;
       max_upload_speed =
@@ -1083,14 +1081,14 @@ let update ?data_dir ?min_connections ?expected_connections ?max_connections
         Option.first_some peer_table_size cfg.p2p.limits.max_known_points;
       max_known_peer_ids =
         Option.first_some peer_table_size cfg.p2p.limits.max_known_peer_ids;
-      binary_chunks_size = Option.map ~f:(fun x -> x lsl 10) binary_chunks_size;
+      binary_chunks_size = Option.map (fun x -> x lsl 10) binary_chunks_size;
     }
   in
   let p2p : p2p =
     {
-      expected_pow = Option.unopt ~default:cfg.p2p.expected_pow expected_pow;
+      expected_pow = Option.value ~default:cfg.p2p.expected_pow expected_pow;
       bootstrap_peers =
-        Option.unopt ~default:cfg.p2p.bootstrap_peers bootstrap_peers;
+        Option.value ~default:cfg.p2p.bootstrap_peers bootstrap_peers;
       listen_addr = Option.first_some listen_addr cfg.p2p.listen_addr;
       discovery_addr = Option.first_some discovery_addr cfg.p2p.discovery_addr;
       private_mode = cfg.p2p.private_mode || private_mode;
@@ -1107,7 +1105,7 @@ let update ?data_dir ?min_connections ?expected_connections ?max_connections
       tls = Option.first_some rpc_tls cfg.rpc.tls;
     }
   and log : Lwt_log_sink_unix.cfg =
-    {cfg.log with output = Option.unopt ~default:cfg.log.output log_output}
+    {cfg.log with output = Option.value ~default:cfg.log.output log_output}
   and shell : shell =
     {
       peer_validator_limits = cfg.shell.peer_validator_limits;
@@ -1117,25 +1115,25 @@ let update ?data_dir ?min_connections ?expected_connections ?max_connections
         (let bootstrap_conf : Chain_validator.bootstrap_conf =
            {
              max_latency =
-               Option.unopt
+               Option.value
                  ~default:
                    Node.default_chain_validator_limits.bootstrap_conf
                      .max_latency
                  max_latency;
              chain_stuck_delay =
-               Option.unopt
+               Option.value
                  ~default:
                    Node.default_chain_validator_limits.bootstrap_conf
                      .chain_stuck_delay
                  chain_stuck_delay;
              sync_polling_period =
-               Option.unopt
+               Option.value
                  ~default:
                    Node.default_chain_validator_limits.bootstrap_conf
                      .sync_polling_period
                  sync_polling_period;
              bootstrap_threshold =
-               Option.unopt
+               Option.value
                  ~default:
                    Node.default_chain_validator_limits.bootstrap_conf
                      .bootstrap_threshold
@@ -1149,7 +1147,7 @@ let update ?data_dir ?min_connections ?expected_connections ?max_connections
   (* If --network is specified it overrides the "network" entry of the
      configuration file, which itself defaults to mainnet. *)
   let blockchain_network =
-    Option.unopt ~default:cfg.blockchain_network network
+    Option.value ~default:cfg.blockchain_network network
   in
   return {cfg with data_dir; p2p; rpc; log; shell; blockchain_network}
 

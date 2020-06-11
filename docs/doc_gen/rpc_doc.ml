@@ -204,7 +204,7 @@ module Description = struct
         ppf
         "@[<h>%a@]%a"
         Format.pp_print_text
-        (Option.unopt ~default:"" service.description)
+        (Option.value ~default:"" service.description)
         Query.pp
         service.query
 
@@ -219,7 +219,8 @@ module Description = struct
                 ~shortlabel:"descr"
                 ~content:"Description"
                 target_ref ;
-              Option.iter service.input ~f:(fun _ ->
+              Option.iter
+                (fun _ ->
                   pp_button
                     ppf
                     ~default:false
@@ -231,7 +232,8 @@ module Description = struct
                     ~default:false
                     ~shortlabel:"input.bin"
                     ~content:"Binary input"
-                    target_ref) ;
+                    target_ref)
+                service.input ;
               pp_button
                 ppf
                 ~default:false
@@ -251,7 +253,8 @@ module Description = struct
             target_ref
             pp_description
             service ;
-          Option.iter service.input ~f:(fun input ->
+          Option.iter
+            (fun input ->
               let (schema, bin_schema) = Lazy.force input in
               pp_content
                 ppf
@@ -266,7 +269,8 @@ module Description = struct
                 ~shortlabel:"input.bin"
                 target_ref
                 Data_encoding.Binary_schema.pp
-                bin_schema) ;
+                bin_schema)
+            service.input ;
           pp_content
             ppf
             ~tag:"pre"

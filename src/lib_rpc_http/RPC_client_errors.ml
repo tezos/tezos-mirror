@@ -230,7 +230,7 @@ let pp_rpc_error ppf err =
         ppf
         "@[<v 2>The server refused connection to host \"%s\", please check \
          the node settings for CORS allowed origins.@]"
-        (Option.unopt ~default:"" host)
+        (Option.value ~default:"" host)
 
 let () =
   register_error_kind

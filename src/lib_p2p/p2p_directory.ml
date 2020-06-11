@@ -152,9 +152,9 @@ let build_rpc_directory net =
       P2p_services.Connections.S.info
       (fun peer_id () () ->
         return
-        @@ Option.apply (P2p.pool net) ~f:(fun pool ->
+        @@ Option.bind (P2p.pool net) (fun pool ->
                Option.map
-                 ~f:P2p_conn.info
+                 P2p_conn.info
                  (P2p_pool.Connection.find_by_peer_id pool peer_id)))
   in
   let dir =
@@ -211,7 +211,7 @@ let build_rpc_directory net =
         | Some pool ->
             return
             @@ Option.map
-                 ~f:(info_of_peer_info pool)
+                 (info_of_peer_info pool)
                  (P2p_pool.Peers.info pool peer_id))
   in
   let dir =
@@ -239,7 +239,7 @@ let build_rpc_directory net =
                 let first_request = ref true in
                 let next () =
                   if not !first_request then
-                    Lwt_stream.get stream >|= Option.map ~f:(fun i -> [i])
+                    Lwt_stream.get stream >|= Option.map (fun i -> [i])
                   else (
                     first_request := false ;
                     Lwt.return_some evts )
@@ -336,9 +336,7 @@ let build_rpc_directory net =
             return_none
         | Some pool ->
             return
-            @@ Option.map
-                 (P2p_pool.Points.info pool point)
-                 ~f:info_of_point_info)
+            @@ Option.map info_of_point_info (P2p_pool.Points.info pool point))
   in
   let dir =
     RPC_directory.gen_register1
@@ -365,7 +363,7 @@ let build_rpc_directory net =
                 let first_request = ref true in
                 let next () =
                   if not !first_request then
-                    Lwt_stream.get stream >|= Option.map ~f:(fun i -> [i])
+                    Lwt_stream.get stream >|= Option.map (fun i -> [i])
                   else (
                     first_request := false ;
                     Lwt.return_some evts )

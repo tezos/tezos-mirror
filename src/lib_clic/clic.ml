@@ -533,8 +533,8 @@ let setup_formatter ppf format verbosity =
           let format =
             match !ansi_stack with
             | (pfg, pbg, pb, pu) :: _ ->
-                ( Option.unopt ~default:pfg fg,
-                  Option.unopt ~default:pbg bg,
+                ( Option.value ~default:pfg fg,
+                  Option.value ~default:pbg bg,
                   pb || b,
                   pu || u )
             | [] ->
@@ -1622,24 +1622,23 @@ let insert_in_dispatch_tree : type ctx. ctx tree -> ctx command -> ctx tree =
       type a ictx. (ctx -> ictx) -> ctx tree -> (a, ictx) params -> ctx tree =
    fun conv t c ->
     let insert_tree t c = insert_tree conv t c in
+    let map_autocomplete autocomplete =
+      Option.map (fun a c -> a (conv c)) autocomplete
+    in
     match (t, c) with
     | (TEmpty, Stop) ->
         TStop command
     | (TEmpty, Seq (_, _, {autocomplete; _})) ->
-        TSeq (command, Option.map autocomplete ~f:(fun a c -> a (conv c)))
+        TSeq (command, map_autocomplete autocomplete)
     | (TEmpty, Param (_, _, param, next)) ->
         let autocomplete = access_autocomplete param in
-        let autocomplete =
-          Option.map autocomplete ~f:(fun a c -> a (conv c))
-        in
+        let autocomplete = map_autocomplete autocomplete in
         TParam {tree = insert_tree TEmpty next; stop = None; autocomplete}
     | (TEmpty, Prefix (n, next)) ->
         TPrefix {stop = None; prefix = [(n, insert_tree TEmpty next)]}
     | (TStop cmd, Param (_, _, param, next)) ->
         let autocomplete = access_autocomplete param in
-        let autocomplete =
-          Option.map autocomplete ~f:(fun a c -> a (conv c))
-        in
+        let autocomplete = map_autocomplete autocomplete in
         if not (has_options cmd) then
           TParam
             {tree = insert_tree TEmpty next; stop = Some cmd; autocomplete}
@@ -1899,7 +1898,7 @@ let autocompletion ~script ~cur_arg ~prev_arg ~args ~global_options commands
         None
     | hd :: tl ->
         if hd = prev_arg then
-          Some (Option.unopt ~default:(n + 1) (ind (n + 1) tl))
+          Some (Option.value ~default:(n + 1) (ind (n + 1) tl))
         else ind (n + 1) tl
   in
   ( if prev_arg = script then
@@ -2061,31 +2060,19 @@ let pp_cli_errors ppf ~executable_name ~global_options ~default errs =
           ppf
           "Command line option @{<opt>%s@} expects an argument."
           arg ;
-        Some
-          (Option.unopt_map
-             ~f:(fun command -> [Ex command])
-             ~default:[]
-             command)
+        Some (Option.fold ~some:(fun command -> [Ex command]) ~none:[] command)
     | Bad_option_argument (arg, command) ->
         Format.fprintf
           ppf
           "Wrong value for command line option @{<opt>%s@}."
           arg ;
-        Some
-          (Option.unopt_map
-             ~f:(fun command -> [Ex command])
-             ~default:[]
-             command)
+        Some (Option.fold ~some:(fun command -> [Ex command]) ~none:[] command)
     | Multiple_occurrences (arg, command) ->
         Format.fprintf
           ppf
           "Command line option @{<opt>%s@} appears multiple times."
           arg ;
-        Some
-          (Option.unopt_map
-             ~f:(fun command -> [Ex command])
-             ~default:[]
-             command)
+        Some (Option.fold ~some:(fun command -> [Ex command]) ~none:[] command)
     | No_manual_entry [keyword] ->
         Format.fprintf
           ppf
@@ -2104,11 +2091,7 @@ let pp_cli_errors ppf ~executable_name ~global_options ~default errs =
         Some []
     | Unknown_option (option, command) ->
         Format.fprintf ppf "Unexpected command line option @{<opt>%s@}." option ;
-        Some
-          (Option.unopt_map
-             ~f:(fun command -> [Ex command])
-             ~default:[]
-             command)
+        Some (Option.fold ~some:(fun command -> [Ex command]) ~none:[] command)
     | Extra_arguments (extra, command) ->
         Format.(
           fprintf

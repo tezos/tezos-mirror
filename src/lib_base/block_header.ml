@@ -152,7 +152,7 @@ let of_bytes_exn b = Data_encoding.Binary.of_bytes_exn encoding b
 let to_b58check v = Base58.safe_encode (Bytes.to_string (to_bytes v))
 
 let of_b58check b =
-  Option.apply (Base58.safe_decode b) ~f:(fun s ->
+  Option.bind (Base58.safe_decode b) (fun s ->
       Data_encoding.Binary.of_bytes_opt encoding (Bytes.of_string s))
 
 let hash block = Block_hash.hash_bytes [to_bytes block]

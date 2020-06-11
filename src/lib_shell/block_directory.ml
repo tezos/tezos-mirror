@@ -222,7 +222,7 @@ let build_raw_rpc_directory ~user_activated_upgrades
       >>= fun op -> return op) ;
   (* context *)
   register1 S.Context.read (fun block path q () ->
-      let depth = Option.unopt ~default:max_int q#depth in
+      let depth = Option.value ~default:max_int q#depth in
       fail_unless
         (depth >= 0)
         (Tezos_shell_services.Block_services.Invalid_depth_arg depth)

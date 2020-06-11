@@ -121,7 +121,7 @@ let raw_decode ?(alphabet = Alphabet.default) s =
           None)
     (Some Z.zero)
     s
-  |> Option.map ~f:(fun res ->
+  |> Option.map (fun res ->
          let res = Z.to_bits res in
          let res_tzeros = count_trailing_char res '\000' in
          let len = String.length res - res_tzeros in
@@ -137,15 +137,14 @@ let checksum s =
 let safe_encode ?alphabet s = raw_encode ?alphabet (s ^ checksum s)
 
 let safe_decode ?alphabet s =
-  raw_decode ?alphabet s
-  |> Option.apply ~f:(fun s ->
-         let len = String.length s in
-         if len < 4 then None
-         else
-           (* only if the string is long enough to extract a checksum do we check it *)
-           let msg = String.sub s 0 (len - 4) in
-           let msg_hash = String.sub s (len - 4) 4 in
-           if msg_hash <> checksum msg then None else Some msg)
+  Option.bind (raw_decode ?alphabet s) (fun s ->
+      let len = String.length s in
+      if len < 4 then None
+      else
+        (* only if the string is long enough to extract a checksum do we check it *)
+        let msg = String.sub s 0 (len - 4) in
+        let msg_hash = String.sub s (len - 4) 4 in
+        if msg_hash <> checksum msg then None else Some msg)
 
 type data = ..
 
@@ -162,9 +161,8 @@ type 'a encoding = {
 let prefix {prefix; _} = prefix
 
 let simple_decode ?alphabet {prefix; of_raw; _} s =
-  safe_decode ?alphabet s
-  |> Option.apply ~f:(TzString.remove_prefix ~prefix)
-  |> Option.apply ~f:of_raw
+  let open TzOption in
+  safe_decode ?alphabet s >>= TzString.remove_prefix ~prefix >>= of_raw
 
 let simple_encode ?alphabet {prefix; to_raw; _} d =
   safe_encode ?alphabet (prefix ^ to_raw d)
@@ -250,9 +248,9 @@ struct
         | None ->
             find s encodings
         | Some msg ->
-            of_raw msg |> Option.map ~f:wrap )
+            of_raw msg |> Option.map wrap )
     in
-    safe_decode ?alphabet s |> Option.apply ~f:(fun s -> find s !encodings)
+    Option.bind (safe_decode ?alphabet s) (fun s -> find s !encodings)
 end
 
 type 'a resolver =
@@ -311,7 +309,7 @@ struct
                   (fun msg ->
                     let res = simple_encode encoding ?alphabet msg in
                     TzString.remove_prefix ~prefix:request res
-                    |> Option.map ~f:(fun _ -> res))
+                    |> Option.map (fun _ -> res))
                   msgs )
     in
     find request !resolvers

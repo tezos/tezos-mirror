@@ -70,10 +70,8 @@ type limits = {
 }
 
 let create_scheduler limits =
-  let max_upload_speed = Option.map limits.max_upload_speed ~f:(( * ) 1024) in
-  let max_download_speed =
-    Option.map limits.max_upload_speed ~f:(( * ) 1024)
-  in
+  let max_upload_speed = Option.map (( * ) 1024) limits.max_upload_speed in
+  let max_download_speed = Option.map (( * ) 1024) limits.max_upload_speed in
   P2p_io_scheduler.create
     ~read_buffer_size:limits.read_buffer_size
     ?max_upload_speed
@@ -655,9 +653,9 @@ let iter_connections net = net.iter_connections
 let on_new_connection net = net.on_new_connection
 
 let greylist_addr net addr =
-  Option.iter net.pool ~f:(fun pool -> P2p_pool.greylist_addr pool addr)
+  Option.iter (fun pool -> P2p_pool.greylist_addr pool addr) net.pool
 
 let greylist_peer net peer_id =
-  Option.iter net.pool ~f:(fun pool -> P2p_pool.greylist_peer pool peer_id)
+  Option.iter (fun pool -> P2p_pool.greylist_peer pool peer_id) net.pool
 
 let watcher net = Lwt_watcher.create_stream net.watcher

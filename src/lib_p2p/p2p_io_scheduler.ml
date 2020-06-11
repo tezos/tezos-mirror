@@ -183,7 +183,7 @@ module Scheduler (IO : IO) = struct
         worker = Lwt.return_unit;
         counter = Moving_average.create ~init:0 ~alpha;
         max_speed;
-        quota = Option.unopt ~default:0 max_speed;
+        quota = Option.value ~default:0 max_speed;
         quota_updated = Lwt_condition.create ();
         readys = Lwt_condition.create ();
         readys_high = Queue.create ();
@@ -218,9 +218,11 @@ module Scheduler (IO : IO) = struct
 
   let update_quota st =
     debug "scheduler(%s).update_quota" IO.name ;
-    Option.iter st.max_speed ~f:(fun quota ->
+    Option.iter
+      (fun quota ->
         st.quota <- min st.quota 0 + quota ;
-        Lwt_condition.broadcast st.quota_updated ()) ;
+        Lwt_condition.broadcast st.quota_updated ())
+      st.max_speed ;
     if not (Queue.is_empty st.readys_low) then (
       let tmp = Queue.create () in
       Queue.iter
@@ -388,11 +390,9 @@ let register st fd =
   else
     let id = P2p_fd.id fd in
     let canceler = Lwt_canceler.create () in
-    let read_size =
-      Option.map st.read_queue_size ~f:(fun v -> (v, read_size))
-    in
+    let read_size = Option.map (fun v -> (v, read_size)) st.read_queue_size in
     let write_size =
-      Option.map st.write_queue_size ~f:(fun v -> (v, write_size))
+      Option.map (fun v -> (v, write_size)) st.write_queue_size
     in
     let read_queue = Lwt_pipe.create ?size:read_size () in
     let write_queue = Lwt_pipe.create ?size:write_size () in
@@ -443,9 +443,9 @@ let write_now {write_queue; _} msg = Lwt_pipe.push_now write_queue msg
 
 let read_from conn ?pos ?len buf msg =
   let maxlen = Bytes.length buf in
-  let pos = Option.unopt ~default:0 pos in
+  let pos = Option.value ~default:0 pos in
   assert (0 <= pos && pos < maxlen) ;
-  let len = Option.unopt ~default:(maxlen - pos) len in
+  let len = Option.value ~default:(maxlen - pos) len in
   assert (len <= maxlen - pos) ;
   match msg with
   | Ok msg ->
@@ -466,7 +466,7 @@ let read_now conn ?pos ?len buf =
   | None -> (
     try
       Option.map
-        ~f:(read_from conn ?pos ?len buf)
+        (read_from conn ?pos ?len buf)
         (Lwt_pipe.pop_now conn.read_queue)
     with Lwt_pipe.Closed -> Some (error P2p_errors.Connection_closed) )
 
@@ -484,8 +484,8 @@ let read ?canceler conn ?pos ?len buf =
 
 let read_full ?canceler conn ?pos ?len buf =
   let maxlen = Bytes.length buf in
-  let pos = Option.unopt ~default:0 pos in
-  let len = Option.unopt ~default:(maxlen - pos) len in
+  let pos = Option.value ~default:0 pos in
+  let len = Option.value ~default:(maxlen - pos) len in
   assert (0 <= pos && pos < maxlen) ;
   assert (len <= maxlen - pos) ;
   let rec loop pos len =

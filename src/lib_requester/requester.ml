@@ -419,7 +419,7 @@ end = struct
                       else remaining_peers )
                   in
                   let next_request =
-                    Option.unopt ~default:Ptime.max (Ptime.add_span now delay)
+                    Option.value ~default:Ptime.max (Ptime.add_span now delay)
                   in
                   let next =
                     {
@@ -676,8 +676,9 @@ end = struct
           Scheduler.notify s.scheduler p k ;
           Memory_table.replace s.memory k (Found v) ;
           Lwt.wakeup_later w (Ok v) ;
-          Option.iter s.global_input ~f:(fun input ->
-              Lwt_watcher.notify input (k, v)) ;
+          Option.iter
+            (fun input -> Lwt_watcher.notify input (k, v))
+            s.global_input ;
           Lwt_watcher.notify s.input (k, v) ;
           Lwt.return_unit )
     | Some (Found _) ->

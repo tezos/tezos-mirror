@@ -169,7 +169,7 @@ module Info = struct
   let last_miss s =
     match
       ( s.last_failed_connection,
-        Option.map ~f:(fun (_, time) -> time)
+        Option.map snd
         @@ Time.System.recent s.last_rejected_connection s.last_disconnection
       )
     with

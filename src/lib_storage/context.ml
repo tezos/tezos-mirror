@@ -333,7 +333,7 @@ let dir_mem ctxt key =
   Store.Tree.mem_tree ctxt.tree (data_key key) >>= fun v -> Lwt.return v
 
 let raw_get ctxt key =
-  Store.Tree.find ctxt.tree key >|= Option.map ~f:Bytes.of_string
+  Store.Tree.find ctxt.tree key >|= Option.map Bytes.of_string
 
 let get t key = raw_get t (data_key key)
 

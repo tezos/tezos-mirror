@@ -259,7 +259,7 @@ module Ledger_commands = struct
 
   let sign ?watermark ~version hid curve path (base_msg : Bytes.t) =
     let msg =
-      Option.unopt_map watermark ~default:base_msg ~f:(fun watermark ->
+      Option.fold watermark ~none:base_msg ~some:(fun watermark ->
           Bytes.cat (Signature.bytes_of_watermark watermark) base_msg)
     in
     let path = Bip32_path.tezos_root @ path in
@@ -416,11 +416,11 @@ module Ledger_uri = struct
 
   let parse ?allow_weak uri : t tzresult Lwt.t =
     let host = Uri.host uri in
-    ( match Option.apply host ~f:Signature.Public_key_hash.of_b58check_opt with
+    ( match Option.bind host Signature.Public_key_hash.of_b58check_opt with
     | Some pkh ->
         return (Ledger_id.Pkh pkh)
     | None -> (
-      match Option.apply host ~f:parse_animals with
+      match Option.bind host parse_animals with
       | Some animals ->
           return (Ledger_id.Animals animals)
       | None ->
@@ -657,7 +657,7 @@ let use_ledger_or_fail ~ledger_uri ?filter ?msg f =
   | None ->
       failwith
         "%sFound no ledger corresponding to %a%t."
-        (Option.unopt_map ~default:"" ~f:(Printf.sprintf "%s: ") msg)
+        (Option.fold ~none:"" ~some:(Printf.sprintf "%s: ") msg)
         Ledger_uri.pp
         ledger_uri
         (fun ppf ->
@@ -806,9 +806,9 @@ let generic_commands group =
                         version
                         git_commit
                         ( device_info.manufacturer_string
-                        |> Option.unopt ~default:"NO-MANUFACTURER" )
+                        |> Option.value ~default:"NO-MANUFACTURER" )
                         ( device_info.product_string
-                        |> Option.unopt ~default:"NO-PRODUCT" )
+                        |> Option.value ~default:"NO-PRODUCT" )
                         device_info.path
                     in
                     pp_open_vbox ppf 0 ;
@@ -832,7 +832,7 @@ let generic_commands group =
                           "  tezos-client import secret key ledger_%s \
                            \"ledger://%a/%a/0h/0h\""
                           ( Sys.getenv_opt "USER"
-                          |> Option.unopt ~default:"user" )
+                          |> Option.value ~default:"user" )
                           Ledger_id.pp
                           ledger_id
                           Ledgerwallet_tezos.pp_curve
@@ -862,11 +862,11 @@ let generic_commands group =
               >>= fun () ->
               cctxt#message
                 "* Manufacturer: %s"
-                (Option.unopt device_info.manufacturer_string ~default:"NONE")
+                (Option.value device_info.manufacturer_string ~default:"NONE")
               >>= fun () ->
               cctxt#message
                 "* Product: %s"
-                (Option.unopt device_info.product_string ~default:"NONE")
+                (Option.value device_info.product_string ~default:"NONE")
               >>= fun () ->
               cctxt#message
                 "* Application: %a (git-description: %S)"
@@ -1154,8 +1154,8 @@ let baking_commands group =
               >>=? fun ( `Main_hwm current_mh,
                          `Test_hwm current_th,
                          `Chain_id current_ci ) ->
-              let main_hwm = Option.unopt main_hwm_opt ~default:current_mh in
-              let test_hwm = Option.unopt test_hwm_opt ~default:current_th in
+              let main_hwm = Option.value main_hwm_opt ~default:current_mh in
+              let test_hwm = Option.value test_hwm_opt ~default:current_th in
               cctxt#message
                 "Setting up the ledger:@.* Main chain ID: %a -> %a@.* Main \
                  chain High Watermark: %ld -> %ld@.* Test chain High \

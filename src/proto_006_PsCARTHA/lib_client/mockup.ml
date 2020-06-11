@@ -233,10 +233,10 @@ let apply_protocol_overrides (cctxt : Tezos_client_base.Client_context.full)
     (o : protocol_constants_overrides) (c : Protocol.Constants_repr.parametric)
     =
   let has_custom =
-    Stdlib.Option.is_some o.hard_gas_limit_per_operation
-    || Stdlib.Option.is_some o.hard_gas_limit_per_block
-    || Stdlib.Option.is_some o.hard_storage_limit_per_operation
-    || Stdlib.Option.is_some o.cost_per_byte
+    Option.is_some o.hard_gas_limit_per_operation
+    || Option.is_some o.hard_gas_limit_per_block
+    || Option.is_some o.hard_storage_limit_per_operation
+    || Option.is_some o.cost_per_byte
   in
   ( if has_custom then
     let pp_opt_custom name pp ppf opt_value =
@@ -262,18 +262,18 @@ let apply_protocol_overrides (cctxt : Tezos_client_base.Client_context.full)
     {
       c with
       hard_gas_limit_per_operation =
-        Option.unopt
+        Option.value
           ~default:c.hard_gas_limit_per_operation
           o.hard_gas_limit_per_operation;
       hard_gas_limit_per_block =
-        Option.unopt
+        Option.value
           ~default:c.hard_gas_limit_per_block
           o.hard_gas_limit_per_block;
       hard_storage_limit_per_operation =
-        Option.unopt
+        Option.value
           ~default:c.hard_storage_limit_per_operation
           o.hard_storage_limit_per_operation;
-      cost_per_byte = Option.unopt ~default:c.cost_per_byte o.cost_per_byte;
+      cost_per_byte = Option.value ~default:c.cost_per_byte o.cost_per_byte;
     }
 
 let to_bootstrap_account repr =
@@ -424,7 +424,7 @@ let mem_init :
     {
       parameters with
       bootstrap_accounts =
-        Option.unopt
+        Option.value
           ~default:parameters.bootstrap_accounts
           bootstrap_accounts_custom;
       constants = protocol_custom;

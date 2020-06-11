@@ -593,12 +593,12 @@ end)
 
 let of_b58check_opt s =
   if TzString.has_prefix ~prefix:Ed25519.b58check_encoding.encoded_prefix s
-  then Option.map (Ed25519.of_b58check_opt s) ~f:(fun x -> Ed25519 x)
+  then Option.map (fun x -> Ed25519 x) (Ed25519.of_b58check_opt s)
   else if
     TzString.has_prefix ~prefix:Secp256k1.b58check_encoding.encoded_prefix s
-  then Option.map (Secp256k1.of_b58check_opt s) ~f:(fun x -> Secp256k1 x)
+  then Option.map (fun x -> Secp256k1 x) (Secp256k1.of_b58check_opt s)
   else if TzString.has_prefix ~prefix:P256.b58check_encoding.encoded_prefix s
-  then Option.map (P256.of_b58check_opt s) ~f:(fun x -> P256 x)
+  then Option.map (fun x -> P256 x) (P256.of_b58check_opt s)
   else Base58.simple_decode b58check_encoding s
 
 let of_b58check_exn s =
@@ -693,7 +693,7 @@ let pp_watermark ppf =
         (try String.sub hexed 0 10 ^ "..." with _ -> hexed)
 
 let sign ?watermark secret_key message =
-  let watermark = Option.map ~f:bytes_of_watermark watermark in
+  let watermark = Option.map bytes_of_watermark watermark in
   match secret_key with
   | Secret_key.Ed25519 sk ->
       of_ed25519 (Ed25519.sign ?watermark sk message)
@@ -703,7 +703,7 @@ let sign ?watermark secret_key message =
       of_p256 (P256.sign ?watermark sk message)
 
 let check ?watermark public_key signature message =
-  let watermark = Option.map ~f:bytes_of_watermark watermark in
+  let watermark = Option.map bytes_of_watermark watermark in
   match (public_key, signature) with
   | (Public_key.Ed25519 pk, Unknown signature) -> (
     match Ed25519.of_bytes_opt signature with

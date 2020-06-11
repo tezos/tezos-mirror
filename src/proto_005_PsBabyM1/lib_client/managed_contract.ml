@@ -211,7 +211,7 @@ let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
   | None ->
       return_none )
   >>=? fun parameters ->
-  let parameters = Option.unopt ~default:d_unit parameters in
+  let parameters = Option.value ~default:d_unit parameters in
   let lambda =
     let destination =
       Data_encoding.Binary.to_bytes_exn Contract.encoding destination

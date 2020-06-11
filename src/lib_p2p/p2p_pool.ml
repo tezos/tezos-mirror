@@ -103,9 +103,11 @@ let register_point ?trusted pool ((addr, port) as point) =
   match P2p_point.Table.find_opt pool.known_points point with
   | None ->
       let point_info = P2p_point_state.Info.create ?trusted addr port in
-      Option.iter pool.config.max_known_points ~f:(fun (max, _) ->
+      Option.iter
+        (fun (max, _) ->
           if P2p_point.Table.length pool.known_points >= max then
-            gc_points pool) ;
+            gc_points pool)
+        pool.config.max_known_points ;
       P2p_point.Table.add pool.known_points point point_info ;
       P2p_trigger.broadcast_new_point pool.triggers ;
       pool.log (New_point point) ;
@@ -191,9 +193,11 @@ let register_peer pool peer_id =
           peer_id
           ~peer_metadata:(pool.peer_meta_config.peer_meta_initial ())
       in
-      Option.iter pool.config.max_known_peer_ids ~f:(fun (max, _) ->
+      Option.iter
+        (fun (max, _) ->
           if P2p_peer.Table.length pool.known_peer_ids >= max then
-            gc_peer_ids pool) ;
+            gc_peer_ids pool)
+        pool.config.max_known_peer_ids ;
       P2p_peer.Table.add pool.known_peer_ids peer_id peer ;
       pool.log (New_peer peer_id) ;
       peer
@@ -203,9 +207,7 @@ let register_peer pool peer_id =
 (* this function duplicates bit of code from the modules below to avoid
    creating mutually recursive modules *)
 let connection_of_peer_id pool peer_id =
-  Option.apply
-    (P2p_peer.Table.find_opt pool.known_peer_ids peer_id)
-    ~f:(fun p ->
+  Option.bind (P2p_peer.Table.find_opt pool.known_peer_ids peer_id) (fun p ->
       match P2p_peer_state.get p with
       | Running {data; _} ->
           Some data
@@ -227,8 +229,9 @@ let connections_of_addr pool addr =
     []
 
 let get_addr pool peer_id =
-  Option.map (connection_of_peer_id pool peer_id) ~f:(fun ci ->
-      (P2p_conn.info ci).id_point)
+  Option.map
+    (fun ci -> (P2p_conn.info ci).id_point)
+    (connection_of_peer_id pool peer_id)
 
 module Points = struct
   type ('msg, 'peer, 'conn) info =
@@ -238,9 +241,9 @@ module Points = struct
     P2p_point.Table.find_opt known_points point
 
   let get_trusted pool point =
-    Option.unopt_map
-      ~default:false
-      ~f:P2p_point_state.Info.trusted
+    Option.fold
+      ~none:false
+      ~some:P2p_point_state.Info.trusted
       (P2p_point.Table.find_opt pool.known_points point)
 
   let set_trusted pool point =
@@ -248,7 +251,7 @@ module Points = struct
 
   let unset_trusted pool point =
     Option.iter
-      ~f:P2p_point_state.Info.unset_trusted
+      P2p_point_state.Info.unset_trusted
       (P2p_point.Table.find_opt pool.known_points point)
 
   let fold_known pool ~init ~f = P2p_point.Table.fold f pool.known_points init
@@ -346,7 +349,7 @@ module Peers = struct
           Lwt_exit.exit 1)
         (fun () -> P2p_conn.disconnect conn)
     in
-    Option.iter (connection_of_peer_id pool peer) ~f
+    Option.iter f (connection_of_peer_id pool peer)
 
   let unban pool peer = P2p_acl.unban_peer pool.acl peer
 
@@ -423,7 +426,7 @@ module Connection = struct
         None
 
   let find_by_peer_id pool peer_id =
-    Option.apply (Peers.info pool peer_id) ~f:(fun p ->
+    Option.bind (Peers.info pool peer_id) (fun p ->
         match P2p_peer_state.get p with
         | Running {data; _} ->
             Some data
@@ -431,7 +434,7 @@ module Connection = struct
             None)
 
   let find_by_point pool point =
-    Option.apply (Points.info pool point) ~f:(fun p ->
+    Option.bind (Points.info pool point) (fun p ->
         match P2p_point_state.get p with
         | Running {data; _} ->
             Some data
@@ -445,9 +448,11 @@ let greylist_addr pool addr =
   P2p_acl.IPGreylist.add pool.acl addr (Systime_os.now ())
 
 let greylist_peer pool peer =
-  Option.iter (get_addr pool peer) ~f:(fun (addr, _port) ->
+  Option.iter
+    (fun (addr, _port) ->
       greylist_addr pool addr ;
       P2p_acl.PeerGreylist.add pool.acl peer)
+    (get_addr pool peer)
 
 let acl_clear pool = P2p_acl.clear pool.acl
 

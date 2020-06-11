@@ -463,7 +463,7 @@ module Reader = struct
       (* we push Error only when we close the socket,
                         we don't fear memory leaks in that case... *)
     in
-    let size = Option.map size ~f:(fun max -> (max, compute_size)) in
+    let size = Option.map (fun max -> (max, compute_size)) size in
     let st =
       {
         canceler;
@@ -546,11 +546,13 @@ module Writer = struct
         >>= fun res ->
         match res with
         | Ok () ->
-            Option.iter wakener ~f:(fun u -> Lwt.wakeup_later u res) ;
+            Option.iter (fun u -> Lwt.wakeup_later u res) wakener ;
             worker_loop st
         | Error err -> (
-            Option.iter wakener ~f:(fun u ->
-                Lwt.wakeup_later u (error P2p_errors.Connection_closed)) ;
+            Option.iter
+              (fun u ->
+                Lwt.wakeup_later u (error P2p_errors.Connection_closed))
+              wakener ;
             match err with
             | (Canceled | Exn Lwt_pipe.Closed) :: _ ->
                 lwt_debug
@@ -595,7 +597,7 @@ module Writer = struct
       | (buf_l, Some _) ->
           (2 * Sys.word_size) + buf_list_size buf_l + Lwt_pipe.push_overhead
     in
-    let size = Option.map size ~f:(fun max -> (max, compute_size)) in
+    let size = Option.map (fun max -> (max, compute_size)) size in
     let st =
       {
         canceler;
@@ -610,8 +612,9 @@ module Writer = struct
         Lwt_pipe.close st.messages ;
         while not (Lwt_pipe.is_empty st.messages) do
           let (_, w) = Lwt_pipe.pop_now_exn st.messages in
-          Option.iter w ~f:(fun u ->
-              Lwt.wakeup_later u (error (Exn Lwt_pipe.Closed)))
+          Option.iter
+            (fun u -> Lwt.wakeup_later u (error (Exn Lwt_pipe.Closed)))
+            w
         done ;
         Lwt.return_unit) ;
     st.worker <-

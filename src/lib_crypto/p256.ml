@@ -139,7 +139,7 @@ module Secret_key = struct
   let size = sk_size secp256r1
 
   let of_bytes_opt buf =
-    Option.map ~f:fst (sk_of_bytes secp256r1 (Bigstring.of_bytes buf))
+    Option.map fst (sk_of_bytes secp256r1 (Bigstring.of_bytes buf))
 
   let to_bigstring = to_bytes ~compress:true
 

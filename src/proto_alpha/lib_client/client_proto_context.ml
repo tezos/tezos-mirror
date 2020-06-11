@@ -66,10 +66,7 @@ let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
       return_none )
   >>=? fun parameters ->
   let parameters =
-    Option.unopt_map
-      ~f:Script.lazy_expr
-      ~default:Script.unit_parameter
-      parameters
+    Option.fold ~some:Script.lazy_expr ~none:Script.unit_parameter parameters
   in
   let contents = Transaction {amount; parameters; destination; entrypoint} in
   Injection.inject_manager_operation

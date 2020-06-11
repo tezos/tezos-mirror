@@ -202,11 +202,11 @@ module Make (Proto : Registered_protocol.T) = struct
     iteri2_p
       (fun i ops quota ->
         fail_unless
-          (Option.unopt_map
-             ~default:true
-             ~f:(fun max -> List.length ops <= max)
+          (Option.fold
+             ~none:true
+             ~some:(fun max -> List.length ops <= max)
              quota.Tezos_protocol_environment.max_op)
-          (let max = Option.unopt ~default:~-1 quota.max_op in
+          (let max = Option.value ~default:~-1 quota.max_op in
            invalid_block
              (Too_many_operations {pass = i + 1; found = List.length ops; max}))
         >>=? fun () ->

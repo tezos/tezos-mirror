@@ -57,7 +57,7 @@ module M = struct
         Some empty
     | (n :: k, Dir m, _) -> (
       match
-        raw_set (Option.unopt ~default:empty (StringMap.find_opt n m)) k v
+        raw_set (Option.value ~default:empty (StringMap.find_opt n m)) k v
       with
       | None ->
           None

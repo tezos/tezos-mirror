@@ -545,7 +545,7 @@ module Simple = struct
      | Obj (Req {encoding; _} | Dft {encoding; _}) ->
          pp_human_readable ~never_empty encoding fmt value
      | Obj (Opt {encoding; _}) ->
-         Option.iter ~f:(pp_human_readable ~never_empty encoding fmt) value
+         Option.iter (pp_human_readable ~never_empty encoding fmt) value
      | Objs _ ->
          if never_empty then Format.pp_print_string fmt "<obj>"
      | Tup encoding ->
@@ -1457,10 +1457,7 @@ module Lwt_log_sink = struct
       protect (fun () ->
           let ev = v () in
           let section =
-            Option.unopt_map
-              ~f:Section.to_lwt_log
-              section
-              ~default:default_section
+            Option.fold ~some:Section.to_lwt_log section ~none:default_section
           in
           let level = M.level ev in
           Format.kasprintf

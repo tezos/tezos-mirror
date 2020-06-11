@@ -65,7 +65,7 @@ let run stdin stdout =
             user_activated_upgrades;
             user_activated_protocol_overrides } ->
   let sandbox_param =
-    Option.map ~f:(fun p -> ("sandbox_parameter", p)) sandbox_parameters
+    Option.map (fun p -> ("sandbox_parameter", p)) sandbox_parameters
   in
   Context.init
     ~patch_context:(Patch_context.patch_context genesis sandbox_param)

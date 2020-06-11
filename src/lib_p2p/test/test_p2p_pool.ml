@@ -121,7 +121,7 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
   let identity = P2p_identity.generate proof_of_work_target in
   let private_mode = false in
   let nb_points = List.length trusted_points in
-  let unopt = Option.unopt ~default:nb_points in
+  let unopt = Option.value ~default:nb_points in
   let connect_handler_cfg =
     P2p_connect_handler.
       {
@@ -163,7 +163,7 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
       in
       with_timeout
         ~canceler
-        (Option.unopt_map ~f:timer ~default:(Lwt_utils.never_ending ()) timeout)
+        (Option.fold ~some:timer ~none:(Lwt_utils.never_ending ()) timeout)
         (fun _canceler ->
           let iteration = ref 0 in
           let sched =
@@ -191,7 +191,7 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
           Lwt_list.map_p
             (fun point ->
               P2p_pool.Points.info pool point
-              |> Option.iter ~f:(fun info ->
+              |> Option.iter (fun info ->
                      P2p_point_state.set_private info false) ;
               Lwt.return_unit)
             trusted_points
@@ -228,13 +228,13 @@ let detach_nodes ?prefix ?timeout ?min_connections ?max_connections
   let clients = List.length points in
   Lwt_list.map_p
     (fun n ->
-      let prefix = Option.map prefix ~f:(fun f -> f n) in
-      let p2p_versions = Option.map p2p_versions ~f:(fun f -> f n) in
-      let msg_config = Option.map msg_config ~f:(fun f -> f n) in
-      let min_connections = Option.map min_connections ~f:(fun f -> f n) in
-      let max_connections = Option.map max_connections ~f:(fun f -> f n) in
+      let prefix = Option.map (fun f -> f n) prefix in
+      let p2p_versions = Option.map (fun f -> f n) p2p_versions in
+      let msg_config = Option.map (fun f -> f n) msg_config in
+      let min_connections = Option.map (fun f -> f n) min_connections in
+      let max_connections = Option.map (fun f -> f n) max_connections in
       let max_incoming_connections =
-        Option.map max_incoming_connections ~f:(fun f -> f n)
+        Option.map (fun f -> f n) max_incoming_connections
       in
       let ((addr, port), other_points) = List.select n points in
       detach_node
@@ -535,7 +535,7 @@ module Overcrowded = struct
       P2p_point.Id.pp_list
       all_points ;
     let port =
-      Option.unopt
+      Option.value
         ~default:0
         (P2p_connect_handler.config connect_handler).listening_port
     in
