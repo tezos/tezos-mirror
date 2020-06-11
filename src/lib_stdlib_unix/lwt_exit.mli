@@ -32,18 +32,7 @@
     Specifically, this module allows users to (1) register clean-up callbacks
     and (2) trigger a soft exit. When a soft exit is triggered, the clean-up
     callbacks are called. The process exits once all the clean-up callbacks
-    calls have resolved.
-
-    The module also sets up handlers for signals. [SIGINT] has a soft-handler:
-    it triggers a soft exit (as described above), but triggers an immediate
-    process termination when sent a second time. [SIGTERM] has a hard-handler:
-    it triggers an immediate exit without waiting for the clean-up to resolve.
-
-    IMPORTANT: a hard exit can leave open files in inconsistent states. *)
-
-(** [signal_name signal] is the name of [signal].
-    E.g., [signal_name Sys.sigterm] is ["TERM"]. *)
-val signal_name : int -> string
+    calls have resolved. *)
 
 (** A global promise that resolves when clean-up starts. Note that there is no
     way to "just" start clean-up. Specifically, it is only possible to start the
@@ -103,6 +92,30 @@ val exit_and_raise : int -> 'a
     [Lwt_main.run] for a clean exit. *)
 val exit_and_wait : int -> int Lwt.t
 
+(** Managing signals *)
+
+(** A soft signal handler is one that triggers clean-up. Sending a soft-handled
+    signal a second time whilst the clean-up is in progress terminates the
+    progress immediately. A hard signal handler is one that terminates the
+    process immediately.
+
+    IMPORTANT: a hard exit can leave open files in inconsistent states. *)
+
+type signal_setup
+
+(** [make_signal_setup ~soft ~hard] is a signal setup with [soft] as soft
+    signals and [hard] as hard signals.
+
+    @raise [Invalid_argument] if a signal is not one of [Sys.sig*]*)
+val make_signal_setup : soft:int list -> hard:int list -> signal_setup
+
+(** [default_signal_setup] is [make_signal_setup ~soft:[Sys.sigint] ~hard:[Sys.sigterm]] *)
+val default_signal_setup : signal_setup
+
+(** [signal_name signal] is the name of [signal].
+    E.g., [signal_name Sys.sigterm] is ["TERM"]. *)
+val signal_name : int -> string
+
 (** [wrap_and_exit p] is a promise [q] that behaves as follows:
 
     If [exit_and_raise] is called before [p] is resolved, then the process
@@ -124,6 +137,10 @@ val exit_and_wait : int -> int Lwt.t
     when [max_clean_up_time] has elapsed, then the pending callbacks are
     [cancel]ed, then, after a [Lwt.pause], the process exits.
 
+    The optional argument [signal_setup] (defaults to [default_signal_setup])
+    sets up soft and hard handlers at the beginning and clears them when [q]
+    resolves.
+
     Intended use:
     [Stdlib.exit @@ Lwt_main.run begin
       Lwt_exit.wrap_and_exit (init ()) >>= fun v ->
@@ -132,7 +149,11 @@ val exit_and_wait : int -> int Lwt.t
       exit_and_wait 0 (* clean exit afterwards *)
     end]
 *)
-val wrap_and_exit : ?max_clean_up_time:Ptime.Span.t -> 'a Lwt.t -> 'a Lwt.t
+val wrap_and_exit :
+  ?signal_setup:signal_setup ->
+  ?max_clean_up_time:Ptime.Span.t ->
+  'a Lwt.t ->
+  'a Lwt.t
 
 (** [wrap_and_error p] is similar to [wrap_and_exit p] but it resolves to
     [Error status] instead of exiting with [status]. When it resolves with
@@ -161,7 +182,10 @@ val wrap_and_exit : ?max_clean_up_time:Ptime.Span.t -> 'a Lwt.t -> 'a Lwt.t
     end]
 *)
 val wrap_and_error :
-  ?max_clean_up_time:Ptime.Span.t -> 'a Lwt.t -> ('a, int) result Lwt.t
+  ?signal_setup:signal_setup ->
+  ?max_clean_up_time:Ptime.Span.t ->
+  'a Lwt.t ->
+  ('a, int) result Lwt.t
 
 (** [wrap_and_forward p] is similar to [wrap_and_error p] except that it
     collapses [Ok _] and [Error _].
@@ -189,4 +213,7 @@ val wrap_and_error :
     end]
 *)
 val wrap_and_forward :
-  ?max_clean_up_time:Ptime.Span.t -> int Lwt.t -> int Lwt.t
+  ?signal_setup:signal_setup ->
+  ?max_clean_up_time:Ptime.Span.t ->
+  int Lwt.t ->
+  int Lwt.t

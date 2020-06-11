@@ -104,8 +104,10 @@ let exit_and_wait n = exit n ; clean_up_ends
 
 (* 5. signals *)
 
+type signal_setup = {soft : (int * string) list; hard : (int * string) list}
+
 (** Known signals and their names *)
-let signals =
+let all_signal_names =
   let open Sys in
   [ (sigabrt, "ABRT");
     (sigalrm, "ALRM");
@@ -138,16 +140,25 @@ let signals =
 
 (** recovering the name of a signal *)
 let signal_name signal =
-  match List.assoc_opt signal signals with
+  match List.assoc_opt signal all_signal_names with
   | Some name ->
       name
   | None ->
       Format.asprintf "%d" signal
 
+let make_signal_setup ~soft ~hard =
+  try
+    let soft = List.map (fun signal -> (signal, signal_name signal)) soft in
+    let hard = List.map (fun signal -> (signal, signal_name signal)) hard in
+    {soft; hard}
+  with Not_found -> raise (Invalid_argument "Lwt_exit.make_signal_setup")
+
+let default_signal_setup =
+  make_signal_setup ~soft:[Sys.sigint] ~hard:[Sys.sigterm]
+
 (* soft handling: trigger an exit on first signal, immediately terminate
    process on second signal *)
-let set_soft_handler signal =
-  let name = signal_name signal in
+let set_soft_handler signal name =
   let already_received_once = ref false in
   Lwt_unix.on_signal signal (fun _signal ->
       if !already_received_once then (
@@ -170,13 +181,27 @@ let set_soft_handler signal =
             assert false)
 
 (* hard handling: immediately terminate process *)
-let set_hard_handler signal =
-  let name = signal_name signal in
+let set_hard_handler signal name =
   Lwt_unix.on_signal signal (fun _signal ->
       Format.eprintf "%s: force-quiting.\n%!" name ;
       Stdlib.exit 1)
 
-let unset_handler = Lwt_unix.disable_signal_handler
+let setup_signal_handlers signal_setup =
+  let soft_handler_ids =
+    List.fold_left
+      (fun acc (signal, name) -> set_soft_handler signal name :: acc)
+      []
+      signal_setup.soft
+  in
+  let all_handler_ids =
+    List.fold_left
+      (fun acc (signal, name) -> set_hard_handler signal name :: acc)
+      soft_handler_ids
+      signal_setup.hard
+  in
+  all_handler_ids
+
+let unset_handlers = List.iter Lwt_unix.disable_signal_handler
 
 (* 6. internal synchronisation *)
 
@@ -205,10 +230,9 @@ let wait_for_clean_up max_clean_up_time =
 
 (* take a promise and wrap it in `Ok` but also watch for exiting and wrap that
    in `Error` *)
-let wrap_and_error ?max_clean_up_time p =
-  (* set signal handling (TODO: provide parameter to customise that) *)
-  let int_handler = set_soft_handler Sys.sigint in
-  let term_handler = set_hard_handler Sys.sigterm in
+let wrap_and_error ?(signal_setup = default_signal_setup) ?max_clean_up_time p
+    =
+  let handler_ids = setup_signal_handlers signal_setup in
   Lwt.try_bind
     (fun () ->
       (* Watch out for both [p] and the start of clean-up *)
@@ -220,9 +244,7 @@ let wrap_and_error ?max_clean_up_time p =
               ()
           | _ ->
               assert false ) ;
-          unset_handler int_handler ;
-          unset_handler term_handler ;
-          Lwt.return (Ok v)
+          unset_handlers handler_ids ; Lwt.return (Ok v)
       | Error status ->
           ( match Lwt.state clean_up_starts with
           | Return s ->
@@ -231,10 +253,7 @@ let wrap_and_error ?max_clean_up_time p =
               assert false ) ;
           Lwt.cancel p ;
           wait_for_clean_up max_clean_up_time
-          >>= fun () ->
-          unset_handler int_handler ;
-          unset_handler term_handler ;
-          Lwt.return (Error status))
+          >>= fun () -> unset_handlers handler_ids ; Lwt.return (Error status))
     (function
       | Exit -> (
           (* When [Exit] bubbles from the wrapped promise, maybe it called
@@ -245,9 +264,7 @@ let wrap_and_error ?max_clean_up_time p =
           | Return status ->
               wait_for_clean_up max_clean_up_time
               >>= fun () ->
-              unset_handler int_handler ;
-              unset_handler term_handler ;
-              Lwt.return (Error status)
+              unset_handlers handler_ids ; Lwt.return (Error status)
           | Fail _ ->
               assert false
           | Sleep ->
@@ -256,27 +273,21 @@ let wrap_and_error ?max_clean_up_time p =
                 "Exit: exit because of uncaught exception: %s\n%!"
                 (Printexc.to_string Exit) ;
               wait_for_clean_up max_clean_up_time
-              >>= fun () ->
-              unset_handler int_handler ;
-              unset_handler term_handler ;
-              Lwt.return (Error 2) )
+              >>= fun () -> unset_handlers handler_ids ; Lwt.return (Error 2) )
       | exc ->
           exit 2 ;
           Format.eprintf
             "Exit: exit because of uncaught exception: %s\n%!"
             (Printexc.to_string exc) ;
           wait_for_clean_up max_clean_up_time
-          >>= fun () ->
-          unset_handler int_handler ;
-          unset_handler term_handler ;
-          Lwt.return (Error 2))
+          >>= fun () -> unset_handlers handler_ids ; Lwt.return (Error 2))
 
 (* same but exit on error *)
-let wrap_and_exit ?max_clean_up_time p =
-  wrap_and_error ?max_clean_up_time p
+let wrap_and_exit ?signal_setup ?max_clean_up_time p =
+  wrap_and_error ?max_clean_up_time ?signal_setup p
   >>= function Ok v -> Lwt.return v | Error status -> Stdlib.exit status
 
 (* same but just return exit status *)
-let wrap_and_forward ?max_clean_up_time p =
-  wrap_and_error ?max_clean_up_time p
+let wrap_and_forward ?signal_setup ?max_clean_up_time p =
+  wrap_and_error ?max_clean_up_time ?signal_setup p
   >>= function Ok v -> Lwt.return v | Error status -> Lwt.return status
