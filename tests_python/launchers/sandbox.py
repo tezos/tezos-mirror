@@ -85,7 +85,6 @@ class Sandbox:
         self.p2p = p2p
         self.num_peers = num_peers
         self.clients = {}  # type: Dict[int, Client]
-        self.mockup_client = None
         self.nodes = {}  # type: Dict[int, Node]
         # bakers for each protocol
         self.bakers = {}  # type: Dict[str, Dict[int, Baker]]
@@ -158,6 +157,30 @@ class Sandbox:
         client = client_factory(local_client, local_admin_client,
                                 endpoint=endpoint)
         return client
+
+    def create_client(self,
+                      branch: str = "",
+                      client_factory: Callable = Client,
+                      **kwargs) -> Client:
+        """
+        Creates a new client. Because this method doesn't require a Node,
+        it is appropriate for tests that do not need a node, such as
+        those of the mockup client.
+
+        This client isn't registered in the Sandbox. It means the caller
+        has to perform the cleanup itself by calling the client cleanup method.
+
+        Args:
+            branch (str): sub-dir where to lookup the node and client
+                          binary, default = "". Allows execution of different
+                          versions of nodes.
+            client_factory (Callable): the constructor of clients. Defaults to
+                                       Client. Allows e.g. regression testing.
+            **kwargs: arguments passed to client_factory
+        """
+        local_admin_client = self._wrap_path(CLIENT_ADMIN, branch)
+        local_client = self._wrap_path(CLIENT, branch)
+        return client_factory(local_client, local_admin_client, **kwargs)
 
     def get_new_client(self,
                        node: Node,
@@ -293,23 +316,6 @@ class Sandbox:
                                       client_factory)
 
         self.init_client(client, node, config_client)
-
-    def add_mockup_client(self,
-                          branch: str = "",
-                          client_factory: Callable = Client) -> None:
-        """ Set up new mockup client
-
-        Args:
-            branch (str): sub-dir where to lookup the node and client
-                          binary, default = "". Allows execution of different
-                          versions of nodes.
-            client_factory (Callable): the constructor of clients. Defaults to
-                                       Client. Allows e.g. regression testing.
-        """
-        local_admin_client = self._wrap_path(CLIENT_ADMIN, branch)
-        local_client = self._wrap_path(CLIENT, branch)
-        self.mockup_client = client_factory(local_client, local_admin_client,
-                                            mode="mockup")
 
     def add_baker(self,
                   node_id: int,

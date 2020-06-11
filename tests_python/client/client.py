@@ -368,14 +368,6 @@ class Client:
         res = self.run(cmd)
         return client_output.TransferResult(res)
 
-    def set_base_dir(self, base_dir: str):
-        """
-        Args:
-            base_dir(str): The new base directory to use (--base-dir arg)
-        """
-        assert base_dir is not None
-        self.base_dir = base_dir
-
     def set_delegate(self,
                      account1: str,
                      account2: str,

@@ -1,14 +1,18 @@
 """ This file tests the mockup mode (tezos-client --mode mockup).
     In this mode the client does not need a node running.
 
-    In the tests fiddling with --base-dir, make sure to
-    call client.py's set_base_dir method prior to doing
-    queries.
+    Make sure to either use the fixture mockup_client or
+    to mimick it if you want a mockup with custom parameters.
+
+    Care is taken not to leave any base_dir dangling after
+    tests are finished. Please continue doing this.
 """
 import json
 import os
 import re
+import shutil
 import tempfile
+from pathlib import Path
 from typing import Any, Iterator, Optional, Tuple, List
 import pytest
 from launchers.sandbox import Sandbox
@@ -22,62 +26,46 @@ _PC_FLAG = "protocol-constants"
 
 
 @pytest.fixture
-def mockup_client(sandbox: Sandbox) -> Client:
+def mockup_client(sandbox: Sandbox) -> Iterator[Client]:
     """
-        If you don't know what you're doing, you likely want
-        the next fixture, not this one.
-    """
-    sandbox.add_mockup_client()
-    client = sandbox.mockup_client
-    assert client is not None
-    return client
+        Returns a mockup client with its persistent directory created
 
+        This is done in two steps, because we want to create the mockup
+        with a client that doesn't have "--mode mockup" (as per
+        the public documentation) but we want to return a
+        client that has "--mode mockup" and uses the base-dir created
+        in the first step.
 
-@pytest.fixture
-def base_dir_n_mockup(mockup_client: Client) -> Iterator[Tuple[str, Client]]:
-    """
-        This is THE fixture to use when 1/ you're unsure or 2/ you're doing
-        a positive test (i.e. a test which must succeed, in an
-        environment where things are expected to work).
+        There is no way around this pattern. If you want to create
+        a mockup using custom arguments; you MUST use do the same
+        as this method.
 
-        In this scenario, you likely want to call this fixture
-        and retrieve solely it's second value like this:
-
-        `_, mockup_client = base_dir_n_mockup`
+        This fixture is NOT in conftest.py since it uses a precise
+        protocol and hence is wrong for being reused as it is.
     """
     with tempfile.TemporaryDirectory(prefix='tezos-client.') as base_dir:
-        mockup_client.set_base_dir(base_dir)
-        res = mockup_client.create_mockup(protocol=_PROTO).create_mockup_result
+        unmanaged_client = sandbox.create_client(base_dir=base_dir)
+        res = unmanaged_client.create_mockup(
+            protocol=_PROTO).create_mockup_result
         assert res == 'ok'
-        yield (base_dir, mockup_client)  # yield instead of return: so that
-        # 'with' block is exited during teardown, see
-        # https://docs.pytest.org/en/latest/fixture.html#fixture-finalization-executing-teardown-code
+        yield sandbox.create_client(base_dir=base_dir, mode="mockup")
 
 
 @pytest.mark.client
-def test_list_mockup_protocols(mockup_client: Client):
+def test_list_mockup_protocols(sandbox: Sandbox):
     """ Executes `tezos-client list mockup protocols`
         The call must succeed and return a non empty list.
     """
-    protocols = mockup_client.list_mockup_protocols().mockup_protocols
-    assert protocols[0] == _PROTO
+    try:
+        client = sandbox.create_client()
+        protocols = client.list_mockup_protocols().mockup_protocols
+        assert protocols
+    finally:
+        shutil.rmtree(client.base_dir)
 
 
 @pytest.mark.client
-def test_create_mockup_file_exists(mockup_client: Client):
-    """ Executes `tezos-client --base-dir /tmp/mdir create mockup`
-        when /tmp/mdir is a file, whereas a directory is expected.
-        The call must fail.
-    """
-    with tempfile.NamedTemporaryFile(prefix='tezos-client.') as tmp_file:
-        mockup_client.set_base_dir(tmp_file.name)
-        res = mockup_client.create_mockup(protocol=_PROTO,
-                                          check=False)
-        assert res.exit_code == 1 and res.create_mockup_result == 'is_not_dir'
-
-
-@pytest.mark.client
-def test_create_mockup_dir_exists_nonempty(mockup_client: Client):
+def test_create_mockup_dir_exists_nonempty(sandbox: Sandbox):
     """ Executes `tezos-client --base-dir /tmp/mdir create mockup`
         when /tmp/mdir is a non empty directory which is NOT a mockup
         directory. The call must fail.
@@ -86,20 +74,17 @@ def test_create_mockup_dir_exists_nonempty(mockup_client: Client):
         # Make the directory not empty
         with open(os.path.join(base_dir, "whatever"), "w") as handle:
             handle.write("")
-        mockup_client.set_base_dir(base_dir)
-        res = mockup_client.create_mockup(protocol=_PROTO,
-                                          check=False).create_mockup_result
+        unmanaged_client = sandbox.create_client(base_dir=base_dir)
+        res = unmanaged_client.create_mockup(protocol=_PROTO,
+                                             check=False).create_mockup_result
         assert res == 'dir_not_empty'
 
 
 @pytest.mark.client
-def test_create_mockup_fresh_dir(mockup_client: Client):
-    """ Executes `tezos-client --base-dir /tmp/mdir create mockup`
-        when /tmp/mdir is fresh and retrieves known addresses.
-        Calls must succeed.
+def test_retrieve_addresses(mockup_client: Client):
+    """ Retrieves known addresses of a fresh mockup.
+        The call must succeed.
     """
-    res = mockup_client.create_mockup(protocol=_PROTO).create_mockup_result
-    assert res == 'ok'
     addresses = mockup_client.get_known_addresses().wallet
     assert addresses == {
         'bootstrap1': 'tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx',
@@ -116,21 +101,20 @@ def test_create_mockup_already_initialized(mockup_client: Client):
         when /tmp/mdir is not fresh.
         The call must fail.
     """
-    res = mockup_client.create_mockup(protocol=_PROTO).create_mockup_result
-    assert res == 'ok'
+    # mockup was created already by fixture, try to create it second time:
     res = mockup_client.create_mockup(protocol=_PROTO,
                                       check=False).create_mockup_result
+    # it should fail:
     assert res == 'already_initialized'
 
 
 @pytest.mark.client
-def test_transfer(base_dir_n_mockup: Tuple[str, Client]):
+def test_transfer(mockup_client: Client):
     """ Executes `tezos-client --base-dir /tmp/mdir -M mockup
                   transfer 1 from bootstrap1 to bootstrap2`
         in a valid mockup environment.
         The call must succeed and the balances must be updated correctly.
     """
-    _, mockup_client = base_dir_n_mockup
     giver = "bootstrap1"
     receiver = "bootstrap2"
     transferred = 1.0
@@ -152,7 +136,7 @@ def test_transfer(base_dir_n_mockup: Tuple[str, Client]):
     "NetXi7C1pyLhQNe"
 ])
 @pytest.mark.client
-def test_create_mockup_custom_constants(mockup_client: Client, chain_id: str):
+def test_create_mockup_custom_constants(sandbox: Sandbox, chain_id: str):
     """ Tests `tezos-client create mockup` --protocols-constants  argument
         The call must succeed.
 
@@ -168,8 +152,8 @@ def test_create_mockup_custom_constants(mockup_client: Client, chain_id: str):
                      "chain_id": chain_id}
         json.dump(json_data, json_file)
         json_file.flush()
-        mockup_client.set_base_dir(base_dir)
-        res = mockup_client.create_mockup(
+        unmanaged_client = sandbox.create_client(base_dir=base_dir)
+        res = unmanaged_client.create_mockup(
             protocol=_PROTO,
             protocol_constants_file=json_file.name).create_mockup_result
         assert res == "ok"
@@ -204,7 +188,7 @@ def _create_accounts_list():
 
 
 @pytest.mark.client
-def test_create_mockup_custom_bootstrap_accounts(mockup_client):
+def test_create_mockup_custom_bootstrap_accounts(sandbox: Sandbox):
     """ Tests `tezos-client create mockup` --bootstrap-accounts argument
         The call must succeed.
     """
@@ -216,66 +200,82 @@ def test_create_mockup_custom_bootstrap_accounts(mockup_client):
                                     mode='w+t') as json_file:
         json.dump(accounts_list, json_file)
         json_file.flush()
-        mockup_client.set_base_dir(base_dir)
-        res = mockup_client.create_mockup(
+        # Follow pattern of mockup_client fixture:
+        unmanaged_client = sandbox.create_client(base_dir=base_dir)
+        res = unmanaged_client.create_mockup(
             protocol=_PROTO,
             bootstrap_accounts_file=json_file.name).create_mockup_result
         assert res == "ok"
-        addresses_result = mockup_client.get_known_addresses()
+        mock_client = sandbox.create_client(base_dir=base_dir, mode="mockup")
+        addresses_result = mock_client.get_known_addresses()
         names_sent = sorted([account["name"] for account in accounts_list])
         names_witnessed = sorted(list(addresses_result.wallet.keys()))
         assert names_sent == names_witnessed
 
 
 @pytest.mark.client
-def test_transfer_bad_base_dir(mockup_client: Client):
+def test_transfer_bad_base_dir(sandbox: Sandbox):
     """ Executes `tezos-client --base-dir /tmp/mdir create mockup`
         when /tmp/mdir looks like a dubious base directory.
         Checks that a warning is printed.
     """
-    with tempfile.TemporaryDirectory(prefix='tezos-client.') as base_dir:
-        # Create a FILE named "mockup", whereas a directory is expected;
-        # so that the base_dir is invalid
-        with open(os.path.join(base_dir, "mockup"), "w") as handle:
-            handle.write("")
-        mockup_client.set_base_dir(base_dir)
+    try:
+        unmanaged_client = sandbox.create_client()
+        res = unmanaged_client.create_mockup(
+            protocol=_PROTO).create_mockup_result
+        assert res == 'ok'
+        base_dir = unmanaged_client.base_dir
+        mockup_dir = os.path.join(base_dir, "mockup")
+
+        # A valid mockup has a directory named "mockup", in its directory:
+        assert os.path.isdir(mockup_dir)
+        mock_client = sandbox.create_client(base_dir=base_dir, mode="mockup")
+        # Delete this directory:
+        shutil.rmtree(mockup_dir)
+        # And put a file instead:
+        Path(os.path.join(mockup_dir)).touch()
+
+        # Now execute a command
         cmd = ["transfer", "1", "from", "bootstrap1", "to", "bootstrap2"]
-        (_, err_output, _) = mockup_client.run_generic(cmd, check=False)
+        (_, err_output, _) = mock_client.run_generic(cmd, check=False)
         # See
         # https://gitlab.com/tezos/tezos/-/merge_requests/1760#note_329071488
         # for the content being matched
         searched = "Some commands .* might not work correctly."
+        # Witness that warning is printed:
         assert re.search(
             searched, err_output), f"'{searched}' not matched in error output"
+    finally:
+        shutil.rmtree(base_dir)
 
 
 @pytest.mark.client
-def test_config_show_mockup(base_dir_n_mockup):
+def test_config_show_mockup(mockup_client: Client):
     """ Executes `tezos-client config show mockup` in
         a state where it should succeed.
     """
-    _, mockup_client = base_dir_n_mockup
     mockup_client.run_generic(["config", "show", "mockup"])
 
 
 @pytest.mark.client
-def test_config_show_mockup_fail(mockup_client):
+def test_config_show_mockup_fail(mockup_client: Client):
     """ Executes `tezos-client config show mockup` when
         base dir is NOT a mockup. It should fail as this is dangerous
         (the default base directory could contain sensitive data,
          such as private keys)
     """
+    shutil.rmtree(mockup_client.base_dir)  # See test_config_init_mockup_fail
+    # for a variant of how to make the base dir invalid for the mockup mode
     _, _, return_code = mockup_client.run_generic(["config", "show", "mockup"],
                                                   check=False)
     assert return_code != 0
 
 
 @pytest.mark.client
-def test_config_init_mockup(base_dir_n_mockup):
+def test_config_init_mockup(mockup_client: Client):
     """ Executes `tezos-client config init mockup` in
         a state where it should succeed.
     """
-    _, mockup_client = base_dir_n_mockup
     # We cannot use NamedTemporaryFile because `config init mockup`
     # does not overwrite files. Because NamedTemporaryFile creates the file
     # it would make the test fail.
@@ -293,28 +293,39 @@ def test_config_init_mockup(base_dir_n_mockup):
     with open(pc_json_file) as handle:
         json.load(handle)
 
-    # Cleanup of tempfile.mktemp
+    # Cleanup
     os.remove(ba_json_file)
     os.remove(pc_json_file)
 
 
 @pytest.mark.client
-def test_config_init_mockup_fail(mockup_client):
+def test_config_init_mockup_fail(mockup_client: Client):
     """ Executes `tezos-client config init mockup` when
         base dir is NOT a mockup. It should fail as this is dangerous
         (the default base directory could contain sensitive data,
          such as private keys)
     """
-    with tempfile.NamedTemporaryFile(
-            prefix='tezos-bootstrap-accounts',
-            mode='w+t') as ba_json_file, tempfile.NamedTemporaryFile(
-                prefix='tezos-proto-consts', mode='w+t') as pc_json_file:
-        cmd = [
-            "config", "init", "mockup", f"--{_BA_FLAG}", ba_json_file.name,
-            f"--{_PC_FLAG}", pc_json_file.name
-        ]
-        _, _, return_code = mockup_client.run_generic(cmd, check=False)
-        assert return_code != 0
+    ba_json_file = tempfile.mktemp(prefix='tezos-bootstrap-accounts')
+    pc_json_file = tempfile.mktemp(prefix='tezos-proto-consts')
+    cmd = [
+        "config", "init", "mockup", f"--{_BA_FLAG}", ba_json_file,
+        f"--{_PC_FLAG}", pc_json_file
+    ]
+
+    # A valid mockup has a directory named "mockup" in its base_dir:
+    mockup_dir = os.path.join(mockup_client.base_dir, "mockup")
+    assert os.path.isdir(mockup_dir)
+    # Delete this directory, so that the base_dir is not a valid mockup
+    # base dir anymore:
+    shutil.rmtree(mockup_dir)  # See test_config_show_mockup_fail above
+    # for a variant of how to make the base_dir invalid for the mockup mode
+
+    _, _, return_code = mockup_client.run_generic(cmd,
+                                                  check=False)
+    assert return_code != 0
+    # Check the test doesn't leak directories:
+    assert not os.path.exists(ba_json_file)
+    assert not os.path.exists(pc_json_file)
 
 
 def _try_json_loads(flag: str, string: str) -> Any:
@@ -326,16 +337,20 @@ def _try_json_loads(flag: str, string: str) -> Any:
 {string}""")
 
 
-def _get_state_using_config_init_mockup(mockup_client) -> Tuple[str, str]:
+def _get_state_using_config_init_mockup(mock_client: Client)\
+        -> Tuple[str, str]:
     """
-        Calls `config init mockup` on `m_client` and returns
+        Calls `config init mockup` on a mockup client and returns
         the strings of the bootstrap accounts and the protocol
         constants
+
+        Note that because this a mockup specific operation, the `mock_client`
+        parameter must be in mockup mode; do not give a vanilla client.
     """
     ba_json_file = tempfile.mktemp(prefix='tezos-bootstrap-accounts')
     pc_json_file = tempfile.mktemp(prefix='tezos-proto-consts')
 
-    mockup_client.run([
+    mock_client.run([
         "config", "init", "mockup", f"--{_BA_FLAG}", ba_json_file,
         f"--{_PC_FLAG}", pc_json_file
     ])
@@ -352,11 +367,15 @@ def _get_state_using_config_init_mockup(mockup_client) -> Tuple[str, str]:
     return (ba_str, pc_str)
 
 
-def _get_state_using_config_show_mockup(mockup_client) -> Tuple[str, str]:
+def _get_state_using_config_show_mockup(mock_client: Client)\
+        -> Tuple[str, str]:
     """
-        Calls `config show mockup` on `mockup_client` and returns
+        Calls `config show mockup` on a mockup client and returns
         the strings of the bootstrap accounts and the protocol
         constants, by parsing standard output.
+
+        Note that because this a mockup specific operation, the `mock_client`
+        parameter must be in mockup mode; do not give a vanilla client.
     """
     def _find_line_starting_with(strings, searched) -> int:
         i = 0
@@ -385,12 +404,12 @@ def _get_state_using_config_show_mockup(mockup_client) -> Tuple[str, str]:
         pc_json = string[proto_constants_index + len(tagline2) + 1:]
         return (bc_json, pc_json)
 
-    stdout = mockup_client.run(["config", "show", "mockup"])
+    stdout = mock_client.run(["config", "show", "mockup"])
     return _parse_config_init_output(stdout)
 
 
 def _test_create_mockup_init_show_roundtrip(
-        mockup_client,
+        sandbox: Sandbox,
         read_initial_state,
         read_final_state,
         bootstrap_json: Optional[str] = None,
@@ -425,18 +444,23 @@ def _test_create_mockup_init_show_roundtrip(
             with open(ba_file, 'w') as handle:
                 handle.write(bootstrap_json)
 
-        res = mockup_client.create_mockup(
-            protocol=_PROTO,
-            bootstrap_accounts_file=ba_file,
-            protocol_constants_file=pc_file).create_mockup_result
+        with tempfile.TemporaryDirectory(prefix='tezos-client.') as base_dir:
+            # Follow pattern of mockup_client fixture:
+            unmanaged_client = sandbox.create_client(base_dir=base_dir)
+            res = unmanaged_client.create_mockup(
+                protocol=_PROTO,
+                bootstrap_accounts_file=ba_file,
+                protocol_constants_file=pc_file).create_mockup_result
+            assert res == 'ok'
+            mock_client = sandbox.create_client(base_dir=base_dir,
+                                                mode="mockup")
+            (ba_str, pc_str) = read_initial_state(mock_client)
     finally:
         if pc_file is not None:
             os.remove(pc_file)
         if ba_file is not None:
             os.remove(ba_file)
 
-    assert res == 'ok'
-    (ba_str, pc_str) = read_initial_state(mockup_client)
     # 2/ Check the json obtained is valid by building json objects
     ba_sent = _try_json_loads(_BA_FLAG, ba_str)
     pc_sent = _try_json_loads(_PC_FLAG, pc_str)
@@ -449,22 +473,27 @@ def _test_create_mockup_init_show_roundtrip(
             prefix='tezos-client.') as base_dir, tempfile.NamedTemporaryFile(
                 prefix='tezos-bootstrap-accounts',
                 mode='w+t') as ba_json_file, tempfile.NamedTemporaryFile(
-                    prefix='tezos-proto-consts', mode='w+t') as pc_json_file:
+                    prefix='tezos-proto-consts', mode='w+t') as pc_json_file,\
+            tempfile.TemporaryDirectory(prefix='tezos-client.') as base_dir:
 
         ba_json_file.write(ba_str)
         ba_json_file.flush()
         pc_json_file.write(pc_str)
         pc_json_file.flush()
 
-        mockup_client.set_base_dir(base_dir)
-        res = mockup_client.create_mockup(
-            protocol=_PROTO,
-            protocol_constants_file=pc_json_file.name,
-            bootstrap_accounts_file=ba_json_file.name).create_mockup_result
-        assert res == "ok"
-
-        # 4/ Retrieve state again
-        (ba_received_str, pc_received_str) = read_final_state(mockup_client)
+        with tempfile.TemporaryDirectory(prefix='tezos-client.') as base_dir:
+            # Follow pattern of mockup_client fixture:
+            unmanaged_client = sandbox.create_client(base_dir=base_dir)
+            res = unmanaged_client.create_mockup(
+                protocol=_PROTO,
+                protocol_constants_file=pc_json_file.name,
+                bootstrap_accounts_file=ba_json_file.name).create_mockup_result
+            assert res == 'ok'
+            mock_client = sandbox.create_client(base_dir=base_dir,
+                                                mode="mockup")
+            # 4/ Retrieve state again
+            (ba_received_str, pc_received_str) =\
+                read_final_state(mock_client)
 
     # Convert it to json objects (check that json is valid)
     ba_received = _try_json_loads(_BA_FLAG, ba_received_str)
@@ -493,7 +522,7 @@ def _test_create_mockup_init_show_roundtrip(
 @pytest.mark.parametrize(
     'read_final_state',
     [_get_state_using_config_show_mockup, _get_state_using_config_init_mockup])
-def test_create_mockup_config_show_init_roundtrip(mockup_client,
+def test_create_mockup_config_show_init_roundtrip(sandbox: Sandbox,
                                                   initial_bootstrap_accounts,
                                                   read_initial_state,
                                                   read_final_state):
@@ -508,15 +537,15 @@ def test_create_mockup_config_show_init_roundtrip(mockup_client,
 
         This is a roundtrip test using a matrix.
     """
-    _test_create_mockup_init_show_roundtrip(mockup_client, read_initial_state,
+    _test_create_mockup_init_show_roundtrip(sandbox,
+                                            read_initial_state,
                                             read_final_state,
                                             initial_bootstrap_accounts)
 
 
-def test_transfer_rpc(base_dir_n_mockup):
+def test_transfer_rpc(mockup_client: Client):
     """ Variant of test_transfer that uses RPCs to get the balances.
     """
-    _, mockup_client = base_dir_n_mockup
     giver = "bootstrap1"
     receiver = "bootstrap2"
     transferred = 1.0
