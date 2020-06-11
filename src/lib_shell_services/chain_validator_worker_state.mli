@@ -83,7 +83,6 @@ module Distributed_db_state : sig
     operation_db : table_scheduler;
     operations_db : table_scheduler;
     block_header_db : table_scheduler;
-    operations_hashed_db : table_scheduler;
     active_connections_length : int;
     active_peers_length : int;
   }

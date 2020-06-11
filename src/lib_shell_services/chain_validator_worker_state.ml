@@ -252,7 +252,6 @@ module Distributed_db_state = struct
     operation_db : table_scheduler;
     operations_db : table_scheduler;
     block_header_db : table_scheduler;
-    operations_hashed_db : table_scheduler;
     active_connections_length : int;
     active_peers_length : int;
   }
@@ -274,7 +273,6 @@ module Distributed_db_state = struct
              operation_db;
              operations_db;
              block_header_db;
-             operations_hashed_db;
              active_connections_length;
              active_peers_length } ->
         ( p2p_readers_length,
@@ -282,7 +280,6 @@ module Distributed_db_state = struct
           operation_db,
           operations_db,
           block_header_db,
-          operations_hashed_db,
           active_connections_length,
           active_peers_length ))
       (fun ( p2p_readers_length,
@@ -290,7 +287,6 @@ module Distributed_db_state = struct
              operation_db,
              operations_db,
              block_header_db,
-             operations_hashed_db,
              active_connections_length,
              active_peers_length ) ->
         {
@@ -299,17 +295,15 @@ module Distributed_db_state = struct
           operation_db;
           operations_db;
           block_header_db;
-          operations_hashed_db;
           active_connections_length;
           active_peers_length;
         })
-      (obj8
+      (obj7
          (req "p2p_readers" int31)
          (req "active_chains" int31)
          (req "operation_db" table_scheduler_encoding)
          (req "operations_db" table_scheduler_encoding)
          (req "block_header_db" table_scheduler_encoding)
-         (req "operations_hashed_db" table_scheduler_encoding)
          (req "active_connections" int31)
          (req "active_peers" int31))
 end

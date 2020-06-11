@@ -104,8 +104,6 @@ end)
             Operations
         | Get_protocols _ ->
             Protocols
-        | Get_operation_hashes_for_blocks _ ->
-            Operation_hashes_for_block
         | Get_operations_for_blocks _ ->
             Operations_for_block
         | _ ->
@@ -201,28 +199,6 @@ module Raw_block_header =
       let precheck _ _ v = Some v
     end)
 
-module Operation_hashes_storage = struct
-  type store = State.Chain.t
-
-  type value = Operation_hash.t list
-
-  let known chain_state (h, _) = State.Block.known_valid chain_state h
-
-  let read chain_state (h, i) =
-    State.Block.read chain_state h
-    >>=? fun b ->
-    State.Block.operation_hashes b i >>= fun (ops, _) -> return ops
-
-  let read_opt chain_state (h, i) =
-    State.Block.read_opt chain_state h
-    >>= function
-    | None ->
-        Lwt.return_none
-    | Some b ->
-        State.Block.operation_hashes b i
-        >>= fun (ops, _) -> Lwt.return_some ops
-end
-
 module Operations_table = Hashtbl.Make (struct
   type t = Block_hash.t * int
 
@@ -230,60 +206,6 @@ module Operations_table = Hashtbl.Make (struct
 
   let equal (b1, i1) (b2, i2) = Block_hash.equal b1 b2 && i1 = i2
 end)
-
-module Raw_operation_hashes = struct
-  include Make_raw
-            (struct
-              type t = Block_hash.t * int
-
-              let name = "operation_hashes"
-
-              let pp ppf (h, n) = Format.fprintf ppf "%a:%d" Block_hash.pp h n
-
-              let encoding =
-                let open Data_encoding in
-                obj2 (req "block" Block_hash.encoding) (req "index" uint16)
-
-              module Logging = struct
-                let tag = Tag.def ~doc:"Operation hashes" "operation_hashes" pp
-              end
-            end)
-            (Operation_hashes_storage)
-            (Operations_table)
-            (struct
-              type param = unit
-
-              let max_length = 10
-
-              let initial_delay = Time.System.Span.of_seconds_exn 1.
-
-              let forge () keys = Message.Get_operation_hashes_for_blocks keys
-            end)
-            (struct
-              type param = Operation_list_list_hash.t
-
-              type notified_value =
-                Operation_hash.t list * Operation_list_list_hash.path
-
-              let precheck (_block, expected_ofs) expected_hash (ops, path) =
-                let (received_hash, received_ofs) =
-                  Operation_list_list_hash.check_path
-                    path
-                    (Operation_list_hash.compute ops)
-                in
-                if
-                  received_ofs = expected_ofs
-                  && Operation_list_list_hash.compare
-                       expected_hash
-                       received_hash
-                     = 0
-                then Some ops
-                else None
-            end)
-
-  let clear_all table hash n =
-    List.iter (fun i -> clear_or_cancel table (hash, i)) (0 -- (n - 1))
-end
 
 module Operations_storage = struct
   type store = State.Chain.t

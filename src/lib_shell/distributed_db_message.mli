@@ -37,12 +37,6 @@ type t =
   | Operation of Operation.t
   | Get_protocols of Protocol_hash.t list
   | Protocol of Protocol.t
-  | Get_operation_hashes_for_blocks of (Block_hash.t * int) list
-  | Operation_hashes_for_block of
-      Block_hash.t
-      * int
-      * Operation_hash.t list
-      * Operation_list_list_hash.path
   | Get_operations_for_blocks of (Block_hash.t * int) list
   | Operations_for_block of
       Block_hash.t * int * Operation.t list * Operation_list_list_hash.path

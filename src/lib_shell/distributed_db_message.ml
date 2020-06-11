@@ -76,13 +76,6 @@ module Bounded_encoding = struct
          ?max_pass:!operation_max_pass
          ())
 
-  let operation_hash_list_cache =
-    ref
-      (Operation.bounded_hash_list_encoding
-         ?max_length:!operation_list_max_length
-         ?max_pass:!operation_max_pass
-         ())
-
   let update_operation_list_encoding () =
     operation_list_cache :=
       Operation.bounded_list_encoding
@@ -126,8 +119,6 @@ module Bounded_encoding = struct
 
   let operation_list = delayed (fun () -> !operation_list_cache)
 
-  let operation_hash_list = delayed (fun () -> !operation_hash_list_cache)
-
   let protocol_max_size = ref (Some (2 * 1024 * 1024)) (* FIXME: arbitrary *)
 
   let protocol_cache =
@@ -159,12 +150,6 @@ type t =
   | Operation of Operation.t
   | Get_protocols of Protocol_hash.t list
   | Protocol of Protocol.t
-  | Get_operation_hashes_for_blocks of (Block_hash.t * int) list
-  | Operation_hashes_for_block of
-      Block_hash.t
-      * int
-      * Operation_hash.t list
-      * Operation_list_list_hash.path
   | Get_operations_for_blocks of (Block_hash.t * int) list
   | Operations_for_block of
       Block_hash.t * int * Operation.t list * Operation_list_list_hash.path
@@ -256,34 +241,6 @@ let encoding =
       (obj1 (req "protocol" Bounded_encoding.protocol))
       (function Protocol proto -> Some proto | _ -> None)
       (fun proto -> Protocol proto);
-    case
-      ~tag:0x50
-      ~title:"Get_operation_hashes_for_blocks"
-      (obj1
-         (req
-            "get_operation_hashes_for_blocks"
-            (list ~max_length:10 (tup2 Block_hash.encoding int8))))
-      (function
-        | Get_operation_hashes_for_blocks keys -> Some keys | _ -> None)
-      (fun keys -> Get_operation_hashes_for_blocks keys);
-    case
-      ~tag:0x51
-      ~title:"Operation_hashes_for_blocks"
-      (merge_objs
-         (obj1
-            (req
-               "operation_hashes_for_block"
-               (obj2
-                  (req "hash" Block_hash.encoding)
-                  (req "validation_pass" int8))))
-         Bounded_encoding.operation_hash_list)
-      (function
-        | Operation_hashes_for_block (block, ofs, ops, path) ->
-            Some ((block, ofs), (path, ops))
-        | _ ->
-            None)
-      (fun ((block, ofs), (path, ops)) ->
-        Operation_hashes_for_block (block, ofs, ops, path));
     case
       ~tag:0x60
       ~title:"Get_operations_for_blocks"

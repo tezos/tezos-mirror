@@ -79,16 +79,6 @@ module Raw_block_header :
      and type value = Block_header.t
      and type notified_value = Block_header.t
 
-module Raw_operation_hashes :
-  EXTENDED_REQUESTER_2
-    with type key = Block_hash.t * int
-     and type param = Operation_list_list_hash.t
-     and type request_param = unit request_param
-     and type store = State.Chain.t
-     and type value = Operation_hash.t list
-     and type notified_value =
-          Operation_hash.t list * Operation_list_list_hash.path
-
 module Raw_operations :
   EXTENDED_REQUESTER_2
     with type key = Block_hash.t * int

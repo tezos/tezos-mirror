@@ -132,7 +132,6 @@ type chain_db = {
   chain_state : State.Chain.t;
   operation_db : Distributed_db_requester.Raw_operation.t;
   block_header_db : Distributed_db_requester.Raw_block_header.t;
-  operation_hashes_db : Distributed_db_requester.Raw_operation_hashes.t;
   operations_db : Distributed_db_requester.Raw_operations.t;
   mutable callback : callback;
   active_peers : P2p_peer.Set.t ref;

@@ -42,7 +42,6 @@ type chain_db = {
   chain_state : State.Chain.t;
   operation_db : Distributed_db_requester.Raw_operation.t;
   block_header_db : Distributed_db_requester.Raw_block_header.t;
-  operation_hashes_db : Distributed_db_requester.Raw_operation_hashes.t;
   operations_db : Distributed_db_requester.Raw_operations.t;
   mutable callback : callback;
   active_peers : P2p_peer.Set.t ref;
@@ -114,22 +113,6 @@ let find_pending_operations {peer_active_chains; _} h i =
       | None
         when Distributed_db_requester.Raw_operations.pending
                chain_db.operations_db
-               (h, i) ->
-          Some chain_db
-      | None ->
-          None)
-    peer_active_chains
-    None
-
-let find_pending_operation_hashes {peer_active_chains; _} h i =
-  Chain_id.Table.fold
-    (fun _chain_id chain_db acc ->
-      match acc with
-      | Some _ ->
-          acc
-      | None
-        when Distributed_db_requester.Raw_operation_hashes.pending
-               chain_db.operation_hashes_db
                (h, i) ->
           Some chain_db
       | None ->
@@ -393,36 +376,6 @@ let handle_msg state msg =
       >>= fun () ->
       Peer_metadata.incr meta @@ Received_response Protocols ;
       Lwt.return_unit
-  | Get_operation_hashes_for_blocks blocks ->
-      Peer_metadata.incr meta @@ Received_request Operation_hashes_for_block ;
-      Lwt_list.iter_p
-        (fun (hash, ofs) ->
-          State.read_block state.disk hash
-          >>= function
-          | None ->
-              Lwt.return_unit
-          | Some block ->
-              State.Block.operation_hashes block ofs
-              >>= fun (hashes, path) ->
-              Peer_metadata.update_responses meta Operation_hashes_for_block
-              @@ P2p.try_send state.p2p state.conn
-              @@ Operation_hashes_for_block (hash, ofs, hashes, path) ;
-              Lwt.return_unit)
-        blocks
-  | Operation_hashes_for_block (block, ofs, ops, path) -> (
-    match find_pending_operation_hashes state block ofs with
-    | None ->
-        Peer_metadata.incr meta Unexpected_response ;
-        Lwt.return_unit
-    | Some chain_db ->
-        Distributed_db_requester.Raw_operation_hashes.notify
-          chain_db.operation_hashes_db
-          state.gid
-          (block, ofs)
-          (ops, path)
-        >>= fun () ->
-        Peer_metadata.incr meta @@ Received_response Operation_hashes_for_block ;
-        Lwt.return_unit )
   | Get_operations_for_blocks blocks ->
       Peer_metadata.incr meta @@ Received_request Operations_for_block ;
       Lwt_list.iter_p

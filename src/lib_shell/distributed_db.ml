@@ -26,9 +26,8 @@
 
 (** One role of this module is to export read-through [REQUESTER] services.
     These services allow client code to lookup resources identified by their
-    hashes. Resources are protocols, operations, block_header, operation_hashes
-    and operations. Values are first looked up locally, in [State], or are
-    requested to peers.
+    hashes. Resources are protocols, operations, block_header, and operations.
+    Values are first looked up locally, in [State], or are requested to peers.
 
     An exported [REQUESTER] service is implemented by a [FULL_REQUESTER] and
     [P2p_reader] workers working together. Resources are requested via a
@@ -93,9 +92,6 @@ let information {global_db; reader_chain_db} =
     block_header_db =
       Distributed_db_requester.Raw_block_header.state_of_t
         reader_chain_db.block_header_db;
-    operations_hashed_db =
-      Distributed_db_requester.Raw_operation_hashes.state_of_t
-        reader_chain_db.operation_hashes_db;
     active_connections_length =
       P2p_peer.Table.length reader_chain_db.active_connections;
     active_peers_length = P2p_peer.Set.cardinal !(reader_chain_db.active_peers);
@@ -186,11 +182,6 @@ let activate
             p2p_request
             chain_state
         in
-        let operation_hashes_db =
-          Distributed_db_requester.Raw_operation_hashes.create
-            p2p_request
-            chain_state
-        in
         let operations_db =
           Distributed_db_requester.Raw_operations.create
             p2p_request
@@ -202,7 +193,6 @@ let activate
               chain_state;
               operation_db;
               block_header_db;
-              operation_hashes_db;
               operations_db;
               callback = noop_callback;
               active_peers;
@@ -284,10 +274,6 @@ let shutdown {p2p_readers; active_chains; _} =
 let clear_block chain_db hash n =
   Distributed_db_requester.Raw_operations.clear_all
     chain_db.reader_chain_db.operations_db
-    hash
-    n ;
-  Distributed_db_requester.Raw_operation_hashes.clear_all
-    chain_db.reader_chain_db.operation_hashes_db
     hash
     n ;
   Distributed_db_requester.Raw_block_header.clear_or_cancel
