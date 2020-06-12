@@ -402,14 +402,21 @@ let client_mode_arg () =
 
 let read_config_file config_file =
   Lwt_utils_unix.Json.read_file config_file
-  >>=? fun cfg_json ->
-  try return @@ Cfg_file.from_json cfg_json
-  with exn ->
-    failwith
-      "Can't parse the configuration file: %s@,%a"
-      config_file
-      (fun ppf exn -> Json_encoding.print_error ppf exn)
-      exn
+  >>= function
+  | Error errs ->
+      failwith
+        "Can't parse the configuration file as a JSON: %s@,%a"
+        config_file
+        pp_print_error
+        errs
+  | Ok cfg_json -> (
+    try return @@ Cfg_file.from_json cfg_json
+    with exn ->
+      failwith
+        "Can't parse the configuration file: %s@,%a"
+        config_file
+        (fun ppf exn -> Json_encoding.print_error ppf exn)
+        exn )
 
 let default_config_file_name = "config"
 
