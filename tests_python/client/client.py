@@ -229,6 +229,22 @@ class Client:
     def import_secret_key(self, name: str, secret: str) -> str:
         return self.run(['import', 'secret', 'key', name, secret])
 
+    def add_address(self, name: str, address: str, force: bool = False):
+        cmd = ['add', 'address', name, address]
+        if force:
+            cmd += ['--force']
+        output = self.run(cmd)
+        assert not output
+
+    def show_address(self,
+                     name: str,
+                     show_secret: bool = False
+                     ) -> client_output.ShowAddressResult:
+        cmd = ['show', 'address', name]
+        if show_secret:
+            cmd += ['--show-secret']
+        return client_output.ShowAddressResult(self.run(cmd))
+
     def activate_protocol(self,
                           protocol: str,
                           parameter_file: str,

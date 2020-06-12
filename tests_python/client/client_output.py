@@ -148,6 +148,29 @@ class BakeForResult:
         self.block_hash = match.groups()[0]
 
 
+class ShowAddressResult:
+    """Result of a 'show address' command."""
+
+    def __init__(self, client_output: str):
+        pattern = r"Hash: ?(\w*)"
+        match = re.search(pattern, client_output)
+        if match is None:
+            raise InvalidClientOutput(client_output)
+        self.hash = match.groups()[0]
+        pattern = r"Public Key: ?(\w*)"
+        match = re.search(pattern, client_output)
+        if match is None:
+            self.public_key = None
+        else:
+            self.public_key = match.groups()[0]
+        pattern = r"Secret Key: ?(\w*)"
+        match = re.search(pattern, client_output)
+        if match is None:
+            self.secret_key = None
+        else:
+            self.secret_key = match.groups()[0]
+
+
 class ActivationResult:
     """Result of 'activate protocol' command"""
 
