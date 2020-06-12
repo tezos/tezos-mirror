@@ -163,9 +163,6 @@ class TestRawContext:
         client.transfer(10, keys[3], keys[4], TRANSFER_ARGS)
         client.bake('bootstrap1', BAKE_ARGS)
 
-    @pytest.mark.xfail(
-        reason="See https://gitlab.com/tezos/tezos/-/issues/653",
-        strict=True)
     def test_duplicate_alias(self, client: Client):
         client.add_address("baz", "foo", force=True)
         show_foo = client.show_address("foo", show_secret=True)
