@@ -160,7 +160,7 @@ let getaddrinfo ~passive ~node ~service =
     (AI_SOCKTYPE SOCK_STREAM :: (if passive then [AI_PASSIVE] else []))
   >>= fun addr ->
   let points =
-    TzList.filter_map (fun {ai_addr; _} -> of_sockaddr ai_addr) addr
+    List.filter_map (fun {ai_addr; _} -> of_sockaddr ai_addr) addr
   in
   Lwt.return points
 

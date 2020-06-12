@@ -305,7 +305,7 @@ struct
                 in
                 resolver context msg
                 >|= fun msgs ->
-                TzList.filter_map
+                List.filter_map
                   (fun msg ->
                     let res = simple_encode encoding ?alphabet msg in
                     TzString.remove_prefix ~prefix:request res
