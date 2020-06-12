@@ -1005,6 +1005,63 @@ let () =
     (function Invalid_content (p, e) -> Some (p, e) | _ -> None)
     (fun (p, e) -> Invalid_content (p, e))
 
+module Event = struct
+  include Internal_event.Simple
+
+  let section = ["node"; "main"]
+
+  let level = Internal_event.Warning
+
+  let cannot_convert_to_ipv4 =
+    Internal_event.Simple.declare_1
+      ~section
+      ~level
+      ~name:"cannot_convert_to_ipv4"
+      ~msg:"failed to convert {addr} to an ipv4 address"
+      ~pp1:(fun ppf -> Format.fprintf ppf "%S")
+      ("addr", Data_encoding.string)
+
+  let cannot_resolve_listening_addr =
+    Internal_event.Simple.declare_1
+      ~section
+      ~level
+      ~name:"cannot_resolve_listening_addr"
+      ~msg:"failed to resolve {addr}"
+      ~pp1:(fun ppf -> Format.fprintf ppf "%S")
+      ("addr", Data_encoding.string)
+
+  let cannot_parse_listening_addr =
+    Internal_event.Simple.declare_2
+      ~section
+      ~level
+      ~name:"cannot_parse_listening_addr"
+      ~msg:"failed to parse {addr}: {msg}"
+      ~pp1:(fun ppf -> Format.fprintf ppf "%S")
+      ("addr", Data_encoding.string)
+      ~pp2:(fun ppf -> Format.fprintf ppf "%s")
+      ("msg", Data_encoding.string)
+
+  let cannot_resolve_discovery_addr =
+    Internal_event.Simple.declare_1
+      ~section
+      ~level
+      ~name:"cannot_resolve_discovery_addr"
+      ~msg:"failed to resolve {addr}"
+      ~pp1:(fun ppf -> Format.fprintf ppf "%S")
+      ("addr", Data_encoding.string)
+
+  let cannot_parse_discovery_addr =
+    Internal_event.Simple.declare_2
+      ~section
+      ~level
+      ~name:"cannot_parse_discovery_addr"
+      ~msg:"failed to parse {addr}: {msg}"
+      ~pp1:(fun ppf -> Format.fprintf ppf "%S")
+      ("addr", Data_encoding.string)
+      ~pp2:(fun ppf -> Format.fprintf ppf "%s")
+      ("msg", Data_encoding.string)
+end
+
 let string_of_json_encoding_error exn =
   Format.asprintf "%a" (Json_encoding.print_error ?print_unknown:None) exn
 
@@ -1141,14 +1198,12 @@ let to_ipv4 ipv6_l =
     let ipv4 = Ipaddr.v4_of_v6 ipv6 in
     match ipv4 with
     | None ->
-        Format.eprintf
-          "Warning: failed to convert %S to an ipv4 address@."
-          (Ipaddr.V6.to_string ipv6) ;
-        None
+        Event.(emit cannot_convert_to_ipv4) (Ipaddr.V6.to_string ipv6)
+        >>= fun () -> Lwt.return_none
     | Some ipv4 ->
-        Some (ipv4, port)
+        Lwt.return_some (ipv4, port)
   in
-  List.filter_map convert_or_warn ipv6_l
+  Lwt_list.filter_map_s convert_or_warn ipv6_l
 
 let resolve_addr ~default_addr ?default_port ?(passive = false) peer =
   let (addr, port) = P2p_point.Id.parse_addr_port peer in
@@ -1178,7 +1233,7 @@ let resolve_discovery_addrs discovery_addr =
     ~default_port:default_discovery_port
     ~passive:true
     discovery_addr
-  >>= fun addrs -> Lwt.return (to_ipv4 addrs)
+  >>= fun addrs -> to_ipv4 addrs
 
 let resolve_listening_addrs listen_addr =
   resolve_addr
@@ -1207,14 +1262,12 @@ let check_listening_addrs config =
           resolve_listening_addrs addr
           >>= function
           | [] ->
-              Format.eprintf "Warning: failed to resolve %S\n@." addr ;
-              Lwt.return_unit
+              Event.(emit cannot_resolve_listening_addr) addr
           | _ :: _ ->
               Lwt.return_unit)
         (function
           | Invalid_argument msg ->
-              Format.eprintf "Warning: failed to parse %S:   %s\n@." addr msg ;
-              Lwt.return_unit
+              Event.(emit cannot_parse_listening_addr) (addr, msg)
           | exn ->
               Lwt.fail exn)
 
@@ -1228,14 +1281,12 @@ let check_discovery_addr config =
           resolve_discovery_addrs addr
           >>= function
           | [] ->
-              Format.eprintf "Warning: failed to resolve %S\n@." addr ;
-              Lwt.return_unit
+              Event.(emit cannot_resolve_discovery_addr) addr
           | _ :: _ ->
               Lwt.return_unit)
         (function
           | Invalid_argument msg ->
-              Format.eprintf "Warning: failed to parse %S:   %s\n@." addr msg ;
-              Lwt.return_unit
+              Event.(emit cannot_parse_discovery_addr) (addr, msg)
           | exn ->
               Lwt.fail exn)
 
