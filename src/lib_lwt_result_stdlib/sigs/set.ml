@@ -30,6 +30,8 @@ module type S = sig
 
   type t
 
+  module Legacy : Stdlib.Set.S with type elt = elt and type t = t
+
   val empty : t
 
   val is_empty : t -> bool

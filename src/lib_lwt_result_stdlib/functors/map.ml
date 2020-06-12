@@ -28,7 +28,8 @@ module Make (Seq : Sigs.Seq.S) = struct
 
   module Make (Ord : Stdlib.Map.OrderedType) : S with type key = Ord.t = struct
     open Seq
-    include Stdlib.Map.Make (Ord)
+    module Legacy = Stdlib.Map.Make (Ord)
+    include Legacy
 
     let iter_e f t = iter_e (fun (k, v) -> f k v) (to_seq t)
 

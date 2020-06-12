@@ -30,6 +30,8 @@ module type S = sig
 
   type +'a t
 
+  module Legacy : Stdlib.Map.S with type key = key and type 'a t = 'a t
+
   val empty : 'a t
 
   val is_empty : 'a t -> bool
