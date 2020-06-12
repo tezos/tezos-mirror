@@ -315,12 +315,24 @@ let register_key cctxt ?(force = false) (public_key_hash, pk_uri, sk_uri)
   Public_key_hash.add ~force cctxt name public_key_hash
   >>=? fun () -> return_unit
 
+(* This function is used to chose between two aliases associated
+   to the same key hash; if we know the secret key for one of them
+   we take it, otherwise if we know the public key for one of them
+   we take it. *)
+let join_keys keys1_opt keys2 =
+  match (keys1_opt, keys2) with
+  | (Some (_, Some _, None), (_, None, None)) ->
+      keys1_opt
+  | (Some (_, _, Some _), _) ->
+      keys1_opt
+  | _ ->
+      Some keys2
+
 let raw_get_key (cctxt : #Client_context.wallet) pkh =
-  Public_key_hash.rev_find cctxt pkh
-  >>=? (function
-         | None ->
-             failwith "no keys for the source contract manager"
-         | Some n ->
+  Public_key_hash.rev_find_all cctxt pkh
+  >>=? (fun names ->
+         fold_left_s
+           (fun keys_opt n ->
              Secret_key.find_opt cctxt n
              >>=? fun sk_uri ->
              Public_key.find_opt cctxt n
@@ -334,7 +346,14 @@ let raw_get_key (cctxt : #Client_context.wallet) pkh =
                         >>=? fun pk ->
                         Public_key.update cctxt n (pk_uri, Some pk)
                         >>=? fun () -> return_some pk)
-             >>=? fun pk -> return (n, pk, sk_uri))
+             >>=? fun pk -> return @@ join_keys keys_opt (n, pk, sk_uri))
+           None
+           names
+         >>=? function
+         | None ->
+             failwith "no keys for the source contract manager"
+         | Some keys ->
+             return keys)
   >>= function
   | (Ok (_, None, None) | Error _) as initial_result -> (
       (* try to lookup for a remote key *)

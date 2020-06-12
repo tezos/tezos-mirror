@@ -52,6 +52,8 @@ module type Alias = sig
 
   val rev_find : #Client_context.wallet -> t -> string option tzresult Lwt.t
 
+  val rev_find_all : #Client_context.wallet -> t -> string list tzresult Lwt.t
+
   val name : #Client_context.wallet -> t -> string tzresult Lwt.t
 
   val mem : #Client_context.wallet -> string -> bool tzresult Lwt.t

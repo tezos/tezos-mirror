@@ -57,6 +57,8 @@ module type Alias = sig
 
   val rev_find : #Client_context.wallet -> t -> string option tzresult Lwt.t
 
+  val rev_find_all : #Client_context.wallet -> t -> string list tzresult Lwt.t
+
   val name : #Client_context.wallet -> t -> string tzresult Lwt.t
 
   val mem : #Client_context.wallet -> string -> bool tzresult Lwt.t
@@ -142,6 +144,12 @@ module Alias (Entity : Entity) = struct
     >>=? fun list ->
     try return_some (List.find (fun (_, v') -> v = v') list |> fst)
     with Not_found -> return_none
+
+  let rev_find_all (wallet : #wallet) v =
+    load wallet
+    >>=? fun list ->
+    return
+      (List.filter_map (fun (n, v') -> if v = v' then Some n else None) list)
 
   let mem (wallet : #wallet) name =
     load wallet
