@@ -104,15 +104,14 @@ Encoding for this types can be expressed as:
 .. code-block:: ocaml
 
     let variant_encoding =
-      Data_encoding.(union ~tag_size:`Uint8
-                       [ case
-                           bool
-                           (function B b -> Some b | _ -> None)
-                           (fun b -> B b) ;
-                         case
-                           string
-                           (function S s -> Some s | _ -> None)
-                           (fun s -> S s) ])
+      let open Data_encoding in
+      union ~tag_size:`Uint8
+        [ case ~title:"B" (Tag 0) bool
+            (function B b -> Some b | _ -> None)
+            (fun b -> B b) ;
+          case ~title:"S" (Tag 1) string
+            (function S s -> Some s | _ -> None)
+            (fun s -> S s) ]
 
 This variant encoding is a bit more complicated. Let’s look at the parts
 of the encoding:
