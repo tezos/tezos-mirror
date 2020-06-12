@@ -9,6 +9,7 @@ depends: [
   "tezos-tooling" { with-test }
   "dune" { >= "1.11" }
   "tezos-stdlib"
+  "tezos-crypto"
   "tezos-protocol-environment-packer"
 ]
 build: [

@@ -104,6 +104,12 @@ end)
 () =
 struct
   include Stdlib
+
+  (* The modules provided in the [_struct.V0.M] pack are meant specifically to
+     shadow modules from [Stdlib]/[Base]/etc. with backwards compatible
+     versions. Thus we open the module, hiding the incompatible, newer modules.
+  *)
+  open Tezos_protocol_environment_structs.V0.M
   module Pervasives = Stdlib
   module Compare = Compare
   module List = List
@@ -120,15 +126,15 @@ struct
     module LE = EndianString.LittleEndian
   end
 
-  module Set = Set
-  module Map = Map
+  module Set = Stdlib.Set
+  module Map = Stdlib.Map
   module Int32 = Int32
   module Int64 = Int64
   module Nativeint = Nativeint
   module Buffer = Buffer
   module Format = Format
-  module Option = Tezos_protocol_environment_structs.V0.M.Option
-  module MBytes = Tezos_protocol_environment_structs.V0.M.MBytes
+  module Option = Option
+  module MBytes = MBytes
 
   module Raw_hashes = struct
     let sha256 = Hacl.Hash.SHA256.digest
@@ -340,7 +346,7 @@ struct
 
     module type HASHABLE = Tezos_base.S.HASHABLE
 
-    module type MINIMAL_HASH = S.MINIMAL_HASH
+    module type MINIMAL_HASH = Tezos_crypto.S.MINIMAL_HASH
 
     module type B58_DATA = sig
       type t
@@ -378,9 +384,9 @@ struct
       val rpc_arg : t RPC_arg.t
     end
 
-    module type SET = Tezos_protocol_environment_structs.V0.M.S.SET
+    module type SET = S.SET
 
-    module type MAP = Tezos_protocol_environment_structs.V0.M.S.MAP
+    module type MAP = S.MAP
 
     module type INDEXES = sig
       type t

@@ -4,5 +4,6 @@
  (name tezos_protocol_environment_structs)
  (public_name tezos-protocol-environment-structs)
  (flags :standard)
- (libraries tezos-stdlib)
+ (libraries tezos-stdlib
+            tezos-crypto)
  (modules ("V0")))
