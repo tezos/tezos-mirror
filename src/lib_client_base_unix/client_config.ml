@@ -156,6 +156,9 @@ let default_endpoint = Uri.of_string "http://localhost:8732"
 let ( // ) = Filename.concat
 
 module Cfg_file = struct
+  (* the fields [node_addr], [node_port], and [tls] are deprecated by
+   * and should not coexist with [endpoint].
+   * see [parse_config_args] for the exact handling *)
   type t = {
     base_dir : string;
     node_addr : string option;
@@ -438,7 +441,7 @@ let endpoint_arg () =
     ~short:'E'
     ~placeholder:"uri"
     ~doc:
-      "HTTP endpoint of the node RPC interface; e.g. 'http://localhost:8732'"
+      "HTTP(S) endpoint of the node RPC interface; e.g. 'http://localhost:8732'"
     (endpoint_parameter ())
 
 let remote_signer_arg () =
