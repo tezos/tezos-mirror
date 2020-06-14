@@ -130,10 +130,10 @@ module S = struct
       let open Data_encoding in
       RPC_service.get_service
         ~description:
-          "Lists known heads of the blockchain sorted with decreasing \
-           fitness. Optional arguments allows to returns the list of \
-           predecessors for known heads or the list of predecessors for a \
-           given list of blocks."
+          "Lists known heads of the blockchain up to the last checkpoint \
+           sorted with decreasing fitness. Optional arguments allows to \
+           return the list of predecessors for known heads or the list of \
+           predecessors for a given list of blocks."
         ~query:list_query
         ~output:(list (list Block_hash.encoding))
         path
