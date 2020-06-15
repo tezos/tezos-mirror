@@ -206,7 +206,7 @@ let create_mockup ~(cctxt : Tezos_client_base.Client_context.full)
   let create_base_dir () =
     Tezos_stdlib_unix.Lwt_utils_unix.create_dir base_dir
     >>= fun () ->
-    cctxt#message "created mockup client base dir in %s" base_dir
+    cctxt#message "Created mockup client base dir in %s" base_dir
     >>= fun () -> return_unit
   in
   ( match classify_base_dir base_dir with

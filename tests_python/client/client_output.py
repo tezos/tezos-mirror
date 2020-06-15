@@ -368,7 +368,7 @@ class CreateMockup:
              client_stderr, "dir_not_empty", 1),
             (r"^  \S+ is already initialized as a mockup directory$",
              client_stderr, "already_initialized", 1),
-            (r"^created mockup client base dir in \S+$", client_stdout, "ok",
+            (r"^Created mockup client base dir in \S+$", client_stdout, "ok",
              0),
         ]
 
