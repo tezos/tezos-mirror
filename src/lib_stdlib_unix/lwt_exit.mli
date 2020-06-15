@@ -55,11 +55,15 @@ type clean_up_callback_id
     interruption by signals, [2] for uncaught exceptions, other values are also
     available.
 
+    The argument [after], if passed, delays the call to this callback until
+    the one identified by [after] has resovled.
+
     Once clean-up has started, this function has no effect.
 
     The promise returned by this callback may be canceled if it takes too long
     to complete. (See [max_clean_up_time] below.) *)
-val register_clean_up_callback : (int -> unit Lwt.t) -> clean_up_callback_id
+val register_clean_up_callback :
+  ?after:clean_up_callback_id -> (int -> unit Lwt.t) -> clean_up_callback_id
 
 (** [unregister_clean_up_callback cid] removes the callback with id [cid] from
     the set of functions to call for cleaning up.

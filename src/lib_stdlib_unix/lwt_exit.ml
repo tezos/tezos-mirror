@@ -39,13 +39,14 @@ let new_clean_up_callback_id () =
 (* clean-up callbacks are stored in a reference to a map *)
 module Callbacks_map = Map.Make (Int)
 
-let clean_up_callbacks : (int -> unit Lwt.t) Callbacks_map.t ref =
+let clean_up_callbacks :
+    ((int -> unit Lwt.t) * clean_up_callback_id option) Callbacks_map.t ref =
   ref Callbacks_map.empty
 
 (* adding and removing clean-up callbacks affects the global reference map *)
-let register_clean_up_callback f =
+let register_clean_up_callback ?after f =
   let id = new_clean_up_callback_id () in
-  clean_up_callbacks := Callbacks_map.add id f !clean_up_callbacks ;
+  clean_up_callbacks := Callbacks_map.add id (f, after) !clean_up_callbacks ;
   id
 
 let unregister_clean_up_callback id =
@@ -57,18 +58,36 @@ let unregister_clean_up_callback id =
    function is not exported: it cannot be called directly, it can only be
    triggered as a side effect to calling [exit_and_raise] or [exit_and_wait] *)
 let clean_up status =
-  let callbacks = List.of_seq @@ Callbacks_map.to_seq !clean_up_callbacks in
+  let callbacks = Callbacks_map.to_seq !clean_up_callbacks in
   clean_up_callbacks := Callbacks_map.empty ;
-  Lwt_list.iter_p
-    (fun (_, c) ->
-      Lwt.catch
-        (fun () -> c status)
-        (fun exc ->
-          Format.eprintf
-            "Exit: uncaught exception during clean-up: %s\n%!"
-            (Printexc.to_string exc) ;
-          Lwt.return_unit))
-    callbacks
+  let promises : unit Lwt.t Callbacks_map.t =
+    Seq.fold_left
+      (fun promises (id, (c, after)) ->
+        let pre =
+          match after with
+          | None ->
+              Lwt.return_unit
+          | Some after -> (
+            match Callbacks_map.find_opt after promises with
+            | None ->
+                assert false
+            | Some p ->
+                p )
+        in
+        let promise =
+          Lwt.catch
+            (fun () -> pre >>= fun () -> c status)
+            (fun exc ->
+              Format.eprintf
+                "Exit: uncaught exception during clean-up: %s\n%!"
+                (Printexc.to_string exc) ;
+              Lwt.return_unit)
+        in
+        Callbacks_map.add id promise promises)
+      Callbacks_map.empty
+      callbacks
+  in
+  Lwt.join (List.of_seq @@ Seq.map snd @@ Callbacks_map.to_seq promises)
 
 (* 3. synchronisation primitives *)
 
