@@ -239,7 +239,7 @@ def test_transfer_bad_base_dir(mockup_client: Client):
         with open(os.path.join(base_dir, "mockup"), "w") as handle:
             handle.write("")
         mockup_client.set_base_dir(base_dir)
-        cmd = ["transfer", "1", "from", "bootstrap1", "to", "boostrap2"]
+        cmd = ["transfer", "1", "from", "bootstrap1", "to", "bootstrap2"]
         (_, err_output, _) = mockup_client.run_generic(cmd, check=False)
         # See
         # https://gitlab.com/tezos/tezos/-/merge_requests/1760#note_329071488
