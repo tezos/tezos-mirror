@@ -23,9 +23,121 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Internal_event.Legacy_logging.Make (struct
-  let name = "p2p.protocol"
-end)
+module Events = struct
+  include Internal_event.Simple
+
+  let section = ["p2p"; "protocol"]
+
+  let private_node_new_peers =
+    declare_1
+      ~section
+      ~name:"private_node_new_peers"
+      ~msg:"received new peers addresses from private peer {peer}"
+      ~level:Warning
+      ("peer", P2p_peer.Id.encoding)
+
+  let private_node_peers_request =
+    declare_1
+      ~section
+      ~name:"private_node_peers_request"
+      ~msg:"received requests for peers addresses from private peer {peer}"
+      ~level:Warning
+      ("peer", P2p_peer.Id.encoding)
+
+  let private_node_swap_request =
+    declare_1
+      ~section
+      ~name:"private_node_swap_request"
+      ~msg:"received swap requests from private peer {peer}"
+      ~level:Warning
+      ("peer", P2p_peer.Id.encoding)
+
+  let private_node_swap_ack =
+    declare_1
+      ~section
+      ~name:"private_node_swap_ack"
+      ~msg:"received swap ack from private peer {peer}"
+      ~level:Warning
+      ("peer", P2p_peer.Id.encoding)
+
+  let private_node_request =
+    declare_1
+      ~section
+      ~name:"private_node_request"
+      ~msg:"private peer ({peer}) asked other peer's addresses"
+      ~level:Warning
+      ("peer", P2p_peer.Id.encoding)
+
+  let advertise_sending_failed =
+    declare_2
+      ~section
+      ~name:"advertise_sending_failed"
+      ~msg:"sending advertise to {peer} failed: {trace}"
+      ~level:Warning
+      ~pp2:pp_print_error_first
+      ("peer", P2p_peer.Id.encoding)
+      ("trace", Error_monad.trace_encoding)
+
+  let swap_succeeded =
+    declare_1
+      ~section
+      ~name:"swap_succeeded"
+      ~msg:"swap to {point} succeeded"
+      ~level:Info
+      ("point", P2p_point.Id.encoding)
+
+  let swap_interrupted =
+    declare_2
+      ~section
+      ~name:"swap_interrupted"
+      ~msg:"swap to {point} was interrupted: {trace}"
+      ~level:Debug
+      ~pp2:pp_print_error_first
+      ("point", P2p_point.Id.encoding)
+      ("trace", Error_monad.trace_encoding)
+
+  let swap_failed =
+    declare_2
+      ~section
+      ~name:"swap_failed"
+      ~msg:"swap to {point} failed: {trace}"
+      ~level:Debug
+      ~pp2:pp_print_error_first
+      ("point", P2p_point.Id.encoding)
+      ("trace", Error_monad.trace_encoding)
+
+  let swap_ack_received =
+    declare_1
+      ~section
+      ~name:"swap_ack_received"
+      ~msg:"swap ack received from {peer}"
+      ~level:Info
+      ("peer", P2p_peer.Id.encoding)
+
+  let swap_request_received =
+    declare_1
+      ~section
+      ~name:"swap_request_received"
+      ~msg:"swap request received from {peer}"
+      ~level:Info
+      ("peer", P2p_peer.Id.encoding)
+
+  let swap_request_ignored =
+    declare_1
+      ~section
+      ~name:"swap_request_ignored"
+      ~msg:"swap request ignored from {peer}"
+      ~level:Info
+      ("peer", P2p_peer.Id.encoding)
+
+  let no_swap_candidate =
+    declare_1
+      ~section
+      ~name:"no_swap_candidate"
+      ~msg:"no swap candidate for {peer}"
+      ~level:Info
+      ("peer", P2p_peer.Id.encoding)
+end
 
 type ('msg, 'peer, 'conn) config = {
   swap_linger : Time.System.Span.t;
@@ -36,35 +148,23 @@ type ('msg, 'peer, 'conn) config = {
   mutable latest_successful_swap : Time.System.t;
 }
 
-let private_node_warn fmt =
-  Format.kasprintf (fun s -> lwt_warn "[private node] %s" s) fmt
-
 open P2p_answerer
 
 let message conn _request size msg = Lwt_pipe.push conn.messages (size, msg)
 
 module Private_answerer = struct
   let advertise conn _request _points =
-    private_node_warn
-      "Received new peers addresses from %a"
-      P2p_peer.Id.pp
-      conn.peer_id
+    Events.(emit private_node_new_peers) conn.peer_id
 
   let bootstrap conn _request =
-    private_node_warn
-      "Receive requests for peers addresses from %a"
-      P2p_peer.Id.pp
-      conn.peer_id
+    Events.(emit private_node_peers_request) conn.peer_id
     >>= fun () -> return_unit
 
   let swap_request conn _request _new_point _peer =
-    private_node_warn
-      "Received swap requests from %a"
-      P2p_peer.Id.pp
-      conn.peer_id
+    Events.(emit private_node_swap_request) conn.peer_id
 
   let swap_ack conn _request _point _peer_id =
-    private_node_warn "Received swap ack from %a" P2p_peer.Id.pp conn.peer_id
+    Events.(emit private_node_swap_ack) conn.peer_id
 
   let create conn =
     P2p_answerer.
@@ -96,11 +196,7 @@ module Default_answerer = struct
     let source_peer_id = conn.peer_id in
     log (Bootstrap_received {source = source_peer_id}) ;
     if conn.is_private then
-      private_node_warn
-        "Private peer (%a) asked other peers addresses"
-        P2p_peer.Id.pp
-        conn.peer_id
-      >>= fun () -> return_unit
+      Events.(emit private_node_request) conn.peer_id >>= fun () -> return_unit
     else
       P2p_pool.list_known_points ~ignore_private:true config.pool
       >>= function
@@ -115,12 +211,7 @@ module Default_answerer = struct
             (* if not sent then ?? TODO count dropped message ?? *)
             return_unit
         | Error err ->
-            lwt_log_error
-              "Sending advertise to %a failed: %a"
-              P2p_peer.Id.pp
-              source_peer_id
-              pp_print_error
-              err
+            Events.(emit advertise_sending_failed) (source_peer_id, err)
             >>= fun () -> Lwt.return (Error err) )
 
   let swap t pool source_peer_id ~connect current_peer_id new_point =
@@ -130,7 +221,7 @@ module Default_answerer = struct
     | Ok _new_conn -> (
         t.latest_successful_swap <- Systime_os.now () ;
         t.log (Swap_success {source = source_peer_id}) ;
-        lwt_log_info "Swap to %a succeeded" P2p_point.Id.pp new_point
+        Events.(emit swap_succeeded) new_point
         >>= fun () ->
         match P2p_pool.Connection.find_by_peer_id pool current_peer_id with
         | None ->
@@ -142,19 +233,9 @@ module Default_answerer = struct
         t.log (Swap_failure {source = source_peer_id}) ;
         match err with
         | [Timeout] ->
-            lwt_debug
-              "Swap to %a was interrupted: %a"
-              P2p_point.Id.pp
-              new_point
-              pp_print_error
-              err
+            Events.(emit swap_interrupted) (new_point, err)
         | _ ->
-            lwt_log_error
-              "Swap to %a failed: %a"
-              P2p_point.Id.pp
-              new_point
-              pp_print_error
-              err )
+            Events.(emit swap_failed) (new_point, err) )
 
   let swap_ack config conn request new_point _peer =
     let source_peer_id = conn.peer_id in
@@ -162,7 +243,7 @@ module Default_answerer = struct
     let connect = config.connect in
     let log = config.log in
     log (Swap_ack_received {source = source_peer_id}) ;
-    lwt_log_info "Swap ack received from %a" P2p_peer.Id.pp source_peer_id
+    Events.(emit swap_ack_received) source_peer_id
     >>= fun () ->
     match request.last_sent_swap_request with
     | None ->
@@ -182,7 +263,7 @@ module Default_answerer = struct
     let connect = config.connect in
     let log = config.log in
     log (Swap_request_received {source = source_peer_id}) ;
-    lwt_log_info "Swap request received from %a" P2p_peer.Id.pp source_peer_id
+    Events.(emit swap_request_received) source_peer_id
     >>= fun () ->
     (* Ignore if already connected to peer or already swapped less than <swap_linger> ago. *)
     let span_since_last_swap =
@@ -198,14 +279,11 @@ module Default_answerer = struct
       || not (P2p_point_state.is_disconnected new_point_info)
     then (
       log (Swap_request_ignored {source = source_peer_id}) ;
-      lwt_log_info
-        "Ignoring swap request from %a"
-        P2p_peer.Id.pp
-        source_peer_id )
+      Events.(emit swap_request_ignored) source_peer_id )
     else
       match P2p_pool.Connection.random_addr pool ~no_private:true with
       | None ->
-          lwt_log_info "No swap candidate for %a" P2p_peer.Id.pp source_peer_id
+          Events.(emit no_swap_candidate) source_peer_id
       | Some (proposed_point, proposed_peer_id) -> (
         match conn.write_swap_ack proposed_point proposed_peer_id with
         | Ok true ->
