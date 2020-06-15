@@ -26,7 +26,7 @@
 
 (** One role of this module is to export read-through [REQUESTER] services.
     These services allow client code to lookup resources identified by their
-    hashes. Resources are protocols, operations, block_header, and operations.
+    hashes. Resources are protocols, operations, block_header.
     Values are first looked up locally, in [State], or are requested to peers.
 
     An exported [REQUESTER] service is implemented by a [FULL_REQUESTER] and
