@@ -1,5 +1,6 @@
 import os
 import re
+
 import pytest
 
 from tools.constants import IDENTITIES
