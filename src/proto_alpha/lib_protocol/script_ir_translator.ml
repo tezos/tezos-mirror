@@ -72,19 +72,32 @@ let rec comparable_type_size : type t. t comparable_ty -> int =
  fun ty ->
   (* No wildcard to force the update when comparable_ty changes. *)
   match ty with
-  | Unit_key _
-  | Never_key _
-  | Int_key _
-  | Nat_key _
-  | Signature_key _
-  | String_key _
-  | Bytes_key _
-  | Mutez_key _
-  | Bool_key _
-  | Key_hash_key _
-  | Key_key _
-  | Timestamp_key _
-  | Chain_id_key _
+  | Unit_key _ ->
+      1
+  | Never_key _ ->
+      1
+  | Int_key _ ->
+      1
+  | Nat_key _ ->
+      1
+  | Signature_key _ ->
+      1
+  | String_key _ ->
+      1
+  | Bytes_key _ ->
+      1
+  | Mutez_key _ ->
+      1
+  | Bool_key _ ->
+      1
+  | Key_hash_key _ ->
+      1
+  | Key_key _ ->
+      1
+  | Timestamp_key _ ->
+      1
+  | Chain_id_key _ ->
+      1
   | Address_key _ ->
       1
   | Pair_key ((t1, _), (t2, _), _) ->
@@ -97,20 +110,34 @@ let rec comparable_type_size : type t. t comparable_ty -> int =
 let rec type_size : type t. t ty -> int =
  fun ty ->
   match ty with
-  | Unit_t _
-  | Int_t _
-  | Nat_t _
-  | Signature_t _
-  | Bytes_t _
-  | String_t _
-  | Mutez_t _
-  | Key_hash_t _
-  | Key_t _
-  | Timestamp_t _
-  | Address_t _
-  | Bool_t _
-  | Operation_t _
-  | Chain_id_t _
+  | Unit_t _ ->
+      1
+  | Int_t _ ->
+      1
+  | Nat_t _ ->
+      1
+  | Signature_t _ ->
+      1
+  | Bytes_t _ ->
+      1
+  | String_t _ ->
+      1
+  | Mutez_t _ ->
+      1
+  | Key_hash_t _ ->
+      1
+  | Key_t _ ->
+      1
+  | Timestamp_t _ ->
+      1
+  | Address_t _ ->
+      1
+  | Bool_t _ ->
+      1
+  | Operation_t _ ->
+      1
+  | Chain_id_t _ ->
+      1
   | Never_t _ ->
       1
   | Pair_t ((l, _, _), (r, _, _), _) ->
@@ -158,25 +185,39 @@ let rec type_size_of_stack_head : type st. st stack_ty -> up_to:int -> int =
 let number_of_generated_growing_types : type b a. (b, a) instr -> int =
   function
   (* Constructors *)
-  | Const _
-  | Cons_pair
-  | Cons_some
-  | Cons_none _
-  | Cons_left
-  | Cons_right
-  | Nil
-  | Empty_set _
-  | Empty_map _
-  | Empty_big_map _
-  | Lambda _
-  | Self _
+  | Const _ ->
+      1
+  | Cons_pair ->
+      1
+  | Cons_some ->
+      1
+  | Cons_none _ ->
+      1
+  | Cons_left ->
+      1
+  | Cons_right ->
+      1
+  | Nil ->
+      1
+  | Empty_set _ ->
+      1
+  | Empty_map _ ->
+      1
+  | Empty_big_map _ ->
+      1
+  | Lambda _ ->
+      1
+  | Self _ ->
+      1
   | Contract _ ->
       1
   (* Magic constructor *)
   | Unpack _ ->
       1
   (* Mappings *)
-  | List_map _ | Map_map _ ->
+  | List_map _ ->
+      1
+  | Map_map _ ->
       1
   (* Others:
      - don't add types
@@ -185,121 +226,236 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int =
      - produce only constants
      - have types bounded by parameters
      - etc. *)
-  | Drop
-  | Dup
-  | Swap
-  | Car
-  | Cdr
-  | Unpair
-  | If_none _
-  | If_left _
-  | Cons_list
-  | If_cons _
-  | List_size
-  | List_iter _
-  | Set_iter _
-  | Set_mem
-  | Set_update
-  | Set_size
-  | Map_iter _
-  | Map_mem
-  | Map_get
-  | Map_update
-  | Map_size
-  | Big_map_get
-  | Big_map_update
-  | Big_map_mem
-  | Concat_string
-  | Concat_string_pair
-  | Slice_string
-  | String_size
-  | Concat_bytes
-  | Concat_bytes_pair
-  | Slice_bytes
-  | Bytes_size
-  | Add_seconds_to_timestamp
-  | Add_timestamp_to_seconds
-  | Sub_timestamp_seconds
-  | Diff_timestamps
-  | Add_tez
-  | Sub_tez
-  | Mul_teznat
-  | Mul_nattez
-  | Ediv_teznat
-  | Ediv_tez
-  | Or
-  | And
-  | Xor
-  | Not
-  | Is_nat
-  | Neg_nat
-  | Neg_int
-  | Abs_int
-  | Int_nat
-  | Add_intint
-  | Add_intnat
-  | Add_natint
-  | Add_natnat
-  | Sub_int
-  | Mul_intint
-  | Mul_intnat
-  | Mul_natint
-  | Mul_natnat
-  | Ediv_intint
-  | Ediv_intnat
-  | Ediv_natint
-  | Ediv_natnat
-  | Lsl_nat
-  | Lsr_nat
-  | Or_nat
-  | And_nat
-  | And_int_nat
-  | Xor_nat
-  | Not_nat
-  | Not_int
-  | Seq _
-  | If _
-  | Loop _
-  | Loop_left _
-  | Dip _
-  | Exec
-  | Apply _
-  | Failwith _
-  | Nop
-  | Compare _
-  | Eq
-  | Neq
-  | Lt
-  | Gt
-  | Le
-  | Ge
-  | Address
-  | Transfer_tokens
-  | Implicit_account
-  | Create_contract _
-  | Now
-  | Level
-  | Balance
-  | Check_signature
-  | Hash_key
-  | Blake2b
-  | Sha256
-  | Sha512
-  | Source
-  | Sender
-  | Self_address
-  | Amount
-  | Set_delegate
-  | Pack _
-  | Dig _
-  | Dug _
-  | Dipn _
-  | Dropn _
-  | ChainId
-  | Never
-  | Voting_power
-  | Total_voting_power
-  | Keccak
+  | Drop ->
+      0
+  | Dup ->
+      0
+  | Swap ->
+      0
+  | Car ->
+      0
+  | Cdr ->
+      0
+  | Unpair ->
+      0
+  | If_none _ ->
+      0
+  | If_left _ ->
+      0
+  | Cons_list ->
+      0
+  | If_cons _ ->
+      0
+  | List_size ->
+      0
+  | List_iter _ ->
+      0
+  | Set_iter _ ->
+      0
+  | Set_mem ->
+      0
+  | Set_update ->
+      0
+  | Set_size ->
+      0
+  | Map_iter _ ->
+      0
+  | Map_mem ->
+      0
+  | Map_get ->
+      0
+  | Map_update ->
+      0
+  | Map_size ->
+      0
+  | Big_map_get ->
+      0
+  | Big_map_update ->
+      0
+  | Big_map_mem ->
+      0
+  | Concat_string ->
+      0
+  | Concat_string_pair ->
+      0
+  | Slice_string ->
+      0
+  | String_size ->
+      0
+  | Concat_bytes ->
+      0
+  | Concat_bytes_pair ->
+      0
+  | Slice_bytes ->
+      0
+  | Bytes_size ->
+      0
+  | Add_seconds_to_timestamp ->
+      0
+  | Add_timestamp_to_seconds ->
+      0
+  | Sub_timestamp_seconds ->
+      0
+  | Diff_timestamps ->
+      0
+  | Add_tez ->
+      0
+  | Sub_tez ->
+      0
+  | Mul_teznat ->
+      0
+  | Mul_nattez ->
+      0
+  | Ediv_teznat ->
+      0
+  | Ediv_tez ->
+      0
+  | Or ->
+      0
+  | And ->
+      0
+  | Xor ->
+      0
+  | Not ->
+      0
+  | Is_nat ->
+      0
+  | Neg_nat ->
+      0
+  | Neg_int ->
+      0
+  | Abs_int ->
+      0
+  | Int_nat ->
+      0
+  | Add_intint ->
+      0
+  | Add_intnat ->
+      0
+  | Add_natint ->
+      0
+  | Add_natnat ->
+      0
+  | Sub_int ->
+      0
+  | Mul_intint ->
+      0
+  | Mul_intnat ->
+      0
+  | Mul_natint ->
+      0
+  | Mul_natnat ->
+      0
+  | Ediv_intint ->
+      0
+  | Ediv_intnat ->
+      0
+  | Ediv_natint ->
+      0
+  | Ediv_natnat ->
+      0
+  | Lsl_nat ->
+      0
+  | Lsr_nat ->
+      0
+  | Or_nat ->
+      0
+  | And_nat ->
+      0
+  | And_int_nat ->
+      0
+  | Xor_nat ->
+      0
+  | Not_nat ->
+      0
+  | Not_int ->
+      0
+  | Seq _ ->
+      0
+  | If _ ->
+      0
+  | Loop _ ->
+      0
+  | Loop_left _ ->
+      0
+  | Dip _ ->
+      0
+  | Exec ->
+      0
+  | Apply _ ->
+      0
+  | Failwith _ ->
+      0
+  | Nop ->
+      0
+  | Compare _ ->
+      0
+  | Eq ->
+      0
+  | Neq ->
+      0
+  | Lt ->
+      0
+  | Gt ->
+      0
+  | Le ->
+      0
+  | Ge ->
+      0
+  | Address ->
+      0
+  | Transfer_tokens ->
+      0
+  | Implicit_account ->
+      0
+  | Create_contract _ ->
+      0
+  | Now ->
+      0
+  | Level ->
+      0
+  | Balance ->
+      0
+  | Check_signature ->
+      0
+  | Hash_key ->
+      0
+  | Blake2b ->
+      0
+  | Sha256 ->
+      0
+  | Sha512 ->
+      0
+  | Source ->
+      0
+  | Sender ->
+      0
+  | Self_address ->
+      0
+  | Amount ->
+      0
+  | Set_delegate ->
+      0
+  | Pack _ ->
+      0
+  | Dig _ ->
+      0
+  | Dug _ ->
+      0
+  | Dipn _ ->
+      0
+  | Dropn _ ->
+      0
+  | ChainId ->
+      0
+  | Never ->
+      0
+  | Voting_power ->
+      0
+  | Total_voting_power ->
+      0
+  | Keccak ->
+      0
   | Sha3 ->
       0
 
@@ -710,12 +866,18 @@ let rec comparable_ty_of_ty_no_gas : type a. a ty -> a comparable_ty option =
         None
     | Some ty ->
         Some (Option_key (ty, tname)) )
-  | Lambda_t _
-  | List_t _
-  | Set_t _
-  | Map_t _
-  | Big_map_t _
-  | Contract_t _
+  | Lambda_t _ ->
+      None
+  | List_t _ ->
+      None
+  | Set_t _ ->
+      None
+  | Map_t _ ->
+      None
+  | Big_map_t _ ->
+      None
+  | Contract_t _ ->
+      None
   | Operation_t _ ->
       None
 
@@ -896,29 +1058,52 @@ let serialize_stack_for_error ctxt stack_ty =
   trace Cannot_serialize_error (unparse_stack ctxt stack_ty)
 
 let name_of_ty : type a. a ty -> type_annot option = function
-  | Unit_t tname
-  | Int_t tname
-  | Nat_t tname
-  | String_t tname
-  | Bytes_t tname
-  | Mutez_t tname
-  | Bool_t tname
-  | Key_hash_t tname
-  | Key_t tname
-  | Timestamp_t tname
-  | Address_t tname
-  | Signature_t tname
-  | Operation_t tname
-  | Chain_id_t tname
-  | Never_t tname
-  | Contract_t (_, tname)
-  | Pair_t (_, _, tname)
-  | Union_t (_, _, tname)
-  | Lambda_t (_, _, tname)
-  | Option_t (_, tname)
-  | List_t (_, tname)
-  | Set_t (_, tname)
-  | Map_t (_, _, tname)
+  | Unit_t tname ->
+      tname
+  | Int_t tname ->
+      tname
+  | Nat_t tname ->
+      tname
+  | String_t tname ->
+      tname
+  | Bytes_t tname ->
+      tname
+  | Mutez_t tname ->
+      tname
+  | Bool_t tname ->
+      tname
+  | Key_hash_t tname ->
+      tname
+  | Key_t tname ->
+      tname
+  | Timestamp_t tname ->
+      tname
+  | Address_t tname ->
+      tname
+  | Signature_t tname ->
+      tname
+  | Operation_t tname ->
+      tname
+  | Chain_id_t tname ->
+      tname
+  | Never_t tname ->
+      tname
+  | Contract_t (_, tname) ->
+      tname
+  | Pair_t (_, _, tname) ->
+      tname
+  | Union_t (_, _, tname) ->
+      tname
+  | Lambda_t (_, _, tname) ->
+      tname
+  | Option_t (_, tname) ->
+      tname
+  | List_t (_, tname) ->
+      tname
+  | Set_t (_, tname) ->
+      tname
+  | Map_t (_, _, tname) ->
+      tname
   | Big_map_t (_, _, tname) ->
       tname
 
@@ -1814,21 +1999,36 @@ let check_packable ~legacy loc root =
         error (Unexpected_big_map loc)
     | Operation_t _ ->
         error (Unexpected_operation loc)
-    | Unit_t _
-    | Int_t _
-    | Nat_t _
-    | Signature_t _
-    | String_t _
-    | Bytes_t _
-    | Mutez_t _
-    | Key_hash_t _
-    | Key_t _
-    | Timestamp_t _
-    | Address_t _
-    | Bool_t _
-    | Chain_id_t _
-    | Never_t _
-    | Set_t (_, _)
+    | Unit_t _ ->
+        ok ()
+    | Int_t _ ->
+        ok ()
+    | Nat_t _ ->
+        ok ()
+    | Signature_t _ ->
+        ok ()
+    | String_t _ ->
+        ok ()
+    | Bytes_t _ ->
+        ok ()
+    | Mutez_t _ ->
+        ok ()
+    | Key_hash_t _ ->
+        ok ()
+    | Key_t _ ->
+        ok ()
+    | Timestamp_t _ ->
+        ok ()
+    | Address_t _ ->
+        ok ()
+    | Bool_t _ ->
+        ok ()
+    | Chain_id_t _ ->
+        ok ()
+    | Never_t _ ->
+        ok ()
+    | Set_t (_, _) ->
+        ok ()
     | Lambda_t (_, _, _) ->
         ok ()
     | Pair_t ((l_ty, _, _), (r_ty, _, _), _) ->
@@ -5532,23 +5732,40 @@ let rec has_big_map : type t. t ty -> t has_big_map =
   function
   | Big_map_t (_, _, _) ->
       Big_map_f
-  | Unit_t _
-  | Int_t _
-  | Nat_t _
-  | Signature_t _
-  | String_t _
-  | Bytes_t _
-  | Mutez_t _
-  | Key_hash_t _
-  | Key_t _
-  | Timestamp_t _
-  | Address_t _
-  | Bool_t _
-  | Lambda_t (_, _, _)
-  | Set_t (_, _)
-  | Contract_t (_, _)
-  | Operation_t _
-  | Chain_id_t _
+  | Unit_t _ ->
+      False_f
+  | Int_t _ ->
+      False_f
+  | Nat_t _ ->
+      False_f
+  | Signature_t _ ->
+      False_f
+  | String_t _ ->
+      False_f
+  | Bytes_t _ ->
+      False_f
+  | Mutez_t _ ->
+      False_f
+  | Key_hash_t _ ->
+      False_f
+  | Key_t _ ->
+      False_f
+  | Timestamp_t _ ->
+      False_f
+  | Address_t _ ->
+      False_f
+  | Bool_t _ ->
+      False_f
+  | Lambda_t (_, _, _) ->
+      False_f
+  | Set_t (_, _) ->
+      False_f
+  | Contract_t (_, _) ->
+      False_f
+  | Operation_t _ ->
+      False_f
+  | Chain_id_t _ ->
+      False_f
   | Never_t _ ->
       False_f
   | Pair_t ((l, _, _), (r, _, _), _) ->
