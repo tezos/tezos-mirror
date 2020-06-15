@@ -412,16 +412,42 @@ struct
     | h :: t ->
         fold_right_s f t init >>=? fun acc -> f h acc
 
-  let rec join = function
+  let join_p = Lwt.join
+
+  let all_p = Lwt.all
+
+  let both_p = Lwt.both
+
+  let rec join_e = function
     | [] ->
-        return_unit
-    | t :: ts -> (
-        t
-        >>= function
-        | Error _ as err ->
-            join ts >>=? fun () -> Lwt.return err
-        | Ok () ->
-            join ts )
+        ok_unit
+    | t :: ts ->
+        t >>? fun () -> join_e ts
+
+  let all_e ts =
+    let rec aux acc = function
+      | [] ->
+          Ok (List.rev acc)
+      | t :: ts ->
+          t >>? fun v -> aux (v :: acc) ts
+    in
+    aux [] ts
+
+  let both_e a b =
+    match (a, b) with
+    | (Ok a, Ok b) ->
+        Ok (a, b)
+    | (Error err, Ok _) | (Ok _, Error err) ->
+        Error err
+    | (Error erra, Error errb) ->
+        (* Improve this once we improved the support for parallel traces *)
+        ignore errb ; Error erra
+
+  let join_ep ts = all_p ts >|= join_e
+
+  let all_ep ts = all_p ts >|= all_e
+
+  let both_ep a b = both_p a b >|= fun (a, b) -> both_e a b
 
   let record_trace err result =
     match result with Ok _ as res -> res | Error errs -> Error (err :: errs)

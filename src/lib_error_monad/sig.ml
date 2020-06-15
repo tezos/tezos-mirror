@@ -389,6 +389,25 @@ module type MONAD = sig
   val fold_right_s :
     ('a -> 'b -> 'b tzresult Lwt.t) -> 'a list -> 'b -> 'b tzresult Lwt.t
 
-  (** A {!Lwt.join} in the monad *)
-  val join : unit tzresult Lwt.t list -> unit tzresult Lwt.t
+  (** A few aliases for Lwt functions *)
+  val join_p : unit Lwt.t list -> unit Lwt.t
+
+  val all_p : 'a Lwt.t list -> 'a list Lwt.t
+
+  val both_p : 'a Lwt.t -> 'b Lwt.t -> ('a * 'b) Lwt.t
+
+  (** Similar functions in the error monad *)
+  val join_e : unit tzresult list -> unit tzresult
+
+  val all_e : 'a tzresult list -> 'a list tzresult
+
+  val both_e : 'a tzresult -> 'b tzresult -> ('a * 'b) tzresult
+
+  (** Similar functions in the combined monad *)
+  val join_ep : unit tzresult Lwt.t list -> unit tzresult Lwt.t
+
+  val all_ep : 'a tzresult Lwt.t list -> 'a list tzresult Lwt.t
+
+  val both_ep :
+    'a tzresult Lwt.t -> 'b tzresult Lwt.t -> ('a * 'b) tzresult Lwt.t
 end

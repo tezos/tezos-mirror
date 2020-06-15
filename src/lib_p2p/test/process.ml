@@ -188,24 +188,24 @@ let wait_all processes =
       lwt_log_error "Early error!"
       >>= fun () ->
       List.iter Lwt.cancel remaining ;
-      join remaining
+      join_ep remaining
       >>= fun _ -> failwith "A process finished with error %d !" n
   | Some ([Exn (Signaled n)], remaining) ->
       lwt_log_error "Early error!"
       >>= fun () ->
       List.iter Lwt.cancel remaining ;
-      join remaining
+      join_ep remaining
       >>= fun _ -> failwith "A process was killed by a SIG%s !" (signal_name n)
   | Some ([Exn (Stopped n)], remaining) ->
       lwt_log_error "Early error!"
       >>= fun () ->
       List.iter Lwt.cancel remaining ;
-      join remaining
+      join_ep remaining
       >>= fun _ ->
       failwith "A process was stopped by a SIG%s !" (signal_name n)
   | Some (err, remaining) ->
       lwt_log_error "@[<v 2>Unexpected error!@,%a@]" pp_print_error err
       >>= fun () ->
       List.iter Lwt.cancel remaining ;
-      join remaining
+      join_ep remaining
       >>= fun _ -> failwith "A process finished with an unexpected error !"
