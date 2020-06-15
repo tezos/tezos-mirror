@@ -50,7 +50,7 @@ module Events = struct
       ~section
       ~name:"too_many_connections_maintenance"
       ~msg:"Too many connections (will kill {connections})"
-      ~level:Notice
+      ~level:Debug
       ("connections", Data_encoding.int16)
 end
 
