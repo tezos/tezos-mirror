@@ -319,8 +319,6 @@ let default_p2p_limits : P2p.limits =
     incoming_app_message_queue_size = None;
     incoming_message_queue_size = None;
     outgoing_message_queue_size = None;
-    known_points_history_size = 500;
-    known_peer_ids_history_size = 500;
     max_known_points = Some (400, 300);
     max_known_peer_ids = Some (400, 300);
     swap_linger = Time.System.Span.of_seconds_exn 30.;
@@ -383,8 +381,6 @@ let limit : P2p.limits Data_encoding.t =
            incoming_app_message_queue_size;
            incoming_message_queue_size;
            outgoing_message_queue_size;
-           known_points_history_size;
-           known_peer_ids_history_size;
            max_known_points;
            max_known_peer_ids;
            swap_linger;
@@ -406,8 +402,6 @@ let limit : P2p.limits Data_encoding.t =
             incoming_app_message_queue_size,
             incoming_message_queue_size,
             outgoing_message_queue_size,
-            known_points_history_size,
-            known_peer_ids_history_size,
             max_known_points ) ),
         (max_known_peer_ids, greylist_timeout, maintenance_idle_time) ))
     (fun ( ( ( connection_timeout,
@@ -427,8 +421,6 @@ let limit : P2p.limits Data_encoding.t =
                incoming_app_message_queue_size,
                incoming_message_queue_size,
                outgoing_message_queue_size,
-               known_points_history_size,
-               known_peer_ids_history_size,
                max_known_points ) ),
            (max_known_peer_ids, greylist_timeout, maintenance_idle_time) ) ->
       {
@@ -449,8 +441,6 @@ let limit : P2p.limits Data_encoding.t =
         incoming_app_message_queue_size;
         incoming_message_queue_size;
         outgoing_message_queue_size;
-        known_points_history_size;
-        known_peer_ids_history_size;
         max_known_points;
         max_known_peer_ids;
         swap_linger;
@@ -520,7 +510,7 @@ let limit : P2p.limits Data_encoding.t =
                 "swap-linger"
                 Time.System.Span.encoding
                 default_p2p_limits.swap_linger))
-          (obj10
+          (obj8
              (opt "binary-chunks-size" uint8)
              (dft
                 "read-buffer-size"
@@ -532,17 +522,12 @@ let limit : P2p.limits Data_encoding.t =
              (opt "incoming-app-message-queue-size" int31)
              (opt "incoming-message-queue-size" int31)
              (opt "outgoing-message-queue-size" int31)
-             (dft
-                "known_points_history_size"
-                uint16
-                default_p2p_limits.known_points_history_size)
-             (dft
-                "known_peer_ids_history_size"
-                uint16
-                default_p2p_limits.known_points_history_size)
              (opt "max_known_points" (tup2 uint16 uint16))))
        (obj3
-          (opt "max_known_peer_ids" (tup2 uint16 uint16))
+          (opt
+             "max_known_peer_ids"
+             ~description:"max and target size for the known address table."
+             (tup2 uint16 uint16))
           (dft
              "greylist-timeout"
              ~description:"GC delay for the greylists tables, in seconds."

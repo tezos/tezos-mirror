@@ -60,9 +60,6 @@ type limits = {
   incoming_app_message_queue_size : int option;
   incoming_message_queue_size : int option;
   outgoing_message_queue_size : int option;
-  known_peer_ids_history_size : int;
-  (* TODO: remove these two fields *)
-  known_points_history_size : int;
   max_known_peer_ids : (int * int) option;
   max_known_points : (int * int) option;
   swap_linger : Time.System.Span.t;
@@ -511,10 +508,6 @@ let check_limits =
     fail_2 c.max_incoming_connections "max-incoming-connections"
     >>=? fun () ->
     fail_2 c.read_buffer_size "read-buffer-size"
-    >>=? fun () ->
-    fail_2 c.known_peer_ids_history_size "known-peer-ids-history-size"
-    >>=? fun () ->
-    fail_2 c.known_points_history_size "known-points-history-size"
     >>=? fun () ->
     fail_1 c.swap_linger "swap-linger"
     >>=? fun () ->

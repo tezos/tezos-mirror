@@ -136,9 +136,6 @@ type limits = {
   incoming_message_queue_size : int option;
   outgoing_message_queue_size : int option;
       (** Various bounds for internal queues. *)
-  known_peer_ids_history_size : int;
-  known_points_history_size : int;
-      (** Size of circular log buffers, in number of events recorded. *)
   max_known_peer_ids : (int * int) option;
   max_known_points : (int * int) option;
       (** Optional limitation of internal hashtables (max, target) *)
