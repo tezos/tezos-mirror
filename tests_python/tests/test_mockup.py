@@ -9,7 +9,7 @@ import json
 import os
 import re
 import tempfile
-from typing import Any, Iterator, Optional, Tuple
+from typing import Any, Iterator, Optional, Tuple, List
 import pytest
 from launchers.sandbox import Sandbox
 from client.client import Client
@@ -145,16 +145,27 @@ def test_transfer(base_dir_n_mockup: Tuple[str, Client]):
     assert receiver_balance_after == receiver_balance_before + transferred
 
 
+# It's impossible to guess values of chain_id, these ones have been
+# obtained by looking at the output of the test test_chain_id_seed.
+@pytest.mark.parametrize('chain_id', [
+    "NetXcqTGZX74DxG", "NetXaFDF7xZQCpR", "NetXkKbtqncJcAz", "NetXjjE5cZUeWPy",
+    "NetXi7C1pyLhQNe"
+])
 @pytest.mark.client
-def test_create_mockup_custom_constants(mockup_client: Client):
+def test_create_mockup_custom_constants(mockup_client: Client, chain_id: str):
     """ Tests `tezos-client create mockup` --protocols-constants  argument
         The call must succeed.
+
+        Args:
+            mockup_client: the client to use
+            chain_id (str): the string to pass for field `chain_id`
     """
     # Use another directory so that the constants change takes effect
     with tempfile.TemporaryDirectory(prefix='tezos-client.') as base_dir,\
             tempfile.NamedTemporaryFile(prefix='tezos-custom-constants',
                                         mode='w+t') as json_file:
-        json_data = {"hard_gas_limit_per_operation": "400000"}
+        json_data = {"hard_gas_limit_per_operation": "400000",
+                     "chain_id": chain_id}
         json.dump(json_data, json_file)
         json_file.flush()
         mockup_client.set_base_dir(base_dir)
@@ -236,6 +247,60 @@ def test_transfer_bad_base_dir(mockup_client: Client):
         searched = "Some commands .* might not work correctly."
         assert re.search(
             searched, err_output), f"'{searched}' not matched in error output"
+
+
+def _create_mockup_chain_id_seed(mockup_client,
+                                 seed: Optional[str] = None) -> str:
+    """ Creates a mockup specifying `chain-id-seed`
+        and returns the computed chain id.
+
+        Args:
+            mockup_client: the client to use
+            seed (str): the string to pass to chain_id_seed
+        Returns:
+            The chain id computed
+    """
+    with tempfile.TemporaryDirectory(prefix='tezos-client.') as base_dir:
+        mockup_client.set_base_dir(base_dir)
+        res = mockup_client.create_mockup(protocol=_PROTO, chain_id_seed=seed)
+        assert res.create_mockup_result == "ok"
+        res.parse_chain_id()
+        assert res.chain_id is not None, "Absent chain id value from command"
+        return res.chain_id
+
+
+@pytest.mark.parametrize('chain_id_seed_value', [
+    ("", " NetXjDm9eYUvhif"),
+    ("0", "NetXjjE5cZUeWPy"),
+    ("main", "NetXaFDF7xZQCpR"),
+    ("test", "NetXkKbtqncJcAz"),
+    ("whatever", "NetXi7C1pyLhQNe"),
+    ("longerlongerlongerseed", "NetXdhGxXRpN8i8"),
+    ("⚠unicode♥one", "NetXNrs2NkmLRfW")])
+@pytest.mark.client
+def test_chain_id_seed(mockup_client, chain_id_seed_value):
+    """ Executes `tezos-client create mockup --chain-id-seed chain_id_seed """
+    chain_id = _create_mockup_chain_id_seed(mockup_client, chain_id_seed_value[0])
+    assert chain_id == chain_id_seed_value[1], \
+    "Unexpected chain id for seed: " + chain_id_seed_value
+
+
+@pytest.mark.client
+def test_chain_id_seed_matters(mockup_client):
+    """ Executes `tezos-client create mockup --chain-id-seed
+        with different seeds and checks that the obtained chain id
+        indeed differ.
+    """
+    seeds = ["1234", "main", "test", "0", "whatever"]
+    chain_ids: List[str] = []
+    for seed in seeds:
+        chain_id = _create_mockup_chain_id_seed(mockup_client, seed)
+        in_there = chain_ids.index(chain_id) if chain_id in chain_ids else None
+        if in_there:
+            yielder = seeds[in_there]
+            assert False, f"Seeds '{yielder}' and '{seed}''"\
+                          f" produce the same chain_id: {chain_id}"
+        chain_ids.append(chain_id)
 
 
 @pytest.mark.client
@@ -382,7 +447,8 @@ def _test_create_mockup_init_show_roundtrip(
         mockup_client,
         read_initial_state,
         read_final_state,
-        bootstrap_json: Optional[str] = None):
+        bootstrap_json: Optional[str] = None,
+        protocol_constants_json: Optional[str] = None):
     """ 1/ Creates a mockup, using possibly custom bootstrap_accounts
            (as specified by `bootstrap_json`)
         2/ Then execute either `config show mockup` or `config init mockup`
@@ -397,16 +463,31 @@ def _test_create_mockup_init_show_roundtrip(
 
         This is a roundtrip test.
     """
-    if bootstrap_json is None:
-        res = mockup_client.create_mockup(protocol=_PROTO).create_mockup_result
-    else:
-        with tempfile.NamedTemporaryFile(prefix='tezos-bootstrap-accounts',
-                                         mode='w+t') as json_file:
-            json_file.write(bootstrap_json)
-            json_file.flush()
-            res = mockup_client.create_mockup(
-                protocol=_PROTO,
-                bootstrap_accounts_file=json_file.name).create_mockup_result
+
+    ba_file = None
+    pc_file = None
+    try:
+        if protocol_constants_json is not None:
+            pc_file = tempfile.mktemp(
+                prefix='tezos-proto-consts')
+            with open(pc_file, 'w') as handle:
+                handle.write(protocol_constants_json)
+
+        if bootstrap_json is not None:
+            ba_file = tempfile.mktemp(
+                prefix='tezos-bootstrap-accounts')
+            with open(ba_file, 'w') as handle:
+                handle.write(bootstrap_json)
+
+        res = mockup_client.create_mockup(
+            protocol=_PROTO,
+            bootstrap_accounts_file=ba_file,
+            protocol_constants_file=pc_file).create_mockup_result
+    finally:
+        if pc_file is not None:
+            os.remove(pc_file)
+        if ba_file is not None:
+            os.remove(ba_file)
 
     assert res == 'ok'
     (ba_str, pc_str) = read_initial_state(mockup_client)
