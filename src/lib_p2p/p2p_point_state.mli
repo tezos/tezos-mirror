@@ -100,14 +100,14 @@ module Info : sig
   *)
   val last_miss : 'conn point_info -> Time.System.t option
 
-  val greylisted : ?now:Time.System.t -> 'conn point_info -> bool
+  val greylisted : now:Time.System.t -> 'conn point_info -> bool
 
   val greylisted_until : 'conn point_info -> Time.System.t
 
   val point : 'conn point_info -> Id.t
 
   val log_incoming_rejection :
-    ?timestamp:Time.System.t -> 'conn point_info -> P2p_peer.Id.t -> unit
+    timestamp:Time.System.t -> 'conn point_info -> P2p_peer.Id.t -> unit
 
   val fold : 'conn t -> init:'a -> f:('a -> Pool_event.t -> 'a) -> 'a
 
@@ -119,22 +119,22 @@ val get : 'conn Info.t -> 'conn t
 val is_disconnected : 'conn Info.t -> bool
 
 val set_requested :
-  ?timestamp:Time.System.t -> 'conn Info.t -> Lwt_canceler.t -> unit
+  timestamp:Time.System.t -> 'conn Info.t -> Lwt_canceler.t -> unit
 
 val set_accepted :
-  ?timestamp:Time.System.t ->
+  timestamp:Time.System.t ->
   'conn Info.t ->
   P2p_peer.Id.t ->
   Lwt_canceler.t ->
   unit
 
 val set_running :
-  ?timestamp:Time.System.t -> 'conn Info.t -> P2p_peer.Id.t -> 'conn -> unit
+  timestamp:Time.System.t -> 'conn Info.t -> P2p_peer.Id.t -> 'conn -> unit
 
 val set_private : 'conn Info.t -> bool -> unit
 
 val set_disconnected :
-  ?timestamp:Time.System.t ->
+  timestamp:Time.System.t ->
   ?requested:bool ->
   Info.greylisting_config ->
   'conn Info.t ->

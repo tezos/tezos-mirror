@@ -54,7 +54,7 @@ module Info : sig
   (** [create ~trusted ~meta peer_id] is a freshly minted peer_id info for
       [peer_id]. *)
   val create :
-    ?created:Time.System.t ->
+    created:Time.System.t ->
     ?trusted:bool ->
     peer_metadata:'peer_meta ->
     Id.t ->
@@ -112,7 +112,7 @@ module Info : sig
     (P2p_connection.Id.t * Time.System.t) option
 
   val log_incoming_rejection :
-    ?timestamp:Time.System.t ->
+    timestamp:Time.System.t ->
     ('conn, 'peer_meta, 'conn_meta) peer_info ->
     P2p_connection.Id.t ->
     unit
@@ -146,14 +146,14 @@ val get : ('conn, 'peer_meta, 'conn_meta) Info.t -> ('conn, 'conn_meta) state
 val is_disconnected : ('conn, 'peer_meta, 'conn_meta) Info.t -> bool
 
 val set_accepted :
-  ?timestamp:Time.System.t ->
+  timestamp:Time.System.t ->
   ('conn, 'peer_meta, 'conn_meta) Info.t ->
   P2p_connection.Id.t ->
   Lwt_canceler.t ->
   unit
 
 val set_running :
-  ?timestamp:Time.System.t ->
+  timestamp:Time.System.t ->
   ('conn, 'peer_meta, 'conn_meta) Info.t ->
   P2p_connection.Id.t ->
   'conn ->
@@ -161,7 +161,7 @@ val set_running :
   unit
 
 val set_disconnected :
-  ?timestamp:Time.System.t ->
+  timestamp:Time.System.t ->
   ?requested:bool ->
   ('conn, 'peer_meta, 'conn_meta) Info.t ->
   unit

@@ -217,20 +217,27 @@ let create_connection t p2p_conn id_point point_info peer_info
   let conn_meta = P2p_socket.remote_metadata p2p_conn in
   Option.iter point_info ~f:(fun point_info ->
       let point = P2p_point_state.Info.point point_info in
-      P2p_point_state.set_running point_info peer_id conn ;
+      let timestamp = Systime_os.now () in
+      P2p_point_state.set_running ~timestamp point_info peer_id conn ;
       P2p_pool.Points.add_connected t.pool point point_info) ;
   t.log (Connection_established (id_point, peer_id)) ;
-  P2p_peer_state.set_running peer_info id_point conn conn_meta ;
+  let timestamp = Systime_os.now () in
+  P2p_peer_state.set_running ~timestamp peer_info id_point conn conn_meta ;
   P2p_pool.Peers.add_connected t.pool peer_id peer_info ;
   P2p_trigger.broadcast_new_connection t.triggers ;
   Lwt_canceler.on_cancel canceler (fun () ->
       Events.(emit disconnected) (peer_id, id_point)
       >>= fun () ->
+      let timestamp = Systime_os.now () in
       Option.iter
-        ~f:(P2p_point_state.set_disconnected t.config.greylisting_config)
+        ~f:
+          (P2p_point_state.set_disconnected
+             ~timestamp
+             t.config.greylisting_config)
         point_info ;
       t.log (Disconnection peer_id) ;
-      P2p_peer_state.set_disconnected peer_info ;
+      let timestamp = Systime_os.now () in
+      P2p_peer_state.set_disconnected ~timestamp peer_info ;
       Option.iter point_info ~f:(fun point_info ->
           P2p_pool.Points.remove_connected t.pool point_info) ;
       P2p_pool.Peers.remove_connected t.pool peer_id ;
@@ -336,11 +343,15 @@ let raw_authenticate t ?point_info canceler fd point =
       >>= fun () ->
       may_register_my_id_point t.pool err ;
       t.log (Authentication_failed point) ;
-      if incoming then P2p_point.Table.remove t.incoming point
+      ( if incoming then P2p_point.Table.remove t.incoming point
       else
+        let timestamp = Systime_os.now () in
         Option.iter
-          ~f:(P2p_point_state.set_disconnected t.config.greylisting_config)
-          point_info ;
+          ~f:
+            (P2p_point_state.set_disconnected
+               ~timestamp
+               t.config.greylisting_config)
+          point_info ) ;
       Lwt.return_error err)
   >>=? fun (info, auth_fd) ->
   (* Authentication correct! *)
@@ -417,13 +428,15 @@ let raw_authenticate t ?point_info canceler fd point =
       >>= fun point_list ->
       P2p_socket.nack auth_fd motive point_list
       >>= fun () ->
-      if not incoming then
+      ( if not incoming then
+        let timestamp = Systime_os.now () in
         Option.iter
           ~f:
             (P2p_point_state.set_disconnected
+               ~timestamp
                ~requested:true
                t.config.greylisting_config)
-          point_info ;
+          point_info ) ;
       match motive with
       | Unknown_chain_name
       | Deprecated_distributed_db_version
@@ -451,8 +464,14 @@ let raw_authenticate t ?point_info canceler fd point =
   | Ok version ->
       t.log (Accepting_request (point, info.id_point, info.peer_id)) ;
       Option.iter connection_point_info ~f:(fun point_info ->
-          P2p_point_state.set_accepted point_info info.peer_id canceler) ;
-      P2p_peer_state.set_accepted peer_info info.id_point canceler ;
+          let timestamp = Systime_os.now () in
+          P2p_point_state.set_accepted
+            ~timestamp
+            point_info
+            info.peer_id
+            canceler) ;
+      let timestamp = Systime_os.now () in
+      P2p_peer_state.set_accepted ~timestamp peer_info info.id_point canceler ;
       Events.(emit authenticate_status) ("accept", point, info.peer_id)
       >>= fun () ->
       protect
@@ -490,10 +509,15 @@ let raw_authenticate t ?point_info canceler fd point =
           >>= fun () ->
           Events.(emit authenticate_status) ("rejected", point, info.peer_id)
           >>= fun () ->
+          let timestamp = Systime_os.now () in
           Option.iter
             connection_point_info
-            ~f:(P2p_point_state.set_disconnected t.config.greylisting_config) ;
-          P2p_peer_state.set_disconnected peer_info ;
+            ~f:
+              (P2p_point_state.set_disconnected
+                 ~timestamp
+                 t.config.greylisting_config) ;
+          let timestamp = Systime_os.now () in
+          P2p_peer_state.set_disconnected ~timestamp peer_info ;
           Lwt.return_error err)
       >>=? fun conn ->
       let id_point =
@@ -588,7 +612,8 @@ let connect ?timeout t point =
       >>=? fun () ->
       fail_unless_disconnected_point point_info
       >>=? fun () ->
-      P2p_point_state.set_requested point_info canceler ;
+      let timestamp = Systime_os.now () in
+      P2p_point_state.set_requested ~timestamp point_info canceler ;
       P2p_fd.socket PF_INET6 SOCK_STREAM 0
       >>= fun fd ->
       let uaddr =
@@ -604,7 +629,9 @@ let connect ?timeout t point =
         ~on_error:(fun err ->
           Events.(emit connect_error) ("disconnect", point, err)
           >>= fun () ->
+          let timestamp = Systime_os.now () in
           P2p_point_state.set_disconnected
+            ~timestamp
             t.config.greylisting_config
             point_info ;
           P2p_fd.close fd

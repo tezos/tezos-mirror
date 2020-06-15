@@ -184,8 +184,10 @@ let register_peer pool peer_id =
   match P2p_peer.Table.find_opt pool.known_peer_ids peer_id with
   | None ->
       P2p_trigger.broadcast_new_peer pool.triggers ;
+      let created = Systime_os.now () in
       let peer =
         P2p_peer_state.Info.create
+          ~created
           peer_id
           ~peer_metadata:(pool.peer_meta_config.peer_meta_initial ())
       in

@@ -157,8 +157,7 @@ module Info = struct
 
   let known_public s = s.known_public
 
-  let greylisted ?(now = Systime_os.now ()) s =
-    Time.System.compare now s.greylisting_end <= 0
+  let greylisted ~now s = Time.System.compare now s.greylisting_end <= 0
 
   let greylisted_until s = s.greylisting_end
 
@@ -181,14 +180,13 @@ module Info = struct
     | ((Some t1 as a1), (Some t2 as a2)) ->
         if Time.System.compare t1 t2 < 0 then a2 else a1
 
-  let log {events; watchers; _} ?timestamp kind =
-    let time = Option.unopt ~default:(Systime_os.now ()) timestamp in
-    let event = Time.System.stamp ~time kind in
+  let log {events; watchers; _} ~timestamp kind =
+    let event = Time.System.stamp ~time:timestamp kind in
     Ringo.Ring.add events event ;
     Lwt_watcher.notify watchers event
 
-  let log_incoming_rejection ?timestamp point_info peer_id =
-    log point_info ?timestamp (Rejecting_request peer_id)
+  let log_incoming_rejection ~timestamp point_info peer_id =
+    log point_info ~timestamp (Rejecting_request peer_id)
 
   let fold {events; _} ~init ~f = Ringo.Ring.fold events ~init ~f
 
@@ -204,7 +202,7 @@ let is_disconnected {Info.state; _} =
   | Requested _ | Accepted _ | Running _ ->
       false
 
-let set_requested ?timestamp point_info cancel =
+let set_requested ~timestamp point_info cancel =
   assert (
     match point_info.Info.state with
     | Requested _ ->
@@ -214,10 +212,9 @@ let set_requested ?timestamp point_info cancel =
     | Disconnected ->
         true ) ;
   point_info.state <- Requested {cancel} ;
-  Info.log point_info ?timestamp Outgoing_request
+  Info.log point_info ~timestamp Outgoing_request
 
-let set_accepted ?(timestamp = Systime_os.now ()) point_info current_peer_id
-    cancel =
+let set_accepted ~timestamp point_info current_peer_id cancel =
   (* log_notice "SET_ACCEPTED %a@." P2p_point.pp point_info.point ; *)
   assert (
     match point_info.Info.state with
@@ -231,7 +228,7 @@ let set_accepted ?(timestamp = Systime_os.now ()) point_info current_peer_id
 let set_private point_info known_private =
   point_info.Info.known_public <- not known_private
 
-let set_running ?(timestamp = Systime_os.now ()) point_info peer_id data =
+let set_running ~timestamp point_info peer_id data =
   assert (
     match point_info.Info.state with
     | Disconnected ->
@@ -262,8 +259,8 @@ let set_greylisted greylisting_config timestamp point_info =
      then new_delay
      else greylisting_config.Info.increase_cap)
 
-let set_disconnected ?(timestamp = Systime_os.now ()) ?(requested = false)
-    greylisting_config point_info =
+let set_disconnected ~timestamp ?(requested = false) greylisting_config
+    point_info =
   let event : Pool_event.kind =
     match point_info.Info.state with
     | Requested _ ->

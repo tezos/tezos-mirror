@@ -69,8 +69,7 @@ module Info = struct
 
   let log_size = 100
 
-  let create ?(created = Systime_os.now ()) ?(trusted = false) ~peer_metadata
-      peer_id =
+  let create ~created ?(trusted = false) ~peer_metadata peer_id =
     {
       peer_id;
       created;
@@ -116,7 +115,7 @@ module Info = struct
              last_rejected_connection,
              last_established_connection,
              last_disconnection ) ->
-        let info = create ~trusted ~peer_metadata peer_id in
+        let info = create ~created ~trusted ~peer_metadata peer_id in
         let events = Ringo.Ring.create log_size in
         Ringo.Ring.add_list info.events event_list ;
         {
@@ -183,13 +182,13 @@ module Info = struct
       s.last_failed_connection
       (Time.System.recent s.last_rejected_connection s.last_disconnection)
 
-  let log {events; watchers; _} ?(timestamp = Systime_os.now ()) point kind =
+  let log {events; watchers; _} ~timestamp point kind =
     let event = {Pool_event.kind; timestamp; point} in
     Ringo.Ring.add events event ;
     Lwt_watcher.notify watchers event
 
-  let log_incoming_rejection ?timestamp peer_info point =
-    log peer_info ?timestamp point Rejecting_request
+  let log_incoming_rejection ~timestamp peer_info point =
+    log peer_info ~timestamp point Rejecting_request
 
   module File = struct
     let load path peer_metadata_encoding =
@@ -215,8 +214,7 @@ let get {Info.state; _} = state
 let is_disconnected {Info.state; _} =
   match state with Disconnected -> true | Accepted _ | Running _ -> false
 
-let set_accepted ?(timestamp = Systime_os.now ()) peer_info current_point
-    cancel =
+let set_accepted ~timestamp peer_info current_point cancel =
   assert (
     match peer_info.Info.state with
     | Accepted _ | Running _ ->
@@ -226,8 +224,7 @@ let set_accepted ?(timestamp = Systime_os.now ()) peer_info current_point
   peer_info.state <- Accepted {current_point; cancel} ;
   Info.log peer_info ~timestamp current_point Accepting_request
 
-let set_running ?(timestamp = Systime_os.now ()) peer_info point data
-    conn_metadata =
+let set_running ~timestamp peer_info point data conn_metadata =
   assert (
     match peer_info.Info.state with
     | Disconnected ->
@@ -240,8 +237,7 @@ let set_running ?(timestamp = Systime_os.now ()) peer_info point data
   peer_info.last_established_connection <- Some (point, timestamp) ;
   Info.log peer_info ~timestamp point Connection_established
 
-let set_disconnected ?(timestamp = Systime_os.now ()) ?(requested = false)
-    peer_info =
+let set_disconnected ~timestamp ?(requested = false) peer_info =
   let (current_point, (event : Pool_event.kind)) =
     match peer_info.Info.state with
     | Accepted {current_point; _} ->
