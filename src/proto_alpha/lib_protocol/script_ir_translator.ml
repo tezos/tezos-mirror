@@ -810,12 +810,18 @@ let rec comparable_ty_of_ty_no_gas : type a. a ty -> a comparable_ty option =
         None
     | Some ty ->
         Some (Option_key (ty, tname)) )
-  | Lambda_t _
-  | List_t _
-  | Set_t _
-  | Map_t _
-  | Big_map_t _
-  | Contract_t _
+  | Lambda_t _ ->
+      None
+  | List_t _ ->
+      None
+  | Set_t _ ->
+      None
+  | Map_t _ ->
+      None
+  | Big_map_t _ ->
+      None
+  | Contract_t _ ->
+      None
   | Operation_t _ ->
       None
 
