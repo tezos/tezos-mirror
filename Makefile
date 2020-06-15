@@ -132,23 +132,53 @@ build-sandbox:
 build-test: build-sandbox
 	@dune build @buildtest
 
-.PHONY: test_protocol_compile
-test_protocol_compile:
-	@dune build  @runtest_compile_protocol
+.PHONY: test-protocol-compile
+test-protocol-compile:
+	@dune build @runtest_compile_protocol
+	@dune build @runtest_out_of_opam
 
-test: test_protocol_compile
-	@dune build @runtest_dune_template @runtest @runtest_flextesa @runtest_out_of_opam
+.PHONY: test-unit
+test-unit:
+	@dune build @runtest
+
+.PHONY: test-python
+test-python: all
+	@make -C tests_python all
+
+.PHONY: test-flextesa
+test-flextesa:
+	@dune build @runtest_flextesa
+
+.PHONY: test-tezt test-tezt-i test-tezt-c test-tezt-v
+test-tezt:
+	@dune exec tezt/tests/main.exe
+test-tezt-i:
+	@dune exec tezt/tests/main.exe -- --info
+test-tezt-c:
+	@dune exec tezt/tests/main.exe -- --commands
+test-tezt-v:
+	@dune exec tezt/tests/main.exe -- --verbose
+
+.PHONY: test-code
+test-code: test-protocol-compile test-unit test-flextesa test-python test-tezt
+
+# This is `make test-code` except for flextesa (which doesn't
+# play well with coverage). We allow failure (prefix "-") because we still want
+# the coverage report even if an individual test happens to fail.
+.PHONY: test-coverage
+test-coverage:
+	-@$(MAKE) test-protocol-compile
+	-@$(MAKE) test-unit
+	-@$(MAKE) test-python
+	-@$(MAKE) test-tezt
+
+.PHONY: lint-opam-dune
+lint-opam-dune:
+	@dune build @runtest_dune_template
 	@./scripts/check_opam_test.sh
 
-.PHONY: tezt tezt-i tezt-c tezt-v
-tezt:
-	@dune exec tezt/tests/main.exe
-tezt-i:
-	@dune exec tezt/tests/main.exe -- --info
-tezt-c:
-	@dune exec tezt/tests/main.exe -- --commands
-tezt-v:
-	@dune exec tezt/tests/main.exe -- --verbose
+.PHONY: test
+test: lint-opam-dune test-code
 
 .PHONY: check-linting check-python-linting
 

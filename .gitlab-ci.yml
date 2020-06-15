@@ -1429,12 +1429,11 @@ test_coverage:
   script:
     - scripts/instrument_dune_bisect.sh src/ --except $COVERAGE_EXCLUDE
     - make
-    # A failing test shouldn't prevent the generation of the report (|| true)
-    - dune build @runtest || true
     # Load the environment poetry previously created in the docker image.
     # Give access to the Python dependencies/executables
     - . $HOME/.venv/bin/activate
-    - make -C tests_python all || true
+    # A failing test shouldn't prevent the generation of the report (|| true)
+    - make test-coverage || true
     - make coverage-report
     - make coverage-report-summary
     # hack to capture script success in after_script script

@@ -268,9 +268,12 @@ Whereas executing the tests through the CI, as described below, is the
 standard and most convenient way of running the full test suite, it
 can also be executed locally.
 
-Flextesa and Alcotest tests are run with ``make test`` in the project root.
-
-The Python tests are run with ``make all`` in the directory ``tests_python``.
+All tests can be run with ``make test`` in the project root. However, this
+can take some time, and some tests are resource-intensive or require additional
+configuration. Alternatively, one can run subsets of tests identified
+by a specialized target ``test-*``. For instance, ``make test-unit``
+runs the alcotest tests and should be quite fast. See the project
+``Makefile`` for the full list of testing targets.
 
 .. _measuring-test-coverage:
 
