@@ -561,21 +561,6 @@ opam:flextesa:
   variables:
     package: flextesa
 
-opam:index:
-  <<: *opam_definition
-  variables:
-    package: index
-
-opam:irmin:
-  <<: *opam_definition
-  variables:
-    package: irmin
-
-opam:irmin-pack:
-  <<: *opam_definition
-  variables:
-    package: irmin-pack
-
 opam:ledgerwallet:
   <<: *opam_definition
   variables:
@@ -585,11 +570,6 @@ opam:ledgerwallet-tezos:
   <<: *opam_definition
   variables:
     package: ledgerwallet-tezos
-
-opam:secp256k1-internal:
-  <<: *opam_definition
-  variables:
-    package: secp256k1-internal
 
 opam:tezos-006-PsCARTHA-test-helpers:
   <<: *opam_definition
