@@ -39,4 +39,4 @@ let register hash proto =
 
 let mem hash = VersionTable.mem versions hash
 
-let get hash = VersionTable.find_opt versions hash
+let get hash = VersionTable.find versions hash
