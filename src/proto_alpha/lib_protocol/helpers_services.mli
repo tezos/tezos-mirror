@@ -44,6 +44,7 @@ module Scripts : sig
     Script.expr
     * Script.expr
     * Tez.t
+    * Tez.t
     * Chain_id.t
     * Contract.t option
     * Contract.t option
@@ -59,6 +60,7 @@ module Scripts : sig
     Script.expr ->
     Script.expr
     * Script.expr
+    * Tez.t
     * Tez.t
     * Chain_id.t
     * Contract.t option
