@@ -1,4 +1,4 @@
-from typing import Dict, List, Tuple, Callable
+from typing import Dict, List, Tuple, Callable, Optional
 import os
 import time
 
@@ -153,8 +153,10 @@ class Sandbox:
                             client_factory: Callable = Client):
         local_admin_client = self._wrap_path(CLIENT_ADMIN, branch)
         local_client = self._wrap_path(CLIENT, branch)
+        scheme = 'https' if use_tls else 'http'
+        endpoint = f'{scheme}://localhost:{rpc_port}'
         client = client_factory(local_client, local_admin_client,
-                                rpc_port=rpc_port, use_tls=use_tls)
+                                endpoint=endpoint)
         return client
 
     def get_new_client(self,

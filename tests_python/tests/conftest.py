@@ -105,10 +105,11 @@ def client_regtest_bis(sandbox: Sandbox) -> Iterator[Client]:
     """One node with protocol alpha, regression test enabled."""
     def reg_client_factory(client_path: str,
                            admin_client_path: str,
-                           host: str = '127.0.0.1',
+                           host: Optional[str] = None,
                            base_dir: Optional[str] = None,
-                           rpc_port: int = 8732,
-                           use_tls: bool = False,
+                           rpc_port: Optional[int] = None,
+                           use_tls: Optional[bool] = None,
+                           endpoint: Optional[str] = 'http://127.0.0.1:8732',
                            disable_disclaimer: bool = True
                            ) -> ClientRegression:
         client = ClientRegression(client_path,
@@ -117,6 +118,7 @@ def client_regtest_bis(sandbox: Sandbox) -> Iterator[Client]:
                                   base_dir,
                                   rpc_port,
                                   use_tls,
+                                  endpoint,
                                   disable_disclaimer)
         return client
 

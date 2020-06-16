@@ -44,10 +44,11 @@ class Client:
     def __init__(self,
                  client_path: str,
                  admin_client_path: str,
-                 host: str = '127.0.0.1',
+                 host: Optional[str] = None,
                  base_dir: Optional[str] = None,
-                 rpc_port: int = 8732,
-                 use_tls: bool = False,
+                 rpc_port: Optional[int] = None,
+                 use_tls: Optional[bool] = None,
+                 endpoint: Optional[str] = 'http://127.0.0.1:8732',
                  disable_disclaimer: bool = True,
                  mode: str = None):
         """
@@ -79,23 +80,29 @@ class Client:
             assert base_dir
         self.base_dir = base_dir
 
+        connectivity_options = []
+        if host is not None:
+            connectivity_options += ['-addr', host]
+        if rpc_port is not None:
+            connectivity_options += ['-port', str(rpc_port)]
+        if use_tls is True:
+            connectivity_options += ['-S']
+        if endpoint is not None:
+            connectivity_options += ['-endpoint', endpoint]
+
         client = [client_path]
         if mode is None or mode == "client":
-            client.extend(['-base-dir', base_dir,
-                           '-addr', host,
-                           '-port', str(rpc_port)])
+            client.extend(['-base-dir', base_dir])
         elif mode == "mockup":
             client.extend(['-mode', mode])
         else:
             msg = f"Unexpected mode: {mode}." + \
                   "Expected one of 'client' or 'mockup'."
             assert False, msg
-        admin_client = [admin_client_path, '-base-dir', base_dir, '-addr',
-                        host, '-port', str(rpc_port)]
+        admin_client = [admin_client_path, '-base-dir', base_dir]
 
-        if use_tls:
-            client.append('-S')
-            admin_client.append('-S')
+        client.extend(connectivity_options)
+        admin_client.extend(connectivity_options)
 
         self._client = client
         self._admin_client = admin_client
