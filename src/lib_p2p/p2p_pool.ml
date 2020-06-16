@@ -100,7 +100,7 @@ let gc_points {config = {max_known_points; _}; known_points; log; _} =
         log Gc_points )
 
 let register_point ?trusted pool ((addr, port) as point) =
-  match P2p_point.Table.find_opt pool.known_points point with
+  match P2p_point.Table.find pool.known_points point with
   | None ->
       let point_info = P2p_point_state.Info.create ?trusted addr port in
       Option.iter
@@ -183,7 +183,7 @@ let gc_peer_ids
         log Gc_peer_ids )
 
 let register_peer pool peer_id =
-  match P2p_peer.Table.find_opt pool.known_peer_ids peer_id with
+  match P2p_peer.Table.find pool.known_peer_ids peer_id with
   | None ->
       P2p_trigger.broadcast_new_peer pool.triggers ;
       let created = Systime_os.now () in
@@ -207,7 +207,7 @@ let register_peer pool peer_id =
 (* this function duplicates bit of code from the modules below to avoid
    creating mutually recursive modules *)
 let connection_of_peer_id pool peer_id =
-  Option.bind (P2p_peer.Table.find_opt pool.known_peer_ids peer_id) (fun p ->
+  Option.bind (P2p_peer.Table.find pool.known_peer_ids peer_id) (fun p ->
       match P2p_peer_state.get p with
       | Running {data; _} ->
           Some data
@@ -237,14 +237,13 @@ module Points = struct
   type ('msg, 'peer, 'conn) info =
     ('msg, 'peer, 'conn) P2p_conn.t P2p_point_state.Info.t
 
-  let info {known_points; _} point =
-    P2p_point.Table.find_opt known_points point
+  let info {known_points; _} point = P2p_point.Table.find known_points point
 
   let get_trusted pool point =
     Option.fold
       ~none:false
       ~some:P2p_point_state.Info.trusted
-      (P2p_point.Table.find_opt pool.known_points point)
+      (P2p_point.Table.find pool.known_points point)
 
   let set_trusted pool point =
     ignore @@ register_point ~trusted:true pool point
@@ -252,7 +251,7 @@ module Points = struct
   let unset_trusted pool point =
     Option.iter
       P2p_point_state.Info.unset_trusted
-      (P2p_point.Table.find_opt pool.known_points point)
+      (P2p_point.Table.find pool.known_points point)
 
   let fold_known pool ~init ~f = P2p_point.Table.fold f pool.known_points init
 
@@ -288,13 +287,14 @@ module Peers = struct
     (('msg, 'peer, 'conn) P2p_conn.t, 'peer, 'conn) P2p_peer_state.Info.t
 
   let info {known_peer_ids; _} peer_id =
-    P2p_peer.Table.find_opt known_peer_ids peer_id
+    P2p_peer.Table.find known_peer_ids peer_id
 
   let get_peer_metadata pool peer_id =
-    try
-      P2p_peer_state.Info.peer_metadata
-        (P2p_peer.Table.find pool.known_peer_ids peer_id)
-    with Not_found -> pool.peer_meta_config.peer_meta_initial ()
+    match P2p_peer.Table.find pool.known_peer_ids peer_id with
+    | Some peer ->
+        P2p_peer_state.Info.peer_metadata peer
+    | None ->
+        pool.peer_meta_config.peer_meta_initial ()
 
   let get_score pool peer_id =
     pool.peer_meta_config.score (get_peer_metadata pool peer_id)
@@ -304,7 +304,7 @@ module Peers = struct
 
   let get_trusted pool peer_id =
     Option.fold
-      (P2p_peer.Table.find_opt pool.known_peer_ids peer_id)
+      (P2p_peer.Table.find pool.known_peer_ids peer_id)
       ~some:P2p_peer_state.Info.trusted
       ~none:false
 
@@ -314,7 +314,7 @@ module Peers = struct
   let unset_trusted pool peer_id =
     Option.iter
       P2p_peer_state.Info.unset_trusted
-      (P2p_peer.Table.find_opt pool.known_peer_ids peer_id)
+      (P2p_peer.Table.find pool.known_peer_ids peer_id)
 
   let fold_known pool ~init ~f = P2p_peer.Table.fold f pool.known_peer_ids init
 
@@ -509,27 +509,27 @@ let destroy {config; peer_meta_config; known_peer_ids; known_points; _} =
         | Ok () ->
             Lwt.return_unit)
   >>= fun () ->
-  P2p_point.Table.fold
-    (fun _point point_info acc ->
+  P2p_peer.Table.iter_p
+    (fun _peer_id peer_info ->
+      match P2p_peer_state.get peer_info with
+      | Accepted {cancel; _} ->
+          Lwt_canceler.cancel cancel
+      | Running {data = conn; _} ->
+          P2p_conn.disconnect conn
+      | Disconnected ->
+          Lwt.return_unit)
+    known_peer_ids
+  >>= fun () ->
+  P2p_point.Table.iter_p
+    (fun _point point_info ->
       match P2p_point_state.get point_info with
       | Requested {cancel} | Accepted {cancel; _} ->
-          Lwt_canceler.cancel cancel >>= fun () -> acc
+          Lwt_canceler.cancel cancel
       | Running {data = conn; _} ->
-          P2p_conn.disconnect conn >>= fun () -> acc
+          P2p_conn.disconnect conn
       | Disconnected ->
-          acc)
+          Lwt.return_unit)
     known_points
-  @@ P2p_peer.Table.fold
-       (fun _peer_id peer_info acc ->
-         match P2p_peer_state.get peer_info with
-         | Accepted {cancel; _} ->
-             Lwt_canceler.cancel cancel >>= fun () -> acc
-         | Running {data = conn; _} ->
-             P2p_conn.disconnect conn >>= fun () -> acc
-         | Disconnected ->
-             acc)
-       known_peer_ids
-       Lwt.return_unit
 
 let add_to_id_points t point =
   P2p_point.Table.add t.my_id_points point () ;

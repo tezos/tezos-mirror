@@ -552,7 +552,6 @@ let stat t = P2p_io_scheduler.global_stat t.io_sched
 let on_new_connection t f = t.new_connection_hook <- f :: t.new_connection_hook
 
 let destroy t =
-  P2p_point.Table.fold
-    (fun _point canceler acc -> Lwt_canceler.cancel canceler >>= fun () -> acc)
+  P2p_point.Table.iter_p
+    (fun _point canceler -> Lwt_canceler.cancel canceler)
     t.incoming
-    Lwt.return_unit

@@ -533,10 +533,9 @@ let shutdown ?timeout st =
   st.closed <- true ;
   ReadScheduler.shutdown st.read_scheduler
   >>= fun () ->
-  P2p_fd.Table.fold
-    (fun _peer_id conn acc -> close ?timeout conn >>= fun _ -> acc)
+  P2p_fd.Table.iter_p
+    (fun _peer_id conn -> close ?timeout conn >>= fun _ -> Lwt.return_unit)
     st.connected
-    Lwt.return_unit
   >>= fun () ->
   WriteScheduler.shutdown st.write_scheduler
   >>= fun () -> Events.(emit shutdown_scheduler) ()
