@@ -37,6 +37,7 @@ val run :
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?amount:Tez.t ->
+  balance:Tez.t ->
   program:Michelson_v1_parser.parsed ->
   storage:Michelson_v1_parser.parsed ->
   input:Michelson_v1_parser.parsed ->
@@ -54,6 +55,7 @@ val trace :
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?amount:Tez.t ->
+  balance:Tez.t ->
   program:Michelson_v1_parser.parsed ->
   storage:Michelson_v1_parser.parsed ->
   input:Michelson_v1_parser.parsed ->
