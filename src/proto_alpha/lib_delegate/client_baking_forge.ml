@@ -540,20 +540,19 @@ let merge_preapps (old : error Preapply_result.t)
 let error_of_op (result : error Preapply_result.t) op =
   let op = forge op in
   let h = Tezos_base.Operation.hash op in
-  try
-    Some
-      (Failed_to_preapply (op, snd @@ Operation_hash.Map.find h result.refused))
-  with Not_found -> (
-    try
-      Some
-        (Failed_to_preapply
-           (op, snd @@ Operation_hash.Map.find h result.branch_refused))
-    with Not_found -> (
-      try
-        Some
-          (Failed_to_preapply
-             (op, snd @@ Operation_hash.Map.find h result.branch_delayed))
-      with Not_found -> None ) )
+  match Operation_hash.Map.find h result.refused with
+  | Some (_, trace) ->
+      Some (Failed_to_preapply (op, trace))
+  | None -> (
+    match Operation_hash.Map.find h result.branch_refused with
+    | Some (_, trace) ->
+        Some (Failed_to_preapply (op, trace))
+    | None -> (
+      match Operation_hash.Map.find h result.branch_delayed with
+      | Some (_, trace) ->
+          Some (Failed_to_preapply (op, trace))
+      | None ->
+          None ) )
 
 let filter_and_apply_operations cctxt state ~chain ~block block_info ~priority
     ?protocol_data

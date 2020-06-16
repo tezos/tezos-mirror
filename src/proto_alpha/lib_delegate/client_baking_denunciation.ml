@@ -96,17 +96,12 @@ let process_endorsements (cctxt : #Protocol_client_context.full) state
             {shell; protocol_data}
           in
           let map =
-            match
-              HLevel.find_opt state.endorsements_table (chain_id, level)
-            with
-            | None ->
-                Delegate_Map.empty
-            | Some x ->
-                x
+            Option.value ~default:Delegate_Map.empty
+            @@ HLevel.find state.endorsements_table (chain_id, level)
           in
           (* If a previous endorsement made by this pkh is found for
              the same level we inject a double_endorsement *)
-          match Delegate_Map.find_opt delegate map with
+          match Delegate_Map.find delegate map with
           | None ->
               return
               @@ HLevel.add
@@ -187,13 +182,13 @@ let process_block (cctxt : #Protocol_client_context.full) state
       _ } -> (
       let chain = `Hash chain_id in
       let map =
-        match HLevel.find_opt state.blocks_table (chain_id, level) with
+        match HLevel.find state.blocks_table (chain_id, level) with
         | None ->
             Delegate_Map.empty
         | Some x ->
             x
       in
-      match Delegate_Map.find_opt baker map with
+      match Delegate_Map.find baker map with
       | None ->
           return
           @@ HLevel.add

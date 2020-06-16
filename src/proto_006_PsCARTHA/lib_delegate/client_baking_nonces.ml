@@ -55,7 +55,7 @@ let save (wallet : #Client_context.wallet) location nonces =
 
 let mem nonces hash = Block_hash.Map.mem hash nonces
 
-let find_opt nonces hash = Block_hash.Map.find_opt hash nonces
+let find_opt nonces hash = Block_hash.Map.find hash nonces
 
 let add nonces hash nonce = Block_hash.Map.add hash nonce nonces
 

@@ -47,9 +47,11 @@ let add_account ({pkh; _} as account) =
 let activator_account = new_account ()
 
 let find pkh =
-  try return (Signature.Public_key_hash.Table.find known_accounts pkh)
-  with Not_found ->
-    failwith "Missing account: %a" Signature.Public_key_hash.pp pkh
+  match Signature.Public_key_hash.Table.find known_accounts pkh with
+  | Some k ->
+      return k
+  | None ->
+      failwith "Missing account: %a" Signature.Public_key_hash.pp pkh
 
 let find_alternate pkh =
   let exception Found of t in

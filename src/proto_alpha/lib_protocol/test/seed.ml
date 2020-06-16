@@ -116,7 +116,10 @@ let revelation_early_wrong_right_twice () =
   balance_was_credited ~loc:__LOC__ (B b) id ~kind:Rewards bal_rewards reward
   >>=? fun () ->
   (* test that revealing too early produces an error *)
-  Op.seed_nonce_revelation (B b) level_commitment (Nonce.get committed_hash)
+  Op.seed_nonce_revelation
+    (B b)
+    level_commitment
+    (Option.unopt_exn Not_found @@ Nonce.get committed_hash)
   >>=? fun operation ->
   Block.bake ~policy ~operation b
   >>= fun e ->
@@ -133,7 +136,10 @@ let revelation_early_wrong_right_twice () =
   >>=? fun b ->
   (* test that revealing at the right time but the wrong value produces an error *)
   let (wrong_hash, _) = Nonce.generate () in
-  Op.seed_nonce_revelation (B b) level_commitment (Nonce.get wrong_hash)
+  Op.seed_nonce_revelation
+    (B b)
+    level_commitment
+    (Option.unopt_exn Not_found @@ Nonce.get wrong_hash)
   >>=? fun operation ->
   Block.bake ~operation b
   >>= fun e ->
@@ -144,7 +150,10 @@ let revelation_early_wrong_right_twice () =
           false)
   >>=? fun () ->
   (* reveals correctly *)
-  Op.seed_nonce_revelation (B b) level_commitment (Nonce.get committed_hash)
+  Op.seed_nonce_revelation
+    (B b)
+    level_commitment
+    (Option.unopt_exn Not_found @@ Nonce.get committed_hash)
   >>=? fun operation ->
   Block.get_next_baker ~policy b
   >>=? fun (baker_pkh, _, _) ->
@@ -182,7 +191,10 @@ let revelation_early_wrong_right_twice () =
     expected_rewards
   >>=? fun () ->
   (* test that revealing twice produces an error *)
-  Op.seed_nonce_revelation (B b) level_commitment (Nonce.get wrong_hash)
+  Op.seed_nonce_revelation
+    (B b)
+    level_commitment
+    (Option.unopt_exn Not_found @@ Nonce.get wrong_hash)
   >>=? fun operation ->
   Block.bake ~operation ~policy b
   >>= fun e ->
@@ -258,7 +270,10 @@ let revelation_missing_and_late () =
   balance_was_debited ~loc:__LOC__ (B b) id ~kind:Rewards bal_rewards reward
   >>=? fun () ->
   (* test that revealing too late (after cycle 1) produces an error *)
-  Op.seed_nonce_revelation (B b) level_commitment (Nonce.get committed_hash)
+  Op.seed_nonce_revelation
+    (B b)
+    level_commitment
+    (Option.unopt_exn Not_found @@ Nonce.get committed_hash)
   >>=? fun operation ->
   Block.bake ~operation b
   >>= fun e ->
