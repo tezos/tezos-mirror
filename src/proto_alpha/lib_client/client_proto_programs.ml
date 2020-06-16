@@ -102,7 +102,7 @@ let print_trace_result (cctxt : #Client_context.printer) ~show_source ~parsed =
       print_errors cctxt errs ~show_source ~parsed
 
 let run (cctxt : #Protocol_client_context.rpc_context)
-    ~(chain : Chain_services.chain) ~block ?(amount = Tez.fifty_cents)
+    ~(chain : Chain_services.chain) ~block ?(amount = Tez.fifty_cents) ~balance
     ~(program : Michelson_v1_parser.parsed)
     ~(storage : Michelson_v1_parser.parsed)
     ~(input : Michelson_v1_parser.parsed) ?source ?payer ?gas
@@ -116,6 +116,7 @@ let run (cctxt : #Protocol_client_context.rpc_context)
     ( storage.expanded,
       input.expanded,
       amount,
+      balance,
       chain_id,
       source,
       payer,
@@ -123,7 +124,7 @@ let run (cctxt : #Protocol_client_context.rpc_context)
       entrypoint )
 
 let trace (cctxt : #Protocol_client_context.rpc_context)
-    ~(chain : Chain_services.chain) ~block ?(amount = Tez.fifty_cents)
+    ~(chain : Chain_services.chain) ~block ?(amount = Tez.fifty_cents) ~balance
     ~(program : Michelson_v1_parser.parsed)
     ~(storage : Michelson_v1_parser.parsed)
     ~(input : Michelson_v1_parser.parsed) ?source ?payer ?gas
@@ -137,6 +138,7 @@ let trace (cctxt : #Protocol_client_context.rpc_context)
     ( storage.expanded,
       input.expanded,
       amount,
+      balance,
       chain_id,
       source,
       payer,

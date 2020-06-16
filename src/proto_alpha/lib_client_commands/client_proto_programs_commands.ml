@@ -83,6 +83,12 @@ let commands () =
       ~doc:"name of the payer (i.e. SOURCE) contract for the transaction"
       ()
   in
+  let balance_arg =
+    Client_proto_args.tez_arg
+      ~parameter:"balance"
+      ~doc:"balance of run contract in \xEA\x9C\xA9"
+      ~default:"4_000_000"
+  in
   let custom_gas_flag =
     arg
       ~long:"gas"
@@ -214,9 +220,10 @@ let commands () =
     command
       ~group
       ~desc:"Ask the node to run a script."
-      (args7
+      (args8
          trace_stack_switch
          amount_arg
+         balance_arg
          source_arg
          payer_arg
          no_print_source_flag
@@ -229,7 +236,14 @@ let commands () =
       @@ prefixes ["and"; "input"]
       @@ param ~name:"input" ~desc:"the input data" data_parameter
       @@ stop )
-      (fun (trace_exec, amount, source, payer, no_print_source, gas, entrypoint)
+      (fun ( trace_exec,
+             amount,
+             balance,
+             source,
+             payer,
+             no_print_source,
+             gas,
+             entrypoint )
            program
            storage
            input
@@ -245,6 +259,7 @@ let commands () =
             ~chain:cctxt#chain
             ~block:cctxt#block
             ~amount
+            ~balance
             ~program
             ~storage
             ~input
@@ -261,6 +276,7 @@ let commands () =
             ~chain:cctxt#chain
             ~block:cctxt#block
             ~amount
+            ~balance
             ~program
             ~storage
             ~input
