@@ -281,7 +281,7 @@ def test_chain_id_seed(mockup_client, chain_id_seed, chain_id_value):
     """ Executes `tezos-client create mockup --chain-id-seed chain_id_seed """
     chain_id = _create_mockup_chain_id_seed(mockup_client, chain_id_seed)
     assert chain_id == chain_id_value, \
-    f"""Unexpected chain id for seed: {chain_id_seed}
+        f"""Unexpected chain id for seed: {chain_id_seed}
 expected {chain_id_value} instead of {chain_id}"""
 
 
