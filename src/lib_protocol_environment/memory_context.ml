@@ -39,11 +39,7 @@ module M = struct
     | ([], m) ->
         Some m
     | (n :: k, Dir m) -> (
-      match StringMap.find_opt n m with
-      | Some res ->
-          raw_get res k
-      | None ->
-          None )
+      match StringMap.find n m with Some res -> raw_get res k | None -> None )
     | (_ :: _, Key _) ->
         None
 
@@ -56,9 +52,7 @@ module M = struct
     | ([], (Key _ | Dir _), None) ->
         Some empty
     | (n :: k, Dir m, _) -> (
-      match
-        raw_set (Option.value ~default:empty (StringMap.find_opt n m)) k v
-      with
+      match raw_set (Option.value ~default:empty (StringMap.find n m)) k v with
       | None ->
           None
       | Some rm when rm = empty ->
