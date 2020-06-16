@@ -67,11 +67,11 @@ type t = {
    chain_db corresponding to this chain id. Activates [chain_id] for the
    remote peer if not active yet. *)
 let may_activate state chain_id f =
-  match Chain_id.Table.find_opt state.peer_active_chains chain_id with
+  match Chain_id.Table.find state.peer_active_chains chain_id with
   | Some chain_db ->
       f chain_db
   | None -> (
-    match Chain_id.Table.find_opt state.active_chains chain_id with
+    match Chain_id.Table.find state.active_chains chain_id with
     | Some chain_db ->
         chain_db.active_peers :=
           P2p_peer.Set.add state.gid !(chain_db.active_peers) ;
@@ -87,7 +87,7 @@ let may_activate state chain_id f =
    and [chain_db] is the chain_db corresponding to this chain id, otherwise
    does nothing (simply update peer metadata). *)
 let may_handle state chain_id f =
-  match Chain_id.Table.find_opt state.peer_active_chains chain_id with
+  match Chain_id.Table.find state.peer_active_chains chain_id with
   | None ->
       let meta = P2p.get_peer_metadata state.p2p state.gid in
       Peer_metadata.incr meta Inactive_chain ;
@@ -98,7 +98,7 @@ let may_handle state chain_id f =
 (* performs [f chain_db] if [chain_id] is active and [chain_db] is the
    chain_db corresponding to this chain id. *)
 let may_handle_global state chain_id f =
-  match Chain_id.Table.find_opt state.active_chains chain_id with
+  match Chain_id.Table.find state.active_chains chain_id with
   | None ->
       Lwt.return_unit
   | Some chain_db ->
@@ -137,12 +137,11 @@ let find_pending_operation {peer_active_chains; _} h =
     None
 
 let read_operation state h =
-  Chain_id.Table.fold
+  Chain_id.Table.fold_s
     (fun chain_id chain_db acc ->
-      acc
-      >>= function
+      match acc with
       | Some _ ->
-          acc
+          Lwt.return acc
       | None -> (
           Distributed_db_requester.Raw_operation.read_opt
             chain_db.operation_db
@@ -151,7 +150,7 @@ let read_operation state h =
           | None -> Lwt.return_none | Some bh -> Lwt.return_some (chain_id, bh)
           ))
     state.active_chains
-    Lwt.return_none
+    None
 
 let read_block_header {disk; _} h =
   State.read_block disk h

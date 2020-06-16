@@ -360,7 +360,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
 
   let filter_config w pv =
     try
-      match Protocol_hash.Map.find_opt Proto.hash pv.filter_config with
+      match Protocol_hash.Map.find Proto.hash pv.filter_config with
       | Some config ->
           Data_encoding.Json.destruct Filter.config_encoding config
       | None ->
@@ -602,7 +602,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
            !dir
            (Proto_services.S.Mempool.get_filter RPC_path.open_root)
            (fun pv () () ->
-             match Protocol_hash.Map.find_opt Proto.hash pv.filter_config with
+             match Protocol_hash.Map.find Proto.hash pv.filter_config with
              | Some obj ->
                  return obj
              | None -> (
@@ -1040,7 +1040,7 @@ let create limits (module Filter : Prevalidator_filters.FILTER) chain_db =
   let chain_state = Distributed_db.chain_state chain_db in
   let chain_id = State.Chain.id chain_state in
   match
-    ChainProto_registry.find_opt
+    ChainProto_registry.find
       (chain_id, Filter.Proto.hash)
       !chain_proto_registry
   with

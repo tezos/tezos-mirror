@@ -26,8 +26,9 @@
 
 (** One role of this module is to export read-through [REQUESTER] services.
     These services allow client code to lookup resources identified by their
-    hashes. Resources are protocols, operations, block_header.
-    Values are first looked up locally, in [State], or are requested to peers.
+    hashes. Resources are protocols, operations, block_header, operation_hashes
+    and operations. Values are first looked up locally, in [State], or are
+    requested to peers.
 
     An exported [REQUESTER] service is implemented by a [FULL_REQUESTER] and
     [P2p_reader] workers working together. Resources are requested via a
@@ -154,7 +155,7 @@ let activate
   P2p.activate p2p ;
   let chain_id = State.Chain.id chain_state in
   let reader_chain_db =
-    match Chain_id.Table.find_opt active_chains chain_id with
+    match Chain_id.Table.find active_chains chain_id with
     | Some local_db ->
         local_db
     | None ->
@@ -251,7 +252,7 @@ let deactivate chain_db =
 
 let get_chain global_db chain_id =
   let f reader_chain_db = {global_db; reader_chain_db} in
-  Option.map f (Chain_id.Table.find_opt global_db.active_chains chain_id)
+  Option.map f (Chain_id.Table.find global_db.active_chains chain_id)
 
 let greylist {global_db = {p2p; _}; _} peer_id =
   Lwt.return (P2p.greylist_peer p2p peer_id)
@@ -264,23 +265,18 @@ let disconnect {global_db = {p2p; _}; _} peer_id =
       P2p.disconnect p2p conn
 
 let shutdown {p2p_readers; active_chains; _} =
-  Lwt.join
-  @@ P2p_peer.Table.fold
-       (fun _peer_id reader acc -> P2p_reader.shutdown reader :: acc)
-       p2p_readers
-       []
+  P2p_peer.Table.iter_p
+    (fun _peer_id reader -> P2p_reader.shutdown reader)
+    p2p_readers
   >>= fun () ->
-  Lwt.join
-  @@ Chain_id.Table.fold
-       (fun _ reader_chain_db acc ->
-         ( Distributed_db_requester.Raw_operation.shutdown
-             reader_chain_db.P2p_reader.operation_db
-         >>= fun () ->
-         Distributed_db_requester.Raw_block_header.shutdown
-           reader_chain_db.P2p_reader.block_header_db )
-         :: acc)
-       active_chains
-       []
+  Chain_id.Table.iter_p
+    (fun _ reader_chain_db ->
+      Distributed_db_requester.Raw_operation.shutdown
+        reader_chain_db.P2p_reader.operation_db
+      >>= fun () ->
+      Distributed_db_requester.Raw_block_header.shutdown
+        reader_chain_db.P2p_reader.block_header_db)
+    active_chains
 
 let clear_block chain_db hash n =
   Distributed_db_requester.Raw_operations.clear_all
@@ -445,7 +441,7 @@ let broadcast chain_db msg =
 
 let try_send chain_db peer_id msg =
   match
-    P2p_peer.Table.find_opt chain_db.reader_chain_db.active_connections peer_id
+    P2p_peer.Table.find chain_db.reader_chain_db.active_connections peer_id
   with
   | None ->
       ()
@@ -502,27 +498,21 @@ module Advertise = struct
         in
         ignore @@ P2p.try_send chain_db.global_db.p2p conn msg
       in
-      List.iter
-        (fun (_receiver_id, conn) -> send_mempool conn)
-        (P2p_peer.Table.fold
-           (fun k v acc -> (k, v) :: acc)
-           chain_db.reader_chain_db.active_connections
-           [])
+      P2p_peer.Table.iter
+        (fun _receiver_id conn -> send_mempool conn)
+        chain_db.reader_chain_db.active_connections
 
   let current_branch chain_db =
     let chain_id = State.Chain.id chain_db.reader_chain_db.chain_state in
     let chain_state = chain_state chain_db in
     let sender_id = my_peer_id chain_db in
-    Lwt_list.iter_p
-      (fun (receiver_id, conn) ->
+    P2p_peer.Table.iter_p
+      (fun receiver_id conn ->
         let seed = {Block_locator.receiver_id; sender_id} in
         Chain.locator chain_state seed
         >>= fun locator ->
         let msg = Message.Current_branch (chain_id, locator) in
         ignore (P2p.try_send chain_db.global_db.p2p conn msg) ;
         Lwt.return_unit)
-      (P2p_peer.Table.fold
-         (fun k v acc -> (k, v) :: acc)
-         chain_db.reader_chain_db.active_connections
-         [])
+      chain_db.reader_chain_db.active_connections
 end

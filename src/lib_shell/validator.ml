@@ -68,7 +68,7 @@ let activate v ~start_prevalidator ~validator_process chain_state =
   let chain_id = State.Chain.id chain_state in
   Validator_event.(emit activate_chain) chain_id
   >>= fun () ->
-  match Chain_id.Table.find_opt v.active_chains chain_id with
+  match Chain_id.Table.find v.active_chains chain_id with
   | Some chain ->
       return chain
   | None ->
@@ -86,11 +86,13 @@ let activate v ~start_prevalidator ~validator_process chain_state =
         chain_state
         v.chain_validator_limits
 
-let get_exn {active_chains; _} chain_id =
+let get_opt {active_chains; _} chain_id =
   Chain_id.Table.find active_chains chain_id
 
-let get {active_chains; _} chain_id =
-  match Chain_id.Table.find_opt active_chains chain_id with
+let get_exn t chain_id = Option.unopt_exn Not_found @@ get_opt t chain_id
+
+let get t chain_id =
+  match get_opt t chain_id with
   | Some nv ->
       Ok nv
   | None ->

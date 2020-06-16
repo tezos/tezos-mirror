@@ -78,12 +78,10 @@ let list_blocks chain_state ?(length = 1) ?min_date heads =
         | None ->
             heads
         | Some min_date ->
-            List.fold_left
-              (fun acc block ->
+            List.filter
+              (fun block ->
                 let timestamp = State.Block.timestamp block in
-                if Time.Protocol.(min_date <= timestamp) then block :: acc
-                else acc)
-              []
+                Time.Protocol.(min_date <= timestamp))
               heads
       in
       let sorted_heads =

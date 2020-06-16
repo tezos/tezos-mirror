@@ -713,19 +713,15 @@ module Chain = struct
   let read_all state =
     Shared.use state.global_data (fun data -> locked_read_all state data)
 
-  let get_exn state id =
+  let get_opt state id =
     Shared.use state.global_data (fun data ->
         Lwt.return (Chain_id.Table.find data.chains id))
 
-  let get_opt state id =
-    Lwt.catch
-      (fun () -> get_exn state id >>= Lwt.return_some)
-      (function _ -> Lwt.return_none)
+  let get_exn state id = get_opt state id >|= Option.unopt_exn Not_found
 
   let get state id =
-    Lwt.catch
-      (fun () -> get_exn state id >>= return)
-      (function Not_found -> fail (Unknown_chain id) | exn -> Lwt.fail exn)
+    get_opt state id
+    >|= function Some v -> Ok v | None -> error (Unknown_chain id)
 
   let all state =
     Shared.use state.global_data (fun {chains; _} ->
@@ -1441,16 +1437,14 @@ module Block = struct
         protocol_hash_exn pred
         >>= fun protocol ->
         match
-          Protocol_hash.Table.find_opt
-            chain_state.block_rpc_directories
-            protocol
+          Protocol_hash.Table.find chain_state.block_rpc_directories protocol
         with
         | None ->
             Lwt.return_none
         | Some map ->
             protocol_hash_exn block
             >>= fun next_protocol ->
-            Lwt.return (Protocol_hash.Map.find_opt next_protocol map) )
+            Lwt.return (Protocol_hash.Map.find next_protocol map) )
 
   let set_rpc_directory ({chain_state; _} as block) dir =
     read_opt chain_state block.header.shell.predecessor
@@ -1467,9 +1461,7 @@ module Block = struct
     let map =
       Option.value
         ~default:Protocol_hash.Map.empty
-        (Protocol_hash.Table.find_opt
-           chain_state.block_rpc_directories
-           protocol)
+        (Protocol_hash.Table.find chain_state.block_rpc_directories protocol)
     in
     Protocol_hash.Table.replace
       chain_state.block_rpc_directories
@@ -1489,7 +1481,7 @@ module Block = struct
             Chain.get_level_indexed_protocol chain_state header
             >>= fun protocol ->
             match
-              Protocol_hash.Table.find_opt
+              Protocol_hash.Table.find
                 chain_state.header_rpc_directories
                 protocol
             with
@@ -1498,7 +1490,7 @@ module Block = struct
             | Some map ->
                 Chain.get_level_indexed_protocol chain_state pred
                 >>= fun next_protocol ->
-                Lwt.return (Protocol_hash.Map.find_opt next_protocol map) ))
+                Lwt.return (Protocol_hash.Map.find next_protocol map) ))
 
   let set_header_rpc_directory chain_state header dir =
     Shared.use chain_state.block_store (fun block_store ->
@@ -1514,7 +1506,7 @@ module Block = struct
             let map =
               Option.value
                 ~default:Protocol_hash.Map.empty
-                (Protocol_hash.Table.find_opt
+                (Protocol_hash.Table.find
                    chain_state.header_rpc_directories
                    protocol)
             in
@@ -1530,17 +1522,17 @@ let watcher (state : global_state) =
 
 let read_block {global_data; _} hash =
   Shared.use global_data (fun {chains; _} ->
-      Chain_id.Table.fold
+      Chain_id.Table.fold_s
         (fun _chain_id chain_state acc ->
-          acc
-          >>= function
+          match acc with
           | Some _ ->
-              acc
+              Lwt.return acc
           | None -> (
               Block.read_opt chain_state hash
-              >>= function None -> acc | Some block -> Lwt.return_some block ))
+              >>= function
+              | None -> Lwt.return acc | Some block -> Lwt.return_some block ))
         chains
-        Lwt.return_none)
+        None)
 
 let read_block_exn t hash =
   read_block t hash
