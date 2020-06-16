@@ -683,7 +683,7 @@ end = struct
   let record pk_uri ~pk ~pkh =
     Client_keys.Pk_uri_hashtbl.replace _cache pk_uri (pkh, pk)
 
-  let get pk_uri = Client_keys.Pk_uri_hashtbl.find_opt _cache pk_uri
+  let get pk_uri = Client_keys.Pk_uri_hashtbl.find _cache pk_uri
 end
 
 (** The implementation of the “signer-plugin.” *)
