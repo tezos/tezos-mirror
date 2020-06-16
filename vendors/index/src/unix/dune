@@ -1,5 +1,0 @@
-(library
- (public_name index.unix)
- (name index_unix)
- (c_names fsync pread pwrite)
- (libraries fmt index logs logs.threaded threads.posix unix))
