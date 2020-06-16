@@ -225,6 +225,7 @@ class Client:
                    storage: str,
                    inp: str,
                    amount: float = None,
+                   balance: float = None,
                    trace_stack: bool = False,
                    gas: int = None,
                    file: bool = True) -> client_output.RunScriptResult:
@@ -233,7 +234,9 @@ class Client:
         cmd = ['run', 'script', contract, 'on', 'storage', storage, 'and',
                'input', inp]
         if amount is not None:
-            cmd += ['-z', str(amount)]
+            cmd += ['-z', '%.6f' % amount]
+        if balance is not None:
+            cmd += ['--balance', '%.6f' % balance]
         if trace_stack:
             cmd += ['--trace-stack']
         if gas is not None:
