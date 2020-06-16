@@ -56,11 +56,12 @@ module Scripts = struct
     let path = RPC_path.(path / "scripts")
 
     let run_code_input_encoding =
-      obj9
+      obj10
         (req "script" Script.expr_encoding)
         (req "storage" Script.expr_encoding)
         (req "input" Script.expr_encoding)
         (req "amount" Tez.encoding)
+        (req "balance" Tez.encoding)
         (req "chain_id" Chain_id.encoding)
         (opt "source" Contract.encoding)
         (opt "payer" Contract.encoding)
@@ -220,17 +221,10 @@ module Scripts = struct
 
   let register () =
     let open Services_registration in
-    let originate_dummy_contract ctxt script =
+    let originate_dummy_contract ctxt script balance =
       let ctxt = Contract.init_origination_nonce ctxt Operation_hash.zero in
       Lwt.return (Contract.fresh_contract_from_current_nonce ctxt)
       >>=? fun (ctxt, dummy_contract) ->
-      let balance =
-        match Tez.of_mutez 4_000_000_000_000L with
-        | Some balance ->
-            balance
-        | None ->
-            assert false
-      in
       Contract.originate
         ctxt
         dummy_contract
@@ -247,6 +241,7 @@ module Scripts = struct
              storage,
              parameter,
              amount,
+             balance,
              chain_id,
              source,
              payer,
@@ -255,7 +250,7 @@ module Scripts = struct
            ->
         let storage = Script.lazy_expr storage in
         let code = Script.lazy_expr code in
-        originate_dummy_contract ctxt {storage; code}
+        originate_dummy_contract ctxt {storage; code} balance
         >>=? fun (ctxt, dummy_contract) ->
         let (source, payer) =
           match (source, payer) with
@@ -297,6 +292,7 @@ module Scripts = struct
              storage,
              parameter,
              amount,
+             balance,
              chain_id,
              source,
              payer,
@@ -305,7 +301,7 @@ module Scripts = struct
            ->
         let storage = Script.lazy_expr storage in
         let code = Script.lazy_expr code in
-        originate_dummy_contract ctxt {storage; code}
+        originate_dummy_contract ctxt {storage; code} balance
         >>=? fun (ctxt, dummy_contract) ->
         let (source, payer) =
           match (source, payer) with
@@ -548,22 +544,56 @@ module Scripts = struct
               [] ) ))
 
   let run_code ctxt block code
-      (storage, input, amount, chain_id, source, payer, gas, entrypoint) =
+      ( storage,
+        input,
+        amount,
+        balance,
+        chain_id,
+        source,
+        payer,
+        gas,
+        entrypoint ) =
     RPC_context.make_call0
       S.run_code
       ctxt
       block
       ()
-      (code, storage, input, amount, chain_id, source, payer, gas, entrypoint)
+      ( code,
+        storage,
+        input,
+        amount,
+        balance,
+        chain_id,
+        source,
+        payer,
+        gas,
+        entrypoint )
 
   let trace_code ctxt block code
-      (storage, input, amount, chain_id, source, payer, gas, entrypoint) =
+      ( storage,
+        input,
+        amount,
+        balance,
+        chain_id,
+        source,
+        payer,
+        gas,
+        entrypoint ) =
     RPC_context.make_call0
       S.trace_code
       ctxt
       block
       ()
-      (code, storage, input, amount, chain_id, source, payer, gas, entrypoint)
+      ( code,
+        storage,
+        input,
+        amount,
+        balance,
+        chain_id,
+        source,
+        payer,
+        gas,
+        entrypoint )
 
   let typecheck_code ctxt block =
     RPC_context.make_call0 S.typecheck_code ctxt block ()
