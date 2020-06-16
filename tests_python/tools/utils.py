@@ -413,7 +413,7 @@ def assert_run_script_success(client: Client,
                               contract: str,
                               param: str,
                               storage: str) -> RunScriptResult:
-    return client.run_script(contract, param, storage, None, True)
+    return client.run_script(contract, param, storage, trace_stack=True)
 
 
 def assert_run_script_failwith(client: Client,
@@ -423,7 +423,7 @@ def assert_run_script_failwith(client: Client,
 
     pattern = 'script reached FAILWITH instruction'
     with assert_run_failure(pattern):
-        client.run_script(contract, param, storage, None, True)
+        client.run_script(contract, param, storage, trace_stack=True)
 
 
 def assert_typecheck_data_failure(
