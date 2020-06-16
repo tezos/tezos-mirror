@@ -171,6 +171,7 @@ in the :ref:`introduction <howtoget>`.
    api/api-inline
    api/cli-commands
    api/rpc
+   api/openapi
    api/errors
    api/p2p
 
