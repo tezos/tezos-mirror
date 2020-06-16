@@ -191,11 +191,6 @@ unit:ocaml-ledger-wallet:
   script:
     - dune build @vendors/ocaml-ledger-wallet/runtest
 
-unit:ocaml-secp256k1:
-  <<: *test_definition
-  script:
-    - dune build @vendors/ocaml-secp256k1/runtest
-
 unit:ocaml-lmdb:
   <<: *test_definition
   script:
