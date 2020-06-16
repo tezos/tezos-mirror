@@ -24,22 +24,28 @@
 (*****************************************************************************)
 
 (** A locator [t] is a data structure which roughly represents a list
-    of block hashes in the chain. These hashes go from the top of the
-    chain to the bottom. It is sparse in the sense that the distance between
-    two hashes increases exponentially when we move away from the head.
+   of block hashes in the chain. These hashes go from the top of the
+   chain to the bottom. It is sparse in the sense that the distance
+   between two hashes increases exponentially when we move away from
+   the head.
 
-    The distance between two hashes of a locator is randomized to prevent from
-    attacks. The seed is determined uniquely from the peer_id of the sender and
-    the receiver so that the distance between two hashes can be recomputed locally.
-    This is the purpose of the function [to_steps].
+    The distance between two hashes of a locator is randomized to
+   prevent from attacks. The seed is determined uniquely from the
+   [peer_id] of the sender and the receiver so that the distance
+   between two hashes can be recomputed locally.  This is the purpose
+   of the function [to_steps].
 
-    The [step] representation is mostly used by the [peer_validator] module and the
-    [bootstrap_pipeline} modules.
+    The [step] representation is mostly used by the [peer_validator]
+   and the [bootstrap_pipeline} modules.
 
-    The last step of a locator may be truncated. There are two typical case of this:
-    1. When the last step hit the genesis block hash
-    2. In [Rolling] or [Full] mode, we are not inserted into blocks below the
-    [save point]. A step which is not truncated is said [strict]. *)
+    The last step of a locator may be truncated. There are two typical
+   cases for this:
+
+    1. When the last step hits the genesis block hash
+
+    2. In [Rolling] or [Full] mode, we are not interested into blocks
+   below the [save point]. A step which is not truncated is said
+   [strict]. *)
 
 (** Type for sparse block locators (/à la/ Bitcoin). *)
 type t = private Block_header.t * Block_hash.t list
@@ -56,16 +62,16 @@ val bounded_encoding :
 (** Argument to the seed used to randomize the locator. *)
 type seed = {sender_id : P2p_peer.Id.t; receiver_id : P2p_peer.Id.t}
 
-(** [estimated_length seed locator] estimate the length of the chain
-    represented by [locator] using [seed]. *)
+(** [estimated_length seed locator] estimates the length of the chain
+   represented by [locator] using [seed]. *)
 val estimated_length : seed -> t -> int
 
-(** [compute ~get_predecessor ~caboose ~size block_hash header seed] returns
-    a sparse block locator whose header is the given [header] and whose
-    sparse block is computed using [seed] to compute random jumps from
-    the [block_hash], adding the [caboose] at the end of the sparse block.
-    The sparse block locator contains at most [size + 1] elements, including the
-    caboose. *)
+(** [compute ~get_predecessor ~caboose ~size block_hash header seed]
+   returns a sparse block locator whose header is the given [header]
+   and whose sparse block is computed using [seed] to compute random
+   jumps from the [block_hash], adding the [caboose] at the end of the
+   sparse block.  The sparse block locator contains at most [size + 1]
+   elements, including the caboose. *)
 val compute :
   get_predecessor:(Block_hash.t -> int -> Block_hash.t option Lwt.t) ->
   caboose:Block_hash.t ->
@@ -76,8 +82,8 @@ val compute :
   t Lwt.t
 
 (** A 'step' in a locator is a couple of consecutive hashes in the
-    locator, and the expected difference of level between the two
-    blocks (or an upper bounds when [strict_step = false]). *)
+   locator, and the expected difference of level between the two
+   blocks (or an upper bounds when [strict_step = false]). *)
 type step = {
   block : Block_hash.t;
   predecessor : Block_hash.t;
@@ -88,16 +94,17 @@ type step = {
 val pp_step : Format.formatter -> step -> unit
 
 (** [to_steps seed t] builds all the 'steps' composing the locator
-    using the given [seed], starting with the oldest one
-    (typically the predecessor of the first step will be the `caboose`).
-    All steps contains [strict_step = true], except the oldest one. *)
+   using the given [seed], starting with the oldest one (typically the
+   predecessor of the first step will be the `caboose`).  All steps
+   contains [strict_step = true], except the oldest one. *)
 val to_steps : seed -> t -> step list
 
-(** [to_steps_truncate ~limit ~save_point seed t] behaves as [to_steps]
-    except that when the sum of all the steps already done, and the steps
-    to do in order to reach the next block is superior to [limit],
-    we return a truncated list of steps, setting the [predecessor] of the
-    last step as [save_point] and its field [strict] to [false]. *)
+(** [to_steps_truncate ~limit ~save_point seed t] behaves as
+   [to_steps] except that when the sum of all the steps already done,
+   and the steps to do in order to reach the next block is superior to
+   [limit], we return a truncated list of steps, setting the
+   [predecessor] of the last step as [save_point] and its field
+   [strict] to [false]. *)
 val to_steps_truncate :
   limit:int -> save_point:Block_hash.t -> seed -> t -> step list
 
@@ -106,16 +113,17 @@ type validity = Unknown | Known_valid | Known_invalid
 
 (** [unknown_prefix ~is_known t] either returns :
 
-    - [(Known_valid, (h, hist))] when we find a known valid block in the
-      locator history (w.r.t. [is_known]), where [h] is the given locator header
-      and [hist] is the unknown prefix ending with the known valid block.
+    - [(Known_valid, (h, hist))] when we find a known valid block in
+   the locator history (w.r.t. [is_known]), where [h] is the given
+   locator header and [hist] is the unknown prefix ending with the
+   known valid block.
 
     - [(Known_invalid, (h, hist))] when we find a known invalid block
-      (w.r.t. [is_known]) in the locator history, where [h] is the given locator
-      header and [hist] is the unknown prefix ending with the known invalid
-      block.
+   (w.r.t. [is_known]) in the locator history, where [h] is the given
+   locator header and [hist] is the unknown prefix ending with the
+   known invalid block.
 
-    - [(Unknown, (h, hist))] when no block is known valid nor invalid (w.r.t.
-      [is_known]), where [(h, hist)] is the given [locator]. *)
+    - [(Unknown, (h, hist))] when no block is known valid nor invalid
+   (w.r.t.  [is_known]), where [(h, hist)] is the given [locator]. *)
 val unknown_prefix :
   is_known:(Block_hash.t -> validity Lwt.t) -> t -> (validity * t) Lwt.t
