@@ -55,11 +55,13 @@ class Client:
         Args:
             client (str): path to the client executable file
             admin_client (str): path to the admin-client executable file
-            host (str): IP of the host
+            host (str): IP of the host; deprecated: use endpoint instead
             base_dir (str): path to the client dir. If None, a temp file is
                             created.
-            rpc_port (int): port of the server
+            rpc_port (int): port of the server; deprecated: use endpoint
+                            instead
             use_tls (bool): use TLS
+            endpoint (str): the RPC endpoint
             disable_disclaimer (bool): disable disclaimer
             mode (str): the mode to use, one of "client" or "mockup"
         Returns:
