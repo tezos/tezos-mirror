@@ -74,6 +74,16 @@ let commands =
     Node_snapshot_command.cmd ]
 
 let () =
+  Printf.eprintf
+    "%sWarning: test network Babylonnet has reached end of life.\n\
+     It is advised to use a newer test network, such as Carthagenet.\n\
+     Additionally, all networks (Mainnet and test networks) are now supported \
+     by a common release.\n\
+     Checkout branch latest-release and configure your node with:\n\n\
+    \    tezos-config init --network carthagenet%s\n\n\
+     %!"
+    (if Unix.(isatty stdout) then "\027[31m" else "")
+    (if Unix.(isatty stdout) then "\027[0m" else "") ;
   Random.self_init () ;
   match Cmdliner.Term.eval_choice (term, info) commands with
   | `Error _ ->
