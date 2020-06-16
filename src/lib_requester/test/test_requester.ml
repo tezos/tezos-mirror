@@ -76,9 +76,9 @@ module Test_disk_table_hash = struct
       (Option.fold
          ~some:(fun v -> Ok v)
          ~none:(Error_monad.error_exn Not_found)
-         (find_opt st k))
+         (find st k))
 
-  let read_opt st k = Lwt.return (find_opt st k)
+  let read_opt st k = Lwt.return (find st k)
 end
 
 module Test_memory_table = Hashtbl.Make (struct

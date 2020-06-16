@@ -106,9 +106,7 @@ module type MEMORY_TABLE = sig
 
   val create : int -> 'a t
 
-  val find : 'a t -> key -> 'a
-
-  val find_opt : 'a t -> key -> 'a option
+  val find : 'a t -> key -> 'a option
 
   val add : 'a t -> key -> 'a -> unit
 
@@ -298,7 +296,7 @@ end = struct
               -% a Hash.Logging.tag key
               -% a P2p_peer.Id.Logging.tag_opt peer)
         >>= fun () ->
-        match Table.find_opt state.pending key with
+        match Table.find state.pending key with
         | Some data ->
             let peers =
               match peer with
@@ -432,7 +430,7 @@ end = struct
                     key
                     :: Option.value
                          ~default:[]
-                         (P2p_peer.Map.find_opt requested_peer acc)
+                         (P2p_peer.Map.find requested_peer acc)
                   in
                   P2p_peer.Map.add requested_peer requests acc)
             state.pending
@@ -540,7 +538,7 @@ end = struct
     | Found of value
 
   let known s k =
-    match Memory_table.find_opt s.memory k with
+    match Memory_table.find s.memory k with
     | None ->
         Disk_table.known s.disk k
     | Some (Pending _) ->
@@ -549,7 +547,7 @@ end = struct
         Lwt.return_true
 
   let read_opt s k =
-    match Memory_table.find_opt s.memory k with
+    match Memory_table.find s.memory k with
     | None ->
         Disk_table.read_opt s.disk k
     | Some (Found v) ->
@@ -599,7 +597,7 @@ end = struct
       (fun key -> Timeout key)
 
   let read s k =
-    match Memory_table.find_opt s.memory k with
+    match Memory_table.find s.memory k with
     | None ->
         trace (Missing_data k) @@ Disk_table.read s.disk k
     | Some (Found v) ->
@@ -610,7 +608,7 @@ end = struct
   let wrap s k ?timeout t =
     let t = Lwt.protected t in
     Lwt.on_cancel t (fun () ->
-        match Memory_table.find_opt s.memory k with
+        match Memory_table.find s.memory k with
         | None ->
             ()
         | Some (Found _) ->
@@ -628,14 +626,14 @@ end = struct
         Lwt.pick [t; timeout]
 
   let fetch s ?peer ?timeout k param =
-    match Memory_table.find_opt s.memory k with
+    match Memory_table.find s.memory k with
     | None -> (
         Disk_table.read_opt s.disk k
         >>= function
         | Some v ->
             return v
         | None -> (
-          match Memory_table.find_opt s.memory k with
+          match Memory_table.find s.memory k with
           | None ->
               let (waiter, wakener) = Lwt.wait () in
               Memory_table.add
@@ -658,7 +656,7 @@ end = struct
         return v
 
   let notify s p k v =
-    match Memory_table.find_opt s.memory k with
+    match Memory_table.find s.memory k with
     | None -> (
         Disk_table.known s.disk k
         >>= function
@@ -687,7 +685,7 @@ end = struct
         Lwt.return_unit
 
   let inject s k v =
-    match Memory_table.find_opt s.memory k with
+    match Memory_table.find s.memory k with
     | None -> (
         Disk_table.known s.disk k
         >>= function
@@ -700,7 +698,7 @@ end = struct
         Lwt.return_false
 
   let clear_or_cancel s k =
-    match Memory_table.find_opt s.memory k with
+    match Memory_table.find s.memory k with
     | None ->
         ()
     | Some (Pending {wakener = w; _}) ->
@@ -719,7 +717,7 @@ end = struct
     {scheduler; disk; memory; input; global_input}
 
   let pending s k =
-    match Memory_table.find_opt s.memory k with
+    match Memory_table.find s.memory k with
     | None ->
         false
     | Some (Found _) ->

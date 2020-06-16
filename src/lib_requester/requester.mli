@@ -191,9 +191,7 @@ module type MEMORY_TABLE = sig
 
   val create : int -> 'a t
 
-  val find : 'a t -> key -> 'a
-
-  val find_opt : 'a t -> key -> 'a option
+  val find : 'a t -> key -> 'a option
 
   val add : 'a t -> key -> 'a -> unit
 
