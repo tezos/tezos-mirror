@@ -29,7 +29,7 @@ open Alpha_context
 type info = {
   balance : Tez.t;
   frozen_balance : Tez.t;
-  frozen_balance_by_cycle : Delegate.frozen_balance Cycle.Map.t;
+  frozen_balance_by_cycle : Baker.frozen_balance Cycle.Map.t;
   staking_balance : Tez.t;
   delegated_contracts : Contract_repr.t list;
   delegated_balance : Tez.t;
@@ -87,7 +87,7 @@ let info_encoding =
     (obj10
        (req "balance" Tez.encoding)
        (req "frozen_balance" Tez.encoding)
-       (req "frozen_balance_by_cycle" Delegate.frozen_balance_by_cycle_encoding)
+       (req "frozen_balance_by_cycle" Baker.frozen_balance_by_cycle_encoding)
        (req "staking_balance" Tez.encoding)
        (req "delegated_contracts" (list Contract_repr.encoding))
        (req "delegated_balance" Tez.encoding)
@@ -110,9 +110,15 @@ module S = struct
     |+ flag "inactive" (fun t -> t.inactive)
     |> seal
 
+  let add_deprecated_notice description =
+    Format.sprintf
+      "%s DEPRECATED: new RPC endpoint at \"bakers\" path segment instead of \
+       \"delegates\", where baker hash is the new baker identifier."
+      description
+
   let list_delegate =
     RPC_service.get_service
-      ~description:"Lists all registered delegates."
+      ~description:(add_deprecated_notice "Lists all registered delegates.")
       ~query:list_query
       ~output:(list Signature.Public_key_hash.encoding)
       path
@@ -121,7 +127,7 @@ module S = struct
 
   let info =
     RPC_service.get_service
-      ~description:"Everything about a delegate."
+      ~description:(add_deprecated_notice "Everything about a delegate.")
       ~query:RPC_query.empty
       ~output:info_encoding
       path
@@ -129,8 +135,9 @@ module S = struct
   let balance =
     RPC_service.get_service
       ~description:
-        "Returns the full balance of a given delegate, including the frozen \
-         balances."
+        (add_deprecated_notice
+           "Returns the full balance of a given delegate, including the \
+            frozen balances.")
       ~query:RPC_query.empty
       ~output:Tez.encoding
       RPC_path.(path / "balance")
@@ -138,8 +145,9 @@ module S = struct
   let frozen_balance =
     RPC_service.get_service
       ~description:
-        "Returns the total frozen balances of a given delegate, this includes \
-         the frozen deposits, rewards and fees."
+        (add_deprecated_notice
+           "Returns the total frozen balances of a given delegate, this \
+            includes the frozen deposits, rewards and fees.")
       ~query:RPC_query.empty
       ~output:Tez.encoding
       RPC_path.(path / "frozen_balance")
@@ -147,20 +155,22 @@ module S = struct
   let frozen_balance_by_cycle =
     RPC_service.get_service
       ~description:
-        "Returns the frozen balances of a given delegate, indexed by the \
-         cycle by which it will be unfrozen"
+        (add_deprecated_notice
+           "Returns the frozen balances of a given delegate, indexed by the \
+            cycle by which it will be unfrozen.")
       ~query:RPC_query.empty
-      ~output:Delegate.frozen_balance_by_cycle_encoding
+      ~output:Baker.frozen_balance_by_cycle_encoding
       RPC_path.(path / "frozen_balance_by_cycle")
 
   let staking_balance =
     RPC_service.get_service
       ~description:
-        "Returns the total amount of tokens delegated to a given delegate. \
-         This includes the balances of all the contracts that delegate to it, \
-         but also the balance of the delegate itself and its frozen fees and \
-         deposits. The rewards do not count in the delegated balance until \
-         they are unfrozen."
+        (add_deprecated_notice
+           "Returns the total amount of tokens delegated to a given delegate. \
+            This includes the balances of all the contracts that delegate to \
+            it, but also the balance of the delegate itself and its frozen \
+            fees and deposits. The rewards do not count in the delegated \
+            balance until they are unfrozen.")
       ~query:RPC_query.empty
       ~output:Tez.encoding
       RPC_path.(path / "staking_balance")
@@ -168,7 +178,8 @@ module S = struct
   let delegated_contracts =
     RPC_service.get_service
       ~description:
-        "Returns the list of contracts that delegate to a given delegate."
+        (add_deprecated_notice
+           "Returns the list of contracts that delegate to a given delegate.")
       ~query:RPC_query.empty
       ~output:(list Contract_repr.encoding)
       RPC_path.(path / "delegated_contracts")
@@ -176,9 +187,10 @@ module S = struct
   let delegated_balance =
     RPC_service.get_service
       ~description:
-        "Returns the balances of all the contracts that delegate to a given \
-         delegate. This excludes the delegate's own balance and its frozen \
-         balances."
+        (add_deprecated_notice
+           "Returns the balances of all the contracts that delegate to a \
+            given delegate. This excludes the delegate's own balance and its \
+            frozen balances.")
       ~query:RPC_query.empty
       ~output:Tez.encoding
       RPC_path.(path / "delegated_balance")
@@ -186,7 +198,9 @@ module S = struct
   let deactivated =
     RPC_service.get_service
       ~description:
-        "Tells whether the delegate is currently tagged as deactivated or not."
+        (add_deprecated_notice
+           "Tells whether the delegate is currently tagged as deactivated or \
+            not.")
       ~query:RPC_query.empty
       ~output:bool
       RPC_path.(path / "deactivated")
@@ -194,12 +208,12 @@ module S = struct
   let grace_period =
     RPC_service.get_service
       ~description:
-        "Returns the cycle by the end of which the delegate might be \
-         deactivated if she fails to execute any delegate action. A \
-         deactivated delegate might be reactivated (without loosing any \
-         rolls) by simply re-registering as a delegate. For deactivated \
-         delegates, this value contains the cycle by which they were \
-         deactivated."
+        (add_deprecated_notice
+           "Returns the cycle by the end of which the delegate might be \
+            deactivated if she fails to execute any delegate action. A \
+            deactivated delegate might be reactivated (without loosing any \
+            rolls) with a call to baker script. For deactivated delegates, \
+            this value contains the cycle by which they were deactivated.")
       ~query:RPC_query.empty
       ~output:Cycle.encoding
       RPC_path.(path / "grace_period")
@@ -207,7 +221,8 @@ module S = struct
   let voting_power =
     RPC_service.get_service
       ~description:
-        "The number of rolls in the vote listings for a given delegate"
+        (add_deprecated_notice
+           "The number of rolls in the vote listings for a given delegate.")
       ~query:RPC_query.empty
       ~output:Data_encoding.int32
       RPC_path.(path / "voting_power")
@@ -215,8 +230,9 @@ module S = struct
   let proof_levels =
     RPC_service.get_service
       ~description:
-        "Returns the list of levels where a proof has been made against a \
-         given delegate."
+        (add_deprecated_notice
+           "Returns the list of levels where a proof has been made against a \
+            given delegate.")
       ~query:RPC_query.empty
       ~output:Raw_level.LSet.encoding
       RPC_path.(path / "proof_levels")
@@ -225,509 +241,120 @@ end
 let register () =
   let open Services_registration in
   register0 S.list_delegate (fun ctxt q () ->
-      Delegate.list ctxt
-      >>= fun delegates ->
+      Baker.list ctxt
+      >>= fun bakers ->
+      map_s
+        (fun baker ->
+          Baker.get_consensus_key ctxt baker
+          >|=? fun consensus_key ->
+          (baker, Signature.Public_key.hash consensus_key))
+        bakers
+      >>=? fun delegates ->
       match q with
       | {active = true; inactive = false} ->
-          filter_s
-            (fun pkh -> Delegate.deactivated ctxt pkh >|=? not)
+          filter_map_s
+            (fun (baker, pkh) ->
+              Baker.deactivated ctxt baker
+              >|=? function true -> None | false -> Some pkh)
             delegates
       | {active = false; inactive = true} ->
-          filter_s (fun pkh -> Delegate.deactivated ctxt pkh) delegates
+          filter_map_s
+            (fun (baker, pkh) ->
+              Baker.deactivated ctxt baker
+              >|=? function false -> None | true -> Some pkh)
+            delegates
       | _ ->
-          return delegates) ;
+          return @@ List.map snd delegates) ;
   register1 S.info (fun ctxt pkh () () ->
-      Delegate.full_balance ctxt pkh
-      >>=? fun balance ->
-      Delegate.frozen_balance ctxt pkh
-      >>=? fun frozen_balance ->
-      Delegate.frozen_balance_by_cycle ctxt pkh
-      >>= fun frozen_balance_by_cycle ->
-      Delegate.staking_balance ctxt pkh
-      >>=? fun staking_balance ->
-      Delegate.delegated_contracts ctxt pkh
-      >>= fun delegated_contracts ->
-      Delegate.delegated_balance ctxt pkh
-      >>=? fun delegated_balance ->
-      Delegate.deactivated ctxt pkh
-      >>=? fun deactivated ->
-      Delegate.grace_period ctxt pkh
-      >>=? fun grace_period ->
-      Vote.get_voting_power_free ctxt pkh
-      >>=? fun voting_power ->
-      Delegate.Proof.all ctxt pkh
-      >|=? fun proof_levels ->
-      {
-        balance;
-        frozen_balance;
-        frozen_balance_by_cycle;
-        staking_balance;
-        delegated_contracts;
-        delegated_balance;
-        deactivated;
-        grace_period;
-        voting_power;
-        proof_levels;
-      }) ;
-  register1 S.balance (fun ctxt pkh () () -> Delegate.full_balance ctxt pkh) ;
+      Baker.is_consensus_key ctxt pkh
+      >>=? function
+      | None ->
+          raise Not_found
+      | Some baker ->
+          Baker.full_balance ctxt baker
+          >>=? fun balance ->
+          Baker.frozen_balance ctxt baker
+          >>=? fun frozen_balance ->
+          Baker.frozen_balance_by_cycle ctxt baker
+          >>= fun frozen_balance_by_cycle ->
+          Baker.staking_balance ctxt baker
+          >>=? fun staking_balance ->
+          Baker.delegated_contracts ctxt baker
+          >>= fun delegated_contracts ->
+          Baker.delegated_balance ctxt baker
+          >>=? fun delegated_balance ->
+          Baker.deactivated ctxt baker
+          >>=? fun deactivated ->
+          Baker.grace_period ctxt baker
+          >>=? fun grace_period ->
+          Vote.get_voting_power_free ctxt baker
+          >>=? fun voting_power ->
+          Baker.Proof.all ctxt baker
+          >|=? fun proof_levels ->
+          {
+            balance;
+            frozen_balance;
+            frozen_balance_by_cycle;
+            staking_balance;
+            delegated_contracts;
+            delegated_balance;
+            deactivated;
+            grace_period;
+            voting_power;
+            proof_levels;
+          }) ;
+  register1 S.balance (fun ctxt pkh () () ->
+      Baker.is_consensus_key ctxt pkh
+      >>=? function
+      | None -> raise Not_found | Some baker -> Baker.full_balance ctxt baker) ;
   register1 S.frozen_balance (fun ctxt pkh () () ->
-      Delegate.frozen_balance ctxt pkh) ;
-  register1 S.frozen_balance_by_cycle (fun ctxt pkh () () ->
-      Delegate.frozen_balance_by_cycle ctxt pkh >|= ok) ;
-  register1 S.staking_balance (fun ctxt pkh () () ->
-      Delegate.staking_balance ctxt pkh) ;
-  register1 S.delegated_contracts (fun ctxt pkh () () ->
-      Delegate.delegated_contracts ctxt pkh >|= ok) ;
-  register1 S.delegated_balance (fun ctxt pkh () () ->
-      Delegate.delegated_balance ctxt pkh) ;
-  register1 S.deactivated (fun ctxt pkh () () -> Delegate.deactivated ctxt pkh) ;
-  register1 S.grace_period (fun ctxt pkh () () ->
-      Delegate.grace_period ctxt pkh) ;
-  register1 S.voting_power (fun ctxt pkh () () ->
-      Vote.get_voting_power_free ctxt pkh) ;
-  register1 S.proof_levels (fun ctxt pkh () () -> Delegate.Proof.all ctxt pkh)
-
-let list ctxt block ?(active = true) ?(inactive = false) () =
-  RPC_context.make_call0 S.list_delegate ctxt block {active; inactive} ()
-
-let info ctxt block pkh = RPC_context.make_call1 S.info ctxt block pkh () ()
-
-let balance ctxt block pkh =
-  RPC_context.make_call1 S.balance ctxt block pkh () ()
-
-let frozen_balance ctxt block pkh =
-  RPC_context.make_call1 S.frozen_balance ctxt block pkh () ()
-
-let frozen_balance_by_cycle ctxt block pkh =
-  RPC_context.make_call1 S.frozen_balance_by_cycle ctxt block pkh () ()
-
-let staking_balance ctxt block pkh =
-  RPC_context.make_call1 S.staking_balance ctxt block pkh () ()
-
-let delegated_contracts ctxt block pkh =
-  RPC_context.make_call1 S.delegated_contracts ctxt block pkh () ()
-
-let delegated_balance ctxt block pkh =
-  RPC_context.make_call1 S.delegated_balance ctxt block pkh () ()
-
-let deactivated ctxt block pkh =
-  RPC_context.make_call1 S.deactivated ctxt block pkh () ()
-
-let grace_period ctxt block pkh =
-  RPC_context.make_call1 S.grace_period ctxt block pkh () ()
-
-let voting_power ctxt block pkh =
-  RPC_context.make_call1 S.voting_power ctxt block pkh () ()
-
-let proof_levels ctxt block pkh =
-  RPC_context.make_call1 S.proof_levels ctxt block pkh () ()
-
-let requested_levels ~default ctxt cycles levels =
-  match (levels, cycles) with
-  | ([], []) ->
-      ok [default]
-  | (levels, cycles) ->
-      (* explicitly fail when requested levels or cycle are in the past...
-         or too far in the future... *)
-      let levels =
-        List.sort_uniq
-          Level.compare
-          (List.concat
-             ( List.map (Level.from_raw ctxt) levels
-             :: List.map (Level.levels_in_cycle ctxt) cycles ))
-      in
-      map
-        (fun level ->
-          let current_level = Level.current ctxt in
-          if Level.(level <= current_level) then ok (level, None)
-          else
-            Baking.earlier_predecessor_timestamp ctxt level
-            >|? fun timestamp -> (level, Some timestamp))
-        levels
-
-module Baking_rights = struct
-  type t = {
-    level : Raw_level.t;
-    delegate : Signature.Public_key_hash.t;
-    priority : int;
-    timestamp : Timestamp.t option;
-  }
-
-  let encoding =
-    let open Data_encoding in
-    conv
-      (fun {level; delegate; priority; timestamp} ->
-        (level, delegate, priority, timestamp))
-      (fun (level, delegate, priority, timestamp) ->
-        {level; delegate; priority; timestamp})
-      (obj4
-         (req "level" Raw_level.encoding)
-         (req "delegate" Signature.Public_key_hash.encoding)
-         (req "priority" uint16)
-         (opt "estimated_time" Timestamp.encoding))
-
-  module S = struct
-    open Data_encoding
-
-    let custom_root = RPC_path.(open_root / "helpers" / "baking_rights")
-
-    type baking_rights_query = {
-      levels : Raw_level.t list;
-      cycles : Cycle.t list;
-      delegates : Signature.Public_key_hash.t list;
-      max_priority : int option;
-      all : bool;
-    }
-
-    let baking_rights_query =
-      let open RPC_query in
-      query (fun levels cycles delegates max_priority all ->
-          {levels; cycles; delegates; max_priority; all})
-      |+ multi_field "level" Raw_level.rpc_arg (fun t -> t.levels)
-      |+ multi_field "cycle" Cycle.rpc_arg (fun t -> t.cycles)
-      |+ multi_field "delegate" Signature.Public_key_hash.rpc_arg (fun t ->
-             t.delegates)
-      |+ opt_field "max_priority" RPC_arg.int (fun t -> t.max_priority)
-      |+ flag "all" (fun t -> t.all)
-      |> seal
-
-    let baking_rights =
-      RPC_service.get_service
-        ~description:
-          "Retrieves the list of delegates allowed to bake a block.\n\
-           By default, it gives the best baking priorities for bakers that \
-           have at least one opportunity below the 64th priority for the next \
-           block.\n\
-           Parameters `level` and `cycle` can be used to specify the (valid) \
-           level(s) in the past or future at which the baking rights have to \
-           be returned. Parameter `delegate` can be used to restrict the \
-           results to the given delegates. If parameter `all` is set, all the \
-           baking opportunities for each baker at each level are returned, \
-           instead of just the first one.\n\
-           Returns the list of baking slots. Also returns the minimal \
-           timestamps that correspond to these slots. The timestamps are \
-           omitted for levels in the past, and are only estimates for levels \
-           later that the next block, based on the hypothesis that all \
-           predecessor blocks were baked at the first priority."
-        ~query:baking_rights_query
-        ~output:(list encoding)
-        custom_root
-  end
-
-  let baking_priorities ctxt max_prio (level, pred_timestamp) =
-    Baking.baking_priorities ctxt level
-    >>=? fun contract_list ->
-    let rec loop l acc priority =
-      if Compare.Int.(priority > max_prio) then return (List.rev acc)
-      else
-        let (Misc.LCons (pk, next)) = l in
-        let delegate = Signature.Public_key.hash pk in
-        ( match pred_timestamp with
-        | None ->
-            ok_none
-        | Some pred_timestamp ->
-            Baking.minimal_time ctxt priority pred_timestamp
-            >|? fun t -> Some t )
-        >>?= fun timestamp ->
-        let acc =
-          {level = level.level; delegate; priority; timestamp} :: acc
-        in
-        next () >>=? fun l -> loop l acc (priority + 1)
-    in
-    loop contract_list [] 0
-
-  let remove_duplicated_delegates rights =
-    List.rev @@ fst
-    @@ List.fold_left
-         (fun (acc, previous) r ->
-           if Signature.Public_key_hash.Set.mem r.delegate previous then
-             (acc, previous)
-           else
-             (r :: acc, Signature.Public_key_hash.Set.add r.delegate previous))
-         ([], Signature.Public_key_hash.Set.empty)
-         rights
-
-  let register () =
-    let open Services_registration in
-    register0 S.baking_rights (fun ctxt q () ->
-        requested_levels
-          ~default:
-            ( Level.succ ctxt (Level.current ctxt),
-              Some (Timestamp.current ctxt) )
-          ctxt
-          q.cycles
-          q.levels
-        >>?= fun levels ->
-        let max_priority =
-          match q.max_priority with None -> 64 | Some max -> max
-        in
-        map_s (baking_priorities ctxt max_priority) levels
-        >|=? fun rights ->
-        let rights =
-          if q.all then rights else List.map remove_duplicated_delegates rights
-        in
-        let rights = List.concat rights in
-        match q.delegates with
-        | [] ->
-            rights
-        | _ :: _ as delegates ->
-            let is_requested p =
-              List.exists
-                (Signature.Public_key_hash.equal p.delegate)
-                delegates
-            in
-            List.filter is_requested rights)
-
-  let get ctxt ?(levels = []) ?(cycles = []) ?(delegates = []) ?(all = false)
-      ?max_priority block =
-    RPC_context.make_call0
-      S.baking_rights
-      ctxt
-      block
-      {levels; cycles; delegates; max_priority; all}
-      ()
-end
-
-module Endorsing_rights = struct
-  type t = {
-    level : Raw_level.t;
-    delegate : Signature.Public_key_hash.t;
-    slots : int list;
-    estimated_time : Time.t option;
-  }
-
-  let encoding =
-    let open Data_encoding in
-    conv
-      (fun {level; delegate; slots; estimated_time} ->
-        (level, delegate, slots, estimated_time))
-      (fun (level, delegate, slots, estimated_time) ->
-        {level; delegate; slots; estimated_time})
-      (obj4
-         (req "level" Raw_level.encoding)
-         (req "delegate" Signature.Public_key_hash.encoding)
-         (req "slots" (list uint16))
-         (opt "estimated_time" Timestamp.encoding))
-
-  module S = struct
-    open Data_encoding
-
-    let custom_root = RPC_path.(open_root / "helpers" / "endorsing_rights")
-
-    type endorsing_rights_query = {
-      levels : Raw_level.t list;
-      cycles : Cycle.t list;
-      delegates : Signature.Public_key_hash.t list;
-    }
-
-    let endorsing_rights_query =
-      let open RPC_query in
-      query (fun levels cycles delegates -> {levels; cycles; delegates})
-      |+ multi_field "level" Raw_level.rpc_arg (fun t -> t.levels)
-      |+ multi_field "cycle" Cycle.rpc_arg (fun t -> t.cycles)
-      |+ multi_field "delegate" Signature.Public_key_hash.rpc_arg (fun t ->
-             t.delegates)
-      |> seal
-
-    let endorsing_rights =
-      RPC_service.get_service
-        ~description:
-          "Retrieves the delegates allowed to endorse a block.\n\
-           By default, it gives the endorsement slots for delegates that have \
-           at least one in the next block.\n\
-           Parameters `level` and `cycle` can be used to specify the (valid) \
-           level(s) in the past or future at which the endorsement rights \
-           have to be returned. Parameter `delegate` can be used to restrict \
-           the results to the given delegates.\n\
-           Returns the list of endorsement slots. Also returns the minimal \
-           timestamps that correspond to these slots. The timestamps are \
-           omitted for levels in the past, and are only estimates for levels \
-           later that the next block, based on the hypothesis that all \
-           predecessor blocks were baked at the first priority."
-        ~query:endorsing_rights_query
-        ~output:(list encoding)
-        custom_root
-  end
-
-  let endorsement_slots ctxt (level, estimated_time) =
-    Baking.endorsement_rights ctxt level
-    >|=? fun rights ->
-    Signature.Public_key_hash.Map.fold
-      (fun delegate (_, slots, _) acc ->
-        {level = level.level; delegate; slots; estimated_time} :: acc)
-      rights
-      []
-
-  let register () =
-    let open Services_registration in
-    register0 S.endorsing_rights (fun ctxt q () ->
-        requested_levels
-          ~default:(Level.current ctxt, Some (Timestamp.current ctxt))
-          ctxt
-          q.cycles
-          q.levels
-        >>?= fun levels ->
-        map_s (endorsement_slots ctxt) levels
-        >|=? fun rights ->
-        let rights = List.concat rights in
-        match q.delegates with
-        | [] ->
-            rights
-        | _ :: _ as delegates ->
-            let is_requested p =
-              List.exists
-                (Signature.Public_key_hash.equal p.delegate)
-                delegates
-            in
-            List.filter is_requested rights)
-
-  let get ctxt ?(levels = []) ?(cycles = []) ?(delegates = []) block =
-    RPC_context.make_call0
-      S.endorsing_rights
-      ctxt
-      block
-      {levels; cycles; delegates}
-      ()
-end
-
-module Endorsing_power = struct
-  let endorsing_power ctxt (operation, chain_id) =
-    let (Operation_data data) = operation.protocol_data in
-    match data.contents with
-    | Single (Endorsement _) ->
-        Baking.check_endorsement_rights
-          ctxt
-          chain_id
-          {shell = operation.shell; protocol_data = data}
-        >|=? fun (_, slots, _) -> List.length slots
-    | _ ->
-        failwith "Operation is not an endorsement"
-
-  module S = struct
-    let endorsing_power =
-      let open Data_encoding in
-      RPC_service.post_service
-        ~description:
-          "Get the endorsing power of an endorsement, that is, the number of \
-           slots that the endorser has"
-        ~query:RPC_query.empty
-        ~input:
-          (obj2
-             (req "endorsement_operation" Operation.encoding)
-             (req "chain_id" Chain_id.encoding))
-        ~output:int31
-        RPC_path.(open_root / "endorsing_power")
-  end
-
-  let register () =
-    let open Services_registration in
-    register0 S.endorsing_power (fun ctxt () (op, chain_id) ->
-        endorsing_power ctxt (op, chain_id))
-
-  let get ctxt block op chain_id =
-    RPC_context.make_call0 S.endorsing_power ctxt block () (op, chain_id)
-end
-
-module Required_endorsements = struct
-  let required_endorsements ctxt block_delay =
-    Baking.minimum_allowed_endorsements ctxt ~block_delay
-
-  module S = struct
-    type t = {block_delay : Period.t}
-
-    let required_endorsements_query =
-      let open RPC_query in
-      query (fun block_delay -> {block_delay})
-      |+ field "block_delay" Period.rpc_arg Period.zero (fun t ->
-             t.block_delay)
-      |> seal
-
-    let required_endorsements =
-      let open Data_encoding in
-      RPC_service.get_service
-        ~description:
-          "Minimum number of endorsements for a block to be valid, given a \
-           delay of the block's timestamp with respect to the minimum time to \
-           bake at the block's priority"
-        ~query:required_endorsements_query
-        ~output:int31
-        RPC_path.(open_root / "required_endorsements")
-  end
-
-  let register () =
-    let open Services_registration in
-    register0 S.required_endorsements (fun ctxt {block_delay} () ->
-        return @@ required_endorsements ctxt block_delay)
-
-  let get ctxt block block_delay =
-    RPC_context.make_call0 S.required_endorsements ctxt block {block_delay} ()
-end
-
-module Minimal_valid_time = struct
-  let minimal_valid_time ctxt ~priority ~endorsing_power =
-    Baking.minimal_valid_time ctxt ~priority ~endorsing_power
-
-  module S = struct
-    type t = {priority : int; endorsing_power : int}
-
-    let minimal_valid_time_query =
-      let open RPC_query in
-      query (fun priority endorsing_power -> {priority; endorsing_power})
-      |+ field "priority" RPC_arg.int 0 (fun t -> t.priority)
-      |+ field "endorsing_power" RPC_arg.int 0 (fun t -> t.endorsing_power)
-      |> seal
-
-    let minimal_valid_time =
-      RPC_service.get_service
-        ~description:
-          "Minimal valid time for a block given a priority and an endorsing \
-           power."
-        ~query:minimal_valid_time_query
-        ~output:Time.encoding
-        RPC_path.(open_root / "minimal_valid_time")
-  end
-
-  let register () =
-    let open Services_registration in
-    register0 S.minimal_valid_time (fun ctxt {priority; endorsing_power} () ->
-        Lwt.return @@ minimal_valid_time ctxt ~priority ~endorsing_power)
-
-  let get ctxt block priority endorsing_power =
-    RPC_context.make_call0
-      S.minimal_valid_time
-      ctxt
-      block
-      {priority; endorsing_power}
-      ()
-end
-
-let register () =
-  register () ;
-  Baking_rights.register () ;
-  Endorsing_rights.register () ;
-  Endorsing_power.register () ;
-  Required_endorsements.register () ;
-  Minimal_valid_time.register ()
-
-let endorsement_rights ctxt level =
-  Endorsing_rights.endorsement_slots ctxt (level, None)
-  >|=? fun l -> List.map (fun {Endorsing_rights.delegate; _} -> delegate) l
-
-let baking_rights ctxt max_priority =
-  let max = match max_priority with None -> 64 | Some m -> m in
-  let level = Level.current ctxt in
-  Baking_rights.baking_priorities ctxt max (level, None)
-  >|=? fun l ->
-  ( level.level,
-    List.map
-      (fun {Baking_rights.delegate; timestamp; _} -> (delegate, timestamp))
-      l )
-
-let endorsing_power ctxt operation =
-  Endorsing_power.endorsing_power ctxt operation
-
-let required_endorsements ctxt delay =
-  Required_endorsements.required_endorsements ctxt delay
-
-let minimal_valid_time ctxt priority endorsing_power =
-  Minimal_valid_time.minimal_valid_time ctxt priority endorsing_power
+      Baker.is_consensus_key ctxt pkh
+      >>=? function
+      | None -> raise Not_found | Some baker -> Baker.frozen_balance ctxt baker) ;
+  register1 S.frozen_balance_by_cycle (fun ctxt baker () () ->
+      Baker.is_consensus_key ctxt baker
+      >>=? function
+      | None ->
+          raise Not_found
+      | Some baker ->
+          Baker.frozen_balance_by_cycle ctxt baker >>= return) ;
+  register1 S.staking_balance (fun ctxt baker () () ->
+      Baker.is_consensus_key ctxt baker
+      >>=? function
+      | None ->
+          raise Not_found
+      | Some baker ->
+          Baker.staking_balance ctxt baker) ;
+  register1 S.delegated_contracts (fun ctxt baker () () ->
+      Baker.is_consensus_key ctxt baker
+      >>=? function
+      | None ->
+          raise Not_found
+      | Some baker ->
+          Baker.delegated_contracts ctxt baker >>= return) ;
+  register1 S.delegated_balance (fun ctxt baker () () ->
+      Baker.is_consensus_key ctxt baker
+      >>=? function
+      | None ->
+          raise Not_found
+      | Some baker ->
+          Baker.delegated_balance ctxt baker) ;
+  register1 S.deactivated (fun ctxt baker () () ->
+      Baker.is_consensus_key ctxt baker
+      >>=? function
+      | None -> raise Not_found | Some baker -> Baker.deactivated ctxt baker) ;
+  register1 S.grace_period (fun ctxt baker () () ->
+      Baker.is_consensus_key ctxt baker
+      >>=? function
+      | None -> raise Not_found | Some baker -> Baker.grace_period ctxt baker) ;
+  register1 S.voting_power (fun ctxt baker () () ->
+      Baker.is_consensus_key ctxt baker
+      >>=? function
+      | None ->
+          raise Not_found
+      | Some baker ->
+          Vote.get_voting_power_free ctxt baker) ;
+  register1 S.proof_levels (fun ctxt baker () () ->
+      Baker.is_consensus_key ctxt baker
+      >>=? function
+      | None -> raise Not_found | Some baker -> Baker.Proof.all ctxt baker)
