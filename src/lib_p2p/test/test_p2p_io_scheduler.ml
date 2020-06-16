@@ -115,7 +115,7 @@ let server ?(display_client_stat = true) ?max_download_speed ?read_queue_size
   accept_n main_socket n
   >>=? fun conns ->
   let conns = List.map (P2p_io_scheduler.register sched) conns in
-  Lwt.join (List.map receive conns)
+  Lwt_list.iter_p receive conns
   >>= fun () ->
   iter_p P2p_io_scheduler.close conns
   >>=? fun () ->

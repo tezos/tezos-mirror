@@ -42,8 +42,8 @@ let rec gen acc f = function 0 -> acc | n -> gen (f () :: acc) f (pred n)
 let run qsize nbp nbc p c =
   let q = Lwt_pipe.create ~size:(qsize, fun () -> qsize) () in
   let producers = gen [] (fun () -> producer q p) nbp in
-  let consumers = gen [] (fun () -> consumer q c) nbc in
-  Lwt.join producers <&> Lwt.join consumers
+  let consumers_and_producers = gen producers (fun () -> consumer q c) nbc in
+  Lwt.join consumers_and_producers
 
 let main () =
   let qsize = ref 10 in
