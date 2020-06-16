@@ -86,7 +86,10 @@ let wait_for_operation_inclusion (ctxt : #Client_context.full) ~chain
   let process hash header =
     let block = `Hash (hash, 0) in
     let predecessor = header.Tezos_base.Block_header.predecessor in
-    match Block_hash.Table.find blocks predecessor with
+    let pred_block =
+      Option.unopt_exn Not_found @@ Block_hash.Table.find blocks predecessor
+    in
+    match pred_block with
     | Some (block_with_op, n) ->
         ctxt#answer
           "Operation received %d confirmations as of block: %a"
@@ -189,7 +192,7 @@ let wait_for_operation_inclusion (ctxt : #Client_context.full) ~chain
               failwith "..."
           | Some (hash, _) -> (
               stop () ;
-              match Block_hash.Table.find_opt blocks hash with
+              match Block_hash.Table.find blocks hash with
               | None | Some None ->
                   assert false
               | Some (Some (hash, _)) ->

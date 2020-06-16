@@ -38,12 +38,13 @@ let get_versions () =
 
 let register name commands =
   let previous =
-    try Protocol_hash.Table.find versions name
-    with Not_found -> fun (_network : network option) -> ([] : command list)
+    Option.value ~default:(fun (_network : network option) ->
+        ([] : command list))
+    @@ Protocol_hash.Table.find versions name
   in
   Protocol_hash.Table.replace versions name (fun (network : network option) ->
       commands network @ previous network)
 
 let commands_for_version version =
-  try Protocol_hash.Table.find versions version
-  with Not_found -> raise Version_not_found
+  Option.unopt_exn Version_not_found
+  @@ Protocol_hash.Table.find versions version
