@@ -24,4 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type error = Core.error = ..
+
 include Sig.MONAD with type error := Core.error

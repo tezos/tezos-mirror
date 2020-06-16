@@ -31,7 +31,7 @@ type error_category =
   | `Temporary  (** Errors that may not happen in a later context *)
   | `Permanent  (** Errors that will happen no matter the context *) ]
 
-include Sig.CORE
+include Sig.CORE with type error = Core.error
 
 include Sig.EXT with type error := error
 
