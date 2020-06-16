@@ -117,15 +117,6 @@ let list_blocks chain_state ?(length = 1) ?min_date heads =
     requested_heads
   >>= fun (_, blocks) -> return (List.rev blocks)
 
-let sync_state cv =
-  match Chain_validator.sync_state cv with
-  | `Sync ->
-      return "sync"
-  | `Unsync ->
-      return "unsync"
-  | `Stuck ->
-      return "stuck"
-
 let rpc_directory ~user_activated_upgrades ~user_activated_protocol_overrides
     validator =
   let dir : State.Chain.t RPC_directory.t ref = ref RPC_directory.empty in
@@ -165,14 +156,11 @@ let rpc_directory ~user_activated_upgrades ~user_activated_protocol_overrides
       | Ok chain_validator ->
           return (Chain_validator.is_bootstrapped chain_validator)) ;
   register0 S.sync_state (fun chain () () ->
-      let chain_validator =
-        match Validator.get validator (State.Chain.id chain) with
-        | Error _ ->
-            Lwt.fail Not_found
-        | Ok chain_validator ->
-            return chain_validator
-      in
-      chain_validator >>=? sync_state) ;
+      match Validator.get validator (State.Chain.id chain) with
+      | Error _ ->
+          Lwt.fail Not_found
+      | Ok chain_validator ->
+          return (Chain_validator.sync_state chain_validator)) ;
   (* blocks *)
   register0 S.Blocks.list (fun chain q () ->
       list_blocks chain ?length:q#length ?min_date:q#min_date q#heads) ;
