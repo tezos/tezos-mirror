@@ -34,6 +34,8 @@ module Name = struct
   let base = ["validator"; "chain"]
 
   let pp = Chain_id.pp_short
+
+  let equal = Chain_id.equal
 end
 
 module Request = struct

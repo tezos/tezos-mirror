@@ -43,6 +43,8 @@ module Name = struct
       chain
       P2p_peer.Id.pp_short
       peer
+
+  let equal (c1, p1) (c2, p2) = Chain_id.equal c1 c2 && P2p_peer.Id.equal p1 p2
 end
 
 module Request = struct

@@ -40,6 +40,8 @@ module Name = struct
   let base = ["validator"; "block"]
 
   let pp _ () = ()
+
+  let equal () () = true
 end
 
 module Types = struct

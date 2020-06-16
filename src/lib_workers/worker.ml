@@ -249,6 +249,14 @@ struct
   module Types = Types
   module Logger = Logger
 
+  module Nametbl = Hashtbl.MakeSeeded (struct
+    type t = Name.t
+
+    let hash = Hashtbl.seeded_hash
+
+    let equal = Name.equal
+  end)
+
   let base_name = String.concat "-" Name.base
 
   type message = Message : 'a Request.t * 'a tzresult Lwt.u option -> message
@@ -304,7 +312,7 @@ struct
   and 'kind table = {
     buffer_kind : 'kind buffer_kind;
     mutable last_id : int;
-    instances : (Name.t, 'kind t) Hashtbl.t;
+    instances : 'kind t Nametbl.t;
   }
 
   let queue_item ?u r = (Systime_os.now (), Message (r, u))
@@ -539,7 +547,7 @@ struct
   end
 
   let create_table buffer_kind =
-    {buffer_kind; last_id = 0; instances = Hashtbl.create 10}
+    {buffer_kind; last_id = 0; instances = Nametbl.create ~random:true 10}
 
   let worker_loop (type kind) handlers (w : kind t) =
     let (module Handlers : HANDLERS with type self = kind t) = handlers in
@@ -556,7 +564,7 @@ struct
       Lwt_canceler.cancel w.canceler
       >>= fun () ->
       w.status <- Closed (t0, Systime_os.now (), errs) ;
-      Hashtbl.remove w.table.instances w.name ;
+      Nametbl.remove w.table.instances w.name ;
       Handlers.on_close w
       >>= fun () ->
       w.state <- None ;
@@ -662,7 +670,7 @@ struct
       if name_s = "" then base_name
       else Format.asprintf "%s_%s" base_name name_s
     in
-    if Hashtbl.mem table.instances name then
+    if Nametbl.mem table.instances name then
       invalid_arg
         (Format.asprintf "Worker.launch: duplicate worker %s" full_name)
     else
@@ -707,7 +715,7 @@ struct
           status = Launching (Systime_os.now ());
         }
       in
-      Hashtbl.add table.instances name w ;
+      Nametbl.add table.instances name w ;
       ( if id_name = base_name then lwt_emit w (Started None)
       else lwt_emit w (Started (Some name_s)) )
       >>= fun () ->
@@ -765,7 +773,7 @@ struct
 
   let information (type a) (w : a t) =
     {
-      Worker_types.instances_number = Hashtbl.length w.table.instances;
+      Worker_types.instances_number = Nametbl.length w.table.instances;
       wstatus = w.status;
       queue_length =
         ( match w.buffer with
@@ -780,9 +788,9 @@ struct
   let view w = Types.view (state w) w.parameters
 
   let list {instances; _} =
-    Hashtbl.fold (fun n w acc -> (n, w) :: acc) instances []
+    Nametbl.fold (fun n w acc -> (n, w) :: acc) instances []
 
-  let find_opt {instances; _} = Hashtbl.find_opt instances
+  let find_opt {instances; _} = Nametbl.find instances
 
   (* TODO? add a list of cancelers for nested protection ? *)
   let protect {canceler; _} ?on_error f = protect ?on_error ~canceler f

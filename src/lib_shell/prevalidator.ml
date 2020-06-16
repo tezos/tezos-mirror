@@ -185,6 +185,9 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       Chain_id.pp_short fmt chain_id ;
       Format.pp_print_string fmt "." ;
       Protocol_hash.pp_short fmt proto_hash
+
+    let equal (c1, p1) (c2, p2) =
+      Chain_id.equal c1 c2 && Protocol_hash.equal p1 p2
   end
 
   module Types = struct

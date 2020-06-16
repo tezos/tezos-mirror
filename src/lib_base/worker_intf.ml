@@ -42,6 +42,8 @@ module type NAME = sig
 
   (** Pretty printer for displaying the worker name *)
   val pp : Format.formatter -> t -> unit
+
+  val equal : t -> t -> bool
 end
 
 module type VIEW = sig
