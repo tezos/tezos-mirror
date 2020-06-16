@@ -115,9 +115,8 @@ module Info = struct
              last_rejected_connection,
              last_established_connection,
              last_disconnection ) ->
-        let info = create ~created ~trusted ~peer_metadata peer_id in
         let events = Ringo.Ring.create log_size in
-        Ringo.Ring.add_list info.events event_list ;
+        Ringo.Ring.add_list events event_list ;
         {
           state = Disconnected;
           trusted;
