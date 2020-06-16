@@ -355,6 +355,9 @@ class CreateMockup:
         self.exit_code = exit_code
         self.create_mockup_result = None
         self.chain_id = None
+        match = re.search(r"Chain id is (.*)", self.client_stdout)
+        if match is not None:
+            self.chain_id = match.group(1)
 
         # an element of outputs contains:
         # - a pattern that we expect the output to contain
@@ -382,9 +385,3 @@ class CreateMockup:
                 if exit_code != expected_exit_code:
                     raise InvalidExitCode(exit_code)
                 return
-
-
-    def parse_chain_id(self):
-        match = re.search(r"Chain id is (.*)", self.client_stdout)
-        if match is not None:
-            self.chain_id = match.group(1)

@@ -264,7 +264,6 @@ def _create_mockup_chain_id_seed(mockup_client,
         mockup_client.set_base_dir(base_dir)
         res = mockup_client.create_mockup(protocol=_PROTO, chain_id_seed=seed)
         assert res.create_mockup_result == "ok"
-        res.parse_chain_id()
         assert res.chain_id is not None, "Absent chain id value from command"
         return res.chain_id
 
