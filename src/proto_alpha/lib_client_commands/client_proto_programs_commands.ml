@@ -760,6 +760,7 @@ let commands () =
             ~stack
             ~unparsing_mode
             ~other_contracts:None
+            ~extra_big_maps:None
         in
         match r with
         | Ok expr ->

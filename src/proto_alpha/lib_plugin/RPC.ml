@@ -233,6 +233,14 @@ module Scripts = struct
            (req "address" Script.expr_encoding)
            (req "type" Script.expr_encoding))
 
+    let extra_big_maps_encoding =
+      list
+        (obj4
+           (req "id" Script.expr_encoding)
+           (req "key_type" Script.expr_encoding)
+           (req "val_type" Script.expr_encoding)
+           (req "map_literal" Script.expr_encoding))
+
     let run_code_input_encoding =
       merge_objs
         (obj10
@@ -331,11 +339,12 @@ module Scripts = struct
         (obj1 (opt "level" Script_int.n_encoding))
 
     let normalize_stack_input_encoding =
-      obj4
+      obj5
         (req "input" stack_encoding)
         (req "unparsing_mode" unparsing_mode_encoding)
         (opt "legacy" bool)
         (opt "other_contracts" other_contracts_encoding)
+        (opt "extra_big_maps" extra_big_maps_encoding)
 
     let normalize_stack_output_encoding = obj1 (req "output" stack_encoding)
 
@@ -1208,6 +1217,83 @@ module Scripts = struct
           | _ -> return ctxt)
         ctxt
     in
+    let initialize_big_maps ctxt big_maps =
+      let* ctxt, (big_map_diff : Lazy_storage.diffs) =
+        List.fold_left_es
+          (fun (ctxt, big_map_diff_tl) (id, kty, vty, update) ->
+            let open Script_ir_translator in
+            let update = Micheline.root update in
+            let init =
+              Lazy_storage.(Alloc Big_map.{key_type = kty; value_type = vty})
+            in
+            let id = Micheline.root id in
+            let* id, ctxt =
+              parse_data
+                ctxt
+                ~elab_conf:(Script_ir_translator_config.make ~legacy:false ())
+                ~allow_forged:false
+                Script_typed_ir.nat_t
+                id
+            in
+            let id = Script_int.to_zint id in
+            let*? Ex_comparable_ty key_comparable_type, ctxt =
+              parse_comparable_ty ctxt (Micheline.root kty)
+            in
+            let*? Ex_ty value_type, ctxt =
+              parse_big_map_value_ty ctxt ~legacy:false (Micheline.root vty)
+            in
+            (* Typecheck the update seq to check that the values are well-typed and the keys are sorted *)
+            let*? map_ty =
+              Script_typed_ir.map_t (-1) key_comparable_type value_type
+            in
+            let* _, ctxt =
+              parse_data
+                ctxt
+                ~elab_conf:(Script_ir_translator_config.make ~legacy:false ())
+                ~allow_forged:true
+                map_ty
+                update
+            in
+            let items =
+              match update with
+              | Micheline.Seq (_, items) -> items
+              | _ -> assert false
+            in
+            (* Build a big_map_diff *)
+            let+ ctxt, updates =
+              List.fold_left_es
+                (fun (ctxt, acc) key_value ->
+                  let open Micheline in
+                  let key, value =
+                    match key_value with
+                    | Prim (_, Michelson_v1_primitives.D_Elt, [key; value], _)
+                      ->
+                        (key, value)
+                    | _ -> assert false
+                  in
+                  let* k, ctxt =
+                    parse_comparable_data ctxt key_comparable_type key
+                  in
+                  let+ key_hash, ctxt = hash_data ctxt key_comparable_type k in
+                  let key = Micheline.strip_locations key in
+                  let value = Some (Micheline.strip_locations value) in
+                  (ctxt, Big_map.{key; key_hash; value} :: acc))
+                (ctxt, [])
+                items
+            in
+            ( ctxt,
+              Lazy_storage.(
+                make
+                  Big_map
+                  (Big_map.Id.parse_z id)
+                  (Update {init; updates = List.rev updates}))
+              :: big_map_diff_tl ))
+          (ctxt, [])
+          big_maps
+      in
+      let+ ctxt, _size_change = Lazy_storage.apply ctxt big_map_diff in
+      ctxt
+    in
     let sender_and_payer ~sender_opt ~payer_opt ~default_sender =
       match (sender_opt, payer_opt) with
       | None, None ->
@@ -1714,7 +1800,11 @@ module Scripts = struct
     Registration.register0
       ~chunked:true
       S.normalize_stack
-      (fun ctxt () (stack, unparsing_mode, legacy, other_contracts) ->
+      (fun
+        ctxt
+        ()
+        (stack, unparsing_mode, legacy, other_contracts, extra_big_maps)
+      ->
         let legacy = Option.value ~default:false legacy in
         let ctxt = Gas.set_unlimited ctxt in
         let nodes =
@@ -1722,6 +1812,8 @@ module Scripts = struct
         in
         let other_contracts = Option.value ~default:[] other_contracts in
         let* ctxt = originate_dummy_contracts ctxt other_contracts in
+        let extra_big_maps = Option.value ~default:[] extra_big_maps in
+        let* ctxt = initialize_big_maps ctxt extra_big_maps in
         let* Normalize_stack.Ex_stack (st_ty, x, st), ctxt =
           Normalize_stack.parse_stack ctxt ~legacy nodes
         in
@@ -1906,14 +1998,14 @@ module Scripts = struct
       ()
       (data, ty, unparsing_mode, legacy)
 
-  let normalize_stack ?legacy ~other_contracts ~stack ~unparsing_mode ctxt block
-      =
+  let normalize_stack ?legacy ~other_contracts ~extra_big_maps ~stack
+      ~unparsing_mode ctxt block =
     RPC_context.make_call0
       S.normalize_stack
       ctxt
       block
       ()
-      (stack, unparsing_mode, legacy, other_contracts)
+      (stack, unparsing_mode, legacy, other_contracts, extra_big_maps)
 
   let normalize_script ~script ~unparsing_mode ctxt block =
     RPC_context.make_call0
