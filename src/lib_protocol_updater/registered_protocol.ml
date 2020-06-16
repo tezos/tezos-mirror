@@ -81,8 +81,10 @@ let mem hash =
   || Tezos_protocol_registerer.Registerer.mem hash
 
 let get hash =
-  try Some (VersionTable.find versions hash)
-  with Not_found -> (
+  match VersionTable.find versions hash with
+  | Some proto ->
+      Some proto
+  | None -> (
     match build hash with
     | Some proto ->
         VersionTable.add versions hash proto ;
@@ -119,10 +121,10 @@ let list () = VersionTable.fold (fun _ p acc -> p :: acc) versions []
 
 let list_embedded () = VersionTable.fold (fun k _ acc -> k :: acc) sources []
 
-let get_embedded_sources_exn hash = VersionTable.find sources hash
+let get_embedded_sources hash = VersionTable.find sources hash
 
-let get_embedded_sources hash =
-  try Some (get_embedded_sources_exn hash) with Not_found -> None
+let get_embedded_sources_exn hash =
+  Option.unopt_exn Not_found @@ get_embedded_sources hash
 
 module type Source_sig = sig
   val hash : Protocol_hash.t option
