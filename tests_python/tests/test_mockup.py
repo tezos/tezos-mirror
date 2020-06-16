@@ -269,8 +269,8 @@ def _create_mockup_chain_id_seed(mockup_client,
         return res.chain_id
 
 
-@pytest.mark.parametrize('chain_id_seed_value', [
-    ("", " NetXjDm9eYUvhif"),
+@pytest.mark.parametrize('chain_id_seed,chain_id_value', [
+    ("", "NetXjDm9eYUvhif"),
     ("0", "NetXjjE5cZUeWPy"),
     ("main", "NetXaFDF7xZQCpR"),
     ("test", "NetXkKbtqncJcAz"),
@@ -278,11 +278,12 @@ def _create_mockup_chain_id_seed(mockup_client,
     ("longerlongerlongerseed", "NetXdhGxXRpN8i8"),
     ("⚠unicode♥one", "NetXNrs2NkmLRfW")])
 @pytest.mark.client
-def test_chain_id_seed(mockup_client, chain_id_seed_value):
+def test_chain_id_seed(mockup_client, chain_id_seed, chain_id_value):
     """ Executes `tezos-client create mockup --chain-id-seed chain_id_seed """
-    chain_id = _create_mockup_chain_id_seed(mockup_client, chain_id_seed_value[0])
-    assert chain_id == chain_id_seed_value[1], \
-    "Unexpected chain id for seed: " + chain_id_seed_value
+    chain_id = _create_mockup_chain_id_seed(mockup_client, chain_id_seed)
+    assert chain_id == chain_id_value, \
+    f"""Unexpected chain id for seed: {chain_id_seed}
+expected {chain_id_value} instead of {chain_id}"""
 
 
 @pytest.mark.client
