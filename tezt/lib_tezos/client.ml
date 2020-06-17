@@ -222,6 +222,33 @@ let spawn_bake_for ?node ?(key = Constant.bootstrap1.alias)
 let bake_for ?node ?key ?minimal_timestamp client =
   spawn_bake_for ?node ?key ?minimal_timestamp client |> Process.check
 
+let spawn_submit_proposals ?node ?(key = Constant.bootstrap1.alias) ~proto_hash
+    client =
+  spawn_command client ?node ["submit"; "proposals"; "for"; key; proto_hash]
+
+let submit_proposals ?node ?key ~proto_hash client =
+  spawn_submit_proposals ?node ?key ~proto_hash client |> Process.check
+
+type ballot = Nay | Pass | Yay
+
+let spawn_submit_ballot ?node ?(key = Constant.bootstrap1.alias) ~proto_hash
+    vote client =
+  let string_of_vote = function
+    | Yay ->
+        "yay"
+    | Nay ->
+        "nay"
+    | Pass ->
+        "pass"
+  in
+  spawn_command
+    client
+    ?node
+    ["submit"; "ballot"; "for"; key; proto_hash; string_of_vote vote]
+
+let submit_ballot ?node ?key ~proto_hash vote client =
+  spawn_submit_ballot ?node ?key ~proto_hash vote client |> Process.check
+
 let init ?path ?admin_path ?name ?color ?base_dir ?node () =
   let client = create ?path ?admin_path ?name ?color ?base_dir ?node () in
   let* () =

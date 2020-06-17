@@ -146,6 +146,28 @@ val bake_for :
 val spawn_bake_for :
   ?node:Node.t -> ?key:string -> ?minimal_timestamp:bool -> t -> Process.t
 
+(** Run [tezos-client submit proposals for].
+
+    Default [key] is {!Constant.bootstrap1.alias}. *)
+val submit_proposals :
+  ?node:Node.t -> ?key:string -> proto_hash:string -> t -> unit Lwt.t
+
+(** Same as [submit_proposals], but do not wait for the process to exit. *)
+val spawn_submit_proposals :
+  ?node:Node.t -> ?key:string -> proto_hash:string -> t -> Process.t
+
+type ballot = Nay | Pass | Yay
+
+(** Run [tezos-client submit ballot for].
+
+    Default [key] is {!Constant.bootstrap1.alias}. *)
+val submit_ballot :
+  ?node:Node.t -> ?key:string -> proto_hash:string -> ballot -> t -> unit Lwt.t
+
+(** Same as [submit_ballot], but do not wait for the process to exit. *)
+val spawn_submit_ballot :
+  ?node:Node.t -> ?key:string -> proto_hash:string -> ballot -> t -> Process.t
+
 (** {2 High-Level Functions} *)
 
 (** Create a client and import all secret keys listed in {!Constant.all_secret_keys}. *)
