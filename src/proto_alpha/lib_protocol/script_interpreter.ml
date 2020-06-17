@@ -533,6 +533,31 @@ let cost_of_instr : type b a. (b, a) descr -> b -> Gas.cost =
       let outputs = List.length tx.outputs in
       Interp_costs.sapling_verify_update ~inputs ~outputs
 
+let unpack ctxt ~ty ~bytes =
+  Gas.check_enough ctxt (Script.serialized_cost bytes)
+  >>?= fun () ->
+  if
+    Compare.Int.(Bytes.length bytes >= 1)
+    && Compare.Int.(TzEndian.get_uint8 bytes 0 = 0x05)
+  then
+    let bytes = Bytes.sub bytes 1 (Bytes.length bytes - 1) in
+    match Data_encoding.Binary.of_bytes Script.expr_encoding bytes with
+    | None ->
+        Lwt.return
+          ( Gas.consume ctxt (Interp_costs.unpack_failed bytes)
+          >|? fun ctxt -> (None, ctxt) )
+    | Some expr -> (
+        Gas.consume ctxt (Script.deserialized_cost expr)
+        >>?= fun ctxt ->
+        parse_data ctxt ~legacy:false ty (Micheline.root expr)
+        >|= function
+        | Ok (value, ctxt) ->
+            ok (Some value, ctxt)
+        | Error _ignored ->
+            Gas.consume ctxt (Interp_costs.unpack_failed bytes)
+            >|? fun ctxt -> (None, ctxt) )
+  else return (None, ctxt)
+
 let rec step_bounded :
     type b a.
     logger ->
@@ -1019,29 +1044,9 @@ let rec step_bounded :
   | (Pack t, (value, rest)) ->
       Script_ir_translator.pack_data ctxt t value
       >>=? fun (bytes, ctxt) -> logged_return ((bytes, rest), ctxt)
-  | (Unpack t, (bytes, rest)) ->
-      Gas.check_enough ctxt (Script.serialized_cost bytes)
-      >>?= fun () ->
-      if
-        Compare.Int.(Bytes.length bytes >= 1)
-        && Compare.Int.(TzEndian.get_uint8 bytes 0 = 0x05)
-      then
-        let bytes = Bytes.sub bytes 1 (Bytes.length bytes - 1) in
-        match Data_encoding.Binary.of_bytes Script.expr_encoding bytes with
-        | None ->
-            Gas.consume ctxt (Interp_costs.unpack_failed bytes)
-            >>?= fun ctxt -> logged_return ((None, rest), ctxt)
-        | Some expr -> (
-            Gas.consume ctxt (Script.deserialized_cost expr)
-            >>?= fun ctxt ->
-            parse_data ctxt ~legacy:false t (Micheline.root expr)
-            >>= function
-            | Ok (value, ctxt) ->
-                logged_return ((Some value, rest), ctxt)
-            | Error _ignored ->
-                Gas.consume ctxt (Interp_costs.unpack_failed bytes)
-                >>?= fun ctxt -> logged_return ((None, rest), ctxt) )
-      else logged_return ((None, rest), ctxt)
+  | (Unpack ty, (bytes, rest)) ->
+      unpack ctxt ~ty ~bytes
+      >>=? fun (opt, ctxt) -> logged_return ((opt, rest), ctxt)
   (* protocol *)
   | (Address, ((_, address), rest)) ->
       logged_return ((address, rest), ctxt)
