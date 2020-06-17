@@ -62,6 +62,11 @@ let invalid_block_encoding =
 let sync_state_encoding =
   string_enum [("sync", `Sync); ("unsync", `Unsync); ("stuck", `Stuck)]
 
+let bootstrap_encoding =
+  obj2
+    (req "bootstrapped" Encoding.bool)
+    (req "sync_state" sync_state_encoding)
+
 module S = struct
   let path : prefix RPC_path.context = RPC_path.open_root
 
@@ -79,18 +84,11 @@ module S = struct
       ~output:checkpoint_encoding
       RPC_path.(path / "checkpoint")
 
-  let sync_state =
-    RPC_service.get_service
-      ~description:"The synchronization state of a chain"
-      ~query:RPC_query.empty
-      ~output:sync_state_encoding
-      RPC_path.(path / "sync_state")
-
   let is_bootstrapped =
     RPC_service.get_service
       ~description:"The bootstrap status of a chain"
       ~query:RPC_query.empty
-      ~output:Encoding.bool
+      ~output:bootstrap_encoding
       RPC_path.(path / "is_bootstrapped")
 
   module Blocks = struct

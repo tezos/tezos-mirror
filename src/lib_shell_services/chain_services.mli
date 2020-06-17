@@ -100,17 +100,14 @@ module S : sig
       Block_header.t * int32 * int32 * History_mode.t )
     RPC_service.t
 
-  val sync_state :
+  val is_bootstrapped :
     ( [`GET],
       prefix,
       prefix,
       unit,
       unit,
-      [`Sync | `Stuck | `Unsync] )
+      bool * [`Sync | `Stuck | `Unsync] )
     RPC_service.t
-
-  val is_bootstrapped :
-    ([`GET], prefix, prefix, unit, unit, bool) RPC_service.t
 
   module Blocks : sig
     val path : (prefix, prefix) RPC_path.t

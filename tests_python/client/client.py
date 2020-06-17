@@ -595,11 +595,13 @@ class Client:
         return self.run(['bootstrapped'])
 
     def sync_state(self) -> str:
-        return self.rpc('get', 'chains/main/sync_state')
+        res = self.rpc('get', 'chains/main/is_bootstrapped')
+        return res['sync_state']
 
     def is_bootstrapped(self, chain: str = 'main') -> bool:
         assert chain in {'main', 'test'}
-        return self.rpc('get', f'chains/{chain}/is_bootstrapped')
+        res = self.rpc('get', f'chains/{chain}/is_bootstrapped')
+        return res['bootstrapped']
 
     def cleanup(self) -> None:
         """Remove base dir, only if not provided by user."""
