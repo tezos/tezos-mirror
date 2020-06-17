@@ -292,7 +292,15 @@ module Scripts = struct
       let module Logger = Trace_logger () in
       let open Script_interpreter in
       let logger = (module Logger : STEP_LOGGER) in
-      execute ~logger ctxt mode step_constants ~script ~entrypoint ~parameter
+      execute
+        ~logger
+        ctxt
+        mode
+        step_constants
+        ~script
+        ~entrypoint
+        ~parameter
+        ~internal:true
       >>=? fun {ctxt; storage; lazy_storage_diff; operations} ->
       Logger.get_log ()
       >|=? fun trace ->
@@ -319,9 +327,14 @@ module Scripts = struct
           ( Script_ir_translator.serialize_ty_for_error ctxt exp_ty
           >|? fun (exp_ty, _ctxt) ->
           Script_tc_errors.Ill_typed_data (None, data, exp_ty) ))
-      (Script_ir_translator.parse_data
+      (let allow_forged =
+         true
+         (* Safe since we ignore the value afterwards. *)
+       in
+       Script_ir_translator.parse_data
          ctxt
          ~legacy
+         ~allow_forged
          exp_ty
          (Micheline.root data))
     >|=? fun (_, ctxt) -> ctxt
@@ -389,6 +402,7 @@ module Scripts = struct
           ~script:{storage; code}
           ~entrypoint
           ~parameter
+          ~internal:true
         >|=? fun {Script_interpreter.storage; operations; lazy_storage_diff; _} ->
         (storage, operations, lazy_storage_diff)) ;
     register0
@@ -478,7 +492,12 @@ module Scripts = struct
         in
         parse_packable_ty ctxt ~legacy:true (Micheline.root typ)
         >>?= fun (Ex_ty typ, ctxt) ->
-        parse_data ctxt ~legacy:true typ (Micheline.root expr)
+        parse_data
+          ctxt
+          ~legacy:true
+          ~allow_forged:true
+          typ
+          (Micheline.root expr)
         >>=? fun (data, ctxt) ->
         Script_ir_translator.pack_data ctxt typ data
         >|=? fun (bytes, ctxt) -> (bytes, Gas.level ctxt)) ;

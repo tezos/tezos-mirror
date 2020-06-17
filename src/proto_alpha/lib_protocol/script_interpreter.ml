@@ -549,7 +549,12 @@ let unpack ctxt ~ty ~bytes =
     | Some expr -> (
         Gas.consume ctxt (Script.deserialized_cost expr)
         >>?= fun ctxt ->
-        parse_data ctxt ~legacy:false ty (Micheline.root expr)
+        parse_data
+          ctxt
+          ~legacy:false
+          ~allow_forged:false
+          ty
+          (Micheline.root expr)
         >|= function
         | Ok (value, ctxt) ->
             ok (Some value, ctxt)
@@ -1396,14 +1401,15 @@ let interp :
   >|=? fun ((ret, ()), ctxt) -> (ret, ctxt)
 
 (* ---- contract handling ---------------------------------------------------*)
-let execute logger ctxt mode step_constants ~entrypoint unparsed_script arg :
+let execute logger ctxt mode step_constants ~entrypoint ~internal
+    unparsed_script arg :
     ( Script.expr
     * packed_internal_operation list
     * context
     * Lazy_storage.diffs option )
     tzresult
     Lwt.t =
-  parse_script ctxt unparsed_script ~legacy:true
+  parse_script ctxt unparsed_script ~legacy:true ~allow_forged_in_storage:true
   >>=? fun (Ex_script {code; arg_type; storage; storage_type; root_name}, ctxt) ->
   record_trace
     (Bad_contract_parameter step_constants.self)
@@ -1411,7 +1417,7 @@ let execute logger ctxt mode step_constants ~entrypoint unparsed_script arg :
   >>?= fun (box, _) ->
   trace
     (Bad_contract_parameter step_constants.self)
-    (parse_data ctxt ~legacy:false arg_type (box arg))
+    (parse_data ctxt ~legacy:false ~allow_forged:internal arg_type (box arg))
   >>=? fun (arg, ctxt) ->
   Script.force_decode_in_context ctxt unparsed_script.code
   >>?= fun (script_code, ctxt) ->
@@ -1461,13 +1467,14 @@ type execution_result = {
 }
 
 let execute ?(logger = (module No_trace : STEP_LOGGER)) ctxt mode
-    step_constants ~script ~entrypoint ~parameter =
+    step_constants ~script ~entrypoint ~parameter ~internal =
   execute
     logger
     ctxt
     mode
     step_constants
     ~entrypoint
+    ~internal
     script
     (Micheline.root parameter)
   >|=? fun (storage, operations, ctxt, lazy_storage_diff) ->

@@ -2770,16 +2770,30 @@ let comb_witness1 : type t. t ty -> (t, unit -> unit) comb_witness = function
   | _ ->
       Comb_Any
 
+(*
+  Some values, such as operations or big map ids, are used only
+  internally and are not allowed to be forged by users.
+  In [parse_data], [allow_forged] should be [false] for:
+  - PUSH
+  - UNPACK
+  - user-provided script parameters
+  - storage on origination
+  And [true] for:
+  - internal calls parameters
+  - storage after origination
+*)
+
 let rec parse_data :
     type a.
     ?type_logger:type_logger ->
     stack_depth:int ->
     context ->
     legacy:bool ->
+    allow_forged:bool ->
     a ty ->
     Script.node ->
     (a * context) tzresult Lwt.t =
- fun ?type_logger ~stack_depth ctxt ~legacy ty script_data ->
+ fun ?type_logger ~stack_depth ctxt ~legacy ~allow_forged ty script_data ->
   Gas.consume ctxt Typecheck_costs.parse_data_cycle
   >>?= fun ctxt ->
   let non_terminal_recursion ?type_logger ctxt ~legacy ty script_data =
@@ -2791,6 +2805,7 @@ let rec parse_data :
         ~stack_depth:(stack_depth + 1)
         ctxt
         ~legacy
+        ~allow_forged
         ty
         script_data
   in
@@ -3368,7 +3383,14 @@ and parse_instr :
       >>?= fun annot ->
       parse_packable_ty ctxt ~legacy t
       >>?= fun (Ex_ty t, ctxt) ->
-      parse_data ?type_logger ~stack_depth:(stack_depth + 1) ctxt ~legacy t d
+      parse_data
+        ?type_logger
+        ~stack_depth:(stack_depth + 1)
+        ctxt
+        ~legacy
+        ~allow_forged:false
+        t
+        d
       >>=? fun (v, ctxt) -> typed ctxt loc (Const v) (Item_t (t, stack, annot))
   | (Prim (loc, I_UNIT, [], annot), stack) ->
       parse_var_type_annot loc annot
@@ -5762,10 +5784,11 @@ let parse_storage :
     ?type_logger:type_logger ->
     context ->
     legacy:bool ->
+    allow_forged:bool ->
     'storage ty ->
     storage:lazy_expr ->
     ('storage * context) tzresult Lwt.t =
- fun ?type_logger ctxt ~legacy storage_type ~storage ->
+ fun ?type_logger ctxt ~legacy ~allow_forged storage_type ~storage ->
   Script.force_decode_in_context ctxt storage
   >>?= fun (storage, ctxt) ->
   trace_eval
@@ -5779,6 +5802,7 @@ let parse_storage :
        ~stack_depth:0
        ctxt
        ~legacy
+       ~allow_forged
        storage_type
        (root storage))
 
@@ -5786,12 +5810,19 @@ let parse_script :
     ?type_logger:type_logger ->
     context ->
     legacy:bool ->
+    allow_forged_in_storage:bool ->
     Script.t ->
     (ex_script * context) tzresult Lwt.t =
- fun ?type_logger ctxt ~legacy {code; storage} ->
+ fun ?type_logger ctxt ~legacy ~allow_forged_in_storage {code; storage} ->
   parse_code ~legacy ctxt ?type_logger ~code
   >>=? fun (Ex_code {code; arg_type; storage_type; root_name}, ctxt) ->
-  parse_storage ?type_logger ctxt ~legacy storage_type ~storage
+  parse_storage
+    ?type_logger
+    ctxt
+    ~legacy
+    ~allow_forged:allow_forged_in_storage
+    storage_type
+    ~storage
   >|=? fun (storage, ctxt) ->
   (Ex_script {code; arg_type; storage; storage_type; root_name}, ctxt)
 
@@ -6370,7 +6401,20 @@ and unparse_code ctxt ~stack_depth mode code =
   | Prim (loc, I_PUSH, [ty; data], annot) ->
       parse_packable_ty ctxt ~legacy ty
       >>?= fun (Ex_ty t, ctxt) ->
-      parse_data ctxt ~stack_depth:(stack_depth + 1) ~legacy t data
+      let allow_forged =
+        false
+        (* Forgeable in PUSH data are already forbidden at parsing,
+         the only case for which this matters is storing a lambda resulting
+         from APPLYing a non-forgeable but this cannot happen either as long
+         as all packable values are also forgeable. *)
+      in
+      parse_data
+        ctxt
+        ~stack_depth:(stack_depth + 1)
+        ~legacy
+        ~allow_forged
+        t
+        data
       >>=? fun (data, ctxt) ->
       unparse_data ctxt ~stack_depth:(stack_depth + 1) mode t data
       >>=? fun (data, ctxt) ->
@@ -6505,6 +6549,7 @@ let big_map_get ctxt key {id; diff; key_type; value_type} =
             ~stack_depth:0
             ctxt
             ~legacy:true
+            ~allow_forged:true
             value_type
             (Micheline.root value)
           >|=? fun (x, ctxt) -> (Some x, ctxt) )
