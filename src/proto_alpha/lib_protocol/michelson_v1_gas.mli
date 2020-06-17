@@ -291,6 +291,12 @@ module Cost_of : sig
 
     val split_ticket :
       'a Script_int.num -> 'a Script_int.num -> 'a Script_int.num -> Gas.cost
+
+    val join_tickets :
+      'a Script_typed_ir.comparable_ty ->
+      'a Script_typed_ir.ticket ->
+      'a Script_typed_ir.ticket ->
+      Gas.cost
   end
 
   module Typechecking : sig

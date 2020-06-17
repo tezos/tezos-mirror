@@ -538,6 +538,8 @@ let cost_of_instr : type b a. (b, a) descr -> b -> Gas.cost =
       Interp_costs.read_ticket
   | (Split_ticket, (ticket, ((amount_a, amount_b), _))) ->
       Interp_costs.split_ticket ticket.amount amount_a amount_b
+  | (Join_tickets ty, ((ticket_a, ticket_b), _)) ->
+      Interp_costs.join_tickets ty ticket_a ticket_b
 
 let unpack ctxt ~ty ~bytes =
   Gas.check_enough ctxt (Script.serialized_cost bytes)
@@ -1394,6 +1396,26 @@ let rec step_bounded :
         then
           Some
             ({ticket with amount = amount_a}, {ticket with amount = amount_b})
+        else None
+      in
+      logged_return ((result, rest), ctxt)
+  | (Join_tickets contents_ty, ((ticket_a, ticket_b), rest)) ->
+      let result =
+        if
+          Compare.Int.(
+            compare_address ticket_a.ticketer ticket_b.ticketer = 0
+            && compare_comparable
+                 contents_ty
+                 ticket_a.contents
+                 ticket_b.contents
+               = 0)
+        then
+          Some
+            {
+              ticketer = ticket_a.ticketer;
+              contents = ticket_a.contents;
+              amount = Script_int.add_n ticket_a.amount ticket_b.amount;
+            }
         else None
       in
       logged_return ((result, rest), ctxt)
