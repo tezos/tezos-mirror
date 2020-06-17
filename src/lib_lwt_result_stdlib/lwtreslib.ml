@@ -27,3 +27,4 @@ module Seq = Lib.Seq
 module Set = Lib.Set
 module Map = Lib.Map
 module Hashtbl = Lib.Hashtbl
+module List = Lib.List
