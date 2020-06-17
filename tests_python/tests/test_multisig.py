@@ -35,10 +35,8 @@ class TestMultisig:
         to_sign = client.msig_prepare_transfer('msig', 10,
                                                'bootstrap2',
                                                ['--bytes-only'])
-        sign = client.sign_bytes(to_sign, session['keys'][1])
-        session['sig1'] = sign.signature
-        sign = client.sign_bytes(to_sign, session['keys'][2])
-        session['sig2'] = sign.signature
+        session['sig1'] = client.sign_bytes(to_sign, session['keys'][1])
+        session['sig2'] = client.sign_bytes(to_sign, session['keys'][2])
 
     def test_transfer_failure(self, client: Client, session: dict):
         error_pattern = (r"Not enough signatures: " +
@@ -60,8 +58,7 @@ class TestMultisig:
                                              session['keys'][0])
         to_sign = client.msig_prepare_set_delegate('msig', 'bootstrap5',
                                                    ['--bytes-only'])
-        sign = client.sign_bytes(to_sign, session['keys'][2])
-        sig2 = sign.signature
+        sig2 = client.sign_bytes(to_sign, session['keys'][2])
         client.msig_set_delegate('msig', 'bootstrap5', 'bootstrap1',
                                  [sig0, sig2])
         client.bake('bootstrap1', BAKE_ARGS)
@@ -72,8 +69,7 @@ class TestMultisig:
         to_sign = client.msig_prepare_withdrawing_delegate('msig',
                                                            ['--bytes-only'])
 
-        sign = client.sign_bytes(to_sign, session['keys'][1])
-        sig1 = sign.signature
+        sig1 = client.sign_bytes(to_sign, session['keys'][1])
         client.msig_withdrawing_delegate('msig', 'bootstrap1',
                                          [sig0, sig1])
         client.bake('bootstrap1', BAKE_ARGS)
@@ -85,8 +81,7 @@ class TestMultisig:
         to_sign = client.msig_prepare_setting_threshold('msig', 2,
                                                         [keys[0], keys[2]],
                                                         ['--bytes-only'])
-        sign = client.sign_bytes(to_sign, session['keys'][2])
-        sig2 = sign.signature
+        sig2 = client.sign_bytes(to_sign, session['keys'][2])
         client.msig_run_transaction('msig', to_sign,
                                     'bootstrap1',
                                     [sig0, sig2])
@@ -127,10 +122,10 @@ class TestMultisigFromAddress:
         to_sign = client.msig_prepare_transfer(msig, 10,
                                                'bootstrap2',
                                                ['--bytes-only'])
-        sign = client.sign_bytes(to_sign, session['keys'][1])
-        session['sig1'] = sign.signature
-        sign = client.sign_bytes(to_sign, session['keys'][2])
-        session['sig2'] = sign.signature
+        sig1 = client.sign_bytes(to_sign, session['keys'][1])
+        session['sig1'] = sig1
+        sig2 = client.sign_bytes(to_sign, session['keys'][2])
+        session['sig2'] = sig2
 
     def test_transfer_failure(self, client: Client, session: dict):
         msig = session['msig']
@@ -159,8 +154,7 @@ class TestMultisigFromAddress:
                                              session['keys'][0])
         to_sign = client.msig_prepare_set_delegate(msig, 'bootstrap5',
                                                    ['--bytes-only'])
-        sign = client.sign_bytes(to_sign, session['keys'][2])
-        sig2 = sign.signature
+        sig2 = client.sign_bytes(to_sign, session['keys'][2])
         client.msig_set_delegate(msig, 'bootstrap5', 'bootstrap1',
                                  [sig0, sig2])
         client.bake('bootstrap1', BAKE_ARGS)
@@ -172,8 +166,7 @@ class TestMultisigFromAddress:
         to_sign = client.msig_prepare_withdrawing_delegate(msig,
                                                            ['--bytes-only'])
 
-        sign = client.sign_bytes(to_sign, session['keys'][1])
-        sig1 = sign.signature
+        sig1 = client.sign_bytes(to_sign, session['keys'][1])
         client.msig_withdrawing_delegate(msig, 'bootstrap1',
                                          [sig0, sig1])
         client.bake('bootstrap1', BAKE_ARGS)
@@ -186,8 +179,7 @@ class TestMultisigFromAddress:
         to_sign = client.msig_prepare_setting_threshold(msig, 2,
                                                         [keys[0], keys[2]],
                                                         ['--bytes-only'])
-        sign = client.sign_bytes(to_sign, session['keys'][2])
-        sig2 = sign.signature
+        sig2 = client.sign_bytes(to_sign, session['keys'][2])
         client.msig_run_transaction(msig, to_sign,
                                     'bootstrap1',
                                     [sig0, sig2])

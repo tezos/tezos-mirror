@@ -482,7 +482,7 @@ class TestChainId:
             f'(Pair {operation} 0)',
             'pair (pair chain_id address)' +
             '(pair (lambda unit (list operation)) nat)')
-        signature = client.sign(packed, "bootstrap1")
+        signature = client.sign_bytes_of_string(packed, "bootstrap1")
         client.call('bootstrap2', 'authentication',
                     ['--arg', f'Pair {operation} \"{signature}\"'])
         client.bake('bootstrap5', BAKE_ARGS)
@@ -886,8 +886,8 @@ class TestComparables:
     def test_comparable_signature(self, client):
         client.typecheck_data('{}', '(set signature)')
         packed = client.pack('Unit', 'unit')
-        sig1 = client.sign(packed, "bootstrap1")
-        sig2 = client.sign(packed, "bootstrap2")
+        sig1 = client.sign_bytes_of_string(packed, "bootstrap1")
+        sig2 = client.sign_bytes_of_string(packed, "bootstrap2")
         utils.assert_typecheck_data_failure(client, '{"' + f'{sig1}' + '"; "' +
                                             f'{sig2}' + '"}',
                                             '(set signature)')
