@@ -11,9 +11,9 @@ variables:
 stages:
   - test_coverage
   - publish_coverage
-  - doc
   - build
   - test
+  - doc
   - packaging
   - publish
 
@@ -518,6 +518,7 @@ integration:examples_test_example:
 
 documentation:build:
   <<: *test_definition
+  stage: doc
   except:
     - master
     - zeronet
@@ -536,17 +537,22 @@ documentation:build:
     expire_in: 1 week
 
 documentation:linkcheck:
-  <<: *test_definition
-  except:
-    - master
-    - zeronet
-    - mainnet
-    - zeronet-staging
-    - mainnet-staging
-    - zeronet-snapshots
-    - mainnet-snapshots
-    - /-release$/
-    - tags
+  image: ${build_deps_image_name}:${build_deps_image_version}
+  stage: doc
+  before_script:
+    - . ./scripts/version.sh
+  dependencies:
+    - build
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master"'
+      when: on_success
+    - if: '$CI_COMMIT_BRANCH =~ /doc/'
+      when: on_success
+    - if: '$CI_COMMIT_BRANCH =~ /-release$/'
+      when: on_success
+    - changes:
+      - /docs
+      when: on_success
   script:
     - make doc-html-and-linkcheck
   allow_failure: true
