@@ -473,6 +473,7 @@ and ('bef, 'aft) instr =
   | Dup_n :
       int * ('before, 'after) dup_n_gadt_witness
       -> ('before, 'after * 'before) instr
+  | Ticket : ('a * (n num * 'rest), 'a ticket * 'rest) instr
 
 and ('before, 'after) comb_gadt_witness =
   | Comb_one : ('a * 'before, 'a * 'before) comb_gadt_witness

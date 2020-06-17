@@ -1200,6 +1200,9 @@ module Cost_of = struct
       +@ len
          *@ ( Z.of_int (Z.numbits len)
             *@ (alloc_cost (Z.of_int 3) +@ step_cost Z.one) )
+
+    (* TODO benchmark *)
+    let ticket = atomic_step_cost (Z.of_int 200)
   end
 
   module Typechecking = struct
