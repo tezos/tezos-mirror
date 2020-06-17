@@ -40,16 +40,16 @@ module Scripts : sig
   val run_code :
     'a #RPC_context.simple ->
     'a ->
-    Script.expr ->
-    Script.expr
-    * Script.expr
-    * Tez.t
-    * Tez.t
-    * Chain_id.t
-    * Contract.t option
-    * Contract.t option
-    * Z.t option
-    * string ->
+    ?gas:Z.t ->
+    ?entrypoint:string ->
+    script:Script.expr ->
+    storage:Script.expr ->
+    input:Script.expr ->
+    amount:Tez.t ->
+    balance:Tez.t ->
+    chain_id:Chain_id.t ->
+    source:Contract.t option ->
+    payer:Contract.t option ->
     ( Script.expr
     * packed_internal_operation list
     * Contract.big_map_diff option )
@@ -59,16 +59,16 @@ module Scripts : sig
   val trace_code :
     'a #RPC_context.simple ->
     'a ->
-    Script.expr ->
-    Script.expr
-    * Script.expr
-    * Tez.t
-    * Tez.t
-    * Chain_id.t
-    * Contract.t option
-    * Contract.t option
-    * Z.t option
-    * string ->
+    ?gas:Z.t ->
+    ?entrypoint:string ->
+    script:Script.expr ->
+    storage:Script.expr ->
+    input:Script.expr ->
+    amount:Tez.t ->
+    balance:Tez.t ->
+    chain_id:Chain_id.t ->
+    source:Contract.t option ->
+    payer:Contract.t option ->
     ( Script.expr
     * packed_internal_operation list
     * Script_interpreter.execution_trace
@@ -79,25 +79,33 @@ module Scripts : sig
   val typecheck_code :
     'a #RPC_context.simple ->
     'a ->
-    Script.expr * Z.t option * bool option ->
+    ?gas:Z.t ->
+    ?legacy:bool ->
+    script:Script.expr ->
     (Script_tc_errors.type_map * Gas.t) shell_tzresult Lwt.t
 
   val typecheck_data :
     'a #RPC_context.simple ->
     'a ->
-    Script.expr * Script.expr * Z.t option * bool option ->
+    ?gas:Z.t ->
+    ?legacy:bool ->
+    data:Script.expr ->
+    ty:Script.expr ->
     Gas.t shell_tzresult Lwt.t
 
   val pack_data :
     'a #RPC_context.simple ->
     'a ->
-    Script.expr * Script.expr * Z.t option ->
+    ?gas:Z.t ->
+    data:Script.expr ->
+    ty:Script.expr ->
     (bytes * Gas.t) shell_tzresult Lwt.t
 
   val run_operation :
     'a #RPC_context.simple ->
     'a ->
-    packed_operation * Chain_id.t ->
+    op:packed_operation ->
+    chain_id:Chain_id.t ->
     (packed_protocol_data * Apply_results.packed_operation_metadata)
     shell_tzresult
     Lwt.t
@@ -105,13 +113,14 @@ module Scripts : sig
   val entrypoint_type :
     'a #RPC_context.simple ->
     'a ->
-    Script.expr * string ->
+    script:Script.expr ->
+    entrypoint:string ->
     Script.expr shell_tzresult Lwt.t
 
   val list_entrypoints :
     'a #RPC_context.simple ->
     'a ->
-    Script.expr ->
+    script:Script.expr ->
     (Michelson_v1_primitives.prim list list * (string * Script.expr) list)
     shell_tzresult
     Lwt.t

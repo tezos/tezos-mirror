@@ -515,22 +515,14 @@ module Scripts = struct
               map
               [] ))
 
-  let run_code ctxt block code
-      ( storage,
-        input,
-        amount,
-        balance,
-        chain_id,
-        source,
-        payer,
-        gas,
-        entrypoint ) =
+  let run_code ctxt block ?gas ?(entrypoint = "default") ~script ~storage
+      ~input ~amount ~balance ~chain_id ~source ~payer =
     RPC_context.make_call0
       S.run_code
       ctxt
       block
       ()
-      ( code,
+      ( script,
         storage,
         input,
         amount,
@@ -541,22 +533,14 @@ module Scripts = struct
         gas,
         entrypoint )
 
-  let trace_code ctxt block code
-      ( storage,
-        input,
-        amount,
-        balance,
-        chain_id,
-        source,
-        payer,
-        gas,
-        entrypoint ) =
+  let trace_code ctxt block ?gas ?(entrypoint = "default") ~script ~storage
+      ~input ~amount ~balance ~chain_id ~source ~payer =
     RPC_context.make_call0
       S.trace_code
       ctxt
       block
       ()
-      ( code,
+      ( script,
         storage,
         input,
         amount,
@@ -567,22 +551,28 @@ module Scripts = struct
         gas,
         entrypoint )
 
-  let typecheck_code ctxt block =
-    RPC_context.make_call0 S.typecheck_code ctxt block ()
+  let typecheck_code ctxt block ?gas ?legacy ~script =
+    RPC_context.make_call0 S.typecheck_code ctxt block () (script, gas, legacy)
 
-  let typecheck_data ctxt block =
-    RPC_context.make_call0 S.typecheck_data ctxt block ()
+  let typecheck_data ctxt block ?gas ?legacy ~data ~ty =
+    RPC_context.make_call0
+      S.typecheck_data
+      ctxt
+      block
+      ()
+      (data, ty, gas, legacy)
 
-  let pack_data ctxt block = RPC_context.make_call0 S.pack_data ctxt block ()
+  let pack_data ctxt block ?gas ~data ~ty =
+    RPC_context.make_call0 S.pack_data ctxt block () (data, ty, gas)
 
-  let run_operation ctxt block =
-    RPC_context.make_call0 S.run_operation ctxt block ()
+  let run_operation ctxt block ~op ~chain_id =
+    RPC_context.make_call0 S.run_operation ctxt block () (op, chain_id)
 
-  let entrypoint_type ctxt block =
-    RPC_context.make_call0 S.entrypoint_type ctxt block ()
+  let entrypoint_type ctxt block ~script ~entrypoint =
+    RPC_context.make_call0 S.entrypoint_type ctxt block () (script, entrypoint)
 
-  let list_entrypoints ctxt block =
-    RPC_context.make_call0 S.list_entrypoints ctxt block ()
+  let list_entrypoints ctxt block ~script =
+    RPC_context.make_call0 S.list_entrypoints ctxt block () script
 end
 
 module Forge = struct
