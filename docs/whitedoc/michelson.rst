@@ -2223,6 +2223,16 @@ Type ``'a`` must be comparable (the ``COMPARE`` primitive must be defined over i
    :: ticket 'a : (pair nat nat) : 'S ->
    option (pair (ticket 'a) (ticket 'a)) : 'S
 
+- ``JOIN_TICKETS``: The inverse of ``SPLIT_TICKET``. Delete the given tickets and create a ticket with an amount equal to the
+  sum of the amounts of the input tickets.
+  (This can be used to consolidate UTXOs.)
+  Return None iff the input tickets have a different ticketer or content.
+
+::
+
+   :: (pair (ticket 'a) (ticket 'a)) : 'S ->
+   option (ticket 'a) : 'S
+
 
 Removed instructions
 ~~~~~~~~~~~~~~~~~~~~
@@ -3533,6 +3543,7 @@ Full grammar
       | TICKET
       | READ_TICKET
       | SPLIT_TICKET
+      | JOIN_TICKETS
     <type> ::=
       | <comparable type>
       | option <type>
