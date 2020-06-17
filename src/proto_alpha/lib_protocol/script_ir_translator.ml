@@ -160,6 +160,8 @@ let rec type_size : type t. t ty -> int =
       1 + type_size t
   | List_t (t, _) ->
       1 + type_size t
+  | Ticket_t (t, _) ->
+      1 + comparable_type_size t
   | Set_t (k, _) ->
       1 + comparable_type_size k
   | Map_t (k, v, _) ->
@@ -862,6 +864,8 @@ let rec comparable_ty_of_ty_no_gas : type a. a ty -> a comparable_ty option =
       None
   | List_t _ ->
       None
+  | Ticket_t _ ->
+      None
   | Set_t _ ->
       None
   | Map_t _ ->
@@ -1035,6 +1039,9 @@ let rec unparse_ty :
   | List_t (ut, tname) ->
       unparse_ty ctxt ut
       >>? fun (t, ctxt) -> return ctxt (T_list, [t], unparse_type_annot tname)
+  | Ticket_t (ut, tname) ->
+      let t = unparse_comparable_ty ut in
+      return ctxt (T_ticket, [t], unparse_type_annot tname)
   | Set_t (ut, tname) ->
       let t = unparse_comparable_ty ut in
       return ctxt (T_set, [t], unparse_type_annot tname)
@@ -1138,6 +1145,8 @@ let name_of_ty : type a. a ty -> type_annot option = function
   | Option_t (_, tname) ->
       tname
   | List_t (_, tname) ->
+      tname
+  | Ticket_t (_, tname) ->
       tname
   | Set_t (_, tname) ->
       tname
@@ -1383,6 +1392,12 @@ let merge_types :
         merge_comparable_types ~legacy ctxt ea eb
         >|? fun (Eq, e, ctxt) ->
         ((Eq : (ta ty, tb ty) eq), Set_t (e, tname), ctxt)
+    | (Ticket_t (ea, tn1), Ticket_t (eb, tn2)) ->
+        merge_type_annot tn1 tn2
+        >>? fun tname ->
+        merge_comparable_types ~legacy ctxt ea eb
+        >|? fun (Eq, e, ctxt) ->
+        ((Eq : (ta ty, tb ty) eq), Ticket_t (e, tname), ctxt)
     | ( Pair_t ((tal, l_field1, l_var1), (tar, r_field1, r_var1), tn1),
         Pair_t ((tbl, l_field2, l_var2), (tbr, r_field2, r_var2), tn2) ) ->
         merge_type_annot tn1 tn2
@@ -1913,6 +1928,11 @@ and parse_ty :
       >>? fun (Ex_ty t, ctxt) ->
       parse_type_annot loc annot
       >>? fun ty_name -> ok (Ex_ty (List_t (t, ty_name)), ctxt)
+  | Prim (loc, T_ticket, [ut], annot) ->
+      parse_comparable_ty ctxt ut
+      >>? fun (Ex_comparable_ty t, ctxt) ->
+      parse_type_annot loc annot
+      >>? fun ty_name -> ok (Ex_ty (Ticket_t (t, ty_name)), ctxt)
   | Prim (loc, T_set, [ut], annot) ->
       parse_comparable_ty ctxt ut
       >>? fun (Ex_comparable_ty t, ctxt) ->
@@ -1973,7 +1993,9 @@ and parse_ty :
         l,
         _ ) ->
       error (Invalid_arity (loc, prim, 0, List.length l))
-  | Prim (loc, ((T_set | T_list | T_option | T_contract) as prim), l, _) ->
+  | Prim
+      (loc, ((T_set | T_list | T_option | T_contract | T_ticket) as prim), l, _)
+    ->
       error (Invalid_arity (loc, prim, 1, List.length l))
   | Prim (loc, ((T_pair | T_or | T_map | T_lambda) as prim), l, _) ->
       error (Invalid_arity (loc, prim, 2, List.length l))
@@ -2007,7 +2029,8 @@ and parse_ty :
              T_never;
              T_bls12_381_g1;
              T_bls12_381_g2;
-             T_bls12_381_fr ]
+             T_bls12_381_fr;
+             T_ticket ]
 
 and parse_big_map_ty ctxt ~legacy big_map_loc args map_annot =
   Gas.consume ctxt Typecheck_costs.parse_type_cycle
@@ -2101,6 +2124,8 @@ let check_packable ~legacy loc root =
     | Never_t _ ->
         ok_unit
     | Set_t (_, _) ->
+        ok_unit
+    | Ticket_t _ ->
         ok_unit
     | Lambda_t (_, _, _) ->
         ok_unit
@@ -2358,6 +2383,19 @@ let parse_uint ~nb_bits =
 let parse_uint10 = parse_uint ~nb_bits:10
 
 let parse_uint11 = parse_uint ~nb_bits:11
+
+(* This type is used to:
+   - serialize and deserialize tickets when they are stored or transferred,
+   - type the READ_TICKET instruction. *)
+let opened_ticket_type t =
+  let ty =
+    ty_of_comparable_ty t
+    (* TODO: avoid this conversion every time *)
+  in
+  Pair_t
+    ( (Address_t None, None, None),
+      (Pair_t ((ty, None, None), (Nat_t None, None, None), None), None, None),
+      None )
 
 (* -- parse data of primitive types -- *)
 
@@ -2771,7 +2809,7 @@ let comb_witness1 : type t. t ty -> (t, unit -> unit) comb_witness = function
       Comb_Any
 
 (*
-  Some values, such as operations or big map ids, are used only
+  Some values, such as operations, tickets, or big map ids, are used only
   internally and are not allowed to be forged by users.
   In [parse_data], [allow_forged] should be [false] for:
   - PUSH
@@ -2957,6 +2995,18 @@ let rec parse_data :
            (list_empty, ctxt)
   | (List_t _, expr) ->
       traced_fail (Invalid_kind (location expr, [Seq_kind], kind expr))
+  (* Tickets *)
+  | (Ticket_t (t, _ty_name), expr) ->
+      if allow_forged then
+        non_terminal_recursion
+          ?type_logger
+          ctxt
+          ~legacy
+          (opened_ticket_type t)
+          expr
+        >|=? fun ((ticketer, (contents, amount)), ctxt) ->
+        ({ticketer; contents; amount}, ctxt)
+      else traced_fail (Unexpected_forged_value (location expr))
   (* Sets *)
   | (Set_t (t, _ty_name), (Seq (loc, vs) as expr)) ->
       traced
@@ -6296,6 +6346,12 @@ let rec unparse_data :
         ([], ctxt)
         items.elements
       >|=? fun (items, ctxt) -> (Micheline.Seq (-1, List.rev items), ctxt)
+  | (Ticket_t (t, _), {ticketer; contents; amount}) ->
+      non_terminal_recursion
+        ctxt
+        mode
+        (opened_ticket_type t)
+        (ticketer, (contents, amount))
   | (Set_t (t, _), set) ->
       fold_left_s
         (fun (l, ctxt) item ->
@@ -6736,6 +6792,8 @@ let rec has_lazy_storage : type t. t ty -> t has_lazy_storage =
   | Bls12_381_fr_t _ ->
       False_f
   | Sapling_transaction_t _ ->
+      False_f
+  | Ticket_t _ ->
       False_f
   | Pair_t ((l, _, _), (r, _, _), _) ->
       aux2 (fun l r -> Pair_f (l, r)) l r

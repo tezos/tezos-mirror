@@ -387,6 +387,7 @@ module Script : sig
     | T_bls12_381_g1
     | T_bls12_381_g2
     | T_bls12_381_fr
+    | T_ticket
 
   type location = Micheline.canonical_location
 

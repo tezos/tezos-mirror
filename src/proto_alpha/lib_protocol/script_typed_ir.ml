@@ -103,6 +103,8 @@ type ('key, 'value) map =
 
 type operation = packed_internal_operation * Lazy_storage.diffs option
 
+type 'a ticket = {ticketer : address; contents : 'a; amount : n num}
+
 type ('arg, 'storage) script = {
   code : (('arg, 'storage) pair, (operation boxed_list, 'storage) pair) lambda;
   arg_type : 'arg ty;
@@ -164,6 +166,7 @@ and 'ty ty =
   | Bls12_381_g1_t : type_annot option -> Bls12_381.G1.t ty
   | Bls12_381_g2_t : type_annot option -> Bls12_381.G2.t ty
   | Bls12_381_fr_t : type_annot option -> Bls12_381.Fr.t ty
+  | Ticket_t : 'a comparable_ty * type_annot option -> 'a ticket ty
 
 and 'ty stack_ty =
   | Item_t :
