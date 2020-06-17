@@ -214,7 +214,7 @@ Raw Sha512 hash: ?(\w*)'''
         self.sha512 = match.groups()[4]
 
 
-class SignByteResult:
+class SignBytesResult:
     """Result of a 'sign bytes ...' command."""
 
     def __init__(self, client_output: str):
@@ -225,6 +225,17 @@ class SignByteResult:
             raise InvalidClientOutput(client_output)
         self.signature = match.groups()[0]
 
+
+class SignMessageResult:
+    """Result of a 'sign message ...' command."""
+
+    def __init__(self, client_output: str):
+
+        pattern = r'Signature: ?(\w*)\n'
+        match = re.search(pattern, client_output)
+        if match is None:
+            raise InvalidClientOutput(client_output)
+        self.signature = match.groups()[0]
 
 
 class SetDelegateResult:
@@ -484,3 +495,15 @@ class CreateMockup:
                 if exit_code != expected_exit_code:
                     raise InvalidExitCode(exit_code)
                 return
+
+
+class CheckSignMessageResult:
+    """Result of a 'check that message...' command."""
+
+    def __init__(self, client_output: str):
+
+        pattern = r'Signature check successful *\n'
+        match = re.search(pattern, client_output)
+        if match is None:
+            raise InvalidClientOutput(client_output)
+        self.check = True

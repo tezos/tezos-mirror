@@ -445,6 +445,28 @@ class Client:
     def cmd_batch(self, source: str, json_ops: str) -> List[str]:
         return ['multiple', 'transfers', 'from', source, 'using', json_ops]
 
+    def sign_message(self, data: str, identity: str, block=None) -> str:
+        cmd = ['sign', 'message', data, 'for', identity]
+        if block is not None:
+            cmd += ["--block", block]
+        return client_output.SignMessageResult(self.run(cmd)).signature
+
+    def check_message(self, data: str, identity: str, signature: str) -> bool:
+        cmd = [
+            'check',
+            'that',
+            'message',
+            data,
+            'was',
+            'signed',
+            'by',
+            identity,
+            'to',
+            'produce',
+            signature,
+        ]
+        return client_output.CheckSignMessageResult(self.run(cmd)).check
+
     def transfer(
         self,
         amount: float,
@@ -889,7 +911,7 @@ class Client:
 
     def sign_bytes_of_string(self, data: str, identity: str) -> str:
         cmd = ['sign', 'bytes', data, 'for', identity]
-        return client_output.SignByteResult(self.run(cmd)).signature
+        return client_output.SignBytesResult(self.run(cmd)).signature
 
     def sign_bytes(self, to_sign: bytes, key: str) -> str:
         return self.sign_bytes_of_string(str(to_sign), key)
