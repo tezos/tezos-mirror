@@ -478,6 +478,10 @@ and ('bef, 'aft) instr =
       : ( 'a ticket * 'rest,
           (address * ('a * n num)) * ('a ticket * 'rest) )
         instr
+  | Split_ticket
+      : ( 'a ticket * ((n num * n num) * 'rest),
+          ('a ticket * 'a ticket) option * 'rest )
+        instr
 
 and ('before, 'after) comb_gadt_witness =
   | Comb_one : ('a * 'before, 'a * 'before) comb_gadt_witness

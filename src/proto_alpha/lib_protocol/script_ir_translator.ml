@@ -228,6 +228,8 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int =
   | Read_ticket ->
       (* `pair address (pair T nat)` is bigger than `ticket T` *)
       1
+  | Split_ticket ->
+      1
   (* Magic constructor *)
   | Unpack _ ->
       1
@@ -5329,6 +5331,20 @@ and parse_instr :
       let () = check_dupable_comparable_ty t in
       let result = opened_ticket_type t in
       typed ctxt loc Read_ticket (Item_t (result, full_stack, annot))
+  | ( Prim (loc, I_SPLIT_TICKET, [], annot),
+      Item_t
+        ( (Ticket_t (t, _) as ticket_t),
+          Item_t
+            (Pair_t ((Nat_t _, fa_a, a_a), (Nat_t _, fa_b, a_b), _), rest, _),
+          _ ) ) ->
+      parse_var_annot loc annot
+      >>?= fun annot ->
+      let () = check_dupable_comparable_ty t in
+      let result =
+        Option_t
+          (Pair_t ((ticket_t, fa_a, a_a), (ticket_t, fa_b, a_b), None), None)
+      in
+      typed ctxt loc Split_ticket (Item_t (result, rest, annot))
   (* Primitive parsing errors *)
   | ( Prim
         ( loc,
@@ -5396,7 +5412,8 @@ and parse_instr :
             | I_SHA3
             | I_PAIRING_CHECK
             | I_TICKET
-            | I_READ_TICKET ) as name ),
+            | I_READ_TICKET
+            | I_SPLIT_TICKET ) as name ),
           (_ :: _ as l),
           _ ),
       _ ) ->
@@ -5565,7 +5582,8 @@ and parse_instr :
             | I_LSR
             | I_COMPARE
             | I_PAIRING_CHECK
-            | I_TICKET ) as name ),
+            | I_TICKET
+            | I_SPLIT_TICKET ) as name ),
           _,
           _ ),
       stack ) ->
@@ -5660,7 +5678,8 @@ and parse_instr :
              I_SAPLING_EMPTY_STATE;
              I_SAPLING_VERIFY_UPDATE;
              I_TICKET;
-             I_READ_TICKET ]
+             I_READ_TICKET;
+             I_SPLIT_TICKET ]
 
 and parse_contract :
     type arg.
