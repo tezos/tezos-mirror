@@ -324,6 +324,35 @@ class TestContractOnchainOpcodes:
         bake(client)
 
 
+class TestTickets:
+    """Tests for tickets."""
+
+    def test_ticket_user_forge(self, client):
+        bake(client)
+        init_with_transfer(client,
+                           path.join(OPCODES_CONTRACT_PATH,
+                                     'ticket_store-2.tz'),
+                           'None', 100, 'bootstrap1', 'storer')
+
+        # Create parameter by hand with a ticket type but no ticket in it
+        client.transfer(100, 'bootstrap1', 'storer',
+                        ['-arg', 'None',
+                         '--burn-cap', '10'])
+
+        with assert_run_failure(r'Unexpected forged value'):
+            # Create parameter by hand with a ticket in it
+            client.transfer(100, 'bootstrap1', 'storer',
+                            ['-arg', 'Some 1',
+                             '--burn-cap', '10'])
+
+        with assert_run_failure(r'Unexpected forged value'):
+            # Create storage by hand with a ticket in it
+            init_with_transfer(client,
+                               path.join(OPCODES_CONTRACT_PATH,
+                                         'ticket_bad.tz'),
+                               '1', 100, 'bootstrap1', 'ticket_bad')
+
+
 ORIGINATE_BIG_MAP_FILE = path.join(OPCODES_CONTRACT_PATH,
                                    'originate_big_map.tz')
 
