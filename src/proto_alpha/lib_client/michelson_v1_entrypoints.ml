@@ -51,7 +51,8 @@ let script_entrypoint_type cctxt ~(chain : Chain_services.chain) ~block
   Alpha_services.Helpers.Scripts.entrypoint_type
     cctxt
     (chain, block)
-    (program, entrypoint)
+    ~script:program
+    ~entrypoint
   >>= function
   | Ok ty ->
       return_some ty
@@ -134,11 +135,17 @@ let list_contract_entrypoints cctxt ~chain ~block ~contract =
   else return entrypoints
 
 let list_unreachables cctxt ~chain ~block (program : Script.expr) =
-  Alpha_services.Helpers.Scripts.list_entrypoints cctxt (chain, block) program
+  Alpha_services.Helpers.Scripts.list_entrypoints
+    cctxt
+    (chain, block)
+    ~script:program
   >>=? fun (unreachables, _) -> return unreachables
 
 let list_entrypoints cctxt ~chain ~block (program : Script.expr) =
-  Alpha_services.Helpers.Scripts.list_entrypoints cctxt (chain, block) program
+  Alpha_services.Helpers.Scripts.list_entrypoints
+    cctxt
+    (chain, block)
+    ~script:program
   >>=? fun (_, entrypoints) ->
   if not @@ List.mem_assoc "default" entrypoints then
     script_entrypoint_type cctxt ~chain ~block program ~entrypoint:"default"
