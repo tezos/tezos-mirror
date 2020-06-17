@@ -1683,6 +1683,8 @@ Domain specific data types
 
 -  ``sapling_state ms``: A :ref:`Sapling<sapling_dev>` state
 
+-  ``ticket (t)``: A ticket used to authenticate information of type ``(t)`` on-chain.
+
 Domain specific operations
 --------------------------
 
@@ -2172,6 +2174,25 @@ comprehensive description of the Sapling protocol.
     > SAPLING_EMPTY_STATE ms /  S  =>  sapling_state ms : S
         with `sapling_state ms` being the empty state (ie. no one can spend tokens from it)
         with memo_size `ms`
+
+
+Operations on tickets
+~~~~~~~~~~~~~~~~~~~~~
+
+Tickets are a way for smart-contracts
+to authenticate data with respect to a Tezos address. This authentication can
+then be used to build composable permission systems.
+
+It is
+impossible for a contract to “forge” a ticket that appears to have been created
+by another ticketer.
+
+The amount is a meta-data that can be used to implement UTXOs.
+
+For example, a ticket could represent a Non Fungible Token (NFT) or a Unspent
+Transaction Output (UTXO) which can then be passed around and behave like a value.
+This process can happen without the need to interact with a centralized NFT contract,
+simplifying the code.
 
 
 Removed instructions
@@ -3487,6 +3508,7 @@ Full grammar
       | set <comparable type>
       | operation
       | contract <type>
+      | ticket <comparable type>
       | pair <type> <type> ...
       | or <type> <type>
       | lambda <type> <type>
