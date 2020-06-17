@@ -394,7 +394,9 @@ let commands () =
         Alpha_services.Helpers.Scripts.pack_data
           cctxt
           (cctxt#chain, cctxt#block)
-          (data.expanded, typ.expanded, Some original_gas)
+          ~gas:original_gas
+          ~data:data.expanded
+          ~ty:typ.expanded
         >>= function
         | Ok (bytes, remaining_gas) ->
             let hash = Script_expr_hash.hash_bytes [bytes] in

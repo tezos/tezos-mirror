@@ -299,7 +299,8 @@ let simulate (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
   Alpha_services.Helpers.Scripts.run_operation
     cctxt
     (chain, block)
-    (Operation.pack op, chain_id)
+    ~op:(Operation.pack op)
+    ~chain_id
   >>=? function
   | (Operation_data op', Operation_metadata result) -> (
     match
