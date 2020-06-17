@@ -51,6 +51,71 @@ class TestRawContext:
     def test_bake(self, client: Client):
         client.bake('bootstrap4', BAKE_ARGS)
 
+    @pytest.mark.parametrize(
+        "identity, message, expected_signature",
+        [('bootstrap1', 'msg1',
+          'edsigtZHRixK8wxudi71uVFGKhD9psBCKEVKjocZ6iTUmXD7GUb8Kr78MZk3bZmwA9K'
+          'xUb4LaGK4djK6mELFizi7gHXEJmJE9Mq'),
+         ('bootstrap2', 'msg2',
+          'edsigtYRSNM9ayrAhHzdrjkoGgHRZfPSDmr7nijuNEwMm3rrtoeTLdMGygGJeoikP6T'
+          'C6ApppWzXK2kiujoRQ7oea5ZjTAvXU2m'),
+         ('bootstrap3', 'msg3',
+          'edsigtreUCu9SycaDnvKT3tYGzx9Jd4guqDnxcx8Q1wwrsaiKsG4xkmkwjsoyGgRbKN'
+          'sy89texWneLPtD5PmGb8idEmWucecYDP'),
+         ('bootstrap4', 'msg4',
+          'edsigttaHYfYhmWFQPkQztHTE5tSfXuCskFLZ5yzLTyRvJjs3MKPziurLPHt6Ct2sZu'
+          'XTHziprFvsei3ExeU36v7A3EsasaKNkG')])
+    def test_sign_message(self, client, identity, message,
+                          expected_signature):
+        assert client.sign_message(message, identity) == expected_signature
+
+    @pytest.mark.parametrize(
+        "identity, message, signature",
+        [('bootstrap1', 'msg1',
+          'edsigtZHRixK8wxudi71uVFGKhD9psBCKEVKjocZ6iTUmXD7GUb8Kr78MZk3bZmwA9K'
+          'xUb4LaGK4djK6mELFizi7gHXEJmJE9Mq'),
+         ('bootstrap2', 'msg2',
+          'edsigtYRSNM9ayrAhHzdrjkoGgHRZfPSDmr7nijuNEwMm3rrtoeTLdMGygGJeoikP6T'
+          'C6ApppWzXK2kiujoRQ7oea5ZjTAvXU2m'),
+         ('bootstrap3', 'msg3',
+          'edsigtreUCu9SycaDnvKT3tYGzx9Jd4guqDnxcx8Q1wwrsaiKsG4xkmkwjsoyGgRbKN'
+          'sy89texWneLPtD5PmGb8idEmWucecYDP'),
+         ('bootstrap4', 'msg4',
+          'edsigttaHYfYhmWFQPkQztHTE5tSfXuCskFLZ5yzLTyRvJjs3MKPziurLPHt6Ct2sZu'
+          'XTHziprFvsei3ExeU36v7A3EsasaKNkG')])
+    def test_check_message(self, client, identity, message,
+                           signature):
+        assert client.check_message(message, identity, signature)
+
+    @pytest.mark.parametrize(
+        "identity, message, head_block",
+        [("bootstrap1", "msg1", False),
+         ("bootstrap2", "msg2", False),
+         ("bootstrap3", "msg3", True),
+         ("bootstrap4", "msg4", True)])
+    def test_fail_inject_signed_arbitrary_ope(self, client, identity, message,
+                                              head_block):
+        if head_block:
+            signature = client.sign_message(message, identity, block="head")
+        else:
+            signature = client.sign_message(message, identity)
+        chain_id = client.rpc('get', '/chains/main/chain_id')
+        head_hash = client.rpc('get', '/chains/main/blocks/head/hash')
+        run_json = {'operation':
+                    {"branch": head_hash,
+                     "contents": [
+                         {"kind": "failing_noop",
+                          "arbitrary": message}],
+                     'signature': signature},
+                    'chain_id': chain_id}
+        run_operation_path = ('/chains/main/blocks/head/helpers/scripts/'
+                              'run_operation')
+        with pytest.raises(client_output.InvalidClientOutput) as exc:
+            client.rpc('post', run_operation_path, data=run_json)
+        assert exc.value.client_output == ('Command failed : The failing_noop '
+                                           'operation cannot be executed by '
+                                           'the protocol\n\n')
+
     def test_gen_keys(self, client: Client, session):
         session['keys'] = ['foo', 'bar', 'boo']
         sigs = [None, 'secp256k1', 'ed25519']

@@ -345,6 +345,18 @@ class Client:
         cmd = ['activate', 'account', manager, 'with', contract]
         return self.run(cmd)
 
+    def sign_message(self, data: str, identity: str, block=None) -> str:
+        cmd = ['sign', 'message', data, 'for', identity]
+        if block is not None:
+            cmd += ["--block", block]
+        return client_output.SignMessageResult(self.run(cmd)).signature
+
+    def check_message(self, data: str, identity: str, signature: str) -> bool:
+        cmd = ['check', 'that', 'message', data,
+               'was', 'signed', 'by', identity,
+               'to', 'produce', signature]
+        return client_output.CheckSignMessageResult(self.run(cmd)).check
+
     def transfer(self,
                  amount: float,
                  giver: str,
