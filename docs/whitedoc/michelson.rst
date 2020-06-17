@@ -2183,8 +2183,8 @@ The following operations deal with tickets. Tickets are a way for smart-contract
 to authenticate data with respect to a Tezos address. This authentication can
 then be used to build composable permission systems.
 
-A contract can create a ticket from a value and an amount.
-It is
+A contract can create a ticket from a value and an amount. The ticket, when
+inspected reveals the value, the amount, and the address of the ticketer (the contract that created the ticket). It is
 impossible for a contract to “forge” a ticket that appears to have been created
 by another ticketer.
 
@@ -2205,6 +2205,12 @@ simplifying the code.
    :: 'a : nat : 'S -> ticket 'a : 'S
 
 Type ``'a`` must be comparable (the ``COMPARE`` primitive must be defined over it).
+
+- ``READ_TICKET``: Retrieve the information stored in a ticket. Also return the ticket.
+
+::
+
+   :: ticket 'a : 'S -> pair address 'a nat : ticket 'a : 'S
 
 
 Removed instructions
@@ -3514,6 +3520,7 @@ Full grammar
       | SAPLING_EMPTY_STATE <natural number constant>
       | SAPLING_VERIFY_UPDATE
       | TICKET
+      | READ_TICKET
     <type> ::=
       | <comparable type>
       | option <type>
