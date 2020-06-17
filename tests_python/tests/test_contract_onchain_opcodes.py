@@ -352,6 +352,35 @@ class TestTickets:
                                          'ticket_bad.tz'),
                                '1', 100, 'bootstrap1', 'ticket_bad')
 
+    def test_ticket_user_big_forge(self, client):
+        bake(client)
+        contract_name = 'big_storer'
+        init_with_transfer(client,
+                           path.join(OPCODES_CONTRACT_PATH,
+                                     'ticket_big_store.tz'),
+                           '{}', 100, 'bootstrap1', contract_name)
+        bake(client)
+        client.transfer(100, 'bootstrap1', contract_name,
+                        ['-arg', '42',
+                         '--burn-cap', '10'])
+        bake(client)
+        storage = client.get_storage(contract_name)
+
+        with assert_run_failure(r'Unexpected forged value'):
+            # Create a storage with the ID of a big map that has tickets in it
+            init_with_transfer(client,
+                               path.join(OPCODES_CONTRACT_PATH,
+                                         'ticket_big_store.tz'),
+                               storage, 100, 'bootstrap1', 'thief')
+
+        with assert_run_failure(r'Unexpected forged value'):
+            # Create a storage with the ID of a big map that has tickets in it
+            init_with_transfer(client,
+                               path.join(OPCODES_CONTRACT_PATH,
+                                         'ticket_big_store.tz'),
+                               '(Pair ' + storage + ' {})', 100, 'bootstrap1',
+                               'thief')
+
 
 ORIGINATE_BIG_MAP_FILE = path.join(OPCODES_CONTRACT_PATH,
                                    'originate_big_map.tz')
