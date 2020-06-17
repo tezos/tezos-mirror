@@ -288,6 +288,9 @@ module Cost_of : sig
     val ticket : Gas.cost
 
     val read_ticket : Gas.cost
+
+    val split_ticket :
+      'a Script_int.num -> 'a Script_int.num -> 'a Script_int.num -> Gas.cost
   end
 
   module Typechecking : sig

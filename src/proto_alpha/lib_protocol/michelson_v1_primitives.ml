@@ -143,6 +143,7 @@ type prim =
   | I_PAIRING_CHECK
   | I_TICKET
   | I_READ_TICKET
+  | I_SPLIT_TICKET
   | T_bool
   | T_contract
   | T_int
@@ -279,6 +280,7 @@ let namespace = function
   | I_SLICE
   | I_SOME
   | I_SOURCE
+  | I_SPLIT_TICKET
   | I_STEPS_TO_QUOTA
   | I_SUB
   | I_SWAP
@@ -555,6 +557,8 @@ let string_of_prim = function
       "TICKET"
   | I_READ_TICKET ->
       "READ_TICKET"
+  | I_SPLIT_TICKET ->
+      "SPLIT_TICKET"
   | T_bool ->
       "bool"
   | T_contract ->
@@ -833,6 +837,8 @@ let prim_of_string = function
       ok I_TICKET
   | "READ_TICKET" ->
       ok I_READ_TICKET
+  | "SPLIT_TICKET" ->
+      ok I_SPLIT_TICKET
   | "bool" ->
       ok T_bool
   | "contract" ->
@@ -1090,7 +1096,8 @@ let prim_encoding =
          (* /!\ NEW INSTRUCTIONS MUST BE ADDED AT THE END OF THE STRING_ENUM, FOR BACKWARD COMPATIBILITY OF THE ENCODING. *)
          (* Alpha_008 addition *)
          ("TICKET", I_TICKET);
-         ("READ_TICKET", I_READ_TICKET)
+         ("READ_TICKET", I_READ_TICKET);
+         ("SPLIT_TICKET", I_SPLIT_TICKET)
          (* New instructions must be added here, for backward compatibility of the encoding. *)
          (* Keep the comment above at the end of the list *)
         ]

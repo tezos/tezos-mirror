@@ -360,6 +360,7 @@ module Script : sig
     | I_PAIRING_CHECK
     | I_TICKET
     | I_READ_TICKET
+    | I_SPLIT_TICKET
     | T_bool
     | T_contract
     | T_int

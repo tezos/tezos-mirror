@@ -1191,6 +1191,7 @@ module Cost_of = struct
     (* Same as cost_source *)
     let chain_id = source
 
+    (* TODO benchmark *)
     (* FIXME: imported from 006, needs proper benchmarks *)
     let unpack_failed bytes =
       (* We cannot instrument failed deserialization,
@@ -1206,6 +1207,12 @@ module Cost_of = struct
 
     (* TODO benchmark *)
     let read_ticket = atomic_step_cost (Z.of_int 200)
+
+    (* TODO benchmark *)
+    let split_ticket ticket_amount amount_a amount_b =
+      ticket
+      +@ add_bigint amount_a amount_b
+      +@ compare_nat ticket_amount ticket_amount
   end
 
   module Typechecking = struct
