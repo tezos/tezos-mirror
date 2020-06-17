@@ -2179,10 +2179,11 @@ comprehensive description of the Sapling protocol.
 Operations on tickets
 ~~~~~~~~~~~~~~~~~~~~~
 
-Tickets are a way for smart-contracts
+The following operations deal with tickets. Tickets are a way for smart-contracts
 to authenticate data with respect to a Tezos address. This authentication can
 then be used to build composable permission systems.
 
+A contract can create a ticket from a value and an amount.
 It is
 impossible for a contract to “forge” a ticket that appears to have been created
 by another ticketer.
@@ -2195,6 +2196,15 @@ For example, a ticket could represent a Non Fungible Token (NFT) or a Unspent
 Transaction Output (UTXO) which can then be passed around and behave like a value.
 This process can happen without the need to interact with a centralized NFT contract,
 simplifying the code.
+
+- ``TICKET``: Create a ticket with the given content and amount. The ticketer is the address
+  of `SELF`.
+
+::
+
+   :: 'a : nat : 'S -> ticket 'a : 'S
+
+Type ``'a`` must be comparable (the ``COMPARE`` primitive must be defined over it).
 
 
 Removed instructions
@@ -3503,6 +3513,7 @@ Full grammar
       | PAIRING_CHECK
       | SAPLING_EMPTY_STATE <natural number constant>
       | SAPLING_VERIFY_UPDATE
+      | TICKET
     <type> ::=
       | <comparable type>
       | option <type>
