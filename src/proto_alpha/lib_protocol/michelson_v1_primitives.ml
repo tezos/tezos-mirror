@@ -142,6 +142,7 @@ type prim =
   | I_SHA3
   | I_PAIRING_CHECK
   | I_TICKET
+  | I_READ_TICKET
   | T_bool
   | T_contract
   | T_int
@@ -262,6 +263,7 @@ let namespace = function
   | I_PAIR
   | I_PAIRING_CHECK
   | I_PUSH
+  | I_READ_TICKET
   | I_RENAME
   | I_RIGHT
   | I_SAPLING_EMPTY_STATE
@@ -551,6 +553,8 @@ let string_of_prim = function
       "PAIRING_CHECK"
   | I_TICKET ->
       "TICKET"
+  | I_READ_TICKET ->
+      "READ_TICKET"
   | T_bool ->
       "bool"
   | T_contract ->
@@ -827,6 +831,8 @@ let prim_of_string = function
       ok I_TOTAL_VOTING_POWER
   | "TICKET" ->
       ok I_TICKET
+  | "READ_TICKET" ->
+      ok I_READ_TICKET
   | "bool" ->
       ok T_bool
   | "contract" ->
@@ -1083,7 +1089,8 @@ let prim_encoding =
          ("ticket", T_ticket);
          (* /!\ NEW INSTRUCTIONS MUST BE ADDED AT THE END OF THE STRING_ENUM, FOR BACKWARD COMPATIBILITY OF THE ENCODING. *)
          (* Alpha_008 addition *)
-         ("TICKET", I_TICKET)
+         ("TICKET", I_TICKET);
+         ("READ_TICKET", I_READ_TICKET)
          (* New instructions must be added here, for backward compatibility of the encoding. *)
          (* Keep the comment above at the end of the list *)
         ]
