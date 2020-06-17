@@ -381,6 +381,40 @@ class TestTickets:
                                '(Pair ' + storage + ' {})', 100, 'bootstrap1',
                                'thief')
 
+    def test_ticket_read(self, client):
+        """Test TICKETS"""
+        init_with_transfer(client,
+                           path.join(OPCODES_CONTRACT_PATH, 'ticketer.tz'),
+                           '42', 100, 'bootstrap1', 'ticketer_read')
+        bake(client)
+        ticketer_addr = client.get_contract_address('ticketer_read')
+        init_with_transfer(client,
+                           path.join(OPCODES_CONTRACT_PATH, 'ticket_read.tz'),
+                           '"' + ticketer_addr + '"', 100,
+                           'bootstrap1', 'reader')
+        bake(client)
+        reader_addr = client.get_contract_address('reader')
+        client.transfer(100, 'bootstrap1', 'ticketer_read',
+                        ['-arg', '"' + reader_addr + '"', '--burn-cap', '10'])
+        bake(client)
+        assert_storage_contains(client, "reader", '"' + ticketer_addr + '"')
+
+    def test_bad_ticket(self, client):
+        init_with_transfer(client,
+                           path.join(OPCODES_CONTRACT_PATH, 'ticketer.tz'),
+                           '42', 100, 'bootstrap1', 'ticketer_bad')
+        bake(client)
+        ticketer_addr = client.get_contract_address('ticketer_bad')
+        init_with_transfer(client,
+                           path.join(OPCODES_CONTRACT_PATH, 'ticket_read.tz'),
+                           '"' + ticketer_addr + '"', 100,
+                           'bootstrap1', 'reader_bad')
+        bake(client)
+        with assert_run_failure(r'Unexpected forged value'):
+            client.transfer(100, 'bootstrap1', 'reader_bad',
+                            ['-arg', '1', '--burn-cap', '10'])
+            bake(client)
+
 
 ORIGINATE_BIG_MAP_FILE = path.join(OPCODES_CONTRACT_PATH,
                                    'originate_big_map.tz')
