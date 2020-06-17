@@ -164,6 +164,7 @@ val parse_data :
   ?type_logger:type_logger ->
   context ->
   legacy:bool ->
+  allow_forged:bool ->
   'a Script_typed_ir.ty ->
   Script.node ->
   ('a * context) tzresult Lwt.t
@@ -243,6 +244,7 @@ val parse_storage :
   ?type_logger:type_logger ->
   context ->
   legacy:bool ->
+  allow_forged:bool ->
   'storage Script_typed_ir.ty ->
   storage:Script.lazy_expr ->
   ('storage * context) tzresult Lwt.t
@@ -252,6 +254,7 @@ val parse_script :
   ?type_logger:type_logger ->
   context ->
   legacy:bool ->
+  allow_forged_in_storage:bool ->
   Script.t ->
   (ex_script * context) tzresult Lwt.t
 

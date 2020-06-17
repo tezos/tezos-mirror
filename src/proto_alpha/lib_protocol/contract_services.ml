@@ -174,7 +174,11 @@ module S = struct
           raise Not_found
       | Some script ->
           let ctxt = Gas.set_unlimited ctxt in
-          Script_ir_translator.parse_script ctxt ~legacy:true script
+          Script_ir_translator.parse_script
+            ctxt
+            ~legacy:true
+            ~allow_forged_in_storage:true
+            script
           >|= fun tzresult ->
           tzresult
           >>? fun (Ex_script script, ctxt) ->
@@ -233,7 +237,12 @@ let register () =
         | None ->
             raise Not_found
         | Some value ->
-            parse_data ctxt ~legacy:true value_type (Micheline.root value)
+            parse_data
+              ctxt
+              ~legacy:true
+              ~allow_forged:true
+              value_type
+              (Micheline.root value)
             >>=? fun (value, ctxt) ->
             unparse_data ctxt Readable value_type value
             >|=? fun (value, _ctxt) -> Micheline.strip_locations value )
@@ -268,7 +277,7 @@ let register () =
       | Some script ->
           let ctxt = Gas.set_unlimited ctxt in
           let open Script_ir_translator in
-          parse_script ctxt ~legacy:true script
+          parse_script ctxt ~legacy:true ~allow_forged_in_storage:true script
           >>=? fun (Ex_script script, ctxt) ->
           unparse_script ctxt Readable script
           >>=? fun (script, ctxt) ->
@@ -347,7 +356,7 @@ let register () =
       | Some script -> (
           let ctxt = Gas.set_unlimited ctxt in
           let open Script_ir_translator in
-          parse_script ctxt ~legacy:true script
+          parse_script ctxt ~legacy:true ~allow_forged_in_storage:true script
           >>=? fun (Ex_script script, ctxt) ->
           Script_ir_translator.collect_lazy_storage
             ctxt
@@ -381,7 +390,7 @@ let register () =
       | Some script ->
           let ctxt = Gas.set_unlimited ctxt in
           let open Script_ir_translator in
-          parse_script ctxt ~legacy:true script
+          parse_script ctxt ~legacy:true ~allow_forged_in_storage:true script
           >>=? fun (Ex_script script, ctxt) ->
           unparse_script ctxt Readable script
           >|=? fun (script, ctxt) -> (Some script, ctxt) )

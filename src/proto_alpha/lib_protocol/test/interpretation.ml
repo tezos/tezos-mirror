@@ -46,6 +46,7 @@ let run_script ctx ?(step_constants = default_step_constants) contract
     ~script
     ~entrypoint
     ~parameter:parameter_expr
+    ~internal:false
   >>=?? fun res -> return res
 
 module Logger : STEP_LOGGER = struct

@@ -357,7 +357,15 @@ let init ctxt block_header =
   let timestamp = block_header.timestamp in
   let typecheck (ctxt : Alpha_context.context)
       (script : Alpha_context.Script.t) =
-    Script_ir_translator.parse_script ctxt ~legacy:false script
+    let allow_forged_in_storage =
+      false
+      (* There should be no forged value in bootstrap contracts. *)
+    in
+    Script_ir_translator.parse_script
+      ctxt
+      ~legacy:false
+      ~allow_forged_in_storage
+      script
     >>=? fun (Ex_script parsed_script, ctxt) ->
     Script_ir_translator.extract_lazy_storage_diff
       ctxt

@@ -102,4 +102,5 @@ val execute :
   script:Script.t ->
   entrypoint:string ->
   parameter:Script.expr ->
+  internal:bool ->
   execution_result tzresult Lwt.t

@@ -626,6 +626,7 @@ let apply_manager_operation_content :
             ~script
             ~parameter
             ~entrypoint
+            ~internal
           >>=? fun {ctxt; storage; lazy_storage_diff; operations} ->
           Contract.update_script_storage
             ctxt
@@ -668,7 +669,11 @@ let apply_manager_operation_content :
       (* see [note] *)
       Gas.consume ctxt (Script.deserialized_cost unparsed_code)
       >>?= fun ctxt ->
-      Script_ir_translator.parse_script ctxt ~legacy:false script
+      Script_ir_translator.parse_script
+        ctxt
+        ~legacy:false
+        ~allow_forged_in_storage:internal
+        script
       >>=? fun (Ex_script parsed_script, ctxt) ->
       Script_ir_translator.collect_lazy_storage
         ctxt
