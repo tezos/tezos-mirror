@@ -482,6 +482,9 @@ and ('bef, 'aft) instr =
       : ( 'a ticket * ((n num * n num) * 'rest),
           ('a ticket * 'a ticket) option * 'rest )
         instr
+  | Join_tickets :
+      'a comparable_ty
+      -> (('a ticket * 'a ticket) * 'rest, 'a ticket option * 'rest) instr
 
 and ('before, 'after) comb_gadt_witness =
   | Comb_one : ('a * 'before, 'a * 'before) comb_gadt_witness

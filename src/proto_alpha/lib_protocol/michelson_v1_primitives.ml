@@ -144,6 +144,7 @@ type prim =
   | I_TICKET
   | I_READ_TICKET
   | I_SPLIT_TICKET
+  | I_JOIN_TICKETS
   | T_bool
   | T_contract
   | T_int
@@ -239,6 +240,7 @@ let namespace = function
   | I_INT
   | I_ISNAT
   | I_ITER
+  | I_JOIN_TICKETS
   | I_KECCAK
   | I_LAMBDA
   | I_LE
@@ -559,6 +561,8 @@ let string_of_prim = function
       "READ_TICKET"
   | I_SPLIT_TICKET ->
       "SPLIT_TICKET"
+  | I_JOIN_TICKETS ->
+      "JOIN_TICKETS"
   | T_bool ->
       "bool"
   | T_contract ->
@@ -839,6 +843,8 @@ let prim_of_string = function
       ok I_READ_TICKET
   | "SPLIT_TICKET" ->
       ok I_SPLIT_TICKET
+  | "JOIN_TICKETS" ->
+      ok I_JOIN_TICKETS
   | "bool" ->
       ok T_bool
   | "contract" ->
@@ -1097,7 +1103,8 @@ let prim_encoding =
          (* Alpha_008 addition *)
          ("TICKET", I_TICKET);
          ("READ_TICKET", I_READ_TICKET);
-         ("SPLIT_TICKET", I_SPLIT_TICKET)
+         ("SPLIT_TICKET", I_SPLIT_TICKET);
+         ("JOIN_TICKETS", I_JOIN_TICKETS)
          (* New instructions must be added here, for backward compatibility of the encoding. *)
          (* Keep the comment above at the end of the list *)
         ]

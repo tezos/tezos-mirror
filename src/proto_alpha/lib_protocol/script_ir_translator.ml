@@ -511,6 +511,8 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int =
       1
   | Dup_n _ ->
       0
+  | Join_tickets _ ->
+      0
 
 (* ---- Error helpers -------------------------------------------------------*)
 
@@ -5346,6 +5348,24 @@ and parse_instr :
           (Pair_t ((ticket_t, fa_a, a_a), (ticket_t, fa_b, a_b), None), None)
       in
       typed ctxt loc Split_ticket (Item_t (result, rest, annot))
+  | ( Prim (loc, I_JOIN_TICKETS, [], annot),
+      Item_t
+        ( Pair_t (((Ticket_t _ as ty_a), _, _), ((Ticket_t _ as ty_b), _, _), _),
+          rest,
+          _ ) ) -> (
+      parse_var_annot loc annot
+      >>?= fun annot ->
+      merge_types ~legacy ctxt loc ty_a ty_b
+      >>?= fun (Eq, ty, ctxt) ->
+      match ty with
+      | Ticket_t (contents_ty, _) ->
+          typed
+            ctxt
+            loc
+            (Join_tickets contents_ty)
+            (Item_t (Option_t (ty, None), rest, annot))
+      | _ ->
+          (* TODO: fix injectivity of types *) assert false )
   (* Primitive parsing errors *)
   | ( Prim
         ( loc,
@@ -5414,7 +5434,8 @@ and parse_instr :
             | I_PAIRING_CHECK
             | I_TICKET
             | I_READ_TICKET
-            | I_SPLIT_TICKET ) as name ),
+            | I_SPLIT_TICKET
+            | I_JOIN_TICKETS ) as name ),
           (_ :: _ as l),
           _ ),
       _ ) ->
@@ -5556,7 +5577,8 @@ and parse_instr :
             | I_NEVER
             | I_KECCAK
             | I_SHA3
-            | I_READ_TICKET ) as name ),
+            | I_READ_TICKET
+            | I_JOIN_TICKETS ) as name ),
           _,
           _ ),
       stack ) ->
@@ -5680,7 +5702,8 @@ and parse_instr :
              I_SAPLING_VERIFY_UPDATE;
              I_TICKET;
              I_READ_TICKET;
-             I_SPLIT_TICKET ]
+             I_SPLIT_TICKET;
+             I_JOIN_TICKETS ]
 
 and parse_contract :
     type arg.

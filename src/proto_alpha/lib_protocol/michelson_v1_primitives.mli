@@ -143,6 +143,7 @@ type prim =
   | I_TICKET
   | I_READ_TICKET
   | I_SPLIT_TICKET
+  | I_JOIN_TICKETS
   | T_bool
   | T_contract
   | T_int

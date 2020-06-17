@@ -1213,6 +1213,16 @@ module Cost_of = struct
       ticket
       +@ add_bigint amount_a amount_b
       +@ compare_nat ticket_amount ticket_amount
+
+    (* TODO benchmark *)
+    let join_tickets :
+        'a Script_typed_ir.comparable_ty ->
+        'a Script_typed_ir.ticket ->
+        'a Script_typed_ir.ticket ->
+        Gas.cost =
+     fun ty ticket_a ticket_b ->
+      ticket +@ compare_address
+      +@ compare ty ticket_a.contents ticket_b.contents
   end
 
   module Typechecking = struct
