@@ -303,9 +303,11 @@ let clear_storage_space_to_pay ctxt =
         storage_space_to_pay,
         allocated_contracts )
 
+type missing_key_kind = Get | Set | Del | Copy
+
 type storage_error =
   | Incompatible_protocol_version of string
-  | Missing_key of string list * [`Get | `Set | `Del | `Copy]
+  | Missing_key of string list * missing_key_kind
   | Existing_key of string list
   | Corrupted_data of string list
 
@@ -326,7 +328,7 @@ let storage_error_encoding =
            (req
               "function"
               (string_enum
-                 [("get", `Get); ("set", `Set); ("del", `Del); ("copy", `Copy)])))
+                 [("get", Get); ("set", Set); ("del", Del); ("copy", Copy)])))
         (function Missing_key (key, f) -> Some (key, f) | _ -> None)
         (fun (key, f) -> Missing_key (key, f));
       case
@@ -348,19 +350,19 @@ let pp_storage_error ppf = function
         ppf
         "Found a context with an unexpected version '%s'."
         version
-  | Missing_key (key, `Get) ->
+  | Missing_key (key, Get) ->
       Format.fprintf ppf "Missing key '%s'." (String.concat "/" key)
-  | Missing_key (key, `Set) ->
+  | Missing_key (key, Set) ->
       Format.fprintf
         ppf
         "Cannot set undefined key '%s'."
         (String.concat "/" key)
-  | Missing_key (key, `Del) ->
+  | Missing_key (key, Del) ->
       Format.fprintf
         ppf
         "Cannot delete undefined key '%s'."
         (String.concat "/" key)
-  | Missing_key (key, `Copy) ->
+  | Missing_key (key, Copy) ->
       Format.fprintf
         ppf
         "Cannot copy undefined key '%s'."
@@ -414,7 +416,7 @@ let get_first_level ctxt =
   Context.get ctxt first_level_key
   >>= function
   | None ->
-      storage_error (Missing_key (first_level_key, `Get))
+      storage_error (Missing_key (first_level_key, Get))
   | Some bytes -> (
     match Data_encoding.Binary.of_bytes Raw_level_repr.encoding bytes with
     | None ->
@@ -696,7 +698,7 @@ let dir_mem ctxt k = Context.dir_mem ctxt.context k
 let get ctxt k =
   Context.get ctxt.context k
   >>= function
-  | None -> storage_error (Missing_key (k, `Get)) | Some v -> return v
+  | None -> storage_error (Missing_key (k, Get)) | Some v -> return v
 
 let get_option ctxt k = Context.get ctxt.context k
 
@@ -705,7 +707,7 @@ let set ctxt k v =
   Context.mem ctxt.context k
   >>= function
   | false ->
-      storage_error (Missing_key (k, `Set))
+      storage_error (Missing_key (k, Set))
   | true ->
       Context.set ctxt.context k v
       >>= fun context -> return {ctxt with context}
@@ -730,7 +732,7 @@ let delete ctxt k =
   Context.mem ctxt.context k
   >>= function
   | false ->
-      storage_error (Missing_key (k, `Del))
+      storage_error (Missing_key (k, Del))
   | true ->
       Context.del ctxt.context k >>= fun context -> return {ctxt with context}
 
@@ -752,7 +754,7 @@ let copy ctxt ~from ~to_ =
   Context.copy ctxt.context ~from ~to_
   >>= function
   | None ->
-      storage_error (Missing_key (from, `Copy))
+      storage_error (Missing_key (from, Copy))
   | Some context ->
       return {ctxt with context}
 

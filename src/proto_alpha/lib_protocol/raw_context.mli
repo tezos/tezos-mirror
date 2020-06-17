@@ -27,10 +27,12 @@
 
 type error += Too_many_internal_operations (* `Permanent *)
 
+type missing_key_kind = Get | Set | Del | Copy
+
 (** An internal storage error that should not happen *)
 type storage_error =
   | Incompatible_protocol_version of string
-  | Missing_key of string list * [`Get | `Set | `Del | `Copy]
+  | Missing_key of string list * missing_key_kind
   | Existing_key of string list
   | Corrupted_data of string list
 
