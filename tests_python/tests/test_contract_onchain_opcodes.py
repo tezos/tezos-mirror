@@ -464,6 +464,41 @@ class TestTickets:
             ticket(splitter_addr, 42, 4)
         bake(client)
 
+    def test_ticket_join(self, client):
+        """Test JOIN"""
+        def params(target_addr, utxo_amount, param):
+            return '(Pair (Pair "' + target_addr + '" ' + str(param) + ') ' + \
+                str(utxo_amount) + ')'
+        init_with_transfer(client,
+                           path.join(OPCODES_CONTRACT_PATH, 'ticketer-2.tz'),
+                           'Unit', 100, 'bootstrap1', 'ticketer_a')
+        init_with_transfer(client,
+                           path.join(OPCODES_CONTRACT_PATH, 'ticketer-2.tz'),
+                           'Unit', 100, 'bootstrap1', 'ticketer_b')
+        init_with_transfer(client,
+                           path.join(OPCODES_CONTRACT_PATH, 'ticket_join.tz'),
+                           'None', 100, 'bootstrap1', 'joiner')
+        bake(client)
+        joiner_addr = client.get_contract_address('joiner')
+        client.transfer(100, 'bootstrap1', 'ticketer_a',
+                        ['-arg', params(joiner_addr, 42, 1),
+                         '--burn-cap', '10'])
+        bake(client)
+        client.transfer(100, 'bootstrap1', 'ticketer_a',
+                        ['-arg', params(joiner_addr, 144, 1),
+                         '--burn-cap', '10'])
+        bake(client)
+        with assert_run_failure(r'script reached FAILWITH instruction'):
+            # Different Ticketer
+            client.transfer(100, 'bootstrap1', 'ticketer_b',
+                            ['-arg', params(joiner_addr, 23, 1),
+                             '--burn-cap', '10'])
+        with assert_run_failure(r'script reached FAILWITH instruction'):
+            # Different Content
+            client.transfer(100, 'bootstrap1', 'ticketer_a',
+                            ['-arg', params(joiner_addr, 21, 23),
+                             '--burn-cap', '10'])
+
 
 ORIGINATE_BIG_MAP_FILE = path.join(OPCODES_CONTRACT_PATH,
                                    'originate_big_map.tz')
