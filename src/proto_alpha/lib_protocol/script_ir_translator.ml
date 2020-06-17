@@ -223,6 +223,8 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int =
       1
   | Contract _ ->
       1
+  | Ticket ->
+      1
   (* Magic constructor *)
   | Unpack _ ->
       1
@@ -5305,6 +5307,18 @@ and parse_instr :
         loc
         Pairing_check_bls12_381
         (Item_t (Bool_t None, rest, annot))
+  (* Tickets *)
+  | (Prim (loc, I_TICKET, [], annot), Item_t (t, Item_t (Nat_t _, rest, _), _))
+    -> (
+      parse_var_annot loc annot
+      >>?= fun annot ->
+      (* TODO: carbonated this *)
+      match comparable_ty_of_ty_no_gas t with
+      | None ->
+          serialize_ty_for_error ctxt t
+          >>?= fun (t, _ctxt) -> fail (Comparable_type_expected (loc, t))
+      | Some ty ->
+          typed ctxt loc Ticket (Item_t (Ticket_t (ty, None), rest, annot)) )
   (* Primitive parsing errors *)
   | ( Prim
         ( loc,
@@ -5370,7 +5384,8 @@ and parse_instr :
             | I_TOTAL_VOTING_POWER
             | I_KECCAK
             | I_SHA3
-            | I_PAIRING_CHECK ) as name ),
+            | I_PAIRING_CHECK
+            | I_TICKET ) as name ),
           (_ :: _ as l),
           _ ),
       _ ) ->
@@ -5537,7 +5552,8 @@ and parse_instr :
             | I_LSL
             | I_LSR
             | I_COMPARE
-            | I_PAIRING_CHECK ) as name ),
+            | I_PAIRING_CHECK
+            | I_TICKET ) as name ),
           _,
           _ ),
       stack ) ->
@@ -5630,7 +5646,8 @@ and parse_instr :
              I_SHA3;
              I_PAIRING_CHECK;
              I_SAPLING_EMPTY_STATE;
-             I_SAPLING_VERIFY_UPDATE ]
+             I_SAPLING_VERIFY_UPDATE;
+             I_TICKET ]
 
 and parse_contract :
     type arg.

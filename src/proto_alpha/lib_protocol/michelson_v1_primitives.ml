@@ -141,6 +141,7 @@ type prim =
   | I_KECCAK
   | I_SHA3
   | I_PAIRING_CHECK
+  | I_TICKET
   | T_bool
   | T_contract
   | T_int
@@ -279,6 +280,7 @@ let namespace = function
   | I_STEPS_TO_QUOTA
   | I_SUB
   | I_SWAP
+  | I_TICKET
   | I_TOTAL_VOTING_POWER
   | I_TRANSFER_TOKENS
   | I_UNIT
@@ -547,6 +549,8 @@ let string_of_prim = function
       "SHA3"
   | I_PAIRING_CHECK ->
       "PAIRING_CHECK"
+  | I_TICKET ->
+      "TICKET"
   | T_bool ->
       "bool"
   | T_contract ->
@@ -821,6 +825,8 @@ let prim_of_string = function
       ok I_VOTING_POWER
   | "TOTAL_VOTING_POWER" ->
       ok I_TOTAL_VOTING_POWER
+  | "TICKET" ->
+      ok I_TICKET
   | "bool" ->
       ok T_bool
   | "contract" ->
@@ -1074,7 +1080,10 @@ let prim_encoding =
          ("sapling_transaction", T_sapling_transaction);
          ("SAPLING_EMPTY_STATE", I_SAPLING_EMPTY_STATE);
          ("SAPLING_VERIFY_UPDATE", I_SAPLING_VERIFY_UPDATE);
-         ("ticket", T_ticket)
+         ("ticket", T_ticket);
+         (* /!\ NEW INSTRUCTIONS MUST BE ADDED AT THE END OF THE STRING_ENUM, FOR BACKWARD COMPATIBILITY OF THE ENCODING. *)
+         (* Alpha_008 addition *)
+         ("TICKET", I_TICKET)
          (* New instructions must be added here, for backward compatibility of the encoding. *)
          (* Keep the comment above at the end of the list *)
         ]
