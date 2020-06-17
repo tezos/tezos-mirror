@@ -415,6 +415,55 @@ class TestTickets:
                             ['-arg', '1', '--burn-cap', '10'])
             bake(client)
 
+    def test_ticket_utxo(self, client):
+        """Test UTXOs"""
+        init_with_transfer(client,
+                           path.join(OPCODES_CONTRACT_PATH, 'utxor.tz'),
+                           '42', 100, 'bootstrap1')
+        bake(client)
+        utxor_addr = client.get_contract_address('utxor')
+        init_with_transfer(client,
+                           path.join(OPCODES_CONTRACT_PATH, 'utxo_read.tz'),
+                           '"' + utxor_addr + '"', 100,
+                           'bootstrap1', "reader_a")
+        bake(client)
+        reader_a_addr = client.get_contract_address('reader_a')
+        utxor_addr = client.get_contract_address('utxor')
+        init_with_transfer(client,
+                           path.join(OPCODES_CONTRACT_PATH,
+                                     'utxo_read.tz'),
+                           '"' + utxor_addr + '"', 100,
+                           'bootstrap1', "reader_b")
+        bake(client)
+        reader_b_addr = client.get_contract_address('reader_b')
+        client.transfer(100, 'bootstrap1', 'utxor',
+                        ['-arg', '(Pair "' + reader_a_addr +
+                         '" "' + reader_b_addr + '")',
+                         '--burn-cap', '10'])
+        bake(client)
+
+    def test_ticket_split(self, client):
+        def ticket(target_addr, param, utxo_amount):
+            param = '(Pair (Pair "' + target_addr + '" ' + \
+                    str(param) + ') ' + \
+                    str(utxo_amount) + ')'
+            client.transfer(100, 'bootstrap1', 'ticketer',
+                            ['-arg', param,
+                             '--burn-cap', '10'])
+        init_with_transfer(client,
+                           path.join(OPCODES_CONTRACT_PATH, 'ticketer-2.tz'),
+                           'Unit', 100, 'bootstrap1', 'ticketer')
+        init_with_transfer(client,
+                           path.join(OPCODES_CONTRACT_PATH, 'ticket_split.tz'),
+                           'Unit', 100, 'bootstrap1', 'splitter')
+        bake(client)
+        splitter_addr = client.get_contract_address('splitter')
+        ticket(splitter_addr, 42, 3)
+        with assert_run_failure(r'script reached FAILWITH instruction'):
+            # Wrong Split Amount
+            ticket(splitter_addr, 42, 4)
+        bake(client)
+
 
 ORIGINATE_BIG_MAP_FILE = path.join(OPCODES_CONTRACT_PATH,
                                    'originate_big_map.tz')
