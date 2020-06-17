@@ -438,10 +438,6 @@ class Client:
         cmd = ['normalize', 'type', typ]
         return self.run(cmd)
 
-    def sign(self, data: str, identity: str) -> str:
-        cmd = ['sign', 'bytes', data, 'for', identity]
-        return client_output.SignatureResult(self.run(cmd)).sig
-
     def activate_account(self, manager: str, contract: str):
         cmd = ['activate', 'account', manager, 'with', contract]
         return self.run(cmd)
@@ -891,11 +887,12 @@ class Client:
         res = self.run(cmd)
         return res[:-1]
 
-    def sign_bytes(
-        self, to_sign: bytes, key: str
-    ) -> client_output.SignBytesResult:
-        cmd = ['sign', 'bytes', str(to_sign), 'for', key]
-        return client_output.SignBytesResult(self.run(cmd))
+    def sign_bytes_of_string(self, data: str, identity: str) -> str:
+        cmd = ['sign', 'bytes', data, 'for', identity]
+        return client_output.SignByteResult(self.run(cmd)).signature
+
+    def sign_bytes(self, to_sign: bytes, key: str) -> str:
+        return self.sign_bytes_of_string(str(to_sign), key)
 
     def msig_prepare_transfer(
         self, msig_name: str, amount: float, dest: str, args: List[str] = None

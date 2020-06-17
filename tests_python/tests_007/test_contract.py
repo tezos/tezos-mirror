@@ -611,7 +611,7 @@ class TestChainId:
             'pair (pair chain_id address)'
             + '(pair (lambda unit (list operation)) nat)',
         )
-        signature = client.sign(packed, "bootstrap1")
+        signature = client.sign_bytes_of_string(packed, "bootstrap1")
         client.call(
             'bootstrap2',
             'authentication',
