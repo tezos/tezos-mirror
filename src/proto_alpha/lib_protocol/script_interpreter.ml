@@ -534,6 +534,8 @@ let cost_of_instr : type b a. (b, a) descr -> b -> Gas.cost =
       Interp_costs.sapling_verify_update ~inputs ~outputs
   | (Ticket, _) ->
       Interp_costs.ticket
+  | (Read_ticket, _) ->
+      Interp_costs.ticket
 
 let unpack ctxt ~ty ~bytes =
   Gas.check_enough ctxt (Script.serialized_cost bytes)
@@ -1380,6 +1382,8 @@ let rec step_bounded :
   | (Ticket, (contents, (amount, rest))) ->
       let ticketer = (step_constants.self, "default") in
       logged_return (({ticketer; contents; amount}, rest), ctxt)
+  | (Read_ticket, (({ticketer; contents; amount}, _) as stack)) ->
+      logged_return (((ticketer, (contents, amount)), stack), ctxt)
 
 let step :
     type b a.

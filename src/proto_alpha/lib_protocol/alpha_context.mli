@@ -359,6 +359,7 @@ module Script : sig
     | I_SHA3
     | I_PAIRING_CHECK
     | I_TICKET
+    | I_READ_TICKET
     | T_bool
     | T_contract
     | T_int
