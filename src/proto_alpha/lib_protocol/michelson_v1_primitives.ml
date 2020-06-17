@@ -170,6 +170,7 @@ type prim =
   | T_bls12_381_g1
   | T_bls12_381_g2
   | T_bls12_381_fr
+  | T_ticket
 
 (* Auxiliary types for error documentation.
    All the prim constructor prefixes must match their namespace. *)
@@ -315,7 +316,8 @@ let namespace = function
   | T_unit
   | T_bls12_381_fr
   | T_bls12_381_g1
-  | T_bls12_381_g2 ->
+  | T_bls12_381_g2
+  | T_ticket ->
       Type_namespace
 
 let valid_case name =
@@ -603,6 +605,8 @@ let string_of_prim = function
       "bls12_381_g2"
   | T_bls12_381_fr ->
       "bls12_381_fr"
+  | T_ticket ->
+      "ticket"
 
 let prim_of_string = function
   | "parameter" ->
@@ -875,6 +879,8 @@ let prim_of_string = function
       ok T_bls12_381_g2
   | "bls12_381_fr" ->
       ok T_bls12_381_fr
+  | "ticket" ->
+      ok T_ticket
   | n ->
       if valid_case n then error (Unknown_primitive_name n)
       else error (Invalid_case n)
@@ -1067,7 +1073,8 @@ let prim_encoding =
          ("sapling_state", T_sapling_state);
          ("sapling_transaction", T_sapling_transaction);
          ("SAPLING_EMPTY_STATE", I_SAPLING_EMPTY_STATE);
-         ("SAPLING_VERIFY_UPDATE", I_SAPLING_VERIFY_UPDATE)
+         ("SAPLING_VERIFY_UPDATE", I_SAPLING_VERIFY_UPDATE);
+         ("ticket", T_ticket)
          (* New instructions must be added here, for backward compatibility of the encoding. *)
          (* Keep the comment above at the end of the list *)
         ]
