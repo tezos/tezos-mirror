@@ -636,6 +636,21 @@ Stack operations
 
     > DUP / x : S  =>  x : x : S
 
+-  ``DUP n``: Duplicate the N-th element of the stack. `DUP 1` is equivalent to `DUP`. `DUP 0` is rejected.
+
+::
+
+    DUP 1 :: 'a : 'A   ->   'a : 'a : 'A
+
+    DUP (n+1) :: 'a : 'A   ->   'b : 'a : 'A
+        iff DUP n :: 'A   ->    'b : 'A
+
+    > DUP 1 / x : S  =>  x : x : S
+
+    > DUP (n+1) / x : S  =>  y : x : S
+      iff DUP n / S  =>  y : S
+
+
 -  ``SWAP``: Exchange the top two elements of the stack.
 
 ::
@@ -2141,15 +2156,6 @@ Syntactic Conveniences
 These macros are simply more convenient syntax for various common
 operations.
 
--  ``DUP n``: A syntactic sugar for duplicating the ``n``\ th element of
-   the stack.
-
-::
-
-    > DUP 1 / S  =>  DUP / S
-    > DUP 2 / S  =>  DIP (DUP) ; SWAP / S
-    > DUP (n+1) / S  =>  DIP n (DUP) ; DIG (n+1) / S
-
 -  ``P(\left=A|P(\left)(\right))(\right=I|P(\left)(\right))R``: A syntactic sugar
    for building nested pairs.
 
@@ -3205,6 +3211,7 @@ Full grammar
       | DROP
       | DROP <natural number constant>
       | DUP
+      | DUP <natural number constant>
       | SWAP
       | DIG <natural number constant>
       | DUG <natural number constant>
