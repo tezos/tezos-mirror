@@ -539,34 +539,8 @@ let expand_unpappaiir original =
 
 exception Not_a_dup
 
-let dupn loc nloc n annot =
-  assert (n > 1) ;
-  if n = 2 then
-    (* keep the old expansion, shorter for [DUP 2] *)
-    Seq
-      ( loc,
-        [ Prim (loc, "DIP", [Seq (loc, [Prim (nloc, "DUP", [], annot)])], []);
-          Prim (loc, "SWAP", [], []) ] )
-  else
-    Seq
-      ( loc,
-        [ Prim
-            ( loc,
-              "DIP",
-              [ Int (loc, Z.of_int (n - 1));
-                Seq (loc, [Prim (loc, "DUP", [], annot)]) ],
-              [] );
-          Prim (loc, "DIG", [Int (nloc, Z.of_int n)], []) ] )
-
-let expand_dupn original =
-  match original with
-  | Prim (loc, "DUP", [Int (nloc, n)], annot) ->
-      ok (Some (dupn loc nloc (Z.to_int n) annot))
-  | _ ->
-      ok None
-
 let expand_deprecated_duuuuup original =
-  (* transparently expands deprecated macro [DU...UP] to [{ DIP n { DUP } ; DIG n }] *)
+  (* transparently expands deprecated macro [DU...UP] to [{ DUP n }] *)
   match original with
   | Prim (loc, str, args, annot) ->
       let len = String.length str in
@@ -584,7 +558,8 @@ let expand_deprecated_duuuuup original =
         >>? fun () ->
         try
           let rec parse i =
-            if i = 1 then dupn loc loc (len - 2) annot
+            if i = 1 then
+              Prim (loc, "DUP", [Int (loc, Z.of_int (len - 2))], annot)
             else if str.[i] = 'U' then parse (i - 1)
             else raise_notrace Not_a_dup
           in
@@ -806,7 +781,6 @@ let expand original =
       (* expand_unpaaiair ; *)
       expand_unpappaiir;
       expand_deprecated_duuuuup;
-      expand_dupn;
       expand_compare;
       expand_asserts;
       expand_if_some;
