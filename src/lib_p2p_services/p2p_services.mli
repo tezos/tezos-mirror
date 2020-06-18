@@ -115,18 +115,13 @@ module Points : sig
     P2p_point.Id.t ->
     (P2p_point.Pool_event.t list Lwt_stream.t * stopper) tzresult Lwt.t
 
-  val ban : #simple -> P2p_point.Id.t -> unit tzresult Lwt.t
-
-  val unban : #simple -> P2p_point.Id.t -> unit tzresult Lwt.t
-
-  val trust : #simple -> P2p_point.Id.t -> unit tzresult Lwt.t
-
-  val untrust : #simple -> P2p_point.Id.t -> unit tzresult Lwt.t
+  val patch :
+    #simple ->
+    P2p_point.Id.t ->
+    [`Ban | `Open | `Trust] option * P2p_peer.Id.t option ->
+    P2p_point.Info.t tzresult Lwt.t
 
   val banned : #simple -> P2p_point.Id.t -> bool tzresult Lwt.t
-
-  val set_expected_peer_id :
-    #simple -> P2p_point.Id.t -> P2p_peer.Id.t -> unit tzresult Lwt.t
 
   module S : sig
     val list :
@@ -147,6 +142,18 @@ module Points : sig
         P2p_point.Info.t )
       RPC_service.t
 
+    val patch_input_encoding :
+      ([`Ban | `Open | `Trust] option * P2p_peer.Id.t option) Data_encoding.t
+
+    val patch :
+      ( [`PATCH],
+        unit,
+        unit * P2p_point.Id.t,
+        unit,
+        [`Ban | `Open | `Trust] option * P2p_peer.Id.t option,
+        P2p_point.Info.t )
+      RPC_service.service
+
     val events :
       ( [`GET],
         unit,
@@ -161,15 +168,6 @@ module Points : sig
 
     val unban :
       ([`GET], unit, unit * P2p_point.Id.t, unit, unit, unit) RPC_service.t
-
-    val set_expected_peer_id :
-      ( [`PATCH],
-        unit,
-        unit * P2p_point.Id.t,
-        unit,
-        P2p_peer.Id.t,
-        unit )
-      RPC_service.t
 
     val trust :
       ([`GET], unit, unit * P2p_point.Id.t, unit, unit, unit) RPC_service.t
@@ -201,13 +199,11 @@ module Peers : sig
     P2p_peer.Id.t ->
     (P2p_peer.Pool_event.t list Lwt_stream.t * stopper) tzresult Lwt.t
 
-  val ban : #simple -> P2p_peer.Id.t -> unit tzresult Lwt.t
-
-  val unban : #simple -> P2p_peer.Id.t -> unit tzresult Lwt.t
-
-  val trust : #simple -> P2p_peer.Id.t -> unit tzresult Lwt.t
-
-  val untrust : #simple -> P2p_peer.Id.t -> unit tzresult Lwt.t
+  val patch :
+    #simple ->
+    P2p_peer.Id.t ->
+    [`Ban | `Open | `Trust] option ->
+    (Peer_metadata.t, Connection_metadata.t) P2p_peer.Info.t tzresult Lwt.t
 
   val banned : #simple -> P2p_peer.Id.t -> bool tzresult Lwt.t
 
@@ -240,6 +236,17 @@ module Peers : sig
         unit,
         P2p_peer.Pool_event.t list )
       RPC_service.t
+
+    val patch_input_encoding : [`Ban | `Open | `Trust] option Data_encoding.t
+
+    val patch :
+      ( [`PATCH],
+        unit,
+        unit * Crypto_box.Public_key_hash.t,
+        unit,
+        [`Ban | `Open | `Trust] option,
+        (Peer_metadata.t, Connection_metadata.t) P2p_peer.Info.t )
+      RPC_service.service
 
     val ban :
       ([`GET], unit, unit * P2p_peer.Id.t, unit, unit, unit) RPC_service.t
