@@ -37,7 +37,7 @@ val split_path : string -> string list
     split(s). [dups] defaults to [true] and [limit] defaults to [max_int].
     Examples:
     - split ~dup:true ',' ",hello,,world,"] returns ["hello"; "world"]
-    - split ~dup:false ',' ",,hello,world,,"] returns [","; "hello"; "world"; ","]
+    - split ~dup:false ',' ",,hello,,,world,,"] returns [""; "hello"; ""; ""; "world"; ""]
  *)
 val split : char -> ?dup:bool -> ?limit:int -> string -> string list
 
