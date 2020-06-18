@@ -1103,8 +1103,8 @@ is, concatenate or splice them, and use them as keys.
     > COMPARE / s : t : S  =>  1 : S
         iff s > t
 
-Operations on pairs
-~~~~~~~~~~~~~~~~~~~
+Operations on pairs and right combs
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The type ``pair l r`` is the type of binary pairs composed of a left
 element of type ``l`` and a right element of type ``r``. A value of
@@ -1120,7 +1120,7 @@ the right-comb value ``Pair x{0} (Pair x{1} ... (Pair x{n-2} x{n-1})
 ...)``. Right-comb values can also be written using sequences; ``Pair
 x{0} x{1} ... x{n-2} x{n-1}`` can be written ``{x{0}; x{1}; ...; x{n-2}; x{n-1}}``.
 
--  ``PAIR``: Build a pair from the stack's top two elements.
+-  ``PAIR``: Build a binary pair from the stack's top two elements.
 
 ::
 
@@ -1128,13 +1128,51 @@ x{0} x{1} ... x{n-2} x{n-1}`` can be written ``{x{0}; x{1}; ...; x{n-2}; x{n-1}}
 
     > PAIR / x : y : S  =>  Pair x y : S
 
+-  ``PAIR n``: Fold ``n`` values on the top of the stack in a right comb.
+   ``PAIR 0`` and ``PAIR 1`` are rejected. ``PAIR 2`` is equivalent to ``PAIR``.
+
+::
+
+    PAIR 2 :: 'a : 'b : 'S   ->   pair 'a 'b : 'S
+    PAIR (k+1) :: 'x : 'S   ->   pair 'x 'y : 'T
+         iff PAIR k :: 'S   ->   'y : 'T
+
+    Or equivalently, for n >= 2,
+    PAIR n :: 'a{0} : ... : 'a{n-1} : 'A -> pair 'a{0} ...  'a{n-1} : 'A
+
+    > PAIR 2 / x : y : S  =>  Pair x y : S
+    > PAIR (k+1) / x : S  =>  Pair x y : T
+         iff PAIR k / S  =>  y : T
+
+    Or equivalently, for n >= 2,
+    > PAIR n / x{0} : ... : x{n-1} : S  =>  Pair x{0} ... x{n-1} : S
+
 -  ``UNPAIR``: Split a pair into its components.
 
 ::
 
     :: pair 'a 'b : 'S   ->   'a : 'b : 'S
 
-    > UNPAIR / (Pair a b) : S  =>  a : b : S
+    > UNPAIR / Pair a b : S  =>  a : b : S
+
+
+-  ``UNPAIR n``: Unfold ``n`` values from a right comb on the top of the stack. ``UNPAIR 0`` and ``UNPAIR 1`` are rejected. ``UNPAIR 2`` is equivalent to ``UNPAIR``.
+
+::
+
+    UNPAIR 2 :: pair 'a 'b : 'A   ->   'a : 'b : 'A
+    UNPAIR (k+1) :: pair 'a 'b : 'A   ->   'a : 'B
+         iff UNPAIR k :: 'b : 'A   ->   'B
+
+    Or equivalently, for n >= 2,
+    UNPAIR n :: pair 'a{0} ... 'a{n-1} : S   ->   'a{0} : ... : 'a{n-1} : S
+
+    > UNPAIR 2 / Pair x y : S  =>  x : y : S
+    > UNPAIR (k+1) / Pair x y : SA  =>  x : SB
+         iff UNPAIR k / y : SA  =>  SB
+
+    Or equivalently, for n >= 2,
+    > UNPAIR n / Pair x{0} ... x{n-1} : S  =>  x{0} : ... : x{n-1} : S
 
 -  ``CAR``: Access the left part of a pair.
 
@@ -1142,7 +1180,7 @@ x{0} x{1} ... x{n-2} x{n-1}`` can be written ``{x{0}; x{1}; ...; x{n-2}; x{n-1}}
 
     :: pair 'a _ : 'S   ->   'a : 'S
 
-    > CAR / (Pair a _) : S  =>  a : S
+    > CAR / Pair x _ : S  =>  x : S
 
 -  ``CDR``: Access the right part of a pair.
 
@@ -1150,7 +1188,82 @@ x{0} x{1} ... x{n-2} x{n-1}`` can be written ``{x{0}; x{1}; ...; x{n-2}; x{n-1}}
 
     :: pair _ 'b : 'S   ->   'b : 'S
 
-    > CDR / (Pair _ b) : S  =>  b : S
+    > CDR / Pair _ y : S  =>  y : S
+
+- ``GET k``: Access an element or a sub comb in a right comb.
+
+  The nodes of a right comb of size ``n`` are canonically numbered as follows:
+
+::
+
+         0
+       /   \
+     1       2
+           /   \
+         3       4
+               /   \
+             5       ...
+                          2n-2
+                        /      \
+                   2n-1          2n
+
+
+Or in plain English:
+
+  - The root is numbered with 0,
+  - The left child of the node numbered by ``k`` is numbered by ``k+1``, and
+  - The right child of the node numbered by ``k`` is numbered by ``k+2``.
+
+The ``GET k`` instruction accesses the node numbered by ``k``. In
+particular, for a comb of size ``n``, the ``n-1`` first elements are
+accessed by ``GET 1``, ``GET 3``, ..., and ``GET (2n-1)`` and the last
+element is accessed by ``GET (2n)``.
+
+::
+
+    GET 0 :: 'a : 'S   ->   'a : 'S
+    GET 1 :: pair 'x _ : 'S   ->   'x : 'S
+    GET (k+2) :: pair _ 'y : 'S   ->   'z : 'S
+         iff GET k :: 'y : 'S   ->   'z : 'S
+
+    Or equivalently,
+    GET 0 :: 'a : 'S   ->   'a : 'S
+    GET (2k) :: pair 'a{0} ... 'a{k-1} 'a{k} : 'S   ->   'a{k} : 'S
+    GET (2k+1) :: pair 'a{0} ... 'a{k} 'a{k+1} : 'S   ->   'a{k} : 'S
+
+    > GET 0 / x : S  =>  x : S
+    > GET 1 / Pair x _ : S  =>  x : S
+    > GET (k+2) / Pair _ y : S  =>  GET k / y : S
+
+    Or equivalently,
+    > GET 0 / x : S  =>  x : S
+    > GET (2k) / Pair x{0} ... x{k-1} x{k} : 'S   ->   x{k} : 'S
+    > GET (2k+1) / Pair x{0} ... x{k} x{k+1} : 'S   ->   x{k} : 'S
+
+
+- ``UPDATE k``: Update an element or a sub comb in a right comb. The topmost stack element is the new value to insert in the comb, the second stack element is the right comb to update. The meaning of ``k`` is the same as for the ``GET k`` instruction.
+
+::
+
+    UPDATE 0 :: 'a : 'b : 'S   ->   'a : 'S
+    UPDATE 1 :: 'a2 : pair 'a1 'b : 'S   ->   pair 'a2 'b : 'S
+    UPDATE (k+2) :: 'c : pair 'a 'b1 : 'S   ->   pair 'a 'b2 : 'S
+         iff UPDATE k :: 'c : 'b1 : 'S   ->   'b2 : 'S
+
+    Or equivalently,
+    UPDATE 0 :: 'a : 'b : 'S   ->   'a : 'S
+    UPDATE (2k) :: 'c : pair 'a{0} ... 'a{k-1} 'a{k} : 'S   ->   pair 'a{0} ... 'a{k-1} 'c : 'S
+    UPDATE (2k+1) :: 'c : pair 'a{0} ... 'a{k} 'a{k+1} : 'S   ->   pair 'a{0} ... 'a{k-1} 'c 'a{k+1} : 'S
+
+    > UPDATE 0 / x : _ : S  =>  x : S
+    > UPDATE 1 / x2 : Pair x1 y : S  =>  Pair x2 y : S
+    > UPDATE (k+2) / z : Pair x y1 : S  =>  Pair x y2 : S
+         iff UPDATE k / z : y1 : S  =>  y2 : S
+
+    Or equivalently,
+    > UPDATE 0 / x : _ : S  =>  x : S
+    > UPDATE (2k) / z : Pair x{0} ... x{k-1} x{k} : 'S  =>  Pair x{0} ... x{k-1} z : 'S
+    > UPDATE (2k+1) / z : Pair x{0} ... x{k-1} x{k} x{k+1} : 'S  =>  Pair x{0} ... x{k-1} z x{k+1} : 'S
 
 -  ``COMPARE``: Lexicographic comparison.
 
@@ -2173,7 +2286,7 @@ These macros are simply more convenient syntax for various common
 operations.
 
 -  ``P(\left=A|P(\left)(\right))(\right=I|P(\left)(\right))R``: A syntactic sugar
-   for building nested pairs.
+   for building nested pairs. In the case of right combs, `PAIR n` is more efficient.
 
 ::
 
@@ -2210,12 +2323,24 @@ A typing rule can be inferred:
     > UNP(\left)IR / S => UNPAIR ; UN(\left)R / S
     > UNP(\left)(\right)R => UNPAIR ; DIP (UN(\right)R) ; UN(\left)R / S
 
--  ``C[AD]+R``: A syntactic sugar for accessing fields in nested pairs.
+-  ``C[AD]+R``: A syntactic sugar for accessing fields in nested pairs. In the case of right combs, ``CAR k`` and ``CDR k`` are more efficient.
 
 ::
 
     > CA(\rest=[AD]+)R / S  =>  CAR ; C(\rest)R / S
     > CD(\rest=[AD]+)R / S  =>  CDR ; C(\rest)R / S
+
+-  ``CAR k``: Access the ``k`` -th part of a right comb of size ``n > k + 1``. ``CAR 0`` is equivalent to ``CAR`` and in general ``CAR k`` is equivalent to ``k`` times the ``CDR`` instruction followed by once the ``CAR`` instruction. Note that this instruction cannot access the last element of a right comb; ``CDR k`` should be used for that.
+
+::
+
+    > CAR n / S  =>  GET (2n+1) / S
+
+-  ``CDR k``: Access the rightmost element of a right comb of size ``k``. ``CDR 0`` is a no-op, ``CDR 1`` is equivalent to ``CDR`` and in general ``CDR k`` is equivalent to ``k`` times the ``CDR`` instruction. Note that on a right comb of size ``n > k >= 2``, ``CDR k`` will return the right comb composed of the same elements but the ``k`` leftmost ones.
+
+::
+
+    > CDR n / S  =>  GET (2n) / S
 
 -  ``IF_SOME bt bf``: Inspect an optional value.
 
@@ -2229,20 +2354,20 @@ A typing rule can be inferred:
 
     > IF_RIGHT bt bf / S  =>  IF_LEFT bf bt / S
 
--  ``SET_CAR``: Set the left field of a pair.
+-  ``SET_CAR``: Set the left field of a pair. This is equivalent to ``SWAP; UPDATE 1``.
 
 ::
 
     > SET_CAR  =>  CDR ; SWAP ; PAIR
 
--  ``SET_CDR``: Set the right field of a pair.
+-  ``SET_CDR``: Set the right field of a pair. This is equivalent to ``SWAP; UPDATE 2``.
 
 ::
 
     > SET_CDR  =>  CAR ; PAIR
 
 -  ``SET_C[AD]+R``: A syntactic sugar for setting fields in nested
-   pairs.
+   pairs. In the case of right combs, `UPDATE n` is more efficient.
 
 ::
 
@@ -3238,9 +3363,11 @@ Full grammar
       | NEVER
       | IF_NONE { <instruction> ... } { <instruction> ... }
       | PAIR
+      | PAIR <natural number constant>
       | CAR
       | CDR
       | UNPAIR
+      | UNPAIR <natural number constant>
       | LEFT <type>
       | RIGHT <type>
       | IF_LEFT { <instruction> ... } { <instruction> ... }
@@ -3255,7 +3382,9 @@ Full grammar
       | ITER { <instruction> ... }
       | MEM
       | GET
+      | GET <natural number constant>
       | UPDATE
+      | UPDATE <natural number constant>
       | IF { <instruction> ... } { <instruction> ... }
       | LOOP { <instruction> ... }
       | LOOP_LEFT { <instruction> ... }
