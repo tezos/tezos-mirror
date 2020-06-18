@@ -375,13 +375,9 @@ let test_unpair () =
     into   "DIP {DUP} ; SWAP"
 *)
 let test_duup () =
-  let dup = Prim (zero_loc, "DUP", [], []) in
   assert_expands
     (Prim (zero_loc, "DUUP", [], []))
-    (Seq
-       ( zero_loc,
-         [ Prim (zero_loc, "DIP", [Seq (zero_loc, [dup])], []);
-           Prim (zero_loc, "SWAP", [], []) ] ))
+    (Prim (zero_loc, "DUP", [Int (zero_loc, Z.of_int 2)], []))
 
 (* car/cdr *)
 
