@@ -512,6 +512,13 @@ integration:examples_test_example:
 documentation:build:
   <<: *test_definition
   except:
+    - master
+    - zeronet
+    - mainnet
+    - zeronet-staging
+    - mainnet-staging
+    - zeronet-snapshots
+    - mainnet-snapshots
     - /-release$/
     - tags
   script:
@@ -524,6 +531,13 @@ documentation:build:
 documentation:linkcheck:
   <<: *test_definition
   except:
+    - master
+    - zeronet
+    - mainnet
+    - zeronet-staging
+    - mainnet-staging
+    - zeronet-snapshots
+    - mainnet-snapshots
     - /-release$/
     - tags
   script:
