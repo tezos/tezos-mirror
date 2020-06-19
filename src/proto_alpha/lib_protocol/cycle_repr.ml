@@ -32,11 +32,7 @@ let encoding = Data_encoding.int32
 let rpc_arg =
   let construct = Int32.to_string in
   let destruct str =
-    match Int32.of_string_opt str with
-    | None ->
-        Error "Cannot parse cycle"
-    | Some cycle ->
-        Ok cycle
+    Int32.of_string_opt str |> Option.to_result ~none:"Cannot parse cycle"
   in
   RPC_arg.make
     ~descr:"A cycle integer"

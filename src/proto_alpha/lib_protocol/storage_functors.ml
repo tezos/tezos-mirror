@@ -164,7 +164,7 @@ struct
   let init_set t v = C.init_set t N.name (to_bytes v) >|= fun t -> C.project t
 
   let set_option t v =
-    C.set_option t N.name (Option.map ~f:to_bytes v) >|= fun t -> C.project t
+    C.set_option t N.name (Option.map to_bytes v) >|= fun t -> C.project t
 
   let remove t = C.remove t N.name >|= fun t -> C.project t
 
@@ -320,7 +320,7 @@ module Make_indexed_data_storage (C : Raw_context.T) (I : INDEX) (V : VALUE) :
     C.init_set s (I.to_path i []) (to_bytes v) >|= fun t -> C.project t
 
   let set_option s i v =
-    C.set_option s (I.to_path i []) (Option.map ~f:to_bytes v)
+    C.set_option s (I.to_path i []) (Option.map to_bytes v)
     >|= fun t -> C.project t
 
   let remove s i = C.remove s (I.to_path i []) >|= fun t -> C.project t
@@ -895,7 +895,7 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
       C.project s
 
     let set_option s i v =
-      Raw_context.set_option (pack s i) N.name (Option.map ~f:to_bytes v)
+      Raw_context.set_option (pack s i) N.name (Option.map to_bytes v)
       >|= fun c ->
       let (s, _) = unpack c in
       C.project s

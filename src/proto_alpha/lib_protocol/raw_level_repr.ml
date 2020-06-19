@@ -36,11 +36,7 @@ let pp ppf level = Format.fprintf ppf "%ld" level
 let rpc_arg =
   let construct raw_level = Int32.to_string raw_level in
   let destruct str =
-    match Int32.of_string_opt str with
-    | None ->
-        Error "Cannot parse level"
-    | Some raw_level ->
-        Ok raw_level
+    Int32.of_string_opt str |> Option.to_result ~none:"Cannot parse level"
   in
   RPC_arg.make
     ~descr:"A level integer"
