@@ -157,13 +157,18 @@ let compute_endorsing_power cctxt ~chain ~block operations =
     (fun sum -> function
       | { Alpha_context.protocol_data =
             Operation_data {contents = Single (Endorsement _); _};
-          _ } as op ->
+          _ } as op -> (
           Delegate_services.Endorsing_power.get
             cctxt
             (chain, block)
             op
             chain_id
-          >>=? fun power -> return (sum + power) | _ -> return sum)
+          >>= function
+          | Error _ ->
+              (* Filters invalid endorsements *)
+              return sum
+          | Ok power ->
+              return (sum + power) ) | _ -> return sum)
     0
     operations
 
