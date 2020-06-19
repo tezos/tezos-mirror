@@ -27,7 +27,9 @@ open Protocol
 
 (** Generation of input data *)
 
-let ids = [|1; 42; 1337; 1984|] |> Array.map Z.of_int
+let ids =
+  [|1; 42; 1337; 1984|] |> Array.map Z.of_int
+  |> Array.map Lazy_storage_kind.Big_map.Id.parse_z
 
 let strs = [|"0"; "True"; "nat"; "bool"|]
 
@@ -41,19 +43,23 @@ let updates_len_existing = [1; 2; 3]
 let updates_len_other = 0 :: updates_len_existing
 
 let gen_inits idx :
-    (Lazy_storage_diff.Big_map.alloc Lazy_storage_diff.init * int list) list =
+    ( ( Lazy_storage_kind.Big_map.Id.t,
+        Lazy_storage_kind.Big_map.alloc )
+      Lazy_storage_diff.init
+    * int list )
+    list =
   [ (Existing, updates_len_existing);
     (Copy {src = ids.(idx - 1)}, updates_len_other);
     ( Alloc {key_type = exprs.(idx); value_type = exprs.(idx - 1)},
       updates_len_other ) ]
 
-let gen_update_list idx : Lazy_storage_diff.Big_map.update list =
+let gen_update_list idx : Lazy_storage_kind.Big_map.update list =
   [None; Some exprs.(idx)]
   |> List.map (fun value ->
-         Lazy_storage_diff.Big_map.
+         Lazy_storage_kind.Big_map.
            {key = exprs.(idx); key_hash = hashes.(idx); value})
 
-let rec gen_updates updates_len : Lazy_storage_diff.Big_map.updates list =
+let rec gen_updates updates_len : Lazy_storage_kind.Big_map.updates list =
   if updates_len = 0 then []
   else
     gen_updates (updates_len - 1)
@@ -62,12 +68,13 @@ let rec gen_updates updates_len : Lazy_storage_diff.Big_map.updates list =
            |> List.map (fun prefix -> prefix :: suffix))
     |> List.flatten
 
-let gen_updates_list updates_lens : Lazy_storage_diff.Big_map.updates list =
+let gen_updates_list updates_lens : Lazy_storage_kind.Big_map.updates list =
   updates_lens |> List.map gen_updates |> List.flatten
 
 let gen_diffs idx :
-    ( Lazy_storage_diff.Big_map.alloc,
-      Lazy_storage_diff.Big_map.updates )
+    ( Lazy_storage_kind.Big_map.Id.t,
+      Lazy_storage_kind.Big_map.alloc,
+      Lazy_storage_kind.Big_map.updates )
     Lazy_storage_diff.diff
     list =
   let open Lazy_storage_diff in
