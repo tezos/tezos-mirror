@@ -308,7 +308,7 @@ val collect_lazy_storage :
   'a ->
   (lazy_storage_ids * context) tzresult
 
-val list_of_big_map_ids : lazy_storage_ids -> Z.t list
+val list_of_big_map_ids : lazy_storage_ids -> Big_map.Id.t list
 
 val extract_lazy_storage_diff :
   context ->

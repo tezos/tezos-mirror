@@ -142,7 +142,7 @@ module S = struct
       ~description:"Access the value associated with a key in a big map."
       ~query:RPC_query.empty
       ~output:Script.expr_encoding
-      RPC_path.(big_map_root /: Big_map.rpc_arg /: Script_expr_hash.rpc_arg)
+      RPC_path.(big_map_root /: Big_map.Id.rpc_arg /: Script_expr_hash.rpc_arg)
 
   let info =
     RPC_service.get_service
@@ -318,7 +318,7 @@ let register () =
           let rec find = function
             | [] ->
                 return_none
-            | (id : Z.t) :: ids -> (
+            | (id : Big_map.Id.t) :: ids -> (
               try do_big_map_get ctxt id key >>=? return_some
               with Not_found -> find ids )
           in
