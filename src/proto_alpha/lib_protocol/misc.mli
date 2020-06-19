@@ -45,3 +45,7 @@ val remove_prefix : prefix:string -> string -> string option
 
 (** [remove nb list] remove the first [nb] elements from the list [list]. *)
 val remove_elem_from_list : int -> 'a list -> 'a list
+
+module Syntax : sig
+  val ( >|=? ) : 'a tzresult Lwt.t -> ('a -> 'b) -> 'b tzresult Lwt.t
+end

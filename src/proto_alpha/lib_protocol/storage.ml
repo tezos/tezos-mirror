@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Storage_functors
+open Misc.Syntax
 
 module UInt16 = struct
   type t = int
@@ -233,7 +234,7 @@ module Contract = struct
     let get ctxt contract =
       I.get ctxt contract
       >>=? fun (ctxt, value) ->
-      consume_deserialize_gas ctxt value >>|? fun ctxt -> (ctxt, value)
+      consume_deserialize_gas ctxt value >|=? fun ctxt -> (ctxt, value)
 
     let get_option ctxt contract =
       I.get_option ctxt contract
@@ -242,7 +243,7 @@ module Contract = struct
       | None ->
           return (ctxt, None)
       | Some value ->
-          consume_deserialize_gas ctxt value >>|? fun ctxt -> (ctxt, value_opt)
+          consume_deserialize_gas ctxt value >|=? fun ctxt -> (ctxt, value_opt)
 
     let set ctxt contract value =
       consume_serialize_gas ctxt value
@@ -476,7 +477,7 @@ module Big_map = struct
     let get ctxt contract =
       I.get ctxt contract
       >>=? fun (ctxt, value) ->
-      consume_deserialize_gas ctxt value >>|? fun ctxt -> (ctxt, value)
+      consume_deserialize_gas ctxt value >|=? fun ctxt -> (ctxt, value)
 
     let get_option ctxt contract =
       I.get_option ctxt contract
@@ -485,7 +486,7 @@ module Big_map = struct
       | None ->
           return (ctxt, None)
       | Some value ->
-          consume_deserialize_gas ctxt value >>|? fun ctxt -> (ctxt, value_opt)
+          consume_deserialize_gas ctxt value >|=? fun ctxt -> (ctxt, value_opt)
   end
 end
 

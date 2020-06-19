@@ -86,3 +86,8 @@ let rec remove_elem_from_list nb = function
       l
   | _ :: tl ->
       remove_elem_from_list (nb - 1) tl
+
+module Syntax = struct
+  (* To be upstreamed in environment v1 *)
+  let ( >|=? ) = ( >>|? )
+end

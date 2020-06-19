@@ -26,6 +26,7 @@
 (** Tezos Protocol Implementation - Main Entry Points *)
 
 open Alpha_context
+open Misc.Syntax
 
 type error += Wrong_voting_period of Voting_period.t * Voting_period.t
 
@@ -812,7 +813,7 @@ let precheck_manager_contents (type kind) ctxt chain_id raw_operation
       >>=? fun (_code, ctxt) ->
       trace Gas_quota_exceeded_init_deserialize
       @@ Script.force_decode ctxt script.storage
-      >>|? fun (_storage, ctxt) -> ctxt
+      >|=? fun (_storage, ctxt) -> ctxt
   | _ ->
       return ctxt )
   >>=? fun ctxt ->
