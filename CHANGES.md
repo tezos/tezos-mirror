@@ -1,3 +1,10 @@
+# Version 7.2
+
+- Fixed an error that could cause baking to fail when validating some smart contracts.
+
+- Fixed an issue in `tezos-docker-manager.sh` which prevented to use some options,
+  such as `--rpc-port`.
+
 # Version 7.1
 
 ## Source Compilation
