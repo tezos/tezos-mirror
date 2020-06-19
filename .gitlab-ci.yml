@@ -488,6 +488,9 @@ integration:examples_test_example:
 
 documentation:build:
   <<: *test_definition
+  except:
+    - /-release$/
+    - tags
   script:
     - make doc-html
   artifacts:
@@ -497,6 +500,9 @@ documentation:build:
 
 documentation:linkcheck:
   <<: *test_definition
+  except:
+    - /-release$/
+    - tags
   script:
     - make doc-html-and-linkcheck
   allow_failure: true
