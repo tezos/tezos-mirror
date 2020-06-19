@@ -38,6 +38,8 @@ type error +=
       time : Time.System.t;
     }
 
+type error += Cannot_serialize_operation_metadata
+
 (************************* State errors ***********************************)
 
 type error += Unknown_chain of Chain_id.t

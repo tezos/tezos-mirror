@@ -363,12 +363,29 @@ module Make (Proto : Registered_protocol.T) = struct
         Proto.block_header_metadata_encoding
         block_data
     in
-    let ops_metadata =
-      List.map
-        (List.map
-           (Data_encoding.Binary.to_bytes_exn Proto.operation_receipt_encoding))
-        ops_metadata
-    in
+    ( try
+        return
+          (List.map
+             (List.map (fun receipt ->
+                  (* Check that the metadata are
+                     serializable/deserializable *)
+                  let bytes =
+                    Data_encoding.Binary.to_bytes_exn
+                      Proto.operation_receipt_encoding
+                      receipt
+                  in
+                  let _ =
+                    Data_encoding.Binary.of_bytes_exn
+                      Proto.operation_receipt_encoding
+                      bytes
+                  in
+                  bytes))
+             ops_metadata)
+      with exn ->
+        trace
+          Validation_errors.Cannot_serialize_operation_metadata
+          (fail (Exn exn)) )
+    >>=? fun ops_metadata ->
     let context =
       Shell_context.unwrap_disk_context validation_result.context
     in

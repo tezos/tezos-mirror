@@ -609,14 +609,33 @@ let filter_and_apply_operations cctxt state ~chain ~block block_info ~priority
           Tag.DSL.(
             fun f ->
               f
-                "@[<v 4>Client-side validation: invalid operation filtered %a@\n\
+                "@[<v 4>Client-side validation: filtered invalid operation %a@\n\
                  %a@]"
               -% t event "baking_rejected_invalid_operation"
               -% a Operation_hash.Logging.tag (Operation.hash_packed op)
               -% a errs_tag errs)
         >>= fun () -> Lwt.return_none
-    | Ok (resulting_state, _receipt) ->
+    | Ok (resulting_state, receipt) -> (
+      try
+        (* Check that the metadata are serializable/deserializable *)
+        let _ =
+          Data_encoding.Binary.(
+            of_bytes_exn
+              Protocol.operation_receipt_encoding
+              (to_bytes_exn Protocol.operation_receipt_encoding receipt))
+        in
         Lwt.return_some resulting_state
+      with exn ->
+        lwt_debug
+          Tag.DSL.(
+            fun f ->
+              f "Client-side validation: filtered invalid operation %a"
+              -% t event "baking_rejected_invalid_operation"
+              -% a
+                   errs_tag
+                   [ Validation_errors.Cannot_serialize_operation_metadata;
+                     Exn exn ])
+        >>= fun () -> Lwt.return_none )
   in
   let filter_valid_operations inc ops =
     Lwt_list.fold_left_s

@@ -38,6 +38,8 @@ type error +=
       time : Time.System.t;
     }
 
+type error += Cannot_serialize_operation_metadata
+
 let () =
   (* Parse error *)
   register_error_kind
@@ -102,7 +104,17 @@ let () =
       | _ ->
           None)
     (fun (block, block_time, time) ->
-      Future_block_header {block; block_time; time})
+      Future_block_header {block; block_time; time}) ;
+  Error_monad.register_error_kind
+    `Permanent
+    ~id:"block_validation.cannot_serialize_metadata"
+    ~title:"Cannot serialize metadata"
+    ~description:"Unable to serialize metadata"
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "Unable to serialize the metadata for an operation.")
+    Data_encoding.empty
+    (function Cannot_serialize_operation_metadata -> Some () | _ -> None)
+    (fun () -> Cannot_serialize_operation_metadata)
 
 (************************* State errors ***********************************)
 
