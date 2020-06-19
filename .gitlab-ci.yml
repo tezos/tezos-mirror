@@ -32,6 +32,8 @@ stages:
     - mainnet-staging
     - zeronet-snapshots
     - mainnet-snapshots
+    - latest-release
+    - tags
   before_script:
     - . ./scripts/version.sh
 
