@@ -121,6 +121,10 @@ type error +=
 
 type error += Type_too_large : Script.location * int * int -> error
 
+type error += Pair_bad_argument of Script.location
+
+type error += Unpair_bad_argument of Script.location
+
 type error += Dup_n_bad_argument of Script.location
 
 type error += Dup_n_bad_stack of Script.location
