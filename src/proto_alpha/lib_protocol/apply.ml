@@ -952,7 +952,15 @@ let check_manager_signature ctxt chain_id (op : _ Kind.manager contents_list)
            [reveal_manager_key] in [precheck_manager_contents]. *)
     | Some (manager, manager_key) ->
         if Signature.Public_key_hash.equal source manager then
-          let key = Option.first_some manager_key source_key in
+          let key =
+            match (manager_key, source_key) with
+            | (Some _, _) ->
+                manager_key
+            | (_, Some _) ->
+                source_key
+            | _ ->
+                None
+          in
           ok (source, key)
         else error Inconsistent_sources
   in

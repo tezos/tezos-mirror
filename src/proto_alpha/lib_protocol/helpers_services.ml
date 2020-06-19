@@ -661,9 +661,9 @@ module Forge = struct
         ~destination ?(entrypoint = "default") ?parameters ~gas_limit
         ~storage_limit ~fee () =
       let parameters =
-        Option.unopt_map
-          ~f:Script.lazy_expr
-          ~default:Script.unit_parameter
+        Option.fold
+          ~some:Script.lazy_expr
+          ~none:Script.unit_parameter
           parameters
       in
       operations
