@@ -6,6 +6,7 @@ list.mli
 lwt.mli
 lwt_list.mli
 map.mli
+option.mli
 pervasives.mli
 s.mli
 set.mli

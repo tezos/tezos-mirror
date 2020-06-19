@@ -125,7 +125,7 @@ struct
   module Nativeint = Nativeint
   module Buffer = Buffer
   module Format = Format
-  module Option = Tezos_protocol_environment_structs.V0.M.Option
+  module Option = Option
 
   module Raw_hashes = struct
     let sha256 = Hacl.Hash.SHA256.digest
@@ -706,19 +706,19 @@ struct
           | `No_content ->
               Lwt.return `No_content
           | `Unauthorized e ->
-              let e = Option.map e ~f:(List.map (fun e -> Ecoproto_error e)) in
+              let e = Option.map (List.map (fun e -> Ecoproto_error e)) e in
               Lwt.return (`Unauthorized e)
           | `Forbidden e ->
-              let e = Option.map e ~f:(List.map (fun e -> Ecoproto_error e)) in
+              let e = Option.map (List.map (fun e -> Ecoproto_error e)) e in
               Lwt.return (`Forbidden e)
           | `Not_found e ->
-              let e = Option.map e ~f:(List.map (fun e -> Ecoproto_error e)) in
+              let e = Option.map (List.map (fun e -> Ecoproto_error e)) e in
               Lwt.return (`Not_found e)
           | `Conflict e ->
-              let e = Option.map e ~f:(List.map (fun e -> Ecoproto_error e)) in
+              let e = Option.map (List.map (fun e -> Ecoproto_error e)) e in
               Lwt.return (`Conflict e)
           | `Error e ->
-              let e = Option.map e ~f:(List.map (fun e -> Ecoproto_error e)) in
+              let e = Option.map (List.map (fun e -> Ecoproto_error e)) e in
               Lwt.return (`Error e))
 
     let register dir service handler =
