@@ -124,7 +124,7 @@ let in_listings = Storage.Vote.Listings.mem
 let get_listings = Storage.Vote.Listings.bindings
 
 let get_voting_power_free ctxt owner =
-  Storage.Vote.Listings.get_option ctxt owner >>|? Option.unopt ~default:0l
+  Storage.Vote.Listings.get_option ctxt owner >|=? Option.unopt ~default:0l
 
 (* This function bypases the carbonated functors to account for gas consumption.
    This is a temporary situation intended to be fixed by adding the right

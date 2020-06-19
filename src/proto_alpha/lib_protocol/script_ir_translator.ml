@@ -1514,7 +1514,7 @@ let merge_branches :
         serialize_stack_for_error ctxt aftbt
         >>=? fun (aftbt, ctxt) ->
         serialize_stack_for_error ctxt aftbf
-        >>|? fun (aftbf, _ctxt) -> Unmatched_branches (loc, aftbt, aftbf)
+        >|=? fun (aftbf, _ctxt) -> Unmatched_branches (loc, aftbt, aftbf)
       in
       trace_eval
         unmatched_branches
@@ -2246,7 +2246,7 @@ let rec parse_data :
   >>=? fun ctxt ->
   let error () =
     Lwt.return (serialize_ty_for_error ctxt ty)
-    >>|? fun (ty, _ctxt) ->
+    >|=? fun (ty, _ctxt) ->
     Invalid_constant (location script_data, strip_locations script_data, ty)
   in
   let traced body = trace_eval error body in
@@ -2283,7 +2283,7 @@ let rec parse_data :
       (None, empty_map key_type, ctxt)
       items
     |> traced
-    >>|? fun (_, items, ctxt) -> (items, ctxt)
+    >|=? fun (_, items, ctxt) -> (items, ctxt)
   in
   match (ty, script_data) with
   (* Unit *)
@@ -2291,7 +2291,7 @@ let rec parse_data :
       (if legacy then return () else fail_unexpected_annot loc annot)
       >>=? fun () ->
       Lwt.return (Gas.consume ctxt Typecheck_costs.unit)
-      >>|? fun ctxt -> ((() : a), ctxt)
+      >|=? fun ctxt -> ((() : a), ctxt)
   | (Unit_t _, Prim (loc, D_Unit, l, _)) ->
       traced (fail (Invalid_arity (loc, D_Unit, 0, List.length l)))
   | (Unit_t _, expr) ->
@@ -2301,12 +2301,12 @@ let rec parse_data :
       (if legacy then return () else fail_unexpected_annot loc annot)
       >>=? fun () ->
       Lwt.return (Gas.consume ctxt Typecheck_costs.bool)
-      >>|? fun ctxt -> (true, ctxt)
+      >|=? fun ctxt -> (true, ctxt)
   | (Bool_t _, Prim (loc, D_False, [], annot)) ->
       (if legacy then return () else fail_unexpected_annot loc annot)
       >>=? fun () ->
       Lwt.return (Gas.consume ctxt Typecheck_costs.bool)
-      >>|? fun ctxt -> (false, ctxt)
+      >|=? fun ctxt -> (false, ctxt)
   | (Bool_t _, Prim (loc, ((D_True | D_False) as c), l, _)) ->
       traced (fail (Invalid_arity (loc, c, 0, List.length l)))
   | (Bool_t _, expr) ->
@@ -2684,7 +2684,7 @@ let rec parse_data :
              >>=? fun ctxt -> return (Some v, set_update v true set, ctxt))
            (None, empty_set t, ctxt)
            vs
-      >>|? fun (_, set, ctxt) -> (set, ctxt)
+      >|=? fun (_, set, ctxt) -> (set, ctxt)
   | (Set_t _, expr) ->
       traced (fail (Invalid_kind (location expr, [Seq_kind], kind expr)))
   (* Maps *)
@@ -2782,7 +2782,7 @@ and parse_returning :
           Lwt.return (serialize_ty_for_error ctxt ret)
           >>=? fun (ret, ctxt) ->
           serialize_stack_for_error ctxt stack_ty
-          >>|? fun (stack_ty, _ctxt) -> Bad_return (loc, stack_ty, ret))
+          >|=? fun (stack_ty, _ctxt) -> Bad_return (loc, stack_ty, ret))
         ( Lwt.return (merge_types ~legacy ctxt loc ty ret)
         >>=? fun (Eq, _ret, ctxt) ->
         return ((Lam (descr, script_instr) : (arg, ret) lambda), ctxt) )
@@ -2825,7 +2825,7 @@ and parse_instr :
       ((a, b) eq * a ty * context) tzresult Lwt.t =
     trace_eval (fun () ->
         serialize_stack_for_error ctxt stack_ty
-        >>|? fun (stack_ty, _ctxt) -> Bad_stack (loc, name, m, stack_ty))
+        >|=? fun (stack_ty, _ctxt) -> Bad_stack (loc, name, m, stack_ty))
     @@ trace (Bad_stack_item n)
     @@ Lwt.return
          ( merge_types ~legacy ctxt loc exp got
@@ -3232,7 +3232,7 @@ and parse_instr :
       | Typed ({aft = Item_t (ret, rest, _); _} as ibody) ->
           let invalid_map_body () =
             serialize_stack_for_error ctxt ibody.aft
-            >>|? fun (aft, _ctxt) -> Invalid_map_body (loc, aft)
+            >|=? fun (aft, _ctxt) -> Invalid_map_body (loc, aft)
           in
           trace_eval
             invalid_map_body
@@ -3269,7 +3269,7 @@ and parse_instr :
             serialize_stack_for_error ctxt ibody.aft
             >>=? fun (aft, ctxt) ->
             serialize_stack_for_error ctxt rest
-            >>|? fun (rest, _ctxt) -> Invalid_iter_body (loc, rest, aft)
+            >|=? fun (rest, _ctxt) -> Invalid_iter_body (loc, rest, aft)
           in
           trace_eval
             invalid_iter_body
@@ -3307,7 +3307,7 @@ and parse_instr :
             serialize_stack_for_error ctxt ibody.aft
             >>=? fun (aft, ctxt) ->
             serialize_stack_for_error ctxt rest
-            >>|? fun (rest, _ctxt) -> Invalid_iter_body (loc, rest, aft)
+            >|=? fun (rest, _ctxt) -> Invalid_iter_body (loc, rest, aft)
           in
           trace_eval
             invalid_iter_body
@@ -3375,7 +3375,7 @@ and parse_instr :
       | Typed ({aft = Item_t (ret, rest, _); _} as ibody) ->
           let invalid_map_body () =
             serialize_stack_for_error ctxt ibody.aft
-            >>|? fun (aft, _ctxt) -> Invalid_map_body (loc, aft)
+            >|=? fun (aft, _ctxt) -> Invalid_map_body (loc, aft)
           in
           trace_eval
             invalid_map_body
@@ -3417,7 +3417,7 @@ and parse_instr :
             serialize_stack_for_error ctxt ibody.aft
             >>=? fun (aft, ctxt) ->
             serialize_stack_for_error ctxt rest
-            >>|? fun (rest, _ctxt) -> Invalid_iter_body (loc, rest, aft)
+            >|=? fun (rest, _ctxt) -> Invalid_iter_body (loc, rest, aft)
           in
           trace_eval
             invalid_iter_body
@@ -3579,7 +3579,7 @@ and parse_instr :
             serialize_stack_for_error ctxt ibody.aft
             >>=? fun (aft, ctxt) ->
             serialize_stack_for_error ctxt stack
-            >>|? fun (stack, _ctxt) -> Unmatched_branches (loc, aft, stack)
+            >|=? fun (stack, _ctxt) -> Unmatched_branches (loc, aft, stack)
           in
           trace_eval
             unmatched_branches
@@ -3612,7 +3612,7 @@ and parse_instr :
             serialize_stack_for_error ctxt ibody.aft
             >>=? fun (aft, ctxt) ->
             serialize_stack_for_error ctxt stack
-            >>|? fun (stack, _ctxt) -> Unmatched_branches (loc, aft, stack)
+            >|=? fun (stack, _ctxt) -> Unmatched_branches (loc, aft, stack)
           in
           trace_eval
             unmatched_branches
@@ -5064,7 +5064,7 @@ let parse_storage :
   trace_eval
     (fun () ->
       Lwt.return @@ serialize_ty_for_error ctxt storage_type
-      >>|? fun (storage_type, _ctxt) ->
+      >|=? fun (storage_type, _ctxt) ->
       Ill_typed_data (None, storage, storage_type))
     (parse_data ?type_logger ctxt ~legacy storage_type (root storage))
 
@@ -5155,7 +5155,7 @@ let typecheck_data :
   trace_eval
     (fun () ->
       Lwt.return @@ serialize_ty_for_error ctxt exp_ty
-      >>|? fun (exp_ty, _ctxt) -> Ill_typed_data (None, data, exp_ty))
+      >|=? fun (exp_ty, _ctxt) -> Ill_typed_data (None, data, exp_ty))
     (parse_data ?type_logger ctxt ~legacy exp_ty (root data))
   >>=? fun (_, ctxt) -> return ctxt
 

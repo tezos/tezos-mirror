@@ -582,7 +582,7 @@ let precheck_manager_contents (type kind) ctxt chain_id raw_operation
       (* Fail if not enough gas for complete deserialization cost *)
       trace Gas_quota_exceeded_init_deserialize
       @@ Script.force_decode ctxt parameters
-      >>|? fun (_arg, ctxt) -> ctxt
+      >|=? fun (_arg, ctxt) -> ctxt
   | Origination {script; _} ->
       (* Fail quickly if not enough gas for minimal deserialization cost *)
       Lwt.return
@@ -598,7 +598,7 @@ let precheck_manager_contents (type kind) ctxt chain_id raw_operation
       >>=? fun (_code, ctxt) ->
       trace Gas_quota_exceeded_init_deserialize
       @@ Script.force_decode ctxt script.storage
-      >>|? fun (_storage, ctxt) -> ctxt
+      >|=? fun (_storage, ctxt) -> ctxt
   | _ ->
       return ctxt )
   >>=? fun ctxt ->

@@ -442,7 +442,7 @@ module Proof = struct
   let all ctxt delegate =
     Storage.Contract.Proof_level.get_option ctxt
     @@ Contract_repr.implicit_contract delegate
-    >>|? Option.unopt ~default:LSet.empty
+    >|=? Option.unopt ~default:LSet.empty
 end
 
 let cycle_end ctxt last_cycle unrevealed =

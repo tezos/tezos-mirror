@@ -395,7 +395,7 @@ module Scripts = struct
               (* Fail if not enough gas for complete deserialization cost *)
               trace Apply.Gas_quota_exceeded_init_deserialize
               @@ Script.force_decode ctxt arg
-              >>|? fun (_arg, ctxt) -> ctxt
+              >|=? fun (_arg, ctxt) -> ctxt
           | Origination {script; _} ->
               (* Here the data comes already deserialized, so we need to fake the deserialization to mimic apply *)
               let script_bytes =
@@ -427,7 +427,7 @@ module Scripts = struct
               >>=? fun (_code, ctxt) ->
               trace Apply.Gas_quota_exceeded_init_deserialize
               @@ Script.force_decode ctxt script.storage
-              >>|? fun (_storage, ctxt) -> ctxt
+              >|=? fun (_storage, ctxt) -> ctxt
           | _ ->
               return ctxt )
           >>=? fun ctxt ->
@@ -834,7 +834,7 @@ module Parse = struct
             (* op.protocol_data.signature op.shell op.protocol_data.contents *)
             | Some false | None ->
                 return_unit )
-            >>|? fun () -> op)
+            >|=? fun () -> op)
           operations) ;
     register0_noctxt S.block (fun () raw_block ->
         parse_protocol_data raw_block.protocol_data)
