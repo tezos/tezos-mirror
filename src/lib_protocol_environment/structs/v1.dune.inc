@@ -2,7 +2,6 @@
  (targets v1.ml)
  (deps
    v1/s.ml
-   v1/option.ml
    v1/blake2B.ml
    v1/ed25519.ml
    v1/secp256k1.ml
