@@ -484,6 +484,14 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int =
       0
   | Pairing_check_bls12_381 ->
       0
+  | Uncomb _ ->
+      0
+  | Comb_get _ ->
+      0
+  | Comb _ ->
+      1
+  | Comb_set _ ->
+      1
   | Dup_n _ ->
       0
 
@@ -2086,6 +2094,26 @@ type _ dropn_proof_argument =
       * 'aft stack_ty )
       -> 'bef dropn_proof_argument
 
+type 'before comb_proof_argument =
+  | Comb_proof_argument :
+      ('before, 'after) comb_gadt_witness * 'after stack_ty
+      -> 'before comb_proof_argument
+
+type 'before uncomb_proof_argument =
+  | Uncomb_proof_argument :
+      ('before, 'after) uncomb_gadt_witness * 'after stack_ty
+      -> 'before uncomb_proof_argument
+
+type 'before comb_get_proof_argument =
+  | Comb_get_proof_argument :
+      ('before, 'after) comb_get_gadt_witness * 'after ty
+      -> 'before comb_get_proof_argument
+
+type ('rest, 'before) comb_set_proof_argument =
+  | Comb_set_proof_argument :
+      ('rest, 'before, 'after) comb_set_gadt_witness * 'after ty
+      -> ('rest, 'before) comb_set_proof_argument
+
 type 'before dup_n_proof_argument =
   | Dup_n_proof_argument :
       ('before, 'a) dup_n_gadt_witness * 'a ty
@@ -2254,6 +2282,8 @@ let parse_uint ~nb_bits =
              ^ "-bit integer (between 0 and " ^ string_of_int max_int ^ ")" )
 
 let parse_uint10 = parse_uint ~nb_bits:10
+
+let parse_uint11 = parse_uint ~nb_bits:11
 
 let rec parse_data :
     type a.
@@ -3179,6 +3209,158 @@ and parse_instr :
            ( Pair_t ((a, l_field, fst_annot), (b, r_field, snd_annot), ty_name),
              rest,
              annot ))
+  | (Prim (loc, I_PAIR, [n], annot), stack_ty) ->
+      parse_var_annot loc annot
+      >>?= fun annot ->
+      let rec make_proof_argument :
+          type before.
+          int ->
+          before stack_ty ->
+          (before comb_proof_argument * var_annot option) tzresult =
+       fun n stack_ty ->
+        match (n, stack_ty) with
+        | (1, Item_t (a_ty, tl_ty, a_annot_opt)) ->
+            ok
+              ( Comb_proof_argument (Comb_one, Item_t (a_ty, tl_ty, annot)),
+                a_annot_opt )
+        | (n, Item_t (a_ty, tl_ty, prop_annot_opt)) ->
+            make_proof_argument (n - 1) tl_ty
+            >|? fun ( Comb_proof_argument
+                        (comb_witness, Item_t (b_ty, tl_ty', annot)),
+                      b_annot_opt ) ->
+            let prop_annot_opt' = var_to_field_annot prop_annot_opt in
+            let b_prop_annot_opt = var_to_field_annot b_annot_opt in
+            let pair_t =
+              Pair_t
+                ( (a_ty, prop_annot_opt', None),
+                  (b_ty, b_prop_annot_opt, None),
+                  None )
+            in
+            ( Comb_proof_argument
+                (Comb_succ comb_witness, Item_t (pair_t, tl_ty', annot)),
+              None )
+        | _ ->
+            serialize_stack_for_error ctxt stack_ty
+            >>? fun (whole_stack, _ctxt) ->
+            error (Bad_stack (loc, I_PAIR, 1, whole_stack))
+      in
+      parse_uint10 n
+      >>?= fun n ->
+      Gas.consume ctxt (Typecheck_costs.proof_argument n)
+      >>?= fun ctxt ->
+      error_unless (Compare.Int.( > ) n 1) (Pair_bad_argument loc)
+      >>?= fun () ->
+      make_proof_argument n stack_ty
+      >>?= fun (Comb_proof_argument (witness, after_ty), _none) ->
+      typed ctxt loc (Comb (n, witness)) after_ty
+  | (Prim (loc, I_UNPAIR, [n], annot), stack_ty) ->
+      error_unexpected_annot loc annot
+      >>?= fun () ->
+      let rec make_proof_argument :
+          type before.
+          int -> before stack_ty -> before uncomb_proof_argument tzresult =
+       fun n stack_ty ->
+        match (n, stack_ty) with
+        | (1, Item_t (a_ty, tl_ty, annot)) ->
+            ok
+            @@ Uncomb_proof_argument (Uncomb_one, Item_t (a_ty, tl_ty, annot))
+        | ( n,
+            Item_t
+              ( Pair_t ((a_ty, field_opt, _), (b_ty, b_field_opt, _), _),
+                tl_ty,
+                _ ) ) ->
+            let b_annot = Script_ir_annot.field_to_var_annot b_field_opt in
+            make_proof_argument (n - 1) (Item_t (b_ty, tl_ty, b_annot))
+            >|? fun (Uncomb_proof_argument (uncomb_witness, after_ty)) ->
+            Uncomb_proof_argument
+              ( Uncomb_succ uncomb_witness,
+                Item_t
+                  (a_ty, after_ty, Script_ir_annot.field_to_var_annot field_opt)
+              )
+        | _ ->
+            serialize_stack_for_error ctxt stack_ty
+            >>? fun (whole_stack, _ctxt) ->
+            error (Bad_stack (loc, I_UNPAIR, 1, whole_stack))
+      in
+      parse_uint10 n
+      >>?= fun n ->
+      Gas.consume ctxt (Typecheck_costs.proof_argument n)
+      >>?= fun ctxt ->
+      error_unless (Compare.Int.( > ) n 1) (Unpair_bad_argument loc)
+      >>?= fun () ->
+      make_proof_argument n stack_ty
+      >>?= fun (Uncomb_proof_argument (witness, after_ty)) ->
+      typed ctxt loc (Uncomb (n, witness)) after_ty
+  | (Prim (loc, I_GET, [n], annot), Item_t (comb_ty, rest_ty, _)) ->
+      parse_var_annot loc annot
+      >>?= fun annot ->
+      let rec make_proof_argument :
+          type before.
+          int -> before ty -> before comb_get_proof_argument tzresult =
+       fun n ty ->
+        match (n, ty) with
+        | (0, value_ty) ->
+            ok @@ Comb_get_proof_argument (Comb_get_zero, value_ty)
+        | (1, Pair_t ((hd_ty, _at1, _at2), _, _annot)) ->
+            ok @@ Comb_get_proof_argument (Comb_get_one, hd_ty)
+        | (n, Pair_t (_, (tl_ty, _bt1, _bt2), _annot)) ->
+            make_proof_argument (n - 2) tl_ty
+            >|? fun (Comb_get_proof_argument (comb_get_left_witness, ty')) ->
+            Comb_get_proof_argument
+              (Comb_get_plus_two comb_get_left_witness, ty')
+        | _ ->
+            serialize_stack_for_error ctxt stack_ty
+            >>? fun (whole_stack, _ctxt) ->
+            error (Bad_stack (loc, I_GET, 1, whole_stack))
+      in
+      parse_uint11 n
+      >>?= fun n ->
+      Gas.consume ctxt (Typecheck_costs.proof_argument n)
+      >>?= fun ctxt ->
+      make_proof_argument n comb_ty
+      >>?= fun (Comb_get_proof_argument (witness, ty')) ->
+      let after_stack_ty = Item_t (ty', rest_ty, annot) in
+      typed ctxt loc (Comb_get (n, witness)) after_stack_ty
+  | ( Prim (loc, I_UPDATE, [n], annot),
+      Item_t (value_ty, Item_t (comb_ty, rest_ty, _), _) ) ->
+      parse_var_annot loc annot
+      >>?= fun annot ->
+      let rec make_proof_argument :
+          type value before.
+          int ->
+          value ty ->
+          before ty ->
+          (value, before) comb_set_proof_argument tzresult =
+       fun n value_ty ty ->
+        match (n, ty) with
+        | (0, _) ->
+            ok @@ Comb_set_proof_argument (Comb_set_zero, value_ty)
+        | (1, Pair_t ((_hd_ty, at1, at2), (tl_ty, bt1, bt2), annot)) ->
+            let after_ty =
+              Pair_t ((value_ty, at1, at2), (tl_ty, bt1, bt2), annot)
+            in
+            ok @@ Comb_set_proof_argument (Comb_set_one, after_ty)
+        | (n, Pair_t ((hd_ty, at1, at2), (tl_ty, bt1, bt2), annot)) ->
+            make_proof_argument (n - 2) value_ty tl_ty
+            >|? fun (Comb_set_proof_argument (comb_set_left_witness, tl_ty')) ->
+            let after_ty =
+              Pair_t ((hd_ty, at1, at2), (tl_ty', bt1, bt2), annot)
+            in
+            Comb_set_proof_argument
+              (Comb_set_plus_two comb_set_left_witness, after_ty)
+        | _ ->
+            serialize_stack_for_error ctxt stack_ty
+            >>? fun (whole_stack, _ctxt) ->
+            error (Bad_stack (loc, I_UPDATE, 2, whole_stack))
+      in
+      parse_uint11 n
+      >>?= fun n ->
+      Gas.consume ctxt (Typecheck_costs.proof_argument n)
+      >>?= fun ctxt ->
+      make_proof_argument n value_ty comb_ty
+      >>?= fun (Comb_set_proof_argument (witness, after_ty)) ->
+      let after_stack_ty = Item_t (after_ty, rest_ty, annot) in
+      typed ctxt loc (Comb_set (n, witness)) after_stack_ty
   | ( Prim (loc, I_UNPAIR, [], annot),
       Item_t
         ( Pair_t

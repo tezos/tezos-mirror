@@ -612,6 +612,24 @@ let () =
     (function
       | Type_too_large (loc, ts, maxts) -> Some (loc, ts, maxts) | _ -> None)
     (fun (loc, ts, maxts) -> Type_too_large (loc, ts, maxts)) ;
+  (* Bad PAIR argument *)
+  register_error_kind
+    `Permanent
+    ~id:"michelson_v1.bad_pair_argument"
+    ~title:"0 or 1 passed to PAIR"
+    ~description:"PAIR expects an argument of at least 2"
+    (obj1 (req "loc" Script.location_encoding))
+    (function Pair_bad_argument loc -> Some loc | _ -> None)
+    (fun loc -> Pair_bad_argument loc) ;
+  (* Bad UNPAIR argument *)
+  register_error_kind
+    `Permanent
+    ~id:"michelson_v1.bad_unpair_argument"
+    ~title:"0 or 1 passed to UNPAIR"
+    ~description:"UNPAIR expects an argument of at least 2"
+    (obj1 (req "loc" Script.location_encoding))
+    (function Unpair_bad_argument loc -> Some loc | _ -> None)
+    (fun loc -> Unpair_bad_argument loc) ;
   (* Bad dup_n argument *)
   register_error_kind
     `Permanent

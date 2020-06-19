@@ -582,6 +582,14 @@ let cost_of_instr : type b a. (b, a) descr -> b -> Gas.cost =
       Interp_costs.neg_bls12_381_fr
   | (Pairing_check_bls12_381, (pairs, _)) ->
       Interp_costs.pairing_check_bls12_381 pairs
+  | (Comb (n, _), _) ->
+      Interp_costs.comb n
+  | (Uncomb (n, _), _) ->
+      Interp_costs.uncomb n
+  | (Comb_get (n, _), _) ->
+      Interp_costs.comb_get n
+  | (Comb_set (n, _), _) ->
+      Interp_costs.comb_set n
   | (Dup_n (n, _), _) ->
       Interp_costs.dupn n
 
@@ -1334,6 +1342,62 @@ let rec step_bounded :
             |> Option.value ~default:false
       in
       logged_return ((check, rest), ctxt)
+  | (Comb (_, witness), stack) ->
+      let rec aux :
+          type before after.
+          (before, after) comb_gadt_witness -> before -> after =
+       fun witness stack ->
+        match (witness, stack) with
+        | (Comb_one, stack) ->
+            stack
+        | (Comb_succ witness', (a, tl)) ->
+            let (b, tl') = aux witness' tl in
+            ((a, b), tl')
+      in
+      logged_return (aux witness stack, ctxt)
+  | (Uncomb (_, witness), stack) ->
+      let rec aux :
+          type before after.
+          (before, after) uncomb_gadt_witness -> before -> after =
+       fun witness stack ->
+        match (witness, stack) with
+        | (Uncomb_one, stack) ->
+            stack
+        | (Uncomb_succ witness', ((a, b), tl)) ->
+            (a, aux witness' (b, tl))
+      in
+      logged_return (aux witness stack, ctxt)
+  | (Comb_get (_, witness), (comb, stack)) ->
+      let rec aux :
+          type before after.
+          (before, after) comb_get_gadt_witness -> before -> after =
+       fun witness comb ->
+        match (witness, comb) with
+        | (Comb_get_zero, v) ->
+            v
+        | (Comb_get_one, (a, _)) ->
+            a
+        | (Comb_get_plus_two witness', (_, b)) ->
+            aux witness' b
+      in
+      logged_return ((aux witness comb, stack), ctxt)
+  | (Comb_set (_, witness), (value, (comb, stack))) ->
+      let rec aux :
+          type value before after.
+          (value, before, after) comb_set_gadt_witness ->
+          value ->
+          before ->
+          after =
+       fun witness value item ->
+        match (witness, item) with
+        | (Comb_set_zero, _) ->
+            value
+        | (Comb_set_one, (_hd, tl)) ->
+            (value, tl)
+        | (Comb_set_plus_two witness', (hd, tl)) ->
+            (hd, aux witness' value tl)
+      in
+      logged_return ((aux witness value comb, stack), ctxt)
   | (Dup_n (_, witness), stack) ->
       let rec aux :
           type before after.

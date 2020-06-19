@@ -890,6 +890,7 @@ let prim_encoding =
   let open Data_encoding in
   def "michelson.v1.primitives"
   @@ string_enum
+       (* Add the comment below every 10 lines *)
        [ (* /!\ NEW INSTRUCTIONS MUST BE ADDED AT THE END OF THE STRING_ENUM, FOR BACKWARD COMPATIBILITY OF THE ENCODING. *)
          ("parameter", K_parameter);
          ("storage", K_storage);
@@ -1039,7 +1040,8 @@ let prim_encoding =
          ("bls12_381_g1", T_bls12_381_g1);
          ("bls12_381_g2", T_bls12_381_g2);
          ("bls12_381_fr", T_bls12_381_fr)
-         (* /!\ NEW INSTRUCTIONS MUST BE ADDED AT THE END OF THE STRING_ENUM, FOR BACKWARD COMPATIBILITY OF THE ENCODING. *)
+         (* New instructions must be added here, for backward compatibility of the encoding. *)
+         (* Keep the comment above at the end of the list *)
         ]
 
 let () =

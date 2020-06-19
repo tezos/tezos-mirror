@@ -171,6 +171,19 @@ module Cost_of = struct
       let size = Z.of_int size in
       Z.of_int 60_000 + (size + (size lsr 2))
 
+    (* model N_Comb *)
+
+    let cost_N_Comb size = Z.of_int (80 + (6 * size))
+
+    (* model N_Comb_get *)
+    (* Approximating 2.506050 x term *)
+
+    let cost_N_Comb_get size = Z.of_int (65 + ((size lsl 1) + (size lsr 1)))
+
+    (* model N_Comb_set *)
+
+    let cost_N_Comb_set size = Z.of_int (70 + (4 * size))
+
     (* model N_Compare_address *)
     let cost_N_Compare_address size1 size2 =
       Z.of_int (80 + (2 * Compare.Int.min size1 size2))
@@ -498,6 +511,11 @@ module Cost_of = struct
 
     (* model N_Total_voting_power *)
     let cost_N_Total_voting_power = Z.of_int 400
+
+    (* model N_Uncomb *)
+    (* Approximating 0.661861 x term *)
+
+    let cost_N_Uncomb size = Z.of_int (100 + ((size lsr 1) + (size lsr 3)))
 
     (* model N_Unpair *)
     let cost_N_Unpair = Z.of_int 80
@@ -955,6 +973,14 @@ module Cost_of = struct
 
     let pairing_check_bls12_381 (l : 'a Script_typed_ir.boxed_list) =
       atomic_step_cost (cost_N_Pairing_check_bls12_381 l.length)
+
+    let comb n = atomic_step_cost (cost_N_Comb n)
+
+    let uncomb n = atomic_step_cost (cost_N_Uncomb n)
+
+    let comb_get n = atomic_step_cost (cost_N_Comb_get n)
+
+    let comb_set n = atomic_step_cost (cost_N_Comb_set n)
 
     let dupn n = atomic_step_cost (cost_N_DupN n)
 

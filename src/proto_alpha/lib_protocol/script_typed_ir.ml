@@ -437,9 +437,45 @@ and ('bef, 'aft) instr =
       : ( (Bls12_381.G1.t, Bls12_381.G2.t) pair boxed_list * 'rest,
           bool * 'rest )
         instr
+  | Comb : int * ('before, 'after) comb_gadt_witness -> ('before, 'after) instr
+  | Uncomb :
+      int * ('before, 'after) uncomb_gadt_witness
+      -> ('before, 'after) instr
+  | Comb_get :
+      int * ('before, 'after) comb_get_gadt_witness
+      -> ('before * 'rest, 'after * 'rest) instr
+  | Comb_set :
+      int * ('value, 'before, 'after) comb_set_gadt_witness
+      -> ('value * ('before * 'rest), 'after * 'rest) instr
   | Dup_n :
       int * ('before, 'after) dup_n_gadt_witness
       -> ('before, 'after * 'before) instr
+
+and ('before, 'after) comb_gadt_witness =
+  | Comb_one : ('a * 'before, 'a * 'before) comb_gadt_witness
+  | Comb_succ :
+      ('before, 'b * 'after) comb_gadt_witness
+      -> ('a * 'before, ('a * 'b) * 'after) comb_gadt_witness
+
+and ('before, 'after) uncomb_gadt_witness =
+  | Uncomb_one : ('rest, 'rest) uncomb_gadt_witness
+  | Uncomb_succ :
+      ('b * 'before, 'after) uncomb_gadt_witness
+      -> (('a * 'b) * 'before, 'a * 'after) uncomb_gadt_witness
+
+and ('before, 'after) comb_get_gadt_witness =
+  | Comb_get_zero : ('b, 'b) comb_get_gadt_witness
+  | Comb_get_one : ('a * 'b, 'a) comb_get_gadt_witness
+  | Comb_get_plus_two :
+      ('before, 'after) comb_get_gadt_witness
+      -> ('a * 'before, 'after) comb_get_gadt_witness
+
+and ('value, 'before, 'after) comb_set_gadt_witness =
+  | Comb_set_zero : ('value, _, 'value) comb_set_gadt_witness
+  | Comb_set_one : ('value, 'hd * 'tl, 'value * 'tl) comb_set_gadt_witness
+  | Comb_set_plus_two :
+      ('value, 'before, 'after) comb_set_gadt_witness
+      -> ('value, 'a * 'before, 'a * 'after) comb_set_gadt_witness
 
 and ('before, 'after) dup_n_gadt_witness =
   | Dup_n_zero : ('a * 'rest, 'a) dup_n_gadt_witness
