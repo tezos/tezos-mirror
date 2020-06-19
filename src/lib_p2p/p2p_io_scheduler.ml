@@ -76,7 +76,6 @@ module Scheduler (IO : IO) = struct
     mutable current_push : unit tzresult Lwt.t;
     counter : Moving_average.t;
     mutable quota : int;
-    mutable last_quota : int;
   }
 
   let cancel (conn : connection) err =
@@ -206,7 +205,6 @@ module Scheduler (IO : IO) = struct
         current_push = return_unit;
         counter = Moving_average.create ~init:0 ~alpha;
         quota = 0;
-        last_quota = 0;
       }
     in
     waiter st conn ; conn
@@ -330,9 +328,7 @@ let reset_quota st =
     and fair_write_quota = current_outflow / nb_conn in
     P2p_fd.Table.iter
       (fun _id conn ->
-        conn.read_conn.last_quota <- fair_read_quota ;
         conn.read_conn.quota <- min conn.read_conn.quota 0 + fair_read_quota ;
-        conn.write_conn.last_quota <- fair_write_quota ;
         conn.write_conn.quota <- min conn.write_conn.quota 0 + fair_write_quota)
       st.connected ) ;
   ReadScheduler.update_quota st.read_scheduler ;
