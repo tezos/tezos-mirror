@@ -1,6 +1,6 @@
 .. _version-7:
 
-Version 7.1
+Version 7.2
 ===========
 
 Version 7.0 notably introduces the multinetwork node.
@@ -8,18 +8,22 @@ Version 7.0 notably introduces the multinetwork node.
 Version 7.1 fixes a few compilation issues that users encountered with version 7.0,
 and fixes a few client commands.
 
+Version 7.2 fixes an issue that could cause baking to fail when validating some
+smart contracts, and fixes how arguments are passed by the tezos-docker-manager.sh
+script when using Docker images.
+
 Update Instructions
 -------------------
 
 To update from sources::
 
   git fetch
-  git checkout v7.1
+  git checkout v7.2
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``v7.1`` Docker images of Tezos.
+If you are using Docker instead, use the ``v7.2`` Docker images of Tezos.
 
 New Versioning Scheme
 ---------------------
@@ -40,7 +44,7 @@ Additionnally, we provide a ``latest-release`` branch which will always
 be equal to the latest release. Release candidates are not considered
 to be releases in this sense, so ``latest-release`` will never
 point to a release candidate. In other words, ``latest-release`` points
-to the latest stable release. Currently, it thus points to version 7.1.
+to the latest stable release. Currently, it thus points to version 7.2.
 
 If you are used to the ``mainnet`` and ``mainnet-staging`` branches,
 you can consider release candidates to be the new ``mainnet-staging``
@@ -50,8 +54,8 @@ branch.
 Note for Remote Signer Users
 ----------------------------
 
-Note for users of ``tezos-signer``: the 7.0 (or 7.1) client, baker, endorser
-and accuser need the 7.0 signer (or 7.1) to work. They are in particular not
+Note for users of ``tezos-signer``: the 7.0 (or 7.1, or 7.2) client, baker, endorser
+and accuser need the 7.0 signer (or 7.1, or 7.2) to work. They are in particular not
 compatible with the ``mainnet`` version of ``tezos-signer``. So remember to
 update your remote signer too!
 
@@ -72,6 +76,14 @@ If you are using the Docker script (``alphanet.sh``), note that
 this script has been renamed ``tezos-docker-manager.sh``. The ``alphanet.sh``
 script is still available in the Docker image for the auto-update mechanism.
 See :ref:`howtoget` for more information.
+
+Changelog — Version 7.2
+-----------------------
+
+- Fixed an error that could cause baking to fail when validating some smart contracts.
+
+- Fixed an issue in ``tezos-docker-manager.sh`` which prevented to use some options,
+  such as ``--rpc-port``.
 
 Changelog — Version 7.1
 -----------------------
