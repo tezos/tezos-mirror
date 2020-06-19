@@ -631,8 +631,6 @@ struct
 
     include Error_core
     include Tezos_error_monad.Monad_maker.Make (Error_core)
-
-    let ( >>|? ) = ( >|=? ) (* for backward compatibility *)
   end
 
   let () =

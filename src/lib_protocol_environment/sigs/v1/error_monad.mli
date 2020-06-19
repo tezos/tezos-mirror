@@ -130,7 +130,7 @@ val ( >>= ) : 'a Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
 val ( >|= ) : 'a Lwt.t -> ('a -> 'b) -> 'b Lwt.t
 
 (** To operator *)
-val ( >>|? ) : 'a tzresult Lwt.t -> ('a -> 'b) -> 'b tzresult Lwt.t
+val ( >|=? ) : 'a tzresult Lwt.t -> ('a -> 'b) -> 'b tzresult Lwt.t
 
 (** Non-Lwt to operator *)
 val ( >|? ) : 'a tzresult -> ('a -> 'b) -> 'b tzresult
