@@ -54,6 +54,10 @@ val create :
   unit ->
   t
 
+(** [ma_state sched] returns the state of the moving average
+    worker. *)
+val ma_state : t -> Moving_average.state
+
 (** [register sched fd] is a [connection] managed by [sched]. *)
 val register : t -> P2p_fd.t -> connection
 

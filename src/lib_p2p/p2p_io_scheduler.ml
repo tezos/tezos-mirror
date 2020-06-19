@@ -55,6 +55,7 @@ module Scheduler (IO : IO) = struct
   [@@@ocaml.warning "-30"]
 
   type t = {
+    ma_state : Moving_average.state;
     canceler : Lwt_canceler.t;
     mutable worker : unit Lwt.t;
     counter : Moving_average.t;
@@ -170,12 +171,13 @@ module Scheduler (IO : IO) = struct
           waiter st conn ;
           worker_loop st
 
-  let create max_speed =
+  let create ma_state max_speed =
     let st =
       {
+        ma_state;
         canceler = Lwt_canceler.create ();
         worker = Lwt.return_unit;
-        counter = Moving_average.create ~init:0 ~alpha;
+        counter = Moving_average.create ma_state ~init:0 ~alpha;
         max_speed;
         quota = Option.value ~default:0 max_speed;
         quota_updated = Lwt_condition.create ();
@@ -203,7 +205,7 @@ module Scheduler (IO : IO) = struct
         out_param;
         current_pop = Lwt.fail Not_found (* dummy *);
         current_push = return_unit;
-        counter = Moving_average.create ~init:0 ~alpha;
+        counter = Moving_average.create st.ma_state ~init:0 ~alpha;
         quota = 0;
       }
     in
@@ -304,6 +306,7 @@ type connection = {
 
 and t = {
   mutable closed : bool;
+  ma_state : Moving_average.state;
   connected : connection P2p_fd.Table.t;
   read_scheduler : ReadScheduler.t;
   write_scheduler : WriteScheduler.t;
@@ -337,12 +340,16 @@ let reset_quota st =
 let create ?max_upload_speed ?max_download_speed ?read_queue_size
     ?write_queue_size ~read_buffer_size () =
   Events.(emit_dont_wait create ()) ;
+  let ma_state =
+    Moving_average.fresh_state ~id:"p2p-io-sched" ~refresh_interval:1.0
+  in
   let st =
     {
       closed = false;
+      ma_state;
       connected = P2p_fd.Table.create 53;
-      read_scheduler = ReadScheduler.create max_download_speed;
-      write_scheduler = WriteScheduler.create max_upload_speed;
+      read_scheduler = ReadScheduler.create ma_state max_download_speed;
+      write_scheduler = WriteScheduler.create ma_state max_upload_speed;
       max_upload_speed;
       max_download_speed;
       read_buffer_size;
@@ -350,8 +357,10 @@ let create ?max_upload_speed ?max_download_speed ?read_queue_size
       write_queue_size;
     }
   in
-  Moving_average.on_update (fun () -> reset_quota st) ;
+  Moving_average.on_update ma_state (fun () -> reset_quota st) ;
   st
+
+let ma_state {ma_state; _} = ma_state
 
 exception Closed
 
@@ -402,8 +411,8 @@ let register st fd =
     in
     Lwt_canceler.on_cancel canceler (fun () ->
         P2p_fd.Table.remove st.connected fd ;
-        Moving_average.destroy read_conn.counter ;
-        Moving_average.destroy write_conn.counter ;
+        Moving_average.destroy st.ma_state read_conn.counter ;
+        Moving_average.destroy st.ma_state write_conn.counter ;
         Lwt_pipe.close write_queue ;
         Lwt_pipe.close read_queue ;
         P2p_fd.close fd

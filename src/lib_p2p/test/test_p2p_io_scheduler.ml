@@ -103,7 +103,7 @@ let server ?(display_client_stat = true) ?max_download_speed ?read_queue_size
       ~read_buffer_size
       ()
   in
-  Moving_average.on_update (fun () ->
+  Moving_average.on_update (P2p_io_scheduler.ma_state sched) (fun () ->
       log_notice "Stat: %a" P2p_stat.pp (P2p_io_scheduler.global_stat sched) ;
       if display_client_stat then
         P2p_io_scheduler.iter_connection sched (fun conn ->

@@ -41,19 +41,18 @@ type t = {
   mutable average : int;
 }
 
-let counters = Inttbl.create 51
+type state = {
+  refresh_interval : float;
+  counters : t Inttbl.t;
+  updated : unit Lwt_condition.t;
+  mutable update_hook : (unit -> unit) list;
+}
 
-let updated = Lwt_condition.create ()
-
-let update_hook = ref []
-
-let on_update f = update_hook := f :: !update_hook
-
-let worker_loop () =
+let worker_loop state () =
   let rec inner sleep time_at_entry =
     sleep
     >>= fun () ->
-    let sleep = Lwt_unix.sleep 1. in
+    let sleep = Lwt_unix.sleep state.refresh_interval in
     let now = Mtime_clock.elapsed () in
     let elapsed = int_of_float Mtime.Span.(to_ms now -. to_ms time_at_entry) in
     Inttbl.iter
@@ -62,38 +61,53 @@ let worker_loop () =
           (c.alpha * c.current / elapsed)
           + ((1000 - c.alpha) * c.average / 1000) ;
         c.current <- 0)
-      counters ;
-    List.iter (fun f -> f ()) !update_hook ;
-    Lwt_condition.broadcast updated () ;
+      state.counters ;
+    List.iter (fun f -> f ()) state.update_hook ;
+    Lwt_condition.broadcast state.updated () ;
     inner sleep now
   in
-  inner (Lwt_unix.sleep 1.) (Mtime_clock.elapsed ())
+  inner (Lwt_unix.sleep state.refresh_interval) (Mtime_clock.elapsed ())
 
-let worker =
-  lazy
-    (Lwt.ignore_result
-       (Lwt_utils.worker
-          "counter"
-          ~on_event:Internal_event.Lwt_worker_event.on_event
-          ~run:worker_loop
-          ~cancel:(fun _ -> Lwt.return_unit)))
+let fresh_state ~id ~refresh_interval =
+  if refresh_interval <= 0.0 then
+    raise (Invalid_argument "Moving_average.fresh_state") ;
+  let state =
+    {
+      refresh_interval;
+      counters = Inttbl.create 41;
+      updated = Lwt_condition.create ();
+      update_hook = [];
+    }
+  in
+  Lwt.ignore_result
+    (Lwt_utils.worker
+       (Format.asprintf "counter(%s)" id)
+       ~on_event:Internal_event.Lwt_worker_event.on_event
+       ~run:(worker_loop state)
+       ~cancel:(fun _ -> Lwt.return_unit)) ;
+  state
+
+let on_update state f = state.update_hook <- f :: state.update_hook
 
 let create =
   let cpt = ref 0 in
-  fun ~init ~alpha ->
-    Lazy.force worker ;
+  fun state ~init ~alpha ->
+    if not (0. < alpha && alpha <= 1.) then
+      raise (Invalid_argument "Moving_average.create") ;
     let id = !cpt in
     incr cpt ;
-    assert (0. < alpha && alpha <= 1.) ;
     let alpha = int_of_float (1000. *. alpha) in
     let c = {id; alpha; total = 0L; current = 0; average = init} in
-    Inttbl.add counters id c ; c
+    Inttbl.add state.counters id c ;
+    c
 
 let add c x =
   c.total <- Int64.(add c.total (of_int x)) ;
   c.current <- c.current + x
 
-let destroy c = Inttbl.remove counters c.id
+let destroy state c = Inttbl.remove state.counters c.id
+
+let updated {updated; _} = updated
 
 type stat = {total : int64; average : int}
 
