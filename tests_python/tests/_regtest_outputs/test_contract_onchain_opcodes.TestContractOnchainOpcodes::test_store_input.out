@@ -17,8 +17,8 @@ This sequence of operations was run:
     Gas limit: 10307
     Storage limit: 277 bytes
     Balance updates:
-      [CONTRACT_HASH] ........... -ꜩ0.001284
-      fees([CONTRACT_HASH],[CTR]) ... +ꜩ0.001284
+      [CONTRACT_HASH] ................ -ꜩ0.001284
+      fees(the baker who will include this operation,0) ... +ꜩ0.001284
     Transaction:
       Amount: ꜩ1000
       From: [CONTRACT_HASH]
@@ -48,8 +48,8 @@ This sequence of operations was run:
     Gas limit: 10307
     Storage limit: 277 bytes
     Balance updates:
-      [CONTRACT_HASH] ........... -ꜩ0.001284
-      fees([CONTRACT_HASH],[CTR]) ... +ꜩ0.001284
+      [CONTRACT_HASH] ................ -ꜩ0.001284
+      fees(the baker who will include this operation,0) ... +ꜩ0.001284
     Transaction:
       Amount: ꜩ2000
       From: [CONTRACT_HASH]
@@ -81,8 +81,8 @@ This sequence of operations was run:
     Gas limit: 11054
     Storage limit: 318 bytes
     Balance updates:
-      [CONTRACT_HASH] ........... -ꜩ0.001377
-      fees([CONTRACT_HASH],[CTR]) ... +ꜩ0.001377
+      [CONTRACT_HASH] ................ -ꜩ0.001377
+      fees(the baker who will include this operation,0) ... +ꜩ0.001377
     Origination:
       From: [CONTRACT_HASH]
       Credit: ꜩ100
@@ -124,8 +124,8 @@ This sequence of operations was run:
     Gas limit: 11505
     Storage limit: 27 bytes
     Balance updates:
-      [CONTRACT_HASH] ........... -ꜩ0.001419
-      fees([CONTRACT_HASH],[CTR]) ... +ꜩ0.001419
+      [CONTRACT_HASH] ................ -ꜩ0.001419
+      fees(the baker who will include this operation,0) ... +ꜩ0.001419
     Transaction:
       Amount: ꜩ100
       From: [CONTRACT_HASH]
@@ -161,8 +161,8 @@ This sequence of operations was run:
     Gas limit: 11517
     Storage limit: 0 bytes
     Balance updates:
-      [CONTRACT_HASH] ........... -ꜩ0.001416
-      fees([CONTRACT_HASH],[CTR]) ... +ꜩ0.001416
+      [CONTRACT_HASH] ................ -ꜩ0.001416
+      fees(the baker who will include this operation,0) ... +ꜩ0.001416
     Transaction:
       Amount: ꜩ100
       From: [CONTRACT_HASH]

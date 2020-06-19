@@ -17,8 +17,8 @@ This sequence of operations was run:
     Gas limit: 24520
     Storage limit: 855 bytes
     Balance updates:
-      [CONTRACT_HASH] ........... -ꜩ0.003283
-      fees([CONTRACT_HASH],[CTR]) ... +ꜩ0.003283
+      [CONTRACT_HASH] ................ -ꜩ0.003283
+      fees(the baker who will include this operation,3) ... +ꜩ0.003283
     Origination:
       From: [CONTRACT_HASH]
       Credit: ꜩ1000
