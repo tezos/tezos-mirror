@@ -7,7 +7,7 @@ tests/test_contract_macros.py::TestMacroExpansion::test_macro_expansion[macros/m
          UNIT ;
          PAIR %truc ;
          UNIT ;
-         { DIP { DUP @new_storage } ; SWAP } ;
+         DUP @new_storage 2 ;
          DIP { DROP ; DROP } ;
          NIL operation ;
          PAIR } }
