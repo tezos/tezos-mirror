@@ -1294,7 +1294,7 @@ let execute logger ctxt mode step_constants ~entrypoint unparsed_script arg :
   let big_map_diff =
     match
       List.flatten
-        (List.map (Option.unopt ~default:[]) (op_diffs @ [big_map_diff]))
+        (List.map (Option.value ~default:[]) (op_diffs @ [big_map_diff]))
     with
     | [] ->
         None
@@ -1326,7 +1326,7 @@ let trace ctxt mode step_constants ~script ~entrypoint ~parameter =
   >>=? fun (code, storage, operations, ctxt, big_map_diff) ->
   Logger.get_log ()
   >>=? fun trace ->
-  let trace = Option.unopt ~default:[] trace in
+  let trace = Option.value ~default:[] trace in
   return ({ctxt; code; storage; big_map_diff; operations}, trace)
 
 let execute ctxt mode step_constants ~script ~entrypoint ~parameter =

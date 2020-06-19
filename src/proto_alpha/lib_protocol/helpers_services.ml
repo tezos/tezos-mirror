@@ -308,7 +308,7 @@ module Scripts = struct
                    trace ) ->
         return (storage, operations, trace, big_map_diff)) ;
     register0 S.typecheck_code (fun ctxt () (expr, maybe_gas, legacy) ->
-        let legacy = Option.unopt ~default:false legacy in
+        let legacy = Option.value ~default:false legacy in
         let ctxt =
           match maybe_gas with
           | None ->
@@ -319,7 +319,7 @@ module Scripts = struct
         Script_ir_translator.typecheck_code ~legacy ctxt expr
         >>=? fun (res, ctxt) -> return (res, Gas.level ctxt)) ;
     register0 S.typecheck_data (fun ctxt () (data, ty, maybe_gas, legacy) ->
-        let legacy = Option.unopt ~default:false legacy in
+        let legacy = Option.value ~default:false legacy in
         let ctxt =
           match maybe_gas with
           | None ->
@@ -688,9 +688,9 @@ module Forge = struct
         ~destination ?(entrypoint = "default") ?parameters ~gas_limit
         ~storage_limit ~fee () =
       let parameters =
-        Option.unopt_map
-          ~f:Script.lazy_expr
-          ~default:Script.unit_parameter
+        Option.fold
+          ~some:Script.lazy_expr
+          ~none:Script.unit_parameter
           parameters
       in
       operations

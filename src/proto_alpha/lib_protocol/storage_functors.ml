@@ -169,7 +169,7 @@ struct
     C.init_set t N.name (to_bytes v) >>= fun t -> Lwt.return (C.project t)
 
   let set_option t v =
-    C.set_option t N.name (Option.map ~f:to_bytes v)
+    C.set_option t N.name (Option.map to_bytes v)
     >>= fun t -> Lwt.return (C.project t)
 
   let remove t = C.remove t N.name >>= fun t -> Lwt.return (C.project t)
@@ -333,7 +333,7 @@ module Make_indexed_data_storage (C : Raw_context.T) (I : INDEX) (V : VALUE) :
     >>= fun t -> Lwt.return (C.project t)
 
   let set_option s i v =
-    C.set_option s (I.to_path i []) (Option.map ~f:to_bytes v)
+    C.set_option s (I.to_path i []) (Option.map to_bytes v)
     >>= fun t -> Lwt.return (C.project t)
 
   let remove s i =
@@ -905,7 +905,7 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
       Lwt.return (C.project s)
 
     let set_option s i v =
-      Raw_context.set_option (pack s i) N.name (Option.map ~f:to_bytes v)
+      Raw_context.set_option (pack s i) N.name (Option.map to_bytes v)
       >>= fun c ->
       let (s, _) = unpack c in
       Lwt.return (C.project s)

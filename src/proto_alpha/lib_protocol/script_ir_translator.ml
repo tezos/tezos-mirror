@@ -4420,9 +4420,9 @@ and parse_instr :
       @@ parse_entrypoint_annot loc annot ~default:default_self_annot
       >>=? fun (annot, entrypoint) ->
       let entrypoint =
-        Option.unopt_map
-          ~f:(fun (Field_annot annot) -> annot)
-          ~default:"default"
+        Option.fold
+          ~some:(fun (Field_annot annot) -> annot)
+          ~none:"default"
           entrypoint
       in
       let rec get_toplevel_type :

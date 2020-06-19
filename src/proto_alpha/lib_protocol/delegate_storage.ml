@@ -415,14 +415,14 @@ module Proof = struct
     let contract = Contract_repr.implicit_contract delegate in
     Storage.Contract.Proof_level.get_option ctxt contract
     >>=? fun level_set ->
-    return @@ Option.unopt_map ~f:(LSet.mem level) ~default:false level_set
+    return @@ Option.fold ~some:(LSet.mem level) ~none:false level_set
 
   let add ctxt delegate level =
     let contract = Contract_repr.implicit_contract delegate in
     Storage.Contract.Proof_level.get_option ctxt contract
     >>=? fun proof_set_opt ->
     let proof_set =
-      LSet.add level (Option.unopt ~default:LSet.empty proof_set_opt)
+      LSet.add level (Option.value ~default:LSet.empty proof_set_opt)
     in
     Storage.Contract.Proof_level.init_set ctxt contract proof_set
     >>= fun ctxt -> return ctxt
@@ -442,7 +442,7 @@ module Proof = struct
   let all ctxt delegate =
     Storage.Contract.Proof_level.get_option ctxt
     @@ Contract_repr.implicit_contract delegate
-    >|=? Option.unopt ~default:LSet.empty
+    >|=? Option.value ~default:LSet.empty
 end
 
 let cycle_end ctxt last_cycle unrevealed =
