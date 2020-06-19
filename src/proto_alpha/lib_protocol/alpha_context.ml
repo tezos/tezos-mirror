@@ -170,15 +170,13 @@ module Contract = struct
 end
 
 module Big_map = struct
-  type id = Z.t
+  include Lazy_storage_kind.Big_map
 
   let fresh ~temporary c = Lazy_storage.fresh Big_map ~temporary c
 
   let mem c m k = Storage.Big_map.Contents.mem (c, m) k
 
   let get_opt c m k = Storage.Big_map.Contents.get_option (c, m) k
-
-  let rpc_arg = Storage.Big_map.rpc_arg
 
   let exists c id =
     Lwt.return

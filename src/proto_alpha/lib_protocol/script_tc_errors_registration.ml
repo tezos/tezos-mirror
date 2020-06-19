@@ -519,7 +519,7 @@ let () =
     ~description:
       "A script or data expression references a big_map that does not exist \
        or assumes a wrong type for an existing big_map."
-    (located (obj1 (req "big_map" z)))
+    (located (obj1 (req "big_map" Big_map.Id.encoding)))
     (function Invalid_big_map (loc, c) -> Some (loc, c) | _ -> None)
     (fun (loc, c) -> Invalid_big_map (loc, c)) ;
   (* Comparable type expected *)

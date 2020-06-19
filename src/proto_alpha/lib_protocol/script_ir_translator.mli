@@ -325,7 +325,7 @@ val find_big_map_unaccounted :
   context ->
   'a Script_typed_ir.ty ->
   'a ->
-  f:(Z.t -> 'b option tzresult Lwt.t) ->
+  f:(Big_map.Id.t -> 'b option tzresult Lwt.t) ->
   'b option tzresult Lwt.t
 
 val extract_lazy_storage_diff :

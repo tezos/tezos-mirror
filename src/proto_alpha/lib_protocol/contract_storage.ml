@@ -352,7 +352,7 @@ module Legacy_big_map_diff = struct
   let encoding = Data_encoding.list item_encoding
 
   let to_lazy_storage_diff legacy_diffs =
-    let rev_head (diffs : (_ * (_, _) Lazy_storage_diff.diff) list) =
+    let rev_head (diffs : (_ * (_, _, _) Lazy_storage_diff.diff) list) =
       match diffs with
       | [] ->
           []
@@ -366,19 +366,27 @@ module Legacy_big_map_diff = struct
       item. So only and exactly the head diff item has its updates reversed.
     *)
     List.fold_left
-      (fun (new_diff : (_ * (_, _) Lazy_storage_diff.diff) list) item ->
+      (fun (new_diff : (_ * (_, _, _) Lazy_storage_diff.diff) list) item ->
         match item with
         | Clear id ->
             (id, Lazy_storage_diff.Remove) :: rev_head new_diff
         | Copy {src; dst} ->
+            let src =
+              Lazy_storage_kind.Big_map.Id
+              .of_legacy_USE_ONLY_IN_Legacy_big_map_diff
+                src
+            in
             (dst, Lazy_storage_diff.Update {init = Copy {src}; updates = []})
             :: rev_head new_diff
         | Alloc {big_map; key_type; value_type} ->
             ( big_map,
               Lazy_storage_diff.(
                 Update
-                  {init = Alloc Big_map.{key_type; value_type}; updates = []})
-            )
+                  {
+                    init =
+                      Alloc Lazy_storage_kind.Big_map.{key_type; value_type};
+                    updates = [];
+                  }) )
             :: rev_head new_diff
         | Update
             { big_map;
@@ -393,7 +401,7 @@ module Legacy_big_map_diff = struct
                     assert false
                 | Update {init; updates} ->
                     let updates =
-                      Lazy_storage_diff.Big_map.{key; key_hash; value}
+                      Lazy_storage_kind.Big_map.{key; key_hash; value}
                       :: updates
                     in
                     Lazy_storage_diff.Update {init; updates}
@@ -401,7 +409,7 @@ module Legacy_big_map_diff = struct
               (id, diff) :: rest
           | new_diff ->
               let updates =
-                [Lazy_storage_diff.Big_map.{key; key_hash; value}]
+                [Lazy_storage_kind.Big_map.{key; key_hash; value}]
               in
               (big_map, Update {init = Existing; updates}) :: rev_head new_diff
           ))
@@ -409,6 +417,11 @@ module Legacy_big_map_diff = struct
       legacy_diffs
     |> rev_head
     |> List.rev_map (fun (id, diff) ->
+           let id =
+             Lazy_storage_kind.Big_map.Id
+             .of_legacy_USE_ONLY_IN_Legacy_big_map_diff
+               id
+           in
            Lazy_storage_diff.make Lazy_storage_kind.Big_map id diff)
 
   let of_lazy_storage_diff diffs =
@@ -417,29 +430,39 @@ module Legacy_big_map_diff = struct
         let diffs =
           match kind with
           | Lazy_storage_kind.Big_map -> (
-            match diff with
-            | Remove ->
-                [Clear id]
-            | Update {init; updates} -> (
-                let updates =
-                  List.rev_map
-                    (fun {Lazy_storage_diff.Big_map.key; key_hash; value} ->
-                      Update
-                        {
-                          big_map = id;
-                          diff_key = key;
-                          diff_key_hash = key_hash;
-                          diff_value = value;
-                        })
-                    updates
-                in
-                match init with
-                | Existing ->
-                    updates
-                | Copy {src} ->
-                    Copy {src; dst = id} :: updates
-                | Alloc {key_type; value_type} ->
-                    Alloc {big_map = id; key_type; value_type} :: updates ) )
+              let id =
+                Lazy_storage_kind.Big_map.Id
+                .to_legacy_USE_ONLY_IN_Legacy_big_map_diff
+                  id
+              in
+              match diff with
+              | Remove ->
+                  [Clear id]
+              | Update {init; updates} -> (
+                  let updates =
+                    List.rev_map
+                      (fun {Lazy_storage_kind.Big_map.key; key_hash; value} ->
+                        Update
+                          {
+                            big_map = id;
+                            diff_key = key;
+                            diff_key_hash = key_hash;
+                            diff_value = value;
+                          })
+                      updates
+                  in
+                  match init with
+                  | Existing ->
+                      updates
+                  | Copy {src} ->
+                      let src =
+                        Lazy_storage_kind.Big_map.Id
+                        .to_legacy_USE_ONLY_IN_Legacy_big_map_diff
+                          src
+                      in
+                      Copy {src; dst = id} :: updates
+                  | Alloc {key_type; value_type} ->
+                      Alloc {big_map = id; key_type; value_type} :: updates ) )
           (* | _ ->
               (* Not a Big_map *) [] *)
         in

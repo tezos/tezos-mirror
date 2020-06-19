@@ -23,17 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module KId = struct
-  type t = E : (_, _) Lazy_storage_kind.t * Z.t -> t
-
-  let make kind id = E (kind, id)
-
-  let compare (E (kind1, id1)) (E (kind2, id2)) =
-    let c = Lazy_storage_kind.compare kind1 kind2 in
-    if Compare.Int.(c <> 0) then c else Compare.Z.compare id1 id2
-end
-
 module type OPS = sig
+  module Id : Lazy_storage_kind.ID
+
   type alloc
 
   type updates
@@ -46,29 +38,29 @@ module type OPS = sig
 
   val bytes_size_for_empty : Z.t
 
-  val alloc : Raw_context.t -> id:Z.t -> alloc -> Raw_context.t tzresult Lwt.t
+  val alloc : Raw_context.t -> id:Id.t -> alloc -> Raw_context.t tzresult Lwt.t
 
   val apply_updates :
-    Raw_context.t -> id:Z.t -> updates -> (Raw_context.t * Z.t) tzresult Lwt.t
+    Raw_context.t -> id:Id.t -> updates -> (Raw_context.t * Z.t) tzresult Lwt.t
 
   module Next : sig
     val init : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
-    val incr : Raw_context.t -> (Raw_context.t * Z.t) tzresult Lwt.t
+    val incr : Raw_context.t -> (Raw_context.t * Id.t) tzresult Lwt.t
   end
 
   module Total_bytes : sig
-    val init : Raw_context.t -> Z.t -> Z.t -> Raw_context.t tzresult Lwt.t
+    val init : Raw_context.t -> Id.t -> Z.t -> Raw_context.t tzresult Lwt.t
 
-    val get : Raw_context.t -> Z.t -> Z.t tzresult Lwt.t
+    val get : Raw_context.t -> Id.t -> Z.t tzresult Lwt.t
 
-    val set : Raw_context.t -> Z.t -> Z.t -> Raw_context.t tzresult Lwt.t
+    val set : Raw_context.t -> Id.t -> Z.t -> Raw_context.t tzresult Lwt.t
   end
 
   val copy :
-    Raw_context.t -> from:Z.t -> to_:Z.t -> Raw_context.t tzresult Lwt.t
+    Raw_context.t -> from:Id.t -> to_:Id.t -> Raw_context.t tzresult Lwt.t
 
-  val remove_rec : Raw_context.t -> Z.t -> Raw_context.t Lwt.t
+  val remove_rec : Raw_context.t -> Id.t -> Raw_context.t Lwt.t
 end
 
 module Big_map = struct
@@ -127,20 +119,39 @@ module Big_map = struct
   include Storage.Big_map
 end
 
-type ('alloc, 'updates) ops =
-  (module OPS with type alloc = 'alloc and type updates = 'updates)
+type ('id, 'alloc, 'updates) ops =
+  (module OPS
+     with type Id.t = 'id
+      and type alloc = 'alloc
+      and type updates = 'updates)
 
-let get_ops : type a u. (a, u) Lazy_storage_kind.t -> (a, u) ops = function
+let get_ops : type i a u. (i, a, u) Lazy_storage_kind.t -> (i, a, u) ops =
+  function
   | Big_map ->
       (module Big_map)
 
-type 'alloc init = Existing | Copy of {src : Z.t} | Alloc of 'alloc
+module KId = struct
+  type t = E : ('id, _, _) Lazy_storage_kind.t * 'id -> t
 
-type ('alloc, 'updates) diff =
+  let compare (E (kind1, id1)) (E (kind2, id2)) =
+    match Lazy_storage_kind.compare kind1 kind2 with
+    | Lt ->
+        -1
+    | Gt ->
+        1
+    | Eq ->
+        let (module OPS) = get_ops kind1 in
+        OPS.Id.compare id1 id2
+end
+
+type ('id, 'alloc) init = Existing | Copy of {src : 'id} | Alloc of 'alloc
+
+type ('id, 'alloc, 'updates) diff =
   | Remove
-  | Update of {init : 'alloc init; updates : 'updates}
+  | Update of {init : ('id, 'alloc) init; updates : 'updates}
 
-let diff_encoding : type a u. (a, u) ops -> (a, u) diff Data_encoding.t =
+let diff_encoding : type i a u. (i, a, u) ops -> (i, a, u) diff Data_encoding.t
+    =
  fun (module OPS) ->
   let open Data_encoding in
   union
@@ -164,7 +175,7 @@ let diff_encoding : type a u. (a, u) ops -> (a, u) diff Data_encoding.t =
         ~title:"copy"
         (obj3
            (req "action" (constant "copy"))
-           (req "source" z)
+           (req "source" OPS.Id.encoding)
            (req "updates" OPS.updates_encoding))
         (function
           | Update {init = Copy {src}; updates} ->
@@ -188,10 +199,10 @@ let diff_encoding : type a u. (a, u) ops -> (a, u) diff Data_encoding.t =
         (fun (((), updates), alloc) -> Update {init = Alloc alloc; updates}) ]
 
 let apply_updates :
-    type a u.
+    type i a u.
     Raw_context.t ->
-    (a, u) ops ->
-    id:Z.t ->
+    (i, a, u) ops ->
+    id:i ->
     u ->
     (Raw_context.t * Z.t) tzresult Lwt.t =
  fun ctxt (module OPS) ~id updates ->
@@ -205,11 +216,11 @@ let apply_updates :
     >|=? fun ctxt -> (ctxt, updates_size)
 
 let apply_init :
-    type a u.
+    type i a u.
     Raw_context.t ->
-    (a, u) ops ->
-    id:Z.t ->
-    a init ->
+    (i, a, u) ops ->
+    id:i ->
+    (i, a) init ->
     (Raw_context.t * Z.t) tzresult Lwt.t =
  fun ctxt (module OPS) ~id init ->
   match init with
@@ -228,11 +239,11 @@ let apply_init :
       >>=? fun ctxt -> return (ctxt, OPS.bytes_size_for_empty)
 
 let apply_diff :
-    type a u.
+    type i a u.
     Raw_context.t ->
-    (a, u) ops ->
-    id:Z.t ->
-    (a, u) diff ->
+    (i, a, u) ops ->
+    id:i ->
+    (i, a, u) diff ->
     (Raw_context.t * Z.t) tzresult Lwt.t =
  fun ctxt ((module OPS) as ops) ~id diff ->
   match diff with
@@ -249,10 +260,11 @@ let apply_diff :
       return (ctxt, Z.add init_size updates_size)
 
 type diffs_item =
-  | E : ('a, 'u) Lazy_storage_kind.t * Z.t * ('a, 'u) diff -> diffs_item
+  | E : ('i, 'a, 'u) Lazy_storage_kind.t * 'i * ('i, 'a, 'u) diff -> diffs_item
 
 let make :
-    type a u. (a, u) Lazy_storage_kind.t -> Z.t -> (a, u) diff -> diffs_item =
+    type i a u.
+    (i, a, u) Lazy_storage_kind.t -> i -> (i, a, u) diff -> diffs_item =
  fun k id diff -> E (k, id, diff)
 
 let make_remove (KId.E (k, id)) = E (k, id, Remove)
@@ -270,13 +282,13 @@ let item_encoding =
            ~title
            (obj3
               (req "kind" (constant title))
-              (req "id" z)
+              (req "id" OPS.Id.encoding)
               (req "diff" (diff_encoding ops)))
            (fun (E (kind, id, diff)) ->
-             match Lazy_storage_kind.eq k kind with
-             | Some Eq ->
+             match Lazy_storage_kind.compare k kind with
+             | Eq ->
                  Some ((), id, diff)
-             | None ->
+             | Lt | Gt ->
                  None)
            (fun ((), id, diff) -> E (k, id, diff)))
        Lazy_storage_kind.all
@@ -293,20 +305,24 @@ let apply ctxt diffs =
       let ops = get_ops k in
       apply_diff ctxt ops id diff
       >|=? fun (ctxt, added_size) ->
+      let (module OPS) = ops in
       ( ctxt,
-        if Compare.Z.(id < Z.zero) then total_size
-        else Z.add total_size added_size ))
+        if OPS.Id.is_temp id then total_size else Z.add total_size added_size
+      ))
     (ctxt, Z.zero)
     diffs
 
 let fresh :
-    type a u.
-    (a, u) Lazy_storage_kind.t ->
+    type i a u.
+    (i, a, u) Lazy_storage_kind.t ->
     temporary:bool ->
     Raw_context.t ->
-    (Raw_context.t * Z.t) tzresult Lwt.t =
+    (Raw_context.t * i) tzresult Lwt.t =
  fun kind ~temporary ctxt ->
-  if temporary then return (Raw_context.fresh_temporary_lazy_storage kind ctxt)
+  if temporary then
+    return
+      (Raw_context.fold_map_temporary_lazy_storage_ids ctxt (fun temp_ids ->
+           Lazy_storage_kind.Temp_ids.fresh kind temp_ids))
   else
     let (module OPS) = get_ops kind in
     OPS.Next.incr ctxt
@@ -319,6 +335,12 @@ let init ctxt =
     ctxt
     Lazy_storage_kind.all
 
-let cleanup_temporaries =
-  let cleanup_fs = Lazy_storage_kind.Record.{big_map = Big_map.remove_rec} in
-  fun ctxt -> Raw_context.cleanup_temporary_lazy_storage ~cleanup_fs ctxt
+let cleanup_temporaries ctxt =
+  Raw_context.map_temporary_lazy_storage_ids_s ctxt (fun temp_ids ->
+      Lwt_list.fold_left_s
+        (fun ctxt (_tag, Lazy_storage_kind.E k) ->
+          let (module OPS) = get_ops k in
+          Lazy_storage_kind.Temp_ids.fold_s k OPS.remove_rec temp_ids ctxt)
+        ctxt
+        Lazy_storage_kind.all
+      >|= fun ctxt -> (ctxt, Lazy_storage_kind.Temp_ids.init))

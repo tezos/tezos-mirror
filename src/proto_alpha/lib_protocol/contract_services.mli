@@ -105,7 +105,7 @@ val storage_opt :
 val big_map_get :
   'a #RPC_context.simple ->
   'a ->
-  Z.t ->
+  Big_map.Id.t ->
   Script_expr_hash.t ->
   Script.expr shell_tzresult Lwt.t
 

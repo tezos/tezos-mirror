@@ -674,61 +674,68 @@ module Seed : sig
 end
 
 module Big_map : sig
-  type id = Z.t
+  module Id : sig
+    type t
 
-  val fresh : temporary:bool -> context -> (context * id) tzresult Lwt.t
+    val encoding : t Data_encoding.t
+
+    val rpc_arg : t RPC_arg.arg
+
+    (** In the protocol, to be used in parse_data only *)
+    val parse_z : Z.t -> t
+
+    (** In the protocol, to be used in unparse_data only *)
+    val unparse_to_z : t -> Z.t
+  end
+
+  val fresh : temporary:bool -> context -> (context * Id.t) tzresult Lwt.t
 
   val mem :
-    context -> id -> Script_expr_hash.t -> (context * bool) tzresult Lwt.t
+    context -> Id.t -> Script_expr_hash.t -> (context * bool) tzresult Lwt.t
 
   val get_opt :
     context ->
-    id ->
+    Id.t ->
     Script_expr_hash.t ->
     (context * Script.expr option) tzresult Lwt.t
 
-  val rpc_arg : id RPC_arg.t
-
   val exists :
     context ->
-    id ->
+    Id.t ->
     (context * (Script.expr * Script.expr) option) tzresult Lwt.t
+
+  type update = {
+    key : Script_repr.expr;
+    key_hash : Script_expr_hash.t;
+    value : Script_repr.expr option;
+  }
+
+  type updates = update list
+
+  type alloc = {key_type : Script_repr.expr; value_type : Script_repr.expr}
 end
 
 module Lazy_storage : sig
-  module Big_map : sig
-    type update = {
-      key : Script_repr.expr;
-      key_hash : Script_expr_hash.t;
-      value : Script_repr.expr option;
-    }
-
-    type updates = update list
-
-    type alloc = {key_type : Script_repr.expr; value_type : Script_repr.expr}
-  end
-
   module Kind : sig
-    type ('alloc, 'updates) t = Big_map : (Big_map.alloc, Big_map.updates) t
+    type ('id, 'alloc, 'updates) t =
+      | Big_map : (Big_map.Id.t, Big_map.alloc, Big_map.updates) t
   end
 
   module KId : sig
-    type t = private E : (_, _) Kind.t * Z.t -> t
-
-    val make : (_, _) Kind.t -> Z.t -> t
+    type t = E : ('id, _, _) Kind.t * 'id -> t
 
     val compare : t -> t -> int
   end
 
-  type 'alloc init = Existing | Copy of {src : Z.t} | Alloc of 'alloc
+  type ('id, 'alloc) init = Existing | Copy of {src : 'id} | Alloc of 'alloc
 
-  type ('alloc, 'updates) diff =
+  type ('id, 'alloc, 'updates) diff =
     | Remove
-    | Update of {init : 'alloc init; updates : 'updates}
+    | Update of {init : ('id, 'alloc) init; updates : 'updates}
 
   type diffs_item
 
-  val make : ('a, 'u) Kind.t -> Z.t -> ('a, 'u) diff -> diffs_item
+  val make : ('i, 'a, 'u) Kind.t -> 'i -> ('i, 'a, 'u) diff -> diffs_item
 
   val make_remove : KId.t -> diffs_item
 
@@ -815,15 +822,15 @@ module Contract : sig
   module Legacy_big_map_diff : sig
     type item = private
       | Update of {
-          big_map : Big_map.id;
+          big_map : Z.t;
           diff_key : Script.expr;
           diff_key_hash : Script_expr_hash.t;
           diff_value : Script.expr option;
         }
-      | Clear of Big_map.id
-      | Copy of {src : Big_map.id; dst : Big_map.id}
+      | Clear of Z.t
+      | Copy of {src : Z.t; dst : Z.t}
       | Alloc of {
-          big_map : Big_map.id;
+          big_map : Z.t;
           key_type : Script.expr;
           value_type : Script.expr;
         }

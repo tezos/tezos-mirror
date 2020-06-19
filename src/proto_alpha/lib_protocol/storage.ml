@@ -312,6 +312,8 @@ end
 (** Big maps handling *)
 
 module Big_map = struct
+  type id = Lazy_storage_kind.Big_map.Id.t
+
   module Raw_context =
     Make_subcontext (Registered) (Raw_context)
       (struct
@@ -323,52 +325,30 @@ module Big_map = struct
               (struct
                 let name = ["next"]
               end)
-              (Z)
+              (Lazy_storage_kind.Big_map.Id)
 
     let incr ctxt =
       get ctxt
-      >>=? fun i -> set ctxt (Z.succ i) >>=? fun ctxt -> return (ctxt, i)
+      >>=? fun i ->
+      set ctxt (Lazy_storage_kind.Big_map.Id.next i)
+      >>=? fun ctxt -> return (ctxt, i)
 
-    let init ctxt = init ctxt Z.zero
+    let init ctxt = init ctxt Lazy_storage_kind.Big_map.Id.init
   end
 
   module Index = struct
-    type t = Z.t
+    (* After flat storage, just use module Index = Lazy_storage_kind.Big_map.Id *)
 
-    let rpc_arg =
-      let construct = Z.to_string in
-      let destruct hash =
-        match Z.of_string hash with
-        | exception _ ->
-            Error "Cannot parse big map id"
-        | id ->
-            Ok id
-      in
-      RPC_arg.make
-        ~descr:"A big map identifier"
-        ~name:"big_map_id"
-        ~construct
-        ~destruct
-        ()
+    include Lazy_storage_kind.Big_map.Id
 
-    let encoding =
-      Data_encoding.def
-        "big_map_id"
-        ~title:"Big map identifier"
-        ~description:"A big map identifier"
-        Z.encoding
-
-    let compare = Compare.Z.compare
-
-    let path_length = 7
+    let path_length = 6 + path_length
 
     let to_path c l =
       let raw_key = Data_encoding.Binary.to_bytes_exn encoding c in
       let (`Hex index_key) = Hex.of_bytes (Raw_hashes.blake2b raw_key) in
       String.sub index_key 0 2 :: String.sub index_key 2 2
       :: String.sub index_key 4 2 :: String.sub index_key 6 2
-      :: String.sub index_key 8 2 :: String.sub index_key 10 2 :: Z.to_string c
-      :: l
+      :: String.sub index_key 8 2 :: String.sub index_key 10 2 :: to_path c l
 
     let of_path = function
       | []
@@ -380,17 +360,20 @@ module Big_map = struct
       | [_; _; _; _; _; _]
       | _ :: _ :: _ :: _ :: _ :: _ :: _ :: _ :: _ ->
           None
-      | [index1; index2; index3; index4; index5; index6; key] ->
-          let c = Z.of_string key in
-          let raw_key = Data_encoding.Binary.to_bytes_exn encoding c in
-          let (`Hex index_key) = Hex.of_bytes (Raw_hashes.blake2b raw_key) in
-          assert (Compare.String.(String.sub index_key 0 2 = index1)) ;
-          assert (Compare.String.(String.sub index_key 2 2 = index2)) ;
-          assert (Compare.String.(String.sub index_key 4 2 = index3)) ;
-          assert (Compare.String.(String.sub index_key 6 2 = index4)) ;
-          assert (Compare.String.(String.sub index_key 8 2 = index5)) ;
-          assert (Compare.String.(String.sub index_key 10 2 = index6)) ;
-          Some c
+      | index1 :: index2 :: index3 :: index4 :: index5 :: index6 :: tail ->
+          of_path tail
+          |> Option.map (fun c ->
+                 let raw_key = Data_encoding.Binary.to_bytes_exn encoding c in
+                 let (`Hex index_key) =
+                   Hex.of_bytes (Raw_hashes.blake2b raw_key)
+                 in
+                 assert (Compare.String.(String.sub index_key 0 2 = index1)) ;
+                 assert (Compare.String.(String.sub index_key 2 2 = index2)) ;
+                 assert (Compare.String.(String.sub index_key 4 2 = index3)) ;
+                 assert (Compare.String.(String.sub index_key 6 2 = index4)) ;
+                 assert (Compare.String.(String.sub index_key 8 2 = index5)) ;
+                 assert (Compare.String.(String.sub index_key 10 2 = index6)) ;
+                 c)
   end
 
   module Indexed_context =
@@ -411,7 +394,7 @@ module Big_map = struct
 
   let copy ctxt ~from ~to_ = Indexed_context.copy ctxt ~from ~to_
 
-  type key = Raw_context.t * Z.t
+  type key = Raw_context.t * Index.t
 
   module Total_bytes =
     Indexed_context.Make_map

@@ -24,38 +24,22 @@
 (*****************************************************************************)
 
 module KId : sig
-  type t = private E : (_, _) Lazy_storage_kind.t * Z.t -> t
-
-  val make : (_, _) Lazy_storage_kind.t -> Z.t -> t
+  type t = E : ('id, _, _) Lazy_storage_kind.t * 'id -> t
 
   val compare : t -> t -> int
 end
 
-module Big_map : sig
-  type alloc = Lazy_storage_kind.Big_map.alloc = {
-    key_type : Script_repr.expr;
-    value_type : Script_repr.expr;
-  }
+type ('id, 'alloc) init = Existing | Copy of {src : 'id} | Alloc of 'alloc
 
-  type update = Lazy_storage_kind.Big_map.update = {
-    key : Script_repr.expr;
-    key_hash : Script_expr_hash.t;
-    value : Script_repr.expr option;
-  }
-
-  type updates = Lazy_storage_kind.Big_map.updates
-end
-
-type 'alloc init = Existing | Copy of {src : Z.t} | Alloc of 'alloc
-
-type ('alloc, 'updates) diff =
+type ('id, 'alloc, 'updates) diff =
   | Remove
-  | Update of {init : 'alloc init; updates : 'updates}
+  | Update of {init : ('id, 'alloc) init; updates : 'updates}
 
 type diffs_item = private
-  | E : ('a, 'u) Lazy_storage_kind.t * Z.t * ('a, 'u) diff -> diffs_item
+  | E : ('i, 'a, 'u) Lazy_storage_kind.t * 'i * ('i, 'a, 'u) diff -> diffs_item
 
-val make : ('a, 'u) Lazy_storage_kind.t -> Z.t -> ('a, 'u) diff -> diffs_item
+val make :
+  ('i, 'a, 'u) Lazy_storage_kind.t -> 'i -> ('i, 'a, 'u) diff -> diffs_item
 
 val make_remove : KId.t -> diffs_item
 
@@ -64,16 +48,15 @@ type diffs = diffs_item list
 val encoding : diffs Data_encoding.t
 
 (**
-  Unlike other places in the module where [Z.t] represents an identifier,
-  here the returned [Z.t] is the size added by the application of the diffs.
+  The returned [Z.t] is the size added by the application of the diffs.
 *)
 val apply : Raw_context.t -> diffs -> (Raw_context.t * Z.t) tzresult Lwt.t
 
 val fresh :
-  (_, _) Lazy_storage_kind.t ->
+  ('id, _, _) Lazy_storage_kind.t ->
   temporary:bool ->
   Raw_context.t ->
-  (Raw_context.t * Z.t) tzresult Lwt.t
+  (Raw_context.t * 'id) tzresult Lwt.t
 
 val init : Raw_context.t -> Raw_context.t tzresult Lwt.t
 

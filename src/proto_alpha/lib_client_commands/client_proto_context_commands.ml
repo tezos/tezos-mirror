@@ -295,7 +295,7 @@ let commands version () =
           cctxt
           ~chain:cctxt#chain
           ~block:cctxt#block
-          (Z.of_int id)
+          (Big_map.Id.parse_z (Z.of_int id))
           key
         >>=? fun value ->
         cctxt#answer "%a" Michelson_v1_printer.print_expr_unwrapped value

@@ -44,7 +44,7 @@ type t = {
   storage_space_to_pay : Z.t option;
   allocated_contracts : int option;
   origination_nonce : Contract_repr.origination_nonce option;
-  temporary_lazy_storage : Z.t Lazy_storage_kind.Record.t;
+  temporary_lazy_storage_ids : Lazy_storage_kind.Temp_ids.t;
   internal_nonce : int;
   internal_nonces_used : Int_set.t;
   contract_code_cache : Script_repr.expr Contract_repr.Map.t;
@@ -565,8 +565,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
       allocated_contracts = None;
       block_gas = constants.Constants_repr.hard_gas_limit_per_block;
       origination_nonce = None;
-      temporary_lazy_storage =
-        Lazy_storage_kind.Record.init (Z.sub Z.zero Z.one);
+      temporary_lazy_storage_ids = Lazy_storage_kind.Temp_ids.init;
       internal_nonce = 0;
       internal_nonces_used = Int_set.empty;
       contract_code_cache = Contract_repr.Map.empty;
@@ -766,29 +765,12 @@ let absolute_key _ k = k
 
 let description = Storage_description.create ()
 
-let fresh_temporary_lazy_storage kind ctxt =
-  let (temporary_lazy_storage, fresh_id) =
-    Lazy_storage_kind.Record.map_get_one
-      (fun temp_id -> (Z.(sub temp_id one), temp_id))
-      kind
-      ctxt.temporary_lazy_storage
-  in
-  ({ctxt with temporary_lazy_storage}, fresh_id)
+let fold_map_temporary_lazy_storage_ids ctxt f =
+  f ctxt.temporary_lazy_storage_ids
+  |> fun (temporary_lazy_storage_ids, x) ->
+  ({ctxt with temporary_lazy_storage_ids}, x)
 
-let cleanup_temporary_lazy_storage ~cleanup_fs ctxt =
-  Lazy_storage_kind.Record.fold2_s
-    (fun cleanup_f temp_id ctxt ->
-      assert (Compare.Z.(temp_id < Z.zero)) ;
-      let rec iter acc id =
-        if Z.equal id temp_id then Lwt.return acc
-        else cleanup_f acc id >>= fun acc -> iter acc Z.(sub id one)
-      in
-      iter ctxt Z.(sub zero one))
-    cleanup_fs
-    ctxt.temporary_lazy_storage
-    ctxt
-  >|= fun ctxt ->
-  {
-    ctxt with
-    temporary_lazy_storage = Lazy_storage_kind.Record.init Z.(sub zero one);
-  }
+let map_temporary_lazy_storage_ids_s ctxt f =
+  f ctxt.temporary_lazy_storage_ids
+  >|= fun (ctxt, temporary_lazy_storage_ids) ->
+  {ctxt with temporary_lazy_storage_ids}

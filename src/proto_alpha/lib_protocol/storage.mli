@@ -228,25 +228,26 @@ module Contract : sig
 end
 
 module Big_map : sig
+  type id = Lazy_storage_kind.Big_map.Id.t
+
   module Next : sig
-    val incr : Raw_context.t -> (Raw_context.t * Z.t) tzresult Lwt.t
+    val incr : Raw_context.t -> (Raw_context.t * id) tzresult Lwt.t
 
     val init : Raw_context.t -> Raw_context.t tzresult Lwt.t
   end
 
   (** The domain of alive big maps *)
-  val fold : Raw_context.t -> init:'a -> f:(Z.t -> 'a -> 'a Lwt.t) -> 'a Lwt.t
+  val fold : Raw_context.t -> init:'a -> f:(id -> 'a -> 'a Lwt.t) -> 'a Lwt.t
 
-  val list : Raw_context.t -> Z.t list Lwt.t
+  val list : Raw_context.t -> id list Lwt.t
 
-  val remove_rec : Raw_context.t -> Z.t -> Raw_context.t Lwt.t
+  val remove_rec : Raw_context.t -> id -> Raw_context.t Lwt.t
 
-  val copy :
-    Raw_context.t -> from:Z.t -> to_:Z.t -> Raw_context.t tzresult Lwt.t
+  val copy : Raw_context.t -> from:id -> to_:id -> Raw_context.t tzresult Lwt.t
 
-  type key = Raw_context.t * Z.t
+  type key = Raw_context.t * id
 
-  val rpc_arg : Z.t RPC_arg.t
+  val rpc_arg : id RPC_arg.t
 
   module Contents :
     Non_iterable_indexed_carbonated_data_storage
@@ -256,19 +257,19 @@ module Big_map : sig
 
   module Total_bytes :
     Indexed_data_storage
-      with type key = Z.t
+      with type key = id
        and type value = Z.t
        and type t := Raw_context.t
 
   module Key_type :
     Indexed_data_storage
-      with type key = Z.t
+      with type key = id
        and type value = Script_repr.expr
        and type t := Raw_context.t
 
   module Value_type :
     Indexed_data_storage
-      with type key = Z.t
+      with type key = id
        and type value = Script_repr.expr
        and type t := Raw_context.t
 end

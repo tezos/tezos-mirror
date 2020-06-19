@@ -130,7 +130,7 @@ type error +=
 
 type error += Invalid_contract of Script.location * Contract.t
 
-type error += Invalid_big_map of Script.location * Big_map.id
+type error += Invalid_big_map of Script.location * Big_map.Id.t
 
 type error +=
   | Comparable_type_expected : Script.location * Script.expr -> error

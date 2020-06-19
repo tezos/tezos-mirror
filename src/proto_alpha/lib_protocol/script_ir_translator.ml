@@ -2737,6 +2737,7 @@ let rec parse_data :
   | (Big_map_t (tk, tv, _ty_name), expr) ->
       ( match expr with
       | Int (loc, id) ->
+          let id = Big_map.Id.parse_z id in
           return (Some (id, loc), empty_map tk, ctxt)
       | Seq (loc, vs) ->
           parse_items ?type_logger loc ctxt expr tk tv vs (fun x -> Some x)
@@ -2746,7 +2747,9 @@ let rec parse_data :
           >>=? fun () ->
           let tv_opt = Option_t (tv, None) in
           parse_items ?type_logger loc_vs ctxt expr tk tv_opt vs (fun x -> x)
-          >>=? fun (diff, ctxt) -> return (Some (id, loc_id), diff, ctxt)
+          >>=? fun (diff, ctxt) ->
+          let id = Big_map.Id.parse_z id in
+          return (Some (id, loc_id), diff, ctxt)
       | Prim (_, D_Pair, [Int _; expr], _) ->
           traced (fail (Invalid_kind (location expr, [Seq_kind], kind expr)))
       | Prim (_, D_Pair, [expr; _], _) ->
@@ -5478,7 +5481,7 @@ let rec unparse_data :
       >>=? fun (items, ctxt) -> return (Micheline.Seq (-1, items), ctxt)
   | (Big_map_t (_kt, _vt, _), {id = Some id; diff = (module Diff); _})
     when Diff.OPS.is_empty (fst Diff.boxed) ->
-      return (Micheline.Int (-1, id), ctxt)
+      return (Micheline.Int (-1, Big_map.Id.unparse_to_z id), ctxt)
   | (Big_map_t (kt, vt, _), {id = Some id; diff = (module Diff); _}) ->
       let kt = ty_of_comparable_ty kt in
       let items =
@@ -5487,6 +5490,7 @@ let rec unparse_data :
       let vt = Option_t (vt, None) in
       unparse_items ctxt mode kt vt items
       >>=? fun (items, ctxt) ->
+      let id = Big_map.Id.unparse_to_z id in
       return
         (Micheline.Prim (-1, D_Pair, [Int (-1, id); Seq (-1, items)], []), ctxt)
   | (Big_map_t (kt, vt, _), {id = None; diff = (module Diff); _}) ->
@@ -5675,7 +5679,7 @@ let diff_of_big_map ctxt mode ~temporary ~ids {id; key_type; value_type; diff}
     =
   ( match id with
   | Some id ->
-      let kid = Lazy_storage.KId.make Big_map id in
+      let kid = Lazy_storage.KId.E (Big_map, id) in
       if Ids.mem kid ids then
         Big_map.fresh ~temporary ctxt
         >>=? fun (ctxt, duplicate) ->
@@ -5718,7 +5722,7 @@ let diff_of_big_map ctxt mode ~temporary ~ids {id; key_type; value_type; diff}
           >>=? fun (node, ctxt) ->
           return (Some (Micheline.strip_locations node), ctxt) )
       >>=? fun (value, ctxt) ->
-      let diff_item = Lazy_storage.Big_map.{key; key_hash; value} in
+      let diff_item = Big_map.{key; key_hash; value} in
       return (diff_item :: acc, ctxt))
     diff
     ([], ctxt)
@@ -5843,7 +5847,7 @@ let extract_lazy_storage_updates ctxt mode ~temporary ids acc ty x =
         let (module Map) = map.diff in
         let map = {map with diff = empty_map Map.key_ty; id = Some id} in
         let diff = Lazy_storage.make Big_map id diff in
-        let kid = Lazy_storage.KId.make Big_map id in
+        let kid = Lazy_storage.KId.E (Big_map, id) in
         return (ctxt, map, Ids.add kid ids, diff :: acc)
     | (Pair_f (hl, hr), Pair_t ((tyl, _, _), (tyr, _, _), _), (xl, xr)) ->
         aux ctxt mode ~temporary ids acc tyl xl ~has_lazy_storage:hl
@@ -5930,7 +5934,7 @@ let rec fold_lazy_storage :
   | (_, Big_map_t (_, _, _), {id = Some id}) ->
       Gas.consume ctxt Typecheck_costs.cycle
       >>? fun ctxt ->
-      let kid = Lazy_storage.KId.make Big_map id in
+      let kid = Lazy_storage.KId.E (Big_map, id) in
       ok (f kid init, ctxt)
   | (_, Big_map_t (_, _, _), {id = None}) ->
       ok (init, ctxt)
@@ -6003,7 +6007,7 @@ let find_big_map_unaccounted ctxt ty x ~f =
     | [] ->
         return_none
     | Lazy_storage.KId.E (Big_map, id) :: kids -> (
-        f id
+        f (id : Big_map.Id.t)
         >>=? function
         | None -> find_in_ids kids | Some _ as found -> return found )
     (* When more lazy storage kinds are added:

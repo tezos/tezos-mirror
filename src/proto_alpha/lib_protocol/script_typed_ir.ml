@@ -163,7 +163,7 @@ and 'ty stack_ty =
   | Empty_t : end_of_stack stack_ty
 
 and ('key, 'value) big_map = {
-  id : Z.t option;
+  id : Big_map.Id.t option;
   diff : ('key, 'value option) map;
   key_type : 'key ty;
   value_type : 'value ty;
