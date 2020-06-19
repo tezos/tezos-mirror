@@ -183,7 +183,7 @@ struct
             pv.state
             {shell = op.raw.shell; protocol_data = op.protocol_data})
       >|= function
-      | Ok (state, receipt) ->
+      | Ok (state, receipt) -> (
           let pv =
             {
               state;
@@ -193,7 +193,18 @@ struct
                 Operation_hash.Set.add op.hash pv.live_operations;
             }
           in
-          Applied (pv, receipt)
+          try
+            let receipt =
+              Data_encoding.Binary.(
+                of_bytes_exn
+                  Proto.operation_receipt_encoding
+                  (to_bytes_exn Proto.operation_receipt_encoding receipt))
+            in
+            Applied (pv, receipt)
+          with exn ->
+            Refused
+              [Validation_errors.Cannot_serialize_operation_metadata; Exn exn]
+          )
       | Error errors -> (
         match classify_errors errors with
         | `Branch ->
