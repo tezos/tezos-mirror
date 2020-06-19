@@ -308,13 +308,7 @@ module Points = struct
       end)
       ()
 
-  let ban ctxt point_id = make_call1 S.ban ctxt point_id () ()
-
-  let unban ctxt point_id = make_call1 S.unban ctxt point_id () ()
-
-  let trust ctxt peer_id = make_call1 S.trust ctxt peer_id () ()
-
-  let untrust ctxt peer_id = make_call1 S.untrust ctxt peer_id () ()
+  let patch ctxt peer_id input = make_call1 S.patch ctxt peer_id () input
 
   let banned ctxt peer_id = make_call1 S.banned ctxt peer_id () ()
 end
@@ -453,13 +447,7 @@ module Peers = struct
       end)
       ()
 
-  let ban ctxt peer_id = make_call1 S.ban ctxt peer_id () ()
-
-  let unban ctxt peer_id = make_call1 S.unban ctxt peer_id () ()
-
-  let trust ctxt peer_id = make_call1 S.trust ctxt peer_id () ()
-
-  let untrust ctxt peer_id = make_call1 S.untrust ctxt peer_id () ()
+  let patch ctxt point_id input = make_call1 S.patch ctxt point_id () input
 
   let banned ctxt peer_id = make_call1 S.banned ctxt peer_id () ()
 end

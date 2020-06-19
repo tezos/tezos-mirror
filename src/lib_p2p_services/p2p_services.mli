@@ -163,15 +163,19 @@ module Points : sig
         P2p_point.Pool_event.t list )
       RPC_service.t
 
+    (* DEPRECATED *)
     val ban :
       ([`GET], unit, unit * P2p_point.Id.t, unit, unit, unit) RPC_service.t
 
+    (* DEPRECATED *)
     val unban :
       ([`GET], unit, unit * P2p_point.Id.t, unit, unit, unit) RPC_service.t
 
+    (* DEPRECATED *)
     val trust :
       ([`GET], unit, unit * P2p_point.Id.t, unit, unit, unit) RPC_service.t
 
+    (* DEPRECATED *)
     val untrust :
       ([`GET], unit, unit * P2p_point.Id.t, unit, unit, unit) RPC_service.t
 
