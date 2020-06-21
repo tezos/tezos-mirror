@@ -160,21 +160,17 @@ module Info = struct
 
   let known_public s = s.known_public
 
-  let greylisted ~now s =
+  let greylisted ~now {greylisting; _} =
     (* TODO : use Option.map_default when will be available *)
-    match s.greylisting with
+    match greylisting with
     | None ->
         false
     | Some gr ->
         Time.System.compare now gr.end_time <= 0
 
-  let greylisted_until s =
+  let greylisted_until {greylisting; _} =
     (* TODO : use Option.map_default when will be available *)
-    match s.greylisting with
-    | None ->
-        Time.System.epoch
-    | Some gr ->
-        gr.end_time
+    match greylisting with None -> None | Some gr -> Some gr.end_time
 
   let last_seen s =
     Time.System.recent

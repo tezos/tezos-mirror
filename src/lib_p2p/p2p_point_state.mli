@@ -103,7 +103,7 @@ module Info : sig
   (* Check if a point is greylisted w.r.t. the current time *)
   val greylisted : now:Time.System.t -> 'conn point_info -> bool
 
-  val greylisted_until : 'conn point_info -> Time.System.t
+  val greylisted_until : 'conn point_info -> Time.System.t option
 
   val point : 'conn point_info -> Id.t
 

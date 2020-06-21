@@ -281,7 +281,7 @@ end
 module Info = struct
   type t = {
     trusted : bool;
-    greylisted_until : Time.System.t;
+    greylisted_until : Time.System.t option;
     state : State.t;
     last_failed_connection : Time.System.t option;
     last_rejected_connection : (P2p_peer_id.t * Time.System.t) option;
@@ -343,7 +343,7 @@ module Info = struct
            })
          (obj10
             (req "trusted" bool)
-            (dft "greylisted_until" Time.System.encoding Time.System.epoch)
+            (opt "greylisted_until" Time.System.encoding)
             (req "state" State.encoding)
             (opt "p2p_peer_id" P2p_peer_id.encoding)
             (opt "last_failed_connection" Time.System.encoding)
