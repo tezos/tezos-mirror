@@ -100,6 +100,7 @@ module Info : sig
   *)
   val last_miss : 'conn point_info -> Time.System.t option
 
+  (* Check if a point is greylisted w.r.t. the current time *)
   val greylisted : now:Time.System.t -> 'conn point_info -> bool
 
   val greylisted_until : 'conn point_info -> Time.System.t

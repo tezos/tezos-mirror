@@ -51,6 +51,11 @@ module Info = struct
     increase_cap : Time.System.Span.t;
   }
 
+  type greylisting_info = {
+    delay : Time.System.Span.t;
+    end_time : Time.System.t;
+  }
+
   type 'data t = {
     point : Id.t;
     mutable trusted : bool;
@@ -61,8 +66,7 @@ module Info = struct
       (P2p_peer.Id.t * Time.System.t) option;
     mutable known_public : bool;
     mutable last_disconnection : (P2p_peer.Id.t * Time.System.t) option;
-    mutable greylisting_delay : Time.System.Span.t;
-    mutable greylisting_end : Time.System.t;
+    mutable greylisting : greylisting_info option;
     events : Pool_event.t Ringo.Ring.t;
     watchers : Pool_event.t Lwt_watcher.input;
   }
@@ -134,8 +138,7 @@ module Info = struct
       last_disconnection = None;
       known_public = false;
       events = Ringo.Ring.create log_size;
-      greylisting_delay = Ptime.Span.of_int_s 1;
-      greylisting_end = Time.System.epoch;
+      greylisting = None;
       watchers = Lwt_watcher.create_input ();
     }
 
@@ -157,9 +160,21 @@ module Info = struct
 
   let known_public s = s.known_public
 
-  let greylisted ~now s = Time.System.compare now s.greylisting_end <= 0
+  let greylisted ~now s =
+    (* TODO : use Option.map_default when will be available *)
+    match s.greylisting with
+    | None ->
+        false
+    | Some gr ->
+        Time.System.compare now gr.end_time <= 0
 
-  let greylisted_until s = s.greylisting_end
+  let greylisted_until s =
+    (* TODO : use Option.map_default when will be available *)
+    match s.greylisting with
+    | None ->
+        Time.System.epoch
+    | Some gr ->
+        gr.end_time
 
   let last_seen s =
     Time.System.recent
@@ -247,17 +262,25 @@ let maxed_time_add t s =
   match Ptime.add_span t s with Some t -> t | None -> Ptime.max
 
 let set_greylisted greylisting_config timestamp point_info =
-  point_info.Info.greylisting_end <-
-    maxed_time_add timestamp point_info.Info.greylisting_delay ;
-  point_info.greylisting_delay <-
-    (let new_delay =
-       Time.System.Span.multiply_exn
-         greylisting_config.Info.factor
-         point_info.greylisting_delay
-     in
-     if Ptime.Span.compare greylisting_config.Info.increase_cap new_delay > 0
-     then new_delay
-     else greylisting_config.Info.increase_cap)
+  let disconnection_delay =
+    match point_info.Info.greylisting with
+    | None ->
+        greylisting_config.Info.initial_delay
+    | Some gr ->
+        gr.delay
+  in
+  let end_time = maxed_time_add timestamp disconnection_delay in
+  let delay =
+    let new_delay =
+      Time.System.Span.multiply_exn
+        greylisting_config.Info.factor
+        disconnection_delay
+    in
+    if Ptime.Span.compare greylisting_config.Info.increase_cap new_delay > 0
+    then new_delay
+    else greylisting_config.Info.increase_cap
+  in
+  point_info.Info.greylisting <- Some {delay; end_time}
 
 let set_disconnected ~timestamp ?(requested = false) greylisting_config
     point_info =
@@ -272,9 +295,11 @@ let set_disconnected ~timestamp ?(requested = false) greylisting_config
         point_info.last_rejected_connection <- Some (current_peer_id, timestamp) ;
         Request_rejected (Some current_peer_id)
     | Running {current_peer_id; _} ->
-        point_info.greylisting_delay <- greylisting_config.Info.initial_delay ;
-        point_info.greylisting_end <-
-          maxed_time_add timestamp greylisting_config.Info.disconnection_delay ;
+        let delay = greylisting_config.Info.initial_delay in
+        let end_time =
+          maxed_time_add timestamp greylisting_config.Info.disconnection_delay
+        in
+        point_info.greylisting <- Some {delay; end_time} ;
         point_info.last_disconnection <- Some (current_peer_id, timestamp) ;
         if requested then Disconnection current_peer_id
         else External_disconnection current_peer_id
