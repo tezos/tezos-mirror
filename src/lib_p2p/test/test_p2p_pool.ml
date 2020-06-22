@@ -129,7 +129,7 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
         proof_of_work_target;
         listening_port = Some port;
         private_mode;
-        greylisting_config = P2p_point_state.Info.default_greylisting_config;
+        reconnection_config = P2p_point_state.Info.default_reconnection_config;
         min_connections = unopt min_connections;
         max_connections = unopt max_connections;
         max_incoming_connections = unopt max_incoming_connections;

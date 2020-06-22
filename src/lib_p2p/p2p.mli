@@ -101,8 +101,8 @@ type config = {
       (** Expected level of proof of work of peers' identity. *)
   trust_discovered_peers : bool;
       (** If [true], peers discovered on the local network will be trusted. *)
-  greylisting_config : P2p_point_state.Info.greylisting_config;
-      (** The greylisting configuration. *)
+  reconnection_config : P2p_point_state.Info.reconnection_config;
+      (** The reconnection delat configuration. *)
 }
 
 (** Network capacities *)

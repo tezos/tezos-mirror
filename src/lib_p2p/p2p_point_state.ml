@@ -44,14 +44,14 @@ let pp ppf = function
       Format.fprintf ppf "disconnected"
 
 module Info = struct
-  type greylisting_config = {
+  type reconnection_config = {
     factor : float;
     initial_delay : Time.System.Span.t;
     disconnection_delay : Time.System.Span.t;
     increase_cap : Time.System.Span.t;
   }
 
-  type greylisting_info = {
+  type reconnection_info = {
     delay : Time.System.Span.t;
     end_time : Time.System.t;
   }
@@ -66,7 +66,7 @@ module Info = struct
       (P2p_peer.Id.t * Time.System.t) option;
     mutable known_public : bool;
     mutable last_disconnection : (P2p_peer.Id.t * Time.System.t) option;
-    mutable greylisting : greylisting_info option;
+    mutable reconnection_info : reconnection_info option;
     events : Pool_event.t Ringo.Ring.t;
     watchers : Pool_event.t Lwt_watcher.input;
   }
@@ -77,7 +77,7 @@ module Info = struct
 
   let log_size = 100
 
-  let default_greylisting_config =
+  let default_reconnection_config =
     {
       factor = 1.2;
       initial_delay = Ptime.Span.of_int_s 1;
@@ -85,7 +85,7 @@ module Info = struct
       increase_cap = Ptime.Span.of_int_s 172800 (* 2 days *);
     }
 
-  let greylisting_config_encoding =
+  let reconnection_config_encoding =
     let open Data_encoding in
     conv
       (fun {factor; initial_delay; disconnection_delay; increase_cap} ->
@@ -96,36 +96,36 @@ module Info = struct
          (dft
             "factor"
             ~description:
-              "The factor by which the greylisting delay is increased when an \
-               already greylisted peer is greylisted again. This value should \
-               be set to 1 for a linear back-off and to >1 for an exponential \
-               back-off."
+              "The factor by which the reconnection delay is increased when a \
+               peer that was previously disconnected is disconnected again. \
+               This value should be set to 1 for a linear back-off and to >1 \
+               for an exponential back-off."
             float
-            default_greylisting_config.factor)
+            default_reconnection_config.factor)
          (dft
             "initial-delay"
             ~description:
-              "The span of time a peer is greylisted for when it is first \
-               greylisted."
+              "The span of time a peer is disconnected for when it is first \
+               disconnected."
             Time.System.Span.encoding
-            default_greylisting_config.initial_delay)
+            default_reconnection_config.initial_delay)
          (dft
             "disconnection-delay"
             ~description:
-              "The span of time a peer is greylisted for when it is \
-               greylisted as the result of an abrupt disconnection."
+              "The span of time a peer is disconnected for when it is \
+               disconnected as the result of an error."
             Time.System.Span.encoding
-            default_greylisting_config.disconnection_delay)
+            default_reconnection_config.disconnection_delay)
          (dft
             "increase-cap"
             ~description:
-              "The maximum amount by which the greylisting is extended. This \
+              "The maximum amount by which the reconnection is extended. This \
                limits the rate of the exponential back-off, which eventually \
                becomes linear when it reaches this limit. This limit is set \
-               to avoid reaching the End-of-Time when repeatedly greylisting \
+               to avoid reaching the End-of-Time when repeatedly reconnection \
                a peer."
             Time.System.Span.encoding
-            default_greylisting_config.increase_cap))
+            default_reconnection_config.increase_cap))
 
   let create ?(trusted = false) addr port =
     {
@@ -138,7 +138,7 @@ module Info = struct
       last_disconnection = None;
       known_public = false;
       events = Ringo.Ring.create log_size;
-      greylisting = None;
+      reconnection_info = None;
       watchers = Lwt_watcher.create_input ();
     }
 
@@ -150,6 +150,8 @@ module Info = struct
 
   let unset_trusted gi = gi.trusted <- false
 
+  let reset_reconnection_delay gi = gi.reconnection_info <- None
+
   let last_established_connection s = s.last_established_connection
 
   let last_disconnection s = s.last_disconnection
@@ -160,17 +162,17 @@ module Info = struct
 
   let known_public s = s.known_public
 
-  let greylisted ~now {greylisting; _} =
+  let can_reconnect ~now {reconnection_info; _} =
     (* TODO : use Option.map_default when will be available *)
-    match greylisting with
+    match reconnection_info with
     | None ->
         false
     | Some gr ->
         Time.System.compare now gr.end_time <= 0
 
-  let greylisted_until {greylisting; _} =
+  let reconnection_time {reconnection_info; _} =
     (* TODO : use Option.map_default when will be available *)
-    match greylisting with None -> None | Some gr -> Some gr.end_time
+    match reconnection_info with None -> None | Some gr -> Some gr.end_time
 
   let last_seen s =
     Time.System.recent
@@ -257,11 +259,11 @@ let set_running ~timestamp point_info peer_id data =
 let maxed_time_add t s =
   match Ptime.add_span t s with Some t -> t | None -> Ptime.max
 
-let set_greylisted greylisting_config timestamp point_info =
+let set_greylisted reconnection_config timestamp point_info =
   let disconnection_delay =
-    match point_info.Info.greylisting with
+    match point_info.Info.reconnection_info with
     | None ->
-        greylisting_config.Info.initial_delay
+        reconnection_config.Info.initial_delay
     | Some gr ->
         gr.delay
   in
@@ -269,33 +271,33 @@ let set_greylisted greylisting_config timestamp point_info =
   let delay =
     let new_delay =
       Time.System.Span.multiply_exn
-        greylisting_config.Info.factor
+        reconnection_config.Info.factor
         disconnection_delay
     in
-    if Ptime.Span.compare greylisting_config.Info.increase_cap new_delay > 0
+    if Ptime.Span.compare reconnection_config.Info.increase_cap new_delay > 0
     then new_delay
-    else greylisting_config.Info.increase_cap
+    else reconnection_config.Info.increase_cap
   in
-  point_info.Info.greylisting <- Some {delay; end_time}
+  point_info.Info.reconnection_info <- Some {delay; end_time}
 
-let set_disconnected ~timestamp ?(requested = false) greylisting_config
+let set_disconnected ~timestamp ?(requested = false) reconnection_config
     point_info =
   let event : Pool_event.kind =
     match point_info.Info.state with
     | Requested _ ->
-        set_greylisted greylisting_config timestamp point_info ;
+        set_greylisted reconnection_config timestamp point_info ;
         point_info.last_failed_connection <- Some timestamp ;
         Request_rejected None
     | Accepted {current_peer_id; _} ->
-        set_greylisted greylisting_config timestamp point_info ;
+        set_greylisted reconnection_config timestamp point_info ;
         point_info.last_rejected_connection <- Some (current_peer_id, timestamp) ;
         Request_rejected (Some current_peer_id)
     | Running {current_peer_id; _} ->
-        let delay = greylisting_config.Info.initial_delay in
+        let delay = reconnection_config.Info.initial_delay in
         let end_time =
-          maxed_time_add timestamp greylisting_config.Info.disconnection_delay
+          maxed_time_add timestamp reconnection_config.Info.disconnection_delay
         in
-        point_info.greylisting <- Some {delay; end_time} ;
+        point_info.reconnection_info <- Some {delay; end_time} ;
         point_info.last_disconnection <- Some (current_peer_id, timestamp) ;
         if requested then Disconnection current_peer_id
         else External_disconnection current_peer_id

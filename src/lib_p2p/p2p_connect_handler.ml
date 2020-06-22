@@ -37,7 +37,7 @@ type config = {
   identity : P2p_identity.t;
   connection_timeout : Time.System.Span.t;
   authentication_timeout : Time.System.Span.t;
-  greylisting_config : P2p_point_state.Info.greylisting_config;
+  reconnection_config : P2p_point_state.Info.reconnection_config;
   proof_of_work_target : Crypto_box.target;
   listening_port : P2p_addr.port option;
 }
@@ -130,7 +130,7 @@ let create_connection t p2p_conn id_point point_info peer_info
       Option.iter
         (P2p_point_state.set_disconnected
            ~timestamp
-           t.config.greylisting_config)
+           t.config.reconnection_config)
         point_info ;
       t.log (Disconnection peer_id) ;
       P2p_peer_state.set_disconnected ~timestamp peer_info ;
@@ -248,7 +248,7 @@ let raw_authenticate t ?point_info canceler fd point =
         Option.iter
           (P2p_point_state.set_disconnected
              ~timestamp
-             t.config.greylisting_config)
+             t.config.reconnection_config)
           point_info ) ;
       Lwt.return_error err)
   >>=? fun (info, auth_fd) ->
@@ -334,7 +334,7 @@ let raw_authenticate t ?point_info canceler fd point =
           (P2p_point_state.set_disconnected
              ~timestamp
              ~requested:true
-             t.config.greylisting_config)
+             t.config.reconnection_config)
           point_info ) ;
       match motive with
       | Unknown_chain_name
@@ -413,7 +413,7 @@ let raw_authenticate t ?point_info canceler fd point =
           Option.iter
             (P2p_point_state.set_disconnected
                ~timestamp
-               t.config.greylisting_config)
+               t.config.reconnection_config)
             connection_point_info ;
           P2p_peer_state.set_disconnected ~timestamp peer_info ;
           Lwt.return_error err)
@@ -530,7 +530,7 @@ let connect ?timeout t point =
           let timestamp = Systime_os.now () in
           P2p_point_state.set_disconnected
             ~timestamp
-            t.config.greylisting_config
+            t.config.reconnection_config
             point_info ;
           P2p_fd.close fd
           >>= (function

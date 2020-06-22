@@ -65,7 +65,7 @@ let default_p2p : P2p.config =
     identity = P2p_identity.generate (Crypto_box.make_target 0.);
     proof_of_work_target = Crypto_box.default_target;
     trust_discovered_peers = false;
-    greylisting_config = P2p_point_state.Info.default_greylisting_config;
+    reconnection_config = P2p_point_state.Info.default_reconnection_config;
   }
 
 let default_p2p_limits : P2p.limits =

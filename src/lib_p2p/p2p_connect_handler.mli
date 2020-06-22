@@ -72,7 +72,7 @@ type config = {
       (** Maximum time allowed to the establishment of a connection. *)
   authentication_timeout : Time.System.Span.t;
       (** Maximum time allowed to the establishment of a connection. *)
-  greylisting_config : P2p_point_state.Info.greylisting_config;
+  reconnection_config : P2p_point_state.Info.reconnection_config;
       (** Delay granted to a peer to perform authentication. *)
   proof_of_work_target : Crypto_box.target;
       (** The greylisting configuration. *)

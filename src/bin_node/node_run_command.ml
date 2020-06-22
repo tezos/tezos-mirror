@@ -209,7 +209,7 @@ let init_node ?sandbox ?checkpoint ~singleprocess (config : Node_config_file.t)
           peers_file =
             config.data_dir // Node_data_version.default_peers_file_name;
           private_mode = config.p2p.private_mode;
-          greylisting_config = config.p2p.greylisting_config;
+          reconnection_config = config.p2p.reconnection_config;
           identity;
           proof_of_work_target = Crypto_box.make_target config.p2p.expected_pow;
           trust_discovered_peers = sandbox <> None;

@@ -279,7 +279,7 @@ and p2p = {
   limits : P2p.limits;
   disable_mempool : bool;
   enable_testchain : bool;
-  greylisting_config : P2p_point_state.Info.greylisting_config;
+  reconnection_config : P2p_point_state.Info.reconnection_config;
 }
 
 and rpc = {
@@ -335,7 +335,7 @@ let default_p2p =
     limits = default_p2p_limits;
     disable_mempool = false;
     enable_testchain = false;
-    greylisting_config = P2p_point_state.Info.default_greylisting_config;
+    reconnection_config = P2p_point_state.Info.default_reconnection_config;
   }
 
 let default_rpc =
@@ -552,7 +552,7 @@ let p2p =
            limits;
            disable_mempool;
            enable_testchain;
-           greylisting_config } ->
+           reconnection_config } ->
       ( expected_pow,
         bootstrap_peers,
         listen_addr,
@@ -561,7 +561,7 @@ let p2p =
         limits,
         disable_mempool,
         enable_testchain,
-        greylisting_config ))
+        reconnection_config ))
     (fun ( expected_pow,
            bootstrap_peers,
            listen_addr,
@@ -570,7 +570,7 @@ let p2p =
            limits,
            disable_mempool,
            enable_testchain,
-           greylisting_config ) ->
+           reconnection_config ) ->
       {
         expected_pow;
         bootstrap_peers;
@@ -580,7 +580,7 @@ let p2p =
         limits;
         disable_mempool;
         enable_testchain;
-        greylisting_config;
+        reconnection_config;
       })
     (obj9
        (dft
@@ -643,8 +643,8 @@ let p2p =
        dft
          "greylisting_config"
          ~description:"The greylisting policy."
-         greylisting_config_encoding
-         default_greylisting_config))
+         reconnection_config_encoding
+         default_reconnection_config))
 
 let rpc : rpc Data_encoding.t =
   let open Data_encoding in
@@ -1137,7 +1137,7 @@ let update ?data_dir ?min_connections ?expected_connections ?max_connections
       limits;
       disable_mempool = cfg.p2p.disable_mempool || disable_mempool;
       enable_testchain = cfg.p2p.enable_testchain || enable_testchain;
-      greylisting_config = cfg.p2p.greylisting_config;
+      reconnection_config = cfg.p2p.reconnection_config;
     }
   and rpc : rpc =
     {

@@ -39,7 +39,7 @@ type config = {
   identity : P2p_identity.t;
   proof_of_work_target : Crypto_box.target;
   trust_discovered_peers : bool;
-  greylisting_config : P2p_point_state.Info.greylisting_config;
+  reconnection_config : P2p_point_state.Info.reconnection_config;
 }
 
 type limits = {
@@ -98,7 +98,7 @@ let create_connect_handler config limits pool msg_cfg conn_meta_cfg io_sched
       proof_of_work_target = config.proof_of_work_target;
       listening_port = config.listening_port;
       private_mode = config.private_mode;
-      greylisting_config = config.greylisting_config;
+      reconnection_config = config.reconnection_config;
       min_connections = limits.min_connections;
       max_connections = limits.max_connections;
       max_incoming_connections = limits.max_incoming_connections;
