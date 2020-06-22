@@ -24,28 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Events = struct
-  include Internal_event.Simple
-
-  let section = ["p2p"; "conn"]
-
-  let unexpected_error =
-    declare_1
-      ~section
-      ~name:"unexpected_error_answerer"
-      ~msg:"Answerer unexpected error: {errors}"
-      ~level:Error
-      ("errors", Error_monad.trace_encoding)
-
-  let bytes_popped_from_queue =
-    declare_2
-      ~section
-      ~name:"bytes_popped_from_queue"
-      ~msg:"{bytes} bytes message popped from queue {peer}\027[0m"
-      ~level:Debug
-      ("bytes", Data_encoding.int8)
-      ("peer", P2p_peer.Id.encoding)
-end
+module Events = P2p_events.P2p_conn
 
 type ('msg, 'peer, 'conn) t = {
   canceler : Lwt_canceler.t;

@@ -23,36 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Events = struct
-  include Internal_event.Simple
-
-  let section = ["p2p"; "welcome"]
-
-  let incoming_error =
-    declare_2
-      ~section
-      ~name:"incoming_error"
-      ~msg:"Incoming connection failed with {error}. Ignoring"
-      ~level:Debug
-      ("error", Error_monad.trace_encoding)
-      ("type", Data_encoding.string)
-
-  let unexpected_error =
-    declare_1
-      ~section
-      ~name:"unexpected_error_welcome"
-      ~msg:"Unexpected error."
-      ~level:Error
-      ("error", Error_monad.trace_encoding)
-
-  let incoming_connection_error =
-    declare_1
-      ~section
-      ~name:"incoming_connection_error"
-      ~msg:"Cannot accept incoming connections."
-      ~level:Error
-      ("exception", Error_monad.error_encoding)
-end
+module Events = P2p_events.P2p_welcome
 
 type connect_handler =
   | Connect_handler :

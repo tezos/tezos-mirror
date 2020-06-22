@@ -1,0 +1,418 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
+
+module P2p_protocol = struct
+  include Internal_event.Simple
+
+  let section = ["p2p"; "protocol"]
+
+  let private_node_new_peers =
+    declare_1
+      ~section
+      ~name:"private_node_new_peers"
+      ~msg:"received new peers addresses from private peer {peer}"
+      ~level:Warning
+      ("peer", P2p_peer.Id.encoding)
+
+  let private_node_peers_request =
+    declare_1
+      ~section
+      ~name:"private_node_peers_request"
+      ~msg:"received requests for peers addresses from private peer {peer}"
+      ~level:Warning
+      ("peer", P2p_peer.Id.encoding)
+
+  let private_node_swap_request =
+    declare_1
+      ~section
+      ~name:"private_node_swap_request"
+      ~msg:"received swap requests from private peer {peer}"
+      ~level:Warning
+      ("peer", P2p_peer.Id.encoding)
+
+  let private_node_swap_ack =
+    declare_1
+      ~section
+      ~name:"private_node_swap_ack"
+      ~msg:"received swap ack from private peer {peer}"
+      ~level:Warning
+      ("peer", P2p_peer.Id.encoding)
+
+  let private_node_request =
+    declare_1
+      ~section
+      ~name:"private_node_request"
+      ~msg:"private peer ({peer}) asked other peer's addresses"
+      ~level:Warning
+      ("peer", P2p_peer.Id.encoding)
+
+  let advertise_sending_failed =
+    declare_2
+      ~section
+      ~name:"advertise_sending_failed"
+      ~msg:"sending advertise to {peer} failed: {trace}"
+      ~level:Warning
+      ~pp2:pp_print_error_first
+      ("peer", P2p_peer.Id.encoding)
+      ("trace", Error_monad.trace_encoding)
+
+  let swap_succeeded =
+    declare_1
+      ~section
+      ~name:"swap_succeeded"
+      ~msg:"swap to {point} succeeded"
+      ~level:Info
+      ("point", P2p_point.Id.encoding)
+
+  let swap_interrupted =
+    declare_2
+      ~section
+      ~name:"swap_interrupted"
+      ~msg:"swap to {point} was interrupted: {trace}"
+      ~level:Debug
+      ~pp2:pp_print_error_first
+      ("point", P2p_point.Id.encoding)
+      ("trace", Error_monad.trace_encoding)
+
+  let swap_failed =
+    declare_2
+      ~section
+      ~name:"swap_failed"
+      ~msg:"swap to {point} failed: {trace}"
+      ~level:Debug
+      ~pp2:pp_print_error_first
+      ("point", P2p_point.Id.encoding)
+      ("trace", Error_monad.trace_encoding)
+
+  let swap_ack_received =
+    declare_1
+      ~section
+      ~name:"swap_ack_received"
+      ~msg:"swap ack received from {peer}"
+      ~level:Info
+      ("peer", P2p_peer.Id.encoding)
+
+  let swap_request_received =
+    declare_1
+      ~section
+      ~name:"swap_request_received"
+      ~msg:"swap request received from {peer}"
+      ~level:Info
+      ("peer", P2p_peer.Id.encoding)
+
+  let swap_request_ignored =
+    declare_1
+      ~section
+      ~name:"swap_request_ignored"
+      ~msg:"swap request ignored from {peer}"
+      ~level:Info
+      ("peer", P2p_peer.Id.encoding)
+
+  let no_swap_candidate =
+    declare_1
+      ~section
+      ~name:"no_swap_candidate"
+      ~msg:"no swap candidate for {peer}"
+      ~level:Info
+      ("peer", P2p_peer.Id.encoding)
+end
+
+module P2p_connect_handler = struct
+  include Internal_event.Simple
+
+  let section = ["p2p"; "connect_handler"]
+
+  let disconnected =
+    declare_2
+      ~section
+      ~name:"disconnected"
+      ~msg:"disconnected: {peer} ({point})"
+      ~level:Debug
+      ~pp2:P2p_connection.Id.pp
+      ("peer", P2p_peer.Id.encoding)
+      ("point", P2p_connection.Id.encoding)
+
+  let peer_rejected =
+    declare_0
+      ~section
+      ~name:"peer_rejected"
+      ~msg:"[private node] incoming connection from untrusted peer rejected"
+      ~level:Notice
+      ()
+
+  let authenticate =
+    declare_3
+      ~section
+      ~name:"authenticate"
+      ~msg:"authenticate: {point} {type} -> {state}"
+      ~level:Debug
+      ("point", P2p_point.Id.encoding)
+      ("type", Data_encoding.(option string))
+      ("state", Data_encoding.(option string))
+
+  let authenticate_status =
+    declare_3
+      ~section
+      ~name:"authenticate_status"
+      ~msg:"authenticate: {point} {type} -> {peer}"
+      ~level:Debug
+      ("type", Data_encoding.string)
+      ("point", P2p_point.Id.encoding)
+      ("peer", P2p_peer.Id.encoding)
+
+  let authenticate_error =
+    declare_2
+      ~section
+      ~name:"authentication_error"
+      ~msg:"authenticate: {point} {errors}"
+      ~level:Debug
+      ~pp2:pp_print_error_first
+      ("point", P2p_point.Id.encoding)
+      ("errors", Error_monad.trace_encoding)
+
+  let connection_rejected_by_peers =
+    declare_3
+      ~section
+      ~name:"connection_rejected_by_peers"
+      ~msg:
+        "connection to {point} rejected by peer. Reason {reason}. Peer list \
+         received: {points}"
+      ~level:Debug
+      ("point", P2p_point.Id.encoding)
+      ("reason", P2p_rejection.encoding)
+      ("points", Data_encoding.list P2p_point.Id.encoding)
+
+  let connection_error =
+    declare_2
+      ~section
+      ~name:"connection_error"
+      ~msg:"connection to {point} rejected by peer : {errors}"
+      ~level:Debug
+      ~pp2:pp_print_error_first
+      ("point", P2p_point.Id.encoding)
+      ("errors", Error_monad.trace_encoding)
+
+  let connect_status =
+    declare_2
+      ~section
+      ~name:"connect_status"
+      ~msg:"connect: {point} {state}"
+      ~level:Debug
+      ("state", Data_encoding.string)
+      ("point", P2p_point.Id.encoding)
+
+  let connect_error =
+    declare_3
+      ~section
+      ~name:"connect_error"
+      ~msg:"connect: {point} {state} : {errors}"
+      ~level:Debug
+      ~pp3:pp_print_error_first
+      ("state", Data_encoding.string)
+      ("point", P2p_point.Id.encoding)
+      ("errors", Error_monad.trace_encoding)
+
+  let authenticate_reject_protocol_mismatch =
+    declare_8
+      ~section
+      ~name:"authenticate_reject_protocol_mismatch"
+      ~msg:"no common protocol with {peer}"
+      ~level:Debug
+      ("point", P2p_point.Id.encoding)
+      ("peer", P2p_peer.Id.encoding)
+      ("local_chain", Distributed_db_version.Name.encoding)
+      ("remote_chain", Distributed_db_version.Name.encoding)
+      ("local_db_versions", Data_encoding.list Distributed_db_version.encoding)
+      ("remote_db_version", Distributed_db_version.encoding)
+      ("local_p2p_version", Data_encoding.list P2p_version.encoding)
+      ("remote_p2p_version", P2p_version.encoding)
+end
+
+module P2p_conn = struct
+  include Internal_event.Simple
+
+  let section = ["p2p"; "conn"]
+
+  let unexpected_error =
+    declare_1
+      ~section
+      ~name:"unexpected_error_answerer"
+      ~msg:"answerer unexpected error: {errors}"
+      ~level:Error
+      ~pp1:pp_print_error_first
+      ("errors", Error_monad.trace_encoding)
+
+  let bytes_popped_from_queue =
+    declare_2
+      ~section
+      ~name:"bytes_popped_from_queue"
+      ~msg:"{bytes} bytes message popped from queue {peer}"
+      ~level:Debug
+      ("bytes", Data_encoding.int8)
+      ("peer", P2p_peer.Id.encoding)
+end
+
+module P2p_fd = struct
+  include Internal_event.Simple
+
+  let section = ["p2p"; "fd"]
+
+  let create_fd =
+    declare_1
+      ~section
+      ~name:"create_fd"
+      ~msg:"cnx:{connection_id}:create fd"
+      ~level:Debug
+      ("connection_id", Data_encoding.int16)
+
+  let close_fd =
+    declare_3
+      ~section
+      ~name:"close_fd"
+      ~msg:"cnx:{connection_id}:close fd (stats : {nread}/{nwrit})"
+      ~level:Debug
+      ("connection_id", Data_encoding.int16)
+      ("nread", Data_encoding.int16)
+      ("nwrit", Data_encoding.int16)
+
+  let try_read =
+    declare_2
+      ~section
+      ~name:"try_read"
+      ~msg:"cnx:{connection_id}:try read {length}"
+      ~level:Debug
+      ("connection_id", Data_encoding.int16)
+      ("length", Data_encoding.int16)
+
+  let try_write =
+    declare_2
+      ~section
+      ~name:"try_write"
+      ~msg:"cnx:{connection_id}:try write {length}"
+      ~level:Debug
+      ("connection_id", Data_encoding.int16)
+      ("length", Data_encoding.int16)
+
+  let read_fd =
+    declare_3
+      ~section
+      ~name:"read_fd"
+      ~msg:"cnx:{connection_id}:read {nread} ({nread_total})"
+      ~level:Debug
+      ("connection_id", Data_encoding.int16)
+      ("nread", Data_encoding.int16)
+      ("nread_total", Data_encoding.int16)
+
+  let written_fd =
+    declare_3
+      ~section
+      ~name:"written_fd"
+      ~msg:"cnx:{connection_id}:written {nwrit} ({nwrit_total})"
+      ~level:Debug
+      ("connection_id", Data_encoding.int16)
+      ("nwrit", Data_encoding.int16)
+      ("nwrit_total", Data_encoding.int16)
+
+  let connect_fd =
+    declare_2
+      ~section
+      ~name:"connect"
+      ~msg:"cnx:{connection_id}:connect {socket}"
+      ~level:Debug
+      ("connection_id", Data_encoding.int16)
+      ("socket", Data_encoding.string)
+
+  let accept_fd =
+    declare_2
+      ~section
+      ~name:"accept"
+      ~msg:"cnx:{connection_id}:accept {socket}"
+      ~level:Debug
+      ("connection_id", Data_encoding.int16)
+      ("socket", Data_encoding.string)
+end
+
+module P2p_maintainance = struct
+  include Internal_event.Simple
+
+  let section = ["p2p"; "maintenance"]
+
+  let maintenance_ended =
+    declare_0
+      ~section
+      ~name:"maintenance_ended"
+      ~msg:"maintenance step ended"
+      ~level:Debug
+      ()
+
+  let too_few_connections =
+    declare_1
+      ~section
+      ~name:"too_few_connections_maintenance"
+      ~msg:"too few connections ({connections})"
+      ~level:Notice
+      ("connections", Data_encoding.int16)
+
+  let too_many_connections =
+    declare_1
+      ~section
+      ~name:"too_many_connections_maintenance"
+      ~msg:"too many connections (will kill {connections})"
+      ~level:Debug
+      ("connections", Data_encoding.int16)
+end
+
+module P2p_welcome = struct
+  include Internal_event.Simple
+
+  let section = ["p2p"; "welcome"]
+
+  let incoming_error =
+    declare_2
+      ~section
+      ~name:"incoming_error"
+      ~msg:"incoming connection failed with {error}. Ignoring"
+      ~level:Debug
+      ~pp1:pp_print_error_first
+      ("error", Error_monad.trace_encoding)
+      ("type", Data_encoding.string)
+
+  let unexpected_error =
+    declare_1
+      ~section
+      ~name:"unexpected_error_welcome"
+      ~msg:"unexpected error"
+      ~level:Error
+      ~pp1:pp_print_error_first
+      ("error", Error_monad.trace_encoding)
+
+  let incoming_connection_error =
+    declare_1
+      ~section
+      ~name:"incoming_connection_error"
+      ~msg:"cannot accept incoming connections"
+      ~level:Error
+      ("exception", Error_monad.error_encoding)
+end

@@ -24,35 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Events = struct
-  include Internal_event.Simple
-
-  let section = ["p2p"; "maintenance"]
-
-  let maintenance_ended =
-    declare_0
-      ~section
-      ~name:"maintenance_ended"
-      ~msg:"Maintenance step ended"
-      ~level:Debug
-      ()
-
-  let too_few_connections =
-    declare_1
-      ~section
-      ~name:"too_few_connections_maintenance"
-      ~msg:"Too few connections ({connections})"
-      ~level:Notice
-      ("connections", Data_encoding.int16)
-
-  let too_many_connections =
-    declare_1
-      ~section
-      ~name:"too_many_connections_maintenance"
-      ~msg:"Too many connections (will kill {connections})"
-      ~level:Debug
-      ("connections", Data_encoding.int16)
-end
+module Events = P2p_events.P2p_maintainance
 
 let time_between_looking_for_peers = 5.0 (* TODO put this in config *)
 
