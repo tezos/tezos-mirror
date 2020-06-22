@@ -53,7 +53,6 @@ type t = {
   gid : P2p_peer.Id.t;  (** remote peer id *)
   conn : connection;
   peer_active_chains : chain_db Chain_id.Table.t;
-      (** chains known to be active for the remote peer *)
   disk : State.t;
   canceler : Lwt_canceler.t;
   mutable worker : unit Lwt.t;
@@ -62,26 +61,6 @@ type t = {
       (** All chains managed by this peer **)
   unregister : unit -> unit;
 }
-
-(* performs [f chain_db] if the chain is active where [chain_db] is the
-   chain_db corresponding to this chain id. Activates [chain_id] for the
-   remote peer if not active yet. *)
-let may_activate state chain_id f =
-  match Chain_id.Table.find state.peer_active_chains chain_id with
-  | Some chain_db ->
-      f chain_db
-  | None -> (
-    match Chain_id.Table.find state.active_chains chain_id with
-    | Some chain_db ->
-        chain_db.active_peers :=
-          P2p_peer.Set.add state.gid !(chain_db.active_peers) ;
-        P2p_peer.Table.add chain_db.active_connections state.gid state.conn ;
-        Chain_id.Table.add state.peer_active_chains chain_id chain_db ;
-        f chain_db
-    | None ->
-        let meta = P2p.get_peer_metadata state.p2p state.gid in
-        Peer_metadata.incr meta Unactivated_chain ;
-        Lwt.return_unit )
 
 (* performs [f chain_db] if the chain is active for the remote peer
    and [chain_db] is the chain_db corresponding to this chain id, otherwise
@@ -163,6 +142,21 @@ let soon () =
   | None ->
       invalid_arg "Distributed_db.handle_msg: end of time"
 
+(* Active the chain_id for the remote peer. Is a nop if it is already activated. *)
+let activate state chain_id chain_db =
+  let meta = P2p.get_peer_metadata state.p2p state.gid in
+  match Chain_id.Table.find state.peer_active_chains chain_id with
+  | Some _ ->
+      ()
+  | None ->
+      Peer_metadata.update_requests meta Branch
+      @@ P2p.try_send state.p2p state.conn
+      @@ Get_current_branch chain_id ;
+      chain_db.active_peers :=
+        P2p_peer.Set.add state.gid !(chain_db.active_peers) ;
+      P2p_peer.Table.add chain_db.active_connections state.gid state.conn ;
+      Chain_id.Table.add state.peer_active_chains chain_id chain_db
+
 let my_peer_id state = P2p.peer_id state.p2p
 
 let handle_msg state msg =
@@ -175,10 +169,7 @@ let handle_msg state msg =
       Peer_metadata.incr meta @@ Received_request Branch ;
       may_handle_global state chain_id
       @@ fun chain_db ->
-      if not (Chain_id.Table.mem state.peer_active_chains chain_id) then
-        Peer_metadata.update_requests meta Branch
-        @@ P2p.try_send state.p2p state.conn
-        @@ Get_current_branch chain_id ;
+      activate state chain_id chain_db ;
       let seed =
         {Block_locator.receiver_id = state.gid; sender_id = my_peer_id state}
       in
@@ -189,7 +180,7 @@ let handle_msg state msg =
       @@ Current_branch (chain_id, locator) ;
       Lwt.return_unit
   | Current_branch (chain_id, locator) ->
-      may_activate state chain_id
+      may_handle state chain_id
       @@ fun chain_db ->
       let (head, hist) = (locator :> Block_header.t * Block_hash.t list) in
       Lwt_list.exists_p
