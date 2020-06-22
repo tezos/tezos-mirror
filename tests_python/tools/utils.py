@@ -69,6 +69,13 @@ def check_protocol(client: Client, proto: str,
     return res['next_protocol'] == proto
 
 
+@retry(timeout=1., attempts=20)
+def check_two_chains(client: Client) -> bool:
+    main_id = client.rpc('get', 'chains/main/chain_id')
+    test_id = client.rpc('get', 'chains/test/chain_id')
+    return test_id != main_id
+
+
 @retry(timeout=2., attempts=10)
 def check_level(client: Client, level, chain: str = 'main') -> bool:
     return client.get_level(chain=chain) == level
