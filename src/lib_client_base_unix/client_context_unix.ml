@@ -199,7 +199,7 @@ class unix_mockup ~base_dir ~mem_only ~mockup_env ~chain_id ~rpc_context :
 
     inherit
       Tezos_mockup_proxy.RPC_client.local_ctxt
-        (Tezos_mockup.RPC_client.build_directory
+        (Tezos_mockup.Local_services.build_directory
            base_dir
            mem_only
            mockup_env

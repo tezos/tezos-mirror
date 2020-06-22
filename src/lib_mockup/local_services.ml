@@ -732,3 +732,48 @@ let build_shell_directory (base_dir : string)
     let rpc_context = rpc_context
   end) in
   M.build_shell_directory mem_only write_context_callback
+
+(** The directory of RPCs that the mockup client honors. Parameters are:
+
+    [mem_only] specifies whether the mockup uses a persistent state.
+    [mockup_env] is the implementation provided by the protocol.
+    [chain_id] is the only chain that the mockup honors.
+    [rpc_context] is data used when honoring an RPC.
+ *)
+let build_directory (base_dir : string) (mem_only : bool)
+    (mockup_env : Registration.mockup_environment) (chain_id : Chain_id.t)
+    (rpc_context : Tezos_protocol_environment.rpc_context) :
+    unit RPC_directory.t =
+  let write_context rpc_context =
+    let (module Mockup_environment) = mockup_env in
+    Persistence.overwrite_mockup
+      ~chain_id
+      ~protocol_hash:Mockup_environment.protocol_hash
+      ~rpc_context
+      ~base_dir
+  in
+  let (module Mockup_environment) = mockup_env in
+  let proto_directory =
+    (* register protocol-specific RPCs *)
+    Directory.prefix
+      Tezos_shell_services.Chain_services.path
+      (Directory.prefix
+         Tezos_shell_services.Block_services.path
+         (Directory.map
+            (fun (_chain, _block) -> Lwt.return rpc_context)
+            Mockup_environment.directory))
+  in
+  let shell_directory =
+    let (module Mockup_environment) = mockup_env in
+    build_shell_directory
+      base_dir
+      mockup_env
+      chain_id
+      rpc_context
+      mem_only
+      write_context
+  in
+  let base = Directory.merge shell_directory proto_directory in
+  RPC_directory.register_describe_directory_service
+    base
+    RPC_service.description_service
