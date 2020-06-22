@@ -24,7 +24,6 @@
 (*****************************************************************************)
 
 module Directory = Resto_directory.Make (RPC_encoding)
-module Service = Resto.MakeService (RPC_encoding)
 open Tezos_shell_services
 
 type error += Injection_not_possible
@@ -58,23 +57,6 @@ let () =
 
 (* Since we bypass the node but still use the RPC mechanism for procedure
    calls, we have to register some RPCs ourselves. *)
-
-let rec print_path : type pr p. (pr, p) Resto.Internal.path -> string list =
- fun path ->
-  match path with
-  | Root ->
-      []
-  | Static (path, s) ->
-      s :: print_path path
-  | Dynamic (path, arg) ->
-      Printf.sprintf "<%s>" arg.descr.name :: print_path path
-  | DynamicTail (path, arg) ->
-      Printf.sprintf "<%s>" arg.descr.name :: print_path path
-
-let print_service : type p q i o. (_, _, p, q, i, o, _) Service.t -> string =
- fun serv ->
-  let iserv = Service.Internal.to_service serv in
-  String.concat "/" (List.rev (print_path iserv.path))
 
 (* [MENV] is a thin extension of [Registration.Mockup_sig] comprising some
  * parameters used in most functions. *)

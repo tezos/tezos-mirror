@@ -16,6 +16,7 @@
  (libraries
    tezos-base
    tezos-client-base
+   tezos-mockup-proxy
    tezos-rpc
    tezos-p2p-services
    tezos-p2p ; for registering the relevant RPCs

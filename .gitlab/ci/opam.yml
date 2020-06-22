@@ -516,6 +516,11 @@ opam:tezos-mockup-commands:
   variables:
     package: tezos-mockup-commands
 
+opam:tezos-mockup-proxy:
+  extends: .opam_template
+  variables:
+    package: tezos-mockup-proxy
+
 opam:tezos-mockup-registration:
   extends: .opam_template
   variables:

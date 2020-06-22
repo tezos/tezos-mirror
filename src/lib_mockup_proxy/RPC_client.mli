@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,10 +23,20 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val build_directory :
-  string ->
-  bool ->
-  Registration.mockup_environment ->
-  Chain_id.t ->
-  Tezos_protocol_environment.rpc_context ->
-  unit RPC_directory.t
+type rpc_error =
+  | Rpc_generic_error of string option
+  (* This case is caught by the proxy mode: when it is raised, the proxy
+     delegates to the node *)
+  | Rpc_not_found of string option
+  | Rpc_unauthorized of string option
+  | Rpc_unexpected_type_of_failure
+  | Rpc_cannot_parse_path
+  | Rpc_cannot_parse_query
+  | Rpc_cannot_parse_body
+  | Rpc_streams_not_handled
+
+type error += Local_RPC_error of rpc_error
+
+(** The class [local_ctxt directory] creates
+    an RPC context that executes RPCs locally. *)
+class local_ctxt : unit RPC_directory.t -> RPC_context.json

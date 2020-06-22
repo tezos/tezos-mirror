@@ -1,0 +1,17 @@
+(library
+ (name tezos_mockup_proxy)
+ (public_name tezos-mockup-proxy)
+ (modules RPC_client)
+ (libraries
+   tezos-base
+   tezos-client-base
+   tezos-protocol-environment
+   tezos-rpc-http
+   tezos-shell-services)
+ (flags (:standard
+  -open Tezos_base__TzPervasives)))
+
+(rule
+ (alias runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))
