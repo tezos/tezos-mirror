@@ -177,7 +177,8 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
    (list
     '("\\<[@]\\(\\|%\\|%%\\|[A-Za-z-_][A-Za-z-_0-9\.]*\\)\\>" . michelson-face-var-annotation)
     '("\\<[%:]\\(\\|@\\|[A-Za-z-_][A-Za-z-_0-9\.]*\\)\\>" . michelson-face-type-annotation)
-    '("\\<[0-9]+\\>" . michelson-face-constant)
+    '("-?\\<[0-9]+\\>" . michelson-face-constant)
+    '("\\<0[xX][0-9a-fA-F]*\\>" . michelson-face-constant)
     '("\\<[A-Z][a-z_0-9]+\\>" . michelson-face-constant)
     '("\\<[A-Z][A-Z_0-9]*\\>" . michelson-face-instruction)
     ;; This will have problems if users have whitespace in front of the declarations
