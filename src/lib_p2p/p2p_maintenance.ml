@@ -93,7 +93,7 @@ let classify pool private_mode start_time seen_points point pi =
       match P2p_point_state.Info.last_miss pi with
       | Some last
         when Time.System.(start_time < last)
-             || P2p_point_state.Info.greylisted ~now pi ->
+             || P2p_point_state.Info.can_reconnect ~now pi ->
           `Seen
       | last ->
           `Candidate last )

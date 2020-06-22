@@ -259,7 +259,7 @@ let set_running ~timestamp point_info peer_id data =
 let maxed_time_add t s =
   match Ptime.add_span t s with Some t -> t | None -> Ptime.max
 
-let set_greylisted reconnection_config timestamp point_info =
+let set_reconnection_delay reconnection_config timestamp point_info =
   let disconnection_delay =
     match point_info.Info.reconnection_info with
     | None ->
@@ -285,11 +285,11 @@ let set_disconnected ~timestamp ?(requested = false) reconnection_config
   let event : Pool_event.kind =
     match point_info.Info.state with
     | Requested _ ->
-        set_greylisted reconnection_config timestamp point_info ;
+        set_reconnection_delay reconnection_config timestamp point_info ;
         point_info.last_failed_connection <- Some timestamp ;
         Request_rejected None
     | Accepted {current_peer_id; _} ->
-        set_greylisted reconnection_config timestamp point_info ;
+        set_reconnection_delay reconnection_config timestamp point_info ;
         point_info.last_rejected_connection <- Some (current_peer_id, timestamp) ;
         Request_rejected (Some current_peer_id)
     | Running {current_peer_id; _} ->

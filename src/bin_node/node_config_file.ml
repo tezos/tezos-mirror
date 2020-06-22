@@ -642,7 +642,9 @@ let p2p =
        (let open P2p_point_state.Info in
        dft
          "greylisting_config"
-         ~description:"The greylisting policy."
+         ~description:
+           "The reconnection policy regulates the frequency with which the \
+            node tries to reconnect to an old known peer."
          reconnection_config_encoding
          default_reconnection_config))
 

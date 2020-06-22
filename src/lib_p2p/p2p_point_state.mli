@@ -141,6 +141,8 @@ val set_running :
 
 val set_private : 'conn Info.t -> bool -> unit
 
+(* [set_disconnected] Change the state of a peer upon disconnection and
+   set the reconnection delay accordingly *)
 val set_disconnected :
   timestamp:Time.System.t ->
   ?requested:bool ->

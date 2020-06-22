@@ -41,7 +41,7 @@ let info_of_point_info i =
     {
       trusted = trusted i;
       state;
-      greylisted_until = greylisted_until i;
+      reconnection_time = reconnection_time i;
       last_failed_connection = last_failed_connection i;
       last_rejected_connection = last_rejected_connection i;
       last_established_connection = last_established_connection i;

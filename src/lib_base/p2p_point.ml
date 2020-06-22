@@ -281,7 +281,7 @@ end
 module Info = struct
   type t = {
     trusted : bool;
-    greylisted_until : Time.System.t option;
+    reconnection_time : Time.System.t option;
     state : State.t;
     last_failed_connection : Time.System.t option;
     last_rejected_connection : (P2p_peer_id.t * Time.System.t) option;
@@ -300,7 +300,7 @@ module Info = struct
          about past events."
     @@ conv
          (fun { trusted;
-                greylisted_until;
+                reconnection_time;
                 state;
                 last_failed_connection;
                 last_rejected_connection;
@@ -310,7 +310,7 @@ module Info = struct
                 last_miss } ->
            let p2p_peer_id = State.of_p2p_peer_id state in
            ( trusted,
-             greylisted_until,
+             reconnection_time,
              state,
              p2p_peer_id,
              last_failed_connection,
@@ -320,7 +320,7 @@ module Info = struct
              last_seen,
              last_miss ))
          (fun ( trusted,
-                greylisted_until,
+                reconnection_time,
                 state,
                 p2p_peer_id,
                 last_failed_connection,
@@ -332,7 +332,7 @@ module Info = struct
            let state = State.of_peerid_state state p2p_peer_id in
            {
              trusted;
-             greylisted_until;
+             reconnection_time;
              state;
              last_failed_connection;
              last_rejected_connection;

@@ -87,7 +87,7 @@ end
 module Info : sig
   type t = {
     trusted : bool;
-    greylisted_until : Time.System.t option;
+    reconnection_time : Time.System.t option;
     state : State.t;
     last_failed_connection : Time.System.t option;
     last_rejected_connection : (P2p_peer_id.t * Time.System.t) option;
