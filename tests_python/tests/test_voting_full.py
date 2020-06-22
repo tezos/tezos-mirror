@@ -58,7 +58,11 @@ class TestVotingFull:
     def test_add_tmp_bootstrap_baker(self, sandbox: Sandbox):
         """ Launch a temporary baker so that 10 and 11 keep broadcasting
             heads to the future joining nodes and help them bootstrap """
-        sandbox.add_baker(10, 'bootstrap5', proto=PROTO_A_DAEMON)
+        # note we use 'bootstrap1' for all baking, this avoids the issue
+        # of a delegate becoming inactive. For instance, if we want
+        # to bake with 'bootstrap2' later in the test, it may have became
+        # inactive
+        sandbox.add_baker(10, 'bootstrap1', proto=PROTO_A_DAEMON)
 
     def test_add_initial_nodes(self, sandbox: Sandbox):
         """ We launch nodes with non-null bootstrap-threshold.
@@ -81,7 +85,7 @@ class TestVotingFull:
         sandbox.rm_node(11)
 
     def test_add_baker(self, sandbox: Sandbox):
-        sandbox.add_baker(0, 'bootstrap5', proto=PROTO_A_DAEMON)
+        sandbox.add_baker(0, 'bootstrap1', proto=PROTO_A_DAEMON)
 
     def test_client_knows_proto_b(self, sandbox: Sandbox):
         client = sandbox.client(0)
@@ -136,15 +140,13 @@ class TestVotingFull:
             assert client.get_current_period_kind() == 'testing'
 
     def test_start_baker_testchain(self, sandbox: Sandbox):
-        sandbox.add_baker(3, 'bootstrap4', proto=PROTO_B_DAEMON,
+        sandbox.add_baker(3, 'bootstrap1', proto=PROTO_B_DAEMON,
                           params=['--chain', 'test'])
 
     def test_testchain_rpc(self, sandbox: Sandbox):
+        """Check all clients know both chains"""
         for client in sandbox.all_clients():
-            assert client.get_current_period_kind() == 'testing'
-            main_id = client.rpc('get', 'chains/main/chain_id')
-            test_id = client.rpc('get', 'chains/test/chain_id')
-            assert test_id != main_id
+            assert utils.check_two_chains(client)
 
     def test_testchains_bootstrapped(self, sandbox: Sandbox):
         """All testchains must be bootstrapped, since they inherited
@@ -167,7 +169,7 @@ class TestVotingFull:
     def test_reactivate_all_delegates(self, sandbox: Sandbox):
         """Delegates may have become unactive"""
         client = sandbox.client(0)
-        for i in range(1, 5):
+        for i in range(2, 5):
             account = f'bootstrap{i}'
             client.set_delegate(account, account)
 
@@ -182,10 +184,6 @@ class TestVotingFull:
         client = sandbox.client(0)
         for i in range(1, 5):
             client.submit_ballot(f'bootstrap{i}', PROTO_B, 'yay')
-
-    def test_start_proto_b_baker(self, sandbox: Sandbox):
-        """Proto_B will be elected, launch a new Proto_B baker"""
-        sandbox.add_baker(1, 'bootstrap3', proto=PROTO_B_DAEMON)
 
     @pytest.mark.timeout(60)
     def test_wait_for_proto_b(self, sandbox: Sandbox):
@@ -208,6 +206,10 @@ class TestVotingFull:
         sandbox.rm_baker(0, PROTO_A_DAEMON)
         sandbox.rm_baker(3, PROTO_B_DAEMON)
         time.sleep(1)
+
+    def test_start_proto_b_baker(self, sandbox: Sandbox):
+        """Proto_B will be elected, launch a new Proto_B baker"""
+        sandbox.add_baker(1, 'bootstrap1', proto=PROTO_B_DAEMON)
 
     def test_new_chain_progress(self, sandbox: Sandbox):
         client = sandbox.client(0)
