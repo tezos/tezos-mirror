@@ -112,7 +112,7 @@ module S = struct
            "head"
            ~descr:
              "An empty argument requests blocks starting with the current \
-              head. A non empty list allow to request one or more specific \
+              head. A non empty list allows to request one or more specific \
               fragments of the chain."
            Block_hash.rpc_arg
            (fun x -> x#heads)
