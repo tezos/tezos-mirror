@@ -1918,8 +1918,8 @@ let compute_protocol_locator chain_state ?max_size ~proto_level seed =
 
 type error +=
   | Incorrect_history_mode_switch of {
-      previous_mode : History_mode.t;
-      next_mode : History_mode.t;
+      previous_mode : History_mode.Legacy.t;
+      next_mode : History_mode.Legacy.t;
     }
 
 let () =
@@ -1932,13 +1932,13 @@ let () =
       Format.fprintf
         ppf
         "@[cannot switch from history mode %a mode to %a mode@]"
-        History_mode.pp
+        History_mode.Legacy.pp
         prev
-        History_mode.pp
+        History_mode.Legacy.pp
         next)
     (Data_encoding.obj2
-       (Data_encoding.req "previous_mode" History_mode.encoding)
-       (Data_encoding.req "next_mode" History_mode.encoding))
+       (Data_encoding.req "previous_mode" History_mode.Legacy.encoding)
+       (Data_encoding.req "next_mode" History_mode.Legacy.encoding))
     (function
       | Incorrect_history_mode_switch x ->
           Some (x.previous_mode, x.next_mode)
@@ -1984,7 +1984,9 @@ let init ?patch_context ?commit_genesis ?(store_mapsize = 40_960_000_000L)
   Store.Configuration.History_mode.read_opt global_store
   >>= (function
         | None ->
-            let mode = Option.value ~default:History_mode.Full history_mode in
+            let mode =
+              Option.value ~default:History_mode.Legacy.Full history_mode
+            in
             Store.Configuration.History_mode.store global_store mode
             >>= fun () -> return mode
         | Some previous_history_mode -> (

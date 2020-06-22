@@ -49,7 +49,7 @@ val checkpoint :
   #simple ->
   ?chain:chain ->
   unit ->
-  (Block_header.t * int32 * int32 * History_mode.t) tzresult Lwt.t
+  (Block_header.t * int32 * int32 * History_mode.Legacy.t) tzresult Lwt.t
 
 module Mempool = Block_services.Empty.Mempool
 
@@ -97,7 +97,7 @@ module S : sig
       prefix,
       unit,
       unit,
-      Block_header.t * int32 * int32 * History_mode.t )
+      Block_header.t * int32 * int32 * History_mode.Legacy.t )
     RPC_service.t
 
   val is_bootstrapped :

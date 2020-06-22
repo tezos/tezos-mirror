@@ -154,7 +154,7 @@ let may_update_checkpoint chain_state checkpoint history_mode =
       Chain.set_head chain_state new_head
       >>= fun _old_head ->
       match history_mode with
-      | History_mode.Archive ->
+      | History_mode.Legacy.Archive ->
           State.Chain.set_checkpoint chain_state checkpoint
           >>= fun () -> return_unit
       | Full ->

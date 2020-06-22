@@ -186,7 +186,7 @@ val dump_contexts :
   * Block_data.t
   * Block_metadata_hash.t option
   * Operation_metadata_hash.t list list option
-  * History_mode.t
+  * History_mode.Legacy.t
   * (Block_header.t ->
     (Pruned_block.t option * Protocol_data.t option) tzresult Lwt.t) ->
   filename:string ->
@@ -204,7 +204,7 @@ val restore_contexts :
   * Block_data.t
   * Block_metadata_hash.t option
   * Operation_metadata_hash.t list list option
-  * History_mode.t
+  * History_mode.Legacy.t
   * Block_header.t option
   * Block_hash.t list
   * Protocol_data.t list )

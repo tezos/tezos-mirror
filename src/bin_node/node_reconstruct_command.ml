@@ -69,7 +69,7 @@ module Term = struct
       >>=? fun (state, chain_state, context_index, history_mode) ->
       let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
       fail_unless
-        (history_mode = History_mode.Full)
+        (history_mode = History_mode.Legacy.Full)
         (Snapshots.Cannot_reconstruct history_mode)
       >>=? fun () ->
       Snapshots.reconstruct

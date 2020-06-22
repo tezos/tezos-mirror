@@ -39,7 +39,7 @@ module Configuration = struct
       (struct
         let name = ["history_mode"]
       end)
-      (Store_helpers.Make_value (History_mode))
+      (Store_helpers.Make_value (History_mode.Legacy))
 end
 
 (**************************************************************************

@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2019 Nomadic Labs. <contact@tezcore.com>                    *)
+(* Copyright (c) 2019-2020 Nomadic Labs. <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,12 +23,34 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = Archive | Full | Rolling
+module Legacy : sig
+  type t = Archive | Full | Rolling
 
-val encoding : t RPC_encoding.t
+  val encoding : t Data_encoding.t
+
+  val pp : Format.formatter -> t -> unit
+end
+
+type additional_cycles = {offset : int}
+
+type t = Archive | Full of additional_cycles | Rolling of additional_cycles
+
+val convert : Legacy.t -> t
+
+val default_offset : int
+
+val default_full : t
+
+val default_rolling : t
+
+val default : t
+
+val encoding : t Data_encoding.t
 
 val equal : t -> t -> bool
 
 val pp : Format.formatter -> t -> unit
+
+val pp_short : Format.formatter -> t -> unit
 
 val tag : t Tag.def

@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type error += Cannot_reconstruct of History_mode.t
+type error += Cannot_reconstruct of History_mode.Legacy.t
 
 val export :
   ?export_rolling:bool ->

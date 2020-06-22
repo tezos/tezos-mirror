@@ -56,7 +56,7 @@ type t = {
   rpc_tls : Node_config_file.tls option;
   log_output : Lwt_log_sink_unix.Output.t option;
   bootstrap_threshold : int option;
-  history_mode : History_mode.t option;
+  history_mode : History_mode.Legacy.t option;
   synchronisation_threshold : int option;
   latency : int option;
 }
@@ -210,7 +210,7 @@ module Term = struct
       Lwt_log_sink_unix.Output.pp )
 
   let history_mode_converter =
-    let open History_mode in
+    let open History_mode.Legacy in
     ( (function
       | "archive" ->
           `Ok Archive

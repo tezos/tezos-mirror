@@ -534,7 +534,7 @@ let test_dump {idx; block3b; _} =
   Lwt_utils_unix.with_tempdir "tezos_test_" (fun base_dir2 ->
       let dumpfile = base_dir2 // "dump" in
       let ctxt_hash = block3b in
-      let history_mode = Tezos_shell_services.History_mode.Full in
+      let history_mode = Tezos_shell_services.History_mode.Legacy.Full in
       let empty_block_header context =
         Block_header.
           {

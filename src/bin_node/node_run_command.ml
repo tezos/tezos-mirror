@@ -409,9 +409,9 @@ let run ?verbosity ?sandbox ?checkpoint ~singleprocess
               "@[Cannot switch from history mode '%a' to '%a'. In order to \
                change your history mode please refer to the Tezos node \
                documentation. @]"
-              History_mode.pp
+              History_mode.Legacy.pp
               previous_mode
-              History_mode.pp
+              History_mode.Legacy.pp
               next_mode
         | Error _ as err ->
             Lwt.return err)

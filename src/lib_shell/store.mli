@@ -48,7 +48,9 @@ val with_atomic_rw : t -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 
 module Configuration : sig
   module History_mode :
-    SINGLE_STORE with type t := global_store and type value := History_mode.t
+    SINGLE_STORE
+      with type t := global_store
+       and type value := History_mode.Legacy.t
 end
 
 (** {2 Chain store} *)

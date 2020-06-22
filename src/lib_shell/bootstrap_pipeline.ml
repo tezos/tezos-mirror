@@ -262,7 +262,7 @@ let headers_fetch_worker_loop pipeline =
    State.history_mode state
    >>= fun history_mode ->
    ( match history_mode with
-   | History_mode.Archive ->
+   | History_mode.Legacy.Archive ->
        Lwt.return_none
    | Full | Rolling ->
        let chain_state = Distributed_db.chain_state pipeline.chain_db in

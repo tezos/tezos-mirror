@@ -48,7 +48,7 @@ let checkpoint_encoding =
     (req "block" Block_header.encoding)
     (req "save_point" int32)
     (req "caboose" int32)
-    (req "history_mode" History_mode.encoding)
+    (req "history_mode" History_mode.Legacy.encoding)
 
 let invalid_block_encoding =
   conv

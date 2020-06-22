@@ -34,7 +34,7 @@ let updated_to_checkpoint =
     ~msg:"updated to checkpoint {block_hash} (running in mode {history_mode})"
     ~level:Notice
     ("block_hash", Block_hash.encoding)
-    ("history_mode", History_mode.encoding)
+    ("history_mode", History_mode.Legacy.encoding)
 
 let prevalidator_filter_not_found =
   declare_1
