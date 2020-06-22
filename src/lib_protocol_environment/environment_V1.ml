@@ -125,7 +125,7 @@ struct
   module Nativeint = Nativeint
   module Buffer = Buffer
   module Format = Format
-  module Option = Option
+  module Option = Tezos_base.TzPervasives.Option
 
   module Raw_hashes = struct
     let sha256 = Hacl.Hash.SHA256.digest

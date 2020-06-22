@@ -21,7 +21,7 @@
 
 (** {1:options Options} *)
 
-type 'a t = 'a option = None | Some of 'a (**)
+type 'a t = 'a option = None | Some of 'a
 (** The type for option values. Either [None] or a value [Some v]. *)
 
 val none : 'a option
@@ -48,6 +48,9 @@ val fold : none:'a -> some:('b -> 'a) -> 'b option -> 'a
 
 val iter : ('a -> unit) -> 'a option -> unit
 (** [iter f o] is [f v] if [o] is [Some v] and [()] otherwise. *)
+
+val first_some : 'a option -> 'a option -> 'a option
+(** First input of form [Some x], or [None] if both are [None] *)
 
 (** {1:preds Predicates and comparisons} *)
 
