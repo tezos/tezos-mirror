@@ -26,6 +26,29 @@
 
 (* Tezos Command line interface - Configuration and Arguments Parsing *)
 
+type cli_args = {
+  chain : Chain_services.chain;
+  block : Shell_services.block;
+  confirmations : int option;
+  password_filename : string option;
+  protocol : Protocol_hash.t option;
+  print_timings : bool;
+  log_requests : bool;
+  client_mode : client_mode;
+}
+
+and client_mode = Mode_client | Mode_mockup | Mode_proxy
+
+let all_modes = [Mode_client; Mode_mockup; Mode_proxy]
+
+let client_mode_to_string = function
+  | Mode_client ->
+      "client"
+  | Mode_mockup ->
+      "mockup"
+  | Mode_proxy ->
+      "proxy"
+
 type error += Invalid_endpoint_arg of string
 
 type error += Suppressed_arg of {args : string list; by : string}
@@ -42,7 +65,7 @@ type error += Invalid_remote_signer_argument of string
 
 type error += Invalid_wait_arg of string
 
-type error += Invalid_mockup_arg of string
+type error += Invalid_mode_arg of string
 
 let () =
   register_error_kind
@@ -135,14 +158,21 @@ let () =
     (fun s -> Invalid_wait_arg s) ;
   register_error_kind
     `Branch
-    ~id:"invalidMockupArgument"
-    ~title:"Invalid Mockup Argument"
-    ~description:"Mockup argument could not be parsed"
+    ~id:"invalidModeArgument"
+    ~title:"Invalid Mode Argument"
+    ~description:"Mode argument could not be parsed"
     ~pp:(fun ppf s ->
-      Format.fprintf ppf "%s is neither \"default\" nor \"mockup\"." s)
+      let enclose s = "\"" ^ s ^ "\"" in
+      let pp_mode s = enclose @@ client_mode_to_string s in
+      let mode_strings = List.map pp_mode all_modes in
+      Format.fprintf
+        ppf
+        "Value \"%s\" is invalid. It should be one of: %s"
+        s
+        (String.concat " or " mode_strings))
     Data_encoding.(obj1 (req "value" string))
-    (function Invalid_mockup_arg s -> Some s | _ -> None)
-    (fun s -> Invalid_mockup_arg s)
+    (function Invalid_mode_arg s -> Some s | _ -> None)
+    (fun s -> Invalid_mode_arg s)
 
 let home = try Sys.getenv "HOME" with Not_found -> "/root"
 
@@ -253,19 +283,6 @@ module Cfg_file = struct
       out
       (Data_encoding.Json.construct encoding cfg)
 end
-
-type cli_args = {
-  chain : Chain_services.chain;
-  block : Shell_services.block;
-  confirmations : int option;
-  password_filename : string option;
-  protocol : Protocol_hash.t option;
-  print_timings : bool;
-  log_requests : bool;
-  client_mode : client_mode;
-}
-
-and client_mode = Mode_client | Mode_mockup
 
 let default_cli_args =
   {
@@ -473,19 +490,27 @@ let password_filename_arg () =
     (string_parameter ())
 
 let client_mode_arg () =
+  let mode_strings = List.map client_mode_to_string all_modes in
   let parse_client_mode (str : string) : client_mode tzresult Lwt.t =
-    if str = "client" then return Mode_client
-    else if str = "mockup" then return Mode_mockup
-    else fail (Invalid_mockup_arg str)
+    List.combine
+      ~when_different_lengths:(TzTrace.make @@ Exn (Failure __LOC__))
+      mode_strings
+      all_modes
+    >>?= fun modes_and_strings ->
+    match List.assoc_opt str modes_and_strings with
+    | None ->
+        fail @@ Invalid_mode_arg str
+    | Some mode ->
+        return mode
   in
   default_arg
     ~short:'M'
     ~long:"mode"
-    ~placeholder:"client|mockup"
+    ~placeholder:(String.concat "|" mode_strings)
     ~doc:"how to interact with the node"
-    ~default:"client"
+    ~default:(client_mode_to_string Mode_client)
     (parameter
-       ~autocomplete:(fun _ -> return ["client"; "mockup"])
+       ~autocomplete:(fun _ -> return mode_strings)
        (fun _ param -> parse_client_mode param))
 
 let read_config_file config_file =
@@ -646,7 +671,7 @@ let commands config_file cfg (client_mode : client_mode)
       (fixed ["config"; "show"])
       (fun () (cctxt : #Client_context.full) ->
         match client_mode with
-        | Mode_client ->
+        | Mode_client | Mode_proxy ->
             config_show_client cctxt config_file cfg
         | Mode_mockup ->
             config_show_mockup cctxt protocol_hash_opt base_dir);
@@ -705,7 +730,7 @@ let commands config_file cfg (client_mode : client_mode)
       (fun (config_file, bootstrap_accounts_file, protocol_constants_file)
            cctxt ->
         match client_mode with
-        | Mode_client ->
+        | Mode_client | Mode_proxy ->
             config_init_client config_file cfg
         | Mode_mockup ->
             config_init_mockup
@@ -764,7 +789,7 @@ let check_base_dir_for_mode (ctx : #Client_context.full) client_mode base_dir =
   classify_base_dir base_dir
   >>=? fun base_dir_class ->
   match client_mode with
-  | Mode_client -> (
+  | Mode_client | Mode_proxy -> (
     match base_dir_class with
     | Base_dir_is_mockup ->
         failwith
@@ -876,7 +901,7 @@ let parse_config_args (ctx : #Client_context.full) argv =
       >>=? fun () -> return base_dir
   | Some dir -> (
     match client_mode with
-    | Mode_client ->
+    | Mode_client | Mode_proxy ->
         if not (Sys.file_exists dir) then
           failwith
             "Specified --base-dir does not exist. Please create the directory \

@@ -211,7 +211,9 @@ let setup_client_config (cctxt : Tezos_client_base.Client_context.full)
     | Client_config.Mode_client ->
         setup_http_rpc_client_config parsed_args base_dir rpc_config
     | Client_config.Mode_mockup ->
-        setup_mockup_rpc_client_config cctxt args base_dir )
+        setup_mockup_rpc_client_config cctxt args base_dir
+    | Client_config.Mode_proxy ->
+        assert false )
 
 (* Main (lwt) entry *)
 let main (module C : M) ~select_commands =
