@@ -681,6 +681,11 @@ opam:tezos-protocol-updater:
   variables:
     package: tezos-protocol-updater
 
+opam:tezos-proxy:
+  extends: .opam_template
+  variables:
+    package: tezos-proxy
+
 opam:tezos-requester:
   extends: .opam_template
   variables:
