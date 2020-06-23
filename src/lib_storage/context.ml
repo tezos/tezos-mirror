@@ -692,7 +692,9 @@ module Dumpable_context = struct
     | `Contents (b, _) ->
         `Blob (Store.Contents.hash b)
 
-  let sub_tree tree key = Store.Tree.find_tree tree key
+  let sub_tree tree key =
+    Store.Tree.find_tree tree key
+    >|= fun subtree -> Store.Tree.clear tree ; subtree
 
   let tree_list tree = Store.Tree.list tree []
 
