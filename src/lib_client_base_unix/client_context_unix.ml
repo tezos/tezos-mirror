@@ -214,3 +214,27 @@ class unix_mockup ~base_dir ~mem_only ~mockup_env ~chain_id ~rpc_context :
 
     method confirmations = None
   end
+
+class unix_proxy ~base_dir ~chain ~block ~confirmations ~password_filename
+  ~_rpc_config : Client_context.full =
+  object
+    inherit unix_logger ~base_dir
+
+    inherit unix_prompter
+
+    inherit unix_wallet ~base_dir ~password_filename
+
+    inherit
+      Tezos_mockup_proxy.RPC_client.local_ctxt
+        (Tezos_proxy.Proxy_services.build_directory
+           (assert false)
+           (assert false))
+
+    inherit unix_ui
+
+    method chain = chain
+
+    method block = block
+
+    method confirmations = confirmations
+  end

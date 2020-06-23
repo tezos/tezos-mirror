@@ -9,6 +9,7 @@
             tezos-mockup
             tezos-mockup-registration
             tezos-mockup-commands
+            tezos-proxy
             tezos-signer-backends.unix
             tezos-shell-services)
  (flags (:standard -open Tezos_base__TzPervasives

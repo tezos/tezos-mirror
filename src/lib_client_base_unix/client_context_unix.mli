@@ -49,3 +49,12 @@ class unix_mockup :
   -> chain_id:Chain_id.t
   -> rpc_context:Tezos_protocol_environment.rpc_context
   -> Client_context.full
+
+class unix_proxy :
+  base_dir:string
+  -> chain:Shell_services.chain
+  -> block:Shell_services.block
+  -> confirmations:int option
+  -> password_filename:string option
+  -> _rpc_config:Tezos_rpc_http_client_unix.RPC_client_unix.config
+  -> Client_context.full
