@@ -117,17 +117,19 @@ def client_regtest_bis(sandbox: Sandbox) -> Iterator[Client]:
         rpc_port: Optional[int] = None,
         use_tls: Optional[bool] = None,
         endpoint: Optional[str] = 'http://127.0.0.1:8732',
+        mode: str = None,
         disable_disclaimer: bool = True,
     ) -> ClientRegression:
         client = ClientRegression(
-            client_path,
-            admin_client_path,
-            host,
-            base_dir,
-            rpc_port,
-            use_tls,
-            endpoint,
-            disable_disclaimer,
+            client_path=client_path,
+            admin_client_path=admin_client_path,
+            host=host,
+            base_dir=base_dir,
+            rpc_port=rpc_port,
+            use_tls=use_tls,
+            endpoint=endpoint,
+            mode=mode,
+            disable_disclaimer=disable_disclaimer,
         )
         return client
 

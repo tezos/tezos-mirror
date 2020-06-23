@@ -164,16 +164,24 @@ class Sandbox:
         rpc_port: int,
         use_tls: Tuple[str, str] = None,
         branch: str = "",
+        mode: str = None,
         client_factory: Callable = Client,
     ):
         scheme = 'https' if use_tls else 'http'
         endpoint = f'{scheme}://localhost:{rpc_port}'
         return self.create_client(
-            branch=branch, client_factory=client_factory, endpoint=endpoint
+            branch=branch,
+            client_factory=client_factory,
+            mode=mode,
+            endpoint=endpoint,
         )
 
     def create_client(
-        self, branch: str = "", client_factory: Callable = Client, **kwargs
+        self,
+        branch: str = "",
+        mode: str = None,
+        client_factory: Callable = Client,
+        **kwargs,
     ) -> Client:
         """
         Creates a new client. Because this method doesn't require a Node,
@@ -187,13 +195,18 @@ class Sandbox:
             branch (str): sub-dir where to lookup the node and client
                           binary, default = "". Allows execution of different
                           versions of nodes.
+            mode (str): the client's mode to use. One of
+                        ["client", "mockup", "proxy]. None defaults to
+                        "client".
             client_factory (Callable): the constructor of clients. Defaults to
                                        Client. Allows e.g. regression testing.
             **kwargs: arguments passed to client_factory
         """
         local_admin_client = self._wrap_path(CLIENT_ADMIN, branch)
         local_client = self._wrap_path(CLIENT, branch)
-        return client_factory(local_client, local_admin_client, **kwargs)
+        return client_factory(
+            local_client, local_admin_client, mode=mode, **kwargs
+        )
 
     def get_new_client(
         self,
@@ -237,6 +250,7 @@ class Sandbox:
         rpc_port: int,
         use_tls: Tuple[str, str] = None,
         branch: str = "",
+        mode: str = None,
         client_factory: Callable = Client,
     ):
         """Instantiate a Client and add it to the sandbox manager"""
@@ -246,6 +260,7 @@ class Sandbox:
             rpc_port=rpc_port,
             use_tls=use_tls,
             branch=branch,
+            mode=mode,
             client_factory=client_factory,
         )
         self.clients[node_id] = client
@@ -290,6 +305,7 @@ class Sandbox:
         reconstruct: bool = False,
         branch: str = "",
         node_config: dict = None,
+        mode: str = None,
         client_factory: Callable = Client,
     ) -> None:
         """Launches new node with given node_id and initializes client
@@ -310,6 +326,8 @@ class Sandbox:
             branch (str): sub-dir where to lookup the node and client
                           binary, default = "". Allows execution of different
                           versions of nodes.
+            mode (str): the mode to use, one of "client", "mockup", or
+                        "proxy", default=None (equivalent to "client").
             client_factory (Callable): the constructor of clients. Defaults to
                                        Client. Allows e.g. regression testing.
 
@@ -347,6 +365,7 @@ class Sandbox:
             rpc_port=rpc_port,
             use_tls=use_tls,
             branch=branch,
+            mode=mode,
             client_factory=client_factory,
         )
 
@@ -636,6 +655,7 @@ class SandboxMultiBranch(Sandbox):
         reconstruct: bool = False,
         branch: str = "",
         node_config: dict = None,
+        mode: str = None,
         client_factory: Callable = Client,
     ) -> None:
         assert not branch
@@ -653,5 +673,6 @@ class SandboxMultiBranch(Sandbox):
             reconstruct,
             branch,
             node_config,
+            mode,
             client_factory,
         )

@@ -65,7 +65,8 @@ class Client:
             use_tls (bool): use TLS
             endpoint (str): the RPC endpoint
             disable_disclaimer (bool): disable disclaimer
-            mode (str): the mode to use, one of "client" or "mockup"
+            mode (str): the mode to use, one of "client", "mockup", or
+                        "proxy", default=None (equivalent to "client").
         Returns:
             A Client instance.
         """
@@ -101,10 +102,13 @@ class Client:
             client.extend(connectivity_options)
         elif mode == "mockup":
             client.extend(['-mode', mode])
+        elif mode == "proxy":
+            client.extend(['-mode', mode])
+            client.extend(connectivity_options)
         else:
             msg = (
                 f"Unexpected mode: {mode}."
-                + "Expected one of 'client' or 'mockup'."
+                + "Expected one of 'client', 'mockup', or 'proxy'."
             )
             assert False, msg
         admin_client = [admin_client_path, '-base-dir', base_dir]
