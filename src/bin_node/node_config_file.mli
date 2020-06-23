@@ -83,7 +83,7 @@ and shell = {
   prevalidator_limits : Prevalidator.limits;
   peer_validator_limits : Peer_validator.limits;
   chain_validator_limits : Chain_validator.limits;
-  history_mode : History_mode.Legacy.t option;
+  history_mode : History_mode.t option;
 }
 
 val data_dir_env_name : string
@@ -121,7 +121,7 @@ val update :
   ?rpc_tls:tls ->
   ?log_output:Lwt_log_sink_unix.Output.t ->
   ?synchronisation_threshold:int ->
-  ?history_mode:History_mode.Legacy.t ->
+  ?history_mode:History_mode.t ->
   ?network:blockchain_network ->
   ?latency:int ->
   t ->

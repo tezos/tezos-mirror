@@ -52,7 +52,7 @@ let init_config (* (f : 'a -> unit -> unit Lwt.t) *) f test_dir switch () :
       protocol_root = test_dir;
       patch_context = None;
       p2p = None;
-      checkpoint = None;
+      target = None;
       disable_mempool = false;
       enable_testchain = true;
     }

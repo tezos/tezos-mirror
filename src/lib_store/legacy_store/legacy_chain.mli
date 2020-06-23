@@ -23,47 +23,54 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Tezos Shell Module - Chain Traversal API *)
+(** Tezos Shell Module - Managing the current head. *)
 
-open State
+(** The genesis block of the chain. On a test chain,
+    the test protocol has been promoted as "main" protocol. *)
+val genesis : Legacy_state.Chain.t -> Legacy_state.Block.t Lwt.t
 
-(** If [h1] is an ancestor of [h2] in the current [state],
-    then [path state h1 h2] returns the chain of block from
-    [h1] (excluded) to [h2] (included). Returns [None] otherwise. *)
-val path : Block.t -> Block.t -> Block.t list option Lwt.t
+(** The current head of the chain. *)
+val head : Legacy_state.Chain.t -> Legacy_state.Block.t Lwt.t
 
-(** [common_ancestor state h1 h2] returns the first common ancestors
-    in the history of blocks [h1] and [h2]. *)
-val common_ancestor : Block.t -> Block.t -> Block.t Lwt.t
+val locator :
+  Legacy_state.Chain.t -> Block_locator.seed -> Block_locator.t Lwt.t
 
-(** [iter_predecessors state blocks f] iter [f] on [blocks] and
-    their recursive predecessors. Blocks are visited with a
-    decreasing fitness (then decreasing timestamp). If the optional
-    argument [max] is provided, the iteration is stopped after [max]
-    visited block. If [min_fitness] id provided, blocks with a
-    fitness lower than [min_fitness] are ignored. If [min_date],
-    blocks with a fitness lower than [min_date] are ignored. *)
-val iter_predecessors :
-  ?max:int ->
-  ?min_fitness:Fitness.t ->
-  ?min_date:Time.Protocol.t ->
-  Block.t list ->
-  f:(Block.t -> unit Lwt.t) ->
-  unit Lwt.t
+(** All the available chain data. *)
+type data = {
+  current_head : Legacy_state.Block.t;
+  current_mempool : Mempool.t;
+  live_blocks : Block_hash.Set.t;
+  live_operations : Operation_hash.Set.t;
+  test_chain : Chain_id.t option;
+  save_point : Int32.t * Block_hash.t;
+  caboose : Int32.t * Block_hash.t;
+}
 
-(** [new_blocks ~from_block ~to_block] returns a pair [(ancestor,
-    path)], where [ancestor] is the common ancestor of [from_block]
-    and [to_block] and where [path] is the chain from [ancestor]
-    (excluded) to [to_block] (included).  The function raises an
-    exception when the two provided blocks do not belong to the same
-    [chain].  *)
-val new_blocks :
-  from_block:Block.t -> to_block:Block.t -> (Block.t * Block.t list) Lwt.t
+(** Reading atomically all the chain data. *)
+val data : Legacy_state.Chain.t -> data Lwt.t
 
-(** [live_blocks b n] return a pair [(blocks,operations)] where
-    [blocks] is the set of arity [n], that contains [b] and its [n-1]
-    predecessors. And where [operations] is the set of operations
-    included in those blocks.
-*)
-val live_blocks :
-  Block.t -> int -> (Block_hash.Set.t * Operation_hash.Set.t) tzresult Lwt.t
+(** The current head and all the known (valid) alternate heads. *)
+val known_heads : Legacy_state.Chain.t -> Legacy_state.Block.t list Lwt.t
+
+(** Test whether a block belongs to the current mainchain. *)
+val mem : Legacy_state.Chain.t -> Block_hash.t -> bool Lwt.t
+
+(** Record a block as the current head of the chain.
+    It returns the previous head. *)
+val set_head :
+  Legacy_state.Chain.t ->
+  Legacy_state.Block.t ->
+  Legacy_state.Block.t tzresult Lwt.t
+
+(** Atomically change the current head of the chain.
+    This returns [true] whenever the change succeeded, or [false]
+    when the current head is not equal to the [old] argument. *)
+val test_and_set_head :
+  Legacy_state.Chain.t ->
+  old:Legacy_state.Block.t ->
+  Legacy_state.Block.t ->
+  bool tzresult Lwt.t
+
+(** Restores the data about the current head at startup
+    (recomputes the sets of live blocks and operations). *)
+val init_head : Legacy_state.Chain.t -> unit tzresult Lwt.t

@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2018-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,7 +25,7 @@
 (*****************************************************************************)
 
 type t = {
-  state : State.t;
+  state : Store.t;
   db : Distributed_db.t;
   block_validator : Block_validator.t;
   chain_validator_limits : Chain_validator.limits;
@@ -33,7 +33,7 @@ type t = {
   block_validator_limits : Block_validator.limits;
   prevalidator_limits : Prevalidator.limits;
   start_testchain : bool;
-  valid_block_input : State.Block.t Lwt_watcher.input;
+  valid_block_input : Store.Block.t Lwt_watcher.input;
   chains_input : (Chain_id.t * bool) Lwt_watcher.input;
   active_chains : Chain_validator.t Chain_id.Table.t;
 }
@@ -64,8 +64,8 @@ let create state db peer_validator_limits block_validator_limits
       active_chains = Chain_id.Table.create 7;
     }
 
-let activate v ~start_prevalidator ~validator_process chain_state =
-  let chain_id = State.Chain.id chain_state in
+let activate v ~start_prevalidator ~validator_process chain_store =
+  let chain_id = Store.Chain.chain_id chain_store in
   Validator_event.(emit activate_chain) chain_id
   >>= fun () ->
   match Chain_id.Table.find v.active_chains chain_id with
@@ -83,7 +83,7 @@ let activate v ~start_prevalidator ~validator_process chain_state =
         v.valid_block_input
         v.chains_input
         v.db
-        chain_state
+        chain_store
         v.chain_validator_limits
 
 let get {active_chains; _} chain_id =

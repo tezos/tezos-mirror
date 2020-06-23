@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -26,19 +26,22 @@
 (** Persistent block store with arborescent history
 
     The floating block store is an append-only store where blocks are
-    stored arbitrarily. This structure possess an indexed map
-    {!Block_hash.t} -> (offset × predecessors) which points to its
-    offset in the associated file along with a list of block
-    predecessors. The structure access/modification is protected by a
-    mutex ({!Lwt_idle_waiter}) and thus can be manipulated
-    concurrently. Stored blocks may or may not contain metadata. The
-    instance maintains an opened file descriptor. Therefore it must be
-    properly closed or it might lead to a file descriptor leak.
+   stored arbitrarily. This structure possess an indexed map
+   {!Block_hash.t} -> (offset × predecessors) which points to its
+   offset in the associated file along with an exponential list of
+   predecessors block hashes (as implemented in
+   {!Block_store.compute_predecessors}). The structure
+   access/modification is protected by a mutex ({!Lwt_idle_waiter})
+   and thus can be manipulated concurrently. Stored blocks may or may
+   not contain metadata. The instance maintains an opened file
+   descriptor. Therefore it must be properly closed or it might lead
+   to a file descriptor leak.
 
     Four different kind of instances are allowed to co-exist for an
-    identical path: - RO, a read-only instance; - RW, a read-write
-    instance - RO_TMP, RW_TMP, read-write instances. See
-    {!Block_store}.
+   identical path: - RO, a read-only instance; - RW, a read-write
+   instance - RO_TMP, RW_TMP, read-write instances; - Restore is a
+   generic instance used to wrap leftover instances while fixing a
+   crashed storage. See {!Block_store}.
 
     {1 Invariants}
 
@@ -55,9 +58,8 @@
     | <block> * |
 
     where <kind> is RO(_TMP), RW(_TMP) (see {!Naming}) and <block>, a
-    {!Block_repr.t} value encoded using {!Block_repr.encoding} (thus
-    prefixed by the its size).
-*)
+   {!Block_repr.t} value encoded using {!Block_repr.encoding} (thus
+   prefixed by the its size).  *)
 
 (** The type of the floating store. *)
 type t
@@ -88,7 +90,8 @@ val find_predecessors : t -> Block_hash.t -> Block_hash.t list option Lwt.t
 val read_block : t -> Block_hash.t -> Block_repr.t option Lwt.t
 
 (** [read_block_and_predecessors floating_store hash] same as
-    [read_block] but also returns the block's predecessors. *)
+    [read_block] but also returns the block's predecessors. Returns
+    [None] if it fails to resolve the given [hash].*)
 val read_block_and_predecessors :
   t -> Block_hash.t -> (Block_repr.t * Block_hash.t list) option Lwt.t
 

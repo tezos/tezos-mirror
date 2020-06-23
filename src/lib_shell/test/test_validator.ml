@@ -39,28 +39,28 @@ let init_validator
     (f :
       Validator.t ->
       Block_validator_process.t ->
-      State.Chain.t ->
+      Store.chain_store ->
       'a ->
       unit ->
       unit Lwt.t) test_dir switch () : unit Lwt.t =
   Shell_test_helpers.init_chain test_dir
-  >>= (fun (state, chain, idx, _) ->
+  >>= (fun store ->
         Shell_test_helpers.init_mock_p2p Distributed_db_version.Name.zero
         >>=? fun p2p ->
-        let db = Distributed_db.create state p2p in
+        let chain_store = Store.(main_chain_store store) in
+        let db = Distributed_db.create store p2p in
         let validator_environment =
           {
-            Block_validator_process.genesis = Shell_test_helpers.genesis;
-            user_activated_upgrades = [];
+            Block_validator_process.user_activated_upgrades = [];
             user_activated_protocol_overrides = [];
           }
         in
         Block_validator_process.init
           validator_environment
-          (Block_validator_process.Internal idx)
+          (Block_validator_process.Internal chain_store)
         >>=? fun block_validator ->
         Validator.create
-          state
+          store
           db
           Node.default_peer_validator_limits
           Node.default_block_validator_limits
@@ -69,7 +69,8 @@ let init_validator
           Node.default_chain_validator_limits
           ~start_testchain:false
         >>=? fun validator ->
-        Lwt.return (ok (block_validator, validator, chain)))
+        Lwt.return
+          (ok (block_validator, validator, Store.main_chain_store store)))
   >>= function
   | Ok (block_validator, validator, chain) ->
       f validator block_validator chain switch ()

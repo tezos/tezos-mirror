@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -43,5 +44,5 @@ val fetch_and_compile_protocols :
   t ->
   ?peer:P2p_peer.Id.t ->
   ?timeout:Ptime.Span.t ->
-  State.Block.t ->
+  Store.Block.t ->
   unit tzresult Lwt.t

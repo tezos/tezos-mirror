@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -47,8 +48,11 @@ module type T = sig
       predecessor block . When ?protocol_data is passed to this function, it will
       be used to create the new block *)
   val create :
+    Store.chain_store ->
     ?protocol_data:Bytes.t ->
-    predecessor:State.Block.t ->
+    predecessor:Store.Block.t ->
+    live_blocks:Block_hash.Set.t ->
+    live_operations:Operation_hash.Set.t ->
     timestamp:Time.Protocol.t ->
     unit ->
     t tzresult Lwt.t
@@ -80,9 +84,10 @@ module Make (Proto : Registered_protocol.T) : T with module Proto = Proto
 
 (** Pre-apply creates a new block and returns it. *)
 val preapply :
+  Store.chain_store ->
   user_activated_upgrades:User_activated.upgrades ->
   user_activated_protocol_overrides:User_activated.protocol_overrides ->
-  predecessor:State.Block.t ->
+  predecessor:Store.Block.t ->
   timestamp:Time.Protocol.t ->
   protocol_data:Bytes.t ->
   Operation.t list list ->

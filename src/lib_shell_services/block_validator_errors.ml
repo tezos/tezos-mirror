@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2018-2021 Nomadic Labs. <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -408,7 +408,6 @@ type error +=
       found : Operation_list_list_hash.t;
     }
   | Failed_to_checkout_context of Context_hash.t
-  | Failed_to_get_live_blocks of Block_hash.t
   | System_error of {errno : string; fn : string; msg : string}
   | Missing_test_protocol of Protocol_hash.t
   | Validation_process_failed of validation_process_error
@@ -501,20 +500,6 @@ let () =
     Data_encoding.(obj1 (req "hash" Context_hash.encoding))
     (function Failed_to_checkout_context h -> Some h | _ -> None)
     (fun h -> Failed_to_checkout_context h) ;
-  Error_monad.register_error_kind
-    `Permanent
-    ~id:"Block_validator_process.failed_to_get_live_block"
-    ~title:"Fail to get live blocks"
-    ~description:"Unable to get live blocks from a given hash"
-    ~pp:(fun ppf (hash : Block_hash.t) ->
-      Format.fprintf
-        ppf
-        "@[Failed to get live blocks from block hash %a@]"
-        Block_hash.pp
-        hash)
-    Data_encoding.(obj1 (req "hash" Block_hash.encoding))
-    (function Failed_to_get_live_blocks h -> Some h | _ -> None)
-    (fun h -> Failed_to_get_live_blocks h) ;
   Error_monad.register_error_kind
     `Temporary
     ~id:"Validator_process.system_error_while_validating"

@@ -206,7 +206,10 @@ let compute ~get_predecessor ~caboose ~size block_hash header seed =
           if Block_hash.equal caboose current_block_hash then Lwt.return acc
           else Lwt.return (caboose :: acc)
       | Some predecessor ->
-          loop (predecessor :: acc) (pred size) state predecessor
+          if Block_hash.equal predecessor current_block_hash then
+            (* caboose or genesis reached *)
+            Lwt.return acc
+          else loop (predecessor :: acc) (pred size) state predecessor
   in
   if size <= 0 then Lwt.return (header, [])
   else

@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2018-2021 Nomadic Labs. <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -31,7 +31,6 @@
     (see [Block_validation:check_liveness]). *)
 
 type validator_environment = {
-  genesis : Genesis.t;  (** genesis block of the current chain *)
   user_activated_upgrades : User_activated.upgrades;
       (** user activated upgrades *)
   user_activated_protocol_overrides : User_activated.protocol_overrides;
@@ -43,8 +42,9 @@ type validator_environment = {
     one processus has a write access to the context. Currently informations
     are exchanged via the file system. *)
 type validator_kind =
-  | Internal : Context.index -> validator_kind
+  | Internal : Store.Chain.chain_store -> validator_kind
   | External : {
+      genesis : Genesis.t;
       data_dir : string;
       context_root : string;
       protocol_root : string;
@@ -66,7 +66,8 @@ val restore_context_integrity : t -> int option tzresult Lwt.t
     the operations and then call [Block_validation.apply] *)
 val apply_block :
   t ->
-  predecessor:State.Block.t ->
+  Store.chain_store ->
+  predecessor:Store.Block.t ->
   Block_header.t ->
   Operation.t list list ->
   Block_validation.result tzresult Lwt.t
@@ -74,4 +75,4 @@ val apply_block :
 val commit_genesis : t -> chain_id:Chain_id.t -> Context_hash.t tzresult Lwt.t
 
 (** [init_test_chain] must only be called on a forking block. *)
-val init_test_chain : t -> State.Block.t -> Block_header.t tzresult Lwt.t
+val init_test_chain : t -> Store.Block.t -> Block_header.t tzresult Lwt.t

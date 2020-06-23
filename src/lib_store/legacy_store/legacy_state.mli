@@ -97,7 +97,7 @@ module Chain : sig
 
   val caboose : chain_state -> (Int32.t * Block_hash.t) Lwt.t
 
-  val store : chain_state -> Store.t Lwt.t
+  val store : chain_state -> Legacy_store.t Lwt.t
 
   (** Update the current checkpoint. The current head should be
       consistent (i.e. it should either have a lower level or pass
@@ -149,7 +149,11 @@ type error += Block_not_found of Block_hash.t
 type error += Block_contents_not_found of Block_hash.t
 
 module Block : sig
-  type t
+  type t = {
+    chain_state : Chain.t;
+    hash : Block_hash.t;
+    header : Block_header.t;
+  }
 
   type block = t
 
@@ -158,12 +162,12 @@ module Block : sig
       functions by calling the adequate function depending on the block being pruned or not. *)
   module Header : sig
     val read :
-      Store.Block.store * Block_hash.t -> Block_header.t tzresult Lwt.t
+      Legacy_store.Block.store * Block_hash.t -> Block_header.t tzresult Lwt.t
 
     val read_opt :
-      Store.Block.store * Block_hash.t -> Block_header.t option Lwt.t
+      Legacy_store.Block.store * Block_hash.t -> Block_header.t option Lwt.t
 
-    val known : Store.Block.store * Block_hash.t -> bool Lwt.t
+    val known : Legacy_store.Block.store * Block_hash.t -> bool Lwt.t
   end
 
   val known : Chain.t -> Block_hash.t -> bool Lwt.t
@@ -173,7 +177,7 @@ module Block : sig
   val known_invalid : Chain.t -> Block_hash.t -> bool Lwt.t
 
   val read_invalid :
-    Chain.t -> Block_hash.t -> Store.Block.invalid_block option Lwt.t
+    Chain.t -> Block_hash.t -> Legacy_store.Block.invalid_block option Lwt.t
 
   val list_invalid : Chain.t -> (Block_hash.t * int32 * error list) list Lwt.t
 
@@ -293,14 +297,24 @@ module Block : sig
 
   val watcher : Chain.t -> block Lwt_stream.t * Lwt_watcher.stopper
 
+  (** [known_ancestor chain_state locator] computes the unknown prefix in
+      the [locator] according to [chain_state].
+      It either returns:
+      - [Some (h, hist)] when we find a valid block, where [hist]
+        is the unknown prefix, ending with the first valid block found.
+      - [Some (h, hist)] when we don't find any block known valid nor invalid
+        and the node runs in full or rolling mode. In this case
+        [(h, hist)] is the given [locator].
+      - [None] when the node runs in archive history mode and
+        we find an invalid block or no valid block in the [locator].
+      - [None] when the node runs in full or rolling mode and we find
+        an invalid block in the [locator]. *)
   val known_ancestor :
-    Chain.t ->
-    Block_locator.t ->
-    (Block_locator.validity * Block_locator.t) Lwt.t
+    Chain.t -> Block_locator.t -> Block_locator.t option Lwt.t
 
   val get_rpc_directory : t -> t RPC_directory.t option Lwt.t
 
-  val set_rpc_directory : t -> t RPC_directory.t -> unit Lwt.t
+  val set_rpc_directory : t -> t RPC_directory.t -> unit tzresult Lwt.t
 
   val get_header_rpc_directory :
     Chain.t ->
@@ -346,11 +360,15 @@ type chain_data = {
 }
 
 val read_chain_data :
-  Chain.t -> (Store.Chain_data.store -> chain_data -> 'a Lwt.t) -> 'a Lwt.t
+  Chain.t ->
+  (Legacy_store.Chain_data.store -> chain_data -> 'a Lwt.t) ->
+  'a Lwt.t
 
 val update_chain_data :
   Chain.t ->
-  (Store.Chain_data.store -> chain_data -> (chain_data option * 'a) Lwt.t) ->
+  (Legacy_store.Chain_data.store ->
+  chain_data ->
+  (chain_data option * 'a) Lwt.t) ->
   'a Lwt.t
 
 (** {2 Protocol database} *)
@@ -394,7 +412,7 @@ module Current_mempool : sig
 end
 
 type error +=
-  | Incorrect_history_mode_switch of {
+  | Incorrect_legacy_history_mode_switch of {
       previous_mode : History_mode.Legacy.t;
       next_mode : History_mode.Legacy.t;
     }

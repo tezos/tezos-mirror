@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -155,7 +155,7 @@ type callback = {
 }
 
 type chain_db = {
-  chain_state : State.Chain.t;
+  chain_store : Store.Chain.t;
   operation_db : Distributed_db_requester.Raw_operation.t;
   block_header_db : Distributed_db_requester.Raw_block_header.t;
   operations_db : Distributed_db_requester.Raw_operations.t;
@@ -164,6 +164,10 @@ type chain_db = {
       (** Set of remote peers for which this chain is active. *)
   active_connections : connection P2p_peer.Table.t;
 }
+
+(** Lookup for block header in any active chains *)
+val read_block_header :
+  t -> Block_hash.t -> (Chain_id.t * Block_header.t) option Lwt.t
 
 (** [run ~register ~unregister p2p state protocol_db active_chains peer_id conn]
     runs an answering worker on a p2p connection [connection]. [peer_id] is
@@ -176,7 +180,7 @@ val run :
   register:(t -> unit) ->
   unregister:(unit -> unit) ->
   p2p ->
-  State.t ->
+  Store.t ->
   Distributed_db_requester.Raw_protocol.t ->
   chain_db Chain_id.Table.t ->
   P2p_peer.Id.t ->

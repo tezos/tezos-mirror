@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019-2020 Nomadic Labs, <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2019-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -56,7 +56,7 @@ type t = {
   rpc_tls : Node_config_file.tls option;
   log_output : Lwt_log_sink_unix.Output.t option;
   bootstrap_threshold : int option;
-  history_mode : History_mode.Legacy.t option;
+  history_mode : History_mode.t option;
   synchronisation_threshold : int option;
   latency : int option;
 }
@@ -210,16 +210,36 @@ module Term = struct
       Lwt_log_sink_unix.Output.pp )
 
   let history_mode_converter =
-    let open History_mode.Legacy in
-    ( (function
-      | "archive" ->
-          `Ok Archive
-      | "full" ->
-          `Ok Full
-      | "experimental-rolling" ->
-          `Ok Rolling
-      | s ->
-          `Error s),
+    let open History_mode in
+    (* Parses the history mode given as a string through [arg] from
+       the command line and returns the corresponding well formed
+       history mode. The colon punctuation mark (:) is used to delimit
+       offsets such as: "full:5" -> Full { offset = 5 }. *)
+    let parse_history_mode s =
+      let delim = ':' in
+      let args = String.split_on_char delim s in
+      match args with
+      | ["archive"] | ["Archive"] ->
+          Some Archive
+      | ["full"] | ["Full"] ->
+          Some default_full
+      | ["full"; n] | ["Full"; n] ->
+          Option.map (fun offset -> Full {offset}) (int_of_string_opt n)
+      | ["rolling"] | ["Rolling"] ->
+          Some default_rolling
+      | ["rolling"; n] | ["Rolling"; n] ->
+          Option.map (fun offset -> Rolling {offset}) (int_of_string_opt n)
+      | ["experimental-rolling"] ->
+          Some default_rolling
+      | _ ->
+          None
+    in
+    ( (fun arg ->
+        match parse_history_mode arg with
+        | Some hm ->
+            `Ok hm
+        | None ->
+            `Error arg),
       pp )
 
   let network_printer ppf = function
@@ -285,13 +305,19 @@ module Term = struct
 
   let history_mode =
     let doc =
-      "Set the mode for the chain's data history storage. Possible values are \
-       $(i,archive), $(i,full) (default), $(i,experimental-rolling). Archive \
-       mode retains all data since the genesis block. Full mode only \
-       maintains block headers and operations allowing replaying the chain \
-       since the genesis if wanted. (Experimental-)Rolling mode retains only \
-       the most recent data (i.e. from the 5 last cycles) and deletes the \
-       rest."
+      Format.sprintf
+        "Set the mode for the chain's data history storage. Possible values \
+         are $(i,archive), $(i,full) $(b,(default)), $(i,full:N), \
+         $(i,rolling), $(i,rolling:N). Archive mode retains all data since \
+         the genesis block. Full mode only maintains block headers and \
+         operations allowing replaying the chain since the genesis if wanted. \
+         Rolling mode retains only the most recent data and deletes the rest. \
+         For both Full and Rolling modes, it is possible to adjust the number \
+         of cycles to preserve by using the $(i,:N) annotation. The default \
+         number of preserved cycles is %d. The value \
+         $(i,experimental-rolling) is deprecated but is equivalent to \
+         $(i,rolling) which should be used instead."
+        History_mode.default_offset
     in
     Arg.(
       value

@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -160,30 +160,33 @@ val operations_metadata : metadata -> Bytes.t list list
     that the stored data is consistent:
 
     - Does the [hash] stored equals the result of [Block_header.hash]
-      of its header and, if not, is this the [genesis_hash]?
+      of its header and, if not, is this the stored [genesis_hash]?
     - Is the [block] a successor of [pred_block] with regards to its
-      level and its predecessor's hash? *)
+      level and its predecessor's hash?
+    - Are the stored operations hashes consistent regarding the stored
+      operations hashes? *)
 val check_block_consistency :
   ?genesis_hash:Block_hash.t -> ?pred_block:t -> t -> unit tzresult Lwt.t
 
-(** [read_next_block fd] reads from [fd] and decode the next block
-    found in the descriptor. The [fd]'s offset is moved as a side
-    effect. This returns the decoded block along with the block length
-    (number of bytes) of the encoded block. This function may raise
-    Unix.error errors, see Unix.read. *)
-val read_next_block : Lwt_unix.file_descr -> (t * int) Lwt.t
+(** [read_next_block_exn fd] reads from [fd] and decode the next block
+   found in the descriptor. The [fd]'s offset is moved as a side
+   effect. This returns the decoded block along with the block length
+   (number of bytes) of the encoded block. This function updates the
+   given [fd] state and may raise Unix.error errors, see Unix.read. *)
+val read_next_block_exn : Lwt_unix.file_descr -> (t * int) Lwt.t
 
 (** Same as [read_next_block fd] but returns [None] if there was an
     error. *)
-val read_next_block_opt : Lwt_unix.file_descr -> (t * int) option Lwt.t
+val read_next_block : Lwt_unix.file_descr -> (t * int) option Lwt.t
 
-(** [pread_block fd ~file_offset] reads from [fd] and decode the block
-    at offset [file_offset] in the descriptor. This returns the decoded
-    block along with the block length (number of bytes) of the encoded
-    block. This function may raise Unix.error errors, see Unix.read. *)
-val pread_block : Lwt_unix.file_descr -> file_offset:int -> (t * int) Lwt.t
+(** [pread_block_exn fd ~file_offset] reads from [fd] and decode the
+   block at offset [file_offset] in the descriptor. This returns the
+   decoded block along with the block length (number of bytes) of the
+   encoded block. This function may raise Unix.error errors, see
+   Unix.read. *)
+val pread_block_exn : Lwt_unix.file_descr -> file_offset:int -> (t * int) Lwt.t
 
 (** Same as [pread_block fd ~file_offset] but returns [None] if there
     was an error. *)
-val pread_block_opt :
+val pread_block :
   Lwt_unix.file_descr -> file_offset:int -> (t * int) option Lwt.t

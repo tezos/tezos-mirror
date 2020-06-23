@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -86,12 +86,15 @@
     - If no merging thread is pending, two floating stores are
       present: a [RO] and a [RW].
 
-    - If a merging thread is pending, there is three floating stores
+    - If a merging thread is pending, there are three floating stores
       present: a [RO], a [RO'] and a [RW].
 
     - Blocks may be stored twice in {b floating stores} but only when
-      a merging occurs. However, blocks can be present in both the
-      cemented and the floating store.
+      a merging occurs (as [RO''] is a subset of [RO]+[RO']). However,
+      blocks can be present in both the cemented and the floating
+      store (after importing a storage snapshot as the floating block
+      store consist in a checkpoint associated with its `max_op_ttl`
+      blocks which were already cemented).
 
     - For every stored block in floating stores, its predecessor is
       either already stored in the same floating store file, in a
@@ -152,7 +155,10 @@ type t = block_store
 
     - Block (h, 0) represents the block h itself ;
 
-    - Block (h, n) represents the block's [n]th predecessor. *)
+    - Block (h, n) represents the block's [n]th predecessor.
+
+    A block key may represent an invalid block (wrong hash and/or
+    offset) as it is not ensured to be valid by construction.*)
 type key = Block of (Block_hash.t * int)
 
 (** The status of the merging thread *)
@@ -197,8 +203,9 @@ val genesis_block : block_store -> Block_repr.t
     [block_store]. *)
 val mem : block_store -> key -> bool tzresult Lwt.t
 
-(** [get_hash block_store key] retrieves the hash of [key] in
-    [block_store]. Return [None] if the block is unknown. *)
+(** [get_hash block_store key] retrieves the hash corresponding to the
+   given [key] in [block_store]. Return [None] if the block is
+   unknown. *)
 val get_hash : block_store -> key -> Block_hash.t option tzresult Lwt.t
 
 (** [read_block ~read_metadata block_store key] reads the block [key]
@@ -211,13 +218,13 @@ val read_block :
   Block_repr.t option tzresult Lwt.t
 
 (** [read_block_metadata block_store key] reads the metadata for the
-    block [key] in [block_store] if present. Return [None] if the the
-    block is unknown or if the metadata are not present. *)
+   block [key] in [block_store] if present. Return [None] if the block
+   is unknown or if the metadata are not present. *)
 val read_block_metadata :
   block_store -> key -> Block_repr.metadata option tzresult Lwt.t
 
-(** [store_block block_store block] store the [block] in the current
-    [RW] floating store. *)
+(** [store_block block_store block] stores the [block] in the current
+   [RW] floating store. *)
 val store_block : block_store -> Block_repr.t -> unit tzresult Lwt.t
 
 (** [cement_blocks ?check_consistency ~write_metadata block_store
@@ -281,7 +288,7 @@ val await_merging : block_store -> unit Lwt.t
 
     {b Warning} For a given [block_store], the caller must wait for
     this function termination before calling it again or it may result
-    in concurrent intertwinings causing the cementing to be out of
+    in concurrent intertwining causing the cementing to be out of
     order. *)
 val merge_stores :
   block_store ->
@@ -309,8 +316,10 @@ val switch_history_mode :
   new_history_mode:History_mode.t ->
   unit tzresult Lwt.t
 
-(** [create ~chain_dir ~genesis_block] instantiates a fresh [block_store]
-    in directory [chain_dir] and stores the [genesis_block] in it. *)
+(** [create ~chain_dir ~genesis_block] instantiates a fresh
+   [block_store] in directory [chain_dir] and stores the
+   [genesis_block] in it. It fails if the given [chain_dir] is already
+   populated.*)
 val create :
   [`Chain_dir] Naming.directory ->
   genesis_block:Block_repr.t ->
@@ -332,5 +341,7 @@ val load :
     5s for its termination before effectively closing the store. *)
 val close : block_store -> unit Lwt.t
 
-(** [may_recover_merge block_store] fixes the store. *)
+(** [may_recover_merge block_store] recovers, if needed, from a
+   [block_store] where the merge procedure was unexpectedly
+   interrupted. *)
 val may_recover_merge : block_store -> unit tzresult Lwt.t

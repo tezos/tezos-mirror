@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -246,7 +246,7 @@ let check_block_consistency ?genesis_hash ?pred_block block =
   >>=? fun () -> return_unit
 
 (* FIXME handle I/O errors *)
-let read_next_block fd =
+let read_next_block_exn fd =
   (* Read length *)
   let length_bytes = Bytes.create 4 in
   Lwt_utils_unix.read_bytes ~pos:0 ~len:4 fd length_bytes
@@ -259,12 +259,12 @@ let read_next_block fd =
   Lwt.return
     (Data_encoding.Binary.of_bytes_exn encoding block_bytes, 4 + block_length)
 
-let read_next_block_opt fd =
+let read_next_block fd =
   Lwt.catch
-    (fun () -> read_next_block fd >>= fun b -> Lwt.return_some b)
+    (fun () -> read_next_block_exn fd >>= fun b -> Lwt.return_some b)
     (fun _exn -> Lwt.return_none)
 
-let pread_block fd ~file_offset =
+let pread_block_exn fd ~file_offset =
   (* Read length *)
   let length_bytes = Bytes.create 4 in
   Lwt_utils_unix.read_bytes ~file_offset ~pos:0 ~len:4 fd length_bytes
@@ -282,7 +282,7 @@ let pread_block fd ~file_offset =
   Lwt.return
     (Data_encoding.Binary.of_bytes_exn encoding block_bytes, 4 + block_length)
 
-let pread_block_opt fd ~file_offset =
+let pread_block fd ~file_offset =
   Lwt.catch
-    (fun () -> pread_block fd ~file_offset >>= fun b -> Lwt.return_some b)
+    (fun () -> pread_block_exn fd ~file_offset >>= fun b -> Lwt.return_some b)
     (fun _exn -> Lwt.return_none)

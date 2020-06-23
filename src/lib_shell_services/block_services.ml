@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018-2021 Nomadic Labs. <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -99,11 +100,11 @@ let parse_block s =
         Ok (`Alias (`Checkpoint, int_of_string n))
     | (["checkpoint"; n], '+') ->
         Ok (`Alias (`Checkpoint, -int_of_string n))
-    | (["save_point"], _) ->
+    | (["savepoint"], _) ->
         Ok (`Alias (`Savepoint, 0))
-    | (["save_point"; n], '~') | (["save_point"; n], '-') ->
+    | (["savepoint"; n], '~') | (["savepoint"; n], '-') ->
         Ok (`Alias (`Savepoint, int_of_string n))
-    | (["save_point"; n], '+') ->
+    | (["savepoint"; n], '+') ->
         Ok (`Alias (`Savepoint, -int_of_string n))
     | (["caboose"], _) ->
         Ok (`Alias (`Caboose, 0))
@@ -132,7 +133,7 @@ let alias_to_string = function
   | `Checkpoint ->
       "checkpoint"
   | `Savepoint ->
-      "save_point"
+      "savepoint"
   | `Caboose ->
       "caboose"
 

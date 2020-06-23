@@ -25,10 +25,10 @@
 (*****************************************************************************)
 
 (** A locator [t] is a data structure which roughly represents a list
-   of block hashes in the chain. These hashes go from the top of the
-   chain to the bottom. It is sparse in the sense that the distance
-   between two hashes increases exponentially when we move away from
-   the head.
+    of block hashes in the chain. These hashes go from the top of the
+    chain to the bottom. It is sparse in the sense that the distance
+    between two hashes increases exponentially when we move away from
+    the head.
 
     The distance between two hashes of a locator is randomized to
     prevent attacks. The seed is determined uniquely from the

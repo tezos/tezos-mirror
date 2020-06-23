@@ -51,7 +51,7 @@ let with_node f =
         context_root = dir / "context";
         protocol_root = dir / "protocol";
         p2p = None;
-        checkpoint = None;
+        target = None;
         disable_mempool = true;
         enable_testchain = false;
       }

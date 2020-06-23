@@ -75,12 +75,12 @@ let wrap f _switch () =
   Test_services.with_empty_mock_sink (fun _ ->
       Lwt_utils_unix.with_tempdir "tezos_test_" (fun test_dir ->
           init_chain test_dir
-          >>= fun (st, _, _, _) ->
+          >>= fun store ->
           init_mock_p2p Distributed_db_version.Name.zero
           >>= function
           | Ok p2p ->
               (* Create state *)
-              let db = Distributed_db.create st p2p in
+              let db = Distributed_db.create store p2p in
               (* Set working dir for protocol compiler *)
               Updater.init (Filename.concat test_dir "build") ;
               (* Start validator *)

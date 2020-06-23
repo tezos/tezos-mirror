@@ -2,7 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2020-2021 Nomadic Labs. <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,51 +23,47 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The bootstrap pipeline works as follows:
-    1. From a locator, it computes a list of subchains (identified by
-       a [Block_locator.step]) to fetch.
-    2. A worker starts to fetch all the headers (top to bottom) from a subchain,
-       starting with the top subchain.
-    3. A worker starts to download the list of operations by batch of blocks
-       once a batch of headers is available.
-    4. A worker validates blocks one by one (bottom to top).
+(** Tezos Shell Module - Chain Traversal API *)
 
-    These three workers work concurrently.
+open Legacy_state
+
+(** If [h1] is an ancestor of [h2] in the current [state],
+    then [path state h1 h2] returns the chain of block from
+    [h1] (excluded) to [h2] (included). Returns [None] otherwise. *)
+val path : Block.t -> Block.t -> Block.t list option Lwt.t
+
+(** [common_ancestor state h1 h2] returns the first common ancestors
+    in the history of blocks [h1] and [h2]. *)
+val common_ancestor : Block.t -> Block.t -> Block.t Lwt.t
+
+(** [iter_predecessors state blocks f] iter [f] on [blocks] and
+    their recursive predecessors. Blocks are visited with a
+    decreasing fitness (then decreasing timestamp). If the optional
+    argument [max] is provided, the iteration is stopped after [max]
+    visited block. If [min_fitness] id provided, blocks with a
+    fitness lower than [min_fitness] are ignored. If [min_date],
+    blocks with a fitness lower than [min_date] are ignored. *)
+val iter_predecessors :
+  ?max:int ->
+  ?min_fitness:Fitness.t ->
+  ?min_date:Time.Protocol.t ->
+  Block.t list ->
+  f:(Block.t -> unit Lwt.t) ->
+  unit Lwt.t
+
+(** [new_blocks ~from_block ~to_block] returns a pair [(ancestor,
+    path)], where [ancestor] is the common ancestor of [from_block]
+    and [to_block] and where [path] is the chain from [ancestor]
+    (excluded) to [to_block] (included).  The function raises an
+    exception when the two provided blocks do not belong to the same
+    [chain].  *)
+val new_blocks :
+  from_block:Block.t -> to_block:Block.t -> (Block.t * Block.t list) Lwt.t
+
+(** [live_blocks b n] return a pair [(blocks,operations)] where
+    [blocks] is the set of arity [n], that contains [b] and its [n-1]
+    predecessors. And where [operations] is the set of operations
+    included in those blocks.
 *)
-
-type t
-
-(** [create ?notify_new_block ~block_header_timeout
-    ~block_operations_timeout validator peer ddb locator] initializes a
-    [bootstrap_pipeline] for a [locator] sent by [peer]. It uses the
-    [Distributed_db] to fetch the data needed and [validator] to
-    validate blocks one by one with the function
-    [Block_validator.validate].
-
-    Moreover:
-    - [notify_new_block] is a called everytime a valid block
-    is received.
-    - [block_header_timeout] is the timeout to fetch a [block_header].
-    - [block_operations_timeout] is the timeout to fetch a block
-    operation.
-
-    If a timeout is triggered, the whole [bootstrap_pipeline] is
-    canceled.*)
-val create :
-  ?notify_new_block:(Store.Block.t -> unit) ->
-  block_header_timeout:Time.System.Span.t ->
-  block_operations_timeout:Time.System.Span.t ->
-  Block_validator.t ->
-  P2p_peer.Id.t ->
-  Distributed_db.chain_db ->
-  Block_locator.t ->
-  t
-
-val wait : t -> unit tzresult Lwt.t
-
-val cancel : t -> unit Lwt.t
-
-(** [length pipeline] returns the number of the headers and blocks fetched *)
-val length : t -> Peer_validator_worker_state.Worker_state.pipeline_length
-
-val length_zero : Peer_validator_worker_state.Worker_state.pipeline_length
+val live_blocks :
+  Block.t -> int -> (Block_hash.Set.t * Operation_hash.Set.t) tzresult Lwt.t

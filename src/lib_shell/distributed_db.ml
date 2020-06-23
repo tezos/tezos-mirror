@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2019-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -55,7 +55,7 @@ type p2p = (Message.t, Peer_metadata.t, Connection_metadata.t) P2p.net
 type db = {
   p2p : p2p;
   p2p_readers : P2p_reader.t P2p_peer.Table.t;
-  disk : State.t;
+  disk : Store.t;
   active_chains : P2p_reader.chain_db Chain_id.Table.t;
   protocol_db : Distributed_db_requester.Raw_protocol.t;
   block_input : (Block_hash.t * Block_header.t) Lwt_watcher.input;
@@ -74,9 +74,9 @@ let noop_callback =
 
 type t = db
 
-let state {disk; _} = disk
+let store {disk; _} = disk
 
-let chain_state chain_db = chain_db.reader_chain_db.chain_state
+let chain_store chain_db = chain_db.reader_chain_db.chain_store
 
 let db {global_db; _} = global_db
 
@@ -145,7 +145,7 @@ let create disk p2p =
 
 let activate
     ({p2p; active_chains; protocol_db; disk; p2p_readers; _} as global_db)
-    chain_state =
+    chain_store =
   let run_p2p_reader gid =
     let register p2p_reader = P2p_peer.Table.add p2p_readers gid p2p_reader in
     let unregister () = P2p_peer.Table.remove p2p_readers gid in
@@ -154,7 +154,7 @@ let activate
   P2p.on_new_connection p2p run_p2p_reader ;
   P2p.iter_connections p2p run_p2p_reader ;
   P2p.activate p2p ;
-  let chain_id = State.Chain.id chain_state in
+  let chain_id = Store.Chain.chain_id chain_store in
   let reader_chain_db =
     match Chain_id.Table.find active_chains chain_id with
     | Some local_db ->
@@ -176,23 +176,23 @@ let activate
           Distributed_db_requester.Raw_operation.create
             ~global_input:global_db.operation_input
             p2p_request
-            chain_state
+            chain_store
         in
         let block_header_db =
           Distributed_db_requester.Raw_block_header.create
             ~global_input:global_db.block_input
             p2p_request
-            chain_state
+            chain_store
         in
         let operations_db =
           Distributed_db_requester.Raw_operations.create
             p2p_request
-            chain_state
+            chain_store
         in
         let local_db =
           P2p_reader.
             {
-              chain_state;
+              chain_store;
               operation_db;
               block_header_db;
               operations_db;
@@ -226,7 +226,7 @@ let set_callback chain_db callback =
 
 let deactivate chain_db =
   let {active_chains; p2p; _} = chain_db.global_db in
-  let chain_id = State.Chain.id chain_db.reader_chain_db.chain_state in
+  let chain_id = Store.Chain.chain_id chain_db.reader_chain_db.chain_store in
   Chain_id.Table.remove active_chains chain_id ;
   let sends =
     P2p_peer.Table.iter_ep
@@ -287,30 +287,28 @@ let clear_block chain_db hash n =
     chain_db.reader_chain_db.block_header_db
     hash
 
-let commit_block chain_db hash header header_data operations operations_data
-    block_metadata_hash ops_metadata_hashes result ~forking_testchain =
-  assert (Block_hash.equal hash (Block_header.hash header)) ;
-  assert (List.length operations = header.shell.validation_passes) ;
-  State.Block.store
-    chain_db.reader_chain_db.chain_state
-    header
-    header_data
-    operations
-    operations_data
-    block_metadata_hash
-    ops_metadata_hashes
+let commit_block chain_db hash block_header operations result =
+  assert (Block_hash.equal hash (Block_header.hash block_header)) ;
+  assert (List.length operations = block_header.shell.validation_passes) ;
+  Store.Block.store_block
+    chain_db.reader_chain_db.chain_store
+    ~block_header
+    ~operations
     result
-    ~forking_testchain
   >>=? fun res ->
-  clear_block chain_db hash header.shell.validation_passes ;
+  clear_block chain_db hash block_header.shell.validation_passes ;
   return res
 
 let commit_invalid_block chain_db hash header errors =
   assert (Block_hash.equal hash (Block_header.hash header)) ;
-  State.Block.store_invalid chain_db.reader_chain_db.chain_state header errors
-  >>=? fun res ->
+  Store.Block.mark_invalid
+    chain_db.reader_chain_db.chain_store
+    hash
+    ~level:header.shell.level
+    errors
+  >>=? fun () ->
   clear_block chain_db hash header.shell.validation_passes ;
-  return res
+  return_unit
 
 let inject_operation chain_db h op =
   assert (Operation_hash.equal h (Operation.hash op)) ;
@@ -320,7 +318,7 @@ let inject_operation chain_db h op =
     op
 
 let commit_protocol db h p =
-  State.Protocol.store db.disk p
+  Store.Protocol.store db.disk h p
   >>= fun res ->
   Distributed_db_requester.Raw_protocol.clear_or_cancel db.protocol_db h ;
   return (res <> None)
@@ -427,13 +425,26 @@ module Protocol = struct
            and type param := unit )
 end
 
-let read_block_header {disk; _} h =
-  State.read_block disk h
+let read_block {disk; _} h =
+  Store.all_chain_stores disk
+  >>= fun chain_stores ->
+  Lwt_utils.find_map_s
+    (fun chain_store ->
+      Store.Block.read_block_opt chain_store h
+      >>= function
+      | None ->
+          Lwt.return_none
+      | Some b ->
+          Lwt.return_some (Store.Chain.chain_id chain_store, b))
+    chain_stores
+
+let read_block_header db h =
+  read_block db h
   >>= function
-  | Some b ->
-      Lwt.return_some (State.Block.chain_id b, State.Block.header b)
   | None ->
       Lwt.return_none
+  | Some (chain_id, block) ->
+      Lwt.return_some (chain_id, Store.Block.header block)
 
 let broadcast chain_db msg =
   P2p_peer.Table.iter
@@ -459,7 +470,7 @@ let send chain_db ?peer msg =
 
 module Request = struct
   let current_head chain_db ?peer () =
-    let chain_id = State.Chain.id chain_db.reader_chain_db.chain_state in
+    let chain_id = Store.Chain.chain_id chain_db.reader_chain_db.chain_store in
     ( match peer with
     | Some peer ->
         let meta = P2p.get_peer_metadata chain_db.global_db.p2p peer in
@@ -469,7 +480,7 @@ module Request = struct
     send chain_db ?peer @@ Get_current_head chain_id
 
   let current_branch chain_db ?peer () =
-    let chain_id = State.Chain.id chain_db.reader_chain_db.chain_state in
+    let chain_id = Store.Chain.chain_id chain_db.reader_chain_db.chain_store in
     ( match peer with
     | Some peer ->
         let meta = P2p.get_peer_metadata chain_db.global_db.p2p peer in
@@ -481,15 +492,14 @@ end
 
 module Advertise = struct
   let current_head chain_db ?(mempool = Mempool.empty) head =
-    let chain_id = State.Chain.id chain_db.reader_chain_db.chain_state in
-    assert (Chain_id.equal chain_id (State.Block.chain_id head)) ;
+    let chain_id = Store.Chain.chain_id chain_db.reader_chain_db.chain_store in
     let msg_mempool =
-      Message.Current_head (chain_id, State.Block.header head, mempool)
+      Message.Current_head (chain_id, Store.Block.header head, mempool)
     in
     if mempool = Mempool.empty then send chain_db msg_mempool
     else
       let msg_disable_mempool =
-        Message.Current_head (chain_id, State.Block.header head, Mempool.empty)
+        Message.Current_head (chain_id, Store.Block.header head, Mempool.empty)
       in
       let send_mempool conn =
         let {Connection_metadata.disable_mempool; _} =
@@ -505,13 +515,15 @@ module Advertise = struct
         chain_db.reader_chain_db.active_connections
 
   let current_branch chain_db =
-    let chain_id = State.Chain.id chain_db.reader_chain_db.chain_state in
-    let chain_state = chain_state chain_db in
+    let chain_id = Store.Chain.chain_id chain_db.reader_chain_db.chain_store in
+    let chain_store = chain_store chain_db in
     let sender_id = my_peer_id chain_db in
+    Store.Chain.current_head chain_store
+    >>= fun current_head ->
     P2p_peer.Table.iter_p
       (fun receiver_id conn ->
         let seed = {Block_locator.receiver_id; sender_id} in
-        Chain.locator chain_state seed
+        Store.Chain.compute_locator chain_store current_head seed
         >>= fun locator ->
         let msg = Message.Current_branch (chain_id, locator) in
         ignore (P2p.try_send chain_db.global_db.p2p conn msg) ;

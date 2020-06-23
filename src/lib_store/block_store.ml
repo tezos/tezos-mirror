@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -33,6 +33,9 @@ module Block_cache =
              map_maker ~replacement:LRU ~overflow:Strong ~accounting:Precise)
        )
        (Block_hash))
+
+(* TODO: make limits configurable *)
+let block_cache_limit = 100
 
 type merge_status = Not_running | Running | Merge_failed of tztrace
 
@@ -167,7 +170,7 @@ let compute_predecessors block_store block =
     loop [predecessor] predecessor 1
     >>= fun rev_preds -> Lwt.return (List.rev rev_preds)
 
-(** [get_hash chain_store key] retrieves the block which is at
+(** [get_hash block_store key] retrieves the block which is at
     [distance] from the block with corresponding [hash] by every store
     iteratively. *)
 let get_hash block_store (Block (block_hash, offset)) =
@@ -1260,8 +1263,7 @@ let load chain_dir ~genesis_block ~readonly =
     (Naming.block_store_status_file chain_dir)
     ~initial_data:Idle
   >>=? fun status_data ->
-  (* TODO (later) parameterize the block cache *)
-  let block_cache = Block_cache.create 100 in
+  let block_cache = Block_cache.create block_cache_limit in
   let merge_scheduler = Lwt_idle_waiter.create () in
   let merge_mutex = Lwt_mutex.create () in
   let block_store =

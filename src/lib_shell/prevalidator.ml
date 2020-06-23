@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2018-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -55,7 +55,7 @@ module type T = sig
   type types_state = {
     chain_db : Distributed_db.chain_db;
     limits : limits;
-    mutable predecessor : State.Block.t;
+    mutable predecessor : Store.Block.t;
     mutable timestamp : Time.System.t;
     mutable live_blocks : Block_hash.Set.t;
     mutable live_operations : Operation_hash.Set.t;
@@ -97,8 +97,8 @@ module type T = sig
 
   val list_pendings :
     Distributed_db.chain_db ->
-    from_block:State.Block.t ->
-    to_block:State.Block.t ->
+    from_block:Store.Block.t ->
+    to_block:Store.Block.t ->
     live_blocks:Block_hash.Set.t ->
     Operation.t Operation_hash.Map.t ->
     Operation.t Operation_hash.Map.t Lwt.t
@@ -135,7 +135,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
   type types_state = {
     chain_db : Distributed_db.chain_db;
     limits : limits;
-    mutable predecessor : State.Block.t;
+    mutable predecessor : Store.Block.t;
     mutable timestamp : Time.System.t;
     mutable live_blocks : Block_hash.Set.t;
     (* just a cache *)
@@ -211,7 +211,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
           Operation_hash.Set.empty
       in
       {
-        head = State.Block.hash state.predecessor;
+        head = Store.Block.hash state.predecessor;
         timestamp = state.timestamp;
         fetching = state.fetching;
         pending = domain state.pending;
@@ -257,12 +257,12 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
   type worker = Worker.infinite Worker.queue Worker.t
 
   let list_pendings chain_db ~from_block ~to_block ~live_blocks old_mempool =
+    let chain_store = Distributed_db.chain_store chain_db in
     let rec pop_blocks ancestor block mempool =
-      let hash = State.Block.hash block in
+      let hash = Store.Block.hash block in
       if Block_hash.equal hash ancestor then Lwt.return mempool
       else
-        State.Block.all_operations block
-        >>= fun operations ->
+        let operations = Store.Block.operations block in
         List.fold_left_s
           (List.fold_left_s (fun mempool op ->
                let h = Operation.hash op in
@@ -272,7 +272,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
           mempool
           operations
         >>= fun mempool ->
-        State.Block.predecessor block
+        Store.Block.read_predecessor_opt chain_store block
         >>= function
         | None ->
             assert false
@@ -280,8 +280,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
             pop_blocks ancestor predecessor mempool
     in
     let push_block mempool block =
-      State.Block.all_operation_hashes block
-      >|= fun operations ->
+      let operations = Store.Block.all_operation_hashes block in
       List.iter
         (List.iter (Distributed_db.Operation.clear_or_cancel chain_db))
         operations ;
@@ -290,12 +289,11 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
         mempool
         operations
     in
-    Chain_traversal.new_blocks ~from_block ~to_block
+    Store.Chain_traversal.new_blocks chain_store ~from_block ~to_block
     >>= fun (ancestor, path) ->
-    pop_blocks (State.Block.hash ancestor) from_block old_mempool
+    pop_blocks (Store.Block.hash ancestor) from_block old_mempool
     >>= fun mempool ->
-    List.fold_left_s push_block mempool path
-    >>= fun new_mempool ->
+    let new_mempool = List.fold_left push_block mempool path in
     let (new_mempool, outdated) =
       Operation_hash.Map.partition
         (fun _oph op ->
@@ -568,11 +566,14 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
                pv.branch_refusals
           @@ Operation_hash.Set.empty;
       } ;
-    State.Current_mempool.set
-      (Distributed_db.chain_state pv.chain_db)
-      ~head:(State.Block.hash pv.predecessor)
+    let chain_store = Distributed_db.chain_store pv.chain_db in
+    Store.Chain.set_mempool
+      chain_store
+      ~head:(Store.Block.hash pv.predecessor)
       pv.mempool
-    >>= fun () -> Lwt_main.yield ()
+    >>= fun _res ->
+    (* TODO: debug message on error *)
+    Lwt_main.yield ()
 
   let fetch_operation w pv ?peer oph =
     Worker.log_event w (Fetching_operation oph)
@@ -846,30 +847,33 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
         (fun oph -> Lwt.ignore_result (fetch_operation w pv ~peer oph))
         to_fetch
 
-    let on_flush w pv predecessor =
+    let on_flush w pv predecessor live_blocks live_operations =
       Lwt_watcher.shutdown_input pv.operation_stream ;
-      State.Block.max_operations_ttl predecessor
-      >>=? fun max_op_ttl ->
-      Chain_traversal.live_blocks predecessor max_op_ttl
-      >>=? fun (new_live_blocks, new_live_operations) ->
+      let chain_store = Distributed_db.chain_store pv.chain_db in
       list_pendings
         pv.chain_db
         ~from_block:pv.predecessor
         ~to_block:predecessor
-        ~live_blocks:new_live_blocks
+        ~live_blocks
         (Preapply_result.operations (validation_result pv))
       >>= fun pending ->
       let timestamp_system = Tezos_stdlib_unix.Systime_os.now () in
       let timestamp = Time.System.to_protocol timestamp_system in
-      Prevalidation.create ~predecessor ~timestamp ()
+      Prevalidation.create
+        chain_store
+        ~predecessor
+        ~live_blocks
+        ~live_operations
+        ~timestamp
+        ()
       >>= fun validation_state ->
       Worker.log_event
         w
         (Operations_not_flushed (Operation_hash.Map.cardinal pending))
       >>= fun () ->
       pv.predecessor <- predecessor ;
-      pv.live_blocks <- new_live_blocks ;
-      pv.live_operations <- new_live_operations ;
+      pv.live_blocks <- live_blocks ;
+      pv.live_operations <- live_operations ;
       pv.timestamp <- timestamp_system ;
       pv.mempool <- {known_valid = []; pending = Operation_hash.Set.empty} ;
       pv.pending <- pending ;
@@ -899,12 +903,14 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
      fun w request ->
       let pv = Worker.state w in
       ( match request with
-      | Request.Flush hash ->
+      | Request.Flush (hash, live_blocks, live_operations) ->
           on_advertise pv ;
           (* TODO: rebase the advertisement instead *)
-          let chain_state = Distributed_db.chain_state pv.chain_db in
-          State.Block.read chain_state hash
-          >>=? fun block -> on_flush w pv block >>=? fun () -> return (() : r)
+          let chain_store = Distributed_db.chain_store pv.chain_db in
+          Store.Block.read_block chain_store hash
+          >>=? fun block ->
+          on_flush w pv block live_blocks live_operations
+          >>=? fun () -> return (() : r)
       | Request.Notify (peer, mempool) ->
           on_notify w pv peer mempool ;
           return_unit
@@ -927,16 +933,22 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       Lwt.return_unit
 
     let on_launch w _ (limits, chain_db) =
-      let chain_state = Distributed_db.chain_state chain_db in
-      Chain.data chain_state
-      >>= fun { current_head = predecessor;
-                current_mempool = mempool;
-                live_blocks;
-                live_operations;
-                _ } ->
+      let chain_store = Distributed_db.chain_store chain_db in
+      Store.Chain.current_head chain_store
+      >>= fun predecessor ->
+      Store.Chain.mempool chain_store
+      >>= fun mempool ->
+      Store.Chain.live_blocks chain_store
+      >>= fun (live_blocks, live_operations) ->
       let timestamp_system = Tezos_stdlib_unix.Systime_os.now () in
       let timestamp = Time.System.to_protocol timestamp_system in
-      Prevalidation.create ~predecessor ~timestamp ()
+      Prevalidation.create
+        chain_store
+        ~predecessor
+        ~timestamp
+        ~live_blocks
+        ~live_operations
+        ()
       >>= fun validation_state ->
       let fetching =
         List.fold_left
@@ -1027,7 +1039,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
     | Ok fitness ->
         Lwt.return fitness
     | Error _ ->
-        Lwt.return (State.Block.fitness pv.predecessor)
+        Lwt.return (Store.Block.fitness pv.predecessor)
 end
 
 module ChainProto_registry = Map.Make (struct
@@ -1042,8 +1054,8 @@ let chain_proto_registry : t ChainProto_registry.t ref =
   ref ChainProto_registry.empty
 
 let create limits (module Filter : Prevalidator_filters.FILTER) chain_db =
-  let chain_state = Distributed_db.chain_state chain_db in
-  let chain_id = State.Chain.id chain_state in
+  let chain_store = Distributed_db.chain_store chain_db in
+  let chain_id = Store.Chain.chain_id chain_store in
   match
     ChainProto_registry.find
       (chain_id, Filter.Proto.hash)
@@ -1081,10 +1093,12 @@ let shutdown (t : t) =
     ChainProto_registry.remove Prevalidator.name !chain_proto_registry ;
   Prevalidator.Worker.shutdown w
 
-let flush (t : t) head =
+let flush (t : t) head live_blocks live_operations =
   let module Prevalidator : T = (val t) in
   let w = Lazy.force Prevalidator.worker in
-  Prevalidator.Worker.Queue.push_request_and_wait w (Request.Flush head)
+  Prevalidator.Worker.Queue.push_request_and_wait
+    w
+    (Request.Flush (head, live_blocks, live_operations))
 
 let notify_operations (t : t) peer mempool =
   let module Prevalidator : T = (val t) in

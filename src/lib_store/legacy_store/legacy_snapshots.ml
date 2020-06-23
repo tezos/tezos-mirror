@@ -280,8 +280,6 @@ type error +=
 
 type error += Inconsistent_operation_hashes_lengths
 
-type error += Cannot_reconstruct of History_mode.Legacy.t
-
 type error += Invalid_block_specification of string
 
 let () =
@@ -401,20 +399,6 @@ let () =
     (fun () -> Inconsistent_operation_hashes_lengths) ;
   register_error_kind
     `Permanent
-    ~id:"CannotReconstruct"
-    ~title:"Cannot reconstruct"
-    ~description:"Cannot reconstruct"
-    ~pp:(fun ppf hm ->
-      Format.fprintf
-        ppf
-        "Cannot reconstruct storage from %a mode."
-        History_mode.Legacy.pp
-        hm)
-    (obj1 (req "history_mode " History_mode.Legacy.encoding))
-    (function Cannot_reconstruct hm -> Some hm | _ -> None)
-    (fun hm -> Cannot_reconstruct hm) ;
-  register_error_kind
-    `Permanent
     ~id:"InvalidBlockSpecification"
     ~title:"Invalid block specification"
     ~description:"Invalid specification of block to import"
@@ -428,16 +412,10 @@ let () =
     (function Invalid_block_specification s -> Some s | _ -> None)
     (fun s -> Invalid_block_specification s)
 
-open Filename.Infix
-
-let context_dir data_dir = data_dir // "context"
-
-let store_dir data_dir = data_dir // "store"
-
 let compute_export_limit block_store chain_data_store block_header
     export_rolling =
   let block_hash = Block_header.hash block_header in
-  Store.Block.Contents.read_opt (block_store, block_hash)
+  Legacy_store.Block.Contents.read_opt (block_store, block_hash)
   >>= (function
         | Some contents ->
             return contents
@@ -445,19 +423,20 @@ let compute_export_limit block_store chain_data_store block_header
             fail (Wrong_block_export (Pruned block_hash)))
   >>=? fun {max_operations_ttl; _} ->
   if not export_rolling then
-    Store.Chain_data.Caboose.read chain_data_store
+    Legacy_store.Chain_data.Caboose.read chain_data_store
     >>=? fun (caboose_level, _) -> return (max 1l caboose_level)
   else
     let limit =
       Int32.(
         sub block_header.Block_header.shell.level (of_int max_operations_ttl))
     in
-    (* fails when the limit exceeds the genesis or the genesis is
-       included in the export limit *)
-    fail_when
-      (limit <= 0l)
-      (Wrong_block_export (Too_few_predecessors block_hash))
-    >>=? fun () -> return limit
+    (* (\* fails when the limit exceeds the genesis or the genesis is
+     *    included in the export limit *\)
+     * fail_when
+     *   (limit <= 0l)
+     *   (Wrong_block_export (Too_few_predecessors block_hash))
+     * >>=? fun () -> *)
+    return (max 1l limit)
 
 (** When called with a block, returns its predecessor if it exists and
     its protocol_data if the block is a transition block (i.e. protocol
@@ -468,11 +447,11 @@ let pruned_block_iterator index block_store limit header =
     >>= fun protocol_data -> return (None, Some protocol_data)
   else
     let pred_hash = header.Block_header.shell.predecessor in
-    State.Block.Header.read (block_store, pred_hash)
+    Legacy_state.Block.Header.read (block_store, pred_hash)
     >>=? fun pred_header ->
-    Store.Block.Operations.bindings (block_store, pred_hash)
+    Legacy_store.Block.Operations.bindings (block_store, pred_hash)
     >>= fun pred_operations ->
-    Store.Block.Operation_hashes.bindings (block_store, pred_hash)
+    Legacy_store.Block.Operation_hashes.bindings (block_store, pred_hash)
     >>= fun pred_operation_hashes ->
     let pruned_block =
       {
@@ -499,15 +478,15 @@ let parse_block_arg = function
         failwith "Invalid value for `--block`: %s" err )
 
 let export ?(export_rolling = false) ~context_root ~store_root ~genesis
-    filename ~block =
-  State.init ~context_root ~store_root genesis ~readonly:true
-  >>=? fun (state, chain_state, context_index, history_mode) ->
-  Store.init store_root
+    filename block_hash =
+  Legacy_state.init ~context_root ~store_root genesis ~readonly:true
+  >>=? fun (state, _chain_state, context_index, history_mode) ->
+  Legacy_store.init store_root
   >>=? fun store ->
   let chain_id = Chain_id.of_block_hash genesis.block in
-  let chain_store = Store.Chain.get store chain_id in
-  let chain_data_store = Store.Chain_data.get chain_store in
-  let block_store = Store.Block.get chain_store in
+  let chain_store = Legacy_store.Chain.get store chain_id in
+  let chain_data_store = Legacy_store.Chain_data.get chain_store in
+  let block_store = Legacy_store.Block.get chain_store in
   ( match history_mode with
   | Archive | Full ->
       return_unit
@@ -517,29 +496,7 @@ let export ?(export_rolling = false) ~context_root ~store_root ~genesis
         fail (Wrong_snapshot_export (history_mode, History_mode.Legacy.Full))
   )
   >>=? fun () ->
-  parse_block_arg block
-  >>=? (function
-         | Some block -> (
-             Block_directory.get_block chain_state block
-             >>= function
-             | None ->
-                 fail
-                   (Wrong_block_export
-                      (Unknown_block (Block_services.to_string block)))
-             | Some bh ->
-                 return (State.Block.hash bh) )
-         | None ->
-             Store.Chain_data.Checkpoint.read_opt chain_data_store
-             >|= WithExceptions.Option.get ~loc:__LOC__
-             >>= fun last_checkpoint ->
-             if last_checkpoint.shell.level = 0l then
-               fail (Wrong_block_export (Too_few_predecessors genesis.block))
-             else
-               let last_checkpoint_hash = Block_header.hash last_checkpoint in
-               lwt_emit (Export_unspecified_hash last_checkpoint_hash)
-               >>= fun () -> return last_checkpoint_hash)
-  >>=? fun block_hash ->
-  State.Block.Header.read_opt (block_store, block_hash)
+  Legacy_state.Block.Header.read_opt (block_store, block_hash)
   >>= (function
         | None ->
             fail
@@ -553,23 +510,23 @@ let export ?(export_rolling = false) ~context_root ~store_root ~genesis
               (Export_info (export_mode, block_hash, block_header.shell.level))
             >>= fun () ->
             (* Get block predecessor's block header *)
-            Store.Block.Predecessors.read (block_store, block_hash) 0
+            Legacy_store.Block.Predecessors.read (block_store, block_hash) 0
             >>=? fun pred_block_hash ->
-            State.Block.Header.read (block_store, pred_block_hash)
+            Legacy_state.Block.Header.read (block_store, pred_block_hash)
             >>=? fun pred_block_header ->
             (* Get operation list *)
             let validations_passes = block_header.shell.validation_passes in
             List.map_es
               (fun i ->
-                Store.Block.Operations.read (block_store, block_hash) i)
+                Legacy_store.Block.Operations.read (block_store, block_hash) i)
               (0 -- (validations_passes - 1))
             >>=? fun operations ->
-            Store.Block.Block_metadata_hash.read_opt
+            Legacy_store.Block.Block_metadata_hash.read_opt
               (block_store, pred_block_hash)
             >>= fun predecessor_block_metadata_hash ->
             ( if pred_block_header.shell.validation_passes = 0 then return_none
             else
-              Store.Block.Operations_metadata_hashes.known
+              Legacy_store.Block.Operations_metadata_hashes.known
                 (block_store, pred_block_hash)
                 0
               >>= function
@@ -578,7 +535,7 @@ let export ?(export_rolling = false) ~context_root ~store_root ~genesis
               | true ->
                   List.map_es
                     (fun i ->
-                      Store.Block.Operations_metadata_hashes.read
+                      Legacy_store.Block.Operations_metadata_hashes.read
                         (block_store, pred_block_hash)
                         i)
                     (0 -- (pred_block_header.shell.validation_passes - 1))
@@ -608,8 +565,14 @@ let export ?(export_rolling = false) ~context_root ~store_root ~genesis
   >>=? fun () ->
   lwt_emit (Export_success filename)
   >>= fun () ->
-  Store.close store ;
-  State.close state >>= fun () -> return_unit
+  Legacy_store.close store ;
+  Legacy_state.close state >>= fun () -> return_unit
+
+open Filename.Infix
+
+let context_dir data_dir = data_dir // "context"
+
+let store_dir data_dir = data_dir // "store"
 
 let check_operations_consistency block_header operations operation_hashes =
   (* Compute operations hashes and compare *)
@@ -666,21 +629,23 @@ let check_context_hash_consistency block_validation_result block_header =
 let set_history_mode store history_mode =
   lwt_emit (Set_history_mode history_mode)
   >>= fun () ->
-  Store.Configuration.History_mode.store store history_mode
+  Legacy_store.Configuration.History_mode.store store history_mode
   >>= fun () -> return_unit
 
+(* WARNING
+   In legacy snasphot there is no test chain fork
+*)
 let store_new_head chain_state chain_data ~genesis block_header operations
     block_validation_result =
   let ({ validation_store;
          block_metadata;
          ops_metadata;
          block_metadata_hash;
-         ops_metadata_hashes;
-         forking_testchain }
+         ops_metadata_hashes }
         : Tezos_validation.Block_validation.result) =
     block_validation_result
   in
-  State.Block.store
+  Legacy_state.Block.store
     chain_state
     block_header
     block_metadata
@@ -688,7 +653,7 @@ let store_new_head chain_state chain_data ~genesis block_header operations
     ops_metadata
     block_metadata_hash
     ops_metadata_hashes
-    ~forking_testchain
+    ~forking_testchain:false
     validation_store
   >>=? fun new_head ->
   match new_head with
@@ -699,13 +664,15 @@ let store_new_head chain_state chain_data ~genesis block_header operations
            "a chain head is already registered in the store")
   | Some new_head ->
       (* New head is set*)
-      Store.Chain_data.Known_heads.remove chain_data genesis
+      Legacy_store.Chain_data.Known_heads.remove chain_data genesis
       >>= fun () ->
-      Store.Chain_data.Known_heads.store chain_data (State.Block.hash new_head)
-      >>= fun () ->
-      Store.Chain_data.Current_head.store
+      Legacy_store.Chain_data.Known_heads.store
         chain_data
-        (State.Block.hash new_head)
+        (Legacy_state.Block.hash new_head)
+      >>= fun () ->
+      Legacy_store.Chain_data.Current_head.store
+        chain_data
+        (Legacy_state.Block.hash new_head)
       >>= fun () -> return_unit
 
 let update_checkpoint chain_state checkpoint_header =
@@ -714,13 +681,13 @@ let update_checkpoint chain_state checkpoint_header =
   let new_checkpoint =
     (checkpoint_header.Block_header.shell.level, block_hash)
   in
-  State.Chain.set_checkpoint chain_state checkpoint_header
+  Legacy_state.Chain.set_checkpoint chain_state checkpoint_header
   >>= fun () -> Lwt.return new_checkpoint
 
 let update_savepoint chain_state new_savepoint =
-  State.update_chain_data chain_state (fun store data ->
+  Legacy_state.update_chain_data chain_state (fun store data ->
       let new_data = {data with save_point = new_savepoint} in
-      Store.Chain_data.Save_point.store store new_savepoint
+      Legacy_store.Chain_data.Save_point.store store new_savepoint
       >>= fun () -> Lwt.return (Some new_data, ()))
 
 let update_caboose chain_data ~genesis block_header oldest_header max_op_ttl =
@@ -737,7 +704,7 @@ let update_caboose chain_data ~genesis block_header oldest_header max_op_ttl =
     (Snapshot_import_failure
        (Format.sprintf "caboose level (%ld) is not valid" caboose_level))
   >>=? fun () ->
-  Store.Chain_data.Caboose.store chain_data (caboose_level, caboose_hash)
+  Legacy_store.Chain_data.Caboose.store chain_data (caboose_level, caboose_hash)
   >>= fun () -> return_unit
 
 let import_protocol_data index store block_hash_arr level_oldest_block
@@ -747,8 +714,8 @@ let import_protocol_data index store block_hash_arr level_oldest_block
   ( if delta = Array.length block_hash_arr then Lwt.return new_header
   else
     let pruned_block_hash = block_hash_arr.(delta) in
-    let block_store = Store.Block.get store in
-    State.Block.Header.read_opt (block_store, pruned_block_hash)
+    let block_store = Legacy_store.Block.get store in
+    Legacy_state.Block.Header.read_opt (block_store, pruned_block_hash)
     >>= function
     | None -> assert false | Some block_header -> Lwt.return block_header )
   >>= fun block_header ->
@@ -782,7 +749,7 @@ let import_protocol_data index store block_hash_arr level_oldest_block
   | true ->
       let protocol_level = block_header.shell.proto_level in
       let block_level = block_header.shell.level in
-      Store.Chain.Protocol_info.store
+      Legacy_store.Chain.Protocol_info.store
         store
         protocol_level
         (protocol_hash, block_level)
@@ -834,207 +801,8 @@ let block_validation succ_header_opt header_hash
   check_operations_consistency block_header operations operation_hashes
   >>=? fun () -> return_unit
 
-(* Reconstruct the storage (without checking if the context/store is already populated) *)
-let reconstruct_storage store context_index chain_id ~user_activated_upgrades
-    ~user_activated_protocol_overrides block_store chain_state chain_store
-    (history_list : Block_hash.t list) =
-  let history = Array.of_list history_list in
-  let limit = Array.length history in
-  let rec reconstruct_chunks level =
-    Store.with_atomic_rw store (fun () ->
-        let rec reconstruct_chunks level =
-          Tezos_stdlib_unix.Utils.display_progress (fun m ->
-              m "Reconstructing contexts: %i/%i" level limit) ;
-          if level = limit then return level
-          else
-            let block_hash = history.(level) in
-            State.Block.Header.read (block_store, block_hash)
-            >>=? fun block_header ->
-            let validations_passes = block_header.shell.validation_passes in
-            List.map_es
-              (fun i ->
-                Store.Block.Operations.read (block_store, block_hash) i)
-              (0 -- (validations_passes - 1))
-            >>=? fun operations ->
-            let predecessor_block_hash = block_header.shell.predecessor in
-            State.Block.Header.read (block_store, predecessor_block_hash)
-            >>=? fun predecessor_block_header ->
-            Store.Block.Block_metadata_hash.read_opt
-              (block_store, predecessor_block_hash)
-            >>= fun predecessor_block_metadata_hash ->
-            ( if predecessor_block_header.shell.validation_passes = 0 then
-              return_none
-            else
-              Store.Block.Operations_metadata_hashes.known
-                (block_store, predecessor_block_hash)
-                0
-              >>= function
-              | false ->
-                  return_none
-              | true ->
-                  List.map_es
-                    (fun i ->
-                      Store.Block.Operations_metadata_hashes.read
-                        (block_store, predecessor_block_hash)
-                        i)
-                    ( 0
-                    -- (predecessor_block_header.shell.validation_passes - 1)
-                    )
-                  >|=? fun hashes ->
-                  Some
-                    ( List.map Operation_metadata_list_hash.compute hashes
-                    |> Operation_metadata_list_list_hash.compute ) )
-            >>=? fun predecessor_ops_metadata_hash ->
-            let pred_context_hash = predecessor_block_header.shell.context in
-            Context.checkout_exn context_index pred_context_hash
-            >>= fun predecessor_context ->
-            let max_operations_ttl =
-              Int32.to_int predecessor_block_header.shell.level
-            in
-            let env =
-              {
-                Block_validation.max_operations_ttl;
-                chain_id;
-                predecessor_block_header;
-                predecessor_block_metadata_hash;
-                predecessor_ops_metadata_hash;
-                predecessor_context;
-                user_activated_upgrades;
-                user_activated_protocol_overrides;
-              }
-            in
-            Tezos_validation.Block_validation.apply env block_header operations
-            >>=? fun block_validation_result ->
-            check_context_hash_consistency
-              block_validation_result.validation_store
-              block_header
-            >>=? fun () ->
-            let { Tezos_validation.Block_validation.validation_store;
-                  block_metadata;
-                  block_metadata_hash;
-                  ops_metadata;
-                  ops_metadata_hashes;
-                  _ } =
-              block_validation_result
-            in
-            let contents =
-              {
-                header = block_header;
-                Store.Block.message = validation_store.message;
-                max_operations_ttl = validation_store.max_operations_ttl;
-                last_allowed_fork_level =
-                  validation_store.last_allowed_fork_level;
-                context = validation_store.context_hash;
-                metadata = block_metadata;
-              }
-            in
-            let st = (block_store, block_hash) in
-            Store.Block.Pruned_contents.remove st
-            >>= fun () ->
-            Store.Block.Contents.store st contents
-            >>= fun () ->
-            List.iteri_p
-              (fun i ops ->
-                Store.Block.Operation_hashes.store
-                  st
-                  i
-                  (List.map Operation.hash ops))
-              operations
-            >>= fun () ->
-            List.iteri_p
-              (fun i ops -> Store.Block.Operations.store st i ops)
-              operations
-            >>= fun () ->
-            List.iteri_p
-              (fun i ops -> Store.Block.Operations_metadata.store st i ops)
-              ops_metadata
-            >>= fun () ->
-            Option.iter_s
-              (Store.Block.Block_metadata_hash.store st)
-              block_metadata_hash
-            >>= fun () ->
-            Option.iter_s
-              (Lwt_list.iteri_p (fun i hashes ->
-                   Store.Block.Operations_metadata_hashes.store st i hashes))
-              ops_metadata_hashes
-            >>= fun () -> reconstruct_chunks (level + 1)
-        in
-        if (level + 1) mod 1000 = 0 then return level
-        else reconstruct_chunks level)
-    >>=? fun level ->
-    if level = limit then return_unit else reconstruct_chunks limit
-  in
-  set_history_mode store History_mode.Legacy.Archive
-  >>=? fun () ->
-  reconstruct_chunks 0
-  >>=? fun _cpt ->
-  Tezos_stdlib_unix.Utils.display_progress_end () ;
-  Store.Chain.Genesis_hash.read chain_store
-  >>=? fun genesis_hash ->
-  let new_savepoint = (0l, genesis_hash) in
-  update_savepoint chain_state new_savepoint
-  >>= fun () ->
-  let chain_data = Store.Chain_data.get chain_store in
-  Store.Chain_data.Caboose.store chain_data (0l, genesis_hash)
-  >>= fun () -> return_unit
-
-let reconstruct chain_id ~user_activated_upgrades
-    ~user_activated_protocol_overrides store chain_state context_index =
-  let chain_store = Store.Chain.get store chain_id in
-  let block_store = Store.Block.get chain_store in
-  let chain_data_store = Store.Chain_data.get chain_store in
-  Store.Configuration.History_mode.read store
-  >>=? fun history_mode ->
-  fail_unless
-    (history_mode = History_mode.Legacy.Full)
-    (Cannot_reconstruct history_mode)
-  >>=? fun () ->
-  let low_limit = 1l in
-  lwt_emit Reconstruct_start_default
-  >>= fun () ->
-  Store.Chain_data.Save_point.read chain_data_store
-  >>=? fun (_, savepoint_hash) ->
-  lwt_emit (Reconstruct_end_default savepoint_hash)
-  >>= fun () ->
-  State.Block.Header.read (block_store, savepoint_hash)
-  >>=? fun savepoint_header ->
-  let high_limit = savepoint_header.Block_header.shell.predecessor in
-  lwt_emit Reconstruct_enum
-  >>= fun () ->
-  let rec gather_history low_limit block_hash acc =
-    Store.Block.Pruned_contents.read_opt (block_store, block_hash)
-    >>= function
-    | Some {header; _} ->
-        if header.shell.level = low_limit then return (block_hash :: acc)
-        else
-          gather_history low_limit header.shell.predecessor (block_hash :: acc)
-    | None ->
-        Store.Block.Contents.known (block_store, block_hash)
-        >>= fun is_contents_known ->
-        if is_contents_known then return acc
-        else
-          failwith
-            "Unexpected missing block in store: %a"
-            Block_hash.pp
-            block_hash
-  in
-  gather_history low_limit high_limit []
-  >>=? fun hash_history ->
-  reconstruct_storage
-    store
-    context_index
-    chain_id
-    ~user_activated_upgrades
-    ~user_activated_protocol_overrides
-    block_store
-    chain_state
-    chain_store
-    hash_history
-  >>=? fun () -> lwt_emit Reconstruct_success >>= fun () -> return_unit
-
-let import ?(reconstruct = false) ?patch_context ~data_dir
-    ~user_activated_upgrades ~user_activated_protocol_overrides ~dir_cleaner
-    ~genesis filename ~block =
+let import ?patch_context ~data_dir ~user_activated_upgrades
+    ~user_activated_protocol_overrides ~dir_cleaner ~genesis filename ~block =
   lwt_emit (Import_info filename)
   >>= fun () ->
   ( match block with
@@ -1048,20 +816,20 @@ let import ?(reconstruct = false) ?patch_context ~data_dir
   let context_root = context_dir data_dir in
   let store_root = store_dir data_dir in
   let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
-  State.init ~context_root ~store_root genesis ?patch_context
+  Legacy_state.init ~context_root ~store_root genesis ?patch_context
   >>=? fun (state, chain_state, context_index, _history_mode) ->
-  Store.init store_root
+  Legacy_store.init store_root
   >>=? fun store ->
-  let chain_store = Store.Chain.get store chain_id in
-  let chain_data = Store.Chain_data.get chain_store in
-  let block_store = Store.Block.get chain_store in
+  let chain_store = Legacy_store.Chain.get store chain_id in
+  let chain_data = Legacy_store.Chain_data.get chain_store in
+  let block_store = Legacy_store.Block.get chain_store in
   Lwt.try_bind
     (fun () ->
       let k_store_pruned_blocks data =
-        Store.with_atomic_rw store (fun () ->
+        Legacy_store.with_atomic_rw store (fun () ->
             List.iter_s
               (fun (pruned_header_hash, pruned_block) ->
-                Store.Block.Pruned_contents.store
+                Legacy_store.Block.Pruned_contents.store
                   (block_store, pruned_header_hash)
                   {
                     header =
@@ -1070,7 +838,7 @@ let import ?(reconstruct = false) ?patch_context ~data_dir
                 >>= fun () ->
                 List.iter_s
                   (fun (i, v) ->
-                    Store.Block.Operations.store
+                    Legacy_store.Block.Operations.store
                       (block_store, pruned_header_hash)
                       i
                       v)
@@ -1078,7 +846,7 @@ let import ?(reconstruct = false) ?patch_context ~data_dir
                 >>= fun () ->
                 List.iter_s
                   (fun (i, v) ->
-                    Store.Block.Operation_hashes.store
+                    Legacy_store.Block.Operation_hashes.store
                       (block_store, pruned_header_hash)
                       i
                       v)
@@ -1105,12 +873,12 @@ let import ?(reconstruct = false) ?patch_context ~data_dir
       in
       let block_hashes_arr = Array.of_list rev_block_hashes in
       let write_predecessors_table to_write =
-        Store.with_atomic_rw store (fun () ->
+        Legacy_store.with_atomic_rw store (fun () ->
             List.iter_s
               (fun (current_hash, predecessors_list) ->
                 List.iter_s
                   (fun (l, h) ->
-                    Store.Block.Predecessors.store
+                    Legacy_store.Block.Predecessors.store
                       (block_store, current_hash)
                       l
                       h)
@@ -1118,7 +886,7 @@ let import ?(reconstruct = false) ?patch_context ~data_dir
                 >>= fun () ->
                 match predecessors_list with
                 | (0, pred_hash) :: _ ->
-                    Store.Chain_data.In_main_branch.store
+                    Legacy_store.Chain_data.In_main_branch.store
                       (chain_data, pred_hash)
                       current_hash
                 | [] ->
@@ -1186,13 +954,13 @@ let import ?(reconstruct = false) ?patch_context ~data_dir
           predecessor_ops_metadata_hashes
       in
       Option.iter_s
-        (Store.Block.Block_metadata_hash.store
+        (Legacy_store.Block.Block_metadata_hash.store
            (block_store, Block_header.hash predecessor_block_header))
         predecessor_block_metadata_hash
       >>= fun () ->
       Option.iter_s
         (Lwt_list.iteri_p (fun i hashes ->
-             Store.Block.Operations_metadata_hashes.store
+             Legacy_store.Block.Operations_metadata_hashes.store
                (block_store, Block_header.hash predecessor_block_header)
                i
                hashes))
@@ -1219,8 +987,7 @@ let import ?(reconstruct = false) ?patch_context ~data_dir
       >>=? fun () ->
       verify_oldest_header oldest_header genesis.block
       >>=? fun () ->
-      ( if not reconstruct then set_history_mode store history_mode
-      else return_unit )
+      set_history_mode store history_mode
       >>=? fun () ->
       (* ... and we import protocol data...*)
       import_protocol_data_list
@@ -1252,27 +1019,30 @@ let import ?(reconstruct = false) ?patch_context ~data_dir
         oldest_header
         block_validation_result.validation_store.max_operations_ttl
       >>=? fun () ->
-      ( match reconstruct with
-      | true ->
-          if history_mode = History_mode.Legacy.Full then
-            reconstruct_storage
-              store
-              context_index
-              chain_id
-              ~user_activated_upgrades
-              ~user_activated_protocol_overrides
-              block_store
-              chain_state
-              chain_store
-              rev_block_hashes
-            >>=? fun () ->
-            lwt_emit Reconstruct_success >>= fun () -> return_unit
-          else fail (Cannot_reconstruct history_mode)
-      | false ->
-          return_unit )
-      >>=? fun () ->
-      Store.close store ;
-      State.close state >>= fun () -> return_unit)
+      (* WARNING
+         In legacy snapshot, there is no storage reconstruction
+       *)
+      (* ( match reconstruct with
+       * | true ->
+       *     if history_mode = History_mode.Legacy.Full then
+       *       reconstruct_storage
+       *         store
+       *         context_index
+       *         chain_id
+       *         ~user_activated_upgrades
+       *         ~user_activated_protocol_overrides
+       *         block_store
+       *         chain_state
+       *         chain_store
+       *         rev_block_hashes
+       *       >>=? fun () ->
+       *       lwt_emit Reconstruct_success >>= fun () -> return_unit
+       *     else fail (Cannot_reconstruct history_mode)
+       * | false ->
+       *     return_unit )
+       * >>=? fun () -> *)
+      Legacy_store.close store ;
+      Legacy_state.close state >>= fun () -> return_unit)
     (function
       | Ok () ->
           lwt_emit (Import_success filename) >>= fun () -> return_unit

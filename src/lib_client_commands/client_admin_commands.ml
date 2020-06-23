@@ -91,11 +91,11 @@ let commands () =
           "@[<v 0>Checkpoint: %s@,\
            Checkpoint level: %ld@,\
            History mode: %a@,\
-           Save point level: %ld@,\
+           Savepoint level: %ld@,\
            Caboose level: %ld@]"
           (Block_header.to_b58check block_header)
           block_header.shell.level
-          History_mode.Legacy.pp
+          History_mode.pp
           history_mode
           save_point
           caboose

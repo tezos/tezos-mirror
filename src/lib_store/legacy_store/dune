@@ -3,10 +3,20 @@
  (public_name tezos-legacy-store)
  (libraries tezos-base
             tezos-shell-services
-            tezos-lmdb)
- (flags (:standard -open Tezos_base__TzPervasives
+            tezos-stdlib-unix
+            tezos-protocol-updater
+            tezos-lmdb
+            tezos-validation
+            tezos-context
+            lwt-watcher)
+ (flags (:standard -open Tezos_shell_services
                    -open Tezos_base
-                   -open Tezos_shell_services)))
+                   -open Tezos_base__TzPervasives
+                   -open Tezos_stdlib_unix
+                   -open Tezos_stdlib
+                   -open Tezos_validation
+                   -open Tezos_context
+                   -open Tezos_protocol_updater)))
 
 (alias
  (name runtest_lint)

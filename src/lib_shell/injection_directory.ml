@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,12 +26,12 @@
 
 let read_chain_id validator chain =
   let distributed_db = Validator.distributed_db validator in
-  let state = Distributed_db.state distributed_db in
+  let store = Distributed_db.store distributed_db in
   match chain with
   | None ->
       Lwt.return_none
   | Some chain ->
-      Chain_directory.get_chain_id state chain >>= Lwt.return_some
+      Chain_directory.get_chain_id store chain >>= Lwt.return_some
 
 let inject_block validator ?force ?chain bytes operations =
   read_chain_id validator chain
@@ -51,7 +52,7 @@ let inject_operation validator ?chain bytes =
   let hash = Operation_hash.hash_bytes [bytes] in
   Lwt.return (hash, t)
 
-let inject_protocol state proto =
+let inject_protocol store proto =
   let proto_bytes =
     Data_encoding.Binary.to_bytes_exn Protocol.encoding proto
   in
@@ -62,7 +63,7 @@ let inject_protocol state proto =
     | false ->
         failwith "Compilation failed (%a)" Protocol_hash.pp_short hash
     | true -> (
-        State.Protocol.store state proto
+        Store.Protocol.store store hash proto
         >>= function
         | None ->
             failwith
@@ -76,7 +77,7 @@ let inject_protocol state proto =
 
 let build_rpc_directory validator =
   let distributed_db = Validator.distributed_db validator in
-  let state = Distributed_db.state distributed_db in
+  let state = Distributed_db.store distributed_db in
   let dir : unit RPC_directory.t ref = ref RPC_directory.empty in
   let register0 s f =
     dir := RPC_directory.register !dir s (fun () p q -> f p q)

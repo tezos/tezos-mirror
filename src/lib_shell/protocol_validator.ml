@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -129,43 +130,54 @@ let fetch_and_compile_protocol pv ?peer ?timeout hash =
       >>=? fun protocol ->
       validate pv hash protocol >>=? fun proto -> return proto
 
-let fetch_and_compile_protocols pv ?peer ?timeout (block : State.Block.t) =
-  let protocol_level = State.Block.protocol_level block in
-  let chain_state = State.Block.chain_state block in
-  State.Block.context block
-  >>=? fun context ->
-  let protocol =
-    Context.get_protocol context
-    >>= fun protocol_hash ->
-    fetch_and_compile_protocol pv ?peer ?timeout protocol_hash
-    >>=? fun _p ->
-    let chain_id = State.Chain.id chain_state in
-    State.Chain.update_level_indexed_protocol_store
-      chain_state
-      chain_id
-      protocol_level
-      protocol_hash
-      (State.Block.header block)
-    >>= fun () -> return_unit
-  and test_protocol =
-    Context.get_test_chain context
-    >>= function
-    | Not_running ->
-        return_unit
-    | Forking {protocol; _} | Running {protocol; _} ->
-        fetch_and_compile_protocol pv ?peer ?timeout protocol
-        >>=? fun _ ->
-        State.Chain.test chain_state
-        >>= (function
-              | None ->
-                  Lwt.return_unit
-              | Some chain_id ->
-                  State.Chain.update_level_indexed_protocol_store
-                    chain_state
-                    chain_id
-                    protocol_level
-                    protocol
-                    (State.Block.header block))
-        >>= fun () -> return_unit
-  in
-  protocol >>=? fun () -> test_protocol
+let fetch_and_compile_protocols pv ?peer ?timeout (block : Store.Block.t) =
+  let protocol_level = Store.Block.proto_level block in
+  let hash = Store.Block.hash block in
+  let state = Distributed_db.store pv.db in
+  Store.all_chain_stores state
+  >>= fun chain_stores ->
+  Lwt_utils.find_map_s
+    (fun chain_store ->
+      Store.Block.is_known chain_store hash
+      >>= function
+      | false -> Lwt.return_none | true -> Lwt.return_some chain_store)
+    chain_stores
+  >>= function
+  | None ->
+      failwith
+        "protocol_validator.fetch_and_compile_protocols: chain state not found"
+  | Some chain_store ->
+      Store.Block.context chain_store block
+      >>=? fun context ->
+      let protocol =
+        Context.get_protocol context
+        >>= fun protocol_hash ->
+        fetch_and_compile_protocol pv ?peer ?timeout protocol_hash
+        >>=? fun _p ->
+        Store.Chain.may_update_protocol_level
+          chain_store
+          ~protocol_level
+          (block, protocol_hash)
+      and test_protocol =
+        Context.get_test_chain context
+        >>= function
+        | Not_running ->
+            return_unit
+        | Forking {protocol; _} | Running {protocol; _} -> (
+            fetch_and_compile_protocol pv ?peer ?timeout protocol
+            >>=? fun _ ->
+            Store.Chain.testchain chain_store
+            >>= function
+            | None ->
+                return_unit
+            | Some test_chain ->
+                let test_chain_store =
+                  Store.Chain.testchain_store test_chain
+                in
+                Store.Chain.may_update_protocol_level
+                  test_chain_store
+                  ~protocol_level
+                  (block, protocol)
+                >>=? fun () -> return_unit )
+      in
+      protocol >>=? fun () -> test_protocol

@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -1797,12 +1797,12 @@ struct
     in
     let (stream, bpush) = Lwt_stream.create_bounded 1000 in
     (* Retrieve first floating block *)
-    Block_repr.read_next_block_opt floating_ro_fd
+    Block_repr.read_next_block floating_ro_fd
     >>= (function
           | Some (block, _length) ->
               return block
           | None -> (
-              Block_repr.read_next_block_opt floating_rw_fd
+              Block_repr.read_next_block floating_rw_fd
               >>= function
               | Some (block, _length) ->
                   return block
@@ -2812,7 +2812,7 @@ module Raw_importer : IMPORTER = struct
         if nb_bytes_left < 0 then fail Corrupted_floating_store
         else if nb_bytes_left = 0 then return_unit
         else
-          Block_repr.read_next_block fd
+          Block_repr.read_next_block_exn fd
           >>= fun (block, len_read) ->
           Block_repr.check_block_consistency ~genesis_hash ?pred_block block
           >>=? fun () ->
@@ -3109,7 +3109,7 @@ module Tar_importer : IMPORTER = struct
           if nb_bytes_left < 0L then fail Corrupted_floating_store
           else if nb_bytes_left = 0L then return_unit
           else
-            Block_repr.read_next_block floating_blocks_file_fd
+            Block_repr.read_next_block_exn floating_blocks_file_fd
             >>= fun (block, len_read) ->
             Block_repr.check_block_consistency ~genesis_hash ?pred_block block
             >>=? fun () ->

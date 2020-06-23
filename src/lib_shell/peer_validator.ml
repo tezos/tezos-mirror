@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2018-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -81,7 +81,7 @@ module Types = struct
     chain_db : Distributed_db.chain_db;
     block_validator : Block_validator.t;
     (* callback to chain_validator *)
-    notify_new_block : State.Block.t -> unit;
+    notify_new_block : Store.Block.t -> unit;
     notify_termination : unit -> unit;
     limits : limits;
   }
@@ -192,20 +192,20 @@ let validate_new_head w hash (header : Block_header.t) =
 
 let only_if_fitness_increases w distant_header cont =
   let pv = Worker.state w in
-  let chain_state = Distributed_db.chain_state pv.parameters.chain_db in
+  let chain_store = Distributed_db.chain_store pv.parameters.chain_db in
   let hash = Block_header.hash distant_header in
-  State.Block.known_valid chain_state hash
+  Store.Block.is_known_valid chain_store hash
   >>= fun known_valid ->
   if known_valid then (
     pv.last_validated_head <- distant_header ;
     return_unit )
   else
-    Chain.head chain_state
-    >>= fun local_header ->
+    Store.Chain.current_head chain_store
+    >>= fun current_head ->
     if
       Fitness.compare
         distant_header.Block_header.shell.fitness
-        (State.Block.fitness local_header)
+        (Store.Block.fitness current_head)
       <= 0
     then (
       Worker.log_event w (Ignoring_head {peer = pv.peer_id; hash})
@@ -220,8 +220,8 @@ let only_if_fitness_increases w distant_header cont =
 
 let assert_acceptable_head w hash (header : Block_header.t) =
   let pv = Worker.state w in
-  let chain_state = Distributed_db.chain_state pv.parameters.chain_db in
-  State.Chain.acceptable_block chain_state header
+  let chain_store = Distributed_db.chain_store pv.parameters.chain_db in
+  Store.Chain.is_acceptable_block chain_store (hash, header.shell.level)
   >>= fun acceptable ->
   fail_unless
     acceptable
@@ -229,14 +229,14 @@ let assert_acceptable_head w hash (header : Block_header.t) =
 
 let may_validate_new_head w hash (header : Block_header.t) =
   let pv = Worker.state w in
-  let chain_state = Distributed_db.chain_state pv.parameters.chain_db in
-  State.Block.known_valid chain_state hash
+  let chain_store = Distributed_db.chain_store pv.parameters.chain_db in
+  Store.Block.is_known_valid chain_store hash
   >>= fun valid_block ->
-  State.Block.known_invalid chain_state hash
+  Store.Block.is_known_invalid chain_store hash
   >>= fun invalid_block ->
-  State.Block.known_valid chain_state header.shell.predecessor
+  Store.Block.is_known_valid chain_store header.shell.predecessor
   >>= fun valid_predecessor ->
-  State.Block.known_invalid chain_state header.shell.predecessor
+  Store.Block.is_known_invalid chain_store header.shell.predecessor
   >>= fun invalid_predecessor ->
   let block_received = {Event.peer = pv.peer_id; hash} in
   if valid_block then
@@ -269,6 +269,7 @@ let may_validate_new_head w hash (header : Block_header.t) =
     >>=? fun () -> validate_new_head w hash header
 
 let may_validate_new_branch w distant_hash locator =
+  (* Make sure this is still ok w.r.t @phink fix *)
   let pv = Worker.state w in
   let (distant_header, _) =
     (locator : Block_locator.t :> Block_header.t * _)
@@ -277,24 +278,34 @@ let may_validate_new_branch w distant_hash locator =
   @@ fun () ->
   assert_acceptable_head w (Block_header.hash distant_header) distant_header
   >>=? fun () ->
-  let chain_state = Distributed_db.chain_state pv.parameters.chain_db in
-  State.Block.known_ancestor chain_state locator
-  >>= fun (validity, prefix) ->
+  let chain_store = Distributed_db.chain_store pv.parameters.chain_db in
+  (* TODO: should we consider level as well ? Rolling could have
+     difficulties boostrapping. *)
   let block_received = {Event.peer = pv.peer_id; hash = distant_hash} in
-  match validity with
-  | Known_valid ->
-      let (_, history) = (prefix : Block_locator.t :> _ * Block_hash.t list) in
-      if history <> [] then bootstrap_new_branch w distant_header prefix
+  Block_locator.unknown_prefix
+    ~is_known:(Store.Block.validity chain_store)
+    locator
+  >>= function
+  | (Known_valid, prefix_locator) ->
+      let (_, history) =
+        (prefix_locator : Block_locator.t :> Block_header.t * _)
+      in
+      if history <> [] then
+        bootstrap_new_branch w distant_header prefix_locator
       else return_unit
-  | Known_invalid ->
-      Worker.log_event w (Ignoring_branch_with_invalid_locator block_received)
-      >>= fun () ->
-      fail (Validation_errors.Invalid_locator (pv.peer_id, locator))
-  | Unknown ->
+  | (Unknown, _) ->
+      (* May happen when:
+         - A locator from another chain is received;
+         - A rolling peer is too far ahead;
+         - In rolling mode when the step is too wide. *)
       Worker.log_event
         w
         (Ignoring_branch_without_common_ancestor block_received)
       >>= fun () -> fail Validation_errors.Unknown_ancestor
+  | (Known_invalid, _) ->
+      Worker.log_event w (Ignoring_branch_with_invalid_locator block_received)
+      >>= fun () ->
+      fail (Validation_errors.Invalid_locator (pv.peer_id, locator))
 
 let on_no_request w =
   let pv = Worker.state w in
@@ -398,20 +409,20 @@ let on_close w =
   Lwt.return_unit
 
 let on_launch _ name parameters =
-  let chain_state = Distributed_db.chain_state parameters.chain_db in
-  State.Block.read_opt chain_state (State.Chain.genesis chain_state).block
-  >|= WithExceptions.Option.get ~loc:__LOC__
+  let chain_store = Distributed_db.chain_store parameters.chain_db in
+  Store.Chain.genesis_block chain_store
   >>= fun genesis ->
+  (* TODO : why do we have genesis and not current_head here ?? *)
   let rec pv =
     {
       peer_id = snd name;
       parameters = {parameters with notify_new_block};
       pipeline = None;
-      last_validated_head = State.Block.header genesis;
-      last_advertised_head = State.Block.header genesis;
+      last_validated_head = Store.Block.header genesis;
+      last_advertised_head = Store.Block.header genesis;
     }
   and notify_new_block block =
-    pv.last_validated_head <- State.Block.header block ;
+    pv.last_validated_head <- Store.Block.header block ;
     parameters.notify_new_block block
   in
   return pv
@@ -440,7 +451,9 @@ let table =
 let create ?(notify_new_block = fun _ -> ())
     ?(notify_termination = fun _ -> ()) limits block_validator chain_db peer_id
     =
-  let name = (State.Chain.id (Distributed_db.chain_state chain_db), peer_id) in
+  let name =
+    (Store.Chain.chain_id (Distributed_db.chain_store chain_db), peer_id)
+  in
   let parameters =
     {chain_db; notify_termination; block_validator; notify_new_block; limits}
   in

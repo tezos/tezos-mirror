@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let build_rpc_directory block_validator state =
+let build_rpc_directory block_validator store =
   let dir : unit RPC_directory.t ref = ref RPC_directory.empty in
   let gen_register0 s f =
     dir := RPC_directory.gen_register !dir s (fun () p q -> f p q)
@@ -32,8 +33,7 @@ let build_rpc_directory block_validator state =
     dir := RPC_directory.register !dir s (fun ((), a) p q -> f a p q)
   in
   gen_register0 Protocol_services.S.list (fun () () ->
-      State.Protocol.list state
-      >>= fun set ->
+      let set = Store.Protocol.all store in
       let protocols =
         Protocol_hash.Set.add_seq (Registered_protocol.seq_embedded ()) set
       in
@@ -42,14 +42,24 @@ let build_rpc_directory block_validator state =
       match Registered_protocol.get_embedded_sources hash with
       | Some p ->
           return p
-      | None ->
-          State.Protocol.read state hash) ;
+      | None -> (
+          Store.Protocol.read store hash
+          >>= function
+          | None ->
+              Lwt.return (Error_monad.error_exn Not_found)
+          | Some p ->
+              return p )) ;
   register1 Protocol_services.S.environment (fun hash () () ->
       match Registered_protocol.get_embedded_sources hash with
       | Some p ->
           return p.expected_env
-      | None ->
-          State.Protocol.read state hash >>=? fun p -> return p.expected_env) ;
+      | None -> (
+          Store.Protocol.read store hash
+          >>= function
+          | None ->
+              Lwt.return (Error_monad.error_exn Not_found)
+          | Some p ->
+              return p.expected_env )) ;
   register1 Protocol_services.S.fetch (fun hash () () ->
       Block_validator.fetch_and_compile_protocol block_validator hash
       >>=? fun _proto -> return_unit) ;

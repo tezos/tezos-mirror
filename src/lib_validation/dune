@@ -8,6 +8,7 @@
             tezos-protocol-updater
 	    tezos-stdlib-unix)
  (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_stdlib_unix
                    -open Tezos_context
                    -open Tezos_shell_context
                    -open Tezos_shell_services

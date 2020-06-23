@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -37,7 +38,7 @@ type config = {
   protocol_root : string;
   patch_context : (Context.t -> Context.t tzresult Lwt.t) option;
   p2p : (P2p.config * P2p.limits) option;
-  checkpoint : Block_header.t option;
+  target : (Block_hash.t * int32) option;
   disable_mempool : bool;
       (** If [true], all non-empty mempools will be ignored. *)
   enable_testchain : bool;
@@ -61,7 +62,7 @@ val create :
   Block_validator.limits ->
   Prevalidator.limits ->
   Chain_validator.limits ->
-  History_mode.Legacy.t option ->
+  History_mode.t option ->
   t tzresult Lwt.t
 
 val shutdown : t -> unit Lwt.t

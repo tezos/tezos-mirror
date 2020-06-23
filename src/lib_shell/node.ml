@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018-2019 Nomadic Labs, <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2018-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -28,7 +28,7 @@ open Lwt.Infix
 open Tezos_base
 
 type t = {
-  state : State.t;
+  store : Store.t;
   distributed_db : Distributed_db.t;
   validator : Validator.t;
   mainchain_validator : Chain_validator.t;
@@ -96,7 +96,7 @@ type config = {
   protocol_root : string;
   patch_context : (Context.t -> Context.t tzresult Lwt.t) option;
   p2p : (P2p.config * P2p.limits) option;
-  checkpoint : Block_header.t option;
+  target : (Block_hash.t * int32) option;
   disable_mempool : bool;
   enable_testchain : bool;
 }
@@ -144,25 +144,6 @@ let default_chain_validator_limits =
     worker_limits = default_workers_limits;
   }
 
-let may_update_checkpoint chain_state checkpoint history_mode =
-  match checkpoint with
-  | None ->
-      return_unit
-  | Some checkpoint -> (
-      State.best_known_head_for_checkpoint chain_state checkpoint
-      >>= fun new_head ->
-      Chain.set_head chain_state new_head
-      >>= fun _old_head ->
-      match history_mode with
-      | History_mode.Legacy.Archive ->
-          State.Chain.set_checkpoint chain_state checkpoint
-          >>= fun () -> return_unit
-      | Full ->
-          State.Chain.set_checkpoint_then_purge_full chain_state checkpoint
-      | Rolling ->
-          State.Chain.set_checkpoint_then_purge_rolling chain_state checkpoint
-      )
-
 (* These protocols are linked with the node and
    do not have their actual hash on purpose. *)
 let test_protocol_hashes =
@@ -173,12 +154,11 @@ let test_protocol_hashes =
       "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp";
       "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im" ]
 
-let store_known_protocols state =
+let store_known_protocols store =
   let embedded_protocols = Registered_protocol.seq_embedded () in
   Seq.iter_s
     (fun protocol_hash ->
-      State.Protocol.known state protocol_hash
-      >>= function
+      match Store.Protocol.mem store protocol_hash with
       | true ->
           Node_event.(emit store_protocol_already_included) protocol_hash
       | false -> (
@@ -193,7 +173,7 @@ let store_known_protocols state =
               else
                 Node_event.(emit store_protocol_incorrect_hash) protocol_hash
             else
-              State.Protocol.store state protocol
+              Store.Protocol.store store hash protocol
               >>= function
               | Some hash' ->
                   assert (hash = hash') ;
@@ -221,59 +201,18 @@ let () =
     (function Non_recoverable_context -> Some () | _ -> None)
     (fun () -> Non_recoverable_context)
 
-let check_and_fix_storage_consistency state vp =
-  let restore_context_integrity () =
-    Node_event.(emit storage_corrupted_context_detected) ()
-    >>= fun () ->
-    (* Corrupted context for current block, backtracking head *)
-    Block_validator_process.restore_context_integrity vp
-    >>= function
-    | Ok (Some n) ->
-        Node_event.(emit storage_restored_context_integrity) n
-        >>= fun () -> return_unit
-    | Ok None ->
-        Node_event.(emit storage_context_already_consistent) ()
-        >>= fun () -> return_unit
-    | Error err ->
-        Node_event.(emit storage_restore_context_integrity_error) err
-        >>= fun () -> fail Non_recoverable_context
-  in
-  State.Chain.all state
-  >>= fun chains ->
-  let rec check_block to_be_cleaned n chain_state block =
-    fail_unless (n > 0) Validation_errors.Bad_data_dir
-    >>=? fun () ->
-    Lwt.catch
-      (fun () -> State.Block.context_exists block >>= fun b -> return b)
-      (fun _exn ->
-        restore_context_integrity ()
-        >>=? fun () ->
-        (* Corrupted commit has been purged. We need to backtrack the
-            head. Returning false will do the trick. *)
-        return_false)
-    >>=? fun is_context_known ->
-    if is_context_known then
-      (* Found a known context for the block: setting as consistent head *)
-      Chain.set_head chain_state block
-      >>=? fun _ ->
-      (* Make sure to remove the block only after updating the head *)
-      List.iter_es State.Block.remove to_be_cleaned
-    else
-      (* Did not find a known context. Need to backtrack the head up *)
-      let header = State.Block.header block in
-      State.Block.read chain_state header.shell.predecessor
-      >>=? fun pred ->
-      (check_block [@ocaml.tailcall])
-        (block :: to_be_cleaned)
-        (n - 1)
-        chain_state
-        pred
-  in
-  Seq.iter_es
-    (fun chain_state ->
-      Chain.head chain_state
-      >>= fun block -> check_block [] 500 chain_state block)
-    chains
+let check_context_consistency store =
+  let main_chain_store = Store.main_chain_store store in
+  Store.Chain.current_head main_chain_store
+  >>= fun block ->
+  Store.Block.context_exists main_chain_store block
+  >>= function
+  | true ->
+      Node_event.(emit storage_context_already_consistent ())
+      >>= fun () -> return_unit
+  | false ->
+      Node_event.(emit storage_corrupted_context_detected ())
+      >>= fun () -> fail Non_recoverable_context
 
 let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
     { genesis;
@@ -287,9 +226,9 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
       protocol_root;
       patch_context;
       p2p = p2p_params;
+      target;
       disable_mempool;
-      enable_testchain;
-      checkpoint } peer_validator_limits block_validator_limits
+      enable_testchain } peer_validator_limits block_validator_limits
     prevalidator_limits chain_validator_limits history_mode =
   let (start_prevalidator, start_testchain) =
     match p2p_params with
@@ -305,20 +244,27 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
   >>=? fun p2p ->
   (let open Block_validator_process in
   let validator_environment =
-    {genesis; user_activated_upgrades; user_activated_protocol_overrides}
+    {user_activated_upgrades; user_activated_protocol_overrides}
   in
   if singleprocess then
-    State.init ~store_root ~context_root ?history_mode ?patch_context genesis
-    >>=? fun (state, mainchain_state, context_index, history_mode) ->
-    init validator_environment (Internal context_index)
-    >>=? fun validator_process ->
-    return (validator_process, state, mainchain_state, history_mode)
+    Store.init
+      ?patch_context
+      ?history_mode
+      ~store_dir:store_root
+      ~context_dir:context_root
+      ~allow_testchains:start_testchain
+      genesis
+    >>=? fun store ->
+    let main_chain_store = Store.main_chain_store store in
+    init validator_environment (Internal main_chain_store)
+    >>=? fun validator_process -> return (validator_process, store)
   else
     init
       validator_environment
       (External
          {
            data_dir;
+           genesis;
            context_root;
            protocol_root;
            process_path = Sys.executable_name;
@@ -328,25 +274,28 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
     let commit_genesis ~chain_id =
       Block_validator_process.commit_genesis validator_process ~chain_id
     in
-    State.init
-      ~store_root
-      ~context_root
-      ?history_mode
+    Store.init
       ?patch_context
+      ?history_mode
       ~commit_genesis
+      ~store_dir:store_root
+      ~context_dir:context_root
+      ~allow_testchains:start_testchain
       genesis
-    >>=? fun (state, mainchain_state, _context_index, history_mode) ->
-    return (validator_process, state, mainchain_state, history_mode))
-  >>=? fun (validator_process, state, mainchain_state, history_mode) ->
-  check_and_fix_storage_consistency state validator_process
+    >>=? fun store -> return (validator_process, store))
+  >>=? fun (validator_process, store) ->
+  check_context_consistency store
   >>=? fun () ->
-  may_update_checkpoint mainchain_state checkpoint history_mode
+  let main_chain_store = Store.main_chain_store store in
+  Option.iter_es
+    (fun target_descr -> Store.Chain.set_target main_chain_store target_descr)
+    target
   >>=? fun () ->
-  let distributed_db = Distributed_db.create state p2p in
-  store_known_protocols state
+  let distributed_db = Distributed_db.create store p2p in
+  store_known_protocols store
   >>= fun () ->
   Validator.create
-    state
+    store
     distributed_db
     peer_validator_limits
     block_validator_limits
@@ -355,12 +304,11 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
     chain_validator_limits
     ~start_testchain
   >>=? fun validator ->
-  (* TODO : Check that the testchain is correctly activated after a node restart *)
   Validator.activate
     validator
     ~start_prevalidator
     ~validator_process
-    mainchain_state
+    main_chain_store
   >>=? fun mainchain_validator ->
   let shutdown () =
     (* Shutdown workers in the reverse order of creation *)
@@ -372,16 +320,16 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
     >>= fun () ->
     Distributed_db.shutdown distributed_db
     >>= fun () ->
-    Node_event.(emit shutdown_state) ()
+    Node_event.(emit shutdown_store) ()
     >>= fun () ->
-    State.close state
-    >>= fun () ->
+    Store.close_store store
+    >>= fun _ ->
     Node_event.(emit shutdown_p2p_layer) ()
     >>= fun () -> P2p.shutdown p2p >>= fun () -> Lwt.return_unit
   in
   return
     {
-      state;
+      store;
       distributed_db;
       validator;
       mainchain_validator;
@@ -402,7 +350,7 @@ let build_rpc_directory node =
   merge
     (Protocol_directory.build_rpc_directory
        (Block_validator.running_worker ())
-       node.state) ;
+       node.store) ;
   merge
     (Monitor_directory.build_rpc_directory
        node.validator
@@ -415,7 +363,7 @@ let build_rpc_directory node =
          node.user_activated_protocol_overrides
        node.validator) ;
   merge (P2p_directory.build_rpc_directory node.p2p) ;
-  merge (Worker_directory.build_rpc_directory node.state) ;
+  merge (Worker_directory.build_rpc_directory node.store) ;
   merge (Stat_directory.rpc_directory ()) ;
   merge
     (Config_directory.build_rpc_directory

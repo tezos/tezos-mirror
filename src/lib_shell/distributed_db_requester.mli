@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2019-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -57,7 +57,7 @@ module Raw_protocol :
     with type key = Protocol_hash.t
      and type param = unit
      and type request_param = unit request_param
-     and type store = State.t
+     and type store = Store.t
      and type value = Protocol.t
      and type notified_value = Protocol.t
 
@@ -66,7 +66,7 @@ module Raw_operation :
     with type key = Operation_hash.t
      and type param = unit
      and type request_param = unit request_param
-     and type store = State.Chain.t
+     and type store = Store.chain_store
      and type value = Operation.t
      and type notified_value = Operation.t
 
@@ -75,7 +75,7 @@ module Raw_block_header :
     with type key = Block_hash.t
      and type param = unit
      and type request_param = unit request_param
-     and type store = State.Chain.t
+     and type store = Store.chain_store
      and type value = Block_header.t
      and type notified_value = Block_header.t
 
@@ -86,7 +86,7 @@ module Raw_operations :
     (* root of merkle tree for this block, used to check the notified
         value. *)
      and type param = Operation_list_list_hash.t
-     and type store = State.Chain.t
+     and type store = Store.chain_store
      and type value = Operation.t list
     (* notified value contain the queried value, plus the merkle tree hashes
           needed to recompute the merkle tree root. *)

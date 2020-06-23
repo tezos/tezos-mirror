@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018-2021 Nomadic Labs. <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -49,7 +50,7 @@ val checkpoint :
   #simple ->
   ?chain:chain ->
   unit ->
-  (Block_header.t * int32 * int32 * History_mode.Legacy.t) tzresult Lwt.t
+  (Block_header.t * int32 * int32 * History_mode.t) tzresult Lwt.t
 
 module Mempool = Block_services.Empty.Mempool
 
@@ -97,7 +98,7 @@ module S : sig
       prefix,
       unit,
       unit,
-      Block_header.t * int32 * int32 * History_mode.Legacy.t )
+      Block_header.t * int32 * int32 * History_mode.t )
     RPC_service.t
 
   val is_bootstrapped :

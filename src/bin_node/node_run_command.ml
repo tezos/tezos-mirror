@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019-2020 Nomadic Labs, <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2019-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -176,7 +176,22 @@ module Event = struct
       ~name:"bye"
       ~msg:"bye"
       ~level:Notice
+      (* may be negative in case of signals *)
       ("exit_code", Data_encoding.int31)
+
+  let incorrect_history_mode =
+    declare_2
+      ~section
+      ~name:"incorrect_history_mode"
+      ~msg:
+        "The given history mode {given_history_mode} does not correspond to \
+         the stored history mode {stored_history_mode}. If you wish to force \
+         the switch, use the flag '--force_history_mode_switch'."
+      ~level:Error
+      ~pp1:History_mode.pp
+      ("given_history_mode", History_mode.encoding)
+      ~pp2:History_mode.pp
+      ("stored_history_mode", History_mode.encoding)
 end
 
 open Filename.Infix
@@ -197,8 +212,8 @@ let init_identity_file (config : Node_config_file.t) =
     Event.(emit identity_generated) identity.peer_id
     >>= fun () -> return identity
 
-let init_node ?sandbox ?checkpoint ~identity ~singleprocess
-    (config : Node_config_file.t) =
+let init_node ?sandbox ?target ~identity ~singleprocess
+    ~force_history_mode_switch (config : Node_config_file.t) =
   (* TODO "WARN" when pow is below our expectation. *)
   ( match config.disable_config_validation with
   | true ->
@@ -290,11 +305,21 @@ let init_node ?sandbox ?checkpoint ~identity ~singleprocess
       context_root = Node_data_version.context_dir config.data_dir;
       protocol_root = Node_data_version.protocol_dir config.data_dir;
       p2p = p2p_config;
-      checkpoint;
+      target;
       enable_testchain = config.p2p.enable_testchain;
       disable_mempool = config.p2p.disable_mempool;
     }
   in
+  ( match config.shell.history_mode with
+  | Some history_mode when force_history_mode_switch ->
+      Store.may_switch_history_mode
+        ~store_dir:node_config.store_root
+        ~context_dir:node_config.context_root
+        genesis
+        ~new_history_mode:history_mode
+  | _ ->
+      return_unit )
+  >>=? fun () ->
   Node.create
     ~sandboxed:(sandbox <> None)
     ?sandbox_parameters:(Option.map snd sandbox_param)
@@ -370,7 +395,7 @@ let init_rpc (config : Node_config_file.t) node =
     config.rpc.listen_addrs
     []
 
-let run ?verbosity ?sandbox ?checkpoint ~singleprocess
+let run ?verbosity ?sandbox ?target ~singleprocess ~force_history_mode_switch
     (config : Node_config_file.t) =
   Node_data_version.ensure_data_dir config.data_dir
   >>=? fun () ->
@@ -398,21 +423,21 @@ let run ?verbosity ?sandbox ?checkpoint ~singleprocess
   Updater.init (Node_data_version.protocol_dir config.data_dir) ;
   Event.(emit starting_node) config.blockchain_network.chain_name
   >>= fun () ->
-  init_node ?sandbox ?checkpoint ~identity ~singleprocess config
+  init_node
+    ?sandbox
+    ?target
+    ~identity
+    ~singleprocess
+    ~force_history_mode_switch
+    config
   >>= (function
         | Ok node ->
             return node
         | Error
-            (State.Incorrect_history_mode_switch {previous_mode; next_mode}
-            :: _) ->
-            failwith
-              "@[Cannot switch from history mode '%a' to '%a'. In order to \
-               change your history mode please refer to the Tezos node \
-               documentation. @]"
-              History_mode.Legacy.pp
-              previous_mode
-              History_mode.Legacy.pp
-              next_mode
+            (Store_errors.Cannot_switch_history_mode {previous_mode; next_mode}
+            :: _) as err ->
+            Event.(emit incorrect_history_mode) (previous_mode, next_mode)
+            >>= fun () -> Lwt.return err
         | Error _ as err ->
             Lwt.return err)
   >>=? fun node ->
@@ -441,7 +466,8 @@ let run ?verbosity ?sandbox ?checkpoint ~singleprocess
   in
   Lwt_utils.never_ending ()
 
-let process sandbox verbosity checkpoint singleprocess args =
+let process sandbox verbosity target singleprocess force_history_mode_switch
+    args =
   let verbosity =
     let open Internal_event in
     match verbosity with [] -> None | [_] -> Some Info | _ -> Some Debug
@@ -460,23 +486,39 @@ let process sandbox verbosity checkpoint singleprocess args =
     | None ->
         return_unit )
     >>=? fun () ->
-    ( match checkpoint with
+    ( match target with
     | None ->
         return_none
-    | Some s -> (
-      match Block_header.of_b58check s with
-      | Some b ->
-          return_some b
-      | None ->
-          failwith
-            "Failed to parse the provided checkpoint (Base58Check-encoded)." )
-    )
-    >>=? fun checkpoint ->
+    | Some s ->
+        let l = String.split_on_char ',' s in
+        Lwt.catch
+          (fun () ->
+            assert (List.length l = 2) ;
+            let target =
+              match l with
+              | [block_hash; level] ->
+                  (Block_hash.of_b58check_exn block_hash, Int32.of_string level)
+              | _ ->
+                  assert false
+            in
+            return_some target)
+          (fun _ ->
+            failwith
+              "Failed to parse the provided target. A '<block_hash>,<level>' \
+               value was expected.") )
+    >>=? fun target ->
     Lwt_lock_file.is_locked (Node_data_version.lock_file config.data_dir)
     >>=? function
     | false ->
         Lwt.catch
-          (fun () -> run ?sandbox ?verbosity ?checkpoint ~singleprocess config)
+          (fun () ->
+            run
+              ?sandbox
+              ?verbosity
+              ?target
+              ~singleprocess
+              ~force_history_mode_switch
+              config)
           (function
             | Unix.Unix_error (Unix.EADDRINUSE, "bind", "") ->
                 List.fold_right_es
@@ -536,12 +578,11 @@ module Term = struct
           ~docv:"FILE.json"
           ["sandbox"])
 
-  let checkpoint =
+  let target =
     let open Cmdliner in
     let doc =
-      "When asked to take a block hash as a checkpoint, the daemon will only \
-       accept the chains that contains that block and those that might reach \
-       it."
+      "When asked to take a block as a target, the daemon will only accept \
+       the chains that contains that block and those that might reach it."
     in
     Arg.(
       value
@@ -549,8 +590,8 @@ module Term = struct
       & info
           ~docs:Node_shared_arg.Manpage.misc_section
           ~doc
-          ~docv:"<level>,<block_hash>"
-          ["checkpoint"])
+          ~docv:"<block_hash>,<level>"
+          ["target"])
 
   let singleprocess =
     let open Cmdliner in
@@ -563,11 +604,27 @@ module Term = struct
       value & flag
       & info ~docs:Node_shared_arg.Manpage.misc_section ~doc ["singleprocess"])
 
+  let force_history_mode_switch =
+    let open Cmdliner in
+    let doc =
+      Format.sprintf
+        "Forces the switch of history modes when a different history mode is \
+         found between the written configuration and the given history mode.  \
+         Warning: this option will modify the storage irremediably. Please \
+         refer to the Tezos node documentation for more details."
+    in
+    Arg.(
+      value & flag
+      & info
+          ~docs:Node_shared_arg.Manpage.misc_section
+          ~doc
+          ["force-history-mode-switch"])
+
   let term =
     Cmdliner.Term.(
       ret
-        ( const process $ sandbox $ verbosity $ checkpoint $ singleprocess
-        $ Node_shared_arg.Term.args ))
+        ( const process $ sandbox $ verbosity $ target $ singleprocess
+        $ force_history_mode_switch $ Node_shared_arg.Term.args ))
 end
 
 module Manpage = struct

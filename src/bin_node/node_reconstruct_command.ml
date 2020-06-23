@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2019-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -45,45 +45,50 @@ let () =
 (** Main *)
 
 module Term = struct
-  let process args =
+  let process args sandbox_file =
     let run =
       Internal_event_unix.init ()
       >>= fun () ->
-      Node_shared_arg.read_and_patch_config_file
-        ~ignore_bootstrap_peers:true
-        args
-      >>=? fun config ->
-      let data_dir = config.data_dir in
-      Node_data_version.ensure_data_dir data_dir
-      >>=? fun () ->
+      Node_shared_arg.read_and_patch_config_file args
+      >>=? fun node_config ->
+      let data_dir = node_config.data_dir in
+      let ({genesis; _} : Node_config_file.blockchain_network) =
+        node_config.blockchain_network
+      in
+      ( match
+          (node_config.blockchain_network.genesis_parameters, sandbox_file)
+        with
+      | (None, None) ->
+          return_none
+      | (Some parameters, None) ->
+          return_some (parameters.context_key, parameters.values)
+      | (_, Some filename) -> (
+          Lwt_utils_unix.Json.read_file filename
+          >>= function
+          | Error _err ->
+              fail (Node_snapshot_command.Invalid_sandbox_file filename)
+          | Ok json ->
+              return_some ("sandbox_parameter", json) ) )
+      >>=? fun sandbox_parameters ->
       Lwt_lock_file.is_locked (Node_data_version.lock_file data_dir)
       >>=? fun is_locked ->
       fail_when is_locked Locked_directory
       >>=? fun () ->
-      let context_root = Node_data_version.context_dir data_dir in
-      let store_root = Node_data_version.store_dir data_dir in
-      Store.init ~mapsize:40_960_000_000L store_root
-      >>=? fun store ->
-      let genesis = config.blockchain_network.genesis in
-      State.init ~context_root ~store_root genesis
-      >>=? fun (state, chain_state, context_index, history_mode) ->
-      let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
-      fail_unless
-        (history_mode = History_mode.Legacy.Full)
-        (Snapshots.Cannot_reconstruct history_mode)
-      >>=? fun () ->
-      Snapshots.reconstruct
-        chain_id
+      let context_dir = Node_data_version.context_dir data_dir in
+      let store_dir = Node_data_version.store_dir data_dir in
+      let patch_context =
+        Patch_context.patch_context genesis sandbox_parameters
+      in
+      Tezos_store.Reconstruction.reconstruct
+        ~patch_context
+        ~store_dir
+        ~context_dir
+        genesis
         ~user_activated_upgrades:
-          config.blockchain_network.user_activated_upgrades
+          node_config.blockchain_network.user_activated_upgrades
         ~user_activated_protocol_overrides:
-          config.blockchain_network.user_activated_protocol_overrides
-        store
-        chain_state
-        context_index
-      >>=? fun () ->
-      Store.close store ;
-      State.close state >>= fun () -> return_unit
+          node_config.blockchain_network.user_activated_protocol_overrides
+      >>=? fun () -> return_unit
     in
     match Lwt_main.run @@ Lwt_exit.wrap_and_exit run with
     | Ok () ->
@@ -91,9 +96,28 @@ module Term = struct
     | Error err ->
         `Error (false, Format.asprintf "%a" pp_print_error err)
 
+  let sandbox =
+    let open Cmdliner in
+    let doc =
+      "Run the storage reconstruction in sandbox mode. P2P to non-localhost \
+       addresses are disabled, and constants of the economic protocol can be \
+       altered with an optional JSON file. $(b,IMPORTANT): Using sandbox mode \
+       affects the node state and subsequent runs of Tezos node must also use \
+       sandbox mode. In order to run the node in normal mode afterwards, a \
+       full reset must be performed (by removing the node's data directory)."
+    in
+    Arg.(
+      value
+      & opt (some non_dir_file) None
+      & info
+          ~docs:Node_shared_arg.Manpage.misc_section
+          ~doc
+          ~docv:"FILE.json"
+          ["sandbox"])
+
   let term =
     let open Cmdliner.Term in
-    ret (const process $ Node_shared_arg.Term.args)
+    ret (const process $ Node_shared_arg.Term.args $ sandbox)
 end
 
 module Manpage = struct

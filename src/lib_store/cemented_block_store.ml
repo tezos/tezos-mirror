@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -55,25 +55,47 @@ type t = {
 
 let cemented_blocks_files {cemented_blocks_files; _} = cemented_blocks_files
 
+let cemented_blocks_file_length {start_level; end_level; _} =
+  (* nb blocks : (end_level - start_level) + 1 *)
+  Int32.(succ (sub end_level start_level))
+
 let cemented_block_level_index {cemented_block_level_index; _} =
   cemented_block_level_index
 
 let cemented_block_hash_index {cemented_block_hash_index; _} =
   cemented_block_hash_index
 
+(* The log_size corresponds to the maximum size of the memory zone
+   allocated in memory before flushing it onto the disk. It is
+   basically a cache which is use for the index. The cache size is
+   `log_size * log_entry` where a `log_entry` is roughly 56 bytes. *)
 let default_index_log_size = 10_000
 
 let default_compression_level = 9
 
 let create ~log_size cemented_blocks_dir =
   protect (fun () ->
-      Lwt_utils_unix.create_dir (Naming.dir_path cemented_blocks_dir)
-      >>= fun () ->
+      let cemented_blocks_dir_path = Naming.dir_path cemented_blocks_dir in
       let cemented_blocks_metadata_dir =
         cemented_blocks_dir |> Naming.cemented_blocks_metadata_dir
       in
-      Lwt_utils_unix.create_dir (Naming.dir_path cemented_blocks_metadata_dir)
-      >>= fun () ->
+      let cemented_blocks_metadata_dir_path =
+        Naming.dir_path cemented_blocks_metadata_dir
+      in
+      Lwt.catch
+        (fun () ->
+          Lwt_utils_unix.create_dir cemented_blocks_dir_path
+          >>= fun () ->
+          Lwt_utils_unix.create_dir cemented_blocks_metadata_dir_path
+          >>= fun () -> return_unit)
+        (function
+          | Failure s when s = "Not a directory" ->
+              fail
+                (Store_errors.Failed_to_init_cemented_block_store
+                   cemented_blocks_dir_path)
+          | e ->
+              Lwt.fail e)
+      >>=? fun () ->
       let cemented_block_level_index =
         Cemented_block_level_index.v
           ~readonly:false
@@ -175,8 +197,10 @@ let init ?(log_size = default_index_log_size) chain_dir ~readonly =
   Lwt_unix.file_exists cemented_blocks_dir_path
   >>= function
   | true ->
+      Lwt_utils_unix.is_directory cemented_blocks_dir_path
+      >>= fun is_directory ->
       fail_unless
-        (Sys.is_directory cemented_blocks_dir_path)
+        is_directory
         (Failed_to_init_cemented_block_store cemented_blocks_dir_path)
       >>=? fun () -> load ~readonly ~log_size cemented_blocks_dir
   | false ->
@@ -204,10 +228,7 @@ let find_block_file cemented_store block_level =
       | Some cemented_blocks_files ->
           let length = Array.length cemented_blocks_files in
           let last_interval =
-            let {start_level; end_level; _} =
-              cemented_blocks_files.(length - 1)
-            in
-            Int32.(succ (sub end_level start_level))
+            cemented_blocks_file_length cemented_blocks_files.(length - 1)
           in
           (* Pivot heuristic: in the main chain, the first cycle is
          [0_1]. Then, the second cycle is [2_4097]. *)
@@ -246,11 +267,11 @@ let find_block_file cemented_store block_level =
 
 (* Hypothesis: the table is ordered. *)
 let compute_location cemented_store block_level =
-  match find_block_file cemented_store block_level with
-  | None ->
-      None
-  | Some {start_level; file; _} ->
-      Some (file, Int32.(to_int (sub block_level start_level)))
+  Option.map
+    (function
+      | {start_level; file; _} ->
+          (file, Int32.(to_int (sub block_level start_level))))
+    (find_block_file cemented_store block_level)
 
 let is_cemented cemented_store hash =
   try
@@ -380,7 +401,7 @@ let read_block fd block_number =
   Lwt_unix.lseek fd offset Unix.SEEK_SET
   >>= fun _ofs ->
   (* We move the cursor to the element's position *)
-  Block_repr.read_next_block fd >>= fun (block, _len) -> Lwt.return block
+  Block_repr.read_next_block_exn fd >>= fun (block, _len) -> Lwt.return block
 
 let get_lowest_cemented_level cemented_store =
   match cemented_store.cemented_blocks_files with
@@ -465,9 +486,9 @@ let cement_blocks ?(check_consistency = true) (cemented_store : t)
   let final_path = Naming.file_path file in
   (* Manipulate temporary files and swap it when everything is written *)
   let tmp_file_path = final_path ^ ".tmp" in
-  fail_when
-    (Sys.file_exists tmp_file_path)
-    (Temporary_cemented_file_exists tmp_file_path)
+  Lwt_unix.file_exists tmp_file_path
+  >>= fun exists ->
+  fail_when exists (Temporary_cemented_file_exists tmp_file_path)
   >>=? fun () ->
   Lwt_unix.openfile
     tmp_file_path
@@ -527,7 +548,7 @@ let cement_blocks ?(check_consistency = true) (cemented_store : t)
   (* TODO clear potential artifacts *)
   Lwt_unix.rename tmp_file_path final_path
   >>= fun () ->
-  (* Flush the indexes *)
+  (* Flush the indexes to make sure that the data is stored on disk *)
   Cemented_block_level_index.flush
     ~with_fsync:true
     cemented_store.cemented_block_level_index ;
@@ -553,6 +574,67 @@ let cement_blocks ?(check_consistency = true) (cemented_store : t)
   if write_metadata then cement_blocks_metadata cemented_store blocks
   else return_unit
 
+let trigger_full_gc cemented_store cemented_blocks_files offset =
+  let nb_files = Array.length cemented_blocks_files in
+  if nb_files <= offset then Lwt.return_unit
+  else
+    let cemented_files = Array.to_list cemented_blocks_files in
+    let (files_to_remove, _files_to_keep) =
+      List.split_n (nb_files - offset) cemented_files
+    in
+    (* Remove the rest of the files to prune *)
+    Lwt_list.iter_s
+      (fun {file; _} ->
+        let metadata_file_path =
+          Naming.(
+            cemented_blocks_metadata_file
+              (cemented_blocks_metadata_dir cemented_store.cemented_blocks_dir)
+              file
+            |> file_path)
+        in
+        Lwt.catch
+          (fun () -> Lwt_unix.unlink metadata_file_path)
+          (fun _exn -> Lwt.return_unit))
+      files_to_remove
+
+let trigger_rolling_gc cemented_store cemented_blocks_files offset =
+  let nb_files = Array.length cemented_blocks_files in
+  if nb_files <= offset then Lwt.return_unit
+  else
+    let {end_level = last_level_to_purge; _} =
+      cemented_blocks_files.(nb_files - offset - 1)
+    in
+    let cemented_files = Array.to_list cemented_blocks_files in
+    (* Start by updating the indexes by filtering blocks that are
+           below the offset *)
+    Cemented_block_hash_index.filter
+      cemented_store.cemented_block_hash_index
+      (fun (level, _) -> Compare.Int32.(level > last_level_to_purge)) ;
+    Cemented_block_level_index.filter
+      cemented_store.cemented_block_level_index
+      (fun (_, level) -> Compare.Int32.(level > last_level_to_purge)) ;
+    let (files_to_remove, _files_to_keep) =
+      List.split_n (nb_files - offset) cemented_files
+    in
+    (* Remove the rest of the files to prune *)
+    Lwt_list.iter_s
+      (fun {file; _} ->
+        let metadata_file_path =
+          Naming.(
+            cemented_blocks_metadata_file
+              (cemented_blocks_metadata_dir cemented_store.cemented_blocks_dir)
+              file
+            |> file_path)
+        in
+        Lwt.catch
+          (fun () -> Lwt_unix.unlink metadata_file_path)
+          (fun _exn -> Lwt.return_unit)
+        >>= fun () ->
+        Lwt.catch
+          (fun () -> Lwt_unix.unlink (Naming.file_path file))
+          (fun _exn -> Lwt.return_unit))
+      files_to_remove
+
 let trigger_gc cemented_store =
   match cemented_store.cemented_blocks_files with
   | None ->
@@ -562,68 +644,11 @@ let trigger_gc cemented_store =
       | History_mode.Archive ->
           Lwt.return_unit
       | Full {offset} ->
-          let nb_files = Array.length cemented_blocks_files in
-          if nb_files <= offset then Lwt.return_unit
-          else
-            let cemented_files = Array.to_list cemented_blocks_files in
-            let (files_to_remove, _files_to_keep) =
-              List.split_n (nb_files - offset) cemented_files
-            in
-            (* Remove the rest of the files to prune *)
-            Lwt_list.iter_s
-              (fun {file; _} ->
-                let metadata_file_path =
-                  Naming.(
-                    cemented_blocks_metadata_file
-                      (cemented_blocks_metadata_dir
-                         cemented_store.cemented_blocks_dir)
-                      file
-                    |> file_path)
-                in
-                Lwt.catch
-                  (fun () -> Lwt_unix.unlink metadata_file_path)
-                  (fun _exn -> Lwt.return_unit))
-              files_to_remove
+          trigger_full_gc cemented_store cemented_blocks_files offset
       | Rolling {offset} ->
-          let nb_files = Array.length cemented_blocks_files in
-          if nb_files <= offset then Lwt.return_unit
-          else
-            let {end_level = last_level_to_purge; _} =
-              cemented_blocks_files.(nb_files - offset - 1)
-            in
-            let cemented_files = Array.to_list cemented_blocks_files in
-            (* Start by updating the indexes by filtering blocks that are
-           below the offset *)
-            Cemented_block_hash_index.filter
-              cemented_store.cemented_block_hash_index
-              (fun (level, _) -> Compare.Int32.(level > last_level_to_purge)) ;
-            Cemented_block_level_index.filter
-              cemented_store.cemented_block_level_index
-              (fun (_, level) -> Compare.Int32.(level > last_level_to_purge)) ;
-            let (files_to_remove, _files_to_keep) =
-              List.split_n (nb_files - offset) cemented_files
-            in
-            (* Remove the rest of the files to prune *)
-            Lwt_list.iter_s
-              (fun {file; _} ->
-                let metadata_file_path =
-                  Naming.(
-                    cemented_blocks_metadata_file
-                      (cemented_blocks_metadata_dir
-                         cemented_store.cemented_blocks_dir)
-                      file
-                    |> file_path)
-                in
-                Lwt.catch
-                  (fun () -> Lwt_unix.unlink metadata_file_path)
-                  (fun _exn -> Lwt.return_unit)
-                >>= fun () ->
-                Lwt.catch
-                  (fun () -> Lwt_unix.unlink (Naming.file_path file))
-                  (fun _exn -> Lwt.return_unit))
-              files_to_remove )
+          trigger_rolling_gc cemented_store cemented_blocks_files offset )
 
-let iter_cemented_file f {file; start_level; end_level} =
+let iter_cemented_file f ({file; _} as cemented_blocks_file) =
   protect (fun () ->
       let file_path = Naming.file_path file in
       Lwt_io.with_file
@@ -631,7 +656,7 @@ let iter_cemented_file f {file; start_level; end_level} =
         ~mode:Lwt_io.Input
         file_path
         (fun channel ->
-          let nb_blocks = Int32.(succ (sub end_level start_level)) in
+          let nb_blocks = cemented_blocks_file_length cemented_blocks_file in
           Lwt_io.BE.read_int channel
           >>= fun first_block_offset ->
           Lwt_io.set_position channel (Int64.of_int first_block_offset)
@@ -687,7 +712,7 @@ let check_indexes_consistency ?(post_step = fun () -> Lwt.return_unit)
       >>=? fun () ->
       let table_list = Array.to_list table in
       List.iter_es
-        (fun {start_level = inf; end_level = sup; file} ->
+        (fun ({start_level = inf; file; _} as cemented_blocks_file) ->
           Lwt_unix.openfile
             (Naming.file_path file)
             [Unix.O_RDONLY; O_CLOEXEC]
@@ -695,8 +720,9 @@ let check_indexes_consistency ?(post_step = fun () -> Lwt.return_unit)
           >>= fun fd ->
           Lwt.finalize
             (fun () ->
-              (* nb blocks : (sup - inf) + 1 *)
-              let nb_blocks = Int32.(to_int (succ (sub sup inf))) in
+              let nb_blocks =
+                Int32.to_int (cemented_blocks_file_length cemented_blocks_file)
+              in
               (* Load the offset region *)
               let len_offset = nb_blocks * offset_length in
               let bytes = Bytes.create len_offset in
@@ -718,7 +744,7 @@ let check_indexes_consistency ?(post_step = fun () -> Lwt.return_unit)
                     (Inconsistent_cemented_store
                        (Bad_offset {level = n; cycle = Naming.file_path file}))
                   >>=? fun () ->
-                  Block_repr.read_next_block fd
+                  Block_repr.read_next_block_exn fd
                   >>= fun (block, _) ->
                   fail_unless
                     Compare.Int32.(

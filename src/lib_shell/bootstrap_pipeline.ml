@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020-2021 Nomadic Labs. <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -126,7 +126,7 @@ type t = {
   chain_db : Distributed_db.chain_db;
   locator : Block_locator.t;
   block_validator : Block_validator.t;
-  notify_new_block : State.Block.t -> unit;
+  notify_new_block : Store.Block.t -> unit;
   fetched_headers : (Block_hash.t * Block_header.t) list Lwt_pipe.t;
   fetched_blocks :
     (Block_hash.t * Block_header.t * Operation.t list list tzresult Lwt.t)
@@ -152,30 +152,30 @@ type t = {
     - The checkpoint has been reached (that is, the head of the chain
    is past the checkpoint) but the block is not yet in the chain. *)
 let assert_acceptable_header pipeline hash (header : Block_header.t) =
-  let chain_state = Distributed_db.chain_state pipeline.chain_db in
+  let chain_store = Distributed_db.chain_store pipeline.chain_db in
   let time_now = Systime_os.now () in
   fail_unless
     (Clock_drift.is_not_too_far_in_the_future header.shell.timestamp)
     (Future_block_header
        {block = hash; time = time_now; block_time = header.shell.timestamp})
   >>=? fun () ->
-  State.Chain.checkpoint chain_state
-  >>= fun checkpoint ->
+  Store.Chain.checkpoint chain_store
+  >>= fun (checkpoint_hash, checkpoint_level) ->
   fail_when
-    ( Int32.equal header.shell.level checkpoint.shell.level
-    && not (Block_header.equal checkpoint header) )
+    ( Compare.Int32.(header.shell.level = checkpoint_level)
+    && not (Block_hash.equal hash checkpoint_hash) )
     (Checkpoint_error (hash, Some pipeline.peer_id))
   >>=? fun () ->
-  Chain.head chain_state
-  >>= fun head ->
+  Store.Chain.current_head chain_store
+  >>= fun current_head ->
   let checkpoint_reached =
-    (State.Block.header head).shell.level >= checkpoint.shell.level
+    Compare.Int32.(Store.Block.level current_head >= checkpoint_level)
   in
   if checkpoint_reached then
     (* If the checkpoint is reached, every block before the checkpoint
        must be part of the chain. *)
-    if header.shell.level <= checkpoint.shell.level then
-      Chain.mem chain_state hash
+    if header.shell.level <= checkpoint_level then
+      Store.Chain.is_in_chain chain_store (hash, header.shell.level)
       >>= fun in_chain ->
       fail_unless in_chain (Checkpoint_error (hash, Some pipeline.peer_id))
     else return_unit
@@ -218,8 +218,13 @@ let fetch_step pipeline (step : Block_locator.step) =
         fail (Invalid_locator (pipeline.peer_id, pipeline.locator))
       else return acc
     else
-      let chain_state = Distributed_db.chain_state pipeline.chain_db in
-      Chain.mem chain_state hash
+      let chain_store = Distributed_db.chain_store pipeline.chain_db in
+      Store.Block.read_block_opt chain_store hash
+      >>= (function
+            | Some b ->
+                Store.Chain.is_in_chain chain_store (hash, Store.Block.level b)
+            | None ->
+                Lwt.return_false)
       >>= fun in_chain ->
       if in_chain then return acc
       else
@@ -257,33 +262,29 @@ let headers_fetch_worker_loop pipeline =
    let seed =
      {Block_locator.sender_id = pipeline.peer_id; receiver_id = sender_id}
    in
-   let chain_state = Distributed_db.chain_state pipeline.chain_db in
-   let state = State.Chain.global_state chain_state in
-   State.history_mode state
-   >>= fun history_mode ->
-   ( match history_mode with
-   | History_mode.Legacy.Archive ->
+   let chain_store = Distributed_db.chain_store pipeline.chain_db in
+   ( match Store.Chain.history_mode chain_store with
+   | History_mode.Archive ->
        Lwt.return_none
-   | Full | Rolling ->
-       let chain_state = Distributed_db.chain_state pipeline.chain_db in
-       State.Chain.save_point chain_state >>= Lwt.return_some )
-   >>= fun save_point ->
+   | Full _ | Rolling _ ->
+       Store.Chain.savepoint chain_store >>= Lwt.return_some )
+   >>= fun savepoint ->
    (* In Full and Rolling mode, we do not want to receive blocks that
       are past our savepoint's level, otherwise we would start
       validating them again.  *)
    let steps =
-     match save_point with
+     match savepoint with
      | None ->
          Block_locator.to_steps seed pipeline.locator
-     | Some (save_point_level, save_point) ->
+     | Some (savepoint_hash, savepoint_level) ->
          let (head, _) =
            (pipeline.locator : Block_locator.t :> Block_header.t * _)
          in
          let head_level = head.shell.level in
-         let truncate_limit = Int32.(sub head_level save_point_level) in
+         let truncate_limit = Int32.(sub head_level savepoint_level) in
          Block_locator.to_steps_truncate
            ~limit:(Int32.to_int truncate_limit)
-           ~save_point
+           ~save_point:savepoint_hash
            seed
            pipeline.locator
    in
@@ -296,7 +297,7 @@ let headers_fetch_worker_loop pipeline =
    | [] ->
        fail (Too_short_locator (sender_id, pipeline.locator))
    | {Block_locator.predecessor; _} :: _ ->
-       State.Block.known chain_state predecessor
+       Store.Block.is_known chain_store predecessor
        >>= fun predecessor_known ->
        (* Check that the locator is anchored in a block locally
           known. *)

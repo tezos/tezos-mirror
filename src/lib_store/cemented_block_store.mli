@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -147,9 +147,10 @@ val load_table :
   [`Cemented_blocks_dir] Naming.directory ->
   cemented_blocks_file array option tzresult Lwt.t
 
-(** [find_block_file cemented_store block_level] lookup the
-    [cemented_store] to find the cemented block chunk file that
-    contains the block at level [block_level]. *)
+(** [find_block_file cemented_store block_level] lookups the
+   [cemented_store] to find the cemented block chunk file that
+   contains the block at level [block_level]. Returns [None] if the
+   block cannot be found.*)
 val find_block_file : t -> int32 -> cemented_blocks_file option
 
 (** [is_cemented cemented_store block_hash] checks if the [block_hash]
@@ -178,9 +179,10 @@ val read_block_metadata :
     for every block containing metadata, an entry is written in the
     dedicated .zip metadata file.
 
-    Hypothesis: the blocks containing metadata are contiguous and if
-    at least one block has metadata, then the blocks from that block
-    with metadata to the last block of [chunk] must have metadata.*)
+    We assume that the blocks containing metadata are contiguous and
+    if at least one block has metadata, then the blocks from that
+    block with metadata to the last block of [chunk] must have
+    metadata. However, we do not check the validity of this assumption.*)
 val cement_blocks_metadata : t -> Block_repr.t list -> unit tzresult Lwt.t
 
 (** [get_lowest_cemented_level cemented_store] returns the lowest

@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open State
+open Legacy_state
 
 let path (b1 : Block.t) (b2 : Block.t) =
   if not (Chain_id.equal (Block.chain_id b1) (Block.chain_id b2)) then
@@ -145,7 +145,7 @@ let iter_predecessors ?max ?min_fitness ?min_date heads ~f =
           (List.for_all
              (fun b -> Chain_id.equal chain_id (Block.chain_id b))
              heads)
-      then invalid_arg "State.Helpers.iter_predecessors" ;
+      then invalid_arg "Legacy_state.Helpers.iter_predecessors" ;
       iter_predecessors ?max ?min_fitness ?min_date heads ~f
 
 let new_blocks ~from_block ~to_block =
@@ -167,13 +167,13 @@ let live_blocks block n =
     let bacc = Block_hash.Set.add (Block.hash block_head) bacc in
     if n = 0 then return (bacc, oacc)
     else
-      State.Block.predecessor block_head
+      Legacy_state.Block.predecessor block_head
       >>= function
       | None ->
-          let genesis_hash = (State.Chain.genesis chain_state).block in
+          let genesis_hash = (Legacy_state.Chain.genesis chain_state).block in
           let block_hash = Block.hash block_head in
           if Block_hash.equal genesis_hash block_hash then return (bacc, oacc)
-          else fail (State.Block_not_found block_hash)
+          else fail (Legacy_state.Block_not_found block_hash)
       | Some predecessor ->
           loop bacc oacc chain_state predecessor (pred n)
   in

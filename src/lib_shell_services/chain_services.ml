@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018-2021 Nomadic Labs. <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -45,10 +46,10 @@ let path = Block_services.chain_path
 
 let checkpoint_encoding =
   obj4
-    (req "block" Block_header.encoding)
-    (req "save_point" int32)
+    (req "block" (dynamic_size Block_header.encoding))
+    (req "savepoint" int32)
     (req "caboose" int32)
-    (req "history_mode" History_mode.Legacy.encoding)
+    (req "history_mode" History_mode.encoding)
 
 let invalid_block_encoding =
   conv

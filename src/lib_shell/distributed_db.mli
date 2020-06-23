@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2019-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -55,9 +55,9 @@ type db = t
 
 type p2p = (Message.t, Peer_metadata.t, Connection_metadata.t) P2p.net
 
-val create : State.t -> p2p -> t
+val create : Store.t -> p2p -> t
 
-val state : db -> State.t
+val store : db -> Store.t
 
 val shutdown : t -> unit Lwt.t
 
@@ -71,7 +71,7 @@ type chain_db
     where [chain_id] is the identifier of [chain]. This informs the neighbors
     that this node expects notifications for new heads/mempools. Subsequent
     calls simply return the existing [chain_db]. *)
-val activate : t -> State.Chain.t -> chain_db
+val activate : t -> Store.Chain.t -> chain_db
 
 (** Look for the database of an active chain. *)
 val get_chain : t -> Chain_id.t -> chain_db option
@@ -91,7 +91,9 @@ val disconnect : chain_db -> P2p_peer.Id.t -> unit Lwt.t
 (** Greylist a given peer. *)
 val greylist : chain_db -> P2p_peer.Id.t -> unit Lwt.t
 
-val chain_state : chain_db -> State.Chain.t
+(** Various accessors. *)
+
+val chain_store : chain_db -> Store.chain_store
 
 val db : chain_db -> db
 
@@ -125,7 +127,7 @@ module Advertise : sig
       active peers for this chain. If [mempool] isn't specified, or if
       remote peer has disabled its mempool, [mempool] is empty. [chain_id] is
       the identifier for this [chain_db]. *)
-  val current_head : chain_db -> ?mempool:Mempool.t -> State.Block.t -> unit
+  val current_head : chain_db -> ?mempool:Mempool.t -> Store.Block.t -> unit
 
   (** [current_branch chain_db] sends a
       [Current_branch (chain_id, locator)] message to all known active peers
@@ -171,14 +173,9 @@ val commit_block :
   chain_db ->
   Block_hash.t ->
   Block_header.t ->
-  Bytes.t ->
   Operation.t list list ->
-  Bytes.t list list ->
-  Block_metadata_hash.t option ->
-  Operation_metadata_hash.t list list option ->
-  Block_validation.validation_store ->
-  forking_testchain:bool ->
-  State.Block.t option tzresult Lwt.t
+  Block_validation.result ->
+  Store.Block.t option tzresult Lwt.t
 
 (** Store on disk all the data associated to an invalid block. *)
 val commit_invalid_block :
@@ -186,7 +183,7 @@ val commit_invalid_block :
   Block_hash.t ->
   Block_header.t ->
   Error_monad.error list ->
-  bool tzresult Lwt.t
+  unit tzresult Lwt.t
 
 (** Monitor all the fetched block headers (for all activate chains). *)
 val watch_block_header :
