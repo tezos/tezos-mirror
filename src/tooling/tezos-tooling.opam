@@ -6,6 +6,7 @@ bug-reports: "https://gitlab.com/tezos/tezos/issues"
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
+  "coq-of-ocaml" { = "2.2.1" }
   "dune" { >= "1.11" }
   "ocamlformat" { = "0.10" }
   "bisect_ppx" { >= "2.3" }
@@ -15,4 +16,3 @@ build: [
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
 synopsis: "Tezos: tooling for the project"
-

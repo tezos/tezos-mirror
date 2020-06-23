@@ -518,6 +518,16 @@ integration:examples_test_example:
 ##END_INTEGRATION_PYTHON##
 
 ############################################################
+## Stage: conversion to Coq                               ##
+############################################################
+
+coq:lint:
+  <<: *test_definition
+  script:
+    - coq-of-ocaml --help
+  retry: 0
+
+############################################################
 ## Stage: run doc integration tests                       ##
 ############################################################
 
