@@ -1,6 +1,6 @@
 (library
- (name tezos_store)
- (public_name tezos-store)
+ (name tezos_legacy_store)
+ (public_name tezos-legacy-store)
  (libraries tezos-base
             tezos-shell-services
             tezos-lmdb)

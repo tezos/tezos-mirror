@@ -1,11 +1,11 @@
 (executables
  (names test)
  (libraries tezos-base
-            tezos-store
+            tezos-legacy-store
             tezos-stdlib-unix
             alcotest-lwt)
  (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_store
+                   -open Tezos_legacy_store
                    -open Tezos_stdlib_unix)))
 
 (alias
@@ -14,7 +14,7 @@
 
 (alias
  (name runtest)
- (package tezos-store)
+ (package tezos-legacy-store)
  (action (chdir %{workspace_root} (run %{exe:test.exe}))))
 
 (alias

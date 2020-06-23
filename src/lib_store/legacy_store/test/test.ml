@@ -26,4 +26,4 @@
 
 let () =
   Lwt_main.run
-    (Alcotest_lwt.run "tezos-store" [("raw_store", Test_raw_store.tests)])
+    (Alcotest_lwt.run "tezos-legacy-store" [("raw_store", Test_raw_store.tests)])

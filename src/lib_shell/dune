@@ -6,7 +6,7 @@
             tezos-base
             tezos-version
             tezos-context
-            tezos-store
+            tezos-legacy-store
             tezos-shell-context
             tezos-p2p
             tezos-stdlib-unix
@@ -20,7 +20,7 @@
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_base
                    -open Tezos_context
-                   -open Tezos_store
+                   -open Tezos_legacy_store
                    -open Tezos_shell_context
                    -open Tezos_p2p
                    -open Tezos_stdlib_unix
