@@ -1,4 +1,4 @@
-#!/bin/sh
+#! /usr/bin/env bash
 
 usage () {
     cat >&2 <<EOF
@@ -23,13 +23,11 @@ EOF
 }
 
 ## Testing for dependencies
-type ocamlformat > /dev/null 2>&-
-if [ $? -ne 0 ]; then
+if ! type ocamlformat > /dev/null 2>&-; then
   echo "ocamlformat is required but could not be found. Aborting."
   exit 1
 fi
-type find > /dev/null 2>&-
-if [ $? -ne 0 ]; then
+if ! type find > /dev/null 2>&-; then
   echo "find is required but could not be found. Aborting."
   exit 1
 fi
@@ -60,10 +58,11 @@ break-string-literals=newlines-and-wrap
 EOF
 }
 
-source_directories="src docs/doc_gen"
+declare -a source_directories
+
+source_directories=(src docs/doc_gen)
 
 update_all_dot_ocamlformats () {
-    interesting_directories=$(find $source_directories \( -name "*.ml" -o -name "*.mli"  \) -type f | sed 's:/[^/]*$::' | LC_COLLATE=C sort -u)
     if git diff --name-only HEAD --exit-code
     then
         say "Repository clean :thumbsup:"
@@ -71,6 +70,7 @@ update_all_dot_ocamlformats () {
         say "Repository not clean, which is required by this script."
         exit 2
     fi
+    interesting_directories=$(find "${source_directories[@]}" \( -name "*.ml" -o -name "*.mli"  \) -type f | sed 's:/[^/]*$::' | LC_COLLATE=C sort -u)
     for d in $interesting_directories ; do
         ofmt=$d/.ocamlformat
         say "Dealing with $ofmt"
@@ -94,30 +94,30 @@ update_all_dot_ocamlformats () {
 }
 
 check_with_dune () {
-    for f in $* ; do
+    for f in "$@" ; do
         case "$PWD" in
             */src/proto_alpha/lib_protocol$ | \
             */src/proto_demo_noops/lib_protocol$ )
                 make_dot_ocamlformat .ocamlformat
-                ocamlformat --check $f
+                ocamlformat --check "$f"
                 ;;
             */src/proto_*/lib_protocol$ )
                 say "This a protocol file, ignoring"
                 ;;
             * )
                 make_dot_ocamlformat .ocamlformat
-                ocamlformat --check $f
+                ocamlformat --check "$f"
                 ;;
         esac
     done
 }
 
 check_scripts () {
-    scripts=$(find $source_directories tests_python/ scripts/ -name "*.sh" -type f -print)
+    scripts=$(find "${source_directories[@]}" tests_python/ scripts/ -name "*.sh" -type f -print)
     exit_code=0
+    tab="$(printf '%b' '\t')"
     for f in $scripts ; do
-        if [ $f != src/tooling/lint.sh ] && grep -q "	" $f
-        then
+        if grep -q "$tab" "$f"; then
             say "$f has tab character(s)"
             exit_code=1
         fi
@@ -128,12 +128,12 @@ check_scripts () {
 if [ -f "$1" ] ; then
     action=check.dune
     files="$@"
-elif [ ! -z "${1+set}" ]; then
+elif [ -n "${1+set}" ]; then
     action="$1"
     shift
     files="$@"
     if [ "$files" = "" ]; then
-        files=$(find $source_directories \( -name "*.ml" -o -name "*.mli"  -o -name "*.mlt" \) -type f -print)
+        files=$(find "${source_directories[@]}" \( -name "*.ml" -o -name "*.mli"  -o -name "*.mlt" \) -type f -print)
     fi
 fi
 
