@@ -16,24 +16,28 @@
 
     It also makes the type of encodings ['a t] concrete (['a
     Json_encoding.encodings]) which allows for further use -- see [VALUE]. *)
-module Encoding : Resto.ENCODING
-  with type 'a t = 'a Json_encoding.encoding
-   and type schema = Json_schema.schema
+module Encoding :
+  Resto.ENCODING
+    with type 'a t = 'a Json_encoding.encoding
+     and type schema = Json_schema.schema
 
 (** A [VALUE] module allows the actual conversion of values between different
     representations. It is intended as a companion to the [Encoding] module
     above. *)
 module type VALUE = sig
   type t
+
   type 'a encoding
-  val construct: 'a encoding -> 'a -> t
-  val destruct: 'a encoding -> t -> 'a
+
+  val construct : 'a encoding -> 'a -> t
+
+  val destruct : 'a encoding -> t -> 'a
 end
 
-module Ezjsonm : VALUE
-  with type t = Json_repr.Ezjsonm.value
-   and type 'a encoding := 'a Encoding.t
+module Ezjsonm :
+  VALUE
+    with type t = Json_repr.Ezjsonm.value
+     and type 'a encoding := 'a Encoding.t
 
-module Bson : VALUE
-  with type t = Json_repr_bson.bson
-   and type 'a encoding := 'a Encoding.t
+module Bson :
+  VALUE with type t = Json_repr_bson.bson and type 'a encoding := 'a Encoding.t

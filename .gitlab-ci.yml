@@ -1,7 +1,14 @@
+---
+
+stages:
+  - test
+  - build
 
 build-and-test:
+  stage: build
   image: ocaml/opam2:alpine-3.10-ocaml-4.08
   script:
+    - sudo apk --no-cache add m4
     - opam pin --no-action ezresto-directory .
     - opam pin --no-action ezresto .
     - opam pin --no-action resto-cohttp-client .
@@ -10,8 +17,17 @@ build-and-test:
     - opam pin --no-action resto-directory .
     - opam pin --no-action resto-json .
     - opam pin --no-action resto .
-    - opam depext ezresto-directory ezresto resto-cohttp-client resto-cohttp resto-cohttp-server resto-directory resto-json resto
+    - opam depext ezresto-directory ezresto resto-cohttp-client \
+      resto-cohttp resto-cohttp-server resto-directory resto-json resto
     - opam install --deps-only .
     - dune build
     - dune runtest
     - opam install .
+
+test-fmt:
+  stage: test
+  image: ocaml/opam2:alpine-3.10-ocaml-4.08
+  script:
+    - sudo apk --no-cache add m4
+    - opam install ocamlformat.0.10
+    - ocamlformat --check src/*.ml src/*.mli test/*.ml

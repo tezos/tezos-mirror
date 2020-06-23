@@ -11,3 +11,7 @@ doc-html:
 
 clean:
 	dune clean
+
+fmt:
+	ocamlformat --inplace src/*.ml src/*.mli
+	ocamlformat --inplace test/*.ml

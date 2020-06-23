@@ -9,7 +9,7 @@
 (**************************************************************************)
 
 open Resto
-module Service = MakeService(Resto_json.Encoding)
+module Service = MakeService (Resto_json.Encoding)
 open Service
 
 (** Shared part *)
@@ -62,13 +62,12 @@ let dummy_service =
     ~input:Json_encoding.null
     ~output:Json_encoding.null
     ~error:Json_encoding.empty
-    Path.(root / "a" / "path" / "long" / "enough" /
-          "for" / "<hov>" / "to" / "trigger"
-          /: Arg.float /: Arg.float /: Arg.float /: Arg.float
-          /: Arg.float /: Arg.float /: Arg.float)
+    Path.(
+      root / "a" / "path" / "long" / "enough" / "for" / "<hov>" / "to"
+      / "trigger" /: Arg.float /: Arg.float /: Arg.float /: Arg.float
+      /: Arg.float /: Arg.float /: Arg.float)
 
 let prefix_dir1 = Path.(root / "tartine" /: Arg.float / "chaussure")
-
 
 (** Client only *)
 

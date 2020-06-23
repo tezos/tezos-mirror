@@ -23,4 +23,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val split_path: string -> string list
+val split_path : string -> string list

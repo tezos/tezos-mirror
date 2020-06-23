@@ -9,25 +9,25 @@
 (**************************************************************************)
 
 module Make (Encoding : Resto.ENCODING) : sig
-
   type t = {
-    name: Cohttp.Accept.media_range ;
-    q: int option ;
-    pp: 'a. 'a Encoding.t -> Format.formatter -> string -> unit ;
-    construct: 'a. 'a Encoding.t -> 'a -> string ;
-    destruct: 'a. 'a Encoding.t -> string -> ('a, string) result ;
+    name : Cohttp.Accept.media_range;
+    q : int option;
+    pp : 'a. 'a Encoding.t -> Format.formatter -> string -> unit;
+    construct : 'a. 'a Encoding.t -> 'a -> string;
+    destruct : 'a. 'a Encoding.t -> string -> ('a, string) result;
   }
 
-  val name: t -> string
+  val name : t -> string
 
-  val has_complete_media: t list -> bool
-  val first_complete_media: t list -> ((string * string) * t) option
+  val has_complete_media : t list -> bool
 
-  val find_media: (string * string) -> t list -> t option
+  val first_complete_media : t list -> ((string * string) * t) option
 
-  val resolve_accept_header: t list -> string option -> (string * t) option
+  val find_media : string * string -> t list -> t option
 
-  val accept_header: t list -> string
-  val acceptable_encoding: t list -> string
+  val resolve_accept_header : t list -> string option -> (string * t) option
 
+  val accept_header : t list -> string
+
+  val acceptable_encoding : t list -> string
 end

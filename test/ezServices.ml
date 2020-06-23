@@ -51,5 +51,4 @@ let minus_service r =
     ~error:Json_encoding.empty
     Path.(r /: Arg.int / "minus")
 
-let describe_service =
-  description_service Path.(root / "describe")
+let describe_service = description_service Path.(root / "describe")
