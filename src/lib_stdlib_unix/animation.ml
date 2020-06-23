@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Lwt.Infix
+
 let animation =
   [| "|.....|";
      "|o....|";
@@ -46,7 +48,6 @@ let animation = Array.map (fun x -> clean ^ x) animation
 let number_of_frames = Array.length animation
 
 let make_with_animation ppf ~make ~on_retry seed =
-  let open Lwt.Infix in
   Format.fprintf ppf "%s%!" init ;
   let rec loop n seed =
     let start = Mtime_clock.counter () in
@@ -63,3 +64,53 @@ let make_with_animation ppf ~make ~on_retry seed =
   >|= fun result ->
   Format.fprintf ppf "%s%s\n%!" clean init ;
   result
+
+let display_progress ?(every = 1) ?(out = Lwt_unix.stdout) ~pp_print_step f =
+  if every <= 0 then
+    raise
+      (Invalid_argument "display_progress: negative or null repetition period") ;
+  (* pp_print_step must only write on a single-line with no carriage return *)
+  Lwt_unix.isatty out
+  >>= fun is_a_tty ->
+  if not is_a_tty then f (fun () -> Lwt.return_unit)
+  else
+    let clear_line fmt = Format.fprintf fmt "\027[2K\r" in
+    let (stream, notifier) = Lwt_stream.create () in
+    let wrapped_notifier () = notifier (Some ()) ; Lwt_unix.yield () in
+    let main_promise =
+      Lwt.finalize
+        (fun () -> f wrapped_notifier)
+        (fun () -> notifier None ; Lwt.return_unit)
+    in
+    let oc = Unix.out_channel_of_descr (Lwt_unix.unix_file_descr out) in
+    let fmt = Format.formatter_of_out_channel oc in
+    let cpt = ref 0 in
+    let pp_cpt = ref 0 in
+    let rec tick_promise () =
+      Lwt_unix.sleep 1. >>= fun () -> incr pp_cpt ; tick_promise ()
+    in
+    let loop = tick_promise () in
+    let dot_array = [|""; "."; ".."; "..."|] in
+    let dots () = dot_array.(!pp_cpt mod 4) in
+    let pp () =
+      clear_line fmt ;
+      Format.fprintf fmt "%a%s%!" pp_print_step !cpt (dots ())
+    in
+    let pp_done () =
+      clear_line fmt ;
+      Format.fprintf fmt "%a Done@\n%!" pp_print_step !cpt
+    in
+    pp () ;
+    incr cpt ;
+    let printer =
+      Lwt_stream.iter_s
+        (fun () ->
+          ( if !cpt mod every = 0 then (pp () ; Lwt.return_unit)
+          else Lwt.return_unit )
+          >>= fun () -> incr cpt ; Lwt.return_unit)
+        stream
+    in
+    main_promise
+    >>= fun e ->
+    Lwt.cancel loop ;
+    printer >>= fun () -> decr cpt ; pp_done () ; Lwt.return e
