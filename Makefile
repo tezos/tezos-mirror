@@ -140,9 +140,9 @@ test: test_protocol_compile
 .PHONY: check-linting check-python-linting
 
 check-linting:
-	@src/tooling/lint.sh check.ci
-	@src/tooling/lint.sh check_scripts
-	@src/tooling/lint.sh check.ocamlformat
+	@src/tooling/lint.sh --check-ci
+	@src/tooling/lint.sh --check-scripts
+	@src/tooling/lint.sh --check-ocamlformat
 	@dune build @runtest_lint
 
 check-python-linting:
@@ -150,7 +150,7 @@ check-python-linting:
 
 .PHONY: fmt
 fmt:
-	@src/tooling/lint.sh format
+	@src/tooling/lint.sh --format
 
 .PHONY: build-deps
 build-deps:

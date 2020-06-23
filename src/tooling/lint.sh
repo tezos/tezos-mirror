@@ -6,17 +6,17 @@ usage: $0 [<action>] [FILES]
 
 Where <action> can be:
 
-* update.ocamlformat: update all the \`.ocamlformat\` files and
+* --update-ocamlformat: update all the \`.ocamlformat\` files and
   git-commit (requires clean repo).
-* check.ocamlformat: check the above does nothing.
-* check.dune: check formatting while assuming running under Dune's
+* --check-ocamlformat: check the above does nothing.
+* --check-dune: check formatting while assuming running under Dune's
   rule (\`dune build @runtest_lint\`).
-* check.ci: check formatting using git (for GitLabCI's verbose run).
-* check_scripts: check the .sh files
-* format: format all the files, see also \`make fmt\`.
-* help: display this and return 0.
+* --check-ci: check formatting using git (for GitLabCI's verbose run).
+* --check-scripts: check the .sh files
+* --format: format all the files, see also \`make fmt\`.
+* --help: display this and return 0.
 
-If the first argument is a file, action 'check.dune' is assumed.
+If no action is given, \`--check-dune\` is assumed.
 
 If no files are provided all .ml, .mli, mlt files are formatted/checked.
 EOF
@@ -125,51 +125,78 @@ check_scripts () {
     exit $exit_code
 }
 
-if [ -f "$1" ] ; then
-    action=check.dune
-    files="$@"
-elif [ -n "${1+set}" ]; then
+format_inplace () {
+    ( IFS=$'\n'; say "Formatting $*" )
+    ocamlformat --inplace "$@"
+}
+
+if [ $# -eq 0 ] || [[ "$1" != --* ]]; then
+    action="--check-dune"
+else
     action="$1"
     shift
-    files="$@"
-    if [ "$files" = "" ]; then
-        files=$(find "${source_directories[@]}" \( -name "*.ml" -o -name "*.mli"  -o -name "*.mlt" \) -type f -print)
-    fi
 fi
 
-# $files may contain `*.pp.ml{i}` files which can't be linted. They are filtered
-# by the following loop.
-#
-# Note: another option would be to filter them before calling the script but
-# it was more convenient to do it here.
-
-files=$(echo "$files" | sed "s/\S\+\.pp\.mli\?\b//g")
+check_clean=false
+commit=
+on_files=false
 
 case "$action" in
-    "update.ocamlformat" )
-        update_all_dot_ocamlformats
-        git commit -m 'Update .ocamlformat files' ;;
-    "check.ocamlformat" )
-        update_all_dot_ocamlformats
-        git diff --name-only HEAD --exit-code ;;
-    "check.dune" )
-        check_with_dune $files ;;
-    "check.ci" )
-        say "Formatting for CI-test $files"
-        ocamlformat --inplace $files
-        git diff --exit-code ;;
-    "check_scripts" )
-        check_scripts ;;
-    "format" )
-        say "Formatting $files"
-        ocamlformat --inplace $files ;;
+    "--update-ocamlformat" )
+        action=update_all_dot_ocamlformats
+        commit="Update .ocamlformat files" ;;
+    "--check-ocamlformat" )
+        action=update_all_dot_ocamlformats
+        check_clean=true ;;
+    "--check-dune" )
+        on_files=true
+        action=check_with_dune ;;
+    "--check-ci" )
+        on_files=true
+        action=format_inplace
+        check_clean=true ;;
+    "--check-scripts" )
+        action=check_scripts ;;
+    "--format" )
+        on_files=true
+        action=format_inplace ;;
     "help" | "-help" | "--help" | "-h" )
-        usage ;;
+        usage
+        exit 0 ;;
     * )
         say "Error no action (arg 1 = '$action') provided"
         usage
-        exit 2
-        ;;
+        exit 2 ;;
 esac
 
+if $on_files; then
+    declare -a input_files files
+    if [ $# -gt 0 ]; then
+        input_files=("$@")
+    else
+        mapfile -t input_files <<< "$(find "${source_directories[@]}" \( -name "*.ml" -o -name "*.mli" -o -name "*.mlt" \) -type f -print)"
+    fi
+    # $input_files may contain `*.pp.ml{i}` files which can't be linted. They
+    # are filtered by the following loop.
+    #
+    # Note: another option would be to filter them before calling the script
+    # but it was more convenient to do it here.
+    files=()
+    for file in "${input_files[@]}"; do
+        if [[ ! "$file" == *.pp.ml? ]]; then
+            files+=("$file")
+        fi
+    done
+    $action "${files[@]}"
+else
+    if [ $# -gt 0 ]; then usage; exit 1; fi
+    $action
+fi
 
+if [ -n "$commit" ]; then
+    git commit -m "$commit"
+fi
+
+if $check_clean; then
+    git diff --name-only HEAD --exit-code
+fi
