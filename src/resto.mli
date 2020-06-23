@@ -180,6 +180,8 @@ end
 module Description : sig
   type request = {recurse : bool}
 
+  [@@@ocaml.warning "-30"]
+
   type 'schema service = {
     description : string option;
     path : path_item list;

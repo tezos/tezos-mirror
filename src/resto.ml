@@ -116,9 +116,9 @@ module Internal = struct
         Root
     | Static (path, name) ->
         Static (subst0 path, name)
-    | Dynamic (path, arg) ->
+    | Dynamic _ ->
         assert false (* impossible *)
-    | DynamicTail (path, arg) ->
+    | DynamicTail _ ->
         assert false
 
   (* impossible *)
@@ -207,23 +207,23 @@ module Internal = struct
     | Multi of descr
 
   let field_name (type t) : (_, t) query_field -> _ = function
-    | Single {name} ->
+    | Single {name; _} ->
         name
-    | Opt {name} ->
+    | Opt {name; _} ->
         name
-    | Flag {name} ->
+    | Flag {name; _} ->
         name
-    | Multi {name} ->
+    | Multi {name; _} ->
         name
 
   let field_description (type t) : (_, t) query_field -> _ = function
-    | Single {description} ->
+    | Single {description; _} ->
         description
-    | Opt {description} ->
+    | Opt {description; _} ->
         description
-    | Flag {description} ->
+    | Flag {description; _} ->
         description
-    | Multi {description} ->
+    | Multi {description; _} ->
         description
 
   let field_kind (type t) : (_, t) query_field -> query_kind = function
@@ -259,11 +259,6 @@ module Arg = struct
     {arg with id = Ty.new_id (); descr = {name; descr}}
 
   let descr (ty : 'a arg) = ty.descr
-
-  let ignore : unit arg =
-    let destruct _ = Ok () in
-    let construct () = "" in
-    make ~name:"unit" ~destruct ~construct ()
 
   let bool : bool arg =
     let string_of_bool = function true -> "yes" | false -> "no" in
@@ -483,11 +478,11 @@ module Query = struct
             match StringMap.find name fields with
             | exception Not_found ->
                 fields
-            | Parsed (Single f, Some _) ->
+            | Parsed (Single _, Some _) ->
                 fail "Duplicate argument '%s' in query string." name
-            | Parsed (Opt f, Some _) ->
+            | Parsed (Opt _, Some _) ->
                 fail "Duplicate argument '%s' in query string." name
-            | Parsed (Flag f, Some _) ->
+            | Parsed (Flag _, Some _) ->
                 fail "Duplicate argument '%s' in query string." name
             | Parsed (Single f, None) -> (
               match f.ty.destruct value with
@@ -552,6 +547,8 @@ module Description = struct
     | Optional of Arg.descr
     | Flag
     | Multi of Arg.descr
+
+  [@@@ocaml.warning "-30"]
 
   type 'schema service = {
     description : string option;
@@ -640,7 +637,7 @@ module Description = struct
 
   and pp_print_dispatch_services ppf services =
     MethMap.iter
-      (fun meth s ->
+      (fun _ s ->
         match s with
         | {description = None; meth; _} ->
             Format.fprintf ppf "<%s>" (string_of_meth meth)
@@ -760,22 +757,22 @@ module MakeService (Encoding : ENCODING) = struct
 
   let subst3 s = {s with path = Internal.subst3 s.path}
 
-  let meth {meth} = meth
+  let meth {meth; _} = meth
 
   let query : type pr p i q o e. (_, pr, p, q, i, o, e) service -> q Query.t =
-   fun {types} -> types.query
+   fun {types; _} -> types.query
 
   let input_encoding :
       type pr p i q o e. (_, pr, p, q, i, o, e) service -> i input =
-   fun {types} -> types.input
+   fun {types; _} -> types.input
 
   let output_encoding :
       type pr p i q o e. (_, pr, p, q, i, o, e) service -> o Encoding.t =
-   fun {types} -> types.output
+   fun {types; _} -> types.output
 
   let error_encoding :
       type pr p i q o e. (_, pr, p, q, i, o, e) service -> e Encoding.t =
-   fun {types} -> types.error
+   fun {types; _} -> types.error
 
   type ('prefix, 'params, 'error) description_service =
     ( [`GET],
