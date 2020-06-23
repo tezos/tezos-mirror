@@ -138,7 +138,7 @@ let build_raw_rpc_directory ~user_activated_upgrades
       Chain_traversal.live_blocks block max_op_ttl
       >>=? fun (live_blocks, _) -> return live_blocks) ;
   (* block metadata *)
-  let metadata block =
+  let block_metadata block =
     State.Block.metadata block
     >>=? fun metadata ->
     let protocol_data =
@@ -164,16 +164,18 @@ let build_raw_rpc_directory ~user_activated_upgrades
             Next_proto.validation_passes;
       }
   in
-  register0 S.metadata (fun block () () -> metadata block) ;
+  register0 S.metadata (fun block () () -> block_metadata block) ;
   (* operations *)
-  let convert chain_id (op : Operation.t) metadata : Block_services.operation =
+  let convert_with_metadata chain_id (op : Operation.t) metadata :
+      Block_services.operation =
     let protocol_data =
       Data_encoding.Binary.of_bytes_exn Proto.operation_data_encoding op.proto
     in
     let receipt =
-      Data_encoding.Binary.of_bytes_exn
-        Proto.operation_receipt_encoding
-        metadata
+      Some
+        (Data_encoding.Binary.of_bytes_exn
+           Proto.operation_receipt_encoding
+           metadata)
     in
     {
       Block_services.chain_id;
@@ -183,13 +185,33 @@ let build_raw_rpc_directory ~user_activated_upgrades
       receipt;
     }
   in
+  let convert_without_metadata chain_id (op : Operation.t) =
+    let protocol_data =
+      Data_encoding.Binary.of_bytes_exn Proto.operation_data_encoding op.proto
+    in
+    {
+      Block_services.chain_id;
+      hash = Operation.hash op;
+      shell = op.shell;
+      protocol_data;
+      receipt = None;
+    }
+  in
   let operations block =
+    let chain_id = State.Block.chain_id block in
     State.Block.all_operations block
     >>= fun ops ->
-    State.Block.all_operations_metadata block
-    >>= fun metadata ->
-    let chain_id = State.Block.chain_id block in
-    return (List.map2 (List.map2 (convert chain_id)) ops metadata)
+    Lwt.catch
+      (fun () ->
+        State.Block.all_operations_metadata block
+        >>= fun ops_metadata ->
+        return
+          (List.map2
+             (List.map2 (convert_with_metadata chain_id))
+             ops
+             ops_metadata))
+      (fun _ ->
+        return (List.map (List.map (convert_without_metadata chain_id)) ops))
   in
   register0 S.Operations.operations (fun block () () -> operations block) ;
   register1 S.Operations.operations_in_pass (fun block i () () ->
@@ -197,18 +219,29 @@ let build_raw_rpc_directory ~user_activated_upgrades
       try
         State.Block.operations block i
         >>= fun (ops, _path) ->
-        State.Block.operations_metadata block i
-        >>= fun metadata -> return (List.map2 (convert chain_id) ops metadata)
+        Lwt.catch
+          (fun () ->
+            State.Block.operations_metadata block i
+            >>= fun ops_metadata ->
+            return
+              (List.map2 (convert_with_metadata chain_id) ops ops_metadata))
+          (fun _ ->
+            return ((List.map (convert_without_metadata chain_id)) ops))
       with _ -> Lwt.fail Not_found) ;
   register2 S.Operations.operation (fun block i j () () ->
       let chain_id = State.Block.chain_id block in
-      ( try
-          State.Block.operations block i
-          >>= fun (ops, _path) ->
-          State.Block.operations_metadata block i
-          >>= fun metadata -> Lwt.return (List.nth ops j, List.nth metadata j)
-        with _ -> Lwt.fail Not_found )
-      >>= fun (op, md) -> return (convert chain_id op md)) ;
+      try
+        State.Block.operations block i
+        >>= fun (ops, _path) ->
+        let op = List.nth ops j in
+        Lwt.catch
+          (fun () ->
+            State.Block.operations_metadata block i
+            >>= fun metadata ->
+            let op_metadata = List.nth metadata j in
+            return (convert_with_metadata chain_id op op_metadata))
+          (fun _ -> return (convert_without_metadata chain_id op))
+      with _ -> Lwt.fail Not_found) ;
   (* operation_hashes *)
   register0 S.Operation_hashes.operation_hashes (fun block () () ->
       State.Block.all_operation_hashes block >>= return) ;
@@ -246,7 +279,9 @@ let build_raw_rpc_directory ~user_activated_upgrades
           Proto.block_header_data_encoding
           header.protocol_data
       in
-      metadata block
+      block_metadata block
+      >>= (function
+            | Ok metadata -> return_some metadata | Error _ -> return_none)
       >>=? fun metadata ->
       operations block
       >>=? fun operations ->
@@ -404,25 +439,6 @@ let get_directory ~user_activated_upgrades ~user_activated_protocol_overrides
               State.Block.set_rpc_directory block dir
               >>= fun () -> Lwt.return dir ) )
 
-let get_header_directory chain_state header =
-  State.Block.header_of_hash chain_state header.Block_header.shell.predecessor
-  >>= function
-  | None ->
-      (* should not happen *)
-      Lwt.fail Not_found
-  | Some pred -> (
-      State.Chain.get_level_indexed_protocol chain_state pred
-      >>= fun protocol_hash ->
-      let (module Proto) = get_protocol protocol_hash in
-      State.Block.get_header_rpc_directory chain_state header
-      >>= function
-      | Some dir ->
-          Lwt.return dir
-      | None ->
-          let dir = build_raw_header_rpc_directory (module Proto) in
-          State.Block.set_header_rpc_directory chain_state header dir
-          >>= fun () -> Lwt.return dir )
-
 let get_block chain_state = function
   | `Genesis ->
       Chain.genesis chain_state >>= fun genesis -> Lwt.return_some genesis
@@ -507,28 +523,9 @@ let build_rpc_directory ~user_activated_upgrades
   | None ->
       Lwt.fail Not_found
   | Some b ->
-      State.Chain.save_point chain_state
-      >>= fun (save_point_level, _) ->
-      let block_level = State.Block.level b in
-      let block_hash = State.Block.hash b in
-      let genesis = State.Chain.genesis chain_state in
-      if
-        block_level >= save_point_level
-        || Block_hash.equal block_hash genesis.block
-      then
-        get_directory
-          ~user_activated_upgrades
-          ~user_activated_protocol_overrides
-          chain_state
-          b
-        >>= fun dir ->
-        Lwt.return (RPC_directory.map (fun _ -> Lwt.return b) dir)
-      else
-        let header = State.Block.header b in
-        let hash = State.Block.hash b in
-        get_header_directory chain_state header
-        >>= fun dir ->
-        Lwt.return
-          (RPC_directory.map
-             (fun _ -> Lwt.return (chain_state, hash, header))
-             dir)
+      get_directory
+        ~user_activated_upgrades
+        ~user_activated_protocol_overrides
+        chain_state
+        b
+      >>= fun dir -> Lwt.return (RPC_directory.map (fun _ -> Lwt.return b) dir)

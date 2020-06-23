@@ -1362,11 +1362,20 @@ module Block = struct
     Shared.use chain_state.context_index (fun context_index ->
         Context.exists context_index commit)
 
-  let protocol_hash block =
-    context block >>=? fun context -> Context.get_protocol context >>= return
+  let protocol_hash ({chain_state; _} as block) =
+    Chain.save_point chain_state
+    >>= fun (save_point_level, _) ->
+    if Compare.Int32.(level block < save_point_level) then
+      Chain.get_level_indexed_protocol chain_state block.header >>= return
+    else
+      context block >>=? fun context -> Context.get_protocol context >>= return
 
-  let protocol_hash_exn block =
-    context_exn block >>= fun context -> Context.get_protocol context
+  let protocol_hash_exn ({chain_state; _} as block) =
+    Chain.save_point chain_state
+    >>= fun (save_point_level, _) ->
+    if Compare.Int32.(level block < save_point_level) then
+      Chain.get_level_indexed_protocol chain_state block.header
+    else context_exn block >>= fun context -> Context.get_protocol context
 
   let protocol_level block = block.header.shell.proto_level
 
@@ -1429,11 +1438,7 @@ module Block = struct
     | Some pred when equal pred block ->
         Lwt.return_none (* genesis *)
     | Some pred -> (
-        Chain.save_point chain_state
-        >>= fun (save_point_level, _) ->
-        ( if Compare.Int32.(level pred < save_point_level) then
-          Chain.get_level_indexed_protocol chain_state pred.header
-        else protocol_hash_exn pred )
+        protocol_hash_exn pred
         >>= fun protocol ->
         match
           Protocol_hash.Table.find_opt

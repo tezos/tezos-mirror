@@ -404,8 +404,31 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
     hash : Operation_hash.t;
     shell : Operation.shell_header;
     protocol_data : Proto.operation_data;
-    receipt : Proto.operation_receipt;
+    receipt : Proto.operation_receipt option;
   }
+
+  let operation_data_encoding =
+    let open Data_encoding in
+    union
+      ~tag_size:`Uint8
+      [ case
+          ~title:"Operation with metadata"
+          (Tag 0)
+          Proto.operation_data_and_receipt_encoding
+          (function
+            | (operation_data, Some receipt) ->
+                Some (operation_data, receipt)
+            | _ ->
+                None)
+          (function
+            | (operation_data, receipt) -> (operation_data, Some receipt));
+        case
+          ~title:"Operation without metadata"
+          (Tag 1)
+          Proto.operation_data_encoding
+          (function
+            | (operation_data, None) -> Some operation_data | _ -> None)
+          (fun operation_data -> (operation_data, None)) ]
 
   let operation_encoding =
     def "operation"
@@ -423,13 +446,13 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
             (req "hash" Operation_hash.encoding))
          (merge_objs
             (dynamic_size Operation.shell_header_encoding)
-            (dynamic_size Proto.operation_data_and_receipt_encoding)))
+            (dynamic_size operation_data_encoding)))
 
   type block_info = {
     chain_id : Chain_id.t;
     hash : Block_hash.t;
     header : raw_block_header;
-    metadata : block_metadata;
+    metadata : block_metadata option;
     operations : operation list list;
   }
 
@@ -444,7 +467,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
          (req "chain_id" Chain_id.encoding)
          (req "hash" Block_hash.encoding)
          (req "header" (dynamic_size raw_block_header_encoding))
-         (req "metadata" (dynamic_size block_metadata_encoding))
+         (opt "metadata" (dynamic_size block_metadata_encoding))
          (req "operations" (list (dynamic_size (list operation_encoding)))))
 
   module S = struct
@@ -720,7 +743,10 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
 
     let info =
       RPC_service.get_service
-        ~description:"All the information about a block."
+        ~description:
+          "All the information about a block. The associated metadata may not \
+           be present depending on the history mode and block's distance from \
+           the head."
         ~query:RPC_query.empty
         ~output:block_info_encoding
         path

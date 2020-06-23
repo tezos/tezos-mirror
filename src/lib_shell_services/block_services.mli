@@ -133,14 +133,14 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
     hash : Operation_hash.t;
     shell : Operation.shell_header;
     protocol_data : Proto.operation_data;
-    receipt : Proto.operation_receipt;
+    receipt : Proto.operation_receipt option;
   }
 
   type block_info = {
     chain_id : Chain_id.t;
     hash : Block_hash.t;
     header : raw_block_header;
-    metadata : block_metadata;
+    metadata : block_metadata option;
     operations : operation list list;
   }
 
