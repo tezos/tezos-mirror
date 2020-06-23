@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018-2021 Tarides <contact@tarides.com>                     *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_storage_encoding.Context
+open Tezos_context_encoding.Context
 module AO = Irmin.Content_addressable (Irmin_mem.Append_only)
 module RW = Irmin_mem.Atomic_write
 module Store =
@@ -38,7 +39,7 @@ type key = string list
 
 type value = bytes
 
-module Tree = Tezos_storage_helpers.Context.Make_tree (Store)
+module Tree = Tezos_context_helpers.Context.Make_tree (Store)
 include Tree
 
 let data_key key = "data" :: key

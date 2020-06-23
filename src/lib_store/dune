@@ -1,0 +1,14 @@
+(library
+ (name tezos_store)
+ (public_name tezos-store)
+ (libraries tezos-base
+            tezos-shell-services
+            tezos-lmdb)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_base
+                   -open Tezos_shell_services)))
+
+(alias
+ (name runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

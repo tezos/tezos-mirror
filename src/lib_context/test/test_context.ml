@@ -25,8 +25,8 @@
 
 (* Testing
    -------
-   Component:    Storage
-   Invocation:   dune build @src/lib_storage/runtest
+   Component:    Context
+   Invocation:   dune build @src/lib_context/runtest
    Subject:      On context features.
 *)
 

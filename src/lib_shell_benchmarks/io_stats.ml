@@ -106,7 +106,7 @@ let context_statistics base_dir context_hash =
   in
   load_tree context []
   >>= fun tree ->
-  Tezos_storage.Context.close index
+  Tezos_context.Context.close index
   >>= fun () -> Lwt.return (tree_statistics tree)
 
 open StaTz

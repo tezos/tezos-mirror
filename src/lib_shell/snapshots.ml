@@ -1053,7 +1053,6 @@ let import ?(reconstruct = false) ?patch_context ~data_dir
   let chain_store = Store.Chain.get store chain_id in
   let chain_data = Store.Chain_data.get chain_store in
   let block_store = Store.Block.get chain_store in
-  let open Context in
   Lwt.try_bind
     (fun () ->
       let k_store_pruned_blocks data =
@@ -1083,7 +1082,7 @@ let import ?(reconstruct = false) ?patch_context ~data_dir
         >>= fun () -> return_unit
       in
       (* Restore context and fetch data *)
-      restore_contexts
+      Context.restore_contexts
         context_index
         ~filename
         k_store_pruned_blocks
@@ -1148,7 +1147,7 @@ let import ?(reconstruct = false) ?patch_context ~data_dir
       >>= fun () ->
       Tezos_stdlib_unix.Utils.display_progress_end () ;
       (* Process data imported from snapshot *)
-      let {Block_data.block_header; operations} = meta in
+      let {Context.Block_data.block_header; operations} = meta in
       let block_hash = Block_header.hash block_header in
       (* Checks that the block hash imported by the snapshot is the expected one *)
       parse_block_arg block
@@ -1169,7 +1168,7 @@ let import ?(reconstruct = false) ?patch_context ~data_dir
       lwt_emit (Set_head (Block_header.hash block_header))
       >>= fun () ->
       let pred_context_hash = predecessor_block_header.shell.context in
-      checkout_exn context_index pred_context_hash
+      Context.checkout_exn context_index pred_context_hash
       >>= fun predecessor_context ->
       let max_operations_ttl =
         Int32.to_int predecessor_block_header.shell.level

@@ -14,7 +14,7 @@ depends: [
   "tezos-protocol-compiler"
   "tezos-shell-context"
   "tezos-stdlib-unix"
-  "tezos-storage"
+  "tezos-context"
   "lwt-exit"
 ]
 build: [

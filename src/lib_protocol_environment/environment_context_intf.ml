@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2021 Tarides <contact@tarides.com>                          *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -26,12 +27,12 @@
 
 module type VIEW = sig
   (** @inline *)
-  include Tezos_storage_sigs.Context.VIEW
+  include Tezos_context_sigs.Context.VIEW
 end
 
 module type TREE = sig
   (** @inline *)
-  include Tezos_storage_sigs.Context.TREE
+  include Tezos_context_sigs.Context.TREE
 end
 
 module type S = sig

@@ -1,17 +1,16 @@
 (library
- (name tezos_storage)
- (public_name tezos-storage)
+ (name tezos_context)
+ (public_name tezos-context)
  (libraries tezos-base
             tezos-shell-services
-            tezos-lmdb
             logs.fmt
             digestif.c
             irmin
             irmin-pack
             tezos-stdlib-unix
-            tezos-storage.sigs
-            tezos-storage.helpers
-            tezos-storage.encoding)
+            tezos-context.sigs
+            tezos-context.helpers
+            tezos-context.encoding)
  (flags (:standard -open Tezos_shell_services
                    -open Tezos_base__TzPervasives
                    -open Tezos_stdlib_unix

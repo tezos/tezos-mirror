@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Local = Tezos_storage_memory.Context
+module Local = Tezos_context_memory.Context
 
 module M = struct
   type key = Local.key

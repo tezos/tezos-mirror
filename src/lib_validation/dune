@@ -2,13 +2,13 @@
  (name tezos_validation)
  (public_name tezos-validation)
  (libraries tezos-base
-            tezos-storage
+            tezos-context
             tezos-shell-context
             tezos-shell-services
             tezos-protocol-updater
 	    tezos-stdlib-unix)
  (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_storage
+                   -open Tezos_context
                    -open Tezos_shell_context
                    -open Tezos_shell_services
                    -open Tezos_protocol_updater

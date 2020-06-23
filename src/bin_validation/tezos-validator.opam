@@ -8,7 +8,7 @@ license: "MIT"
 depends: [
   "dune" { >= "2.0" }
   "tezos-base"
-  "tezos-storage"
+  "tezos-context"
   "tezos-stdlib-unix"
   "tezos-protocol-environment"
   "tezos-protocol-updater"

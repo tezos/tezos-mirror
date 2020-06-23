@@ -1,11 +1,7 @@
 (library
- (name tezos_storage_memory)
- (public_name tezos-storage.memory)
- (libraries tezos-base
-            irmin.mem
-            tezos-storage.sigs
-            tezos-storage.encoding
-            tezos-storage.helpers)
+ (name tezos_context_sigs)
+ (public_name tezos-context.sigs)
+ (libraries tezos-base)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_stdlib)))
 

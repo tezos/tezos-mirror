@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018-2021 Tarides <contact@tarides.com>                     *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,42 +24,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_protocol_environment
-open Context
-open Lwt.Infix
+(** Implementation of Tezos context fully in memory. *)
 
-module C = struct
-  include Tezos_context.Context
+include Tezos_context_sigs.Context.S
 
-  let set_protocol = add_protocol
-end
+val empty : t
 
-include Environment_context.Register (C)
+val encoding : t Data_encoding.t
 
-let impl_name = "shell"
+val get_protocol : t -> Protocol_hash.t Lwt.t
 
-let checkout index context_hash =
-  Tezos_context.Context.checkout index context_hash
-  >|= function
-  | Some ctxt ->
-      Some
-        (Context.Context
-           {ops; ctxt; kind = Context; equality_witness; impl_name})
-  | None ->
-      None
-
-let checkout_exn index context_hash =
-  Tezos_context.Context.checkout_exn index context_hash
-  >|= fun ctxt ->
-  Context.Context {ops; ctxt; kind = Context; equality_witness; impl_name}
-
-let wrap_disk_context ctxt =
-  Context.Context {ops; ctxt; kind = Context; equality_witness; impl_name}
-
-let unwrap_disk_context : t -> Tezos_context.Context.t = function
-  | Context.Context {ctxt; kind = Context; _} ->
-      ctxt
-  | Context.Context t ->
-      Environment_context.err_implementation_mismatch
-        ~expected:impl_name
-        ~got:t.impl_name
+val add_protocol : t -> Protocol_hash.t -> t Lwt.t

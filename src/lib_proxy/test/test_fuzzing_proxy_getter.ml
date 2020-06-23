@@ -30,7 +30,7 @@
     Subject:      Fuzzing tests of internals of the client's --mode proxy
 *)
 
-module Local = Tezos_storage_memory.Context
+module Local = Tezos_context_memory.Context
 module Proxy_getter = Tezos_proxy.Proxy_getter
 
 let tree_path_gen = Crowbar.list Crowbar.bytes

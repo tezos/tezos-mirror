@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018-2021 Tarides <contact@tarides.com>                     *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,14 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Implementation of Tezos context fully in memory. *)
-
-include Tezos_storage_sigs.Context.S
-
-val empty : t
-
-val encoding : t Data_encoding.t
-
-val get_protocol : t -> Protocol_hash.t Lwt.t
-
-val add_protocol : t -> Protocol_hash.t -> t Lwt.t
+let () =
+  Lwt_main.run
+    (Alcotest_lwt.run "tezos-context" [("context", Test_context.tests)])

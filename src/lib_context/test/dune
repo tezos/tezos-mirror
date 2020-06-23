@@ -1,11 +1,11 @@
 (executables
  (names test)
  (libraries tezos-base
-            tezos-storage
+            tezos-context
             tezos-stdlib-unix
             alcotest-lwt)
  (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_storage
+                   -open Tezos_context
                    -open Tezos_stdlib_unix)))
 
 (rule
@@ -15,7 +15,7 @@
 
 (rule
  (alias runtest)
- (package tezos-storage)
+ (package tezos-context)
  (action (chdir %{workspace_root} (run %{exe:test.exe}))))
 
 (rule

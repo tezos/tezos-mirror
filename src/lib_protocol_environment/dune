@@ -6,7 +6,7 @@
             tezos-protocol-environment-sigs
             tezos-protocol-environment-structs
             tezos-micheline
-            tezos-storage.memory)
+            tezos-context.memory)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_micheline))
  (wrapped false)
@@ -29,7 +29,7 @@
  (public_name tezos-shell-context)
  (libraries tezos-base
             tezos-protocol-environment
-            tezos-storage)
+            tezos-context)
  (modules Shell_context))
 
 (rule

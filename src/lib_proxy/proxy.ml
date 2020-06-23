@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -30,7 +30,7 @@
     it would create a cyclic dependency between proxy_proto.ml
     and proxy_getter.ml *)
 
-module Local = Tezos_storage_memory.Context
+module Local = Tezos_context_memory.Context
 
 type proxy_getter_input = {
   rpc_context : RPC_context.simple;

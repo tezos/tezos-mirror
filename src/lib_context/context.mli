@@ -32,7 +32,7 @@
 
 module type S = sig
   (** @inline *)
-  include Tezos_storage_sigs.Context.S
+  include Tezos_context_sigs.Context.S
 end
 
 include S

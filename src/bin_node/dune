@@ -19,7 +19,8 @@
             tezos-rpc-http-server
             tezos-p2p
             tezos-shell
-            tezos-storage
+            tezos-store
+            tezos-context
             tezos-validator
             tezos-shell-context
             tezos-protocol-updater
@@ -94,7 +95,8 @@
                    -open Tezos_rpc_http_server
                    -open Tezos_p2p
                    -open Tezos_shell
-                   -open Tezos_storage
+                   -open Tezos_store
+                   -open Tezos_context
                    -open Tezos_validator
                    -open Tezos_shell_context
                    -open Tezos_workers

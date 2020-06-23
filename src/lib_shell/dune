@@ -5,7 +5,8 @@
             lwt-canceler
             tezos-base
             tezos-version
-            tezos-storage
+            tezos-context
+            tezos-store
             tezos-shell-context
             tezos-p2p
             tezos-stdlib-unix
@@ -18,7 +19,8 @@
             lwt-exit)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_base
-                   -open Tezos_storage
+                   -open Tezos_context
+                   -open Tezos_store
                    -open Tezos_shell_context
                    -open Tezos_p2p
                    -open Tezos_stdlib_unix

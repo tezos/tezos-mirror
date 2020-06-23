@@ -3,7 +3,8 @@
         test_locator
         test_synchronisation_heuristic_fuzzy)
  (libraries tezos-base
-            tezos-storage
+            tezos-store
+            tezos-context
             tezos-shell-context
             tezos-p2p
             tezos-p2p-services
@@ -17,7 +18,8 @@
             alcotest-lwt
             crowbar)
  (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_storage
+                   -open Tezos_store
+                   -open Tezos_context
                    -open Tezos_shell_context
                    -open Tezos_protocol_updater
                    -open Tezos_p2p

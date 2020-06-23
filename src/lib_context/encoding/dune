@@ -1,9 +1,7 @@
 (library
- (name tezos_storage_helpers)
- (public_name tezos-storage.helpers)
+ (name tezos_context_encoding)
+ (public_name tezos-context.encoding)
  (libraries tezos-base
-            tezos-storage.encoding
-            tezos-storage.sigs
             irmin)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_stdlib)))

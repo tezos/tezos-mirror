@@ -28,7 +28,7 @@
 
 (** Tezos - Versioned (key x value) store (over Irmin) *)
 
-open Tezos_storage_encoding.Context
+open Tezos_context_encoding.Context
 
 let reporter () =
   let report src level ~over k msgf =
@@ -124,7 +124,7 @@ and context = {index : index; parents : Store.Commit.t list; tree : Store.tree}
 
 type t = context
 
-module type S = Tezos_storage_sigs.Context.S
+module type S = Tezos_context_sigs.Context.S
 
 (*-- Version Access and Update -----------------------------------------------*)
 
@@ -235,7 +235,7 @@ type value = bytes
 
 type tree = Store.tree
 
-module Tree = Tezos_storage_helpers.Context.Make_tree (Store)
+module Tree = Tezos_context_helpers.Context.Make_tree (Store)
 
 let mem ctxt key = Tree.mem ctxt.tree (data_key key)
 

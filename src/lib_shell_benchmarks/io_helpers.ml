@@ -35,7 +35,7 @@ let assert_ok ~msg = function
       exit 1
 
 let prepare_genesis base_dir =
-  Tezos_storage.Context.init
+  Tezos_context.Context.init
     ~mapsize:40_960_000_000_000L
     ~readonly:false
     base_dir
@@ -44,13 +44,13 @@ let prepare_genesis base_dir =
     Block_hash.of_b58check_exn
       "BLockGenesisGenesisGenesisGenesisGenesisGeneskvg68z"
   in
-  Tezos_storage.Context.commit_genesis
+  Tezos_context.Context.commit_genesis
     index
     ~chain_id:(Chain_id.of_block_hash genesis_block)
     ~time:(Time.Protocol.of_seconds 0L)
     ~protocol:(Obj.magic ())
   >>=? fun context_hash ->
-  Tezos_storage.Context.checkout index context_hash
+  Tezos_context.Context.checkout index context_hash
   >>= function
   | None ->
       assert false
@@ -64,7 +64,7 @@ let commit context =
   let context =
     Tezos_shell_context.Shell_context.unwrap_disk_context context
   in
-  Tezos_storage.Context.commit
+  Tezos_context.Context.commit
     ~time:
       (Time.Protocol.of_seconds
          (Int64.of_int (int_of_float @@ Unix.gettimeofday ())))
@@ -75,15 +75,15 @@ let prepare_empty_context base_dir =
   >>=? fun (index, context, _context_hash) ->
   commit context
   >>= fun context_hash ->
-  Tezos_storage.Context.close index >>= fun () -> return context_hash
+  Tezos_context.Context.close index >>= fun () -> return context_hash
 
 let load_context_from_disk_lwt base_dir context_hash =
-  Tezos_storage.Context.init
+  Tezos_context.Context.init
     ~mapsize:40_960_000_000_000L
     ~readonly:false
     base_dir
   >>= fun index ->
-  Tezos_storage.Context.checkout index context_hash
+  Tezos_context.Context.checkout index context_hash
   >>= function
   | None ->
       assert false
@@ -99,7 +99,7 @@ let with_context ~base_dir ~context_hash f =
   Lwt_main.run
     ( f context
     >>= fun res ->
-    Tezos_storage.Context.close index >>= fun () -> Lwt.return res )
+    Tezos_context.Context.close index >>= fun () -> Lwt.return res )
 
 let prepare_base_dir base_dir =
   Unix.unlink base_dir ; Unix.mkdir base_dir 0o700
@@ -112,7 +112,7 @@ let initialize_key rng_state context path storage_size =
 let commit_and_reload base_dir index context =
   commit context
   >>= fun context_hash ->
-  Tezos_storage.Context.close index
+  Tezos_context.Context.close index
   >>= fun () -> load_context_from_disk_lwt base_dir context_hash
 
 (** Maps from string lists to bytes. No balancing. A key cannot be a prefix

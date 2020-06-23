@@ -9,7 +9,6 @@ depends: [
   "tezos-tooling" { with-test }
   "dune" { >= "2.0" }
   "tezos-base"
-  "tezos-lmdb"
   "irmin" { >= "2.5.0" }
   "irmin-pack" { >= "2.5.0" }
   "digestif" {>= "0.7.3"}
@@ -21,4 +20,4 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos: low-level key-value store for `tezos-node`"
+synopsis: "Tezos: on-disk context abstraction for `tezos-node`"

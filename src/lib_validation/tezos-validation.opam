@@ -9,7 +9,7 @@ depends: [
   "tezos-tooling" { with-test }
   "dune" { >= "2.0" }
   "tezos-base"
-  "tezos-storage"
+  "tezos-context"
   "tezos-shell-context"
   "tezos-shell-services"
   "tezos-protocol-updater"

@@ -29,7 +29,7 @@ let patch_context (genesis : Genesis.t) key_json ctxt =
   | None ->
       Lwt.return ctxt
   | Some (key, json) ->
-      Tezos_storage.Context.add
+      Tezos_context.Context.add
         ctxt
         [key]
         (Data_encoding.Binary.to_bytes_exn Data_encoding.json json) )

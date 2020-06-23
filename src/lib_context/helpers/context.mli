@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018-2021 Tarides <contact@tarides.com>                     *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,42 +24,37 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_protocol_environment
-open Context
-open Lwt.Infix
+open Tezos_context_encoding.Context
 
-module C = struct
-  include Tezos_context.Context
+module type DB =
+  Irmin.S
+    with type key = Path.t
+     and type contents = Contents.t
+     and type branch = Branch.t
+     and type hash = Hash.t
+     and type step = Path.step
+     and type metadata = Metadata.t
+     and type Key.step = Path.step
 
-  let set_protocol = add_protocol
+module Make_tree (DB : DB) : sig
+  include
+    Tezos_context_sigs.Context.TREE
+      with type t := DB.t
+       and type key := DB.key
+       and type value := DB.contents
+       and type tree := DB.tree
+
+  val pp : Format.formatter -> DB.tree -> unit
+
+  val empty : _ -> DB.tree
+
+  val of_value : _ -> DB.contents -> DB.tree Lwt.t
+
+  type raw = [`Value of DB.contents | `Tree of raw TzString.Map.t]
+
+  val raw_encoding : raw Data_encoding.t
+
+  val to_raw : DB.tree -> raw Lwt.t
+
+  val of_raw : raw -> DB.tree
 end
-
-include Environment_context.Register (C)
-
-let impl_name = "shell"
-
-let checkout index context_hash =
-  Tezos_context.Context.checkout index context_hash
-  >|= function
-  | Some ctxt ->
-      Some
-        (Context.Context
-           {ops; ctxt; kind = Context; equality_witness; impl_name})
-  | None ->
-      None
-
-let checkout_exn index context_hash =
-  Tezos_context.Context.checkout_exn index context_hash
-  >|= fun ctxt ->
-  Context.Context {ops; ctxt; kind = Context; equality_witness; impl_name}
-
-let wrap_disk_context ctxt =
-  Context.Context {ops; ctxt; kind = Context; equality_witness; impl_name}
-
-let unwrap_disk_context : t -> Tezos_context.Context.t = function
-  | Context.Context {ctxt; kind = Context; _} ->
-      ctxt
-  | Context.Context t ->
-      Environment_context.err_implementation_mismatch
-        ~expected:impl_name
-        ~got:t.impl_name
