@@ -2,7 +2,7 @@
 
 usage () {
     cat >&2 <<EOF
-usage: $0 [<action>] [FILES]
+usage: $0 [<action>] [FILES] [--ignore FILES]
 
 Where <action> can be:
 
@@ -170,12 +170,23 @@ case "$action" in
 esac
 
 if $on_files; then
-    declare -a input_files files
-    if [ $# -gt 0 ]; then
-        input_files=("$@")
-    else
+    declare -a input_files files ignored_files
+    input_files=()
+    while [ $# -gt 0 ]; do
+        if [ "$1" = "--ignore" ]; then
+            shift
+            break
+        fi
+        input_files+=("$1")
+        shift
+    done
+
+    if [ ${#input_files[@]} -eq 0 ]; then
         mapfile -t input_files <<< "$(find "${source_directories[@]}" \( -name "*.ml" -o -name "*.mli" -o -name "*.mlt" \) -type f -print)"
     fi
+
+    ignored_files=("$@")
+
     # $input_files may contain `*.pp.ml{i}` files which can't be linted. They
     # are filtered by the following loop.
     #
@@ -183,9 +194,11 @@ if $on_files; then
     # but it was more convenient to do it here.
     files=()
     for file in "${input_files[@]}"; do
-        if [[ ! "$file" == *.pp.ml? ]]; then
-            files+=("$file")
-        fi
+        if [[ "$file" == *.pp.ml? ]]; then continue; fi
+        for ignored_file in "${ignored_files[@]}"; do
+            if [[ "$file" =~ ^(.*/)?"$ignored_file"$ ]] ; then continue 2; fi
+        done
+        files+=("$file")
     done
     $action "${files[@]}"
 else
