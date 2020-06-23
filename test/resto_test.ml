@@ -58,6 +58,20 @@ struct
 
   let () =
     Lwt_main.run
+      ( Request.request
+          describe_service
+          ((), ["bar"; "3"; "2."])
+          {recurse = true}
+          ()
+      >>= function
+      | `Ok dir ->
+          Format.printf "@[<v>%a@]@." Resto.Description.pp_print_directory dir ;
+          Lwt.return_unit
+      | _ ->
+          assert false )
+
+  let () =
+    Lwt_main.run
       ( Request.request describe_service ((), []) {recurse = true} ()
       >>= function
       | `Ok dir ->

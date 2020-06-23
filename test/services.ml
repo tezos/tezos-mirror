@@ -45,6 +45,22 @@ let alternate_add_service' =
     ~error:Json_encoding.empty
     Path.(root / "bar" /: Arg.int /: Arg.float / "add")
 
+let alternate_add_service_patch =
+  post_service
+    ~query:Query.empty
+    ~input:Json_encoding.int
+    ~output:Json_encoding.int
+    ~error:Json_encoding.empty
+    Path.(root / "bar" /: Arg.int /: Arg.float / "patch")
+
+let alternate_add_service_delete =
+  post_service
+    ~query:Query.empty
+    ~input:Json_encoding.null
+    ~output:Json_encoding.null
+    ~error:Json_encoding.empty
+    Path.(root / "bar" /: Arg.int /: Arg.float)
+
 let minus_service =
   post_service
     ~query:Query.empty

@@ -29,4 +29,12 @@ let dir =
   register dir alternate_add_service' (fun (((), i), j) () () ->
       Lwt.return (`Ok (i + int_of_float j)))
 
+let dir =
+  register dir alternate_add_service_patch (fun (((), i), j) () _ ->
+      Lwt.return (`Ok (int_of_float (float_of_int i +. j))))
+
+let dir =
+  register dir alternate_add_service_delete (fun (((), _), _) () () ->
+      Lwt.return (`Ok ()))
+
 let dir = register_describe_directory_service dir describe_service
