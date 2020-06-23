@@ -22,10 +22,5 @@
 
 (alias
  (name runtest_lint)
-; (deps (glob_files *.ml{,i}))
-; If you find a way to tell either dune to exclude generated file ledger.ml or
-; ocamlformat to not drop first line
-; `# 1 "src/lib_signer_backends/unix/with_ledger.ml"`
-; Be my guest!
- (deps ledger_names.ml remote.mli socket.mli with_ledger.ml ledger.mli ledger_names.mli no_ledger.ml remote.ml socket.ml)
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps} --ignore ledger.ml)))

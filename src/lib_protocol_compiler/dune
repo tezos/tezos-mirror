@@ -108,20 +108,5 @@
 
 (alias
  (name runtest_lint)
- ;; we would like (deps ((glob_files *.ml \ embedded_cmis.ml)))
- ;; meanwhile, we hardcode the module list
- (deps "embedded_cmis.mli"
-       "main_embedded_packer.ml"
-       "main_embedded_packer.mli"
-       "main_byte.ml"
-       "main_native.ml"
-       "native.ml"
-       "native.mli"
-       "byte.ml"
-       "byte.mli"
-       "packer.ml"
-       "packer.mli"
-       "registerer.ml"
-       "registerer.mli"
-       )
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps} --ignore embedded_cmis.ml)))
