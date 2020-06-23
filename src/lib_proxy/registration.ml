@@ -59,4 +59,28 @@ let register_proxy_context m =
             INCOMING_P.protocol_hash)
   else registered := m :: !registered
 
-let get_registered_contexts () = !registered
+let get_registered_proxy :
+    Protocol_hash.t option -> proxy_environment tzresult Lwt.t =
+ fun protocol_hash_opt ->
+  let available = !registered in
+  match available with
+  | [] ->
+      failwith "get_registered_proxy: no registered proxy environment"
+  | fst_proxy :: _ -> (
+    match protocol_hash_opt with
+    | None ->
+        return fst_proxy
+    | Some protocol_hash -> (
+        let proxy_opt =
+          List.find_opt
+            (fun (module Proxy : Proxy_sig) ->
+              Protocol_hash.equal protocol_hash Proxy.protocol_hash)
+            available
+        in
+        match proxy_opt with
+        | Some proxy ->
+            return proxy
+        | None ->
+            failwith
+              "requested protocol not found in available proxy environments" )
+    )

@@ -141,33 +141,42 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config
          | _ ->
              return_unit)
   >>=? fun () ->
-  let (chain, block, confirmations, password_filename) =
+  let (chain, block, confirmations, password_filename, protocol) =
     match parsed_args with
     | None ->
-        (Client_config.default_chain, Client_config.default_block, None, None)
+        ( Client_config.default_chain,
+          Client_config.default_block,
+          None,
+          None,
+          None )
     | Some p ->
         ( p.Client_config.chain,
           p.Client_config.block,
           p.Client_config.confirmations,
-          p.Client_config.password_filename )
+          p.Client_config.password_filename,
+          p.Client_config.protocol )
   in
-  return
-    ( if default_or_proxy then
-      new unix_full
-        ~chain
-        ~block
-        ~confirmations
-        ~password_filename
-        ~base_dir
-        ~rpc_config
-    else
-      new unix_proxy
-        ~chain
-        ~block
-        ~confirmations
-        ~password_filename
-        ~base_dir
-        ~_rpc_config:rpc_config )
+  if default_or_proxy then
+    return
+    @@ new unix_full
+         ~chain
+         ~block
+         ~confirmations
+         ~password_filename
+         ~base_dir
+         ~rpc_config
+  else
+    Tezos_proxy.Registration.get_registered_proxy protocol
+    >>=? fun proxy_env ->
+    return
+    @@ new unix_proxy
+         ~chain
+         ~block
+         ~confirmations
+         ~password_filename
+         ~base_dir
+         ~_rpc_config:rpc_config
+         ~proxy_env
 
 let setup_mockup_rpc_client_config
     (cctxt : Tezos_client_base.Client_context.full)

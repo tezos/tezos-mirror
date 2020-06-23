@@ -47,4 +47,8 @@ type proxy_environment = (module Proxy_sig)
 
 val register_proxy_context : proxy_environment -> unit
 
-val get_registered_contexts : unit -> proxy_environment list
+(** Returns a proxy environment for the given protocol (or the
+    first one in the list of registered protocols
+    if the [Protocol_hash.t] is [None], see the [Registration] module). *)
+val get_registered_proxy :
+  Protocol_hash.t option -> proxy_environment tzresult Lwt.t
