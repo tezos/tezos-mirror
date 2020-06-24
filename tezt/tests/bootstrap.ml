@@ -23,9 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_tezt
-open Base
-
 (* The functions below could be put in the Tezt library. *)
 let get_save_point ?node client =
   let* json = RPC.get_checkpoint ?node client in

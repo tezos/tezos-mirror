@@ -1,0 +1,5 @@
+(library
+ (name tezt_tezos)
+ (public_name tezt-tezos)
+ (libraries tezt hex)
+ (flags (:standard -open Tezt -open Tezt.Base)))

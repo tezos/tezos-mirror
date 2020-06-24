@@ -1,4 +1,4 @@
 (library
- (name tezos_tezt)
- (public_name tezos-tezt)
- (libraries re hex lwt.unix ezjsonm))
+ (name tezt)
+ (public_name tezt)
+ (libraries re lwt.unix ezjsonm))

@@ -1,3 +1,4 @@
 (executable
  (name main)
- (libraries tezos-tezt))
+ (libraries tezt-tezos)
+ (flags (:standard -open Tezt -open Tezt_tezos -open Tezt.Base)))

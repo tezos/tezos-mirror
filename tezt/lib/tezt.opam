@@ -8,11 +8,10 @@ license: "MIT"
 depends: [
   "dune" { >= "1.11" }
   "re"
-  "hex"
   "lwt"
   "ezjsonm"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
 ]
-synopsis: "Tezos test framework: Tezt"
+synopsis: "Framework for integration tests with external processes"
