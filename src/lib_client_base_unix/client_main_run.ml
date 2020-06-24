@@ -175,7 +175,7 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config
          ~confirmations
          ~password_filename
          ~base_dir
-         ~_rpc_config:rpc_config
+         ~rpc_config
          ~proxy_env
 
 let setup_mockup_rpc_client_config

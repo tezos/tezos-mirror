@@ -23,17 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let build_directory (proxy_env : Registration.proxy_environment)
-    (rpc_context : Tezos_protocol_environment.rpc_context) :
-    unit RPC_directory.t =
+let build_directory (printer : Tezos_client_base.Client_context.printer)
+    (rpc_context : RPC_context.json)
+    (proxy_env : Registration.proxy_environment) : unit RPC_directory.t =
   let (module Proxy_environment) = proxy_env in
+  let build_env_rpc_context (chain : Tezos_shell_services.Block_services.chain)
+      (block : Tezos_shell_services.Block_services.block) =
+    Proxy_environment.init_env_rpc_context printer rpc_context chain block
+    >>= fun rpc_context ->
+    match rpc_context with Ok x -> Lwt.return x | Error _ -> assert false
+  in
   let proto_directory =
     let ( // ) = RPC_directory.prefix in
     (* register protocol-specific RPCs *)
     Tezos_shell_services.Chain_services.path
     // ( Tezos_shell_services.Block_services.path
        // RPC_directory.map
-            (fun (_chain, _block) -> Lwt.return rpc_context)
+            (fun ((_, chain), block) -> build_env_rpc_context chain block)
             Proxy_environment.directory )
   in
   RPC_directory.register_describe_directory_service

@@ -56,6 +56,6 @@ class unix_proxy :
   -> block:Shell_services.block
   -> confirmations:int option
   -> password_filename:string option
-  -> _rpc_config:Tezos_rpc_http_client_unix.RPC_client_unix.config
+  -> rpc_config:Tezos_rpc_http_client_unix.RPC_client_unix.config
   -> proxy_env:Tezos_proxy.Registration.proxy_environment
   -> Client_context.full
