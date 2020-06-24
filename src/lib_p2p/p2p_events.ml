@@ -101,7 +101,7 @@ module P2p_protocol = struct
       ~section
       ~name:"swap_failed"
       ~msg:"swap to {point} failed: {trace}"
-      ~level:Debug
+      ~level:Info
       ~pp2:pp_print_error_first
       ("point", P2p_point.Id.encoding)
       ("trace", Error_monad.trace_encoding)
