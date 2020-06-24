@@ -9,13 +9,13 @@ variables:
   ARTIFACT_DOWNLOAD_ATTEMPTS: "2"
 
 stages:
-  - test_coverage
-  - publish_coverage
   - build
   - test
   - doc
   - packaging
   - publish
+  - test_coverage
+  - publish_coverage
 
 ############################################################
 ## Stage: build (only MR)                                 ##
