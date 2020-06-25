@@ -74,7 +74,7 @@ class TestMultiNodeStorageReconstruction:
         # We must fail while requesting those pruned blocks
         for i in range(1, session['snapshot_level']):
             with pytest.raises(Exception):
-                utils.get_block_at_level(sandbox.client(2), i)
+                utils.get_block_metadata_at_level(sandbox.client(2), i)
 
     def test_reconstruct_the_storage(self, sandbox: Sandbox):
         # Stop, reconstruct the storage and restart the node
