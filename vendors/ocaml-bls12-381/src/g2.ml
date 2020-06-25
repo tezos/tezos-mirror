@@ -7,7 +7,7 @@ module Uncompressed = struct
 
   module Scalar = Fr
 
-  let empty () = Bytes.create size
+  let empty () = Bytes.make size '\000'
 
   let check_bytes bs =
     if Bytes.length bs = size then
@@ -99,7 +99,7 @@ module Compressed = struct
 
   module Scalar = Fr
 
-  let empty () = Bytes.create size
+  let empty () = Bytes.make size '\000'
 
   let of_uncompressed uncompressed =
     let g = empty () in

@@ -9,7 +9,7 @@ let order =
 
 type t = Bytes.t
 
-let empty () = Bytes.create size
+let empty () = Bytes.make size '\000'
 
 let check_bytes bs =
   if Bytes.length bs = size then
@@ -33,24 +33,24 @@ let is_one g =
   Fr_stubs.is_one (Ctypes.ocaml_bytes_start g)
 
 let zero () =
-  let g = Bytes.create size in
+  let g = empty () in
   Fr_stubs.zero (Ctypes.ocaml_bytes_start g) ;
   of_bytes g
 
 let one () =
-  let g = Bytes.create size in
+  let g = empty () in
   Fr_stubs.one (Ctypes.ocaml_bytes_start g) ;
   of_bytes g
 
 let random () =
-  let g = Bytes.create size in
+  let g = empty () in
   Fr_stubs.random (Ctypes.ocaml_bytes_start g) ;
   of_bytes g
 
 let add x y =
   assert (Bytes.length x = size) ;
   assert (Bytes.length y = size) ;
-  let g = Bytes.create size in
+  let g = empty () in
   Fr_stubs.add
     (Ctypes.ocaml_bytes_start g)
     (Ctypes.ocaml_bytes_start x)
@@ -60,7 +60,7 @@ let add x y =
 let mul x y =
   assert (Bytes.length x = size) ;
   assert (Bytes.length y = size) ;
-  let g = Bytes.create size in
+  let g = empty () in
   Fr_stubs.mul
     (Ctypes.ocaml_bytes_start g)
     (Ctypes.ocaml_bytes_start x)
@@ -69,7 +69,7 @@ let mul x y =
 
 let inverse g =
   assert (Bytes.length g = size) ;
-  let buffer = Bytes.create size in
+  let buffer = empty () in
   Fr_stubs.unsafe_inverse
     (Ctypes.ocaml_bytes_start buffer)
     (Ctypes.ocaml_bytes_start g) ;
@@ -79,7 +79,7 @@ let inverse_opt g =
   assert (Bytes.length g = size) ;
   if is_zero g then None
   else
-    let buffer = Bytes.create size in
+    let buffer = empty () in
     Fr_stubs.unsafe_inverse
       (Ctypes.ocaml_bytes_start buffer)
       (Ctypes.ocaml_bytes_start g) ;
@@ -87,7 +87,7 @@ let inverse_opt g =
 
 let negate g =
   assert (Bytes.length g = size) ;
-  let buffer = Bytes.create size in
+  let buffer = empty () in
   Fr_stubs.negate
     (Ctypes.ocaml_bytes_start buffer)
     (Ctypes.ocaml_bytes_start g) ;
@@ -95,7 +95,7 @@ let negate g =
 
 let square g =
   assert (Bytes.length g = size) ;
-  let buffer = Bytes.create size in
+  let buffer = empty () in
   Fr_stubs.square
     (Ctypes.ocaml_bytes_start buffer)
     (Ctypes.ocaml_bytes_start g) ;
@@ -103,7 +103,7 @@ let square g =
 
 let double g =
   assert (Bytes.length g = size) ;
-  let buffer = Bytes.create size in
+  let buffer = empty () in
   Fr_stubs.double
     (Ctypes.ocaml_bytes_start buffer)
     (Ctypes.ocaml_bytes_start g) ;
@@ -138,7 +138,7 @@ let of_string s =
   let g = empty () in
   let s = Bytes.of_string (Z.to_bits (Z.erem (Z.of_string s) order)) in
   Bytes.blit s 0 g 0 (min (Bytes.length s) size) ;
-  of_bytes s
+  of_bytes g
 
 let of_z z =
   let z = Bytes.of_string (Z.to_bits (Z.erem z order)) in
