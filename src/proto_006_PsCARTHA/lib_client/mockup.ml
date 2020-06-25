@@ -310,21 +310,6 @@ type block = {
   context : Protocol.Environment.Context.t;
 }
 
-let block_encoding : block Data_encoding.t =
-  let open Data_encoding in
-  conv
-    (fun {hash; header; operations; context} ->
-      (hash, header, operations, context))
-    (fun (hash, header, operations, context) ->
-      {hash; header; operations; context})
-    (obj4
-       (req "hash" Block_hash.encoding)
-       (req "header" Protocol.Alpha_context.Block_header.encoding)
-       (req
-          "operations"
-          (list (dynamic_size Protocol.Alpha_context.Operation.encoding)))
-       (req "context" Memory_context.encoding))
-
 module Forge = struct
   let default_proof_of_work_nonce =
     Bytes.create Protocol.Alpha_context.Constants.proof_of_work_nonce_size
