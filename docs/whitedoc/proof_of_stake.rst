@@ -377,11 +377,10 @@ not forfeited.
 A *nonce revelation* is an operation, and multiple nonce revelations
 can thus be included in a block. A baker receives a
 ``SEED_NONCE_REVELATION_TIP`` = 1/8 ꜩ reward for including a
-revelation.  Revelations are free operations which do not compete with
-transactions for block space. Up to ``MAX_REVELATIONS_PER_BLOCK`` = 32
-revelations can be contained in any given block. Thus, (``BLOCKS_PER_CYCLE`` /
-``MAX_REVELATIONS_PER_BLOCK``) / ``BLOCKS_PER_COMMITMENT`` = 4
-blocks in a cycle are sufficient to include all revelations.
+revelation. Revelations are free operations which do not compete with
+transactions for block space. Up to ``MAX_ANON_OPS_PER_BLOCK`` = 132
+revelations, wallet activations and denunciations can be contained in any
+given block.
 
 The seed for cycle ``n`` is obtained as follows: the seed of cycle
 ``n-1`` is hashed with a constant and then with each nonce revealed in

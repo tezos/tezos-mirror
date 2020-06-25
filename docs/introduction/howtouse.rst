@@ -519,7 +519,7 @@ constants in Tezos, which may differ between Mainnet and other
    {
      "proof_of_work_nonce_size": 8,
      "nonce_length": 32,
-     "max_revelations_per_block": 32,
+     "max_anon_ops_per_block": 132,
      "max_operation_data_length": 16384,
      "preserved_cycles": 5,
      "blocks_per_cycle": 4096,
