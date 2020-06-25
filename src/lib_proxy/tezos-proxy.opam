@@ -9,6 +9,7 @@ depends: [
   "dune" { >= "2.0" }
   "tezos-base"
   "tezos-client-base"
+  "tezos-mockup-proxy"
   "tezos-protocol-environment"
   "tezos-rpc"
   "tezos-shell-services"

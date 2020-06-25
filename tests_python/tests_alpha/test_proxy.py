@@ -65,3 +65,15 @@ def test_chain_block_context_delegates(proxy_client):
     proxy_client.rpc(
         'get', f'/chains/{_CHAIN_ID}/blocks/{_BLOCK_ID}/context/delegates'
     )
+
+
+@pytest.mark.client
+def test_chain_blocks(proxy_client: Client):
+    """ Test an RPC that is delegated to the node """
+    proxy_client.rpc('get', f'/chains/{_CHAIN_ID}/blocks')
+
+
+@pytest.mark.client
+def test_network_self(proxy_client):
+    """ Test an RPC that is delegated to the node """
+    proxy_client.rpc('get', '/network/self')

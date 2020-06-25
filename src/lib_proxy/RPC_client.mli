@@ -23,33 +23,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let build_directory (printer : Tezos_client_base.Client_context.printer)
-    (rpc_context : RPC_context.json)
-    (proxy_env : Registration.proxy_environment) : unit RPC_directory.t =
-  let (module Proxy_environment) = proxy_env in
-  let build_env_rpc_context (chain : Tezos_shell_services.Block_services.chain)
-      (block : Tezos_shell_services.Block_services.block) =
-    Proxy_environment.init_env_rpc_context printer rpc_context chain block
-    >>= fun rpc_context ->
-    match rpc_context with
-    | Ok x ->
-        Lwt.return x
-    | Error err ->
-        Error_monad.pp_print_error Format.err_formatter err ;
-        (* Is there something better we can do!? I'm asking because
-           the caller of [build_directory] expects a unit Directory.t,
-           we can't give it a unit tzresult Directory.t *)
-        assert false
-  in
-  let proto_directory =
-    let ( // ) = RPC_directory.prefix in
-    (* register protocol-specific RPCs *)
-    Tezos_shell_services.Chain_services.path
-    // ( Tezos_shell_services.Block_services.path
-       // RPC_directory.map
-            (fun ((_, chain), block) -> build_env_rpc_context chain block)
-            Proxy_environment.directory )
-  in
-  RPC_directory.register_describe_directory_service
-    proto_directory
-    RPC_service.description_service
+(** The class [http_local_ctxt] creates an RPC context that executes
+    some RPCs locally and delegates others over http. Arguments are:
+
+    - an instance of [RPC_context.json] to perform RPC calls (for delegation
+      over http), and
+    - the protocol-dependent implementation of the proxy (the proxy mode
+      obtains data from endpoints with protocol-dependent RPCs). *)
+class http_local_ctxt :
+  Tezos_client_base.Client_context.printer
+  -> RPC_context.json
+  -> Registration.proxy_environment
+  -> RPC_context.json

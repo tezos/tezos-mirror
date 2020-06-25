@@ -225,11 +225,12 @@ class unix_proxy ~base_dir ~chain ~block ~confirmations ~password_filename
     inherit unix_wallet ~base_dir ~password_filename
 
     inherit
-      Tezos_mockup_proxy.RPC_client.local_ctxt
-        (Tezos_proxy.Proxy_services.build_directory
-           (new unix_logger ~base_dir)
-           (new RPC_client_unix.http_ctxt rpc_config [Media_type.json])
-           proxy_env)
+      Tezos_proxy.RPC_client.http_local_ctxt
+        (new unix_logger ~base_dir)
+        (new Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
+           rpc_config
+           Media_type.all_media_types)
+        proxy_env
 
     inherit unix_ui
 

@@ -334,10 +334,22 @@ class local_ctxt (directory : unit RPC_directory.t) : RPC_context.json =
           (params : p)
           (query : q)
           (input : i) ->
-        try LocalClient.call_service service params query input directory
-        with Not_found ->
+        let fail_not_found () =
           let description = print_service service in
+          (* The proxy mode relies on this code, because it matches
+             Local_RPC_error (Rpc_not_found _) to detect RPCs
+             that cannot be done locally, and delegates them to the node
+             instead. *)
           fail (Local_RPC_error (Rpc_not_found (Some description)))
+        in
+        try
+          LocalClient.call_service service params query input directory
+          >>= function
+          | Error (Tezos_rpc.RPC_context.Not_found _ :: _) ->
+              fail_not_found ()
+          | _ as res ->
+              Lwt.return res
+        with Not_found -> fail_not_found ()
 
     method call_streamed_service
         : 'm 'p 'q 'i 'o.
