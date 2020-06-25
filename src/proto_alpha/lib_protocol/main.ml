@@ -70,22 +70,19 @@ let max_operation_data_length =
   Alpha_context.Constants.max_operation_data_length
 
 let validation_passes =
-  let max_anonymous_operations =
-    Alpha_context.Constants.max_revelations_per_block
-    + (* allow 100 wallet activations or denunciations per block *) 100
-  in
+  let open Alpha_context.Constants in
   Updater.
-    [ {max_size = 32 * 1024; max_op = Some 32};
-      (* 32 endorsements *)
-      {max_size = 32 * 1024; max_op = None};
+    [ (* 32 endorsements *)
+      {max_size = 32 * 1024; max_op = Some 32};
       (* 32k of voting operations *)
+      {max_size = 32 * 1024; max_op = None};
+      (* revelations, wallet activations and denunciations *)
       {
-        max_size = max_anonymous_operations * 1024;
-        max_op = Some max_anonymous_operations;
+        max_size = max_anon_ops_per_block * 1024;
+        max_op = Some max_anon_ops_per_block;
       };
+      (* 512kB *)
       {max_size = 512 * 1024; max_op = None} ]
-
-(* 512kB *)
 
 let rpc_services =
   Alpha_services.register () ;

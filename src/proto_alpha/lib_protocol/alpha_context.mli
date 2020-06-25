@@ -450,7 +450,7 @@ module Constants : sig
   type fixed = {
     proof_of_work_nonce_size : int;
     nonce_length : int;
-    max_revelations_per_block : int;
+    max_anon_ops_per_block : int;
     max_operation_data_length : int;
     max_proposals_per_delegate : int;
     votes_per_roll : int;
@@ -464,7 +464,7 @@ module Constants : sig
 
   val nonce_length : int
 
-  val max_revelations_per_block : int
+  val max_anon_ops_per_block : int
 
   val max_operation_data_length : int
 

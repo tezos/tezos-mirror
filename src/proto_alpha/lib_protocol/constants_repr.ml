@@ -32,7 +32,7 @@ let proof_of_work_nonce_size = 8
 
 let nonce_length = 32
 
-let max_revelations_per_block = 32
+let max_anon_ops_per_block = 132
 
 let max_proposals_per_delegate = 20
 
@@ -43,7 +43,7 @@ let votes_per_roll = 100
 type fixed = {
   proof_of_work_nonce_size : int;
   nonce_length : int;
-  max_revelations_per_block : int;
+  max_anon_ops_per_block : int;
   max_operation_data_length : int;
   max_proposals_per_delegate : int;
   votes_per_roll : int;
@@ -55,20 +55,20 @@ let fixed_encoding =
     (fun c ->
       ( c.proof_of_work_nonce_size,
         c.nonce_length,
-        c.max_revelations_per_block,
+        c.max_anon_ops_per_block,
         c.max_operation_data_length,
         c.max_proposals_per_delegate,
         c.votes_per_roll ))
     (fun ( proof_of_work_nonce_size,
            nonce_length,
-           max_revelations_per_block,
+           max_anon_ops_per_block,
            max_operation_data_length,
            max_proposals_per_delegate,
            votes_per_roll ) ->
       {
         proof_of_work_nonce_size;
         nonce_length;
-        max_revelations_per_block;
+        max_anon_ops_per_block;
         max_operation_data_length;
         max_proposals_per_delegate;
         votes_per_roll;
@@ -76,7 +76,7 @@ let fixed_encoding =
     (obj6
        (req "proof_of_work_nonce_size" uint8)
        (req "nonce_length" uint8)
-       (req "max_revelations_per_block" uint8)
+       (req "max_anon_ops_per_block" uint8)
        (req "max_operation_data_length" int31)
        (req "max_proposals_per_delegate" uint8)
        (req "votes_per_roll" int31))
@@ -85,7 +85,7 @@ let fixed =
   {
     proof_of_work_nonce_size;
     nonce_length;
-    max_revelations_per_block;
+    max_anon_ops_per_block;
     max_operation_data_length;
     max_proposals_per_delegate;
     votes_per_roll;
