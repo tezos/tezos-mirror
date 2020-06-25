@@ -62,12 +62,18 @@ module PatriciaTree (V : HashPtree.Value) = struct
   let mem key t = M.mem (key_of_ipv6 key) t
 
   let key_mask_to_prefix key mask =
-    Ipaddr.V6.Prefix.of_netmask (key_to_ipv6 mask) (key_to_ipv6 key)
+    Ipaddr.V6.Prefix.of_netmask
+      ~netmask:(key_to_ipv6 mask)
+      ~address:(key_to_ipv6 key)
 
   let fold f t acc =
     let f key mask value acc =
-      let prefix = key_mask_to_prefix key mask in
-      f prefix value acc
+      match key_mask_to_prefix key mask with
+      | Ok prefix ->
+          f prefix value acc
+      | Error _ ->
+          (* TODO: print error? *)
+          acc
     in
     M.fold f t acc
 
