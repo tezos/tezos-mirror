@@ -9,10 +9,10 @@ opam_version=2.0
 ## Please update `.gitlab-ci.yml` accordingly
 ## full_opam_repository is a commit hash of the public OPAM repository, i.e.
 ## https://github.com/ocaml/opam-repository
-full_opam_repository_tag=09a2df978b5feeba7d54d7ecd20a82d23ebcb6de
+full_opam_repository_tag=873cadc9ece33ceb81b6a0aba50ae86a26551de0
 
 ## opam_repository is an additional, tezos-specific opam repository.
-opam_repository_tag=d4d744f245bcf4cc50a1536d876815c0ed108cc6
+opam_repository_tag=3ca586100c3774f2317d6099f47381f585104b9e
 opam_repository_url=https://gitlab.com/tezos/opam-repository.git
 opam_repository=$opam_repository_url\#$opam_repository_tag
 
