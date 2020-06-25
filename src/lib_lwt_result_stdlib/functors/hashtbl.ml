@@ -106,6 +106,8 @@ module Make (Seq : Sigs.Seq.S) = struct
 
     let remove t k =
       (match T.find_opt t k with None -> () | Some a -> Lwt.cancel a) ;
+      (* NOTE: we still need to call [T.remove] in case the promise is not
+         cancelable (in which case it is not rejected and thus not removed) *)
       T.remove t k
 
     let mem t k = T.mem t k

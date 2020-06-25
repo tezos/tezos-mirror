@@ -112,6 +112,9 @@ end
     order to insert a value, one has to use `find_or_make` which either returns
     an existing promise for a value bound to the given key, or makes such a
     promise. It is not possible to insert another value for an existing key.
+    This limits the table (e.g., it can only hold one value for any given key),
+    but it forces the user to *atomically* test membership and insert an
+    element.
 
     Second, the table is automatically cleaned. Specifically, when a promise for
     a value is fulfilled with an [Error _], the binding is removed. This leads
@@ -120,22 +123,22 @@ end
     [
     (* setup *)
     let t = create 256 in
-    let () = assert (fold_keys (fun _ acc -> succ acc) t 0 = 0) in
+    let () = assert (length t = 0) in
 
     (* insert a first promise for a value *)
     let p, r = Lwt.task () in
     let i1 = find_or_make t 1 (fun () -> p) in
-    let () = assert (fold_keys (fun _ acc -> succ acc) t 0 = 1) in
+    let () = assert (length t = 1) in
 
     (* because the same key is used, the promise is not inserted. *)
     let i2 = find_or_make t 1 (fun () -> assert false) in
-    let () = assert (fold_keys (fun _ acc -> succ acc) t 0 = 1) in
+    let () = assert (length t = 1) in
 
     (* when the original promise errors, the binding is removed *)
     let () = Lwt.wakeup r (Error ..) in
-    let () = assert (fold_keys (fun _ acc -> succ acc) t 0 = 0) in
+    let () = assert (length t = 0) in
 
-    (* and both the [find_or_make] promises have the error *)
+    (* and both [find_or_make] promises have the error *)
     let () = match Lwt.state i1 with
       | Return (Error ..) -> ()
       | _ -> assert false
@@ -161,16 +164,34 @@ module type S_LWT = sig
 
   val create : int -> 'a t
 
+  (** [clear tbl] cancels and removes all the promises in [tbl]. *)
   val clear : 'a t -> unit
 
+  (** [reset tbl] cancels and removes all the promises in [tbl], and resizes
+      [tbl] to its initial size. *)
   val reset : 'a t -> unit
 
+  (** [find_or_make tbl k make] behaves differently depending on [k] being bound
+      in [tbl]:
+      - if [k] is bound in [tbl] then [find_or_make tbl k make] returns the
+        promise [p] that [k] is bound to. This [p] might be already fulfilled
+        with [Ok _] or it might be pending. This [p] cannot be already fulfilled
+        with [Error _] or already rejected. This is because [Error]/rejected
+        promises are removed from the table automatically. Note however that if
+        this [p] is pending, [p] might become fulfilled with [Error _] or become
+        rejected.
+      - if [k] is not bound in [tbl] then [make ()] is called and the returned
+        promise [p] is bound to [k] in [tbl]. Then [p] is returned. When [p] is
+        resolved, it may be removed automatically from [tbl] as described above.
+  *)
   val find_or_make :
     'a t ->
     key ->
     (unit -> ('a, error) result Lwt.t) ->
     ('a, error) result Lwt.t
 
+  (** [remove tbl k] cancels the promise bound to [k] in [tbl] and removes it.
+      If [k] is not bound in [tbl] it does nothing. *)
   val remove : 'a t -> key -> unit
 
   val find : 'a t -> key -> ('a, error) result Lwt.t option
