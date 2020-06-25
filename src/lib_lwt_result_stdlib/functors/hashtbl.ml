@@ -112,13 +112,31 @@ module Make (Seq : Sigs.Seq.S) = struct
 
     let mem t k = T.mem t k
 
-    let iter_es f t = iter_es (fun (k, v) -> v >>=? f k) (T.to_seq t)
+    let iter_with_waiting_es f t =
+      iter_es
+        (fun (k, p) ->
+          Lwt.try_bind
+            (fun () -> p)
+            (function Error _ -> Monad.return_unit | Ok v -> f k v)
+            (fun _ -> Monad.return_unit))
+        (T.to_seq t)
 
-    let iter_ep f t = iter_ep (fun (k, v) -> v >>=? f k) (T.to_seq t)
+    let iter_with_waiting_ep f t =
+      iter_ep
+        (fun (k, p) ->
+          Lwt.try_bind
+            (fun () -> p)
+            (function Error _ -> Monad.return_unit | Ok v -> f k v)
+            (fun _ -> Monad.return_unit))
+        (T.to_seq t)
 
-    let fold_es f t init =
+    let fold_with_waiting_es f t init =
       fold_left_es
-        (fun acc (k, v) -> v >>=? fun vv -> f k vv acc)
+        (fun acc (k, p) ->
+          Lwt.try_bind
+            (fun () -> p)
+            (function Error _ -> return acc | Ok v -> f k v acc)
+            (fun _ -> return acc))
         init
         (T.to_seq t)
 

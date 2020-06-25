@@ -152,6 +152,8 @@ end
     This automatic cleaning relieves the user from the responsibility of
     cleaning the table (which is another possible source of race condition).
 
+    For consistency, traversal functions ignore [Error _] and rejections.
+
     Third, every time a promise is removed from the table (be it by [clean],
     [reset], or just [remove]), the promise is canceled.
 *)
@@ -198,17 +200,49 @@ module type S_LWT = sig
 
   val mem : 'a t -> key -> bool
 
-  val iter_es :
+  (** [iter_with_waiting_es f tbl] iterates [f] over the bindings in [tbl].
+
+      Specifically, for each binding [(k, p)] it waits for [p] to be fulfilled
+      with [Ok v] and calls [f k v]. If [p] fulfills with [Error _] or is
+      rejected, then no call is made for this binding. Note however that an
+      [Error]/rejection in one promise returned by [f] interrupts the
+      iteration.
+
+      It processes bindings one after the other: it waits for both the bound
+      promise to resolve and then the call promise to resolve before continuing
+      to the next binding. *)
+  val iter_with_waiting_es :
     (key -> 'a -> (unit, error) result Lwt.t) ->
     'a t ->
     (unit, error) result Lwt.t
 
-  val iter_ep :
+  (** [iter_with_waiting_ep f tbl] iterates [f] over the bindings in [tbl].
+
+      Specifically, for each binding [(k, p)] it waits for [p] to be fulfilled
+      with [Ok v] and calls [f k v]. If [p] fulfills with [Error _] or is
+      rejected, then no call is made for this binding.
+
+      Note however that if one (or more) of the promises returned by [f] ends in
+      [Error]/rejection, the final result of this promise is an
+      [Error]/rejection. Even so, it only resolves once all the promises have.
+
+      It processes all bindings concurrently: it concurrently waits for all the
+      bound promises to resolve and calls [f] as they resolve. *)
+  val iter_with_waiting_ep :
     (key -> 'a -> (unit, error) result Lwt.t) ->
     'a t ->
     (unit, error) result Lwt.t
 
-  val fold_es :
+  (** [fold_with_waiting_es f tbl init] folds [init] with [f] over the bindings
+      in [tbl].
+
+      Specifically, for each binding [(k, p)] it waits for [p] to be fulfilled
+      with [Ok v] and determines the next accumulator by calling [f k v acc]. If
+      [p] fulfills with [Error _] or is rejected, then no call is made for this
+      binding.
+
+      It processes bindings one after the other. *)
+  val fold_with_waiting_es :
     (key -> 'a -> 'b -> ('b, error) result Lwt.t) ->
     'a t ->
     'b ->
@@ -216,9 +250,17 @@ module type S_LWT = sig
 
   val fold_keys : (key -> 'b -> 'b) -> 'a t -> 'b -> 'b
 
+  (** [fold_promises f tbl init] folds over the table, passing the raw promises
+      to [f]. This means that [f] can observe [Error]/rejections.
+
+      This can be used to, e.g., count the number of resolved/unresolved
+      promises. *)
   val fold_promises :
     (key -> ('a, error) result Lwt.t -> 'b -> 'b) -> 'a t -> 'b -> 'b
 
+  (** [fold_resolved f tbl init] folds over the already resolved promises of
+      [tbl]. More specifically, it folds over the [v] for all the promises
+      fulfilled with [Ok v] that are bound in [tbl]. *)
   val fold_resolved : (key -> 'a -> 'b -> 'b) -> 'a t -> 'b -> 'b
 
   val length : 'a t -> int
