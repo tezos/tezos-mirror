@@ -113,7 +113,12 @@ type signal_setup
     @raise [Invalid_argument] if a signal is not one of [Sys.sig*]*)
 val make_signal_setup : soft:int list -> hard:int list -> signal_setup
 
-(** [default_signal_setup] is [make_signal_setup ~soft:[Sys.sigint] ~hard:[Sys.sigterm]] *)
+(** [default_signal_setup] is
+    [make_signal_setup ~soft:[Sys.sigint; Sys.sigterm] ~hard:[]].
+
+    Note that pressing Ctrl-C sends [SIGINT] to the process whilst shutting it
+    down through systemd sends [SIGTERM]. This is the reasoning behind the
+    default: both of those signals should be handled softly. *)
 val default_signal_setup : signal_setup
 
 (** [signal_name signal] is the name of [signal].

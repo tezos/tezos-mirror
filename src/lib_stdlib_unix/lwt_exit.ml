@@ -173,7 +173,7 @@ let make_signal_setup ~soft ~hard =
   with Not_found -> raise (Invalid_argument "Lwt_exit.make_signal_setup")
 
 let default_signal_setup =
-  make_signal_setup ~soft:[Sys.sigint] ~hard:[Sys.sigterm]
+  make_signal_setup ~soft:[Sys.sigint; Sys.sigterm] ~hard:[]
 
 (* soft handling: trigger an exit on first signal, immediately terminate
    process on second signal *)

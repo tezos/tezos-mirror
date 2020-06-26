@@ -27,6 +27,10 @@ open Lwt.Infix
 
 let devnull = Lwt_main.run (Lwt_unix.openfile "/dev/null" [O_WRONLY] 0)
 
+(* A signal setup with both soft and hard exits to test both behaviours *)
+let signal_setup =
+  Lwt_exit.make_signal_setup ~soft:[Sys.sigint; Sys.sigterm] ~hard:[Sys.sigusr1]
+
 let child_main () =
   Lwt_unix.dup2 devnull Lwt_unix.stderr ;
   let r = ref 10 in
@@ -41,7 +45,9 @@ let child_main () =
         Lwt.return ())
   in
   Stdlib.exit @@ Lwt_main.run
-  @@ ( Lwt_exit.wrap_and_error (Tezos_stdlib.Lwt_utils.never_ending ())
+  @@ ( Lwt_exit.wrap_and_error
+         ~signal_setup
+         (Tezos_stdlib.Lwt_utils.never_ending ())
      >>= function
      | Ok () ->
          Lwt.return 3
@@ -106,7 +112,7 @@ let main () =
               Lwt_main.run
                 (let s : unit Lwt.t =
                    Lwt_unix.sleep 0.01
-                   >>= fun () -> Unix.kill pid Sys.sigterm ; Lwt.return ()
+                   >>= fun () -> Unix.kill pid Sys.sigusr1 ; Lwt.return ()
                  in
                  Lwt_unix.waitpid [] pid
                  >|= fun (_, status) ->
