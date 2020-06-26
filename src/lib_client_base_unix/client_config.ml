@@ -58,13 +58,15 @@ let () =
     `Branch
     ~id:"suppressedArgument"
     ~title:"Suppressed Argument"
-    ~description:"Certain arguments are suppressed by some other"
+    ~description:"Certain arguments are conflicting with some other"
     ~pp:(fun ppf (args, by) ->
       Format.fprintf
         ppf
-        "certain arguments are suppressed by %s: %s."
-        by
-        (String.concat ", " args))
+        ( if List.length args == 1 then
+          "The argument/config file option %s is in conflict with %s"
+        else "The arguments/config file options %s are in conflict with %s" )
+        (String.concat ", " args)
+        by)
     Data_encoding.(obj2 (req "suppressed" (list string)) (req "by" string))
     (function Suppressed_arg e -> Some (e.args, e.by) | _ -> None)
     (fun (args, by) -> Suppressed_arg {args; by}) ;
@@ -402,7 +404,7 @@ let log_requests_switch () =
   switch ~long:"log-requests" ~short:'l' ~doc:"log all requests to the node" ()
 
 (* Command-line args which can be set in config file as well *)
-let addr_confdesc = "-A|-addr|<cfgfile>node_addr"
+let addr_confdesc = "-A or -addr or 'node_addr' in config file"
 
 let addr_arg () =
   arg
@@ -412,7 +414,7 @@ let addr_arg () =
     ~doc:"[DEPRECATED: use --endpoint instead] IP address of the node"
     (string_parameter ())
 
-let port_confdesc = "-P|--port|<cfgfile>node_port"
+let port_confdesc = "-P or --port or 'node_port' in config file"
 
 let port_arg () =
   arg
@@ -424,7 +426,7 @@ let port_arg () =
          try return (int_of_string x)
          with Failure _ -> fail (Invalid_port_arg x)))
 
-let tls_confdesc = "-S|--tls|<cfgfile>tls"
+let tls_confdesc = "-S or --tls or 'tls' in config file"
 
 let tls_switch () =
   switch
@@ -433,7 +435,7 @@ let tls_switch () =
     ~doc:"[DEPRECATED: use --endpoint instead] use TLS to connect to node."
     ()
 
-let endpoint_confdesc = "-E|--endpoint|<cfgfile>endpoint"
+let endpoint_confdesc = "-E or --endpoint or 'endpoint' in config file"
 
 let endpoint_arg () =
   arg
