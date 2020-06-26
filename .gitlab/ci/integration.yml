@@ -379,6 +379,12 @@ integration:alpha_multinode_storage_reconstruction:
     - poetry run pytest tests_alpha/test_multinode_storage_reconstruction.py -s --log-dir=tmp
   stage: test
 
+integration:alpha_proxy:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_alpha/test_proxy.py -s --log-dir=tmp
+  stage: test
+
 integration:alpha_rpc:
   extends: .integration_python_template
   script:

@@ -2,6 +2,7 @@
 """
 import shutil
 import time
+from typing import Iterator, Tuple
 import pytest
 from client.client import Client
 from tools import utils
@@ -77,3 +78,63 @@ def test_chain_blocks(proxy_client: Client):
 def test_network_self(proxy_client):
     """ Test an RPC that is delegated to the node """
     proxy_client.rpc('get', '/network/self')
+
+
+@pytest.fixture
+def vanilla_and_proxy_clients(sandbox) -> Iterator[Tuple[Client, Client]]:
+    """
+        Returns a vanilla client and a proxy client that talk to the same node
+    """
+    node_idx = 0
+    sandbox.add_node(node_idx)
+    node = sandbox.node(node_idx)
+
+    _update_node_to_alpha(sandbox, node_idx)
+
+    res_vanilla = sandbox.client(node_idx)  # Use the node default client
+    res_proxy = _create_proxy_for_node(sandbox, node)
+
+    try:
+        yield (res_vanilla, res_proxy)
+    finally:
+        # When test returns, this teardown executes
+        # No need to cleanup res_vanilla, it's managed by the sandbox
+        shutil.rmtree(res_proxy.base_dir)
+
+
+@pytest.mark.client
+@pytest.mark.slow
+@pytest.mark.parametrize('path',
+                         [f'{_RPC_PATH}/context/constants',
+                          f'{_RPC_PATH}/helpers/baking_rights',
+                          f'{_RPC_PATH}/helpers/current_level',
+                          f'{_RPC_PATH}/minimal_valid_time',
+                          f'{_RPC_PATH}/context/constants',
+                          f'{_RPC_PATH}/context/constants/errors',
+                          f'{_RPC_PATH}/context/delegates',
+                          f'{_RPC_PATH}/context/nonces/3',
+                          f'{_RPC_PATH}/helpers/endorsing_rights',
+                          f'{_RPC_PATH}/helpers/levels_in_current_cycle',
+                          f'{_RPC_PATH}/votes/ballot_list',
+                          f'{_RPC_PATH}/votes/ballots',
+                          f'{_RPC_PATH}/votes/current_period_kind',
+                          f'{_RPC_PATH}/votes/current_proposal',
+                          f'{_RPC_PATH}/votes/current_quorum',
+                          f'{_RPC_PATH}/votes/listings',
+                          f'{_RPC_PATH}/votes/proposals'])
+def test_compare(vanilla_and_proxy_clients: Tuple[Client, Client], path: str):
+    """ Compare the default client and the proxy clients on
+        a number of RPCs that are done locally by the proxy client
+        to witness they yield the same results """
+    vanilla, proxy = vanilla_and_proxy_clients
+
+    jsons = []
+    for client in [vanilla, proxy]:
+        jsons.append(client.rpc(verb="get", path=path))
+
+    assert jsons[0] == jsons[1],\
+        f"""Executing {path} on the default client and the proxy client
+lead different results. Default client returns:
+{jsons[0]}
+while proxy client returns:
+{jsons[1]}"""
