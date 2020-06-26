@@ -95,6 +95,7 @@ class Client:
         client = [client_path]
         if mode is None or mode == "client":
             client.extend(['-base-dir', base_dir])
+            client.extend(connectivity_options)
         elif mode == "mockup":
             client.extend(['-mode', mode])
         else:
@@ -103,7 +104,6 @@ class Client:
             assert False, msg
         admin_client = [admin_client_path, '-base-dir', base_dir]
 
-        client.extend(connectivity_options)
         admin_client.extend(connectivity_options)
 
         self._client = client
