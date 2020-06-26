@@ -190,7 +190,7 @@ class Client:
         """Run an arbitrary RPC command
 
         Args:
-            verb (str): either `get`, `post` or `put`
+            verb (str): either `get`, `post`, `put`, `patch` or `delete`
             path (str): rpc path
             data (dict): json data for post
             params (list): any additional parameters to pass to the client

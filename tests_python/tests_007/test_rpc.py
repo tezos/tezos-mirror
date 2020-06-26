@@ -149,6 +149,26 @@ class TestRPCsExistence:
         peer_id = sandbox.client(2).rpc('get', '/network/self')
         sandbox.client(1).rpc('get', f'/network/peers/{peer_id}/trust')
 
+    def test_network_peers_peer_id_trust_patch(self, sandbox: Sandbox):
+        peer_id = sandbox.client(2).rpc('get', '/network/self')
+        sandbox.client(1).rpc('patch', f'/network/peers/{peer_id}',
+                              {'trust': True})
+
+    def test_network_peers_peer_id_untrust_patch(self, sandbox: Sandbox):
+        peer_id = sandbox.client(2).rpc('get', '/network/self')
+        sandbox.client(1).rpc('patch', f'/network/peers/{peer_id}',
+                              {'trust': False})
+
+    def test_network_peers_peer_id_ban_patch(self, sandbox: Sandbox):
+        peer_id = sandbox.client(2).rpc('get', '/network/self')
+        sandbox.client(1).rpc('patch', f'/network/peers/{peer_id}',
+                              {'ban': True})
+
+    def test_network_peers_peer_id_unban_patch(self, sandbox: Sandbox):
+        peer_id = sandbox.client(2).rpc('get', '/network/self')
+        sandbox.client(1).rpc('patch', f'/network/peers/{peer_id}',
+                              {'ban': False})
+
     def test_network_points(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get', '/network/points')
 
@@ -181,6 +201,30 @@ class TestRPCsExistence:
         points = sandbox.client(1).rpc('get', '/network/points')
         point = points[-1][0]
         sandbox.client(1).rpc('get', f'/network/points/{point}/untrust')
+
+    def test_network_points_point_ban_patch(self, sandbox: Sandbox):
+        points = sandbox.client(1).rpc('get', '/network/points')
+        point = points[-1][0]
+        sandbox.client(1).rpc('patch', f'/network/points/{point}',
+                              {'ban': True})
+
+    def test_network_points_point_unban_patch(self, sandbox: Sandbox):
+        points = sandbox.client(1).rpc('get', '/network/points')
+        point = points[-1][0]
+        sandbox.client(1).rpc('patch', f'/network/points/{point}',
+                              {'ban': False})
+
+    def test_network_points_point_trust_patch(self, sandbox: Sandbox):
+        points = sandbox.client(1).rpc('get', '/network/points')
+        point = points[-1][0]
+        sandbox.client(1).rpc('patch', f'/network/points/{point}',
+                              {'trust': True})
+
+    def test_network_points_point_untrust_patch(self, sandbox: Sandbox):
+        points = sandbox.client(1).rpc('get', '/network/points')
+        point = points[-1][0]
+        sandbox.client(1).rpc('patch', f'/network/points/{point}',
+                              {'trust': False})
 
     def test_network_stat(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get', '/network/stat')
