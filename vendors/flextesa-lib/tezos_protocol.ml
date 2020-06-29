@@ -145,7 +145,7 @@ let protocol_parameters_json t : Ezjsonm.t =
       match subkind with
       | `Babylon -> (800_000, 8_000_000)
       | `Carthage -> (1_040_000, 10_400_000)
-      | `Alpha -> (128 * 1_040_000, 128 * 10_400_000) in
+      | `Alpha -> (1000 * 1_040_000, 1000 * 10_400_000) in
     let open Ezjsonm in
     let list_of_zs = list (fun i -> string (Int.to_string i)) in
     [ ("blocks_per_commitment", int 4)
