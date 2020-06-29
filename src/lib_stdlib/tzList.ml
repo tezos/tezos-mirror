@@ -41,16 +41,6 @@ let rev_sub l n =
 
 let sub l n = rev_sub l n |> List.rev
 
-let hd_opt = function [] -> None | h :: _ -> Some h
-
-let rec last_exn = function
-  | [] ->
-      raise Not_found
-  | [x] ->
-      x
-  | _ :: xs ->
-      last_exn xs
-
 let merge_filter2 ?(finalize = List.rev) ?(compare = compare)
     ?(f = TzOption.first_some) l1 l2 =
   let sort = List.sort compare in

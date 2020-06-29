@@ -41,8 +41,8 @@ module Option = struct
 end
 
 module List = struct
-  include Stdlib.List
   include Tezos_stdlib.TzList
+  include Tezos_lwt_result_stdlib.Lwtreslib.List
 end
 
 module String = struct

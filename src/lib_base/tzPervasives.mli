@@ -50,9 +50,9 @@ module Option : sig
 end
 
 module List : sig
-  include module type of Stdlib.List
-
   include module type of Tezos_stdlib.TzList
+
+  include module type of Tezos_lwt_result_stdlib.Lwtreslib.List
 end
 
 module String : sig
