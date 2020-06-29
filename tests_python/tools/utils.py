@@ -15,7 +15,8 @@ import ed25519
 import pyblake2
 import requests
 from client.client import Client
-from client.client_output import BakeForResult, RunScriptResult
+from client.client_output import (BakeForResult, RunScriptResult,
+                                  InvalidClientOutput)
 
 from . import constants
 
@@ -72,8 +73,11 @@ def check_protocol(client: Client, proto: str,
 @retry(timeout=1., attempts=20)
 def check_two_chains(client: Client) -> bool:
     main_id = client.rpc('get', 'chains/main/chain_id')
-    test_id = client.rpc('get', 'chains/test/chain_id')
-    return test_id != main_id
+    try:
+        test_id = client.rpc('get', 'chains/test/chain_id')
+        return test_id != main_id
+    except InvalidClientOutput:
+        return False
 
 
 @retry(timeout=2., attempts=10)
