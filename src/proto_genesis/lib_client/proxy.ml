@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,10 +23,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Genesis_block_services = Block_services.Make (Protocol) (Protocol)
+let init_env_rpc_context _ _ _ _ =
+  failwith
+    "In proxy mode, all RPCs of protocol genesis should be forwarded to the \
+     node. Hence this code should not be reached, because the RPC directory \
+     is empty."
 
-module Lifted_protocol = struct
-  include Protocol.Environment.Lift (Protocol)
+let () =
+  let open Tezos_proxy.Registration in
+  let module M : Proxy_sig = struct
+    module Protocol = Protocol_client_context.Lifted_protocol
 
-  let hash = Protocol.hash
-end
+    let protocol_hash = Protocol.hash
+
+    let directory = RPC_directory.empty
+
+    let init_env_rpc_context = init_env_rpc_context
+  end in
+  register_proxy_context (module M)
