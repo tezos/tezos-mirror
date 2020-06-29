@@ -24,28 +24,26 @@
 (*****************************************************************************)
 
 let check_client_node_proto_agree (rpc_context : #RPC_context.simple)
-    (proto_hash : Protocol_hash.t option)
+    (proto_hash : Protocol_hash.t)
     (chain : Tezos_shell_services.Block_services.chain)
     (block : Tezos_shell_services.Block_services.block) : unit tzresult Lwt.t =
-  match proto_hash with
-  | None ->
-      return_unit
-  | Some proto_hash ->
-      Tezos_shell_services.Block_services.protocols
-        rpc_context
-        ~chain
-        ~block
-        ()
-      >>=? fun {current_protocol; _} ->
-      if Protocol_hash.equal current_protocol proto_hash then return_unit
-      else
-        failwith
-          "Protocol passed to the proxy (%a) and protocol of the node (%a) \
-           differ."
-          Protocol_hash.pp
-          proto_hash
-          Protocol_hash.pp
-          current_protocol
+  Tezos_shell_services.Block_services.protocols rpc_context ~chain ~block ()
+  >>=? fun {current_protocol; _} ->
+  if Protocol_hash.equal current_protocol proto_hash then return_unit
+  else
+    failwith
+      "Protocol passed to the proxy (%a) and protocol of the node (%a) differ."
+      Protocol_hash.pp
+      proto_hash
+      Protocol_hash.pp
+      current_protocol
+
+let get_node_protocol (rpc_context : #RPC_context.simple)
+    (chain : Tezos_shell_services.Block_services.chain)
+    (block : Tezos_shell_services.Block_services.block) :
+    Protocol_hash.t tzresult Lwt.t =
+  Tezos_shell_services.Block_services.protocols rpc_context ~chain ~block ()
+  >>=? fun {current_protocol; _} -> return current_protocol
 
 module type Proxy_sig = sig
   val protocol_hash : Protocol_hash.t
@@ -82,33 +80,55 @@ let register_proxy_context m =
             INCOMING_P.protocol_hash)
   else registered := m :: !registered
 
-let get_registered_proxy (_printer : Tezos_client_base.Client_context.printer)
+let get_registered_proxy (printer : Tezos_client_base.Client_context.printer)
     (rpc_context : #RPC_context.simple)
     (protocol_hash_opt : Protocol_hash.t option)
     (chain : Tezos_shell_services.Block_services.chain)
     (block : Tezos_shell_services.Block_services.block) :
     proxy_environment tzresult Lwt.t =
-  check_client_node_proto_agree rpc_context protocol_hash_opt chain block
+  ( match protocol_hash_opt with
+  | None ->
+      get_node_protocol rpc_context chain block
+      >>=? fun protocol_hash ->
+      printer#warning
+        "protocol of proxy unspecified, using the node's protocol: %a"
+        Protocol_hash.pp
+        protocol_hash
+      >>= fun _ -> return protocol_hash
+  | Some protocol_hash ->
+      return protocol_hash )
+  >>=? fun protocol_hash ->
+  check_client_node_proto_agree rpc_context protocol_hash chain block
   >>=? fun _ ->
   let available = !registered in
-  match available with
-  | [] ->
-      failwith "get_registered_proxy: no registered proxy environment"
-  | fst_proxy :: _ -> (
-    match protocol_hash_opt with
-    | None ->
-        return fst_proxy
-    | Some protocol_hash -> (
-        let proxy_opt =
-          List.find_opt
-            (fun (module Proxy : Proxy_sig) ->
-              Protocol_hash.equal protocol_hash Proxy.protocol_hash)
-            available
-        in
-        match proxy_opt with
-        | Some proxy ->
-            return proxy
-        | None ->
-            failwith
-              "requested protocol not found in available proxy environments" )
-    )
+  let proxy_opt =
+    List.find_opt
+      (fun (module Proxy : Proxy_sig) ->
+        Protocol_hash.equal protocol_hash Proxy.protocol_hash)
+      available
+  in
+  match proxy_opt with
+  | Some proxy ->
+      return proxy
+  | None -> (
+    match available with
+    | [] ->
+        failwith
+          "There are no proxy environments registered. --mode proxy cannot be \
+           honored."
+    | fst_available :: _ ->
+        let (module Proxy : Proxy_sig) = fst_available in
+        let fst_available_proto = Proxy.protocol_hash in
+        printer#warning
+          "requested protocol (%a) not found in available proxy environments: \
+           %a@;\
+           Proceeding with the first available protocol (%a). This will work \
+           if the mismatch is harmless, otherwise deserialization is the \
+           failure most likely to happen."
+          Protocol_hash.pp
+          protocol_hash
+          (Format.pp_print_list ~pp_sep:Format.pp_print_space Protocol_hash.pp)
+          ((List.map (fun (module P : Proxy_sig) -> P.protocol_hash)) available)
+          Protocol_hash.pp
+          fst_available_proto
+        >>= fun () -> return fst_available )
