@@ -38,6 +38,8 @@ type t =
 
 val pp : Format.formatter -> t -> unit
 
+val pp_short : Format.formatter -> t -> unit
+
 val encoding : t Data_encoding.t
 
 type error += Rejecting of {motive : t}

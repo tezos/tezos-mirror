@@ -384,7 +384,8 @@ let raw_authenticate t ?point_info canceler fd point =
           | P2p_errors.Rejected_by_nack
               {alternative_points = Some points; motive}
             :: _ ->
-              Events.(emit connection_rejected_by_peers) (point, motive, points)
+              Events.(emit connection_rejected_by_peers)
+                (point, info.peer_id, motive, points)
               >>= fun () ->
               P2p_pool.register_list_of_new_points
                 ~medium:"Nack"

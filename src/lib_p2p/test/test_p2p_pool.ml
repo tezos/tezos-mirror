@@ -155,7 +155,12 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
   in
   Process.detach
     ~prefix:
-      (Format.asprintf "%s%a: " prefix P2p_peer.Id.pp_short identity.peer_id)
+      (Format.asprintf
+         "%s%a:%d: "
+         prefix
+         P2p_peer.Id.pp_short
+         identity.peer_id
+         port)
     ~canceler
     (fun channel ->
       let timer ti =

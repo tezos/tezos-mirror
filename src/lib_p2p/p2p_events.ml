@@ -193,14 +193,17 @@ module P2p_connect_handler = struct
       ("errors", Error_monad.trace_encoding)
 
   let connection_rejected_by_peers =
-    declare_3
+    declare_4
       ~section
       ~name:"connection_rejected_by_peers"
       ~msg:
-        "connection to {point} rejected by peer. Reason {reason}. Peer list \
-         received: {points}"
+        "connection to {point} rejected by peer {peer}. Reason {reason}. Peer \
+         list received: {points}"
       ~level:Debug
+      ~pp2:P2p_peer.Id.pp_short
+      ~pp3:P2p_rejection.pp_short
       ("point", P2p_point.Id.encoding)
+      ("peer", P2p_peer.Id.encoding)
       ("reason", P2p_rejection.encoding)
       ("points", Data_encoding.list P2p_point.Id.encoding)
 
