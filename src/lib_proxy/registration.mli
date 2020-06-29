@@ -64,4 +64,9 @@ val register_proxy_context : proxy_environment -> unit
     first one in the list of registered protocols
     if the [Protocol_hash.t] is [None], see the [Registration] module). *)
 val get_registered_proxy :
-  Protocol_hash.t option -> proxy_environment tzresult Lwt.t
+  Tezos_client_base.Client_context.printer ->
+  #RPC_context.simple ->
+  Protocol_hash.t option ->
+  Tezos_shell_services.Block_services.chain ->
+  Tezos_shell_services.Block_services.block ->
+  proxy_environment tzresult Lwt.t

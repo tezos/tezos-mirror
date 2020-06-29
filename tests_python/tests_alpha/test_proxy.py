@@ -7,7 +7,9 @@ import pytest
 from client.client import Client
 from tools import utils
 
-from tools.constants import ALPHA
+from tools.constants import ALPHA, CARTHAGE
+
+_OTHER_PROTO = CARTHAGE
 
 _BLOCK_ID = "head"
 _CHAIN_ID = "main"
@@ -138,3 +140,18 @@ lead different results. Default client returns:
 {jsons[0]}
 while proxy client returns:
 {jsons[1]}"""
+
+
+def test_wrong_proto(proxy_client):
+    """Test that tezos-client --mode proxy --protocol P fails
+    when the endpoint's protocol is NOT P"""
+    # The chosen protocol must differ from the protocol
+    # initialized by the proxy_client fixture
+    cmd = ["--protocol", _OTHER_PROTO, "bake", "for", "bootstrap1"]
+    (_, stderr, return_code) = proxy_client.run_generic(cmd, check=False)
+    assert return_code != 0
+    err_msg = (
+        f"Protocol passed to the proxy ({_OTHER_PROTO})"
+        + f" and protocol of the node ({_PROTO}) differ"
+    )
+    assert err_msg in stderr

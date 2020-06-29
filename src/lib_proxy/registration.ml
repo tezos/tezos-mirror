@@ -23,6 +23,30 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let check_client_node_proto_agree (rpc_context : #RPC_context.simple)
+    (proto_hash : Protocol_hash.t option)
+    (chain : Tezos_shell_services.Block_services.chain)
+    (block : Tezos_shell_services.Block_services.block) : unit tzresult Lwt.t =
+  match proto_hash with
+  | None ->
+      return_unit
+  | Some proto_hash ->
+      Tezos_shell_services.Block_services.protocols
+        rpc_context
+        ~chain
+        ~block
+        ()
+      >>=? fun {current_protocol; _} ->
+      if Protocol_hash.equal current_protocol proto_hash then return_unit
+      else
+        failwith
+          "Protocol passed to the proxy (%a) and protocol of the node (%a) \
+           differ."
+          Protocol_hash.pp
+          proto_hash
+          Protocol_hash.pp
+          current_protocol
+
 module type Proxy_sig = sig
   val protocol_hash : Protocol_hash.t
 
@@ -58,9 +82,14 @@ let register_proxy_context m =
             INCOMING_P.protocol_hash)
   else registered := m :: !registered
 
-let get_registered_proxy :
-    Protocol_hash.t option -> proxy_environment tzresult Lwt.t =
- fun protocol_hash_opt ->
+let get_registered_proxy (_printer : Tezos_client_base.Client_context.printer)
+    (rpc_context : #RPC_context.simple)
+    (protocol_hash_opt : Protocol_hash.t option)
+    (chain : Tezos_shell_services.Block_services.chain)
+    (block : Tezos_shell_services.Block_services.block) :
+    proxy_environment tzresult Lwt.t =
+  check_client_node_proto_agree rpc_context protocol_hash_opt chain block
+  >>=? fun _ ->
   let available = !registered in
   match available with
   | [] ->

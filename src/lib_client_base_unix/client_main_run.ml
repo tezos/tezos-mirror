@@ -166,7 +166,18 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config
          ~base_dir
          ~rpc_config
   else
-    Tezos_proxy.Registration.get_registered_proxy protocol
+    let printer = new unix_logger ~base_dir in
+    let rpc_context =
+      new Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
+        rpc_config
+        Media_type.all_media_types
+    in
+    Tezos_proxy.Registration.get_registered_proxy
+      printer
+      rpc_context
+      protocol
+      chain
+      block
     >>=? fun proxy_env ->
     return
     @@ new unix_proxy
