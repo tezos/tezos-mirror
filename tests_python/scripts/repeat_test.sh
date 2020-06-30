@@ -1,4 +1,4 @@
-#!/bin/bash
+#! /usr/bin/env bash
 # run test at most NUM times, exit at first failure
 
 if [ $# -ne 2 ] || [ "$1" -le 0 ] || [ ! -f $2 ]; then

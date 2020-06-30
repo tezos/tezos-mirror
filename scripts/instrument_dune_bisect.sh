@@ -1,4 +1,4 @@
-#!/bin/bash
+#! /usr/bin/env bash
 
 script_dir=$(cd "$(dirname "$0")" && pwd -P)
 src_dir="$(dirname "$script_dir")"
