@@ -362,7 +362,7 @@ end
     from values to a different representation and back. This is used to abstract
     resto over specific representations of values.
 
-    See {Resto_json} for example of possible instantiation. *)
+    See {!Resto_json} for example of possible instantiation. *)
 module type ENCODING = sig
   type 'a t
 
