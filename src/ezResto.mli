@@ -9,7 +9,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** [EzResto] is an abstraction layer on top of [Resto] that is simpler to use
+(** [EzResto] is an abstraction layer on top of {!Resto} that is simpler to use
     -- it is the *easy* Resto. We recommend that you read the documentation in
     this module as the basis for understanding EzResto and as a jumping point to
     understand Resto.
@@ -35,29 +35,30 @@
     whilst the interface is light-weight (i.e., the interfaces are simpler),
     the actual runtime cost is the same.
 
-    For example, in [EzResto], [path]s have a single type parameter: this makes
-    the most common use (adding suffixes to an existing path) simpler to reason
-    about, but preclude the use of the [prefix] functionality of [Resto]. But
-    the runtime behavior (including computational and memory cost) is the same.
+    For example, in [EzResto], [path]s ({!Path.t}) have a single type parameter:
+    this makes the most common use (adding suffixes to an existing path) simpler
+    to reason about, but preclude the use of the [prefix] functionality of
+    [Resto] ({!Resto.Path.prefix}). But the runtime behavior (including
+    computational and memory cost) is the same.
 
     In general, you should use [EzResto] if it includes the features you need,
     and resort to [Resto] only on a by-need basis.
 
     # Intended use of EzResto
 
-    The intended use of EzResto is as follows:
+    The intended use of [EzResto] is as follows:
     - Define arguments, paths, query fields, and queries as required by the API
       you describe.
     - Define services using the previously defined arguments, paths, query
       fields and queries.
 
     If you are writing a server, you can then:
-    - Use [EzResto_directory] to register those services.
-    - Use [Resto_cohttp_server] to spin up a server that answers requests to
-      these services.
+    - Use {!EzResto_directory} to register those services.
+    - Use [Resto_cohttp_server.]{!Server} to spin up a server that answers
+      requests to these services.
 
     Alternatively, if you are writing a client, you can then:
-       - Use [Resto_cohttp_client] to make requests to these services.
+    - Use [Resto_cohttp_client.]{!Client} to make requests to these services.
 
 *)
 
@@ -140,7 +141,7 @@ module Path : sig
       service that is parametrized over a value of type [a] is attached to a
       path that includes a argument for a value of type [a]. When the service is
       called, the argument is encoded as by the client/decoded by the server,
-      using the constructor/desctructor of the argument. *)
+      using the constructor/destructor of the argument. *)
   val add_arg : 'params path -> 'a Arg.arg -> ('params * 'a) path
 
   val ( /: ) : 'params path -> 'a Arg.arg -> ('params * 'a) path
@@ -235,8 +236,8 @@ val get_service :
   'params Path.t ->
   ([`GET], 'params, 'query, unit, 'output, 'error) service
 
-(** [post_service], [delete_service], [put_service], and [patch_service] are
-    similar to [get_service] but for other methods.
+(** {!post_service}, {!delete_service}, {!put_service}, and {!patch_service} are
+    similar to {!get_service} but for other methods.
 
     Note that some of these functions take an additional [input] argument. This
     is only for the services with methods that expect additional parameters. It
