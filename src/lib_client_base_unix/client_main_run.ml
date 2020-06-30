@@ -179,7 +179,6 @@ let setup_mockup_rpc_client_config
         Tezos_mockup.Persistence.init_mockup_context_by_protocol_hash
           ~cctxt
           ~protocol_hash
-          ~chain_id:None
           ~constants_overrides_json:None
           ~bootstrap_accounts_json:None
   in

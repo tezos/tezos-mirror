@@ -363,15 +363,10 @@ let initial_context (header : Block_header.shell_header)
 let mem_init :
     cctxt:Tezos_client_base.Client_context.full ->
     parameters:mockup_protocol_parameters ->
-    chain_id:Chain_id.t option ->
     constants_overrides_json:Data_encoding.json option ->
     bootstrap_accounts_json:Data_encoding.json option ->
     (Chain_id.t * Tezos_protocol_environment.rpc_context) tzresult Lwt.t =
- fun ~cctxt
-     ~parameters
-     ~chain_id
-     ~constants_overrides_json
-     ~bootstrap_accounts_json ->
+ fun ~cctxt ~parameters ~constants_overrides_json ~bootstrap_accounts_json ->
   let hash =
     Block_hash.of_b58check_exn
       "BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU"
@@ -442,7 +437,6 @@ let mem_init :
   >>=? fun context ->
   let chain_id =
     Tezos_mockup_registration.Mockup_args.Chain_id.choose
-      ~from_command_line:chain_id
       ~from_config_file:protocol_overrides.chain_id
   in
   return

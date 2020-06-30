@@ -37,7 +37,6 @@ val default_mockup_context :
 val init_mockup_context_by_protocol_hash :
   cctxt:Tezos_client_base.Client_context.full ->
   protocol_hash:Protocol_hash.t ->
-  chain_id:Chain_id.t option ->
   constants_overrides_json:Data_encoding.json option ->
   bootstrap_accounts_json:Data_encoding.json option ->
   (Registration.mockup_environment * Registration.mockup_context) tzresult
@@ -55,7 +54,6 @@ val get_mockup_context_from_disk :
 val create_mockup :
   cctxt:Tezos_client_base.Client_context.full ->
   protocol_hash:Protocol_hash.t ->
-  chain_id:Chain_id.t option ->
   constants_overrides_json:Data_encoding.json option ->
   bootstrap_accounts_json:Data_encoding.json option ->
   unit tzresult Lwt.t

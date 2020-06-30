@@ -28,10 +28,5 @@ module Chain_id = struct
 
   let dummy = of_string "chain"
 
-  let choose ~from_command_line ~from_config_file =
-    match (from_command_line, from_config_file) with
-    | (None, None) ->
-        dummy
-    | (Some cid, (None | Some _)) | (None, Some cid) ->
-        cid
+  let choose ~from_config_file = Option.value from_config_file ~default:dummy
 end

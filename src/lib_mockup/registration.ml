@@ -64,7 +64,6 @@ module type Mockup_sig = sig
   val init :
     cctxt:Tezos_client_base.Client_context.full ->
     parameters:parameters ->
-    chain_id:Chain_id.t option ->
     constants_overrides_json:Data_encoding.json option ->
     bootstrap_accounts_json:Data_encoding.json option ->
     mockup_context tzresult Lwt.t

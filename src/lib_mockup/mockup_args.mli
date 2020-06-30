@@ -37,15 +37,12 @@ module Chain_id : sig
    *)
   val dummy : Chain_id.t
 
-  (** [choose ~from_command_line ~from_config_file]
-   ** chooses a valid chain_id from two options.
+  (** [choose ~from_config_file]
+   ** produces a valid chain id from the optionally given one.
    **
    ** The value from the command line, if any, has highest precedence, over the
    ** one from the config file.
    ** When both values are [None], it uses the {!dummy}.
    *)
-  val choose :
-    from_command_line:Chain_id.t option ->
-    from_config_file:Chain_id.t option ->
-    Chain_id.t
+  val choose : from_config_file:Chain_id.t option -> Chain_id.t
 end

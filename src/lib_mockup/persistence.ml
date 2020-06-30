@@ -102,29 +102,22 @@ let default_mockup_context :
     ~parameters:Mockup.default_parameters
     ~constants_overrides_json:None
     ~bootstrap_accounts_json:None
-    ~chain_id:None
   >>=? fun rpc_context -> return (mockup, rpc_context)
 
 let init_mockup_context_by_protocol_hash :
     cctxt:Tezos_client_base.Client_context.full ->
     protocol_hash:Protocol_hash.t ->
-    chain_id:Chain_id.t option ->
     constants_overrides_json:Data_encoding.json option ->
     bootstrap_accounts_json:Data_encoding.json option ->
     (Registration.mockup_environment * Registration.mockup_context) tzresult
     Lwt.t =
- fun ~cctxt
-     ~protocol_hash
-     ~chain_id
-     ~constants_overrides_json
-     ~bootstrap_accounts_json ->
+ fun ~cctxt ~protocol_hash ~constants_overrides_json ~bootstrap_accounts_json ->
   get_registered_mockup (Some protocol_hash)
   >>=? fun mockup ->
   let (module Mockup) = mockup in
   Mockup.init
     ~cctxt
     ~parameters:Mockup.default_parameters
-    ~chain_id
     ~constants_overrides_json
     ~bootstrap_accounts_json
   >>=? fun menv -> return (mockup, menv)
@@ -200,8 +193,7 @@ let classify_base_dir base_dir =
     else Base_dir_is_nonempty
 
 let create_mockup ~(cctxt : Tezos_client_base.Client_context.full)
-    ~protocol_hash ~chain_id ~constants_overrides_json ~bootstrap_accounts_json
-    =
+    ~protocol_hash ~constants_overrides_json ~bootstrap_accounts_json =
   let base_dir = cctxt#get_base_dir in
   let create_base_dir () =
     Tezos_stdlib_unix.Lwt_utils_unix.create_dir base_dir
@@ -221,18 +213,11 @@ let create_mockup ~(cctxt : Tezos_client_base.Client_context.full)
         "%s is not empty, please specify a fresh base directory"
         base_dir )
   >>=? fun () ->
-  ( match chain_id with
-  | None ->
-      Lwt.return_unit
-  | Some chain_id ->
-      cctxt#message "Chain id is %a" Chain_id.pp chain_id )
-  >>= fun () ->
   init_mockup_context_by_protocol_hash
     ~cctxt
     ~protocol_hash
     ~constants_overrides_json
     ~bootstrap_accounts_json
-    ~chain_id
   >>=? fun (_mockup_env, (chain_id, rpc_context)) ->
   let mockup_dir = Filename.concat base_dir mockup_dirname in
   Tezos_stdlib_unix.Lwt_utils_unix.create_dir mockup_dir
