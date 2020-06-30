@@ -1850,15 +1850,17 @@ let rec parse_data :
       )
   in
   let traced body = trace_eval error body in
-  let parse_items ?type_logger loc ctxt expr key_type value_type items
-      item_wrapper =
+  let parse_items ?type_logger ctxt expr key_type value_type items item_wrapper
+      =
     let length = List.length items in
     fold_left_s
       (fun (last_value, map, ctxt) item ->
         Lwt.return (Gas.consume ctxt (Typecheck_costs.map_element length))
         >>=? fun ctxt ->
         match item with
-        | Prim (_, D_Elt, [k; v], _) ->
+        | Prim (loc, D_Elt, [k; v], annot) ->
+            (if legacy then return () else fail_unexpected_annot loc annot)
+            >>=? fun () ->
             parse_comparable_data ?type_logger ctxt key_type k
             >>=? fun (k, ctxt) ->
             parse_data ?type_logger ctxt ~legacy value_type v
@@ -2203,7 +2205,7 @@ let rec parse_data :
   | (Union_t _, Prim (loc, D_Left, l, _)) ->
       fail @@ Invalid_arity (loc, D_Left, 1, List.length l)
   | (Union_t (_, (tr, _), _), Prim (loc, D_Right, [v], annot)) ->
-      fail_unexpected_annot loc annot
+      (if legacy then return () else fail_unexpected_annot loc annot)
       >>=? fun () ->
       Lwt.return (Gas.consume ctxt Typecheck_costs.union)
       >>=? fun ctxt ->
@@ -2291,12 +2293,12 @@ let rec parse_data :
   | (Set_t _, expr) ->
       traced (fail (Invalid_kind (location expr, [Seq_kind], kind expr)))
   (* Maps *)
-  | (Map_t (tk, tv, _ty_name), (Seq (loc, vs) as expr)) ->
-      parse_items ?type_logger loc ctxt expr tk tv vs (fun x -> x)
+  | (Map_t (tk, tv, _ty_name), (Seq (_, vs) as expr)) ->
+      parse_items ?type_logger ctxt expr tk tv vs (fun x -> x)
   | (Map_t _, expr) ->
       traced (fail (Invalid_kind (location expr, [Seq_kind], kind expr)))
-  | (Big_map_t (tk, tv, _ty_name), (Seq (loc, vs) as expr)) ->
-      parse_items ?type_logger loc ctxt expr tk tv vs (fun x -> Some x)
+  | (Big_map_t (tk, tv, _ty_name), (Seq (_loc, vs) as expr)) ->
+      parse_items ?type_logger ctxt expr tk tv vs (fun x -> Some x)
       >>|? fun (diff, ctxt) ->
       ( {id = None; diff; key_type = ty_of_comparable_ty tk; value_type = tv},
         ctxt )
