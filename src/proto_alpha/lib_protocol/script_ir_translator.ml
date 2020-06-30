@@ -2383,7 +2383,9 @@ let rec parse_data :
         Lwt.return (Gas.consume ctxt (Typecheck_costs.map_element length))
         >>=? fun ctxt ->
         match item with
-        | Prim (_, D_Elt, [k; v], _) ->
+        | Prim (loc, D_Elt, [k; v], annot) ->
+            (if legacy then return () else fail_unexpected_annot loc annot)
+            >>=? fun () ->
             parse_comparable_data ?type_logger ctxt key_type k
             >>=? fun (k, ctxt) ->
             parse_data ?type_logger ctxt ~legacy value_type v
@@ -2728,7 +2730,7 @@ let rec parse_data :
   | (Union_t _, Prim (loc, D_Left, l, _)) ->
       fail @@ Invalid_arity (loc, D_Left, 1, List.length l)
   | (Union_t (_, (tr, _), _), Prim (loc, D_Right, [v], annot)) ->
-      fail_unexpected_annot loc annot
+      (if legacy then return () else fail_unexpected_annot loc annot)
       >>=? fun () ->
       Lwt.return (Gas.consume ctxt Typecheck_costs.union)
       >>=? fun ctxt ->
