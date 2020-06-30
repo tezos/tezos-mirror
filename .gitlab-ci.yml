@@ -1,13 +1,17 @@
 ---
 
 stages:
-  - test
-  - deploy
+  - build-and-test
+  - publish
 
-.build_template: &build_definition
+build-and-test:
+  stage: build-and-test
   image: ocaml/opam2:alpine-3.10-ocaml-4.08
   script:
+    - opam lint .
     - sudo apk --no-cache add m4
+    - opam install ocamlformat.0.10
+    - ocamlformat --check src/*.ml src/*.mli test/*.ml
     - opam pin --no-action ezresto-directory .
     - opam pin --no-action ezresto .
     - opam pin --no-action resto-cohttp-client .
@@ -20,34 +24,18 @@ stages:
       resto-cohttp resto-cohttp-server resto-directory resto-json resto
     - opam install --deps-only .
     - dune build
-    - opam install odoc
-    - dune build @doc
-    - mv _build/default/_doc/_html public/
     - dune runtest
     - opam install .
 
-
-test-fmt:
-  stage: test
+publish-doc:
   image: ocaml/opam2:alpine-3.10-ocaml-4.08
-  script:
-    - sudo apk --no-cache add m4
-    - opam install ocamlformat.0.10
-    - ocamlformat --check src/*.ml src/*.mli test/*.ml
-
-pages:
-  <<: *build_definition
-  stage: deploy
+  stage: publish
   artifacts:
     paths:
     - public/
   only:
   - master
-
-test:
-  <<: *build_definition
-  stage: test
-  only:
-  - branches
-  except:
-  - master
+  script:
+    - opam install odoc
+    - dune build @doc
+    - mv _build/default/_doc/_html public/
