@@ -113,6 +113,7 @@ You can now use standard commands, such as:
 One can also originate contracts:
 
 ::
+
     $ mockup-client originate contract foo transferring 100 from bootstrap1 running 'parameter unit; storage unit; code { CAR; NIL operation; PAIR}' --burn-cap 10
     [...]
     New contract KT1DieU51jzXLerQx5AqMCiLC1SsCeM8yRat originated.
@@ -120,12 +121,14 @@ One can also originate contracts:
 The client can be used to display the state of the contract, eg its storage:
 
 ::
+
     $ mockup-client get contract storage for foo
     Unit
 
 The RPC mechanism can also be conveniently used to access the state of the contract in JSON format:
 
 ::
+
     $ mockup-client rpc get /chains/main/blocks/head/context/contracts/KT1DieU51jzXLerQx5AqMCiLC1SsCeM8yRat/storage
     { "prim": "Unit" }
 
@@ -175,7 +178,7 @@ You can now edit the files ``bootstrap-accounts.json`` and
 
 
 Chain id
---------
+~~~~~~~~
 
 The `chain id` is one particular chain parameter that is also accessible from
 the command line at mockup creation.
@@ -184,6 +187,7 @@ For that, you need to use the `chain-id-seed` command-line switch, which will in
 turn initialize a valid `chain id`. The mockup creation command now becomes
 
 ::
+
     tezos-client --protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK \
       --base-dir /tmp/mockup create mockup --chain-id-seed myseed
 
