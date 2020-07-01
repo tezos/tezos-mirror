@@ -12,7 +12,6 @@ depends: [
   "data-encoding" { = "0.2" }
   "tezos-error-monad"
   "tezos-event-logging"
-  "tezos-rpc"
   "tezos-stdlib"
   "lwt" { >= "3.0.0" }
   "ptime" { >= "0.8.4" }

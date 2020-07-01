@@ -3,13 +3,11 @@
  (public_name tezos-stdlib-unix)
  (flags (:standard -open Tezos_error_monad
                    -open Tezos_event_logging
-                   -open Tezos_rpc
                    -open Tezos_stdlib
                    -open Data_encoding))
  (libraries data-encoding
             tezos-error-monad
             tezos-event-logging
-            tezos-rpc
             tezos-stdlib
             lwt.unix
             ipaddr.unix
