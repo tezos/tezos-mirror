@@ -460,18 +460,18 @@ let accept t fd point =
     (* silently ignore banned points *)
     || P2p_pool.Points.banned t.pool point
   then
-    Lwt_utils.dont_wait
+    Error_monad.dont_wait
       (fun exc ->
-        Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc) ;
-        Lwt_exit.exit 1)
+        Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
+      (fun trace ->
+        Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace)
       (fun () -> P2p_fd.close fd)
   else
     let canceler = Lwt_canceler.create () in
     P2p_point.Table.add t.incoming point canceler ;
     Lwt_utils.dont_wait
       (fun exc ->
-        Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc) ;
-        Lwt_exit.exit 1)
+        Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
       (fun () ->
         with_timeout
           ~canceler
@@ -531,6 +531,15 @@ let connect ?timeout t point =
             t.config.greylisting_config
             point_info ;
           P2p_fd.close fd
+          >>= (function
+                | Error trace ->
+                    Format.eprintf
+                      "Uncaught error: %a\n%!"
+                      pp_print_error
+                      trace ;
+                    Lwt.return_unit
+                | Ok () ->
+                    Lwt.return_unit)
           >>= fun () ->
           match err with
           | [Exn (Unix.Unix_error (Unix.ECONNREFUSED, _, _))] ->

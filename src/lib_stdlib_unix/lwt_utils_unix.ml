@@ -131,14 +131,31 @@ let rec create_dir ?(perm = 0o755) dir =
           Stdlib.failwith "Not a directory" )
 
 let safe_close fd =
-  Lwt.catch (fun () -> Lwt_unix.close fd) (fun _ -> Lwt.return_unit)
+  Lwt.catch
+    (fun () -> Lwt_unix.close fd >>= fun () -> return_unit)
+    (fun exc -> fail (Exn exc))
 
 let create_file ?(perm = 0o644) name content =
   Lwt_unix.openfile name Unix.[O_TRUNC; O_CREAT; O_WRONLY] perm
   >>= fun fd ->
-  Lwt.finalize
+  Lwt.try_bind
     (fun () -> Lwt_unix.write_string fd content 0 (String.length content))
-    (fun () -> safe_close fd)
+    (fun v ->
+      safe_close fd
+      >>= function
+      | Error trace ->
+          Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace ;
+          Lwt.return v
+      | Ok () ->
+          Lwt.return v)
+    (fun exc ->
+      safe_close fd
+      >>= function
+      | Error trace ->
+          Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace ;
+          raise exc
+      | Ok () ->
+          raise exc)
 
 let read_file fn = Lwt_io.with_file fn ~mode:Input (fun ch -> Lwt_io.read ch)
 
@@ -272,8 +289,8 @@ module Socket = struct
     connect ?timeout addr
     >>=? fun conn ->
     protect
-      (fun () -> f conn >>=? fun a -> safe_close conn >>= fun () -> return a)
-      ~on_error:(fun e -> safe_close conn >>= fun () -> Lwt.return (Error e))
+      (fun () -> f conn >>=? fun a -> safe_close conn >>=? fun () -> return a)
+      ~on_error:(fun e -> safe_close conn >>=? fun () -> Lwt.return (Error e))
 
   let bind ?(backlog = 10) = function
     | Unix path ->

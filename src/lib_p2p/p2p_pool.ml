@@ -272,15 +272,8 @@ module Points = struct
   let ban pool (addr, _port) =
     P2p_acl.IPBlacklist.add pool.acl addr ;
     (* Kick [addr]:* if it is in `Running` state. *)
-    List.iter
-      (fun conn ->
-        Lwt_utils.dont_wait
-          (fun exc ->
-            Format.eprintf
-              "Uncaught exception: %s\n%!"
-              (Printexc.to_string exc) ;
-            Lwt_exit.exit 1)
-          (fun () -> P2p_conn.disconnect conn))
+    Lwt_list.iter_p
+      (fun conn -> P2p_conn.disconnect conn)
       (connections_of_addr pool addr)
 
   let unban pool (addr, _port) = P2p_acl.unban_addr pool.acl addr
@@ -342,14 +335,11 @@ module Peers = struct
   let ban pool peer =
     P2p_acl.PeerBlacklist.add pool.acl peer ;
     (* Kick [peer] if it is in `Running` state. *)
-    let f conn =
-      Lwt_utils.dont_wait
-        (fun exc ->
-          Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc) ;
-          Lwt_exit.exit 1)
-        (fun () -> P2p_conn.disconnect conn)
-    in
-    Option.iter f (connection_of_peer_id pool peer)
+    match connection_of_peer_id pool peer with
+    | Some conn ->
+        P2p_conn.disconnect conn
+    | None ->
+        Lwt.return_unit
 
   let unban pool peer = P2p_acl.unban_peer pool.acl peer
 

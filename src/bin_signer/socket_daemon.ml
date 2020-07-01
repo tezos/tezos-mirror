@@ -117,8 +117,7 @@ let run ?magic_bytes ?timeout ~check_high_watermark ~require_auth
     >>= fun (cfd, _) ->
     Lwt_utils.dont_wait
       (fun exc ->
-        Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc) ;
-        Lwt_exit.exit 1)
+        Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
       (fun () ->
         protect
           ~on_error:(function
@@ -136,7 +135,17 @@ let run ?magic_bytes ?timeout ~check_high_watermark ~require_auth
                   ~require_auth
                   cctxt
                   cfd)
-              (fun () -> Lwt_utils_unix.safe_close cfd))
+              (fun () ->
+                Lwt_utils_unix.safe_close cfd
+                >>= function
+                | Error trace ->
+                    Format.eprintf
+                      "Uncaught error: %a\n%!"
+                      pp_print_error
+                      trace ;
+                    Lwt.return_unit
+                | Ok () ->
+                    Lwt.return_unit))
         >>= fun _ -> Lwt.return_unit) ;
     loop fd
   in

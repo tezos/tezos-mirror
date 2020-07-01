@@ -59,7 +59,7 @@ val create_file : ?perm:int -> string -> string -> int Lwt.t
 
 val with_tempdir : string -> (string -> 'a Lwt.t) -> 'a Lwt.t
 
-val safe_close : Lwt_unix.file_descr -> unit Lwt.t
+val safe_close : Lwt_unix.file_descr -> unit tzresult Lwt.t
 
 val getaddrinfo :
   passive:bool ->

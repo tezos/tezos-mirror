@@ -256,8 +256,8 @@ let build_rpc_directory net =
             RPC_answer.not_found
         | Some pool ->
             P2p_pool.Peers.untrust pool peer_id ;
-            P2p_pool.Peers.ban pool peer_id ;
-            RPC_answer.return_unit)
+            P2p_pool.Peers.ban pool peer_id
+            >>= fun () -> RPC_answer.return_unit)
   in
   let dir =
     RPC_directory.gen_register1
@@ -380,8 +380,7 @@ let build_rpc_directory net =
             RPC_answer.not_found
         | Some pool ->
             P2p_pool.Points.untrust pool point ;
-            P2p_pool.Points.ban pool point ;
-            RPC_answer.return_unit)
+            P2p_pool.Points.ban pool point >>= fun () -> RPC_answer.return_unit)
   in
   let dir =
     RPC_directory.gen_register1

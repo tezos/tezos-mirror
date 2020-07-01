@@ -35,7 +35,7 @@ val id : t -> int
 
 val read : t -> Bytes.t -> int -> int -> int Lwt.t
 
-val close : t -> unit Lwt.t
+val close : t -> unit tzresult Lwt.t
 
 val write : t -> Bytes.t -> unit Lwt.t
 

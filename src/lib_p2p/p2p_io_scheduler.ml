@@ -88,8 +88,7 @@ module Scheduler (IO : IO) = struct
     conn.current_pop <- IO.pop conn.in_param ;
     Lwt_utils.dont_wait
       (fun exc ->
-        Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc) ;
-        Lwt_exit.exit 1)
+        Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
       (fun () ->
         conn.current_pop
         >>= fun res ->
@@ -381,10 +380,11 @@ let write_size bytes =
 
 let register st fd =
   if st.closed then (
-    Lwt_utils.dont_wait
+    Error_monad.dont_wait
       (fun exc ->
-        Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc) ;
-        Lwt_exit.exit 1)
+        Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
+      (fun trace ->
+        Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace)
       (fun () -> P2p_fd.close fd) ;
     raise Closed )
   else
@@ -417,7 +417,13 @@ let register st fd =
         Moving_average.destroy write_conn.counter ;
         Lwt_pipe.close write_queue ;
         Lwt_pipe.close read_queue ;
-        P2p_fd.close fd) ;
+        P2p_fd.close fd
+        >>= function
+        | Error trace ->
+            Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace ;
+            Lwt.return_unit
+        | Ok () ->
+            Lwt.return_unit) ;
     let conn =
       {
         sched = st;

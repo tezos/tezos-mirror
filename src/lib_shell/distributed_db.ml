@@ -199,16 +199,21 @@ let activate
               active_connections = P2p_peer.Table.create 53;
             }
         in
-        P2p.iter_connections p2p (fun _peer_id conn ->
-            Lwt_utils.dont_wait
-              (fun exc ->
-                Format.eprintf
-                  "Uncaught exception: %s\n%!"
-                  (Printexc.to_string exc) ;
-                Lwt_exit.exit 1)
-              (fun () ->
-                P2p.send p2p conn (Get_current_branch chain_id)
-                >>= fun _ -> Lwt.return_unit)) ;
+        let sends =
+          P2p.fold_connections p2p ~init:[] ~f:(fun _peer_id conn acc ->
+              P2p.send p2p conn (Get_current_branch chain_id) :: acc)
+        in
+        Error_monad.dont_wait
+          (fun exc ->
+            Format.eprintf
+              "Uncaught exception: %s\n%!"
+              (Printexc.to_string exc))
+          (fun trace ->
+            Format.eprintf
+              "Uncaught error: %a\n%!"
+              Error_monad.pp_print_error
+              trace)
+          (fun () -> join_ep sends) ;
         Chain_id.Table.add active_chains chain_id local_db ;
         local_db
   in
@@ -221,19 +226,23 @@ let deactivate chain_db =
   let {active_chains; p2p; _} = chain_db.global_db in
   let chain_id = State.Chain.id chain_db.reader_chain_db.chain_state in
   Chain_id.Table.remove active_chains chain_id ;
-  let f gid conn =
-    chain_db.reader_chain_db.callback.disconnection gid ;
-    chain_db.reader_chain_db.active_peers :=
-      P2p_peer.Set.remove gid !(chain_db.reader_chain_db.active_peers) ;
-    P2p_peer.Table.remove chain_db.reader_chain_db.active_connections gid ;
-    Lwt_utils.dont_wait
-      (fun exc ->
-        Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc) ;
-        Lwt_exit.exit 1)
-      (fun () ->
-        P2p.send p2p conn (Deactivate chain_id) >>= fun _ -> Lwt.return_unit)
+  let sends =
+    P2p_peer.Table.fold
+      (fun gid conn acc ->
+        chain_db.reader_chain_db.callback.disconnection gid ;
+        chain_db.reader_chain_db.active_peers :=
+          P2p_peer.Set.remove gid !(chain_db.reader_chain_db.active_peers) ;
+        P2p_peer.Table.remove chain_db.reader_chain_db.active_connections gid ;
+        P2p.send p2p conn (Deactivate chain_id) :: acc)
+      chain_db.reader_chain_db.active_connections
+      []
   in
-  P2p_peer.Table.iter f chain_db.reader_chain_db.active_connections ;
+  Error_monad.dont_wait
+    (fun exc ->
+      Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
+    (fun trace ->
+      Format.eprintf "Uncaught error: %a\n%!" Error_monad.pp_print_error trace)
+    (fun () -> join_ep sends) ;
   Distributed_db_requester.Raw_operation.shutdown
     chain_db.reader_chain_db.operation_db
   >>= fun () ->

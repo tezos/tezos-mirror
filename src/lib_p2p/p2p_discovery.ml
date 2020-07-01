@@ -125,7 +125,13 @@ module Answer = struct
       (fun () ->
         let socket = Lwt_unix.socket PF_INET SOCK_DGRAM 0 in
         Lwt_canceler.on_cancel st.canceler (fun () ->
-            Lwt_utils_unix.safe_close socket) ;
+            Lwt_utils_unix.safe_close socket
+            >>= function
+            | Error trace ->
+                Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace ;
+                Lwt.return_unit
+            | Ok () ->
+                Lwt.return_unit) ;
         Lwt_unix.setsockopt socket SO_BROADCAST true ;
         Lwt_unix.setsockopt socket SO_REUSEADDR true ;
         let addr =
@@ -235,7 +241,13 @@ module Sender = struct
       (fun () ->
         let socket = Lwt_unix.(socket PF_INET SOCK_DGRAM 0) in
         Lwt_canceler.on_cancel st.canceler (fun () ->
-            Lwt_utils_unix.safe_close socket) ;
+            Lwt_utils_unix.safe_close socket
+            >>= function
+            | Error trace ->
+                Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace ;
+                Lwt.return_unit
+            | Ok () ->
+                Lwt.return_unit) ;
         Lwt_unix.setsockopt socket Lwt_unix.SO_BROADCAST true ;
         let broadcast_ipv4 = Ipaddr_unix.V4.to_inet_addr st.discovery_addr in
         let addr = Lwt_unix.ADDR_INET (broadcast_ipv4, st.discovery_port) in
@@ -244,7 +256,14 @@ module Sender = struct
         Events.(emit broadcast_message) ()
         >>= fun () ->
         Lwt_unix.sendto socket msg 0 Message.length [] addr
-        >>= fun _len -> Lwt_utils_unix.safe_close socket)
+        >>= fun _len ->
+        Lwt_utils_unix.safe_close socket
+        >>= function
+        | Error trace ->
+            Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace ;
+            Lwt.return_unit
+        | Ok () ->
+            Lwt.return_unit)
       (fun _exn -> Events.(emit broadcast_error) ())
 
   let rec worker_loop sender_config st =

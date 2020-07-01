@@ -107,6 +107,12 @@ let run_nodes client server =
   >>= fun server_node ->
   Process.detach ~prefix:"client: " (fun channel ->
       Lwt_utils_unix.safe_close main_socket
+      >>= (function
+            | Error trace ->
+                Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace ;
+                Lwt.return_unit
+            | Ok () ->
+                Lwt.return_unit)
       >>= fun () ->
       let sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) () in
       client channel sched !addr port

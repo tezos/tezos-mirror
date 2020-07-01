@@ -178,6 +178,12 @@ let run ?display_client_stat ?max_download_speed ?max_upload_speed
     let prefix = Printf.sprintf "client(%d): " n in
     Process.detach ~prefix (fun _ ->
         Lwt_utils_unix.safe_close main_socket
+        >>= (function
+              | Error trace ->
+                  Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace ;
+                  Lwt.return_unit
+              | Ok () ->
+                  Lwt.return_unit)
         >>= fun () ->
         client ?max_upload_speed ?write_queue_size addr port time n)
   in

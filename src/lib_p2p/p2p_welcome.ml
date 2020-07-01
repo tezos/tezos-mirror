@@ -121,7 +121,13 @@ let create ?addr ~backlog connect_handler port =
       >>= fun socket ->
       let canceler = Lwt_canceler.create () in
       Lwt_canceler.on_cancel canceler (fun () ->
-          Lwt_utils_unix.safe_close socket) ;
+          Lwt_utils_unix.safe_close socket
+          >>= function
+          | Error trace ->
+              Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace ;
+              Lwt.return_unit
+          | Ok () ->
+              Lwt.return_unit) ;
       let st =
         {
           socket;

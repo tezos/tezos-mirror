@@ -215,7 +215,7 @@ module Peers : sig
 
   (** [ban t peer_id] blacklists this peer_id and terminates connection
       (if any). *)
-  val ban : ('msg, 'peer, 'conn) t -> P2p_peer.Id.t -> unit
+  val ban : ('msg, 'peer, 'conn) t -> P2p_peer.Id.t -> unit Lwt.t
 
   (** [unban t peer_id] removes this peer_id from the black list. *)
   val unban : ('msg, 'peer, 'conn) t -> P2p_peer.Id.t -> unit
@@ -275,7 +275,7 @@ module Points : sig
   (** [ban t point_id] marks the address of this point_id as blacked-listed.
       it disconnects all connections to this address. This [port_id]'s port is
       ignored. *)
-  val ban : ('msg, 'peer, 'conn) t -> P2p_point.Id.t -> unit
+  val ban : ('msg, 'peer, 'conn) t -> P2p_point.Id.t -> unit Lwt.t
 
   (* TODO this isn't consistent with greylist functions where only an addr is
      provided). *)
