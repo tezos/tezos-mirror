@@ -124,12 +124,17 @@ let build_valid_chain state vtbl pred names =
              }
              : Block_validation.validation_store )
          in
+         let operations_metadata = [[zero]] in
+         let operations_metadata_hashes =
+           Some [[Operation_metadata_hash.hash_bytes [zero]]]
+         in
          State.Block.store
            state
            block
            zero
            [[op]]
-           [[zero]]
+           operations_metadata
+           operations_metadata_hashes
            ( {
                context_hash;
                message = validation_store.message;
