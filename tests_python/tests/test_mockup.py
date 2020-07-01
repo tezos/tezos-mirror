@@ -146,7 +146,7 @@ def test_transfer(base_dir_n_mockup: Tuple[str, Client]):
 
 
 # It's impossible to guess values of chain_id, these ones have been
-# obtained by looking at the output of the test test_chain_id_seed.
+# obtained by looking at the output of `compute chain id from seed`
 @pytest.mark.parametrize('chain_id', [
     "NetXcqTGZX74DxG", "NetXaFDF7xZQCpR", "NetXkKbtqncJcAz", "NetXjjE5cZUeWPy",
     "NetXi7C1pyLhQNe"
@@ -247,60 +247,6 @@ def test_transfer_bad_base_dir(mockup_client: Client):
         searched = "Some commands .* might not work correctly."
         assert re.search(
             searched, err_output), f"'{searched}' not matched in error output"
-
-
-def _create_mockup_chain_id_seed(mockup_client,
-                                 seed: Optional[str] = None) -> str:
-    """ Creates a mockup specifying `chain-id-seed`
-        and returns the computed chain id.
-
-        Args:
-            mockup_client: the client to use
-            seed (str): the string to pass to chain_id_seed
-        Returns:
-            The chain id computed
-    """
-    with tempfile.TemporaryDirectory(prefix='tezos-client.') as base_dir:
-        mockup_client.set_base_dir(base_dir)
-        res = mockup_client.create_mockup(protocol=_PROTO, chain_id_seed=seed)
-        assert res.create_mockup_result == "ok"
-        assert res.chain_id is not None, "Absent chain id value from command"
-        return res.chain_id
-
-
-@pytest.mark.parametrize('chain_id_seed,chain_id_value', [
-    ("", "NetXjDm9eYUvhif"),
-    ("0", "NetXjjE5cZUeWPy"),
-    ("main", "NetXaFDF7xZQCpR"),
-    ("test", "NetXkKbtqncJcAz"),
-    ("whatever", "NetXi7C1pyLhQNe"),
-    ("longerlongerlongerseed", "NetXdhGxXRpN8i8"),
-    ("⚠unicode♥one", "NetXNrs2NkmLRfW")])
-@pytest.mark.client
-def test_chain_id_seed(mockup_client, chain_id_seed, chain_id_value):
-    """ Executes `tezos-client create mockup --chain-id-seed chain_id_seed """
-    chain_id = _create_mockup_chain_id_seed(mockup_client, chain_id_seed)
-    assert chain_id == chain_id_value, \
-        f"""Unexpected chain id for seed: {chain_id_seed}
-expected {chain_id_value} instead of {chain_id}"""
-
-
-@pytest.mark.client
-def test_chain_id_seed_matters(mockup_client):
-    """ Executes `tezos-client create mockup --chain-id-seed
-        with different seeds and checks that the obtained chain id
-        indeed differ.
-    """
-    seeds = ["1234", "main", "test", "0", "whatever"]
-    chain_ids: List[str] = []
-    for seed in seeds:
-        chain_id = _create_mockup_chain_id_seed(mockup_client, seed)
-        in_there = chain_ids.index(chain_id) if chain_id in chain_ids else None
-        if in_there:
-            yielder = seeds[in_there]
-            assert False, f"Seeds '{yielder}' and '{seed}''"\
-                          f" produce the same chain_id: {chain_id}"
-        chain_ids.append(chain_id)
 
 
 @pytest.mark.client

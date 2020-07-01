@@ -800,16 +800,13 @@ class Client:
                       protocol: str,
                       check: bool = True,
                       protocol_constants_file: str = None,
-                      bootstrap_accounts_file: str = None,
-                      chain_id_seed: str = None)\
+                      bootstrap_accounts_file: str = None)\
             -> client_output.CreateMockup:
         cmd = ['--protocol', protocol, 'create', 'mockup']
         if protocol_constants_file is not None:
             cmd += ["--protocol-constants", protocol_constants_file]
         if bootstrap_accounts_file is not None:
             cmd += ["--bootstrap-accounts", bootstrap_accounts_file]
-        if chain_id_seed is not None:
-            cmd += ["--chain-id-seed", chain_id_seed]
         (stdout, stderr, exit_code) = self.run_generic(cmd,
                                                        check=check)
         return client_output.CreateMockup(stdout, stderr, exit_code)
