@@ -914,6 +914,8 @@ struct
     let finalize_block c = finalize_block c >|= wrap_error
 
     let init c bh = init c bh >|= wrap_error
+
+    let environment_version = Protocol.V0
   end
 
   class ['chain, 'block] proto_rpc_context (t : Tezos_rpc.RPC_context.t)
