@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -180,6 +181,7 @@ let on_request : type r. t -> r Request.t -> r tzresult Lwt.t =
                   >>=? fun { validation_store;
                              block_metadata;
                              ops_metadata;
+                             ops_metadata_hashes;
                              forking_testchain } ->
                   let validation_store =
                     ( {
@@ -199,6 +201,7 @@ let on_request : type r. t -> r Request.t -> r tzresult Lwt.t =
                     block_metadata
                     operations
                     ops_metadata
+                    ops_metadata_hashes
                     validation_store
                     ~forking_testchain
                   >>=? function

@@ -195,6 +195,7 @@ module Block : sig
     Bytes.t ->
     Operation.t list list ->
     Bytes.t list list ->
+    Operation_metadata_hash.t list list option ->
     Block_validation.validation_store ->
     forking_testchain:bool ->
     block option tzresult Lwt.t
@@ -276,6 +277,15 @@ module Block : sig
   val operations_metadata : t -> int -> Bytes.t list Lwt.t
 
   val all_operations_metadata : t -> Bytes.t list list Lwt.t
+
+  val operations_metadata_hashes :
+    t -> int -> Operation_metadata_hash.t list option Lwt.t
+
+  val all_operations_metadata_hashes :
+    t -> Operation_metadata_hash.t list list option Lwt.t
+
+  val all_operations_metadata_hash :
+    t -> Operation_metadata_list_list_hash.t option Lwt.t
 
   val watcher : Chain.t -> block Lwt_stream.t * Lwt_watcher.stopper
 

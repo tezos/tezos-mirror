@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -38,6 +39,8 @@ type request =
       chain_id : Chain_id.t;
       block_header : Block_header.t;
       predecessor_block_header : Block_header.t;
+      predecessor_ops_metadata_hash :
+        Operation_metadata_list_list_hash.t option;
       operations : Operation.t list list;
       max_operations_ttl : int;
     }

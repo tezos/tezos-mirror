@@ -131,6 +131,12 @@ val fork_test_chain :
 
 val clear_test_chain : index -> Chain_id.t -> unit Lwt.t
 
+val get_predecessor_ops_metadata_hash :
+  context -> Operation_metadata_list_list_hash.t option Lwt.t
+
+val set_predecessor_ops_metadata_hash :
+  context -> Operation_metadata_list_list_hash.t -> context Lwt.t
+
 (** {2 Context dumping} *)
 
 module Pruned_block : sig
@@ -168,6 +174,7 @@ module Protocol_data : sig
     test_chain_status : Test_chain_status.t;
     data_key : Context_hash.t;
     parents : Context_hash.t list;
+    predecessor_ops_metadata_hash : Operation_metadata_list_list_hash.t option;
   }
 
   val to_bytes : t -> Bytes.t
@@ -184,6 +191,7 @@ val dump_contexts :
   index ->
   Block_header.t
   * Block_data.t
+  * Operation_metadata_hash.t list list option
   * History_mode.t
   * (Block_header.t ->
     (Pruned_block.t option * Protocol_data.t option) tzresult Lwt.t) ->
@@ -200,6 +208,7 @@ val restore_contexts :
   unit tzresult Lwt.t) ->
   ( Block_header.t
   * Block_data.t
+  * Operation_metadata_hash.t list list option
   * History_mode.t
   * Block_header.t option
   * Block_hash.t list
@@ -216,6 +225,7 @@ val validate_context_hash_consistency_and_commit :
   message:string ->
   author:string ->
   parents:Context_hash.t list ->
+  predecessor_ops_metadata_hash:Operation_metadata_list_list_hash.t option ->
   index:index ->
   bool Lwt.t
 

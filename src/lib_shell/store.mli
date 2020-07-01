@@ -170,6 +170,14 @@ module Block : sig
        and type key = int
        and type value = Bytes.t list
 
+  (* The hashes of operations metadata, only set on blocks starting from
+     environment V1. *)
+  module Operations_metadata_hashes :
+    MAP_STORE
+      with type t = store * Block_hash.t
+       and type key = int
+       and type value = Operation_metadata_hash.t list
+
   type invalid_block = {level : int32; errors : Error_monad.error list}
 
   module Invalid_block :

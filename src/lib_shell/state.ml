@@ -1107,7 +1107,7 @@ module Block = struct
         predecessor_n block_store b.hash n)
 
   let store chain_state block_header block_header_metadata operations
-      operations_metadata
+      operations_metadata ops_metadata_hashes
       ({context_hash; message; max_operations_ttl; last_allowed_fork_level} :
         Block_validation.validation_store) ~forking_testchain =
     let bytes = Block_header.to_bytes block_header in
@@ -1139,13 +1139,13 @@ module Block = struct
         else
           (* safety check: never ever commit a block that is not compatible
            with the current checkpoint.  *)
-          (let predecessor = block_header.shell.predecessor in
-           Header.known (store, predecessor)
-           >>= fun valid_predecessor ->
-           if not valid_predecessor then Lwt.return_false
-           else
-             Shared.use chain_state.chain_data (fun chain_data ->
-                 Locked_block.acceptable chain_data block_header))
+          let predecessor = block_header.shell.predecessor in
+          Header.known (store, predecessor)
+          >>= (fun valid_predecessor ->
+                if not valid_predecessor then Lwt.return_false
+                else
+                  Shared.use chain_state.chain_data (fun chain_data ->
+                      Locked_block.acceptable chain_data block_header))
           >>= fun acceptable_block ->
           fail_unless acceptable_block (Checkpoint_error (hash, None))
           >>=? fun () ->
@@ -1160,6 +1160,18 @@ module Block = struct
             (Context_hash.equal block_header.shell.context commit)
             (Inconsistent_hash (commit, block_header.shell.context))
           >>=? fun () ->
+          Header.read (store, predecessor)
+          >>=? fun pred_block ->
+          Chain.get_level_indexed_protocol chain_state pred_block
+          >>= fun protocol ->
+          ( match Registered_protocol.get protocol with
+          | Some (module Proto) ->
+              return Proto.environment_version
+          | None ->
+              fail
+                (Block_validator_errors.Unavailable_protocol
+                   {block = predecessor; protocol}) )
+          >>=? fun env ->
           let contents =
             {
               header = block_header;
@@ -1189,6 +1201,23 @@ module Block = struct
               Store.Block.Operations_metadata.store (store, hash) i ops)
             operations_metadata
           >>= fun () ->
+          ( match ops_metadata_hashes with
+          | Some ops_metadata_hashes ->
+              Lwt_list.iteri_s
+                (fun i hashes ->
+                  Store.Block.Operations_metadata_hashes.store
+                    (store, hash)
+                    i
+                    hashes)
+                ops_metadata_hashes
+              >|= ok
+          | None -> (
+            match env with
+            | V1 when pred_block.shell.validation_passes > 0 ->
+                fail @@ Missing_operation_metadata_hashes predecessor
+            | _ ->
+                return_unit ) )
+          >>=? fun () ->
           (* Store predecessors *)
           store_predecessors store hash
           >>= fun () ->
@@ -1326,6 +1355,37 @@ module Block = struct
             Store.Block.Operations_metadata.read_opt (store, hash) i
             >|= Option.unopt_assert ~loc:__POS__)
           (0 -- (header.shell.validation_passes - 1)))
+
+  let operations_metadata_hashes {chain_state; hash; _} i =
+    Shared.use chain_state.block_store (fun store ->
+        Store.Block.Operations_metadata_hashes.read_opt (store, hash) i)
+
+  let all_operations_metadata_hashes {chain_state; hash; header; _} =
+    Shared.use chain_state.block_store (fun store ->
+        if header.shell.validation_passes = 0 then Lwt.return_none
+        else
+          Store.Block.Operations_metadata_hashes.known (store, hash) 0
+          >>= function
+          | false ->
+              Lwt.return_none
+          | true ->
+              Lwt_list.map_p
+                (fun i ->
+                  Store.Block.Operations_metadata_hashes.read_opt
+                    (store, hash)
+                    i
+                  >|= Option.unopt_assert ~loc:__POS__)
+                (0 -- (header.shell.validation_passes - 1))
+              >|= fun hashes -> Some hashes)
+
+  let all_operations_metadata_hash block =
+    all_operations_metadata_hashes block
+    >|= fun predecessor_ops_metadata_hashes ->
+    Option.map
+      (fun hashes ->
+        List.map Operation_metadata_list_hash.compute hashes
+        |> Operation_metadata_list_list_hash.compute)
+      predecessor_ops_metadata_hashes
 
   let context_exn {chain_state; hash; _} =
     Shared.use chain_state.block_store (fun block_store ->
