@@ -29,6 +29,8 @@ open Environment_context
 (* [module type T] is the union of all [module type Vx_T].*)
 module type T = sig
   include Environment_protocol_T_V0.T
+
+  val environment_version : Protocol.env_version
 end
 
 (* [module type PROTOCOL] is protocol signature that the shell can use*)
