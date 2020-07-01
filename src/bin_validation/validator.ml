@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -270,6 +271,7 @@ let run input output =
         { chain_id;
           block_header;
           predecessor_block_header;
+          predecessor_ops_metadata_hash;
           operations;
           max_operations_ttl } ->
         let validate : unit Lwt.t =
@@ -297,6 +299,7 @@ let run input output =
                      user_activated_protocol_overrides;
                      max_operations_ttl;
                      predecessor_block_header;
+                     predecessor_ops_metadata_hash;
                      predecessor_context;
                    }
                  in

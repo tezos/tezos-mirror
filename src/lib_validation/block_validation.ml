@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2018 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -50,6 +51,7 @@ type result = {
   validation_store : validation_store;
   block_metadata : Bytes.t;
   ops_metadata : Bytes.t list list;
+  ops_metadata_hashes : Operation_metadata_hash.t list list option;
   forking_testchain : bool;
 }
 
@@ -103,14 +105,35 @@ let init_test_chain ctxt forked_header =
 let result_encoding =
   let open Data_encoding in
   conv
-    (fun {validation_store; block_metadata; ops_metadata; forking_testchain} ->
-      (validation_store, block_metadata, ops_metadata, forking_testchain))
-    (fun (validation_store, block_metadata, ops_metadata, forking_testchain) ->
-      {validation_store; block_metadata; ops_metadata; forking_testchain})
-    (obj4
+    (fun { validation_store;
+           block_metadata;
+           ops_metadata;
+           ops_metadata_hashes;
+           forking_testchain } ->
+      ( validation_store,
+        block_metadata,
+        ops_metadata,
+        ops_metadata_hashes,
+        forking_testchain ))
+    (fun ( validation_store,
+           block_metadata,
+           ops_metadata,
+           ops_metadata_hashes,
+           forking_testchain ) ->
+      {
+        validation_store;
+        block_metadata;
+        ops_metadata;
+        ops_metadata_hashes;
+        forking_testchain;
+      })
+    (obj5
        (req "validation_store" validation_store_encoding)
        (req "block_metadata" bytes)
        (req "ops_metadata" (list @@ list @@ bytes))
+       (opt
+          "ops_metadata_hashes"
+          (list @@ list @@ Operation_metadata_hash.encoding))
        (req "forking_testchain" bool))
 
 let may_force_protocol_upgrade ~user_activated_upgrades ~level
@@ -252,7 +275,8 @@ module Make (Proto : Registered_protocol.T) = struct
 
   let apply chain_id ~user_activated_upgrades
       ~user_activated_protocol_overrides ~max_operations_ttl
-      ~(predecessor_block_header : Block_header.t) ~predecessor_context
+      ~(predecessor_block_header : Block_header.t)
+      ~predecessor_ops_metadata_hash ~predecessor_context
       ~(block_header : Block_header.t) operations =
     let block_hash = Block_header.hash block_header in
     let invalid_block = invalid_block block_hash in
@@ -269,6 +293,12 @@ module Make (Proto : Registered_protocol.T) = struct
     >>=? fun context ->
     parse_operations block_hash operations
     >>=? fun operations ->
+    ( match predecessor_ops_metadata_hash with
+    | None ->
+        Lwt.return context
+    | Some hash ->
+        Context.set_predecessor_ops_metadata_hash context hash )
+    >>= fun context ->
     let context = Shell_context.wrap_disk_context context in
     Proto.begin_application
       ~chain_id
@@ -345,15 +375,17 @@ module Make (Proto : Registered_protocol.T) = struct
             }))
     >>=? fun () ->
     ( if Protocol_hash.equal new_protocol Proto.hash then
-      return validation_result
+      return (validation_result, Proto.environment_version)
     else
       match Registered_protocol.get new_protocol with
       | None ->
           fail
             (Unavailable_protocol {block = block_hash; protocol = new_protocol})
       | Some (module NewProto) ->
-          NewProto.init validation_result.context block_header.shell )
-    >>=? fun validation_result ->
+          NewProto.init validation_result.context block_header.shell
+          >|=? fun validation_result ->
+          (validation_result, NewProto.environment_version) )
+    >>=? fun (validation_result, new_protocol_env_version) ->
     let max_operations_ttl =
       max 0 (min (max_operations_ttl + 1) validation_result.max_operations_ttl)
     in
@@ -389,6 +421,15 @@ module Make (Proto : Registered_protocol.T) = struct
     let context =
       Shell_context.unwrap_disk_context validation_result.context
     in
+    ( match new_protocol_env_version with
+    | Protocol.V0 ->
+        return_none
+    | Protocol.V1 ->
+        return_some
+          (List.map
+             (List.map (fun r -> Operation_metadata_hash.hash_bytes [r]))
+             ops_metadata) )
+    >>=? fun ops_metadata_hashes ->
     Context.commit
       ~time:block_header.shell.timestamp
       ?message:validation_result.message
@@ -402,7 +443,14 @@ module Make (Proto : Registered_protocol.T) = struct
         last_allowed_fork_level = validation_result.last_allowed_fork_level;
       }
     in
-    return {validation_store; block_metadata; ops_metadata; forking_testchain}
+    return
+      {
+        validation_store;
+        block_metadata;
+        ops_metadata;
+        ops_metadata_hashes;
+        forking_testchain;
+      }
 end
 
 let assert_no_duplicate_operations block_hash live_operations operations =
@@ -449,6 +497,7 @@ type apply_environment = {
   chain_id : Chain_id.t;
   predecessor_block_header : Block_header.t;
   predecessor_context : Context.t;
+  predecessor_ops_metadata_hash : Operation_metadata_list_list_hash.t option;
   user_activated_upgrades : User_activated.upgrades;
   user_activated_protocol_overrides : User_activated.protocol_overrides;
 }
@@ -459,6 +508,7 @@ let apply
       user_activated_protocol_overrides;
       max_operations_ttl;
       predecessor_block_header;
+      predecessor_ops_metadata_hash;
       predecessor_context } block_header operations =
   let block_hash = Block_header.hash block_header in
   Context.get_protocol predecessor_context
@@ -478,6 +528,7 @@ let apply
     ~user_activated_protocol_overrides
     ~max_operations_ttl
     ~predecessor_block_header
+    ~predecessor_ops_metadata_hash
     ~predecessor_context
     ~block_header
     operations
