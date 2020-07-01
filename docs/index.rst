@@ -104,6 +104,7 @@ in the :ref:`introduction <howtoget>`.
    user/key-management
    user/sandbox
    user/mockup
+   user/proxy
    user/history_modes
    user/snapshots
    user/various

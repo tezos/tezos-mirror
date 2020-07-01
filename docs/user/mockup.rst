@@ -8,7 +8,8 @@ By default the ``tezos-client`` described in the
 :ref:`sandboxed node<sandboxed-mode>` needs a node running.
 This page describes the *mockup* mode, a mode that works without
 connecting to a node. For the moment, its features are more
-limited than the default mode.
+limited than the default mode (see the :ref:`proxy mode<proxy-mode>`
+for an intermediate mode between default and mockup).
 
 In mockup mode, the client uses some dummy values for initial parameters that
 are usually gathered from a node, such as the head of the chain or the network
