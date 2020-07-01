@@ -31,6 +31,8 @@ let devnull = Lwt_main.run (Lwt_unix.openfile "/dev/null" [O_WRONLY] 0)
 let signal_setup =
   Lwt_exit.make_signal_setup ~soft:[Sys.sigint; Sys.sigterm] ~hard:[Sys.sigusr1]
 
+let double_signal_safety = Option.get @@ Ptime.Span.of_float_s 0.1
+
 let child_main () =
   Lwt_unix.dup2 devnull Lwt_unix.stderr ;
   let r = ref 10 in
@@ -42,10 +44,11 @@ let child_main () =
         Lwt_unix.sleep 0.05
         >>= fun () ->
         r := 12 ;
-        Lwt.return ())
+        Lwt_unix.sleep 0.2 >>= fun () -> Lwt.return ())
   in
   Stdlib.exit @@ Lwt_main.run
   @@ ( Lwt_exit.wrap_and_error
+         ~double_signal_safety
          ~signal_setup
          (Tezos_stdlib.Lwt_utils.never_ending ())
      >>= function
@@ -79,7 +82,7 @@ let main () =
              assert false
          | WSTOPPED _ ->
              assert false) ;
-      (* test INT-sleep-INT *)
+      (* test INT-short-sleep-INT *)
       match Lwt_unix.fork () with
       | 0 ->
           child_main ()
@@ -89,14 +92,14 @@ let main () =
                Lwt_unix.sleep 0.01
                >>= fun () ->
                Unix.kill pid Sys.sigint ;
-               Lwt_unix.sleep 0.03
+               Lwt_unix.sleep 0.02
                >>= fun () -> Unix.kill pid Sys.sigint ; Lwt.return ()
              in
              Lwt_unix.waitpid [] pid
              >|= fun (_, status) ->
              Lwt.cancel s ;
              match status with
-             | WEXITED 1 ->
+             | WEXITED 12 ->
                  ()
              | WEXITED _ ->
                  assert false
@@ -104,7 +107,7 @@ let main () =
                  assert false
              | WSTOPPED _ ->
                  assert false) ;
-          (* test TERM *)
+          (* test INT-long-sleep-INT *)
           match Lwt_unix.fork () with
           | 0 ->
               child_main ()
@@ -112,7 +115,10 @@ let main () =
               Lwt_main.run
                 (let s : unit Lwt.t =
                    Lwt_unix.sleep 0.01
-                   >>= fun () -> Unix.kill pid Sys.sigusr1 ; Lwt.return ()
+                   >>= fun () ->
+                   Unix.kill pid Sys.sigint ;
+                   Lwt_unix.sleep 0.11
+                   >>= fun () -> Unix.kill pid Sys.sigint ; Lwt.return ()
                  in
                  Lwt_unix.waitpid [] pid
                  >|= fun (_, status) ->
@@ -126,26 +132,49 @@ let main () =
                      assert false
                  | WSTOPPED _ ->
                      assert false) ;
-              (* test KILL *)
+              (* test TERM *)
               match Lwt_unix.fork () with
               | 0 ->
                   child_main ()
-              | pid ->
+              | pid -> (
                   Lwt_main.run
                     (let s : unit Lwt.t =
                        Lwt_unix.sleep 0.01
-                       >>= fun () -> Unix.kill pid Sys.sigkill ; Lwt.return ()
+                       >>= fun () -> Unix.kill pid Sys.sigusr1 ; Lwt.return ()
                      in
                      Lwt_unix.waitpid [] pid
                      >|= fun (_, status) ->
                      Lwt.cancel s ;
                      match status with
+                     | WEXITED 1 ->
+                         ()
                      | WEXITED _ ->
                          assert false
                      | WSIGNALED _ ->
-                         ()
+                         assert false
                      | WSTOPPED _ ->
                          assert false) ;
-                  () ) ) )
+                  (* test KILL *)
+                  match Lwt_unix.fork () with
+                  | 0 ->
+                      child_main ()
+                  | pid ->
+                      Lwt_main.run
+                        (let s : unit Lwt.t =
+                           Lwt_unix.sleep 0.01
+                           >>= fun () ->
+                           Unix.kill pid Sys.sigkill ; Lwt.return ()
+                         in
+                         Lwt_unix.waitpid [] pid
+                         >|= fun (_, status) ->
+                         Lwt.cancel s ;
+                         match status with
+                         | WEXITED _ ->
+                             assert false
+                         | WSIGNALED _ ->
+                             ()
+                         | WSTOPPED _ ->
+                             assert false) ;
+                      () ) ) ) )
 
 let () = main () ; Stdlib.exit 0

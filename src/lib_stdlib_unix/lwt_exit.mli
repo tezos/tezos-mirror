@@ -98,10 +98,13 @@ val exit_and_wait : int -> int Lwt.t
 
 (** Managing signals *)
 
-(** A soft signal handler is one that triggers clean-up. Sending a soft-handled
-    signal a second time whilst the clean-up is in progress terminates the
-    progress immediately. A hard signal handler is one that terminates the
-    process immediately.
+(** A soft signal handler is one that triggers clean-up.
+
+    After the clean-up has started, and after a safety period has elapsed,
+    sending the same soft-handled signal a second time terminates the
+    process immediately. The safety period is set by the parameter to 
+
+    A hard signal handler is one that terminates the process immediately.
 
     IMPORTANT: a hard exit can leave open files in inconsistent states. *)
 
@@ -146,6 +149,10 @@ val signal_name : int -> string
     when [max_clean_up_time] has elapsed, then the pending callbacks are
     [cancel]ed, then, after a [Lwt.pause], the process exits.
 
+    The optional argument [double_signal_safety] (defaults to one (1) second)
+    is the grace period after sending one of the softly-handled signal before
+    sending the same signal is handled as hard.
+
     The optional argument [signal_setup] (defaults to [default_signal_setup])
     sets up soft and hard handlers at the beginning and clears them when [q]
     resolves.
@@ -160,6 +167,7 @@ val signal_name : int -> string
 *)
 val wrap_and_exit :
   ?signal_setup:signal_setup ->
+  ?double_signal_safety:Ptime.Span.t ->
   ?max_clean_up_time:Ptime.Span.t ->
   'a Lwt.t ->
   'a Lwt.t
@@ -192,6 +200,7 @@ val wrap_and_exit :
 *)
 val wrap_and_error :
   ?signal_setup:signal_setup ->
+  ?double_signal_safety:Ptime.Span.t ->
   ?max_clean_up_time:Ptime.Span.t ->
   'a Lwt.t ->
   ('a, int) result Lwt.t
@@ -223,6 +232,7 @@ val wrap_and_error :
 *)
 val wrap_and_forward :
   ?signal_setup:signal_setup ->
+  ?double_signal_safety:Ptime.Span.t ->
   ?max_clean_up_time:Ptime.Span.t ->
   int Lwt.t ->
   int Lwt.t

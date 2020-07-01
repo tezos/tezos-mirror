@@ -175,9 +175,29 @@ let make_signal_setup ~soft ~hard =
 let default_signal_setup =
   make_signal_setup ~soft:[Sys.sigint; Sys.sigterm] ~hard:[]
 
+let sleep_span s = Lwt_unix.sleep (Ptime.Span.to_float_s s)
+
+let set_already_received_once double_signal_safety already_received_once name =
+  if Ptime.Span.(equal double_signal_safety zero) then (
+    Format.eprintf "%s: send signal again to force-quit.\n%!" name ;
+    already_received_once := true )
+  else
+    Lwt_utils.dont_wait
+      (fun _exc -> assert false)
+      (fun () ->
+        (* Wait one second for safety, then set force-quitting *)
+        sleep_span double_signal_safety
+        >>= fun () ->
+        Format.eprintf "%s: send signal again to force-quit.\n%!" name ;
+        already_received_once := true ;
+        Lwt.return_unit)
+
+let default_double_signal_safety = Option.get @@ Ptime.Span.of_float_s 1.0
+
 (* soft handling: trigger an exit on first signal, immediately terminate
    process on second signal *)
-let set_soft_handler signal name =
+let set_soft_handler ?(double_signal_safety = default_double_signal_safety)
+    signal name =
   let already_received_once = ref false in
   Lwt_unix.on_signal signal (fun _signal ->
       if !already_received_once then (
@@ -189,13 +209,17 @@ let set_soft_handler signal name =
         match Lwt.state clean_up_starts with
         | Sleep ->
             Format.eprintf "%s: triggering shutdown.\n%!" name ;
-            Format.eprintf "%s: send signal again to force-quit.\n%!" name ;
-            already_received_once := true ;
-            exit 1
+            exit 1 ;
+            set_already_received_once
+              double_signal_safety
+              already_received_once
+              name
         | Return _ ->
             Format.eprintf "%s: already in shutdown.\n%!" name ;
-            Format.eprintf "%s: send signal again to force-quit.\n%!" name ;
-            already_received_once := true
+            set_already_received_once
+              double_signal_safety
+              already_received_once
+              name
         | Fail _ ->
             assert false)
 
@@ -205,10 +229,11 @@ let set_hard_handler signal name =
       Format.eprintf "%s: force-quiting.\n%!" name ;
       Stdlib.exit 1)
 
-let setup_signal_handlers signal_setup =
+let setup_signal_handlers ?double_signal_safety signal_setup =
   let soft_handler_ids =
     List.fold_left
-      (fun acc (signal, name) -> set_soft_handler signal name :: acc)
+      (fun acc (signal, name) ->
+        set_soft_handler ?double_signal_safety signal name :: acc)
       []
       signal_setup.soft
   in
@@ -223,8 +248,6 @@ let setup_signal_handlers signal_setup =
 let unset_handlers = List.iter Lwt_unix.disable_signal_handler
 
 (* 6. internal synchronisation *)
-
-let sleep_span s = Lwt_unix.sleep (Ptime.Span.to_float_s s)
 
 let wait_for_clean_up max_clean_up_time =
   (match Lwt.state clean_up_starts with Return _ -> () | _ -> assert false) ;
@@ -249,9 +272,9 @@ let wait_for_clean_up max_clean_up_time =
 
 (* take a promise and wrap it in `Ok` but also watch for exiting and wrap that
    in `Error` *)
-let wrap_and_error ?(signal_setup = default_signal_setup) ?max_clean_up_time p
-    =
-  let handler_ids = setup_signal_handlers signal_setup in
+let wrap_and_error ?(signal_setup = default_signal_setup) ?double_signal_safety
+    ?max_clean_up_time p =
+  let handler_ids = setup_signal_handlers ?double_signal_safety signal_setup in
   Lwt.try_bind
     (fun () ->
       (* Watch out for both [p] and the start of clean-up *)
@@ -302,11 +325,11 @@ let wrap_and_error ?(signal_setup = default_signal_setup) ?max_clean_up_time p
           >>= fun () -> unset_handlers handler_ids ; Lwt.return (Error 2))
 
 (* same but exit on error *)
-let wrap_and_exit ?signal_setup ?max_clean_up_time p =
-  wrap_and_error ?max_clean_up_time ?signal_setup p
+let wrap_and_exit ?signal_setup ?double_signal_safety ?max_clean_up_time p =
+  wrap_and_error ?max_clean_up_time ?double_signal_safety ?signal_setup p
   >>= function Ok v -> Lwt.return v | Error status -> Stdlib.exit status
 
 (* same but just return exit status *)
-let wrap_and_forward ?signal_setup ?max_clean_up_time p =
-  wrap_and_error ?max_clean_up_time ?signal_setup p
+let wrap_and_forward ?signal_setup ?double_signal_safety ?max_clean_up_time p =
+  wrap_and_error ?max_clean_up_time ?double_signal_safety ?signal_setup p
   >>= function Ok v -> Lwt.return v | Error status -> Lwt.return status
