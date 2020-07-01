@@ -4,6 +4,7 @@
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2018-2020 Nomadic Labs. <nomadic@tezcore.com>               *)
 (* Copyright (c) 2018-2020 Tarides <contact@tarides.com>                     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -160,6 +161,7 @@ module type S = sig
     index ->
     block_header
     * block_data
+    * Operation_metadata_hash.t list list option
     * History_mode.t
     * (block_header ->
       (pruned_block option * protocol_data option) tzresult Lwt.t) ->
@@ -176,6 +178,7 @@ module type S = sig
     unit tzresult Lwt.t) ->
     ( block_header
     * block_data
+    * Operation_metadata_hash.t list list option
     * History_mode.t
     * Block_header.t option
     * Block_hash.t list

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -279,6 +280,17 @@ module Block = struct
         type t = Bytes.t list
 
         let encoding = Data_encoding.(list bytes)
+      end))
+
+  module Operations_metadata_hashes =
+    Operations_index.Make_map
+      (struct
+        let name = ["operations_metadata_hashes"]
+      end)
+      (Store_helpers.Make_value (struct
+        type t = Operation_metadata_hash.t list
+
+        let encoding = Data_encoding.(list Operation_metadata_hash.encoding)
       end))
 
   type invalid_block = {level : int32; errors : Error_monad.error list}
