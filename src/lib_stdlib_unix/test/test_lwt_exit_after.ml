@@ -28,7 +28,7 @@ open Lwt.Infix
 let r = ref 0
 
 let first =
-  Lwt_exit.register_clean_up_callback (fun _ ->
+  Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
       Lwt_unix.sleep 0.2
       >>= fun () ->
       assert (!r = 0) ;
@@ -36,15 +36,15 @@ let first =
       Lwt.return_unit)
 
 let second =
-  Lwt_exit.register_clean_up_callback ~after:first (fun _ ->
+  Lwt_exit.register_clean_up_callback ~after:first ~loc:__LOC__ (fun _ ->
       Lwt_unix.sleep 0.1
       >>= fun () ->
       assert (!r = 1) ;
       incr r ;
       Lwt.return_unit)
 
-let third =
-  Lwt_exit.register_clean_up_callback ~after:second (fun _ ->
+let _third =
+  Lwt_exit.register_clean_up_callback ~after:second ~loc:__LOC__ (fun _ ->
       assert (!r = 2) ;
       incr r ;
       Lwt.return_unit)

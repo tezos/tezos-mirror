@@ -39,14 +39,19 @@ let new_clean_up_callback_id () =
 (* clean-up callbacks are stored in a reference to a map *)
 module Callbacks_map = Map.Make (Int)
 
-let clean_up_callbacks :
-    ((int -> unit Lwt.t) * clean_up_callback_id option) Callbacks_map.t ref =
-  ref Callbacks_map.empty
+type callback = {
+  callback : int -> unit Lwt.t;
+  after : clean_up_callback_id option;
+  loc : string;
+}
+
+let clean_up_callbacks : callback Callbacks_map.t ref = ref Callbacks_map.empty
 
 (* adding and removing clean-up callbacks affects the global reference map *)
-let register_clean_up_callback ?after f =
+let register_clean_up_callback ?after ~loc callback =
   let id = new_clean_up_callback_id () in
-  clean_up_callbacks := Callbacks_map.add id (f, after) !clean_up_callbacks ;
+  let callback = {callback; after; loc} in
+  clean_up_callbacks := Callbacks_map.add id callback !clean_up_callbacks ;
   id
 
 let unregister_clean_up_callback id =
@@ -62,7 +67,7 @@ let clean_up status =
   clean_up_callbacks := Callbacks_map.empty ;
   let promises : unit Lwt.t Callbacks_map.t =
     Seq.fold_left
-      (fun promises (id, (c, after)) ->
+      (fun promises (id, {callback; after; loc}) ->
         let pre =
           match after with
           | None ->
@@ -76,10 +81,11 @@ let clean_up status =
         in
         let promise =
           Lwt.catch
-            (fun () -> pre >>= fun () -> c status)
+            (fun () -> pre >>= fun () -> callback status)
             (fun exc ->
               Format.eprintf
-                "Exit: uncaught exception during clean-up: %s\n%!"
+                "Exit: uncaught exception during clean-up (%s): %s\n%!"
+                loc
                 (Printexc.to_string exc) ;
               Lwt.return_unit)
         in

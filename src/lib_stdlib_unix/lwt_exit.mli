@@ -63,7 +63,10 @@ type clean_up_callback_id
     The promise returned by this callback may be canceled if it takes too long
     to complete. (See [max_clean_up_time] below.) *)
 val register_clean_up_callback :
-  ?after:clean_up_callback_id -> (int -> unit Lwt.t) -> clean_up_callback_id
+  ?after:clean_up_callback_id ->
+  loc:string ->
+  (int -> unit Lwt.t) ->
+  clean_up_callback_id
 
 (** [unregister_clean_up_callback cid] removes the callback with id [cid] from
     the set of functions to call for cleaning up.

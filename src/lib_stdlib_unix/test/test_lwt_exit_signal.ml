@@ -37,7 +37,7 @@ let child_main () =
   Lwt_unix.dup2 devnull Lwt_unix.stderr ;
   let r = ref 10 in
   let _ =
-    Lwt_exit.register_clean_up_callback (fun _ ->
+    Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
         Lwt_unix.sleep 0.02
         >>= fun () ->
         r := 11 ;

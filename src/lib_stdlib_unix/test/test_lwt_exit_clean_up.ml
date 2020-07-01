@@ -28,7 +28,7 @@ open Lwt.Infix
 let r = ref 0
 
 let _ =
-  Lwt_exit.register_clean_up_callback (fun s ->
+  Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun s ->
       Lwt_unix.sleep 0.01
       >>= fun () ->
       r := s ;
