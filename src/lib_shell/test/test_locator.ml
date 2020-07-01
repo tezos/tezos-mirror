@@ -144,6 +144,7 @@ let make_empty_chain (chain : State.Chain.t) n : Block_hash.t Lwt.t =
         zero
         []
         []
+        None
         empty_result
         ~forking_testchain:false
       >>=? fun _ -> loop (lvl + 1) (Block_header.hash header)
