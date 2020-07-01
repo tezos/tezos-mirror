@@ -315,10 +315,12 @@ let test_dump {idx; block3b; _} =
           operations = [[]];
         }
       in
+      let empty_ops_metadata_hashes = None in
       let bhs =
         (fun context ->
           ( empty_block_header context,
             empty,
+            empty_ops_metadata_hashes,
             history_mode,
             fun _ -> return (None, None) ))
           ctxt_hash
@@ -334,7 +336,7 @@ let test_dump {idx; block3b; _} =
         (fun _ -> return_unit)
         (fun _ _ _ -> return_unit)
       >>=? fun imported ->
-      let (bh, _, _, _, _, _) = imported in
+      let (bh, _, _, _, _, _, _) = imported in
       let expected_ctxt_hash = bh.Block_header.shell.context in
       assert (Context_hash.equal ctxt_hash expected_ctxt_hash) ;
       return ())
