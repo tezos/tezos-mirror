@@ -8,10 +8,12 @@ license: "MIT"
 depends: [
   "tezos-tooling" { with-test }
   "dune" { >= "2.0" }
+  "sapling"
   "tezos-base"
   "tezos-protocol-environment-sigs"
   "tezos-protocol-environment-structs"
   "alcotest-lwt" { with-test & >= "1.1.0" }
+  "sapling"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
