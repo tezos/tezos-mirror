@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019-2020 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -545,6 +546,9 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
       Storage.Pending_migration_balance_updates.init
         ctxt
         (invoice_balance_updates @ baker_balance_updates)
+      >>=? (* In the genesis case Sapling is initialized by Contract_storage.init *)
+      fun ctxt ->
+      Storage.Sapling.Next.init ctxt
 
 let prepare ctxt ~level ~predecessor_timestamp ~timestamp ~fitness =
   Raw_context.prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt
