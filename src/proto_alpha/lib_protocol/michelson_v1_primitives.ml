@@ -840,21 +840,11 @@ let prims_of_strings expr =
           (Invalid_primitive_name (expr, loc))
           (prim_of_string prim)
         >>? fun prim ->
-        List.fold_left
-          (fun acc arg ->
-            acc >>? fun args -> convert arg >|? fun arg -> arg :: args)
-          (ok [])
-          args
-        >|? fun args -> Prim (0, prim, List.rev args, annot)
+        Error_monad.map convert args >|? fun args -> Prim (0, prim, args, annot)
     | Seq (_, args) ->
-        List.fold_left
-          (fun acc arg ->
-            acc >>? fun args -> convert arg >|? fun arg -> arg :: args)
-          (ok [])
-          args
-        >|? fun args -> Seq (0, List.rev args)
+        Error_monad.map convert args >|? fun args -> Seq (0, args)
   in
-  convert (root expr) >>? fun expr -> ok (strip_locations expr)
+  convert (root expr) >|? strip_locations
   [@@coq_axiom "implicit type conversion for expr in the constant cases"]
 
 let strings_of_prims expr =
