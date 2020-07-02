@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019-2020 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -64,7 +65,9 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
       Storage.Vote.Current_period.init
         ctxt
         {index = voting_period_index; kind = Proposal; start_position}
-      >>=? fun ctxt -> Storage.Vote.Pred_period_kind.init ctxt Promotion_vote
+      >>=? fun ctxt ->
+      Storage.Vote.Pred_period_kind.init ctxt Promotion_vote
+      >>=? fun ctxt -> Storage.Sapling.Next.init ctxt
 
 let prepare ctxt ~level ~predecessor_timestamp ~timestamp ~fitness =
   Raw_context.prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt
