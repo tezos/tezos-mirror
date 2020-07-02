@@ -8,7 +8,8 @@
             tezos-stdlib-unix
             tezos-client-base
             tezos-protocol-alpha-parameters
-            tezos-test-services)
+            tezos-test-services
+            sapling)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_micheline
                    -open Tezos_client_alpha
@@ -30,14 +31,14 @@
 ; runs only the `Quick tests
 (rule
  (alias runtest_proto_alpha)
- (deps contracts/big_interpreter_stack.tz)
+ (deps (glob_files contracts/*))
  (package tezos-protocol-alpha-tests)
  (action (run %{exe:main.exe} -v -q)))
 
 ; runs both `Quick and `Slow tests
 (rule
  (alias runtest_slow)
- (deps contracts/big_interpreter_stack.tz)
+ (deps (glob_files contracts/*))
  (package tezos-protocol-alpha-tests)
  (action (run %{exe:main.exe} -v)))
 
