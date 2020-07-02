@@ -735,11 +735,11 @@ let init c =
 
 let used_storage_space c contract =
   Storage.Contract.Used_storage_space.get_option c contract
-  >|=? function None -> Z.zero | Some fees -> fees
+  >|=? Option.unopt ~default:Z.zero
 
 let paid_storage_space c contract =
   Storage.Contract.Paid_storage_space.get_option c contract
-  >|=? function None -> Z.zero | Some paid_space -> paid_space
+  >|=? Option.unopt ~default:Z.zero
 
 let set_paid_storage_space_and_return_fees_to_pay c contract new_storage_space
     =

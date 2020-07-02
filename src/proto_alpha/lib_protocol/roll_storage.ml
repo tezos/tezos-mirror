@@ -226,7 +226,7 @@ let count_rolls ctxt delegate =
 
 let get_change ctxt delegate =
   Storage.Roll.Delegate_change.get_option ctxt delegate
-  >|=? function None -> Tez_repr.zero | Some change -> change
+  >|=? Option.unopt ~default:Tez_repr.zero
 
 module Delegate = struct
   let fresh_roll ctxt =
