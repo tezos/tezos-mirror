@@ -668,7 +668,10 @@ class TestContractOpcodes:
              '(Some (Pair 2 4 "toto" 0x01))'),
 
             # Test DUP n
-            ('dup-n.tz', 'Unit', 'Unit', 'Unit')
+            ('dup-n.tz', 'Unit', 'Unit', 'Unit'),
+
+            # Test Sapling
+            ('sapling_empty_state.tz', '{}', 'Unit', '0')
         ])
     def test_contract_input_output(self,
                                    client_regtest: ClientRegression,

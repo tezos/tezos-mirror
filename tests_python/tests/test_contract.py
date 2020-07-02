@@ -322,7 +322,7 @@ class TestContracts:
          r'operation type forbidden in parameter, storage and constants'),
         # big_maps cannot be PACKed
         ("pack_big_map.tz",
-         r'big_map type not expected here'),
+         r'big_map or sapling_state type not expected here'),
         ("invalid_self_entrypoint.tz",
          r'Contract has no entrypoint named D'),
         ("contract_annotation_default.tz",
@@ -377,6 +377,16 @@ class TestContracts:
          r"UNPAIR expects an argument of at least 2"),
         ("dup0.tz",
          r"DUP n expects an argument of at least 1"),
+        ("push_big_map_with_id_with_parens.tz",
+         r"big_map or sapling_state type not expected here"),
+        ("push_big_map_with_id_without_parens.tz",
+         r"primitive PUSH expects 2 arguments but is given 4"),
+        # sapling_state is not packable
+        ("pack_sapling_state.tz",
+         r"big_map or sapling_state type not expected here"),
+        # sapling_state is not packable
+        ("unpack_sapling_state.tz",
+         r"big_map or sapling_state type not expected here"),
     ])
     def test_ill_typecheck(self, client: Client, contract, error_pattern):
         with utils.assert_run_failure(error_pattern):
@@ -873,6 +883,39 @@ code {{
         expected_storage = expected_storage.format(adr=session['contract'])
         run_script_res = client.run_script(contract, 'None', param, file=False)
         assert run_script_res.storage == expected_storage
+
+    def test_overwrite_big_map_of_other_contract(self,
+                                                 session: dict,
+                                                 client: Client):
+        """
+        The test consists of:
+        - one contract with a storage containing a big_map, the one we try to
+          write in.
+        - one contract reading values of the storage of the first contract.
+        - one contract attempting to write values in the storage of the first
+        contract.
+
+        It should fail with a FAILWITH instruction because the writer wrote in
+        a copy of the first contract, therefore the value does not exist.
+        """
+        contract_path_store = os.path.join(CONTRACT_PATH, 'mini_scenarios',
+                                           'big_map_store.tz')
+        contract_path_write = os.path.join(CONTRACT_PATH, 'mini_scenarios',
+                                           'big_map_write.tz')
+        contract_path_read = os.path.join(CONTRACT_PATH, 'mini_scenarios',
+                                          'big_map_read.tz')
+        contract_store = originate(client, session, contract_path_store,
+                                   '{}', 0)
+        big_map_id = client.get_storage(contract_store.contract)
+        contract_read = originate(client, session, contract_path_read, "42",
+                                  0)
+        contract_write = originate(client, session, contract_path_write,
+                                   'Unit', 0)
+        client.transfer(0, 'bootstrap1', contract_write.contract,
+                        ['--burn-cap', '10', '--arg', big_map_id])
+        with utils.assert_run_failure("script reached FAILWITH instruction"):
+            client.transfer(0, 'bootstrap1', contract_read.contract,
+                            ['--burn-cap', '10', '--arg', big_map_id])
 
 
 @pytest.mark.contract

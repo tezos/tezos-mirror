@@ -534,6 +534,12 @@ integration:rpc:
     - poetry run pytest tests/test_rpc.py -s --log-dir=tmp
   stage: test
 
+integration:sapling:
+  <<: *integration_python_definition
+  script:
+    - poetry run pytest tests/test_sapling.py -s --log-dir=tmp
+  stage: test
+
 integration:tls:
   <<: *integration_python_definition
   script:

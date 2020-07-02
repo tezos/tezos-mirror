@@ -268,6 +268,54 @@ class SignBytesResult:
         self.signature = match.groups()[0]
 
 
+class SaplingGenKeyResult:
+    """Result of a 'sapling gen key' operation."""
+
+    def __init__(self, client_output: str):
+        pattern = (r'It is important to save this mnemonic in a secure '
+                   r'place:\n\n([\w\s]+)\n\nThe mnemonic')
+        match = re.search(pattern, client_output)
+        if match is None:
+            raise InvalidClientOutput(client_output)
+        self.mnemonic = match.groups()[0].split()
+
+
+class SaplingGenAddressResult:
+    """Result of a 'sapling gen address' operation."""
+
+    def __init__(self, client_output: str):
+        address_match = re.search(r"Generated address:\n(\w+)\n",
+                                  client_output)
+        if address_match is None:
+            raise InvalidClientOutput(client_output)
+        self.address = address_match.groups()[0]
+        index_match = re.search(r"at index (\d+)", client_output)
+        if index_match is None:
+            raise InvalidClientOutput(client_output)
+        self.index = int(index_match.groups()[0])
+
+
+class SaplingDeriveKeyResult:
+    """Result of a 'sapling derive key' operation."""
+
+    def __init__(self, client_output: str):
+        path_match = re.search(r"with path (\S+)", client_output)
+        if path_match is None:
+            raise InvalidClientOutput(client_output)
+        self.path = path_match.groups()[0]
+
+
+class SaplingGetBalanceResult:
+    """Result of a 'sapling get balance' query."""
+
+    def __init__(self, client_output: str):
+        balance_match = re.search(r"Total Sapling funds ([\d\.]+)",
+                                  client_output)
+        if balance_match is None:
+            raise InvalidClientOutput(client_output)
+        self.balance = float(balance_match.groups()[0])
+
+
 def extract_rpc_answer(client_output: str) -> dict:
     """Convert json client output to a dict representation.
 
