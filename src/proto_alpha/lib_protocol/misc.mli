@@ -56,4 +56,9 @@ module Syntax : sig
   val ok_some : 'a -> 'a option tzresult
 
   val error_unless : bool -> error -> unit tzresult
+
+  val filter_s :
+    ('a -> bool tzresult Lwt.t) -> 'a list -> 'a list tzresult Lwt.t
+
+  val map : ('a -> 'b tzresult) -> 'a list -> 'b list tzresult
 end

@@ -97,5 +97,26 @@ module Syntax = struct
 
   let[@inline] ok_some x = Ok (Some x)
 
+  let ok_nil = Ok []
+
   let error_unless cond exn = if cond then ok_unit else error exn
+
+  let rec filter_s f l =
+    match l with
+    | [] ->
+        return_nil
+    | h :: t -> (
+        f h
+        >>=? function
+        | false ->
+            filter_s f t
+        | true ->
+            filter_s f t >>=? fun t -> return (h :: t) )
+
+  let rec map f l =
+    match l with
+    | [] ->
+        ok_nil
+    | h :: t ->
+        f h >>? fun rh -> map f t >>? fun rt -> Ok (rh :: rt)
 end

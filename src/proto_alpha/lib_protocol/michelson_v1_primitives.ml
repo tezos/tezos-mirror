@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Micheline
+open Misc.Syntax
 
 type error += Unknown_primitive_name of string
 
@@ -785,21 +786,11 @@ let prims_of_strings expr =
           (Invalid_primitive_name (expr, loc))
           (prim_of_string prim)
         >>? fun prim ->
-        List.fold_left
-          (fun acc arg ->
-            acc >>? fun args -> convert arg >|? fun arg -> arg :: args)
-          (ok [])
-          args
-        >|? fun args -> Prim (0, prim, List.rev args, annot)
+        map convert args >|? fun args -> Prim (0, prim, args, annot)
     | Seq (_, args) ->
-        List.fold_left
-          (fun acc arg ->
-            acc >>? fun args -> convert arg >|? fun arg -> arg :: args)
-          (ok [])
-          args
-        >|? fun args -> Seq (0, List.rev args)
+        map convert args >|? fun args -> Seq (0, args)
   in
-  convert (root expr) >>? fun expr -> ok (strip_locations expr)
+  convert (root expr) >|? fun expr -> strip_locations expr
 
 let strings_of_prims expr =
   let rec convert = function
