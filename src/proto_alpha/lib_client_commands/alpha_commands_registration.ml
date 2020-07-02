@@ -36,3 +36,4 @@ let () =
   @ Client_proto_mockup_commands.commands ()
   @ Client_proto_utils_commands.commands ()
   @ Client_proto_baker_commands.commands ()
+  @ Client_sapling_commands.commands ()

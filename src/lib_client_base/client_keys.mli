@@ -29,6 +29,8 @@ type pk_uri = private Uri.t
 
 type sk_uri = private Uri.t
 
+type sapling_uri = private Uri.t
+
 val pk_uri_parameter : unit -> (pk_uri, 'a) Clic.parameter
 
 val pk_uri_param :
@@ -56,6 +58,16 @@ module Public_key :
   Client_aliases.Alias with type t = pk_uri * Signature.Public_key.t option
 
 module Secret_key : Client_aliases.Alias with type t = sk_uri
+
+type sapling_key = {
+  sk : sapling_uri;
+  (* zip32 derivation path *)
+  path : int32 list;
+  (* index of the last issued address *)
+  address_index : Sapling.Core.Client.Viewing_key.index;
+}
+
+module Sapling_key : Client_aliases.Alias with type t = sapling_key
 
 module Logging : sig
   val tag : string Tag.def
@@ -213,3 +225,5 @@ val force_switch : unit -> (bool, 'ctx) Clic.arg
 val make_pk_uri : Uri.t -> pk_uri tzresult Lwt.t
 
 val make_sk_uri : Uri.t -> sk_uri tzresult Lwt.t
+
+val make_sapling_uri : Uri.t -> sapling_uri
