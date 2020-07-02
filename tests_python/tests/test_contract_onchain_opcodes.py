@@ -334,6 +334,7 @@ class TestContractOnchainOpcodes:
             'Pair 0 {Elt 0 None}',
             'Pair 0 {Elt 0 (Some 4)}',
             'Pair 0 {Elt 1 (Some 4)}']),
+        ('sapling_empty_state', '{}', ['Unit']),
     ])
     def test_trace_transfer(self, client_regtest_scrubbed, contract,
                             init_storage, parameters):

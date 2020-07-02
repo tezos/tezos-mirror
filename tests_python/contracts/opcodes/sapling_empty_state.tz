@@ -1,0 +1,3 @@
+parameter unit;
+storage sapling_state;
+code { DROP; SAPLING_EMPTY_STATE; NIL operation; PAIR; };

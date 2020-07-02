@@ -655,7 +655,10 @@ class TestContractOpcodes:
             # Test SHA3
             ('sha3.tz', 'None', f'0x{b"Hello, world!".hex()}',
              '(Some 0xf345a219da005ebe9c1a1eaad97bbf38' +
-             'a10c8473e41d0af7fb617caa0c6aa722)')
+             'a10c8473e41d0af7fb617caa0c6aa722)'),
+
+            # Test Sapling
+            ('sapling_empty_state.tz', '{}', 'Unit', '0')
         ])
     def test_contract_input_output(self,
                                    client_regtest: ClientRegression,

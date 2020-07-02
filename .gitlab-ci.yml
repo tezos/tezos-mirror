@@ -528,6 +528,12 @@ integration:rpc:
     - pytest tests_python/tests/test_rpc.py -s --log-dir=tmp
   stage: test
 
+integration:sapling:
+  <<: *integration_python_definition
+  script:
+    - pytest tests_python/tests/test_sapling.py -s --log-dir=tmp
+  stage: test
+
 integration:sha3:
   <<: *integration_python_definition
   script:
