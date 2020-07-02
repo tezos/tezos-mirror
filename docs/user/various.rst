@@ -192,7 +192,7 @@ writing your own configuration file if needed.
         their messages logged up to the debug level, whereas the rest of
         log sections will be logged up to the notice level. */
 
-        "rules": "client* -> debug, net -> debug, * -> notice",
+        "rules": "client* -> debug; net -> debug; * -> notice",
 
         /* Format for the log file, see
         http://ocsigen.org/lwt/dev/api/Lwt_log_core#2_Logtemplates. */
