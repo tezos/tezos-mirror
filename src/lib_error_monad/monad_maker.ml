@@ -84,13 +84,13 @@ struct
 
   let ( >>= ) = Lwt.( >>= )
 
-  let ok v = Ok v
+  let[@inline] ok v = Ok v
 
   let ok_unit = Ok ()
 
   let ok_none = Ok None
 
-  let ok_some x = Ok (Some x)
+  let[@inline] ok_some x = Ok (Some x)
 
   let ok_nil = Ok []
 
@@ -98,15 +98,15 @@ struct
 
   let ok_false = Ok false
 
-  let error s = Error [s]
+  let[@inline] error s = Error [s]
 
-  let return v = Lwt.return_ok v
+  let[@inline] return v = Lwt.return_ok v
 
   let return_unit = Lwt.return ok_unit
 
   let return_none = Lwt.return ok_none
 
-  let return_some x = Lwt.return (Ok (Some x))
+  let[@inline] return_some x = Lwt.return (Ok (Some x))
 
   let return_nil = Lwt.return ok_nil
 
@@ -114,7 +114,7 @@ struct
 
   let return_false = Lwt.return ok_false
 
-  let fail s = Lwt.return_error [s]
+  let[@inline] fail s = Lwt.return_error [s]
 
   let ( >>? ) v f = match v with Error _ as err -> err | Ok v -> f v
 
