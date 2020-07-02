@@ -9,7 +9,7 @@ history can be deleted as they are not required anymore.
 
 Three history modes are provided:
 
-- **Full mode** (default mode)
+- **Full** (default mode with 5 additional cycles)
 
   The node stores the minimal data since the genesis required to reconstruct
   (or 'replay') the complete chain's ledger state.
@@ -32,9 +32,9 @@ Three history modes are provided:
       before the current checkpoint.
     - Disk storage slowly increases as the node keeps the history.
 
-  See how to :ref:`set up a full node<Set up a full node>`.
+  See how to :ref:`set up a full node<Set_up_a_full_node>`.
 
-- **Rolling mode**
+- **Rolling**
 
   This is the lightest mode as it only maintains a minimal rolling fragment of the
   chain data so the node can still validate new blocks and synchronize with the head.
@@ -52,13 +52,13 @@ Three history modes are provided:
     - The node does not help other nodes to bootstrap as it is not able to
       send the whole chain history.
 
-  See how to :ref:`set up a rolling node<Set up a rolling node>`.
+  See how to :ref:`set up a rolling node<Set_up_a_rolling_node>`.
 
 - **Archive**
 
   This is the heaviest mode as it keeps the whole chain data to be able to
   query any information stored on the chain since the genesis. It is
-  particularly suitable for indexers or block explorer.
+  particularly suitable for indexers or block explorers.
 
   * Upsides
 
@@ -68,12 +68,12 @@ Three history modes are provided:
 
     - Consume an increasing and rather large amount and data storage.
 
-  See how to :ref:`set up an archive node<Set up an archive node>`.
+  See how to :ref:`set up an archive node<Set_up_an_archive_node>`.
 
 .. _Recap:
 
 History modes in a nutshell
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+---------------------------
 
 +---------+----------------+---------------------+--------------------+
 |         | Storage amount | Suitable for bakers | Operations history |
@@ -82,16 +82,26 @@ History modes in a nutshell
 +---------+----------------+---------------------+--------------------+
 | Full    | Limited        | Yes                 | Complete           |
 +---------+----------------+---------------------+--------------------+
-| Rolling | Low            | Restricted*         | Last cycle         |
+| Rolling | Low            | Restricted*         | Restricted*        |
 +---------+----------------+---------------------+--------------------+
 
-(*) Not suitable for delegation services which needs more than one
-previous cycle to compute rewards.
+(*) Suitable for delegation services if the number of additional
+preserved cycles is high enough to allow the computation of rewards.
+See :ref:`Preserving additional cycles<History_mode_additional_cycles>` for
+details.
 
-.. _Set up a full node:
+History modes use some markers which are used to describe the state
+of the storage:
+
+- `checkpoint`: the last allowed fork level of the chain (as defined
+  in the Tezos position paper),
+- `savepoint`: the last known block which contains metadata,
+- `caboose`: the last known block.
+
+.. _Set_up_a_full_node:
 
 Setting up a node in full mode
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+------------------------------
 
 To run a ``full`` node you can either use the command line arguments:
 
@@ -118,16 +128,16 @@ You can then verify that your history mode is set to full by using the checkpoin
 .. code-block:: json
 
     { "block": { "some": "data" },
-       "save_point": 4096, "caboose": 0, "history_mode": "full" }
+       "savepoint": 4096, "caboose": 0, "history_mode": "full" }
 
-In full mode, the save point corresponds to the checkpoint of the current chain.
-It is the oldest block that contains all the data.
-The caboose is the oldest pruned block (that contains partial data).
+In full mode, the `savepoint` is the last block which contains its
+metadata. The `caboose` is the last known block which is pruned (that
+contains partial data).
 
-.. _Set up a rolling node:
+.. _Set_up_a_rolling_node:
 
 Setting up a node in rolling mode
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+---------------------------------
 
 To run a ``rolling`` node you can either use the command line arguments:
 
@@ -143,17 +153,18 @@ or use your configuration file as described in :ref:`here <node-conf>`:
        "history_mode": "experimental-rolling"
    }}
 
-Please note that the ``rolling`` mode is still an experimental feature.
+In ``rolling`` mode, the `caboose` is the genesis at its early state,
+and then, it is updated to the last known block of the rolling
+window. The `savepoint` is moved in accordance to the number of
+configured additional cycles.
 
-In this mode, the new checkpoint RPC will also give you the save point
-(the oldest block that contains all the data) and caboose (the oldest
-pruned block).
 ``$ tezos rpc get /chains/main/checkpoint``
 
-.. _Set up an archive node:
+
+.. _Set_up_an_archive_node:
 
 Setting up a node in archive mode
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+---------------------------------
 
 To run an ``archive`` node you can use the command line arguments:
 ``$ tezos-node run --history-mode archive``
@@ -165,40 +176,67 @@ If you want to start an ``archive`` node, it is now mandatory to pass
 this argument the first time you launch your node. Indeed, there are
 some restrictions when switching from one mode to another.
 
-.. _Switch mode restrictions:
+In ``archive`` mode, both the `savepoint` and `caboose` are located
+down to the genesis.
+
+.. _History_mode_additional_cycles:
+
+Preserving additional cycles
+----------------------------
+
+When running a node in ``full`` or ``rolling`` mode, you have a full
+access to the block information in a sliding window of
+history. Indeed, at each new cycle, a garbage collection phase removes
+the ledger state and the block metadata (operation receipts, rewards
+updates, etc.) of blocks outside the offset of this sliding
+window. Depending on the network, a minimum number of cycles are
+preserved (e.g., 7 on mainnet). However, the node keeps a number of
+additional cycles that is configurable.
+
+By default, the number of preserved additional cycles, for both
+``full`` and ``rolling`` nodes, is *5 cycles*. On mainnet, this would
+total *12 cycles* of complete history (approximately a month).  It is
+possible to increase this parameter to keep more history or, on the
+contrary, decrease it to reduce the storage size. For example, it is
+possible to run a baker and a delegation service on rolling mode with
+*7 additional cycles* providing two more weeks to dispatch rewards.
+
+When running your node for the first time on an empty storage, you may
+specify the history mode and number of additional cycles using
+``--history-mode <HISTORY_MODE>:<NB_CYCLES>`` when running it. For
+example, ``--history-mode rolling:7``.
+
+It is also possible to modify the number of additional preserved
+cycles of a previously configured node. See :ref:`Switch mode
+restrictions<Switch_mode_restrictions>`
+
+.. _Switch_mode_restrictions:
 
 Switching between node's modes
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+------------------------------
 
-As the different modes relies on different storage schemes, there are
-some restrictions when switching from one mode to another.
+It is possible to switch between history modes and/or to modify the
+number of additional cycles. To do so, it is necessary to restart the
+node with the desired history mode and add the flag
+``--force-history-mode-switch``. This flag is required to prevent
+erroneous history switches. Indeed, changing from one history mode to
+an other can irremediably remove data from the storage. The history
+mode switches must be manipulated with care.
 
-Going from ``archive`` to ``full`` or ``rolling`` or from ``full`` to
-``rolling`` is possible by successively exporting a snapshot of the
-targeted mode and then, importing it into a clean data directory.
+However, as the different modes rely on different storage schemes,
+there are some restrictions when switching from one mode to another.
 
-It is possible to restore an ``archive`` storage from a ``full`` one
-using the reconstruction feature (you should note that the procedure
-may take a couple of days to complete). To do so, you have two
-choices:
++---------+---------+------+---------+
+|From/to  | Archive | Full | Rolling |
++=========+=========+======+=========+
+| Archive | X       | Yes  | Yes     |
++---------+---------+------+---------+
+| Full    | Yes*    | Yes  | Yes     |
++---------+---------+------+---------+
+| Rolling | No      | No   | Yes     |
++---------+---------+------+---------+
 
-- import a ``full`` snapshot using the ``--reconstruct`` option (see
-  :ref:`snapshots`),
-
-- use the dedicated command ``tezos-node reconstruct`` if you already
-  have ``full`` storage.
-
-However, it is not possible to switch from ``rolling`` to ``full`` or
-``archive`` using a successive export and import or by using the
-reconstruct feature since the ``rolling`` mode does not keep enough
-data to restore a complete storage.
-
-+---------+-------------+-----------+-----------+
-| From/To | Archive     | Full      | Rolling   |
-+=========+=============+===========+===========+
-| Archive | X           | Exp./Imp. | Exp./Imp. |
-+---------+-------------+-----------+-----------+
-| Full    | Reconstruct | X         | Exp./Imp. |
-+---------+-------------+-----------+-----------+
-| Rolling | No          | No        | X         |
-+---------+-------------+-----------+-----------+
+(*) Switching from a ``full`` node to an ``archive`` one is possible
+using the ``reconstruct`` feature. To do so, run ``tezos-node
+reconstruct`` on your node. Note that the storage reconstruction is a
+long process that, on the main network, may requires days to complete.
