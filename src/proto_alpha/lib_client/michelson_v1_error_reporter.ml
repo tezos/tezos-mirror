@@ -107,7 +107,7 @@ let collect_error_locations errs =
         | Invalid_kind (loc, _, _)
         | Invalid_never_expr loc
         | Duplicate_field (loc, _)
-        | Unexpected_big_map loc
+        | Unexpected_lazy_storage loc
         | Unexpected_operation loc
         | Fail_not_in_tail_position loc
         | Undefined_binop (loc, _, _, _)
@@ -317,8 +317,12 @@ let report_errors ~details ~show_source ?parsed ppf errs =
           (Michelson_v1_primitives.string_of_prim prim) ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
-    | Environment.Ecoproto_error (Unexpected_big_map loc) :: rest ->
-        Format.fprintf ppf "%abig_map type not expected here" print_loc loc ;
+    | Environment.Ecoproto_error (Unexpected_lazy_storage loc) :: rest ->
+        Format.fprintf
+          ppf
+          "%abig_map or sapling_state type not expected here"
+          print_loc
+          loc ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
     | Environment.Ecoproto_error (Unexpected_operation loc) :: rest ->

@@ -1047,6 +1047,11 @@ opam:tezos-client-sapling-008-PtEdoTez:
   variables:
     package: tezos-client-sapling-008-PtEdoTez
 
+opam:tezos-client-sapling-alpha:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-sapling-alpha
+
 opam:tezos-codec:
   <<: *opam_definition
   variables:

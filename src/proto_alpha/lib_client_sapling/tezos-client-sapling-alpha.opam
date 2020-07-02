@@ -7,19 +7,19 @@ dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "tezos-tooling" { with-test }
-  "dune" { >= "2.0" }
+  "ocamlfind" { build }
+  "dune" { >= "1.7" }
   "tezos-base"
-  "tezos-protocol-environment"
-  "tezos-protocol-alpha"
-  "tezos-shell-services"
+  "tezos-clic"
+  "tezos-crypto"
   "tezos-client-base"
+  "tezos-signer-backends"
   "tezos-client-alpha"
   "tezos-client-alpha-commands"
-  "tezos-client-sapling-alpha"
-  "tezos-client-commands"
+  "tezos-protocol-alpha"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos/Protocol: protocol-specific commands for `tezos-client`"
+synopsis: "Tezos: sapling support for `tezos-client`"
