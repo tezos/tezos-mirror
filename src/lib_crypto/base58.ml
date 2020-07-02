@@ -342,6 +342,14 @@ struct
 end
 
 module Prefix = struct
+  (* These encoded prefixes are computed using scripts/base58_prefix.py
+     $ ./scripts/base58_prefix.py tz1 20
+     36 434591 [6L, 161L, 159L]
+     $ dune utop src/lib_crypto
+     utop # Tezos_crypto.Base58.make_encoded_prefix "\006\161\159" 20 ;;
+     - : string * int = ("tz1", 36)
+   *)
+
   (* 32 *)
   let block_hash = "\001\052" (* B(51) *)
 
@@ -410,7 +418,11 @@ module Prefix = struct
   let generic_signature = "\004\130\043" (* sig(96) *)
 
   (* 4 *)
-  let chain_id = "\087\082\000"
+  let chain_id = "\087\082\000" (* Net(15) *)
 
-  (* Net(15) *)
+  (* 169 *)
+  let sapling_spending_key = "\011\237\020\092" (* sask(241) *)
+
+  (* 43 *)
+  let sapling_address = "\018\071\040\223" (* zet1(69) *)
 end

@@ -88,6 +88,10 @@ module Prefix : sig
   val secp256k1_element : string
 
   val secp256k1_scalar : string
+
+  val sapling_spending_key : string
+
+  val sapling_address : string
 end
 
 (** An extensible sum-type for decoded data: one case per known
