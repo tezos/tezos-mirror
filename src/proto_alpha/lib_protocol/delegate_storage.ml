@@ -274,7 +274,7 @@ let delegated_contracts ctxt delegate =
 
 let get_frozen_deposit ctxt contract cycle =
   Storage.Contract.Frozen_deposits.get_option (ctxt, contract) cycle
-  >|=? function None -> Tez_repr.zero | Some frozen -> frozen
+  >|=? Option.value ~default:Tez_repr.zero
 
 let credit_frozen_deposit ctxt delegate cycle amount =
   let contract = Contract_repr.implicit_contract delegate in
@@ -303,7 +303,7 @@ let freeze_deposit ctxt delegate amount =
 
 let get_frozen_fees ctxt contract cycle =
   Storage.Contract.Frozen_fees.get_option (ctxt, contract) cycle
-  >|=? function None -> Tez_repr.zero | Some frozen -> frozen
+  >|=? Option.value ~default:Tez_repr.zero
 
 let credit_frozen_fees ctxt delegate cycle amount =
   let contract = Contract_repr.implicit_contract delegate in
@@ -337,7 +337,7 @@ let burn_fees ctxt delegate cycle amount =
 
 let get_frozen_rewards ctxt contract cycle =
   Storage.Contract.Frozen_rewards.get_option (ctxt, contract) cycle
-  >|=? function None -> Tez_repr.zero | Some frozen -> frozen
+  >|=? Option.value ~default:Tez_repr.zero
 
 let credit_frozen_rewards ctxt delegate cycle amount =
   let contract = Contract_repr.implicit_contract delegate in

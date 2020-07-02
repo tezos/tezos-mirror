@@ -26,7 +26,7 @@
 
 let recorded_proposal_count_for_delegate ctxt proposer =
   Storage.Vote.Proposals_count.get_option ctxt proposer
-  >|=? function None -> 0 | Some count -> count
+  >|=? Option.value ~default:0
 
 let record_proposal ctxt proposal proposer =
   recorded_proposal_count_for_delegate ctxt proposer
@@ -107,7 +107,7 @@ let update_listings ctxt =
       (* TODO use snapshots *)
       let delegate = Signature.Public_key.hash delegate in
       Storage.Vote.Listings.get_option ctxt delegate
-      >|=? (function None -> 0l | Some count -> count)
+      >|=? Option.value ~default:0l
       >>=? fun count ->
       Storage.Vote.Listings.init_set ctxt delegate (Int32.succ count)
       >|= fun ctxt -> ok (ctxt, Int32.succ total))
