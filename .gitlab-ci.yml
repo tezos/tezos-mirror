@@ -108,6 +108,11 @@ unit:lwt_result_stdlib:
   script:
     - dune build @src/lib_lwt_result_stdlib/runtest
 
+unit:sapling:
+  <<: *test_definition
+  script:
+    - dune build @src/lib_sapling/runtest
+
 unit:stdlib:
   <<: *test_definition
   script:
@@ -694,6 +699,11 @@ opam:ledgerwallet-tezos:
   <<: *opam_definition
   variables:
     package: ledgerwallet-tezos
+
+opam:sapling:
+  <<: *opam_definition
+  variables:
+    package: sapling
 
 opam:tezos-006-PsCARTHA-test-helpers:
   <<: *opam_definition
