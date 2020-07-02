@@ -186,6 +186,7 @@ unit:alltest:
     - scripts/test_wrapper.sh src/lib_protocol_compiler protocol_compiler
     - scripts/test_wrapper.sh src/lib_protocol_environment protocol_environment
     - scripts/test_wrapper.sh src/lib_requester requester
+    - scripts/test_wrapper.sh src/lib_sapling sapling
     - scripts/test_wrapper.sh src/lib_shell shell
     - scripts/test_wrapper.sh src/lib_signer_backends signer_backends
     - scripts/test_wrapper.sh src/lib_signer_backends/unix signer_backends_unix
@@ -693,6 +694,11 @@ opam:ledgerwallet-tezos:
   <<: *opam_definition
   variables:
     package: ledgerwallet-tezos
+
+opam:sapling:
+  <<: *opam_definition
+  variables:
+    package: sapling
 
 opam:tezos-006-PsCARTHA-test-helpers:
   <<: *opam_definition

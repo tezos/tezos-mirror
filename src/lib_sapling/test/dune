@@ -1,0 +1,18 @@
+(tests
+ (names test_rustzcash
+        test_keys
+        test_merkle
+        test_sapling)
+ (deps vectors.csv vectors-zip32.csv)
+ (libraries sapling
+            str
+            tezos-stdlib-unix
+            alcotest-lwt)
+ (flags (:standard -open Sapling
+                   -open Tezos_crypto
+                   -open Tezos_stdlib
+                   -open Data_encoding)))
+
+(env
+ (dev
+  (flags (:standard -warn-error -A))))
