@@ -40,6 +40,7 @@ val miss_signed_endorsement :
   Kind.endorsement Operation.t tzresult Lwt.t
 
 val transaction :
+  ?counter:Z.t ->
   ?fee:Tez.tez ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->

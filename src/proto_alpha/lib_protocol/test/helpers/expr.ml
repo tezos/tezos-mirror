@@ -25,7 +25,6 @@
 
 open Protocol
 open Alpha_context
-open Tezos_client_alpha
 
 exception Expression_from_string
 
