@@ -53,6 +53,7 @@
    v1/protocol_hash.mli
    v1/context_hash.mli
    v1/pvss_secp256k1.mli
+   v1/sapling.mli
 
    ;; Tezos specifics
    v1/micheline.mli
