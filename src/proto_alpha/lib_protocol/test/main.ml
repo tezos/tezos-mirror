@@ -43,5 +43,6 @@ let () =
       ("gas properties", Gas_properties.tests);
       ("Storage description", Storage.tests);
       ("Failing_noop", Failing_noop.tests);
-      ("lazy storage diff", Lazy_storage_diff.tests) ]
+      ("lazy storage diff", Lazy_storage_diff.tests);
+      ("sapling", Test_sapling.tests) ]
   |> Lwt_main.run
