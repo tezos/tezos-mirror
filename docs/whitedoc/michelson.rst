@@ -1679,6 +1679,10 @@ Domain specific data types
 
 -  ``bls12_381_fr`` : An element of the scalar field F\ :sub:`r`\ , used for scalar multiplication on the BLS12-381 curves G\ :sub:`1`\  and G\ :sub:`2`\ .
 
+-  ``sapling_transaction ms``: A :ref:`Sapling<sapling_dev>` transaction
+
+-  ``sapling_state ms``: A :ref:`Sapling<sapling_dev>` state
+
 Domain specific operations
 --------------------------
 
@@ -2139,6 +2143,35 @@ BLS12-381 primitives
 ::
 
     :: list (pair bls12_381_g1 bls12_381_g2) : 'S -> bool : 'S
+
+
+Sapling operations
+~~~~~~~~~~~~~~~~~~
+
+Please see the :ref:`Sapling integration<sapling_dev>` page for a more
+comprehensive description of the Sapling protocol.
+
+-  ``SAPLING_VERIFY_UPDATE``: verify and apply a transaction on a Sapling state.
+
+::
+
+    :: sapling_transaction ms : sapling_state ms : 'S   ->   option (pair int (sapling_state ms)): 'S
+
+    > SAPLING_VERIFY_UPDATE / t : s : S  =>  Some (Pair b s') : S
+        iff the transaction t successfully applied on state s resulting
+        in balance b and an updated state s'
+    > SAPLING_VERIFY_UPDATE / t : s : S  =>  None : S
+        iff the transaction t is invalid with respect to the state
+
+-  ``SAPLING_EMPTY_STATE ms``: Pushes an empty state on the stack.
+
+   ::
+
+    ::  'S   ->   sapling_state ms: 'S
+
+    > SAPLING_EMPTY_STATE ms /  S  =>  sapling_state ms : S
+        with `sapling_state ms` being the empty state (ie. no one can spend tokens from it)
+        with memo_size `ms`
 
 
 Removed instructions
@@ -3445,6 +3478,8 @@ Full grammar
       | CHAIN_ID
       | TOTAL_VOTING_POWER
       | PAIRING_CHECK
+      | SAPLING_EMPTY_STATE <natural number constant>
+      | SAPLING_VERIFY_UPDATE
     <type> ::=
       | <comparable type>
       | option <type>
@@ -3460,6 +3495,8 @@ Full grammar
       | bls12_381_g1
       | bls12_381_g2
       | bls12_381_fr
+      | sapling_transaction <natural number constant>
+      | sapling_state <natural number constant>
     <comparable type> ::=
       | unit
       | never
