@@ -858,3 +858,143 @@ class Client:
     def get_operations_metadata_hash(self) -> str:
         return self.rpc('get',
                         '/chains/main/blocks/head/operations_metadata_hash')
+
+    def sapling_gen_key(self,
+                        key_name: str,
+                        force: bool = False,
+                        args: List[str] = None
+                        ) -> client_output.SaplingGenKeyResult:
+
+        cmd = ['sapling', 'gen', 'key', key_name,
+               '--unencrypted']
+        args = args or []
+        if force:
+            args += ['--force']
+        cmd += args
+        return client_output.SaplingGenKeyResult(self.run(cmd))
+
+    def sapling_use_key_for_contract(
+            self,
+            key_name: str,
+            contract_name: str,
+            memo_size: int = None,
+    ) -> None:
+        cmd = ['sapling', 'use', 'key', key_name, 'for', 'contract',
+               contract_name]
+        if memo_size is not None:
+            cmd += ['--memo-size', str(memo_size)]
+        self.run(cmd)
+
+    def sapling_gen_address(self,
+                            key_name: str,
+                            index: int = None,
+                            args: List[str] = None
+                            ) -> client_output.SaplingGenAddressResult:
+        args = args or []
+        cmd = ['sapling', 'gen', 'address', key_name]
+        if index is not None:
+            cmd += ['--address-index', str(index)]
+        cmd += args
+        return client_output.SaplingGenAddressResult(self.run(cmd))
+
+    def sapling_import_key(self,
+                           key_name: str,
+                           mnemonic: List[str],
+                           force: bool = False,
+                           args: List[str] = None) -> None:
+
+        mnemonic_str = " ".join(mnemonic)
+        cmd = ['sapling', 'import', 'key', key_name,
+               '--unencrypted',
+               '--mnemonic', mnemonic_str]
+        args = args or []
+        if force:
+            cmd += ['--force']
+        cmd += args
+        self.run(cmd)
+
+    def sapling_derive_key(self,
+                           source_key_name: str,
+                           target_key_name: str,
+                           contract_name: str,
+                           index: int,
+                           force: bool = False
+                           ) -> client_output.SaplingDeriveKeyResult:
+
+        cmd = ['sapling', 'derive', 'key', target_key_name,
+               'from', source_key_name, 'at', 'index', str(index),
+               '--for-contract', contract_name,
+               '--unencrypted']
+        if force:
+            cmd += ['--force']
+        return client_output.SaplingDeriveKeyResult(self.run(cmd))
+
+    def sapling_get_balance(self,
+                            key_name: str,
+                            contract_name: str,
+                            args: List[str] = None
+                            ) -> client_output.SaplingGetBalanceResult:
+
+        cmd = ['sapling', 'get', 'balance', 'for', key_name,
+               'in', 'contract', contract_name]
+        args = args or []
+        cmd += args
+        return client_output.SaplingGetBalanceResult(self.run(cmd))
+
+    def sapling_shield(self,
+                       amount: float,
+                       src: str,
+                       dest: str,
+                       contract: str,
+                       args: List[str] = None
+                       ) -> None:
+        cmd = ['sapling', 'shield',
+               str(amount), 'from', src, 'to', dest,
+               'using', contract]
+        args = args or []
+        cmd += args
+        self.run(cmd)
+
+    def sapling_unshield(self,
+                         amount: float,
+                         src: str,
+                         dest: str,
+                         contract: str,
+                         args: List[str] = None
+                         ) -> None:
+        cmd = ['sapling', 'unshield',
+               str(amount), 'from', src, 'to', dest,
+               'using', contract]
+        args = args or []
+        cmd += args
+        self.run(cmd)
+
+    def sapling_forge_transaction(self,
+                                  amount: float,
+                                  src: str,
+                                  dest: str,
+                                  contract: str,
+                                  file: str,
+                                  args: List[str] = None) -> None:
+        cmd = ['sapling', 'forge', 'transaction',
+               str(amount), 'from', src, 'to', dest,
+               'using', contract, '--file', file]
+        args = args or []
+        cmd += args
+        self.run(cmd)
+
+    def sapling_submit(self,
+                       file: str,
+                       fee_payer: str,
+                       contract: str,
+                       args: List[str] = None) -> None:
+        cmd = ['sapling', 'submit', file,
+               'from', fee_payer,
+               'using', contract]
+        args = args or []
+        cmd += args
+        self.run(cmd)
+
+    def sapling_list_keys(self) -> List[str]:
+        cmd = ['sapling', 'list', 'keys']
+        return self.run(cmd).strip().split("\n")
