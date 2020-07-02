@@ -141,6 +141,8 @@ in the :ref:`introduction <howtoget>`.
    developer/profiling
    developer/contributing
    developer/merge_team
+   developer/sapling
+
 
 .. toctree::
    :maxdepth: 2

@@ -1536,6 +1536,10 @@ Domain specific data types
 
 -  ``bls12_381_fr`` : An element of the scalar field F\ :sub:`r`\ , used for scalar multiplication on the BLS12-381 curves G\ :sub:`1`\  and G\ :sub:`2`\ .
 
+-  ``sapling_transaction``: A :ref:`Sapling<sapling_dev>` transaction
+
+-  ``sapling_state``: A :ref:`Sapling<sapling_dev>` state
+
 Domain specific operations
 --------------------------
 
@@ -1997,6 +2001,33 @@ BLS12-381 primitives
 
     :: list (pair bls12_381_g1 bls12_381_g2) : 'S -> bool : 'S
 
+
+Sapling operations
+~~~~~~~~~~~~~~~~~~
+
+Please see the :ref:`Sapling integration<sapling_dev>` page for a more
+comprehensive description of the Sapling protocol.
+
+-  ``SAPLING_VERIFY_UPDATE``: verify and apply a transaction on a Sapling state.
+
+::
+
+    :: sapling_transaction : sapling_state : 'S   ->   option (pair int sapling_state): 'S
+
+    > SAPLING_VERIFY_UPDATE / t : s : S  =>  Some (Pair b s') : S
+        iff the transaction t successfully applied on state s resulting
+        in balance b and an updated state s'
+    > SAPLING_VERIFY_UPDATE / t : s : S  =>  None : S
+        iff the transaction t is invalid with respect to the state
+
+-  ``SAPLING_EMPTY_STATE``: Pushes an empty state on the stack.
+
+   ::
+
+    ::  'S   ->   sapling_state: 'S
+
+    > SAPLING_EMPTY_STATE /  S  =>  sapling_state : S
+        with sapling_state being the empty state (ie. no one can spend tokens from it)
 
 Removed instructions
 ~~~~~~~~~~~~~~~~~~~~
