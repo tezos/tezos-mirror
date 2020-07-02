@@ -954,6 +954,11 @@ opam:tezos-client-genesis-carthagenet:
   variables:
     package: tezos-client-genesis-carthagenet
 
+opam:tezos-client-sapling-alpha:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-sapling-alpha
+
 opam:tezos-codec:
   <<: *opam_definition
   variables:

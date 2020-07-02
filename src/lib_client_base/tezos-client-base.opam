@@ -14,7 +14,9 @@ depends: [
   "tezos-storage"
   "tezos-rpc-http"
   "cmdliner"
+  "sapling"
   "alcotest" { with-test }
+  "sapling"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
