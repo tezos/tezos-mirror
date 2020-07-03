@@ -1,11 +1,6 @@
 ---
 
-stages:
-  - build-and-test
-  - publish
-
 build-and-test:
-  stage: build-and-test
   image: ocaml/opam2:alpine-3.10-ocaml-4.08
   script:
     - opam lint .
@@ -27,9 +22,8 @@ build-and-test:
     - dune runtest
     - opam install .
 
-publish-doc:
+pages:
   image: ocaml/opam2:alpine-3.10-ocaml-4.08
-  stage: publish
   artifacts:
     paths:
     - public/
