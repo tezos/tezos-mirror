@@ -340,88 +340,124 @@ module Box = struct
     Hacl.NaCl.Detached.box_open_afternm buf buf tag nonce k
 end
 
-module Sign = struct
+module type SIGNATURE = sig
+  type _ key
+
+  val size : int
+
+  val pk_size : int
+
+  val sk_size : int
+
+  val compare : 'a key -> 'a key -> int
+
+  val equal : 'a key -> 'a key -> bool
+
+  val sk_of_bytes : Bytes.t -> secret key option
+
+  val pk_of_bytes : Bytes.t -> public key option
+
+  val neuterize : 'a key -> public key
+
+  val keypair : unit -> public key * secret key
+
+  val to_bytes : _ key -> Bytes.t
+
+  val blit_to_bytes : _ key -> ?pos:int -> Bytes.t -> unit
+
+  val sign : sk:secret key -> msg:Bytes.t -> Bytes.t
+
+  val verify : pk:public key -> msg:Bytes.t -> signature:Bytes.t -> bool
+end
+
+module Ed25519 : SIGNATURE = struct
   type _ key = Sk : Bytes.t -> secret key | Pk : Bytes.t -> public key
 
   let size = 64
 
-  let pkbytes = 32
+  let pk_size = 32
 
-  let skbytes = 32
+  let sk_size = 32
 
-  let unsafe_to_bytes : type a. a key -> Bytes.t = function
+  let to_bytes : type a. a key -> Bytes.t = function
     | Pk buf ->
-        buf
+        Bytes.copy buf
     | Sk buf ->
-        buf
+        Bytes.copy buf
 
-  let unsafe_sk_of_bytes seed =
-    if Bytes.length seed <> skbytes then
-      invalid_arg
-        (Printf.sprintf
-           "Sign.unsafe_sk_of_bytes: sk must be at least %d bytes long"
-           skbytes) ;
-    Sk seed
+  let sk_of_bytes seed =
+    if Bytes.length seed <> sk_size then None else Some (Sk (Bytes.copy seed))
 
-  let unsafe_pk_of_bytes pk =
-    if Bytes.length pk <> pkbytes then
-      invalid_arg
-        (Printf.sprintf
-           "Sign.unsafe_pk_of_bytes: pk must be at least %d bytes long"
-           pkbytes) ;
-    Pk pk
+  let pk_of_bytes pk =
+    if Bytes.length pk <> pk_size then None else Some (Pk (Bytes.copy pk))
 
   let blit_to_bytes : type a. a key -> ?pos:int -> Bytes.t -> unit =
    fun key ?(pos = 0) buf ->
     match key with
     | Pk pk ->
-        Bytes.blit pk 0 buf pos pkbytes
+        Bytes.blit pk 0 buf pos pk_size
     | Sk sk ->
-        Bytes.blit sk 0 buf pos skbytes
+        Bytes.blit sk 0 buf pos sk_size
 
-  let equal : type a. a key -> a key -> bool =
+  let compare : type a. a key -> a key -> int =
    fun a b ->
     (* TODO re-group once coverage ppx is updated *)
     match (a, b) with
     | (Pk a, Pk b) ->
-        Bytes.equal a b
+        Bytes.compare a b
     | (Sk a, Sk b) ->
-        Bytes.equal a b
+        Bytes.compare a b
+
+  let equal : type a. a key -> a key -> bool = fun a b -> compare a b = 0
 
   let neuterize : type a. a key -> public key = function
     | Pk pk ->
         Pk pk
     | Sk sk ->
-        let pk = Bytes.create pkbytes in
+        let pk = Bytes.create pk_size in
         Hacl.Ed25519.secret_to_public pk sk ;
         Pk pk
 
   let keypair () =
-    let sk = Sk (Rand.gen skbytes) in
+    let sk = Sk (Rand.gen sk_size) in
     (neuterize sk, sk)
 
-  let sign ~sk:(Sk sk) ~msg ~signature =
-    if Bytes.length signature < size then
-      invalid_arg
-        (Printf.sprintf
-           "Sign.write_sign: output buffer must be at least %d bytes long"
-           size) ;
-    Hacl.Ed25519.sign signature sk msg
+  let sign ~sk:(Sk sk) ~msg =
+    let signature = Bytes.create size in
+    Hacl.Ed25519.sign signature sk msg ;
+    signature
 
   let verify ~pk:(Pk pk) ~msg ~signature = Hacl.Ed25519.verify pk msg signature
 end
 
-module ECDSA = struct
+module P256 : SIGNATURE = struct
+  type _ key = Sk : Bytes.t -> secret key | Pk : Bytes.t -> public key
+
+  let size = 64
+
+  (* A public key is an elliptic curve point with 2 32-byte coordinates (x, y).
+   * Internally we use 3 formats to represent public keys:
+   * - "raw":          64 bytes, representing the concatenation of the 2 components
+   * - "compressed":   33 bytes, in which the first component is replaced by a single
+   *                   byte (either '\x02' or '\x03'). This is the default representation
+   *                   used throughout the interface.
+   * - "uncompressed": 65 bytes, same as "raw" but with one additional leading '\x04' byte,
+   *                   which identifies it as an uncompressed public key.
+   * We bind the HACL* functions which convert between these representations.
+   * More details about how they work can be found in Section 2.3.3 of this document:
+   * http://www.secg.org/sec1-v2.pdf *)
+
+  let pk_size_raw = 64
+
+  let pk_size = (pk_size_raw / 2) + 1
+
+  let pk_size_uncompressed = pk_size_raw + 1
+
   let sk_size = 32
 
-  let pk_size = 64
-
-  let compressed_size = (pk_size / 2) + 1
-
-  let uncompressed_size = pk_size + 1
-
-  let signature_size = 64
-
+  (* A public key is generated from a secret key using the first step of the
+   * Elliptic Curve Diffie-Hellman (ECDH) key agreement protocol, in which
+   * sk is multiplied with the base point of the curve. *)
   let pk_of_sk sk pk = Hacl.P256.dh_initiator pk sk
 
   let valid_pk pk = Hacl.P256.valid_pk pk
@@ -445,93 +481,105 @@ module ECDSA = struct
     if not (Hacl.P256.decompress_n buf pk) then
       failwith "P256.raw_from_uncompressed failure"
 
-  type _ key = Sk : Bytes.t -> secret key | Pk : Bytes.t -> public key
+  let compare : type a. a key -> a key -> int =
+   fun a b ->
+    (* TODO re-group once coverage ppx is updated *)
+    match (a, b) with
+    | (Pk a, Pk b) ->
+        Bytes.compare a b
+    | (Sk a, Sk b) ->
+        Bytes.compare a b
 
-  let equal : type a. a key -> a key -> bool =
-   fun k1 k2 ->
-    match (k1, k2) with
-    | (Sk sk, Sk sk2) ->
-        Bytes.equal sk sk2
-    | (Pk pk, Pk pk2) ->
-        Bytes.equal pk pk2
+  let equal : type a. a key -> a key -> bool = fun a b -> compare a b = 0
 
   let neuterize : type a. a key -> public key = function
     | Pk pk ->
         Pk pk
     | Sk sk ->
-        let pk = Bytes.create pk_size in
+        let pk = Bytes.create pk_size_raw in
         let pk_computed_ok = pk_of_sk sk pk in
-        let pk_is_valid = valid_pk pk in
-        if (not pk_computed_ok) && pk_is_valid then
-          invalid_arg "Uecc.neuterize" ;
+        if not (pk_computed_ok && valid_pk pk) then
+          failwith "P256.neuterize: failure" ;
         Pk pk
 
+  (* This function accepts a buffer representing a public key in either the
+   * compressed or the uncompressed form. *)
   let pk_of_bytes : Bytes.t -> public key option =
    fun buf ->
-    let pk = Bytes.create pk_size in
+    let pk = Bytes.create pk_size_raw in
     match Bytes.length buf with
-    | len when len = compressed_size ->
+    | len when len = pk_size ->
         raw_from_compressed buf pk ;
         if valid_pk pk then Some (Pk pk) else None
-    | len when len = uncompressed_size ->
+    | len when len = pk_size_uncompressed ->
         raw_from_uncompressed buf pk ;
         if valid_pk pk then Some (Pk pk) else None
     | _ ->
         None
 
-  let sk_of_bytes : Bytes.t -> (secret key * public key) option =
+  let sk_of_bytes : Bytes.t -> secret key option =
    fun buf ->
-    if not (Bytes.length buf = sk_size && Hacl.P256.valid_sk buf) then None
-    else
-      let sk = Sk (Bytes.copy buf) in
-      try
-        let pk = neuterize sk in
-        Some (sk, pk)
-      with _ -> None
+    if Bytes.length buf = sk_size && Hacl.P256.valid_sk buf then
+      Some (Sk (Bytes.copy buf))
+    else None
 
-  let to_bytes : type a. ?compress:bool -> a key -> Bytes.t =
+  let to_bytes_with_compression : type a. ?compress:bool -> a key -> Bytes.t =
    fun ?compress:(comp = true) -> function
     | Sk sk ->
         Bytes.copy sk
     | Pk pk ->
         if comp then (
-          let buf = Bytes.create compressed_size in
+          let buf = Bytes.create pk_size in
           compressed_from_raw pk buf ; buf )
         else
-          let buf = Bytes.create uncompressed_size in
+          let buf = Bytes.create pk_size_uncompressed in
           uncompressed_from_raw pk buf ;
-          assert (Bytes.sub buf 1 pk_size = pk) ;
+          assert (Bytes.sub buf 1 pk_size_raw = pk) ;
           buf
 
-  let write_key : type a. ?compress:bool -> Bytes.t -> a key -> int =
-   fun ?compress:(comp = true) buf -> function
+  let to_bytes : type a. a key -> Bytes.t =
+   fun key -> to_bytes_with_compression ~compress:true key
+
+  let blit_to_bytes_with_compression :
+      type a. ?compress:bool -> a key -> ?pos:int -> Bytes.t -> unit =
+   fun ?compress:(comp = true) key ?(pos = 0) buf ->
+    match key with
     | Sk sk ->
         let len = Bytes.length sk in
-        Bytes.blit sk 0 buf 0 len ; len
+        Bytes.blit sk 0 buf pos len
     | Pk pk ->
-        if comp then (compressed_from_raw pk buf ; compressed_size)
-        else (
-          uncompressed_from_raw pk buf ;
-          uncompressed_size )
+        if pos = 0 then
+          if comp then compressed_from_raw pk buf
+          else uncompressed_from_raw pk buf
+        else if comp then (
+          let out = Bytes.create pk_size in
+          compressed_from_raw pk out ;
+          Bytes.blit out 0 buf pos pk_size )
+        else
+          let out = Bytes.create pk_size_uncompressed in
+          uncompressed_from_raw pk out ;
+          Bytes.blit out 0 buf pos pk_size_uncompressed
 
-  let keypair () : (secret key * public key) option =
-    let pk = Bytes.create pk_size in
+  let blit_to_bytes : type a. a key -> ?pos:int -> Bytes.t -> unit =
+   fun key ?pos buf ->
+    blit_to_bytes_with_compression ~compress:true key ?pos buf
+
+  let keypair () : public key * secret key =
+    let pk = Bytes.create pk_size_raw in
     let sk = get_valid_sk () in
-    if Hacl.P256.dh_initiator pk sk then Some (Sk sk, Pk pk) else None
+    if pk_of_sk sk pk then (Pk pk, Sk sk) else failwith "P256.keypair: failure"
 
-  let write_sign (Sk sk) buf ~msg =
-    assert (Bytes.length buf = signature_size) ;
+  let sign ~sk:(Sk sk) ~msg =
+    let signature = Bytes.create size in
     (* A random non-zero signing secret k is generated which, similar to
      * secret keys, needs to be non-zero and smaller than the prime order. *)
     let k = get_valid_sk () in
-    let res = Hacl.P256.sign sk msg k buf in
-    Bytes.fill k 0 32 '\x00' ; res
+    let res = Hacl.P256.sign sk msg k signature in
+    Bytes.fill k 0 32 '\x00' ;
+    if not res then failwith "P256.sign: signing failure" ;
+    signature
 
-  let sign (Sk sk) ~msg =
-    let signature = Bytes.create 64 in
-    if write_sign (Sk sk) signature ~msg then Some signature else None
-
-  let verify (Pk pk) ~msg ~signature =
-    if Bytes.length signature <> signature_size then false
+  let verify ~pk:(Pk pk) ~msg ~signature =
+    if Bytes.length signature <> size then false
     else Hacl.P256.verify pk msg signature
 end

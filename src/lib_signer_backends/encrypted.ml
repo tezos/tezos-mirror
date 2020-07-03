@@ -42,7 +42,7 @@ module Raw = struct
   let nonce = Crypto_box.zero_nonce
 
   (* Secret keys for Ed25519, secp256k1, P256 have the same size. *)
-  let encrypted_size = Crypto_box.tag_length + Hacl.Sign.skbytes
+  let encrypted_size = Crypto_box.tag_length + Hacl.Ed25519.sk_size
 
   let pbkdf ~salt ~password =
     Pbkdf.SHA512.pbkdf2 ~count:32768 ~dk_len:32l ~salt ~password
@@ -103,7 +103,7 @@ end
 
 module Encodings = struct
   let ed25519 =
-    let length = Hacl.Sign.skbytes + Crypto_box.tag_length + Raw.salt_len in
+    let length = Hacl.Ed25519.sk_size + Crypto_box.tag_length + Raw.salt_len in
     Base58.register_encoding
       ~prefix:Base58.Prefix.ed25519_encrypted_seed
       ~length
@@ -126,7 +126,7 @@ module Encodings = struct
       ~wrap:(fun sk -> Encrypted_secp256k1 sk)
 
   let p256 =
-    let length = Hacl.ECDSA.sk_size + Crypto_box.tag_length + Raw.salt_len in
+    let length = Hacl.P256.sk_size + Crypto_box.tag_length + Raw.salt_len in
     Base58.register_encoding
       ~prefix:Base58.Prefix.p256_encrypted_secret_key
       ~length

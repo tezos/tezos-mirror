@@ -219,81 +219,49 @@ module Box : sig
     k:combined key -> nonce:Bytes.t -> tag:Bytes.t -> buf:Bytes.t -> bool
 end
 
-module Sign : sig
+module type SIGNATURE = sig
   type _ key
 
   (** Size of a signature*)
   val size : int
 
   (** Size of a public key *)
-  val pkbytes : int
+  val pk_size : int
 
   (** Size of a secret key *)
-  val skbytes : int
+  val sk_size : int
+
+  val compare : 'a key -> 'a key -> int
 
   val equal : 'a key -> 'a key -> bool
 
-  (** @raise Invalid_argument if argument is less than [skbytes] bytes long *)
-  val unsafe_sk_of_bytes : Bytes.t -> secret key
+  val sk_of_bytes : Bytes.t -> secret key option
 
-  (** @raise Invalid_argument if argument is less than [pkbytes] bytes long *)
-  val unsafe_pk_of_bytes : Bytes.t -> public key
-
-  (** [unsafe_to_bytes k] is the internal [Bytes.t] where the key
-      is stored. DO NOT MODIFY. *)
-  val unsafe_to_bytes : _ key -> Bytes.t
-
-  val blit_to_bytes : _ key -> ?pos:int -> Bytes.t -> unit
+  val pk_of_bytes : Bytes.t -> public key option
 
   (** [neuterize sk] generates the corresponding public key of [sk] *)
-  val neuterize : _ key -> public key
+  val neuterize : 'a key -> public key
 
   (** [keypair] generates both a secret key and its corresponding public key *)
   val keypair : unit -> public key * secret key
 
-  (** [sign sk msg signature] writes the signature of [msg] with [sk] in
-      [signature].
+  (** [to_bytes key] returns the contents of the key. For P-256 public keys, it
+      returns the compressed form (see hacl.ml for more details) *)
+  val to_bytes : _ key -> Bytes.t
 
-      @raise Invalid_argument if [signature] is smaller than [bytes]
-      bytes long. *)
-  val sign : sk:secret key -> msg:Bytes.t -> signature:Bytes.t -> unit
+  (** [blit_to_bytes key ?pos buf] copies all of the bytes of [key]
+      into [buf] starting at position [pos]. As above, P-256 public keys are
+      written in compressed form. *)
+  val blit_to_bytes : _ key -> ?pos:int -> Bytes.t -> unit
+
+  (** [sign sk msg] returns the signature of [msg] with [sk] *)
+  val sign : sk:secret key -> msg:Bytes.t -> Bytes.t
 
   (** [verify pk msg signature] attempts to verify [msg] with [signature] and
       returns true if successful *)
   val verify : pk:public key -> msg:Bytes.t -> signature:Bytes.t -> bool
 end
 
-(* TODO: rewrite docs *)
-module ECDSA : sig
-  type _ key
+module Ed25519 : SIGNATURE
 
-  val sk_size : int
-
-  val pk_size : int
-
-  val compressed_size : int
-
-  val uncompressed_size : int
-
-  val signature_size : int
-
-  val equal : 'a key -> 'a key -> bool
-
-  val neuterize : 'a key -> public key
-
-  val sk_of_bytes : Bytes.t -> (secret key * public key) option
-
-  val pk_of_bytes : Bytes.t -> public key option
-
-  val to_bytes : ?compress:bool -> _ key -> Bytes.t
-
-  val write_key : ?compress:bool -> Bytes.t -> _ key -> int
-
-  val keypair : unit -> (secret key * public key) option
-
-  val write_sign : secret key -> Bytes.t -> msg:Bytes.t -> bool
-
-  val sign : secret key -> msg:Bytes.t -> Bytes.t option
-
-  val verify : public key -> msg:Bytes.t -> signature:Bytes.t -> bool
-end
+module P256 : SIGNATURE

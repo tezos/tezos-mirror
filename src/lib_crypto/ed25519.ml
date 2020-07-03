@@ -45,27 +45,24 @@ end
 
 let () = Base58.check_encoded_prefix Public_key_hash.b58check_encoding "tz1" 36
 
-open Hacl
+open Hacl.Ed25519
 
 module Public_key = struct
-  type t = public Sign.key
+  type t = Hacl.public key
 
   let name = "Ed25519.Public_key"
 
   let title = "Ed25519 public key"
 
-  let to_bytes pk = Bytes.copy (Sign.unsafe_to_bytes pk)
+  let to_bytes = to_bytes
 
-  let of_bytes_opt buf =
-    if Bytes.length buf = Sign.pkbytes then
-      Some (Sign.unsafe_pk_of_bytes (Bytes.copy buf))
-    else None
+  let to_string s = Bytes.to_string (to_bytes s)
 
-  let to_string s = Bytes.to_string (Sign.unsafe_to_bytes s)
+  let of_bytes_opt = pk_of_bytes
 
   let of_string_opt s = of_bytes_opt (Bytes.of_string s)
 
-  let size = Sign.pkbytes
+  let size = pk_size
 
   type Base58.data += Data of t
 
@@ -79,13 +76,12 @@ module Public_key = struct
 
   let () = Base58.check_encoded_prefix b58check_encoding "edpk" 54
 
-  let hash v = Public_key_hash.hash_bytes [Sign.unsafe_to_bytes v]
+  let hash v = Public_key_hash.hash_bytes [to_bytes v]
 
   include Compare.Make (struct
     type nonrec t = t
 
-    let compare a b =
-      Bytes.compare (Sign.unsafe_to_bytes a) (Sign.unsafe_to_bytes b)
+    let compare = compare
   end)
 
   include Helpers.MakeRaw (struct
@@ -134,26 +130,23 @@ module Public_key = struct
 end
 
 module Secret_key = struct
-  type t = secret Sign.key
+  type t = Hacl.secret key
 
   let name = "Ed25519.Secret_key"
 
   let title = "An Ed25519 secret key"
 
-  let size = Sign.skbytes
+  let size = sk_size
 
-  let to_bytes sk = Bytes.copy (Sign.unsafe_to_bytes sk)
-
-  let of_bytes_opt s =
-    if Bytes.length s = Sign.skbytes then
-      Some (Sign.unsafe_sk_of_bytes (Bytes.copy s))
-    else None
+  let to_bytes = to_bytes
 
   let to_string s = Bytes.to_string (to_bytes s)
 
+  let of_bytes_opt = sk_of_bytes
+
   let of_string_opt s = of_bytes_opt (Bytes.of_string s)
 
-  let to_public_key = Sign.neuterize
+  let to_public_key = neuterize
 
   type Base58.data += Data of t
 
@@ -161,28 +154,24 @@ module Secret_key = struct
     Base58.register_encoding
       ~prefix:Base58.Prefix.ed25519_seed
       ~length:size
-      ~to_raw:(fun sk -> Bytes.to_string (Sign.unsafe_to_bytes sk))
-      ~of_raw:(fun buf ->
-        if String.length buf <> Sign.skbytes then None
-        else Some (Sign.unsafe_sk_of_bytes (Bytes.of_string buf)))
+      ~to_raw:to_string
+      ~of_raw:of_string_opt
       ~wrap:(fun sk -> Data sk)
 
   (* Legacy NaCl secret key encoding. Used to store both sk and pk. *)
   let secret_key_encoding =
     Base58.register_encoding
       ~prefix:Base58.Prefix.ed25519_secret_key
-      ~length:Sign.(skbytes + pkbytes)
+      ~length:(sk_size + pk_size)
       ~to_raw:(fun sk ->
-        let pk = Sign.neuterize sk in
-        let buf = Bytes.create Sign.(skbytes + pkbytes) in
-        Sign.blit_to_bytes sk buf ;
-        Sign.blit_to_bytes pk ~pos:Sign.skbytes buf ;
+        let pk = neuterize sk in
+        let buf = Bytes.create (sk_size + pk_size) in
+        blit_to_bytes sk buf ;
+        blit_to_bytes pk ~pos:sk_size buf ;
         Bytes.to_string buf)
       ~of_raw:(fun buf ->
-        if String.length buf <> Sign.(skbytes + pkbytes) then None
-        else
-          let sk = Bytes.(sub (of_string buf) 0 Sign.skbytes) in
-          Some (Sign.unsafe_sk_of_bytes sk))
+        let sk = Bytes.(sub (of_string buf) 0 sk_size) in
+        sk_of_bytes sk)
       ~wrap:(fun x -> Data x)
 
   let of_b58check_opt s =
@@ -221,8 +210,7 @@ module Secret_key = struct
   include Compare.Make (struct
     type nonrec t = t
 
-    let compare a b =
-      Bytes.compare (Sign.unsafe_to_bytes a) (Sign.unsafe_to_bytes b)
+    let compare = compare
   end)
 
   include Helpers.MakeRaw (struct
@@ -270,13 +258,13 @@ let name = "Ed25519"
 
 let title = "An Ed25519 signature"
 
-let size = Sign.size
+let size = size
 
-let of_bytes_opt s = if Bytes.length s = size then Some s else None
-
-let to_bytes x = x
+let to_bytes s = Bytes.copy s
 
 let to_string s = Bytes.to_string (to_bytes s)
+
+let of_bytes_opt s = if Bytes.length s = size then Some s else None
 
 let of_string_opt s = of_bytes_opt (Bytes.of_string s)
 
@@ -286,8 +274,8 @@ let b58check_encoding =
   Base58.register_encoding
     ~prefix:Base58.Prefix.ed25519_signature
     ~length:size
-    ~to_raw:Bytes.to_string
-    ~of_raw:(fun s -> Some (Bytes.of_string s))
+    ~to_raw:to_string
+    ~of_raw:of_string_opt
     ~wrap:(fun x -> Data x)
 
 let () = Base58.check_encoded_prefix b58check_encoding "edsig" 99
@@ -343,34 +331,36 @@ let sign ?watermark sk msg =
     Blake2B.to_bytes @@ Blake2B.hash_bytes
     @@ match watermark with None -> [msg] | Some prefix -> [prefix; msg]
   in
-  let signature = Bytes.create Sign.size in
-  Sign.sign ~sk ~msg ~signature ;
-  signature
+  sign ~sk ~msg
 
 let check ?watermark pk signature msg =
   let msg =
     Blake2B.to_bytes @@ Blake2B.hash_bytes
     @@ match watermark with None -> [msg] | Some prefix -> [prefix; msg]
   in
-  Sign.verify ~pk ~signature ~msg
+  verify ~pk ~msg ~signature
 
 let generate_key ?seed () =
   match seed with
   | None ->
-      let (pk, sk) = Sign.keypair () in
+      let (pk, sk) = keypair () in
       (Public_key.hash pk, pk, sk)
-  | Some seed ->
+  | Some seed -> (
       let seedlen = Bytes.length seed in
-      if seedlen < Sign.skbytes then
+      if seedlen < Secret_key.size then
         invalid_arg
           (Printf.sprintf
              "Ed25519.generate_key: seed must be at least %d bytes long (got \
               %d)"
-             Sign.skbytes
-             seedlen) ;
-      let sk = Sign.unsafe_sk_of_bytes (Bytes.sub seed 0 Sign.skbytes) in
-      let pk = Sign.neuterize sk in
-      (Public_key.hash pk, pk, sk)
+             Secret_key.size
+             seedlen)
+      else
+        match sk_of_bytes (Bytes.sub seed 0 Secret_key.size) with
+        | None ->
+            invalid_arg "Ed25519.generate_key: invalid seed"
+        | Some sk ->
+            let pk = neuterize sk in
+            (Public_key.hash pk, pk, sk) )
 
 let deterministic_nonce sk msg =
   let key = Secret_key.to_bytes sk in
