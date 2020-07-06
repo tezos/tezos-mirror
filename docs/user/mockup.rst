@@ -176,21 +176,37 @@ You can now edit the files ``bootstrap-accounts.json`` and
      --protocol-constants protocol-constants.json \
      --bootstrap-accounts bootstrap-accounts.json
 
+Setting protocol constants for the mockup mode
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Chain id
-~~~~~~~~
+Let's look at the contents of the ``protocol-constants.json`` file as produced
+by the ``config init mockup`` of ``config show mockup`` commands. The following
+was generated using the Carthage protocol:
 
-The `chain id` is one particular chain parameter that is also accessible from
-the command line at mockup creation.
+.. code-block:: JSON
 
-For that, you need to use the `chain-id-seed` command-line switch, which will in
-turn initialize a valid `chain id`. The mockup creation command now becomes
+   { "hard_gas_limit_per_operation": "1040000",
+     "hard_gas_limit_per_block": "10400000",
+     "hard_storage_limit_per_operation": "60000",
+     "cost_per_byte": "1000",
+     "chain_id": "NetXynUjJNZm7wi" }
+
+By modifying the two first fields, a user can easily create a mockup environment
+with bumped up (or down) gas limits and storage limit. A invariant should be that
+the gas limit per block should be greater or equal to the gas limit per operation.
+The ``cost_per_byte`` is used to compute the amount of tokens to be burnt
+proportionally to the fresh storage consumed by the execution of an operation.
+Last, the ``chain_id`` is used to prevent replay of operations between chains.
+You can pick a chain id for your mockup environment using the following command:
 
 ::
 
-    tezos-client --protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK \
-      --base-dir /tmp/mockup create mockup --chain-id-seed myseed
+   $ tezos-client compute chain id from seed <string>
 
+For instance, the following command:
 
-Among the response output to this command, there is a valid chain id
-`Chain id is NetXi1dwBfm6F4Y` initialized from your input.
+::
+
+   $ tezos-client compute chain id from seed strudel
+
+yields the chain id ``NetXwWbjfCqBTLV``.
