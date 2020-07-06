@@ -244,6 +244,37 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       Operation_hash.t tzresult Lwt.t
   end
 
+  module Operation_metadata_hashes : sig
+    val root :
+      #simple ->
+      ?chain:chain ->
+      ?block:block ->
+      unit ->
+      Operation_metadata_list_list_hash.t option tzresult Lwt.t
+
+    val operation_metadata_hashes :
+      #simple ->
+      ?chain:chain ->
+      ?block:block ->
+      unit ->
+      Operation_metadata_hash.t list list option tzresult Lwt.t
+
+    val operation_metadata_hashes_in_pass :
+      #simple ->
+      ?chain:chain ->
+      ?block:block ->
+      int ->
+      Operation_metadata_hash.t list option tzresult Lwt.t
+
+    val operation_metadata_hash :
+      #simple ->
+      ?chain:chain ->
+      ?block:block ->
+      int ->
+      int ->
+      Operation_metadata_hash.t option tzresult Lwt.t
+  end
+
   module Context : sig
     val read :
       #simple ->
@@ -418,6 +449,44 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           unit,
           unit,
           Tezos_crypto.Operation_hash.t )
+        RPC_service.t
+    end
+
+    module Operation_metadata_hashes : sig
+      val root :
+        ( [`GET],
+          prefix,
+          prefix,
+          unit,
+          unit,
+          Operation_metadata_list_list_hash.t option )
+        RPC_service.t
+
+      val operation_metadata_hashes :
+        ( [`GET],
+          prefix,
+          prefix,
+          unit,
+          unit,
+          Tezos_crypto.Operation_metadata_hash.t list list option )
+        RPC_service.t
+
+      val operation_metadata_hashes_in_pass :
+        ( [`GET],
+          prefix,
+          prefix * int,
+          unit,
+          unit,
+          Tezos_crypto.Operation_metadata_hash.t list option )
+        RPC_service.t
+
+      val operation_metadata_hash :
+        ( [`GET],
+          prefix,
+          (prefix * int) * int,
+          unit,
+          unit,
+          Tezos_crypto.Operation_metadata_hash.t option )
         RPC_service.t
     end
 

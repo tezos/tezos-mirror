@@ -253,6 +253,23 @@ let build_raw_rpc_directory ~user_activated_upgrades
           >>= fun (ops, _) -> Lwt.return (List.nth ops j)
         with _ -> Lwt.fail Not_found )
       >>= fun op -> return op) ;
+  (* operation_metadata_hashes *)
+  register0 S.Operation_metadata_hashes.root (fun block () () ->
+      State.Block.all_operations_metadata_hash block >>= return) ;
+  register0
+    S.Operation_metadata_hashes.operation_metadata_hashes
+    (fun block () () ->
+      State.Block.all_operations_metadata_hashes block >>= return) ;
+  register1
+    S.Operation_metadata_hashes.operation_metadata_hashes_in_pass
+    (fun block i () () ->
+      State.Block.operations_metadata_hashes block i >>= return) ;
+  register2
+    S.Operation_metadata_hashes.operation_metadata_hash
+    (fun block i j () () ->
+      State.Block.operations_metadata_hashes block i
+      >>= fun hashes ->
+      return @@ Option.map (fun hashes -> List.nth hashes j) hashes) ;
   (* context *)
   register1 S.Context.read (fun block path q () ->
       let depth = Option.value ~default:max_int q#depth in
