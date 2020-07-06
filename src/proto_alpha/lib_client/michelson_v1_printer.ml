@@ -31,21 +31,23 @@ open Micheline_printer
 
 let anon = {comment = None}
 
-let node_of_expr expr =
+let node_of_expr loc expr =
   expr |> Michelson_v1_primitives.strings_of_prims
-  |> Micheline.inject_locations (fun _ -> anon)
+  |> Micheline.inject_locations (fun _ -> loc)
 
-let node_of_stack_elt (ty, x) =
-  let ty = node_of_expr ty in
-  let x = node_of_expr x in
-  Micheline.Prim (anon, "Stack_elt", [ty; x], [])
+let node_of_stack_elt loc (ty, x) =
+  let ty = node_of_expr loc ty in
+  let x = node_of_expr loc x in
+  Micheline.Prim (loc, "Stack_elt", [ty; x], [])
 
-let print_typed_stack out l =
-  print_expr out (Micheline.Seq (anon, List.map node_of_stack_elt l))
+let unparse_stack loc l = Micheline.Seq (loc, List.map (node_of_stack_elt loc) l)
 
-let print_expr ppf expr = print_expr ppf (node_of_expr expr)
+let print_typed_stack out l = print_expr out (unparse_stack anon l)
 
-let print_expr_unwrapped ppf expr = print_expr_unwrapped ppf (node_of_expr expr)
+let print_expr ppf expr = print_expr ppf (node_of_expr anon expr)
+
+let print_expr_unwrapped ppf expr =
+  print_expr_unwrapped ppf (node_of_expr anon expr)
 
 let print_stack ppf = function
   | [] -> Format.fprintf ppf "[]"

@@ -60,7 +60,7 @@ type unit_test_optional = {
 type unit_test = {
   input : (Script.expr * Script.expr) list;
   code : Script.expr;
-  output : (Script.expr * Script.expr) list;
+  output : (Micheline.canonical_location, string) Micheline.node;
   optional : unit_test_optional;
 }
 

@@ -422,7 +422,7 @@ type unit_test_optional = {
 type unit_test = {
   input : (Script.expr * Script.expr) list;
   code : Script.expr;
-  output : (Script.expr * Script.expr) list;
+  output : (Micheline.canonical_location, string) Micheline.node;
   optional : unit_test_optional;
 }
 
@@ -431,7 +431,7 @@ type unit_test = {
 type temp_unit_test = {
   temp_input : (Script.expr * Script.expr) list option;
   temp_code : Script.expr option;
-  temp_output : (Script.expr * Script.expr) list option;
+  temp_output : (Micheline.canonical_location, string) Micheline.node option;
   temp_optional : unit_test_optional;
 }
 
@@ -524,8 +524,7 @@ let parse_unit_test (parsed : string Michelson_v1_parser.parser_result) =
             parse {ut with temp_input = Some items} l
         | "output" ->
             let* () = check_duplicated ut.temp_output in
-            let* items = trace_invalid_format @@ parse_stack ~node:arg parsed in
-            parse {ut with temp_output = Some items} l
+            parse {ut with temp_output = Some arg} l
         | "code" ->
             let* () = check_duplicated ut.temp_code in
             let* c = trace_invalid_format @@ parse_expression arg in
