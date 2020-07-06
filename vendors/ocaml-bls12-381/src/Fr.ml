@@ -32,12 +32,12 @@ let is_one g =
   assert (Bytes.length g = size) ;
   Fr_stubs.is_one (Ctypes.ocaml_bytes_start g)
 
-let zero () =
+let zero =
   let g = empty () in
   Fr_stubs.zero (Ctypes.ocaml_bytes_start g) ;
   of_bytes g
 
-let one () =
+let one =
   let g = empty () in
   Fr_stubs.one (Ctypes.ocaml_bytes_start g) ;
   of_bytes g
@@ -67,7 +67,7 @@ let mul x y =
     (Ctypes.ocaml_bytes_start y) ;
   of_bytes g
 
-let inverse g =
+let inverse_exn g =
   assert (Bytes.length g = size) ;
   let buffer = empty () in
   Fr_stubs.unsafe_inverse

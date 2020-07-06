@@ -30,8 +30,7 @@ module Constructors = struct
     let g = Bls12_381.G2.Uncompressed.of_z_opt ~x ~y in
     match g with
     | Some g ->
-        assert (
-          Bls12_381.G2.Uncompressed.eq (Bls12_381.G2.Uncompressed.one ()) g )
+        assert (Bls12_381.G2.Uncompressed.eq Bls12_381.G2.Uncompressed.one g)
     | None ->
         assert false
 

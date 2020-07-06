@@ -653,10 +653,10 @@ documentation:linkcheck:
 ##BEGIN_OPAM##
 # this section is updated using the script scripts/update_opam_test.sh
 
-opam:bls12_381:
+opam:bls12-381:
   <<: *opam_definition
   variables:
-    package: bls12_381
+    package: bls12-381
 
 opam:flextesa:
   <<: *opam_definition

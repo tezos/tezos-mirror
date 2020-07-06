@@ -26,10 +26,10 @@ module type T = sig
   val to_bytes : t -> Bytes.t
 
   (** Zero of the elliptic curve *)
-  val zero : unit -> t
+  val zero : t
 
   (** A fixed generator of the elliptic curve *)
-  val one : unit -> t
+  val one : t
 
   (** Return true if the given element is zero *)
   val is_zero : t -> bool

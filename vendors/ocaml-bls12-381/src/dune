@@ -1,7 +1,7 @@
 (copy_files bindings/{rustc_bls12_381_ctypes_c_stubs.c,rustc_bls12_381_stubs.ml,rustc_bls12_381_bindings.ml})
 
 (library
- (public_name bls12_381)
+ (public_name bls12-381)
  (name bls12_381)
  (modules_without_implementation ff_sig elliptic_curve_sig)
  (libraries zarith ctypes ctypes.foreign)

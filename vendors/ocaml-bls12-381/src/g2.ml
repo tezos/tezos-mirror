@@ -38,12 +38,12 @@ module Uncompressed = struct
 
   let to_bytes g = g
 
-  let zero () =
+  let zero =
     let g = empty () in
     G2_stubs.zero (Ctypes.ocaml_bytes_start g) ;
     of_bytes g
 
-  let one () =
+  let one =
     let g = empty () in
     G2_stubs.one (Ctypes.ocaml_bytes_start g) ;
     of_bytes g
@@ -126,12 +126,12 @@ module Compressed = struct
 
   let to_bytes g = g
 
-  let zero () =
+  let zero =
     let g = empty () in
     G2_stubs.compressed_zero (Ctypes.ocaml_bytes_start g) ;
     of_bytes g
 
-  let one () =
+  let one =
     let g = empty () in
     G2_stubs.compressed_one (Ctypes.ocaml_bytes_start g) ;
     of_bytes g

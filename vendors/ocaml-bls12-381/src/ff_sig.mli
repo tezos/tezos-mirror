@@ -23,9 +23,9 @@ module type T = sig
   val empty : unit -> t
 
   (* Let's use a function for the moment *)
-  val zero : unit -> t
+  val zero : t
 
-  val one : unit -> t
+  val one : t
 
   val is_zero : t -> bool
 
@@ -42,7 +42,7 @@ module type T = sig
   val negate : t -> t
 
   (* Unsafe version of inverse *)
-  val inverse : t -> t
+  val inverse_exn : t -> t
 
   (* Safe version of inverse *)
   val inverse_opt : t -> t option

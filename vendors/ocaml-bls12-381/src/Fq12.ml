@@ -26,12 +26,12 @@ let of_bytes g =
 
 let to_bytes s = s
 
-let zero () =
+let zero =
   let g = empty () in
   Fq12_stubs.zero (Ctypes.ocaml_bytes_start g) ;
   g
 
-let one () =
+let one =
   let g = empty () in
   Fq12_stubs.one (Ctypes.ocaml_bytes_start g) ;
   g
@@ -94,7 +94,7 @@ let double g =
     (Ctypes.ocaml_bytes_start g) ;
   buffer
 
-let inverse g =
+let inverse_exn g =
   assert (Bytes.length g = size) ;
   let inverse_buffer = empty () in
   Fq12_stubs.unsafe_inverse

@@ -7,21 +7,11 @@ let rec repeat n f =
     repeat (n - 1) f )
 
 module MakeEquality (G : Bls12_381.Elliptic_curve_sig.T) = struct
-  (** Verify the equality of two values of zero created invidually *)
-  let zero_two_different_objects () = assert (G.eq (G.zero ()) (G.zero ()))
-
   (** Verify the equality on one value of zero created *)
-  let zero_same_objects () =
-    let zero = G.zero () in
-    assert (G.eq zero zero)
-
-  (** Verify the equality of two values of one created invidually *)
-  let one_two_different_objects () = assert (G.eq (G.one ()) (G.one ()))
+  let zero_same_objects () = assert (G.eq G.zero G.zero)
 
   (** Verify the equality on one value of one created *)
-  let one_same_objects () =
-    let one = G.one () in
-    assert (G.eq one one)
+  let one_same_objects () = assert (G.eq G.one G.one)
 
   (** Verify the equality of two random values created invidually *)
   let random_same_objects () =
@@ -32,38 +22,26 @@ module MakeEquality (G : Bls12_381.Elliptic_curve_sig.T) = struct
   let get_tests () =
     let open Alcotest in
     ( "equality",
-      [ test_case
-          "zero_two_different_objects"
-          `Quick
-          (repeat 100 zero_two_different_objects);
-        test_case "zero_same_objects" `Quick (repeat 100 zero_same_objects);
-        test_case
-          "one_two_different_objects"
-          `Quick
-          (repeat 100 one_two_different_objects);
+      [ test_case "zero_same_objects" `Quick (repeat 100 zero_same_objects);
         test_case "one_same_objects" `Quick (repeat 100 one_same_objects);
         test_case "random_same_objects" `Quick (repeat 100 random_same_objects)
       ] )
 end
 
 module MakeValueGeneration (G : Bls12_381.Elliptic_curve_sig.T) = struct
-  let zero () = ignore @@ G.zero ()
+  let zero () = ignore @@ G.zero
 
   let random () = ignore @@ G.random ()
 
-  let one () = ignore @@ G.one ()
+  let one () = ignore @@ G.one
 
   let negation_with_random () =
     let random = G.random () in
     ignore @@ G.negate random
 
-  let negation_with_zero () =
-    let zero = G.zero () in
-    ignore @@ G.negate zero
+  let negation_with_zero () = ignore @@ G.negate G.zero
 
-  let negation_with_one () =
-    let one = G.one () in
-    ignore @@ G.negate one
+  let negation_with_one () = ignore @@ G.negate G.one
 
   (** Returns the tests to be used with Alcotest *)
   let get_tests () =
@@ -78,7 +56,7 @@ module MakeValueGeneration (G : Bls12_381.Elliptic_curve_sig.T) = struct
 end
 
 module MakeIsZero (G : Bls12_381.Elliptic_curve_sig.T) = struct
-  let with_zero_value () = assert (G.is_zero (G.zero ()) = true)
+  let with_zero_value () = assert (G.is_zero G.zero = true)
 
   let with_random_value () = assert (G.is_zero (G.random ()) = false)
 
@@ -96,31 +74,26 @@ module MakeECProperties (G : Bls12_381.Elliptic_curve_sig.T) = struct
   let check_bytes_random () = assert (G.(check_bytes @@ to_bytes @@ random ()))
 
   (** Verify that the zero point is valid *)
-  let check_bytes_zero () = assert (G.(check_bytes @@ to_bytes @@ zero ()))
+  let check_bytes_zero () = assert (G.(check_bytes @@ to_bytes @@ zero))
 
   (** Verify that the one point is valid *)
-  let check_bytes_one () = assert (G.(check_bytes @@ to_bytes @@ one ()))
+  let check_bytes_one () = assert (G.(check_bytes @@ to_bytes @@ one))
 
   (** Verify 0_S * g_EC = 0_EC where 0_S is the zero of the scalar field, 0_EC
   is the point at infinity and g_EC is an element of the EC *)
   let zero_scalar_nullifier_random () =
-    let zero = G.Scalar.zero () in
     let random = G.random () in
-    assert (G.is_zero (G.mul random zero))
+    assert (G.is_zero (G.mul random G.Scalar.zero))
 
   (** Verify 0_S * 0_EC = 0_EC where 0_S is the zero of the scalar field and
   0_EC is the point at infinity of the EC *)
   let zero_scalar_nullifier_zero () =
-    let zero_fr = G.Scalar.zero () in
-    let zero_g1 = G.zero () in
-    assert (G.is_zero (G.mul zero_g1 zero_fr))
+    assert (G.is_zero (G.mul G.zero G.Scalar.zero))
 
   (** Verify 0_S * 1_EC = 0_EC where 0_S is the 0 of the scalar field, 1_EC is a
   fixed generator and 0_EC is the point at infinity of the EC *)
   let zero_scalar_nullifier_one () =
-    let zero = G.Scalar.zero () in
-    let one = G.one () in
-    assert (G.is_zero (G.mul one zero))
+    assert (G.is_zero (G.mul G.one G.Scalar.zero))
 
   (** Verify -(-g) = g where g is an element of the EC *)
   let opposite_of_opposite () =
@@ -128,9 +101,7 @@ module MakeECProperties (G : Bls12_381.Elliptic_curve_sig.T) = struct
     assert (G.eq (G.negate (G.negate random)) random)
 
   (** Verify -(-0_EC) = 0_EC where 0_EC is the point at infinity of the EC *)
-  let opposite_of_zero_is_zero () =
-    let zero = G.zero () in
-    assert (G.eq (G.negate zero) zero)
+  let opposite_of_zero_is_zero () = assert (G.eq (G.negate G.zero) G.zero)
 
   (** Verify g1 + (g2 + g3) = (g1 + g2) + g3 where g1, g2 and g3 are elements of the EC *)
   let additive_associativity () =

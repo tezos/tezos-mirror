@@ -32,10 +32,10 @@ module FieldProperties = Test_ff_make.MakeFieldProperties (Bls12_381.Fr)
 
 module StringRepresentation = struct
   let test_to_string_one () =
-    assert (String.equal "1" (Bls12_381.Fr.to_string (Bls12_381.Fr.one ())))
+    assert (String.equal "1" (Bls12_381.Fr.to_string Bls12_381.Fr.one))
 
   let test_to_string_zero () =
-    assert (String.equal "0" (Bls12_381.Fr.to_string (Bls12_381.Fr.zero ())))
+    assert (String.equal "0" (Bls12_381.Fr.to_string Bls12_381.Fr.zero))
 
   let test_of_string_with_of_z () =
     List.iter
@@ -70,13 +70,11 @@ end
 
 module ZRepresentation = struct
   let test_of_z_zero () =
-    assert (Bls12_381.Fr.eq (Bls12_381.Fr.zero ()) (Bls12_381.Fr.of_z Z.zero))
+    assert (Bls12_381.Fr.eq Bls12_381.Fr.zero (Bls12_381.Fr.of_z Z.zero))
 
   let test_of_z_one () =
     assert (
-      Bls12_381.Fr.eq
-        (Bls12_381.Fr.one ())
-        (Bls12_381.Fr.of_z (Z.of_string "1")) )
+      Bls12_381.Fr.eq Bls12_381.Fr.one (Bls12_381.Fr.of_z (Z.of_string "1")) )
 
   let test_random_of_z_and_to_z () =
     let x = Bls12_381.Fr.random () in
@@ -140,14 +138,14 @@ module TestVector = struct
       (fun (e, i) ->
         assert (
           Bls12_381.Fr.eq
-            (Bls12_381.Fr.inverse (Bls12_381.Fr.of_string e))
+            (Bls12_381.Fr.inverse_exn (Bls12_381.Fr.of_string e))
             (Bls12_381.Fr.of_string i) ))
       test_vectors ;
     List.iter
       (fun (e, i) ->
         assert (
           Bls12_381.Fr.eq
-            (Bls12_381.Fr.inverse (Bls12_381.Fr.of_string i))
+            (Bls12_381.Fr.inverse_exn (Bls12_381.Fr.of_string i))
             (Bls12_381.Fr.of_string e) ))
       test_vectors
 

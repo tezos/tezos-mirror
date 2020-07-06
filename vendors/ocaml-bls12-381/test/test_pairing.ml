@@ -12,14 +12,14 @@ module Properties = struct
   let with_zero_as_first_component () =
     assert (
       Fq12.eq
-        (Pairing.pairing (G1.Uncompressed.zero ()) (G2.Uncompressed.random ()))
-        (Fq12.one ()) )
+        (Pairing.pairing G1.Uncompressed.zero (G2.Uncompressed.random ()))
+        Fq12.one )
 
   let with_zero_as_second_component () =
     assert (
       Fq12.eq
-        (Pairing.pairing (G1.Uncompressed.random ()) (G2.Uncompressed.zero ()))
-        (Fq12.one ()) )
+        (Pairing.pairing (G1.Uncompressed.random ()) G2.Uncompressed.zero)
+        Fq12.one )
 
   let linearity_commutativity_scalar () =
     (* pairing(a * g_{1}, b * g_{2}) = pairing(b * g_{1}, a * g_{2})*)
@@ -99,14 +99,12 @@ let test_vectors_one_one () =
   in
   assert (
     Fq12.eq
-      (Pairing.pairing (G1.Uncompressed.one ()) (G2.Uncompressed.one ()))
+      (Pairing.pairing G1.Uncompressed.one G2.Uncompressed.one)
       expected_result ) ;
   assert (
     Fq12.eq
       (Pairing.unsafe_final_exponentiation
-         (Pairing.miller_loop_simple
-            (G1.Uncompressed.one ())
-            (G2.Uncompressed.one ())))
+         (Pairing.miller_loop_simple G1.Uncompressed.one G2.Uncompressed.one))
       expected_result )
 
 let test_vectors_one_one_multiple_miller_loop () =
@@ -129,8 +127,8 @@ let test_vectors_one_one_multiple_miller_loop () =
   assert (
     Fq12.eq
       (Pairing.miller_loop
-         [ (G1.Uncompressed.one (), G2.Uncompressed.one ());
-           (G1.Uncompressed.one (), G2.Uncompressed.one ()) ])
+         [ (G1.Uncompressed.one, G2.Uncompressed.one);
+           (G1.Uncompressed.one, G2.Uncompressed.one) ])
       expected_result )
 
 let () =
