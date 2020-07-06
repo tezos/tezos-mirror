@@ -620,6 +620,48 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           RPC_path.(path /: Operations.list_arg /: Operations.offset_arg)
     end
 
+    module Operation_metadata_hashes = struct
+      let root =
+        RPC_service.get_service
+          ~description:
+            "The root hash of the operations metadata from the block. This is \
+             only set on blocks starting from environment V1."
+          ~query:RPC_query.empty
+          ~output:(option Operation_metadata_list_list_hash.encoding)
+          RPC_path.(path / "operations_metadata_hash")
+
+      let path = RPC_path.(path / "operation_metadata_hashes")
+
+      let operation_metadata_hashes =
+        RPC_service.get_service
+          ~description:
+            "The hashes of all the operation metadata included in the block. \
+             This is only set on blocks starting from environment V1."
+          ~query:RPC_query.empty
+          ~output:(option (list (list Operation_metadata_hash.encoding)))
+          path
+
+      let operation_metadata_hashes_in_pass =
+        RPC_service.get_service
+          ~description:
+            "All the operation metadata included in `n-th` validation pass of \
+             the block. This is only set on blocks starting from environment \
+             V1."
+          ~query:RPC_query.empty
+          ~output:(option (list Operation_metadata_hash.encoding))
+          RPC_path.(path /: Operations.list_arg)
+
+      let operation_metadata_hash =
+        RPC_service.get_service
+          ~description:
+            "The hash of then `m-th` operation metadata in the `n-th` \
+             validation pass of the block. This is only set on blocks \
+             starting from environment V1."
+          ~query:RPC_query.empty
+          ~output:(option Operation_metadata_hash.encoding)
+          RPC_path.(path /: Operations.list_arg /: Operations.offset_arg)
+    end
+
     module Helpers = struct
       let path = RPC_path.(path / "helpers")
 
@@ -973,6 +1015,26 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
 
     let operation_hash ctxt =
       let f = make_call2 S.operation_hash ctxt in
+      fun ?(chain = `Main) ?(block = `Head 0) n m -> f chain block n m () ()
+  end
+
+  module Operation_metadata_hashes = struct
+    module S = S.Operation_metadata_hashes
+
+    let root ctxt =
+      let f = make_call0 S.root ctxt in
+      fun ?(chain = `Main) ?(block = `Head 0) () -> f chain block () ()
+
+    let operation_metadata_hashes ctxt =
+      let f = make_call0 S.operation_metadata_hashes ctxt in
+      fun ?(chain = `Main) ?(block = `Head 0) () -> f chain block () ()
+
+    let operation_metadata_hashes_in_pass ctxt =
+      let f = make_call1 S.operation_metadata_hashes_in_pass ctxt in
+      fun ?(chain = `Main) ?(block = `Head 0) n -> f chain block n () ()
+
+    let operation_metadata_hash ctxt =
+      let f = make_call2 S.operation_metadata_hash ctxt in
       fun ?(chain = `Main) ?(block = `Head 0) n m -> f chain block n m () ()
   end
 
