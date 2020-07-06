@@ -1,0 +1,6 @@
+(executable
+ (name main)
+ (libraries
+   tezt-tezos
+   yes_wallet_lib)
+ (flags (:standard -open Tezt -open Tezt_tezos -open Tezt.Base)))
