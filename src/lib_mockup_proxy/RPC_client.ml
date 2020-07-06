@@ -23,8 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Directory = Resto_directory.Make (RPC_encoding)
-module Service = Resto.MakeService (RPC_encoding)
+module Directory = RPC_directory
+module Service = RPC_service
 
 type rpc_error =
   | Rpc_generic_error of string option
@@ -111,7 +111,7 @@ let rec print_path : type pr p. (pr, p) Resto.Internal.path -> string list =
   | DynamicTail (path, arg) ->
       Printf.sprintf "<%s>" arg.descr.name :: print_path path
 
-let print_service : type p q i o. (_, _, p, q, i, o, _) Service.t -> string =
+let print_service : type p q i o. (_, _, p, q, i, o) Service.t -> string =
  fun serv ->
   let iserv = Service.Internal.to_service serv in
   String.concat "/" (List.rev (print_path iserv.path))
@@ -129,7 +129,7 @@ module type LOCAL_CLIENT = sig
     Lwt.t
 
   val call_service :
-    ([< Resto.meth], unit, 'p, 'q, 'i, 'o, 'a) Service.t ->
+    ([< Resto.meth], unit, 'p, 'q, 'i, 'o) Service.t ->
     'p ->
     'q ->
     'i ->
@@ -138,7 +138,7 @@ module type LOCAL_CLIENT = sig
 
   val call_streamed_service :
     ?base:Uri.t ->
-    ([< Resto.meth], unit, 'p, 'q, 'i, 'o, 'e) Service.t ->
+    ([< Resto.meth], unit, 'p, 'q, 'i, 'o) Service.t ->
     on_chunk:('o -> unit) ->
     on_close:(unit -> unit) ->
     'p ->
@@ -150,7 +150,7 @@ end
 
 module LocalClient : LOCAL_CLIENT = struct
   let prepare (type i) media_types ?base
-      (service : (_, _, _, _, i, _, _) Service.t) params query body :
+      (service : (_, _, _, _, i, _) Service.t) params query body :
       ( Resto.meth
       * Uri.t
       * Cohttp_lwt.Body.t option
@@ -242,7 +242,7 @@ module LocalClient : LOCAL_CLIENT = struct
 
   let media_types = [media_type]
 
-  let create_error (service : (_, _, _, _, _, _, _) Service.t) = function
+  let create_error (service : (_, _, _, _, _, _) Service.t) = function
     | `Error None ->
         Local_RPC_error (Rpc_generic_error None)
     | `Error (Some err) ->
@@ -263,7 +263,7 @@ module LocalClient : LOCAL_CLIENT = struct
     | _ ->
         Local_RPC_error Rpc_unexpected_type_of_failure
 
-  let call_service (type p q i o) (service : (_, _, p, q, i, o, _) Service.t)
+  let call_service (type p q i o) (service : (_, _, p, q, i, o) Service.t)
       (params : p) (query : q) (body : i) (directory : unit Directory.t) :
       o tzresult Lwt.t =
     prepare media_types service params query body
@@ -330,7 +330,7 @@ class local_ctxt (directory : unit RPC_directory.t) : RPC_context.json =
           (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) RPC_service.t -> 'p ->
           'q -> 'i -> 'o tzresult Lwt.t =
       fun (type p q i o)
-          (service : (_, _, p, q, i, o, _) Service.t)
+          (service : (_, _, p, q, i, o) Service.t)
           (params : p)
           (query : q)
           (input : i) ->
@@ -357,7 +357,7 @@ class local_ctxt (directory : unit RPC_directory.t) : RPC_context.json =
           on_chunk:('o -> unit) -> on_close:(unit -> unit) -> 'p -> 'q -> 'i ->
           (unit -> unit) tzresult Lwt.t =
       fun (type p q i o)
-          (service : (_, _, p, q, i, o, _) Service.t)
+          (service : (_, _, p, q, i, o) Service.t)
           ~on_chunk
           ~on_close
           (params : p)

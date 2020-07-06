@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Service = Resto.MakeService (RPC_encoding)
+module Service = RPC_service
 
 module L = Internal_event.Legacy_logging.Make (struct
   let name = "proxy_rpc_ctxt"
@@ -47,7 +47,7 @@ let rec print_path : type pr p. (pr, p) Resto.Internal.path -> string list =
 
    And at the same time, do the same in the mockup mode; which
    has these functions too. *)
-let print_service : type p q i o. (_, _, p, q, i, o, _) Service.t -> string =
+let print_service : type p q i o. (_, _, p, q, i, o) Service.t -> string =
  fun serv ->
   let iserv = Service.Internal.to_service serv in
   String.concat "/" (List.rev (print_path iserv.path))
@@ -73,7 +73,7 @@ class http_local_ctxt (printer : Tezos_client_base.Client_context.printer)
           (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) RPC_service.t -> 'p ->
           'q -> 'i -> 'o tzresult Lwt.t =
       fun (type p q i o)
-          (service : (_, _, p, q, i, o, _) Service.t)
+          (service : (_, _, p, q, i, o) Service.t)
           (params : p)
           (query : q)
           (input : i) ->
