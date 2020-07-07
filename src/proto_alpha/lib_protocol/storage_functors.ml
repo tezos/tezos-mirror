@@ -1091,14 +1091,19 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
   end
 end
 
+module type WRAPPER = sig
+  type t
+
+  type key
+
+  val wrap : t -> key
+
+  val unwrap : key -> t option
+end
+
 module Wrap_indexed_data_storage
-    (C : Indexed_data_storage) (K : sig
-      type t
-
-      val wrap : t -> C.key
-
-      val unwrap : C.key -> t option
-    end) =
+    (C : Indexed_data_storage)
+    (K : WRAPPER with type key := C.key) =
 struct
   type t = C.t
 
