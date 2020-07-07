@@ -1101,6 +1101,7 @@ let mark_backtracked results =
         Backtracked (result, None)
   in
   mark_contents_list results
+  [@@coq_axiom "non-top-level mutual recursion"]
 
 let apply_manager_contents_list ctxt mode baker chain_id contents_list =
   apply_manager_contents_list_rec ctxt mode baker chain_id contents_list
