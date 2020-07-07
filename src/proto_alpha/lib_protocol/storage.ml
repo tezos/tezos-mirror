@@ -239,13 +239,13 @@ module Contract = struct
     let get_option ctxt contract =
       I.get_option ctxt contract
       >>=? fun (ctxt, value_opt) ->
+      Lwt.return
+      @@
       match value_opt with
       | None ->
-          return (ctxt, None)
+          ok (ctxt, None)
       | Some value ->
-          Lwt.return
-            ( consume_deserialize_gas ctxt value
-            >|? fun ctxt -> (ctxt, value_opt) )
+          consume_deserialize_gas ctxt value >|? fun ctxt -> (ctxt, value_opt)
 
     let set ctxt contract value =
       consume_serialize_gas ctxt value
@@ -473,13 +473,13 @@ module Big_map = struct
     let get_option ctxt contract =
       I.get_option ctxt contract
       >>=? fun (ctxt, value_opt) ->
+      Lwt.return
+      @@
       match value_opt with
       | None ->
-          return (ctxt, None)
+          ok (ctxt, None)
       | Some value ->
-          Lwt.return
-            ( consume_deserialize_gas ctxt value
-            >|? fun ctxt -> (ctxt, value_opt) )
+          consume_deserialize_gas ctxt value >|? fun ctxt -> (ctxt, value_opt)
   end
 end
 

@@ -130,16 +130,17 @@ let get_voting_power ctxt owner =
   let open Raw_context in
   let open Gas_limit_repr in
   (* Always consume read access to memory *)
-  Lwt.return (consume_gas ctxt (read_bytes_cost Z.zero))
-  >>=? fun ctxt ->
+  consume_gas ctxt (read_bytes_cost Z.zero)
+  >>?= fun ctxt ->
   Storage.Vote.Listings.get_option ctxt owner
   >>=? function
   | None ->
       return (ctxt, 0l)
   | Some power ->
       (* If some power is returned, consume read size_of(int32) = 4 bytes *)
-      Lwt.return (consume_gas ctxt (read_bytes_cost (Z.of_int 4)))
-      >|=? fun ctxt -> (ctxt, power)
+      Lwt.return
+        ( consume_gas ctxt (read_bytes_cost (Z.of_int 4))
+        >|? fun ctxt -> (ctxt, power) )
 
 let get_total_voting_power_free = listing_size
 
