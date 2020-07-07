@@ -416,7 +416,8 @@ module Cost_of = struct
           compare_chain_id x y
       | Pair_key ((tl, _), (tr, _), _) ->
           (* Reasonable over-approximation of the cost of lexicographic comparison. *)
-          let (xl, xr) = x and (yl, yr) = y in
+          let (xl, xr) = x in
+          let (yl, yr) = y in
           compare tl xl yl +@ compare tr xr yr
       | Union_key ((tl, _), (tr, _), _) -> (
           compare_union_tag

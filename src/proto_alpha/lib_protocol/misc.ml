@@ -37,7 +37,7 @@ let rec ( ---> ) i j =
   (* [i; i+1; ...; j] *)
   if Compare.Int32.(i > j) then [] else i :: (Int32.succ i ---> j)
 
-let split delim ?(limit = max_int) path =
+let[@coq_axiom] split delim ?(limit = max_int) path =
   let l = String.length path in
   let rec do_slashes acc limit i =
     if Compare.Int.(i >= l) then List.rev acc

@@ -1237,7 +1237,7 @@ let comparable_ty_eq :
   merge_comparable_types ~legacy:true ctxt ta tb
   >|? fun (eq, _ty, ctxt) -> (eq, ctxt)
 
-let merge_types :
+let[@coq_axiom] merge_types :
     type a b.
     legacy:bool ->
     context ->

@@ -790,7 +790,7 @@ let rec apply_manager_contents_list_rec :
           >>= fun (ctxt_result, results) ->
           Lwt.return (ctxt_result, Cons_result (result, results)) )
 
-let mark_backtracked results =
+let[@coq_axiom] mark_backtracked results =
   let rec mark_contents_list :
       type kind.
       kind Kind.manager contents_result_list ->
