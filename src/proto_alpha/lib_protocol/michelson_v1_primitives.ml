@@ -855,6 +855,7 @@ let prims_of_strings expr =
         >>? fun args -> ok (Seq (0, List.rev args))
   in
   convert (root expr) >>? fun expr -> ok (strip_locations expr)
+  [@@coq_axiom "implicit type conversion for expr in the constant cases"]
 
 let strings_of_prims expr =
   let rec convert = function
@@ -869,6 +870,7 @@ let strings_of_prims expr =
         Seq (0, args)
   in
   strip_locations (convert (root expr))
+  [@@coq_axiom "implicit type conversion for expr in the constant cases"]
 
 let prim_encoding =
   let open Data_encoding in

@@ -1237,7 +1237,7 @@ let comparable_ty_eq :
   merge_comparable_types ~legacy:true ctxt ta tb
   >|? fun (eq, _ty, ctxt) -> (eq, ctxt)
 
-let[@coq_axiom] merge_types :
+let merge_types :
     type a b.
     legacy:bool ->
     context ->
@@ -1437,6 +1437,7 @@ let[@coq_axiom] merge_types :
         >>? fun (ty2, _ctxt) -> error (Inconsistent_types (ty1, ty2))
   in
   help ctxt ty1 ty2
+ [@@coq_axiom "non-top-level mutual recursion"]
 
 let ty_eq :
     type ta tb.

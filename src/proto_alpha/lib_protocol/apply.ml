@@ -790,7 +790,7 @@ let rec apply_manager_contents_list_rec :
           >>= fun (ctxt_result, results) ->
           Lwt.return (ctxt_result, Cons_result (result, results)) )
 
-let[@coq_axiom] mark_backtracked results =
+let mark_backtracked results =
   let rec mark_contents_list :
       type kind.
       kind Kind.manager contents_result_list ->
@@ -834,6 +834,7 @@ let[@coq_axiom] mark_backtracked results =
         Backtracked (result, None)
   in
   mark_contents_list results
+  [@@coq_axiom "non-top-level mutual recursion"]
 
 let apply_manager_contents_list ctxt mode baker chain_id contents_list =
   apply_manager_contents_list_rec ctxt mode baker chain_id contents_list
