@@ -40,8 +40,6 @@ module type CONTEXT = sig
 
   val copy : t -> from:key -> to_:key -> t option Lwt.t
 
-  val del : t -> key -> t Lwt.t
-
   val remove_rec : t -> key -> t Lwt.t
 
   val fold :

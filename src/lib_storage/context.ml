@@ -346,8 +346,6 @@ let set t key data = raw_set t (data_key key) data
 let raw_del ctxt key =
   Store.Tree.remove ctxt.tree key >>= fun tree -> Lwt.return {ctxt with tree}
 
-let del t key = raw_del t (data_key key)
-
 let remove_rec ctxt key =
   Store.Tree.remove ctxt.tree (data_key key)
   >>= fun tree -> Lwt.return {ctxt with tree}

@@ -75,8 +75,6 @@ val get : context -> key -> value option Lwt.t
 
 val set : context -> key -> value -> t Lwt.t
 
-val del : context -> key -> t Lwt.t
-
 val remove_rec : context -> key -> t Lwt.t
 
 (** [copy] returns None if the [from] key is not bound *)

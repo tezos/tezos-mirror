@@ -34,13 +34,13 @@ let create_block2 ctxt =
   >>= fun ctxt -> Lwt.return ctxt
 
 let create_block3a ctxt =
-  Context.del ctxt ["a"; "b"]
+  Context.remove_rec ctxt ["a"; "b"]
   >>= fun ctxt ->
   Context.set ctxt ["a"; "d"] (Bytes.of_string "Mars")
   >>= fun ctxt -> Lwt.return ctxt
 
 let create_block3b ctxt =
-  Context.del ctxt ["a"; "c"]
+  Context.remove_rec ctxt ["a"; "c"]
   >>= fun ctxt ->
   Context.set ctxt ["a"; "d"] (Bytes.of_string "Février")
   >>= fun ctxt -> Lwt.return ctxt

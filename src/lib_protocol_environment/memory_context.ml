@@ -98,10 +98,6 @@ module M = struct
     | Some m ->
         Lwt.return m
 
-  let del m k =
-    (* TODO assert key *)
-    match raw_set m k None with None -> Lwt.return m | Some m -> Lwt.return m
-
   let remove_rec m k =
     match raw_set m k None with None -> Lwt.return m | Some m -> Lwt.return m
 

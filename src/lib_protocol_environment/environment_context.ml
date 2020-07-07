@@ -42,8 +42,6 @@ module type CONTEXT = sig
 
   val copy : t -> from:key -> to_:key -> t option Lwt.t
 
-  val del : t -> key -> t Lwt.t
-
   val remove_rec : t -> key -> t Lwt.t
 
   val fold :
@@ -88,9 +86,6 @@ module Context = struct
         Lwt.return_some (Context {ops; ctxt; kind})
     | None ->
         Lwt.return_none
-
-  let del (Context {ops = (module Ops) as ops; ctxt; kind}) key =
-    Ops.del ctxt key >>= fun ctxt -> Lwt.return (Context {ops; ctxt; kind})
 
   let remove_rec (Context {ops = (module Ops) as ops; ctxt; kind}) key =
     Ops.remove_rec ctxt key

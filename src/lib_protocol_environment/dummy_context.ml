@@ -40,8 +40,6 @@ module M = struct
 
   let copy _ ~from:_ ~to_:_ = assert false
 
-  let del _ _ = assert false
-
   let remove_rec _ _ = assert false
 
   let fold _ _ ~init:_ ~f:_ = assert false

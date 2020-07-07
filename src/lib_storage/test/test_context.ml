@@ -86,7 +86,7 @@ let create_block3a idx block2_commit =
   | None ->
       Assert.fail_msg "checkout block2"
   | Some ctxt ->
-      del ctxt ["a"; "b"]
+      remove_rec ctxt ["a"; "b"]
       >>= fun ctxt ->
       set ctxt ["a"; "d"] (Bytes.of_string "Mars") >>= fun ctxt -> commit ctxt
 
@@ -104,7 +104,7 @@ let create_block3b idx block2_commit =
   | None ->
       Assert.fail_msg "checkout block3b"
   | Some ctxt ->
-      del ctxt ["a"; "c"]
+      remove_rec ctxt ["a"; "c"]
       >>= fun ctxt ->
       set ctxt ["a"; "d"] (Bytes.of_string "Février")
       >>= fun ctxt -> commit ctxt
