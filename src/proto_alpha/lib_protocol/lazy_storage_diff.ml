@@ -23,6 +23,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module type Next = sig
+  type id
+
+  val init : Raw_context.t -> Raw_context.t tzresult Lwt.t
+
+  val incr : Raw_context.t -> (Raw_context.t * id) tzresult Lwt.t
+end
+
+module type Total_bytes = sig
+  type id
+
+  val init : Raw_context.t -> id -> Z.t -> Raw_context.t tzresult Lwt.t
+
+  val get : Raw_context.t -> id -> Z.t tzresult Lwt.t
+
+  val set : Raw_context.t -> id -> Z.t -> Raw_context.t tzresult Lwt.t
+end
+
 module type OPS = sig
   module Id : Lazy_storage_kind.ID
 
@@ -43,19 +61,9 @@ module type OPS = sig
   val apply_updates :
     Raw_context.t -> id:Id.t -> updates -> (Raw_context.t * Z.t) tzresult Lwt.t
 
-  module Next : sig
-    val init : Raw_context.t -> Raw_context.t tzresult Lwt.t
+  module Next : Next with type id := Id.t
 
-    val incr : Raw_context.t -> (Raw_context.t * Id.t) tzresult Lwt.t
-  end
-
-  module Total_bytes : sig
-    val init : Raw_context.t -> Id.t -> Z.t -> Raw_context.t tzresult Lwt.t
-
-    val get : Raw_context.t -> Id.t -> Z.t tzresult Lwt.t
-
-    val set : Raw_context.t -> Id.t -> Z.t -> Raw_context.t tzresult Lwt.t
-  end
+  module Total_bytes : Total_bytes with type id := Id.t
 
   val copy :
     Raw_context.t -> from:Id.t -> to_:Id.t -> Raw_context.t tzresult Lwt.t

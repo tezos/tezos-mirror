@@ -67,13 +67,17 @@ module type ID = sig
   val of_path : string list -> t option
 end
 
-module MakeId (Title : sig
+module type Title = sig
   val title : string
-end) : sig
+end
+
+module type TitleWithId = sig
   val title : string
 
   module Id : ID
-end = struct
+end
+
+module MakeId (Title : Title) : TitleWithId = struct
   let title = Title.title
 
   let title_words = String.map (function '_' -> ' ' | c -> c) title
