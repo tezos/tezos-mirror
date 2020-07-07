@@ -34,9 +34,9 @@ module type Dump_interface = sig
 
   type hash
 
-  type step = string
+  type contents := string
 
-  type key = step list
+  type step := string
 
   type commit_info
 
@@ -125,13 +125,13 @@ module type Dump_interface = sig
   (* for dumping *)
   val context_tree : context -> tree
 
-  val tree_hash : tree -> hash
-
-  val sub_tree : tree -> key -> tree option Lwt.t
-
-  val tree_list : tree -> (step * [`Contents | `Node]) list Lwt.t
-
-  val tree_content : tree -> string option Lwt.t
+  (** Visit each branch and leaf of the given tree {i exactly once}, in
+      depth-first post-order traversal. Branch children are visited in ascending
+      key order. Memory usage is linear in the size of the tree. *)
+  val tree_iteri_unique :
+    (int -> [`Branch of (step * hash) list | `Leaf of contents] -> unit Lwt.t) ->
+    tree ->
+    unit Lwt.t
 
   (* for restoring *)
   val make_context : index -> context

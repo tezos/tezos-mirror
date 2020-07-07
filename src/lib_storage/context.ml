@@ -612,10 +612,6 @@ module Dumpable_context = struct
 
   type hash = [`Blob of Store.hash | `Node of Store.hash]
 
-  type step = string
-
-  type key = step list
-
   type commit_info = Irmin.Info.t
 
   type batch =
@@ -692,13 +688,65 @@ module Dumpable_context = struct
     | `Contents (b, _) ->
         `Blob (Store.Contents.hash b)
 
-  let sub_tree tree key =
-    Store.Tree.find_tree tree key
-    >|= fun subtree -> Store.Tree.clear tree ; subtree
+  type binding = {
+    key : string;
+    value : tree;
+    value_kind : [`Node | `Contents];
+    value_hash : hash;
+  }
 
-  let tree_list tree = Store.Tree.list tree []
+  (** Unpack the bindings in a tree node (in lexicographic order) and clear its
+      internal cache. *)
+  let bindings tree : binding list Lwt.t =
+    Store.Tree.list tree []
+    >>= fun keys ->
+    keys
+    |> List.sort (fun (a, _) (b, _) -> String.compare a b)
+    |> Lwt_list.map_s (fun (key, value_kind) ->
+           Store.Tree.get_tree tree [key]
+           >|= fun value ->
+           let value_hash = tree_hash value in
+           {key; value; value_kind; value_hash})
+    >|= fun bindings -> Store.Tree.clear tree ; bindings
 
-  let tree_content tree = Store.Tree.find tree []
+  module Hashtbl = Hashtbl.MakeSeeded (struct
+    type t = hash
+
+    let hash = Hashtbl.seeded_hash
+
+    let equal = hash_equal
+  end)
+
+  let tree_iteri_unique f tree =
+    let total_visited = ref 0 in
+    (* Noting the visited hashes *)
+    let visited_hash = Hashtbl.create 1000 in
+    let visited h = Hashtbl.mem visited_hash h in
+    let set_visit h =
+      incr total_visited ;
+      Hashtbl.add visited_hash h ()
+    in
+    let rec aux : type a. tree -> (unit -> a) -> a Lwt.t =
+     fun tree k ->
+      bindings tree
+      >>= Lwt_list.map_s (fun {key; value; value_hash; value_kind} ->
+              let kv = (key, value_hash) in
+              if visited value_hash then Lwt.return kv
+              else
+                match value_kind with
+                | `Node ->
+                    (* Visit children first, in left-to-right order. *)
+                    (aux [@ocaml.tailcall]) value (fun () ->
+                        (* There cannot be a cycle. *)
+                        set_visit value_hash ; kv)
+                | `Contents ->
+                    Store.Tree.get value []
+                    >>= fun data ->
+                    f !total_visited (`Leaf data)
+                    >|= fun () -> set_visit value_hash ; kv)
+      >>= fun sub_keys -> f !total_visited (`Branch sub_keys) >|= k
+    in
+    aux tree Fun.id
 
   let make_context index = {index; tree = Store.Tree.empty; parents = []}
 

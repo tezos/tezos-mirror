@@ -298,17 +298,10 @@ module Make (I : Dump_interface) = struct
     let bytes = Data_encoding.Binary.to_bytes_exn command_encoding root in
     set_mbytes buf bytes
 
-  let set_node buf contents =
-    let bytes =
-      Data_encoding.Binary.to_bytes_exn command_encoding (Node contents)
-    in
-    set_mbytes buf bytes
-
-  let set_blob buf data =
-    let bytes =
-      Data_encoding.Binary.to_bytes_exn command_encoding (Blob data)
-    in
-    set_mbytes buf bytes
+  let set_tree buf tree =
+    (match tree with `Branch node -> Node node | `Leaf blob -> Blob blob)
+    |> Data_encoding.Binary.to_bytes_exn command_encoding
+    |> set_mbytes buf
 
   let set_proot buf pruned_block =
     let proot = Proot pruned_block in
@@ -358,13 +351,18 @@ module Make (I : Dump_interface) = struct
       (v.version <> current_version)
       (Invalid_snapshot_version (v.version, current_version))
 
-  module Hashtbl = Hashtbl.MakeSeeded (struct
-    type t = I.hash
-
-    let hash = Hashtbl.seeded_hash
-
-    let equal = I.hash_equal
-  end)
+  let serialize_tree ~maybe_flush ~written buf =
+    I.tree_iteri_unique (fun visited sub_tree ->
+        set_tree buf sub_tree ;
+        maybe_flush ()
+        >|= fun () ->
+        Tezos_stdlib_unix.Utils.display_progress
+          ~refresh_rate:(visited, 1_000)
+          (fun m ->
+            m
+              "Context: %dK elements, %dMiB written%!"
+              (visited / 1_000)
+              (written () / 1_048_576)))
 
   let dump_contexts_fd idx data ~fd =
     (* Dumping *)
@@ -379,53 +377,6 @@ module Make (I : Dump_interface) = struct
     let maybe_flush () =
       if Buffer.length buf > 1_000_000 then flush () else Lwt.return_unit
     in
-    (* Noting the visited hashes *)
-    let visited_hash = Hashtbl.create ~random:true 1000 in
-    let visited h = Hashtbl.mem visited_hash h in
-    let set_visit h = Hashtbl.add visited_hash h () in
-    (* Folding through a node *)
-    let fold_tree_path ctxt tree =
-      let cpt = ref 0 in
-      let rec fold_tree_path ctxt tree =
-        I.tree_list tree
-        >>= fun keys ->
-        let keys = List.sort (fun (a, _) (b, _) -> String.compare a b) keys in
-        Lwt_list.map_s
-          (fun (name, kind) ->
-            I.sub_tree tree [name]
-            >>= function
-            | None ->
-                assert false
-            | Some sub_tree ->
-                let hash = I.tree_hash sub_tree in
-                ( if visited hash then Lwt.return_unit
-                else (
-                  Tezos_stdlib_unix.Utils.display_progress
-                    ~refresh_rate:(!cpt, 1_000)
-                    (fun m ->
-                      m
-                        "Context: %dK elements, %dMiB written%!"
-                        (!cpt / 1_000)
-                        (!written / 1_048_576)) ;
-                  incr cpt ;
-                  set_visit hash ;
-                  (* There cannot be a cycle *)
-                  match kind with
-                  | `Node ->
-                      fold_tree_path ctxt sub_tree
-                  | `Contents -> (
-                      I.tree_content sub_tree
-                      >>= function
-                      | None ->
-                          assert false
-                      | Some data ->
-                          set_blob buf data ; maybe_flush () ) ) )
-                >|= fun () -> (name, hash))
-          keys
-        >>= fun sub_keys -> set_node buf sub_keys ; maybe_flush ()
-      in
-      fold_tree_path ctxt tree
-    in
     Lwt.catch
       (fun () ->
         let (bh, block_data, mode, pruned_iterator) = data in
@@ -435,8 +386,8 @@ module Make (I : Dump_interface) = struct
         | None ->
             fail @@ Context_not_found (I.Block_header.to_bytes bh)
         | Some ctxt ->
-            let tree = I.context_tree ctxt in
-            fold_tree_path ctxt tree
+            I.context_tree ctxt
+            |> serialize_tree ~maybe_flush ~written:(fun () -> !written) buf
             >>= fun () ->
             Tezos_stdlib_unix.Utils.display_progress_end () ;
             let parents = I.context_parents ctxt in
