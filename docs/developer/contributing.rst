@@ -101,7 +101,7 @@ the branch name.
 Code Review
 -----------
 
-At tezos all the code is peer reviewed before getting committed in the
+At Tezos all the code is peer reviewed before getting committed in the
 master branch. Briefly, a code review is a discussion between two or
 more developers about changes to the code to address an issue.
 
