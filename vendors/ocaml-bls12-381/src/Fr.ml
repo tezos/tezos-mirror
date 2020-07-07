@@ -1,5 +1,7 @@
 module Fr_stubs = Rustc_bls12_381_bindings.Fr (Rustc_bls12_381_stubs)
 
+exception Not_in_field of Bytes.t
+
 (** High level (OCaml) definitions/logic *)
 let size = 32
 
@@ -18,9 +20,8 @@ let check_bytes bs =
 
 let of_bytes_opt bs = if check_bytes bs then Some bs else None
 
-let of_bytes (g : Bytes.t) : t =
-  assert (Bytes.length g = size) ;
-  g
+let of_bytes_exn (g : Bytes.t) : t =
+  if check_bytes g then g else raise (Not_in_field g)
 
 let to_bytes g = g
 
@@ -35,17 +36,17 @@ let is_one g =
 let zero =
   let g = empty () in
   Fr_stubs.zero (Ctypes.ocaml_bytes_start g) ;
-  of_bytes g
+  g
 
 let one =
   let g = empty () in
   Fr_stubs.one (Ctypes.ocaml_bytes_start g) ;
-  of_bytes g
+  g
 
 let random () =
   let g = empty () in
   Fr_stubs.random (Ctypes.ocaml_bytes_start g) ;
-  of_bytes g
+  g
 
 let add x y =
   assert (Bytes.length x = size) ;
@@ -55,7 +56,7 @@ let add x y =
     (Ctypes.ocaml_bytes_start g)
     (Ctypes.ocaml_bytes_start x)
     (Ctypes.ocaml_bytes_start y) ;
-  of_bytes g
+  g
 
 let mul x y =
   assert (Bytes.length x = size) ;
@@ -65,7 +66,7 @@ let mul x y =
     (Ctypes.ocaml_bytes_start g)
     (Ctypes.ocaml_bytes_start x)
     (Ctypes.ocaml_bytes_start y) ;
-  of_bytes g
+  g
 
 let inverse_exn g =
   assert (Bytes.length g = size) ;
@@ -73,7 +74,7 @@ let inverse_exn g =
   Fr_stubs.unsafe_inverse
     (Ctypes.ocaml_bytes_start buffer)
     (Ctypes.ocaml_bytes_start g) ;
-  of_bytes buffer
+  buffer
 
 let inverse_opt g =
   assert (Bytes.length g = size) ;
@@ -83,7 +84,7 @@ let inverse_opt g =
     Fr_stubs.unsafe_inverse
       (Ctypes.ocaml_bytes_start buffer)
       (Ctypes.ocaml_bytes_start g) ;
-    Some (of_bytes buffer)
+    Some buffer
 
 let negate g =
   assert (Bytes.length g = size) ;
@@ -91,7 +92,7 @@ let negate g =
   Fr_stubs.negate
     (Ctypes.ocaml_bytes_start buffer)
     (Ctypes.ocaml_bytes_start g) ;
-  of_bytes buffer
+  buffer
 
 let square g =
   assert (Bytes.length g = size) ;
@@ -99,7 +100,7 @@ let square g =
   Fr_stubs.square
     (Ctypes.ocaml_bytes_start buffer)
     (Ctypes.ocaml_bytes_start g) ;
-  of_bytes buffer
+  buffer
 
 let double g =
   assert (Bytes.length g = size) ;
@@ -107,7 +108,7 @@ let double g =
   Fr_stubs.double
     (Ctypes.ocaml_bytes_start buffer)
     (Ctypes.ocaml_bytes_start g) ;
-  of_bytes buffer
+  buffer
 
 let eq x y =
   (* IMPORTANT: DO NOT USE THE BYTES representation because we use 384 bits
@@ -138,10 +139,10 @@ let of_string s =
   let g = empty () in
   let s = Bytes.of_string (Z.to_bits (Z.erem (Z.of_string s) order)) in
   Bytes.blit s 0 g 0 (min (Bytes.length s) size) ;
-  of_bytes g
+  of_bytes_exn g
 
 let of_z z =
   let z = Bytes.of_string (Z.to_bits (Z.erem z order)) in
   let x = empty () in
   Bytes.blit z 0 x 0 (min (Bytes.length z) size) ;
-  x
+  of_bytes_exn x

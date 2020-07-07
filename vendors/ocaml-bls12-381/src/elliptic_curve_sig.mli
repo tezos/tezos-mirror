@@ -1,4 +1,6 @@
 module type T = sig
+  exception Not_on_curve of Bytes.t
+
   (** The type of the element in the elliptic curve *)
   type t
 
@@ -7,8 +9,6 @@ module type T = sig
 
   module Scalar : Ff_sig.T
 
-  (** Build an element using a bytes representation. Use carefully *)
-
   (** Create an empty value to store an element of the curve. DO NOT USE THIS TO
       DO COMPUTATIONS WITH, UNDEFINED BEHAVIORS MAY HAPPEN *)
   val empty : unit -> t
@@ -16,13 +16,15 @@ module type T = sig
   (** Check if a point, represented as a byte array, is on the curve **)
   val check_bytes : Bytes.t -> bool
 
-  (* Attempt to construct a point from a byte array *)
+  (** Attempt to construct a point from a byte array *)
   val of_bytes_opt : Bytes.t -> t option
 
-  (** UNSAFE *)
-  val of_bytes : Bytes.t -> t
+  (** Attempt to construct a point from a byte array.
+      Raise [Not_on_curve] if the point is not on the curve
+  *)
+  val of_bytes_exn : Bytes.t -> t
 
-  (** Return a representation in bytes. Use carefully *)
+  (** Return a representation in bytes *)
   val to_bytes : t -> Bytes.t
 
   (** Zero of the elliptic curve *)

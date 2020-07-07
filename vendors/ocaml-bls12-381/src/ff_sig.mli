@@ -1,5 +1,7 @@
 (** General module signature for a finite field *)
 module type T = sig
+  exception Not_in_field of Bytes.t
+
   type t
 
   (** The size of a point representation, in bytes *)
@@ -8,13 +10,15 @@ module type T = sig
   (** Check if a point, represented as a byte array, is in the field **)
   val check_bytes : Bytes.t -> bool
 
-  (* Attempt to construct a point from a byte array *)
+  (** Attempt to construct a point from a byte array *)
   val of_bytes_opt : Bytes.t -> t option
 
   (** Order of the field *)
   val order : Z.t
 
-  val of_bytes : Bytes.t -> t
+  (** Attempt to construct a point from a byte array. If the point is not in the
+      field, raise [Not_in_field] with the bytes as argument *)
+  val of_bytes_exn : Bytes.t -> t
 
   val to_bytes : t -> Bytes.t
 

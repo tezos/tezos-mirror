@@ -1,6 +1,8 @@
 module G2_stubs = Rustc_bls12_381_bindings.G2 (Rustc_bls12_381_stubs)
 
 module Uncompressed = struct
+  exception Not_on_curve of Bytes.t
+
   type t = Bytes.t
 
   let size = 192
@@ -16,7 +18,8 @@ module Uncompressed = struct
 
   let of_bytes_opt bs = if check_bytes bs then Some bs else None
 
-  let of_bytes (g : Bytes.t) : t = g
+  let of_bytes_exn (g : Bytes.t) : t =
+    if check_bytes g then g else raise (Not_on_curve g)
 
   let of_z_opt ~x ~y =
     let (x_1, x_2) = x in
@@ -41,17 +44,17 @@ module Uncompressed = struct
   let zero =
     let g = empty () in
     G2_stubs.zero (Ctypes.ocaml_bytes_start g) ;
-    of_bytes g
+    g
 
   let one =
     let g = empty () in
     G2_stubs.one (Ctypes.ocaml_bytes_start g) ;
-    of_bytes g
+    g
 
   let random () =
     let g = empty () in
     G2_stubs.random (Ctypes.ocaml_bytes_start g) ;
-    of_bytes g
+    g
 
   let add g1 g2 =
     assert (Bytes.length g1 = size) ;
@@ -61,7 +64,7 @@ module Uncompressed = struct
       (Ctypes.ocaml_bytes_start g)
       (Ctypes.ocaml_bytes_start g1)
       (Ctypes.ocaml_bytes_start g2) ;
-    of_bytes g
+    g
 
   let negate g =
     assert (Bytes.length g = size) ;
@@ -69,7 +72,7 @@ module Uncompressed = struct
     G2_stubs.negate
       (Ctypes.ocaml_bytes_start buffer)
       (Ctypes.ocaml_bytes_start g) ;
-    of_bytes buffer
+    buffer
 
   let eq g1 g2 =
     assert (Bytes.length g1 = size) ;
@@ -78,8 +81,7 @@ module Uncompressed = struct
 
   let is_zero g =
     assert (Bytes.length g = size) ;
-    let g = G2_stubs.is_zero (Ctypes.ocaml_bytes_start g) in
-    g
+    G2_stubs.is_zero (Ctypes.ocaml_bytes_start g)
 
   let mul (g : t) (a : Scalar.t) : t =
     assert (Bytes.length g = size) ;
@@ -89,10 +91,12 @@ module Uncompressed = struct
       (Ctypes.ocaml_bytes_start buffer)
       (Ctypes.ocaml_bytes_start g)
       (Ctypes.ocaml_bytes_start (Scalar.to_bytes a)) ;
-    of_bytes buffer
+    buffer
 end
 
 module Compressed = struct
+  exception Not_on_curve of Bytes.t
+
   type t = Bytes.t
 
   let size = 96
@@ -101,20 +105,6 @@ module Compressed = struct
 
   let empty () = Bytes.make size '\000'
 
-  let of_uncompressed uncompressed =
-    let g = empty () in
-    G2_stubs.compressed_of_uncompressed
-      (Ctypes.ocaml_bytes_start g)
-      (Ctypes.ocaml_bytes_start uncompressed) ;
-    g
-
-  let to_uncompressed compressed =
-    let g = Uncompressed.empty () in
-    G2_stubs.uncompressed_of_compressed
-      (Ctypes.ocaml_bytes_start g)
-      (Ctypes.ocaml_bytes_start compressed) ;
-    g
-
   let check_bytes bs =
     if Bytes.length bs = size then
       G2_stubs.compressed_check_bytes (Ctypes.ocaml_bytes_start bs)
@@ -122,24 +112,38 @@ module Compressed = struct
 
   let of_bytes_opt bs = if check_bytes bs then Some bs else None
 
-  let of_bytes g = g
+  let of_bytes_exn g = if check_bytes g then g else raise (Not_on_curve g)
+
+  let of_uncompressed uncompressed =
+    let g = empty () in
+    G2_stubs.compressed_of_uncompressed
+      (Ctypes.ocaml_bytes_start g)
+      (Ctypes.ocaml_bytes_start uncompressed) ;
+    of_bytes_exn g
+
+  let to_uncompressed compressed =
+    let g = Uncompressed.empty () in
+    G2_stubs.uncompressed_of_compressed
+      (Ctypes.ocaml_bytes_start g)
+      (Ctypes.ocaml_bytes_start compressed) ;
+    Uncompressed.of_bytes_exn g
 
   let to_bytes g = g
 
   let zero =
     let g = empty () in
     G2_stubs.compressed_zero (Ctypes.ocaml_bytes_start g) ;
-    of_bytes g
+    g
 
   let one =
     let g = empty () in
     G2_stubs.compressed_one (Ctypes.ocaml_bytes_start g) ;
-    of_bytes g
+    g
 
   let random () =
     let g = empty () in
     G2_stubs.compressed_random (Ctypes.ocaml_bytes_start g) ;
-    of_bytes g
+    g
 
   let add g1 g2 =
     assert (Bytes.length g1 = size) ;
@@ -149,7 +153,7 @@ module Compressed = struct
       (Ctypes.ocaml_bytes_start g)
       (Ctypes.ocaml_bytes_start g1)
       (Ctypes.ocaml_bytes_start g2) ;
-    of_bytes g
+    g
 
   let negate g =
     assert (Bytes.length g = size) ;
@@ -157,7 +161,7 @@ module Compressed = struct
     G2_stubs.compressed_negate
       (Ctypes.ocaml_bytes_start buffer)
       (Ctypes.ocaml_bytes_start g) ;
-    of_bytes buffer
+    buffer
 
   let eq g1 g2 =
     assert (Bytes.length g1 = size) ;
@@ -168,8 +172,7 @@ module Compressed = struct
 
   let is_zero g =
     assert (Bytes.length g = size) ;
-    let g = G2_stubs.compressed_is_zero (Ctypes.ocaml_bytes_start g) in
-    g
+    G2_stubs.compressed_is_zero (Ctypes.ocaml_bytes_start g)
 
   let mul (g : t) (a : Scalar.t) : t =
     assert (Bytes.length g = size) ;
@@ -179,5 +182,5 @@ module Compressed = struct
       (Ctypes.ocaml_bytes_start buffer)
       (Ctypes.ocaml_bytes_start g)
       (Ctypes.ocaml_bytes_start (Fr.to_bytes a)) ;
-    of_bytes buffer
+    buffer
 end

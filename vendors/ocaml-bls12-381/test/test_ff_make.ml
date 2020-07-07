@@ -8,11 +8,7 @@ let rec repeat n f =
 
 (** Check the routine generators do not raise any exception *)
 module MakeValueGeneration (FiniteField : Bls12_381.Ff_sig.T) = struct
-  let zero () = ignore @@ FiniteField.zero
-
   let random () = ignore @@ FiniteField.random ()
-
-  let one () = ignore @@ FiniteField.one
 
   let rec inverse_with_random_not_null () =
     let random = FiniteField.random () in
@@ -50,8 +46,7 @@ module MakeValueGeneration (FiniteField : Bls12_381.Ff_sig.T) = struct
   let get_tests () =
     let open Alcotest in
     ( "value generation",
-      [ test_case "zero" `Quick (repeat 1 zero);
-        test_case "random" `Quick (repeat 1000 random);
+      [ test_case "random" `Quick (repeat 1000 random);
         test_case
           "inverse_random_not_null"
           `Quick
@@ -89,11 +84,9 @@ module MakeIsZero (FiniteField : Bls12_381.Ff_sig.T) = struct
 end
 
 module MakeEquality (FiniteField : Bls12_381.Ff_sig.T) = struct
-  let zero_same_objects () =
-    assert (FiniteField.eq FiniteField.zero FiniteField.zero)
+  let zero () = assert (FiniteField.eq FiniteField.zero FiniteField.zero)
 
-  let one_same_objects () =
-    assert (FiniteField.eq FiniteField.one FiniteField.one)
+  let one () = assert (FiniteField.eq FiniteField.one FiniteField.one)
 
   let random_same_objects () =
     let random = FiniteField.random () in
@@ -102,8 +95,8 @@ module MakeEquality (FiniteField : Bls12_381.Ff_sig.T) = struct
   let get_tests () =
     let open Alcotest in
     ( "equality",
-      [ test_case "zero_same_objects" `Quick (repeat 1000 zero_same_objects);
-        test_case "one_same_objects" `Quick (repeat 1000 one_same_objects);
+      [ test_case "zero" `Quick (repeat 1 zero);
+        test_case "one" `Quick (repeat 1 one);
         test_case
           "random_same_objects"
           `Quick
@@ -309,11 +302,8 @@ module MakeFieldProperties (FiniteField : Bls12_381.Ff_sig.T) = struct
         test_case
           "inverse_of_one_is_one"
           `Quick
-          (repeat 1000 inverse_of_one_is_one);
-        test_case
-          "zero_has_no_inverse"
-          `Quick
-          (repeat 1000 zero_has_no_inverse);
+          (repeat 1 inverse_of_one_is_one);
+        test_case "zero_has_no_inverse" `Quick (repeat 1 zero_has_no_inverse);
         test_case "inverse_of_inverse" `Quick (repeat 1000 inverse_of_inverse);
         test_case
           "opposite_of_opposite"
@@ -322,7 +312,7 @@ module MakeFieldProperties (FiniteField : Bls12_381.Ff_sig.T) = struct
         test_case
           "opposite_of_zero_is_zero"
           `Quick
-          (repeat 1000 opposite_of_zero_is_zero);
+          (repeat 1 opposite_of_zero_is_zero);
         test_case
           "additive_associativity"
           `Quick
@@ -335,7 +325,7 @@ module MakeFieldProperties (FiniteField : Bls12_381.Ff_sig.T) = struct
         test_case
           "pow zero on one equals one"
           `Quick
-          (repeat 1000 pow_zero_on_one_equals_one);
+          (repeat 1 pow_zero_on_one_equals_one);
         test_case
           "pow one on random element equals the same element"
           `Quick
