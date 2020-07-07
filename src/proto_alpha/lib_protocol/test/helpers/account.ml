@@ -92,6 +92,7 @@ let new_commitment ?seed () =
   let open Commitment_repr in
   let pkh = match pkh with Ed25519 pkh -> pkh | _ -> assert false in
   let bpkh = Blinded_public_key_hash.of_ed25519_pkh commitment_secret pkh in
-  (Lwt.return @@ Environment.wrap_error @@ Tez_repr.(one *? 4_000L))
-  >|=? fun amount ->
-  (unactivated_account, {blinded_public_key_hash = bpkh; amount})
+  Lwt.return
+    ( (Environment.wrap_error @@ Tez_repr.(one *? 4_000L))
+    >|? fun amount ->
+    (unactivated_account, {blinded_public_key_hash = bpkh; amount}) )
