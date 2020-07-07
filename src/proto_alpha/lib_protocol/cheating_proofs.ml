@@ -58,29 +58,29 @@ type error +=
 
 let check_level_bounds ctxt level =
   let current_level = Level.current ctxt in
-  fail_unless
+  error_unless
     Level.(level < current_level)
     (Too_early_evidence {level = level.level; current = current_level.level})
-  >>=? fun () ->
+  >>? fun () ->
   let oldest_level = Level.last_allowed_fork_level ctxt in
-  fail_unless
+  error_unless
     Raw_level.(oldest_level <= level.level)
     (Outdated_evidence {level = level.level; last = oldest_level})
 
 let prove_double_baking ctxt chain_id (Double_baking_evidence {bh1; bh2}) =
   let hash1 = Block_header.hash bh1 in
   let hash2 = Block_header.hash bh2 in
-  Lwt.return @@ Raw_level.of_int32 bh1.shell.level
-  >>=? fun level1 ->
-  Lwt.return @@ Raw_level.of_int32 bh2.shell.level
-  >>=? fun level2 ->
-  fail_unless
+  Raw_level.of_int32 bh1.shell.level
+  >>?= fun level1 ->
+  Raw_level.of_int32 bh2.shell.level
+  >>?= fun level2 ->
+  error_unless
     (Raw_level.(level1 = level2) && not (Block_hash.equal hash1 hash2))
     (Invalid_double_baking_evidence {hash1; level1; hash2; level2})
-  >>=? fun () ->
+  >>?= fun () ->
   let level = Level.from_raw ctxt level1 in
   check_level_bounds ctxt level
-  >>=? fun () ->
+  >>?= fun () ->
   Roll.baking_rights_owner
     ctxt
     level
@@ -98,10 +98,11 @@ let prove_double_baking ctxt chain_id (Double_baking_evidence {bh1; bh2}) =
   let (delegate1, delegate2) =
     (Signature.Public_key.hash delegate1, Signature.Public_key.hash delegate2)
   in
-  fail_unless
-    (Signature.Public_key_hash.equal delegate1 delegate2)
-    (Inconsistent_evidence {delegate1; delegate2})
-  >>=? fun () -> return (level, delegate1)
+  Lwt.return
+    ( error_unless
+        (Signature.Public_key_hash.equal delegate1 delegate2)
+        (Inconsistent_evidence {delegate1; delegate2})
+    >|? fun () -> (level, delegate1) )
 
 let prove_double_endorsement ctxt chain_id
     (Double_endorsement_evidence {op1; op2}) =
@@ -112,22 +113,23 @@ let prove_double_endorsement ctxt chain_id
   let hash2 = Operation.hash op2 in
   let level1 = e1.level in
   let level2 = e2.level in
-  fail_unless
+  error_unless
     ( Raw_level.(level1 = level2)
     && not (Block_hash.equal op1.shell.branch op2.shell.branch) )
     (Invalid_double_endorsement_evidence {hash1; level1; hash2; level2})
-  >>=? fun () ->
+  >>?= fun () ->
   let level = Level.from_raw ctxt level1 in
   check_level_bounds ctxt level
-  >>=? fun () ->
+  >>?= fun () ->
   Baking.check_endorsement_rights ctxt chain_id op1
   >>=? fun (delegate1, _, _) ->
   Baking.check_endorsement_rights ctxt chain_id op2
   >>=? fun (delegate2, _, _) ->
-  fail_unless
-    (Signature.Public_key_hash.equal delegate1 delegate2)
-    (Inconsistent_evidence {delegate1; delegate2})
-  >>=? fun () -> return (level, delegate1)
+  Lwt.return
+    ( error_unless
+        (Signature.Public_key_hash.equal delegate1 delegate2)
+        (Inconsistent_evidence {delegate1; delegate2})
+    >|? fun () -> (level, delegate1) )
 
 let () =
   register_error_kind

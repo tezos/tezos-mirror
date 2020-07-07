@@ -423,8 +423,8 @@ module Proof = struct
   let cleanup ctxt =
     let oldest_level = Level_storage.last_allowed_fork_level ctxt in
     let f contract level_set ctxt =
-      Lwt.return ctxt
-      >>=? fun ctxt ->
+      ctxt
+      >>?= fun ctxt ->
       Storage.Contract.Proof_level.set ctxt contract
       @@ LSet.filter
            (fun level -> Raw_level_repr.(level > oldest_level))
