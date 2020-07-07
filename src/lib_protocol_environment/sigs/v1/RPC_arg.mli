@@ -39,6 +39,8 @@ type descr = {name : string; descr : string option}
 
 val descr : 'a arg -> descr
 
+val bool : bool arg
+
 val int : int arg
 
 val int32 : int32 arg
