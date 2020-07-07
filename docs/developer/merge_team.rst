@@ -32,11 +32,28 @@ reviewer to work on the MR.
 - *Test*:
 
   - Explain how you tested your patch (or why you didn't).
-  - Give instructions to reproduce the bug or to test the new feature.
-  - As much as possible, provide automatic tests in the CI.
-    Make sure the new code is covered by the tests execution using
-    ``bisect_ppx``. The available testing frameworks, tools and testing
-    conventions are documented :ref:`here <testing>`.
+
+  - The description of merge requests must include instructions for
+    how to manually test them, when applicable.
+
+  - Merge requests should include automated tests for new
+    functionality and bug fixes.
+
+    - Refer to the :ref:`testing guide <testing>` for more information.
+
+    - Bug fixes should include a test that exposes that the bug
+      (i.e. that fails before the supplied fix).
+
+    - The :ref:`test coverage <measuring-test-coverage>` can be used to
+      guide testing of the proposed MR. If the modified code lacks
+      coverage, then this indicates that tests should be added.
+
+    - If no tests are included, a justification should be given in the
+      description. Possible justifications include that testing is
+      prohibitively difficult, or that the modified code is already
+      well-exercised by the existing test suite. The point of the
+      justification is to stress the importance of testing and to guide
+      improvements of the test framework.
 
 - *Divide and conquer*: it is easier to merge several simple merge
   requests than a big one.
