@@ -197,19 +197,18 @@ module Ledger_commands = struct
           (Bigstring.to_bytes buf)
     | Secp256r1 -> (
         let open Uecc in
-        let pklen = compressed_size secp256r1 in
-        let buf = Bigstring.create (pklen + 1) in
-        match pk_of_bytes secp256r1 (Cstruct.to_bigarray pk) with
+        let pklen = compressed_size in
+        let buf = Bytes.create (pklen + 1) in
+        match pk_of_bytes (Cstruct.to_bytes pk) with
         | None ->
             Stdlib.failwith "Impossible to read P256 public key from Ledger"
         | Some pk ->
-            EndianBigstring.BigEndian.set_int8 buf 0 2 ;
+            TzEndian.set_int8 buf 0 2 ;
             let _nb_written =
-              write_key ~compress:true (Bigstring.sub buf 1 pklen) pk
+              write_key ~compress:true (Bytes.sub buf 1 pklen) pk
             in
-            Data_encoding.Binary.of_bytes_exn
-              Signature.Public_key.encoding
-              (Bigstring.to_bytes buf) )
+            Data_encoding.Binary.of_bytes_exn Signature.Public_key.encoding buf
+        )
 
   let get_public_key = public_key_returning_instruction `Get_public_key
 

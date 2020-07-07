@@ -126,9 +126,7 @@ module Encodings = struct
       ~wrap:(fun sk -> Encrypted_secp256k1 sk)
 
   let p256 =
-    let length =
-      Uecc.(sk_size secp256r1) + Crypto_box.tag_length + Raw.salt_len
-    in
+    let length = Uecc.sk_size + Crypto_box.tag_length + Raw.salt_len in
     Base58.register_encoding
       ~prefix:Base58.Prefix.p256_encrypted_secret_key
       ~length

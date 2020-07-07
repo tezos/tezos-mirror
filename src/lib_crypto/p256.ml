@@ -46,23 +46,21 @@ let () = Base58.check_encoded_prefix Public_key_hash.b58check_encoding "tz3" 36
 open Uecc
 
 module Public_key = struct
-  type t = (secp256r1, public) key
+  type t = public key
 
   let name = "P256.Public_key"
 
   let title = "A P256 public key"
 
-  let to_bigstring = to_bytes ~compress:true
-
-  let to_bytes b = Bigstring.to_bytes (to_bigstring b)
+  let to_bytes = to_bytes ~compress:true
 
   let to_string s = Bytes.to_string (to_bytes s)
 
-  let of_bytes_opt b = pk_of_bytes secp256r1 (Bigstring.of_bytes b)
+  let of_bytes_opt b = pk_of_bytes (Bytes.copy b)
 
   let of_string_opt s = of_bytes_opt (Bytes.of_string s)
 
-  let size = compressed_size secp256r1
+  let size = compressed_size
 
   type Base58.data += Data of t
 
@@ -130,20 +128,17 @@ module Public_key = struct
 end
 
 module Secret_key = struct
-  type t = (secp256r1, secret) key
+  type t = secret key
 
   let name = "P256.Secret_key"
 
   let title = "A P256 secret key"
 
-  let size = sk_size secp256r1
+  let size = sk_size
 
-  let of_bytes_opt buf =
-    Option.map fst (sk_of_bytes secp256r1 (Bigstring.of_bytes buf))
+  let of_bytes_opt buf = Option.map fst (sk_of_bytes buf)
 
-  let to_bigstring = to_bytes ~compress:true
-
-  let to_bytes t = Bigstring.to_bytes (to_bigstring t)
+  let to_bytes = to_bytes ~compress:true
 
   let to_string s = Bytes.to_string (to_bytes s)
 
@@ -214,7 +209,7 @@ module Secret_key = struct
   let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
 end
 
-type t = Bigstring.t
+type t = Bytes.t
 
 type watermark = Bytes.t
 
@@ -222,12 +217,11 @@ let name = "P256"
 
 let title = "A P256 signature"
 
-let size = pk_size secp256r1
+let size = pk_size
 
-let of_bytes_opt s =
-  if Bytes.length s = size then Some (Bigstring.of_bytes s) else None
+let of_bytes_opt s = if Bytes.length s = size then Some s else None
 
-let to_bytes s = Bigstring.to_bytes s
+let to_bytes s = Bytes.copy s
 
 let to_string s = Bytes.to_string (to_bytes s)
 
@@ -296,7 +290,7 @@ let sign ?watermark sk msg =
     Blake2B.to_bytes @@ Blake2B.hash_bytes
     @@ match watermark with None -> [msg] | Some prefix -> [prefix; msg]
   in
-  match sign sk (Bigstring.of_bytes msg) with
+  match sign sk msg with
   | None ->
       (* Will never happen in practice. This can only happen in case
          of RNG error. *)
@@ -309,7 +303,7 @@ let check ?watermark public_key signature msg =
     Blake2B.to_bytes @@ Blake2B.hash_bytes
     @@ match watermark with None -> [msg] | Some prefix -> [prefix; msg]
   in
-  verify public_key ~msg:(Bigstring.of_bytes msg) ~signature
+  verify public_key ~msg ~signature
 
 let generate_key ?(seed = Hacl.Rand.gen 32) () =
   let seedlen = Bytes.length seed in
@@ -318,7 +312,7 @@ let generate_key ?(seed = Hacl.Rand.gen 32) () =
       (Printf.sprintf
          "P256.generate_key: seed must be at least 32 bytes long (was %d)"
          seedlen) ;
-  match sk_of_bytes secp256r1 (Bigstring.of_bytes seed) with
+  match sk_of_bytes seed with
   | None ->
       invalid_arg "P256.generate_key: invalid seed (very rare!)"
   | Some (sk, pk) ->
@@ -336,5 +330,5 @@ let deterministic_nonce_hash sk msg =
 include Compare.Make (struct
   type nonrec t = t
 
-  let compare = Bigstring.compare
+  let compare = Bytes.compare
 end)

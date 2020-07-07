@@ -10,8 +10,8 @@ let msgs =
 let keys =
   List.map begin fun (sk, pk) ->
     match
-      sk_of_bytes secp256r1 (bigstring_of_hex sk),
-      pk_of_bytes secp256r1 (bigstring_of_hex pk) with
+      sk_of_bytes (bigstring_of_hex sk),
+      pk_of_bytes (bigstring_of_hex pk) with
     | Some (sk, pk), Some pk' when pk = pk' -> sk, pk
     | _ -> failwith "invalid key"
   end keys
