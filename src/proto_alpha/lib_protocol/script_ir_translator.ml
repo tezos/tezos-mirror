@@ -4131,39 +4131,41 @@ and parse_instr :
       >>?= fun annot ->
       typed ctxt loc Sender (Item_t (Address_t None, stack, annot))
   | (Prim (loc, I_SELF, [], annot), stack) ->
-      parse_entrypoint_annot loc annot ~default:default_self_annot
-      >>?= fun (annot, entrypoint) ->
-      let entrypoint =
-        Option.unopt_map
-          ~f:(fun (Field_annot annot) -> annot)
-          ~default:"default"
-          entrypoint
-      in
-      let rec get_toplevel_type :
-          tc_context -> (bef judgement * context) tzresult = function
-        | Lambda ->
-            error (Self_in_lambda loc)
-        | Dip (_, prev) ->
-            get_toplevel_type prev
-        | Toplevel
-            {param_type; root_name; legacy_create_contract_literal = false} ->
-            find_entrypoint param_type ~root_name entrypoint
-            >>? fun (_, Ex_ty param_type) ->
-            typed_no_lwt
-              ctxt
-              loc
-              (Self (param_type, entrypoint))
-              (Item_t (Contract_t (param_type, None), stack, annot))
-        | Toplevel
-            {param_type; root_name = _; legacy_create_contract_literal = true}
-          ->
-            typed_no_lwt
-              ctxt
-              loc
-              (Self (param_type, "default"))
-              (Item_t (Contract_t (param_type, None), stack, annot))
-      in
-      Lwt.return (get_toplevel_type tc_context)
+      Lwt.return
+        ( parse_entrypoint_annot loc annot ~default:default_self_annot
+        >>? fun (annot, entrypoint) ->
+        let entrypoint =
+          Option.unopt_map
+            ~f:(fun (Field_annot annot) -> annot)
+            ~default:"default"
+            entrypoint
+        in
+        let rec get_toplevel_type :
+            tc_context -> (bef judgement * context) tzresult = function
+          | Lambda ->
+              error (Self_in_lambda loc)
+          | Dip (_, prev) ->
+              get_toplevel_type prev
+          | Toplevel
+              {param_type; root_name; legacy_create_contract_literal = false}
+            ->
+              find_entrypoint param_type ~root_name entrypoint
+              >>? fun (_, Ex_ty param_type) ->
+              typed_no_lwt
+                ctxt
+                loc
+                (Self (param_type, entrypoint))
+                (Item_t (Contract_t (param_type, None), stack, annot))
+          | Toplevel
+              {param_type; root_name = _; legacy_create_contract_literal = true}
+            ->
+              typed_no_lwt
+                ctxt
+                loc
+                (Self (param_type, "default"))
+                (Item_t (Contract_t (param_type, None), stack, annot))
+        in
+        get_toplevel_type tc_context )
   (* Primitive parsing errors *)
   | ( Prim
         ( loc,
@@ -4580,11 +4582,11 @@ and parse_contract_for_script :
               (* Since protocol 005, we have the invariant that all originated accounts have code *)
               assert false
           | Some code ->
-              Script.force_decode_in_context ctxt code
-              >>?= fun (code, ctxt) ->
-              (* can only fail because of gas *)
               Lwt.return
-                ( match parse_toplevel ~legacy:true code with
+                ( Script.force_decode_in_context ctxt code
+                >>? fun (code, ctxt) ->
+                (* can only fail because of gas *)
+                match parse_toplevel ~legacy:true code with
                 | Error _ ->
                     error (Invalid_contract (loc, contract))
                 | Ok (arg_type, _, _, root_name) -> (
@@ -5252,21 +5254,21 @@ let unparse_script ctxt mode {code; arg_type; storage; storage_type; root_name}
   >>=? fun (code, ctxt) ->
   unparse_data ctxt mode storage_type storage
   >>=? fun (storage, ctxt) ->
-  unparse_ty ctxt arg_type
-  >>?= fun (arg_type, ctxt) ->
-  unparse_ty ctxt storage_type
-  >>?= fun (storage_type, ctxt) ->
-  let arg_type = add_field_annot root_name None arg_type in
-  let open Micheline in
-  let code =
-    Seq
-      ( -1,
-        [ Prim (-1, K_parameter, [arg_type], []);
-          Prim (-1, K_storage, [storage_type], []);
-          Prim (-1, K_code, [code], []) ] )
-  in
   Lwt.return
-    ( Gas.consume ctxt (Unparse_costs.seq_cost 3)
+    ( unparse_ty ctxt arg_type
+    >>? fun (arg_type, ctxt) ->
+    unparse_ty ctxt storage_type
+    >>? fun (storage_type, ctxt) ->
+    let arg_type = add_field_annot root_name None arg_type in
+    let open Micheline in
+    let code =
+      Seq
+        ( -1,
+          [ Prim (-1, K_parameter, [arg_type], []);
+            Prim (-1, K_storage, [storage_type], []);
+            Prim (-1, K_code, [code], []) ] )
+    in
+    Gas.consume ctxt (Unparse_costs.seq_cost 3)
     >>? fun ctxt ->
     Gas.consume ctxt (Unparse_costs.prim_cost 1 [])
     >>? fun ctxt ->
