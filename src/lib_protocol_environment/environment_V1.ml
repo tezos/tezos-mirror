@@ -1049,8 +1049,6 @@ struct
     let register_resolver = Base58.register_resolver
 
     let complete ctxt s = Base58.complete ctxt s
-
-    let del = remove_rec
   end
 
   module Lift (P : Updater.PROTOCOL) = struct

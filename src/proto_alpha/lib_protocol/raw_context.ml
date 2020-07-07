@@ -474,7 +474,7 @@ let get_proto_param ctxt =
     | None ->
         fail (Failed_to_parse_parameter bytes)
     | Some json -> (
-        Context.del ctxt protocol_param_key
+        Context.remove_rec ctxt protocol_param_key
         >|= fun ctxt ->
         match Data_encoding.Json.destruct Parameters_repr.encoding json with
         | exception (Data_encoding.Json.Cannot_destruct _ as exn) ->
@@ -722,11 +722,12 @@ let delete ctxt k =
   | false ->
       Lwt.return @@ storage_error (Missing_key (k, Del))
   | true ->
-      Context.del ctxt.context k >|= fun context -> ok {ctxt with context}
+      Context.remove_rec ctxt.context k
+      >|= fun context -> ok {ctxt with context}
 
 (* Do not verify before deleting *)
 let remove ctxt k =
-  Context.del ctxt.context k >|= fun context -> {ctxt with context}
+  Context.remove_rec ctxt.context k >|= fun context -> {ctxt with context}
 
 let set_option ctxt k = function
   | None ->
