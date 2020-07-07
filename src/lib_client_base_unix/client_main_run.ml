@@ -129,8 +129,7 @@ let setup_remote_signer (module C : M) client_config
     | None ->
         () )
 
-let setup_default_proxy_client_config parsed_args base_dir rpc_config
-    default_or_proxy =
+let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
   (* Make sure that base_dir is not a mockup. *)
   Tezos_mockup.Persistence.classify_base_dir base_dir
   >>=? (function
@@ -156,38 +155,39 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config
           p.Client_config.password_filename,
           p.Client_config.protocol )
   in
-  if default_or_proxy then
-    return
-    @@ new unix_full
-         ~chain
-         ~block
-         ~confirmations
-         ~password_filename
-         ~base_dir
-         ~rpc_config
-  else
-    let printer = new unix_logger ~base_dir in
-    let rpc_context =
-      new Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
-        rpc_config
-        Media_type.all_media_types
-    in
-    Tezos_proxy.Registration.get_registered_proxy
-      printer
-      rpc_context
-      protocol
-      chain
-      block
-    >>=? fun proxy_env ->
-    return
-    @@ new unix_proxy
-         ~chain
-         ~block
-         ~confirmations
-         ~password_filename
-         ~base_dir
-         ~rpc_config
-         ~proxy_env
+  match mode with
+  | `Mode_client ->
+      return
+      @@ new unix_full
+           ~chain
+           ~block
+           ~confirmations
+           ~password_filename
+           ~base_dir
+           ~rpc_config
+  | `Mode_proxy ->
+      let printer = new unix_logger ~base_dir in
+      let rpc_context =
+        new Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
+          rpc_config
+          Media_type.all_media_types
+      in
+      Tezos_proxy.Registration.get_registered_proxy
+        printer
+        rpc_context
+        protocol
+        chain
+        block
+      >>=? fun proxy_env ->
+      return
+      @@ new unix_proxy
+           ~chain
+           ~block
+           ~confirmations
+           ~password_filename
+           ~base_dir
+           ~rpc_config
+           ~proxy_env
 
 let setup_mockup_rpc_client_config
     (cctxt : Tezos_client_base.Client_context.full)
@@ -228,15 +228,15 @@ let setup_client_config (cctxt : Tezos_client_base.Client_context.full)
   in
   match parsed_args with
   | None ->
-      client_or_proxy_fun true
+      client_or_proxy_fun `Mode_client
   | Some args -> (
     match args.Client_config.client_mode with
-    | Client_config.Mode_client ->
-        client_or_proxy_fun true
-    | Client_config.Mode_mockup ->
+    | `Mode_client ->
+        client_or_proxy_fun `Mode_client
+    | `Mode_mockup ->
         setup_mockup_rpc_client_config cctxt args base_dir
-    | Client_config.Mode_proxy ->
-        client_or_proxy_fun false )
+    | `Mode_proxy ->
+        client_or_proxy_fun `Mode_proxy )
 
 (* Main (lwt) entry *)
 let main (module C : M) ~select_commands =

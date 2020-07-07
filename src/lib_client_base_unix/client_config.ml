@@ -37,16 +37,16 @@ type cli_args = {
   client_mode : client_mode;
 }
 
-and client_mode = Mode_client | Mode_mockup | Mode_proxy
+and client_mode = [`Mode_client | `Mode_mockup | `Mode_proxy]
 
-let all_modes = [Mode_client; Mode_mockup; Mode_proxy]
+let all_modes = [`Mode_client; `Mode_mockup; `Mode_proxy]
 
 let client_mode_to_string = function
-  | Mode_client ->
+  | `Mode_client ->
       "client"
-  | Mode_mockup ->
+  | `Mode_mockup ->
       "mockup"
-  | Mode_proxy ->
+  | `Mode_proxy ->
       "proxy"
 
 type error += Invalid_endpoint_arg of string
@@ -293,7 +293,7 @@ let default_cli_args =
     protocol = None;
     print_timings = false;
     log_requests = false;
-    client_mode = Mode_client;
+    client_mode = `Mode_client;
   }
 
 open Clic
@@ -508,7 +508,7 @@ let client_mode_arg () =
     ~long:"mode"
     ~placeholder:(String.concat "|" mode_strings)
     ~doc:"how to interact with the node"
-    ~default:(client_mode_to_string Mode_client)
+    ~default:(client_mode_to_string `Mode_client)
     (parameter
        ~autocomplete:(fun _ -> return mode_strings)
        (fun _ param -> parse_client_mode param))
@@ -671,9 +671,9 @@ let commands config_file cfg (client_mode : client_mode)
       (fixed ["config"; "show"])
       (fun () (cctxt : #Client_context.full) ->
         match client_mode with
-        | Mode_client | Mode_proxy ->
+        | `Mode_client | `Mode_proxy ->
             config_show_client cctxt config_file cfg
-        | Mode_mockup ->
+        | `Mode_mockup ->
             config_show_mockup cctxt protocol_hash_opt base_dir);
     command
       ~group
@@ -730,9 +730,9 @@ let commands config_file cfg (client_mode : client_mode)
       (fun (config_file, bootstrap_accounts_file, protocol_constants_file)
            cctxt ->
         match client_mode with
-        | Mode_client | Mode_proxy ->
+        | `Mode_client | `Mode_proxy ->
             config_init_client config_file cfg
-        | Mode_mockup ->
+        | `Mode_mockup ->
             config_init_mockup
               cctxt
               protocol_hash_opt
@@ -789,7 +789,7 @@ let check_base_dir_for_mode (ctx : #Client_context.full) client_mode base_dir =
   classify_base_dir base_dir
   >>=? fun base_dir_class ->
   match client_mode with
-  | Mode_client | Mode_proxy -> (
+  | `Mode_client | `Mode_proxy -> (
     match base_dir_class with
     | Base_dir_is_mockup ->
         failwith
@@ -808,7 +808,7 @@ let check_base_dir_for_mode (ctx : #Client_context.full) client_mode base_dir =
           base_dir_class
     | _ ->
         return_unit )
-  | Mode_mockup -> (
+  | `Mode_mockup -> (
       let warn_might_not_work explain =
         ctx#warning
           "@[<hv>Base directory %s %a@ Some commands (e.g., transfer) might \
@@ -896,19 +896,19 @@ let parse_config_args (ctx : #Client_context.full) argv =
       let base_dir = default_base_dir in
       unless
         (* Mockup mode will create the base directory on need *)
-        (client_mode = Mode_mockup || Sys.file_exists base_dir)
+        (client_mode = `Mode_mockup || Sys.file_exists base_dir)
         (fun () -> Lwt_utils_unix.create_dir base_dir >>= return)
       >>=? fun () -> return base_dir
   | Some dir -> (
     match client_mode with
-    | Mode_client | Mode_proxy ->
+    | `Mode_client | `Mode_proxy ->
         if not (Sys.file_exists dir) then
           failwith
             "Specified --base-dir does not exist. Please create the directory \
              and try again."
         else if Sys.is_directory dir then return dir
         else failwith "Specified --base-dir must be a directory"
-    | Mode_mockup ->
+    | `Mode_mockup ->
         (* In mockup mode base dir may be created automatically. *)
         return dir ) )
   >>=? fun base_dir ->
@@ -1011,8 +1011,9 @@ let parse_config_args (ctx : #Client_context.full) argv =
   if Sys.file_exists config_dir && not (Sys.is_directory config_dir) then (
     Format.eprintf "%s is not a directory.@." config_dir ;
     exit 1 ) ;
-  unless (client_mode = Mode_mockup) (fun () ->
-      Lwt_utils_unix.create_dir config_dir >>= return)
+  unless
+    (client_mode = `Mode_mockup)
+    (fun () -> Lwt_utils_unix.create_dir config_dir >>= return)
   >>=? fun () ->
   let parsed_args =
     {
