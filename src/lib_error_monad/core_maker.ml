@@ -89,6 +89,8 @@ end = struct
 
   let error_kinds : error_kind list ref = ref []
 
+  let has_recursive_error = ref false
+
   let get_registered_errors () : error_info list =
     List.flatten
       (List.map
@@ -353,6 +355,7 @@ end = struct
             from_error
             to_error)
     in
+    has_recursive_error := true ;
     error_kinds :=
       Error_kind
         {
@@ -370,28 +373,50 @@ end = struct
     match !error_encoding_cache with
     | None ->
         let encoding =
-          Data_encoding.mu error_encoding_name
-          @@ fun error_encoding ->
-          let cases =
-            List.map
-              (fun (Error_kind {encoding_case; _}) ->
-                match encoding_case with
-                | Non_recursive case ->
-                    case
-                | Recursive make ->
-                    make error_encoding)
-              !error_kinds
-          in
-          let union_encoding = Data_encoding.union cases in
-          let open Data_encoding in
-          dynamic_size
-          @@ splitted
-               ~json:union_encoding
-               ~binary:
-                 (conv
-                    (Json.construct union_encoding)
-                    (Json.destruct union_encoding)
-                    json)
+          if !has_recursive_error then
+            Data_encoding.mu error_encoding_name
+            @@ fun error_encoding ->
+            let cases =
+              List.map
+                (fun (Error_kind {encoding_case; _}) ->
+                  match encoding_case with
+                  | Non_recursive case ->
+                      case
+                  | Recursive make ->
+                      make error_encoding)
+                !error_kinds
+            in
+            let union_encoding = Data_encoding.union cases in
+            let open Data_encoding in
+            dynamic_size
+            @@ splitted
+                 ~json:union_encoding
+                 ~binary:
+                   (conv
+                      (Json.construct union_encoding)
+                      (Json.destruct union_encoding)
+                      json)
+          else
+            let cases =
+              List.map
+                (fun (Error_kind {encoding_case; _}) ->
+                  match encoding_case with
+                  | Non_recursive case ->
+                      case
+                  | Recursive _ ->
+                      assert false)
+                !error_kinds
+            in
+            let union_encoding = Data_encoding.union cases in
+            let open Data_encoding in
+            dynamic_size
+            @@ splitted
+                 ~json:union_encoding
+                 ~binary:
+                   (conv
+                      (Json.construct union_encoding)
+                      (Json.destruct union_encoding)
+                      json)
         in
         error_encoding_cache := Some encoding ;
         encoding
