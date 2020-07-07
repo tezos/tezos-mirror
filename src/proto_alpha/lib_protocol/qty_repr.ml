@@ -25,6 +25,8 @@
 
 module type QTY = sig
   val id : string
+
+  val name : string
 end
 
 module type S = sig
@@ -240,7 +242,9 @@ module Make (T : QTY) : S = struct
 
   let encoding =
     let open Data_encoding in
-    check_size 10 (conv Z.of_int64 (Json.wrap_error Z.to_int64) n)
+    Data_encoding.def
+      T.name
+      (check_size 10 (conv Z.of_int64 (Json.wrap_error Z.to_int64) n))
 
   let () =
     let open Data_encoding in
