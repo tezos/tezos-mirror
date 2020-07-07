@@ -15,7 +15,6 @@
             tezos-error-monad
             tezos-rpc
             tezos-stdlib
-            uecc
             ringo
             zarith))
 

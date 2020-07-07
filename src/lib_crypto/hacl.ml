@@ -410,3 +410,128 @@ module Sign = struct
 
   let verify ~pk:(Pk pk) ~msg ~signature = Hacl.Ed25519.verify pk msg signature
 end
+
+module ECDSA = struct
+  let sk_size = 32
+
+  let pk_size = 64
+
+  let compressed_size = (pk_size / 2) + 1
+
+  let uncompressed_size = pk_size + 1
+
+  let signature_size = 64
+
+  let pk_of_sk sk pk = Hacl.P256.dh_initiator pk sk
+
+  let valid_pk pk = Hacl.P256.valid_pk pk
+
+  (* Generate a random sk_size buffer until it is valid to be used as
+   * secret key, i.e. non-zero and smaller than the prime order.
+   * This is also used to generate signing secrets. *)
+  let rec get_valid_sk () =
+    let sk = Rand.gen sk_size in
+    if Hacl.P256.valid_sk sk then sk else get_valid_sk ()
+
+  let compressed_from_raw pk cpk = Hacl.P256.compress_c pk cpk
+
+  let uncompressed_from_raw pk cpk = Hacl.P256.compress_n pk cpk
+
+  let raw_from_compressed buf pk =
+    if not (Hacl.P256.decompress_c buf pk) then
+      failwith "P256.raw_from_compressed: failure"
+
+  let raw_from_uncompressed buf pk =
+    if not (Hacl.P256.decompress_n buf pk) then
+      failwith "P256.raw_from_uncompressed failure"
+
+  type _ key = Sk : Bytes.t -> secret key | Pk : Bytes.t -> public key
+
+  let equal : type a. a key -> a key -> bool =
+   fun k1 k2 ->
+    match (k1, k2) with
+    | (Sk sk, Sk sk2) ->
+        Bytes.equal sk sk2
+    | (Pk pk, Pk pk2) ->
+        Bytes.equal pk pk2
+
+  let neuterize : type a. a key -> public key = function
+    | Pk pk ->
+        Pk pk
+    | Sk sk ->
+        let pk = Bytes.create pk_size in
+        let pk_computed_ok = pk_of_sk sk pk in
+        let pk_is_valid = valid_pk pk in
+        if (not pk_computed_ok) && pk_is_valid then
+          invalid_arg "Uecc.neuterize" ;
+        Pk pk
+
+  let pk_of_bytes : Bytes.t -> public key option =
+   fun buf ->
+    let pk = Bytes.create pk_size in
+    match Bytes.length buf with
+    | len when len = compressed_size ->
+        raw_from_compressed buf pk ;
+        if valid_pk pk then Some (Pk pk) else None
+    | len when len = uncompressed_size ->
+        raw_from_uncompressed buf pk ;
+        if valid_pk pk then Some (Pk pk) else None
+    | _ ->
+        None
+
+  let sk_of_bytes : Bytes.t -> (secret key * public key) option =
+   fun buf ->
+    if not (Bytes.length buf = sk_size && Hacl.P256.valid_sk buf) then None
+    else
+      let sk = Sk (Bytes.copy buf) in
+      try
+        let pk = neuterize sk in
+        Some (sk, pk)
+      with _ -> None
+
+  let to_bytes : type a. ?compress:bool -> a key -> Bytes.t =
+   fun ?compress:(comp = true) -> function
+    | Sk sk ->
+        Bytes.copy sk
+    | Pk pk ->
+        if comp then (
+          let buf = Bytes.create compressed_size in
+          compressed_from_raw pk buf ; buf )
+        else
+          let buf = Bytes.create uncompressed_size in
+          uncompressed_from_raw pk buf ;
+          assert (Bytes.sub buf 1 pk_size = pk) ;
+          buf
+
+  let write_key : type a. ?compress:bool -> Bytes.t -> a key -> int =
+   fun ?compress:(comp = true) buf -> function
+    | Sk sk ->
+        let len = Bytes.length sk in
+        Bytes.blit sk 0 buf 0 len ; len
+    | Pk pk ->
+        if comp then (compressed_from_raw pk buf ; compressed_size)
+        else (
+          uncompressed_from_raw pk buf ;
+          uncompressed_size )
+
+  let keypair () : (secret key * public key) option =
+    let pk = Bytes.create pk_size in
+    let sk = get_valid_sk () in
+    if Hacl.P256.dh_initiator pk sk then Some (Sk sk, Pk pk) else None
+
+  let write_sign (Sk sk) buf ~msg =
+    assert (Bytes.length buf = signature_size) ;
+    (* A random non-zero signing secret k is generated which, similar to
+     * secret keys, needs to be non-zero and smaller than the prime order. *)
+    let k = get_valid_sk () in
+    let res = Hacl.P256.sign sk msg k buf in
+    Bytes.fill k 0 32 '\x00' ; res
+
+  let sign (Sk sk) ~msg =
+    let signature = Bytes.create 64 in
+    if write_sign (Sk sk) signature ~msg then Some signature else None
+
+  let verify (Pk pk) ~msg ~signature =
+    if Bytes.length signature <> signature_size then false
+    else Hacl.P256.verify pk msg signature
+end

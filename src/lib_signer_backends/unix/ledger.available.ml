@@ -196,7 +196,7 @@ module Ledger_commands = struct
           Signature.Public_key.encoding
           (Bigstring.to_bytes buf)
     | Secp256r1 -> (
-        let open Uecc in
+        let open Hacl.ECDSA in
         let pklen = compressed_size in
         let buf = Bytes.create (pklen + 1) in
         match pk_of_bytes (Cstruct.to_bytes pk) with

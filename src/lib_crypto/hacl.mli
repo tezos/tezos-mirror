@@ -262,3 +262,38 @@ module Sign : sig
       returns true if successful *)
   val verify : pk:public key -> msg:Bytes.t -> signature:Bytes.t -> bool
 end
+
+(* TODO: rewrite docs *)
+module ECDSA : sig
+  type _ key
+
+  val sk_size : int
+
+  val pk_size : int
+
+  val compressed_size : int
+
+  val uncompressed_size : int
+
+  val signature_size : int
+
+  val equal : 'a key -> 'a key -> bool
+
+  val neuterize : 'a key -> public key
+
+  val sk_of_bytes : Bytes.t -> (secret key * public key) option
+
+  val pk_of_bytes : Bytes.t -> public key option
+
+  val to_bytes : ?compress:bool -> _ key -> Bytes.t
+
+  val write_key : ?compress:bool -> Bytes.t -> _ key -> int
+
+  val keypair : unit -> (secret key * public key) option
+
+  val write_sign : secret key -> Bytes.t -> msg:Bytes.t -> bool
+
+  val sign : secret key -> msg:Bytes.t -> Bytes.t option
+
+  val verify : public key -> msg:Bytes.t -> signature:Bytes.t -> bool
+end

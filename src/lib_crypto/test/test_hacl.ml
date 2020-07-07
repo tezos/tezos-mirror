@@ -264,10 +264,139 @@ let public () =
   Alcotest.check check_bytes "public" pk' ppk ;
   Alcotest.check check_bytes "public" pk' psk
 
-let sign =
+let ed25519 =
   [ ("keypair", `Quick, keypair);
     ("sign", `Quick, sign);
     ("public", `Quick, public) ]
+
+open ECDSA
+
+let nb_iterations = 10
+
+let checki = Alcotest.check Alcotest.int
+
+let test_export_p256 compress =
+  let pk_size = if compress then compressed_size else uncompressed_size in
+  match keypair () with
+  | None ->
+      assert false
+  | Some (sk, pk) -> (
+      let sk_bytes = to_bytes ~compress sk in
+      let pk_bytes = to_bytes ~compress pk in
+      checki __LOC__ sk_size (Bytes.length sk_bytes) ;
+      checki __LOC__ pk_size (Bytes.length pk_bytes) ;
+      match (sk_of_bytes sk_bytes, pk_of_bytes pk_bytes) with
+      | (Some (sk', pk'), Some pk'') ->
+          assert (equal sk sk') ;
+          assert (equal pk pk') ;
+          assert (equal pk pk'') ;
+          assert (equal pk' pk')
+      | _ ->
+          assert false )
+
+let test_export_p256 () =
+  for _i = 0 to nb_iterations - 1 do
+    test_export_p256 true ; test_export_p256 false
+  done
+
+let test_write_key_p256 compress =
+  let pk_size = if compress then compressed_size else uncompressed_size in
+  match keypair () with
+  | None ->
+      assert false
+  | Some (sk, pk) ->
+      let sk_bytes = to_bytes ~compress sk in
+      let pk_bytes = to_bytes ~compress pk in
+      let sk_buf = Bytes.create sk_size in
+      let pk_buf = Bytes.create pk_size in
+      let sk_buf_len = write_key ~compress sk_buf sk in
+      let pk_buf_len = write_key ~compress pk_buf pk in
+      assert (Bytes.equal sk_bytes sk_buf) ;
+      assert (Bytes.equal pk_bytes pk_buf) ;
+      assert (sk_buf_len = sk_size) ;
+      assert (pk_buf_len = pk_size)
+
+let test_write_key_p256 () =
+  for _i = 0 to nb_iterations - 1 do
+    test_write_key_p256 true ; test_write_key_p256 false
+  done
+
+let test_keypair_p256 () =
+  match keypair () with
+  | None ->
+      assert false
+  | Some (sk, pk) ->
+      let pk' = neuterize sk in
+      assert (equal pk pk')
+
+let test_keypair_p256 () =
+  for _i = 0 to nb_iterations - 1 do
+    test_keypair_p256 ()
+  done
+
+let test_sign_p256 () =
+  match keypair () with
+  | None ->
+      assert false
+  | Some (sk, pk) -> (
+      let signature = Bytes.create pk_size in
+      if write_sign sk signature ~msg then assert (verify pk ~msg ~signature)
+      else assert false ;
+      match sign sk ~msg with
+      | None ->
+          assert false
+      | Some signature ->
+          assert (verify pk ~msg ~signature) )
+
+let test_sign_p256 () =
+  for _i = 0 to nb_iterations - 1 do
+    test_sign_p256 ()
+  done
+
+let test_vectors_p256 () =
+  let msgs = List.map of_hex Vectors_p256.msgs in
+  let keys =
+    List.map
+      (fun (sk, pk) ->
+        match (sk_of_bytes (of_hex sk), pk_of_bytes (of_hex pk)) with
+        | (Some (sk, pk), Some pk') when pk = pk' ->
+            (sk, pk)
+        | _ ->
+            failwith "invalid key")
+      Vectors_p256.keys
+  in
+  let expected_sigs =
+    List.map
+      (fun block ->
+        List.map
+          (fun (r, s) ->
+            let r = of_hex r in
+            let s = of_hex s in
+            Bytes.cat r s)
+          block)
+      Vectors_p256.sigs
+  in
+  List.iter2
+    (fun (sk, pk) sigs ->
+      List.iter2
+        (fun msg s ->
+          assert (verify pk ~msg ~signature:s) ;
+          match sign sk ~msg with
+          | Some signature ->
+              assert (verify pk ~msg ~signature)
+          | None ->
+              assert false)
+        msgs
+        sigs)
+    keys
+    expected_sigs
+
+let p256 =
+  [ ("export", `Quick, test_export_p256);
+    ("write_key", `Quick, test_write_key_p256);
+    ("keypair", `Quick, test_keypair_p256);
+    ("sign", `Quick, test_sign_p256);
+    ("test_vectors", `Quick, test_vectors_p256) ]
 
 let () =
   Alcotest.run
@@ -276,4 +405,5 @@ let () =
       ("blake2b", blake2b_tests);
       ("secretbox", secretbox);
       ("box", box);
-      ("sign", sign) ]
+      ("ed25519", ed25519);
+      ("p256", p256) ]

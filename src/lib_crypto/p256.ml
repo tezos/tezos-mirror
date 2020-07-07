@@ -43,10 +43,10 @@ end
 
 let () = Base58.check_encoded_prefix Public_key_hash.b58check_encoding "tz3" 36
 
-open Uecc
+open Hacl.ECDSA
 
 module Public_key = struct
-  type t = public key
+  type t = Hacl.public key
 
   let name = "P256.Public_key"
 
@@ -128,7 +128,7 @@ module Public_key = struct
 end
 
 module Secret_key = struct
-  type t = secret key
+  type t = Hacl.secret key
 
   let name = "P256.Secret_key"
 
@@ -290,7 +290,7 @@ let sign ?watermark sk msg =
     Blake2B.to_bytes @@ Blake2B.hash_bytes
     @@ match watermark with None -> [msg] | Some prefix -> [prefix; msg]
   in
-  match sign sk msg with
+  match sign sk ~msg with
   | None ->
       (* Will never happen in practice. This can only happen in case
          of RNG error. *)
