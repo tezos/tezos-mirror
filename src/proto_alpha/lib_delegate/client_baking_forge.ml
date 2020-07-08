@@ -729,7 +729,7 @@ let filter_and_apply_operations cctxt state ~chain ~block block_info ~priority
 
 (* Build the block header : mimics node prevalidation *)
 let finalize_block_header shell_header ~timestamp validation_result operations
-    predecessor_ops_metadata_hash =
+    predecessor_block_metadata_hash predecessor_ops_metadata_hash =
   let {Tezos_protocol_environment.context; fitness; message; _} =
     validation_result
   in
@@ -754,6 +754,14 @@ let finalize_block_header shell_header ~timestamp validation_result operations
         | Forking _ ->
             fail Forking_test_chain)
   >>=? fun context ->
+  ( match predecessor_block_metadata_hash with
+  | Some predecessor_block_metadata_hash ->
+      Context.set_predecessor_block_metadata_hash
+        context
+        predecessor_block_metadata_hash
+  | None ->
+      Lwt.return context )
+  >>= fun context ->
   ( match predecessor_ops_metadata_hash with
   | Some predecessor_ops_metadata_hash ->
       Context.set_predecessor_ops_metadata_hash
@@ -893,6 +901,8 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
       Context.get_protocol context
       >>= fun next_protocol ->
       if Protocol_hash.equal current_protocol next_protocol then
+        Alpha_block_services.metadata_hash cctxt ~chain ~block ()
+        >>=? fun predecessor_block_metadata_hash ->
         Alpha_block_services.Operation_metadata_hashes.root
           cctxt
           ~chain
@@ -904,6 +914,7 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
           ~timestamp:min_valid_timestamp
           validation_result
           operations
+          predecessor_block_metadata_hash
           predecessor_ops_metadata_hash
         >>= function
         | Error (Forking_test_chain :: _) ->
@@ -1267,6 +1278,8 @@ let build_block cctxt ~user_activated_upgrades state seed_nonce_hash
             Context.get_protocol context
             >>= fun next_protocol ->
             if Protocol_hash.equal current_protocol next_protocol then
+              Alpha_block_services.metadata_hash cctxt ~chain ~block ()
+              >>=? fun predecessor_block_metadata_hash ->
               Alpha_block_services.Operation_metadata_hashes.root
                 cctxt
                 ~chain
@@ -1278,6 +1291,7 @@ let build_block cctxt ~user_activated_upgrades state seed_nonce_hash
                 ~timestamp:valid_timestamp
                 validation_result
                 operations
+                predecessor_block_metadata_hash
                 predecessor_ops_metadata_hash
               >>= function
               | Error (Forking_test_chain :: _) ->
