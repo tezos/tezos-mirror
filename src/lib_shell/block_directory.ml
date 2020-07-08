@@ -165,6 +165,8 @@ let build_raw_rpc_directory ~user_activated_upgrades
       }
   in
   register0 S.metadata (fun block () () -> block_metadata block) ;
+  register0 S.metadata_hash (fun block () () ->
+      State.Block.metadata_hash block >|= ok) ;
   (* operations *)
   let convert_with_metadata chain_id (op : Operation.t) metadata :
       Block_services.operation =
