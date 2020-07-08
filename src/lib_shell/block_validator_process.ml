@@ -179,13 +179,21 @@ module External_validator_process = struct
       let process =
         Lwt_process.open_process_none (vp.process_path, [|"tezos-validator"|])
       in
+      let socket_path = External_validation.socket_path ~pid:process#pid in
       External_validation.create_socket_listen
         ~canceler
         ~max_requests:1
-        ~pid:process#pid
+        ~socket_path
       >>= fun process_socket ->
       Lwt_unix.accept process_socket
       >>= fun (process_socket, _) ->
+      (* As the external validation process is now started, we can
+      unlink the named socket. Indeed, the file descriptor will remain
+      valid until at least one process keep it open. This method
+      mimics an anonymous file descriptor without relying on Linux
+      specific features. *)
+      Lwt_unix.unlink socket_path
+      >>= fun () ->
       let process_stdin = Lwt_io.of_fd ~mode:Output process_socket in
       let process_stdout = Lwt_io.of_fd ~mode:Input process_socket in
       lwt_emit (Validator_started process#pid)

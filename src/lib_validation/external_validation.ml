@@ -228,6 +228,12 @@ let recv pout encoding =
   Lwt_io.read_into_exactly pout buf 0 count
   >>= fun () -> Lwt.return (Data_encoding.Binary.of_bytes_exn encoding buf)
 
+let socket_path ~pid = Format.sprintf "/tmp/tezos-validation-socket-%d" pid
+
+(* To get optimized socket communication of processes on the same
+   machine, we use Unix domain sockets: ADDR_UNIX. *)
+let make_socket socket_path = Unix.ADDR_UNIX socket_path
+
 let create_socket ~canceler =
   Lwt.catch
     (fun () ->
@@ -240,24 +246,16 @@ let create_socket ~canceler =
       Format.printf "Error creating a socket" ;
       Lwt.fail exn)
 
-(* To get optimized socket communication of processes on the same
-   machine, we use Unix domain sockets: ADDR_UNIX. To avoid using a
-   concrete file to communicate through, we use \000<name> which aims
-   to point toward an anonymous file descriptor. *)
-let anonymous_socket pid =
-  let handle = Format.sprintf "\000tezos-validation-channel-%d" pid in
-  Unix.ADDR_UNIX handle
-
-let create_socket_listen ~canceler ~max_requests ~pid =
+let create_socket_listen ~canceler ~max_requests ~socket_path =
   create_socket ~canceler
   >>= fun socket ->
-  Lwt_unix.bind socket (anonymous_socket pid)
+  Lwt_unix.bind socket (make_socket socket_path)
   >>= fun () ->
   Lwt_unix.listen socket max_requests ;
   Lwt.return socket
 
-let create_socket_connect ~canceler ~pid =
+let create_socket_connect ~canceler ~socket_path =
   create_socket ~canceler
   >>= fun socket ->
-  Lwt_unix.connect socket (anonymous_socket pid)
+  Lwt_unix.connect socket (make_socket socket_path)
   >>= fun () -> Lwt.return socket

@@ -360,8 +360,9 @@ let main () =
   Internal_event_unix.init ()
   >>= fun () ->
   let pid = Unix.getpid () in
+  let socket_path = External_validation.socket_path ~pid in
   let canceler = Lwt_canceler.create () in
-  External_validation.create_socket_connect ~canceler ~pid
+  External_validation.create_socket_connect ~canceler ~socket_path
   >>= fun socket_process ->
   let socket_in = Lwt_io.of_fd ~mode:Input socket_process in
   let socket_out = Lwt_io.of_fd ~mode:Output socket_process in
