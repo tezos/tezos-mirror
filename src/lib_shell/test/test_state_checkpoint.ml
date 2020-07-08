@@ -155,6 +155,10 @@ let build_valid_chain state vtbl pred names =
              }
              : Tezos_validation.Block_validation.validation_store )
          in
+         let block_metadata = zero in
+         let block_metadata_hash =
+           Option.some @@ Block_metadata_hash.hash_bytes [block_metadata]
+         in
          let operations_metadata = [[zero]] in
          let operations_metadata_hashes =
            Some [[Operation_metadata_hash.hash_bytes [zero]]]
@@ -162,9 +166,10 @@ let build_valid_chain state vtbl pred names =
          State.Block.store
            state
            block
-           zero
+           block_metadata
            [[op]]
            operations_metadata
+           block_metadata_hash
            operations_metadata_hashes
            validation_store
            ~forking_testchain:false
