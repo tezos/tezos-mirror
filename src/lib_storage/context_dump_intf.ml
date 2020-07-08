@@ -161,6 +161,7 @@ module type S = sig
     index ->
     block_header
     * block_data
+    * Block_metadata_hash.t option
     * Operation_metadata_hash.t list list option
     * History_mode.t
     * (block_header ->
@@ -178,6 +179,7 @@ module type S = sig
     unit tzresult Lwt.t) ->
     ( block_header
     * block_data
+    * Block_metadata_hash.t option
     * Operation_metadata_hash.t list list option
     * History_mode.t
     * Block_header.t option

@@ -39,6 +39,7 @@ type request =
       chain_id : Chain_id.t;
       block_header : Block_header.t;
       predecessor_block_header : Block_header.t;
+      predecessor_block_metadata_hash : Block_metadata_hash.t option;
       predecessor_ops_metadata_hash :
         Operation_metadata_list_list_hash.t option;
       operations : Operation.t list list;

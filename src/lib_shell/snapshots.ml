@@ -545,6 +545,9 @@ let export ?(export_rolling = false) ~context_root ~store_root ~genesis
                 Store.Block.Operations.read (block_store, block_hash) i)
               (0 -- (validations_passes - 1))
             >>=? fun operations ->
+            Store.Block.Block_metadata_hash.read_opt
+              (block_store, pred_block_hash)
+            >>= fun predecessor_block_metadata_hash ->
             ( if pred_block_header.shell.validation_passes = 0 then return_none
             else
               Store.Block.Operations_metadata_hashes.known
@@ -560,7 +563,7 @@ let export ?(export_rolling = false) ~context_root ~store_root ~genesis
                         (block_store, pred_block_hash)
                         i)
                     (0 -- (pred_block_header.shell.validation_passes - 1))
-                  >|=? fun hashes -> Some hashes )
+                  >|=? Option.some )
             >>=? fun predecessor_ops_metadata_hashes ->
             compute_export_limit
               block_store
@@ -575,6 +578,7 @@ let export ?(export_rolling = false) ~context_root ~store_root ~genesis
             return
               ( pred_block_header,
                 block_data,
+                predecessor_block_metadata_hash,
                 predecessor_ops_metadata_hashes,
                 export_mode,
                 iterator ))
@@ -643,6 +647,7 @@ let store_new_head chain_state chain_data ~genesis block_header operations
   let ({ validation_store;
          block_metadata;
          ops_metadata;
+         block_metadata_hash;
          ops_metadata_hashes;
          forking_testchain }
         : Tezos_validation.Block_validation.result) =
@@ -654,6 +659,7 @@ let store_new_head chain_state chain_data ~genesis block_header operations
     block_metadata
     operations
     ops_metadata
+    block_metadata_hash
     ops_metadata_hashes
     ~forking_testchain
     validation_store
@@ -726,6 +732,9 @@ let import_protocol_data index store block_hash_arr level_oldest_block
   let data_hash = protocol_data.data_key in
   let parents = protocol_data.parents in
   let protocol_hash = protocol_data.protocol_hash in
+  let predecessor_block_metadata_hash =
+    protocol_data.predecessor_block_metadata_hash
+  in
   let predecessor_ops_metadata_hash =
     protocol_data.predecessor_ops_metadata_hash
   in
@@ -739,6 +748,7 @@ let import_protocol_data index store block_hash_arr level_oldest_block
     ~expected_context_hash
     ~test_chain
     ~protocol_hash
+    ~predecessor_block_metadata_hash
     ~predecessor_ops_metadata_hash
     ~index
   >>= function
@@ -822,6 +832,9 @@ let reconstruct_storage store context_index chain_id ~user_activated_upgrades
             let predecessor_block_hash = block_header.shell.predecessor in
             State.Block.Header.read (block_store, predecessor_block_hash)
             >>=? fun predecessor_block_header ->
+            Store.Block.Block_metadata_hash.read_opt
+              (block_store, predecessor_block_hash)
+            >>= fun predecessor_block_metadata_hash ->
             ( if predecessor_block_header.shell.validation_passes = 0 then
               return_none
             else
@@ -856,6 +869,7 @@ let reconstruct_storage store context_index chain_id ~user_activated_upgrades
                 Block_validation.max_operations_ttl;
                 chain_id;
                 predecessor_block_header;
+                predecessor_block_metadata_hash;
                 predecessor_ops_metadata_hash;
                 predecessor_context;
                 user_activated_upgrades;
@@ -870,6 +884,7 @@ let reconstruct_storage store context_index chain_id ~user_activated_upgrades
             >>=? fun () ->
             let { Tezos_validation.Block_validation.validation_store;
                   block_metadata;
+                  block_metadata_hash;
                   ops_metadata;
                   ops_metadata_hashes;
                   _ } =
@@ -906,6 +921,12 @@ let reconstruct_storage store context_index chain_id ~user_activated_upgrades
             Lwt_list.iteri_p
               (fun i ops -> Store.Block.Operations_metadata.store st i ops)
               ops_metadata
+            >>= fun () ->
+            ( match block_metadata_hash with
+            | Some block_metadata_hash ->
+                Store.Block.Block_metadata_hash.store st block_metadata_hash
+            | None ->
+                Lwt.return_unit )
             >>= fun () ->
             ( match ops_metadata_hashes with
             | Some ops_metadata_hashes ->
@@ -1050,6 +1071,7 @@ let import ?(reconstruct = false) ?patch_context ~data_dir
         block_validation
       >>=? fun ( predecessor_block_header,
                  meta,
+                 predecessor_block_metadata_hash,
                  predecessor_ops_metadata_hashes,
                  history_mode,
                  oldest_header_opt,
@@ -1143,6 +1165,7 @@ let import ?(reconstruct = false) ?patch_context ~data_dir
           Block_validation.max_operations_ttl;
           chain_id;
           predecessor_block_header;
+          predecessor_block_metadata_hash;
           predecessor_ops_metadata_hash;
           predecessor_context;
           user_activated_upgrades;

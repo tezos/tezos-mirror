@@ -53,6 +53,8 @@ type error += Block_not_invalid of Block_hash.t
 
 type error += Inconsistent_hash of Context_hash.t * Context_hash.t
 
+type error += Missing_block_metadata_hash of Block_hash.t
+
 type error += Missing_operation_metadata_hashes of Block_hash.t
 
 (******************* Bootstrap pipeline errors ****************************)

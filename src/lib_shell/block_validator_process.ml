@@ -113,6 +113,8 @@ module Internal_validator_process = struct
           | Some ctx ->
               return ctx)
     >>=? fun predecessor_context ->
+    State.Block.metadata_hash predecessor
+    >>= fun predecessor_block_metadata_hash ->
     State.Block.all_operations_metadata_hash predecessor
     >>= fun predecessor_ops_metadata_hash ->
     return
@@ -120,6 +122,7 @@ module Internal_validator_process = struct
         Block_validation.max_operations_ttl;
         chain_id;
         predecessor_block_header;
+        predecessor_block_metadata_hash;
         predecessor_ops_metadata_hash;
         predecessor_context;
         user_activated_upgrades;
@@ -351,6 +354,8 @@ module External_validator_process = struct
     let chain_state = State.Block.chain_state predecessor in
     let predecessor_block_header = State.Block.header predecessor in
     let chain_id = State.Chain.id chain_state in
+    State.Block.metadata_hash predecessor
+    >>= fun predecessor_block_metadata_hash ->
     State.Block.all_operations_metadata_hash predecessor
     >>= fun predecessor_ops_metadata_hash ->
     let request =
@@ -359,6 +364,7 @@ module External_validator_process = struct
           chain_id;
           block_header;
           predecessor_block_header;
+          predecessor_block_metadata_hash;
           predecessor_ops_metadata_hash;
           operations;
           max_operations_ttl;

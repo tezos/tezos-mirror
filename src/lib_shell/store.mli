@@ -153,6 +153,13 @@ module Block : sig
       with type t = store * Block_hash.t
        and type value := pruned_contents
 
+  (* The hash of block header metadata, only set on blocks starting from
+     environment V1. *)
+  module Block_metadata_hash :
+    SINGLE_STORE
+      with type t = store * Block_hash.t
+       and type value := Block_metadata_hash.t
+
   module Operation_hashes :
     MAP_STORE
       with type t = store * Block_hash.t
