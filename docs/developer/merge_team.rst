@@ -41,7 +41,7 @@ reviewer to work on the MR.
 
     - Refer to the :ref:`testing guide <testing>` for more information.
 
-    - Bug fixes should include a test that exposes that the bug
+    - Bug fixes should include a test that demonstrates that the bug has been fixed
       (i.e. that fails before the supplied fix).
 
     - The :ref:`test coverage <measuring-test-coverage>` can be used to
