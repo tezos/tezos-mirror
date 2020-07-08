@@ -501,6 +501,15 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         ~output:block_metadata_encoding
         RPC_path.(path / "metadata")
 
+    let metadata_hash =
+      RPC_service.get_service
+        ~description:
+          "Hash of the metadata associated to the block. This is only set on \
+           blocks starting from environment V1."
+        ~query:RPC_query.empty
+        ~output:(option Block_metadata_hash.encoding)
+        RPC_path.(path / "metadata_hash")
+
     let protocols =
       RPC_service.get_service
         ~description:"Current and next protocol."
@@ -964,6 +973,10 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
 
   let metadata ctxt =
     let f = make_call0 S.metadata ctxt in
+    fun ?(chain = `Main) ?(block = `Head 0) () -> f chain block () ()
+
+  let metadata_hash ctxt =
+    let f = make_call0 S.metadata_hash ctxt in
     fun ?(chain = `Main) ?(block = `Head 0) () -> f chain block () ()
 
   let protocols ctxt =
