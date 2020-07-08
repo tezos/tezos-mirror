@@ -355,6 +355,8 @@ module Prefix = struct
 
   let context_hash = "\079\199" (* Co(52) *)
 
+  let block_metadata_hash = "\234\249" (* bm(52) *)
+
   let operation_metadata_hash = "\005\183" (* r(51) *)
 
   let operation_metadata_list_hash = "\134\039" (* Lr(52) *)
