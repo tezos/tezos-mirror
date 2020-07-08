@@ -1,4 +1,21 @@
-.build-test-lint: &build_definition
+stages:
+  - lint
+  - build
+
+lint:
+  stage: lint
+  image: ocaml/opam2:4.09
+  before_script:
+    - sudo apt-get install m4 -y
+    - eval $(opam env)
+    - opam update
+    - opam install ocamlformat.0.10 -y
+  script:
+    - ocamlformat --check benchmark/*.ml*
+    - ocamlformat --check src/*.ml*
+    - ocamlformat --check test/*.ml*
+
+.build-test: &build_definition
   stage: build
   before_script:
     # Always update system package manager + setup OPAM env
@@ -25,20 +42,12 @@
     - opam install alcotest -y
     - cd ${CI_PROJECT_DIR}
     - dune runtest
-    # Lint. Use same version than Tezos
-    - opam install ocamlformat.0.10
-    - ocamlformat --check src/*.ml*
-    - ocamlformat --check test/*.ml*
-    - ocamlformat --check benchmark/*.ml*
     # Benchmark
     - opam install core_bench.v0.12.0
     - dune build benchmark/bench_ec.exe
     - dune build benchmark/bench_ff.exe
     - dune build benchmark/bench_pairing.exe
  
-stages:
-  - build
-
 build-ocaml-4.07-rust-1.34.0:
   <<: *build_definition
   variables:

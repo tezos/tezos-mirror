@@ -115,7 +115,7 @@ struct
     if List.length xs = 0 then failwith "Empty list of points given"
       (* it is fine to use unsafe because we should not have any nnull values,
          otherwise the pairing would be null everywhere *)
-    else unsafe_final_exponentiation (f GT.one xs)
+    else f GT.one xs
 end
 
 module Bls12_381 = Make (G1.Uncompressed) (G2.Uncompressed) (Fq12)
