@@ -24,11 +24,11 @@ developing a new protocol is to revert the migration commits from the previous
 protocol. The rest of the commits are used as a base for current proposals.
 
 The commits in ``proto-proposal`` are mostly confined to the directory
-``proto_alpha``. Any change outside this directory is to adapt the client, the
-daemons or the test frameworks to the new protocol.
+``src/proto_alpha``. Any change outside this directory is to adapt the client,
+the daemons or the test frameworks to the new protocol.
 
 Conversely, the commits in the ``master`` branch should never touch the
-directory ``proto_alpha/lib_protocol``.
+directory ``src/proto_alpha/lib_protocol``.
 
 We next describe how to run unit tests and how to activate the Alpha protocol in
 sandboxed node.
@@ -62,17 +62,20 @@ the shell (see :ref:`sandboxed-mode`)::
 
   $ tezos-client bake for bootstrap1 --minimal-timestamp
 
-The remainder of the tutorial is organised as follows. Section `Test a
-migration`_ provides detailed indications on how to test a migration, and
-Section `Wrap up the migration procedure`_ summarises these indications by
-collecting all the steps needed to test the migration. To conclude, Section
-`Tips and tricks`_ indicates how to use the shell to inspect the context, and
-Section `Anatomy of migration code`_ contains a primer on how to read and write
-migration code.
+The remainder of the tutorial is organised as follows. Section `Manual migration
+testing`_ provides detailed indications on how to test a migration, and Section
+`Wrap up the manual migration procedure`_ summarises this indications by
+collecting all the steps needed to test the migration. Section `Automatic
+migration testing with Tezt`_ describes how to test a migration automatically by
+using a test within the Tezt framework, and Section `Wrap up the automatic
+migration procedure with Tezt`_ collects all the steps needed to automatically
+test the migration. To conclude, Section `Tips and tricks`_ indicates how to use
+the shell to inspect the context, and Section `Anatomy of migration code`_
+contains a primer on how to read and write migration code.
 
 
-Test a migration
-----------------
+Manual migration testing
+------------------------
 
 The most delicate part of migrating to a new protocol is to produce a new
 context from the context of its predecessor. The migration code takes care of
@@ -89,11 +92,15 @@ a node in sandboxed mode, and by activating the predecessor of the Alpha
 protocol on the genesis block. We refer to this procedure as `migration on the
 sandbox`.
 
-In this tutorial we describe a `manual migration procedure` in which the
-developer is in charge of setting up the migration environment and of manually
-baking the blocks that would eventually trigger the migration.
-For convenience, we have automated parts of this manual migration procedure by
-providing scripts that encompass some of its steps.
+This section describes a `manual migration procedure` in which the developer is
+in charge of setting up the migration environment and of manually baking the
+blocks that would eventually trigger the migration. For convenience, we have
+batched parts of this manual migration procedure by providing scripts that
+encompass some of its steps.
+
+We defer to Section `Automatic migration testing with Tezt`_ the description of
+an automatic migration procedure in which the migration is triggered within the
+Tezt framework.
 
 We will illustrate the migration procedure through an example where the version
 of the Alpha protocol to which we migrate is ``007``.
@@ -130,20 +137,21 @@ Prepare the migration
 
 Preparing the migration comprises the following steps:
 
-1. `snapshot` the Alpha protocol,
-2. link the snapshot Alpha protocol in the build system,
+1. `snapshot` the Alpha protocol, if so wished,
+2. link the snapshot Alpha protocol in the build system, if we wished to
+   snapshot the Alpha protocol,
 3. set `user-activated upgrade` that will trigger the migration at a given
    level,
-4. patch the snapshot Alpha protocol to obtain a `yes-node` that can fake baker
-   signatures, if we wish to import the context from Mainnet,
+4. patch the shell to obtain a `yes-node` that can fake baker signatures, if we
+   wish to import the context from Mainnet,
 5. create a `yes-wallet` that stores such fake signatures, if we wish to import
    the context from Mainnet,
-6. compile the snapshot Alpha protocol, and
+6. compile the project, and
 7. import a context from Mainnet, if so wished.
 
 
 Steps 1--7 can be batched by invoking the script
-``./scripts/prepare_migration_test.sh`` in the way we explain
+``scripts/prepare_migration_test.sh`` in the way we explain
 below. Alternatively, each of the steps above can be performed individually by
 invoking the corresponding commands/scripts that we detail in the rest of the
 section.
@@ -154,20 +162,20 @@ the sandbox starts on an empty context, and the sandbox automatically contains
 accounts with implicit credentials that will allow us to bake blocks and make
 the chain progress.
 
-When on a context imported from Mainnet, we will use a `snapshot file` (not to
-be mistaken with the `snapshot` operation of step 1 above) that contains the
-real status of a Mainnet's node at a particular moment in time (see
-:ref:`snapshots`). Such a snapshot file can be downloaded from several sites on
-the internet. For instance, the site
-`TulipTools<https://snapshots.tulip.tools/>`_ stores daily snapshot files from
-both Mainnet and Testnet, in both ``full`` and ``rolling`` mode (see
-:ref:`History modes`). For the purposes of testing the migration, a snapshot
-file in ``rolling`` mode is enough. It is important to use a snapshot file that
-is recent enough as to contain the predecessor of the Alpha protocol. It is also
-important to note down the level at which the snapshot file was taken, which
-determines at which level we want to trigger the migration. The site
-`TulipTools<https://snapshots.tulip.tools/>`_ conveniently indicates the date
-and the level (the `block`) at which each snapshot file was taken.
+When on a context imported from Mainnet, we will use a `snapshot file` (do not
+mistake `snapshot a protocol`, like in step 1 above, with `snapshot a node`,
+which results in a snapshot file like in here) that contains the real status of
+a Mainnet's node at a particular moment in time (see :ref:`snapshots`). Such a
+snapshot file can be downloaded from several sites on the internet. For
+instance, the site `TulipTools<https://snapshots.tulip.tools/>`_ stores daily
+snapshot files from both Mainnet and Testnet, in both ``full`` and ``rolling``
+mode (see :ref:`History modes`). For the purposes of testing the migration, a
+snapshot file in ``rolling`` mode is enough. It is important to use a snapshot
+file that is recent enough as to contain the predecessor of the Alpha
+protocol. It is also important to note down the level at which the snapshot file
+was taken, which determines at which level we want to trigger the migration. The
+site `TulipTools<https://snapshots.tulip.tools/>`_ conveniently indicates the
+date and the level (the `block`) at which each snapshot file was taken.
 
 In our example we will use a snapshot file
 ``~/mainnet_2020-07-14_12 00.rolling`` that was downloaded from
@@ -180,17 +188,17 @@ The next subsections explain each of the individual steps 1--7.
 1. Snapshot the Alpha protocol
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The first step is to convert the Alpha protocol to a format suitable for
-Mainnet, a procedure usually referred to as `snapshot the Alpha protocol`. This
-procedure consists mainly of three steps:
+Snapshoting the Alpha protocol is an optional procedure whose objective is to
+convert the Alpha protocol to a format that could be injected into Mainnet,
+which is done by performing the following three steps:
 
 - specify the version and name of the current protocol in ``raw_context.ml``,
 - compute the protocol's hash in ``TEZOS_PROTOCOL``, and
 - replace names and protocol hashes in various places in the code base.
 
-These three steps are performed by the script ``scripts/snapshot_alpha.sh``,
-which receives a parameter with the name of the Alpha protocol. This name
-parameter follows the convention
+If so wished, these three steps can be performed by the script
+``scripts/snapshot_alpha.sh``, which receives a parameter with the name of the
+Alpha protocol. This name parameter follows the convention
 ``<tag_starting_with_version_letter>_<version_number>``. For historical reasons
 version ``004`` corresponds to letter ``a``. A valid name for the Alpha protocol
 in our example would be ``d_007``, since version ``007`` corresponds to letter
@@ -198,35 +206,32 @@ in our example would be ``d_007``, since version ``007`` corresponds to letter
 
   $ ./scripts/snapshot_alpha.sh d_007
 
-The script creates a new directory ``src/proto_007_<hash>`` where ``<hash>`` is
-a short hash that coincides with the first eight characters of the hash computed
-by the script and written in the file ``TEZOS_PROTOCOL``. The new folder
-contains the Alpha protocol in a format that can be linked in the node and
-client in the build system.
+The script creates a new directory ``src/proto_007_<short_hash>`` where
+``<short_hash>`` is a short hash that coincides with the first eight characters
+of the hash computed by the script and written in the file ``TEZOS_PROTOCOL``.
+
+If the Alpha protocol has been snapshot, proceed to Section `2. Link the
+snapshot Alpha protocol in the build system`_ below, which details how to link
+the snapshot code in the build system. Otherwise proceed directly to Section
+`3. Set user-activated upgrade`_.
 
 
 2. Link the snapshot Alpha protocol in the build system
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Protocol ``proto_007_<hash>`` can now be linked in the node and client in the
-build system. Note that linking the protocol is not mandatory; we can always
+If the Alpha protocol was snapshot into
+``src/proto_<version_number>_<short_hash>``, this protocol can now be linked in
+the build system. Note that linking the protocol is not mandatory; we can always
 inject a protocol that compiles in a node and link it dynamically on the
 fly. However, linking the protocol in the client enables the use of the commands
-that may be present in the folder ``lib_client`` of the protocol, if
-any. Otherwise, only the commands accessible through the RPCs would be
-available. Except for some specific scenarios in which the commands accessible
-through the RPCs are enough, it is always convenient to link the protocol in the
-build system. In our example, this can be done by invoking::
+that may be present in the folder
+``src/proto_<version_number>_<short_hash>/lib_client``, if any. Otherwise, only
+the commands accessible through the RPCs would be available. Except for some
+specific scenarios in which the commands accessible through the RPCs are enough,
+it is always convenient to link the snapshot protocol in the build system. In
+our example, this can be done by invoking::
 
   $ ./scripts/link_protocol.sh src/proto_007_*
-
-If we opted to test the migration on an empty context on the sandbox, then we
-should proceed directly to Section `Set user-activated upgrades`_. Otherwise, in
-the next section we show how to patch the code to fake the credentials needed to
-make the chain imported from Mainnet progress.
-
-The next two subsections detail how to produce credentials that will allow us to
-make the chain that we imported from Mainnet progress.
 
 
 3. Set user-activated upgrade
@@ -258,12 +263,19 @@ activation of the Alpha protocol when the sandbox reaches a given level. Using
 this mechanism, we can start the sandbox, activate the predecessor of the Alpha
 protocol, populate the empty context at will by using the shell of the
 predecessor protocol, and then have the migration triggered automatically at the
-desired level. In our example, we can set the user-activated upgrade such that
+desired level. The script ``scripts/user_activated_upgrade.sh`` receives the
+path of the protocol to which we would like to upgrade, and the desired level.
+
+In our example above, where the Alpha protocol was snapshot into
+``src/proto_007_<short_hash>``, we can set the user-activated upgrade such that
 the migration is triggered at level three by invoking::
 
   $ ./scripts/user_activated_upgrade.sh src/proto_007_* 3
 
-Now we consider the case when testing the migration in a context imported from
+If we had opted for not snapshoting the Alpha protocol, we could pass the path
+``src/proto_alpha`` as the parameter of the command above.
+
+Now we consider the case when testing the migration on a context imported from
 the snapshot file. In that case, we should recall the level at which the
 snapshot file was taken from the beginning of Section `Prepare the
 migration`_. In our example, this level is ``1039318``. The user-activated
@@ -271,15 +283,26 @@ upgrade allows us to start the node imported from Mainnet, which would have the
 predecessor of the Alpha protocol already active if the snapshot is recent
 enough, and then have the migration triggered automatically at the desired
 level, which has to be strictly bigger than the level at which the snapshot file
-was taken. In our example, we can set the user-activated upgrade such that the
-migration is triggered three levels after the level ``1039321`` at which the
+was taken.
+
+In our example, where we the Alpha protocol was snapshot into
+``src/proto_007_<short_hash>``, we can set the user-activated upgrade such that
+the migration is triggered three levels after the level ``1039321`` at which the
 snapshot was taken by invoking::
 
   $ ./scripts/user_activated_upgrade.sh src/proto_007_* 1039321
 
+As before, if we had opted for not snapshoting the Alpha protocol, we could pass
+the path ``src/proto_alpha`` as the parameter of the command above.
 
-4. Patch the snapshot Alpha protocol to obtain a yes-node
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we are testing the migration on an empty context on the sandbox, then we
+should proceed directly to Section `Compile the project`_. Otherwise, the next
+two subsections detail how to produce credentials that will allow us to make the
+chain that we imported from Mainnet progress.
+
+
+4. Patch the shell to obtain a yes-node
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If we would start a node imported from Mainnet, how could we bake new blocks and
 make the chain progress? We do not know the private keys of existing bakers in
@@ -288,10 +311,11 @@ Mainnet!
 In order to produce credentials to make the chain imported from Mainnet
 progress, we modify the code to produce a `yes-node` that forges and verifies
 fake signatures. This can be achieved with a small patch to
-``lib_crypto/signature.ml`` that replaces each signature with a concatenation of
-a public key and a message, such that this fake signature is still unique for
-each key and message. This patch is encoded as the git diff contained in the
-file ``./scripts/yes-node.patch``. We can apply such patch by invoking::
+``src/lib_crypto/signature.ml`` that replaces each signature with a
+concatenation of a public key and a message, such that this fake signature is
+still unique for each key and message. This patch is encoded as the git diff
+contained in the file ``scripts/yes-node.patch``. We can apply such patch by
+invoking::
 
   $ patch -p1 < scripts/yes-node.patch
 
@@ -321,11 +345,13 @@ system's temp directory (in our example, ``/tmp``) as given by the path argument
 yes-wallet folder in the default path ``./yes-wallet``.
 
 
-6. Compile the snapshot Alpha protocol
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+6. Compile the project
+~~~~~~~~~~~~~~~~~~~~~~
 
-At this point we can compile the snapshot Alpha protocol that we will activate
-when running the migration. We can do so by invoking::
+At this point we have to compile the Alpha protocol (or the snapshot Alpha
+protocol, in case we opted for it) that we will activate when running the
+migration, as well as the shell if we patched it. We can compile the whole
+project under the ``src`` folder by invoking::
 
   $ make
 
@@ -340,11 +366,11 @@ context from a Mainnet's snapshot file. As explained in the beginning of Section
 `TulipTools<https://snapshots.tulip.tools/>`_ on July the 14th of 2020, and
 which was taken at level ``1039318``.
 
-We also need to generate a node identity, which we will keep in the same folder
-that contains the history of the node in a folder. Since importing a node from a
-snapshot file is very time consuming, once the node is imported and the identity
-is generated we will keep the original folder unchanged, and we will copy its
-contents to a fresh test folder every time we want to perform the migration.
+We also need to generate a node identity, which we will keep in the folder that
+contains the history of the node. Since importing a node from a snapshot file is
+very time consuming, once the node is imported and the identity is generated we
+will keep the original folder unchanged, and we will copy its contents to a
+fresh test folder every time we want to perform the migration.
 
 For instance, the following commands import a context from the snapshot file
 ``~/mainnet_2020-07-14_12 00.rolling`` into the folder ``/tmp/mainnet_2020-07-14_12 00``,
@@ -353,29 +379,50 @@ and generate an identity in the same folder::
   $ ./tezos-node snapshot import ~/mainnet_2020-07-14_12\ 00.rolling --data-dir /tmp/tezos-node-mainnet_2020-07-14_12\ 00
   $ ./tezos-node identity generate --data-dir /tmp/tezos-node-mainnet_2020-07-14_12\ 00
 
+The ``./tezos-node snapshot import`` command accepts an option
+``--block <block_hash>`` that instructs the command to check that the hash of
+the last block in the imported chain is ``<block_hash>``. This mechanism helps
+the developer to check that the imported chain contains blocks that are part of
+the current main chain of the Tezos network. The web
+`TulipTools<https://snapshots.tulip.tools/>`_ provides the first ten characters
+of the hash of the last block in a given snapshot file. Although we will not be
+using the ``--block`` option in this tutorial, the developer is encouraged to
+check that this prefix corresponds to the hash of a real block in Mainnet.
+
 Importing the context from a snapshot file is optional and should be performed
 only if we want to test the migration on a realistic context from
 Mainnet. Otherwise the migration will run on the sandbox.
 
 
-Automate steps 1--7 above
-~~~~~~~~~~~~~~~~~~~~~~~~~
+Batch steps 1--7 above
+~~~~~~~~~~~~~~~~~~~~~~
 
-The script ``./scripts/prepare_migration_test.sh`` automates steps 1--7 above by
-distinguishing whether the migration is on the sandbox or an imported context,
-based on the level given as argument to the script. (Recall that a level less or
-equal than ``28082`` corresponds to the sandbox, and a level greater than
-``28082`` corresponds to an imported context.) In our example, if we are testing
-the migration on the sandbox and want to trigger it at level three, we can use::
+The script ``scripts/prepare_migration_test.sh`` batches steps 1--7 above. The
+script first receives a parameter ``[manual | auto]``, which distinguishes
+whether the migration testing is manual or automatic. Here we focus on the case
+``manual``.
 
-  $ ./scripts/prepare_migration_test.sh d_007 3
+The next parameter is optional and contains a name in the format
+``<tag_starting_with_version_letter>_<version_number>``. If some name is passed,
+then the Alpha protocol is snapshot into
+``src/proto_<version_number>_<short_hash>``. If the name is omitted, then the
+Alpha protocol in ``src/proto_alpha`` will be used for the migration testing.
+
+Now the script takes the level at which we want to set the user-activated
+upgrade. The script distinguishes whether the migration is on the sandbox or on
+an imported context based on this level. (Recall that a level less or equal than
+``28082`` corresponds to the sandbox, and a level greater than ``28082``
+corresponds to an imported context.)  In our example, if we want to test the
+migration on the sandbox and want to trigger it at level three, we can use::
+
+  $ ./scripts/prepare_migration_test.sh manual d_007 3
 
 If on the contrary we have imported a realistic context from the snapshot file
 ``~/mainnet_2020-07-14_12\ 00.rolling`` taken at level ``1039318``, and we want
 to trigger the migration three levels after the level at which the snapshot file
 was taken, we can use::
 
-  $ ./scripts/prepare_migration_test.sh d_007 1039321 ~/mainnet_2020-07-14_12\ 00.rolling
+  $ ./scripts/prepare_migration_test.sh manual d_007 1039321 ~/mainnet_2020-07-14_12\ 00.rolling
 
 In the latter case both the context and the yes-wallet folder will be placed in
 the system's temp directory. In our example the temp directory is ``/tmp``, and
@@ -392,9 +439,18 @@ passes the path of a folder instead of the path of a snapshot file, then the
 script will use the corresponding folder as the original folder, and will not
 import a new context.
 
-After performing the steps 1--7 in the subsections above, the migration will be
-ready to be tested. The next two subsections respectively detail how to run the
-migration on the sandbox and on a context imported from Mainnet.
+In case we opted for not snapshoting the Alpha protocol, we could batch steps
+1--7 by respectively using the commands above, but omitting the name parameter
+``d_007``.
+
+The script ``scripts/prepare_migration_test.sh`` receives an optional
+``<block_hash>`` as the last argument which, if passed, will be used for the
+option ``--block <block_hash>`` to the ``./tezos-node snapshot import`` command
+when importing the context form Mainnet.
+
+After performing the steps 1--7, the migration will be ready to be tested. The
+next two subsections respectively detail how to run the migration on the sandbox
+and on a context imported from Mainnet.
 
 
 Run the migration on the sandbox
@@ -411,33 +467,33 @@ We can also start the client::
 
 Instead of command ``tezos-activate-alpha``, the sandboxed client script
 ``src/bin_client/tezos-init-sandboxed-client.sh`` now accepts a command
-``tezos-activate-XXX-<hash>`` that activates the predecessor protocol with
-version number ``XXX`` and short hash ``<hash>``. In our example, the
+``tezos-activate-XXX-<short_hash>`` that activates the predecessor protocol with
+version number ``XXX`` and short hash ``<short_hash>``. In our example, the
 predecessor protocol is ``006`` with short hash ``PsCARTHA``. (Check the folder
-``./src`` for the version number and short hash of the predecessor protocol for
+``src`` for the version number and short hash of the predecessor protocol for
 migrations to versions different from ``007``.) We can activate this protocol by
 invoking::
 
   $ tezos-activate-006-PsCARTHA
 
-Activation of the predecessor protocol produces one block and moves the chain
-one level forward. This fact has to be taken into account in order to pick the
-desired level when setting the user-activated upgrades.
+Activation of the predecessor protocol produces one block and increases the
+level by one. This unavoidable increase of the level has to be taken into
+account when setting the desired level for the user-activated upgrade.
 
 Now we can use the client commands to bake blocks until we reach the level at
 which migration will be triggered, which in our example is ``3``. Since
-activating the predecessor protocol moves the chain to level one, we need to
-bake two more blocks::
+activating the predecessor protocol increases the level by one, we need to bake
+two more blocks::
 
   $ tezos-client bake for bootstrap1 --minimal-timestamp
   $ tezos-client bake for bootstrap1 --minimal-timestamp
 
-At this moment migration will be triggered and the protocol ``proto_007_<hash>``
-will become active, and we will see the log message ``STITCHING!``.
+At this moment migration will be triggered and the protocol
+``proto_007_<short_hash>`` will become active, and we will see the log message
+``STITCHING!``.
 
-Note: the migration can be tested again by restarting the sandboxed node and
-client, by activating the predecessor of the Alpha protocol, and by baking two
-blocks.
+The migration can be tested again by restarting the sandboxed node and client,
+by activating the predecessor of the Alpha protocol, and by baking two blocks.
 
 
 Run the migration on a context imported form Mainnet
@@ -481,12 +537,12 @@ virtually impossible that at some moment all the eight accounts cease to have
 the priority to bake.
 
 After baking three blocks the migration will be triggered and the protocol
-``proto_007_<hash>`` will become active.  We will see the log message
+``proto_007_<short_hash>`` will become active.  We will see the log message
 ``STITCHING!``.
 
-Note: the migration can be tested again by removing the test folder and the
-spurious files ``blocks`` and ``wallet_lock`` in the yes-wallet folder. In our
-example we can do this with the following command::
+The migration can be tested again by removing the test folder and the spurious
+files ``blocks`` and ``wallet_lock`` in the yes-wallet folder. In our example we
+can do this with the following command::
 
   $ rm -rf "$test_directory" && rm -f /tmp/yes-wallet/{blocks,wallet_lock}
 
@@ -504,12 +560,12 @@ upgrade, with the command::
 
   $ ./tezos-client -d /tmp/yes-wallet bake for foundation1 --minimal-timestamp
 
-Wrap up the migration procedure
--------------------------------
+
+Wrap up the manual migration procedure
+--------------------------------------
 
 For convenience, this section collects all the steps needed to test the
 migration, both on the sandbox and on a context imported from Mainnet.
-
 
 Migration on the sandbox
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -529,9 +585,9 @@ Commit the feature back to branch ``proto-proposal``::
   $ git commit -am 'My awesome feature'
 
 Prepare migration by snapshoting the Alpha protocol, linking it to the build
-system, setting user-activate upgrades, and compiling it::
+system, setting user-activate upgrades, and compiling the project::
 
-  S ./scripts/prepare_migration_test.sh d_007 3
+  $ ./scripts/prepare_migration_test.sh manual d_007 3
 
 (Alternatively, each of these steps could be performed individually by invoking
 the following fur commands)::
@@ -555,7 +611,7 @@ Bake two more blocks by using account ``bootstrap1``::
   $ tezos-client bake for bootstrap1 --minimal-timestamp
   $ tezos-client bake for bootstrap1 --minimal-timestamp
 
-You should see the ``STITCHING!`` message in the logs!
+You should see the ``STITCHING!`` message!
 
 To test again, restart the sandboxed node and client::
 
@@ -596,11 +652,12 @@ Commit the feature back to branch ``proto-proposal``::
   $ git commit -am 'My awesome feature'
 
 Prepare migration by snapshoting the Alpha protocol, linking it to the build
-system, patching the yes-node, creating a yes-wallet, setting user-activated
-upgrades, importing a context from Mainnet in the ``-orig`` folder, generating
-an identity in the same folder, and compiling the snapshot Alpha protocol::
+system, patching the shell in order to obtain yes-node, creating a yes-wallet,
+setting user-activated upgrades, importing a context from Mainnet into the
+original context folder, generating an identity in the same folder, and
+compiling the project::
 
-  $ ./scripts/prepare_migration_test.sh d_007 1039321 ~/mainnet_2020-07-14_12\ 00.rolling
+  $ ./scripts/prepare_migration_test.sh manual d_007 1039321 ~/mainnet_2020-07-14_12\ 00.rolling
 
 (Alternatively, each of these steps could be performed individually by
 invoking the following eight commands)::
@@ -628,7 +685,7 @@ Bake three blocks by using accounts ``foundation1`` to ``foundation8``::
   $ ./tezos-client -d /tmp/yes-wallet bake for foundation1 --minimal-timestamp
   $ ./tezos-client -d /tmp/yes-wallet bake for foundation1 --minimal-timestamp
 
-You should see the ``STITCHING!`` message in the logs!
+You should see the ``STITCHING!`` message!
 
 To test again, kill the node::
 
@@ -654,6 +711,171 @@ And bake three blocks::
   $ ./tezos-client -d /tmp/yes-wallet bake for foundation1 --minimal-timestamp
 
 You should see the ``STITCHING!`` message again!
+
+
+Automatic migration testing with Tezt
+-------------------------------------
+
+The migration can be automatically tested inside the Tezt framework (see
+:ref:`tezt`) with the test file ``tezt/manual_tests/migration.ml``. The
+automatic migration runs on a context imported from Mainnet, and proceeds as
+follows. First, the migration needs to be prepared by applying steps analogous
+to the steps 1--7 of Section `Prepare the migration`_ above, but with the
+differences that we detail in the next paragraph. Then, the test file
+``tezt/manual_tests/migration.ml`` is executed: this test starts a node on the
+imported context, activates the new protocol on the next baked block, and then
+bakes blocks until a new cycle starts. Once the execution of the test file ends,
+the developer can manually run the node on the resulting context and inspect the
+storage manually to check that the migration code is correct.
+
+In the automatic test, the operations to the storage are internally triggered by
+the protocol, and some of these operations are only completed at the end of the
+cycle. Baking until a new cycle starts helps to check that the migration code is
+compatible with the actions triggered by the protocol at the end of a
+cycle. Consequently, the execution of the test file may take a significant
+amount of time (something between a few minutes and half an hour).
+
+Preparing the automatic migration with Tezt can be done with the script
+``scripts/prepare_migration_test.sh``, by passing the parameter ``auto`` as the
+first argument. As in Section `Batch steps 1--7 above`_, the developer can
+decide whether to snapshot the Alpha protocol by passing an optional second
+parameter to the script with a protocol name in the format
+``<tag_with_version_letter>_<version_number>``. Recall that snapshoting the
+Alpha protocol may be useful for producing a realistic hash of the protocol in
+the file
+``src/proto_<version_number>_<short_hash>/lib_protocol/TEZOS_PROTOCOL``.
+
+When passing ``auto`` as the first parameter, the script
+``scripts/prepare_migration_test.sh`` also receives a parameter
+``<path/to/snapshot.rolling>`` with the path to a snapshot file, and it proceeds
+as follows: since the automatic migration always runs on a context imported from
+Mainnet, the script patches the shell in order to obtain a yes-node and imports
+the context from the file ``<path/to/snapshot.rolling>``. It is enough to
+provide a snapshot file taken with the `rolling` history mode (extension
+``.rolling``), although the script also accepts snapshot files taken with the
+`full` or the `archive` history mode (extensions ``.full`` and ``.archive``
+respectively). The script creates a folder under the system's temp directory (in
+our example ``/tmp``) with the same name as the snapshot file, and imports the
+context there.
+
+If a folder already exists in the system's temp directory with the same name as
+the snapshot file, then the script assumes that the context was already imported
+and uses it as the original folder for the migration.
+
+In our example, we can prepare the automatic migration with the following
+command::
+
+  $ ./scripts/prepare_migration_test.sh auto d_007 ~/mainnet_2020-07-14_12\ 00.rolling
+
+This command snapshots the Alpha protocol into ``src/proto_007_<short_hash>``
+and links it in the build system, and then patches the shell in order to obtain
+a yes-node. If the folder ``/tmp/mainnet_2020-07-14_12 00`` does not exist
+already, then it creates that folder and imports the context from the snapshot
+file ``~/mainnet_2020-07-14_12 00.rolling`` into it. As explained in Section
+`Batch steps 1--7 above`_, the script ``scripts/prepare_migration_test.sh`` may
+receive an optional ``<block_hash>`` parameter as the last argument which, if
+present, will be used for the option ``--block <block_hash>`` of the command
+``./tezos-node snapshot import`` when importing the context form Mainnet.
+
+If we opt for not snapshoting the Alpha protocol, we can prepare the automatic
+migration with the same command as above, but omitting the optional name
+parameter ``d_007``.
+
+The automatic test can be run by invoking::
+
+  $ dune exec ./tezt/manual_tests/main.exe -- --keep-temp migration
+
+By default, the automatic test starts the node, activates the Alpha protocol
+when the first block is baked, and then bakes as many blocks as to complete a
+cycle. This behaviour can be personalised by modifying test file
+``tezt/manual_tests/migration.ml``.
+
+The developer will not see the ``STITCHING!`` message when the migration is
+triggered unless the option ``-v`` for `verbose` is passed to the command
+above. The option ``--color`` improves the output of the test by alternating
+colors for the output of each process. Nevertheless, if the developer wants to
+inspect the verbose output of the test, we strongly recommend to use a log file
+since the output of the whole migration test can be quite big. In our example,
+we can collect the logs into the file ``/tmp/tezt.log`` by passing the options
+``--log-buffer-size 5000 --log-file /tmp/tezt.log`` to the command above (notice
+that the option ``-v`` is not required when specifying a log file).
+
+Each time the automatic test is run, Tezt creates a temporary folder under the
+system's temp directory with name ``tezt-XXXXXX``, where the ``XXXXXX`` are six
+random decimal figures. The content of the original context folder is copied on
+the fly in the test folder ``tezt-XXXXXX/tezos-node-test``, and a yes-wallet
+folder is created on the fly in ``tezt-XXXXXX/yes-wallet``. The option
+``--keep-temp`` in the command above keeps the temporary folder for the
+developer to be able to inspect the storage after the migration has been
+performed. Assume the temporary folder in our example is ``/tmp/tezt-526039``,
+the developer can start the node with the migrated context by invoking::
+
+  $ ./tezos-node run --connections 0 --data-dir /tmp/tezt-526039/tezos-node-test --rpc-addr localhost &
+
+Once the node is up, it is possible to inspect the storage by using the Tezos
+client and/or the RPCs. New blocks can be baked with any of the accounts
+``foundation1`` to ``foundation8`` by using the following command::
+
+  $ ./tezos-client -d /tmp/tezt-526039/yes-wallet bake for foundation1 --minimal-timestamp
+
+If the developer wishes not to start the node that results after the migration,
+the parameter ``--keep-temp`` can be omitted and the Tezt's temp folder will be
+automatically deleted when the migration test ends.
+
+The migration can be tested again by stopping the node (if it was up) and
+running the test file with::
+
+  $ dune exec ./tezt/manual_tests/main.exe -- --keep-temp migration
+
+There is no need to prepare the migration again.
+
+
+Wrap up the automatic migration procedure with Tezt
+---------------------------------------------------
+
+Check latest code in branch ``proto-proposal``::
+
+  $ git checkout proto-proposal
+
+Tweak migration by checking that
+``src/proto_alpha/lib_protocol/init_storage.ml`` includes the
+following lines::
+
+  | Carthage_006 ->
+      Logging.log_notice "\nSTITCHING!\n" ;
+
+Commit the feature back to branch ``proto-proposal``::
+
+  $ git commit -am 'My awesome feature'
+
+Prepare migration by snapshoting the Alpha protocol, linking it in the build
+system, patching the shell in order to obtain a yes-node and compiling the
+project::
+
+  $ ./scripts/prepare_migration_test.sh auto d_007 ~/mainnet_2020-07-14_12\ 00.rolling
+
+Run the migration test::
+
+  $ dune exec ./tezt/manual_tests/main.exe -- --keep-temp migration
+
+Run the resulting node (assuming temp folder ``/tmp/tezt-526039``)::
+
+  $ ./tezos-node run --connections 0 --data-dir /tmp/tezt-526039/tezos-node-test --rpc-addr localhost &
+
+Use the client, to manually inspect the storage, or for example to bake new
+blocks with the following command::
+
+  $ ./tezos-client -d /tmp/tezt-526039/yes-wallet bake for foundation1 --minimal-timestamp
+
+To test again, kill the node::
+
+  $ fg
+  ./tezos-node run --connections 0 --data-dir /tmp/tezt-526039/tezos-node-test --rpc-addr localhost
+  ^C
+
+And run the migration test::
+
+  $ dune exec ./tezt/manual_tests/main.exe -- --keep-temp migration
 
 
 Tips and tricks
