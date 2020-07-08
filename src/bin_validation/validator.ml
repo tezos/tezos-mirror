@@ -271,6 +271,7 @@ let run input output =
         { chain_id;
           block_header;
           predecessor_block_header;
+          predecessor_block_metadata_hash;
           predecessor_ops_metadata_hash;
           operations;
           max_operations_ttl } ->
@@ -299,6 +300,7 @@ let run input output =
                      user_activated_protocol_overrides;
                      max_operations_ttl;
                      predecessor_block_header;
+                     predecessor_block_metadata_hash;
                      predecessor_ops_metadata_hash;
                      predecessor_context;
                    }

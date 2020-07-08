@@ -183,6 +183,7 @@ let on_request : type r. t -> r Request.t -> r tzresult Lwt.t =
                   >>=? fun { validation_store;
                              block_metadata;
                              ops_metadata;
+                             block_metadata_hash;
                              ops_metadata_hashes;
                              forking_testchain } ->
                   let validation_store =
@@ -203,6 +204,7 @@ let on_request : type r. t -> r Request.t -> r tzresult Lwt.t =
                     block_metadata
                     operations
                     ops_metadata
+                    block_metadata_hash
                     ops_metadata_hashes
                     validation_store
                     ~forking_testchain

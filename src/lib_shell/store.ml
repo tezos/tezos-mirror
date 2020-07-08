@@ -240,6 +240,14 @@ module Block = struct
             (obj1 (req "header" Block_header.encoding))
       end))
 
+  module Block_metadata_hash =
+    Store_helpers.Make_single_store
+      (Indexed_store.Store)
+      (struct
+        let name = ["block_metadata_hash"]
+      end)
+      (Store_helpers.Make_value (Block_metadata_hash))
+
   module Operations_index =
     Store_helpers.Make_indexed_substore
       (Store_helpers.Make_substore

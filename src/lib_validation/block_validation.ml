@@ -51,6 +51,7 @@ type result = {
   validation_store : validation_store;
   block_metadata : Bytes.t;
   ops_metadata : Bytes.t list list;
+  block_metadata_hash : Block_metadata_hash.t option;
   ops_metadata_hashes : Operation_metadata_hash.t list list option;
   forking_testchain : bool;
 }
@@ -108,29 +109,34 @@ let result_encoding =
     (fun { validation_store;
            block_metadata;
            ops_metadata;
+           block_metadata_hash;
            ops_metadata_hashes;
            forking_testchain } ->
       ( validation_store,
         block_metadata,
         ops_metadata,
+        block_metadata_hash,
         ops_metadata_hashes,
         forking_testchain ))
     (fun ( validation_store,
            block_metadata,
            ops_metadata,
+           block_metadata_hash,
            ops_metadata_hashes,
            forking_testchain ) ->
       {
         validation_store;
         block_metadata;
         ops_metadata;
+        block_metadata_hash;
         ops_metadata_hashes;
         forking_testchain;
       })
-    (obj5
+    (obj6
        (req "validation_store" validation_store_encoding)
        (req "block_metadata" bytes)
        (req "ops_metadata" (list @@ list @@ bytes))
+       (opt "block_metadata_hash" Block_metadata_hash.encoding)
        (opt
           "ops_metadata_hashes"
           (list @@ list @@ Operation_metadata_hash.encoding))
@@ -276,8 +282,8 @@ module Make (Proto : Registered_protocol.T) = struct
   let apply chain_id ~user_activated_upgrades
       ~user_activated_protocol_overrides ~max_operations_ttl
       ~(predecessor_block_header : Block_header.t)
-      ~predecessor_ops_metadata_hash ~predecessor_context
-      ~(block_header : Block_header.t) operations =
+      ~predecessor_block_metadata_hash ~predecessor_ops_metadata_hash
+      ~predecessor_context ~(block_header : Block_header.t) operations =
     let block_hash = Block_header.hash block_header in
     let invalid_block = invalid_block block_hash in
     check_block_header ~predecessor_block_header block_hash block_header
@@ -293,6 +299,12 @@ module Make (Proto : Registered_protocol.T) = struct
     >>=? fun context ->
     parse_operations block_hash operations
     >>=? fun operations ->
+    ( match predecessor_block_metadata_hash with
+    | None ->
+        Lwt.return context
+    | Some hash ->
+        Context.set_predecessor_block_metadata_hash context hash )
+    >>= fun context ->
     ( match predecessor_ops_metadata_hash with
     | None ->
         Lwt.return context
@@ -423,13 +435,15 @@ module Make (Proto : Registered_protocol.T) = struct
     in
     ( match new_protocol_env_version with
     | Protocol.V0 ->
-        return_none
+        return (None, None)
     | Protocol.V1 ->
-        return_some
-          (List.map
-             (List.map (fun r -> Operation_metadata_hash.hash_bytes [r]))
-             ops_metadata) )
-    >>=? fun ops_metadata_hashes ->
+        return
+          ( Some
+              (List.map
+                 (List.map (fun r -> Operation_metadata_hash.hash_bytes [r]))
+                 ops_metadata),
+            Some (Block_metadata_hash.hash_bytes [block_metadata]) ) )
+    >>=? fun (ops_metadata_hashes, block_metadata_hash) ->
     Context.commit
       ~time:block_header.shell.timestamp
       ?message:validation_result.message
@@ -448,6 +462,7 @@ module Make (Proto : Registered_protocol.T) = struct
         validation_store;
         block_metadata;
         ops_metadata;
+        block_metadata_hash;
         ops_metadata_hashes;
         forking_testchain;
       }
@@ -497,6 +512,7 @@ type apply_environment = {
   chain_id : Chain_id.t;
   predecessor_block_header : Block_header.t;
   predecessor_context : Context.t;
+  predecessor_block_metadata_hash : Block_metadata_hash.t option;
   predecessor_ops_metadata_hash : Operation_metadata_list_list_hash.t option;
   user_activated_upgrades : User_activated.upgrades;
   user_activated_protocol_overrides : User_activated.protocol_overrides;
@@ -508,6 +524,7 @@ let apply
       user_activated_protocol_overrides;
       max_operations_ttl;
       predecessor_block_header;
+      predecessor_block_metadata_hash;
       predecessor_ops_metadata_hash;
       predecessor_context } block_header operations =
   let block_hash = Block_header.hash block_header in
@@ -528,6 +545,7 @@ let apply
     ~user_activated_protocol_overrides
     ~max_operations_ttl
     ~predecessor_block_header
+    ~predecessor_block_metadata_hash
     ~predecessor_ops_metadata_hash
     ~predecessor_context
     ~block_header

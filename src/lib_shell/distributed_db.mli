@@ -174,6 +174,7 @@ val commit_block :
   Bytes.t ->
   Operation.t list list ->
   Bytes.t list list ->
+  Block_metadata_hash.t option ->
   Operation_metadata_hash.t list list option ->
   Block_validation.validation_store ->
   forking_testchain:bool ->
