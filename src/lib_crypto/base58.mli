@@ -39,6 +39,8 @@ module Prefix : sig
 
   val context_hash : string
 
+  val block_metadata_hash : string
+
   val operation_metadata_hash : string
 
   val operation_metadata_list_hash : string
