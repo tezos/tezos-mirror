@@ -198,13 +198,8 @@ class unix_mockup ~base_dir ~mem_only ~mockup_env ~chain_id ~rpc_context :
     inherit unix_wallet ~base_dir ~password_filename:None
 
     inherit
-      Tezos_mockup_proxy.RPC_client.local_ctxt
-        (Tezos_mockup.Local_services.build_directory
-           base_dir
-           mem_only
-           mockup_env
-           chain_id
-           rpc_context)
+      Tezos_mockup.RPC_client.mockup_ctxt
+        base_dir mem_only mockup_env chain_id rpc_context
 
     inherit unix_ui
 

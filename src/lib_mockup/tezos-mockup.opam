@@ -15,6 +15,7 @@ depends: [
   "tezos-p2p-services"
   "tezos-p2p"
   "tezos-protocol-environment"
+  "tezos-mockup-proxy"
   "tezos-mockup-registration"
 ]
 build: [
