@@ -383,19 +383,31 @@ let preapply ~user_activated_upgrades ~user_activated_protocol_overrides
              return context
          | Protocol.V1 -> (
              State.Block.all_operations_metadata_hash predecessor
+             >>= (function
+                   | None
+                     when (State.Block.header predecessor).shell
+                            .validation_passes > 0 ->
+                       fail
+                       @@ Missing_operation_metadata_hashes pred_block_hash
+                   | None ->
+                       (* Operation metadata hash is not be set on testchain genesis
+                          block and activation block, even when they are using
+                          environment V1, they contain no operations. *)
+                       return context
+                   | Some hash ->
+                       Context.set_predecessor_ops_metadata_hash context hash
+                       >|= ok)
+             >>=? fun context ->
+             State.Block.metadata_hash predecessor
              >>= function
-             | None
-               when (State.Block.header predecessor).shell.validation_passes
-                    > 0 ->
-                 fail @@ Missing_operation_metadata_hashes pred_block_hash
              | None ->
-                 (* Operation metadata hash is not be set on testchain genesis
-                    block and activation block, even when they are using
-                    environment V1, they contain no operations. *)
-                 return context
-             | Some hash ->
-                 Context.set_predecessor_ops_metadata_hash context hash >|= ok
-             ))
+                 (* Block metadata hash should always be set in environment V1. *)
+                 fail @@ Missing_block_metadata_hash pred_block_hash
+             | Some predecessor_block_metadata_hash ->
+                 Context.set_predecessor_block_metadata_hash
+                   context
+                   predecessor_block_metadata_hash
+                 >|= ok ))
   >>=? fun context ->
   let context = Context.hash ?message ~time:timestamp context in
   return ({shell_header with context}, validation_result_list)

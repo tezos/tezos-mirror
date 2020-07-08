@@ -161,6 +161,7 @@ module type S = sig
     index ->
     block_header
     * block_data
+    * Block_metadata_hash.t option
     * Operation_metadata_hash.t list list option
     * History_mode.t
     * (block_header ->
@@ -178,6 +179,7 @@ module type S = sig
     unit tzresult Lwt.t) ->
     ( block_header
     * block_data
+    * Block_metadata_hash.t option
     * Operation_metadata_hash.t list list option
     * History_mode.t
     * Block_header.t option
@@ -332,6 +334,7 @@ module Make (I : Dump_interface) = struct
         info : I.commit_info;
         parents : I.Commit_hash.t list;
         block_data : I.Block_data.t;
+        pred_block_metadata_hash : Block_metadata_hash.t option;
         pred_ops_metadata_hashes : Operation_metadata_hash.t list list option;
       }
     | Node of (string * I.hash) list
@@ -392,7 +395,8 @@ module Make (I : Dump_interface) = struct
     case
       ~title:"root"
       (Tag (Char.code 'r'))
-      (obj5
+      (obj6
+         (opt "pred_block_metadata_hash" Block_metadata_hash.encoding)
          (opt
             "pred_ops_metadata_hashes"
             (list (list Operation_metadata_hash.encoding)))
@@ -402,19 +406,36 @@ module Make (I : Dump_interface) = struct
          (req "block_data" I.Block_data.encoding))
       (function
         | Root
-            {pred_ops_metadata_hashes; block_header; info; parents; block_data}
-          ->
+            { pred_block_metadata_hash;
+              pred_ops_metadata_hashes;
+              block_header;
+              info;
+              parents;
+              block_data } ->
             Some
-              ( pred_ops_metadata_hashes,
+              ( pred_block_metadata_hash,
+                pred_ops_metadata_hashes,
                 block_header,
                 info,
                 parents,
                 block_data )
         | _ ->
             None)
-      (fun (pred_ops_metadata_hashes, block_header, info, parents, block_data) ->
+      (fun ( pred_block_metadata_hash,
+             pred_ops_metadata_hashes,
+             block_header,
+             info,
+             parents,
+             block_data ) ->
         Root
-          {pred_ops_metadata_hashes; block_header; info; parents; block_data})
+          {
+            pred_block_metadata_hash;
+            pred_ops_metadata_hashes;
+            block_header;
+            info;
+            parents;
+            block_data;
+          })
 
   let command_encoding =
     Data_encoding.union
@@ -481,9 +502,17 @@ module Make (I : Dump_interface) = struct
     >|=? fun bytes -> Data_encoding.Binary.of_bytes_exn command_encoding bytes
 
   let set_root buf block_header info parents block_data
-      pred_ops_metadata_hashes =
+      pred_block_metadata_hash pred_ops_metadata_hashes =
     let root =
-      Root {block_header; info; parents; block_data; pred_ops_metadata_hashes}
+      Root
+        {
+          block_header;
+          info;
+          parents;
+          block_data;
+          pred_block_metadata_hash;
+          pred_ops_metadata_hashes;
+        }
     in
     let bytes = Data_encoding.Binary.to_bytes_exn command_encoding root in
     set_mbytes buf bytes
@@ -610,7 +639,12 @@ module Make (I : Dump_interface) = struct
     in
     Lwt.catch
       (fun () ->
-        let (bh, block_data, pred_ops_metadata_hashes, mode, pruned_iterator) =
+        let ( bh,
+              block_data,
+              pred_block_metadata_hash,
+              pred_ops_metadata_hashes,
+              mode,
+              pruned_iterator ) =
           data
         in
         write_snapshot_metadata ~mode buf ;
@@ -630,6 +664,7 @@ module Make (I : Dump_interface) = struct
               (I.context_info ctxt)
               parents
               block_data
+              pred_block_metadata_hash
               pred_ops_metadata_hashes ;
             (* Dump pruned blocks *)
             let dump_pruned cpt pruned =
@@ -705,14 +740,22 @@ module Make (I : Dump_interface) = struct
         get_command rbuf
         >>=? function
         | Root
-            {block_header; info; parents; block_data; pred_ops_metadata_hashes}
-          -> (
+            { block_header;
+              info;
+              parents;
+              block_data;
+              pred_block_metadata_hash;
+              pred_ops_metadata_hashes } -> (
             I.set_context ~info ~parents ctxt block_header
             >>= function
             | None ->
                 fail Inconsistent_snapshot_data
             | Some block_header ->
-                return (block_header, block_data, pred_ops_metadata_hashes) )
+                return
+                  ( block_header,
+                    block_data,
+                    pred_block_metadata_hash,
+                    pred_ops_metadata_hashes ) )
         | Node contents ->
             add_dir batch contents
             >>=? fun tree ->
@@ -768,7 +811,10 @@ module Make (I : Dump_interface) = struct
             fail Inconsistent_snapshot_data
       in
       I.batch index (fun batch -> first_pass batch (I.make_context index) 0)
-      >>=? fun (block_header, block_data, pred_ops_metadata_hashes) ->
+      >>=? fun ( block_header,
+                 block_data,
+                 pred_block_metadata_hash,
+                 pred_ops_metadata_hashes ) ->
       Tezos_stdlib_unix.Utils.display_progress_end () ;
       second_pass None ([], []) [] 0
       >>=? fun (oldest_header_opt, rev_block_hashes, protocol_datas) ->
@@ -776,6 +822,7 @@ module Make (I : Dump_interface) = struct
       return
         ( block_header,
           block_data,
+          pred_block_metadata_hash,
           pred_ops_metadata_hashes,
           history_mode,
           oldest_header_opt,

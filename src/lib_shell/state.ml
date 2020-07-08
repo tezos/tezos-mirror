@@ -1107,7 +1107,7 @@ module Block = struct
         predecessor_n block_store b.hash n)
 
   let store chain_state block_header block_header_metadata operations
-      operations_metadata ops_metadata_hashes
+      operations_metadata block_metadata_hash ops_metadata_hashes
       ({context_hash; message; max_operations_ttl; last_allowed_fork_level} :
         Block_validation.validation_store) ~forking_testchain =
     let bytes = Block_header.to_bytes block_header in
@@ -1201,6 +1201,19 @@ module Block = struct
               Store.Block.Operations_metadata.store (store, hash) i ops)
             operations_metadata
           >>= fun () ->
+          ( match block_metadata_hash with
+          | Some block_metadata_hash ->
+              Store.Block.Block_metadata_hash.store
+                (store, hash)
+                block_metadata_hash
+              >|= ok
+          | None -> (
+            match env with
+            | V1 ->
+                fail @@ Missing_block_metadata_hash predecessor
+            | V0 ->
+                return_unit ) )
+          >>=? fun () ->
           ( match ops_metadata_hashes with
           | Some ops_metadata_hashes ->
               Lwt_list.iteri_s
@@ -1355,6 +1368,10 @@ module Block = struct
             Store.Block.Operations_metadata.read_opt (store, hash) i
             >|= Option.unopt_assert ~loc:__POS__)
           (0 -- (header.shell.validation_passes - 1)))
+
+  let metadata_hash {chain_state; hash; _} =
+    Shared.use chain_state.block_store (fun store ->
+        Store.Block.Block_metadata_hash.read_opt (store, hash))
 
   let operations_metadata_hashes {chain_state; hash; _} i =
     Shared.use chain_state.block_store (fun store ->

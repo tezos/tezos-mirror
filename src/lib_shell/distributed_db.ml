@@ -291,7 +291,7 @@ let clear_block chain_db hash n =
     hash
 
 let commit_block chain_db hash header header_data operations operations_data
-    ops_metadata_hashes result ~forking_testchain =
+    block_metadata_hash ops_metadata_hashes result ~forking_testchain =
   assert (Block_hash.equal hash (Block_header.hash header)) ;
   assert (List.length operations = header.shell.validation_passes) ;
   State.Block.store
@@ -300,6 +300,7 @@ let commit_block chain_db hash header header_data operations operations_data
     header_data
     operations
     operations_data
+    block_metadata_hash
     ops_metadata_hashes
     result
     ~forking_testchain

@@ -195,6 +195,7 @@ module Block : sig
     Bytes.t ->
     Operation.t list list ->
     Bytes.t list list ->
+    Block_metadata_hash.t option ->
     Operation_metadata_hash.t list list option ->
     Block_validation.validation_store ->
     forking_testchain:bool ->
@@ -277,6 +278,8 @@ module Block : sig
   val operations_metadata : t -> int -> Bytes.t list Lwt.t
 
   val all_operations_metadata : t -> Bytes.t list list Lwt.t
+
+  val metadata_hash : t -> Block_metadata_hash.t option Lwt.t
 
   val operations_metadata_hashes :
     t -> int -> Operation_metadata_hash.t list option Lwt.t
