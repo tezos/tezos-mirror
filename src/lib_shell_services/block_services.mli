@@ -177,6 +177,13 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
     unit ->
     block_metadata tzresult Lwt.t
 
+  val metadata_hash :
+    #simple ->
+    ?chain:chain ->
+    ?block:block ->
+    unit ->
+    Block_metadata_hash.t option tzresult Lwt.t
+
   module Header : sig
     val shell_header :
       #simple ->
@@ -373,6 +380,15 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
 
     val metadata :
       ([`GET], prefix, prefix, unit, unit, block_metadata) RPC_service.t
+
+    val metadata_hash :
+      ( [`GET],
+        prefix,
+        prefix,
+        unit,
+        unit,
+        Block_metadata_hash.t option )
+      RPC_service.t
 
     val protocols :
       ([`GET], prefix, prefix, unit, unit, protocols) RPC_service.t
