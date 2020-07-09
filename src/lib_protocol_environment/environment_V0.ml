@@ -378,9 +378,9 @@ struct
       val rpc_arg : t RPC_arg.t
     end
 
-    module type SET = Tezos_base.S.SET
+    module type SET = Tezos_protocol_environment_structs.V0.M.S.SET
 
-    module type MAP = Tezos_base.S.MAP
+    module type MAP = Tezos_protocol_environment_structs.V0.M.S.MAP
 
     module type INDEXES = sig
       type t
@@ -396,13 +396,13 @@ struct
       val path_length : int
 
       module Set : sig
-        include Set.S with type elt = t
+        include SET with type elt = t
 
         val encoding : t Data_encoding.t
       end
 
       module Map : sig
-        include Map.S with type key = t
+        include MAP with type key = t
 
         val encoding : 'a Data_encoding.t -> 'a t Data_encoding.t
       end
