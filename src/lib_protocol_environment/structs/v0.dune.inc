@@ -1,6 +1,7 @@
 (rule
  (targets v0.ml)
  (deps
+   v0/s.ml
    v0/option.ml
    v0/mBytes.ml
  )
