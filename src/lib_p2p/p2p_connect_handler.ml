@@ -242,8 +242,7 @@ let raw_authenticate t ?point_info canceler fd point =
       >>= fun () ->
       may_register_my_id_point t.pool err ;
       t.log (Authentication_failed point) ;
-      if incoming then P2p_point.Table.remove t.incoming point
-      else
+      if not incoming then
         Option.iter
           ~f:(P2p_point_state.set_disconnected t.config.greylisting_config)
           point_info ;
@@ -296,16 +295,6 @@ let raw_authenticate t ?point_info canceler fd point =
     (* we have a slot, checking if point and peer are acceptable *)
     is_acceptable t connection_point_info peer_info incoming version
   in
-  (* To Verify : the thread must ? not be interrupted between
-     point removal from incoming and point registration into
-     active connection to prevent flooding attack.
-     incoming_connections + active_connection must reflect/dominate
-     the actual number of ongoing connections.
-     On the other hand, if we wait too long for Ack, we will reject
-     incoming connections, thus giving an entry point for dos attack
-     by giving late Nack.
-  *)
-  if incoming then P2p_point.Table.remove t.incoming point ;
   Option.iter connection_point_info ~f:(fun point_info ->
       (* set the point to private or not, depending on the [info] gethered
            during authentication *)
@@ -511,7 +500,10 @@ let accept t fd point =
         with_timeout
           ~canceler
           (Systime_os.sleep t.config.authentication_timeout)
-          (fun canceler -> authenticate t canceler fd point))
+          (fun canceler -> authenticate t canceler fd point)
+        >>= fun _ ->
+        P2p_point.Table.remove t.incoming point ;
+        Lwt.return_unit)
 
 let fail_unless_disconnected_point point_info =
   match P2p_point_state.get point_info with
