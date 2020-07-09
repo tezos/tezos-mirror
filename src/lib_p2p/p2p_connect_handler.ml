@@ -242,8 +242,7 @@ let raw_authenticate t ?point_info canceler fd point =
       >>= fun () ->
       may_register_my_id_point t.pool err ;
       t.log (Authentication_failed point) ;
-      ( if incoming then P2p_point.Table.remove t.incoming point
-      else
+      ( if not incoming then
         let timestamp = Systime_os.now () in
         Option.iter
           (P2p_point_state.set_disconnected
@@ -294,16 +293,6 @@ let raw_authenticate t ?point_info canceler fd point =
     (* we have a slot, checking if point and peer are acceptable *)
     is_acceptable t connection_point_info peer_info incoming version
   in
-  (* To Verify : the thread must ? not be interrupted between
-     point removal from incoming and point registration into
-     active connection to prevent flooding attack.
-     incoming_connections + active_connection must reflect/dominate
-     the actual number of ongoing connections.
-     On the other hand, if we wait too long for Ack, we will reject
-     incoming connections, thus giving an entry point for dos attack
-     by giving late Nack.
-  *)
-  if incoming then P2p_point.Table.remove t.incoming point ;
   Option.iter
     (fun point_info ->
       (* set the point to private or not, depending on the [info] gathered
@@ -473,13 +462,21 @@ let accept t fd point =
     P2p_point.Table.add t.incoming point canceler ;
     Lwt_utils.dont_wait
       (fun exc ->
-        Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
+        P2p_point.Table.remove t.incoming point ;
+        P2p_pool.greylist_addr t.pool (fst point) ;
+        Format.eprintf
+          "Uncaught exception on incoming connection from %a: %s\n%!"
+          P2p_point.Id.pp
+          point
+          (Printexc.to_string exc))
       (fun () ->
         with_timeout
           ~canceler
           (Systime_os.sleep t.config.authentication_timeout)
           (fun canceler -> authenticate t canceler fd point)
-        >>= fun _ -> Lwt.return_unit)
+        >>= fun _ ->
+        P2p_point.Table.remove t.incoming point ;
+        Lwt.return_unit)
 
 let fail_unless_disconnected_point point_info =
   match P2p_point_state.get point_info with
