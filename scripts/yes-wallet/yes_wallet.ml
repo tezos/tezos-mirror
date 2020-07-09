@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,16 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let contract : Protocol.Alpha_context.Contract.t Alcotest.testable =
-  let open Protocol in
-  let open Alpha_context in
-  Alcotest.testable Contract.pp Contract.( = )
-
-let script_expr : Protocol.Alpha_context.Script.expr Alcotest.testable =
-  Alcotest.testable Michelson_v1_printer.print_expr ( = )
-
-let trace : trace Alcotest.testable = Alcotest.testable pp_print_error ( = )
-
-let protocol_error : Environment.Error_monad.error Alcotest.testable =
-  let open Environment.Error_monad in
-  Alcotest.testable pp ( = )
+let _ =
+  let yes_wallet_dir =
+    if Array.length Sys.argv > 1 then Sys.argv.(1) else "yes-wallet"
+  in
+  Unix.mkdir yes_wallet_dir 0o750 ;
+  Unix.chdir yes_wallet_dir ;
+  json_to_file (pkh_list_json alias_pkh_pk_list) "public_key_hashs" ;
+  json_to_file (pk_list_json alias_pkh_pk_list) "public_keys" ;
+  json_to_file (sk_list_json alias_pkh_pk_list) "secret_keys"

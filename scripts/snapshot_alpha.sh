@@ -3,12 +3,9 @@
 set -e
 
 usage="Usage:
-$ ./scripts/snapshot_alpha.sh babylon_005 from athens_004
+$ ./scripts/snapshot_alpha.sh babylon_005
 Packs the current proto_alpha directory in a new proto_005_<hash>
-directory with all the necessary renamings.
-
-$ ./scripts/snapshot_alpha.sh babylon_005 --master
-Prepares the protocol for master, just for development."
+directory with all the necessary renamings."
 
 script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 cd "$script_dir"/..
@@ -22,19 +19,6 @@ if ! ( [[ "$label" =~ ^[a-z]+$ ]] && [[ "$version" =~ ^[0-9][0-9][0-9]$ ]] ); th
     echo
     echo "$usage"
     exit 1
-fi
-
-predecessor=$3
-previous_label=$(echo $predecessor | cut -d'_' -f1)
-previous_version=$(echo $predecessor | cut -d'_' -f2)
-if ! ( [[ "$2" == "from" ]] && [[ "$3" ]] && [[ "$previous_label" =~ ^[a-z]+$ ]] && [[ "$previous_version" =~ ^[0-9][0-9][0-9]$ ]] ); then
-    if [[ "$2" == "--master" ]]; then master="true"
-    else
-        echo 'pass a predecessor such as "from athens_004" or "--master"'
-        echo
-        echo "$usage"
-        exit 1
-    fi
 fi
 
 if [ -d src/proto_${version} ] ; then
@@ -52,22 +36,6 @@ rm -rf /tmp/tezos_proto_snapshot
 # set current version
 sed -i.old.old -e 's/let version_value = "alpha_current"/let version_value = "'${current}'"/' \
     src/proto_${version}/lib_protocol/raw_context.ml
-
-# set previous version
-if [[ "$master" ]]; then
-    #in master our predecessor is alpha_current
-    sed -i.old -e 's/s = "alpha_previous"/s = "alpha_current"/' \
-        src/proto_${version}/lib_protocol/raw_context.ml
-else
-    # set previous version
-    Predecessor=$(echo $predecessor | sed 's/.*/\u&/') # capitalize
-    sed -i.old -e 's/Alpha_previous/'${Predecessor}'/' \
-        src/proto_${version}/lib_protocol/{raw_context.ml,raw_context.mli,init_storage.ml}
-
-    # set previous version
-    sed -i.old -e 's/s = "alpha_previous"/s = "'${predecessor}'"/' \
-        src/proto_${version}/lib_protocol/raw_context.ml
-fi
 
 long_hash=$(./tezos-protocol-compiler -hash-only src/proto_${version}/lib_protocol)
 short_hash=$(echo $long_hash | head -c 8)

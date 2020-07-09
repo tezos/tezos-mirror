@@ -1,7 +1,6 @@
 open Protocol
 open Alpha_context
 open Script_interpreter
-open Tezos_client_alpha
 
 exception Expression_from_string
 
@@ -126,7 +125,7 @@ let test_json_roundtrip_err name e () =
   test_json_roundtrip
     name
     Testable.protocol_error
-    Tezos_protocol_environment_alpha.Environment.Error_monad.error_encoding
+    Environment.Error_monad.error_encoding
     e
 
 let error_encoding_tests =

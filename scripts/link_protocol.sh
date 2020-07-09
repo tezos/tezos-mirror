@@ -3,7 +3,7 @@
 set -e
 
 usage="Usage:
-$ ./scripts/activate_protocol.sh src/proto_004_PtDPBVyN
+$ ./scripts/link_protocol.sh src/proto_004_PtDPBVyN
 Inserts the protocol in the right files of the build system to compile it
 Activate in addition to its predecessor, here proto_003_PsddFKi3."
 
@@ -45,15 +45,39 @@ duplicate_and_replace() {
         }}' PATTERN=$PATTERN REPLACEMENT=$REPLACEMENT $*
 }
 
+duplicate_and_replace_when_2_occ() {
+    PATTERN=$1
+    REPLACEMENT=$2
+    shift 2
+
+    awk -i inplace '{
+        print
+        if (prevlast ~ pattern && last ~ PATTERN && $0 !~ PATTERN) {
+           sub(PATTERN,REPLACEMENT,prevlast)
+           sub(PATTERN,REPLACEMENT,last)
+           {print prevlast}
+           {print last}
+           print
+        }
+        {prevlast = last}
+        {last = $0}
+
+       }' PATTERN=$PATTERN REPLACEMENT=$REPLACEMENT $*
+}
+
 # the minimum needed, although you can't bake
 duplicate_and_replace ${pattern} ${replacement} active_protocol_versions
 
 # activate in client to bake and use RPCs
 duplicate_and_replace -${pattern} -${replacement} \
-    src/bin_client/{dune,tezos-client.opam}
+    src/bin_client/tezos-client.opam
+duplicate_and_replace_when_2_occ -${pattern} -${replacement} \
+    src/bin_client/dune
 
 # activate in node
+duplicate_and_replace_when_2_occ -${pattern} -${replacement} \
+    src/bin_node/dune
 duplicate_and_replace -${pattern} -${replacement} \
-    src/bin_node/{dune,tezos-node.opam}
+    src/bin_node/tezos-node.opam
 duplicate_and_replace -${pattern} -${replacement} \
     src/bin_validation/{dune,tezos-validator.opam}

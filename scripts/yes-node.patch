@@ -1,24 +1,24 @@
 diff --git a/src/lib_crypto/signature.ml b/src/lib_crypto/signature.ml
-index 8aec1057e..5b47714e4 100644
+index f65386618..cc4ab48bf 100644
 --- a/src/lib_crypto/signature.ml
 +++ b/src/lib_crypto/signature.ml
-@@ -539,7 +539,7 @@ let pp_watermark ppf =
-       fprintf ppf "Custom: 0x%s"
-         (try String.sub hexed 0 10 ^ "..." with _ ->  hexed)
- 
+@@ -705,7 +705,7 @@ let pp_watermark ppf =
+         "Custom: 0x%s"
+         (try String.sub hexed 0 10 ^ "..." with _ -> hexed)
+
 -let sign ?watermark secret_key message =
 +let _sign ?watermark secret_key message =
-   let watermark = Option.map ~f:bytes_of_watermark watermark in
+   let watermark = Option.map bytes_of_watermark watermark in
    match secret_key with
-   | Secret_key.Ed25519 sk -> of_ed25519 (Ed25519.sign ?watermark sk message)
-@@ -572,6 +572,25 @@ let check ?watermark public_key signature message =
-       P256.check ?watermark pk signature message
-   | _ -> false
- 
+   | Secret_key.Ed25519 sk ->
+@@ -745,6 +745,25 @@ let check ?watermark public_key signature message =
+   | _ ->
+       false
+
 +let fake_sign pk_bytes msg =
 +  let half = size / 2 in
 +  let tmp = Bytes.init size (fun _ -> '0') in
-+  let all_or_half buf = Pervasives.min (Bytes.length buf) half in
++  let all_or_half buf = Stdlib.min (Bytes.length buf) half in
 +  Bytes.blit pk_bytes 0 tmp 0 (all_or_half pk_bytes) ;
 +  Bytes.blit msg 0 tmp half (all_or_half msg) ;
 +  of_bytes_exn tmp
@@ -35,5 +35,4 @@ index 8aec1057e..5b47714e4 100644
 +let check = fake_check
 +
  let append ?watermark sk msg =
-   Bytes.concat "" [msg; (to_bytes (sign ?watermark sk msg))]
- 
+   Bytes.cat msg (to_bytes (sign ?watermark sk msg))
