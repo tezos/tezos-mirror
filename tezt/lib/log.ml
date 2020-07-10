@@ -111,6 +111,8 @@ module Color = struct
   end
 end
 
+let log_file = Option.map open_out Cli.options.log_file
+
 let output_time output =
   let now = Unix.gettimeofday () in
   let time = Unix.gmtime now in
@@ -122,12 +124,36 @@ let output_time output =
        time.tm_sec
        (int_of_float ((now -. float (truncate now)) *. 1000.)))
 
-let log_string ~(level : Cli.log_level) ?color ?prefix message =
+let log_string ~(level : Cli.log_level) ?color ?prefix ?prefix_color message =
   match String.split_on_char '\n' message with
   | [] | [""] ->
       ()
   | lines ->
       let log_line message =
+        let log_line_to ~use_colors channel =
+          let output = output_string channel in
+          output "[" ;
+          output_time output ;
+          output "] " ;
+          if use_colors then Option.iter output color ;
+          Option.iter
+            (fun prefix ->
+              output "[" ;
+              if use_colors then Option.iter output prefix_color ;
+              output prefix ;
+              ( if use_colors then
+                match prefix_color with
+                | None ->
+                    ()
+                | Some _ ->
+                    output Color.reset ; Option.iter output color ) ;
+              output "] ")
+            prefix ;
+          output message ;
+          if use_colors && color <> None then output Color.reset ;
+          output "\n"
+        in
+        Option.iter (log_line_to ~use_colors:false) log_file ;
         match (Cli.options.log_level, level) with
         | (_, Quiet) ->
             invalid_arg "Log.log_string: level cannot be Quiet"
@@ -136,17 +162,7 @@ let log_string ~(level : Cli.log_level) ?color ?prefix message =
         | (Report, (Error | Warn | Report))
         | (Info, (Error | Warn | Report | Info))
         | (Debug, (Error | Warn | Report | Info | Debug)) ->
-            let output = print_string in
-            output "[" ;
-            output_time output ;
-            output "] " ;
-            if Cli.options.color then Option.iter output color ;
-            Option.iter
-              (fun prefix -> output "[" ; output prefix ; output "] ")
-              prefix ;
-            output message ;
-            if Cli.options.color && color <> None then output Color.reset ;
-            output "\n" ;
+            log_line_to ~use_colors:Cli.options.color stdout ;
             flush stdout
         | ((Quiet | Error | Warn | Report | Info), _) ->
             ()
@@ -169,7 +185,7 @@ let error x = log ~level:Error ~color:Color.FG.red ~prefix:"error" x
 type test_result = Successful | Failed | Aborted
 
 let test_result test_result test_name =
-  let (prefix, color) =
+  let (prefix, prefix_color) =
     match test_result with
     | Successful ->
         ("SUCCESS", Color.(FG.green ++ bold))
@@ -178,12 +194,7 @@ let test_result test_result test_name =
     | Aborted ->
         ("ABORTED", Color.(FG.red ++ bold))
   in
-  let message =
-    if Cli.options.color then
-      Printf.sprintf "[%s%s%s] %s" color prefix Color.reset test_name
-    else Printf.sprintf "[%s] %s" prefix test_name
-  in
-  log_string ~level:Report message
+  log_string ~level:Report ~prefix ~prefix_color test_name
 
 let command ?color ?prefix command arguments =
   let message =

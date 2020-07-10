@@ -30,6 +30,7 @@ type temporary_file_mode = Delete | Delete_if_successful | Keep
 type options = {
   color : bool;
   log_level : log_level;
+  log_file : string option;
   commands : bool;
   temporary_file_mode : temporary_file_mode;
   keep_going : bool;
@@ -45,6 +46,7 @@ let options =
     ref (Unix.isatty Unix.stdout && Sys.getenv_opt "TERM" <> Some "dumb")
   in
   let log_level = ref Report in
+  let log_file = ref None in
   let commands = ref false in
   let temporary_file_mode = ref Delete in
   let keep_going = ref false in
@@ -77,6 +79,10 @@ let options =
           Arg.String set_log_level,
           "<LEVEL> Set log level to LEVEL. Possible LEVELs are: quiet, error, \
            warn, report, info, debug. Default is report." );
+        ( "--log-file",
+          Arg.String (fun f -> log_file := Some f),
+          "<FILE> Also log to FILE (in verbose mode: --log-level only applies \
+           to stdout)." );
         ( "--verbose",
           Arg.Unit (fun () -> log_level := Debug),
           " Same as --log-level debug." );
@@ -159,6 +165,7 @@ let options =
   {
     color = !color;
     log_level = !log_level;
+    log_file = !log_file;
     commands = !commands;
     temporary_file_mode = !temporary_file_mode;
     keep_going = !keep_going;

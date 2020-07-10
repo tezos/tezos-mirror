@@ -61,6 +61,7 @@ type temporary_file_mode = Delete | Delete_if_successful | Keep
 type options = {
   color : bool;
   log_level : log_level;
+  log_file : string option;
   commands : bool;
   temporary_file_mode : temporary_file_mode;
   keep_going : bool;
