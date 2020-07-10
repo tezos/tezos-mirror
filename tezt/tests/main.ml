@@ -27,8 +27,4 @@
    Each module defines tests which are thematically related,
    as functions to be called here. *)
 
-(* Note: it is a good idea to have each module tag all of its tests with
-   the module name. For instance, all tests implemented in [bootstrap.ml]
-   have tag ["bootstrap"]. This allows to run only those tests easily. *)
-
 let () = Basic.run () ; Bootstrap.run ()

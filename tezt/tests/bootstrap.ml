@@ -86,6 +86,7 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
   let hmode1s = Node.show_history_mode hmode1 in
   let hmode2s = Node.show_history_mode hmode2 in
   Test.run
+    ~__FILE__
     ~title:(Format.sprintf "node synchronization (%s / %s)" hmode1s hmode2s)
     ~tags:
       [ "bootstrap";

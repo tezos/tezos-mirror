@@ -36,6 +36,10 @@ val fail : ('a, unit, string, 'b) format4 -> 'a
 
 (** Run a test.
 
+    The [__FILE__] argument, which should be equal to [__FILE__]
+    (i.e. just write [Test.run ~__FILE__]), is used to let the user
+    select which files to run from the command-line.
+
     One should be able to infer, from [title], what the test will do.
     It is typically a short sentence like ["addition is commutative"]
     or ["server runs until client tells it to stop"].
@@ -56,4 +60,9 @@ val fail : ('a, unit, string, 'b) format4 -> 'a
     You can call [run] several times in the same executable if you want
     it to run several tests. Each of those tests should be standalone, as
     the user is able to specify the list of tests to run on the command-line. *)
-val run : title:string -> tags:string list -> (unit -> unit Lwt.t) -> unit
+val run :
+  __FILE__:string ->
+  title:string ->
+  tags:string list ->
+  (unit -> unit Lwt.t) ->
+  unit

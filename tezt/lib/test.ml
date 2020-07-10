@@ -171,23 +171,28 @@ let really_run title f =
   | Aborted ->
       exit 2
 
-let test_should_be_run ~title ~tags =
+let test_should_be_run ~file ~title ~tags =
   List.for_all (fun tag -> List.mem tag tags) Cli.options.tags_to_run
   && (not
         (List.exists (fun tag -> List.mem tag tags) Cli.options.tags_not_to_run))
+  && ( match Cli.options.tests_to_run with
+     | [] ->
+         true
+     | titles ->
+         List.mem title titles )
   &&
-  match Cli.options.tests_to_run with
+  match Cli.options.files_to_run with
   | [] ->
       true
-  | titles ->
-      List.mem title titles
+  | files ->
+      List.mem file files
 
-let list title tags =
+let list file title tags =
   match tags with
   | [] ->
-      Printf.printf "%s (no tags)\n" title
+      Printf.printf "%s: %s (no tags)\n" file title
   | _ :: _ ->
-      Printf.printf "%s (tags: %s)\n" title (String.concat ", " tags)
+      Printf.printf "%s: %s (tags: %s)\n" file title (String.concat ", " tags)
 
 let tag_rex = rex "^[a-z0-9_]{1,32}$"
 
@@ -224,8 +229,9 @@ let () =
       List.iter (Printf.eprintf "Unknown tag: %s\n") unknown_tags ;
       exit 1
 
-let run ~title ~tags f =
+let run ~__FILE__ ~title ~tags f =
+  let file = Filename.basename __FILE__ in
   check_tags tags ;
   List.iter register_tag tags ;
-  if test_should_be_run ~title ~tags then
-    if Cli.options.list then list title tags else really_run title f
+  if test_should_be_run ~file ~title ~tags then
+    if Cli.options.list then list file title tags else really_run title f

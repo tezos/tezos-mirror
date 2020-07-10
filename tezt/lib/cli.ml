@@ -33,6 +33,7 @@ type options = {
   commands : bool;
   temporary_file_mode : temporary_file_mode;
   keep_going : bool;
+  files_to_run : string list;
   tests_to_run : string list;
   tags_to_run : string list;
   tags_not_to_run : string list;
@@ -47,6 +48,7 @@ let options =
   let commands = ref false in
   let temporary_file_mode = ref Delete in
   let keep_going = ref false in
+  let files_to_run = ref [] in
   let tests_to_run = ref [] in
   let tags_to_run = ref [] in
   let tags_not_to_run = ref [] in
@@ -111,12 +113,21 @@ let options =
         ("-k", Arg.Set keep_going, " Same as --keep-going.");
         ("--list", Arg.Set list, " List tests instead of running them.");
         ("-l", Arg.Set list, " Same as --list.");
+        ( "--file",
+          Arg.String (fun file -> files_to_run := file :: !files_to_run),
+          "<FILE> Only run tests implemented in source file FILE. You can \
+           specify several --file options, all of them will be run. \
+           Specifying tags (see TAGS) or --test may still reduce the set of \
+           tests to run." );
+        ( "-f",
+          Arg.String (fun file -> files_to_run := file :: !files_to_run),
+          "<TITLE> Same as --file." );
         ( "--test",
           Arg.String (fun title -> tests_to_run := title :: !tests_to_run),
           "<TITLE> Only run tests which are exactly entitled TITLE. You can \
            specify several --test options, all of them will be run. \
-           Specifying tags (see TAGS) may still reduce the set of tests to \
-           run." );
+           Specifying tags (see TAGS) or --file may still reduce the set of \
+           tests to run." );
         ( "-t",
           Arg.String (fun title -> tests_to_run := title :: !tests_to_run),
           "<TITLE> Same as --test." ) ]
@@ -151,6 +162,7 @@ let options =
     commands = !commands;
     temporary_file_mode = !temporary_file_mode;
     keep_going = !keep_going;
+    files_to_run = !files_to_run;
     tests_to_run = !tests_to_run;
     tags_to_run = !tags_to_run;
     tags_not_to_run = !tags_not_to_run;

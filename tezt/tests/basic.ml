@@ -28,6 +28,7 @@
 
 let check_node_initialization history_mode =
   Test.run
+    ~__FILE__
     ~title:
       (sf "node initialization (%s mode)" (Node.show_history_mode history_mode))
     ~tags:["basic"; "node"; Node.show_history_mode history_mode]

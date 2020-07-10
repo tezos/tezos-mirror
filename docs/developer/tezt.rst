@@ -145,6 +145,8 @@ Let's review what our basic test in the previous section does.
   with all three modes (this is what ``run_all`` does).
 
 - Function ``Test.run`` declares a test.
+  The ``~__FILE__`` argument gives the source filename so that one can select this
+  file with the ``--file`` argument, to only run tests declared in this file.
   Each test has a title which is used in logs and on the command-line with the ``--test``
   option (which allows to run a particular test from its title).
   Each test also has a list of tags.

@@ -64,6 +64,7 @@ type options = {
   commands : bool;
   temporary_file_mode : temporary_file_mode;
   keep_going : bool;
+  files_to_run : string list;
   tests_to_run : string list;
   tags_to_run : string list;
   tags_not_to_run : string list;
