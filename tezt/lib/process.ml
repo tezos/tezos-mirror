@@ -104,6 +104,8 @@ let get_echo_lwt_channel echo =
 type t = {
   id : int;
   name : string;
+  command : string;
+  arguments : string list;
   color : Log.Color.t;
   lwt_process : Lwt_process.process_full;
   log_status_on_exit : bool;
@@ -243,6 +245,8 @@ let spawn_with_stdin ?(log_status_on_exit = true) ?name
     {
       id = fresh_id ();
       name;
+      command;
+      arguments;
       color;
       lwt_process;
       log_status_on_exit;
@@ -299,16 +303,23 @@ let () =
   | _ ->
       None
 
-let run ?log_status_on_exit ?name ?color ?env command arguments =
-  let process =
-    spawn ?log_status_on_exit ?name ?color ?env command arguments
-  in
+let check process =
   let* status = wait process in
   match status with
   | WEXITED 0 ->
       unit
   | _ ->
-      raise (Failed {name = process.name; command; arguments; status})
+      raise
+        (Failed
+           {
+             name = process.name;
+             command = process.command;
+             arguments = process.arguments;
+             status;
+           })
+
+let run ?log_status_on_exit ?name ?color ?env command arguments =
+  spawn ?log_status_on_exit ?name ?color ?env command arguments |> check
 
 let clean_up () =
   let list = ID_map.bindings !live_processes |> List.map snd in

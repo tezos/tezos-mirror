@@ -88,14 +88,26 @@ module Admin : sig
   (** Connect a node to another peer. *)
   val connect_address : ?node:Node.t -> peer:Node.t -> t -> unit Lwt.t
 
-  (** Kick a peer *)
-  val kick_peer : ?node:Node.t -> peer:Node.t -> t -> unit Lwt.t
+  (** Same as [connect_address], but do not wait for the process to exit. *)
+  val spawn_connect_address : ?node:Node.t -> peer:Node.t -> t -> Process.t
+
+  (** Kick a peer.
+
+      [peer] is the identity of the peer to kick.
+      You can get it with [Node.wait_for_identity] for instance. *)
+  val kick_peer : ?node:Node.t -> peer:string -> t -> unit Lwt.t
+
+  (** Same as [kick_peer], but do not wait for the process to exit. *)
+  val spawn_kick_peer : ?node:Node.t -> peer:string -> t -> Process.t
 end
 
 (** {2 Regular Client Commands} *)
 
 (** Run [tezos-client import secret key]. *)
 val import_secret_key : ?node:Node.t -> t -> Constant.key -> unit Lwt.t
+
+(** Same as [import_secret_key], but do not wait for the process to exit. *)
+val spawn_import_secret_key : ?node:Node.t -> t -> Constant.key -> Process.t
 
 (** Run [tezos-client activate protocol].
 
@@ -113,11 +125,26 @@ val activate_protocol :
   t ->
   unit Lwt.t
 
+(** Same as [activate_protocol], but do not wait for the process to exit. *)
+val spawn_activate_protocol :
+  ?node:Node.t ->
+  ?protocol:Constant.protocol ->
+  ?fitness:int ->
+  ?key:string ->
+  ?timestamp:string ->
+  ?timestamp_delay:float ->
+  t ->
+  Process.t
+
 (** Run [tezos-client bake for].
 
     Default [key] is {!Constant.bootstrap1.alias}. *)
 val bake_for :
   ?node:Node.t -> ?key:string -> ?minimal_timestamp:bool -> t -> unit Lwt.t
+
+(** Same as [bake_for], but do not wait for the process to exit. *)
+val spawn_bake_for :
+  ?node:Node.t -> ?key:string -> ?minimal_timestamp:bool -> t -> Process.t
 
 (** {2 High-Level Functions} *)
 

@@ -68,19 +68,12 @@ val kill : t -> unit
 (** Wait until a process terminates and return its status. *)
 val wait : t -> Unix.process_status Lwt.t
 
-(** Raised by {!run} if its process does not exit with code 0. *)
-exception
-  Failed of {
-    name : string;
-    command : string;
-    arguments : string list;
-    status : Unix.process_status;
-  }
+(** Wait until a process terminates and check its status.
 
-(** Spawn a process, wait for it to terminate, and check its exit code.
+    If the exit code is not 0, or if the process was killed, fail the test. *)
+val check : t -> unit Lwt.t
 
-    If the exit code is not 0, or if the process was killed, reject the promise
-    with [Failed]. *)
+(** Spawn a process, wait for it to terminate, and check its status. *)
 val run :
   ?log_status_on_exit:bool ->
   ?name:string ->

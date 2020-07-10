@@ -95,6 +95,9 @@ val terminate : t -> unit Lwt.t
 (** Run [tezos-node identity generate]. *)
 val identity_generate : ?expected_pow:int -> t -> unit Lwt.t
 
+(** Same as [identity_generate], but do not wait for the process to exit. *)
+val spawn_identity_generate : ?expected_pow:int -> t -> Process.t
+
 (** History modes for the node. *)
 type history_mode = Archive | Full | Rolling
 
@@ -115,6 +118,15 @@ val config_init :
   ?history_mode:history_mode ->
   t ->
   unit Lwt.t
+
+(** Same as [config_init], but do not wait for the process to exit. *)
+val spawn_config_init :
+  ?network:string ->
+  ?net_port:int ->
+  ?rpc_port:int ->
+  ?history_mode:history_mode ->
+  t ->
+  Process.t
 
 (** Spawn [tezos-node run]. *)
 val run :

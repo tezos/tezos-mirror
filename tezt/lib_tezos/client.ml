@@ -75,9 +75,9 @@ let base_args ?node client =
       ["-P"; string_of_int (Node.rpc_port node)] )
   @ ["--base-dir"; client.base_dir]
 
-let run_command ?(needs_node = true) ?(admin = false) ?node client command =
+let spawn_command ?(needs_node = true) ?(admin = false) ?node client command =
   if needs_node then check_node_is_specified ?node command client ;
-  Process.run
+  Process.spawn
     ~name:client.name
     ~color:client.color
     (if admin then client.admin_path else client.path)
@@ -134,27 +134,35 @@ let rpc ?node ?data ?query_string meth path client : JSON.t Lwt.t =
   return (JSON.parse ~origin:(path ^ " response") output)
 
 module Admin = struct
-  let run_command = run_command ~admin:true
+  let spawn_command = spawn_command ~admin:true
 
-  let connect_address ?node ~peer client =
-    run_command
+  let spawn_connect_address ?node ~peer client =
+    spawn_command
       client
       ?node
       ["connect"; "address"; "[::1]:" ^ string_of_int (Node.net_port peer)]
 
+  let connect_address ?node ~peer client =
+    spawn_connect_address ?node ~peer client |> Process.check
+
+  let spawn_kick_peer ?node ~peer client =
+    spawn_command client ?node ["kick"; "peer"; peer]
+
   let kick_peer ?node ~peer client =
-    let* identity = Node.wait_for_identity peer in
-    run_command client ?node ["kick"; "peer"; identity]
+    spawn_kick_peer ?node ~peer client |> Process.check
 end
 
-let import_secret_key ?node client (key : Constant.key) =
-  run_command
+let spawn_import_secret_key ?node client (key : Constant.key) =
+  spawn_command
     ~needs_node:false
     ?node
     client
     ["import"; "secret"; "key"; key.alias; key.secret]
 
-let activate_protocol ?node ?(protocol = Constant.alpha) ?(fitness = 1)
+let import_secret_key ?node client key =
+  spawn_import_secret_key ?node client key |> Process.check
+
+let spawn_activate_protocol ?node ?(protocol = Constant.alpha) ?(fitness = 1)
     ?(key = Constant.activator.alias) ?timestamp
     ?(timestamp_delay = 3600. *. 24. *. 365.) client =
   let timestamp =
@@ -172,7 +180,7 @@ let activate_protocol ?node ?(protocol = Constant.alpha) ?(fitness = 1)
           tm.tm_min
           tm.tm_sec
   in
-  run_command
+  spawn_command
     client
     ?node
     [ "activate";
@@ -190,13 +198,28 @@ let activate_protocol ?node ?(protocol = Constant.alpha) ?(fitness = 1)
       "--timestamp";
       timestamp ]
 
-let bake_for ?node ?(key = Constant.bootstrap1.alias)
+let activate_protocol ?node ?protocol ?fitness ?key ?timestamp ?timestamp_delay
+    client =
+  spawn_activate_protocol
+    ?node
+    ?protocol
+    ?fitness
+    ?key
+    ?timestamp
+    ?timestamp_delay
+    client
+  |> Process.check
+
+let spawn_bake_for ?node ?(key = Constant.bootstrap1.alias)
     ?(minimal_timestamp = true) client =
-  run_command
+  spawn_command
     client
     ?node
     ( "bake" :: "for" :: key
     :: (if minimal_timestamp then ["--minimal-timestamp"] else []) )
+
+let bake_for ?node ?key ?minimal_timestamp client =
+  spawn_bake_for ?node ?key ?minimal_timestamp client |> Process.check
 
 let init ?path ?admin_path ?name ?color ?base_dir ?node () =
   let client = create ?path ?admin_path ?name ?color ?base_dir ?node () in

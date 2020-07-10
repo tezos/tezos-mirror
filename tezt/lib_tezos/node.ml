@@ -151,16 +151,20 @@ let create ?(path = Constant.tezos_node) ?name ?color ?data_dir ?event_pipe
     pending_custom = String_map.empty;
   }
 
-let run_command node = Process.run ~name:node.name ~color:node.color node.path
+let spawn_command node =
+  Process.spawn ~name:node.name ~color:node.color node.path
 
-let identity_generate ?(expected_pow = 0) node =
-  run_command
+let spawn_identity_generate ?(expected_pow = 0) node =
+  spawn_command
     node
     [ "identity";
       "generate";
       "--data-dir";
       node.data_dir;
       string_of_int expected_pow ]
+
+let identity_generate ?expected_pow node =
+  spawn_identity_generate ?expected_pow node |> Process.check
 
 type history_mode = Archive | Full | Rolling
 
@@ -172,10 +176,11 @@ let show_history_mode = function
   | Rolling ->
       "rolling"
 
-let config_init ?(network = "sandbox") ?net_port ?rpc_port ?history_mode node =
+let spawn_config_init ?(network = "sandbox") ?net_port ?rpc_port ?history_mode
+    node =
   (match net_port with None -> () | Some port -> node.net_port <- port) ;
   (match rpc_port with None -> () | Some port -> node.rpc_port <- port) ;
-  run_command
+  spawn_command
     node
     ( "config" :: "init" :: "--data-dir" :: node.data_dir :: "--network"
     :: network :: "--net-addr"
@@ -192,6 +197,10 @@ let config_init ?(network = "sandbox") ?net_port ?rpc_port ?history_mode node =
         ["--history-mode"; "archive"]
     | Some Rolling ->
         ["--history-mode"; "experimental-rolling"] ) )
+
+let config_init ?network ?net_port ?rpc_port ?history_mode node =
+  spawn_config_init ?network ?net_port ?rpc_port ?history_mode node
+  |> Process.check
 
 let trigger_ready node value =
   let pending = node.pending_ready in
