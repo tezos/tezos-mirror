@@ -541,7 +541,12 @@ tezt:main:
   before_script:
     - make
   script:
-    - dune exec tezt/tests/main.exe -- -v --color
+    - dune exec tezt/tests/main.exe -- --color --log-buffer-size 5000 --log-file tezt.log
+  artifacts:
+    paths:
+    - tezt.log
+    expire_in: 1 day
+    when: on_failure
 
 ############################################################
 ## Stage: run doc integration tests                       ##
