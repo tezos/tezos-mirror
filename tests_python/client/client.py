@@ -126,6 +126,7 @@ class Client:
         check: bool = True,
         trace: bool = False,
         stdin: str = "",
+        env_change: dict = None,
     ) -> Tuple[str, str, int]:
         """Run an arbitrary command
 
@@ -137,6 +138,7 @@ class Client:
             trace (bool): use '-l' option to trace RPCs
             stdin (string): string that will be passed as standard
                             input to the process
+            env_change (dict): overrides to environment variables
         Returns:
             (stdout of command, stderr of command, return code)
 
@@ -151,6 +153,8 @@ class Client:
         print(format_command(cmd))
 
         new_env = os.environ.copy()
+        if env_change is not None:
+            new_env.update(env_change)
         if self._disable_disclaimer:
             new_env["TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER"] = "Y"
         process = subprocess.Popen(
