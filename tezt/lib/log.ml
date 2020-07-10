@@ -113,6 +113,41 @@ end
 
 let log_file = Option.map open_out Cli.options.log_file
 
+(* The log buffer is a queue with a maximum size.
+   Older items are dropped. *)
+module Log_buffer = struct
+  let capacity = Cli.options.log_buffer_size
+
+  (* Each item is a tuple [(color, prefix, prefix_color, message)]. *)
+  let buffer = Array.make capacity (None, None, None, "")
+
+  (* Index where to add the next item. *)
+  let next = ref 0
+
+  (* Number of items which are actually used in the array. *)
+  let used = ref 0
+
+  let reset () =
+    next := 0 ;
+    used := 0
+
+  let push line =
+    if capacity > 0 then (
+      if !next >= capacity then next := 0 ;
+      buffer.(!next) <- line ;
+      incr next ;
+      used := min capacity (!used + 1) )
+
+  (* Note: don't call [push] in [f]. *)
+  let iter f =
+    let first = !next - !used in
+    let last = !next - 1 in
+    for i = first to last do
+      (* Add [capacity] to avoid issues with modulo of negative integers. *)
+      f buffer.((i + capacity) mod capacity)
+    done
+end
+
 let output_time output =
   let now = Unix.gettimeofday () in
   let time = Unix.gmtime now in
@@ -124,36 +159,37 @@ let output_time output =
        time.tm_sec
        (int_of_float ((now -. float (truncate now)) *. 1000.)))
 
+let log_line_to ~use_colors (color, prefix, prefix_color, message) channel =
+  let output = output_string channel in
+  output "[" ;
+  output_time output ;
+  output "] " ;
+  if use_colors then Option.iter output color ;
+  Option.iter
+    (fun prefix ->
+      output "[" ;
+      if use_colors then Option.iter output prefix_color ;
+      output prefix ;
+      ( if use_colors then
+        match prefix_color with
+        | None ->
+            ()
+        | Some _ ->
+            output Color.reset ; Option.iter output color ) ;
+      output "] ")
+    prefix ;
+  output message ;
+  if use_colors && color <> None then output Color.reset ;
+  output "\n"
+
 let log_string ~(level : Cli.log_level) ?color ?prefix ?prefix_color message =
   match String.split_on_char '\n' message with
   | [] | [""] ->
       ()
   | lines ->
       let log_line message =
-        let log_line_to ~use_colors channel =
-          let output = output_string channel in
-          output "[" ;
-          output_time output ;
-          output "] " ;
-          if use_colors then Option.iter output color ;
-          Option.iter
-            (fun prefix ->
-              output "[" ;
-              if use_colors then Option.iter output prefix_color ;
-              output prefix ;
-              ( if use_colors then
-                match prefix_color with
-                | None ->
-                    ()
-                | Some _ ->
-                    output Color.reset ; Option.iter output color ) ;
-              output "] ")
-            prefix ;
-          output message ;
-          if use_colors && color <> None then output Color.reset ;
-          output "\n"
-        in
-        Option.iter (log_line_to ~use_colors:false) log_file ;
+        let line = (color, prefix, prefix_color, message) in
+        Option.iter (log_line_to ~use_colors:false line) log_file ;
         match (Cli.options.log_level, level) with
         | (_, Quiet) ->
             invalid_arg "Log.log_string: level cannot be Quiet"
@@ -162,10 +198,15 @@ let log_string ~(level : Cli.log_level) ?color ?prefix ?prefix_color message =
         | (Report, (Error | Warn | Report))
         | (Info, (Error | Warn | Report | Info))
         | (Debug, (Error | Warn | Report | Info | Debug)) ->
-            log_line_to ~use_colors:Cli.options.color stdout ;
+            ( if level = Error then
+              Log_buffer.iter
+              @@ fun line ->
+              log_line_to ~use_colors:Cli.options.color line stdout ) ;
+            Log_buffer.reset () ;
+            log_line_to ~use_colors:Cli.options.color line stdout ;
             flush stdout
         | ((Quiet | Error | Warn | Report | Info), _) ->
-            ()
+            Log_buffer.push line
       in
       List.iter log_line lines
 

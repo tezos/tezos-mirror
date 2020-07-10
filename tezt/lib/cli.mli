@@ -62,6 +62,7 @@ type options = {
   color : bool;
   log_level : log_level;
   log_file : string option;
+  log_buffer_size : int;
   commands : bool;
   temporary_file_mode : temporary_file_mode;
   keep_going : bool;

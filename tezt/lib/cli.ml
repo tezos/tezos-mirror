@@ -31,6 +31,7 @@ type options = {
   color : bool;
   log_level : log_level;
   log_file : string option;
+  log_buffer_size : int;
   commands : bool;
   temporary_file_mode : temporary_file_mode;
   keep_going : bool;
@@ -47,6 +48,7 @@ let options =
   in
   let log_level = ref Report in
   let log_file = ref None in
+  let log_buffer_size = ref 50 in
   let commands = ref false in
   let temporary_file_mode = ref Delete in
   let keep_going = ref false in
@@ -83,6 +85,11 @@ let options =
           Arg.String (fun f -> log_file := Some f),
           "<FILE> Also log to FILE (in verbose mode: --log-level only applies \
            to stdout)." );
+        ( "--log-buffer-size",
+          Arg.Set_int log_buffer_size,
+          "<COUNT> Before logging an error on stdout, also log the last COUNT \
+           messages that have been ignored because of the log level since the \
+           last message that was not ignored. Default is 50." );
         ( "--verbose",
           Arg.Unit (fun () -> log_level := Debug),
           " Same as --log-level debug." );
@@ -166,6 +173,7 @@ let options =
     color = !color;
     log_level = !log_level;
     log_file = !log_file;
+    log_buffer_size = !log_buffer_size;
     commands = !commands;
     temporary_file_mode = !temporary_file_mode;
     keep_going = !keep_going;
