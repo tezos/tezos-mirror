@@ -111,15 +111,15 @@ module MakeId (Title : Title) : TitleWithId = struct
 
     let init = Z.zero
 
-    let parse_z z = z
+    let parse_z (z : Z.t) : t = z
 
-    let unparse_to_z z = z
+    let unparse_to_z (z : t) : Z.t = z
 
     let next = Z.succ
 
-    let of_legacy_USE_ONLY_IN_Legacy_big_map_diff z = z
+    let of_legacy_USE_ONLY_IN_Legacy_big_map_diff (z : Z.t) : t = z
 
-    let to_legacy_USE_ONLY_IN_Legacy_big_map_diff z = z
+    let to_legacy_USE_ONLY_IN_Legacy_big_map_diff (z : t) : Z.t = z
 
     module Temp = struct
       type nonrec t = t
@@ -211,6 +211,7 @@ module Temp_ids = struct
     | Big_map ->
         let big_map = Big_map.Id.Temp.next temp_ids.big_map in
         ({big_map}, (big_map :> Big_map.Id.t))
+   [@@coq_axiom "gadt"]
 
   let fold_s :
       type i a u.
@@ -229,4 +230,5 @@ module Temp_ids = struct
           (module Big_map.Id.Temp)
           ~last:temp_ids.big_map
           (fun acc temp_id -> f acc (temp_id :> i))
+   [@@coq_axiom "gadt"]
 end
