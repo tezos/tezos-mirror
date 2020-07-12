@@ -141,15 +141,19 @@ let get_ops : type i a u. (i, a, u) Lazy_storage_kind.t -> (i, a, u) ops =
 module KId = struct
   type t = E : ('id, _, _) Lazy_storage_kind.t * 'id -> t
 
-  let compare (E (kind1, id1)) (E (kind2, id2)) =
-    match Lazy_storage_kind.compare kind1 kind2 with
-    | Lt ->
-        -1
-    | Gt ->
-        1
-    | Eq ->
-        let (module OPS) = get_ops kind1 in
-        OPS.Id.compare id1 id2
+  module Comparable = struct
+    type nonrec t = t
+
+    let compare (E (kind1, id1)) (E (kind2, id2)) =
+      match Lazy_storage_kind.compare kind1 kind2 with
+      | Lt ->
+          -1
+      | Gt ->
+          1
+      | Eq ->
+          let (module OPS) = get_ops kind1 in
+          OPS.Id.compare id1 id2
+  end
 end
 
 type ('id, 'alloc) init = Existing | Copy of {src : 'id} | Alloc of 'alloc

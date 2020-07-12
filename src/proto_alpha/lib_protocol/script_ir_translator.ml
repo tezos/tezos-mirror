@@ -5675,7 +5675,7 @@ let big_map_get ctxt key {id; diff; key_type; value_type} =
 let big_map_update key value ({diff; _} as map) =
   {map with diff = map_set key value diff}
 
-module Ids = Set.Make (Lazy_storage.KId)
+module Ids = Set.Make (Lazy_storage.KId.Comparable)
 
 type lazy_storage_ids = Ids.t
 

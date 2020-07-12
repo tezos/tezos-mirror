@@ -724,7 +724,7 @@ module Lazy_storage : sig
   module KId : sig
     type t = E : ('id, _, _) Kind.t * 'id -> t
 
-    val compare : t -> t -> int
+    module Comparable : Compare.COMPARABLE with type t = t
   end
 
   type ('id, 'alloc) init = Existing | Copy of {src : 'id} | Alloc of 'alloc
