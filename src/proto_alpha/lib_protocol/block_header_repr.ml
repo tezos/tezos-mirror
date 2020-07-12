@@ -102,7 +102,8 @@ let max_header_length =
       fitness = Fitness_repr.from_int64 0L;
       context = Context_hash.zero;
     }
-  and fake_contents =
+  in
+  let fake_contents =
     {
       priority = 0;
       proof_of_work_nonce =

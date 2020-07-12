@@ -1055,15 +1055,15 @@ module Vote : sig
 end
 
 module Block_header : sig
-  type t = {shell : Block_header.shell_header; protocol_data : protocol_data}
-
-  and protocol_data = {contents : contents; signature : Signature.t}
-
-  and contents = {
+  type contents = {
     priority : int;
     seed_nonce_hash : Nonce_hash.t option;
     proof_of_work_nonce : bytes;
   }
+
+  type protocol_data = {contents : contents; signature : Signature.t}
+
+  type t = {shell : Block_header.shell_header; protocol_data : protocol_data}
 
   type block_header = t
 
