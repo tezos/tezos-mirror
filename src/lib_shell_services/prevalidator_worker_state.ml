@@ -83,7 +83,13 @@ module Request = struct
           ~title:"Advertise"
           (obj1 (req "request" (constant "advertise")))
           (function View Advertise -> Some () | _ -> None)
-          (fun () -> View Advertise) ]
+          (fun () -> View Advertise);
+        case
+          (Tag 5)
+          ~title:"Leftover"
+          (obj1 (req "request" (constant "leftover")))
+          (function View Leftover -> Some () | _ -> None)
+          (fun () -> View Leftover) ]
 
   let pp ppf (View r) =
     match r with

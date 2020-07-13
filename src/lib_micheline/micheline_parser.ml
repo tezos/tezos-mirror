@@ -121,7 +121,13 @@ let token_value_encoding =
         ~title:"Bytes"
         (obj1 (req "bytes" string))
         (function Bytes s -> Some s | _ -> None)
-        (fun s -> Bytes s) ]
+        (fun s -> Bytes s);
+      case
+        (Tag 6)
+        ~title:"Ident"
+        (obj1 (req "ident" string))
+        (function Ident s -> Some s | _ -> None)
+        (fun s -> Ident s) ]
 
 type token = {token : token_value; loc : location}
 
