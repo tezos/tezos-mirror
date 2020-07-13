@@ -51,26 +51,24 @@ let rec worker_loop bv =
     bv.pending <- Protocol_hash.Map.remove hash bv.pending ;
     Updater.compile hash protocol
     >>= fun valid ->
-    ( if valid then Distributed_db.commit_protocol bv.db hash protocol
-    else
-      (* no need to tag 'invalid' protocol on disk,
-             the economic protocol prevents us from
-             being spammed with protocol validation. *)
-      return_true )
-    >>=? fun _ ->
-    if valid then
-      match Registered_protocol.get hash with
+    if valid then (
+      Distributed_db.commit_protocol bv.db hash protocol
+      >>=? fun _ ->
+      ( match Registered_protocol.get hash with
       | Some protocol ->
           Lwt.wakeup_later wakener (Ok protocol)
       | None ->
           Lwt.wakeup_later
             wakener
-            (error (Invalid_protocol {hash; error = Dynlinking_failed}))
-    else
+            (error (Invalid_protocol {hash; error = Dynlinking_failed})) ) ;
+      return_unit )
+    else (
+      (* no need to tag 'invalid' protocol on disk, the economic protocol
+         prevents us from being spammed with protocol validation. *)
       Lwt.wakeup_later
         wakener
         (error (Invalid_protocol {hash; error = Compilation_failed})) ;
-    return_unit )
+      return_unit ) )
   >>= function
   | Ok () ->
       worker_loop bv
