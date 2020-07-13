@@ -251,7 +251,13 @@ let directory_descr_encoding =
         ~title:"Dynamic"
         (obj1 (req "dynamic" (option string)))
         (function Dynamic descr -> Some descr | _ -> None)
-        (fun descr -> Dynamic descr) ]
+        (fun descr -> Dynamic descr);
+      case
+        (Tag 2)
+        ~title:"Empty"
+        (constant "empty")
+        (function Empty -> Some () | _ -> None)
+        (fun () -> Empty) ]
 
 let description_request_encoding =
   let open Data_encoding in
