@@ -56,12 +56,13 @@ let () =
       "primitiveNamespace"
       ~title:"Primitive namespace"
       ~description:
-        "One of the three possible namespaces of primitive (data constructor, \
-         type name or instruction)."
+        "One of the four possible namespaces of primitive (data constructor, \
+         type name, instruction or keyword)."
     @@ string_enum
          [ ("type", Michelson_v1_primitives.Type_namespace);
            ("constant", Constant_namespace);
-           ("instruction", Instr_namespace) ]
+           ("instruction", Instr_namespace);
+           ("keyword", Keyword_namespace) ]
   in
   let kind_enc =
     def
