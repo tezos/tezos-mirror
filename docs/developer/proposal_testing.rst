@@ -3,320 +3,694 @@
 How to test a protocol proposal
 ===============================
 
-In this tutorial we show how to test a newly developed protocol and,
-in particular, how to test the migration process from its
-predecessor. We also provide a short guide on how to read the
-migration code.
+In this tutorial we show how to test a newly developed protocol and, in
+particular, how to test the migration process from its predecessor. We also
+provide a short guide on how to read the migration code.
 
-We start by describing the branch that contains the protocol proposal
-that is under development.
+We start by describing the branch that contains the protocol proposal that is
+under development.
 
 The branch ``proto-proposal``
 -----------------------------
 
-The current proposal from Nomadic is developed in the branch
-``proto-proposal``, which contains both the new protocol and its
-migration code from the current active protocol. The current protocol
-proposal under development is referred to as the "Alpha protocol".
+The current proposal is developed in the branch ``proto-proposal``, which
+contains both the new protocol and its migration code from the current active
+protocol. The current protocol proposal under development is referred to as the
+`Alpha protocol`.
 
-Since the commits for migration code are only used once, we keep them
-clearly separated by marking them with the tag ``Migration:``. The
-first step when developing a new protocol is to revert the migration
-commits from the previous protocol. The rest of the comits are used as
-a base for current proposals.
+Since the commits for migration code are only used once, we keep them clearly
+separated by marking them with the tag ``Migration:``. The first step when
+developing a new protocol is to revert the migration commits from the previous
+protocol. The rest of the commits are used as a base for current proposals.
 
 The commits in ``proto-proposal`` are mostly confined to the directory
-``proto_alpha``. Any change outside this directory is to adapt the
-client, the daemons or the test frameworks to the new protocol.
+``proto_alpha``. Any change outside this directory is to adapt the client, the
+daemons or the test frameworks to the new protocol.
 
-Conversely, the commits in the ``master`` branch should never touch
-the directory ``proto_alpha/lib_protocol``.
+Conversely, the commits in the ``master`` branch should never touch the
+directory ``proto_alpha/lib_protocol``.
 
-We next describe how to run unit tests and how to activate the Alpha
-protocol in a sandboxed node.
+We next describe how to run unit tests and how to activate the Alpha protocol in
+sandboxed node.
 
-Unit tests and sandbox
-----------------------
+Unit tests and sandboxed mode
+-----------------------------
 
-The first step for tweaking and testing the current proposal is to
-checkout the latest code and run unit tests::
+The first step for tweaking and testing the current proposal is to checkout the
+latest code and run unit tests::
 
-  git checkout proto-proposal
-  make
-  make test
+  $ git checkout proto-proposal
+  $ make
+  $ make test
 
-The sandbox script allows one to activate the Alpha protocol---located
-in the directory ``proto_alpha``---by using the command
-``tezos-activate-alpha``. We can use the usual commands to run a node,
-client and daemons for further manual testing::
+We can run a node and a client in sandboxed mode by invoking::
 
-  ./src/bin_node/tezos-sandboxed-node.sh 1 --connections 0 &
-  eval `./src/bin_client/tezos-init-sandboxed-client.sh 1`
-  tezos-activate-alpha
+  $ ./src/bin_node/tezos-sandboxed-node.sh 1 --connections 0 &
+  $ eval `./src/bin_client/tezos-init-sandboxed-client.sh 1`
 
-After activating the Alpha protocol we can use the usual RPCs to bake
-with the client and make the chain progress (see :ref:`sandboxed-mode`)::
+By default, the sandbox starts from the `genesis` block at level 0, and the
+sandbox's active protocol is the `Genesis protocol`. Once the sandbox is
+started, the Alpha protocol can be activated by invoking the command::
 
-  tezos-client bake for bootstrap1
+  $ tezos-activate-alpha
 
-In the following section we provide detailed indications on how to
-write migration code, and how to run and bench a migration on a real
-context from `Mainnet`.
+This command inserts a new block after which the active protocol is the Alpha
+protocol. From this point on, making the chain progress is straightforward
+because the sandbox contains accounts ``bootstrap1`` to ``bootstrap5`` with
+implicit credentials that allow them to bake blocks by using the usual RPCs in
+the shell (see :ref:`sandboxed-mode`)::
 
+  $ tezos-client bake for bootstrap1 --minimal-timestamp
 
-Test migration on Mainnet
--------------------------
-
-The most delicate part of developing a new protocol is migrating the
-context of its predecessor. Migration code often has to convert large
-data structures, therefore it is important to bench its running time
-and the size of the context produced. For these reasons it is
-imperative to run the migration on a real context from Mainnet, bench
-it and manually inspect the content of the storage. This process is
-somewhat manual but we have tried to automate most of it with a few
-scripts.
-
-Snapshot the Alpha protocol
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-In order to test the Alpha protocol ``proto_alpha`` contained in
-``proto_proposal``, we first need to convert the protocol to a format
-suitable for Mainnet, a procedure usually referred to as `to snapshot
-the Alpha protocol`. This procedure consists mainly of three steps:
-
-- specify the version and name of the current protocol (in
-  ``raw_context.ml``),
-- compute the protocol's hash (in ``TEZOS_PROTOCOL``), and
-- rename a bunch of protocol tags (several places in the code base).
-
-These steps are performed by the script ``scripts/snapshot_alpha.sh``,
-which receives a parameter with the name of the Alpha protocol. This
-name parameter follows the convention
-``<tag_starting_with_version_letter>_<version_number>``. For
-historical reasons version ``004`` corresponds to letter ``a``. In the
-remainder we will illustrate the migration process through an example
-where we migrate to the version ``007``, which corresponds to the
-letter ``d``. A valid name for the Alpha protocol in our example would
-be ``d_007``. Invoking the script::
-
-  ./scripts/snapshot_alpha.sh d_007
-
-snapshots the Alpha protocol and creates a new directory
-``src/proto_007_<hash>`` where the ``<hash>`` computed by the script
-coincides with the one in the file ``TEZOS_PROTOCOL``. The new folder
-contains the Alpha protocol in a format that can be linked in the node
-and client in the build system.
-
-Link the Alpha protocol in the build system
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Protocol ``proto_007_<hash>`` can now be linked in the node and client
-in the build system. Note that linking the protocol is not mandatory;
-we can always inject a protocol that compiles in a node and link it
-dynamically on the fly. However, linking the protocol in the client
-enables the use of the commands that may be present in the folder
-``lib_client`` of the protocol, if any. Otherwise, only the commands
-accessible through the RPCs would be available. Except for some
-specific scenarios in which the commands accessible through the RPCs
-are enough, it is always convenient to link the protocol in the build
-system. In our example, this can be done by invoking::
-
-  ./scripts/link_protocol.sh src/proto_007_*
-
-User-activated upgrade
-----------------------
-
-The current Alpha protocol supports self-amending through the voting
-procedure of Tezos. However, such procedure can take up to three
-months, and we would rather test our migration without waiting such a
-long period of time. Besides the amendments driven by the protocol,
-Tezos also supports `user-activated` upgrades that are triggered by
-the shell. These upgrades are useful in case of emergency bug fixes,
-and have been used to migrate from 001 to 002 and from 002 to 003.
-
-The user-activated upgrades can be used to trigger an amendment to any
-version of the protocol. In the next section we show how to use this
-mechanism in the sandbox, to test the migration from an empty context,
-and also in a realistic migration scenario where the context is
-imported from a Mainnet snapshot.
-
-User-activated upgrade in the sandbox
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The sandbox starts from an empty context, which can be useful to do
-some preliminary migration testing. Instead of activating directly the
-version of the Alpha protocol under development, we could activate its
-predecessor, and then set the activation of the Alpha protocol at a
-given level. For instance, by invoking::
-
-  ./scripts/user_activated_upgrade.sh src/proto_007_* 3
-
-we set a user-activated upgrade that will activate the Alpha protocol
-in our example when the blockchain reaches level three. Now we
-can start the sandbox as usual and use the client commands to bake
-three blocks, after which the Alpha protocol ``proto_007_<hash>`` will
-become active.
+The remainder of the tutorial is organised as follows. Section `Test a
+migration`_ provides detailed indications on how to test a migration, and
+Section `Wrap up the migration procedure`_ summarises these indications by
+collecting all the steps needed to test the migration. To conclude, Section
+`Tips and tricks`_ indicates how to use the shell to inspect the context, and
+Section `Anatomy of migration code`_ contains a primer on how to read and write
+migration code.
 
 
-Import a Mainnet context from a snapshot
+Test a migration
+----------------
+
+The most delicate part of migrating to a new protocol is to produce a new
+context from the context of its predecessor. The migration code takes care of
+producing the new context, which often has to convert large data
+structures. Therefore, it is important to bench the migration running time and
+the size of the context produced. For these reasons it is imperative to test the
+migration on a real context imported from `Mainnet`, bench it, and manually
+inspect the content of the storage. We refer to this procedure as `migration on
+a context imported from Mainnet`.
+
+However, sometimes we may want to perform some preliminary tests and run the
+migration on an empty context that we populate manually. We can do so by running
+a node in sandboxed mode, and by activating the predecessor of the Alpha
+protocol on the genesis block. We refer to this procedure as `migration on the
+sandbox`.
+
+In this tutorial we describe a `manual migration procedure` in which the
+developer is in charge of setting up the migration environment and of manually
+baking the blocks that would eventually trigger the migration.
+For convenience, we have automated parts of this manual migration procedure by
+providing scripts that encompass some of its steps.
+
+We will illustrate the migration procedure through an example where the version
+of the Alpha protocol to which we migrate is ``007``.
+
+
+Checkout latest code and tweak migration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-In order to test the migration from a real Mainnet context we first
-need to import the context from a snapshot (see :ref:`snapshots`). We
-also need to generate a node identity, which we will keep together
-with the imported context in a folder with an ``-orig`` suffix. For
-instance, the following commands import a context from the snapshot
-``~/488274.roll`` into the folder ``~/488274-node-orig``, and generate
-an identity in the same folder::
+We start by checking out the latest code for the Alpha protocol in the
+``proto-proposal`` branch::
 
-  ./tezos-node snapshot import ~/488274.roll --data-dir ~/488274-node-orig
-  ./tezos-node identity generate --data-dir ~/488274-node-orig
+  $ git checkout proto-proposal
 
-Now, each time we want to test the migration, we copy the contents of
-``-orig`` folder into a fresh folder where the migration will be
-performed. In our example, we do this with the fresh folder
-``~/tezos-node-test`` by invoking::
-
-  cp -r ~/488274-node-orig ~/tezos-node-test
-
-At this stage, it is important to note the level at which the snapshot
-was taken, in our example ``488274``.
-
-
-Yes-node and yes-wallet
-~~~~~~~~~~~~~~~~~~~~~~~
-
-Once we start a node from a Mainnet context, how can we make the chain
-progress? We don't have the rights to produce blocks and we don't know
-the private keys of existing bakers at this point!
-
-The solution is to patch the code to make a `yes-node` that forges and
-verifies fake signatures.  This can be achieved with a small patch in
-``lib_crypto/signature.ml`` that replaces signatures with a
-concatenation of public key and message, such that this fake signature
-is still unique for each key and message.
-
-Once we have a yes-node we need to create a `yes-wallet`, which is a
-special wallet where secret keys actually encode the same bytes as
-their corresponding public keys. By adding to the yes-wallet the
-existing accounts of large bakers in Mainnet, e.g. the foundation, we
-would have enough rights to bake blocks at will. In our exmaple, we
-can generate such a wallet with::
-
-  ./scripts/user_activated_upgrade.sh src/proto_007_* 488277
-
-Triggering the migration is then a matter of::
-
-  ./tezos-client -d yes-wallet bake for foundation1 --minimal-timestamp
-  or
-  ./tezos-baker-007-* -d yes-wallet run with local node ~/488274-node foundation1
-
-Since we set the user-activated upgrade at level three, we should see
-the change of protocol after baking three blocks.
-
-Note: to test the migration again, remember to remove spurious files
-such as ``blocks`` or ``wallet_lock`` in the yes-wallet directory and
-to recopy the contents of the ``-orig`` folder into the folder where
-the test will be performed.
-
-Wrap it up
-~~~~~~~~~~
-
-Here's a full example of how to modify and test ``proto-007``::
-
-  git checkout proto-proposal
-
-Change line 47 of ``src/proto_alpha/lib_protocol/init_storage.ml`` as follows::
+Now we could tweak our migration by adding any desired feature. For instance, we
+could log the point at which migration takes place by editing the file
+``src/proto_alpha/lib_protocol/init_storage.ml``. This can be done by modifying
+the match expression of the function ``prepare_first_block`` in the said file to
+include the following lines::
 
   | Carthage_006 ->
       Logging.log_notice "\nSTITCHING!\n" ;
 
-Then::
+After making sure that our ``proto-proposal`` branch contains all the migration
+code that we want to test, we need to commit the changes locally::
 
   $ git commit -am 'My awesome feature'
+
+The next section summarises how to prepare the migration once we have tweaked
+the Alpha protocol in the branch ``proto-proposal``.
+
+
+Prepare the migration
+~~~~~~~~~~~~~~~~~~~~~
+
+Preparing the migration comprises the following steps:
+
+1. `snapshot` the Alpha protocol,
+2. link the snapshot Alpha protocol in the build system,
+3. set `user-activated upgrade` that will trigger the migration at a given
+   level,
+4. patch the snapshot Alpha protocol to obtain a `yes-node` that can fake baker
+   signatures, if we wish to import the context from Mainnet,
+5. create a `yes-wallet` that stores such fake signatures, if we wish to import
+   the context from Mainnet,
+6. compile the snapshot Alpha protocol, and
+7. import a context from Mainnet, if so wished.
+
+
+Steps 1--7 can be batched by invoking the script
+``./scripts/prepare_migration_test.sh`` in the way we explain
+below. Alternatively, each of the steps above can be performed individually by
+invoking the corresponding commands/scripts that we detail in the rest of the
+section.
+
+Before preparing the migration, we need to choose on which context the migration
+will run. When on the sandbox, the steps 4, 5 and 7 above are omitted because
+the sandbox starts on an empty context, and the sandbox automatically contains
+accounts with implicit credentials that will allow us to bake blocks and make
+the chain progress.
+
+When on a context imported from Mainnet, we will use a `snapshot file` (not to
+be mistaken with the `snapshot` operation of step 1 above) that contains the
+real status of a Mainnet's node at a particular moment in time (see
+:ref:`snapshots`). Such a snapshot file can be downloaded from several sites on
+the internet. For instance, the site
+`TulipTools<https://snapshots.tulip.tools/>`_ stores daily snapshot files from
+both Mainnet and Testnet, in both ``full`` and ``rolling`` mode (see
+:ref:`History modes`). For the purposes of testing the migration, a snapshot
+file in ``rolling`` mode is enough. It is important to use a snapshot file that
+is recent enough as to contain the predecessor of the Alpha protocol. It is also
+important to note down the level at which the snapshot file was taken, which
+determines at which level we want to trigger the migration. The site
+`TulipTools<https://snapshots.tulip.tools/>`_ conveniently indicates the date
+and the level (the `block`) at which each snapshot file was taken.
+
+In our example we will use a snapshot file
+``~/mainnet_2020-07-14_12 00.rolling`` that was downloaded from
+`TulipTools<https://snapshots.tulip.tools/>`_ on July the 14th of 2020, and
+which was taken at level ``1039318``.
+
+The next subsections explain each of the individual steps 1--7.
+
+
+1. Snapshot the Alpha protocol
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The first step is to convert the Alpha protocol to a format suitable for
+Mainnet, a procedure usually referred to as `snapshot the Alpha protocol`. This
+procedure consists mainly of three steps:
+
+- specify the version and name of the current protocol in ``raw_context.ml``,
+- compute the protocol's hash in ``TEZOS_PROTOCOL``, and
+- replace names and protocol hashes in various places in the code base.
+
+These three steps are performed by the script ``scripts/snapshot_alpha.sh``,
+which receives a parameter with the name of the Alpha protocol. This name
+parameter follows the convention
+``<tag_starting_with_version_letter>_<version_number>``. For historical reasons
+version ``004`` corresponds to letter ``a``. A valid name for the Alpha protocol
+in our example would be ``d_007``, since version ``007`` corresponds to letter
+``d``. We can snapshot the protocol by invoking the following::
+
   $ ./scripts/snapshot_alpha.sh d_007
+
+The script creates a new directory ``src/proto_007_<hash>`` where ``<hash>`` is
+a short hash that coincides with the first eight characters of the hash computed
+by the script and written in the file ``TEZOS_PROTOCOL``. The new folder
+contains the Alpha protocol in a format that can be linked in the node and
+client in the build system.
+
+
+2. Link the snapshot Alpha protocol in the build system
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Protocol ``proto_007_<hash>`` can now be linked in the node and client in the
+build system. Note that linking the protocol is not mandatory; we can always
+inject a protocol that compiles in a node and link it dynamically on the
+fly. However, linking the protocol in the client enables the use of the commands
+that may be present in the folder ``lib_client`` of the protocol, if
+any. Otherwise, only the commands accessible through the RPCs would be
+available. Except for some specific scenarios in which the commands accessible
+through the RPCs are enough, it is always convenient to link the protocol in the
+build system. In our example, this can be done by invoking::
+
   $ ./scripts/link_protocol.sh src/proto_007_*
-  $ ./scripts/user_activated_upgrade.sh src/proto_007_* 488277
 
-  #patch yes-node
-  $ patch -p1 < ./scripts/yes-node.patch
+If we opted to test the migration on an empty context on the sandbox, then we
+should proceed directly to Section `Set user-activated upgrades`_. Otherwise, in
+the next section we show how to patch the code to fake the credentials needed to
+make the chain imported from Mainnet progress.
 
-  #create yes_wallet directory
-  $ dune exec ./script/yes-wallet/yes_wallet.exe ~/yes-wallet
+The next two subsections detail how to produce credentials that will allow us to
+make the chain that we imported from Mainnet progress.
 
-  # import Mainnet context and keep imported clean of modification
-  $ ./tezos-node snapshot import ~/488274.roll --data-dir ~/488274-node-orig
-  $ ./tezos-node identity generate --data-dir ~/488274-node-orig
-  $ cp -r ~/488274-node-orig ~/tezos-node-test
+
+3. Set user-activated upgrade
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The current Alpha protocol supports self-amending through the voting procedure
+of Tezos. However, such procedure needs to go through several voting periods
+that involve several quorums of bakers, and we would rather test our migration
+in a less involved way. Besides the amendments driven by the protocol, Tezos
+also supports `user-activated` upgrades, which are triggered by the shell. The
+user-activated upgrades allow the user to specify the level at which the next
+protocol will be adopted, which can be used to perform emergency bug fixes, but
+which is also useful to test migrations.
+
+Depending on whether we test the migration on the sandbox or on a realistic
+context imported from Mainnet, we would like to set the user-activated upgrades
+respectively at a small level (some blocks after the genesis block at level
+``0``) or at a high level (some blocks after the status imported from Mainnet,
+which contains several hundreds of thousands of blocks). By convention, when
+setting a user-activated upgrade the scripts would consider that the migration
+is on the sandbox if the level is less or equal than ``28082``, and on a real
+context imported form Mainnet otherwise, and the scripts would behave
+differently.
+
+If we are testing the migration on the sandbox, the user-activated upgrade
+allows us to activate the predecessor of the Alpha protocol by using an
+activation command after the sandbox starts, and to automatically trigger the
+activation of the Alpha protocol when the sandbox reaches a given level. Using
+this mechanism, we can start the sandbox, activate the predecessor of the Alpha
+protocol, populate the empty context at will by using the shell of the
+predecessor protocol, and then have the migration triggered automatically at the
+desired level. In our example, we can set the user-activated upgrade such that
+the migration is triggered at level three by invoking::
+
+  $ ./scripts/user_activated_upgrade.sh src/proto_007_* 3
+
+Now we consider the case when testing the migration in a context imported from
+the snapshot file. In that case, we should recall the level at which the
+snapshot file was taken from the beginning of Section `Prepare the
+migration`_. In our example, this level is ``1039318``. The user-activated
+upgrade allows us to start the node imported from Mainnet, which would have the
+predecessor of the Alpha protocol already active if the snapshot is recent
+enough, and then have the migration triggered automatically at the desired
+level, which has to be strictly bigger than the level at which the snapshot file
+was taken. In our example, we can set the user-activated upgrade such that the
+migration is triggered three levels after the level ``1039321`` at which the
+snapshot was taken by invoking::
+
+  $ ./scripts/user_activated_upgrade.sh src/proto_007_* 1039321
+
+
+4. Patch the snapshot Alpha protocol to obtain a yes-node
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If we would start a node imported from Mainnet, how could we bake new blocks and
+make the chain progress? We do not know the private keys of existing bakers in
+Mainnet!
+
+In order to produce credentials to make the chain imported from Mainnet
+progress, we modify the code to produce a `yes-node` that forges and verifies
+fake signatures. This can be achieved with a small patch to
+``lib_crypto/signature.ml`` that replaces each signature with a concatenation of
+a public key and a message, such that this fake signature is still unique for
+each key and message. This patch is encoded as the git diff contained in the
+file ``./scripts/yes-node.patch``. We can apply such patch by invoking::
+
+  $ patch -p1 < scripts/yes-node.patch
+
+If the patch was already applied, for instance if we run the command above twice
+by mistake, then we should answer with the default ``n`` option to the two
+messages that the ``patch`` tool displays, or otherwise the patch would fail or
+we would revert it::
+
+  Reversed (or previously applied) patch detected!  Assume -R? [n] n
+  Apply anyway? [n] n
+
+
+5. Create a yes-wallet
+~~~~~~~~~~~~~~~~~~~~~~
+
+We also need to create a `yes-wallet`, which is a special wallet where secret
+keys actually encode the same bytes as their corresponding public keys. By
+adding to the yes-wallet the existing accounts of large bakers in Mainnet,
+e.g. ``foundation1`` to ``foundation8``, we would have enough rights to bake
+blocks at will. We can do so by running::
+
+  $ dune exec scripts/yes-wallet/yes_wallet.exe /tmp/yes-wallet
+
+This command creates a yes-wallet and places the yes-wallet folder in the
+system's temp directory (in our example, ``/tmp``) as given by the path argument
+``/tmp/yes-wallet``. If no path argument was given, the command would create the
+yes-wallet folder in the default path ``./yes-wallet``.
+
+
+6. Compile the snapshot Alpha protocol
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+At this point we can compile the snapshot Alpha protocol that we will activate
+when running the migration. We can do so by invoking::
 
   $ make
 
-  # Run the node
-  $ ./tezos-node run --connections 0 --data-dir ~/tezos-node-test --rpc-addr localhost &
 
-  $ curl -s localhost:8732/chains/main/blocks/head/metadata | jq '.level.level, .protocol, .next_protocol'
-  488274
-  "Pt24m4xiPbLDhVgVfABUjirbmda3yohdN82Sp9FeuAXJ4eV9otd"
-  "Pt24m4xiPbLDhVgVfABUjirbmda3yohdN82Sp9FeuAXJ4eV9otd"
+7. Import a context from Mainnet
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-  # baking a regular 006 block should be quick
-  $ time ./tezos-client -d yes-wallet bake for foundation1 --minimal-timestamp
+If we wish to test the migration in a realistic scenario, we need to import a
+context from a Mainnet's snapshot file. As explained in the beginning of Section
+`Prepare the migration`_, in our example we will use a snapshot file
+``~/mainnet_2020-07-14_12 00.rolling`` that was downloaded from
+`TulipTools<https://snapshots.tulip.tools/>`_ on July the 14th of 2020, and
+which was taken at level ``1039318``.
 
-  # baking the migration block to 007 takes longer and you should see the
-  # STITCHING! message in the logs
-  $ time ./tezos-client -d yes-wallet bake for foundation1 --minimal-timestamp
+We also need to generate a node identity, which we will keep in the same folder
+that contains the history of the node in a folder. Since importing a node from a
+snapshot file is very time consuming, once the node is imported and the identity
+is generated we will keep the original folder unchanged, and we will copy its
+contents to a fresh test folder every time we want to perform the migration.
 
-  # the context resulted from the application of
-  # block 488276 is understood by 007
-  $ curl -s localhost:8732/chains/main/blocks/head/metadata | jq '.level.level, .protocol, .next_protocol'
-  488276
-  "Pt24m4xiPbLDhVgVfABUjirbmda3yohdN82Sp9FeuAXJ4eV9otd"
-  "PscqRYywd243M2eZspXZEJGsRmNchp4ZKfKmoyEZTRHeLQvVGjp"
+For instance, the following commands import a context from the snapshot file
+``~/mainnet_2020-07-14_12 00.rolling`` into the folder ``/tmp/mainnet_2020-07-14_12 00``,
+and generate an identity in the same folder::
 
-  # kill the node, a little cleanup and we are ready for another test
+  $ ./tezos-node snapshot import ~/mainnet_2020-07-14_12\ 00.rolling --data-dir /tmp/tezos-node-mainnet_2020-07-14_12\ 00
+  $ ./tezos-node identity generate --data-dir /tmp/tezos-node-mainnet_2020-07-14_12\ 00
+
+Importing the context from a snapshot file is optional and should be performed
+only if we want to test the migration on a realistic context from
+Mainnet. Otherwise the migration will run on the sandbox.
+
+
+Automate steps 1--7 above
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The script ``./scripts/prepare_migration_test.sh`` automates steps 1--7 above by
+distinguishing whether the migration is on the sandbox or an imported context,
+based on the level given as argument to the script. (Recall that a level less or
+equal than ``28082`` corresponds to the sandbox, and a level greater than
+``28082`` corresponds to an imported context.) In our example, if we are testing
+the migration on the sandbox and want to trigger it at level three, we can use::
+
+  $ ./scripts/prepare_migration_test.sh d_007 3
+
+If on the contrary we have imported a realistic context from the snapshot file
+``~/mainnet_2020-07-14_12\ 00.rolling`` taken at level ``1039318``, and we want
+to trigger the migration three levels after the level at which the snapshot file
+was taken, we can use::
+
+  $ ./scripts/prepare_migration_test.sh d_007 1039321 ~/mainnet_2020-07-14_12\ 00.rolling
+
+In the latter case both the context and the yes-wallet folder will be placed in
+the system's temp directory. In our example the temp directory is ``/tmp``, and
+the context and yes-wallet would be placed in paths
+``/tmp/tezos-node-mainnet_2020-07-14_12\ 00`` and ``/tmp/yes-wallet``
+respectively.
+
+If the script detects that the yes-wallet folder already exists int ``/tmp``,
+then it will clean it by removing spurious files ``/tmp/yes-wallet/blocks`` and
+``/tmp/yes-wallet/wallet_locks``, and it will not create a new yes-wallet
+folder. If the script detects that the folder
+``/tmp/tezos-node-mainnet_2020-07-14_12 00`` already exists, or if the developer
+passes the path of a folder instead of the path of a snapshot file, then the
+script will use the corresponding folder as the original folder, and will not
+import a new context.
+
+After performing the steps 1--7 in the subsections above, the migration will be
+ready to be tested. The next two subsections respectively detail how to run the
+migration on the sandbox and on a context imported from Mainnet.
+
+
+Run the migration on the sandbox
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If we run the migration on an empty context, then we would start a sandboxed
+node as usual. In our example we can run the following::
+
+  $ ./src/bin_node/tezos-sandboxed-node.sh 1 --connections 0 &
+
+We can also start the client::
+
+  $ eval `./src/bin_client/tezos-init-sandboxed-client.sh 1`
+
+Instead of command ``tezos-activate-alpha``, the sandboxed client script
+``src/bin_client/tezos-init-sandboxed-client.sh`` now accepts a command
+``tezos-activate-XXX-<hash>`` that activates the predecessor protocol with
+version number ``XXX`` and short hash ``<hash>``. In our example, the
+predecessor protocol is ``006`` with short hash ``PsCARTHA``. (Check the folder
+``./src`` for the version number and short hash of the predecessor protocol for
+migrations to versions different from ``007``.) We can activate this protocol by
+invoking::
+
+  $ tezos-activate-006-PsCARTHA
+
+Activation of the predecessor protocol produces one block and moves the chain
+one level forward. This fact has to be taken into account in order to pick the
+desired level when setting the user-activated upgrades.
+
+Now we can use the client commands to bake blocks until we reach the level at
+which migration will be triggered, which in our example is ``3``. Since
+activating the predecessor protocol moves the chain to level one, we need to
+bake two more blocks::
+
+  $ tezos-client bake for bootstrap1 --minimal-timestamp
+  $ tezos-client bake for bootstrap1 --minimal-timestamp
+
+At this moment migration will be triggered and the protocol ``proto_007_<hash>``
+will become active, and we will see the log message ``STITCHING!``.
+
+Note: the migration can be tested again by restarting the sandboxed node and
+client, by activating the predecessor of the Alpha protocol, and by baking two
+blocks.
+
+
+Run the migration on a context imported form Mainnet
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If we run the migration on a context imported from Mainnet, then we would start
+the node using the context imported from the snapshot file. Since importing a
+snapshot file is very time consuming, we will leave the original folder
+unchanged, and every time we want to run the test, we will copy its contents to
+a fresh test folder. In our example, we can do this by taking advantage of a
+environment variable ``test-directory`` and the tool ``mktemp`` as follows::
+
+  $ test_directory=$(mktemp -d -t "tezos-node-mainnet_2020-07-14_12 00-XXXX") && cp -r "/tmp/tezos-node-mainnet_2020-07-14_12 00/." "$test_directory"
+
+This command creates a fresh test folder in the system's temp directory (in our
+example ``/tmp``) whose name is ``tezos-node-mainnet_2020-07-14_12 00-XXXX``,
+where the ``XXXX`` are four random alphanumerical characters, and sets the
+environment variable ``test-directory`` to the path of the test folder, such
+that we can run the node in the test folder later. Then it copies the contents
+of the original context folder into the test folder.
+
+Now, we can run the ``tezos-node`` command by specifying the test folder
+``$test-directory`` as the data directory. We will also specify the RPC address
+``localhost``, such that the RPCs will be available at the url
+``localhost:8732``. In our example, by invoking the following::
+
+  $ ./tezos-node run --connections 0 --data-dir "$test_directory" --rpc-addr localhost &
+
+We will now trigger the migration by baking blocks until the level reaches the
+one specified when setting the user-activated upgrades. The blocks can be baked
+with the yes-wallet created in step 5 above, and with any of the accounts
+``foundation1`` to ``foundation8``. In our example, we can bake one block by
+running the following command::
+
+  $ ./tezos-client -d /tmp/yes-wallet bake for foundation1 --minimal-timestamp
+
+If the chosen account ``foundation1`` ceases to have the priority to bake, we
+can switch to any of the remaining accounts ``foundation2`` to
+``foundation8``. We will always be able to make the chain progress since it is
+virtually impossible that at some moment all the eight accounts cease to have
+the priority to bake.
+
+After baking three blocks the migration will be triggered and the protocol
+``proto_007_<hash>`` will become active.  We will see the log message
+``STITCHING!``.
+
+Note: the migration can be tested again by removing the test folder and the
+spurious files ``blocks`` and ``wallet_lock`` in the yes-wallet folder. In our
+example we can do this with the following command::
+
+  $ rm -rf "$test_directory" && rm -f /tmp/yes-wallet/{blocks,wallet_lock}
+
+Then we repeat the commands above in order to create a fresh test folder, and to
+copy the context of the original folder into the test folder. In our example::
+
+  $ test_directory=$(mktemp -d -t "tezos-node-mainnet_2020-07-14_12 00-XXXX") && cp -r "/tmp/tezos-node-mainnet_2020-07-14_12 00/." "$test_directory"
+
+Now we run the node in the test folder by invoking::
+
+  $ ./tezos-node run --connections 0 --data-dir "$test_directory" --rpc-addr localhost &
+
+And finally, we bake the numbers of blocks specified by the user-activated
+upgrade, with the command::
+
+  $ ./tezos-client -d /tmp/yes-wallet bake for foundation1 --minimal-timestamp
+
+Wrap up the migration procedure
+-------------------------------
+
+For convenience, this section collects all the steps needed to test the
+migration, both on the sandbox and on a context imported from Mainnet.
+
+
+Migration on the sandbox
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+Check latest code in branch ``proto-proposal``::
+
+  $ git checkout proto-proposal
+
+Tweak migration by checking that
+``src/proto_alpha/lib_protocol/init_storage.ml`` includes the following lines::
+
+  | Carthage_006 ->
+      Logging.log_notice "\nSTITCHING!\n" ;
+
+Commit the feature back to branch ``proto-proposal``::
+
+  $ git commit -am 'My awesome feature'
+
+Prepare migration by snapshoting the Alpha protocol, linking it to the build
+system, setting user-activate upgrades, and compiling it::
+
+  S ./scripts/prepare_migration_test.sh d_007 3
+
+(Alternatively, each of these steps could be performed individually by invoking
+the following fur commands)::
+
+  $ ./scripts/snapshot_alpha.sh d_007
+  $ ./scripts/link_protocol.sh src/proto_007_*
+  $ ./scripts/user_activated_upgrade.sh src/proto_007_* 3
+  $ make
+
+Run sandboxed node and client::
+
+  $ ./src/bin_node/tezos-sandboxed-node.sh 1 --connections 0 &
+  $ eval `./src/bin_client/tezos-init-sandboxed-client.sh 1`
+
+Activate predecessor of the Alpha protocol and move chain one level forward::
+
+  $ tezos-activate-006-PsCARTHA
+
+Bake two more blocks by using account ``bootstrap1``::
+
+  $ tezos-client bake for bootstrap1 --minimal-timestamp
+  $ tezos-client bake for bootstrap1 --minimal-timestamp
+
+You should see the ``STITCHING!`` message in the logs!
+
+To test again, restart the sandboxed node and client::
+
   $ fg
-  ./tezos-node run --connections 0 --data-dir ~/check/tezos-heavy/488274-node --rpc-addr localhost
+  ./src/bin_node/tezos-sandboxed-node.sh 1 --connections 0
   ^C
-  $ rm -rf ~/tezos-node-test && cp -r ~/488274-node-orig ~/tezos-node-test && rm -f yes-wallet/{wallet_lock,blocks}
+  $ ./src/bin_node/tezos-sandboxed-node.sh 1 --connections 0 &
+  $ eval `./src/bin_client/tezos-init-sandboxed-client.sh 1`
+
+Activate predecessor of the Alpha protocol::
+
+  $ tezos-activate-006-PsCARTHA
+
+Bake two blocks by using account ``bootstrap1``::
+
+  $ tezos-client bake for bootstrap1 --minimal-timestamp
+  $ tezos-client bake for bootstrap1 --minimal-timestamp
+
+You should see the ``STITCHING!`` message again!
+
+
+Migration on a context imported from Mainnet
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Check latest code in branch ``proto-proposal``::
+
+  $ git checkout proto-proposal
+
+Tweak migration by checking that
+``src/proto_alpha/lib_protocol/init_storage.ml`` includes the
+following lines::
+
+  | Carthage_006 ->
+      Logging.log_notice "\nSTITCHING!\n" ;
+
+Commit the feature back to branch ``proto-proposal``::
+
+  $ git commit -am 'My awesome feature'
+
+Prepare migration by snapshoting the Alpha protocol, linking it to the build
+system, patching the yes-node, creating a yes-wallet, setting user-activated
+upgrades, importing a context from Mainnet in the ``-orig`` folder, generating
+an identity in the same folder, and compiling the snapshot Alpha protocol::
+
+  $ ./scripts/prepare_migration_test.sh d_007 1039321 ~/mainnet_2020-07-14_12\ 00.rolling
+
+(Alternatively, each of these steps could be performed individually by
+invoking the following eight commands)::
+
+  $ ./scripts/snapshot_alpha.sh d_007
+  $ ./scripts/link_protocol.sh src/proto_007_*
+  $ ./scripts/user_activated_upgrade.sh src/proto_007_* 1039321
+  $ patch -p1 < scripts/yes-node.patch
+  $ dune exec scripts/yes-wallet/yes_wallet.exe /tmp/yes-wallet
+  $ make
+  $ ./tezos-node snapshot import ~/mainnet_2020-07-14_12\ 00.rolling --data-dir /tmp/mainnet_2020-07-14_12\ 00
+  $ ./tezos-node identity generate --data-dir /tmp/mainnet_2020-07-14_12\ 00
+
+Copy original folder into test folder::
+
+  $ test_directory=$(mktemp -d -t "tezos-node-mainnet_2020-07-14_12 00-XXXX") && cp -r "/tmp/tezos-node-mainnet_2020-07-14_12 00/." "$test_directory"
+
+Run the node`::
+
+  $ ./tezos-node run --connections 0 --data-dir "$test_directory" --rpc-addr localhost &
+
+Bake three blocks by using accounts ``foundation1`` to ``foundation8``::
+
+  $ ./tezos-client -d /tmp/yes-wallet bake for foundation1 --minimal-timestamp
+  $ ./tezos-client -d /tmp/yes-wallet bake for foundation1 --minimal-timestamp
+  $ ./tezos-client -d /tmp/yes-wallet bake for foundation1 --minimal-timestamp
+
+You should see the ``STITCHING!`` message in the logs!
+
+To test again, kill the node::
+
+  $ fg
+  ./tezos-node run --connections 0 --data-dir "$test_directory" --rpc-addr localhost
+  ^C
+
+Clean up by removing test folder and copying original folder into fresh
+test folder, and by removing files ``/tmp/yes-wallet/wallet_lock`` and
+``/tmp/yes-wallet/blocks``::
+
+  $ rm -rf "$test_directory" && rm -f /tmp/yes-wallet/{blocks,wallet_lock};
+  $ test_directory=$(mktemp -d -t "tezos-node-mainnet_2020-07-14_12 00-XXXX") && cp -r "/tmp/tezos-node-mainnet_2020-07-14_12 00/." "$test_directory"
+
+Run the node::
+
+  ./tezos-node run --connections 0 --data-dir "$test_directory" --rpc-addr localhost &
+
+And bake three blocks::
+
+  $ ./tezos-client -d /tmp/yes-wallet bake for foundation1 --minimal-timestamp
+  $ ./tezos-client -d /tmp/yes-wallet bake for foundation1 --minimal-timestamp
+  $ ./tezos-client -d /tmp/yes-wallet bake for foundation1 --minimal-timestamp
+
+You should see the ``STITCHING!`` message again!
 
 
 Tips and tricks
 ---------------
 
-Migrating a context mostly concerns editing existing data structures.
-For this reason it is important to inspect the resulting context with
-the RPCs ``context/raw/json`` and ``context/raw/bytes``. The former
-RPC displays the json value relative to a key of the context, using
-its json format. This is possible thanks to the storage functors of
-Tezos, which are used to register every piece of storage in a node and
-are aware of the json structure of the data. The latter RPC is more
-low level and simply returns the bytes corresponding to a key. Both
-RPCs support the option `depth` to control how much of the subtree of
-the key should be displayed.
+Migrating a context mostly concerns editing existing data structures.  For this
+reason it is important to inspect the resulting context with the RPCs
+``context/raw/json`` and ``context/raw/bytes``. The former RPC displays the json
+value relative to a key of the context, using its json format. This is possible
+thanks to the storage functors of Tezos, which are used to register every piece
+of storage in a node and are aware of the json structure of the data. The latter
+RPC is more low level and simply returns the bytes corresponding to a key. Both
+RPCs support the option `depth` to control how much of the subtree of the key
+should be displayed.
 
-For example, if we use ``context/raw/json`` to inspect the size of the
-current listings, which informs of how many rolls are allowed to vote
-in the current period, we get::
+For example, if we use ``context/raw/json`` to inspect the size of the current
+listings, which informs of how many rolls are allowed to vote in the current
+period, we get::
 
   $ curl -s localhost:8732/chains/main/blocks/head/context/raw/json/votes/listings_size
   56639
 
-On the other hand, if instead we use ``context/raw/bytes`` to inspect
-the data corresponding to the same key, we obtain a string of bytes in
-hexadecimal format::
+On the other hand, if instead we use ``context/raw/bytes`` to inspect the data
+corresponding to the same key, we obtain a string of bytes in hexadecimal
+format::
 
   $ curl -s localhost:8732/chains/main/blocks/head/context/raw/bytes/votes/listings_size
   "0000dd3f"
 
-This string of bytes can be converted using the OCaml toplevel to
-obtain the same value retrieved before::
+This string of bytes can be converted using the OCaml toplevel to obtain the
+same value retrieved before::
 
   utop # let h = 0x0000dd3f ;;
   val h : int = 56639
 
-
-In our migration example above, we can inspect the json output of a
-specific contract::
+In our migration example above, we can inspect the json output of a specific
+contract::
 
   $ curl -s localhost:8732/chains/main/blocks/head/context/raw/json/contracts/index/tz3bvNMQ95vfAYtG8193ymshqjSvmxiCUuR5 | jq .
   {
@@ -333,15 +707,14 @@ specific contract::
     "spendable": true
   }
 
-The ``raw/json`` interface conveniently hides the disk representation
-of data and keys. Notice how the hashes of public keys are not stored
-as is, but instead they are encripted using the more efficient base58
-format.
+The ``raw/json`` interface conveniently hides the disk representation of data
+and keys. Notice how the hashes of public keys are not stored as is, but instead
+they are encrypted using the more efficient base58 format.
 
-In this case, in order to inspect the low level representation in
-bytes, which we would often need to, we have to convert hashes of
-public keys using ``utop`` and the functions ``of_b58check`` and
-``to_b58check`` of module ``Contratc_repr``::
+In this case, in order to inspect the low level representation in bytes, which
+we would often need to, we have to convert hashes of public keys using ``utop``
+and the functions ``of_b58check`` and ``to_b58check`` of module
+``Contract_repr``::
 
   # let's borrow some code from the protocol tests
   $ dune utop src/proto_007_*/lib_protocol/test/
@@ -364,8 +737,8 @@ public keys using ``utop`` and the functions ``of_b58check`` and
   # path_to_b58check "ff/18/cc/02/32/fc/0002ab07ab920a19a555c8b8d93070d5a21dd1ff33fe"  ;;
   "tz3bvNMQ95vfAYtG8193ymshqjSvmxiCUuR5"
 
-On the other hand, we could have inspected the data corresponding to
-the same key above with ``raw/bytes``, as we do below::
+On the other hand, we could have inspected the data corresponding to the same
+key above with ``raw/bytes``, as we do below::
 
   $ curl -s localhost:8732/chains/main/blocks/head/context/raw/bytes/contracts/index/ff/18/cc/02/32/fc/0002ab07ab920a19a555c8b8d93070d5a21dd1ff33fe | jq .
   {
@@ -401,43 +774,39 @@ the same key above with ``raw/bytes``, as we do below::
     "spendable": "696e69746564"
   }
 
-Observe that while the value in json format above shows a ``big_map``
-field that is empty (i.e. ``"big_map": [],``), the low-level
-representation of the same value reveals that the field containing
-such an empty ``big_map`` is not stored at all.
+Observe that while the value in json format above shows a ``big_map`` field that
+is empty (i.e. ``"big_map": [],``), the low-level representation of the same
+value reveals that the field containing such an empty ``big_map`` is not stored
+at all.
 
 
 Anatomy of migration code
 -------------------------
 
-The migration code is triggered in
-``init_storage.ml:prepare_first_block``, so that method is the entry
-point to start reading it. Notice that constants are migrated in
-``raw_context.ml:prepare_first_block``, which takes a ``Context.t``
-and returns a ``Raw_context.t`` containing the new
-constants. Migrating other data can usually be done by manipulating
-the ``Raw_context.t``, and such code should be placed in the match
-case ``Alpha_previous`` of ``init_storage.ml:prepare_first_block``.
+The migration code is triggered in ``init_storage.ml:prepare_first_block``, so
+that function is the entry point to start reading it. Notice that constants are
+migrated in ``raw_context.ml:prepare_first_block``, which takes a ``Context.t``
+and returns a ``Raw_context.t`` containing the new constants. Migrating other
+data can usually be done by manipulating the ``Raw_context.t``, and such code
+should be placed in the match case ``Alpha_previous`` of
+``init_storage.ml:prepare_first_block``.
 
-Conversion of data structures from the previous protocol are typically
-found in ``storage.ml,i``, which may involve the functors in
-``storage_functors.ml,i``.  Each migration is very custom, but there
-are two recurring schemas that emerged over time.
+Conversion of data structures from the previous protocol are typically found in
+``storage.ml,i``, which may involve the functors in ``storage_functors.ml,i``.
+Each migration is very custom, but there are two recurring schemas that emerged
+over time.
 
-For high-level changes, the interface offered by the
-``storage_functors`` is usually expressive enough. The migration would
-copy the code to read the data structures in the previous version and
-simply rename it by adding a suffix with the previous version number
-(in our example above where we are migrating to version ``007``, the
-indentifiers in the old code would be renamed by appending the suffix
-``_006`` to them). The values are then written using the code for the
-data structures of the current protocol, thus performing the
-migration. The last step in the migration would be to manually remove
-any remaining code with a suffix corresponding to the previous version
-(``_006`` in our example).
+For high-level changes, the interface offered by the ``storage_functors`` is
+usually expressive enough. The migration would copy the code to read the data
+structures in the previous version and simply rename it by adding a suffix with
+the previous version number (in our example above where we are migrating to
+version ``007``, the identifiers in the old code would be renamed by appending
+the suffix ``_006`` to them). The values are then written using the code for the
+data structures of the current protocol, thus performing the migration. The last
+step in the migration would be to manually remove any remaining code with a
+suffix corresponding to the previous version (``_006`` in our example).
 
 Some migrations may requires to break the interface offered by the
-``storage_functors``, and to modify the file ``raw_context.mli``
-directly. In this case we usually `copy` the data to a temporary path,
-perform the conversion, and then `recursively remove` the temporary
-path.
+``storage_functors``, and to modify the file ``raw_context.mli`` directly. In
+this case we usually `copy` the data to a temporary path, perform the
+conversion, and then `recursively remove` the temporary path.
