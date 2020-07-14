@@ -82,9 +82,10 @@ let sync iteration ch =
 
 (** Syncing from the main process everyone until one node fails to sync  *)
 let rec sync_nodes nodes =
-  Error_monad.iter_p (fun p -> Process.receive p) nodes
+  List.iter_ep (fun p -> Process.receive p) nodes
   >>=? fun () ->
-  iter_p (fun p -> Process.send p ()) nodes >>=? fun () -> sync_nodes nodes
+  List.iter_ep (fun p -> Process.send p ()) nodes
+  >>=? fun () -> sync_nodes nodes
 
 let sync_nodes nodes =
   sync_nodes nodes
@@ -178,7 +179,7 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
               ~log
               ~answerer
           in
-          Lwt_list.map_p
+          List.map_p
             (fun point ->
               P2p_pool.Points.info pool point
               |> Option.iter (fun info ->
@@ -225,7 +226,7 @@ let detach_nodes ?prefix ?timeout ?min_connections ?max_connections
     ?max_incoming_connections ?p2p_versions ?msg_config run_node
     ?(trusted = fun _ points -> points) points =
   let canceler = Lwt_canceler.create () in
-  Lwt_list.mapi_s
+  List.mapi_s
     (fun n _ ->
       let prefix = Option.map (fun f -> f n) prefix in
       let p2p_versions = Option.map (fun f -> f n) p2p_versions in
@@ -252,7 +253,7 @@ let detach_nodes ?prefix ?timeout ?min_connections ?max_connections
         port)
     points
   >>= fun nodes ->
-  Lwt.return @@ Error_monad.map2 (fun p _p -> p) nodes nodes
+  Lwt.return @@ Error_monad.all_e nodes
   >>=? fun nodes ->
   Lwt.ignore_result (sync_nodes nodes) ;
   Process.wait_all nodes
@@ -327,18 +328,20 @@ module Simple = struct
         Lwt.return res
 
   let connect_all ~timeout connect_handler pool points =
-    map_p (connect ~timeout connect_handler pool) points
+    List.map_ep (connect ~timeout connect_handler pool) points
 
   let write_all conns msg =
-    iter_p (fun conn -> trace Write @@ P2p_conn.write_sync conn msg) conns
+    List.iter_ep
+      (fun conn -> trace Write @@ P2p_conn.write_sync conn msg)
+      conns
 
   let read_all conns =
-    iter_p
+    List.iter_ep
       (fun conn ->
         trace Read @@ P2p_conn.read conn >>=? fun Ping -> return_unit)
       conns
 
-  let close_all conns = Lwt_list.iter_p P2p_conn.disconnect conns
+  let close_all conns = List.iter_p P2p_conn.disconnect conns
 
   let node iteration channel _stream connect_handler pool points _ =
     connect_all
@@ -405,7 +408,7 @@ module Random_connections = struct
   let connect_random_all connect_handler pool points n =
     let total = List.length points in
     let rem = ref (n * total) in
-    iter_p
+    List.iter_ep
       (fun point -> connect_random connect_handler pool total rem point n)
       points
 
@@ -439,7 +442,7 @@ module Garbled = struct
 
   let write_bad_all conns =
     let bad_msg = Bytes.of_string (String.make 16 '\000') in
-    iter_p
+    List.iter_ep
       (fun conn -> trace Write @@ P2p_conn.raw_write_sync conn bad_msg)
       conns
 
@@ -559,7 +562,7 @@ module Overcrowded = struct
         ~default:0
         (P2p_connect_handler.config connect_handler).listening_port
     in
-    let target = List.hd trusted_points in
+    let target = Option.get @@ List.hd trusted_points in
     connect
       ~iter_count:0
       ~timeout:(Time.System.Span.of_seconds_exn 2.)
@@ -712,7 +715,8 @@ module Overcrowded = struct
 
   let node_mixed i = if i = 0 then target else client (i mod 2 = 1)
 
-  let trusted i points = if i = 0 then points else [List.hd points]
+  let trusted i points =
+    if i = 0 then points else [Option.get @@ List.hd points]
 
   (** Detaches a number of nodes: one of them is the target (its
       max_incoming_connections is set to zero), and all the rest are
@@ -852,7 +856,7 @@ module No_common_network = struct
       ~timeout:(Time.System.Span.of_seconds_exn 2.)
       connect_handler
       pool
-      (List.hd trusted_points)
+      (Option.get @@ List.hd trusted_points)
     >>= function
     | Ok conn ->
         lwt_log_info
@@ -891,7 +895,8 @@ module No_common_network = struct
 
   let node i = if i = 0 then target else client
 
-  let trusted i points = if i = 0 then points else [List.hd points]
+  let trusted i points =
+    if i = 0 then points else [Option.get @@ List.hd points]
 
   (** Running the target and the clients.
       All clients should have their pool populated with the list of points.

@@ -809,9 +809,10 @@ let commands () =
       (fun () (cctxt : Protocol_client_context.full) ->
         Sapling_key.load cctxt
         >>=? fun l ->
-        iter_s
-          (fun (s, _) -> cctxt#message "%s" s >>= fun () -> return_unit)
-          (List.sort (fun (s1, _) (s2, _) -> String.compare s1 s2) l));
+        List.iter_s
+          (fun (s, _) -> cctxt#message "%s" s)
+          (List.sort (fun (s1, _) (s2, _) -> String.compare s1 s2) l)
+        >>= fun () -> return_unit);
     shield_cmd;
     unshield_cmd;
     forge_shielded_cmd;

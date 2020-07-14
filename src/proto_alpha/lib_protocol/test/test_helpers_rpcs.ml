@@ -44,7 +44,7 @@ let test_baking_rights () =
   assert (List.length rights = max_priority + 1) ;
   (* filtering by delegate *)
   let d =
-    Contract.is_implicit (List.nth contracts 0)
+    Option.bind (List.nth contracts 0) Contract.is_implicit
     |> Option.unopt_assert ~loc:__POS__
   in
   get Block.rpc_ctxt b ~all:true ~delegates:[d]

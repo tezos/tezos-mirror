@@ -381,13 +381,13 @@ let rec operations_fetch_worker_loop pipeline =
         protect ~canceler:pipeline.canceler (fun () ->
             Lwt_pipe.pop pipeline.fetched_headers >>= return)
         >>=? fun batch ->
-        map_p
+        List.map_ep
           (fun (hash, header) ->
             Bootstrap_pipeline_event.(emit fetching_operations)
               (hash, pipeline.peer_id)
             >>= fun () ->
             let operations =
-              map_p
+              List.map_ep
                 (fun i ->
                   protect ~canceler:pipeline.canceler (fun () ->
                       Distributed_db.Operations.fetch
@@ -406,7 +406,7 @@ let rec operations_fetch_worker_loop pipeline =
             return (hash, header, operations))
           batch
         >>=? fun operationss ->
-        iter_s
+        List.iter_es
           (fun (hash, header, operations) ->
             protect ~canceler:pipeline.canceler (fun () ->
                 Lwt_pipe.push pipeline.fetched_blocks (hash, header, operations)

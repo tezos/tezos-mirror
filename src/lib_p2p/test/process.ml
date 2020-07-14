@@ -282,45 +282,42 @@ let detach ?(prefix = "") ?canceler ?input_encoding ?output_encoding
     ~on_error:(fun err ->
       Lwt_canceler.cancel canceler >>= fun _ -> Lwt.return (Error err))
 
-let signal_name =
-  let names =
-    [ (Sys.sigabrt, "ABRT");
-      (Sys.sigalrm, "ALRM");
-      (Sys.sigfpe, "FPE");
-      (Sys.sighup, "HUP");
-      (Sys.sigill, "ILL");
-      (Sys.sigint, "INT");
-      (Sys.sigkill, "KILL");
-      (Sys.sigpipe, "PIPE");
-      (Sys.sigquit, "QUIT");
-      (Sys.sigsegv, "SEGV");
-      (Sys.sigterm, "TERM");
-      (Sys.sigusr1, "USR1");
-      (Sys.sigusr2, "USR2");
-      (Sys.sigchld, "CHLD");
-      (Sys.sigcont, "CONT");
-      (Sys.sigstop, "STOP");
-      (Sys.sigtstp, "TSTP");
-      (Sys.sigttin, "TTIN");
-      (Sys.sigttou, "TTOU");
-      (Sys.sigvtalrm, "VTALRM");
-      (Sys.sigprof, "PROF");
-      (Sys.sigbus, "BUS");
-      (Sys.sigpoll, "POLL");
-      (Sys.sigsys, "SYS");
-      (Sys.sigtrap, "TRAP");
-      (Sys.sigurg, "URG");
-      (Sys.sigxcpu, "XCPU");
-      (Sys.sigxfsz, "XFSZ") ]
-  in
-  fun n -> List.assoc n names
+let signal_names =
+  [ (Sys.sigabrt, "SIGABRT");
+    (Sys.sigalrm, "SIGALRM");
+    (Sys.sigfpe, "SIGFPE");
+    (Sys.sighup, "SIGHUP");
+    (Sys.sigill, "SIGILL");
+    (Sys.sigint, "SIGINT");
+    (Sys.sigkill, "SIGKILL");
+    (Sys.sigpipe, "SIGPIPE");
+    (Sys.sigquit, "SIGQUIT");
+    (Sys.sigsegv, "SIGSEGV");
+    (Sys.sigterm, "SIGTERM");
+    (Sys.sigusr1, "SIGUSR1");
+    (Sys.sigusr2, "SIGUSR2");
+    (Sys.sigchld, "SIGCHLD");
+    (Sys.sigcont, "SIGCONT");
+    (Sys.sigstop, "SIGSTOP");
+    (Sys.sigtstp, "SIGTSTP");
+    (Sys.sigttin, "SIGTTIN");
+    (Sys.sigttou, "SIGTTOU");
+    (Sys.sigvtalrm, "SIGVTALRM");
+    (Sys.sigprof, "SIGPROF");
+    (Sys.sigbus, "SIGBUS");
+    (Sys.sigpoll, "SIGPOLL");
+    (Sys.sigsys, "SIGSYS");
+    (Sys.sigtrap, "SIGTRAP");
+    (Sys.sigurg, "SIGURG");
+    (Sys.sigxcpu, "SIGXCPU");
+    (Sys.sigxfsz, "SIGXFSZ") ]
+
+let signal_name n = List.assoc n signal_names
 
 let print_errors plist =
-  Lwt_list.partition_p
-    (fun (_i, _prefix, p) ->
-      match p with Ok _ -> Lwt.return_true | _ -> Lwt.return_false)
-    plist
-  >>= fun (ok_list, errlist) ->
+  let (ok_list, errlist) =
+    List.partition (fun (_i, _prefix, p) -> Result.is_ok p) plist
+  in
   lwt_log_error
     "@[Processes @[%a@] finished successfully.@]"
     (fun ppf ->
@@ -334,7 +331,7 @@ let print_errors plist =
         match p with Error [Exn _] -> true | _ -> false)
       errlist
   in
-  Lwt_list.iter_s
+  List.iter_s
     (fun (i, prefix, p) ->
       let prefix = String.trim prefix in
       match p with
@@ -348,16 +345,16 @@ let print_errors plist =
             n
       | Error [Exn (Signaled n)] ->
           lwt_log_error
-            "@[Process %d (%s) was killed by a SIG%s !@]"
+            "@[Process %d (%s) was killed by %s!@]"
             i
             prefix
-            (signal_name n)
+            (Option.value ~default:"an unknown signal" @@ signal_name n)
       | Error [Exn (Stopped n)] ->
           lwt_log_error
-            "@[Process %d (%s) was stopped by a SIG%s !@]"
+            "@[Process %d (%s) was stopped by %s!@]"
             i
             prefix
-            (signal_name n)
+            (Option.value ~default:"an unknown signal" @@ signal_name n)
       | Error err ->
           lwt_log_error
             "@[<v 2>Process %d (%s) failed with error:@ @[ %a @]@]"
@@ -388,7 +385,7 @@ let print_errors plist =
               Format.fprintf ppf "@ %d(%s)" i (String.trim pref)))
         canceled_list )
   >>= fun () ->
-  Lwt_list.iter_s
+  List.iter_s
     (fun (i, prefix, p) ->
       let prefix = String.trim prefix in
       match p with
@@ -445,11 +442,8 @@ let () =
     (function Par lst -> Some lst | _ -> None)
     (fun lst -> Par lst)
 
-let join (plist : 'a Lwt.t list) =
-  Lwt_list.map_s (fun (p : 'a Lwt.t) -> p) plist
-
 let join_process (plist : ('a, 'b, 'c) t list) =
-  Lwt_list.map_p
+  List.map_p
     (fun {termination; prefix; _} ->
       termination >>= fun t -> Lwt.return (prefix, t))
     plist
@@ -487,7 +481,7 @@ let wait_all_results (processes : ('a, 'b, 'c) t list) =
   | None ->
       lwt_log_info "All done!"
       >>= fun () ->
-      join terminations
+      Error_monad.all_p terminations
       >>= fun terminated ->
       return
       @@ List.map (function Ok a -> a | Error _ -> assert false) terminated

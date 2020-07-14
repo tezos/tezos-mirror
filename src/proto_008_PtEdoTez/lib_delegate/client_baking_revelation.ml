@@ -43,7 +43,7 @@ let inject_seed_nonce_revelation (cctxt : #Protocol_client_context.full) ~chain
             -% a Block_hash.Logging.tag hash)
       >>= fun () -> return_unit
   | _ ->
-      iter_s
+      List.iter_es
         (fun (level, nonce) ->
           Alpha_services.Forge.seed_nonce_revelation
             cctxt

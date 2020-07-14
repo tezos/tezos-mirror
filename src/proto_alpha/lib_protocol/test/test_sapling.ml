@@ -54,7 +54,7 @@ module Raw_context_tests = struct
     Sapling_storage.init ctx id ~memo_size:0
     >>= wrap
     >>=? fun ctx ->
-    fold_left_s
+    List.fold_left_es
       (fun ctx pos ->
         Sapling_storage.Commitments.get_root ctx id
         >>= wrap
@@ -137,7 +137,11 @@ module Raw_context_tests = struct
     Sapling_storage.init ctx id ~memo_size:0
     >>= wrap
     >>=? fun ctx ->
-    let nf_list_ctx = List.init 10 (fun _ -> gen_nf ()) in
+    let nf_list_ctx =
+      List.init ~when_negative_length:() 10 (fun _ -> gen_nf ())
+      |> function
+      | Error () -> assert false (* 10 > 0 *) | Ok nf_list_ctx -> nf_list_ctx
+    in
     let state =
       List.fold_left
         (fun state nf -> Sapling_storage.nullifiers_add state nf)
@@ -147,14 +151,18 @@ module Raw_context_tests = struct
     Sapling_storage.apply_diff ctx id state.diff
     >>= wrap
     >>=? fun (ctx, _) ->
-    let nf_list_diff = List.init 10 (fun _ -> gen_nf ()) in
+    let nf_list_diff =
+      List.init ~when_negative_length:() 10 (fun _ -> gen_nf ())
+      |> function
+      | Error () -> assert false (* 10 > 0 *) | Ok nf_list_diff -> nf_list_diff
+    in
     let state =
       List.fold_left
         (fun state nf -> Sapling_storage.nullifiers_add state nf)
         state
         nf_list_diff
     in
-    Error_monad.iter_p
+    List.iter_ep
       (fun nf ->
         Sapling_storage.nullifiers_mem ctx state nf
         >>= wrap
@@ -163,8 +171,15 @@ module Raw_context_tests = struct
         return_unit)
       (nf_list_ctx @ nf_list_diff)
     >>=? fun () ->
-    let nf_list_absent = List.init 10 (fun _ -> gen_nf ()) in
-    Error_monad.iter_p
+    let nf_list_absent =
+      List.init 10 ~when_negative_length:() (fun _ -> gen_nf ())
+      |> function
+      | Error () ->
+          assert false (* 10 > 0 *)
+      | Ok nf_list_absent ->
+          nf_list_absent
+    in
+    List.iter_ep
       (fun nf ->
         Sapling_storage.nullifiers_mem ctx state nf
         >>= wrap
@@ -200,7 +215,12 @@ module Raw_context_tests = struct
     Sapling_storage.state_from_id ctx id
     >>= wrap
     >>=? fun (diff, ctx) ->
-    let list_added = List.init 10 (fun _ -> gen_cm_cipher ~memo_size ()) in
+    let list_added =
+      List.init ~when_negative_length:() 10 (fun _ ->
+          gen_cm_cipher ~memo_size ())
+      |> function
+      | Error () -> assert false (* 10 > 0 *) | Ok list_added -> list_added
+    in
     let state = Sapling_storage.add diff list_added in
     Sapling_storage.apply_diff ctx id state.diff
     >>= wrap
@@ -218,7 +238,7 @@ module Raw_context_tests = struct
         >>=? fun result ->
         let expected_cm = List.map fst expected in
         assert (result = expected_cm) ;
-        test_from (Int64.succ from) until (List.tl expected)
+        test_from (Int64.succ from) until (Option.get @@ List.tl expected)
     in
     test_from 0L 9L list_added
 
@@ -247,7 +267,10 @@ module Raw_context_tests = struct
     >>= wrap
     >>=? fun ctx ->
     let list_to_add =
-      fst @@ List.split @@ List.init 33 (fun _ -> gen_cm_cipher ~memo_size ())
+      fst @@ List.split
+      @@ ( List.init ~when_negative_length:() 33 (fun _ ->
+               gen_cm_cipher ~memo_size ())
+         |> function Error () -> assert false (* 33 > 0 *) | Ok r -> r )
     in
     let rec test counter ctx =
       if counter >= 32 then return_unit
@@ -256,7 +279,7 @@ module Raw_context_tests = struct
         Sapling_storage.Commitments.add
           ctx
           id_one_by_one
-          [List.nth list_to_add counter]
+          [Option.get @@ List.nth list_to_add counter]
           (Int64.of_int counter)
         >>= wrap
         (* create a new tree and add a list of cms *)
@@ -273,7 +296,9 @@ module Raw_context_tests = struct
         Sapling_storage.Commitments.add
           ctx
           id_all_at_once
-          (List.init (counter + 1) (fun i -> List.nth list_to_add i))
+          ( List.init ~when_negative_length:() (counter + 1) (fun i ->
+                Option.get @@ List.nth list_to_add i)
+          |> function Error () -> assert false (* counter >= 0*) | Ok r -> r )
           0L
         >>= wrap
         >>=? fun (ctx, _size) ->
@@ -302,8 +327,11 @@ module Raw_context_tests = struct
     in
     let roots_ctx =
       List.init
+        ~when_negative_length:()
         (Int32.to_int Sapling_storage.Roots.size + 10)
         (fun _ -> gen_root ())
+      |> function
+      | Error () -> assert false (* size >= 0 *) | Ok roots_ctx -> roots_ctx
     in
     Context.init 1
     >>=? fun (b, _) ->
@@ -325,7 +353,7 @@ module Raw_context_tests = struct
     >>= wrap
     >>=? fun ctx ->
     (* Add one root per level to the context *)
-    Error_monad.fold_left_s
+    List.fold_left_es
       (fun (ctx, cnt) root ->
         Sapling_storage.Roots.add ctx id root
         >>= wrap
@@ -348,7 +376,7 @@ module Raw_context_tests = struct
       Sapling_storage.
         {id = Some id; diff = Sapling_storage.empty_diff; memo_size = 0}
     in
-    Error_monad.fold_left_s
+    List.fold_left_es
       (fun i root ->
         Sapling_storage.root_mem ctx state root
         >>= wrap
@@ -359,13 +387,20 @@ module Raw_context_tests = struct
       roots_ctx
     >>=? fun _ ->
     (* Add roots w/o increasing the level *)
-    let roots_same_level = List.init 10 (fun _ -> gen_root ()) in
-    Error_monad.fold_left_s
+    let roots_same_level =
+      List.init ~when_negative_length:() 10 (fun _ -> gen_root ())
+      |> function
+      | Error () ->
+          assert false (* 10 > 0 *)
+      | Ok roots_same_level ->
+          roots_same_level
+    in
+    List.fold_left_es
       (fun ctx root -> Sapling_storage.Roots.add ctx id root >>= wrap)
       ctx
       roots_same_level
     >>=? fun ctx ->
-    Error_monad.fold_left_s
+    List.fold_left_es
       (fun (i, ctx) root ->
         Sapling_storage.root_mem ctx state root
         >>= wrap
@@ -447,7 +482,7 @@ module Alpha_context_tests = struct
     let ctime_shields = Unix.gettimeofday () -. start in
     Printf.printf "client_shields %f\n" ctime_shields ;
     let start = Unix.gettimeofday () in
-    Error_monad.fold_left_s
+    List.fold_left_es
       (fun ctx vt ->
         verify_update ctx ~id vt |> assert_some >|=? fun (ctx, _id) -> ctx)
       ctx
@@ -462,7 +497,7 @@ module Alpha_context_tests = struct
     let ctime_transfers = Unix.gettimeofday () -. start in
     Printf.printf "client_txs %f\n" ctime_transfers ;
     let start = Unix.gettimeofday () in
-    Error_monad.fold_left_s
+    List.fold_left_es
       (fun ctx vt ->
         verify_update ctx ~id vt |> assert_some >|=? fun (ctx, _id) -> ctx)
       ctx
@@ -541,7 +576,7 @@ module Alpha_context_tests = struct
     (* randomize one output to fail check outputs *)
     (* don't randomize the ciphertext as it is not part of the proof *)
     let open Sapling.Core.Client.UTXO in
-    let o = List.hd vt.outputs in
+    let o = Option.get @@ List.hd vt.outputs in
     let o_wrong_cm =
       {
         o with
@@ -663,7 +698,7 @@ module Interpreter_tests = struct
     let wb = wallet_gen () in
     let list_addr = gen_addr 15 wb.vk in
     let list_forge_input =
-      List.init 14 (fun pos_int ->
+      List.init ~when_negative_length:() 14 (fun pos_int ->
           let pos = Int64.of_int pos_int in
           let forge_input =
             snd
@@ -671,6 +706,11 @@ module Interpreter_tests = struct
               |> Option.unopt_assert ~loc:__POS__ )
           in
           forge_input)
+      |> function
+      | Error () ->
+          assert false (* 14 > 0 *)
+      | Ok list_forge_input ->
+          list_forge_input
     in
     let list_forge_output =
       List.map
@@ -715,7 +755,7 @@ module Interpreter_tests = struct
     (* The inputs total [total] mutez and 15 of those are transfered in shielded tez *)
     assert (Int64.equal diff (Int64.of_int (total - 15))) ;
     let list_forge_input =
-      List.init 15 (fun i ->
+      List.init ~when_negative_length:() 15 (fun i ->
           let pos = Int64.of_int (i + 14 + 14) in
           let forge_input =
             snd
@@ -723,6 +763,11 @@ module Interpreter_tests = struct
               |> Option.unopt_assert ~loc:__POS__ )
           in
           forge_input)
+      |> function
+      | Error () ->
+          assert false (* 14 > 0 *)
+      | Ok list_forge_input ->
+          list_forge_input
     in
     let addr_a =
       snd
@@ -815,7 +860,7 @@ module Interpreter_tests = struct
         (Format.sprintf "(Pair 0x%s 0)")
         anti_replay_2
     in
-    let transaction = List.hd transactions in
+    let transaction = Option.get @@ List.hd transactions in
     let parameters =
       Alpha_context.Script.(lazy_expr (expression_from_string transaction))
     in

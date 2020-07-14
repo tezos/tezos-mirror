@@ -275,6 +275,8 @@ type error +=
   | Inconsistent_operation_hashes of
       (Operation_list_list_hash.t * Operation_list_list_hash.t)
 
+type error += Inconsistent_operation_hashes_lengths
+
 type error += Cannot_reconstruct of History_mode.t
 
 type error += Invalid_block_specification of string
@@ -382,6 +384,16 @@ let () =
       | _ ->
           None)
     (fun (oph, oph') -> Inconsistent_operation_hashes (oph, oph')) ;
+  register_error_kind
+    `Permanent
+    ~id:"InconsistentOperationHashesLengths"
+    ~title:"Inconsistent operation hashes lengths"
+    ~description:"Different number of operations and hashes given."
+    ~pp:(fun ppf () ->
+      Format.pp_print_string ppf "Inconsistent operation hashes lengths")
+    unit
+    (function Inconsistent_operation_hashes_lengths -> Some () | _ -> None)
+    (fun () -> Inconsistent_operation_hashes_lengths) ;
   register_error_kind
     `Permanent
     ~id:"CannotReconstruct"
@@ -540,7 +552,7 @@ let export ?(export_rolling = false) ~context_root ~store_root ~genesis
             >>=? fun pred_block_header ->
             (* Get operation list *)
             let validations_passes = block_header.shell.validation_passes in
-            map_s
+            List.map_es
               (fun i ->
                 Store.Block.Operations.read (block_store, block_hash) i)
               (0 -- (validations_passes - 1))
@@ -557,7 +569,7 @@ let export ?(export_rolling = false) ~context_root ~store_root ~genesis
               | false ->
                   return_none
               | true ->
-                  map_s
+                  List.map_es
                     (fun i ->
                       Store.Block.Operations_metadata_hashes.read
                         (block_store, pred_block_hash)
@@ -592,15 +604,19 @@ let export ?(export_rolling = false) ~context_root ~store_root ~genesis
 
 let check_operations_consistency block_header operations operation_hashes =
   (* Compute operations hashes and compare *)
-  List.iter2
+  List.iter2_e
+    ~when_different_lengths:Inconsistent_operation_hashes_lengths
     (fun (_, op) (_, oph) ->
       let expected_op_hash = List.map Operation.hash op in
       List.iter2
+        ~when_different_lengths:Inconsistent_operation_hashes_lengths
         (fun expected found -> assert (Operation_hash.equal expected found))
         expected_op_hash
         oph)
     operations
-    operation_hashes ;
+    operation_hashes
+  |> (function Ok _ as ok -> ok | Error err -> error err) (* To make a trace *)
+  >>? fun () ->
   (* Check header hashes based on Merkle tree *)
   let hashes =
     List.map
@@ -616,10 +632,14 @@ let check_operations_consistency block_header operations operation_hashes =
       computed_hash
       block_header.Block_header.shell.operations_hash
   in
-  fail_unless
+  error_unless
     are_oph_equal
     (Inconsistent_operation_hashes
        (computed_hash, block_header.Block_header.shell.operations_hash))
+
+let check_operations_consistency block_header operations operation_hashes =
+  Lwt.return
+  @@ check_operations_consistency block_header operations operation_hashes
 
 let compute_predecessors ~genesis_hash oldest_level block_hashes i =
   let rec step s d acc =
@@ -824,7 +844,7 @@ let reconstruct_storage store context_index chain_id ~user_activated_upgrades
             State.Block.Header.read (block_store, block_hash)
             >>=? fun block_header ->
             let validations_passes = block_header.shell.validation_passes in
-            map_s
+            List.map_es
               (fun i ->
                 Store.Block.Operations.read (block_store, block_hash) i)
               (0 -- (validations_passes - 1))
@@ -845,7 +865,7 @@ let reconstruct_storage store context_index chain_id ~user_activated_upgrades
               | false ->
                   return_none
               | true ->
-                  map_s
+                  List.map_es
                     (fun i ->
                       Store.Block.Operations_metadata_hashes.read
                         (block_store, predecessor_block_hash)
@@ -906,7 +926,7 @@ let reconstruct_storage store context_index chain_id ~user_activated_upgrades
             >>= fun () ->
             Store.Block.Contents.store st contents
             >>= fun () ->
-            Lwt_list.iteri_p
+            List.iteri_p
               (fun i ops ->
                 Store.Block.Operation_hashes.store
                   st
@@ -914,11 +934,11 @@ let reconstruct_storage store context_index chain_id ~user_activated_upgrades
                   (List.map Operation.hash ops))
               operations
             >>= fun () ->
-            Lwt_list.iteri_p
+            List.iteri_p
               (fun i ops -> Store.Block.Operations.store st i ops)
               operations
             >>= fun () ->
-            Lwt_list.iteri_p
+            List.iteri_p
               (fun i ops -> Store.Block.Operations_metadata.store st i ops)
               ops_metadata
             >>= fun () ->
@@ -1039,13 +1059,13 @@ let import ?(reconstruct = false) ?patch_context ~data_dir
     (fun () ->
       let k_store_pruned_blocks data =
         Store.with_atomic_rw store (fun () ->
-            Lwt_list.iter_s
+            List.iter_s
               (fun (pruned_header_hash, pruned_block) ->
                 Store.Block.Pruned_contents.store
                   (block_store, pruned_header_hash)
                   {header = pruned_block.Context.Pruned_block.block_header}
                 >>= fun () ->
-                Lwt_list.iter_s
+                List.iter_s
                   (fun (i, v) ->
                     Store.Block.Operations.store
                       (block_store, pruned_header_hash)
@@ -1053,7 +1073,7 @@ let import ?(reconstruct = false) ?patch_context ~data_dir
                       v)
                   pruned_block.operations
                 >>= fun () ->
-                Lwt_list.iter_s
+                List.iter_s
                   (fun (i, v) ->
                     Store.Block.Operation_hashes.store
                       (block_store, pruned_header_hash)
@@ -1081,9 +1101,9 @@ let import ?(reconstruct = false) ?patch_context ~data_dir
       let block_hashes_arr = Array.of_list rev_block_hashes in
       let write_predecessors_table to_write =
         Store.with_atomic_rw store (fun () ->
-            Lwt_list.iter_s
+            List.iter_s
               (fun (current_hash, predecessors_list) ->
-                Lwt_list.iter_s
+                List.iter_s
                   (fun (l, h) ->
                     Store.Block.Predecessors.store
                       (block_store, current_hash)
@@ -1102,7 +1122,7 @@ let import ?(reconstruct = false) ?patch_context ~data_dir
                     assert false)
               to_write)
       in
-      Lwt_list.fold_left_s
+      List.fold_left_s
         (fun (cpt, to_write) current_hash ->
           Tezos_stdlib_unix.Utils.display_progress
             ~refresh_rate:(cpt, 1_000)

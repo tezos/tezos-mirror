@@ -108,7 +108,7 @@ let get_endorsers ctxt =
 let get_endorser ctxt =
   Alpha_services.Delegate.Endorsing_rights.get rpc_ctxt ctxt
   >|=? fun endorsers ->
-  let endorser = List.hd endorsers in
+  let endorser = Option.get @@ List.hd endorsers in
   (endorser.delegate, endorser.slots)
 
 let get_bakers ctxt =

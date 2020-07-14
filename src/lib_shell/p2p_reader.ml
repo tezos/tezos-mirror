@@ -198,7 +198,7 @@ let handle_msg state msg =
       may_handle state chain_id
       @@ fun chain_db ->
       let (head, hist) = (locator :> Block_header.t * Block_hash.t list) in
-      Lwt_list.exists_p
+      List.exists_p
         (State.Block.known_invalid chain_db.chain_state)
         (Block_header.hash head :: hist)
       >>= fun known_invalid ->
@@ -275,7 +275,7 @@ let handle_msg state msg =
         Lwt.return_unit )
   | Get_block_headers hashes ->
       Peer_metadata.incr meta @@ Received_request Block_header ;
-      Lwt_list.iter_p
+      List.iter_p
         (fun hash ->
           read_block_header state hash
           >>= function
@@ -305,7 +305,7 @@ let handle_msg state msg =
           Lwt.return_unit )
   | Get_operations hashes ->
       Peer_metadata.incr meta @@ Received_request Operations ;
-      Lwt_list.iter_p
+      List.iter_p
         (fun hash ->
           read_operation state hash
           >>= function
@@ -335,7 +335,7 @@ let handle_msg state msg =
           Lwt.return_unit )
   | Get_protocols hashes ->
       Peer_metadata.incr meta @@ Received_request Protocols ;
-      Lwt_list.iter_p
+      List.iter_p
         (fun hash ->
           State.Protocol.read_opt state.disk hash
           >>= function
@@ -360,7 +360,7 @@ let handle_msg state msg =
       Lwt.return_unit
   | Get_operations_for_blocks blocks ->
       Peer_metadata.incr meta @@ Received_request Operations_for_block ;
-      Lwt_list.iter_p
+      List.iter_p
         (fun (hash, ofs) ->
           State.read_block state.disk hash
           >>= function

@@ -123,7 +123,7 @@ let reveal_block_nonces (cctxt : #Protocol_client_context.full) ~chain ~block
       >>=? fun nonces_location ->
       Client_baking_nonces.load cctxt nonces_location)
   >>=? fun nonces ->
-  Lwt_list.filter_map_p
+  List.filter_map_p
     (fun hash ->
       Lwt.catch
         (fun () ->
@@ -138,7 +138,7 @@ let reveal_block_nonces (cctxt : #Protocol_client_context.full) ~chain ~block
           >>= fun () -> Lwt.return_none))
     block_hashes
   >>= fun block_infos ->
-  filter_map_s
+  List.filter_map_es
     (fun (bi : Client_baking_blocks.block_info) ->
       match Client_baking_nonces.find_opt nonces bi.hash with
       | None ->

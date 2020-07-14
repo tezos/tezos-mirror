@@ -228,8 +228,8 @@ module Make (Proto : Registered_protocol.T) = struct
 
   let check_operation_quota block_hash operations =
     let invalid_block = invalid_block block_hash in
-    iteri2_p
-      (fun i ops quota ->
+    List.iteri_ep
+      (fun i (ops, quota) ->
         fail_unless
           (Option.fold
              ~none:true
@@ -239,7 +239,7 @@ module Make (Proto : Registered_protocol.T) = struct
            invalid_block
              (Too_many_operations {pass = i + 1; found = List.length ops; max}))
         >>=? fun () ->
-        iter_p
+        List.iter_ep
           (fun op ->
             let size = Data_encoding.Binary.length Operation.encoding op in
             fail_unless
@@ -251,16 +251,23 @@ module Make (Proto : Registered_protocol.T) = struct
                       size;
                       max = Proto.max_operation_data_length;
                     })))
-          ops
-        >>=? fun () -> return_unit)
-      operations
-      Proto.validation_passes
+          ops)
+      ( match
+          List.combine
+            ~when_different_lengths:()
+            operations
+            Proto.validation_passes
+        with
+      | Ok combined ->
+          combined
+      | Error () ->
+          raise (Invalid_argument "Block_validation.check_operation_quota") )
 
   let parse_operations block_hash operations =
     let invalid_block = invalid_block block_hash in
-    mapi_s
+    List.mapi_es
       (fun pass ->
-        map_s (fun op ->
+        List.map_es (fun op ->
             let op_hash = Operation.hash op in
             match
               Data_encoding.Binary.of_bytes_opt
@@ -319,9 +326,9 @@ module Make (Proto : Registered_protocol.T) = struct
       ~predecessor_fitness:predecessor_block_header.shell.fitness
       block_header
     >>=? (fun state ->
-           fold_left_s
+           List.fold_left_es
              (fun (state, acc) ops ->
-               fold_left_s
+               List.fold_left_es
                  (fun (state, acc) op ->
                    Proto.apply_operation state op
                    >>=? fun (state, op_metadata) ->

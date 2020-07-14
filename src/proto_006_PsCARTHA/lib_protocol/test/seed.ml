@@ -205,7 +205,7 @@ let revelation_early_wrong_right_twice () =
           false)
   >>=? fun () ->
   (* bake [preserved_cycles] cycles excluding [id] *)
-  Error_monad.fold_left_s
+  List.fold_left_es
     (fun b _ -> Block.bake_until_cycle_end ~policy b)
     b
     (1 -- preserved_cycles)

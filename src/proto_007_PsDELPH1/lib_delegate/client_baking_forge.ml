@@ -158,7 +158,7 @@ let assert_valid_operations_hash shell_header operations =
 let compute_endorsing_power cctxt ~chain ~block operations =
   Shell_services.Chain.chain_id cctxt ~chain ()
   >>=? fun chain_id ->
-  fold_left_s
+  List.fold_left_es
     (fun sum -> function
       | { Alpha_context.protocol_data =
             Operation_data {contents = Single (Endorsement _); _};
@@ -260,7 +260,7 @@ let get_manager_operation_gas_and_fee op =
   let {protocol_data = Operation_data {contents; _}; _} = op in
   let open Operation in
   let l = to_list (Contents_list contents) in
-  fold_left_s
+  List.fold_left_es
     (fun ((total_fee, total_gas) as acc) -> function
       | Contents (Manager_operation {fee; gas_limit; _}) ->
           (Lwt.return @@ Environment.wrap_error @@ Tez.(total_fee +? fee))
@@ -287,7 +287,7 @@ let sort_manager_operations ~max_size ~hard_gas_limit_per_block ~minimal_fees
     in
     (size, gas, Q.(fee_f / max size_ratio gas_ratio))
   in
-  filter_map_s
+  List.filter_map_es
     (fun op ->
       get_manager_operation_gas_and_fee op
       >>=? fun (fee, gas) ->
@@ -347,7 +347,7 @@ let retain_operations_up_to_quota operations quota =
 
 let trim_manager_operations ~max_size ~hard_gas_limit_per_block
     manager_operations =
-  map_s
+  List.map_es
     (fun op ->
       get_manager_operation_gas_and_fee op
       >>=? fun (_fee, gas) ->
@@ -402,7 +402,7 @@ let classify_operations (cctxt : #Protocol_client_context.full) ~chain ~block
   (* Retrieve the optimist maximum paying manager operations *)
   let manager_operations = t.(managers_index) in
   let {Environment.Updater.max_size; _} =
-    List.nth Main.validation_passes managers_index
+    Option.get @@ List.nth Main.validation_passes managers_index
   in
   sort_manager_operations
     ~max_size
@@ -488,20 +488,20 @@ let decode_priority cctxt chain block ~priority ~endorsing_power =
         ~delegates:[src_pkh]
         (chain, block)
       >>=? fun possibilities ->
-      try
-        let {Alpha_services.Delegate.Baking_rights.priority = prio; _} =
-          List.find
-            (fun p -> p.Alpha_services.Delegate.Baking_rights.level = level)
-            possibilities
-        in
-        Alpha_services.Delegate.Minimal_valid_time.get
-          cctxt
-          (chain, block)
-          prio
-          endorsing_power
-        >>=? fun minimal_timestamp -> return (prio, minimal_timestamp)
-      with Not_found ->
-        failwith "No slot found at level %a" Raw_level.pp level )
+      match
+        List.find
+          (fun p -> p.Alpha_services.Delegate.Baking_rights.level = level)
+          possibilities
+      with
+      | Some {Alpha_services.Delegate.Baking_rights.priority = prio; _} ->
+          Alpha_services.Delegate.Minimal_valid_time.get
+            cctxt
+            (chain, block)
+            prio
+            endorsing_power
+          >>=? fun minimal_timestamp -> return (prio, minimal_timestamp)
+      | None ->
+          failwith "No slot found at level %a" Raw_level.pp level )
 
 let unopt_timestamp ?(force = false) timestamp minimal_timestamp =
   let timestamp =
@@ -606,10 +606,10 @@ let filter_and_apply_operations cctxt state ~chain ~block block_info ~priority
             state.index <- index ;
             return inc)
   >>=? fun initial_inc ->
-  let endorsements = List.nth operations endorsements_index in
-  let votes = List.nth operations votes_index in
-  let anonymous = List.nth operations anonymous_index in
-  let managers = List.nth operations managers_index in
+  let endorsements = Option.get @@ List.nth operations endorsements_index in
+  let votes = Option.get @@ List.nth operations votes_index in
+  let anonymous = Option.get @@ List.nth operations anonymous_index in
+  let managers = Option.get @@ List.nth operations managers_index in
   let validate_operation inc op =
     protect (fun () -> add_operation inc op)
     >>= function
@@ -647,7 +647,7 @@ let filter_and_apply_operations cctxt state ~chain ~block block_info ~priority
         >>= fun () -> Lwt.return_none )
   in
   let filter_valid_operations inc ops =
-    Lwt_list.fold_left_s
+    List.fold_left_s
       (fun (inc, acc) op ->
         validate_operation inc op
         >>= function
@@ -677,15 +677,17 @@ let filter_and_apply_operations cctxt state ~chain ~block block_info ~priority
   let quota : Environment.Updater.quota list = Main.validation_passes in
   let {Constants.hard_gas_limit_per_block; _} = state.constants.parametric in
   let votes =
-    retain_operations_up_to_quota (List.rev votes) (List.nth quota votes_index)
+    retain_operations_up_to_quota
+      (List.rev votes)
+      (Option.get @@ List.nth quota votes_index)
   in
   let anonymous =
     retain_operations_up_to_quota
       (List.rev anonymous)
-      (List.nth quota anonymous_index)
+      (Option.get @@ List.nth quota anonymous_index)
   in
   trim_manager_operations
-    ~max_size:(List.nth quota managers_index).max_size
+    ~max_size:(Option.get @@ List.nth quota managers_index).max_size
     ~hard_gas_limit_per_block
     managers
   >>=? fun (accepted_managers, _overflowing_managers) ->
@@ -717,7 +719,7 @@ let filter_and_apply_operations cctxt state ~chain ~block block_info ~priority
     state.index
     block_info
   >>=? fun inc ->
-  fold_left_s
+  List.fold_left_es
     (fun inc op -> add_operation inc op >>=? fun (inc, _receipt) -> return inc)
     inc
     (List.flatten operations)
@@ -802,20 +804,22 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
   (* Ensure that we retain operations up to the quota *)
   let quota : Environment.Updater.quota list = Main.validation_passes in
   let endorsements =
-    List.sub (List.nth operations endorsements_index) endorsers_per_block
+    List.sub
+      (Option.get @@ List.nth operations endorsements_index)
+      endorsers_per_block
   in
   let votes =
     retain_operations_up_to_quota
-      (List.nth operations votes_index)
-      (List.nth quota votes_index)
+      (Option.get @@ List.nth operations votes_index)
+      (Option.get @@ List.nth quota votes_index)
   in
   let anonymous =
     retain_operations_up_to_quota
-      (List.nth operations anonymous_index)
-      (List.nth quota anonymous_index)
+      (Option.get @@ List.nth operations anonymous_index)
+      (Option.get @@ List.nth quota anonymous_index)
   in
   (* Size/Gas check already occurred in classify operations *)
-  let managers = List.nth operations managers_index in
+  let managers = Option.get @@ List.nth operations managers_index in
   let operations = [endorsements; votes; anonymous; managers] in
   ( match context_path with
   | None ->

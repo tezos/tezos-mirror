@@ -33,8 +33,10 @@ open Alpha_context
 (*                  Utility functions                           *)
 (****************************************************************)
 
+let get_hd_hd = function x :: y :: _ -> (x, y) | _ -> assert false
+
 let get_first_different_baker baker bakers =
-  return
+  return @@ Option.get
   @@ List.find
        (fun baker' -> Signature.Public_key_hash.( <> ) baker baker')
        bakers
@@ -42,23 +44,18 @@ let get_first_different_baker baker bakers =
 let get_first_different_bakers ctxt =
   Context.get_bakers ctxt
   >>=? fun bakers ->
-  let baker_1 = List.hd bakers in
-  get_first_different_baker baker_1 (List.tl bakers)
+  let baker_1 = Option.get @@ List.hd bakers in
+  get_first_different_baker baker_1 (Option.get @@ List.tl bakers)
   >>=? fun baker_2 -> return (baker_1, baker_2)
 
 let get_first_different_endorsers ctxt =
   Context.get_endorsers ctxt
-  >>=? fun endorsers ->
-  let endorser_1 = (List.hd endorsers).delegate in
-  let endorser_2 = (List.hd (List.tl endorsers)).delegate in
-  return (endorser_1, endorser_2)
+  >>=? fun endorsers -> return @@ get_hd_hd endorsers
 
 (** Bake two block at the same level using the same policy (i.e. same
     baker) *)
 let block_fork ?policy contracts b =
-  let (contract_a, contract_b) =
-    (List.hd contracts, List.hd (List.tl contracts))
-  in
+  let (contract_a, contract_b) = get_hd_hd contracts in
   Op.transaction (B b) contract_a contract_b Alpha_context.Tez.one_cent
   >>=? fun operation ->
   Block.bake ?policy ~operation b
@@ -75,7 +72,7 @@ let valid_double_baking_evidence () =
   >>=? fun (b, contracts) ->
   Context.get_bakers (B b)
   >>=? fun bakers ->
-  let priority_0_baker = List.hd bakers in
+  let priority_0_baker = Option.get @@ List.hd bakers in
   block_fork ~policy:(By_priority 0) contracts b
   >>=? fun (blk_a, blk_b) ->
   Op.double_baking (B blk_a) blk_a.header blk_b.header
@@ -83,7 +80,7 @@ let valid_double_baking_evidence () =
   Block.bake ~policy:(Excluding [priority_0_baker]) ~operation blk_a
   >>=? fun blk ->
   (* Check that the frozen deposit, the fees and rewards are removed *)
-  iter_s
+  List.iter_es
     (fun kind ->
       let contract =
         Alpha_context.Contract.implicit_contract priority_0_baker
@@ -157,7 +154,7 @@ let too_late_double_baking_evidence () =
   >>=? fun Constants.{parametric = {preserved_cycles; _}; _} ->
   block_fork ~policy:(By_priority 0) contracts b
   >>=? fun (blk_a, blk_b) ->
-  fold_left_s
+  List.fold_left_es
     (fun blk _ -> Block.bake_until_cycle_end blk)
     blk_a
     (1 -- (preserved_cycles + 1))

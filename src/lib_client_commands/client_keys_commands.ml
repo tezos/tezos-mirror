@@ -268,7 +268,7 @@ let commands network : Client_context.full Clic.command list =
             (fun (ka, _) (kb, _) -> String.compare ka kb)
             (registered_signers ())
         in
-        Lwt_list.iter_s
+        List.iter_s
           (fun (n, (module S : SIGNER)) ->
             cctxt#message
               "@[<v 2>Scheme `%s`: %s@,@[<hov 0>%a@]@]"
@@ -479,7 +479,7 @@ let commands network : Client_context.full Clic.command list =
         (fun () (cctxt : #Client_context.full) ->
           list_keys cctxt
           >>=? fun l ->
-          iter_s
+          List.iter_es
             (fun (name, pkh, pk, sk) ->
               Public_key_hash.to_source pkh
               >>=? fun v ->

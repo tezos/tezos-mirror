@@ -518,7 +518,8 @@ struct
     lwt_emit w (Logger.WorkerEvent (evt, Event.level evt))
     >>= fun () ->
     if Event.level evt >= w.limits.backlog_level then
-      Ringo.Ring.add (List.assoc (Event.level evt) w.event_log) evt ;
+      List.assoc (Event.level evt) w.event_log
+      |> Option.iter (fun ring -> Ringo.Ring.add ring evt) ;
     Lwt.return_unit
 
   let record_event w evt = Lwt.ignore_result (log_event w evt)

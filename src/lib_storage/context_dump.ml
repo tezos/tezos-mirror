@@ -545,7 +545,7 @@ module Make (I : Dump_interface) = struct
             aux 0 [] starting_block_header
             >>=? fun protocol_datas ->
             (* Dump protocol data *)
-            Lwt_list.iter_s
+            List.iter_s
               (fun proto -> set_loot buf proto ; maybe_flush ())
               protocol_datas
             >>= fun () ->

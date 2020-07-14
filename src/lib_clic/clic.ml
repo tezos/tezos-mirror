@@ -1884,11 +1884,12 @@ let find_command tree initial_arguments =
         return (cmd, empty_args_dict, initial_arguments)
     | (TPrefix {stop = None; prefix}, ([] | ("-h" | "--help") :: _)) ->
         fail (Unterminated_command (initial_arguments, gather_assoc prefix))
-    | (TPrefix {prefix; _}, hd_arg :: tl) ->
-        ( try return (List.assoc hd_arg prefix)
-          with Not_found ->
-            fail (Command_not_found (List.rev acc, gather_assoc prefix)) )
-        >>=? fun tree' -> traverse tree' tl (hd_arg :: acc)
+    | (TPrefix {prefix; _}, hd_arg :: tl) -> (
+      match List.assoc hd_arg prefix with
+      | None ->
+          fail (Command_not_found (List.rev acc, gather_assoc prefix))
+      | Some tree' ->
+          traverse tree' tl (hd_arg :: acc) )
     | (TParam {stop = None; _}, ([] | ("-h" | "--help") :: _)) ->
         fail (Unterminated_command (initial_arguments, gather_commands tree))
     | (TParam {stop = Some c; _}, []) ->
@@ -2013,7 +2014,7 @@ let complete_next_tree cctxt = function
       >|=? fun completions -> completions @ list_command_args command
   | TNonTerminalSeq {autocomplete; suffix; _} ->
       complete_func autocomplete cctxt
-      >|=? fun completions -> completions @ [List.hd suffix]
+      >|=? fun completions -> completions @ [Option.get @@ List.hd suffix]
   | TParam {autocomplete; _} ->
       complete_func autocomplete cctxt
   | TStop command ->
@@ -2059,8 +2060,11 @@ let complete_tree cctxt tree index args =
           | _ ->
               complete_next_tree cctxt this_tree )
       | (TPrefix {prefix; _}, hd :: tl) -> (
-        try help (List.assoc hd prefix) tl (ind - 1)
-        with Not_found -> return_nil )
+        match List.assoc hd prefix with
+        | None ->
+            return_nil
+        | Some p ->
+            help p tl (ind - 1) )
       | (TParam {tree; _}, _ :: tl) ->
           help tree tl (ind - 1)
       | (TStop (Command {options = Argument {spec; _}; conv; _}), args) ->

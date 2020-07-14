@@ -130,17 +130,19 @@ let inject_types type_map parsed =
     | Bytes (loc, value) ->
         Bytes (inject_loc `after loc, value)
   and inject_loc which loc =
-    try
-      let stack =
-        let locs =
-          List.assoc loc parsed.Michelson_v1_parser.expansion_table
-          |> snd |> List.sort compare
-        in
-        let (bef, aft) = List.assoc (List.hd locs) type_map in
-        match which with `before -> bef | `after -> aft
-      in
-      {comment = Some (Format.asprintf "%a" print_stack stack)}
-    with Not_found -> {comment = None}
+    let comment =
+      let ( >>= ) = Option.bind in
+      List.assoc loc parsed.Michelson_v1_parser.expansion_table
+      >>= fun (_, locs) ->
+      let locs = List.sort compare locs in
+      List.hd locs
+      >>= fun head_loc ->
+      List.assoc head_loc type_map
+      >>= fun (bef, aft) ->
+      let stack = match which with `before -> bef | `after -> aft in
+      Some (Format.asprintf "%a" print_stack stack)
+    in
+    {comment}
   in
   inject_expr (root parsed.unexpanded)
 
@@ -165,15 +167,16 @@ let unparse ?type_map parse expanded =
           | Bytes (loc, value) ->
               Bytes (inject_loc `after loc, value)
         and inject_loc which loc =
-          try
-            let stack =
-              let (bef, aft) =
-                List.assoc (List.assoc loc unexpansion_table) type_map
-              in
-              match which with `before -> bef | `after -> aft
-            in
-            {comment = Some (Format.asprintf "%a" print_stack stack)}
-          with Not_found -> {comment = None}
+          let comment =
+            let ( >>= ) = Option.bind in
+            List.assoc loc unexpansion_table
+            >>= fun loc ->
+            List.assoc loc type_map
+            >>= fun (bef, aft) ->
+            let stack = match which with `before -> bef | `after -> aft in
+            Some (Format.asprintf "%a" print_stack stack)
+          in
+          {comment}
         in
         unexpanded |> root |> inject_expr
         |> Format.asprintf "%a" Micheline_printer.print_expr

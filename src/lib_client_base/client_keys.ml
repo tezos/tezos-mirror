@@ -386,7 +386,7 @@ let join_keys keys1_opt keys2 =
 let raw_get_key (cctxt : #Client_context.wallet) pkh =
   Public_key_hash.rev_find_all cctxt pkh
   >>=? (fun names ->
-         fold_left_s
+         List.fold_left_es
            (fun keys_opt n ->
              Secret_key.find_opt cctxt n
              >>=? fun sk_uri ->
@@ -448,7 +448,7 @@ let get_public_key cctxt pkh =
 let get_keys (cctxt : #Client_context.wallet) =
   Secret_key.load cctxt
   >>=? fun sks ->
-  Lwt_list.filter_map_s
+  List.filter_map_s
     (fun (name, sk_uri) ->
       Public_key_hash.find cctxt name
       >>=? (fun pkh ->
@@ -469,7 +469,7 @@ let get_keys (cctxt : #Client_context.wallet) =
 let list_keys cctxt =
   Public_key_hash.load cctxt
   >>=? fun l ->
-  map_s
+  List.map_es
     (fun (name, pkh) ->
       raw_get_key cctxt pkh
       >>= function

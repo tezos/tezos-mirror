@@ -809,7 +809,7 @@ let commands () =
       (fun () (cctxt : Protocol_client_context.full) ->
         Sapling_key.load cctxt
         >>=? fun l ->
-        iter_s
+        List.iter_es
           (fun (s, _) -> cctxt#message "%s" s >>= fun () -> return_unit)
           (List.sort (fun (s1, _) (s2, _) -> String.compare s1 s2) l));
     shield_cmd;

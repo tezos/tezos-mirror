@@ -66,7 +66,9 @@ let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
     (packed_operations : packed_operation list) =
   assert (List.length packed_operations > 0) ;
   (* Hypothesis : each operation must have the same branch (is this really true?) *)
-  let {Tezos_base.Operation.branch} = (List.hd packed_operations).shell in
+  let {Tezos_base.Operation.branch} =
+    (Option.get @@ List.hd packed_operations).shell
+  in
   assert (
     List.for_all
       (fun {shell = {Tezos_base.Operation.branch = b; _}; _} ->

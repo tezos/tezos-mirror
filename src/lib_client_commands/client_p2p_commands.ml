@@ -72,17 +72,17 @@ let commands () =
         let (incoming, outgoing) =
           List.partition (fun c -> c.P2p_connection.Info.incoming) conns
         in
-        Lwt_list.iter_s
+        List.iter_s
           (fun conn -> cctxt#message "  %a" pp_connection_info conn)
           incoming
         >>= fun () ->
-        Lwt_list.iter_s
+        List.iter_s
           (fun conn -> cctxt#message "  %a" pp_connection_info conn)
           outgoing
         >>= fun () ->
         cctxt#message "KNOWN PEERS"
         >>= fun () ->
-        Lwt_list.iter_s
+        List.iter_s
           (fun (p, pi) ->
             cctxt#message
               "  %a  %.0f %a %a %s"
@@ -98,7 +98,7 @@ let commands () =
         >>= fun () ->
         cctxt#message "KNOWN POINTS"
         >>= fun () ->
-        Lwt_list.iter_s
+        List.iter_s
           (fun (p, pi) ->
             match pi.P2p_point.Info.state with
             | Running peer_id ->

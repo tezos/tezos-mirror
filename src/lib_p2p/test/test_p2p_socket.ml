@@ -96,9 +96,10 @@ let sync ch =
   >>=? fun () -> Process.Channel.pop ch >>=? fun () -> return_unit
 
 let rec sync_nodes nodes =
-  iter_p (fun p -> Process.receive p) nodes
+  List.iter_ep (fun p -> Process.receive p) nodes
   >>=? fun () ->
-  iter_p (fun p -> Process.send p ()) nodes >>=? fun () -> sync_nodes nodes
+  List.iter_ep (fun p -> Process.send p ()) nodes
+  >>=? fun () -> sync_nodes nodes
 
 let sync_nodes nodes =
   sync_nodes nodes

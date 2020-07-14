@@ -149,7 +149,13 @@ let print_list ppf l =
 (** Creating a list from a set preserves the elements of the set. *)
 let test_to_list _ =
   let to_list s = P2p_acl.IpSet.fold (fun k _v acc -> k :: acc) s [] in
-  let list_eq = List.for_all2 (fun x y -> Ipaddr.V6.Prefix.compare x y = 0) in
+  let list_eq =
+    List.for_all2 ~when_different_lengths:() (fun x y ->
+        Ipaddr.V6.Prefix.compare x y = 0)
+  in
+  let list_eq l1 l2 =
+    match list_eq l1 l2 with Ok v -> v | Error () -> false
+  in
   let assert_equal_set ~msg a b =
     let a = List.sort compare a in
     let b = List.sort compare (to_list b) in

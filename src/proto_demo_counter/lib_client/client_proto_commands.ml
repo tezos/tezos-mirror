@@ -45,7 +45,7 @@ let bake (cctxt : Protocol_client_context.full) message : unit tzresult Lwt.t =
   let header_encoded =
     Data_encoding.Binary.to_bytes_exn Block_header.encoding header
   in
-  let preapply_result = List.hd preapply_result in
+  let preapply_result = Option.get @@ List.hd preapply_result in
   let operations = [List.map snd preapply_result.applied] in
   Shell_services.Injection.block cctxt header_encoded operations
   >>=? fun block_hash ->

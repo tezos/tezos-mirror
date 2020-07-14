@@ -287,7 +287,7 @@ let unshallow context =
   Store.Tree.list context.tree []
   >>= fun children ->
   P.Repo.batch context.index.repo (fun x y _ ->
-      Lwt_list.iter_s
+      List.iter_s
         (fun (s, k) ->
           match k with
           | `Contents ->
@@ -371,7 +371,7 @@ type key_or_dir = [`Key of key | `Dir of key]
 let fold ctxt key ~init ~f =
   Store.Tree.list ctxt.tree (data_key key)
   >>= fun keys ->
-  Lwt_list.fold_left_s
+  List.fold_left_s
     (fun acc (name, kind) ->
       let key =
         match kind with
@@ -826,7 +826,7 @@ module Dumpable_context = struct
     >>= fun keys ->
     keys
     |> List.sort (fun (a, _) (b, _) -> String.compare a b)
-    |> Lwt_list.map_s (fun (key, value_kind) ->
+    |> List.map_s (fun (key, value_kind) ->
            Store.Tree.get_tree tree [key]
            >|= fun value ->
            let value_hash = tree_hash value in
@@ -853,7 +853,7 @@ module Dumpable_context = struct
     let rec aux : type a. tree -> (unit -> a) -> a Lwt.t =
      fun tree k ->
       bindings tree
-      >>= Lwt_list.map_s (fun {key; value; value_hash; value_kind} ->
+      >>= List.map_s (fun {key; value; value_hash; value_kind} ->
               let kv = (key, value_hash) in
               if visited value_hash then Lwt.return kv
               else

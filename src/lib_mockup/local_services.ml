@@ -298,7 +298,7 @@ module Make (E : MENV) = struct
             | Error errs ->
                 RPC_answer.fail errs
             | Ok pooled_operations -> (
-                map_s
+                List.map_es
                   (fun (shell_header, operation_data) ->
                     let op =
                       {
@@ -397,8 +397,8 @@ module Make (E : MENV) = struct
            with_chain chain (fun () ->
                begin_construction ()
                >>=? (fun validation_state ->
-                      fold_left_s
-                        (fold_left_s simulate_operation)
+                      List.fold_left_es
+                        (List.fold_left_es simulate_operation)
                         (validation_state, [])
                         operations
                       >>=? fun (validation_state, preapply_results) ->
@@ -459,7 +459,7 @@ module Make (E : MENV) = struct
            with_chain chain (fun () ->
                begin_construction ()
                >>=? (fun state ->
-                      fold_left_s
+                      List.fold_left_es
                         (fun (state, acc) op ->
                           E.Protocol.apply_operation state op
                           >>=? fun (state, result) ->
@@ -485,7 +485,7 @@ module Make (E : MENV) = struct
       let operations = op :: mempool_operations in
       begin_construction ()
       >>=? fun validation_state ->
-      fold_left_s
+      List.fold_left_es
         (fun rstate (shell, protocol_data) ->
           simulate_operation rstate E.Protocol.{shell; protocol_data})
         (validation_state, [])
@@ -591,8 +591,8 @@ module Make (E : MENV) = struct
         }
       >>=? fun validation_state ->
       let i = ref 0 in
-      fold_left_s
-        (fold_left_s (fun (validation_state, _results) op ->
+      List.fold_left_es
+        (List.fold_left_es (fun (validation_state, _results) op ->
              incr i ;
              match
                Data_encoding.Binary.of_bytes
@@ -645,7 +645,7 @@ module Make (E : MENV) = struct
                    >>=? fun () ->
                    Mempool.read ()
                    >>=? fun mempool_operations ->
-                   fold_left_s
+                   List.fold_left_es
                      (fun map ((shell_header, operation_data) as v) ->
                        match
                          Data_encoding.Binary.to_bytes

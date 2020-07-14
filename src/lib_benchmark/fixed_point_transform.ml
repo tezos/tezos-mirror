@@ -218,7 +218,8 @@ module Fixed_point_arithmetic (Lang : Fixed_point_lang_sig) = struct
   (* All bits of a float:
      all_bits x = [sign] @ exponent @ mantissa *)
   let all_bits (x : float) : int64 list =
-    List.init 64 (fun i -> bit x i) |> List.rev
+    List.init ~when_negative_length:() 64 (fun i -> bit x i)
+    |> (* 64 >= 0 *) Result.get_ok |> List.rev
 
   (* take n first elements from a list *)
   let take n l =

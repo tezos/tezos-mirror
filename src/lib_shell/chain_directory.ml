@@ -94,9 +94,9 @@ let list_blocks chain_state ?(length = 1) ?min_date heads =
       in
       Lwt.return (List.map (fun b -> Some b) sorted_heads)
   | _ :: _ as heads ->
-      Lwt_list.map_p (State.Block.read_opt chain_state) heads )
+      List.map_p (State.Block.read_opt chain_state) heads )
   >>= fun requested_heads ->
-  Lwt_list.fold_left_s
+  List.fold_left_s
     (fun (ignored, acc) head ->
       match head with
       | None ->

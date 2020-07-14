@@ -68,7 +68,7 @@ let build_rpc_directory validator mainchain_validator =
             Lwt.return_true
         | chains ->
             let that_chain_id = State.Block.chain_id block in
-            Lwt_list.exists_p
+            List.exists_p
               (fun chain ->
                 Chain_directory.get_chain_id_opt state chain
                 >|= function
@@ -216,7 +216,7 @@ let build_rpc_directory validator mainchain_validator =
         in
         if !first_call then (
           first_call := false ;
-          Lwt_list.map_p
+          List.map_p
             (fun c -> convert (c, true))
             (Validator.get_active_chains validator)
           >>= fun l -> Lwt.return_some l )

@@ -98,11 +98,13 @@ module Tested_terms () = struct
       lazy_terms
 
   let check_correctness () =
-    Error_monad.iter2_p
+    List.iter2_e
+      ~when_different_lengths:
+        (TzTrace.make @@ Exn (Failure "differently sized cost lists"))
       (fun min full ->
-        if Z.leq min full then return_unit
+        if Z.leq min full then ok_unit
         else
-          failwith
+          generic_error
             "Script_repr: inconsistent costs %a vs %a@."
             Z.pp_print
             min
@@ -110,6 +112,8 @@ module Tested_terms () = struct
             full)
       minimal_costs
       full_costs
+
+  let check_correctness () = Lwt.return @@ check_correctness ()
 end
 
 let check_property () =

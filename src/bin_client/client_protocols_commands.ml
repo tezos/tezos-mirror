@@ -48,9 +48,7 @@ let commands () =
       (fun () (cctxt : #Client_context.full) ->
         Shell_services.Protocol.list cctxt
         >>=? fun protos ->
-        Lwt_list.iter_s
-          (fun ph -> cctxt#message "%a" Protocol_hash.pp ph)
-          protos
+        List.iter_s (fun ph -> cctxt#message "%a" Protocol_hash.pp ph) protos
         >>= fun () -> return_unit);
     command
       ~group

@@ -211,7 +211,7 @@ let decrypt_all (cctxt : #Client_context.io_wallet) =
   >>=? fun sks ->
   password_file_load cctxt
   >>=? fun () ->
-  iter_s
+  List.iter_es
     (fun (name, sk_uri) ->
       if Uri.scheme (sk_uri : sk_uri :> Uri.t) <> Some scheme then return_unit
       else decrypt cctxt ~name sk_uri >>=? fun _ -> return_unit)
@@ -222,7 +222,7 @@ let decrypt_list (cctxt : #Client_context.io_wallet) keys =
   >>=? fun sks ->
   password_file_load cctxt
   >>=? fun () ->
-  iter_s
+  List.iter_es
     (fun (name, sk_uri) ->
       if
         Uri.scheme (sk_uri : sk_uri :> Uri.t) = Some scheme

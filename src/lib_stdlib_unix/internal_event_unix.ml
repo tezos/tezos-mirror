@@ -48,7 +48,8 @@ module Configuration = struct
     >>=? fun json ->
     protect (fun () -> return (Data_encoding.Json.destruct encoding json))
 
-  let apply {activate} = iter_s Internal_event.All_sinks.activate activate
+  let apply {activate} =
+    List.iter_es Internal_event.All_sinks.activate activate
 end
 
 let env_var_name = "TEZOS_EVENTS_CONFIG"
@@ -75,7 +76,7 @@ let init ?lwt_log_sink ?(configuration = Configuration.default) () =
         |> List.filter (( <> ) "")
         |> List.map Uri.of_string
       in
-      iter_s
+      List.iter_es
         (fun uri ->
           match Uri.scheme uri with
           | None ->

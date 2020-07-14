@@ -248,8 +248,12 @@ let inferred_params_table (solution : Inference.solution) =
     | [] | [[]] ->
         assert false
     | column_names :: lines ->
-        let dim = List.length column_names in
-        let spec = splice Syntax.Vbar (List.init dim (fun _i -> Syntax.L)) in
+        let spec_data =
+          (* we do not actually care about the content of the column_names,
+              just matching things one-to-one for equal length. *)
+          List.rev_map (fun _ -> Syntax.L) column_names
+        in
+        let spec = splice Syntax.Vbar spec_data in
         let hdr =
           Syntax.Row (List.map (fun x -> [normal_text x]) column_names)
         in

@@ -316,7 +316,7 @@ let single_activation () =
   activation_init ()
   >>=? fun (blk, _contracts, secrets) ->
   let ({account; activation_code; amount = expected_amount; _} as _first_one) =
-    List.hd secrets
+    Option.get @@ List.hd secrets
   in
   (* Contract does not exist *)
   Assert.balance_is
@@ -340,7 +340,7 @@ let single_activation () =
 let multi_activation_1 () =
   activation_init ()
   >>=? fun (blk, _contracts, secrets) ->
-  Error_monad.fold_left_s
+  List.fold_left_es
     (fun blk {account; activation_code; amount = expected_amount; _} ->
       Op.activation (B blk) account activation_code
       >>=? fun operation ->
@@ -360,7 +360,7 @@ let multi_activation_1 () =
 let multi_activation_2 () =
   activation_init ()
   >>=? fun (blk, _contracts, secrets) ->
-  Error_monad.fold_left_s
+  List.fold_left_es
     (fun ops {account; activation_code; _} ->
       Op.activation (B blk) account activation_code >|=? fun op -> op :: ops)
     []
@@ -368,7 +368,7 @@ let multi_activation_2 () =
   >>=? fun ops ->
   Block.bake ~operations:ops blk
   >>=? fun blk ->
-  Error_monad.iter_s
+  List.iter_es
     (fun {account; amount = expected_amount; _} ->
       (* Contract does exist *)
       Assert.balance_is
@@ -382,8 +382,10 @@ let multi_activation_2 () =
 let activation_and_transfer () =
   activation_init ()
   >>=? fun (blk, contracts, secrets) ->
-  let ({account; activation_code; _} as _first_one) = List.hd secrets in
-  let bootstrap_contract = List.hd contracts in
+  let ({account; activation_code; _} as _first_one) =
+    Option.get @@ List.hd secrets
+  in
+  let bootstrap_contract = Option.get @@ List.hd contracts in
   let first_contract = Contract.implicit_contract account in
   Op.activation (B blk) account activation_code
   >>=? fun operation ->
@@ -410,8 +412,10 @@ let activation_and_transfer () =
 let transfer_to_unactivated_then_activate () =
   activation_init ()
   >>=? fun (blk, contracts, secrets) ->
-  let ({account; activation_code; amount} as _first_one) = List.hd secrets in
-  let bootstrap_contract = List.hd contracts in
+  let ({account; activation_code; amount} as _first_one) =
+    Option.get @@ List.hd secrets
+  in
+  let bootstrap_contract = Option.get @@ List.hd contracts in
   let unactivated_commitment_contract = Contract.implicit_contract account in
   Context.Contract.balance (B blk) bootstrap_contract
   >>=? fun b_amount ->
@@ -450,7 +454,9 @@ let invalid_activation_with_no_commitments () =
   Context.init 1
   >>=? fun (blk, _) ->
   let secrets = secrets () in
-  let ({account; activation_code; _} as _first_one) = List.hd secrets in
+  let ({account; activation_code; _} as _first_one) =
+    Option.get @@ List.hd secrets
+  in
   Op.activation (B blk) account activation_code
   >>=? fun operation ->
   Block.bake ~operation blk
@@ -465,8 +471,10 @@ let invalid_activation_with_no_commitments () =
 let invalid_activation_wrong_secret () =
   activation_init ()
   >>=? fun (blk, _, secrets) ->
-  let ({account; _} as _first_one) = List.nth secrets 0 in
-  let ({activation_code; _} as _second_one) = List.nth secrets 1 in
+  let ({account; _} as _first_one) = Option.get @@ List.nth secrets 0 in
+  let ({activation_code; _} as _second_one) =
+    Option.get @@ List.nth secrets 1
+  in
   Op.activation (B blk) account activation_code
   >>=? fun operation ->
   Block.bake ~operation blk
@@ -482,7 +490,7 @@ let invalid_activation_wrong_secret () =
 let invalid_activation_inexistent_pkh () =
   activation_init ()
   >>=? fun (blk, _, secrets) ->
-  let ({activation_code; _} as _first_one) = List.hd secrets in
+  let ({activation_code; _} as _first_one) = Option.get @@ List.hd secrets in
   let inexistent_pkh =
     Signature.Public_key_hash.of_b58check_exn
       "tz1PeQHGKPWSpNoozvxgqLN9TFsj6rDqNV3o"
@@ -502,7 +510,9 @@ let invalid_activation_inexistent_pkh () =
 let invalid_double_activation () =
   activation_init ()
   >>=? fun (blk, _, secrets) ->
-  let ({account; activation_code; _} as _first_one) = List.hd secrets in
+  let ({account; activation_code; _} as _first_one) =
+    Option.get @@ List.hd secrets
+  in
   Incremental.begin_construction blk
   >>=? fun inc ->
   Op.activation (I inc) account activation_code
@@ -523,8 +533,8 @@ let invalid_double_activation () =
 let invalid_transfer_from_unactivated_account () =
   activation_init ()
   >>=? fun (blk, contracts, secrets) ->
-  let ({account; _} as _first_one) = List.hd secrets in
-  let bootstrap_contract = List.hd contracts in
+  let ({account; _} as _first_one) = Option.get @@ List.hd secrets in
+  let bootstrap_contract = Option.get @@ List.hd contracts in
   let unactivated_commitment_contract = Contract.implicit_contract account in
   (* No activation *)
   Op.transaction

@@ -34,7 +34,7 @@ let known_heads chain_state =
   State.read_chain_data chain_state (fun chain_store _data ->
       Store.Chain_data.Known_heads.elements chain_store)
   >>= fun hashes ->
-  Lwt_list.map_p
+  List.map_p
     (fun h ->
       State.Block.read_opt chain_state h >|= Option.unopt_assert ~loc:__POS__)
     hashes
@@ -103,7 +103,7 @@ let locked_set_head chain_store data block live_blocks live_operations =
   let ancestor = State.Block.hash ancestor in
   pop_blocks ancestor data.current_head
   >>= fun () ->
-  Lwt_list.fold_left_s push_block ancestor path
+  List.fold_left_s push_block ancestor path
   >>= fun _ ->
   Store.Chain_data.Current_head.store chain_store (State.Block.hash block)
   >>= fun () ->

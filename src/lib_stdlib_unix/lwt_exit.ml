@@ -76,18 +76,19 @@ let clean_up status =
           | [] ->
               Lwt.return_unit
           | _ :: _ as after -> (
-              Callbacks_map.to_seq promises
-              |> Seq.filter_map (fun (id, (_, p)) ->
-                     if List.mem id after then Some p else None)
-              |> List.of_seq
-              |> function
-              | [] ->
-                  (* This can happen if all after-callbacks were unregistered *)
-                  Lwt.return_unit
-              | [p] ->
-                  p
-              | _ :: _ :: _ as ps ->
-                  Lwt.join ps )
+            match
+              Callbacks_map.fold
+                (fun id (_, p) ps -> if List.mem id after then p :: ps else ps)
+                promises
+                []
+            with
+            | [] ->
+                (* This can happen if all after-callbacks were unregistered *)
+                Lwt.return_unit
+            | [p] ->
+                p
+            | _ :: _ :: _ as ps ->
+                Lwt.join ps )
         in
         let promise = pre >>= fun () -> callback status in
         Lwt.on_failure promise (fun exc ->

@@ -102,4 +102,4 @@ let () = Registration.register (module Blake2b_bench)
 let () =
   Registration.register_for_codegen
     "blake2b_codegen"
-    (Model.For_codegen (List.assoc "blake2b" Blake2b_bench.models))
+    (Model.For_codegen (Option.get @@ List.assoc "blake2b" Blake2b_bench.models))

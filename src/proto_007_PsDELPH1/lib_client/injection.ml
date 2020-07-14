@@ -879,7 +879,7 @@ let inject_operation (type kind) cctxt ~chain ~block ?confirmations
     >>= fun () ->
     Lwt.return (originated_contracts result.contents)
     >>=? fun contracts ->
-    Lwt_list.iter_s
+    List.iter_s
       (fun c -> cctxt#message "New contract %a originated." Contract.pp c)
       contracts
     >>= fun () ->

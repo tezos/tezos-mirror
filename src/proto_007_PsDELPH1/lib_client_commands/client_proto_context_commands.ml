@@ -277,7 +277,7 @@ let commands network () =
       (fun () (cctxt : Protocol_client_context.full) ->
         list_contract_labels cctxt ~chain:cctxt#chain ~block:cctxt#block
         >>=? fun contracts ->
-        Lwt_list.iter_s
+        List.iter_s
           (fun (alias, hash, kind) -> cctxt#message "%s%s%s" hash kind alias)
           contracts
         >>= fun () -> return_unit);
@@ -840,7 +840,7 @@ let commands network () =
                 >>=? fun (_, src_pk, src_sk) -> return (source, src_pk, src_sk)
             )
             >>=? fun (source, src_pk, src_sk) ->
-            mapi_p prepare operations
+            List.mapi_ep prepare operations
             >>=? fun contents ->
             let (Manager_list contents) = Injection.manager_of_list contents in
             Injection.inject_manager_operation

@@ -10,6 +10,7 @@ depends: [
   "tezos-tooling" { with-test }
   "dune" { >= "2.0" }
   "tezos-stdlib"
+  "tezos-lwt-result-stdlib"
   "data-encoding" { = "0.2" }
   "tezos-error-monad"
   "lwt_log"

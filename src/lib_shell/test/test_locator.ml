@@ -446,13 +446,14 @@ let test_locator base_dir =
     let (_, l_exp) = (l_exp : Block_locator.t :> _ * _) in
     let (_, l_lin) = (l_lin : Block_locator.t :> _ * _) in
     let _ = Printf.printf "%10i %f %f\n" max_size t_exp t_lin in
-    List.iter2
-      (fun hn ho ->
-        if not (Block_hash.equal hn ho) then
-          Assert.fail_msg "Invalid locator %i" max_size)
-      l_exp
-      l_lin ;
-    return_unit
+    Lwt.return
+    @@ List.iter2
+         ~when_different_lengths:(TzTrace.make @@ Exn (Failure __LOC__))
+         (fun hn ho ->
+           if not (Block_hash.equal hn ho) then
+             Assert.fail_msg "Invalid locator %i" max_size)
+         l_exp
+         l_lin
   in
   let stop = locator_limit + 20 in
   let rec loop size =
@@ -466,12 +467,22 @@ let test_protocol_locator base_dir =
   >>= fun chain ->
   let chain_length = 200 in
   let fork_points = [1; 10; 50; 66; 150] in
+  (* further_points = List.tl fork_points @ [chain_length] *)
+  let further_points = [10; 50; 66; 150; chain_length] in
   let fork_points_assoc =
     List.map2
+      ~when_different_lengths:()
       (fun x y -> (x, y))
       fork_points
-      (List.tl fork_points @ [chain_length])
-    |> List.mapi (fun i x -> (i + 1, x))
+      further_points
+    >|? List.mapi (fun i x -> (i + 1, x))
+  in
+  let fork_points_assoc =
+    match fork_points_assoc with
+    | Ok fork_points_assoc ->
+        fork_points_assoc
+    | Error () ->
+        assert false
   in
   make_multiple_protocol_chain chain ~chain_length ~fork_points
   >>= fun head_hash ->
@@ -489,7 +500,7 @@ let test_protocol_locator base_dir =
           let open Block_locator in
           let steps = to_steps seed locator in
           let has_lower_bound = ref false in
-          iter_s
+          List.iter_es
             (fun {block; predecessor; _} ->
               State.Block.read chain block
               >>=? fun block ->
@@ -549,7 +560,7 @@ let test_protocol_locator base_dir =
   >>=? fun pred ->
   State.Chain.set_checkpoint_then_purge_rolling chain (State.Block.header pred)
   >>=? fun () ->
-  iter_s
+  List.iter_es
     (fun i ->
       State.compute_protocol_locator chain ~proto_level:i seed
       >>= function
@@ -569,7 +580,7 @@ let test_protocol_locator base_dir =
       let has_lower_bound = ref false in
       let inf = 170 in
       let sup = 200 in
-      iter_s
+      List.iter_es
         (fun {block; predecessor; _} ->
           State.Block.read chain block
           >>=? fun block ->
@@ -592,11 +603,11 @@ let test_protocol_locator base_dir =
           return_unit)
         steps
       >>=? fun () ->
-      let last_hash = (List.hd steps).predecessor in
+      let last_hash = (Option.get @@ List.hd steps).predecessor in
       Assert.is_true
         ~msg:"last block in locator is the checkpoint"
         (Block_hash.equal last_hash (State.Block.hash pred)) ;
-      let first_hash = (List.hd (List.rev steps)).block in
+      let first_hash = (Option.get @@ List.last_opt steps).block in
       Assert.is_true
         ~msg:"first block in locator is the head"
         (Block_hash.equal first_hash head_hash) ;

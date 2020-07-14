@@ -335,7 +335,7 @@ let test_full_fetch_issues_request _ () =
     (tuple3 unit p2p_peer_id (list testable_test_key))
     "should have sent a request"
     ((), P2p_peer.Id.zero, ["baz"])
-    (List.hd !Test_request.registered_requests) ;
+    (Option.get @@ List.hd !Test_request.registered_requests) ;
   Lwt.cancel f1 ;
   Lwt.return_unit
 

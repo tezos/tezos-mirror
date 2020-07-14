@@ -189,7 +189,7 @@ let mockup_default_bootstrap_accounts
   let errors = ref [] in
   Client_keys.list_keys wallet
   >>=? fun all_keys ->
-  Lwt_list.iter_s
+  List.iter_s
     (function
       | (name, pkh, _pk_opt, Some sk_uri) -> (
           let contract =
@@ -433,7 +433,7 @@ let mem_init :
              parsed_account_repr_pp)
           accounts
         >>= fun () ->
-        Tezos_base.TzPervasives.map_s to_bootstrap_account accounts
+        List.map_es to_bootstrap_account accounts
         >>=? fun bootstrap_accounts -> return (Some bootstrap_accounts)
     | exception error ->
         failwith

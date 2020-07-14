@@ -326,8 +326,7 @@ end = struct
         state.events
         >>= fun events ->
         state.events <- Lwt_pipe.pop_all state.queue ;
-        Lwt_list.iter_s (process_event state now) events
-        >>= fun () -> loop state )
+        List.iter_s (process_event state now) events >>= fun () -> loop state )
       else
         Events.(emit timeout) ()
         >>= fun () ->
@@ -376,7 +375,7 @@ end = struct
         P2p_peer.Map.iter (Request.send state.param) requests ;
         P2p_peer.Map.iter_s
           (fun peer request ->
-            Lwt_list.iter_s
+            List.iter_s
               (fun (key : key) -> Events.(emit requested) (key, peer))
               request)
           requests

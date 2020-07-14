@@ -396,11 +396,11 @@ let tag_invalid_heads block_store chain_store heads level =
       | Some header ->
           tag_invalid_head (Block_header.hash header, header)
   in
-  Lwt_list.iter_p
+  List.iter_p
     (fun (hash, _header) ->
       Store.Chain_data.Known_heads.remove chain_store hash)
     heads
-  >>= fun () -> Lwt_list.filter_map_s tag_invalid_head heads
+  >>= fun () -> List.filter_map_s tag_invalid_head heads
 
 let prune_block store block_hash =
   let st = (store, block_hash) in
@@ -455,7 +455,7 @@ let cut_alternate_heads block_store chain_store heads =
           delete_block block_store hash
           >>= fun () -> cut_alternate_head (Block_header.hash header) header
   in
-  Lwt_list.iter_p
+  List.iter_p
     (fun (hash, header) ->
       Store.Chain_data.Known_heads.remove chain_store hash
       >>= fun () -> cut_alternate_head hash header)
@@ -681,7 +681,7 @@ module Chain = struct
   let locked_read_all global_state data =
     Store.Chain.list data.global_store
     >>= fun ids ->
-    iter_p
+    List.iter_ep
       (fun id ->
         locked_read global_state data id
         >>=? fun chain ->
@@ -734,7 +734,7 @@ module Chain = struct
       block_hash caboose_level =
     let do_prune blocks =
       Store.with_atomic_rw global_store
-      @@ fun () -> Lwt_list.iter_s (store_header_and_prune_block store) blocks
+      @@ fun () -> List.iter_s (store_header_and_prune_block store) blocks
     in
     let rec loop block_hash (n_blocks, blocks) =
       ( if n_blocks >= chunk_size then
@@ -776,7 +776,7 @@ module Chain = struct
   let purge_loop_rolling global_store store ~genesis_hash block_hash limit =
     let do_delete blocks =
       Store.with_atomic_rw global_store
-      @@ fun () -> Lwt_list.iter_s (delete_block store) blocks
+      @@ fun () -> List.iter_s (delete_block store) blocks
     in
     let rec prune_loop block_hash limit =
       if Block_hash.equal genesis_hash block_hash then Lwt.return block_hash
@@ -1094,13 +1094,18 @@ module Block = struct
       (block_header.shell.validation_passes = List.length operations_metadata)
       (failure "State.Block.store: invalid operations_data length")
     >>=? fun () ->
-    fail_unless
-      (List.for_all2
-         (fun l1 l2 -> List.length l1 = List.length l2)
-         operations
-         operations_metadata)
-      (failure "State.Block.store: inconsistent operations and operations_data")
-    >>=? fun () ->
+    let inconsistent_failure =
+      failure "State.Block.store: inconsistent operations and operations_data"
+    in
+    List.for_all2
+      ~when_different_lengths:inconsistent_failure
+      (fun l1 l2 -> List.length l1 = List.length l2)
+      operations
+      operations_metadata
+    |> (function Ok _ as ok -> ok | Error err -> error err)
+    >>?= fun all_have_equal_lengths ->
+    error_unless all_have_equal_lengths inconsistent_failure
+    >>?= fun () ->
     (* let's the validator check the consistency... of fitness, level, ... *)
     Shared.use chain_state.block_store (fun store ->
         Store.Block.Invalid_block.known store hash
@@ -1158,7 +1163,7 @@ module Block = struct
           in
           Store.Block.Contents.store (store, hash) contents
           >>= fun () ->
-          Lwt_list.iteri_p
+          List.iteri_p
             (fun i ops ->
               Store.Block.Operation_hashes.store
                 (store, hash)
@@ -1166,11 +1171,11 @@ module Block = struct
                 (List.map Operation.hash ops))
             operations
           >>= fun () ->
-          Lwt_list.iteri_p
+          List.iteri_p
             (fun i ops -> Store.Block.Operations.store (store, hash) i ops)
             operations
           >>= fun () ->
-          Lwt_list.iteri_p
+          List.iteri_p
             (fun i ops ->
               Store.Block.Operations_metadata.store (store, hash) i ops)
             operations_metadata
@@ -1288,18 +1293,18 @@ module Block = struct
     if i < 0 || header.shell.validation_passes <= i then
       invalid_arg "State.Block.operations" ;
     Shared.use chain_state.block_store (fun store ->
-        Lwt_list.map_p
+        List.map_p
           (fun n ->
             Store.Block.Operation_hashes.read_opt (store, hash) n
             >|= Option.unopt_assert ~loc:__POS__)
           (0 -- (header.shell.validation_passes - 1))
         >>= fun hashes ->
         let path = compute_operation_path hashes in
-        Lwt.return (List.nth hashes i, path i))
+        Lwt.return (Option.unopt_exn Not_found @@ List.nth hashes i, path i))
 
   let all_operation_hashes {chain_state; hash; header; _} =
     Shared.use chain_state.block_store (fun store ->
-        Lwt_list.map_p
+        List.map_p
           (fun i ->
             Store.Block.Operation_hashes.read_opt (store, hash) i
             >|= Option.unopt_assert ~loc:__POS__)
@@ -1309,7 +1314,7 @@ module Block = struct
     if i < 0 || header.shell.validation_passes <= i then
       invalid_arg "State.Block.operations" ;
     Shared.use chain_state.block_store (fun store ->
-        Lwt_list.map_p
+        List.map_p
           (fun n ->
             Store.Block.Operation_hashes.read_opt (store, hash) n
             >|= Option.unopt_assert ~loc:__POS__)
@@ -1329,7 +1334,7 @@ module Block = struct
 
   let all_operations {chain_state; hash; header; _} =
     Shared.use chain_state.block_store (fun store ->
-        Lwt_list.map_p
+        List.map_p
           (fun i ->
             Store.Block.Operations.read_opt (store, hash) i
             >|= Option.unopt_assert ~loc:__POS__)
@@ -1337,7 +1342,7 @@ module Block = struct
 
   let all_operations_metadata {chain_state; hash; header; _} =
     Shared.use chain_state.block_store (fun store ->
-        Lwt_list.map_p
+        List.map_p
           (fun i ->
             Store.Block.Operations_metadata.read_opt (store, hash) i
             >|= Option.unopt_assert ~loc:__POS__)

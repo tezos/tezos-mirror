@@ -317,11 +317,13 @@ val gc_greylist : older_than:Time.System.t -> ('msg, 'peer, 'conn) t -> unit
 (** [acl_clear pool] clears ACL tables. *)
 val acl_clear : ('msg, 'peer, 'conn) t -> unit
 
-(** [list_known_points ~ignore_private t] returns a list of point ids,
+(** [list_known_points ~ignore_private ?size t] returns a list of point ids,
     which are not banned, and if [ignore_private] is [true], public.
 
     It returns at most [size] point ids (default is 50) based on a
-    heuristic that selects a mix of 3/5 "good" and 2/5 random points. *)
+    heuristic that selects a mix of 3/5 "good" and 2/5 random points.
+
+    @raise [Invalid_argument] if [size < 0] *)
 val list_known_points :
   ignore_private:bool ->
   ?size:int ->

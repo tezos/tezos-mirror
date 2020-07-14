@@ -290,12 +290,12 @@ let preapply ~user_activated_upgrades ~user_activated_protocol_overrides
   in
   Prevalidation.create ~protocol_data ~predecessor ~timestamp ()
   >>=? fun validation_state ->
-  Lwt_list.fold_left_s
+  List.fold_left_s
     (fun ( acc_validation_passes,
            acc_validation_result_rev,
            acc_validation_state )
          operations ->
-      Lwt_list.fold_left_s
+      List.fold_left_s
         (fun (acc_validation_result, acc_validation_state) op ->
           match Prevalidation.parse op with
           | Error _ ->

@@ -21,6 +21,7 @@
  * SOFTWARE. *)
 
 open Tezos_error_monad.Error_monad
+open Tezos_lwt_result_stdlib.Lwtreslib
 
 module Client = struct
   module Core = Core.Client
@@ -103,7 +104,7 @@ module Client = struct
     assert (Int64.add wallet.balance tez >= 0L) ;
     let rec gather_input to_pay balance inputs unspent_inputs =
       if to_pay > 0L then
-        let input_to_add = InputSet.choose unspent_inputs in
+        let input_to_add = Option.get @@ InputSet.choose unspent_inputs in
         let amount = Forge.Input.amount input_to_add in
         gather_input
           (Int64.sub to_pay amount)
@@ -152,7 +153,7 @@ module Client = struct
     assert (Int64.(add wallet.balance tez) >= amount) ;
     let rec gather_input to_pay balance inputs unspent_input =
       if to_pay > 0L then
-        let input_to_add = InputSet.choose unspent_input in
+        let input_to_add = Option.get @@ InputSet.choose unspent_input in
         let amount = Forge.Input.amount input_to_add in
         gather_input
           (Int64.sub to_pay amount)
@@ -394,7 +395,7 @@ module Validator = struct
     else
       Core.Verification.with_verification_ctx (fun ctx ->
           (* Check all the output ZK proofs *)
-          iter_s
+          List.iter_es
             (fun output ->
               fail_unless
                 (Core.Verification.check_output ctx output)
@@ -402,7 +403,7 @@ module Validator = struct
             transaction.outputs
           >>=? fun () ->
           (* Check all the input Zk proofs and signatures *)
-          iter_s
+          List.iter_es
             (fun input ->
               if Core.Verification.check_spend ctx input transaction.root key
               then return_unit
@@ -416,7 +417,7 @@ module Validator = struct
       >>=? fun () ->
       (* Check that each nullifier is not already present in the state and add it.
              Important to avoid spending the same input twice in a transaction. *)
-      fold_left_s
+      List.fold_left_es
         (fun state input ->
           if Storage.mem_nullifier state Core.UTXO.(input.nf) then
             fail (Input_spent input)

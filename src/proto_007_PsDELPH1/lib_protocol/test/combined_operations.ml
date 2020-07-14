@@ -43,10 +43,10 @@ let ten_tez = Tez.of_int 10
 let multiple_transfers () =
   Context.init 3
   >>=? fun (blk, contracts) ->
-  let c1 = List.nth contracts 0 in
-  let c2 = List.nth contracts 1 in
-  let c3 = List.nth contracts 2 in
-  map_s (fun _ -> Op.transaction (B blk) c1 c2 Tez.one) (1 -- 10)
+  let (c1, c2, c3) =
+    match contracts with [c1; c2; c3] -> (c1, c2, c3) | _ -> assert false
+  in
+  List.map_es (fun _ -> Op.transaction (B blk) c1 c2 Tez.one) (1 -- 10)
   >>=? fun ops ->
   Op.combine_operations ~source:c1 (B blk) ops
   >>=? fun operation ->
@@ -77,15 +77,16 @@ let multiple_transfers () =
 let multiple_origination_and_delegation () =
   Context.init 2
   >>=? fun (blk, contracts) ->
-  let c1 = List.nth contracts 0 in
-  let c2 = List.nth contracts 1 in
+  let (c1, c2) =
+    match contracts with [c1; c2] -> (c1, c2) | _ -> assert false
+  in
   let n = 10 in
   Context.get_constants (B blk)
   >>=? fun {parametric = {origination_size; cost_per_byte; _}; _} ->
   Context.Contract.pkh c2
   >>=? fun delegate_pkh ->
   (* Deploy n smart contracts with dummy scripts from c1 *)
-  map_s
+  List.map_es
     (fun i ->
       Op.origination
         ~delegate:delegate_pkh
@@ -146,7 +147,7 @@ let multiple_origination_and_delegation () =
   >>?= fun total_cost ->
   Assert.balance_was_debited ~loc:__LOC__ (I inc) c1 c1_old_balance total_cost
   >>=? fun () ->
-  iter_s
+  List.iter_es
     (fun c -> Assert.balance_is ~loc:__LOC__ (I inc) c (Tez.of_int 10))
     new_contracts
 
@@ -164,8 +165,9 @@ let expect_balance_too_low = function
 let failing_operation_in_the_middle () =
   Context.init 2
   >>=? fun (blk, contracts) ->
-  let c1 = List.nth contracts 0 in
-  let c2 = List.nth contracts 1 in
+  let (c1, c2) =
+    match contracts with [c1; c2] -> (c1, c2) | _ -> assert false
+  in
   Op.transaction ~fee:Tez.zero (B blk) c1 c2 Tez.one
   >>=? fun op1 ->
   Op.transaction ~fee:Tez.zero (B blk) c1 c2 Tez.max_tez
@@ -220,8 +222,9 @@ let failing_operation_in_the_middle () =
 let failing_operation_in_the_middle_with_fees () =
   Context.init 2
   >>=? fun (blk, contracts) ->
-  let c1 = List.nth contracts 0 in
-  let c2 = List.nth contracts 1 in
+  let (c1, c2) =
+    match contracts with [c1; c2] -> (c1, c2) | _ -> assert false
+  in
   Op.transaction ~fee:Tez.one (B blk) c1 c2 Tez.one
   >>=? fun op1 ->
   Op.transaction ~fee:Tez.one (B blk) c1 c2 Tez.max_tez
@@ -294,8 +297,9 @@ let expect_wrong_signature list =
 let wrong_signature_in_the_middle () =
   Context.init 2
   >>=? fun (blk, contracts) ->
-  let c1 = List.nth contracts 0 in
-  let c2 = List.nth contracts 1 in
+  let (c1, c2) =
+    match contracts with [c1; c2] -> (c1, c2) | _ -> assert false
+  in
   Op.transaction ~fee:Tez.one (B blk) c1 c2 Tez.one
   >>=? fun op1 ->
   Op.transaction ~fee:Tez.one (B blk) c2 c1 Tez.one

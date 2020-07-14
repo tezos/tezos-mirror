@@ -117,7 +117,11 @@ module Adversarial = struct
     assert (n > 0) ;
     let common_prefix = string state ~range in
     let rand_suffix () = if Random.bool () then "\x00" else "\x01" in
-    let elements = List.init n (fun _ -> common_prefix ^ rand_suffix ()) in
+    let elements =
+      List.init ~when_negative_length:() n (fun _ ->
+          common_prefix ^ rand_suffix ())
+      |> (* see [assert] above *) Result.get_ok
+    in
     (common_prefix, elements)
 
   (* Adversarial bytes *)

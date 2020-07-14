@@ -77,7 +77,7 @@ let fill_in ?(show_optionals = true) input schema =
     | Combine ((One_of | Any_of), elts) ->
         let nb = List.length elts in
         input.int 0 (nb - 1) (Some "Select the schema to follow") path
-        >>= fun n -> element path (List.nth elts n)
+        >>= fun n -> element path (Option.get @@ List.nth elts n)
     | Combine ((All_of | Not), _) ->
         Lwt.fail Unsupported_construct
     | Def_ref name ->
@@ -85,29 +85,23 @@ let fill_in ?(show_optionals = true) input schema =
     | Id_ref _ | Ext_ref _ ->
         Lwt.fail Unsupported_construct
     | Array (elts, _) ->
-        let rec fill_loop acc n ls =
-          match ls with
-          | [] ->
-              Lwt.return acc
-          | elt :: elts ->
-              element (string_of_int n :: path) elt
-              >>= fun json -> fill_loop (json :: acc) (succ n) elts
-        in
-        fill_loop [] 0 elts >>= fun acc -> Lwt.return (`A (List.rev acc))
+        List.mapi_s (fun n elt -> element (string_of_int n :: path) elt) elts
+        >|= fun a -> `A a
     | Object {properties; _} ->
-        let properties =
-          if show_optionals then properties
-          else List.filter (fun (_, _, b, _) -> b) properties
-        in
-        let rec fill_loop acc ls =
-          match ls with
-          | [] ->
-              Lwt.return acc
-          | (n, elt, _, _) :: elts ->
-              element (n :: path) elt
-              >>= fun json -> fill_loop ((n, json) :: acc) elts
-        in
-        fill_loop [] properties >>= fun acc -> Lwt.return (`O (List.rev acc))
+        if show_optionals then
+          List.map_s
+            (fun (n, elt, _, _) ->
+              element (n :: path) elt >|= fun json -> (n, json))
+            properties
+          >|= fun o -> `O o
+        else
+          List.filter_map_s
+            (fun (n, elt, optional, _) ->
+              if optional then
+                element (n :: path) elt >|= fun json -> Some (n, json)
+              else Lwt.return_none)
+            properties
+          >|= fun o -> `O o
     | Monomorphic_array (elt, specs) ->
         let rec fill_loop acc min n max =
           if n > max then Lwt.return acc

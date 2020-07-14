@@ -160,7 +160,7 @@ let get_n_endorsements ctxt n =
   Context.get_endorsers ctxt
   >>=? fun endorsing_rights ->
   let endorsing_rights = List.sub endorsing_rights n in
-  map_s
+  List.map_es
     (fun {Delegate_services.Endorsing_rights.delegate; level; _} ->
       Op.endorsement ~delegate ~level ctxt ())
     endorsing_rights
@@ -182,7 +182,7 @@ let generate_and_add_random_endorsements inc =
   in
   let endorsements = List.sort_uniq compare endorsements in
   let endorsements = List.map Operation.pack endorsements in
-  fold_left_s Incremental.add_operation inc endorsements
+  List.fold_left_es Incremental.add_operation inc endorsements
 
 let regenerate_transfers = ref false
 
@@ -202,16 +202,18 @@ let generate_random_activation ({remaining_activations; _} as gen_state) inc =
 exception No_transfer_left
 
 let rec generate_random_transfer ({remaining_transfers; _} as gen_state) ctxt =
-  if remaining_transfers = [] then raise No_transfer_left ;
-  let (a1, a2) = List.hd remaining_transfers in
-  gen_state.remaining_transfers <- List.tl remaining_transfers ;
-  let open Account in
-  let c1 = Alpha_context.Contract.implicit_contract a1.pkh in
-  let c2 = Alpha_context.Contract.implicit_contract a2.pkh in
-  Context.Contract.balance ctxt c1
-  >>=? fun b1 ->
-  if Tez.(b1 < Tez.one) then generate_random_transfer gen_state ctxt
-  else Op.transaction ctxt c1 c2 Tez.one
+  match remaining_transfers with
+  | [] ->
+      raise No_transfer_left
+  | (a1, a2) :: remaining_transfers ->
+      gen_state.remaining_transfers <- remaining_transfers ;
+      let open Account in
+      let c1 = Alpha_context.Contract.implicit_contract a1.pkh in
+      let c2 = Alpha_context.Contract.implicit_contract a2.pkh in
+      Context.Contract.balance ctxt c1
+      >>=? fun b1 ->
+      if Tez.(b1 < Tez.one) then generate_random_transfer gen_state ctxt
+      else Op.transaction ctxt c1 c2 Tez.one
 
 let generate_random_operation (inc : Incremental.t) gen_state =
   let rnd = Random.int 100 in
@@ -262,7 +264,7 @@ let step gen_state blk : Block.t tzresult Lwt.t =
         "[DEBUG] Generating %d random operations...\n%!"
         nb_operations) ;
   (* Generate random operations *)
-  fold_left_s
+  List.fold_left_es
     (fun inc _ ->
       try
         generate_random_operation inc gen_state
@@ -294,7 +296,7 @@ let step gen_state blk : Block.t tzresult Lwt.t =
                         %!"
                      @@ List.length l) ;
                  gen_state.nonce_to_reveal <- [] ;
-                 (* fold_left_s (fun inc (_, level, nonce) -> *)
+                 (* List.fold_left_es (fun inc (_, level, nonce) -> *)
                  (* Op.seed_nonce_revelation inc level nonce >>=? fun op ->
                   * Incremental.add_operation inc op *)
                  (* return *)
@@ -329,7 +331,7 @@ let init () =
   let new_seed () : Bytes.t =
     Bytes.(make 32 '\000' |> map (fun _ -> Random.int 0x100 |> char_of_int))
   in
-  map_s
+  List.map_es
     (fun _ ->
       return (Account.new_account ~seed:(new_seed ()) (), initial_amount))
     (1 -- args.accounts)
@@ -350,7 +352,9 @@ let init () =
   | x when x < 0 ->
       return ([], parameters)
   | x ->
-      map_s (fun _ -> Account.new_commitment ~seed:(new_seed ()) ()) (1 -- x)
+      List.map_es
+        (fun _ -> Account.new_commitment ~seed:(new_seed ()) ())
+        (1 -- x)
       >>=? fun commitments ->
       return
         (commitments, {parameters with commitments = List.map snd commitments})
@@ -389,7 +393,7 @@ let init () =
   Block.genesis_with_parameters parameters
   >>=? fun genesis ->
   if_debug_s (fun () ->
-      iter_s
+      List.iter_es
         (let open Account in
         fun (({pkh; _} as acc), _) ->
           let contract = Alpha_context.Contract.implicit_contract acc.pkh in

@@ -355,10 +355,13 @@ module Connection = struct
   let list pool =
     fold pool ~init:[] ~f:(fun peer_id c acc -> (peer_id, c) :: acc)
 
-  let random_elt l =
-    let n = List.length l in
-    let r = Random.int n in
-    List.nth l r
+  let random_elt = function
+    | [] ->
+        None
+    | _ :: _ as l ->
+        let n = List.length l in
+        let r = Random.int n in
+        List.nth l r
 
   let random_addr ?different_than ~no_private pool =
     let candidates =
@@ -376,7 +379,7 @@ module Connection = struct
                 | (addr, Some port) ->
                     ((addr, port), ci.peer_id) :: acc ))
     in
-    match candidates with [] -> None | _ -> Some (random_elt candidates)
+    random_elt candidates
 
   (** [random_connection ?conn no_private t] returns a random connection from
       the pool of connections. It ignores:
@@ -395,7 +398,7 @@ module Connection = struct
             | Some _ | None ->
                 conn :: acc)
     in
-    match candidates with [] -> None | _ -> Some (random_elt candidates)
+    random_elt candidates
 
   let propose_swap_request pool =
     match random_connection ~no_private:true pool with
@@ -537,15 +540,23 @@ let add_to_id_points t point =
    The [best] first elements are taken, then [other] elements are chosen
    randomly in the rest of the list.
    Note that it might select fewer elements than [other] if it the same index
-   close to the end of the list is picked multiple times. *)
+   close to the end of the list is picked multiple times.
+
+   @raise [Invalid_argument] if either [best] or [other] is strictly negative.
+   *)
 let sample best other points =
+  if best < 0 || other < 0 then raise (Invalid_argument "P2p_pool.sample") ;
   let l = List.length points in
   if l <= best + other then points
   else
-    let best_indexes = List.init best (fun i -> i) in
+    (* This is safe because we checked the value of [best] and [other] *)
+    let list_init n f =
+      Result.get_ok @@ List.init ~when_negative_length:() n f
+    in
+    let best_indexes = list_init best Fun.id in
     let other_indexes =
       List.sort compare
-      @@ List.init other (fun _ -> best + Random.int (l - best))
+      @@ list_init other (fun _ -> best + Random.int (l - best))
     in
     let indexes = best_indexes @ other_indexes in
     (* Note: we are doing a [fold_left_i] by hand, passing [i] manually *)
@@ -599,16 +610,18 @@ let compare_known_point_info p1 p2 =
       compare_last_seen p2 p1
 
 let list_known_points ~ignore_private ?(size = 50) pool =
-  P2p_point.Table.fold
-    (fun point_id point_info acc ->
-      if
-        (ignore_private && not (P2p_point_state.Info.known_public point_info))
-        || Points.banned pool point_id
-      then acc
-      else point_info :: acc)
-    pool.known_points
-    []
-  |> List.sort compare_known_point_info
-  |> sample (size * 3 / 5) (size * 2 / 5)
-  |> List.map P2p_point_state.Info.point
-  |> Lwt.return
+  if size < 0 then Lwt.fail (Invalid_argument "P2p_pool.list_known_points")
+  else
+    P2p_point.Table.fold
+      (fun point_id point_info acc ->
+        if
+          (ignore_private && not (P2p_point_state.Info.known_public point_info))
+          || Points.banned pool point_id
+        then acc
+        else point_info :: acc)
+      pool.known_points
+      []
+    |> List.sort compare_known_point_info
+    |> sample (size * 3 / 5) (size * 2 / 5)
+    |> List.map P2p_point_state.Info.point
+    |> Lwt.return

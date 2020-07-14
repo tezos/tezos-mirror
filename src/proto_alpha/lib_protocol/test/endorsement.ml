@@ -38,6 +38,8 @@ open Test_tez
 (*                    Utility functions                         *)
 (****************************************************************)
 
+let get_hd_hd = function x :: y :: _ -> (x, y) | _ -> assert false
+
 let get_expected_reward ctxt ~priority ~baker ~endorsing_power =
   ( if baker then Context.get_baking_reward ctxt ~priority ~endorsing_power
   else return (Test_tez.Tez.of_int 0) )
@@ -135,7 +137,7 @@ let max_endorsement () =
              endorsers)))
     endorsers_per_block
   >>=? fun () ->
-  fold_left_s
+  List.fold_left_es
     (fun (delegates, ops, balances)
          (endorser : Alpha_services.Delegate.Endorsing_rights.t) ->
       let delegate = endorser.delegate in
@@ -153,22 +155,24 @@ let max_endorsement () =
   >>=? fun b ->
   (* One account can endorse more than one time per level, we must
      check that the bonds are summed up *)
-  iter_s
-    (fun (endorser_account, (endorsing_power, previous_balance)) ->
+  List.iter2_es
+    ~when_different_lengths:(TzTrace.make (Exn (Failure __LOC__)))
+    (fun endorser_account (endorsing_power, previous_balance) ->
       assert_endorser_balance_consistency
         ~loc:__LOC__
         (B b)
         ~endorsing_power
         endorser_account
         previous_balance)
-    (List.combine delegates previous_balances)
+    delegates
+    previous_balances
 
 (** Check every that endorsers' balances are consistent with different priorities *)
 let consistent_priorities () =
   let priorities = 0 -- 64 in
   Context.init 64
   >>=? fun (b, _) ->
-  fold_left_s
+  List.fold_left_es
     (fun (b, used_pkhes) priority ->
       (* Choose an endorser that has not baked nor endorsed before *)
       Context.get_endorsers (B b)
@@ -236,7 +240,7 @@ let reward_retrieval () =
   Block.bake ~policy ~operation b
   >>=? fun b ->
   (* Bake (preserved_cycles + 1) cycles *)
-  fold_left_s
+  List.fold_left_es
     (fun b _ -> Block.bake_until_cycle_end ~policy:(Excluding [endorser]) b)
     b
     (0 -- preserved_cycles)
@@ -266,8 +270,7 @@ let reward_retrieval_two_endorsers () =
                _ } ->
   Context.get_endorsers (B b)
   >>=? fun endorsers ->
-  let endorser1 = List.hd endorsers in
-  let endorser2 = List.hd (List.tl endorsers) in
+  let (endorser1, endorser2) = get_hd_hd endorsers in
   Context.Contract.balance
     (B b)
     (Contract.implicit_contract endorser1.delegate)
@@ -329,7 +332,7 @@ let reward_retrieval_two_endorsers () =
     Signature.Public_key_hash.(
       endorser.Delegate_services.Endorsing_rights.delegate = endorser2.delegate)
   in
-  let endorser2 = List.find same_endorser2 endorsers in
+  let endorser2 = Option.get @@ List.find same_endorser2 endorsers in
   (* No exception raised: in sandboxed mode endorsers do not change between blocks *)
   Tez.(
     endorsement_security_deposit *? Int64.of_int (List.length endorser2.slots))
@@ -361,7 +364,7 @@ let reward_retrieval_two_endorsers () =
     security_deposit2
   >>=? fun () ->
   (* bake [preserved_cycles] cycles *)
-  fold_left_s
+  List.fold_left_es
     (fun b _ ->
       Assert.balance_was_debited
         ~loc:__LOC__
@@ -481,7 +484,7 @@ let duplicate_endorsement () =
 let not_enough_for_deposit () =
   Context.init 5 ~endorsers_per_block:1
   >>=? fun (b_init, contracts) ->
-  Error_monad.map_s
+  List.map_es
     (fun c -> Context.Contract.manager (B b_init) c >|=? fun m -> (m, c))
     contracts
   >>=? fun managers ->
@@ -491,15 +494,17 @@ let not_enough_for_deposit () =
   Context.get_endorser (B b)
   >>=? fun (endorser, _slots) ->
   let (_, contract_other_than_endorser) =
-    List.find
-      (fun (c, _) ->
-        not (Signature.Public_key_hash.equal c.Account.pkh endorser))
-      managers
+    Option.get
+    @@ List.find
+         (fun (c, _) ->
+           not (Signature.Public_key_hash.equal c.Account.pkh endorser))
+         managers
   in
   let (_, contract_of_endorser) =
-    List.find
-      (fun (c, _) -> Signature.Public_key_hash.equal c.Account.pkh endorser)
-      managers
+    Option.get
+    @@ List.find
+         (fun (c, _) -> Signature.Public_key_hash.equal c.Account.pkh endorser)
+         managers
   in
   Context.Contract.balance (B b) (Contract.implicit_contract endorser)
   >>=? fun initial_balance ->
@@ -537,14 +542,14 @@ let endorsement_threshold () =
   let num_endorsers = List.length endorsers in
   (* we try to bake with more and more endorsers, but at each
      iteration with a timestamp smaller than required *)
-  iter_s
+  List.iter_es
     (fun i ->
       (* the priority is chosen rather arbitrarily *)
       let priority = num_endorsers - i in
       let crt_endorsers = List.take_n i endorsers in
       let endorsing_power = endorsing_power crt_endorsers in
       let delegates = delegates_with_slots crt_endorsers in
-      map_s (fun x -> Op.endorsement ~delegate:x (B b) ()) delegates
+      List.map_es (fun x -> Op.endorsement ~delegate:x (B b) ()) delegates
       >>=? fun ops ->
       Context.get_minimal_valid_time (B b) ~priority ~endorsing_power
       >>=? fun timestamp ->
@@ -574,7 +579,7 @@ let endorsement_threshold () =
   let priority = 0 in
   let endorsing_power = endorsing_power endorsers in
   let delegates = delegates_with_slots endorsers in
-  map_s (fun delegate -> Op.endorsement ~delegate (B b) ()) delegates
+  List.map_es (fun delegate -> Op.endorsement ~delegate (B b) ()) delegates
   >>=? fun ops ->
   Context.get_minimal_valid_time (B b) ~priority ~endorsing_power
   >>=? fun timestamp ->

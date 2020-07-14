@@ -109,7 +109,7 @@ let establish t contactable =
         P2p_connect_handler.connect t.connect_handler point)
     >|= function Ok _ -> succ count | Error _ -> count
   in
-  Lwt_list.fold_left_s try_to_connect 0 contactable
+  List.fold_left_s try_to_connect 0 contactable
 
 (* [connectable t start_time expected seen_points] selects at most
    [expected] connections candidates from the known points, not in [seen]
@@ -268,7 +268,7 @@ and too_many_connections t n_connected =
   Events.(emit too_many_connections) n
   >>= fun () ->
   let connections = random_connections t.pool n in
-  Lwt_list.iter_p P2p_conn.disconnect connections >>= fun () -> do_maintain t
+  List.iter_p P2p_conn.disconnect connections >>= fun () -> do_maintain t
 
 let rec worker_loop t =
   (let n_connected = P2p_pool.active_connections t.pool in

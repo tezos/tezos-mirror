@@ -12,7 +12,7 @@ depends: [
   "tezos-stdlib"
   "tezos-stdlib-unix"
   "tezos-error-monad"
-  "alcotest-lwt" { with-test & >= "1.1.0" }
+  "tezos-lwt-result-stdlib"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

@@ -67,10 +67,11 @@ let get_next_baker_by_priority priority block =
     block
   >|=? fun bakers ->
   let {Alpha_services.Delegate.Baking_rights.delegate = pkh; timestamp; _} =
-    List.find
-      (fun {Alpha_services.Delegate.Baking_rights.priority = p; _} ->
-        p = priority)
-      bakers
+    Option.get
+    @@ List.find
+         (fun {Alpha_services.Delegate.Baking_rights.priority = p; _} ->
+           p = priority)
+         bakers
   in
   (pkh, priority, Option.unopt_exn (Failure "") timestamp)
 
@@ -85,7 +86,7 @@ let get_next_baker_by_account pkh block =
         timestamp;
         priority;
         _ } =
-    List.hd bakers
+    Option.get @@ List.hd bakers
   in
   (pkh, priority, Option.unopt_exn (Failure "") timestamp)
 
@@ -96,10 +97,11 @@ let get_next_baker_excluding excludes block =
         timestamp;
         priority;
         _ } =
-    List.find
-      (fun {Alpha_services.Delegate.Baking_rights.delegate; _} ->
-        not (List.mem delegate excludes))
-      bakers
+    Option.get
+    @@ List.find
+         (fun {Alpha_services.Delegate.Baking_rights.delegate; _} ->
+           not (List.mem delegate excludes))
+         bakers
   in
   (pkh, priority, Option.unopt_exn (Failure "") timestamp)
 
@@ -114,7 +116,7 @@ let dispatch_policy = function
 let get_next_baker ?(policy = By_priority 0) = dispatch_policy policy
 
 let get_endorsing_power b =
-  fold_left_s
+  List.fold_left_es
     (fun acc (op : Operation.packed) ->
       let (Operation_data data) = op.protocol_data in
       match data.contents with
@@ -328,8 +330,9 @@ let genesis ?with_commitments ?endorsers_per_block ?initial_endorsers
     }
   in
   (* Check there is at least one roll *)
-  ( try
-      fold_left_s
+  Lwt.catch
+    (fun () ->
+      List.fold_left_es
         (fun acc (_, amount) ->
           Environment.wrap_error @@ Tez_repr.( +? ) acc amount
           >>?= fun acc ->
@@ -337,8 +340,8 @@ let genesis ?with_commitments ?endorsers_per_block ?initial_endorsers
         Tez_repr.zero
         initial_accounts
       >>=? fun _ ->
-      failwith "Insufficient tokens in initial accounts to create one roll"
-    with Exit -> return_unit )
+      failwith "Insufficient tokens in initial accounts to create one roll")
+    (function Exit -> return_unit | exc -> raise exc)
   >>=? fun () ->
   check_constants_consistency constants
   >>=? fun () ->
@@ -412,7 +415,7 @@ let bake ?policy ?timestamp ?operation ?operations pred =
 let get_constants b = Alpha_services.Constants.all rpc_ctxt b
 
 let bake_n ?policy n b =
-  Error_monad.fold_left_s (fun b _ -> bake ?policy b) b (1 -- n)
+  List.fold_left_es (fun b _ -> bake ?policy b) b (1 -- n)
 
 let bake_until_cycle_end ?policy b =
   get_constants b
@@ -423,7 +426,7 @@ let bake_until_cycle_end ?policy b =
   bake_n ?policy (Int32.to_int delta) b
 
 let bake_until_n_cycle_end ?policy n b =
-  Error_monad.fold_left_s (fun b _ -> bake_until_cycle_end ?policy b) b (1 -- n)
+  List.fold_left_es (fun b _ -> bake_until_cycle_end ?policy b) b (1 -- n)
 
 let bake_until_cycle ?policy cycle (b : t) =
   get_constants b

@@ -59,12 +59,19 @@ let expand_all source ast errors =
       in
       group ([], sorted)
     in
-    List.map2
-      (fun (l, ploc) (l', elocs) ->
-        assert (l = l') ;
-        (l, (ploc, elocs)))
-      (List.sort compare loc_table)
-      (List.sort compare grouped)
+    match
+      List.map2
+        ~when_different_lengths:()
+        (fun (l, ploc) (l', elocs) ->
+          assert (l = l') ;
+          (l, (ploc, elocs)))
+        (List.sort compare loc_table)
+        (List.sort compare grouped)
+    with
+    | Ok v ->
+        v
+    | Error () ->
+        invalid_arg "Michelson_v1_parser.expand_all"
   in
   match
     Environment.wrap_error (Michelson_v1_primitives.prims_of_strings expanded)

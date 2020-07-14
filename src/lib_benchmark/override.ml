@@ -46,6 +46,7 @@ let load_file ~filename map =
         (header, overrides)
   in
   List.fold_left2
+    ~when_different_lengths:()
     (fun map name coeff ->
       let coeff_float =
         try float_of_string coeff
@@ -56,6 +57,7 @@ let load_file ~filename map =
     map
     header
     values
+  |> (* {!Csv.import} fails before this can *) Result.get_ok
 
 let load ~filenames : t =
   List.fold_left

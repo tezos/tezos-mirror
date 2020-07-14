@@ -569,7 +569,7 @@ let action_of_expr e =
                     [] ) ],
               [] ) ],
         [] ) ->
-      map_s
+      List.map_es
         (function
           | Tezos_micheline.Micheline.Bytes (_, s) ->
               return
@@ -608,7 +608,7 @@ let multisig_get_information (cctxt : #Protocol_client_context.full) ~chain
           D_Pair,
           [Int (_, counter); Int (_, threshold); Seq (_, key_nodes)],
           _ ) ->
-        map_s
+        List.map_es
           (function
             | String (_, key_str) ->
                 return @@ Signature.Public_key.of_b58check_exn key_str
@@ -623,7 +623,7 @@ let multisig_create_storage ~counter ~threshold ~keys () :
     Script.expr tzresult Lwt.t =
   let loc = Tezos_micheline.Micheline_parser.location_zero in
   let open Tezos_micheline.Micheline in
-  map_s
+  List.map_es
     (fun key ->
       let key_str = Signature.Public_key.to_b58check key in
       return (String (loc, key_str)))
@@ -642,7 +642,7 @@ let multisig_create_param ~counter ~action ~optional_signatures () :
     Script.expr tzresult Lwt.t =
   let loc = Tezos_micheline.Micheline_parser.location_zero in
   let open Tezos_micheline.Micheline in
-  map_s
+  List.map_es
     (fun sig_opt ->
       match sig_opt with
       | None ->
@@ -763,7 +763,7 @@ let check_multisig_signatures ~bytes ~threshold ~keys signatures =
       matching_key_found := true ;
       opt_sigs_arr.(i) <- Some signature )
   in
-  iter_p
+  List.iter_ep
     (fun signature ->
       matching_key_found := false ;
       List.iteri (check_signature_against_key_number signature) keys ;

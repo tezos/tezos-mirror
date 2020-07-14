@@ -89,7 +89,7 @@ let parsed_block ({shell; protocol_data} : Block_header.t) =
 let zero = Bytes.create 0
 
 let build_valid_chain state vtbl pred names =
-  Lwt_list.fold_left_s
+  List.fold_left_s
     (fun pred name ->
       State.Block.context_exn pred
       >>= fun predecessor_context ->
@@ -232,7 +232,7 @@ let test_init (_ : state) = return_unit
 (** State.Block.read *)
 
 let test_read_block (s : state) =
-  Lwt_list.iter_s
+  List.iter_s
     (fun (name, vblock) ->
       let hash = State.Block.hash vblock in
       State.Block.read s.chain hash
@@ -512,19 +512,23 @@ let test_locator s =
     State.compute_locator s.chain ~max_size:length (vblock s h1) seed
     >>= fun l ->
     let (_, l) = (l : Block_locator.t :> _ * _) in
-    if List.length l <> List.length expected then
-      Assert.fail_msg
-        "Invalid locator length %s (found: %d, expected: %d)"
-        h1
-        (List.length l)
-        (List.length expected) ;
-    List.iter2
-      (fun h h2 ->
-        if not (Block_hash.equal h (State.Block.hash @@ vblock s h2)) then
-          Assert.fail_msg "Invalid locator %s (expected: %s)" h1 h2)
-      l
-      expected ;
-    Lwt.return_unit
+    match
+      List.iter2
+        ~when_different_lengths:()
+        (fun h h2 ->
+          if not (Block_hash.equal h (State.Block.hash @@ vblock s h2)) then
+            Assert.fail_msg "Invalid locator %s (expected: %s)" h1 h2)
+        l
+        expected
+    with
+    | Error () ->
+        Assert.fail_msg
+          "Invalid locator length %s (found: %d, expected: %d)"
+          h1
+          (List.length l)
+          (List.length expected)
+    | Ok () ->
+        Lwt.return_unit
   in
   check_locator 6 "A8" ["A7"; "A6"; "A5"; "A4"; "A3"; "A2"]
   >>= fun () ->
@@ -696,28 +700,32 @@ let test_new_blocks s =
         head
         h
         expected_ancestor ;
-    if List.length blocks <> List.length expected then
-      Assert.fail_msg
-        "Invalid locator length %s (found: %d, expected: %d)"
-        h
-        (List.length blocks)
-        (List.length expected) ;
-    List.iter2
-      (fun h1 h2 ->
-        if
-          not
-            (Block_hash.equal
-               (State.Block.hash h1)
-               (State.Block.hash @@ vblock s h2))
-        then
-          Assert.fail_msg
-            "Invalid new blocks %s -> %s (expected: %s)"
-            head
-            h
-            h2)
-      blocks
-      expected ;
-    Lwt.return_unit
+    match
+      List.iter2
+        ~when_different_lengths:()
+        (fun h1 h2 ->
+          if
+            not
+              (Block_hash.equal
+                 (State.Block.hash h1)
+                 (State.Block.hash @@ vblock s h2))
+          then
+            Assert.fail_msg
+              "Invalid new blocks %s -> %s (expected: %s)"
+              head
+              h
+              h2)
+        blocks
+        expected
+    with
+    | Error () ->
+        Assert.fail_msg
+          "Invalid locator length %s (found: %d, expected: %d)"
+          h
+          (List.length blocks)
+          (List.length expected)
+    | Ok () ->
+        Lwt.return_unit
   in
   test s "A6" "A6" "A6" []
   >>= fun () ->

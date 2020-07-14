@@ -37,7 +37,7 @@ let output ?(channel = Lwt_io.stdout) how_option ~for_human ~for_script =
       for_human ()
   | Some (Rows {separator; escape}) ->
       let open Format in
-      iter_s
+      List.iter_es
         (fun row ->
           fprintf_lwt
             channel

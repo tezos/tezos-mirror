@@ -117,7 +117,7 @@ let block_header_data_encoding =
   Data_encoding.(obj1 (req "proto_block_header" string))
 
 let build_valid_chain state vtbl pred names =
-  Lwt_list.fold_left_s
+  List.fold_left_s
     (fun pred name ->
       State.Block.context_exn pred
       >>= fun predecessor_context ->

@@ -151,9 +151,8 @@ let check_authorization cctxt pkh data require_auth signature =
       Authorized_key.load cctxt
       >>=? fun keys ->
       if
-        List.fold_left
-          (fun acc (_, key) -> acc || Signature.check key signature to_sign)
-          false
+        List.exists
+          (fun (_, key) -> Signature.check key signature to_sign)
           keys
       then return_unit
       else failwith "invalid authentication signature"

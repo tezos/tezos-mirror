@@ -43,7 +43,7 @@ let get_script (rpc : #Alpha_client_context.rpc_context) ~chain ~block contract
 let list_contract_labels (cctxt : #Alpha_client_context.full) ~chain ~block =
   Alpha_services.Contract.list cctxt (chain, block)
   >>=? fun contracts ->
-  map_s
+  List.map_es
     (fun h ->
       ( match Contract.is_implicit h with
       | Some m -> (

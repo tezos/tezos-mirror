@@ -35,7 +35,7 @@ let test_context () =
 let test_context_with_nat_nat_big_map () =
   Context.init 3
   >>=? fun (b, contracts) ->
-  let source = List.hd contracts in
+  let source = Option.get @@ List.hd contracts in
   Op.origination (B b) source ~script:Op.dummy_script
   >>=? fun (operation, originated) ->
   Block.bake ~operation b
@@ -725,7 +725,7 @@ let test_optimal_comb () =
           v
       >>=? fun (unparsed, ctxt) ->
       let (unparsed_canonical, unparsed_size) = size_of_micheline unparsed in
-      Error_monad.iter_s (fun other_repr ->
+      List.iter_es (fun other_repr ->
           let (other_repr_canonical, other_repr_size) =
             size_of_micheline other_repr
           in

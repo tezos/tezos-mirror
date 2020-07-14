@@ -347,12 +347,11 @@ module Sink_implementation : Internal_event.SINK with type t = t = struct
         return_unit
 
   let close {lwt_bad_citizen_hack; _} =
-    iter_s
+    List.iter_es
       (fun (f, j) ->
         output_json f j ~pp:(fun fmt () ->
             Format.fprintf fmt "Destacking: %s" f))
       !lwt_bad_citizen_hack
-    >>=? fun () -> return_unit
 end
 
 let () = Internal_event.All_sinks.register (module Sink_implementation)

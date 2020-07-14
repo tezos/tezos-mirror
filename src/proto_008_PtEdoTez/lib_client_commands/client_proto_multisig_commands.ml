@@ -192,7 +192,9 @@ let commands () : #Protocol_client_context.full Clic.command list =
                   burn_cap;
                 }
               in
-              map_s (fun (pk_uri, _) -> Client_keys.public_key pk_uri) keys
+              List.map_es
+                (fun (pk_uri, _) -> Client_keys.public_key pk_uri)
+                keys
               >>=? fun keys ->
               Client_proto_multisig.originate_multisig
                 cctxt
@@ -335,7 +337,9 @@ let commands () : #Protocol_client_context.full Clic.command list =
              new_threshold
              new_keys
              (cctxt : #Protocol_client_context.full) ->
-          map_s (fun (pk_uri, _) -> Client_keys.public_key pk_uri) new_keys
+          List.map_es
+            (fun (pk_uri, _) -> Client_keys.public_key pk_uri)
+            new_keys
           >>=? fun keys ->
           Client_proto_multisig.prepare_multisig_transaction
             cctxt
@@ -459,7 +463,9 @@ let commands () : #Protocol_client_context.full Clic.command list =
              new_threshold
              new_keys
              (cctxt : #Protocol_client_context.full) ->
-          map_s (fun (pk_uri, _) -> Client_keys.public_key pk_uri) new_keys
+          List.map_es
+            (fun (pk_uri, _) -> Client_keys.public_key pk_uri)
+            new_keys
           >>=? fun keys ->
           Client_proto_multisig.prepare_multisig_transaction
             cctxt

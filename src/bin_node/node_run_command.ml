@@ -341,14 +341,14 @@ let launch_rpc_server (config : Node_config_file.t) node (addr, port) =
           Lwt.return (error_exn exn))
 
 let init_rpc (config : Node_config_file.t) node =
-  fold_right_s
+  List.fold_right_es
     (fun addr acc ->
       Node_config_file.resolve_rpc_listening_addrs addr
       >>= function
       | [] ->
           failwith "Cannot resolve listening address: %S" addr
       | addrs ->
-          fold_right_s
+          List.fold_right_es
             (fun x a ->
               launch_rpc_server config node x >>=? fun o -> return (o :: a))
             addrs
@@ -412,7 +412,7 @@ let run ?verbosity ?sandbox ?checkpoint ~singleprocess
       ~after:[node_downer]
       (fun _ ->
         Event.(emit shutting_down_rpc_server) ()
-        >>= fun () -> Lwt_list.iter_p RPC_server.shutdown rpc)
+        >>= fun () -> List.iter_p RPC_server.shutdown rpc)
   in
   Event.(emit node_is_ready) ()
   >>= fun () ->
@@ -463,7 +463,7 @@ let process sandbox verbosity checkpoint singleprocess args =
           (fun () -> run ?sandbox ?verbosity ?checkpoint ~singleprocess config)
           (function
             | Unix.Unix_error (Unix.EADDRINUSE, "bind", "") ->
-                Lwt_list.fold_right_s
+                List.fold_right_s
                   (fun addr acc ->
                     Node_config_file.resolve_rpc_listening_addrs addr
                     >>= fun x -> Lwt.return (x @ acc))

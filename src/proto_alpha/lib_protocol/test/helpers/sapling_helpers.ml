@@ -401,11 +401,16 @@ module Interpreter_helpers = struct
           Sapling.Core.Wallet.Viewing_key.(new_address vk index)
         in
         let outputs =
-          List.init number_outputs (fun _ ->
+          List.init ~when_negative_length:() number_outputs (fun _ ->
               Sapling.Forge.make_output
                 new_addr
                 amount_output
                 (Bytes.create memo_size))
+          |> function
+          | Error () ->
+              assert false (* conditional above guards against this *)
+          | Ok outputs ->
+              outputs
         in
         let tr_hex =
           to_hex

@@ -1233,7 +1233,7 @@ let to_ipv4 ipv6_l =
     | Some ipv4 ->
         Lwt.return_some (ipv4, port)
   in
-  Lwt_list.filter_map_s convert_or_warn ipv6_l
+  List.filter_map_s convert_or_warn ipv6_l
 
 let resolve_addr ~default_addr ?default_port ?(passive = false) peer =
   let (addr, port) = P2p_point.Id.parse_addr_port peer in
@@ -1250,7 +1250,7 @@ let resolve_addr ~default_addr ?default_port ?(passive = false) peer =
   Lwt_utils_unix.getaddrinfo ~passive ~node ~service
 
 let resolve_addrs ~default_addr ?default_port ?passive peers =
-  Lwt_list.fold_left_s
+  List.fold_left_s
     (fun a peer ->
       resolve_addr ~default_addr ?default_port ?passive peer
       >>= fun points -> Lwt.return (List.rev_append points a))
@@ -1321,7 +1321,7 @@ let check_discovery_addr config =
               Lwt.fail exn)
 
 let check_rpc_listening_addr config =
-  Lwt_list.iter_p
+  List.iter_p
     (fun addr ->
       Lwt.catch
         (fun () ->
@@ -1365,7 +1365,7 @@ let bootstrap_peers config =
       peers
 
 let check_bootstrap_peers config =
-  Lwt_list.iter_p check_bootstrap_peer (bootstrap_peers config)
+  List.iter_p check_bootstrap_peer (bootstrap_peers config)
 
 let fail fmt = Format.kasprintf (fun s -> prerr_endline s ; exit 1) fmt
 

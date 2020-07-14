@@ -129,12 +129,12 @@ module Alias (Entity : Entity) = struct
     | Error _ -> return_nil | Ok list -> return (List.map fst list)
 
   let find_opt (wallet : #wallet) name =
-    load wallet >|=? fun list -> List.assoc_opt name list
+    load wallet >|=? fun list -> List.assoc name list
 
   let find (wallet : #wallet) name =
     load wallet
     >>=? fun list ->
-    match List.assoc_opt name list with
+    match List.assoc name list with
     | Some v ->
         return v
     | None ->
@@ -142,8 +142,7 @@ module Alias (Entity : Entity) = struct
 
   let rev_find (wallet : #wallet) v =
     load wallet
-    >|=? fun list ->
-    Option.map fst @@ List.find_opt (fun (_, v') -> v = v') list
+    >|=? fun list -> Option.map fst @@ List.find (fun (_, v') -> v = v') list
 
   let rev_find_all (wallet : #wallet) v =
     load wallet
@@ -160,7 +159,7 @@ module Alias (Entity : Entity) = struct
     >>=? fun list ->
     ( if force then return_unit
     else
-      iter_s
+      List.iter_es
         (fun (n, v) ->
           if n = name && v = value then (
             keep := true ;
@@ -215,7 +214,7 @@ module Alias (Entity : Entity) = struct
     >>=? fun list ->
     ( if force then return_unit
     else
-      iter_s
+      List.iter_es
         (fun (n, v) ->
           if n = s then
             Entity.to_source v

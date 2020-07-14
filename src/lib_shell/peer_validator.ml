@@ -161,7 +161,7 @@ let validate_new_head w hash (header : Block_header.t) =
   let block_received = {Event.peer = pv.peer_id; hash} in
   Worker.log_event w (Fetching_operations_for_head block_received)
   >>= fun () ->
-  map_p
+  List.map_ep
     (fun i ->
       Worker.protect w (fun () ->
           Distributed_db.Operations.fetch

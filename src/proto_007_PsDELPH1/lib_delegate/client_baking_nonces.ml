@@ -156,7 +156,7 @@ let get_unrevealed_nonces cctxt location nonces =
     ~offset:(-1l)
     ()
   >>=? fun blocks ->
-  filter_map_s
+  List.filter_map_es
     (fun hash ->
       match find_opt nonces hash with
       | None ->

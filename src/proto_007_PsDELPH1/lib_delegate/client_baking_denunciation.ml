@@ -80,7 +80,7 @@ let get_block_offset level =
 
 let process_endorsements (cctxt : #Protocol_client_context.full) state
     (endorsements : Alpha_block_services.operation list) level =
-  iter_s
+  List.iter_es
     (fun {Alpha_block_services.shell; chain_id; receipt; hash; protocol_data; _}
          ->
       let chain = `Hash chain_id in
@@ -330,11 +330,12 @@ let process_new_block (cctxt : #Protocol_client_context.full) state
     (* Processing endorsements *)
     Alpha_block_services.Operations.operations cctxt ~chain ~block ()
     >>= (function
-          | Ok operations ->
-              if List.length operations > endorsements_index then
-                let endorsements = List.nth operations endorsements_index in
+          | Ok operations -> (
+            match List.nth operations endorsements_index with
+            | Some endorsements ->
                 process_endorsements cctxt state endorsements level
-              else return_unit
+            | None ->
+                return_unit )
           | Error errs ->
               lwt_log_error
                 Tag.DSL.(
