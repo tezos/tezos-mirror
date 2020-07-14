@@ -92,6 +92,7 @@ environment variable, but this does not take effect until you restart
 your desktop environment or window manager, so you may have to manually
 update it for your current session::
 
+    rustup set profile minimal
     rustup toolchain install 1.39.0
     rustup default 1.39.0
     source $HOME/.cargo/env
