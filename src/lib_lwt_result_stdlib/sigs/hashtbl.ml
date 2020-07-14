@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Modules with the signature [S] are safe (e.g., [find] uses [option] rather
+(** Hashtbls with the signature [S] are safe (e.g., [find] uses [option] rather
     than raising [Not_found]) extensions of [Hashtbl.S] with some Lwt- and
     Error-aware traversal functions. *)
 module type S = sig
@@ -34,6 +34,84 @@ module type S = sig
   type 'a t
 
   val create : int -> 'a t
+
+  val clear : 'a t -> unit
+
+  val reset : 'a t -> unit
+
+  val add : 'a t -> key -> 'a -> unit
+
+  val remove : 'a t -> key -> unit
+
+  val find : 'a t -> key -> 'a option
+
+  val find_all : 'a t -> key -> 'a list
+
+  val replace : 'a t -> key -> 'a -> unit
+
+  val mem : 'a t -> key -> bool
+
+  val iter : (key -> 'a -> unit) -> 'a t -> unit
+
+  val iter_s : (key -> 'a -> unit Lwt.t) -> 'a t -> unit Lwt.t
+
+  val iter_p : (key -> 'a -> unit Lwt.t) -> 'a t -> unit Lwt.t
+
+  val iter_e :
+    (key -> 'a -> (unit, error) result) -> 'a t -> (unit, error) result
+
+  val iter_es :
+    (key -> 'a -> (unit, error) result Lwt.t) ->
+    'a t ->
+    (unit, error) result Lwt.t
+
+  val iter_ep :
+    (key -> 'a -> (unit, error) result Lwt.t) ->
+    'a t ->
+    (unit, error) result Lwt.t
+
+  val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
+
+  val try_map_inplace : (key -> 'a -> ('a, error) result) -> 'a t -> unit
+
+  val fold : (key -> 'a -> 'b -> 'b) -> 'a t -> 'b -> 'b
+
+  val fold_s : (key -> 'a -> 'b -> 'b Lwt.t) -> 'a t -> 'b -> 'b Lwt.t
+
+  val fold_e :
+    (key -> 'a -> 'b -> ('b, error) result) -> 'a t -> 'b -> ('b, error) result
+
+  val fold_es :
+    (key -> 'a -> 'b -> ('b, error) result Lwt.t) ->
+    'a t ->
+    'b ->
+    ('b, error) result Lwt.t
+
+  val length : 'a t -> int
+
+  val stats : 'a t -> Stdlib.Hashtbl.statistics
+
+  val to_seq : 'a t -> (key * 'a) Stdlib.Seq.t
+
+  val to_seq_keys : _ t -> key Stdlib.Seq.t
+
+  val to_seq_values : 'a t -> 'a Stdlib.Seq.t
+
+  val add_seq : 'a t -> (key * 'a) Stdlib.Seq.t -> unit
+
+  val replace_seq : 'a t -> (key * 'a) Stdlib.Seq.t -> unit
+
+  val of_seq : (key * 'a) Stdlib.Seq.t -> 'a t
+end
+
+module type SeededS = sig
+  type error
+
+  type key
+
+  type 'a t
+
+  val create : ?random:bool -> int -> 'a t
 
   val clear : 'a t -> unit
 

@@ -26,11 +26,52 @@
 module Make (Seq : Sigs.Seq.S) = struct
   let hash = Stdlib.Hashtbl.hash
 
+  let seeded_hash = Stdlib.Hashtbl.seeded_hash
+
+  let hash_param = Stdlib.Hashtbl.hash_param
+
+  let seeded_hash_param = Stdlib.Hashtbl.seeded_hash_param
+
   module type S = Sigs.Hashtbl.S with type error := Seq.Monad.out_error
+
+  module type SeededS =
+    Sigs.Hashtbl.SeededS with type error := Seq.Monad.out_error
 
   module Make (H : Stdlib.Hashtbl.HashedType) : S with type key = H.t = struct
     open Seq
     include Stdlib.Hashtbl.Make (H)
+
+    let iter_e f t = iter_e (fun (k, v) -> f k v) (to_seq t)
+
+    let iter_s f t = iter_s (fun (k, v) -> f k v) (to_seq t)
+
+    let iter_es f t = iter_es (fun (k, v) -> f k v) (to_seq t)
+
+    let iter_p f t = iter_p (fun (k, v) -> f k v) (to_seq t)
+
+    let iter_ep f t = iter_ep (fun (k, v) -> f k v) (to_seq t)
+
+    let fold_e f t init =
+      fold_left_e (fun acc (k, v) -> f k v acc) init (to_seq t)
+
+    let fold_s f t init =
+      fold_left_s (fun acc (k, v) -> f k v acc) init (to_seq t)
+
+    let fold_es f t init =
+      fold_left_es (fun acc (k, v) -> f k v acc) init (to_seq t)
+
+    let find = find_opt
+
+    let try_map_inplace f t =
+      filter_map_inplace
+        (fun k v -> match f k v with Error _ -> None | Ok r -> Some r)
+        t
+  end
+
+  module MakeSeeded (H : Stdlib.Hashtbl.SeededHashedType) :
+    SeededS with type key = H.t = struct
+    open Seq
+    include Stdlib.Hashtbl.MakeSeeded (H)
 
     let iter_e f t = iter_e (fun (k, v) -> f k v) (to_seq t)
 

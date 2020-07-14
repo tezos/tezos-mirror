@@ -44,6 +44,14 @@ end
 module String = struct
   include String
   include Tezos_stdlib.TzString
+
+  module Hashtbl = Tezos_lwt_result_stdlib.Lwtreslib.Hashtbl.Make (struct
+    type t = string
+
+    let equal = String.equal
+
+    let hash = Hashtbl.hash
+  end)
 end
 
 module Time = Time

@@ -24,12 +24,24 @@
 (*****************************************************************************)
 
 module Make (Seq : Sigs.Seq.S) : sig
-  (** [Stdlib.Hashtbl.hash] reexported to allow shadowing *)
+  (** Polymorphic hashing re-exported *)
   val hash : 'a -> int
+
+  val seeded_hash : int -> 'a -> int
+
+  val hash_param : int -> int -> 'a -> int
+
+  val seeded_hash_param : int -> int -> int -> 'a -> int
 
   module type S = Sigs.Hashtbl.S with type error := Seq.Monad.out_error
 
+  module type SeededS =
+    Sigs.Hashtbl.SeededS with type error := Seq.Monad.out_error
+
   module Make (H : Stdlib.Hashtbl.HashedType) : S with type key = H.t
+
+  module MakeSeeded (H : Stdlib.Hashtbl.SeededHashedType) :
+    SeededS with type key = H.t
 
   module type S_LWT = Sigs.Hashtbl.S_LWT with type error := Seq.Monad.out_error
 
