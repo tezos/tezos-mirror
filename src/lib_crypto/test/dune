@@ -16,6 +16,7 @@
             alcotest-lwt)
  (flags (:standard -open Tezos_stdlib
                    -open Tezos_crypto
+                   -open Tezos_lwt_result_stdlib.Lwtreslib
                    -open Data_encoding)))
 
 (rule
