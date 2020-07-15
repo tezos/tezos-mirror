@@ -119,6 +119,7 @@ and ('arg, 'ret) lambda =
   | Lam :
       ('arg * end_of_stack, 'ret * end_of_stack) descr * Script.node
       -> ('arg, 'ret) lambda
+[@@coq_force_gadt]
 
 and 'arg typed_contract = 'arg ty * address
 

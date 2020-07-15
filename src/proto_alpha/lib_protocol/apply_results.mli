@@ -90,6 +90,7 @@ and 'kind manager_operation_result =
       'kind successful_manager_operation_result * error list option
   | Failed : 'kind Kind.manager * error list -> 'kind manager_operation_result
   | Skipped : 'kind Kind.manager -> 'kind manager_operation_result
+[@@coq_force_gadt]
 
 (** Result of applying a {!manager_operation_content}, either internal
     or external. *)
