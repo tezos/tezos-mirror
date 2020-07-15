@@ -139,7 +139,7 @@ let () =
     ~title:"Invalid Mockup Argument"
     ~description:"Mockup argument could not be parsed"
     ~pp:(fun ppf s ->
-      Format.fprintf ppf "%s is not \"default\", nor \"directory:<path>\"." s)
+      Format.fprintf ppf "%s is neither \"default\" nor \"mockup\"." s)
     Data_encoding.(obj1 (req "value" string))
     (function Invalid_mockup_arg s -> Some s | _ -> None)
     (fun s -> Invalid_mockup_arg s)
