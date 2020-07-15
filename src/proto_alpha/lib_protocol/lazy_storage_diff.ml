@@ -137,6 +137,7 @@ let get_ops : type i a u. (i, a, u) Lazy_storage_kind.t -> (i, a, u) ops =
   function
   | Big_map ->
       (module Big_map)
+  [@@coq_axiom "gadt"]
 
 module KId = struct
   type t = E : ('id, _, _) Lazy_storage_kind.t * 'id -> t
@@ -150,6 +151,7 @@ module KId = struct
     | Eq ->
         let (module OPS) = get_ops kind1 in
         OPS.Id.compare id1 id2
+    [@@coq_axiom "gadt"]
 end
 
 type ('id, 'alloc) init = Existing | Copy of {src : 'id} | Alloc of 'alloc
@@ -275,7 +277,7 @@ let make :
     (i, a, u) Lazy_storage_kind.t -> i -> (i, a, u) diff -> diffs_item =
  fun k id diff -> E (k, id, diff)
 
-let make_remove (KId.E (k, id)) = E (k, id, Remove)
+let make_remove (KId.E (k, id)) = E (k, id, Remove) [@@coq_axiom "gadt"]
 
 let item_encoding =
   let open Data_encoding in
@@ -300,6 +302,7 @@ let item_encoding =
                  None)
            (fun ((), id, diff) -> E (k, id, diff)))
        Lazy_storage_kind.all
+  [@@coq_axiom "gadt"]
 
 type diffs = diffs_item list
 
@@ -334,6 +337,7 @@ let fresh :
   else
     let (module OPS) = get_ops kind in
     OPS.Next.incr ctxt
+ [@@coq_axiom "gadt"]
 
 let init ctxt =
   fold_left_s
@@ -342,6 +346,7 @@ let init ctxt =
       OPS.Next.init ctxt)
     ctxt
     Lazy_storage_kind.all
+  [@@coq_axiom "gadt"]
 
 let cleanup_temporaries ctxt =
   Raw_context.map_temporary_lazy_storage_ids_s ctxt (fun temp_ids ->
@@ -352,3 +357,4 @@ let cleanup_temporaries ctxt =
         ctxt
         Lazy_storage_kind.all
       >|= fun ctxt -> (ctxt, Lazy_storage_kind.Temp_ids.init))
+  [@@coq_axiom "gadt"]
