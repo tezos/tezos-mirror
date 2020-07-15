@@ -64,7 +64,7 @@ val recv : Lwt_io.input_channel -> 'a Data_encoding.t -> 'a Lwt.t
 val recv_result :
   Lwt_io.input_channel -> 'a Data_encoding.t -> 'a tzresult Lwt.t
 
-val socket_path : pid:int -> string
+val socket_path : data_dir:string -> pid:int -> string
 
 val create_socket_listen :
   canceler:Lwt_canceler.t ->

@@ -356,21 +356,29 @@ let run input output =
   in
   loop ()
 
-let main () =
-  Internal_event_unix.init ()
-  >>= fun () ->
-  let pid = Unix.getpid () in
-  let socket_path = External_validation.socket_path ~pid in
+let main ?socket_dir () =
   let canceler = Lwt_canceler.create () in
-  External_validation.create_socket_connect ~canceler ~socket_path
-  >>= fun socket_process ->
-  let socket_in = Lwt_io.of_fd ~mode:Input socket_process in
-  let socket_out = Lwt_io.of_fd ~mode:Output socket_process in
+  ( match socket_dir with
+  | Some socket_dir ->
+      Internal_event_unix.init ()
+      >>= fun () ->
+      let pid = Unix.getpid () in
+      let socket_path =
+        External_validation.socket_path ~data_dir:socket_dir ~pid
+      in
+      External_validation.create_socket_connect ~canceler ~socket_path
+      >>= fun socket_process ->
+      let socket_in = Lwt_io.of_fd ~mode:Input socket_process in
+      let socket_out = Lwt_io.of_fd ~mode:Output socket_process in
+      Lwt.return (socket_in, socket_out)
+  | None ->
+      Lwt.return (Lwt_io.stdin, Lwt_io.stdout) )
+  >>= fun (in_channel, out_channel) ->
   lwt_emit Initialized
   >>= fun () ->
   Lwt.catch
     (fun () ->
-      run socket_in socket_out
+      run in_channel out_channel
       >>=? fun () -> Lwt_canceler.cancel canceler >>= fun () -> return 0)
     (fun e -> Lwt.return (error_exn e))
   >>= function
@@ -378,7 +386,7 @@ let main () =
       lwt_emit Terminated >>= fun () -> Lwt.return v
   | Error _ as errs ->
       External_validation.send
-        socket_out
+        out_channel
         (Error_monad.result_encoding Data_encoding.unit)
         errs
       >>= fun () -> Lwt.return 1

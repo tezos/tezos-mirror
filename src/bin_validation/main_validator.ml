@@ -23,4 +23,28 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let () = Stdlib.exit (Lwt_main.run @@ Validator.main ())
+let () =
+  let socket_dir = ref None in
+  let args =
+    Arg.
+      [ ( "--socket-dir",
+          String
+            (fun s ->
+              if not (Sys.file_exists s && Sys.is_directory s) then
+                raise
+                  (Arg.Bad
+                     (Format.sprintf "File '%s' is not a valid directory" s))
+              else socket_dir := Some s),
+          {|<dir>
+      When provided, the validator will communicate through a socket located
+      at '<dir>/tezos-validation-socket-<pid>' where <pid> is the
+      tezos-validator's process identifier. By default, the validator will
+      communicate through its standard input and output.|}
+        ) ]
+  in
+  let usage_msg = Format.sprintf "tezos-validator [--socket-dir <dir>]" in
+  Arg.parse
+    args
+    (fun s -> raise (Arg.Bad (Format.sprintf "Unexpected argument: %s" s)))
+    usage_msg ;
+  Stdlib.exit (Lwt_main.run @@ Validator.main ?socket_dir:!socket_dir ())

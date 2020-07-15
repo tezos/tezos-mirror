@@ -48,7 +48,18 @@ let () =
 
 let () =
   if Filename.basename Sys.argv.(0) = "tezos-validator" then (
-    try Stdlib.exit (Lwt_main.run @@ Validator.main ())
+    try
+      let is_valid_directory =
+        Array.length Sys.argv = 3
+        && Sys.argv.(1) = "--socket-dir"
+        && Sys.file_exists Sys.argv.(2)
+        && Sys.is_directory Sys.argv.(2)
+      in
+      if not is_valid_directory then
+        invalid_arg
+          "Invalid arguments provided for the validator: expected \
+           'tezos-validator --socket-dir <dir>'." ;
+      Stdlib.exit (Lwt_main.run @@ Validator.main ~socket_dir:Sys.argv.(2) ())
     with exn ->
       Format.eprintf "%a\n%!" Opterrors.report_error exn ;
       Stdlib.exit 1 )

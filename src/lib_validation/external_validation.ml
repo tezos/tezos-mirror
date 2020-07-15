@@ -228,7 +228,9 @@ let recv pout encoding =
   Lwt_io.read_into_exactly pout buf 0 count
   >>= fun () -> Lwt.return (Data_encoding.Binary.of_bytes_exn encoding buf)
 
-let socket_path ~pid = Format.sprintf "/tmp/tezos-validation-socket-%d" pid
+let socket_path ~data_dir ~pid =
+  let filename = Format.sprintf "tezos-validation-socket-%d" pid in
+  Filename.concat data_dir filename
 
 (* To get optimized socket communication of processes on the same
    machine, we use Unix domain sockets: ADDR_UNIX. *)
@@ -239,7 +241,7 @@ let create_socket ~canceler =
     (fun () ->
       let socket = Lwt_unix.socket PF_UNIX SOCK_STREAM 0o000 in
       Lwt_canceler.on_cancel canceler (fun () ->
-          Lwt_utils_unix.safe_close socket) ;
+          Lwt_utils_unix.safe_close socket >>= fun _ -> Lwt.return_unit) ;
       Lwt_unix.setsockopt socket SO_REUSEADDR true ;
       Lwt.return socket)
     (fun exn ->

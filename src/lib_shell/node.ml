@@ -92,6 +92,7 @@ type config = {
   sandboxed_chain_name : Distributed_db_version.Name.t;
   user_activated_upgrades : User_activated.upgrades;
   user_activated_protocol_overrides : User_activated.protocol_overrides;
+  data_dir : string;
   store_root : string;
   context_root : string;
   protocol_root : string;
@@ -274,6 +275,7 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
       sandboxed_chain_name;
       user_activated_upgrades;
       user_activated_protocol_overrides;
+      data_dir;
       store_root;
       context_root;
       protocol_root;
@@ -310,6 +312,7 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
       validator_environment
       (External
          {
+           data_dir;
            context_root;
            protocol_root;
            process_path = Sys.executable_name;

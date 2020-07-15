@@ -244,6 +244,7 @@ let init_node ?sandbox ?checkpoint ~singleprocess (config : Node_config_file.t)
       user_activated_protocol_overrides =
         config.blockchain_network.user_activated_protocol_overrides;
       patch_context;
+      data_dir = config.data_dir;
       store_root = Node_data_version.store_dir config.data_dir;
       context_root = Node_data_version.context_dir config.data_dir;
       protocol_root = Node_data_version.protocol_dir config.data_dir;

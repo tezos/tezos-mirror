@@ -46,6 +46,7 @@ let with_node f =
         user_activated_upgrades = [];
         user_activated_protocol_overrides = [];
         patch_context = None;
+        data_dir = dir;
         store_root = dir / "store";
         context_root = dir / "context";
         protocol_root = dir / "protocol";

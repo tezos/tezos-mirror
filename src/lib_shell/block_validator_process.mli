@@ -45,6 +45,7 @@ type validator_environment = {
 type validator_kind =
   | Internal : Context.index -> validator_kind
   | External : {
+      data_dir : string;
       context_root : string;
       protocol_root : string;
       process_path : string;

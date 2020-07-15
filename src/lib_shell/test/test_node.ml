@@ -40,6 +40,7 @@ let init_config (* (f : 'a -> unit -> unit Lwt.t) *) f test_dir switch () :
       sandboxed_chain_name = Distributed_db_version.Name.zero;
       user_activated_upgrades = [];
       user_activated_protocol_overrides = [];
+      data_dir = test_dir;
       store_root = test_dir;
       context_root = test_dir;
       protocol_root = test_dir;

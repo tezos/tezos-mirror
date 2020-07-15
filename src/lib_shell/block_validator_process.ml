@@ -33,6 +33,7 @@ type validator_environment = {
 type validator_kind =
   | Internal : Context.index -> validator_kind
   | External : {
+      data_dir : string;
       context_root : string;
       protocol_root : string;
       process_path : string;
@@ -161,6 +162,7 @@ module External_validator_process = struct
   }
 
   type t = {
+    data_dir : string;
     context_root : string;
     protocol_root : string;
     genesis : Genesis.t;
@@ -176,10 +178,15 @@ module External_validator_process = struct
     let start_process () =
       let canceler = Lwt_canceler.create () in
       (* We assume that there is only one validation process per socket *)
+      (* TODO spawn the socket in $XDG_RUNTIME_DIR while making sure
+         it's portable *)
       let process =
-        Lwt_process.open_process_none (vp.process_path, [|"tezos-validator"|])
+        Lwt_process.open_process_none
+          (vp.process_path, [|"tezos-validator"; "--socket-dir"; vp.data_dir|])
       in
-      let socket_path = External_validation.socket_path ~pid:process#pid in
+      let socket_path =
+        External_validation.socket_path ~data_dir:vp.data_dir ~pid:process#pid
+      in
       External_validation.create_socket_listen
         ~canceler
         ~max_requests:1
@@ -188,10 +195,10 @@ module External_validator_process = struct
       Lwt_unix.accept process_socket
       >>= fun (process_socket, _) ->
       (* As the external validation process is now started, we can
-      unlink the named socket. Indeed, the file descriptor will remain
-      valid until at least one process keep it open. This method
-      mimics an anonymous file descriptor without relying on Linux
-      specific features. *)
+         unlink the named socket. Indeed, the file descriptor will
+         remain valid until at least one process keep it open. This
+         method mimics an anonymous file descriptor without relying on
+         Linux specific features. *)
       Lwt_unix.unlink socket_path
       >>= fun () ->
       let process_stdin = Lwt_io.of_fd ~mode:Output process_socket in
@@ -278,12 +285,13 @@ module External_validator_process = struct
 
   let init
       ({genesis; user_activated_upgrades; user_activated_protocol_overrides} :
-        validator_environment) context_root protocol_root process_path
+        validator_environment) data_dir context_root protocol_root process_path
       sandbox_parameters =
     lwt_emit Init
     >>= fun () ->
     let validator =
       {
+        data_dir;
         context_root;
         protocol_root;
         genesis;
@@ -369,9 +377,12 @@ let init : validator_environment -> validator_kind -> t tzresult Lwt.t =
         (module Internal_validator_process)
       in
       return (E {validator_process; validator})
-  | External {context_root; protocol_root; process_path; sandbox_parameters} ->
+  | External
+      {data_dir; context_root; protocol_root; process_path; sandbox_parameters}
+    ->
       External_validator_process.init
         validator_environment
+        data_dir
         context_root
         protocol_root
         process_path
