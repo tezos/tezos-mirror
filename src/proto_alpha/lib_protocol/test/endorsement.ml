@@ -556,7 +556,7 @@ let endorsement_threshold () =
       let seconds =
         Int64.(sub (of_string (Timestamp.to_seconds_string timestamp)) 1L)
       in
-      match Timestamp.of_seconds (Int64.to_string seconds) with
+      match Timestamp.of_seconds_string (Int64.to_string seconds) with
       | None ->
           failwith "timestamp to/from string manipulation failed"
       | Some timestamp ->

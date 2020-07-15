@@ -111,7 +111,7 @@ module Timestamp : sig
 
   val to_notation : time -> string
 
-  val of_seconds : string -> time option
+  val of_seconds_string : string -> time option
 
   val to_seconds_string : time -> string
 
