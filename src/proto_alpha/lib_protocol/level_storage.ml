@@ -35,14 +35,14 @@ let from_raw c ?offset l =
   in
   let constants = Raw_context.constants c in
   let first_level = Raw_context.first_level c in
-  Level_repr.from_raw
+  Level_repr.level_from_raw
     ~first_level
     ~blocks_per_cycle:constants.Constants_repr.blocks_per_cycle
     ~blocks_per_voting_period:constants.Constants_repr.blocks_per_voting_period
     ~blocks_per_commitment:constants.Constants_repr.blocks_per_commitment
     l
 
-let root c = Level_repr.root (Raw_context.first_level c)
+let root c = Level_repr.root_level (Raw_context.first_level c)
 
 let succ c l = from_raw c (Raw_level_repr.succ l.level)
 

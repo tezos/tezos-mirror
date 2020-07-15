@@ -537,7 +537,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
   get_first_level ctxt
   >|=? fun first_level ->
   let level =
-    Level_repr.from_raw
+    Level_repr.level_from_raw
       ~first_level
       ~blocks_per_cycle:constants.Constants_repr.blocks_per_cycle
       ~blocks_per_voting_period:

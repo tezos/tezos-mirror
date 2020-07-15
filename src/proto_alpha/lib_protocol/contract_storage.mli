@@ -167,7 +167,7 @@ val spend :
   Tez_repr.t ->
   Raw_context.t tzresult Lwt.t
 
-val originate :
+val raw_originate :
   Raw_context.t ->
   ?prepaid_bootstrap_storage:bool ->
   Contract_repr.t ->

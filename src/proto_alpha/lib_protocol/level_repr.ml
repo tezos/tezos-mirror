@@ -137,7 +137,7 @@ let encoding =
              hash."
           bool))
 
-let root first_level =
+let root_level first_level =
   {
     level = first_level;
     level_position = 0l;
@@ -148,7 +148,7 @@ let root first_level =
     expected_commitment = false;
   }
 
-let from_raw ~first_level ~blocks_per_cycle ~blocks_per_voting_period
+let level_from_raw ~first_level ~blocks_per_cycle ~blocks_per_voting_period
     ~blocks_per_commitment level =
   let raw_level = Raw_level_repr.to_int32 level in
   let first_level = Raw_level_repr.to_int32 first_level in

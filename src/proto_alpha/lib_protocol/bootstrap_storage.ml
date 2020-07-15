@@ -45,7 +45,7 @@ let init_contract ~typecheck ctxt
   >>=? fun (ctxt, contract) ->
   typecheck ctxt script
   >>=? fun (script, ctxt) ->
-  Contract_storage.originate
+  Contract_storage.raw_originate
     ctxt
     contract
     ~balance:amount

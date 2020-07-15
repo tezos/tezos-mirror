@@ -35,7 +35,7 @@ type nonce = bytes
 
 let nonce_encoding = Data_encoding.Fixed.bytes Constants_repr.nonce_length
 
-let init = "Laissez-faire les proprietaires."
+let initial_seed = "Laissez-faire les proprietaires."
 
 let zero_bytes = Bytes.make Nonce_hash.size '\000'
 
@@ -50,7 +50,7 @@ let seed_encoding =
   let open Data_encoding in
   conv (fun (B b) -> b) (fun b -> B b) state_hash_encoding
 
-let empty = B (State_hash.hash_bytes [Bytes.of_string init])
+let empty = B (State_hash.hash_bytes [Bytes.of_string initial_seed])
 
 let nonce (B state) nonce =
   B (State_hash.hash_bytes [State_hash.to_bytes state; nonce])

@@ -528,8 +528,8 @@ let create_base c ?(prepaid_bootstrap_storage = false)
   | None ->
       return c
 
-let originate c ?prepaid_bootstrap_storage contract ~balance ~script ~delegate
-    =
+let raw_originate c ?prepaid_bootstrap_storage contract ~balance ~script
+    ~delegate =
   create_base
     c
     ?prepaid_bootstrap_storage

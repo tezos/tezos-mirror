@@ -162,7 +162,7 @@ module Contract = struct
   include Contract_storage
 
   let originate c contract ~balance ~script ~delegate =
-    originate c contract ~balance ~script ~delegate
+    raw_originate c contract ~balance ~script ~delegate
 
   let init_origination_nonce = Raw_context.init_origination_nonce
 
