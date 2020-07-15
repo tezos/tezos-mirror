@@ -251,11 +251,11 @@ let set_gas_limit ctxt remaining =
 let set_gas_unlimited ctxt = {ctxt with operation_gas = Unaccounted}
 
 let consume_gas ctxt cost =
-  Gas_limit_repr.consume ctxt.block_gas ctxt.operation_gas cost
+  Gas_limit_repr.raw_consume ctxt.block_gas ctxt.operation_gas cost
   >>? fun (block_gas, operation_gas) -> ok {ctxt with block_gas; operation_gas}
 
 let check_enough_gas ctxt cost =
-  Gas_limit_repr.check_enough ctxt.block_gas ctxt.operation_gas cost
+  Gas_limit_repr.raw_check_enough ctxt.block_gas ctxt.operation_gas cost
 
 let gas_level ctxt = ctxt.operation_gas
 

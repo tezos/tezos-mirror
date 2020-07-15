@@ -75,7 +75,7 @@ let byte_written_weight = Z.of_int (scaling_factor * 15)
 
 let cost_to_gas (cost : cost) : Z.t = cost
 
-let consume block_gas operation_gas cost =
+let raw_consume block_gas operation_gas cost =
   match operation_gas with
   | Unaccounted ->
       ok (block_gas, Unaccounted)
@@ -90,8 +90,8 @@ let consume block_gas operation_gas cost =
         else ok (block_remaining, Limited {remaining})
       else ok (block_gas, operation_gas)
 
-let check_enough block_gas operation_gas cost =
-  consume block_gas operation_gas cost
+let raw_check_enough block_gas operation_gas cost =
+  raw_consume block_gas operation_gas cost
   >|? fun (_block_remaining, _remaining) -> ()
 
 let alloc_cost n = Z.mul allocation_weight (Z.of_int (n + 1))
