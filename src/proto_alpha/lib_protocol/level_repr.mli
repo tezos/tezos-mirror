@@ -61,9 +61,9 @@ val pp : Format.formatter -> level -> unit
 
 val pp_full : Format.formatter -> level -> unit
 
-val root : Raw_level_repr.t -> level
+val root_level : Raw_level_repr.t -> level
 
-val from_raw :
+val level_from_raw :
   first_level:Raw_level_repr.t ->
   blocks_per_cycle:int32 ->
   blocks_per_voting_period:int32 ->
