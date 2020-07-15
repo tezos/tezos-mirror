@@ -91,7 +91,7 @@ let main ~(name : string) ~(cctxt : #Protocol_client_context.full)
        unit tzresult Lwt.t)
     ~(event_k :
        #Protocol_client_context.full -> 'state -> 'event -> unit tzresult Lwt.t)
-    =
+    ~finalizer =
   lwt_log_info
     Tag.DSL.(
       fun f ->
@@ -113,8 +113,6 @@ let main ~(name : string) ~(cctxt : #Protocol_client_context.full)
   in
   state_maker first_event
   >>=? fun state ->
-  log_errors_and_continue ~name @@ pre_loop cctxt state first_event
-  >>= fun () ->
   (* main loop *)
   let rec worker_loop () =
     (* event construction *)
@@ -160,4 +158,9 @@ let main ~(name : string) ~(cctxt : #Protocol_client_context.full)
     Tag.DSL.(
       fun f ->
         f "Starting %s daemon" -% t event "daemon_start" -% s worker_tag name)
-  >>= fun () -> worker_loop ()
+  >>= fun () ->
+  Lwt.finalize
+    (fun () ->
+      log_errors_and_continue ~name @@ pre_loop cctxt state first_event
+      >>= fun () -> worker_loop ())
+    (fun () -> finalizer state)

@@ -54,6 +54,8 @@ let default_minimal_nanotez_per_gas_unit = Z.of_int 100
 
 let default_minimal_nanotez_per_byte = Z.of_int 1000
 
+let default_retry_counter = 5
+
 type slot =
   Time.Protocol.t * (Client_baking_blocks.block_info * int * public_key_hash)
 
@@ -74,12 +76,14 @@ type state = {
   minimal_nanotez_per_byte : Z.t;
   (* truly mutable *)
   mutable best_slot : slot option;
+  mutable retry_counter : int;
 }
 
 let create_state ?(minimal_fees = default_minimal_fees)
     ?(minimal_nanotez_per_gas_unit = default_minimal_nanotez_per_gas_unit)
-    ?(minimal_nanotez_per_byte = default_minimal_nanotez_per_byte) context_path
-    index nonces_location delegates constants =
+    ?(minimal_nanotez_per_byte = default_minimal_nanotez_per_byte)
+    ?(retry_counter = default_retry_counter) context_path index nonces_location
+    delegates constants =
   {
     context_path;
     index;
@@ -90,6 +94,7 @@ let create_state ?(minimal_fees = default_minimal_fees)
     minimal_nanotez_per_gas_unit;
     minimal_nanotez_per_byte;
     best_slot = None;
+    retry_counter;
   }
 
 let get_delegates cctxt state =
@@ -853,6 +858,7 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
           minimal_fees = default_minimal_fees;
           minimal_nanotez_per_gas_unit = default_minimal_nanotez_per_gas_unit;
           minimal_nanotez_per_byte = default_minimal_nanotez_per_byte;
+          retry_counter = default_retry_counter;
         }
       in
       filter_and_apply_operations
@@ -1576,13 +1582,28 @@ let create (cctxt : #Protocol_client_context.full) ~user_activated_upgrades
     bake cctxt ~user_activated_upgrades ~chain state
     >>= function
     | Error err ->
-        (* Close the context properly. *)
-        Context.close state.index >>= fun () -> Lwt.return (Error err)
+        if state.retry_counter = 0 then (
+          (* Stop the timeout and wait for the next block *)
+          state.best_slot <- None ;
+          state.retry_counter <- default_retry_counter ;
+          Lwt.return (Error err) )
+        else
+          lwt_log_error
+            Tag.DSL.(
+              fun f ->
+                f "Retrying after baking error %a"
+                -% t event "retrying_on_error"
+                -% a errs_tag err)
+          >>= fun () ->
+          state.retry_counter <- pred state.retry_counter ;
+          return_unit
     | Ok () ->
-        (* Stopping the timeout and waiting for the next block *)
+        (* Stop the timeout and wait for the next block *)
         state.best_slot <- None ;
+        state.retry_counter <- default_retry_counter ;
         return_unit
   in
+  let finalizer state = Context.close state.index in
   Client_baking_scheduling.main
     ~name:"baker"
     ~cctxt
@@ -1592,3 +1613,4 @@ let create (cctxt : #Protocol_client_context.full) ~user_activated_upgrades
     ~compute_timeout
     ~timeout_k
     ~event_k
+    ~finalizer

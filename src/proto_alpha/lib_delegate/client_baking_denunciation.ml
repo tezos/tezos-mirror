@@ -386,3 +386,4 @@ let create (cctxt : #Protocol_client_context.full) ~preserved_levels
     ~compute_timeout:(fun _ -> Lwt_utils.never_ending ())
     ~timeout_k:(fun _ _ () -> return_unit)
     ~event_k:process_block
+    ~finalizer:(fun _ -> Lwt.return_unit)
