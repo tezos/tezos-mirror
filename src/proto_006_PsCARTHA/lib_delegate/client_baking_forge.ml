@@ -54,6 +54,8 @@ let default_minimal_nanotez_per_gas_unit = Z.of_int 100
 
 let default_minimal_nanotez_per_byte = Z.of_int 1000
 
+let default_retry_counter = 5
+
 type slot =
   Time.Protocol.t * (Client_baking_blocks.block_info * int * public_key_hash)
 
@@ -74,12 +76,14 @@ type state = {
   minimal_nanotez_per_byte : Z.t;
   (* truly mutable *)
   mutable best_slot : slot option;
+  mutable retry_counter : int;
 }
 
 let create_state ?(minimal_fees = default_minimal_fees)
     ?(minimal_nanotez_per_gas_unit = default_minimal_nanotez_per_gas_unit)
-    ?(minimal_nanotez_per_byte = default_minimal_nanotez_per_byte) context_path
-    index nonces_location delegates constants =
+    ?(minimal_nanotez_per_byte = default_minimal_nanotez_per_byte)
+    ?(retry_counter = default_retry_counter) context_path index nonces_location
+    delegates constants =
   {
     context_path;
     index;
@@ -90,6 +94,7 @@ let create_state ?(minimal_fees = default_minimal_fees)
     minimal_nanotez_per_gas_unit;
     minimal_nanotez_per_byte;
     best_slot = None;
+    retry_counter;
   }
 
 let get_delegates cctxt state =
@@ -853,6 +858,7 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
           minimal_fees = default_minimal_fees;
           minimal_nanotez_per_gas_unit = default_minimal_nanotez_per_gas_unit;
           minimal_nanotez_per_byte = default_minimal_nanotez_per_byte;
+          retry_counter = default_retry_counter;
         }
       in
       filter_and_apply_operations
@@ -1096,7 +1102,7 @@ let fetch_operations (cctxt : #Protocol_client_context.full) ~chain
 (** Given a delegate baking slot [build_block] constructs a full block
     with consistent operations that went through the client-side
     validation *)
-let build_block ~user_activated_upgrades cctxt state seed_nonce_hash
+let build_block cctxt ~user_activated_upgrades state seed_nonce_hash
     ((slot_timestamp, (bi, priority, delegate)) as slot) =
   let chain = `Hash bi.Client_baking_blocks.chain_id in
   let block = `Hash (bi.hash, 0) in
@@ -1289,7 +1295,7 @@ let build_block ~user_activated_upgrades cctxt state seed_nonce_hash
 (** [bake cctxt state] create a single block when woken up to do
     so. All the necessary information is available in the
     [state.best_slot]. *)
-let bake ~user_activated_upgrades (cctxt : #Protocol_client_context.full)
+let bake (cctxt : #Protocol_client_context.full) ~user_activated_upgrades
     ~chain state =
   ( match state.best_slot with
   | None ->
@@ -1299,7 +1305,7 @@ let bake ~user_activated_upgrades (cctxt : #Protocol_client_context.full)
   >>=? fun slot ->
   let seed_nonce = generate_seed_nonce () in
   let seed_nonce_hash = Nonce.hash seed_nonce in
-  build_block ~user_activated_upgrades cctxt state seed_nonce_hash slot
+  build_block cctxt ~user_activated_upgrades state seed_nonce_hash slot
   >>=? function
   | Some (head, priority, shell_header, operations, delegate, seed_nonce_hash)
     -> (
@@ -1574,11 +1580,30 @@ let create (cctxt : #Protocol_client_context.full) ~user_activated_upgrades
   in
   let timeout_k cctxt state () =
     bake cctxt ~user_activated_upgrades ~chain state
-    >>=? fun () ->
-    (* Stopping the timeout and waiting for the next block *)
-    state.best_slot <- None ;
-    return_unit
+    >>= function
+    | Error err ->
+        if state.retry_counter = 0 then (
+          (* Stop the timeout and wait for the next block *)
+          state.best_slot <- None ;
+          state.retry_counter <- default_retry_counter ;
+          Lwt.return (Error err) )
+        else
+          lwt_log_error
+            Tag.DSL.(
+              fun f ->
+                f "Retrying after baking error %a"
+                -% t event "retrying_on_error"
+                -% a errs_tag err)
+          >>= fun () ->
+          state.retry_counter <- pred state.retry_counter ;
+          return_unit
+    | Ok () ->
+        (* Stop the timeout and wait for the next block *)
+        state.retry_counter <- default_retry_counter ;
+        state.best_slot <- None ;
+        return_unit
   in
+  let finalizer state = Context.close state.index in
   Client_baking_scheduling.main
     ~name:"baker"
     ~cctxt
@@ -1588,3 +1613,4 @@ let create (cctxt : #Protocol_client_context.full) ~user_activated_upgrades
     ~compute_timeout
     ~timeout_k
     ~event_k
+    ~finalizer

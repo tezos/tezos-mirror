@@ -324,3 +324,4 @@ let create (cctxt : #Protocol_client_context.full) ?(max_past = 110L) ~delay
     ~compute_timeout
     ~timeout_k
     ~event_k
+    ~finalizer:(fun _ -> Lwt.return_unit)
