@@ -4443,7 +4443,7 @@ and parse_contract :
             | entrypoint ->
                 error (No_such_entrypoint entrypoint) )
       | Some code ->
-          Script.force_decode ctxt code
+          Script.force_decode_in_context ctxt code
           >>=? fun (code, ctxt) ->
           Lwt.return
             ( parse_toplevel ~legacy:true code
@@ -4515,7 +4515,7 @@ and parse_contract_for_script :
               (* Since protocol 005, we have the invariant that all originated accounts have code *)
               assert false
           | Some code ->
-              Script.force_decode ctxt code
+              Script.force_decode_in_context ctxt code
               >>=? fun (code, ctxt) ->
               (* can only fail because of gas *)
               Lwt.return
@@ -4660,7 +4660,7 @@ let parse_code :
     code:lazy_expr ->
     (ex_code * context) tzresult Lwt.t =
  fun ?type_logger ctxt ~legacy ~code ->
-  Script.force_decode ctxt code
+  Script.force_decode_in_context ctxt code
   >>=? fun (code, ctxt) ->
   Lwt.return @@ parse_toplevel ~legacy code
   >>=? fun (arg_type, storage_type, code_field, root_name) ->
@@ -4724,7 +4724,7 @@ let parse_storage :
     storage:lazy_expr ->
     ('storage * context) tzresult Lwt.t =
  fun ?type_logger ctxt ~legacy storage_type ~storage ->
-  Script.force_decode ctxt storage
+  Script.force_decode_in_context ctxt storage
   >>=? fun (storage, ctxt) ->
   trace_eval
     (fun () ->
