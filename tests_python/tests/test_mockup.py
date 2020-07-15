@@ -17,6 +17,7 @@ from typing import Any, Iterator, Optional, Tuple, List
 import pytest
 from launchers.sandbox import Sandbox
 from client.client import Client
+from client.client_output import CreateMockupResult
 
 from tools.constants import ALPHA
 
@@ -47,7 +48,7 @@ def mockup_client(sandbox: Sandbox) -> Iterator[Client]:
         unmanaged_client = sandbox.create_client(base_dir=base_dir)
         res = unmanaged_client.create_mockup(
             protocol=_PROTO).create_mockup_result
-        assert res == 'ok'
+        assert res == CreateMockupResult.OK
         yield sandbox.create_client(base_dir=base_dir, mode="mockup")
 
 
@@ -77,7 +78,7 @@ def test_create_mockup_dir_exists_nonempty(sandbox: Sandbox):
         unmanaged_client = sandbox.create_client(base_dir=base_dir)
         res = unmanaged_client.create_mockup(protocol=_PROTO,
                                              check=False).create_mockup_result
-        assert res == 'dir_not_empty'
+        assert res == CreateMockupResult.DIR_NOT_EMPTY
 
 
 @pytest.mark.client
@@ -105,7 +106,7 @@ def test_create_mockup_already_initialized(mockup_client: Client):
     res = mockup_client.create_mockup(protocol=_PROTO,
                                       check=False).create_mockup_result
     # it should fail:
-    assert res == 'already_initialized'
+    assert res == CreateMockupResult.ALREADY_INITIALIZED
 
 
 @pytest.mark.client
@@ -156,7 +157,7 @@ def test_create_mockup_custom_constants(sandbox: Sandbox, chain_id: str):
         res = unmanaged_client.create_mockup(
             protocol=_PROTO,
             protocol_constants_file=json_file.name).create_mockup_result
-        assert res == "ok"
+        assert res == CreateMockupResult.OK
 
 
 def _create_accounts_list():
@@ -205,7 +206,7 @@ def test_create_mockup_custom_bootstrap_accounts(sandbox: Sandbox):
         res = unmanaged_client.create_mockup(
             protocol=_PROTO,
             bootstrap_accounts_file=json_file.name).create_mockup_result
-        assert res == "ok"
+        assert res == CreateMockupResult.OK
         mock_client = sandbox.create_client(base_dir=base_dir, mode="mockup")
         addresses_result = mock_client.get_known_addresses()
         names_sent = sorted([account["name"] for account in accounts_list])
@@ -223,7 +224,7 @@ def test_transfer_bad_base_dir(sandbox: Sandbox):
         unmanaged_client = sandbox.create_client()
         res = unmanaged_client.create_mockup(
             protocol=_PROTO).create_mockup_result
-        assert res == 'ok'
+        assert res == CreateMockupResult.OK
         base_dir = unmanaged_client.base_dir
         mockup_dir = os.path.join(base_dir, "mockup")
 
@@ -451,7 +452,7 @@ def _test_create_mockup_init_show_roundtrip(
                 protocol=_PROTO,
                 bootstrap_accounts_file=ba_file,
                 protocol_constants_file=pc_file).create_mockup_result
-            assert res == 'ok'
+            assert res == CreateMockupResult.OK
             mock_client = sandbox.create_client(base_dir=base_dir,
                                                 mode="mockup")
             (ba_str, pc_str) = read_initial_state(mock_client)
@@ -488,7 +489,7 @@ def _test_create_mockup_init_show_roundtrip(
                 protocol=_PROTO,
                 protocol_constants_file=pc_json_file.name,
                 bootstrap_accounts_file=ba_json_file.name).create_mockup_result
-            assert res == 'ok'
+            assert res == CreateMockupResult.OK
             mock_client = sandbox.create_client(base_dir=base_dir,
                                                 mode="mockup")
             # 4/ Retrieve state again

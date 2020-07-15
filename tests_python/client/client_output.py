@@ -1,6 +1,7 @@
 """Structured representation of client output."""
 import json
 import re
+from enum import auto, Enum, unique
 from typing import List, Dict
 
 # TODO This is incomplete. Add additional attributes and result classes as
@@ -370,6 +371,23 @@ class ListMockupProtocols:
         self.mockup_protocols = re.findall(pattern, client_output)
 
 
+@unique
+class CreateMockupResult(Enum):
+    """
+        Possible behaviors of `tezos-client create mockup`
+    """
+
+    ALREADY_INITIALIZED = auto()
+    DIR_NOT_EMPTY = auto()
+    OK = auto()
+
+    def to_return_code(self) -> int:
+        """ The expected return code of the client when 'self' is returned """
+        if self == CreateMockupResult.OK:
+            return 0
+        return 1
+
+
 class CreateMockup:
     """Result of 'create mockup' command."""
 
@@ -387,24 +405,22 @@ class CreateMockup:
         # - the output channel itself (stdout/stderr)
         #   aka, where to look for the pattern
         # - the result to set in self.create_mockup_result
-        # - the expected exit code of the test
         outputs = [
-            (r"^\S+ is not a directory\.$", client_stderr, "is_not_dir", 1),
             (r"^  \S+ is not empty, please specify a fresh base directory$",
-             client_stderr, "dir_not_empty", 1),
+             client_stderr, CreateMockupResult.DIR_NOT_EMPTY),
             (r"^  \S+ is already initialized as a mockup directory$",
-             client_stderr, "already_initialized", 1),
-            (r"^Created mockup client base dir in \S+$", client_stdout, "ok",
-             0),
+             client_stderr, CreateMockupResult.ALREADY_INITIALIZED),
+            (r"^Created mockup client base dir in \S+$", client_stdout,
+             CreateMockupResult.OK),
         ]
 
         for outp in outputs:
             pattern = re.compile(outp[0], re.MULTILINE)
             out_channel = outp[1]
-            result_code = outp[2]
-            expected_exit_code = outp[3]
+            result = outp[2]
+            expected_exit_code = result.to_return_code()
             if re.search(pattern, out_channel) is not None:
-                self.create_mockup_result = result_code
+                self.create_mockup_result = result
                 if exit_code != expected_exit_code:
                     raise InvalidExitCode(exit_code)
                 return
