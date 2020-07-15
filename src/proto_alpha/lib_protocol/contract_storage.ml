@@ -470,6 +470,7 @@ module Legacy_big_map_diff = struct
       []
       diffs
     |> List.rev |> List.flatten
+    [@@coq_axiom "gadt"]
 end
 
 let update_script_lazy_storage c = function
