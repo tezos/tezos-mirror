@@ -39,9 +39,9 @@ type error += Block_quota_exceeded (* `Temporary *)
 
 type error += Operation_quota_exceeded (* `Temporary *)
 
-val consume : Z.t -> t -> cost -> (Z.t * t) tzresult
+val raw_consume : Z.t -> t -> cost -> (Z.t * t) tzresult
 
-val check_enough : Z.t -> t -> cost -> unit tzresult
+val raw_check_enough : Z.t -> t -> cost -> unit tzresult
 
 val free : cost
 
