@@ -84,6 +84,11 @@ let signals =
     (sigxcpu, "XCPU");
     (sigxfsz, "XFSZ") ]
 
+let string_of_signal sig_num =
+  Option.value
+    ~default:(Format.sprintf "%d" sig_num)
+    (List.assoc_opt sig_num signals)
+
 let set_exit_handler ?(log = Format.eprintf "%s\n%!") signal =
   match List.assoc_opt signal signals with
   | None ->

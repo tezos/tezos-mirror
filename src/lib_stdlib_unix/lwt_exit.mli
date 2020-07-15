@@ -23,6 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Returns the string associated to the {!Unix} signal value. *)
+val string_of_signal : int -> string
+
 (** A global thread that resumes the first time {!exit} is called
     anywhere in the program. Called by the main to wait for any other
     thread in the system to call {!exit}. *)
