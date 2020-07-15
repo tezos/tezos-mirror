@@ -29,7 +29,7 @@
 
     This is internally a [Z.t].
     This module mostly adds signedness preservation guarantees. *)
-type 't num
+type 't num [@@coq_phantom]
 
 (** Flag for natural numbers. *)
 type n = Natural_tag
