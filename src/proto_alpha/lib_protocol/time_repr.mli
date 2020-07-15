@@ -31,7 +31,7 @@ type time = t
 
 val pp : Format.formatter -> t -> unit
 
-val of_seconds : string -> time option
+val of_seconds_string : string -> time option
 
 val to_seconds_string : time -> string
 
