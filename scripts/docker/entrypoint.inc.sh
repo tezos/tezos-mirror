@@ -7,11 +7,11 @@ configure_client() {
 
     if [ ! -f "$client_config" ]; then
         "$client" --base-dir "$client_dir" \
-                  --addr "$NODE_HOST" --port "$NODE_RPC_PORT" \
+                  --endpoint "http://$NODE_HOST:$NODE_RPC_PORT" \
                   config init --output "$client_config" >/dev/null 2>&1
     else
         "$client" --base-dir "$client_dir" \
-                  --addr "$NODE_HOST" --port "$NODE_RPC_PORT" \
+                  --endpoint "http://$NODE_HOST:$NODE_RPC_PORT" \
                   config update >/dev/null 2>&1
     fi
 
@@ -135,7 +135,7 @@ launch_baker() {
     configure_client
     exec "$baker" --chain main \
          --base-dir "$client_dir" \
-         --addr "$NODE_HOST" --port "$NODE_RPC_PORT" \
+         --endpoint "http://$NODE_HOST:$NODE_RPC_PORT" \
          run with local node "$node_data_dir" "$@"
 }
 
@@ -143,7 +143,7 @@ launch_baker_test() {
     configure_client
     exec "$baker" --chain test \
          --base-dir "$client_dir" \
-         --addr "$NODE_HOST" --port "$NODE_RPC_PORT" \
+         --endpoint "http://$NODE_HOST:$NODE_RPC_PORT" \
          run with local node "$node_data_dir" "$@"
 }
 
@@ -152,7 +152,7 @@ launch_endorser() {
     wait_for_the_node_to_be_bootstrapped
     exec "$endorser" --chain main \
          --base-dir "$client_dir" \
-         --addr "$NODE_HOST" --port "$NODE_RPC_PORT" \
+         --endpoint "http://$NODE_HOST:$NODE_RPC_PORT" \
          run "$@"
 }
 
@@ -161,7 +161,7 @@ launch_endorser_test() {
     wait_for_the_node_to_be_bootstrapped
     exec "$endorser" --chain test \
          --base-dir "$client_dir" \
-         --addr "$NODE_HOST" --port "$NODE_RPC_PORT" \
+         --endpoint "http://$NODE_HOST:$NODE_RPC_PORT" \
          run "$@"
 }
 
@@ -169,7 +169,7 @@ launch_accuser() {
     configure_client
     wait_for_the_node_to_be_bootstrapped
     exec "$accuser" --base-dir "$client_dir" \
-         --addr "$NODE_HOST" --port "$NODE_RPC_PORT" \
+         --endpoint "http://$NODE_HOST:$NODE_RPC_PORT" \
          run "$@"
 }
 
@@ -178,6 +178,6 @@ launch_accuser_test() {
     wait_for_the_node_to_be_bootstrapped
     exec "$accuser" --chain test \
          --base-dir "$client_dir" \
-         --addr "$NODE_HOST" --port "$NODE_RPC_PORT" \
+         --endpoint "http://$NODE_HOST:$NODE_RPC_PORT" \
          run "$@"
 }

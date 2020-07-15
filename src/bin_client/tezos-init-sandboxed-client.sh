@@ -15,20 +15,20 @@ init_sandboxed_client() {
     client_dirs+=("$client_dir")
     signer="$local_signer -d $client_dir"
     if [ -n "$USE_TLS" ]; then
-        client="$local_client -S -base-dir $client_dir -addr $host -port $rpc"
-        admin_client="$local_admin_client -S -base-dir $client_dir -addr $host -port $rpc"
-        alpha_baker="$local_alpha_baker -S -base-dir $client_dir -addr $host -port $rpc"
-        alpha_endorser="$local_alpha_endorser -S -base-dir $client_dir -addr $host -port $rpc"
-        alpha_accuser="$local_alpha_accuser -S -base-dir $client_dir -addr $host -port $rpc"
-        signer="$local_signer -S -base-dir $client_dir -addr $host -port $rpc"
+        client="$local_client -base-dir $client_dir -endpoint https://$host:$rpc"
+        admin_client="$local_admin_client -base-dir $client_dir -endpoint https://$host:$rpc"
+        alpha_baker="$local_alpha_baker -base-dir $client_dir -endpoint https://$host:$rpc"
+        alpha_endorser="$local_alpha_endorser -base-dir $client_dir -endpoint https://$host:$rpc"
+        alpha_accuser="$local_alpha_accuser -base-dir $client_dir -endpoint https://$host:$rpc"
+        signer="$local_signer -base-dir $client_dir -endpoint https://$host:$rpc"
         compiler="$local_compiler"
     else
-        client="$local_client -base-dir $client_dir -addr $host -port $rpc"
-        admin_client="$local_admin_client -base-dir $client_dir -addr $host -port $rpc"
-        alpha_baker="$local_alpha_baker -base-dir $client_dir -addr $host -port $rpc"
-        alpha_endorser="$local_alpha_endorser -base-dir $client_dir -addr $host -port $rpc"
-        alpha_accuser="$local_alpha_accuser -base-dir $client_dir -addr $host -port $rpc"
-        signer="$local_signer -base-dir $client_dir -addr $host -port $rpc"
+        client="$local_client -base-dir $client_dir -endpoint http://$host:$rpc"
+        admin_client="$local_admin_client -base-dir $client_dir -endpoint http://$host:$rpc"
+        alpha_baker="$local_alpha_baker -base-dir $client_dir -endpoint http://$host:$rpc"
+        alpha_endorser="$local_alpha_endorser -base-dir $client_dir -endpoint http://$host:$rpc"
+        alpha_accuser="$local_alpha_accuser -base-dir $client_dir -endpoint http://$host:$rpc"
+        signer="$local_signer -base-dir $client_dir -endpoint http://$host:$rpc"
         compiler="$local_compiler"
     fi
 }
@@ -164,13 +164,13 @@ main () {
         local_accuser="$bin_dir/../../_build/default/src/proto_$protocol_underscore/bin_accuser/main_accuser_$protocol_underscore.exe"
 
         if [ -n "$USE_TLS" ]; then
-            baker="$local_baker -S -base-dir $client_dir -addr $host -port $rpc"
-            endorser="$local_endorser -S -base-dir $client_dir -addr $host -port $rpc"
-            accuser="$local_accuser -S -base-dir $client_dir -addr $host -port $rpc"
+            baker="$local_baker -base-dir $client_dir -endpoint https://$host:$rpc"
+            endorser="$local_endorser -base-dir $client_dir -endpoint https://$host:$rpc"
+            accuser="$local_accuser -base-dir $client_dir -endpoint https://$host:$rpc"
         else
-            baker="$local_baker -base-dir $client_dir -addr $host -port $rpc"
-            endorser="$local_endorser -base-dir $client_dir -addr $host -port $rpc"
-            accuser="$local_accuser -base-dir $client_dir -addr $host -port $rpc"
+            baker="$local_baker -base-dir $client_dir -endpoint http://$host:$rpc"
+            endorser="$local_endorser -base-dir $client_dir -endpoint http://$host:$rpc"
+            accuser="$local_accuser -base-dir $client_dir -endpoint http://$host:$rpc"
         fi
 
         echo '#!/bin/sh' > $client_dir/bin/tezos-baker-$protocol
