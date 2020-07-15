@@ -119,24 +119,18 @@ module Request : sig
 end
 
 module Advertise : sig
-  (** [current_head chain_db ?peer ?mempool head] sends a
-      [Current_head (chain_id, head_header, mempool)] message to [peer],
-      or if [peer] isn't specified, to all known active peers for this chain.
-      If  [mempool] isn't specified, or if remote peer has disabled its mempool,
-      [mempool] is empty. [chain_id] is the identifier for this [chain_db]. *)
-  val current_head :
-    chain_db ->
-    ?peer:P2p_peer.Id.t ->
-    ?mempool:Mempool.t ->
-    State.Block.t ->
-    unit
+  (** [current_head chain_db ?mempool head] sends a
+      [Current_head (chain_id, head_header, mempool)] message to all known
+      active peers for this chain. If [mempool] isn't specified, or if
+      remote peer has disabled its mempool, [mempool] is empty. [chain_id] is
+      the identifier for this [chain_db]. *)
+  val current_head : chain_db -> ?mempool:Mempool.t -> State.Block.t -> unit
 
-  (** [current_branch ?peer chain_db] sends a
-      [Current_branch (chain_id, locator)] message to [peer], or if [peer] is
-      not specified, to all known active peers for this chain.
-      [locator] is constructed based on the seed
+  (** [current_branch chain_db] sends a
+      [Current_branch (chain_id, locator)] message to all known active peers
+      for this chain. [locator] is constructed based on the seed
       [(remote_peer_id, this_peer_id)]. *)
-  val current_branch : ?peer:P2p_peer.Id.t -> chain_db -> unit Lwt.t
+  val current_branch : chain_db -> unit Lwt.t
 end
 
 (** {2 Block index} *)

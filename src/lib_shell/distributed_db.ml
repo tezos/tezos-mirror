@@ -480,19 +480,13 @@ module Request = struct
 end
 
 module Advertise = struct
-  let current_head chain_db ?peer ?(mempool = Mempool.empty) head =
+  let current_head chain_db ?(mempool = Mempool.empty) head =
     let chain_id = State.Chain.id chain_db.reader_chain_db.chain_state in
     assert (Chain_id.equal chain_id (State.Block.chain_id head)) ;
-    ( match peer with
-    | Some peer ->
-        let meta = P2p.get_peer_metadata chain_db.global_db.p2p peer in
-        Peer_metadata.incr meta (Sent_advertisement Head)
-    | None ->
-        () ) ;
     let msg_mempool =
       Message.Current_head (chain_id, State.Block.header head, mempool)
     in
-    if mempool = Mempool.empty then send chain_db ?peer msg_mempool
+    if mempool = Mempool.empty then send chain_db msg_mempool
     else
       let msg_disable_mempool =
         Message.Current_head (chain_id, State.Block.header head, Mempool.empty)
@@ -506,51 +500,27 @@ module Advertise = struct
         in
         ignore @@ P2p.try_send chain_db.global_db.p2p conn msg
       in
-      match peer with
-      | Some receiver_id ->
-          let conn =
-            P2p_peer.Table.find
-              chain_db.reader_chain_db.active_connections
-              receiver_id
-          in
-          send_mempool conn
-      | None ->
-          List.iter
-            (fun (_receiver_id, conn) -> send_mempool conn)
-            (P2p_peer.Table.fold
-               (fun k v acc -> (k, v) :: acc)
-               chain_db.reader_chain_db.active_connections
-               [])
+      List.iter
+        (fun (_receiver_id, conn) -> send_mempool conn)
+        (P2p_peer.Table.fold
+           (fun k v acc -> (k, v) :: acc)
+           chain_db.reader_chain_db.active_connections
+           [])
 
-  let current_branch ?peer chain_db =
+  let current_branch chain_db =
     let chain_id = State.Chain.id chain_db.reader_chain_db.chain_state in
     let chain_state = chain_state chain_db in
     let sender_id = my_peer_id chain_db in
-    ( match peer with
-    | Some peer ->
-        let meta = P2p.get_peer_metadata chain_db.global_db.p2p peer in
-        Peer_metadata.incr meta (Sent_advertisement Branch)
-    | None ->
-        () ) ;
-    match peer with
-    | Some receiver_id ->
+    Lwt_list.iter_p
+      (fun (receiver_id, conn) ->
         let seed = {Block_locator.receiver_id; sender_id} in
         Chain.locator chain_state seed
         >>= fun locator ->
         let msg = Message.Current_branch (chain_id, locator) in
-        try_send chain_db receiver_id msg ;
-        Lwt.return_unit
-    | None ->
-        Lwt_list.iter_p
-          (fun (receiver_id, conn) ->
-            let seed = {Block_locator.receiver_id; sender_id} in
-            Chain.locator chain_state seed
-            >>= fun locator ->
-            let msg = Message.Current_branch (chain_id, locator) in
-            ignore (P2p.try_send chain_db.global_db.p2p conn msg) ;
-            Lwt.return_unit)
-          (P2p_peer.Table.fold
-             (fun k v acc -> (k, v) :: acc)
-             chain_db.reader_chain_db.active_connections
-             [])
+        ignore (P2p.try_send chain_db.global_db.p2p conn msg) ;
+        Lwt.return_unit)
+      (P2p_peer.Table.fold
+         (fun k v acc -> (k, v) :: acc)
+         chain_db.reader_chain_db.active_connections
+         [])
 end
