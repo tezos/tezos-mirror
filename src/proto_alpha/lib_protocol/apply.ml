@@ -343,7 +343,7 @@ let apply_manager_operation_content :
           | entrypoint ->
               fail (Script_tc_errors.No_such_entrypoint entrypoint) )
           >>=? (fun () ->
-                 Script.force_decode ctxt parameters
+                 Script.force_decode_in_context ctxt parameters
                  >>=? fun (arg, ctxt) ->
                  (* see [note] *)
                  (* [note]: for toplevel ops, cost is nil since the
@@ -380,7 +380,7 @@ let apply_manager_operation_content :
           in
           (ctxt, result, [])
       | Some script ->
-          Script.force_decode ctxt parameters
+          Script.force_decode_in_context ctxt parameters
           >>=? fun (parameter, ctxt) ->
           (* see [note] *)
           let cost_parameter = Script.deserialized_cost parameter in
@@ -432,12 +432,12 @@ let apply_manager_operation_content :
           in
           (ctxt, result, operations) )
   | Origination {delegate; script; preorigination; credit} ->
-      Script.force_decode ctxt script.storage
+      Script.force_decode_in_context ctxt script.storage
       >>=? fun (unparsed_storage, ctxt) ->
       (* see [note] *)
       Lwt.return (Gas.consume ctxt (Script.deserialized_cost unparsed_storage))
       >>=? fun ctxt ->
-      Script.force_decode ctxt script.code
+      Script.force_decode_in_context ctxt script.code
       >>=? fun (unparsed_code, ctxt) ->
       (* see [note] *)
       Lwt.return (Gas.consume ctxt (Script.deserialized_cost unparsed_code))
@@ -583,7 +583,7 @@ let precheck_manager_contents (type kind) ctxt chain_id raw_operation
       >>=? fun () ->
       (* Fail if not enough gas for complete deserialization cost *)
       trace Gas_quota_exceeded_init_deserialize
-      @@ Script.force_decode ctxt parameters
+      @@ Script.force_decode_in_context ctxt parameters
       >|=? fun (_arg, ctxt) -> ctxt
   | Origination {script; _} ->
       (* Fail quickly if not enough gas for minimal deserialization cost *)
@@ -596,10 +596,10 @@ let precheck_manager_contents (type kind) ctxt chain_id raw_operation
       >>=? fun () ->
       (* Fail if not enough gas for complete deserialization cost *)
       trace Gas_quota_exceeded_init_deserialize
-      @@ Script.force_decode ctxt script.code
+      @@ Script.force_decode_in_context ctxt script.code
       >>=? fun (_code, ctxt) ->
       trace Gas_quota_exceeded_init_deserialize
-      @@ Script.force_decode ctxt script.storage
+      @@ Script.force_decode_in_context ctxt script.storage
       >|=? fun (_storage, ctxt) -> ctxt
   | _ ->
       return ctxt )

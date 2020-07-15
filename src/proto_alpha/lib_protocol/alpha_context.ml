@@ -91,13 +91,13 @@ module Script = struct
   include Michelson_v1_primitives
   include Script_repr
 
-  let force_decode ctxt lexpr =
+  let force_decode_in_context ctxt lexpr =
     Lwt.return
       ( Script_repr.force_decode lexpr
       >>? fun (v, cost) ->
       Raw_context.consume_gas ctxt cost >|? fun ctxt -> (v, ctxt) )
 
-  let force_bytes ctxt lexpr =
+  let force_bytes_in_context ctxt lexpr =
     Lwt.return
       ( Script_repr.force_bytes lexpr
       >>? fun (b, cost) ->

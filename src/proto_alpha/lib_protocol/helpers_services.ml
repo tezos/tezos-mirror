@@ -426,7 +426,7 @@ module Scripts = struct
               >>=? fun () ->
               (* Fail if not enough gas for complete deserialization cost *)
               trace Apply.Gas_quota_exceeded_init_deserialize
-              @@ Script.force_decode ctxt arg
+              @@ Script.force_decode_in_context ctxt arg
               >|=? fun (_arg, ctxt) -> ctxt
           | Origination {script; _} ->
               (* Here the data comes already deserialized, so we need to fake the deserialization to mimic apply *)
@@ -455,10 +455,10 @@ module Scripts = struct
               >>=? fun () ->
               (* Fail if not enough gas for complete deserialization cost *)
               trace Apply.Gas_quota_exceeded_init_deserialize
-              @@ Script.force_decode ctxt script.code
+              @@ Script.force_decode_in_context ctxt script.code
               >>=? fun (_code, ctxt) ->
               trace Apply.Gas_quota_exceeded_init_deserialize
-              @@ Script.force_decode ctxt script.storage
+              @@ Script.force_decode_in_context ctxt script.storage
               >|=? fun (_storage, ctxt) -> ctxt
           | _ ->
               return ctxt )
