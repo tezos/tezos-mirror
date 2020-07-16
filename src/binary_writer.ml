@@ -312,8 +312,8 @@ let rec write_rec : type a. a Encoding.t -> state -> a -> unit =
       write_case cases
   | Dynamic_size {kind; encoding = e} ->
       let initial_offset = state.offset in
-      Atom.int kind state 0 ;
       (* place holder for [size] *)
+      Atom.int kind state 0 ;
       write_with_limit (Binary_size.max_int kind) e state value ;
       (* patch the written [size] *)
       Atom.set_int
