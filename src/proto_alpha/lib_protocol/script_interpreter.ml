@@ -252,7 +252,7 @@ end
 
 type logger = (module STEP_LOGGER)
 
-module Trace_logger () = struct
+module Trace_logger () : STEP_LOGGER = struct
   let log : log_element list ref = ref []
 
   let log_interp ctxt descr stack =
