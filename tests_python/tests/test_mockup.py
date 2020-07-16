@@ -242,7 +242,9 @@ def test_config_show_mockup(mockup_client: Client):
     """ Executes `tezos-client config show mockup` in
         a state where it should succeed.
     """
-    mockup_client.run_generic(["config", "show", "mockup"])
+    proto = _get_mockup_proto(mockup_client)
+    mockup_client.run_generic(["--protocol", proto,
+                               "config", "show", "mockup"])
 
 
 @pytest.mark.client
@@ -264,6 +266,7 @@ def test_config_init_mockup(mockup_client: Client):
     """ Executes `tezos-client config init mockup` in
         a state where it should succeed.
     """
+    proto = _get_mockup_proto(mockup_client)
     # We cannot use NamedTemporaryFile because `config init mockup`
     # does not overwrite files. Because NamedTemporaryFile creates the file
     # it would make the test fail.
@@ -271,6 +274,7 @@ def test_config_init_mockup(mockup_client: Client):
     pc_json_file = tempfile.mktemp(prefix='tezos-proto-consts')
     # 1/ call `config init mockup`
     mockup_client.run([
+        "--protocol", proto,
         "config", "init", "mockup", f"--{_BA_FLAG}", ba_json_file,
         f"--{_PC_FLAG}", pc_json_file
     ])
@@ -293,9 +297,11 @@ def test_config_init_mockup_fail(mockup_client: Client):
         (the default base directory could contain sensitive data,
          such as private keys)
     """
+    proto = _get_mockup_proto(mockup_client)
     ba_json_file = tempfile.mktemp(prefix='tezos-bootstrap-accounts')
     pc_json_file = tempfile.mktemp(prefix='tezos-proto-consts')
     cmd = [
+        "--protocol", proto,
         "config", "init", "mockup", f"--{_BA_FLAG}", ba_json_file,
         f"--{_PC_FLAG}", pc_json_file
     ]
@@ -335,10 +341,13 @@ def _get_state_using_config_init_mockup(mock_client: Client)\
         Note that because this a mockup specific operation, the `mock_client`
         parameter must be in mockup mode; do not give a vanilla client.
     """
+    proto = _get_mockup_proto(mock_client)
+
     ba_json_file = tempfile.mktemp(prefix='tezos-bootstrap-accounts')
     pc_json_file = tempfile.mktemp(prefix='tezos-proto-consts')
 
     mock_client.run([
+        "--protocol", proto,
         "config", "init", "mockup", f"--{_BA_FLAG}", ba_json_file,
         f"--{_PC_FLAG}", pc_json_file
     ])
@@ -392,7 +401,9 @@ def _get_state_using_config_show_mockup(mock_client: Client)\
         pc_json = string[proto_constants_index + len(tagline2) + 1:]
         return (bc_json, pc_json)
 
-    stdout = mock_client.run(["config", "show", "mockup"])
+    proto = _get_mockup_proto(mock_client)
+    stdout = mock_client.run(["--protocol", proto,
+                              "config", "show", "mockup"])
     return _parse_config_init_output(stdout)
 
 
