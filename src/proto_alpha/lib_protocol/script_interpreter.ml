@@ -235,7 +235,7 @@ type step_constants = {
 }
 
 type log_element =
-  | Log :
+  | Log_element :
       context * Script.location * 'a * 'a Script_typed_ir.stack_ty
       -> log_element
 
@@ -256,16 +256,16 @@ module Trace_logger () : STEP_LOGGER = struct
   let log : log_element list ref = ref []
 
   let log_interp ctxt descr stack =
-    log := Log (ctxt, descr.loc, stack, descr.bef) :: !log
+    log := Log_element (ctxt, descr.loc, stack, descr.bef) :: !log
 
   let log_entry _ctxt _descr _stack = ()
 
   let log_exit ctxt descr stack =
-    log := Log (ctxt, descr.loc, stack, descr.aft) :: !log
+    log := Log_element (ctxt, descr.loc, stack, descr.aft) :: !log
 
   let get_log () =
     map_s
-      (fun (Log (ctxt, loc, stack, stack_ty)) ->
+      (fun (Log_element (ctxt, loc, stack, stack_ty)) ->
         trace Cannot_serialize_log (unparse_stack ctxt (stack, stack_ty))
         >>=? fun stack -> return (loc, Gas.level ctxt, stack))
       !log
