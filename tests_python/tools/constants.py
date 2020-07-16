@@ -68,6 +68,9 @@ BABYLON_DAEMON = "005-PsBabyM1"
 CARTHAGE = "PsCARTHAGazKbHtnKfLzQg3kms52kSRpgnDY982a9oYsSXRLQEb"
 CARTHAGE_DAEMON = "006-PsCARTHA"
 
+# Protocols supported by the mockup mode
+MOCKUP_PROTOCOLS = [ALPHA, CARTHAGE]
+
 TEZOS_CRT = """
 Certificate:
     Data:

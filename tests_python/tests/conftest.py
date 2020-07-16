@@ -6,6 +6,7 @@ in the test function, and the yielded values is then accessible with this
 parameter.
 """
 import os
+import tempfile
 from typing import Optional, Iterator, List
 import pytest
 from pytest_regtest import register_converter_pre, deregister_converter_pre, \
@@ -14,6 +15,7 @@ from launchers.sandbox import Sandbox, SandboxMultiBranch
 from tools import constants, paths, utils
 from tools.client_regression import ClientRegression
 from client.client import Client
+from client.client_output import CreateMockupResult
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -237,3 +239,26 @@ def simple_client():
     client = Client(client_path, client_admin_path)
     yield client
     client.cleanup()
+
+
+@pytest.fixture(params=constants.MOCKUP_PROTOCOLS)
+def mockup_client(request, sandbox: Sandbox) -> Iterator[Client]:
+    """
+        Returns a mockup client with its persistent directory created
+
+        This is done in two steps, because we want to create the mockup
+        with a client that doesn't have "--mode mockup" (as per
+        the public documentation) but we want to return a
+        client that has "--mode mockup" and uses the base-dir created
+        in the first step.
+
+        There is no way around this pattern. If you want to create
+        a mockup using custom arguments; you MUST do the same
+        as this method.
+    """
+    with tempfile.TemporaryDirectory(prefix='tezos-client.') as base_dir:
+        unmanaged_client = sandbox.create_client(base_dir=base_dir)
+        res = unmanaged_client.create_mockup(
+            protocol=request.param).create_mockup_result
+        assert res == CreateMockupResult.OK
+        yield sandbox.create_client(base_dir=base_dir, mode="mockup")
