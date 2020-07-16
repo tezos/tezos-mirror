@@ -27,8 +27,8 @@ module Fr : S.FIELD
 
 module Fq12 : S.FIELD
 
-module G1 : S.CURVE with module Scalar = Fr
-
-module G2 : S.CURVE with module Scalar = Fr
-
-include S.PAIRING with module Gt = Fq12 and module G1 := G1 and module G2 := G2
+include
+  S.PAIRING
+    with type Gt.t = Fq12.t
+     and type G1.Scalar.t = Fr.t
+     and type G2.Scalar.t = Fr.t
