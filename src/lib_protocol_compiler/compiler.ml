@@ -33,20 +33,17 @@ let () = Clflags.unsafe_string := false
     with a lookup in locally defined hashtable.
 *)
 
-let preloaded_cmis : (string, Persistent_env.Persistent_signature.t) Hashtbl.t
-    =
-  Hashtbl.create ~random:true 42
+let preloaded_cmis : Persistent_env.Persistent_signature.t String.Hashtbl.t =
+  String.Hashtbl.create ~random:true 42
 
 (* Set hook *)
 let () =
   Persistent_env.Persistent_signature.load :=
     fun ~unit_name ->
-      try
-        Some (Hashtbl.find preloaded_cmis (String.capitalize_ascii unit_name))
-      with Not_found -> None
+      String.Hashtbl.find preloaded_cmis (String.capitalize_ascii unit_name)
 
 let load_cmi_from_file file =
-  Hashtbl.add
+  String.Hashtbl.add
     preloaded_cmis
     (String.capitalize_ascii Filename.(basename (chop_extension file)))
     {filename = file; cmi = Cmi_format.read_cmi file}
@@ -67,7 +64,7 @@ let load_embedded_cmi (unit_name, content) =
   (* Read cmi_flags *)
   let cmi_flags = Marshal.from_bytes content pos in
   (* TODO check crcrs... *)
-  Hashtbl.add
+  String.Hashtbl.add
     preloaded_cmis
     (String.capitalize_ascii unit_name)
     {
