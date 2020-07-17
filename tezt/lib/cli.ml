@@ -132,19 +132,15 @@ let options =
         ("-l", Arg.Set list, " Same as --list.");
         ( "--file",
           Arg.String (fun file -> files_to_run := file :: !files_to_run),
-          "<FILE> Only run tests implemented in source file FILE. You can \
-           specify several --file options, all of them will be run. \
-           Specifying tags (see TAGS) or --test may still reduce the set of \
-           tests to run." );
+          "<FILE> Only run tests implemented in source file FILE (see \
+           SELECTING TESTS)." );
         ( "-f",
           Arg.String (fun file -> files_to_run := file :: !files_to_run),
-          "<TITLE> Same as --file." );
+          "<FILE> Same as --file." );
         ( "--test",
           Arg.String (fun title -> tests_to_run := title :: !tests_to_run),
-          "<TITLE> Only run tests which are exactly entitled TITLE. You can \
-           specify several --test options, all of them will be run. \
-           Specifying tags (see TAGS) or --file may still reduce the set of \
-           tests to run." );
+          "<TITLE> Only run tests which are exactly entitled TITLE (see \
+           SELECTING TESTS)." );
         ( "-t",
           Arg.String (fun title -> tests_to_run := title :: !tests_to_run),
           "<TITLE> Same as --test." );
@@ -161,17 +157,28 @@ let options =
     (* This was formatted by ocamlformat. Sorry for all the slashes. *)
     "Usage: " ^ Sys.argv.(0)
     ^ " [OPTION..] [TAG..]\n\n\
-       TAGS\n\n\
-      \  You can specify tags or negated tags on the command line.\n\
-      \  Only tests which match all tags and no negated tags will be run.\n\
-      \  To negate a tag, prefix it with a slash: /\n\n\
+       SELECTING TESTS\n\n\
+      \  You can specify multiple tags, negated tags, titles and filenames on \
+       the command line. Only tests which match all the following conditions \
+       will be run:\n\
+      \  - the test must have all tags and none of the negated tags;\n\
+      \  - the test must have one of the specified titles;\n\
+      \  - the test must be implemented in one of the specified files.\n\n\
+      \  The tags of a test are given by the ~tags argument of Test.run. To \
+       negate a tag, prefix it with a slash: /\n\n\
+      \  The title of a test is given by the ~title argument of Test.run. It \
+       is what is printed after [SUCCESS] (or [FAILURE] or [ABORTED]) in the \
+       reports. Use --test to select a test by its title on the command-line.\n\n\
+      \  The file in which a test is implemented is specified by the \
+       ~__FILE__ argument of Test.run. In other words, it is the name of the \
+       file in which the test is defined, without directories. Use --file to \
+       select a test by its filename on the command-line.\n\n\
       \  For instance:\n\n\
       \    " ^ Sys.argv.(0)
-    ^ " node bootstrap /rpc\n\n\
-      \  will run all tests tagged with at least tags 'node' and 'bootstrap', \
-       but not\n\
-      \  tests tagged with tag 'rpc'.\n\n\
-      \  You can get the list of tests and their tags with --list.\n\n\
+    ^ " node bake /rpc --file bootstrap.ml --file sync.ml\n\n\
+      \  will run all tests defined in either bootstrap.ml or sync.ml, which \
+       have at least tags 'node' and 'bake', but which do not have the 'rpc' \
+       tag.\n\n\
        OPTIONS\n"
   in
   let add_tag tag =
