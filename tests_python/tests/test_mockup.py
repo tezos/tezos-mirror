@@ -13,13 +13,13 @@ import re
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Any, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 import pytest
 from launchers.sandbox import Sandbox
 from client.client import Client
 from client.client_output import CreateMockupResult
 
-from tools.constants import MOCKUP_PROTOCOLS
+from tools.constants import ALPHA, CARTHAGE, MOCKUP_PROTOCOLS
 
 _BA_FLAG = "bootstrap-accounts"
 _PC_FLAG = "protocol-constants"
@@ -589,3 +589,43 @@ def test_transfer_rpc(mockup_client: Client):
 
     assert giver_balance_after < giver_balance_before - transferred_mutz
     assert receiver_balance_after == receiver_balance_before + transferred_mutz
+
+
+@pytest.mark.parametrize('protos',
+                         [(proto1, proto2)
+                          for proto1 in [ALPHA, CARTHAGE]
+                          for proto2 in [ALPHA, CARTHAGE, ""]])
+@pytest.mark.parametrize('command',
+                         [["config", "show"],
+                          ["config", "init"],
+                          ["list", "known", "addresses"],
+                          ["get", "balance", "for", "bootstrap1"]])
+def test_proto_mix(sandbox: Sandbox,
+                   protos: Tuple[str, str],
+                   command: List[str]):
+    """
+    This test covers 3 cases:
+
+    1/ When proto's second element equals the first member:
+       it tests that the command works.
+    2/ When proto's second element is empty:
+       it tests that the correct mockup implementation is picked
+       (i.e. the one of the first element) and that the command works.
+    3/ When protos' second element is not empty and differs from
+       the first member: it tests
+       that creating a mockup with a protocol and using it with another
+       protocol fails.
+    """
+    proto1 = protos[0]
+    proto2 = protos[1]
+    with tempfile.TemporaryDirectory(prefix='tezos-client.') as base_dir:
+        # Follow pattern of mockup_client fixture:
+        unmanaged_client = sandbox.create_client(base_dir=base_dir)
+        res = unmanaged_client.create_mockup(protocol=proto1)
+        assert res.create_mockup_result == CreateMockupResult.OK
+        mock_client = sandbox.create_client(base_dir=base_dir,
+                                            mode="mockup")
+        cmd = (["--protocol", proto2] if proto2 else []) + command
+        success = (proto2 == proto1) or (not proto2)
+        (_, _, return_code) = mock_client.run_generic(cmd, check=False)
+        assert (return_code == 0) == success
