@@ -45,12 +45,12 @@ module String = struct
   include String
   include Tezos_stdlib.TzString
 
-  module Hashtbl = Tezos_lwt_result_stdlib.Lwtreslib.Hashtbl.Make (struct
+  module Hashtbl = Tezos_lwt_result_stdlib.Lwtreslib.Hashtbl.MakeSeeded (struct
     type t = string
 
     let equal = String.equal
 
-    let hash = Hashtbl.hash
+    let hash = Hashtbl.seeded_hash
   end)
 end
 

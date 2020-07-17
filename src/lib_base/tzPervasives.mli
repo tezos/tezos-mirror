@@ -57,7 +57,7 @@ module String : sig
   include module type of Tezos_stdlib.TzString
 
   module Hashtbl :
-    Tezos_lwt_result_stdlib.Lwtreslib.Hashtbl.S with type key = t
+    Tezos_lwt_result_stdlib.Lwtreslib.Hashtbl.SeededS with type key = t
 end
 
 module Time = Time
