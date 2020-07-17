@@ -215,13 +215,6 @@ let test_should_be_run ~file ~title ~tags =
   | files ->
       List.mem file files
 
-let list file title tags =
-  match tags with
-  | [] ->
-      Printf.printf "%s: %s (no tags)\n" file title
-  | _ :: _ ->
-      Printf.printf "%s: %s (tags: %s)\n" file title (String.concat ", " tags)
-
 let tag_rex = rex "^[a-z0-9_]{1,32}$"
 
 let check_tags tags =
@@ -241,9 +234,7 @@ let known_tags = ref String_set.empty
 
 let register_tag tag = known_tags := String_set.add tag !known_tags
 
-let () =
-  at_exit
-  @@ fun () ->
+let check_tags_exist () =
   let cli_tags =
     String_set.union
       (String_set.of_list Cli.options.tags_to_run)
@@ -257,9 +248,81 @@ let () =
       List.iter (Printf.eprintf "Unknown tag: %s\n") unknown_tags ;
       exit 1
 
+(* List of tests, filled if --list is specified on the command-line,
+   and displayed as a table at exit. *)
+let list = ref []
+
+let list_tests () =
+  let file_header = "FILE" in
+  let title_header = "TITLE" in
+  let tags_header = "TAGS" in
+  let list =
+    List.map
+      (fun (file, title, tags) -> (file, title, String.concat ", " tags))
+      !list
+  in
+  (* Compute the size of each column. *)
+  let (file_size, title_size, tags_size) =
+    List.fold_left
+      (fun (max_file, max_title, max_tags) (file, title, tags) ->
+        ( max max_file (String.length file),
+          max max_title (String.length title),
+          max max_tags (String.length tags) ))
+      ( String.length file_header,
+        String.length title_header,
+        String.length tags_header )
+      list
+  in
+  (* Prepare the line separator. *)
+  let line =
+    "+"
+    ^ String.make (file_size + 2) '-'
+    ^ "+"
+    ^ String.make (title_size + 2) '-'
+    ^ "+"
+    ^ String.make (tags_size + 2) '-'
+    ^ "+\n"
+  in
+  (* Print the header row. *)
+  print_string line ;
+  let center size header =
+    let padding = size - String.length header in
+    let left_padding = padding / 2 in
+    let right_padding = padding - left_padding in
+    String.make left_padding ' ' ^ header ^ String.make right_padding ' '
+  in
+  Printf.printf
+    "| %s | %s | %s |\n"
+    (center file_size file_header)
+    (center title_size title_header)
+    (center tags_size tags_header) ;
+  print_string line ;
+  (* Print rows. *)
+  let pad size text =
+    let padding = size - String.length text in
+    text ^ String.make padding ' '
+  in
+  List.iter
+    (fun (file, title, tags) ->
+      Printf.printf
+        "| %s | %s | %s |\n"
+        (pad file_size file)
+        (pad title_size title)
+        (pad tags_size tags))
+    list ;
+  if list <> [] then print_string line ;
+  ()
+
 let run ~__FILE__ ~title ~tags f =
   let file = Filename.basename __FILE__ in
   check_tags tags ;
   List.iter register_tag tags ;
   if test_should_be_run ~file ~title ~tags then
-    if Cli.options.list then list file title tags else really_run title f
+    if Cli.options.list then list := (file, title, tags) :: !list
+    else really_run title f
+
+let () =
+  at_exit
+  @@ fun () ->
+  check_tags_exist () ;
+  if Cli.options.list then list_tests ()
