@@ -38,12 +38,12 @@ module Int32 = struct
 end
 
 module Z = struct
-  include Z
+  type t = Z.t
 
   let encoding = Data_encoding.z
 end
 
-module Int31_index = struct
+module Int31_index : INDEX with type t = int = struct
   type t = int
 
   let path_length = 1
