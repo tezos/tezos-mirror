@@ -127,7 +127,7 @@ let mockup_context_from_persisted pm_env =
   get_registered_mockup (Some pm_env.protocol_hash)
   >>=? fun mockup -> return (mockup, (pm_env.chain_id, pm_env.rpc_context))
 
-let get_mockup_context_from_disk ~base_dir =
+let get_mockup_context_from_disk ~base_dir ~protocol_hash =
   let file =
     Filename.concat base_dir (Filename.concat mockup_dirname context_file)
   in
@@ -139,6 +139,25 @@ let get_mockup_context_from_disk ~base_dir =
     match Persistent_mockup_environment.of_json context_json with
     | persisted_mockup ->
         mockup_context_from_persisted persisted_mockup
+        >>=? fun (((module Mockup_environment), _) as res) ->
+        ( match protocol_hash with
+        | None ->
+            return_unit
+        | Some desired_protocol
+          when Protocol_hash.equal
+                 Mockup_environment.protocol_hash
+                 desired_protocol ->
+            return_unit
+        | Some desired_protocol ->
+            failwith
+              "Protocol %a was requested via --protocol\n\
+               yet the mockup at %s was initialized with %a"
+              Protocol_hash.pp_short
+              desired_protocol
+              base_dir
+              Protocol_hash.pp_short
+              Mockup_environment.protocol_hash )
+        >>=? fun () -> return res
     | exception _e ->
         failwith "get_mockup_context_from_disk: could not read %s" file
 

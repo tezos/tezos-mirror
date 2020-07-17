@@ -43,9 +43,11 @@ val init_mockup_context_by_protocol_hash :
   Lwt.t
 
 (** Load a mockup environment and initializes a protocol RPC context from
-    a mockup base directory. *)
+    a mockup base directory. If the protocol is specified, check that the
+    loaded environment agrees with it. *)
 val get_mockup_context_from_disk :
   base_dir:string ->
+  protocol_hash:Protocol_hash.t option ->
   (Registration.mockup_environment * Registration.mockup_context) tzresult
   Lwt.t
 

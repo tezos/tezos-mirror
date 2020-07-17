@@ -540,11 +540,13 @@ let config_show_client (cctxt : #Client_context.full) (config_file : string) =
 
 (* The implementation of ["config"; "show"] when --mode is "mockup" *)
 let config_show_mockup (cctxt : #Client_context.full)
-    (protocol_hash_opt : Protocol_hash.t option) =
+    (protocol_hash_opt : Protocol_hash.t option) (base_dir : string) =
   fail_on_non_mockup_dir cctxt
-  >>=? fun _ ->
-  Tezos_mockup.Persistence.get_registered_mockup protocol_hash_opt
-  >>=? fun mockup ->
+  >>=? fun () ->
+  Tezos_mockup.Persistence.get_mockup_context_from_disk
+    ~base_dir
+    ~protocol_hash:protocol_hash_opt
+  >>=? fun (mockup, _) ->
   let (module Mockup) = mockup in
   let json_pp encoding ppf value =
     Data_encoding.Json.pp ppf (Data_encoding.Json.construct encoding value)
@@ -571,9 +573,9 @@ let config_init_client config_file cfg =
 
 (* The implementation of ["config"; "init"] when --mode is "mockup" *)
 let config_init_mockup cctxt protocol_hash_opt bootstrap_accounts_file
-    protocol_constants_file =
+    protocol_constants_file base_dir =
   fail_on_non_mockup_dir cctxt
-  >>=? fun _ ->
+  >>=? fun () ->
   fail_when
     (Sys.file_exists bootstrap_accounts_file)
     (failure
@@ -588,8 +590,10 @@ let config_init_mockup cctxt protocol_hash_opt bootstrap_accounts_file
        mockup_protocol_constants
        protocol_constants_file)
   >>=? fun () ->
-  Tezos_mockup.Persistence.get_registered_mockup protocol_hash_opt
-  >>=? fun mockup ->
+  Tezos_mockup.Persistence.get_mockup_context_from_disk
+    ~base_dir
+    ~protocol_hash:protocol_hash_opt
+  >>=? fun (mockup, _) ->
   let (module Mockup) = mockup in
   Mockup.default_bootstrap_accounts cctxt
   >>=? fun string_to_write ->
@@ -614,7 +618,7 @@ let config_init_mockup cctxt protocol_hash_opt bootstrap_accounts_file
   >>= return
 
 let commands config_file cfg (client_mode : client_mode)
-    (protocol_hash_opt : Protocol_hash.t option) =
+    (protocol_hash_opt : Protocol_hash.t option) (base_dir : string) =
   let open Clic in
   let group =
     {
@@ -634,7 +638,7 @@ let commands config_file cfg (client_mode : client_mode)
         | Mode_client ->
             config_show_client cctxt config_file
         | Mode_mockup ->
-            config_show_mockup cctxt protocol_hash_opt);
+            config_show_mockup cctxt protocol_hash_opt base_dir);
     command
       ~group
       ~desc:"Reset the config file to the factory defaults."
@@ -697,7 +701,8 @@ let commands config_file cfg (client_mode : client_mode)
               cctxt
               protocol_hash_opt
               bootstrap_accounts_file
-              protocol_constants_file) ]
+              protocol_constants_file
+              base_dir) ]
 
 let global_options () =
   args15
@@ -955,7 +960,7 @@ let parse_config_args (ctx : #Client_context.full) argv =
         parsed_config_file = Some cfg;
         parsed_args = Some parsed_args;
         config_commands =
-          commands config_file cfg client_mode parsed_args.protocol;
+          commands config_file cfg client_mode parsed_args.protocol base_dir;
       },
       remaining )
 
