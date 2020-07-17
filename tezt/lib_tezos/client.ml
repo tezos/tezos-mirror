@@ -72,7 +72,8 @@ let base_args ?node client =
   | None ->
       []
   | Some node ->
-      ["-P"; string_of_int (Node.rpc_port node)] )
+      ["--endpoint"; "http://localhost:" ^ string_of_int (Node.rpc_port node)]
+  )
   @ ["--base-dir"; client.base_dir]
 
 let spawn_command ?(needs_node = true) ?(admin = false) ?node client command =
