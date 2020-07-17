@@ -230,23 +230,28 @@ let check_tags tags =
 
 module String_set = Set.Make (String)
 
+let known_files = ref String_set.empty
+
+let known_titles = ref String_set.empty
+
 let known_tags = ref String_set.empty
+
+let register_file file = known_files := String_set.add file !known_files
+
+let register_title title = known_titles := String_set.add title !known_titles
 
 let register_tag tag = known_tags := String_set.add tag !known_tags
 
-let check_tags_exist () =
-  let cli_tags =
-    String_set.union
-      (String_set.of_list Cli.options.tags_to_run)
-      (String_set.of_list Cli.options.tags_not_to_run)
-  in
-  let unknown_tags = String_set.diff cli_tags !known_tags in
-  match String_set.elements unknown_tags with
+(* Check that all [specified] values are in [!known]. *)
+let check_existence kind known specified =
+  match
+    String_set.elements (String_set.diff (String_set.of_list specified) !known)
+  with
   | [] ->
-      ()
-  | unknown_tags ->
-      List.iter (Printf.eprintf "Unknown tag: %s\n") unknown_tags ;
-      exit 1
+      true
+  | unknown ->
+      List.iter (Printf.eprintf "Unknown %s: %s\n" kind) unknown ;
+      false
 
 (* List of tests, filled if --list is specified on the command-line,
    and displayed as a table at exit. *)
@@ -316,13 +321,29 @@ let list_tests () =
 let run ~__FILE__ ~title ~tags f =
   let file = Filename.basename __FILE__ in
   check_tags tags ;
+  register_file file ;
+  register_title title ;
   List.iter register_tag tags ;
   if test_should_be_run ~file ~title ~tags then
     if Cli.options.list then list := (file, title, tags) :: !list
     else really_run title f
 
+(* The list of files / tests / tags is only known at the very end. *)
 let () =
   at_exit
   @@ fun () ->
-  check_tags_exist () ;
+  let all_files_exist =
+    check_existence "--file" known_files Cli.options.files_to_run
+  in
+  let all_titles_exist =
+    check_existence "--test" known_titles Cli.options.tests_to_run
+  in
+  let all_tags_exist =
+    check_existence
+      "tag"
+      known_tags
+      (Cli.options.tags_to_run @ Cli.options.tags_not_to_run)
+  in
+  if (not all_files_exist) || (not all_titles_exist) || not all_tags_exist then
+    exit 1 ;
   if Cli.options.list then list_tests ()
