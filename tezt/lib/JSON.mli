@@ -51,6 +51,11 @@ val encode_u : u -> string
 
 (** {2 Decoding} *)
 
+(** Parse a JSON file.
+
+    Call [Test.fail] if the input is invalid JSON. *)
+val parse_file : string -> t
+
 (** Parse a JSON string.
 
     Call [Test.fail] if the input is invalid JSON. *)

@@ -81,6 +81,14 @@ let fail_string origin message =
 
 let fail origin x = Printf.ksprintf (fail_string origin) x
 
+let parse_file file =
+  let node =
+    try Base.with_open_in file (fun chan -> Ezjsonm.from_channel chan)
+    with Ezjsonm.Parse_error (_, message) ->
+      Test.fail "%s: invalid JSON: %s" file message
+  in
+  annotate ~origin:file node
+
 let parse ~origin raw =
   let node =
     try Ezjsonm.value_from_string raw

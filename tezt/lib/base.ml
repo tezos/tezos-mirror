@@ -74,3 +74,13 @@ let rec repeat n f =
   else
     let* () = f () in
     repeat (n - 1) f
+
+let with_open_out file write_f =
+  let chan = open_out file in
+  try (write_f chan; close_out chan;)
+  with x -> close_out chan; raise x
+
+let with_open_in file read_f =
+  let chan = open_in file in
+  try (let value = read_f chan in close_in chan; value)
+  with x -> close_in chan; raise x

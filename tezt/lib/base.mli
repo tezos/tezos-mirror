@@ -99,3 +99,14 @@ val wait_for_async : unit -> unit Lwt.t
 
 (** Repeat something a given amount of times. *)
 val repeat : int -> (unit -> unit Lwt.t) -> unit Lwt.t
+
+
+(** {2 Input/Output} *)
+
+(* Open file, use function to write output then close the output. In case of
+   error while writing, the channel is closed before raising the exception *)
+val with_open_out : string -> (out_channel -> unit) ->unit
+
+(* Open file, use function to read input then close the input. In case of
+   error while reading, the channel is closed before raising the exception *)
+val with_open_in : string -> (in_channel -> 'a) -> 'a
