@@ -63,6 +63,9 @@ Tezt is composed of some generic, non-Tezos-related modules:
 
 - a ``Test`` module with a ``Test.run`` function, which starts tests and cleans up after them.
 
+All those modules are part of the ``tezt`` library which can be found in directory
+``tezt/lib`` of the Tezos repository.
+
 Tezt also contains the following Tezos-specific modules:
 
 - a ``Constant`` module with constants such as protocol hashes or identities;
@@ -73,7 +76,8 @@ Tezt also contains the following Tezos-specific modules:
 
 - an ``RPC`` module with some RPC implementations.
 
-All those modules can be found in directory ``tezt/lib`` of the Tezos repository.
+All those modules are part of the ``tezt-tezos`` library, which depends on ``tezt``
+and which can be found in directory ``tezt/lib_tezos`` of the Tezos repository.
 
 How to Write New Tests
 ----------------------
