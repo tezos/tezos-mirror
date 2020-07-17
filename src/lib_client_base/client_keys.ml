@@ -203,21 +203,21 @@ module type SIGNER = sig
   val supports_deterministic_nonces : sk_uri -> bool tzresult Lwt.t
 end
 
-let signers_table : (string, (module SIGNER)) Hashtbl.t = Hashtbl.create 13
+let signers_table : (module SIGNER) String.Hashtbl.t = String.Hashtbl.create 13
 
 let register_signer signer =
   let module Signer = (val signer : SIGNER) in
-  Hashtbl.replace signers_table Signer.scheme signer
+  String.Hashtbl.replace signers_table Signer.scheme signer
 
 let find_signer_for_key ~scheme =
-  match Hashtbl.find_opt signers_table scheme with
+  match String.Hashtbl.find signers_table scheme with
   | None ->
       fail (Unregistered_key_scheme scheme)
   | Some signer ->
       return signer
 
 let registered_signers () : (string * (module SIGNER)) list =
-  Hashtbl.fold (fun k v acc -> (k, v) :: acc) signers_table []
+  String.Hashtbl.fold (fun k v acc -> (k, v) :: acc) signers_table []
 
 type error += Signature_mismatch of sk_uri
 

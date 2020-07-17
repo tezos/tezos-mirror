@@ -142,7 +142,7 @@ let build_valid_chain state vtbl pred names =
          >>=? fun _vblock ->
          State.Block.read state hash
          >>=? fun vblock ->
-         Hashtbl.add vtbl name vblock ;
+         String.Hashtbl.add vtbl name vblock ;
          return vblock)
         >>= function
         | Ok v ->
@@ -171,17 +171,17 @@ let build_valid_chain state vtbl pred names =
   >>= fun _ -> Lwt.return_unit
 
 type state = {
-  vblock : (string, State.Block.t) Hashtbl.t;
+  vblock : State.Block.t String.Hashtbl.t;
   state : State.t;
   chain : State.Chain.t;
 }
 
-let vblock s = Hashtbl.find s.vblock
+let vblock s k = Option.get @@ String.Hashtbl.find s.vblock k
 
 exception Found of string
 
 let vblocks s =
-  Hashtbl.fold (fun k v acc -> (k, v) :: acc) s.vblock []
+  String.Hashtbl.fold (fun k v acc -> (k, v) :: acc) s.vblock []
   |> List.sort Stdlib.compare
 
 (*******************************************************)
@@ -193,14 +193,14 @@ let vblocks s =
 *)
 
 let build_example_tree chain =
-  let vtbl = Hashtbl.create 23 in
+  let vtbl = String.Hashtbl.create 23 in
   Chain.genesis chain
   >>= fun genesis ->
-  Hashtbl.add vtbl "Genesis" genesis ;
+  String.Hashtbl.add vtbl "Genesis" genesis ;
   let c = ["A1"; "A2"; "A3"; "A4"; "A5"; "A6"; "A7"; "A8"] in
   build_valid_chain chain vtbl genesis c
   >>= fun () ->
-  let a3 = Hashtbl.find vtbl "A3" in
+  let a3 = Option.get @@ String.Hashtbl.find vtbl "A3" in
   let c = ["B1"; "B2"; "B3"; "B4"; "B5"; "B6"; "B7"; "B8"] in
   build_valid_chain chain vtbl a3 c >>= fun () -> Lwt.return vtbl
 
