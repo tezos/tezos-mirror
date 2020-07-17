@@ -318,15 +318,18 @@ let list_tests () =
   if list <> [] then print_string line ;
   ()
 
+let found_a_test = ref false
+
 let run ~__FILE__ ~title ~tags f =
   let file = Filename.basename __FILE__ in
   check_tags tags ;
   register_file file ;
   register_title title ;
   List.iter register_tag tags ;
-  if test_should_be_run ~file ~title ~tags then
+  if test_should_be_run ~file ~title ~tags then (
+    found_a_test := true ;
     if Cli.options.list then list := (file, title, tags) :: !list
-    else really_run title f
+    else really_run title f )
 
 (* The list of files / tests / tags is only known at the very end. *)
 let () =
@@ -346,4 +349,20 @@ let () =
   in
   if (not all_files_exist) || (not all_titles_exist) || not all_tags_exist then
     exit 1 ;
-  if Cli.options.list then list_tests ()
+  if Cli.options.list then list_tests () ;
+  if not !found_a_test then (
+    Printf.eprintf
+      "No test found for filters: %s\n%!"
+      (String.concat
+         " "
+         ( List.map
+             (fun x -> "--file " ^ Log.quote_shell x)
+             Cli.options.files_to_run
+         @ List.map
+             (fun x -> "--test " ^ Log.quote_shell x)
+             Cli.options.tests_to_run
+         @ Cli.options.tags_to_run
+         @ List.map (sf "/%s") Cli.options.tags_not_to_run )) ;
+    if not Cli.options.list then
+      prerr_endline
+        "You can use --list to get the list of tests and their tags." )
