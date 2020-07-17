@@ -81,6 +81,14 @@ let uri_encoding =
 
 type pk_uri = Uri.t
 
+module Pk_uri_hashtbl = Hashtbl.Make (struct
+  type t = pk_uri
+
+  let equal = Uri.equal
+
+  let hash = Hashtbl.hash
+end)
+
 let make_pk_uri (x : Uri.t) : pk_uri tzresult Lwt.t =
   match Uri.scheme x with
   | None ->

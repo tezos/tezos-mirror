@@ -676,13 +676,14 @@ module Global_cache : sig
   val get : pk_uri -> (Signature.public_key_hash * Signature.public_key) option
 end = struct
   let _cache :
-      (pk_uri, Signature.Public_key_hash.t * Signature.Public_key.t) Hashtbl.t
-      =
-    Hashtbl.create 13
+      (Signature.Public_key_hash.t * Signature.Public_key.t)
+      Client_keys.Pk_uri_hashtbl.t =
+    Client_keys.Pk_uri_hashtbl.create 13
 
-  let record pk_uri ~pk ~pkh = Hashtbl.replace _cache pk_uri (pkh, pk)
+  let record pk_uri ~pk ~pkh =
+    Client_keys.Pk_uri_hashtbl.replace _cache pk_uri (pkh, pk)
 
-  let get pk_uri = Hashtbl.find_opt _cache pk_uri
+  let get pk_uri = Client_keys.Pk_uri_hashtbl.find_opt _cache pk_uri
 end
 
 (** The implementation of the “signer-plugin.” *)

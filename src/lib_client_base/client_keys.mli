@@ -27,6 +27,8 @@
 
 type pk_uri = private Uri.t
 
+module Pk_uri_hashtbl : Hashtbl.S with type key = pk_uri
+
 type sk_uri = private Uri.t
 
 val pk_uri_parameter : unit -> (pk_uri, 'a) Clic.parameter
