@@ -94,7 +94,7 @@ type config = {
   private_mode : bool;
       (** If [true], only open outgoing/accept incoming connections
       to/from peers whose addresses are in [trusted_peers], and inform
-      these peers that the identity of this node should be revealed to
+      these peers that the identity of this node should not be revealed to
       the rest of the network. *)
   identity : P2p_identity.t;  (** Cryptographic identity of the peer. *)
   proof_of_work_target : Crypto_box.target;
