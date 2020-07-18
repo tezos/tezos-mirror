@@ -56,7 +56,7 @@ val create : int -> t
 val banned_addr : t -> P2p_addr.t -> bool
 
 (** [unban_addr t addr] remove the address from both the blacklist
-    of banned ips and the greylist of addresses *)
+    of banned addresses and the greylist of addresses *)
 val unban_addr : t -> P2p_addr.t -> unit
 
 (** [banned_peer t peer_id] is [true] if peer with id [peer_id] is

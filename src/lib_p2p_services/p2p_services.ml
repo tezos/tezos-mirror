@@ -261,7 +261,7 @@ module Points = struct
           "DEPRECATED: Trust a given address permanently and remove it from \
            the blacklist if present. Connections from this address can still \
            be closed on authentication if the peer is greylisted. Use \
-           PATCH`/network/point/:peerid` instead."
+           PATCH`/network/point/<point_id>` instead."
         RPC_path.(
           root / "network" / "points" /: P2p_point.Id.rpc_arg / "trust")
 
@@ -271,7 +271,7 @@ module Points = struct
         ~output:Data_encoding.empty
         ~description:
           "DEPRECATED: Remove an address from the whitelist. Use PATCH \
-           `/network/point/:peerid` instead."
+           `/network/point/<point_id>` instead."
         RPC_path.(
           root / "network" / "points" /: P2p_point.Id.rpc_arg / "untrust")
 
@@ -387,7 +387,7 @@ module Peers = struct
         ~output:Data_encoding.empty
         ~description:
           "DEPRECATED: Blacklist the given peer and remove it from the \
-           whitelist if present. Use PATCH `network/peers/:peerid` instead."
+           whitelist if present. Use PATCH `network/peers/<peer_id>` instead."
         RPC_path.(root / "network" / "peers" /: P2p_peer.Id.rpc_arg / "ban")
 
     let unban =
@@ -396,7 +396,7 @@ module Peers = struct
         ~output:Data_encoding.empty
         ~description:
           "DEPRECATED: Remove the given peer from the blacklist. Use PATCH \
-           `network/peers/:peerid` instead."
+           `network/peers/<peer_id>` instead."
         RPC_path.(root / "network" / "peers" /: P2p_peer.Id.rpc_arg / "unban")
 
     let trust =
@@ -406,7 +406,7 @@ module Peers = struct
         ~description:
           "DEPRECATED: Whitelist a given peer permanently and remove it from \
            the blacklist if present. The peer cannot be blocked (but its host \
-           IP still can). Use PATCH `network/peers/:peerid` instead."
+           IP still can). Use PATCH `network/peers/<peer_id>` instead."
         RPC_path.(root / "network" / "peers" /: P2p_peer.Id.rpc_arg / "trust")
 
     let untrust =
@@ -415,7 +415,7 @@ module Peers = struct
         ~output:Data_encoding.empty
         ~description:
           "DEPRECATED: Remove a given peer from the whitelist. Use PATCH \
-           `network/peers/:peerid` instead."
+           `network/peers/<peer_id>` instead."
         RPC_path.(
           root / "network" / "peers" /: P2p_peer.Id.rpc_arg / "untrust")
 
@@ -461,7 +461,7 @@ module ACL = struct
         ~query:RPC_query.empty
         ~output:Data_encoding.empty
         ~description:
-          "DEPRECATED: Clear all greylists tables. This will unbann all \
+          "DEPRECATED: Clear all greylists tables. This will unban all \
            addresses and peers automatically greylisted by the system. Use \
            DELETE `/network/greylist` instead"
         RPC_path.(root / "network" / "greylist" / "clear")
@@ -471,7 +471,7 @@ module ACL = struct
         ~query:RPC_query.empty
         ~output:Data_encoding.empty
         ~description:
-          "Clear all greylists tables. This will unbann all addresses and \
+          "Clear all greylists tables. This will unban all addresses and \
            peers automatically greylisted by the system."
         RPC_path.(root / "network" / "greylist")
   end

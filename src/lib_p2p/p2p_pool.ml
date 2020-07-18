@@ -301,21 +301,19 @@ module Points = struct
 
   let banned pool (addr, _port) = P2p_acl.banned_addr pool.acl addr
 
-  (** Blacklist the given address and remove it from the address
-    whitelist if present. All peers from this address will be disconnected.
-    Port component is unused. *)
-  let ban pool (addr, _port) =
+  let ban pool ?(ban_peers = true) (addr, _port) =
     P2p_acl.IPBlacklist.add pool.acl addr ;
     (* Kick [addr]:* if it is in `Running` state. *)
     Seq.iter_p
-      (fun conn -> P2p_conn.disconnect conn)
+      (fun conn ->
+        if ban_peers then
+          P2p_acl.PeerBlacklist.add pool.acl (P2p_conn.peer_id conn) ;
+        P2p_conn.disconnect conn)
       (connections_of_addr pool addr)
 
-  (** Remove an address and unban all peers from this address
-      from the address blacklist / greylist. Port component is unused. *)
   let unban pool (addr, _port) =
     P2p_acl.unban_addr pool.acl addr ;
-    List.iter
+    Seq.iter
       (fun conn -> P2p_acl.unban_peer pool.acl (P2p_conn.peer_id conn))
       (connections_of_addr pool addr)
 
