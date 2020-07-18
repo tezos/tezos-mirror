@@ -97,7 +97,7 @@ module Index = struct
   let compare = compare
 end
 
-module LSet = struct
+module LSet : S.INDEXES_Set with type elt = raw_level = struct
   include Set.Make (struct
     type t = raw_level
 

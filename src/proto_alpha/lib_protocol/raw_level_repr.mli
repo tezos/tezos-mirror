@@ -54,8 +54,4 @@ val pred : raw_level -> raw_level option
 
 module Index : Storage_description.INDEX with type t = raw_level
 
-module LSet : sig
-  include S.SET with type elt = raw_level
-
-  val encoding : t Data_encoding.t
-end
+module LSet : S.INDEXES_Set with type elt = raw_level
