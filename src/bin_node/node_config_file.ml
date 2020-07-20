@@ -123,6 +123,37 @@ let blockchain_network_carthagenet =
         "carthagenet.kaml.fr";
         "104.248.136.94" ]
 
+let blockchain_network_dalphanet =
+  make_blockchain_network
+    ~alias:"dalphanet"
+    {
+      time = Time.Protocol.of_notation_exn "2020-07-30T12:06:40Z";
+      block =
+        Block_hash.of_b58check_exn
+          "BLockGenesisGenesisGenesisGenesisGenesis95a45c4riC7";
+      protocol =
+        Protocol_hash.of_b58check_exn
+          "PtYuensgYBb3G3x1hLLbCmcav8ue8Kyd2khADcL5LsT5R1hcXex";
+    }
+    ~genesis_parameters:
+      {
+        context_key = "sandbox_parameter";
+        values =
+          `O
+            [ ( "genesis_pubkey",
+                `String
+                  "edpkugeDwmwuwyyD3Q5enapgEYDxZLtEUFFSrvVwXASQMVEqsvTqWu" ) ];
+      }
+    ~chain_name:"TEZOS_DALPHANET_2020-07-30T12:06:40Z"
+    ~sandboxed_chain_name:"SANDBOXED_TEZOS"
+    ~default_bootstrap_peers:
+      [ "paris.bootzero.tzalpha.net:19732";
+        "toronto.bootzero.tzalpha.net:19732";
+        "tokyo.bootzero.tzalpha.net:19732";
+        (* Metastate: *)
+        "13.48.3.55";
+        "13.53.138.50" ]
+
 let blockchain_network_sandbox =
   make_blockchain_network
     ~alias:"sandbox"
@@ -215,7 +246,8 @@ let blockchain_network_encoding : blockchain_network Data_encoding.t =
 let builtin_blockchain_networks_with_tags =
   [ (1, blockchain_network_sandbox);
     (4, blockchain_network_mainnet);
-    (6, blockchain_network_carthagenet) ]
+    (6, blockchain_network_carthagenet);
+    (8, blockchain_network_dalphanet) ]
   |> List.map (fun (tag, network) ->
          match network.alias with
          | None ->
