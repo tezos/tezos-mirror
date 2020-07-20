@@ -1,21 +1,4 @@
-(* run this as: cd scripts; ocaml gen_genesis.ml *)
-
-#use "topfind";;
-#thread;;
-#require "threads";;
-#require "stringext";;
-#require "lwt";;
-#require "lwt.unix";;
-#require "zarith";;
-#require "re";;
-#require "hacl";;
-#mod_use "../src/lib_stdlib/tzString.ml";;
-#mod_use "../src/lib_stdlib/option.ml";;
-#mod_use "../src/lib_stdlib/tzList.ml";;
-#mod_use "../src/lib_stdlib/utils.ml";;
-#mod_use "../src/lib_crypto/base58.ml";;
-
-open Lwt.Infix;;
+open Tezos_crypto
 
 (* Generate a random hash for the genesis block.
    This hash must be a valid Base58 string, so we may have to retry several times. *)
@@ -35,27 +18,17 @@ let genesis, date = genesis ()
 
 let echo x = Printf.ksprintf print_endline x
 
-let () =
-  echo "Updating alphanet_version (used by Docker images)...";
-  Lwt_main.run @@
-  let stream = Lwt_io.lines_of_file "alphanet_version" in
-  Lwt_stream.to_list stream >>= function
-  | [] | _ :: _ :: _ -> failwith "bad alphanet_version file"
-  | [ line ] -> match String.split_on_char 'Z' line with
-    | [ _ ; branch ] ->
-        let contents = if String.trim branch = "" then date else date ^ branch in
-        Lwt_io.lines_to_file "alphanet_version" (Lwt_stream.of_list [ contents ])
-    | _ -> failwith "bad alphanet_version file"
-
-let chain_name_prefix = "TEZOS_ALPHANET_"
+let network_name = "dalphanet"
+let chain_name_prefix = "TEZOS_" ^ String.uppercase_ascii network_name ^ "_"
 let chain_name = chain_name_prefix ^ date
 let sandboxed_chain_name = "SANDBOXED_TEZOS"
-let genesis_protocol_hash_placeholder = "HASH OF GENESIS PROTOCOL TO USE"
+(* The genesis protocol of Carthagenet. *)
+let genesis_protocol_hash = "PtYuensgYBb3G3x1hLLbCmcav8ue8Kyd2khADcL5LsT5R1hcXex"
 
 let () =
   echo "Here is the configuration that you can add to src/bin_node/node_config_file.ml:";
   echo "";
-  echo "let blockchain_network_XXXXXXXXnet =";
+  echo "let blockchain_network_%s =" (String.lowercase_ascii network_name);
   echo "  make_blockchain_network";
   echo "    State.Chain.";
   echo "      {";
@@ -65,7 +38,7 @@ let () =
   echo "            %S;" genesis;
   echo "        protocol =";
   echo "          Protocol_hash.of_b58check_exn";
-  echo "            %S;" genesis_protocol_hash_placeholder;
+  echo "            %S;" genesis_protocol_hash;
   echo "      }";
   echo "    ~chain_name:%S" chain_name;
   echo "    ~sandboxed_chain_name:%S" sandboxed_chain_name;
@@ -80,7 +53,7 @@ let () =
   echo "    \"genesis\": {";
   echo "      \"timestamp\": %S," date;
   echo "      \"block\": %S," genesis;
-  echo "      \"protocol\": %S" genesis_protocol_hash_placeholder;
+  echo "      \"protocol\": %S" genesis_protocol_hash;
   echo "    },";
   echo "    \"chain_name\": %S," chain_name;
   echo "    \"sandboxed_chain_name\": %S," sandboxed_chain_name;
