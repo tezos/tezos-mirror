@@ -1,0 +1,29 @@
+(executables
+ (names
+   test_time
+ )
+ (libraries
+   tezos-base
+   data-encoding
+   crowbar
+ )
+ (flags (:standard
+          -open Tezos_base
+        )))
+
+(alias
+ (name buildtest)
+ (deps
+   test_time.exe
+ ))
+
+(alias
+ (name runtest_time)
+ (action (run %{exe:test_time.exe})))
+
+(alias
+ (name runtest)
+ (package tezos-base)
+ (deps
+   (alias runtest_time)
+ ))
