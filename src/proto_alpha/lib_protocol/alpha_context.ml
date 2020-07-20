@@ -192,7 +192,7 @@ module Big_map = struct
 end
 
 module Receipt = Receipt_repr
-module Delegate = Delegate_storage
+module Delegation = Delegation_storage
 module Baker = Baker_storage
 
 module Roll = struct

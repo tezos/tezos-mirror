@@ -906,7 +906,7 @@ module Receipt : sig
   val cleanup_balance_updates : balance_updates -> balance_updates
 end
 
-module Delegate : sig
+module Delegation : sig
   val get : context -> Contract.t -> public_key_hash option tzresult Lwt.t
 
   val set :
