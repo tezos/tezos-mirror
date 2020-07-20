@@ -1,4 +1,46 @@
-;; Major mode for editing Michelson smart contracts.
+;;; michelson-mode.el --- Major mode for editing Michelson smart contracts.
+
+;; Open Source License
+;; Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>
+;;
+;; Permission is hereby granted, free of charge, to any person obtaining a
+;; copy of this software and associated documentation files (the "Software"),
+;; to deal in the Software without restriction, including without limitation
+;; the rights to use, copy, modify, merge, publish, distribute, sublicense,
+;; and/or sell copies of the Software, and to permit persons to whom the
+;; Software is furnished to do so, subject to the following conditions:
+;;
+;; The above copyright notice and this permission notice shall be included
+;; in all copies or substantial portions of the Software.
+;;
+;; THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+;; IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+;; FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+;; THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+;; LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+;; FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+;; DEALINGS IN THE SOFTWARE.
+
+;; Author: Nomadic Labs, <contact@nomadic-labs.com>
+;; Created: 20 Jul 2020
+;; Keywords: languages
+;; Homepage: https://gitlab.com/tezos/tezos
+;; URL: https://gitlab.com/tezos/tezos
+;; Version: 0.1
+;; Licence: MIT
+;; Package-Requires: (deferred cl-lib)
+
+;; This file is not part of GNU Emacs.
+
+;;; Commentary:
+
+;; This file defines a major mode for editing Michelson files.  The
+;; documentation for this major mode is available at
+;; https://tezos.gitlab.io/user/various.html#environment-for-writing-michelson-contracts,
+;; the documentation of the Michelson language is available at
+;; https://tezos.gitlab.io/whitedoc/michelson.html
+
+;;; Code:
 
 (require 'cl)
 (require 'cl-lib)
@@ -886,6 +928,7 @@ Enables or disables stack and error display."
       (let ((window (get-buffer-window buffer)))
         (if window (quit-window t window) (kill-buffer buffer))))))
 
+;;;###autoload
 (define-derived-mode michelson-mode prog-mode "Michelson"
   "Major mode for editing Michelson smart contracts."
   (interactive)
@@ -928,7 +971,13 @@ Enables or disables stack and error display."
                           (cons "TEZOS_ALPHANET_DO_NOT_PULL=yes"
                                 process-environment))))
   (run-hooks 'michelson-mode-hook))
+
+;;;###autoload
 (add-to-list 'auto-mode-alist '("\\.tz\\'" . michelson-mode))
+
+;;;###autoload
 (add-to-list 'auto-mode-alist '("\\.tez\\'" . michelson-mode))
 
 (provide 'michelson-mode)
+
+;;; michelson-mode.el ends here
