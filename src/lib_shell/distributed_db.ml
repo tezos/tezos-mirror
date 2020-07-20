@@ -264,21 +264,23 @@ let disconnect {global_db = {p2p; _}; _} peer_id =
       P2p.disconnect p2p conn
 
 let shutdown {p2p_readers; active_chains; _} =
-  P2p_peer.Table.fold
-    (fun _peer_id reader acc -> P2p_reader.shutdown reader >>= fun () -> acc)
-    p2p_readers
-    Lwt.return_unit
+  Lwt.join
+  @@ P2p_peer.Table.fold
+       (fun _peer_id reader acc -> P2p_reader.shutdown reader :: acc)
+       p2p_readers
+       []
   >>= fun () ->
-  Chain_id.Table.fold
-    (fun _ reader_chain_db acc ->
-      Distributed_db_requester.Raw_operation.shutdown
-        reader_chain_db.P2p_reader.operation_db
-      >>= fun () ->
-      Distributed_db_requester.Raw_block_header.shutdown
-        reader_chain_db.P2p_reader.block_header_db
-      >>= fun () -> acc)
-    active_chains
-    Lwt.return_unit
+  Lwt.join
+  @@ Chain_id.Table.fold
+       (fun _ reader_chain_db acc ->
+         ( Distributed_db_requester.Raw_operation.shutdown
+             reader_chain_db.P2p_reader.operation_db
+         >>= fun () ->
+         Distributed_db_requester.Raw_block_header.shutdown
+           reader_chain_db.P2p_reader.block_header_db )
+         :: acc)
+       active_chains
+       []
 
 let clear_block chain_db hash n =
   Distributed_db_requester.Raw_operations.clear_all
