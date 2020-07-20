@@ -374,11 +374,11 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
 
 (defun michelson-async-command-to-string (command callback)
   "Asynchronously execute `COMMAND' and call the `CALLBACK' on the resulting string."
-  (lexical-let ((command command)
+  (lexical-let ((shell-command (append command '("2>" "/dev/null")))
                 (callback-fun callback))
     (deferred:$
       (deferred:$
-          (apply 'deferred:process command)
+          (apply 'deferred:process-shell shell-command)
           (deferred:nextc it callback-fun))
       ;; TODO: make this show only the client error
       (deferred:error it (lambda (err) (michelson-write-output-buffer (cadr err)))))))
