@@ -142,6 +142,11 @@ unit:client:
   script:
     - dune build @src/bin_client/runtest
 
+unit:base:
+  <<: *test_definition
+  script:
+    - dune build @src/lib_base/runtest
+
 unit:client_base:
   <<: *test_definition
   script:
