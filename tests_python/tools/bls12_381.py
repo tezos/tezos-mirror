@@ -3,8 +3,6 @@ This file is intended to encompass and augment the functionality from py_ecc.
 """
 from typing import Iterable, Tuple
 
-from random import randint
-
 from py_ecc import bls
 from py_ecc import optimized_bls12_381 as bls12_381
 
@@ -46,8 +44,8 @@ class Fr:
         return f'0x{point.to_bytes(32, byteorder="little").hex()}'
 
     @staticmethod
-    def random():
-        return randint(0, Fr.modulus)
+    def random(gen):
+        return gen.randint(0, Fr.modulus)
 
 
 class G1:
@@ -99,9 +97,9 @@ class G1:
 
     @staticmethod
     # Generate a random non-infinity point on G1
-    def random() -> G1Point:
+    def random(gen) -> G1Point:
         # Get a random point by multiplying a random Fr by the generator
-        g1_point = G1.mul(G1.one, Fr.random())
+        g1_point = G1.mul(G1.one, Fr.random(gen))
         assert G1.is_on_curve(g1_point)
         return g1_point
 
@@ -164,9 +162,9 @@ class G2:
 
     @staticmethod
     # Generate a random non-infinity point on G2
-    def random() -> G2Point:
+    def random(gen) -> G2Point:
         # Get a random point by multiplying a random Fr by the generator
-        g2_point = G2.mul(G2.one, Fr.random())
+        g2_point = G2.mul(G2.one, Fr.random(gen))
         assert G2.is_on_curve(g2_point)
         return g2_point
 

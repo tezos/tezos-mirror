@@ -85,7 +85,8 @@ class TestBls12_381:
     # Fix the random seed to ensure reproducibility
     h = blake2b()
     h.update(b'seed')
-    random.seed(bytes.fromhex(h.hexdigest()))
+    gen = random.Random()
+    gen.seed(bytes.fromhex(h.hexdigest()))
 
     # Store
     @pytest.mark.parametrize("cls", STORE_CLASSES)
@@ -99,7 +100,7 @@ class TestBls12_381:
     @pytest.mark.parametrize("cls", STORE_CLASSES)
     def test_store_random(self, client_regtest, cls):
         for _ in RANDOM_ITERATIONS:
-            check_store(client_regtest, cls, cls.random())
+            check_store(client_regtest, cls, cls.random(self.gen))
 
     # Add
     @pytest.mark.parametrize("cls", ADD_CLASSES)
@@ -113,7 +114,7 @@ class TestBls12_381:
     @pytest.mark.parametrize("cls", ADD_CLASSES)
     def test_add_zero_random(self, client_regtest, cls):
         for _ in RANDOM_ITERATIONS:
-            check_add(client_regtest, cls, cls.zero, cls.random())
+            check_add(client_regtest, cls, cls.zero, cls.random(self.gen))
 
     @pytest.mark.parametrize("cls", ADD_CLASSES)
     def test_add_one_zero(self, client_regtest, cls):
@@ -126,22 +127,23 @@ class TestBls12_381:
     @pytest.mark.parametrize("cls", ADD_CLASSES)
     def test_add_one_random(self, client_regtest, cls):
         for _ in RANDOM_ITERATIONS:
-            check_add(client_regtest, cls, cls.one, cls.random())
+            check_add(client_regtest, cls, cls.one, cls.random(self.gen))
 
     @pytest.mark.parametrize("cls", ADD_CLASSES)
     def test_add_random_zero(self, client_regtest, cls):
         for _ in RANDOM_ITERATIONS:
-            check_add(client_regtest, cls, cls.random(), cls.zero)
+            check_add(client_regtest, cls, cls.random(self.gen), cls.zero)
 
     @pytest.mark.parametrize("cls", ADD_CLASSES)
     def test_add_random_one(self, client_regtest, cls):
         for _ in RANDOM_ITERATIONS:
-            check_add(client_regtest, cls, cls.random(), cls.one)
+            check_add(client_regtest, cls, cls.random(self.gen), cls.one)
 
     @pytest.mark.parametrize("cls", ADD_CLASSES)
     def test_add_random_random(self, client_regtest, cls):
         for _ in RANDOM_ITERATIONS:
-            check_add(client_regtest, cls, cls.random(), cls.random())
+            check_add(client_regtest, cls, cls.random(self.gen),
+                      cls.random(self.gen))
 
     # Mul
     @pytest.mark.parametrize("cls", MUL_CLASSES)
@@ -155,7 +157,7 @@ class TestBls12_381:
     @pytest.mark.parametrize("cls", MUL_CLASSES)
     def test_mul_zero_random(self, client_regtest, cls):
         for _ in RANDOM_ITERATIONS:
-            check_mul(client_regtest, cls, cls.zero, Fr.random())
+            check_mul(client_regtest, cls, cls.zero, Fr.random(self.gen))
 
     @pytest.mark.parametrize("cls", MUL_CLASSES)
     def test_mul_one_zero(self, client_regtest, cls):
@@ -168,22 +170,23 @@ class TestBls12_381:
     @pytest.mark.parametrize("cls", MUL_CLASSES)
     def test_mul_one_random(self, client_regtest, cls):
         for _ in RANDOM_ITERATIONS:
-            check_mul(client_regtest, cls, cls.one, Fr.random())
+            check_mul(client_regtest, cls, cls.one, Fr.random(self.gen))
 
     @pytest.mark.parametrize("cls", MUL_CLASSES)
     def test_mul_random_zero(self, client_regtest, cls):
         for _ in RANDOM_ITERATIONS:
-            check_mul(client_regtest, cls, cls.random(), Fr.zero)
+            check_mul(client_regtest, cls, cls.random(self.gen), Fr.zero)
 
     @pytest.mark.parametrize("cls", MUL_CLASSES)
     def test_mul_random_one(self, client_regtest, cls):
         for _ in RANDOM_ITERATIONS:
-            check_mul(client_regtest, cls, cls.random(), Fr.one)
+            check_mul(client_regtest, cls, cls.random(self.gen), Fr.one)
 
     @pytest.mark.parametrize("cls", MUL_CLASSES)
     def test_mul_random_random(self, client_regtest, cls):
         for _ in RANDOM_ITERATIONS:
-            check_mul(client_regtest, cls, cls.random(), Fr.random())
+            check_mul(client_regtest, cls, cls.random(self.gen),
+                      Fr.random(self.gen))
 
     # Neg
     @pytest.mark.parametrize("cls", NEG_CLASSES)
@@ -197,7 +200,7 @@ class TestBls12_381:
     @pytest.mark.parametrize("cls", NEG_CLASSES)
     def test_neg_random(self, client_regtest, cls):
         for _ in RANDOM_ITERATIONS:
-            check_neg(client_regtest, cls, cls.random())
+            check_neg(client_regtest, cls, cls.random(self.gen))
 
     # Pairing checks
     def test_pairing_zero_zero(self, client_regtest):
@@ -210,7 +213,7 @@ class TestBls12_381:
 
     def test_pairing_zero_random(self, client_regtest):
         for _ in RANDOM_ITERATIONS:
-            args = [(G1.zero, G2.random())]
+            args = [(G1.zero, G2.random(self.gen))]
             check_pairing_check(client_regtest, args)
 
     def test_pairing_one_zero(self, client_regtest):
@@ -223,50 +226,50 @@ class TestBls12_381:
 
     def test_pairing_one_random(self, client_regtest):
         for _ in RANDOM_ITERATIONS:
-            args = [(G1.one, G2.random())]
+            args = [(G1.one, G2.random(self.gen))]
             check_pairing_check(client_regtest, args)
 
     def test_pairing_random_zero(self, client_regtest):
         for _ in RANDOM_ITERATIONS:
-            args = [(G1.random(), G2.zero)]
+            args = [(G1.random(self.gen), G2.zero)]
             check_pairing_check(client_regtest, args)
 
     def test_pairing_random_one(self, client_regtest):
         for _ in RANDOM_ITERATIONS:
-            args = [(G1.random(), G2.one)]
+            args = [(G1.random(self.gen), G2.one)]
             check_pairing_check(client_regtest, args)
 
     def test_pairing_random_random(self, client_regtest):
         for _ in RANDOM_ITERATIONS:
-            args = [(G1.random(), G2.random())]
+            args = [(G1.random(self.gen), G2.random(self.gen))]
             check_pairing_check(client_regtest, args)
 
     def test_pairing_neg_g1(self, client_regtest):
         for _ in RANDOM_ITERATIONS:
-            g1_point = G1.random()
-            g2_point = G2.random()
+            g1_point = G1.random(self.gen)
+            g2_point = G2.random(self.gen)
             args = [(g1_point, g2_point), (G1.neg(g1_point), g2_point)]
             check_pairing_check(client_regtest, args)
 
     def test_pairing_neg_g2(self, client_regtest):
         for _ in RANDOM_ITERATIONS:
-            g1_point = G1.random()
-            g2_point = G2.random()
+            g1_point = G1.random(self.gen)
+            g2_point = G2.random(self.gen)
             args = [(g1_point, g2_point), (g1_point, G2.neg(g2_point))]
             check_pairing_check(client_regtest, args)
 
     # Pairing Check test based on signature aggregation
     def test_signature_aggregation(self, client_regtest):
         for _ in RANDOM_ITERATIONS:
-            sk0 = Fr.random()  # secret key
+            sk0 = Fr.random(self.gen)  # secret key
             pk0 = G2.mul(G2.one, sk0)  # public key
             # we don't have hash-to-curve on g1, so compute a random point
-            msg_hash = G1.random()  # message hash
+            msg_hash = G1.random(self.gen)  # message hash
             sig0 = G1.mul(msg_hash, sk0)  # signature
             args0 = [(msg_hash, pk0), (G1.neg(sig0), G2.one)]
             check_pairing_check(client_regtest, args0)
 
-            sk1 = Fr.random()  # secret key
+            sk1 = Fr.random(self.gen)  # secret key
             pk1 = G2.mul(G2.one, sk1)  # public key
             # we don't have hash-to-curve on g1, so compute a random point
             sig1 = G1.mul(msg_hash, sk1)  # signature
