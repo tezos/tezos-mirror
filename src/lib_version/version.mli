@@ -38,7 +38,7 @@
     [Release] means "no additional information".
     This is an actual released version.
     No additional info is printed. *)
-type additional_info = Dev | RC of int | Release
+type additional_info = Dev | RC of int | Release | Other of string
 
 (** Convert additional version information to a string.
 

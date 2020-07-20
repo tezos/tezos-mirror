@@ -59,7 +59,13 @@ let additional_info_encoding =
         ~title:"Release"
         (constant "release")
         (function Release -> Some () | _ -> None)
-        (fun () -> Release) ]
+        (fun () -> Release);
+      case
+        (Tag 3)
+        ~title:"Other"
+        (obj1 (req "info" string))
+        (function Other info -> Some info | _ -> None)
+        (fun info -> Other info) ]
 
 (* Locally defined encoding for Version.t *)
 let current_version_encoding =

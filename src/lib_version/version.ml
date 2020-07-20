@@ -26,7 +26,7 @@
 (* Note: please try to keep this module free of *any* dependency so that
    a script can trivially run the toplevel on it to get the version number. *)
 
-type additional_info = Dev | RC of int | Release
+type additional_info = Dev | RC of int | Release | Other of string
 
 let string_of_additional_info = function
   | Dev ->
@@ -35,6 +35,8 @@ let string_of_additional_info = function
       "~rc" ^ string_of_int n
   | Release ->
       ""
+  | Other info ->
+      "+" ^ info
 
 type t = {major : int; minor : int; additional_info : additional_info}
 
@@ -42,6 +44,6 @@ let to_string {major; minor; additional_info} =
   string_of_int major ^ "." ^ string_of_int minor
   ^ string_of_additional_info additional_info
 
-let current = {major = 7; minor = 3; additional_info = Dev}
+let current = {major = 7; minor = 3; additional_info = Other "dev+007"}
 
 let current_string = to_string current
