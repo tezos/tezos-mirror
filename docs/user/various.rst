@@ -222,31 +222,29 @@ Environment for writing Michelson contracts
 Here is how to setup a practical environment for
 writing, editing and debugging Michelson programs.
 
-Install `Emacs <https://www.gnu.org/software/emacs/>`_ with
-the `deferred <https://github.com/kiwanami/emacs-deferred>`_ and
-`exec-path-from-shell
-<https://github.com/purcell/exec-path-from-shell>`_ packages.
-The packages can be installed from within Emacs with
-``M-x package-install``.
-The last package imports the shell path in Emacs and it is needed
-because we will run a sandboxed node.
+Install `Emacs <https://www.gnu.org/software/emacs/>`_ and configure
+it to use the `MELPA <https://melpa.org/#/getting-started>`_ package
+repository.
+
+Inside Emacs, install the ``michelson-mode`` package and its
+dependency `deferred <https://github.com/kiwanami/emacs-deferred>`_ by
+running ``M-x package-install-file``; the package file is located in
+the ``emacs`` folder of the Tezos code base.
 
 Set up the `Michelson mode
-<https://gitlab.com/tezos/tezos/tree/master/emacs>`_ by adding in
-your ``.emacs`` :
+<https://gitlab.com/tezos/tezos/tree/master/emacs>`_ to use the Tezos
+client in :ref:`mockup mode<mockup-mode>` (to typecheck Michelson
+scripts without interacting with a Tezos node) by adding in your
+``.emacs`` file:
 
 ::
 
-   (load "~/tezos/tezos/emacs/michelson-mode.el" nil t)
-   (setq michelson-client-command "tezos-client")
+   (setq michelson-client-command "tezos-client --base-dir /tmp/mockup --mode mockup --protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK")
    (setq michelson-alphanet nil)
 
 Note that the Michelson mode will be chosen automatically by Emacs for
 files with a ``.tz`` or ``.tez`` extension.
 
-Run a :ref:`sandboxed node<sandboxed-mode>` (and activate the Alpha
-protocol with ``tezos-activate-alpha``) so that useful information
-about the program can be displayed.
 We can now open our favourite contract ``emacs
 ./src/bin_client/test/contracts/attic/id.tz`` and, when moving the cursor on
 a Michelson instruction, in the bottom of the windows Emacs should
