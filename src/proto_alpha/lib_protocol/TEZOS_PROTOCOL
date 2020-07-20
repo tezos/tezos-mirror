@@ -53,7 +53,7 @@
         "Seed_storage",
         "Roll_storage",
         "Baker_storage",
-        "Delegate_storage",
+        "Delegation_storage",
         "Sapling_storage",
         "Lazy_storage_diff",
         "Contract_storage",
