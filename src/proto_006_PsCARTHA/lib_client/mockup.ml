@@ -39,6 +39,7 @@ type protocol_constants_overrides = {
   hard_storage_limit_per_operation : Z.t option;
   cost_per_byte : Protocol.Tez_repr.t option;
   chain_id : Chain_id.t option;
+  timestamp : Time.Protocol.t option;
 }
 
 type parsed_account_repr = {
@@ -112,25 +113,29 @@ let protocol_constants_overrides_encoding =
         p.hard_gas_limit_per_block,
         p.hard_storage_limit_per_operation,
         p.cost_per_byte,
-        p.chain_id ))
+        p.chain_id,
+        p.timestamp ))
     (fun ( hard_gas_limit_per_operation,
            hard_gas_limit_per_block,
            hard_storage_limit_per_operation,
            cost_per_byte,
-           chain_id ) ->
+           chain_id,
+           timestamp ) ->
       {
         hard_gas_limit_per_operation;
         hard_gas_limit_per_block;
         hard_storage_limit_per_operation;
         cost_per_byte;
         chain_id;
+        timestamp;
       })
-    (obj5
+    (obj6
        (opt "hard_gas_limit_per_operation" z)
        (opt "hard_gas_limit_per_block" z)
        (opt "hard_storage_limit_per_operation" z)
        (opt "cost_per_byte" Protocol.Tez_repr.encoding)
-       (opt "chain_id" Chain_id.encoding))
+       (opt "chain_id" Chain_id.encoding)
+       (opt "initial_timestamp" Time.Protocol.encoding))
 
 let default_mockup_parameters : mockup_protocol_parameters =
   let open Tezos_protocol_006_PsCARTHA_parameters in
@@ -155,6 +160,7 @@ let default_mockup_protocol_constants : protocol_constants_overrides =
       Some default.constants.hard_storage_limit_per_operation;
     cost_per_byte = Some default.constants.cost_per_byte;
     chain_id = Some Tezos_mockup_registration.Mockup_args.Chain_id.dummy;
+    timestamp = Some default_mockup_parameters.initial_timestamp;
   }
 
 (* Use the wallet to convert a bootstrap account's public key
@@ -234,6 +240,7 @@ let protocol_constants_no_overrides =
     hard_storage_limit_per_operation = None;
     cost_per_byte = None;
     chain_id = None;
+    timestamp = None;
   }
 
 let apply_protocol_overrides (cctxt : Tezos_client_base.Client_context.full)
@@ -373,14 +380,8 @@ let mem_init :
     Block_hash.of_b58check_exn
       "BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU"
   in
-  let shell =
-    Forge.make_shell
-      ~level:0l
-      ~predecessor:hash
-      ~timestamp:parameters.initial_timestamp
-      ~fitness:(Protocol.Fitness_repr.from_int64 0L)
-      ~operations_hash:Operation_list_list_hash.zero
-  in
+  (* Need to read this Json file before since timestamp modification may be in
+     there *)
   ( match constants_overrides_json with
   | None ->
       return protocol_constants_no_overrides
@@ -396,6 +397,20 @@ let mem_init :
           (Data_encoding.Json.print_error ?print_unknown:None)
           error ) )
   >>=? fun protocol_overrides ->
+  let default = parameters.initial_timestamp in
+  let timestamp = Option.value ~default protocol_overrides.timestamp in
+  ( if not @@ Time.Protocol.equal default timestamp then
+    cctxt#message "@[<h>initial_timestamp: %a@]" Time.Protocol.pp_hum timestamp
+  else Lwt.return_unit )
+  >>= fun () ->
+  let shell =
+    Forge.make_shell
+      ~level:0l
+      ~predecessor:hash
+      ~timestamp
+      ~fitness:(Protocol.Fitness_repr.from_int64 0L)
+      ~operations_hash:Operation_list_list_hash.zero
+  in
   apply_protocol_overrides cctxt protocol_overrides parameters.constants
   >>=? fun protocol_custom ->
   ( match bootstrap_accounts_json with

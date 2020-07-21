@@ -23,10 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let choose ~default ~from_config_file =
+  match from_config_file with None -> default | Some cid -> cid
+
 module Chain_id = struct
   let of_string s = Chain_id.hash_string ~key:"mockup" [s]
 
   let dummy = of_string "chain"
 
-  let choose ~from_config_file = Option.value from_config_file ~default:dummy
+  let choose = choose ~default:dummy
 end

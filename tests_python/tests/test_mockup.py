@@ -13,7 +13,7 @@ import re
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Any, Optional, Tuple, List
+from typing import Any, Optional, Tuple
 import pytest
 from launchers.sandbox import Sandbox
 from client.client import Client
@@ -119,23 +119,29 @@ def test_transfer(mockup_client: Client):
     "NetXcqTGZX74DxG", "NetXaFDF7xZQCpR", "NetXkKbtqncJcAz", "NetXjjE5cZUeWPy",
     "NetXi7C1pyLhQNe"
 ])
+@pytest.mark.parametrize('initial_timestamp', [
+    "2020-07-21T17:11:10+02:00", "1970-01-01T00:00:00Z"
+])
 @pytest.mark.client
 def test_create_mockup_custom_constants(sandbox: Sandbox,
                                         proto: str,
-                                        chain_id: str):
+                                        chain_id: str,
+                                        initial_timestamp: str):
     """ Tests `tezos-client create mockup` --protocols-constants  argument
         The call must succeed.
 
         Args:
             mockup_client: the client to use
             chain_id (str): the string to pass for field `chain_id`
+            initial_timestamp(str): an ISO-8601 formatted date string
     """
     # Use another directory so that the constants change takes effect
     with tempfile.TemporaryDirectory(prefix='tezos-client.') as base_dir,\
             tempfile.NamedTemporaryFile(prefix='tezos-custom-constants',
                                         mode='w+t') as json_file:
         json_data = {"hard_gas_limit_per_operation": "400000",
-                     "chain_id": chain_id}
+                     "chain_id": chain_id,
+                     "initial_timestamp": initial_timestamp}
         json.dump(json_data, json_file)
         json_file.flush()
         unmanaged_client = sandbox.create_client(base_dir=base_dir)
@@ -518,6 +524,12 @@ def _test_create_mockup_init_show_roundtrip(
 @pytest.mark.parametrize('initial_bootstrap_accounts',
                          [None, json.dumps(_create_accounts_list())])
 @pytest.mark.parametrize(
+    'protocol_constants',
+    [None,
+     json.dumps(
+         {'chain_id': "NetXaFDF7xZQCpR",
+          'initial_timestamp': "2020-07-21T17:11:10+02:00"})])
+@pytest.mark.parametrize(
     'read_initial_state',
     [_get_state_using_config_show_mockup, _get_state_using_config_init_mockup])
 @pytest.mark.parametrize(
@@ -526,6 +538,7 @@ def _test_create_mockup_init_show_roundtrip(
 def test_create_mockup_config_show_init_roundtrip(sandbox: Sandbox,
                                                   proto: str,
                                                   initial_bootstrap_accounts,
+                                                  protocol_constants,
                                                   read_initial_state,
                                                   read_final_state):
     """ 1/ Create a mockup, using possibly custom bootstrap_accounts
@@ -543,7 +556,8 @@ def test_create_mockup_config_show_init_roundtrip(sandbox: Sandbox,
                                             proto,
                                             read_initial_state,
                                             read_final_state,
-                                            initial_bootstrap_accounts)
+                                            initial_bootstrap_accounts,
+                                            protocol_constants)
 
 
 def test_transfer_rpc(mockup_client: Client):
