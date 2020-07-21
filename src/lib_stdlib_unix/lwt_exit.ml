@@ -75,7 +75,8 @@ let clean_up status =
           | Some after -> (
             match Callbacks_map.find_opt after promises with
             | None ->
-                assert false
+                (* This can happen if the callback was unregistered *)
+                Lwt.return_unit
             | Some p ->
                 p )
         in
