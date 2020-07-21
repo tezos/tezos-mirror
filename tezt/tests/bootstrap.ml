@@ -24,9 +24,9 @@
 (*****************************************************************************)
 
 (* The functions below could be put in the Tezt library. *)
-let get_save_point ?node client =
+let get_savepoint ?node client =
   let* json = RPC.get_checkpoint ?node client in
-  return JSON.(json |-> "save_point" |> as_int)
+  return JSON.(json |-> "savepoint" |> as_int)
 
 let get_caboose ?node client =
   let* json = RPC.get_checkpoint ?node client in
@@ -89,7 +89,7 @@ let bootstrapped_event =
    when Node 2 was killed.
 
    b) Otherwise, we check that both nodes synchronize. In full mode, we also check
-   that the save_point is higher than when Node 2 was killed. *)
+   that the savepoint is higher than when Node 2 was killed. *)
 let check_bootstrap_with_history_modes protocol hmode1 hmode2 =
   (* Number of calls to [tezos-client bake for] once the protocol is activated,
      before we kill [node_2]. *)
@@ -157,11 +157,11 @@ let check_bootstrap_with_history_modes protocol hmode1 hmode2 =
   let* () =
     match hmode1 with
     | Full ->
-        let* save_point = get_save_point ~node:node_1 client in
-        if save_point <= bakes_before_kill then
+        let* savepoint = get_savepoint ~node:node_1 client in
+        if savepoint <= bakes_before_kill then
           Test.fail
-            "save point level (%d) is lower or equal to the starting level (%d)"
-            save_point
+            "savepoint level (%d) is lower or equal to the starting level (%d)"
+            savepoint
             bakes_before_kill ;
         return ()
     | Rolling ->

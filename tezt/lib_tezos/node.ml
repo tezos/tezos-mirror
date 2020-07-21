@@ -44,7 +44,7 @@ let make_argument = function
   | History_mode Full ->
       ["--history-mode"; "full"]
   | History_mode Rolling ->
-      ["--history-mode"; "experimental-rolling"]
+      ["--history-mode"; "rolling"]
   | Expected_pow x ->
       ["--expected-pow"; string_of_int x]
   | Singleprocess ->
