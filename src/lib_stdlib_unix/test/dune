@@ -5,6 +5,7 @@
    test_lwt_exit_after
    test_lwt_exit_signal
    test_lwt_exit_clean_up
+   test_lwt_exit_unregister_clean_up
    )
  (libraries tezos-stdlib-unix
             tezos-stdlib
@@ -52,6 +53,14 @@
  (action (run %{exe:test_lwt_exit_clean_up.exe})))
 
 (alias
+ (name buildtest)
+ (deps test_lwt_exit_unregister_clean_up.exe))
+
+(alias
+ (name runtest_test_lwt_exit_unregister_clean_up)
+ (action (run %{exe:test_lwt_exit_unregister_clean_up.exe})))
+
+(alias
  (name runtest)
  (package tezos-stdlib-unix)
  (deps (alias runtest_lwt_exit_exit)
@@ -59,6 +68,7 @@
        (alias runtest_lwt_exit_after)
        (alias runtest_lwt_exit_signal)
        (alias runtest_lwt_exit_clean_up)
+       (alias runtest_test_lwt_exit_unregister_clean_up)
  ))
 
 (alias
