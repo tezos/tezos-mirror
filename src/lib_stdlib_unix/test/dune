@@ -1,12 +1,15 @@
 (executables
  (names
    test_lwt_exit_exit
+   test_lwt_exit_exit_escape
    test_lwt_exit_return
    test_lwt_exit_after
    test_lwt_exit_signal
    test_lwt_exit_clean_up
    test_lwt_exit_unregister_clean_up
    test_lwt_exit_unregister_clean_up_with_after
+   test_lwt_exit_raise
+   test_lwt_exit_raise_exit
    )
  (libraries tezos-stdlib-unix
             tezos-stdlib
@@ -20,6 +23,14 @@
 (alias
  (name runtest_lwt_exit_exit)
  (action (run %{exe:test_lwt_exit_exit.exe})))
+
+(alias
+ (name buildtest)
+ (deps test_lwt_exit_exit_escape.exe))
+
+(alias
+ (name runtest_lwt_exit_exit_escape)
+ (action (run %{exe:test_lwt_exit_exit_escape.exe})))
 
 (alias
  (name buildtest)
@@ -70,15 +81,34 @@
  (action (run %{exe:test_lwt_exit_unregister_clean_up_with_after.exe})))
 
 (alias
+ (name buildtest)
+ (deps test_lwt_exit_raise.exe))
+
+(alias
+ (name runtest_test_lwt_exit_raise)
+ (action (run %{exe:test_lwt_exit_raise.exe})))
+
+(alias
+ (name buildtest)
+ (deps test_lwt_exit_raise_exit.exe))
+
+(alias
+ (name runtest_test_lwt_exit_raise_exit)
+ (action (run %{exe:test_lwt_exit_raise_exit.exe})))
+
+(alias
  (name runtest)
  (package tezos-stdlib-unix)
  (deps (alias runtest_lwt_exit_exit)
+       (alias runtest_lwt_exit_exit_escape)
        (alias runtest_lwt_exit_return)
        (alias runtest_lwt_exit_after)
        (alias runtest_lwt_exit_signal)
        (alias runtest_lwt_exit_clean_up)
        (alias runtest_test_lwt_exit_unregister_clean_up)
        (alias runtest_test_lwt_exit_unregister_clean_up_with_after)
+       (alias runtest_test_lwt_exit_raise)
+       (alias runtest_test_lwt_exit_raise_exit)
  ))
 
 (alias
