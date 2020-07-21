@@ -203,6 +203,9 @@ class TestBls12_381:
             check_neg(client_regtest, cls, cls.random(self.gen))
 
     # Pairing checks
+    def test_pairing_nil(self, client_regtest):
+        check_pairing_check(client_regtest, [])
+
     def test_pairing_zero_zero(self, client_regtest):
         args = [(G1.zero, G2.zero)]
         check_pairing_check(client_regtest, args)
