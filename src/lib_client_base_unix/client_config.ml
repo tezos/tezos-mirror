@@ -561,21 +561,19 @@ let commands config_file cfg (protocol_hash_opt : Protocol_hash.t option) =
         >>=? fun mockup ->
         let (module Mockup) = mockup in
         let json_pp encoding ppf value =
-          Format.fprintf
+          Data_encoding.Json.pp
             ppf
-            "%a"
-            Data_encoding.Json.pp
             (Data_encoding.Json.construct encoding value)
         in
         Mockup.default_bootstrap_accounts cctxt
         >>=? fun bootstrap_accounts_string ->
         cctxt#message
-          "Default value of --%s:\n%s"
+          "@[<v>Default value of --%s:@,%s@]"
           mockup_bootstrap_accounts
           bootstrap_accounts_string
         >>= fun () ->
         cctxt#message
-          "Default value of --%s:\n%a"
+          "@[<v>Default value of --%s:@,%a@]"
           mockup_protocol_constants
           (json_pp Mockup.protocol_constants_encoding)
           Mockup.default_protocol_constants
