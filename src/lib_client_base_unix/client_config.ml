@@ -619,7 +619,7 @@ let commands config_file cfg (protocol_hash_opt : Protocol_hash.t option) =
         if not (Sys.file_exists config_file) then
           Cfg_file.(write config_file cfg)
           (* Should be default or command would have failed *)
-        else failwith "Config file already exists at location");
+        else failwith "Config file already exists at location: %s" config_file);
     command
       ~group
       ~desc:
