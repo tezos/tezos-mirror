@@ -111,7 +111,22 @@ val fast_box_open_noalloc : channel_key -> nonce -> Bytes.t -> Bytes.t -> bool
 
 val check_proof_of_work : public_key -> nonce -> target -> bool
 
-val generate_proof_of_work : ?max:int -> public_key -> target -> nonce
+(** [generate_proof_of_work pk target] generates a proof of work for the public
+    key [pk] following the [target].
+
+    The parameter [yield_every] (defaults to [500]) inserts a cooperation point
+    ([Lwt.pause ()]) every so many attempts. This allows other promises to make
+    progress towards resolution. It also allows Unix signals to be processed so
+    that, say, Ctrl+C can be effective.
+
+    The parameter [max] (not set by default) sets a maximum number of attempts
+    to be made before giving up. When [max] number of attempts have been made
+    and no pow has been found, the exception [Not_found] is raised.
+  *)
+val generate_proof_of_work :
+  ?yield_every:int -> ?max:int -> public_key -> target -> nonce Lwt.t
+
+val generate_proof_of_work_with_target_0 : public_key -> nonce
 
 val public_key_to_bytes : public_key -> Bytes.t
 

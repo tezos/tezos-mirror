@@ -46,18 +46,20 @@ let animation = Array.map (fun x -> clean ^ x) animation
 let number_of_frames = Array.length animation
 
 let make_with_animation ppf ~make ~on_retry seed =
+  let open Lwt.Infix in
   Format.fprintf ppf "%s%!" init ;
   let rec loop n seed =
     let start = Mtime_clock.counter () in
     Format.fprintf ppf "%s%!" animation.(n mod number_of_frames) ;
-    match make seed with
+    make seed
+    >>= function
     | Ok v ->
-        v
+        Lwt.return v
     | Error r ->
         let time = Mtime_clock.count start in
-        let v = on_retry time r in
-        loop (n + 1) v
+        on_retry time r >>= fun v -> loop (n + 1) v
   in
-  let result = loop 0 seed in
+  loop 0 seed
+  >|= fun result ->
   Format.fprintf ppf "%s%s\n%!" clean init ;
   result

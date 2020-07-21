@@ -147,24 +147,49 @@ let make_target f =
 
 let default_target = make_target 24.
 
+let target_0 = make_target 0.
+
 let check_proof_of_work pk nonce target =
   let hash = Blake2B.hash_bytes [Box.unsafe_to_bytes pk; nonce] in
   compare_target hash target
 
-let generate_proof_of_work ?max pk target =
-  let may_interrupt =
-    match max with
-    | None ->
-        fun _ -> ()
-    | Some max ->
-        fun cpt -> if max < cpt then raise Not_found
-  in
-  let rec loop nonce cpt =
-    may_interrupt cpt ;
-    if check_proof_of_work pk nonce target then nonce
-    else loop (Nonce.increment nonce) (cpt + 1)
+(* This is the non-yielding function to generate an identity. It performs a
+   bounded number of attempts ([n]). This function is not exported. Instead, the
+   wrapper below, [generate_proof_of_work], uses this function repeatedly but it
+   intersperses calls to [Lwt.pause] to yield explicitly. *)
+let generate_proof_of_work_n_attempts n pk target =
+  let rec loop nonce attempts =
+    if attempts > n then raise Not_found
+    else if check_proof_of_work pk nonce target then nonce
+    else loop (Nonce.increment nonce) (attempts + 1)
   in
   loop (random_nonce ()) 0
+
+let generate_proof_of_work_with_target_0 pk =
+  generate_proof_of_work_n_attempts 1 pk target_0
+
+let rec generate_proof_of_work ?(yield_every = 10000) ?max pk target =
+  let open Lwt.Infix in
+  match max with
+  | None -> (
+    try
+      let pow = generate_proof_of_work_n_attempts yield_every pk target in
+      Lwt.return pow
+    with Not_found ->
+      Lwt.pause () >>= fun () -> generate_proof_of_work ~yield_every pk target
+    )
+  | Some max -> (
+      if max <= 0 then Lwt.apply raise Not_found
+      else
+        let attempts = min max yield_every in
+        try
+          let pow = generate_proof_of_work_n_attempts attempts pk target in
+          Lwt.return pow
+        with Not_found ->
+          Lwt.pause ()
+          >>= fun () ->
+          let max = max - attempts in
+          generate_proof_of_work ~yield_every ~max pk target )
 
 let public_key_to_bytes pk = Bytes.copy (Box.unsafe_to_bytes pk)
 

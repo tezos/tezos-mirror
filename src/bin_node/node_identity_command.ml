@@ -42,11 +42,18 @@ let generate_with_animation ppf target =
   Animation.make_with_animation
     ppf
     ~make:(fun count ->
-      try Ok (P2p_identity.generate_with_bound ~max:count target)
-      with Not_found -> Error count)
+      Lwt.catch
+        (fun () ->
+          P2p_identity.generate_with_bound ~max:count target
+          >|= fun id -> Ok id)
+        (function
+          | Not_found -> Lwt.return @@ Error count | exc -> Lwt.fail exc))
     ~on_retry:(fun time count ->
       let ms = int_of_float (Mtime.Span.to_ms time) in
-      if ms <= 1 then max 10 (count * 10) else count * duration / ms)
+      let count =
+        if ms <= 1 then max 10 (count * 10) else count * duration / ms
+      in
+      Lwt.pause () >>= fun () -> Lwt.return count)
     10000
 
 let generate {Node_config_file.data_dir; p2p; _} =
@@ -58,7 +65,8 @@ let generate {Node_config_file.data_dir; p2p; _} =
     Format.eprintf
       "Generating a new identity... (level: %.2f) "
       p2p.expected_pow ;
-    let id = generate_with_animation Format.err_formatter target in
+    generate_with_animation Format.err_formatter target
+    >>= fun id ->
     Node_identity_file.write identity_file id
     >>=? fun () ->
     Format.eprintf

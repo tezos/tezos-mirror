@@ -408,7 +408,7 @@ module Real = struct
 end
 
 module Fake = struct
-  let id = P2p_identity.generate (Crypto_box.make_target 0.)
+  let id = P2p_identity.generate_with_target_0 ()
 
   let empty_stat =
     {
