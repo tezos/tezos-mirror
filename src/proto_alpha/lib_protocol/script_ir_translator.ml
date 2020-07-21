@@ -2380,8 +2380,8 @@ let rec parse_data :
       )
   in
   let traced body = trace_eval error body in
-  let parse_items ?type_logger loc ctxt expr key_type value_type items
-      item_wrapper =
+  let parse_items ?type_logger ctxt expr key_type value_type items item_wrapper
+      =
     let length = List.length items in
     fold_left_s
       (fun (last_value, map, ctxt) item ->
@@ -2823,8 +2823,8 @@ let rec parse_data :
   | (Set_t _, expr) ->
       traced (fail (Invalid_kind (location expr, [Seq_kind], kind expr)))
   (* Maps *)
-  | (Map_t (tk, tv, _ty_name), (Seq (loc, vs) as expr)) ->
-      parse_items ?type_logger loc ctxt expr tk tv vs (fun x -> x)
+  | (Map_t (tk, tv, _ty_name), (Seq (_, vs) as expr)) ->
+      parse_items ?type_logger ctxt expr tk tv vs (fun x -> x)
   | (Map_t _, expr) ->
       traced (fail (Invalid_kind (location expr, [Seq_kind], kind expr)))
   | (Big_map_t (tk, tv, _ty_name), expr) ->
@@ -2832,14 +2832,14 @@ let rec parse_data :
       | Int (loc, id) ->
           let id = Big_map.Id.parse_z id in
           return (Some (id, loc), empty_map tk, ctxt)
-      | Seq (loc, vs) ->
-          parse_items ?type_logger loc ctxt expr tk tv vs (fun x -> Some x)
+      | Seq (_, vs) ->
+          parse_items ?type_logger ctxt expr tk tv vs (fun x -> Some x)
           >>=? fun (diff, ctxt) -> return (None, diff, ctxt)
-      | Prim (loc, D_Pair, [Int (loc_id, id); Seq (loc_vs, vs)], annot) ->
+      | Prim (loc, D_Pair, [Int (loc_id, id); Seq (_, vs)], annot) ->
           fail_unexpected_annot loc annot
           >>=? fun () ->
           let tv_opt = Option_t (tv, None) in
-          parse_items ?type_logger loc_vs ctxt expr tk tv_opt vs (fun x -> x)
+          parse_items ?type_logger ctxt expr tk tv_opt vs (fun x -> x)
           >>=? fun (diff, ctxt) ->
           let id = Big_map.Id.parse_z id in
           return (Some (id, loc_id), diff, ctxt)
