@@ -259,7 +259,7 @@ include Tezos_raw_protocol_001_PtCJ7pwo.Main
  (library_flags (:standard -linkall))
  (flags (:standard -nopervasives -nostdlib
                    -w +a-4-6-7-9-29-32-40..42-44-45-48
-                   -warn-error -a+8
+                   -warn-error +a
                    -open Tezos_protocol_environment_001_PtCJ7pwo__Environment
                    -open Pervasives
                    -open Error_monad))
@@ -345,7 +345,7 @@ include Tezos_raw_protocol_001_PtCJ7pwo.Main
       tezos-protocol-environment-sigs
       tezos_raw_protocol_001_PtCJ7pwo)
  (flags -w "+a-4-6-7-9-29-40..42-44-45-48"
-        -warn-error "-a+8"
+        -warn-error "+a"
         -nopervasives)
  (modules Protocol))
 
@@ -357,7 +357,7 @@ include Tezos_raw_protocol_001_PtCJ7pwo.Main
       tezos-protocol-environment-sigs
       tezos_raw_protocol_001_PtCJ7pwo)
  (flags -w "+a-4-6-7-9-29-40..42-44-45-48"
-        -warn-error "-a+8"
+        -warn-error "+a"
         -nopervasives)
  (modules Functor))
 
@@ -369,7 +369,7 @@ include Tezos_raw_protocol_001_PtCJ7pwo.Main
             tezos-protocol-updater
             tezos-protocol-environment)
  (flags (:standard -w +a-4-6-7-9-29-32-40..42-44-45-48
-                   -warn-error -a+8))
+                   -warn-error +a))
  (modules Registerer))
 
 (alias
