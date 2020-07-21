@@ -66,8 +66,41 @@ let test_b58check_invalids () =
       String.init 2048 (fun _ -> Char.chr (Random.int 256));
       "" ]
 
+let of_hex hex = Cstruct.(to_bytes (of_hex hex))
+
+let test_pkh_encodings () =
+  let test_encoded_pkh (input, test) =
+    let encoding = Ed25519.Public_key_hash.b58check_encoding in
+    let input = of_hex input in
+    let pkh = Ed25519.Public_key_hash.of_bytes_exn input in
+    let encoded = Base58.simple_encode encoding pkh in
+    assert (String.equal encoded test)
+  in
+  List.iter test_encoded_pkh Key_encoding_vectors.ed25519_pkhs
+
+let test_key_encodings () =
+  let test_encoded_key (seed, pkh_b58, pk_b58, sk_b58) =
+    let seed = of_hex seed in
+    let (pkh_test, pk_test, sk_test) = Ed25519.generate_key ~seed () in
+    let pkh_test =
+      Base58.simple_encode Ed25519.Public_key_hash.b58check_encoding pkh_test
+    in
+    let pk_test =
+      Base58.simple_encode Ed25519.Public_key.b58check_encoding pk_test
+    in
+    let sk_test =
+      Base58.simple_encode Ed25519.Secret_key.b58check_encoding sk_test
+    in
+    assert (String.equal pkh_test pkh_b58) ;
+    assert (String.equal pk_test pk_b58) ;
+    assert (String.equal sk_test sk_b58)
+  in
+  List.iter test_encoded_key Key_encoding_vectors.ed25519_key_encodings
+
 let tests =
   [ ("b58check.roundtrip", `Quick, test_b58check_roundtrips);
-    ("b58check.invalid", `Slow, test_b58check_invalids) ]
+    ("b58check.invalid", `Slow, test_b58check_invalids);
+    ("b58 pkh encodings", `Slow, test_pkh_encodings);
+    ("b58 key encodings", `Slow, test_key_encodings) ]
 
 let () = Alcotest.run "tezos-crypto" [("ed25519", tests)]
