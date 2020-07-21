@@ -112,6 +112,7 @@ class local_ctxt (base_dir : string) (mem_only : bool)
     let shell_directory =
       let (module Mockup_environment) = mockup_env in
       Local_services.build_shell_directory
+        base_dir
         mockup_env
         chain_id
         rpc_context

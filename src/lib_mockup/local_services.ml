@@ -139,6 +139,34 @@ let monitor (rpc_context : Tezos_protocol_environment.rpc_context) =
     Monitor_services.S.bootstrapped
     (fun () () () -> RPC_answer.return (block_hash, block_header.timestamp))
 
+let mempool (mockup_env : Registration.mockup_environment) (dirname : string) =
+  Format.printf "Registering for mempool %@ %s@." dirname ;
+  (* /chains/<chain_id> *)
+  let chain_path = Block_services.chain_path in
+  (* /chains/<chain_id>/mempool *)
+  let mempool_path = Block_services.mempool_path chain_path in
+  (* /chains/<chain_id>/mempool *)
+  let pending_operations_path =
+    RPC_path.(mempool_path / "pending_operations")
+  in
+  let module M = (val mockup_env : Registration.Mockup_sig) in
+  RPC_directory.register
+    Directory.empty
+    (* M.Block_services.Mempool.pending_operations ? *)
+    (Block_services.Empty.S.Mempool.pending_operations pending_operations_path)
+    (fun _ () () ->
+      (* TODO: wrap an a read file action *)
+      return Operation_hash.Map.empty
+      >>=? fun unprocessed ->
+      return
+        {
+          Block_services.Empty.Mempool.applied = [];
+          refused = Operation_hash.Map.empty;
+          branch_refused = Operation_hash.Map.empty;
+          branch_delayed = Operation_hash.Map.empty;
+          unprocessed;
+        })
+
 let block_hash (rpc_context : Tezos_protocol_environment.rpc_context) =
   let path =
     let open Tezos_rpc.RPC_path in
@@ -161,6 +189,7 @@ let preapply (mockup_env : Registration.mockup_environment)
        Block_services.path)
     (Directory.register
        Directory.empty
+       (* /chains/<chain_id>/blocks/<block_id>/helpers/preapply/operations *)
        Mockup_environment.Block_services.S.Helpers.Preapply.operations
        (fun _prefix () op_list ->
          (let predecessor = rpc_context.block_hash in
@@ -194,16 +223,50 @@ let preapply (mockup_env : Registration.mockup_environment)
          | Error errs ->
              RPC_answer.fail errs))
 
+let inject_block =
+  let register0 dir s f = RPC_directory.register dir s (fun () p q -> f p q) in
+  register0
+    Directory.empty
+    (* /injection/block *)
+    Tezos_shell_services.Injection_services.S.block
+    (* See injection_directory.ml for vanilla implementation *)
+    (fun _q (_raw, _operations) ->
+      (* FIXME here we should do what inject_operation is doing now *)
+      assert false)
+
 let inject_operation (mockup_env : Registration.mockup_environment)
     (chain_id : Chain_id.t)
     (rpc_context : Tezos_protocol_environment.rpc_context) (mem_only : bool)
     (write_context_callback :
       Tezos_protocol_environment.rpc_context -> unit tzresult Lwt.t) =
   let (module Mockup_environment) = mockup_env in
+  let _write_ops (ops : Mockup_environment.Protocol.operation list) =
+    let op_data_encoding =
+      Mockup_environment.Protocol.operation_data_encoding
+    in
+    let op_encoding =
+      Data_encoding.(
+        list
+        @@ obj2
+             (req "shell_header" Operation.shell_header_encoding)
+             (req "protocol_data" op_data_encoding))
+    in
+    let ops' =
+      List.map
+        (fun (op : Mockup_environment.Protocol.operation) ->
+          (op.shell, op.protocol_data))
+        ops
+    in
+    let _ = Data_encoding.Json.construct op_encoding ops' in
+    assert false
+  in
   Directory.register
     Directory.empty
+    (* /injection/operation, vanilla client implementation is in
+      injection_directory.ml *)
     Tezos_shell_services.Injection_services.S.operation
     (fun _q _contents operation_bytes ->
+      (* FIXME instead of doing that, we should fill the mempool file *)
       if mem_only then RPC_answer.fail [Injection_not_possible]
       else
         match
@@ -263,9 +326,9 @@ let inject_operation (mockup_env : Registration.mockup_environment)
                 | Error errs ->
                     RPC_answer.fail errs ) ))
 
-let build_shell_directory (mockup_env : Registration.mockup_environment)
-    chain_id (rpc_context : Tezos_protocol_environment.rpc_context)
-    (mem_only : bool)
+let build_shell_directory (base_dir : string)
+    (mockup_env : Registration.mockup_environment) chain_id
+    (rpc_context : Tezos_protocol_environment.rpc_context) (mem_only : bool)
     (write_context_callback :
       Tezos_protocol_environment.rpc_context -> unit tzresult Lwt.t) =
   let (module Mockup_environment) = mockup_env in
@@ -277,6 +340,7 @@ let build_shell_directory (mockup_env : Registration.mockup_environment)
   merge (protocols Mockup_environment.Protocol.hash) ;
   merge (block_hash rpc_context) ;
   merge (preapply mockup_env chain_id rpc_context) ;
+  merge (mempool mockup_env base_dir) ;
   merge
     (inject_operation
        mockup_env
@@ -284,4 +348,5 @@ let build_shell_directory (mockup_env : Registration.mockup_environment)
        rpc_context
        mem_only
        write_context_callback) ;
+  merge inject_block ;
   !directory

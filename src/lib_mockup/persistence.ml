@@ -226,7 +226,7 @@ let create_mockup ~(cctxt : Tezos_client_base.Client_context.full)
     ~protocol_hash
     ~constants_overrides_json
     ~bootstrap_accounts_json
-  >>=? fun (_mockup_env, (chain_id, rpc_context)) ->
+  >>=? fun (mockup_env, (chain_id, rpc_context)) ->
   let mockup_dir = (Files.mockup_directory ~dirname:base_dir :> string) in
   Tezos_stdlib_unix.Lwt_utils_unix.create_dir mockup_dir
   >>= fun () ->
@@ -234,3 +234,19 @@ let create_mockup ~(cctxt : Tezos_client_base.Client_context.full)
   Persistent_mockup_environment.(
     to_json {protocol_hash; chain_id; rpc_context})
   |> Tezos_stdlib_unix.Lwt_utils_unix.Json.write_file context_file
+  >>=? fun () ->
+  (* Setup a local persistent mempool *)
+  let mempool_file = (Files.mempool ~dirname:base_dir :> string) in
+  cctxt#message "Creating persistent mempool_file at %s" mempool_file
+  >>= fun () ->
+  let module Mockup = (val mockup_env : Registration.Mockup_sig) in
+  let encoding =
+    let open Data_encoding in
+    Variable.list
+    @@ dynamic_size
+         (obj2
+            (req "shell_header" Operation.shell_header_encoding)
+            (req "protocol_data" Mockup.Protocol.operation_data_encoding))
+  in
+  let json = Data_encoding.Json.construct encoding [] in
+  Tezos_stdlib_unix.Lwt_utils_unix.Json.write_file mempool_file json
