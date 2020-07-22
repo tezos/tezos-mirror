@@ -264,8 +264,13 @@ module Box = struct
 
   let equal : type a. a key -> a key -> bool =
    fun a b ->
+    (* TODO re-group once coverage ppx is updated *)
     match (a, b) with
-    | (Pk a, Pk b) | (Sk a, Sk b) | (Ck a, Ck b) ->
+    | (Pk a, Pk b) ->
+        Bytes.equal a b
+    | (Sk a, Sk b) ->
+        Bytes.equal a b
+    | (Ck a, Ck b) ->
         Bytes.equal a b
 
   let unsafe_sk_of_bytes buf =
@@ -376,7 +381,12 @@ module Sign = struct
 
   let equal : type a. a key -> a key -> bool =
    fun a b ->
-    match (a, b) with (Pk a, Pk b) | (Sk a, Sk b) -> Bytes.equal a b
+    (* TODO re-group once coverage ppx is updated *)
+    match (a, b) with
+    | (Pk a, Pk b) ->
+        Bytes.equal a b
+    | (Sk a, Sk b) ->
+        Bytes.equal a b
 
   let neuterize : type a. a key -> public key = function
     | Pk pk ->
