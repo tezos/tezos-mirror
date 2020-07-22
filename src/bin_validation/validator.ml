@@ -165,15 +165,15 @@ let load_protocol proto protocol_root =
       // Protocol_hash.to_short_b58check proto
       // Format.asprintf "protocol_%a.cmxs" Protocol_hash.pp proto
     in
+    lwt_emit (Dynload_protocol proto)
+    >|= fun () ->
     try
-      lwt_emit (Dynload_protocol proto)
-      >>= fun () ->
       Dynlink.loadfile_private cmxs_file ;
-      return_unit
+      ok_unit
     with Dynlink.Error err ->
       Format.ksprintf
         (fun msg ->
-          fail
+          error
             Block_validator_errors.(
               Validation_process_failed (Protocol_dynlink_failure msg)))
         "Cannot load file: %s. (Expected location: %s.)"
