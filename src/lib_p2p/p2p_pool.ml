@@ -288,8 +288,7 @@ module Peers = struct
     (('msg, 'peer, 'conn) P2p_conn.t, 'peer, 'conn) P2p_peer_state.Info.t
 
   let info {known_peer_ids; _} peer_id =
-    try Some (P2p_peer.Table.find known_peer_ids peer_id)
-    with Not_found -> None
+    P2p_peer.Table.find_opt known_peer_ids peer_id
 
   let get_peer_metadata pool peer_id =
     try
@@ -304,22 +303,18 @@ module Peers = struct
     P2p_peer_state.Info.set_peer_metadata (register_peer pool peer_id) data
 
   let get_trusted pool peer_id =
-    try
-      P2p_peer_state.Info.trusted
-        (P2p_peer.Table.find pool.known_peer_ids peer_id)
-    with Not_found -> false
+    Option.fold
+      (P2p_peer.Table.find_opt pool.known_peer_ids peer_id)
+      ~some:P2p_peer_state.Info.trusted
+      ~none:false
 
   let set_trusted pool peer_id =
-    try P2p_peer_state.Info.set_trusted (register_peer pool peer_id)
-    with Not_found -> ()
-
-  (* TODO can this exception occur *)
+    P2p_peer_state.Info.set_trusted (register_peer pool peer_id)
 
   let unset_trusted pool peer_id =
-    try
+    Option.iter
       P2p_peer_state.Info.unset_trusted
-        (P2p_peer.Table.find pool.known_peer_ids peer_id)
-    with Not_found -> ()
+      (P2p_peer.Table.find_opt pool.known_peer_ids peer_id)
 
   let fold_known pool ~init ~f = P2p_peer.Table.fold f pool.known_peer_ids init
 

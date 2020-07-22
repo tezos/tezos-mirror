@@ -298,46 +298,46 @@ end = struct
               -% a Hash.Logging.tag key
               -% a P2p_peer.Id.Logging.tag_opt peer)
         >>= fun () ->
-        try
-          let data = Table.find state.pending key in
-          let peers =
-            match peer with
-            | None ->
-                data.peers
-            | Some peer ->
-                P2p_peer.Set.add peer data.peers
-          in
-          let next_request = now in
-          Table.replace
-            state.pending
-            key
-            {delay = Request.initial_delay; next_request; peers} ;
-          lwt_debug
-            Tag.DSL.(
-              fun f ->
-                f "registering request %a from %a -> replaced"
-                -% t event "registering_request_replaced"
-                -% a Hash.Logging.tag key
-                -% a P2p_peer.Id.Logging.tag_opt peer)
-        with Not_found ->
-          let peers =
-            match peer with
-            | None ->
-                P2p_peer.Set.empty
-            | Some peer ->
-                P2p_peer.Set.singleton peer
-          in
-          Table.add
-            state.pending
-            key
-            {peers; next_request = now; delay = Request.initial_delay} ;
-          lwt_debug
-            Tag.DSL.(
-              fun f ->
-                f "registering request %a from %a -> added"
-                -% t event "registering_request_added"
-                -% a Hash.Logging.tag key
-                -% a P2p_peer.Id.Logging.tag_opt peer) )
+        match Table.find_opt state.pending key with
+        | Some data ->
+            let peers =
+              match peer with
+              | None ->
+                  data.peers
+              | Some peer ->
+                  P2p_peer.Set.add peer data.peers
+            in
+            let next_request = now in
+            Table.replace
+              state.pending
+              key
+              {delay = Request.initial_delay; next_request; peers} ;
+            lwt_debug
+              Tag.DSL.(
+                fun f ->
+                  f "registering request %a from %a -> replaced"
+                  -% t event "registering_request_replaced"
+                  -% a Hash.Logging.tag key
+                  -% a P2p_peer.Id.Logging.tag_opt peer)
+        | None ->
+            let peers =
+              match peer with
+              | None ->
+                  P2p_peer.Set.empty
+              | Some peer ->
+                  P2p_peer.Set.singleton peer
+            in
+            Table.add
+              state.pending
+              key
+              {peers; next_request = now; delay = Request.initial_delay} ;
+            lwt_debug
+              Tag.DSL.(
+                fun f ->
+                  f "registering request %a from %a -> added"
+                  -% t event "registering_request_added"
+                  -% a Hash.Logging.tag key
+                  -% a P2p_peer.Id.Logging.tag_opt peer) )
     | Notify (peer, key) ->
         Table.remove state.pending key ;
         lwt_debug
@@ -430,8 +430,10 @@ end = struct
                   in
                   Table.replace state.pending key next ;
                   let requests =
-                    try key :: P2p_peer.Map.find requested_peer acc
-                    with Not_found -> [key]
+                    key
+                    :: Option.value
+                         ~default:[]
+                         (P2p_peer.Map.find_opt requested_peer acc)
                   in
                   P2p_peer.Map.add requested_peer requests acc)
             state.pending

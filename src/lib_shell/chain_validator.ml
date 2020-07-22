@@ -129,11 +129,10 @@ let notify_new_block w block =
   let nv = Worker.state w in
   Option.iter
     (fun (id, _) ->
-      try
-        let w = List.assoc id (Worker.list table) in
-        let nv = Worker.state w in
-        Lwt_watcher.notify nv.valid_block_input block
-      with Not_found -> ())
+      List.assoc_opt id (Worker.list table)
+      |> Option.iter (fun w ->
+             let nv = Worker.state w in
+             Lwt_watcher.notify nv.valid_block_input block))
     nv.parameters.parent ;
   Lwt_watcher.notify nv.valid_block_input block ;
   Lwt_watcher.notify nv.parameters.global_valid_block_input block ;
@@ -763,12 +762,10 @@ let chain_db w =
   chain_db
 
 let child w =
-  match (Worker.state w).child with
-  | None ->
-      None
-  | Some ({parameters = {chain_state; _}; _}, _) -> (
-    try Some (List.assoc (State.Chain.id chain_state) (Worker.list table))
-    with Not_found -> None )
+  Option.bind
+    (Worker.state w).child
+    (fun ({parameters = {chain_state; _}; _}, _) ->
+      List.assoc_opt (State.Chain.id chain_state) (Worker.list table))
 
 let assert_fitness_increases ?(force = false) w distant_header =
   let pv = Worker.state w in
