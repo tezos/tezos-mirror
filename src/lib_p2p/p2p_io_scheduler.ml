@@ -25,9 +25,15 @@
 
 (* TODO decide whether we need to preallocate buffers or not. *)
 
-include Internal_event.Legacy_logging.Make (struct
-  let name = "p2p.io-scheduler"
-end)
+module Events = struct
+  include P2p_events.P2p_io_scheduler
+
+  let emit_dont_wait e p =
+    Lwt_utils.dont_wait
+      (fun exc ->
+        Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
+      (fun () -> emit e p)
+end
 
 let alpha = 0.2
 
@@ -75,7 +81,7 @@ module Scheduler (IO : IO) = struct
 
   let cancel (conn : connection) err =
     Lwt_utils.unless conn.closed (fun () ->
-        lwt_debug "Connection closed (%d, %s) " conn.id IO.name
+        Events.(emit connection_closed) ("cancel", conn.id, IO.name)
         >>= fun () ->
         conn.closed <- true ;
         Lwt.catch
@@ -110,14 +116,14 @@ module Scheduler (IO : IO) = struct
 
   let check_quota st =
     if st.max_speed <> None && st.quota < 0 then
-      lwt_debug "scheduler.wait_quota(%s)" IO.name
+      Events.(emit wait_quota) IO.name
       >>= fun () -> Lwt_condition.wait st.quota_updated
     else Lwt_unix.yield ()
 
   let rec worker_loop st =
     check_quota st
     >>= fun () ->
-    lwt_debug "scheduler.wait(%s)" IO.name
+    Events.(emit wait) IO.name
     >>= fun () ->
     Lwt.pick [Lwt_canceler.cancellation st.canceler; wait_data st]
     >>= fun () ->
@@ -135,15 +141,10 @@ module Scheduler (IO : IO) = struct
       | Error (Exn Lwt_pipe.Closed :: _ as err)
       | Error (Exn (Unix.Unix_error ((EBADF | ETIMEDOUT), _, _)) :: _ as err)
         ->
-          lwt_debug "Connection closed (pop: %d, %s)" conn.id IO.name
+          Events.(emit connection_closed) ("pop", conn.id, IO.name)
           >>= fun () -> cancel conn err >>= fun () -> worker_loop st
       | Error err ->
-          lwt_log_error
-            "@[Unexpected error in connection (pop: %d, %s):@ %a@]"
-            conn.id
-            IO.name
-            pp_print_error
-            err
+          Events.(emit unexpected_error) ("pop", conn.id, IO.name, err)
           >>= fun () -> cancel conn err >>= fun () -> worker_loop st
       | Ok msg ->
           conn.current_push <-
@@ -154,19 +155,14 @@ module Scheduler (IO : IO) = struct
             | Error (P2p_errors.Connection_closed :: _ as err)
             | Error (Exn (Unix.Unix_error (EBADF, _, _)) :: _ as err)
             | Error (Exn Lwt_pipe.Closed :: _ as err) ->
-                lwt_debug "Connection closed (push: %d, %s)" conn.id IO.name
+                Events.(emit connection_closed) ("push", conn.id, IO.name)
                 >>= fun () -> cancel conn err >>= fun () -> return_unit
             | Error err ->
-                lwt_log_error
-                  "@[Unexpected error in connection (push: %d, %s):@ %a@]"
-                  conn.id
-                  IO.name
-                  pp_print_error
-                  err
+                Events.(emit unexpected_error) ("push", conn.id, IO.name, err)
                 >>= fun () ->
                 cancel conn err >>= fun () -> Lwt.return_error err ) ;
           let len = Bytes.length msg in
-          lwt_debug "Handle: %d (%d, %s)" len conn.id IO.name
+          Events.(emit handle_connection) (len, conn.id, IO.name)
           >>= fun () ->
           Moving_average.add st.counter len ;
           st.quota <- st.quota - len ;
@@ -198,7 +194,7 @@ module Scheduler (IO : IO) = struct
     st
 
   let create_connection st in_param out_param canceler id =
-    debug "scheduler(%s).create_connection (%d)" IO.name id ;
+    Events.(emit_dont_wait create_connection (id, IO.name)) ;
     let conn =
       {
         id;
@@ -216,7 +212,7 @@ module Scheduler (IO : IO) = struct
     waiter st conn ; conn
 
   let update_quota st =
-    debug "scheduler(%s).update_quota" IO.name ;
+    Events.(emit_dont_wait update_quota IO.name) ;
     Option.iter
       (fun quota ->
         st.quota <- min st.quota 0 + quota ;
@@ -233,11 +229,8 @@ module Scheduler (IO : IO) = struct
       Queue.transfer tmp st.readys_low )
 
   let shutdown st =
-    lwt_debug "--> scheduler(%s).shutdown" IO.name
-    >>= fun () ->
     Lwt_canceler.cancel st.canceler
-    >>= fun () ->
-    st.worker >>= fun () -> lwt_debug "<-- scheduler(%s).shutdown" IO.name
+    >>= fun () -> st.worker >>= fun () -> Events.(emit shutdown) IO.name
 end
 
 module ReadScheduler = Scheduler (struct
@@ -325,7 +318,7 @@ and t = {
 }
 
 let reset_quota st =
-  debug "--> reset quota" ;
+  Events.(emit_dont_wait reset_quota ()) ;
   let {Moving_average.average = current_inflow; _} =
     Moving_average.stat st.read_scheduler.counter
   and {Moving_average.average = current_outflow; _} =
@@ -347,7 +340,7 @@ let reset_quota st =
 
 let create ?max_upload_speed ?max_download_speed ?read_queue_size
     ?write_queue_size ~read_buffer_size () =
-  log_info "--> create" ;
+  Events.(emit_dont_wait create ()) ;
   let st =
     {
       closed = false;
@@ -437,7 +430,7 @@ let register st fd =
       }
     in
     P2p_fd.Table.add st.connected conn.fd conn ;
-    log_info "--> register (%d)" id ;
+    (* Events.(emit register) id) *)
     conn
 
 let write ?canceler {write_queue; _} msg =
@@ -522,8 +515,6 @@ let stat {read_conn; write_conn; _} =
 
 let close ?timeout conn =
   let id = P2p_fd.id conn.fd in
-  lwt_log_info "--> close (%d)" id
-  >>= fun () ->
   P2p_fd.Table.remove conn.sched.connected conn.fd ;
   Lwt_pipe.close conn.write_queue ;
   ( match timeout with
@@ -536,14 +527,12 @@ let close ?timeout conn =
         (fun canceler -> return (Lwt_canceler.cancellation canceler)) )
   >>=? fun _ ->
   conn.write_conn.current_push
-  >>= fun res -> lwt_log_info "<-- close (%d)" id >>= fun () -> Lwt.return res
+  >>= fun res -> Events.(emit close) id >>= fun () -> Lwt.return res
 
 let iter_connection {connected; _} f =
   P2p_fd.Table.iter (fun _ conn -> f conn) connected
 
 let shutdown ?timeout st =
-  lwt_log_info "--> shutdown"
-  >>= fun () ->
   st.closed <- true ;
   ReadScheduler.shutdown st.read_scheduler
   >>= fun () ->
@@ -553,6 +542,6 @@ let shutdown ?timeout st =
     Lwt.return_unit
   >>= fun () ->
   WriteScheduler.shutdown st.write_scheduler
-  >>= fun () -> lwt_log_info "<-- shutdown"
+  >>= fun () -> Events.(emit shutdown_scheduler) ()
 
 let id conn = P2p_fd.id conn.fd

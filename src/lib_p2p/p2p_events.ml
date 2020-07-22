@@ -416,3 +416,114 @@ module P2p_welcome = struct
       ~level:Error
       ("exception", Error_monad.error_encoding)
 end
+
+module P2p_io_scheduler = struct
+  include Internal_event.Simple
+
+  let section = ["p2p"; "io-scheduler"]
+
+  let connection_closed =
+    declare_3
+      ~section
+      ~name:"connection_closed_scheduler"
+      ~msg:"connection closed {direction} ({connection_id},{name})"
+      ~level:Debug
+      ("direction", Data_encoding.string)
+      ("connection_id", Data_encoding.int16)
+      ("name", Data_encoding.string)
+
+  let unexpected_error =
+    declare_4
+      ~section
+      ~name:"unexpected_error_scheduler"
+      ~msg:
+        "unexpected error in connection ({direction}: \
+         {connection_id},{name}): {error}"
+      ~level:Error
+      ~pp4:pp_print_error_first
+      ("direction", Data_encoding.string)
+      ("connection_id", Data_encoding.int16)
+      ("name", Data_encoding.string)
+      ("error", Error_monad.trace_encoding)
+
+  let wait_quota =
+    declare_1
+      ~section
+      ~name:"scheduler_wait_quota"
+      ~msg:"wait_quota ({name})"
+      ~level:Debug
+      ("name", Data_encoding.string)
+
+  let wait =
+    declare_1
+      ~section
+      ~name:"scheduler_wait"
+      ~msg:"wait ({name})"
+      ~level:Debug
+      ("name", Data_encoding.string)
+
+  let handle_connection =
+    declare_3
+      ~section
+      ~name:"handle_connection"
+      ~msg:"handle {len} ({connection_id},{name})"
+      ~level:Debug
+      ("len", Data_encoding.int31)
+      ("connection_id", Data_encoding.int16)
+      ("name", Data_encoding.string)
+
+  let create_connection =
+    declare_2
+      ~section
+      ~name:"create_connection_scheduler"
+      ~msg:"create connection ({connection_id},{name})"
+      ~level:Debug
+      ("connection_id", Data_encoding.int16)
+      ("name", Data_encoding.string)
+
+  let update_quota =
+    declare_1
+      ~section
+      ~name:"update_quota"
+      ~msg:"update quota {name}"
+      ~level:Debug
+      ("name", Data_encoding.string)
+
+  let reset_quota =
+    declare_0 ~section ~name:"reset_quota" ~msg:"reset quota" ~level:Debug ()
+
+  let create =
+    declare_0 ~section ~name:"create_connection" ~msg:"create" ~level:Debug ()
+
+  let register =
+    declare_1
+      ~section
+      ~name:"register_connection"
+      ~msg:"register_connection {connection_id}"
+      ~level:Debug
+      ("connection_id", Data_encoding.int16)
+
+  let close =
+    declare_1
+      ~section
+      ~name:"close_connection"
+      ~msg:"close {connection_id}"
+      ~level:Debug
+      ("connection_id", Data_encoding.int16)
+
+  let shutdown =
+    declare_1
+      ~section
+      ~name:"shutdown_connection"
+      ~msg:"shutdown {name}"
+      ~level:Debug
+      ("name", Data_encoding.string)
+
+  let shutdown_scheduler =
+    declare_0
+      ~section
+      ~name:"shutdown_scheduler"
+      ~msg:"shutdown scheduler"
+      ~level:Debug
+      ()
+end
