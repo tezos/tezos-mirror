@@ -159,26 +159,26 @@ let double_bake protocol =
   let* () = Client.activate_protocol ~protocol client_1 in
   Log.info "Activated protocol." ;
   let common_ancestor = 0 in
-  let bootstrap1_key = Constant.bootstrap1.identity in
-  let bootstrap2_key = Constant.bootstrap2.identity in
+  let baker1_key = Constant.baker1.identity in
+  let baker2_key = Constant.baker2.identity in
   let* _ = Node.wait_for_level node_1 (common_ancestor + 1)
   and* _ = Node.wait_for_level node_2 (common_ancestor + 1) in
   Log.info "Both nodes are at level %d." (common_ancestor + 1) ;
   (* Step 3 *)
   let* () = Node.terminate node_2 in
-  (* Craft a branch of size 2, baked by bootstrap1 *)
-  let* () = Client.bake_for ~key:bootstrap1_key client_1 in
-  let* () = Client.bake_for ~key:bootstrap1_key client_1 in
+  (* Craft a branch of size 2, baked by baker1 *)
+  let* () = Client.bake_for ~key:baker1_key client_1 in
+  let* () = Client.bake_for ~key:baker1_key client_1 in
   let* _ = Node.wait_for_level node_1 (common_ancestor + 3) in
   (* Step 4 *)
   let* () = Node.terminate node_1 in
   let* () = Node.run node_2 [Bootstrap_threshold 0] in
   let* () = Node.wait_for_ready node_2 in
-  (* Craft a branch of size 2, the first block is baked by bootstrap2 *)
-  let* () = Client.bake_for ~key:bootstrap2_key client_2 in
-  (* The second block is double baked by bootstrap1 to simulate a
+  (* Craft a branch of size 2, the first block is baked by baker2 *)
+  let* () = Client.bake_for ~key:baker2_key client_2 in
+  (* The second block is double baked by baker1 to simulate a
      double bake *)
-  let* () = Client.bake_for ~key:bootstrap1_key client_2 in
+  let* () = Client.bake_for ~key:baker1_key client_2 in
   let* _ = Node.wait_for_level node_2 (common_ancestor + 3) in
   (* Step 5 *)
   let* () = Node.run node_1 [Bootstrap_threshold 0] in
@@ -204,7 +204,7 @@ let double_bake protocol =
   (* Ensure that the denunciation is in node_3's mempool *)
   let* _ = denunciation_injection in
   (* Step 7 *)
-  let* () = Client.bake_for ~key:bootstrap1_key client_3 in
+  let* () = Client.bake_for ~key:baker1_key client_3 in
   let* _ = Node.wait_for_level node_2 (common_ancestor + 4)
   and* _ = Node.wait_for_level node_3 (common_ancestor + 4) in
   (* Getting the operations of the current head *)

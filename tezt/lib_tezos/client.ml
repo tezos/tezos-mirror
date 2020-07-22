@@ -271,7 +271,14 @@ let activate_protocol ?node ~protocol ?fitness ?key ?timestamp ?timestamp_delay
     client
   |> Process.check
 
-let spawn_bake_for ?node ?(key = Constant.bootstrap1.alias)
+let remember_baker_contracts client =
+  Lwt_list.iter_s
+    (fun (baker : Constant.baker) ->
+      spawn_command client ["remember"; "contract"; baker.alias; baker.identity]
+      |> Process.check)
+    Constant.all_bakers
+
+let spawn_bake_for ?node ?(key = Constant.baker1.identity)
     ?(minimal_timestamp = true) client =
   spawn_command
     ?node
@@ -493,6 +500,22 @@ let spawn_migrate_mockup ~next_protocol client =
 let migrate_mockup ~next_protocol client =
   spawn_migrate_mockup ~next_protocol client |> Process.check
 
+let spawn_find_baker_with_consensus_key ~key client =
+  spawn_command
+    client
+    (mode_arg client @ ["find"; "baker"; "with"; "consensus"; "key"; key])
+
+let find_baker_with_consensus_key ~key client =
+  let* output =
+    spawn_find_baker_with_consensus_key ~key client
+    |> Process.check_and_read_stdout
+  in
+  match output =~* rex "Found baker: ?(\\w*)" with
+  | None ->
+      Test.fail "Cannot extract baker hash from output: %s" output
+  | Some hash ->
+      return hash
+
 let init ?path ?admin_path ?name ?color ?base_dir ?node () =
   let client = create ?path ?admin_path ?name ?color ?base_dir ?node () in
   let* () =
@@ -510,4 +533,8 @@ let init_mockup ?path ?admin_path ?name ?color ?base_dir ?sync_mode ~protocol
   in
   let* () = create_mockup ?sync_mode ~protocol client in
   (* We want, however, to return a mockup client; hence the following: *)
-  set_mode Mockup client ; return client
+  set_mode Mockup client ;
+  let* () =
+    Lwt_list.iter_s (import_secret_key client) Constant.all_baker_keys
+  in
+  return client

@@ -91,7 +91,14 @@ let test_transfer protocol =
       client
   in
   Log.info "Transferred 10 tez." ;
-  let* () = Client.bake_for ~key:"bootstrap2" client in
+  let baker =
+    match protocol with
+    | Protocol.Alpha ->
+        Constant.baker2.identity
+    | _ ->
+        "bootstrap2"
+  in
+  let* () = Client.bake_for ~key:baker client in
   Log.info "Baked block for bootstrap2." ;
   return ()
 
