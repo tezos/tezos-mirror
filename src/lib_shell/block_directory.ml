@@ -216,42 +216,42 @@ let build_raw_rpc_directory ~user_activated_upgrades
   register0 S.Operations.operations (fun block () () -> operations block) ;
   register1 S.Operations.operations_in_pass (fun block i () () ->
       let chain_id = State.Block.chain_id block in
-      try
-        State.Block.operations block i
-        >>= fun (ops, _path) ->
-        Lwt.catch
-          (fun () ->
-            State.Block.operations_metadata block i
-            >>= fun ops_metadata ->
-            return
-              (List.map2 (convert_with_metadata chain_id) ops ops_metadata))
-          (fun _ ->
-            return ((List.map (convert_without_metadata chain_id)) ops))
-      with _ -> Lwt.fail Not_found) ;
+      Lwt.catch
+        (fun () -> State.Block.operations block i)
+        (fun _ -> Lwt.fail Not_found)
+      >>= fun (ops, _path) ->
+      Lwt.catch
+        (fun () ->
+          State.Block.operations_metadata block i
+          >>= fun ops_metadata ->
+          return (List.map2 (convert_with_metadata chain_id) ops ops_metadata))
+        (fun _ -> return ((List.map (convert_without_metadata chain_id)) ops))) ;
   register2 S.Operations.operation (fun block i j () () ->
       let chain_id = State.Block.chain_id block in
-      try
-        State.Block.operations block i
-        >>= fun (ops, _path) ->
-        let op = List.nth ops j in
-        Lwt.catch
-          (fun () ->
-            State.Block.operations_metadata block i
-            >>= fun metadata ->
-            let op_metadata = List.nth metadata j in
-            return (convert_with_metadata chain_id op op_metadata))
-          (fun _ -> return (convert_without_metadata chain_id op))
-      with _ -> Lwt.fail Not_found) ;
+      Lwt.catch
+        (fun () ->
+          State.Block.operations block i
+          >>= fun (ops, _path) ->
+          let op = List.nth ops j in
+          Lwt.catch
+            (fun () ->
+              State.Block.operations_metadata block i
+              >>= fun metadata ->
+              let op_metadata = List.nth metadata j in
+              return (convert_with_metadata chain_id op op_metadata))
+            (fun _ -> return (convert_without_metadata chain_id op)))
+        (fun _ -> Lwt.fail Not_found)) ;
   (* operation_hashes *)
   register0 S.Operation_hashes.operation_hashes (fun block () () ->
       State.Block.all_operation_hashes block >>= return) ;
   register1 S.Operation_hashes.operation_hashes_in_pass (fun block i () () ->
       State.Block.operation_hashes block i >>= fun (ops, _) -> return ops) ;
   register2 S.Operation_hashes.operation_hash (fun block i j () () ->
-      ( try
+      Lwt.catch
+        (fun () ->
           State.Block.operation_hashes block i
-          >>= fun (ops, _) -> Lwt.return (List.nth ops j)
-        with _ -> Lwt.fail Not_found )
+          >|= fun (ops, _) -> List.nth ops j)
+        (fun _ -> Lwt.fail Not_found)
       >>= fun op -> return op) ;
   (* context *)
   register1 S.Context.read (fun block path q () ->
