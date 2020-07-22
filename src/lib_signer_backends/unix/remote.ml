@@ -207,21 +207,30 @@ let () =
     (fun s -> Invalid_remote_signer s)
 
 let parse_base_uri s =
-  trace (Invalid_remote_signer s)
-  @@
-  try
-    let uri = Uri.of_string s in
+  (* FIXME: documentation for [Uri.of_string] doesn't mention any exception.
+      However, from reading the code it seems like [Not_found] can be raised
+      (via some internal call to [Re.exec]. *)
+  match Uri.of_string s with
+  (* We keep [Invalid_argument] but this needs investigation because of the
+      above comment *)
+  | exception Invalid_argument msg ->
+      generic_error "Malformed URI: %s" msg
+  | exception Not_found ->
+      generic_error "Malformed URI"
+  | uri -> (
     match Uri.scheme uri with
     | Some "http" ->
-        return uri
+        Ok uri
     | Some "https" ->
-        return uri
+        Ok uri
     | Some "tcp" ->
-        return uri
+        Ok uri
     | Some "unix" ->
-        return uri
+        Ok uri
     | Some scheme ->
-        failwith "Unknown scheme: %s" scheme
+        generic_error "Unknown scheme: %s" scheme
     | None ->
-        failwith "Unknown scheme: <empty>"
-  with Invalid_argument msg -> failwith "Malformed URI: %s" msg
+        generic_error "Unknown scheme: <empty>" )
+
+let parse_base_uri s =
+  parse_base_uri s |> record_trace (Invalid_remote_signer s) |> Lwt.return

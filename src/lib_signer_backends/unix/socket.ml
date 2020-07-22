@@ -156,15 +156,14 @@ struct
 
     let parse uri =
       assert (Uri.scheme uri = Some scheme) ;
-      trace (Invalid_uri uri)
-      @@
       match Uri.get_query_param uri "pkh" with
       | None ->
-          failwith "Missing the query parameter: 'pkh=tz1...'"
+          generic_error "Missing the query parameter: 'pkh=tz1...'"
       | Some key ->
-          Lwt.return (Signature.Public_key_hash.of_b58check key)
-          >>=? fun key ->
-          return (Tezos_base_unix.Socket.Unix (Uri.path uri), key)
+          Signature.Public_key_hash.of_b58check key
+          >|? fun key -> (Tezos_base_unix.Socket.Unix (Uri.path uri), key)
+
+    let parse uri = parse uri |> record_trace (Invalid_uri uri) |> Lwt.return
 
     let public_key uri =
       parse (uri : pk_uri :> Uri.t) >>=? fun (path, pkh) -> public_key path pkh
@@ -205,22 +204,23 @@ struct
 
     let parse uri =
       assert (Uri.scheme uri = Some scheme) ;
-      trace (Invalid_uri uri)
-      @@
       match (Uri.host uri, Uri.port uri) with
       | (None, _) ->
-          failwith "Missing host address"
+          generic_error "Missing host address"
       | (_, None) ->
-          failwith "Missing host port"
+          generic_error "Missing host port"
       | (Some path, Some port) ->
           let pkh = Uri.path uri in
           let pkh = try String.(sub pkh 1 (length pkh - 1)) with _ -> "" in
-          Lwt.return (Signature.Public_key_hash.of_b58check pkh)
-          >>=? fun pkh ->
-          return
-            ( Tezos_base_unix.Socket.Tcp
-                (path, string_of_int port, [Lwt_unix.AI_SOCKTYPE SOCK_STREAM]),
-              pkh )
+          Signature.Public_key_hash.of_b58check pkh
+          >|? fun pkh ->
+          let tcp_socket =
+            Tezos_base_unix.Socket.Tcp
+              (path, string_of_int port, [Lwt_unix.AI_SOCKTYPE SOCK_STREAM])
+          in
+          (tcp_socket, pkh)
+
+    let parse uri = parse uri |> record_trace (Invalid_uri uri) |> Lwt.return
 
     let public_key uri =
       parse (uri : pk_uri :> Uri.t) >>=? fun (path, pkh) -> public_key path pkh
