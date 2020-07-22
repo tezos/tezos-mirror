@@ -184,7 +184,7 @@ let spawn_config_init ?(network = "sandbox") ?net_port ?rpc_port ?history_mode
     node
     ( "config" :: "init" :: "--data-dir" :: node.data_dir :: "--network"
     :: network :: "--net-addr"
-    :: ("[::1]:" ^ string_of_int node.net_port)
+    :: ("127.0.0.1:" ^ string_of_int node.net_port)
     :: "--rpc-addr"
     :: ("localhost:" ^ string_of_int node.rpc_port)
     ::

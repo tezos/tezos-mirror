@@ -140,7 +140,7 @@ module Admin = struct
     spawn_command
       client
       ?node
-      ["connect"; "address"; "[::1]:" ^ string_of_int (Node.net_port peer)]
+      ["connect"; "address"; "127.0.0.1:" ^ string_of_int (Node.net_port peer)]
 
   let connect_address ?node ~peer client =
     spawn_connect_address ?node ~peer client |> Process.check
