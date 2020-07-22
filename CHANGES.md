@@ -1,3 +1,12 @@
+# Version 7.3
+
+- Fixed a case where the number of open file descriptors was not correctly limited.
+  This could result in the node crashing due to being out of file descriptors.
+
+- Set a limit to the length of some incoming messages which previously did not have one.
+
+- Fixed some value encodings which were missing cases.
+
 # Version 7.2
 
 - Fixed an error that could cause baking to fail when validating some smart contracts.
