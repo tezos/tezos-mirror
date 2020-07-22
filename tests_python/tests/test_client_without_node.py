@@ -59,9 +59,9 @@ def _with_config_file_cmd(config_file: Optional[str], cmd: List[str]):
 
 
 @pytest.mark.client
-@pytest.mark.parametrize('config_dict', _INPUT_CONFIG_FILES)
 class TestConfigInit:
 
+    @pytest.mark.parametrize('config_dict', _INPUT_CONFIG_FILES)
     def test_config_init(self, simple_client, config_dict):
         """
             Tests that calling
@@ -86,3 +86,46 @@ class TestConfigInit:
             if in_file is not None:
                 os.remove(in_file)
             os.remove(out_file)
+
+    def test_config_init_roundtrip(self, simple_client):
+        """ Tests that calling `config init -o tmp_file` and
+            feeding its result to `tezos-client --config-file` works
+            and yields the same result (i.e. calling `tezos-client
+            --config-file tmp_file config init -o tmp_file2 yields
+            a `tmp_file2` that is similar to `tmp_file`).
+        """
+        try:
+            tmp_file1 = tempfile.mktemp(prefix='tezos-client.config_file')
+            tmp_file2 = tempfile.mktemp(prefix='tezos-client.config_file')
+            cmd = ["config", "init", "-o", tmp_file1]
+            simple_client.run(cmd)
+            with open(tmp_file1) as handle:
+                json1 = json.load(handle)
+
+            flag = "--config-file"
+
+            # Execute an arbitrary effectless command
+            cmd = _with_config_file_cmd(tmp_file1,
+                                        ["list", "understood", "protocols"])
+            simple_client.run(cmd)  # Should work
+
+            cmd = _with_config_file_cmd(tmp_file1,
+                                        ["config", "init", "-o", tmp_file2])
+            simple_client.run(cmd)  # Generate new config file
+
+            with open(tmp_file2) as handle:
+                json2 = json.load(handle)
+
+            def _gen_assert_msg(flag, sent, received):
+                result = f"Json sent with --{flag} differs from"
+                result += " json received"
+                result += f"\nJson sent is:\n{sent}"
+                result += f"\nwhile json received is:\n{received}"
+
+            # and finally check that the json object received is the same
+            # as the one given as input
+            assert json1 == json2,\
+                _gen_assert_msg(flag, json1, json2)
+        finally:
+            os.remove(tmp_file1)
+            os.remove(tmp_file2)
