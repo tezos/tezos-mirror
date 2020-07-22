@@ -33,8 +33,10 @@ let zero_nonce = Crypto_box.zero_nonce
 let chkey = Crypto_box.precompute sk pk
 
 let test_check_pow () =
+  let open Lwt.Infix in
   let target = Crypto_box.make_target 2. in
-  let pow = Crypto_box.generate_proof_of_work pk target in
+  Crypto_box.generate_proof_of_work pk target
+  >|= fun pow ->
   Alcotest.(check bool)
     "check_pow"
     (Crypto_box.check_proof_of_work pk pow target)
@@ -75,10 +77,14 @@ let test_fast_box msg () =
 let tests =
   [ ("Neuterize Secret roundtrip", `Quick, test_neuterize sk pk);
     ("Public Key Hash roundtrip", `Quick, test_hash pk pkh);
-    ("Check PoW", `Slow, test_check_pow);
     ( "HACL* box (noalloc)",
       `Quick,
       test_fast_box_noalloc (Bytes.of_string "test") );
     ("HACL* box", `Quick, test_fast_box (Bytes.of_string "test")) ]
 
 let () = Alcotest.run "tezos-crypto" [("crypto_box", tests)]
+
+let tests_lwt = [("Check PoW", `Slow, test_check_pow)]
+
+let () =
+  Lwt_main.run @@ Alcotest_lwt.run "tezos-crypto" [("crypto_box", tests_lwt)]

@@ -137,6 +137,8 @@ let raw_accept sched main_socket =
 let accept sched main_socket =
   raw_accept sched main_socket
   >>= fun (fd, point) ->
+  id1
+  >>= fun id1 ->
   P2p_socket.authenticate
     ~canceler
     ~proof_of_work_target
@@ -159,6 +161,10 @@ let raw_connect sched addr port =
 let connect sched addr port id =
   raw_connect sched addr port
   >>= fun fd ->
+  id
+  >>= fun id ->
+  id1
+  >>= fun id1 ->
   P2p_socket.authenticate
     ~canceler
     ~proof_of_work_target
@@ -337,6 +343,8 @@ module Nack = struct
     >>=? fun (info, auth_fd) ->
     _assert info.incoming __LOC__ ""
     >>=? fun () ->
+    id2
+    >>= fun id2 ->
     _assert (P2p_peer.Id.compare info.peer_id id2.peer_id = 0) __LOC__ ""
     >>=? fun () ->
     P2p_socket.nack auth_fd P2p_rejection.No_motive []

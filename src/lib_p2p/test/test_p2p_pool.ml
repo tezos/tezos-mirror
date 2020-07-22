@@ -119,7 +119,7 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
       trusted_points
   in
   let proof_of_work_target = Crypto_box.make_target 0. in
-  let identity = P2p_identity.generate proof_of_work_target in
+  let identity = P2p_identity.generate_with_target_0 () in
   let private_mode = false in
   let nb_points = List.length trusted_points in
   let unopt = Option.value ~default:nb_points in

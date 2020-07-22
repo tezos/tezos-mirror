@@ -22,6 +22,7 @@ depends: [
   "conf-rust" # fake (for the CI) to be removed once libsapling is merged
   "ringo" { = "0.5" }
   "alcotest" { with-test & >= "1.1.0" }
+  "alcotest-lwt" { with-test & >= "1.1.0" }
 ]
 conflicts: [
   "hacl_x25519"

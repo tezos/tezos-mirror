@@ -10,7 +10,8 @@
  (libraries tezos-stdlib
             tezos-crypto
             data-encoding
-            alcotest)
+            alcotest
+            alcotest-lwt)
  (flags (:standard -open Tezos_stdlib
                    -open Tezos_crypto
                    -open Data_encoding)))
