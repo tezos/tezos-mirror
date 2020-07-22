@@ -175,23 +175,23 @@ module Term = struct
 
   let network_name_converter =
     let of_string s =
-      try
-        let ntw =
-          List.assoc
-            (String.lowercase_ascii s)
-            Node_config_file.builtin_blockchain_networks
-        in
-        Ok ntw
-      with Not_found ->
-        Error
-          (`Msg
-            (Format.asprintf
-               "invalid value '%s', expected one of '%a'"
-               s
-               (Format.pp_print_list
-                  ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
-                  Format.pp_print_string)
-               (List.map fst Node_config_file.builtin_blockchain_networks)))
+      match
+        List.assoc_opt
+          (String.lowercase_ascii s)
+          Node_config_file.builtin_blockchain_networks
+      with
+      | Some ntw ->
+          Ok ntw
+      | None ->
+          Error
+            (`Msg
+              (Format.asprintf
+                 "invalid value '%s', expected one of '%a'"
+                 s
+                 (Format.pp_print_list
+                    ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
+                    Format.pp_print_string)
+                 (List.map fst Node_config_file.builtin_blockchain_networks)))
     in
     let printer ppf ({alias; _} : Node_config_file.blockchain_network) =
       (* Should not fail by construction of Node_config_file.block_chain_network *)

@@ -129,9 +129,7 @@ module Alias (Entity : Entity) = struct
     | Error _ -> return_nil | Ok list -> return (List.map fst list)
 
   let find_opt (wallet : #wallet) name =
-    load wallet
-    >>=? fun list ->
-    try return_some (List.assoc name list) with Not_found -> return_none
+    load wallet >|=? fun list -> List.assoc_opt name list
 
   let find (wallet : #wallet) name =
     load wallet
@@ -141,9 +139,8 @@ module Alias (Entity : Entity) = struct
 
   let rev_find (wallet : #wallet) v =
     load wallet
-    >>=? fun list ->
-    try return_some (List.find (fun (_, v') -> v = v') list |> fst)
-    with Not_found -> return_none
+    >|=? fun list ->
+    Option.map fst @@ List.find_opt (fun (_, v') -> v = v') list
 
   let rev_find_all (wallet : #wallet) v =
     load wallet
@@ -152,12 +149,7 @@ module Alias (Entity : Entity) = struct
       (List.filter_map (fun (n, v') -> if v = v' then Some n else None) list)
 
   let mem (wallet : #wallet) name =
-    load wallet
-    >>=? fun list ->
-    try
-      ignore (List.assoc name list) ;
-      return_true
-    with Not_found -> return_false
+    load wallet >|=? fun list -> List.mem_assoc name list
 
   let add ~force (wallet : #wallet) name value =
     let keep = ref false in
