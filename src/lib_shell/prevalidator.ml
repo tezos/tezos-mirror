@@ -235,9 +235,10 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
 
   let decode_operation_data proto_bytes =
     try
-      Data_encoding.Binary.of_bytes_opt
-        Proto.operation_data_encoding
-        proto_bytes
+      Some
+        (Data_encoding.Binary.of_bytes_exn
+           Proto.operation_data_encoding
+           proto_bytes)
     with _ -> None
 
   (** Centralised operation stream for the RPCs *)
