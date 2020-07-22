@@ -519,6 +519,12 @@ let mockup_bootstrap_accounts = "bootstrap-accounts"
 
 let mockup_protocol_constants = "protocol-constants"
 
+(* The implementation of ["config"; "init"] when --mode is "client" *)
+let config_init_client config_file cfg =
+  if not (Sys.file_exists config_file) then Cfg_file.(write config_file cfg)
+    (* Should be default or command would have failed *)
+  else failwith "Config file already exists at location: %s" config_file
+
 let commands config_file cfg (protocol_hash_opt : Protocol_hash.t option) =
   let open Clic in
   let group =
@@ -615,11 +621,7 @@ let commands config_file cfg (protocol_hash_opt : Protocol_hash.t option) =
             ~default:(cfg.base_dir // default_config_file_name)
             (parameter (fun _ctx str -> return str))))
       (fixed ["config"; "init"])
-      (fun config_file _cctxt ->
-        if not (Sys.file_exists config_file) then
-          Cfg_file.(write config_file cfg)
-          (* Should be default or command would have failed *)
-        else failwith "Config file already exists at location: %s" config_file);
+      (fun config_file _cctxt -> config_init_client config_file cfg);
     command
       ~group
       ~desc:
