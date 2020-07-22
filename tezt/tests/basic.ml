@@ -37,6 +37,7 @@ let check_node_initialization history_mode =
   let* client = Client.init ~node () in
   let* () = Client.activate_protocol client in
   Log.info "Activated protocol." ;
+  let* () = Client.remember_baker_contracts client in
   let* () = repeat 10 (fun () -> Client.bake_for client) in
   Log.info "Baked 10 blocks." ;
   let* level = Node.wait_for_level node 11 in

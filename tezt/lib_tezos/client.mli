@@ -136,6 +136,9 @@ val spawn_activate_protocol :
   t ->
   Process.t
 
+(** Remember bootstrap baker contracts' aliases. *)
+val remember_baker_contracts : t -> unit Lwt.t
+
 (** Run [tezos-client bake for].
 
     Default [key] is {!Constant.bootstrap1.alias}. *)

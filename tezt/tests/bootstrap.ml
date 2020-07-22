@@ -109,6 +109,7 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
   let* () = Client.Admin.connect_address client ~peer:node_2 in
   let* () = Client.activate_protocol client in
   Log.info "Activated protocol." ;
+  let* () = Client.remember_baker_contracts client in
   let* () = repeat bakes_before_kill (fun () -> Client.bake_for client) in
   let* _ = Node.wait_for_level node_1 (bakes_before_kill + 1)
   and* _ = Node.wait_for_level node_2 (bakes_before_kill + 1) in
