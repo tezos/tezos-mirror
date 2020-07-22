@@ -66,6 +66,10 @@ val get_protocol_data :
   Client.t ->
   JSON.t Lwt.t
 
+(** Call RPC /chain/[chain]/blocks/[block]/helpers/levels_in_current_cycle *)
+val get_levels_in_curent_cycle :
+  ?node:Node.t -> ?chain:string -> ?block:string -> Client.t -> JSON.t Lwt.t
+
 (** Call RPC /chain/[chain]/blocks/[block]/helpers/preapply/block *)
 val preapply_block :
   ?node:Node.t ->

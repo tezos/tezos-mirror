@@ -58,6 +58,13 @@ let get_protocol_data ?node ?(chain = "main") ?(block = "head") ?(offset = 0)
   let query_string = [("offset", string_of_int offset)] in
   Client.rpc ?node GET path ~query_string client
 
+let get_levels_in_curent_cycle ?node ?(chain = "main") ?(block = "head") client
+    =
+  let path =
+    ["chains"; chain; "blocks"; block; "helpers"; "levels_in_current_cycle"]
+  in
+  Client.rpc ?node GET path client
+
 let preapply_block ?node ?(chain = "main") ?(block = "head") ~data client =
   let path =
     ["chains"; chain; "blocks"; block; "helpers"; "preapply"; "block"]
