@@ -3,9 +3,11 @@
 set -e
 
 usage="Usage:
-$ ./scripts/snapshot_alpha.sh babylon_005
-Packs the current proto_alpha directory in a new proto_005_<hash>
-directory with all the necessary renamings."
+
+$ ./scripts/snapshot_alpha.sh <name>_<version_number>
+Packs the current proto_alpha directory in a new
+proto_<version_number>_<hash> directory with all the necessary
+renamings."
 
 script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 cd "$script_dir"/..
@@ -15,7 +17,7 @@ label=$(echo $current | cut -d'_' -f1)
 version=$(echo $current | cut -d'_' -f2)
 
 if ! ( [[ "$label" =~ ^[a-z]+$ ]] && [[ "$version" =~ ^[0-9][0-9][0-9]$ ]] ); then
-    echo "Wrong protocol version"
+    echo "Wrong protocol version."
     echo
     echo "$usage"
     exit 1
@@ -65,13 +67,6 @@ rename s/alpha/${version}-${short_hash}/ $(find . -name \*.opam)
 sed -i.old -e s/_alpha/_${version}_${short_hash}/g \
        -e s/-alpha/-${version}-${short_hash}/g \
     $(find . -name dune -or -name \*.opam)
-
-# rename genesis except if in master
-if [[ ! "$master" ]]; then
-    #rename genesis
-    sed -i.old -e "s/-genesis/-000-Ps9mPmXa/" \
-        $(find . -name dune -or -name \*.opam)
-fi
 
 mv $daemons ..
 cd ..

@@ -3,15 +3,26 @@
 set -e
 
 usage="Usage:
-$ ./scripts/user_activate_update.sh src/proto_007_* 3
-Inserts a user-activated upgrade for protocol 007 at level 3.
+$ ./scripts/user_activate_update.sh src/proto_<version_number|alpha>* <level>
 
-When passing a low level it will make the sandbox activate protocol
-006 so that in a few levels you can test the migration.
+Inserts a user-activated upgrade for the snapshot protocol with the given
+version number at the given level.
 
-When passing a high level (greater than 28082), it assumes that you are using a mainnet
-snapshot and it creates a yes-node and yes-wallet. If a yes-wallet is
-already present it is preserved."
+When passing a low level (less or equal than 28082) it assumes that migration is
+on the sandbox, and it renames the sandbox command tezos-activate-alpha that
+activates the Alpha protocol to the command
+
+  tezos-activate-<predecessor_version>_<predecessor_short_hash>
+
+which activates the predecessor of the Alpha protocol. The <predecessor_version>
+coincides with <protocol_version> minus one, and the <predecessor_short_hash>
+coincides with the short hash in the name of the folder that contains the
+predecessor of the Alpha protocol in the ./src directory, i.e., the folder
+
+  ./src/proto_<predecessor_version>_<predecessor_short_hash>
+
+When passing a high level (greater than 28082), it assumes that
+migration is on a context imported from Mainnet."
 
 script_dir="$(cd "$(dirname "$0")" && pwd -P)"
 cd "$script_dir"/..
@@ -21,12 +32,24 @@ if [ ! -d "$1" ] || [ -z "$2" ]; then
     exit 1
 fi
 
-version=$(echo "$1" | sed 's/.*proto_\([0-9]\{3\}\)_.*/\1/')
-pred=$(printf "%03d" $(($version -1)))
-pred_full_hash=$(jq -r .hash < src/proto_${pred}_*/lib_protocol/TEZOS_PROTOCOL)
-pred_short_hash=$(echo $pred_full_hash | head -c 8)
+if [[ $1 =~ ^.*/proto_[0-9]{3}_.*$ ]]
+then
+    version=$(echo "$1" | sed 's/.*proto_\([0-9]\{3\}\)_.*/\1/')
+    pred=$(printf "%03d" $(($version -1)))
+    pred_full_hash=$(jq -r .hash < src/proto_${pred}_*/lib_protocol/TEZOS_PROTOCOL)
+    pred_short_hash=$(echo $pred_full_hash | head -c 8)
 
-full_hash=$(jq -r .hash < $1/lib_protocol/TEZOS_PROTOCOL)
+    full_hash=$(jq -r .hash < $1/lib_protocol/TEZOS_PROTOCOL)
+else
+    pred_version_dir=$(find src -name "proto_00*" -printf '%P\n' | sort -r | head -1)
+    pred=$(echo $pred_version_dir | cut -d'_' -f2)
+    pred_full_hash=$(jq -r .hash < src/proto_${pred}_*/lib_protocol/TEZOS_PROTOCOL)
+    pred_short_hash=$(echo $pred_full_hash | head -c 8)
+
+    version=$((pred +1))
+
+    full_hash=$(jq -r .hash < src/proto_alpha/lib_protocol/TEZOS_PROTOCOL)
+fi
 level=$2
 
 if (( $level > 28082 )); then
@@ -44,13 +67,7 @@ else {
     { if (!found){print}}
 }}' src/bin_node/node_config_file.ml
 
-    patch -p1 < scripts/yes-node.patch
-
-    if ! [ -d yes-wallet ]; then
-        dune exec scripts/yes-wallet/yes_wallet.exe
-        echo 'Created `yes-wallet` directory.'
-    fi
-    echo "You can now bake for foundation{1..8}"
+    echo "The sandbox will now switch to $full_hash at level $level."
 else # we are in sandbox
 
     # add upgrade to the sandbox
@@ -65,7 +82,5 @@ else # we are in sandbox
     sed -i.old "s/tezos-activate-alpha/tezos-activate-${pred}-${pred_short_hash}/" src/bin_client/tezos-init-sandboxed-client.sh
     sed -i.old "s/activate protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK/activate protocol $pred_full_hash/" src/bin_client/tezos-init-sandboxed-client.sh
     rm src/bin_client/tezos-init-sandboxed-client.sh.old
-    echo "The sandbox will now activate $pred_full_hash and switch to $full_hash at level $level"
+    echo "The sandbox will now switch to $full_hash at level $level."
 fi
-
-make

@@ -3,9 +3,18 @@
 set -e
 
 usage="Usage:
-$ ./scripts/link_protocol.sh src/proto_004_PtDPBVyN
-Inserts the protocol in the right files of the build system to compile it
-Activate in addition to its predecessor, here proto_003_PsddFKi3."
+$ ./scripts/link_protocol.sh src/proto_<version_number>_<short_hash>
+
+Inserts the protocol with the given version number and short hash in the right
+files of the build system to compile it, and replaces the occurrences of
+
+   proto_<predecessor_version_number>_<predecessor_short_hash>
+
+in the code by
+
+   proto_<predecessor_version_number>_<predecessor_short_hash>
+   proto_<version_number>_<short_hash>
+"
 
 script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 cd "$script_dir"/..
