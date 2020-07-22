@@ -3,9 +3,9 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
-import sys
 from typing import Any, List, Optional, Tuple
 
 from . import client_output
@@ -830,3 +830,11 @@ class Client:
         (stdout, stderr, exit_code) = self.run_generic(cmd,
                                                        check=check)
         return client_output.CreateMockup(stdout, stderr, exit_code)
+
+    def get_block_metadata_hash(self) -> str:
+        return self.rpc('get',
+                        '/chains/main/blocks/head/metadata_hash')
+
+    def get_operations_metadata_hash(self) -> str:
+        return self.rpc('get',
+                        '/chains/main/blocks/head/operations_metadata_hash')
