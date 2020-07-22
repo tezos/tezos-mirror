@@ -86,6 +86,66 @@ module type COMMON_PROTOCOL = sig
     JSON.t Lwt.t
 end
 
+module type COMMON_PROTOCOL_BAKER = sig
+  (** Call RPC /chain/[chain]/blocks/[block]/context/bakers *)
+  val get_all :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    Client.t ->
+    string list Lwt.t
+
+  (** Same as [get_all], but do not wait for the process to exit. *)
+  val spawn_get_all :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    Client.t ->
+    Process.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/context/bakers/[baker_hash] *)
+  val get :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    baker_hash:string ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Same as [get], but do not wait for the process to exit. *)
+  val spawn_get :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    baker_hash:string ->
+    Client.t ->
+    Process.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/context/bakers/[baker_hash]/consensus_key *)
+  val get_consensus_key :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    baker_hash:string ->
+    Client.t ->
+    Tezos_crypto.Signature.public_key Lwt.t
+
+  (** Same as [get_consensus_key], but do not wait for the process to exit. *)
+  val spawn_get_consensus_key :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    baker_hash:string ->
+    Client.t ->
+    Process.t
+end
+
 module type COMMON_PROTOCOL_CONTRACT = sig
   (** Call RPC /chain/[chain]/blocks/[block]/context/contracts *)
   val get_all :

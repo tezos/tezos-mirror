@@ -117,6 +117,61 @@ module Proto_common = struct
     in
     Client.rpc ?node ?hooks GET path client
 
+  module Baker = struct
+    let spawn_get_all ?node ?hooks ?(chain = "main") ?(block = "head") client =
+      let path = ["chains"; chain; "blocks"; block; "context"; "bakers"] in
+      Client.spawn_rpc ?node ?hooks GET path client
+
+    let get_all ?node ?hooks ?(chain = "main") ?(block = "head") client =
+      let path = ["chains"; chain; "blocks"; block; "context"; "bakers"] in
+      let* contracts = Client.rpc ?node ?hooks GET path client in
+      return (JSON.as_list contracts |> List.map JSON.as_string)
+
+    let spawn_get ?node ?hooks ?(chain = "main") ?(block = "head") ~baker_hash
+        client =
+      let path =
+        ["chains"; chain; "blocks"; block; "context"; "bakers"; baker_hash]
+      in
+      Client.spawn_rpc ?node ?hooks GET path client
+
+    let get ?node ?hooks ?(chain = "main") ?(block = "head") ~baker_hash client
+        =
+      let path =
+        ["chains"; chain; "blocks"; block; "context"; "bakers"; baker_hash]
+      in
+      Client.rpc ?node ?hooks GET path client
+
+    let sub_path ~chain ~block ~baker_hash field =
+      ["chains"; chain; "blocks"; block; "context"; "bakers"; baker_hash; field]
+
+    let spawn_get_sub ?node ?hooks ~chain ~block ~baker_hash field client =
+      let path = sub_path ~chain ~block ~baker_hash field in
+      Client.spawn_rpc ?node ?hooks GET path client
+
+    let get_sub ?node ?hooks ~chain ~block ~baker_hash field client =
+      let path = sub_path ~chain ~block ~baker_hash field in
+      Client.rpc ?node ?hooks GET path client
+
+    let spawn_get_consensus_key ?node ?hooks ?(chain = "main")
+        ?(block = "head") ~baker_hash client =
+      spawn_get_sub
+        ?node
+        ?hooks
+        ~chain
+        ~block
+        ~baker_hash
+        "consensus_key"
+        client
+
+    let get_consensus_key ?node ?hooks ?(chain = "main") ?(block = "head")
+        ~baker_hash client =
+      let* result =
+        get_sub ?node ?hooks ~chain ~block ~baker_hash "consensus_key" client
+      in
+      return @@ Tezos_crypto.Signature.Public_key.of_b58check_exn
+      @@ JSON.as_string result
+  end
+
   module Contract = struct
     let spawn_get_all ?node ?hooks ?(chain = "main") ?(block = "head") client =
       let path = ["chains"; chain; "blocks"; block; "context"; "contracts"] in

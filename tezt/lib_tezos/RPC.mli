@@ -107,6 +107,10 @@ val preapply_block :
 module Proto_alpha : sig
   include RPC_intf.COMMON_PROTOCOL
 
+  module Baker : sig
+    include RPC_intf.COMMON_PROTOCOL_BAKER
+  end
+
   module Contract : sig
     include RPC_intf.COMMON_PROTOCOL_CONTRACT
   end

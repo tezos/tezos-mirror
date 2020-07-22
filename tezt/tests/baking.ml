@@ -304,7 +304,7 @@ let fees = [|1_000; 2_000; 3_000|]
 
 type fee = Fee_auto | Fee_mutez of int [@@warning "-37"]
 
-let sample_next_transfer_for state ~fee ~branch ~account =
+let sample_next_transfer_for state ~fee ~branch ~(account : Constant.key) =
   let receiver = sample_bootstrap () in
   let fee =
     match fee with

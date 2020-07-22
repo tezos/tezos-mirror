@@ -213,6 +213,9 @@ val spawn_activate_protocol :
   t ->
   Process.t
 
+(** Remember bootstrap baker contracts' aliases. *)
+val remember_baker_contracts : t -> unit Lwt.t
+
 (** Run [tezos-client bake for].
 
     Default [key] is {!Constant.bootstrap1.alias}. *)
@@ -392,6 +395,12 @@ val migrate_mockup : next_protocol:Protocol.t -> t -> unit Lwt.t
 
 (** Same as [migrate_mockup], but do not wait for the process to exit. *)
 val spawn_migrate_mockup : next_protocol:Protocol.t -> t -> Process.t
+
+(** Run [tezos-client find baker with consensus key]. *)
+val find_baker_with_consensus_key : key:string -> t -> string Lwt.t
+
+(** Same as [find_baker_with_consensus_key], but do not wait for the process to exit. *)
+val spawn_find_baker_with_consensus_key : key:string -> t -> Process.t
 
 (** {2 High-Level Functions} *)
 

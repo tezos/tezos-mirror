@@ -9,6 +9,7 @@ depends: [
   "dune" { >= "2.0" }
   "tezt"
   "hex"
+  "tezos-crypto"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

@@ -96,13 +96,21 @@ let check_rpc ~group_name ~protocol ~client_mode_tag
       in
       let* () = Client.activate_protocol ~protocol ?parameter_file client in
       Log.info "Activated protocol." ;
+      (* remember baker contracts to be able to use their alias *)
+      let* () =
+        match protocol with
+        | Protocol.Alpha ->
+            Client.remember_baker_contracts client
+        | Carthage | Delphi | Edo ->
+            unit
+      in
       let* _ = rpc client in
       unit)
     rpcs
 
-(* Test the contracts RPC. *)
-let test_contracts (module Protocol_rpc : RPC_intf.COMMON_PROTOCOL_ALL) client
-    =
+(* Test the contracts RPC for protocol Alpha. *)
+let test_contracts_alpha client =
+  let module Protocol_rpc = RPC.Proto_alpha in
   let test_implicit_contract contract_id =
     let* _ = Protocol_rpc.Contract.get ~hooks ~contract_id client in
     let* _ = Protocol_rpc.Contract.get_balance ~hooks ~contract_id client in
@@ -113,11 +121,25 @@ let test_contracts (module Protocol_rpc : RPC_intf.COMMON_PROTOCOL_ALL) client
     unit
   in
   let* contracts = Protocol_rpc.Contract.get_all ~hooks client in
-  Log.info "Test implicit baker contract" ;
-  let bootstrap = List.hd contracts in
-  let* () = test_implicit_contract bootstrap in
+  let* bakers = RPC.Proto_alpha.Baker.get_all client in
+  Log.info "Test baker contract" ;
+  let baker = List.hd bakers in
+  let* _ = RPC.Proto_alpha.Contract.get ~hooks ~contract_id:baker client in
   let* _ =
-    Protocol_rpc.Contract.get_delegate ~hooks ~contract_id:bootstrap client
+    Protocol_rpc.Contract.get_balance ~hooks ~contract_id:baker client
+  in
+  let* _ =
+    Protocol_rpc.Contract.get_counter ~hooks ~contract_id:baker client
+  in
+  let* _ =
+    Protocol_rpc.Contract.spawn_get_manager_key
+      ~hooks
+      ~contract_id:baker
+      client
+    |> Process.check ~expect_failure:true
+  in
+  let* _ =
+    Protocol_rpc.Contract.get_delegate ~hooks ~contract_id:baker client
   in
   Log.info "Test un-allocated implicit contract" ;
   let unallocated_implicit = "tz1c5BVkpwCiaPHJBzyjg7UHpJEMPTYA1bHG" in
@@ -131,6 +153,7 @@ let test_contracts (module Protocol_rpc : RPC_intf.COMMON_PROTOCOL_ALL) client
     Client.gen_and_show_keys ~alias:simple_implicit client
   in
   let bootstrap1 = "bootstrap1" in
+  let baker1 = "baker1" in
   let* () =
     Client.transfer
       ~amount:Tez.(of_int 100)
@@ -172,7 +195,7 @@ let test_contracts (module Protocol_rpc : RPC_intf.COMMON_PROTOCOL_ALL) client
   in
   let* () = Client.bake_for client in
   let* () =
-    Client.set_delegate ~src:delegated_implicit ~delegate:bootstrap1 client
+    Client.set_delegate ~src:delegated_implicit ~delegate:baker1 client
   in
   let* () = Client.bake_for client in
   let* () = test_implicit_contract delegated_implicit_key.public_key_hash in
@@ -279,46 +302,234 @@ let test_contracts (module Protocol_rpc : RPC_intf.COMMON_PROTOCOL_ALL) client
   in
   unit
 
-(* Test the delegates RPC for protocol Alpha. *)
-let test_delegates_alpha client =
-  let* contracts = RPC.Proto_alpha.Contract.get_all client in
+(* Test the contracts RPC for protocol 007. *)
+let test_contracts_007 client =
+  let module Protocol_rpc = RPC.Proto_007 in
+  let test_implicit_contract contract_id =
+    let* _ = Protocol_rpc.Contract.get ~hooks ~contract_id client in
+    let* _ = Protocol_rpc.Contract.get_balance ~hooks ~contract_id client in
+    let* _ = Protocol_rpc.Contract.get_counter ~hooks ~contract_id client in
+    let* _ =
+      Protocol_rpc.Contract.get_manager_key ~hooks ~contract_id client
+    in
+    unit
+  in
+  let* contracts = Protocol_rpc.Contract.get_all ~hooks client in
   Log.info "Test implicit baker contract" ;
   let bootstrap = List.hd contracts in
-  let* _ = RPC.Proto_alpha.Delegate.get ~hooks ~pkh:bootstrap client in
-  let* _ = RPC.Proto_alpha.Delegate.get_balance ~hooks ~pkh:bootstrap client in
+  let* () = test_implicit_contract bootstrap in
   let* _ =
-    RPC.Proto_alpha.Delegate.get_deactivated ~hooks ~pkh:bootstrap client
+    Protocol_rpc.Contract.get_delegate ~hooks ~contract_id:bootstrap client
+  in
+  Log.info "Test un-allocated implicit contract" ;
+  let unallocated_implicit = "tz1c5BVkpwCiaPHJBzyjg7UHpJEMPTYA1bHG" in
+  assert (not @@ List.mem unallocated_implicit contracts) ;
+  let* _ =
+    Protocol_rpc.Contract.get ~hooks ~contract_id:unallocated_implicit client
+  in
+  Log.info "Test non-delegated implicit contract" ;
+  let simple_implicit = "simple" in
+  let* simple_implicit_key =
+    Client.gen_and_show_keys ~alias:simple_implicit client
+  in
+  let bootstrap1 = "bootstrap1" in
+  let* () =
+    Client.transfer
+      ~amount:Tez.(of_int 100)
+      ~giver:bootstrap1
+      ~receiver:simple_implicit_key.public_key_hash
+      ~burn_cap:Constant.implicit_account_burn
+      client
+  in
+  let* () = Client.bake_for ~key:bootstrap1 client in
+  let* () = test_implicit_contract simple_implicit_key.public_key_hash in
+  let* () =
+    Lwt_list.iter_s
+      (fun rpc ->
+        rpc
+          ?node:None
+          ?hooks:(Some hooks)
+          ?chain:None
+          ?block:None
+          ~contract_id:simple_implicit_key.public_key_hash
+          client
+        |> Process.check ~expect_failure:true)
+      [ Protocol_rpc.Contract.spawn_get_delegate;
+        Protocol_rpc.Contract.spawn_get_entrypoints;
+        Protocol_rpc.Contract.spawn_get_script;
+        Protocol_rpc.Contract.spawn_get_storage ]
+  in
+  Log.info "Test delegated implicit contract" ;
+  let delegated_implicit = "delegated" in
+  let* delegated_implicit_key =
+    Client.gen_and_show_keys ~alias:delegated_implicit client
+  in
+  let* () =
+    Client.transfer
+      ~amount:Tez.(of_int 100)
+      ~giver:bootstrap1
+      ~receiver:delegated_implicit
+      ~burn_cap:Constant.implicit_account_burn
+      client
+  in
+  let* () = Client.bake_for ~key:bootstrap1 client in
+  let* () =
+    Client.set_delegate ~src:delegated_implicit ~delegate:bootstrap1 client
+  in
+  let* () = Client.bake_for ~key:bootstrap1 client in
+  let* () = test_implicit_contract delegated_implicit_key.public_key_hash in
+  let* _ =
+    Protocol_rpc.Contract.get_delegate
+      ~hooks
+      ~contract_id:delegated_implicit_key.public_key_hash
+      client
+  in
+  let* () =
+    Lwt_list.iter_s
+      (fun rpc ->
+        rpc
+          ?node:None
+          ?hooks:(Some hooks)
+          ?chain:None
+          ?block:None
+          ~contract_id:delegated_implicit_key.public_key_hash
+          client
+        |> Process.check ~expect_failure:true)
+      [ Protocol_rpc.Contract.spawn_get_entrypoints;
+        Protocol_rpc.Contract.spawn_get_script;
+        Protocol_rpc.Contract.spawn_get_storage ]
+  in
+  let test_originated_contract contract_id =
+    let* _ = Protocol_rpc.Contract.get ~hooks ~contract_id client in
+    let* _ = Protocol_rpc.Contract.get_balance ~hooks ~contract_id client in
+    let* () =
+      Protocol_rpc.Contract.spawn_get_counter ~hooks ~contract_id client
+      |> Process.check ~expect_failure:true
+    in
+    let* () =
+      Protocol_rpc.Contract.spawn_get_manager_key ~hooks ~contract_id client
+      |> Process.check ~expect_failure:true
+    in
+    let big_map_key =
+      Ezjsonm.value_from_string
+        "{ \"key\": { \"int\": \"0\" }, \"type\": { \"prim\": \"int\" } }"
+    in
+    let* _ =
+      Protocol_rpc.Contract.big_map_get
+        ~hooks
+        ~contract_id
+        ~data:big_map_key
+        client
+    in
+    let* _ =
+      Protocol_rpc.Contract.get_entrypoints ~hooks ~contract_id client
+    in
+    let* _ = Protocol_rpc.Contract.get_script ~hooks ~contract_id client in
+    let* _ = Protocol_rpc.Contract.get_storage ~hooks ~contract_id client in
+    unit
+  in
+  (* A smart contract without any big map or entrypoints *)
+  Log.info "Test simple originated contract" ;
+  let* originated_contract_simple =
+    Client.originate_contract
+      ~alias:"originated_contract_simple"
+      ~amount:Tez.zero
+      ~src:"bootstrap1"
+      ~prg:"file:./tezt/tests/contracts/proto_007/str_id.tz"
+      ~init:"Some \"initial storage\""
+      ~burn_cap:Tez.(of_int 3)
+      client
+  in
+  let* () = Client.bake_for ~key:bootstrap1 client in
+  let* () = test_originated_contract originated_contract_simple in
+  (* A smart contract with a big map and entrypoints *)
+  Log.info "Test advanced originated contract" ;
+  let* originated_contract_advanced =
+    Client.originate_contract
+      ~alias:"originated_contract_advanced"
+      ~amount:Tez.zero
+      ~src:"bootstrap1"
+      ~prg:"file:./tezt/tests/contracts/proto_007/big_map_entrypoints.tz"
+      ~init:"Pair { Elt \"dup\" 0 } { Elt \"dup\" 1 ; Elt \"test\" 5 }"
+      ~burn_cap:Tez.(of_int 3)
+      client
+  in
+  let* () = Client.bake_for ~key:bootstrap1 client in
+  let* () = test_originated_contract originated_contract_advanced in
+  let unique_big_map_key =
+    Ezjsonm.value_from_string
+      "{ \"key\": { \"string\": \"test\" }, \"type\": { \"prim\": \"string\" \
+       } }"
   in
   let* _ =
-    RPC.Proto_alpha.Delegate.get_delegated_balance ~hooks ~pkh:bootstrap client
+    Protocol_rpc.Contract.big_map_get
+      ~hooks
+      ~contract_id:originated_contract_advanced
+      ~data:unique_big_map_key
+      client
+  in
+  let duplicate_big_map_key =
+    Ezjsonm.value_from_string
+      "{ \"key\": { \"string\": \"dup\" }, \"type\": { \"prim\": \"string\" } }"
+  in
+  let* _ =
+    Protocol_rpc.Contract.big_map_get
+      ~hooks
+      ~contract_id:originated_contract_advanced
+      ~data:duplicate_big_map_key
+      client
+  in
+  unit
+
+(* Test the delegates RPC for protocol Alpha. *)
+let test_delegates_alpha client =
+  (* The delegates RPC has been replaced by bakers RPC, but delegates RPC should
+     be preserved for compatibility. In the compatibility RPC, hashes of
+     baker accounts' consensus keys are being used in place of the previous
+     implicit accounts public key hashes. *)
+  let* bakers = RPC.Proto_alpha.Baker.get_all client in
+  Log.info "Test implicit baker contract" ;
+  let baker_hash = List.hd bakers in
+  let* baker_pk = RPC.Proto_alpha.Baker.get_consensus_key ~baker_hash client in
+  let baker_pkh =
+    Tezos_crypto.Signature.(
+      Public_key.hash baker_pk |> Public_key_hash.to_b58check)
+  in
+  let* _ = RPC.Proto_alpha.Delegate.get ~hooks ~pkh:baker_pkh client in
+  let* _ = RPC.Proto_alpha.Delegate.get_balance ~hooks ~pkh:baker_pkh client in
+  let* _ =
+    RPC.Proto_alpha.Delegate.get_deactivated ~hooks ~pkh:baker_pkh client
+  in
+  let* _ =
+    RPC.Proto_alpha.Delegate.get_delegated_balance ~hooks ~pkh:baker_pkh client
   in
   let* _ =
     RPC.Proto_alpha.Delegate.get_delegated_contracts
       ~hooks
-      ~pkh:bootstrap
+      ~pkh:baker_pkh
       client
   in
   let* _ =
-    RPC.Proto_alpha.Delegate.get_frozen_balance ~hooks ~pkh:bootstrap client
+    RPC.Proto_alpha.Delegate.get_frozen_balance ~hooks ~pkh:baker_pkh client
   in
   let* _ =
     RPC.Proto_alpha.Delegate.get_frozen_balance_by_cycle
       ~hooks
-      ~pkh:bootstrap
+      ~pkh:baker_pkh
       client
   in
   let* _ =
-    RPC.Proto_alpha.Delegate.get_grace_period ~hooks ~pkh:bootstrap client
+    RPC.Proto_alpha.Delegate.get_grace_period ~hooks ~pkh:baker_pkh client
   in
   let* _ =
-    RPC.Proto_alpha.Delegate.get_staking_balance ~hooks ~pkh:bootstrap client
+    RPC.Proto_alpha.Delegate.get_staking_balance ~hooks ~pkh:baker_pkh client
   in
   let* _ =
-    RPC.Proto_alpha.Delegate.get_voting_power ~hooks ~pkh:bootstrap client
+    RPC.Proto_alpha.Delegate.get_voting_power ~hooks ~pkh:baker_pkh client
   in
   Log.info "Test with a PKH that is not a registered baker contract" ;
   let unregistered_baker = "tz1c5BVkpwCiaPHJBzyjg7UHpJEMPTYA1bHG" in
-  assert (not @@ List.mem unregistered_baker contracts) ;
+  assert (not @@ List.mem unregistered_baker bakers) ;
   let* _ =
     RPC.Proto_alpha.Delegate.spawn_get ~hooks ~pkh:unregistered_baker client
     |> Process.check ~expect_failure:true
@@ -477,7 +688,7 @@ let test_delegates_007 client =
 let test_votes_alpha client =
   (* initialize data *)
   let proto_hash = "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp" in
-  let* () = Client.submit_proposals ~proto_hash client in
+  let* () = Client.submit_proposals ~key:"baker1" ~proto_hash client in
   let* () = Client.bake_for client in
   (* RPC calls *)
   let* _ = RPC.Proto_alpha.Votes.get_ballot_list ~hooks client in
@@ -493,9 +704,9 @@ let test_votes_alpha client =
   (* bake to testing vote period and submit some ballots *)
   let* () = Client.bake_for client in
   let* () = Client.bake_for client in
-  let* () = Client.submit_ballot ~key:"bootstrap1" ~proto_hash Yay client in
-  let* () = Client.submit_ballot ~key:"bootstrap2" ~proto_hash Nay client in
-  let* () = Client.submit_ballot ~key:"bootstrap3" ~proto_hash Pass client in
+  let* () = Client.submit_ballot ~key:"baker1" ~proto_hash Yay client in
+  let* () = Client.submit_ballot ~key:"baker2" ~proto_hash Nay client in
+  let* () = Client.submit_ballot ~key:"baker3" ~proto_hash Pass client in
   let* () = Client.bake_for client in
   (* RPC calls again *)
   let* _ = RPC.Proto_alpha.Votes.get_ballot_list ~hooks client in
@@ -516,7 +727,7 @@ let test_votes_007 client =
   (* initialize data *)
   let proto_hash = "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp" in
   let* () = Client.submit_proposals ~proto_hash client in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for client ~key:"bootstrap1" in
   (* RPC calls *)
   let* _ = RPC.Proto_007.Votes.get_ballot_list ~hooks client in
   let* _ = RPC.Proto_007.Votes.get_ballots ~hooks client in
@@ -526,12 +737,12 @@ let test_votes_007 client =
   let* _ = RPC.Proto_007.Votes.get_listings ~hooks client in
   let* _ = RPC.Proto_007.Votes.get_proposals ~hooks client in
   (* bake to testing vote period and submit some ballots *)
-  let* () = Client.bake_for client in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for client ~key:"bootstrap1" in
+  let* () = Client.bake_for client ~key:"bootstrap1" in
   let* () = Client.submit_ballot ~key:"bootstrap1" ~proto_hash Yay client in
   let* () = Client.submit_ballot ~key:"bootstrap2" ~proto_hash Nay client in
   let* () = Client.submit_ballot ~key:"bootstrap3" ~proto_hash Pass client in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for client ~key:"bootstrap1" in
   (* RPC calls again *)
   let* _ = RPC.Proto_007.Votes.get_ballot_list ~hooks client in
   let* _ = RPC.Proto_007.Votes.get_ballots ~hooks client in
@@ -558,7 +769,7 @@ let register () =
       ~protocol:Protocol.Alpha
       ~client_mode_tag
       ~rpcs:
-        [ ("contracts", test_contracts (module RPC.Proto_alpha), None);
+        [ ("contracts", test_contracts_alpha, None);
           ("delegates", test_delegates_alpha, None);
           ( "votes",
             test_votes_alpha,
@@ -575,7 +786,7 @@ let register () =
       ~protocol:Protocol.Delphi
       ~client_mode_tag
       ~rpcs:
-        [ ("contracts", test_contracts (module RPC.Proto_007), None);
+        [ ("contracts", test_contracts_007, None);
           ("delegates", test_delegates_007, None);
           ( "votes",
             test_votes_007,
