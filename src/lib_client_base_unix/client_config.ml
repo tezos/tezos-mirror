@@ -525,6 +525,50 @@ let config_init_client config_file cfg =
     (* Should be default or command would have failed *)
   else failwith "Config file already exists at location: %s" config_file
 
+(* The implementation of ["config"; "init"] when --mode is "mockup" *)
+let config_init_mockup cctxt protocol_hash_opt bootstrap_accounts_file
+    protocol_constants_file =
+  fail_on_non_mockup_dir cctxt
+  >>=? fun _ ->
+  fail_when
+    (Sys.file_exists bootstrap_accounts_file)
+    (failure
+       "Config file to write value of --%s exists already: %s"
+       mockup_bootstrap_accounts
+       bootstrap_accounts_file)
+  >>=? fun () ->
+  fail_when
+    (Sys.file_exists protocol_constants_file)
+    (failure
+       "Config file to write value of --%s exists already: %s"
+       mockup_protocol_constants
+       protocol_constants_file)
+  >>=? fun () ->
+  Tezos_mockup.Persistence.get_registered_mockup protocol_hash_opt
+  >>=? fun mockup ->
+  let (module Mockup) = mockup in
+  Mockup.default_bootstrap_accounts cctxt
+  >>=? fun string_to_write ->
+  Lwt_utils_unix.create_file bootstrap_accounts_file string_to_write
+  >>= fun _ ->
+  cctxt#message
+    "Written default --%s file: %s"
+    mockup_bootstrap_accounts
+    bootstrap_accounts_file
+  >>= fun () ->
+  let string_to_write =
+    Data_encoding.Json.construct
+      Mockup.protocol_constants_encoding
+      Mockup.default_protocol_constants
+  in
+  Lwt_utils_unix.Json.write_file protocol_constants_file string_to_write
+  >>=? fun () ->
+  cctxt#message
+    "Written default --%s file: %s"
+    mockup_protocol_constants
+    protocol_constants_file
+  >>= return
+
 let commands config_file cfg (protocol_hash_opt : Protocol_hash.t option) =
   let open Clic in
   let group =
@@ -645,46 +689,11 @@ let commands config_file cfg (protocol_hash_opt : Protocol_hash.t option) =
       (fixed ["config"; "init"; "mockup"])
       (fun (bootstrap_accounts_file, protocol_constants_file)
            (cctxt : Client_context.full) ->
-        fail_on_non_mockup_dir cctxt
-        >>=? fun _ ->
-        fail_when
-          (Sys.file_exists bootstrap_accounts_file)
-          (failure
-             "Config file to write value of --%s exists already: %s"
-             mockup_bootstrap_accounts
-             bootstrap_accounts_file)
-        >>=? fun () ->
-        fail_when
-          (Sys.file_exists protocol_constants_file)
-          (failure
-             "Config file to write value of --%s exists already: %s"
-             mockup_protocol_constants
-             protocol_constants_file)
-        >>=? fun () ->
-        Tezos_mockup.Persistence.get_registered_mockup protocol_hash_opt
-        >>=? fun mockup ->
-        let (module Mockup) = mockup in
-        Mockup.default_bootstrap_accounts cctxt
-        >>=? fun string_to_write ->
-        Lwt_utils_unix.create_file bootstrap_accounts_file string_to_write
-        >>= fun _ ->
-        cctxt#message
-          "Written default --%s file: %s"
-          mockup_bootstrap_accounts
+        config_init_mockup
+          cctxt
+          protocol_hash_opt
           bootstrap_accounts_file
-        >>= fun () ->
-        let string_to_write =
-          Data_encoding.Json.construct
-            Mockup.protocol_constants_encoding
-            Mockup.default_protocol_constants
-        in
-        Lwt_utils_unix.Json.write_file protocol_constants_file string_to_write
-        >>=? fun () ->
-        cctxt#message
-          "Written default --%s file: %s"
-          mockup_protocol_constants
-          protocol_constants_file
-        >>= return) ]
+          protocol_constants_file) ]
 
 let global_options () =
   args15
