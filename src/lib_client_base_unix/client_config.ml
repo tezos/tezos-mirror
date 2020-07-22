@@ -569,7 +569,8 @@ let config_init_mockup cctxt protocol_hash_opt bootstrap_accounts_file
     protocol_constants_file
   >>= return
 
-let commands config_file cfg (protocol_hash_opt : Protocol_hash.t option) =
+let commands config_file cfg (client_mode : client_mode)
+    (protocol_hash_opt : Protocol_hash.t option) =
   let open Clic in
   let group =
     {
@@ -648,52 +649,49 @@ let commands config_file cfg (protocol_hash_opt : Protocol_hash.t option) =
     command
       ~group
       ~desc:
-        "Create a config file based on the current CLI values.\n\
+        "Create config file(s) based on the current CLI values.\n\
          If the `-file` option is not passed, this will initialize the \
          default config file, based on default parameters, altered by other \
          command line options (such as the node's address, etc.).\n\
          Otherwise, it will create a new config file, based on the default \
          parameters (or the the ones specified with `-config-file`), altered \
-         by other command line options.\n\
-         The command will always fail if the file already exists."
-      (args1
+         by other command line options.\n\n\
+         If `-mode mockup` is specified, this will initialize the mockup's \
+         default files instead of the config file. Use `-bootstrap-accounts` \
+         and `-protocol-constants` to specify custom paths.\n\n\
+         The command will always fail if file(s) to create exist already"
+      (args3
          (default_arg
             ~long:"output"
             ~short:'o'
             ~placeholder:"path"
             ~doc:"path at which to create the file"
             ~default:(cfg.base_dir // default_config_file_name)
-            (parameter (fun _ctx str -> return str))))
-      (fixed ["config"; "init"])
-      (fun config_file _cctxt -> config_init_client config_file cfg);
-    command
-      ~group
-      ~desc:
-        "Create mockup configuration files using the default values.\n\
-         The command will always fail if the file already exists."
-      (args2
-         (let default_file_name = mockup_bootstrap_accounts ^ ".json" in
-          default_arg
+            (parameter (fun _ctx str -> return str)))
+         (default_arg
             ~long:mockup_bootstrap_accounts
             ~placeholder:"path"
             ~doc:"path at which to create the file"
-            ~default:(cfg.base_dir // default_file_name)
+            ~default:((cfg.base_dir // mockup_bootstrap_accounts) ^ ".json")
             (parameter (fun _ctx str -> return str)))
-         (let default_file_name = mockup_protocol_constants ^ ".json" in
-          default_arg
+         (default_arg
             ~long:mockup_protocol_constants
             ~placeholder:"path"
             ~doc:"path at which to create the file"
-            ~default:(cfg.base_dir // default_file_name)
+            ~default:((cfg.base_dir // mockup_protocol_constants) ^ ".json")
             (parameter (fun _ctx str -> return str))))
-      (fixed ["config"; "init"; "mockup"])
-      (fun (bootstrap_accounts_file, protocol_constants_file)
-           (cctxt : Client_context.full) ->
-        config_init_mockup
-          cctxt
-          protocol_hash_opt
-          bootstrap_accounts_file
-          protocol_constants_file) ]
+      (fixed ["config"; "init"])
+      (fun (config_file, bootstrap_accounts_file, protocol_constants_file)
+           cctxt ->
+        match client_mode with
+        | Mode_client ->
+            config_init_client config_file cfg
+        | Mode_mockup ->
+            config_init_mockup
+              cctxt
+              protocol_hash_opt
+              bootstrap_accounts_file
+              protocol_constants_file) ]
 
 let global_options () =
   args15
@@ -942,7 +940,8 @@ let parse_config_args (ctx : #Client_context.full) argv =
         default_parsed_config_args with
         parsed_config_file = Some cfg;
         parsed_args = Some parsed_args;
-        config_commands = commands config_file cfg parsed_args.protocol;
+        config_commands =
+          commands config_file cfg client_mode parsed_args.protocol;
       },
       remaining )
 
