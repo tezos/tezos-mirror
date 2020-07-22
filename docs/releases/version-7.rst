@@ -1,6 +1,6 @@
 .. _version-7:
 
-Version 7.2
+Version 7.3
 ===========
 
 Version 7.0 notably introduces the multinetwork node.
@@ -12,18 +12,20 @@ Version 7.2 fixes an issue that could cause baking to fail when validating some
 smart contracts, and fixes how arguments are passed by the tezos-docker-manager.sh
 script when using Docker images.
 
+Version 7.3 fixes a couple of security issues.
+
 Update Instructions
 -------------------
 
 To update from sources::
 
   git fetch
-  git checkout v7.2
+  git checkout v7.3
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``v7.2`` Docker images of Tezos.
+If you are using Docker instead, use the ``v7.3`` Docker images of Tezos.
 
 New Versioning Scheme
 ---------------------
@@ -44,7 +46,7 @@ Additionnally, we provide a ``latest-release`` branch which will always
 be equal to the latest release. Release candidates are not considered
 to be releases in this sense, so ``latest-release`` will never
 point to a release candidate. In other words, ``latest-release`` points
-to the latest stable release. Currently, it thus points to version 7.2.
+to the latest stable release. Currently, it thus points to version 7.3.
 
 If you are used to the ``mainnet`` and ``mainnet-staging`` branches,
 you can consider release candidates to be the new ``mainnet-staging``
@@ -54,8 +56,8 @@ branch.
 Note for Remote Signer Users
 ----------------------------
 
-Note for users of ``tezos-signer``: the 7.0 (or 7.1, or 7.2) client, baker, endorser
-and accuser need the 7.0 signer (or 7.1, or 7.2) to work. They are in particular not
+Note for users of ``tezos-signer``: the 7.0 (or above) client, baker, endorser
+and accuser need the 7.0 signer (or above) to work. They are in particular not
 compatible with the ``mainnet`` version of ``tezos-signer``. So remember to
 update your remote signer too!
 
@@ -76,6 +78,16 @@ If you are using the Docker script (``alphanet.sh``), note that
 this script has been renamed ``tezos-docker-manager.sh``. The ``alphanet.sh``
 script is still available in the Docker image for the auto-update mechanism.
 See :ref:`howtoget` for more information.
+
+Changelog — Version 7.3
+-----------------------
+
+- Fixed a case where the number of open file descriptors was not correctly limited.
+  This could result in the node crashing due to being out of file descriptors.
+
+- Set a limit to the length of some incoming messages which previously did not have one.
+
+- Fixed some value encodings which were missing cases.
 
 Changelog — Version 7.2
 -----------------------
