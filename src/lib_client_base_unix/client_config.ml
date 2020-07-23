@@ -624,18 +624,17 @@ let commands config_file cfg (client_mode : client_mode)
   in
   [ command
       ~group
-      ~desc:"Show the config file."
+      ~desc:
+        "Show the config file (or the mockup config files if `--mode mockup` \
+         is specified)."
       no_options
       (fixed ["config"; "show"])
       (fun () (cctxt : #Client_context.full) ->
-        config_show_client cctxt config_file);
-    command
-      ~group
-      ~desc:"Show mockup config files."
-      no_options
-      (fixed ["config"; "show"; "mockup"])
-      (fun () (cctxt : #Client_context.full) ->
-        config_show_mockup cctxt protocol_hash_opt);
+        match client_mode with
+        | Mode_client ->
+            config_show_client cctxt config_file
+        | Mode_mockup ->
+            config_show_mockup cctxt protocol_hash_opt);
     command
       ~group
       ~desc:"Reset the config file to the factory defaults."

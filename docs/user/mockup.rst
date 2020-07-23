@@ -150,7 +150,7 @@ section):
 
 ::
 
-    $ mockup-client config show mockup
+    $ mockup-client config show
     Default value of --bootstrap-accounts:
     ...
     Default value of --protocol-constants:
@@ -180,8 +180,8 @@ Setting protocol constants for the mockup mode
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Let's look at the contents of the ``protocol-constants.json`` file as produced
-by the ``--mode mockup config init`` and ``config show mockup`` commands. The following
-was generated using the Carthage protocol:
+by the ``--mode mockup config init`` and ``--mode mockup config show``
+commands. The following was generated using the Carthage protocol:
 
 .. code-block:: JSON
 
