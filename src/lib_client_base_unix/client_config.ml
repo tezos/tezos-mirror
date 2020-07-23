@@ -519,6 +519,25 @@ let mockup_bootstrap_accounts = "bootstrap-accounts"
 
 let mockup_protocol_constants = "protocol-constants"
 
+(* The implementation of ["config"; "show"] when --mode is "client" *)
+let config_show_client (cctxt : #Client_context.full) (config_file : string) =
+  let pp_cfg ppf cfg =
+    Format.fprintf
+      ppf
+      "%a"
+      Data_encoding.Json.pp
+      (Data_encoding.Json.construct Cfg_file.encoding cfg)
+  in
+  if not @@ Sys.file_exists config_file then
+    cctxt#warning
+      "@[<v 2>Warning: no config file at %s,@,\
+       displaying the default configuration.@]"
+      config_file
+    >>= fun () -> cctxt#warning "%a@," pp_cfg Cfg_file.default >>= return
+  else
+    read_config_file config_file
+    >>=? fun cfg -> cctxt#message "%a@," pp_cfg cfg >>= return
+
 (* The implementation of ["config"; "init"] when --mode is "client" *)
 let config_init_client config_file cfg =
   if not (Sys.file_exists config_file) then Cfg_file.(write config_file cfg)
@@ -584,22 +603,7 @@ let commands config_file cfg (client_mode : client_mode)
       no_options
       (fixed ["config"; "show"])
       (fun () (cctxt : #Client_context.full) ->
-        let pp_cfg ppf cfg =
-          Format.fprintf
-            ppf
-            "%a"
-            Data_encoding.Json.pp
-            (Data_encoding.Json.construct Cfg_file.encoding cfg)
-        in
-        if not @@ Sys.file_exists config_file then
-          cctxt#warning
-            "@[<v 2>Warning: no config file at %s,@,\
-             displaying the default configuration.@]"
-            config_file
-          >>= fun () -> cctxt#warning "%a@," pp_cfg Cfg_file.default >>= return
-        else
-          read_config_file config_file
-          >>=? fun cfg -> cctxt#message "%a@," pp_cfg cfg >>= return);
+        config_show_client cctxt config_file);
     command
       ~group
       ~desc:"Show mockup config files."
