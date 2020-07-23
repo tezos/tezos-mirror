@@ -129,3 +129,26 @@ class TestConfigInit:
         finally:
             os.remove(tmp_file1)
             os.remove(tmp_file2)
+
+
+@pytest.mark.client
+@pytest.mark.parametrize('config_dict', _INPUT_CONFIG_FILES)
+class TestConfigShow:
+    """ Tests of `tezos-client config show` """
+
+    def test_config_show(self, simple_client: Client, config_dict: dict):
+        """
+            Tests that calling `config show` works, with or without
+            specifying `--config-file`
+        """
+        try:
+            tmp_file = None
+            if config_dict is not None:
+                tmp_file = tempfile.mktemp(prefix='tezos-client.config_file')
+                _write_config_file(simple_client, tmp_file, config_dict)
+
+            cmd = _with_config_file_cmd(tmp_file, ["config", "show"])
+            simple_client.run(cmd)
+        finally:
+            if tmp_file is not None:
+                os.remove(tmp_file)
