@@ -909,6 +909,11 @@ let parse_config_args (ctx : #Client_context.full) argv =
     first_some remote_signer @@ first_some remote_signer_env cfg.remote_signer
   in
   let confirmations = Option.value ~default:cfg.confirmations confirmations in
+  (* --password-filename has precedence over --config-file's
+     "password-filename" json field *)
+  let password_filename =
+    Option.first_some password_filename cfg.password_filename
+  in
   let cfg =
     {
       cfg with
