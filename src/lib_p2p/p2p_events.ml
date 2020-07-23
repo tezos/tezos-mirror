@@ -285,7 +285,7 @@ module P2p_fd = struct
       ~name:"create_fd"
       ~msg:"cnx:{connection_id}:create fd"
       ~level:Debug
-      ("connection_id", Data_encoding.int16)
+      ("connection_id", Data_encoding.int31)
 
   let close_fd =
     declare_3
@@ -293,9 +293,9 @@ module P2p_fd = struct
       ~name:"close_fd"
       ~msg:"cnx:{connection_id}:close fd (stats : {nread}/{nwrit})"
       ~level:Debug
-      ("connection_id", Data_encoding.int16)
-      ("nread", Data_encoding.int16)
-      ("nwrit", Data_encoding.int16)
+      ("connection_id", Data_encoding.int31)
+      ("nread", Data_encoding.int31)
+      ("nwrit", Data_encoding.int31)
 
   let try_read =
     declare_2
@@ -303,8 +303,8 @@ module P2p_fd = struct
       ~name:"try_read"
       ~msg:"cnx:{connection_id}:try read {length}"
       ~level:Debug
-      ("connection_id", Data_encoding.int16)
-      ("length", Data_encoding.int16)
+      ("connection_id", Data_encoding.int31)
+      ("length", Data_encoding.int31)
 
   let try_write =
     declare_2
@@ -312,8 +312,8 @@ module P2p_fd = struct
       ~name:"try_write"
       ~msg:"cnx:{connection_id}:try write {length}"
       ~level:Debug
-      ("connection_id", Data_encoding.int16)
-      ("length", Data_encoding.int16)
+      ("connection_id", Data_encoding.int31)
+      ("length", Data_encoding.int31)
 
   let read_fd =
     declare_3
@@ -321,9 +321,9 @@ module P2p_fd = struct
       ~name:"read_fd"
       ~msg:"cnx:{connection_id}:read {nread} ({nread_total})"
       ~level:Debug
-      ("connection_id", Data_encoding.int16)
-      ("nread", Data_encoding.int16)
-      ("nread_total", Data_encoding.int16)
+      ("connection_id", Data_encoding.int31)
+      ("nread", Data_encoding.int31)
+      ("nread_total", Data_encoding.int31)
 
   let written_fd =
     declare_3
@@ -331,9 +331,9 @@ module P2p_fd = struct
       ~name:"written_fd"
       ~msg:"cnx:{connection_id}:written {nwrit} ({nwrit_total})"
       ~level:Debug
-      ("connection_id", Data_encoding.int16)
-      ("nwrit", Data_encoding.int16)
-      ("nwrit_total", Data_encoding.int16)
+      ("connection_id", Data_encoding.int31)
+      ("nwrit", Data_encoding.int31)
+      ("nwrit_total", Data_encoding.int31)
 
   let connect_fd =
     declare_2
@@ -341,7 +341,7 @@ module P2p_fd = struct
       ~name:"connect"
       ~msg:"cnx:{connection_id}:connect {socket}"
       ~level:Debug
-      ("connection_id", Data_encoding.int16)
+      ("connection_id", Data_encoding.int31)
       ("socket", Data_encoding.string)
 
   let accept_fd =
@@ -350,7 +350,7 @@ module P2p_fd = struct
       ~name:"accept"
       ~msg:"cnx:{connection_id}:accept {socket}"
       ~level:Debug
-      ("connection_id", Data_encoding.int16)
+      ("connection_id", Data_encoding.int31)
       ("socket", Data_encoding.string)
 end
 
@@ -373,7 +373,7 @@ module P2p_maintainance = struct
       ~name:"too_few_connections_maintenance"
       ~msg:"too few connections ({connections})"
       ~level:Notice
-      ("connections", Data_encoding.int16)
+      ("connections", Data_encoding.int31)
 
   let too_many_connections =
     declare_1
@@ -381,7 +381,7 @@ module P2p_maintainance = struct
       ~name:"too_many_connections_maintenance"
       ~msg:"too many connections (will kill {connections})"
       ~level:Debug
-      ("connections", Data_encoding.int16)
+      ("connections", Data_encoding.int31)
 end
 
 module P2p_welcome = struct
@@ -429,7 +429,7 @@ module P2p_io_scheduler = struct
       ~msg:"connection closed {direction} ({connection_id},{name})"
       ~level:Debug
       ("direction", Data_encoding.string)
-      ("connection_id", Data_encoding.int16)
+      ("connection_id", Data_encoding.int31)
       ("name", Data_encoding.string)
 
   let unexpected_error =
@@ -442,7 +442,7 @@ module P2p_io_scheduler = struct
       ~level:Error
       ~pp4:pp_print_error_first
       ("direction", Data_encoding.string)
-      ("connection_id", Data_encoding.int16)
+      ("connection_id", Data_encoding.int31)
       ("name", Data_encoding.string)
       ("error", Error_monad.trace_encoding)
 
@@ -469,7 +469,7 @@ module P2p_io_scheduler = struct
       ~msg:"handle {len} ({connection_id},{name})"
       ~level:Debug
       ("len", Data_encoding.int31)
-      ("connection_id", Data_encoding.int16)
+      ("connection_id", Data_encoding.int31)
       ("name", Data_encoding.string)
 
   let create_connection =
@@ -478,7 +478,7 @@ module P2p_io_scheduler = struct
       ~name:"create_connection_scheduler"
       ~msg:"create connection ({connection_id},{name})"
       ~level:Debug
-      ("connection_id", Data_encoding.int16)
+      ("connection_id", Data_encoding.int31)
       ("name", Data_encoding.string)
 
   let update_quota =
@@ -501,7 +501,7 @@ module P2p_io_scheduler = struct
       ~name:"register_connection"
       ~msg:"register_connection {connection_id}"
       ~level:Debug
-      ("connection_id", Data_encoding.int16)
+      ("connection_id", Data_encoding.int31)
 
   let close =
     declare_1
@@ -509,7 +509,7 @@ module P2p_io_scheduler = struct
       ~name:"close_connection"
       ~msg:"close {connection_id}"
       ~level:Debug
-      ("connection_id", Data_encoding.int16)
+      ("connection_id", Data_encoding.int31)
 
   let shutdown =
     declare_1
