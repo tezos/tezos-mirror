@@ -34,19 +34,37 @@ val pp : Format.formatter -> t -> unit
 
 val encoding : t Data_encoding.t
 
-(** [announced supported] computes the network protocol version
-    announced on peer connection, given the [supported] versions for
-    the higher-level messages. *)
+(** Get the network protocol version to announce on peer connection.
+
+    Use the highest [distributed_db_versions] and the highest [p2p_versions].
+    The version also contains the [chain_name] since it is used to prevent
+    peers from different networks to communicate.
+
+    Neither [distributed_db_versions] nor [p2p_versions] can be empty. *)
 val announced :
   chain_name:Distributed_db_version.Name.t ->
   distributed_db_versions:Distributed_db_version.t list ->
   p2p_versions:P2p_version.t list ->
   t
 
-(** [select acceptables remote] computes network protocol version to
-    be used on a given connection where [remote] is version announced
-    by the remote peer, and [acceptables] the locally accepted
-    versions for the higher-level messages. *)
+(** Try to find a version which is supported both by us and a peer.
+
+    Usage: [select ~chain_name ~distributed_db_versions ~p2p_versions remote_version]
+
+    If the chain name of [remote_version] is not equal to [chain_name],
+    there is no compatible version.
+
+    [distributed_db_versions] is the list of distributed database versions
+    supported by the node.
+    If the highest supported version is lesser or equal to the remote version,
+    use this highest supported version.
+    Otherwise, there is no compatible version.
+
+    Similarly, [p2p_versions] is the list of peer-to-peer versions
+    supported by the node. The rules to find a compatible version are the same
+    as the ones for [distributed_db_versions].
+
+    If there is no compatible version, return a [P2p_rejection.Rejecting] error. *)
 val select :
   chain_name:Distributed_db_version.Name.t ->
   distributed_db_versions:Distributed_db_version.t list ->
