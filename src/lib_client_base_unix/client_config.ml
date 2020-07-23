@@ -538,6 +538,31 @@ let config_show_client (cctxt : #Client_context.full) (config_file : string) =
     read_config_file config_file
     >>=? fun cfg -> cctxt#message "%a@," pp_cfg cfg >>= return
 
+(* The implementation of ["config"; "show"] when --mode is "mockup" *)
+let config_show_mockup (cctxt : #Client_context.full)
+    (protocol_hash_opt : Protocol_hash.t option) =
+  fail_on_non_mockup_dir cctxt
+  >>=? fun _ ->
+  Tezos_mockup.Persistence.get_registered_mockup protocol_hash_opt
+  >>=? fun mockup ->
+  let (module Mockup) = mockup in
+  let json_pp encoding ppf value =
+    Data_encoding.Json.pp ppf (Data_encoding.Json.construct encoding value)
+  in
+  Mockup.default_bootstrap_accounts cctxt
+  >>=? fun bootstrap_accounts_string ->
+  cctxt#message
+    "@[<v>Default value of --%s:@,%s@]"
+    mockup_bootstrap_accounts
+    bootstrap_accounts_string
+  >>= fun () ->
+  cctxt#message
+    "@[<v>Default value of --%s:@,%a@]"
+    mockup_protocol_constants
+    (json_pp Mockup.protocol_constants_encoding)
+    Mockup.default_protocol_constants
+  >>= return
+
 (* The implementation of ["config"; "init"] when --mode is "client" *)
 let config_init_client config_file cfg =
   if not (Sys.file_exists config_file) then Cfg_file.(write config_file cfg)
@@ -610,29 +635,7 @@ let commands config_file cfg (client_mode : client_mode)
       no_options
       (fixed ["config"; "show"; "mockup"])
       (fun () (cctxt : #Client_context.full) ->
-        fail_on_non_mockup_dir cctxt
-        >>=? fun _ ->
-        Tezos_mockup.Persistence.get_registered_mockup protocol_hash_opt
-        >>=? fun mockup ->
-        let (module Mockup) = mockup in
-        let json_pp encoding ppf value =
-          Data_encoding.Json.pp
-            ppf
-            (Data_encoding.Json.construct encoding value)
-        in
-        Mockup.default_bootstrap_accounts cctxt
-        >>=? fun bootstrap_accounts_string ->
-        cctxt#message
-          "@[<v>Default value of --%s:@,%s@]"
-          mockup_bootstrap_accounts
-          bootstrap_accounts_string
-        >>= fun () ->
-        cctxt#message
-          "@[<v>Default value of --%s:@,%a@]"
-          mockup_protocol_constants
-          (json_pp Mockup.protocol_constants_encoding)
-          Mockup.default_protocol_constants
-        >>= return);
+        config_show_mockup cctxt protocol_hash_opt);
     command
       ~group
       ~desc:"Reset the config file to the factory defaults."
