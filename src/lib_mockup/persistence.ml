@@ -23,10 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let mockup_dirname = "mockup"
-
-let context_file = "context.json"
-
 let rpc_context_encoding :
     Tezos_protocol_environment.rpc_context Data_encoding.t =
   let open Data_encoding in
@@ -128,9 +124,7 @@ let mockup_context_from_persisted pm_env =
   >>=? fun mockup -> return (mockup, (pm_env.chain_id, pm_env.rpc_context))
 
 let get_mockup_context_from_disk ~base_dir ~protocol_hash =
-  let file =
-    Filename.concat base_dir (Filename.concat mockup_dirname context_file)
-  in
+  let file = (Files.Context.get ~dirname:base_dir :> string) in
   if not (Sys.file_exists file) then
     failwith "get_mockup_context_from_disk: file %s not found" file
   else
@@ -162,8 +156,7 @@ let get_mockup_context_from_disk ~base_dir ~protocol_hash =
         failwith "get_mockup_context_from_disk: could not read %s" file
 
 let overwrite_mockup ~protocol_hash ~chain_id ~rpc_context ~base_dir =
-  let mockup_dir = Filename.concat base_dir mockup_dirname in
-  let context_file = Filename.concat mockup_dir context_file in
+  let context_file = (Files.context ~dirname:base_dir :> string) in
   if not (Sys.file_exists context_file) then
     failwith "overwrite_mockup: file %s does not exist" context_file
   else
@@ -202,13 +195,9 @@ let classify_base_dir base_dir =
   else if not (Sys.is_directory base_dir) then Base_dir_is_file
   else if is_directory_empty base_dir then Base_dir_is_empty
   else
-    let mockup_dir = Filename.concat base_dir mockup_dirname in
-    let context_file = Filename.concat mockup_dir context_file in
-    if
-      Sys.file_exists mockup_dir
-      && Sys.is_directory mockup_dir
-      && Sys.file_exists context_file
-    then Base_dir_is_mockup
+    let dirname = base_dir in
+    if Files.has_mockup_directory ~dirname && Files.has_context ~dirname then
+      Base_dir_is_mockup
     else Base_dir_is_nonempty
 
 let create_mockup ~(cctxt : Tezos_client_base.Client_context.full)
@@ -238,10 +227,10 @@ let create_mockup ~(cctxt : Tezos_client_base.Client_context.full)
     ~constants_overrides_json
     ~bootstrap_accounts_json
   >>=? fun (_mockup_env, (chain_id, rpc_context)) ->
-  let mockup_dir = Filename.concat base_dir mockup_dirname in
+  let mockup_dir = (Files.mockup_directory ~dirname:base_dir :> string) in
   Tezos_stdlib_unix.Lwt_utils_unix.create_dir mockup_dir
   >>= fun () ->
-  let context_file = Filename.concat mockup_dir context_file in
+  let context_file = (Files.context ~dirname:base_dir :> string) in
   Persistent_mockup_environment.(
     to_json {protocol_hash; chain_id; rpc_context})
   |> Tezos_stdlib_unix.Lwt_utils_unix.Json.write_file context_file

@@ -12,7 +12,7 @@
 (library
  (name tezos_mockup)
  (public_name tezos-mockup)
- (modules local_services RPC_client persistence)
+ (modules files local_services RPC_client persistence)
  (libraries
    tezos-base
    tezos-client-base
