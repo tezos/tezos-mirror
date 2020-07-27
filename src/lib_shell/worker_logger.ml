@@ -173,8 +173,10 @@ struct
           level
       | Request _ ->
           Internal_event.Debug
-      | Terminated | Timeout | Started _ ->
+      | Timeout ->
           Internal_event.Notice
+      | Terminated | Started _ ->
+          Internal_event.Info
       | Crashed _ ->
           Internal_event.Error
       | Triggering_shutdown ->
