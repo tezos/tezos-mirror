@@ -25,18 +25,19 @@ _INPUT_CONFIG_FILES = [None, _INPUT_CONFIG_FILE]
 @pytest.mark.client
 class TestChainId:
 
-    def test_chain_id_block_hash(self, simple_client):
+    def test_chain_id_block_hash(self, simple_client: Client):
         block_hash = 'BKyFui5WPY1n3e9aKF3qd2kGBKBtHu3rtm5miYFnUagJC1BdHTF'
         prms = ['compute', 'chain', 'id', 'from', 'block', 'hash', block_hash]
         assert simple_client.run(prms).strip() == 'NetXuwrXPL4VeX5'
 
-    def test_chain_id_seed(self, simple_client):
+    def test_chain_id_seed(self, simple_client: Client):
         seed = 'choucroute'
         prms = ['compute', 'chain', 'id', 'from', 'seed', seed]
         assert simple_client.run(prms).strip() == 'NetXLGmPi3c5DXf'
 
 
-def _write_config_file(client: Client, filename: str, config_dict: dict):
+def _write_config_file(client: Client, filename: str,
+                       config_dict: Optional[dict]):
     """ Writes `config_dict` to `filename`. Returns the json effectively
         written """
     assert client is not None
@@ -62,7 +63,8 @@ def _with_config_file_cmd(config_file: Optional[str], cmd: List[str]):
 @pytest.mark.parametrize('config_dict', _INPUT_CONFIG_FILES)
 class TestConfigInit:
 
-    def test_config_init(self, simple_client, config_dict):
+    def test_config_init(self, simple_client: Client,
+                         config_dict: Optional[dict]):
         """
             Tests that calling
             `[--config-file config_dict]? config init -o tmp_file`
@@ -87,7 +89,8 @@ class TestConfigInit:
                 os.remove(in_file)
             os.remove(out_file)
 
-    def test_config_init_roundtrip(self, simple_client, config_dict):
+    def test_config_init_roundtrip(self, simple_client: Client,
+                                   config_dict: Optional[dict]):
         """ Tests that calling `config init -o tmp_file` and
             feeding its result to `tezos-client --config-file` works
             and yields the same result (i.e. calling `tezos-client
@@ -153,7 +156,8 @@ class TestConfigInit:
 class TestConfigShow:
     """ Tests of `tezos-client config show` """
 
-    def test_config_show(self, simple_client: Client, config_dict: dict):
+    def test_config_show(self, simple_client: Client,
+                         config_dict: Optional[dict]):
         """
             Tests that calling `config show` works, with or without
             specifying `--config-file`
