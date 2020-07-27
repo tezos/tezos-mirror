@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -42,6 +43,7 @@ type options = {
   list : bool;
   global_timeout : float option;
   test_timeout : float option;
+  reset_regressions : bool;
 }
 
 let options =
@@ -61,6 +63,7 @@ let options =
   let list = ref false in
   let global_timeout = ref None in
   let test_timeout = ref None in
+  let reset_regressions = ref false in
   let set_log_level = function
     | "quiet" ->
         log_level := Quiet
@@ -151,7 +154,11 @@ let options =
         ( "--test-timeout",
           Arg.Float (fun delay -> test_timeout := Some delay),
           "<SECONDS> Fail if a test takes, on its own, more than SECONDS to \
-           run." ) ]
+           run." );
+        ( "--reset-regressions",
+          Arg.Set reset_regressions,
+          " Remove regression test outputs if they exist, and regenerate them."
+        ) ]
   in
   let usage =
     (* This was formatted by ocamlformat. Sorry for all the slashes. *)
@@ -203,4 +210,5 @@ let options =
     list = !list;
     global_timeout = !global_timeout;
     test_timeout = !test_timeout;
+    reset_regressions = !reset_regressions;
   }

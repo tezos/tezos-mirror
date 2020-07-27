@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -61,6 +62,9 @@ let quote_shell s =
           Buffer.add_char buffer c
     in
     String.iter add_char s ; Buffer.contents buffer
+
+let quote_shell_command command arguments =
+  String.concat " " (List.map quote_shell (command :: arguments))
 
 module Color = struct
   type t = string
@@ -240,8 +244,6 @@ let test_result test_result test_name =
   log_string ~level:Report ~prefix ~prefix_color test_name
 
 let command ?color ?prefix command arguments =
-  let message =
-    String.concat " " (List.map quote_shell (command :: arguments))
-  in
+  let message = quote_shell_command command arguments in
   log_string ~level:Debug ?color ?prefix message ;
   if Cli.options.commands then print_endline message

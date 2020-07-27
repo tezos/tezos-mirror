@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -37,6 +38,10 @@ type echo = {
   mutable closed : bool;
   mutable pending : unit Lwt.u list;
 }
+
+let on_log = ref None
+
+let on_spawn = ref None
 
 let wake_up_echo echo =
   let pending = echo.pending in
@@ -191,14 +196,16 @@ let wait process =
 
 (* Read process outputs and log them.
    Also take care of removing the process from [live_processes] on termination. *)
-let handle_process process =
+let handle_process ~log_output process =
   let rec handle_output name (ch : Lwt_io.input_channel) echo =
     let* line = Lwt_io.read_line_opt ch in
     match line with
     | None ->
         close_echo echo ; Lwt_io.close ch
     | Some line ->
-        Log.debug ~prefix:name ~color:process.color "%s" line ;
+        if log_output then (
+          Log.debug ~prefix:name ~color:process.color "%s" line ;
+          Option.iter (fun f -> f line) !on_log ) ;
         push_to_echo echo line ;
         (* TODO: here we assume that all lines end with "\n",
              but it may not always be the case:
@@ -214,11 +221,12 @@ let handle_process process =
   and* _ = wait process in
   unit
 
-let spawn_with_stdin ?(log_status_on_exit = true) ?name
+let spawn_with_stdin ?(log_status_on_exit = true) ?(log_output = true) ?name
     ?(color = Log.Color.FG.cyan) ?(env = []) command arguments =
   let name =
     match name with None -> get_unique_name command | Some name -> name
   in
+  Option.iter (fun f -> f command arguments) !on_spawn ;
   Log.command ~color:Log.Color.bold ~prefix:name command arguments ;
   let old_env =
     let not_modified item =
@@ -255,12 +263,19 @@ let spawn_with_stdin ?(log_status_on_exit = true) ?name
     }
   in
   live_processes := ID_map.add process.id process !live_processes ;
-  async (handle_process process) ;
+  async (handle_process ~log_output process) ;
   (process, (process.lwt_process)#stdin)
 
-let spawn ?log_status_on_exit ?name ?color ?env command arguments =
+let spawn ?log_status_on_exit ?log_output ?name ?color ?env command arguments =
   let (process, stdin) =
-    spawn_with_stdin ?log_status_on_exit ?name ?color ?env command arguments
+    spawn_with_stdin
+      ?log_status_on_exit
+      ?log_output
+      ?name
+      ?color
+      ?env
+      command
+      arguments
   in
   async (Lwt_io.close stdin) ;
   process

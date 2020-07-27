@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -27,6 +28,9 @@
 
 (** Quote or escape a string using shell syntax. *)
 val quote_shell : string -> string
+
+(** Quote or escape a command with arguments using shell syntax. *)
+val quote_shell_command : string -> string list -> string
 
 (** {2 Colors} *)
 

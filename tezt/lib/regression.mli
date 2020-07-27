@@ -1,7 +1,6 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -24,70 +23,26 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let tezos_client = "./tezos-client"
+(** Run Tezt regression tests and capture their output.
 
-let tezos_admin_client = "./tezos-admin-client"
+    NOTE: consider using dune cram when it becomes available:
+    https://dune.readthedocs.io/en/stable/tests.html#cram-tests
+*)
 
-let tezos_node = "./tezos-node"
+(** Run a regression test.
 
-type protocol = {hash : string; parameter_file : string}
+    This function is a wrapper around [Test.run]. It adds the "regression" tag
+    to the [tags] list provided by the argument.
 
-let alpha =
-  {
-    hash = "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK";
-    parameter_file = "src/proto_alpha/parameters/sandbox-parameters.json";
-  }
-
-type key = {identity : string; alias : string; secret : string}
-
-let activator =
-  {
-    identity = "";
-    (* FIXME: could be computed *)
-    alias = "activator";
-    secret =
-      "unencrypted:edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6";
-  }
-
-let bootstrap1 =
-  {
-    identity = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
-    alias = "bootstrap1";
-    secret =
-      "unencrypted:edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh";
-  }
-
-let bootstrap2 =
-  {
-    identity = "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN";
-    alias = "bootstrap2";
-    secret =
-      "unencrypted:edsk39qAm1fiMjgmPkw1EgQYkMzkJezLNewd7PLNHTkr6w9XA2zdfo";
-  }
-
-let bootstrap3 =
-  {
-    identity = "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU";
-    alias = "bootstrap3";
-    secret =
-      "unencrypted:edsk4ArLQgBTLWG5FJmnGnT689VKoqhXwmDPBuGx3z4cvwU9MmrPZZ";
-  }
-
-let bootstrap4 =
-  {
-    identity = "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv";
-    alias = "bootstrap4";
-    secret =
-      "unencrypted:edsk2uqQB9AY4FvioK2YMdfmyMrer5R8mGFyuaLLFfSRo8EoyNdht3";
-  }
-
-let bootstrap5 =
-  {
-    identity = "tz1ddb9NMYHZi5UzPdzTZMYQQZoMub195zgv";
-    alias = "bootstrap5";
-    secret =
-      "unencrypted:edsk4QLrcijEffxV31gGdN2HU7UpyJjA8drFoNcmnB28n89YjPNRFm";
-  }
-
-let all_secret_keys =
-  [activator; bootstrap1; bootstrap2; bootstrap3; bootstrap4; bootstrap5]
+    The [output_file] is a filename, where the output of the test is stored and
+    read to be compared on subsequent runs. The output file with ".out"
+    filename extension added is placed in the [regression_output_path],
+    which is by default "tezt/_regressions". *)
+val run :
+  __FILE__:string ->
+  title:string ->
+  tags:string list ->
+  output_file:string ->
+  ?regression_output_path:string ->
+  (unit -> unit Lwt.t) ->
+  unit

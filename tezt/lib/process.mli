@@ -35,6 +35,9 @@ type t
     If [log_status_on_exit] is [true] (which is the default), log the exit code
     when the process terminates.
 
+    If [log_output] is [true] (which is the default), log the [stdout] and
+    [stderr] output.
+
     Parameter [name] specifies the prefix (in brackets) that is added to
     each logged output line. Parameter [color] specifies the color of those
     output lines.
@@ -42,6 +45,7 @@ type t
     Example: [spawn "git" [ "log"; "-p" ]] *)
 val spawn :
   ?log_status_on_exit:bool ->
+  ?log_output:bool ->
   ?name:string ->
   ?color:Log.Color.t ->
   ?env:(string * string) list ->
@@ -52,6 +56,7 @@ val spawn :
 (** Same as {!spawn}, but with a channel to send data to the process [stdin]. *)
 val spawn_with_stdin :
   ?log_status_on_exit:bool ->
+  ?log_output:bool ->
   ?name:string ->
   ?color:Log.Color.t ->
   ?env:(string * string) list ->
@@ -105,3 +110,9 @@ val run_and_read_stdout :
   string ->
   string list ->
   string Lwt.t
+
+(** A hook that is called with every line that is being logged. *)
+val on_log : (string -> unit) option ref
+
+(** A hook that is called whenever a process is being spawned. *)
+val on_spawn : (string -> string list -> unit) option ref
