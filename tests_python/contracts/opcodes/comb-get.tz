@@ -1,0 +1,33 @@
+parameter (pair nat nat nat unit);
+storage unit;
+code {
+       CAR ;
+
+       # Checking the first element
+       DUP ; CAR ;
+       PUSH nat 1 ; ASSERT_CMPEQ ;
+       DUP ; CAR 0 ;
+       PUSH nat 1 ; ASSERT_CMPEQ ;
+       DUP ; GET 1 ;
+       PUSH nat 1 ; ASSERT_CMPEQ ;
+
+       # Checking the second element
+       DUP ; CAR 1 ;
+       PUSH nat 4 ; ASSERT_CMPEQ ;
+       DUP ; GET 3 ;
+       PUSH nat 4 ; ASSERT_CMPEQ ;
+
+       # Checking the third element
+       DUP ; CAR 2 ;
+       PUSH nat 2 ; ASSERT_CMPEQ ;
+       DUP ; GET 5 ;
+       PUSH nat 2 ; ASSERT_CMPEQ ;
+
+       # Checking the fourth and last element
+       DUP ; CDR 3 ;
+       UNIT ; ASSERT_CMPEQ ;
+       DUP ; GET 6 ;
+       UNIT ; ASSERT_CMPEQ ;
+
+       DROP ; UNIT ; NIL operation ; PAIR
+     }

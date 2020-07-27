@@ -368,9 +368,13 @@ class TestContracts:
          r'The field access annotation does not match'),
         # COMB, UNCOMB, and DUP cannot take 0 as argument
         ("comb0.tz",
-         r"COMB expects an argument of at least 1"),
+         r"PAIR expects an argument of at least 2"),
+        ("comb1.tz",
+         r"PAIR expects an argument of at least 2"),
         ("uncomb0.tz",
-         r"UNCOMB expects an argument of at least 1"),
+         r"UNPAIR expects an argument of at least 2"),
+        ("uncomb1.tz",
+         r"UNPAIR expects an argument of at least 2"),
         ("dup0.tz",
          r"DUP n expects an argument of at least 1"),
     ])
