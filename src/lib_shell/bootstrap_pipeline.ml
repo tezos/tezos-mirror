@@ -370,7 +370,7 @@ let headers_fetch_worker_loop pipeline =
   | Error err ->
       pipeline.errors <- pipeline.errors @ err ;
       Bootstrap_pipeline_event.(emit unexpected_error_while_fetching_headers)
-        ()
+        err
       >>= fun () -> Lwt_canceler.cancel pipeline.canceler
 
 (** [operations_fetch_worker_loop] is a promise which fethches
@@ -431,7 +431,7 @@ let rec operations_fetch_worker_loop pipeline =
   | Error err ->
       pipeline.errors <- pipeline.errors @ err ;
       Bootstrap_pipeline_event.(emit unexpected_error_while_fetching_headers)
-        ()
+        err
       >>= fun () -> Lwt_canceler.cancel pipeline.canceler
 
 (** [validation_work_loop] is a promise which validates blocks one by
@@ -479,7 +479,7 @@ let rec validation_worker_loop pipeline =
   | Error err ->
       pipeline.errors <- pipeline.errors @ err ;
       Bootstrap_pipeline_event.(emit unexpected_error_while_fetching_headers)
-        ()
+        err
       >>= fun () -> Lwt_canceler.cancel pipeline.canceler
 
 (** The creation of the bootstrap starts three promises:
