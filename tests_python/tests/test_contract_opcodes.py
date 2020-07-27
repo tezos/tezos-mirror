@@ -658,6 +658,15 @@ class TestContractOpcodes:
              '(Some 0xf345a219da005ebe9c1a1eaad97bbf38' +
              'a10c8473e41d0af7fb617caa0c6aa722)'),
 
+            # Test COMBs
+            ('comb.tz', '(Pair 0 0 0)', 'Unit', '(Pair 1 2 3)'),
+            ('uncomb.tz', '0', '(Pair 1 4 2)', '142'),
+            ('comb-get.tz', 'Unit', '(Pair 1 4 2 Unit)', 'Unit'),
+            ('comb-set.tz', '(Pair 1 4 2 Unit)', 'Unit',
+             '(Pair 2 12 8 Unit)'),
+            ('comb-set-2.tz', 'None', '(Pair 1 4 2 Unit)',
+             '(Some (Pair 2 4 "toto" 0x01))'),
+
             # Test DUP n
             ('dup-n.tz', 'Unit', 'Unit', 'Unit')
         ])
