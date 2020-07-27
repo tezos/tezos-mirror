@@ -30,6 +30,8 @@ let tezos_admin_client = "./tezos-admin-client"
 
 let tezos_node = "./tezos-node"
 
+let tezos_codec = "./tezos-codec"
+
 type protocol = {hash : string; parameter_file : string}
 
 let alpha =

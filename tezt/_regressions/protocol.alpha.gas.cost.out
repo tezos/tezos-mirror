@@ -1,0 +1,9 @@
+tezt/_regressions/protocol.alpha.gas.cost.out
+
+./tezos-codec encode alpha.gas.cost from '{ "allocations": "0", "steps": "0", "reads": "0", "writes": "0",
+  "bytes_read": "0", "bytes_written": "0" }'
+000000000000
+
+./tezos-codec decode alpha.gas.cost from 000000000000
+{ "allocations": "0", "steps": "0", "reads": "0", "writes": "0",
+  "bytes_read": "0", "bytes_written": "0" }
