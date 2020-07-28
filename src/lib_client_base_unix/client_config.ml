@@ -787,21 +787,17 @@ let check_base_dir_for_mode (ctx : #Client_context.full) client_mode base_dir =
     | Base_dir_is_mockup ->
         return_unit )
 
-let decide_endpoint endpoint addr port tls =
-  match endpoint with
-  | Some k ->
-      k
-  | None ->
-      let updatecomp updatef ov uri =
-        match ov with Some x -> updatef uri (Some x) | None -> uri
-      in
-      let url = default_endpoint in
-      url
-      |> updatecomp Uri.with_host addr
-      |> updatecomp Uri.with_port port
-      |> updatecomp
-           Uri.with_scheme
-           Option.(tls >>| function true -> "https" | false -> "http")
+let build_endpoint addr port tls =
+  let updatecomp updatef ov uri =
+    match ov with Some x -> updatef uri (Some x) | None -> uri
+  in
+  let url = default_endpoint in
+  url
+  |> updatecomp Uri.with_host addr
+  |> updatecomp Uri.with_port port
+  |> updatecomp
+       Uri.with_scheme
+       Option.(tls >>| function true -> "https" | false -> "http")
 
 let parse_config_args (ctx : #Client_context.full) argv =
   parse_global_options (global_options ()) ctx argv
@@ -868,8 +864,12 @@ let parse_config_args (ctx : #Client_context.full) argv =
    *            use it but check no presence of merged --addr, --port, or --tls
    *        2b) synthesize --endpoint from --addr, --port, and --tls *)
   let check_absence addr port tls =
-    let (id, ap) = ((fun x -> x), fun x l -> l @ [x]) in
-    let checkabs argdesc = function None -> id | _ -> ap argdesc in
+    let checkabs argdesc = function
+      | None ->
+          fun x -> x
+      | _ ->
+          fun x -> x @ [argdesc]
+    in
     let superr =
       []
       |> checkabs addr_confdesc addr
@@ -882,21 +882,19 @@ let parse_config_args (ctx : #Client_context.full) argv =
   in
   let tls = if tls then Some true else None in
   ( match endpoint with
-  | Some _ ->
-      check_absence node_addr node_port tls
-      >>=? fun _ -> return (endpoint, node_addr, node_port, tls)
+  | Some endpt ->
+      check_absence node_addr node_port tls >>=? fun _ -> return endpt
   | None -> (
       let merge = Option.first_some in
       let node_addr = merge node_addr cfg.node_addr in
       let node_port = merge node_port cfg.node_port in
       let tls = merge tls cfg.tls in
       match cfg.endpoint with
-      | Some _ ->
-          check_absence node_addr node_port tls
-          >>=? fun _ -> return (cfg.endpoint, node_addr, node_port, tls)
+      | Some endpt ->
+          check_absence node_addr node_port tls >>=? fun _ -> return endpt
       | None ->
-          return (None, node_addr, node_port, tls) ) )
-  >>=? fun (endpoint, node_addr', node_port', tls') ->
+          return (build_endpoint node_addr node_port tls) ) )
+  >>=? fun endpoint ->
   (* give a kind warning when any of -A -P -S exists *)
   (let got = function Some _ -> true | None -> false in
    let gotany =
@@ -924,10 +922,10 @@ let parse_config_args (ctx : #Client_context.full) argv =
   let cfg =
     {
       cfg with
-      node_addr = node_addr';
-      node_port = node_port';
-      tls = tls';
-      endpoint;
+      node_addr = None;
+      node_port = None;
+      tls = None;
+      endpoint = Some endpoint;
       remote_signer;
       confirmations;
       password_filename;

@@ -284,12 +284,9 @@ let main (module C : M) ~select_commands =
                      {
                        RPC_client_unix.default_config with
                        endpoint =
-                         Client_config.(
-                           decide_endpoint
-                             cfg.endpoint
-                             cfg.node_addr
-                             cfg.node_port
-                             cfg.tls);
+                         Option.value
+                           cfg.endpoint
+                           ~default:Client_config.default_endpoint;
                      }
                in
                match parsed_args with
