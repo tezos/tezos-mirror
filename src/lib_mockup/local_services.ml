@@ -139,33 +139,68 @@ let monitor (rpc_context : Tezos_protocol_environment.rpc_context) =
     Monitor_services.S.bootstrapped
     (fun () () () -> RPC_answer.return (block_hash, block_header.timestamp))
 
-let mempool (mockup_env : Registration.mockup_environment) (dirname : string) =
-  Format.printf "Registering for mempool %@ %s@." dirname ;
-  (* /chains/<chain_id> *)
-  let chain_path = Block_services.chain_path in
-  (* /chains/<chain_id>/mempool *)
-  let mempool_path = Block_services.mempool_path chain_path in
-  (* /chains/<chain_id>/mempool *)
-  let pending_operations_path =
-    RPC_path.(mempool_path / "pending_operations")
-  in
+let pending_operations (mockup_env : Registration.mockup_environment)
+    (dirname : string) =
+  (* Format.printf "Registering mempool %@ %s@." dirname ; *)
   let module M = (val mockup_env : Registration.Mockup_sig) in
-  RPC_directory.register
-    Directory.empty
-    (* M.Block_services.Mempool.pending_operations ? *)
-    (Block_services.Empty.S.Mempool.pending_operations pending_operations_path)
-    (fun _ () () ->
-      (* TODO: wrap an a read file action *)
-      return Operation_hash.Map.empty
-      >>=? fun unprocessed ->
-      return
-        {
-          Block_services.Empty.Mempool.applied = [];
-          refused = Operation_hash.Map.empty;
-          branch_refused = Operation_hash.Map.empty;
-          branch_delayed = Operation_hash.Map.empty;
-          unprocessed;
-        })
+  (* TODO: Don't know why it fails *)
+  let service =
+    M.Block_services.S.Mempool.pending_operations
+      Block_services.(mempool_path chain_path)
+  in
+  let op_data_encoding = M.Protocol.operation_data_encoding in
+  let read_operations () =
+    let op_encoding =
+      Data_encoding.(
+        dynamic_size
+        @@ obj2
+             (req "shell_header" Operation.shell_header_encoding)
+             (req "protocol_data" op_data_encoding))
+    in
+    let ops_encoding = Data_encoding.Variable.list op_encoding in
+    (* Read current mempool *)
+    let mempool_file = (Files.mempool ~dirname :> string) in
+    (* Format.printf "Reading mempool file %s@." mempool_file ; *)
+    Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file mempool_file
+    >>=? fun json -> return @@ Data_encoding.Json.destruct ops_encoding json
+  in
+  Directory.register Directory.empty service (fun _ () () ->
+      read_operations ()
+      >>= function
+      | Error errs ->
+          RPC_answer.fail errs
+      | Ok pooled_operations ->
+          (* Format.printf "Retrieving unprocessed operations@." ; *)
+          let unprocessed =
+            List.fold_left
+              (fun map (shell_header, operation_data) ->
+                let op =
+                  {
+                    M.Protocol.shell = shell_header;
+                    protocol_data = operation_data;
+                  }
+                in
+                match
+                  Data_encoding.Binary.to_bytes op_data_encoding operation_data
+                with
+                | Error _ ->
+                    map
+                | Ok proto ->
+                    let operation_hash =
+                      Operation.hash {Operation.shell = shell_header; proto}
+                    in
+                    Operation_hash.Map.add operation_hash op map)
+              Operation_hash.Map.empty
+              pooled_operations
+          in
+          RPC_answer.return
+            {
+              M.Block_services.Mempool.applied = [];
+              refused = Operation_hash.Map.empty;
+              branch_refused = Operation_hash.Map.empty;
+              branch_delayed = Operation_hash.Map.empty;
+              unprocessed;
+            })
 
 let block_hash (rpc_context : Tezos_protocol_environment.rpc_context) =
   let path =
@@ -231,6 +266,7 @@ let inject_block =
     Tezos_shell_services.Injection_services.S.block
     (* See injection_directory.ml for vanilla implementation *)
     (fun _q (_raw, _operations) ->
+      Format.printf "inject block@." ;
       (* FIXME here we should do what inject_operation is doing now *)
       assert false)
 
@@ -256,11 +292,11 @@ let inject_operation (mockup_env : Registration.mockup_environment)
     let mempool_file = (Files.mempool ~dirname :> string) in
     Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file mempool_file
     >>=? fun pooled_operations_json ->
-    let pooled_operations =
+    let ops =
       Data_encoding.Json.destruct ops_encoding pooled_operations_json
     in
-    op :: pooled_operations
-    |> Data_encoding.Json.construct ops_encoding
+    let ops' = op :: ops in
+    Data_encoding.Json.construct ops_encoding ops'
     |> Tezos_stdlib_unix.Lwt_utils_unix.Json.write_file mempool_file
   in
   Directory.register
@@ -345,7 +381,7 @@ let build_shell_directory (base_dir : string)
   merge (protocols Mockup_environment.Protocol.hash) ;
   merge (block_hash rpc_context) ;
   merge (preapply mockup_env chain_id rpc_context) ;
-  merge (mempool mockup_env base_dir) ;
+  merge (pending_operations mockup_env base_dir) ;
   merge
     (inject_operation
        mockup_env
