@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019-2020 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -382,14 +383,13 @@ module Make_indexed_data_storage (C : Raw_context.T) (I : INDEX) (V : VALUE) :
       V.encoding
 end
 
-module Make_indexed_carbonated_data_storage
+(* Internal-use-only version of {!Make_indexed_carbonated_data_storage} to
+   expose fold_keys_unaccounted *)
+module Make_indexed_carbonated_data_storage_INTERNAL
     (C : Raw_context.T)
     (I : INDEX)
-    (V : VALUE) :
-  Non_iterable_indexed_carbonated_data_storage
-    with type t = C.t
-     and type key = I.t
-     and type value = V.t = struct
+    (V : VALUE) =
+struct
   type t = C.t
 
   type context = t
@@ -561,6 +561,42 @@ module Make_indexed_carbonated_data_storage
          C.description
          I.args)
       V.encoding
+end
+
+module Make_indexed_carbonated_data_storage : functor
+  (C : Raw_context.T)
+  (I : INDEX)
+  (V : VALUE)
+  ->
+  Non_iterable_indexed_carbonated_data_storage
+    with type t = C.t
+     and type key = I.t
+     and type value = V.t =
+  Make_indexed_carbonated_data_storage_INTERNAL
+
+module Make_carbonated_data_set_storage (C : Raw_context.T) (I : INDEX) :
+  Carbonated_data_set_storage with type t = C.t and type elt = I.t = struct
+  module V = struct
+    type t = unit
+
+    let encoding = Data_encoding.unit
+  end
+
+  module M = Make_indexed_carbonated_data_storage_INTERNAL (C) (I) (V)
+
+  type t = M.t
+
+  type context = t
+
+  type elt = I.t
+
+  let mem = M.mem
+
+  let init s i = M.init s i ()
+
+  let del s i = M.remove s i
+
+  let fold_keys_unaccounted = M.fold_keys_unaccounted
 end
 
 module Make_indexed_data_snapshotable_storage

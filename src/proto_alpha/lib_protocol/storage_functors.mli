@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019-2020 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -58,6 +59,9 @@ module Pair (I1 : INDEX) (I2 : INDEX) : INDEX with type t = I1.t * I2.t
 
 module Make_data_set_storage (C : Raw_context.T) (I : INDEX) :
   Data_set_storage with type t = C.t and type elt = I.t
+
+module Make_carbonated_data_set_storage (C : Raw_context.T) (I : INDEX) :
+  Carbonated_data_set_storage with type t = C.t and type elt = I.t
 
 module Make_indexed_data_storage (C : Raw_context.T) (I : INDEX) (V : VALUE) :
   Indexed_data_storage
