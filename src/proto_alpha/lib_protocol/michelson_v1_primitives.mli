@@ -130,6 +130,8 @@ type prim =
   | I_ISNAT
   | I_CAST
   | I_RENAME
+  | I_SAPLING_EMPTY_STATE
+  | I_SAPLING_VERIFY_UPDATE
   | I_DIG
   | I_DUG
   | I_NEVER
@@ -160,6 +162,8 @@ type prim =
   | T_unit
   | T_operation
   | T_address
+  | T_sapling_transaction
+  | T_sapling_state
   | T_chain_id
   | T_never
   | T_bls12_381_g1

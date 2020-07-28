@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019-2020 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -115,5 +116,14 @@ val contract_big_map_get_opt :
   Contract.t ->
   Script.expr * Script.expr ->
   Script.expr option shell_tzresult Lwt.t
+
+val single_sapling_get_diff :
+  'a #RPC_context.simple ->
+  'a ->
+  Contract.t ->
+  ?offset_commitment:int64 ->
+  ?offset_nullifier:int64 ->
+  unit ->
+  (Sapling.root * Sapling.diff) shell_tzresult Lwt.t
 
 val register : unit -> unit

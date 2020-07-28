@@ -188,14 +188,15 @@ let () =
   (* Unexpected big_map *)
   register_error_kind
     `Permanent
-    ~id:"michelson_v1.unexpected_bigmap"
-    ~title:"Big map in unauthorized position (type error)"
+    ~id:"michelson_v1.unexpected_lazy_storage"
+    ~title:"Lazy storage in unauthorized position (type error)"
     ~description:
-      "When parsing script, a big_map type was found in a position where it \
-       could end up stored inside a big_map, which is forbidden for now."
+      "When parsing script, a big_map or sapling_state type was found in a \
+       position where it could end up stored inside a big_map, which is \
+       forbidden for now."
     (obj1 (req "loc" location_encoding))
-    (function Unexpected_big_map loc -> Some loc | _ -> None)
-    (fun loc -> Unexpected_big_map loc) ;
+    (function Unexpected_lazy_storage loc -> Some loc | _ -> None)
+    (fun loc -> Unexpected_lazy_storage loc) ;
   (* Unexpected operation *)
   register_error_kind
     `Permanent
@@ -563,6 +564,19 @@ let () =
        (req "other_type" Script.expr_encoding))
     (function Inconsistent_types (tya, tyb) -> Some (tya, tyb) | _ -> None)
     (fun (tya, tyb) -> Inconsistent_types (tya, tyb)) ;
+  (* Inconsistent memo_sizes *)
+  register_error_kind
+    `Permanent
+    ~id:"michelson_v1.inconsistent_memo_sizes"
+    ~title:"Inconsistent memo sizes"
+    ~description:
+      "Memo sizes of two sapling states or transactions do not match"
+    (obj2
+       (req "first_memo_size" Sapling.Memo_size.encoding)
+       (req "other_memo_size" Sapling.Memo_size.encoding))
+    (function
+      | Inconsistent_memo_sizes (msa, msb) -> Some (msa, msb) | _ -> None)
+    (fun (msa, msb) -> Inconsistent_memo_sizes (msa, msb)) ;
   (* -- Instruction typing errors ------------------- *)
   (* Invalid map body *)
   register_error_kind

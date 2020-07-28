@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019-2020 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -193,6 +194,15 @@ module Big_map = struct
         return (c, None)
     | Some kt ->
         Storage.Big_map.Value_type.get c id >|=? fun kv -> (c, Some (kt, kv))
+end
+
+module Sapling = struct
+  include Lazy_storage_kind.Sapling_state
+  include Sapling_repr
+  include Sapling_storage
+  include Sapling_validator
+
+  let fresh ~temporary c = Lazy_storage.fresh Sapling_state ~temporary c
 end
 
 module Delegate = Delegate_storage
