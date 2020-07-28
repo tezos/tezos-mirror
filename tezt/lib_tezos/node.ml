@@ -25,10 +25,23 @@
 
 type 'a known = Unknown | Known of 'a
 
+(* When a node is running, we store:
+   - its process, so that we can terminate it for instance;
+   - the event loop promise, which reads events and cleans them up when
+     the node terminates;
+   - some information about the state of the node so that users can query them.
+
+   The event loop promise is particularly important as when we terminate
+   the node we must also wait for the event loop to finish cleaning up before
+   we start the node again. The event loop is also responsible to set the status
+   of the node to [Not_running], which is another reason to wait for it to
+   finish before restarting a node. Otherwise we could have a [Not_running]
+   node which would be actually running. *)
 type status =
   | Not_running
   | Running of {
       process : Process.t;
+      event_loop_promise : unit Lwt.t;
       mutable ready : bool;
       mutable level : int known;
       mutable identity : string known;
@@ -75,10 +88,8 @@ let terminate node =
   match node.status with
   | Not_running ->
       unit
-  | Running {process; _} ->
-      Process.terminate process ;
-      let* _ = Process.wait process in
-      unit
+  | Running {process; event_loop_promise; _} ->
+      Process.terminate process ; event_loop_promise
 
 let next_name = ref 1
 
@@ -318,6 +329,11 @@ let handle_raw_event node line =
 
 let run ?(expected_pow = 0) ?(single_process = false) ?bootstrap_threshold
     ?connections node =
+  ( match node.status with
+  | Not_running ->
+      ()
+  | Running _ ->
+      Test.fail "node %s is already running" node.name ) ;
   let args =
     "run" :: "--expected-pow" :: string_of_int expected_pow :: "--data-dir"
     :: node.data_dir
@@ -346,53 +362,62 @@ let run ?(expected_pow = 0) ?(single_process = false) ?bootstrap_threshold
       node.path
       args
   in
-  node.status <-
-    Running {process; ready = false; level = Unknown; identity = Unknown} ;
   (* Return control now, the rest (event handling) happens concurrently. *)
-  async
-  @@ let* input = Lwt_io.(open_file ~mode:input) node.event_pipe in
-     let rec event_loop () =
-       let* line = Lwt_io.read_line_opt input in
-       match line with
-       | Some line ->
-           handle_raw_event node line ; event_loop ()
-       | None -> (
-         match node.status with
-         | Not_running ->
-             (* Process terminated, there will be no more events. *)
-             Lwt_io.close input
-         | Running _ ->
-             (* It can take a little while before the pipe is opened by the node,
+  let event_loop_promise =
+    let* input = Lwt_io.(open_file ~mode:input) node.event_pipe in
+    let rec event_loop () =
+      let* line = Lwt_io.read_line_opt input in
+      match line with
+      | Some line ->
+          handle_raw_event node line ; event_loop ()
+      | None -> (
+        match node.status with
+        | Not_running ->
+            (* Process terminated, there will be no more events. *)
+            Lwt_io.close input
+        | Running _ ->
+            (* It can take a little while before the pipe is opened by the node,
                 and before that, reading from it yields end of file for some reason. *)
-             let* () = Lwt_unix.sleep 0.01 in
-             event_loop () )
-     in
-     let* () = event_loop ()
-     and* () =
-       let* _ = Process.wait process in
-       (* Setting [node.status] to [Not_running] stops the event loop cleanly. *)
-       node.status <- Not_running ;
-       (* Cancel all [Ready] event listeners. *)
-       trigger_ready node None ;
-       (* Cancel all [Level_at_least] event listeners. *)
-       let pending = node.pending_level in
-       node.pending_level <- [] ;
-       List.iter (fun (_, pending) -> Lwt.wakeup_later pending None) pending ;
-       (* Cancel all [Read_identity] event listeners. *)
-       let pending = node.pending_identity in
-       node.pending_identity <- [] ;
-       List.iter (fun pending -> Lwt.wakeup_later pending None) pending ;
-       (* Cancel all [Any] event listeners. *)
-       let pending = node.pending_custom in
-       node.pending_custom <- String_map.empty ;
-       String_map.iter
-         (fun _ ->
-           List.iter (fun (Custom_event {resolver; _}) ->
-               Lwt.wakeup_later resolver None))
-         pending ;
-       unit
-     in
-     unit
+            let* () = Lwt_unix.sleep 0.01 in
+            event_loop () )
+    in
+    let* () = event_loop ()
+    and* () =
+      let* _ = Process.wait process in
+      (* Setting [node.status] to [Not_running] stops the event loop cleanly. *)
+      node.status <- Not_running ;
+      (* Cancel all [Ready] event listeners. *)
+      trigger_ready node None ;
+      (* Cancel all [Level_at_least] event listeners. *)
+      let pending = node.pending_level in
+      node.pending_level <- [] ;
+      List.iter (fun (_, pending) -> Lwt.wakeup_later pending None) pending ;
+      (* Cancel all [Read_identity] event listeners. *)
+      let pending = node.pending_identity in
+      node.pending_identity <- [] ;
+      List.iter (fun pending -> Lwt.wakeup_later pending None) pending ;
+      (* Cancel all [Any] event listeners. *)
+      let pending = node.pending_custom in
+      node.pending_custom <- String_map.empty ;
+      String_map.iter
+        (fun _ ->
+          List.iter (fun (Custom_event {resolver; _}) ->
+              Lwt.wakeup_later resolver None))
+        pending ;
+      unit
+    in
+    unit
+  in
+  node.status <-
+    Running
+      {
+        process;
+        ready = false;
+        level = Unknown;
+        identity = Unknown;
+        event_loop_promise;
+      } ;
+  async event_loop_promise
 
 exception
   Terminated_before_event of {
