@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019-2020 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -753,6 +754,8 @@ module Lazy_storage : sig
   val legacy_big_map_diff_encoding : diffs Data_encoding.t
 
   val cleanup_temporaries : context -> context Lwt.t
+
+  val apply : t -> diffs -> (t * Z.t) tzresult Lwt.t
 end
 
 module Contract : sig
