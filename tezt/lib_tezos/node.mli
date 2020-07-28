@@ -184,7 +184,7 @@ val wait_for_identity : t -> string Lwt.t
     If [filter] returns [None], continue waiting.
     If [filter] returns [Some x], return [x].
 
-    [where] is used as the second field of the [Terminated_before_event] exception
+    [where] is used as the [where] field of the [Terminated_before_event] exception
     if the node terminates. It should describe the constraint that [filter] applies,
     such as ["field level exists"].
 
