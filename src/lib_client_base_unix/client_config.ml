@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2018-2020 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -520,23 +520,20 @@ let mockup_bootstrap_accounts = "bootstrap-accounts"
 let mockup_protocol_constants = "protocol-constants"
 
 (* The implementation of ["config"; "show"] when --mode is "client" *)
-let config_show_client (cctxt : #Client_context.full) (config_file : string) =
-  let pp_cfg ppf cfg =
-    Format.fprintf
-      ppf
-      "%a"
-      Data_encoding.Json.pp
-      (Data_encoding.Json.construct Cfg_file.encoding cfg)
-  in
-  if not @@ Sys.file_exists config_file then
+let config_show_client (cctxt : #Client_context.full) (config_file : string)
+    cfg =
+  ( if not @@ Sys.file_exists config_file then
     cctxt#warning
       "@[<v 2>Warning: no config file at %s,@,\
        displaying the default configuration.@]"
       config_file
-    >>= fun () -> cctxt#warning "%a@," pp_cfg Cfg_file.default >>= return
-  else
-    read_config_file config_file
-    >>=? fun cfg -> cctxt#message "%a@," pp_cfg cfg >>= return
+  else Lwt.return_unit )
+  >>= fun () ->
+  cctxt#message
+    "%a@,"
+    Data_encoding.Json.pp
+    (Data_encoding.Json.construct Cfg_file.encoding cfg)
+  >>= return
 
 (* The implementation of ["config"; "show"] when --mode is "mockup" *)
 let config_show_mockup (cctxt : #Client_context.full)
@@ -629,14 +626,15 @@ let commands config_file cfg (client_mode : client_mode)
   [ command
       ~group
       ~desc:
-        "Show the config file (or the mockup config files if `--mode mockup` \
-         is specified)."
+        "Show the current config (config file content + command line \
+         arguments) or the mockup config files if `--mode mockup` is \
+         specified."
       no_options
       (fixed ["config"; "show"])
       (fun () (cctxt : #Client_context.full) ->
         match client_mode with
         | Mode_client ->
-            config_show_client cctxt config_file
+            config_show_client cctxt config_file cfg
         | Mode_mockup ->
             config_show_mockup cctxt protocol_hash_opt base_dir);
     command
