@@ -1161,25 +1161,24 @@ let update ?data_dir ?min_connections ?expected_connections ?max_connections
              max_latency =
                Option.value
                  ~default:
-                   Node.default_chain_validator_limits.bootstrap_conf
-                     .max_latency
+                   cfg.shell.chain_validator_limits.bootstrap_conf.max_latency
                  max_latency;
              chain_stuck_delay =
                Option.value
                  ~default:
-                   Node.default_chain_validator_limits.bootstrap_conf
+                   cfg.shell.chain_validator_limits.bootstrap_conf
                      .chain_stuck_delay
                  chain_stuck_delay;
              sync_polling_period =
                Option.value
                  ~default:
-                   Node.default_chain_validator_limits.bootstrap_conf
+                   cfg.shell.chain_validator_limits.bootstrap_conf
                      .sync_polling_period
                  sync_polling_period;
              bootstrap_threshold =
                Option.value
                  ~default:
-                   Node.default_chain_validator_limits.bootstrap_conf
+                   cfg.shell.chain_validator_limits.bootstrap_conf
                      .bootstrap_threshold
                  bootstrap_threshold;
            }
