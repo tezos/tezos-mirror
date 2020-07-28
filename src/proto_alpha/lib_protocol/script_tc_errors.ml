@@ -56,7 +56,7 @@ type error += Missing_field of prim
 
 type error += Duplicate_field of Script.location * prim
 
-type error += Unexpected_big_map of Script.location
+type error += Unexpected_lazy_storage of Script.location
 
 type error += Unexpected_operation of Script.location
 
@@ -146,6 +146,11 @@ type error +=
   | Comparable_type_expected : Script.location * Script.expr -> error
 
 type error += Inconsistent_types : Script.expr * Script.expr -> error
+
+type error +=
+  | Inconsistent_memo_sizes :
+      Sapling.Memo_size.t * Sapling.Memo_size.t
+      -> error
 
 type error += Unordered_map_keys of Script.location * Script.expr
 

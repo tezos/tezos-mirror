@@ -146,6 +146,10 @@ let rec type_size : type t. t ty -> int =
       1
   | Bls12_381_fr_t _ ->
       1
+  | Sapling_transaction_t _ ->
+      1
+  | Sapling_state_t _ ->
+      1
   | Pair_t ((l, _, _), (r, _, _), _) ->
       1 + type_size l + type_size r
   | Union_t ((l, _), (r, _), _) ->
@@ -439,6 +443,10 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int =
   | Amount ->
       0
   | Self_address ->
+      0
+  | Sapling_empty_state _ ->
+      0
+  | Sapling_verify_update ->
       0
   | Set_delegate ->
       0
@@ -870,6 +878,10 @@ let rec comparable_ty_of_ty_no_gas : type a. a ty -> a comparable_ty option =
       None
   | Bls12_381_g2_t _ ->
       None
+  | Sapling_state_t _ ->
+      None
+  | Sapling_transaction_t _ ->
+      None
 
 let add_field_annot a var = function
   | Prim (loc, prim, args, annots) ->
@@ -928,6 +940,10 @@ let rec unparse_comparable_ty : type a. a comparable_ty -> Script.node =
       Prim (-1, T_or, [tl; tr], unparse_type_annot tname)
   | Option_key (t, tname) ->
       Prim (-1, T_option, [unparse_comparable_ty t], unparse_type_annot tname)
+
+let unparse_memo_size memo_size =
+  let z = Sapling.Memo_size.unparse_to_z memo_size in
+  Int (-1, z)
 
 let rec unparse_ty :
     type a. context -> a ty -> (Script.node * context) tzresult =
@@ -1032,6 +1048,18 @@ let rec unparse_ty :
       unparse_ty ctxt utr
       >>? fun (tr, ctxt) ->
       return ctxt (T_big_map, [ta; tr], unparse_type_annot tname)
+  | Sapling_transaction_t (memo_size, tname) ->
+      return
+        ctxt
+        ( T_sapling_transaction,
+          [unparse_memo_size memo_size],
+          unparse_type_annot tname )
+  | Sapling_state_t (memo_size, tname) ->
+      return
+        ctxt
+        ( T_sapling_state,
+          [unparse_memo_size memo_size],
+          unparse_type_annot tname )
 
 let rec strip_var_annots = function
   | (Int _ | String _ | Bytes _) as atom ->
@@ -1122,6 +1150,10 @@ let name_of_ty : type a. a ty -> type_annot option = function
   | Bls12_381_g2_t tname ->
       tname
   | Bls12_381_fr_t tname ->
+      tname
+  | Sapling_state_t (_, tname) ->
+      tname
+  | Sapling_transaction_t (_, tname) ->
       tname
 
 (* ---- Equality witnesses --------------------------------------------------*)
@@ -1253,6 +1285,10 @@ let comparable_ty_eq :
  fun ctxt ta tb ->
   merge_comparable_types ~legacy:true ctxt ta tb
   >|? fun (eq, _ty, ctxt) -> (eq, ctxt)
+
+let merge_memo_sizes ms1 ms2 =
+  if Sapling.Memo_size.equal ms1 ms2 then ok ms1
+  else error (Inconsistent_memo_sizes (ms1, ms2))
 
 let merge_types :
     type a b.
@@ -1405,6 +1441,16 @@ let merge_types :
         help ctxt tva tvb
         >|? fun (Eq, ty, ctxt) ->
         ((Eq : (ta ty, tb ty) eq), List_t (ty, tname), ctxt)
+    | (Sapling_state_t (ms1, tn1), Sapling_state_t (ms2, tn2)) ->
+        merge_type_annot tn1 tn2
+        >>? fun tname ->
+        merge_memo_sizes ms1 ms2
+        >|? fun ms -> (Eq, Sapling_state_t (ms, tname), ctxt)
+    | (Sapling_transaction_t (ms1, tn1), Sapling_transaction_t (ms2, tn2)) ->
+        merge_type_annot tn1 tn2
+        >>? fun tname ->
+        merge_memo_sizes ms1 ms2
+        >|? fun ms -> (Eq, Sapling_transaction_t (ms, tname), ctxt)
     | (_, _) ->
         serialize_ty_for_error ctxt ty1
         >>? fun (ty1, ctxt) ->
@@ -1506,6 +1552,19 @@ let merge_branches :
       ok (Typed (branch dbt (descrf dbt.aft)), ctxt)
   | (Failed {descr = descrt}, Typed dbf) ->
       ok (Typed (branch (descrt dbf.aft) dbf), ctxt)
+
+let parse_memo_size (n : (location, _) Micheline.node) :
+    Sapling.Memo_size.t tzresult =
+  match n with
+  | Int (_, z) -> (
+    match Sapling.Memo_size.parse_z z with
+    | Ok _ as ok_memo_size ->
+        ok_memo_size
+    | Error msg ->
+        error @@ Invalid_syntactic_constant (location n, strip_locations n, msg)
+    )
+  | _ ->
+      error @@ Invalid_kind (location n, [Int_kind], kind n)
 
 let rec parse_comparable_ty :
     context -> Script.node -> (ex_comparable_ty * context) tzresult =
@@ -1872,6 +1931,12 @@ and parse_ty :
       >>? fun (Ex_ty tr, ctxt) ->
       parse_type_annot loc annot
       >>? fun ty_name -> ok (Ex_ty (Map_t (ta, tr, ty_name)), ctxt)
+  | Prim (loc, T_sapling_transaction, [memo_size], annot) ->
+      parse_type_annot loc annot
+      >>? fun ty_name ->
+      parse_memo_size memo_size
+      >|? fun memo_size ->
+      (Ex_ty (Sapling_transaction_t (memo_size, ty_name)), ctxt)
   (*
     /!\ When adding new lazy storage kinds, be careful to use
     [when allow_lazy_storage] /!\
@@ -1881,8 +1946,13 @@ and parse_ty :
   | Prim (loc, T_big_map, args, annot) when allow_lazy_storage ->
       parse_big_map_ty ctxt ~legacy loc args annot
       >>? fun (big_map_ty, ctxt) -> ok (big_map_ty, ctxt)
-  | Prim (loc, T_big_map, _, _) ->
-      error (Unexpected_big_map loc)
+  | Prim (loc, T_sapling_state, [memo_size], annot) when allow_lazy_storage ->
+      parse_type_annot loc annot
+      >>? fun ty_name ->
+      parse_memo_size memo_size
+      >|? fun memo_size -> (Ex_ty (Sapling_state_t (memo_size, ty_name)), ctxt)
+  | Prim (loc, (T_big_map | T_sapling_state), _, _) ->
+      error (Unexpected_lazy_storage loc)
   | Prim
       ( loc,
         ( ( T_unit
@@ -1997,7 +2067,9 @@ let check_packable ~legacy loc root =
     (* /!\ When adding new lazy storage kinds, be sure to return an error. /!\
     Lazy storage should not be packable. *)
     | Big_map_t _ ->
-        error (Unexpected_big_map loc)
+        error (Unexpected_lazy_storage loc)
+    | Sapling_state_t _ ->
+        error (Unexpected_lazy_storage loc)
     | Operation_t _ ->
         error (Unexpected_operation loc)
     | Unit_t _ ->
@@ -2052,6 +2124,8 @@ let check_packable ~legacy loc root =
         ok_unit
     | Contract_t (_, _) ->
         error (Unexpected_contract loc)
+    | Sapling_transaction_t _ ->
+        ok ()
   in
   check root
 
@@ -2985,6 +3059,35 @@ let rec parse_data :
           fail_parse_data () )
   | (Bls12_381_fr_t _, expr) ->
       traced_fail (Invalid_kind (location expr, [Bytes_kind], kind expr))
+  (* Sapling *)
+  | (Sapling_transaction_t (memo_size, _), Bytes (_, bytes)) -> (
+    match Data_encoding.Binary.of_bytes Sapling.transaction_encoding bytes with
+    | Some transaction -> (
+      match Sapling.transaction_get_memo_size transaction with
+      | None ->
+          return (transaction, ctxt)
+      | Some transac_memo_size ->
+          Lwt.return
+            ( merge_memo_sizes memo_size transac_memo_size
+            >|? fun _ms -> (transaction, ctxt) ) )
+    | None ->
+        fail_parse_data () )
+  | (Sapling_transaction_t _, expr) ->
+      traced_fail (Invalid_kind (location expr, [Bytes_kind], kind expr))
+  | (Sapling_state_t (memo_size, _), Int (_, id)) ->
+      let id = Sapling.Id.parse_z id in
+      Sapling.state_from_id ctxt id
+      >>=? fun (state, ctxt) ->
+      Lwt.return
+        ( traced_no_lwt @@ merge_memo_sizes memo_size state.Sapling.memo_size
+        >|? fun _memo_size -> (state, ctxt) )
+  | (Sapling_state_t (memo_size, _), Seq (_, [])) ->
+      return (Sapling.empty_state ~memo_size (), ctxt)
+  | (Sapling_state_t _, expr) ->
+      (* Do not allow to input diffs as they are untrusted and may not be the
+         result of a verify_update. *)
+      traced_fail
+        (Invalid_kind (location expr, [Int_kind; Seq_kind], kind expr))
 
 and parse_returning :
     type arg ret.
@@ -3940,7 +4043,40 @@ and parse_instr :
         loc
         Big_map_update
         (Item_t (Big_map_t (map_key, map_value, map_name), rest, annot))
-  (* control *)
+  | (Prim (loc, I_SAPLING_EMPTY_STATE, [memo_size], annot), rest) ->
+      parse_memo_size memo_size
+      >>?= fun memo_size ->
+      parse_var_annot loc annot ~default:default_sapling_state_annot
+      >>?= fun annot ->
+      typed
+        ctxt
+        loc
+        (Sapling_empty_state {memo_size})
+        (Item_t (Sapling_state_t (memo_size, None), rest, annot))
+  | ( Prim (loc, I_SAPLING_VERIFY_UPDATE, [], _),
+      Item_t
+        ( Sapling_transaction_t (transaction_memo_size, _),
+          Item_t
+            ( (Sapling_state_t (state_memo_size, _) as state_ty),
+              rest,
+              stack_annot ),
+          _ ) ) ->
+      merge_memo_sizes state_memo_size transaction_memo_size
+      >>?= fun _memo_size ->
+      typed
+        ctxt
+        loc
+        Sapling_verify_update
+        (Item_t
+           ( Option_t
+               ( Pair_t
+                   ( (Int_t None, None, default_sapling_balance_annot),
+                     (state_ty, None, None),
+                     None ),
+                 None ),
+             rest,
+             stack_annot ))
+      (* control *)
   | (Seq (loc, []), stack) ->
       typed ctxt loc Nop stack
   | (Seq (loc, [single]), stack) -> (
@@ -5316,7 +5452,9 @@ and parse_instr :
              I_TOTAL_VOTING_POWER;
              I_KECCAK;
              I_SHA3;
-             I_PAIRING_CHECK ]
+             I_PAIRING_CHECK;
+             I_SAPLING_EMPTY_STATE;
+             I_SAPLING_VERIFY_UPDATE ]
 
 and parse_contract :
     type arg.
@@ -6185,6 +6323,39 @@ let rec unparse_data :
       unparse_code ctxt ~stack_depth:(stack_depth + 1) mode original_code
   | (Never_t _, _) ->
       .
+  | (Sapling_transaction_t _, s) ->
+      Lwt.return
+        ( Gas.consume ctxt (Unparse_costs.sapling_transaction s)
+        >|? fun ctxt ->
+        let bytes =
+          Data_encoding.Binary.to_bytes_exn Sapling.transaction_encoding s
+        in
+        (Bytes (-1, bytes), ctxt) )
+  | (Sapling_state_t _, {id; diff; _}) ->
+      Lwt.return
+        ( Gas.consume ctxt (Unparse_costs.sapling_diff diff)
+        >|? fun ctxt ->
+        ( ( match diff with
+          | {commitments_and_ciphertexts = []; nullifiers = []} -> (
+            match id with
+            | None ->
+                Micheline.Seq (-1, [])
+            | Some id ->
+                let id = Sapling.Id.unparse_to_z id in
+                Micheline.Int (-1, id) )
+          | diff -> (
+              let diff_bytes =
+                Data_encoding.Binary.to_bytes_exn Sapling.diff_encoding diff
+              in
+              let unparsed_diff = Bytes (-1, diff_bytes) in
+              match id with
+              | None ->
+                  unparsed_diff
+              | Some id ->
+                  let id = Sapling.Id.unparse_to_z id in
+                  Micheline.Prim (-1, D_Pair, [Int (-1, id); unparsed_diff], [])
+              ) ),
+          ctxt ) )
 
 and unparse_items :
     type k v.
@@ -6427,6 +6598,22 @@ let diff_of_big_map ctxt mode ~temporary ~ids_to_copy
     (List.rev pairs)
   >|=? fun (updates, ctxt) -> (Lazy_storage.Update {init; updates}, id, ctxt)
 
+let diff_of_sapling_state ctxt ~temporary ~ids_to_copy
+    ({id; diff; memo_size} : Sapling.state) =
+  ( match id with
+  | Some id ->
+      if Lazy_storage.IdSet.mem Sapling_state id ids_to_copy then
+        Sapling.fresh ~temporary ctxt
+        >|=? fun (ctxt, duplicate) ->
+        (ctxt, Lazy_storage.Copy {src = id}, duplicate)
+      else return (ctxt, Lazy_storage.Existing, id)
+  | None ->
+      Sapling.fresh ~temporary ctxt
+      >|=? fun (ctxt, id) -> (ctxt, Lazy_storage.Alloc Sapling.{memo_size}, id)
+  )
+  >|=? fun (ctxt, init, id) ->
+  (Lazy_storage.Update {init; updates = diff}, id, ctxt)
+
 (**
     Witness flag for whether a type can be populated by a value containing a
     lazy storage.
@@ -6444,7 +6631,7 @@ let diff_of_big_map ctxt mode ~temporary ~ids_to_copy
     Please keep the usage of this GADT local.
 *)
 type 'ty has_lazy_storage =
-  | Big_map_f : (_, _) big_map has_lazy_storage
+  | True_f : _ has_lazy_storage
   | False_f : _ has_lazy_storage
   | Pair_f :
       'a has_lazy_storage * 'b has_lazy_storage
@@ -6475,7 +6662,9 @@ let rec has_lazy_storage : type t. t ty -> t has_lazy_storage =
   in
   function
   | Big_map_t (_, _, _) ->
-      Big_map_f
+      True_f
+  | Sapling_state_t _ ->
+      True_f
   | Unit_t _ ->
       False_f
   | Int_t _ ->
@@ -6517,6 +6706,8 @@ let rec has_lazy_storage : type t. t ty -> t has_lazy_storage =
   | Bls12_381_g2_t _ ->
       False_f
   | Bls12_381_fr_t _ ->
+      False_f
+  | Sapling_transaction_t _ ->
       False_f
   | Pair_t ((l, _, _), (r, _, _), _) ->
       aux2 (fun l r -> Pair_f (l, r)) l r
@@ -6563,6 +6754,17 @@ let extract_lazy_storage_updates ctxt mode ~temporary ids_to_copy acc ty x =
         let diff = Lazy_storage.make Big_map id diff in
         let ids_to_copy = Lazy_storage.IdSet.add Big_map id ids_to_copy in
         (ctxt, map, ids_to_copy, diff :: acc)
+    | (_, Sapling_state_t _, sapling_state) ->
+        diff_of_sapling_state ctxt ~temporary ~ids_to_copy sapling_state
+        >|=? fun (diff, id, ctxt) ->
+        let sapling_state =
+          Sapling.empty_state ~id ~memo_size:sapling_state.memo_size ()
+        in
+        let diff = Lazy_storage.make Sapling_state id diff in
+        let ids_to_copy =
+          Lazy_storage.IdSet.add Sapling_state id ids_to_copy
+        in
+        (ctxt, sapling_state, ids_to_copy, diff :: acc)
     | (Pair_f (hl, hr), Pair_t ((tyl, _, _), (tyr, _, _), _), (xl, xr)) ->
         aux ctxt mode ~temporary ids_to_copy acc tyl xl ~has_lazy_storage:hl
         >>=? fun (ctxt, xl, ids_to_copy, acc) ->
@@ -6635,12 +6837,17 @@ let rec fold_lazy_storage :
   Gas.consume ctxt Typecheck_costs.parse_instr_cycle
   >>? fun ctxt ->
   match (has_lazy_storage, ty, x) with
-  | (False_f, _, _) ->
-      ok (init, ctxt)
   | (_, Big_map_t (_, _, _), {id = Some id}) ->
       Gas.consume ctxt Typecheck_costs.parse_instr_cycle
       >>? fun ctxt -> ok (f.f Big_map id init, ctxt)
+  | (_, Sapling_state_t _, {id = Some id}) ->
+      Gas.consume ctxt Typecheck_costs.parse_instr_cycle
+      >>? fun ctxt -> ok (f.f Sapling_state id init, ctxt)
+  | (False_f, _, _) ->
+      ok (init, ctxt)
   | (_, Big_map_t (_, _, _), {id = None}) ->
+      ok (init, ctxt)
+  | (_, Sapling_state_t _, {id = None}) ->
       ok (init, ctxt)
   | (Pair_f (hl, hr), Pair_t ((tyl, _, _), (tyr, _, _), _), (xl, xr)) ->
       fold_lazy_storage ~f ~init ctxt tyl xl ~has_lazy_storage:hl
@@ -6718,3 +6925,17 @@ let parse_instr = parse_instr ~stack_depth:0
 let unparse_data = unparse_data ~stack_depth:0
 
 let unparse_code = unparse_code ~stack_depth:0
+
+let get_single_sapling_state ctxt ty x =
+  let has_lazy_storage = has_lazy_storage ty in
+  let f (type i a u) (kind : (i, a, u) Lazy_storage.Kind.t) (id : i)
+      single_id_opt : Sapling.Id.t option =
+    match kind with
+    | Lazy_storage.Kind.Sapling_state -> (
+      match single_id_opt with None -> Some id | Some _ -> raise Not_found
+      (* more than one *) )
+    | _ ->
+        single_id_opt
+  in
+  fold_lazy_storage ~f:{f} ~init:None ctxt ty x ~has_lazy_storage
+  >>? function (None, _) -> raise Not_found | (Some id, ctxt) -> ok (id, ctxt)

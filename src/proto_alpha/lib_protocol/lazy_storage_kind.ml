@@ -190,6 +190,25 @@ module Big_map = struct
   let updates_encoding = Data_encoding.list update_encoding
 end
 
+module Sapling_state = struct
+  include MakeId (struct
+    let title = "sapling_state"
+  end)
+
+  type alloc = {memo_size : Sapling_repr.Memo_size.t}
+
+  type updates = Sapling_repr.diff
+
+  let alloc_encoding =
+    let open Data_encoding in
+    conv
+      (fun {memo_size} -> memo_size)
+      (fun memo_size -> {memo_size})
+      (obj1 (req "memo_size" Sapling_repr.Memo_size.encoding))
+
+  let updates_encoding = Sapling_repr.diff_encoding
+end
+
 (*
   When adding cases to this type, grep for [new lazy storage kind] in the code
   for locations to update.
@@ -200,32 +219,55 @@ end
 *)
 type ('id, 'alloc, 'updates) t =
   | Big_map : (Big_map.Id.t, Big_map.alloc, Big_map.updates) t
+  | Sapling_state
+      : (Sapling_state.Id.t, Sapling_state.alloc, Sapling_state.updates) t
 
 type ex = Ex_Kind : (_, _, _) t -> ex
 
 (* /!\ Don't forget to add new lazy storage kinds here. /!\ *)
-let all = [(0, Ex_Kind Big_map)]
+let all = [(0, Ex_Kind Big_map); (1, Ex_Kind Sapling_state)]
 
 type (_, _) cmp = Eq : ('a, 'a) cmp | Neq
 
 let equal :
     type i1 a1 u1 i2 a2 u2.
     (i1, a1, u1) t -> (i2, a2, u2) t -> (i1 * a1 * u1, i2 * a2 * u2) cmp =
- fun k1 k2 -> match (k1, k2) with (Big_map, Big_map) -> Eq
+ fun k1 k2 ->
+  match (k1, k2) with
+  | (Big_map, Big_map) ->
+      Eq
+  | (Sapling_state, Sapling_state) ->
+      Eq
+  | (Big_map, _) ->
+      Neq
+  | (_, Big_map) ->
+      Neq
 
 type ('i, 'a, 'u) kind = ('i, 'a, 'u) t
 
 module Temp_ids = struct
-  type t = {big_map : Big_map.Id.Temp.t}
+  type t = {
+    big_map : Big_map.Id.Temp.t;
+    sapling_state : Sapling_state.Id.Temp.t;
+  }
 
-  let init = {big_map = Big_map.Id.Temp.init}
+  let init =
+    {
+      big_map = Big_map.Id.Temp.init;
+      sapling_state = Sapling_state.Id.Temp.init;
+    }
 
   let fresh : type i a u. (i, a, u) kind -> t -> t * i =
    fun kind temp_ids ->
     match kind with
     | Big_map ->
         let big_map = Big_map.Id.Temp.next temp_ids.big_map in
-        ({big_map}, (big_map :> Big_map.Id.t))
+        ({temp_ids with big_map}, (big_map :> Big_map.Id.t))
+    | Sapling_state ->
+        let sapling_state =
+          Sapling_state.Id.Temp.next temp_ids.sapling_state
+        in
+        ({temp_ids with sapling_state}, (sapling_state :> Sapling_state.Id.t))
    [@@coq_axiom "gadt"]
 
   let fold_s :
@@ -245,36 +287,52 @@ module Temp_ids = struct
           (module Big_map.Id.Temp)
           ~last:temp_ids.big_map
           (fun acc temp_id -> f acc (temp_id :> i))
+    | Sapling_state ->
+        helper
+          (module Sapling_state.Id.Temp)
+          ~last:temp_ids.sapling_state
+          (fun acc temp_id -> f acc (temp_id :> i))
    [@@coq_axiom "gadt"]
 end
 
 module IdSet = struct
-  type t = {big_map : Big_map.IdSet.t}
+  type t = {big_map : Big_map.IdSet.t; sapling_state : Sapling_state.IdSet.t}
 
   type 'acc fold_f = {f : 'i 'a 'u. ('i, 'a, 'u) kind -> 'i -> 'acc -> 'acc}
 
-  let empty = {big_map = Big_map.IdSet.empty}
+  let empty =
+    {big_map = Big_map.IdSet.empty; sapling_state = Sapling_state.IdSet.empty}
 
   let mem (type i a u) (kind : (i, a, u) kind) (id : i) set =
     match (kind, set) with
     | (Big_map, {big_map}) ->
         Big_map.IdSet.mem id big_map
+    | (Sapling_state, {sapling_state}) ->
+        Sapling_state.IdSet.mem id sapling_state
 
   let add (type i a u) (kind : (i, a, u) kind) (id : i) set =
     match (kind, set) with
     | (Big_map, {big_map}) ->
         let big_map = Big_map.IdSet.add id big_map in
-        {big_map}
+        {set with big_map}
+    | (Sapling_state, {sapling_state}) ->
+        let sapling_state = Sapling_state.IdSet.add id sapling_state in
+        {set with sapling_state}
 
   let diff set1 set2 =
     let big_map = Big_map.IdSet.diff set1.big_map set2.big_map in
-    {big_map}
+    let sapling_state =
+      Sapling_state.IdSet.diff set1.sapling_state set2.sapling_state
+    in
+    {big_map; sapling_state}
 
   let fold (type i a u) (kind : (i, a, u) kind) (f : i -> 'acc -> 'acc) set
       (acc : 'acc) =
     match (kind, set) with
     | (Big_map, {big_map}) ->
         Big_map.IdSet.fold f big_map acc
+    | (Sapling_state, {sapling_state}) ->
+        Sapling_state.IdSet.fold f sapling_state acc
 
   let fold_all f set acc =
     List.fold_left

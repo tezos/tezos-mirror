@@ -108,6 +108,20 @@ module Big_map : sig
   val updates_encoding : updates Data_encoding.t
 end
 
+module Sapling_state : sig
+  val title : string
+
+  module Id : ID
+
+  type alloc = {memo_size : Sapling_repr.Memo_size.t}
+
+  type updates = Sapling_repr.diff
+
+  val alloc_encoding : alloc Data_encoding.t
+
+  val updates_encoding : updates Data_encoding.t
+end
+
 (**
   Kinds of lazy storage.
   The GADT ensures operations are properly applied to the correct kind.
@@ -118,6 +132,8 @@ end
 *)
 type ('id, 'alloc, 'updates) t =
   | Big_map : (Big_map.Id.t, Big_map.alloc, Big_map.updates) t
+  | Sapling_state
+      : (Sapling_state.Id.t, Sapling_state.alloc, Sapling_state.updates) t
 
 type ex = Ex_Kind : (_, _, _) t -> ex
 

@@ -82,6 +82,10 @@ let default_right_annot = Some (Field_annot "right")
 
 let default_binding_annot = Some (Field_annot "bnd")
 
+let default_sapling_state_annot = Some (Var_annot "sapling")
+
+let default_sapling_balance_annot = Some (Var_annot "sapling_balance")
+
 let unparse_type_annot : type_annot option -> string list = function
   | None ->
       []

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019-2020 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -1097,6 +1098,10 @@ module Cost_of = struct
     (* The cost functions below where not benchmarked, a cost model was derived
        from looking at similar instructions. *)
 
+    let sapling_empty_state = step_cost Z.one (* TODO *)
+
+    let sapling_verify_update = step_cost Z.one (* TODO *)
+
     (* Cost for Concat_string is paid in two steps: when entering the interpreter,
        the user pays for the cost of computing the information necessary to compute
        the actual gas (so it's meta-gas): indeed, one needs to run through the
@@ -1390,5 +1395,17 @@ module Cost_of = struct
 
     (* Reuse 006 costs. *)
     let operation bytes = Script.bytes_node_cost bytes
+
+    let sapling_transaction _t =
+      (* TODO should it be scaled? *)
+      (*       let size = Data_encoding.Binary.length Sapling.transaction_encoding t in *)
+      (*       string_cost size *)
+      Gas.free
+
+    let sapling_diff _d =
+      (* TODO should it be scaled? *)
+      (*       let size = Data_encoding.Binary.length Sapling.diff_encoding d in *)
+      (*       string_cost size *)
+      Gas.free
   end
 end

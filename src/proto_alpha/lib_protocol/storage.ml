@@ -32,9 +32,15 @@ module UInt16 = struct
 end
 
 module Int32 = struct
-  type t = Int32.t
+  include Int32
 
   let encoding = Data_encoding.int32
+end
+
+module Int64 = struct
+  include Int64
+
+  let encoding = Data_encoding.int64
 end
 
 module Z = struct
@@ -474,6 +480,322 @@ module Big_map = struct
       | Some value ->
           consume_deserialize_gas ctxt value >|? fun ctxt -> (ctxt, value_opt)
   end
+end
+
+module Sapling = struct
+  type id = Lazy_storage_kind.Sapling_state.Id.t
+
+  module Raw_context =
+    Make_subcontext (Registered) (Raw_context)
+      (struct
+        let name = ["sapling"]
+      end)
+
+  module Next = struct
+    include Make_single_data_storage (Registered) (Raw_context)
+              (struct
+                let name = ["next"]
+              end)
+              (Lazy_storage_kind.Sapling_state.Id)
+
+    let incr ctxt =
+      get ctxt
+      >>=? fun i ->
+      set ctxt (Lazy_storage_kind.Sapling_state.Id.next i)
+      >|=? fun ctxt -> (ctxt, i)
+
+    let init ctxt = init ctxt Lazy_storage_kind.Sapling_state.Id.init
+  end
+
+  module Index = Lazy_storage_kind.Sapling_state.Id
+
+  let rpc_arg = Index.rpc_arg
+
+  module Indexed_context =
+    Make_indexed_subcontext
+      (Make_subcontext (Registered) (Raw_context)
+         (struct
+           let name = ["index"]
+         end))
+         (Make_index (Index))
+
+  let remove_rec ctxt n = Indexed_context.remove_rec ctxt n
+
+  let copy ctxt ~from ~to_ = Indexed_context.copy ctxt ~from ~to_
+
+  module Total_bytes =
+    Indexed_context.Make_map
+      (struct
+        let name = ["total_bytes"]
+      end)
+      (Z)
+
+  module Commitments_size =
+    Make_single_data_storage (Registered) (Indexed_context.Raw_context)
+      (struct
+        let name = ["commitments_size"]
+      end)
+      (Int64)
+
+  module Memo_size =
+    Make_single_data_storage (Registered) (Indexed_context.Raw_context)
+      (struct
+        let name = ["memo_size"]
+      end)
+      (Sapling_repr.Memo_size)
+
+  module Commitments =
+    Make_indexed_carbonated_data_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["commitments"]
+         end))
+         (Make_index (struct
+           type t = int64
+
+           let rpc_arg =
+             let construct = Int64.to_string in
+             let destruct hash =
+               match Int64.of_string_opt hash with
+               | None ->
+                   Error "Cannot parse node position"
+               | Some id ->
+                   Ok id
+             in
+             RPC_arg.make
+               ~descr:"The position of a node in a sapling commitment tree"
+               ~name:"sapling_node_position"
+               ~construct
+               ~destruct
+               ()
+
+           let encoding =
+             Data_encoding.def
+               "sapling_node_position"
+               ~title:"Sapling node position"
+               ~description:
+                 "The position of a node in a sapling commitment tree"
+               Data_encoding.int64
+
+           let compare = Compare.Int64.compare
+
+           let path_length = 1
+
+           let to_path c l = Int64.to_string c :: l
+
+           let of_path = function [c] -> Int64.of_string_opt c | _ -> None
+         end))
+      (Sapling.Hash)
+
+  let commitments_init ctx id =
+    Indexed_context.Raw_context.remove_rec (ctx, id) ["commitments"]
+    >|= fun (ctx, _id) -> ctx
+
+  module Ciphertexts =
+    Make_indexed_carbonated_data_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["ciphertexts"]
+         end))
+         (Make_index (struct
+           type t = int64
+
+           let rpc_arg =
+             let construct = Int64.to_string in
+             let destruct hash =
+               match Int64.of_string_opt hash with
+               | None ->
+                   Error "Cannot parse ciphertext position"
+               | Some id ->
+                   Ok id
+             in
+             RPC_arg.make
+               ~descr:"The position of a sapling ciphertext"
+               ~name:"sapling_ciphertext_position"
+               ~construct
+               ~destruct
+               ()
+
+           let encoding =
+             Data_encoding.def
+               "sapling_ciphertext_position"
+               ~title:"Sapling ciphertext position"
+               ~description:"The position of a sapling ciphertext"
+               Data_encoding.int64
+
+           let compare = Compare.Int64.compare
+
+           let path_length = 1
+
+           let to_path c l = Int64.to_string c :: l
+
+           let of_path = function [c] -> Int64.of_string_opt c | _ -> None
+         end))
+      (Sapling.Ciphertext)
+
+  let ciphertexts_init ctx id =
+    Indexed_context.Raw_context.remove_rec (ctx, id) ["commitments"]
+    >|= fun (ctx, _id) -> ctx
+
+  module Nullifiers_size =
+    Make_single_data_storage (Registered) (Indexed_context.Raw_context)
+      (struct
+        let name = ["nullifiers_size"]
+      end)
+      (Int64)
+
+  (* For sequential access when building a diff *)
+  module Nullifiers_ordered =
+    Make_indexed_data_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["nullifiers_ordered"]
+         end))
+         (Make_index (struct
+           type t = int64
+
+           let rpc_arg =
+             let construct = Int64.to_string in
+             let destruct hash =
+               match Int64.of_string_opt hash with
+               | None ->
+                   Error "Cannot parse nullifier position"
+               | Some id ->
+                   Ok id
+             in
+             RPC_arg.make
+               ~descr:"A sapling nullifier position"
+               ~name:"sapling_nullifier_position"
+               ~construct
+               ~destruct
+               ()
+
+           let encoding =
+             Data_encoding.def
+               "sapling_nullifier_position"
+               ~title:"Sapling nullifier position"
+               ~description:"Sapling nullifier position"
+               Data_encoding.int64
+
+           let compare = Compare.Int64.compare
+
+           let path_length = 1
+
+           let to_path c l = Int64.to_string c :: l
+
+           let of_path = function [c] -> Int64.of_string_opt c | _ -> None
+         end))
+      (Sapling.Nullifier)
+
+  (* Check membership in O(1) for verify_update *)
+  module Nullifiers_hashed =
+    Make_carbonated_data_set_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["nullifiers_hashed"]
+         end))
+         (Make_index (struct
+           type t = Sapling.Nullifier.t
+
+           let encoding = Sapling.Nullifier.encoding
+
+           let of_string hexstring =
+             let b = Hex.to_bytes (`Hex hexstring) in
+             match Data_encoding.Binary.of_bytes encoding b with
+             | None ->
+                 Error "Cannot parse sapling nullifier"
+             | Some nf ->
+                 Ok nf
+
+           let to_string nf =
+             let b = Data_encoding.Binary.to_bytes_exn encoding nf in
+             let (`Hex hexstring) = Hex.of_bytes b in
+             hexstring
+
+           let rpc_arg =
+             RPC_arg.make
+               ~descr:"A sapling nullifier"
+               ~name:"sapling_nullifier"
+               ~construct:to_string
+               ~destruct:of_string
+               ()
+
+           let compare = Sapling.Nullifier.compare
+
+           let path_length = 1
+
+           let to_path c l = to_string c :: l
+
+           let of_path = function
+             | [c] -> (
+               match of_string c with Error _ -> None | Ok nf -> Some nf )
+             | _ ->
+                 None
+         end))
+
+  let nullifiers_init ctx id =
+    Nullifiers_size.init_set (ctx, id) Int64.zero
+    >>= fun ctx ->
+    Indexed_context.Raw_context.remove_rec (ctx, id) ["nullifiers_ordered"]
+    >>= fun (ctx, id) ->
+    Indexed_context.Raw_context.remove_rec (ctx, id) ["nullifiers_hashed"]
+    >|= fun (ctx, _id) -> ctx
+
+  module Roots =
+    Make_indexed_data_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["roots"]
+         end))
+         (Make_index (struct
+           type t = int32
+
+           let rpc_arg =
+             let construct = Int32.to_string in
+             let destruct hash =
+               match Int32.of_string_opt hash with
+               | None ->
+                   Error "Cannot parse nullifier position"
+               | Some id ->
+                   Ok id
+             in
+             RPC_arg.make
+               ~descr:"A sapling root"
+               ~name:"sapling_root"
+               ~construct
+               ~destruct
+               ()
+
+           let encoding =
+             Data_encoding.def
+               "sapling_root"
+               ~title:"Sapling root"
+               ~description:"Sapling root"
+               Data_encoding.int32
+
+           let compare = Compare.Int32.compare
+
+           let path_length = 1
+
+           let to_path c l = Int32.to_string c :: l
+
+           let of_path = function [c] -> Int32.of_string_opt c | _ -> None
+         end))
+      (Sapling.Hash)
+
+  module Roots_pos =
+    Make_single_data_storage (Registered) (Indexed_context.Raw_context)
+      (struct
+        let name = ["roots_pos"]
+      end)
+      (Int32)
+
+  module Roots_level =
+    Make_single_data_storage (Registered) (Indexed_context.Raw_context)
+      (struct
+        let name = ["roots_level"]
+      end)
+      (Raw_level_repr)
 end
 
 module Delegates =

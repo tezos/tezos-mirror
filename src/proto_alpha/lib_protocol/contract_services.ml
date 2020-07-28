@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019-2020 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -158,6 +159,49 @@ module S = struct
       ~query:RPC_query.empty
       ~output:(list Contract.encoding)
       custom_root
+
+  module Sapling = struct
+    (*
+      Sapling: these RPCs are like Sapling RPCs (sapling_services.ml)
+      specialized for contracts containing a single sapling state.
+    *)
+
+    let single_sapling_get_id ctxt contract_id =
+      Contract.get_script ctxt contract_id
+      >>=? fun (ctxt, script) ->
+      match script with
+      | None ->
+          raise Not_found
+      | Some script ->
+          let ctxt = Gas.set_unlimited ctxt in
+          Script_ir_translator.parse_script ctxt ~legacy:true script
+          >|= fun tzresult ->
+          tzresult
+          >>? fun (Ex_script script, ctxt) ->
+          Script_ir_translator.get_single_sapling_state
+            ctxt
+            script.storage_type
+            script.storage
+
+    let make_service
+        Sapling_services.S.Args.{name; description; query; output; f} =
+      let name = "single_sapling_" ^ name in
+      let path = RPC_path.(custom_root /: Contract.rpc_arg / name) in
+      let service = RPC_service.get_service ~description ~query ~output path in
+      ( service,
+        fun ctxt contract_id q () ->
+          single_sapling_get_id ctxt contract_id
+          >>=? fun (sapling_id, ctxt) -> f ctxt sapling_id q )
+
+    let get_diff = make_service Sapling_services.S.Args.get_diff
+
+    let register () =
+      let reg (service, f) = Services_registration.register1 service f in
+      reg get_diff
+
+    let mk_call1 (service, _f) ctxt block id q =
+      RPC_context.make_call1 service ctxt block id q ()
+  end
 end
 
 let register () =
@@ -341,7 +385,8 @@ let register () =
           >>=? fun (Ex_script script, ctxt) ->
           unparse_script ctxt Readable script
           >|=? fun (script, ctxt) -> (Some script, ctxt) )
-      >|=? fun (script, _ctxt) -> {balance; delegate; script; counter})
+      >|=? fun (script, _ctxt) -> {balance; delegate; script; counter}) ;
+  S.Sapling.register ()
 
 let list ctxt block = RPC_context.make_call0 S.list ctxt block () ()
 
@@ -398,3 +443,11 @@ let big_map_get ctxt block id key =
 
 let contract_big_map_get_opt ctxt block contract key =
   RPC_context.make_call1 S.contract_big_map_get_opt ctxt block contract () key
+
+let single_sapling_get_diff ctxt block id ?offset_commitment ?offset_nullifier
+    () =
+  S.Sapling.(mk_call1 get_diff)
+    ctxt
+    block
+    id
+    Sapling_services.{offset_commitment; offset_nullifier}
