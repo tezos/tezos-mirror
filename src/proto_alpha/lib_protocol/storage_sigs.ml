@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019-2020 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -356,6 +357,34 @@ module type Data_set_storage = sig
 
   (** Removes all elements in the set *)
   val clear : context -> Raw_context.t Lwt.t
+end
+
+(** Variant of {!Data_set_storage} with gas accounting. *)
+module type Carbonated_data_set_storage = sig
+  type t
+
+  type context = t
+
+  (** The type of elements. *)
+  type elt
+
+  (** Tells whether an elt is a member of the set.
+      Consumes [Gas_repr.read_bytes_cost Z.zero] *)
+  val mem : context -> elt -> (Raw_context.t * bool) tzresult Lwt.t
+
+  (** Adds an elt as a member of the set.
+      Consumes [Gas_repr.write_bytes_cost <size of the new value>].
+      Returns the difference from the old (maybe 0) to the new size. *)
+  val init : context -> elt -> (Raw_context.t * int) tzresult Lwt.t
+
+  (** Removes an elt from the set ; does nothing if not a member.
+      Consumes [Gas_repr.write_bytes_cost Z.zero].
+      Returns the freed size, and a boolean
+      indicating if a value was already associated to this key. *)
+  val del : context -> elt -> (Raw_context.t * int * bool) tzresult Lwt.t
+
+  val fold_keys_unaccounted :
+    context -> init:'acc -> f:(elt -> 'acc -> 'acc Lwt.t) -> 'acc Lwt.t
 end
 
 module type NAME = sig
