@@ -259,14 +259,13 @@ let preapply (mockup_env : Registration.mockup_environment)
              RPC_answer.fail errs))
 
 let inject_block =
-  let register0 dir s f = RPC_directory.register dir s (fun () p q -> f p q) in
-  register0
+  Directory.register
     Directory.empty
     (* /injection/block *)
     Tezos_shell_services.Injection_services.S.block
     (* See injection_directory.ml for vanilla implementation *)
-    (fun _q (_raw, _operations) ->
-      Format.printf "inject block@." ;
+    (fun _q _ ->
+      (* Format.printf "inject block@." ; *)
       (* FIXME here we should do what inject_operation is doing now *)
       assert false)
 
@@ -305,7 +304,20 @@ let inject_operation (mockup_env : Registration.mockup_environment)
       injection_directory.ml *)
     Tezos_shell_services.Injection_services.S.operation
     (fun _q _contents operation_bytes ->
-      (* FIXME instead of doing that, we should fill the mempool file *)
+      (* TODO:
+         We might want to preserve the initial (aka synchronous) operation
+         injection without "bake for" support.
+
+         In this case, we will need to handle two possibilities here, depending
+         on whether there is a mempool file.
+
+         If the mempool file is present, we are in so-called asynchronous mode
+         (delayed ?). Otherwise we are in the older synchronous mode.
+
+         The absence of the file would be handled by an appropriate switch at
+         mockup creation time. We still need to decide on the default case.
+
+       *)
       if mem_only then RPC_answer.fail [Injection_not_possible]
       else
         match
