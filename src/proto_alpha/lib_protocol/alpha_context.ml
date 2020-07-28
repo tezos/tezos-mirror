@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019-2020 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -194,6 +195,15 @@ end
 module Receipt = Receipt_repr
 module Delegation = Delegation_storage
 module Baker = Baker_storage
+
+module Sapling = struct
+  include Lazy_storage_kind.Sapling_state
+  include Sapling_repr
+  include Sapling_storage
+  include Sapling_validator
+
+  let fresh ~temporary c = Lazy_storage.fresh Sapling_state ~temporary c
+end
 
 module Roll = struct
   include Roll_repr

@@ -131,6 +131,8 @@ type prim =
   | I_ISNAT
   | I_CAST
   | I_RENAME
+  | I_SAPLING_EMPTY_STATE
+  | I_SAPLING_VERIFY_UPDATE
   | I_DIG
   | I_DUG
   | I_NEVER
@@ -167,6 +169,8 @@ type prim =
   | T_unit
   | T_operation
   | T_address
+  | T_sapling_transaction
+  | T_sapling_state
   | T_chain_id
   | T_never
   | T_bls12_381_g1
@@ -267,6 +271,8 @@ let namespace = function
   | I_PUSH
   | I_RENAME
   | I_RIGHT
+  | I_SAPLING_EMPTY_STATE
+  | I_SAPLING_VERIFY_UPDATE
   | I_SELF
   | I_SELF_ADDRESS
   | I_SENDER
@@ -318,6 +324,8 @@ let namespace = function
   | T_or
   | T_pair
   | T_pvss_key
+  | T_sapling_state
+  | T_sapling_transaction
   | T_set
   | T_signature
   | T_string
@@ -535,6 +543,10 @@ let string_of_prim = function
       "CAST"
   | I_RENAME ->
       "RENAME"
+  | I_SAPLING_EMPTY_STATE ->
+      "SAPLING_EMPTY_STATE"
+  | I_SAPLING_VERIFY_UPDATE ->
+      "SAPLING_VERIFY_UPDATE"
   | I_DIG ->
       "DIG"
   | I_DUG ->
@@ -607,6 +619,10 @@ let string_of_prim = function
       "operation"
   | T_address ->
       "address"
+  | T_sapling_state ->
+      "sapling_state"
+  | T_sapling_transaction ->
+      "sapling_transaction"
   | T_chain_id ->
       "chain_id"
   | T_never ->
@@ -823,6 +839,10 @@ let prim_of_string = function
       ok I_CAST
   | "RENAME" ->
       ok I_RENAME
+  | "SAPLING_EMPTY_STATE" ->
+      ok I_SAPLING_EMPTY_STATE
+  | "SAPLING_VERIFY_UPDATE" ->
+      ok I_SAPLING_VERIFY_UPDATE
   | "DIG" ->
       ok I_DIG
   | "DUG" ->
@@ -889,6 +909,10 @@ let prim_of_string = function
       ok T_operation
   | "address" ->
       ok T_address
+  | "sapling_state" ->
+      ok T_sapling_state
+  | "sapling_transaction" ->
+      ok T_sapling_transaction
   | "chain_id" ->
       ok T_chain_id
   | "never" ->
@@ -1102,7 +1126,12 @@ let prim_encoding =
          ("SET_BAKER_ACTIVE", I_SET_BAKER_ACTIVE);
          ("TOGGLE_BAKER_DELEGATIONS", I_TOGGLE_BAKER_DELEGATIONS);
          ("SET_BAKER_CONSENSUS_KEY", I_SET_BAKER_CONSENSUS_KEY);
-         ("SET_BAKER_PVSS_KEY", I_SET_BAKER_PVSS_KEY)
+         ("SET_BAKER_PVSS_KEY", I_SET_BAKER_PVSS_KEY);
+         (* /!\ NEW INSTRUCTIONS MUST BE ADDED AT THE END OF THE STRING_ENUM, FOR BACKWARD COMPATIBILITY OF THE ENCODING. *)
+         ("sapling_state", T_sapling_state);
+         ("sapling_transaction", T_sapling_transaction);
+         ("SAPLING_EMPTY_STATE", I_SAPLING_EMPTY_STATE);
+         ("SAPLING_VERIFY_UPDATE", I_SAPLING_VERIFY_UPDATE)
          (* New instructions must be added here, for backward compatibility of the encoding. *)
         ]
 

@@ -133,10 +133,26 @@ type ('id, 'alloc, 'updates) ops =
       and type alloc = 'alloc
       and type updates = 'updates)
 
+module Sapling_state = struct
+  include Lazy_storage_kind.Sapling_state
+
+  let bytes_size_for_empty = Z.of_int 33
+
+  let alloc ctxt ~id Sapling_repr.{memo_size} =
+    Sapling_storage.init ctxt id ~memo_size
+
+  let apply_updates ctxt ~id updates =
+    Sapling_storage.apply_diff ctxt id updates
+
+  include Storage.Sapling
+end
+
 let get_ops : type i a u. (i, a, u) Lazy_storage_kind.t -> (i, a, u) ops =
   function
   | Big_map ->
       (module Big_map)
+  | Sapling_state ->
+      (module Sapling_state)
   [@@coq_axiom "gadt"]
 
 module KId = struct

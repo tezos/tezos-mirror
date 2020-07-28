@@ -53,6 +53,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    commitment_repr.mli commitment_repr.ml
    parameters_repr.mli parameters_repr.ml
    receipt_repr.mli receipt_repr.ml
+   sapling_repr.ml
    lazy_storage_kind.ml
    raw_context.mli raw_context.ml
    storage_sigs.ml
@@ -65,6 +66,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    roll_storage.mli roll_storage.ml
    baker_storage.mli baker_storage.ml
    delegation_storage.mli delegation_storage.ml
+   sapling_storage.ml
    lazy_storage_diff.mli lazy_storage_diff.ml
    contract_storage.mli contract_storage.ml
    bootstrap_storage.mli bootstrap_storage.ml
@@ -73,6 +75,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    commitment_storage.mli commitment_storage.ml
    init_storage.ml
    fees_storage.mli fees_storage.ml
+   sapling_validator.ml
    alpha_context.mli alpha_context.ml
    script_typed_ir.ml
    script_tc_errors.ml
@@ -88,6 +91,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    apply.ml
    services_registration.ml
    constants_services.mli constants_services.ml
+   sapling_services.ml
    contract_services.mli contract_services.ml
    delegate_services.mli delegate_services.ml
    baker_services.mli baker_services.ml
@@ -137,6 +141,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    commitment_repr.mli commitment_repr.ml
    parameters_repr.mli parameters_repr.ml
    receipt_repr.mli receipt_repr.ml
+   sapling_repr.ml
    lazy_storage_kind.ml
    raw_context.mli raw_context.ml
    storage_sigs.ml
@@ -149,6 +154,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    roll_storage.mli roll_storage.ml
    baker_storage.mli baker_storage.ml
    delegation_storage.mli delegation_storage.ml
+   sapling_storage.ml
    lazy_storage_diff.mli lazy_storage_diff.ml
    contract_storage.mli contract_storage.ml
    bootstrap_storage.mli bootstrap_storage.ml
@@ -157,6 +163,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    commitment_storage.mli commitment_storage.ml
    init_storage.ml
    fees_storage.mli fees_storage.ml
+   sapling_validator.ml
    alpha_context.mli alpha_context.ml
    script_typed_ir.ml
    script_tc_errors.ml
@@ -172,6 +179,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    apply.ml
    services_registration.ml
    constants_services.mli constants_services.ml
+   sapling_services.ml
    contract_services.mli contract_services.ml
    delegate_services.mli delegate_services.ml
    baker_services.mli baker_services.ml
@@ -221,6 +229,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    commitment_repr.mli commitment_repr.ml
    parameters_repr.mli parameters_repr.ml
    receipt_repr.mli receipt_repr.ml
+   sapling_repr.ml
    lazy_storage_kind.ml
    raw_context.mli raw_context.ml
    storage_sigs.ml
@@ -233,6 +242,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    roll_storage.mli roll_storage.ml
    baker_storage.mli baker_storage.ml
    delegation_storage.mli delegation_storage.ml
+   sapling_storage.ml
    lazy_storage_diff.mli lazy_storage_diff.ml
    contract_storage.mli contract_storage.ml
    bootstrap_storage.mli bootstrap_storage.ml
@@ -241,6 +251,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    commitment_storage.mli commitment_storage.ml
    init_storage.ml
    fees_storage.mli fees_storage.ml
+   sapling_validator.ml
    alpha_context.mli alpha_context.ml
    script_typed_ir.ml
    script_tc_errors.ml
@@ -256,6 +267,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    apply.ml
    services_registration.ml
    constants_services.mli constants_services.ml
+   sapling_services.ml
    contract_services.mli contract_services.ml
    delegate_services.mli delegate_services.ml
    baker_services.mli baker_services.ml
@@ -325,6 +337,7 @@ include Tezos_raw_protocol_alpha.Main
    Commitment_repr
    Parameters_repr
    Receipt_repr
+   Sapling_repr
    Lazy_storage_kind
    Raw_context
    Storage_sigs
@@ -337,6 +350,7 @@ include Tezos_raw_protocol_alpha.Main
    Roll_storage
    Baker_storage
    Delegation_storage
+   Sapling_storage
    Lazy_storage_diff
    Contract_storage
    Bootstrap_storage
@@ -345,6 +359,7 @@ include Tezos_raw_protocol_alpha.Main
    Commitment_storage
    Init_storage
    Fees_storage
+   Sapling_validator
    Alpha_context
    Script_typed_ir
    Script_tc_errors
@@ -360,6 +375,7 @@ include Tezos_raw_protocol_alpha.Main
    Apply
    Services_registration
    Constants_services
+   Sapling_services
    Contract_services
    Delegate_services
    Baker_services

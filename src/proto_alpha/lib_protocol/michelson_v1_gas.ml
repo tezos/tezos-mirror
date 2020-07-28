@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019-2020 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -447,6 +448,10 @@ module Cost_of = struct
 
     let baker_operation = step_cost 10
 
+    let sapling_empty_state = step_cost 1
+
+    let sapling_verify_update = step_cost 1
+
     let rec compare : type a. a Script_typed_ir.comparable_ty -> a -> a -> cost
         =
      fun ty x y ->
@@ -842,6 +847,10 @@ module Cost_of = struct
           alloc_cost 1
       | Amount ->
           alloc_cost 1
+      | Sapling_empty_state ->
+          alloc_cost 1
+      | Sapling_verify_update ->
+          alloc_cost 1
       | Dig (n, _) ->
           n *@ alloc_cost 1 (* _ is a unary development of n *)
       | Dug (n, _) ->
@@ -962,5 +971,15 @@ module Cost_of = struct
     let one_arg_type = prim_cost 1
 
     let two_arg_type = prim_cost 2
+
+    let sapling_transaction t =
+      (* TODO should it be scaled? *)
+      let size = Data_encoding.Binary.length Sapling.transaction_encoding t in
+      string_cost size
+
+    let sapling_diff d =
+      (* TODO should it be scaled? *)
+      let size = Data_encoding.Binary.length Sapling.diff_encoding d in
+      string_cost size
   end
 end

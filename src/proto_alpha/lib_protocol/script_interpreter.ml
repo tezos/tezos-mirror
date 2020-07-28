@@ -606,6 +606,10 @@ let cost_of_instr : type b a. (b, a) descr -> b -> Gas.cost =
         Interp_costs.baker_operation
     | (Toggle_baker_delegations, _) ->
         Interp_costs.baker_operation
+    | (Sapling_empty_state, _) ->
+        Interp_costs.sapling_empty_state
+    | (Sapling_verify_update, _) ->
+        Interp_costs.sapling_verify_update
   in
   Gas.(cycle_cost +@ instr_cost)
 
@@ -1410,6 +1414,20 @@ let rec step :
         n'
         stack
       >>=? fun (_, rest) -> logged_return (rest, ctxt)
+  | (Sapling_empty_state, rest) ->
+      logged_return ((Sapling.empty_state ~memo_size:0 (), rest), ctxt)
+  | (Sapling_verify_update, (transaction, (state, rest))) -> (
+      let address = Contract.to_b58check step_constants.self in
+      let chain_id = Chain_id.to_b58check step_constants.chain_id in
+      let anti_replay = address ^ chain_id in
+      Sapling.verify_update ctxt state transaction anti_replay
+      >>=? fun (ctxt, balance_state_opt) ->
+      match balance_state_opt with
+      | Some (balance, state) ->
+          logged_return
+            ((Some (Script_int.of_int64 balance, state), rest), ctxt)
+      | None ->
+          logged_return ((None, rest), ctxt) )
   | (ChainId, rest) ->
       logged_return ((step_constants.chain_id, rest), ctxt)
   | (Never, (_, _)) ->

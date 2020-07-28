@@ -168,6 +168,8 @@ and 'ty ty =
       'k comparable_ty * 'v ty * type_annot option
       -> ('k, 'v) big_map ty
   | Contract_t : 'arg ty * type_annot option -> 'arg typed_contract ty
+  | Sapling_transaction_t : type_annot option -> Sapling.transaction ty
+  | Sapling_state_t : type_annot option -> Sapling.state ty
   | Operation_t : type_annot option -> operation ty
   | Baker_operation_t : type_annot option -> baker_operation ty
   | Chain_id_t : type_annot option -> Chain_id.t ty
@@ -413,6 +415,11 @@ and ('bef, 'aft) instr =
   | Self : 'p ty * string -> ('rest, 'p typed_contract * 'rest) instr
   | Self_address : ('rest, address * 'rest) instr
   | Amount : ('rest, Tez.t * 'rest) instr
+  | Sapling_empty_state : ('rest, Sapling.state * 'rest) instr
+  | Sapling_verify_update
+      : ( Sapling.transaction * (Sapling.state * 'rest),
+          (z num, Sapling.state) pair option * 'rest )
+        instr
   | Dig :
       int * ('x * 'rest, 'rest, 'bef, 'aft) stack_prefix_preservation_witness
       -> ('bef, 'x * 'aft) instr

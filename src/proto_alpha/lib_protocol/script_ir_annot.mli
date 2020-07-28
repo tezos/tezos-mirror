@@ -50,6 +50,10 @@ val default_param_annot : var_annot option
 
 val default_storage_annot : var_annot option
 
+val default_sapling_state_annot : var_annot option
+
+val default_sapling_balance_annot : var_annot option
+
 val default_car_annot : field_annot option
 
 val default_cdr_annot : field_annot option

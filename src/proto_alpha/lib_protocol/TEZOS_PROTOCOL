@@ -37,6 +37,7 @@
         "Commitment_repr",
         "Parameters_repr",
         "Receipt_repr",
+        "Sapling_repr",
         "Lazy_storage_kind",
 
         "Raw_context",
@@ -51,6 +52,7 @@
         "Roll_storage",
         "Baker_storage",
         "Delegation_storage",
+        "Sapling_storage",
         "Lazy_storage_diff",
         "Contract_storage",
         "Bootstrap_storage",
@@ -59,6 +61,7 @@
         "Commitment_storage",
         "Init_storage",
         "Fees_storage",
+        "Sapling_validator",
 
         "Alpha_context",
 
@@ -78,6 +81,7 @@
 
         "Services_registration",
         "Constants_services",
+        "Sapling_services",
         "Contract_services",
         "Delegate_services",
         "Baker_services",

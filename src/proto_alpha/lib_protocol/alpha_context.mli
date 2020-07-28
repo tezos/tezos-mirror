@@ -355,6 +355,8 @@ module Script : sig
     | I_ISNAT
     | I_CAST
     | I_RENAME
+    | I_SAPLING_EMPTY_STATE
+    | I_SAPLING_VERIFY_UPDATE
     | I_DIG
     | I_DUG
     | I_NEVER
@@ -391,6 +393,8 @@ module Script : sig
     | T_unit
     | T_operation
     | T_address
+    | T_sapling_transaction
+    | T_sapling_state
     | T_chain_id
     | T_never
     | T_bls12_381_g1
@@ -733,10 +737,86 @@ module Big_map : sig
   type alloc = {key_type : Script_repr.expr; value_type : Script_repr.expr}
 end
 
+module Sapling : sig
+  module Id : sig
+    type t
+
+    val encoding : t Data_encoding.t
+
+    val rpc_arg : t RPC_arg.arg
+
+    val parse_z : Z.t -> t (* To be used in parse_data only *)
+
+    val unparse_to_z : t -> Z.t (* To be used in unparse_data only *)
+  end
+
+  val fresh : temporary:bool -> context -> (context * Id.t) tzresult Lwt.t
+
+  type diff = private {
+    commitments : Sapling.Commitment.t list;
+    ciphertexts : Sapling.Ciphertext.t list;
+    nullifiers : Sapling.Nullifier.t list;
+  }
+
+  val diff_encoding : diff Data_encoding.t
+
+  val empty_diff : diff
+
+  type state = private {id : Id.t option; diff : diff; memo_size : int}
+
+  type memo_size = {memo_size : int}
+
+  (**
+    Returns a [state] with fields filled accordingly.
+    [id] should only be used by [extract_lazy_storage_updates].
+    [diff] should only be used by [unparse_data].
+  *)
+  val empty_state : ?id:Id.t -> ?diff:diff -> memo_size:int -> unit -> state
+
+  type transaction = Sapling.UTXO.transaction
+
+  val transaction_encoding : transaction Data_encoding.t
+
+  (**
+    Tries to fetch a state from the storage.
+    [diff] should only be used by [unparse_data].
+  *)
+  val state_from_id :
+    context -> ?diff:diff -> Id.t -> (state * context) tzresult Lwt.t
+
+  val rpc_arg : Id.t RPC_arg.t
+
+  type root = Sapling.Hash.t
+
+  val root_encoding : root Data_encoding.t
+
+  (* Function exposed as RPC. Returns the root and a diff of a state starting
+     from an optional offset which is zero by default. *)
+  val get_diff :
+    context ->
+    Id.t ->
+    ?offset_commitment:Int64.t ->
+    ?offset_nullifier:Int64.t ->
+    unit ->
+    (root * diff) tzresult Lwt.t
+
+  val verify_update :
+    context ->
+    state ->
+    transaction ->
+    string ->
+    (context * (Int64.t * state) option) tzresult Lwt.t
+
+  type alloc = memo_size
+
+  type updates = diff
+end
+
 module Lazy_storage : sig
   module Kind : sig
     type ('id, 'alloc, 'updates) t =
       | Big_map : (Big_map.Id.t, Big_map.alloc, Big_map.updates) t
+      | Sapling_state : (Sapling.Id.t, Sapling.alloc, Sapling.updates) t
   end
 
   module KId : sig

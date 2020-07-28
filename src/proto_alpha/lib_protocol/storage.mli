@@ -305,6 +305,87 @@ module Big_map : sig
        and type t := Raw_context.t
 end
 
+module Sapling : sig
+  type id = Lazy_storage_kind.Sapling_state.Id.t
+
+  val rpc_arg : id RPC_arg.t
+
+  module Next : sig
+    val incr : Raw_context.t -> (Raw_context.t * id) tzresult Lwt.t
+
+    val init : Raw_context.t -> Raw_context.t tzresult Lwt.t
+  end
+
+  val remove_rec : Raw_context.t -> id -> Raw_context.t Lwt.t
+
+  val copy : Raw_context.t -> from:id -> to_:id -> Raw_context.t tzresult Lwt.t
+
+  module Total_bytes :
+    Indexed_data_storage
+      with type key = id
+       and type value = Z.t
+       and type t := Raw_context.t
+
+  (* Used by both Commitments and Ciphertexts *)
+  module Commitments_size :
+    Single_data_storage
+      with type t := Raw_context.t * id
+       and type value = int64
+
+  module Memo_size :
+    Single_data_storage with type t := Raw_context.t * id and type value = int
+
+  module Commitments :
+    Non_iterable_indexed_carbonated_data_storage
+      with type t := Raw_context.t * id
+       and type key = int64
+       and type value = Sapling.Hash.t
+
+  val commitments_init : Raw_context.t -> id -> Raw_context.t Lwt.t
+
+  module Ciphertexts :
+    Non_iterable_indexed_carbonated_data_storage
+      with type t := Raw_context.t * id
+       and type key = int64
+       and type value = Sapling.Ciphertext.t
+
+  val ciphertexts_init : Raw_context.t -> id -> Raw_context.t Lwt.t
+
+  module Nullifiers_size :
+    Single_data_storage
+      with type t := Raw_context.t * id
+       and type value = int64
+
+  module Nullifiers_ordered :
+    Non_iterable_indexed_data_storage
+      with type t := Raw_context.t * id
+       and type key = int64
+       and type value = Sapling.Nullifier.t
+
+  module Nullifiers_hashed :
+    Carbonated_data_set_storage
+      with type t := Raw_context.t * id
+       and type elt = Sapling.Nullifier.t
+
+  val nullifiers_init : Raw_context.t -> id -> Raw_context.t Lwt.t
+
+  module Roots :
+    Non_iterable_indexed_data_storage
+      with type t := Raw_context.t * id
+       and type key = int32
+       and type value = Sapling.Hash.t
+
+  module Roots_pos :
+    Single_data_storage
+      with type t := Raw_context.t * id
+       and type value = int32
+
+  module Roots_level :
+    Single_data_storage
+      with type t := Raw_context.t * id
+       and type value = Raw_level_repr.t
+end
+
 (** Map of baker accounts migrated from implicit contracts to baker contracts.
     Only used during migration, then cleared-up. *)
 module Delegates_006 :

@@ -228,6 +228,10 @@ module Cost_of : sig
     val apply : Gas.cost
 
     val baker_operation : Gas.cost
+
+    val sapling_empty_state : Gas.cost
+
+    val sapling_verify_update : Gas.cost
   end
 
   module Typechecking : sig
@@ -369,5 +373,9 @@ module Cost_of : sig
     val one_arg_type : Script.annot -> Gas.cost
 
     val two_arg_type : Script.annot -> Gas.cost
+
+    val sapling_transaction : Sapling.transaction -> Gas.cost
+
+    val sapling_diff : Sapling.diff -> Gas.cost
   end
 end

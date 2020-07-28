@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019-2020 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -449,8 +450,8 @@ module Legacy_big_map_diff = struct
                       Copy {src; dst = id} :: updates
                   | Alloc {key_type; value_type} ->
                       Alloc {big_map = id; key_type; value_type} :: updates ) )
-          (* | _ ->
-              (* Not a Big_map *) [] *)
+          | _ ->
+              (* Not a Big_map *) []
         in
         diffs :: legacy_diffs)
       []
