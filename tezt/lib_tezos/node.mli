@@ -227,3 +227,19 @@ val init :
   ?connections:int ->
   unit ->
   t Lwt.t
+
+(** Restart a node.
+
+    This {!terminate}s a node, then {!run}s it again and waits for it to be ready.
+
+    If you passed arguments such as [expected_pow] or [single_process]
+    to {!run} (or {!init}) they are not automatically passed again.
+    You can pass them to [restart], or you can pass other values if you want
+    to restart with other parameters. *)
+val restart :
+  ?expected_pow:int ->
+  ?single_process:bool ->
+  ?bootstrap_threshold:int ->
+  ?connections:int ->
+  t ->
+  unit Lwt.t

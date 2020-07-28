@@ -500,3 +500,9 @@ let init ?path ?name ?color ?data_dir ?event_pipe ?expected_pow ?network
   run ?expected_pow ?single_process ?bootstrap_threshold ?connections node ;
   let* () = wait_for_ready node in
   return node
+
+let restart ?expected_pow ?single_process ?bootstrap_threshold ?connections
+    node =
+  let* () = terminate node in
+  run ?expected_pow ?single_process ?bootstrap_threshold ?connections node ;
+  wait_for_ready node
