@@ -40,6 +40,8 @@ type options = {
   tags_to_run : string list;
   tags_not_to_run : string list;
   list : bool;
+  global_timeout : float option;
+  test_timeout : float option;
 }
 
 let options =
@@ -57,6 +59,8 @@ let options =
   let tags_to_run = ref [] in
   let tags_not_to_run = ref [] in
   let list = ref false in
+  let global_timeout = ref None in
+  let test_timeout = ref None in
   let set_log_level = function
     | "quiet" ->
         log_level := Quiet
@@ -143,7 +147,15 @@ let options =
            tests to run." );
         ( "-t",
           Arg.String (fun title -> tests_to_run := title :: !tests_to_run),
-          "<TITLE> Same as --test." ) ]
+          "<TITLE> Same as --test." );
+        ( "--global-timeout",
+          Arg.Float (fun delay -> global_timeout := Some delay),
+          "<SECONDS> Fail if the set of tests takes more than SECONDS to run."
+        );
+        ( "--test-timeout",
+          Arg.Float (fun delay -> test_timeout := Some delay),
+          "<SECONDS> Fail if a test takes, on its own, more than SECONDS to \
+           run." ) ]
   in
   let usage =
     (* This was formatted by ocamlformat. Sorry for all the slashes. *)
@@ -182,4 +194,6 @@ let options =
     tags_to_run = !tags_to_run;
     tags_not_to_run = !tags_not_to_run;
     list = !list;
+    global_timeout = !global_timeout;
+    test_timeout = !test_timeout;
   }

@@ -71,6 +71,8 @@ let fail x =
       raise (Failed message))
     x
 
+let global_starting_time = Unix.gettimeofday ()
+
 let really_run title f =
   Log.info "Starting test: %s" title ;
   List.iter (fun reset -> reset ()) !reset_functions ;
@@ -105,8 +107,34 @@ let really_run title f =
       test_result := Aborted ;
       unit
     in
+    let global_timeout =
+      match Cli.options.global_timeout with
+      | None ->
+          []
+      | Some delay ->
+          let local_starting_time = Unix.gettimeofday () in
+          let remaining_delay =
+            max 0. (delay -. local_starting_time +. global_starting_time)
+          in
+          [ let* () = Lwt_unix.sleep remaining_delay in
+            fail
+              "the set of tests took more than specified global timeout (%gs) \
+               to run"
+              delay ]
+    in
+    let test_timeout =
+      match Cli.options.test_timeout with
+      | None ->
+          []
+      | Some delay ->
+          [ let* () = Lwt_unix.sleep delay in
+            fail "test took more than specified timeout (%gs) to run" delay ]
+    in
     Lwt.catch
-      (fun () -> Lwt.pick [run_test (); handle_sigint (); fail_promise])
+      (fun () ->
+        Lwt.pick
+          ( (run_test () :: handle_sigint () :: fail_promise :: global_timeout)
+          @ test_timeout ))
       handle_exception
   in
   (* Terminate all remaining processes. *)

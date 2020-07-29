@@ -71,6 +71,8 @@ type options = {
   tags_to_run : string list;
   tags_not_to_run : string list;
   list : bool;
+  global_timeout : float option;
+  test_timeout : float option;
 }
 
 (** Values for command-line options. *)
