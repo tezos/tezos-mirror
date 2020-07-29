@@ -1,8 +1,8 @@
 """This example show how to forge and inject a transaction in a node
 using RPCs."""
+import math
 from tools import constants, paths, utils
 from launchers.sandbox import Sandbox
-
 
 SENDER = 'bootstrap1'
 RECEIVER = 'bootstrap2'
@@ -32,7 +32,7 @@ def scenario():
                                         "source": SENDER_ID,
                                         "fee": "0",
                                         "counter": str(int(counter) + 1),
-                                        "gas_limit": "400000000",
+                                        "gas_limit": "400000",
                                         "storage_limit": "60000",
                                         "amount": '1000',
                                         "destination": RECEIVER_ID}]}
@@ -50,7 +50,7 @@ def scenario():
         # update fields before forging
         gas_limit = (res['contents'][0]['metadata']['operation_result']
                      ['consumed_gas'])
-        safer_gas_limit = str(int(gas_limit) + 100)
+        safer_gas_limit = str(int(math.ceil(float(gas_limit) / 1000)) + 100)
         operation_json['contents'][0]['gas_limit'] = safer_gas_limit
         operation_json['contents'][0]['storage_limit'] = '0'
         operation_json['contents'][0]['fee'] = '1300'  # arbitrary fee
