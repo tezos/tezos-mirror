@@ -50,7 +50,7 @@ type config = {
 let default_minimal_fees =
   match Tez.of_mutez 100L with None -> assert false | Some t -> t
 
-let default_minimal_nanotez_per_gas_unit = Q.(100 // 1000)
+let default_minimal_nanotez_per_gas_unit = Q.of_int 100
 
 let default_minimal_nanotez_per_byte = Q.of_int 1000
 
@@ -107,10 +107,10 @@ let get_manager_operation_gas_and_fee contents =
         | Ok (total_fee, total_gas) -> (
           match Tez.(total_fee +? fee) with
           | Ok total_fee ->
-              Ok (total_fee, Z.add total_gas gas_limit)
+              Ok (total_fee, Gas.Arith.add total_gas gas_limit)
           | Error _ as e ->
               e ) ) | _ -> acc)
-    (Ok (Tez.zero, Z.zero))
+    (Ok (Tez.zero, Gas.Arith.zero))
     l
 
 let pre_filter_manager :
@@ -127,7 +127,9 @@ let pre_filter_manager :
         Q.mul (Q.of_int64 (Tez.to_mutez config.minimal_fees)) (Q.of_int 1000)
       in
       let minimal_fees_for_gas_in_nanotez =
-        Q.mul config.minimal_nanotez_per_gas_unit (Q.of_bigint gas)
+        Q.mul
+          config.minimal_nanotez_per_gas_unit
+          (Q.of_bigint @@ Gas.Arith.integral_to_z gas)
       in
       let minimal_fees_for_size_in_nanotez =
         Q.mul config.minimal_nanotez_per_byte (Q.of_int size)
