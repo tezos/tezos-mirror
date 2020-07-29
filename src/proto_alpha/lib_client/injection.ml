@@ -62,7 +62,7 @@ type _ annotated_manager_operation =
   | Manager_info : {
       fee : Tez.t option;
       operation : 'kind manager_operation;
-      gas_limit : Z.t option;
+      gas_limit : Gas.Arith.integral option;
       storage_limit : Z.t option;
     }
       -> 'kind annotated_manager_operation
@@ -113,10 +113,10 @@ let get_manager_operation_gas_and_fee contents =
         | Ok (total_fee, total_gas) -> (
           match Tez.(total_fee +? fee) with
           | Ok total_fee ->
-              Ok (total_fee, Z.add total_gas gas_limit)
+              Ok (total_fee, Gas.Arith.add total_gas gas_limit)
           | Error _ as e ->
               e ) ) | _ -> acc)
-    (Ok (Tez.zero, Z.zero))
+    (Ok (Tez.zero, Gas.Arith.zero))
     l
 
 type fee_parameter = {
@@ -177,7 +177,9 @@ let check_fees :
           Q.mul (Q.of_int64 (Tez.to_mutez config.minimal_fees)) (Q.of_int 1000)
         in
         let minimal_fees_for_gas_in_nanotez =
-          Q.mul config.minimal_nanotez_per_gas_unit (Q.of_bigint gas)
+          Q.mul
+            config.minimal_nanotez_per_gas_unit
+            (Q.of_bigint (Gas.Arith.integral_to_z gas))
         in
         let minimal_fees_for_size_in_nanotez =
           Q.mul config.minimal_nanotez_per_byte (Q.of_int size)
@@ -372,7 +374,7 @@ let estimated_gas_single (type kind)
     | Skipped _ ->
         assert false
     | Backtracked (_, None) ->
-        Ok Z.zero (* there must be another error for this to happen *)
+        Ok Gas.Arith.zero (* there must be another error for this to happen *)
     | Backtracked (_, Some errs) ->
         Environment.wrap_error (Error errs)
     | Failed (_, errs) ->
@@ -380,7 +382,8 @@ let estimated_gas_single (type kind)
   in
   List.fold_left
     (fun acc (Internal_operation_result (_, r)) ->
-      acc >>? fun acc -> consumed_gas r >>? fun gas -> Ok (Z.add acc gas))
+      acc
+      >>? fun acc -> consumed_gas r >>? fun gas -> Ok (Gas.Arith.add acc gas))
     (consumed_gas operation_result)
     internal_operation_results
 
@@ -523,25 +526,32 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
     (contents : kind contents_list) : kind contents_list tzresult Lwt.t =
   Alpha_services.Constants.all cctxt (chain, block)
   >>=? fun { parametric =
-               { hard_gas_limit_per_operation = gas_limit;
+               { hard_gas_limit_per_operation;
                  hard_storage_limit_per_operation = storage_limit;
                  origination_size;
                  cost_per_byte;
                  _ };
              _ } ->
+  let user_gas_limit_needs_patching user_gas_limit =
+    Gas.Arith.(user_gas_limit < zero)
+    || Gas.Arith.(hard_gas_limit_per_operation <= user_gas_limit)
+  in
+  let user_storage_limit_needs_patching user_storage_limit =
+    user_storage_limit < Z.zero || storage_limit <= user_storage_limit
+  in
   let may_need_patching_single :
       type kind. kind contents -> kind contents option = function
     | Manager_operation c
       when (compute_fee && c.fee = Tez.zero)
-           || c.gas_limit < Z.zero || gas_limit <= c.gas_limit
-           || c.storage_limit < Z.zero
-           || storage_limit <= c.storage_limit ->
+           || user_gas_limit_needs_patching c.gas_limit
+           || user_storage_limit_needs_patching c.storage_limit ->
         let gas_limit =
-          if c.gas_limit < Z.zero || gas_limit <= c.gas_limit then gas_limit
+          if user_gas_limit_needs_patching c.gas_limit then
+            hard_gas_limit_per_operation
           else c.gas_limit
         in
         let storage_limit =
-          if c.storage_limit < Z.zero || storage_limit <= c.storage_limit then
+          if user_storage_limit_needs_patching c.storage_limit then
             storage_limit
           else c.storage_limit
         in
@@ -573,7 +583,6 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
   let rec patch_fee : type kind. bool -> kind contents -> kind contents =
    fun first -> function
     | Manager_operation c as op -> (
-        let gas_limit = c.gas_limit in
         let size =
           if first then
             Data_encoding.Binary.fixed_length_exn
@@ -595,7 +604,7 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
         let minimal_fees_for_gas_in_nanotez =
           Q.mul
             fee_parameter.minimal_nanotez_per_gas_unit
-            (Q.of_bigint gas_limit)
+            (Q.of_bigint @@ Gas.Arith.integral_to_z c.gas_limit)
         in
         let minimal_fees_for_size_in_nanotez =
           Q.mul fee_parameter.minimal_nanotez_per_byte (Q.of_int size)
@@ -623,17 +632,25 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
       kind contents tzresult Lwt.t =
    fun first -> function
     | (Manager_operation c, (Manager_operation_result _ as result)) ->
-        ( if c.gas_limit < Z.zero || gas_limit <= c.gas_limit then
+        ( if user_gas_limit_needs_patching c.gas_limit then
           Lwt.return (estimated_gas_single result)
           >>=? fun gas ->
-          if Z.equal gas Z.zero then
-            cctxt#message "Estimated gas: none" >>= fun () -> return Z.zero
+          if Gas.Arith.(gas = zero) then
+            cctxt#message "Estimated gas: none"
+            >>= fun () -> return Gas.Arith.zero
           else
             cctxt#message
-              "Estimated gas: %s units (will add 100000 for safety)"
-              (Z.to_string gas)
+              "Estimated gas: %a units (will add 100 for safety)"
+              Gas.Arith.pp
+              gas
             >>= fun () ->
-            return (Z.min (Z.add gas (Z.of_int 100_000)) gas_limit)
+            let gas_plus_100 =
+              Gas.Arith.(add (ceil gas) (integral_of_int 100))
+            in
+            let patched_gas =
+              Gas.Arith.min gas_plus_100 hard_gas_limit_per_operation
+            in
+            return patched_gas
         else return c.gas_limit )
         >>=? fun gas_limit ->
         ( if c.storage_limit < Z.zero || storage_limit <= c.storage_limit then
@@ -857,8 +874,8 @@ let prepare_manager_operation ?fee ?gas_limit ?storage_limit operation =
 
 let inject_manager_operation cctxt ~chain ~block ?branch ?confirmations
     ?dry_run ?verbose_signing ~source ~src_pk ~src_sk ?fee
-    ?(gas_limit = Z.minus_one) ?(storage_limit = Z.of_int (-1)) ?counter
-    ~fee_parameter (type kind)
+    ?(gas_limit = Gas.Arith.integral Z.minus_one)
+    ?(storage_limit = Z.of_int (-1)) ?counter ~fee_parameter (type kind)
     (operations : kind annotated_manager_operation_list) :
     ( Operation_hash.t
     * kind Kind.manager contents_list
@@ -935,7 +952,7 @@ let inject_manager_operation cctxt ~chain ~block ?branch ?confirmations
                 source;
                 fee = Tez.zero;
                 counter;
-                gas_limit = Z.of_int (1000 * 10_000);
+                gas_limit = Gas.Arith.integral_of_int 10_000;
                 storage_limit = Z.zero;
                 operation = Reveal src_pk;
               },

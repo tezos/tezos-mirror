@@ -38,9 +38,9 @@ val default_fee_arg : (Tez.t option, full) Clic.arg
 
 val counter_arg : (Z.t option, full) Clic.arg
 
-val gas_limit_arg : (Z.t option, full) Clic.arg
+val gas_limit_arg : (Gas.Arith.integral option, full) Clic.arg
 
-val default_gas_limit_arg : (Z.t option, full) Clic.arg
+val default_gas_limit_arg : (Gas.Arith.integral option, full) Clic.arg
 
 val storage_limit_arg : (Z.t option, full) Clic.arg
 

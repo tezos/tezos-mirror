@@ -71,7 +71,7 @@ val get_balance :
 
 val build_delegate_operation :
   ?fee:Tez.t ->
-  ?gas_limit:Z.t ->
+  ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   public_key_hash option ->
   Kind.delegation Injection.annotated_manager_operation
@@ -120,7 +120,7 @@ val originate_contract :
   ?verbose_signing:bool ->
   ?branch:int ->
   ?fee:Tez.t ->
-  ?gas_limit:Z.t ->
+  ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   delegate:public_key_hash option ->
   initial_storage:string ->
@@ -140,7 +140,7 @@ val build_transaction_operation :
   parameters:Script.lazy_expr ->
   ?entrypoint:string ->
   ?fee:Tez.t ->
-  ?gas_limit:Z.t ->
+  ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   Contract.t ->
   Kind.transaction Injection.annotated_manager_operation
@@ -161,7 +161,7 @@ val transfer :
   ?arg:string ->
   amount:Tez.t ->
   ?fee:Tez.t ->
-  ?gas_limit:Z.t ->
+  ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Z.t ->
   fee_parameter:Injection.fee_parameter ->
@@ -171,7 +171,7 @@ val transfer :
 
 val build_reveal_operation :
   ?fee:Tez.t ->
-  ?gas_limit:Z.t ->
+  ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   public_key ->
   Kind.reveal Injection.annotated_manager_operation
@@ -206,7 +206,7 @@ val activation_key_encoding : activation_key Data_encoding.t
 type batch_transfer_operation = {
   destination : string;
   fee : string option;
-  gas_limit : Z.t option;
+  gas_limit : Gas.Arith.integral option;
   storage_limit : Z.t option;
   amount : string;
   arg : string option;

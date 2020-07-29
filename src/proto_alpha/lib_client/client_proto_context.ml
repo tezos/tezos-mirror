@@ -121,7 +121,7 @@ let reveal cctxt ~chain ~block ?confirmations ?dry_run ?verbose_signing ?branch
     Injection.Single_manager
       (build_reveal_operation
          ?fee
-         ~gas_limit:(Z.of_int ~-1)
+         ~gas_limit:(Gas.Arith.integral_of_int ~-1)
          ~storage_limit:Z.zero
          src_pk)
   in
@@ -376,7 +376,7 @@ let activation_key_encoding =
 type batch_transfer_operation = {
   destination : string;
   fee : string option;
-  gas_limit : Z.t option;
+  gas_limit : Gas.Arith.integral option;
   storage_limit : Z.t option;
   amount : string;
   arg : string option;
@@ -393,7 +393,7 @@ let batch_transfer_operation_encoding =
     (obj7
        (req "destination" string)
        (opt "fee" string)
-       (opt "gas-limit" z)
+       (opt "gas-limit" Gas.Arith.z_integral_encoding)
        (opt "storage-limit" z)
        (req "amount" string)
        (opt "arg" string)

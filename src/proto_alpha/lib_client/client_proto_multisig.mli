@@ -49,7 +49,7 @@ val originate_multisig :
   ?dry_run:bool ->
   ?branch:int ->
   ?fee:Tez.t ->
-  ?gas_limit:Z.t ->
+  ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?verbose_signing:bool ->
   delegate:public_key_hash option ->
@@ -88,7 +88,7 @@ val call_multisig :
   signatures:Signature.t list ->
   amount:Tez.t ->
   ?fee:Tez.t ->
-  ?gas_limit:Z.t ->
+  ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Z.t ->
   fee_parameter:Injection.fee_parameter ->
@@ -112,7 +112,7 @@ val call_multisig_on_bytes :
   signatures:Signature.t list ->
   amount:Tez.t ->
   ?fee:Tez.t ->
-  ?gas_limit:Z.t ->
+  ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Z.t ->
   fee_parameter:Injection.fee_parameter ->

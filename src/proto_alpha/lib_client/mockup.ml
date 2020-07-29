@@ -34,8 +34,8 @@ type mockup_protocol_parameters = {
 }
 
 type protocol_constants_overrides = {
-  hard_gas_limit_per_operation : Z.t option;
-  hard_gas_limit_per_block : Z.t option;
+  hard_gas_limit_per_operation : Protocol.Gas_limit_repr.Arith.integral option;
+  hard_gas_limit_per_block : Protocol.Gas_limit_repr.Arith.integral option;
   hard_storage_limit_per_operation : Z.t option;
   cost_per_byte : Protocol.Tez_repr.t option;
   chain_id : Chain_id.t option;
@@ -130,8 +130,12 @@ let protocol_constants_overrides_encoding =
         timestamp;
       })
     (obj6
-       (opt "hard_gas_limit_per_operation" z)
-       (opt "hard_gas_limit_per_block" z)
+       (opt
+          "hard_gas_limit_per_operation"
+          Protocol.Gas_limit_repr.Arith.z_integral_encoding)
+       (opt
+          "hard_gas_limit_per_block"
+          Protocol.Gas_limit_repr.Arith.z_integral_encoding)
        (opt "hard_storage_limit_per_operation" z)
        (opt "cost_per_byte" Protocol.Tez_repr.encoding)
        (opt "chain_id" Chain_id.encoding)
@@ -261,9 +265,13 @@ let apply_protocol_overrides (cctxt : Tezos_client_base.Client_context.full)
     in
     cctxt#message
       "@[<v>mockup client uses protocol overrides:@,%a%a%a%a@]@?"
-      (pp_opt_custom "hard_gas_limit_per_operation" Z.pp_print)
+      (pp_opt_custom
+         "hard_gas_limit_per_operation"
+         Protocol.Gas_limit_repr.Arith.pp_integral)
       o.hard_gas_limit_per_operation
-      (pp_opt_custom "hard_gas_limit_per_block" Z.pp_print)
+      (pp_opt_custom
+         "hard_gas_limit_per_block"
+         Protocol.Gas_limit_repr.Arith.pp_integral)
       o.hard_gas_limit_per_block
       (pp_opt_custom "hard_storage_limit_per_operation" Z.pp_print)
       o.hard_storage_limit_per_operation

@@ -31,7 +31,7 @@ type _ annotated_manager_operation =
   | Manager_info : {
       fee : Tez.t option;
       operation : 'kind manager_operation;
-      gas_limit : Z.t option;
+      gas_limit : Gas.Arith.integral option;
       storage_limit : Z.t option;
     }
       -> 'kind annotated_manager_operation
@@ -114,7 +114,7 @@ type 'kind result = Operation_hash.t * 'kind contents * 'kind contents_result
 
 val prepare_manager_operation :
   ?fee:Tez.t ->
-  ?gas_limit:Z.t ->
+  ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   'kind manager_operation ->
   'kind annotated_manager_operation
@@ -131,7 +131,7 @@ val inject_manager_operation :
   src_pk:Signature.public_key ->
   src_sk:Client_keys.sk_uri ->
   ?fee:Tez.t ->
-  ?gas_limit:Z.t ->
+  ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Z.t ->
   fee_parameter:fee_parameter ->

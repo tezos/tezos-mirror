@@ -255,7 +255,7 @@ let gas_limit_kind =
       try
         let v = Z.of_string s in
         assert (Compare.Z.(v >= Z.zero)) ;
-        return v
+        return (Gas.Arith.integral v)
       with _ -> failwith "invalid gas limit (must be a positive number)")
 
 let gas_limit_arg =
@@ -332,9 +332,7 @@ let max_priority_arg =
 let default_minimal_fees =
   match Tez.of_mutez 100L with None -> assert false | Some t -> t
 
-let default_minimal_nanotez_per_gas_unit =
-  let scaling = 1000 in
-  Q.(100 // scaling)
+let default_minimal_nanotez_per_gas_unit = Q.of_int 100
 
 let default_minimal_nanotez_per_byte = Q.of_int 1000
 

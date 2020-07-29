@@ -42,7 +42,7 @@ val run :
   input:Michelson_v1_parser.parsed ->
   ?source:Contract.t ->
   ?payer:Contract.t ->
-  ?gas:Z.t ->
+  ?gas:Gas.Arith.integral ->
   ?entrypoint:string ->
   unit ->
   (Script.expr * packed_internal_operation list * Contract.big_map_diff option)
@@ -59,7 +59,7 @@ val trace :
   input:Michelson_v1_parser.parsed ->
   ?source:Contract.t ->
   ?payer:Contract.t ->
-  ?gas:Z.t ->
+  ?gas:Gas.Arith.integral ->
   ?entrypoint:string ->
   unit ->
   ( Script.expr
@@ -94,7 +94,7 @@ val typecheck_data :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
-  ?gas:Z.t ->
+  ?gas:Gas.Arith.integral ->
   data:Michelson_v1_parser.parsed ->
   ty:Michelson_v1_parser.parsed ->
   unit ->
@@ -104,7 +104,7 @@ val typecheck_program :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
-  ?gas:Z.t ->
+  ?gas:Gas.Arith.integral ->
   Michelson_v1_parser.parsed ->
   (Script_tc_errors.type_map * Gas.t) tzresult Lwt.t
 
