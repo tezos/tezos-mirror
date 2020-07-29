@@ -118,8 +118,8 @@ let log_file = Option.map open_out Cli.options.log_file
 module Log_buffer = struct
   let capacity = Cli.options.log_buffer_size
 
-  (* Each item is a tuple [(color, prefix, prefix_color, message)]. *)
-  let buffer = Array.make capacity (None, None, None, "")
+  (* Each item is a tuple [(timestamp, color, prefix, prefix_color, message)]. *)
+  let buffer = Array.make capacity (0., None, None, None, "")
 
   (* Index where to add the next item. *)
   let next = ref 0
@@ -148,21 +148,21 @@ module Log_buffer = struct
     done
 end
 
-let output_time output =
-  let now = Unix.gettimeofday () in
-  let time = Unix.gmtime now in
+let output_timestamp output timestamp =
+  let time = Unix.gmtime timestamp in
   output
     (Printf.sprintf
        "%02d:%02d:%02d.%03d"
        time.tm_hour
        time.tm_min
        time.tm_sec
-       (int_of_float ((now -. float (truncate now)) *. 1000.)))
+       (int_of_float ((timestamp -. float (truncate timestamp)) *. 1000.)))
 
-let log_line_to ~use_colors (color, prefix, prefix_color, message) channel =
+let log_line_to ~use_colors (timestamp, color, prefix, prefix_color, message)
+    channel =
   let output = output_string channel in
   output "[" ;
-  output_time output ;
+  output_timestamp output timestamp ;
   output "] " ;
   if use_colors then Option.iter output color ;
   Option.iter
@@ -188,7 +188,9 @@ let log_string ~(level : Cli.log_level) ?color ?prefix ?prefix_color message =
       ()
   | lines ->
       let log_line message =
-        let line = (color, prefix, prefix_color, message) in
+        let line =
+          (Unix.gettimeofday (), color, prefix, prefix_color, message)
+        in
         Option.iter (log_line_to ~use_colors:false line) log_file ;
         match (Cli.options.log_level, level) with
         | (_, Quiet) ->
