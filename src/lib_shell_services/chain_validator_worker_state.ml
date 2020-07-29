@@ -78,8 +78,18 @@ module Event = struct
         Internal_event.Debug
 
   let sync_status_encoding =
-    Data_encoding.string_enum
-      [("sync", Sync); ("unsync", Unsync); ("stuck", Stuck)]
+    let open Data_encoding in
+    def
+      "chain_status"
+      ~description:
+        "If 'unsync', the node is not currently synchronized with of its \
+         peers (it is probably still bootstrapping and its head is lagging \
+         behind the chain's).\n\
+         If 'sync', the node considers itself synchronized with its peers and \
+         the current head timestamp is recent.\n\
+         If 'stuck', the node considers itself synchronized with its peers \
+         but the chain seems to be halted from its viewpoint."
+      (string_enum [("sync", Sync); ("unsync", Unsync); ("stuck", Stuck)])
 
   let encoding =
     let open Data_encoding in
