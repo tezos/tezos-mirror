@@ -7,70 +7,70 @@ emitted operations
 big_map diff
   
 trace
-  - location: 9 (remaining gas: 1039244000 units remaining)
+  - location: 9 (remaining gas: 1039244 units remaining)
     [ (Pair (Pair 0 1) (Some 0xaabbcc))  	 ]
-  - location: 12 (remaining gas: 1039243900 units remaining)
+  - location: 12 (remaining gas: 1039243.900 units remaining)
     [ (Pair (Pair 0 1) (Some 0xaabbcc))  	
       (Pair (Pair 0 1) (Some 0xaabbcc))  	 ]
-  - location: 13 (remaining gas: 1039243840 units remaining)
+  - location: 13 (remaining gas: 1039243.840 units remaining)
     [ (Pair 0 1)  	@parameter
       (Pair (Pair 0 1) (Some 0xaabbcc))  	 ]
-  - location: 16 (remaining gas: 1039243720 units remaining)
+  - location: 16 (remaining gas: 1039243.720 units remaining)
     [ (Some 0xaabbcc)  	@storage ]
-  - location: 15 (remaining gas: 1039243700 units remaining)
+  - location: 15 (remaining gas: 1039243.700 units remaining)
     [ (Some 0xaabbcc)  	@storage ]
-  - location: 14 (remaining gas: 1039243700 units remaining)
+  - location: 14 (remaining gas: 1039243.700 units remaining)
     [ (Pair 0 1)  	@parameter
       (Some 0xaabbcc)  	@storage ]
-  - location: -1 (remaining gas: 1039243680 units remaining)
+  - location: -1 (remaining gas: 1039243.680 units remaining)
     [ (Pair 0 1)  	@parameter
       (Some 0xaabbcc)  	@storage ]
-  - location: 10 (remaining gas: 1039243660 units remaining)
+  - location: 10 (remaining gas: 1039243.660 units remaining)
     [ (Pair 0 1)  	@parameter
       (Some 0xaabbcc)  	@storage ]
-  - location: 17 (remaining gas: 1039243600 units remaining)
+  - location: 17 (remaining gas: 1039243.600 units remaining)
     [ (Some 0xaabbcc)  	@storage
       (Pair 0 1)  	@parameter ]
-  - location: 25 (remaining gas: 1039243460 units remaining)
+  - location: 25 (remaining gas: 1039243.460 units remaining)
     [ (Pair 0 1)  	@parameter
       0xaabbcc  	@storage.some ]
-  - location: 28 (remaining gas: 1039243360 units remaining)
+  - location: 28 (remaining gas: 1039243.360 units remaining)
     [ (Pair 0 1)  	@parameter
       (Pair 0 1)  	@parameter
       0xaabbcc  	@storage.some ]
-  - location: 29 (remaining gas: 1039243300 units remaining)
+  - location: 29 (remaining gas: 1039243.300 units remaining)
     [ 0  	
       (Pair 0 1)  	@parameter
       0xaabbcc  	@storage.some ]
-  - location: 32 (remaining gas: 1039243180 units remaining)
+  - location: 32 (remaining gas: 1039243.180 units remaining)
     [ 1  	
       0xaabbcc  	@storage.some ]
-  - location: 31 (remaining gas: 1039243160 units remaining)
+  - location: 31 (remaining gas: 1039243.160 units remaining)
     [ 1  	
       0xaabbcc  	@storage.some ]
-  - location: 30 (remaining gas: 1039243160 units remaining)
+  - location: 30 (remaining gas: 1039243.160 units remaining)
     [ 0  	
       1  	
       0xaabbcc  	@storage.some ]
-  - location: -1 (remaining gas: 1039243140 units remaining)
+  - location: -1 (remaining gas: 1039243.140 units remaining)
     [ 0  	
       1  	
       0xaabbcc  	@storage.some ]
-  - location: 26 (remaining gas: 1039243120 units remaining)
+  - location: 26 (remaining gas: 1039243.120 units remaining)
     [ 0  	
       1  	
       0xaabbcc  	@storage.some ]
-  - location: 33 (remaining gas: 1039243000 units remaining)
+  - location: 33 (remaining gas: 1039243 units remaining)
     [ (Some 0xaa)  	@storage.some.slice ]
-  - location: -1 (remaining gas: 1039242980 units remaining)
+  - location: -1 (remaining gas: 1039242.980 units remaining)
     [ (Some 0xaa)  	@storage.some.slice ]
-  - location: 18 (remaining gas: 1039242960 units remaining)
+  - location: 18 (remaining gas: 1039242.960 units remaining)
     [ (Some 0xaa)  	 ]
-  - location: 34 (remaining gas: 1039242900 units remaining)
+  - location: 34 (remaining gas: 1039242.900 units remaining)
     [ {}  	
       (Some 0xaa)  	 ]
-  - location: 36 (remaining gas: 1039242840 units remaining)
+  - location: 36 (remaining gas: 1039242.840 units remaining)
     [ (Pair {} (Some 0xaa))  	 ]
-  - location: -1 (remaining gas: 1039242820 units remaining)
+  - location: -1 (remaining gas: 1039242.820 units remaining)
     [ (Pair {} (Some 0xaa))  	 ]
 

@@ -10,45 +10,45 @@ big_map diff
   New map(0) of type (big_map string string)
   Set map(0)["3"] to "three"
 trace
-  - location: 42 (remaining gas: 1035735000 units remaining)
+  - location: 42 (remaining gas: 1035735 units remaining)
     [ (Pair (Right (Left (Left (Pair { Elt "3" "three" } { Elt "4" "four" }))))
             (Left (Pair { Elt "1" "one" } { Elt "2" "two" })))  	 ]
-  - location: 45 (remaining gas: 1035734900 units remaining)
+  - location: 45 (remaining gas: 1035734.900 units remaining)
     [ (Pair (Right (Left (Left (Pair { Elt "3" "three" } { Elt "4" "four" }))))
             (Left (Pair { Elt "1" "one" } { Elt "2" "two" })))  	
       (Pair (Right (Left (Left (Pair { Elt "3" "three" } { Elt "4" "four" }))))
             (Left (Pair { Elt "1" "one" } { Elt "2" "two" })))  	 ]
-  - location: 46 (remaining gas: 1035734840 units remaining)
+  - location: 46 (remaining gas: 1035734.840 units remaining)
     [ (Right (Left (Left (Pair { Elt "3" "three" } { Elt "4" "four" }))))  	@parameter
       (Pair (Right (Left (Left (Pair { Elt "3" "three" } { Elt "4" "four" }))))
             (Left (Pair { Elt "1" "one" } { Elt "2" "two" })))  	 ]
-  - location: 49 (remaining gas: 1035734720 units remaining)
+  - location: 49 (remaining gas: 1035734.720 units remaining)
     [ (Left (Pair { Elt "1" "one" } { Elt "2" "two" }))  	@storage ]
-  - location: 48 (remaining gas: 1035734700 units remaining)
+  - location: 48 (remaining gas: 1035734.700 units remaining)
     [ (Left (Pair { Elt "1" "one" } { Elt "2" "two" }))  	@storage ]
-  - location: 47 (remaining gas: 1035734700 units remaining)
+  - location: 47 (remaining gas: 1035734.700 units remaining)
     [ (Right (Left (Left (Pair { Elt "3" "three" } { Elt "4" "four" }))))  	@parameter
       (Left (Pair { Elt "1" "one" } { Elt "2" "two" }))  	@storage ]
-  - location: -1 (remaining gas: 1035734680 units remaining)
+  - location: -1 (remaining gas: 1035734.680 units remaining)
     [ (Right (Left (Left (Pair { Elt "3" "three" } { Elt "4" "four" }))))  	@parameter
       (Left (Pair { Elt "1" "one" } { Elt "2" "two" }))  	@storage ]
-  - location: 43 (remaining gas: 1035734660 units remaining)
+  - location: 43 (remaining gas: 1035734.660 units remaining)
     [ (Right (Left (Left (Pair { Elt "3" "three" } { Elt "4" "four" }))))  	@parameter
       (Left (Pair { Elt "1" "one" } { Elt "2" "two" }))  	@storage ]
-  - location: 74 (remaining gas: 1035734480 units remaining)
+  - location: 74 (remaining gas: 1035734.480 units remaining)
     [ (Left (Pair { Elt "1" "one" } { Elt "2" "two" }))  	@storage
       (Left (Pair { Elt "3" "three" } { Elt "4" "four" }))  	@parameter.right.reset ]
-  - location: 75 (remaining gas: 1035734420 units remaining)
+  - location: 75 (remaining gas: 1035734.420 units remaining)
     [ (Left (Pair { Elt "3" "three" } { Elt "4" "four" }))  	@parameter.right.reset ]
-  - location: -1 (remaining gas: 1035734400 units remaining)
+  - location: -1 (remaining gas: 1035734.400 units remaining)
     [ (Left (Pair { Elt "3" "three" } { Elt "4" "four" }))  	@parameter.right.reset ]
-  - location: 71 (remaining gas: 1035734380 units remaining)
+  - location: 71 (remaining gas: 1035734.380 units remaining)
     [ (Left (Pair { Elt "3" "three" } { Elt "4" "four" }))  	 ]
-  - location: 199 (remaining gas: 1035734320 units remaining)
+  - location: 199 (remaining gas: 1035734.320 units remaining)
     [ {}  	
       (Left (Pair { Elt "3" "three" } { Elt "4" "four" }))  	 ]
-  - location: 201 (remaining gas: 1035734260 units remaining)
+  - location: 201 (remaining gas: 1035734.260 units remaining)
     [ (Pair {} (Left (Pair { Elt "3" "three" } { Elt "4" "four" })))  	 ]
-  - location: -1 (remaining gas: 1035734240 units remaining)
+  - location: -1 (remaining gas: 1035734.240 units remaining)
     [ (Pair {} (Left (Pair { Elt "3" "three" } { Elt "4" "four" })))  	 ]
 

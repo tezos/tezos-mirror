@@ -7,78 +7,78 @@ emitted operations
 big_map diff
   
 trace
-  - location: 14 (remaining gas: 1038901000 units remaining)
+  - location: 14 (remaining gas: 1038901 units remaining)
     [ (Pair (Pair (Pair (Pair "toto" { 3 ; 7 ; 9 ; 1 }) { 1 ; 2 ; 3 })
                   0x05070707070100000004746f746f020000000800030007000900010200000006000100020003)
             Unit)  	 ]
-  - location: 15 (remaining gas: 1038900940 units remaining)
+  - location: 15 (remaining gas: 1038900.940 units remaining)
     [ (Pair (Pair (Pair "toto" { 3 ; 7 ; 9 ; 1 }) { 1 ; 2 ; 3 })
             0x05070707070100000004746f746f020000000800030007000900010200000006000100020003)  	@parameter ]
-  - location: 18 (remaining gas: 1038900840 units remaining)
+  - location: 18 (remaining gas: 1038900.840 units remaining)
     [ (Pair (Pair (Pair "toto" { 3 ; 7 ; 9 ; 1 }) { 1 ; 2 ; 3 })
             0x05070707070100000004746f746f020000000800030007000900010200000006000100020003)  	@parameter
       (Pair (Pair (Pair "toto" { 3 ; 7 ; 9 ; 1 }) { 1 ; 2 ; 3 })
             0x05070707070100000004746f746f020000000800030007000900010200000006000100020003)  	@parameter ]
-  - location: 19 (remaining gas: 1038900780 units remaining)
+  - location: 19 (remaining gas: 1038900.780 units remaining)
     [ (Pair (Pair "toto" { 3 ; 7 ; 9 ; 1 }) { 1 ; 2 ; 3 })  	
       (Pair (Pair (Pair "toto" { 3 ; 7 ; 9 ; 1 }) { 1 ; 2 ; 3 })
             0x05070707070100000004746f746f020000000800030007000900010200000006000100020003)  	@parameter ]
-  - location: 22 (remaining gas: 1038900660 units remaining)
+  - location: 22 (remaining gas: 1038900.660 units remaining)
     [ 0x05070707070100000004746f746f020000000800030007000900010200000006000100020003  	 ]
-  - location: 21 (remaining gas: 1038900640 units remaining)
+  - location: 21 (remaining gas: 1038900.640 units remaining)
     [ 0x05070707070100000004746f746f020000000800030007000900010200000006000100020003  	 ]
-  - location: 20 (remaining gas: 1038900640 units remaining)
+  - location: 20 (remaining gas: 1038900.640 units remaining)
     [ (Pair (Pair "toto" { 3 ; 7 ; 9 ; 1 }) { 1 ; 2 ; 3 })  	
       0x05070707070100000004746f746f020000000800030007000900010200000006000100020003  	 ]
-  - location: -1 (remaining gas: 1038900620 units remaining)
+  - location: -1 (remaining gas: 1038900.620 units remaining)
     [ (Pair (Pair "toto" { 3 ; 7 ; 9 ; 1 }) { 1 ; 2 ; 3 })  	
       0x05070707070100000004746f746f020000000800030007000900010200000006000100020003  	 ]
-  - location: 16 (remaining gas: 1038900600 units remaining)
+  - location: 16 (remaining gas: 1038900.600 units remaining)
     [ (Pair (Pair "toto" { 3 ; 7 ; 9 ; 1 }) { 1 ; 2 ; 3 })  	
       0x05070707070100000004746f746f020000000800030007000900010200000006000100020003  	 ]
-  - location: 25 (remaining gas: 1038900480 units remaining)
+  - location: 25 (remaining gas: 1038900.480 units remaining)
     [ 0x05070707070100000004746f746f020000000800030007000900010200000006000100020003  	
       0x05070707070100000004746f746f020000000800030007000900010200000006000100020003  	 ]
-  - location: 24 (remaining gas: 1038900460 units remaining)
+  - location: 24 (remaining gas: 1038900.460 units remaining)
     [ 0x05070707070100000004746f746f020000000800030007000900010200000006000100020003  	
       0x05070707070100000004746f746f020000000800030007000900010200000006000100020003  	 ]
-  - location: 23 (remaining gas: 1038900460 units remaining)
+  - location: 23 (remaining gas: 1038900.460 units remaining)
     [ (Pair (Pair "toto" { 3 ; 7 ; 9 ; 1 }) { 1 ; 2 ; 3 })  	
       0x05070707070100000004746f746f020000000800030007000900010200000006000100020003  	
       0x05070707070100000004746f746f020000000800030007000900010200000006000100020003  	 ]
-  - location: 26 (remaining gas: 1038672420 units remaining)
+  - location: 26 (remaining gas: 1038672.420 units remaining)
     [ 0x05070707070100000004746f746f020000000800030007000900010200000006000100020003  	@packed
       0x05070707070100000004746f746f020000000800030007000900010200000006000100020003  	
       0x05070707070100000004746f746f020000000800030007000900010200000006000100020003  	 ]
-  - location: 29 (remaining gas: 1038672280 units remaining)
+  - location: 29 (remaining gas: 1038672.280 units remaining)
     [ 0  	
       0x05070707070100000004746f746f020000000800030007000900010200000006000100020003  	 ]
-  - location: 30 (remaining gas: 1038672180 units remaining)
+  - location: 30 (remaining gas: 1038672.180 units remaining)
     [ True  	
       0x05070707070100000004746f746f020000000800030007000900010200000006000100020003  	 ]
-  - location: -1 (remaining gas: 1038672160 units remaining)
+  - location: -1 (remaining gas: 1038672.160 units remaining)
     [ True  	
       0x05070707070100000004746f746f020000000800030007000900010200000006000100020003  	 ]
-  - location: 32 (remaining gas: 1038672080 units remaining)
+  - location: 32 (remaining gas: 1038672.080 units remaining)
     [ 0x05070707070100000004746f746f020000000800030007000900010200000006000100020003  	 ]
-  - location: -1 (remaining gas: 1038672060 units remaining)
+  - location: -1 (remaining gas: 1038672.060 units remaining)
     [ 0x05070707070100000004746f746f020000000800030007000900010200000006000100020003  	 ]
-  - location: 37 (remaining gas: 1038289020 units remaining)
+  - location: 37 (remaining gas: 1038289.020 units remaining)
     [ (Some (Pair (Pair "toto" { 3 ; 7 ; 9 ; 1 }) { 1 ; 2 ; 3 }))  	@unpacked ]
-  - location: 51 (remaining gas: 1038288920 units remaining)
+  - location: 51 (remaining gas: 1038288.920 units remaining)
     [ (Pair (Pair "toto" { 3 ; 7 ; 9 ; 1 }) { 1 ; 2 ; 3 })  	@unpacked.some ]
-  - location: 45 (remaining gas: 1038288900 units remaining)
+  - location: 45 (remaining gas: 1038288.900 units remaining)
     [ (Pair (Pair "toto" { 3 ; 7 ; 9 ; 1 }) { 1 ; 2 ; 3 })  	@unpacked.some ]
-  - location: 52 (remaining gas: 1038288840 units remaining)
+  - location: 52 (remaining gas: 1038288.840 units remaining)
     [  ]
-  - location: 53 (remaining gas: 1038288780 units remaining)
+  - location: 53 (remaining gas: 1038288.780 units remaining)
     [ Unit  	 ]
-  - location: 54 (remaining gas: 1038288720 units remaining)
+  - location: 54 (remaining gas: 1038288.720 units remaining)
     [ {}  	
       Unit  	 ]
-  - location: 56 (remaining gas: 1038288660 units remaining)
+  - location: 56 (remaining gas: 1038288.660 units remaining)
     [ (Pair {} Unit)  	 ]
-  - location: -1 (remaining gas: 1038288640 units remaining)
+  - location: -1 (remaining gas: 1038288.640 units remaining)
     [ (Pair {} Unit)  	 ]
 
 Runtime error in contract [CONTRACT_HASH]:
@@ -93,59 +93,59 @@ At line 4 characters 14 to 26,
 script reached FAILWITH instruction
 with Unit
 trace
-  - location: 14 (remaining gas: 1038901000 units remaining)
+  - location: 14 (remaining gas: 1038901 units remaining)
     [ (Pair (Pair (Pair (Pair "toto" { 3 ; 7 ; 9 ; 1 }) { 1 ; 2 ; 3 })
                   0x05070707070100000004746f746f0200000008000300070009000102000000060001000200030004)
             Unit)  	 ]
-  - location: 15 (remaining gas: 1038900940 units remaining)
+  - location: 15 (remaining gas: 1038900.940 units remaining)
     [ (Pair (Pair (Pair "toto" { 3 ; 7 ; 9 ; 1 }) { 1 ; 2 ; 3 })
             0x05070707070100000004746f746f0200000008000300070009000102000000060001000200030004)  	@parameter ]
-  - location: 18 (remaining gas: 1038900840 units remaining)
+  - location: 18 (remaining gas: 1038900.840 units remaining)
     [ (Pair (Pair (Pair "toto" { 3 ; 7 ; 9 ; 1 }) { 1 ; 2 ; 3 })
             0x05070707070100000004746f746f0200000008000300070009000102000000060001000200030004)  	@parameter
       (Pair (Pair (Pair "toto" { 3 ; 7 ; 9 ; 1 }) { 1 ; 2 ; 3 })
             0x05070707070100000004746f746f0200000008000300070009000102000000060001000200030004)  	@parameter ]
-  - location: 19 (remaining gas: 1038900780 units remaining)
+  - location: 19 (remaining gas: 1038900.780 units remaining)
     [ (Pair (Pair "toto" { 3 ; 7 ; 9 ; 1 }) { 1 ; 2 ; 3 })  	
       (Pair (Pair (Pair "toto" { 3 ; 7 ; 9 ; 1 }) { 1 ; 2 ; 3 })
             0x05070707070100000004746f746f0200000008000300070009000102000000060001000200030004)  	@parameter ]
-  - location: 22 (remaining gas: 1038900660 units remaining)
+  - location: 22 (remaining gas: 1038900.660 units remaining)
     [ 0x05070707070100000004746f746f0200000008000300070009000102000000060001000200030004  	 ]
-  - location: 21 (remaining gas: 1038900640 units remaining)
+  - location: 21 (remaining gas: 1038900.640 units remaining)
     [ 0x05070707070100000004746f746f0200000008000300070009000102000000060001000200030004  	 ]
-  - location: 20 (remaining gas: 1038900640 units remaining)
+  - location: 20 (remaining gas: 1038900.640 units remaining)
     [ (Pair (Pair "toto" { 3 ; 7 ; 9 ; 1 }) { 1 ; 2 ; 3 })  	
       0x05070707070100000004746f746f0200000008000300070009000102000000060001000200030004  	 ]
-  - location: -1 (remaining gas: 1038900620 units remaining)
+  - location: -1 (remaining gas: 1038900.620 units remaining)
     [ (Pair (Pair "toto" { 3 ; 7 ; 9 ; 1 }) { 1 ; 2 ; 3 })  	
       0x05070707070100000004746f746f0200000008000300070009000102000000060001000200030004  	 ]
-  - location: 16 (remaining gas: 1038900600 units remaining)
+  - location: 16 (remaining gas: 1038900.600 units remaining)
     [ (Pair (Pair "toto" { 3 ; 7 ; 9 ; 1 }) { 1 ; 2 ; 3 })  	
       0x05070707070100000004746f746f0200000008000300070009000102000000060001000200030004  	 ]
-  - location: 25 (remaining gas: 1038900480 units remaining)
+  - location: 25 (remaining gas: 1038900.480 units remaining)
     [ 0x05070707070100000004746f746f0200000008000300070009000102000000060001000200030004  	
       0x05070707070100000004746f746f0200000008000300070009000102000000060001000200030004  	 ]
-  - location: 24 (remaining gas: 1038900460 units remaining)
+  - location: 24 (remaining gas: 1038900.460 units remaining)
     [ 0x05070707070100000004746f746f0200000008000300070009000102000000060001000200030004  	
       0x05070707070100000004746f746f0200000008000300070009000102000000060001000200030004  	 ]
-  - location: 23 (remaining gas: 1038900460 units remaining)
+  - location: 23 (remaining gas: 1038900.460 units remaining)
     [ (Pair (Pair "toto" { 3 ; 7 ; 9 ; 1 }) { 1 ; 2 ; 3 })  	
       0x05070707070100000004746f746f0200000008000300070009000102000000060001000200030004  	
       0x05070707070100000004746f746f0200000008000300070009000102000000060001000200030004  	 ]
-  - location: 26 (remaining gas: 1038672420 units remaining)
+  - location: 26 (remaining gas: 1038672.420 units remaining)
     [ 0x05070707070100000004746f746f020000000800030007000900010200000006000100020003  	@packed
       0x05070707070100000004746f746f0200000008000300070009000102000000060001000200030004  	
       0x05070707070100000004746f746f0200000008000300070009000102000000060001000200030004  	 ]
-  - location: 29 (remaining gas: 1038672280 units remaining)
+  - location: 29 (remaining gas: 1038672.280 units remaining)
     [ -1  	
       0x05070707070100000004746f746f0200000008000300070009000102000000060001000200030004  	 ]
-  - location: 30 (remaining gas: 1038672180 units remaining)
+  - location: 30 (remaining gas: 1038672.180 units remaining)
     [ False  	
       0x05070707070100000004746f746f0200000008000300070009000102000000060001000200030004  	 ]
-  - location: -1 (remaining gas: 1038672160 units remaining)
+  - location: -1 (remaining gas: 1038672.160 units remaining)
     [ False  	
       0x05070707070100000004746f746f0200000008000300070009000102000000060001000200030004  	 ]
-  - location: 35 (remaining gas: 1038672020 units remaining)
+  - location: 35 (remaining gas: 1038672.020 units remaining)
     [ Unit  	
       0x05070707070100000004746f746f0200000008000300070009000102000000060001000200030004  	 ]
 Fatal error:
