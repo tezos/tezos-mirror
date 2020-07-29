@@ -33,7 +33,7 @@ module Raw_context_tests = struct
    tests that the returned root is as expected. *)
   let commitments_add_uncommitted () =
     Context.init 1
-    >>=? fun (b, _) ->
+    >>=? fun (b, _, _) ->
     Raw_context.prepare
       b.context
       ~level:b.header.shell.level
@@ -81,7 +81,7 @@ module Raw_context_tests = struct
      trying to initialize the same key twice. *)
   let nullifier_double () =
     Context.init 1
-    >>=? fun (b, _) ->
+    >>=? fun (b, _, _) ->
     Raw_context.prepare
       b.context
       ~level:b.header.shell.level
@@ -119,7 +119,7 @@ module Raw_context_tests = struct
    and false for a third one. *)
   let nullifier_test () =
     Context.init 1
-    >>=? fun (b, _) ->
+    >>=? fun (b, _, _) ->
     Raw_context.prepare
       b.context
       ~level:b.header.shell.level
@@ -179,7 +179,7 @@ module Raw_context_tests = struct
     Random.self_init () ;
     let memo_size = Random.int 200 in
     Context.init 1
-    >>=? fun (b, _) ->
+    >>=? fun (b, _, _) ->
     Raw_context.prepare
       b.context
       ~level:b.header.shell.level
@@ -244,7 +244,7 @@ module Raw_context_tests = struct
         (fun _ -> gen_root ())
     in
     Context.init 1
-    >>=? fun (b, _) ->
+    >>=? fun (b, _, _) ->
     Raw_context.prepare
       b.context
       ~level:b.header.shell.level
@@ -316,7 +316,7 @@ module Raw_context_tests = struct
 
   let test_get_memo_size () =
     Context.init 1
-    >>=? fun (b, _) ->
+    >>=? fun (b, _, _) ->
     Raw_context.prepare
       b.context
       ~level:b.header.shell.level
@@ -560,18 +560,9 @@ module Interpreter_tests = struct
    transfer all of b inputs to a while adding dummy inputs and outputs.
    At last we fail we make a failing transaction *)
   let test_shielded_tez () =
-    Context.init 3
-    >>=? fun (b, contracts) ->
-    (* address from which we will do all our operations *)
-    let src = List.nth contracts 0 in
-    let src_2 = List.nth contracts 1 in
-    let to_exclude =
-      [ Alpha_context.Contract.is_implicit src
-        |> Option.unopt_assert ~loc:__POS__;
-        Alpha_context.Contract.is_implicit src_2
-        |> Option.unopt_assert ~loc:__POS__ ]
-    in
-    originate_contract "contracts/sapling_contract.tz" "{}" src b to_exclude
+    init ()
+    >>=? fun (b, baker, src0, src1) ->
+    originate_contract "contracts/sapling_contract.tz" "{}" src0 b baker
     >>=? fun (dst, b, anti_replay) ->
     let wa = wallet_gen () in
     let (list_transac, total) =
@@ -579,7 +570,7 @@ module Interpreter_tests = struct
     in
     let parameters = parameters_of_list list_transac in
     (* a does a list of shield transaction *)
-    transac_and_sync b parameters total src dst to_exclude
+    transac_and_sync b parameters total src0 dst baker
     >>=? fun (b, _ctx, _state) ->
     (* we shield again on another block, forging with the empty state *)
     let (list_transac, total) =
@@ -587,10 +578,10 @@ module Interpreter_tests = struct
     in
     let parameters = parameters_of_list list_transac in
     (* a does a list of shield transaction *)
-    transac_and_sync b parameters total src dst to_exclude
+    transac_and_sync b parameters total src0 dst baker
     >>=? fun (b, ctx, state) ->
     (* address that will receive an unshield *)
-    Alpha_context.Contract.get_balance ctx src_2
+    Alpha_context.Contract.get_balance ctx src1
     >>= wrap
     >>=? fun balance_before_shield ->
     let wb = wallet_gen () in
@@ -624,7 +615,7 @@ module Interpreter_tests = struct
     in
     let hex_pkh =
       to_hex
-        ( Alpha_context.Contract.is_implicit src_2
+        ( Alpha_context.Contract.is_implicit src1
         |> Option.unopt_assert ~loc:__POS__ )
         Signature.Public_key_hash.encoding
     in
@@ -635,9 +626,9 @@ module Interpreter_tests = struct
       Alpha_context.Script.(lazy_expr (expression_from_string string))
     in
     (* a transfers to b and unshield some money to src_2 (the pkh) *)
-    transac_and_sync b parameters 0 src dst to_exclude
+    transac_and_sync b parameters 0 src0 dst baker
     >>=? fun (b, ctx, state) ->
-    Alpha_context.Contract.get_balance ctx src_2
+    Alpha_context.Contract.get_balance ctx src1
     >>= wrap
     >>=? fun balance_after_shield ->
     let diff =
@@ -681,13 +672,13 @@ module Interpreter_tests = struct
       Alpha_context.Script.(lazy_expr (expression_from_string string))
     in
     (* b transfers to a with dummy inputs and outputs *)
-    transac_and_sync b parameters 0 src dst to_exclude
+    transac_and_sync b parameters 0 src0 dst baker
     >>=? fun (b, _ctx, _state) ->
     (* Here we fail by doing the same transaction again*)
     Incremental.begin_construction b
     >>=? fun incr ->
     let fee = Test_tez.Tez.of_int 10 in
-    Op.transaction ~fee (B b) src dst Test_tez.Tez.zero ~parameters
+    Op.transaction ~fee (B b) src0 dst Test_tez.Tez.zero ~parameters
     >>=? fun operation ->
     Incremental.add_operation (* TODO make more precise *)
       ~expect_failure:(fun _ -> return_unit)
@@ -696,22 +687,12 @@ module Interpreter_tests = struct
     >>=? fun _incr -> return_unit
 
   (* In this test we do two transactions in one block and same two in two block.
-     We check that the sate is the same expect for roots.
-     The second transaction is possible only if the first one is done. *)
+       We check that the sate is the same expect for roots.
+       The second transaction is possible only if the first one is done. *)
   let test_transac_and_block () =
-    Context.init 3
-    >>=? fun (b, contracts) ->
-    (* address from which we will do all our operations *)
-    let src = List.nth contracts 0 in
-    (* addres that will receive an unshield*)
-    let src_2 = List.nth contracts 1 in
-    let to_exclude =
-      [ Alpha_context.Contract.is_implicit src
-        |> Option.unopt_assert ~loc:__POS__;
-        Alpha_context.Contract.is_implicit src_2
-        |> Option.unopt_assert ~loc:__POS__ ]
-    in
-    originate_contract "contracts/sapling_contract.tz" "{}" src b to_exclude
+    init ()
+    >>=? fun (b, baker, src, _) ->
+    originate_contract "contracts/sapling_contract.tz" "{}" src b baker
     >>=? fun (dst, block_start, anti_replay) ->
     let {sk; vk} = wallet_gen () in
     let hex_transac_1 = hex_shield {sk; vk} anti_replay in
@@ -719,7 +700,7 @@ module Interpreter_tests = struct
     let parameters_1 =
       Alpha_context.Script.(lazy_expr (expression_from_string string_1))
     in
-    transac_and_sync block_start parameters_1 15 src dst to_exclude
+    transac_and_sync block_start parameters_1 15 src dst baker
     >>=? fun (block_1, _ctx, state) ->
     let intermediary_root = Sapling.Storage.get_root state in
     let addr =
@@ -743,7 +724,7 @@ module Interpreter_tests = struct
     let parameters_2 =
       Alpha_context.Script.(lazy_expr (expression_from_string string_2))
     in
-    transac_and_sync block_1 parameters_2 0 src dst to_exclude
+    transac_and_sync block_1 parameters_2 0 src dst baker
     >>=? fun (block_1, _ctx, state_1) ->
     let final_root = Sapling.Storage.get_root state_1 in
     Alpha_services.Contract.single_sapling_get_diff
@@ -771,11 +752,7 @@ module Interpreter_tests = struct
     >>=? fun incr ->
     (* We need to manually get the counter here *)
     let ctx = Incremental.alpha_ctxt incr in
-    let pkh =
-      Alpha_context.Contract.is_implicit src
-      |> Option.unopt_assert ~loc:__POS__
-    in
-    Alpha_context.Contract.get_counter ctx pkh
+    Alpha_context.Contract.get_counter ctx src
     >>= wrap
     >>=? fun counter ->
     Op.transaction
@@ -812,7 +789,7 @@ module Interpreter_tests = struct
       let ctx_without_gas_2 = Alpha_context.Gas.set_unlimited ctx_2 in
       Script_ir_translator.parse_script ctx_without_gas_2 ~legacy:true script
       >>= wrap
-      >>=? fun (Ex_script script, ctxt) ->
+      >>=? fun (Ex_originated_script script, ctxt) ->
       Script_ir_translator.get_single_sapling_state
         ctxt
         script.storage_type
@@ -833,7 +810,7 @@ module Interpreter_tests = struct
       >>=? fun raw_ctx -> Sapling_storage.Roots.mem raw_ctx id root >>= wrap
     in
     (* We check that the second state did not store the root in between
-       transactions. *)
+         transactions. *)
     is_root_in block_2 dst intermediary_root
     |> assert_false
     >>=? fun () ->
@@ -849,15 +826,13 @@ module Interpreter_tests = struct
     is_root_in block_1 dst intermediary_root |> assert_true
 
   (* In this test we try a contract which creates an empty sapling state on the
-     fly. It then applies a list of transactions, checks they are correct and
-     drops the result. We make several shields in the same list (since the state
-     is drop). *)
+       fly. It then applies a list of transactions, checks they are correct and
+       drops the result. We make several shields in the same list (since the state
+       is drop). *)
   let test_drop () =
-    Context.init 1
-    >>=? fun (b, contracts) ->
-    (* address from which we will do all our operations*)
-    let src = List.nth contracts 0 in
-    originate_contract "contracts/sapling_contract_drop.tz" "Unit" src b []
+    init ()
+    >>=? fun (b, baker, src, _) ->
+    originate_contract "contracts/sapling_contract_drop.tz" "Unit" src b baker
     >>=? fun (dst, b, anti_replay) ->
     let {sk; vk} = wallet_gen () in
     let (list_transac, _total) =
@@ -880,22 +855,14 @@ module Interpreter_tests = struct
      At each transactions both are applied but only state is updated.
      We then check that the first state is updated in the correct way. *)
   let test_double () =
-    Context.init 2
-    >>=? fun (b, contracts) ->
-    (* address from which we will do all our operations*)
-    let src = List.nth contracts 0 in
-    let to_exclude =
-      [ Alpha_context.Contract.is_implicit src
-        |> Option.unopt_assert ~loc:__POS__ ]
-    in
-    (* address from which we will do all our operations*)
-    let src = List.hd contracts in
+    init ()
+    >>=? fun (b, baker, src, _) ->
     originate_contract
       "contracts/sapling_contract_double.tz"
       "(Pair {} {})"
       src
       b
-      to_exclude
+      baker
     >>=? fun (dst, b, anti_replay) ->
     let wa = wallet_gen () in
     let hex_transac_1 = hex_shield wa anti_replay in
@@ -982,18 +949,16 @@ module Interpreter_tests = struct
     assert (Option.is_none @@ Sapling.Forge.Input.get state_2 0L wb.vk)
 
   let test_state_as_arg () =
-    Context.init 2
-    >>=? fun (b, contracts) ->
-    (* address from which we will do all our operations*)
-    let src = List.nth contracts 0 in
+    init ()
+    >>=? fun (b, baker, src, _) ->
     originate_contract
       "contracts/sapling_contract_state_as_arg.tz"
       "None"
       src
       b
-      []
+      baker
     >>=? fun (dst, b, anti_replay) ->
-    originate_contract "contracts/sapling_contract_send.tz" "Unit" src b []
+    originate_contract "contracts/sapling_contract_send.tz" "Unit" src b baker
     >>=? fun (dst_2, b, anti_replay_2) ->
     let w = wallet_gen () in
     let hex_transac_1 = hex_shield w anti_replay in

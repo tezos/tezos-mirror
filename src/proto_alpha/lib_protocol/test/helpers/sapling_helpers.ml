@@ -140,7 +140,7 @@ module Alpha_context_helpers = struct
 
   let init () =
     Context.init 1
-    >>=? fun (b, _) ->
+    >>=? fun (b, _, _) ->
     Alpha_context.prepare
       b.context
       ~level:b.header.shell.level
@@ -247,6 +247,20 @@ end
 module Interpreter_helpers = struct
   include Common
 
+  (* Initialize n addresses to do only operations plus one that will be use to
+     bake. *)
+  let init () =
+    Context.init 3
+    >|=? fun (b, contracts, bakers) ->
+    let (src0, src1) =
+      match contracts with
+      | src0 :: src1 :: _ ->
+          (src0, src1)
+      | _ ->
+          assert false
+    in
+    (b, List.hd bakers, src0, src1)
+
   (* Parse a Michelson contract from string. *)
   let toplevel_from_string str =
     let (ast, errs) = Michelson_v1_parser.parse_toplevel ~check:true str in
@@ -267,7 +281,7 @@ module Interpreter_helpers = struct
 
   (* returns a block in which the contract is originated.
      Also returns the associtaed anti-replay string and KT1 address. *)
-  let originate_contract file storage src b to_exclude =
+  let originate_contract file storage src b baker =
     let load_file f =
       let ic = open_in f in
       let res = really_input_string ic (in_channel_length ic) in
@@ -281,7 +295,7 @@ module Interpreter_helpers = struct
     in
     Op.origination (B b) src ~fee:(Test_tez.Tez.of_int 10) ~script
     >>=? fun (operation, dst) ->
-    Incremental.begin_construction ~policy:Block.(Excluding to_exclude) b
+    Incremental.begin_construction ~policy:Block.(By_account baker) b
     >>=? fun incr ->
     Incremental.add_operation incr operation
     >>=? fun incr ->
@@ -318,13 +332,13 @@ module Interpreter_helpers = struct
 
   (* Make a transaction and sync a local client state. [to_exclude] is the list
      of addresses that cannot bake the block*)
-  let transac_and_sync block parameters amount src dst to_exclude =
+  let transac_and_sync block parameters amount src dst baker =
     Test_tez.Tez.(one_mutez *? Int64.of_int amount)
     >>?= fun amount_tez ->
     let fee = Test_tez.Tez.of_int 10 in
     Op.transaction ~fee (B block) src dst amount_tez ~parameters
     >>=? fun operation ->
-    Incremental.begin_construction ~policy:Block.(Excluding to_exclude) block
+    Incremental.begin_construction ~policy:Block.(By_account baker) block
     >>=? fun incr ->
     Incremental.add_operation incr operation
     >>=? fun incr ->
@@ -339,7 +353,7 @@ module Interpreter_helpers = struct
       ()
     >>=? fun diff ->
     let state = client_state_of_diff diff in
-    Incremental.begin_construction ~policy:Block.(Excluding to_exclude) block
+    Incremental.begin_construction ~policy:Block.(By_account baker) block
     >|=? fun incr ->
     let ctx = Incremental.alpha_ctxt incr in
     (block, ctx, state)
