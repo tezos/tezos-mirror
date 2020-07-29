@@ -812,6 +812,10 @@ let bootstrapped w =
 
 let is_bootstrapped w = (Worker.state w).bootstrapped
 
+let force_bootstrapped w b =
+  let state = Worker.state w in
+  state.bootstrapped <- b
+
 let valid_block_watcher w =
   let {valid_block_input; _} = Worker.state w in
   Lwt_watcher.create_stream valid_block_input

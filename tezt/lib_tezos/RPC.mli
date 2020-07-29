@@ -33,6 +33,14 @@ val get_connections :
 (** Call RPC /chain/[chain]/chain_id *)
 val get_chain_id : ?node:Node.t -> ?chain:string -> Client.t -> JSON.t Lwt.t
 
+(** Call RPC /chain/[chain] *)
+val force_bootstrapped :
+  ?node:Node.t ->
+  ?chain:string ->
+  ?bootstrapped:bool ->
+  Client.t ->
+  JSON.t Lwt.t
+
 (** Call RPC /chain/[chain]/checkpoint *)
 val get_checkpoint : ?node:Node.t -> ?chain:string -> Client.t -> JSON.t Lwt.t
 

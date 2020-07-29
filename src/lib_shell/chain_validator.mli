@@ -85,6 +85,8 @@ val bootstrapped : t -> unit Lwt.t
 
 val is_bootstrapped : t -> bool
 
+val force_bootstrapped : t -> bool -> unit
+
 val prevalidator : t -> Prevalidator.t option
 
 val chain_db : t -> Distributed_db.chain_db

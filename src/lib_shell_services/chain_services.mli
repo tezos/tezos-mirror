@@ -109,6 +109,9 @@ module S : sig
       bool * [`Sync | `Stuck | `Unsync] )
     RPC_service.t
 
+  val force_bootstrapped :
+    ([`PATCH], prefix, prefix, unit, bool, unit) RPC_service.t
+
   module Blocks : sig
     val path : (prefix, prefix) RPC_path.t
 

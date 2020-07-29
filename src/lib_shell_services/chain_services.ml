@@ -91,6 +91,18 @@ module S = struct
       ~output:bootstrap_encoding
       RPC_path.(path / "is_bootstrapped")
 
+  let bootstrapped_flag_encoding =
+    let open Data_encoding in
+    obj1 (req "bootstrapped" bool)
+
+  let force_bootstrapped =
+    RPC_service.patch_service
+      ~description:"Forcefully set the bootstrapped flag of the node"
+      ~query:RPC_query.empty
+      ~input:bootstrapped_flag_encoding
+      ~output:unit
+      path
+
   module Blocks = struct
     let list_query =
       let open RPC_query in
