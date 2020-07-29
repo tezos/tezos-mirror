@@ -546,12 +546,14 @@ coq:lint:
 ## Stage: run tests written using Tezt                    ##
 ############################################################
 
+# We set a global timeout of 55min (3300s) so that in case of timeout,
+# we still get the artifact (CI timeouts cause artifacts to not be uploaded).
 tezt:main:
   <<: *test_definition
   before_script:
     - make
   script:
-    - dune exec tezt/tests/main.exe -- --color --log-buffer-size 5000 --log-file tezt.log
+    - dune exec tezt/tests/main.exe -- --color --log-buffer-size 5000 --log-file tezt.log --global-timeout 3300
   artifacts:
     paths:
     - tezt.log
