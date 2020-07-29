@@ -42,6 +42,29 @@ And here is how to get the list of tests and their tags::
 
     dune exec tezt/tests/main.exe -- --list
 
+Regression Tests
+----------------
+
+This form of testing is used to prevent unintended changes to existing
+functionality by ensuring that the software behaves the same way as it did
+before introduced changes.
+
+Regression tests capture commands and output of commands executed during a test. 
+An output of regression test is stored in the repository and is expected to
+match exactly with the captured output on subsequent runs. An added advantage of
+this is that when a change in behaviour is intentional, its effect is made
+visible by the change in test's output.
+
+To run all the regression tests, use the ``regression`` tag::
+
+    dune exec tezt/tests/main.exe regression
+
+When the change in behaviour is intentional or when a new regression test is
+introduced, the output of regression test must be (re-)generated. This can be
+done with the ``--reset-regressions`` option, e.g.::
+
+    dune exec tezt/tests/main.exe regression -- --reset-regressions
+
 Architecture
 ------------
 
