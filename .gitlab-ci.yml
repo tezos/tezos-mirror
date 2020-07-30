@@ -660,7 +660,7 @@ documentation:linkcheck:
 
 .opam_template: &opam_definition
   image: ${build_deps_image_name}:opam--${build_deps_image_version}
-  stage: packaging
+  stage: build
   dependencies: []
   rules:
     - if: '$CI_COMMIT_BRANCH == "master"'
