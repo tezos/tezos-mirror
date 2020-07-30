@@ -44,7 +44,7 @@ New contract [CONTRACT_HASH] originated.
 Contract memorized as sapling_empty_state.
 Injected block [BLOCK_HASH]
 Node is bootstrapped.
-Estimated gas: 11537240 units (will add 100000 for safety)
+Estimated gas: 11437240 units (will add 100000 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -55,13 +55,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [CONTRACT_HASH]
-    Fee to the baker: ꜩ0.001414
+    Fee to the baker: ꜩ0.001404
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 11637240
+    Gas limit: 11537240
     Storage limit: 0 bytes
     Balance updates:
-      [CONTRACT_HASH] ................ -ꜩ0.001414
-      fees(the baker who will include this operation,5) ... +ꜩ0.001414
+      [CONTRACT_HASH] ................ -ꜩ0.001404
+      fees(the baker who will include this operation,5) ... +ꜩ0.001404
     Transaction:
       Amount: ꜩ0
       From: [CONTRACT_HASH]
@@ -69,6 +69,6 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: 1
       Storage size: 73 bytes
-      Consumed gas: 11537240
+      Consumed gas: 11437240
 
 Injected block [BLOCK_HASH]

@@ -176,6 +176,7 @@ class TestSaplingShieldedTez:
     @pytest.fixture(scope="class")
     def client(self, sandbox, node):
         client = sandbox.get_new_client(node)
+        utils.remember_baker_contracts(client)
         return client
 
     @pytest.fixture
@@ -205,7 +206,7 @@ class TestSaplingShieldedTez:
             args=["--init", "{}", "--burn-cap", "3.0"]
         )
         session["contract_address"] = origination.contract
-        client.bake(sender, ["--minimal-timestamp"])
+        client.bake("baker1", ["--minimal-timestamp"])
         assert utils.check_block_contains_operations(
             client,
             [origination.operation_hash],
@@ -263,10 +264,10 @@ class TestSaplingShieldedTez:
             contract=contract_name,
             args=["--burn-cap", "3.0"],
         )
-        client.bake("bootstrap2", ["--minimal-timestamp"])
+        client.bake("baker2", ["--minimal-timestamp"])
         bootstrap2_balance = client.get_balance("bootstrap2")
         # Fees
-        assert 3999386 <= bootstrap2_balance <= 3999387
+        assert 3999898 <= bootstrap2_balance <= 3999899
         bob_balance = client.sapling_get_balance(
             key_name="bob",
             contract_name=contract_name).balance
@@ -329,10 +330,10 @@ class TestSaplingShieldedTez:
             contract=contract_name,
             args=["--burn-cap", "3.0"],
         )
-        client.bake("bootstrap3", ["--minimal-timestamp"])
+        client.bake("baker3", ["--minimal-timestamp"])
         bootstrap3_balance = client.get_balance("bootstrap3")
-        assert bootstrap3_balance >= 3999387
-        assert bootstrap3_balance <= 3999388
+        assert bootstrap3_balance >= 3999899
+        assert bootstrap3_balance <= 3999900
         alice_balance = client.sapling_get_balance(
             key_name="alice",
             contract_name=contract_name).balance
@@ -413,7 +414,7 @@ class TestSaplingShieldedTez:
             contract=contract_name,
             args=additional_args,
         )
-        client.bake("bootstrap2", ["--minimal-timestamp"])
+        client.bake("baker2", ["--minimal-timestamp"])
 
     @pytest.mark.parametrize("key_name,expected_balance", [
         ("alice", 50.0),
@@ -471,7 +472,7 @@ class TestSaplingShieldedTez:
             contract=contract_name,
             args=additional_args,
         )
-        client.bake("bootstrap2", ["--minimal-timestamp"])
+        client.bake("baker2", ["--minimal-timestamp"])
 
     @pytest.mark.parametrize("key_name,expected_balance", [
         ("alice", 0.0),
@@ -540,7 +541,7 @@ class TestSaplingShieldedTez:
             contract=contract_name,
             args=["--burn-cap", "3.0"],
         )
-        client.bake("bootstrap2", ['--minimal-timestamp'])
+        client.bake("baker2", ['--minimal-timestamp'])
         bob_balance = client.sapling_get_balance(
             key_name="bob",
             contract_name=contract_name).balance
@@ -569,7 +570,7 @@ class TestSaplingShieldedTez:
         assert bob_balance == 110.0
 
     @pytest.mark.parametrize("transparent_signer,baker", [
-        ("bootstrap4", "bootstrap2")
+        ("bootstrap4", "baker2")
     ])
     def test_shielded_transfer_using_non_sapling_transfer_method(
             self, client, contract_name, session, transparent_signer,
