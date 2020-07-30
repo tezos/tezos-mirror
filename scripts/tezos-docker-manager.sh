@@ -704,14 +704,14 @@ if [ "$#" -eq 0 ] ; then usage ; exit 1;  else shift ; fi
 case $(basename "$0") in
     carthagenet.sh)
         docker_base_dir="$HOME/.tezos-carthagenet"
-        docker_image=tezos/tezos:master
+        docker_image=tezos/tezos:dalpha-release
         docker_compose_base_name=carthagenet
         default_port=19732
         network=carthagenet
         ;;
     *)
         docker_base_dir="$HOME/.tezos-mainnet"
-        docker_image=tezos/tezos:master
+        docker_image=tezos/tezos:dalpha-release
         docker_compose_base_name="mainnet"
         default_port=9732
         network=mainnet
