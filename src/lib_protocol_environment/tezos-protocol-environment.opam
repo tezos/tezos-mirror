@@ -12,6 +12,7 @@ depends: [
   "tezos-protocol-environment-sigs"
   "tezos-protocol-environment-structs"
   "alcotest-lwt" { with-test & >= "1.1.0" }
+  "sapling"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
