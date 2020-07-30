@@ -41,7 +41,7 @@ type status =
   | Not_running
   | Running of {
       process : Process.t;
-      event_loop_promise : unit Lwt.t;
+      mutable event_loop_promise : unit Lwt.t option;
       mutable ready : bool;
       mutable level : int known;
       mutable identity : string known;
@@ -88,7 +88,9 @@ let terminate node =
   match node.status with
   | Not_running ->
       unit
-  | Running {process; event_loop_promise; _} ->
+  | Running {event_loop_promise = None; _} ->
+      invalid_arg "you cannot call Node.terminate before Node.run returns"
+  | Running {process; event_loop_promise = Some event_loop_promise; _} ->
       Process.terminate process ; event_loop_promise
 
 let next_name = ref 1
@@ -353,6 +355,11 @@ let run ?(expected_pow = 0) ?(single_process = false) ?bootstrap_threshold
   (* Create the named pipe where the node will send its internal events in JSON. *)
   if Sys.file_exists node.event_pipe then Sys.remove node.event_pipe ;
   Unix.mkfifo node.event_pipe 0o640 ;
+  (* Note: in the CI, it seems that if the node tries to open the FIFO
+     for writing before we opened it for reading, the [Lwt.openfile] call
+     (of the node, for writing) blocks forever. So we need to make sure
+     that we open the file before we spawn the node. *)
+  let* event_input = Lwt_io.(open_file ~mode:input) node.event_pipe in
   let process =
     Process.spawn
       ~name:node.name
@@ -362,11 +369,21 @@ let run ?(expected_pow = 0) ?(single_process = false) ?bootstrap_threshold
       node.path
       args
   in
+  (* Make sure the node status is [Running], otherwise [event_loop_promise]
+     would stop immediately thinking the node has been terminated. *)
+  node.status <-
+    Running
+      {
+        process;
+        ready = false;
+        level = Unknown;
+        identity = Unknown;
+        event_loop_promise = None;
+      } ;
   (* Return control now, the rest (event handling) happens concurrently. *)
   let event_loop_promise =
-    let* input = Lwt_io.(open_file ~mode:input) node.event_pipe in
     let rec event_loop () =
-      let* line = Lwt_io.read_line_opt input in
+      let* line = Lwt_io.read_line_opt event_input in
       match line with
       | Some line ->
           handle_raw_event node line ; event_loop ()
@@ -374,7 +391,7 @@ let run ?(expected_pow = 0) ?(single_process = false) ?bootstrap_threshold
         match node.status with
         | Not_running ->
             (* Process terminated, there will be no more events. *)
-            Lwt_io.close input
+            Lwt_io.close event_input
         | Running _ ->
             (* It can take a little while before the pipe is opened by the node,
                 and before that, reading from it yields end of file for some reason. *)
@@ -408,6 +425,7 @@ let run ?(expected_pow = 0) ?(single_process = false) ?bootstrap_threshold
     in
     unit
   in
+  (* Update [node.status.event_loop_promise]. *)
   node.status <-
     Running
       {
@@ -415,9 +433,10 @@ let run ?(expected_pow = 0) ?(single_process = false) ?bootstrap_threshold
         ready = false;
         level = Unknown;
         identity = Unknown;
-        event_loop_promise;
+        event_loop_promise = Some event_loop_promise;
       } ;
-  async event_loop_promise
+  async event_loop_promise ;
+  unit
 
 exception
   Terminated_before_event of {
@@ -497,12 +516,16 @@ let init ?path ?name ?color ?data_dir ?event_pipe ?expected_pow ?network
   let node = create ?path ?name ?color ?data_dir ?event_pipe () in
   let* () = identity_generate ?expected_pow node in
   let* () = config_init ?network ?net_port ?rpc_port ?history_mode node in
-  run ?expected_pow ?single_process ?bootstrap_threshold ?connections node ;
+  let* () =
+    run ?expected_pow ?single_process ?bootstrap_threshold ?connections node
+  in
   let* () = wait_for_ready node in
   return node
 
 let restart ?expected_pow ?single_process ?bootstrap_threshold ?connections
     node =
   let* () = terminate node in
-  run ?expected_pow ?single_process ?bootstrap_threshold ?connections node ;
+  let* () =
+    run ?expected_pow ?single_process ?bootstrap_threshold ?connections node
+  in
   wait_for_ready node

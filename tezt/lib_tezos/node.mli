@@ -128,14 +128,17 @@ val spawn_config_init :
   t ->
   Process.t
 
-(** Spawn [tezos-node run]. *)
+(** Spawn [tezos-node run].
+
+    The resulting promise is fulfilled as soon as the node has been spawned.
+    It continues running in the background. *)
 val run :
   ?expected_pow:int ->
   ?single_process:bool ->
   ?bootstrap_threshold:int ->
   ?connections:int ->
   t ->
-  unit
+  unit Lwt.t
 
 (** {2 Events} *)
 

@@ -118,7 +118,7 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
   let* () = repeat bakes_during_kill (fun () -> Client.bake_for client) in
   (* Restart node 2 and let it catch up. *)
   Log.info "Baked %d times with node_2 down, restart node_2." bakes_during_kill ;
-  Node.run ~bootstrap_threshold:1 ~connections:1 node_2 ;
+  let* () = Node.run ~bootstrap_threshold:1 ~connections:1 node_2 in
   let* _ = Node.wait_for_ready node_2 in
   let final_level = 1 + bakes_before_kill + bakes_during_kill in
   let* _ = Node.wait_for_level node_1 final_level in
