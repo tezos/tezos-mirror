@@ -1,0 +1,23 @@
+(library
+ (name tezos_client_007_PryLyZ8A)
+ (public_name tezos-client-007-PryLyZ8A)
+ (libraries tezos-base
+            tezos-protocol-007-PryLyZ8A
+            tezos-shell-services
+            tezos-client-base
+            tezos-mockup-registration
+            tezos-rpc
+            tezos-signer-backends
+            tezos-protocol-007-PryLyZ8A-parameters)
+ (library_flags (:standard -linkall))
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_shell_services
+                   -open Tezos_client_base
+                   -open Tezos_protocol_007_PryLyZ8A
+                   -open Tezos_protocol_007_PryLyZ8A_parameters
+                   -open Tezos_rpc)))
+
+(alias
+ (name runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

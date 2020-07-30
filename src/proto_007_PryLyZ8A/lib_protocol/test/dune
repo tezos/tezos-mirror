@@ -1,0 +1,52 @@
+(executable
+ (name main)
+ (libraries tezos-base
+            tezos-micheline
+            tezos-protocol-environment
+            alcotest-lwt
+            tezos-007-PryLyZ8A-test-helpers
+            tezos-stdlib-unix
+            tezos-client-base
+            tezos-protocol-007-PryLyZ8A-parameters
+            tezos-test-services
+            tezos-client-007-PryLyZ8A
+            sapling)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_micheline
+                   -open Tezos_client_007_PryLyZ8A
+                   -open Tezos_protocol_007_PryLyZ8A
+                   -open Tezos_protocol_environment_007_PryLyZ8A
+                   -open Tezos_007_PryLyZ8A_test_helpers
+                   -open Tezos_test_services
+                   -open Tezos_client_007_PryLyZ8A)))
+
+(alias
+ (name buildtest)
+ (package tezos-protocol-007-PryLyZ8A-tests)
+ (deps main.exe))
+
+(rule
+ (copy %{lib:tezos-protocol-007-PryLyZ8A-parameters:test-parameters.json}
+       protocol_parameters.json))
+
+; runs only the `Quick tests
+(alias
+ (name runtest_proto_007_PryLyZ8A)
+ (package tezos-protocol-007-PryLyZ8A-tests)
+ (action (run %{exe:main.exe} -v -q)))
+
+; runs both `Quick and `Slow tests
+(alias
+ (name runtest_slow)
+ (package tezos-protocol-007-PryLyZ8A-tests)
+ (action (run %{exe:main.exe} -v)))
+
+(alias
+ (name runtest)
+ (package tezos-protocol-007-PryLyZ8A-tests)
+ (deps (alias runtest_proto_007_PryLyZ8A)))
+
+(alias
+ (name runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

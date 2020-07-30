@@ -1,0 +1,23 @@
+(library
+ (name tezos_007_PryLyZ8A_test_helpers)
+ (public_name tezos-007-PryLyZ8A-test-helpers)
+ (libraries alcotest-lwt
+            tezos-base
+            tezos-stdlib-unix
+            tezos-shell-services
+            tezos-protocol-environment
+            tezos-protocol-007-PryLyZ8A
+            tezos-protocol-007-PryLyZ8A-parameters
+            tezos-client-007-PryLyZ8A)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_micheline
+                   -open Tezos_stdlib_unix
+                   -open Tezos_protocol_007_PryLyZ8A
+                   -open Tezos_client_007_PryLyZ8A
+                   -open Tezos_protocol_environment_007_PryLyZ8A
+                   -open Tezos_shell_services)))
+
+(alias
+ (name runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

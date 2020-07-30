@@ -1,0 +1,18 @@
+(executable
+ (name main_accuser_007_PryLyZ8A)
+ (public_name tezos-accuser-007-PryLyZ8A)
+ (libraries tezos-client-base-unix
+            tezos-client-commands
+            tezos-baking-007-PryLyZ8A-commands)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_protocol_007_PryLyZ8A
+                   -open Tezos_client_007_PryLyZ8A
+                   -open Tezos_client_commands
+                   -open Tezos_baking_007_PryLyZ8A_commands
+                   -open Tezos_stdlib_unix
+                   -open Tezos_client_base_unix)))
+
+(alias
+ (name runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

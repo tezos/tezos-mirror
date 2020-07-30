@@ -1,0 +1,56 @@
+(library
+ (name tezos_client_007_PryLyZ8A_commands)
+ (public_name tezos-client-007-PryLyZ8A-commands)
+ (libraries tezos-base
+            tezos-stdlib-unix
+            tezos-protocol-007-PryLyZ8A
+            tezos-protocol-environment
+            tezos-shell-services
+            tezos-mockup
+            tezos-mockup-registration
+            tezos-mockup-commands
+            tezos-client-base-unix
+            tezos-client-007-PryLyZ8A
+            tezos-client-commands
+            tezos-rpc)
+ (library_flags (:standard -linkall))
+ (modules (:standard \ alpha_commands_registration))
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_protocol_007_PryLyZ8A
+                   -open Tezos_stdlib_unix
+                   -open Tezos_shell_services
+                   -open Tezos_client_base
+                   -open Tezos_client_007_PryLyZ8A
+                   -open Tezos_client_commands
+                   -open Tezos_client_base_unix
+                   -open Tezos_rpc)))
+
+(library
+ (name tezos_client_007_PryLyZ8A_commands_registration)
+ (public_name tezos-client-007-PryLyZ8A-commands.registration)
+ (libraries tezos-base
+            tezos-protocol-007-PryLyZ8A
+            tezos-protocol-environment
+            tezos-shell-services
+            tezos-client-base
+            tezos-client-007-PryLyZ8A
+            tezos-client-commands
+            tezos-client-007-PryLyZ8A-commands
+            tezos-client-sapling-007-PryLyZ8A
+            tezos-rpc)
+ (library_flags (:standard -linkall))
+ (modules alpha_commands_registration)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_protocol_007_PryLyZ8A
+                   -open Tezos_shell_services
+                   -open Tezos_client_base
+                   -open Tezos_client_007_PryLyZ8A
+                   -open Tezos_client_commands
+                   -open Tezos_client_007_PryLyZ8A_commands
+                   -open Tezos_client_sapling_007_PryLyZ8A
+                   -open Tezos_rpc)))
+
+(alias
+ (name runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

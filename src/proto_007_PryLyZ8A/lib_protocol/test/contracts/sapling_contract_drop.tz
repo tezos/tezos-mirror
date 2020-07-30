@@ -1,0 +1,14 @@
+storage (unit);
+parameter (list sapling_transaction);
+code { UNPAIR ;
+       SAPLING_EMPTY_STATE ;
+       SWAP ;
+       ITER { SAPLING_VERIFY_UPDATE ;
+              ASSERT_SOME ;
+              UNPAIR ;
+              DROP ;
+            } ;
+       DROP ;
+       NIL operation;
+       PAIR;
+     }
