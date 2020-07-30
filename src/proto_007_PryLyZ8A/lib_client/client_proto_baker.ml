@@ -61,7 +61,7 @@ type error += More_than_one_key
 let () =
   register_error_kind
     `Permanent
-    ~id:"baker_script.more_than_one_key"
+    ~id:"007.baker_script.more_than_one_key"
     ~title:"More_than_one_key"
     ~description:
       "The script storage has more than one owner key. Use multi-signature \
