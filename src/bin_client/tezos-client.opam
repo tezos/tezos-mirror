@@ -16,24 +16,17 @@ depends: [
 
   "tezos-client-alpha"
   "tezos-client-000-Ps9mPmXa"
-  "tezos-client-001-PtCJ7pwo"
-  "tezos-client-002-PsYLVpVv"
-  "tezos-client-003-PsddFKi3"
-  "tezos-client-004-Pt24m4xi"
-  "tezos-client-005-PsBabyM1"
   "tezos-client-006-PsCARTHA"
+  "tezos-client-007-PryLyZ8A"
   "tezos-client-demo-counter"
 
   "tezos-client-alpha-commands"
-  "tezos-client-001-PtCJ7pwo-commands"
-  "tezos-client-002-PsYLVpVv-commands"
-  "tezos-client-003-PsddFKi3-commands"
-  "tezos-client-004-Pt24m4xi-commands"
-  "tezos-client-005-PsBabyM1-commands"
   "tezos-client-006-PsCARTHA-commands"
+  "tezos-client-007-PryLyZ8A-commands"
 
   "tezos-baking-alpha-commands"
   "tezos-baking-006-PsCARTHA-commands"
+  "tezos-baking-007-PryLyZ8A-commands"
 
   "tezos-client-base-unix"
   "tezos-mockup-commands"
