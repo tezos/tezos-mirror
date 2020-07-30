@@ -58,6 +58,7 @@ val create_mockup :
   protocol_hash:Protocol_hash.t ->
   constants_overrides_json:Data_encoding.json option ->
   bootstrap_accounts_json:Data_encoding.json option ->
+  asynchronous:bool ->
   unit tzresult Lwt.t
 
 (** Overwrites an on-disk mockup environment. *)

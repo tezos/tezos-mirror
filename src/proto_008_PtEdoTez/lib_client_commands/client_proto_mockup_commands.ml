@@ -40,6 +40,12 @@ let bootstrap_accounts_arg =
     ~placeholder:"path"
     (Clic.parameter (fun _ x -> return x))
 
+let asynchronous_flag =
+  Clic.switch
+    ~long:"asynchronous"
+    ~doc:"put operations in mempool and require baking to include in the chain"
+    ()
+
 let load_json_file (cctxt : Protocol_client_context.full) json_file =
   match json_file with
   | None ->
@@ -50,7 +56,7 @@ let load_json_file (cctxt : Protocol_client_context.full) json_file =
       return (Some (Ezjsonm.from_string json_string :> Data_encoding.json))
 
 let create_mockup_command_handler
-    (constants_overrides_file, bootstrap_accounts_file)
+    (constants_overrides_file, bootstrap_accounts_file, asynchronous)
     (cctxt : Protocol_client_context.full) =
   load_json_file cctxt constants_overrides_file
   >>=? fun constants_overrides_json ->
@@ -61,6 +67,7 @@ let create_mockup_command_handler
     ~protocol_hash:Protocol.hash
     ~constants_overrides_json
     ~bootstrap_accounts_json
+    ~asynchronous
   >>=? fun () ->
   Tezos_mockup_commands.Mockup_wallet.populate cctxt bootstrap_accounts_file
 
@@ -69,7 +76,7 @@ let create_mockup_command : Protocol_client_context.full Clic.command =
   command
     ~group:Tezos_mockup_commands.Mockup_commands.group
     ~desc:"Create a mockup environment."
-    (args2 protocol_constants_arg bootstrap_accounts_arg)
+    (args3 protocol_constants_arg bootstrap_accounts_arg asynchronous_flag)
     (prefixes ["create"; "mockup"] @@ stop)
     create_mockup_command_handler
 
