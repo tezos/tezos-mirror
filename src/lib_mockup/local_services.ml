@@ -269,11 +269,9 @@ let inject_block =
       (* FIXME here we should do what inject_operation is doing now *)
       assert false)
 
-let inject_operation (mockup_env : Registration.mockup_environment)
-    (dirname : string) (_chain_id : Chain_id.t)
-    (_rpc_context : Tezos_protocol_environment.rpc_context) (mem_only : bool)
-    (_write_context_callback :
-      Tezos_protocol_environment.rpc_context -> unit tzresult Lwt.t) =
+let inject_operation_with_mempool
+    (mockup_env : Registration.mockup_environment) (dirname : string)
+    operation_bytes =
   let (module Mockup_environment) = mockup_env in
   let write_op op =
     let op_data_encoding =
@@ -298,86 +296,119 @@ let inject_operation (mockup_env : Registration.mockup_environment)
     Data_encoding.Json.construct ops_encoding ops'
     |> Tezos_stdlib_unix.Lwt_utils_unix.Json.write_file mempool_file
   in
+  match Data_encoding.Binary.of_bytes Operation.encoding operation_bytes with
+  | Error _ ->
+      RPC_answer.fail [Cannot_parse_op]
+  | Ok ({Operation.shell = shell_header; proto} as op) -> (
+      let operation_hash = Operation.hash op in
+      let proto_op_opt =
+        Data_encoding.Binary.of_bytes
+          Mockup_environment.Protocol.operation_data_encoding
+          proto
+      in
+      match proto_op_opt with
+      | Error _ ->
+          RPC_answer.fail [Cannot_parse_op]
+      | Ok operation_data -> (
+          let op = (shell_header, operation_data) in
+          write_op op
+          >>= function
+          | Ok _ ->
+              RPC_answer.return operation_hash
+          | Error errs ->
+              RPC_answer.fail errs ) )
+
+let inject_operation_without_mempool
+    (mockup_env : Registration.mockup_environment) (chain_id : Chain_id.t)
+    (rpc_context : Tezos_protocol_environment.rpc_context)
+    (write_context_callback :
+      Tezos_protocol_environment.rpc_context -> unit tzresult Lwt.t)
+    operation_bytes =
+  let (module Mockup_environment) = mockup_env in
+  match Data_encoding.Binary.of_bytes Operation.encoding operation_bytes with
+  | Error _ ->
+      RPC_answer.fail [Cannot_parse_op]
+  | Ok ({Operation.shell = shell_header; proto} as op) -> (
+      let operation_hash = Operation.hash op in
+      let proto_op_opt =
+        Data_encoding.Binary.of_bytes
+          Mockup_environment.Protocol.operation_data_encoding
+          proto
+      in
+      match proto_op_opt with
+      | Error _ ->
+          RPC_answer.fail [Cannot_parse_op]
+      | Ok operation_data -> (
+          let op =
+            {
+              Mockup_environment.Protocol.shell = shell_header;
+              protocol_data = operation_data;
+            }
+          in
+          let predecessor = rpc_context.block_hash in
+          let header = rpc_context.block_header in
+          let predecessor_context = rpc_context.context in
+          Mockup_environment.Protocol.begin_construction
+            ~chain_id
+            ~predecessor_context
+            ~predecessor_timestamp:header.timestamp
+            ~predecessor_level:header.level
+            ~predecessor_fitness:header.fitness
+            ~predecessor
+            ~timestamp:
+              (Time.System.to_protocol (Tezos_stdlib_unix.Systime_os.now ()))
+            ()
+          >>=? (fun state ->
+                 Mockup_environment.Protocol.apply_operation state op
+                 >>=? fun (state, receipt) ->
+                 Mockup_environment.Protocol.finalize_block state
+                 >>=? fun (validation_result, _block_header_metadata) ->
+                 return (validation_result, receipt))
+          >>= fun result ->
+          match result with
+          | Ok ({context; _}, _receipt) ->
+              let rpc_context = {rpc_context with context} in
+              Lwt.bind (write_context_callback rpc_context) (fun result ->
+                  match result with
+                  | Ok () ->
+                      RPC_answer.return operation_hash
+                  | Error errs ->
+                      RPC_answer.fail errs)
+          | Error errs ->
+              RPC_answer.fail errs ) )
+
+let inject_operation (mockup_env : Registration.mockup_environment)
+    (dirname : string) (chain_id : Chain_id.t)
+    (rpc_context : Tezos_protocol_environment.rpc_context) (mem_only : bool)
+    (write_context_callback :
+      Tezos_protocol_environment.rpc_context -> unit tzresult Lwt.t) =
+  let (module Mockup_environment) = mockup_env in
   Directory.register
     Directory.empty
     (* /injection/operation, vanilla client implementation is in
       injection_directory.ml *)
     Tezos_shell_services.Injection_services.S.operation
     (fun _q _contents operation_bytes ->
-      (* TODO:
-         We might want to preserve the initial (aka synchronous) operation
-         injection without "bake for" support.
-
-         In this case, we will need to handle two possibilities here, depending
-         on whether there is a mempool file.
-
-         If the mempool file is present, we are in so-called asynchronous mode
-         (delayed ?). Otherwise we are in the older synchronous mode.
-
-         The absence of the file would be handled by an appropriate switch at
-         mockup creation time. We still need to decide on the default case.
-
-       *)
       if mem_only then RPC_answer.fail [Injection_not_possible]
       else
-        match
-          Data_encoding.Binary.of_bytes Operation.encoding operation_bytes
-        with
-        | Error _ ->
-            RPC_answer.fail [Cannot_parse_op]
-        | Ok ({Operation.shell = shell_header; proto} as op) -> (
-            let operation_hash = Operation.hash op in
-            let proto_op_opt =
-              Data_encoding.Binary.of_bytes
-                Mockup_environment.Protocol.operation_data_encoding
-                proto
-            in
-            match proto_op_opt with
-            | Error _ ->
-                RPC_answer.fail [Cannot_parse_op]
-            | Ok operation_data -> (
-                let op = (shell_header, operation_data) in
-                write_op op
-                >>= function
-                | Ok _ ->
-                    RPC_answer.return operation_hash
-                | Error errs ->
-                    RPC_answer.fail errs ) ))
-
-(* let predecessor = rpc_context.block_hash in
- * let header = rpc_context.block_header in
- * let predecessor_context = rpc_context.context in
- * Mockup_environment.Protocol.begin_construction
- *   ~chain_id
- *   ~predecessor_context
- *   ~predecessor_timestamp:header.timestamp
- *   ~predecessor_level:header.level
- *   ~predecessor_fitness:header.fitness
- *   ~predecessor
- *   ~timestamp:
- *     (Time.System.to_protocol
- *        (Tezos_stdlib_unix.Systime_os.now ()))
- *   ()
- * >>=? (fun state ->
- *        Mockup_environment.Protocol.apply_operation state op
- *        >>=? fun (state, receipt) ->
- *        Mockup_environment.Protocol.finalize_block state
- *        >>=? fun (validation_result, _block_header_metadata) ->
- *        return (validation_result, receipt))
- * >>= fun result ->
- * match result with
- * | Ok ({context; _}, _receipt) ->
- *     let rpc_context = {rpc_context with context} in
- *     Lwt.bind
- *       (write_context_callback rpc_context)
- *       (fun result ->
- *         match result with
- *         | Ok () ->
- *             RPC_answer.return operation_hash
- *         | Error errs ->
- *             RPC_answer.fail errs)
- * | Error errs ->
- *     RPC_answer.fail errs ) )) *)
+        let mempool_file = (Files.mempool ~dirname :> string) in
+        Lwt_unix.file_exists mempool_file
+        >>= fun mempool_exists ->
+        (* Looking at the implementations of the two inject_operation_*
+           functions it looks like there is code to share (proto_op_opt,
+           operation_data), but it's not that easy to do;
+           because types of concerned variables depend on Mockup_environment,
+           which cannot cross functions boundaries without putting all that in
+           Mockup_sig *)
+        if mempool_exists then
+          inject_operation_with_mempool mockup_env dirname operation_bytes
+        else
+          inject_operation_without_mempool
+            mockup_env
+            chain_id
+            rpc_context
+            write_context_callback
+            operation_bytes)
 
 let build_shell_directory (base_dir : string)
     (mockup_env : Registration.mockup_environment) chain_id
