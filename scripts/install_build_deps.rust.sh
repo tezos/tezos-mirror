@@ -37,7 +37,6 @@ mkdir -p "${HEADER_DIR}"
 mkdir -p "${BUILD_DIR}/opam-repository"
 cd "${BUILD_DIR}/opam-repository"
 git init
-git config --local protocol.version 2
 git remote add origin "$opam_repository_url"
 git fetch --depth 1 origin "$opam_repository_tag"
 git reset --hard "$opam_repository_tag"
