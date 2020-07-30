@@ -92,9 +92,9 @@ let free_neutral since =
   Gas.consume since cost
   >>? fun branch2 ->
   if
-    Z.equal
-      (Gas.consumed ~since:ctxt ~until:branch1)
-      (Gas.consumed ~since:ctxt ~until:branch2)
+    Gas.Arith.(
+      Gas.consumed ~since:ctxt ~until:branch1
+      = Gas.consumed ~since:ctxt ~until:branch2)
   then ok_none
   else Ok (Some (cost, Gas.free))
 
@@ -110,9 +110,9 @@ let consume_commutes since =
   Gas.consume since Gas.(cost1 +@ cost2)
   >>? fun branch2 ->
   if
-    Z.equal
-      (Gas.consumed ~since:ctxt ~until:branch1)
-      (Gas.consumed ~since:ctxt ~until:branch2)
+    Gas.Arith.(
+      Gas.consumed ~since:ctxt ~until:branch1
+      = Gas.consumed ~since:ctxt ~until:branch2)
   then ok_none
   else Ok (Some (cost1, cost2))
 
@@ -135,7 +135,9 @@ let check_property prop () =
   >>=? fun inc ->
   let state = Incremental.validation_state inc in
   let ctxt =
-    Alpha_context.Gas.set_limit state.ctxt (Z.of_string "100000000")
+    Alpha_context.Gas.set_limit
+      state.ctxt
+      Alpha_context.Gas.Arith.(fp (integral_of_int 100_000_000))
   in
   let result = prop ctxt in
   match result with

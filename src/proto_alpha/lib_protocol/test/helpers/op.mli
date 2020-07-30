@@ -41,7 +41,7 @@ val miss_signed_endorsement :
 
 val transaction :
   ?fee:Tez.tez ->
-  ?gas_limit:Z.t ->
+  ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?parameters:Script.lazy_expr ->
   ?entrypoint:string ->
@@ -68,7 +68,7 @@ val origination :
   ?public_key:public_key ->
   ?credit:Tez.tez ->
   ?fee:Tez.tez ->
-  ?gas_limit:Z.t ->
+  ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   Context.t ->
   Contract.contract ->
