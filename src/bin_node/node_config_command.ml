@@ -36,8 +36,6 @@ let show (args : Node_shared_arg.t) =
       args.config_file ;
   Node_shared_arg.read_and_patch_config_file args
   >>=? fun cfg ->
-  Node_config_file.check cfg
-  >>=? fun () ->
   print_endline @@ Node_config_file.to_string cfg ;
   return_unit
 
