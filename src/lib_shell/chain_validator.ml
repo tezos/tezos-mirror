@@ -814,6 +814,7 @@ let is_bootstrapped w = (Worker.state w).bootstrapped
 
 let force_bootstrapped w b =
   let state = Worker.state w in
+  if b then Worker.record_event w Event.Bootstrapped ;
   state.bootstrapped <- b
 
 let valid_block_watcher w =

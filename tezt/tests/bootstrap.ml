@@ -57,6 +57,21 @@ let wait_for_unknown_ancestor node =
     ~where:"[1].event.error[0].id is node.peer_validator.unknown_ancestor"
     filter
 
+(* FIXME: this is not robust since we cannot catch the bootstrapped event precisely. *)
+let bootstrapped_event =
+  let fulfilled = ref false in
+  fun resolver Node.{name; value} ->
+    let filter json =
+      let json = JSON.(json |=> 1 |-> "event") in
+      (* We check is_null first otherwise as_object_opt may aslo returns `Some []` for this case *)
+      if JSON.is_null json then false
+      else match JSON.as_object_opt json with Some [] -> true | _ -> false
+    in
+    if name = "node_chain_validator.v0" && filter value then
+      if not !fulfilled then (
+        fulfilled := true ;
+        Lwt.wakeup resolver () )
+
 (* This test replicates part of the flextesa test "command_node_synchronization".
    It checks the synchronization of two nodes depending on their history mode.
    The beginning of the scenario is the following:
@@ -164,6 +179,23 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
     let* b = is_connected client ~peer_id:node2_identity in
     if b then Test.fail "expected the two nodes NOT to be connected" else unit
 
+let check_rpc_force_bootstrapped () =
+  Test.run
+    ~__FILE__
+    ~title:(sf "RPC force bootstrapped")
+    ~tags:["rpc"; "bootstrapped"]
+  @@ fun () ->
+  Log.info "Start a node." ;
+  let* node = Node.init ~bootstrap_threshold:10000 () in
+  let* client = Client.init ~node () in
+  let (bootstrapped_promise, bootstrapped_resolver) = Lwt.task () in
+  Node.on_event node (bootstrapped_event bootstrapped_resolver) ;
+  Log.info "Force the node to be bootstrapped." ;
+  let* _ = RPC.force_bootstrapped client in
+  Log.info "Waiting for the node to be bootstrapped." ;
+  let* () = bootstrapped_promise in
+  unit
+
 let run () =
   check_bootstrap_with_history_modes Archive Archive ;
   check_bootstrap_with_history_modes Archive Full ;
@@ -173,4 +205,5 @@ let run () =
   check_bootstrap_with_history_modes Full Rolling ;
   check_bootstrap_with_history_modes Rolling Archive ;
   check_bootstrap_with_history_modes Rolling Rolling ;
-  check_bootstrap_with_history_modes Rolling Full
+  check_bootstrap_with_history_modes Rolling Full ;
+  check_rpc_force_bootstrapped ()

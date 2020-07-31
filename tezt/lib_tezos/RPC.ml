@@ -36,6 +36,11 @@ let get_chain_id ?node ?(chain = "main") client =
   let path = ["chains"; chain; "chain_id"] in
   Client.rpc ?node GET path client
 
+let force_bootstrapped ?node ?(chain = "main") ?(bootstrapped = true) client =
+  let path = ["chains"; chain] in
+  let data = `O [("bootstrapped", `Bool bootstrapped)] in
+  Client.rpc ?node ~data PATCH path client
+
 let get_checkpoint ?node ?(chain = "main") client =
   let path = ["chains"; chain; "checkpoint"] in
   Client.rpc ?node GET path client

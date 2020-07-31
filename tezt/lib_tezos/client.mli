@@ -65,7 +65,7 @@ type path = string list
 type query_string = (string * string) list
 
 (** HTTP methods for RPCs. *)
-type meth = GET | PUT | POST
+type meth = GET | PUT | POST | PATCH
 
 (** Use the client to call an RPC.
 

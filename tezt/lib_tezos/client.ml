@@ -98,9 +98,17 @@ let url_encode str =
   let result = Buffer.contents buffer in
   Buffer.reset buffer ; result
 
-type meth = GET | PUT | POST
+type meth = GET | PUT | POST | PATCH
 
-let string_of_meth = function GET -> "get" | PUT -> "put" | POST -> "post"
+let string_of_meth = function
+  | GET ->
+      "get"
+  | PUT ->
+      "put"
+  | POST ->
+      "post"
+  | PATCH ->
+      "patch"
 
 type path = string list
 
