@@ -340,6 +340,11 @@ class Client:
         cmd = ['activate', 'account', manager, 'with', contract]
         return self.run(cmd)
 
+    def cmd_batch(self,
+                  source: str,
+                  json_ops: str) -> List[str]:
+        return ['multiple', 'transfers', 'from', source, 'using', json_ops]
+
     def transfer(self,
                  amount: float,
                  giver: str,
@@ -354,6 +359,19 @@ class Client:
         if args is None:
             args = []
         cmd += args
+        res = self.run(cmd)
+        return client_output.TransferResult(res)
+
+    def transfer_json(self,
+                      amount: int,
+                      giver: str,
+                      receiver: str,
+                      args: List[str] = None) -> client_output.TransferResult:
+        json_obj = [{"destination": receiver, "amount": str(amount)}]
+        json_ops = json.dumps(json_obj, separators=(',', ':'))
+        if args is None:
+            args = []
+        cmd = self.cmd_batch(giver, json_ops) + args
         res = self.run(cmd)
         return client_output.TransferResult(res)
 

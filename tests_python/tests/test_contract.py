@@ -1,5 +1,6 @@
 import os
 import re
+import json
 import pytest
 from tools.paths import CONTRACT_PATH, ILLTYPED_CONTRACT_PATH, \
     all_contracts
@@ -139,6 +140,22 @@ class TestManager:
         assert (balance_bootstrap + amount_mutez - fee_mutez
                 == new_balance_bootstrap)
 
+    def test_simple_transfer_from_manager_to_implicit_json(self, client):
+        balance = client.get_mutez_balance('manager')
+        balance_bootstrap = client.get_mutez_balance('bootstrap2')
+        amount = 10.1
+        amount_mutez = utils.mutez_of_tez(amount)
+        client.transfer_json(amount, 'manager', 'bootstrap2',
+                             ['--default-gas-limit', '26183'])
+        client.bake('bootstrap5', BAKE_ARGS)
+        new_balance = client.get_mutez_balance('manager')
+        new_balance_bootstrap = client.get_mutez_balance('bootstrap2')
+        fee = 0.002931
+        fee_mutez = utils.mutez_of_tez(fee)
+        assert balance - amount_mutez == new_balance
+        assert (balance_bootstrap + amount_mutez - fee_mutez
+                == new_balance_bootstrap)
+
     def test_transfer_from_manager_to_manager(self, client: Client):
         balance = client.get_mutez_balance('manager')
         balance_dest = client.get_mutez_balance('manager2')
@@ -228,6 +245,52 @@ class TestManager:
                     ['--arg', arg,
                      '--entrypoint', 'root'])
         client.bake('bootstrap5', BAKE_ARGS)
+
+    def test_transfer_json_to_entrypoint_with_args(self, client):
+        balance = client.get_mutez_balance('manager')
+        balance_bootstrap = client.get_mutez_balance('bootstrap2')
+        fee = 0.0123
+        fee_mutez = utils.mutez_of_tez(fee)
+        json_obj = [{"destination": "target",
+                     "amount": "0",
+                     "fee": str(fee),
+                     "gas-limit": "65942",
+                     "storage-limit": "1024",
+                     "arg": 'Pair "hello" 42',
+                     "entrypoint": "add_left"}]
+        json_ops = json.dumps(json_obj, separators=(',', ':'))
+        client.run(client.cmd_batch('manager', json_ops))
+        client.bake('bootstrap5', BAKE_ARGS)
+        new_balance = client.get_mutez_balance('manager')
+        new_balance_bootstrap = client.get_mutez_balance('bootstrap2')
+        assert balance == new_balance
+        assert (balance_bootstrap - fee_mutez
+                == new_balance_bootstrap)
+
+    def test_multiple_transfers(self, client):
+        balance = client.get_mutez_balance('manager')
+        balance_bootstrap2 = client.get_mutez_balance('bootstrap2')
+        balance_bootstrap3 = client.get_mutez_balance('bootstrap3')
+        amount_2 = 10.1
+        amount_mutez_2 = utils.mutez_of_tez(amount_2)
+        amount_3 = 11.01
+        amount_mutez_3 = utils.mutez_of_tez(amount_3)
+        json_obj = [{"destination": "bootstrap2",
+                     "amount": str(amount_2)},
+                    {"destination": "bootstrap3",
+                     "amount": str(amount_3)}]
+        json_ops = json.dumps(json_obj, separators=(',', ':'))
+        client.run(client.cmd_batch('manager', json_ops))
+        client.bake('bootstrap5', BAKE_ARGS)
+        new_balance = client.get_mutez_balance('manager')
+        new_balance_bootstrap2 = client.get_mutez_balance('bootstrap2')
+        new_balance_bootstrap3 = client.get_mutez_balance('bootstrap3')
+        fee_mutez = 2941+2845
+        assert balance - amount_mutez_2 - amount_mutez_3 == new_balance
+        assert (balance_bootstrap2 + amount_mutez_2 - fee_mutez
+                == new_balance_bootstrap2)
+        assert (balance_bootstrap3 + amount_mutez_3
+                == new_balance_bootstrap3)
 
 
 @pytest.mark.slow
