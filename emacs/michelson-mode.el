@@ -404,14 +404,13 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
     (write-region (point-min) (point-max) tmp-file nil 'no-message)
     (let ((command
            (append (split-string michelson-client-command " ")
-                   (list
-                    "typecheck"
-                    "script"
-                    (if michelson-alphanet
-                        (concat "container:" tmp-file)
-                      tmp-file)
-                    "-details"
-                    "--emacs"))))
+                   `("typecheck"
+                     "script"
+                     ,(if michelson-alphanet
+                          (concat "container:" tmp-file)
+                        tmp-file)
+                     "-details"
+                     "--emacs"))))
           (michelson-async-command-to-string
            command
            (lambda (output)
