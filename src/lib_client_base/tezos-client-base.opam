@@ -15,6 +15,7 @@ depends: [
   "tezos-rpc-http"
   "cmdliner"
   "alcotest" { with-test }
+  "sapling"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
