@@ -406,9 +406,10 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
            (append (split-string michelson-client-command " ")
                    `("typecheck"
                      "script"
-                     ,(if michelson-alphanet
-                          (concat "container:" tmp-file)
-                        tmp-file)
+                     ,(shell-quote-argument
+                       (if michelson-alphanet
+                           (concat "container:" tmp-file)
+                         tmp-file))
                      "-details"
                      "--emacs"))))
           (michelson-async-command-to-string
