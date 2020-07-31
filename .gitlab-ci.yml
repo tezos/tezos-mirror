@@ -990,6 +990,11 @@ opam:tezos-client-alpha-commands:
   variables:
     package: tezos-client-alpha-commands
 
+opam:tezos-client-alpha-commands-registration:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-alpha-commands-registration
+
 opam:tezos-client-base:
   <<: *opam_definition
   variables:

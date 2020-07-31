@@ -25,7 +25,7 @@
 
 (library
  (name tezos_client_alpha_commands_registration)
- (public_name tezos-client-alpha-commands.registration)
+ (public_name tezos-client-alpha-commands-registration)
  (libraries tezos-base
             tezos-protocol-alpha
             tezos-protocol-environment

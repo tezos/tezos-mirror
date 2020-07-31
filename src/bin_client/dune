@@ -47,7 +47,7 @@
               (-> void_for_linking-007-PsDELPH1.empty))
 
             (select void_for_linking-alpha from
-              (tezos-client-alpha-commands.registration -> void_for_linking-alpha.empty)
+              (tezos-client-alpha-commands-registration -> void_for_linking-alpha.empty)
               (-> void_for_linking-alpha.empty))
             (select void_for_linking-demo-counter from
               (tezos-client-demo-counter -> void_for_linking-demo-counter.empty)
