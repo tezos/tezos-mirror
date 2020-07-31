@@ -27,7 +27,7 @@
 
 (library
  (name tezos_client_007_PryLyZ8A_commands_registration)
- (public_name tezos-client-007-PryLyZ8A-commands.registration)
+ (public_name tezos-client-007-PryLyZ8A-commands-registration)
  (libraries tezos-base
             tezos-protocol-007-PryLyZ8A
             tezos-protocol-environment

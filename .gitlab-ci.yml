@@ -891,6 +891,11 @@ opam:tezos-client-007-PryLyZ8A-commands:
   variables:
     package: tezos-client-007-PryLyZ8A-commands
 
+opam:tezos-client-007-PryLyZ8A-commands-registration:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-007-PryLyZ8A-commands-registration
+
 opam:tezos-client-alpha:
   <<: *opam_definition
   variables:
@@ -900,6 +905,11 @@ opam:tezos-client-alpha-commands:
   <<: *opam_definition
   variables:
     package: tezos-client-alpha-commands
+
+opam:tezos-client-alpha-commands-registration:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-alpha-commands-registration
 
 opam:tezos-client-base:
   <<: *opam_definition
