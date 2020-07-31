@@ -11,6 +11,12 @@ depends: [
   "dune" { >= "1.7" }
   "tezos-base"
   "tezos-clic"
+  "tezos-crypto"
+  "tezos-client-base"
+  "tezos-signer-backends"
+  "tezos-client-007-PryLyZ8A"
+  "tezos-client-007-PryLyZ8A-commands"
+  "tezos-protocol-007-PryLyZ8A"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
