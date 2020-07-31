@@ -65,6 +65,21 @@ done with the ``--reset-regressions`` option, e.g.::
 
     dune exec tezt/tests/main.exe regression -- --reset-regressions
 
+Pre-commit hook
+---------------
+
+The `pre-commit <https://git-scm.com/book/en/v2/Customizing-Git-Git-Hooks>`_
+hook located in ``scripts/pre_commit/pre_commit.py``
+executes modified tezt tests automatically. It looks for staged files
+(the default) or modified files (if ``--unstaged`` is passed) in
+``tezt/tests`` and executes them. This avoids
+pushing commits that will break the CI. It is also handy to execute
+the relevant subset of tests by calling
+``./scripts/pre_commit/pre_commit.py [--unstaged]`` manually.
+
+We refer to the header of ``pre_commit.py`` and its ``--help`` flag
+for additional instructions.
+
 Architecture
 ------------
 

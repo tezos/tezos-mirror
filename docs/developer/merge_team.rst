@@ -99,7 +99,7 @@ Dos and Don'ts
   Some of these checks can be executed with a `pre-commit <https://git-scm.com/book/en/v2/Customizing-Git-Git-Hooks>`_
   which is installed with
   ``ln -sr scripts/pre_commit/pre_commit.py .git/hooks/pre-commit``
-  (see the header of `./scripts/pre_commit/pre_commit.py --help`
+  (see the header of `./scripts/pre_commit/pre_commit.py` and its `--help`
   for additional options).
 
 - No peneloping: don't do something in a commit just to undo it two
