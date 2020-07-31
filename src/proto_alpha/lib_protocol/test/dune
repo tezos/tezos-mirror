@@ -32,12 +32,28 @@
 ; runs only the `Quick tests
 (alias
  (name runtest_proto_alpha)
+ (deps contracts/sapling_contract.tz
+       contracts/sapling_contract_state_as_arg.tz
+       contracts/sapling_contract.tz
+       contracts/sapling_contract_send.tz
+       contracts/sapling_contract_double.tz
+       contracts/sapling_contract_drop.tz
+       contracts/cps_fact.tz
+       contracts/cps_fact_2.tz)
  (package tezos-protocol-alpha-tests)
  (action (run %{exe:main.exe} -v -q)))
 
 ; runs both `Quick and `Slow tests
 (alias
  (name runtest_slow)
+ (deps contracts/sapling_contract.tz
+       contracts/sapling_contract_state_as_arg.tz
+       contracts/sapling_contract.tz
+       contracts/sapling_contract_send.tz
+       contracts/sapling_contract_double.tz
+       contracts/sapling_contract_drop.tz
+       contracts/cps_fact.tz
+       contracts/cps_fact_2.tz)
  (package tezos-protocol-alpha-tests)
  (action (run %{exe:main.exe} -v)))
 
