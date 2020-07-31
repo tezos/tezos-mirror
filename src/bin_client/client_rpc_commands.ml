@@ -595,7 +595,7 @@ let commands =
     command
       ~group
       ~desc:
-        "Call an RPC with the POST method,  providing input data via the \
+        "Call an RPC with the POST method, providing input data via the \
          command line."
       no_options
       ( prefixes ["rpc"; "post"]
@@ -612,6 +612,33 @@ let commands =
     command
       ~group
       ~desc:
+        "Call an RPC with the PATCH method.\n\
+         It invokes $EDITOR if input data is needed."
+      no_options
+      ( prefixes ["rpc"; "patch"]
+      @@ string ~name:"url" ~desc:"the RPC URL"
+      @@ stop )
+      (fun () -> call `PATCH);
+    command
+      ~group
+      ~desc:
+        "Call an RPC with the PATCH method, providing input data via the \
+         command line."
+      no_options
+      ( prefixes ["rpc"; "patch"]
+      @@ string ~name:"url" ~desc:"the RPC URL"
+      @@ prefix "with"
+      @@ string
+           ~name:"input"
+           ~desc:
+             "the raw JSON input to the RPC\n\
+              For instance, use `{}` to send the empty document.\n\
+              Alternatively, use `file:path` to read the JSON data from a file."
+      @@ stop )
+      (fun () -> call_with_file_or_json `PATCH);
+    command
+      ~group
+      ~desc:
         "Call an RPC with the PUT method.\n\
          It invokes $EDITOR if input data is needed."
       no_options
@@ -622,7 +649,7 @@ let commands =
     command
       ~group
       ~desc:
-        "Call an RPC with the PUT method,  providing input data via the \
+        "Call an RPC with the PUT method, providing input data via the \
          command line."
       no_options
       ( prefixes ["rpc"; "put"]
