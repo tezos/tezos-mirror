@@ -25,6 +25,7 @@
 (*****************************************************************************)
 
 type t = {
+  disable_config_validation : bool;
   data_dir : string option;
   config_file : string;
   network : Node_config_file.blockchain_network option;

@@ -45,6 +45,7 @@ val builtin_blockchain_networks : (string * blockchain_network) list
 
 type t = {
   data_dir : string;
+  disable_config_validation : bool;
   p2p : p2p;
   rpc : rpc;
   log : Lwt_log_sink_unix.cfg;
@@ -95,6 +96,7 @@ val default_p2p : p2p
 val default_config : t
 
 val update :
+  ?disable_config_validation:bool ->
   ?data_dir:string ->
   ?min_connections:int ->
   ?expected_connections:int ->

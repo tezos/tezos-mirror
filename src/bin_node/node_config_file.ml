@@ -368,6 +368,7 @@ let sugared_blockchain_network_encoding : blockchain_network Data_encoding.t =
 
 type t = {
   data_dir : string;
+  disable_config_validation : bool;
   p2p : p2p;
   rpc : rpc;
   log : Lwt_log_sink_unix.cfg;
@@ -456,6 +457,8 @@ let default_shell =
     history_mode = None;
   }
 
+let default_disable_config_validation = false
+
 let default_config =
   {
     data_dir = default_data_dir;
@@ -465,6 +468,7 @@ let default_config =
     internal_events = Internal_event_unix.Configuration.default;
     shell = default_shell;
     blockchain_network = blockchain_network_mainnet;
+    disable_config_validation = default_disable_config_validation;
   }
 
 let limit : P2p.limits Data_encoding.t =
@@ -1049,16 +1053,51 @@ let shell =
 let encoding =
   let open Data_encoding in
   conv
-    (fun {data_dir; rpc; p2p; log; internal_events; shell; blockchain_network} ->
-      (data_dir, rpc, p2p, log, internal_events, shell, blockchain_network))
-    (fun (data_dir, rpc, p2p, log, internal_events, shell, blockchain_network) ->
-      {data_dir; rpc; p2p; log; internal_events; shell; blockchain_network})
-    (obj7
+    (fun { data_dir;
+           disable_config_validation;
+           rpc;
+           p2p;
+           log;
+           internal_events;
+           shell;
+           blockchain_network } ->
+      ( data_dir,
+        disable_config_validation,
+        rpc,
+        p2p,
+        log,
+        internal_events,
+        shell,
+        blockchain_network ))
+    (fun ( data_dir,
+           disable_config_validation,
+           rpc,
+           p2p,
+           log,
+           internal_events,
+           shell,
+           blockchain_network ) ->
+      {
+        disable_config_validation;
+        data_dir;
+        rpc;
+        p2p;
+        log;
+        internal_events;
+        shell;
+        blockchain_network;
+      })
+    (obj8
        (dft
           "data-dir"
           ~description:"Location of the data dir on disk."
           string
           default_data_dir)
+       (dft
+          "disable-config-validation"
+          ~description:"Disable the node configuration validation."
+          bool
+          default_disable_config_validation)
        (dft
           "rpc"
           ~description:"Configuration of rpc parameters"
@@ -1170,13 +1209,17 @@ let write fp cfg =
 let to_string cfg =
   Data_encoding.Json.to_string (Data_encoding.Json.construct encoding cfg)
 
-let update ?data_dir ?min_connections ?expected_connections ?max_connections
-    ?max_download_speed ?max_upload_speed ?binary_chunks_size ?peer_table_size
-    ?expected_pow ?bootstrap_peers ?listen_addr ?discovery_addr
-    ?(rpc_listen_addrs = []) ?(private_mode = false) ?(disable_mempool = false)
+let update ?(disable_config_validation = false) ?data_dir ?min_connections
+    ?expected_connections ?max_connections ?max_download_speed
+    ?max_upload_speed ?binary_chunks_size ?peer_table_size ?expected_pow
+    ?bootstrap_peers ?listen_addr ?discovery_addr ?(rpc_listen_addrs = [])
+    ?(private_mode = false) ?(disable_mempool = false)
     ?(enable_testchain = false) ?(cors_origins = []) ?(cors_headers = [])
     ?rpc_tls ?log_output ?synchronisation_threshold ?history_mode ?network
     ?latency cfg =
+  let disable_config_validation =
+    cfg.disable_config_validation || disable_config_validation
+  in
   let data_dir = Option.value ~default:cfg.data_dir data_dir in
   Node_data_version.ensure_data_dir data_dir
   >>=? fun () ->
@@ -1255,7 +1298,17 @@ let update ?data_dir ?min_connections ?expected_connections ?max_connections
   let blockchain_network =
     Option.value ~default:cfg.blockchain_network network
   in
-  return {cfg with data_dir; p2p; rpc; log; shell; blockchain_network}
+  return
+    {
+      cfg with
+      disable_config_validation;
+      data_dir;
+      p2p;
+      rpc;
+      log;
+      shell;
+      blockchain_network;
+    }
 
 type Error_monad.error += Failed_to_parse_address of (string * string)
 

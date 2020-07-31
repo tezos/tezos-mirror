@@ -28,6 +28,7 @@ open Cmdliner
 open Filename.Infix
 
 type t = {
+  disable_config_validation : bool;
   data_dir : string option;
   config_file : string;
   network : Node_config_file.blockchain_network option;
@@ -60,7 +61,7 @@ let wrap data_dir config_file network connections max_download_speed
     discovery_addr peers no_bootstrap_peers bootstrap_threshold private_mode
     disable_mempool enable_testchain expected_pow rpc_listen_addrs rpc_tls
     cors_origins cors_headers log_output history_mode synchronisation_threshold
-    latency =
+    latency disable_config_validation =
   let actual_data_dir =
     Option.value ~default:Node_config_file.default_data_dir data_dir
   in
@@ -73,6 +74,7 @@ let wrap data_dir config_file network connections max_download_speed
     Option.map (fun (cert, key) -> {Node_config_file.cert; key}) rpc_tls
   in
   {
+    disable_config_validation;
     data_dir;
     config_file;
     network;
@@ -168,6 +170,10 @@ module Term = struct
   (* misc args *)
 
   let docs = Manpage.misc_section
+
+  let disable_config_validation =
+    let doc = "Disable the node configuration validation." in
+    Arg.(value & flag & info ~docs ~doc ["disable-config-validation"])
 
   let history_mode =
     let doc =
@@ -418,7 +424,7 @@ module Term = struct
     $ no_bootstrap_peers $ bootstrap_threshold $ private_mode $ disable_mempool
     $ enable_testchain $ expected_pow $ rpc_listen_addrs $ rpc_tls
     $ cors_origins $ cors_headers $ log_output $ history_mode
-    $ synchronisation_threshold $ latency
+    $ synchronisation_threshold $ latency $ disable_config_validation
 end
 
 let read_config_file args =
@@ -507,6 +513,7 @@ let read_and_patch_config_file ?(may_override_network = false)
   read_config_file args
   >>=? fun cfg ->
   let { data_dir;
+        disable_config_validation;
         connections;
         max_download_speed;
         max_upload_speed;
@@ -640,6 +647,7 @@ let read_and_patch_config_file ?(may_override_network = false)
               peer_table_size ) )
   in
   Node_config_file.update
+    ~disable_config_validation
     ?data_dir
     ?min_connections
     ?expected_connections

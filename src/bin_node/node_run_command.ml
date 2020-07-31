@@ -119,6 +119,14 @@ module Event = struct
       ~level:Notice
       ("peer_id", P2p_peer.Id.encoding)
 
+  let disabled_config_validation =
+    declare_0
+      ~section
+      ~name:"disabled_config_validation"
+      ~msg:"disabled node configuration validation"
+      ~level:Warning
+      ()
+
   let starting_rpc_server =
     declare_3
       ~section
@@ -192,6 +200,12 @@ let init_identity_file (config : Node_config_file.t) =
 let init_node ?sandbox ?checkpoint ~identity ~singleprocess
     (config : Node_config_file.t) =
   (* TODO "WARN" when pow is below our expectation. *)
+  ( match config.disable_config_validation with
+  | true ->
+      Event.(emit disabled_config_validation) ()
+  | false ->
+      Lwt.return_unit )
+  >>= fun () ->
   ( match config.p2p.discovery_addr with
   | None ->
       Event.(emit disabled_discovery_addr) () >>= fun () -> return (None, None)
