@@ -355,7 +355,7 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
          (cdr (save-excursion
                 (michelson-goto-next-token)
                 (michelson-goto-previous-token)))))
-    (display-message-or-buffer message "*Michelson*")))
+    (display-message-or-buffer message michelson-output-buffer-name)))
 
 (cl-defstruct cache
   "Cache for types. Invalid entries are removed"
