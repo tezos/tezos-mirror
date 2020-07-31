@@ -236,7 +236,7 @@ let finalize_block {mode; ctxt; op_count} =
             level;
             voting_period_kind;
             nonce_hash = None;
-            consumed_gas = Z.zero;
+            consumed_gas = Alpha_context.Gas.Arith.zero;
             deactivated = [];
             balance_updates = [];
           } )
@@ -259,7 +259,7 @@ let finalize_block {mode; ctxt; op_count} =
             level;
             voting_period_kind;
             nonce_hash = None;
-            consumed_gas = Z.zero;
+            consumed_gas = Alpha_context.Gas.Arith.zero;
             deactivated = [];
             balance_updates = [];
           } )

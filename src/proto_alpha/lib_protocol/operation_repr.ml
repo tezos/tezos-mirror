@@ -115,7 +115,7 @@ and _ contents =
       fee : Tez_repr.tez;
       counter : counter;
       operation : 'kind manager_operation;
-      gas_limit : Z.t;
+      gas_limit : Gas_limit_repr.Arith.integral;
       storage_limit : Z.t;
     }
       -> 'kind Kind.manager contents
@@ -532,7 +532,7 @@ module Encoding = struct
       (req "source" Signature.Public_key_hash.encoding)
       (req "fee" Tez_repr.encoding)
       (req "counter" (check_size 10 n))
-      (req "gas_limit" (check_size 10 n))
+      (req "gas_limit" (check_size 10 Gas_limit_repr.Arith.n_integral_encoding))
       (req "storage_limit" (check_size 10 n))
 
   let extract (type kind)

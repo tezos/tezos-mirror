@@ -1265,13 +1265,8 @@ let rec step :
       let hash = Raw_hashes.sha512 bytes in
       logged_return ((hash, rest), ctxt)
   | (Steps_to_quota, rest) ->
-      let steps =
-        match Gas.level ctxt with
-        | Limited {remaining} ->
-            remaining
-        | Unaccounted ->
-            Z.of_string "99999999"
-      in
+      (* FIXME: to remove *)
+      let steps = Z.zero in
       logged_return ((Script_int.(abs (of_zint steps)), rest), ctxt)
   | (Source, rest) ->
       logged_return (((step_constants.payer, "default"), rest), ctxt)

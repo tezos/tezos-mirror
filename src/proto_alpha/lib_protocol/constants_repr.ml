@@ -90,8 +90,8 @@ type parametric = {
   blocks_per_voting_period : int32;
   time_between_blocks : Period_repr.t list;
   endorsers_per_block : int;
-  hard_gas_limit_per_operation : Z.t;
-  hard_gas_limit_per_block : Z.t;
+  hard_gas_limit_per_operation : Gas_limit_repr.Arith.integral;
+  hard_gas_limit_per_block : Gas_limit_repr.Arith.integral;
   proof_of_work_threshold : int64;
   tokens_per_roll : Tez_repr.t;
   michelson_maximum_type_size : int;
@@ -205,8 +205,12 @@ let parametric_encoding =
           (req "blocks_per_voting_period" int32)
           (req "time_between_blocks" (list Period_repr.encoding))
           (req "endorsers_per_block" uint16)
-          (req "hard_gas_limit_per_operation" z)
-          (req "hard_gas_limit_per_block" z))
+          (req
+             "hard_gas_limit_per_operation"
+             Gas_limit_repr.Arith.z_integral_encoding)
+          (req
+             "hard_gas_limit_per_block"
+             Gas_limit_repr.Arith.z_integral_encoding))
        (merge_objs
           (obj8
              (req "proof_of_work_threshold" int64)

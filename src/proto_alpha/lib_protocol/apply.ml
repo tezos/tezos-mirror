@@ -833,6 +833,8 @@ let apply_manager_contents (type kind) ctxt mode chain_id
     * packed_internal_operation_result list )
     Lwt.t =
   let (Manager_operation {source; operation; gas_limit; storage_limit}) = op in
+  (* We do not expose the internal scaling to the users. Instead, we multiply
+       the specified gas limit by the internal scaling. *)
   let ctxt = Gas.set_limit ctxt gas_limit in
   let ctxt = Fees.start_counting_storage_fees ctxt in
   let source = Contract.implicit_contract source in
@@ -878,7 +880,7 @@ let skipped_operation_result :
     match operation with
     | Reveal _ ->
         Applied
-          ( Reveal_result {consumed_gas = Z.zero}
+          ( Reveal_result {consumed_gas = Gas.Arith.zero}
             : kind successful_manager_operation_result )
     | _ ->
         Skipped (manager_kind operation) )
@@ -1452,8 +1454,8 @@ let finalize_application ctxt protocol_data delegate ~block_delay =
         @ balance_updates ))
   in
   let consumed_gas =
-    Z.sub
-      (Constants.hard_gas_limit_per_block ctxt)
+    Gas.Arith.sub
+      (Gas.Arith.fp @@ Constants.hard_gas_limit_per_block ctxt)
       (Alpha_context.Gas.block_level ctxt)
   in
   Alpha_context.Vote.get_current_period_kind ctxt

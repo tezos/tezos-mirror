@@ -237,7 +237,7 @@ let pp_manager_operation_contents_and_result ppf
         ppf
         "@,Paid storage size diff: %s bytes"
         (Z.to_string paid_storage_size_diff) ;
-    Format.fprintf ppf "@,Consumed gas: %s" (Z.to_string consumed_gas) ;
+    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
     match balance_updates with
     | [] ->
         ()

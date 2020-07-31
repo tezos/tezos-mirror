@@ -123,17 +123,17 @@ val get_deposits : context -> Tez_repr.t Signature.Public_key_hash.Map.t
 
 type error += Gas_limit_too_high (* `Permanent *)
 
-val check_gas_limit : t -> Z.t -> unit tzresult
+val check_gas_limit : t -> 'a Gas_limit_repr.Arith.t -> unit tzresult
 
-val set_gas_limit : t -> Z.t -> t
+val set_gas_limit : t -> 'a Gas_limit_repr.Arith.t -> t
 
 val set_gas_unlimited : t -> t
 
 val gas_level : t -> Gas_limit_repr.t
 
-val gas_consumed : since:t -> until:t -> Z.t
+val gas_consumed : since:t -> until:t -> Gas_limit_repr.Arith.fp
 
-val block_gas_level : t -> Z.t
+val block_gas_level : t -> Gas_limit_repr.Arith.fp
 
 val init_storage_space_to_pay : t -> t
 

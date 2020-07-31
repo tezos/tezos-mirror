@@ -95,7 +95,7 @@ and 'kind manager_operation_result =
     or external. *)
 and _ successful_manager_operation_result =
   | Reveal_result : {
-      consumed_gas : Z.t;
+      consumed_gas : Gas.Arith.fp;
     }
       -> Kind.reveal successful_manager_operation_result
   | Transaction_result : {
@@ -103,7 +103,7 @@ and _ successful_manager_operation_result =
       big_map_diff : Contract.big_map_diff option;
       balance_updates : Delegate.balance_updates;
       originated_contracts : Contract.t list;
-      consumed_gas : Z.t;
+      consumed_gas : Gas.Arith.fp;
       storage_size : Z.t;
       paid_storage_size_diff : Z.t;
       allocated_destination_contract : bool;
@@ -113,13 +113,13 @@ and _ successful_manager_operation_result =
       big_map_diff : Contract.big_map_diff option;
       balance_updates : Delegate.balance_updates;
       originated_contracts : Contract.t list;
-      consumed_gas : Z.t;
+      consumed_gas : Gas.Arith.fp;
       storage_size : Z.t;
       paid_storage_size_diff : Z.t;
     }
       -> Kind.origination successful_manager_operation_result
   | Delegation_result : {
-      consumed_gas : Z.t;
+      consumed_gas : Gas.Arith.fp;
     }
       -> Kind.delegation successful_manager_operation_result
 
@@ -182,7 +182,7 @@ type block_metadata = {
   level : Level.t;
   voting_period_kind : Voting_period.kind;
   nonce_hash : Nonce_hash.t option;
-  consumed_gas : Z.t;
+  consumed_gas : Gas.Arith.fp;
   deactivated : Signature.Public_key_hash.t list;
   balance_updates : Delegate.balance_updates;
 }

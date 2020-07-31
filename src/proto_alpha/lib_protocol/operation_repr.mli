@@ -115,7 +115,7 @@ and _ contents =
       fee : Tez_repr.tez;
       counter : counter;
       operation : 'kind manager_operation;
-      gas_limit : Z.t;
+      gas_limit : Gas_limit_repr.Arith.integral;
       storage_limit : Z.t;
     }
       -> 'kind Kind.manager contents

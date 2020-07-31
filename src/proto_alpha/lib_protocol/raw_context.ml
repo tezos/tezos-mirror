@@ -40,7 +40,7 @@ type t = {
     (Signature.Public_key.t * int list * bool) Signature.Public_key_hash.Map.t;
   fees : Tez_repr.t;
   rewards : Tez_repr.t;
-  block_gas : Z.t;
+  block_gas : Gas_limit_repr.Arith.fp;
   operation_gas : Gas_limit_repr.t;
   storage_space_to_pay : Z.t option;
   allocated_contracts : int option;
@@ -210,14 +210,16 @@ let () =
     (function Gas_limit_too_high -> Some () | _ -> None)
     (fun () -> Gas_limit_too_high)
 
-let check_gas_limit ctxt remaining =
+let check_gas_limit ctxt (remaining : 'a Gas_limit_repr.Arith.t) =
   if
-    Compare.Z.(remaining > ctxt.constants.hard_gas_limit_per_operation)
-    || Compare.Z.(remaining < Z.zero)
+    Gas_limit_repr.Arith.(
+      remaining > ctxt.constants.hard_gas_limit_per_operation
+      || remaining < zero)
   then error Gas_limit_too_high
   else ok_unit
 
-let set_gas_limit ctxt remaining =
+let set_gas_limit ctxt (remaining : 'a Gas_limit_repr.Arith.t) =
+  let remaining = Gas_limit_repr.Arith.fp remaining in
   {ctxt with operation_gas = Limited {remaining}}
 
 let set_gas_unlimited ctxt = {ctxt with operation_gas = Unaccounted}
@@ -236,9 +238,9 @@ let block_gas_level ctxt = ctxt.block_gas
 let gas_consumed ~since ~until =
   match (gas_level since, gas_level until) with
   | (Limited {remaining = before}, Limited {remaining = after}) ->
-      Z.sub before after
+      Gas_limit_repr.Arith.sub before after
   | (_, _) ->
-      Z.zero
+      Gas_limit_repr.Arith.zero
 
 let init_storage_space_to_pay ctxt =
   match ctxt.storage_space_to_pay with
@@ -533,7 +535,8 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
     operation_gas = Unaccounted;
     storage_space_to_pay = None;
     allocated_contracts = None;
-    block_gas = constants.Constants_repr.hard_gas_limit_per_block;
+    block_gas =
+      Gas_limit_repr.Arith.fp constants.Constants_repr.hard_gas_limit_per_block;
     origination_nonce = None;
     temporary_big_map = Z.sub Z.zero Z.one;
     internal_nonce = 0;

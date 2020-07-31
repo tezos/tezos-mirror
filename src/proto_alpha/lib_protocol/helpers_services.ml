@@ -65,7 +65,7 @@ module Scripts = struct
         (req "chain_id" Chain_id.encoding)
         (opt "source" Contract.encoding)
         (opt "payer" Contract.encoding)
-        (opt "gas" z)
+        (opt "gas" Gas.Arith.z_integral_encoding)
         (dft "entrypoint" string "default")
 
     let trace_encoding =
@@ -108,7 +108,10 @@ module Scripts = struct
       RPC_service.post_service
         ~description:"Typecheck a piece of code in the current context"
         ~query:RPC_query.empty
-        ~input:(obj2 (req "program" Script.expr_encoding) (opt "gas" z))
+        ~input:
+          (obj2
+             (req "program" Script.expr_encoding)
+             (opt "gas" Gas.Arith.z_integral_encoding))
         ~output:
           (obj2
              (req "type_map" Script_tc_errors_registration.type_map_enc)
@@ -125,7 +128,7 @@ module Scripts = struct
           (obj3
              (req "data" Script.expr_encoding)
              (req "type" Script.expr_encoding)
-             (opt "gas" z))
+             (opt "gas" Gas.Arith.z_integral_encoding))
         ~output:(obj1 (req "gas" Gas.encoding))
         RPC_path.(path / "typecheck_data")
 
@@ -138,7 +141,7 @@ module Scripts = struct
           (obj3
              (req "data" Script.expr_encoding)
              (req "type" Script.expr_encoding)
-             (opt "gas" z))
+             (opt "gas" Gas.Arith.z_integral_encoding))
         ~output:(obj2 (req "packed" bytes) (req "gas" Gas.encoding))
         ~query:RPC_query.empty
         RPC_path.(path / "pack_data")
@@ -651,7 +654,7 @@ module Forge = struct
         ~sourcePubKey
         ~counter
         ~fee
-        ~gas_limit:Z.zero
+        ~gas_limit:Gas.Arith.zero
         ~storage_limit:Z.zero
         []
 
@@ -707,7 +710,7 @@ module Forge = struct
         ?sourcePubKey
         ~counter
         ~fee
-        ~gas_limit:Z.zero
+        ~gas_limit:Gas.Arith.zero
         ~storage_limit:Z.zero
         [Manager (Delegation delegate)]
   end

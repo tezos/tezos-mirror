@@ -46,7 +46,7 @@ let error_encoding =
 
 type _ successful_manager_operation_result =
   | Reveal_result : {
-      consumed_gas : Z.t;
+      consumed_gas : Gas.Arith.fp;
     }
       -> Kind.reveal successful_manager_operation_result
   | Transaction_result : {
@@ -54,7 +54,7 @@ type _ successful_manager_operation_result =
       big_map_diff : Contract.big_map_diff option;
       balance_updates : Delegate.balance_updates;
       originated_contracts : Contract.t list;
-      consumed_gas : Z.t;
+      consumed_gas : Gas.Arith.fp;
       storage_size : Z.t;
       paid_storage_size_diff : Z.t;
       allocated_destination_contract : bool;
@@ -64,13 +64,13 @@ type _ successful_manager_operation_result =
       big_map_diff : Contract.big_map_diff option;
       balance_updates : Delegate.balance_updates;
       originated_contracts : Contract.t list;
-      consumed_gas : Z.t;
+      consumed_gas : Gas.Arith.fp;
       storage_size : Z.t;
       paid_storage_size_diff : Z.t;
     }
       -> Kind.origination successful_manager_operation_result
   | Delegation_result : {
-      consumed_gas : Z.t;
+      consumed_gas : Gas.Arith.fp;
     }
       -> Kind.delegation successful_manager_operation_result
 
@@ -169,7 +169,9 @@ module Manager_result = struct
   let reveal_case =
     make
       ~op_case:Operation.Encoding.Manager_operations.reveal_case
-      ~encoding:Data_encoding.(obj1 (dft "consumed_gas" z Z.zero))
+      ~encoding:
+        Data_encoding.(
+          obj1 (dft "consumed_gas" Gas.Arith.z_fp_encoding Gas.Arith.zero))
       ~iselect:(function
         | Internal_operation_result (({operation = Reveal _; _} as op), res) ->
             Some (op, res)
@@ -193,7 +195,7 @@ module Manager_result = struct
            (opt "big_map_diff" Contract.big_map_diff_encoding)
            (dft "balance_updates" Delegate.balance_updates_encoding [])
            (dft "originated_contracts" (list Contract.encoding) [])
-           (dft "consumed_gas" z Z.zero)
+           (dft "consumed_gas" Gas.Arith.z_fp_encoding Gas.Arith.zero)
            (dft "storage_size" z Z.zero)
            (dft "paid_storage_size_diff" z Z.zero)
            (dft "allocated_destination_contract" bool false))
@@ -256,7 +258,7 @@ module Manager_result = struct
            (opt "big_map_diff" Contract.big_map_diff_encoding)
            (dft "balance_updates" Delegate.balance_updates_encoding [])
            (dft "originated_contracts" (list Contract.encoding) [])
-           (dft "consumed_gas" z Z.zero)
+           (dft "consumed_gas" Gas.Arith.z_fp_encoding Gas.Arith.zero)
            (dft "storage_size" z Z.zero)
            (dft "paid_storage_size_diff" z Z.zero))
       ~iselect:(function
@@ -305,7 +307,9 @@ module Manager_result = struct
   let delegation_case =
     make
       ~op_case:Operation.Encoding.Manager_operations.delegation_case
-      ~encoding:Data_encoding.(obj1 (dft "consumed_gas" z Z.zero))
+      ~encoding:
+        Data_encoding.(
+          obj1 (dft "consumed_gas" Gas.Arith.z_fp_encoding Gas.Arith.zero))
       ~iselect:(function
         | Internal_operation_result (({operation = Delegation _; _} as op), res)
           ->
@@ -1138,7 +1142,7 @@ type block_metadata = {
   level : Level.t;
   voting_period_kind : Voting_period.kind;
   nonce_hash : Nonce_hash.t option;
-  consumed_gas : Z.t;
+  consumed_gas : Gas.Arith.fp;
   deactivated : Signature.Public_key_hash.t list;
   balance_updates : Delegate.balance_updates;
 }
@@ -1182,6 +1186,6 @@ let block_metadata_encoding =
           (req "level" Level.encoding)
           (req "voting_period_kind" Voting_period.kind_encoding)
           (req "nonce_hash" (option Nonce_hash.encoding))
-          (req "consumed_gas" (check_size 10 n))
+          (req "consumed_gas" (check_size 10 Gas.Arith.n_fp_encoding))
           (req "deactivated" (list Signature.Public_key_hash.encoding))
           (req "balance_updates" Delegate.balance_updates_encoding))

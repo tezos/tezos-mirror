@@ -160,7 +160,9 @@ module Cycle : sig
 end
 
 module Gas : sig
-  type t = private Unaccounted | Limited of {remaining : Z.t}
+  module Arith : Fixed_point_repr.Safe
+
+  type t = private Unaccounted | Limited of {remaining : Arith.fp}
 
   val encoding : t Data_encoding.encoding
 
@@ -200,9 +202,9 @@ module Gas : sig
 
   val ( +@ ) : cost -> cost -> cost
 
-  val check_limit : context -> Z.t -> unit tzresult
+  val check_limit : context -> 'a Arith.t -> unit tzresult
 
-  val set_limit : context -> Z.t -> context
+  val set_limit : context -> 'a Arith.t -> context
 
   val set_unlimited : context -> context
 
@@ -212,9 +214,9 @@ module Gas : sig
 
   val level : context -> t
 
-  val consumed : since:context -> until:context -> Z.t
+  val consumed : since:context -> until:context -> Arith.fp
 
-  val block_level : context -> Z.t
+  val block_level : context -> Arith.fp
 end
 
 module Script_int : module type of Script_int_repr
@@ -484,8 +486,8 @@ module Constants : sig
     blocks_per_voting_period : int32;
     time_between_blocks : Period.t list;
     endorsers_per_block : int;
-    hard_gas_limit_per_operation : Z.t;
-    hard_gas_limit_per_block : Z.t;
+    hard_gas_limit_per_operation : Gas.Arith.integral;
+    hard_gas_limit_per_block : Gas.Arith.integral;
     proof_of_work_threshold : int64;
     tokens_per_roll : Tez.t;
     michelson_maximum_type_size : int;
@@ -527,9 +529,9 @@ module Constants : sig
 
   val delay_per_missing_endorsement : context -> Period.t
 
-  val hard_gas_limit_per_operation : context -> Z.t
+  val hard_gas_limit_per_operation : context -> Gas.Arith.integral
 
-  val hard_gas_limit_per_block : context -> Z.t
+  val hard_gas_limit_per_block : context -> Gas.Arith.integral
 
   val cost_per_byte : context -> Tez.t
 
@@ -1083,7 +1085,7 @@ and _ contents =
       fee : Tez.tez;
       counter : counter;
       operation : 'kind manager_operation;
-      gas_limit : Z.t;
+      gas_limit : Gas.Arith.integral;
       storage_limit : Z.t;
     }
       -> 'kind Kind.manager contents

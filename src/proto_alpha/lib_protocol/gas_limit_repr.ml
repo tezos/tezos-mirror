@@ -23,7 +23,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = Unaccounted | Limited of {remaining : Z.t}
+let scaling_factor = 1000
+
+let decimals = 3
+
+module Arith = Fixed_point_repr.Make (struct
+  let decimals = decimals
+end)
+
+type t = Unaccounted | Limited of {remaining : Arith.fp}
 
 type cost = Z.t
 
@@ -33,7 +41,7 @@ let encoding =
     [ case
         (Tag 0)
         ~title:"Limited"
-        z
+        Arith.z_fp_encoding
         (function Limited {remaining} -> Some remaining | _ -> None)
         (fun remaining -> Limited {remaining});
       case
@@ -47,7 +55,7 @@ let pp ppf = function
   | Unaccounted ->
       Format.fprintf ppf "unaccounted"
   | Limited {remaining} ->
-      Format.fprintf ppf "%s units remaining" (Z.to_string remaining)
+      Format.fprintf ppf "%a units remaining" Arith.pp remaining
 
 let cost_encoding = Data_encoding.z
 
@@ -56,8 +64,6 @@ let pp_cost fmt z = Format.fprintf fmt "%s" (Z.to_string z)
 type error += Block_quota_exceeded (* `Temporary *)
 
 type error += Operation_quota_exceeded (* `Temporary *)
-
-let scaling_factor = 1000
 
 let allocation_weight = Z.of_int (scaling_factor * 2)
 
@@ -73,20 +79,19 @@ let byte_read_weight = Z.of_int (scaling_factor * 10)
 
 let byte_written_weight = Z.of_int (scaling_factor * 15)
 
-let cost_to_gas (cost : cost) : Z.t = cost
+let cost_to_milligas (cost : cost) : Arith.fp = Arith.unsafe_fp cost
 
 let raw_consume block_gas operation_gas cost =
   match operation_gas with
   | Unaccounted ->
       ok (block_gas, Unaccounted)
   | Limited {remaining} ->
-      let gas = cost_to_gas cost in
-      if Compare.Z.(gas > Z.zero) then
-        let remaining = Z.sub remaining gas in
-        let block_remaining = Z.sub block_gas gas in
-        if Compare.Z.(remaining < Z.zero) then error Operation_quota_exceeded
-        else if Compare.Z.(block_remaining < Z.zero) then
-          error Block_quota_exceeded
+      let gas = cost_to_milligas cost in
+      if Arith.(gas > zero) then
+        let remaining = Arith.sub remaining gas in
+        let block_remaining = Arith.sub block_gas gas in
+        if Arith.(remaining < zero) then error Operation_quota_exceeded
+        else if Arith.(block_remaining < zero) then error Block_quota_exceeded
         else ok (block_remaining, Limited {remaining})
       else ok (block_gas, operation_gas)
 
