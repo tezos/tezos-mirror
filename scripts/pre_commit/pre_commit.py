@@ -16,6 +16,10 @@ For the moment this script:
   first: https://tezos.gitlab.io/developer/python_testing_framework.html
 
   This is most useful when working on the python tests themselves.
+* executes tezt tests of staged *.ml files in "tezt/tests" that contain
+  the string "let run () =". Like the python tests, the point is to
+  execute a required subset of the CI and
+  this is most useful when working on the tezt tests themselves.
 * lints and typechecks staged tests_python/*.py files.
 * calls ocamlformat on staged *.ml, *.mli files in a way
   faster than `make fmt`.
@@ -23,17 +27,13 @@ For the moment this script:
   see below), formatted files are added before creating the commit;
   hereby autoformatting the files upon committing.
 
-The first two points are blocking, if the corresponding check fails
+The first three points are blocking, if the corresponding check fails
 the commit is aborted.
 
 Installation: `ln -sr scripts/pre_commit/pre_commit.py .git/hooks/pre-commit`
 
-You can call the hook manually on modified but not yet staged files
-to make sure an upcoming call to `git commit` will succeed:
-`./scripts/pre_commit/pre_commit.py --unstaged`
-
-You can pass "--lint-only" to avoid calling `pytest`, so that the hook
-is always fast. In this case, install it as follows:
+You can pass "--lint-only" to avoid calling `pytest` and executing tezt tests,
+so that the hook is always fast. In this case, install it as follows:
 
 ```
 cd .git/hooks
@@ -42,11 +42,16 @@ echo './scripts/pre_commit/pre_commit.py --lint-only "$@"' >> pre-commit
 chmod +x pre-commit
 ```
 
+You can call the hook manually on modified but not yet staged files
+to make sure an upcoming call to `git commit` will succeed:
+`./scripts/pre_commit/pre_commit.py --unstaged [--lint-only]?`
+
 You can pass "--test-itself" for the precommit to test itself. This is
 used in the CI.
 """
 
 import os
+import re
 import subprocess
 import sys
 from typing import List, Optional, Tuple
@@ -291,6 +296,54 @@ def _call_py_linters(tests_python_path: str, files) -> int:
     return return_code
 
 
+def _call_tezt(files: List[str], staged_or_modified: bool) -> int:
+    """
+    Args:
+        files (list(str)): All {ml,mli} files to consider. Filtering
+                           for tezt has NOT been done yet.
+        staged_or_modified (bool) Whether staged files are considered (True)
+                                  or modified ones (False)
+    Returns:
+        The maximum of return codes
+    """
+    tezt_test_dir = "tezt/tests"
+    if not os.path.isdir(tezt_test_dir):
+        print(f"Unexpectedly, {tezt_test_dir} directory cannot be found",
+              file=sys.stderr)
+        return 1
+
+    tezt_files = []
+    for file_ in files:
+        if not file_.startswith(tezt_test_dir):
+            continue
+        if not file_.endswith(".ml"):
+            continue
+        with open(file_, 'r') as handle:
+            pattern = re.escape("let run () =")
+            match = re.search(pattern, handle.read())
+            if match is None:
+                continue
+        to_add = file_[len(tezt_test_dir) + len(os.sep):]  # remove tezt/tests/
+        tezt_files.append(to_add)
+
+    adjective = "staged" if staged_or_modified else "modified"
+
+    if not tezt_files:
+        print(f"No {adjective} file relevant to tezt found")
+        return 0
+
+    return_code = 0
+
+    for tezt_file in tezt_files:
+        cmd = ["dune", "exec", "tezt/tests/main.exe", "--", "--file",
+               tezt_file]
+        print("> " + " ".join(cmd))
+        cmd_result = subprocess.run(cmd, check=False)
+        return_code = max(return_code, cmd_result.returncode)
+
+    return return_code
+
+
 def _main_py_files(staged_or_modified: bool, adjective: str,
                    pytest: bool) -> int:
     """
@@ -358,14 +411,14 @@ def _parse_arguments() -> Tuple[bool, bool, bool]:
     """
     Returns: A tuple with three Booleans:
         1/ Whether staged (True) or modified (False) files should be considered
-        2/ Whether pytest should be called
+        2/ Whether --lint-only was passed
         3/ Whether the hook should test itself instead of doing its normal
            operations
     """
     staged = _UNSTAGED not in sys.argv
-    pytest = _LINT_ONLY not in sys.argv
+    lint_only = _LINT_ONLY in sys.argv
     test_itself = _TEST_ITSELF in sys.argv
-    return (staged, pytest, test_itself)
+    return (staged, lint_only, test_itself)
 
 
 def _print_help():
@@ -390,18 +443,23 @@ def main() -> int:
     """ The main """
     _print_help()
 
-    staged, pytest, test_itself = _parse_arguments()
+    staged, lint_only, test_itself = _parse_arguments()
     if test_itself:
         print(f"Recognized {_TEST_ITSELF}")
         return _main_test_itself()
     adjective = "staged" if staged else "modified"
 
-    return_code = _main_py_files(staged, adjective, pytest)
+    return_code = _main_py_files(staged, adjective, not lint_only)
 
     ml_extensions = ["ml", "mli"]
     relevant_ocaml_files = _git_diff_many(staged, ml_extensions)
     if relevant_ocaml_files:
         _call_ocamlformat(relevant_ocaml_files, staged)
+        if lint_only:
+            print(f"{_LINT_ONLY} passed: not calling tezt")
+        else:
+            tezt_rc = _call_tezt(relevant_ocaml_files, staged)
+            return_code = max(return_code, tezt_rc)
     else:
         extensions = "{" + ",".join(ml_extensions) + "}"
         print(f"No {adjective} *.{extensions} relevant file found")
