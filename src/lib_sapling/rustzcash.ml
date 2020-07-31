@@ -680,29 +680,72 @@ let zip32_xfvk_derive parent index =
   if res then Some (to_zip32_full_viewing_key derived) else None
 
 let init_params () =
-  let getenv_and_exists env path =
-    Option.bind (Sys.getenv_opt env) (fun env ->
-        let path = env ^ path in
-        if Sys.file_exists path then Some path else None)
+  let home = Option.value (Sys.getenv_opt "HOME") ~default:"/" in
+  let opam_switch =
+    match Sys.getenv_opt "OPAM_SWITCH_PREFIX" with
+    | Some _ as x ->
+        x
+    | None -> (
+      match Sys.getenv_opt "PWD" with
+      | Some d ->
+          let switch = Filename.concat d "_opam" in
+          if Sys.file_exists switch then Some switch else None
+      | None ->
+          None )
+  in
+  let candidates =
+    Option.fold
+      ~none:[]
+      ~some:(fun d -> [Filename.concat d "share/zcash-params"])
+      opam_switch
+  in
+  let candidates = candidates @ [Filename.concat home ".zcash-params"] in
+  let data_home =
+    match Sys.getenv_opt "XDG_DATA_HOME" with
+    | Some x ->
+        x
+    | None ->
+        Filename.concat home ".local/share/"
+  in
+  let data_dirs =
+    data_home
+    :: String.split_on_char
+         ':'
+         (Option.value
+            (Sys.getenv_opt "XDG_DATA_DIRS")
+            ~default:"/usr/local/share/:/usr/share/")
+  in
+  let candidates =
+    List.fold_right
+      (fun x acc -> Filename.concat x "zcash-params" :: acc)
+      data_dirs
+      candidates
+  in
+  let prefix_opt =
+    List.fold_left
+      (fun acc x ->
+        match acc with
+        | Some _ ->
+            acc
+        | None ->
+            if Sys.file_exists x then Some x else acc)
+      None
+      candidates
   in
   let prefix =
-    let share = "/usr/share/zcash-params" in
-    if Sys.file_exists share then share
-    else
-      let opam_share =
-        getenv_and_exists "OPAM_SWITCH_PREFIX" "/share/zcash-params"
-      in
-      let home = getenv_and_exists "HOME" "/.zcash-params" in
-      match TzOption.first_some opam_share home with
-      | Some p ->
-          p
-      | None ->
-          Format.eprintf
-            "Download zcash params using \
-             https://raw.githubusercontent.com/zcash/zcash/master/zcutil/fetch-params.sh\n" ;
-          failwith
-            "Couldn't find ZCash params in /usr/share/zcash-params, \
-             ${OPAM_SWITCH_PREFIX}/share/zcash-params or ${HOME}/.zcash-params"
+    match prefix_opt with
+    | Some p ->
+        p
+    | None ->
+        Format.eprintf
+          "@[Cannot find zcash params in any of @[%a@].@ You may download \
+           them using \
+           https://raw.githubusercontent.com/zcash/zcash/master/zcutil/fetch-params.sh@]@."
+          (Format.pp_print_list
+             ~pp_sep:Format.pp_print_space
+             Format.pp_print_string)
+          candidates ;
+        raise Not_found
   in
   let spend_path = prefix ^ "/sapling-spend.params" in
   let spend_hash =
