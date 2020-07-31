@@ -264,6 +264,9 @@ def test_config_show_mockup_fail(mockup_client: Client):
     # for a variant of how to make the base dir invalid for the mockup mode
     _, _, return_code = mockup_client.run_generic(["config", "show"],
                                                   check=False)
+
+    # recreate directory: the cleanup later on expects its existence
+    os.mkdir(mockup_client.base_dir)
     assert return_code != 0
 
 

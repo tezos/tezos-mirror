@@ -819,18 +819,20 @@ let parse_config_args (ctx : #Client_context.full) argv =
   ( match base_dir with
   | None ->
       let base_dir = default_base_dir in
-      unless (Sys.file_exists base_dir) (fun () ->
-          Lwt_utils_unix.create_dir base_dir >>= return)
+      unless
+        (* Mockup mode will create the base directory on need *)
+        (client_mode = Mode_mockup || Sys.file_exists base_dir)
+        (fun () -> Lwt_utils_unix.create_dir base_dir >>= return)
       >>=? fun () -> return base_dir
   | Some dir -> (
     match client_mode with
     | Mode_client ->
         if not (Sys.file_exists dir) then
           failwith
-            "Specified -base-dir does not exist. Please create the directory \
+            "Specified --base-dir does not exist. Please create the directory \
              and try again."
         else if Sys.is_directory dir then return dir
-        else failwith "Specified -base-dir must be a directory"
+        else failwith "Specified --base-dir must be a directory"
     | Mode_mockup ->
         (* In mockup mode base dir may be created automatically. *)
         return dir ) )
@@ -932,8 +934,9 @@ let parse_config_args (ctx : #Client_context.full) argv =
   if Sys.file_exists config_dir && not (Sys.is_directory config_dir) then (
     Format.eprintf "%s is not a directory.@." config_dir ;
     exit 1 ) ;
-  Lwt_utils_unix.create_dir config_dir
-  >>= fun () ->
+  unless (client_mode = Mode_mockup) (fun () ->
+      Lwt_utils_unix.create_dir config_dir >>= return)
+  >>=? fun () ->
   let parsed_args =
     {
       chain;
