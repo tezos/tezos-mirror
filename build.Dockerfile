@@ -7,6 +7,7 @@ WORKDIR /home/tezos
 RUN mkdir -p /home/tezos/tezos/scripts
 COPY --chown=tezos:nogroup Makefile tezos
 COPY --chown=tezos:nogroup active_protocol_versions tezos
+COPY --chown=tezos:nogroup dune tezos
 COPY --chown=tezos:nogroup scripts/version.sh tezos/scripts/
 COPY --chown=tezos:nogroup src tezos/src
 COPY --chown=tezos:nogroup vendors tezos/vendors
