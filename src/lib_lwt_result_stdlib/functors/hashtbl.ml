@@ -28,9 +28,11 @@ module Make (Seq : Sigs.Seq.S) = struct
 
   let seeded_hash = Stdlib.Hashtbl.seeded_hash
 
-  let hash_param = Stdlib.Hashtbl.hash_param
+  let hash_param ~meaningful ~total v =
+    Stdlib.Hashtbl.hash_param meaningful total v
 
-  let seeded_hash_param = Stdlib.Hashtbl.seeded_hash_param
+  let seeded_hash_param ~meaningful ~total seed v =
+    Stdlib.Hashtbl.seeded_hash_param meaningful total seed v
 
   module type S = Sigs.Hashtbl.S with type error := Seq.Monad.out_error
 

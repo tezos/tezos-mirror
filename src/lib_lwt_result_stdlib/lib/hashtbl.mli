@@ -27,9 +27,9 @@ val hash : 'a -> int
 
 val seeded_hash : int -> 'a -> int
 
-val hash_param : int -> int -> 'a -> int
+val hash_param : meaningful:int -> total:int -> 'a -> int
 
-val seeded_hash_param : int -> int -> int -> 'a -> int
+val seeded_hash_param : meaningful:int -> total:int -> int -> 'a -> int
 
 module type S = Sigs.Hashtbl.S with type error := Error_monad.error list
 

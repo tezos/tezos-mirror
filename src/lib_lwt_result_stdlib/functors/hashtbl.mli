@@ -24,14 +24,16 @@
 (*****************************************************************************)
 
 module Make (Seq : Sigs.Seq.S) : sig
-  (** Polymorphic hashing re-exported *)
+  (** Polymorphic hashing re-exported. These functions are meant to be passed to
+      the [Make] and [MakeSeeded] functors (below). Check {!Stdlib.Hashtbl} for
+      documentation. *)
   val hash : 'a -> int
 
   val seeded_hash : int -> 'a -> int
 
-  val hash_param : int -> int -> 'a -> int
+  val hash_param : meaningful:int -> total:int -> 'a -> int
 
-  val seeded_hash_param : int -> int -> int -> 'a -> int
+  val seeded_hash_param : meaningful:int -> total:int -> int -> 'a -> int
 
   module type S = Sigs.Hashtbl.S with type error := Seq.Monad.out_error
 
