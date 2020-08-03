@@ -307,11 +307,10 @@ end = struct
               | Some peer ->
                   P2p_peer.Set.add peer data.peers
             in
-            let next_request = now in
             Table.replace
               state.pending
               key
-              {delay = Request.initial_delay; next_request; peers} ;
+              {peers; next_request = now; delay = Request.initial_delay} ;
             lwt_debug
               Tag.DSL.(
                 fun f ->

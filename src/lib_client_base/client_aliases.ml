@@ -134,8 +134,11 @@ module Alias (Entity : Entity) = struct
   let find (wallet : #wallet) name =
     load wallet
     >>=? fun list ->
-    try return (List.assoc name list)
-    with Not_found -> failwith "no %s alias named %s" Entity.name name
+    match List.assoc_opt name list with
+    | Some v ->
+        return v
+    | None ->
+        failwith "no %s alias named %s" Entity.name name
 
   let rev_find (wallet : #wallet) v =
     load wallet

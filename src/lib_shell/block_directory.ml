@@ -218,7 +218,7 @@ let build_raw_rpc_directory ~user_activated_upgrades
       let chain_id = State.Block.chain_id block in
       Lwt.catch
         (fun () -> State.Block.operations block i)
-        (fun _ -> Lwt.fail Not_found)
+        (fun _ -> raise Not_found)
       >>= fun (ops, _path) ->
       Lwt.catch
         (fun () ->
@@ -240,7 +240,7 @@ let build_raw_rpc_directory ~user_activated_upgrades
               let op_metadata = List.nth metadata j in
               return (convert_with_metadata chain_id op op_metadata))
             (fun _ -> return (convert_without_metadata chain_id op)))
-        (fun _ -> Lwt.fail Not_found)) ;
+        (fun _ -> raise Not_found)) ;
   (* operation_hashes *)
   register0 S.Operation_hashes.operation_hashes (fun block () () ->
       State.Block.all_operation_hashes block >>= return) ;
@@ -251,7 +251,7 @@ let build_raw_rpc_directory ~user_activated_upgrades
         (fun () ->
           State.Block.operation_hashes block i
           >|= fun (ops, _) -> List.nth ops j)
-        (fun _ -> Lwt.fail Not_found)
+        (fun _ -> raise Not_found)
       >>= fun op -> return op) ;
   (* context *)
   register1 S.Context.read (fun block path q () ->
