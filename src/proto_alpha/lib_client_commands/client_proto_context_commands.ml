@@ -133,57 +133,56 @@ let transfer_command amount source destination cctxt
       burn_cap;
     }
   in
-  ( match Contract.is_implicit source with
-  | None ->
-      let contract = source in
-      Managed_contract.get_contract_manager cctxt source
-      >>=? fun source ->
-      Client_keys.get_key cctxt source
-      >>=? fun (_, src_pk, src_sk) ->
-      Managed_contract.transfer
-        cctxt
-        ~chain:cctxt#chain
-        ~block:cctxt#block
-        ?confirmations:cctxt#confirmations
-        ~dry_run
-        ~verbose_signing
-        ~fee_parameter
-        ?fee
-        ~contract
-        ~source
-        ~src_pk
-        ~src_sk
-        ~destination
-        ?entrypoint
-        ?arg
-        ~amount
-        ?gas_limit
-        ?storage_limit
-        ?counter
-        ()
-  | Some source ->
-      Client_keys.get_key cctxt source
-      >>=? fun (_, src_pk, src_sk) ->
-      transfer
-        cctxt
-        ~chain:cctxt#chain
-        ~block:cctxt#block
-        ?confirmations:cctxt#confirmations
-        ~dry_run
-        ~verbose_signing
-        ~fee_parameter
-        ~source
-        ?fee
-        ~src_pk
-        ~src_sk
-        ~destination
-        ?entrypoint
-        ?arg
-        ~amount
-        ?gas_limit
-        ?storage_limit
-        ?counter
-        () )
+  get_source_keys cctxt source
+  >>=? (function
+         | None ->
+             let contract = source in
+             Managed_contract.get_contract_manager cctxt source
+             >>=? fun source ->
+             Client_keys.get_key cctxt source
+             >>=? fun (_, src_pk, src_sk) ->
+             Managed_contract.transfer
+               cctxt
+               ~chain:cctxt#chain
+               ~block:cctxt#block
+               ?confirmations:cctxt#confirmations
+               ~dry_run
+               ~verbose_signing
+               ~fee_parameter
+               ?fee
+               ~contract
+               ~source
+               ~src_pk
+               ~src_sk
+               ~destination
+               ?entrypoint
+               ?arg
+               ~amount
+               ?gas_limit
+               ?storage_limit
+               ?counter
+               ()
+         | Some (_name, source, src_pk, src_sk) ->
+             transfer
+               cctxt
+               ~chain:cctxt#chain
+               ~block:cctxt#block
+               ?confirmations:cctxt#confirmations
+               ~dry_run
+               ~verbose_signing
+               ~fee_parameter
+               ~source
+               ?fee
+               ~src_pk
+               ~src_sk
+               ~destination
+               ?entrypoint
+               ?arg
+               ~amount
+               ?gas_limit
+               ?storage_limit
+               ?counter
+               ())
   >>= report_michelson_errors
         ~no_print_source
         ~msg:"transfer simulation failed"
@@ -717,121 +716,116 @@ let commands network () =
         >>=? fun alias_name ->
         Lwt.return (Micheline_parser.no_parsing_error program)
         >>=? fun {expanded = code; _} ->
-        match Contract.is_implicit source with
+        get_source_keys cctxt source
+        >>=? function
         | None ->
             failwith
-              "only implicit accounts can be the source of an origination"
-        | Some source -> (
-            Client_keys.get_key cctxt source
-            >>=? (fun (_, src_pk, src_sk) ->
-                   let fee_parameter =
-                     {
-                       Injection.minimal_fees;
-                       minimal_nanotez_per_byte;
-                       minimal_nanotez_per_gas_unit;
-                       force_low_fee;
-                       fee_cap;
-                       burn_cap;
-                     }
-                   in
-                   match delegate with
-                   | None ->
-                       originate_contract
-                         cctxt
-                         ~chain:cctxt#chain
-                         ~block:cctxt#block
-                         ?confirmations:cctxt#confirmations
-                         ~dry_run
-                         ~verbose_signing
-                         ?fee
-                         ?gas_limit
-                         ?storage_limit
-                         ~delegate:None
-                         ~initial_storage
-                         ~balance
-                         ~source
-                         ~src_pk
-                         ~src_sk
-                         ~code
-                         ~fee_parameter
-                         ()
-                       >>= fun errors ->
-                       report_michelson_errors
-                         ~no_print_source
-                         ~msg:"origination simulation failed"
-                         cctxt
-                         errors
-                       >|= fun res ->
-                       ok
-                       @@ Option.(map (fun (_res, contract) -> contract)) res
-                   | Some delegate -> (
-                     match
-                       ( Contract.is_implicit delegate,
-                         Contract.is_baker delegate )
-                     with
-                     | (Some delegate, _) ->
-                         originate_contract_legacy
-                           cctxt
-                           ~chain:cctxt#chain
-                           ~block:cctxt#block
-                           ?confirmations:cctxt#confirmations
-                           ~dry_run
-                           ~verbose_signing
-                           ?fee
-                           ?gas_limit
-                           ?storage_limit
-                           ~delegate:(Some delegate)
-                           ~initial_storage
-                           ~balance
-                           ~source
-                           ~src_pk
-                           ~src_sk
-                           ~code
-                           ~fee_parameter
-                           ()
-                         >>= fun errors ->
-                         report_michelson_errors
-                           ~no_print_source
-                           ~msg:"origination simulation failed"
-                           cctxt
-                           errors
-                         >|= fun res ->
-                         ok
-                         @@ Option.(map (fun (_res, contract) -> contract)) res
-                     | (_, Some baker) ->
-                         originate_contract
-                           cctxt
-                           ~chain:cctxt#chain
-                           ~block:cctxt#block
-                           ?confirmations:cctxt#confirmations
-                           ~dry_run
-                           ~verbose_signing
-                           ?fee
-                           ?gas_limit
-                           ?storage_limit
-                           ~delegate:(Some baker)
-                           ~initial_storage
-                           ~balance
-                           ~source
-                           ~src_pk
-                           ~src_sk
-                           ~code
-                           ~fee_parameter
-                           ()
-                         >>= fun errors ->
-                         report_michelson_errors
-                           ~no_print_source
-                           ~msg:"origination simulation failed"
-                           cctxt
-                           errors
-                         >|= fun res ->
-                         ok
-                         @@ Option.(map (fun (_res, contract) -> contract)) res
-                     | _ ->
-                         failwith
-                           "The delegate must be an implicit contract (that \
-                            is the consensus key of a baker contract) or a \
-                            baker contract" ))
+              "only implicit and baker accounts can be the source of an \
+               origination"
+        | Some (_name, source, src_pk, src_sk) -> (
+            (let fee_parameter =
+               {
+                 Injection.minimal_fees;
+                 minimal_nanotez_per_byte;
+                 minimal_nanotez_per_gas_unit;
+                 force_low_fee;
+                 fee_cap;
+                 burn_cap;
+               }
+             in
+             match delegate with
+             | None ->
+                 originate_contract
+                   cctxt
+                   ~chain:cctxt#chain
+                   ~block:cctxt#block
+                   ?confirmations:cctxt#confirmations
+                   ~dry_run
+                   ~verbose_signing
+                   ?fee
+                   ?gas_limit
+                   ?storage_limit
+                   ~delegate:None
+                   ~initial_storage
+                   ~balance
+                   ~source
+                   ~src_pk
+                   ~src_sk
+                   ~code
+                   ~fee_parameter
+                   ()
+                 >>= fun errors ->
+                 report_michelson_errors
+                   ~no_print_source
+                   ~msg:"origination simulation failed"
+                   cctxt
+                   errors
+                 >|= fun res ->
+                 ok @@ Option.(map (fun (_res, contract) -> contract)) res
+             | Some delegate -> (
+               match
+                 (Contract.is_implicit delegate, Contract.is_baker delegate)
+               with
+               | (Some delegate, _) ->
+                   originate_contract_legacy
+                     cctxt
+                     ~chain:cctxt#chain
+                     ~block:cctxt#block
+                     ?confirmations:cctxt#confirmations
+                     ~dry_run
+                     ~verbose_signing
+                     ?fee
+                     ?gas_limit
+                     ?storage_limit
+                     ~delegate:(Some delegate)
+                     ~initial_storage
+                     ~balance
+                     ~source
+                     ~src_pk
+                     ~src_sk
+                     ~code
+                     ~fee_parameter
+                     ()
+                   >>= fun errors ->
+                   report_michelson_errors
+                     ~no_print_source
+                     ~msg:"origination simulation failed"
+                     cctxt
+                     errors
+                   >|= fun res ->
+                   ok @@ Option.(map (fun (_res, contract) -> contract)) res
+               | (_, Some baker) ->
+                   originate_contract
+                     cctxt
+                     ~chain:cctxt#chain
+                     ~block:cctxt#block
+                     ?confirmations:cctxt#confirmations
+                     ~dry_run
+                     ~verbose_signing
+                     ?fee
+                     ?gas_limit
+                     ?storage_limit
+                     ~delegate:(Some baker)
+                     ~initial_storage
+                     ~balance
+                     ~source
+                     ~src_pk
+                     ~src_sk
+                     ~code
+                     ~fee_parameter
+                     ()
+                   >>= fun errors ->
+                   report_michelson_errors
+                     ~no_print_source
+                     ~msg:"origination simulation failed"
+                     cctxt
+                     errors
+                   >|= fun res ->
+                   ok @@ Option.(map (fun (_res, contract) -> contract)) res
+               | _ ->
+                   failwith
+                     "The delegate must be an implicit contract (that is the \
+                      consensus key of a baker contract) or a baker contract" ))
             >>=? function
             | Some contract when not dry_run ->
                 save_contract ~force cctxt alias_name contract
@@ -1239,15 +1233,15 @@ let commands network () =
            threshold
            owner_keys
            cctxt ->
-        match Contract.is_implicit source with
+        get_source_keys cctxt source
+        >>=? function
         | None ->
             failwith
-              "only implicit accounts can be the source of a baker registration"
-        | Some source -> (
+              "only implicit and baker accounts can be the source of a baker \
+               registration"
+        | Some (_name, source, src_pk, src_sk) -> (
             Raw_contract_alias.of_fresh cctxt force alias_name
             >>=? fun alias_name ->
-            Client_keys.get_key cctxt source
-            >>=? fun (_, src_pk, src_sk) ->
             let fee_parameter =
               {
                 Injection.minimal_fees;
@@ -1509,159 +1503,157 @@ let commands network () =
              source
              proposals
              (cctxt : Protocol_client_context.full) ->
-          ( match Contract.is_implicit source with
-          | None -> (
-            match Contract.is_baker source with
-            | None ->
-                failwith
-                  "only implicit and baker accounts can submit proposals"
-            | Some baker ->
-                get_baker_consensus_key cctxt ~chain:cctxt#chain baker
-                >>=? fun (name, pkh, _, sk) -> return (name, pkh, sk) )
-          | Some src_pkh ->
-              Client_keys.get_key cctxt src_pkh
-              >>=? fun (src_name, _src_pk, src_sk) ->
-              return (src_name, src_pkh, src_sk) )
-          >>=? fun (src_name, src_pkh, src_sk) ->
-          get_period_info
-          (* Find period info of the successor, because the operation will
+          get_source_keys cctxt source
+          >>=? function
+          | None ->
+              failwith "only implicit and baker accounts can submit proposals"
+          | Some (src_name, source, _src_pk, src_sk) -> (
+              get_period_info
+              (* Find period info of the successor, because the operation will
                  be injected on the next block at the earliest *)
-            ~successor:true
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            cctxt
-          >>=? fun info ->
-          ( match info.current_period_kind with
-          | Proposal ->
-              return_unit
-          | _ ->
-              cctxt#error "Not in a proposal period" )
-          >>=? fun () ->
-          Shell_services.Protocol.list cctxt
-          >>=? fun known_protos ->
-          get_proposals ~chain:cctxt#chain ~block:cctxt#block cctxt
-          >>=? fun known_proposals ->
-          Alpha_services.Voting.listings cctxt (cctxt#chain, cctxt#block)
-          >>=? fun listings ->
-          (* for a proposal to be valid it must either a protocol that was already
+                ~successor:true
+                ~chain:cctxt#chain
+                ~block:cctxt#block
+                cctxt
+              >>=? fun info ->
+              ( match info.current_period_kind with
+              | Proposal ->
+                  return_unit
+              | _ ->
+                  cctxt#error "Not in a proposal period" )
+              >>=? fun () ->
+              Shell_services.Protocol.list cctxt
+              >>=? fun known_protos ->
+              get_proposals ~chain:cctxt#chain ~block:cctxt#block cctxt
+              >>=? fun known_proposals ->
+              Alpha_services.Voting.listings cctxt (cctxt#chain, cctxt#block)
+              >>=? fun listings ->
+              (* for a proposal to be valid it must either a protocol that was already
            proposed by somebody else or a protocol known by the node, because
            the user is the first proposer and just injected it with
            tezos-admin-client *)
-          let check_proposals proposals : bool tzresult Lwt.t =
-            let n = List.length proposals in
-            let errors = ref [] in
-            let error ppf =
-              Format.kasprintf (fun s -> errors := s :: !errors) ppf
-            in
-            if n = 0 then error "Empty proposal list." ;
-            if n > Constants.fixed.max_proposals_per_delegate then
-              error
-                "Too many proposals: %d > %d."
-                n
-                Constants.fixed.max_proposals_per_delegate ;
-            ( match
-                Base.List.find_all_dups
-                  ~compare:Protocol_hash.compare
-                  proposals
-              with
-            | [] ->
-                ()
-            | dups ->
-                error
-                  "There %s: %a."
-                  ( if List.length dups = 1 then "is a duplicate proposal"
-                  else "are duplicate proposals" )
-                  Format.(
-                    pp_print_list
-                      ~pp_sep:(fun ppf () -> pp_print_string ppf ", ")
-                      Protocol_hash.pp)
-                  dups ) ;
-            List.iter
-              (fun (p : Protocol_hash.t) ->
-                if
-                  List.mem p known_protos
-                  || Environment.Protocol_hash.Map.mem p known_proposals
-                then ()
-                else
+              let check_proposals proposals : bool tzresult Lwt.t =
+                let n = List.length proposals in
+                let errors = ref [] in
+                let error ppf =
+                  Format.kasprintf (fun s -> errors := s :: !errors) ppf
+                in
+                if n = 0 then error "Empty proposal list." ;
+                if n > Constants.fixed.max_proposals_per_delegate then
                   error
-                    "Protocol %a is not a known proposal."
-                    Protocol_hash.pp
-                    p)
-              proposals ;
-            List.fold_left_es
-              (fun acc (baker, _) ->
-                if acc then return true
-                else
-                  get_baker_consensus_key cctxt ~chain:cctxt#chain baker
-                  >>=? fun (_, consensus_key, _, _) ->
-                  return
-                  @@ Signature.Public_key_hash.equal consensus_key src_pkh)
-              false
-              listings
-            >>=? fun has_a_listing ->
-            if not has_a_listing then
-              error
-                "Public-key-hash `%a` from account `%s` does not appear to \
-                 have voting rights."
-                Signature.Public_key_hash.pp
-                src_pkh
-                src_name ;
-            if !errors <> [] then
-              cctxt#message
-                "There %s with the submission:%t"
-                ( if List.length !errors = 1 then "is an issue"
-                else "are issues" )
-                Format.(
-                  fun ppf ->
-                    pp_print_cut ppf () ;
-                    pp_open_vbox ppf 0 ;
-                    List.iter
-                      (fun msg ->
-                        pp_open_hovbox ppf 2 ;
-                        pp_print_string ppf "* " ;
-                        pp_print_text ppf msg ;
-                        pp_close_box ppf () ;
-                        pp_print_cut ppf ())
-                      !errors ;
-                    pp_close_box ppf ())
-              >>= fun () -> return_false
-            else return_true
-          in
-          check_proposals proposals
-          >>=? fun all_valid ->
-          ( if all_valid then cctxt#message "All proposals are valid."
-          else if force then
-            cctxt#message
-              "Some proposals are not valid, but `--force` was used."
-          else cctxt#error "Submission failed because of invalid proposals." )
-          >>= fun () ->
-          submit_proposals
-            ~dry_run
-            ~verbose_signing
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ~src_sk
-            src_pkh
-            proposals
-          >>= function
-          | Ok _res ->
-              return_unit
-          | Error errs ->
-              ( match errs with
-              | [ Unregistered_error
-                    (`O [("kind", `String "generic"); ("error", `String msg)])
-                ] ->
+                    "Too many proposals: %d > %d."
+                    n
+                    Constants.fixed.max_proposals_per_delegate ;
+                ( match
+                    Base.List.find_all_dups
+                      ~compare:Protocol_hash.compare
+                      proposals
+                  with
+                | [] ->
+                    ()
+                | dups ->
+                    error
+                      "There %s: %a."
+                      ( if List.length dups = 1 then "is a duplicate proposal"
+                      else "are duplicate proposals" )
+                      Format.(
+                        pp_print_list
+                          ~pp_sep:(fun ppf () -> pp_print_string ppf ", ")
+                          Protocol_hash.pp)
+                      dups ) ;
+                List.iter
+                  (fun (p : Protocol_hash.t) ->
+                    if
+                      List.mem p known_protos
+                      || Environment.Protocol_hash.Map.mem p known_proposals
+                    then ()
+                    else
+                      error
+                        "Protocol %a is not a known proposal."
+                        Protocol_hash.pp
+                        p)
+                  proposals ;
+                List.fold_left_es
+                  (fun acc (baker, _) ->
+                    if acc then return true
+                    else
+                      get_baker_consensus_key cctxt ~chain:cctxt#chain baker
+                      >>=? fun (_, consensus_key, _, _) ->
+                      return
+                      @@ Signature.Public_key_hash.equal consensus_key source)
+                  false
+                  listings
+                >>=? fun has_a_listing ->
+                if not has_a_listing then
+                  error
+                    "Public-key-hash `%a` from account `%s` does not appear \
+                     to have voting rights."
+                    Signature.Public_key_hash.pp
+                    source
+                    src_name ;
+                if !errors <> [] then
                   cctxt#message
-                    "Error:@[<hov>@.%a@]"
-                    Format.pp_print_text
-                    ( String.split_on_char ' ' msg
-                    |> List.filter (function "" | "\n" -> false | _ -> true)
-                    |> String.concat " "
-                    |> String.map (function '\n' | '\t' -> ' ' | c -> c) )
-              | el ->
-                  cctxt#message "Error:@ %a" pp_print_error el )
-              >>= fun () -> failwith "Failed to submit proposals");
+                    "There %s with the submission:%t"
+                    ( if List.length !errors = 1 then "is an issue"
+                    else "are issues" )
+                    Format.(
+                      fun ppf ->
+                        pp_print_cut ppf () ;
+                        pp_open_vbox ppf 0 ;
+                        List.iter
+                          (fun msg ->
+                            pp_open_hovbox ppf 2 ;
+                            pp_print_string ppf "* " ;
+                            pp_print_text ppf msg ;
+                            pp_close_box ppf () ;
+                            pp_print_cut ppf ())
+                          !errors ;
+                        pp_close_box ppf ())
+                  >>= fun () -> return_false
+                else return_true
+              in
+              check_proposals proposals
+              >>=? fun all_valid ->
+              ( if all_valid then cctxt#message "All proposals are valid."
+              else if force then
+                cctxt#message
+                  "Some proposals are not valid, but `--force` was used."
+              else
+                cctxt#error "Submission failed because of invalid proposals."
+              )
+              >>= fun () ->
+              submit_proposals
+                ~dry_run
+                ~verbose_signing
+                cctxt
+                ~chain:cctxt#chain
+                ~block:cctxt#block
+                ~src_sk
+                source
+                proposals
+              >>= function
+              | Ok _res ->
+                  return_unit
+              | Error errs ->
+                  ( match errs with
+                  | [ Unregistered_error
+                        (`O
+                          [("kind", `String "generic"); ("error", `String msg)])
+                    ] ->
+                      cctxt#message
+                        "Error:@[<hov>@.%a@]"
+                        Format.pp_print_text
+                        ( String.split_on_char ' ' msg
+                        |> List.filter (function
+                               | "" | "\n" ->
+                                   false
+                               | _ ->
+                                   true)
+                        |> String.concat " "
+                        |> String.map (function '\n' | '\t' -> ' ' | c -> c) )
+                  | el ->
+                      cctxt#message "Error:@ %a" pp_print_error el )
+                  >>= fun () -> failwith "Failed to submit proposals" ));
       command
         ~group
         ~desc:"Submit a ballot"
@@ -1701,44 +1693,36 @@ let commands network () =
              proposal
              ballot
              (cctxt : Protocol_client_context.full) ->
-          ( match Contract.is_implicit source with
-          | None -> (
-            match Contract.is_baker source with
-            | None ->
-                failwith
-                  "only implicit and baker accounts can submit proposals"
-            | Some baker ->
-                get_baker_consensus_key cctxt ~chain:cctxt#chain baker
-                >>=? fun (_, pkh, _, sk) -> return (pkh, sk) )
-          | Some src_pkh ->
-              Client_keys.get_key cctxt src_pkh
-              >>=? fun (_, _src_pk, src_sk) -> return (src_pkh, src_sk) )
-          >>=? fun (src_pkh, src_sk) ->
-          get_period_info
-          (* Find period info of the successor, because the operation will
+          get_source_keys cctxt source
+          >>=? function
+          | None ->
+              failwith "only implicit and baker accounts can submit proposals"
+          | Some (_name, source, _src_pk, src_sk) ->
+              get_period_info
+              (* Find period info of the successor, because the operation will
                  be injected on the next block at the earliest *)
-            ~successor:true
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            cctxt
-          >>=? fun info ->
-          ( match info.current_period_kind with
-          | Exploration | Promotion ->
-              return_unit
-          | _ ->
-              cctxt#error "Not in Exploration or Promotion period" )
-          >>=? fun () ->
-          submit_ballot
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ~src_sk
-            src_pkh
-            ~verbose_signing
-            ~dry_run
-            proposal
-            ballot
-          >>=? fun _res -> return_unit);
+                ~successor:true
+                ~chain:cctxt#chain
+                ~block:cctxt#block
+                cctxt
+              >>=? fun info ->
+              ( match info.current_period_kind with
+              | Exploration | Promotion ->
+                  return_unit
+              | _ ->
+                  cctxt#error "Not in Exploration or Promotion period" )
+              >>=? fun () ->
+              submit_ballot
+                cctxt
+                ~chain:cctxt#chain
+                ~block:cctxt#block
+                ~src_sk
+                source
+                ~verbose_signing
+                ~dry_run
+                proposal
+                ballot
+              >>=? fun _res -> return_unit);
       command
         ~group
         ~desc:"Summarize the current voting period"

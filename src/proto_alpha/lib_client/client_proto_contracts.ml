@@ -445,9 +445,7 @@ let get_baker_consensus_key ?level ?offset cctxt ~chain baker =
   >>=? fun pk ->
   let pkh = Signature.Public_key.hash pk in
   Client_keys.get_key cctxt pkh
-  >>=? fun (name, _, sk_uri) ->
-  Tezos_signer_backends.Encrypted.decrypt_list cctxt [name]
-  >>=? fun () -> return (name, pkh, pk, sk_uri)
+  >>=? fun (name, pk, sk_uri) -> return (name, pkh, pk, sk_uri)
 
 let baker_of_contract cctxt contract =
   let not_a_baker () =
@@ -471,3 +469,16 @@ let baker_of_contract cctxt contract =
         not_a_baker () )
   | Some baker_hash ->
       return baker_hash
+
+let get_source_keys cctxt source_contract =
+  match Contract.is_implicit source_contract with
+  | None -> (
+    match Contract.is_baker source_contract with
+    | None ->
+        return_none
+    | Some baker ->
+        get_baker_consensus_key cctxt ~chain:cctxt#chain baker >|=? Option.some
+    )
+  | Some pkh ->
+      Client_keys.get_key cctxt pkh
+      >>=? fun (name, pk, sk) -> return_some (name, pkh, pk, sk)

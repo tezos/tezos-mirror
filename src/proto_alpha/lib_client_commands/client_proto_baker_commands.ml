@@ -1336,13 +1336,13 @@ let multisig_commands () : #Protocol_client_context.full Clic.command list =
              (_, source)
              signatures
              (cctxt : #Protocol_client_context.full) ->
-          match Contract.is_implicit source with
+          get_source_keys cctxt source
+          >>=? function
           | None ->
               failwith
-                "only implicit accounts can be the source of a contract call"
-          | Some source -> (
-              Client_keys.get_key cctxt source
-              >>=? fun (_, src_pk, src_sk) ->
+                "only implicit and baker accounts can be the source of a \
+                 contract call"
+          | Some (_name, source, src_pk, src_sk) -> (
               let fee_parameter =
                 {
                   Injection.minimal_fees;
@@ -1433,13 +1433,13 @@ let multisig_commands () : #Protocol_client_context.full Clic.command list =
              signatures
              proposals
              (cctxt : #Protocol_client_context.full) ->
-          match Contract.is_implicit source with
+          get_source_keys cctxt source
+          >>=? function
           | None ->
               failwith
-                "only implicit accounts can be the source of a contract call"
-          | Some source -> (
-              Client_keys.get_key cctxt source
-              >>=? fun (_, src_pk, src_sk) ->
+                "only implicit and baker accounts can be the source of a \
+                 contract call"
+          | Some (_name, source, src_pk, src_sk) -> (
               let fee_parameter =
                 {
                   Injection.minimal_fees;
@@ -1607,13 +1607,13 @@ let multisig_commands () : #Protocol_client_context.full Clic.command list =
              proposal
              ballot
              (cctxt : #Protocol_client_context.full) ->
-          match Contract.is_implicit source with
+          get_source_keys cctxt source
+          >>=? function
           | None ->
               failwith
-                "only implicit accounts can be the source of a contract call"
-          | Some source -> (
-              Client_keys.get_key cctxt source
-              >>=? fun (_, src_pk, src_sk) ->
+                "only implicit and baker accounts can be the source of a \
+                 contract call"
+          | Some (_name, source, src_pk, src_sk) -> (
               let fee_parameter =
                 {
                   Injection.minimal_fees;
@@ -1688,13 +1688,13 @@ let multisig_commands () : #Protocol_client_context.full Clic.command list =
              (_, source)
              signatures
              (cctxt : #Protocol_client_context.full) ->
-          match Contract.is_implicit source with
+          get_source_keys cctxt source
+          >>=? function
           | None ->
               failwith
-                "only implicit accounts can be the source of a contract call"
-          | Some source -> (
-              Client_keys.get_key cctxt source
-              >>=? fun (_, src_pk, src_sk) ->
+                "only implicit and baker accounts can be the source of a \
+                 contract call"
+          | Some (_name, source, src_pk, src_sk) -> (
               let fee_parameter =
                 {
                   Injection.minimal_fees;
@@ -1758,13 +1758,13 @@ let multisig_commands () : #Protocol_client_context.full Clic.command list =
              (_, source)
              signatures
              (cctxt : #Protocol_client_context.full) ->
-          match Contract.is_implicit source with
+          get_source_keys cctxt source
+          >>=? function
           | None ->
               failwith
-                "only implicit accounts can be the source of a contract call"
-          | Some source -> (
-              Client_keys.get_key cctxt source
-              >>=? fun (_, src_pk, src_sk) ->
+                "only implicit and baker accounts can be the source of a \
+                 contract call"
+          | Some (_name, source, src_pk, src_sk) -> (
               let fee_parameter =
                 {
                   Injection.minimal_fees;
@@ -1839,13 +1839,13 @@ let multisig_commands () : #Protocol_client_context.full Clic.command list =
           | Some new_key ->
               return new_key )
           >>=? fun new_key ->
-          match Contract.is_implicit source with
+          get_source_keys cctxt source
+          >>=? function
           | None ->
               failwith
-                "only implicit accounts can be the source of a contract call"
-          | Some source -> (
-              Client_keys.get_key cctxt source
-              >>=? fun (_, src_pk, src_sk) ->
+                "only implicit and baker accounts can be the source of a \
+                 contract call"
+          | Some (_name, source, src_pk, src_sk) -> (
               let fee_parameter =
                 {
                   Injection.minimal_fees;
@@ -1913,17 +1913,17 @@ let multisig_commands () : #Protocol_client_context.full Clic.command list =
              (_, source)
              signatures
              (cctxt : #Protocol_client_context.full) ->
-          match Contract.is_implicit source with
+          get_source_keys cctxt source
+          >>=? function
           | None ->
               failwith
-                "only implicit accounts can be the source of a contract call"
-          | Some source -> (
+                "only implicit and baker accounts can be the source of a \
+                 contract call"
+          | Some (_name, source, src_pk, src_sk) -> (
               List.map_es
                 (fun (pk_uri, _) -> Client_keys.public_key pk_uri)
                 keys
               >>=? fun keys ->
-              Client_keys.get_key cctxt source
-              >>=? fun (_, src_pk, src_sk) ->
               let fee_parameter =
                 {
                   Injection.minimal_fees;
@@ -1988,13 +1988,12 @@ let multisig_commands () : #Protocol_client_context.full Clic.command list =
              (_, source)
              signatures
              (cctxt : #Protocol_client_context.full) ->
-          match Contract.is_implicit source with
+          get_source_keys cctxt source
+          >>=? function
           | None ->
               failwith
                 "only implicit accounts can be the source of a contract call"
-          | Some source -> (
-              Client_keys.get_key cctxt source
-              >>=? fun (_, src_pk, src_sk) ->
+          | Some (_name, source, src_pk, src_sk) -> (
               let fee_parameter =
                 {
                   Injection.minimal_fees;

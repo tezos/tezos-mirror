@@ -151,3 +151,9 @@ val baker_of_contract :
   #Protocol_client_context.full ->
   Contract.t ->
   Baker_hash.t Error_monad.tzresult Lwt.t
+
+val get_source_keys :
+  #Protocol_client_context.full ->
+  Contract.t ->
+  (string * public_key_hash * public_key * Client_keys.sk_uri) option tzresult
+  Lwt.t
