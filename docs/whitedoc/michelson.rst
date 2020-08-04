@@ -2717,7 +2717,7 @@ The input values will be wrapped as in the following examples.
    | %default   | Unit                | Right (Left Unit)     |
    | %root      | Right (Right "bob") | Right (Right "bob")   |
    +------------+---------------------+-----------------------+
-   | not given  | Unit                | Right Unit            |
+   | not given  | Unit                | Right (Left Unit)     |
    | %BAD       | _                   | failure, contract not |
    +------------+---------------------+-----------------------+
 
