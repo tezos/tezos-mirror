@@ -161,10 +161,7 @@ let is_acceptable t connection_point_info peer_info incoming version =
     && not (P2p_peer_state.Info.trusted peer_info)
   in
   if unexpected then (
-    Lwt_utils.dont_wait
-      (fun exc ->
-        Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
-      (fun () -> Events.(emit peer_rejected) ()) ;
+    Events.(emit__dont_wait__use_with_care peer_rejected) () ;
     error P2p_errors.Private_mode )
   else
     (* checking if point is acceptable *)

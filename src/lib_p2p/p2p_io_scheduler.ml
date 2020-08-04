@@ -25,15 +25,7 @@
 
 (* TODO decide whether we need to preallocate buffers or not. *)
 
-module Events = struct
-  include P2p_events.P2p_io_scheduler
-
-  let emit_dont_wait e p =
-    Lwt_utils.dont_wait
-      (fun exc ->
-        Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
-      (fun () -> emit e p)
-end
+module Events = P2p_events.P2p_io_scheduler
 
 let alpha = 0.2
 
@@ -195,7 +187,7 @@ module Scheduler (IO : IO) = struct
     st
 
   let create_connection st in_param out_param canceler id =
-    Events.(emit_dont_wait create_connection (id, IO.name)) ;
+    Events.(emit__dont_wait__use_with_care create_connection (id, IO.name)) ;
     let conn =
       {
         id;
@@ -212,7 +204,7 @@ module Scheduler (IO : IO) = struct
     waiter st conn ; conn
 
   let update_quota st =
-    Events.(emit_dont_wait update_quota IO.name) ;
+    Events.(emit__dont_wait__use_with_care update_quota IO.name) ;
     Option.iter
       (fun quota ->
         st.quota <- min st.quota 0 + quota ;
@@ -319,7 +311,7 @@ and t = {
 }
 
 let reset_quota st =
-  Events.(emit_dont_wait reset_quota ()) ;
+  Events.(emit__dont_wait__use_with_care reset_quota ()) ;
   let {Moving_average.average = current_inflow; _} =
     Moving_average.stat st.read_scheduler.counter
   and {Moving_average.average = current_outflow; _} =
@@ -339,7 +331,7 @@ let reset_quota st =
 
 let create ?max_upload_speed ?max_download_speed ?read_queue_size
     ?write_queue_size ~read_buffer_size () =
-  Events.(emit_dont_wait create ()) ;
+  Events.(emit__dont_wait__use_with_care create ()) ;
   let ma_state =
     Moving_average.fresh_state ~id:"p2p-io-sched" ~refresh_interval:1.0
   in

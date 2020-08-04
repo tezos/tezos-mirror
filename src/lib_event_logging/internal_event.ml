@@ -414,25 +414,37 @@ module Simple = struct
   type 'a t = 'a -> unit tzresult Lwt.t
 
   let emit simple_event parameters =
-    simple_event parameters
-    >>= function
-    | Ok () ->
-        Lwt.return_unit
-    | Error trace ->
-        (* Having to handle errors when sending events would make the
-           code very heavy. We are much more likely to just use [>>=?]
-           to propagate the error, assuming that sending events cannot
-           fail. But consider this example:
-           - we log that we are going to do some cleanup, like remove
-             temporary directories...
-           - and then because we failed to log, we don't actually
-             clean the temporary directories.
-           Instead we just print the error on stderr. *)
+    Lwt.try_bind
+      (fun () -> simple_event parameters)
+      (function
+        | Ok () ->
+            Lwt.return_unit
+        | Error trace ->
+            (* Having to handle errors when sending events would make the
+              code very heavy. We are much more likely to just use [>>=?]
+              to propagate the error, assuming that sending events cannot
+              fail. But consider this example:
+              - we log that we are going to do some cleanup, like remove
+                temporary directories...
+              - and then because we failed to log, we don't actually
+                clean the temporary directories.
+              Instead we just print the error on stderr. *)
+            Format.eprintf
+              "@[<hv 2>Failed to send event:@ %a@]@."
+              Error_monad.pp_print_error
+              trace ;
+            Lwt.return_unit)
+      (fun exc ->
+        (* For the same reason we also just print exceptions *)
         Format.eprintf
-          "@[<hv 2>Failed to send event:@ %a@]@."
-          Error_monad.pp_print_error
-          trace ;
-        Lwt.return_unit
+          "@[<hv 2>Failed to send event:@ %s@]@."
+          (Printexc.to_string exc) ;
+        Lwt.return_unit)
+
+  let emit__dont_wait__use_with_care simple_event parameters =
+    Lwt_utils.dont_wait
+      (fun exc -> raise exc) (* emit never lets exceptions escape *)
+      (fun () -> emit simple_event parameters)
 
   let make_section names =
     match names with

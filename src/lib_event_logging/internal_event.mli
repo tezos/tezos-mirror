@@ -238,6 +238,11 @@ module Simple : sig
   (** Emit an instance of an event. *)
   val emit : 'a t -> 'a -> unit Lwt.t
 
+  (** Emit an instance of an event but do not wait for completion. Only use if
+      you really need to not wait for logging resolution before continuing. May
+      cause increased memory usage and out-of-order log messages. *)
+  val emit__dont_wait__use_with_care : 'a t -> 'a -> unit
+
   (** Declare an event with no parameters. *)
   val declare_0 :
     ?section:string list ->
