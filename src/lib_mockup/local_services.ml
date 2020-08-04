@@ -171,6 +171,7 @@ let pending_operations (mockup_env : Registration.mockup_environment) chain_id
   in
   Directory.register
     Directory.empty
+    (* /chains/<chain_id>/mempool/pending_operations *)
     ( M.Block_services.S.Mempool.pending_operations
     @@ Block_services.mempool_path Block_services.chain_path )
     (fun ((), chain) () () ->
@@ -259,7 +260,9 @@ let preapply (mockup_env : Registration.mockup_environment)
   let (module Mockup_environment) = mockup_env in
   Directory.prefix
     (Tezos_rpc.RPC_path.prefix
+       (* /chains/<chain> *)
        Tezos_shell_services.Chain_services.path
+       (* blocks/<block_id> *)
        Block_services.path)
     (Directory.register
        Directory.empty
