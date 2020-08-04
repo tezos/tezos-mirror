@@ -139,15 +139,20 @@ let monitor (rpc_context : Tezos_protocol_environment.rpc_context) =
     Monitor_services.S.bootstrapped
     (fun () () () -> RPC_answer.return (block_hash, block_header.timestamp))
 
-let pending_operations (mockup_env : Registration.mockup_environment)
+let eq_chain_chain_id (chain : Block_services.chain) (chain_id : Chain_id.t) =
+  ( match chain with
+  | `Main ->
+      Chain_id.hash_string ["main"]
+  | `Test ->
+      Chain_id.hash_string ["test"]
+  | `Hash cid ->
+      cid )
+  |> Chain_id.equal chain_id
+
+let pending_operations (mockup_env : Registration.mockup_environment) chain_id
     (dirname : string) =
-  (* Format.printf "Registering mempool %@ %s@." dirname ; *)
   let module M = (val mockup_env : Registration.Mockup_sig) in
   (* TODO: Don't know why it fails *)
-  let service =
-    M.Block_services.S.Mempool.pending_operations
-      Block_services.(mempool_path chain_path)
-  in
   let op_data_encoding = M.Protocol.operation_data_encoding in
   let read_operations () =
     let op_encoding =
@@ -164,43 +169,77 @@ let pending_operations (mockup_env : Registration.mockup_environment)
     Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file mempool_file
     >>=? fun json -> return @@ Data_encoding.Json.destruct ops_encoding json
   in
-  Directory.register Directory.empty service (fun _ () () ->
-      read_operations ()
-      >>= function
-      | Error errs ->
-          RPC_answer.fail errs
-      | Ok pooled_operations ->
-          (* Format.printf "Retrieving unprocessed operations@." ; *)
-          let unprocessed =
-            List.fold_left
-              (fun map (shell_header, operation_data) ->
-                let op =
-                  {
-                    M.Protocol.shell = shell_header;
-                    protocol_data = operation_data;
-                  }
-                in
-                match
-                  Data_encoding.Binary.to_bytes op_data_encoding operation_data
-                with
-                | Error _ ->
-                    map
-                | Ok proto ->
-                    let operation_hash =
-                      Operation.hash {Operation.shell = shell_header; proto}
-                    in
-                    Operation_hash.Map.add operation_hash op map)
-              Operation_hash.Map.empty
-              pooled_operations
-          in
-          RPC_answer.return
-            {
-              M.Block_services.Mempool.applied = [];
-              refused = Operation_hash.Map.empty;
-              branch_refused = Operation_hash.Map.empty;
-              branch_delayed = Operation_hash.Map.empty;
-              unprocessed;
-            })
+  Directory.register
+    Directory.empty
+    ( M.Block_services.S.Mempool.pending_operations
+    @@ Block_services.mempool_path Block_services.chain_path )
+    (fun ((), chain) () () ->
+      if not @@ eq_chain_chain_id chain chain_id then
+        let msg =
+          let open Format in
+          asprintf
+            "Mismatched chain id. Got %a (expected %a for this mockup)"
+            (fun ppf chain ->
+              match chain with
+              | `Main ->
+                  fprintf
+                    ppf
+                    "main (%a)"
+                    Chain_id.pp
+                    (Chain_id.hash_string ["main"])
+              | `Test ->
+                  fprintf
+                    ppf
+                    "test (%a)"
+                    Chain_id.pp
+                    (Chain_id.hash_string ["test"])
+              | `Hash chain_id ->
+                  Chain_id.pp ppf chain_id)
+            chain
+            Chain_id.pp
+            chain_id
+        in
+        Lwt.fail_with msg
+      else
+        read_operations ()
+        >>= function
+        | Error errs ->
+            RPC_answer.fail errs
+        | Ok pooled_operations ->
+            (* Format.printf "Retrieving unprocessed operations@." ; *)
+            let unprocessed =
+              List.fold_left
+                (fun map (shell_header, operation_data) ->
+                  let op =
+                    {
+                      M.Protocol.shell = shell_header;
+                      protocol_data = operation_data;
+                    }
+                  in
+                  match
+                    Data_encoding.Binary.to_bytes
+                      op_data_encoding
+                      operation_data
+                  with
+                  | Error _ ->
+                      map
+                  | Ok proto ->
+                      let operation_hash =
+                        Operation.hash {Operation.shell = shell_header; proto}
+                      in
+                      Operation_hash.Map.add operation_hash op map)
+                Operation_hash.Map.empty
+                pooled_operations
+            in
+            Lwt.return
+              (`Ok
+                {
+                  M.Block_services.Mempool.applied = [];
+                  refused = Operation_hash.Map.empty;
+                  branch_refused = Operation_hash.Map.empty;
+                  branch_delayed = Operation_hash.Map.empty;
+                  unprocessed;
+                }))
 
 let block_hash (rpc_context : Tezos_protocol_environment.rpc_context) =
   let path =
@@ -424,7 +463,7 @@ let build_shell_directory (base_dir : string)
   merge (protocols Mockup_environment.Protocol.hash) ;
   merge (block_hash rpc_context) ;
   merge (preapply mockup_env chain_id rpc_context) ;
-  merge (pending_operations mockup_env base_dir) ;
+  merge (pending_operations mockup_env chain_id base_dir) ;
   merge
     (inject_operation
        mockup_env
