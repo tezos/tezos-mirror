@@ -179,7 +179,7 @@ let check_chain_chain_id (chain : Block_services.chain) (chain_id : Chain_id.t)
 
 let pending_operations (mockup_env : Registration.mockup_environment) chain_id
     (dirname : string) =
-  let module M = (val mockup_env : Registration.Mockup_sig) in
+  let (module M) = mockup_env in
   (* TODO: Don't know why it fails *)
   let op_data_encoding = M.Protocol.operation_data_encoding in
   let read_operations () =
