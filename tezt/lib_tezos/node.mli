@@ -87,6 +87,9 @@ val net_port : t -> int
 (** Get the RPC port given as [--rpc-addr] to a node. *)
 val rpc_port : t -> int
 
+(** Get the data-dir of a node. *)
+val data_dir : t -> string
+
 (** Send SIGTERM to a node and wait for it to terminate. *)
 val terminate : t -> unit Lwt.t
 

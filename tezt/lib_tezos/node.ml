@@ -84,6 +84,8 @@ let net_port node = node.net_port
 
 let rpc_port node = node.rpc_port
 
+let data_dir node = node.data_dir
+
 let terminate node =
   match node.status with
   | Not_running ->
