@@ -261,6 +261,33 @@ let block_hash (rpc_context : Tezos_protocol_environment.rpc_context) =
   Directory.register Directory.empty service (fun _prefix () () ->
       RPC_answer.return rpc_context.block_hash)
 
+let live_blocks =
+  Directory.prefix
+    (Tezos_rpc.RPC_path.prefix
+       (* /chains/<chain> *)
+       Tezos_shell_services.Chain_services.path
+       (* blocks/<block_id> *)
+       Block_services.path)
+  @@ Directory.register
+       Directory.empty
+       Block_services.Empty.S.live_blocks
+       (fun _ () () -> RPC_answer.return Block_hash.Set.empty)
+
+let preapply_block (rpc_context : Tezos_protocol_environment.rpc_context) =
+  Directory.prefix
+    (Tezos_rpc.RPC_path.prefix
+       (* /chains/<chain> *)
+       Tezos_shell_services.Chain_services.path
+       (* blocks/<block_id> *)
+       Block_services.path)
+  @@ Directory.register
+       Directory.empty
+       Block_services.Empty.S.Helpers.Preapply.block
+       (fun _ _ _ ->
+         let preapply_results = [] in
+         let shell_header = rpc_context.block_header in
+         RPC_answer.return (shell_header, preapply_results))
+
 let preapply (mockup_env : Registration.mockup_environment)
     (chain_id : Chain_id.t)
     (rpc_context : Tezos_protocol_environment.rpc_context) =
@@ -483,4 +510,6 @@ let build_shell_directory (base_dir : string)
        mem_only
        write_context_callback) ;
   merge inject_block ;
+  merge live_blocks ;
+  merge (preapply_block rpc_context) ;
   !directory
