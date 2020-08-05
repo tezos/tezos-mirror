@@ -41,4 +41,5 @@ let () =
   Bootstrap.run () ;
   Synchronisation_heuristic.run () ;
   Encoding.run () ;
-  Mockup.run ()
+  Mockup.run () ;
+  Double_bake.run ()

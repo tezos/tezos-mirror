@@ -44,7 +44,7 @@ type t
     The [node] parameter is the accuser's node target. The accusser
     will be configured to be synchronised with the given node, and
     will communicate with it. If the [wait_for_node] parameter is
-    true, the accuser is not until the target node is
+    true, the accuser is not spawned until the target node is
     ready. Otherwise, it is directly spawned.*)
 val create :
   ?path:string ->
@@ -91,7 +91,7 @@ exception
 (** Wait until the accuser is ready.
 
     More precisely, wait until the node on which the accuser is
-    connect to is bootstrapped, and thus, the accuser is ready.*)
+    connected to is bootstrapped, and then, the accuser is ready. *)
 val wait_for_ready : t -> unit Lwt.t
 
 (** Wait for a custom event to occur.

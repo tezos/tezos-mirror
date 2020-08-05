@@ -1,0 +1,202 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
+
+(* Testing
+   -------
+   Component:    Accuser
+   Invocation:   dune exec tezt/tests/main.exe -- double baking accuser
+   Subject:      Detect double baking through the accuser.
+*)
+
+let is_operation_in_operations ops oph =
+  let open JSON in
+  let ops_list = ops |=> 2 |> as_list in
+  List.exists (fun e -> e |-> "hash" |> as_string = oph) ops_list
+
+let is_operation_in_applied_mempool mempool oph =
+  let open JSON in
+  let applied_list = as_list (mempool |-> "applied") in
+  List.exists (fun e -> e |-> "hash" |> as_string = oph) applied_list
+
+(* Matches events where the message is of the form:
+   "Double baking evidence injected <operation_hash>".
+   For example:
+
+    "event": {
+      "legacy_logging_event-alpha-baking-denunciation.v0": {
+        "message": "Double baking evidence injected onkfjSun49iRrGtuN9FwtiCqDAEgzPKzg1BSa7BSHnaAkButUxx",
+        "section": [
+          "alpha",
+          "baking",
+          "denunciation"
+        ],
+        "level": "notice",
+        "tags": "{(tag:Operation_hash onkfjSun49iRrGtuN9FwtiCqDAEgzPKzg1BSa7BSHnaAkButUxx)\n (tag:signed_operation\n  aede0aa...000000)\n (tag:event double_baking_denounced)}"
+      }
+    }
+ *)
+let wait_for_denunciation accuser =
+  let filter json =
+    match JSON.(json |-> "message" |> as_string_opt) with
+    | Some s ->
+        s =~* rex "Double baking evidence injected (\\S*)$"
+    | None ->
+        None
+  in
+  Accuser.wait_for
+    accuser
+    "legacy_logging_event-alpha-baking-denunciation.v0"
+    filter
+
+(* Matches events which contain an injection request.
+   For example:
+
+   "event": {
+     "node_prevalidator.v0": [
+       "2020-09-11T12:32:05.353-00:00",
+       {
+         "event": {
+           "request": {
+             "request": "inject",
+             "operation": {
+               "branch": "BM3J62AvjnjJKfinoq1op2uw5Hdn3YGMQmusnLdrfCd1yrpftG2",
+               "data": "030000...00000"
+             }
+           },
+           "status": {
+             "pushed": "2020-09-11T12:32:05.343-00:00",
+             "treated": 4.5947e-05,
+             "completed": 0.009614550999999999
+           }
+         },
+         "level": "notice"
+       }
+     ]
+   }
+ *)
+let wait_for_denunciation_injection node client oph_promise =
+  let filter json =
+    match
+      JSON.(
+        json |=> 1 |-> "event" |-> "request" |-> "request" |> as_string_opt)
+    with
+    | Some s when s = "inject" ->
+        Some s
+    | Some _ | None ->
+        None
+  in
+  let* _ = Node.wait_for node "node_prevalidator.v0" filter in
+  let* oph = oph_promise in
+  let* mempool = RPC.get_mempool_pending_operations client in
+  if is_operation_in_applied_mempool mempool oph then some oph else none
+
+(* This tests aims to detect a double baking evidence with an accuser.
+   The scenario is the following:
+
+   1. Node 1 activates a protocol and bakes one block,
+
+   2. Node 2 catches up with Node 1,
+
+   3. Node 2 is terminated. Then, Node 1 bakes one block at level 1
+      with bootstrap1 key,
+
+   4. Node 1 is terminated. Then, Node 2 is restarted and bake one
+      block at level 1 too with the same bootstrap1 key. The block at
+      level 1 is double baked,
+
+   5. Node 1 came back in the dance,
+
+   6. Node 3 is run along with its accuser and catches up. The accuser
+      must detect the double baking evidence and generate an operation
+      accordingly,
+
+   7. A block is baked.
+
+   The test is successful if the double baking evidence can be found
+   in the last baked block. *)
+let double_bake () =
+  Test.run
+    ~__FILE__
+    ~title:"Test double baking with accuser"
+    ~tags:["double"; "baking"; "accuser"; "node"]
+  @@ fun () ->
+  (* Step 1 and 2 *)
+  let* node_1 = Node.init ~bootstrap_threshold:0 ()
+  and* node_2 = Node.init ~bootstrap_threshold:0 () in
+  let* client_1 = Client.init ~node:node_1 ()
+  and* client_2 = Client.init ~node:node_2 () in
+  let* () = Client.Admin.connect_address client_1 ~peer:node_2 in
+  let* () = Client.activate_protocol client_1 in
+  Log.info "Activated protocol." ;
+  (* At least one block must be baked *)
+  let bakes_before_kill = 1 in
+  (* The key used to produce the double baked block *)
+  let key = Constant.bootstrap1.identity in
+  let* () =
+    repeat bakes_before_kill (fun () -> Client.bake_for ~key client_1)
+  in
+  let* _ = Node.wait_for_level node_1 (bakes_before_kill + 1)
+  and* _ = Node.wait_for_level node_2 (bakes_before_kill + 1) in
+  Log.info "Both nodes are at level %d." (bakes_before_kill + 1) ;
+  (* Step 3 *)
+  let* () = Node.terminate node_2 in
+  let* () = Client.bake_for ~key client_1 in
+  let* _ = Node.wait_for_level node_1 (bakes_before_kill + 2) in
+  (* Step 4 *)
+  let* () = Node.terminate node_1 in
+  let* () = Node.run ~bootstrap_threshold:0 node_2 in
+  let* () = Node.wait_for_ready node_2 in
+  (* Client 2 bake a block with bootstrap1's key to simulate a double bake *)
+  let* () = Client.bake_for ~minimal_timestamp:false ~key client_2 in
+  let* _ = Node.wait_for_level node_2 (bakes_before_kill + 2) in
+  (* Step 5 *)
+  let* () = Node.run ~bootstrap_threshold:0 node_1 in
+  let* () = Node.wait_for_ready node_1 in
+  (* Step 6 *)
+  let* node_3 = Node.init ~bootstrap_threshold:0 () in
+  let* client_3 = Client.init ~node:node_3 () in
+  let* accuser_3 = Accuser.init ~node:node_3 () in
+  let denunciation = wait_for_denunciation accuser_3 in
+  let denunciation_injection =
+    wait_for_denunciation_injection node_3 client_3 denunciation
+  in
+  let* () = Client.Admin.connect_address client_1 ~peer:node_3
+  and* () = Client.Admin.connect_address client_2 ~peer:node_3 in
+  let* _ = Node.wait_for_level node_3 (bakes_before_kill + 2) in
+  (* Ensure that the denunciation was emitted by the accuser *)
+  let* denunciation_oph = denunciation in
+  (* Ensure that the denunciation is in node_3's mempool *)
+  let* _ = denunciation_injection in
+  (* Step 7 *)
+  let* () = Client.bake_for ~minimal_timestamp:false ~key client_3 in
+  let* _ = Node.wait_for_level node_2 (bakes_before_kill + 3)
+  and* _ = Node.wait_for_level node_3 (bakes_before_kill + 3) in
+  (* Getting the operations of the current head *)
+  let* ops = RPC.get_operations client_1 in
+  let* () = Accuser.terminate accuser_3 in
+  if is_operation_in_operations ops denunciation_oph then unit
+  else Test.fail "Double baking evidence was not found"
+
+let run () = double_bake ()
