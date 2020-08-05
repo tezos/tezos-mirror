@@ -261,7 +261,9 @@ let block_hash (rpc_context : Tezos_protocol_environment.rpc_context) =
   Directory.register Directory.empty service (fun _prefix () () ->
       RPC_answer.return rpc_context.block_hash)
 
-let live_blocks =
+let live_blocks (mockup_env : Registration.mockup_environment)
+    (rpc_context : Tezos_protocol_environment.rpc_context) =
+  let (module Mockup_environment) = mockup_env in
   Directory.prefix
     (Tezos_rpc.RPC_path.prefix
        (* /chains/<chain> *)
@@ -270,10 +272,14 @@ let live_blocks =
        Block_services.path)
   @@ Directory.register
        Directory.empty
-       Block_services.Empty.S.live_blocks
-       (fun _ () () -> RPC_answer.return Block_hash.Set.empty)
+       Mockup_environment.Block_services.S.live_blocks
+       (fun _ () () ->
+         let set = Block_hash.Set.singleton rpc_context.block_hash in
+         RPC_answer.return set)
 
-let preapply_block (rpc_context : Tezos_protocol_environment.rpc_context) =
+let preapply_block (mockup_env : Registration.mockup_environment)
+    (rpc_context : Tezos_protocol_environment.rpc_context) chain_id =
+  let (module Mockup_environment) = mockup_env in
   Directory.prefix
     (Tezos_rpc.RPC_path.prefix
        (* /chains/<chain> *)
@@ -282,11 +288,37 @@ let preapply_block (rpc_context : Tezos_protocol_environment.rpc_context) =
        Block_services.path)
   @@ Directory.register
        Directory.empty
-       Block_services.Empty.S.Helpers.Preapply.block
-       (fun _ _ _ ->
-         let preapply_results = [] in
-         let shell_header = rpc_context.block_header in
-         RPC_answer.return (shell_header, preapply_results))
+       Mockup_environment.Block_services.S.Helpers.Preapply.block
+       (fun (((), chain), block) _ {operations; _} ->
+         Format.printf
+           "block %s with %d operation list @."
+           (Block_services.to_string block)
+           (List.length operations) ;
+         List.iteri
+           (fun i ops ->
+             Format.printf "@[<v>%i: " i ;
+             if ops = [] then Format.printf "[]"
+             else
+               List.iter
+                 (fun Mockup_environment.Protocol.{protocol_data; _} ->
+                   let encoding =
+                     Mockup_environment.Protocol.operation_data_encoding
+                   in
+                   let json =
+                     Data_encoding.Json.construct encoding protocol_data
+                   in
+                   Format.printf "%a@;" Data_encoding.Json.pp json)
+                 ops ;
+             Format.printf "@]@.")
+           operations ;
+         check_chain_chain_id chain chain_id
+         >>= function
+         | Error err ->
+             RPC_answer.fail err
+         | Ok () ->
+             let preapply_results = [Preapply_result.empty] in
+             let shell_header = rpc_context.block_header in
+             RPC_answer.return (shell_header, preapply_results))
 
 let preapply (mockup_env : Registration.mockup_environment)
     (chain_id : Chain_id.t)
@@ -510,6 +542,6 @@ let build_shell_directory (base_dir : string)
        mem_only
        write_context_callback) ;
   merge inject_block ;
-  merge live_blocks ;
-  merge (preapply_block rpc_context) ;
+  merge (live_blocks mockup_env rpc_context) ;
+  merge (preapply_block mockup_env rpc_context chain_id) ;
   !directory
