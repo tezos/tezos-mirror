@@ -27,10 +27,6 @@ module Make (Error : Sig.CORE) (Trace : Sig.TRACE) :
   Sig.MONAD
     with type error := Error.error
      and type 'err trace := 'err Trace.trace = struct
-  type tztrace = Error.error Trace.trace
-
-  type 'a tzresult = ('a, tztrace) result
-
   let ( >>= ) = Lwt.( >>= )
 
   let[@inline] ok v = Ok v

@@ -160,21 +160,57 @@ end
 
 module type TRACE = sig
   (** [trace] is abstract in this interface but it is made concrete in the
-      instantiated error monad (see [error_monad.mli]). *)
+      instantiated error monad (see [error_monad.mli]).
+
+      The idea of abstracting the trace is so that it can evolve more easily.
+      Eventually, we can make the trace abstract in the instantiated error
+      monad, we can have different notions of traces for the protocol and the
+      shell, etc. *)
   type 'err trace
 
+  (** [make e] makes a singleton trace, the simplest of traces that carries a
+      single error. *)
   val make : 'error -> 'error trace
 
+  (** [cons e t] (construct sequential) constructs a sequential trace. This is
+      for tracing events/failures/things that happen one after the other,
+      generally one as a consequence of the other. E.g.,
+
+      [let file_handle =
+         match attempt_open name with
+         | Ok handle -> Ok handle
+         | Error error ->
+               let trace = make error in
+               match attempt_create name with
+               | Ok handle -> Ok handle
+               | Error error -> Error (cons error trace)
+      ]
+  *)
   val cons : 'error -> 'error trace -> 'error trace
 
+  (** [conp t1 t2] (construct parallel) construct a parallel trace. This is for
+      tracing events/failure/things that happen concurrently, in parallel, or
+      simply independently of each other. E.g.,
+
+      [let fetch_density () =
+         let area = fetch_area () in
+         let population = fetch_population () in
+         match area, population with
+         | Ok area, Ok population -> Ok (population / area)
+         | Error trace, Ok _ | Ok _, Error trace -> Error trace
+         | Error trace1, Error trace2 -> Error (conp trace1 trace2)
+      ]
+  *)
   val conp : 'error trace -> 'error trace -> 'error trace
 
+  (** [pp_print] pretty-prints a trace of errors *)
   val pp_print :
     (Format.formatter -> 'err -> unit) ->
     Format.formatter ->
     'err trace ->
     unit
 
+  (** [pp_print_top] pretty-prints the top errors of the trace *)
   val pp_print_top :
     (Format.formatter -> 'err -> unit) ->
     Format.formatter ->
@@ -183,6 +219,10 @@ module type TRACE = sig
 
   val encoding : 'error Data_encoding.t -> 'error trace Data_encoding.t
 
+  (** [fold f init trace] traverses the trace (in an unspecified manner) so that
+      [init] is folded over each of the error within [trace] by [f]. Typical use
+      is to find the worst error, to check for the presence of a given error,
+      etc. *)
   val fold : ('a -> 'error -> 'a) -> 'a -> 'error trace -> 'a
 end
 
@@ -204,51 +244,47 @@ module type MONAD = sig
   (** To be subsituted/constrained *)
   type 'err trace
 
-  type tztrace = error trace
-
-  type 'a tzresult = ('a, tztrace) result
-
   (** Successful result *)
-  val ok : 'a -> 'a tzresult
+  val ok : 'a -> ('a, 'trace) result
 
-  val ok_unit : unit tzresult
+  val ok_unit : (unit, 'trace) result
 
-  val ok_none : 'a option tzresult
+  val ok_none : ('a option, 'trace) result
 
-  val ok_some : 'a -> 'a option tzresult
+  val ok_some : 'a -> ('a option, 'trace) result
 
-  val ok_nil : 'a list tzresult
+  val ok_nil : ('a list, 'trace) result
 
-  val ok_true : bool tzresult
+  val ok_true : (bool, 'trace) result
 
-  val ok_false : bool tzresult
+  val ok_false : (bool, 'trace) result
 
   (** Successful return *)
-  val return : 'a -> 'a tzresult Lwt.t
+  val return : 'a -> ('a, 'trace) result Lwt.t
 
   (** Successful return of [()] *)
-  val return_unit : unit tzresult Lwt.t
+  val return_unit : (unit, 'trace) result Lwt.t
 
   (** Successful return of [None] *)
-  val return_none : 'a option tzresult Lwt.t
+  val return_none : ('a option, 'trace) result Lwt.t
 
   (** [return_some x] is a successful return of [Some x] *)
-  val return_some : 'a -> 'a option tzresult Lwt.t
+  val return_some : 'a -> ('a option, 'trace) result Lwt.t
 
   (** Successful return of [[]] *)
-  val return_nil : 'a list tzresult Lwt.t
+  val return_nil : ('a list, 'trace) result Lwt.t
 
   (** Successful return of [true] *)
-  val return_true : bool tzresult Lwt.t
+  val return_true : (bool, 'trace) result Lwt.t
 
   (** Successful return of [false] *)
-  val return_false : bool tzresult Lwt.t
+  val return_false : (bool, 'trace) result Lwt.t
 
   (** Erroneous result *)
-  val error : error -> 'a tzresult
+  val error : 'err -> ('a, 'err trace) result
 
   (** Erroneous return *)
-  val fail : error -> 'a tzresult Lwt.t
+  val fail : 'err -> ('a, 'err trace) result Lwt.t
 
   (** Infix operators for monadic binds/maps. All operators follow this naming
       convention:
@@ -268,18 +304,22 @@ module type MONAD = sig
 
   (** Non-Lwt bind operator. In this operator and the ones below, [?] indicates
       that we operate within the error monad. *)
-  val ( >>? ) : 'a tzresult -> ('a -> 'b tzresult) -> 'b tzresult
+  val ( >>? ) :
+    ('a, 'trace) result -> ('a -> ('b, 'trace) result) -> ('b, 'trace) result
 
   (** Non-Lwt map operator. *)
-  val ( >|? ) : 'a tzresult -> ('a -> 'b) -> 'b tzresult
+  val ( >|? ) : ('a, 'trace) result -> ('a -> 'b) -> ('b, 'trace) result
 
   (** Combined bind operator. The [=?] indicates that the operator acts within
       the combined error-lwt monad. *)
   val ( >>=? ) :
-    'a tzresult Lwt.t -> ('a -> 'b tzresult Lwt.t) -> 'b tzresult Lwt.t
+    ('a, 'trace) result Lwt.t ->
+    ('a -> ('b, 'trace) result Lwt.t) ->
+    ('b, 'trace) result Lwt.t
 
   (** Combined map operator. *)
-  val ( >|=? ) : 'a tzresult Lwt.t -> ('a -> 'b) -> 'b tzresult Lwt.t
+  val ( >|=? ) :
+    ('a, 'trace) result Lwt.t -> ('a -> 'b) -> ('b, 'trace) result Lwt.t
 
   (** Injecting bind operator. This is for transitioning from the simple Error
       monad to the combined Error-Lwt monad.
@@ -287,137 +327,194 @@ module type MONAD = sig
       Note the order of the character: it starts with the error monad marker [?]
       and has the Lwt monad marker later. This hints at the role of the operator
       to transition into Lwt. *)
-  val ( >>?= ) : 'a tzresult -> ('a -> 'b tzresult Lwt.t) -> 'b tzresult Lwt.t
+  val ( >>?= ) :
+    ('a, 'trace) result ->
+    ('a -> ('b, 'trace) result Lwt.t) ->
+    ('b, 'trace) result Lwt.t
 
   (** Injecting map operator. *)
-  val ( >|?= ) : 'a tzresult -> ('a -> 'b Lwt.t) -> 'b tzresult Lwt.t
+  val ( >|?= ) :
+    ('a, 'trace) result -> ('a -> 'b Lwt.t) -> ('b, 'trace) result Lwt.t
 
   (** Enrich an error report (or do nothing on a successful result) manually *)
-  val record_trace : error -> 'a tzresult -> 'a tzresult
+  val record_trace : 'err -> ('a, 'err trace) result -> ('a, 'err trace) result
 
   (** Automatically enrich error reporting on stack rewind *)
-  val trace : error -> 'b tzresult Lwt.t -> 'b tzresult Lwt.t
+  val trace :
+    'err -> ('b, 'err trace) result Lwt.t -> ('b, 'err trace) result Lwt.t
 
   (** Same as record_trace, for unevaluated error *)
   val record_trace_eval :
-    (unit -> error tzresult) -> 'a tzresult -> 'a tzresult
+    (unit -> ('err, 'err trace) result) ->
+    ('a, 'err trace) result ->
+    ('a, 'err trace) result
 
   (** Same as trace, for unevaluated Lwt error *)
   val trace_eval :
-    (unit -> error tzresult Lwt.t) -> 'b tzresult Lwt.t -> 'b tzresult Lwt.t
+    (unit -> ('err, 'err trace) result Lwt.t) ->
+    ('b, 'err trace) result Lwt.t ->
+    ('b, 'err trace) result Lwt.t
 
   (** Error on failed assertion *)
-  val error_unless : bool -> error -> unit tzresult
+  val error_unless : bool -> 'err -> (unit, 'err trace) result
 
-  val error_when : bool -> error -> unit tzresult
+  val error_when : bool -> 'err -> (unit, 'err trace) result
 
   (** Erroneous return on failed assertion *)
-  val fail_unless : bool -> error -> unit tzresult Lwt.t
+  val fail_unless : bool -> 'err -> (unit, 'err trace) result Lwt.t
 
-  val fail_when : bool -> error -> unit tzresult Lwt.t
+  val fail_when : bool -> 'err -> (unit, 'err trace) result Lwt.t
 
-  val unless : bool -> (unit -> unit tzresult Lwt.t) -> unit tzresult Lwt.t
+  val unless :
+    bool ->
+    (unit -> (unit, 'trace) result Lwt.t) ->
+    (unit, 'trace) result Lwt.t
 
-  val _when : bool -> (unit -> unit tzresult Lwt.t) -> unit tzresult Lwt.t
+  val _when :
+    bool ->
+    (unit -> (unit, 'trace) result Lwt.t) ->
+    (unit, 'trace) result Lwt.t
 
   (** Wrapper around [Lwt_utils.dont_wait] *)
   val dont_wait :
     (exn -> unit) ->
-    (error trace -> unit) ->
-    (unit -> unit tzresult Lwt.t) ->
+    ('trace -> unit) ->
+    (unit -> (unit, 'trace) result Lwt.t) ->
     unit
 
   (** {2 In-monad list iterators} *)
 
   (** A {!List.iter} in the monad *)
-  val iter : ('a -> unit tzresult) -> 'a list -> unit tzresult
+  val iter : ('a -> (unit, 'trace) result) -> 'a list -> (unit, 'trace) result
 
-  val iter_s : ('a -> unit tzresult Lwt.t) -> 'a list -> unit tzresult Lwt.t
+  val iter_s :
+    ('a -> (unit, 'trace) result Lwt.t) ->
+    'a list ->
+    (unit, 'trace) result Lwt.t
 
-  val iter_p : ('a -> unit tzresult Lwt.t) -> 'a list -> unit tzresult Lwt.t
+  val iter_p :
+    ('a -> (unit, 'err trace) result Lwt.t) ->
+    'a list ->
+    (unit, 'err trace) result Lwt.t
 
   val iteri_p :
-    (int -> 'a -> unit tzresult Lwt.t) -> 'a list -> unit tzresult Lwt.t
+    (int -> 'a -> (unit, 'err trace) result Lwt.t) ->
+    'a list ->
+    (unit, 'err trace) result Lwt.t
 
   (** @raise [Invalid_argument] if provided two lists of different lengths. *)
   val iter2_p :
-    ('a -> 'b -> unit tzresult Lwt.t) ->
+    ('a -> 'b -> (unit, 'err trace) result Lwt.t) ->
     'a list ->
     'b list ->
-    unit tzresult Lwt.t
+    (unit, 'err trace) result Lwt.t
 
   (** @raise [Invalid_argument] if provided two lists of different lengths. *)
   val iteri2_p :
-    (int -> 'a -> 'b -> unit tzresult Lwt.t) ->
+    (int -> 'a -> 'b -> (unit, 'err trace) result Lwt.t) ->
     'a list ->
     'b list ->
-    unit tzresult Lwt.t
+    (unit, 'err trace) result Lwt.t
 
   (** A {!List.map} in the monad *)
-  val map : ('a -> 'b tzresult) -> 'a list -> 'b list tzresult
+  val map : ('a -> ('b, 'trace) result) -> 'a list -> ('b list, 'trace) result
 
-  val mapi : (int -> 'a -> 'b tzresult) -> 'a list -> 'b list tzresult
+  val mapi :
+    (int -> 'a -> ('b, 'trace) result) -> 'a list -> ('b list, 'trace) result
 
-  val map_s : ('a -> 'b tzresult Lwt.t) -> 'a list -> 'b list tzresult Lwt.t
+  val map_s :
+    ('a -> ('b, 'trace) result Lwt.t) ->
+    'a list ->
+    ('b list, 'trace) result Lwt.t
 
   val rev_map_s :
-    ('a -> 'b tzresult Lwt.t) -> 'a list -> 'b list tzresult Lwt.t
+    ('a -> ('b, 'trace) result Lwt.t) ->
+    'a list ->
+    ('b list, 'trace) result Lwt.t
 
-  val map_p : ('a -> 'b tzresult Lwt.t) -> 'a list -> 'b list tzresult Lwt.t
+  val map_p :
+    ('a -> ('b, 'err trace) result Lwt.t) ->
+    'a list ->
+    ('b list, 'err trace) result Lwt.t
 
   val mapi_s :
-    (int -> 'a -> 'b tzresult Lwt.t) -> 'a list -> 'b list tzresult Lwt.t
+    (int -> 'a -> ('b, 'trace) result Lwt.t) ->
+    'a list ->
+    ('b list, 'trace) result Lwt.t
 
   val mapi_p :
-    (int -> 'a -> 'b tzresult Lwt.t) -> 'a list -> 'b list tzresult Lwt.t
+    (int -> 'a -> ('b, 'err trace) result Lwt.t) ->
+    'a list ->
+    ('b list, 'err trace) result Lwt.t
 
   (** A {!List.map2} in the monad.
 
       @raise [Invalid_argument] if provided two lists of different lengths. *)
   val map2 :
-    ('a -> 'b -> 'c tzresult) -> 'a list -> 'b list -> 'c list tzresult
+    ('a -> 'b -> ('c, 'trace) result) ->
+    'a list ->
+    'b list ->
+    ('c list, 'trace) result
 
   (** @raise [Invalid_argument] if provided two lists of different lengths. *)
   val mapi2 :
-    (int -> 'a -> 'b -> 'c tzresult) -> 'a list -> 'b list -> 'c list tzresult
+    (int -> 'a -> 'b -> ('c, 'trace) result) ->
+    'a list ->
+    'b list ->
+    ('c list, 'trace) result
 
   (** @raise [Invalid_argument] if provided two lists of different lengths. *)
   val map2_s :
-    ('a -> 'b -> 'c tzresult Lwt.t) ->
+    ('a -> 'b -> ('c, 'trace) result Lwt.t) ->
     'a list ->
     'b list ->
-    'c list tzresult Lwt.t
+    ('c list, 'trace) result Lwt.t
 
   (** @raise [Invalid_argument] if provided two lists of different lengths. *)
   val mapi2_s :
-    (int -> 'a -> 'b -> 'c tzresult Lwt.t) ->
+    (int -> 'a -> 'b -> ('c, 'trace) result Lwt.t) ->
     'a list ->
     'b list ->
-    'c list tzresult Lwt.t
+    ('c list, 'trace) result Lwt.t
 
   (** A {!List.filter_map} in the monad *)
   val filter_map_s :
-    ('a -> 'b option tzresult Lwt.t) -> 'a list -> 'b list tzresult Lwt.t
+    ('a -> ('b option, 'trace) result Lwt.t) ->
+    'a list ->
+    ('b list, 'trace) result Lwt.t
 
   val filter_map_p :
-    ('a -> 'b option tzresult Lwt.t) -> 'a list -> 'b list tzresult Lwt.t
+    ('a -> ('b option, 'err trace) result Lwt.t) ->
+    'a list ->
+    ('b list, 'err trace) result Lwt.t
 
   (** A {!List.filter} in the monad *)
-  val filter : ('a -> bool tzresult) -> 'a list -> 'a list tzresult
+  val filter :
+    ('a -> (bool, 'trace) result) -> 'a list -> ('a list, 'trace) result
 
   val filter_s :
-    ('a -> bool tzresult Lwt.t) -> 'a list -> 'a list tzresult Lwt.t
+    ('a -> (bool, 'trace) result Lwt.t) ->
+    'a list ->
+    ('a list, 'trace) result Lwt.t
 
   val filter_p :
-    ('a -> bool tzresult Lwt.t) -> 'a list -> 'a list tzresult Lwt.t
+    ('a -> (bool, 'err trace) result Lwt.t) ->
+    'a list ->
+    ('a list, 'err trace) result Lwt.t
 
   (** A {!List.fold_left} in the monad *)
   val fold_left_s :
-    ('a -> 'b -> 'a tzresult Lwt.t) -> 'a -> 'b list -> 'a tzresult Lwt.t
+    ('a -> 'b -> ('a, 'trace) result Lwt.t) ->
+    'a ->
+    'b list ->
+    ('a, 'trace) result Lwt.t
 
   (** A {!List.fold_right} in the monad *)
   val fold_right_s :
-    ('a -> 'b -> 'b tzresult Lwt.t) -> 'a list -> 'b -> 'b tzresult Lwt.t
+    ('a -> 'b -> ('b, 'trace) result Lwt.t) ->
+    'a list ->
+    'b ->
+    ('b, 'trace) result Lwt.t
 
   (** A few aliases for Lwt functions *)
   val join_p : unit Lwt.t list -> unit Lwt.t
@@ -427,19 +524,26 @@ module type MONAD = sig
   val both_p : 'a Lwt.t -> 'b Lwt.t -> ('a * 'b) Lwt.t
 
   (** Similar functions in the error monad *)
-  val join_e : unit tzresult list -> unit tzresult
+  val join_e : (unit, 'err trace) result list -> (unit, 'err trace) result
 
-  val all_e : 'a tzresult list -> 'a list tzresult
+  val all_e : ('a, 'err trace) result list -> ('a list, 'err trace) result
 
-  val both_e : 'a tzresult -> 'b tzresult -> ('a * 'b) tzresult
+  val both_e :
+    ('a, 'err trace) result ->
+    ('b, 'err trace) result ->
+    ('a * 'b, 'err trace) result
 
   (** Similar functions in the combined monad *)
-  val join_ep : unit tzresult Lwt.t list -> unit tzresult Lwt.t
+  val join_ep :
+    (unit, 'err trace) result Lwt.t list -> (unit, 'err trace) result Lwt.t
 
-  val all_ep : 'a tzresult Lwt.t list -> 'a list tzresult Lwt.t
+  val all_ep :
+    ('a, 'err trace) result Lwt.t list -> ('a list, 'err trace) result Lwt.t
 
   val both_ep :
-    'a tzresult Lwt.t -> 'b tzresult Lwt.t -> ('a * 'b) tzresult Lwt.t
+    ('a, 'err trace) result Lwt.t ->
+    ('b, 'err trace) result Lwt.t ->
+    ('a * 'b, 'err trace) result Lwt.t
 end
 
 module type MONAD_EXT = sig

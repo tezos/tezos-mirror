@@ -53,8 +53,6 @@ include
   Sig.MONAD_EXT
     with type error := error
      and type 'error trace := 'error TzTrace.trace
-     and type tztrace := tztrace
-     and type 'a tzresult := 'a tzresult
 
 (** Erroneous result (shortcut for generic errors) *)
 val generic_error : ('a, Format.formatter, unit, 'b tzresult) format4 -> 'a

@@ -37,5 +37,3 @@ end)
   Sig.MONAD_EXT
     with type error := Error.error
      and type 'error trace := 'error Trace.trace
-     and type tztrace := Monad.tztrace
-     and type 'a tzresult := 'a Monad.tzresult

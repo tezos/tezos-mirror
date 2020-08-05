@@ -36,9 +36,9 @@ end)
             and type 'error trace := 'error Trace.trace) :
   Sig.MONAD_EXT
     with type error := Error.error
-     and type 'error trace := 'error Trace.trace
-     and type tztrace := Monad.tztrace
-     and type 'a tzresult := 'a Monad.tzresult = struct
+     and type 'error trace := 'error Trace.trace = struct
+        type tztrace = Error.error Trace.trace
+        type 'a tzresult = ('a, tztrace) result
   let trace_encoding = Trace.encoding Error.error_encoding
 
   let result_encoding a_encoding =
