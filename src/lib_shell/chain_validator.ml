@@ -83,7 +83,8 @@ module Types = struct
     new_head_input : State.Block.t Lwt_watcher.input;
     mutable child : (state * (unit -> unit Lwt.t (* shutdown *))) option;
     mutable prevalidator : Prevalidator.t option;
-    active_peers : Peer_validator.t P2p_peer.Error_table.t;
+    active_peers :
+      (Peer_validator.t, Error_monad.tztrace) P2p_peer.Error_table.t;
   }
 
   let view (state : state) _ : view =
