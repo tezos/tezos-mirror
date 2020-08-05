@@ -139,15 +139,43 @@ let monitor (rpc_context : Tezos_protocol_environment.rpc_context) =
     Monitor_services.S.bootstrapped
     (fun () () () -> RPC_answer.return (block_hash, block_header.timestamp))
 
-let eq_chain_chain_id (chain : Block_services.chain) (chain_id : Chain_id.t) =
-  ( match chain with
-  | `Main ->
-      Chain_id.hash_string ["main"]
-  | `Test ->
-      Chain_id.hash_string ["test"]
-  | `Hash cid ->
-      cid )
-  |> Chain_id.equal chain_id
+let check_chain_chain_id (chain : Block_services.chain) (chain_id : Chain_id.t)
+    =
+  let chain_chain_id =
+    match chain with
+    | `Main ->
+        Chain_id.hash_string ["main"]
+    | `Test ->
+        Chain_id.hash_string ["test"]
+    | `Hash cid ->
+        cid
+  in
+  unless (Chain_id.equal chain_id chain_chain_id) (fun () ->
+      let msg =
+        let open Format in
+        asprintf
+          "Mismatched chain id: got %a but this mockup client expected %a."
+          (fun ppf chain ->
+            match chain with
+            | `Main ->
+                fprintf
+                  ppf
+                  "main (%a)"
+                  Chain_id.pp
+                  (Chain_id.hash_string ["main"])
+            | `Test ->
+                fprintf
+                  ppf
+                  "test (%a)"
+                  Chain_id.pp
+                  (Chain_id.hash_string ["test"])
+            | `Hash chain_id ->
+                Chain_id.pp ppf chain_id)
+          chain
+          Chain_id.pp
+          chain_id
+      in
+      Lwt.fail_with msg)
 
 let pending_operations (mockup_env : Registration.mockup_environment) chain_id
     (dirname : string) =
@@ -175,72 +203,51 @@ let pending_operations (mockup_env : Registration.mockup_environment) chain_id
     ( M.Block_services.S.Mempool.pending_operations
     @@ Block_services.mempool_path Block_services.chain_path )
     (fun ((), chain) () () ->
-      if not @@ eq_chain_chain_id chain chain_id then
-        let msg =
-          let open Format in
-          asprintf
-            "Mismatched chain id. Got %a (expected %a for this mockup)"
-            (fun ppf chain ->
-              match chain with
-              | `Main ->
-                  fprintf
-                    ppf
-                    "main (%a)"
-                    Chain_id.pp
-                    (Chain_id.hash_string ["main"])
-              | `Test ->
-                  fprintf
-                    ppf
-                    "test (%a)"
-                    Chain_id.pp
-                    (Chain_id.hash_string ["test"])
-              | `Hash chain_id ->
-                  Chain_id.pp ppf chain_id)
-            chain
-            Chain_id.pp
-            chain_id
-        in
-        Lwt.fail_with msg
-      else
-        read_operations ()
-        >>= function
-        | Error errs ->
-            RPC_answer.fail errs
-        | Ok pooled_operations ->
-            (* Format.printf "Retrieving unprocessed operations@." ; *)
-            let unprocessed =
-              List.fold_left
-                (fun map (shell_header, operation_data) ->
-                  let op =
-                    {
-                      M.Protocol.shell = shell_header;
-                      protocol_data = operation_data;
-                    }
-                  in
-                  match
-                    Data_encoding.Binary.to_bytes
-                      op_data_encoding
-                      operation_data
-                  with
-                  | Error _ ->
-                      map
-                  | Ok proto ->
-                      let operation_hash =
-                        Operation.hash {Operation.shell = shell_header; proto}
-                      in
-                      Operation_hash.Map.add operation_hash op map)
-                Operation_hash.Map.empty
-                pooled_operations
-            in
-            Lwt.return
-              (`Ok
-                {
-                  M.Block_services.Mempool.applied = [];
-                  refused = Operation_hash.Map.empty;
-                  branch_refused = Operation_hash.Map.empty;
-                  branch_delayed = Operation_hash.Map.empty;
-                  unprocessed;
-                }))
+      check_chain_chain_id chain chain_id
+      >>= function
+      | Error errs ->
+          RPC_answer.fail errs
+      | Ok () -> (
+          read_operations ()
+          >>= function
+          | Error errs ->
+              RPC_answer.fail errs
+          | Ok pooled_operations ->
+              (* Format.printf "Retrieving unprocessed operations@." ; *)
+              let unprocessed =
+                List.fold_left
+                  (fun map (shell_header, operation_data) ->
+                    let op =
+                      {
+                        M.Protocol.shell = shell_header;
+                        protocol_data = operation_data;
+                      }
+                    in
+                    match
+                      Data_encoding.Binary.to_bytes
+                        op_data_encoding
+                        operation_data
+                    with
+                    | Error _ ->
+                        map
+                    | Ok proto ->
+                        let operation_hash =
+                          Operation.hash
+                            {Operation.shell = shell_header; proto}
+                        in
+                        Operation_hash.Map.add operation_hash op map)
+                  Operation_hash.Map.empty
+                  pooled_operations
+              in
+              Lwt.return
+                (`Ok
+                  {
+                    M.Block_services.Mempool.applied = [];
+                    refused = Operation_hash.Map.empty;
+                    branch_refused = Operation_hash.Map.empty;
+                    branch_delayed = Operation_hash.Map.empty;
+                    unprocessed;
+                  }) ))
 
 let block_hash (rpc_context : Tezos_protocol_environment.rpc_context) =
   let path =
