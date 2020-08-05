@@ -29,32 +29,7 @@ module Make (Error : Sig.CORE) (Trace : Sig.TRACE) :
      and type 'err trace := 'err Trace.trace = struct
   type tztrace = Error.error Trace.trace
 
-  let trace_encoding = Trace.encoding Error.error_encoding
-
-  let pp_print_error = Trace.pp_print Error.pp
-
-  let pp_print_error_first = Trace.pp_print_top Error.pp
-
   type 'a tzresult = ('a, tztrace) result
-
-  let result_encoding a_encoding =
-    let open Data_encoding in
-    let trace_encoding = obj1 (req "error" trace_encoding) in
-    let a_encoding = obj1 (req "result" a_encoding) in
-    union
-      ~tag_size:`Uint8
-      [ case
-          (Tag 0)
-          a_encoding
-          ~title:"Ok"
-          (function Ok x -> Some x | _ -> None)
-          (function res -> Ok res);
-        case
-          (Tag 1)
-          trace_encoding
-          ~title:"Error"
-          (function Error x -> Some x | _ -> None)
-          (function x -> Error x) ]
 
   let ( >>= ) = Lwt.( >>= )
 

@@ -33,5 +33,7 @@ include
 
 include
   Sig.MONAD_EXT
-    with type 'a tzresult := 'a tzresult
-     and type trace := error TzTrace.trace
+    with type error := error
+     and type 'error trace := 'error TzTrace.trace
+     and type tztrace := tztrace
+     and type 'a tzresult := 'a tzresult

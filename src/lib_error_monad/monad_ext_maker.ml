@@ -35,8 +35,35 @@ end)
            with type error := Error.error
             and type 'error trace := 'error Trace.trace) :
   Sig.MONAD_EXT
-    with type 'a tzresult := 'a Monad.tzresult
-     and type trace := Error.error Trace.trace = struct
+    with type error := Error.error
+     and type 'error trace := 'error Trace.trace
+     and type tztrace := Monad.tztrace
+     and type 'a tzresult := 'a Monad.tzresult = struct
+  let trace_encoding = Trace.encoding Error.error_encoding
+
+  let result_encoding a_encoding =
+    let open Data_encoding in
+    let trace_encoding = obj1 (req "error" trace_encoding) in
+    let a_encoding = obj1 (req "result" a_encoding) in
+    union
+      ~tag_size:`Uint8
+      [ case
+          (Tag 0)
+          a_encoding
+          ~title:"Ok"
+          (function Ok x -> Some x | _ -> None)
+          (function res -> Ok res);
+        case
+          (Tag 1)
+          trace_encoding
+          ~title:"Error"
+          (function Error x -> Some x | _ -> None)
+          (function x -> Error x) ]
+
+  let pp_print_error = Trace.pp_print Error.pp
+
+  let pp_print_error_first = Trace.pp_print_top Error.pp
+
   let classify_errors trace =
     Trace.fold
       (fun c e -> Sig.combine_category c (Error.classify_error e))

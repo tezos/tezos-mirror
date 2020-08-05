@@ -206,24 +206,7 @@ module type MONAD = sig
 
   type tztrace = error trace
 
-  (* NOTE: Right now we leave this [pp_print_error] named as is. Later on we
-     might rename it to [pp_print_trace]. *)
-  val pp_print_error : Format.formatter -> error trace -> unit
-
-  (** Pretty prints a trace as the message of its first error *)
-  val pp_print_error_first : Format.formatter -> error trace -> unit
-
-  val trace_encoding : error trace Data_encoding.t
-
-  (** The error monad wrapper type, the error case holds a stack of
-      error, initialized by the first call to {!fail} and completed by
-      each call to {!trace} as the stack is rewound. The most general
-      error is thus at the top of the error stack, going down to the
-      specific error that actually caused the failure. *)
   type 'a tzresult = ('a, tztrace) result
-
-  (** A serializer for result of a given type *)
-  val result_encoding : 'a Data_encoding.t -> 'a tzresult Data_encoding.t
 
   (** Successful result *)
   val ok : 'a -> 'a tzresult
@@ -461,11 +444,15 @@ end
 
 module type MONAD_EXT = sig
   (** for substitution *)
-  type 'a tzresult
+  type error
 
-  type trace
+  type 'error trace
 
-  val classify_errors : trace -> error_category
+  type tztrace = error trace
+
+  type 'a tzresult = ('a, tztrace) result
+
+  val classify_errors : tztrace -> error_category
 
   (* Usage: [_assert cond __LOC__ "<fmt>" ...] *)
   val _assert :
@@ -473,4 +460,18 @@ module type MONAD_EXT = sig
     string ->
     ('a, Format.formatter, unit, unit tzresult Lwt.t) format4 ->
     'a
+
+  (* This is for legacy, for backwards compatibility, there are old names *)
+
+  (* NOTE: Right now we leave this [pp_print_error] named as is. Later on we
+     might rename it to [pp_print_trace]. *)
+  val pp_print_error : Format.formatter -> error trace -> unit
+
+  (** Pretty prints a trace as the message of its first error *)
+  val pp_print_error_first : Format.formatter -> error trace -> unit
+
+  val trace_encoding : error trace Data_encoding.t
+
+  (** A serializer for result of a given type *)
+  val result_encoding : 'a Data_encoding.t -> 'a tzresult Data_encoding.t
 end
