@@ -35,7 +35,9 @@ let json_pp id description encoding ppf data =
 let set_error_encoding_cache_dirty = ref (fun () -> ())
 
 module Make (Prefix : Sig.PREFIX) : sig
-  include Sig.CORE
+  type error = ..
+
+  include Sig.CORE with type error := error
 
   include Sig.EXT with type error := error
 

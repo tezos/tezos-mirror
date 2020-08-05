@@ -1,8 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,6 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type error = Core.error = ..
+(** A [trace] is a stack of [error]s. It is implemented as an [error list]
+    but such a list MUST NEVER be empty.
 
-include Monad_maker.Make (Core)
+    It is implemented as a concrete [error list] for backwards compatibility
+    but future improvements might modify the type or render the type
+    abstract. *)
+include
+  Sig.TRACE with type 'err trace = 'err list

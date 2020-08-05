@@ -1,6 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -23,12 +24,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Make (Prefix : Sig.PREFIX) : sig
-  type error = ..
+type error = ..
 
-  include Sig.CORE with type error := error
+include Sig.CORE with type error := error
 
-  include Sig.EXT with type error := error
+include Sig.EXT with type error := error
 
-  include Sig.WITH_WRAPPED with type error := error
-end
+include Sig.WITH_WRAPPED with type error := error

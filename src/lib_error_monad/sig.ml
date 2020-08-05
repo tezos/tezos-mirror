@@ -38,6 +38,15 @@ let string_of_category = function
   | `Branch ->
       "branch"
 
+let combine_category c1 c2 =
+  match (c1, c2) with
+  | (`Permanent, _) | (_, `Permanent) ->
+      `Permanent
+  | (`Branch, _) | (_, `Branch) ->
+      `Branch
+  | (`Temporary, `Temporary) ->
+      `Temporary
+
 module type PREFIX = sig
   (** The identifier for parts of the code that need their own error monad. It
       is expected (but not enforced) that the identifier:
@@ -47,11 +56,15 @@ module type PREFIX = sig
 end
 
 module type CORE = sig
-  type error = ..
+  type error
 
   val error_encoding : error Data_encoding.t
 
   val pp : Format.formatter -> error -> unit
+end
+
+module type EXT = sig
+  type error = ..
 
   (** The error data type is extensible. Each module can register specialized
       error serializers
@@ -91,10 +104,6 @@ module type CORE = sig
 
   (** Classify an error using the registered kinds *)
   val classify_error : error -> error_category
-end
-
-module type EXT = sig
-  type error = ..
 
   (** Catch all error when 'serializing' an error. *)
   type error +=
@@ -149,6 +158,34 @@ module type WITH_WRAPPED = sig
     unit
 end
 
+module type TRACE = sig
+  (** [trace] is abstract in this interface but it is made concrete in the
+      instantiated error monad (see [error_monad.mli]). *)
+  type 'err trace
+
+  val make : 'error -> 'error trace
+
+  val cons : 'error -> 'error trace -> 'error trace
+
+  val conp : 'error trace -> 'error trace -> 'error trace
+
+  val pp_print :
+    (Format.formatter -> 'err -> unit) ->
+    Format.formatter ->
+    'err trace ->
+    unit
+
+  val pp_print_top :
+    (Format.formatter -> 'err -> unit) ->
+    Format.formatter ->
+    'err trace ->
+    unit
+
+  val encoding : 'error Data_encoding.t -> 'error trace Data_encoding.t
+
+  val fold : ('a -> 'error -> 'a) -> 'a -> 'error trace -> 'a
+end
+
 module type MONAD = sig
   (** This type is meant to be substituted/constrained. The intended use is
       along the following lines:
@@ -164,33 +201,26 @@ module type MONAD = sig
       *)
   type error
 
-  (** A [trace] is a stack of [error]s. It is implemented as an [error list]
-      but such a list MUST NEVER be empty.
+  (** To be subsituted/constrained *)
+  type 'err trace
 
-      It is implemented as a concrete [error list] for backwards compatibility
-      but future improvements might modify the type or render the type
-      abstract. *)
-  type trace = error list
+  type tztrace = error trace
 
   (* NOTE: Right now we leave this [pp_print_error] named as is. Later on we
      might rename it to [pp_print_trace]. *)
-  val pp_print_error : Format.formatter -> trace -> unit
+  val pp_print_error : Format.formatter -> error trace -> unit
 
   (** Pretty prints a trace as the message of its first error *)
-  val pp_print_error_first : Format.formatter -> trace -> unit
+  val pp_print_error_first : Format.formatter -> error trace -> unit
 
-  val trace_encoding : trace Data_encoding.t
-
-  (* NOTE: Right now we leave this [classify_errors] named as is. Later on we
-     might rename it to [classify_trace]. *)
-  val classify_errors : trace -> error_category
+  val trace_encoding : error trace Data_encoding.t
 
   (** The error monad wrapper type, the error case holds a stack of
       error, initialized by the first call to {!fail} and completed by
       each call to {!trace} as the stack is rewound. The most general
       error is thus at the top of the error stack, going down to the
       specific error that actually caused the failure. *)
-  type 'a tzresult = ('a, trace) result
+  type 'a tzresult = ('a, tztrace) result
 
   (** A serializer for result of a given type *)
   val result_encoding : 'a Data_encoding.t -> 'a tzresult Data_encoding.t
@@ -307,16 +337,12 @@ module type MONAD = sig
 
   val _when : bool -> (unit -> unit tzresult Lwt.t) -> unit tzresult Lwt.t
 
-  (* Usage: [_assert cond __LOC__ "<fmt>" ...] *)
-  val _assert :
-    bool ->
-    string ->
-    ('a, Format.formatter, unit, unit tzresult Lwt.t) format4 ->
-    'a
-
   (** Wrapper around [Lwt_utils.dont_wait] *)
   val dont_wait :
-    (exn -> unit) -> (trace -> unit) -> (unit -> unit tzresult Lwt.t) -> unit
+    (exn -> unit) ->
+    (error trace -> unit) ->
+    (unit -> unit tzresult Lwt.t) ->
+    unit
 
   (** {2 In-monad list iterators} *)
 
@@ -431,4 +457,20 @@ module type MONAD = sig
 
   val both_ep :
     'a tzresult Lwt.t -> 'b tzresult Lwt.t -> ('a * 'b) tzresult Lwt.t
+end
+
+module type MONAD_EXT = sig
+  (** for substitution *)
+  type 'a tzresult
+
+  type trace
+
+  val classify_errors : trace -> error_category
+
+  (* Usage: [_assert cond __LOC__ "<fmt>" ...] *)
+  val _assert :
+    bool ->
+    string ->
+    ('a, Format.formatter, unit, unit tzresult Lwt.t) format4 ->
+    'a
 end

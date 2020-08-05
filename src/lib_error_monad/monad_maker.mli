@@ -23,4 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Make (Error : Sig.CORE) : Sig.MONAD with type error := Error.error
+module Make (Error : Sig.CORE) (Trace : Sig.TRACE) :
+  Sig.MONAD
+    with type error := Error.error
+     and type 'err trace := 'err Trace.trace

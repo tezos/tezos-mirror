@@ -32,13 +32,27 @@ type error_category =
   | `Temporary  (** Errors that may not happen in a later context *)
   | `Permanent  (** Errors that will happen no matter the context *) ]
 
-include Sig.CORE with type error = Core.error
+type error = TzCore.error = ..
+
+include Sig.CORE with type error := error
 
 include Sig.EXT with type error := error
 
 include Sig.WITH_WRAPPED with type error := error
 
-include Sig.MONAD with type error := error
+module TzTrace : Sig.TRACE with type 'error trace = 'error list
+
+type 'error trace = 'error TzTrace.trace
+
+include
+  Sig.MONAD
+    with type error := error
+     and type 'error trace := 'error TzTrace.trace
+
+include
+  Sig.MONAD_EXT
+    with type 'a tzresult := 'a tzresult
+     and type trace := error TzTrace.trace
 
 (** Erroneous result (shortcut for generic errors) *)
 val generic_error : ('a, Format.formatter, unit, 'b tzresult) format4 -> 'a
@@ -56,7 +70,7 @@ val generic_trace :
   ( 'a,
     Format.formatter,
     unit,
-    ('b, trace) result Lwt.t -> ('b, trace) result Lwt.t )
+    ('b, error trace) result Lwt.t -> ('b, error trace) result Lwt.t )
   format4 ->
   'a
 
@@ -82,7 +96,7 @@ type error += Canceled
     is returned. An Lwt failure triggered by [~on_error] is wrapped into an
     [Exn] *)
 val protect :
-  ?on_error:(trace -> 'a tzresult Lwt.t) ->
+  ?on_error:(error trace -> 'a tzresult Lwt.t) ->
   ?canceler:Lwt_canceler.t ->
   (unit -> 'a tzresult Lwt.t) ->
   'a tzresult Lwt.t
@@ -97,4 +111,4 @@ val with_timeout :
 
 (**/**)
 
-val errs_tag : trace Tag.def
+val errs_tag : error trace Tag.def

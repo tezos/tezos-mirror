@@ -1,8 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,8 +23,46 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Sig.CORE
+module Make (Error : sig
+  type error = ..
 
-include Sig.EXT with type error := error
+  include Sig.CORE with type error := error
 
-include Sig.WITH_WRAPPED with type error := error
+  include Sig.EXT with type error := error
+end)
+(Trace : Sig.TRACE)
+(Monad : Sig.MONAD
+           with type error := Error.error
+            and type 'error trace := 'error Trace.trace) :
+  Sig.MONAD_EXT
+    with type 'a tzresult := 'a Monad.tzresult
+     and type trace := Error.error Trace.trace = struct
+  let classify_errors trace =
+    Trace.fold
+      (fun c e -> Sig.combine_category c (Error.classify_error e))
+      `Temporary
+      trace
+
+  type Error.error += Assert_error of string * string
+
+  let () =
+    Error.register_error_kind
+      `Permanent
+      ~id:"assertion"
+      ~title:"Assertion failure"
+      ~description:"A fatal assertion failed"
+      ~pp:(fun ppf (loc, msg) ->
+        Format.fprintf
+          ppf
+          "Assert failure (%s)%s"
+          loc
+          (if msg = "" then "." else ": " ^ msg))
+      Data_encoding.(obj2 (req "loc" string) (req "msg" string))
+      (function Assert_error (loc, msg) -> Some (loc, msg) | _ -> None)
+      (fun (loc, msg) -> Assert_error (loc, msg))
+
+  let _assert b loc fmt =
+    if b then
+      Format.ikfprintf (fun _ -> Monad.return_unit) Format.str_formatter fmt
+    else Format.kasprintf (fun msg -> Monad.fail (Assert_error (loc, msg))) fmt
+end

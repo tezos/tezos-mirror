@@ -530,7 +530,11 @@ struct
     type error_category = [`Branch | `Temporary | `Permanent]
 
     include Error_core
-    include Tezos_error_monad.Monad_maker.Make (Error_core)
+    module Local_monad =
+      Tezos_error_monad.Monad_maker.Make (Error_core) (TzTrace)
+    include Local_monad
+    include Tezos_error_monad.Monad_ext_maker.Make (Error_core) (TzTrace)
+              (Local_monad)
 
     let ( >>|? ) = ( >|=? ) (* for backward compatibility *)
   end

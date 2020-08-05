@@ -1,6 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -23,12 +24,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Make (Prefix : Sig.PREFIX) : sig
-  type error = ..
+type error = TzCore.error = ..
 
-  include Sig.CORE with type error := error
+include
+  Sig.MONAD
+    with type error := error
+     and type 'error trace := 'error TzTrace.trace
 
-  include Sig.EXT with type error := error
-
-  include Sig.WITH_WRAPPED with type error := error
-end
+include
+  Sig.MONAD_EXT
+    with type 'a tzresult := 'a tzresult
+     and type trace := error TzTrace.trace

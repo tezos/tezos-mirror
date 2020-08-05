@@ -30,8 +30,11 @@
 
 type error_category = [`Branch | `Temporary | `Permanent]
 
-include Core
-include Monad
+include TzCore
+include TzMonad
+module TzTrace = TzTrace
+
+type 'error trace = 'error TzTrace.trace
 
 type error += Exn of exn
 
@@ -56,7 +59,7 @@ let generic_error fmt = Format.kasprintf (fun s -> error (Exn (Failure s))) fmt
 
 let failwith fmt = Format.kasprintf (fun s -> fail (Exn (Failure s))) fmt
 
-let error_exn s = Error [Exn s]
+let error_exn s = Error (TzTrace.make @@ Exn s)
 
 let trace_exn exn f = trace (Exn exn) f
 
@@ -106,16 +109,16 @@ let protect ?on_error ?canceler t =
   >>= function
   | Ok _ ->
       res
-  | Error err -> (
+  | Error trace -> (
       let canceled =
         Option.fold canceler ~none:false ~some:Lwt_canceler.canceled
       in
-      let err = if canceled then [Canceled] else err in
+      let trace = if canceled then TzTrace.make Canceled else trace in
       match on_error with
       | None ->
-          Lwt.return_error err
+          Lwt.return_error trace
       | Some on_error ->
-          Lwt.catch (fun () -> on_error err) (fun exn -> fail (Exn exn)) )
+          Lwt.catch (fun () -> on_error trace) (fun exn -> fail (Exn exn)) )
 
 type error += Timeout
 

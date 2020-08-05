@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 module Make () = struct
-  open Core
+  open TzCore
 
   (* Shallow parallel errors *)
   type error += ParSha of error list
@@ -103,7 +103,7 @@ module Make () = struct
   let (_ : string) = Format.asprintf "%a" pp parsha_aa
 
   (* Deep recursive errors *)
-  type error += ParD of Monad.trace list
+  type error += ParD of TzMonad.tztrace list
 
   let () =
     register_recursive_error_kind
@@ -118,7 +118,7 @@ module Make () = struct
           (List.length traces)
           (Format.pp_print_list
              ~pp_sep:Format.pp_print_space
-             Monad.pp_print_error)
+             TzMonad.pp_print_error)
           traces)
       (fun err_enc ->
         let open Data_encoding in

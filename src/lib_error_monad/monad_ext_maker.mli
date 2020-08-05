@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,12 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Make (Prefix : Sig.PREFIX) : sig
+module Make (Error : sig
   type error = ..
 
   include Sig.CORE with type error := error
 
   include Sig.EXT with type error := error
-
-  include Sig.WITH_WRAPPED with type error := error
-end
+end)
+(Trace : Sig.TRACE)
+(Monad : Sig.MONAD
+           with type error := Error.error
+            and type 'error trace := 'error Trace.trace) :
+  Sig.MONAD_EXT
+    with type 'a tzresult := 'a Monad.tzresult
+     and type trace := Error.error Trace.trace

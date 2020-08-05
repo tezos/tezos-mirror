@@ -23,49 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Make (Error : Sig.CORE) : Sig.MONAD with type error := Error.error =
-struct
-  (* INVARIANT: traces are never empty, they must contain at least one error *)
+module Make (Error : Sig.CORE) (Trace : Sig.TRACE) :
+  Sig.MONAD
+    with type error := Error.error
+     and type 'err trace := 'err Trace.trace = struct
+  type tztrace = Error.error Trace.trace
 
-  type trace = Error.error list
+  let trace_encoding = Trace.encoding Error.error_encoding
 
-  let trace_encoding = Data_encoding.list Error.error_encoding
+  let pp_print_error = Trace.pp_print Error.pp
 
-  let pp_print_error ppf = function
-    | [] ->
-        assert false
-    | [error] ->
-        Format.fprintf ppf "@[<v 2>Error:@ %a@]@." Error.pp error
-    | error :: _ as errors ->
-        Format.fprintf
-          ppf
-          "@[<v 2>Error:@ %a,@ trace:@ %a@]@."
-          Error.pp
-          error
-          (Format.pp_print_list Error.pp)
-          (List.rev errors)
+  let pp_print_error_first = Trace.pp_print_top Error.pp
 
-  let pp_print_error_first fmt trace =
-    Format.fprintf fmt "%a" Error.pp @@ List.hd trace
-
-  let classify_errors trace =
-    List.fold_left
-      (fun r e ->
-        match (r, Error.classify_error e) with
-        | (`Permanent, _) | (_, `Permanent) ->
-            `Permanent
-        | (`Branch, _) | (_, `Branch) ->
-            `Branch
-        | (`Temporary, `Temporary) ->
-            `Temporary)
-      `Temporary
-      trace
-
-  type 'a tzresult = ('a, trace) result
+  type 'a tzresult = ('a, tztrace) result
 
   let result_encoding a_encoding =
     let open Data_encoding in
-    let errors_encoding = obj1 (req "error" trace_encoding) in
+    let trace_encoding = obj1 (req "error" trace_encoding) in
     let a_encoding = obj1 (req "result" a_encoding) in
     union
       ~tag_size:`Uint8
@@ -77,10 +51,10 @@ struct
           (function res -> Ok res);
         case
           (Tag 1)
-          errors_encoding
+          trace_encoding
           ~title:"Error"
           (function Error x -> Some x | _ -> None)
-          (function [] -> assert false | _ :: _ as errs -> Error errs) ]
+          (function x -> Error x) ]
 
   let ( >>= ) = Lwt.( >>= )
 
@@ -98,7 +72,7 @@ struct
 
   let ok_false = Ok false
 
-  let[@inline] error s = Error [s]
+  let[@inline] error s = Error (Trace.make s)
 
   let[@inline] return v = Lwt.return_ok v
 
@@ -114,7 +88,7 @@ struct
 
   let return_false = Lwt.return ok_false
 
-  let[@inline] fail s = Lwt.return_error [s]
+  let[@inline] fail s = Lwt.return_error @@ Trace.make s
 
   let ( >>? ) v f = match v with Error _ as err -> err | Ok v -> f v
 
@@ -188,10 +162,10 @@ struct
         match (x, l) with
         | (Ok x, Ok l) ->
             Lwt.return_ok (x :: l)
-        | (Error exn1, Error exn2) ->
-            Lwt.return_error (exn1 @ exn2)
-        | (Ok _, Error exn) | (Error exn, Ok _) ->
-            Lwt.return_error exn )
+        | (Error trace1, Error trace2) ->
+            Lwt.return_error (Trace.conp trace1 trace2)
+        | (Ok _, Error trace) | (Error trace, Ok _) ->
+            Lwt.return_error trace )
 
   let mapi_p f l =
     let rec mapi_p f i l =
@@ -207,10 +181,10 @@ struct
           match (x, l) with
           | (Ok x, Ok l) ->
               Lwt.return_ok (x :: l)
-          | (Error exn1, Error exn2) ->
-              Lwt.return_error (exn1 @ exn2)
-          | (Ok _, Error exn) | (Error exn, Ok _) ->
-              Lwt.return_error exn )
+          | (Error trace1, Error trace2) ->
+              Lwt.return_error (Trace.conp trace1 trace2)
+          | (Ok _, Error trace) | (Error trace, Ok _) ->
+              Lwt.return_error trace )
     in
     mapi_p f 0 l
 
@@ -329,10 +303,10 @@ struct
         match (tx_res, tl_res) with
         | (Ok (), Ok ()) ->
             Lwt.return_ok ()
-        | (Error exn1, Error exn2) ->
-            Lwt.return_error (exn1 @ exn2)
-        | (Ok (), Error exn) | (Error exn, Ok ()) ->
-            Lwt.return_error exn )
+        | (Error trace1, Error trace2) ->
+            Lwt.return_error (Trace.conp trace1 trace2)
+        | (Ok (), Error trace) | (Error trace, Ok ()) ->
+            Lwt.return_error trace )
 
   let iteri_p f l =
     let rec iteri_p i f l =
@@ -348,10 +322,10 @@ struct
           match (tx_res, tl_res) with
           | (Ok (), Ok ()) ->
               Lwt.return ok_unit
-          | (Error exn1, Error exn2) ->
-              Lwt.return (Error (exn1 @ exn2))
-          | (Ok (), Error exn) | (Error exn, Ok ()) ->
-              Lwt.return (Error exn) )
+          | (Error trace1, Error trace2) ->
+              Lwt.return_error (Trace.conp trace1 trace2)
+          | (Ok (), Error trace) | (Error trace, Ok ()) ->
+              Lwt.return_error trace )
     in
     iteri_p 0 f l
 
@@ -370,10 +344,10 @@ struct
         match (tx_res, tl_res) with
         | (Ok (), Ok ()) ->
             Lwt.return_ok ()
-        | (Error exn1, Error exn2) ->
-            Lwt.return_error (exn1 @ exn2)
-        | (Ok (), Error exn) | (Error exn, Ok ()) ->
-            Lwt.return_error exn )
+        | (Error trace1, Error trace2) ->
+            Lwt.return_error (Trace.conp trace1 trace2)
+        | (Ok (), Error trace) | (Error trace, Ok ()) ->
+            Lwt.return_error trace )
 
   let iteri2_p f l1 l2 =
     let rec iteri2_p i f l1 l2 =
@@ -391,10 +365,10 @@ struct
           match (tx_res, tl_res) with
           | (Ok (), Ok ()) ->
               Lwt.return_ok ()
-          | (Error exn1, Error exn2) ->
-              Lwt.return_error (exn1 @ exn2)
-          | (Ok (), Error exn) | (Error exn, Ok ()) ->
-              Lwt.return_error exn )
+          | (Error trace1, Error trace2) ->
+              Lwt.return_error (Trace.conp trace1 trace2)
+          | (Ok (), Error trace) | (Error trace, Ok ()) ->
+              Lwt.return_error trace )
     in
     iteri2_p 0 f l1 l2
 
@@ -418,18 +392,30 @@ struct
 
   let both_p = Lwt.both
 
+  let rec join_e_errors trace_acc = function
+    | Ok _ :: ts ->
+        join_e_errors trace_acc ts
+    | Error trace :: ts ->
+        join_e_errors (Trace.conp trace_acc trace) ts
+    | [] ->
+        Error trace_acc
+
   let rec join_e = function
     | [] ->
         ok_unit
-    | t :: ts ->
-        t >>? fun () -> join_e ts
+    | Ok () :: ts ->
+        join_e ts
+    | Error trace :: ts ->
+        join_e_errors trace ts
 
   let all_e ts =
     let rec aux acc = function
       | [] ->
           Ok (List.rev acc)
-      | t :: ts ->
-          t >>? fun v -> aux (v :: acc) ts
+      | Ok v :: ts ->
+          aux (v :: acc) ts
+      | Error trace :: ts ->
+          join_e_errors trace ts
     in
     aux [] ts
 
@@ -440,8 +426,7 @@ struct
     | (Error err, Ok _) | (Ok _, Error err) ->
         Error err
     | (Error erra, Error errb) ->
-        (* Improve this once we improved the support for parallel traces *)
-        ignore errb ; Error erra
+        Error (Trace.conp erra errb)
 
   let join_ep ts = all_p ts >|= join_e
 
@@ -450,25 +435,31 @@ struct
   let both_ep a b = both_p a b >|= fun (a, b) -> both_e a b
 
   let record_trace err result =
-    match result with Ok _ as res -> res | Error errs -> Error (err :: errs)
+    match result with
+    | Ok _ as res ->
+        res
+    | Error trace ->
+        Error (Trace.cons err trace)
 
   let trace err f =
     f
     >>= function
-    | Error errs -> Lwt.return_error (err :: errs) | ok -> Lwt.return ok
+    | Error trace ->
+        Lwt.return_error (Trace.cons err trace)
+    | ok ->
+        Lwt.return ok
 
-  let record_trace_eval mk_err result =
-    match result with
-    | Ok _ as res ->
-        res
-    | Error errs ->
-        mk_err () >>? fun err -> Error (err :: errs)
+  let record_trace_eval mk_err = function
+    | Error trace ->
+        mk_err () >>? fun err -> Error (Trace.cons err trace)
+    | ok ->
+        ok
 
   let trace_eval mk_err f =
     f
     >>= function
-    | Error errs ->
-        mk_err () >>=? fun err -> Lwt.return_error (err :: errs)
+    | Error trace ->
+        mk_err () >>=? fun err -> Lwt.return_error (Trace.cons err trace)
     | ok ->
         Lwt.return ok
 
@@ -483,28 +474,6 @@ struct
   let unless cond f = if cond then return_unit else f ()
 
   let _when cond f = if cond then f () else return_unit
-
-  type Error.error += Assert_error of string * string
-
-  let () =
-    Error.register_error_kind
-      `Permanent
-      ~id:"assertion"
-      ~title:"Assertion failure"
-      ~description:"A fatal assertion failed"
-      ~pp:(fun ppf (loc, msg) ->
-        Format.fprintf
-          ppf
-          "Assert failure (%s)%s"
-          loc
-          (if msg = "" then "." else ": " ^ msg))
-      Data_encoding.(obj2 (req "loc" string) (req "msg" string))
-      (function Assert_error (loc, msg) -> Some (loc, msg) | _ -> None)
-      (fun (loc, msg) -> Assert_error (loc, msg))
-
-  let _assert b loc fmt =
-    if b then Format.ikfprintf (fun _ -> return_unit) Format.str_formatter fmt
-    else Format.kasprintf (fun msg -> fail (Assert_error (loc, msg))) fmt
 
   let dont_wait exc_handler err_handler f =
     Lwt_utils.dont_wait exc_handler (fun () ->

@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,12 +23,37 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Make (Prefix : Sig.PREFIX) : sig
-  type error = ..
+(* INVARIANT: traces are never empty, they must contain at least one error *)
+type 'err trace = 'err list
 
-  include Sig.CORE with type error := error
+let make err = [err]
 
-  include Sig.EXT with type error := error
+let cons err trace = err :: trace
 
-  include Sig.WITH_WRAPPED with type error := error
-end
+(* This is temporary. Eventually, the traces might have a more structured
+   semantic. *)
+let conp trace _trace = trace
+
+let pp_print pp_error ppf = function
+  | [] ->
+      assert false
+  | [error] ->
+      Format.fprintf ppf "@[<v 2>Error:@ %a@]@." pp_error error
+  | error :: _ as errors ->
+      Format.fprintf
+        ppf
+        "@[<v 2>Error:@ %a,@ trace:@ %a@]@."
+        pp_error
+        error
+        (Format.pp_print_list pp_error)
+        (List.rev errors)
+
+let pp_print_top pp_error fmt = function
+  | [] ->
+      assert false
+  | error :: _ ->
+      pp_error fmt error
+
+let encoding error_encoding = Data_encoding.list error_encoding
+
+let fold = List.fold_left

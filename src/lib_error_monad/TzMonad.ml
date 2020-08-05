@@ -24,6 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type error = Core.error = ..
+type error = TzCore.error = ..
 
-include Sig.MONAD with type error := Core.error
+module Monad = Monad_maker.Make (TzCore) (TzTrace)
+include Monad
+include Monad_ext_maker.Make (TzCore) (TzTrace) (Monad)
