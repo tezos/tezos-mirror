@@ -31,9 +31,7 @@ module Make (Error : sig
   include Sig.EXT with type error := error
 end)
 (Trace : Sig.TRACE)
-(Monad : Sig.MONAD
-           with type error := Error.error
-            and type 'error trace := 'error Trace.trace) :
+(Monad : Sig.MONAD with type 'error trace := 'error Trace.trace) :
   Sig.MONAD_EXT
     with type error := Error.error
      and type 'error trace := 'error Trace.trace

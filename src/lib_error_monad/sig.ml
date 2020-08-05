@@ -227,20 +227,6 @@ module type TRACE = sig
 end
 
 module type MONAD = sig
-  (** This type is meant to be substituted/constrained. The intended use is
-      along the following lines:
-
-      [module Foo : sig
-         include CORE
-         include MONAD with type error := error
-       end = struct
-         ...
-       end]
-
-      See core.mli and monad.mli as examples.
-      *)
-  type error
-
   (** To be subsituted/constrained *)
   type 'err trace
 

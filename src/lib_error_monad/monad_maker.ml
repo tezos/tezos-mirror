@@ -23,10 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Make (Error : Sig.CORE) (Trace : Sig.TRACE) :
-  Sig.MONAD
-    with type error := Error.error
-     and type 'err trace := 'err Trace.trace = struct
+module Make (Trace : Sig.TRACE) :
+  Sig.MONAD with type 'err trace := 'err Trace.trace = struct
   let ( >>= ) = Lwt.( >>= )
 
   let[@inline] ok v = Ok v
