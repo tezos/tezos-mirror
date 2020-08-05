@@ -27,7 +27,7 @@
     than raising [Not_found]) extensions of [Hashtbl.S] with some Lwt- and
     Error-aware traversal functions. *)
 module type S = sig
-  type error
+  type 'error trace
 
   type key
 
@@ -58,34 +58,37 @@ module type S = sig
   val iter_p : (key -> 'a -> unit Lwt.t) -> 'a t -> unit Lwt.t
 
   val iter_e :
-    (key -> 'a -> (unit, error) result) -> 'a t -> (unit, error) result
+    (key -> 'a -> (unit, 'trace) result) -> 'a t -> (unit, 'trace) result
 
   val iter_es :
-    (key -> 'a -> (unit, error) result Lwt.t) ->
+    (key -> 'a -> (unit, 'trace) result Lwt.t) ->
     'a t ->
-    (unit, error) result Lwt.t
+    (unit, 'trace) result Lwt.t
 
   val iter_ep :
-    (key -> 'a -> (unit, error) result Lwt.t) ->
+    (key -> 'a -> (unit, 'error trace) result Lwt.t) ->
     'a t ->
-    (unit, error) result Lwt.t
+    (unit, 'error trace) result Lwt.t
 
   val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
 
-  val try_map_inplace : (key -> 'a -> ('a, error) result) -> 'a t -> unit
+  val try_map_inplace : (key -> 'a -> ('a, 'trace) result) -> 'a t -> unit
 
   val fold : (key -> 'a -> 'b -> 'b) -> 'a t -> 'b -> 'b
 
   val fold_s : (key -> 'a -> 'b -> 'b Lwt.t) -> 'a t -> 'b -> 'b Lwt.t
 
   val fold_e :
-    (key -> 'a -> 'b -> ('b, error) result) -> 'a t -> 'b -> ('b, error) result
-
-  val fold_es :
-    (key -> 'a -> 'b -> ('b, error) result Lwt.t) ->
+    (key -> 'a -> 'b -> ('b, 'trace) result) ->
     'a t ->
     'b ->
-    ('b, error) result Lwt.t
+    ('b, 'trace) result
+
+  val fold_es :
+    (key -> 'a -> 'b -> ('b, 'trace) result Lwt.t) ->
+    'a t ->
+    'b ->
+    ('b, 'trace) result Lwt.t
 
   val length : 'a t -> int
 
@@ -105,7 +108,7 @@ module type S = sig
 end
 
 module type SeededS = sig
-  type error
+  type 'error trace
 
   type key
 
@@ -136,34 +139,37 @@ module type SeededS = sig
   val iter_p : (key -> 'a -> unit Lwt.t) -> 'a t -> unit Lwt.t
 
   val iter_e :
-    (key -> 'a -> (unit, error) result) -> 'a t -> (unit, error) result
+    (key -> 'a -> (unit, 'trace) result) -> 'a t -> (unit, 'trace) result
 
   val iter_es :
-    (key -> 'a -> (unit, error) result Lwt.t) ->
+    (key -> 'a -> (unit, 'trace) result Lwt.t) ->
     'a t ->
-    (unit, error) result Lwt.t
+    (unit, 'trace) result Lwt.t
 
   val iter_ep :
-    (key -> 'a -> (unit, error) result Lwt.t) ->
+    (key -> 'a -> (unit, 'error trace) result Lwt.t) ->
     'a t ->
-    (unit, error) result Lwt.t
+    (unit, 'error trace) result Lwt.t
 
   val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
 
-  val try_map_inplace : (key -> 'a -> ('a, error) result) -> 'a t -> unit
+  val try_map_inplace : (key -> 'a -> ('a, 'trace) result) -> 'a t -> unit
 
   val fold : (key -> 'a -> 'b -> 'b) -> 'a t -> 'b -> 'b
 
   val fold_s : (key -> 'a -> 'b -> 'b Lwt.t) -> 'a t -> 'b -> 'b Lwt.t
 
   val fold_e :
-    (key -> 'a -> 'b -> ('b, error) result) -> 'a t -> 'b -> ('b, error) result
-
-  val fold_es :
-    (key -> 'a -> 'b -> ('b, error) result Lwt.t) ->
+    (key -> 'a -> 'b -> ('b, 'trace) result) ->
     'a t ->
     'b ->
-    ('b, error) result Lwt.t
+    ('b, 'trace) result
+
+  val fold_es :
+    (key -> 'a -> 'b -> ('b, 'trace) result Lwt.t) ->
+    'a t ->
+    'b ->
+    ('b, 'trace) result Lwt.t
 
   val length : 'a t -> int
 
@@ -236,20 +242,20 @@ end
     [reset], or just [remove]), the promise is canceled.
 *)
 module type S_LWT = sig
-  type error
+  type 'error trace
 
   type key
 
-  type 'a t
+  type ('a, 'trace) t
 
-  val create : int -> 'a t
+  val create : int -> ('a, 'trace) t
 
   (** [clear tbl] cancels and removes all the promises in [tbl]. *)
-  val clear : 'a t -> unit
+  val clear : ('a, 'trace) t -> unit
 
   (** [reset tbl] cancels and removes all the promises in [tbl], and resizes
       [tbl] to its initial size. *)
-  val reset : 'a t -> unit
+  val reset : ('a, 'trace) t -> unit
 
   (** [find_or_make tbl k make] behaves differently depending on [k] being bound
       in [tbl]:
@@ -265,18 +271,18 @@ module type S_LWT = sig
         resolved, it may be removed automatically from [tbl] as described above.
   *)
   val find_or_make :
-    'a t ->
+    ('a, 'trace) t ->
     key ->
-    (unit -> ('a, error) result Lwt.t) ->
-    ('a, error) result Lwt.t
+    (unit -> ('a, 'trace) result Lwt.t) ->
+    ('a, 'trace) result Lwt.t
 
   (** [remove tbl k] cancels the promise bound to [k] in [tbl] and removes it.
       If [k] is not bound in [tbl] it does nothing. *)
-  val remove : 'a t -> key -> unit
+  val remove : ('a, 'trace) t -> key -> unit
 
-  val find : 'a t -> key -> ('a, error) result Lwt.t option
+  val find : ('a, 'trace) t -> key -> ('a, 'trace) result Lwt.t option
 
-  val mem : 'a t -> key -> bool
+  val mem : ('a, 'trace) t -> key -> bool
 
   (** [iter_with_waiting_es f tbl] iterates [f] over the bindings in [tbl].
 
@@ -290,9 +296,9 @@ module type S_LWT = sig
       promise to resolve and then the call promise to resolve before continuing
       to the next binding. *)
   val iter_with_waiting_es :
-    (key -> 'a -> (unit, error) result Lwt.t) ->
-    'a t ->
-    (unit, error) result Lwt.t
+    (key -> 'a -> (unit, 'trace) result Lwt.t) ->
+    ('a, 'trace) t ->
+    (unit, 'trace) result Lwt.t
 
   (** [iter_with_waiting_ep f tbl] iterates [f] over the bindings in [tbl].
 
@@ -307,9 +313,9 @@ module type S_LWT = sig
       It processes all bindings concurrently: it concurrently waits for all the
       bound promises to resolve and calls [f] as they resolve. *)
   val iter_with_waiting_ep :
-    (key -> 'a -> (unit, error) result Lwt.t) ->
-    'a t ->
-    (unit, error) result Lwt.t
+    (key -> 'a -> (unit, 'error trace) result Lwt.t) ->
+    ('a, 'error trace) t ->
+    (unit, 'error trace) result Lwt.t
 
   (** [fold_with_waiting_es f tbl init] folds [init] with [f] over the bindings
       in [tbl].
@@ -321,12 +327,12 @@ module type S_LWT = sig
 
       It processes bindings one after the other. *)
   val fold_with_waiting_es :
-    (key -> 'a -> 'b -> ('b, error) result Lwt.t) ->
-    'a t ->
+    (key -> 'a -> 'b -> ('b, 'trace) result Lwt.t) ->
+    ('a, 'trace) t ->
     'b ->
-    ('b, error) result Lwt.t
+    ('b, 'trace) result Lwt.t
 
-  val fold_keys : (key -> 'b -> 'b) -> 'a t -> 'b -> 'b
+  val fold_keys : (key -> 'b -> 'b) -> ('a, 'trace) t -> 'b -> 'b
 
   (** [fold_promises f tbl init] folds over the table, passing the raw promises
       to [f]. This means that [f] can observe [Error]/rejections.
@@ -334,14 +340,17 @@ module type S_LWT = sig
       This can be used to, e.g., count the number of resolved/unresolved
       promises. *)
   val fold_promises :
-    (key -> ('a, error) result Lwt.t -> 'b -> 'b) -> 'a t -> 'b -> 'b
+    (key -> ('a, 'trace) result Lwt.t -> 'b -> 'b) ->
+    ('a, 'trace) t ->
+    'b ->
+    'b
 
   (** [fold_resolved f tbl init] folds over the already resolved promises of
       [tbl]. More specifically, it folds over the [v] for all the promises
       fulfilled with [Ok v] that are bound in [tbl]. *)
-  val fold_resolved : (key -> 'a -> 'b -> 'b) -> 'a t -> 'b -> 'b
+  val fold_resolved : (key -> 'a -> 'b -> 'b) -> ('a, 'trace) t -> 'b -> 'b
 
-  val length : 'a t -> int
+  val length : ('a, 'trace) t -> int
 
-  val stats : 'a t -> Stdlib.Hashtbl.statistics
+  val stats : ('a, 'trace) t -> Stdlib.Hashtbl.statistics
 end

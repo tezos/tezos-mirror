@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 module Make (Seq : Sigs.Seq.S) : sig
-  module type S = Sigs.Map.S with type error := Seq.Monad.out_error
+  module type S = Sigs.Map.S with type 'error trace := 'error Seq.Monad.trace
 
   module Make (Ord : Stdlib.Map.OrderedType) : S with type key = Ord.t
 end

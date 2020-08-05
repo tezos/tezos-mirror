@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 module type S = sig
-  type error (* for substitution/constraint *)
+  type 'error trace
 
   type elt
 
@@ -58,32 +58,34 @@ module type S = sig
 
   val iter : (elt -> unit) -> t -> unit
 
-  val iter_e : (elt -> (unit, error) result) -> t -> (unit, error) result
+  val iter_e : (elt -> (unit, 'trace) result) -> t -> (unit, 'trace) result
 
   val iter_s : (elt -> unit Lwt.t) -> t -> unit Lwt.t
 
   val iter_p : (elt -> unit Lwt.t) -> t -> unit Lwt.t
 
   val iter_es :
-    (elt -> (unit, error) result Lwt.t) -> t -> (unit, error) result Lwt.t
+    (elt -> (unit, 'trace) result Lwt.t) -> t -> (unit, 'trace) result Lwt.t
 
   val iter_ep :
-    (elt -> (unit, error) result Lwt.t) -> t -> (unit, error) result Lwt.t
+    (elt -> (unit, 'error trace) result Lwt.t) ->
+    t ->
+    (unit, 'error trace) result Lwt.t
 
   val map : (elt -> elt) -> t -> t
 
   val fold : (elt -> 'a -> 'a) -> t -> 'a -> 'a
 
   val fold_e :
-    (elt -> 'a -> ('a, error) result) -> t -> 'a -> ('a, error) result
+    (elt -> 'a -> ('a, 'trace) result) -> t -> 'a -> ('a, 'trace) result
 
   val fold_s : (elt -> 'a -> 'a Lwt.t) -> t -> 'a -> 'a Lwt.t
 
   val fold_es :
-    (elt -> 'a -> ('a, error) result Lwt.t) ->
+    (elt -> 'a -> ('a, 'trace) result Lwt.t) ->
     t ->
     'a ->
-    ('a, error) result Lwt.t
+    ('a, 'trace) result Lwt.t
 
   val for_all : (elt -> bool) -> t -> bool
 

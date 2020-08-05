@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 module Make (Seq : Sigs.Seq.S) = struct
-  module type S = Sigs.Set.S with type error := Seq.Monad.out_error
+  module type S = Sigs.Set.S with type 'error trace := 'error Seq.Monad.trace
 
   module Make (Ord : Stdlib.Map.OrderedType) : S with type elt = Ord.t = struct
     open Seq

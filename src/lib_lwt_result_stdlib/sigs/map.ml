@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 module type S = sig
-  type error (* for substitution/constraint *)
+  type 'error trace
 
   type key
 
@@ -61,7 +61,7 @@ module type S = sig
       [Error e] then the iteration stops and the result of the iteration is
       [Error e]. *)
   val iter_e :
-    (key -> 'a -> (unit, error) result) -> 'a t -> (unit, error) result
+    (key -> 'a -> (unit, 'trace) result) -> 'a t -> (unit, 'trace) result
 
   val iter_s : (key -> 'a -> unit Lwt.t) -> 'a t -> unit Lwt.t
 
@@ -73,18 +73,18 @@ module type S = sig
       the applications results in [Error e] then the iteration stops and the
       result of the iteration is [Error e]. *)
   val iter_es :
-    (key -> 'a -> (unit, error) result Lwt.t) ->
+    (key -> 'a -> (unit, 'trace) result Lwt.t) ->
     'a t ->
-    (unit, error) result Lwt.t
+    (unit, 'trace) result Lwt.t
 
   (** [iter_ep f m] applies [f] to the bindings of [m]. All the applications are
       done concurrently. If all the applications result in [Ok ()], then the
       result of the iteration is [Ok ()]. If any of the applications results in
       [Error e] then the result of the iteration is [Error e]. *)
   val iter_ep :
-    (key -> 'a -> (unit, error) result Lwt.t) ->
+    (key -> 'a -> (unit, 'error trace) result Lwt.t) ->
     'a t ->
-    (unit, error) result Lwt.t
+    (unit, 'error trace) result Lwt.t
 
   val fold : (key -> 'a -> 'b -> 'b) -> 'a t -> 'b -> 'b
 
@@ -92,7 +92,10 @@ module type S = sig
       [f k1 d1 init >>? fun acc -> f k2 d2 acc >>? fun acc -> …] where [kN] is
       the key bound to [dN] in [m]. *)
   val fold_e :
-    (key -> 'a -> 'b -> ('b, error) result) -> 'a t -> 'b -> ('b, error) result
+    (key -> 'a -> 'b -> ('b, 'trace) result) ->
+    'a t ->
+    'b ->
+    ('b, 'trace) result
 
   val fold_s : (key -> 'a -> 'b -> 'b Lwt.t) -> 'a t -> 'b -> 'b Lwt.t
 
@@ -100,10 +103,10 @@ module type S = sig
       [f k1 d1 init >>=? fun acc -> f k2 d2 acc >>=? fun acc -> …] where [kN] is
       the key bound to [dN] in [m]. *)
   val fold_es :
-    (key -> 'a -> 'b -> ('b, error) result Lwt.t) ->
+    (key -> 'a -> 'b -> ('b, 'trace) result Lwt.t) ->
     'a t ->
     'b ->
-    ('b, error) result Lwt.t
+    ('b, 'trace) result Lwt.t
 
   val for_all : (key -> 'a -> bool) -> 'a t -> bool
 

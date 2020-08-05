@@ -31,17 +31,18 @@ val hash_param : meaningful:int -> total:int -> 'a -> int
 
 val seeded_hash_param : meaningful:int -> total:int -> int -> 'a -> int
 
-module type S = Sigs.Hashtbl.S with type error := Error_monad.error list
-
-module type SeededS =
-  Sigs.Hashtbl.SeededS with type error := Error_monad.error list
+module type S =
+  Sigs.Hashtbl.S with type 'error trace := 'error Error_monad.trace
 
 module Make (H : Stdlib.Hashtbl.HashedType) : S with type key = H.t
+
+module type SeededS =
+  Sigs.Hashtbl.SeededS with type 'error trace := 'error Error_monad.trace
 
 module MakeSeeded (H : Stdlib.Hashtbl.SeededHashedType) :
   SeededS with type key = H.t
 
 module type S_LWT =
-  Sigs.Hashtbl.S_LWT with type error := Error_monad.error list
+  Sigs.Hashtbl.S_LWT with type 'error trace := 'error Seq.Monad.trace
 
 module Make_Lwt (H : Stdlib.Hashtbl.HashedType) : S_LWT with type key = H.t

@@ -34,10 +34,8 @@ module Make (Seq : Sigs.Seq.S) = struct
   let seeded_hash_param ~meaningful ~total seed v =
     Stdlib.Hashtbl.seeded_hash_param meaningful total seed v
 
-  module type S = Sigs.Hashtbl.S with type error := Seq.Monad.out_error
-
-  module type SeededS =
-    Sigs.Hashtbl.SeededS with type error := Seq.Monad.out_error
+  module type S =
+    Sigs.Hashtbl.S with type 'error trace := 'error Seq.Monad.trace
 
   module Make (H : Stdlib.Hashtbl.HashedType) : S with type key = H.t = struct
     open Seq
@@ -69,6 +67,9 @@ module Make (Seq : Sigs.Seq.S) = struct
         (fun k v -> match f k v with Error _ -> None | Ok r -> Some r)
         t
   end
+
+  module type SeededS =
+    Sigs.Hashtbl.SeededS with type 'error trace := 'error Seq.Monad.trace
 
   module MakeSeeded (H : Stdlib.Hashtbl.SeededHashedType) :
     SeededS with type key = H.t = struct
@@ -102,7 +103,8 @@ module Make (Seq : Sigs.Seq.S) = struct
         t
   end
 
-  module type S_LWT = Sigs.Hashtbl.S_LWT with type error := Seq.Monad.out_error
+  module type S_LWT =
+    Sigs.Hashtbl.S_LWT with type 'error trace := 'error Seq.Monad.trace
 
   module Make_Lwt (H : Stdlib.Hashtbl.HashedType) : S_LWT with type key = H.t =
   struct
@@ -112,7 +114,7 @@ module Make (Seq : Sigs.Seq.S) = struct
 
     type key = H.t
 
-    type 'a t = ('a, Seq.Monad.out_error) result Lwt.t T.t
+    type ('a, 'trace) t = ('a, 'trace) result Lwt.t T.t
 
     let create n = T.create n
 

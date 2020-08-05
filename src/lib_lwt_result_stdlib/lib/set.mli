@@ -23,6 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module type S = Sigs.Set.S with type error := Error_monad.error list
+module type S = Sigs.Set.S with type 'error trace := 'error Seq.Monad.trace
 
 module Make (Ord : Stdlib.Map.OrderedType) : S with type elt = Ord.t

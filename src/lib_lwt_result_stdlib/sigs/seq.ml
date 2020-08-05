@@ -60,7 +60,7 @@
 module type S = sig
   module Monad : Monad.S
 
-  open Monad (* for [error] *)
+  open Monad (* for [error]/[trace] *)
 
   (** including the OCaml's {!Stdlib.Seq} module to share the {!Seq.t} type
       (including concrete definition) and to bring the existing functions. *)
@@ -71,21 +71,18 @@ module type S = sig
 
   (** in-monad, preallocated empty/nil *)
 
-  val ok_empty : ('a t, out_error) result
+  val ok_empty : ('a t, 'trace) result
 
-  val return_empty : ('a t, out_error) result Lwt.t
+  val return_empty : ('a t, 'trace) result Lwt.t
 
-  val ok_nil : ('a node, out_error) result
+  val ok_nil : ('a node, 'trace) result
 
-  val return_nil : ('a node, out_error) result Lwt.t
+  val return_nil : ('a node, 'trace) result Lwt.t
 
   (** Similar to {!fold_left} but wraps the traversal in {!result}. The
       traversal is interrupted if one of the step returns an [Error _]. *)
   val fold_left_e :
-    ('a -> 'b -> ('a, out_error) result) ->
-    'a ->
-    'b t ->
-    ('a, out_error) result
+    ('a -> 'b -> ('a, 'trace) result) -> 'a -> 'b t -> ('a, 'trace) result
 
   (** Similar to {!fold_left} but wraps the traversing in {!Lwt}. Each step of
       the traversal is started after the previous one has resolved. The
@@ -97,15 +94,14 @@ module type S = sig
       traversal is interrupted if one of the step is rejected or is fulfilled
       with [Error _]. *)
   val fold_left_es :
-    ('a -> 'b -> ('a, out_error) result Lwt.t) ->
+    ('a -> 'b -> ('a, 'trace) result Lwt.t) ->
     'a ->
     'b t ->
-    ('a, out_error) result Lwt.t
+    ('a, 'trace) result Lwt.t
 
   (** Similar to {!iter} but wraps the iteration in {!result}. The iteration
       is interrupted if one of the step returns an [Error _]. *)
-  val iter_e :
-    ('a -> (unit, out_error) result) -> 'a t -> (unit, out_error) result
+  val iter_e : ('a -> (unit, 'trace) result) -> 'a t -> (unit, 'trace) result
 
   (** Similar to {!iter} but wraps the iteration in {!Lwt}. Each step
       of the iteration is started after the previous one resolved. The iteration
@@ -117,9 +113,7 @@ module type S = sig
       is interrupted if one of the promise is rejected of fulfilled with an
       [Error _]. *)
   val iter_es :
-    ('a -> (unit, out_error) result Lwt.t) ->
-    'a t ->
-    (unit, out_error) result Lwt.t
+    ('a -> (unit, 'trace) result Lwt.t) -> 'a t -> (unit, 'trace) result Lwt.t
 
   (** Similar to {!iter} but wraps the iteration in {!Lwt}. All the
       steps of the iteration are started concurrently. The promise [iter_p f s]
@@ -137,9 +131,9 @@ module type S = sig
         otherwise
       - is fulfilled with [Ok ()] if all the promises are. *)
   val iter_ep :
-    ('a -> (unit, out_error) result Lwt.t) ->
+    ('a -> (unit, 'error trace) result Lwt.t) ->
     'a t ->
-    (unit, out_error) result Lwt.t
+    (unit, 'error trace) result Lwt.t
 
   (** Similar to {!map} but wraps the transformation in {!result}. The
       traversal is interrupted if any of the application returns an [Error _].
@@ -149,8 +143,7 @@ module type S = sig
       is interrupted by an [Error _]) and does not terminate on infinite
       sequences (again, unless interrupted). Moreover [map_e] is not
       tail-recursive. *)
-  val map_e :
-    ('a -> ('b, out_error) result) -> 'a t -> ('b t, out_error) result
+  val map_e : ('a -> ('b, 'trace) result) -> 'a t -> ('b t, 'trace) result
 
   (** Similar to {!map} but wraps the transformation in {!Lwt}. Each
       transformation is done sequentially, only starting once the previous
@@ -174,9 +167,7 @@ module type S = sig
       infinite sequences (again, unless interrupted). Moreover [map_es] is not
       tail-recursive. *)
   val map_es :
-    ('a -> ('b, out_error) result Lwt.t) ->
-    'a t ->
-    ('b t, out_error) result Lwt.t
+    ('a -> ('b, 'trace) result Lwt.t) -> 'a t -> ('b t, 'trace) result Lwt.t
 
   (** Similar to {!map} but wraps the transformation in {!Lwt}. All the
       transformations are done concurrently. The promise [map_p f s] resolves
@@ -201,16 +192,15 @@ module type S = sig
       terminate on infinite sequences. Moreover [map_p] is not tail-recursive.
   *)
   val map_ep :
-    ('a -> ('b, out_error) result Lwt.t) ->
+    ('a -> ('b, 'error trace) result Lwt.t) ->
     'a t ->
-    ('b t, out_error) result Lwt.t
+    ('b t, 'error trace) result Lwt.t
 
   (** Similar to {!filter} but wraps the transformation in [result]. Note
       that, unlike {!filter}, [filter_e] is not lazy: it applies the
       transformation immediately and does not terminate on infinite sequences.
       Moreover [filter_e] is not tail-recursive. *)
-  val filter_e :
-    ('a -> (bool, out_error) result) -> 'a t -> ('a t, out_error) result
+  val filter_e : ('a -> (bool, 'trace) result) -> 'a t -> ('a t, 'trace) result
 
   (** Similar to {!filter} but wraps the transformation in {!Lwt.t}. Each
       test of the predicate is done sequentially, only starting once the
@@ -225,14 +215,12 @@ module type S = sig
       lazy: it applies the transformation immediately and does not terminate on
       infinite sequences. Moreover [filter_es] is not tail-recursive. *)
   val filter_es :
-    ('a -> (bool, out_error) result Lwt.t) ->
-    'a t ->
-    ('a t, out_error) result Lwt.t
+    ('a -> (bool, 'trace) result Lwt.t) -> 'a t -> ('a t, 'trace) result Lwt.t
 
   (** Similar to {!filter_map} but within [result]. Not lazy and not
       tail-recursive. *)
   val filter_map_e :
-    ('a -> ('b option, out_error) result) -> 'a t -> ('b t, out_error) result
+    ('a -> ('b option, 'trace) result) -> 'a t -> ('b t, 'trace) result
 
   (** Similar to {!filter_map} but within [Lwt.t]. Not lazy and not
       tail-recursive. *)
@@ -241,9 +229,9 @@ module type S = sig
   (** Similar to {!filter_map} but within [result Lwt.t]. Not lazy and not
       tail-recursive. *)
   val filter_map_es :
-    ('a -> ('b option, out_error) result Lwt.t) ->
+    ('a -> ('b option, 'trace) result Lwt.t) ->
     'a t ->
-    ('b t, out_error) result Lwt.t
+    ('b t, 'trace) result Lwt.t
 
   (** [find_first f t] is [Some x] where [x] is the first item in [t] such that
       [f x]. It is [None] if there are no such element. It does not terminate if
@@ -259,7 +247,7 @@ module type S = sig
     - [Ok None] otherwise and [t] is finite,
     - an expression that never returns otherwise. *)
   val find_first_e :
-    ('a -> (bool, out_error) result) -> 'a t -> ('a option, out_error) result
+    ('a -> (bool, 'trace) result) -> 'a t -> ('a option, 'trace) result
 
   (** [find_first_s f t] is similar to {!find_first} but wrapped within
       [Lwt.t]. The search is identical to [find_first_e] but each
@@ -270,7 +258,7 @@ module type S = sig
       [result Lwt.t]. The search is identical to [find_first_e] but each
       predicate is applied when the previous one has resolved. *)
   val find_first_es :
-    ('a -> (bool, out_error) result Lwt.t) ->
+    ('a -> (bool, 'trace) result Lwt.t) ->
     'a t ->
-    ('a option, out_error) result Lwt.t
+    ('a option, 'trace) result Lwt.t
 end

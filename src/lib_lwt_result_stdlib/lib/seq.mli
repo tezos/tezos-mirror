@@ -25,5 +25,5 @@
 
 include
   Sigs.Seq.S
-    with type Monad.in_error = Error_monad.error
-     and type Monad.out_error = Error_monad.error list
+    with type Monad.error = Error_monad.error
+     and type 'error Monad.trace = 'error Error_monad.trace

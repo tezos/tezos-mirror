@@ -24,9 +24,6 @@
 (*****************************************************************************)
 
 include Functors.Seq.Make (struct
-  type in_error = Error_monad.error
-
-  type out_error = Error_monad.error TzTrace.trace
-
+  include Tezos_error_monad.TzTrace
   include Tezos_error_monad.TzMonad
 end)
