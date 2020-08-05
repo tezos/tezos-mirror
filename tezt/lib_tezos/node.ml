@@ -37,15 +37,15 @@ type 'a known = Unknown | Known of 'a
    of the node to [Not_running], which is another reason to wait for it to
    finish before restarting a node. Otherwise we could have a [Not_running]
    node which would be actually running. *)
-type status =
-  | Not_running
-  | Running of {
-      process : Process.t;
-      mutable event_loop_promise : unit Lwt.t option;
-      mutable ready : bool;
-      mutable level : int known;
-      mutable identity : string known;
-    }
+type running_status = {
+  process : Process.t;
+  mutable event_loop_promise : unit Lwt.t option;
+  mutable ready : bool;
+  mutable level : int known;
+  mutable identity : string known;
+}
+
+type status = Not_running | Running of running_status
 
 module String_map = Map.Make (String)
 
@@ -371,15 +371,16 @@ let run ?(expected_pow = 0) ?(single_process = false) ?bootstrap_threshold
   in
   (* Make sure the node status is [Running], otherwise [event_loop_promise]
      would stop immediately thinking the node has been terminated. *)
-  node.status <-
-    Running
-      {
-        process;
-        ready = false;
-        level = Unknown;
-        identity = Unknown;
-        event_loop_promise = None;
-      } ;
+  let running_status =
+    {
+      process;
+      ready = false;
+      level = Unknown;
+      identity = Unknown;
+      event_loop_promise = None;
+    }
+  in
+  node.status <- Running running_status ;
   (* Return control now, the rest (event handling) happens concurrently. *)
   let event_loop_promise =
     let rec event_loop () =
@@ -425,16 +426,7 @@ let run ?(expected_pow = 0) ?(single_process = false) ?bootstrap_threshold
     in
     unit
   in
-  (* Update [node.status.event_loop_promise]. *)
-  node.status <-
-    Running
-      {
-        process;
-        ready = false;
-        level = Unknown;
-        identity = Unknown;
-        event_loop_promise = Some event_loop_promise;
-      } ;
+  running_status.event_loop_promise <- Some event_loop_promise ;
   async event_loop_promise ;
   unit
 
