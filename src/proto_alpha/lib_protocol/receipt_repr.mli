@@ -34,8 +34,13 @@ type balance =
 (** A credit or debit of tezzies to a balance. *)
 type balance_update = Debited of Tez_repr.t | Credited of Tez_repr.t
 
+(** An origin of a balance update *)
+type update_origin =
+  | Block_application  (** Update from a block application *)
+  | Protocol_migration  (** Update from a protocol migration *)
+
 (** A list of balance updates. Duplicates may happen. *)
-type balance_updates = (balance * balance_update) list
+type balance_updates = (balance * balance_update * update_origin) list
 
 val balance_updates_encoding : balance_updates Data_encoding.t
 

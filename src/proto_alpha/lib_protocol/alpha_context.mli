@@ -985,7 +985,9 @@ module Receipt : sig
 
   type balance_update = Debited of Tez.t | Credited of Tez.t
 
-  type balance_updates = (balance * balance_update) list
+  type update_origin = Block_application | Protocol_migration
+
+  type balance_updates = (balance * balance_update * update_origin) list
 
   val balance_updates_encoding : balance_updates Data_encoding.t
 

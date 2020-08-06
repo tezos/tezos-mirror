@@ -395,11 +395,12 @@ let unfreeze ctxt delegate cycle =
   ok
     ( ctxt,
       Receipt_repr.cleanup_balance_updates
-        [ (Deposits (delegate, cycle), Debited deposit);
-          (Fees (delegate, cycle), Debited fees);
-          (Rewards (delegate, cycle), Debited rewards);
+        [ (Deposits (delegate, cycle), Debited deposit, Block_application);
+          (Fees (delegate, cycle), Debited fees, Block_application);
+          (Rewards (delegate, cycle), Debited rewards, Block_application);
           ( Contract (Contract_repr.implicit_contract delegate),
-            Credited unfrozen_amount ) ] )
+            Credited unfrozen_amount,
+            Block_application ) ] )
 
 let cycle_end ctxt last_cycle unrevealed =
   let preserved = Constants_storage.preserved_cycles ctxt in
@@ -415,8 +416,12 @@ let cycle_end ctxt last_cycle unrevealed =
           >|=? fun ctxt ->
           let bus =
             Receipt_repr.
-              [ (Fees (u.delegate, revealed_cycle), Debited u.fees);
-                (Rewards (u.delegate, revealed_cycle), Debited u.rewards) ]
+              [ ( Fees (u.delegate, revealed_cycle),
+                  Debited u.fees,
+                  Block_application );
+                ( Rewards (u.delegate, revealed_cycle),
+                  Debited u.rewards,
+                  Block_application ) ]
           in
           (ctxt, bus @ balance_updates))
         (ctxt, [])

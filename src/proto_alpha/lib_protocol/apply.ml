@@ -555,7 +555,10 @@ let apply_manager_operation_content :
                 ( Fees.origination_burn ctxt
                 >|? fun (ctxt, origination_burn) ->
                 ( ctxt,
-                  [(Receipt.Contract payer, Receipt.Debited origination_burn)],
+                  [ Receipt.
+                      ( Contract payer,
+                        Debited origination_burn,
+                        Block_application ) ],
                   true ) ) ) )
       >>=? fun (ctxt, maybe_burn_balance_update, allocated_destination_contract)
                ->
@@ -595,10 +598,13 @@ let apply_manager_operation_content :
                   storage = None;
                   lazy_storage_diff = None;
                   balance_updates =
-                    Receipt.cleanup_balance_updates
-                      ( [ (Receipt.Contract source, Receipt.Debited amount);
-                          (Contract destination, Credited amount) ]
-                      @ maybe_burn_balance_update );
+                    Receipt.(
+                      cleanup_balance_updates
+                        [ (Contract source, Debited amount, Block_application);
+                          ( Contract destination,
+                            Credited amount,
+                            Block_application ) ]
+                      @ maybe_burn_balance_update);
                   originated_contracts = [];
                   consumed_gas =
                     Gas.consumed ~since:before_operation ~until:ctxt;
@@ -647,9 +653,10 @@ let apply_manager_operation_content :
                 lazy_storage_diff;
                 balance_updates =
                   Receipt.cleanup_balance_updates
-                    [ (Contract payer, Debited fees);
-                      (Contract source, Debited amount);
-                      (Contract destination, Credited amount) ];
+                    [ (Contract payer, Debited fees, Block_application);
+                      (Contract source, Debited amount, Block_application);
+                      (Contract destination, Credited amount, Block_application)
+                    ];
                 originated_contracts;
                 consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
                 storage_size = new_size;
@@ -727,10 +734,10 @@ let apply_manager_operation_content :
             lazy_storage_diff;
             balance_updates =
               Receipt.cleanup_balance_updates
-                [ (Contract payer, Debited fees);
-                  (Contract payer, Debited origination_burn);
-                  (Contract source, Debited credit);
-                  (Contract contract, Credited credit) ];
+                [ (Contract payer, Debited fees, Block_application);
+                  (Contract payer, Debited origination_burn, Block_application);
+                  (Contract source, Debited credit, Block_application);
+                  (Contract contract, Credited credit, Block_application) ];
             originated_contracts = [contract];
             consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
             storage_size = size;
@@ -910,8 +917,9 @@ let rec mark_skipped :
            {
              balance_updates =
                Receipt.cleanup_balance_updates
-                 [ (Contract source, Debited fee);
-                   (Fees (baker, level.cycle), Credited fee) ];
+                 [ (Contract source, Debited fee, Block_application);
+                   (Fees (baker, level.cycle), Credited fee, Block_application)
+                 ];
              operation_result = skipped_operation_result operation;
              internal_operation_results = [];
            })
@@ -922,8 +930,9 @@ let rec mark_skipped :
             {
               balance_updates =
                 Receipt.cleanup_balance_updates
-                  [ (Contract source, Debited fee);
-                    (Fees (baker, level.cycle), Credited fee) ];
+                  [ (Contract source, Debited fee, Block_application);
+                    (Fees (baker, level.cycle), Credited fee, Block_application)
+                  ];
               operation_result = skipped_operation_result operation;
               internal_operation_results = [];
             },
@@ -1009,8 +1018,9 @@ let rec apply_manager_contents_list_rec :
           {
             balance_updates =
               Receipt.cleanup_balance_updates
-                [ (Contract source, Debited fee);
-                  (Fees (baker, level.cycle), Credited fee) ];
+                [ (Contract source, Debited fee, Block_application);
+                  (Fees (baker, level.cycle), Credited fee, Block_application)
+                ];
             operation_result;
             internal_operation_results;
           }
@@ -1026,8 +1036,10 @@ let rec apply_manager_contents_list_rec :
               {
                 balance_updates =
                   Receipt.cleanup_balance_updates
-                    [ (Contract source, Debited fee);
-                      (Fees (baker, level.cycle), Credited fee) ];
+                    [ (Contract source, Debited fee, Block_application);
+                      ( Fees (baker, level.cycle),
+                        Credited fee,
+                        Block_application ) ];
                 operation_result;
                 internal_operation_results;
               }
@@ -1040,8 +1052,10 @@ let rec apply_manager_contents_list_rec :
               {
                 balance_updates =
                   Receipt.cleanup_balance_updates
-                    [ (Contract source, Debited fee);
-                      (Fees (baker, level.cycle), Credited fee) ];
+                    [ (Contract source, Debited fee, Block_application);
+                      ( Fees (baker, level.cycle),
+                        Credited fee,
+                        Block_application ) ];
                 operation_result;
                 internal_operation_results;
               }
@@ -1144,9 +1158,14 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
                  balance_updates =
                    Receipt.cleanup_balance_updates
                      [ ( Contract (Contract.implicit_contract delegate),
-                         Debited deposit );
-                       (Deposits (delegate, level.cycle), Credited deposit);
-                       (Rewards (delegate, level.cycle), Credited reward) ];
+                         Debited deposit,
+                         Block_application );
+                       ( Deposits (delegate, level.cycle),
+                         Credited deposit,
+                         Block_application );
+                       ( Rewards (delegate, level.cycle),
+                         Credited reward,
+                         Block_application ) ];
                  delegate;
                  slots;
                }) )
@@ -1164,7 +1183,8 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
           Single_result
             (Seed_nonce_revelation_result
                [ ( Rewards (baker, level.cycle),
-                   Credited seed_nonce_revelation_tip ) ]) ) )
+                   Credited seed_nonce_revelation_tip,
+                   Block_application ) ]) ) )
   | Single (Double_endorsement_evidence {op1; op2}) -> (
     match (op1.protocol_data.contents, op2.protocol_data.contents) with
     | (Single (Endorsement e1), Single (Endorsement e2))
@@ -1210,11 +1230,17 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
               (Double_endorsement_evidence_result
                  (Receipt.cleanup_balance_updates
                     [ ( Deposits (delegate1, level.cycle),
-                        Debited balance.deposit );
-                      (Fees (delegate1, level.cycle), Debited balance.fees);
+                        Debited balance.deposit,
+                        Block_application );
+                      ( Fees (delegate1, level.cycle),
+                        Debited balance.fees,
+                        Block_application );
                       ( Rewards (delegate1, level.cycle),
-                        Debited balance.rewards );
-                      (Rewards (baker, current_cycle), Credited reward) ])) )
+                        Debited balance.rewards,
+                        Block_application );
+                      ( Rewards (baker, current_cycle),
+                        Credited reward,
+                        Block_application ) ])) )
     | (_, _) ->
         fail Invalid_double_endorsement_evidence )
   | Single (Double_baking_evidence {bh1; bh2}) ->
@@ -1282,10 +1308,18 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
           Single_result
             (Double_baking_evidence_result
                (Receipt.cleanup_balance_updates
-                  [ (Deposits (delegate, level.cycle), Debited balance.deposit);
-                    (Fees (delegate, level.cycle), Debited balance.fees);
-                    (Rewards (delegate, level.cycle), Debited balance.rewards);
-                    (Rewards (baker, current_cycle), Credited reward) ])) ) )
+                  [ ( Deposits (delegate, level.cycle),
+                      Debited balance.deposit,
+                      Block_application );
+                    ( Fees (delegate, level.cycle),
+                      Debited balance.fees,
+                      Block_application );
+                    ( Rewards (delegate, level.cycle),
+                      Debited balance.rewards,
+                      Block_application );
+                    ( Rewards (baker, current_cycle),
+                      Credited reward,
+                      Block_application ) ])) ) )
   | Single (Activate_account {id = pkh; activation_code}) -> (
       let blinded_pkh =
         Blinded_public_key_hash.of_ed25519_pkh activation_code pkh
@@ -1302,8 +1336,8 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
           >|=? fun ctxt ->
           ( ctxt,
             Single_result
-              (Activate_account_result [(Contract contract, Credited amount)])
-          ) )
+              (Activate_account_result
+                 [(Contract contract, Credited amount, Block_application)]) ) )
   | Single (Proposals {source; period; proposals}) ->
       Roll.delegate_pubkey ctxt source
       >>=? fun delegate ->
@@ -1499,9 +1533,11 @@ let finalize_application ctxt protocol_data delegate ~block_delay =
   let balance_updates =
     Receipt.(
       cleanup_balance_updates
-        ( [ (Contract (Contract.implicit_contract delegate), Debited deposit);
-            (Deposits (delegate, cycle), Credited deposit);
-            (Rewards (delegate, cycle), Credited reward) ]
+        ( [ ( Contract (Contract.implicit_contract delegate),
+              Debited deposit,
+              Block_application );
+            (Deposits (delegate, cycle), Credited deposit, Block_application);
+            (Rewards (delegate, cycle), Credited reward, Block_application) ]
         @ balance_updates ))
   in
   let consumed_gas =

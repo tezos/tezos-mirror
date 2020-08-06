@@ -103,15 +103,44 @@ let balance_update_encoding =
                    failwith "Qty.of_mutez" )
              int64))
 
-type balance_updates = (balance * balance_update) list
+type update_origin = Block_application | Protocol_migration
+
+let update_origin_encoding =
+  let open Data_encoding in
+  def "operation_metadata.alpha.update_origin"
+  @@ obj1 @@ req "origin"
+  @@ union
+       [ case
+           (Tag 0)
+           ~title:"Block_application"
+           (constant "block")
+           (function Block_application -> Some () | _ -> None)
+           (fun () -> Block_application);
+         case
+           (Tag 1)
+           ~title:"Protocol_migration"
+           (constant "migration")
+           (function Protocol_migration -> Some () | _ -> None)
+           (fun () -> Protocol_migration) ]
+
+type balance_updates = (balance * balance_update * update_origin) list
 
 let balance_updates_encoding =
   let open Data_encoding in
   def "operation_metadata.alpha.balance_updates"
-  @@ list (merge_objs balance_encoding balance_update_encoding)
+  @@ list
+       (conv
+          (function
+            | (balance, balance_update, update_origin) ->
+                ((balance, balance_update), update_origin))
+          (fun ((balance, balance_update), update_origin) ->
+            (balance, balance_update, update_origin))
+          (merge_objs
+             (merge_objs balance_encoding balance_update_encoding)
+             update_origin_encoding))
 
 let cleanup_balance_updates balance_updates =
   List.filter
-    (fun (_, (Credited update | Debited update)) ->
+    (fun (_, (Credited update | Debited update), _) ->
       not (Tez_repr.equal update Tez_repr.zero))
     balance_updates
