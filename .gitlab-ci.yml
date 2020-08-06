@@ -107,6 +107,24 @@ build:
 ## Stage: test (only MR)                                  ##
 ############################################################
 
+test-script-gen-genesis:
+  image: ${build_deps_image_name}:${build_deps_image_version}
+  stage: test
+  except:
+    - master
+    - zeronet
+    - mainnet
+    - zeronet-staging
+    - mainnet-staging
+    - zeronet-snapshots
+    - mainnet-snapshots
+    - latest-release
+    - tags
+  before_script:
+    - cd scripts/gen-genesis
+  script:
+    - dune build gen_genesis.exe
+
 .test_template: &test_definition
   <<: *build_definition
   stage: test
