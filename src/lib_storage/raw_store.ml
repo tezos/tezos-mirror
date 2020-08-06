@@ -281,6 +281,14 @@ let next_key_after_subdirs = function
       List.sub path (List.length path - 1)
       @ [List.last_exn path ^ zero_char_str]
 
+module Hashtbl = Hashtbl.MakeSeeded (struct
+  type t = string list
+
+  let hash = Hashtbl.seeded_hash
+
+  let equal (d1 : string list) d2 = d1 = d2
+end)
+
 let fold t k ~init ~f =
   let base_len = List.length k in
   let rec inner ht cursor acc =

@@ -652,6 +652,8 @@ module Dumpable_context = struct
             `Node (Hash.of_context_hash (Context_hash.of_bytes_exn h)))
       (obj2 (req "kind" kind_encoding) (req "value" bytes))
 
+  let hash_equal (h1 : hash) (h2 : hash) = h1 = h2
+
   let context_parents ctxt =
     match ctxt with
     | {parents = [commit]; _} ->

@@ -66,6 +66,8 @@ module type Dump_interface = sig
 
   val hash_encoding : hash Data_encoding.t
 
+  val hash_equal : hash -> hash -> bool
+
   module Block_header : sig
     type t = Block_header.t
 

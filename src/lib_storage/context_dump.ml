@@ -51,6 +51,8 @@ module type Dump_interface = sig
 
   val hash_encoding : hash Data_encoding.t
 
+  val hash_equal : hash -> hash -> bool
+
   module Block_header : sig
     type t = Block_header.t
 
@@ -531,6 +533,14 @@ module Make (I : Dump_interface) = struct
       (v.version <> current_version)
       (Invalid_snapshot_version (v.version, current_version))
 
+  module Hashtbl = Hashtbl.MakeSeeded (struct
+    type t = I.hash
+
+    let hash = Hashtbl.seeded_hash
+
+    let equal = I.hash_equal
+  end)
+
   let dump_contexts_fd idx data ~fd =
     (* Dumping *)
     let buf = Buffer.create 1_000_000 in
@@ -545,7 +555,7 @@ module Make (I : Dump_interface) = struct
       if Buffer.length buf > 1_000_000 then flush () else Lwt.return_unit
     in
     (* Noting the visited hashes *)
-    let visited_hash = Hashtbl.create 1000 in
+    let visited_hash = Hashtbl.create ~random:true 1000 in
     let visited h = Hashtbl.mem visited_hash h in
     let set_visit h = Hashtbl.add visited_hash h () in
     (* Folding through a node *)
