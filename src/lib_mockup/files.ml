@@ -25,3 +25,5 @@ let mempool ~dirname = dir_file ~dirname mempool_file
 let context ~dirname = dir_file ~dirname context_file
 
 let has_context ~dirname = Sys.file_exists @@ context ~dirname
+
+let has_mempool ~dirname = Sys.file_exists @@ mempool ~dirname

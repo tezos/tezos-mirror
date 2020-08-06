@@ -498,25 +498,22 @@ let inject_operation (mockup_env : Registration.mockup_environment)
     Tezos_shell_services.Injection_services.S.operation
     (fun _q _contents operation_bytes ->
       if mem_only then RPC_answer.fail [Injection_not_possible]
-      else
-        let mempool_file = (Files.mempool ~dirname :> string) in
-        Lwt_unix.file_exists mempool_file
-        >>= fun mempool_exists ->
+      else if
         (* Looking at the implementations of the two inject_operation_*
            functions it looks like there is code to share (proto_op_opt,
            operation_data), but it's not that easy to do;
            because types of concerned variables depend on Mockup_environment,
            which cannot cross functions boundaries without putting all that in
            Mockup_sig *)
-        if mempool_exists then
-          inject_operation_with_mempool mockup_env dirname operation_bytes
-        else
-          inject_operation_without_mempool
-            mockup_env
-            chain_id
-            rpc_context
-            write_context_callback
-            operation_bytes)
+        Files.has_mempool ~dirname
+      then inject_operation_with_mempool mockup_env dirname operation_bytes
+      else
+        inject_operation_without_mempool
+          mockup_env
+          chain_id
+          rpc_context
+          write_context_callback
+          operation_bytes)
 
 let build_shell_directory (base_dir : string)
     (mockup_env : Registration.mockup_environment) chain_id

@@ -10,4 +10,6 @@ val has_context : dirname:string -> bool
 
 val mempool : dirname:string -> t
 
+val has_mempool : dirname:string -> bool
+
 val dir_file : dirname:string -> t -> t
