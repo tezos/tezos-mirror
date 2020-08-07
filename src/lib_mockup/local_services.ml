@@ -424,17 +424,6 @@ let preapply (mockup_env : Registration.mockup_environment)
          | Error errs ->
              RPC_answer.fail errs))
 
-let inject_block =
-  Directory.register
-    Directory.empty
-    (* /injection/block *)
-    Tezos_shell_services.Injection_services.S.block
-    (* See injection_directory.ml for vanilla implementation *)
-    (fun _q _ ->
-      (* Format.printf "inject block@." ; *)
-      (* FIXME here we should do what inject_operation is doing now *)
-      assert false)
-
 let inject_operation_with_mempool
     (mockup_env : Registration.mockup_environment) (dirname : string)
     operation_bytes =
@@ -543,6 +532,123 @@ let inject_operation_without_mempool
           | Error errs ->
               RPC_answer.fail errs ) )
 
+(* [inject_block] is a feature that assumes that the mockup is on-disk and
+ * uses a mempool. *)
+let inject_block (mockup_env : Registration.mockup_environment)
+    (dirname : string) (_chain_id : Chain_id.t)
+    (rpc_context : Tezos_protocol_environment.rpc_context)
+    (write_context_callback :
+      Tezos_protocol_environment.rpc_context -> unit tzresult Lwt.t) =
+  let (module Mockup_environment) = mockup_env in
+  let op_data_encoding = Mockup_environment.Protocol.operation_data_encoding in
+  let op_encoding =
+    Data_encoding.(
+      dynamic_size
+      @@ obj2
+           (req "shell_header" Operation.shell_header_encoding)
+           (req "protocol_data" op_data_encoding))
+  in
+  let ops_encoding = Data_encoding.Variable.list op_encoding in
+  Directory.register
+    Directory.empty
+    (* /injection/block *)
+    Tezos_shell_services.Injection_services.S.block
+    (* See injection_directory.ml for vanilla implementation *)
+    (fun () _ (bytes, operations) ->
+      (* TODO: This is probably where it all comes together i.e., where the
+         mempool  is actually modified and the context updated at the same time.
+
+         Do we need to ensure an invariant that avoids being in some weird state
+         where the mempool is updated on disk but somehow the context fails (or
+         vice versa) ?
+       *)
+      assert (Files.has_mempool ~dirname) ;
+      let block_hash = Block_hash.hash_bytes [bytes] in
+      match Block_header.of_bytes bytes with
+      | None ->
+          RPC_answer.fail [Cannot_parse_op]
+      | Some block_header -> (
+          (* Format.printf
+           *   "inject_block: %a - %d bytes from %d operations@."
+           *   Block_header.pp
+           *   block_header
+           *   (Bytes.length bytes)
+           *   (List.length operations) ; *)
+          let mempool_file = (Files.mempool ~dirname :> string) in
+          Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file mempool_file
+          >>= function
+          | Error errs ->
+              RPC_answer.fail errs
+          | Ok pooled_operations_json -> (
+              let ops =
+                Data_encoding.Json.destruct ops_encoding pooled_operations_json
+              in
+              let op_hash_map =
+                List.fold_left
+                  (fun map ((shell_header, operation_data) as v) ->
+                    match
+                      Data_encoding.Binary.to_bytes
+                        op_data_encoding
+                        operation_data
+                    with
+                    | Error _ ->
+                        assert false
+                    | Ok proto ->
+                        let h =
+                          Operation.hash
+                            {Operation.shell = shell_header; proto}
+                        in
+                        Operation_hash.Map.add h v map)
+                  Operation_hash.Map.empty
+                  ops
+              in
+              (* Format.printf
+               *   "Mempool has %d operations@."
+               *   (Operation_hash.Map.cardinal op_hash_map) ; *)
+              let unapplied_ops =
+                let operation_hashes =
+                  List.map Operation.hash (List.flatten operations)
+                in
+                let m =
+                  List.fold_left
+                    (fun map h -> Operation_hash.Map.remove h map)
+                    op_hash_map
+                    operation_hashes
+                in
+                Operation_hash.Map.fold (fun _k v l -> v :: l) m []
+              in
+              (* Format.printf
+               *   "Mempool still has %d operations@."
+               *   (List.length unapplied_ops) ; *)
+              Data_encoding.Json.construct ops_encoding unapplied_ops
+              |> Tezos_stdlib_unix.Lwt_utils_unix.Json.write_file mempool_file
+              >>= function
+              | Error errs ->
+                  RPC_answer.fail errs
+              | Ok () -> (
+                  let rpc_context =
+                    {
+                      rpc_context with
+                      block_hash;
+                      block_header = block_header.shell;
+                    }
+                  in
+                  write_context_callback rpc_context
+                  >>= function
+                  | Ok _ ->
+                      RPC_answer.return block_hash
+                  | Error errs -> (
+                      (* We couldn't write the new context. Let's first try to
+                        roll back the mempool before raising the errors. *)
+                      Tezos_stdlib_unix.Lwt_utils_unix.Json.write_file
+                        mempool_file
+                        pooled_operations_json
+                      >>= function
+                      | Error errs' ->
+                          RPC_answer.fail (errs @ errs')
+                      | Ok () ->
+                          RPC_answer.fail errs ) ) ) ))
+
 let inject_operation (mockup_env : Registration.mockup_environment)
     (dirname : string) (chain_id : Chain_id.t)
     (rpc_context : Tezos_protocol_environment.rpc_context) (mem_only : bool)
@@ -596,7 +702,13 @@ let build_shell_directory (base_dir : string)
        rpc_context
        mem_only
        write_context_callback) ;
-  merge inject_block ;
+  merge
+    (inject_block
+       mockup_env
+       base_dir
+       chain_id
+       rpc_context
+       write_context_callback) ;
   merge (live_blocks mockup_env rpc_context) ;
   merge (preapply_block mockup_env rpc_context chain_id) ;
   !directory
