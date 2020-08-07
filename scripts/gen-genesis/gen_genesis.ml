@@ -1,5 +1,17 @@
 open Tezos_crypto
 
+let () =
+  if Array.length Sys.argv <= 3 then (
+    Printf.printf
+      "Usage: %s <network_name> <previous_protocol_hash> [bootstrap_peer..]\n\
+       Example: %s dalphanet \
+       PtYuensgYBb3G3x1hLLbCmcav8ue8Kyd2khADcL5LsT5R1hcXex \
+       'paris.bootzero.tzalpha.net:19732'\n\
+       %!"
+      Sys.argv.(0)
+      Sys.argv.(0) ;
+    exit 0 )
+
 let network_name = Sys.argv.(1)
 
 (* The genesis protocol of Carthagenet. *)
