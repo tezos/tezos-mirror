@@ -216,16 +216,18 @@ let build_raw_rpc_directory ~user_activated_upgrades
   register0 S.Operations.operations (fun block () () -> operations block) ;
   register1 S.Operations.operations_in_pass (fun block i () () ->
       let chain_id = State.Block.chain_id block in
-      Lwt.catch
+      Lwt.try_bind
         (fun () -> State.Block.operations block i)
-        (fun _ -> raise Not_found)
-      >>= fun (ops, _path) ->
-      Lwt.catch
-        (fun () ->
-          State.Block.operations_metadata block i
-          >>= fun ops_metadata ->
-          return (List.map2 (convert_with_metadata chain_id) ops ops_metadata))
-        (fun _ -> return ((List.map (convert_without_metadata chain_id)) ops))) ;
+        (fun (ops, _path) ->
+          Lwt.catch
+            (fun () ->
+              State.Block.operations_metadata block i
+              >>= fun ops_metadata ->
+              return
+                (List.map2 (convert_with_metadata chain_id) ops ops_metadata))
+            (fun _ ->
+              return ((List.map (convert_without_metadata chain_id)) ops)))
+        (fun _ -> raise Not_found)) ;
   register2 S.Operations.operation (fun block i j () () ->
       let chain_id = State.Block.chain_id block in
       Lwt.catch
