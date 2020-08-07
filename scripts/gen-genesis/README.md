@@ -13,7 +13,7 @@ dune build gen_genesis.exe
 Peers are optional
 
 ```bash
-gen_genesis.exe <network_name> <previous_protocol_hash> [bootstrap_peer..]
+gen_genesis.exe <network_name> <genesis_protocol_hash> [bootstrap_peer..]
 ```
 
 Example:
