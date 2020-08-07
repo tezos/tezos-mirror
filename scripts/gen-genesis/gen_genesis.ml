@@ -91,7 +91,7 @@ let () =
   echo "    }," ;
   echo "    \"chain_name\": %S," chain_name ;
   echo "    \"sandboxed_chain_name\": %S," sandboxed_chain_name ;
-  echo "    \"default_bootstrap_peers\": []" ;
+  echo "    \"default_bootstrap_peers\": [ %s ]" default_bootstrap_peers ;
   echo "  }" ;
   echo "}" ;
   ()
