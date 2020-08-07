@@ -235,6 +235,10 @@ let pending_operations (mockup_env : Registration.mockup_environment) chain_id
                           Operation.hash
                             {Operation.shell = shell_header; proto}
                         in
+                        (* Format.printf
+                         *   "Pending operations op hash: %a@."
+                         *   Operation_hash.pp
+                         *   operation_hash ; *)
                         Operation_hash.Map.add operation_hash op map)
                   Operation_hash.Map.empty
                   pooled_operations
@@ -289,36 +293,90 @@ let preapply_block (mockup_env : Registration.mockup_environment)
   @@ Directory.register
        Directory.empty
        Mockup_environment.Block_services.S.Helpers.Preapply.block
-       (fun (((), chain), block) _ {operations; _} ->
-         Format.printf
-           "block %s with %d operation list @."
-           (Block_services.to_string block)
-           (List.length operations) ;
-         List.iteri
-           (fun i ops ->
-             Format.printf "@[<v>%i: " i ;
-             if ops = [] then Format.printf "[]"
-             else
-               List.iter
-                 (fun Mockup_environment.Protocol.{protocol_data; _} ->
-                   let encoding =
-                     Mockup_environment.Protocol.operation_data_encoding
-                   in
-                   let json =
-                     Data_encoding.Json.construct encoding protocol_data
-                   in
-                   Format.printf "%a@;" Data_encoding.Json.pp json)
-                 ops ;
-             Format.printf "@]@.")
-           operations ;
+       (fun (((), chain), _block) _ {operations; protocol_data = _} ->
+         (* Why is operations a operation list list ?
+            Is there any specific
+            implicit meaning to the different sublists ? *)
+         (* Format.printf
+          *   "block %s with %d operation list @."
+          *   (Block_services.to_string block)
+          *   (List.length operations) ;
+          * List.iteri
+          *   (fun i ops ->
+          *     Format.printf "@[<v>%i: " i ;
+          *     if ops = [] then Format.printf "[]"
+          *     else
+          *       List.iter
+          *         (fun Mockup_environment.Protocol.{protocol_data; _} ->
+          *           let encoding =
+          *             Mockup_environment.Protocol.operation_data_encoding
+          *           in
+          *           let json =
+          *             Data_encoding.Json.construct encoding protocol_data
+          *           in
+          *           Format.printf "%a@;" Data_encoding.Json.pp json)
+          *         ops ;
+          *     Format.printf "@]@.")
+          *   operations ; *)
          check_chain_chain_id chain chain_id
          >>= function
-         | Error err ->
-             RPC_answer.fail err
-         | Ok () ->
-             let preapply_results = [Preapply_result.empty] in
-             let shell_header = rpc_context.block_header in
-             RPC_answer.return (shell_header, preapply_results))
+         | Error errs ->
+             RPC_answer.fail errs
+         | Ok () -> (
+             (let predecessor = rpc_context.block_hash in
+              let header = rpc_context.block_header in
+              let predecessor_context = rpc_context.context in
+              Mockup_environment.Protocol.begin_construction
+                ~chain_id
+                ~predecessor_context
+                ~predecessor_timestamp:header.timestamp
+                ~predecessor_level:header.level
+                ~predecessor_fitness:header.fitness
+                ~predecessor
+                ~timestamp:
+                  (Time.System.to_protocol
+                     (Tezos_stdlib_unix.Systime_os.now ()))
+                ()
+              >>=? fun state ->
+              fold_left_s
+                (fold_left_s (fun (state, preapply_results) op ->
+                     Mockup_environment.Protocol.apply_operation state op
+                     >>=? fun (state, _) ->
+                     match
+                       Data_encoding.Binary.to_bytes
+                         Mockup_environment.Protocol.operation_data_encoding
+                         op.protocol_data
+                     with
+                     | Error _ ->
+                         failwith "foo"
+                     | Ok proto ->
+                         let op_t = {Operation.shell = op.shell; proto} in
+                         let hash = Operation.hash op_t in
+                         return
+                           ( state,
+                             Preapply_result.
+                               {empty with applied = [(hash, op_t)]}
+                             :: preapply_results )))
+                (state, [])
+                operations
+              >>=? fun (state, preapply_results) ->
+              Mockup_environment.Protocol.finalize_block state
+              >>=? fun _ ->
+              let operations_hash =
+                let open Preapply_result in
+                Operation_list_list_hash.compute
+                @@ List.map
+                     (fun x ->
+                       Operation_list_hash.compute @@ List.map fst x.applied)
+                     preapply_results
+              in
+              let shell_header =
+                {rpc_context.block_header with operations_hash}
+              in
+              return (shell_header, preapply_results))
+             >>= function
+             | Error errs -> RPC_answer.fail errs | Ok v -> RPC_answer.return v
+             ))
 
 let preapply (mockup_env : Registration.mockup_environment)
     (chain_id : Chain_id.t)
