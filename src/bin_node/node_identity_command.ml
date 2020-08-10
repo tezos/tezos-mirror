@@ -122,7 +122,7 @@ module Term = struct
       | Check ->
           check cfg
     in
-    match Lwt_main.run res with
+    match Lwt_main.run @@ Lwt_exit.wrap_and_exit res with
     | Ok () ->
         `Ok ()
     | Error err ->

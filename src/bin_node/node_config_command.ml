@@ -109,7 +109,7 @@ module Term = struct
       | Update ->
           update args
     in
-    match Lwt_main.run res with
+    match Lwt_main.run @@ Lwt_exit.wrap_and_exit res with
     | Ok () ->
         `Ok ()
     | Error err ->

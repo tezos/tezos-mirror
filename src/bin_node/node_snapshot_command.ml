@@ -121,7 +121,7 @@ module Term = struct
             snapshot_file
             ~block
     in
-    match Lwt_main.run run with
+    match Lwt_main.run @@ Lwt_exit.wrap_and_exit run with
     | Ok () ->
         `Ok ()
     | Error err ->
