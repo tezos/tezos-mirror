@@ -232,11 +232,13 @@ CLIENT_ADMIN = 'tezos-admin-client'
 
 
 @pytest.fixture(scope="class")
-def simple_client():
+def nodeless_client():
+    """
+        A client that is suited for being used in tests that do not
+        require a node
+    """
     client_path = _wrap_path(CLIENT)
     client_admin_path = _wrap_path(CLIENT_ADMIN)
-    # We want minimal options for this client hence we override
-    # Client's default value for the endpoint.
     client = Client(client_path, client_admin_path, endpoint=None)
     yield client
     client.cleanup()
