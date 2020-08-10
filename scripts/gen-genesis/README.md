@@ -1,6 +1,7 @@
 # Generate genesis information for a new network
 
-Generate a configuration for a new network
+Generate configuration code (in OCaml) to bootstrap a new network. The result
+can be used in `src/bin_node/node_config.ml`.
 
 ## Compile
 
