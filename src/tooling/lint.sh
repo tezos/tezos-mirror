@@ -45,18 +45,23 @@ say () {
 make_dot_ocamlformat () {
     local path="$1"
     cat > "$path" <<EOF
-version=0.10
+version=0.18.0
 wrap-fun-args=false
 let-binding-spacing=compact
 field-space=loose
-break-separators=after-and-docked
+break-separators=after
+space-around-arrays=false
+space-around-lists=false
+space-around-records=false
+space-around-variants=false
+dock-collection-brackets=true
+space-around-records=false
 sequence-style=separator
 doc-comments=before
 margin=80
 module-item-spacing=sparse
 parens-tuple=always
 parens-tuple-patterns=always
-break-string-literals=newlines-and-wrap
 EOF
 }
 
@@ -99,14 +104,14 @@ check_with_dune () {
             */src/proto_alpha/lib_protocol$ | \
             */src/proto_demo_noops/lib_protocol$ )
                 make_dot_ocamlformat .ocamlformat
-                ocamlformat --check "$f"
+                ocamlformat --enable-outside-detected-project --check "$f"
                 ;;
             */src/proto_*/lib_protocol$ )
                 say "This a protocol file, ignoring"
                 ;;
             * )
                 make_dot_ocamlformat .ocamlformat
-                ocamlformat --check "$f"
+                ocamlformat --enable-outside-detected-project --check "$f"
                 ;;
         esac
     done
@@ -149,7 +154,7 @@ check_redirects () {
 }
 
 format_inplace () {
-    ocamlformat --inplace "$@"
+    ocamlformat --enable-outside-detected-project --inplace "$@"
 }
 
 update_gitlab_ci_yml () {
