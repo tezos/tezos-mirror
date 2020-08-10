@@ -23,13 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type mode = Client of Node.t option | Mockup
+
+let mode_needs_node = function Client _ -> true | Mockup -> false
+
 type t = {
   path : string;
   admin_path : string;
   name : string;
   color : Log.Color.t;
   base_dir : string;
-  node : Node.t option;
+  mode : mode;
 }
 
 let next_name = ref 1
@@ -41,32 +45,43 @@ let fresh_name () =
 
 let () = Test.declare_reset_function @@ fun () -> next_name := 1
 
-let create ?(path = Constant.tezos_client)
+let create_with_mode ?(path = Constant.tezos_client)
     ?(admin_path = Constant.tezos_admin_client) ?name
-    ?(color = Log.Color.FG.blue) ?base_dir ?node () =
+    ?(color = Log.Color.FG.blue) ?base_dir mode =
   let name = match name with None -> fresh_name () | Some name -> name in
   let base_dir =
     match base_dir with None -> Temp.dir name | Some dir -> dir
   in
-  {path; admin_path; name; color; base_dir; node}
+  {path; admin_path; name; color; base_dir; mode}
+
+let create ?path ?admin_path ?name ?color ?base_dir ?node () =
+  create_with_mode ?path ?admin_path ?name ?color ?base_dir @@ Client node
 
 let check_node_is_specified ?node command client =
-  match (node, client.node) with
-  | (None, None) ->
-      Test.fail
-        "%s has no node, cannot run command: %s"
-        client.name
-        (String.concat " " command)
-  | (Some _, _) | (_, Some _) ->
+  match client.mode with
+  | Mockup ->
       ()
+  | Client node_opt -> (
+    match (node, node_opt) with
+    | (None, None) ->
+        Test.fail
+          "%s has no node, cannot run command: %s"
+          client.name
+          (String.concat " " command)
+    | (Some _, _) | (_, Some _) ->
+        () )
 
 let base_args ?node client =
   let node =
-    match (node, client.node) with
-    | (Some node, _) | (None, Some node) ->
-        Some node
-    | (None, None) ->
+    match client.mode with
+    | Mockup ->
         None
+    | Client node_opt -> (
+      match (node, node_opt) with
+      | (Some node, _) | (None, Some node) ->
+          Some node
+      | (None, None) ->
+          None )
   in
   ( match node with
   | None ->
@@ -76,13 +91,21 @@ let base_args ?node client =
   )
   @ ["--base-dir"; client.base_dir]
 
+let mode_args = function
+  | Client _ ->
+      [] (* It's the default mode *)
+  | Mockup ->
+      ["--mode"; "mockup"]
+
+let common_args ?node client = base_args ?node client @ mode_args client.mode
+
 let spawn_command ?(needs_node = true) ?(admin = false) ?node client command =
   if needs_node then check_node_is_specified ?node command client ;
   Process.spawn
     ~name:client.name
     ~color:client.color
     (if admin then client.admin_path else client.path)
-    (base_args ?node client @ command)
+  @@ common_args ?node client @ command
 
 let url_encode str =
   let buffer = Buffer.create (String.length str * 3) in
@@ -138,7 +161,9 @@ let rpc ?node ?data ?query_string meth path client : JSON.t Lwt.t =
       ~name:client.name
       ~color:client.color
       client.path
-      (base_args ?node client @ ["rpc"; string_of_meth meth; full_path] @ data)
+      ( common_args ?node client
+      @ ["rpc"; string_of_meth meth; full_path]
+      @ data )
   in
   return (JSON.parse ~origin:(path ^ " response") output)
 
@@ -221,7 +246,9 @@ let activate_protocol ?node ?protocol ?fitness ?key ?timestamp ?timestamp_delay
 
 let spawn_bake_for ?node ?(key = Constant.bootstrap1.alias)
     ?(minimal_timestamp = true) client =
+  let needs_node = mode_needs_node client.mode in
   spawn_command
+    ~needs_node
     client
     ?node
     ( "bake" :: "for" :: key
@@ -229,6 +256,20 @@ let spawn_bake_for ?node ?(key = Constant.bootstrap1.alias)
 
 let bake_for ?node ?key ?minimal_timestamp client =
   spawn_bake_for ?node ?key ?minimal_timestamp client |> Process.check
+
+let create_mockup ?(protocol = Constant.alpha) client : unit Lwt.t =
+  let cmd = ["--protocol"; protocol.hash; "create"; "mockup"] in
+  spawn_command ~needs_node:false ?node:None client cmd |> Process.check
+
+let init_mockup ~(protocol : Constant.protocol) =
+  (* To create the mockup, we don't want --mode mockup to be specified,
+     as per the public tutorial:
+     https://tezos.gitlab.io/user/mockup.html *)
+  let mockup_creator = create () in
+  let* () = create_mockup ~protocol mockup_creator in
+  let base_dir = mockup_creator.base_dir in
+  (* but then we want it in the client we use, hence: *)
+  return @@ create_with_mode ~base_dir Mockup
 
 let spawn_submit_proposals ?node ?(key = Constant.bootstrap1.alias) ~proto_hash
     client =

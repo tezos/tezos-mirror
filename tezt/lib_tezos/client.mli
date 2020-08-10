@@ -25,6 +25,9 @@
 
 (** Run Tezos client commands. *)
 
+(** Mode of the client *)
+type mode = Client of Node.t option | Mockup
+
 (** Tezos client states. *)
 type t
 
@@ -48,6 +51,16 @@ val create :
   ?base_dir:string ->
   ?node:Node.t ->
   unit ->
+  t
+
+(** Create a client like [create] but do not assume [Client] as the mode. *)
+val create_with_mode :
+  ?path:string ->
+  ?admin_path:string ->
+  ?name:string ->
+  ?color:Log.Color.t ->
+  ?base_dir:string ->
+  mode ->
   t
 
 (** {2 RPC calls} *)
@@ -141,6 +154,9 @@ val spawn_activate_protocol :
     Default [key] is {!Constant.bootstrap1.alias}. *)
 val bake_for :
   ?node:Node.t -> ?key:string -> ?minimal_timestamp:bool -> t -> unit Lwt.t
+
+(** Creates a mockup client, running [create mockup] under the hood. *)
+val init_mockup : protocol:Constant.protocol -> t Lwt.t
 
 (** Same as [bake_for], but do not wait for the process to exit. *)
 val spawn_bake_for :
