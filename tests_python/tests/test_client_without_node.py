@@ -20,12 +20,8 @@ _INPUT_CONFIG_FILE = {"confirmations": 1,
                       "web_port": 8080,
                       "password_filename": "/tmp/doesnt_exist"}
 _INPUT_CONFIG_FILES = [None, _INPUT_CONFIG_FILE]
-# We cannot specify --endpoint in _CMD_LINE_ARGS, because the fixture
-# for obtaining a client in this file (simple_client) uses Client's
-# constructor default endpoint value. Hence if we specify --endpoint here
-# it'll end up being specified twice in commands, and the value specified here
-# will be ignored.
-_CMD_LINE_ARGS = {"--wait": "3",
+_CMD_LINE_ARGS = {"--endpoint": "http://127.0.0.1:9732",
+                  "--wait": "3",
                   "--remote-signer": "http://10.0.0.2",
                   "--password-filename": "/tmp/doesnt_exist_either"}
 _CONFIG_FILE_FLAG = "--config-file"

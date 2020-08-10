@@ -235,7 +235,9 @@ CLIENT_ADMIN = 'tezos-admin-client'
 def simple_client():
     client_path = _wrap_path(CLIENT)
     client_admin_path = _wrap_path(CLIENT_ADMIN)
-    client = Client(client_path, client_admin_path)
+    # We want minimal options for this client hence we override
+    # Client's default value for the endpoint.
+    client = Client(client_path, client_admin_path, endpoint=None)
     yield client
     client.cleanup()
 
