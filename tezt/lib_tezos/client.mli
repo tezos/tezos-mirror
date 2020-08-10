@@ -28,6 +28,11 @@
 (** Mode of the client *)
 type mode = Client of Node.t option | Mockup
 
+(** The synchronization mode of the client
+    Asynchronous mode is when transfer doesn't bake the block
+    Synchronous is the default mode (no flag passed at create mockup) *)
+type mockup_sync_mode = Asynchronous | Synchronous
+
 (** Tezos client states. *)
 type t
 
@@ -206,10 +211,12 @@ val get_balance_for : ?node:Node.t -> account:string -> t -> float Lwt.t
 val spawn_get_balance_for : ?node:Node.t -> account:string -> t -> Process.t
 
 (** Run [tezos-client create mockup]. *)
-val create_mockup : protocol:Protocol.t -> t -> unit Lwt.t
+val create_mockup :
+  ?sync_mode:mockup_sync_mode -> protocol:Protocol.t -> t -> unit Lwt.t
 
 (** Same as [create_mockup], but do not wait for the process to exit. *)
-val spawn_create_mockup : protocol:Protocol.t -> t -> Process.t
+val spawn_create_mockup :
+  ?sync_mode:mockup_sync_mode -> protocol:Protocol.t -> t -> Process.t
 
 (** Run [tezos-client submit proposals for].
 
@@ -248,13 +255,16 @@ val init :
 (** Create a client with mode [Mockup] and run [create mockup].
 
     Contrary to [init], this does not import any secret key, because
-    [tezos-client create mockup] already initializes the mockup with bootstrap keys. *)
+   [tezos-client create mockup] already initializes the mockup with bootstrap
+   keys.
+*)
 val init_mockup :
   ?path:string ->
   ?admin_path:string ->
   ?name:string ->
   ?color:Log.Color.t ->
   ?base_dir:string ->
+  ?sync_mode:mockup_sync_mode ->
   protocol:Protocol.t ->
   unit ->
   t Lwt.t

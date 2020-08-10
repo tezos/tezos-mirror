@@ -94,4 +94,25 @@ let test_transfer protocol =
     (receiver_balance_before, receiver_balance_after) ;
   return ()
 
-let register protocol = test_rpc_list protocol ; test_transfer protocol
+let test_asynchronous ~(protocol : Constant.protocol) =
+  Test.run
+    ~__FILE__
+    ~title:
+      (Printf.sprintf "transfer (mockup / aysynchronous / %s)" protocol.tag)
+    ~tags:["mockup"; "client"; "transfer"; protocol.tag; "asynchronous"]
+  @@ fun () ->
+  let (giver, amount, _, receiver) = transfer_data in
+  let* client = Client.init_mockup ~sync_mode:Client.Asynchronous protocol in
+  Log.info "About to transfer %d from %s to %s" amount giver receiver ;
+  let* () = Client.transfer ~amount ~giver ~receiver client in
+  let chain_id = "NetXynUjJNZm7wi" in
+  let path = ["chains"; chain_id; "mempool"; "pending_operations"] in
+  let* json = Client.rpc Client.GET path client in
+  let _json = JSON.unannotate json in
+  let* () = Client.bake_for ~key:giver client in
+  return ()
+
+let register protocol =
+  test_rpc_list protocol ;
+  test_transfer ~protocol ;
+  test_asynchronous ~protocol

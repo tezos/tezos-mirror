@@ -25,6 +25,8 @@
 
 type mode = Client of Node.t option | Mockup
 
+type mockup_sync_mode = Asynchronous | Synchronous
+
 type t = {
   path : string;
   admin_path : string;
@@ -274,13 +276,19 @@ let get_balance_for ?node ~account client =
   and* output = read_all (Process.stdout process) in
   return @@ extract_balance output
 
-let spawn_create_mockup ~protocol client =
-  spawn_command
-    client
-    ["--protocol"; Protocol.hash protocol; "create"; "mockup"]
+let spawn_create_mockup ?(sync_mode = Synchronous) ~protocol client =
+  let cmd =
+    let common = ["--protocol"; Protocol.hash protocol; "create"; "mockup"] in
+    match sync_mode with
+    | Synchronous ->
+        common
+    | Asynchronous ->
+        common @ ["--asynchronous"]
+  in
+  spawn_command client cmd
 
-let create_mockup ~protocol client =
-  spawn_create_mockup ~protocol client |> Process.check
+let create_mockup ?sync_mode ~protocol client =
+  spawn_create_mockup ?sync_mode ~protocol client |> Process.check
 
 let spawn_submit_proposals ?(key = Constant.bootstrap1.alias) ~proto_hash
     client =
@@ -315,9 +323,10 @@ let init ?path ?admin_path ?name ?color ?base_dir ?node () =
   in
   return client
 
-let init_mockup ?path ?admin_path ?name ?color ?base_dir ~protocol () =
+let init_mockup ?path ?admin_path ?name ?color ?base_dir ?sync_mode ~protocol
+    () =
   let client =
     create_with_mode ?path ?admin_path ?name ?color ?base_dir Mockup
   in
-  let* () = create_mockup ~protocol client in
+  let* () = create_mockup ?sync_mode ~protocol client in
   return client
