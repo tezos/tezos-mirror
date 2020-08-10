@@ -1,0 +1,21 @@
+(library
+ (name tezos_benchmark)
+ (public_name tezos-benchmark)
+ (libraries tezos-base
+            tezos-stdlib-unix
+            tezos-micheline
+            tezos-clic
+            data-encoding
+            staTz
+            benchmark-utils
+            pyml-plot ;; because of Matrix module... pyml-plot should be split further
+            )
+ (flags (:standard
+                 -open Tezos_base__TzPervasives
+                 -open StaTz
+                 -open Tezos_stdlib_unix)))
+
+(rule
+ (alias runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

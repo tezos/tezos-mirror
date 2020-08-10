@@ -1,0 +1,19 @@
+(library
+ (name tezos_micheline_rewriting)
+ (public_name tezos-micheline-rewriting)
+ (libraries
+  ;; External
+  zarith
+  ;; Internal
+  tezos-stdlib
+  tezos-error-monad
+  tezos-micheline
+  )
+ (flags (:standard -open Tezos_stdlib
+                   -open Tezos_error_monad
+                   -open Tezos_micheline)))
+
+(rule
+ (alias runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))
