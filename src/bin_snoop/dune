@@ -7,6 +7,7 @@
             tezos-clic
             tezos-benchmark
             tezos-benchmark-examples
+	    tezos-shell-benchmarks
             str
             ocamlgraph
             pyml
