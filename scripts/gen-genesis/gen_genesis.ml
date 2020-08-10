@@ -24,7 +24,7 @@ let default_bootstrap_peers =
     String.concat
       " ; "
       (List.map
-         (fun s -> Printf.sprintf "\"%s\"" s)
+         (fun s -> Printf.sprintf "%S" s)
          (Array.to_list (Array.sub Sys.argv 3 (argc - 3))))
   else ""
 
