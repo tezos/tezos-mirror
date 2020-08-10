@@ -123,9 +123,6 @@ let list_embedded () = VersionTable.fold (fun k _ acc -> k :: acc) sources []
 
 let get_embedded_sources hash = VersionTable.find sources hash
 
-let get_embedded_sources_exn hash =
-  Option.unopt_exn Not_found @@ get_embedded_sources hash
-
 module type Source_sig = sig
   val hash : Protocol_hash.t option
 

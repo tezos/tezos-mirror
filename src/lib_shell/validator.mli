@@ -51,8 +51,6 @@ val activate :
 
 val get : t -> Chain_id.t -> Chain_validator.t tzresult
 
-val get_exn : t -> Chain_id.t -> Chain_validator.t
-
 val get_active_chains : t -> Chain_id.t list
 
 (** Force the validation of a block. *)
