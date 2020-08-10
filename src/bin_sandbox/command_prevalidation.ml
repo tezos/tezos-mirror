@@ -20,8 +20,6 @@ let run state node_exec client_exec () =
          TODO: commands for interactive use *)
       Stdlib.ignore c1 ;
       Stdlib.ignore c2 ;
-      return ()
-      >>= fun () ->
       let commands = Interactive_test.Commands.all_defaults state ~nodes in
       Prompt.command state ~commands
       >>= fun () -> Running_processes.wait_all state

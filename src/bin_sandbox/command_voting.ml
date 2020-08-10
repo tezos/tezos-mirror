@@ -564,7 +564,6 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
             Interactive_test.Pauser.generic
               state
               EF.[wf "Testing period, with proper winner-client, have fun."]
-            >>= fun () -> return ()
         | `Expected_misunderstanding ->
             Console.say
               state
@@ -797,7 +796,6 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
         desc
           (af "Estimated level: %d" (Counter_log.sum level_counter))
           (markdown_verbatim (Counter_log.to_table_string level_counter)) ]
-  >>= fun () -> return ()
 
 let cmd () =
   let open Cmdliner in
