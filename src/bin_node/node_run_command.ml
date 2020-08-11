@@ -298,9 +298,16 @@ let sanitize_cors_headers ~default headers =
   |> String.Set.(union (of_list default))
   |> String.Set.elements
 
-let launch_rpc_server (rpc_config : Node_config_file.rpc) node (addr, port) =
+let launch_rpc_server (config : Node_config_file.t) node (addr, port) =
+  let rpc_config = config.rpc in
   let host = Ipaddr.V6.to_string addr in
   let dir = Node.build_rpc_directory node in
+  let dir = Node_directory.build_node_directory config dir in
+  let dir =
+    RPC_directory.register_describe_directory_service
+      dir
+      RPC_service.description_service
+  in
   let mode =
     match rpc_config.tls with
     | None ->
@@ -332,7 +339,7 @@ let launch_rpc_server (rpc_config : Node_config_file.rpc) node (addr, port) =
       | exn ->
           Lwt.return (error_exn exn))
 
-let init_rpc (rpc_config : Node_config_file.rpc) node =
+let init_rpc (config : Node_config_file.t) node =
   fold_right_s
     (fun addr acc ->
       Node_config_file.resolve_rpc_listening_addrs addr
@@ -342,10 +349,10 @@ let init_rpc (rpc_config : Node_config_file.rpc) node =
       | addrs ->
           fold_right_s
             (fun x a ->
-              launch_rpc_server rpc_config node x >>=? fun o -> return (o :: a))
+              launch_rpc_server config node x >>=? fun o -> return (o :: a))
             addrs
             acc)
-    rpc_config.listen_addrs
+    config.rpc.listen_addrs
     []
 
 let run ?verbosity ?sandbox ?checkpoint ~singleprocess
@@ -396,7 +403,7 @@ let run ?verbosity ?sandbox ?checkpoint ~singleprocess
     Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
         Event.(emit shutting_down_node) () >>= fun () -> Node.shutdown node)
   in
-  init_rpc config.rpc node
+  init_rpc config node
   >>=? fun rpc ->
   let rpc_downer =
     Lwt_exit.register_clean_up_callback

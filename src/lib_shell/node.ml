@@ -424,6 +424,4 @@ let build_rpc_directory node =
   merge (Version_directory.rpc_directory node.p2p) ;
   register0 RPC_service.error_service (fun () () ->
       return (Data_encoding.Json.schema Error_monad.error_encoding)) ;
-  RPC_directory.register_describe_directory_service
-    !dir
-    RPC_service.description_service
+  !dir
