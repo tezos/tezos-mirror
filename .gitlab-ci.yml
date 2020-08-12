@@ -33,7 +33,8 @@ sanity:
         echo "${build_deps_image_version} != ${opam_repository_tag}" ;
         exit 1 ;
       fi
-    - ./scripts/check_opam_test.sh
+    - scripts/check_opam_test.sh
+    - src/tooling/lint.sh --check-gitlab-ci-yml
 
 ############################################################
 ## Stage: build (only MR)                                 ##

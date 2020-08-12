@@ -12,6 +12,7 @@ Where <action> can be:
 * --check-dune: check formatting while assuming running under Dune's
   rule (\`dune build @runtest_lint\`).
 * --check-ci: check formatting using git (for GitLabCI's verbose run).
+* --check-gitlab-ci-yml: check .gitlab-ci.yml has been updated.
 * --check-scripts: check the .sh files
 * --format: format all the files, see also \`make fmt\`.
 * --help: display this and return 0.
@@ -130,6 +131,13 @@ format_inplace () {
     ocamlformat --inplace "$@"
 }
 
+update_gitlab_ci_yml () {
+    for script in scripts/update_*_test.sh; do
+        echo "Running $script..."
+        $script
+    done
+}
+
 if [ $# -eq 0 ] || [[ "$1" != --* ]]; then
     action="--check-dune"
 else
@@ -154,6 +162,9 @@ case "$action" in
     "--check-ci" )
         on_files=true
         action=format_inplace
+        check_clean=true ;;
+    "--check-gitlab-ci-yml" )
+        action=update_gitlab_ci_yml
         check_clean=true ;;
     "--check-scripts" )
         action=check_scripts ;;
