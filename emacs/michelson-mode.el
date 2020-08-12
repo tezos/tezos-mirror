@@ -431,10 +431,9 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
 
 (defun michelson-output-width ()
   (lexical-let* ((buffer (get-buffer-create michelson-output-buffer-name))
-                 (message-window
-                  (if (get-buffer-window buffer)
-                      (get-buffer-window buffer)
-                    (display-buffer-below-selected buffer nil))))
+         (message-window
+          (or (get-buffer-window buffer)
+              (display-buffer-below-selected buffer nil))))
     (window-body-width message-window)))
 
 (defvar michelson-output-buffer-map
@@ -466,12 +465,11 @@ If `DO-NOT-OVERWRITE' is non-nil, the existing contents of the buffer are mainta
   (lexical-let*
       ((buffer (get-buffer-create michelson-output-buffer-name))
        (message-window
-        (if (get-buffer-window buffer)
-            (get-buffer-window buffer)
-          (display-buffer-below-selected buffer nil)))
+        (or (get-buffer-window buffer)
+            (display-buffer-below-selected buffer nil)))
        (lines 0))
     (when (get-buffer-window buffer)
-      (set-window-dedicated-p (get-buffer-window buffer) t))
+      (set-window-dedicated-p message-window t))
     (save-excursion
       (set-buffer michelson-output-buffer-name)
       (read-only-mode -1)
