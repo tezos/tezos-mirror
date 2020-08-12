@@ -33,3 +33,5 @@ val pp_operation_result :
   Format.formatter ->
   'kind contents_list * 'kind Apply_results.contents_result_list ->
   unit
+
+val pp_mapped_keys : Format.formatter -> Apply_results.mapped_key list -> unit

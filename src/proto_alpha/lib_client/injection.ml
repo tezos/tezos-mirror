@@ -599,7 +599,7 @@ let detect_script_failure : type kind. kind operation_metadata -> _ =
         detect_script_failure_single res
         >>? fun () -> detect_script_failure rest
   in
-  fun {contents} -> detect_script_failure contents
+  fun {contents; mapped_keys = _} -> detect_script_failure contents
 
 (* This value is used as a safety guard for gas limit. *)
 let safety_guard = Gas.Arith.(integral_of_int_exn 100)
@@ -870,6 +870,13 @@ let inject_operation (type kind) cctxt ~chain ~block ?confirmations
       "@[<v 2>Simulation result:@,%a@]"
       Operation_result.pp_operation_result
       (op.protocol_data.contents, result.contents)
+    >>= fun () ->
+    ( if List.length result.mapped_keys > 0 then
+      cctxt#message
+        "@[<v 2>Active consensus keys mapped to baker contracts:@,%a@]"
+        Operation_result.pp_mapped_keys
+        result.mapped_keys
+    else Lwt.return_unit )
     >>= fun () -> return (oph, op.protocol_data.contents, result.contents)
   else
     Shell_services.Injection.operation cctxt ~chain bytes
@@ -925,6 +932,13 @@ let inject_operation (type kind) cctxt ~chain ~block ?confirmations
       "@[<v 2>This sequence of operations was run:@,%a@]"
       Operation_result.pp_operation_result
       (op.protocol_data.contents, result.contents)
+    >>= fun () ->
+    ( if List.length result.mapped_keys > 0 then
+      cctxt#message
+        "@[<v 2>Active consensus keys mapped to baker contracts:@,%a@]"
+        Operation_result.pp_mapped_keys
+        result.mapped_keys
+    else Lwt.return_unit )
     >>= fun () ->
     Lwt.return (originated_contracts result.contents)
     >>=? fun contracts ->

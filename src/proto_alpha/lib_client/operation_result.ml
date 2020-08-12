@@ -843,3 +843,20 @@ let pp_internal_operation ppf = function
         (operation, ())
   | Internal_baker_operation {baker; operation; nonce = _} ->
       pp_baker_operation_content baker (fun _ppf () -> ()) ppf (operation, ())
+
+let pp_mapped_keys ppf mappings =
+  Format.fprintf
+    ppf
+    "@[<v 0>%a@]@."
+    (Format.pp_print_list
+       ~pp_sep:(fun ppf () -> Format.fprintf ppf "@\n")
+       (fun ppf mapping ->
+         let Apply_results.{consensus_key; baker} = mapping in
+         Format.fprintf
+           ppf
+           "From %a to %a"
+           Signature.Public_key_hash.pp
+           consensus_key
+           Baker_hash.pp
+           baker))
+    mappings

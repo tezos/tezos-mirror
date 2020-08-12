@@ -104,8 +104,8 @@ let process_endorsements (cctxt : #Protocol_client_context.full) state
                 { contents =
                     Single_result
                       (Endorsement_with_slot_result
-                        (Endorsement_result {baker; slots = slot :: _; _})) })
-        ) -> (
+                        (Endorsement_result {baker; slots = slot :: _; _}));
+                  mapped_keys = _ }) ) -> (
           let new_endorsement : Kind.endorsement Alpha_context.operation =
             {shell; protocol_data}
           in
