@@ -13,7 +13,7 @@ depends: [
   "json-data-encoding" { = "0.9.1" }
   "json-data-encoding-bson" { = "0.9.1" }
   "alcotest" { with-test }
-  "crowbar" { with-test }
+  "crowbar" { >= "0.2" & with-test }
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
