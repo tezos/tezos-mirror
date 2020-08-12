@@ -146,7 +146,7 @@ let detect_script_failure :
         detect_script_failure_single res
         >>? fun () -> detect_script_failure rest
   in
-  fun {contents} -> detect_script_failure contents
+  fun {contents; mapped_keys = _} -> detect_script_failure contents
 
 let add_operation ?expect_apply_failure ?expect_failure st op =
   let open Apply_results in
