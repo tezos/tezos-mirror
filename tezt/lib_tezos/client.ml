@@ -264,6 +264,34 @@ let spawn_bake_for ?node ?(key = Constant.bootstrap1.alias)
 let bake_for ?node ?key ?minimal_timestamp client =
   spawn_bake_for ?node ?key ?minimal_timestamp client |> Process.check
 
+let spawn_transfer ?node ~amount ~giver ~receiver client =
+  let needs_node = mode_needs_node client.mode in
+  spawn_command
+    ~needs_node
+    ?node
+    client
+    ["transfer"; string_of_int amount; "from"; giver; "to"; receiver]
+
+let transfer ?node ~amount ~giver ~receiver client =
+  spawn_transfer ?node ~amount ~giver ~receiver client |> Process.check
+
+let get_balance_for ?node ~account client =
+  let extract_balance (client_output : string) : float =
+    match client_output =~* rex "(\\d+(?:\\.\\d+)?) \u{A729}" with
+    | None ->
+        Test.fail "Cannot extract balance from client_output: %s" client_output
+    | Some balance ->
+        float_of_string balance
+  in
+  let* output =
+    Process.run_and_read_stdout
+      ~name:client.name
+      ~color:client.color
+      client.path
+      (common_args ?node client @ ["get"; "balance"; "for"; account])
+  in
+  return @@ extract_balance output
+
 let create_mockup ?(protocol = Constant.alpha) client : unit Lwt.t =
   let cmd = ["--protocol"; protocol.hash; "create"; "mockup"] in
   spawn_command ~needs_node:false ?node:None client cmd |> Process.check

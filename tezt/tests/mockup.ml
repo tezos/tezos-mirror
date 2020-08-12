@@ -42,5 +42,52 @@ let test_rpc_list protocol =
   let* _ = Client.rpc_list client in
   Lwt.return_unit
 
+let transfer_data = (Constant.bootstrap1.alias, 1, Constant.bootstrap2.alias)
+
+let test_balances_after_transfer giver amount receiver =
+  let (giver_balance_before, giver_balance_after) = giver in
+  let (receiver_balance_before, receiver_balance_after) = receiver in
+  if not (giver_balance_after < giver_balance_before -. amount) then
+    Test.fail
+      "Invalid balance of giver after transfer: %f (before it was %f)"
+      giver_balance_after
+      giver_balance_before ;
+  Log.info "Balance of giver after transfer is valid: %f" giver_balance_after ;
+  let receiver_expected_after = receiver_balance_before +. amount in
+  if receiver_balance_after <> receiver_expected_after then
+    Test.fail
+      "Invalid balance of receiver after transfer: %f (expected %f)"
+      receiver_balance_after
+      receiver_expected_after ;
+  Log.info
+    "Balance of receiver after transfer is valid: %f"
+    receiver_balance_after
+
+let test_transfer ~(protocol : Constant.protocol) =
+  Test.run
+    ~__FILE__
+    ~title:(Printf.sprintf "transfer (mockup / %s)" protocol.tag)
+    ~tags:["mockup"; "client"; "transfer"; protocol.tag]
+  @@ fun () ->
+  let (giver, amount, receiver) = transfer_data in
+  let* client = Client.init_mockup ~protocol in
+  let* giver_balance_before = Client.get_balance_for ~account:giver client in
+  let* receiver_balance_before =
+    Client.get_balance_for ~account:receiver client
+  in
+  Log.info "About to transfer %d from %s to %s" amount giver receiver ;
+  let* () = Client.transfer ~amount ~giver ~receiver client in
+  let* giver_balance_after = Client.get_balance_for ~account:giver client in
+  let* receiver_balance_after =
+    Client.get_balance_for ~account:receiver client
+  in
+  test_balances_after_transfer
+    (giver_balance_before, giver_balance_after)
+    (float_of_int amount)
+    (receiver_balance_before, receiver_balance_after) ;
+  return ()
+
 let run () =
-  test_rpc_list Constant.alpha
+  test_rpc_list Constant.alpha ;
+  test_transfer ~protocol:Constant.alpha ;
+  test_transfer ~protocol:Constant.carthage

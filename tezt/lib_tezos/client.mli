@@ -161,6 +161,27 @@ val bake_for :
 (** Creates a mockup client, running [create mockup] under the hood. *)
 val init_mockup : protocol:Constant.protocol -> t Lwt.t
 
+(** Run [tezos-client transfer amount from giver to receiver]. *)
+val transfer :
+  ?node:Node.t ->
+  amount:int ->
+  giver:string ->
+  receiver:string ->
+  t ->
+  unit Lwt.t
+
+(** Same as [transfer], but do not wait for the process to exit. *)
+val spawn_transfer :
+  ?node:Node.t ->
+  amount:int ->
+  giver:string ->
+  receiver:string ->
+  t ->
+  Process.t
+
+(** Run [tezos-client get balance for]. *)
+val get_balance_for : ?node:Node.t -> account:string -> t -> float Lwt.t
+
 (** Same as [bake_for], but do not wait for the process to exit. *)
 val spawn_bake_for :
   ?node:Node.t -> ?key:string -> ?minimal_timestamp:bool -> t -> Process.t
