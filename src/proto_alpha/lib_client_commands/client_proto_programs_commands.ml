@@ -60,6 +60,12 @@ let commands () =
   let zero_loc_switch =
     switch ~short:'z' ~long:"zero-loc" ~doc:"replace location with \"0\"" ()
   in
+  let skip_typecheck_switch =
+    switch
+      ~long:"skip-typecheck"
+      ~doc:"do not type-check the script when converting from Micheline"
+      ()
+  in
   let legacy_switch =
     switch
       ~long:"legacy"
@@ -779,11 +785,11 @@ let commands () =
       ~desc:
         "Conversion of Michelson script from Micheline, JSON or binary to \
          Micheline, JSON, binary or OCaml"
-      (args1 zero_loc_switch)
+      (args2 zero_loc_switch skip_typecheck_switch)
       ( prefixes ["convert"; "script"]
       @@ file_or_literal_param @@ prefix "from" @@ convert_input_format_param
       @@ prefix "to" @@ convert_output_format_param @@ stop )
-      (fun zero_loc
+      (fun (zero_loc, skip_typecheck)
            expr_string
            from_format
            to_format
@@ -793,22 +799,24 @@ let commands () =
             let program = Michelson_v1_parser.parse_toplevel expr_string in
             Lwt.return @@ Micheline_parser.no_parsing_error program
             >>=? fun program ->
-            typecheck_program
-              cctxt
-              ~chain:cctxt#chain
-              ~block:cctxt#block
-              program
-            >>= (function
-                  | Error _ as res ->
-                      print_typecheck_result
-                        ~emacs:false
-                        ~show_types:true
-                        ~print_source_on_error:true
-                        program
-                        res
-                        cctxt
-                  | Ok _ ->
-                      return_unit)
+            ( if skip_typecheck then return_unit
+            else
+              typecheck_program
+                cctxt
+                ~chain:cctxt#chain
+                ~block:cctxt#block
+                program
+              >>= function
+              | Error _ as res ->
+                  print_typecheck_result
+                    ~emacs:false
+                    ~show_types:true
+                    ~print_source_on_error:true
+                    program
+                    res
+                    cctxt
+              | Ok _ ->
+                  return_unit )
             >>=? fun () -> return program.expanded
         | `JSON -> (
           match Data_encoding.Json.from_string expr_string with
