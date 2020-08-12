@@ -167,6 +167,13 @@ let rpc ?node ?data ?query_string meth path client : JSON.t Lwt.t =
   in
   return (JSON.parse ~origin:(path ^ " response") output)
 
+let rpc_list client : string Lwt.t =
+  Process.run_and_read_stdout
+    ~name:client.name
+    ~color:client.color
+    client.path
+    (common_args ?node:None client @ ["rpc"; "list"])
+
 module Admin = struct
   let spawn_command = spawn_command ~admin:true
 

@@ -2,7 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,13 +23,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* This module runs the tests implemented in all other modules of this directory.
-   Each module defines tests which are thematically related,
-   as functions to be called here. *)
+(** Tests of the client's mockup mode. To execute them individually, run:
 
-let () =
-  Basic.run () ;
-  Bootstrap.run () ;
-  Bootstrap_heuristic.run () ;
-  Encoding.run ();
-  Mockup.run()
+    dune exec tezt/tests/main.exe -- --file mockup.ml
+
+    These tests are not exhaustive by any means, most tests of the mockup
+    are written with the python framework for now. It was important, though,
+    to provide the mockup's API in tezt; for other tests that use the mockup.
+  *)
+
+let test_rpc_list protocol =
+  Test.run
+    ~__FILE__
+    ~title:"rpc list (mockup)"
+    ~tags:["mockup"; "client"; "rpc"]
+  @@ fun () ->
+  let* client = Client.init_mockup ~protocol in
+  let* _ = Client.rpc_list client in
+  Lwt.return_unit
+
+let run () =
+  test_rpc_list Constant.alpha

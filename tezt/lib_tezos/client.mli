@@ -93,6 +93,9 @@ val rpc :
   t ->
   JSON.t Lwt.t
 
+(** Run [tezos-client rpc list]. *)
+val rpc_list : t -> string Lwt.t
+
 (** {2 Admin Client Commands} *)
 
 module Admin : sig
