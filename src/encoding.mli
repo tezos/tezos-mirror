@@ -207,8 +207,6 @@ val option : 'a encoding -> 'a option encoding
 
 val result : 'a encoding -> 'b encoding -> ('a, 'b) result encoding
 
-val legacy_result : 'a encoding -> 'b encoding -> ('a, 'b) result encoding
-
 val string_enum : (string * 'a) list -> 'a encoding
 
 val is_obj : 'a encoding -> bool

@@ -24,6 +24,25 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let legacy_result ok_enc error_enc =
+  let open Data_encoding in
+  union
+    ~tag_size:`Uint8
+    [
+      case
+        (Tag 1)
+        ok_enc
+        ~title:"Ok"
+        (function Ok x -> Some x | Error _ -> None)
+        (fun x -> Ok x);
+      case
+        (Tag 0)
+        error_enc
+        ~title:"Result"
+        (function Ok _ -> None | Error x -> Some x)
+        (fun x -> Error x);
+    ]
+
 (* NOTE: the current release of Crowbar, v0.1, is quite limited. Several
  * improvements have been made to the dev version which will make it possible to
  * simplify this file and increase coverage.
@@ -90,7 +109,6 @@ type _ ty =
   | Bytes : bytes ty
   | Option : 'a ty -> 'a option ty
   | Result : 'a ty * 'b ty -> ('a, 'b) result ty
-  | LegacyResult : 'a ty * 'b ty -> ('a, 'b) result ty
   | List : 'a ty -> 'a list ty
   | Array : 'a ty -> 'a array ty
   | Dynamic_size : 'a ty -> 'a ty
@@ -136,8 +154,6 @@ let rec is_nullable : type a. a ty -> bool = function
   | Option _ ->
       true
   | Result (tya, tyb) ->
-      is_nullable tya || is_nullable tyb
-  | LegacyResult (tya, tyb) ->
       is_nullable tya || is_nullable tyb
   | List ty ->
       is_nullable ty
@@ -188,8 +204,6 @@ let rec is_variable : type a. a ty -> bool = function
   | Option _ ->
       true
   | Result (tya, tyb) ->
-      is_variable tya || is_variable tyb
-  | LegacyResult (tya, tyb) ->
       is_variable tya || is_variable tyb
   | List _ ->
       true
@@ -243,7 +257,7 @@ let rec fixed_size : type a. a ty -> int option = function
       None
   | Option _ ->
       None (* actually Some if payload is Null *)
-  | Result _ | LegacyResult _ ->
+  | Result _ ->
       None (* actually Some if both payloads are same fixed size *)
   | List _ ->
       None
@@ -302,8 +316,6 @@ let rec is_zeroable : type a. a ty -> bool = function
       true
   | Result (tya, tyb) ->
       is_zeroable tya || is_zeroable tyb
-  | LegacyResult (tya, tyb) ->
-      is_zeroable tya || is_zeroable tyb
   | List _ ->
       true
   | Array _ ->
@@ -361,8 +373,6 @@ let rec pp_ty : type a. a ty Crowbar.printer =
       Crowbar.pp ppf "option(%a)" pp_ty ty
   | Result (tya, tyb) ->
       Crowbar.pp ppf "result(%a,%a)" pp_ty tya pp_ty tyb
-  | LegacyResult (tya, tyb) ->
-      Crowbar.pp ppf "legacyresult(%a,%a)" pp_ty tya pp_ty tyb
   | List ty ->
       Crowbar.pp ppf "list(%a)" pp_ty ty
   | Array ty ->
@@ -1031,7 +1041,7 @@ let full_check_size
     end )
 *)
 
-let full_legacyresult : type a b. a full -> b full -> (a, b) result full =
+let full_legacy_result : type a b. a full -> b full -> (a, b) result full =
  fun fulla fullb ->
   let module Fulla = (val fulla) in
   let module Fullb = (val fullb) in
@@ -1050,7 +1060,7 @@ let full_legacyresult : type a b. a full -> b full -> (a, b) result full =
 
     let gen = Crowbar.result Fulla.gen Fullb.gen
 
-    let encoding = Data_encoding.legacy_result Fulla.encoding Fullb.encoding
+    let encoding = legacy_result Fulla.encoding Fullb.encoding
   end )
 
 let rec full_of_ty : type a. a ty -> a full = function
@@ -1090,8 +1100,6 @@ let rec full_of_ty : type a. a ty -> a full = function
       full_option (full_of_ty ty)
   | Result (tya, tyb) ->
       full_result (full_of_ty tya) (full_of_ty tyb)
-  | LegacyResult (tya, tyb) ->
-      full_legacyresult (full_of_ty tya) (full_of_ty tyb)
   | List ty ->
       full_list (full_of_ty ty)
   | Array ty ->
@@ -1195,9 +1203,9 @@ let roundtrip_json_stream pp ding v =
       pp
       vv
 
-let roundtrip_binary_to_bytes pp ding v =
+let double_trip_binary pp encode_ding decode_ding v =
   let bin =
-    try Data_encoding.Binary.to_bytes_exn ding v
+    try Data_encoding.Binary.to_bytes_exn encode_ding v
     with Data_encoding.Binary.Write_error we ->
       Format.kasprintf
         Crowbar.fail
@@ -1208,7 +1216,7 @@ let roundtrip_binary_to_bytes pp ding v =
         we
   in
   let vv =
-    try Data_encoding.Binary.of_bytes_exn ding bin
+    try Data_encoding.Binary.of_bytes_exn decode_ding bin
     with Data_encoding.Binary.Read_error re ->
       Format.kasprintf
         Crowbar.fail
@@ -1219,6 +1227,8 @@ let roundtrip_binary_to_bytes pp ding v =
         re
   in
   Crowbar.check_eq ~pp v vv
+
+let roundtrip_binary_to_bytes pp ding v = double_trip_binary pp ding ding v
 
 let roundtrip_binary_to_string pp ding v =
   let bin =
@@ -1310,109 +1320,15 @@ let test_binary_compat_legacy_res (fulla_and_v : full_and_v)
     (fullb_and_v : full_and_v) =
   match (fulla_and_v, fullb_and_v) with
   | (FullAndV (fulla, a), FullAndV (fullb, b)) ->
-      let module Fulla = (val fulla) in
-      let module Fullb = (val fullb) in
       let fullr = full_result fulla fullb in
-      let fullleg = full_legacyresult fulla fullb in
       let module Fullr = (val fullr) in
+      let fullleg = full_legacy_result fulla fullb in
       let module Fullleg = (val fullleg) in
-      let pp = Fullr.pp in
-      let v = Ok a in
-      let bin =
-        try Data_encoding.Binary.to_bytes_exn Fullr.encoding v
-        with Data_encoding.Binary.Write_error we ->
-          Format.kasprintf
-            Crowbar.fail
-            "Cannot construct: %a (%a)"
-            pp
-            v
-            Data_encoding.Binary.pp_write_error
-            we
-      in
-      let vv =
-        try Data_encoding.Binary.of_bytes_exn Fullleg.encoding bin
-        with Data_encoding.Binary.Read_error re ->
-          Format.kasprintf
-            Crowbar.fail
-            "Cannot destruct: %a (%a)"
-            pp
-            v
-            Data_encoding.Binary.pp_read_error
-            re
-      in
-      Crowbar.check_eq ~pp v vv ;
-      let v = Ok a in
-      let bin =
-        try Data_encoding.Binary.to_bytes_exn Fullleg.encoding v
-        with Data_encoding.Binary.Write_error we ->
-          Format.kasprintf
-            Crowbar.fail
-            "Cannot construct: %a (%a)"
-            pp
-            v
-            Data_encoding.Binary.pp_write_error
-            we
-      in
-      let vv =
-        try Data_encoding.Binary.of_bytes_exn Fullr.encoding bin
-        with Data_encoding.Binary.Read_error re ->
-          Format.kasprintf
-            Crowbar.fail
-            "Cannot destruct: %a (%a)"
-            pp
-            v
-            Data_encoding.Binary.pp_read_error
-            re
-      in
-      Crowbar.check_eq ~pp v vv ;
-      let v = Error b in
-      let bin =
-        try Data_encoding.Binary.to_bytes_exn Fullr.encoding v
-        with Data_encoding.Binary.Write_error we ->
-          Format.kasprintf
-            Crowbar.fail
-            "Cannot construct: %a (%a)"
-            pp
-            v
-            Data_encoding.Binary.pp_write_error
-            we
-      in
-      let vv =
-        try Data_encoding.Binary.of_bytes_exn Fullleg.encoding bin
-        with Data_encoding.Binary.Read_error re ->
-          Format.kasprintf
-            Crowbar.fail
-            "Cannot destruct: %a (%a)"
-            pp
-            v
-            Data_encoding.Binary.pp_read_error
-            re
-      in
-      Crowbar.check_eq ~pp v vv ;
-      let v = Error b in
-      let bin =
-        try Data_encoding.Binary.to_bytes_exn Fullleg.encoding v
-        with Data_encoding.Binary.Write_error we ->
-          Format.kasprintf
-            Crowbar.fail
-            "Cannot construct: %a (%a)"
-            pp
-            v
-            Data_encoding.Binary.pp_write_error
-            we
-      in
-      let vv =
-        try Data_encoding.Binary.of_bytes_exn Fullr.encoding bin
-        with Data_encoding.Binary.Read_error re ->
-          Format.kasprintf
-            Crowbar.fail
-            "Cannot destruct: %a (%a)"
-            pp
-            v
-            Data_encoding.Binary.pp_read_error
-            re
-      in
-      Crowbar.check_eq ~pp v vv ; ()
+      double_trip_binary Fullr.pp Fullr.encoding Fullleg.encoding (Ok a) ;
+      double_trip_binary Fullr.pp Fullleg.encoding Fullr.encoding (Ok a) ;
+      double_trip_binary Fullr.pp Fullr.encoding Fullleg.encoding (Error b) ;
+      double_trip_binary Fullr.pp Fullleg.encoding Fullr.encoding (Error b) ;
+      ()
 
 let () =
   let open Crowbar in
