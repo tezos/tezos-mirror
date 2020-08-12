@@ -44,6 +44,8 @@ module type IO = sig
 end
 
 module Scheduler (IO : IO) = struct
+  (* Two labels or constructors of the same name are defined in two mutually
+     recursive types: fields canceler, counter and quota *)
   [@@@ocaml.warning "-30"]
 
   type t = {
@@ -70,6 +72,8 @@ module Scheduler (IO : IO) = struct
     counter : Moving_average.t;
     mutable quota : int;
   }
+
+  [@@@ocaml.warning "+30"]
 
   let cancel (conn : connection) err =
     if conn.closed then Lwt.return_unit
