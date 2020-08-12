@@ -455,7 +455,11 @@ module Garbled = struct
     >>=? fun () ->
     write_bad_all conns
     >>=? (fun () -> Simple.read_all conns)
-    >>= fun err -> _assert (is_connection_closed err) __LOC__ ""
+    >>= fun err ->
+    if is_connection_closed err then return_unit
+    else
+      let pos (file, lnum, cnum, _) = (file, lnum, cnum) in
+      fail (Exn (Assert_failure (pos __POS__)))
 
   let run points = detach_nodes (fun _ -> node) points
 end

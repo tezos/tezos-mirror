@@ -28,6 +28,10 @@ include Internal_event.Legacy_logging.Make (struct
   let name = "test.p2p.connection"
 end)
 
+let tzassert b pos =
+  let p (file, lnum, cnum, _) = (file, lnum, cnum) in
+  if b then return_unit else fail (Exn (Assert_failure (p pos)))
+
 let addr = ref Ipaddr.V6.localhost
 
 let canceler = Lwt_canceler.create () (* unused *)
@@ -175,9 +179,9 @@ let connect sched addr port id =
     version
     conn_meta_config
   >>=? fun (info, auth_fd) ->
-  _assert (not info.incoming) __LOC__ ""
+  tzassert (not info.incoming) __POS__
   >>=? fun () ->
-  _assert (P2p_peer.Id.compare info.peer_id id1.peer_id = 0) __LOC__ ""
+  tzassert (P2p_peer.Id.compare info.peer_id id1.peer_id = 0) __POS__
   >>=? fun () -> return auth_fd
 
 let is_connection_closed = function
@@ -238,14 +242,13 @@ module Crypto_test = struct
     Bytes.blit tag 0 payload header_length tag_length ;
     Bytes.blit cmsg 0 payload extrabytes msg_length ;
     return (Unix.write fd payload 0 payload_length)
-    >>=? fun i ->
-    _assert (payload_length = i) __LOC__ "" >>=? fun () -> return_unit
+    >>=? fun i -> tzassert (payload_length = i) __POS__
 
   let read_chunk fd cryptobox_data =
     let header_buf = Bytes.create header_length in
     return (Unix.read fd header_buf 0 header_length)
     >>=? fun i ->
-    _assert (header_length = i) __LOC__ ""
+    tzassert (header_length = i) __POS__
     >>=? fun () ->
     let encrypted_length = TzEndian.get_uint16 header_buf 0 in
     assert (encrypted_length >= tag_length) ;
@@ -253,13 +256,13 @@ module Crypto_test = struct
     let tag = Bytes.make tag_length '\x00' in
     return (Unix.read fd tag 0 tag_length)
     >>=? fun i ->
-    _assert (tag_length = i) __LOC__ ""
+    tzassert (tag_length = i) __POS__
     >>=? fun () ->
     let msg = Bytes.make msg_length '\x00' in
     ( if msg_length > 0 then return (Unix.read fd msg 0 msg_length)
     else return 0 )
     >>=? fun i ->
-    _assert (msg_length = i) __LOC__ ""
+    tzassert (msg_length = i) __POS__
     >>=? fun () ->
     let remote_nonce = cryptobox_data.remote_nonce in
     cryptobox_data.remote_nonce <- Crypto_box.increment_nonce remote_nonce ;
@@ -314,8 +317,8 @@ module Low_level = struct
     >>= fun fd ->
     P2p_io_scheduler.read_full fd msg
     >>=? fun () ->
-    _assert (Bytes.compare simple_msg msg = 0) __LOC__ ""
-    >>=? fun () -> P2p_io_scheduler.close fd >>=? fun () -> return_unit
+    tzassert (Bytes.compare simple_msg msg = 0) __POS__
+    >>=? fun () -> P2p_io_scheduler.close fd
 
   let server _ch sched socket =
     raw_accept sched socket
@@ -341,11 +344,11 @@ module Nack = struct
   let server _ch sched socket =
     accept sched socket
     >>=? fun (info, auth_fd) ->
-    _assert info.incoming __LOC__ ""
+    tzassert info.incoming __POS__
     >>=? fun () ->
     id2
     >>= fun id2 ->
-    _assert (P2p_peer.Id.compare info.peer_id id2.peer_id = 0) __LOC__ ""
+    tzassert (P2p_peer.Id.compare info.peer_id id2.peer_id = 0) __POS__
     >>=? fun () ->
     P2p_socket.nack auth_fd P2p_rejection.No_motive []
     >>= fun () -> return_unit
@@ -354,8 +357,7 @@ module Nack = struct
     connect sched addr port id2
     >>=? fun auth_fd ->
     P2p_socket.accept ~canceler auth_fd encoding
-    >>= fun conn ->
-    _assert (is_rejected conn) __LOC__ "" >>=? fun () -> return_unit
+    >>= fun conn -> tzassert (is_rejected conn) __POS__
 
   let run _dir = run_nodes client server
 end
@@ -367,8 +369,7 @@ module Nacked = struct
     accept sched socket
     >>=? fun (_info, auth_fd) ->
     P2p_socket.accept ~canceler auth_fd encoding
-    >>= fun conn ->
-    _assert (Nack.is_rejected conn) __LOC__ "" >>=? fun () -> return_unit
+    >>= fun conn -> tzassert (Nack.is_rejected conn) __POS__
 
   let client _ch sched addr port =
     connect sched addr port id2
@@ -396,7 +397,7 @@ module Simple_message = struct
     >>=? fun () ->
     P2p_socket.read conn
     >>=? fun (_msg_size, msg) ->
-    _assert (Bytes.compare simple_msg2 msg = 0) __LOC__ ""
+    tzassert (Bytes.compare simple_msg2 msg = 0) __POS__
     >>=? fun () ->
     sync ch >>=? fun () -> P2p_socket.close conn >>= fun _stat -> return_unit
 
@@ -409,7 +410,7 @@ module Simple_message = struct
     >>=? fun () ->
     P2p_socket.read conn
     >>=? fun (_msg_size, msg) ->
-    _assert (Bytes.compare simple_msg msg = 0) __LOC__ ""
+    tzassert (Bytes.compare simple_msg msg = 0) __POS__
     >>=? fun () ->
     sync ch >>=? fun () -> P2p_socket.close conn >>= fun _stat -> return_unit
 
@@ -432,7 +433,7 @@ module Chunked_message = struct
     >>=? fun () ->
     P2p_socket.read conn
     >>=? fun (_msg_size, msg) ->
-    _assert (Bytes.compare simple_msg2 msg = 0) __LOC__ ""
+    tzassert (Bytes.compare simple_msg2 msg = 0) __POS__
     >>=? fun () ->
     sync ch >>=? fun () -> P2p_socket.close conn >>= fun _stat -> return_unit
 
@@ -445,7 +446,7 @@ module Chunked_message = struct
     >>=? fun () ->
     P2p_socket.read conn
     >>=? fun (_msg_size, msg) ->
-    _assert (Bytes.compare simple_msg msg = 0) __LOC__ ""
+    tzassert (Bytes.compare simple_msg msg = 0) __POS__
     >>=? fun () ->
     sync ch >>=? fun () -> P2p_socket.close conn >>= fun _stat -> return_unit
 
@@ -468,7 +469,7 @@ module Oversized_message = struct
     >>=? fun () ->
     P2p_socket.read conn
     >>=? fun (_msg_size, msg) ->
-    _assert (Bytes.compare simple_msg2 msg = 0) __LOC__ ""
+    tzassert (Bytes.compare simple_msg2 msg = 0) __POS__
     >>=? fun () ->
     sync ch >>=? fun () -> P2p_socket.close conn >>= fun _stat -> return_unit
 
@@ -481,7 +482,7 @@ module Oversized_message = struct
     >>=? fun () ->
     P2p_socket.read conn
     >>=? fun (_msg_size, msg) ->
-    _assert (Bytes.compare simple_msg msg = 0) __LOC__ ""
+    tzassert (Bytes.compare simple_msg msg = 0) __POS__
     >>=? fun () ->
     sync ch >>=? fun () -> P2p_socket.close conn >>= fun _stat -> return_unit
 
@@ -509,7 +510,7 @@ module Close_on_read = struct
     >>=? fun () ->
     P2p_socket.read conn
     >>= fun err ->
-    _assert (is_connection_closed err) __LOC__ ""
+    tzassert (is_connection_closed err) __POS__
     >>=? fun () -> P2p_socket.close conn >>= fun _stat -> return_unit
 
   let run _dir = run_nodes client server
@@ -538,7 +539,7 @@ module Close_on_write = struct
     >>= fun () ->
     P2p_socket.write_sync conn simple_msg
     >>= fun err ->
-    _assert (is_connection_closed err) __LOC__ ""
+    tzassert (is_connection_closed err) __POS__
     >>=? fun () -> P2p_socket.close conn >>= fun _stat -> return_unit
 
   let run _dir = run_nodes client server
@@ -568,7 +569,7 @@ module Garbled_data = struct
     >>=? fun () ->
     P2p_socket.read conn
     >>= fun err ->
-    _assert (is_connection_closed err) __LOC__ ""
+    tzassert (is_connection_closed err) __POS__
     >>=? fun () -> P2p_socket.close conn >>= fun _stat -> return_unit
 
   let client _ch sched addr port =
@@ -578,7 +579,7 @@ module Garbled_data = struct
     >>=? fun conn ->
     P2p_socket.read conn
     >>= fun err ->
-    _assert (is_decoding_error err) __LOC__ ""
+    tzassert (is_decoding_error err) __POS__
     >>=? fun () -> P2p_socket.close conn >>= fun _stat -> return_unit
 
   let run _dir = run_nodes client server
