@@ -181,10 +181,16 @@ module System = struct
         ()
   end
 
-  let of_seconds_opt x =
+  let of_seconds_opt seconds =
+    let x = Int64.abs seconds in
     let days = Int64.to_int (Int64.div x 86_400L) in
     let ps = Int64.mul (Int64.rem x 86_400L) 1_000_000_000_000L in
-    Option.bind (Ptime.Span.of_d_ps (days, ps)) Ptime.of_span
+    match Ptime.Span.of_d_ps (days, ps) with
+    | None ->
+        None
+    | Some span ->
+        let span = if seconds < 0L then Ptime.Span.neg span else span in
+        Ptime.of_span span
 
   let of_seconds_exn x =
     match of_seconds_opt x with
