@@ -442,7 +442,7 @@ module Make (Trace : Sig.TRACE) :
 
   let unless cond f = if cond then return_unit else f ()
 
-  let _when cond f = if cond then f () else return_unit
+  let when_ cond f = if cond then f () else return_unit
 
   let dont_wait exc_handler err_handler f =
     Lwt_utils.dont_wait exc_handler (fun () ->

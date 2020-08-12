@@ -356,7 +356,7 @@ module type MONAD = sig
     (unit -> (unit, 'trace) result Lwt.t) ->
     (unit, 'trace) result Lwt.t
 
-  val _when :
+  val when_ :
     bool ->
     (unit -> (unit, 'trace) result Lwt.t) ->
     (unit, 'trace) result Lwt.t
