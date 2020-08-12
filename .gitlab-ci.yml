@@ -231,7 +231,6 @@ unit:ocaml-uecc:
   script:
     - dune build @vendors/ocaml-uecc/runtest
 
-
 ##END_UNITEST##
 
 unit:protocol_compiles:
@@ -542,7 +541,6 @@ integration:examples_test_example:
   script:
     - pytest tests_python/examples/test_example.py
   stage: test
-
 ##END_INTEGRATION_PYTHON##
 
 ############################################################
@@ -1229,7 +1227,6 @@ opam:uecc:
   <<: *opam_definition
   variables:
     package: uecc
-
 
 ##END_OPAM##
 
