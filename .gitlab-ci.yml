@@ -103,60 +103,80 @@ build:
 
 # this section is updated using the script scripts/update_unit_test.sh
 ##BEGIN_UNITEST##
-unit:signer_backends/unix:
+unit:src/bin_client:
   <<: *test_definition
   script:
-    - dune build @src/lib_signer_backends/unix/runtest
+    - dune build @src/bin_client/runtest
 
-unit:signer_backends:
+unit:client_base:
   <<: *test_definition
   script:
-    - dune build @src/lib_signer_backends/runtest
+    - dune build @src/lib_client_base/runtest
 
 unit:crypto:
   <<: *test_definition
   script:
     - dune build @src/lib_crypto/runtest
 
-unit:stdlib_unix:
+unit:error_monad:
   <<: *test_definition
   script:
-    - dune build @src/lib_stdlib_unix/runtest
+    - dune build @src/lib_error_monad/runtest
 
-unit:protocol_environment:
+unit:lwt_result_stdlib:
   <<: *test_definition
   script:
-    - dune build @src/lib_protocol_environment/runtest
+    - dune build @src/lib_lwt_result_stdlib/runtest
 
-unit:stdlib:
+unit:micheline:
   <<: *test_definition
   script:
-    - dune build @src/lib_stdlib/runtest
+    - dune build @src/lib_micheline/runtest
 
-unit:shell:
+unit:p2p:
   <<: *test_definition
   script:
-    - dune build @src/lib_shell/runtest
+    - dune build @src/lib_p2p/runtest
 
 unit:protocol_compiler:
   <<: *test_definition
   script:
     - dune build @src/lib_protocol_compiler/runtest
 
-unit:src/bin_client:
+unit:protocol_environment:
   <<: *test_definition
   script:
-    - dune build @src/bin_client/runtest
+    - dune build @src/lib_protocol_environment/runtest
 
-unit:error_monad:
+unit:requester:
   <<: *test_definition
   script:
-    - dune build @src/lib_error_monad/runtest
+    - dune build @src/lib_requester/runtest
 
-unit:micheline:
+unit:shell:
   <<: *test_definition
   script:
-    - dune build @src/lib_micheline/runtest
+    - dune build @src/lib_shell/runtest
+
+unit:signer_backends:
+  <<: *test_definition
+  script:
+    - dune build @src/lib_signer_backends/runtest
+
+unit:signer_backends/unix:
+  <<: *test_definition
+  script:
+    - dune build @src/lib_signer_backends/unix/runtest
+
+unit:stdlib:
+  <<: *test_definition
+  script:
+    - dune build @src/lib_stdlib/runtest
+
+unit:stdlib_unix:
+  <<: *test_definition
+  script:
+    - dune build @src/lib_stdlib_unix/runtest
 
 unit:storage:
   <<: *test_definition
@@ -183,35 +203,15 @@ unit:src/proto_alpha/lib_protocol:
   script:
     - dune build @src/proto_alpha/lib_protocol/runtest
 
-unit:lwt_result_stdlib:
+unit:ocaml-ledger-wallet:
   <<: *test_definition
   script:
-    - dune build @src/lib_lwt_result_stdlib/runtest
-
-unit:client_base:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_client_base/runtest
-
-unit:requester:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_requester/runtest
-
-unit:p2p:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_p2p/runtest
+    - dune build @vendors/ocaml-ledger-wallet/runtest
 
 unit:ocaml-lmdb:
   <<: *test_definition
   script:
     - dune build @vendors/ocaml-lmdb/runtest
-
-unit:ocaml-ledger-wallet:
-  <<: *test_definition
-  script:
-    - dune build @vendors/ocaml-ledger-wallet/runtest
 
 unit:ocaml-uecc:
   <<: *test_definition
