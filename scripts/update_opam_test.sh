@@ -11,7 +11,7 @@ src_dir="$(dirname "$script_dir")"
 
 tmp=$(mktemp)
 
-packages=$(echo "$packages" | sort)
+packages=$(echo "$packages" | LC_COLLATE=C sort)
 
 (
   sed -z 's/^\(.*##BEGIN_OPAM##\n\).*\(\n##END_OPAM##.*\)$/\1/' "$src_dir/.gitlab-ci.yml"
