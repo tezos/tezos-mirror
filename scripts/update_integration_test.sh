@@ -9,7 +9,9 @@ src_dir="$(dirname "$script_dir")"
 
 tmp=$(mktemp)
 
-sed -z 's/^\(.*##BEGIN_INTEGRATION_PYTHON##\n\).*\(\n##END_INTEGRATION_PYTHON##.*\)$/\1/' "$src_dir/.gitlab-ci.yml" > $tmp
+csplit --quiet --prefix="$tmp" "$src_dir/.gitlab-ci.yml" /##BEGIN_INTEGRATION_PYTHON##/+1
+mv "$tmp"00 "$tmp"
+rm "$tmp"0*
 
 for test in $(find tests_python/tests/ -name 'test_*.py' | LC_COLLATE=C sort); do
     case "$test" in
@@ -50,6 +52,8 @@ integration:examples_test_example:
   stage: test
 EOF
 
-sed -z 's/^\(.*##BEGIN_INTEGRATION_PYTHON##\n\).*\(\n##END_INTEGRATION_PYTHON##.*\)$/\2/' "$src_dir/.gitlab-ci.yml" >> $tmp
+csplit --quiet --prefix="$tmp" "$src_dir/.gitlab-ci.yml" %##END_INTEGRATION_PYTHON##%
+cat "$tmp"00 >> "$tmp"
+rm "$tmp"0*
 
 mv $tmp "$src_dir/.gitlab-ci.yml"

@@ -14,7 +14,9 @@ tmp=$(mktemp)
 packages=$(echo "$packages" | LC_COLLATE=C sort)
 
 (
-  sed -z 's/^\(.*##BEGIN_OPAM##\n\).*\(\n##END_OPAM##.*\)$/\1/' "$src_dir/.gitlab-ci.yml"
+  csplit --quiet --prefix="$tmp" "$src_dir/.gitlab-ci.yml" /##BEGIN_OPAM##/+1
+  cat "$tmp"00
+  rm "$tmp"0*
 
   echo "# this section is updated using the script $(basename $script_dir)/$(basename $0)"
   echo
@@ -29,7 +31,9 @@ opam:$package:
 EOF
   done
 
-  sed -z 's/^\(.*##BEGIN_OPAM##\n\).*\(\n##END_OPAM##.*\)$/\2/' "$src_dir/.gitlab-ci.yml"
+  csplit --quiet --prefix="$tmp" "$src_dir/.gitlab-ci.yml" %##END_OPAM##%
+  cat "$tmp"00
+  rm "$tmp"0*
 ) > $tmp
 
 mv $tmp "$src_dir/.gitlab-ci.yml"
