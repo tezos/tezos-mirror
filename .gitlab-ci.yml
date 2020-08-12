@@ -103,7 +103,7 @@ build:
 
 # this section is updated using the script scripts/update_unit_test.sh
 ##BEGIN_UNITEST##
-unit:src/bin_client:
+unit:client:
   <<: *test_definition
   script:
     - dune build @src/bin_client/runtest
