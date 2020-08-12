@@ -208,7 +208,7 @@ module Mempool = struct
     match receipt with
     | No_operation_metadata ->
         assert false (* only for multipass validator *)
-    | Operation_metadata {contents} -> (
+    | Operation_metadata {contents; mapped_keys = _} -> (
       match contents with
       | Single_result (Endorsement_result _) ->
           Lwt.return_false (* legacy format *)
@@ -286,12 +286,10 @@ module RPC = struct
       | Option_key (t, tname) ->
           Prim
             (-1, T_option, [unparse_comparable_ty t], unparse_type_annot tname)
-
-    (* Uncomment when rebasing on top of Baking account *)
-    (* | Baker_hash_key tname ->
-     *     Prim (-1, T_baker_hash, [], unparse_type_annot tname)
-     * | Pvss_key_key tname ->
-     *     Prim (-1, T_pvss_key, [], unparse_type_annot tname) *)
+      | Baker_hash_key tname ->
+          Prim (-1, T_baker_hash, [], unparse_type_annot tname)
+      | Pvss_key_key tname ->
+          Prim (-1, T_pvss_key, [], unparse_type_annot tname)
 
     let unparse_memo_size memo_size =
       let z = Alpha_context.Sapling.Memo_size.unparse_to_z memo_size in
@@ -389,14 +387,12 @@ module RPC = struct
             ( T_sapling_state,
               [unparse_memo_size memo_size],
               unparse_type_annot tname )
-
-    (* Uncomment when rebasing on top of Baking account *)
-    (* | Baker_hash_t tname ->
-     *     return (T_baker_hash, [], unparse_type_annot tname)
-     * | Pvss_key_t tname ->
-     *     return (T_pvss_key, [], unparse_type_annot tname)
-     * | Baker_operation_t tname ->
-     *     return (T_baker_operation, [], unparse_type_annot tname) *)
+      | Baker_hash_t tname ->
+          return (T_baker_hash, [], unparse_type_annot tname)
+      | Pvss_key_t tname ->
+          return (T_pvss_key, [], unparse_type_annot tname)
+      | Baker_operation_t tname ->
+          return (T_baker_operation, [], unparse_type_annot tname)
   end
 
   let helpers_path = RPC_path.(open_root / "helpers" / "scripts")
