@@ -510,8 +510,7 @@ If `DO-NOT-OVERWRITE' is non-nil, the existing contents of the buffer are mainta
                 (substring str 0 (- len 1))
               str))))
        (bef-strs (if bef-ele (split-string (funcall pp-no-trailing-newline bef-ele) "\n") '("")))
-       (aft-strs (if aft-ele (split-string (funcall pp-no-trailing-newline aft-ele) "\n") '("")))
-       (width width))
+       (aft-strs (if aft-ele (split-string (funcall pp-no-trailing-newline aft-ele) "\n") '(""))))
     (letrec ((format-strings
               (lambda (befs afts)
                 (if (or befs afts)
