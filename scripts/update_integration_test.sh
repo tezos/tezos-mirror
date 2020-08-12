@@ -11,8 +11,8 @@ tmp=$(mktemp)
 
 sed -z 's/^\(.*##BEGIN_INTEGRATION_PYTHON##\n\).*\(\n##END_INTEGRATION_PYTHON##.*\)$/\1/' "$src_dir/.gitlab-ci.yml" > $tmp
 
-for test in tests_python/tests/test_*.py; do
-    testname=${test##tests_python/tests/test_}
+for test in $(find tests_python/tests/ -name 'test_*.py' | LC_COLLATE=C sort); do
+    testname=${test##*/test_}
     testname=${testname%%.py}
     cat >> $tmp <<EOF
 integration:$testname:
