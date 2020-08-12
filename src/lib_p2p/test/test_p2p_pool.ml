@@ -668,12 +668,8 @@ module Overcrowded = struct
     lwt_log_info "client closing.@." >>= fun () -> return_unit
 
   (** Code of the target that should be overcrowded by all the clients. *)
-  let target iteration channel stream connect_handler pool trusted_points
+  let target iteration channel stream _connect_handler _pool trusted_points
       all_points =
-    let _trusted = trusted_points
-    and _all_points = all_points
-    and _pool = pool
-    and _connect_handler = connect_handler in
     let unknowns_knowns () =
       P2p_pool.Points.fold_known
         _pool
@@ -695,8 +691,6 @@ module Overcrowded = struct
     lwt_debug "known : %a" P2p_point.Id.pp_list knowns
     >>= fun () ->
     let _pool_watcher =
-      Lwt.return_unit
-      >>= fun () ->
       Lwt_stream.iter
         (debug "p2p event %a" P2p_connection.P2p_event.pp)
         watcher
@@ -871,12 +865,8 @@ module No_common_network = struct
     lwt_log_info "client closing.@." >>= fun () -> return_unit
 
   (** Code of the target that should be overcrowded by all the clients. *)
-  let target iteration channel _stream connect_handler pool trusted_points
-      all_points =
-    let _trusted = trusted_points
-    and _all_points = all_points
-    and _pool = pool
-    and _connect_handler = connect_handler in
+  let target iteration channel _stream _connect_handler _pool _trusted_points
+      _all_points =
     lwt_log_info "Target waiting.@."
     >>= fun () ->
     sync iteration channel

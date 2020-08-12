@@ -35,8 +35,6 @@ let log_f ~level format =
     Format.ikfprintf (fun _ -> Lwt.return_unit) Format.std_formatter format
   else Format.kasprintf (fun msg -> Lwt_log.log ~section ~level msg) format
 
-let _lwt_debug fmt = log_f ~level:Lwt_log.Debug fmt
-
 let lwt_log_notice fmt = log_f ~level:Lwt_log.Notice fmt
 
 let lwt_log_info fmt = log_f ~level:Lwt_log.Info fmt
