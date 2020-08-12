@@ -1492,11 +1492,28 @@ let contents_and_result_list_encoding =
   in
   conv to_list of_list (Variable.list contents_and_result_encoding)
 
-type 'kind operation_metadata = {contents : 'kind contents_result_list}
+type mapped_key = {
+  consensus_key : Signature.Public_key_hash.t;
+  baker : Baker_hash.t;
+}
+
+type 'kind operation_metadata = {
+  contents : 'kind contents_result_list;
+  mapped_keys : mapped_key list;
+}
 
 type packed_operation_metadata =
   | Operation_metadata : 'kind operation_metadata -> packed_operation_metadata
   | No_operation_metadata : packed_operation_metadata
+
+let mapped_key_encoding =
+  def "mapped_key"
+  @@ conv
+       (fun {consensus_key; baker} -> (consensus_key, baker))
+       (fun (consensus_key, baker) -> {consensus_key; baker})
+  @@ obj2
+       (req "consensus_key" Signature.Public_key_hash.encoding)
+       (req "baker" Baker_hash.encoding)
 
 let operation_metadata_encoding =
   def "operation.alpha.result"
@@ -1504,14 +1521,16 @@ let operation_metadata_encoding =
        [ case
            (Tag 0)
            ~title:"Operation_metadata"
-           contents_result_list_encoding
+           (obj2
+              (req "contents" contents_result_list_encoding)
+              (req "mapped_keys" (list mapped_key_encoding)))
            (function
-             | Operation_metadata {contents} ->
-                 Some (Contents_result_list contents)
+             | Operation_metadata {contents; mapped_keys} ->
+                 Some (Contents_result_list contents, mapped_keys)
              | _ ->
                  None)
-           (fun (Contents_result_list contents) ->
-             Operation_metadata {contents});
+           (fun (Contents_result_list contents, mapped_keys) ->
+             Operation_metadata {contents; mapped_keys});
          case
            (Tag 1)
            ~title:"No_operation_metadata"
@@ -1802,9 +1821,10 @@ let operation_data_and_metadata_encoding =
        [ case
            (Tag 0)
            ~title:"Operation_with_metadata"
-           (obj2
+           (obj3
               (req "contents" (dynamic_size contents_and_result_list_encoding))
-              (opt "signature" Signature.encoding))
+              (opt "signature" Signature.encoding)
+              (req "mapped_keys" (list mapped_key_encoding)))
            (function
              | (Operation_data _, No_operation_metadata) ->
                  None
@@ -1817,11 +1837,12 @@ let operation_data_and_metadata_encoding =
                    Some
                      ( Contents_and_result_list
                          (pack_contents_list op.contents res.contents),
-                       op.signature ) ))
-           (fun (Contents_and_result_list contents, signature) ->
+                       op.signature,
+                       res.mapped_keys ) ))
+           (fun (Contents_and_result_list contents, signature, mapped_keys) ->
              let (op_contents, res_contents) = unpack_contents_list contents in
              ( Operation_data {contents = op_contents; signature},
-               Operation_metadata {contents = res_contents} ));
+               Operation_metadata {contents = res_contents; mapped_keys} ));
          case
            (Tag 1)
            ~title:"Operation_without_metadata"

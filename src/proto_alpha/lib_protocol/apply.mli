@@ -101,6 +101,10 @@ type error +=
 
 type error += (* `Permanent *) Failing_noop_error
 
+module Mapped_key_set : S.SET with type elt = baker_hash * public_key_hash
+
+val list_of_mapped_keys : Mapped_key_set.t -> Apply_results.mapped_key list
+
 val begin_partial_construction : t -> (t, error trace) result Lwt.t
 
 val begin_full_construction :
@@ -140,7 +144,7 @@ val apply_manager_contents_list :
   baker_hash ->
   Chain_id.t ->
   'a Kind.manager contents_list ->
-  (t * 'a Kind.manager contents_result_list) tzresult Lwt.t
+  (t * 'a Kind.manager contents_result_list * Mapped_key_set.t) tzresult Lwt.t
 
 val apply_contents_list :
   t ->
@@ -150,7 +154,7 @@ val apply_contents_list :
   baker_hash ->
   'kind operation ->
   'kind contents_list ->
-  (t * 'kind contents_result_list) tzresult Lwt.t
+  (t * 'kind contents_result_list * Mapped_key_set.t) tzresult Lwt.t
 
 val check_minimum_endorsements :
   t -> Block_header.contents -> Period.t -> int -> (unit, error trace) result

@@ -622,40 +622,58 @@ let () =
 
 (* Operation sources and destinations that refer to an active baker consensus
    key are mapped to the baker account that owns the key. *)
-type mapped_key = Consensus_key of baker_hash | Original of Contract.t
+type mapped_contract = Consensus_key of baker_hash | Original of Contract.t
+
+module Mapped_key_set = Set.Make (struct
+  type t = baker_hash * public_key_hash
+
+  let compare (_baker_hash_a, pkh_a) (_baker_hash_b, pkh_b) =
+    Signature.Public_key_hash.compare pkh_a pkh_b
+end)
+
+let list_of_mapped_keys mapped_keys =
+  Mapped_key_set.elements mapped_keys
+  |> List.map (fun (baker, consensus_key) ->
+         Apply_results.{consensus_key; baker})
 
 (* Try to find if the given contract is being used as an active consensus key.
    If so, find the baker with this key. *)
-let map_consensus_key ctxt contract =
+let map_consensus_key ?(mapped_keys = Mapped_key_set.empty) ctxt contract =
   match Contract.is_implicit contract with
   | None ->
-      return @@ Original contract
+      return (Original contract, mapped_keys)
   | Some pkh -> (
       Baker.is_consensus_key ctxt pkh
       >>=? function
       | None ->
-          return @@ Original contract
+          return (Original contract, mapped_keys)
       | Some baker_hash ->
-          return @@ Consensus_key baker_hash )
+          let mapped_keys = Mapped_key_set.add (baker_hash, pkh) mapped_keys in
+          return (Consensus_key baker_hash, mapped_keys) )
 
-let contract_of_mapped_key : mapped_key -> Contract.t = function
+let contract_of_mapped_key : mapped_contract -> Contract.t = function
   | Consensus_key baker ->
       Contract.baker_contract baker
   | Original contract ->
       contract
 
-let map_contract ctxt contract =
-  map_consensus_key ctxt contract >|=? contract_of_mapped_key
+let map_contract ?mapped_keys ctxt contract =
+  map_consensus_key ?mapped_keys ctxt contract
+  >|=? fun (mapped_key, mapped_keys) ->
+  (contract_of_mapped_key mapped_key, mapped_keys)
 
 (* Try to map the given key to a baker consensus key. Fails with
    [Not_an_active_consensus_key] when no matching consensus key is found. *)
-let map_delegate ctxt delegate =
+let map_delegate ?(mapped_keys = Mapped_key_set.empty) ctxt delegate =
   Baker.is_consensus_key ctxt delegate
   >>=? function
   | None ->
       fail @@ Not_an_active_consensus_key delegate
   | Some baker_hash ->
-      return baker_hash
+      let mapped_keys =
+        Mapped_key_set.add (baker_hash, delegate) mapped_keys
+      in
+      return (baker_hash, mapped_keys)
 
 open Apply_results
 
@@ -663,17 +681,19 @@ let apply_manager_operation_content :
     type kind.
     Alpha_context.t ->
     Script_ir_translator.unparsing_mode ->
-    payer:mapped_key ->
-    source:mapped_key ->
+    payer:mapped_contract ->
+    source:mapped_contract ->
     chain_id:Chain_id.t ->
     internal:bool ->
+    mapped_keys:Mapped_key_set.t ->
     kind manager_operation ->
     ( context
     * kind successful_manager_operation_result
-    * packed_internal_operation list )
+    * packed_internal_operation list
+    * Mapped_key_set.t )
     tzresult
     Lwt.t =
- fun ctxt mode ~payer ~source ~chain_id ~internal operation ->
+ fun ctxt mode ~payer ~source ~chain_id ~internal ~mapped_keys operation ->
   let before_operation =
     (* This context is not used for backtracking. Only to compute
          gas consumption and originations for the operation result. *)
@@ -773,15 +793,16 @@ let apply_manager_operation_content :
           ( Reveal_result
               {consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt}
             : kind successful_manager_operation_result ),
-          [] )
+          [],
+          mapped_keys )
   | Transaction {amount; parameters; destination; entrypoint} -> (
       Baker.is_pending_consensus_key ctxt destination
       >>=? fun is_destination_pending_consensus_key ->
       fail_when is_destination_pending_consensus_key
       @@ Forbidden_pending_consensus_key_destination destination
       >>=? fun () ->
-      map_contract ctxt destination
-      >>=? fun destination ->
+      map_contract ~mapped_keys ctxt destination
+      >>=? fun (destination, mapped_keys) ->
       Contract.spend ctxt source amount
       >>=? fun ctxt ->
       ( match Contract.is_implicit destination with
@@ -855,7 +876,7 @@ let apply_manager_operation_content :
                   allocated_destination_contract;
                 }
             in
-            (ctxt, result, []) )
+            (ctxt, result, [], mapped_keys) )
       | Some script ->
           Script.force_decode_in_context ctxt parameters
           >>?= fun (parameter, ctxt) ->
@@ -913,14 +934,15 @@ let apply_manager_operation_content :
                 allocated_destination_contract;
               }
           in
-          (ctxt, result, operations) )
+          (ctxt, result, operations, mapped_keys) )
   | Origination_legacy {delegate; script; preorigination; credit} ->
       ( match delegate with
       | None ->
-          return_none
+          return (None, mapped_keys)
       | Some delegate ->
-          map_delegate ctxt delegate >|=? Option.some )
-      >>=? fun delegate ->
+          map_delegate ~mapped_keys ctxt delegate
+          >|=? fun (delegate, mapped_keys) -> (Some delegate, mapped_keys) )
+      >>=? fun (delegate, mapped_keys) ->
       apply_origination ctxt ~delegate ~script ~preorigination ~credit
       >|=? fun ( ctxt,
                  lazy_storage_diff,
@@ -939,7 +961,7 @@ let apply_manager_operation_content :
             paid_storage_size_diff;
           }
       in
-      (ctxt, result, [])
+      (ctxt, result, [], mapped_keys)
   | Origination {delegate; script; preorigination; credit} ->
       apply_origination ctxt ~delegate ~script ~preorigination ~credit
       >|=? fun ( ctxt,
@@ -959,21 +981,23 @@ let apply_manager_operation_content :
             paid_storage_size_diff;
           }
       in
-      (ctxt, result, [])
+      (ctxt, result, [], mapped_keys)
   | Delegation_legacy delegate ->
       ( match delegate with
       | None ->
-          return_none
+          return (None, mapped_keys)
       | Some delegate ->
-          map_delegate ctxt delegate >|=? Option.some )
-      >>=? fun delegate ->
+          map_delegate ~mapped_keys ctxt delegate
+          >|=? fun (delegate, mapped_keys) -> (Some delegate, mapped_keys) )
+      >>=? fun (delegate, mapped_keys) ->
       Delegation.set ctxt source delegate
       >>=? fun ctxt ->
       return
         ( ctxt,
           Delegation_legacy_result
             {consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt},
-          [] )
+          [],
+          mapped_keys )
   | Delegation delegate ->
       Delegation.set ctxt source delegate
       >>=? fun ctxt ->
@@ -981,7 +1005,8 @@ let apply_manager_operation_content :
         ( ctxt,
           Delegation_result
             {consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt},
-          [] )
+          [],
+          mapped_keys )
   | Baker_registration {credit; consensus_key; threshold; owner_keys} ->
       Contract.spend ctxt source credit
       >>=? fun ctxt ->
@@ -1007,7 +1032,7 @@ let apply_manager_operation_content :
             paid_storage_size_diff;
           }
       in
-      (ctxt, result, [])
+      (ctxt, result, [], mapped_keys)
 
 type success_or_failure = Success of context | Failure
 
@@ -1126,7 +1151,7 @@ let apply_baker_operation_content :
             {consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt},
           [] )
 
-let apply_internal_operations ctxt mode ~payer ~chain_id ops =
+let apply_internal_operations ctxt mode ~payer ~chain_id ~mapped_keys ops =
   let skip =
     List.rev_map (function
         | Internal_manager_operation op ->
@@ -1136,17 +1161,17 @@ let apply_internal_operations ctxt mode ~payer ~chain_id ops =
             Internal_baker_operation_result
               (op, Skipped (baker_kind op.operation)))
   in
-  let rec apply ctxt applied worklist =
+  let rec apply ctxt applied worklist mapped_keys =
     match worklist with
     | [] ->
-        Lwt.return (Success ctxt, List.rev applied)
+        Lwt.return (Success ctxt, List.rev applied, mapped_keys)
     | Internal_manager_operation ({source; operation; nonce} as op) :: rest
       -> (
         ( if internal_nonce_already_recorded ctxt nonce then
           fail (Internal_operation_replay (Internal_manager_operation op))
         else
-          map_consensus_key ctxt source
-          >>=? fun source ->
+          map_consensus_key ~mapped_keys ctxt source
+          >>=? fun (source, mapped_keys) ->
           let ctxt = record_internal_nonce ctxt nonce in
           apply_manager_operation_content
             ctxt
@@ -1155,6 +1180,7 @@ let apply_internal_operations ctxt mode ~payer ~chain_id ops =
             ~payer
             ~chain_id
             ~internal:true
+            ~mapped_keys
             operation )
         >>= function
         | Error errors ->
@@ -1163,13 +1189,15 @@ let apply_internal_operations ctxt mode ~payer ~chain_id ops =
                 (op, Failed (manager_kind op.operation, errors))
             in
             let skipped = skip rest in
-            Lwt.return (Failure, List.rev (skipped @ (result :: applied)))
-        | Ok (ctxt, result, emitted) ->
+            Lwt.return
+              (Failure, List.rev (skipped @ (result :: applied)), mapped_keys)
+        | Ok (ctxt, result, emitted, mapped_keys) ->
             apply
               ctxt
               ( Internal_manager_operation_result (op, Applied result)
               :: applied )
-              (rest @ emitted) )
+              (rest @ emitted)
+              mapped_keys )
     | Internal_baker_operation ({baker; operation; nonce} as op) :: rest -> (
         ( if internal_nonce_already_recorded ctxt nonce then
           fail (Internal_operation_replay (Internal_baker_operation op))
@@ -1183,14 +1211,16 @@ let apply_internal_operations ctxt mode ~payer ~chain_id ops =
                 (op, Failed (baker_kind op.operation, errors))
             in
             let skipped = skip rest in
-            Lwt.return (Failure, List.rev (skipped @ (result :: applied)))
+            Lwt.return
+              (Failure, List.rev (skipped @ (result :: applied)), mapped_keys)
         | Ok (ctxt, result, emitted) ->
             apply
               ctxt
               (Internal_baker_operation_result (op, Applied result) :: applied)
-              (rest @ emitted) )
+              (rest @ emitted)
+              mapped_keys )
   in
-  apply ctxt [] ops
+  apply ctxt [] ops mapped_keys
 
 let precheck_manager_contents (type kind) ctxt
     (op : kind Kind.manager contents) : context tzresult Lwt.t =
@@ -1199,7 +1229,7 @@ let precheck_manager_contents (type kind) ctxt
     op
   in
   map_contract ctxt (Contract.implicit_contract source)
-  >>=? fun source_contract ->
+  >>=? fun (source_contract, _mapped_keys) ->
   Gas.check_limit ctxt gas_limit
   >>?= fun () ->
   let ctxt = Gas.set_limit ctxt gas_limit in
@@ -1250,55 +1280,65 @@ let precheck_manager_contents (type kind) ctxt
   >>=? fun ctxt -> Lwt.return (add_fees ctxt fee)
 
 let apply_manager_contents (type kind) ctxt mode chain_id
-    (op : kind Kind.manager contents) :
+    (op : kind Kind.manager contents) ~(mapped_keys : Mapped_key_set.t) :
     ( success_or_failure
     * kind manager_operation_result
-    * packed_internal_operation_result list )
+    * packed_internal_operation_result list
+    * Mapped_key_set.t )
+    tzresult
     Lwt.t =
   let (Manager_operation {source; operation; gas_limit; storage_limit}) = op in
   (* We do not expose the internal scaling to the users. Instead, we multiply
        the specified gas limit by the internal scaling. *)
   let ctxt = Gas.set_limit ctxt gas_limit in
   let ctxt = Fees.start_counting_storage_fees ctxt in
-  map_consensus_key ctxt (Contract.implicit_contract source)
-  >>=? (fun source ->
-         apply_manager_operation_content
-           ctxt
-           mode
-           ~source
-           ~payer:source
-           ~internal:false
-           ~chain_id
-           operation
-         >>=? fun apply_result -> return (source, apply_result))
+  map_consensus_key ~mapped_keys ctxt (Contract.implicit_contract source)
+  >>=? fun (source, mapped_keys) ->
+  apply_manager_operation_content
+    ctxt
+    mode
+    ~source
+    ~payer:source
+    ~internal:false
+    ~mapped_keys
+    ~chain_id
+    operation
   >>= function
-  | Ok (source, (ctxt, operation_results, internal_operations)) -> (
+  | Ok (ctxt, operation_results, internal_operations, mapped_keys) -> (
       apply_internal_operations
         ctxt
         mode
         ~payer:source
         ~chain_id
+        ~mapped_keys
         internal_operations
       >>= function
-      | (Success ctxt, internal_operations_results) -> (
+      | (Success ctxt, internal_operations_results, mapped_keys) -> (
           Fees.burn_storage_fees
             ctxt
             ~storage_limit
             ~payer:(contract_of_mapped_key source)
           >|= function
           | Ok ctxt ->
-              ( Success ctxt,
-                Applied operation_results,
-                internal_operations_results )
+              ok
+                ( Success ctxt,
+                  Applied operation_results,
+                  internal_operations_results,
+                  mapped_keys )
           | Error errors ->
-              ( Failure,
-                Backtracked (operation_results, Some errors),
-                internal_operations_results ) )
-      | (Failure, internal_operations_results) ->
-          Lwt.return
-            (Failure, Applied operation_results, internal_operations_results) )
+              ok
+                ( Failure,
+                  Backtracked (operation_results, Some errors),
+                  internal_operations_results,
+                  mapped_keys ) )
+      | (Failure, internal_operations_results, mapped_keys) ->
+          return
+            ( Failure,
+              Applied operation_results,
+              internal_operations_results,
+              mapped_keys ) )
   | Error errors ->
-      Lwt.return (Failure, Failed (manager_kind operation, errors), [])
+      return (Failure, Failed (manager_kind operation, errors), [], mapped_keys)
 
 let skipped_operation_result :
     type kind. kind manager_operation -> kind manager_operation_result =
@@ -1316,36 +1356,19 @@ let rec mark_skipped :
     type kind.
     Alpha_context.t ->
     baker:baker_hash ->
+    mapped_keys:Mapped_key_set.t ->
     Level.t ->
     kind Kind.manager contents_list ->
-    kind Kind.manager contents_result_list tzresult Lwt.t =
- fun ctxt ~baker level -> function
+    (kind Kind.manager contents_result_list * Mapped_key_set.t) tzresult Lwt.t
+    =
+ fun ctxt ~baker ~mapped_keys level -> function
   | Single (Manager_operation {source; fee; operation}) ->
       let source = Contract.implicit_contract source in
-      map_contract ctxt source
-      >>=? fun source ->
+      map_contract ~mapped_keys ctxt source
+      >>=? fun (source, mapped_keys) ->
       return
-      @@ Single_result
-           (Manager_operation_result
-              {
-                balance_updates =
-                  Receipt.cleanup_balance_updates
-                    [ (Contract source, Debited fee, Block_application);
-                      ( Fees (baker, level.cycle),
-                        Credited fee,
-                        Block_application ) ];
-                operation_result = skipped_operation_result operation;
-                internal_operation_results = [];
-              })
-  | Cons (Manager_operation {source; fee; operation}, rest) ->
-      let source = Contract.implicit_contract source in
-      map_contract ctxt source
-      >>=? fun source ->
-      mark_skipped ctxt ~baker level rest
-      >>=? fun skipped_rest ->
-      return
-      @@ Cons_result
-           ( Manager_operation_result
+        ( Single_result
+            (Manager_operation_result
                {
                  balance_updates =
                    Receipt.cleanup_balance_updates
@@ -1355,8 +1378,29 @@ let rec mark_skipped :
                          Block_application ) ];
                  operation_result = skipped_operation_result operation;
                  internal_operation_results = [];
-               },
-             skipped_rest )
+               }),
+          mapped_keys )
+  | Cons (Manager_operation {source; fee; operation}, rest) ->
+      let source = Contract.implicit_contract source in
+      map_contract ~mapped_keys ctxt source
+      >>=? fun (source, mapped_keys) ->
+      mark_skipped ctxt ~baker ~mapped_keys level rest
+      >>=? fun (skipped_rest, mapped_keys) ->
+      return
+        ( Cons_result
+            ( Manager_operation_result
+                {
+                  balance_updates =
+                    Receipt.cleanup_balance_updates
+                      [ (Contract source, Debited fee, Block_application);
+                        ( Fees (baker, level.cycle),
+                          Credited fee,
+                          Block_application ) ];
+                  operation_result = skipped_operation_result operation;
+                  internal_operation_results = [];
+                },
+              skipped_rest ),
+          mapped_keys )
 
 let rec precheck_manager_contents_list :
     type kind.
@@ -1425,17 +1469,25 @@ let rec apply_manager_contents_list_rec :
     baker_hash ->
     Chain_id.t ->
     kind Kind.manager contents_list ->
-    (success_or_failure * kind Kind.manager contents_result_list) tzresult
+    mapped_keys:Mapped_key_set.t ->
+    ( success_or_failure
+    * kind Kind.manager contents_result_list
+    * Mapped_key_set.t )
+    tzresult
     Lwt.t =
- fun ctxt mode baker chain_id contents_list ->
+ fun ctxt mode baker chain_id contents_list ~mapped_keys ->
   let level = Level.current ctxt in
   match contents_list with
   | Single (Manager_operation {source; fee; _} as op) ->
       let source = Contract.implicit_contract source in
-      map_contract ctxt source
-      >>=? fun source ->
-      apply_manager_contents ctxt mode chain_id op
-      >|= fun (ctxt_result, operation_result, internal_operation_results) ->
+      map_consensus_key ~mapped_keys ctxt source
+      >>=? fun (mapped_source, mapped_keys) ->
+      let source = contract_of_mapped_key mapped_source in
+      apply_manager_contents ctxt mode chain_id op ~mapped_keys
+      >|=? fun ( ctxt_result,
+                 operation_result,
+                 internal_operation_results,
+                 mapped_keys ) ->
       let result =
         Manager_operation_result
           {
@@ -1448,14 +1500,15 @@ let rec apply_manager_contents_list_rec :
             internal_operation_results;
           }
       in
-      ok (ctxt_result, Single_result result)
+      (ctxt_result, Single_result result, mapped_keys)
   | Cons ((Manager_operation {source; fee; _} as op), rest) -> (
       let source = Contract.implicit_contract source in
-      map_contract ctxt source
-      >>=? fun source ->
-      apply_manager_contents ctxt mode chain_id op
-      >>= function
-      | (Failure, operation_result, internal_operation_results) ->
+      map_consensus_key ~mapped_keys ctxt source
+      >>=? fun (mapped_source, mapped_keys) ->
+      let source = contract_of_mapped_key mapped_source in
+      apply_manager_contents ctxt mode chain_id op ~mapped_keys
+      >>=? function
+      | (Failure, operation_result, internal_operation_results, mapped_keys) ->
           let result =
             Manager_operation_result
               {
@@ -1469,9 +1522,13 @@ let rec apply_manager_contents_list_rec :
                 internal_operation_results;
               }
           in
-          mark_skipped ctxt ~baker level rest
-          >|=? fun skipped -> (Failure, Cons_result (result, skipped))
-      | (Success ctxt, operation_result, internal_operation_results) ->
+          mark_skipped ctxt ~baker ~mapped_keys level rest
+          >|=? fun (skipped, mapped_keys) ->
+          (Failure, Cons_result (result, skipped), mapped_keys)
+      | ( Success ctxt,
+          operation_result,
+          internal_operation_results,
+          mapped_keys ) ->
           let result =
             Manager_operation_result
               {
@@ -1485,9 +1542,15 @@ let rec apply_manager_contents_list_rec :
                 internal_operation_results;
               }
           in
-          apply_manager_contents_list_rec ctxt mode baker chain_id rest
-          >|=? fun (ctxt_result, results) ->
-          (ctxt_result, Cons_result (result, results)) )
+          apply_manager_contents_list_rec
+            ctxt
+            mode
+            baker
+            chain_id
+            rest
+            ~mapped_keys
+          >|=? fun (ctxt_result, results, mapped_keys) ->
+          (ctxt_result, Cons_result (result, results), mapped_keys) )
 
 let mark_backtracked results =
   let mark_manager_operation_result :
@@ -1550,17 +1613,24 @@ let mark_backtracked results =
   [@@coq_axiom "non-top-level mutual recursion"]
 
 let apply_manager_contents_list ctxt mode baker chain_id contents_list =
-  apply_manager_contents_list_rec ctxt mode baker chain_id contents_list
-  >>=? fun (ctxt_result, results) ->
+  apply_manager_contents_list_rec
+    ctxt
+    mode
+    baker
+    chain_id
+    contents_list
+    ~mapped_keys:Mapped_key_set.empty
+  >>=? fun (ctxt_result, results, mapped_keys) ->
   match ctxt_result with
   | Failure ->
-      return (ctxt (* backtracked *), mark_backtracked results)
+      return (ctxt (* backtracked *), mark_backtracked results, mapped_keys)
   | Success ctxt ->
-      Lazy_storage.cleanup_temporaries ctxt >|= fun ctxt -> ok (ctxt, results)
+      Lazy_storage.cleanup_temporaries ctxt
+      >|= fun ctxt -> ok (ctxt, results, mapped_keys)
 
 let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
     (operation : kind operation) (contents_list : kind contents_list) :
-    (context * kind contents_result_list) tzresult Lwt.t =
+    (context * kind contents_result_list * Mapped_key_set.t) tzresult Lwt.t =
   match contents_list with
   | Single
       (Endorsement_with_slot
@@ -1624,7 +1694,8 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
                               Block_application ) ];
                       baker;
                       slots;
-                    })) )
+                    })),
+            Mapped_key_set.empty )
   | Single (Endorsement _) ->
       fail Unwrapped_endorsement
   | Single (Seed_nonce_revelation {level; nonce}) ->
@@ -1642,7 +1713,8 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
             (Seed_nonce_revelation_result
                [ ( Rewards (baker, level.cycle),
                    Credited seed_nonce_revelation_tip,
-                   Block_application ) ]) ) )
+                   Block_application ) ]),
+          Mapped_key_set.empty ) )
   | Single (Double_endorsement_evidence {op1; op2; slot}) -> (
     match (op1.protocol_data.contents, op2.protocol_data.contents) with
     | (Single (Endorsement e1), Single (Endorsement e2))
@@ -1698,7 +1770,8 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
                         Block_application );
                       ( Rewards (baker, current_cycle),
                         Credited reward,
-                        Block_application ) ])) )
+                        Block_application ) ])),
+            Mapped_key_set.empty )
     | (_, _) ->
         fail Invalid_double_endorsement_evidence )
   | Single (Double_baking_evidence {bh1; bh2}) ->
@@ -1773,7 +1846,8 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
                       Block_application );
                     ( Rewards (baker, current_cycle),
                       Credited reward,
-                      Block_application ) ])) ) )
+                      Block_application ) ])),
+          Mapped_key_set.empty ) )
   | Single (Activate_account {id = pkh; activation_code}) -> (
       let blinded_pkh =
         Blinded_public_key_hash.of_ed25519_pkh activation_code pkh
@@ -1791,10 +1865,11 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
           ( ctxt,
             Single_result
               (Activate_account_result
-                 [(Contract contract, Credited amount, Block_application)]) ) )
+                 [(Contract contract, Credited amount, Block_application)]),
+            Mapped_key_set.empty ) )
   | Single (Proposals {source; period; proposals}) ->
       map_delegate ctxt source
-      >>=? fun baker ->
+      >>=? fun (baker, mapped_keys) ->
       Baker.get_consensus_key ctxt baker
       >>=? fun key ->
       Operation.check_signature key chain_id operation
@@ -1806,10 +1881,10 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
         (Wrong_voting_period (current_period, period))
       >>?= fun () ->
       Amendment.record_proposals ctxt baker proposals
-      >|=? fun ctxt -> (ctxt, Single_result Proposals_result)
+      >|=? fun ctxt -> (ctxt, Single_result Proposals_result, mapped_keys)
   | Single (Ballot {source; period; proposal; ballot}) ->
       map_delegate ctxt source
-      >>=? fun baker ->
+      >>=? fun (baker, mapped_keys) ->
       Baker.get_consensus_key ctxt baker
       >>=? fun key ->
       Operation.check_signature key chain_id operation
@@ -1821,7 +1896,7 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
         (Wrong_voting_period (current_period, period))
       >>?= fun () ->
       Amendment.record_ballot ctxt baker proposal ballot
-      >|=? fun ctxt -> (ctxt, Single_result Ballot_result)
+      >|=? fun ctxt -> (ctxt, Single_result Ballot_result, mapped_keys)
   | Single (Failing_noop _) ->
       (* Failing_noop _ always fails *)
       fail Failing_noop_error
@@ -1846,10 +1921,11 @@ let apply_operation ctxt chain_id mode pred_block baker hash operation =
     baker
     operation
     operation.protocol_data.contents
-  >|=? fun (ctxt, result) ->
+  >|=? fun (ctxt, result, mapped_keys) ->
   let ctxt = Gas.set_unlimited ctxt in
   let ctxt = Contract.unset_origination_nonce ctxt in
-  (ctxt, {contents = result})
+  let mapped_keys = list_of_mapped_keys mapped_keys in
+  (ctxt, {contents = result; mapped_keys})
 
 let may_snapshot_roll ctxt =
   let level = Alpha_context.Level.current ctxt in

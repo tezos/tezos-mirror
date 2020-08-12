@@ -31,8 +31,18 @@
 
 open Alpha_context
 
+type mapped_key = {
+  consensus_key : Signature.Public_key_hash.t;
+  baker : Baker_hash.t;
+}
+
 (** Result of applying a {!Operation.t}. Follows the same structure. *)
-type 'kind operation_metadata = {contents : 'kind contents_result_list}
+type 'kind operation_metadata = {
+  contents : 'kind contents_result_list;
+  mapped_keys : mapped_key list;
+      (* A set of baker's active consensus keys that were mapped to the baker's
+         contract *)
+}
 
 and packed_operation_metadata =
   | Operation_metadata : 'kind operation_metadata -> packed_operation_metadata
@@ -263,3 +273,5 @@ type block_metadata = {
 }
 
 val block_metadata_encoding : block_metadata Data_encoding.encoding
+
+val mapped_key_encoding : mapped_key Data_encoding.encoding

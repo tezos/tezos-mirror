@@ -895,9 +895,10 @@ module Scripts = struct
               partial_precheck_manager_contents ctxt op
               >>=? fun ctxt -> partial_precheck_manager_contents_list ctxt rest
         in
-        let ret contents =
+        let ret contents mapped_keys =
+          let mapped_keys = Apply.list_of_mapped_keys mapped_keys in
           ( Operation_data protocol_data,
-            Apply_results.Operation_metadata {contents} )
+            Apply_results.Operation_metadata {contents; mapped_keys} )
         in
         let operation : _ operation = {shell; protocol_data} in
         let hash = Operation.hash {shell; protocol_data} in
@@ -908,12 +909,12 @@ module Scripts = struct
             partial_precheck_manager_contents_list ctxt op
             >>=? fun ctxt ->
             Apply.apply_manager_contents_list ctxt Optimized baker chain_id op
-            >|=? fun (_ctxt, result) -> ret result
+            >|=? fun (_ctxt, result, mapped_keys) -> ret result mapped_keys
         | Cons (Manager_operation _, _) as op ->
             partial_precheck_manager_contents_list ctxt op
             >>=? fun ctxt ->
             Apply.apply_manager_contents_list ctxt Optimized baker chain_id op
-            >|=? fun (_ctxt, result) -> ret result
+            >|=? fun (_ctxt, result, mapped_keys) -> ret result mapped_keys
         | _ ->
             Apply.apply_contents_list
               ctxt
@@ -923,7 +924,7 @@ module Scripts = struct
               baker
               operation
               operation.protocol_data.contents
-            >|=? fun (_ctxt, result) -> ret result) ;
+            >|=? fun (_ctxt, result, mapped_keys) -> ret result mapped_keys) ;
     register0 S.entrypoint_type (fun ctxt () (expr, entrypoint) ->
         let ctxt = Gas.set_unlimited ctxt in
         let legacy = false in
