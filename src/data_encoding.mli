@@ -180,6 +180,8 @@ module Encoding : sig
        encodings do not collide)). *)
   val result : 'a encoding -> 'b encoding -> ('a, 'b) result encoding
 
+  val legacy_result : 'a encoding -> 'b encoding -> ('a, 'b) result encoding
+
   (** Array combinator.
       - encoded as an array in JSON
       - encoded as the concatenation of all the element in binary

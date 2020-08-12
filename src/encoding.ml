@@ -1007,6 +1007,24 @@ let result ok_enc error_enc =
     [
       case
         (Tag 1)
+        (obj1 (req "ok" ok_enc))
+        ~title:"Ok"
+        (function Ok x -> Some x | Error _ -> None)
+        (fun x -> Ok x);
+      case
+        (Tag 0)
+        (obj1 (req "error" error_enc))
+        ~title:"Result"
+        (function Ok _ -> None | Error x -> Some x)
+        (fun x -> Error x);
+    ]
+
+let legacy_result ok_enc error_enc =
+  union
+    ~tag_size:`Uint8
+    [
+      case
+        (Tag 1)
         ok_enc
         ~title:"Ok"
         (function Ok x -> Some x | Error _ -> None)
