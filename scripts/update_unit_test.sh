@@ -25,6 +25,7 @@ for lib in `find src/ vendors/ -name test -type d | LC_COLLATE=C sort` ; do
   if git ls-files --error-unmatch $lib  > /dev/null 2>&1; then
     nametest=${lib%%/test}
     name=$nametest
+    name=${name##src/bin_}
     name=${name##src/lib_}
     name=${name##vendors/}
     cat >> $tmp <<EOF
