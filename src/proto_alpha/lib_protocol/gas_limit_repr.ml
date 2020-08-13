@@ -67,8 +67,6 @@ type error += Operation_quota_exceeded (* `Temporary *)
 
 let allocation_weight = Z.of_int (scaling_factor * 2)
 
-let atomic_step_weight = Z.of_int 1
-
 let step_weight = Z.of_int scaling_factor
 
 let read_base_weight = Z.of_int (scaling_factor * 100)
@@ -105,7 +103,7 @@ let alloc_bytes_cost n = alloc_cost ((n + 7) / 8)
 
 let alloc_bits_cost n = alloc_cost ((n + 63) / 64)
 
-let atomic_step_cost n = Z.mul atomic_step_weight (Z.of_int (2 * n))
+let atomic_step_cost n = Z.of_int n
 
 let step_cost n = Z.mul step_weight (Z.of_int n)
 
