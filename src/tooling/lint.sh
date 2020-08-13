@@ -132,6 +132,15 @@ format_inplace () {
 }
 
 update_gitlab_ci_yml () {
+    # Check that a rule is not defined twice, which would result in the first
+    # one being ignored. Gitlab linter doesn't warn for it
+    repeated=$(grep '^[^ #]' .gitlab-ci.yml | sort | uniq --repeated)
+    if [ -n "$repeated" ]; then
+        echo ".gitlab-ci.yml contains repeated rules:"
+        echo "$repeated"
+        exit 1
+    fi
+    # Update generated test sections
     for script in scripts/update_*_test.sh; do
         echo "Running $script..."
         $script
