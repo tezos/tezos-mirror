@@ -16,8 +16,8 @@ src_dir="$(dirname "$script_dir")"
 tmp=$(mktemp)
 
 # 1: Extract the beginning of the CI configuration file. Everything up to
-# the line ##BEGIN_UNITEST## is added to the temporary file.
-csplit --quiet --prefix="$tmp" "$src_dir/.gitlab-ci.yml" /##BEGIN_UNITEST##/+1
+# the line ##BEGIN_UNITTEST## is added to the temporary file.
+csplit --quiet --prefix="$tmp" "$src_dir/.gitlab-ci.yml" /##BEGIN_UNITTEST##/+1
 mv "$tmp"00 "$tmp"
 rm "$tmp"0*
 
@@ -42,8 +42,8 @@ done
 
 
 # 3: Extract the end of the CI configuration file. Everything after the line
-# ##END_UNITEST## is added to the temporary file.
-csplit --quiet --prefix="$tmp" "$src_dir/.gitlab-ci.yml" %##END_UNITEST##%
+# ##END_UNITTEST## is added to the temporary file.
+csplit --quiet --prefix="$tmp" "$src_dir/.gitlab-ci.yml" %##END_UNITTEST##%
 cat "$tmp"00 >> "$tmp"
 rm "$tmp"0*
 

@@ -115,7 +115,7 @@ build:
   retry: 2
 
 # this section is updated using the script scripts/update_unit_test.sh
-##BEGIN_UNITEST##
+##BEGIN_UNITTEST##
 unit:client:
   <<: *test_definition
   script:
@@ -231,7 +231,7 @@ unit:ocaml-uecc:
   script:
     - dune build @vendors/ocaml-uecc/runtest
 
-##END_UNITEST##
+##END_UNITTEST##
 
 unit:protocol_compiles:
   <<: *test_definition
