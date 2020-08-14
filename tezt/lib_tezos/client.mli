@@ -39,7 +39,7 @@ type t
     Default [base_dir] is a temporary directory
     which is always the same for each [name].
 
-    The node argument is used to know which port to give to the client with [-P].
+    The node argument is used to know which port the client should connect to.
     This node can be overridden for each command, as a client is not actually tied
     to a node. Most commands require a node to be specified (either with [create]
     or with the command itself). *)
@@ -94,7 +94,7 @@ val rpc :
   JSON.t Lwt.t
 
 (** Run [tezos-client rpc list]. *)
-val rpc_list : t -> string Lwt.t
+val rpc_list : ?node:Node.t -> t -> string Lwt.t
 
 (** {2 Admin Client Commands} *)
 

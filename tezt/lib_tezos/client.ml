@@ -71,33 +71,19 @@ let check_node_is_specified ?node command client =
     | (Some _, _) | (_, Some _) ->
         () )
 
-let base_args ?node client =
-  let node =
-    match client.mode with
-    | Mockup ->
-        None
-    | Client node_opt -> (
-      match (node, node_opt) with
-      | (Some node, _) | (None, Some node) ->
-          Some node
-      | (None, None) ->
-          None )
-  in
-  ( match node with
-  | None ->
+let base_dir_arg client = ["--base-dir"; client.base_dir]
+
+(* [?node] can be used to override the default node stored in the client.
+   Mockup nodes do not use [--endpoint] at all: RPCs are mocked up. *)
+let endpoint_arg ?node client =
+  match (client.mode, node) with
+  | (Mockup, _) | (Client None, None) ->
       []
-  | Some node ->
+  | (Client _, Some node) | (Client (Some node), None) ->
       ["--endpoint"; "http://localhost:" ^ string_of_int (Node.rpc_port node)]
-  )
-  @ ["--base-dir"; client.base_dir]
 
-let mode_args = function
-  | Client _ ->
-      [] (* It's the default mode *)
-  | Mockup ->
-      ["--mode"; "mockup"]
-
-let common_args ?node client = base_args ?node client @ mode_args client.mode
+let mode_arg client =
+  match client.mode with Client _ -> [] | Mockup -> ["--mode"; "mockup"]
 
 let spawn_command ?(needs_node = true) ?(admin = false) ?node client command =
   if needs_node then check_node_is_specified ?node command client ;
@@ -105,7 +91,7 @@ let spawn_command ?(needs_node = true) ?(admin = false) ?node client command =
     ~name:client.name
     ~color:client.color
     (if admin then client.admin_path else client.path)
-  @@ common_args ?node client @ command
+  @@ base_dir_arg client @ command
 
 let url_encode str =
   let buffer = Buffer.create (String.length str * 3) in
@@ -161,18 +147,19 @@ let rpc ?node ?data ?query_string meth path client : JSON.t Lwt.t =
       ~name:client.name
       ~color:client.color
       client.path
-      ( common_args ?node client
+      ( base_dir_arg client @ endpoint_arg ?node client @ mode_arg client
       @ ["rpc"; string_of_meth meth; full_path]
       @ data )
   in
   return (JSON.parse ~origin:(path ^ " response") output)
 
-let rpc_list client : string Lwt.t =
+let rpc_list ?node client : string Lwt.t =
   Process.run_and_read_stdout
     ~name:client.name
     ~color:client.color
     client.path
-    (common_args ?node:None client @ ["rpc"; "list"])
+    ( base_dir_arg client @ endpoint_arg ?node client @ mode_arg client
+    @ ["rpc"; "list"] )
 
 module Admin = struct
   let spawn_command = spawn_command ~admin:true
@@ -181,13 +168,19 @@ module Admin = struct
     spawn_command
       client
       ?node
-      ["connect"; "address"; "127.0.0.1:" ^ string_of_int (Node.net_port peer)]
+      ( endpoint_arg ?node client @ mode_arg client
+      @ [ "connect";
+          "address";
+          "127.0.0.1:" ^ string_of_int (Node.net_port peer) ] )
 
   let connect_address ?node ~peer client =
     spawn_connect_address ?node ~peer client |> Process.check
 
   let spawn_kick_peer ?node ~peer client =
-    spawn_command client ?node ["kick"; "peer"; peer]
+    spawn_command
+      client
+      ?node
+      (endpoint_arg ?node client @ mode_arg client @ ["kick"; "peer"; peer])
 
   let kick_peer ?node ~peer client =
     spawn_kick_peer ?node ~peer client |> Process.check
@@ -198,7 +191,8 @@ let spawn_import_secret_key ?node client (key : Constant.key) =
     ~needs_node:false
     ?node
     client
-    ["import"; "secret"; "key"; key.alias; key.secret]
+    ( endpoint_arg ?node client @ mode_arg client
+    @ ["import"; "secret"; "key"; key.alias; key.secret] )
 
 let import_secret_key ?node client key =
   spawn_import_secret_key ?node client key |> Process.check
@@ -224,20 +218,21 @@ let spawn_activate_protocol ?node ?(protocol = Constant.alpha) ?(fitness = 1)
   spawn_command
     client
     ?node
-    [ "activate";
-      "protocol";
-      protocol.hash;
-      "with";
-      "fitness";
-      string_of_int fitness;
-      "and";
-      "key";
-      key;
-      "and";
-      "parameters";
-      protocol.parameter_file;
-      "--timestamp";
-      timestamp ]
+    ( endpoint_arg ?node client @ mode_arg client
+    @ [ "activate";
+        "protocol";
+        protocol.hash;
+        "with";
+        "fitness";
+        string_of_int fitness;
+        "and";
+        "key";
+        key;
+        "and";
+        "parameters";
+        protocol.parameter_file;
+        "--timestamp";
+        timestamp ] )
 
 let activate_protocol ?node ?protocol ?fitness ?key ?timestamp ?timestamp_delay
     client =
@@ -258,8 +253,9 @@ let spawn_bake_for ?node ?(key = Constant.bootstrap1.alias)
     ~needs_node
     client
     ?node
-    ( "bake" :: "for" :: key
-    :: (if minimal_timestamp then ["--minimal-timestamp"] else []) )
+    ( endpoint_arg ?node client @ mode_arg client
+    @ "bake" :: "for" :: key
+      :: (if minimal_timestamp then ["--minimal-timestamp"] else []) )
 
 let bake_for ?node ?key ?minimal_timestamp client =
   spawn_bake_for ?node ?key ?minimal_timestamp client |> Process.check
@@ -270,7 +266,8 @@ let spawn_transfer ?node ~amount ~giver ~receiver client =
     ~needs_node
     ?node
     client
-    ["transfer"; string_of_int amount; "from"; giver; "to"; receiver]
+    ( endpoint_arg ?node client @ mode_arg client
+    @ ["transfer"; string_of_int amount; "from"; giver; "to"; receiver] )
 
 let transfer ?node ~amount ~giver ~receiver client =
   spawn_transfer ?node ~amount ~giver ~receiver client |> Process.check
@@ -288,7 +285,8 @@ let get_balance_for ?node ~account client =
       ~name:client.name
       ~color:client.color
       client.path
-      (common_args ?node client @ ["get"; "balance"; "for"; account])
+      ( base_dir_arg client @ endpoint_arg ?node client @ mode_arg client
+      @ ["get"; "balance"; "for"; account] )
   in
   return @@ extract_balance output
 
