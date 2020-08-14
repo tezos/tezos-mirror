@@ -38,7 +38,7 @@ let test_rpc_list protocol =
     ~title:"rpc list (mockup)"
     ~tags:["mockup"; "client"; "rpc"]
   @@ fun () ->
-  let* client = Client.init_mockup ~protocol in
+  let* client = Client.init_mockup ~protocol () in
   let* _ = Client.rpc_list client in
   Lwt.return_unit
 
@@ -70,7 +70,7 @@ let test_transfer ~(protocol : Constant.protocol) =
     ~tags:["mockup"; "client"; "transfer"; protocol.tag]
   @@ fun () ->
   let (giver, amount, receiver) = transfer_data in
-  let* client = Client.init_mockup ~protocol in
+  let* client = Client.init_mockup ~protocol () in
   let* giver_balance_before = Client.get_balance_for ~account:giver client in
   let* receiver_balance_before =
     Client.get_balance_for ~account:receiver client

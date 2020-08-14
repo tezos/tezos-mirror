@@ -300,16 +300,6 @@ let spawn_create_mockup ?(protocol = Constant.alpha) client =
 let create_mockup ?protocol client =
   spawn_create_mockup ?protocol client |> Process.check
 
-let init_mockup ~(protocol : Constant.protocol) =
-  (* To create the mockup, we don't want --mode mockup to be specified,
-     as per the public tutorial:
-     https://tezos.gitlab.io/user/mockup.html *)
-  let mockup_creator = create () in
-  let* () = create_mockup ~protocol mockup_creator in
-  let base_dir = mockup_creator.base_dir in
-  (* but then we want it in the client we use, hence: *)
-  return @@ create_with_mode ~base_dir Mockup
-
 let spawn_submit_proposals ?node ?(key = Constant.bootstrap1.alias) ~proto_hash
     client =
   spawn_command client ?node ["submit"; "proposals"; "for"; key; proto_hash]
@@ -342,4 +332,11 @@ let init ?path ?admin_path ?name ?color ?base_dir ?node () =
   let* () =
     Lwt_list.iter_s (import_secret_key client) Constant.all_secret_keys
   in
+  return client
+
+let init_mockup ?path ?admin_path ?name ?color ?base_dir ?protocol () =
+  let client =
+    create_with_mode ?path ?admin_path ?name ?color ?base_dir Mockup
+  in
+  let* () = create_mockup ?protocol client in
   return client

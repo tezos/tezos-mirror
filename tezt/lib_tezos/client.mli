@@ -215,10 +215,8 @@ val spawn_submit_ballot :
 
 (** {2 High-Level Functions} *)
 
-(** Creates a mockup client, running [create mockup] under the hood. *)
-val init_mockup : protocol:Constant.protocol -> t Lwt.t
-
-(** Create a client and import all secret keys listed in {!Constant.all_secret_keys}. *)
+(** Create a client with mode [Client] and import all secret keys
+    listed in {!Constant.all_secret_keys}. *)
 val init :
   ?path:string ->
   ?admin_path:string ->
@@ -226,5 +224,19 @@ val init :
   ?color:Log.Color.t ->
   ?base_dir:string ->
   ?node:Node.t ->
+  unit ->
+  t Lwt.t
+
+(** Create a client with mode [Mockup] and run [create mockup].
+
+    Contrary to [init], this does not import any secret key, because
+    [tezos-client create mockup] already initializes the mockup with bootstrap keys. *)
+val init_mockup :
+  ?path:string ->
+  ?admin_path:string ->
+  ?name:string ->
+  ?color:Log.Color.t ->
+  ?base_dir:string ->
+  ?protocol:Constant.protocol ->
   unit ->
   t Lwt.t
