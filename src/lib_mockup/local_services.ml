@@ -266,7 +266,7 @@ let block_hash (rpc_context : Tezos_protocol_environment.rpc_context) =
       RPC_answer.return rpc_context.block_hash)
 
 let live_blocks (mockup_env : Registration.mockup_environment)
-    (rpc_context : Tezos_protocol_environment.rpc_context) =
+    (rpc_context : Tezos_protocol_environment.rpc_context) chain_id =
   let (module Mockup_environment) = mockup_env in
   Directory.prefix
     (Tezos_rpc.RPC_path.prefix
@@ -277,9 +277,14 @@ let live_blocks (mockup_env : Registration.mockup_environment)
   @@ Directory.register
        Directory.empty
        Mockup_environment.Block_services.S.live_blocks
-       (fun _ () () ->
-         let set = Block_hash.Set.singleton rpc_context.block_hash in
-         RPC_answer.return set)
+       (fun (((), chain), _block) () () ->
+         check_chain_chain_id chain chain_id
+         >>= function
+         | Error errs ->
+             RPC_answer.fail errs
+         | Ok () ->
+             let set = Block_hash.Set.singleton rpc_context.block_hash in
+             RPC_answer.return set)
 
 let preapply_block (mockup_env : Registration.mockup_environment)
     (rpc_context : Tezos_protocol_environment.rpc_context) chain_id =
@@ -787,6 +792,6 @@ let build_shell_directory (base_dir : string)
        chain_id
        rpc_context
        write_context_callback) ;
-  merge (live_blocks mockup_env rpc_context) ;
+  merge (live_blocks mockup_env rpc_context chain_id) ;
   merge (preapply_block mockup_env rpc_context chain_id) ;
   !directory
