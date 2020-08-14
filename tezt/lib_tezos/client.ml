@@ -243,6 +243,12 @@ let spawn_transfer ?node ~amount ~giver ~receiver client =
 let transfer ?node ~amount ~giver ~receiver client =
   spawn_transfer ?node ~amount ~giver ~receiver client |> Process.check
 
+let spawn_get_balance_for ?node ~account client =
+  spawn_command
+    client
+    ( endpoint_arg ?node client @ mode_arg client
+    @ ["get"; "balance"; "for"; account] )
+
 let get_balance_for ?node ~account client =
   let extract_balance (client_output : string) : float =
     match client_output =~* rex "(\\d+(?:\\.\\d+)?) \u{A729}" with
@@ -251,14 +257,9 @@ let get_balance_for ?node ~account client =
     | Some balance ->
         float_of_string balance
   in
-  let* output =
-    Process.run_and_read_stdout
-      ~name:client.name
-      ~color:client.color
-      client.path
-      ( base_dir_arg client @ endpoint_arg ?node client @ mode_arg client
-      @ ["get"; "balance"; "for"; account] )
-  in
+  let process = spawn_get_balance_for ?node ~account client in
+  let* () = Process.check process
+  and* output = read_all (Process.stdout process) in
   return @@ extract_balance output
 
 let spawn_create_mockup ?(protocol = Constant.alpha) client =

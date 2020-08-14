@@ -84,3 +84,10 @@ let with_open_in file read_f =
   let chan = open_in file in
   try (let value = read_f chan in close_in chan; value)
   with x -> close_in chan; raise x
+
+let read_all io =
+  let stream = Lwt_io.read_lines io in
+  let buffer = Buffer.create 1024 in
+  let* () = Lwt_stream.iter (Buffer.add_string buffer) stream in
+  let result = Buffer.contents buffer in
+  Buffer.reset buffer ; return result

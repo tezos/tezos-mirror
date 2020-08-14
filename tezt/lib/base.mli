@@ -110,3 +110,6 @@ val with_open_out : string -> (out_channel -> unit) ->unit
 (* Open file, use function to read input then close the input. In case of
    error while reading, the channel is closed before raising the exception *)
 val with_open_in : string -> (in_channel -> 'a) -> 'a
+
+(** Read all contents from an input channel. *)
+val read_all : Lwt_io.input_channel -> string Lwt.t

@@ -183,6 +183,9 @@ val spawn_transfer :
 (** Run [tezos-client get balance for]. *)
 val get_balance_for : ?node:Node.t -> account:string -> t -> float Lwt.t
 
+(** Same as [get_balance_for], but do not wait for the process to exit. *)
+val spawn_get_balance_for : ?node:Node.t -> account:string -> t -> Process.t
+
 (** Run [tezos-client create mockup].
 
     Default [protocol] is {!Constant.alpha}. *)
