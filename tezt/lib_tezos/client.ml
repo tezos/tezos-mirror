@@ -25,8 +25,6 @@
 
 type mode = Client of Node.t option | Mockup
 
-let mode_needs_node = function Client _ -> true | Mockup -> false
-
 type t = {
   path : string;
   admin_path : string;
@@ -57,20 +55,6 @@ let create_with_mode ?(path = Constant.tezos_client)
 let create ?path ?admin_path ?name ?color ?base_dir ?node () =
   create_with_mode ?path ?admin_path ?name ?color ?base_dir @@ Client node
 
-let check_node_is_specified ?node command client =
-  match client.mode with
-  | Mockup ->
-      ()
-  | Client node_opt -> (
-    match (node, node_opt) with
-    | (None, None) ->
-        Test.fail
-          "%s has no node, cannot run command: %s"
-          client.name
-          (String.concat " " command)
-    | (Some _, _) | (_, Some _) ->
-        () )
-
 let base_dir_arg client = ["--base-dir"; client.base_dir]
 
 (* [?node] can be used to override the default node stored in the client.
@@ -85,8 +69,7 @@ let endpoint_arg ?node client =
 let mode_arg client =
   match client.mode with Client _ -> [] | Mockup -> ["--mode"; "mockup"]
 
-let spawn_command ?(needs_node = true) ?(admin = false) ?node client command =
-  if needs_node then check_node_is_specified ?node command client ;
+let spawn_command ?(admin = false) client command =
   Process.spawn
     ~name:client.name
     ~color:client.color
@@ -133,7 +116,6 @@ let string_of_query_string = function
       "?" ^ String.concat "&" @@ List.map (fun (k, v) -> k ^ "=" ^ v) qs'
 
 let rpc ?node ?data ?query_string meth path client : JSON.t Lwt.t =
-  check_node_is_specified ?node ["rpc"] client ;
   let data =
     Option.fold ~none:[] ~some:(fun x -> ["with"; JSON.encode_u x]) data
   in
@@ -167,7 +149,6 @@ module Admin = struct
   let spawn_connect_address ?node ~peer client =
     spawn_command
       client
-      ?node
       ( endpoint_arg ?node client @ mode_arg client
       @ [ "connect";
           "address";
@@ -179,7 +160,6 @@ module Admin = struct
   let spawn_kick_peer ?node ~peer client =
     spawn_command
       client
-      ?node
       (endpoint_arg ?node client @ mode_arg client @ ["kick"; "peer"; peer])
 
   let kick_peer ?node ~peer client =
@@ -188,8 +168,6 @@ end
 
 let spawn_import_secret_key ?node client (key : Constant.key) =
   spawn_command
-    ~needs_node:false
-    ?node
     client
     ( endpoint_arg ?node client @ mode_arg client
     @ ["import"; "secret"; "key"; key.alias; key.secret] )
@@ -217,7 +195,6 @@ let spawn_activate_protocol ?node ?(protocol = Constant.alpha) ?(fitness = 1)
   in
   spawn_command
     client
-    ?node
     ( endpoint_arg ?node client @ mode_arg client
     @ [ "activate";
         "protocol";
@@ -248,11 +225,8 @@ let activate_protocol ?node ?protocol ?fitness ?key ?timestamp ?timestamp_delay
 
 let spawn_bake_for ?node ?(key = Constant.bootstrap1.alias)
     ?(minimal_timestamp = true) client =
-  let needs_node = mode_needs_node client.mode in
   spawn_command
-    ~needs_node
     client
-    ?node
     ( endpoint_arg ?node client @ mode_arg client
     @ "bake" :: "for" :: key
       :: (if minimal_timestamp then ["--minimal-timestamp"] else []) )
@@ -261,10 +235,7 @@ let bake_for ?node ?key ?minimal_timestamp client =
   spawn_bake_for ?node ?key ?minimal_timestamp client |> Process.check
 
 let spawn_transfer ?node ~amount ~giver ~receiver client =
-  let needs_node = mode_needs_node client.mode in
   spawn_command
-    ~needs_node
-    ?node
     client
     ( endpoint_arg ?node client @ mode_arg client
     @ ["transfer"; string_of_int amount; "from"; giver; "to"; receiver] )
@@ -291,26 +262,22 @@ let get_balance_for ?node ~account client =
   return @@ extract_balance output
 
 let spawn_create_mockup ?(protocol = Constant.alpha) client =
-  spawn_command
-    ~needs_node:false
-    ?node:None
-    client
-    ["--protocol"; protocol.hash; "create"; "mockup"]
+  spawn_command client ["--protocol"; protocol.hash; "create"; "mockup"]
 
 let create_mockup ?protocol client =
   spawn_create_mockup ?protocol client |> Process.check
 
-let spawn_submit_proposals ?node ?(key = Constant.bootstrap1.alias) ~proto_hash
+let spawn_submit_proposals ?(key = Constant.bootstrap1.alias) ~proto_hash
     client =
-  spawn_command client ?node ["submit"; "proposals"; "for"; key; proto_hash]
+  spawn_command client ["submit"; "proposals"; "for"; key; proto_hash]
 
-let submit_proposals ?node ?key ~proto_hash client =
-  spawn_submit_proposals ?node ?key ~proto_hash client |> Process.check
+let submit_proposals ?key ~proto_hash client =
+  spawn_submit_proposals ?key ~proto_hash client |> Process.check
 
 type ballot = Nay | Pass | Yay
 
-let spawn_submit_ballot ?node ?(key = Constant.bootstrap1.alias) ~proto_hash
-    vote client =
+let spawn_submit_ballot ?(key = Constant.bootstrap1.alias) ~proto_hash vote
+    client =
   let string_of_vote = function
     | Yay ->
         "yay"
@@ -321,11 +288,10 @@ let spawn_submit_ballot ?node ?(key = Constant.bootstrap1.alias) ~proto_hash
   in
   spawn_command
     client
-    ?node
     ["submit"; "ballot"; "for"; key; proto_hash; string_of_vote vote]
 
-let submit_ballot ?node ?key ~proto_hash vote client =
-  spawn_submit_ballot ?node ?key ~proto_hash vote client |> Process.check
+let submit_ballot ?key ~proto_hash vote client =
+  spawn_submit_ballot ?key ~proto_hash vote client |> Process.check
 
 let init ?path ?admin_path ?name ?color ?base_dir ?node () =
   let client = create ?path ?admin_path ?name ?color ?base_dir ?node () in

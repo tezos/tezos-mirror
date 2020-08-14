@@ -194,12 +194,10 @@ val spawn_create_mockup : ?protocol:Constant.protocol -> t -> Process.t
 (** Run [tezos-client submit proposals for].
 
     Default [key] is {!Constant.bootstrap1.alias}. *)
-val submit_proposals :
-  ?node:Node.t -> ?key:string -> proto_hash:string -> t -> unit Lwt.t
+val submit_proposals : ?key:string -> proto_hash:string -> t -> unit Lwt.t
 
 (** Same as [submit_proposals], but do not wait for the process to exit. *)
-val spawn_submit_proposals :
-  ?node:Node.t -> ?key:string -> proto_hash:string -> t -> Process.t
+val spawn_submit_proposals : ?key:string -> proto_hash:string -> t -> Process.t
 
 type ballot = Nay | Pass | Yay
 
@@ -207,11 +205,11 @@ type ballot = Nay | Pass | Yay
 
     Default [key] is {!Constant.bootstrap1.alias}. *)
 val submit_ballot :
-  ?node:Node.t -> ?key:string -> proto_hash:string -> ballot -> t -> unit Lwt.t
+  ?key:string -> proto_hash:string -> ballot -> t -> unit Lwt.t
 
 (** Same as [submit_ballot], but do not wait for the process to exit. *)
 val spawn_submit_ballot :
-  ?node:Node.t -> ?key:string -> proto_hash:string -> ballot -> t -> Process.t
+  ?key:string -> proto_hash:string -> ballot -> t -> Process.t
 
 (** {2 High-Level Functions} *)
 
