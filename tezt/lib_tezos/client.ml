@@ -290,9 +290,15 @@ let get_balance_for ?node ~account client =
   in
   return @@ extract_balance output
 
-let create_mockup ?(protocol = Constant.alpha) client : unit Lwt.t =
-  let cmd = ["--protocol"; protocol.hash; "create"; "mockup"] in
-  spawn_command ~needs_node:false ?node:None client cmd |> Process.check
+let spawn_create_mockup ?(protocol = Constant.alpha) client =
+  spawn_command
+    ~needs_node:false
+    ?node:None
+    client
+    ["--protocol"; protocol.hash; "create"; "mockup"]
+
+let create_mockup ?protocol client =
+  spawn_create_mockup ?protocol client |> Process.check
 
 let init_mockup ~(protocol : Constant.protocol) =
   (* To create the mockup, we don't want --mode mockup to be specified,

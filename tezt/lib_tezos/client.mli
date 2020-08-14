@@ -158,8 +158,9 @@ val spawn_activate_protocol :
 val bake_for :
   ?node:Node.t -> ?key:string -> ?minimal_timestamp:bool -> t -> unit Lwt.t
 
-(** Creates a mockup client, running [create mockup] under the hood. *)
-val init_mockup : protocol:Constant.protocol -> t Lwt.t
+(** Same as [bake_for], but do not wait for the process to exit. *)
+val spawn_bake_for :
+  ?node:Node.t -> ?key:string -> ?minimal_timestamp:bool -> t -> Process.t
 
 (** Run [tezos-client transfer amount from giver to receiver]. *)
 val transfer :
@@ -182,9 +183,13 @@ val spawn_transfer :
 (** Run [tezos-client get balance for]. *)
 val get_balance_for : ?node:Node.t -> account:string -> t -> float Lwt.t
 
-(** Same as [bake_for], but do not wait for the process to exit. *)
-val spawn_bake_for :
-  ?node:Node.t -> ?key:string -> ?minimal_timestamp:bool -> t -> Process.t
+(** Run [tezos-client create mockup].
+
+    Default [protocol] is {!Constant.alpha}. *)
+val create_mockup : ?protocol:Constant.protocol -> t -> unit Lwt.t
+
+(** Same as [create_mockup], but do not wait for the process to exit. *)
+val spawn_create_mockup : ?protocol:Constant.protocol -> t -> Process.t
 
 (** Run [tezos-client submit proposals for].
 
@@ -209,6 +214,9 @@ val spawn_submit_ballot :
   ?node:Node.t -> ?key:string -> proto_hash:string -> ballot -> t -> Process.t
 
 (** {2 High-Level Functions} *)
+
+(** Creates a mockup client, running [create mockup] under the hood. *)
+val init_mockup : protocol:Constant.protocol -> t Lwt.t
 
 (** Create a client and import all secret keys listed in {!Constant.all_secret_keys}. *)
 val init :
