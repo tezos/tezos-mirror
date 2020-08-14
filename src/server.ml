@@ -63,6 +63,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
     default_media_type : string * Media_type.t;
     stopper : unit Lwt.u;
     mutable acl : Acl.t;
+    agent : string;
     mutable worker : unit Lwt.t;
   }
 
@@ -99,7 +100,9 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
       when server.cors.allowed_origins <> []
            && not (Cors.check_host req_headers server.cors) ->
         let headers =
-          Cohttp.Header.init_with "X-OCaml-Resto-CORS-Error" "invalid host"
+          Cohttp.Header.init_with
+            (Format.asprintf "X-%s-CORS-Error" server.agent)
+            "invalid host"
         in
         Lwt.return_ok
           (Response.make ~headers ~status:`Forbidden (), Cohttp_lwt.Body.empty)
@@ -339,7 +342,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
 
   (* Promise a running RPC server. *)
 
-  let launch ?(host = "::") ?(cors = Cors.default)
+  let launch ?(host = "::") ?(cors = Cors.default) ?(agent = "OCaml-Resto")
       ?(acl = Acl.Allow_all {except = []}) ~media_types mode root =
     let default_media_type =
       match Media_type.first_complete_media media_types with
@@ -358,6 +361,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
         default_media_type;
         stopper;
         acl;
+        agent;
         worker = Lwt.return_unit;
       }
     in

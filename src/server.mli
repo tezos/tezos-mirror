@@ -40,6 +40,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) : sig
   val launch :
     ?host:string ->
     ?cors:Cors.t ->
+    ?agent:string ->
     ?acl:Acl.t ->
     media_types:Media_type.Make(Encoding).t list ->
     Conduit_lwt_unix.server ->
