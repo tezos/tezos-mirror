@@ -180,7 +180,6 @@ let check_chain_chain_id (chain : Block_services.chain) (chain_id : Chain_id.t)
 let pending_operations (mockup_env : Registration.mockup_environment) chain_id
     (dirname : string) =
   let (module M) = mockup_env in
-  (* TODO: Don't know why it fails *)
   let op_data_encoding = M.Protocol.operation_data_encoding in
   let read_operations () =
     let op_encoding =
@@ -191,9 +190,7 @@ let pending_operations (mockup_env : Registration.mockup_environment) chain_id
              (req "protocol_data" op_data_encoding))
     in
     let ops_encoding = Data_encoding.Variable.list op_encoding in
-    (* Read current mempool *)
     let mempool_file = (Files.mempool ~dirname :> string) in
-    (* Format.printf "Reading mempool file %s@." mempool_file ; *)
     Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file mempool_file
     >>=? fun json -> return @@ Data_encoding.Json.destruct ops_encoding json
   in
@@ -235,10 +232,6 @@ let pending_operations (mockup_env : Registration.mockup_environment) chain_id
                           Operation.hash
                             {Operation.shell = shell_header; proto}
                         in
-                        (* Format.printf
-                         *   "Pending operations op hash: %a@."
-                         *   Operation_hash.pp
-                         *   operation_hash ; *)
                         Operation_hash.Map.add operation_hash op map)
                   Operation_hash.Map.empty
                   pooled_operations
@@ -299,30 +292,6 @@ let preapply_block (mockup_env : Registration.mockup_environment)
        Directory.empty
        Mockup_environment.Block_services.S.Helpers.Preapply.block
        (fun (((), chain), _block) o {operations; protocol_data = _} ->
-         (* Why is operations a operation list list ?
-            Is there any specific
-            implicit meaning to the different sublists ? *)
-         (* Format.printf
-          *   "block %s with %d operation list @."
-          *   (Block_services.to_string block)
-          *   (List.length operations) ;
-          * List.iteri
-          *   (fun i ops ->
-          *     Format.printf "@[<v>%i: " i ;
-          *     if ops = [] then Format.printf "[]"
-          *     else
-          *       List.iter
-          *         (fun Mockup_environment.Protocol.{protocol_data; _} ->
-          *           let encoding =
-          *             Mockup_environment.Protocol.operation_data_encoding
-          *           in
-          *           let json =
-          *             Data_encoding.Json.construct encoding protocol_data
-          *           in
-          *           Format.printf "%a@;" Data_encoding.Json.pp json)
-          *         ops ;
-          *     Format.printf "@]@.")
-          *   operations ; *)
          check_chain_chain_id chain chain_id
          >>= function
          | Error errs ->
@@ -386,6 +355,8 @@ let preapply_block (mockup_env : Registration.mockup_environment)
                      cannot switch protocols *)
                   predecessor = rpc_context.block_hash;
                   timestamp =
+                    (* The timestamp exists if --minimal-timestamp has been
+                       given on the command line *)
                     ( match o#timestamp with
                     | None ->
                         Time.System.to_protocol
@@ -589,7 +560,6 @@ let inject_block (mockup_env : Registration.mockup_environment)
         (Time.System.to_protocol (Tezos_stdlib_unix.Systime_os.now ()))
       ()
     >>=? fun validation_state ->
-    Format.printf "Got %d operations@." (List.length @@ List.flatten operations) ;
     let i = ref 0 in
     fold_left_s
       (fold_left_s (fun (validation_state, _results) op ->
@@ -633,12 +603,6 @@ let inject_block (mockup_env : Registration.mockup_environment)
       | None ->
           RPC_answer.fail [Cannot_parse_op]
       | Some block_header -> (
-          (* Format.printf
-           *   "inject_block: %a - %d bytes from %d operations@."
-           *   Block_header.pp
-           *   block_header
-           *   (Bytes.length bytes)
-           *   (List.length operations) ; *)
           let mempool_file = (Files.mempool ~dirname :> string) in
           Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file mempool_file
           >>= function
@@ -690,35 +654,16 @@ let inject_block (mockup_env : Registration.mockup_environment)
                   | Error _ ->
                       assert false
                   | Ok ({context; _}, _) -> (
-                      Format.printf
-                        "Block header: %a@."
-                        Data_encoding.Json.pp
-                        (Data_encoding.Json.construct
-                           Block_header.shell_header_encoding
-                           block_header.shell) ;
-                      let context' = context in
                       let rpc_context =
-                        let block_header =
-                          block_header.shell
-                          (* with
-                             * level = Int32.succ block_header.shell.level;
-                             * predecessor = rpc_context.block_hash;
-                             * timestamp =
-                             *   (\* Here we do not assume that baking should always
-                             *      succeed in mockup mode, independently of
-                             *      minimal time interval constraint.contqext.
-                             *
-                             *      If this was actually needed, the new timestamp
-                             *      could be the max of now and
-                             *      [Baking.minimal_timestamp] *\)
-                             *   Time.System.to_protocol
-                             *     (Tezos_stdlib_unix.Systime_os.now ()); *)
-                        in
-                        {
-                          {rpc_context with context = context'} with
-                          block_hash;
-                          block_header;
-                        }
+                        Tezos_protocol_environment.
+                          {
+                            context;
+                            block_hash;
+                            block_header =
+                              (* block_header.shell has been carefully constructed in
+                               * preapply_block. *)
+                              block_header.shell;
+                          }
                       in
                       write_context_callback rpc_context
                       >>= function
