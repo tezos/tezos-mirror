@@ -85,10 +85,11 @@ BAKER_ACTIONS = [
 class TestBaker:
     """Test baker contract registration, commands and helpers"""
 
-    def test_register_baker(self, client: Client):
+    def test_register_baker(self, client: Client, session):
         baker_0_key = 'baker-0-key'
         client.gen_key(baker_0_key)
         address_0 = client.show_address(baker_0_key)
+        session['address_0'] = address_0
         client.register_baker(
             'new-baker-0',
             10000,
@@ -109,6 +110,124 @@ class TestBaker:
                 consensus_key=baker_0_key,
                 owner_keys=[baker_0_key],
             )
+
+        with utils.assert_run_failure(
+            r'Threshold too high: 2; at most 1 expected\.'
+        ):
+            baker_1_key = 'baker-1-key'
+            client.gen_key(baker_1_key)
+            client.register_baker(
+                'new-baker-2',
+                10000,
+                'bootstrap1',
+                consensus_key=baker_1_key,
+                owner_keys=[baker_1_key],
+                threshold=2,
+            )
+
+        with utils.assert_run_failure(
+            r'Multisig threshold 0 should be positive\.'
+        ):
+            baker_1_key = 'baker-2-key'
+            client.gen_key(baker_1_key)
+            client.register_baker(
+                'new-baker-3',
+                10000,
+                'bootstrap1',
+                consensus_key=baker_1_key,
+                owner_keys=[],
+                threshold=0,
+            )
+
+    def test_set_consensus_key(self, client: Client, session):
+        address_0 = session['address_0']
+        with utils.assert_run_failure(
+            rf'The given baker consensus key {address_0.public_key} is '
+            r'already being used\. A unique consensus key must be used\.'
+        ):
+            client.set_baker_consensus_key('baker1', 'baker-0-key')
+
+    def test_set_threshold_and_owner_keys(self, client: Client):
+        with utils.assert_run_failure(
+            r'Threshold too high: 2; at most 1 expected\.'
+        ):
+            client.set_baker_threshold_and_owner_keys(
+                'baker1', 2, ['baker1_key']
+            )
+
+    def test_set_multisig_threshold_and_owner_keys(self, client: Client):
+        baker = 'baker1'
+        threshold = 2
+        key = 'baker1_key'
+        expected_failure = r'Threshold too high: 2; at most 1 expected\.'
+        with utils.assert_run_failure(expected_failure):
+            cmd = [
+                'prepare',
+                'baker',
+                'transaction',
+                'on',
+                baker,
+                'setting',
+                'threshold',
+                'to',
+                str(threshold),
+                'and',
+                'owner',
+                'keys',
+                'to',
+                key,
+            ]
+            client.run(cmd)
+
+        with utils.assert_run_failure(expected_failure):
+            cmd = [
+                'sign',
+                'baker',
+                'transaction',
+                'on',
+                baker,
+                'setting',
+                'threshold',
+                'to',
+                str(threshold),
+                'and',
+                'owner',
+                'keys',
+                'to',
+                key,
+                'with',
+                'key',
+                'baker1_key',
+            ]
+            client.run(cmd)
+
+        with utils.assert_run_failure(expected_failure):
+            fake_signature = (
+                'sigbQ5ZNvkjvGssJgoAnUAfY4Wvvg3QZqawBYB1j1VDBNTMBAALnCzRHWzer3'
+                '4bnfmzgHg3EvwdzQKdxgSghB897cono6gbQ'
+            )
+            cmd = [
+                'set',
+                'multisig',
+                'baker',
+                baker,
+                'threshold',
+                'to',
+                str(threshold),
+                'and',
+                'owner',
+                'keys',
+                'to',
+                key,
+                'on',
+                'behalf',
+                'of',
+                'baker1',
+                'with',
+                'signatures',
+                fake_signature,
+            ]
+            client.run(cmd)
 
     def test_transfer_to_a_pending_consensus_key_fails(self, client: Client):
         baker = 'baker2'
