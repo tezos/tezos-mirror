@@ -298,7 +298,7 @@ let preapply_block (mockup_env : Registration.mockup_environment)
   @@ Directory.register
        Directory.empty
        Mockup_environment.Block_services.S.Helpers.Preapply.block
-       (fun (((), chain), _block) _ {operations; protocol_data = _} ->
+       (fun (((), chain), _block) o {operations; protocol_data = _} ->
          (* Why is operations a operation list list ?
             Is there any specific
             implicit meaning to the different sublists ? *)
@@ -386,8 +386,12 @@ let preapply_block (mockup_env : Registration.mockup_environment)
                      cannot switch protocols *)
                   predecessor = rpc_context.block_hash;
                   timestamp =
-                    Time.System.to_protocol
-                      (Tezos_stdlib_unix.Systime_os.now ());
+                    ( match o#timestamp with
+                    | None ->
+                        Time.System.to_protocol
+                          (Tezos_stdlib_unix.Systime_os.now ())
+                    | Some t ->
+                        t );
                   operations_hash;
                   validation_passes = List.length preapply_results;
                   fitness = validation_result.fitness;
