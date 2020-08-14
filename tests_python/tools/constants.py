@@ -70,6 +70,7 @@ IDENTITIES = {
         ),
     },
     'baker1_key': {
+        'identity': "tz1UJbFsTQfdpa1qYrqHG9Ykw834AXi5WqRR",
         'public': 'edpkuDjETsuw7Tve4hczaEiDd5q8q5CnzppnoENpvf3hSt2g2N6fy5',
         'secret': (
             'unencrypted:'
@@ -77,6 +78,7 @@ IDENTITIES = {
         ),
     },
     'baker2_key': {
+        'identity': "tz1fWJ2oeeG6h2r61XY1wen2sV87AvCqGjAU",
         'public': 'edpkuDDr1FWd79GdjtcRAYJ7zufsxHUpCbtjPvQ2SGzp5QGBV6jFXo',
         'secret': (
             'unencrypted:'
@@ -84,6 +86,7 @@ IDENTITIES = {
         ),
     },
     'baker3_key': {
+        'identity': "tz1SERFDUknkjJTas8sUco7dskxWrUWhTc2s",
         'public': 'edpkuxfqVAGvJegMn8h4Qsrfc6ncLYQsAWKaAx2SieFn2Mz5QxNSmL',
         'secret': (
             'unencrypted:'
@@ -91,6 +94,7 @@ IDENTITIES = {
         ),
     },
     'baker4_key': {
+        'identity': "tz1eJ9yR95LmJgVrGLvgt56T6ngCFcgjLo2S",
         'public': 'edpku5MdpRkypXjBpyQ5vEbf3iUkRbt7iVjKvyx7RrkWSXpHS4fSck',
         'secret': (
             'unencrypted:'
@@ -98,6 +102,7 @@ IDENTITIES = {
         ),
     },
     'baker5_key': {
+        'identity': "tz1cwoRFe3BzJv9nZZBA5fk8uV6w9AVVrBF9",
         'public': 'edpkvFYoA3cwPyVMAheyX29pQFw9gwfxDHJgbthG3caZNuQFNzrwkM',
         'secret': (
             'unencrypted:'
