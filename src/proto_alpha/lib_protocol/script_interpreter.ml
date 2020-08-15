@@ -173,7 +173,7 @@ let unparse_stack ctxt (stack, stack_ty) =
   in
   unparse_stack (stack_ty, stack)
 
-module Interp_costs = Michelson_v1_gas.Cost_of.Interpreter_007
+module Interp_costs = Michelson_v1_gas.Cost_of.Interpreter
 
 let rec interp_stack_prefix_preserving_operation :
     type fbef bef faft aft result.
