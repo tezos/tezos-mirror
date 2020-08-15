@@ -427,6 +427,396 @@ module Cost_of = struct
       8 + ((v0 lsr 4) + (v0 lsr 6))
   end
 
+  module Interpreter_007 = struct
+    open Generated_costs_007
+
+    let drop = atomic_step_cost cost_N_Drop
+
+    let dup = atomic_step_cost cost_N_Dup
+
+    let swap = atomic_step_cost cost_N_Swap
+
+    let push = atomic_step_cost cost_N_Const
+
+    let cons_some = atomic_step_cost cost_N_Cons_some
+
+    let cons_none = atomic_step_cost cost_N_Cons_none
+
+    let if_none = atomic_step_cost cost_N_If_none
+
+    let cons_pair = atomic_step_cost cost_N_Cons_pair
+
+    let car = atomic_step_cost cost_N_Car
+
+    let cdr = atomic_step_cost cost_N_Cdr
+
+    let cons_left = atomic_step_cost cost_N_Left
+
+    let cons_right = atomic_step_cost cost_N_Right
+
+    let if_left = atomic_step_cost cost_N_If_left
+
+    let cons_list = atomic_step_cost cost_N_Cons_list
+
+    let nil = atomic_step_cost cost_N_Nil
+
+    let if_cons = atomic_step_cost cost_N_If_cons
+
+    let list_map : 'a Script_typed_ir.boxed_list -> Gas.cost =
+     fun {length; _} -> atomic_step_cost (cost_N_List_map length)
+
+    let list_size = atomic_step_cost cost_N_List_size
+
+    let list_iter : 'a Script_typed_ir.boxed_list -> Gas.cost =
+     fun {length; _} -> atomic_step_cost (cost_N_List_iter length)
+
+    let empty_set = atomic_step_cost cost_N_Empty_set
+
+    let set_iter (type a) ((module Box) : a Script_typed_ir.set) =
+      atomic_step_cost (cost_N_Set_iter Box.size)
+
+    let set_mem (type a) (elt : a) ((module Box) : a Script_typed_ir.set) =
+      let elt_size = size_of_comparable Box.elt_ty elt in
+      atomic_step_cost (cost_N_Set_mem elt_size Box.size)
+
+    let set_update (type a) (elt : a) ((module Box) : a Script_typed_ir.set) =
+      let elt_size = size_of_comparable Box.elt_ty elt in
+      atomic_step_cost (cost_N_Set_update elt_size Box.size)
+
+    let set_size = atomic_step_cost cost_N_Set_size
+
+    let empty_map = atomic_step_cost cost_N_Empty_map
+
+    let map_map (type k v) ((module Box) : (k, v) Script_typed_ir.map) =
+      atomic_step_cost (cost_N_Map_map (snd Box.boxed))
+
+    let map_iter (type k v) ((module Box) : (k, v) Script_typed_ir.map) =
+      atomic_step_cost (cost_N_Map_iter (snd Box.boxed))
+
+    let map_mem (type k v) (elt : k)
+        ((module Box) : (k, v) Script_typed_ir.map) =
+      let elt_size = size_of_comparable Box.key_ty elt in
+      atomic_step_cost (cost_N_Map_mem elt_size (snd Box.boxed))
+
+    let map_get (type k v) (elt : k)
+        ((module Box) : (k, v) Script_typed_ir.map) =
+      let elt_size = size_of_comparable Box.key_ty elt in
+      atomic_step_cost (cost_N_Map_get elt_size (snd Box.boxed))
+
+    let map_update (type k v) (elt : k)
+        ((module Box) : (k, v) Script_typed_ir.map) =
+      let elt_size = size_of_comparable Box.key_ty elt in
+      atomic_step_cost (cost_N_Map_update elt_size (snd Box.boxed))
+
+    let map_size = atomic_step_cost cost_N_Map_size
+
+    let big_map_mep = map_mem
+
+    let big_map_get = map_get
+
+    let big_map_update = map_update
+
+    let add_seconds_timestamp :
+        'a Script_int.num -> Script_timestamp.t -> Gas.cost =
+     fun seconds timestamp ->
+      let seconds_bytes = int_bytes seconds in
+      let timestamp_bytes = z_bytes (Script_timestamp.to_zint timestamp) in
+      atomic_step_cost (cost_N_Add_intint seconds_bytes timestamp_bytes)
+
+    let sub_seconds_timestamp :
+        'a Script_int.num -> Script_timestamp.t -> Gas.cost =
+     fun seconds timestamp ->
+      let seconds_bytes = int_bytes seconds in
+      let timestamp_bytes = z_bytes (Script_timestamp.to_zint timestamp) in
+      atomic_step_cost (cost_N_Sub_int seconds_bytes timestamp_bytes)
+
+    let diff_timestamps t1 t2 =
+      let t1_bytes = z_bytes (Script_timestamp.to_zint t1) in
+      let t2_bytes = z_bytes (Script_timestamp.to_zint t2) in
+      atomic_step_cost (cost_N_Sub_int t1_bytes t2_bytes)
+
+    let concat_string_pair s1 s2 =
+      atomic_step_cost
+        (cost_N_Concat_string_pair (String.length s1) (String.length s2))
+
+    let slice_string s =
+      atomic_step_cost (cost_N_Slice_string (String.length s))
+
+    let string_size = atomic_step_cost cost_N_String_size
+
+    let concat_bytes_pair b1 b2 =
+      atomic_step_cost
+        (cost_N_Concat_string_pair (MBytes.length b1) (MBytes.length b2))
+
+    let slice_bytes b =
+      atomic_step_cost (cost_N_Slice_string (MBytes.length b))
+
+    let bytes_size = atomic_step_cost cost_N_String_size
+
+    let add_tez = atomic_step_cost cost_N_Add_tez
+
+    let sub_tez = atomic_step_cost cost_N_Sub_tez
+
+    let mul_teznat n = atomic_step_cost (cost_N_Mul_teznat (int_bytes n))
+
+    let bool_or = atomic_step_cost cost_N_Or
+
+    let bool_and = atomic_step_cost cost_N_And
+
+    let bool_xor = atomic_step_cost cost_N_Xor
+
+    let bool_not = atomic_step_cost cost_N_Not
+
+    let is_nat = atomic_step_cost cost_N_Is_nat
+
+    let abs_int i = atomic_step_cost (cost_N_Abs_int (int_bytes i))
+
+    let int_nat = atomic_step_cost cost_N_Int_nat
+
+    let neg_int i = atomic_step_cost (cost_N_Neg_int (int_bytes i))
+
+    let neg_nat n = atomic_step_cost (cost_N_Neg_int (int_bytes n))
+
+    let add_bigint i1 i2 =
+      atomic_step_cost (cost_N_Add_intint (int_bytes i1) (int_bytes i2))
+
+    let sub_bigint i1 i2 =
+      atomic_step_cost (cost_N_Sub_int (int_bytes i1) (int_bytes i2))
+
+    let mul_bigint i1 i2 =
+      atomic_step_cost (cost_N_Mul_intint (int_bytes i1) (int_bytes i2))
+
+    let ediv_teznat _tez n =
+      atomic_step_cost (cost_N_Ediv_teznat 8 (int_bytes n))
+
+    let ediv_tez = atomic_step_cost cost_N_Ediv_tez
+
+    let ediv_bigint i1 i2 =
+      atomic_step_cost (cost_N_Ediv_natnat (int_bytes i1) (int_bytes i2))
+
+    let eq = atomic_step_cost cost_N_Eq
+
+    let lsl_nat shifted = atomic_step_cost (cost_N_Lsl_nat (int_bytes shifted))
+
+    let lsr_nat shifted = atomic_step_cost (cost_N_Lsr_nat (int_bytes shifted))
+
+    let or_nat n1 n2 =
+      atomic_step_cost (cost_N_Or_nat (int_bytes n1) (int_bytes n2))
+
+    let and_nat n1 n2 =
+      atomic_step_cost (cost_N_And_nat (int_bytes n1) (int_bytes n2))
+
+    let xor_nat n1 n2 =
+      atomic_step_cost (cost_N_Xor_nat (int_bytes n1) (int_bytes n2))
+
+    let not_int i = atomic_step_cost (cost_N_Not_int (int_bytes i))
+
+    let not_nat = not_int
+
+    let seq = atomic_step_cost cost_N_Seq
+
+    let if_ = atomic_step_cost cost_N_If
+
+    let loop = atomic_step_cost cost_N_Loop
+
+    let loop_left = atomic_step_cost cost_N_Loop_left
+
+    let dip = atomic_step_cost cost_N_Dip
+
+    let check_signature (pkey : Signature.public_key) b =
+      let cost =
+        match pkey with
+        | Ed25519 _ ->
+            cost_N_Check_signature_ed25519 (MBytes.length b)
+        | Secp256k1 _ ->
+            cost_N_Check_signature_secp256k1 (MBytes.length b)
+        | P256 _ ->
+            cost_N_Check_signature_p256 (MBytes.length b)
+      in
+      atomic_step_cost cost
+
+    let blake2b b = atomic_step_cost (cost_N_Blake2b (MBytes.length b))
+
+    let sha256 b = atomic_step_cost (cost_N_Sha256 (MBytes.length b))
+
+    let sha512 b = atomic_step_cost (cost_N_Sha512 (MBytes.length b))
+
+    let dign n = atomic_step_cost (cost_N_Dig n)
+
+    let dugn n = atomic_step_cost (cost_N_Dug n)
+
+    let dipn n = atomic_step_cost (cost_N_DipN n)
+
+    let dropn n = atomic_step_cost (cost_N_DropN n)
+
+    let neq = atomic_step_cost cost_N_Neq
+
+    let nop = atomic_step_cost cost_N_Nop
+
+    (* --------------------------------------------------------------------- *)
+    (* Semi-hand-crafted models *)
+    let compare_bool = atomic_step_cost (cost_N_Compare_bool 1 1)
+
+    let compare_string s1 s2 =
+      atomic_step_cost
+        (cost_N_Compare_string (String.length s1) (String.length s2))
+
+    let compare_bytes b1 b2 =
+      atomic_step_cost
+        (cost_N_Compare_string (MBytes.length b1) (MBytes.length b2))
+
+    let compare_mutez = atomic_step_cost (cost_N_Compare_mutez 8 8)
+
+    let compare_int i1 i2 =
+      atomic_step_cost (cost_N_Compare_int (int_bytes i1) (int_bytes i2))
+
+    let compare_nat n1 n2 =
+      atomic_step_cost (cost_N_Compare_int (int_bytes n1) (int_bytes n2))
+
+    let compare_key_hash =
+      let sz = Signature.Public_key_hash.size in
+      atomic_step_cost (cost_N_Compare_key_hash sz sz)
+
+    let compare_timestamp t1 t2 =
+      atomic_step_cost
+        (cost_N_Compare_timestamp
+           (z_bytes (Script_timestamp.to_zint t1))
+           (z_bytes (Script_timestamp.to_zint t2)))
+
+    let compare_address =
+      let sz = Signature.Public_key_hash.size + Chain_id.size in
+      atomic_step_cost (cost_N_Compare_address sz sz)
+
+    let rec compare :
+        type a s. (a, s) Script_typed_ir.comparable_struct -> a -> a -> cost =
+     fun ty x y ->
+      match ty with
+      | Bool_key _ ->
+          compare_bool
+      | String_key _ ->
+          compare_string x y
+      | Bytes_key _ ->
+          compare_bytes x y
+      | Mutez_key _ ->
+          compare_mutez
+      | Int_key _ ->
+          compare_int x y
+      | Nat_key _ ->
+          compare_nat x y
+      | Key_hash_key _ ->
+          compare_key_hash
+      | Timestamp_key _ ->
+          compare_timestamp x y
+      | Address_key _ ->
+          compare_address
+      | Pair_key ((tl, _), (tr, _), _) ->
+          (* Reasonable over-approximation of the cost of lexicographic comparison. *)
+          let (xl, xr) = x in
+          let (yl, yr) = y in
+          compare tl xl yl +@ compare tr xr yr
+
+    (* --------------------------------------------------------------------- *)
+    (* Hand-crafted models *)
+
+    (* The cost functions below where not benchmarked, a cost model was derived
+       from looking at similar instructions. *)
+
+    (* Creating an empty big map involves converting a type to a comparable
+       and allocating an empty map. Since the user already paied at typechecking
+       time for writing this type, we charge a constant overhead here. *)
+    let empty_big_map = atomic_step_cost (100 + cost_N_Empty_map)
+
+    (* Cost for Concat_string is paid in two steps: when entering the interpreter,
+       the user pays for the cost of computing the information necessary to compute
+       the actual gas (so it's meta-gas): indeed, one needs to run through the
+       list of strings to compute the total allocated cost.
+       [concat_string_precheck] corresponds to the meta-gas cost of this computation.
+     *)
+    let concat_string_precheck (l : 'a Script_typed_ir.boxed_list) =
+      (* we set the precheck to be slightly more expensive than cost_N_List_iter *)
+      atomic_step_cost (l.length * 10)
+
+    (* This is the cost of allocating a string and blitting existing ones into it. *)
+    let concat_string total_bytes = atomic_step_cost (100 + (total_bytes / 10))
+
+    (* Same story as Concat_string. *)
+    let concat_bytes total_bytes = atomic_step_cost (100 + (total_bytes / 10))
+
+    (* Cost of additional call to logger + overhead of setting up call to [interp]. *)
+    let exec = atomic_step_cost 100
+
+    (* Heavy computation happens in the [unparse_data], [unparse_ty]
+       functions which are carbonated. We must account for allocating
+       the Micheline lambda wrapper. *)
+    let apply = atomic_step_cost 1000
+
+    (* Pushing a pointer on the stack. *)
+    let lambda = push
+
+    (* Pusing an address on the stack. *)
+    let address = push
+
+    (* Most computation happens in [parse_contract_from_script], which is carbonated.
+       Account for pushing on the stack. *)
+    let contract = push
+
+    (* Most computation happens in [collect_lazy_storage], [extract_lazy_storage_diff]
+       and [unparse_data] which are carbonated. The instruction-specific overhead
+       is mostly that of updating the internal nonce, which we approximate by the
+       cost of a push. *)
+    let transfer_tokens = Gas.(push +@ push)
+
+    (* Wrapping a value and pushing it on the stack. *)
+    let implicit_account = push
+
+    (* As for [transfer_token], most computation happens elsewhere.
+       We still account for the overhead of updating the internal_nonce. *)
+    let create_contract = Gas.(push +@ push)
+
+    (* Increments the internal_nonce counter. *)
+    let set_delegate = Gas.(push +@ push)
+
+    (* TODO 007: this instruction performs a read access to the context through
+       an uncarbonated functor. Cost to be set in IO-specific gas MR. The cost below
+       is not unrealistic. *)
+    let balance = atomic_step_cost 300_000
+
+    (* Accessing the raw_context, Small arithmetic & pushing on the stack. *)
+    let level = atomic_step_cost (2 * cost_N_Const)
+
+    (* Same as [cost_level] *)
+    let now = level
+
+    (* Public keys are hashed with Blake2b *)
+    let hash_key _pk = atomic_step_cost (cost_N_Blake2b public_key_size)
+
+    (* Pushes on the stack an element from the [step_constants] record. *)
+    let source = push
+
+    (* Same as cost_source *)
+    let sender = source
+
+    (* Same as cost_source *)
+    let self = source
+
+    (* Same as cost_source *)
+    let self_address = source
+
+    (* Same as cost_source *)
+    let amount = source
+
+    (* Same as cost_source *)
+    let chain_id = source
+
+    (* Copy cost from 006. *)
+    let unpack_failed bytes =
+      (* We cannot instrument failed deserialization,
+         so we take worst case fees: a set of size 1 bytes values. *)
+      let len = MBytes.length bytes in
+      (len *@ alloc_mbytes_cost 1)
+      +@ (len *@ (log2 len *@ (alloc_cost 3 +@ step_cost 1)))
+  end
+
   module Interpreter = struct
     let cycle = atomic_step_cost 10
 
