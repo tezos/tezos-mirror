@@ -714,6 +714,12 @@ let rec step :
       let s = String.concat "" [x; y] in
       logged_return ((s, rest), ctxt)
   | (Concat_string, (ss, rest)) ->
+      (* The cost for this fold_left has been paid upfront *)
+      let total_length =
+        List.fold_left (fun acc s -> acc + String.length s) 0 ss.elements
+      in
+      Gas.consume ctxt (Interp_costs.concat_string total_length)
+      >>?= fun ctxt ->
       let s = String.concat "" ss.elements in
       logged_return ((s, rest), ctxt)
   | (Slice_string, (offset, (length, (s, rest)))) ->
@@ -732,6 +738,12 @@ let rec step :
       let s = MBytes.concat "" [x; y] in
       logged_return ((s, rest), ctxt)
   | (Concat_bytes, (ss, rest)) ->
+      (* The cost for this fold_left has been paid upfront *)
+      let total_length =
+        List.fold_left (fun acc s -> acc + MBytes.length s) 0 ss.elements
+      in
+      Gas.consume ctxt (Interp_costs.concat_string total_length)
+      >>?= fun ctxt ->
       let s = MBytes.concat "" ss.elements in
       logged_return ((s, rest), ctxt)
   | (Slice_bytes, (offset, (length, (s, rest)))) ->
