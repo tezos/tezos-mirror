@@ -383,6 +383,12 @@ class TestBaker:
 
         client.toggle_baker_delegations('baker3', False)
         client.bake('baker5', BAKE_ARGS)
+        expected_error = (
+            rf'The baker {BOOTSTRAP_BAKERS[2]["hash"]} already declines '
+            'delegations, no need to set it again'
+        )
+        with utils.assert_run_failure(expected_error):
+            client.toggle_baker_delegations('baker3', False)
 
         # new delegation should be declined
         expected_error = "Baker declines new delegations"
@@ -410,5 +416,11 @@ class TestBaker:
         # allow delegations and try again
         client.toggle_baker_delegations('baker3', True)
         client.bake('baker5', BAKE_ARGS)
+        expected_error = (
+            rf'The baker {BOOTSTRAP_BAKERS[2]["hash"]} already accepts '
+            'delegations, no need to set it again'
+        )
+        with utils.assert_run_failure(expected_error):
+            client.toggle_baker_delegations('baker3', True)
         client.set_delegate('bootstrap1', 'baker3')
         client.set_delegate('bootstrap2', 'baker3')
