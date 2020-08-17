@@ -1245,8 +1245,8 @@ let rec step :
             rest ),
           ctxt )
   | (Balance, rest) ->
-      Contract.get_balance ctxt step_constants.self
-      >>=? fun balance -> logged_return ((balance, rest), ctxt)
+      Contract.get_balance_carbonated ctxt step_constants.self
+      >>=? fun (ctxt, balance) -> logged_return ((balance, rest), ctxt)
   | (Now, rest) ->
       let now = Script_timestamp.now ctxt in
       logged_return ((now, rest), ctxt)

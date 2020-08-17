@@ -663,6 +663,14 @@ let get_balance c contract =
   | Some v ->
       return v
 
+let get_balance_carbonated c contract =
+  (* Reading an int64 from /contracts/pkh/balance
+     NB: this cost assumes a flattened storage structure. *)
+  Raw_context.consume_gas
+    c
+    (Storage_costs.read_access ~path_length:3 ~read_bytes:8)
+  >>?= fun c -> get_balance c contract >>=? fun balance -> return (c, balance)
+
 let update_script_storage c contract storage big_map_diff =
   let storage = Script_repr.lazy_expr storage in
   update_script_big_map c big_map_diff

@@ -776,10 +776,8 @@ module Cost_of = struct
     (* Increments the internal_nonce counter. *)
     let set_delegate = Gas.(push +@ push)
 
-    (* TODO 007: this instruction performs a read access to the context through
-       an uncarbonated functor. Cost to be set in IO-specific gas MR. The cost below
-       is not unrealistic. *)
-    let balance = atomic_step_cost 300_000
+    (* Cost of access taken care of in Contract_storage.get_balance_carbonated *)
+    let balance = Gas.free
 
     (* Accessing the raw_context, Small arithmetic & pushing on the stack. *)
     let level = atomic_step_cost (2 * cost_N_Const)

@@ -750,6 +750,9 @@ module Contract : sig
 
   val get_balance : context -> contract -> Tez.t tzresult Lwt.t
 
+  val get_balance_carbonated :
+    context -> contract -> (context * Tez.t) tzresult Lwt.t
+
   val init_origination_nonce : context -> Operation_hash.t -> context
 
   val unset_origination_nonce : context -> context
