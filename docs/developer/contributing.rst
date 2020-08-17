@@ -12,7 +12,7 @@ Reporting issues
 ----------------
 
 The simplest way to contribute to Tezos is to report issues that you may
-find with the software on `gitlab <https://gitlab.com/tezos/tezos/issues>`__.
+find with the software on `gitlab <https://gitlab.com/tezos/tezos/-/issues>`__.
 If you are unsure about an issue ask on IRC first and always make sure
 to search the existing issues before reporting a new one.
 Some info that are probably important to include in the description:

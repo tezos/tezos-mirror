@@ -167,19 +167,19 @@ mistake `snapshot a protocol`, like in step 1 above, with `snapshot a node`,
 which results in a snapshot file like in here) that contains the real status of
 a Mainnet's node at a particular moment in time (see :ref:`snapshots`). Such a
 snapshot file can be downloaded from several sites on the internet. For
-instance, the site `TulipTools<https://snapshots.tulip.tools/>`_ stores daily
+instance, the site `TulipTools <https://snapshots.tulip.tools/>`_ stores daily
 snapshot files from both Mainnet and Testnet, in both ``full`` and ``rolling``
-mode (see :ref:`History modes`). For the purposes of testing the migration, a
+mode (see :ref:`history-modes`). For the purposes of testing the migration, a
 snapshot file in ``rolling`` mode is enough. It is important to use a snapshot
 file that is recent enough as to contain the predecessor of the Alpha
 protocol. It is also important to note down the level at which the snapshot file
 was taken, which determines at which level we want to trigger the migration. The
-site `TulipTools<https://snapshots.tulip.tools/>`_ conveniently indicates the
+site `TulipTools <https://snapshots.tulip.tools/>`_ conveniently indicates the
 date and the level (the `block`) at which each snapshot file was taken.
 
 In our example we will use a snapshot file
 ``~/mainnet_2020-07-14_12 00.rolling`` that was downloaded from
-`TulipTools<https://snapshots.tulip.tools/>`_ on July the 14th of 2020, and
+`TulipTools <https://snapshots.tulip.tools/>`_ on July the 14th of 2020, and
 which was taken at level ``1039318``.
 
 The next subsections explain each of the individual steps 1--7.
@@ -296,7 +296,7 @@ As before, if we had opted for not snapshoting the Alpha protocol, we could pass
 the path ``src/proto_alpha`` as the parameter of the command above.
 
 If we are testing the migration on an empty context on the sandbox, then we
-should proceed directly to Section `Compile the project`_. Otherwise, the next
+should proceed directly to Section `6. Compile the project`_. Otherwise, the next
 two subsections detail how to produce credentials that will allow us to make the
 chain that we imported from Mainnet progress.
 
@@ -363,7 +363,7 @@ If we wish to test the migration in a realistic scenario, we need to import a
 context from a Mainnet's snapshot file. As explained in the beginning of Section
 `Prepare the migration`_, in our example we will use a snapshot file
 ``~/mainnet_2020-07-14_12 00.rolling`` that was downloaded from
-`TulipTools<https://snapshots.tulip.tools/>`_ on July the 14th of 2020, and
+`TulipTools <https://snapshots.tulip.tools/>`_ on July the 14th of 2020, and
 which was taken at level ``1039318``.
 
 We also need to generate a node identity, which we will keep in the folder that
@@ -384,7 +384,7 @@ The ``./tezos-node snapshot import`` command accepts an option
 the last block in the imported chain is ``<block_hash>``. This mechanism helps
 the developer to check that the imported chain contains blocks that are part of
 the current main chain of the Tezos network. The web
-`TulipTools<https://snapshots.tulip.tools/>`_ provides the first ten characters
+`TulipTools <https://snapshots.tulip.tools/>`_ provides the first ten characters
 of the hash of the last block in a given snapshot file. Although we will not be
 using the ``--block`` option in this tutorial, the developer is encouraged to
 check that this prefix corresponds to the hash of a real block in Mainnet.

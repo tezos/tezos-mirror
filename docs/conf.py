@@ -180,4 +180,8 @@ texinfo_documents = [
 # -- Ignore fragments in linkcheck
 
 linkcheck_anchors = False
-linkcheck_ignore = [r'https://www.reddit.com.*/','https://www.michelson-lang.com/']
+linkcheck_ignore = [
+    r'https://www.reddit.com.*/',
+    'https://www.michelson-lang.com/',
+    r'https://gitlab.com/nomadic-labs/tezos/-/merge_requests/*'
+]
