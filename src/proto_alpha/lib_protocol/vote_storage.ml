@@ -127,19 +127,12 @@ let get_voting_power_free ctxt owner =
    carbonated functors in a future amendment *)
 let get_voting_power ctxt owner =
   let open Raw_context in
-  let open Gas_limit_repr in
   (* Always consume read access to memory *)
-  consume_gas ctxt (read_bytes_cost Z.zero)
+  (* Accessing an int32 at /votes/listings/pkh *)
+  consume_gas ctxt (Storage_costs.read_access ~path_length:3 ~read_bytes:4)
   >>?= fun ctxt ->
   Storage.Vote.Listings.get_option ctxt owner
-  >>=? function
-  | None ->
-      return (ctxt, 0l)
-  | Some power ->
-      (* If some power is returned, consume read size_of(int32) = 4 bytes *)
-      Lwt.return
-        ( consume_gas ctxt (read_bytes_cost (Z.of_int 4))
-        >|? fun ctxt -> (ctxt, power) )
+  >|=? function None -> (ctxt, 0l) | Some power -> (ctxt, power)
 
 let get_total_voting_power_free = listing_size
 
@@ -148,15 +141,11 @@ let get_total_voting_power_free = listing_size
    carbonated functors in a future amendment *)
 let get_total_voting_power ctxt =
   let open Raw_context in
-  let open Gas_limit_repr in
-  listing_size ctxt
-  >>=? fun total_power ->
-  (* Consume access to memory and read size_of(int32) = 4 bytes *)
-  Lwt.return
-    ( consume_gas ctxt (read_bytes_cost Z.zero)
-    >>? fun ctxt ->
-    consume_gas ctxt (read_bytes_cost (Z.of_int 4))
-    >>? fun ctxt -> ok (ctxt, total_power) )
+  (* Accessing an int32 at /votes/listings_size *)
+  consume_gas ctxt (Storage_costs.read_access ~path_length:2 ~read_bytes:4)
+  >>?= fun ctxt ->
+  get_total_voting_power_free ctxt
+  >|=? fun total_voting_power -> (ctxt, total_voting_power)
 
 let get_current_period_kind = Storage.Vote.Current_period_kind.get
 
