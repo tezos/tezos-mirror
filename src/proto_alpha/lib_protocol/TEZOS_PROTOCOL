@@ -37,6 +37,7 @@
         "Parameters_repr",
 
         "Raw_context",
+        "Storage_costs",
         "Storage_sigs",
         "Storage_functors",
         "Storage",

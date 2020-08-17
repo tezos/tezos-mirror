@@ -53,6 +53,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    commitment_repr.mli commitment_repr.ml
    parameters_repr.mli parameters_repr.ml
    raw_context.mli raw_context.ml
+   storage_costs.mli storage_costs.ml
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
    storage.mli storage.ml
@@ -131,6 +132,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    commitment_repr.mli commitment_repr.ml
    parameters_repr.mli parameters_repr.ml
    raw_context.mli raw_context.ml
+   storage_costs.mli storage_costs.ml
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
    storage.mli storage.ml
@@ -209,6 +211,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    commitment_repr.mli commitment_repr.ml
    parameters_repr.mli parameters_repr.ml
    raw_context.mli raw_context.ml
+   storage_costs.mli storage_costs.ml
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
    storage.mli storage.ml
@@ -307,6 +310,7 @@ include Tezos_raw_protocol_alpha.Main
    Commitment_repr
    Parameters_repr
    Raw_context
+   Storage_costs
    Storage_sigs
    Storage_functors
    Storage
@@ -421,6 +425,7 @@ include Tezos_raw_protocol_alpha.Main
    commitment_repr.mli commitment_repr.ml
    parameters_repr.mli parameters_repr.ml
    raw_context.mli raw_context.ml
+   storage_costs.mli storage_costs.ml
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
    storage.mli storage.ml
