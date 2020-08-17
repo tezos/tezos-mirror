@@ -55,6 +55,11 @@ let include_ mode oc file =
   Printf.fprintf oc "# 1 %S\n" file ;
   dump_file oc file ;
   Printf.fprintf oc "end\n" ;
+  (* We add the following attribute for coq-of-ocaml. The idea is to force the
+     translation of all the top-level modules of the environment to plain Coq
+     modules (by opposition to records). This simplifies the presentation of the
+     generated Coq for the environment. *)
+  Printf.fprintf oc "[@@coq_plain_module]\n" ;
   if unit = "Result" then
     Printf.fprintf
       oc
