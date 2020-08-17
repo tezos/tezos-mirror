@@ -405,8 +405,10 @@ module Make_indexed_carbonated_data_storage
 
   let len_key i = I.to_path i [len_name]
 
-  let consume_mem_gas c =
-    C.consume_gas c (Gas_limit_repr.read_bytes_cost Z.zero)
+  let consume_mem_gas c key =
+    C.consume_gas
+      c
+      (Storage_costs.read_access ~path_length:(List.length key) ~read_bytes:0)
 
   let existing_size c i =
     C.get_option c (len_key i)
@@ -417,30 +419,40 @@ module Make_indexed_carbonated_data_storage
         decode_len_value (len_key i) len >|? fun len -> (len, true)
 
   let consume_read_gas get c i =
-    get c (len_key i)
+    let len_key = len_key i in
+    get c len_key
     >>=? fun len ->
     Lwt.return
-      ( decode_len_value (len_key i) len
-      >>? fun len ->
-      C.consume_gas c (Gas_limit_repr.read_bytes_cost (Z.of_int len)) )
+      ( decode_len_value len_key len
+      >>? fun read_bytes ->
+      let cost =
+        Storage_costs.read_access
+          ~path_length:(List.length len_key)
+          ~read_bytes
+      in
+      C.consume_gas c cost )
 
+  (* For the future: here, we bill a generic cost for encoding the value
+     to bytes. It would be cleaner for users of this functor to provide
+     gas costs for the encoding. *)
   let consume_serialize_write_gas set c i v =
     let bytes = to_bytes v in
     let len = MBytes.length bytes in
     C.consume_gas c (Gas_limit_repr.alloc_mbytes_cost len)
     >>?= fun c ->
-    C.consume_gas c (Gas_limit_repr.write_bytes_cost (Z.of_int len))
+    let cost = Storage_costs.write_access ~written_bytes:len in
+    C.consume_gas c cost
     >>?= fun c ->
     set c (len_key i) (encode_len_value bytes) >|=? fun c -> (c, bytes)
 
   let consume_remove_gas del c i =
-    C.consume_gas c (Gas_limit_repr.write_bytes_cost Z.zero)
+    C.consume_gas c (Storage_costs.write_access ~written_bytes:0)
     >>?= fun c -> del c (len_key i)
 
   let mem s i =
-    consume_mem_gas s
-    >>?= fun s ->
-    C.mem s (data_key i) >|= fun exists -> ok (C.project s, exists)
+    let key = data_key i in
+    consume_mem_gas s key
+    >>?= fun s -> C.mem s key >|= fun exists -> ok (C.project s, exists)
 
   let get s i =
     consume_read_gas C.get s i
@@ -451,9 +463,10 @@ module Make_indexed_carbonated_data_storage
     Lwt.return (of_bytes ~key b >|? fun v -> (C.project s, v))
 
   let get_option s i =
-    consume_mem_gas s
+    let key = data_key i in
+    consume_mem_gas s key
     >>?= fun s ->
-    C.mem s (data_key i)
+    C.mem s key
     >>= fun exists ->
     if exists then get s i >|=? fun (s, v) -> (s, Some v)
     else return (C.project s, None)
@@ -946,8 +959,12 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
 
     let data_name = data_name :: N.name
 
+    let path_length = List.length N.name + 1
+
     let consume_mem_gas c =
-      Raw_context.consume_gas c (Gas_limit_repr.read_bytes_cost Z.zero)
+      Raw_context.consume_gas
+        c
+        (Storage_costs.read_access ~path_length ~read_bytes:0)
 
     let existing_size c =
       Raw_context.get_option c len_name
@@ -962,22 +979,20 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
       >>=? fun len ->
       Lwt.return
         ( decode_len_value len_name len
-        >>? fun len ->
+        >>? fun read_bytes ->
         Raw_context.consume_gas
           c
-          (Gas_limit_repr.read_bytes_cost (Z.of_int len)) )
+          (Storage_costs.read_access ~path_length ~read_bytes) )
 
     let consume_write_gas set c v =
       let bytes = to_bytes v in
       let len = MBytes.length bytes in
-      Raw_context.consume_gas
-        c
-        (Gas_limit_repr.write_bytes_cost (Z.of_int len))
+      Raw_context.consume_gas c (Storage_costs.write_access ~written_bytes:len)
       >>?= fun c ->
       set c len_name (encode_len_value bytes) >|=? fun c -> (c, bytes)
 
     let consume_remove_gas del c =
-      Raw_context.consume_gas c (Gas_limit_repr.write_bytes_cost Z.zero)
+      Raw_context.consume_gas c (Storage_costs.write_access ~written_bytes:0)
       >>?= fun c -> del c len_name
 
     let mem s i =
