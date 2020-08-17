@@ -209,42 +209,41 @@ let pending_operations (mockup_env : Registration.mockup_environment) chain_id
           >>= function
           | Error errs ->
               RPC_answer.fail errs
-          | Ok pooled_operations ->
-              (* Format.printf "Retrieving unprocessed operations@." ; *)
-              let unprocessed =
-                List.fold_left
-                  (fun map (shell_header, operation_data) ->
-                    let op =
+          | Ok pooled_operations -> (
+              map_s
+                (fun (shell_header, operation_data) ->
+                  let op =
+                    {
+                      M.Protocol.shell = shell_header;
+                      protocol_data = operation_data;
+                    }
+                  in
+                  match
+                    Data_encoding.Binary.to_bytes
+                      op_data_encoding
+                      operation_data
+                  with
+                  | Error _ ->
+                      failwith "mockup pending_operations"
+                  | Ok proto ->
+                      let operation_hash =
+                        Operation.hash {Operation.shell = shell_header; proto}
+                      in
+                      return (operation_hash, op))
+                pooled_operations
+              >>= function
+              | Error _ ->
+                  RPC_answer.fail [Cannot_parse_op]
+              | Ok applied ->
+                  Lwt.return
+                    (`Ok
                       {
-                        M.Protocol.shell = shell_header;
-                        protocol_data = operation_data;
-                      }
-                    in
-                    match
-                      Data_encoding.Binary.to_bytes
-                        op_data_encoding
-                        operation_data
-                    with
-                    | Error _ ->
-                        map
-                    | Ok proto ->
-                        let operation_hash =
-                          Operation.hash
-                            {Operation.shell = shell_header; proto}
-                        in
-                        Operation_hash.Map.add operation_hash op map)
-                  Operation_hash.Map.empty
-                  pooled_operations
-              in
-              Lwt.return
-                (`Ok
-                  {
-                    M.Block_services.Mempool.applied = [];
-                    refused = Operation_hash.Map.empty;
-                    branch_refused = Operation_hash.Map.empty;
-                    branch_delayed = Operation_hash.Map.empty;
-                    unprocessed;
-                  }) ))
+                        M.Block_services.Mempool.applied;
+                        refused = Operation_hash.Map.empty;
+                        branch_refused = Operation_hash.Map.empty;
+                        branch_delayed = Operation_hash.Map.empty;
+                        unprocessed = Operation_hash.Map.empty;
+                      }) ) ))
 
 let block_hash (rpc_context : Tezos_protocol_environment.rpc_context) =
   let path =
@@ -324,7 +323,7 @@ let preapply_block (mockup_env : Registration.mockup_environment)
                          op.protocol_data
                      with
                      | Error _ ->
-                         failwith "foo"
+                         failwith "mockup preapply_block"
                      | Ok proto ->
                          let op_t = {Operation.shell = op.shell; proto} in
                          let hash = Operation.hash op_t in
