@@ -425,6 +425,172 @@ module Cost_of = struct
     let cost_N_Xor_nat size1 size2 =
       let v0 = Compare.Int.max size1 size2 in
       8 + ((v0 lsr 4) + (v0 lsr 6))
+
+    (* model B58CHECK_DECODING_CHAIN_ID *)
+    let cost_B58CHECK_DECODING_CHAIN_ID = 1495
+
+    (* model B58CHECK_DECODING_PUBLIC_KEY_HASH_ed25519 *)
+    let cost_B58CHECK_DECODING_PUBLIC_KEY_HASH_ed25519 = 3265
+
+    (* model B58CHECK_DECODING_PUBLIC_KEY_HASH_p256 *)
+    let cost_B58CHECK_DECODING_PUBLIC_KEY_HASH_p256 = 3153
+
+    (* model B58CHECK_DECODING_PUBLIC_KEY_HASH_secp256k1 *)
+    let cost_B58CHECK_DECODING_PUBLIC_KEY_HASH_secp256k1 = 3088
+
+    (* model B58CHECK_DECODING_PUBLIC_KEY_ed25519 *)
+    let cost_B58CHECK_DECODING_PUBLIC_KEY_ed25519 = 4220
+
+    (* model B58CHECK_DECODING_PUBLIC_KEY_p256 *)
+    let cost_B58CHECK_DECODING_PUBLIC_KEY_p256 = 28631
+
+    (* model B58CHECK_DECODING_PUBLIC_KEY_secp256k1 *)
+    let cost_B58CHECK_DECODING_PUBLIC_KEY_secp256k1 = 9419
+
+    (* model B58CHECK_DECODING_SIGNATURE_ed25519 *)
+    let cost_B58CHECK_DECODING_SIGNATURE_ed25519 = 6547
+
+    (* model B58CHECK_DECODING_SIGNATURE_p256 *)
+    let cost_B58CHECK_DECODING_SIGNATURE_p256 = 6543
+
+    (* model B58CHECK_DECODING_SIGNATURE_secp256k1 *)
+    let cost_B58CHECK_DECODING_SIGNATURE_secp256k1 = 6553
+
+    (* model B58CHECK_ENCODING_CHAIN_ID *)
+    let cost_B58CHECK_ENCODING_CHAIN_ID = 1610
+
+    (* model B58CHECK_ENCODING_PUBLIC_KEY_HASH_ed25519 *)
+    let cost_B58CHECK_ENCODING_PUBLIC_KEY_HASH_ed25519 = 3138
+
+    (* model B58CHECK_ENCODING_PUBLIC_KEY_HASH_p256 *)
+    let cost_B58CHECK_ENCODING_PUBLIC_KEY_HASH_p256 = 3728
+
+    (* model B58CHECK_ENCODING_PUBLIC_KEY_HASH_secp256k1 *)
+    let cost_B58CHECK_ENCODING_PUBLIC_KEY_HASH_secp256k1 = 3224
+
+    (* model B58CHECK_ENCODING_PUBLIC_KEY_ed25519 *)
+    let cost_B58CHECK_ENCODING_PUBLIC_KEY_ed25519 = 4503
+
+    (* model B58CHECK_ENCODING_PUBLIC_KEY_p256 *)
+    let cost_B58CHECK_ENCODING_PUBLIC_KEY_p256 = 5246
+
+    (* model B58CHECK_ENCODING_PUBLIC_KEY_secp256k1 *)
+    let cost_B58CHECK_ENCODING_PUBLIC_KEY_secp256k1 = 5018
+
+    (* model B58CHECK_ENCODING_SIGNATURE_ed25519 *)
+    let cost_B58CHECK_ENCODING_SIGNATURE_ed25519 = 8713
+
+    (* model B58CHECK_ENCODING_SIGNATURE_p256 *)
+    let cost_B58CHECK_ENCODING_SIGNATURE_p256 = 8716
+
+    (* model B58CHECK_ENCODING_SIGNATURE_secp256k1 *)
+    let cost_B58CHECK_ENCODING_SIGNATURE_secp256k1 = 8628
+
+    (* model DECODING_CHAIN_ID *)
+    let cost_DECODING_CHAIN_ID = 48
+
+    (* model DECODING_PUBLIC_KEY_HASH_ed25519 *)
+    let cost_DECODING_PUBLIC_KEY_HASH_ed25519 = 54
+
+    (* model DECODING_PUBLIC_KEY_HASH_p256 *)
+    let cost_DECODING_PUBLIC_KEY_HASH_p256 = 60
+
+    (* model DECODING_PUBLIC_KEY_HASH_secp256k1 *)
+    let cost_DECODING_PUBLIC_KEY_HASH_secp256k1 = 56
+
+    (* model DECODING_PUBLIC_KEY_ed25519 *)
+    let cost_DECODING_PUBLIC_KEY_ed25519 = 65
+
+    (* model DECODING_PUBLIC_KEY_p256 *)
+    let cost_DECODING_PUBLIC_KEY_p256 = 24394
+
+    (* model DECODING_PUBLIC_KEY_secp256k1 *)
+    let cost_DECODING_PUBLIC_KEY_secp256k1 = 5307
+
+    (* model DECODING_SIGNATURE_ed25519 *)
+    let cost_DECODING_SIGNATURE_ed25519 = 32
+
+    (* model DECODING_SIGNATURE_p256 *)
+    let cost_DECODING_SIGNATURE_p256 = 32
+
+    (* model DECODING_SIGNATURE_secp256k1 *)
+    let cost_DECODING_SIGNATURE_secp256k1 = 32
+
+    (* model ENCODING_CHAIN_ID *)
+    let cost_ENCODING_CHAIN_ID = 47
+
+    (* model ENCODING_PUBLIC_KEY_HASH_ed25519 *)
+    let cost_ENCODING_PUBLIC_KEY_HASH_ed25519 = 65
+
+    (* model ENCODING_PUBLIC_KEY_HASH_p256 *)
+    let cost_ENCODING_PUBLIC_KEY_HASH_p256 = 76
+
+    (* model ENCODING_PUBLIC_KEY_HASH_secp256k1 *)
+    let cost_ENCODING_PUBLIC_KEY_HASH_secp256k1 = 73
+
+    (* model ENCODING_PUBLIC_KEY_ed25519 *)
+    let cost_ENCODING_PUBLIC_KEY_ed25519 = 77
+
+    (* model ENCODING_PUBLIC_KEY_p256 *)
+    let cost_ENCODING_PUBLIC_KEY_p256 = 453
+
+    (* model ENCODING_PUBLIC_KEY_secp256k1 *)
+    let cost_ENCODING_PUBLIC_KEY_secp256k1 = 486
+
+    (* model ENCODING_SIGNATURE_ed25519 *)
+    let cost_ENCODING_SIGNATURE_ed25519 = 39
+
+    (* model ENCODING_SIGNATURE_p256 *)
+    let cost_ENCODING_SIGNATURE_p256 = 39
+
+    (* model ENCODING_SIGNATURE_secp256k1 *)
+    let cost_ENCODING_SIGNATURE_secp256k1 = 39
+
+    (* model TIMESTAMP_READABLE_DECODING *)
+    let cost_TIMESTAMP_READABLE_DECODING = 131
+
+    (* model TIMESTAMP_READABLE_ENCODING *)
+    let cost_TIMESTAMP_READABLE_ENCODING = 868
+
+    (* model CHECK_PRINTABLE *)
+    let cost_CHECK_PRINTABLE size = 14 + (10 * size)
+
+    (* model MERGE_TYPES
+       This is the estimated cost of one iteration of merge_types, extracted
+       and copied manually from the parameter fit for the MERGE_TYPES benchmark
+       (the model is parametric on the size of the type, which we don't have
+       access to in O(1)). *)
+    let cost_MERGE_TYPES = 130
+
+    (* model TYPECHECKING_CODE
+       This is the cost of one iteration of parse_instr, extracted by hand from the
+       parameter fit for the TYPECHECKING_CODE benchmark. *)
+    let cost_TYPECHECKING_CODE = 375
+
+    (* model UNPARSING_CODE
+       This is the cost of one iteration of unparse_instr, extracted by hand from the
+       parameter fit for the UNPARSING_CODE benchmark. *)
+    let cost_UNPARSING_CODE = 200
+
+    (* model TYPECHECKING_DATA
+       This is the cost of one iteration of parse_data, extracted by hand from the
+       parameter fit for the TYPECHECKING_DATA benchmark. *)
+    let cost_TYPECHECKING_DATA = 240
+
+    (* model UNPARSING_DATA
+       This is the cost of one iteration of unparse_data, extracted by hand from the
+       parameter fit for the UNPARSING_DATA benchmark. *)
+    let cost_UNPARSING_DATA = 140
+
+    (* model PARSE_TYPE
+       This is the cost of one iteration of parse_ty, extracted by hand from the
+       parameter fit for the PARSE_TYPE benchmark. *)
+    let cost_PARSE_TYPE = 167
+
+    (* model UNPARSE_TYPE
+       This is the cost of one iteration of unparse_ty, extracted by hand from the
+       parameter fit for the UNPARSE_TYPE benchmark. *)
+    let cost_UNPARSE_TYPE = 184
   end
 
   module Interpreter = struct
