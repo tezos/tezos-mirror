@@ -1,5 +1,6 @@
 import os
 import re
+from os import path
 
 import pytest
 
@@ -424,3 +425,71 @@ class TestBaker:
             client.toggle_baker_delegations('baker3', True)
         client.set_delegate('bootstrap1', 'baker3')
         client.set_delegate('bootstrap2', 'baker3')
+
+    def test_call_generic(self, client: Client):
+        # generic lambda type is:
+        # `lambda unit (pair (list operation) (list baker_operation))`
+        param = (
+            '{ DROP ; NIL baker_operation ; NIL operation ; '
+            f'PUSH key_hash "{IDENTITIES["bootstrap1"]["identity"]}" ; '
+            'IMPLICIT_ACCOUNT ; PUSH mutez 10000 ; UNIT ; '
+            'TRANSFER_TOKENS ; CONS ; PAIR }'
+        )
+        generic_call = [
+            'call',
+            'generic',
+            'baker',
+            'baker3',
+            'with',
+            'lambda',
+            param,
+        ]
+        client.run(generic_call)
+        client.bake('baker5', BAKE_ARGS)
+
+    def test_transfer(self, client: Client):
+        source = 'baker3'
+        amount = 101.301
+        amount_mutez = utils.mutez_of_tez(amount)
+        cmd = [
+            'from',
+            'baker',
+            'contract',
+            source,
+            'transfer',
+            str(amount),
+            'to',
+        ]
+
+        # transfer to an implicit account
+        target = 'bootstrap1'
+        fee = 0.000859
+        fee_mutez = utils.mutez_of_tez(fee)
+        balance_source = client.get_mutez_balance(source)
+        balance_target = client.get_mutez_balance(target)
+        client.run(cmd + [target])
+        client.bake('baker5', BAKE_ARGS)
+        new_balance_source = client.get_mutez_balance(source)
+        new_balance_target = client.get_mutez_balance(target)
+        assert balance_source - fee_mutez - amount_mutez == new_balance_source
+        assert balance_target + amount_mutez == new_balance_target
+
+        # transfer to an originated account
+        target = 'str_id_contract'
+        fee = 0.001098
+        fee_mutez = utils.mutez_of_tez(fee)
+        contract = path.join(
+            CONTRACT_PATH, 'entrypoints', 'simple_entrypoints.tz'
+        )
+        client.originate(
+            target, 1000, source, contract, args=['--burn-cap', '0.321']
+        )
+        client.bake('baker5', BAKE_ARGS)
+        balance_source = client.get_mutez_balance(source)
+        balance_target = client.get_mutez_balance(target)
+        client.run(cmd + [target, '--arg', '"foo"', '--entrypoint', 'B'])
+        client.bake('baker5', BAKE_ARGS)
+        new_balance_source = client.get_mutez_balance(source)
+        new_balance_target = client.get_mutez_balance(target)
+        assert balance_source - fee_mutez - amount_mutez == new_balance_source
+        assert balance_target + amount_mutez == new_balance_target
