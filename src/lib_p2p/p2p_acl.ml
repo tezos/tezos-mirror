@@ -30,7 +30,6 @@ module PeerFIFOCache : Ringo.CACHE_SET with type elt = P2p_peer.Id.t =
 
 module PatriciaTree (V : HashPtree.Value) = struct
   module M = HashPtree.Make_BE_int2_64 (V)
-  module Bits = HashPtree.Int2_64
 
   type t = M.t
 
