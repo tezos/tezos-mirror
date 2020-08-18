@@ -29,34 +29,6 @@ let may ~f = function None -> Lwt.return_unit | Some x -> f x
 
 let never_ending () = fst (Lwt.wait ())
 
-type trigger = Absent | Present | Waiting of unit Lwt.t * unit Lwt.u
-
-let trigger () : (unit -> unit) * (unit -> unit Lwt.t) =
-  let state = ref Absent in
-  let trigger () =
-    match !state with
-    | Absent ->
-        state := Present
-    | Present ->
-        ()
-    | Waiting (_waiter, wakener) ->
-        state := Absent ;
-        Lwt.wakeup wakener ()
-  in
-  let wait () =
-    match !state with
-    | Absent ->
-        let (waiter, wakener) = Lwt.wait () in
-        state := Waiting (waiter, wakener) ;
-        waiter
-    | Present ->
-        state := Absent ;
-        Lwt.return_unit
-    | Waiting (waiter, _wakener) ->
-        waiter
-  in
-  (trigger, wait)
-
 (* A worker launcher, takes a cancel callback to call upon *)
 let worker name ~on_event ~run ~cancel =
   let (stop, stopper) = Lwt.wait () in
