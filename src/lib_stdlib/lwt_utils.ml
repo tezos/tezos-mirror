@@ -59,22 +59,25 @@ let trigger () : (unit -> unit) * (unit -> unit Lwt.t) =
 
 (* A worker launcher, takes a cancel callback to call upon *)
 let worker name ~on_event ~run ~cancel =
-  let stop = Lwt_condition.create () in
+  let (stop, stopper) = Lwt.wait () in
   let fail e =
-    on_event
-      name
-      (`Failed (Printf.sprintf "Exception: %s" (Printexc.to_string e)))
-    >>= fun () -> cancel ()
+    Lwt.finalize
+      (fun () ->
+        on_event
+          name
+          (`Failed (Printf.sprintf "Exception: %s" (Printexc.to_string e))))
+      cancel
   in
-  let waiter = Lwt_condition.wait stop in
   on_event name `Started
   >>= fun () ->
-  Lwt.ignore_result
-    ( Lwt.catch run fail
-    >>= fun () ->
-    Lwt_condition.signal stop () ;
-    Lwt.return_unit ) ;
-  waiter >>= fun () -> on_event name `Ended >>= fun () -> Lwt.return_unit
+  let p = Lwt.catch run fail in
+  Lwt.on_termination p (Lwt.wakeup stopper) ;
+  stop
+  >>= fun () ->
+  Lwt.catch (fun () -> on_event name `Ended) (fun _ -> Lwt.return_unit)
+
+let worker name ~on_event ~run ~cancel =
+  Lwt.no_cancel (worker name ~on_event ~run ~cancel)
 
 let rec chop k l =
   if k = 0 then l

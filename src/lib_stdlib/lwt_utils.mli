@@ -27,9 +27,32 @@ val may : f:('a -> unit Lwt.t) -> 'a option -> unit Lwt.t
 
 val never_ending : unit -> 'a Lwt.t
 
-(** [worker name ~on_event ~run ~cancel] runs worker [run], and logs worker
-    creation, ending or failure using [~on_event].
-    [cancel] is called if worker fails. *)
+(** [worker name ~on_event ~run ~cancel] internally calls [run ()] (which
+    returns a promise [p]) and returns its own promise [work].
+    If [p] becomes fulfilled, then [work] also becomes fulfilled.
+    If [p] becomes rejected then [cancel ()] is called and, once its promise is
+    resolved, [work] is fulfilled. This gives the opportunity for the function
+    [cancel] to clean-up some resources.
+
+    The function [on_event] is called at different times (start, failure, end)
+    and is mostly meant as a logging mechanism but can also be used for other
+    purposes such as synchronization between different workers.
+
+    If the promises returned by [on_event] or [cancel] raise an exception or
+    become rejected, the exception/failure is simply ignored and the promise is
+    treated as having resolved anyway.
+
+    Note that the promise [work] returned by the [worker] function is not
+    cancelable. If you need to cancel the promise returned by [run], you need
+    to embed your own synchronization system within [run]. E.g.,
+
+    [let p, r = Lwt.wait in
+     let run () =
+        let main = … in
+        Lwt.pick [main ; p]
+     in]
+
+*)
 val worker :
   string ->
   on_event:(string -> [`Ended | `Failed of string | `Started] -> unit Lwt.t) ->
