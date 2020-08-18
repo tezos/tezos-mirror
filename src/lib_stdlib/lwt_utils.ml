@@ -25,7 +25,7 @@
 
 open Lwt.Infix
 
-let may ~f = function None -> Lwt.return_unit | Some x -> f x
+let may ~f = Option.fold ~none:Lwt.return_unit ~some:f
 
 let never_ending () = fst (Lwt.wait ())
 
