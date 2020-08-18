@@ -95,14 +95,6 @@ val with_timeout :
   (Lwt_canceler.t -> 'a tzresult Lwt.t) ->
   'a tzresult Lwt.t
 
-module Make (Prefix : Sig.PREFIX) : sig
-  include Sig.CORE
-
-  include Sig.EXT with type error := error
-
-  include Sig.WITH_WRAPPED with type error := error
-end
-
 (**/**)
 
 val errs_tag : trace Tag.def
