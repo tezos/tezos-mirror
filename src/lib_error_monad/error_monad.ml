@@ -96,13 +96,22 @@ let () =
     (function Canceled -> Some () | _ -> None)
     (fun () -> Canceled)
 
-let protect ?on_error ?canceler t =
-  let cancellation =
-    match canceler with
+let protect_no_canceler ?on_error t =
+  let res = Lwt.catch t (fun exn -> fail (Exn exn)) in
+  res
+  >>= function
+  | Ok _ ->
+      res
+  | Error trace -> (
+    match on_error with
     | None ->
-        Lwt_utils.never_ending ()
-    | Some canceler ->
-        Lwt_canceler.cancellation canceler >>= fun () -> fail Canceled
+        res
+    | Some on_error ->
+        Lwt.catch (fun () -> on_error trace) (fun exn -> fail (Exn exn)) )
+
+let protect_canceler ?on_error canceler t =
+  let cancellation =
+    Lwt_canceler.cancellation canceler >>= fun () -> fail Canceled
   in
   let res = Lwt.pick [cancellation; Lwt.catch t (fun exn -> fail (Exn exn))] in
   res
@@ -110,15 +119,21 @@ let protect ?on_error ?canceler t =
   | Ok _ ->
       res
   | Error trace -> (
-      let canceled =
-        Option.fold canceler ~none:false ~some:Lwt_canceler.canceled
+      let trace =
+        if Lwt_canceler.canceled canceler then TzTrace.make Canceled else trace
       in
-      let trace = if canceled then TzTrace.make Canceled else trace in
       match on_error with
       | None ->
           Lwt.return_error trace
       | Some on_error ->
           Lwt.catch (fun () -> on_error trace) (fun exn -> fail (Exn exn)) )
+
+let protect ?on_error ?canceler t =
+  match canceler with
+  | None ->
+      protect_no_canceler ?on_error t
+  | Some canceler ->
+      protect_canceler ?on_error canceler t
 
 type error += Timeout
 
