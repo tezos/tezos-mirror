@@ -60,8 +60,6 @@ val worker :
   cancel:(unit -> unit Lwt.t) ->
   unit Lwt.t
 
-val sort : ('a -> 'a -> int Lwt.t) -> 'a list -> 'a list Lwt.t
-
 val unless : bool -> (unit -> unit Lwt.t) -> unit Lwt.t
 
 (** Evaluates fold_left_s on a batch of [n] elements and returns a pair
