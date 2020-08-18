@@ -51,8 +51,6 @@ let worker name ~on_event ~run ~cancel =
 let worker name ~on_event ~run ~cancel =
   Lwt.no_cancel (worker name ~on_event ~run ~cancel)
 
-let unless cond f = if cond then Lwt.return_unit else f ()
-
 let rec fold_left_s_n ~n f acc l =
   if n = 0 then Lwt.return (acc, l)
   else

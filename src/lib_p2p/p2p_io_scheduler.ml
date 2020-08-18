@@ -72,14 +72,15 @@ module Scheduler (IO : IO) = struct
   }
 
   let cancel (conn : connection) err =
-    Lwt_utils.unless conn.closed (fun () ->
-        Events.(emit connection_closed) ("cancel", conn.id, IO.name)
-        >>= fun () ->
-        conn.closed <- true ;
-        Lwt.catch
-          (fun () -> IO.close conn.out_param err)
-          (fun _ -> Lwt.return_unit)
-        >>= fun () -> Lwt_canceler.cancel conn.canceler)
+    if conn.closed then Lwt.return_unit
+    else
+      Events.(emit connection_closed) ("cancel", conn.id, IO.name)
+      >>= fun () ->
+      conn.closed <- true ;
+      Lwt.catch
+        (fun () -> IO.close conn.out_param err)
+        (fun _ -> Lwt.return_unit)
+      >>= fun () -> Lwt_canceler.cancel conn.canceler
 
   let waiter st conn =
     assert (Lwt.state conn.current_pop <> Sleep) ;
