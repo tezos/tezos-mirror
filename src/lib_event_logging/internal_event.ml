@@ -1450,6 +1450,15 @@ module Lwt_worker_event = struct
       ~message:(Printf.sprintf "Trying to emit worker event for %S" name)
       ~severity:`Fatal
       (fun () -> emit ~section (fun () -> {name; event}))
+
+  let on_event name event =
+    Lwt.catch
+      (fun () -> on_event name event)
+      (fun exc ->
+        Format.eprintf
+          "@[<hv 2>Failed to log event:@ %s@]@."
+          (Printexc.to_string exc) ;
+        Lwt.return_unit)
 end
 
 module Lwt_log_sink = struct
