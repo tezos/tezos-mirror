@@ -258,6 +258,52 @@ module Cost_of : sig
     val unpack_failed : MBytes.t -> Gas.cost
   end
 
+  module Typechecking_007 : sig
+    val public_key_optimized : Gas.cost
+
+    val public_key_readable : Gas.cost
+
+    val key_hash_optimized : Gas.cost
+
+    val key_hash_readable : Gas.cost
+
+    val signature_optimized : Gas.cost
+
+    val signature_readable : Gas.cost
+
+    val chain_id_optimized : Gas.cost
+
+    val chain_id_readable : Gas.cost
+
+    val address_optimized : Gas.cost
+
+    val contract_optimized : Gas.cost
+
+    val contract_readable : Gas.cost
+
+    val check_printable : string -> Gas.cost
+
+    val merge_cycle : Gas.cost
+
+    val parse_type_cycle : Gas.cost
+
+    val parse_instr_cycle : Gas.cost
+
+    val parse_data_cycle : Gas.cost
+
+    val bool : Gas.cost
+
+    val unit : Gas.cost
+
+    val timestamp_readable : Gas.cost
+
+    val contract : Gas.cost
+
+    val contract_exists : Gas.cost
+
+    val proof_argument : int -> Gas.cost
+  end
+
   module Typechecking : sig
     val cycle : Gas.cost
 

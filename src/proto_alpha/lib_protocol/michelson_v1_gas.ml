@@ -981,6 +981,107 @@ module Cost_of = struct
       +@ (len *@ (log2 len *@ (alloc_cost 3 +@ step_cost 1)))
   end
 
+  module Typechecking_007 = struct
+    open Generated_costs_007
+
+    let public_key_optimized =
+      atomic_step_cost
+      @@ Compare.Int.(
+           max
+             cost_DECODING_PUBLIC_KEY_ed25519
+             (max
+                cost_DECODING_PUBLIC_KEY_secp256k1
+                cost_DECODING_PUBLIC_KEY_p256))
+
+    let public_key_readable =
+      atomic_step_cost
+      @@ Compare.Int.(
+           max
+             cost_B58CHECK_DECODING_PUBLIC_KEY_ed25519
+             (max
+                cost_B58CHECK_DECODING_PUBLIC_KEY_secp256k1
+                cost_B58CHECK_DECODING_PUBLIC_KEY_p256))
+
+    let key_hash_optimized =
+      atomic_step_cost
+      @@ Compare.Int.(
+           max
+             cost_DECODING_PUBLIC_KEY_HASH_ed25519
+             (max
+                cost_DECODING_PUBLIC_KEY_HASH_secp256k1
+                cost_DECODING_PUBLIC_KEY_HASH_p256))
+
+    let key_hash_readable =
+      atomic_step_cost
+      @@ Compare.Int.(
+           max
+             cost_B58CHECK_DECODING_PUBLIC_KEY_HASH_ed25519
+             (max
+                cost_B58CHECK_DECODING_PUBLIC_KEY_HASH_secp256k1
+                cost_B58CHECK_DECODING_PUBLIC_KEY_HASH_p256))
+
+    let signature_optimized =
+      atomic_step_cost
+      @@ Compare.Int.(
+           max
+             cost_DECODING_SIGNATURE_ed25519
+             (max
+                cost_DECODING_SIGNATURE_secp256k1
+                cost_DECODING_SIGNATURE_p256))
+
+    let signature_readable =
+      atomic_step_cost
+      @@ Compare.Int.(
+           max
+             cost_B58CHECK_DECODING_SIGNATURE_ed25519
+             (max
+                cost_B58CHECK_DECODING_SIGNATURE_secp256k1
+                cost_B58CHECK_DECODING_SIGNATURE_p256))
+
+    let chain_id_optimized = atomic_step_cost cost_DECODING_CHAIN_ID
+
+    let chain_id_readable = atomic_step_cost cost_B58CHECK_DECODING_CHAIN_ID
+
+    (* Reasonable approximation *)
+    let address_optimized = key_hash_optimized
+
+    (* Reasonable approximation *)
+    let contract_optimized = key_hash_optimized
+
+    (* Reasonable approximation *)
+    let contract_readable = key_hash_readable
+
+    let check_printable s =
+      atomic_step_cost (cost_CHECK_PRINTABLE (String.length s))
+
+    let merge_cycle = atomic_step_cost cost_MERGE_TYPES
+
+    let parse_type_cycle = atomic_step_cost cost_PARSE_TYPE
+
+    let parse_instr_cycle = atomic_step_cost cost_TYPECHECKING_CODE
+
+    let parse_data_cycle = atomic_step_cost cost_TYPECHECKING_DATA
+
+    let bool = free
+
+    let unit = free
+
+    let timestamp_readable = atomic_step_cost cost_TIMESTAMP_READABLE_DECODING
+
+    (* Reasonable estimate. *)
+    let contract = Gas.(2 *@ public_key_readable)
+
+    (* Assuming unflattened storage: /contracts/hash1/.../hash6/key/balance,
+       balance stored on 64 bits *)
+    let contract_exists =
+      Gas.cost_of_repr
+      @@ Storage_costs.read_access ~path_length:9 ~read_bytes:8
+
+    (* Constructing proof arguments consists in a decreasing loop in the result
+       monad, allocating at each step. We charge a reasonable overapproximation. *)
+    let proof_argument n = atomic_step_cost (n * 50)
+  end
+
   module Typechecking = struct
     let cycle = step_cost 1
 
