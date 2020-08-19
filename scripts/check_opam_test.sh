@@ -1,4 +1,16 @@
 #! /bin/sh
+#
+# Performs a sanity check for .gitlab-ci.yml. Must be launched without
+# parameters.
+#
+# Specifically, for each opam package X in the code base,
+# ensures there is a corresponding rule `opam:X` in .gitlab-ci.yml
+# (which performs checks on this package). Conversely, checks there are no
+# rules for packages which don't exist in the codebase.
+#
+# Note that the corresponding part of `.gitlab-ci.yml` can be updated
+# automatically with ./scripts/update_opam_test.sh.
+#
 
 set -e
 
