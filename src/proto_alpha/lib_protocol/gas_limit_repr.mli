@@ -31,7 +31,7 @@ val encoding : t Data_encoding.encoding
 
 val pp : Format.formatter -> t -> unit
 
-type cost
+type cost = Z.t
 
 val cost_encoding : cost Data_encoding.encoding
 

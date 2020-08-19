@@ -217,6 +217,8 @@ module Gas : sig
   val consumed : since:context -> until:context -> Arith.fp
 
   val block_level : context -> Arith.fp
+
+  val cost_of_repr : Gas_limit_repr.cost -> cost
 end
 
 module Script_int : module type of Script_int_repr

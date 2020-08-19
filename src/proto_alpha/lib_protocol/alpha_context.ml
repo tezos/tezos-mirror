@@ -141,6 +141,9 @@ module Gas = struct
   let consumed = Raw_context.gas_consumed
 
   let block_level = Raw_context.block_gas_level
+
+  (* Necessary to inject costs for Storage_costs into Gas.cost *)
+  let cost_of_repr cost = cost
 end
 
 module Level = struct
