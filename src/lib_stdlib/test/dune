@@ -36,13 +36,6 @@
        (alias runtest_lwt_pipe)))
 
 (alias
- (name buildweaknesstest)
- (deps test_ring_weakness.exe))
-(alias
- (name runweaknesstest)
- (action (setenv OCAMLRUNPARAM "o=20,h=16,s=16,i=2" (run %{exe:test_ring_weakness.exe}))))
-
-(alias
  (name runtest_lint)
  (deps (glob_files *.ml{,i}))
  (action (run %{lib:tezos-tooling:lint.sh} %{deps})))
