@@ -170,12 +170,6 @@ let pop_now ({closed; queue; empty; current_size; _} as q) =
          notify_pop q ;
          elt)
 
-let rec values_available q =
-  if is_empty q then
-    if q.closed then raise Closed
-    else wait_push q >>= fun () -> values_available q
-  else Lwt.return_unit
-
 let rec pop_all_loop q acc =
   match pop_now q with
   | None ->

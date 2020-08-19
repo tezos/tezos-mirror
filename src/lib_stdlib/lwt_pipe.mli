@@ -77,11 +77,6 @@ val peek : 'a t -> 'a Lwt.t
     or [[]] if empty. *)
 val peek_all : 'a t -> 'a list
 
-(** [values_available q] is a promise that blocks while [q] is empty.
-
-    The promise is rejected with [Closed] if [q] has been {!close}d *)
-val values_available : 'a t -> unit Lwt.t
-
 (** [push_now q v] either
     - adds [v] at the ends of [q] immediately and returns [true], or
     - if [q] is full, returns [false]. *)

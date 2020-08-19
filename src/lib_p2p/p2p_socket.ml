@@ -758,12 +758,6 @@ let raw_write_sync {writer; _} bytes =
       let (waiter, wakener) = Lwt.wait () in
       Lwt_pipe.push writer.messages (bytes, Some wakener) >>= fun () -> waiter)
 
-let is_readable {reader; _} = not (Lwt_pipe.is_empty reader.messages)
-
-let wait_readable {reader; _} =
-  catch_closed_pipe (fun () ->
-      Lwt_pipe.values_available reader.messages >>= fun () -> return_unit)
-
 let read {reader; _} =
   catch_closed_pipe (fun () -> Lwt_pipe.pop reader.messages)
 

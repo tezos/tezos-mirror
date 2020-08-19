@@ -158,7 +158,7 @@ let read t =
 
 let is_readable t =
   Lwt.catch
-    (fun () -> Lwt_pipe.values_available t.messages >>= return)
+    (fun () -> Lwt_pipe.peek t.messages >>= fun _ -> return_unit)
     pipe_exn_handler
 
 let write t msg = P2p_socket.write t.conn (Message msg)

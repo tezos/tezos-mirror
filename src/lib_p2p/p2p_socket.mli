@@ -164,14 +164,6 @@ val write_sync : ('msg, 'meta) t -> 'msg -> unit tzresult Lwt.t
 
 (** {2 Input functions} *)
 
-(** [is_readable conn] is [true] iff [conn] internal read queue is not
-    empty. *)
-val is_readable : ('msg, 'meta) t -> bool
-
-(** (Cancelable) [wait_readable conn] returns when [conn]'s internal
-    read queue becomes readable (i.e. not empty). *)
-val wait_readable : ('msg, 'meta) t -> unit tzresult Lwt.t
-
 (** [read conn msg] returns when [msg] has successfully been popped
     from [conn]'s internal read queue or fails with a corresponding
     error. *)
