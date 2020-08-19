@@ -213,28 +213,36 @@ let validate_new_head w hash (header : Block_header.t) =
 let only_if_fitness_increases w distant_header cont =
   let pv = Worker.state w in
   let chain_state = Distributed_db.chain_state pv.parameters.chain_db in
-  Chain.head chain_state
-  >>= fun local_header ->
-  if
-    Fitness.compare
-      distant_header.Block_header.shell.fitness
-      (State.Block.fitness local_header)
-    <= 0
-  then (
-    debug
-      w
-      "ignoring head %a with non increasing fitness from peer: %a."
-      Block_hash.pp_short
-      (Block_header.hash distant_header)
-      P2p_peer.Id.pp_short
-      pv.peer_id ;
-    (* Don't download a branch that cannot beat the current head. *)
-    let meta =
-      Distributed_db.get_peer_metadata pv.parameters.chain_db pv.peer_id
-    in
-    Peer_metadata.incr meta Old_heads ;
+  let hash = Block_header.hash distant_header in
+  State.Block.known_valid chain_state hash
+  >>= fun known_valid ->
+  if known_valid then (
+    pv.started_validation <- true ;
+    pv.last_validated_head <- distant_header ;
     return_unit )
-  else cont ()
+  else
+    Chain.head chain_state
+    >>= fun local_header ->
+    if
+      Fitness.compare
+        distant_header.Block_header.shell.fitness
+        (State.Block.fitness local_header)
+      <= 0
+    then (
+      debug
+        w
+        "ignoring head %a with non increasing fitness from peer: %a."
+        Block_hash.pp_short
+        (Block_header.hash distant_header)
+        P2p_peer.Id.pp_short
+        pv.peer_id ;
+      (* Don't download a branch that cannot beat the current head. *)
+      let meta =
+        Distributed_db.get_peer_metadata pv.parameters.chain_db pv.peer_id
+      in
+      Peer_metadata.incr meta Old_heads ;
+      return_unit )
+    else cont ()
 
 let assert_acceptable_head w hash (header : Block_header.t) =
   let pv = Worker.state w in

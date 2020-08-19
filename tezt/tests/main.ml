@@ -27,4 +27,4 @@
    Each module defines tests which are thematically related,
    as functions to be called here. *)
 
-let () = Basic.run () ; Bootstrap.run ()
+let () = Basic.run () ; Bootstrap.run () ; Bootstrap_heuristic.run ()

@@ -36,7 +36,7 @@ type limits = {
 
 val peer_id : t -> P2p_peer.Id.t
 
-(** Returns timestamp of the most recent head communicated (and validatd)
+(** Returns timestamp of the most recent head communicated (and validated)
     by this peer *)
 val current_head_timestamp : t -> Time.Protocol.t
 

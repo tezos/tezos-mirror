@@ -69,9 +69,9 @@ module Event = struct
     | Could_not_switch_testchain _ ->
         Internal_event.Error
     | Bootstrapped ->
-        Internal_event.Info
+        Internal_event.Notice
     | Sync_status _ ->
-        Internal_event.Info
+        Internal_event.Notice
     | Bootstrap_active_peers _ ->
         Internal_event.Debug
     | Bootstrap_active_peers_heads_time _ ->
