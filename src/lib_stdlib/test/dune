@@ -4,6 +4,7 @@
         test_lwt_pipe)
  (libraries tezos-stdlib
             alcotest
+            alcotest-lwt
             lwt_log
             bigstring
             lwt.unix)

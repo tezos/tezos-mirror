@@ -25,6 +25,8 @@
 
 open Lwt.Infix
 
+(* Basic push/pop test *)
+
 let rec producer queue = function
   | 0 ->
       Lwt.return_unit
@@ -37,46 +39,83 @@ let rec consumer queue = function
   | n ->
       Lwt_pipe.pop queue >>= fun _ -> consumer queue (pred n)
 
-let rec gen acc f = function 0 -> acc | n -> gen (f () :: acc) f (pred n)
+let rec gen f = function 0 -> [] | n -> f () :: gen f (pred n)
 
-let run qsize nbp nbc p c =
-  let q = Lwt_pipe.create ~size:(qsize, fun () -> qsize) () in
-  let producers = gen [] (fun () -> producer q p) nbp in
-  let consumers_and_producers = gen producers (fun () -> consumer q c) nbc in
-  Lwt.join consumers_and_producers
+let run capacity unit_weight actors actor_work =
+  let q = Lwt_pipe.create ~size:(capacity, fun () -> unit_weight) () in
+  assert (Lwt_pipe.is_empty q) ;
+  let producers = gen (fun () -> producer q actor_work) actors in
+  let consumers = gen (fun () -> consumer q actor_work) actors in
+  Lwt.join producers
+  >>= fun () ->
+  Lwt.join consumers
+  >>= fun () ->
+  assert (Lwt_pipe.is_empty q) ;
+  Lwt.return_unit
 
-let main () =
-  let qsize = ref 10 in
-  let nb_producers = ref 10 in
-  let nb_consumers = ref 10 in
-  let produced_per_producer = ref 10 in
-  let consumed_per_consumer = ref 10 in
-  let spec =
-    Arg.
-      [ ("-qsize", Set_int qsize, "<int> Size of the pipe");
-        ("-nc", Set_int nb_consumers, "<int> Number of consumers");
-        ("-np", Set_int nb_producers, "<int> Number of producers");
-        ( "-n",
-          Set_int consumed_per_consumer,
-          "<int> Number of consumed items per consumers" );
-        ( "-p",
-          Set_int produced_per_producer,
-          "<int> Number of produced items per producers" );
-        ( "-v",
-          Unit (fun () -> Lwt_log_core.(add_rule "*" Info)),
-          " Log up to info msgs" );
-        ( "-vv",
-          Unit (fun () -> Lwt_log_core.(add_rule "*" Debug)),
-          " Log up to debug msgs" ) ]
+let push_pop () =
+  Lwt_list.iter_p
+    (fun (capacity, unit_weight, actors, actor_work) ->
+      run capacity unit_weight actors actor_work)
+    [ (max_int, 0, 1, 100);
+      (max_int, 0, 10, 10);
+      (max_int, 0, 100, 1);
+      (10, 1, 20, 20);
+      (10, 3, 10, 10);
+      (10, 3, 1, 100);
+      (10, 9, 1, 3);
+      (10, 6, 3, 1);
+      (1, 1, 10, 10);
+      (1, 1, 50, 2) ]
+
+(* push/pop_all *)
+
+let run capacity unit_weight prods production min_iterations =
+  let q = Lwt_pipe.create ~size:(capacity, fun () -> unit_weight) () in
+  let producers = gen (fun () -> producer q production) prods in
+  let rec consume iterations =
+    Lwt_unix.sleep 0.01
+    >>= fun () ->
+    match Lwt_pipe.pop_all_now q with
+    | _ :: _ ->
+        consume (iterations + 1)
+    | [] ->
+        Lwt.return iterations
   in
-  let anon_fun _ = () in
-  let usage_msg = "Usage: %s <num_peers>.\nArguments are:" in
-  Arg.parse spec anon_fun usage_msg ;
-  run
-    !qsize
-    !nb_producers
-    !nb_consumers
-    !produced_per_producer
-    !consumed_per_consumer
+  let consumer = consume 0 in
+  Lwt.join producers
+  >>= fun () ->
+  consumer
+  >>= fun iterations ->
+  assert (Lwt_pipe.is_empty q) ;
+  assert (iterations >= min_iterations) ;
+  Lwt.return_unit
 
-let () = Lwt_main.run @@ main ()
+let push_pop_all () =
+  Lwt_list.iter_p
+    (fun (capacity, unit_weight, prods, prodtion, exp) ->
+      run capacity unit_weight prods prodtion exp)
+    [ (max_int, 0, 1, 100, 1);
+      (max_int, 0, 10, 10, 1);
+      (max_int, 0, 100, 1, 1);
+      (10, 1, 10, 10, 10);
+      (10, 3, 10, 5, 17);
+      (10, 9, 1, 3, 3);
+      (10, 6, 3, 1, 3);
+      (1, 1, 2, 2, 4) ]
+
+(* Scaffolding and main *)
+
+let with_timeout t f () =
+  let timeout = Lwt_unix.sleep t >|= fun () -> Error () in
+  let main = f () >|= fun () -> Ok () in
+  Lwt.pick [main; timeout]
+  >|= function Ok () -> () | Error () -> assert false
+
+let () =
+  Lwt_main.run
+  @@ Alcotest_lwt.run
+       "Lwt_pipe"
+       [ ( "push-pop",
+           [ ("push-pop", `Quick, with_timeout 0.2 push_pop);
+             ("push-pop-all", `Quick, with_timeout 0.5 push_pop_all) ] ) ]

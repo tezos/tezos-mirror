@@ -15,6 +15,7 @@ depends: [
   "bigstring" { with-test }
   "lwt_log" { with-test }
   "alcotest" { with-test & >= "1.1.0" }
+  "alcotest-lwt" { with-test & >= "1.1.0" }
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
