@@ -140,23 +140,6 @@ val is_empty : 'a t -> bool
 (** [empty q] is a promise that resolves when [q] becomes empty. *)
 val empty : 'a t -> unit Lwt.t
 
-(** [iter q ~f] pops each element of [q] and applies [f] on it until [q] is
-    empty.
-
-    Note that the elements are popped on a by-need basis, i.e., when the
-    previous iteration is resolved. Thus, concurrent [pop] may cause [iter] to
-    miss some elements, and concurrent [push] may cause [iter] to never resolve.
-
-    Also note that an exception raised by [f] will cause the iteration to stop
-    and to be rejected with the same exception.
-
-    Also note that if [q] is closed, the iterations are interrupted when [q] is
-    empty and it resolves with [()].
-
-    If you want to iterate over all the current elements of [q], you need to
-    iterate over the list returned by [pop_all]. *)
-val iter : 'a t -> f:('a -> unit Lwt.t) -> unit Lwt.t
-
 exception Closed
 
 (** [close q] the write-end of [q]:
