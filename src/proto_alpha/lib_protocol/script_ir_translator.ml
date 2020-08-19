@@ -30,7 +30,7 @@ open Script_typed_ir
 open Script_tc_errors
 open Script_ir_annot
 open Misc.Syntax
-module Typecheck_costs = Michelson_v1_gas.Cost_of.Typechecking
+module Typecheck_costs = Michelson_v1_gas.Cost_of.Typechecking_007
 module Unparse_costs = Michelson_v1_gas.Cost_of.Unparse
 
 type ex_comparable_ty =
@@ -804,7 +804,7 @@ let rec merge_comparable_types :
     * context )
     tzresult =
  fun ~legacy ctxt ta tb ->
-  Gas.consume ctxt Typecheck_costs.cycle
+  Gas.consume ctxt Typecheck_costs.merge_cycle
   >>? fun ctxt ->
   match (ta, tb) with
   | (Int_key annot_a, Int_key annot_b) ->
@@ -895,73 +895,40 @@ let merge_types :
       tb ty ->
       ((ta ty, tb ty) eq * ta ty * context) tzresult =
    fun ctxt ty1 ty2 ->
-    let consume ctxt nb_args : context tzresult =
-      Gas.consume ctxt (Typecheck_costs.type_ (2 * nb_args))
-    in
-    Gas.consume ctxt Typecheck_costs.cycle
+    Gas.consume ctxt Typecheck_costs.merge_cycle
     >>? fun ctxt ->
     match (ty1, ty2) with
     | (Unit_t tn1, Unit_t tn2) ->
-        consume ctxt 0
-        >>? fun ctxt ->
         merge_type_annot tn1 tn2
         >|? fun tname ->
         ((Eq : (ta ty, tb ty) eq), (Unit_t tname : ta ty), ctxt)
     | (Int_t tn1, Int_t tn2) ->
-        consume ctxt 0
-        >>? fun ctxt ->
         merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Int_t tname, ctxt)
     | (Nat_t tn1, Nat_t tn2) ->
-        consume ctxt 0
-        >>? fun ctxt ->
         merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Nat_t tname, ctxt)
     | (Key_t tn1, Key_t tn2) ->
-        consume ctxt 0
-        >>? fun ctxt ->
         merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Key_t tname, ctxt)
     | (Key_hash_t tn1, Key_hash_t tn2) ->
-        consume ctxt 0
-        >>? fun ctxt ->
         merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Key_hash_t tname, ctxt)
     | (String_t tn1, String_t tn2) ->
-        consume ctxt 0
-        >>? fun ctxt ->
         merge_type_annot tn1 tn2 >|? fun tname -> (Eq, String_t tname, ctxt)
     | (Bytes_t tn1, Bytes_t tn2) ->
-        consume ctxt 0
-        >>? fun ctxt ->
         merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Bytes_t tname, ctxt)
     | (Signature_t tn1, Signature_t tn2) ->
-        consume ctxt 0
-        >>? fun ctxt ->
         merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Signature_t tname, ctxt)
     | (Mutez_t tn1, Mutez_t tn2) ->
-        consume ctxt 0
-        >>? fun ctxt ->
         merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Mutez_t tname, ctxt)
     | (Timestamp_t tn1, Timestamp_t tn2) ->
-        consume ctxt 0
-        >>? fun ctxt ->
         merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Timestamp_t tname, ctxt)
     | (Address_t tn1, Address_t tn2) ->
-        consume ctxt 0
-        >>? fun ctxt ->
         merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Address_t tname, ctxt)
     | (Bool_t tn1, Bool_t tn2) ->
-        consume ctxt 0
-        >>? fun ctxt ->
         merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Bool_t tname, ctxt)
     | (Chain_id_t tn1, Chain_id_t tn2) ->
-        consume ctxt 0
-        >>? fun ctxt ->
         merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Chain_id_t tname, ctxt)
     | (Operation_t tn1, Operation_t tn2) ->
-        consume ctxt 0
-        >>? fun ctxt ->
         merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Operation_t tname, ctxt)
     | (Map_t (tal, tar, tn1), Map_t (tbl, tbr, tn2)) ->
-        consume ctxt 2
-        >>? fun ctxt ->
         merge_type_annot tn1 tn2
         >>? fun tname ->
         help ctxt tar tbr
@@ -970,8 +937,6 @@ let merge_types :
         >|? fun (Eq, tk, ctxt) ->
         ((Eq : (ta ty, tb ty) eq), Map_t (tk, value, tname), ctxt)
     | (Big_map_t (tal, tar, tn1), Big_map_t (tbl, tbr, tn2)) ->
-        consume ctxt 2
-        >>? fun ctxt ->
         merge_type_annot tn1 tn2
         >>? fun tname ->
         help ctxt tar tbr
@@ -980,8 +945,6 @@ let merge_types :
         >|? fun (Eq, tk, ctxt) ->
         ((Eq : (ta ty, tb ty) eq), Big_map_t (tk, value, tname), ctxt)
     | (Set_t (ea, tn1), Set_t (eb, tn2)) ->
-        consume ctxt 1
-        >>? fun ctxt ->
         merge_type_annot tn1 tn2
         >>? fun tname ->
         merge_comparable_types ~legacy ctxt ea eb
@@ -989,8 +952,6 @@ let merge_types :
         ((Eq : (ta ty, tb ty) eq), Set_t (e, tname), ctxt)
     | ( Pair_t ((tal, l_field1, l_var1), (tar, r_field1, r_var1), tn1),
         Pair_t ((tbl, l_field2, l_var2), (tbr, r_field2, r_var2), tn2) ) ->
-        consume ctxt 2
-        >>? fun ctxt ->
         merge_type_annot tn1 tn2
         >>? fun tname ->
         merge_field_annot ~legacy l_field1 l_field2
@@ -1008,8 +969,6 @@ let merge_types :
           ctxt )
     | ( Union_t ((tal, tal_annot), (tar, tar_annot), tn1),
         Union_t ((tbl, tbl_annot), (tbr, tbr_annot), tn2) ) ->
-        consume ctxt 2
-        >>? fun ctxt ->
         merge_type_annot tn1 tn2
         >>? fun tname ->
         merge_field_annot ~legacy tal_annot tbl_annot
@@ -1024,8 +983,6 @@ let merge_types :
           Union_t ((left_ty, left_annot), (right_ty, right_annot), tname),
           ctxt )
     | (Lambda_t (tal, tar, tn1), Lambda_t (tbl, tbr, tn2)) ->
-        consume ctxt 2
-        >>? fun ctxt ->
         merge_type_annot tn1 tn2
         >>? fun tname ->
         help ctxt tal tbl
@@ -1034,24 +991,18 @@ let merge_types :
         >|? fun (Eq, right_ty, ctxt) ->
         ((Eq : (ta ty, tb ty) eq), Lambda_t (left_ty, right_ty, tname), ctxt)
     | (Contract_t (tal, tn1), Contract_t (tbl, tn2)) ->
-        consume ctxt 1
-        >>? fun ctxt ->
         merge_type_annot tn1 tn2
         >>? fun tname ->
         help ctxt tal tbl
         >|? fun (Eq, arg_ty, ctxt) ->
         ((Eq : (ta ty, tb ty) eq), Contract_t (arg_ty, tname), ctxt)
     | (Option_t (tva, tn1), Option_t (tvb, tn2)) ->
-        consume ctxt 1
-        >>? fun ctxt ->
         merge_type_annot tn1 tn2
         >>? fun tname ->
         help ctxt tva tvb
         >|? fun (Eq, ty, ctxt) ->
         ((Eq : (ta ty, tb ty) eq), Option_t (ty, tname), ctxt)
     | (List_t (tva, tn1), List_t (tvb, tn2)) ->
-        consume ctxt 1
-        >>? fun ctxt ->
         merge_type_annot tn1 tn2
         >>? fun tname ->
         help ctxt tva tvb
@@ -1161,9 +1112,7 @@ let merge_branches :
 let rec parse_comparable_ty :
     context -> Script.node -> (ex_comparable_ty * context) tzresult =
  fun ctxt ty ->
-  Gas.consume ctxt Typecheck_costs.cycle
-  >>? fun ctxt ->
-  Gas.consume ctxt (Typecheck_costs.type_ 0)
+  Gas.consume ctxt Typecheck_costs.parse_type_cycle
   >>? fun ctxt ->
   match ty with
   | Prim (loc, T_int, [], annot) ->
@@ -1347,89 +1296,59 @@ and parse_ty :
     Script.node ->
     (ex_ty * context) tzresult =
  fun ctxt ~legacy ~allow_big_map ~allow_operation ~allow_contract node ->
-  Gas.consume ctxt Typecheck_costs.cycle
+  Gas.consume ctxt Typecheck_costs.parse_type_cycle
   >>? fun ctxt ->
   match node with
   | Prim (loc, T_unit, [], annot) ->
       parse_type_annot loc annot
-      >>? fun ty_name ->
-      Gas.consume ctxt (Typecheck_costs.type_ 0)
-      >|? fun ctxt -> (Ex_ty (Unit_t ty_name), ctxt)
+      >>? fun ty_name -> ok (Ex_ty (Unit_t ty_name), ctxt)
   | Prim (loc, T_int, [], annot) ->
       parse_type_annot loc annot
-      >>? fun ty_name ->
-      Gas.consume ctxt (Typecheck_costs.type_ 0)
-      >|? fun ctxt -> (Ex_ty (Int_t ty_name), ctxt)
+      >>? fun ty_name -> ok (Ex_ty (Int_t ty_name), ctxt)
   | Prim (loc, T_nat, [], annot) ->
       parse_type_annot loc annot
-      >>? fun ty_name ->
-      Gas.consume ctxt (Typecheck_costs.type_ 0)
-      >|? fun ctxt -> (Ex_ty (Nat_t ty_name), ctxt)
+      >>? fun ty_name -> ok (Ex_ty (Nat_t ty_name), ctxt)
   | Prim (loc, T_string, [], annot) ->
       parse_type_annot loc annot
-      >>? fun ty_name ->
-      Gas.consume ctxt (Typecheck_costs.type_ 0)
-      >|? fun ctxt -> (Ex_ty (String_t ty_name), ctxt)
+      >>? fun ty_name -> ok (Ex_ty (String_t ty_name), ctxt)
   | Prim (loc, T_bytes, [], annot) ->
       parse_type_annot loc annot
-      >>? fun ty_name ->
-      Gas.consume ctxt (Typecheck_costs.type_ 0)
-      >|? fun ctxt -> (Ex_ty (Bytes_t ty_name), ctxt)
+      >>? fun ty_name -> ok (Ex_ty (Bytes_t ty_name), ctxt)
   | Prim (loc, T_mutez, [], annot) ->
       parse_type_annot loc annot
-      >>? fun ty_name ->
-      Gas.consume ctxt (Typecheck_costs.type_ 0)
-      >|? fun ctxt -> (Ex_ty (Mutez_t ty_name), ctxt)
+      >>? fun ty_name -> ok (Ex_ty (Mutez_t ty_name), ctxt)
   | Prim (loc, T_bool, [], annot) ->
       parse_type_annot loc annot
-      >>? fun ty_name ->
-      Gas.consume ctxt (Typecheck_costs.type_ 0)
-      >|? fun ctxt -> (Ex_ty (Bool_t ty_name), ctxt)
+      >>? fun ty_name -> ok (Ex_ty (Bool_t ty_name), ctxt)
   | Prim (loc, T_key, [], annot) ->
       parse_type_annot loc annot
-      >>? fun ty_name ->
-      Gas.consume ctxt (Typecheck_costs.type_ 0)
-      >|? fun ctxt -> (Ex_ty (Key_t ty_name), ctxt)
+      >>? fun ty_name -> ok (Ex_ty (Key_t ty_name), ctxt)
   | Prim (loc, T_key_hash, [], annot) ->
       parse_type_annot loc annot
-      >>? fun ty_name ->
-      Gas.consume ctxt (Typecheck_costs.type_ 0)
-      >|? fun ctxt -> (Ex_ty (Key_hash_t ty_name), ctxt)
+      >>? fun ty_name -> ok (Ex_ty (Key_hash_t ty_name), ctxt)
   | Prim (loc, T_timestamp, [], annot) ->
       parse_type_annot loc annot
-      >>? fun ty_name ->
-      Gas.consume ctxt (Typecheck_costs.type_ 0)
-      >|? fun ctxt -> (Ex_ty (Timestamp_t ty_name), ctxt)
+      >>? fun ty_name -> ok (Ex_ty (Timestamp_t ty_name), ctxt)
   | Prim (loc, T_address, [], annot) ->
       parse_type_annot loc annot
-      >>? fun ty_name ->
-      Gas.consume ctxt (Typecheck_costs.type_ 0)
-      >|? fun ctxt -> (Ex_ty (Address_t ty_name), ctxt)
+      >>? fun ty_name -> ok (Ex_ty (Address_t ty_name), ctxt)
   | Prim (loc, T_signature, [], annot) ->
       parse_type_annot loc annot
-      >>? fun ty_name ->
-      Gas.consume ctxt (Typecheck_costs.type_ 0)
-      >|? fun ctxt -> (Ex_ty (Signature_t ty_name), ctxt)
+      >>? fun ty_name -> ok (Ex_ty (Signature_t ty_name), ctxt)
   | Prim (loc, T_operation, [], annot) ->
       if allow_operation then
         parse_type_annot loc annot
-        >>? fun ty_name ->
-        Gas.consume ctxt (Typecheck_costs.type_ 0)
-        >|? fun ctxt -> (Ex_ty (Operation_t ty_name), ctxt)
+        >>? fun ty_name -> ok (Ex_ty (Operation_t ty_name), ctxt)
       else error (Unexpected_operation loc)
   | Prim (loc, T_chain_id, [], annot) ->
       parse_type_annot loc annot
-      >>? fun ty_name ->
-      Gas.consume ctxt (Typecheck_costs.type_ 0)
-      >|? fun ctxt -> (Ex_ty (Chain_id_t ty_name), ctxt)
+      >>? fun ty_name -> ok (Ex_ty (Chain_id_t ty_name), ctxt)
   | Prim (loc, T_contract, [utl], annot) ->
       if allow_contract then
         parse_parameter_ty ctxt ~legacy utl
         >>? fun (Ex_ty tl, ctxt) ->
         parse_type_annot loc annot
-        >>? fun ty_name ->
-        Gas.consume ctxt (Typecheck_costs.type_ 1)
-        >|? fun ctxt -> (Ex_ty (Contract_t (tl, ty_name)), ctxt)
+        >>? fun ty_name -> ok (Ex_ty (Contract_t (tl, ty_name)), ctxt)
       else error (Unexpected_contract loc)
   | Prim (loc, T_pair, [utl; utr], annot) ->
       extract_field_annot utl
@@ -1442,11 +1361,10 @@ and parse_ty :
       >>? fun (Ex_ty tr, ctxt) ->
       parse_type_annot loc annot
       >>? fun ty_name ->
-      Gas.consume ctxt (Typecheck_costs.type_ 2)
-      >|? fun ctxt ->
-      ( Ex_ty
-          (Pair_t ((tl, left_field, None), (tr, right_field, None), ty_name)),
-        ctxt )
+      ok
+        ( Ex_ty
+            (Pair_t ((tl, left_field, None), (tr, right_field, None), ty_name)),
+          ctxt )
   | Prim (loc, T_or, [utl; utr], annot) ->
       extract_field_annot utl
       >>? fun (utl, left_constr) ->
@@ -1458,18 +1376,15 @@ and parse_ty :
       >>? fun (Ex_ty tr, ctxt) ->
       parse_type_annot loc annot
       >>? fun ty_name ->
-      Gas.consume ctxt (Typecheck_costs.type_ 2)
-      >|? fun ctxt ->
-      (Ex_ty (Union_t ((tl, left_constr), (tr, right_constr), ty_name)), ctxt)
+      ok
+        (Ex_ty (Union_t ((tl, left_constr), (tr, right_constr), ty_name)), ctxt)
   | Prim (loc, T_lambda, [uta; utr], annot) ->
       parse_any_ty ctxt ~legacy uta
       >>? fun (Ex_ty ta, ctxt) ->
       parse_any_ty ctxt ~legacy utr
       >>? fun (Ex_ty tr, ctxt) ->
       parse_type_annot loc annot
-      >>? fun ty_name ->
-      Gas.consume ctxt (Typecheck_costs.type_ 2)
-      >|? fun ctxt -> (Ex_ty (Lambda_t (ta, tr, ty_name)), ctxt)
+      >>? fun ty_name -> ok (Ex_ty (Lambda_t (ta, tr, ty_name)), ctxt)
   | Prim (loc, T_option, [ut], annot) ->
       ( if legacy then
         (* legacy semantics with (broken) field annotations *)
@@ -1480,37 +1395,27 @@ and parse_ty :
       else parse_type_annot loc annot >>? fun ty_name -> ok (ut, ty_name) )
       >>? fun (ut, ty_name) ->
       parse_ty ctxt ~legacy ~allow_big_map ~allow_operation ~allow_contract ut
-      >>? fun (Ex_ty t, ctxt) ->
-      Gas.consume ctxt (Typecheck_costs.type_ 2)
-      >|? fun ctxt -> (Ex_ty (Option_t (t, ty_name)), ctxt)
+      >>? fun (Ex_ty t, ctxt) -> ok (Ex_ty (Option_t (t, ty_name)), ctxt)
   | Prim (loc, T_list, [ut], annot) ->
       parse_ty ctxt ~legacy ~allow_big_map ~allow_operation ~allow_contract ut
       >>? fun (Ex_ty t, ctxt) ->
       parse_type_annot loc annot
-      >>? fun ty_name ->
-      Gas.consume ctxt (Typecheck_costs.type_ 1)
-      >|? fun ctxt -> (Ex_ty (List_t (t, ty_name)), ctxt)
+      >>? fun ty_name -> ok (Ex_ty (List_t (t, ty_name)), ctxt)
   | Prim (loc, T_set, [ut], annot) ->
       parse_comparable_ty ctxt ut
       >>? fun (Ex_comparable_ty t, ctxt) ->
       parse_type_annot loc annot
-      >>? fun ty_name ->
-      Gas.consume ctxt (Typecheck_costs.type_ 1)
-      >|? fun ctxt -> (Ex_ty (Set_t (t, ty_name)), ctxt)
+      >>? fun ty_name -> ok (Ex_ty (Set_t (t, ty_name)), ctxt)
   | Prim (loc, T_map, [uta; utr], annot) ->
       parse_comparable_ty ctxt uta
       >>? fun (Ex_comparable_ty ta, ctxt) ->
       parse_ty ctxt ~legacy ~allow_big_map ~allow_operation ~allow_contract utr
       >>? fun (Ex_ty tr, ctxt) ->
       parse_type_annot loc annot
-      >>? fun ty_name ->
-      Gas.consume ctxt (Typecheck_costs.type_ 2)
-      >|? fun ctxt -> (Ex_ty (Map_t (ta, tr, ty_name)), ctxt)
+      >>? fun ty_name -> ok (Ex_ty (Map_t (ta, tr, ty_name)), ctxt)
   | Prim (loc, T_big_map, args, annot) when allow_big_map ->
       parse_big_map_ty ctxt ~legacy loc args annot
-      >>? fun (big_map_ty, ctxt) ->
-      Gas.consume ctxt (Typecheck_costs.type_ 2)
-      >|? fun ctxt -> (big_map_ty, ctxt)
+      >>? fun (big_map_ty, ctxt) -> ok (big_map_ty, ctxt)
   | Prim (loc, T_big_map, _, _) ->
       error (Unexpected_big_map loc)
   | Prim
@@ -1565,7 +1470,7 @@ and parse_ty :
              T_chain_id ]
 
 and parse_big_map_ty ctxt ~legacy big_map_loc args map_annot =
-  Gas.consume ctxt Typecheck_costs.cycle
+  Gas.consume ctxt Typecheck_costs.parse_type_cycle
   >>? fun ctxt ->
   match args with
   | [key_ty; value_ty] ->
@@ -1599,7 +1504,7 @@ and parse_storage_ty :
         parse_normal_storage_ty ctxt ~legacy node
     | _ ->
         (* legacy semantics of big maps used the wrong annotation parser *)
-        Gas.consume ctxt Typecheck_costs.cycle
+        Gas.consume ctxt Typecheck_costs.parse_type_cycle
         >>? fun ctxt ->
         parse_big_map_ty ctxt ~legacy big_map_loc args map_annot
         >>? fun (Ex_ty big_map_ty, ctxt) ->
@@ -1607,14 +1512,13 @@ and parse_storage_ty :
         >>? fun (Ex_ty remaining_storage, ctxt) ->
         parse_composed_type_annot loc storage_annot
         >>? fun (ty_name, map_field, storage_field) ->
-        Gas.consume ctxt (Typecheck_costs.type_ 5)
-        >|? fun ctxt ->
-        ( Ex_ty
-            (Pair_t
-               ( (big_map_ty, map_field, None),
-                 (remaining_storage, storage_field, None),
-                 ty_name )),
-          ctxt ) )
+        ok
+          ( Ex_ty
+              (Pair_t
+                 ( (big_map_ty, map_field, None),
+                   (remaining_storage, storage_field, None),
+                   ty_name )),
+            ctxt ) )
   | _ ->
       parse_normal_storage_ty ctxt ~legacy node
 
@@ -1865,7 +1769,7 @@ let rec parse_data :
     Script.node ->
     (a * context) tzresult Lwt.t =
  fun ?type_logger ctxt ~legacy ty script_data ->
-  Gas.consume ctxt Typecheck_costs.cycle
+  Gas.consume ctxt Typecheck_costs.parse_data_cycle
   >>?= fun ctxt ->
   let parse_data_error () =
     serialize_ty_for_error ctxt ty
@@ -1880,11 +1784,8 @@ let rec parse_data :
   let traced_fail err = Lwt.return @@ traced_no_lwt (error err) in
   let parse_items ?type_logger ctxt expr key_type value_type items item_wrapper
       =
-    let length = List.length items in
     fold_left_s
       (fun (last_value, map, ctxt) item ->
-        Gas.consume ctxt (Typecheck_costs.map_element length)
-        >>?= fun ctxt ->
         match item with
         | Prim (loc, D_Elt, [k; v], annot) ->
             (if legacy then ok_unit else error_unexpected_annot loc annot)
@@ -1906,7 +1807,11 @@ let rec parse_data :
                     else ok_unit
                 | None ->
                     ok_unit )
-              >|? fun () ->
+              >>? fun () ->
+              Gas.consume
+                ctxt
+                (Michelson_v1_gas.Cost_of.Interpreter.map_update k map)
+              >|? fun ctxt ->
               (Some k, map_update k (Some (item_wrapper v)) map, ctxt) )
         | Prim (loc, D_Elt, l, _) ->
             fail @@ Invalid_arity (loc, D_Elt, 2, List.length l)
@@ -1948,7 +1853,7 @@ let rec parse_data :
       traced_fail (unexpected expr [] Constant_namespace [D_True; D_False])
   (* Strings *)
   | (String_t _, String (_, v)) ->
-      Gas.consume ctxt (Typecheck_costs.string (String.length v))
+      Gas.consume ctxt (Typecheck_costs.check_printable v)
       >>?= fun ctxt ->
       let rec check_printable_ascii i =
         if Compare.Int.(i < 0) then true
@@ -1965,50 +1870,40 @@ let rec parse_data :
       traced_fail (Invalid_kind (location expr, [String_kind], kind expr))
   (* Byte sequences *)
   | (Bytes_t _, Bytes (_, v)) ->
-      Lwt.return
-        ( Gas.consume ctxt (Typecheck_costs.string (MBytes.length v))
-        >|? fun ctxt -> (v, ctxt) )
+      return (v, ctxt)
   | (Bytes_t _, expr) ->
       traced_fail (Invalid_kind (location expr, [Bytes_kind], kind expr))
   (* Integers *)
   | (Int_t _, Int (_, v)) ->
-      Lwt.return
-        ( Gas.consume ctxt (Typecheck_costs.z v)
-        >|? fun ctxt -> (Script_int.of_zint v, ctxt) )
-  | (Nat_t _, Int (_, v)) ->
-      Gas.consume ctxt (Typecheck_costs.z v)
-      >>?= fun ctxt ->
+      return (Script_int.of_zint v, ctxt)
+  | (Nat_t _, Int (_, v)) -> (
       let v = Script_int.of_zint v in
-      if Compare.Int.(Script_int.compare v Script_int.zero >= 0) then
-        return (Script_int.abs v, ctxt)
-      else fail_parse_data ()
+      match Script_int.is_nat v with
+      | Some nat ->
+          return (nat, ctxt)
+      | None ->
+          fail_parse_data () )
   | (Int_t _, expr) ->
       traced_fail (Invalid_kind (location expr, [Int_kind], kind expr))
   | (Nat_t _, expr) ->
       traced_fail (Invalid_kind (location expr, [Int_kind], kind expr))
   (* Tez amounts *)
   | (Mutez_t _, Int (_, v)) -> (
-      Gas.consume ctxt Typecheck_costs.tez
-      >>? (fun ctxt ->
-            Gas.consume ctxt Michelson_v1_gas.Cost_of.Legacy.z_to_int64)
-      >>?= fun ctxt ->
-      try
-        match Tez.of_mutez (Z.to_int64 v) with
-        | None ->
-            raise Exit
-        | Some tez ->
-            return (tez, ctxt)
-      with _ -> fail_parse_data () )
+    try
+      match Tez.of_mutez (Z.to_int64 v) with
+      | None ->
+          raise Exit
+      | Some tez ->
+          return (tez, ctxt)
+    with _ -> fail_parse_data () )
   | (Mutez_t _, expr) ->
       traced_fail (Invalid_kind (location expr, [Int_kind], kind expr))
   (* Timestamps *)
   | (Timestamp_t _, Int (_, v))
   (* As unparsed with [Optimized] or out of bounds [Readable]. *) ->
-      Lwt.return
-        ( Gas.consume ctxt (Typecheck_costs.z v)
-        >|? fun ctxt -> (Script_timestamp.of_zint v, ctxt) )
+      return (Script_timestamp.of_zint v, ctxt)
   | (Timestamp_t _, String (_, s)) (* As unparsed with [Readable]. *) -> (
-      Gas.consume ctxt Typecheck_costs.string_timestamp
+      Gas.consume ctxt Typecheck_costs.timestamp_readable
       >>?= fun ctxt ->
       match Script_timestamp.of_string s with
       | Some v ->
@@ -2021,7 +1916,7 @@ let rec parse_data :
   (* IDs *)
   | (Key_t _, Bytes (_, bytes)) -> (
       (* As unparsed with [Optimized]. *)
-      Gas.consume ctxt Typecheck_costs.key
+      Gas.consume ctxt Typecheck_costs.public_key_optimized
       >>?= fun ctxt ->
       match
         Data_encoding.Binary.of_bytes Signature.Public_key.encoding bytes
@@ -2032,7 +1927,7 @@ let rec parse_data :
           fail_parse_data () )
   | (Key_t _, String (_, s)) -> (
       (* As unparsed with [Readable]. *)
-      Gas.consume ctxt Typecheck_costs.key
+      Gas.consume ctxt Typecheck_costs.public_key_readable
       >>?= fun ctxt ->
       match Signature.Public_key.of_b58check_opt s with
       | Some k ->
@@ -2044,7 +1939,7 @@ let rec parse_data :
         (Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr))
   | (Key_hash_t _, Bytes (_, bytes)) -> (
       (* As unparsed with [Optimized]. *)
-      Gas.consume ctxt Typecheck_costs.key_hash
+      Gas.consume ctxt Typecheck_costs.key_hash_optimized
       >>?= fun ctxt ->
       match
         Data_encoding.Binary.of_bytes Signature.Public_key_hash.encoding bytes
@@ -2054,7 +1949,7 @@ let rec parse_data :
       | None ->
           fail_parse_data () )
   | (Key_hash_t _, String (_, s)) (* As unparsed with [Readable]. *) -> (
-      Gas.consume ctxt Typecheck_costs.key_hash
+      Gas.consume ctxt Typecheck_costs.key_hash_readable
       >>?= fun ctxt ->
       match Signature.Public_key_hash.of_b58check_opt s with
       | Some k ->
@@ -2066,7 +1961,7 @@ let rec parse_data :
         (Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr))
   (* Signatures *)
   | (Signature_t _, Bytes (_, bytes)) (* As unparsed with [Optimized]. *) -> (
-      Gas.consume ctxt Typecheck_costs.signature
+      Gas.consume ctxt Typecheck_costs.signature_optimized
       >>?= fun ctxt ->
       match Data_encoding.Binary.of_bytes Signature.encoding bytes with
       | Some k ->
@@ -2074,7 +1969,7 @@ let rec parse_data :
       | None ->
           fail_parse_data () )
   | (Signature_t _, String (_, s)) (* As unparsed with [Readable]. *) -> (
-      Gas.consume ctxt Typecheck_costs.signature
+      Gas.consume ctxt Typecheck_costs.signature_readable
       >>?= fun ctxt ->
       match Signature.of_b58check_opt s with
       | Some s ->
@@ -2091,7 +1986,7 @@ let rec parse_data :
       assert false
   (* Chain_ids *)
   | (Chain_id_t _, Bytes (_, bytes)) -> (
-      Gas.consume ctxt Typecheck_costs.chain_id
+      Gas.consume ctxt Typecheck_costs.chain_id_optimized
       >>?= fun ctxt ->
       match Data_encoding.Binary.of_bytes Chain_id.encoding bytes with
       | Some k ->
@@ -2099,7 +1994,7 @@ let rec parse_data :
       | None ->
           fail_parse_data () )
   | (Chain_id_t _, String (_, s)) -> (
-      Gas.consume ctxt Typecheck_costs.chain_id
+      Gas.consume ctxt Typecheck_costs.chain_id_readable
       >>?= fun ctxt ->
       match Chain_id.of_b58check_opt s with
       | Some s ->
@@ -2210,8 +2105,6 @@ let rec parse_data :
     ->
       (if legacy then ok_unit else error_unexpected_annot loc annot)
       >>?= fun () ->
-      Gas.consume ctxt Typecheck_costs.pair
-      >>?= fun ctxt ->
       traced @@ parse_data ?type_logger ctxt ~legacy ta va
       >>=? fun (va, ctxt) ->
       parse_data ?type_logger ctxt ~legacy tb vb
@@ -2224,8 +2117,6 @@ let rec parse_data :
   | (Union_t ((tl, _), _, _), Prim (loc, D_Left, [v], annot)) ->
       (if legacy then ok_unit else error_unexpected_annot loc annot)
       >>?= fun () ->
-      Gas.consume ctxt Typecheck_costs.union
-      >>?= fun ctxt ->
       traced @@ parse_data ?type_logger ctxt ~legacy tl v
       >|=? fun (v, ctxt) -> (L v, ctxt)
   | (Union_t _, Prim (loc, D_Left, l, _)) ->
@@ -2233,8 +2124,6 @@ let rec parse_data :
   | (Union_t (_, (tr, _), _), Prim (loc, D_Right, [v], annot)) ->
       (if legacy then ok_unit else error_unexpected_annot loc annot)
       >>?= fun () ->
-      Gas.consume ctxt Typecheck_costs.union
-      >>?= fun ctxt ->
       traced @@ parse_data ?type_logger ctxt ~legacy tr v
       >|=? fun (v, ctxt) -> (R v, ctxt)
   | (Union_t _, Prim (loc, D_Right, l, _)) ->
@@ -2243,8 +2132,6 @@ let rec parse_data :
       traced_fail (unexpected expr [] Constant_namespace [D_Left; D_Right])
   (* Lambdas *)
   | (Lambda_t (ta, tr, _ty_name), (Seq (_loc, _) as script_instr)) ->
-      Gas.consume ctxt Typecheck_costs.lambda
-      >>?= fun ctxt ->
       traced
       @@ parse_returning
            Lambda
@@ -2260,8 +2147,6 @@ let rec parse_data :
   | (Option_t (t, _), Prim (loc, D_Some, [v], annot)) ->
       (if legacy then ok_unit else error_unexpected_annot loc annot)
       >>?= fun () ->
-      Gas.consume ctxt Typecheck_costs.some
-      >>?= fun ctxt ->
       traced @@ parse_data ?type_logger ctxt ~legacy t v
       >|=? fun (v, ctxt) -> (Some v, ctxt)
   | (Option_t _, Prim (loc, D_Some, l, _)) ->
@@ -2269,8 +2154,7 @@ let rec parse_data :
   | (Option_t (_, _), Prim (loc, D_None, [], annot)) ->
       Lwt.return
         ( (if legacy then ok_unit else error_unexpected_annot loc annot)
-        >>? fun () ->
-        Gas.consume ctxt Typecheck_costs.none >|? fun ctxt -> (None, ctxt) )
+        >>? fun () -> ok (None, ctxt) )
   | (Option_t _, Prim (loc, D_None, l, _)) ->
       fail @@ Invalid_arity (loc, D_None, 0, List.length l)
   | (Option_t _, expr) ->
@@ -2280,8 +2164,6 @@ let rec parse_data :
       traced
       @@ fold_right_s
            (fun v (rest, ctxt) ->
-             Gas.consume ctxt Typecheck_costs.list_element
-             >>?= fun ctxt ->
              parse_data ?type_logger ctxt ~legacy t v
              >|=? fun (v, ctxt) -> (list_cons v rest, ctxt))
            items
@@ -2290,12 +2172,9 @@ let rec parse_data :
       traced_fail (Invalid_kind (location expr, [Seq_kind], kind expr))
   (* Sets *)
   | (Set_t (t, _ty_name), (Seq (loc, vs) as expr)) ->
-      let length = List.length vs in
       traced
       @@ fold_left_s
            (fun (last_value, set, ctxt) v ->
-             Gas.consume ctxt (Typecheck_costs.set_element length)
-             >>?= fun ctxt ->
              parse_comparable_data ?type_logger ctxt t v
              >>=? fun (v, ctxt) ->
              Lwt.return
@@ -2314,7 +2193,7 @@ let rec parse_data :
                >>? fun () ->
                Gas.consume
                  ctxt
-                 (Michelson_v1_gas.Cost_of.Legacy.set_update v false set)
+                 (Michelson_v1_gas.Cost_of.Interpreter.set_update v set)
                >|? fun ctxt -> (Some v, set_update v true set, ctxt) ))
            (None, empty_set t, ctxt)
            vs
@@ -2501,15 +2380,12 @@ and parse_instr :
   in
   let typed_no_lwt ctxt loc instr aft =
     log_stack ctxt loc stack_ty aft
-    >>? fun () ->
-    Gas.consume ctxt (Typecheck_costs.instr instr)
-    >>? fun ctxt ->
-    return_no_lwt ctxt (Typed {loc; instr; bef = stack_ty; aft})
+    >>? fun () -> return_no_lwt ctxt (Typed {loc; instr; bef = stack_ty; aft})
   in
   let typed ctxt loc instr aft =
     Lwt.return @@ typed_no_lwt ctxt loc instr aft
   in
-  Gas.consume ctxt Typecheck_costs.cycle
+  Gas.consume ctxt Typecheck_costs.parse_instr_cycle
   >>?= fun ctxt ->
   match (script_instr, stack_ty) with
   (* stack ops *)
@@ -2519,6 +2395,8 @@ and parse_instr :
   | (Prim (loc, I_DROP, [n], result_annot), whole_stack) ->
       parse_uint30 n
       >>?= fun whole_n ->
+      Gas.consume ctxt (Typecheck_costs.proof_argument whole_n)
+      >>?= fun ctxt ->
       let rec make_proof_argument :
           type tstk. int -> tstk stack_ty -> tstk dropn_proof_argument tzresult
           =
@@ -2567,6 +2445,8 @@ and parse_instr :
       in
       parse_uint30 n
       >>?= fun n ->
+      Gas.consume ctxt (Typecheck_costs.proof_argument n)
+      >>?= fun ctxt ->
       error_unexpected_annot loc result_annot
       >>?= fun () ->
       make_proof_argument n stack
@@ -2578,6 +2458,8 @@ and parse_instr :
     ->
       parse_uint30 n
       >>?= fun whole_n ->
+      Gas.consume ctxt (Typecheck_costs.proof_argument whole_n)
+      >>?= fun ctxt ->
       let rec make_proof_argument :
           type tstk x.
           int ->
@@ -3318,6 +3200,10 @@ and parse_instr :
       | Failed _ ->
           fail (Fail_not_in_tail_position loc) )
   | (Prim (loc, I_DIP, [n; code], result_annot), stack) ->
+      parse_uint30 n
+      >>?= fun n ->
+      Gas.consume ctxt (Typecheck_costs.proof_argument n)
+      >>?= fun ctxt ->
       let rec make_proof_argument :
           type tstk.
           int
@@ -3347,8 +3233,6 @@ and parse_instr :
               >>? fun (whole_stack, _ctxt) ->
               error (Bad_stack (loc, I_DIP, 1, whole_stack)) )
       in
-      parse_uint30 n
-      >>?= fun n ->
       error_unexpected_annot loc result_annot
       >>?= fun () ->
       make_proof_argument n tc_context stack
@@ -4492,8 +4376,6 @@ and parse_contract :
   | false ->
       fail (Invalid_contract (loc, contract))
   | true -> (
-      Gas.consume ctxt Typecheck_costs.get_script
-      >>?= fun ctxt ->
       trace (Invalid_contract (loc, contract))
       @@ Contract.get_script_code ctxt contract
       >>=? fun (ctxt, code) ->
@@ -4557,11 +4439,11 @@ and parse_contract_for_script :
             in
             ok (ctxt, Some contract)
         | Error _ ->
-            Gas.consume ctxt Typecheck_costs.cycle
+            Gas.consume ctxt Typecheck_costs.parse_instr_cycle
             >>? fun ctxt -> ok (ctxt, None) )
   | (Some _, _) ->
       Lwt.return
-        ( Gas.consume ctxt Typecheck_costs.cycle
+        ( Gas.consume ctxt Typecheck_costs.parse_instr_cycle
         >|? fun ctxt ->
         (* An implicit account on any other entrypoint is not a valid contract. *)
         (ctxt, None) )
@@ -4572,8 +4454,6 @@ and parse_contract_for_script :
       | false ->
           return (ctxt, None)
       | true -> (
-          Gas.consume ctxt Typecheck_costs.get_script
-          >>?= fun ctxt ->
           trace (Invalid_contract (loc, contract))
           @@ Contract.get_script_code ctxt contract
           >>=? fun (ctxt, code) ->
@@ -5301,9 +5181,7 @@ let hash_data ctxt typ data =
   pack_data ctxt typ data
   >>=? fun (bytes, ctxt) ->
   Lwt.return
-    ( Gas.consume
-        ctxt
-        (Michelson_v1_gas.Cost_of.Legacy.hash bytes Script_expr_hash.size)
+    ( Gas.consume ctxt (Michelson_v1_gas.Cost_of.Interpreter.blake2b bytes)
     >|? fun ctxt -> (Script_expr_hash.(hash_bytes [bytes]), ctxt) )
 
 (* ---------------- Big map -------------------------------------------------*)
@@ -5393,7 +5271,7 @@ let diff_of_big_map ctxt mode ~temporary ~ids {id; key_type; value_type; diff}
   let pairs = map_fold (fun key value acc -> (key, value) :: acc) diff [] in
   fold_left_s
     (fun (acc, ctxt) (key, value) ->
-      Gas.consume ctxt Typecheck_costs.cycle
+      Gas.consume ctxt Typecheck_costs.parse_instr_cycle
       >>?= fun ctxt ->
       hash_data ctxt key_type key
       >>=? fun (diff_key_hash, ctxt) ->
@@ -5501,7 +5379,7 @@ let extract_big_map_updates ctxt mode ~temporary ids acc ty x =
       has_big_map:a has_big_map ->
       (context * a * Ids.t * Contract.big_map_diff list) tzresult Lwt.t =
    fun ctxt mode ~temporary ids acc ty x ~has_big_map ->
-    Gas.consume ctxt Typecheck_costs.cycle
+    Gas.consume ctxt Typecheck_costs.parse_instr_cycle
     >>?= fun ctxt ->
     match (has_big_map, ty, x) with
     | (False_f, _, _) ->
@@ -5529,8 +5407,6 @@ let extract_big_map_updates ctxt mode ~temporary ids acc ty x =
     | (List_f has_big_map, List_t (ty, _), l) ->
         fold_left_s
           (fun (ctxt, l, ids, acc) x ->
-            Gas.consume ctxt Typecheck_costs.cycle
-            >>?= fun ctxt ->
             aux ctxt mode ~temporary ids acc ty x ~has_big_map
             >|=? fun (ctxt, x, ids, acc) -> (ctxt, list_cons x l, ids, acc))
           (ctxt, list_empty, ids, acc)
@@ -5541,8 +5417,6 @@ let extract_big_map_updates ctxt mode ~temporary ids acc ty x =
     | (Map_f has_big_map, Map_t (_, ty, _), (module M)) ->
         fold_left_s
           (fun (ctxt, m, ids, acc) (k, x) ->
-            Gas.consume ctxt Typecheck_costs.cycle
-            >>?= fun ctxt ->
             aux ctxt mode ~temporary ids acc ty x ~has_big_map
             >|=? fun (ctxt, x, ids, acc) -> (ctxt, M.OPS.add k x m, ids, acc))
           (ctxt, M.OPS.empty, ids, acc)
@@ -5582,13 +5456,13 @@ let collect_big_maps ctxt ty x =
       Ids.t ->
       (Ids.t * context) tzresult =
    fun ctxt ty x ~has_big_map acc ->
-    Gas.consume ctxt Typecheck_costs.cycle
+    Gas.consume ctxt Typecheck_costs.parse_instr_cycle
     >>? fun ctxt ->
     match (has_big_map, ty, x) with
     | (False_f, _, _) ->
         ok (acc, ctxt)
     | (_, Big_map_t (_, _, _), {id = Some id}) ->
-        Gas.consume ctxt Typecheck_costs.cycle
+        Gas.consume ctxt Typecheck_costs.parse_instr_cycle
         >>? fun ctxt -> ok (Ids.add id acc, ctxt)
     | (Pair_f (hl, hr), Pair_t ((tyl, _, _), (tyr, _, _), _), (xl, xr)) ->
         collect ctxt tyl xl ~has_big_map:hl acc
