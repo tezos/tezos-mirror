@@ -43,7 +43,6 @@ let rec gen f = function 0 -> [] | n -> f () :: gen f (pred n)
 
 let run capacity unit_weight actors actor_work =
   let q = Lwt_pipe.create ~size:(capacity, fun () -> unit_weight) () in
-  assert (Lwt_pipe.is_empty q) ;
   let producers = gen (fun () -> producer q actor_work) actors in
   let consumers = gen (fun () -> consumer q actor_work) actors in
   Lwt.join producers
@@ -104,6 +103,53 @@ let push_pop_all () =
       (10, 6, 3, 1, 3);
       (1, 1, 2, 2, 4) ]
 
+(* introspection *)
+
+let introspect () =
+  let q = Lwt_pipe.create ~size:(4, fun n -> n) () in
+  assert (Lwt_pipe.is_empty q) ;
+  assert (Lwt.state @@ Lwt_pipe.empty q = Lwt.Return ()) ;
+  let peek_0 = Lwt_pipe.peek q in
+  assert (Lwt.state peek_0 = Lwt.Sleep) ;
+  let () = assert (Lwt_pipe.push_now q 0) in
+  Lwt.pause () >>= fun () ->
+  assert (Lwt.state peek_0 = Lwt.Return 0) ;
+  let () = assert (Lwt_pipe.push_now q 0) in
+  let () = assert (Lwt_pipe.push_now q 0) in
+  (* can push 4 and then even more because of weight 0 *)
+  let () = assert (Lwt_pipe.push_now q 0) in
+  let () = assert (Lwt_pipe.push_now q 0) in
+  let empty_0 = Lwt_pipe.empty q in
+  assert (Lwt.state empty_0 = Lwt.Sleep) ;
+  assert (Lwt_pipe.peek_all q = [0; 0; 0; 0; 0]);
+  let pop_0 = Lwt_pipe.pop q in
+  assert (Lwt.state pop_0 = Lwt.Return 0) ;
+  let () = match Lwt_pipe.pop_now q with Some 0 -> () | _ -> assert false in
+  let pop_234 = Lwt_pipe.pop_all q in
+  assert (Lwt.state pop_234 = Lwt.Return [0;0;0]) ;
+  Lwt.pause () >>= fun () ->
+  assert (Lwt.state empty_0 = Lwt.Return ()) ;
+  let () = assert (Lwt_pipe.push_now q 1) in
+  let peek_0 = Lwt_pipe.peek q in
+  assert (Lwt.state peek_0 = Lwt.Return 1) ;
+  let () = assert (Lwt_pipe.push_now q 1) in
+  let () = assert (Lwt_pipe.push_now q 1) in
+  let push_big = Lwt_pipe.push q 4 in
+  let push_small = Lwt_pipe.push q 1 in
+  assert (Lwt.state push_big = Lwt.Sleep) ;
+  assert (Lwt.state push_small = Lwt.Sleep) ;
+  let () = match Lwt_pipe.pop_now q with Some 1 -> () | _ -> assert false in
+  Lwt.pause () >>= fun () ->
+  assert (Lwt.state push_big = Lwt.Sleep) ;
+  assert (Lwt.state push_small = Lwt.Return ()) ;
+  let () = match Lwt_pipe.pop_now q with Some 1 -> () | _ -> assert false in
+  let () = match Lwt_pipe.pop_now q with Some 1 -> () | _ -> assert false in
+  let () = match Lwt_pipe.pop_now q with Some 1 -> () | _ -> assert false in
+  Lwt.pause () >>= fun () ->
+  assert (Lwt.state push_big = Lwt.Return ()) ;
+  let () = match Lwt_pipe.pop_now q with Some 4 -> () | _ -> assert false in
+  Lwt.return_unit
+
 (* Scaffolding and main *)
 
 let with_timeout t f () =
@@ -118,4 +164,6 @@ let () =
        "Lwt_pipe"
        [ ( "push-pop",
            [ ("push-pop", `Quick, with_timeout 0.2 push_pop);
-             ("push-pop-all", `Quick, with_timeout 0.5 push_pop_all) ] ) ]
+             ("push-pop-all", `Quick, with_timeout 0.5 push_pop_all) ] ) ;
+         ( "scenarii",
+           [  ("introspect", `Quick, introspect) ] ) ]
