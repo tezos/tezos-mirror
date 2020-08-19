@@ -189,5 +189,8 @@ let close q =
 
 let rec iter q ~f =
   Lwt.catch
-    (fun () -> pop q >>= fun elt -> f elt >>= fun () -> iter q ~f)
-    (function Closed -> Lwt.return_unit | exn -> raise exn)
+    (fun () -> pop q >|= fun elt -> Some elt)
+    (function Closed -> Lwt.return_none | exn -> raise exn)
+  >>= function
+  | None -> Lwt.return_unit
+  | Some elt -> f elt >>= fun () -> iter q ~f
