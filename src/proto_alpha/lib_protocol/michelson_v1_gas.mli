@@ -28,14 +28,6 @@ open Alpha_context
 module Cost_of : sig
   val manager_operation : Gas.cost
 
-  module Legacy : sig
-    val z_to_int64 : Gas.cost
-
-    val hash : MBytes.t -> int -> Gas.cost
-
-    val set_update : 'a -> bool -> 'a Script_typed_ir.set -> Gas.cost
-  end
-
   module Interpreter : sig
     val drop : Gas.cost
 
@@ -258,7 +250,7 @@ module Cost_of : sig
     val unpack_failed : MBytes.t -> Gas.cost
   end
 
-  module Typechecking_007 : sig
+  module Typechecking : sig
     val public_key_optimized : Gas.cost
 
     val public_key_readable : Gas.cost
@@ -304,7 +296,7 @@ module Cost_of : sig
     val proof_argument : int -> Gas.cost
   end
 
-  module Unparsing_007 : sig
+  module Unparsing : sig
     val public_key_optimized : Gas.cost
 
     val public_key_readable : Gas.cost
@@ -340,126 +332,5 @@ module Cost_of : sig
     val contract : Gas.cost
 
     val operation : MBytes.t -> Gas.cost
-  end
-
-  module Typechecking : sig
-    val cycle : Gas.cost
-
-    val unit : Gas.cost
-
-    val bool : Gas.cost
-
-    val tez : Gas.cost
-
-    val z : Z.t -> Gas.cost
-
-    val string : int -> Gas.cost
-
-    val bytes : int -> Gas.cost
-
-    val int_of_string : string -> Gas.cost
-
-    val string_timestamp : Gas.cost
-
-    val key : Gas.cost
-
-    val key_hash : Gas.cost
-
-    val signature : Gas.cost
-
-    val chain_id : Gas.cost
-
-    val contract : Gas.cost
-
-    (** Gas.Cost of getting the code for a contract *)
-    val get_script : Gas.cost
-
-    val contract_exists : Gas.cost
-
-    (** Additional Gas.cost of parsing a pair over the Gas.cost of parsing each type  *)
-    val pair : Gas.cost
-
-    val union : Gas.cost
-
-    val lambda : Gas.cost
-
-    val some : Gas.cost
-
-    val none : Gas.cost
-
-    val list_element : Gas.cost
-
-    val set_element : int -> Gas.cost
-
-    val map_element : int -> Gas.cost
-
-    val primitive_type : Gas.cost
-
-    val one_arg_type : Gas.cost
-
-    val two_arg_type : Gas.cost
-
-    val operation : int -> Gas.cost
-
-    (** Cost of parsing a type *)
-    val type_ : int -> Gas.cost
-
-    (** Cost of parsing an instruction *)
-    val instr : ('a, 'b) Script_typed_ir.instr -> Gas.cost
-  end
-
-  module Unparse : sig
-    val prim_cost : int -> Script.annot -> Gas.cost
-
-    val seq_cost : int -> Gas.cost
-
-    val cycle : Gas.cost
-
-    val unit : Gas.cost
-
-    val bool : Gas.cost
-
-    val z : Z.t -> Gas.cost
-
-    val int : 'a Script_int.num -> Gas.cost
-
-    val tez : Gas.cost
-
-    val string : string -> Gas.cost
-
-    val bytes : MBytes.t -> Gas.cost
-
-    val timestamp : Script_timestamp.t -> Gas.cost
-
-    val key : Gas.cost
-
-    val key_hash : Gas.cost
-
-    val signature : Gas.cost
-
-    val operation : MBytes.t -> Gas.cost
-
-    val chain_id : Gas.cost
-
-    val contract : Gas.cost
-
-    (** Additional Gas.cost of parsing a pair over the Gas.cost of parsing each type  *)
-    val pair : Gas.cost
-
-    val union : Gas.cost
-
-    val some : Gas.cost
-
-    val none : Gas.cost
-
-    val list_element : Gas.cost
-
-    val set_element : Gas.cost
-
-    val map_element : Gas.cost
-
-    val one_arg_type : Script.annot -> Gas.cost
-
-    val two_arg_type : Script.annot -> Gas.cost
   end
 end

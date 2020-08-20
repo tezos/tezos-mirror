@@ -30,8 +30,8 @@ open Script_typed_ir
 open Script_tc_errors
 open Script_ir_annot
 open Misc.Syntax
-module Typecheck_costs = Michelson_v1_gas.Cost_of.Typechecking_007
-module Unparse_costs = Michelson_v1_gas.Cost_of.Unparsing_007
+module Typecheck_costs = Michelson_v1_gas.Cost_of.Typechecking
+module Unparse_costs = Michelson_v1_gas.Cost_of.Unparsing
 
 type ex_comparable_ty =
   | Ex_comparable_ty : 'a comparable_ty -> ex_comparable_ty
