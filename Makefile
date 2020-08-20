@@ -5,3 +5,6 @@ all: tezos-basic.jsonnet
 
 clean:
 	rm output/*.generated
+
+fmt:
+	jsonnetfmt -i src/*.jsonnet
