@@ -12,12 +12,13 @@ local p2p = import './p2p.jsonnet';
 local hardware = import './hardware.jsonnet';
 local workers = import './workers.jsonnet';
 
+local boardtitle = 'Tezos branch: ' + std.extVar('branch');
 
 //###
 // Grafana main stuffs
 //##
 dashboard.new(
-  'Tezos node test',
+  title=boardtitle,
   tags=['tezos', 'storage'],
   schemaVersion=18,
   editable=true,
