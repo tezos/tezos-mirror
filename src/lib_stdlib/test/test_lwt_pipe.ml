@@ -112,6 +112,48 @@ let push_pop_all () =
       (10, 6, 3, 1, 3);
       (1, 1, 2, 2, 4) ]
 
+(* fifo *)
+
+let rec producer q = function
+  | 0 ->
+      Lwt_pipe.push q 0
+  | n ->
+      Lwt_pipe.push q n >>= fun () -> producer q (pred n)
+
+let rec consumer q = function
+  | 0 ->
+      Lwt_pipe.pop q >|= fun m -> assert (0 = m)
+  | n ->
+      Lwt_pipe.pop q
+      >>= fun m ->
+      assert (n = m) ;
+      consumer q (pred n)
+
+let run capacity unit_weight work =
+  let q = Lwt_pipe.create ~size:(capacity, fun _ -> unit_weight) () in
+  let producer = producer q work in
+  let consumer = consumer q work in
+  producer
+  >>= fun () ->
+  consumer
+  >>= fun () ->
+  assert (Lwt_pipe.is_empty q) ;
+  Lwt.return_unit
+
+let count_down () =
+  Lwt_list.iter_p
+    (fun (capacity, unit_weight, work) -> run capacity unit_weight work)
+    [ (max_int, 0, 0);
+      (max_int, 0, 1);
+      (max_int, 0, 10);
+      (max_int, 0, 100);
+      (10, 9, 10);
+      (10, 5, 1);
+      (1, 1, 0);
+      (1, 1, 1);
+      (1, 1, 10);
+      (1, 1, 100) ]
+
 (* introspection *)
 
 let introspect () =
@@ -178,4 +220,5 @@ let () =
        [ ( "push-pop",
            [ ("push-pop", `Quick, with_timeout 0.2 push_pop);
              ("push-pop-all", `Quick, with_timeout 0.5 push_pop_all) ] );
+         ("fifo", [("count-down", `Quick, with_timeout 0.2 count_down)]);
          ("scenarii", [("introspect", `Quick, introspect)]) ]
