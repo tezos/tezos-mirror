@@ -1082,6 +1082,93 @@ module Cost_of = struct
     let proof_argument n = atomic_step_cost (n * 50)
   end
 
+  module Unparsing_007 = struct
+    open Generated_costs_007
+
+    let public_key_optimized =
+      atomic_step_cost
+      @@ Compare.Int.(
+           max
+             cost_ENCODING_PUBLIC_KEY_ed25519
+             (max
+                cost_ENCODING_PUBLIC_KEY_secp256k1
+                cost_ENCODING_PUBLIC_KEY_p256))
+
+    let public_key_readable =
+      atomic_step_cost
+      @@ Compare.Int.(
+           max
+             cost_B58CHECK_ENCODING_PUBLIC_KEY_ed25519
+             (max
+                cost_B58CHECK_ENCODING_PUBLIC_KEY_secp256k1
+                cost_B58CHECK_ENCODING_PUBLIC_KEY_p256))
+
+    let key_hash_optimized =
+      atomic_step_cost
+      @@ Compare.Int.(
+           max
+             cost_ENCODING_PUBLIC_KEY_HASH_ed25519
+             (max
+                cost_ENCODING_PUBLIC_KEY_HASH_secp256k1
+                cost_ENCODING_PUBLIC_KEY_HASH_p256))
+
+    let key_hash_readable =
+      atomic_step_cost
+      @@ Compare.Int.(
+           max
+             cost_B58CHECK_ENCODING_PUBLIC_KEY_HASH_ed25519
+             (max
+                cost_B58CHECK_ENCODING_PUBLIC_KEY_HASH_secp256k1
+                cost_B58CHECK_ENCODING_PUBLIC_KEY_HASH_p256))
+
+    let signature_optimized =
+      atomic_step_cost
+      @@ Compare.Int.(
+           max
+             cost_ENCODING_SIGNATURE_ed25519
+             (max
+                cost_ENCODING_SIGNATURE_secp256k1
+                cost_ENCODING_SIGNATURE_p256))
+
+    let signature_readable =
+      atomic_step_cost
+      @@ Compare.Int.(
+           max
+             cost_B58CHECK_ENCODING_SIGNATURE_ed25519
+             (max
+                cost_B58CHECK_ENCODING_SIGNATURE_secp256k1
+                cost_B58CHECK_ENCODING_SIGNATURE_p256))
+
+    let chain_id_optimized = atomic_step_cost cost_ENCODING_CHAIN_ID
+
+    let chain_id_readable = atomic_step_cost cost_B58CHECK_ENCODING_CHAIN_ID
+
+    let timestamp_readable = atomic_step_cost cost_TIMESTAMP_READABLE_ENCODING
+
+    (* Reasonable approximation *)
+    let address_optimized = key_hash_optimized
+
+    (* Reasonable approximation *)
+    let contract_optimized = key_hash_optimized
+
+    (* Reasonable approximation *)
+    let contract_readable = key_hash_readable
+
+    let unparse_type_cycle = atomic_step_cost cost_UNPARSE_TYPE
+
+    let unparse_instr_cycle = atomic_step_cost cost_UNPARSING_CODE
+
+    let unparse_data_cycle = atomic_step_cost cost_UNPARSING_DATA
+
+    let unit = Gas.free
+
+    (* Reasonable estimate. *)
+    let contract = Gas.(2 *@ public_key_readable)
+
+    (* Reuse 006 costs. *)
+    let operation bytes = Script.bytes_node_cost bytes
+  end
+
   module Typechecking = struct
     let cycle = step_cost 1
 

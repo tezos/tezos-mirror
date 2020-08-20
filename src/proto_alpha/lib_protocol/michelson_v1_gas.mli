@@ -304,6 +304,44 @@ module Cost_of : sig
     val proof_argument : int -> Gas.cost
   end
 
+  module Unparsing_007 : sig
+    val public_key_optimized : Gas.cost
+
+    val public_key_readable : Gas.cost
+
+    val key_hash_optimized : Gas.cost
+
+    val key_hash_readable : Gas.cost
+
+    val signature_optimized : Gas.cost
+
+    val signature_readable : Gas.cost
+
+    val chain_id_optimized : Gas.cost
+
+    val chain_id_readable : Gas.cost
+
+    val timestamp_readable : Gas.cost
+
+    val address_optimized : Gas.cost
+
+    val contract_optimized : Gas.cost
+
+    val contract_readable : Gas.cost
+
+    val unparse_type_cycle : Gas.cost
+
+    val unparse_instr_cycle : Gas.cost
+
+    val unparse_data_cycle : Gas.cost
+
+    val unit : Gas.cost
+
+    val contract : Gas.cost
+
+    val operation : MBytes.t -> Gas.cost
+  end
+
   module Typechecking : sig
     val cycle : Gas.cost
 
