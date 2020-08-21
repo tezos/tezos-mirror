@@ -220,6 +220,7 @@ class Client:
                    inp: str,
                    amount: float = None,
                    trace_stack: bool = False,
+                   gas: int = None,
                    file: bool = True) -> client_output.RunScriptResult:
         if file:
             assert os.path.isfile(contract), f'{contract} is not a file'
@@ -229,6 +230,8 @@ class Client:
             cmd += ['-z', str(amount)]
         if trace_stack:
             cmd += ['--trace-stack']
+        if gas is not None:
+            cmd += ['--gas', '%d' % gas]
         return client_output.RunScriptResult(self.run(cmd))
 
     def gen_key(self, alias: str, args: List[str] = None) -> str:
