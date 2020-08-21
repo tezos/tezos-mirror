@@ -72,3 +72,5 @@ type error += Private_mode
 type error += Point_banned of P2p_point.Id.t
 
 type error += Peer_banned of P2p_peer.Id.t
+
+type error += P2p_layer_disabled

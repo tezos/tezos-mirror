@@ -259,6 +259,8 @@ type error += Point_banned of P2p_point.Id.t
 
 type error += Peer_banned of P2p_peer.Id.t
 
+type error += P2p_layer_disabled
+
 let () =
   (* Pending connection *)
   register_error_kind
@@ -367,4 +369,14 @@ let () =
         peer_id)
     Data_encoding.(obj1 (req "peer" P2p_peer.Id.encoding))
     (function Peer_banned peer_id -> Some peer_id | _ -> None)
-    (fun peer_id -> Peer_banned peer_id)
+    (fun peer_id -> Peer_banned peer_id) ;
+  (* P2p_layer_disabled *)
+  register_error_kind
+    `Permanent
+    ~id:"node.p2p_pool.disabled"
+    ~title:"P2P layer disabled"
+    ~description:"The P2P layer on this node is not active."
+    ~pp:(fun ppf () -> Format.fprintf ppf "P2P layer disabled.")
+    Data_encoding.empty
+    (function P2p_layer_disabled -> Some () | _ -> None)
+    (fun () -> P2p_layer_disabled)
