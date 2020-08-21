@@ -86,3 +86,7 @@ val unit_parameter : lazy_expr
 val is_unit_parameter : lazy_expr -> bool
 
 val strip_annotations : node -> node
+
+val micheline_nodes : node -> int
+
+val strip_locations_cost : node -> Gas_limit_repr.cost

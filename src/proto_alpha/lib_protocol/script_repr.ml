@@ -231,3 +231,31 @@ let rec strip_annotations node =
       Prim (loc, name, List.map strip_annotations args, [])
   | Seq (loc, args) ->
       Seq (loc, List.map strip_annotations args)
+
+let rec micheline_nodes node acc k =
+  match node with
+  | Micheline.Int (_, _) ->
+      k (acc + 1)
+  | Micheline.String (_, _) ->
+      k (acc + 1)
+  | Micheline.Bytes (_, _) ->
+      k (acc + 1)
+  | Micheline.Prim (_, _, subterms, _) ->
+      micheline_nodes_list subterms (acc + 1) k
+  | Micheline.Seq (_, subterms) ->
+      micheline_nodes_list subterms (acc + 1) k
+
+and micheline_nodes_list subterms acc k =
+  match subterms with
+  | [] ->
+      k acc
+  | n :: nodes ->
+      micheline_nodes_list nodes acc (fun acc -> micheline_nodes n acc k)
+
+let micheline_nodes node = micheline_nodes node 0 (fun x -> x)
+
+let cost_MICHELINE_STRIP_LOCATIONS size = size * 100
+
+let strip_locations_cost node =
+  let nodes = micheline_nodes node in
+  Gas_limit_repr.atomic_step_cost (cost_MICHELINE_STRIP_LOCATIONS nodes)

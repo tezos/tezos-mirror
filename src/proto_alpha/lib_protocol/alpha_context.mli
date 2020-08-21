@@ -453,6 +453,10 @@ module Script : sig
 
     val add_root_entrypoint : script_code:lazy_expr -> lazy_expr tzresult Lwt.t
   end
+
+  val micheline_nodes : node -> int
+
+  val strip_locations_cost : node -> Gas.cost
 end
 
 module Constants : sig
