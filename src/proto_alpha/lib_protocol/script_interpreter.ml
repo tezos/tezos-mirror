@@ -1065,6 +1065,8 @@ let rec step :
       >>=? fun (p, big_map_diff, ctxt) ->
       unparse_data ctxt Optimized tp p
       >>=? fun (p, ctxt) ->
+      Gas.consume ctxt (Script.strip_locations_cost p)
+      >>?= fun ctxt ->
       let operation =
         Transaction
           {
@@ -1143,6 +1145,8 @@ let rec step :
       >>=? fun (init, big_map_diff, ctxt) ->
       unparse_data ctxt Optimized storage_type init
       >>=? fun (storage, ctxt) ->
+      Gas.consume ctxt (Script.strip_locations_cost storage)
+      >>?= fun ctxt ->
       let storage = Script.lazy_expr @@ Micheline.strip_locations storage in
       ( if spendable then
         Legacy_support.add_do
@@ -1210,6 +1214,8 @@ let rec step :
       >>=? fun (init, big_map_diff, ctxt) ->
       unparse_data ctxt Optimized storage_type init
       >>=? fun (storage, ctxt) ->
+      Gas.consume ctxt (Script.strip_locations_cost storage)
+      >>?= fun ctxt ->
       let storage = Micheline.strip_locations storage in
       Contract.fresh_contract_from_current_nonce ctxt
       >>?= fun (ctxt, contract) ->
@@ -1355,7 +1361,13 @@ let execute logger ctxt mode step_constants ~entrypoint unparsed_script arg :
     storage_type
     storage
   >>=? fun (storage, big_map_diff, ctxt) ->
-  trace Cannot_serialize_storage (unparse_data ctxt mode storage_type storage)
+  trace
+    Cannot_serialize_storage
+    ( unparse_data ctxt mode storage_type storage
+    >>=? fun (storage, ctxt) ->
+    Lwt.return
+      ( Gas.consume ctxt (Script.strip_locations_cost storage)
+      >>? fun ctxt -> ok (Micheline.strip_locations storage, ctxt) ) )
   >|=? fun (storage, ctxt) ->
   let (ops, op_diffs) = List.split ops.elements in
   let big_map_diff =
@@ -1368,7 +1380,7 @@ let execute logger ctxt mode step_constants ~entrypoint unparsed_script arg :
     | diff ->
         Some diff
   in
-  (Micheline.strip_locations storage, ops, ctxt, big_map_diff)
+  (storage, ops, ctxt, big_map_diff)
 
 type execution_result = {
   ctxt : context;

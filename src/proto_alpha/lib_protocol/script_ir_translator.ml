@@ -727,8 +727,10 @@ let rec strip_var_annots = function
 
 let serialize_ty_for_error ctxt ty =
   unparse_ty ctxt ty
+  >>? (fun (ty, ctxt) ->
+        Gas.consume ctxt (Script.strip_locations_cost ty)
+        >|? fun ctxt -> (Micheline.strip_locations (strip_var_annots ty), ctxt))
   |> record_trace Cannot_serialize_error
-  >|? fun (ty, ctxt) -> (strip_locations (strip_var_annots ty), ctxt)
 
 let rec unparse_stack :
     type a.
@@ -5123,6 +5125,10 @@ let unparse_script ctxt mode {code; arg_type; storage; storage_type; root_name}
     Gas.consume ctxt Unparse_costs.unparse_instr_cycle
     >>? fun ctxt ->
     Gas.consume ctxt Unparse_costs.unparse_instr_cycle
+    >>? fun ctxt ->
+    Gas.consume ctxt (Script.strip_locations_cost code)
+    >>? fun ctxt ->
+    Gas.consume ctxt (Script.strip_locations_cost storage)
     >|? fun ctxt ->
     ( {
         code = lazy_expr (strip_locations code);
@@ -5133,6 +5139,8 @@ let unparse_script ctxt mode {code; arg_type; storage; storage_type; root_name}
 let pack_data ctxt typ data =
   unparse_data ctxt Optimized typ data
   >>=? fun (unparsed, ctxt) ->
+  Gas.consume ctxt (Script.strip_locations_cost unparsed)
+  >>?= fun ctxt ->
   let bytes =
     Data_encoding.Binary.to_bytes_exn
       expr_encoding
@@ -5226,7 +5234,11 @@ let diff_of_big_map ctxt mode ~temporary ~ids {id; key_type; value_type; diff}
         ( unparse_ty ctxt key_type
         >>? fun (kt, ctxt) ->
         unparse_ty ctxt value_type
-        >|? fun (kv, ctxt) ->
+        >>? fun (kv, ctxt) ->
+        Gas.consume ctxt (Script.strip_locations_cost kt)
+        >>? fun ctxt ->
+        Gas.consume ctxt (Script.strip_locations_cost kv)
+        >|? fun ctxt ->
         ( ctxt,
           [ Contract.Alloc
               {
@@ -5245,13 +5257,17 @@ let diff_of_big_map ctxt mode ~temporary ~ids {id; key_type; value_type; diff}
       >>=? fun (diff_key_hash, ctxt) ->
       unparse_data ctxt mode key_type key
       >>=? fun (key_node, ctxt) ->
+      Gas.consume ctxt (Script.strip_locations_cost key_node)
+      >>?= fun ctxt ->
       let diff_key = Micheline.strip_locations key_node in
       ( match value with
       | None ->
           return (None, ctxt)
       | Some x ->
           unparse_data ctxt mode value_type x
-          >|=? fun (node, ctxt) -> (Some (Micheline.strip_locations node), ctxt)
+          >>=? fun (node, ctxt) ->
+          Gas.consume ctxt (Script.strip_locations_cost node)
+          >>?= fun ctxt -> return (Some (Micheline.strip_locations node), ctxt)
       )
       >|=? fun (diff_value, ctxt) ->
       let diff_item =
