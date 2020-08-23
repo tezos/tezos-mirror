@@ -466,7 +466,7 @@ class TestGasBound:
             ("Cannot serialize the resulting storage" +
              " value within the provided gas bounds.")
         with utils.assert_run_failure(expected_error):
-            client.run_script(contract, storage, inp)
+            client.run_script(contract, storage, inp, gas=18291)
 
     def test_typecheck_map_dup_key(self, client: Client):
 
