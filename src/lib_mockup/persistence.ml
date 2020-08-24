@@ -156,7 +156,7 @@ let get_mockup_context_from_disk ~base_dir ~protocol_hash =
         failwith "get_mockup_context_from_disk: could not read %s" file
 
 let overwrite_mockup ~protocol_hash ~chain_id ~rpc_context ~base_dir =
-  let context_file = (Files.context ~dirname:base_dir :> string) in
+  let context_file = (Files.Context.get ~dirname:base_dir :> string) in
   if not (Sys.file_exists context_file) then
     failwith "overwrite_mockup: file %s does not exist" context_file
   else
@@ -196,8 +196,8 @@ let classify_base_dir base_dir =
   else if is_directory_empty base_dir then Base_dir_is_empty
   else
     let dirname = base_dir in
-    if Files.has_mockup_directory ~dirname && Files.has_context ~dirname then
-      Base_dir_is_mockup
+    if Files.exists_mockup_directory ~dirname && Files.Context.exists ~dirname
+    then Base_dir_is_mockup
     else Base_dir_is_nonempty
 
 let create_mockup ~(cctxt : Tezos_client_base.Client_context.full)
@@ -227,29 +227,20 @@ let create_mockup ~(cctxt : Tezos_client_base.Client_context.full)
     ~protocol_hash
     ~constants_overrides_json
     ~bootstrap_accounts_json
-  >>=? fun (mockup_env, (chain_id, rpc_context)) ->
-  let mockup_dir = (Files.mockup_directory ~dirname:base_dir :> string) in
+  >>=? fun (_mockup_env, (chain_id, rpc_context)) ->
+  let mockup_dir = (Files.get_mockup_directory ~dirname:base_dir :> string) in
   Tezos_stdlib_unix.Lwt_utils_unix.create_dir mockup_dir
   >>= fun () ->
-  let context_file = (Files.context ~dirname:base_dir :> string) in
+  let context_file = (Files.Context.get ~dirname:base_dir :> string) in
   Persistent_mockup_environment.(
     to_json {protocol_hash; chain_id; rpc_context})
   |> Tezos_stdlib_unix.Lwt_utils_unix.Json.write_file context_file
   >>=? fun () ->
   if asynchronous then
     (* Setup a local persistent mempool *)
-    let mempool_file = (Files.mempool ~dirname:base_dir :> string) in
+    let mempool_file = (Files.Mempool.get ~dirname:base_dir :> string) in
     cctxt#message "creating persistent mempool_file at %s" mempool_file
     >>= fun () ->
-    let module Mockup = (val mockup_env : Registration.Mockup_sig) in
-    let encoding =
-      let open Data_encoding in
-      Variable.list
-      @@ dynamic_size
-           (obj2
-              (req "shell_header" Operation.shell_header_encoding)
-              (req "protocol_data" Mockup.Protocol.operation_data_encoding))
-    in
-    let json = Data_encoding.Json.construct encoding [] in
-    Tezos_stdlib_unix.Lwt_utils_unix.Json.write_file mempool_file json
+    Lwt_io.with_file ~mode:Lwt_io.Output mempool_file (fun oc ->
+        Lwt_io.write oc "[]" >|= ok)
   else return_unit

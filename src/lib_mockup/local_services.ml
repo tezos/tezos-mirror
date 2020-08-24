@@ -216,23 +216,60 @@ module Make (E : MENV) = struct
 
   let ops_encoding = Data_encoding.Variable.list op_encoding
 
-  (* Read mempool file *)
-  let read_operations () =
-    let dirname = E.base_dir in
-    let mempool_file = (Files.mempool ~dirname :> string) in
-    Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file mempool_file
-    >>=? fun json -> return @@ Data_encoding.Json.destruct ops_encoding json
+  module L = struct
+    module S = Internal_event.Simple
 
-  (* Add operation to mempool_file *)
-  let write_operation op =
-    (* Read current mempool *)
-    read_operations ()
-    >>=? fun ops ->
-    let ops' = op :: ops in
-    Data_encoding.Json.construct ops_encoding ops'
-    |>
-    let mempool_file = (Files.mempool ~dirname:E.base_dir :> string) in
-    Tezos_stdlib_unix.Lwt_utils_unix.Json.write_file mempool_file
+    let section = ["mockup"; "local_services"]
+
+    let warn_trashpool_append =
+      let pp1 ppf l =
+        match List.length l with
+        (* This should not happend as the lone call to this function is
+           protected by a "unless"*)
+        | 0 ->
+            Format.pp_print_string ppf "nothing"
+        | 1 ->
+            Format.pp_print_string ppf "1 operation"
+        | n ->
+            Format.fprintf ppf "%d operations" n
+      in
+      S.declare_1
+        ~section
+        ~name:"thraspool_append"
+        ~msg:"Appending {operations} to trashpool"
+        ~level:Internal_event.Warning
+        ~pp1
+        ("operations", ops_encoding)
+  end
+
+  type write_mode = Append | Zero_truncate
+
+  module Rw (File_accessor : Files.ACCESSOR) = struct
+    let file = (File_accessor.get ~dirname:E.base_dir :> string)
+
+    let unsafe_read () =
+      Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file file
+      >>=? fun json -> return @@ Data_encoding.Json.destruct ops_encoding json
+
+    let read () =
+      if File_accessor.exists ~dirname:E.base_dir then unsafe_read ()
+      else return []
+
+    let write ~mode operations =
+      ( match mode with
+      | Append ->
+          read () >>=? fun ops -> return (ops @ operations)
+      | Zero_truncate ->
+          return operations )
+      >>=? fun ops ->
+      let json = Data_encoding.Json.construct ops_encoding ops in
+      Tezos_stdlib_unix.Lwt_utils_unix.Json.write_file file json
+
+    let append = write ~mode:Append
+  end
+
+  module Mempool = Rw (Files.Mempool)
+  module Trashpool = Rw (Files.Trashpool)
 
   let pending_operations () =
     Directory.register
@@ -246,7 +283,7 @@ module Make (E : MENV) = struct
         | Error errs ->
             RPC_answer.fail errs
         | Ok () -> (
-            read_operations ()
+            Mempool.read ()
             >>= function
             | Error errs ->
                 RPC_answer.fail errs
@@ -446,7 +483,7 @@ module Make (E : MENV) = struct
         | Error _ ->
             RPC_answer.fail [Cannot_parse_op]
         | Ok operation_data -> (
-            write_operation (shell_header, operation_data)
+            Mempool.append [(shell_header, operation_data)]
             >>= function
             | Ok _ ->
                 RPC_answer.return operation_hash
@@ -534,102 +571,73 @@ module Make (E : MENV) = struct
       Tezos_shell_services.Injection_services.S.block
       (* See injection_directory.ml for vanilla implementation *)
       (fun () _ (bytes, operations) ->
-        (* TODO: This is probably where it all comes together i.e., where the
-         mempool  is actually modified and the context updated at the same time.
-
-         Do we need to ensure an invariant that avoids being in some weird state
-         where the mempool is updated on disk but somehow the context fails (or
-         vice versa) ?
-       *)
-        assert (Files.has_mempool ~dirname:E.base_dir) ;
+        assert (Files.Mempool.exists ~dirname:E.base_dir) ;
         let block_hash = Block_hash.hash_bytes [bytes] in
         match Block_header.of_bytes bytes with
         | None ->
             RPC_answer.fail [Cannot_parse_op]
         | Some block_header -> (
-            let mempool_file = (Files.mempool ~dirname:E.base_dir :> string) in
-            Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file mempool_file
+            reconstruct operations
+            >>=? (fun ({context; _}, _) ->
+                   let rpc_context =
+                     Tezos_protocol_environment.
+                       {
+                         context;
+                         block_hash;
+                         block_header =
+                           (* block_header.shell has been carefully constructed in
+                            * preapply_block. *)
+                           block_header.shell;
+                       }
+                   in
+                   write_context_callback rpc_context
+                   >>=? fun () ->
+                   Mempool.read ()
+                   >>=? fun mempool_operations ->
+                   fold_left_s
+                     (fun map ((shell_header, operation_data) as v) ->
+                       match
+                         Data_encoding.Binary.to_bytes
+                           op_data_encoding
+                           operation_data
+                       with
+                       | Error _ ->
+                           failwith
+                             "mockup inject block: byte encoding operation \
+                              failed"
+                       | Ok proto ->
+                           let h =
+                             Operation.hash
+                               {Operation.shell = shell_header; proto}
+                           in
+                           return @@ Operation_hash.Map.add h v map)
+                     Operation_hash.Map.empty
+                     mempool_operations
+                   >>=? fun mempool_map ->
+                   let refused_map =
+                     List.fold_left
+                       (List.fold_left (fun mempool op ->
+                            Operation_hash.Map.remove
+                              (Operation.hash op)
+                              mempool))
+                       mempool_map
+                       operations
+                   in
+                   unless (Operation_hash.Map.is_empty refused_map) (fun () ->
+                       let refused_ops =
+                         Operation_hash.Map.fold
+                           (fun _k v l -> v :: l)
+                           refused_map
+                           []
+                       in
+                       L.(S.emit warn_trashpool_append) refused_ops
+                       >>= fun () -> Trashpool.append refused_ops)
+                   >>=? fun () -> Mempool.write ~mode:Zero_truncate [])
             >>= function
             | Error errs ->
                 RPC_answer.fail errs
-            | Ok pooled_operations_json -> (
-                (* Let's construct an updated mempool in 3 steps:
-                 - reads back the current mempool_file (as map),
-                 - removing operations that are to be injected in the next block
-                 - then reconstruct a mempool structure to be written back.  *)
-                let ops =
-                  Data_encoding.Json.destruct
-                    ops_encoding
-                    pooled_operations_json
-                in
-                let mempool_map =
-                  List.fold_left
-                    (fun map ((shell_header, operation_data) as v) ->
-                      match
-                        Data_encoding.Binary.to_bytes
-                          op_data_encoding
-                          operation_data
-                      with
-                      | Error _ ->
-                          assert false
-                      | Ok proto ->
-                          let h =
-                            Operation.hash
-                              {Operation.shell = shell_header; proto}
-                          in
-                          Operation_hash.Map.add h v map)
-                    Operation_hash.Map.empty
-                    ops
-                in
-                let new_mempool_map =
-                  List.fold_left
-                    (List.fold_left (fun mempool op ->
-                         Operation_hash.Map.remove (Operation.hash op) mempool))
-                    mempool_map
-                    operations
-                in
-                Operation_hash.Map.fold
-                  (fun _k v l -> v :: l)
-                  new_mempool_map
-                  []
-                |> Data_encoding.Json.construct ops_encoding
-                |> Tezos_stdlib_unix.Lwt_utils_unix.Json.write_file
-                     mempool_file
-                >>= function
-                | Error errs ->
-                    RPC_answer.fail errs
-                | Ok () -> (
-                    reconstruct operations
-                    >>= function
-                    | Error _ ->
-                        assert false
-                    | Ok ({context; _}, _) -> (
-                        let rpc_context =
-                          Tezos_protocol_environment.
-                            {
-                              context;
-                              block_hash;
-                              block_header =
-                                (* block_header.shell has been carefully constructed in
-                                 * preapply_block. *)
-                                block_header.shell;
-                            }
-                        in
-                        write_context_callback rpc_context
-                        >>= function
-                        | Ok _ ->
-                            RPC_answer.return block_hash
-                        | Error errs -> (
-                            (* We couldn't write the new context. Let's first try to
-                             roll back the mempool before raising the errors. *)
-                            Tezos_stdlib_unix.Lwt_utils_unix.Json.write_file
-                              mempool_file
-                              pooled_operations_json
-                            >>= function
-                            | Error errs' ->
-                                RPC_answer.fail (errs @ errs')
-                            | Ok () ->
-                                RPC_answer.fail errs ) ) ) ) ))
+            | Ok () ->
+                RPC_answer.return block_hash ))
 
   let inject_operation (mem_only : bool)
       (write_context_callback :
@@ -648,7 +656,7 @@ module Make (E : MENV) = struct
            because types of concerned variables depend on E,
            which cannot cross functions boundaries without putting all that in
            Mockup_sig *)
-          Files.has_mempool ~dirname:E.base_dir
+          Files.Mempool.exists ~dirname:E.base_dir
         then inject_operation_with_mempool operation_bytes
         else
           inject_operation_without_mempool
