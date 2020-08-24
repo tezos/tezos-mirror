@@ -176,13 +176,13 @@ module Protocol_data : sig
   and info = {author : string; message : string; timestamp : Time.Protocol.t}
 
   and data = {
+    predecessor_block_metadata_hash : Block_metadata_hash.t option;
+    predecessor_ops_metadata_hash : Operation_metadata_list_list_hash.t option;
     info : info;
     protocol_hash : Protocol_hash.t;
     test_chain_status : Test_chain_status.t;
     data_key : Context_hash.t;
     parents : Context_hash.t list;
-    predecessor_block_metadata_hash : Block_metadata_hash.t option;
-    predecessor_ops_metadata_hash : Operation_metadata_list_list_hash.t option;
   }
 
   val to_bytes : t -> Bytes.t
@@ -190,6 +190,8 @@ module Protocol_data : sig
   val of_bytes : Bytes.t -> t option
 
   val encoding : t Data_encoding.t
+
+  val encoding_1_0_0 : t Data_encoding.t
 end
 
 val get_protocol_data_from_header :

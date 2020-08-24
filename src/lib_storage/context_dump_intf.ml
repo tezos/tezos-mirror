@@ -95,6 +95,8 @@ module type Dump_interface = sig
     val of_bytes : Bytes.t -> t option
 
     val encoding : t Data_encoding.t
+
+    val encoding_1_0_0 : t Data_encoding.t
   end
 
   module Commit_hash : sig
@@ -203,7 +205,7 @@ type error += Inconsistent_snapshot_data
 
 type error += Missing_snapshot_data
 
-type error += Invalid_snapshot_version of string * string
+type error += Invalid_snapshot_version of string * string list
 
 type error += Restore_context_failure
 
