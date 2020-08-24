@@ -14,329 +14,329 @@ big_map diff
 trace
   - location: 9 (remaining gas: 1038364 units remaining)
     [ (Pair { -9999999 ; -1 ; 0 ; 1 ; 9999999 } {})  	 ]
-  - location: 10 (remaining gas: 1038363.940 units remaining)
+  - location: 10 (remaining gas: 1038363.869 units remaining)
     [ { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 11 (remaining gas: 1038363.880 units remaining)
+  - location: 11 (remaining gas: 1038363.731 units remaining)
     [ {}  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 16 (remaining gas: 1038363.760 units remaining)
+  - location: 16 (remaining gas: 1038363.440 units remaining)
     [ { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 19 (remaining gas: 1038363.260 units remaining)
+  - location: 19 (remaining gas: 1038363.173 units remaining)
     [ False  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 18 (remaining gas: 1038363.240 units remaining)
+  - location: 18 (remaining gas: 1038363.102 units remaining)
     [ False  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 19 (remaining gas: 1038363.140 units remaining)
+  - location: 19 (remaining gas: 1038362.953 units remaining)
     [ False  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 18 (remaining gas: 1038363.120 units remaining)
+  - location: 18 (remaining gas: 1038362.882 units remaining)
     [ False  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 19 (remaining gas: 1038363.020 units remaining)
+  - location: 19 (remaining gas: 1038362.733 units remaining)
     [ True  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 18 (remaining gas: 1038363 units remaining)
+  - location: 18 (remaining gas: 1038362.662 units remaining)
     [ True  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 19 (remaining gas: 1038362.900 units remaining)
+  - location: 19 (remaining gas: 1038362.513 units remaining)
     [ False  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 18 (remaining gas: 1038362.880 units remaining)
+  - location: 18 (remaining gas: 1038362.442 units remaining)
     [ False  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 19 (remaining gas: 1038362.780 units remaining)
+  - location: 19 (remaining gas: 1038362.293 units remaining)
     [ False  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 18 (remaining gas: 1038362.760 units remaining)
+  - location: 18 (remaining gas: 1038362.222 units remaining)
     [ False  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 17 (remaining gas: 1038362.760 units remaining)
+  - location: 17 (remaining gas: 1038362.222 units remaining)
     [ { False ; False ; True ; False ; False }  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: -1 (remaining gas: 1038362.740 units remaining)
+  - location: -1 (remaining gas: 1038362.151 units remaining)
     [ { False ; False ; True ; False ; False }  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 14 (remaining gas: 1038362.740 units remaining)
+  - location: 14 (remaining gas: 1038362.151 units remaining)
     [ {}  	
       { False ; False ; True ; False ; False }  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 20 (remaining gas: 1038362.680 units remaining)
+  - location: 20 (remaining gas: 1038362.021 units remaining)
     [ { False ; False ; True ; False ; False }  	
       {}  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 21 (remaining gas: 1038362.620 units remaining)
+  - location: 21 (remaining gas: 1038361.874 units remaining)
     [ { { False ; False ; True ; False ; False } }  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 24 (remaining gas: 1038362.500 units remaining)
+  - location: 24 (remaining gas: 1038361.583 units remaining)
     [ { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 27 (remaining gas: 1038362 units remaining)
+  - location: 27 (remaining gas: 1038361.316 units remaining)
     [ True  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 26 (remaining gas: 1038361.980 units remaining)
+  - location: 26 (remaining gas: 1038361.245 units remaining)
     [ True  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 27 (remaining gas: 1038361.880 units remaining)
+  - location: 27 (remaining gas: 1038361.096 units remaining)
     [ True  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 26 (remaining gas: 1038361.860 units remaining)
+  - location: 26 (remaining gas: 1038361.025 units remaining)
     [ True  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 27 (remaining gas: 1038361.760 units remaining)
+  - location: 27 (remaining gas: 1038360.876 units remaining)
     [ False  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 26 (remaining gas: 1038361.740 units remaining)
+  - location: 26 (remaining gas: 1038360.805 units remaining)
     [ False  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 27 (remaining gas: 1038361.640 units remaining)
+  - location: 27 (remaining gas: 1038360.656 units remaining)
     [ True  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 26 (remaining gas: 1038361.620 units remaining)
+  - location: 26 (remaining gas: 1038360.585 units remaining)
     [ True  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 27 (remaining gas: 1038361.520 units remaining)
+  - location: 27 (remaining gas: 1038360.436 units remaining)
     [ True  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 26 (remaining gas: 1038361.500 units remaining)
+  - location: 26 (remaining gas: 1038360.365 units remaining)
     [ True  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 25 (remaining gas: 1038361.500 units remaining)
+  - location: 25 (remaining gas: 1038360.365 units remaining)
     [ { True ; True ; False ; True ; True }  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: -1 (remaining gas: 1038361.480 units remaining)
+  - location: -1 (remaining gas: 1038360.294 units remaining)
     [ { True ; True ; False ; True ; True }  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 22 (remaining gas: 1038361.480 units remaining)
+  - location: 22 (remaining gas: 1038360.294 units remaining)
     [ { { False ; False ; True ; False ; False } }  	
       { True ; True ; False ; True ; True }  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 28 (remaining gas: 1038361.420 units remaining)
+  - location: 28 (remaining gas: 1038360.164 units remaining)
     [ { True ; True ; False ; True ; True }  	
       { { False ; False ; True ; False ; False } }  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 29 (remaining gas: 1038361.360 units remaining)
+  - location: 29 (remaining gas: 1038360.017 units remaining)
     [ { { True ; True ; False ; True ; True } ;
         { False ; False ; True ; False ; False } }  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 32 (remaining gas: 1038361.240 units remaining)
+  - location: 32 (remaining gas: 1038359.726 units remaining)
     [ { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 35 (remaining gas: 1038360.740 units remaining)
+  - location: 35 (remaining gas: 1038359.459 units remaining)
     [ True  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 34 (remaining gas: 1038360.720 units remaining)
+  - location: 34 (remaining gas: 1038359.388 units remaining)
     [ True  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 35 (remaining gas: 1038360.620 units remaining)
+  - location: 35 (remaining gas: 1038359.239 units remaining)
     [ True  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 34 (remaining gas: 1038360.600 units remaining)
+  - location: 34 (remaining gas: 1038359.168 units remaining)
     [ True  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 35 (remaining gas: 1038360.500 units remaining)
+  - location: 35 (remaining gas: 1038359.019 units remaining)
     [ True  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 34 (remaining gas: 1038360.480 units remaining)
+  - location: 34 (remaining gas: 1038358.948 units remaining)
     [ True  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 35 (remaining gas: 1038360.380 units remaining)
+  - location: 35 (remaining gas: 1038358.799 units remaining)
     [ False  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 34 (remaining gas: 1038360.360 units remaining)
+  - location: 34 (remaining gas: 1038358.728 units remaining)
     [ False  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 35 (remaining gas: 1038360.260 units remaining)
+  - location: 35 (remaining gas: 1038358.579 units remaining)
     [ False  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 34 (remaining gas: 1038360.240 units remaining)
+  - location: 34 (remaining gas: 1038358.508 units remaining)
     [ False  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 33 (remaining gas: 1038360.240 units remaining)
+  - location: 33 (remaining gas: 1038358.508 units remaining)
     [ { True ; True ; True ; False ; False }  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: -1 (remaining gas: 1038360.220 units remaining)
+  - location: -1 (remaining gas: 1038358.437 units remaining)
     [ { True ; True ; True ; False ; False }  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 30 (remaining gas: 1038360.220 units remaining)
+  - location: 30 (remaining gas: 1038358.437 units remaining)
     [ { { True ; True ; False ; True ; True } ;
         { False ; False ; True ; False ; False } }  	
       { True ; True ; True ; False ; False }  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 36 (remaining gas: 1038360.160 units remaining)
+  - location: 36 (remaining gas: 1038358.307 units remaining)
     [ { True ; True ; True ; False ; False }  	
       { { True ; True ; False ; True ; True } ;
         { False ; False ; True ; False ; False } }  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 37 (remaining gas: 1038360.100 units remaining)
+  - location: 37 (remaining gas: 1038358.160 units remaining)
     [ { { True ; True ; True ; False ; False } ;
         { True ; True ; False ; True ; True } ;
         { False ; False ; True ; False ; False } }  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 40 (remaining gas: 1038359.980 units remaining)
+  - location: 40 (remaining gas: 1038357.869 units remaining)
     [ { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 43 (remaining gas: 1038359.480 units remaining)
+  - location: 43 (remaining gas: 1038357.602 units remaining)
     [ True  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 42 (remaining gas: 1038359.460 units remaining)
+  - location: 42 (remaining gas: 1038357.531 units remaining)
     [ True  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 43 (remaining gas: 1038359.360 units remaining)
+  - location: 43 (remaining gas: 1038357.382 units remaining)
     [ True  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 42 (remaining gas: 1038359.340 units remaining)
+  - location: 42 (remaining gas: 1038357.311 units remaining)
     [ True  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 43 (remaining gas: 1038359.240 units remaining)
+  - location: 43 (remaining gas: 1038357.162 units remaining)
     [ False  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 42 (remaining gas: 1038359.220 units remaining)
+  - location: 42 (remaining gas: 1038357.091 units remaining)
     [ False  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 43 (remaining gas: 1038359.120 units remaining)
+  - location: 43 (remaining gas: 1038356.942 units remaining)
     [ False  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 42 (remaining gas: 1038359.100 units remaining)
+  - location: 42 (remaining gas: 1038356.871 units remaining)
     [ False  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 43 (remaining gas: 1038359 units remaining)
+  - location: 43 (remaining gas: 1038356.722 units remaining)
     [ False  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 42 (remaining gas: 1038358.980 units remaining)
+  - location: 42 (remaining gas: 1038356.651 units remaining)
     [ False  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 41 (remaining gas: 1038358.980 units remaining)
+  - location: 41 (remaining gas: 1038356.651 units remaining)
     [ { True ; True ; False ; False ; False }  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: -1 (remaining gas: 1038358.960 units remaining)
+  - location: -1 (remaining gas: 1038356.580 units remaining)
     [ { True ; True ; False ; False ; False }  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 38 (remaining gas: 1038358.960 units remaining)
+  - location: 38 (remaining gas: 1038356.580 units remaining)
     [ { { True ; True ; True ; False ; False } ;
         { True ; True ; False ; True ; True } ;
         { False ; False ; True ; False ; False } }  	
       { True ; True ; False ; False ; False }  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 44 (remaining gas: 1038358.900 units remaining)
+  - location: 44 (remaining gas: 1038356.450 units remaining)
     [ { True ; True ; False ; False ; False }  	
       { { True ; True ; True ; False ; False } ;
         { True ; True ; False ; True ; True } ;
         { False ; False ; True ; False ; False } }  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 45 (remaining gas: 1038358.840 units remaining)
+  - location: 45 (remaining gas: 1038356.303 units remaining)
     [ { { True ; True ; False ; False ; False } ;
         { True ; True ; True ; False ; False } ;
         { True ; True ; False ; True ; True } ;
         { False ; False ; True ; False ; False } }  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 48 (remaining gas: 1038358.720 units remaining)
+  - location: 48 (remaining gas: 1038356.012 units remaining)
     [ { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 51 (remaining gas: 1038358.220 units remaining)
+  - location: 51 (remaining gas: 1038355.745 units remaining)
     [ False  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 50 (remaining gas: 1038358.200 units remaining)
+  - location: 50 (remaining gas: 1038355.674 units remaining)
     [ False  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 51 (remaining gas: 1038358.100 units remaining)
+  - location: 51 (remaining gas: 1038355.525 units remaining)
     [ False  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 50 (remaining gas: 1038358.080 units remaining)
+  - location: 50 (remaining gas: 1038355.454 units remaining)
     [ False  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 51 (remaining gas: 1038357.980 units remaining)
+  - location: 51 (remaining gas: 1038355.305 units remaining)
     [ True  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 50 (remaining gas: 1038357.960 units remaining)
+  - location: 50 (remaining gas: 1038355.234 units remaining)
     [ True  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 51 (remaining gas: 1038357.860 units remaining)
+  - location: 51 (remaining gas: 1038355.085 units remaining)
     [ True  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 50 (remaining gas: 1038357.840 units remaining)
+  - location: 50 (remaining gas: 1038355.014 units remaining)
     [ True  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 51 (remaining gas: 1038357.740 units remaining)
+  - location: 51 (remaining gas: 1038354.865 units remaining)
     [ True  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 50 (remaining gas: 1038357.720 units remaining)
+  - location: 50 (remaining gas: 1038354.794 units remaining)
     [ True  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 49 (remaining gas: 1038357.720 units remaining)
+  - location: 49 (remaining gas: 1038354.794 units remaining)
     [ { False ; False ; True ; True ; True }  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: -1 (remaining gas: 1038357.700 units remaining)
+  - location: -1 (remaining gas: 1038354.723 units remaining)
     [ { False ; False ; True ; True ; True }  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 46 (remaining gas: 1038357.700 units remaining)
+  - location: 46 (remaining gas: 1038354.723 units remaining)
     [ { { True ; True ; False ; False ; False } ;
         { True ; True ; True ; False ; False } ;
         { True ; True ; False ; True ; True } ;
         { False ; False ; True ; False ; False } }  	
       { False ; False ; True ; True ; True }  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 52 (remaining gas: 1038357.640 units remaining)
+  - location: 52 (remaining gas: 1038354.593 units remaining)
     [ { False ; False ; True ; True ; True }  	
       { { True ; True ; False ; False ; False } ;
         { True ; True ; True ; False ; False } ;
         { True ; True ; False ; True ; True } ;
         { False ; False ; True ; False ; False } }  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 53 (remaining gas: 1038357.580 units remaining)
+  - location: 53 (remaining gas: 1038354.446 units remaining)
     [ { { False ; False ; True ; True ; True } ;
         { True ; True ; False ; False ; False } ;
         { True ; True ; True ; False ; False } ;
         { True ; True ; False ; True ; True } ;
         { False ; False ; True ; False ; False } }  	
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
-  - location: 58 (remaining gas: 1038357.020 units remaining)
+  - location: 58 (remaining gas: 1038354.021 units remaining)
     [ False  	 ]
-  - location: 57 (remaining gas: 1038357 units remaining)
+  - location: 57 (remaining gas: 1038353.950 units remaining)
     [ False  	 ]
-  - location: 58 (remaining gas: 1038356.900 units remaining)
+  - location: 58 (remaining gas: 1038353.801 units remaining)
     [ False  	 ]
-  - location: 57 (remaining gas: 1038356.880 units remaining)
+  - location: 57 (remaining gas: 1038353.730 units remaining)
     [ False  	 ]
-  - location: 58 (remaining gas: 1038356.780 units remaining)
+  - location: 58 (remaining gas: 1038353.581 units remaining)
     [ False  	 ]
-  - location: 57 (remaining gas: 1038356.760 units remaining)
+  - location: 57 (remaining gas: 1038353.510 units remaining)
     [ False  	 ]
-  - location: 58 (remaining gas: 1038356.660 units remaining)
+  - location: 58 (remaining gas: 1038353.361 units remaining)
     [ True  	 ]
-  - location: 57 (remaining gas: 1038356.640 units remaining)
+  - location: 57 (remaining gas: 1038353.290 units remaining)
     [ True  	 ]
-  - location: 58 (remaining gas: 1038356.540 units remaining)
+  - location: 58 (remaining gas: 1038353.141 units remaining)
     [ True  	 ]
-  - location: 57 (remaining gas: 1038356.520 units remaining)
+  - location: 57 (remaining gas: 1038353.070 units remaining)
     [ True  	 ]
-  - location: 56 (remaining gas: 1038356.520 units remaining)
+  - location: 56 (remaining gas: 1038353.070 units remaining)
     [ { False ; False ; False ; True ; True }  	 ]
-  - location: 55 (remaining gas: 1038356.500 units remaining)
+  - location: 55 (remaining gas: 1038352.999 units remaining)
     [ { False ; False ; False ; True ; True }  	 ]
-  - location: 54 (remaining gas: 1038356.500 units remaining)
+  - location: 54 (remaining gas: 1038352.999 units remaining)
     [ { { False ; False ; True ; True ; True } ;
         { True ; True ; False ; False ; False } ;
         { True ; True ; True ; False ; False } ;
         { True ; True ; False ; True ; True } ;
         { False ; False ; True ; False ; False } }  	
       { False ; False ; False ; True ; True }  	 ]
-  - location: 59 (remaining gas: 1038356.440 units remaining)
+  - location: 59 (remaining gas: 1038352.869 units remaining)
     [ { False ; False ; False ; True ; True }  	
       { { False ; False ; True ; True ; True } ;
         { True ; True ; False ; False ; False } ;
         { True ; True ; True ; False ; False } ;
         { True ; True ; False ; True ; True } ;
         { False ; False ; True ; False ; False } }  	 ]
-  - location: 60 (remaining gas: 1038356.380 units remaining)
+  - location: 60 (remaining gas: 1038352.722 units remaining)
     [ { { False ; False ; False ; True ; True } ;
         { False ; False ; True ; True ; True } ;
         { True ; True ; False ; False ; False } ;
         { True ; True ; True ; False ; False } ;
         { True ; True ; False ; True ; True } ;
         { False ; False ; True ; False ; False } }  	 ]
-  - location: 61 (remaining gas: 1038356.320 units remaining)
+  - location: 61 (remaining gas: 1038352.584 units remaining)
     [ {}  	
       { { False ; False ; False ; True ; True } ;
         { False ; False ; True ; True ; True } ;
@@ -344,7 +344,7 @@ trace
         { True ; True ; True ; False ; False } ;
         { True ; True ; False ; True ; True } ;
         { False ; False ; True ; False ; False } }  	 ]
-  - location: 63 (remaining gas: 1038356.260 units remaining)
+  - location: 63 (remaining gas: 1038352.444 units remaining)
     [ (Pair {}
             { { False ; False ; False ; True ; True } ;
               { False ; False ; True ; True ; True } ;
@@ -352,7 +352,7 @@ trace
               { True ; True ; True ; False ; False } ;
               { True ; True ; False ; True ; True } ;
               { False ; False ; True ; False ; False } })  	 ]
-  - location: -1 (remaining gas: 1038356.240 units remaining)
+  - location: -1 (remaining gas: 1038352.373 units remaining)
     [ (Pair {}
             { { False ; False ; False ; True ; True } ;
               { False ; False ; True ; True ; True } ;

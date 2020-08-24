@@ -9,15 +9,15 @@ big_map diff
 trace
   - location: 7 (remaining gas: 1039402 units remaining)
     [ (Pair { 1 ; 2 ; 3 ; 4 ; 5 ; 6 } 111)  	 ]
-  - location: 8 (remaining gas: 1039401.940 units remaining)
+  - location: 8 (remaining gas: 1039401.869 units remaining)
     [ { 1 ; 2 ; 3 ; 4 ; 5 ; 6 }  	@parameter ]
-  - location: 9 (remaining gas: 1039401.880 units remaining)
+  - location: 9 (remaining gas: 1039401.732 units remaining)
     [ 6  	 ]
-  - location: 10 (remaining gas: 1039401.820 units remaining)
+  - location: 10 (remaining gas: 1039401.594 units remaining)
     [ {}  	
       6  	 ]
-  - location: 12 (remaining gas: 1039401.760 units remaining)
+  - location: 12 (remaining gas: 1039401.454 units remaining)
     [ (Pair {} 6)  	 ]
-  - location: -1 (remaining gas: 1039401.740 units remaining)
+  - location: -1 (remaining gas: 1039401.383 units remaining)
     [ (Pair {} 6)  	 ]
 

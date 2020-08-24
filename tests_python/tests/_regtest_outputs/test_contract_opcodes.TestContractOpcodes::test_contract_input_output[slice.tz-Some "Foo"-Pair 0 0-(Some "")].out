@@ -9,68 +9,68 @@ big_map diff
 trace
   - location: 9 (remaining gas: 1039246 units remaining)
     [ (Pair (Pair 0 0) (Some "Foo"))  	 ]
-  - location: 12 (remaining gas: 1039245.900 units remaining)
+  - location: 12 (remaining gas: 1039245.751 units remaining)
     [ (Pair (Pair 0 0) (Some "Foo"))  	
       (Pair (Pair 0 0) (Some "Foo"))  	 ]
-  - location: 13 (remaining gas: 1039245.840 units remaining)
+  - location: 13 (remaining gas: 1039245.620 units remaining)
     [ (Pair 0 0)  	@parameter
       (Pair (Pair 0 0) (Some "Foo"))  	 ]
-  - location: 16 (remaining gas: 1039245.720 units remaining)
+  - location: 16 (remaining gas: 1039245.322 units remaining)
     [ (Some "Foo")  	@storage ]
-  - location: 15 (remaining gas: 1039245.700 units remaining)
+  - location: 15 (remaining gas: 1039245.251 units remaining)
     [ (Some "Foo")  	@storage ]
-  - location: 14 (remaining gas: 1039245.700 units remaining)
+  - location: 14 (remaining gas: 1039245.251 units remaining)
     [ (Pair 0 0)  	@parameter
       (Some "Foo")  	@storage ]
-  - location: -1 (remaining gas: 1039245.680 units remaining)
+  - location: -1 (remaining gas: 1039245.180 units remaining)
     [ (Pair 0 0)  	@parameter
       (Some "Foo")  	@storage ]
-  - location: 10 (remaining gas: 1039245.660 units remaining)
+  - location: 10 (remaining gas: 1039245.109 units remaining)
     [ (Pair 0 0)  	@parameter
       (Some "Foo")  	@storage ]
-  - location: 17 (remaining gas: 1039245.600 units remaining)
+  - location: 17 (remaining gas: 1039244.979 units remaining)
     [ (Some "Foo")  	@storage
       (Pair 0 0)  	@parameter ]
-  - location: 25 (remaining gas: 1039245.460 units remaining)
+  - location: 25 (remaining gas: 1039244.653 units remaining)
     [ (Pair 0 0)  	@parameter
       "Foo"  	@storage.some ]
-  - location: 28 (remaining gas: 1039245.360 units remaining)
+  - location: 28 (remaining gas: 1039244.404 units remaining)
     [ (Pair 0 0)  	@parameter
       (Pair 0 0)  	@parameter
       "Foo"  	@storage.some ]
-  - location: 29 (remaining gas: 1039245.300 units remaining)
+  - location: 29 (remaining gas: 1039244.273 units remaining)
     [ 0  	
       (Pair 0 0)  	@parameter
       "Foo"  	@storage.some ]
-  - location: 32 (remaining gas: 1039245.180 units remaining)
+  - location: 32 (remaining gas: 1039243.975 units remaining)
     [ 0  	
       "Foo"  	@storage.some ]
-  - location: 31 (remaining gas: 1039245.160 units remaining)
+  - location: 31 (remaining gas: 1039243.904 units remaining)
     [ 0  	
       "Foo"  	@storage.some ]
-  - location: 30 (remaining gas: 1039245.160 units remaining)
-    [ 0  	
-      0  	
-      "Foo"  	@storage.some ]
-  - location: -1 (remaining gas: 1039245.140 units remaining)
+  - location: 30 (remaining gas: 1039243.904 units remaining)
     [ 0  	
       0  	
       "Foo"  	@storage.some ]
-  - location: 26 (remaining gas: 1039245.120 units remaining)
+  - location: -1 (remaining gas: 1039243.833 units remaining)
     [ 0  	
       0  	
       "Foo"  	@storage.some ]
-  - location: 33 (remaining gas: 1039245 units remaining)
+  - location: 26 (remaining gas: 1039243.762 units remaining)
+    [ 0  	
+      0  	
+      "Foo"  	@storage.some ]
+  - location: 33 (remaining gas: 1039243.651 units remaining)
     [ (Some "")  	@storage.some.slice ]
-  - location: -1 (remaining gas: 1039244.980 units remaining)
+  - location: -1 (remaining gas: 1039243.580 units remaining)
     [ (Some "")  	@storage.some.slice ]
-  - location: 18 (remaining gas: 1039244.960 units remaining)
+  - location: 18 (remaining gas: 1039243.509 units remaining)
     [ (Some "")  	 ]
-  - location: 34 (remaining gas: 1039244.900 units remaining)
+  - location: 34 (remaining gas: 1039243.371 units remaining)
     [ {}  	
       (Some "")  	 ]
-  - location: 36 (remaining gas: 1039244.840 units remaining)
+  - location: 36 (remaining gas: 1039243.231 units remaining)
     [ (Pair {} (Some ""))  	 ]
-  - location: -1 (remaining gas: 1039244.820 units remaining)
+  - location: -1 (remaining gas: 1039243.160 units remaining)
     [ (Pair {} (Some ""))  	 ]
 
