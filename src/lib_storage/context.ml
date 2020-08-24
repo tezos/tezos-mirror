@@ -626,64 +626,99 @@ module Protocol_data = struct
          (req "timestamp" Time.Protocol.encoding))
 
   type data = {
+    predecessor_block_metadata_hash : Block_metadata_hash.t option;
+    predecessor_ops_metadata_hash : Operation_metadata_list_list_hash.t option;
     info : info;
     protocol_hash : Protocol_hash.t;
     test_chain_status : Test_chain_status.t;
     data_key : Context_hash.t;
     parents : Context_hash.t list;
-    predecessor_block_metadata_hash : Block_metadata_hash.t option;
-    predecessor_ops_metadata_hash : Operation_metadata_list_list_hash.t option;
   }
 
   let data_encoding =
     let open Data_encoding in
     conv
-      (fun { info;
+      (fun { predecessor_block_metadata_hash;
+             predecessor_ops_metadata_hash;
+             info;
              protocol_hash;
              test_chain_status;
              data_key;
-             parents;
-             predecessor_block_metadata_hash;
-             predecessor_ops_metadata_hash } ->
-        ( info,
+             parents } ->
+        ( predecessor_block_metadata_hash,
+          predecessor_ops_metadata_hash,
+          info,
           protocol_hash,
           test_chain_status,
           data_key,
-          parents,
-          predecessor_block_metadata_hash,
-          predecessor_ops_metadata_hash ))
-      (fun ( info,
+          parents ))
+      (fun ( predecessor_block_metadata_hash,
+             predecessor_ops_metadata_hash,
+             info,
              protocol_hash,
              test_chain_status,
              data_key,
-             parents,
-             predecessor_block_metadata_hash,
-             predecessor_ops_metadata_hash ) ->
+             parents ) ->
         {
+          predecessor_block_metadata_hash;
+          predecessor_ops_metadata_hash;
           info;
           protocol_hash;
           test_chain_status;
           data_key;
           parents;
-          predecessor_block_metadata_hash;
-          predecessor_ops_metadata_hash;
         })
       (obj7
+         (opt "predecessor_block_metadata_hash" Block_metadata_hash.encoding)
+         (opt
+            "predecessor_ops_metadata_hash"
+            Operation_metadata_list_list_hash.encoding)
          (req "info" info_encoding)
          (req "protocol_hash" Protocol_hash.encoding)
          (req "test_chain_status" Test_chain_status.encoding)
          (req "data_key" Context_hash.encoding)
-         (req "parents" (list Context_hash.encoding))
-         (opt "predecessor_block_metadata_hash" Block_metadata_hash.encoding)
-         (opt
-            "predecessor_ops_metadata_hash"
-            Operation_metadata_list_list_hash.encoding))
+         (req "parents" (list Context_hash.encoding)))
+
+  (* This version didn't include the optional fields
+     [predecessor_block_metadata_hash] and [predecessor_ops_metadata_hashes],
+     but we can still restore this version by setting these to [None]. *)
+  let data_encoding_1_0_0 =
+    let open Data_encoding in
+    conv
+      (fun { predecessor_block_metadata_hash = _;
+             predecessor_ops_metadata_hash = _;
+             info;
+             protocol_hash;
+             test_chain_status;
+             data_key;
+             parents } ->
+        (info, protocol_hash, test_chain_status, data_key, parents))
+      (fun (info, protocol_hash, test_chain_status, data_key, parents) ->
+        {
+          predecessor_block_metadata_hash = None;
+          predecessor_ops_metadata_hash = None;
+          info;
+          protocol_hash;
+          test_chain_status;
+          data_key;
+          parents;
+        })
+      (obj5
+         (req "info" info_encoding)
+         (req "protocol_hash" Protocol_hash.encoding)
+         (req "test_chain_status" Test_chain_status.encoding)
+         (req "data_key" Context_hash.encoding)
+         (req "parents" (list Context_hash.encoding)))
 
   type t = Int32.t * data
 
   let encoding =
     let open Data_encoding in
     tup2 int32 data_encoding
+
+  let encoding_1_0_0 =
+    let open Data_encoding in
+    tup2 int32 data_encoding_1_0_0
 
   let to_bytes = Data_encoding.Binary.to_bytes_exn encoding
 
@@ -923,13 +958,13 @@ let get_protocol_data_from_header index block_header =
   Lwt.return
     ( level,
       {
+        predecessor_block_metadata_hash;
+        predecessor_ops_metadata_hash;
         Protocol_data.parents;
         protocol_hash;
         test_chain_status;
         data_key;
         info;
-        predecessor_block_metadata_hash;
-        predecessor_ops_metadata_hash;
       } )
 
 let validate_context_hash_consistency_and_commit ~data_hash

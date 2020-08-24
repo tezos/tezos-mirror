@@ -28,7 +28,10 @@
 
 include Context_dump_intf
 
-let current_version = "tezos-snapshot-1.0.0"
+let current_version = "tezos-snapshot-1.1.0"
+
+(* A set of versions that may be restored *)
+let compatible_versions = [current_version; "tezos-snapshot-1.0.0"]
 
 (*****************************************************************************)
 let () =
@@ -130,10 +133,14 @@ let () =
     ~pp:(fun ppf (found, expected) ->
       Format.fprintf
         ppf
-        "The snapshot to import has version \"%s\" but \"%s\" was expected."
+        "The snapshot to import has version \"%s\" but one of %a was expected."
         found
+        Format.(
+          pp_print_list
+            ~pp_sep:(fun ppf () -> fprintf ppf ", ")
+            (fun ppf version -> fprintf ppf "\"%s\"" version))
         expected)
-    (obj2 (req "found" string) (req "expected" string))
+    (obj2 (req "found" string) (req "expected" (list string)))
     (function
       | Invalid_snapshot_version (found, expected) ->
           Some (found, expected)
@@ -205,6 +212,15 @@ module Make (I : Dump_interface) = struct
       (function Loot protocol_data -> Some protocol_data | _ -> None)
       (fun protocol_data -> Loot protocol_data)
 
+  let loot_encoding_1_0_0 =
+    let open Data_encoding in
+    case
+      ~title:"loot"
+      (Tag (Char.code 'l'))
+      I.Protocol_data.encoding_1_0_0
+      (function Loot protocol_data -> Some protocol_data | _ -> None)
+      (fun protocol_data -> Loot protocol_data)
+
   let proot_encoding =
     let open Data_encoding in
     case
@@ -261,6 +277,41 @@ module Make (I : Dump_interface) = struct
             block_data;
           })
 
+  (* This version (1.0.0) doesn't include the optional fields
+     [pred_block_metadata_hash] and [pred_ops_metadata_hashes], but we can still
+     restore this version by setting these to [None]. *)
+  let root_encoding_1_0_0 =
+    let open Data_encoding in
+    case
+      ~title:"root"
+      (Tag (Char.code 'r'))
+      (obj4
+         (req "block_header" (dynamic_size I.Block_header.encoding))
+         (req "info" I.commit_info_encoding)
+         (req "parents" (list I.Commit_hash.encoding))
+         (req "block_data" I.Block_data.encoding))
+      (function
+        | Root
+            { pred_block_metadata_hash = _;
+              pred_ops_metadata_hashes = _;
+              block_header;
+              info;
+              parents;
+              block_data } ->
+            Some (block_header, info, parents, block_data)
+        | _ ->
+            None)
+      (fun (block_header, info, parents, block_data) ->
+        Root
+          {
+            pred_block_metadata_hash = None;
+            pred_ops_metadata_hashes = None;
+            block_header;
+            info;
+            parents;
+            block_data;
+          })
+
   let command_encoding =
     Data_encoding.union
       ~tag_size:`Uint8
@@ -270,6 +321,16 @@ module Make (I : Dump_interface) = struct
         loot_encoding;
         proot_encoding;
         root_encoding ]
+
+  let command_encoding_1_0_0 =
+    Data_encoding.union
+      ~tag_size:`Uint8
+      [ blob_encoding;
+        node_encoding;
+        end_encoding;
+        loot_encoding_1_0_0;
+        proot_encoding;
+        root_encoding_1_0_0 ]
 
   (* IO toolkit. *)
 
@@ -321,9 +382,13 @@ module Make (I : Dump_interface) = struct
 
   (* Getter and setters *)
 
-  let get_command rbuf =
+  let get_command version rbuf =
+    let encoding =
+      if version = "tezos-snapshot-1.0.0" then command_encoding_1_0_0
+      else command_encoding
+    in
     get_mbytes rbuf
-    >|=? fun bytes -> Data_encoding.Binary.of_bytes_exn command_encoding bytes
+    >|=? fun bytes -> Data_encoding.Binary.of_bytes_exn encoding bytes
 
   let set_root buf block_header info parents block_data
       pred_block_metadata_hash pred_ops_metadata_hashes =
@@ -391,8 +456,8 @@ module Make (I : Dump_interface) = struct
 
   let check_version v =
     fail_when
-      (v.version <> current_version)
-      (Invalid_snapshot_version (v.version, current_version))
+      (List.mem v.version compatible_versions |> not)
+      (Invalid_snapshot_version (v.version, compatible_versions))
 
   let serialize_tree ~maybe_flush ~written buf =
     I.tree_iteri_unique (fun visited sub_tree ->
@@ -511,7 +576,8 @@ module Make (I : Dump_interface) = struct
       >>= function
       | None -> fail Restore_context_failure | Some tree -> return tree
     in
-    let restore history_mode =
+    let restore version =
+      let history_mode = version.mode in
       let rec first_pass batch ctxt cpt =
         Tezos_stdlib_unix.Utils.display_progress
           ~refresh_rate:(cpt, 1_000)
@@ -520,7 +586,7 @@ module Make (I : Dump_interface) = struct
               "Context: %dK elements, %dMiB read"
               (cpt / 1_000)
               (!read / 1_048_576)) ;
-        get_command rbuf
+        get_command version.version rbuf
         >>=? function
         | Root
             { block_header;
@@ -559,7 +625,7 @@ module Make (I : Dump_interface) = struct
               "Store: %dK elements, %dMiB read"
               (cpt / 1_000)
               (!read / 1_048_576)) ;
-        get_command rbuf
+        get_command version.version rbuf
         >>=? function
         | Proot pruned_block ->
             let header = I.Pruned_block.header pruned_block in
@@ -617,7 +683,7 @@ module Make (I : Dump_interface) = struct
         (* Check snapshot version *)
         read_snapshot_metadata rbuf
         >>=? fun version ->
-        check_version version >>=? fun () -> restore version.mode)
+        check_version version >>=? fun () -> restore version)
       (function
         | Unix.Unix_error (e, _, _) ->
             fail (System_read_error (Unix.error_message e))
