@@ -7,34 +7,34 @@ emitted operations
 big_map diff
   
 trace
-  - location: 7 (remaining gas: 1039622 units remaining)
+  - location: 7 (remaining gas: 1039990.842 units remaining)
     [ (Pair 99 { -5 ; 10 })  	 ]
-  - location: 10 (remaining gas: 1039621.751 units remaining)
+  - location: 10 (remaining gas: 1039990.593 units remaining)
     [ (Pair 99 { -5 ; 10 })  	
       (Pair 99 { -5 ; 10 })  	 ]
-  - location: 11 (remaining gas: 1039621.620 units remaining)
+  - location: 11 (remaining gas: 1039990.462 units remaining)
     [ 99  	@parameter
       (Pair 99 { -5 ; 10 })  	 ]
-  - location: 14 (remaining gas: 1039621.322 units remaining)
+  - location: 14 (remaining gas: 1039990.164 units remaining)
     [ { -5 ; 10 }  	@storage ]
-  - location: 13 (remaining gas: 1039621.251 units remaining)
+  - location: 13 (remaining gas: 1039990.093 units remaining)
     [ { -5 ; 10 }  	@storage ]
-  - location: 12 (remaining gas: 1039621.251 units remaining)
+  - location: 12 (remaining gas: 1039990.093 units remaining)
     [ 99  	@parameter
       { -5 ; 10 }  	@storage ]
-  - location: -1 (remaining gas: 1039621.180 units remaining)
+  - location: -1 (remaining gas: 1039990.022 units remaining)
     [ 99  	@parameter
       { -5 ; 10 }  	@storage ]
-  - location: 8 (remaining gas: 1039621.109 units remaining)
+  - location: 8 (remaining gas: 1039989.951 units remaining)
     [ 99  	@parameter
       { -5 ; 10 }  	@storage ]
-  - location: 15 (remaining gas: 1039620.962 units remaining)
+  - location: 15 (remaining gas: 1039989.804 units remaining)
     [ { 99 ; -5 ; 10 }  	 ]
-  - location: 16 (remaining gas: 1039620.824 units remaining)
+  - location: 16 (remaining gas: 1039989.666 units remaining)
     [ {}  	
       { 99 ; -5 ; 10 }  	 ]
-  - location: 18 (remaining gas: 1039620.684 units remaining)
+  - location: 18 (remaining gas: 1039989.526 units remaining)
     [ (Pair {} { 99 ; -5 ; 10 })  	 ]
-  - location: -1 (remaining gas: 1039620.613 units remaining)
+  - location: -1 (remaining gas: 1039989.455 units remaining)
     [ (Pair {} { 99 ; -5 ; 10 })  	 ]
 
