@@ -411,9 +411,18 @@ module ACL = struct
       RPC_service.get_service
         ~query:RPC_query.empty
         ~output:Data_encoding.empty
-        ~description:"Clear all greylists tables."
+        ~description:
+          "DEPRECATED: Clear all greylists tables. Use DELETE \
+           `/network/greylist` instead"
         RPC_path.(root / "network" / "greylist" / "clear")
+
+    let clear_delete =
+      RPC_service.delete_service
+        ~query:RPC_query.empty
+        ~output:Data_encoding.empty
+        ~description:"Clear all greylists tables."
+        RPC_path.(root / "network" / "greylist")
   end
 
-  let clear ctxt = make_call S.clear ctxt () ()
+  let clear ctxt = make_call S.clear_delete ctxt () ()
 end

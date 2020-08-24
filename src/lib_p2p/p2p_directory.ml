@@ -433,10 +433,18 @@ let build_rpc_directory net =
   in
   (* Network : Greylist *)
   let dir =
-    RPC_directory.register dir P2p_services.ACL.S.clear (fun () () () ->
+    RPC_directory.register0 dir P2p_services.ACL.S.clear (fun () () ->
         match P2p.pool net with
         | None ->
             fail P2p_errors.P2p_layer_disabled
+        | Some pool ->
+            P2p_pool.acl_clear pool ; return_unit)
+  in
+  let dir =
+    RPC_directory.register0 dir P2p_services.ACL.S.clear_delete (fun () () ->
+        match P2p.pool net with
+        | None ->
+            failwith "The P2P layer is disabled."
         | Some pool ->
             P2p_pool.acl_clear pool ; return_unit)
   in

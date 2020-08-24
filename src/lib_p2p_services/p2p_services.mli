@@ -250,5 +250,7 @@ module ACL : sig
 
   module S : sig
     val clear : ([`GET], unit, unit, unit, unit, unit) RPC_service.t
+
+    val clear_delete : ([`DELETE], unit, unit, unit, unit, unit) RPC_service.t
   end
 end
