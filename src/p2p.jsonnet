@@ -37,7 +37,7 @@ local prometheus = grafana.prometheus;
   peers:
     local disconnected = 'Disconnected peers';
     local running = 'Running peers';
-    local greylisted = 'Greylisted points';
+    local greylisted = 'Waiting to reconnect';
     graphPanel.new(
       title='P2P peers connections',
       datasource='Prometheus',
