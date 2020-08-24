@@ -129,7 +129,6 @@ local prometheus = grafana.prometheus;
       legend_max='true',
       legend_rightSide='true',
       legend_show='true',
-      legend_total='false',
       legend_values='true',
       aliasColors={
         [total]: 'light-green',
