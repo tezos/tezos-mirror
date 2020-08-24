@@ -121,6 +121,9 @@ class TestRPCsExistence:
     def test_network_greylist_clear(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get', '/network/greylist/clear')
 
+    def test_network_greylist_clear_delete(self, sandbox: Sandbox):
+        sandbox.client(1).rpc('delete', "/network/greylist")
+
     def test_network_peers(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get', '/network/peers')
 

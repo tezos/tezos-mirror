@@ -199,7 +199,7 @@ class Client:
 
         See `run` for more details.
         """
-        assert verb in {'put', 'get', 'post'}
+        assert verb in {'put', 'get', 'post', 'delete'}
         params = [] if params is None else params
         params = params + ['rpc', verb, path]
         if data is not None:
