@@ -158,9 +158,15 @@ module type FULL_REQUESTER = sig
   (** Returns the number of requests currently pending *)
   val pending_requests : t -> int
 
-  (** [create ?global_input r s] creates a requester. [r] is the
-      configuration parameter passed to [Request] functions.  *)
+  (** [create ?random_table ?global_input r s] creates a requester. [r] is the
+      configuration parameter passed to [Request] functions.
+
+      The value for [random_table] determines whether the underlying hashtable
+      randomises its hash (see {!Stdlib.Hashtbl.create} and specifically the
+      documentation of the [random] parameter). The default depends on
+      environment variables and {!Stdlib.Hashtbl.randomize} has been called. *)
   val create :
+    ?random_table:bool ->
     ?global_input:(key * value) Lwt_watcher.input ->
     request_param ->
     store ->
@@ -184,7 +190,7 @@ module type DISK_TABLE = sig
 end
 
 module type MEMORY_TABLE = sig
-  (** subtypes Hashtbl.S *)
+  (** subtypes {!Hashtbl.SeededS} *)
   type 'a t
 
   type key

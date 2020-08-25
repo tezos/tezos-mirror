@@ -72,7 +72,7 @@ let create ?(p2p_versions = P2p_version.supported) config pool message_config
           message_config.P2p_params.distributed_db_versions
         ~p2p_versions;
     custom_p2p_versions = p2p_versions;
-    incoming = P2p_point.Table.create 53;
+    incoming = P2p_point.Table.create ~random:true 53;
     io_sched;
     encoding = P2p_message.encoding message_config.P2p_params.encoding;
     triggers;

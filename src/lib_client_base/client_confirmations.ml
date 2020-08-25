@@ -51,7 +51,7 @@ let wait_for_operation_inclusion (ctxt : #Client_context.full) ~chain
           if the `hash` contains the operation in list `i` at position `j`
           and if `hash` denotes the `n-th` predecessors of the block. *)
   let blocks : ((Block_hash.t * int * int) * int) option Block_hash.Table.t =
-    Block_hash.Table.create confirmations
+    Block_hash.Table.create ~random:true confirmations
   in
   (* Fetch _all_ the 'unknown' predecessors af a block. *)
   let fetch_predecessors (hash, header) =

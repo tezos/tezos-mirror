@@ -58,7 +58,7 @@ module Map : Map.S with type key = Id.t
 
 module Set : Set.S with type elt = Id.t
 
-module Table : Hashtbl.S with type key = Id.t
+module Table : Hashtbl.SeededS with type key = Id.t
 
 module Filter : sig
   type t = Requested | Accepted | Running | Disconnected

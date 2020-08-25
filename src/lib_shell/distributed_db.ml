@@ -125,8 +125,8 @@ let create disk p2p =
   let protocol_db =
     Distributed_db_requester.Raw_protocol.create global_request disk
   in
-  let active_chains = Chain_id.Table.create 17 in
-  let p2p_readers = P2p_peer.Table.create 17 in
+  let active_chains = Chain_id.Table.create ~random:true 17 in
+  let p2p_readers = P2p_peer.Table.create ~random:true 17 in
   let block_input = Lwt_watcher.create_input () in
   let operation_input = Lwt_watcher.create_input () in
   let db =
@@ -197,7 +197,7 @@ let activate
               operations_db;
               callback = noop_callback;
               active_peers;
-              active_connections = P2p_peer.Table.create 53;
+              active_connections = P2p_peer.Table.create ~random:true 53;
             }
         in
         let sends =

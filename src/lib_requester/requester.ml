@@ -77,6 +77,7 @@ module type FULL_REQUESTER = sig
   val pending_requests : t -> int
 
   val create :
+    ?random_table:bool ->
     ?global_input:(key * value) Lwt_watcher.input ->
     request_param ->
     store ->
@@ -458,7 +459,7 @@ end = struct
       {
         param;
         queue = Lwt_pipe.create ();
-        pending = Table.create 17;
+        pending = Table.create ~random:true 17;
         events = Lwt.return_nil;
         canceler = Lwt_canceler.create ();
         worker = Lwt.return_unit;
@@ -707,9 +708,9 @@ end = struct
 
   let watch s = Lwt_watcher.create_stream s.input
 
-  let create ?global_input request_param disk =
+  let create ?random_table:random ?global_input request_param disk =
     let scheduler = Scheduler.create request_param in
-    let memory = Memory_table.create 17 in
+    let memory = Memory_table.create ?random 17 in
     let input = Lwt_watcher.create_input () in
     {scheduler; disk; memory; input; global_input}
 

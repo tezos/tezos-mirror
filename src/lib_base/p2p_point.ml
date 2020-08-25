@@ -33,8 +33,6 @@ module Id = struct
 
   let equal p1 p2 = compare p1 p2 = 0
 
-  let hash = Hashtbl.hash
-
   let pp ppf (addr, port) =
     match Ipaddr.v4_of_v6 addr with
     | Some addr ->
@@ -140,7 +138,14 @@ end
 
 module Map = Map.Make (Id)
 module Set = Set.Make (Id)
-module Table = Hashtbl.Make (Id)
+
+module Table = Hashtbl.MakeSeeded (struct
+  type t = Id.t
+
+  let equal = Id.equal
+
+  let hash = Hashtbl.seeded_hash
+end)
 
 module Filter = struct
   type t = Requested | Accepted | Running | Disconnected

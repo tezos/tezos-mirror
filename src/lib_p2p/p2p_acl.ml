@@ -126,7 +126,7 @@ let create size =
     greylist_ips = IpSet.empty;
     greylist_peers = PeerFIFOCache.create size;
     banned_ips = IpTable.create 53;
-    banned_peers = P2p_peer.Table.create 53;
+    banned_peers = P2p_peer.Table.create ~random:true 53;
   }
 
 (* Check if an ip is banned. Priority is given to the static

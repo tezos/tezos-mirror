@@ -453,11 +453,11 @@ let create config peer_meta_config triggers ~log =
     {
       config;
       peer_meta_config;
-      my_id_points = P2p_point.Table.create 7;
-      known_peer_ids = P2p_peer.Table.create 53;
-      connected_peer_ids = P2p_peer.Table.create 53;
-      known_points = P2p_point.Table.create 53;
-      connected_points = P2p_point.Table.create 53;
+      my_id_points = P2p_point.Table.create ~random:true 7;
+      known_peer_ids = P2p_peer.Table.create ~random:true 53;
+      connected_peer_ids = P2p_peer.Table.create ~random:true 53;
+      known_points = P2p_point.Table.create ~random:true 53;
+      connected_points = P2p_point.Table.create ~random:true 53;
       triggers;
       acl = P2p_acl.create 1023;
       log;

@@ -126,8 +126,8 @@ end)
       scheduler_length;
     }
 
-  let create ?global_input request_param disk =
-    Table.create ?global_input request_param disk
+  let create ?random_table ?global_input request_param disk =
+    Table.create ?random_table ?global_input request_param disk
 
   let shutdown t =
     Requester_event.(emit shutting_down_requester) ()

@@ -81,10 +81,10 @@ module Test_disk_table_hash = struct
   let read_opt st k = Lwt.return (find st k)
 end
 
-module Test_memory_table = Hashtbl.Make (struct
+module Test_memory_table = Hashtbl.MakeSeeded (struct
   type t = test_key
 
-  let hash = Hashtbl.hash
+  let hash = Hashtbl.seeded_hash
 
   let equal s1 s2 = s1 = s2
 end)
