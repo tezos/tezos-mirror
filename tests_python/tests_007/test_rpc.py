@@ -132,6 +132,7 @@ class TestRPCsExistence:
     def test_network_peers_peer_id_ban(self, sandbox: Sandbox):
         peer_id = sandbox.client(2).rpc('get', '/network/self')
         sandbox.client(1).rpc('get', f'/network/peers/{peer_id}/ban')
+        assert sandbox.client(1).rpc('get', f'/network/peers/{peer_id}/banned')
 
     def test_network_peers_peer_id_banned(self, sandbox: Sandbox):
         peer_id = sandbox.client(2).rpc('get', '/network/self')
@@ -140,34 +141,53 @@ class TestRPCsExistence:
     def test_network_peers_peer_id_unban(self, sandbox: Sandbox):
         peer_id = sandbox.client(2).rpc('get', '/network/self')
         sandbox.client(1).rpc('get', f'/network/peers/{peer_id}/unban')
+        assert not sandbox.client(1).rpc(
+            'get', f'/network/peers/{peer_id}/banned'
+        )
 
     def test_network_peers_peer_id_untrust(self, sandbox: Sandbox):
         peer_id = sandbox.client(2).rpc('get', '/network/self')
         sandbox.client(1).rpc('get', f'/network/peers/{peer_id}/untrust')
+        status = sandbox.client(1).rpc('get', f'/network/peers/{peer_id}')
+        assert not status['trusted']
 
     def test_network_peers_peer_id_trust(self, sandbox: Sandbox):
         peer_id = sandbox.client(2).rpc('get', '/network/self')
         sandbox.client(1).rpc('get', f'/network/peers/{peer_id}/trust')
+        status = sandbox.client(1).rpc('get', f'/network/peers/{peer_id}')
+        assert status['trusted']
 
     def test_network_peers_peer_id_trust_patch(self, sandbox: Sandbox):
         peer_id = sandbox.client(2).rpc('get', '/network/self')
-        sandbox.client(1).rpc('patch', f'/network/peers/{peer_id}',
-                              {'trust': True})
+        sandbox.client(1).rpc(
+            'patch', f'/network/peers/{peer_id}', {'acl': 'trust'}
+        )
+        status = sandbox.client(1).rpc('get', f'/network/peers/{peer_id}')
+        assert status['trusted']
 
     def test_network_peers_peer_id_untrust_patch(self, sandbox: Sandbox):
         peer_id = sandbox.client(2).rpc('get', '/network/self')
-        sandbox.client(1).rpc('patch', f'/network/peers/{peer_id}',
-                              {'trust': False})
+        sandbox.client(1).rpc(
+            'patch', f'/network/peers/{peer_id}', {'acl': 'open'}
+        )
+        status = sandbox.client(1).rpc('get', f'/network/peers/{peer_id}')
+        assert not status['trusted']
 
     def test_network_peers_peer_id_ban_patch(self, sandbox: Sandbox):
         peer_id = sandbox.client(2).rpc('get', '/network/self')
-        sandbox.client(1).rpc('patch', f'/network/peers/{peer_id}',
-                              {'ban': True})
+        sandbox.client(1).rpc(
+            'patch', f'/network/peers/{peer_id}', {'acl': 'ban'}
+        )
+        assert sandbox.client(1).rpc('get', f'/network/peers/{peer_id}/banned')
 
     def test_network_peers_peer_id_unban_patch(self, sandbox: Sandbox):
         peer_id = sandbox.client(2).rpc('get', '/network/self')
-        sandbox.client(1).rpc('patch', f'/network/peers/{peer_id}',
-                              {'ban': False})
+        sandbox.client(1).rpc(
+            'patch', f'/network/peers/{peer_id}', {'acl': 'open'}
+        )
+        assert not sandbox.client(1).rpc(
+            'get', f'/network/peers/{peer_id}/banned'
+        )
 
     def test_network_points(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get', '/network/points')
@@ -191,40 +211,51 @@ class TestRPCsExistence:
         points = sandbox.client(1).rpc('get', '/network/points')
         point = points[-1][0]
         sandbox.client(1).rpc('get', f'/network/points/{point}/trust')
+        status = sandbox.client(1).rpc('get', f'/network/points/{point}')
+        assert status['trusted']
 
     def test_network_points_point_unban(self, sandbox: Sandbox):
         points = sandbox.client(1).rpc('get', '/network/points')
         point = points[-1][0]
         sandbox.client(1).rpc('get', f'/network/points/{point}/unban')
+        assert not sandbox.client(1).rpc(
+            'get', f'/network/points/{point}/banned'
+        )
 
     def test_network_points_point_untrust(self, sandbox: Sandbox):
         points = sandbox.client(1).rpc('get', '/network/points')
         point = points[-1][0]
         sandbox.client(1).rpc('get', f'/network/points/{point}/untrust')
+        status = sandbox.client(1).rpc('get', f'/network/points/{point}')
+        assert not status['trusted']
 
     def test_network_points_point_ban_patch(self, sandbox: Sandbox):
         points = sandbox.client(1).rpc('get', '/network/points')
         point = points[-1][0]
-        sandbox.client(1).rpc('patch', f'/network/points/{point}',
-                              {'ban': True})
+        sandbox.client(1).rpc(
+            'patch', f'/network/points/{point}', {'acl': 'ban'}
+        )
 
     def test_network_points_point_unban_patch(self, sandbox: Sandbox):
         points = sandbox.client(1).rpc('get', '/network/points')
         point = points[-1][0]
-        sandbox.client(1).rpc('patch', f'/network/points/{point}',
-                              {'ban': False})
+        sandbox.client(1).rpc(
+            'patch', f'/network/points/{point}', {'acl': 'open'}
+        )
 
     def test_network_points_point_trust_patch(self, sandbox: Sandbox):
         points = sandbox.client(1).rpc('get', '/network/points')
         point = points[-1][0]
-        sandbox.client(1).rpc('patch', f'/network/points/{point}',
-                              {'trust': True})
+        sandbox.client(1).rpc(
+            'patch', f'/network/points/{point}', {'acl': 'trust'}
+        )
 
     def test_network_points_point_untrust_patch(self, sandbox: Sandbox):
         points = sandbox.client(1).rpc('get', '/network/points')
         point = points[-1][0]
-        sandbox.client(1).rpc('patch', f'/network/points/{point}',
-                              {'trust': False})
+        sandbox.client(1).rpc(
+            'patch', f'/network/points/{point}', {'acl': 'open'}
+        )
 
     def test_network_stat(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get', '/network/stat')
