@@ -81,131 +81,130 @@ module Cost_of = struct
     (* Approximating 0.068306 x term *)
     let cost_N_Abs_int size =
       let v0 = size in
-      22 + (v0 lsr 4)
+      80 + (v0 lsr 4)
 
     (* model N_Add_intint *)
     (* Approximating 0.082158 x term *)
     let cost_N_Add_intint size1 size2 =
       let v0 = Compare.Int.max size1 size2 in
-      0 + ((v0 lsr 4) + (v0 lsr 6))
+      80 + ((v0 lsr 4) + (v0 lsr 6))
 
     (* model N_Add_tez *)
-    let cost_N_Add_tez = 95
+    let cost_N_Add_tez = 100
 
     (* model N_And *)
-    let cost_N_And = 91
+    let cost_N_And = 100
 
     (* model N_And_nat *)
     (* Approximating 0.079325 x term *)
     let cost_N_And_nat size1 size2 =
       let v0 = Compare.Int.min size1 size2 in
-      93 + ((v0 lsr 4) + (v0 lsr 6))
+      80 + ((v0 lsr 4) + (v0 lsr 6))
 
     (* model N_Blake2b *)
     (* Approximating 1.366428 x term *)
     let cost_N_Blake2b size =
       let v0 = size in
-      519 + (v0 + (v0 lsr 2))
+      500 + (v0 + (v0 lsr 2))
 
     (* model N_Car *)
-    let cost_N_Car = 73
+    let cost_N_Car = 80
 
     (* model N_Cdr *)
-    let cost_N_Cdr = 82
+    let cost_N_Cdr = 80
 
     (* model N_Check_signature_ed25519 *)
     (* Approximating 1.372685 x term *)
     let cost_N_Check_signature_ed25519 size =
       let v0 = size in
-      267512 + (v0 + (v0 lsr 2))
+      270_000 + (v0 + (v0 lsr 2))
 
     (* model N_Check_signature_p256 *)
     (* Approximating 1.385771 x term *)
     let cost_N_Check_signature_p256 size =
       let v0 = size in
-      590829 + (v0 + (v0 lsr 2) + (v0 lsr 3))
+      600_000 + (v0 + (v0 lsr 2) + (v0 lsr 3))
 
     (* model N_Check_signature_secp256k1 *)
     (* Approximating 1.372411 x term *)
     let cost_N_Check_signature_secp256k1 size =
       let v0 = size in
-      55348 + (v0 + (v0 lsr 2))
+      60_000 + (v0 + (v0 lsr 2))
 
     (* model N_Compare_address *)
     let cost_N_Compare_address size1 size2 =
-      0 + (2 * Compare.Int.min size1 size2)
+      80 + (2 * Compare.Int.min size1 size2)
 
     (* model N_Compare_bool *)
     let cost_N_Compare_bool size1 size2 =
-      0 + (128 * Compare.Int.min size1 size2)
+      80 + (128 * Compare.Int.min size1 size2)
 
     (* model N_Compare_int *)
     (* Approximating 0.073657 x term *)
     let cost_N_Compare_int size1 size2 =
       let v0 = Compare.Int.min size1 size2 in
-      152 + ((v0 lsr 4) + (v0 lsr 7))
+      150 + ((v0 lsr 4) + (v0 lsr 7))
 
     (* model N_Compare_key_hash *)
     let cost_N_Compare_key_hash size1 size2 =
-      0 + (2 * Compare.Int.min size1 size2)
+      80 + (2 * Compare.Int.min size1 size2)
 
     (* model N_Compare_mutez *)
-    let cost_N_Compare_mutez size1 size2 =
-      0 + (13 * Compare.Int.min size1 size2)
+    let cost_N_Compare_mutez size1 size2 = 13 * Compare.Int.min size1 size2
 
     (* model N_Compare_string *)
     (* Approximating 0.039389 x term *)
     let cost_N_Compare_string size1 size2 =
       let v0 = Compare.Int.min size1 size2 in
-      121 + ((v0 lsr 5) + (v0 lsr 7))
+      120 + ((v0 lsr 5) + (v0 lsr 7))
 
     (* model N_Compare_timestamp *)
     (* Approximating 0.072483 x term *)
     let cost_N_Compare_timestamp size1 size2 =
       let v0 = Compare.Int.min size1 size2 in
-      141 + ((v0 lsr 4) + (v0 lsr 7))
+      140 + ((v0 lsr 4) + (v0 lsr 7))
 
     (* model N_Concat_string_pair *)
     (* Approximating 0.068808 x term *)
     let cost_N_Concat_string_pair size1 size2 =
       let v0 = size1 + size2 in
-      0 + (v0 lsr 4)
+      80 + (v0 lsr 4)
 
     (* model N_Cons_list *)
-    let cost_N_Cons_list = 89
+    let cost_N_Cons_list = 80
 
     (* model N_Cons_none *)
-    let cost_N_Cons_none = 82
+    let cost_N_Cons_none = 80
 
     (* model N_Cons_pair *)
-    let cost_N_Cons_pair = 82
+    let cost_N_Cons_pair = 80
 
     (* model N_Cons_some *)
-    let cost_N_Cons_some = 74
+    let cost_N_Cons_some = 80
 
     (* model N_Const *)
-    let cost_N_Const = 85
+    let cost_N_Const = 80
 
     (* model N_Dig *)
-    let cost_N_Dig size = 106 + (4 * size)
+    let cost_N_Dig size = 100 + (4 * size)
 
     (* model N_Dip *)
     let cost_N_Dip = 100
 
     (* model N_DipN *)
-    let cost_N_DipN size = 111 + (4 * size)
+    let cost_N_DipN size = 100 + (4 * size)
 
     (* model N_Drop *)
-    let cost_N_Drop = 81
+    let cost_N_Drop = 80
 
     (* model N_DropN *)
-    let cost_N_DropN size = 110 + (4 * size)
+    let cost_N_DropN size = 100 + (4 * size)
 
     (* model N_Dug *)
-    let cost_N_Dug size = 120 + (4 * size)
+    let cost_N_Dug size = 100 + (4 * size)
 
     (* model N_Dup *)
-    let cost_N_Dup = 75
+    let cost_N_Dup = 80
 
     let indic_lt x y = if Compare.Int.(x < y) then 1 else 0
 
@@ -214,122 +213,122 @@ module Cost_of = struct
     let cost_N_Ediv_natnat size1 size2 =
       let q = size1 - size2 in
       let v0 = indic_lt size2 size1 * q * size2 in
-      (v0 lsr 10) + (v0 lsr 11) + (v0 lsr 13) + 153030
+      150_000 + (v0 lsr 10) + (v0 lsr 11) + (v0 lsr 13)
 
     (* model N_Ediv_tez *)
-    let cost_N_Ediv_tez = 208
+    let cost_N_Ediv_tez = 200
 
     (* model N_Ediv_teznat *)
     let cost_N_Ediv_teznat size1 size2 =
       let q = size1 - size2 in
-      (30 * (indic_lt size2 size1 * q * size2)) + 0
+      80 + (30 * (indic_lt size2 size1 * q * size2))
 
     (* model N_Empty_map *)
-    let cost_N_Empty_map = 212
+    let cost_N_Empty_map = 240
 
     (* model N_Empty_set *)
-    let cost_N_Empty_set = 238
+    let cost_N_Empty_set = 240
 
     (* model N_Eq *)
-    let cost_N_Eq = 85
+    let cost_N_Eq = 80
 
     (* model N_If *)
-    let cost_N_If = 57
+    let cost_N_If = 60
 
     (* model N_If_cons *)
-    let cost_N_If_cons = 113
+    let cost_N_If_cons = 110
 
     (* model N_If_left *)
-    let cost_N_If_left = 91
+    let cost_N_If_left = 90
 
     (* model N_If_none *)
     let cost_N_If_none = 80
 
     (* model N_Int_nat *)
-    let cost_N_Int_nat = 84
+    let cost_N_Int_nat = 80
 
     (* model N_Is_nat *)
-    let cost_N_Is_nat = 93
+    let cost_N_Is_nat = 80
 
     (* model N_Left *)
-    let cost_N_Left = 75
+    let cost_N_Left = 80
 
     (* model N_List_iter *)
-    let cost_N_List_iter size = 570 + (7 * size)
+    let cost_N_List_iter size = 500 + (7 * size)
 
     (* model N_List_map *)
-    let cost_N_List_map size = 0 + (12 * size)
+    let cost_N_List_map size = 500 + (12 * size)
 
     (* model N_List_size *)
-    let cost_N_List_size = 78
+    let cost_N_List_size = 80
 
     (* model N_Loop *)
-    let cost_N_Loop = 72
+    let cost_N_Loop = 70
 
     (* model N_Loop_left *)
-    let cost_N_Loop_left = 76
+    let cost_N_Loop_left = 80
 
     (* model N_Lsl_nat *)
     (* Approximating 0.129443 x term *)
     let cost_N_Lsl_nat size =
       let v0 = size in
-      159 + (v0 lsr 3)
+      150 + (v0 lsr 3)
 
     (* model N_Lsr_nat *)
     (* Approximating 0.129435 x term *)
     let cost_N_Lsr_nat size =
       let v0 = size in
-      103 + (v0 lsr 3)
+      150 + (v0 lsr 3)
 
     (* model N_Map_get *)
     (* Approximating 0.057548 x term *)
     let cost_N_Map_get size1 size2 =
       let v0 = size1 * log2 (1 + size2) in
-      (v0 lsr 5) + (v0 lsr 6) + (v0 lsr 7) + 0
+      80 + (v0 lsr 5) + (v0 lsr 6) + (v0 lsr 7)
 
     (* model N_Map_iter *)
-    let cost_N_Map_iter size = 0 + (40 * size)
+    let cost_N_Map_iter size = 80 + (40 * size)
 
     (* model N_Map_map *)
-    let cost_N_Map_map size = 0 + (761 * size)
+    let cost_N_Map_map size = 80 + (761 * size)
 
     (* model N_Map_mem *)
     (* Approximating 0.058563 x term *)
     let cost_N_Map_mem size1 size2 =
       let v0 = size1 * log2 (1 + size2) in
-      (v0 lsr 5) + (v0 lsr 6) + (v0 lsr 7) + 0
+      80 + (v0 lsr 5) + (v0 lsr 6) + (v0 lsr 7)
 
     (* model N_Map_size *)
-    let cost_N_Map_size = 91
+    let cost_N_Map_size = 90
 
     (* model N_Map_update *)
     (* Approximating 0.119968 x term *)
     let cost_N_Map_update size1 size2 =
       let v0 = size1 * log2 (1 + size2) in
-      (v0 lsr 4) + (v0 lsr 5) + (v0 lsr 6) + (v0 lsr 7) + 0
+      80 + (v0 lsr 4) + (v0 lsr 5) + (v0 lsr 6) + (v0 lsr 7)
 
     (* model N_Mul_intint *)
     let cost_N_Mul_intint size1 size2 =
       let a = size1 + size2 in
-      (1 * (a * log2 (1 + a))) + 0
+      80 + (a * log2 a)
 
     (* model N_Mul_teznat *)
-    let cost_N_Mul_teznat size = 194 + (133 * size)
+    let cost_N_Mul_teznat size = 200 + (133 * size)
 
     (* model N_Neg_int *)
     (* Approximating 0.068419 x term *)
     let cost_N_Neg_int size =
       let v0 = size in
-      26 + (v0 lsr 4)
+      80 + (v0 lsr 4)
 
     (* model N_Neq *)
-    let cost_N_Neq = 91
+    let cost_N_Neq = 80
 
     (* model N_Nil *)
     let cost_N_Nil = 80
 
     (* model N_Nop *)
-    let cost_N_Nop = 71
+    let cost_N_Nop = 70
 
     (* model N_Not *)
     let cost_N_Not = 90
@@ -341,64 +340,64 @@ module Cost_of = struct
       55 + ((v0 lsr 4) + (v0 lsr 7))
 
     (* model N_Or *)
-    let cost_N_Or = 87
+    let cost_N_Or = 90
 
     (* model N_Or_nat *)
     (* Approximating 0.078718 x term *)
     let cost_N_Or_nat size1 size2 =
       let v0 = Compare.Int.max size1 size2 in
-      0 + ((v0 lsr 4) + (v0 lsr 6))
+      80 + ((v0 lsr 4) + (v0 lsr 6))
 
     (* model N_Right *)
     let cost_N_Right = 80
 
     (* model N_Seq *)
-    let cost_N_Seq = 58
+    let cost_N_Seq = 60
 
     (* model N_Set_iter *)
-    let cost_N_Set_iter size = 0 + (36 * size)
+    let cost_N_Set_iter size = 80 + (36 * size)
 
     (* model N_Set_mem *)
     (* Approximating 0.059410 x term *)
     let cost_N_Set_mem size1 size2 =
       let v0 = size1 * log2 (1 + size2) in
-      (v0 lsr 5) + (v0 lsr 6) + (v0 lsr 7) + (v0 lsr 8) + 0
+      80 + (v0 lsr 5) + (v0 lsr 6) + (v0 lsr 7) + (v0 lsr 8)
 
     (* model N_Set_size *)
-    let cost_N_Set_size = 79
+    let cost_N_Set_size = 80
 
     (* model N_Set_update *)
     (* Approximating 0.126260 x term *)
     let cost_N_Set_update size1 size2 =
       let v0 = size1 * log2 (1 + size2) in
-      (v0 lsr 3) + 0
+      80 + (v0 lsr 3)
 
     (* model N_Sha256 *)
-    let cost_N_Sha256 size = 492 + (5 * size)
+    let cost_N_Sha256 size = 500 + (5 * size)
 
     (* model N_Sha512 *)
-    let cost_N_Sha512 size = 457 + (3 * size)
+    let cost_N_Sha512 size = 500 + (3 * size)
 
     (* model N_Slice_string *)
     (* Approximating 0.067048 x term *)
     let cost_N_Slice_string size =
       let v0 = size in
-      53 + (v0 lsr 4)
+      80 + (v0 lsr 4)
 
     (* model N_String_size *)
-    let cost_N_String_size = 79
+    let cost_N_String_size = 80
 
     (* model N_Sub_int *)
     (* Approximating 0.082399 x term *)
     let cost_N_Sub_int size1 size2 =
       let v0 = Compare.Int.max size1 size2 in
-      0 + ((v0 lsr 4) + (v0 lsr 6))
+      80 + ((v0 lsr 4) + (v0 lsr 6))
 
     (* model N_Sub_tez *)
-    let cost_N_Sub_tez = 83
+    let cost_N_Sub_tez = 80
 
     (* model N_Swap *)
-    let cost_N_Swap = 72
+    let cost_N_Swap = 70
 
     (* model N_Xor *)
     let cost_N_Xor = 100
@@ -407,133 +406,133 @@ module Cost_of = struct
     (* Approximating 0.078258 x term *)
     let cost_N_Xor_nat size1 size2 =
       let v0 = Compare.Int.max size1 size2 in
-      8 + ((v0 lsr 4) + (v0 lsr 6))
+      80 + ((v0 lsr 4) + (v0 lsr 6))
 
     (* model B58CHECK_DECODING_CHAIN_ID *)
-    let cost_B58CHECK_DECODING_CHAIN_ID = 1495
+    let cost_B58CHECK_DECODING_CHAIN_ID = 1_500
 
     (* model B58CHECK_DECODING_PUBLIC_KEY_HASH_ed25519 *)
-    let cost_B58CHECK_DECODING_PUBLIC_KEY_HASH_ed25519 = 3265
+    let cost_B58CHECK_DECODING_PUBLIC_KEY_HASH_ed25519 = 3_300
 
     (* model B58CHECK_DECODING_PUBLIC_KEY_HASH_p256 *)
-    let cost_B58CHECK_DECODING_PUBLIC_KEY_HASH_p256 = 3153
+    let cost_B58CHECK_DECODING_PUBLIC_KEY_HASH_p256 = 3_300
 
     (* model B58CHECK_DECODING_PUBLIC_KEY_HASH_secp256k1 *)
-    let cost_B58CHECK_DECODING_PUBLIC_KEY_HASH_secp256k1 = 3088
+    let cost_B58CHECK_DECODING_PUBLIC_KEY_HASH_secp256k1 = 3_300
 
     (* model B58CHECK_DECODING_PUBLIC_KEY_ed25519 *)
-    let cost_B58CHECK_DECODING_PUBLIC_KEY_ed25519 = 4220
+    let cost_B58CHECK_DECODING_PUBLIC_KEY_ed25519 = 4_300
 
     (* model B58CHECK_DECODING_PUBLIC_KEY_p256 *)
-    let cost_B58CHECK_DECODING_PUBLIC_KEY_p256 = 28631
+    let cost_B58CHECK_DECODING_PUBLIC_KEY_p256 = 29_000
 
     (* model B58CHECK_DECODING_PUBLIC_KEY_secp256k1 *)
-    let cost_B58CHECK_DECODING_PUBLIC_KEY_secp256k1 = 9419
+    let cost_B58CHECK_DECODING_PUBLIC_KEY_secp256k1 = 9_400
 
     (* model B58CHECK_DECODING_SIGNATURE_ed25519 *)
-    let cost_B58CHECK_DECODING_SIGNATURE_ed25519 = 6547
+    let cost_B58CHECK_DECODING_SIGNATURE_ed25519 = 6_600
 
     (* model B58CHECK_DECODING_SIGNATURE_p256 *)
-    let cost_B58CHECK_DECODING_SIGNATURE_p256 = 6543
+    let cost_B58CHECK_DECODING_SIGNATURE_p256 = 6_600
 
     (* model B58CHECK_DECODING_SIGNATURE_secp256k1 *)
-    let cost_B58CHECK_DECODING_SIGNATURE_secp256k1 = 6553
+    let cost_B58CHECK_DECODING_SIGNATURE_secp256k1 = 6_600
 
     (* model B58CHECK_ENCODING_CHAIN_ID *)
-    let cost_B58CHECK_ENCODING_CHAIN_ID = 1610
+    let cost_B58CHECK_ENCODING_CHAIN_ID = 1_600
 
     (* model B58CHECK_ENCODING_PUBLIC_KEY_HASH_ed25519 *)
-    let cost_B58CHECK_ENCODING_PUBLIC_KEY_HASH_ed25519 = 3138
+    let cost_B58CHECK_ENCODING_PUBLIC_KEY_HASH_ed25519 = 3_300
 
     (* model B58CHECK_ENCODING_PUBLIC_KEY_HASH_p256 *)
-    let cost_B58CHECK_ENCODING_PUBLIC_KEY_HASH_p256 = 3728
+    let cost_B58CHECK_ENCODING_PUBLIC_KEY_HASH_p256 = 3_750
 
     (* model B58CHECK_ENCODING_PUBLIC_KEY_HASH_secp256k1 *)
-    let cost_B58CHECK_ENCODING_PUBLIC_KEY_HASH_secp256k1 = 3224
+    let cost_B58CHECK_ENCODING_PUBLIC_KEY_HASH_secp256k1 = 3_300
 
     (* model B58CHECK_ENCODING_PUBLIC_KEY_ed25519 *)
-    let cost_B58CHECK_ENCODING_PUBLIC_KEY_ed25519 = 4503
+    let cost_B58CHECK_ENCODING_PUBLIC_KEY_ed25519 = 4_500
 
     (* model B58CHECK_ENCODING_PUBLIC_KEY_p256 *)
-    let cost_B58CHECK_ENCODING_PUBLIC_KEY_p256 = 5246
+    let cost_B58CHECK_ENCODING_PUBLIC_KEY_p256 = 5_300
 
     (* model B58CHECK_ENCODING_PUBLIC_KEY_secp256k1 *)
-    let cost_B58CHECK_ENCODING_PUBLIC_KEY_secp256k1 = 5018
+    let cost_B58CHECK_ENCODING_PUBLIC_KEY_secp256k1 = 5_000
 
     (* model B58CHECK_ENCODING_SIGNATURE_ed25519 *)
-    let cost_B58CHECK_ENCODING_SIGNATURE_ed25519 = 8713
+    let cost_B58CHECK_ENCODING_SIGNATURE_ed25519 = 8_700
 
     (* model B58CHECK_ENCODING_SIGNATURE_p256 *)
-    let cost_B58CHECK_ENCODING_SIGNATURE_p256 = 8716
+    let cost_B58CHECK_ENCODING_SIGNATURE_p256 = 8_700
 
     (* model B58CHECK_ENCODING_SIGNATURE_secp256k1 *)
-    let cost_B58CHECK_ENCODING_SIGNATURE_secp256k1 = 8628
+    let cost_B58CHECK_ENCODING_SIGNATURE_secp256k1 = 8_700
 
     (* model DECODING_CHAIN_ID *)
-    let cost_DECODING_CHAIN_ID = 48
+    let cost_DECODING_CHAIN_ID = 50
 
     (* model DECODING_PUBLIC_KEY_HASH_ed25519 *)
-    let cost_DECODING_PUBLIC_KEY_HASH_ed25519 = 54
+    let cost_DECODING_PUBLIC_KEY_HASH_ed25519 = 50
 
     (* model DECODING_PUBLIC_KEY_HASH_p256 *)
     let cost_DECODING_PUBLIC_KEY_HASH_p256 = 60
 
     (* model DECODING_PUBLIC_KEY_HASH_secp256k1 *)
-    let cost_DECODING_PUBLIC_KEY_HASH_secp256k1 = 56
+    let cost_DECODING_PUBLIC_KEY_HASH_secp256k1 = 60
 
     (* model DECODING_PUBLIC_KEY_ed25519 *)
-    let cost_DECODING_PUBLIC_KEY_ed25519 = 65
+    let cost_DECODING_PUBLIC_KEY_ed25519 = 60
 
     (* model DECODING_PUBLIC_KEY_p256 *)
-    let cost_DECODING_PUBLIC_KEY_p256 = 24394
+    let cost_DECODING_PUBLIC_KEY_p256 = 25_000
 
     (* model DECODING_PUBLIC_KEY_secp256k1 *)
-    let cost_DECODING_PUBLIC_KEY_secp256k1 = 5307
+    let cost_DECODING_PUBLIC_KEY_secp256k1 = 5_300
 
     (* model DECODING_SIGNATURE_ed25519 *)
-    let cost_DECODING_SIGNATURE_ed25519 = 32
+    let cost_DECODING_SIGNATURE_ed25519 = 30
 
     (* model DECODING_SIGNATURE_p256 *)
-    let cost_DECODING_SIGNATURE_p256 = 32
+    let cost_DECODING_SIGNATURE_p256 = 30
 
     (* model DECODING_SIGNATURE_secp256k1 *)
-    let cost_DECODING_SIGNATURE_secp256k1 = 32
+    let cost_DECODING_SIGNATURE_secp256k1 = 30
 
     (* model ENCODING_CHAIN_ID *)
-    let cost_ENCODING_CHAIN_ID = 47
+    let cost_ENCODING_CHAIN_ID = 50
 
     (* model ENCODING_PUBLIC_KEY_HASH_ed25519 *)
-    let cost_ENCODING_PUBLIC_KEY_HASH_ed25519 = 65
+    let cost_ENCODING_PUBLIC_KEY_HASH_ed25519 = 70
 
     (* model ENCODING_PUBLIC_KEY_HASH_p256 *)
-    let cost_ENCODING_PUBLIC_KEY_HASH_p256 = 76
+    let cost_ENCODING_PUBLIC_KEY_HASH_p256 = 80
 
     (* model ENCODING_PUBLIC_KEY_HASH_secp256k1 *)
-    let cost_ENCODING_PUBLIC_KEY_HASH_secp256k1 = 73
+    let cost_ENCODING_PUBLIC_KEY_HASH_secp256k1 = 70
 
     (* model ENCODING_PUBLIC_KEY_ed25519 *)
-    let cost_ENCODING_PUBLIC_KEY_ed25519 = 77
+    let cost_ENCODING_PUBLIC_KEY_ed25519 = 80
 
     (* model ENCODING_PUBLIC_KEY_p256 *)
-    let cost_ENCODING_PUBLIC_KEY_p256 = 453
+    let cost_ENCODING_PUBLIC_KEY_p256 = 450
 
     (* model ENCODING_PUBLIC_KEY_secp256k1 *)
-    let cost_ENCODING_PUBLIC_KEY_secp256k1 = 486
+    let cost_ENCODING_PUBLIC_KEY_secp256k1 = 490
 
     (* model ENCODING_SIGNATURE_ed25519 *)
-    let cost_ENCODING_SIGNATURE_ed25519 = 39
+    let cost_ENCODING_SIGNATURE_ed25519 = 40
 
     (* model ENCODING_SIGNATURE_p256 *)
-    let cost_ENCODING_SIGNATURE_p256 = 39
+    let cost_ENCODING_SIGNATURE_p256 = 40
 
     (* model ENCODING_SIGNATURE_secp256k1 *)
-    let cost_ENCODING_SIGNATURE_secp256k1 = 39
+    let cost_ENCODING_SIGNATURE_secp256k1 = 40
 
     (* model TIMESTAMP_READABLE_DECODING *)
-    let cost_TIMESTAMP_READABLE_DECODING = 131
+    let cost_TIMESTAMP_READABLE_DECODING = 130
 
     (* model TIMESTAMP_READABLE_ENCODING *)
-    let cost_TIMESTAMP_READABLE_ENCODING = 868
+    let cost_TIMESTAMP_READABLE_ENCODING = 900
 
     (* model CHECK_PRINTABLE *)
     let cost_CHECK_PRINTABLE size = 14 + (10 * size)
@@ -568,12 +567,12 @@ module Cost_of = struct
     (* model PARSE_TYPE
        This is the cost of one iteration of parse_ty, extracted by hand from the
        parameter fit for the PARSE_TYPE benchmark. *)
-    let cost_PARSE_TYPE = 167
+    let cost_PARSE_TYPE = 170
 
     (* model UNPARSE_TYPE
        This is the cost of one iteration of unparse_ty, extracted by hand from the
        parameter fit for the UNPARSE_TYPE benchmark. *)
-    let cost_UNPARSE_TYPE = 184
+    let cost_UNPARSE_TYPE = 185
   end
 
   module Interpreter = struct
