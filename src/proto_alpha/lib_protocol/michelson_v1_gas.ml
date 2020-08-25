@@ -79,9 +79,7 @@ module Cost_of = struct
 
     (* model N_Abs_int *)
     (* Approximating 0.068306 x term *)
-    let cost_N_Abs_int size =
-      let v0 = size in
-      80 + (v0 lsr 4)
+    let cost_N_Abs_int size = 80 + (size lsr 4)
 
     (* model N_Add_intint *)
     (* Approximating 0.082158 x term *)
@@ -103,9 +101,7 @@ module Cost_of = struct
 
     (* model N_Blake2b *)
     (* Approximating 1.366428 x term *)
-    let cost_N_Blake2b size =
-      let v0 = size in
-      500 + (v0 + (v0 lsr 2))
+    let cost_N_Blake2b size = 500 + (size + (size lsr 2))
 
     (* model N_Car *)
     let cost_N_Car = 80
@@ -115,21 +111,16 @@ module Cost_of = struct
 
     (* model N_Check_signature_ed25519 *)
     (* Approximating 1.372685 x term *)
-    let cost_N_Check_signature_ed25519 size =
-      let v0 = size in
-      270_000 + (v0 + (v0 lsr 2))
+    let cost_N_Check_signature_ed25519 size = 270_000 + (size + (size lsr 2))
 
     (* model N_Check_signature_p256 *)
     (* Approximating 1.385771 x term *)
     let cost_N_Check_signature_p256 size =
-      let v0 = size in
-      600_000 + (v0 + (v0 lsr 2) + (v0 lsr 3))
+      600_000 + (size + (size lsr 2) + (size lsr 3))
 
     (* model N_Check_signature_secp256k1 *)
     (* Approximating 1.372411 x term *)
-    let cost_N_Check_signature_secp256k1 size =
-      let v0 = size in
-      60_000 + (v0 + (v0 lsr 2))
+    let cost_N_Check_signature_secp256k1 size = 60_000 + (size + (size lsr 2))
 
     (* model N_Compare_address *)
     let cost_N_Compare_address size1 size2 =
@@ -270,15 +261,11 @@ module Cost_of = struct
 
     (* model N_Lsl_nat *)
     (* Approximating 0.129443 x term *)
-    let cost_N_Lsl_nat size =
-      let v0 = size in
-      150 + (v0 lsr 3)
+    let cost_N_Lsl_nat size = 150 + (size lsr 3)
 
     (* model N_Lsr_nat *)
     (* Approximating 0.129435 x term *)
-    let cost_N_Lsr_nat size =
-      let v0 = size in
-      150 + (v0 lsr 3)
+    let cost_N_Lsr_nat size = 150 + (size lsr 3)
 
     (* model N_Map_get *)
     (* Approximating 0.057548 x term *)
@@ -317,9 +304,7 @@ module Cost_of = struct
 
     (* model N_Neg_int *)
     (* Approximating 0.068419 x term *)
-    let cost_N_Neg_int size =
-      let v0 = size in
-      80 + (v0 lsr 4)
+    let cost_N_Neg_int size = 80 + (size lsr 4)
 
     (* model N_Neq *)
     let cost_N_Neq = 80
@@ -335,9 +320,7 @@ module Cost_of = struct
 
     (* model N_Not_int *)
     (* Approximating 0.076564 x term *)
-    let cost_N_Not_int size =
-      let v0 = size in
-      55 + ((v0 lsr 4) + (v0 lsr 7))
+    let cost_N_Not_int size = 55 + ((size lsr 4) + (size lsr 7))
 
     (* model N_Or *)
     let cost_N_Or = 90
@@ -380,9 +363,7 @@ module Cost_of = struct
 
     (* model N_Slice_string *)
     (* Approximating 0.067048 x term *)
-    let cost_N_Slice_string size =
-      let v0 = size in
-      80 + (v0 lsr 4)
+    let cost_N_Slice_string size = 80 + (size lsr 4)
 
     (* model N_String_size *)
     let cost_N_String_size = 80
