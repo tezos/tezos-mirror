@@ -41,5 +41,6 @@ let () =
       ("voting", Voting.tests);
       ("interpretation", Interpretation.tests);
       ("gas properties", Gas_properties.tests);
-      ("fixed point computation", Fixed_point.tests) ]
+      ("fixed point computation", Fixed_point.tests);
+      ("gas cost functions", Gas_costs.tests) ]
   |> Lwt_main.run
