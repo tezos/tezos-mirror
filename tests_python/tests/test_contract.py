@@ -431,7 +431,7 @@ class TestGasBound:
         name = 'first_explosion.tz'
         contract = session[name]
         client.typecheck(contract)
-        args = ['-G', f'{8000}', '--burn-cap', '10']
+        args = ['-G', f'{1896}', '--burn-cap', '10']
 
         expected_error = "Gas limit exceeded during typechecking or execution"
         with utils.assert_run_failure(expected_error):
@@ -466,7 +466,7 @@ class TestGasBound:
             ("Cannot serialize the resulting storage" +
              " value within the provided gas bounds.")
         with utils.assert_run_failure(expected_error):
-            client.run_script(contract, storage, inp, gas=18291)
+            client.run_script(contract, storage, inp, gas=9290)
 
     def test_typecheck_map_dup_key(self, client: Client):
 
