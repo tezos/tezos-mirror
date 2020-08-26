@@ -28,6 +28,8 @@ open Filename.Infix
 
 let home = try Sys.getenv "HOME" with Not_found -> "/root"
 
+let data_dir_env_name = "TEZOS_NODE_DIR"
+
 let default_data_dir = home // ".tezos-node"
 
 let default_rpc_port = 8732

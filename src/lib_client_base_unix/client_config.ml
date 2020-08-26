@@ -146,7 +146,11 @@ let () =
 
 let home = try Sys.getenv "HOME" with Not_found -> "/root"
 
-let default_base_dir = Filename.concat home ".tezos-client"
+let base_dir_env_name = "TEZOS_CLIENT_DIR"
+
+let default_base_dir =
+  try Sys.getenv base_dir_env_name
+  with Not_found -> Filename.concat home ".tezos-client"
 
 let default_chain = `Main
 
@@ -346,9 +350,15 @@ let base_dir_arg () =
     ~short:'d'
     ~placeholder:"path"
     ~doc:
-      ( "client data directory\n\
-         The directory where the Tezos client will store all its data.\n\
-         By default: '" ^ default_base_dir ^ "'." )
+      (Format.asprintf
+         "@[<v>@[<2>client data directory@,\
+          The directory where the Tezos client will store all its data.@,\
+          If absent, its value is the value of the %s@,\
+          environment variable. If %s is itself not specified,@,\
+          defaults to %s@]@]@."
+         base_dir_env_name
+         base_dir_env_name
+         default_base_dir)
     (string_parameter ())
 
 let config_file_arg () =

@@ -82,6 +82,8 @@ and shell = {
   history_mode : History_mode.t option;
 }
 
+val data_dir_env_name : string
+
 val default_data_dir : string
 
 val default_p2p_port : int

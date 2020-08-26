@@ -12,7 +12,13 @@ here either.
 
 ## Node
 
+- You can now specify the data directory using environment variable `TEZOS_NODE_DIR`.
+  If you both set this environment variable and specify `--data-dir`, the latter will be used.
+
 ## Client
+
+- You can now specify the base directory using environment variable `TEZOS_CLIENT_DIR`.
+  If you both set this environment variable and specify `--base-dir`, the latter will be used.
 
 ## Baker / Endorser / Accuser
 
