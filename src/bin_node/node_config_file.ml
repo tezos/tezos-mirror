@@ -1103,7 +1103,11 @@ let encoding =
           ~description:"Configuration of rpc parameters"
           rpc
           default_rpc)
-       (req "p2p" ~description:"Configuration of network parameters" p2p)
+       (dft
+          "p2p"
+          ~description:"Configuration of network parameters"
+          p2p
+          default_p2p)
        (dft
           "log"
           ~description:
