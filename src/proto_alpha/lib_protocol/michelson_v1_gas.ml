@@ -68,7 +68,7 @@ module Cost_of = struct
         let (lval, rval) = v in
         size_of_comparable l lval + size_of_comparable r rval
 
-  let manager_operation = step_cost 10_000
+  let manager_operation = step_cost 1_000
 
   (* FIXME: hardcoded constant, available in next environment version.
      Set to a reasonable upper bound. *)
