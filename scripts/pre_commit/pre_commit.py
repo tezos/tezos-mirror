@@ -10,12 +10,13 @@ for gitlab CI to pass.
 
 For the moment this script:
 
-* executes python tests of staged *.py test files
+* executes python tests of staged tests_python/*.py test files
   The point is to execute a subset of "pytest" that is required
-  for a commit to pass CI. Be sure you ran "poetry install" first.
+  for a commit to pass CI. Make sure you've installed everything required
+  first: https://tezos.gitlab.io/developer/python_testing_framework.html
 
   This is most useful when working on the python tests themselves.
-* lints and typechecks staged *.py files.
+* lints and typechecks staged tests_python/*.py files.
 * calls ocamlformat on staged *.ml, *.mli files in a way
   faster than `make fmt`.
   If staged files are being inspected (i.e. if --unstaged is not passed,
@@ -55,14 +56,14 @@ _UNSTAGED = "--unstaged"
 
 
 def _find_python_data(tests_python_path: str)\
-        -> Optional[Tuple[List[str], List[str]]]:
+        -> Optional[Tuple[List[List[str]], List[str]]]:
     """
     Args:
         tests_python_path: the path of the directory `tezos/tests_python`
     Returns:
         A pair of:
 
-        1/ The executables to call on python files
+        1/ The commands to call on python files
         2/ The directories to consider in `tezos/tests_python`
            (relative to tests_python/)
 
@@ -86,15 +87,12 @@ def _find_python_data(tests_python_path: str)\
                     tags.pop(i)
                     if not tags:
                         # Success
-                        # Tools are all elements except the first one:
-                        tools = result[:len(result) - 1]
-                        packages = result[len(result) - 1].split(" ")
-                        # Be resilient to multiple spaces in a row
-                        # Remove leading/trailing WS
-                        packages = [p.strip() for p in packages]
-                        # Remove empty entries if any
-                        packages = [p for p in packages if p]
-                        return (tools, packages)
+                        # Tools are all elements except the last one:
+                        tools = result[:-1]
+                        packages = result[-1]  # Take last
+                        # Here we rely on split() taking care of ignoring
+                        # successive whitespaces, as well as trailing ones.
+                        return ([t.split() for t in tools], packages.split())
     print(
         "Variables identified by prefixes"
         f" that follow not found in {makefile_path}:",
@@ -235,18 +233,25 @@ def _call_ocamlformat(files: List[str], staged_or_modified: bool):
             subprocess.run(cmd, check=True)
 
 
-def _call_pytest(files: List[str]) -> int:
+def _call_pytest(tests_python_path: str, files: List[str]) -> int:
     """
     Args:
+        tests_python_path: the path of the directory `tezos/tests_python`
         files (list(str)): The files on which to call pytest
     Returns:
         The maximum of return codes of calls to pytest on `files`
     """
+    tests_python_basename = os.path.basename(tests_python_path)
     result = 0
     for file_ in files:
+        # trim "tests_python/" from start of path
+        # because we execute within tests_python
+        file_ = file_[len(tests_python_basename) + len(os.sep):]
         cmd = ["poetry", "run", "pytest", file_]
-        print(" ".join(cmd))
-        py_test_result = subprocess.run(cmd, check=False)
+        print(f"{tests_python_basename}> " + " ".join(cmd))
+        py_test_result = subprocess.run(cmd,
+                                        cwd=tests_python_basename,
+                                        check=False)
         result = max(result, py_test_result.returncode)
     return result
 
@@ -263,18 +268,21 @@ def _call_py_linters(tests_python_path: str, files) -> int:
     if not py_data:
         return 1
     tools, packages = py_data
-
     tests_python_basename = os.path.basename(tests_python_path)
+
+    # trim "tests_python/" from start of path
+    # because we execute within tests_python (this is required since
+    # the move to poetry).
+    files = [x[len(tests_python_basename) + len(os.sep):] for x in files]
+    # remove files that are not in 'packages' i.e. not in directories
+    # listed by tests_python/Makefile's PACKAGES variables
+    files = [x for x in files if any([x.startswith(p) for p in packages])]
+    if not files:  # Nothing to do
+        return 0
+
     return_code = 0
     for tool in tools:
-        # trim "tests_python/" from start of path
-        # because we execute within tests_python
-        files_ = [x[len(tests_python_basename) + len(os.sep):] for x in files]
-        # remove files that are not in 'packages' i.e. not in directories
-        # listed by tests_python/Makefile's PACKAGES variables
-        files_ = [x for x in files_ if
-                  any([x.startswith(p) for p in packages])]
-        cmd = [tool] + files_
+        cmd = tool + files
         print(f"{tests_python_basename}> " + " ".join(cmd))
         cmd_result = subprocess.run(cmd,
                                     cwd=tests_python_basename,
@@ -303,7 +311,9 @@ def _main_py_files(staged_or_modified: bool, adjective: str,
         relevant_pytest_files = _get_py_files(tests_python_path,
                                               staged_or_modified, True)
         if relevant_pytest_files:
-            return_code = max(return_code, _call_pytest(relevant_pytest_files))
+            return_code = max(return_code,
+                              _call_pytest(tests_python_path,
+                                           relevant_pytest_files))
         else:
             print("No %s *.py file relevant to pytest found" % adjective)
     else:
