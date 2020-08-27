@@ -344,7 +344,7 @@ def _main_test_itself() -> int:
     py_tools = None if py_data is None else py_data[0]
     if py_tools is None:
         return 1  # Error has been logged in _find_python_data
-    py_packages = py_data[1]
+    py_packages = py_data[1]  # type: ignore
     if py_packages is None:
         return 1  # Error has been logged in _find_python_data
     # Success case
