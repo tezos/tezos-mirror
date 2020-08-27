@@ -141,7 +141,7 @@ let rec type_size_of_stack_head : type st. st stack_ty -> up_to:int -> int =
    than the bound (otherwise every program would be rejected).
 
    In a [(b, a) instr], it is the number of types in [a] that may exceed the
-   limit, knowing than types in [b] don't.
+   limit, knowing that types in [b] don't.
    If the instr is parameterized by [(b', a') descr] then you may assume that
    types in [a'] don't exceed the limit.
 *)
