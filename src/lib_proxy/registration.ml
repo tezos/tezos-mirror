@@ -26,17 +26,16 @@
 module type Proxy_sig = sig
   val protocol_hash : Protocol_hash.t
 
-  module Protocol : sig
-    val hash : Protocol_hash.t
-
-    include Tezos_protocol_environment.PROTOCOL
-  end
-
-  module Block_services :
-      module type of
-        Tezos_shell_services.Block_services.Make (Protocol) (Protocol)
-
+  (** RPCs provided by the protocol *)
   val directory : Tezos_protocol_environment.rpc_context RPC_directory.t
+
+  (** How to build the context to execute RPCs on *)
+  val init_env_rpc_context :
+    Tezos_client_base.Client_context.printer ->
+    RPC_context.json ->
+    Tezos_shell_services.Block_services.chain ->
+    Tezos_shell_services.Block_services.block ->
+    Tezos_protocol_environment.rpc_context tzresult Lwt.t
 end
 
 type proxy_environment = (module Proxy_sig)

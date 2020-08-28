@@ -44,6 +44,19 @@ module M : sig
 
   type tree = Dir of tree TzString.Map.t | Key of value
 
+  module type ProxyDelegate = sig
+    (** Whether [mem] would return Some Dir _ *)
+    val proxy_dir_mem : key -> bool tzresult Lwt.t
+
+    (** The value associated to [key] *)
+    val proxy_get : key -> tree option tzresult Lwt.t
+
+    (** Whether [get] would return Some Key _ *)
+    val proxy_mem : key -> bool tzresult Lwt.t
+  end
+
+  type proxy_delegate = (module ProxyDelegate)
+
   val tree_size : tree -> int
 
   val empty : tree
@@ -51,14 +64,15 @@ module M : sig
   type t
 end
 
-type rpc = M.key -> M.tree tzresult Lwt.t
-
 type _ Context.kind += Proxy : M.t Context.kind
 
-(** Constructs an empty context, possibly giving the rpc right-away.
-    Otherwise set it later with [set rpc] *)
-val empty : rpc option -> Context.t
+(** Constructs an empty context, possibly giving the delegate (the function
+    querying the endpoint) right away.
+    Otherwise set it later with [set delegate] *)
+val empty : M.proxy_delegate option -> Context.t
 
-(** Sets the rpc in the context. Doesn't take an option, because it's never
-    required to put [None]. *)
-val set_rpc : rpc -> Context.t -> Context.t
+(** Sets the delegate (the function querying the endpoint) in the context,
+    hereby making this context behave
+    as a proxy instead of as a [Memory_context]. Doesn't take an option,
+    because it's never required to put [None]. *)
+val set_delegate : M.proxy_delegate -> Context.t -> Context.t

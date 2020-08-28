@@ -3,6 +3,7 @@
  (public_name tezos-proxy)
  (libraries
    tezos-base
+   tezos-client-base
    tezos-protocol-environment
    tezos-rpc
    tezos-shell-services)

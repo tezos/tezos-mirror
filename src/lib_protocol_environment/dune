@@ -17,7 +17,8 @@
           Environment_protocol_T_V0
           Environment_protocol_T_V1
           Dummy_context
-          Memory_context))
+          Memory_context
+          Proxy_context))
 
 (library
  (name tezos_shell_context)

@@ -13,6 +13,7 @@ depends: [
   "tezos-protocol-006-PsCARTHA"
   "tezos-shell-services"
   "tezos-mockup-registration"
+  "tezos-proxy"
   "tezos-signer-backends"
   "tezos-protocol-006-PsCARTHA-parameters"
   "alcotest-lwt" { with-test & >= "1.1.0" }

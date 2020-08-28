@@ -109,7 +109,7 @@ let initial_context (rpc_context : RPC_context.json)
     let proxy_mem = M.proxy_mem pgi
   end in
   let empty = Proxy_context.empty @@ Some (module N) in
-  let version_value = "alpha_current" in
+  let version_value = "delphi_007" in
   Tezos_protocol_environment.Context.set
     empty
     ["version"]

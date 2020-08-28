@@ -32,9 +32,19 @@ module M = struct
 
   type tree = Dir of tree StringMap.t | Key of value
 
+  module type ProxyDelegate = sig
+    val proxy_dir_mem : key -> bool tzresult Lwt.t
+
+    val proxy_get : key -> tree option tzresult Lwt.t
+
+    val proxy_mem : key -> bool tzresult Lwt.t
+  end
+
+  type proxy_delegate = (module ProxyDelegate)
+
   (* When the option is [None], this instance of [M] should behave
      like [Memory_context]. *)
-  type t = {rpc : (key -> tree tzresult Lwt.t) option; tree : tree}
+  type t = {proxy : proxy_delegate option; tree : tree}
 
   let empty = Dir StringMap.empty
 
@@ -75,29 +85,30 @@ module M = struct
     | Dir t ->
         StringMap.fold (fun _ t' i -> tree_size t' + i) t 0
 
-  let rec raw_get m k =
+  let rec local_get m k =
     match (k, m) with
     | ([], m) ->
         Some m
     | (n :: k, Dir m) -> (
       match StringMap.find_opt n m with
       | Some res ->
-          raw_get res k
+          local_get res k
       | None ->
           None )
     | (_ :: _, Key _) ->
         None
 
   let raw_get m k =
-    match raw_get m.tree k with
+    match local_get m.tree k with
     | None -> (
         L.(S.emit proxy_context_missing) k
         >>= fun () ->
-        match m.rpc with
+        match m.proxy with
         | None ->
             return None
-        | Some rpc -> (
-            rpc k
+        | Some proxy -> (
+            let (module ProxyDelegation) = proxy in
+            ProxyDelegation.proxy_get k
             >>= function
             | Error err ->
                 failwith
@@ -105,9 +116,9 @@ module M = struct
                   Error_monad.pp_print_error
                   err
             | Ok t ->
-                return @@ Option.some t ) )
+                return t ) )
     | Some _ as v ->
-        return @@ v
+        return v
 
   let rec raw_set m k v =
     (* This function returns the update it did. This is used in the
@@ -148,20 +159,34 @@ module M = struct
     match u with None -> None | Some u -> Some {m with tree = u}
 
   let mem m k =
-    raw_get m k
-    >>= function
-    | Ok (Some (Key _)) ->
+    match local_get m.tree k with
+    | Some (Key _) ->
         Lwt.return_true
-    | Ok (Some (Dir _) | None) | Error _ ->
+    | Some (Dir _) ->
         Lwt.return_false
+    | None -> (
+      match m.proxy with
+      | None ->
+          Lwt.return_false
+      | Some proxy -> (
+          let (module ProxyDelegation) = proxy in
+          ProxyDelegation.proxy_mem k
+          >>= function Error _ -> Lwt.return_false | Ok x -> Lwt.return x ) )
 
   let dir_mem m k =
-    raw_get m k
-    >>= function
-    | Ok (Some (Dir _)) ->
-        Lwt.return_true
-    | Error _ | Ok (Some (Key _) | None) ->
+    match local_get m.tree k with
+    | Some (Key _) ->
         Lwt.return_false
+    | Some (Dir _) ->
+        Lwt.return_true
+    | None -> (
+      match m.proxy with
+      | None ->
+          Lwt.return_false
+      | Some proxy -> (
+          let (module ProxyDelegation) = proxy in
+          ProxyDelegation.proxy_dir_mem k
+          >>= function Error _ -> Lwt.return_false | Ok x -> Lwt.return x ) )
 
   let get m k =
     raw_get m k
@@ -247,21 +272,19 @@ end
 
 open Tezos_protocol_environment
 
-type rpc = M.key -> M.tree tzresult Lwt.t
-
 type _ Context.kind += Proxy : M.t Context.kind
 
 let ops = (module M : CONTEXT with type t = 'ctxt)
 
-let empty rpc =
-  let ctxt = M.{rpc; tree = empty} in
+let empty proxy =
+  let ctxt = M.{proxy; tree = empty} in
   Context.Context {ops; ctxt; kind = Proxy}
 
-let set_rpc : rpc -> Context.t -> Context.t =
- fun rpc (Context.Context {ops; ctxt; kind} : Context.t) ->
+let set_delegate : M.proxy_delegate -> Context.t -> Context.t =
+ fun proxy (Context.Context {ops; ctxt; kind} : Context.t) ->
   match kind with
   | Proxy ->
-      let ctxt' = {ctxt with rpc = Some rpc} in
+      let ctxt' = {ctxt with proxy = Some proxy} in
       Context.Context {ops; ctxt = ctxt'; kind = Proxy}
   | _ ->
       assert false
