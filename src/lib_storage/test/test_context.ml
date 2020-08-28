@@ -40,7 +40,7 @@ let ( >>=! ) x f =
 
 let ( >|= ) = Lwt.( >|= )
 
-let ( // ) = Filename.concat
+open Filename.Infix
 
 (** Basic blocks *)
 

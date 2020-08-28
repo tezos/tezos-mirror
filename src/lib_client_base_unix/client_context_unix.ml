@@ -141,7 +141,7 @@ class unix_logger ~base_dir : Client_context.printer =
     | "stderr" ->
         prerr_endline msg ; Lwt.return_unit
     | log ->
-        let ( // ) = Filename.concat in
+        let open Filename.Infix in
         Lwt_utils_unix.create_dir (base_dir // "logs" // log)
         >>= fun () ->
         Lwt_io.with_file

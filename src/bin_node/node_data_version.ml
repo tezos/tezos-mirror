@@ -25,7 +25,7 @@
 
 let lwt_emit = Node_data_version_state.lwt_emit
 
-let ( // ) = Filename.concat
+open Filename.Infix
 
 type t = string
 

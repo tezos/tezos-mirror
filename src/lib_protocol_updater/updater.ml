@@ -24,8 +24,7 @@
 (*****************************************************************************)
 
 open Updater_logging
-
-let ( // ) = Filename.concat
+open Filename.Infix
 
 (** Compiler *)
 

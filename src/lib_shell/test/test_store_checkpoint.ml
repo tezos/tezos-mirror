@@ -25,7 +25,7 @@
 
 let mapsize = 4_096_000_000L (* ~4 GiB *)
 
-let ( // ) = Filename.concat
+open Filename.Infix
 
 let wrap_raw_store_init f _ () =
   Lwt_utils_unix.with_tempdir "tezos_test_" (fun base_dir ->

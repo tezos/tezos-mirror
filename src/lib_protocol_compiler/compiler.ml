@@ -101,7 +101,7 @@ let register_env =
 
 (** Helpers *)
 
-let ( // ) = Filename.concat
+open Filename.Infix
 
 let create_file ?(perm = 0o644) name content =
   let open Unix in

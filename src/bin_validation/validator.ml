@@ -155,7 +155,7 @@ let lwt_emit (status : status) =
         pp_print_error
         el
 
-let ( // ) = Filename.concat
+open Filename.Infix
 
 let load_protocol proto protocol_root =
   if Registered_protocol.mem proto then return_unit

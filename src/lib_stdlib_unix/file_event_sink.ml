@@ -398,7 +398,7 @@ module Query = struct
     in
     iter init
 
-  let ( // ) = Filename.concat
+  open TzFilename.Infix
 
   module Time_constraint = struct
     type op = [`Lt | `Le | `Ge | `Gt]

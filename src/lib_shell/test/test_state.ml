@@ -205,7 +205,7 @@ let build_example_tree chain =
   build_valid_chain chain vtbl a3 c >>= fun () -> Lwt.return vtbl
 
 let wrap_state_init f base_dir =
-  let ( // ) = Filename.concat in
+  let open Filename.Infix in
   let store_root = base_dir // "store" in
   let context_root = base_dir // "context" in
   State.init

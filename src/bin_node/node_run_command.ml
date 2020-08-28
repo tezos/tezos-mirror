@@ -172,7 +172,7 @@ module Event = struct
   (* may be negative in case of signals *)
 end
 
-let ( // ) = Filename.concat
+open Filename.Infix
 
 let init_identity_file (config : Node_config_file.t) =
   let identity_file =

@@ -410,7 +410,7 @@ let () =
     (function Invalid_block_specification s -> Some s | _ -> None)
     (fun s -> Invalid_block_specification s)
 
-let ( // ) = Filename.concat
+open Filename.Infix
 
 let context_dir data_dir = data_dir // "context"
 

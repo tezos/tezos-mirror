@@ -25,7 +25,7 @@
 
 (** Setup mocks for testing shell, notably state and protocol validation *)
 
-let ( // ) = Filename.concat
+open Filename.Infix
 
 (** Basic blocks *)
 

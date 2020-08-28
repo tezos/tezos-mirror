@@ -154,7 +154,7 @@ let default_block = `Head 0
 
 let default_endpoint = Uri.of_string "http://localhost:8732"
 
-let ( // ) = Filename.concat
+open Filename.Infix
 
 module Cfg_file = struct
   (* the fields [node_addr], [node_port], and [tls] are deprecated by

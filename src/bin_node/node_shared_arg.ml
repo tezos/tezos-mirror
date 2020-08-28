@@ -25,8 +25,7 @@
 (*****************************************************************************)
 
 open Cmdliner
-
-let ( // ) = Filename.concat
+open Filename.Infix
 
 type t = {
   data_dir : string option;

@@ -3,8 +3,7 @@ open Error_monad
 let name = "TEZOS_PROTOCOL"
 
 open Protocol
-
-let ( // ) = Filename.concat
+open TzFilename.Infix
 
 let to_file ~dir:dirname ?hash ?env_version modules =
   let config_file =
