@@ -33,8 +33,7 @@ exception Version_not_found
 
 let versions = Protocol_hash.Table.create 7
 
-let get_versions () =
-  Protocol_hash.Table.fold (fun k c acc -> (k, c) :: acc) versions []
+let get_versions () = Protocol_hash.Table.to_seq versions
 
 let register name commands =
   let previous =

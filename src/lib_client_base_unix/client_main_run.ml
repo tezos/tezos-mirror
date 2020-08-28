@@ -35,7 +35,7 @@ let builtin_commands =
       no_options
       (fixed ["list"; "understood"; "protocols"])
       (fun () (cctxt : #Client_context.full) ->
-        Lwt_list.iter_s
+        Seq.iter_s
           (fun (ver, _) -> cctxt#message "%a" Protocol_hash.pp_short ver)
           (Client_commands.get_versions ())
         >>= fun () -> return_unit) ]

@@ -328,15 +328,16 @@ let wait_parameter () =
 
 let protocol_parameter () =
   parameter (fun _ arg ->
-      try
-        let (hash, _commands) =
-          List.find
-            (fun (hash, _commands) ->
-              String.has_prefix ~prefix:arg (Protocol_hash.to_b58check hash))
-            (Client_commands.get_versions ())
-        in
-        return_some hash
-      with Not_found -> fail (Invalid_protocol_argument arg))
+      match
+        Seq.find_first
+          (fun (hash, _commands) ->
+            String.has_prefix ~prefix:arg (Protocol_hash.to_b58check hash))
+          (Client_commands.get_versions ())
+      with
+      | Some (hash, _commands) ->
+          return_some hash
+      | None ->
+          fail (Invalid_protocol_argument arg))
 
 (* Command-line only args (not in config file) *)
 let base_dir_arg () =
