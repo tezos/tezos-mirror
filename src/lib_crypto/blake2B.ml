@@ -192,14 +192,16 @@ struct
     let open Compare.Int
     (* shadowing comparators *) in
     if size > 8 then fun seed h ->
-      Int64.to_int (TzEndian.get_int64 (to_bytes h) (seed mod (size - 8)))
+      Int64.to_int
+        (TzEndian.get_int64 (to_bytes h) (abs @@ (seed mod (size - 8))))
     else if size = 8 && Sys.word_size = 64 then fun _seed h ->
       (* NOTE: we do not use the seed here because we have a _perfect_ hash: we
          get the whole value. (Technically we ignore one bit because of the
          conversion from Int64 to int. *)
       Int64.to_int (TzEndian.get_int64 (to_bytes h) 0)
     else if size > 4 then fun seed h ->
-      Int32.to_int (TzEndian.get_int32 (to_bytes h) (seed mod (size - 4)))
+      Int32.to_int
+        (TzEndian.get_int32 (to_bytes h) (abs @@ (seed mod (size - 4))))
     else fun _seed h ->
       (* Here again we have a perfect hash. (Technically again we ignore one bit
          on 32-bit machines if size = 4.) *)
