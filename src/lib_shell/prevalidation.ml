@@ -290,7 +290,7 @@ let preapply ~user_activated_upgrades ~user_activated_protocol_overrides
   Prevalidation.create ~protocol_data ~predecessor ~timestamp ()
   >>=? fun validation_state ->
   Lwt_list.fold_left_s
-    (fun (acc_validation_result, acc_validation_state) operations ->
+    (fun (acc_validation_result_rev, acc_validation_state) operations ->
       Lwt_list.fold_left_s
         (fun (acc_validation_result, acc_validation_state) op ->
           match Prevalidation.parse op with
@@ -313,9 +313,12 @@ let preapply ~user_activated_upgrades ~user_activated_protocol_overrides
         }
       in
       Lwt.return
-        (acc_validation_result @ [new_validation_result], new_validation_state))
+        ( new_validation_result :: acc_validation_result_rev,
+          new_validation_state ))
     ([], validation_state)
     operations
+  >>= fun (validation_result_list_rev, validation_state) ->
+  Lwt.return (List.rev validation_result_list_rev, validation_state)
   >>= fun (validation_result_list, validation_state) ->
   let operations_hash =
     Operation_list_list_hash.compute

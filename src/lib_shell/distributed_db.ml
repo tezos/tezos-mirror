@@ -228,22 +228,21 @@ let deactivate chain_db =
   let chain_id = State.Chain.id chain_db.reader_chain_db.chain_state in
   Chain_id.Table.remove active_chains chain_id ;
   let sends =
-    P2p_peer.Table.fold
-      (fun gid conn acc ->
+    P2p_peer.Table.iter_ep
+      (fun gid conn ->
         chain_db.reader_chain_db.callback.disconnection gid ;
         chain_db.reader_chain_db.active_peers :=
           P2p_peer.Set.remove gid !(chain_db.reader_chain_db.active_peers) ;
         P2p_peer.Table.remove chain_db.reader_chain_db.active_connections gid ;
-        P2p.send p2p conn (Deactivate chain_id) :: acc)
+        P2p.send p2p conn (Deactivate chain_id))
       chain_db.reader_chain_db.active_connections
-      []
   in
   Error_monad.dont_wait
     (fun exc ->
       Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
     (fun trace ->
       Format.eprintf "Uncaught error: %a\n%!" Error_monad.pp_print_error trace)
-    (fun () -> join_ep sends) ;
+    (fun () -> sends) ;
   Distributed_db_requester.Raw_operation.shutdown
     chain_db.reader_chain_db.operation_db
   >>= fun () ->

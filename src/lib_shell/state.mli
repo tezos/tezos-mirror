@@ -68,7 +68,7 @@ module Chain : sig
   val test : chain_state -> Chain_id.t option Lwt.t
 
   (** Returns all the known chains. *)
-  val all : global_state -> chain_state list Lwt.t
+  val all : global_state -> chain_state Seq.t Lwt.t
 
   (** Destroy a chain: this completely removes from the local storage all
       the data associated to the chain (this includes blocks and

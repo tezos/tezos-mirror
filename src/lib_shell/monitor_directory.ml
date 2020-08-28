@@ -67,12 +67,16 @@ let build_rpc_directory validator mainchain_validator =
         | [] ->
             Lwt.return_true
         | chains ->
-            let chain_id = State.Block.chain_id block in
-            Lwt_list.filter_map_p
-              (Chain_directory.get_chain_id_opt state)
+            let that_chain_id = State.Block.chain_id block in
+            Lwt_list.exists_p
+              (fun chain ->
+                Chain_directory.get_chain_id_opt state chain
+                >|= function
+                | None ->
+                    false
+                | Some this_chain_id ->
+                    Chain_id.equal this_chain_id that_chain_id)
               chains
-            >>= fun chains ->
-            Lwt.return (List.exists (Chain_id.equal chain_id) chains)
       in
       let in_protocols block =
         match q#protocols with

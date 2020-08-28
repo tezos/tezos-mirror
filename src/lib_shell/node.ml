@@ -264,7 +264,7 @@ let check_and_fix_storage_consistency state vp =
       (* Make sure to remove the block only after updating the head *)
       State.Block.remove block
   in
-  iter_s
+  Seq.iter_es
     (fun chain_state ->
       Chain.head chain_state >>= fun block -> check_block 500 chain_state block)
     chains

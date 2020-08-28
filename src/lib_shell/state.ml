@@ -368,23 +368,17 @@ end
 let locked_valid_heads_for_checkpoint block_store data checkpoint =
   Store.Chain_data.Known_heads.read_all data.chain_data_store
   >>= fun heads ->
-  Block_hash.Set.fold
-    (fun head acc ->
-      let valid_header =
-        Header.read_opt (block_store, head)
-        >|= Option.unopt_assert ~loc:__POS__
-        >>= fun header ->
-        Locked_block.is_valid_for_checkpoint block_store head header checkpoint
-        >>= fun valid -> Lwt.return (valid, header)
-      in
-      acc
-      >>= fun (valid_heads, invalid_heads) ->
-      valid_header
-      >>= fun (valid, header) ->
+  Block_hash.Set.fold_s
+    (fun head (valid_heads, invalid_heads) ->
+      Header.read_opt (block_store, head)
+      >|= Option.unopt_assert ~loc:__POS__
+      >>= fun header ->
+      Locked_block.is_valid_for_checkpoint block_store head header checkpoint
+      >>= fun valid ->
       if valid then Lwt.return ((head, header) :: valid_heads, invalid_heads)
       else Lwt.return (valid_heads, (head, header) :: invalid_heads))
     heads
-    (Lwt.return ([], []))
+    ([], [])
 
 (* Tag as invalid all blocks in `heads` and their predecessors whose
    level strictly higher to 'level'. *)
@@ -725,8 +719,7 @@ module Chain = struct
 
   let all state =
     Shared.use state.global_data (fun {chains; _} ->
-        Lwt.return
-        @@ Chain_id.Table.fold (fun _ chain acc -> chain :: acc) chains [])
+        Lwt.return @@ Chain_id.Table.to_seq_values chains)
 
   let id {chain_id; _} = chain_id
 
@@ -1627,20 +1620,17 @@ let best_known_head_for_checkpoint chain_state checkpoint =
                 header = genesis_header;
               }
             in
-            Block_hash.Set.fold
+            Block_hash.Set.fold_s
               (fun head best ->
-                let valid_predecessor = find_valid_predecessor head in
-                best
-                >>= fun best ->
-                valid_predecessor
-                >>= fun pred ->
+                find_valid_predecessor head
+                >|= fun pred ->
                 if
                   Fitness.(
                     pred.header.shell.fitness > best.header.shell.fitness)
-                then Lwt.return pred
-                else Lwt.return best)
+                then pred
+                else best)
               heads
-              (Lwt.return genesis)))
+              genesis))
 
 module Protocol = struct
   include Protocol

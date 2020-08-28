@@ -952,7 +952,7 @@ let import ?(reconstruct = false) ?patch_context ~data_dir
     (fun () ->
       let k_store_pruned_blocks data =
         Store.with_atomic_rw store (fun () ->
-            Error_monad.iter_s
+            Lwt_list.iter_s
               (fun (pruned_header_hash, pruned_block) ->
                 Store.Block.Pruned_contents.store
                   (block_store, pruned_header_hash)
@@ -972,9 +972,9 @@ let import ?(reconstruct = false) ?patch_context ~data_dir
                       (block_store, pruned_header_hash)
                       i
                       v)
-                  pruned_block.operation_hashes
-                >>= fun () -> return_unit)
+                  pruned_block.operation_hashes)
               data)
+        >>= fun () -> return_unit
       in
       (* Restore context and fetch data *)
       restore_contexts

@@ -537,11 +537,7 @@ let on_close w =
       []
   in
   Lwt.join
-    ( ( match nv.prevalidator with
-      | Some prevalidator ->
-          Prevalidator.shutdown prevalidator
-      | None ->
-          Lwt.return_unit )
+    ( Lwt_utils.may ~f:Prevalidator.shutdown nv.prevalidator
     :: Lwt_utils.may ~f:(fun (_, shutdown) -> shutdown ()) nv.child
     :: pvs )
 
