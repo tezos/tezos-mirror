@@ -176,8 +176,8 @@ module Local_logging = Internal_event.Legacy_logging.Make_semantic (struct
 end)
 
 let store_known_protocols state =
-  let embedded_protocols = Registered_protocol.list_embedded () in
-  Lwt_list.iter_s
+  let embedded_protocols = Registered_protocol.seq_embedded () in
+  Seq.iter_s
     (fun protocol_hash ->
       State.Protocol.known state protocol_hash
       >>= function

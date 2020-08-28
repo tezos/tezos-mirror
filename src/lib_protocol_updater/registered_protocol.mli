@@ -46,13 +46,13 @@ type t = (module T)
 
 val mem : Protocol_hash.t -> bool
 
-val list : unit -> t list
+val seq : unit -> t Seq.t
 
 val get : Protocol_hash.t -> t option
 
 val get_result : Protocol_hash.t -> t tzresult Lwt.t
 
-val list_embedded : unit -> Protocol_hash.t list
+val seq_embedded : unit -> Protocol_hash.t Seq.t
 
 val get_embedded_sources : Protocol_hash.t -> Protocol.t option
 

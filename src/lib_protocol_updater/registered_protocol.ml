@@ -117,9 +117,9 @@ let get_result hash =
   | None ->
       fail (Unregistered_protocol hash)
 
-let list () = VersionTable.fold (fun _ p acc -> p :: acc) versions []
+let seq () = VersionTable.to_seq_values versions
 
-let list_embedded () = VersionTable.fold (fun k _ acc -> k :: acc) sources []
+let seq_embedded () = VersionTable.to_seq_keys sources
 
 let get_embedded_sources hash = VersionTable.find sources hash
 

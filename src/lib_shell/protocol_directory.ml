@@ -35,9 +35,7 @@ let build_rpc_directory block_validator state =
       State.Protocol.list state
       >>= fun set ->
       let protocols =
-        Protocol_hash.Set.add_seq
-          (List.to_seq @@ Registered_protocol.list_embedded ())
-          set
+        Protocol_hash.Set.add_seq (Registered_protocol.seq_embedded ()) set
       in
       RPC_answer.return (Protocol_hash.Set.elements protocols)) ;
   register1 Protocol_services.S.contents (fun hash () () ->
