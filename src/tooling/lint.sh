@@ -127,7 +127,6 @@ check_scripts () {
 }
 
 format_inplace () {
-    ( IFS=$'\n'; say "Formatting $*" )
     ocamlformat --inplace "$@"
 }
 
