@@ -49,6 +49,7 @@ val begin_construction :
   incremental tzresult Lwt.t
 
 val add_operation :
+  ?expect_apply_failure:(error list -> unit tzresult Lwt.t) ->
   ?expect_failure:(error list -> unit tzresult Lwt.t) ->
   incremental ->
   Operation.packed ->

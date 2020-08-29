@@ -147,39 +147,47 @@ let detect_script_failure :
   in
   fun {contents} -> detect_script_failure contents
 
-let add_operation ?expect_failure st op =
+let add_operation ?expect_apply_failure ?expect_failure st op =
   let open Apply_results in
   apply_operation st.state op
-  >>= fun x ->
-  Environment.wrap_error x
-  >>?= function
-  | (state, (Operation_metadata result as metadata)) ->
-      detect_script_failure result
-      |> fun result ->
-      ( match expect_failure with
-      | None ->
-          Lwt.return result
-      | Some f -> (
-        match result with
-        | Ok _ ->
-            failwith "Error expected while adding operation"
-        | Error e ->
-            f e ) )
-      >|=? fun () ->
-      {
-        st with
-        state;
-        rev_operations = op :: st.rev_operations;
-        rev_tickets = metadata :: st.rev_tickets;
-      }
-  | (state, (No_operation_metadata as metadata)) ->
-      return
-        {
-          st with
-          state;
-          rev_operations = op :: st.rev_operations;
-          rev_tickets = metadata :: st.rev_tickets;
-        }
+  >|= Environment.wrap_error
+  >>= fun result ->
+  match (expect_apply_failure, result) with
+  | (Some _, Ok _) ->
+      failwith "Error expected while adding operation"
+  | (Some f, Error err) ->
+      f err >|=? fun () -> st
+  | (None, result) -> (
+      result
+      >>?= fun result ->
+      match result with
+      | (state, (Operation_metadata result as metadata)) ->
+          detect_script_failure result
+          |> fun result ->
+          ( match expect_failure with
+          | None ->
+              Lwt.return result
+          | Some f -> (
+            match result with
+            | Ok _ ->
+                failwith "Error expected while adding operation"
+            | Error e ->
+                f e ) )
+          >|=? fun () ->
+          {
+            st with
+            state;
+            rev_operations = op :: st.rev_operations;
+            rev_tickets = metadata :: st.rev_tickets;
+          }
+      | (state, (No_operation_metadata as metadata)) ->
+          return
+            {
+              st with
+              state;
+              rev_operations = op :: st.rev_operations;
+              rev_tickets = metadata :: st.rev_tickets;
+            } )
 
 let finalize_block st =
   finalize_block st.state

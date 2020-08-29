@@ -62,7 +62,7 @@ let endorsement ?delegate ?level ctxt ?(signing_context = ctxt) () =
 let sign ?watermark sk ctxt (Contents_list contents) =
   Operation.pack (sign ?watermark sk ctxt contents)
 
-let combine_operations ?public_key ?counter ~source ctxt
+let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
     (packed_operations : packed_operation list) =
   assert (List.length packed_operations > 0) ;
   (* Hypothesis : each operation must have the same branch (is this really true?) *)
@@ -126,6 +126,30 @@ let combine_operations ?public_key ?counter ~source ctxt
       (counter, match manager_op with None -> [] | Some op -> [op])
       unpacked_operations
     |> snd |> List.rev
+  in
+  (* patch a random operation with a corrupted pkh *)
+  let operations =
+    match spurious_operation with
+    | None ->
+        operations
+    | Some op -> (
+        let op =
+          match op with
+          | {protocol_data; shell = _} -> (
+            match protocol_data with
+            | Operation_data {contents; _} -> (
+              match contents with
+              | Cons _ ->
+                  assert false
+              | Single op ->
+                  Alpha_context.Contents op ) )
+        in
+        (* Select where to insert spurious op *)
+        let legit_ops = List.length operations in
+        let index = Random.int legit_ops in
+        match List.split_n index operations with
+        | (preserved_prefix, preserved_suffix) ->
+            preserved_prefix @ (op :: preserved_suffix) )
   in
   let operations = Operation.of_list operations in
   sign account.sk ctxt operations

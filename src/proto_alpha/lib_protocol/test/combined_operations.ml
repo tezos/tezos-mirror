@@ -276,6 +276,55 @@ let failing_operation_in_the_middle_with_fees () =
   Assert.balance_is ~loc:__LOC__ (I inc) c2 c2_old_balance
   >>=? fun () -> return_unit
 
+let expect_wrong_signature list =
+  if
+    List.exists
+      (function
+        | Environment.Ecoproto_error Operation_repr.Invalid_signature ->
+            true
+        | _ ->
+            false)
+      list
+  then return_unit
+  else
+    failwith
+      "Packed operation has invalid source in the middle : operation expected \
+       to fail."
+
+let wrong_signature_in_the_middle () =
+  Context.init 2
+  >>=? fun (blk, contracts) ->
+  let c1 = List.nth contracts 0 in
+  let c2 = List.nth contracts 1 in
+  Op.transaction ~fee:Tez.one (B blk) c1 c2 Tez.one
+  >>=? fun op1 ->
+  Op.transaction ~fee:Tez.one (B blk) c2 c1 Tez.one
+  >>=? fun op2 ->
+  Incremental.begin_construction blk
+  >>=? fun inc ->
+  (* Make legit transfers, performing reveals *)
+  Incremental.add_operation inc op1
+  >>=? fun inc ->
+  Incremental.add_operation inc op2
+  >>=? fun inc ->
+  (* Cook transactions for actual test *)
+  Op.transaction ~fee:Tez.one (I inc) c1 c2 Tez.one
+  >>=? fun op1 ->
+  Op.transaction ~fee:Tez.one (I inc) c1 c2 Tez.one
+  >>=? fun op2 ->
+  Op.transaction ~fee:Tez.one (I inc) c1 c2 Tez.one
+  >>=? fun op3 ->
+  Op.transaction ~fee:Tez.one (I inc) c2 c1 Tez.one
+  >>=? fun spurious_operation ->
+  let operations = [op1; op2; op3] in
+  Op.combine_operations ~spurious_operation ~source:c1 (I inc) operations
+  >>=? fun operation ->
+  Incremental.add_operation
+    ~expect_apply_failure:expect_wrong_signature
+    inc
+    operation
+  >>=? fun _inc -> return_unit
+
 let tests =
   [ Test.tztest "multiple transfers" `Quick multiple_transfers;
     Test.tztest
@@ -289,4 +338,8 @@ let tests =
     Test.tztest
       "Failing operation in the middle (with fees)"
       `Quick
-      failing_operation_in_the_middle_with_fees ]
+      failing_operation_in_the_middle_with_fees;
+    Test.tztest
+      "Failing operation (wrong manager in the middle of a pack)"
+      `Quick
+      wrong_signature_in_the_middle ]

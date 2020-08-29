@@ -97,6 +97,7 @@ val activation :
 val combine_operations :
   ?public_key:public_key ->
   ?counter:counter ->
+  ?spurious_operation:packed_operation ->
   source:Contract.t ->
   Context.t ->
   packed_operation list ->
