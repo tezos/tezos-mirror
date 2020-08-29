@@ -1,3 +1,5 @@
+---
+
 variables:
   ## Please update `scripts/version.sh` accordingly
   build_deps_image_version: 6d1227cc7e4df7a163aeb0d87e4d75e56de6cb5c
@@ -108,14 +110,18 @@ build:
     - make all build-test
     - opam clean
   cache:
-    key: "${CI_COMMIT_REF_SLUG}"
+    key: "$CI_COMMIT_REF_SLUG"
     paths:
       - _build
+      - tezos-*
   artifacts:
-    name: "$CI_COMMIT_REF_NAME"
+    name: "build-$CI_COMMIT_REF_SLUG"
     paths:
-      - _build
+      - tezos-*
+      - src/proto_*/parameters/*.json
+      - _build/default/src/lib_protocol_compiler/main_native.exe
     expire_in: 1 day
+    when: on_success
 
 ############################################################
 ## Stage: test (only MR)                                  ##
@@ -142,9 +148,11 @@ test-script-gen-genesis:
 .test_template: &test_definition
   <<: *build_definition
   stage: test
-  dependencies:
-    - build
   retry: 2
+  # avoid pushing cache for testing stage
+  cache:
+    key: "$CI_COMMIT_REF_SLUG"
+    policy: pull
 
 # this section is updated using the script scripts/update_unit_test.sh
 ##BEGIN_UNITTEST##
@@ -287,8 +295,6 @@ unit:protocol_compiles:
 # definition for the environment to run all integration tests
 .integration_template: &integration_definition
   <<: *test_definition
-  dependencies:
-    - build
   before_script:
     - make
 
@@ -312,7 +318,7 @@ integration:sandboxes:voting:
     - ROOT_PATH=$PWD/flextesa-voting-demo-noops dune build @src/bin_sandbox/runtest_sandbox_voting_demo_noops
   artifacts:
     paths:
-    - flextesa-voting-demo-noops
+      - flextesa-voting-demo-noops
     expire_in: 1 day
     when: on_failure
   allow_failure: true # This test uses too much resources for GitLab's workers
@@ -323,7 +329,7 @@ integration:sandboxes:acc-baking:
     - ROOT_PATH=$PWD/flextesa-acc-sdb dune build @src/bin_sandbox/runtest_sandbox_accusations_simple_double_baking
   artifacts:
     paths:
-    - flextesa-acc-sdb
+      - flextesa-acc-sdb
     expire_in: 1 day
     when: on_failure
 
@@ -333,7 +339,7 @@ integration:sandboxes:acc-endorsement:
     - ROOT_PATH=$PWD/flextesa-acc-sde dune build @src/bin_sandbox/runtest_sandbox_accusations_simple_double_endorsing
   artifacts:
     paths:
-    - flextesa-acc-sde
+      - flextesa-acc-sde
     expire_in: 1 day
     when: on_failure
 
@@ -343,7 +349,7 @@ integration:sandboxes:u-a-u:
     - ROOT_PATH=$PWD/flextesa-hard-fork dune build @src/bin_sandbox/runtest_sandbox_user_activated_upgrade
   artifacts:
     paths:
-    - flextesa-hard-fork
+      - flextesa-hard-fork
     expire_in: 1 day
     when: on_failure
 
@@ -353,7 +359,7 @@ integration:sandboxes:daemons-upgrade:
     - ROOT_PATH=$PWD/flextesa-daemons-upgrade dune build @src/bin_sandbox/runtest_sandbox_daemons_upgrade
   artifacts:
     paths:
-    - flextesa-daemons-upgrade
+      - flextesa-daemons-upgrade
     expire_in: 1 day
     when: on_failure
 
@@ -367,7 +373,6 @@ integration:sandboxes:daemons-upgrade:
   dependencies:
     - build
   before_script:
-    - make
     # Load the environment poetry previously created in the docker image.
     # Give access to the Python dependencies/executables
     - . $HOME/.venv/bin/activate
@@ -375,6 +380,9 @@ integration:sandboxes:daemons-upgrade:
     - cd tests_python
   after_script:
     - tail -n +1 tmp/*
+  # python scripts don't need the _build directory
+  # but only the binaries in the artifacts
+  cache: {}
 
 # this section is updated using the script scripts/update_integration_test.sh
 ##BEGIN_INTEGRATION_PYTHON##
@@ -613,7 +621,7 @@ tezt:main:
     - dune exec tezt/tests/main.exe -- --color --log-buffer-size 5000 --log-file tezt.log --global-timeout 3300
   artifacts:
     paths:
-    - tezt.log
+      - tezt.log
     expire_in: 1 day
     when: on_failure
 
@@ -655,7 +663,7 @@ documentation:build:
     - make doc-html
   artifacts:
     paths:
-    - docs
+      - docs
     expire_in: 1 week
 
 documentation:linkcheck:
@@ -673,7 +681,7 @@ documentation:linkcheck:
     - if: '$CI_COMMIT_BRANCH =~ /-release$/'
       when: on_success
     - changes:
-      - /docs
+        - /docs
       when: on_success
   script:
     - make doc-html-and-linkcheck
@@ -695,12 +703,12 @@ documentation:linkcheck:
     - if: '$CI_COMMIT_BRANCH =~ /-release$/'
       when: on_success
     - changes:
-      - /**/*.opam
-      - /**/dune
-      - /**/dune.inc
-      - /**/*.dune.inc
-      - /scripts/version.sh
-      - /.gitlab-ci.yml
+        - /**/*.opam
+        - /**/dune
+        - /**/dune.inc
+        - /**/*.dune.inc
+        - /scripts/version.sh
+        - /.gitlab-ci.yml
       when: on_success
   script:
     - ./scripts/opam-pin.sh
