@@ -280,7 +280,7 @@ let expect_wrong_signature list =
   if
     List.exists
       (function
-        | Environment.Ecoproto_error Operation_repr.Invalid_signature ->
+        | Environment.Ecoproto_error Apply.Inconsistent_sources ->
             true
         | _ ->
             false)
