@@ -116,6 +116,8 @@ type error += Multiple_revelation
 
 type error += Gas_quota_exceeded_init_deserialize (* Permanent *)
 
+type error += (* `Permanent *) Inconsistent_sources
+
 type error +=
   | Not_enough_endorsements_for_priority of {
       required : int;
@@ -467,6 +469,19 @@ let () =
     (fun () -> Gas_quota_exceeded_init_deserialize) ;
   register_error_kind
     `Permanent
+    ~id:"operation.inconsistent_sources"
+    ~title:"Inconsistent sources in operation pack"
+    ~description:
+      "The operation pack includes operations from different sources."
+    ~pp:(fun ppf () ->
+      Format.pp_print_string
+        ppf
+        "The operation pack includes operations from different sources.")
+    Data_encoding.empty
+    (function Inconsistent_sources -> Some () | _ -> None)
+    (fun () -> Inconsistent_sources) ;
+  register_error_kind
+    `Permanent
     ~id:"operation.not_enough_endorsements_for_priority"
     ~title:"Not enough endorsements for priority"
     ~description:
@@ -770,7 +785,7 @@ let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
   in
   apply ctxt [] ops
 
-let precheck_manager_contents (type kind) ctxt chain_id raw_operation
+let precheck_manager_contents (type kind) ctxt
     (op : kind Kind.manager contents) : context tzresult Lwt.t =
   let (Manager_operation
         {source; fee; counter; operation; gas_limit; storage_limit}) =
@@ -813,14 +828,6 @@ let precheck_manager_contents (type kind) ctxt chain_id raw_operation
   | _ ->
       return ctxt )
   >>=? fun ctxt ->
-  Contract.get_manager_key ctxt source
-  >>=? fun public_key ->
-  (* Currently, the `raw_operation` only contains one signature, so
-     all operations are required to be from the same manager. This may
-     change in the future, allowing several managers to group-sign a
-     sequence of transactions.  *)
-  Operation.check_signature public_key chain_id raw_operation
-  >>?= fun () ->
   Contract.increment_counter ctxt source
   >>=? fun ctxt ->
   Contract.spend ctxt (Contract.implicit_contract source) fee
@@ -921,18 +928,61 @@ let rec mark_skipped :
 let rec precheck_manager_contents_list :
     type kind.
     Alpha_context.t ->
-    Chain_id.t ->
-    _ Operation.t ->
     kind Kind.manager contents_list ->
     context tzresult Lwt.t =
- fun ctxt chain_id raw_operation contents_list ->
+ fun ctxt contents_list ->
   match contents_list with
   | Single (Manager_operation _ as op) ->
-      precheck_manager_contents ctxt chain_id raw_operation op
+      precheck_manager_contents ctxt op
   | Cons ((Manager_operation _ as op), rest) ->
-      precheck_manager_contents ctxt chain_id raw_operation op
-      >>=? fun ctxt ->
-      precheck_manager_contents_list ctxt chain_id raw_operation rest
+      precheck_manager_contents ctxt op
+      >>=? fun ctxt -> precheck_manager_contents_list ctxt rest
+
+let check_manager_signature ctxt chain_id (op : _ Kind.manager contents_list)
+    raw_operation =
+  (* Currently, the [op] only contains one signature, so
+     all operations are required to be from the same manager. This may
+     change in the future, allowing several managers to group-sign a
+     sequence of transactions. *)
+  let check_same_manager (source, source_key) manager =
+    match manager with
+    | None ->
+        ok (source, source_key)
+        (* Consistency already checked by
+           [reveal_manager_key] in [precheck_manager_contents]. *)
+    | Some (manager, manager_key) ->
+        if Signature.Public_key_hash.equal source manager then
+          let key = Option.first_some manager_key source_key in
+          ok (source, key)
+        else error Inconsistent_sources
+  in
+  let rec find_source :
+      type kind.
+      kind Kind.manager contents_list ->
+      (Signature.public_key_hash * Signature.public_key option) option ->
+      (Signature.public_key_hash * Signature.public_key option) tzresult =
+   fun contents_list manager ->
+    match contents_list with
+    | Single (Manager_operation {source; operation = Reveal key; _}) ->
+        check_same_manager (source, Some key) manager
+    | Cons (Manager_operation {source; operation = Reveal key; _}, rest) ->
+        check_same_manager (source, Some key) manager
+        >>? fun manager -> find_source rest (Some manager)
+    | Single (Manager_operation {source; _}) ->
+        check_same_manager (source, None) manager
+    | Cons (Manager_operation {source; _}, rest) ->
+        check_same_manager (source, None) manager
+        >>? fun manager -> find_source rest (Some manager)
+  in
+  find_source op None
+  >>?= fun (source, source_key) ->
+  ( match source_key with
+  | Some key ->
+      return key
+  | None ->
+      Contract.get_manager_key ctxt source )
+  >>=? fun public_key ->
+  Lwt.return (Operation.check_signature public_key chain_id raw_operation)
 
 let rec apply_manager_contents_list_rec :
     type kind.
@@ -1274,12 +1324,16 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
       Amendment.record_ballot ctxt source proposal ballot
       >|=? fun ctxt -> (ctxt, Single_result Ballot_result)
   | Single (Manager_operation _) as op ->
-      precheck_manager_contents_list ctxt chain_id operation op
+      precheck_manager_contents_list ctxt op
       >>=? fun ctxt ->
+      check_manager_signature ctxt chain_id op operation
+      >>=? fun () ->
       apply_manager_contents_list ctxt mode baker chain_id op >|= ok
   | Cons (Manager_operation _, _) as op ->
-      precheck_manager_contents_list ctxt chain_id operation op
+      precheck_manager_contents_list ctxt op
       >>=? fun ctxt ->
+      check_manager_signature ctxt chain_id op operation
+      >>=? fun () ->
       apply_manager_contents_list ctxt mode baker chain_id op >|= ok
 
 let apply_operation ctxt chain_id mode pred_block baker hash operation =
