@@ -575,7 +575,12 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
       set_first_level ctxt first_level
       >>=? fun ctxt -> set_constants ctxt param.constants >|= ok
   | Carthage_006 ->
-      return ctxt )
+      get_constants ctxt
+      >>=? fun constants ->
+      let constants =
+        {constants with cost_per_byte = Tez_repr.of_mutez_exn 250L}
+      in
+      set_constants ctxt constants >>= fun ctxt -> return ctxt )
   >>=? fun ctxt ->
   prepare ctxt ~level ~predecessor_timestamp:timestamp ~timestamp ~fitness
   >|=? fun ctxt -> (previous_proto, ctxt)
