@@ -253,6 +253,11 @@ unit:src/proto_alpha/lib_protocol:
   script:
     - dune build @src/proto_alpha/lib_protocol/runtest
 
+unit:src/tooling:
+  <<: *test_definition
+  script:
+    - dune build @src/tooling/runtest
+
 unit:ocaml-ledger-wallet:
   <<: *test_definition
   script:

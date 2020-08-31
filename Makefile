@@ -153,7 +153,7 @@ tezt-v:
 .PHONY: check-linting check-python-linting
 
 check-linting:
-	@src/tooling/lint.sh --check-ci
+	@src/tooling/lint.sh --check-ci --ignore src/tooling/test/test_not_well_formatted.ml src/tooling/test/test_not_well_formatted.mli
 	@src/tooling/lint.sh --check-scripts
 	@src/tooling/lint.sh --check-ocamlformat
 	@dune build @runtest_lint

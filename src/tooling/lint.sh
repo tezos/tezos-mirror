@@ -11,7 +11,7 @@ Where <action> can be:
 * --check-ocamlformat: check the above does nothing.
 * --check-dune: check formatting while assuming running under Dune's
   rule (\`dune build @runtest_lint\`).
-* --check-ci: check formatting using git (for GitLabCI's verbose run).
+* --check-ci: check formatting using git (for GitLab CI's verbose run).
 * --check-gitlab-ci-yml: check .gitlab-ci.yml has been updated.
 * --check-scripts: check the .sh files
 * --format: format all the files, see also \`make fmt\`.
@@ -214,7 +214,7 @@ if $on_files; then
     # but it was more convenient to do it here.
     files=()
     for file in "${input_files[@]}"; do
-        if [[ "$file" == *.pp.ml? ]]; then continue; fi
+        if [[ "$file" == *.pp.ml?(i) ]]; then continue; fi
         for ignored_file in "${ignored_files[@]}"; do
             if [[ "$file" =~ ^(.*/)?"$ignored_file"$ ]] ; then continue 2; fi
         done
