@@ -381,4 +381,4 @@ let dummy_script =
       storage = lazy_expr (strip_locations (Prim (0, D_Unit, [], [])));
     }
 
-let dummy_script_cost = Test_tez.Tez.of_mutez_exn 38_000L
+let dummy_script_cost = Test_tez.Tez.of_mutez_exn 9_500L
