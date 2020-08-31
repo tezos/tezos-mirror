@@ -260,9 +260,8 @@ module Make_indexed_substore (S : STORE) (I : INDEX) = struct
     let store_all s new_set =
       read_all s
       >>= fun old_set ->
-      Lwt_list.iter_p (remove s) Set.(elements (diff old_set new_set))
-      >>= fun () ->
-      Lwt_list.iter_p (store s) Set.(elements (diff new_set old_set))
+      Set.iter_p (remove s) (Set.diff old_set new_set)
+      >>= fun () -> Set.iter_p (store s) (Set.diff new_set old_set)
   end
 
   module Make_map (N : NAME) (V : VALUE) = struct
@@ -317,15 +316,7 @@ module Make_indexed_substore (S : STORE) (I : INDEX) = struct
     let read_all s =
       fold s ~init:Map.empty ~f:(fun i v set -> Lwt.return (Map.add i v set))
 
-    let store_all s map =
-      remove_all s
-      >>= fun () ->
-      Map.fold
-        (fun k v acc ->
-          let res = store s k v in
-          acc >>= fun () -> res)
-        map
-        Lwt.return_unit
+    let store_all s map = remove_all s >>= fun () -> Map.iter_p (store s) map
   end
 end
 
@@ -386,9 +377,8 @@ struct
   let store_all s new_set =
     read_all s
     >>= fun old_set ->
-    Lwt_list.iter_p (remove s) Set.(elements (diff old_set new_set))
-    >>= fun () ->
-    Lwt_list.iter_p (store s) Set.(elements (diff new_set old_set))
+    Set.iter_p (remove s) (Set.diff old_set new_set)
+    >>= fun () -> Set.iter_p (store s) (Set.diff new_set old_set)
 end
 
 module Make_map (S : STORE) (I : INDEX) (V : VALUE) = struct
@@ -480,15 +470,7 @@ struct
   let read_all s =
     fold s ~init:Map.empty ~f:(fun i v set -> Lwt.return (Map.add i v set))
 
-  let store_all s map =
-    remove_all s
-    >>= fun () ->
-    Map.fold
-      (fun k v acc ->
-        let res = store s k v in
-        acc >>= fun () -> res)
-      map
-      Lwt.return_unit
+  let store_all s map = remove_all s >>= fun () -> Map.iter_p (store s) map
 end
 
 module Integer_index = struct
