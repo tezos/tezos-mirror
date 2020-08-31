@@ -87,6 +87,31 @@ let test_bad_contract_parameter () =
   | Error errs ->
       Alcotest.failf "Unexpected error: %a" Error_monad.pp_print_error errs
 
+let read_file filename =
+  let ch = open_in filename in
+  let s = really_input_string ch (in_channel_length ch) in
+  close_in ch ; s
+
+(* Check that too many recursive calls of the Michelson interpreter result in an error *)
+let test_stack_overflow () =
+  test_context ()
+  >>=? fun ctxt ->
+  let storage = "Unit" in
+  let parameter = "Unit" in
+  let script = read_file "./contracts/big_interpreter_stack.tz" in
+  run_script ctxt script ~storage ~parameter ()
+  >>= function
+  | Ok _ ->
+      Alcotest.fail "expected an error"
+  | Error lst
+    when List.mem
+           (Environment.Ecoproto_error
+              Script_interpreter.Michelson_too_many_recursive_calls)
+           lst ->
+      return ()
+  | Error errs ->
+      Alcotest.failf "Unexpected error: %a" Error_monad.pp_print_error errs
+
 (** Test the encoding/decoding of script_interpreter.ml specific errors *)
 
 let test_json_roundtrip name testable enc v =
@@ -130,5 +155,6 @@ let error_encoding_tests =
       ("Cannot_serialize_storage", Cannot_serialize_storage) ]
 
 let tests =
-  [Test.tztest "test bad contract error" `Quick test_bad_contract_parameter]
+  [ Test.tztest "test bad contract error" `Quick test_bad_contract_parameter;
+    Test.tztest "test stack overflow error" `Slow test_stack_overflow ]
   @ error_encoding_tests
