@@ -216,17 +216,15 @@ let connection_of_peer_id pool peer_id =
 
 (* Every running connection matching the point's ip address is returned. *)
 let connections_of_addr pool addr =
-  P2p_point.Table.fold
-    (fun (addr', _) p acc ->
-      if Ipaddr.V6.compare addr addr' = 0 then
-        match P2p_point_state.get p with
-        | P2p_point_state.Running {data; _} ->
-            data :: acc
-        | _ ->
-            acc
-      else acc)
-    pool.connected_points
-    []
+  P2p_point.Table.to_seq pool.connected_points
+  |> Seq.filter_map (fun ((addr', _), p) ->
+         if Ipaddr.V6.compare addr addr' = 0 then
+           match P2p_point_state.get p with
+           | P2p_point_state.Running {data; _} ->
+               Some data
+           | _ ->
+               None
+         else None)
 
 let get_addr pool peer_id =
   Option.map
@@ -271,7 +269,7 @@ module Points = struct
   let ban pool (addr, _port) =
     P2p_acl.IPBlacklist.add pool.acl addr ;
     (* Kick [addr]:* if it is in `Running` state. *)
-    Lwt_list.iter_p
+    Seq.iter_p
       (fun conn -> P2p_conn.disconnect conn)
       (connections_of_addr pool addr)
 

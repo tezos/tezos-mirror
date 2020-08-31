@@ -104,12 +104,12 @@ let classify pool private_mode start_time seen_points point pi =
     with points in [contactable]. It returns the number of established
     connections *)
 let establish t contactable =
-  let try_to_connect acc point =
+  let try_to_connect count point =
     protect ~canceler:t.canceler (fun () ->
         P2p_connect_handler.connect t.connect_handler point)
-    >>= function Ok _ -> acc >|= succ | Error _ -> acc
+    >|= function Ok _ -> succ count | Error _ -> count
   in
-  List.fold_left try_to_connect (Lwt.return 0) contactable
+  Lwt_list.fold_left_s try_to_connect 0 contactable
 
 (* [connectable t start_time expected seen_points] selects at most
    [expected] connections candidates from the known points, not in [seen]
