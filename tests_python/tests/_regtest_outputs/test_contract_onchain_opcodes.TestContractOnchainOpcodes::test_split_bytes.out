@@ -57,8 +57,8 @@ This sequence of operations was run:
         Paid storage size diff: 317 bytes
         Consumed gas: 2864.153
         Balance updates:
-          [CONTRACT_HASH] ... -ꜩ0.317
-          [CONTRACT_HASH] ... -ꜩ0.257
+          [CONTRACT_HASH] ... -ꜩ0.07925
+          [CONTRACT_HASH] ... -ꜩ0.06425
           [CONTRACT_HASH] ... -ꜩ1000
           [CONTRACT_HASH] ... +ꜩ1000
 
@@ -95,7 +95,7 @@ This sequence of operations was run:
       Paid storage size diff: 18 bytes
       Consumed gas: 3783.623
       Balance updates:
-        [CONTRACT_HASH] ... -ꜩ0.018
+        [CONTRACT_HASH] ... -ꜩ0.0045
 
 Injected block [BLOCK_HASH]
 { 0xaa ; 0xbb ; 0xcc }
@@ -129,7 +129,7 @@ This sequence of operations was run:
       Paid storage size diff: 18 bytes
       Consumed gas: 3924.473
       Balance updates:
-        [CONTRACT_HASH] ... -ꜩ0.018
+        [CONTRACT_HASH] ... -ꜩ0.0045
 
 Injected block [BLOCK_HASH]
 { 0xaa ; 0xbb ; 0xcc ; 0xdd ; 0xee ; 0xff }

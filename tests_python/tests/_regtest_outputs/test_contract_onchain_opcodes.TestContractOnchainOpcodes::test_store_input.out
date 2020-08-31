@@ -28,7 +28,7 @@ This sequence of operations was run:
       Balance updates:
         [CONTRACT_HASH] ... -ꜩ1000
         [CONTRACT_HASH] ... +ꜩ1000
-        [CONTRACT_HASH] ... -ꜩ0.257
+        [CONTRACT_HASH] ... -ꜩ0.06425
 
 Injected block [BLOCK_HASH]
 Node is bootstrapped.
@@ -59,7 +59,7 @@ This sequence of operations was run:
       Balance updates:
         [CONTRACT_HASH] ... -ꜩ2000
         [CONTRACT_HASH] ... +ꜩ2000
-        [CONTRACT_HASH] ... -ꜩ0.257
+        [CONTRACT_HASH] ... -ꜩ0.06425
 
 Injected block [BLOCK_HASH]
 1000 ꜩ
@@ -99,8 +99,8 @@ This sequence of operations was run:
         Paid storage size diff: 41 bytes
         Consumed gas: 1587.588
         Balance updates:
-          [CONTRACT_HASH] ... -ꜩ0.041
-          [CONTRACT_HASH] ... -ꜩ0.257
+          [CONTRACT_HASH] ... -ꜩ0.01025
+          [CONTRACT_HASH] ... -ꜩ0.06425
           [CONTRACT_HASH] ... -ꜩ100
           [CONTRACT_HASH] ... +ꜩ100
 
@@ -137,7 +137,7 @@ This sequence of operations was run:
       Paid storage size diff: 7 bytes
       Consumed gas: 2237.859
       Balance updates:
-        [CONTRACT_HASH] ... -ꜩ0.007
+        [CONTRACT_HASH] ... -ꜩ0.00175
         [CONTRACT_HASH] ... -ꜩ100
         [CONTRACT_HASH] ... +ꜩ100
 

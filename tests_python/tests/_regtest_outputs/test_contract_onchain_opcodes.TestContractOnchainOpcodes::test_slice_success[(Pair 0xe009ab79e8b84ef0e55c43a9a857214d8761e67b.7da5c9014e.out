@@ -40,6 +40,6 @@ This sequence of operations was run:
         Balance updates:
           [CONTRACT_HASH] ... -ꜩ1000
           [CONTRACT_HASH] ... +ꜩ1000
-          [CONTRACT_HASH] ... -ꜩ0.257
+          [CONTRACT_HASH] ... -ꜩ0.06425
 
 Injected block [BLOCK_HASH]

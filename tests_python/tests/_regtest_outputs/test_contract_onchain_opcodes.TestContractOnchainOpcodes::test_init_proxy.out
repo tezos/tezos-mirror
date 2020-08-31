@@ -41,8 +41,8 @@ This sequence of operations was run:
         Paid storage size diff: 76 bytes
         Consumed gas: 1778.894
         Balance updates:
-          [CONTRACT_HASH] ... -ꜩ0.076
-          [CONTRACT_HASH] ... -ꜩ0.257
+          [CONTRACT_HASH] ... -ꜩ0.019
+          [CONTRACT_HASH] ... -ꜩ0.06425
           [CONTRACT_HASH] ... -ꜩ1000
           [CONTRACT_HASH] ... +ꜩ1000
 
