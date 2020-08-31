@@ -49,6 +49,8 @@ type error += Cannot_serialize_failure
 
 type error += Cannot_serialize_storage
 
+type error += Michelson_too_many_recursive_calls
+
 let () =
   let open Data_encoding in
   let trace_encoding =
@@ -141,7 +143,18 @@ let () =
       "The returned storage was too big to be serialized with the provided gas"
     Data_encoding.empty
     (function Cannot_serialize_storage -> Some () | _ -> None)
-    (fun () -> Cannot_serialize_storage)
+    (fun () -> Cannot_serialize_storage) ;
+  (* Michelson Stack Overflow *)
+  register_error_kind
+    `Permanent
+    ~id:"michelson_v1.interp_too_many_recursive_calls"
+    ~title:"Too many recursive calls during interpretation"
+    ~description:
+      "Too many recursive calls were needed for interpretation of a Michelson \
+       script"
+    Data_encoding.empty
+    (function Michelson_too_many_recursive_calls -> Some () | _ -> None)
+    (fun () -> Michelson_too_many_recursive_calls)
 
 (* ---- interpreter ---------------------------------------------------------*)
 
@@ -540,15 +553,16 @@ let cost_of_instr : type b a. (b, a) descr -> b -> Gas.cost =
   | (Steps_to_quota, _) ->
       Interp_costs.push
 
-let rec step :
+let rec step_bounded :
     type b a.
     logger ->
+    stack_depth:int ->
     context ->
     step_constants ->
     (b, a) descr ->
     b ->
     (a * context) tzresult Lwt.t =
- fun logger ctxt step_constants ({instr; loc; _} as descr) stack ->
+ fun logger ~stack_depth ctxt step_constants ({instr; loc; _} as descr) stack ->
   let gas = cost_of_instr descr stack in
   Gas.consume ctxt gas
   >>?= fun ctxt ->
@@ -558,6 +572,12 @@ let rec step :
    fun (ret, ctxt) ->
     Log.log_exit ctxt descr ret ;
     return (ret, ctxt)
+  in
+  let non_terminal_recursion ~ctxt ?(stack_depth = stack_depth + 1) descr stack
+      =
+    if Compare.Int.(stack_depth >= 10_000) then
+      fail Michelson_too_many_recursive_calls
+    else step_bounded logger ~stack_depth ctxt step_constants descr stack
   in
   match (instr, stack) with
   (* stack ops *)
@@ -575,9 +595,9 @@ let rec step :
   | (Cons_none _, rest) ->
       logged_return ((None, rest), ctxt)
   | (If_none (bt, _), (None, rest)) ->
-      step logger ctxt step_constants bt rest
+      step_bounded logger ~stack_depth ctxt step_constants bt rest
   | (If_none (_, bf), (Some v, rest)) ->
-      step logger ctxt step_constants bf (v, rest)
+      step_bounded logger ~stack_depth ctxt step_constants bf (v, rest)
   (* pairs *)
   | (Cons_pair, (a, (b, rest))) ->
       logged_return (((a, b), rest), ctxt)
@@ -591,19 +611,19 @@ let rec step :
   | (Cons_right, (v, rest)) ->
       logged_return ((R v, rest), ctxt)
   | (If_left (bt, _), (L v, rest)) ->
-      step logger ctxt step_constants bt (v, rest)
+      step_bounded logger ~stack_depth ctxt step_constants bt (v, rest)
   | (If_left (_, bf), (R v, rest)) ->
-      step logger ctxt step_constants bf (v, rest)
+      step_bounded logger ~stack_depth ctxt step_constants bf (v, rest)
   (* lists *)
   | (Cons_list, (hd, (tl, rest))) ->
       logged_return ((list_cons hd tl, rest), ctxt)
   | (Nil, rest) ->
       logged_return ((list_empty, rest), ctxt)
   | (If_cons (_, bf), ({elements = []; _}, rest)) ->
-      step logger ctxt step_constants bf rest
+      step_bounded logger ~stack_depth ctxt step_constants bf rest
   | (If_cons (bt, _), ({elements = hd :: tl; length}, rest)) ->
       let tl = {elements = tl; length = length - 1} in
-      step logger ctxt step_constants bt (hd, (tl, rest))
+      step_bounded logger ~stack_depth ctxt step_constants bt (hd, (tl, rest))
   | (List_map body, (list, rest)) ->
       let rec loop rest ctxt l acc =
         match l with
@@ -611,7 +631,7 @@ let rec step :
             let result = {elements = List.rev acc; length = list.length} in
             return ((result, rest), ctxt)
         | hd :: tl ->
-            step logger ctxt step_constants body (hd, rest)
+            non_terminal_recursion ~ctxt body (hd, rest)
             >>=? fun ((hd, rest), ctxt) -> loop rest ctxt tl (hd :: acc)
       in
       loop rest ctxt list.elements []
@@ -624,7 +644,7 @@ let rec step :
         | [] ->
             return (stack, ctxt)
         | hd :: tl ->
-            step logger ctxt step_constants body (hd, stack)
+            non_terminal_recursion ~ctxt body (hd, stack)
             >>=? fun (stack, ctxt) -> loop ctxt tl stack
       in
       loop ctxt l.elements init
@@ -639,7 +659,7 @@ let rec step :
         | [] ->
             return (stack, ctxt)
         | hd :: tl ->
-            step logger ctxt step_constants body (hd, stack)
+            non_terminal_recursion ~ctxt body (hd, stack)
             >>=? fun (stack, ctxt) -> loop ctxt tl stack
       in
       loop ctxt l init >>=? fun (res, ctxt) -> logged_return (res, ctxt)
@@ -659,7 +679,7 @@ let rec step :
         | [] ->
             return ((acc, rest), ctxt)
         | ((k, _) as hd) :: tl ->
-            step logger ctxt step_constants body (hd, rest)
+            non_terminal_recursion ~ctxt body (hd, rest)
             >>=? fun ((hd, rest), ctxt) ->
             loop rest ctxt tl (map_update k (Some hd) acc)
       in
@@ -672,7 +692,7 @@ let rec step :
         | [] ->
             return (stack, ctxt)
         | hd :: tl ->
-            step logger ctxt step_constants body (hd, stack)
+            non_terminal_recursion ~ctxt body (hd, stack)
             >>=? fun (stack, ctxt) -> loop ctxt tl stack
       in
       loop ctxt l init >>=? fun (res, ctxt) -> logged_return (res, ctxt)
@@ -891,28 +911,32 @@ let rec step :
       logged_return ((Script_int.lognot x, rest), ctxt)
   (* control *)
   | (Seq (hd, tl), stack) ->
-      step logger ctxt step_constants hd stack
-      >>=? fun (trans, ctxt) -> step logger ctxt step_constants tl trans
+      non_terminal_recursion ~ctxt hd stack
+      >>=? fun (trans, ctxt) ->
+      step_bounded logger ~stack_depth ctxt step_constants tl trans
   | (If (bt, _), (true, rest)) ->
-      step logger ctxt step_constants bt rest
+      step_bounded logger ~stack_depth ctxt step_constants bt rest
   | (If (_, bf), (false, rest)) ->
-      step logger ctxt step_constants bf rest
+      step_bounded logger ~stack_depth ctxt step_constants bf rest
   | (Loop body, (true, rest)) ->
-      step logger ctxt step_constants body rest
-      >>=? fun (trans, ctxt) -> step logger ctxt step_constants descr trans
+      non_terminal_recursion ~ctxt body rest
+      >>=? fun (trans, ctxt) ->
+      step_bounded logger ~stack_depth ctxt step_constants descr trans
   | (Loop _, (false, rest)) ->
       logged_return (rest, ctxt)
   | (Loop_left body, (L v, rest)) ->
-      step logger ctxt step_constants body (v, rest)
-      >>=? fun (trans, ctxt) -> step logger ctxt step_constants descr trans
+      non_terminal_recursion ~ctxt body (v, rest)
+      >>=? fun (trans, ctxt) ->
+      step_bounded logger ~stack_depth ctxt step_constants descr trans
   | (Loop_left _, (R v, rest)) ->
       logged_return ((v, rest), ctxt)
   | (Dip b, (ign, rest)) ->
-      step logger ctxt step_constants b rest
+      non_terminal_recursion ~ctxt b rest
       >>=? fun (res, ctxt) -> logged_return ((ign, res), ctxt)
-  | (Exec, (arg, (lam, rest))) ->
-      interp logger ctxt step_constants lam arg
-      >>=? fun (res, ctxt) -> logged_return ((res, rest), ctxt)
+  | (Exec, (arg, (Lam (code, _), rest))) ->
+      Log.log_interp ctxt code (arg, ()) ;
+      non_terminal_recursion ~ctxt code (arg, ())
+      >>=? fun ((res, ()), ctxt) -> logged_return ((res, rest), ctxt)
   | (Apply capture_ty, (capture, (lam, rest))) -> (
       let (Lam (descr, expr)) = lam in
       let (Item_t (full_arg_ty, _, _)) = descr.bef in
@@ -1300,9 +1324,17 @@ let rec step :
         n'
         rest
       >>=? fun (aft, ()) -> logged_return (aft, ctxt)
-  | (Dipn (_n, n', b), stack) ->
+  | (Dipn (n, n', b), stack) ->
       interp_stack_prefix_preserving_operation
-        (fun stk -> step logger ctxt step_constants b stk)
+        (fun stk ->
+          non_terminal_recursion
+            ~ctxt
+            b
+            stk
+            (* This is a cheap upper bound of the number recursive calls to
+               `interp_stack_prefix_preserving_operation`, which does
+               ((n / 16) + log2 (n % 16)) iterations *)
+            ~stack_depth:(stack_depth + 4 + (n / 16)))
         n'
         stack
       >>=? fun (aft, ctxt') -> logged_return (aft, ctxt')
@@ -1315,7 +1347,17 @@ let rec step :
   | (ChainId, rest) ->
       logged_return ((step_constants.chain_id, rest), ctxt)
 
-and interp :
+let step :
+    type b a.
+    logger ->
+    context ->
+    step_constants ->
+    (b, a) descr ->
+    b ->
+    (a * context) tzresult Lwt.t =
+  step_bounded ~stack_depth:0
+
+let interp :
     type p r.
     logger ->
     context ->

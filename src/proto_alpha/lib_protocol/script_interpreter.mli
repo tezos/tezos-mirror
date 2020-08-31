@@ -43,6 +43,8 @@ type error += Cannot_serialize_failure
 
 type error += Cannot_serialize_storage
 
+type error += Michelson_too_many_recursive_calls
+
 type execution_result = {
   ctxt : context;
   storage : Script.expr;
