@@ -437,10 +437,8 @@ end = struct
             P2p_peer.Map.empty
         in
         P2p_peer.Map.iter (Request.send state.param) requests ;
-        P2p_peer.Map.fold
-          (fun peer request acc ->
-            acc
-            >>= fun () ->
+        P2p_peer.Map.iter_s
+          (fun peer request ->
             Lwt_list.iter_s
               (fun key ->
                 lwt_debug
@@ -451,7 +449,6 @@ end = struct
                       -% a P2p_peer.Id.Logging.tag peer))
               request)
           requests
-          Lwt.return_unit
         >>= fun () -> loop state
     in
     loop state
