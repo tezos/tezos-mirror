@@ -58,4 +58,5 @@ __pycache__
 *.orig
 
 .idea
-.venv
+# .venv directories are created by poetry if the option in-project is set to true.
+**/.venv
