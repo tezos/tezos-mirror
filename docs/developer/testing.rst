@@ -316,7 +316,7 @@ To instrument all the code in ``src/``, use:
 
 ::
 
-    ./scripts/instrument_dune_bisect.sh src/ --except "src/lib_crypto"
+    ./scripts/instrument_dune_bisect.sh src/
 
 Then, compile the code using ``make``, ignoring warnings such as
 ``.merlin generated is inaccurate.`` which
