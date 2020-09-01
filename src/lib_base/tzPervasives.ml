@@ -34,16 +34,15 @@ module Seq = Tezos_lwt_result_stdlib.Lwtreslib.Seq
 module Map = Tezos_lwt_result_stdlib.Lwtreslib.Map
 module Set = Tezos_lwt_result_stdlib.Lwtreslib.Set
 module Hashtbl = Tezos_lwt_result_stdlib.Lwtreslib.Hashtbl
-
-module Option = struct
-  include Option
-  include Tezos_stdlib.TzOption
-end
+module Option = Tezos_lwt_result_stdlib.Lwtreslib.Option
 
 module List = struct
   include Tezos_stdlib.TzList
   include Tezos_lwt_result_stdlib.Lwtreslib.List
 end
+
+module Result = Tezos_lwt_result_stdlib.Lwtreslib.Result
+module Unsafe = Tezos_lwt_result_stdlib.Lwtreslib.Unsafe
 
 module String = struct
   include String

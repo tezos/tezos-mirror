@@ -24,9 +24,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let ( >>= ) x f = Option.bind x f
+include Stdlib.Option
 
-let ( >>| ) x f = Option.map f x
+let ( >>= ) = bind
+
+let ( >>| ) x f = map f x
+
+let unopt ~default = function None -> default | Some x -> x
+
+let unopt_map ~f ~default = function None -> default | Some x -> f x
 
 let unopt_exn err = function Some x -> x | _ -> raise err
 

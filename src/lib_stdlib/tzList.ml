@@ -41,8 +41,11 @@ let rev_sub l n =
 
 let sub l n = rev_sub l n |> List.rev
 
-let merge_filter2 ?(finalize = List.rev) ?(compare = compare)
-    ?(f = TzOption.first_some) l1 l2 =
+let first_some o1 o2 =
+  match (o1, o2) with (Some _, _) -> o1 | (None, o2) -> o2
+
+let merge_filter2 ?(finalize = List.rev) ?(compare = compare) ?(f = first_some)
+    l1 l2 =
   let sort = List.sort compare in
   let rec merge_aux acc = function
     | ([], []) ->
