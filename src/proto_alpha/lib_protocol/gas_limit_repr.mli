@@ -57,8 +57,6 @@ val alloc_bytes_cost : int -> cost
 
 val alloc_mbytes_cost : int -> cost
 
-val alloc_bits_cost : int -> cost
-
 val read_bytes_cost : Z.t -> cost
 
 val write_bytes_cost : Z.t -> cost

@@ -133,8 +133,6 @@ let cost_of_size (blocks, words) =
   (Compare.Int.max 0 (blocks - 1) *@ alloc_cost 0)
   +@ alloc_cost words +@ step_cost blocks
 
-let node_cost node = cost_of_size (node_size node)
-
 let int_node_cost n = cost_of_size (int_node_size n)
 
 let int_node_cost_of_numbits n = cost_of_size (int_node_size_of_numbits n)
@@ -149,9 +147,6 @@ let bytes_node_cost_of_length s = cost_of_size (bytes_node_size_of_length s)
 
 let prim_node_cost_nonrec args annot =
   cost_of_size (prim_node_size_nonrec args annot)
-
-let prim_node_cost_nonrec_of_length n_args annot =
-  cost_of_size (prim_node_size_nonrec_of_lengths n_args annot)
 
 let seq_node_cost_nonrec args = cost_of_size (seq_node_size_nonrec args)
 

@@ -32,12 +32,11 @@ type cost_kind =
   | Alloc
   | Alloc_bytes
   | Alloc_mbytes
-  | Alloc_bits
   | Read_bytes
   | Write_bytes
 
 let random_cost_kind () =
-  let i = Random.int 8 in
+  let i = Random.int 7 in
   match i with
   | 0 ->
       Atomic_step
@@ -50,10 +49,8 @@ let random_cost_kind () =
   | 4 ->
       Alloc_mbytes
   | 5 ->
-      Alloc_bits
-  | 6 ->
       Read_bytes
-  | 7 ->
+  | 6 ->
       Write_bytes
   | _ ->
       assert false
@@ -72,8 +69,6 @@ let random_cost_of_kind (cost_kind : cost_kind) =
       alloc_bytes_cost rand
   | Alloc_mbytes ->
       alloc_mbytes_cost rand
-  | Alloc_bits ->
-      alloc_bits_cost rand
   | Read_bytes ->
       read_bytes_cost (Z.of_int rand)
   | Write_bytes ->

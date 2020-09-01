@@ -192,8 +192,6 @@ module Gas : sig
 
   val alloc_mbytes_cost : int -> cost
 
-  val alloc_bits_cost : int -> cost
-
   val read_bytes_cost : Z.t -> cost
 
   val write_bytes_cost : Z.t -> cost
@@ -402,8 +400,6 @@ module Script : sig
 
   val traversal_cost : node -> Gas.cost
 
-  val node_cost : node -> Gas.cost
-
   val int_node_cost : Z.t -> Gas.cost
 
   val int_node_cost_of_numbits : int -> Gas.cost
@@ -417,8 +413,6 @@ module Script : sig
   val bytes_node_cost_of_length : int -> Gas.cost
 
   val prim_node_cost_nonrec : expr list -> annot -> Gas.cost
-
-  val prim_node_cost_nonrec_of_length : int -> annot -> Gas.cost
 
   val seq_node_cost_nonrec : expr list -> Gas.cost
 
