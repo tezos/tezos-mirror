@@ -58,7 +58,8 @@ val delegation :
   public_key_hash option ->
   Operation.packed tzresult Lwt.t
 
-val revelation : Context.t -> public_key -> Operation.packed tzresult Lwt.t
+val revelation :
+  ?fee:Tez.tez -> Context.t -> public_key -> Operation.packed tzresult Lwt.t
 
 val origination :
   ?counter:Z.t ->

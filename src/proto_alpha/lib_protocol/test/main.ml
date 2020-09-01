@@ -29,6 +29,7 @@ let () =
     [ ("transfer", Transfer.tests);
       ("origination", Origination.tests);
       ("activation", Activation.tests);
+      ("revelation", Reveal.tests);
       ("endorsement", Endorsement.tests);
       ("double endorsement", Double_endorsement.tests);
       ("double baking", Double_baking.tests);
