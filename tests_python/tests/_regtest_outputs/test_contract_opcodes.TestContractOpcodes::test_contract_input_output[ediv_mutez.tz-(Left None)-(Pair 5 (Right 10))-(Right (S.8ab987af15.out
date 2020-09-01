@@ -36,17 +36,17 @@ trace
   - location: 38 (remaining gas: 1039977.710 units remaining)
     [ 5  	
       10  	 ]
-  - location: 39 (remaining gas: 1039977.360 units remaining)
+  - location: 39 (remaining gas: 1039977.350 units remaining)
     [ (Some (Pair 0 5))  	 ]
-  - location: 40 (remaining gas: 1039977.220 units remaining)
+  - location: 40 (remaining gas: 1039977.210 units remaining)
     [ (Right (Some (Pair 0 5)))  	 ]
-  - location: -1 (remaining gas: 1039977.150 units remaining)
+  - location: -1 (remaining gas: 1039977.140 units remaining)
     [ (Right (Some (Pair 0 5)))  	 ]
-  - location: 45 (remaining gas: 1039977.010 units remaining)
+  - location: 45 (remaining gas: 1039977 units remaining)
     [ {}  	
       (Right (Some (Pair 0 5)))  	 ]
-  - location: 47 (remaining gas: 1039976.870 units remaining)
+  - location: 47 (remaining gas: 1039976.860 units remaining)
     [ (Pair {} (Right (Some (Pair 0 5))))  	 ]
-  - location: -1 (remaining gas: 1039976.800 units remaining)
+  - location: -1 (remaining gas: 1039976.790 units remaining)
     [ (Pair {} (Right (Some (Pair 0 5))))  	 ]
 
