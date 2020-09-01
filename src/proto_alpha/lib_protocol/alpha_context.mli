@@ -182,11 +182,11 @@ module Gas : sig
 
   val free : cost
 
-  val atomic_step_cost : int -> cost
+  val atomic_step_cost : Z.t -> cost
 
-  val step_cost : int -> cost
+  val step_cost : Z.t -> cost
 
-  val alloc_cost : int -> cost
+  val alloc_cost : Z.t -> cost
 
   val alloc_bytes_cost : int -> cost
 
@@ -196,7 +196,7 @@ module Gas : sig
 
   val write_bytes_cost : Z.t -> cost
 
-  val ( *@ ) : int -> cost -> cost
+  val ( *@ ) : Z.t -> cost -> cost
 
   val ( +@ ) : cost -> cost -> cost
 

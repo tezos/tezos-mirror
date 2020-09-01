@@ -60,11 +60,11 @@ let random_cost_of_kind (cost_kind : cost_kind) =
   let rand = Random.int 1000 in
   match cost_kind with
   | Atomic_step ->
-      atomic_step_cost rand
+      atomic_step_cost (Z.of_int rand)
   | Step ->
-      step_cost rand
+      step_cost (Z.of_int rand)
   | Alloc ->
-      alloc_cost rand
+      alloc_cost (Z.of_int rand)
   | Alloc_bytes ->
       alloc_bytes_cost rand
   | Alloc_mbytes ->

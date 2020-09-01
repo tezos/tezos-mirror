@@ -97,13 +97,13 @@ let raw_check_enough block_gas operation_gas cost =
   raw_consume block_gas operation_gas cost
   >|? fun (_block_remaining, _remaining) -> ()
 
-let alloc_cost n = Z.mul allocation_weight (Z.of_int (n + 1))
+let alloc_cost n = Z.mul allocation_weight (Z.succ n)
 
-let alloc_bytes_cost n = alloc_cost ((n + 7) / 8)
+let alloc_bytes_cost n = alloc_cost (Z.of_int ((n + 7) / 8))
 
-let atomic_step_cost n = Z.of_int n
+let atomic_step_cost n = n
 
-let step_cost n = Z.mul step_weight (Z.of_int n)
+let step_cost n = Z.mul step_weight n
 
 let free = Z.zero
 
@@ -113,9 +113,9 @@ let write_bytes_cost n = Z.add write_base_weight (Z.mul byte_written_weight n)
 
 let ( +@ ) x y = Z.add x y
 
-let ( *@ ) x y = Z.mul (Z.of_int x) y
+let ( *@ ) x y = Z.mul x y
 
-let alloc_mbytes_cost n = alloc_cost 12 +@ alloc_bytes_cost n
+let alloc_mbytes_cost n = alloc_cost (Z.of_int 12) +@ alloc_bytes_cost n
 
 let () =
   let open Data_encoding in

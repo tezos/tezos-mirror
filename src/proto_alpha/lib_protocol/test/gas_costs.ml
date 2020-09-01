@@ -87,9 +87,6 @@ let all_interpreter_costs =
     ("map_get", map_get forty_two dummy_map);
     ("map_update", map_update forty_two dummy_map);
     ("map_size", map_size);
-    ("big_map_mep", big_map_mep forty_two dummy_map);
-    ("big_map_get", big_map_get forty_two dummy_map);
-    ("big_map_update", big_map_update forty_two dummy_map);
     ("add_seconds_timestamp", add_seconds_timestamp forty_two dummy_timestamp);
     ("sub_seconds_timestamp", sub_seconds_timestamp forty_two dummy_timestamp);
     ("diff_timestamps", diff_timestamps dummy_timestamp dummy_timestamp);
@@ -144,8 +141,8 @@ let all_interpreter_costs =
     ("compare", compare Script_typed_ir.(Int_key None) forty_two forty_two);
     ( "concat_string_precheck",
       concat_string_precheck (list_cons "42" list_empty) );
-    ("concat_string", concat_string 42);
-    ("concat_bytes", concat_bytes 42);
+    ("concat_string", concat_string (Z.of_int 42));
+    ("concat_bytes", concat_bytes (Z.of_int 42));
     ("exec", exec);
     ("apply", apply);
     ("lambda", lambda);

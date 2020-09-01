@@ -98,28 +98,30 @@ let seq_node_size_nonrec args =
   let n_args = List.length args in
   seq_node_size_nonrec_of_length n_args
 
+let convert_pair (i1, i2) = (Z.of_int i1, Z.of_int i2)
+
 let rec node_size node =
   let open Micheline in
   match node with
   | Int (_, n) ->
-      int_node_size n
+      convert_pair (int_node_size n)
   | String (_, s) ->
-      string_node_size s
+      convert_pair (string_node_size s)
   | Bytes (_, s) ->
-      bytes_node_size s
+      convert_pair (bytes_node_size s)
   | Prim (_, _, args, annot) ->
       List.fold_left
         (fun (blocks, words) node ->
           let (nblocks, nwords) = node_size node in
-          (blocks + nblocks, words + nwords))
-        (prim_node_size_nonrec args annot)
+          (Z.add blocks nblocks, Z.add words nwords))
+        (convert_pair (prim_node_size_nonrec args annot))
         args
   | Seq (_, args) ->
       List.fold_left
         (fun (blocks, words) node ->
           let (nblocks, nwords) = node_size node in
-          (blocks + nblocks, words + nwords))
-        (seq_node_size_nonrec args)
+          (Z.add blocks nblocks, Z.add words nwords))
+        (convert_pair (seq_node_size_nonrec args))
         args
 
 let expr_size expr = node_size (Micheline.root expr)
@@ -130,28 +132,32 @@ let traversal_cost node =
 
 let cost_of_size (blocks, words) =
   let open Gas_limit_repr in
-  (Compare.Int.max 0 (blocks - 1) *@ alloc_cost 0)
+  (Compare.Z.max Z.zero (Z.sub blocks Z.one) *@ alloc_cost Z.zero)
   +@ alloc_cost words +@ step_cost blocks
 
-let int_node_cost n = cost_of_size (int_node_size n)
+let cost_of_size_int pair = cost_of_size (convert_pair pair)
 
-let int_node_cost_of_numbits n = cost_of_size (int_node_size_of_numbits n)
+let int_node_cost n = cost_of_size_int (int_node_size n)
 
-let string_node_cost s = cost_of_size (string_node_size s)
+let int_node_cost_of_numbits n = cost_of_size_int (int_node_size_of_numbits n)
 
-let string_node_cost_of_length s = cost_of_size (string_node_size_of_length s)
+let string_node_cost s = cost_of_size_int (string_node_size s)
 
-let bytes_node_cost s = cost_of_size (bytes_node_size s)
+let string_node_cost_of_length s =
+  cost_of_size_int (string_node_size_of_length s)
 
-let bytes_node_cost_of_length s = cost_of_size (bytes_node_size_of_length s)
+let bytes_node_cost s = cost_of_size_int (bytes_node_size s)
+
+let bytes_node_cost_of_length s =
+  cost_of_size_int (bytes_node_size_of_length s)
 
 let prim_node_cost_nonrec args annot =
-  cost_of_size (prim_node_size_nonrec args annot)
+  cost_of_size_int (prim_node_size_nonrec args annot)
 
-let seq_node_cost_nonrec args = cost_of_size (seq_node_size_nonrec args)
+let seq_node_cost_nonrec args = cost_of_size_int (seq_node_size_nonrec args)
 
 let seq_node_cost_nonrec_of_length n_args =
-  cost_of_size (seq_node_size_nonrec_of_length n_args)
+  cost_of_size_int (seq_node_size_nonrec_of_length n_args)
 
 let deserialized_cost expr = cost_of_size (expr_size expr)
 
@@ -249,7 +255,7 @@ and micheline_nodes_list subterms acc k =
 
 let micheline_nodes node = micheline_nodes node 0 (fun x -> x)
 
-let cost_MICHELINE_STRIP_LOCATIONS size = size * 100
+let cost_MICHELINE_STRIP_LOCATIONS size = Z.mul (Z.of_int size) (Z.of_int 100)
 
 let strip_locations_cost node =
   let nodes = micheline_nodes node in

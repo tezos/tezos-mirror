@@ -716,7 +716,10 @@ let rec step :
   | (Concat_string, (ss, rest)) ->
       (* The cost for this fold_left has been paid upfront *)
       let total_length =
-        List.fold_left (fun acc s -> acc + String.length s) 0 ss.elements
+        List.fold_left
+          (fun acc s -> Z.add acc (Z.of_int (String.length s)))
+          Z.zero
+          ss.elements
       in
       Gas.consume ctxt (Interp_costs.concat_string total_length)
       >>?= fun ctxt ->
@@ -740,7 +743,10 @@ let rec step :
   | (Concat_bytes, (ss, rest)) ->
       (* The cost for this fold_left has been paid upfront *)
       let total_length =
-        List.fold_left (fun acc s -> acc + MBytes.length s) 0 ss.elements
+        List.fold_left
+          (fun acc s -> Z.add acc (Z.of_int (MBytes.length s)))
+          Z.zero
+          ss.elements
       in
       Gas.consume ctxt (Interp_costs.concat_string total_length)
       >>?= fun ctxt ->

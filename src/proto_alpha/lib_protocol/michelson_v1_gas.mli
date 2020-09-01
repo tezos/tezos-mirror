@@ -91,12 +91,6 @@ module Cost_of : sig
 
     val map_size : Gas.cost
 
-    val big_map_mep : 'a -> ('a, 'b) Script_typed_ir.map -> Gas.cost
-
-    val big_map_get : 'a -> ('a, 'b) Script_typed_ir.map -> Gas.cost
-
-    val big_map_update : 'a -> ('a, 'b) Script_typed_ir.map -> Gas.cost
-
     val add_seconds_timestamp :
       'a Script_int.num -> Script_timestamp.t -> Gas.cost
 
@@ -205,9 +199,9 @@ module Cost_of : sig
 
     val concat_string_precheck : 'a Script_typed_ir.boxed_list -> Gas.cost
 
-    val concat_string : int -> Gas.cost
+    val concat_string : Z.t -> Gas.cost
 
-    val concat_bytes : int -> Gas.cost
+    val concat_bytes : Z.t -> Gas.cost
 
     val exec : Gas.cost
 
