@@ -23,11 +23,63 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Seq = Lib.Seq
-module Set = Lib.Set
-module Map = Lib.Map
-module Hashtbl = Lib.Hashtbl
-module List = Lib.List
-module Option = Lib.Option
-module Result = Lib.Result
-module WithExceptions = Lib.WithExceptions
+module M = struct
+  let invalid name loc =
+    Invalid_argument (Printf.sprintf "%s called from %s" name loc)
+
+  module Option = struct
+    let get ~loc = function
+      | Some v ->
+          v
+      | None ->
+          raise (invalid "Lwtreslib.WithExceptions.Option.get" loc)
+
+    let to_exn ~none = function Some v -> v | None -> raise none
+
+    let to_exn_f ~none = function Some v -> v | None -> raise (none ())
+  end
+
+  module Result = struct
+    let get_ok ~loc = function
+      | Ok v ->
+          v
+      | Error _ ->
+          raise (invalid "Lwtreslib.WithExceptions.Result.get_ok" loc)
+
+    let get_error ~loc = function
+      | Error e ->
+          e
+      | Ok _ ->
+          raise (invalid "Lwtreslib.WithExceptions.Result.get_error" loc)
+
+    let to_exn = function Ok v -> v | Error exc -> raise exc
+
+    let to_exn_f ~error = function Ok v -> v | Error b -> raise (error b)
+  end
+
+  module List = struct
+    let rev_combine ~loc xs ys =
+      let rec aux acc xs ys =
+        match (xs, ys) with
+        | ([], []) ->
+            acc
+        | (x :: xs, y :: ys) ->
+            aux ((x, y) :: acc) xs ys
+        | ([], _ :: _) | (_ :: _, []) ->
+            raise (invalid "Lwtreslib.WithExceptions.List.rev_combine" loc)
+      in
+      aux [] xs ys
+
+    let combine ~loc xs ys =
+      let rec aux acc xs ys =
+        match (xs, ys) with
+        | ([], []) ->
+            acc
+        | (x :: xs, y :: ys) ->
+            aux ((x, y) :: acc) xs ys
+        | ([], _ :: _) | (_ :: _, []) ->
+            raise (invalid "Lwtreslib.WithExceptions.List.combine" loc)
+      in
+      Stdlib.List.rev (aux [] xs ys)
+  end
+end

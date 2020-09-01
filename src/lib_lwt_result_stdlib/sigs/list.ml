@@ -93,7 +93,8 @@ module type S = sig
   (** For substituting based on the {!Sigs.Trace} type. *)
   type 'error trace
 
-  (** Include the legacy list. Unsafe functions are shadowed below. *)
+  (** Include the legacy list. Functions that raise exceptions are shadowed
+      below. *)
   include
     module type of Stdlib.List with type 'a t = 'a Stdlib.List.t
 

@@ -40,8 +40,7 @@
 
     More and more modules will be added to this Library. In particular [List]
     (to avoid splitting the functionality from three distinct libraries and to
-    provide more consistent coverage), [Array], and [Option] will be made
-    available.
+    provide more consistent coverage) and [Array] will be made available.
 
 *)
 
@@ -54,3 +53,9 @@ module Map : module type of Lib.Map
 module Hashtbl : module type of Lib.Hashtbl
 
 module List : module type of Lib.List
+
+module Option : module type of Lib.Option
+
+module Result : module type of Lib.Result
+
+module WithExceptions : module type of Lib.WithExceptions

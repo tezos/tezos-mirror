@@ -23,11 +23,37 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Seq = Lib.Seq
-module Set = Lib.Set
-module Map = Lib.Map
-module Hashtbl = Lib.Hashtbl
-module List = Lib.List
-module Option = Lib.Option
-module Result = Lib.Result
-module WithExceptions = Lib.WithExceptions
+(** Functions that raise exceptions are hidden in the main modules of Lwtreslib
+    but available here. These functions are either: very practical or are safe
+    in some specific uses (e.g., [List.init] when used with a literal length).
+
+    Functions that take a [loc] parameter raise {!Invalid_argument} with the
+    location included in the exception's message.
+*)
+
+module type S = sig
+  module Option : sig
+    val get : loc:string -> 'a option -> 'a
+
+    val to_exn : none:exn -> 'a option -> 'a
+
+    val to_exn_f : none:(unit -> exn) -> 'a option -> 'a
+  end
+
+  module Result : sig
+    val get_ok : loc:string -> ('a, 'trace) result -> 'a
+
+    val get_error : loc:string -> ('a, 'trace) result -> 'trace
+
+    (* [to_exn (Ok v)] is [v], [to_exn (Error e)] raises [e] *)
+    val to_exn : ('a, exn) result -> 'a
+
+    val to_exn_f : error:('b -> exn) -> ('a, 'b) result -> 'a
+  end
+
+  module List : sig
+    val combine : loc:string -> 'a list -> 'b list -> ('a * 'b) list
+
+    val rev_combine : loc:string -> 'a list -> 'b list -> ('a * 'b) list
+  end
+end

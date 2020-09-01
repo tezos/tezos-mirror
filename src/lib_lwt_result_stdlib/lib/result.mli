@@ -23,11 +23,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Seq = Lib.Seq
-module Set = Lib.Set
-module Map = Lib.Map
-module Hashtbl = Lib.Hashtbl
-module List = Lib.List
-module Option = Lib.Option
-module Result = Lib.Result
-module WithExceptions = Lib.WithExceptions
+include Sigs.Result.S

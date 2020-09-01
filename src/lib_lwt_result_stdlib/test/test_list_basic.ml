@@ -247,7 +247,7 @@ module Combine = struct
     assert (combine_with_leftovers [] [] = ([], None)) ;
     assert (
       combine_with_leftovers (up 100) (down 100)
-      = ( Result.get_ok
+      = ( Stdlib.Result.get_ok
           @@ init ~when_negative_length:() 101 (fun i -> (i, 100 - i)),
           None ) ) ;
     assert (combine_with_leftovers [0] [1] = ([(0, 1)], None)) ;
