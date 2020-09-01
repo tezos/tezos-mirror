@@ -63,6 +63,24 @@ let run_script ctx ?(step_constants = default_step_constants) contract
     ~parameter:parameter_expr
   >>=?? fun res -> return res
 
+module Logger : STEP_LOGGER = struct
+  let log_interp _ctxt _descr _stack = ()
+
+  let log_entry _ctxt _descr _stack = ()
+
+  let log_exit _ctxt _descr _stack = ()
+
+  let get_log () = Lwt.return (Ok None)
+end
+
+let run_step ctxt code param =
+  Script_interpreter.step
+    (module Logger)
+    ctxt
+    default_step_constants
+    code
+    param
+
 (** Runs a script with an ill-typed parameter and verifies that a
    Bad_contract_parameter error is returned *)
 let test_bad_contract_parameter () =
@@ -96,21 +114,24 @@ let read_file filename =
 let test_stack_overflow () =
   test_context ()
   >>=? fun ctxt ->
-  let storage = "Unit" in
-  let parameter = "Unit" in
-  let script = read_file "./contracts/big_interpreter_stack.tz" in
-  run_script ctxt script ~storage ~parameter ()
+  let descr instr =
+    Script_typed_ir.{loc = 0; bef = Empty_t; aft = Empty_t; instr}
+  in
+  let enorme_et_seq n =
+    let rec aux n acc =
+      if n = 0 then acc else aux (n - 1) (descr (Seq (acc, descr Nop)))
+    in
+    aux n (descr Nop)
+  in
+  run_step ctxt (enorme_et_seq 10_001) ()
   >>= function
   | Ok _ ->
       Alcotest.fail "expected an error"
   | Error lst
-    when List.mem
-           (Environment.Ecoproto_error
-              Script_interpreter.Michelson_too_many_recursive_calls)
-           lst ->
+    when List.mem Script_interpreter.Michelson_too_many_recursive_calls lst ->
       return ()
-  | Error errs ->
-      Alcotest.failf "Unexpected error: %a" Error_monad.pp_print_error errs
+  | Error _ ->
+      Alcotest.failf "Unexpected error (%s)" __LOC__
 
 (** Test the encoding/decoding of script_interpreter.ml specific errors *)
 

@@ -41,6 +41,7 @@ let () =
       ("qty", Qty.tests);
       ("voting", Voting.tests);
       ("interpretation", Interpretation.tests);
+      ("typechecking", Typechecking.tests);
       ("gas properties", Gas_properties.tests);
       ("fixed point computation", Fixed_point.tests);
       ("gas cost functions", Gas_costs.tests) ]
