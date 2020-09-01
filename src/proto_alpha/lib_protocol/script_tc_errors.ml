@@ -157,3 +157,8 @@ type error += Cannot_serialize_error
 
 (* Deprecation errors *)
 type error += Deprecated_instruction of prim
+
+(* Stackoverflow errors *)
+type error += Typechecking_too_many_recursive_calls
+
+type error += Unparsing_too_many_recursive_calls

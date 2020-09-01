@@ -1764,14 +1764,27 @@ let well_formed_entrypoints (type full) (full : full ty) ~root_name =
 let rec parse_data :
     type a.
     ?type_logger:type_logger ->
+    stack_depth:int ->
     context ->
     legacy:bool ->
     a ty ->
     Script.node ->
     (a * context) tzresult Lwt.t =
- fun ?type_logger ctxt ~legacy ty script_data ->
+ fun ?type_logger ~stack_depth ctxt ~legacy ty script_data ->
   Gas.consume ctxt Typecheck_costs.parse_data_cycle
   >>?= fun ctxt ->
+  let non_terminal_recursion ?type_logger ctxt ~legacy ty script_data =
+    if Compare.Int.(stack_depth > 10_000) then
+      fail Typechecking_too_many_recursive_calls
+    else
+      parse_data
+        ?type_logger
+        ~stack_depth:(stack_depth + 1)
+        ctxt
+        ~legacy
+        ty
+        script_data
+  in
   let parse_data_error () =
     serialize_ty_for_error ctxt ty
     >|? fun (ty, _ctxt) ->
@@ -1791,9 +1804,14 @@ let rec parse_data :
         | Prim (loc, D_Elt, [k; v], annot) ->
             (if legacy then ok_unit else error_unexpected_annot loc annot)
             >>?= fun () ->
-            parse_comparable_data ?type_logger ctxt key_type k
+            parse_comparable_data
+              ?type_logger
+              ~stack_depth:(stack_depth + 1)
+              ctxt
+              key_type
+              k
             >>=? fun (k, ctxt) ->
-            parse_data ?type_logger ctxt ~legacy value_type v
+            non_terminal_recursion ?type_logger ctxt ~legacy value_type v
             >>=? fun (v, ctxt) ->
             Lwt.return
               ( ( match last_value with
@@ -2106,9 +2124,9 @@ let rec parse_data :
     ->
       (if legacy then ok_unit else error_unexpected_annot loc annot)
       >>?= fun () ->
-      traced @@ parse_data ?type_logger ctxt ~legacy ta va
+      traced @@ non_terminal_recursion ?type_logger ctxt ~legacy ta va
       >>=? fun (va, ctxt) ->
-      parse_data ?type_logger ctxt ~legacy tb vb
+      non_terminal_recursion ?type_logger ctxt ~legacy tb vb
       >|=? fun (vb, ctxt) -> ((va, vb), ctxt)
   | (Pair_t _, Prim (loc, D_Pair, l, _)) ->
       fail @@ Invalid_arity (loc, D_Pair, 2, List.length l)
@@ -2118,14 +2136,14 @@ let rec parse_data :
   | (Union_t ((tl, _), _, _), Prim (loc, D_Left, [v], annot)) ->
       (if legacy then ok_unit else error_unexpected_annot loc annot)
       >>?= fun () ->
-      traced @@ parse_data ?type_logger ctxt ~legacy tl v
+      traced @@ non_terminal_recursion ?type_logger ctxt ~legacy tl v
       >|=? fun (v, ctxt) -> (L v, ctxt)
   | (Union_t _, Prim (loc, D_Left, l, _)) ->
       fail @@ Invalid_arity (loc, D_Left, 1, List.length l)
   | (Union_t (_, (tr, _), _), Prim (loc, D_Right, [v], annot)) ->
       (if legacy then ok_unit else error_unexpected_annot loc annot)
       >>?= fun () ->
-      traced @@ parse_data ?type_logger ctxt ~legacy tr v
+      traced @@ non_terminal_recursion ?type_logger ctxt ~legacy tr v
       >|=? fun (v, ctxt) -> (R v, ctxt)
   | (Union_t _, Prim (loc, D_Right, l, _)) ->
       fail @@ Invalid_arity (loc, D_Right, 1, List.length l)
@@ -2137,6 +2155,7 @@ let rec parse_data :
       @@ parse_returning
            Lambda
            ?type_logger
+           ~stack_depth
            ctxt
            ~legacy
            (ta, Some (Var_annot "@arg"))
@@ -2148,7 +2167,7 @@ let rec parse_data :
   | (Option_t (t, _), Prim (loc, D_Some, [v], annot)) ->
       (if legacy then ok_unit else error_unexpected_annot loc annot)
       >>?= fun () ->
-      traced @@ parse_data ?type_logger ctxt ~legacy t v
+      traced @@ non_terminal_recursion ?type_logger ctxt ~legacy t v
       >|=? fun (v, ctxt) -> (Some v, ctxt)
   | (Option_t _, Prim (loc, D_Some, l, _)) ->
       fail @@ Invalid_arity (loc, D_Some, 1, List.length l)
@@ -2165,7 +2184,7 @@ let rec parse_data :
       traced
       @@ fold_right_s
            (fun v (rest, ctxt) ->
-             parse_data ?type_logger ctxt ~legacy t v
+             non_terminal_recursion ?type_logger ctxt ~legacy t v
              >|=? fun (v, ctxt) -> (list_cons v rest, ctxt))
            items
            (list_empty, ctxt)
@@ -2176,7 +2195,12 @@ let rec parse_data :
       traced
       @@ fold_left_s
            (fun (last_value, set, ctxt) v ->
-             parse_comparable_data ?type_logger ctxt t v
+             parse_comparable_data
+               ~stack_depth:(stack_depth + 1)
+               ?type_logger
+               ctxt
+               t
+               v
              >>=? fun (v, ctxt) ->
              Lwt.return
                ( ( match last_value with
@@ -2241,21 +2265,24 @@ let rec parse_data :
 and parse_comparable_data :
     type a.
     ?type_logger:type_logger ->
+    stack_depth:int ->
     context ->
     a comparable_ty ->
     Script.node ->
     (a * context) tzresult Lwt.t =
- fun ?type_logger ctxt ty script_data ->
+ fun ?type_logger ~stack_depth ctxt ty script_data ->
   parse_data
     ?type_logger
     ctxt
     ~legacy:false
+    ~stack_depth
     (ty_of_comparable_ty ty)
     script_data
 
 and parse_returning :
     type arg ret.
     ?type_logger:type_logger ->
+    stack_depth:int ->
     tc_context ->
     context ->
     legacy:bool ->
@@ -2263,12 +2290,20 @@ and parse_returning :
     ret ty ->
     Script.node ->
     ((arg, ret) lambda * context) tzresult Lwt.t =
- fun ?type_logger tc_context ctxt ~legacy (arg, arg_annot) ret script_instr ->
+ fun ?type_logger
+     ~stack_depth
+     tc_context
+     ctxt
+     ~legacy
+     (arg, arg_annot)
+     ret
+     script_instr ->
   parse_instr
     ?type_logger
     tc_context
     ctxt
     ~legacy
+    ~stack_depth:(stack_depth + 1)
     script_instr
     (Item_t (arg, Empty_t, arg_annot))
   >>=? function
@@ -2313,13 +2348,14 @@ and parse_uint30 (n : (location, prim) Micheline.node) : int tzresult =
 and parse_instr :
     type bef.
     ?type_logger:type_logger ->
+    stack_depth:int ->
     tc_context ->
     context ->
     legacy:bool ->
     Script.node ->
     bef stack_ty ->
     (bef judgement * context) tzresult Lwt.t =
- fun ?type_logger tc_context ctxt ~legacy script_instr stack_ty ->
+ fun ?type_logger ~stack_depth tc_context ctxt ~legacy script_instr stack_ty ->
   let check_item_ty (type a b) ctxt (exp : a ty) (got : b ty) loc name n m :
       ((a, b) eq * a ty * context) tzresult =
     record_trace_eval (fun () ->
@@ -2388,6 +2424,20 @@ and parse_instr :
   in
   Gas.consume ctxt Typecheck_costs.parse_instr_cycle
   >>?= fun ctxt ->
+  let non_terminal_recursion ?type_logger tc_context ctxt ~legacy script_instr
+      stack_ty =
+    if Compare.Int.(stack_depth > 10000) then
+      fail Typechecking_too_many_recursive_calls
+    else
+      parse_instr
+        ?type_logger
+        tc_context
+        ctxt
+        ~stack_depth:(stack_depth + 1)
+        ~legacy
+        script_instr
+        stack_ty
+  in
   match (script_instr, stack_ty) with
   (* stack ops *)
   | (Prim (loc, I_DROP, [], annot), Item_t (_, rest, _)) ->
@@ -2508,7 +2558,7 @@ and parse_instr :
       >>?= fun annot ->
       parse_packable_ty ctxt ~legacy t
       >>?= fun (Ex_ty t, ctxt) ->
-      parse_data ?type_logger ctxt ~legacy t d
+      parse_data ?type_logger ~stack_depth:(stack_depth + 1) ctxt ~legacy t d
       >>=? fun (v, ctxt) -> typed ctxt loc (Const v) (Item_t (t, stack, annot))
   | (Prim (loc, I_UNIT, [], annot), stack) ->
       parse_var_type_annot loc annot
@@ -2538,9 +2588,9 @@ and parse_instr :
       error_unexpected_annot loc annot
       >>?= fun () ->
       let annot = gen_access_annot option_annot default_some_annot in
-      parse_instr ?type_logger tc_context ctxt ~legacy bt rest
+      non_terminal_recursion ?type_logger tc_context ctxt ~legacy bt rest
       >>=? fun (btr, ctxt) ->
-      parse_instr
+      non_terminal_recursion
         ?type_logger
         tc_context
         ctxt
@@ -2640,7 +2690,7 @@ and parse_instr :
       let right_annot =
         gen_access_annot union_annot r_field ~default:default_right_annot
       in
-      parse_instr
+      non_terminal_recursion
         ?type_logger
         tc_context
         ctxt
@@ -2648,7 +2698,7 @@ and parse_instr :
         bt
         (Item_t (tl, rest, left_annot))
       >>=? fun (btr, ctxt) ->
-      parse_instr
+      non_terminal_recursion
         ?type_logger
         tc_context
         ctxt
@@ -2685,7 +2735,7 @@ and parse_instr :
       >>?= fun () ->
       let hd_annot = gen_access_annot list_annot default_hd_annot in
       let tl_annot = gen_access_annot list_annot default_tl_annot in
-      parse_instr
+      non_terminal_recursion
         ?type_logger
         tc_context
         ctxt
@@ -2693,7 +2743,7 @@ and parse_instr :
         bt
         (Item_t (t, Item_t (List_t (t, ty_name), rest, tl_annot), hd_annot))
       >>=? fun (btr, ctxt) ->
-      parse_instr ?type_logger tc_context ctxt ~legacy bf rest
+      non_terminal_recursion ?type_logger tc_context ctxt ~legacy bf rest
       >>=? fun (bfr, ctxt) ->
       let branch ibt ibf =
         {loc; instr = If_cons (ibt, ibf); bef; aft = ibt.aft}
@@ -2711,7 +2761,7 @@ and parse_instr :
       parse_var_type_annot loc annot
       >>?= fun (ret_annot, list_ty_name) ->
       let elt_annot = gen_access_annot list_annot default_elt_annot in
-      parse_instr
+      non_terminal_recursion
         ?type_logger
         tc_context
         ctxt
@@ -2748,7 +2798,7 @@ and parse_instr :
       error_unexpected_annot loc annot
       >>?= fun () ->
       let elt_annot = gen_access_annot list_annot default_elt_annot in
-      parse_instr
+      non_terminal_recursion
         ?type_logger
         tc_context
         ctxt
@@ -2787,7 +2837,7 @@ and parse_instr :
       >>?= fun () ->
       let elt_annot = gen_access_annot set_annot default_elt_annot in
       let elt = ty_of_comparable_ty comp_elt in
-      parse_instr
+      non_terminal_recursion
         ?type_logger
         tc_context
         ctxt
@@ -2861,7 +2911,7 @@ and parse_instr :
       >>?= fun (ret_annot, ty_name) ->
       let k_name = field_to_var_annot default_key_annot in
       let e_name = field_to_var_annot default_elt_annot in
-      parse_instr
+      non_terminal_recursion
         ?type_logger
         tc_context
         ctxt
@@ -2903,7 +2953,7 @@ and parse_instr :
       let k_name = field_to_var_annot default_key_annot in
       let e_name = field_to_var_annot default_elt_annot in
       let key = ty_of_comparable_ty comp_elt in
-      parse_instr
+      non_terminal_recursion
         ?type_logger
         tc_context
         ctxt
@@ -3019,7 +3069,7 @@ and parse_instr :
   | (Seq (loc, []), stack) ->
       typed ctxt loc Nop stack
   | (Seq (loc, [single]), stack) -> (
-      parse_instr ?type_logger tc_context ctxt ~legacy single stack
+      non_terminal_recursion ?type_logger tc_context ctxt ~legacy single stack
       >>=? fun (judgement, ctxt) ->
       match judgement with
       | Typed ({aft; _} as instr) ->
@@ -3033,13 +3083,13 @@ and parse_instr :
           in
           return ctxt (Failed {descr}) )
   | (Seq (loc, hd :: tl), stack) -> (
-      parse_instr ?type_logger tc_context ctxt ~legacy hd stack
+      non_terminal_recursion ?type_logger tc_context ctxt ~legacy hd stack
       >>=? fun (judgement, ctxt) ->
       match judgement with
       | Failed _ ->
           fail (Fail_not_in_tail_position (Micheline.location hd))
       | Typed ({aft = middle; _} as ihd) -> (
-          parse_instr
+          non_terminal_recursion
             ?type_logger
             tc_context
             ctxt
@@ -3062,9 +3112,9 @@ and parse_instr :
       >>?= fun () ->
       error_unexpected_annot loc annot
       >>?= fun () ->
-      parse_instr ?type_logger tc_context ctxt ~legacy bt rest
+      non_terminal_recursion ?type_logger tc_context ctxt ~legacy bt rest
       >>=? fun (btr, ctxt) ->
-      parse_instr ?type_logger tc_context ctxt ~legacy bf rest
+      non_terminal_recursion ?type_logger tc_context ctxt ~legacy bf rest
       >>=? fun (bfr, ctxt) ->
       let branch ibt ibf = {loc; instr = If (ibt, ibf); bef; aft = ibt.aft} in
       merge_branches ~legacy ctxt loc btr bfr {branch}
@@ -3075,7 +3125,7 @@ and parse_instr :
       >>?= fun () ->
       error_unexpected_annot loc annot
       >>?= fun () ->
-      parse_instr ?type_logger tc_context ctxt ~legacy body rest
+      non_terminal_recursion ?type_logger tc_context ctxt ~legacy body rest
       >>=? fun (judgement, ctxt) ->
       match judgement with
       | Typed ibody ->
@@ -3104,7 +3154,7 @@ and parse_instr :
       let l_annot =
         gen_access_annot union_annot l_field ~default:default_left_annot
       in
-      parse_instr
+      non_terminal_recursion
         ?type_logger
         tc_context
         ctxt
@@ -3145,6 +3195,7 @@ and parse_instr :
       parse_returning
         Lambda
         ?type_logger
+        ~stack_depth
         ctxt
         ~legacy
         (arg, default_arg_annot)
@@ -3187,7 +3238,7 @@ and parse_instr :
       >>?= fun () ->
       check_kind [Seq_kind] code
       >>?= fun () ->
-      parse_instr
+      non_terminal_recursion
         ?type_logger
         (add_dip v stack_annot tc_context)
         ctxt
@@ -3215,7 +3266,13 @@ and parse_instr :
        fun n inner_tc_context stk ->
         match (Compare.Int.(n = 0), stk) with
         | (true, rest) -> (
-            parse_instr ?type_logger inner_tc_context ctxt ~legacy code rest
+            non_terminal_recursion
+              ?type_logger
+              inner_tc_context
+              ctxt
+              ~legacy
+              code
+              rest
             >>=? fun (judgement, ctxt) ->
             Lwt.return
             @@
@@ -3854,6 +3911,7 @@ and parse_instr :
              ctxt
              ~legacy
              ?type_logger
+             ~stack_depth
              (arg_type_full, None)
              ret_type_full
              code_field)
@@ -3936,6 +3994,7 @@ and parse_instr :
            ctxt
            ~legacy
            ?type_logger
+           ~stack_depth
            (arg_type_full, None)
            ret_type_full
            code_field)
@@ -4654,6 +4713,7 @@ let parse_code :
           })
        ctxt
        ~legacy
+       ~stack_depth:0
        ?type_logger
        (arg_type_full, None)
        ret_type_full
@@ -4677,7 +4737,13 @@ let parse_storage :
         ( serialize_ty_for_error ctxt storage_type
         >|? fun (storage_type, _ctxt) ->
         Ill_typed_data (None, storage, storage_type) ))
-    (parse_data ?type_logger ctxt ~legacy storage_type (root storage))
+    (parse_data
+       ?type_logger
+       ~stack_depth:0
+       ctxt
+       ~legacy
+       storage_type
+       (root storage))
 
 let parse_script :
     ?type_logger:type_logger ->
@@ -4740,6 +4806,7 @@ let typecheck_code :
          })
       ctxt
       ~legacy
+      ~stack_depth:0
       ~type_logger:(fun loc bef aft ->
         type_map := (loc, (bef, aft)) :: !type_map)
       (arg_type_full, None)
@@ -4765,7 +4832,7 @@ let typecheck_data :
       Lwt.return
         ( serialize_ty_for_error ctxt exp_ty
         >|? fun (exp_ty, _ctxt) -> Ill_typed_data (None, data, exp_ty) ))
-    (parse_data ?type_logger ctxt ~legacy exp_ty (root data))
+    (parse_data ?type_logger ~stack_depth:0 ctxt ~legacy exp_ty (root data))
   >|=? fun (_, ctxt) -> ctxt
 
 module Entrypoints_map = Map.Make (String)
@@ -4840,13 +4907,19 @@ let list_entrypoints (type full) (full : full ty) ctxt ~root_name =
 let rec unparse_data :
     type a.
     context ->
+    stack_depth:int ->
     unparsing_mode ->
     a ty ->
     a ->
     (Script.node * context) tzresult Lwt.t =
- fun ctxt mode ty a ->
+ fun ctxt ~stack_depth mode ty a ->
   Gas.consume ctxt Unparse_costs.unparse_data_cycle
   >>?= fun ctxt ->
+  let non_terminal_recursion ctxt mode ty a =
+    if Compare.Int.(stack_depth > 10_000) then
+      fail Unparsing_too_many_recursive_calls
+    else unparse_data ctxt ~stack_depth:(stack_depth + 1) mode ty a
+  in
   match (ty, a) with
   | (Unit_t _, ()) ->
       return (Prim (-1, D_Unit, [], []), ctxt)
@@ -4992,25 +5065,25 @@ let rec unparse_data :
             >|? fun ctxt -> (String (-1, Chain_id.to_b58check chain_id), ctxt)
         )
   | (Pair_t ((tl, _, _), (tr, _, _), _), (l, r)) ->
-      unparse_data ctxt mode tl l
+      non_terminal_recursion ctxt mode tl l
       >>=? fun (l, ctxt) ->
-      unparse_data ctxt mode tr r
+      non_terminal_recursion ctxt mode tr r
       >|=? fun (r, ctxt) -> (Prim (-1, D_Pair, [l; r], []), ctxt)
   | (Union_t ((tl, _), _, _), L l) ->
-      unparse_data ctxt mode tl l
+      non_terminal_recursion ctxt mode tl l
       >|=? fun (l, ctxt) -> (Prim (-1, D_Left, [l], []), ctxt)
   | (Union_t (_, (tr, _), _), R r) ->
-      unparse_data ctxt mode tr r
+      non_terminal_recursion ctxt mode tr r
       >|=? fun (r, ctxt) -> (Prim (-1, D_Right, [r], []), ctxt)
   | (Option_t (t, _), Some v) ->
-      unparse_data ctxt mode t v
+      non_terminal_recursion ctxt mode t v
       >|=? fun (v, ctxt) -> (Prim (-1, D_Some, [v], []), ctxt)
   | (Option_t _, None) ->
       return (Prim (-1, D_None, [], []), ctxt)
   | (List_t (t, _), items) ->
       fold_left_s
         (fun (l, ctxt) element ->
-          unparse_data ctxt mode t element
+          non_terminal_recursion ctxt mode t element
           >|=? fun (unparsed, ctxt) -> (unparsed :: l, ctxt))
         ([], ctxt)
         items.elements
@@ -5019,7 +5092,7 @@ let rec unparse_data :
       let t = ty_of_comparable_ty t in
       fold_left_s
         (fun (l, ctxt) item ->
-          unparse_data ctxt mode t item
+          non_terminal_recursion ctxt mode t item
           >|=? fun (item, ctxt) -> (item :: l, ctxt))
         ([], ctxt)
         (set_fold (fun e acc -> e :: acc) set [])
@@ -5028,9 +5101,9 @@ let rec unparse_data :
       let kt = ty_of_comparable_ty kt in
       fold_left_s
         (fun (l, ctxt) (k, v) ->
-          unparse_data ctxt mode kt k
+          non_terminal_recursion ctxt mode kt k
           >>=? fun (key, ctxt) ->
-          unparse_data ctxt mode vt v
+          non_terminal_recursion ctxt mode vt v
           >|=? fun (value, ctxt) ->
           (Prim (-1, D_Elt, [key; value], []) :: l, ctxt))
         ([], ctxt)
@@ -5041,9 +5114,9 @@ let rec unparse_data :
       let kt = ty_of_comparable_ty kt in
       fold_left_s
         (fun (l, ctxt) (k, v) ->
-          unparse_data ctxt mode kt k
+          non_terminal_recursion ctxt mode kt k
           >>=? fun (key, ctxt) ->
-          unparse_data ctxt mode vt v
+          non_terminal_recursion ctxt mode vt v
           >|=? fun (value, ctxt) ->
           (Prim (-1, D_Elt, [key; value], []) :: l, ctxt))
         ([], ctxt)
@@ -5061,26 +5134,31 @@ let rec unparse_data :
              must have been flushed at this point *)
         assert false
   | (Lambda_t _, Lam (_, original_code)) ->
-      unparse_code ctxt mode original_code
+      unparse_code ctxt ~stack_depth:(stack_depth + 1) mode original_code
 
-(* Gas accounting may not be perfect in this function, as it is only called by RPCs. *)
-and unparse_code ctxt mode code =
+and unparse_code ctxt ~stack_depth mode code =
   let legacy = true in
   Gas.consume ctxt Unparse_costs.unparse_instr_cycle
   >>?= fun ctxt ->
+  let non_terminal_recursion ctxt mode code =
+    if Compare.Int.(stack_depth > 10_000) then
+      fail Unparsing_too_many_recursive_calls
+    else unparse_code ctxt ~stack_depth:(stack_depth + 1) mode code
+  in
   match code with
   | Prim (loc, I_PUSH, [ty; data], annot) ->
       parse_packable_ty ctxt ~legacy ty
       >>?= fun (Ex_ty t, ctxt) ->
-      parse_data ctxt ~legacy t data
+      parse_data ctxt ~stack_depth:(stack_depth + 1) ~legacy t data
       >>=? fun (data, ctxt) ->
-      unparse_data ctxt mode t data
+      unparse_data ctxt ~stack_depth:(stack_depth + 1) mode t data
       >>=? fun (data, ctxt) ->
       return (Prim (loc, I_PUSH, [ty; data], annot), ctxt)
   | Seq (loc, items) ->
       fold_left_s
         (fun (l, ctxt) item ->
-          unparse_code ctxt mode item >|=? fun (item, ctxt) -> (item :: l, ctxt))
+          non_terminal_recursion ctxt mode item
+          >|=? fun (item, ctxt) -> (item :: l, ctxt))
         ([], ctxt)
         items
       >>=? fun (items, ctxt) ->
@@ -5088,7 +5166,8 @@ and unparse_code ctxt mode code =
   | Prim (loc, prim, items, annot) ->
       fold_left_s
         (fun (l, ctxt) item ->
-          unparse_code ctxt mode item >|=? fun (item, ctxt) -> (item :: l, ctxt))
+          non_terminal_recursion ctxt mode item
+          >|=? fun (item, ctxt) -> (item :: l, ctxt))
         ([], ctxt)
         items
       >>=? fun (items, ctxt) ->
@@ -5100,9 +5179,9 @@ and unparse_code ctxt mode code =
 let unparse_script ctxt mode {code; arg_type; storage; storage_type; root_name}
     =
   let (Lam (_, original_code)) = code in
-  unparse_code ctxt mode original_code
+  unparse_code ctxt ~stack_depth:0 mode original_code
   >>=? fun (code, ctxt) ->
-  unparse_data ctxt mode storage_type storage
+  unparse_data ctxt ~stack_depth:0 mode storage_type storage
   >>=? fun (storage, ctxt) ->
   Lwt.return
     ( unparse_ty ctxt arg_type
@@ -5137,7 +5216,7 @@ let unparse_script ctxt mode {code; arg_type; storage; storage_type; root_name}
       ctxt ) )
 
 let pack_data ctxt typ data =
-  unparse_data ctxt Optimized typ data
+  unparse_data ~stack_depth:0 ctxt Optimized typ data
   >>=? fun (unparsed, ctxt) ->
   Gas.consume ctxt (Script.strip_locations_cost unparsed)
   >>?= fun ctxt ->
@@ -5197,7 +5276,12 @@ let big_map_get ctxt key {id; diff; key_type; value_type} =
       | (ctxt, None) ->
           return (None, ctxt)
       | (ctxt, Some value) ->
-          parse_data ctxt ~legacy:true value_type (Micheline.root value)
+          parse_data
+            ~stack_depth:0
+            ctxt
+            ~legacy:true
+            value_type
+            (Micheline.root value)
           >|=? fun (x, ctxt) -> (Some x, ctxt) )
 
 let big_map_update key value ({diff; _} as map) =
@@ -5255,7 +5339,7 @@ let diff_of_big_map ctxt mode ~temporary ~ids {id; key_type; value_type; diff}
       >>?= fun ctxt ->
       hash_data ctxt key_type key
       >>=? fun (diff_key_hash, ctxt) ->
-      unparse_data ctxt mode key_type key
+      unparse_data ~stack_depth:0 ctxt mode key_type key
       >>=? fun (key_node, ctxt) ->
       Gas.consume ctxt (Script.strip_locations_cost key_node)
       >>?= fun ctxt ->
@@ -5264,7 +5348,7 @@ let diff_of_big_map ctxt mode ~temporary ~ids {id; key_type; value_type; diff}
       | None ->
           return (None, ctxt)
       | Some x ->
-          unparse_data ctxt mode value_type x
+          unparse_data ~stack_depth:0 ctxt mode value_type x
           >>=? fun (node, ctxt) ->
           Gas.consume ctxt (Script.strip_locations_cost node)
           >>?= fun ctxt -> return (Some (Micheline.strip_locations node), ctxt)
@@ -5497,3 +5581,11 @@ let extract_big_map_diff ctxt mode ~temporary ~to_duplicate ~to_update ty v =
       (v, Some (List.flatten diffs) (* do not reverse *), ctxt)
 
 let list_of_big_map_ids ids = Ids.elements ids
+
+let parse_data = parse_data ~stack_depth:0
+
+let parse_instr = parse_instr ~stack_depth:0
+
+let unparse_data = unparse_data ~stack_depth:0
+
+let unparse_code = unparse_code ~stack_depth:0

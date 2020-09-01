@@ -654,4 +654,22 @@ let () =
       "A deprecated instruction usage is disallowed in newly created contracts"
     (obj1 (req "prim" prim_encoding))
     (function Deprecated_instruction prim -> Some prim | _ -> None)
-    (fun prim -> Deprecated_instruction prim)
+    (fun prim -> Deprecated_instruction prim) ;
+  (* Typechecking stack overflow *)
+  register_error_kind
+    `Temporary
+    ~id:"michelson_v1.typechecking_too_many_recursive_calls"
+    ~title:"Too many recursive calls during typechecking"
+    ~description:"Too many recursive calls were needed for typechecking"
+    Data_encoding.empty
+    (function Typechecking_too_many_recursive_calls -> Some () | _ -> None)
+    (fun () -> Typechecking_too_many_recursive_calls) ;
+  (* Unparsing stack overflow *)
+  register_error_kind
+    `Temporary
+    ~id:"michelson_v1.unparsing_stack_overflow"
+    ~title:"Too many recursive calls during unparsing"
+    ~description:"Too many recursive calls were needed for unparsing"
+    Data_encoding.empty
+    (function Unparsing_too_many_recursive_calls -> Some () | _ -> None)
+    (fun () -> Unparsing_too_many_recursive_calls)
