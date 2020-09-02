@@ -140,6 +140,8 @@ module Protocol = struct
 end
 
 module System = struct
+  let frac_s = 3 (* sub-second fractional precision for pretty-printing *)
+
   type t = Ptime.t
 
   let epoch = Ptime.epoch
@@ -232,7 +234,7 @@ module System = struct
     | Error (`Msg msg) ->
         invalid_arg ("Time.of_notation: " ^ msg)
 
-  let to_notation t = Ptime.to_rfc3339 t
+  let to_notation t = Ptime.to_rfc3339 ~frac_s t
 
   let rfc_encoding =
     let open Data_encoding in
@@ -294,7 +296,7 @@ module System = struct
       ~construct:to_notation
       ()
 
-  let pp_hum ppf t = Ptime.pp_rfc3339 () ppf t
+  let pp_hum ppf t = Ptime.pp_rfc3339 ~frac_s () ppf t
 
   type 'a stamped = {data : 'a; stamp : Ptime.t}
 

@@ -165,4 +165,57 @@ module System = struct
               ~eq:Time.Protocol.equal
               protocol_time
               same_protocol_time)
+
+  let is_small delta =
+    Stdlib.( < )
+      (Ptime.Span.compare delta (Ptime.Span.v (0, 1_000_000_000_000L)))
+      0
+
+  let () =
+    Crowbar.add_test
+    (* Property:
+       forall [ta]: [System.rfc_encoding] roundtrips in binary modulo precision *)
+      ~name:"Base.Time.Protocol.rfc-encoding-binary"
+      [t]
+      (fun t ->
+        let b = Data_encoding.Binary.to_bytes_exn rfc_encoding t in
+        let tt = Data_encoding.Binary.of_bytes_exn rfc_encoding b in
+        let delta = Ptime.Span.abs @@ Ptime.diff t tt in
+        Crowbar.check @@ is_small delta)
+
+  let () =
+    Crowbar.add_test
+    (* Property:
+       forall [ta]: [System.rfc_encoding] roundtrips in json modulo precision *)
+      ~name:"Base.Time.Protocol.rfc-encoding-json"
+      [t]
+      (fun t ->
+        let j = Data_encoding.Json.construct rfc_encoding t in
+        let tt = Data_encoding.Json.destruct rfc_encoding j in
+        let delta = Ptime.Span.abs @@ Ptime.diff t tt in
+        Crowbar.check @@ is_small delta)
+
+  let () =
+    Crowbar.add_test
+    (* Property:
+       forall [ta]: [System.encoding] roundtrips in binary modulo precision *)
+      ~name:"Base.Time.Protocol.encoding-binary"
+      [t]
+      (fun t ->
+        let b = Data_encoding.Binary.to_bytes_exn encoding t in
+        let tt = Data_encoding.Binary.of_bytes_exn encoding b in
+        let delta = Ptime.Span.abs @@ Ptime.diff t tt in
+        Crowbar.check @@ is_small delta)
+
+  let () =
+    Crowbar.add_test
+    (* Property:
+       forall [ta]: [System.encoding] roundtrips in json modulo precision *)
+      ~name:"Base.Time.Protocol.encoding-json"
+      [t]
+      (fun t ->
+        let j = Data_encoding.Json.construct encoding t in
+        let tt = Data_encoding.Json.destruct encoding j in
+        let delta = Ptime.Span.abs @@ Ptime.diff t tt in
+        Crowbar.check @@ is_small delta)
 end
