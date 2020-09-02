@@ -344,10 +344,10 @@ class TestContracts:
          r'primitive chain_id expects 0 arguments but is given 1'),
         # error message for DIP over the limit
         ("big_dip.tz",
-         r'expected a positive 31-bit integer'),
+         r'expected a positive 10-bit integer'),
         # error message for DROP over the limit
         ("big_drop.tz",
-         r'expected a positive 31-bit integer'),
+         r'expected a positive 10-bit integer'),
     ])
     def test_ill_typecheck(self, client: Client, contract, error_pattern):
         with utils.assert_run_failure(error_pattern):
