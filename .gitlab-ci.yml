@@ -7,15 +7,16 @@ build-and-test:
     - sudo apk --no-cache add m4
     - opam install ocamlformat.0.10
     - ocamlformat --check src/*.ml src/*.mli test/*.ml
-    - opam pin --no-action ezresto-directory .
-    - opam pin --no-action ezresto .
-    - opam pin --no-action resto-cohttp-client .
-    - opam pin --no-action resto-cohttp .
-    - opam pin --no-action resto-cohttp-server .
-    - opam pin --no-action resto-directory .
-    - opam pin --no-action resto-json .
-    - opam pin --no-action resto .
-    - opam depext ezresto-directory ezresto resto-cohttp-client \
+    - opam pin --no-action ezresto-directory.dev .
+    - opam pin --no-action ezresto.dev .
+    - opam pin --no-action resto-acl.dev .
+    - opam pin --no-action resto-cohttp-client.dev .
+    - opam pin --no-action resto-cohttp.dev .
+    - opam pin --no-action resto-cohttp-server.dev .
+    - opam pin --no-action resto-directory.dev .
+    - opam pin --no-action resto-json.dev .
+    - opam pin --no-action resto.dev .
+    - opam depext ezresto-directory ezresto resto-acl resto-cohttp-client \
       resto-cohttp resto-cohttp-server resto-directory resto-json resto
     - opam install --deps-only .
     - dune build
@@ -31,15 +32,16 @@ pages:
   - master
   script:
     - sudo apk --no-cache add m4
-    - opam pin --no-action ezresto-directory .
-    - opam pin --no-action ezresto .
-    - opam pin --no-action resto-cohttp-client .
-    - opam pin --no-action resto-cohttp .
-    - opam pin --no-action resto-cohttp-server .
-    - opam pin --no-action resto-directory .
-    - opam pin --no-action resto-json .
-    - opam pin --no-action resto .
-    - opam depext ezresto-directory ezresto resto-cohttp-client \
+    - opam pin --no-action ezresto-directory.dev .
+    - opam pin --no-action ezresto.dev .
+    - opam pin --no-action resto-acl.dev .
+    - opam pin --no-action resto-cohttp-client.dev .
+    - opam pin --no-action resto-cohttp.dev .
+    - opam pin --no-action resto-cohttp-server.dev .
+    - opam pin --no-action resto-directory.dev .
+    - opam pin --no-action resto-json.dev .
+    - opam pin --no-action resto.dev .
+    - opam depext ezresto-directory ezresto resto-acl resto-cohttp-client \
       resto-cohttp resto-cohttp-server resto-directory resto-json resto
     - opam install --deps-only .
     - opam install odoc

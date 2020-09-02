@@ -32,6 +32,11 @@
  (modules server)
  (flags
   (:standard -open Resto_cohttp)))
+(library
+ (name resto_acl)
+ (public_name resto-acl)
+ (libraries resto uri)
+ (modules acl))
 
 (library
  (name resto_cohttp_client)
