@@ -171,7 +171,9 @@ module Manager_result = struct
       ~op_case:Operation.Encoding.Manager_operations.reveal_case
       ~encoding:
         Data_encoding.(
-          obj1 (dft "consumed_gas" Gas.Arith.z_fp_encoding Gas.Arith.zero))
+          obj2
+            (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
+            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
       ~iselect:(function
         | Internal_operation_result (({operation = Reveal _; _} as op), res) ->
             Some (op, res)
@@ -183,19 +185,24 @@ module Manager_result = struct
         | _ ->
             None)
       ~kind:Kind.Reveal_manager_kind
-      ~proj:(function Reveal_result {consumed_gas} -> consumed_gas)
-      ~inj:(fun consumed_gas -> Reveal_result {consumed_gas})
+      ~proj:(function
+        | Reveal_result {consumed_gas} ->
+            (Gas.Arith.ceil consumed_gas, consumed_gas))
+      ~inj:(fun (consumed_gas, consumed_milligas) ->
+        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
+        Reveal_result {consumed_gas = consumed_milligas})
 
   let transaction_case =
     make
       ~op_case:Operation.Encoding.Manager_operations.transaction_case
       ~encoding:
-        (obj8
+        (obj9
            (opt "storage" Script.expr_encoding)
            (opt "big_map_diff" Contract.big_map_diff_encoding)
            (dft "balance_updates" Delegate.balance_updates_encoding [])
            (dft "originated_contracts" (list Contract.encoding) [])
-           (dft "consumed_gas" Gas.Arith.z_fp_encoding Gas.Arith.zero)
+           (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
+           (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
            (dft "storage_size" z Z.zero)
            (dft "paid_storage_size_diff" z Z.zero)
            (dft "allocated_destination_contract" bool false))
@@ -225,6 +232,7 @@ module Manager_result = struct
               big_map_diff,
               balance_updates,
               originated_contracts,
+              Gas.Arith.ceil consumed_gas,
               consumed_gas,
               storage_size,
               paid_storage_size_diff,
@@ -235,16 +243,18 @@ module Manager_result = struct
                balance_updates,
                originated_contracts,
                consumed_gas,
+               consumed_milligas,
                storage_size,
                paid_storage_size_diff,
                allocated_destination_contract ) ->
+        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
         Transaction_result
           {
             storage;
             big_map_diff;
             balance_updates;
             originated_contracts;
-            consumed_gas;
+            consumed_gas = consumed_milligas;
             storage_size;
             paid_storage_size_diff;
             allocated_destination_contract;
@@ -254,11 +264,12 @@ module Manager_result = struct
     make
       ~op_case:Operation.Encoding.Manager_operations.origination_case
       ~encoding:
-        (obj6
+        (obj7
            (opt "big_map_diff" Contract.big_map_diff_encoding)
            (dft "balance_updates" Delegate.balance_updates_encoding [])
            (dft "originated_contracts" (list Contract.encoding) [])
-           (dft "consumed_gas" Gas.Arith.z_fp_encoding Gas.Arith.zero)
+           (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
+           (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
            (dft "storage_size" z Z.zero)
            (dft "paid_storage_size_diff" z Z.zero))
       ~iselect:(function
@@ -283,6 +294,7 @@ module Manager_result = struct
             ( big_map_diff,
               balance_updates,
               originated_contracts,
+              Gas.Arith.ceil consumed_gas,
               consumed_gas,
               storage_size,
               paid_storage_size_diff ))
@@ -292,14 +304,16 @@ module Manager_result = struct
                balance_updates,
                originated_contracts,
                consumed_gas,
+               consumed_milligas,
                storage_size,
                paid_storage_size_diff ) ->
+        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
         Origination_result
           {
             big_map_diff;
             balance_updates;
             originated_contracts;
-            consumed_gas;
+            consumed_gas = consumed_milligas;
             storage_size;
             paid_storage_size_diff;
           })
@@ -309,7 +323,9 @@ module Manager_result = struct
       ~op_case:Operation.Encoding.Manager_operations.delegation_case
       ~encoding:
         Data_encoding.(
-          obj1 (dft "consumed_gas" Gas.Arith.z_fp_encoding Gas.Arith.zero))
+          obj2
+            (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
+            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
       ~iselect:(function
         | Internal_operation_result (({operation = Delegation _; _} as op), res)
           ->
@@ -322,8 +338,12 @@ module Manager_result = struct
         | _ ->
             None)
       ~kind:Kind.Delegation_manager_kind
-      ~proj:(function Delegation_result {consumed_gas} -> consumed_gas)
-      ~inj:(fun consumed_gas -> Delegation_result {consumed_gas})
+      ~proj:(function
+        | Delegation_result {consumed_gas} ->
+            (Gas.Arith.ceil consumed_gas, consumed_gas))
+      ~inj:(fun (consumed_gas, consumed_milligas) ->
+        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
+        Delegation_result {consumed_gas = consumed_milligas})
 end
 
 let internal_operation_result_encoding :
@@ -1186,6 +1206,6 @@ let block_metadata_encoding =
           (req "level" Level.encoding)
           (req "voting_period_kind" Voting_period.kind_encoding)
           (req "nonce_hash" (option Nonce_hash.encoding))
-          (req "consumed_gas" (check_size 10 Gas.Arith.n_fp_encoding))
+          (req "consumed_gas" Gas.Arith.n_fp_encoding)
           (req "deactivated" (list Signature.Public_key_hash.encoding))
           (req "balance_updates" Delegate.balance_updates_encoding))
