@@ -40,10 +40,14 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) : sig
   val launch :
     ?host:string ->
     ?cors:Cors.t ->
+    ?acl:Acl.t ->
     media_types:Media_type.Make(Encoding).t list ->
     Conduit_lwt_unix.server ->
     unit Resto_directory.Make(Encoding).t ->
     server Lwt.t
+
+  (* configure the access list for this server *)
+  val set_acl : server -> Acl.t -> unit
 
   (** Kill an RPC server. *)
   val shutdown : server -> unit Lwt.t

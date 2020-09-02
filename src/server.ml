@@ -62,6 +62,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
     media_types : Media_type.t list;
     default_media_type : string * Media_type.t;
     stopper : unit Lwt.u;
+    mutable acl : Acl.t;
     mutable worker : unit Lwt.t;
   }
 
@@ -169,17 +170,20 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
             server.cors
             (Header.get req_headers "origin")
         in
-        ( match s.types.input with
-        | Service.No_input ->
-            s.handler query () >>= Lwt.return_ok
-        | Service.Input input -> (
-            Cohttp_lwt.Body.to_string body
-            >>= fun body ->
-            match input_media_type.destruct input body with
-            | Error s ->
-                Lwt.return_error (`Cannot_parse_body s)
-            | Ok body ->
-                s.handler query body >>= Lwt.return_ok ) )
+        ( if not @@ Acl.allowed server.acl ~meth ~path then
+          Lwt.return_ok (`Unauthorized None)
+        else
+          match s.types.input with
+          | Service.No_input ->
+              s.handler query () >>= Lwt.return_ok
+          | Service.Input input -> (
+              Cohttp_lwt.Body.to_string body
+              >>= fun body ->
+              match input_media_type.destruct input body with
+              | Error s ->
+                  Lwt.return_error (`Cannot_parse_body s)
+              | Ok body ->
+                  s.handler query body >>= Lwt.return_ok ) )
         >>=? function
         | `Ok o ->
             let body = output o in
@@ -334,7 +338,8 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
 
   (* Promise a running RPC server. *)
 
-  let launch ?(host = "::") ?(cors = Cors.default) ~media_types mode root =
+  let launch ?(host = "::") ?(cors = Cors.default)
+      ?(acl = Acl.Allow_all {except = []}) ~media_types mode root =
     let default_media_type =
       match Media_type.first_complete_media media_types with
       | None ->
@@ -351,6 +356,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
         media_types;
         default_media_type;
         stopper;
+        acl;
         worker = Lwt.return_unit;
       }
     in
@@ -407,4 +413,6 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
     >>= fun () ->
     ConnectionMap.iter (fun _ f -> f ()) server.streams ;
     Lwt.return_unit
+
+  let set_acl server acl = server.acl <- acl
 end

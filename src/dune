@@ -28,10 +28,11 @@
 (library
  (name resto_cohttp_server)
  (public_name resto-cohttp-server)
- (libraries resto resto-directory resto-cohttp cohttp-lwt-unix lwt)
+ (libraries resto resto-directory resto-acl resto-cohttp cohttp-lwt-unix lwt)
  (modules server)
  (flags
-  (:standard -open Resto_cohttp)))
+  (:standard -open Resto_cohttp -open Resto_acl)))
+
 (library
  (name resto_acl)
  (public_name resto-acl)
