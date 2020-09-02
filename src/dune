@@ -3,24 +3,19 @@
  (public_name ezresto)
  (modules ezResto)
  (libraries resto-json resto uri)
- (wrapped false)
- (flags
-  (:standard -safe-string)))
+ (wrapped false))
 
 (library
  (name ezresto_directory)
  (public_name ezresto-directory)
  (modules ezResto_directory)
  (libraries ezresto resto-directory resto lwt)
- (flags
-  (:standard -safe-string))
  (wrapped false))
 
 (library
  (name resto)
  (public_name resto)
  (modules resto)
- (flags (:standard -safe-string))
  (libraries uri)
  (wrapped false))
 
@@ -28,9 +23,7 @@
  (name resto_cohttp)
  (public_name resto-cohttp)
  (libraries resto-directory cohttp-lwt)
- (modules utils media_type cors)
- (flags
-  (:standard -safe-string)))
+ (modules utils media_type cors))
 
 (library
  (name resto_cohttp_server)
@@ -38,7 +31,7 @@
  (libraries resto-directory resto-cohttp cohttp-lwt-unix lwt)
  (modules server)
  (flags
-  (:standard -safe-string -open Resto_cohttp)))
+  (:standard -open Resto_cohttp)))
 
 (library
  (name resto_cohttp_client)
@@ -46,15 +39,13 @@
  (libraries resto-directory resto-cohttp uri lwt)
  (modules client)
  (flags
-  (:standard -safe-string -open Resto_cohttp)))
+  (:standard -open Resto_cohttp)))
 
 (library
  (name resto_directory)
  (public_name resto-directory)
  (modules resto_directory)
  (libraries lwt resto)
- (flags
-  (:standard -safe-string))
  (wrapped false))
 
 (library
@@ -62,6 +53,4 @@
  (public_name resto-json)
  (modules resto_json)
  (libraries json-data-encoding json-data-encoding-bson resto)
- (flags
-  (:standard -safe-string))
  (wrapped false))
