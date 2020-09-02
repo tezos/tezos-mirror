@@ -974,16 +974,18 @@ let check_manager_signature ctxt chain_id (op : _ Kind.manager contents_list)
       (Signature.public_key_hash * Signature.public_key option) option ->
       (Signature.public_key_hash * Signature.public_key option) tzresult =
    fun contents_list manager ->
+    let source (type kind) = function
+      | (Manager_operation {source; operation = Reveal key; _} :
+          kind Kind.manager contents) ->
+          (source, Some key)
+      | Manager_operation {source; _} ->
+          (source, None)
+    in
     match contents_list with
-    | Single (Manager_operation {source; operation = Reveal key; _}) ->
-        check_same_manager (source, Some key) manager
-    | Cons (Manager_operation {source; operation = Reveal key; _}, rest) ->
-        check_same_manager (source, Some key) manager
-        >>? fun manager -> find_source rest (Some manager)
-    | Single (Manager_operation {source; _}) ->
-        check_same_manager (source, None) manager
-    | Cons (Manager_operation {source; _}, rest) ->
-        check_same_manager (source, None) manager
+    | Single op ->
+        check_same_manager (source op) manager
+    | Cons (op, rest) ->
+        check_same_manager (source op) manager
         >>? fun manager -> find_source rest (Some manager)
   in
   find_source op None
