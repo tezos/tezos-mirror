@@ -228,7 +228,11 @@ module Make (Encoding : Resto.ENCODING) (Client : Cohttp_lwt.S.Client) = struct
           | None ->
               None
           | Some s -> (
-            match Utils.split_path s with [x; y] -> Some (x, y) | _ -> None )
+            match Resto.Utils.split_path s with
+            | [x; y] ->
+                Some (x, y)
+            | _ ->
+                None )
           (* ignored invalid *)
         in
         let media =

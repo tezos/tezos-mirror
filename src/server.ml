@@ -90,7 +90,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
     let path = Uri.pct_decode (Uri.path uri) in
     lwt_log_info "(%s) receive request to %s" (Connection.to_string con) path
     >>= fun () ->
-    let path = Utils.split_path path in
+    let path = Resto.Utils.split_path path in
     let req_headers = Request.headers req in
     ( match Request.meth req with
     | #Resto.meth
@@ -108,7 +108,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
         | None ->
             Lwt.return_ok (snd server.default_media_type)
         | Some content_type -> (
-          match Utils.split_path content_type with
+          match Resto.Utils.split_path content_type with
           | [x; y] -> (
             match Media_type.find_media (x, y) server.media_types with
             | None ->

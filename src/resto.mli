@@ -8,6 +8,10 @@
 (*                                                                        *)
 (**************************************************************************)
 
+module Utils : sig
+  val split_path : string -> string list
+end
+
 type meth = [`GET | `POST | `DELETE | `PUT | `PATCH]
 
 val string_of_meth : [< meth] -> string
