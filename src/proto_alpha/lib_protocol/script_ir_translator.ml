@@ -2331,19 +2331,19 @@ and parse_returning :
             : (arg, ret) lambda ),
           ctxt )
 
-and parse_uint30 (n : (location, prim) Micheline.node) : int tzresult =
-  let max_uint30 = 0x3fffffff in
+and parse_uint10 (n : (location, prim) Micheline.node) : int tzresult =
+  let max_uint10 = 0x3ff in
   match n with
   | Micheline.Int (_, n')
-    when Compare.Z.(Z.zero <= n') && Compare.Z.(n' <= Z.of_int max_uint30) ->
+    when Compare.Z.(Z.zero <= n') && Compare.Z.(n' <= Z.of_int max_uint10) ->
       ok (Z.to_int n')
   | _ ->
       error
       @@ Invalid_syntactic_constant
            ( location n,
              strip_locations n,
-             "a positive 31-bit integer (between 0 and "
-             ^ string_of_int max_uint30 ^ ")" )
+             "a positive 10-bit integer (between 0 and "
+             ^ string_of_int max_uint10 ^ ")" )
 
 and parse_instr :
     type bef.
@@ -2444,7 +2444,7 @@ and parse_instr :
       ( error_unexpected_annot loc annot >>?= fun () -> typed ctxt loc Drop rest
         : (bef judgement * context) tzresult Lwt.t )
   | (Prim (loc, I_DROP, [n], result_annot), whole_stack) ->
-      parse_uint30 n
+      parse_uint10 n
       >>?= fun whole_n ->
       Gas.consume ctxt (Typecheck_costs.proof_argument whole_n)
       >>?= fun ctxt ->
@@ -2494,7 +2494,7 @@ and parse_instr :
             >>? fun (whole_stack, _ctxt) ->
             error (Bad_stack (loc, I_DIG, 1, whole_stack))
       in
-      parse_uint30 n
+      parse_uint10 n
       >>?= fun n ->
       Gas.consume ctxt (Typecheck_costs.proof_argument n)
       >>?= fun ctxt ->
@@ -2507,7 +2507,7 @@ and parse_instr :
       fail (Invalid_arity (loc, I_DIG, 1, List.length l))
   | (Prim (loc, I_DUG, [n], result_annot), Item_t (x, whole_stack, stack_annot))
     ->
-      parse_uint30 n
+      parse_uint10 n
       >>?= fun whole_n ->
       Gas.consume ctxt (Typecheck_costs.proof_argument whole_n)
       >>?= fun ctxt ->
@@ -3252,7 +3252,7 @@ and parse_instr :
       | Failed _ ->
           fail (Fail_not_in_tail_position loc) )
   | (Prim (loc, I_DIP, [n; code], result_annot), stack) ->
-      parse_uint30 n
+      parse_uint10 n
       >>?= fun n ->
       Gas.consume ctxt (Typecheck_costs.proof_argument n)
       >>?= fun ctxt ->
