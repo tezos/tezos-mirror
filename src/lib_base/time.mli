@@ -88,12 +88,28 @@ module Protocol : sig
 
   val encoding : t Data_encoding.t
 
+  (* Note: the RFC has a different range than the internal representation.
+     Specifically, the RFC can only represent times from 0000-00-00 and
+     9999-12-31 (inclusive). The rfc-encoding fails for dates outside of this
+     range.
+
+     For this reason, it is preferable to use {!encoding} and only resort to
+     [rfc_encoding] for human-readable format. *)
   val rfc_encoding : t Data_encoding.t
 
   val rpc_arg : t RPC_arg.t
 
   (** Pretty-printing functions *)
 
+  (* Pretty print as a number of seconds after epoch. *)
+  val pp : Format.formatter -> t -> unit
+
+  (* Note: pretty-printing uses the rfc3999 for human-readability. As mentioned
+     in the comment on {!rfc_encoding}, this representation fails when given
+     dates too far in the future (after 9999-12-31) or the past (before
+     0000-00-00).
+
+     For reliable, generic pretty-printing use {!pp}. *)
   val pp_hum : Format.formatter -> t -> unit
 end
 

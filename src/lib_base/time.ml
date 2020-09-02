@@ -83,6 +83,31 @@ module Protocol = struct
                Data_encoding.Json.cannot_destruct "Time.Protocol.of_notation")
          string
 
+  let max_rfc3999 = of_ptime Ptime.max
+
+  let min_rfc3999 = of_ptime Ptime.min
+
+  let as_string_encoding =
+    let open Data_encoding in
+    conv
+      (fun i ->
+        if min_rfc3999 <= i && i <= max_rfc3999 then to_notation i
+        else Int64.to_string i)
+      ( Json.wrap_error
+      (* NOTE: this encoding is only used as a building block for a json
+          encoding so we can raise the json exception directly. *)
+      @@ fun s ->
+      match of_notation s with
+      | Some i ->
+          i
+      | None -> (
+        match Int64.of_string_opt s with
+        | Some i ->
+            i
+        | None ->
+            raise (Invalid_argument "Time.Protocol.decoding") ) )
+      string
+
   let encoding =
     let open Data_encoding in
     def
@@ -90,22 +115,7 @@ module Protocol = struct
       ~description:
         "A timestamp as seen by the protocol: second-level precision, epoch \
          based."
-    @@ splitted
-         ~binary:int64
-         ~json:
-           (union
-              [ case
-                  Json_only
-                  ~title:"RFC encoding"
-                  rfc_encoding
-                  (fun i -> Some i)
-                  (fun i -> i);
-                case
-                  Json_only
-                  ~title:"Second since epoch"
-                  int64
-                  (fun _ -> None)
-                  (fun i -> i) ])
+    @@ splitted ~binary:int64 ~json:as_string_encoding
 
   let rpc_arg =
     RPC_arg.make
@@ -121,6 +131,8 @@ module Protocol = struct
               Error (Format.asprintf "failed to parse time (epoch): %S" s))
       ~construct:Int64.to_string
       ()
+
+  let pp ppf t = Format.fprintf ppf "%Ld" t
 
   let pp_hum ppf t = Ptime.pp_rfc3339 () ppf (to_ptime t)
 
