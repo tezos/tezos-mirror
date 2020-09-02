@@ -63,7 +63,7 @@ Finally, the RPC layer (in yellow on the right in the picture) is an
 important part of the node. It is how the client, third-party
 applications and daemons can interact with the node and introspect its
 state. This component uses the mainstream JSON format and HTTP
-protocol.  It uses in-house libraries ``resto``. It is fully
+protocol.  It uses the library ``resto``. It is fully
 interoperable, and auto descriptive, using JSON schema.
 
 .. |Tezos architecture diagram| image:: octopus.svg
