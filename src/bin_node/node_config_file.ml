@@ -117,11 +117,7 @@ let blockchain_network_carthagenet =
     ~chain_name:"TEZOS_ALPHANET_CARTHAGE_2019-11-28T13:02:13Z"
     ~sandboxed_chain_name:"SANDBOXED_TEZOS"
     ~default_bootstrap_peers:
-      [ "tezaria.com";
-        "34.76.169.218";
-        "34.90.24.160";
-        "carthagenet.kaml.fr";
-        "104.248.136.94" ]
+      ["34.76.169.218"; "34.90.24.160"; "carthagenet.kaml.fr"; "104.248.136.94"]
 
 let blockchain_network_delphinet =
   make_blockchain_network
