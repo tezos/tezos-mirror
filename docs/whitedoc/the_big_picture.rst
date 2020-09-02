@@ -3,18 +3,18 @@
 Tezos Software Architecture
 ===========================
 
-This document contains two section. The first section, which should be
+This document contains two sections. The first section, which should be
 readable by anyone, describes the main elements of Tezos from a
 distance. It abstracts from all plumbing and both internal and system
 dependencies to give a simple view of the main components, their
-responsibilities and interactions. The second part is written for
-developers, and is at the level of OPAM packages.
+responsibilities, and interactions. The second part is written for
+developers and is at the level of OPAM packages.
 
 The Big Picture
 ---------------
 .. _the_big_picture:
 
-The diagram below shows a very coarse grained architecture of Tezos.
+The diagram below shows a very coarse-grained architecture of Tezos.
 
 |Tezos architecture diagram|
 
@@ -29,7 +29,7 @@ administrative operations. It also has the responsibility to detect
 erroneous blocks.
 
 An important thing to notice is that the protocol always sees only one
-block chain. In other words, a linear sequence of blocks since the
+block chain, that is a linear sequence of blocks since the
 genesis. It does not know that it lives in an open network where nodes
 can propose alternative heads.
 
@@ -37,15 +37,15 @@ Only the shell knows about the multiple heads. It is responsible for
 choosing between the various chain proposals that come from the bakers
 (the programs that cook new blocks) of the network. The shell has the
 responsibility of selecting and downloading alternative chains, feed
-them to the protocol, which in turn has the responsibility to check them
-for errors, and give them an absolute score. The shell then simply
-selects the valid head of highest absolute score. This part of the shell
-is called :ref:`the validator<validation>`.
+them to the protocol, which in turn has the responsibility to check
+them for errors, and give them an absolute score. The shell then
+simply selects the valid head of the highest absolute score. This part
+of the shell is called :ref:`the validator<validation>`.
 
 The rest of the shell includes the peer-to-peer layer, the disk storage
 of blocks, the operations to allow the node to transmit the chain data
 to new nodes and the versioned state of the ledger. In-between the
-validator, the peer-to-peer layer and the storage sits a component
+validator, the peer-to-peer layer, and the storage sits a component
 called the distributed database, that abstracts the fetching and
 replication of new chain data to the validator.
 
@@ -60,11 +60,11 @@ called primitives from the plug-in API. It is a form of statically
 enforced sandboxing.
 
 Finally, the RPC layer (in yellow on the right in the picture) is an
-important part of the node. It is how the client, third party
+important part of the node. It is how the client, third-party
 applications and daemons can interact with the node and introspect its
-state. This component uses the mainstream JSON format and HTTP protocol.
-It uses in-house libraries ``resto``. It
-is fully inter-operable, and auto descriptive, using JSON schema.
+state. This component uses the mainstream JSON format and HTTP
+protocol.  It uses in-house libraries ``resto``. It is fully
+interoperable, and auto descriptive, using JSON schema.
 
 .. |Tezos architecture diagram| image:: octopus.svg
 
@@ -91,7 +91,7 @@ Base and below
 ~~~~~~~~~~~~~~
 
 At the center, the :package:`tezos-base` package is where
-the blockchain specific code starts. Before it are the set of libraries
+the blockchain specific code starts. Before it is the set of libraries
 that are used everywhere for basic operations.
 
  - :package:`tezos-stdlib` contains a few extensions over the
@@ -107,7 +107,7 @@ that are used everywhere for basic operations.
    A :ref:`tutorial<error_monad>` is available for this library.
  - :package:`tezos-rpc` provides the basics of Tezos' RPC service
    mechanism. It provides combinators for building service hierarchies
-   à la Ocsigen/Eliom, registering and calling services. This module
+   à la Ocsigen/Eliom, registering, and calling services. This module
    is based on :opam:`resto`, that allows for automatic
    generation of a machine and human-readable of the hierarchy of
    services: the structure of URLs and the expected formats for input
@@ -121,18 +121,18 @@ that are used everywhere for basic operations.
    to C.
  - :package:`tezos-micheline` is the concrete syntax used by
    Michelson, the language of smart contracts. It mostly contains the
-   generic, untyped AST, a printer and a parser.
- - :package:`tezos-base` wraps all these module in a common foundation
+   generic, untyped AST, a printer, and a parser.
+ - :package:`tezos-base` wraps all these modules in a common foundation
    for all the other components of Tezos, and introduces the data
    structures of the blockchain (e.g. ``Block_hash``,
    ``Block_header``, ``Block_locator``, ``Fitness``, ``P2p_identity``)
    that are shared between the shell, economic protocol, client,
-   daemons and third party software. It also rewraps some modules from
+   daemons and third-party software. It also rewraps some modules from
    ``crypto`` as functors that build all-in-one modules for a given
    type (for instance, the module for block hashes contains all
    possible converters, command line and RPC argument builders, pretty
    printers, an autocompleter, etc.). This package also contains the
-   ``cli_entries`` module that we use to handle command line parsing
+   ``cli_entries`` module that we use to handle command-line parsing
    in some executables.
 
 The Shell
@@ -171,13 +171,13 @@ Economic protocols are compiled by a specific version of the OCaml
 compiler. This compiler restricts the set of modules available to the
 economic protocol, as a form of static sandboxing. It also generates a
 functorized version of the protocol, to make the execution of the
-protocol in alternative environment possible.
+protocol in an alternative environment possible.
 
   - :package:`tezos-protocol-environment-sigs` contains the modules
     that are available to the economic protocol. A review of this
-    sandbox is available :ref:`here<protocol_environment>`. This
-    modules include a stripped down standard library, and interfaces
-    to the crypto APIs, RPC definitions, and key-value store.
+    sandbox is available :ref:`here<protocol_environment>`. These
+    modules include a stripped-down standard library, and interfaces
+    to the crypto APIs, RPC definitions, and a key-value store.
 
   - :package:`tezos-protocol-compiler` is the compiler for economic
     protocols: an alternative driver to the OCaml
@@ -186,7 +186,7 @@ protocol in alternative environment possible.
 
   - ``tezos-protocol-xxx`` is produced by the protocol compiler
     and contains a functorized version of protocol ``xxx`` that takes its
-    standard library as parameter. This parameter can be filled with
+    standard library as a parameter. This parameter can be filled with
     any of the implementations described in the two points below.
 
   - :package:`tezos-shell-context` implements a context representation
@@ -197,10 +197,10 @@ protocol in alternative environment possible.
     generic environment. It also defines two different context
     instances: one that simulates the key-value store in memory for
     testing, and one whose context function are dummy ones which can
-    be used when only the types and non contextual functions of the
+    be used when only the types and noncontextual functions of the
     protocol are needed.
 
-  - ``tezos-embedded-protocol-xxx`` contains a version of protocol
+  - ``tezos-embedded-protocol-xxx`` contains a version of the protocol
     ``xxx`` whose standard library is pre-instantiated to the shell's
     implementation, these are the ones that are linked into the
     node. It also contains a module that registers the protocol in the
@@ -243,7 +243,7 @@ The Client Library
 
 The client is split into many packages, to enforce three separation
 lines: shell vs economic protocol, Unix dependent vs JavaScript
-compatible, and library vs command line interface.
+compatible, and library vs command-line interface.
 
   - :package:`tezos-client-base` defines the client context, which is
     an object whose methods allow for: accessing a wallet of keys,
@@ -258,10 +258,10 @@ compatible, and library vs command line interface.
     the client context.
   - :package:`tezos-client-commands` plugs the basic context access
     functions from :package:`tezos-client-base` as handlers for the
-    commands of the ``tezos-client`` command line wallet.
+    commands of the ``tezos-client`` command-line wallet.
   - :package:`tezos-client-alpha-commands` plugs the functions from
     :package:`tezos-client-alpha` as handlers for the Alpha specific
-    commands of the ``tezos-client`` command line wallet.
+    commands of the ``tezos-client`` command-line wallet.
   - :package:`tezos-client-genesis` contains the basic activator
     commands available on the genesis protocol.
   - :package:`tezos-client-base-unix` implements configuration file
