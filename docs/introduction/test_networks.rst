@@ -57,6 +57,7 @@ Dalphanet
 
 - Git branch: ``dalpha-release``
 - Built-in :ref:`multinetwork` alias: ``dalphanet``
+- Run Docker image: ``docker run --name tezos-dalpha-release tezos/tezos:dalpha-release tezos-node --history-mode archive --network dalphanet``
 
 Dalphanet is an experimental test network for the upcoming protocol
 proposal. It may be reset to allow testing of the protocol under
@@ -65,24 +66,33 @@ protocol.
 
 The Dalphanet configuration and the necessary modified protocol
 environment is only available in the ``dalpha-release`` branch, and
-not on the ``latest-release`` nor the ``master`` branches.
+not on the ``latest-release`` nor the ``master`` branches. You can
+either participate in Dalphanet using the pre-built Docker image as
+shown above, or run Dalpha net from a source distribution, as shown
+below.
 
-It must be built from source. To do so, you will need to set up the
-Rust environment and then build as usual. This process is described in
-:ref:`Build from source<build_from_sources>`, with the difference
-that the branch ``dalpha-release`` is now used instead of
-``latest-release``. In other words, the command::
+Running Dalphanet from a source distribution
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To build a ``tezos-node`` for Dalphanet, you will need to set up the
+Rust environment and then build as usual but using the branch
+``dalpha-release`` instead of ``latest-release``. In other words,
+follow the process described in :ref:`Build from
+source<build_from_sources>`, but replace the command::
 
     git checkout latest-release
 
-is replaced with::
+with::
 
     git checkout dalpha-release
 
-Then use the built-in :ref:`multinetwork` alias to configure
+Then use the built-in :ref:`multinetwork` alias ``dalphanet`` to configure
 ``tezos-node`` to use Dalphanet: ::
 
     tezos-node config init --network dalphanet
+
+Constants
+~~~~~~~~~
 
 On Dalphanet, the following constants differ from Mainnet:
 
