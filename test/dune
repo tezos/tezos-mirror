@@ -9,6 +9,18 @@
   (run %{exe:ezResto_test.exe})))
 
 (executable
+ (name acl_unit_test)
+ (modules acl_unit_test)
+ (libraries resto-acl)
+ (flags
+  (:standard -open Resto_acl)))
+
+(alias
+ (name runtest_acl_unit_test)
+ (action
+  (run %{exe:acl_unit_test.exe})))
+
+(executable
  (name resto_test)
  (modules directory resto_test services)
  (libraries resto-directory resto-json json-data-encoding
@@ -23,4 +35,5 @@
  (name runtest)
  (deps
   (alias runtest_resto)
-  (alias runtest_ezresto)))
+  (alias runtest_ezresto)
+  (alias runtest_acl_unit_test)))
