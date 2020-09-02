@@ -30,16 +30,14 @@
 ; runs only the `Quick tests
 (rule
  (alias runtest_proto_alpha)
- (deps contracts/cps_fact.tz
-       contracts/cps_fact_2.tz)
+ (deps contracts/big_interpreter_stack.tz)
  (package tezos-protocol-alpha-tests)
  (action (run %{exe:main.exe} -v -q)))
 
 ; runs both `Quick and `Slow tests
 (rule
  (alias runtest_slow)
- (deps contracts/cps_fact.tz
-       contracts/cps_fact_2.tz)
+ (deps contracts/big_interpreter_stack.tz)
  (package tezos-protocol-alpha-tests)
  (action (run %{exe:main.exe} -v)))
 
