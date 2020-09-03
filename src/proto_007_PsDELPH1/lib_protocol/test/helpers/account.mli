@@ -39,7 +39,7 @@ val activator_account : account
 
 val dummy_account : account
 
-val new_account : ?seed:Bytes.t -> unit -> account
+val new_account : ?seed:MBytes.t -> unit -> account
 
 val add_account : t -> unit
 
@@ -58,4 +58,4 @@ val generate_accounts :
 val commitment_secret : Blinded_public_key_hash.activation_code
 
 val new_commitment :
-  ?seed:Bytes.t -> unit -> (account * Commitment_repr.t) tzresult Lwt.t
+  ?seed:MBytes.t -> unit -> (account * Commitment_repr.t) tzresult Lwt.t

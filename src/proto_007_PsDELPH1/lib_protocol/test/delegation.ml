@@ -26,6 +26,7 @@
 open Protocol
 open Alpha_context
 open Test_tez
+open Test_utils
 
 (**************************************************************************)
 (* bootstrap contracts *)

@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,16 +23,20 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let contract : Protocol.Alpha_context.Contract.t Alcotest.testable =
-  let open Protocol in
-  let open Alpha_context in
-  Alcotest.testable Contract.pp Contract.( = )
+(* This file should not depend on any other file from tests. *)
 
-let script_expr : Protocol.Alpha_context.Script.expr Alcotest.testable =
-  Alcotest.testable Michelson_v1_printer.print_expr ( = )
+let ( >>?= ) x y = match x with Ok a -> y a | Error b -> fail @@ List.hd b
 
-let trace : tztrace Alcotest.testable = Alcotest.testable pp_print_error ( = )
+(** Like List.find but returns the index of the found element *)
+let findi p =
+  let rec aux p i = function
+    | [] ->
+        raise Not_found
+    | x :: l ->
+        if p x then (x, i) else aux p (i + 1) l
+  in
+  aux p 0
 
-let protocol_error : Environment.Error_monad.error Alcotest.testable =
-  let open Environment.Error_monad in
-  Alcotest.testable pp ( = )
+exception Pair_of_list
+
+let pair_of_list = function [a; b] -> (a, b) | _ -> raise Pair_of_list

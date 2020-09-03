@@ -7,15 +7,13 @@
             tezos-007-PsDELPH1-test-helpers
             tezos-stdlib-unix
             tezos-client-base
-            tezos-protocol-007-PsDELPH1-parameters
-            tezos-test-services)
+            tezos-protocol-007-PsDELPH1-parameters)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_micheline
                    -open Tezos_client_007_PsDELPH1
                    -open Tezos_protocol_007_PsDELPH1
-                   -open Tezos_protocol_environment_007_PsDELPH1
                    -open Tezos_007_PsDELPH1_test_helpers
-                   -open Tezos_test_services)))
+                   )))
 
 (alias
  (name buildtest)

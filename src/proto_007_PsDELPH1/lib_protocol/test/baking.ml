@@ -25,6 +25,7 @@
 
 open Protocol
 open Alpha_context
+open Test_utils
 
 (** Tests for [bake_n] and [bake_until_end_cycle]. *)
 let test_cycle () =
@@ -109,7 +110,7 @@ let test_rewards_retrieval () =
       map_p
         (fun endorser ->
           Op.endorsement ~delegate:endorser.delegate (B good_b) ()
-          >|=? fun operation -> Operation.pack operation)
+          >>|? fun operation -> Operation.pack operation)
         real_endorsers
       >>=? fun operations ->
       let policy = Block.By_priority priority in

@@ -97,11 +97,13 @@ let test_bad_contract_parameter () =
   | Ok _ ->
       Alcotest.fail "expected an error"
   | Error (Environment.Ecoproto_error (Bad_contract_parameter source') :: _) ->
-      Test_services.(check Testable.contract)
+      Assert.equal
+        ~loc:__LOC__
+        Contract.( = )
         "incorrect field in Bad_contract_parameter"
+        Contract.pp
         default_source
-        source' ;
-      return_unit
+        source'
   | Error errs ->
       Alcotest.failf "Unexpected error: %a" Error_monad.pp_print_error errs
 
@@ -149,7 +151,7 @@ let test_json_roundtrip name testable enc v =
 let test_json_roundtrip_err name e () =
   test_json_roundtrip
     name
-    Testable.protocol_error
+    (Alcotest.testable Environment.Error_monad.pp ( = ))
     Environment.Error_monad.error_encoding
     e
 

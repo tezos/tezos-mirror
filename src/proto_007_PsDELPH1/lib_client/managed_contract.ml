@@ -183,7 +183,7 @@ let build_lambda_for_originated ~destination ~entrypoint ~amount
     Data_encoding.Binary.to_bytes_exn Contract.encoding destination
   in
   let amount = Tez.to_mutez amount in
-  let (`Hex destination) = Hex.of_bytes destination in
+  let (`Hex destination) = MBytes.to_hex destination in
   let entrypoint = match entrypoint with "default" -> "" | s -> "%" ^ s in
   if parameter_type = t_unit then
     Format.asprintf
@@ -249,7 +249,7 @@ let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
       | None ->
           return_none )
       >>=? fun parameter ->
-      let parameter = Option.value ~default:d_unit parameter in
+      let parameter = Option.unopt ~default:d_unit parameter in
       return
       @@ build_lambda_for_originated
            ~destination

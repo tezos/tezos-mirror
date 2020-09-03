@@ -72,7 +72,7 @@ let begin_construction ?(priority = 0) ?timestamp ?seed_nonce_hash
   >>=? fun real_timestamp ->
   Account.find delegate
   >>=? fun delegate ->
-  let timestamp = Option.value ~default:real_timestamp timestamp in
+  let timestamp = Option.unopt ~default:real_timestamp timestamp in
   let contents = Block.Forge.contents ~priority ?seed_nonce_hash () in
   let protocol_data = {Block_header.contents; signature = Signature.zero} in
   let header =
@@ -156,10 +156,10 @@ let add_operation ?expect_apply_failure ?expect_failure st op =
   | (Some _, Ok _) ->
       failwith "Error expected while adding operation"
   | (Some f, Error err) ->
-      f err >|=? fun () -> st
+      f err >>|? fun () -> st
   | (None, result) -> (
-      result
-      >>?= fun result ->
+      Lwt.return result
+      >>=? fun result ->
       match result with
       | (state, (Operation_metadata result as metadata)) ->
           detect_script_failure result
@@ -173,7 +173,7 @@ let add_operation ?expect_apply_failure ?expect_failure st op =
                 failwith "Error expected while adding operation"
             | Error e ->
                 f e ) )
-          >|=? fun () ->
+          >>|? fun () ->
           {
             st with
             state;

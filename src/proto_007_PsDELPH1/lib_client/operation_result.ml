@@ -138,14 +138,6 @@ let pp_balance_updates ppf = function
       ()
   | balance_updates ->
       let open Delegate in
-      (* For dry runs, the baker's key is zero
-         (tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU). Instead of printing this
-         key hash, we want to make the result more informative. *)
-      let pp_baker ppf baker =
-        if Signature.Public_key_hash.equal baker Signature.Public_key_hash.zero
-        then Format.fprintf ppf "the baker who will include this operation"
-        else Signature.Public_key_hash.pp ppf baker
-      in
       let balance_updates =
         List.map
           (fun (balance, update) ->
@@ -154,11 +146,26 @@ let pp_balance_updates ppf = function
               | Contract c ->
                   Format.asprintf "%a" Contract.pp c
               | Rewards (pkh, l) ->
-                  Format.asprintf "rewards(%a,%a)" pp_baker pkh Cycle.pp l
+                  Format.asprintf
+                    "rewards(%a,%a)"
+                    Signature.Public_key_hash.pp
+                    pkh
+                    Cycle.pp
+                    l
               | Fees (pkh, l) ->
-                  Format.asprintf "fees(%a,%a)" pp_baker pkh Cycle.pp l
+                  Format.asprintf
+                    "fees(%a,%a)"
+                    Signature.Public_key_hash.pp
+                    pkh
+                    Cycle.pp
+                    l
               | Deposits (pkh, l) ->
-                  Format.asprintf "deposits(%a,%a)" pp_baker pkh Cycle.pp l
+                  Format.asprintf
+                    "deposits(%a,%a)"
+                    Signature.Public_key_hash.pp
+                    pkh
+                    Cycle.pp
+                    l
             in
             (balance, update))
           balance_updates

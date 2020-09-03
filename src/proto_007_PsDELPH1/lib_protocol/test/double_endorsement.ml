@@ -40,14 +40,14 @@ let get_first_different_baker baker bakers =
 
 let get_first_different_bakers ctxt =
   Context.get_bakers ctxt
-  >|=? fun bakers ->
+  >>|? fun bakers ->
   let baker_1 = List.hd bakers in
   get_first_different_baker baker_1 (List.tl bakers)
   |> fun baker_2 -> (baker_1, baker_2)
 
 let get_first_different_endorsers ctxt =
   Context.get_endorsers ctxt
-  >|=? fun endorsers ->
+  >>|? fun endorsers ->
   let endorser_1 = List.hd endorsers in
   let endorser_2 = List.hd (List.tl endorsers) in
   (endorser_1, endorser_2)
@@ -57,7 +57,7 @@ let block_fork b =
   >>=? fun (baker_1, baker_2) ->
   Block.bake ~policy:(By_account baker_1) b
   >>=? fun blk_a ->
-  Block.bake ~policy:(By_account baker_2) b >|=? fun blk_b -> (blk_a, blk_b)
+  Block.bake ~policy:(By_account baker_2) b >>|? fun blk_b -> (blk_a, blk_b)
 
 (****************************************************************)
 (*                        Tests                                 *)

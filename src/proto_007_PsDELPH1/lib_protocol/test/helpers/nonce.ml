@@ -12,7 +12,7 @@ open Protocol
 module Table = Hashtbl.Make (struct
   type t = Nonce_hash.t
 
-  let hash h = Int32.to_int (TzEndian.get_int32 (Nonce_hash.to_bytes h) 0)
+  let hash h = Int32.to_int (MBytes.get_int32 (Nonce_hash.to_bytes h) 0)
 
   let equal = Nonce_hash.equal
 end)

@@ -14,7 +14,6 @@ depends: [
   "tezos-protocol-007-PsDELPH1"
   "tezos-protocol-007-PsDELPH1-parameters"
   "tezos-client-007-PsDELPH1"
-  "alcotest-lwt"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

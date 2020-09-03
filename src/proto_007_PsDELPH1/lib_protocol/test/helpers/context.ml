@@ -107,13 +107,13 @@ let get_endorsers ctxt =
 
 let get_endorser ctxt =
   Alpha_services.Delegate.Endorsing_rights.get rpc_ctxt ctxt
-  >|=? fun endorsers ->
+  >>|? fun endorsers ->
   let endorser = List.hd endorsers in
   (endorser.delegate, endorser.slots)
 
 let get_bakers ctxt =
   Alpha_services.Delegate.Baking_rights.get ~max_priority:256 rpc_ctxt ctxt
-  >|=? fun bakers ->
+  >>|? fun bakers ->
   List.map (fun p -> p.Alpha_services.Delegate.Baking_rights.delegate) bakers
 
 let get_seed_nonce_hash ctxt =
@@ -177,11 +177,11 @@ module Vote = struct
 
   let get_voting_period ctxt =
     Alpha_services.Helpers.current_level rpc_ctxt ~offset:1l ctxt
-    >|=? fun l -> l.voting_period
+    >>|? fun l -> l.voting_period
 
   let get_voting_period_position ctxt =
     Alpha_services.Helpers.current_level rpc_ctxt ~offset:1l ctxt
-    >|=? fun l -> l.voting_period_position
+    >>|? fun l -> l.voting_period_position
 
   let get_current_period_kind ctxt =
     Alpha_services.Voting.current_period_kind rpc_ctxt ctxt
@@ -204,11 +204,11 @@ module Vote = struct
   let get_participation_ema (b : Block.t) =
     Environment.Context.get b.context ["votes"; "participation_ema"]
     >|= function
-    | None -> assert false | Some bytes -> ok (TzEndian.get_int32 bytes 0)
+    | None -> assert false | Some bytes -> ok (MBytes.get_int32 bytes 0)
 
   let set_participation_ema (b : Block.t) ema =
     let bytes = Bytes.make 4 '\000' in
-    TzEndian.set_int32 bytes 0 ema ;
+    MBytes.set_int32 bytes 0 ema ;
     Environment.Context.set b.context ["votes"; "participation_ema"] bytes
     >|= fun context -> {b with context}
 end
@@ -272,7 +272,7 @@ module Contract = struct
         invalid_arg "Helpers.Context.is_manager_key_revealed"
     | Some mgr ->
         Alpha_services.Contract.manager_key rpc_ctxt ctxt mgr
-        >|=? fun res -> res <> None
+        >>|? fun res -> res <> None
 
   let delegate ctxt contract =
     Alpha_services.Contract.delegate rpc_ctxt ctxt contract
@@ -310,4 +310,4 @@ let init ?endorsers_per_block ?with_commitments ?(initial_balances = [])
     ?initial_endorsers
     ?min_proposal_quorum
     accounts
-  >|=? fun blk -> (blk, contracts)
+  >>|? fun blk -> (blk, contracts)

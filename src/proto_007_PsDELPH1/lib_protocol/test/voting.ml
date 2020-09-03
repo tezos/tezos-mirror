@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Protocol
+open Test_utils
 
 (* missing stuff in Alpha_context.Vote *)
 let ballots_zero = Alpha_context.Vote.{yay = 0l; nay = 0l; pass = 0l}
@@ -107,7 +108,7 @@ let mk_contracts_from_pkh pkh_list =
 (* get the list of delegates and the list of their rolls from listings *)
 let get_delegates_and_rolls_from_listings b =
   Context.Vote.get_listings (B b)
-  >|=? fun l -> (mk_contracts_from_pkh (List.map fst l), List.map snd l)
+  >>|? fun l -> (mk_contracts_from_pkh (List.map fst l), List.map snd l)
 
 (* compute the rolls of each delegate *)
 let get_rolls b delegates loc =

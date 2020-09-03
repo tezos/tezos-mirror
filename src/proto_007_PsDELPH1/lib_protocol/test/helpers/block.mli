@@ -58,7 +58,7 @@ val get_endorsing_power : block -> int tzresult Lwt.t
 
 module Forge : sig
   val contents :
-    ?proof_of_work_nonce:Bytes.t ->
+    ?proof_of_work_nonce:MBytes.t ->
     ?priority:int ->
     ?seed_nonce_hash:Nonce_hash.t ->
     unit ->

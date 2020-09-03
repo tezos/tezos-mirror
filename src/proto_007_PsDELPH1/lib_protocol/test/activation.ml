@@ -37,6 +37,7 @@
 
 open Protocol
 open Alpha_context
+open Test_utils
 open Test_tez
 
 (* Generated commitments and secrets  *)
@@ -75,9 +76,11 @@ let secrets () =
         assert false
     | Some t ->
         (* TODO: unicode normalization (NFKD)... *)
-        let passphrase = Bytes.(cat (of_string email) (of_string password)) in
+        let passphrase =
+          Bigstring.(concat "" [of_string email; of_string password])
+        in
         let sk = Tezos_client_base.Bip39.to_seed ~passphrase t in
-        let sk = Bytes.sub sk 0 32 in
+        let sk = Bigstring.sub_bytes sk 0 32 in
         let sk : Signature.Secret_key.t =
           Ed25519
             (Data_encoding.Binary.of_bytes_exn Ed25519.Secret_key.encoding sk)
@@ -304,7 +307,7 @@ let secrets () =
 
 let activation_init () =
   Context.init ~with_commitments:true 1
-  >|=? fun (b, cs) -> secrets () |> fun ss -> (b, cs, ss)
+  >>|? fun (b, cs) -> secrets () |> fun ss -> (b, cs, ss)
 
 let simple_init_with_commitments () =
   activation_init ()
@@ -351,7 +354,7 @@ let multi_activation_1 () =
         (B blk)
         (Contract.implicit_contract account)
         expected_amount
-      >|=? fun () -> blk)
+      >>|? fun () -> blk)
     blk
     secrets
   >>=? fun _ -> return_unit
@@ -362,7 +365,7 @@ let multi_activation_2 () =
   >>=? fun (blk, _contracts, secrets) ->
   Error_monad.fold_left_s
     (fun ops {account; activation_code; _} ->
-      Op.activation (B blk) account activation_code >|=? fun op -> op :: ops)
+      Op.activation (B blk) account activation_code >>|? fun op -> op :: ops)
     []
     secrets
   >>=? fun ops ->

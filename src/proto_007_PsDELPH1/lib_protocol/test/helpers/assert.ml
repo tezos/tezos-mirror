@@ -104,8 +104,8 @@ let balance_is ~loc b contract ?(kind = Contract.Main) expected =
     [Rewards] for the others. *)
 let balance_was_operated ~operand ~loc b contract ?(kind = Contract.Main)
     old_balance amount =
-  operand old_balance amount |> Environment.wrap_error
-  >>?= fun expected -> balance_is ~loc b contract ~kind expected
+  Lwt.return (operand old_balance amount |> Environment.wrap_error)
+  >>=? fun expected -> balance_is ~loc b contract ~kind expected
 
 let balance_was_credited =
   balance_was_operated ~operand:Alpha_context.Tez.( +? )
@@ -123,7 +123,7 @@ let print_balances ctxt id =
   Contract.balance ~kind:Fees ctxt id
   >>=? fun fees ->
   Contract.balance ~kind:Rewards ctxt id
-  >|=? fun rewards ->
+  >>|? fun rewards ->
   Format.printf
     "\nMain: %s\nDeposit: %s\nFees: %s\nRewards: %s\n"
     (Alpha_context.Tez.to_string main)

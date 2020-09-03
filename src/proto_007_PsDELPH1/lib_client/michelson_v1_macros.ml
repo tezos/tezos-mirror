@@ -176,7 +176,7 @@ let expand_set_caddadr original =
                   ( loc,
                     "PAIR",
                     [],
-                    [Option.value field_annot ~default:"%"; "%@"] ) ]
+                    [Option.unopt field_annot ~default:"%"; "%@"] ) ]
             in
             let init = Seq (loc, access_check @ encoding @ pair) in
             ok (Some (parse (len - 3) init))
@@ -196,7 +196,7 @@ let expand_set_caddadr original =
                   ( loc,
                     "PAIR",
                     [],
-                    ["%@"; Option.value field_annot ~default:"%"] ) ]
+                    ["%@"; Option.unopt field_annot ~default:"%"] ) ]
             in
             let init = Seq (loc, access_check @ encoding @ pair) in
             ok (Some (parse (len - 3) init))
@@ -297,7 +297,7 @@ let expand_map_caddadr original =
                       ( loc,
                         "PAIR",
                         [],
-                        [Option.value field_annot ~default:"%"; "%@"] ) ] )
+                        [Option.unopt field_annot ~default:"%"; "%@"] ) ] )
             in
             ok (Some (parse (len - 3) init))
         | 'D' ->
@@ -313,7 +313,7 @@ let expand_map_caddadr original =
                       ( loc,
                         "PAIR",
                         [],
-                        ["%@"; Option.value field_annot ~default:"%"] ) ] )
+                        ["%@"; Option.unopt field_annot ~default:"%"] ) ] )
             in
             ok (Some (parse (len - 3) init))
         | _ ->

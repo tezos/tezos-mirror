@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Protocol
+open Test_utils
 open Test_tez
 
 let ten_tez = Tez.of_int 10
@@ -60,7 +61,7 @@ let register_origination ?(fee = Tez.zero) ?(credit = Tez.zero) () =
   >>=? fun () ->
   (* originated contract has been credited *)
   Assert.balance_was_credited ~loc:__LOC__ (B b) originated Tez.zero credit
-  >|=? fun () ->
+  >>|? fun () ->
   (* TODO spendable or not and delegatable or not if relevant for some
      test. Not the case at the moment, cf. uses of
      register_origination *)
@@ -207,7 +208,7 @@ let register_contract_get_endorser () =
   Incremental.begin_construction b
   >>=? fun inc ->
   Context.get_endorser (I inc)
-  >|=? fun (account_endorser, _slots) -> (inc, contract, account_endorser)
+  >>|? fun (account_endorser, _slots) -> (inc, contract, account_endorser)
 
 (*******************)
 (** create multiple originated contracts and
@@ -219,7 +220,7 @@ let n_originations n ?credit ?fee () =
   fold_left_s
     (fun new_contracts _ ->
       register_origination ?fee ?credit ()
-      >|=? fun (_b, _source, new_contract) -> new_contract :: new_contracts)
+      >>|? fun (_b, _source, new_contract) -> new_contract :: new_contracts)
     []
     (1 -- n)
 

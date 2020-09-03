@@ -365,7 +365,7 @@ let commands version () =
               ~contract);
     command
       ~group
-      ~desc:"Get the list of unreachable paths in a contract's parameter type."
+      ~desc:"Get the list of unreachable pathsin a contract's parameter type."
       no_options
       ( prefixes ["get"; "contract"; "unreachable"; "paths"; "for"]
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
@@ -1259,7 +1259,7 @@ let commands version () =
                   return_unit
               | Error errs ->
                   ( match errs with
-                  | [ Unregistered_error
+                  | [ Unregistred_error
                         (`O
                           [("kind", `String "generic"); ("error", `String msg)])
                     ] ->

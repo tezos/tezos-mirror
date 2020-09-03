@@ -98,7 +98,7 @@ let bootstrap_accounts_strings =
     "edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU";
     "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n" ]
 
-let bootstrap_balance = Tez_repr.of_mutez_exn 4_000_000_000_000L
+let boostrap_balance = Tez_repr.of_mutez_exn 4_000_000_000_000L
 
 let bootstrap_accounts =
   List.map
@@ -109,12 +109,12 @@ let bootstrap_accounts =
         {
           public_key_hash;
           public_key = Some public_key;
-          amount = bootstrap_balance;
+          amount = boostrap_balance;
         })
     bootstrap_accounts_strings
 
 (* TODO this could be generated from OCaml together with the faucet
-   for now these are hardcoded values in the tests *)
+   for now these are harcoded values in the tests *)
 let commitments =
   let json_result =
     Data_encoding.Json.from_string

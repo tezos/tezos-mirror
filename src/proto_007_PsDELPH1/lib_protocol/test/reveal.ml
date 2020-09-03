@@ -42,7 +42,7 @@ let simple_reveal () =
   Block.bake blk ~operation
   >>=? fun blk ->
   Context.Contract.is_manager_key_revealed (B blk) new_contract
-  >|=? (function
+  >>|? (function
          | true -> Stdlib.failwith "Unexpected revelation" | false -> ())
   >>=? fun () ->
   (* Reveal the contract *)
@@ -51,7 +51,7 @@ let simple_reveal () =
   Block.bake blk ~operation
   >>=? fun blk ->
   Context.Contract.is_manager_key_revealed (B blk) new_contract
-  >|=? function
+  >>|? function
   | true -> () | false -> Stdlib.failwith "New contract revelation failed."
 
 let empty_account_on_reveal () =
@@ -67,7 +67,7 @@ let empty_account_on_reveal () =
   Block.bake blk ~operation
   >>=? fun blk ->
   Context.Contract.is_manager_key_revealed (B blk) new_contract
-  >|=? (function
+  >>|? (function
          | true -> Stdlib.failwith "Unexpected revelation" | false -> ())
   >>=? fun () ->
   (* Reveal the contract *)
@@ -80,7 +80,7 @@ let empty_account_on_reveal () =
   Block.bake blk ~operation
   >>=? fun blk ->
   Context.Contract.is_manager_key_revealed (B blk) new_contract
-  >|=? function
+  >>|? function
   | false ->
       ()
   | true ->
@@ -98,7 +98,7 @@ let not_enough_found_for_reveal () =
   Block.bake blk ~operation
   >>=? fun blk ->
   Context.Contract.is_manager_key_revealed (B blk) new_contract
-  >|=? (function
+  >>|? (function
          | true -> Stdlib.failwith "Unexpected revelation" | false -> ())
   >>=? fun () ->
   (* Reveal the contract *)

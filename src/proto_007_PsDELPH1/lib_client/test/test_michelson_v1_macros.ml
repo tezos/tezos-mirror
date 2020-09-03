@@ -522,7 +522,7 @@ let test_map_cdadr () =
 (* Unexpand tests *)
 (****************************************************************************)
 
-(* unexpanded : original expression with macros *)
+(* unpexpanded : original expression with macros *)
 
 let assert_unexpansion original ex =
   let ({Michelson_v1_parser.expanded; _}, errors) =
@@ -1061,8 +1061,7 @@ let wrap (n, f) =
           Format.kasprintf Stdlib.failwith "%a" pp_print_error error)
 
 let () =
-  Alcotest_lwt.run
+  Alcotest.run
     ~argv:[|""|]
     "tezos-lib-client"
     [("micheline v1 macros", List.map wrap tests)]
-  |> Lwt_main.run

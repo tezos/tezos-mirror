@@ -66,10 +66,9 @@ let bytes_param ~name ~desc =
   Clic.param ~name ~desc Client_proto_args.bytes_parameter
 
 let transfer_options =
-  Clic.args13
+  Clic.args12
     Client_proto_args.fee_arg
     Client_proto_context_commands.dry_run_switch
-    Client_proto_context_commands.verbose_signing_switch
     Client_proto_args.gas_limit_arg
     Client_proto_args.storage_limit_arg
     Client_proto_args.counter_arg
@@ -81,45 +80,12 @@ let transfer_options =
     Client_proto_args.fee_cap_arg
     Client_proto_args.burn_cap_arg
 
-let prepare_command_display prepared_command bytes_only =
-  if bytes_only then
-    Format.printf
-      "0x%a@."
-      Hex.pp
-      (Hex.of_bytes prepared_command.Client_proto_multisig.bytes)
-  else
-    Format.printf
-      "%a@.%a@.%a@.%a@."
-      (fun ppf x ->
-        Format.fprintf ppf "Bytes to sign: '0x%a'" Hex.pp (Hex.of_bytes x))
-      prepared_command.Client_proto_multisig.bytes
-      (fun ppf x ->
-        Format.fprintf
-          ppf
-          "Blake 2B Hash: '%s'"
-          (Base58.raw_encode Blake2B.(hash_bytes [x] |> to_string)))
-      prepared_command.Client_proto_multisig.bytes
-      (fun ppf z ->
-        Format.fprintf
-          ppf
-          "Threshold (number of signatures required): %s"
-          (Z.to_string z))
-      prepared_command.Client_proto_multisig.threshold
-      (fun ppf ->
-        Format.fprintf
-          ppf
-          "@[<2>Public keys of the signers:@ %a@]"
-          (Format.pp_print_list
-             ~pp_sep:(fun ppf () -> Format.fprintf ppf "@ ")
-             Signature.Public_key.pp))
-      prepared_command.Client_proto_multisig.keys
-
 let commands () : #Protocol_client_context.full Clic.command list =
   Clic.
     [ command
         ~group
         ~desc:"Originate a new multisig contract."
-        (args14
+        (args13
            Client_proto_args.fee_arg
            Client_proto_context_commands.dry_run_switch
            Client_proto_args.gas_limit_arg
@@ -132,7 +98,6 @@ let commands () : #Protocol_client_context.full Clic.command list =
            Client_proto_args.minimal_nanotez_per_gas_unit_arg
            Client_proto_args.force_low_fee_arg
            Client_proto_args.fee_cap_arg
-           Client_proto_context_commands.verbose_signing_switch
            Client_proto_args.burn_cap_arg)
         ( prefixes ["deploy"; "multisig"]
         @@ Client_proto_contracts.RawContractAlias.fresh_alias_param
@@ -162,7 +127,6 @@ let commands () : #Protocol_client_context.full Clic.command list =
                minimal_nanotez_per_gas_unit,
                force_low_fee,
                fee_cap,
-               verbose_signing,
                burn_cap )
              alias_name
              balance
@@ -203,7 +167,6 @@ let commands () : #Protocol_client_context.full Clic.command list =
                 ?fee
                 ?gas_limit
                 ?storage_limit
-                ~verbose_signing
                 ~delegate
                 ~threshold:(Z.of_int threshold)
                 ~keys
@@ -263,7 +226,37 @@ let commands () : #Protocol_client_context.full Clic.command list =
             ~action:(Client_proto_multisig.Transfer (amount, destination))
             ()
           >>=? fun prepared_command ->
-          return @@ prepare_command_display prepared_command bytes_only);
+          return
+          @@
+          if bytes_only then
+            Format.printf
+              "0x%a@."
+              Hex.pp
+              (Hex.of_bytes prepared_command.Client_proto_multisig.bytes)
+          else
+            Format.printf
+              "%a@.%a@.%a@."
+              (fun ppf x ->
+                Format.fprintf
+                  ppf
+                  "Bytes to sign: '0x%a'"
+                  Hex.pp
+                  (Hex.of_bytes x))
+              prepared_command.Client_proto_multisig.bytes
+              (fun ppf z ->
+                Format.fprintf
+                  ppf
+                  "Threshold (number of signatures required): %s"
+                  (Z.to_string z))
+              prepared_command.Client_proto_multisig.threshold
+              (fun ppf ->
+                Format.fprintf
+                  ppf
+                  "@[<2>Public keys of the signers:@ %a@]"
+                  (Format.pp_print_list
+                     ~pp_sep:(fun ppf () -> Format.fprintf ppf "@ ")
+                     Signature.Public_key.pp))
+              prepared_command.Client_proto_multisig.keys);
       command
         ~group
         ~desc:
@@ -291,7 +284,37 @@ let commands () : #Protocol_client_context.full Clic.command list =
             ~action:(Client_proto_multisig.Change_delegate (Some new_delegate))
             ()
           >>=? fun prepared_command ->
-          return @@ prepare_command_display prepared_command bytes_only);
+          return
+          @@
+          if bytes_only then
+            Format.printf
+              "0x%a@."
+              Hex.pp
+              (Hex.of_bytes prepared_command.Client_proto_multisig.bytes)
+          else
+            Format.printf
+              "%a@.%a@.%a@."
+              (fun ppf x ->
+                Format.fprintf
+                  ppf
+                  "Bytes to sign: '0x%a'"
+                  Hex.pp
+                  (Hex.of_bytes x))
+              prepared_command.Client_proto_multisig.bytes
+              (fun ppf z ->
+                Format.fprintf
+                  ppf
+                  "Threshold (number of signatures required): %s"
+                  (Z.to_string z))
+              prepared_command.Client_proto_multisig.threshold
+              (fun ppf ->
+                Format.fprintf
+                  ppf
+                  "@[<2>Public keys of the signers:@ %a@]"
+                  (Format.pp_print_list
+                     ~pp_sep:(fun ppf () -> Format.fprintf ppf "@ ")
+                     Signature.Public_key.pp))
+              prepared_command.Client_proto_multisig.keys);
       command
         ~group
         ~desc:
@@ -315,7 +338,37 @@ let commands () : #Protocol_client_context.full Clic.command list =
             ~action:(Client_proto_multisig.Change_delegate None)
             ()
           >>=? fun prepared_command ->
-          return @@ prepare_command_display prepared_command bytes_only);
+          return
+          @@
+          if bytes_only then
+            Format.printf
+              "0x%a@."
+              Hex.pp
+              (Hex.of_bytes prepared_command.Client_proto_multisig.bytes)
+          else
+            Format.printf
+              "%a@.%a@.%a@."
+              (fun ppf x ->
+                Format.fprintf
+                  ppf
+                  "Bytes to sign: '0x%a'"
+                  Hex.pp
+                  (Hex.of_bytes x))
+              prepared_command.Client_proto_multisig.bytes
+              (fun ppf z ->
+                Format.fprintf
+                  ppf
+                  "Threshold (number of signatures required): %s"
+                  (Z.to_string z))
+              prepared_command.Client_proto_multisig.threshold
+              (fun ppf ->
+                Format.fprintf
+                  ppf
+                  "@[<2>Public keys of the signers:@ %a@]"
+                  (Format.pp_print_list
+                     ~pp_sep:(fun ppf () -> Format.fprintf ppf "@ ")
+                     Signature.Public_key.pp))
+              prepared_command.Client_proto_multisig.keys);
       command
         ~group
         ~desc:
@@ -346,7 +399,37 @@ let commands () : #Protocol_client_context.full Clic.command list =
               (Client_proto_multisig.Change_keys (Z.of_int new_threshold, keys))
             ()
           >>=? fun prepared_command ->
-          return @@ prepare_command_display prepared_command bytes_only);
+          return
+          @@
+          if bytes_only then
+            Format.printf
+              "0x%a@."
+              Hex.pp
+              (Hex.of_bytes prepared_command.Client_proto_multisig.bytes)
+          else
+            Format.printf
+              "%a@.%a@.%a@."
+              (fun ppf x ->
+                Format.fprintf
+                  ppf
+                  "Bytes to sign: '0x%a'"
+                  Hex.pp
+                  (Hex.of_bytes x))
+              prepared_command.Client_proto_multisig.bytes
+              (fun ppf z ->
+                Format.fprintf
+                  ppf
+                  "Threshold (number of signatures required): %s"
+                  (Z.to_string z))
+              prepared_command.Client_proto_multisig.threshold
+              (fun ppf ->
+                Format.fprintf
+                  ppf
+                  "@[<2>Public keys of the signers:@ %a@]"
+                  (Format.pp_print_list
+                     ~pp_sep:(fun ppf () -> Format.fprintf ppf "@ ")
+                     Signature.Public_key.pp))
+              prepared_command.Client_proto_multisig.keys);
       command
         ~group
         ~desc:"Sign a transaction for a multisig contract."
@@ -497,7 +580,6 @@ let commands () : #Protocol_client_context.full Clic.command list =
         @@ seq_of_param (signature_param ()) )
         (fun ( fee,
                dry_run,
-               verbose_signing,
                gas_limit,
                storage_limit,
                counter,
@@ -537,7 +619,6 @@ let commands () : #Protocol_client_context.full Clic.command list =
                 ~block:cctxt#block
                 ?confirmations:cctxt#confirmations
                 ~dry_run
-                ~verbose_signing
                 ~fee_parameter
                 ~source
                 ?fee
@@ -577,7 +658,6 @@ let commands () : #Protocol_client_context.full Clic.command list =
         @@ seq_of_param (signature_param ()) )
         (fun ( fee,
                dry_run,
-               verbose_signing,
                gas_limit,
                storage_limit,
                counter,
@@ -616,7 +696,6 @@ let commands () : #Protocol_client_context.full Clic.command list =
                 ~block:cctxt#block
                 ?confirmations:cctxt#confirmations
                 ~dry_run
-                ~verbose_signing
                 ~fee_parameter
                 ~source
                 ?fee
@@ -638,7 +717,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
               | None -> return_unit | Some (_res, _contracts) -> return_unit ));
       command
         ~group
-        ~desc:"Withdraw the delegate of a multisig contract."
+        ~desc:"Withdrow the delegate of a multisig contract."
         transfer_options
         ( prefixes ["withdraw"; "delegate"; "of"; "multisig"; "contract"]
         @@ Client_proto_contracts.ContractAlias.destination_param
@@ -652,7 +731,6 @@ let commands () : #Protocol_client_context.full Clic.command list =
         @@ seq_of_param (signature_param ()) )
         (fun ( fee,
                dry_run,
-               verbose_signing,
                gas_limit,
                storage_limit,
                counter,
@@ -690,7 +768,6 @@ let commands () : #Protocol_client_context.full Clic.command list =
                 ~block:cctxt#block
                 ?confirmations:cctxt#confirmations
                 ~dry_run
-                ~verbose_signing
                 ~fee_parameter
                 ~source
                 ?fee
@@ -742,7 +819,6 @@ let commands () : #Protocol_client_context.full Clic.command list =
         @@ seq_of_param (signature_param ()) )
         (fun ( fee,
                dry_run,
-               verbose_signing,
                gas_limit,
                storage_limit,
                counter,
@@ -781,7 +857,6 @@ let commands () : #Protocol_client_context.full Clic.command list =
                 ~block:cctxt#block
                 ?confirmations:cctxt#confirmations
                 ~dry_run
-                ~verbose_signing
                 ~fee_parameter
                 ~source
                 ?fee

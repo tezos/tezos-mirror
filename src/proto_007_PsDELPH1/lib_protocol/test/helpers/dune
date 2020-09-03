@@ -1,8 +1,7 @@
 (library
  (name tezos_007_PsDELPH1_test_helpers)
  (public_name tezos-007-PsDELPH1-test-helpers)
- (libraries alcotest-lwt
-            tezos-base
+ (libraries tezos-base
             tezos-stdlib-unix
             tezos-shell-services
             tezos-protocol-environment
@@ -13,8 +12,6 @@
                    -open Tezos_micheline
                    -open Tezos_stdlib_unix
                    -open Tezos_protocol_007_PsDELPH1
-                   -open Tezos_client_007_PsDELPH1
-                   -open Tezos_protocol_environment_007_PsDELPH1
                    -open Tezos_shell_services)))
 
 (alias

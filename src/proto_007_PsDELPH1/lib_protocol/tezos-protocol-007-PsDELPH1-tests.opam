@@ -10,11 +10,10 @@ depends: [
   "dune" { >= "1.11" }
   "tezos-base"
   "tezos-protocol-compiler"
-  "alcotest-lwt" { with-test & >= "1.1.0" }
+  "alcotest-lwt" { with-test & = "0.8.5" }
   "tezos-007-PsDELPH1-test-helpers" { with-test }
   "tezos-stdlib-unix" { with-test }
   "tezos-protocol-environment" { with-test }
-  "tezos-test-services" { with-test }
   "tezos-client-base" { with-test }
   "tezos-protocol-007-PsDELPH1-parameters" { with-test }
   "tezos-shell-services" { with-test }

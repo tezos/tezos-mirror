@@ -31,7 +31,6 @@ module Endorser : sig
     #Protocol_client_context.full ->
     chain:Chain_services.chain ->
     delay:int ->
-    keep_alive:bool ->
     public_key_hash list ->
     unit tzresult Lwt.t
 end
@@ -45,7 +44,6 @@ module Baker : sig
     ?max_priority:int ->
     chain:Chain_services.chain ->
     context_path:string ->
-    keep_alive:bool ->
     public_key_hash list ->
     unit tzresult Lwt.t
 end
@@ -55,6 +53,5 @@ module Accuser : sig
     #Protocol_client_context.full ->
     chain:Chain_services.chain ->
     preserved_levels:int ->
-    keep_alive:bool ->
     unit tzresult Lwt.t
 end

@@ -102,8 +102,8 @@ let revelation_early_wrong_right_twice () =
   (* the baker [id] will include a seed_nonce commitment *)
   Block.bake ~policy:(Block.By_account pkh) b
   >>=? fun b ->
-  Context.get_level (B b)
-  >>?= fun level_commitment ->
+  Lwt.return (Context.get_level (B b))
+  >>=? fun level_commitment ->
   Context.get_seed_nonce_hash (B b)
   >>=? fun committed_hash ->
   baking_reward (B b) b
@@ -171,8 +171,8 @@ let revelation_early_wrong_right_twice () =
     baker_bal_deposit
     bond
   >>=? fun () ->
-  Tez.( +? ) baker_reward tip
-  >>?= fun expected_rewards ->
+  Lwt.return Tez.(baker_reward +? tip)
+  >>=? fun expected_rewards ->
   balance_was_credited
     ~loc:__LOC__
     (B b)
@@ -232,8 +232,8 @@ let revelation_missing_and_late () =
   let id = Alpha_context.Contract.implicit_contract pkh in
   Block.bake b
   >>=? fun b ->
-  Context.get_level (B b)
-  >>?= fun level_commitment ->
+  Lwt.return (Context.get_level (B b))
+  >>=? fun level_commitment ->
   Context.get_seed_nonce_hash (B b)
   >>=? fun committed_hash ->
   Context.Contract.balance ~kind:Main (B b) id

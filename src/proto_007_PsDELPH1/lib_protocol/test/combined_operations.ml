@@ -36,6 +36,7 @@
 
 open Protocol
 open Test_tez
+open Test_utils
 
 let ten_tez = Tez.of_int 10
 

@@ -28,20 +28,6 @@ include Internal_event.Legacy_logging.Make_semantic (struct
 end)
 
 open Logging
-open Protocol_client_context
-
-type error += Node_connection_lost
-
-let () =
-  register_error_kind
-    `Temporary
-    ~id:"client_baking_scheduling.node_connection_lost"
-    ~title:"Node connection lost"
-    ~description:"The connection with the node was lost."
-    ~pp:(fun fmt () -> Format.fprintf fmt "Lost connection with the node")
-    Data_encoding.empty
-    (function Node_connection_lost -> Some () | _ -> None)
-    (fun () -> Node_connection_lost)
 
 let sleep_until time =
   (* Sleeping is a system op, baking is a protocol op, this is where we convert *)
@@ -91,7 +77,7 @@ let main ~(name : string) ~(cctxt : #Protocol_client_context.full)
        unit tzresult Lwt.t)
     ~(event_k :
        #Protocol_client_context.full -> 'state -> 'event -> unit tzresult Lwt.t)
-    ~finalizer =
+    =
   lwt_log_info
     Tag.DSL.(
       fun f ->
@@ -113,12 +99,14 @@ let main ~(name : string) ~(cctxt : #Protocol_client_context.full)
   in
   state_maker first_event
   >>=? fun state ->
+  log_errors_and_continue ~name @@ pre_loop cctxt state first_event
+  >>= fun () ->
   (* main loop *)
   let rec worker_loop () =
     (* event construction *)
     let timeout = compute_timeout state in
     Lwt.choose
-      [ (Lwt_exit.clean_up_starts >|= fun _ -> `Termination);
+      [ (Lwt_exit.termination_thread >|= fun _ -> `Termination);
         (timeout >|= fun timesup -> `Timeout timesup);
         (get_event () >|= fun e -> `Event e) ]
     >>= function
@@ -134,7 +122,7 @@ let main ~(name : string) ~(cctxt : #Protocol_client_context.full)
               f "Connection to node lost, %s exiting."
               -% t event "daemon_connection_lost"
               -% s worker_tag name)
-        >>= fun () -> fail Node_connection_lost
+        >>= fun () -> return_unit
     | `Event (Some (Ok event)) ->
         (* new event: cancel everything and execute callback *)
         last_get_event := None ;
@@ -158,9 +146,4 @@ let main ~(name : string) ~(cctxt : #Protocol_client_context.full)
     Tag.DSL.(
       fun f ->
         f "Starting %s daemon" -% t event "daemon_start" -% s worker_tag name)
-  >>= fun () ->
-  Lwt.finalize
-    (fun () ->
-      log_errors_and_continue ~name @@ pre_loop cctxt state first_event
-      >>= fun () -> worker_loop ())
-    (fun () -> finalizer state)
+  >>= fun () -> worker_loop ()

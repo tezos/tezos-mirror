@@ -192,16 +192,16 @@ let () =
     ~description:
       "When trying to deserialise an action from a sequence of bytes, we got \
        an action for another multisig contract"
-    ~pp:(fun ppf (received, expected) ->
+    ~pp:(fun ppf (recieved, expected) ->
       Format.fprintf
         ppf
-        "Bad deserialized contract, received %a expected %a."
+        "Bad deserialized contract, recieved %a expected %a."
         Contract.pp
-        received
+        recieved
         Contract.pp
         expected)
     Data_encoding.(
-      obj1 (req "received_expected" (tup2 Contract.encoding Contract.encoding)))
+      obj1 (req "recieved_expected" (tup2 Contract.encoding Contract.encoding)))
     (function Bad_deserialized_contract b -> Some b | _ -> None)
     (fun b -> Bad_deserialized_contract b) ;
   register_error_kind
@@ -211,13 +211,13 @@ let () =
     ~description:
       "The byte sequence references a multisig counter that does not match \
        the one currently stored in the given multisig contract"
-    ~pp:(fun ppf (received, expected) ->
+    ~pp:(fun ppf (recieved, expected) ->
       Format.fprintf
         ppf
-        "Bad deserialized counter, received %d expected %d."
-        received
+        "Bad deserialized counter, recieved %d expected %d."
+        recieved
         expected)
-    Data_encoding.(obj1 (req "received_expected" (tup2 int31 int31)))
+    Data_encoding.(obj1 (req "recieved_expected" (tup2 int31 int31)))
     (function
       | Bad_deserialized_counter (c1, c2) ->
           Some (Z.to_int c1, Z.to_int c2)
@@ -237,7 +237,7 @@ let () =
         "Threshold too high: %d expected at most %d."
         threshold
         nkeys)
-    Data_encoding.(obj1 (req "received_expected" (tup2 int31 int31)))
+    Data_encoding.(obj1 (req "recieved_expected" (tup2 int31 int31)))
     (function Threshold_too_high (c1, c2) -> Some (c1, c2) | _ -> None)
     (fun (c1, c2) -> Threshold_too_high (c1, c2)) ;
   register_error_kind
@@ -281,7 +281,7 @@ let multisig_script_string =
   \        UNPAIR ;\n\
   \        # pair the payload with the current contract address, to ensure \
    signatures\n\
-  \        # can't be replayed across different contracts if a key is reused.\n\
+  \        # can't be replayed accross different contracts if a key is reused.\n\
   \        DUP ; SELF ; ADDRESS ; CHAIN_ID ; PAIR ; PAIR ;\n\
   \        PACK ; # form the binary payload that we expect to be signed\n\
   \        DIP { UNPAIR @counter ; DIP { SWAP } } ; SWAP\n\
@@ -375,7 +375,7 @@ type multisig_contract_description = {
 }
 
 let script_hash_of_hex_string s =
-  Script_expr_hash.of_bytes_exn @@ Hex.to_bytes @@ `Hex s
+  Script_expr_hash.of_bytes_exn @@ MBytes.of_hex @@ `Hex s
 
 (* List of known multisig contracts hashes with their kinds *)
 let known_multisig_contracts : multisig_contract_description list =
@@ -658,7 +658,7 @@ let multisig_create_param ~counter ~action ~optional_signatures () :
        (pair ~loc (int ~loc counter) (action_to_expr ~loc action))
        (Seq (loc, l))
 
-let multisig_param_string ~counter ~action ~optional_signatures () =
+let mutlisig_param_string ~counter ~action ~optional_signatures () =
   multisig_create_param ~counter ~action ~optional_signatures ()
   >>=? fun expr ->
   return @@ Format.asprintf "%a" Michelson_v1_printer.print_expr expr
@@ -698,9 +698,8 @@ let check_threshold ~threshold ~keys () =
   else return_unit
 
 let originate_multisig (cctxt : #Protocol_client_context.full) ~chain ~block
-    ?confirmations ?dry_run ?branch ?fee ?gas_limit ?storage_limit
-    ?verbose_signing ~delegate ~threshold ~keys ~balance ~source ~src_pk
-    ~src_sk ~fee_parameter () =
+    ?confirmations ?dry_run ?branch ?fee ?gas_limit ?storage_limit ~delegate
+    ~threshold ~keys ~balance ~source ~src_pk ~src_sk ~fee_parameter () =
   multisig_storage_string ~counter:Z.zero ~threshold ~keys ()
   >>=? fun initial_storage ->
   check_threshold ~threshold ~keys ()
@@ -715,7 +714,6 @@ let originate_multisig (cctxt : #Protocol_client_context.full) ~chain ~block
     ?fee
     ?gas_limit
     ?storage_limit
-    ?verbose_signing
     ~delegate
     ~initial_storage
     ~balance
@@ -783,9 +781,9 @@ let check_multisig_signatures ~bytes ~threshold ~keys signatures =
   else fail (Not_enough_signatures (threshold_int, signature_count))
 
 let call_multisig (cctxt : #Protocol_client_context.full) ~chain ~block
-    ?confirmations ?dry_run ?verbose_signing ?branch ~source ~src_pk ~src_sk
-    ~multisig_contract ~action ~signatures ~amount ?fee ?gas_limit
-    ?storage_limit ?counter ~fee_parameter () =
+    ?confirmations ?dry_run ?branch ~source ~src_pk ~src_sk ~multisig_contract
+    ~action ~signatures ~amount ?fee ?gas_limit ?storage_limit ?counter
+    ~fee_parameter () =
   prepare_multisig_transaction
     cctxt
     ~chain
@@ -796,7 +794,7 @@ let call_multisig (cctxt : #Protocol_client_context.full) ~chain ~block
   >>=? fun {bytes; threshold; keys; counter = stored_counter} ->
   check_multisig_signatures ~bytes ~threshold ~keys signatures
   >>=? fun optional_signatures ->
-  multisig_param_string ~counter:stored_counter ~action ~optional_signatures ()
+  mutlisig_param_string ~counter:stored_counter ~action ~optional_signatures ()
   >>=? fun arg ->
   Client_proto_context.transfer
     cctxt
@@ -816,7 +814,6 @@ let call_multisig (cctxt : #Protocol_client_context.full) ~chain ~block
     ?storage_limit
     ?counter
     ~fee_parameter
-    ?verbose_signing
     ()
 
 let action_of_bytes ~multisig_contract ~stored_counter ~descr ~chain_id bytes =
@@ -880,8 +877,8 @@ let action_of_bytes ~multisig_contract ~stored_counter ~descr ~chain_id bytes =
   else fail (Bytes_deserialisation_error bytes)
 
 let call_multisig_on_bytes (cctxt : #Protocol_client_context.full) ~chain
-    ~block ?confirmations ?dry_run ?verbose_signing ?branch ~source ~src_pk
-    ~src_sk ~multisig_contract ~bytes ~signatures ~amount ?fee ?gas_limit
+    ~block ?confirmations ?dry_run ?branch ~source ~src_pk ~src_sk
+    ~multisig_contract ~bytes ~signatures ~amount ?fee ?gas_limit
     ?storage_limit ?counter ~fee_parameter () =
   multisig_get_information cctxt ~chain ~block multisig_contract
   >>=? fun info ->
@@ -915,5 +912,4 @@ let call_multisig_on_bytes (cctxt : #Protocol_client_context.full) ~chain
     ?storage_limit
     ?counter
     ~fee_parameter
-    ?verbose_signing
     ()
