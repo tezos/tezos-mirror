@@ -10,6 +10,7 @@
    test_lwt_exit_unregister_clean_up_with_after
    test_lwt_exit_raise
    test_lwt_exit_raise_exit
+   test_lwt_exit_range_of_signals
    )
  (libraries tezos-stdlib-unix
             tezos-stdlib
@@ -97,6 +98,14 @@
  (action (run %{exe:test_lwt_exit_raise_exit.exe})))
 
 (alias
+ (name buildtest)
+ (deps test_lwt_exit_range_of_signals.exe))
+
+(alias
+ (name runtest_test_lwt_exit_range_of_signals)
+ (action (run %{exe:test_lwt_exit_range_of_signals.exe})))
+
+(alias
  (name runtest)
  (package tezos-stdlib-unix)
  (deps (alias runtest_lwt_exit_exit)
@@ -109,6 +118,7 @@
        (alias runtest_test_lwt_exit_unregister_clean_up_with_after)
        (alias runtest_test_lwt_exit_raise)
        (alias runtest_test_lwt_exit_raise_exit)
+       (alias runtest_test_lwt_exit_range_of_signals)
  ))
 
 (alias
