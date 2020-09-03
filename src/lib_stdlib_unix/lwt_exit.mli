@@ -105,7 +105,8 @@ val exit_and_wait : int -> int Lwt.t
 
     After the clean-up has started, and after a safety period has elapsed,
     sending the same soft-handled signal a second time terminates the
-    process immediately. The safety period is set by the parameter to 
+    process immediately. The safety period is set by the parameter
+    [double_signal_safety] of the [wrap_and_*] functions (below).
 
     A hard signal handler is one that terminates the process immediately.
 
@@ -124,7 +125,7 @@ val make_signal_setup : soft:int list -> hard:int list -> signal_setup
 
     Note that pressing Ctrl-C sends [SIGINT] to the process whilst shutting it
     down through systemd sends [SIGTERM]. This is the reasoning behind the
-    default: both of those signals should be handled softly. *)
+    default: both of those signals should be handled softly in most cases. *)
 val default_signal_setup : signal_setup
 
 (** [signal_name signal] is the name of [signal].
