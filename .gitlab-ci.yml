@@ -251,6 +251,16 @@ unit:src/proto_006_PsCARTHA/lib_protocol:
   script:
     - dune build @src/proto_006_PsCARTHA/lib_protocol/runtest
 
+unit:src/proto_007_PsDELPH1/lib_client:
+  <<: *test_definition
+  script:
+    - dune build @src/proto_007_PsDELPH1/lib_client/runtest
+
+unit:src/proto_007_PsDELPH1/lib_protocol:
+  <<: *test_definition
+  script:
+    - dune build @src/proto_007_PsDELPH1/lib_protocol/runtest
+
 unit:src/proto_alpha/lib_client:
   <<: *test_definition
   script:
@@ -739,6 +749,11 @@ opam:tezos-006-PsCARTHA-test-helpers:
   variables:
     package: tezos-006-PsCARTHA-test-helpers
 
+opam:tezos-007-PsDELPH1-test-helpers:
+  <<: *opam_definition
+  variables:
+    package: tezos-007-PsDELPH1-test-helpers
+
 opam:tezos-accuser-006-PsCARTHA:
   <<: *opam_definition
   variables:
@@ -748,6 +763,16 @@ opam:tezos-accuser-006-PsCARTHA-commands:
   <<: *opam_definition
   variables:
     package: tezos-accuser-006-PsCARTHA-commands
+
+opam:tezos-accuser-007-PsDELPH1:
+  <<: *opam_definition
+  variables:
+    package: tezos-accuser-007-PsDELPH1
+
+opam:tezos-accuser-007-PsDELPH1-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-accuser-007-PsDELPH1-commands
 
 opam:tezos-accuser-alpha:
   <<: *opam_definition
@@ -769,6 +794,11 @@ opam:tezos-baker-006-PsCARTHA:
   variables:
     package: tezos-baker-006-PsCARTHA
 
+opam:tezos-baker-007-PsDELPH1:
+  <<: *opam_definition
+  variables:
+    package: tezos-baker-007-PsDELPH1
+
 opam:tezos-baker-alpha:
   <<: *opam_definition
   variables:
@@ -783,6 +813,16 @@ opam:tezos-baking-006-PsCARTHA-commands:
   <<: *opam_definition
   variables:
     package: tezos-baking-006-PsCARTHA-commands
+
+opam:tezos-baking-007-PsDELPH1:
+  <<: *opam_definition
+  variables:
+    package: tezos-baking-007-PsDELPH1
+
+opam:tezos-baking-007-PsDELPH1-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-baking-007-PsDELPH1-commands
 
 opam:tezos-baking-alpha:
   <<: *opam_definition
@@ -874,6 +914,21 @@ opam:tezos-client-006-PsCARTHA-commands:
   variables:
     package: tezos-client-006-PsCARTHA-commands
 
+opam:tezos-client-007-PsDELPH1:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-007-PsDELPH1
+
+opam:tezos-client-007-PsDELPH1-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-007-PsDELPH1-commands
+
+opam:tezos-client-007-PsDELPH1-commands-registration:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-007-PsDELPH1-commands-registration
+
 opam:tezos-client-alpha:
   <<: *opam_definition
   variables:
@@ -964,6 +1019,11 @@ opam:tezos-embedded-protocol-006-PsCARTHA:
   variables:
     package: tezos-embedded-protocol-006-PsCARTHA
 
+opam:tezos-embedded-protocol-007-PsDELPH1:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-007-PsDELPH1
+
 opam:tezos-embedded-protocol-alpha:
   <<: *opam_definition
   variables:
@@ -999,6 +1059,16 @@ opam:tezos-endorser-006-PsCARTHA-commands:
   variables:
     package: tezos-endorser-006-PsCARTHA-commands
 
+opam:tezos-endorser-007-PsDELPH1:
+  <<: *opam_definition
+  variables:
+    package: tezos-endorser-007-PsDELPH1
+
+opam:tezos-endorser-007-PsDELPH1-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-endorser-007-PsDELPH1-commands
+
 opam:tezos-endorser-alpha:
   <<: *opam_definition
   variables:
@@ -1033,6 +1103,11 @@ opam:tezos-mempool-006-PsCARTHA:
   <<: *opam_definition
   variables:
     package: tezos-mempool-006-PsCARTHA
+
+opam:tezos-mempool-007-PsDELPH1:
+  <<: *opam_definition
+  variables:
+    package: tezos-mempool-007-PsDELPH1
 
 opam:tezos-mempool-alpha:
   <<: *opam_definition
@@ -1123,6 +1198,21 @@ opam:tezos-protocol-006-PsCARTHA-tests:
   <<: *opam_definition
   variables:
     package: tezos-protocol-006-PsCARTHA-tests
+
+opam:tezos-protocol-007-PsDELPH1:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-007-PsDELPH1
+
+opam:tezos-protocol-007-PsDELPH1-parameters:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-007-PsDELPH1-parameters
+
+opam:tezos-protocol-007-PsDELPH1-tests:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-007-PsDELPH1-tests
 
 opam:tezos-protocol-alpha:
   <<: *opam_definition

@@ -62,8 +62,14 @@
             (select void_for_linking-006-PsCARTHA from
               (tezos-embedded-protocol-006-PsCARTHA -> void_for_linking)
               (-> void_for_linking))
+            (select void_for_linking-007-PsDELPH1 from
+              (tezos-embedded-protocol-007-PsDELPH1 -> void_for_linking)
+              (-> void_for_linking))
             (select void_for_linking-006-PsCARTHA-mempool from
               (tezos-mempool-006-PsCARTHA -> void_for_linking)
+              (-> void_for_linking))
+            (select void_for_linking-007-PsDELPH1-mempool from
+              (tezos-mempool-007-PsDELPH1 -> void_for_linking)
               (-> void_for_linking))
             cmdliner
             tls)

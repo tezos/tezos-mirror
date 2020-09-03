@@ -19,6 +19,9 @@
             (select void_for_linking-006-PsCARTHA from
               (tezos-client-006-PsCARTHA -> void_for_linking)
               (-> void_for_linking))
+            (select void_for_linking-007-PsDELPH1 from
+              (tezos-client-007-PsDELPH1 -> void_for_linking)
+              (-> void_for_linking))
  )
  (flags (:standard -open Data_encoding
                    -open Tezos_base__TzPervasives

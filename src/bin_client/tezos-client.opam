@@ -22,6 +22,7 @@ depends: [
   "tezos-client-004-Pt24m4xi"
   "tezos-client-005-PsBabyM1"
   "tezos-client-006-PsCARTHA"
+  "tezos-client-007-PsDELPH1"
   "tezos-client-demo-counter"
 
   "tezos-client-alpha-commands"
@@ -31,9 +32,11 @@ depends: [
   "tezos-client-004-Pt24m4xi-commands"
   "tezos-client-005-PsBabyM1-commands"
   "tezos-client-006-PsCARTHA-commands"
+  "tezos-client-007-PsDELPH1-commands-registration"
 
   "tezos-baking-alpha-commands"
   "tezos-baking-006-PsCARTHA-commands"
+  "tezos-baking-007-PsDELPH1-commands"
 
   "tezos-client-base-unix"
   "tezos-mockup-commands"

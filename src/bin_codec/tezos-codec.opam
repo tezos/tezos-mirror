@@ -21,6 +21,7 @@ depends: [
 depopts: [
   "tezos-client-005-PsBabyM1"
   "tezos-client-006-PsCARTHA"
+  "tezos-client-007-PsDELPH1"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
