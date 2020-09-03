@@ -76,7 +76,7 @@ concurrently and selects the best one based on its fitness (see
 Node Identity
 ~~~~~~~~~~~~~
 
-First we need to generate a new identity in order for the node to
+First, we need to generate a new identity for the node to
 connect to the network::
 
     tezos-node identity generate
@@ -96,7 +96,7 @@ Node Synchronization
 
 Whenever a node starts, it tries to retrieve the most current head of the chain
 from its peers. This can be a long process if there are many blocks to retrieve
-(e.g. when a node is launched for the first time, or has been out of sync for a
+(e.g. when a node is launched for the first time or has been out of sync for a
 while), or on a slow network connection. The mechanism of :ref:`snapshots` can
 help in reducing the synchronization time.
 
@@ -134,7 +134,7 @@ If removing this directory, please note that if it took you a long time to
 compute your node identity, keep the ``identity.json`` file and instead only
 remove the child ``store`` and ``context`` directories.
 
-If you are also running a baker make sure that it has access to the
+If you are also running a baker, make sure that it has access to the
 ``.tezos-node`` directory of the node.
 
 
@@ -142,10 +142,10 @@ RPC Interface
 ~~~~~~~~~~~~~
 
 The only interface to the node is through JSON RPC calls and it is disabled by
-default.  A more detailed documentation can be found in the :ref:`RPC index.
-<rpc>` The RPC interface must be enabled in order for the clients
-to communicate with the node, but is should not be publicly accessible on the
-internet. With the following command it is available uniquely on the
+default.  More detailed documentation can be found in the :ref:`RPC index.
+<rpc>` The RPC interface must be enabled for the clients
+to communicate with the node but it should not be publicly accessible on the
+internet. With the following command, it is available uniquely on the
 `localhost` address of your machine, on the default port ``8732``.
 
 ::
@@ -163,7 +163,7 @@ Client
 
 Tezos client can be used to interact with the node, it can query its
 status or ask the node to perform some actions.
-For example after starting your node you can check if it has finished
+For example, after starting your node you can check if it has finished
 synchronizing using::
 
    tezos-client bootstrapped
@@ -186,14 +186,14 @@ The client is also a basic wallet and after the activation above you
 will notice that the directory ``.tezos-client`` has been populated with
 3 files ``public_key_hashs``, ``public_keys`` and ``secret_keys``.
 The content of each file is in JSON and keeps the mapping between
-aliases (``alice`` in our case) and what you would expect from the name
+aliases (``alice`` in the subsequent commands) and what you would expect from the name
 of the file.
 Secret keys are stored on disk encrypted with a password except when
 using a hardware wallet (see :ref:`ledger`).
 An additional file ``contracts`` contains the addresses of smart
 contracts, which have the form *KT1…*.
 
-We can for example generate a new pair of keys, which can be used locally
+We can, for example, generate a new pair of keys, which can be used locally
 with the alias *bob*::
 
       $ tezos-client gen keys bob
@@ -206,7 +206,7 @@ Tezos support three different ECC schemes: *Ed25519*, *secp256k1* (the
 one used in Bitcoin), and *P-256* (also called *secp256r1*). The two
 latter curves have been added for interoperability with Bitcoin and
 Hardware Security Modules (*HSMs*) mostly. Unless your use case
-require those, you should probably use *Ed25519*. We use a verified
+requires those, you should probably use *Ed25519*. We use a verified
 library for Ed25519, and it is generally recommended over other curves
 by the crypto community, for performance and security reasons.
 
@@ -222,7 +222,7 @@ For more advanced key management we offer :ref:`ledger support
 Get Free Tez
 ~~~~~~~~~~~~
 
-In order to test the networks and help users get familiar with the
+To test the networks and help users get familiar with the
 system, on Zeronet and Carthagenet test networks you can obtain free tez from a
 `faucet <https://faucet.tzalpha.net>`__.
 
@@ -252,7 +252,7 @@ Please drink carefully and don't abuse the faucet: it only contains
 Transfers and Receipts
 ~~~~~~~~~~~~~~~~~~~~~~
 
-In order to fund our newly created account we need to transfer some
+To fund our newly created account, we need to transfer some
 tez using the `transfer` operation.
 Every operation returns a `receipt` that recapitulates all the effects
 of the operation on the blockchain.
@@ -318,11 +318,11 @@ produced, here's an excerpt::
 The client does a bit of magic to simplify our life and here we see
 that many details were automatically set for us.
 Surprisingly, our transfer operation resulted in `two` operations,
-first a `revelation` and then a transfer.
+first a `revelation`, and then a transfer.
 Alice's address, obtained from the faucet, is already present on the
 blockchain, but only in the form of a `public key hash`
 ``tz1Rj...5w``.
-In order to sign operations Alice needs to first reveal the `public
+To sign operations, Alice needs to first reveal the `public
 key` ``edpkuk...3X`` behind the hash, so that other users can verify
 her signatures.
 The client is kind enough to prepend a reveal operation before the
@@ -331,17 +331,17 @@ transfers will consist of a single operation as expected.
 
 Another interesting thing we learn from the receipt is that there are
 more costs being added on top of the transfer and the burn: `fees`.
-In order to encourage a baker to include our operation, and in general
+To encourage a baker to include our operation, and in general
 to pay for the cost of running the blockchain, each operation usually
 includes a fee that goes to the baker.
 Fees are variable over time and depend on many factors but the tezos
 client selects a default for us.
 
-The last important bit of our receipt are the balance updates which
-resume which address is being debited or credit of a certain amount.
+The last important bit of our receipt is the balance updates that
+resume which address is being debited or credited of a certain amount.
 We see in this case that baker ``tz1Ke...yU`` is being credited one
 fee for each operation, that Bob's address ``tz1Rk...Ph`` gets 1 tez
-and that Alice pays the two fees, the transfer and the burn.
+and that Alice pays the two fees, the transfer, and the burn.
 
 Now that we have a clear picture of what we are going to pay we can
 execute the transfer for real, without the dry-run option.
@@ -352,8 +352,8 @@ network.
 Once it receives a block with the operation inside it will return the
 receipt.
 
-It is advisable to wait several blocks to consider the transaction as
-final, for an important operation we advice to wait 60 blocks.
+It is advisable to wait for several blocks to consider the transaction as
+final, for an important operation we advise to wait for 60 blocks.
 
 In the rare case when an operation is lost, how can we be sure that it
 will not be included in any future block and re-emit it?
@@ -371,17 +371,18 @@ Implicit Accounts and Smart Contracts
 
 In Tezos there are two kinds of accounts: *implicit accounts* and *smart contracts*.
 
--  The implicit accounts are the *tz1*, *tz2*, and *tz3* we have used
-   up to now. They are created with a transfer operation to the
-   account public key hash.
+- The implicit accounts are the addresses starting with *tz1*, *tz2*,
+  and *tz3* we have used up to now. They are created with a transfer
+  operation to the account public key hash.
 
--  Smart contracts have addresses *KT1* and are created with an
-   origination operation. They don't have a corresponding secret key
-   and they run Michelson code each time they receive a transaction.
+- Smart contracts have addresses starting with *KT1* and are created
+  with an origination operation. They don't have a corresponding
+  secret key and they run Michelson code each time they receive a
+  transaction.
 
 Let's originate our first contract and call it *id*::
 
-    tezos-client originate contract id for alice transferring 1 from alice \
+    tezos-client originate contract id transferring 1 from alice \
                  running ./tests_python/contracts/attic/id.tz \
                  --init '"hello"' --burn-cap 0.4
 
@@ -407,7 +408,7 @@ For the sake of this example, here is the `id.tz` contract:
     code {CAR; NIL operation; PAIR};
 
 It specifies the types for the parameter and storage, and implements a
-function which updates the storage with the value passed as parameter
+function which updates the storage with the value passed as a parameter
 and returns the storage unchanged together with an empty list of
 operations.
 
@@ -443,7 +444,7 @@ Contrary to storage there is no cost per gas unit, a transfer can
 require as much gas as it wants, however a baker that has to choose
 among several transactions is much more likely to include a low gas
 one because it's cheaper to run and validate.
-At the same time bakers also give priority to high fee transactions.
+At the same time, bakers also give priority to high fee transactions.
 This means that there is an implicit cost for gas that is related to
 the fee offered versus the gas and fees of other transactions.
 
@@ -458,30 +459,29 @@ limit for both. The transaction fails if any of the two limits are passed.
                                             --storage-limit 46
 
 A baker is more likely to include an operation with lower gas and
-storage limits because it takes less resources to execute so it is in
+storage limits because it takes fewer resources to execute so it is in
 the best interest of the user to pick limits that are as close as
 possible to the actual use. In this case, you may have to specify some
-fees as the baker is expecting some for the resources
+fees as the baker is expecting some for the resource
 usage. Otherwise, you can force a low fee operation using the
 `--force-low-fee`, with the risk that no baker will include it.
 
 More test contracts can be found in directory
 :src:`tests_python/contracts/`.
-An advanced documentation of the smart contract language is available
+Advanced documentation of the smart contract language is available
 :ref:`here<michelson>`.
-For details and examples, see also https://www.michelson-lang.com/
 
 
 Validation
 ~~~~~~~~~~
 
-The node allows to validate an operation before submitting it to the
+The node allows validating an operation before submitting it to the
 network by simply simulating the application of the operation to the
 current context.
-In general if you just send an invalid operation e.g. sending more
+In general, if you just send an invalid operation e.g. sending more
 tokens that what you own, the node will broadcast it and when it is
 included in a block you'll have to pay the usual fee even if it won't
-have an affect on the context.
+have an effect on the context.
 To avoid this case the client first asks the node to validate the
 transaction and then sends it.
 
@@ -491,11 +491,11 @@ the receipt that you see is actually a simulated one.
 Another important use of validation is to determine gas and storage
 limits.
 The node first simulates the execution of a Michelson program and
-takes trace of the amount of gas and storage.
+tracks the amount of gas and storage that has been consumed.
 Then the client sends the transaction with the right limits for gas
-and storage based on that indicated by the node.
+and storage based on those indicated by the node.
 This is why we were able to submit transactions without specifying
-this limits, they were computed for us.
+these limits: they were computed for us.
 
 More information on validation can be found :ref:`here. <validation>`
 

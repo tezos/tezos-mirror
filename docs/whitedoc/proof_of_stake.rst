@@ -26,15 +26,15 @@ contributes in agreeing on a block by **endorsing** that block.
 **Baking rights** and **endorsing rights** are determined at the
 beginning of a **cycle** (a chunk of blocks) by a follow-the-satoshi
 strategy starting from a **random seed** computed from information
-already found on blockchain.
+already found on the blockchain.
 
 To incentivize participation in the consensus algorithm, delegates are
 **rewarded** for their baking and endorsing. As a counter-measure
 against double-baking or double-endorsement a **security deposit** is
 frozen from the delegate's account. The deposit is either released
-after a number of cycles or burnt in case of proven bad behaviour.
+after a number of cycles or burnt in case of proven bad behavior.
 
-The remainder of this document contains the detailed description of
+The remainder of this document contains a detailed description of
 the notions which are in bold in the text above.
 
 Further External Resources
@@ -61,8 +61,8 @@ Blocks
 ------
 
 The Tezos blockchain is a linked list of blocks. Blocks contain a
-header, and a list of operations. The header itself decomposes into a
-shell header (common to all protocols) and a protocol specific header.
+header and a list of operations. The header itself decomposes into a
+shell header (common to all protocols) and a protocol-specific header.
 
 Shell header
 ~~~~~~~~~~~~
@@ -101,7 +101,7 @@ Protocol header
 Block size
 ~~~~~~~~~~
 
-Tezos does not download blocks all at once, but rather considers
+Tezos does not download blocks all at once but rather considers
 headers and various types of operations separately.  Transactions are
 limited by a total maximum size of 512kB (that is 5MB every 10 minutes
 at most).
@@ -115,7 +115,7 @@ transactions for block space.
 Fitness
 ~~~~~~~
 
-To each block we associate a measure of `fitness` which determines the
+To each block, we associate a measure of `fitness` which determines the
 quality of the chain leading to that block. This measure is simply the
 length of the chain (as in Bitcoin). More precisely, the fitness of a
 block is 1 plus the fitness of the previous block. The shell changes
@@ -152,7 +152,7 @@ Tokens are controlled through a private key called the
 *manager key*. Tezos accounts let the manager specify a public
 delegate key. This key may be controlled by the managers themselves, or
 by another party. The responsibility of the delegate is to take part in
-the proof-of-stake consensus algorithm and in the governance of Tezos.
+the proof-of-stake consensus algorithm and the governance of Tezos.
 
 The manager can generally change the delegate at any time, though
 contracts can be marked to specify an immutable delegate. Though
@@ -187,23 +187,23 @@ gives the majority chain a "headstart".
 Rolls
 ~~~~~
 
-In theory, it would be possible to give each token a serial number,
+In theory, it would be possible to give each token a serial number
 and track the specific tokens assigned to specific delegates. However,
-it would be too demanding of nodes to track assignment at such a
-granular level. Instead we introduce the concept of rolls. A *roll*
+it would be too demanding of nodes to track assignments at such a
+granular level. Instead, we introduce the concept of rolls. A *roll*
 represents a set of coins delegated to a given key. A roll holds
 ``TOKENS_PER_ROLL`` = 8,000 tokens. When tokens are moved, or a
 delegate for a contract is changed, the rolls change delegate
 according to the following algorithm.
 
-Each delegate has a stack of roll ids plus some "change" which is always
+Each delegate has a stack of roll identifiers plus some "change" which is always
 an amount smaller than ``TOKENS_PER_ROLL``. When tokens are moved from
 one delegate to the other, first, the change is used. If it is not
 enough, rolls need to be "broken" which means that they move from the
 delegate stack to a global, unallocated, roll stack. This is done until
 the amount is covered, and some change possibly remains.
 
-Then, the other delegate is credited. First the amount is added to the
+Then, the other delegate is credited. First, the amount is added to the
 "change". If it becomes greater than ``TOKENS_PER_ROLL``, then rolls
 are unstacked from the global unallocated roll stack onto the delegate
 stack. If the global stack is empty, a fresh roll is created.
@@ -222,7 +222,7 @@ Roll snapshots
 
 Roll snapshots represent the state of rolls for a given block. Roll
 snapshots are taken every ``BLOCKS_PER_ROLL_SNAPSHOT`` = 256 blocks,
-that is 16 times per cycle. There is a tradeoff between memory
+which is 16 times per cycle. There is a tradeoff between memory
 consumption and economic efficiency. If roll snapshots are too frequent,
 they will consume a lot of memory. If they are too rare, strategic
 participants could purchase many tokens in anticipation of a snapshot
@@ -242,7 +242,7 @@ seed for each cycle. From this random seed, we can seed a
 cryptographically secure pseudo-random number generator which is used
 to draw baking rights for a cycle.
 
-To each level is associated a priority list of delegates.
+Each level is associated with a priority list of delegates.
 This list is obtained by randomly selecting an active roll for each
 position in the list, and then taking the owner of the selected roll.
 As the draw is independent for each list position, it is possible that
@@ -265,12 +265,12 @@ To each level, we associate a list of ``ENDORSERS_PER_BLOCK`` =
 32 *endorsers*. Endorsers are drawn similarly as bakers, by randomly
 selecting 32 active rolls with replacement.
 
-Each endorser verifies the last block that was baked, say at level
+Each endorser verifies the last block that was baked, say at the level
 ``n``, and emits an endorsement operation. The endorsement operations
 are then baked in block ``n+1``. Once block ``n+1`` is baked, no other
 endorsement for block ``n`` will be considered valid.
 
-It is possible that an endorser has more than one endorsement
+An endorser may have more than one endorsement
 slot. However, the endorser injects a single endorsement operation,
 which represents all of its endorsement slots. In what follows, when
 we say "the number of endorsements a block contains", we do not refer
@@ -361,7 +361,7 @@ randomly select a roll snapshot from cycle ``n-2`` and to randomly
 select rolls in the selected snapshot. The selected rolls determine
 the baking and endorsing rights in cycle ``n+PRESERVED_CYCLES``.
 
-The random seed for cycle ``n`` is a 256 bit number generated at the
+The random seed for cycle ``n`` is a 256-bit number generated at the
 very end of cycle ``n-1`` from nonces to which delegates commit during
 cycle ``n-2``. One out of every ``BLOCKS_PER_COMMITMENT`` = 32 blocks
 can contain a commitment. There are therefore at most
@@ -377,7 +377,7 @@ not forfeited.
 A *nonce revelation* is an operation, and multiple nonce revelations
 can thus be included in a block. A baker receives a
 ``SEED_NONCE_REVELATION_TIP`` = 1/8 ꜩ reward for including a
-revelation.  Revelations are free operations which do not compete with
+revelation.  Revelations are free operations that do not compete with
 transactions for block space. Up to ``MAX_REVELATIONS_PER_BLOCK`` = 32
 revelations can be contained in any given block. Thus, (``BLOCKS_PER_CYCLE`` /
 ``MAX_REVELATIONS_PER_BLOCK``) / ``BLOCKS_PER_COMMITMENT`` = 4

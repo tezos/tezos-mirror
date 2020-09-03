@@ -112,9 +112,9 @@ user-activated upgrades (see `Alias Versus Explicit Configuration`_).
   the same network name).
 
 - ``old_chain_name`` is usually the same as ``chain_name``, except for networks
-  which were renamed.
+  that were renamed.
 
-- ``incompatible_chain_name`` is a name which must be different than ``chain_name``
+- ``incompatible_chain_name`` is a name which must be different from ``chain_name``
   and ``old_chain_name``. It is thus ensured to be incompatible. It is used for testing
   purposes.
 
