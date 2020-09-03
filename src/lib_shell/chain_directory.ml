@@ -100,7 +100,7 @@ let list_blocks chain_state ?(length = 1) ?min_date heads =
     (fun (ignored, acc) head ->
       match head with
       | None ->
-          Lwt.return (ignored, [])
+          Lwt.return (ignored, acc)
       | Some block ->
           predecessors ignored length block
           >>= fun predecessors ->
