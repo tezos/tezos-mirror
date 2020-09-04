@@ -1,3 +1,12 @@
+# Version 7.4
+
+- Added the Delphi protocol.
+
+- Added the Delphinet built-in network configuration.
+  The alias to give to ``--network`` is ``delphinet``.
+
+- Updated the list of bootstrap peers for Carthagenet.
+
 # Version 7.3
 
 - Fixed a case where the number of open file descriptors was not correctly limited.
