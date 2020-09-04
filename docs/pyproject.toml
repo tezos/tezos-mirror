@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "tezos-docs"
+version = "0.1.0"
+description = "Tezos documentation"
+authors = ["Tezos community <tezos@tezos.com>"]
+
+readme = "README.rst"
+
+repository = "https://gitlab.com/tezos/tezos"
+homepage = "https://gitlab.com/tezos/tezos"
+keywords = ["tezos"]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+sphinx = "*"
+sphinx-rtd-theme = "*"
+recommonmark = "*"

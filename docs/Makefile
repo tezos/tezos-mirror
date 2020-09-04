@@ -1,6 +1,6 @@
 # You can set these variables from the command line.
 SPHINXOPTS    = -aE -n
-SPHINXBUILD   = sphinx-build
+SPHINXBUILD   = poetry run sphinx-build
 SPHINXPROJ    = Tezos
 SOURCEDIR     = .
 BUILDDIR      = _build
