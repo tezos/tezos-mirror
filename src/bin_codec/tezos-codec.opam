@@ -17,7 +17,8 @@ depends: [
   "tezos-clic"
   "tezos-signer-services"
   "tezos-client-alpha"
-  "tezos-client-004-Pt24m4xi"
+]
+depopts: [
   "tezos-client-005-PsBabyM1"
   "tezos-client-006-PsCARTHA"
   "tezos-client-007-PsDELPH1"
