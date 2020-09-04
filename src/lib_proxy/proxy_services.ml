@@ -41,13 +41,30 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
            we can't give it a unit tzresult Directory.t *)
         assert false
   in
+  let envs_cache = Stdlib.Hashtbl.create 17 in
+  let get_env_rpc_context chain block =
+    let key = (chain, block) in
+    match Stdlib.Hashtbl.find_opt envs_cache key with
+    | None ->
+        build_env_rpc_context chain block
+        >>= fun rpc_context ->
+        Stdlib.Hashtbl.add envs_cache key rpc_context ;
+        Lwt.return rpc_context
+    | Some cached ->
+        Lwt.return cached
+  in
   let proto_directory =
     let ( // ) = RPC_directory.prefix in
     (* register protocol-specific RPCs *)
     Tezos_shell_services.Chain_services.path
     // ( Tezos_shell_services.Block_services.path
-       // RPC_directory.map
-            (fun ((_, chain), block) -> build_env_rpc_context chain block)
+       // (* The Tezos_protocol_environment.rpc_context values returned
+            by init_env_rpc_context contain proxy_getter's RPC
+            cache. We wanna keep it in between RPC calls, hence
+            the use of get_env_rpc_context' to cache init_env_rpc_context
+            values. *)
+          RPC_directory.map
+            (fun ((_, chain), block) -> get_env_rpc_context chain block)
             Proxy_environment.directory )
   in
   RPC_directory.register_describe_directory_service
