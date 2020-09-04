@@ -1,3 +1,23 @@
+# Development Version
+
+When you make a commit on master, you can add an item in this section to document your
+commit or the set of related commits. This will ensure that this change is not forgotten
+in the final changelog. By having your commits update this file you also make it easy
+to find the commits which are related to your changes using `git blame`.
+
+Only describe changes which affect users (bug fixes and new features),
+not refactorings or tests. Changes to the documentation do not need to be documented
+here either.
+
+# Version 7.4
+
+- Added the Delphi protocol.
+
+- Added the Delphinet built-in network configuration.
+  The alias to give to `--network` is `delphinet`.
+
+- Updated the list of bootstrap peers for Carthagenet.
+
 # Version 7.3
 
 - Fixed a case where the number of open file descriptors was not correctly limited.
