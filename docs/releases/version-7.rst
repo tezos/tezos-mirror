@@ -1,6 +1,6 @@
 .. _version-7:
 
-Version 7.3
+Version 7.4
 ===========
 
 Version 7.0 notably introduces the multinetwork node.
