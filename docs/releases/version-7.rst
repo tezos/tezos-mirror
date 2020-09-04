@@ -14,18 +14,20 @@ script when using Docker images.
 
 Version 7.3 fixes a couple of security issues.
 
+Version 7.4 adds the Delphi protocol and the Delphinet built-in network configuration.
+
 Update Instructions
 -------------------
 
 To update from sources::
 
   git fetch
-  git checkout v7.3
+  git checkout v7.4
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``v7.3`` Docker images of Tezos.
+If you are using Docker instead, use the ``v7.4`` Docker images of Tezos.
 
 New Versioning Scheme
 ---------------------
@@ -46,7 +48,7 @@ Additionnally, we provide a ``latest-release`` branch which will always
 be equal to the latest release. Release candidates are not considered
 to be releases in this sense, so ``latest-release`` will never
 point to a release candidate. In other words, ``latest-release`` points
-to the latest stable release. Currently, it thus points to version 7.3.
+to the latest stable release. Currently, it thus points to version 7.4.
 
 If you are used to the ``mainnet`` and ``mainnet-staging`` branches,
 you can consider release candidates to be the new ``mainnet-staging``
@@ -78,6 +80,16 @@ If you are using the Docker script (``alphanet.sh``), note that
 this script has been renamed ``tezos-docker-manager.sh``. The ``alphanet.sh``
 script is still available in the Docker image for the auto-update mechanism.
 See :ref:`howtoget` for more information.
+
+Changelog — Version 7.4
+-----------------------
+
+- Added the Delphi protocol.
+
+- Added the Delphinet built-in network configuration.
+  The alias to give to ``--network`` is ``delphinet``.
+
+- Updated the list of bootstrap peers for Carthagenet.
 
 Changelog — Version 7.3
 -----------------------

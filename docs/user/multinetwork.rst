@@ -45,6 +45,8 @@ the following built-in networks:
 
 - ``carthagenet``
 
+- ``delphinet``
+
 - ``dalphanet`` (only available in the ``dalpha-release`` branch)
 
 If you did not initialize your node configuration, or if your configuration
