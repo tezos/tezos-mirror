@@ -487,6 +487,12 @@ integration:double_endorsement:
     - poetry run pytest tests/test_double_endorsement.py -s --log-dir=tmp
   stage: test
 
+integration:forge_block:
+  <<: *integration_python_definition
+  script:
+    - poetry run pytest tests/test_forge_block.py -s --log-dir=tmp
+  stage: test
+
 integration:fork:
   <<: *integration_python_definition
   script:
