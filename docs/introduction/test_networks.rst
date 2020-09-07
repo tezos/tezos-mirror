@@ -120,40 +120,13 @@ On Carthagenet, the following constants differ from Mainnet:
 - ``blocks_per_voting_period`` is 2048 instead of 32768;
 - ``time_between_blocks`` is ``[ 30, 40 ]`` instead of ``[ 60, 40 ]``;
 - ``test_chain_duration`` is 43200 instead of 1966080;
-- ``quorum_min`` is 3000 (i.e. 30%) instead of 2000 (i.e. 20%);
+- ``quorum_min`` is 3000 (i.e. 30%) instead of 2000 (i.e. 20%).
 
 This results in a faster chain than Mainnet:
 
 - 2 blocks per minute;
 - a cycle should last about 17 hours;
 - a voting period lasts 1 cycle and should thus also last about 17 hours.
-
-Zeronet
--------
-
-- Git branch: ``zeronet``
-- Run Docker image: ``wget -O zeronet.sh https://gitlab.com/tezos/tezos/raw/zeronet/scripts/alphanet.sh``
-
-Zeronet is an unstable test network.
-It is often reset to keep the chain short and to allow testing of
-protocols under development.
-
-On Zeronet, the following constants differ from Mainnet:
-
-- ``blocks_per_cycle`` is 128 instead of 4096;
-- ``blocks_per_roll_snapshot`` is 8 instead of 256;
-- ``blocks_per_voting_period`` is 2816 instead of 32768;
-- ``time_between_blocks`` is ``[ 20 ]`` instead of ``[ 60, 40 ]``;
-- ``test_chain_duration`` is 43200 instead of 1966080;
-- ``quorum_min`` is 3000 (i.e. 30%) instead of 2000 (i.e. 20%);
-- ``delay_per_missing_endorsement`` is 2 instead of 8.
-
-This results in a chain which moves even faster than Carthagenet:
-
-- 3 blocks per minute instead of 1,
-- one cycle should last less than 43 minutes instead of 2 days and 20 hours,
-- a voting period should last less than 16 hours instead of about 23 days.
-  Note that in Zeronet, a voting period is 22 cycles instead of 8 cycles in Mainnet.
 
 Future Networks
 ---------------
@@ -182,3 +155,10 @@ Alphanet
 Alphanet was the test network before Babylonnet. At the end of its life,
 it was running the Athens protocol. Bootstrap nodes were shut down after
 the Babylon protocol was activated on Mainnet.
+
+Zeronet
+-------
+
+Zeronet is a generic name for an unstable test network that is sometimes spawned
+when the need arises. It is currently not running. When it was running, it was used
+to test protocol proposals that were in development. It was reset frequently.
