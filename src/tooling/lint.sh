@@ -74,14 +74,12 @@ update_all_dot_ocamlformats () {
     interesting_directories=$(find "${source_directories[@]}" \( -name "*.ml" -o -name "*.mli"  \) -type f | sed 's:/[^/]*$::' | LC_COLLATE=C sort -u)
     for d in $interesting_directories ; do
         ofmt=$d/.ocamlformat
-        say "Dealing with $ofmt"
         case "$d" in
             src/proto_alpha/lib_protocol | \
             src/proto_demo_noops/lib_protocol )
                 make_dot_ocamlformat "$ofmt"
                 ;;
             src/proto_*/lib_protocol )
-                say "This a protocol"
                 make_dot_ocamlformat "$ofmt"
                 ( cd "$d" ; ls -1 *.mli *.ml | LC_COLLATE=C sort > .ocamlformat-ignore ; )
                 git add "$d/.ocamlformat-ignore"
