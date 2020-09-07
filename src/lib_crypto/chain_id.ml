@@ -131,12 +131,18 @@ let raw_encoding =
   let open Data_encoding in
   conv to_bytes of_bytes_exn (Fixed.bytes size)
 
-(* NOTE: we ignore hashing because identity is a perfect hash. (Technically we
-   ignore one bit on 32-bit machines because of the conversion from Int32 to
-   int.) *)
-let hash h = Int32.to_int (TzEndian.get_int32 (to_bytes h) 0)
+let int_rotate offset i =
+  let open Stdlib in
+  assert (0 <= offset) ;
+  assert (offset < 32) ;
+  (i lsl offset) lor (i lsr (32 - offset))
 
-let seeded_hash _seed h = hash h
+let seeded_hash seed h =
+  int_rotate (abs seed mod 32)
+  @@ Int32.to_int
+  @@ TzEndian.get_int32 (to_bytes h) 0
+
+let hash h = seeded_hash 0 h
 
 let of_block_hash bh = hash_bytes [Block_hash.to_bytes bh]
 
