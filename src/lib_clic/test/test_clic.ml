@@ -199,7 +199,114 @@ let test_parameters_autocompletion =
         let expected = ["oranges"; "pineapples"] in
         test_autocompletion_case ~commands:seq_commands ~args ~expected ) ]
   in
-  param_cases @ prefix_cases @ seq_cases
+  let non_terminal_seq_commands =
+    Clic.
+      [ command
+          ~desc:"command with a non-terminal-seq"
+          no_options
+          ( prefix "number"
+          @@ non_terminal_seq
+               ~suffix:["squared"]
+               (int_param ~autocomplete:(fun _ctxt ->
+                    return ["0"; "1"; "2"; "10"]))
+          @@ stop )
+          (fun () _ints () -> return_unit);
+        command
+          ~desc:"command with a non-terminal-seq"
+          no_options
+          ( prefix "fruit"
+          @@ non_terminal_seq
+               ~suffix:["juiced"]
+               (string_param ~autocomplete:(fun _ctxt ->
+                    return ["oranges"; "pineapples"]))
+          @@ stop )
+          (fun () _strings () -> return_unit);
+        command
+          ~desc:"command with a non-terminal-seq"
+          no_options
+          ( prefixes ["two"; "lists"]
+          @@ non_terminal_seq
+               ~suffix:["and"; "numbers"]
+               (string_param ~autocomplete:(fun _ctxt ->
+                    return ["oranges"; "pineapples"]))
+          @@ non_terminal_seq
+               ~suffix:["squared"]
+               (int_param ~autocomplete:(fun _ctxt ->
+                    return ["0"; "1"; "2"; "10"]))
+          @@ stop )
+          (fun () _strings _ints () -> return_unit) ]
+  in
+  let non_terminal_seq_cases =
+    [ ( "non-terminal-seq: fails when given an empty suffix",
+        fun () ->
+          return
+          @@ Alcotest.check_raises
+               "Expected [Invalid_argument] exception"
+               (Invalid_argument "Clic.non_terminal_seq: empty suffix")
+               (fun () ->
+                 let _failing_param =
+                   Clic.(
+                     non_terminal_seq
+                       ~suffix:[]
+                       (int_param ~autocomplete:(fun _ctxt -> return []))
+                     @@ stop)
+                 in
+                 ()) );
+      ( "non-terminal-seq: when no arg given, suggests all options in seq and \
+         its suffix",
+        let args = ["fruit"; ""] in
+        let expected = ["oranges"; "pineapples"; "juiced"] in
+        test_autocompletion_case
+          ~commands:non_terminal_seq_commands
+          ~args
+          ~expected );
+      ( "non-terminal-seq: when arg given, suggests all matching options",
+        let args = ["number"; "1"] in
+        let expected = ["1"; "10"] in
+        test_autocompletion_case
+          ~commands:non_terminal_seq_commands
+          ~args
+          ~expected );
+      ( "non-terminal-seq: when prev arg is from a sequence and no arg given, \
+         suggests all options in seq and its suffix",
+        let args = ["number"; "1"; ""] in
+        let expected = ["0"; "1"; "2"; "10"; "squared"] in
+        test_autocompletion_case
+          ~commands:non_terminal_seq_commands
+          ~args
+          ~expected );
+      ( "non-terminal-seq: when prev args are from a sequence and no arg \
+         given, suggests all options in seq and its suffix",
+        let args = ["number"; "1"; "10"; "2"; ""] in
+        let expected = ["0"; "1"; "2"; "10"; "squared"] in
+        test_autocompletion_case
+          ~commands:non_terminal_seq_commands
+          ~args
+          ~expected );
+      ( "non-terminal-seq: when first non-terminal-seq and its suffix are \
+         matched and no arg given, suggests all options in the next seq and \
+         its suffix",
+        let args =
+          ["two"; "lists"; "oranges"; "pineapples"; "and"; "numbers"; ""]
+        in
+        let expected = ["0"; "1"; "2"; "10"; "squared"] in
+        test_autocompletion_case
+          ~commands:non_terminal_seq_commands
+          ~args
+          ~expected );
+      ( "non-terminal-seq: when first non-terminal-seq and its suffix are \
+         matched and args given, suggests all matching options in the next \
+         seq and its suffix",
+        let args =
+          ["two"; "lists"; "oranges"; "pineapples"; "and"; "numbers"; "2"; "1"]
+        in
+        let expected = ["1"; "10"] in
+        test_autocompletion_case
+          ~commands:non_terminal_seq_commands
+          ~args
+          ~expected ) ]
+  in
+  param_cases @ prefix_cases @ seq_cases @ non_terminal_seq_cases
 
 let wrap (n, f) =
   Alcotest_lwt.test_case n `Quick (fun _ () ->
