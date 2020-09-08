@@ -91,3 +91,11 @@ include module type of Utils.Infix
 include module type of Tezos_error_monad.Error_monad
 
 module Internal_event = Internal_event
+
+module Filename : sig
+  include module type of Filename
+
+  module Infix : sig
+    val ( // ) : string -> string -> string
+  end
+end

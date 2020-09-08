@@ -82,3 +82,8 @@ module Network_version = Network_version
 include Utils.Infix
 include Error_monad
 module Internal_event = Internal_event
+
+module Filename = struct
+  include Stdlib.Filename
+  include Tezos_stdlib.TzFilename
+end
