@@ -228,3 +228,37 @@ resolved. When the reviewer is satisfied, he/she will mark the discussion resolv
 
 When all discussions are resolved, the reviewer will rebase the branch,
 possibly squash commits and merge the MR in the master branch.
+
+Various recommendations while contributing to the Tezos codebase
+-----------------------------------------------------------------
+
+Logging Levels
+~~~~~~~~~~~~~~
+
+The Tezos libraries use an internal logging library with 5 different verbosity `levels`.
+It is important to choose the appropriate level for each event in the code to
+avoid flooding the node administrator with too much information.
+
+These are the rules-of-thumb that we use in the code to decide the appropriate
+level (here listed from most to least verbose) for each event:
+
+- ``Debug`` level -- the most verbose -- it is used by developers to follow
+  the flow of execution of the node at the lowest granularity.
+- ``Info`` level is about all the additional information that you might want to
+  have, but they are not important to have if you node is running OK
+  (and definitely do not require any action).
+- ``Notice`` level (the default) should be about things that the node
+  admin should be concerned, but that does not require any action.
+
+The two following levels are used to provide information to the node administrator
+of possible problems and errors:
+
+- ``Warning`` level are all those events that might require the attention of
+  the node administrator, and can reveal potential anomalies in the workings of
+  the node.
+- ``Error`` level are all those events that require an intervention of the node
+  administrator or that signal some exceptional circumstance.
+
+It's also important to notice that from the node administrator's point of view,
+it is possible to selectively choose a specific log level for a given component
+by setting the environment variable ``TEZOS_LOG`` accordingly while running the node.
