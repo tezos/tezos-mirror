@@ -290,7 +290,10 @@ let preapply ~user_activated_upgrades ~user_activated_protocol_overrides
   Prevalidation.create ~protocol_data ~predecessor ~timestamp ()
   >>=? fun validation_state ->
   Lwt_list.fold_left_s
-    (fun (acc_validation_result_rev, acc_validation_state) operations ->
+    (fun ( acc_validation_passes,
+           acc_validation_result_rev,
+           acc_validation_state )
+         operations ->
       Lwt_list.fold_left_s
         (fun (acc_validation_result, acc_validation_state) op ->
           match Prevalidation.parse op with
@@ -313,19 +316,20 @@ let preapply ~user_activated_upgrades ~user_activated_protocol_overrides
         }
       in
       Lwt.return
-        ( new_validation_result :: acc_validation_result_rev,
+        ( acc_validation_passes + 1,
+          new_validation_result :: acc_validation_result_rev,
           new_validation_state ))
-    ([], validation_state)
+    (0, [], validation_state)
     operations
-  >>= fun (validation_result_list_rev, validation_state) ->
+  >>= fun (validation_passes, validation_result_list_rev, validation_state) ->
   Lwt.return (List.rev validation_result_list_rev, validation_state)
   >>= fun (validation_result_list, validation_state) ->
   let operations_hash =
     Operation_list_list_hash.compute
-      (List.map
+      (List.rev_map
          (fun r ->
            Operation_list_hash.compute (List.map fst r.Preapply_result.applied))
-         validation_result_list)
+         validation_result_list_rev)
   in
   Prevalidation.status validation_state
   >>=? fun {block_result; _} ->
@@ -353,7 +357,7 @@ let preapply ~user_activated_upgrades ~user_activated_protocol_overrides
       proto_level;
       predecessor = State.Block.hash predecessor;
       timestamp;
-      validation_passes = List.length validation_result_list;
+      validation_passes;
       operations_hash;
       fitness;
       context = Context_hash.zero (* place holder *);
