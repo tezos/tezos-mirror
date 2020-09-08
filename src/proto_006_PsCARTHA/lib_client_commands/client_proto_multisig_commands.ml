@@ -716,13 +716,93 @@ let commands () : #Protocol_client_context.full Clic.command list =
                     cctxt
               >>= function
               | None -> return_unit | Some (_res, _contracts) -> return_unit ));
-      (* Unfortunately, Clic does not support non terminal lists of
-       parameters so we cannot pass both a list of public keys and a
-       list of signatures on the command line. This would permit a
-       command for running the Change_keys action.
-
-       However, we can run any action by deserialising the sequence of
-       bytes built using the "prepare multisig transaction" commands *)
+      command
+        ~group
+        ~desc:"Change public keys and threshold for a multisig contract."
+        transfer_options
+        ( prefixes ["set"; "threshold"; "of"; "multisig"; "contract"]
+        @@ Client_proto_contracts.ContractAlias.destination_param
+             ~name:"multisig"
+             ~desc:"name or address of the originated multisig contract"
+        @@ prefixes ["to"]
+        @@ threshold_param ()
+        @@ prefixes ["and"; "public"; "keys"; "to"]
+        @@ non_terminal_seq (public_key_param ()) ~suffix:["on"; "behalf"; "of"]
+        @@ Client_proto_contracts.ContractAlias.destination_param
+             ~name:"src"
+             ~desc:"source calling the multisig contract"
+        @@ prefixes ["with"; "signatures"]
+        @@ seq_of_param (signature_param ()) )
+        (fun ( fee,
+               dry_run,
+               verbose_signing,
+               gas_limit,
+               storage_limit,
+               counter,
+               no_print_source,
+               minimal_fees,
+               minimal_nanotez_per_byte,
+               minimal_nanotez_per_gas_unit,
+               force_low_fee,
+               fee_cap,
+               burn_cap )
+             (_, multisig_contract)
+             new_threshold
+             new_keys
+             (_, source)
+             signatures
+             (cctxt : #Protocol_client_context.full) ->
+          match Contract.is_implicit source with
+          | None ->
+              failwith
+                "only implicit accounts can be the source of a contract call"
+          | Some source -> (
+              Client_keys.get_key cctxt source
+              >>=? fun (_, src_pk, src_sk) ->
+              List.map_es
+                (fun (pk_uri, _) -> Client_keys.public_key pk_uri)
+                new_keys
+              >>=? fun keys ->
+              let fee_parameter =
+                {
+                  Injection.minimal_fees;
+                  minimal_nanotez_per_byte;
+                  minimal_nanotez_per_gas_unit;
+                  force_low_fee;
+                  fee_cap;
+                  burn_cap;
+                }
+              in
+              Client_proto_multisig.call_multisig
+                cctxt
+                ~chain:cctxt#chain
+                ~block:cctxt#block
+                ?confirmations:cctxt#confirmations
+                ~dry_run
+                ~verbose_signing
+                ~fee_parameter
+                ~source
+                ?fee
+                ~src_pk
+                ~src_sk
+                ~multisig_contract
+                ~action:
+                  (Client_proto_multisig.Change_keys
+                     (Z.of_int new_threshold, keys))
+                ~signatures
+                ~amount:Tez.zero
+                ?gas_limit
+                ?storage_limit
+                ?counter
+                ()
+              >>= Client_proto_context_commands.report_michelson_errors
+                    ~no_print_source
+                    ~msg:"transfer simulation failed"
+                    cctxt
+              >>= function
+              | None -> return_unit | Some (_res, _contracts) -> return_unit ));
+      (* This command is no longer necessary as Clic now supports non terminal
+         lists of parameters, however, it is kept for compatibility. *)
       command
         ~group
         ~desc:
