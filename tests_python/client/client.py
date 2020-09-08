@@ -1065,6 +1065,37 @@ class Client:
         ] + signatures
         return self.run(cmd)
 
+    def msig_set_threshold(
+        self,
+        msig_name: str,
+        threshold: int,
+        public_keys: List[str],
+        src: str,
+        signatures: List[str],
+        args: List[str] = None,
+    ) -> str:
+        cmd = [
+            'set',
+            'threshold',
+            'of',
+            'multisig',
+            'contract',
+            msig_name,
+            'to',
+            str(threshold),
+            'and',
+            'public',
+            'keys',
+            'to',
+        ]
+        cmd += public_keys
+        cmd += ['on', 'behalf', 'of', src, 'with', 'signatures']
+        cmd += signatures
+        if args is None:
+            args = []
+        cmd += args
+        return self.run(cmd)
+
     def check_node_listening(
         self, timeout: float = 1, attempts: int = 20
     ) -> bool:

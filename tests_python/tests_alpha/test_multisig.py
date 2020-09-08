@@ -86,7 +86,10 @@ class TestMultisig:
         client.msig_withdrawing_delegate('msig', 'bootstrap1', [sig0, sig1])
         client.bake('bootstrap1', BAKE_ARGS)
 
-    def test_change_keys_and_threshold(self, client: Client, session: dict):
+    def test_run_transaction_change_keys_and_threshold(
+        self, client: Client, session: dict
+    ):
+        # test changing the keys and threshold with `run transaction` command
         keys = session['keys']
         sig0 = client.msig_sign_setting_threshold(
             'msig', keys[0], 2, [keys[0], keys[2]]
@@ -97,6 +100,21 @@ class TestMultisig:
         sign = client.sign_bytes(to_sign, session['keys'][2])
         sig2 = sign.signature
         client.msig_run_transaction('msig', to_sign, 'bootstrap1', [sig0, sig2])
+        client.bake('bootstrap1', BAKE_ARGS)
+
+    def test_change_keys_and_threshold(self, client: Client, session: dict):
+        # test changing the keys and threshold with `set threshold of multisig`
+        keys = session['keys']
+        new_keys = [keys[0], keys[2]]
+        sig0 = client.msig_sign_setting_threshold('msig', keys[0], 2, new_keys)
+        to_sign = client.msig_prepare_setting_threshold(
+            'msig', 2, new_keys, ['--bytes-only']
+        )
+        sign = client.sign_bytes(to_sign, session['keys'][2])
+        sig2 = sign.signature
+        client.msig_set_threshold(
+            'msig', 2, new_keys, 'bootstrap1', [sig0, sig2]
+        )
         client.bake('bootstrap1', BAKE_ARGS)
 
 
@@ -189,7 +207,10 @@ class TestMultisigFromAddress:
         client.msig_withdrawing_delegate(msig, 'bootstrap1', [sig0, sig1])
         client.bake('bootstrap1', BAKE_ARGS)
 
-    def test_change_keys_and_threshold(self, client: Client, session: dict):
+    def test_run_transaction_change_keys_and_threshold(
+        self, client: Client, session: dict
+    ):
+        # test changing the keys and threshold with `run transaction` command
         msig = session['msig']
         keys = session['keys']
         sig0 = client.msig_sign_setting_threshold(
@@ -201,4 +222,18 @@ class TestMultisigFromAddress:
         sign = client.sign_bytes(to_sign, session['keys'][2])
         sig2 = sign.signature
         client.msig_run_transaction(msig, to_sign, 'bootstrap1', [sig0, sig2])
+        client.bake('bootstrap1', BAKE_ARGS)
+
+    def test_change_keys_and_threshold(self, client: Client, session: dict):
+        # test changing the keys and threshold with `set threshold of multisig`
+        msig = session['msig']
+        keys = session['keys']
+        new_keys = [keys[0], keys[2]]
+        sig0 = client.msig_sign_setting_threshold(msig, keys[0], 2, new_keys)
+        to_sign = client.msig_prepare_setting_threshold(
+            msig, 2, new_keys, ['--bytes-only']
+        )
+        sign = client.sign_bytes(to_sign, session['keys'][2])
+        sig2 = sign.signature
+        client.msig_set_threshold(msig, 2, new_keys, 'bootstrap1', [sig0, sig2])
         client.bake('bootstrap1', BAKE_ARGS)
