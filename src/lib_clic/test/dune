@@ -1,0 +1,28 @@
+(executables
+ (names
+   test_clic
+ )
+ (libraries
+   tezos-clic
+   alcotest-lwt
+ )
+ (flags (:standard
+          -open Tezos_clic
+        )))
+
+(alias
+ (name buildtest)
+ (deps
+   test_clic.exe
+ ))
+
+(alias
+ (name runtest_clic)
+ (action (run %{exe:test_clic.exe})))
+
+(alias
+ (name runtest)
+ (package tezos-clic)
+ (deps
+   (alias runtest_clic)
+ ))

@@ -187,6 +187,7 @@ unit:alltest:
     - scripts/test_wrapper.sh src/lib_base base
     - scripts/test_wrapper.sh src/lib_benchmark/lib_micheline_rewriting benchmark_lib_micheline_rewriting
     - scripts/test_wrapper.sh src/lib_benchmark benchmark
+    - scripts/test_wrapper.sh src/lib_clic clic
     - scripts/test_wrapper.sh src/lib_client_base client_base
     - scripts/test_wrapper.sh src/lib_crypto crypto
     - scripts/test_wrapper.sh src/lib_error_monad error_monad
