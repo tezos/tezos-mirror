@@ -53,17 +53,14 @@ type t = {
   log_output : Lwt_log_sink_unix.Output.t option;
   bootstrap_threshold : int option;
   history_mode : History_mode.t option;
-  max_latency : int option;
-  chain_stuck_delay : int option;
-  sync_polling_period : int option;
+  latency : int option;
 }
 
 let wrap data_dir config_file network connections max_download_speed
     max_upload_speed binary_chunks_size peer_table_size listen_addr
     discovery_addr peers no_bootstrap_peers bootstrap_threshold private_mode
     disable_mempool enable_testchain expected_pow rpc_listen_addrs rpc_tls
-    cors_origins cors_headers log_output history_mode max_latency
-    chain_stuck_delay sync_polling_period =
+    cors_origins cors_headers log_output history_mode latency =
   let actual_data_dir =
     Option.value ~default:Node_config_file.default_data_dir data_dir
   in
@@ -130,9 +127,7 @@ let wrap data_dir config_file network connections max_download_speed
     peer_table_size;
     bootstrap_threshold;
     history_mode;
-    max_latency;
-    chain_stuck_delay;
-    sync_polling_period;
+    latency;
   }
 
 module Manpage = struct
@@ -418,30 +413,17 @@ module Term = struct
     Arg.(
       value & opt_all string [] & info ~docs ~doc ~docv:"HEADER" ["cors-header"])
 
-  let max_latency =
+  let latency =
     let doc =
-      "[max_latency] is the time interval (in seconds) used to determine if a \
+      "[latency] is the time interval (in seconds) used to determine if a \
        peer is synchronized with a chain. For instance, a peer whose known \
        head has a timestamp T is considered synchronized if T >= now - \
-       max_latency. This parameter depends on the baking rate and the latency \
-       of the network."
+       max_latency. This parameter's default value was set with the chain's \
+       current protocol's baking rate in mind (and some allowance for network \
+       latency)."
     in
     Arg.(
-      value & opt (some int) None & info ~docs ~doc ~docv:"NUM" ["max-latency"])
-
-  let chain_stuck_delay =
-    let doc = "Delay (seconds) after which we consider the chain is stuck." in
-    Arg.(
-      value
-      & opt (some int) None
-      & info ~docs ~doc ~docv:"NUM" ["chain-stuck-delay"])
-
-  let sync_polling_period =
-    let doc = "Polling period (seconds) used to check for synchronization." in
-    Arg.(
-      value
-      & opt (some int) None
-      & info ~docs ~doc ~docv:"NUM" ["sync-polling-period"])
+      value & opt (some int) None & info ~docs ~doc ~docv:"NUM" ["sync-latency"])
 
   (* Args. *)
 
@@ -452,8 +434,7 @@ module Term = struct
     $ peer_table_size $ listen_addr $ discovery_addr $ peers
     $ no_bootstrap_peers $ bootstrap_threshold $ private_mode $ disable_mempool
     $ enable_testchain $ expected_pow $ rpc_listen_addrs $ rpc_tls
-    $ cors_origins $ cors_headers $ log_output $ history_mode $ max_latency
-    $ chain_stuck_delay $ sync_polling_period
+    $ cors_origins $ cors_headers $ log_output $ history_mode $ latency
 end
 
 let read_config_file args =
@@ -551,9 +532,7 @@ let read_and_patch_config_file ?(may_override_network = false)
         history_mode;
         network;
         config_file = _;
-        max_latency;
-        chain_stuck_delay;
-        sync_polling_period } =
+        latency } =
     args
   in
   (* Overriding the network with [--network] is a bad idea if the configuration
@@ -621,7 +600,5 @@ let read_and_patch_config_file ?(may_override_network = false)
     ?bootstrap_threshold
     ?history_mode
     ?network
-    ?max_latency
-    ?chain_stuck_delay
-    ?sync_polling_period
+    ?latency
     cfg

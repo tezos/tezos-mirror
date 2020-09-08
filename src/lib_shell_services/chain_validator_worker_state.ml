@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -34,7 +35,9 @@ end
 module Event = struct
   type update = Ignored_head | Branch_switch | Head_increment
 
-  type sync_status = Sync | Unsync | Stuck
+  type synchronisation_status =
+    | Synchronised of {is_chain_stuck : bool}
+    | Not_synchronised
 
   type t =
     | Processed_block of {
@@ -47,7 +50,7 @@ module Event = struct
       }
     | Could_not_switch_testchain of error list
     | Bootstrapped
-    | Sync_status of sync_status
+    | Sync_status of synchronisation_status
     | Bootstrap_active_peers of {active : int; needed : int}
     | Bootstrap_active_peers_heads_time of {
         min_head_time : Time.Protocol.t;
@@ -72,12 +75,11 @@ module Event = struct
         Internal_event.Notice
     | Sync_status sync_status -> (
       match sync_status with
-      | Unsync ->
-          Internal_event.Warning
-      | Stuck ->
-          Internal_event.Error
-      | Sync ->
-          Internal_event.Notice )
+      | Synchronised {is_chain_stuck} ->
+          if is_chain_stuck then Internal_event.Error
+          else Internal_event.Notice
+      | Not_synchronised ->
+          Internal_event.Warning )
     | Bootstrap_active_peers _ ->
         Internal_event.Debug
     | Bootstrap_active_peers_heads_time _ ->
@@ -95,7 +97,10 @@ module Event = struct
          the current head timestamp is recent.\n\
          If 'stuck', the node considers itself synchronized with its peers \
          but the chain seems to be halted from its viewpoint."
-      (string_enum [("sync", Sync); ("unsync", Unsync); ("stuck", Stuck)])
+      (string_enum
+         [ ("synced", Synchronised {is_chain_stuck = false});
+           ("unsynced", Not_synchronised);
+           ("stuck", Synchronised {is_chain_stuck = true}) ])
 
   let encoding =
     let open Data_encoding in
@@ -171,11 +176,11 @@ module Event = struct
               {min_head_time; max_head_time; most_recent_validation}) ]
 
   let sync_status_to_string = function
-    | Sync ->
+    | Synchronised {is_chain_stuck = false} ->
         "sync"
-    | Unsync ->
+    | Not_synchronised ->
         "unsync"
-    | Stuck ->
+    | Synchronised {is_chain_stuck = true} ->
         "stuck"
 
   let pp ppf = function

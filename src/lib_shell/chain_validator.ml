@@ -46,15 +46,10 @@ module Request = struct
   let view (type a) (Validated block : a t) : view = State.Block.hash block
 end
 
-type bootstrap_conf = {
-  max_latency : int;
-  chain_stuck_delay : int;
-  sync_polling_period : int;
-  bootstrap_threshold : int;
-}
+type synchronisation_limits = {latency : int; threshold : int}
 
 type limits = {
-  bootstrap_conf : bootstrap_conf;
+  synchronisation : synchronisation_limits;
   worker_limits : Worker_types.limits;
 }
 
@@ -62,7 +57,7 @@ module Types = struct
   include Worker_state
 
   type parameters = {
-    parent : (Name.t * bool) option;
+    parent : Name.t option;
     (* inherit bootstrap status from parent chain validator *)
     db : Distributed_db.t;
     chain_state : State.Chain.t;
@@ -78,6 +73,14 @@ module Types = struct
 
   type state = {
     parameters : parameters;
+    (* This state should be updated everytime a block is validated or
+       when we receive a message [Current_head] or [Current_branch]
+       with a known head. Because the chain validator does not handle
+       directly these messages, this is done through callbacks. *)
+    synchronisation_state : Synchronisation_heuristic.t;
+    (* This should be true if after updating the synchronisatio_state,
+       the status was [Synchronized] at least once. When this flag is
+       true, the node starts its mempool. *)
     mutable bootstrapped : bool;
     bootstrapped_waiter : unit Lwt.t;
     bootstrapped_wakener : unit Lwt.u;
@@ -128,10 +131,53 @@ let shutdown_child nv active_chains =
       Lwt.return_unit)
     nv.child
 
+(* Update the synchronisation state and if it is relevant, set the
+   bootstrapped flag to true. Assume:
+
+   - [peer_id] is not us.
+
+   - [block] is known as valid. *)
+let update_synchronisation_state =
+  (* Used to detect and log when the status changes. *)
+  let old_status = ref None in
+  fun w ((block, peer_id) : Block_header.t * P2p_peer.Id.t) ->
+    let nv = Worker.state w in
+    Synchronisation_heuristic.update
+      nv.synchronisation_state
+      (block.shell.timestamp, peer_id) ;
+    let status =
+      Synchronisation_heuristic.get_status nv.synchronisation_state
+    in
+    ( match status with
+    | Synchronised _ when nv.bootstrapped = false ->
+        nv.bootstrapped <- true ;
+        Lwt.wakeup_later nv.bootstrapped_wakener () ;
+        Worker.record_event w Bootstrapped
+    | _ ->
+        () ) ;
+    if !old_status <> Some status then (
+      old_status := Some status ;
+      Worker.record_event w (Sync_status status) )
+
+(* The synchronisation state is updated only for blocks known as
+   valid. Assume:
+
+   - [peer_id] is not us *)
+let check_and_update_synchronisation_state w (block, peer_id) : unit Lwt.t =
+  let nv = Worker.state w in
+  let hash = Block_header.hash block in
+  State.Block.known_valid nv.parameters.chain_state hash
+  >>= fun known_valid ->
+  if known_valid then (
+    update_synchronisation_state w (block, peer_id) ;
+    Lwt.return_unit )
+  else Lwt.return_unit
+
+(* Called for every validated block. *)
 let notify_new_block w block =
   let nv = Worker.state w in
   Option.iter
-    (fun (id, _) ->
+    (fun id ->
       List.assoc_opt id (Worker.list table)
       |> Option.iter (fun w ->
              let nv = Worker.state w in
@@ -141,121 +187,16 @@ let notify_new_block w block =
   Lwt_watcher.notify nv.parameters.global_valid_block_input block ;
   Worker.Queue.push_request_now w (Validated block)
 
-(* Return [None] if there are less than [n] active peers. (an active peer
-   has updated its head at least once).
-   Otherwise, for the n active peers with the most recent head
-   returns [Some (min_head_time, max_head_time, most_recent_validation)] where
-   - [min_head_time] is the timestamp of the least recent validated head
-   - [max_head_time] is the timestamp of the most recent validated head
-   - [most_recent_validation] is most recent time a head has been validated
-
-   TODO this is inefficient, could be replaced by
-   structure updated on peers head update *)
-let time_peers active_peers n event_recorder =
-  let head_time peer : Time.Protocol.t * Time.Protocol.t =
-    Peer_validator.(current_head_timestamp peer, time_last_validated_head peer)
-  in
-  let f _peer_id peer acc =
-    if Peer_validator.updated_once peer then head_time peer :: acc else acc
-  in
-  let time_list = P2p_peer.Error_table.fold_resolved f active_peers [] in
-  let active_peers_count = List.length time_list in
-  if active_peers_count < n then (
-    event_recorder
-      (Event.Bootstrap_active_peers {active = active_peers_count; needed = n}) ;
-    None )
-  else
-    let compare (head_time_a, last_validation_a)
-        (head_time_b, last_validation_b) =
-      let u = Time.Protocol.compare head_time_a head_time_b in
-      let v = Time.Protocol.compare last_validation_a last_validation_b in
-      if u != 0 then u else v
-    in
-    (* take_n returns the n greatest elements, in *sorted* order *)
-    let sorted_time_trunc = List.take_n ~compare n time_list in
-    let (max_head_time, most_recent_validation) =
-      List.last_exn sorted_time_trunc
-    in
-    let (min_head_time, _) = List.hd sorted_time_trunc in
-    assert (min_head_time <= max_head_time) ;
-    event_recorder
-      (Event.Bootstrap_active_peers_heads_time
-         {min_head_time; max_head_time; most_recent_validation}) ;
-    Some (min_head_time, max_head_time, most_recent_validation)
-
-let sync_state nv event_recorder =
-  let bootstrap_threshold =
-    nv.parameters.limits.bootstrap_conf.bootstrap_threshold
-  in
-  let chain_stuck_delay =
-    nv.parameters.limits.bootstrap_conf.chain_stuck_delay
-  in
-  let max_latency = nv.parameters.limits.bootstrap_conf.max_latency in
-  if bootstrap_threshold = 0 then `Sync
-  else
-    match time_peers nv.active_peers bootstrap_threshold event_recorder with
-    | None ->
-        `Unsync
-    | Some (min_head_time, max_head_time, last_heard) ->
-        let now = Time.System.to_protocol @@ Systime_os.now () in
-        let some_time_from_now =
-          Time.Protocol.add now (Int64.of_int (-chain_stuck_delay))
-        in
-        let almost_now = Time.Protocol.add now (Int64.of_int (-max_latency)) in
-        if Time.Protocol.(min_head_time >= almost_now) then `Sync
-        else if
-          min_head_time = max_head_time && last_heard <= some_time_from_now
-        then `Stuck
-        else `Unsync
-
-(** Check synchronization status every [sync_polling_period]. Wake up
-    bootstrap wakener and mark node as bootstrapped when synchronization status
-    is either stuck or sync. *)
-let poll_sync nv event_recorder =
-  let sync_polling_period =
-    nv.parameters.limits.bootstrap_conf.sync_polling_period
-  in
-  if nv.bootstrapped then Lwt.wakeup_later nv.bootstrapped_wakener ()
-  else
-    let wait_sync nv =
-      (* only used for logging *)
-      let previous_state = ref `Stuck in
-      let rec loop () =
-        match sync_state nv event_recorder with
-        | `Stuck ->
-            if !previous_state <> `Stuck then
-              event_recorder (Event.Sync_status Stuck) ;
-            previous_state := `Stuck ;
-            Lwt.return_unit
-        | `Sync ->
-            if !previous_state <> `Sync then
-              event_recorder (Event.Sync_status Sync) ;
-            previous_state := `Sync ;
-            Lwt.return_unit
-        | `Unsync ->
-            if !previous_state <> `Unsync then
-              event_recorder (Event.Sync_status Unsync) ;
-            previous_state := `Unsync ;
-            Lwt_unix.sleep (float_of_int sync_polling_period)
-            >>= fun () -> loop ()
-      in
-      loop ()
-    in
-    Lwt_utils.dont_wait
-      (fun exc ->
-        Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
-      (fun () ->
-        wait_sync nv
-        >>= fun () ->
-        nv.bootstrapped <- true ;
-        event_recorder Event.Bootstrapped ;
-        Lwt.return (Lwt.wakeup_later nv.bootstrapped_wakener ()))
+(* Called for every validated block coming from a remote peer_id. *)
+let notify_new_foreign_block w peer_id block =
+  notify_new_block w block ;
+  update_synchronisation_state w (State.Block.header block, peer_id)
 
 let with_activated_peer_validator w peer_id f =
   let nv = Worker.state w in
   P2p_peer.Error_table.find_or_make nv.active_peers peer_id (fun () ->
       Peer_validator.create
-        ~notify_new_block:(notify_new_block w)
+        ~notify_new_block:(notify_new_foreign_block w peer_id)
         ~notify_termination:(fun _pv ->
           P2p_peer.Error_table.remove nv.active_peers peer_id)
         nv.parameters.peer_validator_limits
@@ -384,7 +325,7 @@ let may_switch_test_chain w active_chains spawn_child block =
          global initialization boilerplate (e.g. notifying [global_chains_input],
          adding the chain to the correct tables, ...) *)
       spawn_child
-        ~parent:(State.Chain.id chain_state, nv.bootstrapped)
+        ~parent:(State.Chain.id chain_state)
         nv.parameters.peer_validator_limits
         nv.parameters.prevalidator_limits
         nv.parameters.block_validator
@@ -579,12 +520,17 @@ let on_launch start_prevalidator w _ parameters =
   let valid_block_input = Lwt_watcher.create_input () in
   let new_head_input = Lwt_watcher.create_input () in
   let (bootstrapped_waiter, bootstrapped_wakener) = Lwt.wait () in
+  let synchronisation_state =
+    Synchronisation_heuristic.create
+      ~threshold:parameters.limits.synchronisation.threshold
+      ~latency:parameters.limits.synchronisation.latency
+  in
   let bootstrapped =
-    match parameters.parent with
-    | Some (_, bootstrap_status) ->
-        bootstrap_status
-    | None ->
-        parameters.limits.bootstrap_conf.bootstrap_threshold <= 0
+    match Synchronisation_heuristic.get_status synchronisation_state with
+    | Synchronised _ ->
+        true
+    | Not_synchronised ->
+        false
   in
   let nv =
     {
@@ -594,13 +540,14 @@ let on_launch start_prevalidator w _ parameters =
       bootstrapped_wakener;
       bootstrapped_waiter;
       bootstrapped;
+      synchronisation_state;
       active_peers = P2p_peer.Error_table.create 50;
-      (* TODO use `2 * max_connection` *)
+      (* TODO use [2 * max_connection] *)
       child = None;
       prevalidator;
     }
   in
-  poll_sync nv (Worker.record_event w) ;
+  if nv.bootstrapped then Lwt.wakeup_later nv.bootstrapped_wakener () ;
   Distributed_db.set_callback
     parameters.chain_db
     {
@@ -617,6 +564,9 @@ let on_launch start_prevalidator w _ parameters =
                 Error_monad.pp_print_error
                 trace)
             (fun () ->
+              let (block, _) = (locator : Block_locator.t :> _ * _) in
+              check_and_update_synchronisation_state w (block, peer_id)
+              >>= fun () ->
               with_activated_peer_validator w peer_id
               @@ fun pv ->
               Peer_validator.notify_branch pv locator ;
@@ -634,6 +584,8 @@ let on_launch start_prevalidator w _ parameters =
                 Error_monad.pp_print_error
                 trace)
             (fun () ->
+              check_and_update_synchronisation_state w (block, peer_id)
+              >>= fun () ->
               with_activated_peer_validator w peer_id (fun pv ->
                   Peer_validator.notify_head pv block ;
                   return_unit)
@@ -850,8 +802,6 @@ let ddb_information t =
   let ddb = state.parameters.chain_db in
   Distributed_db.information ddb
 
-let sync_state w =
+let sync_status w =
   let nv = Worker.state w in
-  (* we could pass the full worker here, but only the event recorder is
-     needed *)
-  sync_state nv (Worker.record_event w)
+  Synchronisation_heuristic.get_status nv.synchronisation_state

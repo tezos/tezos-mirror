@@ -50,9 +50,7 @@ type t = {
   log_output : Lwt_log_sink_unix.Output.t option;
   bootstrap_threshold : int option;
   history_mode : History_mode.t option;
-  max_latency : int option;
-  chain_stuck_delay : int option;
-  sync_polling_period : int option;
+  latency : int option;
 }
 
 module Term : sig

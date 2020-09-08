@@ -59,13 +59,10 @@ let invalid_block_encoding =
        (req "level" int32)
        (req "errors" RPC_error.encoding))
 
-let sync_state_encoding =
-  string_enum [("sync", `Sync); ("unsync", `Unsync); ("stuck", `Stuck)]
-
 let bootstrap_encoding =
   obj2
     (req "bootstrapped" Encoding.bool)
-    (req "sync_state" sync_state_encoding)
+    (req "sync_state" Chain_validator_worker_state.Event.sync_status_encoding)
 
 module S = struct
   let path : prefix RPC_path.context = RPC_path.open_root

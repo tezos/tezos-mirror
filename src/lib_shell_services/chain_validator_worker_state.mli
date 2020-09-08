@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -34,7 +35,11 @@ end
 module Event : sig
   type update = Ignored_head | Branch_switch | Head_increment
 
-  type sync_status = Sync | Unsync | Stuck
+  type synchronisation_status =
+    | Synchronised of {is_chain_stuck : bool}
+    | Not_synchronised
+
+  val sync_status_encoding : synchronisation_status Data_encoding.t
 
   type t =
     | Processed_block of {
@@ -47,7 +52,7 @@ module Event : sig
       }
     | Could_not_switch_testchain of error list
     | Bootstrapped
-    | Sync_status of sync_status
+    | Sync_status of synchronisation_status
     | Bootstrap_active_peers of {active : int; needed : int}
     | Bootstrap_active_peers_heads_time of {
         min_head_time : Time.Protocol.t;

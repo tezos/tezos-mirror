@@ -154,7 +154,7 @@ let rpc_directory ~user_activated_upgrades ~user_activated_protocol_overrides
       | Ok chain_validator ->
           return
             Chain_validator.
-              (is_bootstrapped chain_validator, sync_state chain_validator)) ;
+              (is_bootstrapped chain_validator, sync_status chain_validator)) ;
   register0 S.force_bootstrapped (fun chain () b ->
       match Validator.get validator (State.Chain.id chain) with
       | Error _ ->

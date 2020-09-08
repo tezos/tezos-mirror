@@ -36,7 +36,9 @@
     - [latency] is the timestamp drift (in seconds) expected for the
    [threshold] best candidates (see below). *)
 
-type status = Synchronised of {is_chain_stuck : bool} | Not_synchronised
+type status = Chain_validator_worker_state.Event.synchronisation_status =
+  | Synchronised of {is_chain_stuck : bool}
+  | Not_synchronised
 
 (** A node is either [Not_synchronised] or [Synchronised]. If the node
    is [Synchronised] the chain may be stuck (last block validated was

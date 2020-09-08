@@ -27,23 +27,21 @@
 type t
 
 (** Constants parameterizing the bootstrap heuristics. *)
-type bootstrap_conf = {
-  max_latency : int;
-      (** [max_latency] is the time interval (seconds) used to determine if a node is
-          synchronized with a chain. For instance, a node that knows head
-          with timestamp T is synchronized if T >= now - max_latency. This
-          parameter depends on the baking rate and the latency of the network. *)
-  chain_stuck_delay : int;
-      (** [chain_stuck_delay] is the delay (seconds) after which we consider
-          the chain is stuck if we don't get new heads from peers. *)
-  sync_polling_period : int;
-      (** [sync_polling_period] is the polling period (seconds) used to check for
-          synchronisation. *)
-  bootstrap_threshold : int;
+type synchronisation_limits = {
+  latency : int;
+      (** [latency] is the time interval (seconds) used to determine
+          if a node is synchronized with a chain. For instance, a node that
+          knows head with timestamp T is synchronized if T >= now -
+          max_latency. This parameter depends on the baking rate and the
+          latency of the network. *)
+  threshold : int;
+      (** [threshold] determines the number of peers the synchronization
+     heuristic looks at to determine if the node is synchronized or
+     not.  *)
 }
 
 type limits = {
-  bootstrap_conf : bootstrap_conf;
+  synchronisation : synchronisation_limits;
   worker_limits : Worker_types.limits;
 }
 
@@ -66,21 +64,12 @@ val chain_id : t -> Chain_id.t
 
 val chain_state : t -> State.Chain.t
 
-(** - If there are at least `boostrap_threshold` active peers, which validated
-      at least one block, we consider the peers with the most recent
-      heads:
-    . if all heads are *recent enough*, returns [`Sync]. Recent mean timestamp
-      is later than [now() - max_latency]
-    . if all heads have the same time, but haven't been updated for
-      [chain_stuck_delay] returns [`Stuck]
-    . otherwise, returns [`Unsync]
-    - If there are less than `bootstrap_threshold` such peers
-    . if bootstrap_threshold = 0, returns [`Sync] else [`Unsync`] *)
-val sync_state : t -> [`Sync | `Stuck | `Unsync]
+val sync_status : t -> Synchronisation_heuristic.status
 
-(** Poll synchronization state until it is `Sync or `Stuck.
-    Subsequent calls return immediately. In other words, once a node is
-    bootstrapped, it remains bootstrapped until it terminates. *)
+(** Wait for the `synchronisation_status` to be
+   `Synchronised`. Subsequent calls return immediately. In other
+   words, once a node is bootstrapped, it remains bootstrapped until
+   it terminates (except if [force_bootstrapped] is used). *)
 val bootstrapped : t -> unit Lwt.t
 
 val is_bootstrapped : t -> bool

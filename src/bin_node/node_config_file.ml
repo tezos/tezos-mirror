@@ -853,70 +853,40 @@ let peer_validator_limits_encoding =
           default_limits.worker_limits.backlog_size
           default_limits.worker_limits.backlog_level))
 
-let bootstrap_conf_encoding default_max_latency default_chain_stuck_delay
-    default_sync_polling_period default_bootstrap_threshold =
+let synchronisation_heuristic_encoding default_latency default_threshold =
   let open Data_encoding in
   conv
-    (fun { Chain_validator.max_latency;
-           chain_stuck_delay;
-           sync_polling_period;
-           bootstrap_threshold } ->
-      (max_latency, chain_stuck_delay, sync_polling_period, bootstrap_threshold))
-    (fun ( max_latency,
-           chain_stuck_delay,
-           sync_polling_period,
-           bootstrap_threshold ) ->
-      {
-        max_latency;
-        chain_stuck_delay;
-        sync_polling_period;
-        bootstrap_threshold;
-      })
-    (obj4
+    (fun {Chain_validator.latency; threshold} -> (latency, threshold))
+    (fun (latency, threshold) -> {latency; threshold})
+    (obj2
        (dft
-          "max_latency"
+          "latency"
           ~description:
-            "[max_latency] is the time interval (in seconds) used to \
-             determine if a peer is synchronized with a chain. For instance, \
-             a peer whose known head has a timestamp T is considered \
-             synchronized if T >= now - max_latency. This parameter depends \
-             on the baking rate and the latency of the network."
+            "[latency] is the time interval (in seconds) used to determine if \
+             a peer is synchronized with a chain. For instance, a peer whose \
+             known head has a timestamp T is considered synchronized if T >= \
+             now - latency. This parameter depends on the baking rate and the \
+             latency of the network."
           uint16
-          default_max_latency)
+          default_latency)
        (dft
-          "chain_stuck_delay"
-          ~description:
-            "Delay (seconds) after which we consider the chain is stuck."
-          uint16
-          default_chain_stuck_delay)
-       (dft
-          "sync_polling_period"
-          ~description:
-            "Polling period (seconds) used to check for synchronization."
-          uint16
-          default_sync_polling_period)
-       (dft
-          "bootstrap_threshold"
+          "synchronisation_threshold"
           ~description:
             "The minimal number of peers this peer should be synchronized \
              with in order to be bootstrapped."
           uint8
-          default_bootstrap_threshold))
+          default_threshold))
 
 let chain_validator_limits_encoding =
   let open Data_encoding in
   conv
-    (fun {Chain_validator.bootstrap_conf; worker_limits} ->
-      (bootstrap_conf, worker_limits))
-    (fun (bootstrap_conf, worker_limits) -> {bootstrap_conf; worker_limits})
+    (fun {Chain_validator.synchronisation; worker_limits} ->
+      (synchronisation, worker_limits))
+    (fun (synchronisation, worker_limits) -> {synchronisation; worker_limits})
     (merge_objs
-       (bootstrap_conf_encoding
-          default_shell.chain_validator_limits.bootstrap_conf.max_latency
-          default_shell.chain_validator_limits.bootstrap_conf.chain_stuck_delay
-          default_shell.chain_validator_limits.bootstrap_conf
-            .sync_polling_period
-          default_shell.chain_validator_limits.bootstrap_conf
-            .bootstrap_threshold)
+       (synchronisation_heuristic_encoding
+          default_shell.chain_validator_limits.synchronisation.latency
+          default_shell.chain_validator_limits.synchronisation.threshold)
        (worker_limits_encoding
           default_shell.chain_validator_limits.worker_limits.backlog_size
           default_shell.chain_validator_limits.worker_limits.backlog_level))
@@ -1125,8 +1095,8 @@ let update ?data_dir ?min_connections ?expected_connections ?max_connections
     ?expected_pow ?bootstrap_peers ?listen_addr ?discovery_addr
     ?(rpc_listen_addrs = []) ?(private_mode = false) ?(disable_mempool = false)
     ?(enable_testchain = false) ?(cors_origins = []) ?(cors_headers = [])
-    ?rpc_tls ?log_output ?bootstrap_threshold ?history_mode ?network
-    ?max_latency ?chain_stuck_delay ?sync_polling_period cfg =
+    ?rpc_tls ?log_output ?bootstrap_threshold ?history_mode ?network ?latency
+    cfg =
   let data_dir = Option.value ~default:cfg.data_dir data_dir in
   Node_data_version.ensure_data_dir data_dir
   >>=? fun () ->
@@ -1182,34 +1152,21 @@ let update ?data_dir ?min_connections ?expected_connections ?max_connections
       block_validator_limits = cfg.shell.block_validator_limits;
       prevalidator_limits = cfg.shell.prevalidator_limits;
       chain_validator_limits =
-        (let bootstrap_conf : Chain_validator.bootstrap_conf =
+        (let synchronisation : Chain_validator.synchronisation_limits =
            {
-             max_latency =
+             latency =
                Option.value
                  ~default:
-                   cfg.shell.chain_validator_limits.bootstrap_conf.max_latency
-                 max_latency;
-             chain_stuck_delay =
+                   cfg.shell.chain_validator_limits.synchronisation.latency
+                 latency;
+             threshold =
                Option.value
                  ~default:
-                   cfg.shell.chain_validator_limits.bootstrap_conf
-                     .chain_stuck_delay
-                 chain_stuck_delay;
-             sync_polling_period =
-               Option.value
-                 ~default:
-                   cfg.shell.chain_validator_limits.bootstrap_conf
-                     .sync_polling_period
-                 sync_polling_period;
-             bootstrap_threshold =
-               Option.value
-                 ~default:
-                   cfg.shell.chain_validator_limits.bootstrap_conf
-                     .bootstrap_threshold
+                   cfg.shell.chain_validator_limits.synchronisation.threshold
                  bootstrap_threshold;
            }
          in
-         {cfg.shell.chain_validator_limits with bootstrap_conf});
+         {cfg.shell.chain_validator_limits with synchronisation});
       history_mode = Option.first_some history_mode cfg.shell.history_mode;
     }
   in

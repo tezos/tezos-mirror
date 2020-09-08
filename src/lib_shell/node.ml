@@ -142,13 +142,7 @@ let default_peer_validator_limits =
 let default_chain_validator_limits =
   let open Chain_validator in
   {
-    bootstrap_conf =
-      {
-        max_latency = 120;
-        chain_stuck_delay = 600;
-        sync_polling_period = 2;
-        bootstrap_threshold = 4;
-      };
+    synchronisation = {latency = 150; threshold = 4};
     worker_limits = default_workers_limits;
   }
 
