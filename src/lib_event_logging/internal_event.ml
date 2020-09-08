@@ -285,10 +285,8 @@ module All_sinks = struct
       let module S = (val definition : SINK with type t = a) in
       S.handle ?section sink def v
     in
-    List.fold_left
-      (fun prev -> function Active {sink; definition; _} ->
-            prev >>=? fun () -> handle sink definition)
-      return_unit
+    iter_s
+      (function Active {sink; definition; _} -> handle sink definition)
       !active
 
   let pp_state fmt () =
