@@ -117,7 +117,7 @@ module Info : sig
   val log_incoming_rejection :
     timestamp:Time.System.t -> 'conn point_info -> P2p_peer.Id.t -> unit
 
-  val fold : 'conn t -> init:'a -> f:('a -> Pool_event.t -> 'a) -> 'a
+  val events : 'conn t -> Pool_event.t list
 
   val watch : 'conn t -> Pool_event.t Lwt_stream.t * Lwt_watcher.stopper
 end

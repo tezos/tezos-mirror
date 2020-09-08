@@ -212,7 +212,7 @@ module Info = struct
 
   let watch {watchers; _} = Lwt_watcher.create_stream watchers
 
-  let fold {events; _} ~init ~f = Ringo.Ring.fold events ~init ~f
+  let events {events; _} = Ringo.Ring.elements events
 end
 
 let get {Info.state; _} = state

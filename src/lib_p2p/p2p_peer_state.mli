@@ -130,11 +130,7 @@ module Info : sig
       unit tzresult Lwt.t
   end
 
-  val fold :
-    ('conn, 'peer_meta, 'conn_meta) t ->
-    init:'a ->
-    f:('a -> Pool_event.t -> 'a) ->
-    'a
+  val events : ('conn, 'peer_meta, 'conn_meta) t -> Pool_event.t list
 
   val watch :
     ('conn, 'peer_meta, 'conn_meta) t ->

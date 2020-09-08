@@ -201,7 +201,7 @@ module Info = struct
   let log_incoming_rejection ~timestamp point_info peer_id =
     log point_info ~timestamp (Rejecting_request peer_id)
 
-  let fold {events; _} ~init ~f = Ringo.Ring.fold events ~init ~f
+  let events {events; _} = Ringo.Ring.elements events
 
   let watch {watchers; _} = Lwt_watcher.create_stream watchers
 end

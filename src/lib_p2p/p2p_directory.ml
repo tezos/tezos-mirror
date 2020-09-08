@@ -227,9 +227,7 @@ let build_rpc_directory net =
           | None ->
               RPC_answer.return []
           | Some gi ->
-              let evts =
-                P2p_peer_state.Info.fold gi ~init:[] ~f:(fun a e -> e :: a)
-              in
+              let evts = P2p_peer_state.Info.events gi in
               if not q#monitor then RPC_answer.return evts
               else
                 let (stream, stopper) = P2p_peer_state.Info.watch gi in
@@ -349,9 +347,7 @@ let build_rpc_directory net =
           | None ->
               RPC_answer.return []
           | Some gi ->
-              let evts =
-                P2p_point_state.Info.fold gi ~init:[] ~f:(fun a e -> e :: a)
-              in
+              let evts = P2p_point_state.Info.events gi in
               if not q#monitor then RPC_answer.return evts
               else
                 let (stream, stopper) = P2p_point_state.Info.watch gi in
