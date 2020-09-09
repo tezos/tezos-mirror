@@ -76,8 +76,8 @@ type matcher = {meth : meth_matcher; path : path_matcher}
     2. Any number (including none (0)) of spaces ([ ]).
     3. A path which must start with a slash ([/]) and be followed by a sequence
        of chunks separated by slashes ([/]). Each chunk is either a single asterisk
-       ([*]) (for [Wildcard]) or a non-empty sequence of characters excluding
-       asterisk and slash ([*] and [/]) (for [Literal _]).
+       ([*]) (for [Wildcard]) or a non-empty sequence of characters (for
+       [Literal _]). Special characters (see below) must be percentage-encoded.
     4. An optional suffix slash-star-star (["/**"]) indicates
        [FollowedByAnySuffix] and it's absence is for [Exact].
 
@@ -88,6 +88,21 @@ type matcher = {meth : meth_matcher; path : path_matcher}
     E.g., ["PATCH/*"] is a matcher for the PATCH method on any single-chunk path.
     E.g., ["/users/*/display-name"] is a matcher for any method on paths that
     fit in the ["/users/<user-id>/display-name"] pattern.
+
+    Chunks cannot contain the following special characters. These characters
+    must be represented percent-encoded. (Note that chunks are percent-decoded
+    and the character percent ([%]) should appear percent-encoded (%25).
+    - asterisk ([*], represented by %2A)
+    - slash ([/], represented by %2F)
+
+    Also note that each chunk is percent-decoded.
+
+    E.g., ["GET /entries/by/year/2020/*/*"] is a matcher for the GET method on
+    paths that fit in the ["/entries/by/year/2020/<month>/<day>"] pattern.
+    E.g., ["GET /entries/by/year/20*/*/*"] is not a valid matcher. The character
+    asterisk ([*]) is not allowed within literal chunks. To match on the
+    specific string ["20*"] use the percent-encoding [20%2A]. You cannot match
+    on regular expressions nor glob expansions using this Acl module.
 
     @raise {!Invalid_argument} if the path does not follow the format described
     above. *)

@@ -88,10 +88,10 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
 
   let callback server ((_io, con) : Cohttp_lwt_unix.Server.conn) req body =
     let uri = Request.uri req in
-    let path = Uri.pct_decode (Uri.path uri) in
+    let path = Uri.path uri in
     lwt_log_info "(%s) receive request to %s" (Connection.to_string con) path
     >>= fun () ->
-    let path = Resto.Utils.split_path path in
+    let path = path |> Resto.Utils.split_path |> List.map Uri.pct_decode in
     let req_headers = Request.headers req in
     ( match Request.meth req with
     | #Resto.meth

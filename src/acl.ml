@@ -78,17 +78,18 @@ let add_chunk (matcher : path_matcher) (chunk : string) =
         FollowedByAnySuffix f
     | "*" ->
         Exact (Wildcard :: f)
-    | s ->
-        if String.contains s '*' then
+    | literal ->
+        if String.contains literal '*' then
           raise
             (Invalid_argument
                "Resto.Acl.lex: Star cannot appear outside of special patterns \
                 * and **") ;
-        Exact (Literal s :: f) )
+        let decoded_literal = Uri.pct_decode literal in
+        Exact (Literal decoded_literal :: f) )
 
 let parse_path s offset =
   String.sub s offset (String.length s - offset)
-  |> Uri.pct_decode |> Resto.Utils.split_path
+  |> Resto.Utils.split_path
   |> List.fold_left add_chunk (Exact [])
   |> function
   | FollowedByAnySuffix m ->
