@@ -56,7 +56,8 @@ let () =
             FollowedByAnySuffix [Wildcard; Literal "a"; Wildcard; Literal "b"];
         } );
       ( "/%3F%3F%3F/**",
-        {meth = Any; path = FollowedByAnySuffix [Literal "???"]} ) ]
+        {meth = Any; path = FollowedByAnySuffix [Literal "???"]} );
+      ("/%2A%2F%25", {meth = Any; path = Exact [Literal "*/%"]}) ]
 
 let () =
   List.iter
@@ -76,6 +77,8 @@ let () =
       " ";
       "GET    ";
       "GET";
+      "G%45T/";
+      "GET%2F";
       "GE/T";
       "GET ";
       "FOOOOOOOO";
