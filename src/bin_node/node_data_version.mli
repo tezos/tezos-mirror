@@ -64,31 +64,30 @@ val ensure_data_dir : ?bare:bool -> string -> unit tzresult Lwt.t
 
 (** Upgrade data directory from an older version.
 
-    Usage: [upgrade_data_dir dir] *)
+    [upgrade_data_dir dir] checks if an upgrade of
+    the given data directory [dir] is available. If the data directory
+    is upgradable then the upgrade is performed. Otherwise, nothing is
+    done. *)
 val upgrade_data_dir : string -> unit tzresult Lwt.t
 
-(** [store_dir dir] is a directory within [dir] that the node uses for its
-    store. In order for [store_dir dir] to be valid, [dir] must be a valid
-    directory name. *)
-
+(** [store_dir dir] is a directory within [dir] that the node uses for
+    its store. In order for [store_dir dir] to be valid, [dir] must be
+    a valid directory name. *)
 val store_dir : string -> string
 
-(** [context_dir dir] is a directory within [dir] that the node uses for its
-    context. In order for [context_dir dir] to be valid, [dir] must be a valid
-    directory name. *)
-
+(** [context_dir dir] is a directory within [dir] that the node uses
+    for its context. In order for [context_dir dir] to be valid, [dir]
+    must be a valid directory name.*)
 val context_dir : string -> string
 
-(** [protocol_dir dir] is a directory within [dir] that the node uses for its
-    protocol. In order for [protocol_dir dir] to be valid, [dir] must be a valid
-    directory name. *)
-
+(** [protocol_dir dir] is a directory within [dir] that the node uses
+    for its protocol. In order for [protocol_dir dir] to be valid,
+    [dir] must be a valid directory name.*)
 val protocol_dir : string -> string
 
-(** [lock_file dir] is a file within [dir] that the node uses for its lock. In
-    order for [lock_file dir] to be valid, [dir] must be a valid directory name.
-*)
-
+(** [lock_file dir] is a file within [dir] that the node uses for its
+    lock. In order for [lock_file dir] to be valid, [dir] must be a
+    valid directory name. *)
 val lock_file : string -> string
 
 val upgrade_status : string -> unit tzresult Lwt.t
