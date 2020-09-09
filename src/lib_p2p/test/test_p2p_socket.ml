@@ -403,8 +403,7 @@ module Nacked = struct
     >>=? fun auth_fd ->
     P2p_socket.nack auth_fd P2p_rejection.No_motive [] >>= fun () -> sync ch
 
-  (* This test is skipped because its result on the CI is not deterministic *)
-  let run _dir = return_unit
+  let run _dir = run_nodes client server
 end
 
 (** Spawns a client and a server. A client tries to connect to a
