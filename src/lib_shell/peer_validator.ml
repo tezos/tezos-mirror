@@ -90,9 +90,7 @@ module Types = struct
     peer_id : P2p_peer.Id.t;
     parameters : parameters;
     mutable pipeline : Bootstrap_pipeline.t option;
-    mutable started_validation : bool;
     mutable last_validated_head : Block_header.t;
-    mutable time_last_validated_head : Time.Protocol.t;
     mutable last_advertised_head : Block_header.t;
   }
 
@@ -219,7 +217,6 @@ let only_if_fitness_increases w distant_header cont =
   State.Block.known_valid chain_state hash
   >>= fun known_valid ->
   if known_valid then (
-    pv.started_validation <- true ;
     pv.last_validated_head <- distant_header ;
     return_unit )
   else
@@ -275,7 +272,6 @@ let may_validate_new_head w hash (header : Block_header.t) =
       P2p_peer.Id.pp_short
       pv.peer_id ;
     pv.last_validated_head <- header ;
-    pv.started_validation <- true ;
     return_unit )
   else if invalid_block then (
     debug
@@ -472,15 +468,11 @@ let on_launch _ name parameters =
       peer_id = snd name;
       parameters = {parameters with notify_new_block};
       pipeline = None;
-      started_validation = false;
       last_validated_head = State.Block.header genesis;
       last_advertised_head = State.Block.header genesis;
-      time_last_validated_head = Time.System.to_protocol @@ Systime_os.now ();
     }
   and notify_new_block block =
-    pv.started_validation <- true ;
     pv.last_validated_head <- State.Block.header block ;
-    pv.time_last_validated_head <- Time.System.to_protocol @@ Systime_os.now () ;
     parameters.notify_new_block block
   in
   return pv
@@ -555,18 +547,6 @@ let shutdown w = Worker.shutdown w
 let peer_id w =
   let pv = Worker.state w in
   pv.peer_id
-
-let current_head_timestamp w =
-  let pv = Worker.state w in
-  pv.last_validated_head.shell.timestamp
-
-let updated_once w =
-  let pv = Worker.state w in
-  pv.started_validation
-
-let time_last_validated_head w =
-  let pv = Worker.state w in
-  pv.time_last_validated_head
 
 let status = Worker.status
 
