@@ -14,3 +14,14 @@ v0.4:
 * client does not depend on Unix anymore. Users must pass `gettimeofday`
   function directly.
 * Added `Gone response code
+
+v0.5:
+
+* Documentation
+* Updated dependencies (notably Lwt)
+
+v0.6:
+
+* Split path before percentage-decoding chunks to allow slash's encoding to
+  appear in chunks
+* Added ACL module to allow/deny access to entry points based on path matching
