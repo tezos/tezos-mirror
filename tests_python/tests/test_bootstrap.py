@@ -8,8 +8,7 @@ LOG_LEVEL = {"validator.chain":  "debug", "validator.peer": "debug"}
 
 
 def params(threshold=0):
-    return ['--max-latency', '1', '--chain-stuck-delay', '10',
-            '--sync-polling-period', '1', '--bootstrap-threshold',
+    return ['--sync-latency', '3', '--bootstrap-threshold',
             str(threshold), '--connections', '100']
 
 
@@ -24,7 +23,7 @@ class TestThresholdZero:
 
     def test_bootstrap(self, sandbox: Sandbox):
         client = sandbox.client(0)
-        assert client.sync_state() == 'sync'
+        assert client.sync_state() == 'synced'
 
 
 @pytest.mark.baker
@@ -40,7 +39,7 @@ class TestThresholdOne:
 
     def test_bootstrap(self, sandbox: Sandbox):
         client = sandbox.client(0)
-        assert client.sync_state() == 'sync'
+        assert client.sync_state() == 'synced'
 
     def test_add_node(self, sandbox: Sandbox):
         sandbox.add_node(1, params=params(1), log_levels=LOG_LEVEL,
@@ -91,24 +90,23 @@ class TestStuck:
         """Bake a few blocks and kill baker"""
         time.sleep(2)
         sandbox.rm_baker(0, proto=constants.ALPHA_DAEMON)
-        time.sleep(3)
+        time.sleep(5)
 
     def test_progress(self, sandbox: Sandbox):
         assert sandbox.client(0).get_level() >= 2
 
     def test_add_node(self, sandbox: Sandbox):
-        sandbox.add_node(1, params=params(1), config_client=False,
+        sandbox.add_node(1, params=params(2), config_client=False,
+                         log_levels=LOG_LEVEL)
+        sandbox.add_node(2, params=params(2), config_client=False,
                          log_levels=LOG_LEVEL)
 
-    def test_unsync(self, sandbox: Sandbox):
-        """Initially, 1 is unsync"""
-        assert sandbox.client(1).sync_state() == 'unsync'
-
-    @pytest.mark.timeout(15)
     def test_all_nodes_boostrap(self, sandbox: Sandbox):
-        """Eventually, 1 is bootstrapped, considering chain is stuck. """
+        """Eventually, 1 and 2 are bootstrapped with the chain stuck. """
         sandbox.client(1).bootstrapped()
+        sandbox.client(2).bootstrapped()
         assert sandbox.client(1).sync_state() == 'stuck'
+        assert sandbox.client(2).sync_state() == 'stuck'
 
 
 @pytest.mark.baker
@@ -126,8 +124,8 @@ class TestSplitView:
 
     @pytest.mark.timeout(10)
     def test_all_nodes_boostrap(self, sandbox: Sandbox):
-        assert sandbox.client(0).sync_state() == 'sync'
-        assert sandbox.client(1).sync_state() == 'sync'
+        assert sandbox.client(0).sync_state() == 'synced'
+        assert sandbox.client(1).sync_state() == 'synced'
         sandbox.client(2).bootstrapped()
 
     def test_pause(self):
@@ -139,9 +137,9 @@ class TestSplitView:
         sandbox.client(0).ban_peer(sandbox.node(1).p2p_port)
 
     def test_sync_status(self, sandbox: Sandbox):
-        assert sandbox.client(0).sync_state() == 'sync'
-        assert sandbox.client(1).sync_state() == 'sync'
-        assert sandbox.client(2).sync_state() == 'unsync'
+        assert sandbox.client(0).sync_state() == 'synced'
+        assert sandbox.client(1).sync_state() == 'synced'
+        assert sandbox.client(2).sync_state() == 'synced'
 
 
 NUM_NODES = 8

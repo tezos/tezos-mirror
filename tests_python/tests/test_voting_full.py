@@ -35,8 +35,7 @@ with open(PARAMETERS_FILE) as f:
 
 
 def node_params(threshold=0):
-    return ['--max-latency', '2', '--chain-stuck-delay', '10',
-            '--sync-polling-period', '1', '--bootstrap-threshold',
+    return ['--sync-latency', '2', '--bootstrap-threshold',
             str(threshold), '--connections', '500', '--enable-testchain']
 
 
@@ -147,12 +146,6 @@ class TestVotingFull:
         """Check all clients know both chains"""
         for client in sandbox.all_clients():
             assert utils.check_two_chains(client)
-
-    def test_testchains_bootstrapped(self, sandbox: Sandbox):
-        """All testchains must be bootstrapped, since they inherited
-           the bootstrap status of the parent chain"""
-        for client in sandbox.all_clients():
-            assert client.is_bootstrapped(chain='test')
 
     def test_testchain_transfer(self, sandbox: Sandbox):
         client = sandbox.client(0)
