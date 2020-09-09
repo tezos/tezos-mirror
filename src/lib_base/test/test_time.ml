@@ -30,6 +30,8 @@ module Protocol = struct
 
   let t = Crowbar.map [Crowbar.int64] of_seconds
 
+  let pp fmt t = Format.fprintf fmt "%Lx" (to_seconds t)
+
   let () =
     Crowbar.add_test
     (* Property:
@@ -56,7 +58,7 @@ module Protocol = struct
       (fun some_time other_time ->
         let delta = diff other_time some_time in
         let same_other_time = add some_time delta in
-        Crowbar.check_eq ~pp:pp_hum ~eq:equal other_time same_other_time)
+        Crowbar.check_eq ~pp ~eq:equal other_time same_other_time)
 
   let () =
     Crowbar.add_test
@@ -67,7 +69,7 @@ module Protocol = struct
       (fun t ->
         let b = Data_encoding.Binary.to_bytes_exn encoding t in
         let tt = Data_encoding.Binary.of_bytes_exn encoding b in
-        Crowbar.check_eq ~eq:equal t tt)
+        Crowbar.check_eq ~pp ~eq:equal t tt)
 
   let () =
     Crowbar.add_test
@@ -78,7 +80,7 @@ module Protocol = struct
       (fun t ->
         let j = Data_encoding.Json.construct encoding t in
         let tt = Data_encoding.Json.destruct encoding j in
-        Crowbar.check_eq ~eq:equal t tt)
+        Crowbar.check_eq ~pp ~eq:equal t tt)
 end
 
 module System = struct
