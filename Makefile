@@ -193,7 +193,7 @@ check-python-linting:
 
 .PHONY: fmt
 fmt:
-	@src/tooling/lint.sh --format
+	@src/tooling/lint.sh --format --ignore src/tooling/test/test_not_well_formatted.ml src/tooling/test/test_not_well_formatted.mli
 
 .PHONY: build-deps
 build-deps:
