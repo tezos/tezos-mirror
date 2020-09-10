@@ -76,6 +76,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
             >|= function None -> None | Some x -> Some (to_string x))
     in
     let shutdown () =
+      log_info "streamed connection closed %s" (Connection.to_string con) ;
       running := false ;
       s.shutdown () ;
       server.streams <- ConnectionMap.remove con server.streams
@@ -365,7 +366,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
     let ctx = Cohttp_lwt_unix.Net.init ~ctx () in
     server.worker <-
       (let conn_closed (_, con) =
-         log_info "connection closed %s" (Connection.to_string con) ;
+         debug "connection closed %s" (Connection.to_string con) ;
          try ConnectionMap.find con server.streams () with Not_found -> ()
        and on_exn = function
          | Unix.Unix_error (Unix.EADDRINUSE, "bind", _) ->
