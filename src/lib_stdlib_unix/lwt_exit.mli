@@ -134,37 +134,81 @@ val signal_name : int -> string
 
 (** [wrap_and_exit p] is a promise [q] that behaves as follows:
 
-    If [exit_and_raise] is called before [p] is resolved, then the process
-    terminates as soon as the clean-up has ended. As a result, the [q] never
-    resolves.
+    NORMAL OPERATION:
 
     If [p] is fulfilled with value [v] (and [exit_and_raise] was not called)
-    then [q] also is fulfilled with [v].
+    then [q] also is fulfilled with [v]. The process does not exit.
 
-    If [p] is rejected (and [exit_and_raise] was not called), a soft-exit with
-    status [2] is triggered and the process terminates as soon as the clean-up
-    has ended.
+    If [exit_and_raise code] is called before [p] is resolved, then
+    - the clean-up starts,
+    - [q] is canceled,
+    - the process terminates as soon as clean-up ends with exit code [code].
 
-    In addition, [wrap_and_exit p] sets up the signal handlers described above.
-    This can cause calls to [exit_and_raise].
+    If [p] is rejected (and [exit_and_raise] was not called), it is equivalent
+    to calling [exit_and_raise 2]. I.e.,
+    - the clean-up starts,
+    - the process terminates as soon as clean-up ends with exit code [2].
+
+    EXIT CODE:
+
+    The exit code of the process is masked with [lor 128] (i.e., setting the 8th
+    bit) if the clean-up did not complete successfully (i.e., if any of the
+    clean-up callbacks were rejected).
+
+    E.g., if you call [exit_and_raise 3] and one of the clean-up callback fails
+    (is rejected with an exception), then the exit code is [3 lor 128 = 131].
+
+    Note that even if one clean-up callback fails, the other clean-up callbacks
+    are left to execute.
+
+    SIGNALS:
+
+    In addition, [wrap_and_exit p] sets up the signal handlers described above
+    (see {!signal_setup}).
+
+    Any hard-signal that is received triggers an immediate process termination
+    with exit code [1 lor 128].
+
+    Any soft-signal that is received triggers a call to [exit_and_raise 1]
+    (the consequences of which are described above).
+
+    Note that if the same soft-signal is sent a second-time, the process
+    terminates immediately with code [1 lor 128].
+
+    OPTIONAL PARAMETERS:
 
     The optional argument [max_clean_up_time] limits the time the clean-up phase
     is allowed to run for. If any of the clean-up callbacks is still pending
-    when [max_clean_up_time] has elapsed, then the pending callbacks are
-    [cancel]ed, then, after a [Lwt.pause], the process exits.
+    when [max_clean_up_time] has elapsed, the process exits immediately. If the
+    clean-up is interrupted by this then the exit code is masked with [128] as
+    described above.
+
+    By default [max_clean_up_time] is not set and no limits is set for the
+    completion of the clean-up callbacks.
 
     The optional argument [double_signal_safety] (defaults to one (1) second)
     is the grace period after sending one of the softly-handled signal before
     sending the same signal is handled as hard.
 
+    This is meant to protect against double-pressing Ctrl-C in an interactive
+    terminal session. If you press Ctrl-c once, a soft exit is triggered, if you
+    press it again (accidentally) within the grace period it is ignored, if you
+    press it again after the grace period has elapsed it is treated as a hard
+    exit.
+
     The optional argument [signal_setup] (defaults to [default_signal_setup])
     sets up soft and hard handlers at the beginning and clears them when [q]
     resolves.
 
+    EXAMPLE:
+
     Intended use:
     [Stdlib.exit @@ Lwt_main.run begin
       Lwt_exit.wrap_and_exit (init ()) >>= fun v ->
-      Lwt_exit.wrap_and_exit (main v) >>= fun v ->
+      let ccbid_v = register_clean_up_callback ~loc:__LOC__ (fun _ -> clean v) in
+      Lwt_exit.wrap_and_exit (main v) >>= fun r ->
+      let () = unregister_clean_up_callback ccbid_v in
+      let ccbid_r = register_clean_up_callback ~loc:__LOC__ (fun _ -> free r) in
       Lwt_exit.wrap_and_exit (shutdown v) >>= fun () ->
       exit_and_wait 0 (* clean exit afterwards *)
     end]
