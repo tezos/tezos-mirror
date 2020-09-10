@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -30,22 +31,26 @@
    the head.
 
     The distance between two hashes of a locator is randomized to
-   prevent from attacks. The seed is determined uniquely from the
-   [peer_id] of the sender and the receiver so that the distance
-   between two hashes can be recomputed locally.  This is the purpose
-   of the function [to_steps].
+    prevent attacks. The seed is determined uniquely from the
+    [peer_id] of the sender and the receiver so that the distance
+    between two hashes can be recomputed locally. This is the purpose
+    of the function [to_steps].
 
     The [step] representation is mostly used by the [peer_validator]
-   and the [bootstrap_pipeline} modules.
+    and the [bootstrap_pipeline] modules.
 
-    The last step of a locator may be truncated. There are two typical
-   cases for this:
+    The last step of a locator may be truncated. It is the case when
+    the last step hits the caboose. Thus, such a [non-strict] step can
+    be terminated by:
 
-    1. When the last step hits the genesis block hash
+    - The genesis: it is the case in both [Archive] and [Full] modes
+      as the caboose is always located down to the genesis block, but
+      it is also the case in a [Rolling] mode early state (when
+      caboose = genesis).
 
-    2. In [Rolling] or [Full] mode, we are not interested into blocks
-   below the [save point]. A step which is not truncated is said
-   [strict]. *)
+    - Any block: it is the case in [Rolling] mode when the caboose is
+      higher than the genesis. Indeed, the caboose can be located
+      (almost) anywhere. *)
 
 (** Type for sparse block locators (/à la/ Bitcoin). *)
 type t = private Block_header.t * Block_hash.t list
