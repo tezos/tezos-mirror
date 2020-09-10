@@ -79,11 +79,18 @@ let add_chunk (matcher : path_matcher) (chunk : string) =
     | "*" ->
         Exact (Wildcard :: f)
     | literal ->
-        if String.contains literal '*' then
-          raise
-            (Invalid_argument
-               "Resto.Acl.lex: Star cannot appear outside of special patterns \
-                * and **") ;
+        String.iter
+          (function
+            | '/' ->
+                assert false
+            | ('*' | '?' | '&' | '#' | '=') as c ->
+                Format.kasprintf
+                  invalid_arg
+                  "Resto.Acl.parse: %c must be percent-encoded"
+                  c
+            | _ ->
+                ())
+          literal ;
         let decoded_literal = Uri.pct_decode literal in
         Exact (Literal decoded_literal :: f) )
 

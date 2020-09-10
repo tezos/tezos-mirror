@@ -71,6 +71,9 @@ let () =
       with Invalid_argument _ -> ())
     [ "NOTAMETH /a/b";
       "GET /a*";
+      "GET /a&";
+      "GET /a?";
+      "GET /=a";
       " GET /a";
       " GET/";
       "a";

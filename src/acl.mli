@@ -92,8 +92,12 @@ type matcher = {meth : meth_matcher; path : path_matcher}
     Chunks cannot contain the following special characters. These characters
     must be represented percent-encoded. (Note that chunks are percent-decoded
     and the character percent ([%]) should appear percent-encoded (%25).
-    - asterisk ([*], represented by %2A)
     - slash ([/], represented by %2F)
+    - asterisk ([*], represented by %2A)
+    - question mark ([?], represented by %3F)
+    - ampersand ([&], represented by %26)
+    - hash ([#], represented by %23)
+    - equal ([=], represented by %3D)
 
     Also note that each chunk is percent-decoded.
 
