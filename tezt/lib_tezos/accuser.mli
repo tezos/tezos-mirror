@@ -58,7 +58,7 @@ val create :
 (** Get the name of an accuser. *)
 val name : t -> string
 
-(** Get the RPC port of the associated node *)
+(** Get the RPC port of the associated node. *)
 val node_rpc_port : t -> int
 
 (** Send SIGTERM to an accuser and wait for it to terminate. *)
@@ -78,12 +78,12 @@ val run : t -> unit Lwt.t
     before the event.
 
     You may catch or let it propagate to cause the test to fail.
-    [accuser] is the name of the accuser.
+    [daemon] is the name of the accuser.
     [event] is the name of the event.
     [where] is an additional optional constraint, such as ["level >= 10"]. *)
 exception
   Terminated_before_event of {
-    accuser : string;
+    daemon : string;
     event : string;
     where : string option;
   }

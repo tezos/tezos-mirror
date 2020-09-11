@@ -105,6 +105,7 @@ module Make (X : PARAMETERS) = struct
     persistent_state : X.persistent_state;
     mutable status : status;
     event_pipe : string;
+    mutable stdout_handlers : (string -> unit) list;
     mutable persistent_event_handlers : (event -> unit) list;
     mutable one_shot_event_handlers : event_handler list String_map.t;
   }
@@ -161,6 +162,7 @@ module Make (X : PARAMETERS) = struct
       persistent_state;
       status = Not_running;
       event_pipe;
+      stdout_handlers = [];
       persistent_event_handlers = [];
       one_shot_event_handlers = String_map.empty;
     }
@@ -262,7 +264,23 @@ module Make (X : PARAMETERS) = struct
               let* () = Lwt_unix.sleep 0.01 in
               event_loop () )
       in
+      let rec stdout_loop () =
+        let* stdout_line = Lwt_io.read_line_opt (Process.stdout process) in
+        match stdout_line with
+        | Some line ->
+            List.iter (fun handler -> handler line) daemon.stdout_handlers ;
+            stdout_loop ()
+        | None -> (
+          match daemon.status with
+          | Not_running ->
+              Lwt.return_unit
+          | Running _ ->
+              (* TODO: is the sleep necessary here? *)
+              let* () = Lwt_unix.sleep 0.01 in
+              stdout_loop () )
+      in
       let* () = event_loop ()
+      and* () = stdout_loop ()
       and* () =
         let* process_status = Process.wait process in
         (* Setting [daemon.status] to [Not_running] stops the event loop cleanly. *)
@@ -305,4 +323,7 @@ module Make (X : PARAMETERS) = struct
   let on_event daemon handler =
     daemon.persistent_event_handlers <-
       handler :: daemon.persistent_event_handlers
+
+  let on_stdout daemon handler =
+    daemon.stdout_handlers <- handler :: daemon.stdout_handlers
 end
