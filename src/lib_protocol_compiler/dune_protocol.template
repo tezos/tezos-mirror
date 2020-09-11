@@ -102,6 +102,9 @@ include Tezos_raw_protocol_%%LIB_VERSION%%.Main
 
 (alias
  (name runtest_compile_protocol)
+ (deps
+   %%SOURCES%%
+  (:src_dir TEZOS_PROTOCOL))
  (action (run %{bin:tezos-protocol-compiler} %%COMPILE_OPTION%% .)))
 
 (alias

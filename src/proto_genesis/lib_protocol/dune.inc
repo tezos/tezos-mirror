@@ -118,6 +118,11 @@ include Tezos_raw_protocol_genesis.Main
 
 (alias
  (name runtest_compile_protocol)
+ (deps
+   data.ml
+   services.ml
+   main.mli main.ml
+  (:src_dir TEZOS_PROTOCOL))
  (action (run %{bin:tezos-protocol-compiler} -no-hash-check .)))
 
 (alias

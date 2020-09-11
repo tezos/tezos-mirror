@@ -142,6 +142,17 @@ include Tezos_raw_protocol_demo_counter.Main
 
 (alias
  (name runtest_compile_protocol)
+ (deps
+   error.mli error.ml
+   proto_params.mli proto_params.ml
+   header.mli header.ml
+   state.mli state.ml
+   proto_operation.mli proto_operation.ml
+   receipt.mli receipt.ml
+   apply.mli apply.ml
+   services.mli services.ml
+   main.mli main.ml
+  (:src_dir TEZOS_PROTOCOL))
  (action (run %{bin:tezos-protocol-compiler} -no-hash-check .)))
 
 (alias
