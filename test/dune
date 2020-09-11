@@ -21,6 +21,18 @@
   (run %{exe:acl_unit_test.exe})))
 
 (executable
+ (name acl_integration_test)
+ (modules acl_integration_test)
+ (libraries lwt lwt.unix json-data-encoding ezjsonm cohttp
+   cohttp-lwt cohttp-lwt-unix resto-json resto resto-acl resto-cohttp-server
+   resto-cohttp-client))
+
+(alias
+ (name runtest_acl_integration_test)
+ (action
+  (run %{exe:acl_integration_test.exe})))
+
+(executable
  (name resto_test)
  (modules directory resto_test services)
  (libraries resto-directory resto-json json-data-encoding
@@ -36,4 +48,5 @@
  (deps
   (alias runtest_resto)
   (alias runtest_ezresto)
-  (alias runtest_acl_unit_test)))
+  (alias runtest_acl_unit_test)
+  (alias runtest_acl_integration_test)))

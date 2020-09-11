@@ -19,6 +19,7 @@ build-and-test:
     - opam depext ezresto-directory ezresto resto-acl resto-cohttp-client \
       resto-cohttp resto-cohttp-server resto-directory resto-json resto
     - opam install --deps-only .
+    - opam install --deps-only --with-test .
     - dune build
     - dune runtest
     - opam install .

@@ -17,6 +17,7 @@ depends: [
   "uri" {>= "1.9.0" }
   "json-data-encoding" {= "0.8" & with-test }
   "json-data-encoding-bson" {= "0.8" & with-test }
+  "ezjsonm" {with-test}
   "lwt" {with-test}
   "base-unix"{with-test}
 ]
