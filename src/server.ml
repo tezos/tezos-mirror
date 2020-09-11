@@ -410,7 +410,8 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
          ~mode
          ~on_exn
          (Cohttp_lwt_unix.Server.make ~callback ~conn_closed ())) ;
-    Lwt.return server
+    lwt_log_info "Server started (agent: %s)" server.agent
+    >>= fun () -> Lwt.return server
 
   let shutdown server =
     Lwt.wakeup_later server.stopper () ;
