@@ -149,12 +149,12 @@ val run :
 (** Exception raised by [wait_for] functions if the node terminates before the event.
 
     You may catch or let it propagate to cause the test to fail.
-    [node] is the name of the node.
+    [daemon] is the name of the node.
     [event] is the name of the event.
     [where] is an additional optional constraint, such as ["level >= 10"]. *)
 exception
   Terminated_before_event of {
-    node : string;
+    daemon : string;
     event : string;
     where : string option;
   }
