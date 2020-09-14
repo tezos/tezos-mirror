@@ -260,10 +260,6 @@ module Make (Hash : sig
   val encoding : t Data_encoding.t
 
   val pp : Format.formatter -> t -> unit
-
-  module Logging : sig
-    val tag : t Tag.def
-  end
 end)
 (Disk_table : DISK_TABLE with type key := Hash.t)
 (Memory_table : MEMORY_TABLE with type key := Hash.t)

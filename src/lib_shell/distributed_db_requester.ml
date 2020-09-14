@@ -54,10 +54,6 @@ module Make_raw (Hash : sig
   val encoding : t Data_encoding.t
 
   val pp : Format.formatter -> t -> unit
-
-  module Logging : sig
-    val tag : t Tag.def
-  end
 end)
 (Disk_table : Requester.DISK_TABLE with type key := Hash.t)
 (Memory_table : Requester.MEMORY_TABLE with type key := Hash.t)
@@ -239,10 +235,6 @@ module Raw_operations = struct
               let encoding =
                 let open Data_encoding in
                 obj2 (req "block" Block_hash.encoding) (req "index" uint16)
-
-              module Logging = struct
-                let tag = Tag.def ~doc:"Operations" "operations" pp
-              end
             end)
             (Operations_storage)
             (Operations_table)
