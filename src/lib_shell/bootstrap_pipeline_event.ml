@@ -29,6 +29,19 @@ let section = ["node"; "validator"; "bootstrap_pipeline"]
 
 (* notice level events *)
 
+let fetching_step_from_peer =
+  declare_4
+    ~section
+    ~name:"fetching_step_from_peer"
+    ~msg:
+      "fetching block {block} to {predecessor} ({count} headers) from peer \
+       {peer_id}"
+    ~level:Notice
+    ("block", Block_hash.encoding)
+    ("predecessor", Block_hash.encoding)
+    ("count", Data_encoding.int31)
+    ("peer_id", P2p_peer.Id.encoding)
+
 let still_fetching_large_step_from_peer =
   declare_3
     ~section
@@ -42,19 +55,6 @@ let still_fetching_large_step_from_peer =
 
 (* info level events *)
 
-let fetching_step_from_peer =
-  declare_4
-    ~section
-    ~name:"fetching_step_from_peer"
-    ~msg:
-      "fetching block {block} to {predecessor} ({count} headers) from peer \
-       {peer_id}"
-    ~level:Info
-    ("block", Block_hash.encoding)
-    ("predecessor", Block_hash.encoding)
-    ("count", Data_encoding.int31)
-    ("peer_id", P2p_peer.Id.encoding)
-
 let fetching_block_header_from_peer =
   declare_2
     ~section
@@ -64,12 +64,14 @@ let fetching_block_header_from_peer =
     ("hash", Block_hash.encoding)
     ("peer_id", P2p_peer.Id.encoding)
 
+(* debug level events *)
+
 let fetching_all_steps_from_peer =
   declare_1
     ~section
     ~name:"fetching_all_steps_from_peer"
     ~msg:"fetched all steps from peer {peer_id}"
-    ~level:Info
+    ~level:Debug
     ("peer_id", P2p_peer.Id.encoding)
 
 let fetching_operations =
@@ -77,7 +79,7 @@ let fetching_operations =
     ~section
     ~name:"fetching_operations"
     ~msg:"fetching operations of block {block_hash} from peer {peer_id}"
-    ~level:Info
+    ~level:Debug
     ("block_hash", Block_hash.encoding)
     ("peer_id", P2p_peer.Id.encoding)
 
@@ -86,7 +88,7 @@ let fetched_operations =
     ~section
     ~name:"fetched_operations"
     ~msg:"fetched operations of block {block_hash} from peer {peer_id}"
-    ~level:Info
+    ~level:Debug
     ("block_hash", Block_hash.encoding)
     ("peer_id", P2p_peer.Id.encoding)
 
@@ -95,7 +97,7 @@ let requesting_validation =
     ~section
     ~name:"requesting_validation"
     ~msg:"requesting validation for block {block_hash} from peer {peer_id}"
-    ~level:Info
+    ~level:Debug
     ("block_hash", Block_hash.encoding)
     ("peer_id", P2p_peer.Id.encoding)
 
@@ -104,7 +106,7 @@ let validated_block =
     ~section
     ~name:"validated_block"
     ~msg:"validated block {block_hash} from peer {peer_id}"
-    ~level:Info
+    ~level:Debug
     ("block_hash", Block_hash.encoding)
     ("peer_id", P2p_peer.Id.encoding)
 
