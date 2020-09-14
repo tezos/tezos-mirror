@@ -90,11 +90,11 @@ module Event = struct
     def
       "chain_status"
       ~description:
-        "If 'unsync', the node is not currently synchronized with of its \
+        "If 'unsynced', the node is not currently synchronized with of its \
          peers (it is probably still bootstrapping and its head is lagging \
          behind the chain's).\n\
-         If 'sync', the node considers itself synchronized with its peers and \
-         the current head timestamp is recent.\n\
+         If 'synced', the node considers itself synchronized with its peers \
+         and the current head timestamp is recent.\n\
          If 'stuck', the node considers itself synchronized with its peers \
          but the chain seems to be halted from its viewpoint."
       (string_enum
