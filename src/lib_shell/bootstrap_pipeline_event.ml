@@ -56,7 +56,7 @@ let step_too_long =
     ~section
     ~name:"step_too_long"
     ~msg:"invalid step from peer {peer_id} (too long)"
-    ~level:Info
+    ~level:Error
     ("peer_id", P2p_peer.Id.encoding)
 
 let step_too_short =
@@ -64,7 +64,7 @@ let step_too_short =
     ~section
     ~name:"step_too_short"
     ~msg:"invalid step from peer {peer_id} (too short)"
-    ~level:Info
+    ~level:Error
     ("peer_id", P2p_peer.Id.encoding)
 
 let fetching_block_header_from_peer =
@@ -89,7 +89,7 @@ let header_request_timeout =
     ~section
     ~name:"header_request_timeout"
     ~msg:"request for header {block_hash} from peer {peer_id} timed out"
-    ~level:Info
+    ~level:Error
     ("block_hash", Block_hash.encoding)
     ("peer_id", P2p_peer.Id.encoding)
 
@@ -99,7 +99,7 @@ let locator_contains_future_block =
     ~name:"locator_contains_future_block"
     ~msg:
       "block locator {block_hash} from peer {peer_id} contains future blocks"
-    ~level:Notice
+    ~level:Error
     ("block_hash", Block_hash.encoding)
     ("peer_id", P2p_peer.Id.encoding)
     ("time", Time.System.encoding)
@@ -110,7 +110,7 @@ let locator_too_short =
     ~section
     ~name:"locator_too_short"
     ~msg:"received a locator that is too short"
-    ~level:Info
+    ~level:Error
     ()
 
 let unexpected_error_while_fetching_headers =
@@ -147,7 +147,7 @@ let request_operations_timeout =
     ~msg:
       "request for operations {block_hash}:{operations_index_tag} from peer \
        {peer_id} timed out"
-    ~level:Info
+    ~level:Error
     ("block_hash", Block_hash.encoding)
     ("operations_index_tag", Data_encoding.int31)
     ("peer_id", P2p_peer.Id.encoding)
