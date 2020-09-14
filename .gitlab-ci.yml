@@ -540,6 +540,12 @@ integration:multisig:
     - poetry run pytest tests/test_multisig.py -s --log-dir=tmp
   stage: test
 
+integration:openapi:
+  <<: *integration_python_definition
+  script:
+    - poetry run pytest tests/test_openapi.py -s --log-dir=tmp
+  stage: test
+
 integration:p2p:
   <<: *integration_python_definition
   script:
