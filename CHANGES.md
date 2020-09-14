@@ -9,6 +9,16 @@ Only describe changes which affect users (bug fixes and new features),
 not refactorings or tests. Changes to the documentation do not need to be documented
 here either.
 
+- The node's mempool relies on a new synchronisation heuristic. The
+  node's behaviour, especially at startup, may differ slightly; log
+  messages in particular are likely to be different. More information
+  is available in the whitedoc.
+
+- The new synchronisation heuristic emits an event when the
+  synchronisation status changes. This can be used to detect when the
+  chain is stuck for example. More information is available in the
+  whitedoc.
+
 - Fixed an issue which prevented using of ports higher than 32767 in tezos-client config file
 
 # Version 7.4
