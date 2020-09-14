@@ -29,40 +29,57 @@ let section = ["node"; "validator"; "bootstrap_pipeline"]
 
 (* notice level events *)
 
-let fetching_step_from_peer =
-  declare_4
+let fetching_locator =
+  declare_3
     ~section
-    ~name:"fetching_step_from_peer"
+    ~name:"fetching_locator"
     ~msg:
-      "fetching block {block} to {predecessor} ({count} headers) from peer \
-       {peer_id}"
+      "fetching branch of {locator_length} blocks from peer {peer_id} in \
+       {steps_number} steps"
     ~level:Notice
-    ("block", Block_hash.encoding)
-    ("predecessor", Block_hash.encoding)
-    ("count", Data_encoding.int31)
+    ("locator_length", Data_encoding.int31)
     ("peer_id", P2p_peer.Id.encoding)
+    ("steps_number", Data_encoding.int31)
 
 let still_fetching_large_step_from_peer =
   declare_3
     ~section
-    ~name:"still_fetching_large_step_from_peer"
+    ~name:"still_fetching_block_header_from_peer"
     ~msg:
-      "fetched {fetched}/{length} headers from peer {peer_id}, and continuing"
+      "still fetching headers from peer {peer_id}: \
+       {block_fetched}/{step_length}"
     ~level:Notice
-    ("fetched", Data_encoding.int31)
-    ("length", Data_encoding.int31)
     ("peer_id", P2p_peer.Id.encoding)
+    ("block_fetched", Data_encoding.int31)
+    ("step_length", Data_encoding.int31)
 
 (* info level events *)
 
+let fetching_step_from_peer =
+  declare_6
+    ~section
+    ~name:"fetching_step_from_peer"
+    ~msg:
+      "fetching step {step_number}/{number_of_steps} (step length \
+       {step_length}) from {block} to {predecessor} from peer {peer_id}"
+    ~level:Info
+    ("step_number", Data_encoding.int31)
+    ("number_of_steps", Data_encoding.int31)
+    ("step_length", Data_encoding.int31)
+    ("block", Block_hash.encoding)
+    ("predecessor", Block_hash.encoding)
+    ("peer_id", P2p_peer.Id.encoding)
+
 let fetching_block_header_from_peer =
-  declare_2
+  declare_4
     ~section
     ~name:"fetching_block_header_from_peer"
-    ~msg:"fetching header of {hash} from peer {peer_id}"
-    ~level:Info
-    ("hash", Block_hash.encoding)
+    ~msg:"fetched header {block} from {peer_id} {block_fetched}/{step_length}"
+    ~level:Debug
+    ("block", Block_hash.encoding)
     ("peer_id", P2p_peer.Id.encoding)
+    ("block_fetched", Data_encoding.int31)
+    ("step_length", Data_encoding.int31)
 
 (* debug level events *)
 
