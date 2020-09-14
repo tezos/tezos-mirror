@@ -27,18 +27,7 @@ include Internal_event.Simple
 
 let section = ["node"; "validator"; "bootstrap_pipeline"]
 
-let fetching_step_from_peer =
-  declare_4
-    ~section
-    ~name:"fetching_step_from_peer"
-    ~msg:
-      "fetching block {block} to {predecessor} ({count} headers) from peer \
-       {peer_id}"
-    ~level:Info
-    ("block", Block_hash.encoding)
-    ("predecessor", Block_hash.encoding)
-    ("count", Data_encoding.int31)
-    ("peer_id", P2p_peer.Id.encoding)
+(* notice level events *)
 
 let still_fetching_large_step_from_peer =
   declare_3
@@ -51,20 +40,19 @@ let still_fetching_large_step_from_peer =
     ("length", Data_encoding.int31)
     ("peer_id", P2p_peer.Id.encoding)
 
-let step_too_long =
-  declare_1
-    ~section
-    ~name:"step_too_long"
-    ~msg:"invalid step from peer {peer_id} (too long)"
-    ~level:Error
-    ("peer_id", P2p_peer.Id.encoding)
+(* info level events *)
 
-let step_too_short =
-  declare_1
+let fetching_step_from_peer =
+  declare_4
     ~section
-    ~name:"step_too_short"
-    ~msg:"invalid step from peer {peer_id} (too short)"
-    ~level:Error
+    ~name:"fetching_step_from_peer"
+    ~msg:
+      "fetching block {block} to {predecessor} ({count} headers) from peer \
+       {peer_id}"
+    ~level:Info
+    ("block", Block_hash.encoding)
+    ("predecessor", Block_hash.encoding)
+    ("count", Data_encoding.int31)
     ("peer_id", P2p_peer.Id.encoding)
 
 let fetching_block_header_from_peer =
@@ -82,6 +70,72 @@ let fetching_all_steps_from_peer =
     ~name:"fetching_all_steps_from_peer"
     ~msg:"fetched all steps from peer {peer_id}"
     ~level:Info
+    ("peer_id", P2p_peer.Id.encoding)
+
+let fetching_operations =
+  declare_2
+    ~section
+    ~name:"fetching_operations"
+    ~msg:"fetching operations of block {block_hash} from peer {peer_id}"
+    ~level:Info
+    ("block_hash", Block_hash.encoding)
+    ("peer_id", P2p_peer.Id.encoding)
+
+let fetched_operations =
+  declare_2
+    ~section
+    ~name:"fetched_operations"
+    ~msg:"fetched operations of block {block_hash} from peer {peer_id}"
+    ~level:Info
+    ("block_hash", Block_hash.encoding)
+    ("peer_id", P2p_peer.Id.encoding)
+
+let requesting_validation =
+  declare_2
+    ~section
+    ~name:"requesting_validation"
+    ~msg:"requesting validation for block {block_hash} from peer {peer_id}"
+    ~level:Info
+    ("block_hash", Block_hash.encoding)
+    ("peer_id", P2p_peer.Id.encoding)
+
+let validated_block =
+  declare_2
+    ~section
+    ~name:"validated_block"
+    ~msg:"validated block {block_hash} from peer {peer_id}"
+    ~level:Info
+    ("block_hash", Block_hash.encoding)
+    ("peer_id", P2p_peer.Id.encoding)
+
+(* error level events *)
+
+let request_operations_timeout =
+  declare_3
+    ~section
+    ~name:"request_operations_timeout"
+    ~msg:
+      "request for operations {block_hash}:{operations_index_tag} from peer \
+       {peer_id} timed out"
+    ~level:Error
+    ("block_hash", Block_hash.encoding)
+    ("operations_index_tag", Data_encoding.int31)
+    ("peer_id", P2p_peer.Id.encoding)
+
+let step_too_long =
+  declare_1
+    ~section
+    ~name:"step_too_long"
+    ~msg:"invalid step from peer {peer_id} (too long)"
+    ~level:Error
+    ("peer_id", P2p_peer.Id.encoding)
+
+let step_too_short =
+  declare_1
+    ~section
+    ~name:"step_too_short"
+    ~msg:"invalid step from peer {peer_id} (too short)"
+    ~level:Error
     ("peer_id", P2p_peer.Id.encoding)
 
 let header_request_timeout =
@@ -121,51 +175,3 @@ let unexpected_error_while_fetching_headers =
     ~level:Error
     ~pp1:pp_print_error_first
     ("trace", Error_monad.trace_encoding)
-
-let fetching_operations =
-  declare_2
-    ~section
-    ~name:"fetching_operations"
-    ~msg:"fetching operations of block {block_hash} from peer {peer_id}"
-    ~level:Info
-    ("block_hash", Block_hash.encoding)
-    ("peer_id", P2p_peer.Id.encoding)
-
-let fetched_operations =
-  declare_2
-    ~section
-    ~name:"fetched_operations"
-    ~msg:"fetched operations of block {block_hash} from peer {peer_id}"
-    ~level:Info
-    ("block_hash", Block_hash.encoding)
-    ("peer_id", P2p_peer.Id.encoding)
-
-let request_operations_timeout =
-  declare_3
-    ~section
-    ~name:"request_operations_timeout"
-    ~msg:
-      "request for operations {block_hash}:{operations_index_tag} from peer \
-       {peer_id} timed out"
-    ~level:Error
-    ("block_hash", Block_hash.encoding)
-    ("operations_index_tag", Data_encoding.int31)
-    ("peer_id", P2p_peer.Id.encoding)
-
-let requesting_validation =
-  declare_2
-    ~section
-    ~name:"requesting_validation"
-    ~msg:"requesting validation for block {block_hash} from peer {peer_id}"
-    ~level:Info
-    ("block_hash", Block_hash.encoding)
-    ("peer_id", P2p_peer.Id.encoding)
-
-let validated_block =
-  declare_2
-    ~section
-    ~name:"validated_block"
-    ~msg:"validated block {block_hash} from peer {peer_id}"
-    ~level:Info
-    ("block_hash", Block_hash.encoding)
-    ("peer_id", P2p_peer.Id.encoding)
