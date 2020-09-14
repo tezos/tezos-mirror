@@ -73,6 +73,11 @@ let get_levels_in_curent_cycle ?node ?(chain = "main") ?(block = "head") client
 let get_operations ?node ?(chain = "main") ?(block = "head") client =
   let path = ["chains"; chain; "blocks"; block; "operations"] in
   Client.rpc ?node GET path client
+
+let get_mempool_pending_operations ?node ?(chain = "main") client =
+  let path = ["chains"; chain; "mempool"; "pending_operations"] in
+  Client.rpc ?node GET path client
+
 let preapply_block ?node ?(chain = "main") ?(block = "head") ~data client =
   let path =
     ["chains"; chain; "blocks"; block; "helpers"; "preapply"; "block"]
