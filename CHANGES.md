@@ -137,6 +137,16 @@ here either.
 - Added RPC `DELETE /network/greylist` to clear the greylist tables.
   RPC `GET /network/greylist/clear` is now deprecated.
 
+- Added a way to optionally specify an expected peer identity for all
+  command line options accepting a point as argument (such as
+  `--peer`). This identity can be given using the usual b58
+  format. The RPC `patch /network/points/<point> {"peer_id": <peer_id>}` set
+  the expected identity and `get /network/points/<point>` tells whether an
+  expected `peer_id` has been set.
+
+- Added a checking of the well-formedness of addresses in the config files when
+  the node starts. If this check fails, the node stops with an explanation.
+
 ## Client
 
 - Added client command `import keys from mnemonic`, which allows to
