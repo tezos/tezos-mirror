@@ -45,6 +45,7 @@ unit:alltest:
     - scripts/test_wrapper.sh src/lib_p2p p2p
     - scripts/test_wrapper.sh src/lib_protocol_compiler protocol_compiler
     - scripts/test_wrapper.sh src/lib_protocol_environment protocol_environment
+    - scripts/test_wrapper.sh src/lib_proxy proxy
     - scripts/test_wrapper.sh src/lib_requester requester
     - scripts/test_wrapper.sh src/lib_sapling sapling
     - scripts/test_wrapper.sh src/lib_shell shell

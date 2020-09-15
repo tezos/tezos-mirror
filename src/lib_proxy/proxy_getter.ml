@@ -156,46 +156,18 @@ module Tree = struct
           Proxy_context.M.Dir (StringMap.add k_hd k_m map) )
 end
 
-module RequestsTree = struct
-  (** The point of this data structure is as follows:
+module type REQUESTS_TREE = sig
+  type tree = Partial of tree StringMap.t | All
 
-      Suppose [Make.cache] is like this, because key A has been
-      requested already and the tree at A has two nodes B and C:
+  val empty : tree
 
-      A-B
-       \
-        C
+  val add : tree -> string list -> tree
 
-      If proxy_getter receives a request for A-D, there's no point doing
-      a request, even if it's not there; because as A has been requested
-      already; if A-D was available, it would be there already.
-  
-      This is a crucial optimisation that reduces the number of .../raw/bytes
-      RPC requests by 90% when executing baking_rights&?all=true locally,
-      after the chain starts having more than a few cycles.
-      More specifically, in baking_rights, the client keeps looking for
-      (missing) keys of the form rolls;owner;snapshot;10;1;74;5;1354
-      while the parent key rolls;owner;snapshot;10;1 has been obtained before.
+  val find_opt : tree -> string list -> tree option
+end
 
-      This structure has the invariant that all leafs are [All] nodes.
-      If requests A;B and A;C have been one the tree is as follows:
-
-      A[Few] -> B[All]
-         \
-          \---> C[All]
-
-      If then request A is done, the tree becomes:
-
-      A[All]
-    *)
-
-  type tree =
-    | Partial of tree StringMap.t
-        (** Some longer requests have been done.
-            A subset of this key's data is available *)
-    | All
-        (** This exact request has been done.
-            All data of this key is avaiable *)
+module RequestsTree : REQUESTS_TREE = struct
+  type tree = Partial of tree StringMap.t | All
 
   let empty = Partial StringMap.empty
 
