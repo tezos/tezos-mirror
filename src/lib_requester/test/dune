@@ -10,6 +10,9 @@
                    -open Tezos_requester
                    -open Tezos_test_services)))
 
+(alias
+  (name buildtest)
+  (deps test_requester.exe))
 
 (rule
  (alias runtest_requester)
