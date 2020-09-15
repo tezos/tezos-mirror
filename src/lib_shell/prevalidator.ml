@@ -215,7 +215,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
         timestamp = state.timestamp;
         fetching = state.fetching;
         pending = domain state.pending;
-        applied = List.rev (List.map (fun (h, _) -> h) state.applied);
+        applied = List.rev_map (fun (h, _) -> h) state.applied;
         delayed =
           Operation_hash.Set.union
             (domain state.branch_delays)

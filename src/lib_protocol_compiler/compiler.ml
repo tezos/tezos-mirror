@@ -172,7 +172,7 @@ let main {compile_ml; pack_objects; link_shared} =
   in
   Arg.parse args_spec (fun s -> anonymous := s :: !anonymous) usage_msg ;
   let source_dir =
-    match List.rev !anonymous with
+    match !anonymous with
     | [protocol_dir] ->
         protocol_dir
     | _ ->

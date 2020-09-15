@@ -32,7 +32,7 @@ let () =
   let usage_msg = Printf.sprintf "Usage: %s [options] <srcdir>" Sys.argv.(0) in
   Arg.parse args_spec (fun s -> anonymous := s :: !anonymous) usage_msg ;
   let source_dir =
-    match List.rev !anonymous with
+    match !anonymous with
     | [source_dir] when Filename.basename source_dir = "TEZOS_PROTOCOL" ->
         Filename.dirname source_dir
     | [source_dir] ->

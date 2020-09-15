@@ -619,9 +619,7 @@ let check_operations_consistency block_header operations operation_hashes =
   >>? fun () ->
   (* Check header hashes based on Merkle tree *)
   let hashes =
-    List.map
-      (fun (_, opl) -> List.map Operation.hash opl)
-      (List.rev operations)
+    List.rev_map (fun (_, opl) -> List.map Operation.hash opl) operations
   in
   let computed_hash =
     Operation_list_list_hash.compute
