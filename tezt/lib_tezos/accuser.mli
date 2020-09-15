@@ -43,17 +43,14 @@ type t
 
     The [node] parameter is the accuser's node target. The accusser
     will be configured to be synchronised with the given node, and
-    will communicate with it. If the [wait_for_node] parameter is
-    true, the accuser is not spawned until the target node is
-    ready. Otherwise, it is directly spawned.*)
+    will communicate with it. *)
 val create :
   ?path:string ->
   ?name:string ->
   ?color:Log.Color.t ->
   ?event_pipe:string ->
-  wait_for_node:bool ->
   node:Node.t ->
-  t Lwt.t
+  t
 
 (** Get the name of an accuser. *)
 val name : t -> string
@@ -144,7 +141,6 @@ val init :
   ?name:string ->
   ?color:Log.Color.t ->
   ?event_pipe:string ->
-  ?wait_for_node:bool ->
   node:Node.t ->
   unit ->
   t Lwt.t

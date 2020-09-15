@@ -64,17 +64,13 @@ let handle_raw_stdout accuser line =
   | _ ->
       ()
 
-let create ?(path = Constant.alpha_accuser) ?name ?color ?event_pipe
-    ~wait_for_node ~node =
-  let* () =
-    if wait_for_node then Node.wait_for_ready node else Lwt.return_unit
-  in
+let create ?(path = Constant.alpha_accuser) ?name ?color ?event_pipe ~node =
   let node_rpc_port = Node.rpc_port node in
   let accuser =
     create ~path ?name ?color ?event_pipe {node_rpc_port; pending_ready = []}
   in
   on_stdout accuser (handle_raw_stdout accuser) ;
-  Lwt.return accuser
+  accuser
 
 let run accuser =
   ( match accuser.status with
@@ -113,8 +109,9 @@ let wait_for_ready accuser =
         resolver :: accuser.persistent_state.pending_ready ;
       check_event accuser "Accuser started." promise
 
-let init ?path ?name ?color ?event_pipe ?(wait_for_node = true) ~node () =
-  let* accuser = create ?path ?name ?color ?event_pipe ~wait_for_node ~node in
+let init ?path ?name ?color ?event_pipe ~node () =
+  let* () = Node.wait_for_ready node in
+  let accuser = create ?path ?name ?color ?event_pipe ~node in
   let* () = run accuser in
   return accuser
 
