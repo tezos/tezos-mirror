@@ -322,6 +322,11 @@ let point_and_id node =
   let* id = wait_for_identity node in
   Lwt.return ("127.0.0.1:" ^ string_of_int (net_port node) ^ "#" ^ id)
 
+let add_peer_with_id node peer =
+  let* peer = point_and_id peer in
+  add_argument node (Peer peer) ;
+  Lwt.return_unit
+
 let run node arguments =
   ( match node.status with
   | Not_running ->

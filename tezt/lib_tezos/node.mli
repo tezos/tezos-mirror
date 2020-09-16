@@ -119,6 +119,14 @@ val add_argument : t -> argument -> unit
     where [<PORT>] is the P2P port of [peer]. *)
 val add_peer : t -> t -> unit
 
+(** Add a [--peer] argument to a node.
+
+    Usage: [add_peer node peer]
+
+    Same as [add_argument node (Peer "127.0.0.1:<PORT>#<ID>")]
+    where [<PORT>] is the P2P port and [<ID>] is the identity of [peer]. *)
+val add_peer_with_id : t -> t -> unit Lwt.t
+
 (** [point_and_id node] ["127.0.0.1:<PORT>#<ID>"] where [<PORT>] is the P2P
     port  and [<ID>] is the identity of [node]. *)
 val point_and_id : t -> string Lwt.t
