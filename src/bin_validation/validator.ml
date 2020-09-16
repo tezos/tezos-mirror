@@ -383,10 +383,10 @@ let main ?socket_dir () =
     (fun e -> Lwt.return (error_exn e))
   >>= function
   | Ok v ->
-      lwt_emit Terminated >>= fun () -> Lwt.return v
+      lwt_emit Terminated >>= fun () -> return v
   | Error _ as errs ->
       External_validation.send
         out_channel
         (Error_monad.result_encoding Data_encoding.unit)
         errs
-      >>= fun () -> Lwt.return 1
+      >>= fun () -> Lwt.return errs
