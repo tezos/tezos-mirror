@@ -353,10 +353,9 @@ let run input output =
         in
         fork_test_chain >>= loop
     | External_validation.Terminate ->
-        Lwt_io.flush_all ()
-        >>= fun () -> lwt_emit Termination_request >>= fun () -> exit 0
+        Lwt_io.flush_all () >>= fun () -> lwt_emit Termination_request
   in
-  loop ()
+  loop () >>= fun () -> return_unit
 
 let main ?socket_dir () =
   let canceler = Lwt_canceler.create () in
@@ -381,11 +380,11 @@ let main ?socket_dir () =
   Lwt.catch
     (fun () ->
       run in_channel out_channel
-      >>=? fun () -> Lwt_canceler.cancel canceler >>= fun () -> return 0)
+      >>=? fun () -> Lwt_canceler.cancel canceler >>= fun () -> return_unit)
     (fun e -> Lwt.return (error_exn e))
   >>= function
-  | Ok v ->
-      lwt_emit Terminated >>= fun () -> return v
+  | Ok () ->
+      lwt_emit Terminated >>= fun () -> return_unit
   | Error _ as errs ->
       External_validation.send
         out_channel

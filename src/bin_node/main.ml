@@ -55,8 +55,11 @@ let () =
           "Invalid arguments provided for the validator: expected \
            'tezos-validator --socket-dir <dir>'." ;
       Stdlib.exit
-        ( Lwt_main.run @@ Lwt_exit.wrap_and_forward
-        @@ Validator.main ~socket_dir:Sys.argv.(2) () )
+        (Lwt_main.run
+           ( Lwt_exit.wrap_and_exit
+             @@ Validator.main ~socket_dir:Sys.argv.(2) ()
+           >>= function
+           | Ok () -> Lwt_exit.exit_and_wait 0 | Error _ -> Lwt.return 1 ))
     with exn ->
       Format.eprintf "%a\n%!" Opterrors.report_error exn ;
       Stdlib.exit 1 )
