@@ -36,7 +36,7 @@
 (* Test.
    Call `tezos-client rpc list` and check that return code is 0.
  *)
-let test_rpc_list protocol =
+let test_rpc_list ~protocol =
   Test.register
     ~__FILE__
     ~title:(sf "%s: rpc list (mockup)" (Protocol.name protocol))
@@ -94,25 +94,60 @@ let test_transfer protocol =
     (receiver_balance_before, receiver_balance_after) ;
   return ()
 
-let test_asynchronous ~(protocol : Constant.protocol) =
-  Test.run
+let test_simple_baking_event ~protocol =
+  Test.register
     ~__FILE__
     ~title:
-      (Printf.sprintf "transfer (mockup / aysynchronous / %s)" protocol.tag)
-    ~tags:["mockup"; "client"; "transfer"; protocol.tag; "asynchronous"]
+      (sf "transfer (mockup / aysynchronous / %s)" (Protocol.name protocol))
+    ~tags:
+      ["mockup"; "client"; "transfer"; Protocol.tag protocol; "asynchronous"]
   @@ fun () ->
-  let (giver, amount, _, receiver) = transfer_data in
-  let* client = Client.init_mockup ~sync_mode:Client.Asynchronous protocol in
-  Log.info "About to transfer %d from %s to %s" amount giver receiver ;
+  let (giver, amount, receiver) = transfer_data in
+  let* client =
+    Client.init_mockup ~sync_mode:Client.Asynchronous ~protocol ()
+  in
+  Log.info "Transferring %d from %s to %s" amount giver receiver ;
   let* () = Client.transfer ~amount ~giver ~receiver client in
-  let chain_id = "NetXynUjJNZm7wi" in
-  let path = ["chains"; chain_id; "mempool"; "pending_operations"] in
-  let* json = Client.rpc Client.GET path client in
-  let _json = JSON.unannotate json in
-  let* () = Client.bake_for ~key:giver client in
-  return ()
+  Log.info "Baking pending operations..." ;
+  Client.bake_for ~key:giver client
+
+let test_multiple_baking ~protocol =
+  Test.register
+    ~__FILE__
+    ~title:
+      ( "multi-transfer/multi-baking (mockup / asynchronous / "
+      ^ Protocol.name protocol ^ ")" )
+    ~tags:
+      ["mockup"; "client"; "transfer"; Protocol.tag protocol; "asynchronous"]
+  @@ fun () ->
+  let (alice, _amount, bob) = transfer_data and baker = "bootstrap3" in
+  let* client =
+    Client.init_mockup ~sync_mode:Client.Asynchronous ~protocol ()
+  in
+  Lwt_list.iteri_s
+    (fun i amount ->
+      let* () = Client.transfer ~amount ~giver:alice ~receiver:bob client in
+      let* () = Client.transfer ~amount ~giver:bob ~receiver:alice client in
+      let* () = Client.bake_for ~key:baker client in
+      let* alice_balance = Client.get_balance_for ~account:alice client in
+      let* bob_balance = Client.get_balance_for ~account:bob client in
+      Log.info
+        "%d. Balances\n  - Alice :: %f\n  - Bob ::   %f"
+        i
+        alice_balance
+        bob_balance ;
+      if alice_balance <> bob_balance then
+        Test.fail
+          "Unexpected balances for Alice (%f) and Bob (%f). They should be \
+           equal."
+          alice_balance
+          bob_balance ;
+      return ())
+    (range 1 10)
 
 let register protocol =
-  test_rpc_list protocol ;
+  test_rpc_list ~protocol ;
   test_transfer ~protocol ;
-  test_asynchronous ~protocol
+  test_asynchronous ~protocol ;
+  test_simple_baking_event ~protocol ;
+  test_multiple_baking ~protocol
