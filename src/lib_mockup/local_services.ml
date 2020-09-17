@@ -337,11 +337,13 @@ let preapply_block (mockup_env : Registration.mockup_environment)
                   (Time.System.to_protocol
                      (Tezos_stdlib_unix.Systime_os.now ()))
                 ()
-              >>=? fun state ->
+              >>=? fun validation_state ->
               fold_left_s
-                (fold_left_s (fun (state, preapply_results) op ->
-                     Mockup_environment.Protocol.apply_operation state op
-                     >>=? fun (state, _) ->
+                (fold_left_s (fun (validation_state, preapply_results) op ->
+                     Mockup_environment.Protocol.apply_operation
+                       validation_state
+                       op
+                     >>=? fun (validation_state, _) ->
                      match
                        Data_encoding.Binary.to_bytes
                          Mockup_environment.Protocol.operation_data_encoding
@@ -353,15 +355,16 @@ let preapply_block (mockup_env : Registration.mockup_environment)
                          let op_t = {Operation.shell = op.shell; proto} in
                          let hash = Operation.hash op_t in
                          return
-                           ( state,
+                           ( validation_state,
                              Preapply_result.
                                {empty with applied = [(hash, op_t)]}
                              :: preapply_results )))
-                (state, [])
+                (validation_state, [])
                 operations
-              >>=? fun (state, preapply_results) ->
-              Mockup_environment.Protocol.finalize_block state
-              >>=? fun _ ->
+              >>=? fun (validation_state, preapply_results) ->
+              Mockup_environment.Protocol.finalize_block validation_state
+              >>=? fun (validation_result, _metadata) ->
+              (* Similar to lib_shell.Prevalidation.preapply *)
               let operations_hash =
                 let open Preapply_result in
                 Operation_list_list_hash.compute
@@ -371,7 +374,20 @@ let preapply_block (mockup_env : Registration.mockup_environment)
                      preapply_results
               in
               let shell_header =
-                {rpc_context.block_header with operations_hash}
+                {
+                  rpc_context.block_header with
+                  level = Int32.succ rpc_context.block_header.level;
+                  (* proto_level should be unchanged in mockup mode since we
+                     cannot switch protocols *)
+                  predecessor = rpc_context.block_hash;
+                  timestamp =
+                    Time.System.to_protocol
+                      (Tezos_stdlib_unix.Systime_os.now ());
+                  operations_hash;
+                  validation_passes = List.length preapply_results;
+                  fitness = validation_result.fitness;
+                  context = Context_hash.zero (* TODO: is that correct ? *);
+                }
               in
               return (shell_header, preapply_results))
              >>= function
@@ -535,7 +551,7 @@ let inject_operation_without_mempool
 (* [inject_block] is a feature that assumes that the mockup is on-disk and
  * uses a mempool. *)
 let inject_block (mockup_env : Registration.mockup_environment)
-    (dirname : string) (_chain_id : Chain_id.t)
+    (dirname : string) (chain_id : Chain_id.t)
     (rpc_context : Tezos_protocol_environment.rpc_context)
     (write_context_callback :
       Tezos_protocol_environment.rpc_context -> unit tzresult Lwt.t) =
@@ -549,6 +565,46 @@ let inject_block (mockup_env : Registration.mockup_environment)
            (req "protocol_data" op_data_encoding))
   in
   let ops_encoding = Data_encoding.Variable.list op_encoding in
+  let reconstruct (operations : Operation.t list list) =
+    let predecessor = rpc_context.block_hash in
+    let header = rpc_context.block_header in
+    let predecessor_context = rpc_context.context in
+    Mockup_environment.Protocol.begin_construction
+      ~chain_id
+      ~predecessor_context
+      ~predecessor_timestamp:header.timestamp
+      ~predecessor_level:header.level
+      ~predecessor_fitness:header.fitness
+      ~predecessor
+      ~timestamp:
+        (Time.System.to_protocol (Tezos_stdlib_unix.Systime_os.now ()))
+      ()
+    >>=? fun validation_state ->
+    Format.printf "Got %d operations@." (List.length @@ List.flatten operations) ;
+    let i = ref 0 in
+    fold_left_s
+      (fold_left_s (fun (validation_state, _results) op ->
+           incr i ;
+           match
+             Data_encoding.Binary.of_bytes op_data_encoding op.Operation.proto
+           with
+           | Error _ ->
+               failwith "Cannot parse"
+           | Ok operation_data ->
+               let op =
+                 {
+                   Mockup_environment.Protocol.shell = op.shell;
+                   protocol_data = operation_data;
+                 }
+               in
+               Mockup_environment.Protocol.apply_operation validation_state op
+               >>=? fun (validation_state, _receipt) ->
+               return (validation_state, _receipt :: _results)))
+      (validation_state, [])
+      operations
+    >>=? fun (validation_state, _) ->
+    Mockup_environment.Protocol.finalize_block validation_state
+  in
   Directory.register
     Directory.empty
     (* /injection/block *)
@@ -580,10 +636,14 @@ let inject_block (mockup_env : Registration.mockup_environment)
           | Error errs ->
               RPC_answer.fail errs
           | Ok pooled_operations_json -> (
+              (* Let's construct an updated mempool in 3 steps:
+                 - reads back the current mempool_file (as map),
+                 - removing operations that are to be injected in the next block
+                 - then reconstruct a mempool structure to be written back.  *)
               let ops =
                 Data_encoding.Json.destruct ops_encoding pooled_operations_json
               in
-              let op_hash_map =
+              let mempool_map =
                 List.fold_left
                   (fun map ((shell_header, operation_data) as v) ->
                     match
@@ -602,52 +662,70 @@ let inject_block (mockup_env : Registration.mockup_environment)
                   Operation_hash.Map.empty
                   ops
               in
-              (* Format.printf
-               *   "Mempool has %d operations@."
-               *   (Operation_hash.Map.cardinal op_hash_map) ; *)
-              let unapplied_ops =
-                let operation_hashes =
-                  List.map Operation.hash (List.flatten operations)
-                in
-                let m =
-                  List.fold_left
-                    (fun map h -> Operation_hash.Map.remove h map)
-                    op_hash_map
-                    operation_hashes
-                in
-                Operation_hash.Map.fold (fun _k v l -> v :: l) m []
+              let new_mempool_map =
+                List.fold_left
+                  (List.fold_left (fun mempool op ->
+                       Operation_hash.Map.remove (Operation.hash op) mempool))
+                  mempool_map
+                  operations
               in
-              (* Format.printf
-               *   "Mempool still has %d operations@."
-               *   (List.length unapplied_ops) ; *)
-              Data_encoding.Json.construct ops_encoding unapplied_ops
+              Operation_hash.Map.fold (fun _k v l -> v :: l) new_mempool_map []
+              |> Data_encoding.Json.construct ops_encoding
               |> Tezos_stdlib_unix.Lwt_utils_unix.Json.write_file mempool_file
               >>= function
               | Error errs ->
                   RPC_answer.fail errs
               | Ok () -> (
-                  let rpc_context =
-                    {
-                      rpc_context with
-                      block_hash;
-                      block_header = block_header.shell;
-                    }
-                  in
-                  write_context_callback rpc_context
+                  reconstruct operations
                   >>= function
-                  | Ok _ ->
-                      RPC_answer.return block_hash
-                  | Error errs -> (
-                      (* We couldn't write the new context. Let's first try to
-                        roll back the mempool before raising the errors. *)
-                      Tezos_stdlib_unix.Lwt_utils_unix.Json.write_file
-                        mempool_file
-                        pooled_operations_json
+                  | Error _ ->
+                      assert false
+                  | Ok ({context; _}, _) -> (
+                      Format.printf
+                        "Block header: %a@."
+                        Data_encoding.Json.pp
+                        (Data_encoding.Json.construct
+                           Block_header.shell_header_encoding
+                           block_header.shell) ;
+                      let context' = context in
+                      let rpc_context =
+                        let block_header =
+                          block_header.shell
+                          (* with
+                             * level = Int32.succ block_header.shell.level;
+                             * predecessor = rpc_context.block_hash;
+                             * timestamp =
+                             *   (\* Here we do not assume that baking should always
+                             *      succeed in mockup mode, independently of
+                             *      minimal time interval constraint.contqext.
+                             *
+                             *      If this was actually needed, the new timestamp
+                             *      could be the max of now and
+                             *      [Baking.minimal_timestamp] *\)
+                             *   Time.System.to_protocol
+                             *     (Tezos_stdlib_unix.Systime_os.now ()); *)
+                        in
+                        {
+                          {rpc_context with context = context'} with
+                          block_hash;
+                          block_header;
+                        }
+                      in
+                      write_context_callback rpc_context
                       >>= function
-                      | Error errs' ->
-                          RPC_answer.fail (errs @ errs')
-                      | Ok () ->
-                          RPC_answer.fail errs ) ) ) ))
+                      | Ok _ ->
+                          RPC_answer.return block_hash
+                      | Error errs -> (
+                          (* We couldn't write the new context. Let's first try to
+                             roll back the mempool before raising the errors. *)
+                          Tezos_stdlib_unix.Lwt_utils_unix.Json.write_file
+                            mempool_file
+                            pooled_operations_json
+                          >>= function
+                          | Error errs' ->
+                              RPC_answer.fail (errs @ errs')
+                          | Ok () ->
+                              RPC_answer.fail errs ) ) ) ) ))
 
 let inject_operation (mockup_env : Registration.mockup_environment)
     (dirname : string) (chain_id : Chain_id.t)
