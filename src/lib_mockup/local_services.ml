@@ -536,8 +536,22 @@ module Make (E : MENV) = struct
   let inject_block
       (write_context_callback :
         Tezos_protocol_environment.rpc_context -> unit tzresult Lwt.t) =
-    let reconstruct (operations : Operation.t list list) =
-      begin_construction ()
+    let reconstruct (operations : Operation.t list list)
+        (block_header : Block_header.t) =
+      let header = E.rpc_context.block_header in
+      let predecessor_context = E.rpc_context.context in
+      E.Protocol.begin_application
+        ~chain_id:E.chain_id
+        ~predecessor_context
+        ~predecessor_timestamp:header.timestamp
+        ~predecessor_fitness:header.fitness
+        {
+          shell = block_header.shell;
+          protocol_data =
+            Data_encoding.Binary.of_bytes_exn
+              E.Protocol.block_header_data_encoding
+              block_header.protocol_data;
+        }
       >>=? fun validation_state ->
       let i = ref 0 in
       fold_left_s
@@ -577,7 +591,7 @@ module Make (E : MENV) = struct
         | None ->
             RPC_answer.fail [Cannot_parse_op]
         | Some block_header -> (
-            reconstruct operations
+            reconstruct operations block_header
             >>=? (fun ({context; _}, _) ->
                    let rpc_context =
                      Tezos_protocol_environment.
