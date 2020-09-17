@@ -59,7 +59,7 @@ let store_protocol_missing_files =
     ~section
     ~name:"store_protocol_missing_files"
     ~msg:"protocol {protocol} won't be stored: missing source files"
-    ~level:Info
+    ~level:Warning
     ("protocol", Protocol_hash.encoding)
 
 let store_protocol_incorrect_hash =
@@ -67,7 +67,7 @@ let store_protocol_incorrect_hash =
     ~section
     ~name:"store_protocol_incorrect_hash"
     ~msg:"protocol {protocol} won't be stored: wrong hash"
-    ~level:Info
+    ~level:Warning
     ("protocol", Protocol_hash.encoding)
 
 let store_protocol_success =
@@ -102,7 +102,7 @@ let storage_context_already_consistent =
     ~section
     ~name:"context_already_consistent"
     ~msg:"no corruption detected while scanning the context."
-    ~level:Notice
+    ~level:Info
     ()
 
 let storage_restore_context_integrity_error =
@@ -110,7 +110,7 @@ let storage_restore_context_integrity_error =
     ~section
     ~name:"restore_context_integrity_error"
     ~msg:"error while scanning the context: {trace}"
-    ~level:Notice
+    ~level:Error
     ~pp1:pp_print_error_first
     ("trace", trace_encoding)
 
