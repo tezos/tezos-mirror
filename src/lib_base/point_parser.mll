@@ -74,7 +74,7 @@
   (* Remove square brackets for ipv6 addresses *)
   let parse_addr addr k =
       let len = String.length addr in
-      if String.get addr 0 = '[' && String.get addr (len - 1) = ']' then
+      if len > 0 && String.get addr 0 = '[' && String.get addr (len - 1) = ']' then
            k (String.sub addr 1 (len - 2))
       else
            k addr
