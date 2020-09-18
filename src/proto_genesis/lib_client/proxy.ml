@@ -23,11 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let init_env_rpc_context _ _ _ _ =
-  failwith
-    "In proxy mode, all RPCs of protocol genesis should be forwarded to the \
-     node. Hence this code should not be reached, because the RPC directory \
-     is empty."
+let msg : string =
+  "In proxy mode, all RPCs of protocol genesis should be forwarded to the \
+   node. Hence this code should not be reached, because the RPC directory is \
+   empty."
 
 let () =
   let open Tezos_proxy.Registration in
@@ -38,6 +37,9 @@ let () =
 
     let directory = RPC_directory.empty
 
-    let init_env_rpc_context = init_env_rpc_context
+    let hash _ ?chain ?block _ =
+      ignore chain ; ignore block ; failwith "%s" msg
+
+    let init_env_rpc_context _ _ _ _ = failwith "%s" msg
   end in
   register_proxy_context (module M)

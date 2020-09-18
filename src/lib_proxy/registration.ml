@@ -51,6 +51,14 @@ module type Proxy_sig = sig
   (** RPCs provided by the protocol *)
   val directory : Tezos_protocol_environment.rpc_context RPC_directory.t
 
+  (** The protocol's /chains/<chain>/blocks/<block_id>/hash RPC *)
+  val hash :
+    #RPC_context.simple ->
+    ?chain:Tezos_shell_services.Block_services.chain ->
+    ?block:Tezos_shell_services.Block_services.block ->
+    unit ->
+    Block_hash.t tzresult Lwt.t
+
   (** How to build the context to execute RPCs on *)
   val init_env_rpc_context :
     Tezos_client_base.Client_context.printer ->

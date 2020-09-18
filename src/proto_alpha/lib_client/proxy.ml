@@ -136,6 +136,8 @@ let () =
 
     let directory = Protocol.rpc_services
 
+    let hash = Protocol_client_context.Alpha_block_services.hash
+
     let init_env_rpc_context = init_env_rpc_context
   end in
   register_proxy_context (module M)
