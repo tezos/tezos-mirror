@@ -140,6 +140,19 @@ let exit_and_raise n = exit n ; raise Exit
    right inside of [Lwt_main.run] but presumably after [wrap_and_error]. *)
 let exit_and_wait n = exit n ; clean_up_ends
 
+(* exit codes *)
+
+let incomplete_clean_up_mask = 128
+
+let signal_exit_code = 64
+
+let uncaught_exception_exit_code = 32
+
+let mask_code_bc_incomplete_clean_up code = code lor incomplete_clean_up_mask
+
+let mask_code_if_incomplete_clean_up ~complete:all_fine code =
+  if all_fine then code else mask_code_bc_incomplete_clean_up code
+
 (* 5. signals *)
 
 type signal_setup = {soft : (int * string) list; hard : (int * string) list}
@@ -223,12 +236,12 @@ let set_soft_handler ?(double_signal_safety = default_double_signal_safety)
         Format.eprintf
           "%s: signal received again, forcing immediate termination.\n%!"
           name ;
-        Stdlib.exit (1 lor 128) )
+        Stdlib.exit (mask_code_bc_incomplete_clean_up signal_exit_code) )
       else
         match Lwt.state clean_up_starts with
         | Sleep ->
             Format.eprintf "%s: triggering shutdown.\n%!" name ;
-            exit 1 ;
+            exit signal_exit_code ;
             set_already_received_once
               double_signal_safety
               already_received_once
@@ -246,7 +259,7 @@ let set_soft_handler ?(double_signal_safety = default_double_signal_safety)
 let set_hard_handler signal name =
   Lwt_unix.on_signal signal (fun _signal ->
       Format.eprintf "%s: force-quiting.\n%!" name ;
-      Stdlib.exit (128 lor 1))
+      Stdlib.exit (mask_code_bc_incomplete_clean_up signal_exit_code))
 
 let setup_signal_handlers ?double_signal_safety signal_setup =
   let soft_handler_ids =
@@ -265,11 +278,6 @@ let setup_signal_handlers ?double_signal_safety signal_setup =
   all_handler_ids
 
 let unset_handlers = List.iter Lwt_unix.disable_signal_handler
-
-(* exit codes *)
-
-let mask_code_if_incomplete_clean_up all_fine code =
-  if all_fine then code else code lor 128
 
 (* 6. internal synchronisation *)
 
@@ -349,9 +357,9 @@ let wrap_and_error ?(signal_setup = default_signal_setup) ?double_signal_safety
               assert false ) ;
           Lwt.cancel p ;
           wait_for_clean_up max_clean_up_time
-          >>= fun all_fine ->
+          >>= fun complete ->
           unset_handlers handler_ids ;
-          let status = mask_code_if_incomplete_clean_up all_fine status in
+          let status = mask_code_if_incomplete_clean_up ~complete status in
           Lwt.return (Error status))
     (function
       | Exit -> (
@@ -362,31 +370,39 @@ let wrap_and_error ?(signal_setup = default_signal_setup) ?double_signal_safety
           match Lwt.state clean_up_starts with
           | Return status ->
               wait_for_clean_up max_clean_up_time
-              >>= fun all_fine ->
+              >>= fun complete ->
               unset_handlers handler_ids ;
-              let status = mask_code_if_incomplete_clean_up all_fine status in
+              let status = mask_code_if_incomplete_clean_up ~complete status in
               Lwt.return (Error status)
           | Fail _ ->
               assert false
           | Sleep ->
-              exit 2 ;
+              exit uncaught_exception_exit_code ;
               Format.eprintf
                 "Exit: exit because of uncaught exception: %s\n%!"
                 (Printexc.to_string Exit) ;
               wait_for_clean_up max_clean_up_time
-              >>= fun all_fine ->
+              >>= fun complete ->
               unset_handlers handler_ids ;
-              let status = mask_code_if_incomplete_clean_up all_fine 2 in
+              let status =
+                mask_code_if_incomplete_clean_up
+                  ~complete
+                  uncaught_exception_exit_code
+              in
               Lwt.return (Error status) )
       | exc ->
-          exit 2 ;
+          exit uncaught_exception_exit_code ;
           Format.eprintf
             "Exit: exit because of uncaught exception: %s\n%!"
             (Printexc.to_string exc) ;
           wait_for_clean_up max_clean_up_time
-          >>= fun all_fine ->
+          >>= fun complete ->
           unset_handlers handler_ids ;
-          let status = mask_code_if_incomplete_clean_up all_fine 2 in
+          let status =
+            mask_code_if_incomplete_clean_up
+              ~complete
+              uncaught_exception_exit_code
+          in
           Lwt.return (Error status))
 
 (* same but exit on error *)

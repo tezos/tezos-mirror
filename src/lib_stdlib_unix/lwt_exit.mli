@@ -51,8 +51,8 @@ type clean_up_callback_id
     changes, gracefully close connections with peers, etc.
 
     The call to [f] receives an argument [n] that indicates the status the
-    process will exit with at the end of clean-up: [0] is for success, [1] for
-    interruption by signals, [2] for uncaught exceptions, other values are also
+    process will exit with at the end of clean-up: [0] is for success, [64] for
+    interruption by signals, [32] for uncaught exceptions, other values are also
     available.
 
     The argument [after], if passed, delays the call to this callback until
@@ -145,9 +145,9 @@ val signal_name : int -> string
     - the process terminates as soon as clean-up ends with exit code [code].
 
     If [p] is rejected (and [exit_and_raise] was not called), it is equivalent
-    to calling [exit_and_raise 2]. I.e.,
+    to calling [exit_and_raise 32]. I.e.,
     - the clean-up starts,
-    - the process terminates as soon as clean-up ends with exit code [2].
+    - the process terminates as soon as clean-up ends with exit code [32].
 
     EXIT CODE:
 
@@ -155,8 +155,8 @@ val signal_name : int -> string
     bit) if the clean-up did not complete successfully (i.e., if any of the
     clean-up callbacks were rejected).
 
-    E.g., if you call [exit_and_raise 3] and one of the clean-up callback fails
-    (is rejected with an exception), then the exit code is [3 lor 128 = 131].
+    E.g., if you call [exit_and_raise 1] and one of the clean-up callback fails
+    (is rejected with an exception), then the exit code is [1 lor 128 = 129].
 
     Note that even if one clean-up callback fails, the other clean-up callbacks
     are left to execute.
@@ -167,13 +167,24 @@ val signal_name : int -> string
     (see {!signal_setup}).
 
     Any hard-signal that is received triggers an immediate process termination
-    with exit code [1 lor 128].
+    with exit code [64 lor 128].
 
-    Any soft-signal that is received triggers a call to [exit_and_raise 1]
+    Any soft-signal that is received triggers a call to [exit_and_raise 64]
     (the consequences of which are described above).
 
     Note that if the same soft-signal is sent a second-time, the process
-    terminates immediately with code [1 lor 128].
+    terminates immediately with code [64 lor 128].
+
+    To summarize, the exit code can be thought of as a 8-bit integer with the
+    following properties:
+    - the highest bit is set if the clean-up was unsuccessful/incomplete
+    - the second highest bit is set if the process exited because of a signal
+    - the third highest bit is set if the process exited because of an uncaught
+      exception
+    - all other bits can be used by the application as wanted.
+
+    Note that if the second (signal) or third (exception) highest bits are set,
+    then only the highest (incomplete clean-up) may also be set.
 
     OPTIONAL PARAMETERS:
 
