@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2019-2020 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -197,7 +197,7 @@ let init_node ?sandbox ?checkpoint ~identity ~singleprocess
       Event.(emit disabled_discovery_addr) () >>= fun () -> return (None, None)
   | Some addr -> (
       Node_config_file.resolve_discovery_addrs addr
-      >>= function
+      >>=? function
       | [] ->
           failwith "Cannot resolve P2P discovery address: %S" addr
       | (addr, port) :: _ ->
@@ -208,7 +208,7 @@ let init_node ?sandbox ?checkpoint ~identity ~singleprocess
       Event.(emit disabled_listen_addr) () >>= fun () -> return (None, None)
   | Some addr -> (
       Node_config_file.resolve_listening_addrs addr
-      >>= function
+      >>=? function
       | [] ->
           failwith "Cannot resolve P2P listening address: %S" addr
       | (addr, port) :: _ ->
@@ -224,7 +224,7 @@ let init_node ?sandbox ?checkpoint ~identity ~singleprocess
   | _ ->
       Node_config_file.resolve_bootstrap_addrs
         (Node_config_file.bootstrap_peers config)
-      >>= fun trusted_points ->
+      >>=? fun trusted_points ->
       let p2p_config : P2p.config =
         {
           listening_addr;
@@ -344,7 +344,7 @@ let init_rpc (config : Node_config_file.t) node =
   List.fold_right_es
     (fun addr acc ->
       Node_config_file.resolve_rpc_listening_addrs addr
-      >>= function
+      >>=? function
       | [] ->
           failwith "Cannot resolve listening address: %S" addr
       | addrs ->
@@ -377,6 +377,8 @@ let run ?verbosity ?sandbox ?checkpoint ~singleprocess
     ~configuration:config.internal_events
     ()
   >>= fun () ->
+  Node_config_file.check config
+  >>=? fun () ->
   init_identity_file config
   >>=? fun identity ->
   Updater.init (Node_data_version.protocol_dir config.data_dir) ;
@@ -463,13 +465,13 @@ let process sandbox verbosity checkpoint singleprocess args =
           (fun () -> run ?sandbox ?verbosity ?checkpoint ~singleprocess config)
           (function
             | Unix.Unix_error (Unix.EADDRINUSE, "bind", "") ->
-                List.fold_right_s
+                List.fold_right_es
                   (fun addr acc ->
                     Node_config_file.resolve_rpc_listening_addrs addr
-                    >>= fun x -> Lwt.return (x @ acc))
+                    >>=? fun x -> return (x @ acc))
                   config.rpc.listen_addrs
                   []
-                >>= fun addrlist -> fail (RPC_Port_already_in_use addrlist)
+                >>=? fun addrlist -> fail (RPC_Port_already_in_use addrlist)
             | exn ->
                 Lwt.return (error_exn exn))
     | true ->

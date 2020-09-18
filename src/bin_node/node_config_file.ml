@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2019-2020 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -1068,45 +1068,14 @@ module Event = struct
       ~pp1:(fun ppf -> Format.fprintf ppf "%S")
       ("addr", Data_encoding.string)
 
-  let cannot_resolve_listening_addr =
-    Internal_event.Simple.declare_1
-      ~section
-      ~level
-      ~name:"cannot_resolve_listening_addr"
-      ~msg:"failed to resolve {addr}"
-      ~pp1:(fun ppf -> Format.fprintf ppf "%S")
-      ("addr", Data_encoding.string)
-
-  let cannot_parse_listening_addr =
+  let cannot_resolve_addr =
     Internal_event.Simple.declare_2
       ~section
       ~level
-      ~name:"cannot_parse_listening_addr"
-      ~msg:"failed to parse {addr}: {msg}"
-      ~pp1:(fun ppf -> Format.fprintf ppf "%S")
+      ~name:"cannot_resolve_addr"
+      ~msg:"failed to resolve {type} address: '{addr}'"
+      ("type", Data_encoding.string)
       ("addr", Data_encoding.string)
-      ~pp2:(fun ppf -> Format.fprintf ppf "%s")
-      ("msg", Data_encoding.string)
-
-  let cannot_resolve_discovery_addr =
-    Internal_event.Simple.declare_1
-      ~section
-      ~level
-      ~name:"cannot_resolve_discovery_addr"
-      ~msg:"failed to resolve {addr}"
-      ~pp1:(fun ppf -> Format.fprintf ppf "%S")
-      ("addr", Data_encoding.string)
-
-  let cannot_parse_discovery_addr =
-    Internal_event.Simple.declare_2
-      ~section
-      ~level
-      ~name:"cannot_parse_discovery_addr"
-      ~msg:"failed to parse {addr}: {msg}"
-      ~pp1:(fun ppf -> Format.fprintf ppf "%S")
-      ("addr", Data_encoding.string)
-      ~pp2:(fun ppf -> Format.fprintf ppf "%s")
-      ("msg", Data_encoding.string)
 end
 
 let string_of_json_encoding_error exn =
@@ -1226,39 +1195,83 @@ let update ?data_dir ?min_connections ?expected_connections ?max_connections
   in
   return {cfg with data_dir; p2p; rpc; log; shell; blockchain_network}
 
+type Error_monad.error += Failed_to_parse_address of (string * string)
+
+let () =
+  (* Parsing of an address failed with an explanation *)
+  Error_monad.register_error_kind
+    `Permanent
+    ~id:"node_config_file.parsing_address_failed"
+    ~title:"Parsing of an address failed"
+    ~description:"Parsing an address failed with an explanation."
+    ~pp:(fun ppf (addr, explanation) ->
+      Format.fprintf ppf "Failed to parse address '%s': %s@." addr explanation)
+    Data_encoding.(obj2 (req "addr" string) (req "explanation" string))
+    (function Failed_to_parse_address s -> Some s | _ -> None)
+    (fun s -> Failed_to_parse_address s)
+
 let to_ipv4 ipv6_l =
   let convert_or_warn (ipv6, port) =
     let ipv4 = Ipaddr.v4_of_v6 ipv6 in
     match ipv4 with
     | None ->
         Event.(emit cannot_convert_to_ipv4) (Ipaddr.V6.to_string ipv6)
-        >>= fun () -> Lwt.return_none
+        >>= fun () -> return_none
     | Some ipv4 ->
-        Lwt.return_some (ipv4, port)
+        return_some (ipv4, port)
   in
-  List.filter_map_s convert_or_warn ipv6_l
+  List.filter_map_es convert_or_warn ipv6_l
 
-let resolve_addr ~default_addr ?default_port ?(passive = false) peer =
-  let (addr, port) = P2p_point.Id.parse_addr_port peer in
-  let node = if addr = "" || addr = "_" then default_addr else addr
-  and service =
-    match (port, default_port) with
-    | ("", None) ->
-        invalid_arg ""
-    | ("", Some default_port) ->
-        string_of_int default_port
-    | (port, _) ->
-        port
-  in
-  Lwt_utils_unix.getaddrinfo ~passive ~node ~service
+(* Parse an address.
 
-let resolve_addrs ~default_addr ?default_port ?passive peers =
-  List.fold_left_s
-    (fun a peer ->
-      resolve_addr ~default_addr ?default_port ?passive peer
-      >>= fun points -> Lwt.return (List.rev_append points a))
+   - [peer] is a string representing the peer.
+
+   - if [no_peer_id_expected] is true, then parsing a representation
+   containing a peer id will result in an error.
+
+   - [default_addr] is the used if no hostname or IP is given or if
+   the hostname "_" is used.
+
+   - [default_port] is the used if port is given. *)
+let resolve_addr ~default_addr ?(no_peer_id_expected = true) ?default_port
+    ?(passive = false) peer :
+    (P2p_point.Id.t * P2p_peer.Id.t option) list tzresult Lwt.t =
+  match P2p_point.Id.parse_addr_port_id peer with
+  | (Error (P2p_point.Id.Bad_id_format _) | Ok {peer_id = Some _; _})
+    when no_peer_id_expected ->
+      fail
+        (Failed_to_parse_address
+           (peer, "no peer identity should be specified here"))
+  | Error err ->
+      fail
+        (Failed_to_parse_address
+           (peer, P2p_point.Id.string_of_parsing_error err))
+  | Ok {addr; port; peer_id} ->
+      ( match (port, default_port) with
+      | (None, None) ->
+          return (string_of_int default_p2p_port)
+      | (None, Some default_port) ->
+          return (string_of_int default_port)
+      | (Some port, _) ->
+          return (string_of_int port) )
+      >>=? fun service ->
+      let node = if addr = "" || addr = "_" then default_addr else addr in
+      Lwt_utils_unix.getaddrinfo ~passive ~node ~service
+      >>= fun l -> return (List.map (fun point -> (point, peer_id)) l)
+
+let resolve_addrs ?default_port ?passive addrs ?no_peer_id_expected
+    ~default_addr =
+  List.fold_left_es
+    (fun a addr ->
+      resolve_addr
+        ~default_addr
+        ?default_port
+        ?passive
+        ?no_peer_id_expected
+        addr
+      >>=? fun points -> return (List.rev_append points a))
     []
-    peers
+    addrs
 
 let resolve_discovery_addrs discovery_addr =
   resolve_addr
@@ -1266,7 +1279,7 @@ let resolve_discovery_addrs discovery_addr =
     ~default_port:default_discovery_port
     ~passive:true
     discovery_addr
-  >>= fun addrs -> to_ipv4 addrs
+  >>=? fun addrs -> to_ipv4 (List.map fst addrs)
 
 let resolve_listening_addrs listen_addr =
   resolve_addr
@@ -1274,6 +1287,7 @@ let resolve_listening_addrs listen_addr =
     ~default_port:default_p2p_port
     ~passive:true
     listen_addr
+  >|=? List.map fst
 
 let resolve_rpc_listening_addrs listen_addr =
   resolve_addr
@@ -1281,84 +1295,58 @@ let resolve_rpc_listening_addrs listen_addr =
     ~default_port:default_rpc_port
     ~passive:true
     listen_addr
+  >|=? List.map fst
 
 let resolve_bootstrap_addrs peers =
-  resolve_addrs ~default_addr:"::" ~default_port:default_p2p_port peers
+  resolve_addrs
+    ~no_peer_id_expected:false
+    ~default_addr:"::"
+    ~default_port:default_p2p_port
+    peers
+  >|=? List.map fst
 
 let check_listening_addrs config =
   match config.p2p.listen_addr with
   | None ->
-      Lwt.return_unit
-  | Some addr ->
-      Lwt.catch
-        (fun () ->
-          resolve_listening_addrs addr
-          >>= function
-          | [] ->
-              Event.(emit cannot_resolve_listening_addr) addr
-          | _ :: _ ->
-              Lwt.return_unit)
-        (function
-          | Invalid_argument msg ->
-              Event.(emit cannot_parse_listening_addr) (addr, msg)
-          | exn ->
-              Lwt.fail exn)
+      return_unit
+  | Some addr -> (
+      resolve_listening_addrs addr
+      >>=? function
+      | [] ->
+          Event.(emit cannot_resolve_addr) ("RPC listening", addr) >>= return
+      | _ :: _ ->
+          return_unit )
 
 let check_discovery_addr config =
   match config.p2p.discovery_addr with
   | None ->
-      Lwt.return_unit
-  | Some addr ->
-      Lwt.catch
-        (fun () ->
-          resolve_discovery_addrs addr
-          >>= function
-          | [] ->
-              Event.(emit cannot_resolve_discovery_addr) addr
-          | _ :: _ ->
-              Lwt.return_unit)
-        (function
-          | Invalid_argument msg ->
-              Event.(emit cannot_parse_discovery_addr) (addr, msg)
-          | exn ->
-              Lwt.fail exn)
+      return_unit
+  | Some addr -> (
+      resolve_discovery_addrs addr
+      >>=? function
+      | [] ->
+          Event.(emit cannot_resolve_addr) ("discovery", addr) >>= return
+      | _ :: _ ->
+          return_unit )
 
 let check_rpc_listening_addr config =
-  List.iter_p
+  List.iter_ep
     (fun addr ->
-      Lwt.catch
-        (fun () ->
-          resolve_rpc_listening_addrs addr
-          >>= function
-          | [] ->
-              Format.eprintf "Warning: failed to resolve %S\n@." addr ;
-              Lwt.return_unit
-          | _ :: _ ->
-              Lwt.return_unit)
-        (function
-          | Invalid_argument msg ->
-              Format.eprintf "Warning: failed to parse %S:   %s\n@." addr msg ;
-              Lwt.return_unit
-          | exn ->
-              Lwt.fail exn))
+      resolve_rpc_listening_addrs addr
+      >>=? function
+      | [] ->
+          Event.(emit cannot_resolve_addr) ("listenning", addr) >>= return
+      | _ :: _ ->
+          return_unit)
     config.rpc.listen_addrs
 
 let check_bootstrap_peer addr =
-  Lwt.catch
-    (fun () ->
-      resolve_bootstrap_addrs [addr]
-      >>= function
-      | [] ->
-          Format.eprintf "Warning: cannot resolve %S\n@." addr ;
-          Lwt.return_unit
-      | _ :: _ ->
-          Lwt.return_unit)
-    (function
-      | Invalid_argument msg ->
-          Format.eprintf "Warning: failed to parse %S:   %s\n@." addr msg ;
-          Lwt.return_unit
-      | exn ->
-          Lwt.fail exn)
+  resolve_bootstrap_addrs [addr]
+  >>=? function
+  | [] ->
+      Event.(emit cannot_resolve_addr) ("bootstrapping", addr) >>= return
+  | _ :: _ ->
+      return_unit
 
 let bootstrap_peers config =
   match config.p2p.bootstrap_peers with
@@ -1368,7 +1356,7 @@ let bootstrap_peers config =
       peers
 
 let check_bootstrap_peers config =
-  List.iter_p check_bootstrap_peer (bootstrap_peers config)
+  List.iter_ep check_bootstrap_peer (bootstrap_peers config)
 
 let fail fmt = Format.kasprintf (fun s -> prerr_endline s ; exit 1) fmt
 
@@ -1422,10 +1410,9 @@ let check_connections config =
 
 let check config =
   check_listening_addrs config
-  >>= fun () ->
+  >>=? fun () ->
   check_rpc_listening_addr config
-  >>= fun () ->
+  >>=? fun () ->
   check_discovery_addr config
-  >>= fun () ->
-  check_bootstrap_peers config
-  >>= fun () -> check_connections config ; Lwt.return_unit
+  >>=? fun () ->
+  check_bootstrap_peers config >>=? fun () -> return (check_connections config)

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -41,7 +42,7 @@ let show (args : Node_shared_arg.t) =
   Node_shared_arg.read_and_patch_config_file args
   >>=? fun cfg ->
   Node_config_file.check cfg
-  >>= fun () ->
+  >>=? fun () ->
   print_endline @@ Node_config_file.to_string cfg ;
   return_unit
 
@@ -53,7 +54,7 @@ let reset (args : Node_shared_arg.t) =
   Node_shared_arg.read_and_patch_config_file args
   >>=? fun cfg ->
   Node_config_file.check cfg
-  >>= fun () -> Node_config_file.write args.config_file cfg
+  >>=? fun () -> Node_config_file.write args.config_file cfg
 
 let init (args : Node_shared_arg.t) =
   if Sys.file_exists args.config_file then
@@ -62,7 +63,7 @@ let init (args : Node_shared_arg.t) =
     Node_shared_arg.read_and_patch_config_file ~may_override_network:true args
     >>=? fun cfg ->
     Node_config_file.check cfg
-    >>= fun () ->
+    >>=? fun () ->
     Node_config_file.write args.config_file cfg
     >>=? fun () ->
     let default = if args.network = None then " default" else "" in
@@ -92,7 +93,7 @@ let update (args : Node_shared_arg.t) =
     Node_shared_arg.read_and_patch_config_file args
     >>=? fun cfg ->
     Node_config_file.check cfg
-    >>= fun () -> Node_config_file.write args.config_file cfg
+    >>=? fun () -> Node_config_file.write args.config_file cfg
 
 (** Main *)
 

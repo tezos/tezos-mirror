@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2019-2020 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -313,10 +313,12 @@ module Term = struct
   let peers =
     let doc =
       "A peer to bootstrap the network from. Can be used several times to add \
-       several peers."
+       several peers. Optionally, the expected identity of the peer can be \
+       given using the b58 hash format of its public key."
     in
     Arg.(
-      value & opt_all string [] & info ~docs ~doc ~docv:"ADDR:PORT" ["peer"])
+      value & opt_all string []
+      & info ~docs ~doc ~docv:"ADDR:PORT[#ID]" ["peer"])
 
   let expected_pow =
     let doc = "Expected level of proof-of-work for peers identity." in

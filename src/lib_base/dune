@@ -25,7 +25,9 @@
             lwt
             ipaddr))
 
+(ocamllex point_parser)
+
 (rule
  (alias runtest_lint)
  (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps} --ignore point_parser.ml)))
