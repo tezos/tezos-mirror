@@ -232,6 +232,35 @@ let run input output =
   let rec loop () =
     External_validation.recv input External_validation.request_encoding
     >>= (function
+          | External_validation.Init ->
+              External_validation.send
+                output
+                (Error_monad.result_encoding Data_encoding.empty)
+                (Ok ())
+              >>= return
+          | External_validation.Commit_genesis {chain_id} ->
+              lwt_emit (Commit_genesis_request genesis.block)
+              >>= fun () ->
+              Error_monad.protect (fun () ->
+                  Context.commit_genesis
+                    context_index
+                    ~chain_id
+                    ~time:genesis.time
+                    ~protocol:genesis.protocol
+                  >>= fun commit -> return commit)
+              >>=? fun commit ->
+              External_validation.send
+                output
+                (Error_monad.result_encoding Context_hash.encoding)
+                commit
+              >>= return
+          | External_validation.Restore_context_integrity ->
+              let res = Context.restore_integrity context_index in
+              External_validation.send
+                output
+                (Error_monad.result_encoding Data_encoding.(option int31))
+                res
+              >>= return
           | External_validation.Validate
               { chain_id;
                 block_header;
@@ -288,28 +317,6 @@ let run input output =
                 (Error_monad.result_encoding Block_validation.result_encoding)
                 res
               >>= return
-          | External_validation.Commit_genesis {chain_id} ->
-              lwt_emit (Commit_genesis_request genesis.block)
-              >>= fun () ->
-              Error_monad.protect (fun () ->
-                  Context.commit_genesis
-                    context_index
-                    ~chain_id
-                    ~time:genesis.time
-                    ~protocol:genesis.protocol
-                  >>= fun commit -> return commit)
-              >>=? fun commit ->
-              External_validation.send
-                output
-                (Error_monad.result_encoding Context_hash.encoding)
-                commit
-              >>= return
-          | External_validation.Init ->
-              External_validation.send
-                output
-                (Error_monad.result_encoding Data_encoding.empty)
-                (Ok ())
-              >>= return
           | External_validation.Fork_test_chain {context_hash; forked_header}
             ->
               lwt_emit (Fork_test_chain_request forked_header)
@@ -344,14 +351,7 @@ let run input output =
               >>= return
           | External_validation.Terminate ->
               Lwt_io.flush_all ()
-              >>= fun () -> lwt_emit Termination_request >>= fun () -> exit 0
-          | External_validation.Restore_context_integrity ->
-              let res = Context.restore_integrity context_index in
-              External_validation.send
-                output
-                (Error_monad.result_encoding Data_encoding.(option int31))
-                res
-              >>= return)
+              >>= fun () -> lwt_emit Termination_request >>= fun () -> exit 0)
     >>=? loop
   in
   loop ()
