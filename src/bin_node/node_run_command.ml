@@ -401,7 +401,7 @@ let run ?verbosity ?sandbox ?checkpoint ~singleprocess
   let rpc_downer =
     Lwt_exit.register_clean_up_callback
       ~loc:__LOC__
-      ~after:node_downer
+      ~after:[node_downer]
       (fun _ ->
         Event.(emit shutting_down_rpc_server) ()
         >>= fun () -> Lwt_list.iter_p RPC_server.shutdown rpc)
@@ -411,7 +411,7 @@ let run ?verbosity ?sandbox ?checkpoint ~singleprocess
   let _ =
     Lwt_exit.register_clean_up_callback
       ~loc:__LOC__
-      ~after:rpc_downer
+      ~after:[rpc_downer]
       (fun exit_status ->
         Event.(emit bye) exit_status >>= fun () -> Internal_event_unix.close ())
   in

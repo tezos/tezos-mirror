@@ -55,15 +55,24 @@ type clean_up_callback_id
     interruption by signals, [32] for uncaught exceptions, other values are also
     available.
 
-    The argument [after], if passed, delays the call to this callback until
-    the one identified by [after] has resolved.
+    The argument [after], if passed, delays the call to this clean-up callback
+    until the clean-up callbacks identified by [after] have resovled. Appart
+    from this synchronisation mechanism, all clean-up callbacks execute eagerly
+    and concurrently. Note that more complex synchronisation is discouraged but
+    possible via standard Lwt techniques.
+
+    Note that if one of the callbacks identified in [after] is unregistered
+    (through {!unregister_clean_up_callback}) then it is simply ignored for the
+    purpose of synchronisation. Thus, it is important to indicate all the
+    "dependencies" of a clean-up callback and not rely on transitive
+    "dependencies".
 
     Once clean-up has started, this function has no effect.
 
     The promise returned by this callback may be canceled if it takes too long
     to complete. (See {!max_clean_up_time} below.) *)
 val register_clean_up_callback :
-  ?after:clean_up_callback_id ->
+  ?after:clean_up_callback_id list ->
   loc:string ->
   (int -> unit Lwt.t) ->
   clean_up_callback_id

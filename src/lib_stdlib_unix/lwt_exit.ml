@@ -41,14 +41,14 @@ module Callbacks_map = Map.Make (Int)
 
 type callback = {
   callback : int -> unit Lwt.t;
-  after : clean_up_callback_id option;
+  after : clean_up_callback_id list;
   loc : string;
 }
 
 let clean_up_callbacks : callback Callbacks_map.t ref = ref Callbacks_map.empty
 
 (* adding and removing clean-up callbacks affects the global reference map *)
-let register_clean_up_callback ?after ~loc callback =
+let register_clean_up_callback ?(after = []) ~loc callback =
   let id = new_clean_up_callback_id () in
   let callback = {callback; after; loc} in
   clean_up_callbacks := Callbacks_map.add id callback !clean_up_callbacks ;
@@ -65,6 +65,7 @@ let unregister_clean_up_callback id =
 
    Returns a seq of clean-up promises along with their identifiers. *)
 let clean_up status =
+  (* NOTE: [to_seq] iterates in increasing order of keys *)
   let callbacks = Callbacks_map.to_seq !clean_up_callbacks in
   clean_up_callbacks := Callbacks_map.empty ;
   let promises : (string * unit Lwt.t) Callbacks_map.t =
@@ -72,15 +73,21 @@ let clean_up status =
       (fun promises (id, {callback; after; loc}) ->
         let pre =
           match after with
-          | None ->
+          | [] ->
               Lwt.return_unit
-          | Some after -> (
-            match Callbacks_map.find_opt after promises with
-            | None ->
-                (* This can happen if the callback was unregistered *)
-                Lwt.return_unit
-            | Some (_, p) ->
-                p )
+          | _ :: _ as after -> (
+              Callbacks_map.to_seq promises
+              |> Seq.filter_map (fun (id, (_, p)) ->
+                     if List.mem id after then Some p else None)
+              |> List.of_seq
+              |> function
+              | [] ->
+                  (* This can happen if all after-callbacks were unregistered *)
+                  Lwt.return_unit
+              | [p] ->
+                  p
+              | _ :: _ :: _ as ps ->
+                  Lwt.join ps )
         in
         let promise = pre >>= fun () -> callback status in
         Lwt.on_failure promise (fun exc ->
