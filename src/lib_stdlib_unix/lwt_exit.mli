@@ -56,12 +56,12 @@ type clean_up_callback_id
     available.
 
     The argument [after], if passed, delays the call to this callback until
-    the one identified by [after] has resovled.
+    the one identified by [after] has resolved.
 
     Once clean-up has started, this function has no effect.
 
     The promise returned by this callback may be canceled if it takes too long
-    to complete. (See [max_clean_up_time] below.) *)
+    to complete. (See {!max_clean_up_time} below.) *)
 val register_clean_up_callback :
   ?after:clean_up_callback_id ->
   loc:string ->
@@ -90,13 +90,13 @@ val unregister_clean_up_callback : clean_up_callback_id -> unit
 *)
 
 (** [exit_and_raise n] triggers a soft exit (including clean-up) and raises
-    [Exit]. This is intended for use deep inside the program, at a place that
-    wants to trigger an exit after observing, say, a fatal error. *)
+    {!Stdlib.Exit}. This is intended for use deep inside the program, at a place
+    that wants to trigger an exit after observing, say, a fatal error. *)
 val exit_and_raise : int -> 'a
 
 (** [exit_and_wait n] triggers a soft exit (including clean-up) and stays
     pending until it is finished. This is intended to be used directly within
-    [Lwt_main.run] for a clean exit. *)
+    {!Lwt_main.run} for a clean exit. *)
 val exit_and_wait : int -> int Lwt.t
 
 (** Managing signals *)
@@ -106,7 +106,8 @@ val exit_and_wait : int -> int Lwt.t
     After the clean-up has started, and after a safety period has elapsed,
     sending the same soft-handled signal a second time terminates the
     process immediately. The safety period is set by the parameter
-    [double_signal_safety] of the [wrap_and_*] functions (below).
+    [double_signal_safety] of the {!wrap_and_exit}, {!wrap_and_error}, and
+    {!wrap_and_forward} functions (below).
 
     A hard signal handler is one that terminates the process immediately.
 
@@ -117,7 +118,8 @@ type signal_setup
 (** [make_signal_setup ~soft ~hard] is a signal setup with [soft] as soft
     signals and [hard] as hard signals.
 
-    @raise [Invalid_argument] if a signal is not one of [Sys.sig*]*)
+    @raise {!Stdlib.Invalid_argument} if a signal is not one declared in {!Sys}
+    (see all [Sys.sig*] values). *)
 val make_signal_setup : soft:int list -> hard:int list -> signal_setup
 
 (** [default_signal_setup] is
@@ -231,7 +233,7 @@ val wrap_and_exit :
   'a Lwt.t ->
   'a Lwt.t
 
-(** [wrap_and_error p] is similar to [wrap_and_exit p] but it resolves to
+(** [wrap_and_error p] is similar to {!wrap_and_exit} [p] but it resolves to
     [Error status] instead of exiting with [status]. When it resolves with
     [Error _] (i.e., if a soft-exit has been triggered), clean-up has already
     ended.
@@ -264,7 +266,7 @@ val wrap_and_error :
   'a Lwt.t ->
   ('a, int) result Lwt.t
 
-(** [wrap_and_forward p] is similar to [wrap_and_error p] except that it
+(** [wrap_and_forward p] is similar to {!wrap_and_error} [p] except that it
     collapses [Ok _] and [Error _].
 
     Note that, in general, you can expect the status [0] to come from a
