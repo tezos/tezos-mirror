@@ -231,128 +231,130 @@ let run input output =
             user_activated_protocol_overrides ) ->
   let rec loop () =
     External_validation.recv input External_validation.request_encoding
-    >>= (function
-          | External_validation.Init ->
+    >>= function
+    | External_validation.Init ->
+        let init : unit Lwt.t =
+          External_validation.send
+            output
+            (Error_monad.result_encoding Data_encoding.empty)
+            (Ok ())
+        in
+        init >>= loop
+    | External_validation.Commit_genesis {chain_id} ->
+        let commit_genesis : unit Lwt.t =
+          lwt_emit (Commit_genesis_request genesis.block)
+          >>= fun () ->
+          Error_monad.protect (fun () ->
+              Context.commit_genesis
+                context_index
+                ~chain_id
+                ~time:genesis.time
+                ~protocol:genesis.protocol)
+          >>= fun commit ->
+          External_validation.send
+            output
+            (Error_monad.result_encoding Context_hash.encoding)
+            commit
+        in
+        commit_genesis >>= loop
+    | External_validation.Restore_context_integrity ->
+        let restore_context_integrity : unit Lwt.t =
+          let res = Context.restore_integrity context_index in
+          External_validation.send
+            output
+            (Error_monad.result_encoding Data_encoding.(option int31))
+            res
+        in
+        restore_context_integrity >>= loop
+    | External_validation.Validate
+        { chain_id;
+          block_header;
+          predecessor_block_header;
+          operations;
+          max_operations_ttl } ->
+        let validate : unit Lwt.t =
+          lwt_emit (Validation_request block_header)
+          >>= fun () ->
+          Error_monad.protect (fun () ->
+              let pred_context_hash = predecessor_block_header.shell.context in
+              Context.checkout context_index pred_context_hash
+              >>= function
+              | Some context ->
+                  return context
+              | None ->
+                  fail
+                    (Block_validator_errors.Failed_to_checkout_context
+                       pred_context_hash))
+          >>=? (fun predecessor_context ->
+                 Context.get_protocol predecessor_context
+                 >>= fun protocol_hash ->
+                 load_protocol protocol_hash protocol_root
+                 >>=? fun () ->
+                 let env =
+                   {
+                     Block_validation.chain_id;
+                     user_activated_upgrades;
+                     user_activated_protocol_overrides;
+                     max_operations_ttl;
+                     predecessor_block_header;
+                     predecessor_context;
+                   }
+                 in
+                 Block_validation.apply env block_header operations
+                 >>= function
+                 | Error
+                     [Block_validator_errors.Unavailable_protocol {protocol; _}]
+                   as err -> (
+                     (* If `next_protocol` is missing, try to load it *)
+                     load_protocol protocol protocol_root
+                     >>= function
+                     | Error _ ->
+                         Lwt.return err
+                     | Ok () ->
+                         Block_validation.apply env block_header operations )
+                 | result ->
+                     Lwt.return result)
+          >>= fun res ->
+          External_validation.send
+            output
+            (Error_monad.result_encoding Block_validation.result_encoding)
+            res
+        in
+        validate >>= loop
+    | External_validation.Fork_test_chain {context_hash; forked_header} ->
+        let fork_test_chain : unit Lwt.t =
+          lwt_emit (Fork_test_chain_request forked_header)
+          >>= fun () ->
+          Context.checkout context_index context_hash
+          >>= function
+          | Some ctxt ->
+              Block_validation.init_test_chain ctxt forked_header
+              >>= (function
+                    | Error
+                        [Block_validator_errors.Missing_test_protocol protocol]
+                      ->
+                        load_protocol protocol protocol_root
+                        >>=? fun () ->
+                        Block_validation.init_test_chain ctxt forked_header
+                    | result ->
+                        Lwt.return result)
+              >>= fun result ->
+              External_validation.send
+                output
+                (Error_monad.result_encoding Block_header.encoding)
+                result
+          | None ->
               External_validation.send
                 output
                 (Error_monad.result_encoding Data_encoding.empty)
-                (Ok ())
-              >>= return
-          | External_validation.Commit_genesis {chain_id} ->
-              lwt_emit (Commit_genesis_request genesis.block)
-              >>= fun () ->
-              Error_monad.protect (fun () ->
-                  Context.commit_genesis
-                    context_index
-                    ~chain_id
-                    ~time:genesis.time
-                    ~protocol:genesis.protocol
-                  >>= fun commit -> return commit)
-              >>=? fun commit ->
-              External_validation.send
-                output
-                (Error_monad.result_encoding Context_hash.encoding)
-                commit
-              >>= return
-          | External_validation.Restore_context_integrity ->
-              let res = Context.restore_integrity context_index in
-              External_validation.send
-                output
-                (Error_monad.result_encoding Data_encoding.(option int31))
-                res
-              >>= return
-          | External_validation.Validate
-              { chain_id;
-                block_header;
-                predecessor_block_header;
-                operations;
-                max_operations_ttl } ->
-              lwt_emit (Validation_request block_header)
-              >>= fun () ->
-              Error_monad.protect (fun () ->
-                  let pred_context_hash =
-                    predecessor_block_header.shell.context
-                  in
-                  Context.checkout context_index pred_context_hash
-                  >>= function
-                  | Some context ->
-                      return context
-                  | None ->
-                      fail
-                        (Block_validator_errors.Failed_to_checkout_context
-                           pred_context_hash))
-              >>=? (fun predecessor_context ->
-                     Context.get_protocol predecessor_context
-                     >>= fun protocol_hash ->
-                     load_protocol protocol_hash protocol_root
-                     >>=? fun () ->
-                     let env =
-                       {
-                         Block_validation.chain_id;
-                         user_activated_upgrades;
-                         user_activated_protocol_overrides;
-                         max_operations_ttl;
-                         predecessor_block_header;
-                         predecessor_context;
-                       }
-                     in
-                     Block_validation.apply env block_header operations
-                     >>= function
-                     | Error
-                         [ Block_validator_errors.Unavailable_protocol
-                             {protocol; _} ] as err -> (
-                         (* If `next_protocol` is missing, try to load it *)
-                         load_protocol protocol protocol_root
-                         >>= function
-                         | Error _ ->
-                             Lwt.return err
-                         | Ok () ->
-                             Block_validation.apply env block_header operations
-                         )
-                     | result ->
-                         Lwt.return result)
-              >>= fun res ->
-              External_validation.send
-                output
-                (Error_monad.result_encoding Block_validation.result_encoding)
-                res
-              >>= return
-          | External_validation.Fork_test_chain {context_hash; forked_header}
-            ->
-              lwt_emit (Fork_test_chain_request forked_header)
-              >>= (fun () ->
-                    Context.checkout context_index context_hash
-                    >>= function
-                    | Some ctxt ->
-                        Block_validation.init_test_chain ctxt forked_header
-                        >>= (function
-                              | Error
-                                  [ Block_validator_errors.Missing_test_protocol
-                                      protocol ] ->
-                                  load_protocol protocol protocol_root
-                                  >>=? fun () ->
-                                  Block_validation.init_test_chain
-                                    ctxt
-                                    forked_header
-                              | result ->
-                                  Lwt.return result)
-                        >>= fun result ->
-                        External_validation.send
-                          output
-                          (Error_monad.result_encoding Block_header.encoding)
-                          result
-                    | None ->
-                        External_validation.send
-                          output
-                          (Error_monad.result_encoding Data_encoding.empty)
-                          (error
-                             (Block_validator_errors.Failed_to_checkout_context
-                                context_hash)))
-              >>= return
-          | External_validation.Terminate ->
-              Lwt_io.flush_all ()
-              >>= fun () -> lwt_emit Termination_request >>= fun () -> exit 0)
-    >>=? loop
+                (error
+                   (Block_validator_errors.Failed_to_checkout_context
+                      context_hash))
+        in
+        fork_test_chain >>= loop
+    | External_validation.Terminate ->
+        Lwt_io.flush_all ()
+        >>= fun () -> lwt_emit Termination_request >>= fun () -> exit 0
   in
   loop ()
 
