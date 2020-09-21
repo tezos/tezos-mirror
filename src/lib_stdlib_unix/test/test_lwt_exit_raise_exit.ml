@@ -33,7 +33,7 @@ let () =
          >>= fun () ->
          raise Exit >>= fun () -> Tezos_stdlib.Lwt_utils.never_ending () )
   with
-  | Error 2 ->
+  | Error 32 ->
       ()
   | Error _ | Ok () ->
       assert false

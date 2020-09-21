@@ -61,8 +61,8 @@ let child_main ?double_signal_safety ?max_clean_up_time () =
      | Ok () ->
          Lwt.return 3
      | Error code ->
-         if code = 1 then Lwt.return !r
-         else if code = 1 lor 128 then Lwt.return (!r lor 128)
+         if code = 64 then Lwt.return !r
+         else if code = 64 lor 128 then Lwt.return (!r lor 128)
          else Lwt.return code )
 
 let main () =
@@ -152,7 +152,7 @@ let main () =
                      >|= fun (_, status) ->
                      Lwt.cancel s ;
                      match status with
-                     | WEXITED 1 ->
+                     | WEXITED s when s = 64 lor 128 ->
                          ()
                      | WEXITED _ ->
                          assert false
@@ -178,7 +178,7 @@ let main () =
                          >|= fun (_, status) ->
                          Lwt.cancel s ;
                          match status with
-                         | WEXITED 1 ->
+                         | WEXITED s when s = 64 lor 128 ->
                              ()
                          | WEXITED _ ->
                              assert false
@@ -201,7 +201,7 @@ let main () =
                              >|= fun (_, status) ->
                              Lwt.cancel s ;
                              match status with
-                             | WEXITED 1 ->
+                             | WEXITED s when s = 64 lor 128 ->
                                  ()
                              | WEXITED _ ->
                                  assert false
