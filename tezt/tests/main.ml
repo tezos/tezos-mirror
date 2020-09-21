@@ -24,6 +24,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Testing
+   -------
+   Component: many
+   Invocation: make tezt
+   Subject: This file is the entrypoint of all Tezt tests. It dispatches to
+            other files.
+ *)
+
 (* This module runs the tests implemented in all other modules of this directory.
    Each module defines tests which are thematically related,
    as functions to be called here. *)

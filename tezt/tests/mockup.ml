@@ -23,15 +23,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Tests of the client's mockup mode. To execute them individually, run:
-
-    dune exec tezt/tests/main.exe -- --file mockup.ml
-
-    These tests are not exhaustive by any means, most tests of the mockup
-    are written with the python framework for now. It was important, though,
-    to provide the mockup's API in tezt; for other tests that use the mockup.
+(* Testing
+   -------
+   Component: mockup mode
+   Invocation: dune exec tezt/tests/main.exe -- --file mockup.ml
+   Subject: Unexhaustive tests of the client's --mode mockup. Unexhaustive,
+            because most tests of the mockup are written with the python
+            framework for now. It was important, though, to provide the
+            mockup's API in tezt; for other tests that use the mockup.
   *)
 
+(* Test.
+   Call `tezos-client rpc list` and check that return code is 0.
+ *)
 let test_rpc_list protocol =
   Test.run
     ~__FILE__
@@ -63,6 +67,9 @@ let test_balances_after_transfer giver amount receiver =
     "Balance of receiver after transfer is valid: %f"
     receiver_balance_after
 
+(* Test.
+   Transfer some tz and check balance changes are as expected.
+ *)
 let test_transfer ~(protocol : Constant.protocol) =
   Test.run
     ~__FILE__
