@@ -294,6 +294,8 @@ let cost_of_instr : type b a. (b, a) descr -> b -> Gas.cost =
       Interp_costs.map_get v map
   | (Map_update, (k, (_, (map, _)))) ->
       Interp_costs.map_update k map
+  | (Map_get_and_update, (k, (_, (map, _)))) ->
+      Interp_costs.map_get_and_update k map
   | (Map_size, _) ->
       Interp_costs.map_size
   | (Empty_big_map _, _) ->
@@ -304,6 +306,8 @@ let cost_of_instr : type b a. (b, a) descr -> b -> Gas.cost =
       Interp_costs.map_get key map.diff
   | (Big_map_update, (key, (_, (map, _)))) ->
       Interp_costs.map_update key map.diff
+  | (Big_map_get_and_update, (key, (_, (map, _)))) ->
+      Interp_costs.map_get_and_update key map.diff
   | (Add_seconds_to_timestamp, (n, (t, _))) ->
       Interp_costs.add_seconds_timestamp n t
   | (Add_timestamp_to_seconds, (t, (n, _))) ->
@@ -722,6 +726,10 @@ let rec step_bounded :
       logged_return ((map_get v map, rest), ctxt)
   | (Map_update, (k, (v, (map, rest)))) ->
       logged_return ((map_update k v map, rest), ctxt)
+  | (Map_get_and_update, (k, (v, (map, rest)))) ->
+      let map' = map_update k v map in
+      let v' = map_get k map in
+      logged_return ((v', (map', rest)), ctxt)
   | (Map_size, (map, rest)) ->
       logged_return ((map_size map, rest), ctxt)
   (* Big map operations *)
@@ -736,6 +744,10 @@ let rec step_bounded :
   | (Big_map_update, (key, (maybe_value, (map, rest)))) ->
       let big_map = Script_ir_translator.big_map_update key maybe_value map in
       logged_return ((big_map, rest), ctxt)
+  | (Big_map_get_and_update, (k, (v, (map, rest)))) ->
+      let map' = Script_ir_translator.big_map_update k v map in
+      Script_ir_translator.big_map_get ctxt k map
+      >>=? fun (v', ctxt) -> logged_return ((v', (map', rest)), ctxt)
   (* timestamp operations *)
   | (Add_seconds_to_timestamp, (n, (t, rest))) ->
       let result = Script_timestamp.add_delta t n in

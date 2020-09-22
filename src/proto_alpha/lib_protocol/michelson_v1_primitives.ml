@@ -80,6 +80,7 @@ type prim =
   | I_FAILWITH
   | I_GE
   | I_GET
+  | I_GET_AND_UPDATE
   | I_GT
   | I_HASH_KEY
   | I_IF
@@ -230,6 +231,7 @@ let namespace = function
   | I_FAILWITH
   | I_GE
   | I_GET
+  | I_GET_AND_UPDATE
   | I_GT
   | I_HASH_KEY
   | I_IF
@@ -433,6 +435,8 @@ let string_of_prim = function
       "GE"
   | I_GET ->
       "GET"
+  | I_GET_AND_UPDATE ->
+      "GET_AND_UPDATE"
   | I_GT ->
       "GT"
   | I_HASH_KEY ->
@@ -715,6 +719,8 @@ let prim_of_string = function
       ok I_GE
   | "GET" ->
       ok I_GET
+  | "GET_AND_UPDATE" ->
+      ok I_GET_AND_UPDATE
   | "GT" ->
       ok I_GT
   | "HASH_KEY" ->
@@ -1104,7 +1110,8 @@ let prim_encoding =
          ("TICKET", I_TICKET);
          ("READ_TICKET", I_READ_TICKET);
          ("SPLIT_TICKET", I_SPLIT_TICKET);
-         ("JOIN_TICKETS", I_JOIN_TICKETS)
+         ("JOIN_TICKETS", I_JOIN_TICKETS);
+         ("GET_AND_UPDATE", I_GET_AND_UPDATE)
          (* New instructions must be added here, for backward compatibility of the encoding. *)
          (* Keep the comment above at the end of the list *)
         ]

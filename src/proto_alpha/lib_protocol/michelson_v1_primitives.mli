@@ -79,6 +79,7 @@ type prim =
   | I_FAILWITH
   | I_GE
   | I_GET
+  | I_GET_AND_UPDATE
   | I_GT
   | I_HASH_KEY
   | I_IF

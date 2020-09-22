@@ -254,6 +254,10 @@ and ('bef, 'aft) instr =
   | Map_get : ('a * (('a, 'v) map * 'rest), 'v option * 'rest) instr
   | Map_update
       : ('a * ('v option * (('a, 'v) map * 'rest)), ('a, 'v) map * 'rest) instr
+  | Map_get_and_update
+      : ( 'a * ('v option * (('a, 'v) map * 'rest)),
+          'v option * (('a, 'v) map * 'rest) )
+        instr
   | Map_size : (('a, 'b) map * 'rest, n num * 'rest) instr
   (* big maps *)
   | Empty_big_map :
@@ -264,6 +268,10 @@ and ('bef, 'aft) instr =
   | Big_map_update
       : ( 'key * ('value option * (('key, 'value) big_map * 'rest)),
           ('key, 'value) big_map * 'rest )
+        instr
+  | Big_map_get_and_update
+      : ( 'a * ('v option * (('a, 'v) big_map * 'rest)),
+          'v option * (('a, 'v) big_map * 'rest) )
         instr
   (* string operations *)
   | Concat_string : (string boxed_list * 'rest, string * 'rest) instr

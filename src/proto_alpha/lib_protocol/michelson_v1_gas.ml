@@ -811,6 +811,10 @@ module Cost_of = struct
       let elt_size = size_of_comparable Box.key_ty elt in
       atomic_step_cost (cost_N_Map_update elt_size (snd Box.boxed))
 
+    let map_get_and_update (type k v) (elt : k)
+        (m : (k, v) Script_typed_ir.map) =
+      map_get elt m +@ map_update elt m
+
     let map_size = atomic_step_cost cost_N_Map_size
 
     let add_seconds_timestamp :
