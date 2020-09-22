@@ -381,6 +381,24 @@ class TestContractOpcodes:
             Elt "2" "two" })',
              '"1"', '(Pair (Some "one") { Elt "1" "one" ; Elt "2" "two" })'),
 
+            # Get and update the value stored at the given key in the map
+            ('get_and_update_map.tz', '(Pair None {})',
+             '"hello"', '(Pair None {})'),
+            ('get_and_update_map.tz', '(Pair (Some 4) {})',
+             '"hello"', '(Pair None { Elt "hello" 4 })'),
+            ('get_and_update_map.tz', '(Pair None { Elt "hello" 4 })',
+             '"hello"', '(Pair (Some 4) {})'),
+            ('get_and_update_map.tz', '(Pair (Some 5) { Elt "hello" 4 })',
+             '"hello"', '(Pair (Some 4) { Elt "hello" 5 })'),
+            ('get_and_update_map.tz', '(Pair (Some 5) { Elt "hello" 4 })',
+             '"hi"', '(Pair None { Elt "hello" 4 ; Elt "hi" 5 })'),
+            ('get_and_update_map.tz', '(Pair None { Elt "1" 1 ; \
+            Elt "2" 2 })',
+             '"1"', '(Pair (Some 1) { Elt "2" 2 })'),
+            ('get_and_update_map.tz', '(Pair None { Elt "1" 1 ; \
+            Elt "2" 2 })',
+             '"1"', '(Pair (Some 1) { Elt "2" 2 })'),
+
             # Map iter
             ('map_iter.tz', '(Pair 0 0)', '{ Elt 0 100 ; Elt 2 100 }',
              '(Pair 2 200)'),
@@ -756,7 +774,45 @@ class TestContractOpcodes:
              '{ Elt "1" (Some "two") }', '(Pair 0 Unit)',
              [["New map(0) of type (big_map string string)"],
               ['Set map(0)["1"] to "two"'],
-              ['Set map(0)["2"] to "two"']])
+              ['Set map(0)["2"] to "two"']]),
+
+            # test the GET_AND_UPDATE instruction on big maps
+            # Get and update the value stored at the given key in the map
+            ('get_and_update_big_map.tz', '(Pair None {})',
+             '"hello"', '(Pair None 0)',
+             [["New map(0) of type (big_map string nat)"],
+              ['Unset map(0)["hello"]']]),
+            ('get_and_update_big_map.tz', '(Pair (Some 4) {})',
+             '"hello"', '(Pair None 0)',
+             [["New map(0) of type (big_map string nat)"],
+              ['Set map(0)["hello"] to 4']]),
+            ('get_and_update_big_map.tz', '(Pair None { Elt "hello" 4 })',
+             '"hello"', '(Pair (Some 4) 0)',
+             [["New map(0) of type (big_map string nat)"],
+              ['Unset map(0)["hello"]']]),
+            ('get_and_update_big_map.tz', '(Pair (Some 5) { Elt "hello" 4 })',
+             '"hello"', '(Pair (Some 4) 0)',
+             [["New map(0) of type (big_map string nat)"],
+              ['Set map(0)["hello"] to 5']]),
+            ('get_and_update_big_map.tz', '(Pair (Some 5) { Elt "hello" 4 })',
+             '"hi"', '(Pair None 0)',
+             [["New map(0) of type (big_map string nat)"],
+              ['Set map(0)["hello"] to 4'],
+              ['Set map(0)["hi"] to 5']]),
+            ('get_and_update_big_map.tz', '(Pair None { Elt "1" 1 ; \
+            Elt "2" 2 })',
+             '"1"', '(Pair (Some 1) 0)',
+             [["New map(0) of type (big_map string nat)"],
+              ['Unset map(0)["1"]'],
+              ['Set map(0)["2"] to 2']]),
+            ('get_and_update_big_map.tz', '(Pair None { Elt "1" 1 ; \
+            Elt "2" 2 })',
+             '"1"', '(Pair (Some 1) 0)',
+             [["New map(0) of type (big_map string nat)"],
+              ['Unset map(0)["1"]'],
+              ['Set map(0)["2"] to 2']]),
+
+
         ])
     def test__big_map_contract_io(self,
                                   client_regtest: ClientRegression,
