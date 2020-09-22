@@ -25,7 +25,20 @@
 
 open Lwt.Infix
 
-module Make (Encoding : Resto.ENCODING) (Client : Cohttp_lwt.S.Client) = struct
+module type CALL = sig
+  val call :
+    ?headers:Cohttp.Header.t ->
+    ?body:Cohttp_lwt.Body.t ->
+    Cohttp.Code.meth ->
+    Uri.t ->
+    (Cohttp.Response.t * Cohttp_lwt.Body.t) Lwt.t
+end
+
+module OfCohttp (Client : Cohttp_lwt.S.Client) : CALL = struct
+  let call ?headers ?body meth uri = Client.call ?headers ?body meth uri
+end
+
+module Make (Encoding : Resto.ENCODING) (Call : CALL) = struct
   open Cohttp
   module Media_type = Media_type.Make (Encoding)
   module Service = Resto.MakeService (Encoding)
@@ -220,7 +233,7 @@ module Make (Encoding : Resto.ENCODING) (Client : Cohttp_lwt.S.Client) = struct
     in
     Lwt.catch
       (fun () ->
-        Client.call ~headers (meth :> Code.meth) ~body uri
+        Call.call ~headers (meth :> Code.meth) ~body uri
         >>= fun (response, ansbody) ->
         let headers = Response.headers response in
         let media_name =

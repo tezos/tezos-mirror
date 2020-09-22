@@ -13,11 +13,13 @@ build-and-test:
     - opam pin --no-action resto-cohttp-client.dev .
     - opam pin --no-action resto-cohttp.dev .
     - opam pin --no-action resto-cohttp-server.dev .
+    - opam pin --no-action resto-cohttp-local-client.dev .
     - opam pin --no-action resto-directory.dev .
     - opam pin --no-action resto-json.dev .
     - opam pin --no-action resto.dev .
     - opam depext ezresto-directory ezresto resto-acl resto-cohttp-client \
-      resto-cohttp resto-cohttp-server resto-directory resto-json resto
+      resto-cohttp resto-cohttp-server resto-cohttp-local-client \
+      resto-directory resto-json resto
     - opam install --deps-only .
     - opam install --deps-only --with-test .
     - dune build
@@ -39,11 +41,13 @@ pages:
     - opam pin --no-action resto-cohttp-client.dev .
     - opam pin --no-action resto-cohttp.dev .
     - opam pin --no-action resto-cohttp-server.dev .
+    - opam pin --no-action resto-cohttp-local-client.dev .
     - opam pin --no-action resto-directory.dev .
     - opam pin --no-action resto-json.dev .
     - opam pin --no-action resto.dev .
     - opam depext ezresto-directory ezresto resto-acl resto-cohttp-client \
-      resto-cohttp resto-cohttp-server resto-directory resto-json resto
+      resto-cohttp resto-cohttp-server resto-cohttp-local-client \
+      resto-directory resto-json resto
     - opam install --deps-only .
     - opam install odoc
     - dune build @doc

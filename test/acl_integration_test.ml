@@ -125,7 +125,9 @@ let uri = "http://localhost:8000"
 
 let child expect_foo_bar expect_foo_blah expect_bwraf =
   let module Client =
-    Resto_cohttp_client.Client.Make (Encoding) (Cohttp_lwt_unix.Client)
+    Resto_cohttp_client.Client.Make
+      (Encoding)
+      (Resto_cohttp_client.Client.OfCohttp (Cohttp_lwt_unix.Client))
   in
   let logger = Client.full_logger Format.err_formatter in
   let base = Uri.of_string uri in

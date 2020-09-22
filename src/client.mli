@@ -10,6 +10,21 @@
 
 (** Client calls to services. *)
 
+(** The minimal interface for building a client. [Cohttp_lwt.S.Client]
+    is an instance of this signature, modulo some additional
+    optional parameters that resto does not use. See {!OfCohttp} below
+    to obtain an exact intance based on [Cohttp_lwt.S.Client]. *)
+module type CALL = sig
+  val call :
+    ?headers:Cohttp.Header.t ->
+    ?body:Cohttp_lwt.Body.t ->
+    Cohttp.Code.meth ->
+    Uri.t ->
+    (Cohttp.Response.t * Cohttp_lwt.Body.t) Lwt.t
+end
+
+module OfCohttp (Client : Cohttp_lwt.S.Client) : CALL
+
 (** [Make(Encoding)(Client)] is a module that allows you to make calls to
     various [Resto] (or [EzResto]) services.
 
@@ -17,7 +32,7 @@
     services which are automatically encoded according to [Encoding], the answer
     is automatically decoded according to [Encoding]. The scheduling (waiting on
     answers, etc.) is provided by [Client]. *)
-module Make (Encoding : Resto.ENCODING) (Client : Cohttp_lwt.S.Client) : sig
+module Make (Encoding : Resto.ENCODING) (Call : CALL) : sig
   module Service : module type of struct
     include Resto.MakeService (Encoding)
   end
