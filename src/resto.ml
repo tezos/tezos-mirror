@@ -29,10 +29,10 @@ end
 
 let bool_of_string s =
   match String.lowercase_ascii s with
+  | "" | "true" | "t" | "yes" | "y" ->
+      Ok true
   | "false" | "f" | "no" | "n" ->
       Ok false
-  | "true" | "t" | "yes" | "y" ->
-      Ok true
   | _ ->
       Error "Cannot parse boolean value"
 
