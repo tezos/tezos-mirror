@@ -5,6 +5,7 @@ persistent mockup environment. These can be placed here.
 """
 import json
 import os
+import subprocess
 import tempfile
 from typing import List, Optional
 import pytest
@@ -251,3 +252,31 @@ class TestConfigShow:
             for in_file in [in_file1, in_file2]:
                 if in_file is not None:
                     os.remove(in_file)
+
+
+@pytest.mark.client
+class TestConfigValid:
+    """ Tests of validity of tezos-client config """
+    def test_config_node_port(self, nodeless_client: Client):
+        """
+            Tests that calling `config show` works, with a valid node port
+        """
+        self._run_config_show_with_node_port(nodeless_client, 8732)
+        self._run_config_show_with_node_port(nodeless_client, 58732)
+        pytest.raises(subprocess.CalledProcessError, self._run_config_show_with_node_port, nodeless_client, 158732)
+        pytest.raises(subprocess.CalledProcessError, self._run_config_show_with_node_port, nodeless_client, -8732)
+
+    def _run_config_show_with_node_port(self, nodeless_client: Client,
+                                        port: int):
+        try:
+            tmp_file = tempfile.mktemp(prefix='tezos-client.config_file')
+            config_dict = {
+                "node_port": port
+            }
+            _write_config_file(nodeless_client, tmp_file, config_dict)
+
+            cmd = _with_config_file_cmd(tmp_file, ["config", "show"])
+            nodeless_client.run(cmd)
+        finally:
+            if tmp_file is not None:
+                os.remove(tmp_file)
