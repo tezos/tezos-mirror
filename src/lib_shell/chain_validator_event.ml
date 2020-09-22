@@ -41,7 +41,7 @@ let prevalidator_filter_not_found =
     ~section
     ~name:"prevalidator_filter_not_found"
     ~msg:"no prevalidator filter found for protocol {protocol_hash}"
-    ~level:Notice
+    ~level:Warning
     ("protocol_hash", Protocol_hash.encoding)
 
 let prevalidator_reinstantiation_failure =
