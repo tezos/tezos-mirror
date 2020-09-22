@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:    Shell (state)
+    Invocation:   dune exec src/lib_shell/test/test.exe test "state"
+    Subject:      On states.
+*)
+
 module Proto = Shell_test_helpers.Genesis_proto
 
 let incr_fitness fitness =
@@ -230,6 +237,7 @@ let wrap_state_init f base_dir =
   >>=? fun (state, chain, _index, _history_mode) ->
   build_example_tree chain >>= fun vblock -> f {state; chain; vblock}
 
+(** Initializes the store. *)
 let test_init (_ : state) = return_unit
 
 (** State.Block.read *)
@@ -434,6 +442,8 @@ let rec compare_path p1 p2 =
   | _ ->
       false
 
+(** Various path traversal checks on [chain_store] (using
+    [Store.Chain_traversal.path]). *)
 let test_path (s : state) =
   let check_path h1 h2 p2 =
     Chain_traversal.path (vblock s h1) (vblock s h2)
@@ -459,8 +469,8 @@ let test_path (s : state) =
 
 (****************************************************************************)
 
-(** Chain_traversal.common_ancestor *)
-
+(** Checks that two blocks admits some same ancestor (using
+    [Store.Chain_traversal.common_ancestor]). *)
 let test_ancestor s =
   let check_ancestor h1 h2 expected =
     Chain_traversal.common_ancestor (vblock s h1) (vblock s h2)
@@ -508,8 +518,8 @@ let seed =
   in
   {Block_locator.receiver_id; sender_id}
 
-(** Chain_traversal.block_locator *)
-
+(** Checks that the locator of some block (i.e., a number of
+    predecessors) corresponds to an expected length and value. *)
 let test_locator s =
   let check_locator length h1 expected =
     State.compute_locator s.chain ~max_size:length (vblock s h1) seed
@@ -566,6 +576,8 @@ let compare s name heads l =
       then Assert.fail_msg "missing block in known_heads (%s: %s)" name bname)
     l
 
+(** Asserts that the initial chain heads of the example chain are A8
+    and B8, (using [Store.Chain.known_heads]). *)
 let test_known_heads s =
   Chain.known_heads s.chain
   >>= fun heads ->
@@ -574,8 +586,9 @@ let test_known_heads s =
 
 (****************************************************************************)
 
-(** Chain.head/set_head *)
-
+(** First, verifies that the chain head is set to genesis. Then, sets
+    chain head to A6 then checks if head is A6 (using
+    [Chain.head/set_head]). *)
 let test_head s =
   Chain.head s.chain
   >>= fun head ->
@@ -599,8 +612,13 @@ let test_head s =
 
 (****************************************************************************)
 
-(** Chain.mem *)
+(** Checks whether some block belongs (or not) to the current mainchain
+    (using Store.Chain.is_in_chain).
 
+    Genesis - A1 - A2 - A3 - A4 - A5 - A6 - A7 - A8
+                             \
+                              B1 - B2 - B3 - B4 - B5 - B6 - B7 - B8
+*)
 let test_mem s =
   let mem s x = Chain.mem s.chain (State.Block.hash @@ vblock s x) in
   let test_mem s x =
@@ -685,8 +703,9 @@ let test_mem s =
 
 (****************************************************************************)
 
-(** Chain_traversal.new_blocks *)
-
+(** Asserts the expected common ancestor and path as obtained by
+    [Store.Chain_traversal.new_blocks] for a series of block pairs in
+    the example chain. *)
 let test_new_blocks s =
   let test s head h expected_ancestor expected =
     let to_block = vblock s head and from_block = vblock s h in

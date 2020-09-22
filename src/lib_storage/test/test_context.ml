@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Testing
+   -------
+   Component:    Storage
+   Invocation:   dune build @src/lib_storage/runtest
+   Subject:      On context features.
+*)
+
 open Context
 
 let ( >>= ) = Lwt.bind
@@ -121,6 +128,11 @@ let wrap_context_init f _ () =
 
 let c = function None -> None | Some s -> Some (Bytes.to_string s)
 
+(** Checkout the context applied until [block2]. It is asserted that
+    the following key-values are present:
+    - (["version"], ["0.0"])
+    - (["a"; "b"], ["Novembre"])
+    - (["a; "c""], ["Juin"]) *)
 let test_simple {idx; block2; _} =
   checkout idx block2
   >>= function
@@ -150,6 +162,13 @@ let test_list {idx; block2; _} =
       Assert.equal_string_list ~msg:__LOC__ ["b"; "c"] ls ;
       Lwt.return_unit
 
+(** Checkout the context applied until [block3a]. It is asserted that
+    the following key-values are present:
+    - (["version"], ["0.0"])
+    - (["a"; "c"], ["Juin"])
+    - (["a"; "d"], ["Mars"])
+    Additionally, the key ["a"; "b"] is associated with nothing as it
+    has been removed by block [block3a]. *)
 let test_continuation {idx; block3a; _} =
   checkout idx block3a
   >>= function
@@ -170,6 +189,13 @@ let test_continuation {idx; block3a; _} =
       Assert.equal_string_option ~msg:__LOC__ (Some "Mars") (c mars) ;
       Lwt.return_unit
 
+(** Checkout the context applied until [block3b]. It is asserted that
+    the following key-values are present:
+    - (["version"], ["0.0"])
+    - (["a"; "b"], ["Novembre"])
+    - (["a"; "d"], ["Février"])
+    Additionally, the key ["a"; "c"] is associated with nothing as it
+    has been removed by block [block3b]. *)
 let test_fork {idx; block3b; _} =
   checkout idx block3b
   >>= function
@@ -190,6 +216,8 @@ let test_fork {idx; block3b; _} =
       Assert.equal_string_option ~msg:__LOC__ (Some "Février") (c mars) ;
       Lwt.return_unit
 
+(** Checkout the context at [genesis] and explicitly replay
+    setting/getting key-values. *)
 let test_replay {idx; genesis; _} =
   checkout idx genesis
   >>= function
@@ -309,6 +337,8 @@ let test_fold_keys {idx; genesis; _} =
       Assert.equal_string_list_list ~msg:__LOC__ (List.map fst bindings) bs ;
       Lwt.return_unit
 
+(** Checkout the context at [genesis] and fold upon a context a series
+    of key settings. *)
 let test_fold {idx; genesis; _} =
   checkout idx genesis
   >>= function
@@ -497,6 +527,9 @@ let test_encoding {idx; genesis; _} =
         h ;
       Lwt.return ()
 
+(** Exports to a dump file the context reached at block [block2b].
+    After importing it, it is asserted that the context hash is
+    preserved. *)
 let test_dump {idx; block3b; _} =
   Lwt_utils_unix.with_tempdir "tezos_test_" (fun base_dir2 ->
       let dumpfile = base_dir2 // "dump" in

@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:    Shell
+    Invocation:   dune exec src/lib_shell/test/test_locator.exe test_locator
+    Subject:      Checks operations on locators.
+*)
+
 open Filename.Infix
 
 (** Basic blocks *)
@@ -319,10 +326,10 @@ let linear_predecessor_n (chain : State.Chain.t) (bh : Block_hash.t)
     in
     loop bh distance
 
-(* Tests that the linear predecessor defined above and the
-   exponential predecessor implemented in State.predecessor_n
-   return the same block and it is the block at the distance
-   requested *)
+(** Tests that the linear predecessor defined above and the exponential
+    predecessor implemented in State.predecessor_n return the same
+    block and it is the block at the distance requested
+*)
 let test_pred (base_dir : string) : unit tzresult Lwt.t =
   let size_chain = 1000 in
   init_chain base_dir
@@ -394,16 +401,17 @@ let compute_size_chain size_locator =
   let repeats = 10. in
   int_of_float (repeats *. (2. ** float (size_locator + 1)))
 
-(* test if the linear and exponential locator are the same and outputs
-   their timing.
-   Run the test with:
-   $ dune build @runbench_locator
-   Copy the output to a file timing.dat and plot it with:
-   $ generate_locator_plot.sh timing.dat
-*)
 (*
    chain 1 year   518k   covered by locator 150
    chain 2 months 86k    covered by locator 120
+*)
+
+(** Test if the linear and exponential locator are the same and outputs
+    their timing.
+    Run the test with:
+    $ dune build @runbench_locator
+    Copy the output to a file timing.dat and plot it with:
+    $ generate_locator_plot.sh timing.dat
 *)
 let test_locator base_dir =
   let size_chain = 80000 in
@@ -631,7 +639,7 @@ let tests =
   [ wrap "test pred" test_pred;
     wrap "test protocol locator" test_protocol_locator ]
 
-let bench = [wrap "test locator" test_locator]
+let bench = [wrap "locator" test_locator]
 
 let tests =
   try if Sys.argv.(1) = "--no-bench" then tests else tests @ bench

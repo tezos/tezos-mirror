@@ -23,7 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Setup mocks for testing shell, notably state and protocol validation *)
+(** Testing
+    -------
+    Component:    Shell
+    Invocation:   dune build @src/lib_shell/runtest
+    Subject:      Setup mocks for testing shell, notably state and protocol
+                  validation.
+*)
 
 open Filename.Infix
 
@@ -65,7 +71,7 @@ let genesis : Genesis.t =
 let chain_id = Chain_id.of_block_hash genesis_block_hash
 
 (** [init_chain base_dir] with working directory [base_dir] returns a new state
-   with a single genesis block *)
+    with a single genesis block *)
 let init_chain base_dir =
   let store_root = base_dir // "store" in
   let context_root = base_dir // "context" in

@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:    Shell (state checkpoint)
+    Invocation:   dune exec src/lib_shell/test/test.exe test "state checkpoint"
+    Subject:      On checkpoint handling through the state.
+*)
+
 open Filename.Infix
 
 (** Basic blocks *)
@@ -265,6 +272,9 @@ block and remove any concurrent branch
 does not prevent a future good block from correctly being reached
 - There are no bad quadratic behaviours *)
 
+(** Set the checkpoint at A1 using [Store.Chain.set_checkpoint]. Then
+    check that the chain's checkpoint is A1 using
+    [Store.Chain.checkpoint]. *)
 let test_basic_checkpoint s =
   let block = vblock s "A1" in
   let header = State.Block.header block in
@@ -288,9 +298,10 @@ let test_basic_checkpoint s =
                    B1 - B2 - B3 - B4 - B5
   *)
 
-(* State.Chain.acceptable_block:
-   will the block is compatible with the current checkpoint? *)
-
+(** Sets the checkpoint to A2 and the head to A1.
+    Then verifies that A2 is compatible with the checkpoint using
+    [Store.Chain.acceptable_block], which it should be since it is
+    the checkpoint. *)
 let test_acceptable_block s =
   let block = vblock s "A2" in
   let header = State.Block.header block in
@@ -314,9 +325,8 @@ let test_acceptable_block s =
                    B1 - B2 - B3 - B4 - B5
   *)
 
-(* State.Block.is_valid_for_checkpoint :
-   is the block still valid for a given checkpoint ? *)
-
+(** State.Block.is_valid_for_checkpoint:
+    Is the block still valid for a given checkpoint? *)
 let test_is_valid_checkpoint s =
   let block = vblock s "A2" in
   let header = State.Block.header block in
@@ -334,9 +344,8 @@ let test_is_valid_checkpoint s =
   >>= fun is_valid ->
   if is_valid then return_unit else Assert.fail_msg "invalid checkpoint"
 
-(* return a block with the best fitness amongst the known blocks which
-    are compatible with the given checkpoint *)
-
+(** Return a block with the best fitness amongst the known blocks
+    which are compatible with the given checkpoint. *)
 let test_best_know_head_for_checkpoint s =
   let block = vblock s "A2" in
   let checkpoint = State.Block.header block in

@@ -23,11 +23,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Unit tests for validator. Currently only tests that
-   events are emitted. *)
+(** Testing
+    -------
+    Component:    Shell (Validator)
+    Invocation:   dune exec src/lib_shell/test/test.exe test "validator"
+    Subject:      Unit tests for validator. Currently only tests that
+                  events are emitted.
+*)
 
 (** [init_validator f] setups a mock validator, a mock block validator and
- ** mock chain and passes it them to the test function [f]. *)
+    mock chain and passes it them to the test function [f]. *)
 let init_validator
     (f :
       Validator.t ->
@@ -75,8 +80,8 @@ let init_validator
       Lwt.return_unit
 
 (** [wrap f _switch] wraps a test function [f] by setting up a Mock_sink if
-   necessary, initializing a mock p2p network, an empty chain state and a
-   validator. It passes the validator to the test function [f] *)
+    necessary, initializing a mock p2p network, an empty chain state and a
+    validator. It passes the validator to the test function [f] *)
 let wrap f _switch () =
   Shell_test_helpers.with_empty_mock_sink (fun _ ->
       Lwt_utils_unix.with_tempdir "tezos_test_" (fun test_dir ->
@@ -84,8 +89,7 @@ let wrap f _switch () =
 
 (** Start tests *)
 
-(** [validator_events] tests that validator emits activation and shutdown
-   events. *)
+(** Checks that validator emits activation and shutdown events. *)
 let validator_events validator block_validator chain _switch () =
   (* activate validator and check that the corresponding event is emitted *)
   let open Shell_test_helpers in

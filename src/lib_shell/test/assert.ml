@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Provides basic constructs for assertions. *)
+
 let fail expected given msg =
   Format.kasprintf
     Stdlib.failwith

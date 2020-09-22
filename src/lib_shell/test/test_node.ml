@@ -23,8 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Unit tests for node. Currently only tests that
-   events are emitted. *)
+(** Testing
+    -------
+    Component:    Shell (Node)
+    Invocation:   dune exec src/lib_shell/test/test.exe test "node"
+    Dependencies: src/lib_shell/test/shell_test_helpers.ml
+    Subject:      Unit tests for node. Currently only tests that
+                  events are emitted.
+*)
 
 let section = Some (Internal_event.Section.make_sanitized ["node"])
 
@@ -136,6 +142,8 @@ let test_event msg (level1, section1, status1) (level2, section2, json2) =
            Data_encoding.Json.pp
            json2)
 
+(** Node creation in sandbox. Expects one event with status
+    [p2p_layer_disabled]. *)
 let node_sandbox_initialization_events sandbox_parameters config _switch () =
   Node.create
     ~sandboxed:true
@@ -165,6 +173,8 @@ let node_sandbox_initialization_events sandbox_parameters config _switch () =
   (* End tests *)
   Node.shutdown n
 
+(** Node creation. Expects two events with statuses
+    [bootstrapping] and [p2p_maintain_started]. *)
 let node_initialization_events _sandbox_parameters config _switch () =
   Node.create
     ~sandboxed:false

@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:    Shell (store)
+    Invocation:   dune exec src/lib_shell/test/test.exe test "store"
+    Subject:      On the store.
+*)
+
 open Store
 
 let ( >>= ) = Lwt.bind

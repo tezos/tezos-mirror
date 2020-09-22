@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:    Raw Store
+    Invocation:   dune build @src/lib_storage/runtest
+    Subject:      On (key, value) storage.
+*)
+
 open Raw_store
 
 let ( >>= ) = Lwt.bind
@@ -41,6 +48,11 @@ let wrap_store_init f _ () =
 let entries s k =
   fold s k ~init:[] ~f:(fun e acc -> Lwt.return (e :: acc)) >|= List.rev
 
+(** Stores various (key, value) associations from type [string list] to
+    [bytes]. Use function [entries] to filter out keys by prefix. Then,
+    assert that such lists contain the right keys with [`Key] or [`Dir]
+    for key prefixes.
+*)
 let test_fold st =
   store st ["a"; "b"] (Bytes.of_string "Novembre")
   >>= fun _ ->

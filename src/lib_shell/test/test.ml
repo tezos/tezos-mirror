@@ -24,6 +24,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:    Shell
+    Invocation:   dune build @src/lib_shell/runtest
+    Subject:      Entrypoint
+*)
+
 let () =
   Alcotest_lwt.run
     "tezos-shell"
