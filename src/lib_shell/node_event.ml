@@ -51,7 +51,7 @@ let store_protocol_already_included =
     ~section
     ~name:"store_protocol_already_included"
     ~msg:"protocol {protocol} is already in store: nothing to do"
-    ~level:Info
+    ~level:Debug
     ("protocol", Protocol_hash.encoding)
 
 let store_protocol_missing_files =
