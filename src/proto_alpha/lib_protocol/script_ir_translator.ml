@@ -285,11 +285,15 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int =
       0
   | Map_update ->
       0
+  | Map_get_and_update ->
+      0
   | Map_size ->
       0
   | Big_map_get ->
       0
   | Big_map_update ->
+      0
+  | Big_map_get_and_update ->
       0
   | Big_map_mem ->
       0
@@ -4187,6 +4191,29 @@ and parse_instr :
       parse_var_annot loc annot ~default:map_annot
       >>?= fun annot ->
       typed ctxt loc Map_update (Item_t (Map_t (ck, v, map_name), rest, annot))
+  | ( Prim (loc, I_GET_AND_UPDATE, [], annot),
+      Item_t
+        ( vk,
+          Item_t
+            ( Option_t (vv, vname),
+              Item_t (Map_t (ck, v, map_name), rest, map_annot),
+              v_annot ),
+          _ ) ) ->
+      let k = ty_of_comparable_ty ck in
+      check_item_ty ctxt vk k loc I_GET_AND_UPDATE 1 3
+      >>?= fun (Eq, _, ctxt) ->
+      check_item_ty ctxt vv v loc I_GET_AND_UPDATE 2 3
+      >>?= fun (Eq, v, ctxt) ->
+      parse_var_annot loc annot ~default:map_annot
+      >>?= fun annot ->
+      typed
+        ctxt
+        loc
+        Map_get_and_update
+        (Item_t
+           ( Option_t (vv, vname),
+             Item_t (Map_t (ck, v, map_name), rest, annot),
+             v_annot ))
   | (Prim (loc, I_SIZE, [], annot), Item_t (Map_t (_, _, _), rest, _)) ->
       parse_var_annot loc annot
       >>?= fun annot ->
@@ -4240,6 +4267,30 @@ and parse_instr :
         loc
         Big_map_update
         (Item_t (Big_map_t (map_key, map_value, map_name), rest, annot))
+  | ( Prim (loc, I_GET_AND_UPDATE, [], annot),
+      Item_t
+        ( vk,
+          Item_t
+            ( Option_t (vv, vname),
+              Item_t (Big_map_t (ck, v, map_name), rest, map_annot),
+              v_annot ),
+          _ ) ) ->
+      let k = ty_of_comparable_ty ck in
+      check_item_ty ctxt vk k loc I_GET_AND_UPDATE 1 3
+      >>?= fun (Eq, _, ctxt) ->
+      check_item_ty ctxt vv v loc I_GET_AND_UPDATE 2 3
+      >>?= fun (Eq, v, ctxt) ->
+      parse_var_annot loc annot ~default:map_annot
+      >>?= fun annot ->
+      typed
+        ctxt
+        loc
+        Big_map_get_and_update
+        (Item_t
+           ( Option_t (vv, vname),
+             Item_t (Big_map_t (ck, v, map_name), rest, annot),
+             v_annot ))
+  (* Sapling *)
   | (Prim (loc, I_SAPLING_EMPTY_STATE, [memo_size], annot), rest) ->
       parse_memo_size memo_size
       >>?= fun memo_size ->
@@ -4273,7 +4324,7 @@ and parse_instr :
                  None ),
              rest,
              stack_annot ))
-      (* control *)
+  (* control *)
   | (Seq (loc, []), stack) ->
       typed ctxt loc Nop stack
   | (Seq (loc, [single]), stack) -> (
@@ -5638,6 +5689,7 @@ and parse_instr :
              I_MAP;
              I_ITER;
              I_GET;
+             I_GET_AND_UPDATE;
              I_EXEC;
              I_FAILWITH;
              I_SIZE;
