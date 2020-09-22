@@ -288,7 +288,7 @@ class TestManager:
         new_balance = client.get_mutez_balance('manager')
         new_balance_bootstrap2 = client.get_mutez_balance('bootstrap2')
         new_balance_bootstrap3 = client.get_mutez_balance('bootstrap3')
-        fee_mutez = 2941+2845
+        fee_mutez = 810+714
         assert balance - amount_mutez_2 - amount_mutez_3 == new_balance
         assert (balance_bootstrap2 + amount_mutez_2 - fee_mutez
                 == new_balance_bootstrap2)
