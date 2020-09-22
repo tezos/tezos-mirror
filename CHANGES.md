@@ -30,6 +30,9 @@ here either.
 
 - Fixed all known cases where the node would not stop when interrupted with Ctrl+C.
 
+- Changed signal handling and exit codes for most binaries. The codes'
+  significance are detailed in [the user documentation](http://tezos.gitlab.io/user/various.html#tezos_binaries_signals_and_exit_codes).
+
 - The node's mempool relies on a new synchronisation heuristic. The
   node's behaviour, especially at startup, may differ slightly; log
   messages in particular are likely to be different. More information
