@@ -1420,6 +1420,32 @@ Operations on maps
     > UPDATE / x : Some y : { Elt k v ; <tl> } : S  =>  { Elt x y ; Elt k v ; <tl> } : S
         iff COMPARE / x : k : []  =>  -1 : []
 
+-  ``GET_AND_UPDATE``: A combination of the ``GET`` and ``UPDATE`` instructions.
+
+::
+
+    :: 'key : option 'val : map 'key 'val : 'S   ->   option 'val : map 'key 'val : 'S
+
+This instruction is similar to ``UPDATE`` but it also returns the
+value that was previously stored in the ``map`` at the same key as
+``GET`` would.
+
+::
+
+    > GET_AND_UPDATE / x : None : {} : S  =>  None : {} : S
+    > GET_AND_UPDATE / x : Some y : {} : S  =>  None : { Elt x y } : S
+    > GET_AND_UPDATE / x : opt_y : { Elt k v ; <tl> } : S  =>  opt_y' : { Elt k v ; <tl'> } : S
+        iff COMPARE / x : k : []  =>  1 : []
+	      where GET_AND_UPDATE / x : opt_y : { <tl> } : S  =>  opt_y' : { <tl'> } : S
+    > GET_AND_UPDATE / x : None : { Elt k v ; <tl> } : S  =>  Some v : { <tl> } : S
+        iff COMPARE / x : k : []  =>  0 : []
+    > GET_AND_UPDATE / x : Some y : { Elt k v ; <tl> } : S  =>  Some v : { Elt k y ; <tl> } : S
+        iff COMPARE / x : k : []  =>  0 : []
+    > GET_AND_UPDATE / x : None : { Elt k v ; <tl> } : S  =>  None : { Elt k v ; <tl> } : S
+        iff COMPARE / x : k : []  =>  -1 : []
+    > GET_AND_UPDATE / x : Some y : { Elt k v ; <tl> } : S  =>  None : { Elt x y ; Elt k v ; <tl> } : S
+        iff COMPARE / x : k : []  =>  -1 : []
+
 -  ``MAP body``: Apply the body expression to each element of a map. The
    body sequence has access to the stack.
 
@@ -1503,6 +1529,17 @@ deserialized on demand.
 ::
 
     :: 'key : option 'val : big_map 'key 'val : 'S   ->   big_map 'key 'val : 'S
+
+
+-  ``GET_AND_UPDATE``: A combination of the ``GET`` and ``UPDATE`` instructions.
+
+::
+
+    :: 'key : option 'val : big_map 'key 'val : 'S   ->   option 'val : big_map 'key 'val : 'S
+
+This instruction is similar to ``UPDATE`` but it also returns the
+value that was previously stored in the ``big_map`` at the same key as
+``GET`` would.
 
 
 Operations on optional values
