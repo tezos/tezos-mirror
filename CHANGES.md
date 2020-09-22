@@ -9,6 +9,8 @@ Only describe changes which affect users (bug fixes and new features),
 not refactorings or tests. Changes to the documentation do not need to be documented
 here either.
 
+- Fixed an issue which prevented using of ports higher than 32767 in tezos-client config file
+
 # Version 7.4
 
 - Added the Delphi protocol.
