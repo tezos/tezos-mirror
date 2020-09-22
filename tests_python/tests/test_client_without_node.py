@@ -263,8 +263,14 @@ class TestConfigValid:
         """
         self._run_config_show_with_node_port(nodeless_client, 8732)
         self._run_config_show_with_node_port(nodeless_client, 58732)
-        pytest.raises(subprocess.CalledProcessError, self._run_config_show_with_node_port, nodeless_client, 158732)
-        pytest.raises(subprocess.CalledProcessError, self._run_config_show_with_node_port, nodeless_client, -8732)
+        pytest.raises(subprocess.CalledProcessError,
+                      self._run_config_show_with_node_port,
+                      nodeless_client,
+                      158732)
+        pytest.raises(subprocess.CalledProcessError,
+                      self._run_config_show_with_node_port,
+                      nodeless_client,
+                      -8732)
 
     def test_config_web_port(self, nodeless_client: Client):
         """
@@ -272,11 +278,17 @@ class TestConfigValid:
         """
         self._run_config_show_with_web_port(nodeless_client, 8732)
         self._run_config_show_with_web_port(nodeless_client, 58732)
-        pytest.raises(subprocess.CalledProcessError, self._run_config_show_with_web_port, nodeless_client, 158732)
-        pytest.raises(subprocess.CalledProcessError, self._run_config_show_with_web_port, nodeless_client, -8732)
+        pytest.raises(subprocess.CalledProcessError,
+                      self._run_config_show_with_web_port,
+                      nodeless_client,
+                      158732)
+        pytest.raises(subprocess.CalledProcessError,
+                      self._run_config_show_with_web_port,
+                      nodeless_client,
+                      -8732)
 
     def _run_config_show_with_temp_config_file(self, nodeless_client: Client,
-                                        config_dict: dict):
+                                               config_dict: dict):
         try:
             tmp_file = tempfile.mktemp(prefix='tezos-client.config_file')
             _write_config_file(nodeless_client, tmp_file, config_dict)
@@ -285,18 +297,20 @@ class TestConfigValid:
             nodeless_client.run(cmd)
         finally:
             if tmp_file is not None:
-                os.remove(tmp_file)                             
+                os.remove(tmp_file)
 
     def _run_config_show_with_node_port(self, nodeless_client: Client,
                                         port: int):
         config_dict = {
             "node_port": port
         }
-        self._run_config_show_with_temp_config_file(nodeless_client, config_dict)
+        self._run_config_show_with_temp_config_file(nodeless_client,
+                                                    config_dict)
 
     def _run_config_show_with_web_port(self, nodeless_client: Client,
-                                        port: int):
+                                       port: int):
         config_dict = {
             "web_port": port
         }
-        self._run_config_show_with_temp_config_file(nodeless_client, config_dict)
+        self._run_config_show_with_temp_config_file(nodeless_client,
+                                                    config_dict)
