@@ -231,10 +231,10 @@ module Cfg_file = struct
       (obj9
          (req "base_dir" string)
          (opt "node_addr" string)
-         (opt "node_port" int16)
+         (opt "node_port" uint16)
          (opt "tls" bool)
          (opt "endpoint" RPC_encoding.uri_encoding)
-         (opt "web_port" int16)
+         (opt "web_port" uint16)
          (opt "remote_signer" RPC_encoding.uri_encoding)
          (opt "confirmations" int8)
          (opt "password_filename" string))
