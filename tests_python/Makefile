@@ -1,7 +1,29 @@
 TYPECHECK=poetry run mypy
-LINT=poetry run pylint
-LINT2=poetry run pycodestyle
-PACKAGES=daemons launchers client tools scripts tests_007 tests_alpha tests_alpha/multibranch examples codec
+
+# pylint does not support pyproject.toml configuration for now
+# It is configured by ./.pylint.rc
+PYLINT=poetry run pylint
+
+# pycodestyle does not support pyproject.toml configuration for now
+# https://github.com/PyCQA/pydocstyle/issues/447
+#
+# In pycodestyle we ignore the following additional errors w.r.t to defaults
+# (i.e. E121,E123,E126,E226,E24,E704,W503)
+# - E203 :: pycodestyle is wrong (https://github.com/psf/black/issues/315)
+#           and black takes care of it
+# - E231 :: same as E203
+#
+# Other error codes are detailed at https://www.flake8rules.com/
+PYCODESTYLE=poetry run pycodestyle
+PYCODESTYLE_OPTIONS=\
+	--ignore=E121,E123,E126,E226,E24,E704,W503,E203,E231 \
+	--max-line-length=80
+
+# black is configured in pyproject.toml
+BLACK=poetry run black
+
+SRCS?=daemons launchers client tools scripts tests_007 tests_alpha tests_alpha/multibranch examples codec
+
 LOG_DIR=tmp
 
 install-dependencies:
@@ -14,20 +36,36 @@ all:
 	mkdir -p $(LOG_DIR)
 	poetry run pytest --log-dir=tmp --tb=no
 
-lint_all: lint lint2
+lint: pylint pycodestyle lint_black
+
+# Analyses that we want to run as part of pre-commit hook. Target "black"
+# is not in there, because the hook needs finer control regarding git adding
+# formatted files.
+pre_commit_targets: lint typecheck
+
+fmt: black
 
 typecheck:
 	@echo "Typechecking with mypy version `poetry run mypy --version`"
-	$(TYPECHECK) $(PACKAGES)
+	$(TYPECHECK) $(SRCS)
 
-lint:
+# black options are set in pyproject.toml
+black:
+	@echo "Running black formatter"
+	$(BLACK) $(SRCS)
+
+lint_black:
+	@echo "Running black formatter as style checker"
+	$(BLACK) --check $(SRCS)
+
+pylint:
 	@echo "Linting with pylint, version:"
 	@poetry run pylint --version | sed 's/^/  /'
-	$(LINT) $(PACKAGES)
+	$(PYLINT) $(SRCS)
 
-lint2:
+pycodestyle:
 	@echo "Linting with pycodestyle version `poetry run pycodestyle --version` (`poetry run which pycodestyle`)"
-	$(LINT2) $(PACKAGES)
+	$(PYCODESTYLE) $(PYCODESTYLE_OPTIONS) $(SRCS)
 
 clean:
 	rm -rf tmp/*  __pycache__ *.pyc */__pycache__ */*.pyc .mypy_cache .pytest_cache .pytype

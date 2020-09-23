@@ -355,7 +355,7 @@ Adding a test
 - By imitation, choose an existing test that looks similar,
 - use the proper tags,
 - say briefly what the test is supposed to test in the class docstring,
-- *Run the linters* and typechecker `make lint_all`, and `make typecheck`
+- *Run the linters* and typechecker `make lint`, and `make typecheck`
   in `tests_python/`, or simple `make test-python-lint` from the Tezos home
   directory. Note that linting and typechecking are enforced by the CI
   in the build stage.

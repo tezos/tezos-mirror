@@ -1,4 +1,3 @@
-
 PACKAGES:=$(patsubst %.opam,%,$(notdir $(shell find src vendors -name \*.opam -print)))
 
 active_protocol_versions := $(shell cat active_protocol_versions)
@@ -199,11 +198,12 @@ check-linting:
 	@dune build @runtest_lint
 
 check-python-linting:
-	@make -C tests_python lint_all
+	@make -C tests_python lint
 
 .PHONY: fmt
 fmt:
 	@src/tooling/lint.sh --format --ignore src/tooling/test/test_not_well_formatted.ml src/tooling/test/test_not_well_formatted.mli tezt/lib/base.ml tezt/lib/base.mli
+	@make -C tests_python fmt
 
 .PHONY: build-deps
 build-deps:
