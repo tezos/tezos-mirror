@@ -162,14 +162,13 @@ module Event = struct
       ()
 
   let bye =
+    (* Note that "exit_code" may be negative in case of signals. *)
     declare_1
       ~section
       ~name:"bye"
       ~msg:"bye"
       ~level:Notice
       ("exit_code", Data_encoding.int31)
-
-  (* may be negative in case of signals *)
 end
 
 open Filename.Infix
