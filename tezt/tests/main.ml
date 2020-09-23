@@ -26,7 +26,7 @@
 
 (* Testing
    -------
-   Component: many
+   Component: All
    Invocation: make tezt
    Subject: This file is the entrypoint of all Tezt tests. It dispatches to
             other files.
