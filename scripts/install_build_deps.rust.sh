@@ -23,11 +23,19 @@ with rust $recommended_rust_version. Do this at your own peril."
   sleep 3
 fi
 
-if ! [[ "$(rustc --version | cut -d' ' -f2)" == *"$rust_version"* ]]; then
+if [ -x "$(command -v rustup)" ]; then
+  RUSTC="$(rustup which rustc)"
+  CARGO="$(rustup which cargo)"
+else
+  RUSTC="$(command -v rustc)"
+  CARGO="$(command -v cargo)"
+fi
+
+if ! [[ "$($RUSTC --version | cut -d' ' -f2)" == *"$rust_version"* ]]; then
     echo "\
-Wrong Rust version, use your package manager or rustup:
+Wrong Rust version, run the following command in your favorite shell:
 $ rustup toolchain install $rust_version
-$ rustup default $rust_version"
+$ rustup override set $rust_version"
     exit 1
 fi
 
@@ -60,7 +68,7 @@ git reset --hard "$opam_repository_tag"
 echo "Installing Rust dependencies in ${install_dir}"
 # this compilation option is important for the CI to avoid linking
 # statically musl, here is just for consistency
-RUSTFLAGS='-C target-feature=-crt-static' cargo build --release --manifest-path rust/Cargo.toml
+RUSTFLAGS='-C target-feature=-crt-static' $CARGO build --release --manifest-path rust/Cargo.toml
 cp rust/target/release/*.a "${install_dir}"
 # NB: Add the headers that bindings require while compiling the C stubs.
 echo "Installing headers in ${HEADER_DIR}"
