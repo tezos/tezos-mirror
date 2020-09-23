@@ -76,5 +76,17 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) : sig
       ?headers:Cohttp.Header.t ->
       medias ->
       (string * Media_type.t, [> `Not_acceptable]) Result.result
+
+    val handle_error :
+      medias ->
+      [< `Cannot_parse_body of string
+      | `Cannot_parse_path of string list * Resto.Arg.descr * string
+      | `Cannot_parse_query of string
+      | `Method_not_allowed of [< Resto.meth] list
+      | `Not_acceptable
+      | `Not_found
+      | `Not_implemented
+      | `Unsupported_media_type of 'a ] ->
+      Cohttp.Response.t * Cohttp_lwt.Body.t
   end
 end

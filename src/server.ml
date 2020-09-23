@@ -96,6 +96,70 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
               Error `Not_acceptable
           | Some media_type ->
               Ok media_type ) )
+
+    let handle_error medias
+        (error :
+          [< `Cannot_parse_body of string
+          | `Cannot_parse_path of string list * Resto.Arg.descr * string
+          | `Cannot_parse_query of string
+          | `Method_not_allowed of [< Resto.meth] list
+          | `Not_acceptable
+          | `Not_found
+          | `Not_implemented
+          | `Unsupported_media_type of 'a ]) :
+        Cohttp.Response.t * Cohttp_lwt.Body.t =
+      let open Resto.Arg in
+      match error with
+      | `Not_implemented ->
+          (Response.make ~status:`Not_implemented (), Cohttp_lwt.Body.empty)
+      | `Method_not_allowed methods ->
+          let headers = Header.init () in
+          let headers =
+            Header.add_multi
+              headers
+              "allow"
+              (List.map Resto.string_of_meth methods)
+          in
+          ( Response.make ~status:`Method_not_allowed ~headers (),
+            Cohttp_lwt.Body.empty )
+      | `Cannot_parse_path (context, arg, value) ->
+          let headers = Header.init () in
+          let headers = Header.add headers "content-type" "text/plain" in
+          ( Response.make ~status:`Bad_request ~headers (),
+            Format.kasprintf
+              Cohttp_lwt.Body.of_string
+              "Failed to parsed an argument in path. After \"%s\", the value \
+               \"%s\" is not acceptable for type \"%s\""
+              (String.concat "/" context)
+              value
+              arg.name )
+      | `Cannot_parse_body s ->
+          let headers = Header.init () in
+          let headers = Header.add headers "content-type" "text/plain" in
+          ( Response.make ~status:`Bad_request ~headers (),
+            Format.kasprintf
+              Cohttp_lwt.Body.of_string
+              "Failed to parse the request body: %s"
+              s )
+      | `Cannot_parse_query s ->
+          let headers = Header.init () in
+          let headers = Header.add headers "content-type" "text/plain" in
+          ( Response.make ~status:`Bad_request ~headers (),
+            Format.kasprintf
+              Cohttp_lwt.Body.of_string
+              "Failed to parse the query string: %s"
+              s )
+      | `Not_acceptable ->
+          let accepted_encoding =
+            Media_type.acceptable_encoding medias.media_types
+          in
+          ( Response.make ~status:`Not_acceptable (),
+            Cohttp_lwt.Body.of_string accepted_encoding )
+      | `Unsupported_media_type _ ->
+          ( Response.make ~status:`Unsupported_media_type (),
+            Cohttp_lwt.Body.empty )
+      | `Not_found ->
+          (Response.make ~status:`Not_found (), Cohttp_lwt.Body.empty)
   end
 
   type server = {
@@ -305,63 +369,8 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
     >>= function
     | Ok answer ->
         Lwt.return answer
-    | Error `Not_implemented ->
-        Lwt.return
-          (Response.make ~status:`Not_implemented (), Cohttp_lwt.Body.empty)
-    | Error (`Method_not_allowed methods) ->
-        let headers = Header.init () in
-        let headers =
-          Header.add_multi
-            headers
-            "allow"
-            (List.map Resto.string_of_meth methods)
-        in
-        Lwt.return
-          ( Response.make ~status:`Method_not_allowed ~headers (),
-            Cohttp_lwt.Body.empty )
-    | Error (`Cannot_parse_path (context, arg, value)) ->
-        let headers = Header.init () in
-        let headers = Header.add headers "content-type" "text/plain" in
-        Lwt.return
-          ( Response.make ~status:`Bad_request ~headers (),
-            Format.kasprintf
-              Cohttp_lwt.Body.of_string
-              "Failed to parsed an argument in path. After \"%s\", the value \
-               \"%s\" is not acceptable for type \"%s\""
-              (String.concat "/" context)
-              value
-              arg.name )
-    | Error (`Cannot_parse_body s) ->
-        let headers = Header.init () in
-        let headers = Header.add headers "content-type" "text/plain" in
-        Lwt.return
-          ( Response.make ~status:`Bad_request ~headers (),
-            Format.kasprintf
-              Cohttp_lwt.Body.of_string
-              "Failed to parse the request body: %s"
-              s )
-    | Error (`Cannot_parse_query s) ->
-        let headers = Header.init () in
-        let headers = Header.add headers "content-type" "text/plain" in
-        Lwt.return
-          ( Response.make ~status:`Bad_request ~headers (),
-            Format.kasprintf
-              Cohttp_lwt.Body.of_string
-              "Failed to parse the query string: %s"
-              s )
-    | Error `Not_acceptable ->
-        let accepted_encoding =
-          Media_type.acceptable_encoding server.medias.media_types
-        in
-        Lwt.return
-          ( Response.make ~status:`Not_acceptable (),
-            Cohttp_lwt.Body.of_string accepted_encoding )
-    | Error (`Unsupported_media_type _) ->
-        Lwt.return
-          ( Response.make ~status:`Unsupported_media_type (),
-            Cohttp_lwt.Body.empty )
-    | Error `Not_found ->
-        Lwt.return (Response.make ~status:`Not_found (), Cohttp_lwt.Body.empty)
+    | Error err ->
+        Lwt.return @@ Internal.handle_error server.medias err
 
   (* Promise a running RPC server. *)
 
