@@ -55,6 +55,26 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
   module Directory = Resto_directory.Make (Encoding)
   module Media_type = Media_type.Make (Encoding)
 
+  module Internal = struct
+    let output_content_media_type (default_media_type : string * Media_type.t)
+        ?headers (media_types : Media_type.t list) =
+      match headers with
+      | None ->
+          Ok default_media_type
+      | Some headers -> (
+        match Header.get headers "accept" with
+        | None ->
+            Ok default_media_type
+        | Some accepted -> (
+          match
+            Media_type.resolve_accept_header media_types (Some accepted)
+          with
+          | None ->
+              Error `Not_acceptable
+          | Some media_type ->
+              Ok media_type ) )
+  end
+
   type server = {
     root : unit Directory.directory;
     mutable streams : (unit -> unit) ConnectionMap.t;
@@ -84,6 +104,9 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
     in
     server.streams <- ConnectionMap.add con shutdown server.streams ;
     stream
+
+  let ( >>? ) v f =
+    match v with Ok x -> f x | Error err -> Lwt.return_error err
 
   let ( >>=? ) m f =
     m >>= function Ok x -> f x | Error err -> Lwt.return_error err
@@ -128,18 +151,11 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
           (Connection.to_string con)
           (Media_type.name input_media_type)
         >>= fun () ->
-        ( match Header.get req_headers "accept" with
-        | None ->
-            Lwt.return_ok server.default_media_type
-        | Some accepted -> (
-          match
-            Media_type.resolve_accept_header server.media_types (Some accepted)
-          with
-          | None ->
-              Lwt.return_error `Not_acceptable
-          | Some media_type ->
-              Lwt.return_ok media_type ) )
-        >>=? fun (output_content_type, output_media_type) ->
+        Internal.output_content_media_type
+          ~headers:req_headers
+          server.default_media_type
+          server.media_types
+        >>? fun (output_content_type, output_media_type) ->
         ( match
             Resto.Query.parse
               s.types.query

@@ -52,4 +52,12 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) : sig
 
   (** Kill an RPC server. *)
   val shutdown : server -> unit Lwt.t
+
+  module Internal : sig
+    val output_content_media_type :
+      string * Media_type.Make(Encoding).t ->
+      ?headers:Cohttp.Header.t ->
+      Media_type.Make(Encoding).t list ->
+      (string * Media_type.Make(Encoding).t, [> `Not_acceptable]) Result.result
+  end
 end
