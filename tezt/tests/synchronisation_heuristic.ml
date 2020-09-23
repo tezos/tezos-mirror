@@ -31,7 +31,7 @@ let wait_for_sync node =
     | None ->
         None
     | Some status ->
-        if status = "sync" then Some () else None
+        if status = "synced" then Some () else None
   in
   Node.wait_for node "node_chain_validator.v0" filter
 
@@ -46,7 +46,7 @@ let check_node_synchronization_state () =
   Test.run
     ~__FILE__
     ~title:"Check synchronization state"
-    ~tags:["bootstrap_heuristic"; "node"]
+    ~tags:["bootstrap"; "node"; "sync"]
   @@ fun () ->
   let* main_node = Node.init ~name:"main_node" () in
   let* nodes =
@@ -82,7 +82,7 @@ let check_node_synchronization_state () =
   let* _ =
     Lwt_list.iter_p (fun node -> Node.restart node) (main_node :: nodes)
   in
-  Log.info "Waiting for nodes to be synced." ;
+  Log.info "Waiting for nodes to be synchronized." ;
   let* () =
     Lwt_list.iter_p (fun node -> wait_for_sync node) (main_node :: nodes)
   in

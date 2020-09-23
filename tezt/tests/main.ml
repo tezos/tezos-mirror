@@ -39,6 +39,6 @@
 let () =
   Basic.run () ;
   Bootstrap.run () ;
-  Bootstrap_heuristic.run () ;
+  Synchronisation_heuristic.run () ;
   Encoding.run () ;
   Mockup.run ()

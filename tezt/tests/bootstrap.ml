@@ -115,9 +115,7 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
   (* Initialize nodes and client. *)
   let* node_1 =
     Node.init ~bootstrap_threshold:0 ~connections:1 ~history_mode:hmode1 ()
-  and* node_2 =
-    Node.init ~bootstrap_threshold:1 ~connections:1 ~history_mode:hmode2 ()
-  in
+  and* node_2 = Node.init ~connections:1 ~history_mode:hmode2 () in
   let* node2_identity = Node.wait_for_identity node_2 in
   let* client = Client.init ~node:node_1 () in
   (* Connect node 1 to node 2 and start baking. *)
