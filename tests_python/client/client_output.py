@@ -277,8 +277,8 @@ def extract_rpc_answer(client_output: str) -> dict:
     can be retrieved from the InvalidClientOutput exception"""
     try:
         return json.loads(client_output)
-    except json.JSONDecodeError:
-        raise InvalidClientOutput(client_output)
+    except json.JSONDecodeError as json_decode_error:
+        raise InvalidClientOutput(client_output) from json_decode_error
 
 
 def extract_balance(client_output: str) -> float:
@@ -289,8 +289,8 @@ def extract_balance(client_output: str) -> float:
         if match is None:
             raise InvalidClientOutput(client_output)
         return float(match.groups()[0])
-    except Exception:
-        raise InvalidClientOutput(client_output)
+    except Exception as exception:
+        raise InvalidClientOutput(client_output) from exception
 
 
 def extract_protocols(client_output: str) -> List[str]:
