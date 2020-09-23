@@ -93,8 +93,21 @@ val rpc :
   t ->
   JSON.t Lwt.t
 
+(** Same as [rpc], but do not wait for the process to exit. *)
+val spawn_rpc :
+  ?node:Node.t ->
+  ?data:JSON.u ->
+  ?query_string:query_string ->
+  meth ->
+  path ->
+  t ->
+  Process.t
+
 (** Run [tezos-client rpc list]. *)
 val rpc_list : ?node:Node.t -> t -> string Lwt.t
+
+(** Same as [rpc_list], but do not wait for the process to exit. *)
+val spawn_rpc_list : ?node:Node.t -> t -> Process.t
 
 (** {2 Admin Client Commands} *)
 

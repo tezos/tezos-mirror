@@ -78,6 +78,9 @@ val wait : t -> Unix.process_status Lwt.t
     If the exit code is not 0, or if the process was killed, fail the test. *)
 val check : t -> unit Lwt.t
 
+(** Wait until a process terminates and read its standard output if it did not fail. *)
+val check_and_read_stdout : t -> string Lwt.t
+
 (** Spawn a process, wait for it to terminate, and check its status. *)
 val run :
   ?log_status_on_exit:bool ->

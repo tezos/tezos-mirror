@@ -351,10 +351,13 @@ let stderr process = get_echo_lwt_channel process.stderr
 
 let name process = process.name
 
+let check_and_read_stdout process =
+  let* () = check process and* output = read_all (stdout process) in
+  return output
+
 let run_and_read_stdout ?log_status_on_exit ?name ?color ?env command arguments
     =
   let process =
     spawn ?log_status_on_exit ?name ?color ?env command arguments
   in
-  let* () = check process and* output = read_all (stdout process) in
-  return output
+  check_and_read_stdout process

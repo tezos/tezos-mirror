@@ -115,7 +115,7 @@ let string_of_query_string = function
       let qs' = List.map (fun (k, v) -> (url_encode k, url_encode v)) qs in
       "?" ^ String.concat "&" @@ List.map (fun (k, v) -> k ^ "=" ^ v) qs'
 
-let rpc ?node ?data ?query_string meth path client : JSON.t Lwt.t =
+let spawn_rpc ?node ?data ?query_string meth path client =
   let data =
     Option.fold ~none:[] ~some:(fun x -> ["with"; JSON.encode_u x]) data
   in
@@ -124,24 +124,26 @@ let rpc ?node ?data ?query_string meth path client : JSON.t Lwt.t =
   in
   let path = string_of_path path in
   let full_path = path ^ query_string in
-  let* output =
-    Process.run_and_read_stdout
-      ~name:client.name
-      ~color:client.color
-      client.path
-      ( base_dir_arg client @ endpoint_arg ?node client @ mode_arg client
-      @ ["rpc"; string_of_meth meth; full_path]
-      @ data )
-  in
-  return (JSON.parse ~origin:(path ^ " response") output)
+  spawn_command
+    client
+    ( endpoint_arg ?node client @ mode_arg client
+    @ ["rpc"; string_of_meth meth; full_path]
+    @ data )
 
-let rpc_list ?node client : string Lwt.t =
-  Process.run_and_read_stdout
-    ~name:client.name
-    ~color:client.color
-    client.path
-    ( base_dir_arg client @ endpoint_arg ?node client @ mode_arg client
-    @ ["rpc"; "list"] )
+let rpc ?node ?data ?query_string meth path client =
+  let* output =
+    spawn_rpc ?node ?data ?query_string meth path client
+    |> Process.check_and_read_stdout
+  in
+  return (JSON.parse ~origin:(string_of_path path ^ " response") output)
+
+let spawn_rpc_list ?node client =
+  spawn_command
+    client
+    (endpoint_arg ?node client @ mode_arg client @ ["rpc"; "list"])
+
+let rpc_list ?node client =
+  spawn_rpc_list ?node client |> Process.check_and_read_stdout
 
 module Admin = struct
   let spawn_command = spawn_command ~admin:true
