@@ -7,9 +7,17 @@ from tools import constants, paths
 
 from . import protocol
 
-BAKE_ARGS = ['--minimal-fees', '0', '--minimal-nanotez-per-byte', '0',
-             '--minimal-nanotez-per-gas-unit', '0', '--max-priority', '512',
-             '--minimal-timestamp']
+BAKE_ARGS = [
+    '--minimal-fees',
+    '0',
+    '--minimal-nanotez-per-byte',
+    '0',
+    '--minimal-nanotez-per-gas-unit',
+    '0',
+    '--max-priority',
+    '512',
+    '--minimal-timestamp',
+]
 
 
 @pytest.fixture(scope="class")
@@ -19,8 +27,7 @@ def client(sandbox):
     parameters["time_between_blocks"] = ["1", "0"]
     parameters["blocks_per_voting_period"] = 4
     sandbox.add_node(0, params=constants.NODE_PARAMS)
-    protocol.activate(sandbox.client(0), parameters,
-                      activate_in_the_past=True)
+    protocol.activate(sandbox.client(0), parameters, activate_in_the_past=True)
     yield sandbox.client(0)
 
 
@@ -87,8 +94,9 @@ class TestManualBaking:
         assert client.get_listings() != []
 
     def test_inject_proto1(self, client: Client, tmpdir):
-        proto_fp = (f'{paths.TEZOS_HOME}/src/'
-                    f'bin_client/test/proto_test_injection')
+        proto_fp = (
+            f'{paths.TEZOS_HOME}/src/' f'bin_client/test/proto_test_injection'
+        )
         for i in range(1, 4):
             proto = f'{tmpdir}/proto{i}'
             shutil.copytree(proto_fp, proto)
@@ -210,8 +218,7 @@ class TestManualBaking:
         for i in range(1, 4):
             client.submit_ballot(f'bootstrap{i}', proto, 'yay')
 
-    def test_bake_until_prev_last_block_of_voting_period2(self,
-                                                          client: Client):
+    def test_bake_until_prev_last_block_of_voting_period2(self, client: Client):
         client.bake('bootstrap1', BAKE_ARGS)
         client.bake('bootstrap1', BAKE_ARGS)
         period_info = client.get_current_period()

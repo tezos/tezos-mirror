@@ -37,8 +37,7 @@ def parse_sexp(sexp):
     stack = []
     out: List[Any] = []
     for termtypes in re.finditer(TERM_REGEX, sexp):
-        term, value = [(t, v)
-                       for t, v in termtypes.groupdict().items() if v][0]
+        term, value = [(t, v) for t, v in termtypes.groupdict().items() if v][0]
         if term == 'brackl':
             stack.append(out)
             out = []
@@ -62,9 +61,11 @@ def parse_sexp(sexp):
 
 
 def opam_env(tezos_build):
-    process = subprocess.Popen(['opam', 'env', '--sexp', '--set-switch'],
-                               stdout=subprocess.PIPE,
-                               cwd=tezos_build)
+    process = subprocess.Popen(
+        ['opam', 'env', '--sexp', '--set-switch'],
+        stdout=subprocess.PIPE,
+        cwd=tezos_build,
+    )
     out, _err = process.communicate()
     out_str = out.decode('utf-8')
     env = {x[0]: x[1] for x in parse_sexp(out_str)}
@@ -111,11 +112,7 @@ def build(branch, tezos_home, tezos_build, tezos_binaries):
         shutil.copy(filename, branch_dir)
 
 
-def prepare_binaries(
-        tezos_home,
-        tezos_build,
-        tezos_binaries,
-        branch_list):
+def prepare_binaries(tezos_home, tezos_build, tezos_binaries, branch_list):
     assert branch_list, "branch list is empty"
     assert os.path.isdir(tezos_binaries), f"{tezos_binaries} doesn't exist"
     assert os.path.isdir(tezos_build), f"{tezos_build} doesn't exist"
@@ -132,20 +129,38 @@ def prepare_binaries(
 def main():
     parser = argparse.ArgumentParser(description='build_branch.py')
 
-    parser.add_argument('--clone', dest='clone_dir', metavar='DIR',
-                        help='repository to be cloned', required=True)
-    parser.add_argument('--build-dir', dest='build_dir', metavar='DIR',
-                        help='repository where executables will be built',
-                        required=True
-                        )
-    parser.add_argument('--bin-dir', dest='bin_dir', metavar='DIR',
-                        help='repository where executables will be copied',
-                        required=True)
-    parser.add_argument('branches', metavar='BRANCH', type=str, nargs='*',
-                        help='list of branches')
+    parser.add_argument(
+        '--clone',
+        dest='clone_dir',
+        metavar='DIR',
+        help='repository to be cloned',
+        required=True,
+    )
+    parser.add_argument(
+        '--build-dir',
+        dest='build_dir',
+        metavar='DIR',
+        help='repository where executables will be built',
+        required=True,
+    )
+    parser.add_argument(
+        '--bin-dir',
+        dest='bin_dir',
+        metavar='DIR',
+        help='repository where executables will be copied',
+        required=True,
+    )
+    parser.add_argument(
+        'branches',
+        metavar='BRANCH',
+        type=str,
+        nargs='*',
+        help='list of branches',
+    )
     args = parser.parse_args()
-    prepare_binaries(args.clone_dir, args.build_dir, args.bin_dir,
-                     args.branches)
+    prepare_binaries(
+        args.clone_dir, args.build_dir, args.bin_dir, args.branches
+    )
 
 
 if __name__ == "__main__":

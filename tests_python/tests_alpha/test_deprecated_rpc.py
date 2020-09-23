@@ -2,8 +2,6 @@ import json
 import os
 import datetime
 
-from typing import List
-
 import pytest
 
 from tools import constants, paths
@@ -15,19 +13,31 @@ from tools import constants, paths
 # activated then with alpha activated.
 
 BAKER = 'bootstrap1'
-BAKE_ARGS = ['--minimal-fees', '0', '--minimal-nanotez-per-byte', '0',
-             '--minimal-nanotez-per-gas-unit', '0', '--max-priority', '512',
-             '--minimal-timestamp']
+BAKE_ARGS = [
+    '--minimal-fees',
+    '0',
+    '--minimal-nanotez-per-byte',
+    '0',
+    '--minimal-nanotez-per-gas-unit',
+    '0',
+    '--max-priority',
+    '512',
+    '--minimal-timestamp',
+]
 PROTO_A = constants.DELPHI
 PROTO_A_DAEMON = constants.DELPHI_DAEMON
 PROTO_A_PATH = f"proto_{PROTO_A_DAEMON.replace('-','_')}"
 
-PROTO_A_PARAMETERS_FILE = (f'{paths.TEZOS_HOME}src/{PROTO_A_PATH}/parameters/'
-                           'sandbox-parameters.json')
-assert os.path.isfile(PROTO_A_PARAMETERS_FILE), (f'{PROTO_A_PARAMETERS_FILE}'
-                                                 ' cannot be found; please '
-                                                 'first run `make` in '
-                                                 '{paths.TEZOS_HOME}.')
+PROTO_A_PARAMETERS_FILE = (
+    f'{paths.TEZOS_HOME}src/{PROTO_A_PATH}/parameters/'
+    'sandbox-parameters.json'
+)
+assert os.path.isfile(PROTO_A_PARAMETERS_FILE), (
+    f'{PROTO_A_PARAMETERS_FILE}'
+    ' cannot be found; please '
+    'first run `make` in '
+    '{paths.TEZOS_HOME}.'
+)
 with open(PROTO_A_PARAMETERS_FILE) as f:
     PROTO_A_PARAMETERS = dict(json.load(f))
 
@@ -50,8 +60,9 @@ def client(sandbox, protocol, parameters, node_id):
     parameters["blocks_per_cycle"] = BLOCKS_PER_CYCLE
     parameters["blocks_per_voting_period"] = BLOCKS_PER_VOTING_PERIOD
     delay = datetime.timedelta(seconds=3600 * 24 * 365)
-    sandbox.client(node_id).activate_protocol_json(protocol, parameters,
-                                                   delay=delay)
+    sandbox.client(node_id).activate_protocol_json(
+        protocol, parameters, delay=delay
+    )
     yield sandbox.client(node_id)
 
 
@@ -68,10 +79,14 @@ def pytest_generate_tests(metafunc):
     metafunc.parametrize(argnames, argvalues, ids=idlist, scope="class")
 
 
-SCENARIO_PROTO_A = (PROTO_A, {"node_id": 0, "protocol": PROTO_A,
-                              "parameters": PROTO_A_PARAMETERS})
-SCENARIO_PROTO_B = (PROTO_B, {"node_id": 1, "protocol": PROTO_B,
-                              "parameters": PROTO_B_PARAMETERS})
+SCENARIO_PROTO_A = (
+    PROTO_A,
+    {"node_id": 0, "protocol": PROTO_A, "parameters": PROTO_A_PARAMETERS},
+)
+SCENARIO_PROTO_B = (
+    PROTO_B,
+    {"node_id": 1, "protocol": PROTO_B, "parameters": PROTO_B_PARAMETERS},
+)
 
 
 @pytest.mark.incremental

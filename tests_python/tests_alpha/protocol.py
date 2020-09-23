@@ -1,10 +1,10 @@
 from tools import constants, utils
 
 
-def activate(client, parameters=None, timestamp=None,
-             activate_in_the_past=False):
-    utils.activate_alpha(client, parameters, timestamp,
-                         activate_in_the_past)
+def activate(
+    client, parameters=None, timestamp=None, activate_in_the_past=False
+):
+    utils.activate_alpha(client, parameters, timestamp, activate_in_the_past)
 
 
 HASH = constants.ALPHA

@@ -23,25 +23,25 @@ class TestForgeBlock:
         parameters = {}  # type: dict
         delta = datetime.timedelta(seconds=10)
         sandbox.client(1).activate_protocol_json(
-            PROTO_DEMO, parameters,
+            PROTO_DEMO,
+            parameters,
             key='activator',
-            timestamp=(
-                datetime.datetime.utcnow()
-                +
-                delta
-            ).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            fitness='1')
+            timestamp=(datetime.datetime.utcnow() + delta).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"
+            ),
+            fitness='1',
+        )
 
     @pytest.mark.xfail
     def test_activate_proto_demo_time_shifted_ko(self, sandbox: Sandbox):
         parameters = {}  # type: dict
         delta = datetime.timedelta(seconds=30)
         sandbox.client(1).activate_protocol_json(
-            PROTO_DEMO, parameters,
+            PROTO_DEMO,
+            parameters,
             key='activator',
-            timestamp=(
-                datetime.datetime.utcnow()
-                +
-                delta
-            ).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            fitness='1')
+            timestamp=(datetime.datetime.utcnow() + delta).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"
+            ),
+            fitness='1',
+        )

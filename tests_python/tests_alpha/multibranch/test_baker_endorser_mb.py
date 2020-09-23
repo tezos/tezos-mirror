@@ -74,9 +74,9 @@ def params(i):
 @pytest.mark.multibranch
 @pytest.mark.incremental
 class TestAllDaemonsWithOperations:
-    '''Runs two baker and two endorsers, generates random op, and
-       add (or replace) new nodes dynamically. After a little while,
-       we kill the bakers and check everyone synchronize to the same head. '''
+    """Runs two baker and two endorsers, generates random op, and
+    add (or replace) new nodes dynamically. After a little while,
+    we kill the bakers and check everyone synchronize to the same head."""
 
     def test_setup_network(self, sandbox_multibranch: SandboxMultiBranch):
         # Set appropriate time to avoid double-baking
@@ -85,16 +85,14 @@ class TestAllDaemonsWithOperations:
         parameters = dict(constants.ALPHA_PARAMETERS)
         parameters["time_between_blocks"] = ["10", "0"]
         sandbox_multibranch.client(0).activate_protocol_json(ALPHA, parameters)
-        sandbox_multibranch.add_baker(0, 'bootstrap5',
-                                      proto=ALPHA_DAEMON)
-        sandbox_multibranch.add_baker(1, 'bootstrap4',
-                                      proto=ALPHA_DAEMON)
-        sandbox_multibranch.add_endorser(0, account='bootstrap1',
-                                         endorsement_delay=1,
-                                         proto=ALPHA_DAEMON)
-        sandbox_multibranch.add_endorser(1, account='bootstrap2',
-                                         endorsement_delay=1,
-                                         proto=ALPHA_DAEMON)
+        sandbox_multibranch.add_baker(0, 'bootstrap5', proto=ALPHA_DAEMON)
+        sandbox_multibranch.add_baker(1, 'bootstrap4', proto=ALPHA_DAEMON)
+        sandbox_multibranch.add_endorser(
+            0, account='bootstrap1', endorsement_delay=1, proto=ALPHA_DAEMON
+        )
+        sandbox_multibranch.add_endorser(
+            1, account='bootstrap2', endorsement_delay=1, proto=ALPHA_DAEMON
+        )
 
     def test_wait_for_alpha(self, sandbox_multibranch: SandboxMultiBranch):
         clients = sandbox_multibranch.all_clients()
@@ -103,9 +101,8 @@ class TestAllDaemonsWithOperations:
             assert utils.check_protocol(client, proto)
 
     def test_network_gen_operations_and_add_nodes(
-            self,
-            sandbox_multibranch: SandboxMultiBranch,
-            session: dict):
+        self, sandbox_multibranch: SandboxMultiBranch, session: dict
+    ):
         node_add_period = NUM_CYCLES // NEW_NODES
         for cycle in range(NUM_CYCLES):
             i = random.randrange(NUM_NODES)
@@ -126,13 +123,11 @@ class TestAllDaemonsWithOperations:
                     running_nodes.remove(0)
                     running_nodes.remove(1)
                     sandbox_multibranch.rm_node(random.choice(running_nodes))
-                sandbox_multibranch.add_node(
-                    new_node,
-                    params=params(new_node))
+                sandbox_multibranch.add_node(new_node, params=params(new_node))
                 proto = ALPHA
                 assert utils.check_protocol(
-                    sandbox_multibranch.client(new_node),
-                    proto)
+                    sandbox_multibranch.client(new_node), proto
+                )
             time.sleep(TIME_BETWEEN_CYCLE)
 
     def test_kill_baker(self, sandbox_multibranch: SandboxMultiBranch):
@@ -143,8 +138,9 @@ class TestAllDaemonsWithOperations:
         utils.synchronize(sandbox_multibranch.all_clients())
 
     def test_check_operations(self, sandbox_multibranch: SandboxMultiBranch):
-        min_level = min([client.get_level()
-                         for client in sandbox_multibranch.all_clients()])
+        min_level = min(
+            [client.get_level() for client in sandbox_multibranch.all_clients()]
+        )
         heads_hash = set()
         # check there is exactly one head
         for client in sandbox_multibranch.all_clients():

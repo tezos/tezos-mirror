@@ -16,5 +16,4 @@ MACROS_CONTRACT_PATH = path.join(CONTRACT_PATH, 'macros')
 ILLTYPED_CONTRACT_PATH = path.join(CONTRACT_PATH, 'ill_typed')
 LEGACY_CONTRACT_PATH = path.join(CONTRACT_PATH, 'legacy')
 OPCODES_CONTRACT_PATH = path.join(CONTRACT_PATH, 'opcodes')
-MINI_SCENARIOS_CONTRACT_PATH = path.join(CONTRACT_PATH,
-                                         'mini_scenarios')
+MINI_SCENARIOS_CONTRACT_PATH = path.join(CONTRACT_PATH, 'mini_scenarios')

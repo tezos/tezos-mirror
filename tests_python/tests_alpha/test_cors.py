@@ -12,18 +12,21 @@ def node(sandbox: Sandbox):
 
 
 class TestCors:
-
     def test_preflight(self, node: Node):
         origin = 'localhost'
         port = node.rpc_port
         headers = {
             'Origin': origin,
             'Access-Control-Request-Method': 'GET',
-            'Access-Control-Request-Headers': 'Content-Type'
+            'Access-Control-Request-Headers': 'Content-Type',
         }
-        res = utils.rpc(origin, port, 'options',
-                        '/chains/main/blocks/head/header/shell',
-                        headers=headers)
+        res = utils.rpc(
+            origin,
+            port,
+            'options',
+            '/chains/main/blocks/head/header/shell',
+            headers=headers,
+        )
         print(res.headers)
         assert res.headers["access-control-allow-origin"] == '*'
         assert res.headers["access-control-allow-methods"] == 'GET'
@@ -32,12 +35,13 @@ class TestCors:
     def test_request(self, node: Node):
         origin = 'localhost'
         port = node.rpc_port
-        headers = {
-            'Origin': origin,
-            'Content-Type': 'application/json'
-        }
-        res = utils.rpc(origin, port, 'get',
-                        '/chains/main/blocks/head/header/shell',
-                        headers=headers)
+        headers = {'Origin': origin, 'Content-Type': 'application/json'}
+        res = utils.rpc(
+            origin,
+            port,
+            'get',
+            '/chains/main/blocks/head/header/shell',
+            headers=headers,
+        )
         print(res.headers)
         assert res.headers["access-control-allow-origin"] == '*'

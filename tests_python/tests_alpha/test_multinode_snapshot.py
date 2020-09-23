@@ -18,12 +18,10 @@ GROUP2 = [3, 4]
 @pytest.mark.snapshot
 @pytest.mark.slow
 class TestMultiNodeSnapshot:
-
     def test_init(self, sandbox: Sandbox):
         for i in GROUP1:
             sandbox.add_node(i, params=PARAMS)
-        protocol.activate(sandbox.client(GROUP1[0]),
-                          activate_in_the_past=True)
+        protocol.activate(sandbox.client(GROUP1[0]), activate_in_the_past=True)
 
     def test_bake_group1_level_a(self, sandbox: Sandbox):
         for _ in range(LEVEL_A - 1):

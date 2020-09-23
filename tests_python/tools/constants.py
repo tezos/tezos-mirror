@@ -5,15 +5,19 @@ from tools import paths
 
 
 def get_parameters(proto: str) -> dict:
-    """ Takes a protocol suffix ('alpha', '005_PsBabyM1'...) and
+    """Takes a protocol suffix ('alpha', '005_PsBabyM1'...) and
     retrieve json test parameters for that protocol. Assertion failure
-    if parameters can't be found. """
+    if parameters can't be found."""
 
-    params_file = (f'{paths.TEZOS_HOME}src/proto_{proto}/parameters/'
-                   'test-parameters.json')
-    assert os.path.isfile(params_file), (f'{params_file}'
-                                         ' cannot be found; please first run'
-                                         ' `make` in TEZOS_HOME.')
+    params_file = (
+        f'{paths.TEZOS_HOME}src/proto_{proto}/parameters/'
+        'test-parameters.json'
+    )
+    assert os.path.isfile(params_file), (
+        f'{params_file}'
+        ' cannot be found; please first run'
+        ' `make` in TEZOS_HOME.'
+    )
     with open(params_file) as params:
         return json.load(params)
 
@@ -28,44 +32,48 @@ IDENTITIES = {
     'bootstrap1': {
         'identity': "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
         'public': "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav",
-        'secret': ("unencrypted:"
-                   "edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh")
+        'secret': (
+            "unencrypted:"
+            "edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh"
+        ),
     },
     'bootstrap2': {
         'identity': "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
         'public': "edpktzNbDAUjUk697W7gYg2CRuBQjyPxbEg8dLccYYwKSKvkPvjtV9",
-        'secret': ("unencrypted:"
-                   "edsk39qAm1fiMjgmPkw1EgQYkMzkJezLNewd7PLNHTkr6w9XA2zdfo")
+        'secret': (
+            "unencrypted:"
+            "edsk39qAm1fiMjgmPkw1EgQYkMzkJezLNewd7PLNHTkr6w9XA2zdfo"
+        ),
     },
     'bootstrap3': {
         'identity': "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU",
         'public': "edpkuTXkJDGcFd5nh6VvMz8phXxU3Bi7h6hqgywNFi1vZTfQNnS1RV",
-        'secret': ("unencrypted:"
-                   "edsk4ArLQgBTLWG5FJmnGnT689VKoqhXwmDPBuGx3z4cvwU9MmrPZZ")
+        'secret': (
+            "unencrypted:"
+            "edsk4ArLQgBTLWG5FJmnGnT689VKoqhXwmDPBuGx3z4cvwU9MmrPZZ"
+        ),
     },
     'bootstrap4': {
         'identity': "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv",
         'public': "edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU",
-        'secret': ("unencrypted:"
-                   "edsk2uqQB9AY4FvioK2YMdfmyMrer5R8mGFyuaLLFfSRo8EoyNdht3")
+        'secret': (
+            "unencrypted:"
+            "edsk2uqQB9AY4FvioK2YMdfmyMrer5R8mGFyuaLLFfSRo8EoyNdht3"
+        ),
     },
     'bootstrap5': {
         'identity': "tz1ddb9NMYHZi5UzPdzTZMYQQZoMub195zgv",
         'public': "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n",
-        'secret': ("unencrypted:"
-                   "edsk4QLrcijEffxV31gGdN2HU7UpyJjA8drFoNcmnB28n89YjPNRFm")
+        'secret': (
+            "unencrypted:"
+            "edsk4QLrcijEffxV31gGdN2HU7UpyJjA8drFoNcmnB28n89YjPNRFm"
+        ),
     },
-    'activator': {
-        'secret': "unencrypted:" + GENESIS_SK
-    }
+    'activator': {'secret': "unencrypted:" + GENESIS_SK},
 }
 
 
-IDENTITIES_SHORT = {
-    'activator': {
-        'secret': "unencrypted:" + GENESIS_SK
-    }
-}
+IDENTITIES_SHORT = {'activator': {'secret': "unencrypted:" + GENESIS_SK}}
 
 
 ALPHA = "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"

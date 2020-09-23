@@ -16,16 +16,20 @@ from tools.utils import assert_run_failure
 # for the final assertion of test_config_init_roundtrip to pass. That's because
 # `config init -o` writes them even if unspecified by `--config-file`
 # (it's a fine behavior, I just wanted to highlight it).
-_INPUT_CONFIG_FILE = {"confirmations": 1,
-                      "endpoint": "http://127.0.0.1:8732",
-                      "remote_signer": "http://127.0.0.2",
-                      "web_port": 8080,
-                      "password_filename": "/tmp/doesnt_exist"}
+_INPUT_CONFIG_FILE = {
+    "confirmations": 1,
+    "endpoint": "http://127.0.0.1:8732",
+    "remote_signer": "http://127.0.0.2",
+    "web_port": 8080,
+    "password_filename": "/tmp/doesnt_exist",
+}
 _INPUT_CONFIG_FILES = [None, _INPUT_CONFIG_FILE]
-_CMD_LINE_ARGS = {"--endpoint": "http://127.0.0.1:9732",
-                  "--wait": "3",
-                  "--remote-signer": "http://10.0.0.2",
-                  "--password-filename": "/tmp/doesnt_exist_either"}
+_CMD_LINE_ARGS = {
+    "--endpoint": "http://127.0.0.1:9732",
+    "--wait": "3",
+    "--remote-signer": "http://10.0.0.2",
+    "--password-filename": "/tmp/doesnt_exist_either",
+}
 _CONFIG_FILE_FLAG = "--config-file"
 
 
@@ -56,8 +60,14 @@ angry spin ostrich round dress acoustic"
 
     def test_import_already_present_alias(self, client: Client, mnemonic):
         """ Tests that importing fails if the alias is already present. """
-        prms = ["import", "keys", "from",
-                "mnemonic", "super_original", "--force"]
+        prms = [
+            "import",
+            "keys",
+            "from",
+            "mnemonic",
+            "super_original",
+            "--force",
+        ]
         stdin = mnemonic + "\n\n"
         client.run_generic(prms, stdin=stdin)
         prms = ["import", "keys", "from", "mnemonic", "super_original"]
@@ -99,7 +109,8 @@ angry spin ostrich round dress acoustic"
         addr = client.get_known_addresses()
         pkh = addr.wallet["cryptkey"]
         secret_key = client.show_address(
-            "cryptkey", show_secret=True).secret_key
+            "cryptkey", show_secret=True
+        ).secret_key
         assert secret_key is not None
         assert secret_key.startswith("encrypted:")
         assert pkh == "tz1QSF4TSVzaosgbaxnFJpRbs7798Skeb8Re"
@@ -115,7 +126,6 @@ angry spin ostrich round dress acoustic"
 
 @pytest.mark.client
 class TestChainId:
-
     def test_chain_id_block_hash(self, nodeless_client: Client):
         block_hash = 'BKyFui5WPY1n3e9aKF3qd2kGBKBtHu3rtm5miYFnUagJC1BdHTF'
         prms = ['compute', 'chain', 'id', 'from', 'block', 'hash', block_hash]
@@ -127,10 +137,11 @@ class TestChainId:
         assert nodeless_client.run(prms).strip() == 'NetXLGmPi3c5DXf'
 
 
-def _write_config_file(client: Client, filename: str,
-                       config_dict: Optional[dict]):
-    """ Writes `config_dict` to `filename`. Returns the json effectively
-        written """
+def _write_config_file(
+    client: Client, filename: str, config_dict: Optional[dict]
+):
+    """Writes `config_dict` to `filename`. Returns the json effectively
+    written"""
     assert client is not None
     assert filename is not None
     assert config_dict is not None
@@ -145,8 +156,8 @@ def _write_config_file(client: Client, filename: str,
 
 
 def _with_config_file_cmd(config_file: Optional[str], cmd: List[str]):
-    """ Prefixes `cmd` with ["--config-file", config_file] if
-        config_file is not None """
+    """Prefixes `cmd` with ["--config-file", config_file] if
+    config_file is not None"""
     return ([_CONFIG_FILE_FLAG, config_file] if config_file else []) + cmd
 
 
@@ -160,13 +171,13 @@ def _gen_assert_msg(flag, sent, received):
 @pytest.mark.client
 @pytest.mark.parametrize('config_dict', _INPUT_CONFIG_FILES)
 class TestConfigInit:
-
-    def test_config_init(self, nodeless_client: Client,
-                         config_dict: Optional[dict]):
+    def test_config_init(
+        self, nodeless_client: Client, config_dict: Optional[dict]
+    ):
         """
-            Tests that calling
-            `[--config-file config_dict]? config init -o tmp_file`
-            works and yields valid json.
+        Tests that calling
+        `[--config-file config_dict]? config init -o tmp_file`
+        works and yields valid json.
         """
         try:
             out_file = tempfile.mktemp(prefix='tezos-client.config_file')
@@ -176,8 +187,9 @@ class TestConfigInit:
                 in_file = tempfile.mktemp(prefix='tezos-client.config_file')
                 _write_config_file(nodeless_client, in_file, config_dict)
 
-            cmd = _with_config_file_cmd(in_file,
-                                        ["config", "init", "-o", out_file])
+            cmd = _with_config_file_cmd(
+                in_file, ["config", "init", "-o", out_file]
+            )
             nodeless_client.run(cmd)
             # Try loading the file as json, to check it is valid
             with open(out_file) as handle:
@@ -187,16 +199,17 @@ class TestConfigInit:
                 os.remove(in_file)
             os.remove(out_file)
 
-    def test_config_init_roundtrip(self, nodeless_client: Client,
-                                   config_dict: Optional[dict]):
-        """ Tests that calling `config init -o tmp_file` and
-            feeding its result to `tezos-client --config-file` works
-            and yields the same result (i.e. calling `tezos-client
-            --config-file tmp_file config init -o tmp_file2 yields
-            a `tmp_file2` that is similar to `tmp_file`).
+    def test_config_init_roundtrip(
+        self, nodeless_client: Client, config_dict: Optional[dict]
+    ):
+        """Tests that calling `config init -o tmp_file` and
+        feeding its result to `tezos-client --config-file` works
+        and yields the same result (i.e. calling `tezos-client
+        --config-file tmp_file config init -o tmp_file2 yields
+        a `tmp_file2` that is similar to `tmp_file`).
 
-            `config_dict` specifies the content of the initial config file
-            to use or None not to specify one.
+        `config_dict` specifies the content of the initial config file
+        to use or None not to specify one.
         """
         try:
             if config_dict is None:
@@ -219,14 +232,15 @@ class TestConfigInit:
 
                 # Write config_dict to a file
                 tmp_file1 = tempfile.mktemp(prefix='tezos-client.config_file')
-                json1 = _write_config_file(nodeless_client,
-                                           tmp_file1,
-                                           config_dict)
+                json1 = _write_config_file(
+                    nodeless_client, tmp_file1, config_dict
+                )
 
             # Execute `config init -o`
             tmp_file2 = tempfile.mktemp(prefix='tezos-client.config_file')
-            cmd = _with_config_file_cmd(tmp_file1,
-                                        ["config", "init", "-o", tmp_file2])
+            cmd = _with_config_file_cmd(
+                tmp_file1, ["config", "init", "-o", tmp_file2]
+            )
             nodeless_client.run(cmd)
 
             # Load file generated by `config init -o`
@@ -236,8 +250,9 @@ class TestConfigInit:
             # and finally check that the json generated by `config init -o`
             # matches the input data (either the default one or the one
             # specified with --config-file)
-            assert json1 == json2, _gen_assert_msg(_CONFIG_FILE_FLAG,
-                                                   json1, json2)
+            assert json1 == json2, _gen_assert_msg(
+                _CONFIG_FILE_FLAG, json1, json2
+            )
         finally:
             os.remove(tmp_file1)
             os.remove(tmp_file2)
@@ -257,11 +272,12 @@ def _cmd_line_flag_to_json_field(cmd_line_flag: str):
 class TestConfigShow:
     """ Tests of `tezos-client config show` """
 
-    def test_config_show(self, nodeless_client: Client,
-                         config_dict: Optional[dict]):
+    def test_config_show(
+        self, nodeless_client: Client, config_dict: Optional[dict]
+    ):
         """
-            Tests that calling `config show` works, with or without
-            specifying `--config-file`
+        Tests that calling `config show` works, with or without
+        specifying `--config-file`
         """
         try:
             tmp_file = None
@@ -276,20 +292,23 @@ class TestConfigShow:
                 os.remove(tmp_file)
 
     @pytest.mark.parametrize('cmd_line_args', [{}, _CMD_LINE_ARGS])
-    def test_config_show_roundtrip(self, nodeless_client: Client,
-                                   config_dict: Optional[dict],
-                                   cmd_line_args: dict):
+    def test_config_show_roundtrip(
+        self,
+        nodeless_client: Client,
+        config_dict: Optional[dict],
+        cmd_line_args: dict,
+    ):
         """
-            Tests calling `config show` with or without `--config-file`
-            and with some command line parameters (`cmd_line_arg`). It
-            then parses the output to check its valid json and to check
-            that command line parameters were honored.
+        Tests calling `config show` with or without `--config-file`
+        and with some command line parameters (`cmd_line_arg`). It
+        then parses the output to check its valid json and to check
+        that command line parameters were honored.
 
-            Then it feeds this output to a new call to `--config-file file
-            config show` and checks that the json returned by this second call
-            agrees with what was specified by `file`.
+        Then it feeds this output to a new call to `--config-file file
+        config show` and checks that the json returned by this second call
+        agrees with what was specified by `file`.
 
-            This is a roundtrip test using a small matrix.
+        This is a roundtrip test using a small matrix.
         """
         try:
             in_file1 = None
@@ -314,9 +333,11 @@ class TestConfigShow:
                 assert isinstance(input_value, str)
                 output_value = output_json1[_cmd_line_flag_to_json_field(flag)]
                 output_value = str(output_value)
-                err_msg = f"Value of command line flag {flag} is not honored:"\
-                          f" passed {input_value} but"\
-                          f" config show yielded {output_value}"
+                err_msg = (
+                    f"Value of command line flag {flag} is not honored:"
+                    f" passed {input_value} but"
+                    f" config show yielded {output_value}"
+                )
                 assert output_value == input_value, err_msg
             in_file2 = tempfile.mktemp(prefix='tezos-client.config_file')
             # Write output of first call to `config show` to disk,
@@ -331,8 +352,9 @@ class TestConfigShow:
             output_json2 = json.loads(stdout)
 
             # And finally check that the final output matches the input
-            assert output_json1 == output_json2,\
-                _gen_assert_msg(_CONFIG_FILE_FLAG, output_json1, output_json2)
+            assert output_json1 == output_json2, _gen_assert_msg(
+                _CONFIG_FILE_FLAG, output_json1, output_json2
+            )
         finally:
             for in_file in [in_file1, in_file2]:
                 if in_file is not None:
@@ -345,36 +367,45 @@ class TestConfigValid:
 
     def test_config_node_port(self, nodeless_client: Client):
         """
-            Tests that calling `config show` works, with a valid node port
+        Tests that calling `config show` works, with a valid node port
         """
         self._run_config_show_with_node_port(nodeless_client, 8732)
         self._run_config_show_with_node_port(nodeless_client, 58732)
-        pytest.raises(subprocess.CalledProcessError,
-                      self._run_config_show_with_node_port,
-                      nodeless_client,
-                      158732)
-        pytest.raises(subprocess.CalledProcessError,
-                      self._run_config_show_with_node_port,
-                      nodeless_client,
-                      -8732)
+        pytest.raises(
+            subprocess.CalledProcessError,
+            self._run_config_show_with_node_port,
+            nodeless_client,
+            158732,
+        )
+        pytest.raises(
+            subprocess.CalledProcessError,
+            self._run_config_show_with_node_port,
+            nodeless_client,
+            -8732,
+        )
 
     def test_config_web_port(self, nodeless_client: Client):
         """
-            Tests that calling `config show` works, with a valid node port
+        Tests that calling `config show` works, with a valid node port
         """
         self._run_config_show_with_web_port(nodeless_client, 8732)
         self._run_config_show_with_web_port(nodeless_client, 58732)
-        pytest.raises(subprocess.CalledProcessError,
-                      self._run_config_show_with_web_port,
-                      nodeless_client,
-                      158732)
-        pytest.raises(subprocess.CalledProcessError,
-                      self._run_config_show_with_web_port,
-                      nodeless_client,
-                      -8732)
+        pytest.raises(
+            subprocess.CalledProcessError,
+            self._run_config_show_with_web_port,
+            nodeless_client,
+            158732,
+        )
+        pytest.raises(
+            subprocess.CalledProcessError,
+            self._run_config_show_with_web_port,
+            nodeless_client,
+            -8732,
+        )
 
-    def _run_config_show_with_temp_config_file(self, nodeless_client: Client,
-                                               config_dict: dict):
+    def _run_config_show_with_temp_config_file(
+        self, nodeless_client: Client, config_dict: dict
+    ):
         try:
             tmp_file = tempfile.mktemp(prefix='tezos-client.config_file')
             _write_config_file(nodeless_client, tmp_file, config_dict)
@@ -385,18 +416,18 @@ class TestConfigValid:
             if tmp_file is not None:
                 os.remove(tmp_file)
 
-    def _run_config_show_with_node_port(self, nodeless_client: Client,
-                                        port: int):
-        config_dict = {
-            "node_port": port
-        }
-        self._run_config_show_with_temp_config_file(nodeless_client,
-                                                    config_dict)
+    def _run_config_show_with_node_port(
+        self, nodeless_client: Client, port: int
+    ):
+        config_dict = {"node_port": port}
+        self._run_config_show_with_temp_config_file(
+            nodeless_client, config_dict
+        )
 
-    def _run_config_show_with_web_port(self, nodeless_client: Client,
-                                       port: int):
-        config_dict = {
-            "web_port": port
-        }
-        self._run_config_show_with_temp_config_file(nodeless_client,
-                                                    config_dict)
+    def _run_config_show_with_web_port(
+        self, nodeless_client: Client, port: int
+    ):
+        config_dict = {"web_port": port}
+        self._run_config_show_with_temp_config_file(
+            nodeless_client, config_dict
+        )

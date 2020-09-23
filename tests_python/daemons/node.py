@@ -15,8 +15,9 @@ TERM_TIMEOUT = 10
 def _run_and_print(cmd):
     cmd_str = utils.format_command(cmd)
     print(cmd_str)
-    completed_process = subprocess.run(cmd, capture_output=True, text=True,
-                                       check=False)
+    completed_process = subprocess.run(
+        cmd, capture_output=True, text=True, check=False
+    )
     stdout = completed_process.stdout
     stderr = completed_process.stderr
     if stdout:
@@ -59,20 +60,22 @@ class Node:
     node.cleanup() # cleanup temp files
     """
 
-    def __init__(self,
-                 node: str,
-                 config: dict = None,
-                 expected_pow: float = 0.0,
-                 node_dir: str = None,
-                 use_tls: Tuple[str, str] = None,
-                 params: List[str] = None,
-                 log_file: str = None,
-                 p2p_port: int = 9732,
-                 rpc_port: int = 8732,
-                 peers: List[int] = None,
-                 log_levels: Dict[str, str] = None,
-                 singleprocess: bool = False,
-                 env: Dict[str, str] = None):
+    def __init__(
+        self,
+        node: str,
+        config: dict = None,
+        expected_pow: float = 0.0,
+        node_dir: str = None,
+        use_tls: Tuple[str, str] = None,
+        params: List[str] = None,
+        log_file: str = None,
+        p2p_port: int = 9732,
+        rpc_port: int = 8732,
+        peers: List[int] = None,
+        log_levels: Dict[str, str] = None,
+        singleprocess: bool = False,
+        env: Dict[str, str] = None,
+    ):
 
         """Creates a new Popen instance for a tezos-node, and manages context.
 
@@ -84,8 +87,9 @@ class Node:
         Generate node identity.
         """
         assert os.path.isfile(node), f'{node} not a file'
-        assert node_dir is None or os.path.isdir(node_dir), (f'{node_dir} not '
-                                                             f'a dir')
+        assert node_dir is None or os.path.isdir(node_dir), (
+            f'{node_dir} not ' f'a dir'
+        )
         if config is None or 'network' not in config:
             if params is None:
                 params = ['--network', 'sandbox']
@@ -106,8 +110,13 @@ class Node:
         self._params = params
         self._run_called_before = False
         singleprocess_opt = ['--singleprocess'] if singleprocess else []
-        node_run = [node, 'run', '--data-dir', node_dir,
-                    '--no-bootstrap-peers'] + singleprocess_opt
+        node_run = [
+            node,
+            'run',
+            '--data-dir',
+            node_dir,
+            '--no-bootstrap-peers',
+        ] + singleprocess_opt
         if params:
             node_run.extend(params)
 
@@ -124,8 +133,9 @@ class Node:
             new_env.update(env)
         if log_levels is not None:
             new_env = os.environ.copy() if new_env is None else new_env
-            lwt_log = ";".join(f'{key} -> {values}' for key, values in
-                               log_levels.items())
+            lwt_log = ";".join(
+                f'{key} -> {values}' for key, values in log_levels.items()
+            )
             new_env['TEZOS_LOG'] = lwt_log
         self._new_env = new_env
         self._node_run = node_run
@@ -136,30 +146,38 @@ class Node:
         print(node_run_str)
         # overwrite old log on on first invocation only
         overwrite_log = not self._run_called_before
-        stdout, stderr = utils.prepare_log(self._node_run,
-                                           self.log_file,
-                                           overwrite_log)
-        self._process = subprocess.Popen(self._node_run, stdout=stdout,
-                                         stderr=stderr, env=self._new_env)
+        stdout, stderr = utils.prepare_log(
+            self._node_run, self.log_file, overwrite_log
+        )
+        self._process = subprocess.Popen(
+            self._node_run, stdout=stdout, stderr=stderr, env=self._new_env
+        )
         self._run_called_before = True
 
     def init_config(self):
-        node_config = [self.node,
-                       'config',
-                       'init',
-                       '--data-dir', self.node_dir,
-                       '--net-addr', f'127.0.0.1:{self.p2p_port}',
-                       '--rpc-addr', f'127.0.0.1:{self.rpc_port}',
-                       '--expected-pow', str(self.expected_pow)]
+        node_config = [
+            self.node,
+            'config',
+            'init',
+            '--data-dir',
+            self.node_dir,
+            '--net-addr',
+            f'127.0.0.1:{self.p2p_port}',
+            '--rpc-addr',
+            f'127.0.0.1:{self.rpc_port}',
+            '--expected-pow',
+            str(self.expected_pow),
+        ]
         if self._params:
             node_config += self._params
 
         if self.use_tls:
             # We can't create tezos.crt/tezos.key here
             # as node_dir has to be empty when we run node_config
-            node_config += ['--rpc-tls',
-                            (f'{self.node_dir}/tezos.crt,'
-                             f'{self.node_dir}/tezos.key')]
+            node_config += [
+                '--rpc-tls',
+                (f'{self.node_dir}/tezos.crt,' f'{self.node_dir}/tezos.key'),
+            ]
 
         _run_and_print(node_config)
 
@@ -175,11 +193,14 @@ class Node:
                 file.truncate()
 
     def init_id(self):
-        node_identity = [self.node,
-                         'identity',
-                         'generate',
-                         str(self.expected_pow),
-                         '--data-dir', self.node_dir]
+        node_identity = [
+            self.node,
+            'identity',
+            'generate',
+            str(self.expected_pow),
+            '--data-dir',
+            self.node_dir,
+        ]
         _run_and_print(node_identity)
         if self.use_tls:
             with open(f'{self.node_dir}/tezos.crt', 'w+') as file:
@@ -188,31 +209,34 @@ class Node:
                 file.write(self.use_tls[1])
 
     def upgrade_storage(self):
-        node_upgrade = [self.node, 'upgrade', 'storage', '--data-dir',
-                        self.node_dir]
+        node_upgrade = [
+            self.node,
+            'upgrade',
+            'storage',
+            '--data-dir',
+            self.node_dir,
+        ]
         _run_and_print(node_upgrade)
 
     def snapshot_export(self, file, params=None):
         if params is None:
             params = []
         params = ['--data-dir', self.node_dir] + params
-        snapshot_cmd = ([self.node, 'snapshot',
-                         'export'] + list(params) + [file])
+        snapshot_cmd = [self.node, 'snapshot', 'export'] + list(params) + [file]
         _run_and_print(snapshot_cmd)
 
     def snapshot_import(self, file, params=None):
         if params is None:
             params = []
         params = ['--data-dir', self.node_dir] + params
-        snapshot_cmd = ([self.node, 'snapshot',
-                         'import'] + list(params) + [file])
+        snapshot_cmd = [self.node, 'snapshot', 'import'] + list(params) + [file]
         _run_and_print(snapshot_cmd)
 
     def reconstruct(self, params=None):
         if params is None:
             params = []
         params = ['--data-dir', self.node_dir] + params
-        reconstruct_cmd = ([self.node, 'reconstruct'] + list(params))
+        reconstruct_cmd = [self.node, 'reconstruct'] + list(params)
         _run_and_print(reconstruct_cmd)
 
     def cleanup(self):

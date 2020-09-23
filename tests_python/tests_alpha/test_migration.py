@@ -10,19 +10,30 @@ from launchers.sandbox import Sandbox
 from tools import constants, paths, utils
 from client import client_output
 
-BAKE_ARGS = ['--minimal-fees', '0', '--minimal-nanotez-per-byte', '0',
-             '--minimal-nanotez-per-gas-unit', '0', '--max-priority', '512',
-             '--minimal-timestamp']
+BAKE_ARGS = [
+    '--minimal-fees',
+    '0',
+    '--minimal-nanotez-per-byte',
+    '0',
+    '--minimal-nanotez-per-gas-unit',
+    '0',
+    '--max-priority',
+    '512',
+    '--minimal-timestamp',
+]
 PROTO_A = constants.DELPHI
 PROTO_A_DAEMON = constants.DELPHI_DAEMON
 PROTO_A_PATH = f"proto_{PROTO_A_DAEMON.replace('-','_')}"
 PROTO_B = constants.ALPHA
 
-PARAMETERS_FILE = (f'{paths.TEZOS_HOME}src/{PROTO_A_PATH}/parameters/'
-                   'test-parameters.json')
-assert os.path.isfile(PARAMETERS_FILE), (f'{PARAMETERS_FILE}'
-                                         ' cannot be found; please first run'
-                                         ' `make` in {paths.TEZOS_HOME}.')
+PARAMETERS_FILE = (
+    f'{paths.TEZOS_HOME}src/{PROTO_A_PATH}/parameters/' 'test-parameters.json'
+)
+assert os.path.isfile(PARAMETERS_FILE), (
+    f'{PARAMETERS_FILE}'
+    ' cannot be found; please first run'
+    ' `make` in {paths.TEZOS_HOME}.'
+)
 with open(PARAMETERS_FILE) as f:
     PARAMETERS = dict(json.load(f))
 MIGRATION_LEVEL = 3
@@ -30,36 +41,35 @@ BAKER = 'bootstrap1'
 
 BAKER_PKH = constants.IDENTITIES[BAKER]['identity']
 DEPOSIT_RECEIPTS = [
+    {"kind": "contract", "contract": BAKER_PKH, "change": "-512000000"},
     {
-        "kind": "contract",
-        "contract": BAKER_PKH,
-        "change": "-512000000"},
-    {
-        "kind": "freezer", "category": "deposits",
-        "delegate": BAKER_PKH, "cycle": 0,
-        "change": "512000000"}]
+        "kind": "freezer",
+        "category": "deposits",
+        "delegate": BAKER_PKH,
+        "cycle": 0,
+        "change": "512000000",
+    },
+]
 MIGRATION_RECEIPTS: List[object] = []
 
 # configure user-activate-upgrade at MIGRATION_LEVEL to test migration
 NODE_CONFIG = {
     'network': {
         'genesis': {
-            'timestamp':
-            '2018-06-30T16:07:32Z',
-            'block':
-            'BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2',
-            'protocol':
-            'ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im',
+            'timestamp': '2018-06-30T16:07:32Z',
+            'block': 'BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2',
+            'protocol': 'ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im',
         },
         'genesis_parameters': {
-            'values': {
-                'genesis_pubkey': constants.GENESIS_PK
-            }
+            'values': {'genesis_pubkey': constants.GENESIS_PK}
         },
         'chain_name': 'TEZOS',
         'sandboxed_chain_name': 'SANDBOXED_TEZOS',
-        'user_activated_upgrades':
-        [{'level': MIGRATION_LEVEL, 'replacement_protocol': PROTO_B}]}}
+        'user_activated_upgrades': [
+            {'level': MIGRATION_LEVEL, 'replacement_protocol': PROTO_B}
+        ],
+    }
+}
 
 
 @pytest.fixture(scope="class")
@@ -124,8 +134,9 @@ class TestMigration:
 
         # check that migration balance update appears in receipts
         metadata = client.get_metadata()
-        assert metadata['balance_updates'] == (DEPOSIT_RECEIPTS +
-                                               MIGRATION_RECEIPTS)
+        assert metadata['balance_updates'] == (
+            DEPOSIT_RECEIPTS + MIGRATION_RECEIPTS
+        )
         _ops_metadata_hash = client.get_operations_metadata_hash()
         _block_metadata_hash = client.get_block_metadata_hash()
 
@@ -157,32 +168,37 @@ class TestMigration:
         session['snapshot_rolling'] = file_rolling
         node_export.snapshot_export(file_full, params=['--block', head_hash])
         node_export.snapshot_export(
-            file_rolling, params=['--block', head_hash, '--rolling'])
+            file_rolling, params=['--block', head_hash, '--rolling']
+        )
 
     def test_import_full_snapshot_node1(self, sandbox, session):
-        sandbox.add_node(1, snapshot=session['snapshot_full'],
-                         node_config=NODE_CONFIG)
+        sandbox.add_node(
+            1, snapshot=session['snapshot_full'], node_config=NODE_CONFIG
+        )
         client = sandbox.client(1)
         client.bake(BAKER, BAKE_ARGS)
 
     def test_import_rolling_snapshot_node2(self, sandbox, session):
-        sandbox.add_node(2, snapshot=session['snapshot_rolling'],
-                         node_config=NODE_CONFIG)
+        sandbox.add_node(
+            2, snapshot=session['snapshot_rolling'], node_config=NODE_CONFIG
+        )
         client = sandbox.client(2)
         utils.synchronize([sandbox.client(1), client], max_diff=0)
         client.bake(BAKER, BAKE_ARGS)
 
     def test_reconstruct_full_node3(self, sandbox, session):
-        sandbox.add_node(3, snapshot=session['snapshot_full'],
-                         node_config=NODE_CONFIG)
+        sandbox.add_node(
+            3, snapshot=session['snapshot_full'], node_config=NODE_CONFIG
+        )
         sandbox.node(3).terminate()
         time.sleep(3)
         sandbox.node(3).reconstruct()
         sandbox.node(3).run()
         client = sandbox.client(3)
         assert client.check_node_listening()
-        utils.synchronize([sandbox.client(1), sandbox.client(2), client],
-                          max_diff=0)
+        utils.synchronize(
+            [sandbox.client(1), sandbox.client(2), client], max_diff=0
+        )
         client.bake(BAKER, BAKE_ARGS)
 
     def test_rerun_node0(self, sandbox):

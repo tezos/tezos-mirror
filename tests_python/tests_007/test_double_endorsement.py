@@ -16,8 +16,7 @@ class TestDoubleEndorsement:
     def test_init(self, sandbox: Sandbox):
         for i in range(NUM_NODES):
             sandbox.add_node(i, params=constants.NODE_PARAMS)
-        protocol.activate(sandbox.client(0),
-                          activate_in_the_past=True)
+        protocol.activate(sandbox.client(0), activate_in_the_past=True)
         sandbox.client(0).bake('bootstrap1', BAKE_ARGS)
 
     def test_level(self, sandbox: Sandbox):
@@ -31,7 +30,7 @@ class TestDoubleEndorsement:
 
     def test_bake_node_0(self, sandbox: Sandbox):
         """Client 0 bakes block A at level 3, not communicated to 1 and 2
-           Inject an endorsement to ensure a different hash"""
+        Inject an endorsement to ensure a different hash"""
         sandbox.client(0).endorse('bootstrap1')
         sandbox.client(0).bake('bootstrap1', BAKE_ARGS)
 
@@ -81,24 +80,34 @@ class TestDoubleEndorsement:
         head_hash = client.get_head()['hash']
 
         def transform_endorsement(end):
-            return {'branch': end['branch'],
-                    'operations': end['contents'][0],
-                    'signature': end['signature']}
+            return {
+                'branch': end['branch'],
+                'operations': end['contents'][0],
+                'signature': end['signature'],
+            }
+
         endorsement1 = transform_endorsement(session['endorsement1'])
         endorsement2 = transform_endorsement(session['endorsement2'])
-        operation = {'branch': head_hash,
-                     'contents': [{'kind': 'double_endorsement_evidence',
-                                   'op1': endorsement1,
-                                   'op2': endorsement2}]}
+        operation = {
+            'branch': head_hash,
+            'contents': [
+                {
+                    'kind': 'double_endorsement_evidence',
+                    'op1': endorsement1,
+                    'op2': endorsement2,
+                }
+            ],
+        }
 
-        path_forge_operation = ('/chains/main/blocks/head/helpers/forge/'
-                                'operations')
-        operation_hex_string = client.rpc('post',
-                                          path_forge_operation,
-                                          data=operation)
+        path_forge_operation = (
+            '/chains/main/blocks/head/helpers/forge/operations'
+        )
+        operation_hex_string = client.rpc(
+            'post', path_forge_operation, data=operation
+        )
         assert isinstance(operation_hex_string, str)
         sender_sk_long = constants.IDENTITIES['bootstrap1']['secret']
-        sender_sk = sender_sk_long[len('unencrypted:'):]
+        sender_sk = sender_sk_long[len('unencrypted:') :]
         signed_op = utils.sign_operation(operation_hex_string, sender_sk)
         op_hash = client.rpc('post', 'injection/operation', signed_op)
         assert isinstance(op_hash, str)
@@ -107,5 +116,6 @@ class TestDoubleEndorsement:
     def test_operation_applied(self, sandbox: Sandbox, session: dict):
         """Check operation is in mempool"""
         client = sandbox.client(1)
-        assert utils.check_mempool_contains_operations(client,
-                                                       [session['operation']])
+        assert utils.check_mempool_contains_operations(
+            client, [session['operation']]
+        )

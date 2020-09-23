@@ -3,11 +3,17 @@ import os
 from typing import List
 
 
-def all_contracts(contract_path: str,
-                  directories: List[str] = None) -> List[str]:
+def all_contracts(
+    contract_path: str, directories: List[str] = None
+) -> List[str]:
     if directories is None:
-        directories = ['attic', 'opcodes',
-                       'macros', 'mini_scenarios', 'non_regression']
+        directories = [
+            'attic',
+            'opcodes',
+            'macros',
+            'mini_scenarios',
+            'non_regression',
+        ]
     contracts = []
     for directory in directories:
         for contract in os.listdir(path.join(contract_path, directory)):

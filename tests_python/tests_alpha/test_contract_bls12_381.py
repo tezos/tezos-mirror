@@ -17,10 +17,9 @@ def check_contract(client, contract_name, arg, expected_storage):
 
 
 def check_contract_binop(client, contract_name, arg0, arg1, expected_storage):
-    check_contract(client,
-                   contract_name,
-                   f'Pair {arg0} {arg1}',
-                   expected_storage)
+    check_contract(
+        client, contract_name, f'Pair {arg0} {arg1}', expected_storage
+    )
 
 
 # prefix a type name with 'bls12_381_'
@@ -36,20 +35,24 @@ def check_store(client, cls, arg):
 
 # Add
 def check_add(client, cls, xxx, yyy):
-    check_contract_binop(client,
-                         f'add_{bls(cls.name)}',
-                         cls.to_hex(xxx),
-                         cls.to_hex(yyy),
-                         cls.to_hex(cls.add(xxx, yyy)))
+    check_contract_binop(
+        client,
+        f'add_{bls(cls.name)}',
+        cls.to_hex(xxx),
+        cls.to_hex(yyy),
+        cls.to_hex(cls.add(xxx, yyy)),
+    )
 
 
 # Mul
 def check_mul(client, cls, xxx, yyy):
-    check_contract_binop(client,
-                         f'mul_{bls(cls.name)}',
-                         cls.to_hex(xxx),
-                         Fr.to_hex(yyy),
-                         cls.to_hex(cls.mul(xxx, yyy)))
+    check_contract_binop(
+        client,
+        f'mul_{bls(cls.name)}',
+        cls.to_hex(xxx),
+        Fr.to_hex(yyy),
+        cls.to_hex(cls.mul(xxx, yyy)),
+    )
 
 
 # Neg
@@ -142,8 +145,9 @@ class TestBls12_381:
     @pytest.mark.parametrize("cls", ADD_CLASSES)
     def test_add_random_random(self, client_regtest, cls):
         for _ in RANDOM_ITERATIONS:
-            check_add(client_regtest, cls, cls.random(self.gen),
-                      cls.random(self.gen))
+            check_add(
+                client_regtest, cls, cls.random(self.gen), cls.random(self.gen)
+            )
 
     # Mul
     @pytest.mark.parametrize("cls", MUL_CLASSES)
@@ -185,8 +189,9 @@ class TestBls12_381:
     @pytest.mark.parametrize("cls", MUL_CLASSES)
     def test_mul_random_random(self, client_regtest, cls):
         for _ in RANDOM_ITERATIONS:
-            check_mul(client_regtest, cls, cls.random(self.gen),
-                      Fr.random(self.gen))
+            check_mul(
+                client_regtest, cls, cls.random(self.gen), Fr.random(self.gen)
+            )
 
     # Neg
     @pytest.mark.parametrize("cls", NEG_CLASSES)
@@ -276,8 +281,10 @@ class TestBls12_381:
             pk1 = G2.mul(G2.one, sk1)  # public key
             # we don't have hash-to-curve on g1, so compute a random point
             sig1 = G1.mul(msg_hash, sk1)  # signature
-            args1 = [(G1.add(msg_hash, msg_hash), G2.add(pk0, pk1)),
-                     (G1.neg(G1.add(sig0, sig1)), G2.add(G2.one, G2.one))]
+            args1 = [
+                (G1.add(msg_hash, msg_hash), G2.add(pk0, pk1)),
+                (G1.neg(G1.add(sig0, sig1)), G2.add(G2.one, G2.one)),
+            ]
             check_pairing_check(client_regtest, args1)
 
     def test_groth16(self, client_regtest):
@@ -300,8 +307,10 @@ class TestBls12_381:
         client_regtest.run_script(contract, 'Unit', arg)
 
     def test_fr_bytes_parameters_more_than_32_bytes(self, client_regtest):
-        random_bytes = "0xf7ef66f95c90b2f953eb0555af65f22095d4f54b40ea8c6d" + \
-            "cc2014740e8662c16bb8786723"
+        random_bytes = (
+            "0xf7ef66f95c90b2f953eb0555af65f22095d4f54b40ea8c6d"
+            + "cc2014740e8662c16bb8786723"
+        )
         contract = path.join(OPCODES_CONTRACT_PATH, 'bls12_381_fr_to_int.tz')
         with assert_run_failure(r'error running script'):
             client_regtest.run_script(contract, storage='0', inp=random_bytes)

@@ -4,8 +4,8 @@ from launchers.sandbox import Sandbox
 
 
 def scenario():
-    """ a private tezos network, initialized with network parameters
-        and some accounts. """
+    """a private tezos network, initialized with network parameters
+    and some accounts."""
     with Sandbox(paths.TEZOS_HOME, constants.IDENTITIES) as sandbox:
         # Launch node running protocol alpha
         sandbox.add_node(0, params=constants.NODE_PARAMS)

@@ -102,8 +102,9 @@ class RunScriptResult:
         match = re.search(pattern_str, client_output)
         if match is not None:
             compiled_pattern = re.compile(r"  ((New|Set|Del|Unset).*?)\n")
-            for match_diff in compiled_pattern.finditer(client_output,
-                                                        match.end(0)):
+            for match_diff in compiled_pattern.finditer(
+                client_output, match.end(0)
+            ):
                 self.big_map_diff.append([match_diff.group(1)])
 
         self.client_output = client_output
@@ -272,8 +273,10 @@ class SaplingGenKeyResult:
     """Result of a 'sapling gen key' operation."""
 
     def __init__(self, client_output: str):
-        pattern = (r'It is important to save this mnemonic in a secure '
-                   r'place:\n\n([\w\s]+)\n\nThe mnemonic')
+        pattern = (
+            r'It is important to save this mnemonic in a secure '
+            r'place:\n\n([\w\s]+)\n\nThe mnemonic'
+        )
         match = re.search(pattern, client_output)
         if match is None:
             raise InvalidClientOutput(client_output)
@@ -284,8 +287,7 @@ class SaplingGenAddressResult:
     """Result of a 'sapling gen address' operation."""
 
     def __init__(self, client_output: str):
-        address_match = re.search(r"Generated address:\n(\w+)\n",
-                                  client_output)
+        address_match = re.search(r"Generated address:\n(\w+)\n", client_output)
         if address_match is None:
             raise InvalidClientOutput(client_output)
         self.address = address_match.groups()[0]
@@ -309,8 +311,9 @@ class SaplingGetBalanceResult:
     """Result of a 'sapling get balance' query."""
 
     def __init__(self, client_output: str):
-        balance_match = re.search(r"Total Sapling funds ([\d\.]+)",
-                                  client_output)
+        balance_match = re.search(
+            r"Total Sapling funds ([\d\.]+)", client_output
+        )
         if balance_match is None:
             raise InvalidClientOutput(client_output)
         self.balance = float(balance_match.groups()[0])
@@ -358,7 +361,6 @@ def extract_environment_protocol(client_output: str) -> str:
 
 
 class PointInfo:
-
     def __init__(self, peer_id=None, is_connected=None, is_trusted=None):
         self.peer_id = peer_id
         self.is_connected = is_connected
@@ -391,7 +393,7 @@ def parse_point(line):
     point_id = groups[1]
     peer_id = groups[2]
     if peer_id and peer_id.startswith('(last seen: '):
-        peer_id = peer_id[12: 42]
+        peer_id = peer_id[12:42]
     res = (point_id, peer_id, is_connected, is_trusted)
     return res
 
@@ -405,13 +407,13 @@ class P2pStatResult:
         lines = client_output.splitlines()
         j = lines.index('KNOWN PEERS')
         k = lines.index('KNOWN POINTS')
-        self.peers = [parse_peer(line) for line in lines[j+1:k]]
-        points_list = (parse_point(line) for line in lines[k+1:])
+        self.peers = [parse_peer(line) for line in lines[j + 1 : k]]
+        points_list = (parse_point(line) for line in lines[k + 1 :])
         for addr, peer_id, is_connected, is_trusted in points_list:
             self.points[addr] = PointInfo(peer_id, is_connected, is_trusted)
 
 
-class GetContractEntrypointTypeResult():
+class GetContractEntrypointTypeResult:
     """Result of a 'get contract entrypoint type of' command."""
 
     def __init__(self, client_output: str):
@@ -433,7 +435,7 @@ class ListMockupProtocols:
 @unique
 class CreateMockupResult(Enum):
     """
-        Possible behaviors of `tezos-client create mockup`
+    Possible behaviors of `tezos-client create mockup`
     """
 
     ALREADY_INITIALIZED = auto()
@@ -465,12 +467,21 @@ class CreateMockup:
         #   aka, where to look for the pattern
         # - the result to set in self.create_mockup_result
         outputs = [
-            (r"^  \S+ is not empty, please specify a fresh base directory$",
-             client_stderr, CreateMockupResult.DIR_NOT_EMPTY),
-            (r"^  \S+ is already initialized as a mockup directory$",
-             client_stderr, CreateMockupResult.ALREADY_INITIALIZED),
-            (r"^Created mockup client base dir in \S+$", client_stdout,
-             CreateMockupResult.OK),
+            (
+                r"^  \S+ is not empty, please specify a fresh base directory$",
+                client_stderr,
+                CreateMockupResult.DIR_NOT_EMPTY,
+            ),
+            (
+                r"^  \S+ is already initialized as a mockup directory$",
+                client_stderr,
+                CreateMockupResult.ALREADY_INITIALIZED,
+            ),
+            (
+                r"^Created mockup client base dir in \S+$",
+                client_stdout,
+                CreateMockupResult.OK,
+            ),
         ]
 
         for outp in outputs:

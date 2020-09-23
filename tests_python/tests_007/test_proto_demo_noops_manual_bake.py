@@ -49,8 +49,9 @@ class TestProtoDemo:
 
     def test_activate_proto(self, client: Client):
         parameters = {}  # type: dict
-        res = client.activate_protocol_json(PROTO, parameters, key='activator',
-                                            fitness='1')
+        res = client.activate_protocol_json(
+            PROTO, parameters, key='activator', fitness='1'
+        )
         assert res.block_hash
 
     def test_level1(self, client: Client):
@@ -63,15 +64,16 @@ class TestProtoDemo:
         time.sleep(1)
         message = "hello world"
 
-        data = {"protocol_data":
-                {"protocol": PROTO,
-                 "block_header_data": message},
-                "operations": []}
+        data = {
+            "protocol_data": {"protocol": PROTO, "block_header_data": message},
+            "operations": [],
+        }
         block = client.rpc(
             'post',
             '/chains/main/blocks/head/helpers/preapply/block',
             data=data,
-            params=PARAMS)
+            params=PARAMS,
+        )
 
         protocol_data = {'block_header_data': message}
         encoded = forge_block_header_data(protocol_data)
@@ -82,13 +84,12 @@ class TestProtoDemo:
             'post',
             '/chains/main/blocks/head/helpers/forge_block_header',
             data=shell_header,
-            params=PARAMS)
+            params=PARAMS,
+        )
 
         inject = {'data': encoded['block'], 'operations': []}
-        client.rpc('post', '/injection/block', data=inject,
-                   params=PARAMS)
+        client.rpc('post', '/injection/block', data=inject, params=PARAMS)
 
     def test_level2(self, client: Client):
-        head = client.rpc('get', '/chains/main/blocks/head/',
-                          params=PARAMS)
+        head = client.rpc('get', '/chains/main/blocks/head/', params=PARAMS)
         assert head['header']['level'] == 2

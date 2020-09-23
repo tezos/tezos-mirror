@@ -10,8 +10,10 @@ def scenario(contract, storage, time_between_blocks, proto):
     if proto is None:
         proto = 'alpha'
     assert proto in {'alpha', 'babylon'}, 'unknown protocol'
-    protos = {'alpha': (constants.ALPHA, constants.ALPHA_DAEMON),
-              'babylon': (constants.BABYLON, constants.BABYLON_DAEMON)}
+    protos = {
+        'alpha': (constants.ALPHA, constants.ALPHA_DAEMON),
+        'babylon': (constants.BABYLON, constants.BABYLON_DAEMON),
+    }
     proto_hash, proto_daemon = protos[proto]
     if contract:
         assert os.path.isfile(contract), f'{contract} is not a file'
@@ -29,8 +31,9 @@ def scenario(contract, storage, time_between_blocks, proto):
             args = ['--init', storage, '--burn-cap', '10.0']
             sender = 'bootstrap2'
             amount = 0
-            client.originate('my_contract', sender, amount, sender,
-                             contract, args)
+            client.originate(
+                'my_contract', sender, amount, sender, contract, args
+            )
         while 1:
             client.get_head()
             time.sleep(time_between_blocks)
@@ -49,23 +52,39 @@ def main():
     description = DESCRIPTION
     parser = argparse.ArgumentParser(description=description)
 
-    parser.add_argument('--time-between-blocks', dest='time_between_blocks',
-                        metavar='TIME',
-                        help='time between blocks (seconds), default=2',
-                        required=False, default='2')
-    parser.add_argument('--contract', dest='contract', metavar='CONTRACT',
-                        help='path to the contract', required=False)
-    parser.add_argument('--storage', dest='storage', metavar='STORAGE',
-                        help='initial storage for contract',
-                        required=False
-                        )
-    parser.add_argument('--proto', dest='proto', metavar='PROTO',
-                        help='alpha, babylon (default alpha)',
-                        required=False
-                        )
+    parser.add_argument(
+        '--time-between-blocks',
+        dest='time_between_blocks',
+        metavar='TIME',
+        help='time between blocks (seconds), default=2',
+        required=False,
+        default='2',
+    )
+    parser.add_argument(
+        '--contract',
+        dest='contract',
+        metavar='CONTRACT',
+        help='path to the contract',
+        required=False,
+    )
+    parser.add_argument(
+        '--storage',
+        dest='storage',
+        metavar='STORAGE',
+        help='initial storage for contract',
+        required=False,
+    )
+    parser.add_argument(
+        '--proto',
+        dest='proto',
+        metavar='PROTO',
+        help='alpha, babylon (default alpha)',
+        required=False,
+    )
     args = parser.parse_args()
-    scenario(args.contract, args.storage, int(args.time_between_blocks),
-             args.proto)
+    scenario(
+        args.contract, args.storage, int(args.time_between_blocks), args.proto
+    )
 
 
 if __name__ == "__main__":

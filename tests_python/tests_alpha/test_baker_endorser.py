@@ -31,9 +31,9 @@ def random_op(client):
 @pytest.mark.slow
 @pytest.mark.incremental
 class TestAllDaemonsWithOperations:
-    '''Runs two baker and two endorsers, generates random op, and
-       add (or replace) new nodes dynamically. After a little while,
-       we kill the bakers and check everyone synchronize to the same head. '''
+    """Runs two baker and two endorsers, generates random op, and
+    add (or replace) new nodes dynamically. After a little while,
+    we kill the bakers and check everyone synchronize to the same head."""
 
     def test_setup_network(self, sandbox: Sandbox):
         parameters = dict(protocol.PARAMETERS)
@@ -44,10 +44,12 @@ class TestAllDaemonsWithOperations:
         protocol.activate(sandbox.client(0), parameters)
         sandbox.add_baker(0, 'bootstrap5', proto=protocol.DAEMON)
         sandbox.add_baker(1, 'bootstrap4', proto=protocol.DAEMON)
-        sandbox.add_endorser(0, account='bootstrap1', endorsement_delay=1,
-                             proto=protocol.DAEMON)
-        sandbox.add_endorser(1, account='bootstrap2', endorsement_delay=1,
-                             proto=protocol.DAEMON)
+        sandbox.add_endorser(
+            0, account='bootstrap1', endorsement_delay=1, proto=protocol.DAEMON
+        )
+        sandbox.add_endorser(
+            1, account='bootstrap2', endorsement_delay=1, proto=protocol.DAEMON
+        )
 
     def test_wait_for_protocol(self, sandbox: Sandbox):
         clients = sandbox.all_clients()
@@ -55,8 +57,9 @@ class TestAllDaemonsWithOperations:
             proto = protocol.HASH
             assert utils.check_protocol(client, proto)
 
-    def test_network_gen_operations_and_add_nodes(self, sandbox: Sandbox,
-                                                  session):
+    def test_network_gen_operations_and_add_nodes(
+        self, sandbox: Sandbox, session
+    ):
         node_add_period = NUM_CYCLES // NEW_NODES
         for cycle in range(NUM_CYCLES):
             i = random.randrange(NUM_NODES)
@@ -77,8 +80,7 @@ class TestAllDaemonsWithOperations:
                     running_nodes.remove(0)
                     running_nodes.remove(1)
                     sandbox.rm_node(random.choice(running_nodes))
-                sandbox.add_node(new_node,
-                                 params=constants.NODE_PARAMS)
+                sandbox.add_node(new_node, params=constants.NODE_PARAMS)
                 proto = protocol.HASH
                 assert utils.check_protocol(sandbox.client(new_node), proto)
             time.sleep(TIME_BETWEEN_CYCLE)
@@ -95,8 +97,9 @@ class TestAllDaemonsWithOperations:
         assert level >= 5
 
     def test_check_operations(self, sandbox: Sandbox):
-        min_level = min([client.get_level()
-                         for client in sandbox.all_clients()])
+        min_level = min(
+            [client.get_level() for client in sandbox.all_clients()]
+        )
         heads_hash = set()
         # check there is exactly one head
         for client in sandbox.all_clients():

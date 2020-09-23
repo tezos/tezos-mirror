@@ -37,8 +37,9 @@ class TestProtoDemo:
 
     def test_activate_proto(self, client: Client):
         parameters = {'init_a': 100, 'init_b': 100}
-        res = client.activate_protocol_json(PROTO, parameters, key='activator',
-                                            fitness='1')
+        res = client.activate_protocol_json(
+            PROTO, parameters, key='activator', fitness='1'
+        )
         assert res.block_hash
 
     def test_level1(self, client: Client):

@@ -5,14 +5,16 @@ from tools import paths
 
 CODEC_BIN = paths.TEZOS_HOME + "tezos-codec"
 
-ENCODINGS = [("network_version", {"p2p_version": 0,
-                                  "distributed_db_version": 1,
-                                  "chain_name": "main"})]
+ENCODINGS = [
+    (
+        "network_version",
+        {"p2p_version": 0, "distributed_db_version": 1, "chain_name": "main"},
+    )
+]
 
 
 @pytest.mark.codec
 class TestCodec:
-
     @pytest.mark.parametrize("encoding_name, data", ENCODINGS)
     def test_codec_encode_decode(self, encoding_name: str, data: Any):
         codec = Codec(CODEC_BIN)

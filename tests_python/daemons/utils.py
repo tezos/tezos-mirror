@@ -1,6 +1,11 @@
 import subprocess
-from typing import (IO, Any, List, Optional,  # pylint: disable=unused-import
-                    Union)
+from typing import (
+    IO,
+    Any,
+    List,
+    Optional,  # pylint: disable=unused-import
+    Union,
+)
 
 
 # TODO factorize with client.format_command
@@ -12,9 +17,9 @@ def format_command(cmd: List[str], color=True) -> str:
     return f'{color_code}# {cmd_str}{endc}' if color else f'# {cmd_str}'
 
 
-def prepare_log(cmd: List[str],
-                log_file: Optional[str],
-                overwrite: bool = True):
+def prepare_log(
+    cmd: List[str], log_file: Optional[str], overwrite: bool = True
+):
     """ By default overwrite old log, append otherwise """
     stdout = 0  # type: Union[int, IO[Any]]
     cmd_str = format_command(cmd, color=False)

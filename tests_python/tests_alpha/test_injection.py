@@ -16,8 +16,10 @@ def clients(sandbox):
 
 
 PROTO = f'{paths.TEZOS_HOME}/src/bin_client/test/proto_test_injection'
-COMPILER = (f'{paths.TEZOS_HOME}/_build/default/src/lib_protocol_compiler/'
-            'main_native.exe')
+COMPILER = (
+    f'{paths.TEZOS_HOME}/_build/default/src/lib_protocol_compiler/'
+    'main_native.exe'
+)
 PARAMS = ['-p', 'ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im']
 
 
@@ -31,8 +33,9 @@ class TestInjectionAndActivation:
 
     def test_compute_hash(self, session: dict):
         cmd = [COMPILER, '-hash-only', PROTO]
-        res = subprocess.run(cmd, universal_newlines=True, check=True,
-                             stdout=subprocess.PIPE)
+        res = subprocess.run(
+            cmd, universal_newlines=True, check=True, stdout=subprocess.PIPE
+        )
         proto_hash = res.stdout[:-1]
         assert len(proto_hash) == 51
         session['proto_hash'] = proto_hash
@@ -52,8 +55,9 @@ class TestInjectionAndActivation:
     def test_activation(self, clients: List[Client], session: dict):
         proto = session['proto_hash']
         parameters = {}  # type: dict
-        res = clients[0].activate_protocol_json(proto, parameters,
-                                                key='activator', fitness='1')
+        res = clients[0].activate_protocol_json(
+            proto, parameters, key='activator', fitness='1'
+        )
         assert res.block_hash
 
     def test_check_protocol(self, clients: List[Client], session: dict):
@@ -85,8 +89,9 @@ class TestActivation:
     def test_activate_demo(self, client: Client):
         proto = 'ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp'
         parameters = {}  # type: dict
-        res = client.activate_protocol_json(proto, parameters, key='activator',
-                                            fitness='1')
+        res = client.activate_protocol_json(
+            proto, parameters, key='activator', fitness='1'
+        )
         assert res.block_hash
 
     def test_level1(self, client: Client):

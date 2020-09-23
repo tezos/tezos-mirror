@@ -34,10 +34,30 @@ def client(sandbox, node):
 @pytest.fixture
 def mnemonic():
     return [
-        "morning", "dinosaur", "estate", "youth", "sausage", "feature",
-        "apology", "bullet", "square", "type", "zoo", "coyote", "extra",
-        "fabric", "grain", "phone", "pipe", "despair", "razor", "ranch",
-        "blouse", "debris", "urge", "evidence"
+        "morning",
+        "dinosaur",
+        "estate",
+        "youth",
+        "sausage",
+        "feature",
+        "apology",
+        "bullet",
+        "square",
+        "type",
+        "zoo",
+        "coyote",
+        "extra",
+        "fabric",
+        "grain",
+        "phone",
+        "pipe",
+        "despair",
+        "razor",
+        "ranch",
+        "blouse",
+        "debris",
+        "urge",
+        "evidence",
     ]
 
 
@@ -59,69 +79,75 @@ def key_name():
 @pytest.mark.client
 class TestSaplingWalletImportKey:
     @pytest.fixture
-    def client(self, sandbox, node, non_originated_contract_name,
-               non_originated_contract_address):
+    def client(
+        self,
+        sandbox,
+        node,
+        non_originated_contract_name,
+        non_originated_contract_address,
+    ):
         """
         A client with a pre-registered contract to link the wallet with.
         """
         client = sandbox.get_new_client(node)
-        client.remember_contract(non_originated_contract_name,
-                                 non_originated_contract_address)
+        client.remember_contract(
+            non_originated_contract_name, non_originated_contract_address
+        )
         return client
 
     def test_import_key_no_force(self, client, mnemonic, key_name):
         """
         Import key without forcing and without pre-existing alias
         """
-        client.sapling_import_key(key_name,
-                                  mnemonic,
-                                  force=False)
+        client.sapling_import_key(key_name, mnemonic, force=False)
 
     def test_import_key_force_and_non_previously_saved(
-            self, client, mnemonic, key_name,
+        self,
+        client,
+        mnemonic,
+        key_name,
     ):
         """
         Import key with forcing and without pre-existing alias
         """
-        client.sapling_import_key(key_name,
-                                  mnemonic,
-                                  force=True)
+        client.sapling_import_key(key_name, mnemonic, force=True)
 
     def test_import_key_force_and_previously_saved(
-            self, client, mnemonic, key_name,
+        self,
+        client,
+        mnemonic,
+        key_name,
     ):
         """
         Import key with forcing and with pre-existing alias
         """
-        client.sapling_import_key(key_name,
-                                  mnemonic,
-                                  force=False)
-        client.sapling_import_key(key_name,
-                                  mnemonic,
-                                  force=True)
+        client.sapling_import_key(key_name, mnemonic, force=False)
+        client.sapling_import_key(key_name, mnemonic, force=True)
 
 
 class TestSaplingWalletAddressGeneration:
     @pytest.fixture
-    def client(self, sandbox, node, key_name,
-               mnemonic):
+    def client(self, sandbox, node, key_name, mnemonic):
         """
         A client with a sapling wallet
         """
         client = sandbox.get_new_client(node)
-        client.sapling_import_key(key_name,
-                                  mnemonic,
-                                  force=False)
+        client.sapling_import_key(key_name, mnemonic, force=False)
         return client
 
     @pytest.mark.parametrize(
         "expected_address,expected_index",
-        [("zet13XtyU5Bkasoj1b19sy4DJc7U13XydbxLHqLUdf8Y5tarGb"
-          "HgFLgDrT6J6FYJoHGL3", 0)]
+        [
+            (
+                "zet13XtyU5Bkasoj1b19sy4DJc7U13XydbxLHqLUdf8Y5tarGb"
+                "HgFLgDrT6J6FYJoHGL3",
+                0,
+            )
+        ],
     )
-    def test_generate_first_address_of_key(self, client, key_name,
-                                           expected_address,
-                                           expected_index):
+    def test_generate_first_address_of_key(
+        self, client, key_name, expected_address, expected_index
+    ):
         result = client.sapling_gen_address(key_name)
         assert result.index == expected_index
         assert result.address == expected_address
@@ -129,46 +155,70 @@ class TestSaplingWalletAddressGeneration:
     @pytest.mark.parametrize(
         "requested_index,expected_address,expected_index",
         [
-            (0,
-             "zet13XtyU5Bkasoj1b19sy4DJc7U13XydbxLHqLUdf8Y5tarGb"
-             "HgFLgDrT6J6FYJoHGL3",
-             0),
-            (1,
-             "zet13mN26QV67FgPzMSzrigXjKZNMMtCubhi9L3kUePnFYdXqEj"
-             "c8pmjw1h2wC6NLZf5F",
-             1),
-            (2,
-             "zet12hzbYRRKbWwKPY61FkjLg7CRWTcjooqeH7VH18fA6Vxnwy7"
-             "WyTrAEqBXmEdHp9woU",
-             4),
-            (3,
-             "zet12hzbYRRKbWwKPY61FkjLg7CRWTcjooqeH7VH18fA6Vxnwy7"
-             "WyTrAEqBXmEdHp9woU",
-             4),
-            (4,
-             "zet12hzbYRRKbWwKPY61FkjLg7CRWTcjooqeH7VH18fA6Vxnwy7"
-             "WyTrAEqBXmEdHp9woU",
-             4),
-            (100,
-             "zet14LmgdAzVrTtQKpeuD3f2y7wFSjXTMEexNNuiEWhGimm25en"
-             "xkqmwmbdFsC4y6YmYx",
-             100),
-            (143534,
-             "zet14EWNxZYoHJASHFpcCYSfTfQokWSMzdJeV5SfaGEPDtiYiDC"
-             "X5jz8QkMF5jZaK5F4k",
-             143536),
-            (42,
-             "zet143WVQUmNodhSe4ytHL6gvtdXYhRp7bywDWASUFYUCMGAS71"
-             "juXT6AyWY89fjg3eZn",
-             42),
-            (90870987456348,
-             "zet13CiUqFsVEr2LdMnyyUQNL3Nh74sa4LdU6V3oD3YfcizbwuF"
-             "tftPRYvRrB2zsVaEw1",
-             90870987456348),
-        ])
+            (
+                0,
+                "zet13XtyU5Bkasoj1b19sy4DJc7U13XydbxLHqLUdf8Y5tarGb"
+                "HgFLgDrT6J6FYJoHGL3",
+                0,
+            ),
+            (
+                1,
+                "zet13mN26QV67FgPzMSzrigXjKZNMMtCubhi9L3kUePnFYdXqEj"
+                "c8pmjw1h2wC6NLZf5F",
+                1,
+            ),
+            (
+                2,
+                "zet12hzbYRRKbWwKPY61FkjLg7CRWTcjooqeH7VH18fA6Vxnwy7"
+                "WyTrAEqBXmEdHp9woU",
+                4,
+            ),
+            (
+                3,
+                "zet12hzbYRRKbWwKPY61FkjLg7CRWTcjooqeH7VH18fA6Vxnwy7"
+                "WyTrAEqBXmEdHp9woU",
+                4,
+            ),
+            (
+                4,
+                "zet12hzbYRRKbWwKPY61FkjLg7CRWTcjooqeH7VH18fA6Vxnwy7"
+                "WyTrAEqBXmEdHp9woU",
+                4,
+            ),
+            (
+                100,
+                "zet14LmgdAzVrTtQKpeuD3f2y7wFSjXTMEexNNuiEWhGimm25en"
+                "xkqmwmbdFsC4y6YmYx",
+                100,
+            ),
+            (
+                143534,
+                "zet14EWNxZYoHJASHFpcCYSfTfQokWSMzdJeV5SfaGEPDtiYiDC"
+                "X5jz8QkMF5jZaK5F4k",
+                143536,
+            ),
+            (
+                42,
+                "zet143WVQUmNodhSe4ytHL6gvtdXYhRp7bywDWASUFYUCMGAS71"
+                "juXT6AyWY89fjg3eZn",
+                42,
+            ),
+            (
+                90870987456348,
+                "zet13CiUqFsVEr2LdMnyyUQNL3Nh74sa4LdU6V3oD3YfcizbwuF"
+                "tftPRYvRrB2zsVaEw1",
+                90870987456348,
+            ),
+        ],
+    )
     def test_generate_address_with_address_index(
-            self, client, key_name, expected_address, expected_index,
-            requested_index):
+        self,
+        client,
+        key_name,
+        expected_address,
+        expected_index,
+        requested_index,
+    ):
         result = client.sapling_gen_address(key_name, index=requested_index)
         assert result.index == expected_index
         assert result.address == expected_address
@@ -185,8 +235,10 @@ class TestSaplingShieldedTez:
 
     @pytest.fixture
     def contract_path(self):
-        return (f'{paths.TEZOS_HOME}src/proto_alpha/lib_protocol/test/'
-                'contracts/sapling_contract.tz')
+        return (
+            f'{paths.TEZOS_HOME}src/proto_alpha/lib_protocol/test/'
+            'contracts/sapling_contract.tz'
+        )
 
     @pytest.fixture
     def contract_name(self):
@@ -204,15 +256,16 @@ class TestSaplingShieldedTez:
         tmpdir = tmpdir_factory.mktemp("sapling_transactions_shielded_tez")
         return tmpdir
 
-    def test_originate_sapling_contract(self, contract_path, client, session,
-                                        contract_name):
+    def test_originate_sapling_contract(
+        self, contract_path, client, session, contract_name
+    ):
         sender = "bootstrap1"
         origination = client.originate(
             contract_name=contract_name,
             amount=0,
             sender=sender,
             contract=contract_path,
-            args=["--init", "{ }", "--burn-cap", "3.0"]
+            args=["--init", "{ }", "--burn-cap", "3.0"],
         )
         session["contract_address"] = origination.contract
         client.bake(sender, ["--minimal-timestamp"])
@@ -224,9 +277,9 @@ class TestSaplingShieldedTez:
     def test_generate_bob(self, client, session, contract_name):
         key_name = "bob"
         result = client.sapling_gen_key(key_name=key_name)
-        client.sapling_use_key_for_contract(key_name,
-                                            contract_name,
-                                            memo_size=8)
+        client.sapling_use_key_for_contract(
+            key_name, contract_name, memo_size=8
+        )
         session['bob_mnemonic'] = result.mnemonic
 
     def test_list_keys_bob(self, client):
@@ -241,8 +294,9 @@ class TestSaplingShieldedTez:
         """
         key_name = "ali"
         client.sapling_gen_key(key_name=key_name)
-        client.sapling_use_key_for_contract(key_name=key_name,
-                                            contract_name=contract_name)
+        client.sapling_use_key_for_contract(
+            key_name=key_name, contract_name=contract_name
+        )
         keys = client.sapling_list_keys()
         assert keys == ["ali", "bob"]
 
@@ -280,16 +334,16 @@ class TestSaplingShieldedTez:
         # Fees
         assert 3999387 <= bootstrap2_balance <= 3999388
         bob_balance = client.sapling_get_balance(
-            key_name="bob",
-            contract_name=contract_name).balance
+            key_name="bob", contract_name=contract_name
+        ).balance
         assert bob_balance == 100
 
-    def test_check_contract_balance_after_shielding(self, client,
-                                                    contract_name):
+    def test_check_contract_balance_after_shielding(
+        self, client, contract_name
+    ):
         assert client.get_balance(contract_name) == 100.0
 
-    def test_regenerate_bob_from_mnemonic(self, client,
-                                          session):
+    def test_regenerate_bob_from_mnemonic(self, client, session):
         # Overwrite the old 'bob' key with one restored from the mnemonic.
         key_name = "bob"
         client.sapling_import_key(
@@ -303,7 +357,7 @@ class TestSaplingShieldedTez:
             source_key_name='bob',
             target_key_name='alice',
             contract_name=contract_name,
-            index='0'
+            index='0',
         )
         assert result.path == '0/0'
 
@@ -312,7 +366,7 @@ class TestSaplingShieldedTez:
             source_key_name='bob',
             target_key_name='yves',
             contract_name=contract_name,
-            index='1'
+            index='1',
         )
         assert result.path == '0/1'
 
@@ -322,8 +376,9 @@ class TestSaplingShieldedTez:
         )
         session['alice_address_0'] = result.address
 
-    def test_alice_shields_money_insufficient_funds(self, client, session,
-                                                    contract_name):
+    def test_alice_shields_money_insufficient_funds(
+        self, client, session, contract_name
+    ):
         with assert_run_failure(r'too low \(4000000\) to spend 2100000000'):
             client.sapling_shield(
                 amount=2100000000.0,
@@ -339,27 +394,30 @@ class TestSaplingShieldedTez:
             src="bootstrap3",
             dest=session['alice_address_0'],
             contract=contract_name,
-            args=["--burn-cap", "3.0", ],
+            args=[
+                "--burn-cap",
+                "3.0",
+            ],
         )
         client.bake("bootstrap3", ["--minimal-timestamp"])
         bootstrap3_balance = client.get_balance("bootstrap3")
         assert bootstrap3_balance >= 3999387
         assert bootstrap3_balance <= 3999388
         alice_balance = client.sapling_get_balance(
-            key_name="alice",
-            contract_name=contract_name).balance
+            key_name="alice", contract_name=contract_name
+        ).balance
         assert alice_balance == 100.0
 
-    @pytest.mark.parametrize("transaction_file,use_json", [
-        ("sapling_transaction.bin", False),
-        ("sapling_transaction.json", True),
-    ])
-    def test_forge_alice_to_bob_insufficient_funds(self,
-                                                   client,
-                                                   tmpdir, contract_name,
-                                                   session,
-                                                   transaction_file,
-                                                   use_json):
+    @pytest.mark.parametrize(
+        "transaction_file,use_json",
+        [
+            ("sapling_transaction.bin", False),
+            ("sapling_transaction.json", True),
+        ],
+    )
+    def test_forge_alice_to_bob_insufficient_funds(
+        self, client, tmpdir, contract_name, session, transaction_file, use_json
+    ):
         transaction_file = f'{tmpdir}/{transaction_file}'
         amount = 2100000000.0
         account = 'alice'
@@ -368,8 +426,8 @@ class TestSaplingShieldedTez:
             additional_args += ["--json"]
 
         with assert_run_failure(
-                r"Balance too low \({}\) to spend {}".
-                format(100, int(amount))):
+            r"Balance too low \({}\) to spend {}".format(100, int(amount))
+        ):
             client.sapling_forge_transaction(
                 amount=amount,
                 src=account,
@@ -379,9 +437,9 @@ class TestSaplingShieldedTez:
                 args=additional_args,
             )
 
-    def test_forge_alice_to_bob_address_0(self, tmpdir, session,
-                                          client,
-                                          contract_name):
+    def test_forge_alice_to_bob_address_0(
+        self, tmpdir, session, client, contract_name
+    ):
         transaction_file = f'{tmpdir}/sapling_transaction0.bin'
         client.sapling_forge_transaction(
             amount=100.0,
@@ -392,7 +450,7 @@ class TestSaplingShieldedTez:
         )
 
     def test_forge_alice_to_bob_address_1_binary_format(
-            self, tmpdir, session, client, contract_name
+        self, tmpdir, session, client, contract_name
     ):
         transaction_file = f'{tmpdir}/sapling_transaction1.bin'
         client.sapling_forge_transaction(
@@ -403,12 +461,11 @@ class TestSaplingShieldedTez:
             file=transaction_file,
         )
 
-    @pytest.mark.parametrize("key_name,expected_balance", [
-        ("alice", 100.0),
-        ("bob", 100.0)
-    ])
+    @pytest.mark.parametrize(
+        "key_name,expected_balance", [("alice", 100.0), ("bob", 100.0)]
+    )
     def test_check_sapling_balances_post_forge_binary_format(
-            self, client, contract_name, key_name, expected_balance
+        self, client, contract_name, key_name, expected_balance
     ):
         result = client.sapling_get_balance(
             key_name=key_name,
@@ -417,7 +474,7 @@ class TestSaplingShieldedTez:
         assert result.balance == expected_balance
 
     def test_submit_alice_to_bob_address_1_binary_format(
-            self, client, tmpdir, contract_name
+        self, client, tmpdir, contract_name
     ):
         transaction_file = f'{tmpdir}/sapling_transaction1.bin'
         additional_args = ["--burn-cap", "3.0"]
@@ -429,24 +486,19 @@ class TestSaplingShieldedTez:
         )
         client.bake("bootstrap2", ["--minimal-timestamp"])
 
-    @pytest.mark.parametrize("key_name,expected_balance", [
-        ("alice", 50.0),
-        ("bob", 150.0)
-    ])
+    @pytest.mark.parametrize(
+        "key_name,expected_balance", [("alice", 50.0), ("bob", 150.0)]
+    )
     def test_check_sapling_balances_after_successfull_transaction_in_binary(
-            self,
-            client,
-            contract_name,
-            key_name,
-            expected_balance
+        self, client, contract_name, key_name, expected_balance
     ):
         balance = client.sapling_get_balance(
-            key_name=key_name,
-            contract_name=contract_name).balance
+            key_name=key_name, contract_name=contract_name
+        ).balance
         assert balance == expected_balance
 
     def test_forge_alice_to_bob_address_1_json_format(
-            self, tmpdir, session, client, contract_name
+        self, tmpdir, session, client, contract_name
     ):
         transaction_file = f'{tmpdir}/sapling_transaction1.json'
         client.sapling_forge_transaction(
@@ -461,12 +513,11 @@ class TestSaplingShieldedTez:
         with open(transaction_file, "r") as file_descriptor:
             json.load(file_descriptor)
 
-    @pytest.mark.parametrize("key_name,expected_balance", [
-        ("alice", 50.0),
-        ("bob", 150.0)
-    ])
+    @pytest.mark.parametrize(
+        "key_name,expected_balance", [("alice", 50.0), ("bob", 150.0)]
+    )
     def test_check_sapling_balances_post_forge_json_format(
-            self, client, contract_name, key_name, expected_balance
+        self, client, contract_name, key_name, expected_balance
     ):
         result = client.sapling_get_balance(
             key_name=key_name,
@@ -475,7 +526,7 @@ class TestSaplingShieldedTez:
         assert result.balance == expected_balance
 
     def test_submit_alice_to_bob_address_1_json_format(
-            self, client, tmpdir, contract_name
+        self, client, tmpdir, contract_name
     ):
         transaction_file = f'{tmpdir}/sapling_transaction1.json'
         additional_args = ["--burn-cap", "3.0", "--json"]
@@ -487,28 +538,27 @@ class TestSaplingShieldedTez:
         )
         client.bake("bootstrap2", ["--minimal-timestamp"])
 
-    @pytest.mark.parametrize("key_name,expected_balance", [
-        ("alice", 0.0),
-        ("bob", 200.0)
-    ])
+    @pytest.mark.parametrize(
+        "key_name,expected_balance", [("alice", 0.0), ("bob", 200.0)]
+    )
     def test_check_sapling_balances_after_successfull_transaction_in_json(
-            self,
-            client,
-            contract_name,
-            key_name,
-            expected_balance
+        self, client, contract_name, key_name, expected_balance
     ):
         balance = client.sapling_get_balance(
-            key_name=key_name,
-            contract_name=contract_name).balance
+            key_name=key_name, contract_name=contract_name
+        ).balance
         assert balance == expected_balance
 
-    @pytest.mark.parametrize("transaction_file,use_json", [
-        ("sapling_transaction0.bin", False),
-        # ("sapling_transaction0.json", True),
-    ])
-    def test_submit_alice_to_bob0(self, client, transaction_file,
-                                  use_json, tmpdir, contract_name):
+    @pytest.mark.parametrize(
+        "transaction_file,use_json",
+        [
+            ("sapling_transaction0.bin", False),
+            # ("sapling_transaction0.json", True),
+        ],
+    )
+    def test_submit_alice_to_bob0(
+        self, client, transaction_file, use_json, tmpdir, contract_name
+    ):
         transaction_file = f'{tmpdir}/{transaction_file}'
         additional_args = ["--burn-cap", "3.0"]
         if use_json:
@@ -522,20 +572,23 @@ class TestSaplingShieldedTez:
                 args=additional_args,
             )
 
-    @pytest.mark.parametrize("requested_token,real_balance,key_name", [
-        (2100000000, 200, "bob"),
-        (300, 200, "bob"),
-        (2100000000, 0, "alice"),
-        (100, 0, "alice"),
-    ])
-    def test_unshields_money_insufficient_funds(self, client,
-                                                contract_name,
-                                                requested_token,
-                                                real_balance,
-                                                key_name):
+    @pytest.mark.parametrize(
+        "requested_token,real_balance,key_name",
+        [
+            (2100000000, 200, "bob"),
+            (300, 200, "bob"),
+            (2100000000, 0, "alice"),
+            (100, 0, "alice"),
+        ],
+    )
+    def test_unshields_money_insufficient_funds(
+        self, client, contract_name, requested_token, real_balance, key_name
+    ):
         with assert_run_failure(
-                r'Balance too low \({}\) to spend {}'.
-                format(real_balance, requested_token)):
+            r'Balance too low \({}\) to spend {}'.format(
+                real_balance, requested_token
+            )
+        ):
             client.sapling_unshield(
                 amount=requested_token,
                 src=key_name,
@@ -556,8 +609,8 @@ class TestSaplingShieldedTez:
         )
         client.bake("bootstrap2", ['--minimal-timestamp'])
         bob_balance = client.sapling_get_balance(
-            key_name="bob",
-            contract_name=contract_name).balance
+            key_name="bob", contract_name=contract_name
+        ).balance
         assert bob_balance == 200.0 - amount
         bootstrap4_balance = client.get_balance("bootstrap4")
         # The receiver pays fees by default so it will not get the full amount,
@@ -565,8 +618,9 @@ class TestSaplingShieldedTez:
         assert bootstrap4_balance >= bootstrap4_prev_balance
         assert bootstrap4_balance <= bootstrap4_prev_balance + amount
 
-    def test_check_state_with_another_client(self, sandbox, node,
-                                             contract_name, session):
+    def test_check_state_with_another_client(
+        self, sandbox, node, contract_name, session
+    ):
         client = sandbox.get_new_client(node)
         client.remember_contract(contract_name, session["contract_address"])
         key_name = "bob"
@@ -575,21 +629,20 @@ class TestSaplingShieldedTez:
             key_name=key_name,
             mnemonic=session['bob_mnemonic'],
         )
-        client.sapling_use_key_for_contract(key_name,
-                                            contract_name,
-                                            memo_size=8)
+        client.sapling_use_key_for_contract(
+            key_name, contract_name, memo_size=8
+        )
         # Check Bob's balance again, it should be the same:
         bob_balance = client.sapling_get_balance(
-            key_name=key_name,
-            contract_name=contract_name).balance
+            key_name=key_name, contract_name=contract_name
+        ).balance
         assert bob_balance == 110.0
 
-    @pytest.mark.parametrize("transparent_signer,baker", [
-        ("bootstrap4", "bootstrap2")
-    ])
+    @pytest.mark.parametrize(
+        "transparent_signer,baker", [("bootstrap4", "bootstrap2")]
+    )
     def test_shielded_transfer_using_non_sapling_transfer_method(
-            self, client, contract_name, session, transparent_signer,
-            baker, tmpdir
+        self, client, contract_name, session, transparent_signer, baker, tmpdir
     ):
         transaction_filename = f'{tmpdir}/sapling_transaction_2.bin'
         client.sapling_forge_transaction(
@@ -606,26 +659,24 @@ class TestSaplingShieldedTez:
                 0,
                 giver=transparent_signer,
                 receiver=contract_name,
-                args=["--arg",
-                      '{Pair %s None }' % content,
-                      "--burn-cap", "3.0"]
+                args=[
+                    "--arg",
+                    '{Pair %s None }' % content,
+                    "--burn-cap",
+                    "3.0",
+                ],
             )
         client.bake(baker, ["--minimal-timestamp"])
 
-    @pytest.mark.parametrize("key_name,expected_balance", [
-        ("alice", 0.0),
-        ("bob", 110.0)
-    ])
+    @pytest.mark.parametrize(
+        "key_name,expected_balance", [("alice", 0.0), ("bob", 110.0)]
+    )
     def test_check_sapling_balances_after_calling_smart_contract(
-            self,
-            client,
-            contract_name,
-            key_name,
-            expected_balance
+        self, client, contract_name, key_name, expected_balance
     ):
         balance = client.sapling_get_balance(
-            key_name=key_name,
-            contract_name=contract_name).balance
+            key_name=key_name, contract_name=contract_name
+        ).balance
         assert balance == expected_balance
 
 
@@ -646,14 +697,16 @@ code {
       NIL operation;
       PAIR;
      }
-''' % (memo_size, memo_size)
+''' % (
+                memo_size,
+                memo_size,
+            )
+
         return generator
 
-    @pytest.mark.parametrize("memo_size", [
-        0, 1, 10, 42, 100, 65535
-    ])
+    @pytest.mark.parametrize("memo_size", [0, 1, 10, 42, 100, 65535])
     def test_originate_with_valid_size_and_update_with_valid_size(
-            self, client, memo_size, contract_name, tmpdir, contract_generator
+        self, client, memo_size, contract_name, tmpdir, contract_generator
     ):
         contract_path = tmpdir.join("c.tz")
         contract_path.write(contract_generator(memo_size))
@@ -663,23 +716,26 @@ code {
             amount=0,
             sender=sender,
             contract=str(contract_path),
-            args=["--init", '{ }', "--burn-cap", "3.0", "--force"]
+            args=["--init", '{ }', "--burn-cap", "3.0", "--force"],
         )
         client.bake("bootstrap1", ["--minimal-timestamp"])
         client.transfer(
             0,
             giver="bootstrap1",
             receiver=contract_name,
-            args=["--arg", "Unit", "--burn-cap", "3.0"]
+            args=["--arg", "Unit", "--burn-cap", "3.0"],
         )
         client.bake("bootstrap1", ["--minimal-timestamp"])
 
-    @pytest.mark.parametrize("memo_size", [
-        -1, 65536, 65598909, 908923434
-    ])
+    @pytest.mark.parametrize("memo_size", [-1, 65536, 65598909, 908923434])
     def test_originate_with_invalid_size(
-            self, client, memo_size, contract_path, contract_name,
-            contract_generator, tmpdir
+        self,
+        client,
+        memo_size,
+        contract_path,
+        contract_name,
+        contract_generator,
+        tmpdir,
     ):
         contract_path = tmpdir.join("c.tz")
         contract_path.write(contract_generator(memo_size))
@@ -691,7 +747,7 @@ code {
                 amount=0,
                 sender=sender,
                 contract=str(contract_path),
-                args=["--init", "{ }", "--burn-cap", "3.0", "--force"]
+                args=["--init", "{ }", "--burn-cap", "3.0", "--force"],
             )
 
 
@@ -709,10 +765,12 @@ class TestSaplingStateCorruption:
         tmpdir = tmpdir_factory.mktemp("sapling_transactions_shielded_tez")
         return tmpdir
 
-    def test_push_sapling_state_with_id_is_forbidden(self, client,
-                                                     contract_path):
-        contract_name = \
+    def test_push_sapling_state_with_id_is_forbidden(
+        self, client, contract_path
+    ):
+        contract_name = (
             f"{contract_path}/contracts/sapling_push_sapling_state.tz"
+        )
         sender = "bootstrap1"
         msg = r"big_map or sapling_state type not expected here"
         with assert_run_failure(msg):
@@ -721,34 +779,36 @@ class TestSaplingStateCorruption:
                 amount=0,
                 sender=sender,
                 contract=contract_name,
-                args=["--init", "Unit", "--burn-cap", "3.0"]
+                args=["--init", "Unit", "--burn-cap", "3.0"],
             )
 
     def test_originate_with_empty(self, client):
         """
         Makes sure sapling state with id 0 exists
         """
-        contract = path.join(contract_paths.OPCODES_CONTRACT_PATH,
-                             "sapling_empty_state.tz")
+        contract = path.join(
+            contract_paths.OPCODES_CONTRACT_PATH, "sapling_empty_state.tz"
+        )
         client.originate(
             amount=0,
             sender="bootstrap1",
             contract=contract,
             contract_name="sapling_empty_state",
-            args=["--init", "{}", "--burn-cap", "3.0"]
+            args=["--init", "{}", "--burn-cap", "3.0"],
         )
         client.bake("bootstrap1")
 
     def test_originate_with_id_is_forbidden(self, client):
-        contract = path.join(contract_paths.OPCODES_CONTRACT_PATH,
-                             "sapling_empty_state.tz")
+        contract = path.join(
+            contract_paths.OPCODES_CONTRACT_PATH, "sapling_empty_state.tz"
+        )
         with assert_run_failure(r'Unexpected forged value'):
             client.originate(
                 amount=0,
                 sender="bootstrap1",
                 contract=contract,
                 contract_name="sapling_empty_state2",
-                args=["--init", "0", "--burn-cap", "3.0"]
+                args=["--init", "0", "--burn-cap", "3.0"],
             )
 
 
@@ -757,10 +817,13 @@ class TestSaplingDifferentMemosize:
     Deploy a sapling contract using a sapling state with a memo size N and
     create transactions with a memo size of M
     """
+
     @pytest.fixture
     def contract_path(self):
-        return (f'{paths.TEZOS_HOME}/src/proto_alpha/lib_protocol/test/'
-                'contracts/sapling_contract.tz')
+        return (
+            f'{paths.TEZOS_HOME}/src/proto_alpha/lib_protocol/test/'
+            'contracts/sapling_contract.tz'
+        )
 
     def test_shield_with_different_memo_size(self, contract_path, client):
         contract_name = "sapling_memo_size_different"
@@ -770,13 +833,13 @@ class TestSaplingDifferentMemosize:
             amount=0,
             sender=implicit_account,
             contract=contract_path,
-            args=["--init", "{ }", "--burn-cap", "3.0"]
+            args=["--init", "{ }", "--burn-cap", "3.0"],
         ).contract
         client.bake(implicit_account, ["--minimal-timestamp"])
         client.sapling_gen_key(key_name='alice')
-        client.sapling_use_key_for_contract('alice',
-                                            contract_name,
-                                            memo_size=16)
+        client.sapling_use_key_for_contract(
+            'alice', contract_name, memo_size=16
+        )
         address = client.sapling_gen_address(key_name='alice').address
         # Key was registered with a memo_size of 16, it should fail
         with assert_run_failure(r"Memo sizes of two sapling states"):
@@ -794,10 +857,13 @@ class TestSaplingRightMemosize:
     Deploy a sapling contract using a sapling state with a memo size N and
     create transactions with a memo size of N and diverse messages
     """
+
     @pytest.fixture
     def contract_path(self):
-        return (f'{paths.TEZOS_HOME}/src/proto_alpha/lib_protocol/test/'
-                'contracts/sapling_contract.tz')
+        return (
+            f'{paths.TEZOS_HOME}/src/proto_alpha/lib_protocol/test/'
+            'contracts/sapling_contract.tz'
+        )
 
     def test_shield_with_same_memo_size(self, contract_path, client):
         contract_name = "sapling_memo_size_same"
@@ -807,13 +873,11 @@ class TestSaplingRightMemosize:
             amount=0,
             sender=implicit_account,
             contract=contract_path,
-            args=["--init", "{ }", "--burn-cap", "3.0"]
+            args=["--init", "{ }", "--burn-cap", "3.0"],
         ).contract
         client.bake(implicit_account, ["--minimal-timestamp"])
         client.sapling_gen_key(key_name='alice')
-        client.sapling_use_key_for_contract('alice',
-                                            contract_name,
-                                            memo_size=8)
+        client.sapling_use_key_for_contract('alice', contract_name, memo_size=8)
         address = client.sapling_gen_address(key_name='alice').address
         # Should pass since memo-sizes are equal and message is
         # filled with 0's
@@ -827,10 +891,12 @@ class TestSaplingRightMemosize:
         client.bake("bootstrap2", ["--minimal-timestamp"])
         # Deriving a new key should work as well since
         # the memo-size is kept
-        client.sapling_derive_key(source_key_name='alice',
-                                  target_key_name='bob',
-                                  contract_name=contract_name,
-                                  index=10)
+        client.sapling_derive_key(
+            source_key_name='alice',
+            target_key_name='bob',
+            contract_name=contract_name,
+            index=10,
+        )
         address_derived = client.sapling_gen_address(key_name='bob').address
         client.sapling_shield(
             amount=100.0,

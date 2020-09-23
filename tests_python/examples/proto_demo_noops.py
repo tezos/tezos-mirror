@@ -25,9 +25,9 @@ def forge_block_header_data(protocol_data):
 
 
 def main():
-    with Sandbox(paths.TEZOS_HOME,
-                 constants.IDENTITIES,
-                 log_dir='tmp') as sandbox:
+    with Sandbox(
+        paths.TEZOS_HOME, constants.IDENTITIES, log_dir='tmp'
+    ) as sandbox:
         # launch a sandbox node
         sandbox.add_node(0, params=constants.NODE_PARAMS)
         client = sandbox.client(0)
@@ -36,8 +36,9 @@ def main():
         assert PROTO_DEMO in protocols
 
         parameters = {}  # type: dict
-        client.activate_protocol_json(PROTO_DEMO, parameters, key='activator',
-                                      fitness='1')
+        client.activate_protocol_json(
+            PROTO_DEMO, parameters, key='activator', fitness='1'
+        )
 
         head = client.rpc('get', '/chains/main/blocks/head/', params=PARAMS)
         # current protocol is still genesis and level == 1
@@ -52,14 +53,19 @@ def main():
         # - /injection/block injects it
         message = "hello world"
 
-        data = {"protocol_data":
-                {"protocol": PROTO_DEMO, "block_header_data": message},
-                "operations": []}
+        data = {
+            "protocol_data": {
+                "protocol": PROTO_DEMO,
+                "block_header_data": message,
+            },
+            "operations": [],
+        }
         block = client.rpc(
             'post',
             '/chains/main/blocks/head/helpers/preapply/block',
             data=data,
-            params=PARAMS)
+            params=PARAMS,
+        )
 
         protocol_data = {'block_header_data': message}
         encoded = forge_block_header_data(protocol_data)
@@ -70,7 +76,8 @@ def main():
             'post',
             '/chains/main/blocks/head/helpers/forge_block_header',
             data=shell_header,
-            params=PARAMS)
+            params=PARAMS,
+        )
 
         inject = {'data': encoded['block'], 'operations': []}
         client.rpc('post', '/injection/block', data=inject, params=PARAMS)

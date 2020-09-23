@@ -12,8 +12,8 @@ NUM_NODES = 3
 @pytest.mark.incremental
 class TestFork:
     """Constructs two independent branches on disconnected subsets of nodes,
-       one head has higher fitness. At reconnection, check the the highest
-       fitness head is the chosen one """
+    one head has higher fitness. At reconnection, check the the highest
+    fitness head is the chosen one"""
 
     def test_init(self, sandbox: Sandbox):
         for i in range(NUM_NODES):
@@ -77,6 +77,7 @@ class TestFork:
         sandbox.node(1).run()
         assert sandbox.client(0).check_node_listening()
         assert sandbox.client(1).check_node_listening()
+
 
 #    def test_check_head(self, sandbox: Sandbox, session: dict):
 #        """All nodes are at level 3, head should be hash1"""

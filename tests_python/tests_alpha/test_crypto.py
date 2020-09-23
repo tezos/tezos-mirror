@@ -12,10 +12,11 @@ RANDOM_ITERATIONS = 50
 
 HASH_FUNCTIONS = {
     "keccak": lambda bytes_to_hash: keccak.new(digest_bits=256)
-                                          .update(bytes_to_hash)
-                                          .hexdigest(),
-    "sha3": lambda bytes_to_hash: SHA3_256.new().update(bytes_to_hash)
-                                                .hexdigest(),
+    .update(bytes_to_hash)
+    .hexdigest(),
+    "sha3": lambda bytes_to_hash: SHA3_256.new()
+    .update(bytes_to_hash)
+    .hexdigest(),
 }
 
 
@@ -30,8 +31,9 @@ class TestHash:
         "bytes_to_hash",
         [b"", b"a"]
         + [
-            getrandbits(bytes_length * 8).to_bytes(bytes_length,
-                                                   byteorder="little")
+            getrandbits(bytes_length * 8).to_bytes(
+                bytes_length, byteorder="little"
+            )
             for bytes_length in [32]
             for _ in range(RANDOM_ITERATIONS)
         ],

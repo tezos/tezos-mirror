@@ -3,8 +3,13 @@ import subprocess
 import pytest
 from tools.client_regression import ClientRegression
 from tools import paths
-from tools.utils import assert_run_failure, assert_storage_contains, bake, \
-    init_with_transfer, assert_balance
+from tools.utils import (
+    assert_run_failure,
+    assert_storage_contains,
+    bake,
+    init_with_transfer,
+    assert_balance,
+)
 from tools.constants import IDENTITIES
 from .contract_paths import OPCODES_CONTRACT_PATH
 
@@ -37,38 +42,56 @@ class TestContractOnchainOpcodes:
         assert_balance(client, KEY2, 2000)
 
         # Create a contract and transfer 100 ꜩ to it
-        init_with_transfer(client, path.join(OPCODES_CONTRACT_PATH,
-                                             'store_input.tz'),
-                           '""', 100, 'bootstrap1')
+        init_with_transfer(
+            client,
+            path.join(OPCODES_CONTRACT_PATH, 'store_input.tz'),
+            '""',
+            100,
+            'bootstrap1',
+        )
 
-        client.transfer(100, "bootstrap1", "store_input",
-                        ["-arg", '"abcdefg"', '--burn-cap', '10'])
+        client.transfer(
+            100,
+            "bootstrap1",
+            "store_input",
+            ["-arg", '"abcdefg"', '--burn-cap', '10'],
+        )
         bake(client)
 
         assert_balance(client, "store_input", 200)
 
         assert_storage_contains(client, "store_input", '"abcdefg"')
 
-        client.transfer(100, "bootstrap1", "store_input",
-                        ["-arg", '"xyz"', '--burn-cap', '10'])
+        client.transfer(
+            100,
+            "bootstrap1",
+            "store_input",
+            ["-arg", '"xyz"', '--burn-cap', '10'],
+        )
         bake(client)
 
         assert_storage_contains(client, "store_input", '"xyz"')
 
     def test_transfer_amount(self, client_regtest_scrubbed: ClientRegression):
         client = client_regtest_scrubbed
-        init_with_transfer(client,
-                           path.join(OPCODES_CONTRACT_PATH,
-                                     'transfer_amount.tz'),
-                           '0', 100, 'bootstrap1')
+        init_with_transfer(
+            client,
+            path.join(OPCODES_CONTRACT_PATH, 'transfer_amount.tz'),
+            '0',
+            100,
+            'bootstrap1',
+        )
 
-        client.transfer(500, "bootstrap1", 'transfer_amount',
-                        ['-arg', 'Unit', '--burn-cap', '10'])
+        client.transfer(
+            500,
+            "bootstrap1",
+            'transfer_amount',
+            ['-arg', 'Unit', '--burn-cap', '10'],
+        )
 
         bake(client)
 
-        assert_storage_contains(client, "transfer_amount",
-                                '500000000')
+        assert_storage_contains(client, "transfer_amount", '500000000')
 
     def test_now(self, client_regtest_scrubbed: ClientRegression):
         # Regtest is disabled for this test, since one would need to
@@ -77,52 +100,71 @@ class TestContractOnchainOpcodes:
         client = client_regtest_scrubbed
         client.set_regtest(None)
 
-        init_with_transfer(client,
-                           path.join(OPCODES_CONTRACT_PATH, 'store_now.tz'),
-                           '"2017-07-13T09:19:01Z"', 100, 'bootstrap1')
+        init_with_transfer(
+            client,
+            path.join(OPCODES_CONTRACT_PATH, 'store_now.tz'),
+            '"2017-07-13T09:19:01Z"',
+            100,
+            'bootstrap1',
+        )
 
-        client.transfer(500, "bootstrap1", 'store_now',
-                        ['-arg', 'Unit', '--burn-cap', '10'])
+        client.transfer(
+            500, "bootstrap1", 'store_now', ['-arg', 'Unit', '--burn-cap', '10']
+        )
         bake(client)
 
-        assert_storage_contains(client, 'store_now',
-                                f'"{client.get_now()}"')
+        assert_storage_contains(client, 'store_now', f'"{client.get_now()}"')
 
     def test_transfer_tokens(self, client_regtest_scrubbed: ClientRegression):
         """Tests TRANSFER_TOKENS."""
         client = client_regtest_scrubbed
-        client.originate('test_transfer_account1',
-                         100,
-                         'bootstrap1',
-                         path.join(OPCODES_CONTRACT_PATH, 'noop.tz'),
-                         ['--burn-cap', '10'])
+        client.originate(
+            'test_transfer_account1',
+            100,
+            'bootstrap1',
+            path.join(OPCODES_CONTRACT_PATH, 'noop.tz'),
+            ['--burn-cap', '10'],
+        )
         bake(client)
 
-        client.originate('test_transfer_account2',
-                         20,
-                         'bootstrap1',
-                         path.join(OPCODES_CONTRACT_PATH, 'noop.tz'),
-                         ['--burn-cap', '10'])
+        client.originate(
+            'test_transfer_account2',
+            20,
+            'bootstrap1',
+            path.join(OPCODES_CONTRACT_PATH, 'noop.tz'),
+            ['--burn-cap', '10'],
+        )
         bake(client)
 
-        init_with_transfer(client,
-                           path.join(OPCODES_CONTRACT_PATH,
-                                     'transfer_tokens.tz'),
-                           'Unit', 1000, 'bootstrap1')
+        init_with_transfer(
+            client,
+            path.join(OPCODES_CONTRACT_PATH, 'transfer_tokens.tz'),
+            'Unit',
+            1000,
+            'bootstrap1',
+        )
 
         assert_balance(client, 'test_transfer_account1', 100)
 
         account1_addr = client.get_contract_address('test_transfer_account1')
-        client.transfer(100, 'bootstrap1', 'transfer_tokens',
-                        ['-arg', f'"{account1_addr}"', '--burn-cap', '10'])
+        client.transfer(
+            100,
+            'bootstrap1',
+            'transfer_tokens',
+            ['-arg', f'"{account1_addr}"', '--burn-cap', '10'],
+        )
         bake(client)
 
         # Why isn't this 200 ꜩ? Baking fee?
         assert_balance(client, 'test_transfer_account1', 200)
 
         account2_addr = client.get_contract_address('test_transfer_account2')
-        client.transfer(100, 'bootstrap1', 'transfer_tokens',
-                        ['-arg', f'"{account2_addr}"', '--burn-cap', '10'])
+        client.transfer(
+            100,
+            'bootstrap1',
+            'transfer_tokens',
+            ['-arg', f'"{account2_addr}"', '--burn-cap', '10'],
+        )
         bake(client)
 
         assert_balance(client, 'test_transfer_account2', 120)
@@ -134,26 +176,31 @@ class TestContractOnchainOpcodes:
         client = client_regtest_scrubbed
         client.set_regtest(None)
 
-        init_with_transfer(client, path.join(OPCODES_CONTRACT_PATH, 'self.tz'),
-                           '"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"',
-                           1000, 'bootstrap1')
+        init_with_transfer(
+            client,
+            path.join(OPCODES_CONTRACT_PATH, 'self.tz'),
+            '"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"',
+            1000,
+            'bootstrap1',
+        )
 
-        client.transfer(0, 'bootstrap1', 'self',
-                        ['--burn-cap', '10'])
+        client.transfer(0, 'bootstrap1', 'self', ['--burn-cap', '10'])
         bake(client)
 
         self_addr = client.get_contract_address('self')
-        assert_storage_contains(client, 'self',
-                                f'"{self_addr}"')
+        assert_storage_contains(client, 'self', f'"{self_addr}"')
 
     def test_contract_fails(self, client_regtest_scrubbed: ClientRegression):
         client = client_regtest_scrubbed
         client.set_regtest(None)
 
-        init_with_transfer(client, path.join(OPCODES_CONTRACT_PATH,
-                                             'contract.tz'),
-                           'Unit',
-                           1000, 'bootstrap1')
+        init_with_transfer(
+            client,
+            path.join(OPCODES_CONTRACT_PATH, 'contract.tz'),
+            'Unit',
+            1000,
+            'bootstrap1',
+        )
 
         client.transfer(0, 'bootstrap1', 'self', ['--burn-cap', '10'])
         bake(client)
@@ -161,23 +208,32 @@ class TestContractOnchainOpcodes:
 
         with assert_run_failure(r'script reached FAILWITH instruction'):
             client.transfer(
-                0, 'bootstrap1', 'contract',
-                ['-arg', f'"{addr}"', '--burn-cap', '10'])
+                0,
+                'bootstrap1',
+                'contract',
+                ['-arg', f'"{addr}"', '--burn-cap', '10'],
+            )
 
     def test_init_proxy(self, client_regtest_scrubbed: ClientRegression):
         client = client_regtest_scrubbed
-        init_with_transfer(client,
-                           path.join(OPCODES_CONTRACT_PATH, 'proxy.tz'),
-                           'Unit',
-                           1000, 'bootstrap1')
+        init_with_transfer(
+            client,
+            path.join(OPCODES_CONTRACT_PATH, 'proxy.tz'),
+            'Unit',
+            1000,
+            'bootstrap1',
+        )
 
     def test_source(self, client_regtest_scrubbed: ClientRegression):
         client = client_regtest_scrubbed
         init_store = IDENTITIES['bootstrap4']['identity']
-        init_with_transfer(client,
-                           path.join(OPCODES_CONTRACT_PATH, 'source.tz'),
-                           f'"{init_store}"',
-                           1000, 'bootstrap1')
+        init_with_transfer(
+            client,
+            path.join(OPCODES_CONTRACT_PATH, 'source.tz'),
+            f'"{init_store}"',
+            1000,
+            'bootstrap1',
+        )
 
         # direct transfer to the contract
         client.transfer(0, 'bootstrap2', 'source', ['--burn-cap', '10'])
@@ -188,8 +244,12 @@ class TestContractOnchainOpcodes:
 
         # indirect transfer to the contract through proxy
         contract_addr = client.get_contract_address('source')
-        client.transfer(0, 'bootstrap2', 'proxy',
-                        ['--burn-cap', '10', '--arg', f'"{contract_addr}"'])
+        client.transfer(
+            0,
+            'bootstrap2',
+            'proxy',
+            ['--burn-cap', '10', '--arg', f'"{contract_addr}"'],
+        )
         bake(client)
         assert_storage_contains(client, 'source', f'"{source_addr}"')
 
@@ -198,10 +258,13 @@ class TestContractOnchainOpcodes:
         client.set_regtest(None)
 
         init_store = IDENTITIES['bootstrap4']['identity']
-        init_with_transfer(client,
-                           path.join(OPCODES_CONTRACT_PATH, 'sender.tz'),
-                           f'"{init_store}"',
-                           1000, 'bootstrap1')
+        init_with_transfer(
+            client,
+            path.join(OPCODES_CONTRACT_PATH, 'sender.tz'),
+            f'"{init_store}"',
+            1000,
+            'bootstrap1',
+        )
 
         # direct transfer to the contract
         client.transfer(0, 'bootstrap2', 'sender', ['--burn-cap', '10'])
@@ -213,127 +276,196 @@ class TestContractOnchainOpcodes:
         # indirect transfer to the contract through proxy
         contract_addr = client.get_contract_address('sender')
         proxy_addr = client.get_contract_address('proxy')
-        client.transfer(0, 'bootstrap2', 'proxy',
-                        ['--burn-cap', '10', '--arg', f'"{contract_addr}"'])
+        client.transfer(
+            0,
+            'bootstrap2',
+            'proxy',
+            ['--burn-cap', '10', '--arg', f'"{contract_addr}"'],
+        )
         bake(client)
         assert_storage_contains(client, 'sender', f'"{proxy_addr}"')
 
     def test_slice(self, client_regtest_scrubbed: ClientRegression):
         client = client_regtest_scrubbed
         init_with_transfer(
-            client, path.join(OPCODES_CONTRACT_PATH, 'slices.tz'),
+            client,
+            path.join(OPCODES_CONTRACT_PATH, 'slices.tz'),
             '"sppk7dBPqMPjDjXgKbb5f7V3PuKUrA4Zuwc3c3H7XqQerqPUWbK7Hna"',
-            1000, 'bootstrap1')
+            1000,
+            'bootstrap1',
+        )
 
-    @pytest.mark.parametrize('contract_arg',
-                             [line.rstrip('\n')
-                              for line
-                              in open(f'{paths.TEZOS_HOME}'
-                                      + '/tests_python/tests_007/'
-                                      + 'test_slice_fails_params.txt')])
-    def test_slice_fails(self, client_regtest_scrubbed: ClientRegression,
-                         contract_arg: str):
+    @pytest.mark.parametrize(
+        'contract_arg',
+        [
+            line.rstrip('\n')
+            for line in open(
+                f'{paths.TEZOS_HOME}'
+                + '/tests_python/tests_007/'
+                + 'test_slice_fails_params.txt'
+            )
+        ],
+    )
+    def test_slice_fails(
+        self, client_regtest_scrubbed: ClientRegression, contract_arg: str
+    ):
         client = client_regtest_scrubbed
 
         with assert_run_failure(r'script reached FAILWITH instruction'):
             client.transfer(
-                0, 'bootstrap1', 'slices',
-                ['-arg', contract_arg, '--burn-cap', '10'])
+                0,
+                'bootstrap1',
+                'slices',
+                ['-arg', contract_arg, '--burn-cap', '10'],
+            )
         # bake(client)
 
-    @pytest.mark.parametrize('contract_arg',
-                             [line.rstrip('\n')
-                              for line
-                              in open(f'{paths.TEZOS_HOME}'
-                                      + '/tests_python/tests_007/'
-                                      + 'test_slice_success_params.txt')])
-    def test_slice_success(self, client_regtest_scrubbed: ClientRegression,
-                           contract_arg: str):
+    @pytest.mark.parametrize(
+        'contract_arg',
+        [
+            line.rstrip('\n')
+            for line in open(
+                f'{paths.TEZOS_HOME}'
+                + '/tests_python/tests_007/'
+                + 'test_slice_success_params.txt'
+            )
+        ],
+    )
+    def test_slice_success(
+        self, client_regtest_scrubbed: ClientRegression, contract_arg: str
+    ):
         client = client_regtest_scrubbed
-        client.transfer(0, 'bootstrap1', 'slices',
-                        ['-arg', contract_arg, '--burn-cap', '10'])
+        client.transfer(
+            0,
+            'bootstrap1',
+            'slices',
+            ['-arg', contract_arg, '--burn-cap', '10'],
+        )
         bake(client)
 
     def test_split_string(self, client_regtest_scrubbed: ClientRegression):
         client = client_regtest_scrubbed
-        init_with_transfer(client, path.join(OPCODES_CONTRACT_PATH,
-                                             'split_string.tz'),
-                           '{}',
-                           1000, 'bootstrap1')
+        init_with_transfer(
+            client,
+            path.join(OPCODES_CONTRACT_PATH, 'split_string.tz'),
+            '{}',
+            1000,
+            'bootstrap1',
+        )
 
-        client.transfer(0, 'bootstrap1', 'split_string',
-                        ['-arg', '"abc"', '--burn-cap', '10'])
+        client.transfer(
+            0,
+            'bootstrap1',
+            'split_string',
+            ['-arg', '"abc"', '--burn-cap', '10'],
+        )
         bake(client)
-        assert_storage_contains(client, 'split_string',
-                                '{ "a" ; "b" ; "c" }')
+        assert_storage_contains(client, 'split_string', '{ "a" ; "b" ; "c" }')
 
-        client.transfer(0, 'bootstrap1', 'split_string',
-                        ['-arg', '"def"', '--burn-cap', '10'])
+        client.transfer(
+            0,
+            'bootstrap1',
+            'split_string',
+            ['-arg', '"def"', '--burn-cap', '10'],
+        )
         bake(client)
-        assert_storage_contains(client, 'split_string',
-                                '{ "a" ; "b" ; "c" ; "d" ; "e" ; "f" }')
+        assert_storage_contains(
+            client, 'split_string', '{ "a" ; "b" ; "c" ; "d" ; "e" ; "f" }'
+        )
 
     def test_split_bytes(self, client_regtest_scrubbed: ClientRegression):
         client = client_regtest_scrubbed
-        init_with_transfer(client, path.join(OPCODES_CONTRACT_PATH,
-                                             'split_bytes.tz'),
-                           '{}',
-                           1000, 'bootstrap1')
+        init_with_transfer(
+            client,
+            path.join(OPCODES_CONTRACT_PATH, 'split_bytes.tz'),
+            '{}',
+            1000,
+            'bootstrap1',
+        )
 
-        client.transfer(0, 'bootstrap1', 'split_bytes',
-                        ['-arg', '0xaabbcc', '--burn-cap', '10'])
+        client.transfer(
+            0,
+            'bootstrap1',
+            'split_bytes',
+            ['-arg', '0xaabbcc', '--burn-cap', '10'],
+        )
         bake(client)
-        assert_storage_contains(client, 'split_bytes',
-                                '{ 0xaa ; 0xbb ; 0xcc }')
+        assert_storage_contains(client, 'split_bytes', '{ 0xaa ; 0xbb ; 0xcc }')
 
-        client.transfer(0, 'bootstrap1', 'split_bytes',
-                        ['-arg', '0xddeeff', '--burn-cap', '10'])
+        client.transfer(
+            0,
+            'bootstrap1',
+            'split_bytes',
+            ['-arg', '0xddeeff', '--burn-cap', '10'],
+        )
         bake(client)
-        assert_storage_contains(client, 'split_bytes',
-                                '{ 0xaa ; 0xbb ; 0xcc ; 0xdd ; 0xee ; 0xff }')
+        assert_storage_contains(
+            client, 'split_bytes', '{ 0xaa ; 0xbb ; 0xcc ; 0xdd ; 0xee ; 0xff }'
+        )
 
     def test_set_delegate(self, client_regtest_scrubbed: ClientRegression):
         client = client_regtest_scrubbed
-        init_with_transfer(client, path.join(OPCODES_CONTRACT_PATH,
-                                             'set_delegate.tz'),
-                           'Unit', 1000, 'bootstrap1')
+        init_with_transfer(
+            client,
+            path.join(OPCODES_CONTRACT_PATH, 'set_delegate.tz'),
+            'Unit',
+            1000,
+            'bootstrap1',
+        )
         bake(client)
 
         assert client.get_delegate('set_delegate').delegate is None
 
         addr = IDENTITIES['bootstrap5']['identity']
-        client.transfer(0, 'bootstrap1', 'set_delegate',
-                        ['-arg', f'(Some "{addr}")'])
+        client.transfer(
+            0, 'bootstrap1', 'set_delegate', ['-arg', f'(Some "{addr}")']
+        )
         bake(client)
 
         assert client.get_delegate('set_delegate').delegate == addr
 
-        client.transfer(0, 'bootstrap1', 'set_delegate',
-                        ['-arg', 'None'])
+        client.transfer(0, 'bootstrap1', 'set_delegate', ['-arg', 'None'])
         bake(client)
 
         assert client.get_delegate('set_delegate').delegate is None
 
-    @pytest.mark.parametrize('contract,init_storage,parameters', [
-        ('failwith_big_map', '{Elt 0 0}', [
-            '{}',
-            '0',
-            '99999999',
-            'Pair 0 {}',
-            'Pair 0 {Elt 0 None}',
-            'Pair 0 {Elt 0 (Some 4)}',
-            'Pair 0 {Elt 1 (Some 4)}']),
-    ])
-    def test_trace_transfer(self, client_regtest_scrubbed, contract,
-                            init_storage, parameters):
+    @pytest.mark.parametrize(
+        'contract,init_storage,parameters',
+        [
+            (
+                'failwith_big_map',
+                '{Elt 0 0}',
+                [
+                    '{}',
+                    '0',
+                    '99999999',
+                    'Pair 0 {}',
+                    'Pair 0 {Elt 0 None}',
+                    'Pair 0 {Elt 0 (Some 4)}',
+                    'Pair 0 {Elt 1 (Some 4)}',
+                ],
+            ),
+        ],
+    )
+    def test_trace_transfer(
+        self, client_regtest_scrubbed, contract, init_storage, parameters
+    ):
         client = client_regtest_scrubbed
-        init_with_transfer(client,
-                           path.join(OPCODES_CONTRACT_PATH, f'{contract}.tz'),
-                           init_storage, 1000, 'bootstrap1')
+        init_with_transfer(
+            client,
+            path.join(OPCODES_CONTRACT_PATH, f'{contract}.tz'),
+            init_storage,
+            1000,
+            'bootstrap1',
+        )
         for parameter in parameters:
             try:
-                client.transfer(0, 'bootstrap1', contract,
-                                ['-arg', parameter, '--burn-cap', '10'])
+                client.transfer(
+                    0,
+                    'bootstrap1',
+                    contract,
+                    ['-arg', parameter, '--burn-cap', '10'],
+                )
             except subprocess.CalledProcessError:
                 pass
         bake(client)

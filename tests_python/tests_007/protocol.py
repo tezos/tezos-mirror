@@ -1,10 +1,12 @@
 from tools import constants, utils
 
 
-def activate(client, parameters=None, timestamp=None,
-             activate_in_the_past=False):
-    utils.activate_delphi_007(client, parameters, timestamp,
-                              activate_in_the_past)
+def activate(
+    client, parameters=None, timestamp=None, activate_in_the_past=False
+):
+    utils.activate_delphi_007(
+        client, parameters, timestamp, activate_in_the_past
+    )
 
 
 HASH = constants.DELPHI

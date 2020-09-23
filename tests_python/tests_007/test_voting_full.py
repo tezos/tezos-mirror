@@ -25,11 +25,14 @@ PROTO_A_PATH = f"proto_{PROTO_A_DAEMON.replace('-','_')}"
 PROTO_B = protocol.HASH
 PROTO_B_DAEMON = protocol.DAEMON
 
-PARAMETERS_FILE = (f'{paths.TEZOS_HOME}src/{PROTO_A_PATH}/parameters/'
-                   'test-parameters.json')
-assert os.path.isfile(PARAMETERS_FILE), (f'{PARAMETERS_FILE}'
-                                         ' cannot be found; please first run'
-                                         ' `make` in TEZOS_HOME.')
+PARAMETERS_FILE = (
+    f'{paths.TEZOS_HOME}src/{PROTO_A_PATH}/parameters/' 'test-parameters.json'
+)
+assert os.path.isfile(PARAMETERS_FILE), (
+    f'{PARAMETERS_FILE}'
+    ' cannot be found; please first run'
+    ' `make` in TEZOS_HOME.'
+)
 with open(PARAMETERS_FILE) as f:
     PARAMETERS = dict(json.load(f))
     PARAMETERS["time_between_blocks"] = [str(BAKING_RATE), "0"]
@@ -37,8 +40,15 @@ with open(PARAMETERS_FILE) as f:
 
 
 def node_params(threshold=0):
-    return ['--sync-latency', '2', '--synchronisation-threshold',
-            str(threshold), '--connections', '500', '--enable-testchain']
+    return [
+        '--sync-latency',
+        '2',
+        '--synchronisation-threshold',
+        str(threshold),
+        '--connections',
+        '500',
+        '--enable-testchain',
+    ]
 
 
 @pytest.mark.vote
@@ -47,7 +57,6 @@ def node_params(threshold=0):
 @pytest.mark.testchain
 @pytest.mark.incremental
 class TestVotingFull:
-
     def test_add_tmp_bootstrap_node(self, sandbox: Sandbox):
         """ launch tmp nodes just to bootstrap all other ones """
         sandbox.add_node(10, params=node_params(0))
@@ -55,12 +64,13 @@ class TestVotingFull:
 
     def test_activate_proto_a(self, sandbox: Sandbox):
         delay = datetime.timedelta(seconds=0)
-        sandbox.client(10).activate_protocol_json(PROTO_A, PARAMETERS,
-                                                  delay=delay)
+        sandbox.client(10).activate_protocol_json(
+            PROTO_A, PARAMETERS, delay=delay
+        )
 
     def test_add_tmp_bootstrap_baker(self, sandbox: Sandbox):
-        """ Launch a temporary baker so that 10 and 11 keep broadcasting
-            heads to the future joining nodes and help them bootstrap """
+        """Launch a temporary baker so that 10 and 11 keep broadcasting
+        heads to the future joining nodes and help them bootstrap"""
         # note we use 'bootstrap1' for all baking, this avoids the issue
         # of a delegate becoming inactive. For instance, if we want
         # to bake with 'bootstrap2' later in the test, it may have became
@@ -68,8 +78,8 @@ class TestVotingFull:
         sandbox.add_baker(10, 'bootstrap1', proto=PROTO_A_DAEMON)
 
     def test_add_initial_nodes(self, sandbox: Sandbox):
-        """ We launch nodes with non-null synchronisation-threshold.
-            This is to test the bootstrap heuristics with the testchain. """
+        """We launch nodes with non-null synchronisation-threshold.
+        This is to test the bootstrap heuristics with the testchain."""
         sandbox.add_node(0, params=node_params(2))
         sandbox.add_node(1, params=node_params(2))
         sandbox.add_node(2, params=node_params(2))
@@ -99,7 +109,7 @@ class TestVotingFull:
     @pytest.mark.timeout(60)
     def test_wait_second_proposal_period(self, sandbox: Sandbox):
         """Polling until the second proposal period, avoid bug
-           that prevents to make proposals in the first proposal period"""
+        that prevents to make proposals in the first proposal period"""
         client = sandbox.client(0)
         while client.get_level() <= BLOCKS_PER_VOTING_PERIOD:
             time.sleep(POLLING_TIME)
@@ -144,8 +154,9 @@ class TestVotingFull:
             assert client.get_current_period_kind() == 'testing'
 
     def test_start_baker_testchain(self, sandbox: Sandbox):
-        sandbox.add_baker(3, 'bootstrap1', proto=PROTO_B_DAEMON,
-                          params=['--chain', 'test'])
+        sandbox.add_baker(
+            3, 'bootstrap1', proto=PROTO_B_DAEMON, params=['--chain', 'test']
+        )
 
     def test_testchain_rpc(self, sandbox: Sandbox):
         """Check all clients know both chains"""
@@ -160,9 +171,9 @@ class TestVotingFull:
         """Make sure testchain is moving forward"""
         client = sandbox.client(0)
         level_testchain_before = client.get_level(chain='test')
-        assert utils.check_level_greater_than(client,
-                                              level_testchain_before + 1,
-                                              chain='test')
+        assert utils.check_level_greater_than(
+            client, level_testchain_before + 1, chain='test'
+        )
 
     def test_reactivate_all_delegates(self, sandbox: Sandbox):
         """Delegates may have become unactive"""
@@ -195,8 +206,9 @@ class TestVotingFull:
         all_have_proto = False
         while not all_have_proto:
             clients = sandbox.all_clients()
-            all_have_proto = all(client.get_next_protocol() == PROTO_B
-                                 for client in clients)
+            all_have_proto = all(
+                client.get_next_protocol() == PROTO_B for client in clients
+            )
             time.sleep(POLLING_TIME)
 
     def test_stop_old_bakers(self, sandbox: Sandbox):

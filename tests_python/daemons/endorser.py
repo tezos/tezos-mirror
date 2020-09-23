@@ -11,12 +11,14 @@ TERM_TIMEOUT = 10
 class Endorser(subprocess.Popen):
     """Fork an endorser linked to a client"""
 
-    def __init__(self,
-                 endorser: str,
-                 rpc_port: int,
-                 base_dir: str,
-                 params: List[str] = None,
-                 log_file: str = None):
+    def __init__(
+        self,
+        endorser: str,
+        rpc_port: int,
+        base_dir: str,
+        params: List[str] = None,
+        log_file: str = None,
+    ):
         """Create a new Popen instance for the endorser process.
 
         Args:
@@ -40,8 +42,9 @@ class Endorser(subprocess.Popen):
         cmd_string = utils.format_command(cmd)
         print(cmd_string)
         stdout, stderr = utils.prepare_log(cmd, log_file)
-        subprocess.Popen.__init__(self, cmd, stdout=stdout,
-                                  stderr=stderr)  # type: ignore
+        subprocess.Popen.__init__(
+            self, cmd, stdout=stdout, stderr=stderr
+        )  # type: ignore
 
     def terminate_or_kill(self):
         self.terminate()

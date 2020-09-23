@@ -20,8 +20,7 @@ class Fr:
 
     name = 'fr'
 
-    modulus = \
-        0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001
+    modulus = 0x73EDA753299D7D483339D80809A1D80553BDA402FFFE5BFEFFFFFFFF00000001
 
     zero = 0
 

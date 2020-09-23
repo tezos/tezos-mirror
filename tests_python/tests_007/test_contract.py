@@ -6,8 +6,7 @@ import pytest
 from tools import utils
 from tools.constants import IDENTITIES
 from client.client import Client
-from .contract_paths import CONTRACT_PATH, ILLTYPED_CONTRACT_PATH, \
-    all_contracts
+from .contract_paths import CONTRACT_PATH, ILLTYPED_CONTRACT_PATH, all_contracts
 
 BAKE_ARGS = ['--minimal-timestamp']
 
@@ -17,71 +16,97 @@ def file_basename(path):
 
 
 # Generic piece of code to originate a contract
-def originate(client,
-              session,
-              contract,
-              init_storage,
-              amount,
-              contract_name=None,
-              sender='bootstrap1',
-              baker='bootstrap5'):
+def originate(
+    client,
+    session,
+    contract,
+    init_storage,
+    amount,
+    contract_name=None,
+    sender='bootstrap1',
+    baker='bootstrap5',
+):
     if contract_name is None:
         contract_name = file_basename(contract)
     args = ['--init', init_storage, '--burn-cap', '10.0']
-    origination = client.originate(contract_name, amount,
-                                   sender, contract, args)
+    origination = client.originate(
+        contract_name, amount, sender, contract, args
+    )
     session['contract'] = origination.contract
     print(origination.contract)
     client.bake(baker, BAKE_ARGS)
     assert utils.check_block_contains_operations(
-        client, [origination.operation_hash])
+        client, [origination.operation_hash]
+    )
     return origination
 
 
 @pytest.mark.contract
 @pytest.mark.incremental
 class TestManager:
-
     def test_manager_origination(self, client: Client, session: dict):
         path = os.path.join(CONTRACT_PATH, 'entrypoints', 'manager.tz')
         pubkey = IDENTITIES['bootstrap2']['identity']
         originate(client, session, path, f'"{pubkey}"', 1000)
-        originate(client, session, path, f'"{pubkey}"', 1000,
-                  contract_name="manager2")
+        originate(
+            client, session, path, f'"{pubkey}"', 1000, contract_name="manager2"
+        )
 
     def test_delegatable_origination(self, client: Client, session: dict):
-        path = os.path.join(CONTRACT_PATH, 'entrypoints',
-                            'delegatable_target.tz')
+        path = os.path.join(
+            CONTRACT_PATH, 'entrypoints', 'delegatable_target.tz'
+        )
         pubkey = IDENTITIES['bootstrap2']['identity']
-        originate(client, session, path,
-                  f'Pair "{pubkey}" (Pair "hello" 45)', 1000)
+        originate(
+            client, session, path, f'Pair "{pubkey}" (Pair "hello" 45)', 1000
+        )
 
-    def test_target_with_entrypoints_origination(self, client: Client,
-                                                 session):
-        path = os.path.join(CONTRACT_PATH, 'entrypoints',
-                            'big_map_entrypoints.tz')
-        originate(client, session, path, 'Pair {} {}', 1000,
-                  contract_name='target')
+    def test_target_with_entrypoints_origination(self, client: Client, session):
+        path = os.path.join(
+            CONTRACT_PATH, 'entrypoints', 'big_map_entrypoints.tz'
+        )
+        originate(
+            client, session, path, 'Pair {} {}', 1000, contract_name='target'
+        )
 
-    def test_target_without_entrypoints_origination(self, client: Client,
-                                                    session):
-        path = os.path.join(CONTRACT_PATH, 'entrypoints',
-                            'no_entrypoint_target.tz')
-        originate(client, session, path, 'Pair "hello" 42', 1000,
-                  contract_name='target_no_entrypoints')
+    def test_target_without_entrypoints_origination(
+        self, client: Client, session
+    ):
+        path = os.path.join(
+            CONTRACT_PATH, 'entrypoints', 'no_entrypoint_target.tz'
+        )
+        originate(
+            client,
+            session,
+            path,
+            'Pair "hello" 42',
+            1000,
+            contract_name='target_no_entrypoints',
+        )
 
-    def test_target_without_default_origination(self, client: Client,
-                                                session):
-        path = os.path.join(CONTRACT_PATH, 'entrypoints',
-                            'no_default_target.tz')
-        originate(client, session, path, 'Pair "hello" 42', 1000,
-                  contract_name='target_no_default')
+    def test_target_without_default_origination(self, client: Client, session):
+        path = os.path.join(
+            CONTRACT_PATH, 'entrypoints', 'no_default_target.tz'
+        )
+        originate(
+            client,
+            session,
+            path,
+            'Pair "hello" 42',
+            1000,
+            contract_name='target_no_default',
+        )
 
-    def test_target_with_root_origination(self, client: Client,
-                                          session):
+    def test_target_with_root_origination(self, client: Client, session):
         path = os.path.join(CONTRACT_PATH, 'entrypoints', 'rooted_target.tz')
-        originate(client, session, path, 'Pair "hello" 42', 1000,
-                  contract_name='rooted_target')
+        originate(
+            client,
+            session,
+            path,
+            'Pair "hello" 42',
+            1000,
+            contract_name='rooted_target',
+        )
 
     def test_manager_set_delegate(self, client: Client):
         client.set_delegate('manager', 'bootstrap2', [])
@@ -90,18 +115,19 @@ class TestManager:
         client.set_delegate('delegatable_target', bootstrap2_pkh, [])
         client.bake('bootstrap5', BAKE_ARGS)
         delegate = IDENTITIES['bootstrap2']['identity']
-        assert client.get_delegate('manager', []).delegate \
-            == delegate
-        assert client.get_delegate('delegatable_target', []).delegate \
-            == delegate
+        assert client.get_delegate('manager', []).delegate == delegate
+        assert (
+            client.get_delegate('delegatable_target', []).delegate == delegate
+        )
         client.set_delegate('manager', 'bootstrap3', [])
         client.bake('bootstrap5', BAKE_ARGS)
         client.set_delegate('delegatable_target', 'bootstrap3', [])
         client.bake('bootstrap5', BAKE_ARGS)
         delegate = IDENTITIES['bootstrap3']['identity']
         assert client.get_delegate('manager', []).delegate == delegate
-        assert client.get_delegate('delegatable_target', []).delegate \
-            == delegate
+        assert (
+            client.get_delegate('delegatable_target', []).delegate == delegate
+        )
 
     def test_manager_withdraw_delegate(self, client: Client):
         client.withdraw_delegate('manager', [])
@@ -116,48 +142,57 @@ class TestManager:
         balance_bootstrap = client.get_mutez_balance('bootstrap2')
         amount = 10.001
         amount_mutez = utils.mutez_of_tez(amount)
-        client.transfer(amount, 'bootstrap2', 'manager',
-                        ['--gas-limit', f'{15450 + 108}'])
+        client.transfer(
+            amount, 'bootstrap2', 'manager', ['--gas-limit', f'{15450 + 108}']
+        )
         client.bake('bootstrap5', BAKE_ARGS)
         new_balance = client.get_mutez_balance('manager')
         new_balance_bootstrap = client.get_mutez_balance('bootstrap2')
         fee = 0.001807
         fee_mutez = utils.mutez_of_tez(fee)
         assert balance + amount_mutez == new_balance
-        assert (balance_bootstrap - fee_mutez - amount_mutez
-                == new_balance_bootstrap)
+        assert (
+            balance_bootstrap - fee_mutez - amount_mutez
+            == new_balance_bootstrap
+        )
 
     def test_simple_transfer_from_manager_to_implicit(self, client: Client):
         balance = client.get_mutez_balance('manager')
         balance_bootstrap = client.get_mutez_balance('bootstrap2')
         amount = 10.1
         amount_mutez = utils.mutez_of_tez(amount)
-        client.transfer(amount, 'manager', 'bootstrap2',
-                        ['--gas-limit', f'{26350 + 12}'])
+        client.transfer(
+            amount, 'manager', 'bootstrap2', ['--gas-limit', f'{26350 + 12}']
+        )
         client.bake('bootstrap5', BAKE_ARGS)
         new_balance = client.get_mutez_balance('manager')
         new_balance_bootstrap = client.get_mutez_balance('bootstrap2')
         fee = 0.002948 + 0.000001
         fee_mutez = utils.mutez_of_tez(fee)
         assert balance - amount_mutez == new_balance
-        assert (balance_bootstrap + amount_mutez - fee_mutez
-                == new_balance_bootstrap)
+        assert (
+            balance_bootstrap + amount_mutez - fee_mutez
+            == new_balance_bootstrap
+        )
 
     def test_simple_transfer_from_manager_to_implicit_json(self, client):
         balance = client.get_mutez_balance('manager')
         balance_bootstrap = client.get_mutez_balance('bootstrap2')
         amount = 10.1
         amount_mutez = utils.mutez_of_tez(amount)
-        client.transfer_json(amount, 'manager', 'bootstrap2',
-                             ['--default-gas-limit', '26183'])
+        client.transfer_json(
+            amount, 'manager', 'bootstrap2', ['--default-gas-limit', '26183']
+        )
         client.bake('bootstrap5', BAKE_ARGS)
         new_balance = client.get_mutez_balance('manager')
         new_balance_bootstrap = client.get_mutez_balance('bootstrap2')
         fee = 0.002931
         fee_mutez = utils.mutez_of_tez(fee)
         assert balance - amount_mutez == new_balance
-        assert (balance_bootstrap + amount_mutez - fee_mutez
-                == new_balance_bootstrap)
+        assert (
+            balance_bootstrap + amount_mutez - fee_mutez
+            == new_balance_bootstrap
+        )
 
     def test_transfer_from_manager_to_manager(self, client: Client):
         balance = client.get_mutez_balance('manager')
@@ -165,8 +200,9 @@ class TestManager:
         balance_bootstrap = client.get_mutez_balance('bootstrap2')
         amount = 10
         amount_mutez = utils.mutez_of_tez(amount)
-        client.transfer(amount, 'manager', 'manager2',
-                        ['--gas-limit', f'{44950 + 112}'])
+        client.transfer(
+            amount, 'manager', 'manager2', ['--gas-limit', f'{44950 + 112}']
+        )
         client.bake('bootstrap5', BAKE_ARGS)
         new_balance = client.get_mutez_balance('manager')
         new_balance_dest = client.get_mutez_balance('manager2')
@@ -178,75 +214,86 @@ class TestManager:
         assert balance_dest + amount_mutez == new_balance_dest
 
     def test_transfer_from_manager_to_default(self, client: Client):
-        client.transfer(10, 'manager', 'bootstrap2',
-                        ['--entrypoint', 'default'])
+        client.transfer(
+            10, 'manager', 'bootstrap2', ['--entrypoint', 'default']
+        )
         client.bake('bootstrap5', BAKE_ARGS)
-        client.transfer(10, 'manager', 'manager',
-                        ['--entrypoint', 'default'])
+        client.transfer(10, 'manager', 'manager', ['--entrypoint', 'default'])
         client.bake('bootstrap5', BAKE_ARGS)
 
     def test_transfer_from_manager_to_target(self, client: Client):
         client.transfer(10, 'manager', 'target', ['--burn-cap', '0.356'])
         client.bake('bootstrap5', BAKE_ARGS)
 
-    def test_transfer_from_manager_to_entrypoint_with_args(self,
-                                                           client: Client):
+    def test_transfer_from_manager_to_entrypoint_with_args(
+        self, client: Client
+    ):
         arg = 'Pair "hello" 42'
         # using 'transfer'
-        client.transfer(0, 'manager', 'target',
-                        ['--entrypoint', 'add_left',
-                         '--arg', arg,
-                         '--burn-cap', '0.067'])
+        client.transfer(
+            0,
+            'manager',
+            'target',
+            ['--entrypoint', 'add_left', '--arg', arg, '--burn-cap', '0.067'],
+        )
         client.bake('bootstrap5', BAKE_ARGS)
-        client.transfer(0, 'manager', 'target',
-                        ['--entrypoint', 'mem_left',
-                         '--arg', '"hello"'])
+        client.transfer(
+            0,
+            'manager',
+            'target',
+            ['--entrypoint', 'mem_left', '--arg', '"hello"'],
+        )
         client.bake('bootstrap5', BAKE_ARGS)
 
         # using 'call'
-        client.call('manager', 'target',
-                    ['--entrypoint', 'add_left',
-                     '--arg', arg,
-                     '--burn-cap', '0.067'])
+        client.call(
+            'manager',
+            'target',
+            ['--entrypoint', 'add_left', '--arg', arg, '--burn-cap', '0.067'],
+        )
         client.bake('bootstrap5', BAKE_ARGS)
-        client.call('manager', 'target',
-                    ['--entrypoint', 'mem_left',
-                     '--arg', '"hello"'])
+        client.call(
+            'manager',
+            'target',
+            ['--entrypoint', 'mem_left', '--arg', '"hello"'],
+        )
         client.bake('bootstrap5', BAKE_ARGS)
 
-    def test_transfer_from_manager_no_entrypoint_with_args(self,
-                                                           client: Client):
+    def test_transfer_from_manager_no_entrypoint_with_args(
+        self, client: Client
+    ):
         arg = 'Left Unit'
-        client.transfer(0, 'manager', 'target_no_entrypoints',
-                        ['--arg', arg])
+        client.transfer(0, 'manager', 'target_no_entrypoints', ['--arg', arg])
         client.bake('bootstrap5', BAKE_ARGS)
 
-        client.call('manager', 'target_no_entrypoints',
-                    ['--arg', arg])
+        client.call('manager', 'target_no_entrypoints', ['--arg', arg])
         client.bake('bootstrap5', BAKE_ARGS)
 
-    def test_transfer_from_manager_to_no_default_with_args(self,
-                                                           client: Client):
+    def test_transfer_from_manager_to_no_default_with_args(
+        self, client: Client
+    ):
         arg = 'Left Unit'
-        client.transfer(0, 'manager', 'target_no_default',
-                        ['--arg', arg])
+        client.transfer(0, 'manager', 'target_no_default', ['--arg', arg])
         client.bake('bootstrap5', BAKE_ARGS)
 
-        client.call('manager', 'target_no_default',
-                    ['--arg', arg])
+        client.call('manager', 'target_no_default', ['--arg', arg])
         client.bake('bootstrap5', BAKE_ARGS)
 
-    def test_transfer_from_manager_to_rooted_target_with_args(self,
-                                                              client: Client):
+    def test_transfer_from_manager_to_rooted_target_with_args(
+        self, client: Client
+    ):
         arg = 'Left Unit'
-        client.transfer(0, 'manager', 'rooted_target',
-                        ['--arg', arg,
-                         '--entrypoint', 'root'])
+        client.transfer(
+            0,
+            'manager',
+            'rooted_target',
+            ['--arg', arg, '--entrypoint', 'root'],
+        )
         client.bake('bootstrap5', BAKE_ARGS)
 
-        client.call('manager', 'rooted_target',
-                    ['--arg', arg,
-                     '--entrypoint', 'root'])
+        client.call(
+            'manager', 'rooted_target', ['--arg', arg, '--entrypoint', 'root']
+        )
         client.bake('bootstrap5', BAKE_ARGS)
 
     def test_transfer_json_to_entrypoint_with_args(self, client):
@@ -254,21 +301,24 @@ class TestManager:
         balance_bootstrap = client.get_mutez_balance('bootstrap2')
         fee = 0.0123
         fee_mutez = utils.mutez_of_tez(fee)
-        json_obj = [{"destination": "target",
-                     "amount": "0",
-                     "fee": str(fee),
-                     "gas-limit": "65942",
-                     "storage-limit": "1024",
-                     "arg": 'Pair "hello" 42',
-                     "entrypoint": "add_left"}]
+        json_obj = [
+            {
+                "destination": "target",
+                "amount": "0",
+                "fee": str(fee),
+                "gas-limit": "65942",
+                "storage-limit": "1024",
+                "arg": 'Pair "hello" 42',
+                "entrypoint": "add_left",
+            }
+        ]
         json_ops = json.dumps(json_obj, separators=(',', ':'))
         client.run(client.cmd_batch('manager', json_ops))
         client.bake('bootstrap5', BAKE_ARGS)
         new_balance = client.get_mutez_balance('manager')
         new_balance_bootstrap = client.get_mutez_balance('bootstrap2')
         assert balance == new_balance
-        assert (balance_bootstrap - fee_mutez
-                == new_balance_bootstrap)
+        assert balance_bootstrap - fee_mutez == new_balance_bootstrap
 
     def test_multiple_transfers(self, client):
         balance = client.get_mutez_balance('manager')
@@ -278,22 +328,23 @@ class TestManager:
         amount_mutez_2 = utils.mutez_of_tez(amount_2)
         amount_3 = 11.01
         amount_mutez_3 = utils.mutez_of_tez(amount_3)
-        json_obj = [{"destination": "bootstrap2",
-                     "amount": str(amount_2)},
-                    {"destination": "bootstrap3",
-                     "amount": str(amount_3)}]
+        json_obj = [
+            {"destination": "bootstrap2", "amount": str(amount_2)},
+            {"destination": "bootstrap3", "amount": str(amount_3)},
+        ]
         json_ops = json.dumps(json_obj, separators=(',', ':'))
         client.run(client.cmd_batch('manager', json_ops))
         client.bake('bootstrap5', BAKE_ARGS)
         new_balance = client.get_mutez_balance('manager')
         new_balance_bootstrap2 = client.get_mutez_balance('bootstrap2')
         new_balance_bootstrap3 = client.get_mutez_balance('bootstrap3')
-        fee_mutez = 810+714
+        fee_mutez = 810 + 714
         assert balance - amount_mutez_2 - amount_mutez_3 == new_balance
-        assert (balance_bootstrap2 + amount_mutez_2 - fee_mutez
-                == new_balance_bootstrap2)
-        assert (balance_bootstrap3 + amount_mutez_3
-                == new_balance_bootstrap3)
+        assert (
+            balance_bootstrap2 + amount_mutez_2 - fee_mutez
+            == new_balance_bootstrap2
+        )
+        assert balance_bootstrap3 + amount_mutez_3 == new_balance_bootstrap3
 
 
 @pytest.mark.slow
@@ -303,60 +354,75 @@ class TestContracts:
 
     @pytest.mark.parametrize("contract", all_contracts())
     def test_typecheck(self, client: Client, contract):
-        assert contract.endswith('.tz'), \
-            "test contract should have .tz extension"
+        assert contract.endswith(
+            '.tz'
+        ), "test contract should have .tz extension"
         client.typecheck(os.path.join(CONTRACT_PATH, contract))
 
-    @pytest.mark.parametrize("contract,error_pattern", [
-        # operations cannot be PACKed
-        ("pack_operation.tz",
-         r'operation type forbidden in parameter, storage and constants'),
-        # big_maps cannot be PACKed
-        ("pack_big_map.tz",
-         r'big_map type not expected here'),
-        ("invalid_self_entrypoint.tz",
-         r'Contract has no entrypoint named D'),
-        ("contract_annotation_default.tz",
-         r'unexpected annotation'),
-        # Missing field
-        ("missing_only_storage_field.tz",
-         r'Missing contract field: storage'),
-        ("missing_only_code_field.tz",
-         r'Missing contract field: code'),
-        ("missing_only_parameter_field.tz",
-         r'Missing contract field: parameter'),
-        ("missing_parameter_and_storage_fields.tz",
-         r'Missing contract field: parameter'),
-        # Duplicated field
-        ("multiple_parameter_field.tz",
-         r'duplicate contract field: parameter'),
-        ("multiple_code_field.tz", r'duplicate contract field: code'),
-        ("multiple_storage_field.tz",
-         r'duplicate contract field: storage'),
-        # The first duplicated field is reported, storage in this case
-        ("multiple_storage_and_code_fields.tz",
-         r'duplicate contract field: storage'),
-        # error message for set update on non-comparable type
-        ("set_update_non_comparable.tz",
-         r'comparable type expected'),
-        # error message for the arity of the chain_id type
-        ("chain_id_arity.tz",
-         r'primitive chain_id expects 0 arguments but is given 1'),
-        # error message for DIP over the limit
-        ("big_dip.tz",
-         r'expected a positive 10-bit integer'),
-        # error message for DROP over the limit
-        ("big_drop.tz",
-         r'expected a positive 10-bit integer'),
-    ])
+    @pytest.mark.parametrize(
+        "contract,error_pattern",
+        [
+            # operations cannot be PACKed
+            (
+                "pack_operation.tz",
+                r'operation type forbidden in parameter, storage and constants',
+            ),
+            # big_maps cannot be PACKed
+            ("pack_big_map.tz", r'big_map type not expected here'),
+            (
+                "invalid_self_entrypoint.tz",
+                r'Contract has no entrypoint named D',
+            ),
+            ("contract_annotation_default.tz", r'unexpected annotation'),
+            # Missing field
+            (
+                "missing_only_storage_field.tz",
+                r'Missing contract field: storage',
+            ),
+            ("missing_only_code_field.tz", r'Missing contract field: code'),
+            (
+                "missing_only_parameter_field.tz",
+                r'Missing contract field: parameter',
+            ),
+            (
+                "missing_parameter_and_storage_fields.tz",
+                r'Missing contract field: parameter',
+            ),
+            # Duplicated field
+            (
+                "multiple_parameter_field.tz",
+                r'duplicate contract field: parameter',
+            ),
+            ("multiple_code_field.tz", r'duplicate contract field: code'),
+            ("multiple_storage_field.tz", r'duplicate contract field: storage'),
+            # The first duplicated field is reported, storage in this case
+            (
+                "multiple_storage_and_code_fields.tz",
+                r'duplicate contract field: storage',
+            ),
+            # error message for set update on non-comparable type
+            ("set_update_non_comparable.tz", r'comparable type expected'),
+            # error message for the arity of the chain_id type
+            (
+                "chain_id_arity.tz",
+                r'primitive chain_id expects 0 arguments but is given 1',
+            ),
+            # error message for DIP over the limit
+            ("big_dip.tz", r'expected a positive 10-bit integer'),
+            # error message for DROP over the limit
+            ("big_drop.tz", r'expected a positive 10-bit integer'),
+        ],
+    )
     def test_ill_typecheck(self, client: Client, contract, error_pattern):
         with utils.assert_run_failure(error_pattern):
             client.typecheck(os.path.join(ILLTYPED_CONTRACT_PATH, contract))
 
     def test_zero_transfer_to_implicit_contract(self, client):
         pubkey = IDENTITIES['bootstrap3']['identity']
-        err = ('Transaction of 0ꜩ towards a contract without code are '
-               rf'forbidden \({pubkey}\).')
+        err = (
+            'Transaction of 0ꜩ towards a contract without code are '
+            rf'forbidden \({pubkey}\).'
+        )
         with utils.assert_run_failure(err):
             client.transfer(0, 'bootstrap2', 'bootstrap3', [])
 
@@ -416,11 +482,12 @@ SECOND_EXPLOSION = '''
 
 @pytest.mark.contract
 class TestGasBound:
-
     def test_write_contract(self, tmpdir, session: dict):
-        items = {'first_explosion.tz': FIRST_EXPLOSION,
-                 'first_explosion_bigtype.tz': FIRST_EXPLOSION_BIGTYPE,
-                 'second_explosion.tz': SECOND_EXPLOSION}.items()
+        items = {
+            'first_explosion.tz': FIRST_EXPLOSION,
+            'first_explosion_bigtype.tz': FIRST_EXPLOSION_BIGTYPE,
+            'second_explosion.tz': SECOND_EXPLOSION,
+        }.items()
         for name, script in items:
             contract = f'{tmpdir}/{name}'
             with open(contract, 'w') as contract_file:
@@ -454,93 +521,107 @@ class TestGasBound:
         inp = '{1;2;3;4;5;6;7;8;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1}'
         client.run_script(contract, storage, inp)
 
-    def test_originate_second_explosion_fail(self, client: Client,
-                                             session: dict):
+    def test_originate_second_explosion_fail(
+        self, client: Client, session: dict
+    ):
         name = 'second_explosion.tz'
         contract = session[name]
         storage = '{}'
-        inp = ('{1;2;3;4;5;6;7;8;9;0;1;2;3;4;5;6;7;1;1;1;1;1;1;1;1;1;1;1' +
-               ';1;1;1;1;1;1;1;1;1;1;1;1;1;1}')
+        inp = (
+            '{1;2;3;4;5;6;7;8;9;0;1;2;3;4;5;6;7;1;1;1;1;1;1;1;1;1;1;1'
+            + ';1;1;1;1;1;1;1;1;1;1;1;1;1;1}'
+        )
 
-        expected_error = \
-            ("Cannot serialize the resulting storage" +
-             " value within the provided gas bounds.")
+        expected_error = (
+            "Cannot serialize the resulting storage"
+            + " value within the provided gas bounds."
+        )
         with utils.assert_run_failure(expected_error):
             client.run_script(contract, storage, inp, gas=9290)
 
     def test_typecheck_map_dup_key(self, client: Client):
 
-        expected_error = \
-            ('Map literals cannot contain duplicate' +
-             ' keys, however a duplicate key was found')
+        expected_error = (
+            'Map literals cannot contain duplicate'
+            + ' keys, however a duplicate key was found'
+        )
         with utils.assert_run_failure(expected_error):
             client.typecheck_data('{ Elt 0 1 ; Elt 0 1}', '(map nat nat)')
 
     def test_typecheck_map_bad_ordering(self, client: Client):
 
-        expected_error = \
-            ("Keys in a map literal must be in strictly" +
-             " ascending order, but they were unordered in literal")
+        expected_error = (
+            "Keys in a map literal must be in strictly"
+            + " ascending order, but they were unordered in literal"
+        )
         with utils.assert_run_failure(expected_error):
-            client.typecheck_data('{ Elt 0 1 ; Elt 10 1 ; Elt 5 1 }',
-                                  '(map nat nat)')
+            client.typecheck_data(
+                '{ Elt 0 1 ; Elt 10 1 ; Elt 5 1 }', '(map nat nat)'
+            )
 
     def test_typecheck_set_bad_ordering(self, client: Client):
 
-        expected_error = \
-            ("Values in a set literal must be in strictly" +
-             " ascending order, but they were unordered in literal")
+        expected_error = (
+            "Values in a set literal must be in strictly"
+            + " ascending order, but they were unordered in literal"
+        )
         with utils.assert_run_failure(expected_error):
             client.typecheck_data('{ "A" ; "C" ; "B" }', '(set string)')
 
     def test_typecheck_set_no_duplicates(self, client: Client):
-        expected_error = \
-            ("Set literals cannot contain duplicate values," +
-             " however a duplicate value was found")
+        expected_error = (
+            "Set literals cannot contain duplicate values,"
+            + " however a duplicate value was found"
+        )
         with utils.assert_run_failure(expected_error):
             client.typecheck_data('{ "A" ; "B" ; "B" }', '(set string)')
 
 
 @pytest.mark.contract
 class TestChainId:
-
     def test_chain_id_opcode(self, client: Client, session: dict):
         path = os.path.join(CONTRACT_PATH, 'opcodes', 'chain_id.tz')
         originate(client, session, path, 'Unit', 0)
         client.call('bootstrap2', "chain_id", [])
         client.bake('bootstrap5', BAKE_ARGS)
 
-    def test_chain_id_authentication_origination(self, client: Client,
-                                                 session):
-        path = os.path.join(CONTRACT_PATH,
-                            'mini_scenarios', 'authentication.tz')
+    def test_chain_id_authentication_origination(self, client: Client, session):
+        path = os.path.join(
+            CONTRACT_PATH, 'mini_scenarios', 'authentication.tz'
+        )
         pubkey = IDENTITIES['bootstrap1']['public']
         originate(client, session, path, f'Pair 0 "{pubkey}"', 1000)
         client.bake('bootstrap5', BAKE_ARGS)
 
-    def test_chain_id_authentication_first_run(self, client: Client,
-                                               session: dict):
+    def test_chain_id_authentication_first_run(
+        self, client: Client, session: dict
+    ):
         destination = IDENTITIES['bootstrap2']['identity']
-        operation = '{DROP; NIL operation; ' + \
-            f'PUSH address "{destination}"; ' + \
-            'CONTRACT unit; ASSERT_SOME; PUSH mutez 1000; UNIT; ' + \
-            'TRANSFER_TOKENS; CONS}'
+        operation = (
+            '{DROP; NIL operation; '
+            + f'PUSH address "{destination}"; '
+            + 'CONTRACT unit; ASSERT_SOME; PUSH mutez 1000; UNIT; '
+            + 'TRANSFER_TOKENS; CONS}'
+        )
         chain_id = client.rpc('get', 'chains/main/chain_id')
         contract_address = session['contract']
         packed = client.pack(
-            f'Pair (Pair "{chain_id}" "{contract_address}") ' +
-            f'(Pair {operation} 0)',
-            'pair (pair chain_id address)' +
-            '(pair (lambda unit (list operation)) nat)')
+            f'Pair (Pair "{chain_id}" "{contract_address}") '
+            + f'(Pair {operation} 0)',
+            'pair (pair chain_id address)'
+            + '(pair (lambda unit (list operation)) nat)',
+        )
         signature = client.sign(packed, "bootstrap1")
-        client.call('bootstrap2', 'authentication',
-                    ['--arg', f'Pair {operation} \"{signature}\"'])
+        client.call(
+            'bootstrap2',
+            'authentication',
+            ['--arg', f'Pair {operation} \"{signature}\"'],
+        )
         client.bake('bootstrap5', BAKE_ARGS)
 
 
 @pytest.mark.contract
 class TestBigMapToSelf:
-
     def test_big_map_to_self_origination(self, client: Client, session: dict):
         path = os.path.join(CONTRACT_PATH, 'opcodes', 'big_map_to_self.tz')
         originate(client, session, path, '{}', 0)
@@ -581,19 +662,21 @@ class TestMiniScenarios:
 
     # create_contract.tz related tests
     def test_create_contract_originate(self, client: Client, session: dict):
-        path = os.path.join(CONTRACT_PATH, 'mini_scenarios',
-                            'create_contract.tz')
+        path = os.path.join(
+            CONTRACT_PATH, 'mini_scenarios', 'create_contract.tz'
+        )
         originate(client, session, path, 'Unit', 1000)
 
     def test_create_contract_balance(self, client: Client):
         assert client.get_balance('create_contract') == 1000
 
     def test_create_contract_perform_creation(self, client: Client):
-        transfer_result = client.transfer(0, "bootstrap1", "create_contract",
-                                          ['-arg',
-                                           'None',
-                                           '--burn-cap',
-                                           '10'])
+        transfer_result = client.transfer(
+            0,
+            "bootstrap1",
+            "create_contract",
+            ['-arg', 'None', '--burn-cap', '10'],
+        )
         client.bake('bootstrap5', BAKE_ARGS)
         pattern = r"New contract (\w*) originated"
         match = re.search(pattern, transfer_result.client_output)
@@ -607,21 +690,25 @@ class TestMiniScenarios:
     # rootname annotation. Such annotations comes in two flavors, thus the
     # parameterization. Then calls the first contract and verifies the
     # existence and type of the root entrypoint of the create contract.
-    @pytest.mark.parametrize("contract", [
-        'create_contract_rootname.tz',
-        'create_contract_rootname_alt.tz',
-    ])
+    @pytest.mark.parametrize(
+        "contract",
+        [
+            'create_contract_rootname.tz',
+            'create_contract_rootname_alt.tz',
+        ],
+    )
     def test_create_contract_rootname_originate(
-            self, client: Client, session: dict, contract):
+        self, client: Client, session: dict, contract
+    ):
         path = os.path.join(CONTRACT_PATH, 'opcodes', contract)
         origination_res = originate(client, session, path, 'None', 1000)
 
-        transfer_result = client.transfer(0, "bootstrap1",
-                                          origination_res.contract,
-                                          ['-arg',
-                                           'Unit',
-                                           '--burn-cap',
-                                           '10'])
+        transfer_result = client.transfer(
+            0,
+            "bootstrap1",
+            origination_res.contract,
+            ['-arg', 'Unit', '--burn-cap', '10'],
+        )
         client.bake('bootstrap5', BAKE_ARGS)
 
         pattern = r"New contract (\w*) originated"
@@ -629,81 +716,121 @@ class TestMiniScenarios:
         assert match is not None
         kt_1 = match.groups()[0]
 
-        entrypoint_type = client.get_contract_entrypoint_type('root', kt_1) \
-                                .entrypoint_type
+        entrypoint_type = client.get_contract_entrypoint_type(
+            'root', kt_1
+        ).entrypoint_type
 
-        assert entrypoint_type == 'unit', \
-            ('the entrypoint my_root of the originated contract should exist'
-             'with type unit')
+        assert entrypoint_type == 'unit', (
+            'the entrypoint my_root of the originated contract should exist'
+            'with type unit'
+        )
 
     # default_account.tz related tests
     def test_default_account_originate(self, client: Client, session: dict):
-        path = os.path.join(CONTRACT_PATH, 'mini_scenarios',
-                            'default_account.tz')
+        path = os.path.join(
+            CONTRACT_PATH, 'mini_scenarios', 'default_account.tz'
+        )
         originate(client, session, path, 'Unit', 1000)
 
     def test_default_account_transfer_then_bake(self, client: Client):
         tz1 = IDENTITIES['bootstrap4']['identity']
-        client.transfer(0, "bootstrap1", "default_account",
-                        ['-arg', f'"{tz1}"', '--burn-cap', '10'])
+        client.transfer(
+            0,
+            "bootstrap1",
+            "default_account",
+            ['-arg', f'"{tz1}"', '--burn-cap', '10'],
+        )
         client.bake('bootstrap5', BAKE_ARGS)
         account = 'tz1SuakBpFdG9b4twyfrSMqZzruxhpMeSrE5'
-        client.transfer(0, "bootstrap1", "default_account",
-                        ['-arg', f'"{account}"', '--burn-cap', '10'])
+        client.transfer(
+            0,
+            "bootstrap1",
+            "default_account",
+            ['-arg', f'"{account}"', '--burn-cap', '10'],
+        )
         client.bake('bootstrap5', BAKE_ARGS)
         assert client.get_balance(account) == 100
 
     # Test bytes, SHA252, CHECK_SIGNATURE
-    def test_reveal_signed_preimage_originate(self, client: Client,
-                                              session: dict):
-        path = os.path.join(CONTRACT_PATH, 'mini_scenarios',
-                            'reveal_signed_preimage.tz')
-        byt = ('0x9995c2ef7bcc7ae3bd15bdd9b02' +
-               'dc6e877c27b26732340d641a4cbc6524813bb')
+    def test_reveal_signed_preimage_originate(
+        self, client: Client, session: dict
+    ):
+        path = os.path.join(
+            CONTRACT_PATH, 'mini_scenarios', 'reveal_signed_preimage.tz'
+        )
+        byt = (
+            '0x9995c2ef7bcc7ae3bd15bdd9b02'
+            + 'dc6e877c27b26732340d641a4cbc6524813bb'
+        )
         sign = 'p2pk66uq221795tFxT7jfNmXtBMdjMf6RAaxRTwv1dbuSHbH6yfqGwz'
         storage = f'(Pair {byt} "{sign}")'
         originate(client, session, path, storage, 1000)
 
     def test_wrong_preimage(self, client: Client):
-        byt = ('0x050100000027566f756c657a2d766f75732' +
-               '0636f75636865722061766563206d6f692c20636520736f6972')
-        sign = ('p2sigvgDSBnN1bUsfwyMvqpJA1cFhE5s5oi7SetJ' +
-                'VQ6LJsbFrU2idPvnvwJhf5v9DhM9ZTX1euS9DgWozVw6BTHiK9VcQVpAU8')
+        byt = (
+            '0x050100000027566f756c657a2d766f75732'
+            + '0636f75636865722061766563206d6f692c20636520736f6972'
+        )
+        sign = (
+            'p2sigvgDSBnN1bUsfwyMvqpJA1cFhE5s5oi7SetJ'
+            + 'VQ6LJsbFrU2idPvnvwJhf5v9DhM9ZTX1euS9DgWozVw6BTHiK9VcQVpAU8'
+        )
         arg = f'(Pair {byt} "{sign}")'
 
         # We check failure of ASSERT_CMPEQ in the script.
         with utils.assert_run_failure("At line 8 characters 9 to 21"):
-            client.transfer(0, "bootstrap1", "reveal_signed_preimage",
-                            ['-arg', arg, '--burn-cap', '10'])
+            client.transfer(
+                0,
+                "bootstrap1",
+                "reveal_signed_preimage",
+                ['-arg', arg, '--burn-cap', '10'],
+            )
 
     def test_wrong_signature(self, client: Client):
-        byt = ('0x050100000027566f756c657a2d766f757320636' +
-               'f75636865722061766563206d6f692c20636520736f6972203f')
-        sign = ('p2sigvgDSBnN1bUsfwyMvqpJA1cFhE5s5oi7SetJVQ6' +
-                'LJsbFrU2idPvnvwJhf5v9DhM9ZTX1euS9DgWozVw6BTHiK9VcQVpAU8')
+        byt = (
+            '0x050100000027566f756c657a2d766f757320636'
+            + 'f75636865722061766563206d6f692c20636520736f6972203f'
+        )
+        sign = (
+            'p2sigvgDSBnN1bUsfwyMvqpJA1cFhE5s5oi7SetJVQ6'
+            + 'LJsbFrU2idPvnvwJhf5v9DhM9ZTX1euS9DgWozVw6BTHiK9VcQVpAU8'
+        )
         arg = f'(Pair {byt} "{sign}")'
 
         # We check failure of CHECK_SIGNATURE ; ASSERT in the script.
         with utils.assert_run_failure("At line 15 characters 9 to 15"):
-            client.transfer(0, "bootstrap1", "reveal_signed_preimage",
-                            ['-arg', arg, '--burn-cap', '10'])
+            client.transfer(
+                0,
+                "bootstrap1",
+                "reveal_signed_preimage",
+                ['-arg', arg, '--burn-cap', '10'],
+            )
 
     def test_good_preimage_and_signature(self, client: Client):
-        byt = ('0x050100000027566f756c657a2d766f757320636f7563' +
-               '6865722061766563206d6f692c20636520736f6972203f')
-        sign = ('p2sigsceCzcDw2AeYDzUonj4JT341WC9Px4wdhHBxbZcG1F' +
-                'hfqFVuG7f2fGCzrEHSAZgrsrQWpxduDPk9qZRgrpzwJnSHC3gZJ')
+        byt = (
+            '0x050100000027566f756c657a2d766f757320636f7563'
+            + '6865722061766563206d6f692c20636520736f6972203f'
+        )
+        sign = (
+            'p2sigsceCzcDw2AeYDzUonj4JT341WC9Px4wdhHBxbZcG1F'
+            + 'hfqFVuG7f2fGCzrEHSAZgrsrQWpxduDPk9qZRgrpzwJnSHC3gZJ'
+        )
         arg = f'(Pair {byt} "{sign}")'
-        client.transfer(0, "bootstrap1", "reveal_signed_preimage",
-                        ['-arg', arg, '--burn-cap', '10'])
+        client.transfer(
+            0,
+            "bootstrap1",
+            "reveal_signed_preimage",
+            ['-arg', arg, '--burn-cap', '10'],
+        )
         client.bake('bootstrap5', BAKE_ARGS)
 
     # Test vote_for_delegate
     def test_vote_for_delegate_originate(self, client: Client, session: dict):
         b_3 = IDENTITIES['bootstrap3']['identity']
         b_4 = IDENTITIES['bootstrap4']['identity']
-        path = os.path.join(CONTRACT_PATH, 'mini_scenarios',
-                            'vote_for_delegate.tz')
+        path = os.path.join(
+            CONTRACT_PATH, 'mini_scenarios', 'vote_for_delegate.tz'
+        )
         storage = f'''(Pair (Pair "{b_3}" None) (Pair "{b_4}" None))'''
         originate(client, session, path, storage, 1000)
         assert client.get_delegate('vote_for_delegate').delegate is None
@@ -711,19 +838,31 @@ class TestMiniScenarios:
     def test_vote_for_delegate_wrong_identity1(self, client: Client):
         # We check failure of CHECK_SIGNATURE ; ASSERT in the script.
         with utils.assert_run_failure("At line 15 characters 57 to 61"):
-            client.transfer(0, "bootstrap1", "vote_for_delegate",
-                            ['-arg', 'None', '--burn-cap', '10'])
+            client.transfer(
+                0,
+                "bootstrap1",
+                "vote_for_delegate",
+                ['-arg', 'None', '--burn-cap', '10'],
+            )
 
     def test_vote_for_delegate_wrong_identity2(self, client: Client):
         # We check failure of CHECK_SIGNATURE ; ASSERT in the script.
         with utils.assert_run_failure("At line 15 characters 57 to 61"):
-            client.transfer(0, "bootstrap2", "vote_for_delegate",
-                            ['-arg', 'None', '--burn-cap', '10'])
+            client.transfer(
+                0,
+                "bootstrap2",
+                "vote_for_delegate",
+                ['-arg', 'None', '--burn-cap', '10'],
+            )
 
     def test_vote_for_delegate_b3_vote_for_b5(self, client: Client):
         b_5 = IDENTITIES['bootstrap5']['identity']
-        client.transfer(0, "bootstrap3", "vote_for_delegate",
-                        ['-arg', f'(Some "{b_5}")', '--burn-cap', '10'])
+        client.transfer(
+            0,
+            "bootstrap3",
+            "vote_for_delegate",
+            ['-arg', f'(Some "{b_5}")', '--burn-cap', '10'],
+        )
         client.bake('bootstrap5', BAKE_ARGS)
         storage = client.get_storage('vote_for_delegate')
         assert re.search(b_5, storage)
@@ -733,8 +872,12 @@ class TestMiniScenarios:
 
     def test_vote_for_delegate_b4_vote_for_b2(self, client: Client):
         b_2 = IDENTITIES['bootstrap2']['identity']
-        client.transfer(0, "bootstrap4", "vote_for_delegate",
-                        ['-arg', f'(Some "{b_2}")', '--burn-cap', '10'])
+        client.transfer(
+            0,
+            "bootstrap4",
+            "vote_for_delegate",
+            ['-arg', f'(Some "{b_2}")', '--burn-cap', '10'],
+        )
         client.bake('bootstrap5', BAKE_ARGS)
         storage = client.get_storage('vote_for_delegate')
         assert re.search(b_2, storage)
@@ -744,8 +887,12 @@ class TestMiniScenarios:
 
     def test_vote_for_delegate_b4_vote_for_b5(self, client: Client):
         b_5 = IDENTITIES['bootstrap5']['identity']
-        client.transfer(0, "bootstrap4", "vote_for_delegate",
-                        ['-arg', f'(Some "{b_5}")', '--burn-cap', '10'])
+        client.transfer(
+            0,
+            "bootstrap4",
+            "vote_for_delegate",
+            ['-arg', f'(Some "{b_5}")', '--burn-cap', '10'],
+        )
         client.bake('bootstrap5', BAKE_ARGS)
         storage = client.get_storage('vote_for_delegate')
         assert re.search(b_5, storage)
@@ -756,8 +903,9 @@ class TestMiniScenarios:
         assert result.delegate == b_5
 
     def test_multiple_entrypoints_counter(self, session: dict, client: Client):
-        path = os.path.join(CONTRACT_PATH, 'mini_scenarios',
-                            'multiple_entrypoints_counter.tz')
+        path = os.path.join(
+            CONTRACT_PATH, 'mini_scenarios', 'multiple_entrypoints_counter.tz'
+        )
 
         storage = 'None'
 
@@ -766,27 +914,34 @@ class TestMiniScenarios:
         client.bake('bootstrap5', BAKE_ARGS)
 
         # call contract: creates the internal contract and calls it.
-        client.transfer(0, 'bootstrap1', 'multiple_entrypoints_counter',
-                        ['--burn-cap', '10'])
+        client.transfer(
+            0,
+            'bootstrap1',
+            'multiple_entrypoints_counter',
+            ['--burn-cap', '10'],
+        )
         client.bake('bootstrap5', BAKE_ARGS)
-        assert client.get_storage('multiple_entrypoints_counter') == 'None', \
-            ("The storage of the multiple_entrypoints_counter contract"
-             " should be None")
+        assert client.get_storage('multiple_entrypoints_counter') == 'None', (
+            "The storage of the multiple_entrypoints_counter contract"
+            " should be None"
+        )
 
     # Test CONTRACT with/without entrypoint annotation on literal address
     # parameters with/without entrypoint annotation
     def test_originate_simple_entrypoints(self, session: dict, client: Client):
-        '''originates the contract simple_entrypoints.tz
+        """originates the contract simple_entrypoints.tz
          with entrypoint %A of type unit used in
-        test_simple_entrypoints'''
+        test_simple_entrypoints"""
 
-        contract_target = os.path.join(CONTRACT_PATH, 'entrypoints',
-                                       'simple_entrypoints.tz')
+        contract_target = os.path.join(
+            CONTRACT_PATH, 'entrypoints', 'simple_entrypoints.tz'
+        )
         originate(client, session, contract_target, 'Unit', 0)
         client.bake('bootstrap5', BAKE_ARGS)
 
     @pytest.mark.parametrize(
-        'contract_annotation, contract_type, param, expected_storage', [
+        'contract_annotation, contract_type, param, expected_storage',
+        [
             # tests passing adr to CONTRACT %A unit
             # where adr has an entrypoint %A of type unit, is allowed.
             ('%A', 'unit', '"{adr}"', '(Some "{adr}%A")'),
@@ -822,14 +977,17 @@ class TestMiniScenarios:
             ('%A', 'int', '"{adr}"', 'None'),
             ('%B', 'unit', '"{adr}"', 'None'),
             ('%C', 'int', '"{adr}"', 'None'),
-        ])
-    def test_simple_entrypoints(self,
-                                session,
-                                client,
-                                contract_annotation,
-                                contract_type,
-                                param,
-                                expected_storage):
+        ],
+    )
+    def test_simple_entrypoints(
+        self,
+        session,
+        client,
+        contract_annotation,
+        contract_type,
+        param,
+        expected_storage,
+    ):
         contract = f'''parameter address;
 storage (option address);
 code {{
@@ -848,68 +1006,85 @@ code {{
 
 @pytest.mark.contract
 class TestComparablePairs:
-
     def test_comparable_pair(self, client: Client):
         # tests that comb pairs are comparable and that the order is the
         # expected one
         client.typecheck_data('{}', '(set (pair nat string))')
         client.typecheck_data('{Pair 0 "foo"}', '(set (pair nat string))')
-        client.typecheck_data('{Pair 0 "foo"; Pair 1 "bar"}',
-                              '(set (pair nat string))')
-        client.typecheck_data('{Pair 0 "bar"; Pair 0 "foo"; \
+        client.typecheck_data(
+            '{Pair 0 "foo"; Pair 1 "bar"}', '(set (pair nat string))'
+        )
+        client.typecheck_data(
+            '{Pair 0 "bar"; Pair 0 "foo"; \
                                 Pair 1 "bar"; Pair 1 "foo"}',
-                              '(set (pair nat string))')
+            '(set (pair nat string))',
+        )
         client.typecheck_data('{}', '(set (pair nat (pair string bytes)))')
 
         client.typecheck_data('{}', '(map (pair nat string) unit)')
-        client.typecheck_data('{Elt (Pair 0 "foo") Unit}',
-                              '(map (pair nat string) unit)')
-        client.typecheck_data('{Elt (Pair 0 "foo") Unit; \
+        client.typecheck_data(
+            '{Elt (Pair 0 "foo") Unit}', '(map (pair nat string) unit)'
+        )
+        client.typecheck_data(
+            '{Elt (Pair 0 "foo") Unit; \
                                 Elt (Pair 1 "bar") Unit}',
-                              '(map (pair nat string) unit)')
-        client.typecheck_data('{Elt (Pair 0 "bar") Unit; \
+            '(map (pair nat string) unit)',
+        )
+        client.typecheck_data(
+            '{Elt (Pair 0 "bar") Unit; \
                                 Elt (Pair 0 "foo") Unit; \
                                 Elt (Pair 1 "bar") Unit; \
                                 Elt (Pair 1 "foo") Unit}',
-                              '(map (pair nat string) unit)')
-        client.typecheck_data('{}',
-                              '(map (pair nat (pair string bytes)) unit)')
+            '(map (pair nat string) unit)',
+        )
+        client.typecheck_data('{}', '(map (pair nat (pair string bytes)) unit)')
 
         client.typecheck_data('{}', '(big_map (pair nat string) unit)')
-        client.typecheck_data('{Elt (Pair 0 "foo") Unit}',
-                              '(big_map (pair nat string) unit)')
-        client.typecheck_data('{Elt (Pair 0 "foo") Unit; \
+        client.typecheck_data(
+            '{Elt (Pair 0 "foo") Unit}', '(big_map (pair nat string) unit)'
+        )
+        client.typecheck_data(
+            '{Elt (Pair 0 "foo") Unit; \
                                 Elt (Pair 1 "bar") Unit}',
-                              '(big_map (pair nat string) unit)')
-        client.typecheck_data('{Elt (Pair 0 "bar") Unit; \
+            '(big_map (pair nat string) unit)',
+        )
+        client.typecheck_data(
+            '{Elt (Pair 0 "bar") Unit; \
                                 Elt (Pair 0 "foo") Unit; \
                                 Elt (Pair 1 "bar") Unit; \
                                 Elt (Pair 1 "foo") Unit}',
-                              '(big_map (pair nat string) unit)')
-        client.typecheck_data('{}',
-                              '(big_map (pair nat (pair string bytes)) unit)')
+            '(big_map (pair nat string) unit)',
+        )
+        client.typecheck_data(
+            '{}', '(big_map (pair nat (pair string bytes)) unit)'
+        )
 
     def test_order_of_pairs(self, client: Client):
         # tests that badly-ordered set literals are rejected
         utils.assert_typecheck_data_failure(
-            client, '{Pair 0 "foo"; Pair 0 "bar"}', '(set (pair nat string))')
+            client, '{Pair 0 "foo"; Pair 0 "bar"}', '(set (pair nat string))'
+        )
         utils.assert_typecheck_data_failure(
-            client, '{Pair 1 "bar"; Pair 0 "foo"}', '(set (pair nat string))')
+            client, '{Pair 1 "bar"; Pair 0 "foo"}', '(set (pair nat string))'
+        )
 
     def test_non_comparable_non_comb_pair(self, client: Client):
         # tests that non-comb pairs are rejected by the typechecker
         utils.assert_typecheck_data_failure(
-            client, '{}', '(set (pair (pair nat nat) nat))')
+            client, '{}', '(set (pair (pair nat nat) nat))'
+        )
 
 
 @pytest.mark.contract
 class TestTypecheckingErrors:
     def test_big_map_arity_error(self, client: Client):
-        error_pattern = ('primitive EMPTY_BIG_MAP expects 2 arguments but is '
-                         'given 1.')
+        error_pattern = (
+            'primitive EMPTY_BIG_MAP expects 2 arguments but is given 1.'
+        )
         with utils.assert_run_failure(error_pattern):
-            client.typecheck(os.path.join(CONTRACT_PATH, 'ill_typed',
-                                          'big_map_arity.tz'))
+            client.typecheck(
+                os.path.join(CONTRACT_PATH, 'ill_typed', 'big_map_arity.tz')
+            )
 
 
 BAD_ANNOT_TEST = '''
@@ -921,7 +1096,6 @@ code { CAR; UNPACK (lambda unit unit); NIL operation; PAIR}
 
 @pytest.mark.contract
 class TestBadAnnotation:
-
     def test_write_contract_bad_annot(self, tmpdir, session: dict):
         name = 'bad_annot.tz'
         contract = f'{tmpdir}/{name}'
@@ -952,16 +1126,18 @@ class TestOrderInTopLevelDoesNotMatter:
         return [
             "parameter nat",
             "storage unit",
-            "code { CDR; NIL operation; PAIR }"
+            "code { CDR; NIL operation; PAIR }",
         ]
 
-    def test_shuffle(self, client: Client,
-                     contract_splitted_in_top_level_elements):
+    def test_shuffle(
+        self, client: Client, contract_splitted_in_top_level_elements
+    ):
         """
         Test that the storage, code, and parameter sections can appear in any
         order in a contract script.
         """
         for shuffled_list in itertools.permutations(
-                contract_splitted_in_top_level_elements):
+            contract_splitted_in_top_level_elements
+        ):
             contract = ";\n".join(shuffled_list)
             client.typecheck(contract, file=False)

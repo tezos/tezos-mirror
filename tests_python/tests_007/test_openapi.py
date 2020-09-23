@@ -21,8 +21,9 @@ from tools import paths
 def _get_version() -> str:
     cmd = ["ocaml", "../scripts/print_version.ml"]
     print(" ".join(cmd))
-    process_ret = subprocess.run(cmd, check=True,
-                                 capture_output=True, text=True)
+    process_ret = subprocess.run(
+        cmd, check=True, capture_output=True, text=True
+    )
     return process_ret.stdout.strip()
 
 
@@ -33,8 +34,8 @@ def _write_file(path: str, content: str):
 
 def _try_json_loads(addr: str, content: str):
     """
-        `addr` is the address from which `content` was obtained. `addr`
-        is only used for generating a faulty's assert message.
+    `addr` is the address from which `content` was obtained. `addr`
+    is only used for generating a faulty's assert message.
     """
     try:
         json.loads(content)
@@ -43,18 +44,21 @@ def _try_json_loads(addr: str, content: str):
 
 
 def test_openapi(sandbox: Sandbox):
-    """ Mimicks the script src/openapi/generate.sh. Generates the API
-        and check it generates valid json. """
+    """Mimicks the script src/openapi/generate.sh. Generates the API
+    and check it generates valid json."""
     node_idx = 0
     sandbox.add_node(0, params=NODE_PARAMS)
     node = sandbox.node(node_idx)
 
     client = sandbox.client(0)
-    parameters_file = (f'{paths.TEZOS_HOME}src/proto_007_PsDELPH1/parameters/'
-                       'test-parameters.json')
+    parameters_file = (
+        f'{paths.TEZOS_HOME}src/proto_007_PsDELPH1/parameters/'
+        'test-parameters.json'
+    )
     assert os.path.isfile(parameters_file), (
         f'{parameters_file} cannot be found; please first run `make` in '
-        'TEZOS_HOME.')
+        'TEZOS_HOME.'
+    )
     with open(parameters_file) as pfile:
         parameters = json.load(pfile)
         client.activate_protocol_json(DELPHI, parameters)
@@ -63,8 +67,10 @@ def test_openapi(sandbox: Sandbox):
     api = requests.get(api_addr).text
     _try_json_loads(api_addr, api)
 
-    proto_api_addr = f"http://localhost:{node.rpc_port}" + \
-                     "/describe/chains/main/blocks/head?recurse=yes"
+    proto_api_addr = (
+        f"http://localhost:{node.rpc_port}"
+        + "/describe/chains/main/blocks/head?recurse=yes"
+    )
     proto_api = requests.get(proto_api_addr).text
     _try_json_loads(proto_api_addr, proto_api)
 
@@ -75,8 +81,7 @@ def test_openapi(sandbox: Sandbox):
         api_path = os.path.join(base_dir, "api.json")
         proto_api_path = os.path.join(base_dir, "proto_api.json")
 
-        for (path, content) in [(api_path, api),
-                                (proto_api_path, proto_api)]:
+        for (path, content) in [(api_path, api), (proto_api_path, proto_api)]:
             _write_file(path, content)
 
         for input_ in [api_path, proto_api_path]:
@@ -84,9 +89,16 @@ def test_openapi(sandbox: Sandbox):
             # to give you time to inspect generated files before the
             # enclosing 'with' block finishes or to execute the dune
             # command manually while the temporary files are still there.
-            cmd = ["dune", "exec", "../src/openapi/rpc_openapi.exe",
-                   "--", version, input_]
+            cmd = [
+                "dune",
+                "exec",
+                "../src/openapi/rpc_openapi.exe",
+                "--",
+                version,
+                input_,
+            ]
             print(" ".join(cmd))
-            process_ret = subprocess.run(cmd, check=True,
-                                         capture_output=True, text=True)
+            process_ret = subprocess.run(
+                cmd, check=True, capture_output=True, text=True
+            )
             _try_json_loads(" ".join(cmd), process_ret.stdout)

@@ -14,7 +14,6 @@ BATCH = 16
 @pytest.mark.snapshot
 @pytest.mark.slow
 class TestMultiNodeStorageReconstruction:
-
     def test_init(self, sandbox: Sandbox):
         sandbox.add_node(0, params=PARAMS)
         protocol.activate(sandbox.client(0), activate_in_the_past=True)
@@ -33,7 +32,8 @@ class TestMultiNodeStorageReconstruction:
         session['snapshot_head'] = session['head_hash']
         session['snapshot_level'] = session['head_level']
         node_export.snapshot_export(
-            file, params=['--block', session['snapshot_head']])
+            file, params=['--block', session['snapshot_head']]
+        )
 
     # Test the `--reconstruct` flag of the `snapshot import` command
     def test_import_and_reconstruct(self, sandbox: Sandbox, session: dict):
@@ -44,8 +44,9 @@ class TestMultiNodeStorageReconstruction:
 
     # Test that all the reconstructed blocks can be
     # requested as non-pruned blocks
-    def test_request_all_blocks_as_not_pruned(self, sandbox: Sandbox,
-                                              session: dict):
+    def test_request_all_blocks_as_not_pruned(
+        self, sandbox: Sandbox, session: dict
+    ):
         for i in range(session['head_level']):
             assert utils.get_block_at_level(sandbox.client(1), i)
 

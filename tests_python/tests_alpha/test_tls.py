@@ -5,8 +5,11 @@ from client.client import Client
 
 @pytest.fixture(scope="class")
 def client(sandbox):
-    sandbox.add_node(0, use_tls=(constants.TEZOS_CRT, constants.TEZOS_KEY),
-                     params=constants.NODE_PARAMS)
+    sandbox.add_node(
+        0,
+        use_tls=(constants.TEZOS_CRT, constants.TEZOS_KEY),
+        params=constants.NODE_PARAMS,
+    )
     yield sandbox.client(0)
 
 
