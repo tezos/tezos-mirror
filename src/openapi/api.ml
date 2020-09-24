@@ -212,8 +212,7 @@ let show_method = function
 
 type service = {
   meth : meth;
-  path : Json.t option;
-  (* TODO: what is this? *)
+  path : path_item list;
   description : string;
   query : Json.t option;
   (* TODO: what is this? *)
@@ -244,12 +243,20 @@ let parse_schemas (json : Json.t) : schemas =
     binary_schema = get "binary_schema" |> opt_mandatory "binary_schema";
   }
 
+let parse_path_item (json : Json.t) : path_item =
+  match json with
+    | `String s -> PI_static s
+    | _ -> PI_dynamic (parse_arg json)
+
+let parse_path (json : Json.t) : path =
+  json |> Json.as_list |> List.map parse_path_item
+
 let parse_service (json : Json.t) : service =
   Json.as_record json
   @@ fun get ->
   {
     meth = get "meth" |> opt_mandatory "meth" |> Json.as_string |> parse_meth;
-    path = get "path";
+    path = get "path" |> opt_mandatory "path" |> parse_path;
     description =
       get "description"
       |> Option.value ~default:(`String "(no description)")

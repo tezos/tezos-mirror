@@ -26,6 +26,10 @@
 (* Entrypoint for a program that converts a Tezos API description (JSON)
    into an OpenAPI 3 specification (JSON as well). *)
 
+let fail x = Printf.ksprintf failwith x
+
+let warn x = Printf.ksprintf (fun s -> prerr_endline ("Warning: " ^ s)) x
+
 let opt_fold f acc = function None -> acc | Some x -> f acc x
 
 (* Check our assumptions for arrays. *)
@@ -272,20 +276,30 @@ let opt_map_with_env f = function
       let (env, y) = f x in
       (env, Some y)
 
-let convert_service (service : Api.service) : env * Openapi.Service.t =
+let convert_service expected_path expected_method
+    ({meth; path; description; query; input; output; error} : Api.service) :
+    env * Openapi.Service.t =
+  if expected_method <> meth then
+    fail
+      "expected method %s but found %s"
+      (Api.show_method expected_method)
+      (Api.show_method meth) ;
+  (* TODO: in practice [expected_path <> path]. Investigate why. *)
+  if expected_path <> path then
+    warn
+      "expected path %s but found %s"
+      (Api.show_path expected_path)
+      (Api.show_path path) ;
+  (* TODO: query *)
+  let _ = query in
   let (env_1, request_body) =
-    opt_map_with_env (fun x -> convert_schema x.Api.json_schema) service.input
+    opt_map_with_env (fun x -> convert_schema x.Api.json_schema) input
   in
   (* 200 is the HTTP code for OK. *)
-  let (env_2, output) = convert_response ~code:200 service.output in
-  let (env_3, error) = convert_response service.error in
+  let (env_2, output) = convert_response ~code:200 output in
+  let (env_3, error) = convert_response error in
   let responses = List.flatten [output; error] in
-  let service =
-    Openapi.Service.make
-      ~description:service.description
-      ?request_body
-      responses
-  in
+  let service = Openapi.Service.make ~description ?request_body responses in
   let env = merge_env_list [env_1; env_2; env_3] in
   (env, service)
 
@@ -304,11 +318,16 @@ let convert_path (path : Api.path) : Openapi.Path.t =
 
 let convert_endpoint (endpoint : Api.service Api.endpoint) :
     env * Openapi.Endpoint.t =
-  let (env_1, get) = opt_map_with_env convert_service endpoint.get in
-  let (env_2, post) = opt_map_with_env convert_service endpoint.post in
-  let (env_3, put) = opt_map_with_env convert_service endpoint.put in
-  let (env_4, delete) = opt_map_with_env convert_service endpoint.delete in
-  let (env_5, patch) = opt_map_with_env convert_service endpoint.patch in
+  let convert_service = convert_service endpoint.path in
+  let (env_1, get) = opt_map_with_env (convert_service GET) endpoint.get in
+  let (env_2, post) = opt_map_with_env (convert_service POST) endpoint.post in
+  let (env_3, put) = opt_map_with_env (convert_service PUT) endpoint.put in
+  let (env_4, delete) =
+    opt_map_with_env (convert_service DELETE) endpoint.delete
+  in
+  let (env_5, patch) =
+    opt_map_with_env (convert_service PATCH) endpoint.patch
+  in
   let endpoint =
     Openapi.Endpoint.make
       ?get
