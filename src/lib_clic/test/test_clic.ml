@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
+(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,7 +24,212 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(**
+
+  This is a basic test for the Clic library.
+
+*)
+
 open Tezos_error_monad.Error_monad
+
+(* definitions *)
+
+let keywords words =
+  let words = List.map (fun (w, v) -> (String.lowercase_ascii w, v)) words in
+  let matcher _ w =
+    let w = String.lowercase_ascii w in
+    match List.assoc_opt w words with
+    | None ->
+        failwith "wrong argument %s" w
+    | Some v ->
+        return v
+  in
+  let autocomplete _ = return (fst (List.split words)) in
+  Clic.parameter ~autocomplete matcher
+
+type abcd = A | B | C | D
+
+type efgh = E | F | G | H
+
+let string_of_abcd = function A -> "A" | B -> "B" | C -> "C" | D -> "D"
+
+let string_of_efgh = function E -> "E" | F -> "F" | G -> "G" | H -> "H"
+
+let abcd_parameter : (abcd, unit) Clic.parameter =
+  keywords [("A", A); ("B", B); ("C", C); ("D", D)]
+
+let efgh_parameter : (efgh, unit) Clic.parameter =
+  keywords [("E", E); ("F", F); ("G", G); ("H", H)]
+
+let abcd_param ~name =
+  Clic.param ~name ~desc:"must be A,B,C or D" abcd_parameter
+
+let efgh_param ~name =
+  Clic.param ~name ~desc:"must be E,F,G or H" efgh_parameter
+
+(* instrumentation *)
+
+let dispatch cmds argv =
+  let res = ref "nomatch" in
+  let cmd_return v =
+    res := v ;
+    return ()
+  in
+  let cmds = List.map (fun cmd -> cmd cmd_return) cmds in
+  Clic.dispatch cmds () argv >>=? fun () -> return !res
+
+let expect_result line pr exp got =
+  got
+  >>= fun got ->
+  if
+    match (got, exp) with
+    | (Ok got, Ok exp) ->
+        got = exp
+    | (Error got, Error exp) ->
+        let got = Format.asprintf "%a" pp_print_error got in
+        Stringext.find_from got ~pattern:exp <> None
+    | _ ->
+        false
+  then Lwt.return_unit
+  else
+    let pr_got ppf = function
+      | Ok v ->
+          pr ppf v
+      | Error e ->
+          pp_print_error ppf e
+    in
+    let pr_exp ppf = function
+      | Ok v ->
+          pr ppf v
+      | Error e ->
+          Format.pp_print_string ppf e
+    in
+    Lwt.fail_with
+      (Format.asprintf
+         "at line %d, expected %a, got %a"
+         line
+         pr_exp
+         exp
+         pr_got
+         got)
+
+(* basic *)
+
+let prefix () =
+  let empty return =
+    Clic.command ~desc:"empty" Clic.no_options Clic.stop (fun () () ->
+        return "empty")
+  in
+  let prefixes words return =
+    let name = String.concat "-" words in
+    Clic.command
+      ~desc:name
+      Clic.no_options
+      (Clic.prefixes words @@ Clic.stop)
+      (fun () () -> return name)
+  in
+  let expect line = expect_result line Format.pp_print_string in
+  expect __LINE__ (Ok "empty") (dispatch [empty] [])
+  >>= fun () ->
+  expect __LINE__ (Error "Extra_arguments") (dispatch [empty] ["one"])
+  >>= fun () ->
+  let cmds = [empty; prefixes ["one"]; prefixes ["one"; "two"]] in
+  expect __LINE__ (Ok "empty") (dispatch cmds [])
+  >>= fun () ->
+  expect __LINE__ (Ok "one") (dispatch cmds ["one"])
+  >>= fun () ->
+  expect __LINE__ (Ok "one-two") (dispatch cmds ["one"; "two"])
+  >>= fun () ->
+  expect __LINE__ (Error "Command_not_found") (dispatch cmds ["saucisse"])
+  >>= fun () ->
+  expect
+    __LINE__
+    (Error "Command_not_found")
+    (dispatch cmds ["one"; "saucisse"])
+  >>= fun () ->
+  expect
+    __LINE__
+    (Error "Extra_arguments")
+    (dispatch cmds ["one"; "two"; "three"])
+  >>= fun () -> Lwt.return_unit
+
+(* advanced *)
+
+let ntseq () =
+  let en return =
+    Clic.command
+      ~desc:"seq-abcd-en"
+      Clic.no_options
+      ( Clic.non_terminal_seq ~suffix:["the"; "end"] (abcd_param ~name:"item")
+      @@ Clic.stop )
+      (fun () l () ->
+        return ("E" ^ String.concat "" (List.map string_of_abcd l)))
+  in
+  let enp return =
+    Clic.command
+      ~desc:"seq-abcd-en"
+      Clic.no_options
+      ( Clic.non_terminal_seq ~suffix:["the"; "end"] (abcd_param ~name:"item")
+      @@ Clic.prefix "of" @@ efgh_param ~name:"last" @@ Clic.stop )
+      (fun () l p () ->
+        return
+          ( "E"
+          ^ String.concat "" (List.map string_of_abcd l)
+          ^ string_of_efgh p ))
+  in
+  let fr return =
+    Clic.command
+      ~desc:"seq-abcd-fr"
+      Clic.no_options
+      ( Clic.non_terminal_seq ~suffix:["la"; "fin"] (abcd_param ~name:"item")
+      @@ Clic.stop )
+      (fun () l () ->
+        return ("F" ^ String.concat "" (List.map string_of_abcd l)))
+  in
+  let expect line = expect_result line Format.pp_print_string in
+  expect __LINE__ (Error "Unterminated_command") (dispatch [en] ["saucisse"])
+  >>= fun () ->
+  expect __LINE__ (Ok "E") (dispatch [en] ["the"; "end"])
+  >>= fun () ->
+  expect __LINE__ (Ok "EB") (dispatch [en] ["b"; "the"; "end"])
+  >>= fun () ->
+  expect __LINE__ (Ok "EDB") (dispatch [en] ["d"; "b"; "the"; "end"])
+  >>= fun () ->
+  expect __LINE__ (Ok "EB") (dispatch [en; enp] ["b"; "the"; "end"])
+  >>= fun () ->
+  expect
+    __LINE__
+    (Ok "EBE")
+    (dispatch [en; enp] ["b"; "the"; "end"; "of"; "e"])
+  >>= fun () ->
+  expect __LINE__ (Ok "EBE") (dispatch [enp] ["b"; "the"; "end"; "of"; "e"])
+  >>= fun () ->
+  expect
+    __LINE__
+    (Error "wrong argument")
+    (dispatch [en] ["d"; "x"; "the"; "end"])
+  >>= fun () ->
+  expect __LINE__ (Ok "F") (dispatch [fr] ["la"; "fin"])
+  >>= fun () ->
+  expect __LINE__ (Ok "FA") (dispatch [fr] ["a"; "la"; "fin"])
+  >>= fun () ->
+  expect __LINE__ (Ok "FCB") (dispatch [fr] ["c"; "b"; "la"; "fin"])
+  >>= fun () ->
+  (* the following two should probably either all work, or all fail with a command clash error *)
+  expect __LINE__ (Ok "EB") (dispatch [en; fr] ["b"; "the"; "end"])
+  >>= fun () ->
+  expect
+    __LINE__
+    (Error "Unterminated_command")
+    (dispatch [fr; en] ["b"; "the"; "end"])
+  >>= fun () ->
+  expect
+    __LINE__
+    (Error "Unterminated_command")
+    (dispatch [en; fr] ["a"; "la"; "fin"])
+  >>= fun () ->
+  expect __LINE__ (Ok "FA") (dispatch [fr; en] ["a"; "la"; "fin"])
+  >>= fun () -> Lwt.return_unit
 
 let string_param ~autocomplete next =
   Clic.(
@@ -317,9 +523,13 @@ let wrap (n, f) =
       | Error err ->
           Format.kasprintf Lwt.fail_with "%a" pp_print_error err)
 
+(* main *)
+
 let () =
   Alcotest_lwt.run
-    "tezos-clic"
-    [ ( "auto-completion-parameters",
+    "Clic"
+    [ ("prefix", [("prefix", `Quick, prefix)]);
+      ("advanced", [("ntseq", `Quick, ntseq)]);
+      ( "auto-completion-parameters",
         List.map wrap test_parameters_autocompletion ) ]
   |> Lwt_main.run
