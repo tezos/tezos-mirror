@@ -160,6 +160,53 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
             Cohttp_lwt.Body.empty )
       | `Not_found ->
           (Response.make ~status:`Not_found (), Cohttp_lwt.Body.empty)
+
+    let handle_rpc_answer ?headers output error answer =
+      match answer with
+      | `Ok o ->
+          let body = output o in
+          let encoding = Transfer.Fixed (Int64.of_int (String.length body)) in
+          Lwt.return_ok
+            ( Response.make ~status:`OK ~encoding ?headers (),
+              Cohttp_lwt.Body.of_string body )
+      | `Created s ->
+          let headers = Header.init () in
+          let headers =
+            match s with
+            | None ->
+                headers
+            | Some s ->
+                Header.add headers "location" s
+          in
+          Lwt.return_ok
+            (Response.make ~status:`Created ~headers (), Cohttp_lwt.Body.empty)
+      | `No_content ->
+          Lwt.return_ok
+            (Response.make ~status:`No_content (), Cohttp_lwt.Body.empty)
+      | `Unauthorized e ->
+          let (body, encoding) = error e in
+          let status = `Unauthorized in
+          Lwt.return_ok (Response.make ~status ~encoding ?headers (), body)
+      | `Forbidden e ->
+          let (body, encoding) = error e in
+          let status = `Forbidden in
+          Lwt.return_ok (Response.make ~status ~encoding ?headers (), body)
+      | `Gone e ->
+          let (body, encoding) = error e in
+          let status = `Gone in
+          Lwt.return_ok (Response.make ~status ~encoding ?headers (), body)
+      | `Not_found e ->
+          let (body, encoding) = error e in
+          let status = `Not_found in
+          Lwt.return_ok (Response.make ~status ~encoding ?headers (), body)
+      | `Conflict e ->
+          let (body, encoding) = error e in
+          let status = `Conflict in
+          Lwt.return_ok (Response.make ~status ~encoding ?headers (), body)
+      | `Error e ->
+          let (body, encoding) = error e in
+          let status = `Internal_server_error in
+          Lwt.return_ok (Response.make ~status ~encoding ?headers (), body)
   end
 
   type server = {
@@ -276,59 +323,22 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
               | Ok body ->
                   s.handler query body >>= Lwt.return_ok ) )
         >>=? function
-        | `Ok o ->
-            let body = output o in
-            let encoding =
-              Transfer.Fixed (Int64.of_int (String.length body))
-            in
-            Lwt.return_ok
-              ( Response.make ~status:`OK ~encoding ~headers (),
-                Cohttp_lwt.Body.of_string body )
+        | ( `Ok _
+          | `Created _
+          | `No_content
+          | `Unauthorized _
+          | `Forbidden _
+          | `Gone _
+          | `Not_found _
+          | `Conflict _
+          | `Error _ ) as a ->
+            Internal.handle_rpc_answer ~headers output error a
         | `OkStream o ->
             let body = create_stream server con output o in
             let encoding = Transfer.Chunked in
             Lwt.return_ok
               ( Response.make ~status:`OK ~encoding ~headers (),
-                Cohttp_lwt.Body.of_stream body )
-        | `Created s ->
-            let headers = Header.init () in
-            let headers =
-              match s with
-              | None ->
-                  headers
-              | Some s ->
-                  Header.add headers "location" s
-            in
-            Lwt.return_ok
-              ( Response.make ~status:`Created ~headers (),
-                Cohttp_lwt.Body.empty )
-        | `No_content ->
-            Lwt.return_ok
-              (Response.make ~status:`No_content (), Cohttp_lwt.Body.empty)
-        | `Unauthorized e ->
-            let (body, encoding) = error e in
-            let status = `Unauthorized in
-            Lwt.return_ok (Response.make ~status ~encoding ~headers (), body)
-        | `Forbidden e ->
-            let (body, encoding) = error e in
-            let status = `Forbidden in
-            Lwt.return_ok (Response.make ~status ~encoding ~headers (), body)
-        | `Gone e ->
-            let (body, encoding) = error e in
-            let status = `Gone in
-            Lwt.return_ok (Response.make ~status ~encoding ~headers (), body)
-        | `Not_found e ->
-            let (body, encoding) = error e in
-            let status = `Not_found in
-            Lwt.return_ok (Response.make ~status ~encoding ~headers (), body)
-        | `Conflict e ->
-            let (body, encoding) = error e in
-            let status = `Conflict in
-            Lwt.return_ok (Response.make ~status ~encoding ~headers (), body)
-        | `Error e ->
-            let (body, encoding) = error e in
-            let status = `Internal_server_error in
-            Lwt.return_ok (Response.make ~status ~encoding ~headers (), body) )
+                Cohttp_lwt.Body.of_stream body ) )
     | `HEAD ->
         (* TODO ??? *)
         Lwt.return_error `Not_implemented

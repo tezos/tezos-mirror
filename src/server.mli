@@ -88,5 +88,20 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) : sig
       | `Not_implemented
       | `Unsupported_media_type of 'a ] ->
       Cohttp.Response.t * Cohttp_lwt.Body.t
+
+    val handle_rpc_answer :
+      ?headers:Cohttp.Header.t ->
+      ('o -> string) ->
+      ('e -> Cohttp_lwt.Body.t * Cohttp.Transfer.encoding) ->
+      [< `Conflict of 'e
+      | `Created of string option
+      | `Error of 'e
+      | `Forbidden of 'e
+      | `Gone of 'e
+      | `No_content
+      | `Not_found of 'e
+      | `Ok of 'o
+      | `Unauthorized of 'e ] ->
+      (Cohttp.Response.t * Cohttp_lwt.Body.t, 'c) Result.result Lwt.t
   end
 end
