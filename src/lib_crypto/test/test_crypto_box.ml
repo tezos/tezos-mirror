@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:    Crypto
+    Invocation:   dune build @src/lib_crypto/runtest
+    Subject:      Roundtrips for functions built on the HACL* NaCl API.
+*)
+
 let check_bytes =
   Alcotest.testable (fun fmt x -> Hex.pp fmt (Hex.of_bytes x)) Bytes.equal
 
@@ -32,6 +39,10 @@ let zero_nonce = Crypto_box.zero_nonce
 
 let chkey = Crypto_box.precompute sk pk
 
+(** The test defines a proof-of-work target, generates a proof-of-work
+    for that target, and then verifies it the proof of work is accepted
+    by [Crypto_box.check_proof_of_work].
+*)
 let test_check_pow () =
   let open Lwt.Infix in
   let target = Crypto_box.make_target 2. in
@@ -42,6 +53,9 @@ let test_check_pow () =
     (Crypto_box.check_proof_of_work pk pow target)
     true
 
+(** Checks the neuterize function, i.e. the [pk] corresponds to the
+    generated public key from secret key [sk].
+*)
 let test_neuterize sk pk () =
   Alcotest.check
     (Alcotest.testable Crypto_box.pp_pk Crypto_box.equal)
@@ -49,6 +63,9 @@ let test_neuterize sk pk () =
     (Crypto_box.neuterize sk)
     pk
 
+(** Checks that the [pkh] corresponds to the generated hash of the
+    public key [pk].
+*)
 let test_hash pk pkh () =
   Alcotest.check
     (Alcotest.testable
@@ -58,6 +75,9 @@ let test_hash pk pkh () =
     (Crypto_box.hash pk)
     pkh
 
+(** Encrypts then decrypts the message [msg] with authentication
+    (with side-effects, in-place changes).
+*)
 let test_fast_box_noalloc msg () =
   let buf = Bytes.copy msg in
   let tag = Bytes.make Crypto_box.tag_length '\x00' in
@@ -66,6 +86,9 @@ let test_fast_box_noalloc msg () =
   assert (Crypto_box.fast_box_open_noalloc chkey zero_nonce tag buf) ;
   Alcotest.check check_bytes "test_fast_box_noalloc" buf msg
 
+(** Encrypts then decrypts the message [msg] with authentication.
+    Returns a new buffer for ciphertext.
+*)
 let test_fast_box msg () =
   let cmsg = Crypto_box.fast_box chkey zero_nonce msg in
   match Crypto_box.fast_box_open chkey zero_nonce cmsg with

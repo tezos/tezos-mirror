@@ -23,6 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:    Crypto
+    Invocation:   dune build @src/lib_crypto/runtest
+    Dependencies: src/lib_crypto/test/roundtrips.ml
+    Subject:      Checking Base58 encodings for Ed25519 keys.
+*)
+
 module type B58CHECK = sig
   type t
 
@@ -43,6 +51,9 @@ let test_b58check_roundtrip :
     M.of_b58check_opt
     input
 
+(** Ensures that B58Check-roundtrip (encoding then decoding) is sound
+    for pkh, pk and sk in Ed25519
+*)
 let test_b58check_roundtrips () =
   let (pubkey_hash, pubkey, seckey) = Ed25519.generate_key () in
   test_b58check_roundtrip (module Ed25519.Public_key_hash) pubkey_hash ;
@@ -56,6 +67,9 @@ let test_b58check_invalid input =
     Ed25519.Public_key_hash.of_b58check_opt
     input
 
+(** Testing with invalid values, mostly random bytes and wrong
+    sizes, which are not accepted as Ed25519 keys.
+*)
 let test_b58check_invalids () =
   List.iter
     test_b58check_invalid

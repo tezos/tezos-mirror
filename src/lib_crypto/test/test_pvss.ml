@@ -23,7 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* pvss tests here *)
+(** Testing
+    -------
+    Component:    Crypto
+    Invocation:   dune build @src/lib_crypto/runtest
+    Subject:      On Publicly Verifiable Secret Sharing [Schoenmakers, 1999]
+*)
 
 module Pvss = Pvss_secp256k1
 module Sp = Secp256k1_group
@@ -135,6 +140,7 @@ end = struct
       keypairs
 end
 
+(** Checks the dealer's proof of validity of encrypted shares. *)
 let test_dealer_proof () =
   let shr = (Setup.shares, Setup.other_shares)
   and cmt = (Setup.commitments, Setup.other_commitments)
@@ -169,6 +175,9 @@ module Proof = struct
   let mangle : t -> t = fun (e, es) -> (G.Scalar.(mul e e), es)
 end
 
+(** A dealer's proof which is meant to be invalid by falsifying it
+    with [mangle].
+*)
 let test_invalid_dealer_proof () =
   let proof : Proof.t =
     Setup.convert_encoding Pvss.proof_encoding Proof.encoding Setup.proof
@@ -185,8 +194,10 @@ let test_invalid_dealer_proof () =
          ~proof:mangled
          ~public_keys:Setup.public_keys) )
 
+(** Checks revealing shares, i.e. each participant honestly decrypts
+    its share.
+*)
 let test_share_reveal () =
-  (* check reveal shares *)
   let shares_valid =
     List.map2
       (fun (share, (reveal, proof)) public_key ->
@@ -206,6 +217,7 @@ module Encrypted_share = struct
   let mangle : t -> t = fun share -> Sp.Group.(share + share)
 end
 
+(** A dishonestly-revealed share can be checked. *)
 let test_invalid_share_reveal () =
   let mangle_share : Pvss.Encrypted_share.t -> Pvss.Encrypted_share.t =
    fun share ->
@@ -235,6 +247,7 @@ let test_invalid_share_reveal () =
       assert (not b))
     shares_valid
 
+(** Reconstruct the shared secret. *)
 let test_reconstruct () =
   let indices = [0; 1; 2; 3; 4] in
   let reconstructed =
@@ -257,8 +270,8 @@ let test_reconstruct () =
          Setup.group_encoding
          Setup.public_secret) )
 
+(** Try to reconstruct with n < threshold. *)
 let test_invalid_reconstruct () =
-  (* try to reconstruct with n < threshold *)
   let indices = [0; 1; 2; 3] in
   let reconstructed =
     Pvss.reconstruct

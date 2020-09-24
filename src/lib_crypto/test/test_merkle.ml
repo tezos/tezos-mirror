@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:    Crypto
+    Invocation:   dune build @src/lib_crypto/runtest
+    Subject:      Merkle tree
+*)
+
 open Utils.Infix
 
 type tree = Empty | Leaf of int | Node of tree * tree
@@ -49,6 +56,12 @@ module Merkle = Blake2B.Generic_Merkle_tree (struct
   let node x y = Node (x, y)
 end)
 
+(** [compare_list xs ys] returns true if [ys = xs @ tl], where [tl] is
+    a (potentially empty) repetition of the last element of [xs];
+     
+    e.g., [compare_list [1;2;3] [1;2;3]],
+          [compare_list [1;2;3] [1;2;3;3;3]] both return true.
+*)
 let rec compare_list xs ys =
   match (xs, ys) with
   | ([], []) ->
@@ -74,6 +87,9 @@ let check_size i =
          Format.pp_print_int)
       l2
 
+(** A Merkle tree - computed from a range list - that is recast into
+    a list, yields the same range list.
+*)
 let test_compute _ = List.iter check_size (0 -- 99)
 
 let check_path i =
@@ -87,6 +103,12 @@ let check_path i =
       else Format.kasprintf failwith "Failed for %d in %d." j i)
     l
 
+(** Checks paths in the generated Merkle trees. For each element,
+    compute its path. Then use check_path to reconstruct the tree and
+    compute the position of the element. Assert that the reconstructed
+    tree equals the original tree, and that computed position equals
+    the original position of the element.
+*)
 let test_path _ = List.iter check_path (0 -- 128)
 
 let tests = [("compute", `Quick, test_compute); ("path", `Quick, test_path)]

@@ -23,6 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:    Crypto
+    Invocation:   dune build @src/lib_crypto/runtest
+    Dependencies: src/lib_crypto/test/roundtrips.ml
+    Subject:      On the hash function BLAKE2b
+*)
+
 let test_hashed_roundtrip name enc dec input =
   (* this wrapper to start with hashing *)
   Roundtrips.test_rt_opt
@@ -55,8 +63,10 @@ let inputs =
     String.init 1000 (fun i -> Char.chr (32 + (i mod (126 - 32))));
     "" ]
 
+(** Roundtrips of hexadecimal (en/de)coding of Blake2b hash. *)
 let test_roundtrip_hexs () = List.iter test_roundtrip_hex inputs
 
+(** Roundtrips of string (en/de)coding of Blake2b hash. *)
 let test_roundtrip_strings () = List.iter test_roundtrip_string inputs
 
 let tests =

@@ -20,6 +20,14 @@
  *   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  *   SOFTWARE. *)
 
+(** Testing
+    -------
+    Component:    Crypto
+    Invocation:   dune build @src/lib_crypto/runtest
+    Subject:      Checking all of the HACL* primitives used in lib_crypto:
+                  hashing, HMAC, NaCl, Ed25519, and P-256.
+*)
+
 open Hacl
 
 let hex s = Hex.to_bytes (`Hex s)
@@ -82,38 +90,30 @@ let randmsg =
 
 let randmsg_len = Bytes.length randmsg
 
-let sha256 () =
+(** Checks that the SHA256-digest from [msg] corresponds to [expected_value],
+    whether using [digest] or with [init]/[update]. Same for [randmsg].
+*)
+let test_sha256 () =
   let open Hash.SHA256 in
-  let resp =
+  let expected_value =
     of_hex "d8d219deae87c5e5fffbc0a0a38986de266427b2e08be9f9d22a07b91099dbfe"
-  in
-  let randresp =
+  and rand_expected_value =
     of_hex "9f043732d7117fa402d24e7343108976524b097390b0b160df42b0fa5bc6425c"
   in
-  let st = init () in
-  Printf.printf "Init done\n" ;
-  update st msg ;
-  print_endline "Update done." ;
-  let d = finish st in
-  Printf.printf "Digest size %d\n" (Bytes.length d) ;
-  print_endline "Finish done." ;
-  Alcotest.(check check_bytes "sha256" resp d) ;
-  let d = digest msg in
-  print_endline "Direct hash done." ;
-  Alcotest.(check check_bytes "sha256" resp d) ;
-  let st = init () in
-  Printf.printf "Init done\n" ;
-  update st randmsg ;
-  print_endline "Update done." ;
-  let d = finish st in
-  Printf.printf "Digest size %d\n" (Bytes.length d) ;
-  print_endline "Finish done." ;
-  Alcotest.(check check_bytes "sha256" randresp d) ;
-  let d = digest randmsg in
-  print_endline "Direct hash done." ;
-  Alcotest.(check check_bytes "sha256" randresp d)
+  let init_finish_digest (value, msg) =
+    let st = init () in
+    update st msg ;
+    let d = finish st in
+    Alcotest.(check check_bytes "sha256" value d) ;
+    let d = digest msg in
+    Alcotest.(check check_bytes "sha256" value d)
+  in
+  List.iter
+    init_finish_digest
+    [(expected_value, msg); (rand_expected_value, randmsg)]
 
-let sha256_seq () =
+(** Checks SHA256 incremental hashing with 2 updates. *)
+let test_sha256_seq () =
   let open Hash.SHA256 in
   let bothresp =
     of_hex "ddabe6c4552e944d927bd0b03dd5ab95ecdfa5a135b6c3b60416dbde57b38416"
@@ -128,7 +128,8 @@ let sha256_seq () =
   print_endline "Finish done." ;
   Alcotest.(check check_bytes "sha256_seq" bothresp d)
 
-let sha512 () =
+(** Checks SHA512 hash function. *)
+let test_sha512 () =
   let resp =
     of_hex
       "b4686c597b48c05f9d79f933611343e00985967c16f81a301269c75065ed05067dc547b1b36ec1822cc19a78df691e30fdb739ffb6b2a0ea6533ff20a2202e51"
@@ -136,7 +137,8 @@ let sha512 () =
   let digest = Hash.SHA512.digest msg in
   Alcotest.(check check_bytes "sha512" resp digest)
 
-let hmac_sha256 () =
+(** Checks HMAC-SHA256 with a fixed message and key. *)
+let test_hmac_sha256 () =
   let key = Bytes.unsafe_of_string "key" in
   let msg =
     Bytes.unsafe_of_string "The quick brown fox jumps over the lazy dog"
@@ -147,7 +149,8 @@ let hmac_sha256 () =
   let digest = Hash.SHA256.HMAC.digest ~key ~msg in
   Alcotest.(check check_bytes "hmac_sha256" resp digest)
 
-let hmac_sha512 () =
+(** Checks HMAC-SHA512. *)
+let test_hmac_sha512 () =
   let vectors =
     [ ( Bytes.unsafe_of_string "key",
         Bytes.unsafe_of_string "The quick brown fox jumps over the lazy dog",
@@ -166,14 +169,16 @@ let hmac_sha512 () =
       Alcotest.(check check_bytes "hmac_sha512" resp digest))
     vectors
 
-let sha3_256 () =
+(** Checks SHA3-256 hash function. *)
+let test_sha3_256 () =
   let resp =
     of_hex "c0bc8a6fc1d24c6d8aba95294d86159807aacb95eff450367e807c76fdf98037"
   in
   let digest = Hash.SHA3_256.digest msg in
   Alcotest.(check check_bytes "sha3_256" resp digest)
 
-let sha3_512 () =
+(** Checks SHA3-512 hash function. *)
+let test_sha3_512 () =
   let resp =
     of_hex
       "5d64d3ef8598612744af86fb24d9ad792e0064544a97c149ff8aaedf35c2717d105a2ae191aa11e08c525c28433687c044a8e81271ab9a668ba531091823dfe7"
@@ -181,7 +186,8 @@ let sha3_512 () =
   let digest = Hash.SHA3_512.digest msg in
   Alcotest.(check check_bytes "sha3_512" resp digest)
 
-let keccak_256 () =
+(** Checks Keccak-256 hash function. *)
+let test_keccak_256 () =
   let resp =
     of_hex "9f3afe7d35d9bbc4efd98252357e73e85ce1234a48603a063bb7079174aafa68"
   in
@@ -189,15 +195,18 @@ let keccak_256 () =
   Alcotest.(check check_bytes "keccak_256" resp digest)
 
 let hash =
-  [ ("hmac_sha256", `Quick, hmac_sha256);
-    ("hmac_sha512", `Quick, hmac_sha512);
-    ("sha256", `Quick, sha256);
-    ("sha256_seq", `Quick, sha256_seq);
-    ("sha512", `Quick, sha512);
-    ("sha3_256", `Quick, sha3_256);
-    ("sha3_512", `Quick, sha3_512);
-    ("keccak_256", `Quick, keccak_256) ]
+  [ ("hmac_sha256", `Quick, test_hmac_sha256);
+    ("hmac_sha512", `Quick, test_hmac_sha512);
+    ("sha256", `Quick, test_sha256);
+    ("sha256_seq", `Quick, test_sha256_seq);
+    ("sha512", `Quick, test_sha512);
+    ("sha3_256", `Quick, test_sha3_256);
+    ("sha3_512", `Quick, test_sha3_512);
+    ("keccak_256", `Quick, test_keccak_256) ]
 
+(** Compares a Blake2b hash from [data_in] with [key] to the expected
+   output [data_out].
+*)
 let test_blake2b_direct {data_in; data_key; data_out} =
   let (Blake2b.Hash h) =
     Blake2b.direct
@@ -207,12 +216,14 @@ let test_blake2b_direct {data_in; data_key; data_out} =
   in
   assert (Bytes.(equal data_out h))
 
+(** Tests Blake2b using [vectors]. *)
 let blake2b_tests =
   List.mapi
     (fun i v -> (string_of_int i, `Quick, fun () -> test_blake2b_direct v))
     vectors
 
-let secretbox () =
+(** Encrypts then decrypts a message using the Secretbox module. *)
+let test_secretbox () =
   let open Secretbox in
   let key = genkey () in
   let nonce = Nonce.gen () in
@@ -222,9 +233,12 @@ let secretbox () =
   assert (secretbox_open ~key ~nonce ~cmsg ~msg:decrypted_msg) ;
   Alcotest.check check_bytes "secretbox_decrypt" msg decrypted_msg
 
-let secretbox = [("secretbox", `Quick, secretbox)]
+let secretbox = [("secretbox", `Quick, test_secretbox)]
 
-let box () =
+(** Using Box's precomputation inferface. Encrypts and decrypts
+    [msg_orig], ensuring the result is the same.
+*)
+let test_box () =
   let open Box in
   let (pk, sk) = keypair () in
   let k = dh pk sk in
@@ -236,10 +250,14 @@ let box () =
   assert (box_open ~k ~nonce ~cmsg ~msg:decrypted_msg) ;
   Alcotest.check check_bytes "box" msg_orig decrypted_msg
 
-let box = [("box", `Quick, box)]
+let box = [("box", `Quick, test_box)]
 
 open Ed25519
 
+(** Checks that neuterize is deterministic. With the same seed,
+    generates two keypairs. Checks that they are identical. The public
+    key has the expected length.
+*)
 let test_keypair_ed25519 () =
   let seed = Hacl.Rand.gen 32 in
   match (sk_of_bytes seed, sk_of_bytes seed) with
@@ -254,11 +272,15 @@ let test_keypair_ed25519 () =
   | _ ->
       assert false
 
+(** Signs the message [msg] with [Sign.sign] and then verifies that it
+    is accepted by [Sign.verify].
+*)
 let test_sign_ed25519 () =
   let (pk, sk) = keypair () in
   let signature = sign ~sk ~msg in
   assert (verify ~pk ~msg ~signature)
 
+(** Checks the neuterize function for public key generation. *)
 let test_public_ed25519 () =
   let (pk, sk) = keypair () in
   let pk' = to_bytes pk in

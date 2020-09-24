@@ -23,6 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:    Crypto
+    Invocation:   dune build @src/lib_crypto/runtest
+    Subject:      On hash functions with deterministic nonce
+*)
+
+(** Deterministic nonce generation using HMAC-SHA256 *)
 let test_hash_matches (module X : S.SIGNATURE) () =
   let (_, _, sk) = X.generate_key () in
   let data = Bytes.of_string "ce input sa pun eu aici oare?" in
