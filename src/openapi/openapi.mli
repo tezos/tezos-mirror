@@ -85,25 +85,30 @@ module Response : sig
   val make : ?code:int -> description:string -> Schema.t -> t
 end
 
+module Parameter : sig
+  type t = {name : string; description : string option; schema : Schema.t}
+end
+
 module Service : sig
+  type query_parameter = {required : bool; parameter : Parameter.t}
+
   type t = {
     description : string;
     request_body : Schema.t option;
     responses : Response.t list;
+    query : query_parameter list;
   }
 
   val make :
-    description:string -> ?request_body:Schema.t -> Response.t list -> t
+    description:string ->
+    ?request_body:Schema.t ->
+    ?query:query_parameter list ->
+    Response.t list ->
+    t
 end
 
 module Path : sig
-  type dynamic = {
-    name : string;
-    description : string option;
-    schema : Schema.t;
-  }
-
-  type item = Static of string | Dynamic of dynamic
+  type item = Static of string | Dynamic of Parameter.t
 
   val static : string -> item
 

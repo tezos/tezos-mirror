@@ -180,15 +180,30 @@ module Response = struct
                    (obj [field "schema" (Schema.to_json schema)]) ]) ] )
 end
 
+module Parameter = struct
+  type t = {name : string; description : string option; schema : Schema.t}
+
+  let to_json ?(required = true) in_ dynamic =
+    obj
+      [ field "name" (string dynamic.name);
+        field "in" (string in_);
+        field_opt "description" dynamic.description string;
+        field "required" (bool required);
+        field "schema" (Schema.to_json dynamic.schema) ]
+end
+
 module Service = struct
+  type query_parameter = {required : bool; parameter : Parameter.t}
+
   type t = {
     description : string;
     request_body : Schema.t option;
     responses : Response.t list;
+    query : query_parameter list;
   }
 
-  let make ~description ?request_body responses =
-    {description; request_body; responses}
+  let make ~description ?request_body ?(query = []) responses =
+    {description; request_body; responses; query}
 
   let schema_in_content schema =
     obj
@@ -200,30 +215,23 @@ module Service = struct
                  (obj [field "schema" (Schema.to_json schema)]) ]) ]
 
   let to_json parameters service =
+    (* TODO: do we use mandatory query parameters? Here we assume we don't. *)
+    let query =
+      List.map
+        (fun {required; parameter} ->
+          Parameter.to_json ~required "query" parameter)
+        service.query
+    in
     obj
       [ field "description" (string service.description);
-        field_list "parameters" parameters;
+        field_list "parameters" (parameters @ query);
         field_opt "requestBody" service.request_body schema_in_content;
         field "responses" (obj [List.map Response.to_json service.responses])
       ]
 end
 
 module Path = struct
-  type dynamic = {
-    name : string;
-    description : string option;
-    schema : Schema.t;
-  }
-
-  let json_of_dynamic dynamic =
-    obj
-      [ field "name" (string dynamic.name);
-        field "in" (string "path");
-        field_opt "description" dynamic.description string;
-        field "required" (bool true);
-        field "schema" (Schema.to_json dynamic.schema) ]
-
-  type item = Static of string | Dynamic of dynamic
+  type item = Static of string | Dynamic of Parameter.t
 
   let static name = Static name
 
@@ -259,9 +267,9 @@ module Endpoint = struct
     {path; get; post; put; delete; patch}
 
   let to_json endpoint =
-    (* Note: we force parameters to be the same for all methods. *)
+    (* Note: we force path parameters to be the same for all methods. *)
     let parameters =
-      Path.get_dynamics endpoint.path |> List.map Path.json_of_dynamic
+      Path.get_dynamics endpoint.path |> List.map (Parameter.to_json "path")
     in
     ( Path.to_string endpoint.path,
       obj

@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let fail x = Printf.ksprintf failwith x
+
 (* A partially typed version of the result of /describe.
    Some parts are untyped: they are kept as JSON.
    But nothing is removed. *)
@@ -210,12 +212,24 @@ let show_method = function
   | PATCH ->
       "PATCH"
 
+type query_parameter_kind =
+  | Optional of {name : string}
+  | Multi of {name : string}
+  | Single of {name : string}
+  | Flag
+
+type query_parameter = {
+  id : string option;
+  name : string;
+  description : string option;
+  kind : query_parameter_kind;
+}
+
 type service = {
   meth : meth;
   path : path_item list;
   description : string;
-  query : Json.t option;
-  (* TODO: what is this? *)
+  query : query_parameter list;
   input : schemas option;
   output : schemas option;
   error : schemas option;
@@ -244,12 +258,61 @@ let parse_schemas (json : Json.t) : schemas =
   }
 
 let parse_path_item (json : Json.t) : path_item =
-  match json with
-    | `String s -> PI_static s
-    | _ -> PI_dynamic (parse_arg json)
+  match json with `String s -> PI_static s | _ -> PI_dynamic (parse_arg json)
 
 let parse_path (json : Json.t) : path =
   json |> Json.as_list |> List.map parse_path_item
+
+let parse_query_parameter (json : Json.t) : query_parameter =
+  Json.as_record json
+  @@ fun get ->
+  (* First, fetch information which is at the top level of the record. *)
+  let name = get "name" |> opt_mandatory "name" |> Json.as_string in
+  let description = get "description" |> Option.map Json.as_string in
+  (* Then, fetch information which is in the "kind" field. *)
+  let (kind, id, descr) =
+    (get "kind" |> opt_mandatory "kind" |> Json.as_record)
+    @@ fun get ->
+    (* Function used for everything but kind "flag". *)
+    let parse_kind_with_name make record =
+      Json.as_record record
+      @@ fun get ->
+      let name = get "name" |> opt_mandatory "kind.name" |> Json.as_string in
+      ( make name,
+        get "id" |> Option.map Json.as_string,
+        get "descr" |> Option.map Json.as_string )
+    in
+    (* Field "kind" encodes a variant.
+       There must be exactly one of either: "optional", "multi", "single" or "flag". *)
+    match (get "optional", get "multi", get "single", get "flag") with
+    | (Some optional, None, None, None) ->
+        parse_kind_with_name (fun name -> Optional {name}) optional
+    | (None, Some multi, None, None) ->
+        parse_kind_with_name (fun name -> Multi {name}) multi
+    | (None, None, Some single, None) ->
+        parse_kind_with_name (fun name -> Single {name}) single
+    | (None, None, None, Some flag) ->
+        let () =
+          Json.as_record flag
+          @@ fun _get ->
+          (* Flags have no fields. *)
+          ()
+        in
+        (Flag, None, None)
+    | _ ->
+        fail "unsupported kind for query parameter %s" name
+  in
+  (* Both the top level and the kind can contain a description. Merge them. *)
+  let description =
+    match (description, descr) with
+    | (None, None) ->
+        None
+    | ((Some _ as x), None) | (None, (Some _ as x)) ->
+        x
+    | (Some x, Some y) ->
+        Some (y ^ " " ^ x)
+  in
+  {id; name; description; kind}
 
 let parse_service (json : Json.t) : service =
   Json.as_record json
@@ -261,7 +324,9 @@ let parse_service (json : Json.t) : service =
       get "description"
       |> Option.value ~default:(`String "(no description)")
       |> Json.as_string;
-    query = get "query";
+    query =
+      get "query" |> opt_mandatory "query" |> Json.as_list
+      |> List.map parse_query_parameter;
     input = get "input" |> Option.map parse_schemas;
     output = get "output" |> Option.map parse_schemas;
     error = get "error" |> Option.map parse_schemas;

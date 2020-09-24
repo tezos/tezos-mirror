@@ -276,6 +276,21 @@ let opt_map_with_env f = function
       let (env, y) = f x in
       (env, Some y)
 
+let convert_query_parameter {Api.id = _; name; description; kind} :
+    Openapi.Service.query_parameter =
+  (* TODO: use more precise schemas than strings.
+     [kind] contains a [name] that could be used to deduce some constraints,
+     like "it is a hash" or "its length is at most 10". *)
+  let required =
+    match kind with Optional _ | Multi _ | Flag -> false | Single _ -> true
+  in
+  (* Note: OpenAPI does not seem to have a field to specify that the parameter
+     is repeatable (for [Multi]). *)
+  {
+    required;
+    parameter = {name; description; schema = Openapi.Schema.string ()};
+  }
+
 let convert_service expected_path expected_method
     ({meth; path; description; query; input; output; error} : Api.service) :
     env * Openapi.Service.t =
@@ -290,8 +305,6 @@ let convert_service expected_path expected_method
       "expected path %s but found %s"
       (Api.show_path expected_path)
       (Api.show_path path) ;
-  (* TODO: query *)
-  let _ = query in
   let (env_1, request_body) =
     opt_map_with_env (fun x -> convert_schema x.Api.json_schema) input
   in
@@ -299,7 +312,10 @@ let convert_service expected_path expected_method
   let (env_2, output) = convert_response ~code:200 output in
   let (env_3, error) = convert_response error in
   let responses = List.flatten [output; error] in
-  let service = Openapi.Service.make ~description ?request_body responses in
+  let query = List.map convert_query_parameter query in
+  let service =
+    Openapi.Service.make ~description ?request_body ~query responses
+  in
   let env = merge_env_list [env_1; env_2; env_3] in
   (env, service)
 
