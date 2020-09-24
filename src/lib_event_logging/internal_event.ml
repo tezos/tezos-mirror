@@ -1437,7 +1437,7 @@ module Lwt_worker_event = struct
     let doc = "Generic event for callers of the function Lwt_utils.worker."
 
     let level {event; _} =
-      match event with `Failed _ -> Error | `Started | `Ended -> Info
+      match event with `Failed _ -> Error | `Started | `Ended -> Debug
   end
 
   include (Make (Definition) : EVENT with type t := t)
