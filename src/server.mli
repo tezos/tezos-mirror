@@ -103,5 +103,16 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) : sig
       | `Ok of 'o
       | `Unauthorized of 'e ] ->
       (Cohttp.Response.t * Cohttp_lwt.Body.t, 'c) Result.result Lwt.t
+
+    val handle_options :
+      string ->
+      unit Directory.t ->
+      Resto_cohttp.Cors.t ->
+      Cohttp.Header.t ->
+      string list ->
+      ( Cohttp.Response.t * Cohttp_lwt.Body.t,
+        [> Directory.lookup_error] )
+      Result.result
+      Lwt.t
   end
 end

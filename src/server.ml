@@ -48,6 +48,8 @@ module type LOGGING = sig
   val lwt_log_error : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
 end
 
+let ( >>=? ) = Lwt_result.bind
+
 module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
   open Log
   open Cohttp
@@ -207,6 +209,37 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
           let (body, encoding) = error e in
           let status = `Internal_server_error in
           Lwt.return_ok (Response.make ~status ~encoding ?headers (), body)
+
+    let handle_options log_prefix root cors headers path =
+      let origin_header = Header.get headers "origin" in
+      ( if (* Default OPTIONS handler for CORS preflight *)
+           origin_header = None
+      then Directory.allowed_methods root () path
+      else
+        match Header.get headers "Access-Control-Request-Method" with
+        | None ->
+            Directory.allowed_methods root () path
+        | Some meth -> (
+          match Code.method_of_string meth with
+          | #Resto.meth as meth ->
+              Directory.lookup root () meth path
+              >>=? fun _handler -> Lwt.return_ok [meth]
+          | _ ->
+              Lwt.return_error `Not_found ) )
+      >>=? fun cors_allowed_meths ->
+      lwt_log_info "(%s) RPC preflight" log_prefix (*Connection.to_string con*)
+      >>= fun () ->
+      let headers = Header.init () in
+      let headers =
+        Header.add_multi
+          headers
+          "Access-Control-Allow-Methods"
+          (List.map Resto.string_of_meth cors_allowed_meths)
+      in
+      let headers = Cors.add_headers headers cors origin_header in
+      Lwt.return_ok
+        ( Response.make ~flush:true ~status:`OK ~headers (),
+          Cohttp_lwt.Body.empty )
   end
 
   type server = {
@@ -240,9 +273,6 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
 
   let ( >>? ) v f =
     match v with Ok x -> f x | Error err -> Lwt.return_error err
-
-  let ( >>=? ) m f =
-    m >>= function Ok x -> f x | Error err -> Lwt.return_error err
 
   let callback server ((_io, con) : Cohttp_lwt_unix.Server.conn) req body =
     let uri = Request.uri req in
@@ -344,37 +374,12 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
         (* TODO ??? *)
         Lwt.return_error `Not_implemented
     | `OPTIONS ->
-        let req_headers = Request.headers req in
-        let origin_header = Header.get req_headers "origin" in
-        ( if
-          (* Default OPTIONS handler for CORS preflight *)
-          origin_header = None
-        then Directory.allowed_methods server.root () path
-        else
-          match Header.get req_headers "Access-Control-Request-Method" with
-          | None ->
-              Directory.allowed_methods server.root () path
-          | Some meth -> (
-            match Code.method_of_string meth with
-            | #Resto.meth as meth ->
-                Directory.lookup server.root () meth path
-                >>=? fun _handler -> Lwt.return_ok [meth]
-            | _ ->
-                Lwt.return_error `Not_found ) )
-        >>=? fun cors_allowed_meths ->
-        lwt_log_info "(%s) RPC preflight" (Connection.to_string con)
-        >>= fun () ->
-        let headers = Header.init () in
-        let headers =
-          Header.add_multi
-            headers
-            "Access-Control-Allow-Methods"
-            (List.map Resto.string_of_meth cors_allowed_meths)
-        in
-        let headers = Cors.add_headers headers server.cors origin_header in
-        Lwt.return_ok
-          ( Response.make ~flush:true ~status:`OK ~headers (),
-            Cohttp_lwt.Body.empty )
+        Internal.handle_options
+          (Connection.to_string con)
+          server.root
+          server.cors
+          req_headers
+          path
     | _ ->
         Lwt.return_error `Not_implemented )
     >>= function
