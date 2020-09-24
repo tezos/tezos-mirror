@@ -67,6 +67,13 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) : sig
       default_media_type : string * Media_type.t;
     }
 
+    val default_agent : string
+
+    val invalid_cors : Resto_cohttp.Cors.t -> Cohttp.Header.t -> bool
+
+    val invalid_cors_response :
+      string -> (Cohttp.Response.t * Cohttp_lwt.Body.t, 'a) Result.result Lwt.t
+
     val input_media_type :
       ?headers:Cohttp.Header.t ->
       medias ->

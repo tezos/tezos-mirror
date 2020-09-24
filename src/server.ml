@@ -63,6 +63,20 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
       default_media_type : string * Media_type.t;
     }
 
+    let default_agent = "OCaml-Resto"
+
+    let invalid_cors (cors : Cors.t) headers =
+      cors.allowed_origins <> [] && not (Cors.check_host headers cors)
+
+    let invalid_cors_response agent =
+      let headers =
+        Cohttp.Header.init_with
+          (Format.asprintf "X-%s-CORS-Error" agent)
+          "invalid host"
+      in
+      Lwt.return_ok
+        (Response.make ~headers ~status:`Forbidden (), Cohttp_lwt.Body.empty)
+
     let input_media_type ?headers medias =
       match headers with
       | None ->
@@ -282,16 +296,8 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
     let path = path |> Resto.Utils.split_path |> List.map Uri.pct_decode in
     let req_headers = Request.headers req in
     ( match Request.meth req with
-    | #Resto.meth
-      when server.cors.allowed_origins <> []
-           && not (Cors.check_host req_headers server.cors) ->
-        let headers =
-          Cohttp.Header.init_with
-            (Format.asprintf "X-%s-CORS-Error" server.agent)
-            "invalid host"
-        in
-        Lwt.return_ok
-          (Response.make ~headers ~status:`Forbidden (), Cohttp_lwt.Body.empty)
+    | #Resto.meth when Internal.invalid_cors server.cors req_headers ->
+        Internal.invalid_cors_response server.agent
     | #Resto.meth as meth -> (
         Directory.lookup server.root () meth path
         >>=? fun (Directory.Service s) ->
@@ -390,8 +396,9 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
 
   (* Promise a running RPC server. *)
 
-  let launch ?(host = "::") ?(cors = Cors.default) ?(agent = "OCaml-Resto")
-      ?(acl = Acl.Allow_all {except = []}) ~media_types mode root =
+  let launch ?(host = "::") ?(cors = Cors.default)
+      ?(agent = Internal.default_agent) ?(acl = Acl.Allow_all {except = []})
+      ~media_types mode root =
     let default_media_type =
       match Media_type.first_complete_media media_types with
       | None ->
