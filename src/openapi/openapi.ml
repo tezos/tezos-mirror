@@ -23,6 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module String_set = Set.Make (String)
 module String_map = Map.Make (String)
 
 (* Very thin layer over JSON constructors, in case we want to change backend
@@ -102,6 +103,26 @@ module Schema = struct
           | Array item_schema ->
               [typ "array"; field "items" (to_json item_schema)]
           | Object {properties; additional_properties} ->
+              let properties =
+                let rec deduplicate known acc = function
+                  | [] ->
+                      List.rev acc
+                  | property :: tail ->
+                      if String_set.mem property.name known then (
+                        Printf.eprintf
+                          "Warning: field %s appears twice in the same \
+                           object; ignored duplicate occurrence\n\
+                           %!"
+                          property.name ;
+                        deduplicate known acc tail )
+                      else
+                        deduplicate
+                          (String_set.add property.name known)
+                          (property :: acc)
+                          tail
+                in
+                deduplicate String_set.empty [] properties
+              in
               [ typ "object";
                 field
                   "properties"
