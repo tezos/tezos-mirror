@@ -291,15 +291,6 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
           (Connection.to_string con)
           (Media_type.name output_media_type)
         >>= fun () ->
-        let output = output_media_type.construct s.types.output
-        and error = function
-          | None ->
-              (Cohttp_lwt.Body.empty, Transfer.Fixed 0L)
-          | Some e ->
-              let s = output_media_type.construct s.types.error e in
-              ( Cohttp_lwt.Body.of_string s,
-                Transfer.Fixed (Int64.of_int (String.length s)) )
-        in
         let headers = Header.init () in
         let headers = Header.add headers "content-type" output_content_type in
         let headers =
@@ -322,7 +313,17 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
                   Lwt.return_error (`Cannot_parse_body s)
               | Ok body ->
                   s.handler query body >>= Lwt.return_ok ) )
-        >>=? function
+        >>=? fun answer ->
+        let output = output_media_type.construct s.types.output
+        and error = function
+          | None ->
+              (Cohttp_lwt.Body.empty, Transfer.Fixed 0L)
+          | Some e ->
+              let s = output_media_type.construct s.types.error e in
+              ( Cohttp_lwt.Body.of_string s,
+                Transfer.Fixed (Int64.of_int (String.length s)) )
+        in
+        match answer with
         | ( `Ok _
           | `Created _
           | `No_content
