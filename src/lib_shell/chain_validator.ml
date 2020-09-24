@@ -218,16 +218,24 @@ let poll_sync nv event_recorder =
   if nv.bootstrapped then Lwt.wakeup_later nv.bootstrapped_wakener ()
   else
     let wait_sync nv =
+      (* only used for logging *)
+      let previous_state = ref `Stuck in
       let rec loop () =
         match sync_state nv event_recorder with
         | `Stuck ->
-            event_recorder (Event.Sync_status Stuck) ;
+            if !previous_state <> `Stuck then
+              event_recorder (Event.Sync_status Stuck) ;
+            previous_state := `Stuck ;
             Lwt.return_unit
         | `Sync ->
-            event_recorder (Event.Sync_status Sync) ;
+            if !previous_state <> `Sync then
+              event_recorder (Event.Sync_status Sync) ;
+            previous_state := `Sync ;
             Lwt.return_unit
         | `Unsync ->
-            event_recorder (Event.Sync_status Unsync) ;
+            if !previous_state <> `Unsync then
+              event_recorder (Event.Sync_status Unsync) ;
+            previous_state := `Unsync ;
             Lwt_unix.sleep (float_of_int sync_polling_period)
             >>= fun () -> loop ()
       in
