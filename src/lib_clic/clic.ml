@@ -2101,7 +2101,22 @@ let parse_global_options global_options ctx args =
 let dispatch commands ctx args =
   let tree = make_dispatch_tree commands in
   match args with
-  | [] | [("-h" | "--help")] ->
+  | []
+    when match tree with
+         | TPrefix {stop; _} ->
+             stop = None
+         | TParam {stop; _} ->
+             stop = None
+         | TStop _ ->
+             false
+         | TSeq (_, _) ->
+             false
+         | TNonTerminalSeq {stop; _} ->
+             stop = None
+         | TEmpty ->
+             true ->
+      fail (Help None)
+  | [("-h" | "--help")] ->
       fail (Help None)
   | _ ->
       find_command tree args
