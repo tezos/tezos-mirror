@@ -32,10 +32,7 @@ module type LOGGING = sig
   val lwt_log_error : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
 end
 
-module Make (Encoding : Resto.ENCODING) (Log : LOGGING) : sig
-  (** A handle on the server worker. *)
-  type server
-
+module Make (Encoding : Resto.ENCODING) : sig
   module Media_type : module type of struct
     include Media_type.Make (Encoding)
   end
@@ -43,6 +40,11 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) : sig
   module Directory : module type of struct
     include Resto_directory.Make (Encoding)
   end
+
+  module Make (Log : LOGGING) : sig
+  (** A handle on the server worker. *)
+  type server
+
 
   (** Promise a running RPC server.*)
   val launch :
@@ -60,6 +62,8 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) : sig
 
   (** Kill an RPC server. *)
   val shutdown : server -> unit Lwt.t
+
+  end
 
   module Internal : sig
     type medias = {
@@ -114,7 +118,6 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) : sig
       (Cohttp.Response.t * Cohttp_lwt.Body.t, 'c) Result.result Lwt.t
 
     val handle_options :
-      string ->
       unit Directory.t ->
       Resto_cohttp.Cors.t ->
       Cohttp.Header.t ->

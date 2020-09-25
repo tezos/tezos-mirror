@@ -145,7 +145,8 @@ let parent pid =
   Lwt_unix.waitpid [] pid
   >>= function (_, WEXITED 0) -> Lwt.return () | _ -> assert false
 
-module Server = Resto_cohttp_server.Server.Make (Encoding) (Logger)
+module S = Resto_cohttp_server.Server.Make (Encoding)
+module Server = S.Make (Logger)
 
 (* A signal setup with both soft and hard exits to test both behaviours *)
 let main () =

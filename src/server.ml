@@ -50,8 +50,7 @@ end
 
 let ( >>=? ) = Lwt_result.bind
 
-module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
-  open Log
+module Make (Encoding : Resto.ENCODING) = struct
   open Cohttp
   module Service = Resto.MakeService (Encoding)
   module Directory = Resto_directory.Make (Encoding)
@@ -231,7 +230,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
           let status = `Internal_server_error in
           Lwt.return_ok (Response.make ~status ~encoding ?headers (), body)
 
-    let handle_options log_prefix root cors headers path =
+    let handle_options root cors headers path =
       let origin_header = Header.get headers "origin" in
       ( if (* Default OPTIONS handler for CORS preflight *)
            origin_header = None
@@ -248,8 +247,6 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
           | _ ->
               Lwt.return_error `Not_found ) )
       >>=? fun cors_allowed_meths ->
-      lwt_log_info "(%s) RPC preflight" log_prefix (*Connection.to_string con*)
-      >>= fun () ->
       let headers = Header.init () in
       let headers =
         Header.add_multi
@@ -262,6 +259,9 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
         ( Response.make ~flush:true ~status:`OK ~headers (),
           Cohttp_lwt.Body.empty )
   end
+
+  module Make(Log : LOGGING) = struct
+  open Log
 
   type server = {
     root : unit Directory.directory;
@@ -387,12 +387,15 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
         (* TODO ??? *)
         Lwt.return_error `Not_implemented
     | `OPTIONS ->
-        Internal.handle_options
-          (Connection.to_string con)
-          server.root
-          server.cors
-          req_headers
-          path
+        (Internal.handle_options
+           server.root
+           server.cors
+           req_headers
+           path
+         >>= fun res ->
+         lwt_log_info "(%s) RPC preflight" (Connection.to_string con)
+         >>= fun () ->
+         Lwt.return res)
     | _ ->
         Lwt.return_error `Not_implemented )
     >>= function
@@ -477,4 +480,5 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
     Lwt.return_unit
 
   let set_acl server acl = server.acl <- acl
+  end
 end
