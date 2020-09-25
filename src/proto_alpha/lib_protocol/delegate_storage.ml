@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Misc.Syntax
-
 type balance =
   | Contract of Contract_repr.t
   | Rewards of Signature.Public_key_hash.t * Cycle_repr.t

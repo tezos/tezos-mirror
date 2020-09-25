@@ -29,7 +29,6 @@ open Script
 open Script_typed_ir
 open Script_tc_errors
 open Script_ir_annot
-open Misc.Syntax
 module Typecheck_costs = Michelson_v1_gas.Cost_of.Typechecking
 module Unparse_costs = Michelson_v1_gas.Cost_of.Unparsing
 
@@ -2399,7 +2398,7 @@ let rec parse_data :
       traced_fail (Invalid_kind (location expr, [Seq_kind], kind expr))
   | (Big_map_t (tk, tv, _ty_name), (Seq (_loc, vs) as expr)) ->
       parse_items ?type_logger ctxt expr tk tv vs (fun x -> Some x)
-      >>|? fun (diff, ctxt) ->
+      >|=? fun (diff, ctxt) ->
       ( {id = None; diff; key_type = ty_of_comparable_ty tk; value_type = tv},
         ctxt )
   | (Big_map_t (tk, tv, _ty_name), Int (loc, id)) -> (

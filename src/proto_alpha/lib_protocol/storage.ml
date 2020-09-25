@@ -24,7 +24,6 @@
 (*****************************************************************************)
 
 open Storage_functors
-open Misc.Syntax
 module Z' = Z
 
 module UInt16 = struct

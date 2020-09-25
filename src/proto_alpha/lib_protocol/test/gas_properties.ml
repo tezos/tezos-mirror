@@ -24,7 +24,6 @@
 (*****************************************************************************)
 
 open Protocol
-open Misc.Syntax
 
 type cost_kind =
   | Atomic_step

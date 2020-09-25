@@ -24,7 +24,6 @@
 (*****************************************************************************)
 
 open Alpha_context
-open Misc.Syntax
 
 let custom_root =
   ( RPC_path.(open_root / "context" / "contracts")

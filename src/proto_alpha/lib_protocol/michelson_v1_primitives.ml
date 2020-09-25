@@ -24,7 +24,6 @@
 (*****************************************************************************)
 
 open Micheline
-open Misc.Syntax
 
 type error += Unknown_primitive_name of string
 

@@ -25,8 +25,6 @@
 
 (* Tezos Protocol Implementation - Protocol Signature Instance *)
 
-open Misc.Syntax
-
 type block_header_data = Alpha_context.Block_header.protocol_data
 
 type block_header = Alpha_context.Block_header.t = {

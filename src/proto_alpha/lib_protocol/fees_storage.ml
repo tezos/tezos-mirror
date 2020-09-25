@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Misc.Syntax
-
 type error += Cannot_pay_storage_fee (* `Temporary *)
 
 type error += Operation_quota_exceeded (* `Temporary *)

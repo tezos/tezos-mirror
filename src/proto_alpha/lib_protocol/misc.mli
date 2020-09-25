@@ -45,26 +45,3 @@ val remove_prefix : prefix:string -> string -> string option
 
 (** [remove nb list] remove the first [nb] elements from the list [list]. *)
 val remove_elem_from_list : int -> 'a list -> 'a list
-
-module Syntax : sig
-  val ( >|=? ) : 'a tzresult Lwt.t -> ('a -> 'b) -> 'b tzresult Lwt.t
-
-  val ( >>?= ) : 'a tzresult -> ('a -> 'b tzresult Lwt.t) -> 'b tzresult Lwt.t
-
-  val ok_unit : unit tzresult
-
-  val ok_none : 'a option tzresult
-
-  val ok_some : 'a -> 'a option tzresult
-
-  val ok_nil : 'a list tzresult
-
-  val error_unless : bool -> error -> unit tzresult
-
-  val error_when : bool -> error -> unit tzresult
-
-  val filter_s :
-    ('a -> bool tzresult Lwt.t) -> 'a list -> 'a list tzresult Lwt.t
-
-  val map : ('a -> 'b tzresult) -> 'a list -> 'b list tzresult
-end

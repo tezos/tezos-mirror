@@ -25,7 +25,6 @@
 (*****************************************************************************)
 
 open Misc
-open Misc.Syntax
 
 type error +=
   | (* `Permanent *) Consume_roll_change

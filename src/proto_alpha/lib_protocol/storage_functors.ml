@@ -24,7 +24,6 @@
 (*****************************************************************************)
 
 open Storage_sigs
-open Misc.Syntax
 
 module Registered = struct
   let ghost = false

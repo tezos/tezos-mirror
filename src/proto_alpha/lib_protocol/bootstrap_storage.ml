@@ -24,7 +24,6 @@
 (*****************************************************************************)
 
 open Misc
-open Misc.Syntax
 
 let init_account ctxt
     ({public_key_hash; public_key; amount} : Parameters_repr.bootstrap_account)

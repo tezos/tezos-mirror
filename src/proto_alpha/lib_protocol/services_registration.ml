@@ -24,7 +24,6 @@
 (*****************************************************************************)
 
 open Alpha_context
-open Misc.Syntax
 
 type rpc_context = {
   block_hash : Block_hash.t;

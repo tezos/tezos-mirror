@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Misc.Syntax
-
 let recorded_proposal_count_for_delegate ctxt proposer =
   Storage.Vote.Proposals_count.get_option ctxt proposer
   >|=? Option.value ~default:0

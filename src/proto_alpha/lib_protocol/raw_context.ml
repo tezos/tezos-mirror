@@ -23,7 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Misc.Syntax
 module Int_set = Set.Make (Compare.Int)
 
 type t = {
