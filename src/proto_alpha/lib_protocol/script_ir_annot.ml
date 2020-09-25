@@ -27,7 +27,6 @@ open Alpha_context
 open Micheline
 open Script_tc_errors
 open Script_typed_ir
-open Misc.Syntax
 
 let default_now_annot = Some (Var_annot "now")
 

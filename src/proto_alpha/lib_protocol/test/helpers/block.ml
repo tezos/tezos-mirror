@@ -377,12 +377,10 @@ let apply header ?(operations = []) pred =
   >>=? fun vstate ->
   fold_left_s
     (fun vstate op ->
-      let open Misc.Syntax in
       apply_operation vstate op >|=? fun (state, _result) -> state)
     vstate
     operations
   >>=? fun vstate ->
-  let open Misc.Syntax in
   Main.finalize_block vstate
   >|=? fun (validation, _result) -> validation.context)
   >|= Environment.wrap_error

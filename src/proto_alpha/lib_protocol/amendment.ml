@@ -24,7 +24,6 @@
 (*****************************************************************************)
 
 open Alpha_context
-open Misc.Syntax
 
 (** Returns the proposal submitted by the most delegates.
     Returns None in case of a tie, if proposal quorum is below required

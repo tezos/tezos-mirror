@@ -27,7 +27,6 @@ open Alpha_context
 open Script
 open Script_typed_ir
 open Script_ir_translator
-open Misc.Syntax
 
 (* ---- Run-time errors -----------------------------------------------------*)
 

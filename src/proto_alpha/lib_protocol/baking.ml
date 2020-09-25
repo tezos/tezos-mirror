@@ -25,7 +25,6 @@
 
 open Alpha_context
 open Misc
-open Misc.Syntax
 
 type error += Invalid_fitness_gap of int64 * int64 (* `Permanent *)
 

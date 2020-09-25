@@ -176,7 +176,7 @@ let add_do :
   Lwt.return (Script_repr.force_decode script_code)
   >>=? fun (script_code_expr, _gas_cost) ->
   Lwt.return (Script_repr.force_decode script_storage)
-  >>|? fun (script_storage_expr, _gas_cost) ->
+  >|=? fun (script_storage_expr, _gas_cost) ->
   let storage_expr = root script_storage_expr in
   match root script_code_expr with
   | Seq (_, toplevel) -> (
@@ -442,7 +442,7 @@ let add_set_delegate :
   Lwt.return (Script_repr.force_decode script_code)
   >>=? fun (script_code_expr, _gas_cost) ->
   Lwt.return (Script_repr.force_decode script_storage)
-  >>|? fun (script_storage_expr, _gas_cost) ->
+  >|=? fun (script_storage_expr, _gas_cost) ->
   let storage_expr = root script_storage_expr in
   match root script_code_expr with
   | Seq (_, toplevel) -> (
@@ -794,7 +794,7 @@ let add_root_entrypoint :
   let open Micheline in
   let open Michelson_v1_primitives in
   Lwt.return (Script_repr.force_decode script_code)
-  >>|? fun (script_code_expr, _gas_cost) ->
+  >|=? fun (script_code_expr, _gas_cost) ->
   match root script_code_expr with
   | Seq (_, toplevel) ->
       let migrated_code =

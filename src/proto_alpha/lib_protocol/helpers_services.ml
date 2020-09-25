@@ -24,7 +24,6 @@
 (*****************************************************************************)
 
 open Alpha_context
-open Misc.Syntax
 
 type error += Cannot_parse_operation (* `Branch *)
 

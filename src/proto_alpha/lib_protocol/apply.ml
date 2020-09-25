@@ -26,7 +26,6 @@
 (** Tezos Protocol Implementation - Main Entry Points *)
 
 open Alpha_context
-open Misc.Syntax
 
 type error += Wrong_voting_period of Voting_period.t * Voting_period.t
 

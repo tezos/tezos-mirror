@@ -24,7 +24,6 @@
 (*****************************************************************************)
 
 open Alpha_context
-open Misc.Syntax
 
 module S = struct
   let path = RPC_path.(open_root / "votes")

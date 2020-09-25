@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Misc.Syntax
-
 type error +=
   | Balance_too_low of Contract_repr.contract * Tez_repr.t * Tez_repr.t
   | (* `Temporary *)

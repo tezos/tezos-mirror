@@ -23,7 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Misc.Syntax
 module StringMap = Map.Make (String)
 
 type 'key t = 'key description ref
