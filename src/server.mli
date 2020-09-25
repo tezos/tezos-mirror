@@ -42,27 +42,25 @@ module Make (Encoding : Resto.ENCODING) : sig
   end
 
   module Make (Log : LOGGING) : sig
-  (** A handle on the server worker. *)
-  type server
+    (** A handle on the server worker. *)
+    type server
 
+    (** Promise a running RPC server.*)
+    val launch :
+      ?host:string ->
+      ?cors:Cors.t ->
+      ?agent:string ->
+      ?acl:Acl.t ->
+      media_types:Media_type.t list ->
+      Conduit_lwt_unix.server ->
+      unit Directory.t ->
+      server Lwt.t
 
-  (** Promise a running RPC server.*)
-  val launch :
-    ?host:string ->
-    ?cors:Cors.t ->
-    ?agent:string ->
-    ?acl:Acl.t ->
-    media_types:Media_type.t list ->
-    Conduit_lwt_unix.server ->
-    unit Directory.t ->
-    server Lwt.t
+    (* configure the access list for this server *)
+    val set_acl : server -> Acl.t -> unit
 
-  (* configure the access list for this server *)
-  val set_acl : server -> Acl.t -> unit
-
-  (** Kill an RPC server. *)
-  val shutdown : server -> unit Lwt.t
-
+    (** Kill an RPC server. *)
+    val shutdown : server -> unit Lwt.t
   end
 
   module Internal : sig

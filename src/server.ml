@@ -260,225 +260,222 @@ module Make (Encoding : Resto.ENCODING) = struct
           Cohttp_lwt.Body.empty )
   end
 
-  module Make(Log : LOGGING) = struct
-  open Log
+  module Make (Log : LOGGING) = struct
+    open Log
 
-  type server = {
-    root : unit Directory.directory;
-    mutable streams : (unit -> unit) ConnectionMap.t;
-    cors : Cors.t;
-    medias : Internal.medias;
-    stopper : unit Lwt.u;
-    mutable acl : Acl.t;
-    agent : string;
-    mutable worker : unit Lwt.t;
-  }
+    type server = {
+      root : unit Directory.directory;
+      mutable streams : (unit -> unit) ConnectionMap.t;
+      cors : Cors.t;
+      medias : Internal.medias;
+      stopper : unit Lwt.u;
+      mutable acl : Acl.t;
+      agent : string;
+      mutable worker : unit Lwt.t;
+    }
 
-  let create_stream server con to_string s =
-    let running = ref true in
-    let stream =
-      Lwt_stream.from (fun () ->
-          if not !running then Lwt.return None
+    let create_stream server con to_string s =
+      let running = ref true in
+      let stream =
+        Lwt_stream.from (fun () ->
+            if not !running then Lwt.return None
+            else
+              s.Resto_directory.Answer.next ()
+              >|= function None -> None | Some x -> Some (to_string x))
+      in
+      let shutdown () =
+        log_info "streamed connection closed %s" (Connection.to_string con) ;
+        running := false ;
+        s.shutdown () ;
+        server.streams <- ConnectionMap.remove con server.streams
+      in
+      server.streams <- ConnectionMap.add con shutdown server.streams ;
+      stream
+
+    let ( >>? ) v f =
+      match v with Ok x -> f x | Error err -> Lwt.return_error err
+
+    let callback server ((_io, con) : Cohttp_lwt_unix.Server.conn) req body =
+      let uri = Request.uri req in
+      let path = Uri.path uri in
+      lwt_log_info "(%s) receive request to %s" (Connection.to_string con) path
+      >>= fun () ->
+      let path = path |> Resto.Utils.split_path |> List.map Uri.pct_decode in
+      let req_headers = Request.headers req in
+      ( match Request.meth req with
+      | #Resto.meth when Internal.invalid_cors server.cors req_headers ->
+          Internal.invalid_cors_response server.agent
+      | #Resto.meth as meth -> (
+          Directory.lookup server.root () meth path
+          >>=? fun (Directory.Service s) ->
+          Internal.input_media_type ~headers:req_headers server.medias
+          >>? fun input_media_type ->
+          lwt_debug
+            "(%s) input media type %s"
+            (Connection.to_string con)
+            (Media_type.name input_media_type)
+          >>= fun () ->
+          Internal.output_content_media_type ~headers:req_headers server.medias
+          >>? fun (output_content_type, output_media_type) ->
+          ( match
+              Resto.Query.parse
+                s.types.query
+                (List.map
+                   (fun (k, l) -> (k, String.concat "," l))
+                   (Uri.query uri))
+            with
+          | exception Resto.Query.Invalid s ->
+              Lwt.return_error (`Cannot_parse_query s)
+          | query ->
+              Lwt.return_ok query )
+          >>=? fun query ->
+          lwt_debug
+            "(%s) ouput media type %s"
+            (Connection.to_string con)
+            (Media_type.name output_media_type)
+          >>= fun () ->
+          let headers = Header.init () in
+          let headers =
+            Header.add headers "content-type" output_content_type
+          in
+          let headers =
+            Cors.add_allow_origin
+              headers
+              server.cors
+              (Header.get req_headers "origin")
+          in
+          ( if not @@ Acl.allowed server.acl ~meth ~path then
+            Lwt.return_ok (`Unauthorized None)
           else
-            s.Resto_directory.Answer.next ()
-            >|= function None -> None | Some x -> Some (to_string x))
-    in
-    let shutdown () =
-      log_info "streamed connection closed %s" (Connection.to_string con) ;
-      running := false ;
-      s.shutdown () ;
-      server.streams <- ConnectionMap.remove con server.streams
-    in
-    server.streams <- ConnectionMap.add con shutdown server.streams ;
-    stream
+            match s.types.input with
+            | Service.No_input ->
+                s.handler query () >>= Lwt.return_ok
+            | Service.Input input -> (
+                Cohttp_lwt.Body.to_string body
+                >>= fun body ->
+                match input_media_type.destruct input body with
+                | Error s ->
+                    Lwt.return_error (`Cannot_parse_body s)
+                | Ok body ->
+                    s.handler query body >>= Lwt.return_ok ) )
+          >>=? fun answer ->
+          let output = output_media_type.construct s.types.output
+          and error = function
+            | None ->
+                (Cohttp_lwt.Body.empty, Transfer.Fixed 0L)
+            | Some e ->
+                let s = output_media_type.construct s.types.error e in
+                ( Cohttp_lwt.Body.of_string s,
+                  Transfer.Fixed (Int64.of_int (String.length s)) )
+          in
+          match answer with
+          | ( `Ok _
+            | `Created _
+            | `No_content
+            | `Unauthorized _
+            | `Forbidden _
+            | `Gone _
+            | `Not_found _
+            | `Conflict _
+            | `Error _ ) as a ->
+              Internal.handle_rpc_answer ~headers output error a
+          | `OkStream o ->
+              let body = create_stream server con output o in
+              let encoding = Transfer.Chunked in
+              Lwt.return_ok
+                ( Response.make ~status:`OK ~encoding ~headers (),
+                  Cohttp_lwt.Body.of_stream body ) )
+      | `HEAD ->
+          (* TODO ??? *)
+          Lwt.return_error `Not_implemented
+      | `OPTIONS ->
+          Internal.handle_options server.root server.cors req_headers path
+          >>= fun res ->
+          lwt_log_info "(%s) RPC preflight" (Connection.to_string con)
+          >>= fun () -> Lwt.return res
+      | _ ->
+          Lwt.return_error `Not_implemented )
+      >>= function
+      | Ok answer ->
+          Lwt.return answer
+      | Error err ->
+          Lwt.return @@ Internal.handle_error server.medias err
 
-  let ( >>? ) v f =
-    match v with Ok x -> f x | Error err -> Lwt.return_error err
+    (* Promise a running RPC server. *)
 
-  let callback server ((_io, con) : Cohttp_lwt_unix.Server.conn) req body =
-    let uri = Request.uri req in
-    let path = Uri.path uri in
-    lwt_log_info "(%s) receive request to %s" (Connection.to_string con) path
-    >>= fun () ->
-    let path = path |> Resto.Utils.split_path |> List.map Uri.pct_decode in
-    let req_headers = Request.headers req in
-    ( match Request.meth req with
-    | #Resto.meth when Internal.invalid_cors server.cors req_headers ->
-        Internal.invalid_cors_response server.agent
-    | #Resto.meth as meth -> (
-        Directory.lookup server.root () meth path
-        >>=? fun (Directory.Service s) ->
-        Internal.input_media_type ~headers:req_headers server.medias
-        >>? fun input_media_type ->
-        lwt_debug
-          "(%s) input media type %s"
-          (Connection.to_string con)
-          (Media_type.name input_media_type)
-        >>= fun () ->
-        Internal.output_content_media_type ~headers:req_headers server.medias
-        >>? fun (output_content_type, output_media_type) ->
-        ( match
-            Resto.Query.parse
-              s.types.query
-              (List.map
-                 (fun (k, l) -> (k, String.concat "," l))
-                 (Uri.query uri))
-          with
-        | exception Resto.Query.Invalid s ->
-            Lwt.return_error (`Cannot_parse_query s)
-        | query ->
-            Lwt.return_ok query )
-        >>=? fun query ->
-        lwt_debug
-          "(%s) ouput media type %s"
-          (Connection.to_string con)
-          (Media_type.name output_media_type)
-        >>= fun () ->
-        let headers = Header.init () in
-        let headers = Header.add headers "content-type" output_content_type in
-        let headers =
-          Cors.add_allow_origin
-            headers
-            server.cors
-            (Header.get req_headers "origin")
-        in
-        ( if not @@ Acl.allowed server.acl ~meth ~path then
-          Lwt.return_ok (`Unauthorized None)
-        else
-          match s.types.input with
-          | Service.No_input ->
-              s.handler query () >>= Lwt.return_ok
-          | Service.Input input -> (
-              Cohttp_lwt.Body.to_string body
-              >>= fun body ->
-              match input_media_type.destruct input body with
-              | Error s ->
-                  Lwt.return_error (`Cannot_parse_body s)
-              | Ok body ->
-                  s.handler query body >>= Lwt.return_ok ) )
-        >>=? fun answer ->
-        let output = output_media_type.construct s.types.output
-        and error = function
-          | None ->
-              (Cohttp_lwt.Body.empty, Transfer.Fixed 0L)
-          | Some e ->
-              let s = output_media_type.construct s.types.error e in
-              ( Cohttp_lwt.Body.of_string s,
-                Transfer.Fixed (Int64.of_int (String.length s)) )
-        in
-        match answer with
-        | ( `Ok _
-          | `Created _
-          | `No_content
-          | `Unauthorized _
-          | `Forbidden _
-          | `Gone _
-          | `Not_found _
-          | `Conflict _
-          | `Error _ ) as a ->
-            Internal.handle_rpc_answer ~headers output error a
-        | `OkStream o ->
-            let body = create_stream server con output o in
-            let encoding = Transfer.Chunked in
-            Lwt.return_ok
-              ( Response.make ~status:`OK ~encoding ~headers (),
-                Cohttp_lwt.Body.of_stream body ) )
-    | `HEAD ->
-        (* TODO ??? *)
-        Lwt.return_error `Not_implemented
-    | `OPTIONS ->
-        (Internal.handle_options
-           server.root
-           server.cors
-           req_headers
-           path
-         >>= fun res ->
-         lwt_log_info "(%s) RPC preflight" (Connection.to_string con)
-         >>= fun () ->
-         Lwt.return res)
-    | _ ->
-        Lwt.return_error `Not_implemented )
-    >>= function
-    | Ok answer ->
-        Lwt.return answer
-    | Error err ->
-        Lwt.return @@ Internal.handle_error server.medias err
+    let launch ?(host = "::") ?(cors = Cors.default)
+        ?(agent = Internal.default_agent) ?(acl = Acl.Allow_all {except = []})
+        ~media_types mode root =
+      let default_media_type = Internal.default_media_type media_types in
+      let (stop, stopper) = Lwt.wait () in
+      let medias : Internal.medias = {media_types; default_media_type} in
+      let server =
+        {
+          root;
+          streams = ConnectionMap.empty;
+          cors;
+          medias;
+          stopper;
+          acl;
+          agent;
+          worker = Lwt.return_unit;
+        }
+      in
+      Conduit_lwt_unix.init ~src:host ()
+      >>= fun ctx ->
+      let ctx = Cohttp_lwt_unix.Net.init ~ctx () in
+      server.worker <-
+        (let conn_closed (_, con) =
+           debug "connection closed %s" (Connection.to_string con) ;
+           try ConnectionMap.find con server.streams () with Not_found -> ()
+         and on_exn = function
+           | Unix.Unix_error (Unix.EADDRINUSE, "bind", _) ->
+               log_error
+                 "RPC server port already taken, the node will be shutdown" ;
+               exit 1
+           | Unix.Unix_error (ECONNRESET, _, _) | Unix.Unix_error (EPIPE, _, _)
+             ->
+               ()
+           | exn ->
+               Format.eprintf
+                 "@[<v 2>Uncaught (asynchronous) exception:@ %s@ %s@]%!"
+                 (Printexc.to_string exn)
+                 (Printexc.get_backtrace ())
+         and callback (io, con) req body =
+           Lwt.catch
+             (fun () -> callback server (io, con) req body)
+             (function
+               | Not_found ->
+                   let status = `Not_found in
+                   let body = Cohttp_lwt.Body.empty in
+                   Lwt.return (Response.make ~status (), body)
+               | exn ->
+                   let headers = Header.init () in
+                   let headers =
+                     Header.add headers "content-type" "text/ocaml.exception"
+                   in
+                   let status = `Internal_server_error in
+                   let body =
+                     Cohttp_lwt.Body.of_string (Printexc.to_string exn)
+                   in
+                   Lwt.return (Response.make ~status ~headers (), body))
+         in
+         Cohttp_lwt_unix.Server.create
+           ~stop
+           ~ctx
+           ~mode
+           ~on_exn
+           (Cohttp_lwt_unix.Server.make ~callback ~conn_closed ())) ;
+      lwt_log_info "Server started (agent: %s)" server.agent
+      >>= fun () -> Lwt.return server
 
-  (* Promise a running RPC server. *)
+    let shutdown server =
+      Lwt.wakeup_later server.stopper () ;
+      server.worker
+      >>= fun () ->
+      ConnectionMap.iter (fun _ f -> f ()) server.streams ;
+      Lwt.return_unit
 
-  let launch ?(host = "::") ?(cors = Cors.default)
-      ?(agent = Internal.default_agent) ?(acl = Acl.Allow_all {except = []})
-      ~media_types mode root =
-    let default_media_type = Internal.default_media_type media_types in
-    let (stop, stopper) = Lwt.wait () in
-    let medias : Internal.medias = {media_types; default_media_type} in
-    let server =
-      {
-        root;
-        streams = ConnectionMap.empty;
-        cors;
-        medias;
-        stopper;
-        acl;
-        agent;
-        worker = Lwt.return_unit;
-      }
-    in
-    Conduit_lwt_unix.init ~src:host ()
-    >>= fun ctx ->
-    let ctx = Cohttp_lwt_unix.Net.init ~ctx () in
-    server.worker <-
-      (let conn_closed (_, con) =
-         debug "connection closed %s" (Connection.to_string con) ;
-         try ConnectionMap.find con server.streams () with Not_found -> ()
-       and on_exn = function
-         | Unix.Unix_error (Unix.EADDRINUSE, "bind", _) ->
-             log_error
-               "RPC server port already taken, the node will be shutdown" ;
-             exit 1
-         | Unix.Unix_error (ECONNRESET, _, _) | Unix.Unix_error (EPIPE, _, _)
-           ->
-             ()
-         | exn ->
-             Format.eprintf
-               "@[<v 2>Uncaught (asynchronous) exception:@ %s@ %s@]%!"
-               (Printexc.to_string exn)
-               (Printexc.get_backtrace ())
-       and callback (io, con) req body =
-         Lwt.catch
-           (fun () -> callback server (io, con) req body)
-           (function
-             | Not_found ->
-                 let status = `Not_found in
-                 let body = Cohttp_lwt.Body.empty in
-                 Lwt.return (Response.make ~status (), body)
-             | exn ->
-                 let headers = Header.init () in
-                 let headers =
-                   Header.add headers "content-type" "text/ocaml.exception"
-                 in
-                 let status = `Internal_server_error in
-                 let body =
-                   Cohttp_lwt.Body.of_string (Printexc.to_string exn)
-                 in
-                 Lwt.return (Response.make ~status ~headers (), body))
-       in
-       Cohttp_lwt_unix.Server.create
-         ~stop
-         ~ctx
-         ~mode
-         ~on_exn
-         (Cohttp_lwt_unix.Server.make ~callback ~conn_closed ())) ;
-    lwt_log_info "Server started (agent: %s)" server.agent
-    >>= fun () -> Lwt.return server
-
-  let shutdown server =
-    Lwt.wakeup_later server.stopper () ;
-    server.worker
-    >>= fun () ->
-    ConnectionMap.iter (fun _ f -> f ()) server.streams ;
-    Lwt.return_unit
-
-  let set_acl server acl = server.acl <- acl
+    let set_acl server acl = server.acl <- acl
   end
 end
