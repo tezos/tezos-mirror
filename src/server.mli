@@ -36,15 +36,23 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) : sig
   (** A handle on the server worker. *)
   type server
 
+  module Media_type : module type of struct
+    include Media_type.Make (Encoding)
+  end
+
+  module Directory : module type of struct
+    include Resto_directory.Make (Encoding)
+  end
+
   (** Promise a running RPC server.*)
   val launch :
     ?host:string ->
     ?cors:Cors.t ->
     ?agent:string ->
     ?acl:Acl.t ->
-    media_types:Media_type.Make(Encoding).t list ->
+    media_types:Media_type.t list ->
     Conduit_lwt_unix.server ->
-    unit Resto_directory.Make(Encoding).t ->
+    unit Directory.t ->
     server Lwt.t
 
   (* configure the access list for this server *)
@@ -54,10 +62,19 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) : sig
   val shutdown : server -> unit Lwt.t
 
   module Internal : sig
-    val output_content_media_type :
-      string * Media_type.Make(Encoding).t ->
+    type medias = {
+      media_types : Media_type.t list;
+      default_media_type : string * Media_type.t;
+    }
+
+    val input_media_type :
       ?headers:Cohttp.Header.t ->
-      Media_type.Make(Encoding).t list ->
-      (string * Media_type.Make(Encoding).t, [> `Not_acceptable]) Result.result
+      medias ->
+      (Media_type.t, [> `Unsupported_media_type of string]) result
+
+    val output_content_media_type :
+      ?headers:Cohttp.Header.t ->
+      medias ->
+      (string * Media_type.t, [> `Not_acceptable]) Result.result
   end
 end

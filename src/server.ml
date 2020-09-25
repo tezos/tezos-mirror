@@ -56,18 +56,41 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
   module Media_type = Media_type.Make (Encoding)
 
   module Internal = struct
-    let output_content_media_type (default_media_type : string * Media_type.t)
-        ?headers (media_types : Media_type.t list) =
+    type medias = {
+      media_types : Media_type.t list;
+      default_media_type : string * Media_type.t;
+    }
+
+    let input_media_type ?headers medias =
       match headers with
       | None ->
-          Ok default_media_type
+          Ok (snd medias.default_media_type)
+      | Some headers -> (
+        match Header.get headers "content-type" with
+        | None ->
+            Ok (snd medias.default_media_type)
+        | Some content_type -> (
+          match Resto.Utils.split_path content_type with
+          | [x; y] -> (
+            match Media_type.find_media (x, y) medias.media_types with
+            | None ->
+                Error (`Unsupported_media_type content_type)
+            | Some media_type ->
+                Ok media_type )
+          | _ ->
+              Error (`Unsupported_media_type content_type) ) )
+
+    let output_content_media_type ?headers medias =
+      match headers with
+      | None ->
+          Ok medias.default_media_type
       | Some headers -> (
         match Header.get headers "accept" with
         | None ->
-            Ok default_media_type
+            Ok medias.default_media_type
         | Some accepted -> (
           match
-            Media_type.resolve_accept_header media_types (Some accepted)
+            Media_type.resolve_accept_header medias.media_types (Some accepted)
           with
           | None ->
               Error `Not_acceptable
@@ -79,8 +102,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
     root : unit Directory.directory;
     mutable streams : (unit -> unit) ConnectionMap.t;
     cors : Cors.t;
-    media_types : Media_type.t list;
-    default_media_type : string * Media_type.t;
+    medias : Internal.medias;
     stopper : unit Lwt.u;
     mutable acl : Acl.t;
     agent : string;
@@ -132,29 +154,14 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
     | #Resto.meth as meth -> (
         Directory.lookup server.root () meth path
         >>=? fun (Directory.Service s) ->
-        ( match Header.get req_headers "content-type" with
-        | None ->
-            Lwt.return_ok (snd server.default_media_type)
-        | Some content_type -> (
-          match Resto.Utils.split_path content_type with
-          | [x; y] -> (
-            match Media_type.find_media (x, y) server.media_types with
-            | None ->
-                Lwt.return_error (`Unsupported_media_type content_type)
-            | Some media_type ->
-                Lwt.return_ok media_type )
-          | _ ->
-              Lwt.return_error (`Unsupported_media_type content_type) ) )
-        >>=? fun input_media_type ->
+        Internal.input_media_type ~headers:req_headers server.medias
+        >>? fun input_media_type ->
         lwt_debug
           "(%s) input media type %s"
           (Connection.to_string con)
           (Media_type.name input_media_type)
         >>= fun () ->
-        Internal.output_content_media_type
-          ~headers:req_headers
-          server.default_media_type
-          server.media_types
+        Internal.output_content_media_type ~headers:req_headers server.medias
         >>? fun (output_content_type, output_media_type) ->
         ( match
             Resto.Query.parse
@@ -344,7 +351,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
               s )
     | Error `Not_acceptable ->
         let accepted_encoding =
-          Media_type.acceptable_encoding server.media_types
+          Media_type.acceptable_encoding server.medias.media_types
         in
         Lwt.return
           ( Response.make ~status:`Not_acceptable (),
@@ -368,13 +375,13 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
           (l ^ "/" ^ r, m)
     in
     let (stop, stopper) = Lwt.wait () in
+    let medias : Internal.medias = {media_types; default_media_type} in
     let server =
       {
         root;
         streams = ConnectionMap.empty;
         cors;
-        media_types;
-        default_media_type;
+        medias;
         stopper;
         acl;
         agent;
