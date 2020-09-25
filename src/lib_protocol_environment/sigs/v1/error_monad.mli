@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,30 +24,35 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Tezos Protocol Implementation - Error Monad *)
+type error_category = [`Branch | `Temporary | `Permanent]
 
-(** {2 Error classification} *)
-
-(** Categories of error *)
-type error_category =
-  [ `Branch  (** Errors that may not happen in another context *)
-  | `Temporary  (** Errors that may not happen in a later context *)
-  | `Permanent  (** Errors that will happen no matter the context *) ]
-
-(** Custom error handling for economic protocols. *)
+(** CORE : errors *)
 
 type error = ..
 
+val error_encoding : error Data_encoding.t
+
 val pp : Format.formatter -> error -> unit
 
-(** A JSON error serializer *)
-val error_encoding : error Data_encoding.t
+(** EXT : error registration/query *)
+
+val register_error_kind :
+  error_category ->
+  id:string ->
+  title:string ->
+  description:string ->
+  ?pp:(Format.formatter -> 'err -> unit) ->
+  'err Data_encoding.t ->
+  (error -> 'err option) ->
+  ('err -> error) ->
+  unit
+
+val classify_error : error -> error_category
 
 val json_of_error : error -> Data_encoding.json
 
 val error_of_json : Data_encoding.json -> error
 
-(** Error information *)
 type error_info = {
   category : error_category;
   id : string;
@@ -60,131 +66,201 @@ val pp_info : Format.formatter -> error_info -> unit
 (** Retrieves information of registered errors *)
 val get_registered_errors : unit -> error_info list
 
-(** For other modules to register specialized error serializers *)
-val register_error_kind :
-  error_category ->
-  id:string ->
-  title:string ->
-  description:string ->
-  ?pp:(Format.formatter -> 'err -> unit) ->
-  'err Data_encoding.t ->
-  (error -> 'err option) ->
-  ('err -> error) ->
-  unit
+(** MONAD : trace, monad, etc. *)
 
-(** Classify an error using the registered kinds *)
-val classify_errors : error list -> error_category
+(* This is concrete for backwards compatibility purpose. However:
+   - it MUST NEVER be empty
+   - it is not intended for general use (prefer {!error}, {!fail} and such). *)
+type 'err trace = 'err list
 
-(** {2 Monad definition} *)
+type 'a tzresult = ('a, error trace) result
 
-(** The error monad wrapper type, the error case holds a stack of
-    error, initialized by the first call to {!fail} and completed by
-    each call to {!trace} as the stack is rewound. The most general
-    error is thus at the top of the error stack, going down to the
-    specific error that actually caused the failure. *)
-type 'a tzresult = ('a, error list) result
+val trace_encoding : error trace Data_encoding.t
 
-(** A JSON serializer for result of a given type *)
-val result_encoding : 'a Data_encoding.t -> 'a tzresult Data_encoding.encoding
+val result_encoding : 'a Data_encoding.t -> 'a tzresult Data_encoding.t
 
-(** Successful result *)
-val ok : 'a -> 'a tzresult
+val ok : 'a -> ('a, 'trace) result
 
-(** Successful return *)
-val return : 'a -> 'a tzresult Lwt.t
+val ok_unit : (unit, 'trace) result
 
-(** Successful return of [()] *)
-val return_unit : unit tzresult Lwt.t
+val ok_none : ('a option, 'trace) result
 
-(** Successful return of [None] *)
-val return_none : 'a option tzresult Lwt.t
+val ok_some : 'a -> ('a option, 'trace) result
 
-(** [return_some x] is a successful return of [Some x] *)
-val return_some : 'a -> 'a option tzresult Lwt.t
+val ok_nil : ('a list, 'trace) result
 
-(** Successful return of [[]] *)
-val return_nil : 'a list tzresult Lwt.t
+val ok_true : (bool, 'trace) result
 
-(** Successful return of [true] *)
-val return_true : bool tzresult Lwt.t
+val ok_false : (bool, 'trace) result
 
-(** Successful return of [false] *)
-val return_false : bool tzresult Lwt.t
+val return : 'a -> ('a, 'trace) result Lwt.t
 
-(** Erroneous result *)
-val error : error -> 'a tzresult
+val return_unit : (unit, 'trace) result Lwt.t
 
-(** Erroneous return *)
-val fail : error -> 'a tzresult Lwt.t
+val return_none : ('a option, 'trace) result Lwt.t
 
-(** Non-Lwt bind operator *)
-val ( >>? ) : 'a tzresult -> ('a -> 'b tzresult) -> 'b tzresult
+val return_some : 'a -> ('a option, 'trace) result Lwt.t
 
-(** Bind operator *)
-val ( >>=? ) :
-  'a tzresult Lwt.t -> ('a -> 'b tzresult Lwt.t) -> 'b tzresult Lwt.t
+val return_nil : ('a list, 'trace) result Lwt.t
 
-(** Lwt's bind reexported *)
+val return_true : (bool, 'trace) result Lwt.t
+
+val return_false : (bool, 'trace) result Lwt.t
+
+val error : 'err -> ('a, 'err trace) result
+
+val fail : 'err -> ('a, 'err trace) result Lwt.t
+
 val ( >>= ) : 'a Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
 
 val ( >|= ) : 'a Lwt.t -> ('a -> 'b) -> 'b Lwt.t
 
-(** To operator *)
-val ( >>|? ) : 'a tzresult Lwt.t -> ('a -> 'b) -> 'b tzresult Lwt.t
+val ( >>? ) :
+  ('a, 'trace) result -> ('a -> ('b, 'trace) result) -> ('b, 'trace) result
 
-(** Non-Lwt to operator *)
-val ( >|? ) : 'a tzresult -> ('a -> 'b) -> 'b tzresult
+val ( >|? ) : ('a, 'trace) result -> ('a -> 'b) -> ('b, 'trace) result
 
-(** Enrich an error report (or do nothing on a successful result) manually *)
-val record_trace : error -> 'a tzresult -> 'a tzresult
+val ( >>=? ) :
+  ('a, 'trace) result Lwt.t ->
+  ('a -> ('b, 'trace) result Lwt.t) ->
+  ('b, 'trace) result Lwt.t
 
-(** Automatically enrich error reporting on stack rewind *)
-val trace : error -> 'b tzresult Lwt.t -> 'b tzresult Lwt.t
+val ( >|=? ) :
+  ('a, 'trace) result Lwt.t -> ('a -> 'b) -> ('b, 'trace) result Lwt.t
 
-(** Same as record_trace, for unevaluated error *)
-val record_trace_eval : (unit -> error tzresult) -> 'a tzresult -> 'a tzresult
+val ( >>?= ) :
+  ('a, 'trace) result ->
+  ('a -> ('b, 'trace) result Lwt.t) ->
+  ('b, 'trace) result Lwt.t
 
-(** Same as trace, for unevaluated Lwt error *)
+val ( >|?= ) :
+  ('a, 'trace) result -> ('a -> 'b Lwt.t) -> ('b, 'trace) result Lwt.t
+
+val record_trace : 'err -> ('a, 'err trace) result -> ('a, 'err trace) result
+
+val trace :
+  'err -> ('b, 'err trace) result Lwt.t -> ('b, 'err trace) result Lwt.t
+
+val record_trace_eval :
+  (unit -> ('err, 'err trace) result) ->
+  ('a, 'err trace) result ->
+  ('a, 'err trace) result
+
 val trace_eval :
-  (unit -> error tzresult Lwt.t) -> 'b tzresult Lwt.t -> 'b tzresult Lwt.t
+  (unit -> ('err, 'err trace) result Lwt.t) ->
+  ('b, 'err trace) result Lwt.t ->
+  ('b, 'err trace) result Lwt.t
 
-(** Erroneous return on failed assertion *)
-val fail_unless : bool -> error -> unit tzresult Lwt.t
+val error_unless : bool -> 'err -> (unit, 'err trace) result
 
-(** Erroneous return on successful assertion *)
-val fail_when : bool -> error -> unit tzresult Lwt.t
+val error_when : bool -> 'err -> (unit, 'err trace) result
 
-(** {2 In-monad list iterators} *)
+val fail_unless : bool -> 'err -> (unit, 'err trace) result Lwt.t
 
-(** A {!List.iter} in the monad *)
-val iter_s : ('a -> unit tzresult Lwt.t) -> 'a list -> unit tzresult Lwt.t
+val fail_when : bool -> 'err -> (unit, 'err trace) result Lwt.t
 
-(** A {!List.map} in the monad *)
-val map_s : ('a -> 'b tzresult Lwt.t) -> 'a list -> 'b list tzresult Lwt.t
+val unless :
+  bool -> (unit -> (unit, 'trace) result Lwt.t) -> (unit, 'trace) result Lwt.t
 
-(** A {!List.map2} in the monad *)
-val map2 : ('a -> 'b -> 'c tzresult) -> 'a list -> 'b list -> 'c list tzresult
+val when_ :
+  bool -> (unit -> (unit, 'trace) result Lwt.t) -> (unit, 'trace) result Lwt.t
 
-(** A {!List.map2} in the monad *)
-val map2_s :
-  ('a -> 'b -> 'c tzresult Lwt.t) ->
+val dont_wait :
+  (exn -> unit) ->
+  ('trace -> unit) ->
+  (unit -> (unit, 'trace) result Lwt.t) ->
+  unit
+
+(* LIST TRAVERSORS *)
+
+val iter : ('a -> (unit, 'trace) result) -> 'a list -> (unit, 'trace) result
+
+val iter_s :
+  ('a -> (unit, 'trace) result Lwt.t) -> 'a list -> (unit, 'trace) result Lwt.t
+
+val map : ('a -> ('b, 'trace) result) -> 'a list -> ('b list, 'trace) result
+
+val mapi :
+  (int -> 'a -> ('b, 'trace) result) -> 'a list -> ('b list, 'trace) result
+
+val map_s :
+  ('a -> ('b, 'trace) result Lwt.t) ->
+  'a list ->
+  ('b list, 'trace) result Lwt.t
+
+val rev_map_s :
+  ('a -> ('b, 'trace) result Lwt.t) ->
+  'a list ->
+  ('b list, 'trace) result Lwt.t
+
+val mapi_s :
+  (int -> 'a -> ('b, 'trace) result Lwt.t) ->
+  'a list ->
+  ('b list, 'trace) result Lwt.t
+
+val map2 :
+  ('a -> 'b -> ('c, 'trace) result) ->
   'a list ->
   'b list ->
-  'c list tzresult Lwt.t
+  ('c list, 'trace) result
 
-(** A {!List.filter_map} in the monad *)
+val mapi2 :
+  (int -> 'a -> 'b -> ('c, 'trace) result) ->
+  'a list ->
+  'b list ->
+  ('c list, 'trace) result
+
+val map2_s :
+  ('a -> 'b -> ('c, 'trace) result Lwt.t) ->
+  'a list ->
+  'b list ->
+  ('c list, 'trace) result Lwt.t
+
+val mapi2_s :
+  (int -> 'a -> 'b -> ('c, 'trace) result Lwt.t) ->
+  'a list ->
+  'b list ->
+  ('c list, 'trace) result Lwt.t
+
 val filter_map_s :
-  ('a -> 'b option tzresult Lwt.t) -> 'a list -> 'b list tzresult Lwt.t
+  ('a -> ('b option, 'trace) result Lwt.t) ->
+  'a list ->
+  ('b list, 'trace) result Lwt.t
 
-(** A {!List.fold_left} in the monad *)
+val filter :
+  ('a -> (bool, 'trace) result) -> 'a list -> ('a list, 'trace) result
+
+val filter_s :
+  ('a -> (bool, 'trace) result Lwt.t) ->
+  'a list ->
+  ('a list, 'trace) result Lwt.t
+
 val fold_left_s :
-  ('a -> 'b -> 'a tzresult Lwt.t) -> 'a -> 'b list -> 'a tzresult Lwt.t
+  ('a -> 'b -> ('a, 'trace) result Lwt.t) ->
+  'a ->
+  'b list ->
+  ('a, 'trace) result Lwt.t
 
-(** A {!List.fold_right} in the monad *)
 val fold_right_s :
-  ('a -> 'b -> 'b tzresult Lwt.t) -> 'a list -> 'b -> 'b tzresult Lwt.t
+  ('a -> 'b -> ('b, 'trace) result Lwt.t) ->
+  'a list ->
+  'b ->
+  ('b, 'trace) result Lwt.t
+
+(* Synchronisation *)
+
+val join_e : (unit, 'err trace) result list -> (unit, 'err trace) result
+
+val all_e : ('a, 'err trace) result list -> ('a list, 'err trace) result
+
+val both_e :
+  ('a, 'err trace) result ->
+  ('b, 'err trace) result ->
+  ('a * 'b, 'err trace) result
 
 (**/**)
+
+(* boilerplate for interaction with the shell *)
 
 type shell_error
 

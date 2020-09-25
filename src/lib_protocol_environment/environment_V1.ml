@@ -517,7 +517,7 @@ struct
     include Tezos_error_monad.Monad_ext_maker.Make (Error_core) (TzTrace)
               (Local_monad)
 
-    let ( >>|? ) = ( >|=? ) (* for backward compatibility *)
+    type 'err trace = 'err TzTrace.trace
   end
 
   let () =
