@@ -62,4 +62,112 @@ let check_peer_option protocol =
   and* _ = Node.wait_for_level node_2 1 in
   unit
 
-let register protocol = check_peer_option protocol
+(* [wait_pred] waits until [pred arg] is true. An active wait with Lwt
+   cooperation points is used. *)
+let rec wait_pred ~pred ~arg =
+  let* () = Lwt.pause () in
+  let* cond = pred arg in
+  if not cond then wait_pred ~pred ~arg else Lwt.return_unit
+
+(* [get_connections_points ~client] returns the list of active connections
+   point of the node linked to [client]. *)
+let get_connections_points ~client =
+  let* connections = RPC.get_connections client in
+  let connections = JSON.as_list connections in
+  return
+  @@
+  let open JSON in
+  List.map
+    (fun conn_info ->
+      ( as_string (conn_info |-> "id_point" |-> "addr"),
+        as_int (conn_info |-> "id_point" |-> "port") ))
+    connections
+
+(* [get_nb_connections ~client] returns the number of active connections of the
+   node  to [client]. *)
+let get_nb_connections ~client =
+  let* ports = get_connections_points ~client in
+  return @@ List.length ports
+
+(* [wait_connections ~client n] waits until the node related to [client] has at
+   least [n] active connections. *)
+let wait_connections ~client nb_conns_target =
+  wait_pred
+    ~pred:(fun () ->
+      let* nb_conns = get_nb_connections ~client in
+      return @@ (nb_conns >= nb_conns_target))
+    ~arg:()
+
+module Maintenance = struct
+  (* Test.
+     Initialize a node and verify that the number of active connections
+     established by the maintenance is correct. *)
+  let test_expected_connections () =
+    (* The value of [expected_connections] is fixed to 6 in this test for two
+       reasons. Firstly, the consumption of each node is substantial and there
+       will be [expected_connection*2/3+1] nodes launched. This explains why the
+       number of [expected_connections] is quite small. Secondly, since the
+       values of the maintenance configuration are integers, there will be an
+       approximation and then for a small value, it is required to have
+       [expected_connections mod 6 = 0]. *)
+    let expected_connections = 6 in
+    Test.register
+      ~__FILE__
+      ~title:"p2p-maintenance-init-expected_connections"
+      ~tags:["p2p"; "node"; "maintenance"]
+    @@ fun () ->
+    (* Connections values evaluated from --connections option. *)
+    let min_connections = expected_connections / 2 in
+    let max_connections = 3 * expected_connections / 2 in
+    (* Connections values evaluated from P2p_maintenance.config. *)
+    let step_min = (expected_connections - min_connections) / 3
+    and step_max = (max_connections - expected_connections) / 3 in
+    let min_threshold = min_connections + step_min in
+    (* The target variables are used to define the goal interval of active
+       connections reached by the maintenance. *)
+    let min_target = min_connections + (2 * step_min) in
+    let max_target = max_connections - (2 * step_max) in
+    let max_threshold = max_connections - step_max in
+    Log.info
+      "Configuration values (min: %d, min_threshold: %d, min_target: %d, \
+       expected: %d, max_target: %d, max_threshold: %d, max: %d)."
+      min_connections
+      min_threshold
+      min_target
+      expected_connections
+      max_target
+      max_threshold
+      max_connections ;
+    let* target_node = Node.init [Connections expected_connections] in
+    let* target_client = Client.init ~node:target_node () in
+    Log.info "Target created." ;
+    let nodes =
+      Cluster.create max_connections [Connections (max_connections - 1)]
+    in
+    Cluster.clique nodes ;
+    let* () = Cluster.start nodes in
+    Log.info "Complete network of nodes created." ;
+    let maintenance_ended_promise =
+      Node.wait_for target_node "maintenance_ended.v0" (fun _ -> Some ())
+    in
+    let* () =
+      Client.Admin.connect_address target_client ~peer:(List.hd nodes)
+    in
+    Log.info "Target is connected to the network." ;
+    let* () = wait_connections ~client:target_client min_target in
+    Log.info "Enough connections has been established." ;
+    let* () = maintenance_ended_promise in
+    Log.info "The maintenance ended." ;
+    let* nb_active_connections = get_nb_connections ~client:target_client in
+    if nb_active_connections > max_target then
+      Test.fail
+        "There are too many active connections (actual: %d, expected less \
+         than %d)"
+        nb_active_connections
+        max_target ;
+    Lwt.return_unit
+
+  let tests () = test_expected_connections ()
+end
+
+let register protocol = Maintenance.tests () ; check_peer_option protocol

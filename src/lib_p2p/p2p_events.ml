@@ -390,7 +390,7 @@ module P2p_maintainance = struct
       ~section
       ~name:"maintenance_ended"
       ~msg:"maintenance step ended"
-      ~level:Debug
+      ~level:Info
       ()
 
   let too_few_connections =
