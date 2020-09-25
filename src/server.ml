@@ -65,6 +65,13 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
 
     let default_agent = "OCaml-Resto"
 
+    let default_media_type media_types =
+      match Media_type.first_complete_media media_types with
+      | None ->
+          invalid_arg "Resto_directory_cohttp.launch(empty media type list)"
+      | Some ((l, r), m) ->
+          (l ^ "/" ^ r, m)
+
     let invalid_cors (cors : Cors.t) headers =
       cors.allowed_origins <> [] && not (Cors.check_host headers cors)
 
@@ -399,13 +406,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
   let launch ?(host = "::") ?(cors = Cors.default)
       ?(agent = Internal.default_agent) ?(acl = Acl.Allow_all {except = []})
       ~media_types mode root =
-    let default_media_type =
-      match Media_type.first_complete_media media_types with
-      | None ->
-          invalid_arg "Resto_directory_cohttp.launch(empty media type list)"
-      | Some ((l, r), m) ->
-          (l ^ "/" ^ r, m)
-    in
+    let default_media_type = Internal.default_media_type media_types in
     let (stop, stopper) = Lwt.wait () in
     let medias : Internal.medias = {media_types; default_media_type} in
     let server =
