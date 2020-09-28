@@ -170,11 +170,12 @@ You can now edit the files ``bootstrap-accounts.json`` and
 
 ::
 
-   $ mv /tmp/mockup /tmp/mockup.old && \
-     mockup-client --protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK \
-     create mockup for protocol \
-     --protocol-constants protocol-constants.json \
-     --bootstrap-accounts bootstrap-accounts.json
+   $ mv /tmp/mockup/{bootstrap-accounts,protocol-constants}.json /tmp/.
+   $ rm /tmp/mockup -Rf
+   $ mockup-client --protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK \
+     create mockup \
+     --protocol-constants /tmp/protocol-constants.json \
+     --bootstrap-accounts /tmp/bootstrap-accounts.json
 
 Setting protocol constants for the mockup mode
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
