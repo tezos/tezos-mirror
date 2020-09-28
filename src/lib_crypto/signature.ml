@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -400,6 +401,8 @@ module Public_key = struct
 
     let to_short_b58check = to_short_b58check
   end)
+
+  let size pk = Data_encoding.Binary.length encoding pk
 
   let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
 end

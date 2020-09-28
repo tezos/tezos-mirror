@@ -7,7 +7,8 @@
         test_blake2b
         test_pvss
         test_crypto_box
-        test_deterministic_nonce)
+        test_deterministic_nonce
+        test_signature)
  (libraries tezos-stdlib
             tezos-crypto
             data-encoding
@@ -27,7 +28,8 @@
        test_blake2b.exe
        test_pvss.exe
        test_crypto_box.exe
-       test_deterministic_nonce.exe)
+       test_deterministic_nonce.exe
+       test_signature.exe)
  (action (progn)))
 
 (rule
@@ -67,6 +69,10 @@
  (action (run %{exe:test_deterministic_nonce.exe})))
 
 (rule
+ (alias runtest_signature)
+ (action (run %{exe:test_signature.exe})))
+
+(rule
  (alias runtest)
  (package tezos-crypto)
  (deps (alias runtest_hacl)
@@ -77,7 +83,8 @@
        (alias runtest_blake2b)
        (alias runtest_pvss)
        (alias runtest_crypto_box)
-       (alias runtest_deterministic_nonce))
+       (alias runtest_deterministic_nonce)
+       (alias runtest_signature))
  (action (progn)))
 
 (rule
