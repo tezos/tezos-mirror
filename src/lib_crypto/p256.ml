@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -60,14 +61,14 @@ module Public_key = struct
 
   let of_string_opt s = of_bytes_opt (Bytes.of_string s)
 
-  let size = pk_size
+  let size _ = pk_size
 
   type Base58.data += Data of t
 
   let b58check_encoding =
     Base58.register_encoding
       ~prefix:Base58.Prefix.p256_public_key
-      ~length:size
+      ~length:(size ())
       ~to_raw:to_string
       ~of_raw:of_string_opt
       ~wrap:(fun x -> Data x)
@@ -111,7 +112,7 @@ module Public_key = struct
 
     let raw_encoding =
       let open Data_encoding in
-      conv to_bytes of_bytes_exn (Fixed.bytes size)
+      conv to_bytes of_bytes_exn (Fixed.bytes (size ()))
 
     let of_b58check = of_b58check
 
