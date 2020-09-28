@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -571,6 +572,8 @@ module type SIGNATURE = sig
     include ENCODER with type t := t
 
     val hash : t -> Public_key_hash.t
+
+    val size : t -> int (* in bytes *)
   end
 
   type t
