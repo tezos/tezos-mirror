@@ -29,7 +29,6 @@ type rpc_error =
   | Rpc_generic_error
   | Rpc_not_found of string option
   | Rpc_unauthorized
-  | Rpc_unexpected_type_of_failure
   | Rpc_cannot_parse_path
   | Rpc_cannot_parse_query
   | Rpc_cannot_parse_body
@@ -64,30 +63,24 @@ let rpc_error_encoding =
         (fun () -> Rpc_unauthorized);
       case
         (Tag 3)
-        ~title:"Rpc_unexpected_type_of_failure"
-        (obj1 (req "kind" (constant "rpc_unexpected_failure")))
-        (function Rpc_unexpected_type_of_failure -> Some () | _ -> None)
-        (fun () -> Rpc_unexpected_type_of_failure);
-      case
-        (Tag 4)
         ~title:"Rpc_cannot_parse_path"
         (obj1 (req "kind" (constant "rpc_cannot_parse")))
         (function Rpc_cannot_parse_path -> Some () | _ -> None)
         (fun () -> Rpc_cannot_parse_path);
       case
-        (Tag 5)
+        (Tag 4)
         ~title:"Rpc_cannot_parse_query"
         (obj1 (req "kind" (constant "rpc_cannot_query")))
         (function Rpc_cannot_parse_query -> Some () | _ -> None)
         (fun () -> Rpc_cannot_parse_query);
       case
-        (Tag 6)
+        (Tag 5)
         ~title:"Rpc_cannot_parse_body"
         (obj1 (req "kind" (constant "rpc_cannot_body")))
         (function Rpc_cannot_parse_body -> Some () | _ -> None)
         (fun () -> Rpc_cannot_parse_body);
       case
-        (Tag 7)
+        (Tag 6)
         ~title:"Rpc_streams_not_handled"
         (obj1 (req "kind" (constant "rpc_streams_not_handled")))
         (function Rpc_streams_not_handled -> Some () | _ -> None)
@@ -253,8 +246,6 @@ let () =
           Format.fprintf ppf ": RPC not found (%s)" desc
       | Rpc_unauthorized ->
           Format.fprintf ppf ": RPC unauthorized"
-      | Rpc_unexpected_type_of_failure ->
-          Format.fprintf ppf ": unexpected type of failure"
       | Rpc_cannot_parse_path ->
           Format.fprintf ppf ": cannot parse path"
       | Rpc_cannot_parse_query ->
