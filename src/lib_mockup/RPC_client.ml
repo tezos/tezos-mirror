@@ -130,42 +130,7 @@ class local_ctxt (base_dir : string) (mem_only : bool)
       base
       RPC_service.description_service
   in
-  let call_service_local (type p q i o)
-      (service : (_, _, p, q, i, o, _) Service.t) (params : p) (query : q)
-      (input : i) : o tzresult Lwt.t =
-    Directory.transparent_lookup directory service params query input
-    >>= fun res ->
-    match res with
-    | `Ok output ->
-        return output
-    | `Error (Some err) ->
-        Lwt.return (Error err)
-    | `Not_found (Some err) ->
-        Lwt.return (Error err)
-    | `Unauthorized (Some err) ->
-        Lwt.return (Error err)
-    | `Error None ->
-        fail (Local_RPC_error Rpc_generic_error)
-    | `Not_found None ->
-        let path = print_service service in
-        fail (Local_RPC_error (Rpc_not_found (Some path)))
-    | `Unauthorized None ->
-        fail (Local_RPC_error Rpc_unauthorized)
-    | _ ->
-        fail (Local_RPC_error Rpc_unexpected_type_of_failure)
-  in
-  let call_streamed_service_local :
-        'm 'p 'q 'i 'o.
-        (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) RPC_service.t ->
-        on_chunk:('o -> unit) -> on_close:(unit -> unit) -> 'p -> 'q -> 'i ->
-        (unit -> unit) tzresult Lwt.t =
-   fun service ~on_chunk ~on_close params query input ->
-    call_service_local service params query input
-    >>=? fun result ->
-    on_chunk result ;
-    on_close () ;
-    return (fun () -> ())
-  in
+  let rpc_dir_ctxt = new Tezos_rpc.RPC_context.of_directory directory in
   let generic_json_call_stub :
       RPC_service.meth ->
       ?body:Data_encoding.json ->
@@ -256,7 +221,7 @@ class local_ctxt (base_dir : string) (mem_only : bool)
           (params : p)
           (query : q)
           (input : i) ->
-        try call_service_local service params query input
+        try rpc_dir_ctxt#call_service service params query input
         with Not_found ->
           let description = print_service service in
           fail (Local_RPC_error (Rpc_not_found (Some description)))
@@ -266,7 +231,7 @@ class local_ctxt (base_dir : string) (mem_only : bool)
           (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) RPC_service.t ->
           on_chunk:('o -> unit) -> on_close:(unit -> unit) -> 'p -> 'q -> 'i ->
           (unit -> unit) tzresult Lwt.t =
-      call_streamed_service_local
+      rpc_dir_ctxt#call_streamed_service
 
     method generic_json_call = generic_json_call_stub
   end
