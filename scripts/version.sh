@@ -12,7 +12,7 @@ opam_version=2.0
 full_opam_repository_tag=4c7cc1ac40795b4b8975c751ed5badf37803ea33
 
 ## opam_repository is an additional, tezos-specific opam repository.
-opam_repository_tag=dbeca0ad991ae08bff8a403d26332943a92d500b
+opam_repository_tag=2e44bb93832ac3b72243284b38db92b0b238cc22
 opam_repository_url=https://gitlab.com/tezos/opam-repository.git
 opam_repository=$opam_repository_url\#$opam_repository_tag
 
