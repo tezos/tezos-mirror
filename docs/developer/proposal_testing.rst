@@ -33,8 +33,10 @@ directory ``src/proto_alpha/lib_protocol``.
 We next describe how to run unit tests and how to activate the Alpha protocol in
 sandboxed node.
 
+Testing the protocol
+--------------------
 Unit tests and sandboxed mode
------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The first step for tweaking and testing the current proposal is to checkout the
 latest code and run unit tests::
@@ -62,6 +64,25 @@ the shell (see :ref:`sandboxed-mode`)::
 
   $ tezos-client bake for bootstrap1 --minimal-timestamp
 
+Adding new tests in OCaml
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Be sure you first read the :ref:`introduction on the testing ecosystem for Tezos <testing>`.
+In addition to system tests written in Python or written in OCaml with `Tezt`,
+unit tests and integration tests in OCaml can be found in `src/proto_alpha/lib_protocol/test`.
+It is strongly recommended to write unit tests and integration tests in addition to the
+system tests.
+To test a new component, create a new file in this directory and add the module in `main.ml`.
+To print the errors of the Error monad correctly, alcotests must be wrapped into
+the function `tztest` defined in the module `Test` defined at the same level.
+
+Some helpers are available in the module `Tezos_alpha_test_helpers` defined in
+the subdirectory `helpers`. For instance, it contains context, operation and
+block fixtures that can be used in tests requiring these components.
+
+
+Testing migration code
+----------------------
 The remainder of the tutorial is organised as follows. Section `Manual migration
 testing`_ provides detailed indications on how to test a migration, and Section
 `Wrap up the manual migration procedure`_ summarises this indications by
@@ -72,7 +93,6 @@ migration procedure with Tezt`_ collects all the steps needed to automatically
 test the migration. To conclude, Section `Tips and tricks`_ indicates how to use
 the shell to inspect the context, and Section `Anatomy of migration code`_
 contains a primer on how to read and write migration code.
-
 
 Manual migration testing
 ------------------------
