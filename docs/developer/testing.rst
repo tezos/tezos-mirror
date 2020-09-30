@@ -469,5 +469,39 @@ which runs most tests (alcotest and python tests) in a single job.
 Conventions
 -----------
 
-Regardless of the framework, each new test must have a comment (typically
-a file header comment) explaining briefly what it is testing and how.
+Besides implementing tests, it is necessary to comment test files as
+much as possible to keep a maintainable project towards future
+contributors. As part of this effort, we require from contributors to
+follow these guidelines:
+
+1. For each unit test module, add a header that explains the overall
+   goal of the tests in the file (i.e., tested component and nature of
+   the tests). Such header must follow this template, and added after
+   license:
+
+::
+
+    (* Testing
+       -------
+       Component:    (component to test, e.g. Shell, Micheline)
+       Invocation:   (command to invoke tests)
+       Dependencies: (e.g., helper files, optional so this line can be removed)
+       Subject:      (brief description of the test goals)
+    *)
+
+2. For each test in the unit test module, add a small doc that
+   explains what the test actually asserts (2-4 lines are enough). It
+   should start with word ``Test``. These lines should appear at the
+   beginning of each test unit function that is called by
+   ``Alcotest_lwt.test_case``. For instance,
+
+::
+
+    (* Test.
+       Transfer to an unactivated account and then activating it.
+    *)
+    let transfer_to_unactivated_then_activate () =
+    ...
+
+For alcotests, each file name must be prefixed by ``test_`` to
+preserve a uniform directory structure.
