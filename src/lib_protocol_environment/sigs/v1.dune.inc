@@ -2,7 +2,7 @@
  (targets v1.ml)
  (deps
 
-   ;; Part of OCaml stdlib
+   ;; Part of OCaml stdlib 4.09.1
    v1/pervasives.mli
    v1/list.mli
    v1/string.mli
@@ -13,20 +13,20 @@
    v1/format.mli
 
    ;; Part of external libraries
-   v1/hex.mli
-   v1/tzEndian.mli
-   v1/z.mli
-   v1/lwt.mli
+   v1/hex.mli           ; 1.4.0
+   v1/z.mli             ; 1.10
+   v1/lwt.mli           ; 5.3.0
    v1/lwt_list.mli
-   v1/raw_hashes.mli
+   v1/data_encoding.mli ; 0.2
 
-   ;; Tezos extended stdlib
+   ;; Tezos extended stdlib revision 32f04ec483b8d9c62dd0957389eb5268d8b3a38d
+   v1/raw_hashes.mli
    v1/compare.mli
-   v1/data_encoding.mli
    v1/error_monad.mli
    v1/logging.mli
    v1/time.mli
    v1/option.mli
+   v1/tzEndian.mli
 
    v1/RPC_arg.mli
    v1/RPC_path.mli
