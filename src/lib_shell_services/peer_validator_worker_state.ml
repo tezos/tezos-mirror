@@ -73,7 +73,11 @@ module Event = struct
     match req with
     | Debug _ ->
         Internal_event.Debug
-    | Request _ ->
+    | Request (_, _, Some _) ->
+        Internal_event.Notice
+    | Request (Request.New_head _, _, None) ->
+        Internal_event.Debug
+    | Request (Request.New_branch (_, _), _, None) ->
         Internal_event.Info
 
   let encoding =
