@@ -1686,6 +1686,8 @@ and 'arg non_terminal_seq_level = {
   stop : 'arg command option;
   autocomplete : ('arg -> string list tzresult Lwt.t) option;
   tree : 'arg tree;
+  name : string;
+  desc : string;
   suffix : string list;
 }
 
@@ -1734,10 +1736,10 @@ let insert_in_dispatch_tree : type ctx. ctx tree -> ctx command -> ctx tree =
     | (TEmpty, Param (_, _, {autocomplete; _}, next)) ->
         let autocomplete = conv_autocomplete autocomplete in
         TParam {tree = insert_tree TEmpty next; stop = None; autocomplete}
-    | (TEmpty, NonTerminalSeq (_, _, {autocomplete; _}, suffix, next)) ->
+    | (TEmpty, NonTerminalSeq (name, desc, {autocomplete; _}, suffix, next)) ->
         let autocomplete = conv_autocomplete autocomplete in
         let tree = suffix_to_tree suffix next in
-        TNonTerminalSeq {stop = None; tree; autocomplete; suffix}
+        TNonTerminalSeq {stop = None; tree; autocomplete; suffix; name; desc}
     | (TEmpty, Prefix (n, next)) ->
         TPrefix {stop = None; prefix = [(n, insert_tree TEmpty next)]}
     | (TStop cmd, Param (_, _, {autocomplete; _}, next)) ->
@@ -1748,10 +1750,12 @@ let insert_in_dispatch_tree : type ctx. ctx tree -> ctx command -> ctx tree =
         else raise (Failure "Command cannot have both prefix and options")
     | (TStop cmd, Prefix (n, next)) ->
         TPrefix {stop = Some cmd; prefix = [(n, insert_tree TEmpty next)]}
-    | (TStop cmd, NonTerminalSeq (_, _, {autocomplete; _}, suffix, next)) ->
+    | (TStop cmd, NonTerminalSeq (name, desc, {autocomplete; _}, suffix, next))
+      ->
         let autocomplete = conv_autocomplete autocomplete in
         let tree = suffix_to_tree suffix next in
-        TNonTerminalSeq {stop = Some cmd; tree; autocomplete; suffix}
+        TNonTerminalSeq
+          {stop = Some cmd; tree; autocomplete; suffix; name; desc}
     | (TParam t, Param (_, _, _, next)) ->
         TParam {t with tree = insert_tree t.tree next}
     | (TPrefix ({prefix; _} as l), Prefix (n, next)) ->
@@ -1770,9 +1774,18 @@ let insert_in_dispatch_tree : type ctx. ctx tree -> ctx command -> ctx tree =
         TParam {l with stop = Some command}
     | (TParam t, Prefix (_n, next)) ->
         TParam {t with tree = insert_tree t.tree next}
-    | (TNonTerminalSeq t, NonTerminalSeq (_, _, _, suffix, next)) ->
-        let params = suffix_to_params suffix next in
-        TNonTerminalSeq {t with tree = insert_tree t.tree params}
+    | (TNonTerminalSeq t, NonTerminalSeq (n, desc, _, suffix, next)) ->
+        if
+          n <> t.name || desc <> t.desc || t.suffix <> suffix
+          (* we should match the parameter too but this would require a bit of refactoring*)
+        then
+          raise
+            (Failure
+               "Command cannot have different non_terminal_seq_level at the \
+                same position")
+        else
+          let params = suffix_to_params suffix next in
+          TNonTerminalSeq {t with tree = insert_tree t.tree params}
     | (_, _) ->
         Stdlib.failwith
           (Format.asprintf

@@ -69,7 +69,7 @@ let efgh_param ~name =
 
 (* instrumentation *)
 
-let dispatch cmds argv =
+let dispatch cmds argv () =
   let res = ref "nomatch" in
   let cmd_return v =
     res := v ;
@@ -79,7 +79,7 @@ let dispatch cmds argv =
   Clic.dispatch cmds () argv >>=? fun () -> return !res
 
 let expect_result line pr exp got =
-  got
+  protect got
   >>= fun got ->
   if
     match (got, exp) with
@@ -216,19 +216,25 @@ let ntseq () =
   expect __LINE__ (Ok "FCB") (dispatch [fr] ["c"; "b"; "la"; "fin"])
   >>= fun () ->
   (* the following two should probably either all work, or all fail with a command clash error *)
-  expect __LINE__ (Ok "EB") (dispatch [en; fr] ["b"; "the"; "end"])
+  expect
+    __LINE__
+    (Error "non_terminal_seq")
+    (dispatch [en; fr] ["b"; "the"; "end"])
   >>= fun () ->
   expect
     __LINE__
-    (Error "Unterminated_command")
+    (Error "non_terminal_seq")
     (dispatch [fr; en] ["b"; "the"; "end"])
   >>= fun () ->
   expect
     __LINE__
-    (Error "Unterminated_command")
+    (Error "non_terminal_seq")
     (dispatch [en; fr] ["a"; "la"; "fin"])
   >>= fun () ->
-  expect __LINE__ (Ok "FA") (dispatch [fr; en] ["a"; "la"; "fin"])
+  expect
+    __LINE__
+    (Error "non_terminal_seq")
+    (dispatch [fr; en] ["a"; "la"; "fin"])
   >>= fun () -> Lwt.return_unit
 
 let string_param ~autocomplete next =
