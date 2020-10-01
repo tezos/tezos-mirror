@@ -40,6 +40,7 @@
    v1/set.mli
    v1/map.mli
    v1/blake2B.mli
+   v1/bls12_381.mli
    v1/ed25519.mli
    v1/secp256k1.mli
    v1/p256.mli
