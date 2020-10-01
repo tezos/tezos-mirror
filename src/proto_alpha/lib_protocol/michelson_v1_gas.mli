@@ -105,9 +105,9 @@ module Cost_of : sig
 
     val string_size : Gas.cost
 
-    val concat_bytes_pair : MBytes.t -> MBytes.t -> Gas.cost
+    val concat_bytes_pair : bytes -> bytes -> Gas.cost
 
-    val slice_bytes : MBytes.t -> Gas.cost
+    val slice_bytes : bytes -> Gas.cost
 
     val bytes_size : Gas.cost
 
@@ -173,13 +173,13 @@ module Cost_of : sig
 
     val dip : Gas.cost
 
-    val check_signature : Signature.public_key -> MBytes.t -> Gas.cost
+    val check_signature : Signature.public_key -> bytes -> Gas.cost
 
-    val blake2b : MBytes.t -> Gas.cost
+    val blake2b : bytes -> Gas.cost
 
-    val sha256 : MBytes.t -> Gas.cost
+    val sha256 : bytes -> Gas.cost
 
-    val sha512 : MBytes.t -> Gas.cost
+    val sha512 : bytes -> Gas.cost
 
     val dign : int -> Gas.cost
 
@@ -241,7 +241,7 @@ module Cost_of : sig
 
     val chain_id : Gas.cost
 
-    val unpack_failed : MBytes.t -> Gas.cost
+    val unpack_failed : bytes -> Gas.cost
   end
 
   module Typechecking : sig
@@ -325,6 +325,6 @@ module Cost_of : sig
 
     val contract : Gas.cost
 
-    val operation : MBytes.t -> Gas.cost
+    val operation : bytes -> Gas.cost
   end
 end

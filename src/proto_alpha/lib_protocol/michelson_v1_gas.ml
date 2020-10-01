@@ -60,7 +60,7 @@ module Cost_of = struct
     | String_key _ ->
         Z.of_int (String.length v)
     | Bytes_key _ ->
-        Z.of_int (MBytes.length v)
+        Z.of_int (Bytes.length v)
     | Bool_key _ ->
         Z.of_int 8
     | Key_hash_key _ ->
@@ -713,10 +713,9 @@ module Cost_of = struct
 
     let concat_bytes_pair b1 b2 =
       atomic_step_cost
-        (cost_N_Concat_string_pair (MBytes.length b1) (MBytes.length b2))
+        (cost_N_Concat_string_pair (Bytes.length b1) (Bytes.length b2))
 
-    let slice_bytes b =
-      atomic_step_cost (cost_N_Slice_string (MBytes.length b))
+    let slice_bytes b = atomic_step_cost (cost_N_Slice_string (Bytes.length b))
 
     let bytes_size = atomic_step_cost cost_N_String_size
 
@@ -793,19 +792,19 @@ module Cost_of = struct
       let cost =
         match pkey with
         | Ed25519 _ ->
-            cost_N_Check_signature_ed25519 (MBytes.length b)
+            cost_N_Check_signature_ed25519 (Bytes.length b)
         | Secp256k1 _ ->
-            cost_N_Check_signature_secp256k1 (MBytes.length b)
+            cost_N_Check_signature_secp256k1 (Bytes.length b)
         | P256 _ ->
-            cost_N_Check_signature_p256 (MBytes.length b)
+            cost_N_Check_signature_p256 (Bytes.length b)
       in
       atomic_step_cost cost
 
-    let blake2b b = atomic_step_cost (cost_N_Blake2b (MBytes.length b))
+    let blake2b b = atomic_step_cost (cost_N_Blake2b (Bytes.length b))
 
-    let sha256 b = atomic_step_cost (cost_N_Sha256 (MBytes.length b))
+    let sha256 b = atomic_step_cost (cost_N_Sha256 (Bytes.length b))
 
-    let sha512 b = atomic_step_cost (cost_N_Sha512 (MBytes.length b))
+    let sha512 b = atomic_step_cost (cost_N_Sha512 (Bytes.length b))
 
     let dign n = atomic_step_cost (cost_N_Dig n)
 
@@ -829,7 +828,7 @@ module Cost_of = struct
 
     let compare_bytes b1 b2 =
       atomic_step_cost
-        (cost_N_Compare_string (MBytes.length b1) (MBytes.length b2))
+        (cost_N_Compare_string (Bytes.length b1) (Bytes.length b2))
 
     let compare_mutez = atomic_step_cost (cost_N_Compare_mutez 8 8)
 
@@ -981,7 +980,7 @@ module Cost_of = struct
     let unpack_failed bytes =
       (* We cannot instrument failed deserialization,
          so we take worst case fees: a set of size 1 bytes values. *)
-      let len = Z.of_int (MBytes.length bytes) in
+      let len = Z.of_int (Bytes.length bytes) in
       (len *@ alloc_mbytes_cost 1)
       +@ len
          *@ ( Z.of_int (Z.numbits len)

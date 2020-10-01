@@ -195,8 +195,8 @@ module Index = struct
 
   let to_path c l =
     let raw_key = Data_encoding.Binary.to_bytes_exn encoding c in
-    let (`Hex key) = MBytes.to_hex raw_key in
-    let (`Hex index_key) = MBytes.to_hex (Raw_hashes.blake2b raw_key) in
+    let (`Hex key) = Hex.of_bytes raw_key in
+    let (`Hex index_key) = Hex.of_bytes (Raw_hashes.blake2b raw_key) in
     String.sub index_key 0 2 :: String.sub index_key 2 2
     :: String.sub index_key 4 2 :: String.sub index_key 6 2
     :: String.sub index_key 8 2 :: String.sub index_key 10 2 :: key :: l
@@ -212,8 +212,8 @@ module Index = struct
     | _ :: _ :: _ :: _ :: _ :: _ :: _ :: _ :: _ ->
         None
     | [index1; index2; index3; index4; index5; index6; key] ->
-        let raw_key = MBytes.of_hex (`Hex key) in
-        let (`Hex index_key) = MBytes.to_hex (Raw_hashes.blake2b raw_key) in
+        let raw_key = Hex.to_bytes (`Hex key) in
+        let (`Hex index_key) = Hex.of_bytes (Raw_hashes.blake2b raw_key) in
         assert (Compare.String.(String.sub index_key 0 2 = index1)) ;
         assert (Compare.String.(String.sub index_key 2 2 = index2)) ;
         assert (Compare.String.(String.sub index_key 4 2 = index3)) ;

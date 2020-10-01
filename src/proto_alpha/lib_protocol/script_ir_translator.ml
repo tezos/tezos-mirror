@@ -533,7 +533,7 @@ let rec compare_comparable :
       let lres = Contract.compare x y in
       if Compare.Int.(lres = 0) then Compare.String.compare ex ey else lres
   | Bytes_key _ ->
-      wrap_compare MBytes.compare
+      wrap_compare Compare.Bytes.compare
   | Pair_key ((tl, _), (tr, _), _) ->
       fun (lx, rx) (ly, ry) ->
         let lres = compare_comparable tl lx ly in
@@ -5395,7 +5395,7 @@ let pack_data ctxt typ data =
   Lwt.return
     ( Gas.consume ctxt (Script.serialized_cost bytes)
     >>? fun ctxt ->
-    let bytes = MBytes.concat "" [MBytes.of_string "\005"; bytes] in
+    let bytes = Bytes.cat (Bytes.of_string "\005") bytes in
     Gas.consume ctxt (Script.serialized_cost bytes)
     >|? fun ctxt -> (bytes, ctxt) )
 

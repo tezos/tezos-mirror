@@ -30,7 +30,7 @@ and protocol_data = {contents : contents; signature : Signature.t}
 and contents = {
   priority : int;
   seed_nonce_hash : Nonce_hash.t option;
-  proof_of_work_nonce : MBytes.t;
+  proof_of_work_nonce : bytes;
 }
 
 type block_header = t

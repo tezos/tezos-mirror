@@ -396,7 +396,7 @@ module Script : sig
 
   val deserialized_cost : expr -> Gas.cost
 
-  val serialized_cost : MBytes.t -> Gas.cost
+  val serialized_cost : bytes -> Gas.cost
 
   val traversal_cost : node -> Gas.cost
 
@@ -408,7 +408,7 @@ module Script : sig
 
   val string_node_cost_of_length : int -> Gas.cost
 
-  val bytes_node_cost : MBytes.t -> Gas.cost
+  val bytes_node_cost : bytes -> Gas.cost
 
   val bytes_node_cost_of_length : int -> Gas.cost
 
@@ -424,7 +424,7 @@ module Script : sig
     context -> lazy_expr -> (expr * context) tzresult
 
   val force_bytes_in_context :
-    context -> lazy_expr -> (MBytes.t * context) tzresult
+    context -> lazy_expr -> (bytes * context) tzresult
 
   val unit_parameter : lazy_expr
 
@@ -659,7 +659,7 @@ module Nonce : sig
 
   val get : context -> Level.t -> status tzresult Lwt.t
 
-  val of_bytes : MBytes.t -> nonce tzresult
+  val of_bytes : bytes -> nonce tzresult
 
   val hash : nonce -> Nonce_hash.t
 
@@ -971,7 +971,7 @@ module Block_header : sig
   and contents = {
     priority : int;
     seed_nonce_hash : Nonce_hash.t option;
-    proof_of_work_nonce : MBytes.t;
+    proof_of_work_nonce : bytes;
   }
 
   type block_header = t
@@ -1178,7 +1178,7 @@ module Operation : sig
   val unsigned_encoding :
     (Operation.shell_header * packed_contents_list) Data_encoding.t
 
-  type raw = Operation.t = {shell : Operation.shell_header; proto : MBytes.t}
+  type raw = Operation.t = {shell : Operation.shell_header; proto : bytes}
 
   val raw_encoding : raw Data_encoding.t
 
