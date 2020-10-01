@@ -7,6 +7,9 @@ Tezt is a test framework for Tezos written in OCaml.
 It focuses on integration tests that launch external processes
 (in particular Tezos nodes and clients).
 
+Tezt is pronounced `/tɛzti/ <http://ipa-reader.xyz/?text=t%C9%9Bzti>`_
+(think "tezty", as in *Tez* are tas*ty*).
+
 Its main strengths are:
 
 - tests are written in the same language as Tezos itself (OCaml),
