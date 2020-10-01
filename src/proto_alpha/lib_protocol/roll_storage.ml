@@ -163,7 +163,7 @@ let freeze_rolls_for_cycle ctxt cycle =
 (* Roll selection *)
 module Random = struct
   let int32_to_bytes i =
-    let b = Bytes.create 4 in
+    let b = Bytes.make 4 '0' in
     TzEndian.set_int32 b 0 i ; b
 
   let level_random seed use level =

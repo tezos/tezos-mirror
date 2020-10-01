@@ -37,7 +37,7 @@ let () =
     (fun () -> Invalid_fitness)
 
 let int64_to_bytes i =
-  let b = Bytes.create 8 in
+  let b = Bytes.make 8 '0' in
   TzEndian.set_int64 b 0 i ; b
 
 let int64_of_bytes b =
