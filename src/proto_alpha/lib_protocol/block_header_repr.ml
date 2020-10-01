@@ -106,7 +106,7 @@ let max_header_length =
     {
       priority = 0;
       proof_of_work_nonce =
-        Bytes.create Constants_repr.proof_of_work_nonce_size;
+        Bytes.make Constants_repr.proof_of_work_nonce_size '0';
       seed_nonce_hash = Some Nonce_hash.zero;
     }
   in
