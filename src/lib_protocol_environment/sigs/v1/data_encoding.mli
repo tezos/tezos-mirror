@@ -72,7 +72,7 @@ val bool : bool encoding
 
 val string : string encoding
 
-val bytes : MBytes.t encoding
+val bytes : bytes encoding
 
 val float : float encoding
 
@@ -83,7 +83,7 @@ val string_enum : (string * 'a) list -> 'a encoding
 module Fixed : sig
   val string : int -> string encoding
 
-  val bytes : int -> MBytes.t encoding
+  val bytes : int -> bytes encoding
 
   val add_padding : 'a encoding -> int -> 'a encoding
 end
@@ -91,7 +91,7 @@ end
 module Variable : sig
   val string : string encoding
 
-  val bytes : MBytes.t encoding
+  val bytes : bytes encoding
 
   val array : ?max_length:int -> 'a encoding -> 'a array encoding
 
@@ -101,7 +101,7 @@ end
 module Bounded : sig
   val string : int -> string encoding
 
-  val bytes : int -> MBytes.t encoding
+  val bytes : int -> bytes encoding
 end
 
 val dynamic_size :
@@ -335,13 +335,13 @@ val lazy_encoding : 'a encoding -> 'a lazy_t encoding
 
 val force_decode : 'a lazy_t -> 'a option
 
-val force_bytes : 'a lazy_t -> MBytes.t
+val force_bytes : 'a lazy_t -> bytes
 
 val make_lazy : 'a encoding -> 'a -> 'a lazy_t
 
 val apply_lazy :
   fun_value:('a -> 'b) ->
-  fun_bytes:(MBytes.t -> 'b) ->
+  fun_bytes:(bytes -> 'b) ->
   fun_combine:('b -> 'b -> 'b) ->
   'a lazy_t ->
   'b
@@ -401,15 +401,15 @@ module Binary : sig
 
   val fixed_length : 'a encoding -> int option
 
-  val read : 'a encoding -> MBytes.t -> int -> int -> (int * 'a) option
+  val read : 'a encoding -> bytes -> int -> int -> (int * 'a) option
 
-  val write : 'a encoding -> 'a -> MBytes.t -> int -> int -> int option
+  val write : 'a encoding -> 'a -> bytes -> int -> int -> int option
 
-  val to_bytes : 'a encoding -> 'a -> MBytes.t option
+  val to_bytes : 'a encoding -> 'a -> bytes option
 
-  val to_bytes_exn : 'a encoding -> 'a -> MBytes.t
+  val to_bytes_exn : 'a encoding -> 'a -> bytes
 
-  val of_bytes : 'a encoding -> MBytes.t -> 'a option
+  val of_bytes : 'a encoding -> bytes -> 'a option
 
   type write_error
 

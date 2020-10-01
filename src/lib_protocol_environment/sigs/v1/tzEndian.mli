@@ -1,7 +1,6 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -24,66 +23,26 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = bytes
+val get_int32 : bytes -> int -> int32
 
-let create = Bytes.create
+val set_int32 : bytes -> int -> int32 -> unit
 
-let length = Bytes.length
+val set_int8 : bytes -> int -> int -> unit
 
-let copy = Bytes.copy
+val get_int8 : bytes -> int -> int
 
-let sub = Bytes.sub
+val set_int16 : bytes -> int -> int -> unit
 
-let blit = Bytes.blit
+val get_int16 : bytes -> int -> int
 
-let blit_of_string = Bytes.blit_string
+val set_int64 : bytes -> int -> int64 -> unit
 
-let blit_to_bytes = Bytes.blit
+val get_int64 : bytes -> int -> int64
 
-let of_string = Bytes.of_string
+val get_uint8 : bytes -> int -> int
 
-let to_string = Bytes.to_string
+val get_uint16 : bytes -> int -> int
 
-let sub_string = Bytes.sub_string
+val set_double : bytes -> int -> float -> unit
 
-let get_char = Bytes.get
-
-let set_char = Bytes.set
-
-include Tezos_stdlib.TzEndian
-
-module LE = struct
-  let get_uint16 = Bytes.get_uint16_le
-
-  let get_int16 = Bytes.get_int16_le
-
-  let get_int32 = Bytes.get_int32_le
-
-  let get_int64 = Bytes.get_int64_le
-
-  let set_int16 = Bytes.set_int16_le
-
-  let set_int32 = Bytes.set_int32_le
-
-  let set_int64 = Bytes.set_int64_le
-end
-
-let ( = ) = Stdlib.( = )
-
-let ( <> ) = Stdlib.( <> )
-
-let ( < ) = Stdlib.( < )
-
-let ( <= ) = Stdlib.( <= )
-
-let ( >= ) = Stdlib.( >= )
-
-let ( > ) = Stdlib.( > )
-
-let compare = Bytes.compare
-
-let concat s bs = Bytes.concat (Bytes.of_string s) bs
-
-let to_hex t = Hex.of_bytes t
-
-let of_hex hex = Hex.to_bytes hex
+val get_double : bytes -> int -> float

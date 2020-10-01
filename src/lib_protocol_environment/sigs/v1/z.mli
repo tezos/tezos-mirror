@@ -110,9 +110,9 @@ val to_int : t -> int
 (** Converts from a base integer. *)
 val of_int : int -> t
 
-val to_bits : ?pad_to:int -> t -> MBytes.t
+val to_bits : ?pad_to:int -> t -> bytes
 
-val of_bits : MBytes.t -> t
+val of_bits : bytes -> t
 
 val equal : t -> t -> bool
 

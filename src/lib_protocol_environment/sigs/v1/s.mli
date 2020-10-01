@@ -34,9 +34,9 @@ module type T = sig
 
   val encoding : t Data_encoding.t
 
-  val to_bytes : t -> MBytes.t
+  val to_bytes : t -> bytes
 
-  val of_bytes : MBytes.t -> t option
+  val of_bytes : bytes -> t option
 end
 
 (** Generic interface for a datatype with comparison, pretty-printer,
@@ -48,7 +48,7 @@ module type HASHABLE = sig
 
   val hash : t -> hash
 
-  val hash_raw : MBytes.t -> hash
+  val hash_raw : bytes -> hash
 end
 
 (** {2 Hash Types} *)
@@ -72,7 +72,7 @@ module type MINIMAL_HASH = sig
 
   include Compare.S with type t := t
 
-  val hash_bytes : ?key:MBytes.t -> MBytes.t list -> t
+  val hash_bytes : ?key:bytes -> bytes list -> t
 
   val hash_string : ?key:string -> string list -> t
 
@@ -84,11 +84,11 @@ module type RAW_DATA = sig
 
   val size : int (* in bytes *)
 
-  val to_bytes : t -> MBytes.t
+  val to_bytes : t -> bytes
 
-  val of_bytes_opt : MBytes.t -> t option
+  val of_bytes_opt : bytes -> t option
 
-  val of_bytes_exn : MBytes.t -> t
+  val of_bytes_exn : bytes -> t
 end
 
 module type B58_DATA = sig
@@ -350,5 +350,5 @@ module type SIGNATURE = sig
   type watermark
 
   (** Check a signature *)
-  val check : ?watermark:watermark -> Public_key.t -> t -> MBytes.t -> bool
+  val check : ?watermark:watermark -> Public_key.t -> t -> bytes -> bool
 end

@@ -25,4 +25,4 @@
 
 (** Tezos - Ed25519 cryptography *)
 
-include S.SIGNATURE with type watermark := MBytes.t
+include S.SIGNATURE with type watermark := bytes
