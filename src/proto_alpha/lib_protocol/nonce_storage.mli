@@ -51,7 +51,7 @@ val record_hash : Raw_context.t -> unrevealed -> Raw_context.t tzresult Lwt.t
 val reveal :
   Raw_context.t -> Level_repr.t -> nonce -> Raw_context.t tzresult Lwt.t
 
-val of_bytes : MBytes.t -> nonce tzresult
+val of_bytes : bytes -> nonce tzresult
 
 val hash : nonce -> Nonce_hash.t
 

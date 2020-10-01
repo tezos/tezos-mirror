@@ -44,13 +44,13 @@ type seed
 type sequence
 
 (** [initialize_new state ident] returns a new generator *)
-val initialize_new : seed -> MBytes.t list -> t
+val initialize_new : seed -> bytes list -> t
 
 (** [sequence state n] prepares the n-th sequence of a state  *)
 val sequence : t -> int32 -> sequence
 
 (** Generates the next random value in the sequence *)
-val take : sequence -> MBytes.t * sequence
+val take : sequence -> bytes * sequence
 
 (** Generates the next random value as a bounded [int32] *)
 val take_int32 : sequence -> int32 -> int32 * sequence
@@ -76,7 +76,7 @@ type nonce
 val nonce : seed -> nonce -> seed
 
 (** Use a byte sequence as a nonce *)
-val make_nonce : MBytes.t -> nonce tzresult
+val make_nonce : bytes -> nonce tzresult
 
 (** Compute the has of a nonce *)
 val hash : nonce -> Nonce_hash.t
