@@ -183,7 +183,7 @@ test: lint-opam-dune test-code
 .PHONY: check-linting check-python-linting
 
 check-linting:
-	@src/tooling/lint.sh --check-ci --ignore src/tooling/test/test_not_well_formatted.ml src/tooling/test/test_not_well_formatted.mli
+	@src/tooling/lint.sh --check-ci --ignore src/tooling/test/test_not_well_formatted.ml src/tooling/test/test_not_well_formatted.mli tezt/lib/base.ml tezt/lib/base.mli
 	@src/tooling/lint.sh --check-scripts
 	@src/tooling/lint.sh --check-ocamlformat
 	@dune build @runtest_lint
@@ -193,7 +193,7 @@ check-python-linting:
 
 .PHONY: fmt
 fmt:
-	@src/tooling/lint.sh --format --ignore src/tooling/test/test_not_well_formatted.ml src/tooling/test/test_not_well_formatted.mli
+	@src/tooling/lint.sh --format --ignore src/tooling/test/test_not_well_formatted.ml src/tooling/test/test_not_well_formatted.mli tezt/lib/base.ml tezt/lib/base.mli
 
 .PHONY: build-deps
 build-deps:

@@ -61,7 +61,7 @@ EOF
 
 declare -a source_directories
 
-source_directories=(src docs/doc_gen)
+source_directories=(src docs/doc_gen tezt)
 
 update_all_dot_ocamlformats () {
     if git diff --name-only HEAD --exit-code
