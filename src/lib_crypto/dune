@@ -6,14 +6,15 @@
                    -open Tezos_error_monad
                    -open Tezos_lwt_result_stdlib.Lwtreslib
                    -open Tezos_rpc))
- (libraries tezos-stdlib
-            data-encoding
-            tezos-error-monad
+ (libraries data-encoding
             tezos-lwt-result-stdlib
-            tezos-rpc
             lwt
             hacl-star
+            bls12-381
             secp256k1-internal
+            tezos-error-monad
+            tezos-rpc
+            tezos-stdlib
             uecc
             ringo
             zarith))

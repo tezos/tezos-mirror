@@ -46,4 +46,4 @@ if [ -n "$dev" ]; then
     opam install merlin odoc --criteria="-changed,-removed"
 fi
 
-# "$script_dir"/install_build_deps.rust.sh
+"$script_dir"/install_build_deps.rust.sh
