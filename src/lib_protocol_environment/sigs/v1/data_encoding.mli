@@ -74,8 +74,6 @@ val string : string encoding
 
 val bytes : bytes encoding
 
-val float : float encoding
-
 val option : 'a encoding -> 'a option encoding
 
 val string_enum : (string * 'a) list -> 'a encoding
