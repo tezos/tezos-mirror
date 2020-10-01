@@ -32,10 +32,10 @@ let encoding = Data_encoding.int32
 let rpc_arg =
   let construct = Int32.to_string in
   let destruct str =
-    match Int32.of_string str with
-    | exception _ ->
+    match Int32.of_string_opt str with
+    | None ->
         Error "Cannot parse cycle"
-    | cycle ->
+    | Some cycle ->
         Ok cycle
   in
   RPC_arg.make
@@ -79,11 +79,7 @@ module Index = struct
 
   let to_path c l = Int32.to_string (to_int32 c) :: l
 
-  let of_path = function
-    | [s] -> (
-      try Some (Int32.of_string s) with _ -> None )
-    | _ ->
-        None
+  let of_path = function [s] -> Int32.of_string_opt s | _ -> None
 
   let rpc_arg = rpc_arg
 
