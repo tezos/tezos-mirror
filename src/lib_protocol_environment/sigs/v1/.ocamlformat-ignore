@@ -7,4 +7,5 @@ lwt_list.mli
 map.mli
 s.mli
 set.mli
+pervasives.mli
 string.mli
