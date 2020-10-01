@@ -32,7 +32,7 @@ type t
 type key = string list
 
 (** Values in (kex x value) database implementations *)
-type value = MBytes.t
+type value = bytes
 
 val mem : t -> key -> bool Lwt.t
 
