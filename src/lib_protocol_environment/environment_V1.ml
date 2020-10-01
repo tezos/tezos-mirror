@@ -187,8 +187,6 @@ struct
 
     let bytes = bytes
 
-    let float = float
-
     let option = option
 
     let string_enum = string_enum

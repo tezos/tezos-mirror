@@ -69,8 +69,6 @@ module Int64 : S with type t = int64
 
 module Uint64 : S with type t = int64
 
-module Float : S with type t = float
-
 module String : S with type t = string
 
 module Bytes : S with type t = bytes
