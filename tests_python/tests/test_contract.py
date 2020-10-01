@@ -316,6 +316,24 @@ class TestContracts:
          r'Contract has no entrypoint named D'),
         ("contract_annotation_default.tz",
          r'unexpected annotation'),
+        # Missing field
+        ("missing_only_storage_field.tz",
+         r'Missing contract field: storage'),
+        ("missing_only_code_field.tz",
+         r'Missing contract field: code'),
+        ("missing_only_parameter_field.tz",
+         r'Missing contract field: parameter'),
+        ("missing_parameter_and_storage_fields.tz",
+         r'Missing contract field: parameter'),
+        # Duplicated field
+        ("multiple_parameter_field.tz",
+         r'duplicate contract field: parameter'),
+        ("multiple_code_field.tz", r'duplicate contract field: code'),
+        ("multiple_storage_field.tz",
+         r'duplicate contract field: storage'),
+        # The first duplicated field is reported, storage in this case
+        ("multiple_storage_and_code_fields.tz",
+         r'duplicate contract field: storage'),
     ])
     def test_ill_typecheck(self, client: Client, contract, error_pattern):
         with utils.assert_run_failure(error_pattern):
