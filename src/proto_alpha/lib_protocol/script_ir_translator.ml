@@ -5563,7 +5563,7 @@ let diff_of_big_map ctxt mode ~temporary ~ids {id; key_type; value_type; diff}
       let diff_item = Big_map.{key; key_hash; value} in
       (diff_item :: acc, ctxt))
     ([], ctxt)
-    pairs
+    (List.rev pairs)
   >|=? fun (updates, ctxt) -> (Lazy_storage.Update {init; updates}, id, ctxt)
 
 (**
