@@ -4,3 +4,4 @@ hex.mli
 list.mli
 lwt.mli
 lwt_list.mli
+string.mli
