@@ -69,27 +69,4 @@ end)
       (fun c e -> Sig.combine_category c (Error.classify_error e))
       `Temporary
       trace
-
-  type Error.error += Assert_error of string * string
-
-  let () =
-    Error.register_error_kind
-      `Permanent
-      ~id:"assertion"
-      ~title:"Assertion failure"
-      ~description:"A fatal assertion failed"
-      ~pp:(fun ppf (loc, msg) ->
-        Format.fprintf
-          ppf
-          "Assert failure (%s)%s"
-          loc
-          (if msg = "" then "." else ": " ^ msg))
-      Data_encoding.(obj2 (req "loc" string) (req "msg" string))
-      (function Assert_error (loc, msg) -> Some (loc, msg) | _ -> None)
-      (fun (loc, msg) -> Assert_error (loc, msg))
-
-  let _assert b loc fmt =
-    if b then
-      Format.ikfprintf (fun _ -> Monad.return_unit) Format.str_formatter fmt
-    else Format.kasprintf (fun msg -> Monad.fail (Assert_error (loc, msg))) fmt
 end

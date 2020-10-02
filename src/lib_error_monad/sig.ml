@@ -544,13 +544,6 @@ module type MONAD_EXT = sig
 
   val classify_errors : tztrace -> error_category
 
-  (* Usage: [_assert cond __LOC__ "<fmt>" ...] *)
-  val _assert :
-    bool ->
-    string ->
-    ('a, Format.formatter, unit, unit tzresult Lwt.t) format4 ->
-    'a
-
   (* This is for legacy, for backwards compatibility, there are old names *)
 
   (* NOTE: Right now we leave this [pp_print_error] named as is. Later on we
