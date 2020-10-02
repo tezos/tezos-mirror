@@ -68,6 +68,16 @@ module M = struct
         ~msg:"delegating to proxy cache, because data misses for: {key}"
         ~pp1:pp_key
         ("key", Data_encoding.(Variable.list string))
+
+    let delegation_error =
+      S.declare_2
+        ~section
+        ~name:"delegation_error"
+        ~msg:
+          "{function} returned an error, ignoring it but this is bad: {trace}"
+        ~pp2:pp_print_error
+        ("function", Data_encoding.string)
+        ("trace", Error_monad.trace_encoding)
   end
 
   (* Useful for debugging *)
@@ -105,20 +115,18 @@ module M = struct
         >>= fun () ->
         match m.proxy with
         | None ->
-            return None
+            Lwt.return_none
         | Some proxy -> (
             let (module ProxyDelegation) = proxy in
             ProxyDelegation.proxy_get k
             >>= function
             | Error err ->
-                failwith
-                  "Proxy_context's call to RPC failed with: %a"
-                  Error_monad.pp_print_error
-                  err
-            | Ok t ->
-                return t ) )
+                L.(S.emit delegation_error ("get", err))
+                >>= fun () -> Lwt.return_none
+            | Ok x ->
+                Lwt.return x ) )
     | Some _ as v ->
-        return v
+        Lwt.return v
 
   let rec raw_set m k v =
     (* This function returns the update it did. This is used in the
@@ -171,7 +179,12 @@ module M = struct
       | Some proxy -> (
           let (module ProxyDelegation) = proxy in
           ProxyDelegation.proxy_mem k
-          >>= function Error _ -> Lwt.return_false | Ok x -> Lwt.return x ) )
+          >>= function
+          | Error err ->
+              L.(S.emit delegation_error ("mem", err))
+              >>= fun () -> Lwt.return_false
+          | Ok x ->
+              Lwt.return x ) )
 
   let dir_mem m k =
     match local_get m.tree k with
@@ -186,14 +199,19 @@ module M = struct
       | Some proxy -> (
           let (module ProxyDelegation) = proxy in
           ProxyDelegation.proxy_dir_mem k
-          >>= function Error _ -> Lwt.return_false | Ok x -> Lwt.return x ) )
+          >>= function
+          | Error err ->
+              L.(S.emit delegation_error ("dir_mem", err))
+              >>= fun () -> Lwt.return_false
+          | Ok x ->
+              Lwt.return x ) )
 
   let get m k =
     raw_get m k
     >>= function
-    | Error _ | Ok (Some (Dir _) | None) ->
+    | Some (Dir _) | None ->
         Lwt.return_none
-    | Ok (Some (Key v)) ->
+    | Some (Key v) ->
         Lwt.return_some v
 
   let set m k v =
@@ -209,9 +227,9 @@ module M = struct
   let copy m ~from ~to_ =
     raw_get m from
     >>= function
-    | Error _ | Ok None ->
+    | None ->
         Lwt.return_none
-    | Ok (Some v) -> (
+    | Some v -> (
         let pp_path =
           Format.(
             pp_print_list
@@ -244,11 +262,11 @@ module M = struct
   let fold m k ~init ~f =
     raw_get m k
     >>= function
-    | Error _ | Ok None ->
+    | None ->
         Lwt.return init
-    | Ok (Some (Key _)) ->
+    | Some (Key _) ->
         Lwt.return init
-    | Ok (Some (Dir m)) ->
+    | Some (Dir m) ->
         StringMap.fold
           (fun n m acc ->
             acc
