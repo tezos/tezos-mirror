@@ -175,6 +175,16 @@ module Local_logging = Internal_event.Legacy_logging.Make_semantic (struct
   let name = "node.worker"
 end)
 
+(* These protocols are linked with the node and
+   do not have their actual hash on purpose. *)
+let test_protocol_hashes =
+  List.map
+    (fun s -> Protocol_hash.of_b58check_exn s)
+    [ "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK";
+      "ProtoDemoCounterDemoCounterDemoCounterDemoCou4LSpdT";
+      "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp";
+      "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im" ]
+
 let store_known_protocols state =
   let embedded_protocols = Registered_protocol.seq_embedded () in
   Seq.iter_s
@@ -190,7 +200,10 @@ let store_known_protocols state =
         | Some protocol -> (
             let hash = Protocol.hash protocol in
             if not (Protocol_hash.equal hash protocol_hash) then
-              Node_event.(emit store_protocol_incorrect_hash) protocol_hash
+              if List.mem protocol_hash test_protocol_hashes then
+                Lwt.return_unit (* noop. test protocol should not be stored *)
+              else
+                Node_event.(emit store_protocol_incorrect_hash) protocol_hash
             else
               State.Protocol.store state protocol
               >>= function
