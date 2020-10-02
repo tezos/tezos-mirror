@@ -1,6 +1,7 @@
 (executables
  (names test
-        test_locator)
+        test_locator
+        test_synchronisation_heuristic_fuzzy)
  (libraries tezos-base
             tezos-storage
             tezos-shell-context
@@ -13,7 +14,8 @@
             tezos-stdlib-unix
             tezos-validation
             tezos-test-services
-            alcotest-lwt)
+            alcotest-lwt
+            crowbar)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_storage
                    -open Tezos_shell_context
@@ -26,10 +28,12 @@
                    -open Tezos_stdlib_unix
                    -open Tezos_validation)))
 
+
 (alias
  (name buildtest)
  (deps test.exe
-       test_locator.exe))
+       test_locator.exe
+       test_synchronisation_heuristic_fuzzy.exe))
 
 (alias
  (name runtest_shell)
@@ -40,6 +44,10 @@
  (action (run %{exe:test_locator.exe} --no-bench)))
 
 (alias
+ (name runtest_synchronisation)
+ (action (run %{exe:test_synchronisation_heuristic_fuzzy.exe})))
+
+(alias
  (name runbench_locator)
  (action (run %{exe:test_locator.exe})))
 
@@ -47,7 +55,8 @@
  (name runtest)
  (package tezos-shell)
  (deps (alias runtest_shell)
-       (alias runtest_locator)))
+       (alias runtest_locator)
+       (alias runtest_synchronisation)))
 
 (alias
  (name runtest_lint)
