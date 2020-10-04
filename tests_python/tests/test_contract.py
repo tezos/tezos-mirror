@@ -335,6 +335,9 @@ class TestContracts:
         # error message for set update on non-comparable type
         ("set_update_non_comparable.tz",
          r'Type nat is not compatible with type list operation'),
+        # error message for attempting to push a value of type never
+        ("never_literal.tz",
+         r'type never has no inhabitant.'),
     ])
     def test_ill_typecheck(self, client: Client, contract, error_pattern):
         with utils.assert_run_failure(error_pattern):
