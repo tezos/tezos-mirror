@@ -7,55 +7,39 @@ emitted operations
 big_map diff
   
 trace
-  - location: 11 (remaining gas: 1039984.482 units remaining)
+  - location: 11 (remaining gas: 1039987.482 units remaining)
     [ (Pair "bar" (Pair { Elt "foo" 1 } None))  	 ]
-  - location: 14 (remaining gas: 1039984.222 units remaining)
-    [ (Pair "bar" (Pair { Elt "foo" 1 } None))  	
-      (Pair "bar" (Pair { Elt "foo" 1 } None))  	 ]
-  - location: 15 (remaining gas: 1039984.082 units remaining)
-    [ "bar"  	@parameter
-      (Pair "bar" (Pair { Elt "foo" 1 } None))  	 ]
-  - location: 18 (remaining gas: 1039983.782 units remaining)
-    [ (Pair { Elt "foo" 1 } None)  	@storage ]
-  - location: 17 (remaining gas: 1039983.712 units remaining)
-    [ (Pair { Elt "foo" 1 } None)  	@storage ]
-  - location: 16 (remaining gas: 1039983.712 units remaining)
+  - location: 12 (remaining gas: 1039987.342 units remaining)
     [ "bar"  	@parameter
       (Pair { Elt "foo" 1 } None)  	@storage ]
-  - location: -1 (remaining gas: 1039983.642 units remaining)
-    [ "bar"  	@parameter
-      (Pair { Elt "foo" 1 } None)  	@storage ]
-  - location: 12 (remaining gas: 1039983.572 units remaining)
-    [ "bar"  	@parameter
-      (Pair { Elt "foo" 1 } None)  	@storage ]
-  - location: 21 (remaining gas: 1039983.272 units remaining)
+  - location: 15 (remaining gas: 1039987.042 units remaining)
     [ { Elt "foo" 1 }  	 ]
-  - location: 22 (remaining gas: 1039983.132 units remaining)
+  - location: 16 (remaining gas: 1039986.902 units remaining)
     [ { Elt "foo" 1 }  	
       { Elt "foo" 1 }  	 ]
-  - location: -1 (remaining gas: 1039983.062 units remaining)
+  - location: -1 (remaining gas: 1039986.832 units remaining)
     [ { Elt "foo" 1 }  	
       { Elt "foo" 1 }  	 ]
-  - location: 19 (remaining gas: 1039983.062 units remaining)
+  - location: 13 (remaining gas: 1039986.832 units remaining)
     [ "bar"  	@parameter
       { Elt "foo" 1 }  	
       { Elt "foo" 1 }  	 ]
-  - location: 23 (remaining gas: 1039982.922 units remaining)
+  - location: 17 (remaining gas: 1039986.692 units remaining)
     [ False  	
       { Elt "foo" 1 }  	 ]
-  - location: 24 (remaining gas: 1039982.782 units remaining)
+  - location: 18 (remaining gas: 1039986.552 units remaining)
     [ (Some False)  	
       { Elt "foo" 1 }  	 ]
-  - location: 25 (remaining gas: 1039982.652 units remaining)
+  - location: 19 (remaining gas: 1039986.422 units remaining)
     [ { Elt "foo" 1 }  	
       (Some False)  	 ]
-  - location: 26 (remaining gas: 1039982.512 units remaining)
+  - location: 20 (remaining gas: 1039986.282 units remaining)
     [ (Pair { Elt "foo" 1 } (Some False))  	 ]
-  - location: 27 (remaining gas: 1039982.372 units remaining)
+  - location: 21 (remaining gas: 1039986.142 units remaining)
     [ {}  	
       (Pair { Elt "foo" 1 } (Some False))  	 ]
-  - location: 29 (remaining gas: 1039982.232 units remaining)
+  - location: 23 (remaining gas: 1039986.002 units remaining)
     [ (Pair {} (Pair { Elt "foo" 1 } (Some False)))  	 ]
-  - location: -1 (remaining gas: 1039982.162 units remaining)
+  - location: -1 (remaining gas: 1039985.932 units remaining)
     [ (Pair {} (Pair { Elt "foo" 1 } (Some False)))  	 ]
 

@@ -8,19 +8,13 @@ tests/test_contract_macros.py::TestMacroExpansion::test_macro_expansion[macros/u
          UNIT :u2 @a2 ;
          UNIT :u1 @a1 ;
          PAIR ;
-         { { DUP ; CAR ; DIP { CDR } } } ;
+         UNPAIR @x1 @x2 ;
          { DIP 2 { PAIR %x3 %x4 } ; PAIR %x1 %x2 ; PAIR @p1 } ;
-         { { DUP ; CAR ; DIP { CDR } } ;
-           { DUP ; CAR ; DIP { CDR } } ;
-           DIP 2 { { DUP ; CAR ; DIP { CDR } } } } ;
+         { UNPAIR ; UNPAIR ; DIP 2 { UNPAIR } } ;
          { DIP 2 { PAIR %x3 %x4 } ; DIP { PAIR %x2 } ; PAIR %x1 @p2 } ;
-         { { DUP ; CAR ; DIP { CDR } } ;
-           DIP { { DUP ; CAR ; DIP { CDR } } } ;
-           DIP 2 { { DUP ; CAR ; DIP { CDR } } } } ;
+         { UNPAIR ; DIP { UNPAIR } ; DIP 2 { UNPAIR } } ;
          { DIP { PAIR %x2 %x3 } ; DIP { PAIR % %x4 } ; PAIR %x1 @p3 } ;
-         { { DUP ; CAR ; DIP { CDR } } ;
-           DIP { { DUP ; CAR ; DIP { CDR } } } ;
-           DIP { { DUP ; CAR ; DIP { CDR } } } } ;
+         { UNPAIR ; DIP { UNPAIR } ; DIP { UNPAIR } } ;
          DIP { DROP ; DROP ; DROP } ;
          NIL operation ;
          PAIR } }
