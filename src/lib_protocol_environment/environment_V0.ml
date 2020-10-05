@@ -297,7 +297,8 @@ struct
 
     let union = union
 
-    let def = def
+    let def name ?title ?description encoding =
+      def (Param.name ^ "." ^ name) ?title ?description encoding
 
     let conv = conv
 
