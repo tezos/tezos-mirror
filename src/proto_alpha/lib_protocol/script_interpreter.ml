@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -553,6 +554,8 @@ let cost_of_instr : type b a. (b, a) descr -> b -> Gas.cost =
       Interp_costs.create_contract
   | (Never, (_, _)) ->
       .
+  | (Voting_power, _) ->
+      Interp_costs.voting_power
 
 let rec step_bounded :
     type b a.
@@ -1259,6 +1262,10 @@ let rec step_bounded :
       logged_return ((step_constants.chain_id, rest), ctxt)
   | (Never, (_, _)) ->
       .
+  | (Voting_power, (key_hash, rest)) ->
+      Vote.get_voting_power ctxt key_hash
+      >>=? fun rolls ->
+      logged_return ((Script_int.(abs (of_int32 rolls)), rest), ctxt)
 
 let step :
     type b a.
