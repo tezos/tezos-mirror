@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -42,6 +43,7 @@ type info = {
   delegated_balance : Tez.t;
   deactivated : bool;
   grace_period : Cycle.t;
+  voting_power : int32;
 }
 
 val info_encoding : info Data_encoding.t
@@ -99,6 +101,9 @@ val grace_period :
   'a ->
   Signature.Public_key_hash.t ->
   Cycle.t shell_tzresult Lwt.t
+
+val voting_power :
+  'a #RPC_context.simple -> 'a -> public_key_hash -> int32 shell_tzresult Lwt.t
 
 module Baking_rights : sig
   type t = {
