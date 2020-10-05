@@ -23,9 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Data_encoding
-
-let rec equal_json (a : json) (b : json) =
+let rec equal_json (a : JSON.u) (b : JSON.u) =
   match (a, b) with
   | (`O object_a, `O object_b) ->
       let sort_object =
@@ -52,44 +50,18 @@ let rec equal_json (a : json) (b : json) =
 
 let check_sample ~name ~file =
   let* json_string = Tezos_stdlib_unix.Lwt_utils_unix.read_file file in
-  match Data_encoding.Json.from_string json_string with
-  | Error err ->
-      Test.fail
-        "An error occurred while trying to decode JSON sample.\n\
-         Error: %s\n\
-         JSON: %s"
-        err
-        json_string
-  | Ok json -> (
-      let json_string = Json.to_string json in
-      let* binary =
-        Process.run_and_read_stdout
-          Constant.tezos_codec
-          ["encode"; name; "from"; json_string]
-      in
-      let* converted_json_string =
-        Process.run_and_read_stdout
-          Constant.tezos_codec
-          ["decode"; name; "from"; binary]
-      in
-      match Data_encoding.Json.from_string converted_json_string with
-      | Error err ->
-          Test.fail
-            "An error occurred while trying to decode the converted JSON \
-             string.\n\
-             Error: %s\n\
-             JSON: %s"
-            err
-            converted_json_string
-      | Ok decoded_json ->
-          if not @@ equal_json json decoded_json then
-            Test.fail
-              "the converted json doesn't match the original.\n\
-               Expected: %s\n\
-               Actual: %s"
-              (Json.to_string json)
-              (Json.to_string decoded_json) ;
-          return () )
+  let json = JSON.parse ~origin:json_string json_string in
+  let* binary = Codec.encode ~name (JSON.unannotate json) in
+  let* decoded_json = Codec.decode ~name binary in
+  if not @@ equal_json (JSON.unannotate json) (JSON.unannotate decoded_json)
+  then
+    Test.fail
+      "The converted JSON doesn't match the original.\n\
+       Expected: %s\n\
+       Actual: %s"
+      (JSON.encode json)
+      (JSON.encode decoded_json) ;
+  return ()
 
 (** The given samples must be included in registered encodings. These can be
     found with [tezos-codec list encodings]. *)
