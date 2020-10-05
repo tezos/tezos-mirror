@@ -161,8 +161,8 @@ module Make (Arg : Decimals) : Full = struct
       Format.fprintf fmtr "pp_positive_fp: cannot print (decimals <> 3)"
     else
       let (q, r) = Z.ediv_rem milligas scaling_factor in
-      if Z.equal r Z.zero then Z.pp fmtr q
-      else Format.fprintf fmtr "%a.%03d" Z.pp q (Z.to_int r)
+      if Z.equal r Z.zero then Z.pp_print fmtr q
+      else Format.fprintf fmtr "%a.%03d" Z.pp_print q (Z.to_int r)
 
   let pp fmtr fp =
     if Compare.Z.(fp >= Z.zero) then pp_positive_fp fmtr fp
