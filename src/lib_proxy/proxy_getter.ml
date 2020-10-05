@@ -81,33 +81,17 @@ let rec raw_context_to_tree
       let dir = List.fold_left f TzString.Map.empty pairs in
       if TzString.Map.is_empty dir then None else Some (`Tree dir)
 
-type proxy_getter_input = {
-  rpc_context : RPC_context.simple;
-  chain : Tezos_shell_services.Block_services.chain;
-  block : Tezos_shell_services.Block_services.block;
-}
-
-module type PROTO_RPC = sig
-  val split_key :
-    Proxy_context.M.key -> (Proxy_context.M.key * Proxy_context.M.key) option
-
-  val do_rpc :
-    proxy_getter_input ->
-    Proxy_context.M.key ->
-    Proxy_context.M.tree option tzresult Lwt.t
-end
-
 module type M = sig
   val proxy_dir_mem :
-    proxy_getter_input -> Proxy_context.M.key -> bool tzresult Lwt.t
+    Proxy.proxy_getter_input -> Proxy_context.M.key -> bool tzresult Lwt.t
 
   val proxy_get :
-    proxy_getter_input ->
+    Proxy.proxy_getter_input ->
     Proxy_context.M.key ->
     Proxy_context.M.tree option tzresult Lwt.t
 
   val proxy_mem :
-    proxy_getter_input -> Proxy_context.M.key -> bool tzresult Lwt.t
+    Proxy.proxy_getter_input -> Proxy_context.M.key -> bool tzresult Lwt.t
 end
 
 module StringMap = TzString.Map
@@ -204,7 +188,7 @@ end
 
 module StringSet = TzString.Set
 
-module Make (X : PROTO_RPC) : M = struct
+module Make (X : Proxy_proto.PROTO_RPC) : M = struct
   let cache = ref Tree.empty
 
   let requests = ref RequestsTree.empty
@@ -222,7 +206,7 @@ module Make (X : PROTO_RPC) : M = struct
 
   (** Handles the application of [X.split_key]. Performs
       the RPC call and updates [cache] accordingly. *)
-  let do_rpc (pgi : proxy_getter_input) (kind : kind)
+  let do_rpc (pgi : Proxy.proxy_getter_input) (kind : kind)
       (key : Proxy_context.M.key) : unit tzresult Lwt.t =
     let (key, split) =
       match kind with
@@ -271,10 +255,12 @@ module Make (X : PROTO_RPC) : M = struct
 
   let generic_call :
       kind ->
-      proxy_getter_input ->
+      Proxy.proxy_getter_input ->
       Proxy_context.M.key ->
       Proxy_context.M.tree option tzresult Lwt.t =
-   fun (kind : kind) (pgi : proxy_getter_input) (key : Proxy_context.M.key) ->
+   fun (kind : kind)
+       (pgi : Proxy.proxy_getter_input)
+       (key : Proxy_context.M.key) ->
     let pped_key = pp_key key in
     ( if is_all key then
       (* This exact request was done already.

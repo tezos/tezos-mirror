@@ -41,7 +41,7 @@ let proxy_block_header (rpc_context : RPC_context.json)
     ~block
     ()
 
-module ProtoRpc : Tezos_proxy.Proxy_getter.PROTO_RPC = struct
+module ProtoRpc : Tezos_proxy.Proxy_proto.PROTO_RPC = struct
   let split_key (key : Proxy_context.M.key) :
       (Proxy_context.M.key * Proxy_context.M.key) option =
     match key with
@@ -64,7 +64,7 @@ module ProtoRpc : Tezos_proxy.Proxy_getter.PROTO_RPC = struct
     | _ ->
         None
 
-  let do_rpc (pgi : Tezos_proxy.Proxy_getter.proxy_getter_input)
+  let do_rpc (pgi : Tezos_proxy.Proxy.proxy_getter_input)
       (key : Proxy_context.M.key) =
     let chain = pgi.chain in
     let block = pgi.block in
@@ -98,7 +98,7 @@ let initial_context (rpc_context : RPC_context.json)
     ( Tezos_shell_services.Block_services.chain_to_string chain,
       Tezos_shell_services.Block_services.to_string block )
   >>= fun () ->
-  let pgi : Tezos_proxy.Proxy_getter.proxy_getter_input =
+  let pgi : Tezos_proxy.Proxy.proxy_getter_input =
     {rpc_context = (rpc_context :> RPC_context.simple); chain; block}
   in
   let module N : Proxy_context.M.ProxyDelegate = struct

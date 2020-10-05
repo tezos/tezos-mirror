@@ -44,7 +44,7 @@ let rec nb_nodes = function
 let nb_nodes = function None -> 0 | Some t -> nb_nodes t
 
 module type MOCKED_PROTO_RPC = sig
-  include Tezos_proxy.Proxy_getter.PROTO_RPC
+  include Tezos_proxy.Proxy_proto.PROTO_RPC
 
   val calls : Proxy_context.M.key Stack.t
 end
@@ -98,7 +98,7 @@ let mock_chain = `Main
 
 let mock_block = `Head 0
 
-let mock_input : Tezos_proxy.Proxy_getter.proxy_getter_input =
+let mock_input : Tezos_proxy.Proxy.proxy_getter_input =
   {rpc_context = new mock_rpc_context; chain = mock_chain; block = mock_block}
 
 open Test_services_base
