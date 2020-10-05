@@ -809,9 +809,11 @@ struct
   module Micheline = struct
     include Micheline
 
-    let canonical_encoding_v1 = canonical_encoding_v1
+    let canonical_encoding_v1 ~variant encoding =
+      canonical_encoding_v1 ~variant:(Param.name ^ "." ^ variant) encoding
 
-    let canonical_encoding = canonical_encoding_v0
+    let canonical_encoding ~variant encoding =
+      canonical_encoding_v0 ~variant:(Param.name ^ "." ^ variant) encoding
   end
 
   module Logging = Internal_event.Legacy_logging.Make (Param)
