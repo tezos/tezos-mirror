@@ -2,7 +2,7 @@ tests/test_contract_macros.py::TestMacroExpansion::test_macro_expansion[macros/g
 
 { parameter string ;
   storage (map address (option string)) ;
-  code { { { DUP ; CAR @message ; DIP { CDR @guestbook } } } ;
+  code { { { DUP ; CAR ; DIP { CDR } } } ;
          SWAP ;
          DUP ;
          SENDER ;
