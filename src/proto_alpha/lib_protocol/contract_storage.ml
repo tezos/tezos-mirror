@@ -102,11 +102,11 @@ let () =
       Format.fprintf
         ppf
         "Counter %a not yet reached for contract %a (expected %a)"
-        Z.pp
+        Z.pp_print
         found
         Contract_repr.pp
         contract
-        Z.pp
+        Z.pp_print
         exp)
     Data_encoding.(
       obj3
@@ -124,11 +124,11 @@ let () =
       Format.fprintf
         ppf
         "Counter %a already used for contract %a (expected %a)"
-        Z.pp
+        Z.pp_print
         found
         Contract_repr.pp
         contract
-        Z.pp
+        Z.pp_print
         exp)
     Data_encoding.(
       obj3
