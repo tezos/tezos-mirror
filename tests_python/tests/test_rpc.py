@@ -60,7 +60,6 @@ class TestRPCs:
     def test_describe(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get', '/describe')
 
-    @pytest.mark.skip(reason="bug on double encoding registration")
     def test_errors(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get', '/errors')
 

@@ -21,6 +21,12 @@ here either.
 
 - Fixed an issue which prevented using of ports higher than 32767 in tezos-client config file
 
+- Fixed an issue which caused `tezos-client rpc get /errors`
+  as well as `tezos-codec dump encodings` to fail because of duplicate encodings.
+  As a result, some protocol encodings whose name was not prefixed by the protocol name
+  are now prefixed by it. If you have tools which rely on encoding names you may have
+  to update them.
+
 # Version 7.4
 
 - Added the Delphi protocol.
