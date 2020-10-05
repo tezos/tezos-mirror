@@ -23,6 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let check_dump_encodings () =
+  Test.run ~__FILE__ ~title:"tezos-codec dump encodings" ~tags:["codec"; "dump"]
+  @@ fun () ->
+  let* _ : JSON.t = Codec.dump_encodings () in
+  unit
+
 let rec equal_json (a : JSON.u) (b : JSON.u) =
   match (a, b) with
   | (`O object_a, `O object_b) ->
@@ -83,6 +89,7 @@ let check_samples_encoding ~group_name ~samples =
     samples
 
 let run () =
+  check_dump_encodings () ;
   check_samples_encoding
     ~group_name:"protocol"
     ~samples:
