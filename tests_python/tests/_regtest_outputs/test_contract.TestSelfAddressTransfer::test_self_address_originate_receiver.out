@@ -1,8 +1,8 @@
 tests/test_contract.py::TestSelfAddressTransfer::test_self_address_originate_receiver
 
 Node is bootstrapped.
-Estimated gas: 1894.926 units (will add 100 + 52 for safety)
-Estimated storage: 361 bytes added (will add 20 for safety)
+Estimated gas: 1807.842 units (will add 100 + 48 for safety)
+Estimated storage: 340 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
 NOT waiting for the operation to be included.
@@ -12,13 +12,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [CONTRACT_HASH]
-    Fee to the baker: ꜩ0.000536
+    Fee to the baker: ꜩ0.000506
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 2047
-    Storage limit: 381 bytes
+    Gas limit: 1956
+    Storage limit: 360 bytes
     Balance updates:
-      [CONTRACT_HASH] ................ -ꜩ0.000536
-      fees(the baker who will include this operation,0) ... +ꜩ0.000536
+      [CONTRACT_HASH] ................ -ꜩ0.000506
+      fees(the baker who will include this operation,0) ... +ꜩ0.000506
     Origination:
       From: [CONTRACT_HASH]
       Credit: ꜩ0
@@ -37,11 +37,11 @@ This sequence of operations was run:
         This origination was successfully applied
         Originated contracts:
           [CONTRACT_HASH]
-        Storage size: 104 bytes
-        Paid storage size diff: 104 bytes
-        Consumed gas: 1894.926
+        Storage size: 83 bytes
+        Paid storage size diff: 83 bytes
+        Consumed gas: 1807.842
         Balance updates:
-          [CONTRACT_HASH] ... -ꜩ0.026
+          [CONTRACT_HASH] ... -ꜩ0.02075
           [CONTRACT_HASH] ... -ꜩ0.06425
 
 New contract [CONTRACT_HASH] originated.
