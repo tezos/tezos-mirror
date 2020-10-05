@@ -165,7 +165,7 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
            ~password_filename
            ~base_dir
            ~rpc_config
-  | `Mode_proxy ->
+  | `Mode_light | `Mode_proxy ->
       let printer = new unix_logger ~base_dir in
       let rpc_context =
         new Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
@@ -224,20 +224,18 @@ let setup_mockup_rpc_client_config
 
 let setup_client_config (cctxt : Tezos_client_base.Client_context.full)
     (parsed_args : Client_config.cli_args option) base_dir rpc_config =
-  let client_or_proxy_fun =
+  let setup_non_mockup_rpc_client_config =
     setup_default_proxy_client_config parsed_args base_dir rpc_config
   in
   match parsed_args with
   | None ->
-      client_or_proxy_fun `Mode_client
+      setup_non_mockup_rpc_client_config `Mode_client
   | Some args -> (
     match args.Client_config.client_mode with
-    | `Mode_client ->
-        client_or_proxy_fun `Mode_client
+    | (`Mode_client | `Mode_light | `Mode_proxy) as m ->
+        setup_non_mockup_rpc_client_config m
     | `Mode_mockup ->
-        setup_mockup_rpc_client_config cctxt args base_dir
-    | `Mode_proxy ->
-        client_or_proxy_fun `Mode_proxy )
+        setup_mockup_rpc_client_config cctxt args base_dir )
 
 (* Main (lwt) entry *)
 let main (module C : M) ~select_commands =
