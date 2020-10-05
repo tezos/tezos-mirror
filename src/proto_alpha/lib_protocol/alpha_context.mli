@@ -350,6 +350,7 @@ module Script : sig
     | I_DIG
     | I_DUG
     | I_NEVER
+    | I_VOTING_POWER
     | T_bool
     | T_contract
     | T_int
@@ -974,6 +975,9 @@ module Vote : sig
   val get_listings : context -> (public_key_hash * int32) list Lwt.t
 
   type ballot = Yay | Nay | Pass
+
+  val get_voting_power :
+    context -> Signature.Public_key_hash.t -> int32 tzresult Lwt.t
 
   val ballot_encoding : ballot Data_encoding.t
 

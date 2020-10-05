@@ -191,6 +191,8 @@ module Cost_of : sig
 
     val dropn : int -> Gas.cost
 
+    val voting_power : Gas.cost
+
     val neq : Gas.cost
 
     val nop : Gas.cost

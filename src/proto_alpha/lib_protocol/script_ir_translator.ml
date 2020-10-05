@@ -450,6 +450,8 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int =
       0
   | Never ->
       0
+  | Voting_power ->
+      0
 
 (* ---- Error helpers -------------------------------------------------------*)
 
@@ -4291,6 +4293,10 @@ and parse_instr :
       parse_var_annot loc annot ~default:default_level_annot
       >>?= fun annot ->
       typed ctxt loc Level (Item_t (Nat_t None, stack, annot))
+  | (Prim (loc, I_VOTING_POWER, [], annot), Item_t (Key_hash_t _, rest, _)) ->
+      parse_var_annot loc annot
+      >>?= fun annot ->
+      typed ctxt loc Voting_power (Item_t (Nat_t None, rest, annot))
   | (Prim (loc, I_HASH_KEY, [], annot), Item_t (Key_t _, rest, _)) ->
       parse_var_annot loc annot
       >>?= fun annot ->
@@ -4424,7 +4430,8 @@ and parse_instr :
             | I_INT
             | I_SELF
             | I_CHAIN_ID
-            | I_NEVER ) as name ),
+            | I_NEVER
+            | I_VOTING_POWER ) as name ),
           (_ :: _ as l),
           _ ),
       _ ) ->
@@ -4673,7 +4680,8 @@ and parse_instr :
              I_SELF;
              I_SELF_ADDRESS;
              I_LAMBDA;
-             I_NEVER ]
+             I_NEVER;
+             I_VOTING_POWER ]
 
 and parse_contract :
     type arg.

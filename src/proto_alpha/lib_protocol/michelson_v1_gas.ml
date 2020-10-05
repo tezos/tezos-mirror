@@ -444,6 +444,9 @@ module Cost_of = struct
     (* model N_Unpair *)
     let cost_N_Unpair = Z.of_int 80
 
+    (* model N_Voting_power *)
+    let cost_N_Voting_power = Z.of_int 400
+
     (* model N_Xor *)
     let cost_N_Xor = Z.of_int 100
 
@@ -837,6 +840,8 @@ module Cost_of = struct
     let dipn n = atomic_step_cost (cost_N_DipN n)
 
     let dropn n = atomic_step_cost (cost_N_DropN n)
+
+    let voting_power = atomic_step_cost cost_N_Voting_power
 
     let neq = atomic_step_cost cost_N_Neq
 
