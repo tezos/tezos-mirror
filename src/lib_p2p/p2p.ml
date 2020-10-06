@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2019-2020 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -144,7 +144,7 @@ let create_maintenance_worker limits pool connect_handler config triggers log =
       private_mode = config.private_mode;
       min_connections = limits.min_connections;
       max_connections = limits.max_connections;
-      expected_connections = limits.max_connections;
+      expected_connections = limits.expected_connections;
     }
   in
   let discovery = may_create_discovery_worker limits config pool in

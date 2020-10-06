@@ -147,6 +147,9 @@ here either.
 - Added a checking of the well-formedness of addresses in the config files when
   the node starts. If this check fails, the node stops with an explanation.
 
+- Fixed the targeted number of connections which did not respect the
+  constraints expressed with --connections settings.
+
 ## Client
 
 - Added client command `import keys from mnemonic`, which allows to
