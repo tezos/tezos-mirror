@@ -248,6 +248,10 @@ module Cost_of = struct
     (* model N_Dup *)
     let cost_N_Dup = Z.of_int 80
 
+    (* model N_DupN *)
+    (* Approximating 1.299969 x term *)
+    let cost_N_DupN size = Z.of_int (60 + size + (size lsr 2))
+
     (* model N_Ediv_natnat *)
     (* Approximating 0.001599 x term *)
     let cost_N_Ediv_natnat size1 size2 =
@@ -951,6 +955,8 @@ module Cost_of = struct
 
     let pairing_check_bls12_381 (l : 'a Script_typed_ir.boxed_list) =
       atomic_step_cost (cost_N_Pairing_check_bls12_381 l.length)
+
+    let dupn n = atomic_step_cost (cost_N_DupN n)
 
     (* --------------------------------------------------------------------- *)
     (* Semi-hand-crafted models *)

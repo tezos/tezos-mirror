@@ -582,6 +582,8 @@ let cost_of_instr : type b a. (b, a) descr -> b -> Gas.cost =
       Interp_costs.neg_bls12_381_fr
   | (Pairing_check_bls12_381, (pairs, _)) ->
       Interp_costs.pairing_check_bls12_381 pairs
+  | (Dup_n (n, _), _) ->
+      Interp_costs.dupn n
 
 let rec step_bounded :
     type b a.
@@ -1332,6 +1334,18 @@ let rec step_bounded :
             |> Option.value ~default:false
       in
       logged_return ((check, rest), ctxt)
+  | (Dup_n (_, witness), stack) ->
+      let rec aux :
+          type before after.
+          (before, after) dup_n_gadt_witness -> before -> after =
+       fun witness stack ->
+        match (witness, stack) with
+        | (Dup_n_zero, (a, _)) ->
+            a
+        | (Dup_n_succ witness', (_, tl)) ->
+            aux witness' tl
+      in
+      logged_return ((aux witness stack, stack), ctxt)
 
 let step :
     type b a.

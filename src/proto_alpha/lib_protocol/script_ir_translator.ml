@@ -484,6 +484,8 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int =
       0
   | Pairing_check_bls12_381 ->
       0
+  | Dup_n _ ->
+      0
 
 (* ---- Error helpers -------------------------------------------------------*)
 
@@ -2058,6 +2060,11 @@ type _ dropn_proof_argument =
       * 'aft stack_ty )
       -> 'bef dropn_proof_argument
 
+type 'before dup_n_proof_argument =
+  | Dup_n_proof_argument :
+      ('before, 'a) dup_n_gadt_witness * 'a ty
+      -> 'before dup_n_proof_argument
+
 let find_entrypoint (type full) (full : full ty) ~root_name entrypoint =
   let rec find_entrypoint :
       type t. t ty -> string -> (Script.node -> Script.node) * ex_ty =
@@ -2954,6 +2961,34 @@ and parse_instr :
       parse_var_annot loc annot ~default:stack_annot
       >>?= fun annot ->
       typed ctxt loc Dup (Item_t (v, Item_t (v, rest, stack_annot), annot))
+  | (Prim (loc, I_DUP, [n], v_annot), stack_ty) ->
+      parse_var_annot loc v_annot
+      >>?= fun annot ->
+      let rec make_proof_argument :
+          type before.
+          int -> before stack_ty -> before dup_n_proof_argument tzresult =
+       fun n (stack_ty : before stack_ty) ->
+        match (n, stack_ty) with
+        | (1, Item_t (hd_ty, _, _)) ->
+            ok @@ Dup_n_proof_argument (Dup_n_zero, hd_ty)
+        | (n, Item_t (_, tl_ty, _)) ->
+            make_proof_argument (n - 1) tl_ty
+            >|? fun (Dup_n_proof_argument (dup_n_witness, b_ty)) ->
+            Dup_n_proof_argument (Dup_n_succ dup_n_witness, b_ty)
+        | _ ->
+            serialize_stack_for_error ctxt stack_ty
+            >>? fun (whole_stack, _ctxt) ->
+            error (Bad_stack (loc, I_DUP, 1, whole_stack))
+      in
+      parse_uint10 n
+      >>?= fun n ->
+      Gas.consume ctxt (Typecheck_costs.proof_argument n)
+      >>?= fun ctxt ->
+      error_unless (Compare.Int.( > ) n 0) (Dup_n_bad_argument (loc, n))
+      >>?= fun () ->
+      record_trace (Dup_n_bad_stack loc) (make_proof_argument n stack_ty)
+      >>?= fun (Dup_n_proof_argument (witness, after_ty)) ->
+      typed ctxt loc (Dup_n (n, witness)) (Item_t (after_ty, stack_ty, annot))
   | (Prim (loc, I_DIG, [n], result_annot), stack) ->
       let rec make_proof_argument :
           type tstk. int -> tstk stack_ty -> tstk dig_proof_argument tzresult =

@@ -437,6 +437,15 @@ and ('bef, 'aft) instr =
       : ( (Bls12_381.G1.t, Bls12_381.G2.t) pair boxed_list * 'rest,
           bool * 'rest )
         instr
+  | Dup_n :
+      int * ('before, 'after) dup_n_gadt_witness
+      -> ('before, 'after * 'before) instr
+
+and ('before, 'after) dup_n_gadt_witness =
+  | Dup_n_zero : ('a * 'rest, 'a) dup_n_gadt_witness
+  | Dup_n_succ :
+      ('before, 'b) dup_n_gadt_witness
+      -> ('a * 'before, 'b) dup_n_gadt_witness
 
 (* Type witness for operations that work deep in the stack ignoring
    (and preserving) a prefix.

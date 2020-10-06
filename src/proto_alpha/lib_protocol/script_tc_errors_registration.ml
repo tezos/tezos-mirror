@@ -598,6 +598,25 @@ let () =
     (function
       | Type_too_large (loc, ts, maxts) -> Some (loc, ts, maxts) | _ -> None)
     (fun (loc, ts, maxts) -> Type_too_large (loc, ts, maxts)) ;
+  (* Bad dup_n argument *)
+  register_error_kind
+    `Permanent
+    ~id:"michelson_v1.bad_dupn_argument"
+    ~title:"0 passed to DUP n"
+    ~description:"DUP expects an argument of at least 1 (passed 0)"
+    (obj2 (req "loc" Script.location_encoding) (req "argument" int32))
+    (function
+      | Dup_n_bad_argument (x, y) -> Some (x, Int32.of_int y) | _ -> None)
+    (fun (x, y) -> Dup_n_bad_argument (x, Int32.to_int y)) ;
+  (* Bad dup_n stack *)
+  register_error_kind
+    `Permanent
+    ~id:"michelson_v1.bad_dupn_stack"
+    ~title:"Stack too short when typing DUP n"
+    ~description:"Stack present when typing DUP n was too short"
+    (obj1 (req "loc" Script.location_encoding))
+    (function Dup_n_bad_stack x -> Some x | _ -> None)
+    (fun x -> Dup_n_bad_stack x) ;
   (* -- Toplevel errors ------------------- *)
   (* Ill typed data *)
   register_error_kind
