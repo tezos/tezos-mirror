@@ -4,7 +4,6 @@
         test_base58
         test_ed25519
         test_blake2b
-        test_ids
         test_pvss
         test_crypto_box
         test_deterministic_nonce)
@@ -24,7 +23,6 @@
        test_base58.exe
        test_ed25519.exe
        test_blake2b.exe
-       test_ids.exe
        test_pvss.exe
        test_crypto_box.exe
        test_deterministic_nonce.exe))
@@ -50,10 +48,6 @@
  (action (run %{exe:test_blake2b.exe})))
 
 (alias
- (name runtest_ids)
- (action (run %{exe:test_ids.exe})))
-
-(alias
  (name runtest_pvss)
  (action (run %{exe:test_pvss.exe})))
 
@@ -73,7 +67,6 @@
        (alias runtest_base58)
        (alias runtest_ed25519)
        (alias runtest_blake2b)
-       (alias runtest_ids)
        (alias runtest_pvss)
        (alias runtest_crypto_box)
        (alias runtest_deterministic_nonce)))

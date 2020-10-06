@@ -182,40 +182,15 @@ end)
 struct
   include Make_minimal (K)
 
+  let hash = Stdlib.Hashtbl.hash
+
+  let seeded_hash = Stdlib.Hashtbl.seeded_hash
+
   (* Serializers *)
 
   let raw_encoding =
     let open Data_encoding in
     conv to_bytes of_bytes_exn (Fixed.bytes size)
-
-  let int_rotate offset i =
-    let open Stdlib in
-    assert (0 <= offset) ;
-    assert (offset < 32) ;
-    (i lsl offset) lor (i lsr (32 - offset))
-
-  let seeded_hash =
-    (* NOTE: we hash to small integers (32bit) because the OCaml hashtable only
-       cares about a few bits *)
-    let open Compare.Int
-    (* shadowing comparators *) in
-    if size > 4 then fun seed h ->
-      let seed = abs seed in
-      int_rotate (seed mod 32)
-      @@ Int32.to_int
-      @@ TzEndian.get_int32 (to_bytes h) (seed mod (size - 4))
-    else fun seed h ->
-      let seed = abs seed in
-      int_rotate (seed mod 32)
-      @@
-      let r = ref 0 in
-      let h = to_bytes h in
-      for i = 0 to size - 1 do
-        r := TzEndian.get_uint8 h i + (8 * !r)
-      done ;
-      !r
-
-  let hash = seeded_hash 0
 
   type Base58.data += Data of t
 

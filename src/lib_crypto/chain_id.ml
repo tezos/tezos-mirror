@@ -131,19 +131,6 @@ let raw_encoding =
   let open Data_encoding in
   conv to_bytes of_bytes_exn (Fixed.bytes size)
 
-let int_rotate offset i =
-  let open Stdlib in
-  assert (0 <= offset) ;
-  assert (offset < 32) ;
-  (i lsl offset) lor (i lsr (32 - offset))
-
-let seeded_hash seed h =
-  int_rotate (abs seed mod 32)
-  @@ Int32.to_int
-  @@ TzEndian.get_int32 (to_bytes h) 0
-
-let hash h = seeded_hash 0 h
-
 let of_block_hash bh = hash_bytes [Block_hash.to_bytes bh]
 
 include Compare.Make (struct
@@ -151,6 +138,10 @@ include Compare.Make (struct
 
   let compare = String.compare
 end)
+
+let hash = Stdlib.Hashtbl.hash
+
+let seeded_hash = Stdlib.Hashtbl.seeded_hash
 
 include Helpers.Make (struct
   type nonrec t = t
