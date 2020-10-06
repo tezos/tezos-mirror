@@ -328,20 +328,21 @@ end
 module Low_level = struct
   let simple_msg = Rand.generate (1 lsl 4)
 
-  let client _ch sched addr port =
+  let client ch sched addr port =
     let msg = Bytes.create (Bytes.length simple_msg) in
     raw_connect sched addr port
     >>= fun fd ->
     P2p_io_scheduler.read_full fd msg
     >>=? fun () ->
     tzassert (Bytes.compare simple_msg msg = 0) __POS__
-    >>=? fun () -> P2p_io_scheduler.close fd
+    >>=? fun () -> sync ch >>=? fun () -> P2p_io_scheduler.close fd
 
-  let server _ch sched socket =
+  let server ch sched socket =
     raw_accept sched socket
     >>= fun (fd, _point) ->
     P2p_io_scheduler.write fd simple_msg
-    >>=? fun () -> P2p_io_scheduler.close fd >>=? fun _ -> return_unit
+    >>=? fun () ->
+    sync ch >>=? fun () -> P2p_io_scheduler.close fd >>=? fun _ -> return_unit
 
   let run _dir = run_nodes client server
 end
@@ -363,7 +364,7 @@ module Nack = struct
         log_notice "Error: %a" pp_print_error err ;
         false
 
-  let server _ch sched socket =
+  let server ch sched socket =
     accept sched socket
     >>=? fun (info, auth_fd) ->
     tzassert info.incoming __POS__
@@ -372,14 +373,13 @@ module Nack = struct
     >>= fun id2 ->
     tzassert (P2p_peer.Id.compare info.peer_id id2.peer_id = 0) __POS__
     >>=? fun () ->
-    P2p_socket.nack auth_fd P2p_rejection.No_motive []
-    >>= fun () -> return_unit
+    P2p_socket.nack auth_fd P2p_rejection.No_motive [] >>= fun () -> sync ch
 
-  let client _ch sched addr port =
+  let client ch sched addr port =
     connect sched addr port id2
     >>=? fun auth_fd ->
     P2p_socket.accept ~canceler auth_fd encoding
-    >>= fun conn -> tzassert (is_rejected conn) __POS__
+    >>= fun conn -> tzassert (is_rejected conn) __POS__ >>=? fun () -> sync ch
 
   let run _dir = run_nodes client server
 end
@@ -391,17 +391,17 @@ end
 module Nacked = struct
   let encoding = Data_encoding.bytes
 
-  let server _ch sched socket =
+  let server ch sched socket =
     accept sched socket
     >>=? fun (_info, auth_fd) ->
     P2p_socket.accept ~canceler auth_fd encoding
-    >>= fun conn -> tzassert (Nack.is_rejected conn) __POS__
+    >>= fun conn ->
+    tzassert (Nack.is_rejected conn) __POS__ >>=? fun () -> sync ch
 
-  let client _ch sched addr port =
+  let client ch sched addr port =
     connect sched addr port id2
     >>=? fun auth_fd ->
-    P2p_socket.nack auth_fd P2p_rejection.No_motive []
-    >>= fun () -> return_unit
+    P2p_socket.nack auth_fd P2p_rejection.No_motive [] >>= fun () -> sync ch
 
   (* This test is skipped because its result on the CI is not deterministic *)
   let run _dir = return_unit
