@@ -23,7 +23,7 @@ let find_component dirname module_name =
   let interface = implementation ^ "i" in
   match (Sys.file_exists implementation, Sys.file_exists interface) with
   | (false, _) ->
-      Stdlib.failwith @@ "Not such file: " ^ implementation
+      Stdlib.failwith @@ "No such file: " ^ implementation
   | (true, false) ->
       Lwt_utils_unix.read_file implementation
       >|= fun implementation ->
