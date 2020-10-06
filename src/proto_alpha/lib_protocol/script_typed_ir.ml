@@ -155,6 +155,9 @@ and 'ty ty =
   | Operation_t : type_annot option -> operation ty
   | Chain_id_t : type_annot option -> Chain_id.t ty
   | Never_t : type_annot option -> never ty
+  | Bls12_381_g1_t : type_annot option -> Bls12_381.G1.t ty
+  | Bls12_381_g2_t : type_annot option -> Bls12_381.G2.t ty
+  | Bls12_381_fr_t : type_annot option -> Bls12_381.Fr.t ty
 
 and 'ty stack_ty =
   | Item_t :
@@ -403,6 +406,37 @@ and ('bef, 'aft) instr =
   | Total_voting_power : ('rest, n num * 'rest) instr
   | Keccak : (bytes * 'rest, bytes * 'rest) instr
   | Sha3 : (bytes * 'rest, bytes * 'rest) instr
+  | Add_bls12_381_g1
+      : ( Bls12_381.G1.t * (Bls12_381.G1.t * 'rest),
+          Bls12_381.G1.t * 'rest )
+        instr
+  | Add_bls12_381_g2
+      : ( Bls12_381.G2.t * (Bls12_381.G2.t * 'rest),
+          Bls12_381.G2.t * 'rest )
+        instr
+  | Add_bls12_381_fr
+      : ( Bls12_381.Fr.t * (Bls12_381.Fr.t * 'rest),
+          Bls12_381.Fr.t * 'rest )
+        instr
+  | Mul_bls12_381_g1
+      : ( Bls12_381.G1.t * (Bls12_381.Fr.t * 'rest),
+          Bls12_381.G1.t * 'rest )
+        instr
+  | Mul_bls12_381_g2
+      : ( Bls12_381.G2.t * (Bls12_381.Fr.t * 'rest),
+          Bls12_381.G2.t * 'rest )
+        instr
+  | Mul_bls12_381_fr
+      : ( Bls12_381.Fr.t * (Bls12_381.Fr.t * 'rest),
+          Bls12_381.Fr.t * 'rest )
+        instr
+  | Neg_bls12_381_g1 : (Bls12_381.G1.t * 'rest, Bls12_381.G1.t * 'rest) instr
+  | Neg_bls12_381_g2 : (Bls12_381.G2.t * 'rest, Bls12_381.G2.t * 'rest) instr
+  | Neg_bls12_381_fr : (Bls12_381.Fr.t * 'rest, Bls12_381.Fr.t * 'rest) instr
+  | Pairing_check_bls12_381
+      : ( (Bls12_381.G1.t, Bls12_381.G2.t) pair boxed_list * 'rest,
+          bool * 'rest )
+        instr
 
 (* Type witness for operations that work deep in the stack ignoring
    (and preserving) a prefix.
