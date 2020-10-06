@@ -193,8 +193,6 @@ module Cost_of : sig
 
     val nop : Gas.cost
 
-    val empty_big_map : Gas.cost
-
     val compare : 'a Script_typed_ir.comparable_ty -> 'a -> 'a -> Gas.cost
 
     val concat_string_precheck : 'a Script_typed_ir.boxed_list -> Gas.cost

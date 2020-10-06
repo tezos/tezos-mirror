@@ -886,12 +886,6 @@ module Cost_of = struct
     (* The cost functions below where not benchmarked, a cost model was derived
        from looking at similar instructions. *)
 
-    (* Creating an empty big map involves converting a type to a comparable
-       and allocating an empty map. Since the user already paied at typechecking
-       time for writing this type, we charge a constant overhead here. *)
-    let empty_big_map =
-      atomic_step_cost (Z.add (Z.of_int 100) cost_N_Empty_map)
-
     (* Cost for Concat_string is paid in two steps: when entering the interpreter,
        the user pays for the cost of computing the information necessary to compute
        the actual gas (so it's meta-gas): indeed, one needs to run through the
