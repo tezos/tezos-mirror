@@ -223,6 +223,8 @@ module Cost_of : sig
 
     val pairing_check_bls12_381 : 'a Script_typed_ir.boxed_list -> Gas.cost
 
+    val dupn : int -> Gas.cost
+
     val compare : 'a Script_typed_ir.comparable_ty -> 'a -> 'a -> Gas.cost
 
     val concat_string_precheck : 'a Script_typed_ir.boxed_list -> Gas.cost
