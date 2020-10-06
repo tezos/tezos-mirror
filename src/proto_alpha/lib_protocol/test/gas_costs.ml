@@ -137,7 +137,6 @@ let all_interpreter_costs =
     ("dropn", dropn 42);
     ("neq", neq);
     ("nop", nop);
-    ("empty_big_map", empty_big_map);
     ("compare", compare Script_typed_ir.(Int_key None) forty_two forty_two);
     ( "concat_string_precheck",
       concat_string_precheck (list_cons "42" list_empty) );
