@@ -354,6 +354,7 @@ module Script : sig
     | I_TOTAL_VOTING_POWER
     | I_KECCAK
     | I_SHA3
+    | I_PAIRING_CHECK
     | T_bool
     | T_contract
     | T_int
@@ -378,6 +379,9 @@ module Script : sig
     | T_address
     | T_chain_id
     | T_never
+    | T_bls12_381_g1
+    | T_bls12_381_g2
+    | T_bls12_381_fr
 
   type location = Micheline.canonical_location
 

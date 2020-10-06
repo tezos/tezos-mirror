@@ -107,6 +107,18 @@ module Cost_of = struct
     (* Approximating 0.068306 x term *)
     let cost_N_Abs_int size = Z.of_int @@ (80 + (size lsr 4))
 
+    (* model N_Add_bls12_381_fr *)
+
+    let cost_N_Add_bls12_381_fr = Z.of_int 230
+
+    (* model N_Add_bls12_381_g1 *)
+
+    let cost_N_Add_bls12_381_g1 = Z.of_int 9_300
+
+    (* model N_Add_bls12_381_g2 *)
+
+    let cost_N_Add_bls12_381_g2 = Z.of_int 13_000
+
     (* model N_Add_intint *)
     (* Approximating 0.082158 x term *)
     let cost_N_Add_intint size1 size2 =
@@ -349,6 +361,18 @@ module Cost_of = struct
       let v0 = size1 * log2 (Z.of_int size2) in
       Z.of_int 80 + (v0 lsr 4) + (v0 lsr 5) + (v0 lsr 6) + (v0 lsr 7)
 
+    (* model N_Mul_bls12_381_fr *)
+
+    let cost_N_Mul_bls12_381_fr = Z.of_int 260
+
+    (* model N_Mul_bls12_381_g1 *)
+
+    let cost_N_Mul_bls12_381_g1 = Z.of_int 265_000
+
+    (* model N_Mul_bls12_381_g2 *)
+
+    let cost_N_Mul_bls12_381_g2 = Z.of_int 850_000
+
     (* model N_Mul_intint *)
     let cost_N_Mul_intint size1 size2 =
       let open Z_syntax in
@@ -359,6 +383,18 @@ module Cost_of = struct
     let cost_N_Mul_teznat size =
       let open Z_syntax in
       Z.of_int 200 + (Z.of_int 133 * Z.of_int size)
+
+    (* model N_Neg_bls12_381_fr *)
+
+    let cost_N_Neg_bls12_381_fr = Z.of_int 180
+
+    (* model N_Neg_bls12_381_g1 *)
+
+    let cost_N_Neg_bls12_381_g1 = Z.of_int 410
+
+    (* model N_Neg_bls12_381_g2 *)
+
+    let cost_N_Neg_bls12_381_g2 = Z.of_int 715
 
     (* model N_Neg_int *)
     (* Approximating 0.068419 x term *)
@@ -388,6 +424,11 @@ module Cost_of = struct
     let cost_N_Or_nat size1 size2 =
       let v0 = Compare.Int.max size1 size2 in
       Z.of_int (80 + ((v0 lsr 4) + (v0 lsr 6)))
+
+    (* model N_Pairing_check_bls12_381 *)
+
+    let cost_N_Pairing_check_bls12_381 size =
+      Z.add (Z.of_int 1_550_000) (Z.mul (Z.of_int 510_000) (Z.of_int size))
 
     (* model N_Right *)
     let cost_N_Right = Z.of_int 80
@@ -469,6 +510,18 @@ module Cost_of = struct
       let v0 = Compare.Int.max size1 size2 in
       Z.of_int (80 + ((v0 lsr 4) + (v0 lsr 6)))
 
+    (* model DECODING_BLS_FR *)
+
+    let cost_DECODING_BLS_FR = Z.of_int 50
+
+    (* model DECODING_BLS_G1 *)
+
+    let cost_DECODING_BLS_G1 = Z.of_int 230_000
+
+    (* model DECODING_BLS_G2 *)
+
+    let cost_DECODING_BLS_G2 = Z.of_int 740_000
+
     (* model B58CHECK_DECODING_CHAIN_ID *)
     let cost_B58CHECK_DECODING_CHAIN_ID = Z.of_int 1_500
 
@@ -498,6 +551,18 @@ module Cost_of = struct
 
     (* model B58CHECK_DECODING_SIGNATURE_secp256k1 *)
     let cost_B58CHECK_DECODING_SIGNATURE_secp256k1 = Z.of_int 6_600
+
+    (* model ENCODING_BLS_FR *)
+
+    let cost_ENCODING_BLS_FR = Z.of_int 30
+
+    (* model ENCODING_BLS_G1 *)
+
+    let cost_ENCODING_BLS_G1 = Z.of_int 30
+
+    (* model ENCODING_BLS_G2 *)
+
+    let cost_ENCODING_BLS_G2 = Z.of_int 30
 
     (* model B58CHECK_ENCODING_CHAIN_ID *)
     let cost_B58CHECK_ENCODING_CHAIN_ID = Z.of_int 1_600
@@ -862,9 +927,30 @@ module Cost_of = struct
 
     let sha3 b = atomic_step_cost (cost_N_Sha3 (Bytes.length b))
 
+    let add_bls12_381_g1 = atomic_step_cost cost_N_Add_bls12_381_g1
+
+    let add_bls12_381_g2 = atomic_step_cost cost_N_Add_bls12_381_g2
+
+    let add_bls12_381_fr = atomic_step_cost cost_N_Add_bls12_381_fr
+
+    let mul_bls12_381_g1 = atomic_step_cost cost_N_Mul_bls12_381_g1
+
+    let mul_bls12_381_g2 = atomic_step_cost cost_N_Mul_bls12_381_g2
+
+    let mul_bls12_381_fr = atomic_step_cost cost_N_Mul_bls12_381_fr
+
+    let neg_bls12_381_g1 = atomic_step_cost cost_N_Neg_bls12_381_g1
+
+    let neg_bls12_381_g2 = atomic_step_cost cost_N_Neg_bls12_381_g2
+
+    let neg_bls12_381_fr = atomic_step_cost cost_N_Neg_bls12_381_fr
+
     let neq = atomic_step_cost cost_N_Neq
 
     let nop = atomic_step_cost cost_N_Nop
+
+    let pairing_check_bls12_381 (l : 'a Script_typed_ir.boxed_list) =
+      atomic_step_cost (cost_N_Pairing_check_bls12_381 l.length)
 
     (* --------------------------------------------------------------------- *)
     (* Semi-hand-crafted models *)
@@ -1145,6 +1231,12 @@ module Cost_of = struct
     (* Reasonable approximation *)
     let contract_readable = key_hash_readable
 
+    let bls12_381_g1 = atomic_step_cost cost_DECODING_BLS_G1
+
+    let bls12_381_g2 = atomic_step_cost cost_DECODING_BLS_G2
+
+    let bls12_381_fr = atomic_step_cost cost_DECODING_BLS_FR
+
     let check_printable s =
       atomic_step_cost (cost_CHECK_PRINTABLE (String.length s))
 
@@ -1247,6 +1339,12 @@ module Cost_of = struct
 
     (* Reasonable approximation *)
     let contract_readable = key_hash_readable
+
+    let bls12_381_g1 = atomic_step_cost cost_ENCODING_BLS_G1
+
+    let bls12_381_g2 = atomic_step_cost cost_ENCODING_BLS_G2
+
+    let bls12_381_fr = atomic_step_cost cost_ENCODING_BLS_FR
 
     let unparse_type_cycle = atomic_step_cost cost_UNPARSE_TYPE
 

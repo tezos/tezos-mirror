@@ -199,9 +199,29 @@ module Cost_of : sig
 
     val sha3 : bytes -> Gas.cost
 
+    val add_bls12_381_g1 : Gas.cost
+
+    val add_bls12_381_g2 : Gas.cost
+
+    val add_bls12_381_fr : Gas.cost
+
+    val mul_bls12_381_g1 : Gas.cost
+
+    val mul_bls12_381_g2 : Gas.cost
+
+    val mul_bls12_381_fr : Gas.cost
+
+    val neg_bls12_381_g1 : Gas.cost
+
+    val neg_bls12_381_g2 : Gas.cost
+
+    val neg_bls12_381_fr : Gas.cost
+
     val neq : Gas.cost
 
     val nop : Gas.cost
+
+    val pairing_check_bls12_381 : 'a Script_typed_ir.boxed_list -> Gas.cost
 
     val compare : 'a Script_typed_ir.comparable_ty -> 'a -> 'a -> Gas.cost
 
@@ -275,6 +295,12 @@ module Cost_of : sig
 
     val contract_readable : Gas.cost
 
+    val bls12_381_g1 : Gas.cost
+
+    val bls12_381_g2 : Gas.cost
+
+    val bls12_381_fr : Gas.cost
+
     val check_printable : string -> Gas.cost
 
     val merge_cycle : Gas.cost
@@ -322,6 +348,12 @@ module Cost_of : sig
     val contract_optimized : Gas.cost
 
     val contract_readable : Gas.cost
+
+    val bls12_381_g1 : Gas.cost
+
+    val bls12_381_g2 : Gas.cost
+
+    val bls12_381_fr : Gas.cost
 
     val unparse_type_cycle : Gas.cost
 
