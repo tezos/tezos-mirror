@@ -4323,29 +4323,6 @@ and parse_instr :
       parse_var_annot loc annot
       >>?= fun annot ->
       typed ctxt loc Total_voting_power (Item_t (Nat_t None, stack, annot))
-  | (Prim (loc, I_HASH_KEY, [], annot), Item_t (Key_t _, rest, _)) ->
-      parse_var_annot loc annot
-      >>?= fun annot ->
-      typed ctxt loc Hash_key (Item_t (Key_hash_t None, rest, annot))
-  | ( Prim (loc, I_CHECK_SIGNATURE, [], annot),
-      Item_t
-        (Key_t _, Item_t (Signature_t _, Item_t (Bytes_t _, rest, _), _), _) )
-    ->
-      parse_var_annot loc annot
-      >>?= fun annot ->
-      typed ctxt loc Check_signature (Item_t (Bool_t None, rest, annot))
-  | (Prim (loc, I_BLAKE2B, [], annot), Item_t (Bytes_t _, rest, _)) ->
-      parse_var_annot loc annot
-      >>?= fun annot ->
-      typed ctxt loc Blake2b (Item_t (Bytes_t None, rest, annot))
-  | (Prim (loc, I_SHA256, [], annot), Item_t (Bytes_t _, rest, _)) ->
-      parse_var_annot loc annot
-      >>?= fun annot ->
-      typed ctxt loc Sha256 (Item_t (Bytes_t None, rest, annot))
-  | (Prim (loc, I_SHA512, [], annot), Item_t (Bytes_t _, rest, _)) ->
-      parse_var_annot loc annot
-      >>?= fun annot ->
-      typed ctxt loc Sha512 (Item_t (Bytes_t None, rest, annot))
   | (Prim (_, I_STEPS_TO_QUOTA, _, _), _) ->
       fail (Deprecated_instruction I_STEPS_TO_QUOTA)
   | (Prim (loc, I_SOURCE, [], annot), stack) ->
@@ -4396,6 +4373,30 @@ and parse_instr :
       parse_var_annot loc annot ~default:default_self_annot
       >>?= fun annot ->
       typed ctxt loc Self_address (Item_t (Address_t None, stack, annot))
+  (* cryptography *)
+  | (Prim (loc, I_HASH_KEY, [], annot), Item_t (Key_t _, rest, _)) ->
+      parse_var_annot loc annot
+      >>?= fun annot ->
+      typed ctxt loc Hash_key (Item_t (Key_hash_t None, rest, annot))
+  | ( Prim (loc, I_CHECK_SIGNATURE, [], annot),
+      Item_t
+        (Key_t _, Item_t (Signature_t _, Item_t (Bytes_t _, rest, _), _), _) )
+    ->
+      parse_var_annot loc annot
+      >>?= fun annot ->
+      typed ctxt loc Check_signature (Item_t (Bool_t None, rest, annot))
+  | (Prim (loc, I_BLAKE2B, [], annot), Item_t (Bytes_t _, rest, _)) ->
+      parse_var_annot loc annot
+      >>?= fun annot ->
+      typed ctxt loc Blake2b (Item_t (Bytes_t None, rest, annot))
+  | (Prim (loc, I_SHA256, [], annot), Item_t (Bytes_t _, rest, _)) ->
+      parse_var_annot loc annot
+      >>?= fun annot ->
+      typed ctxt loc Sha256 (Item_t (Bytes_t None, rest, annot))
+  | (Prim (loc, I_SHA512, [], annot), Item_t (Bytes_t _, rest, _)) ->
+      parse_var_annot loc annot
+      >>?= fun annot ->
+      typed ctxt loc Sha512 (Item_t (Bytes_t None, rest, annot))
   (* Primitive parsing errors *)
   | ( Prim
         ( loc,
