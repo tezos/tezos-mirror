@@ -663,7 +663,18 @@ let spec =
                    ~rules:
                      "test.p2p.connection -> debug; p2p.connection -> debug"
                    ())),
-        " Log up to debug msgs" ) ]
+        " Log up to debug msgs" );
+      ( "-vvv",
+        Unit
+          (fun () ->
+            log_config :=
+              Some
+                (Lwt_log_sink_unix.create_cfg
+                   ~rules:
+                     "test.p2p.connection -> debug; p2p.connection ->  debug; \
+                      p2p.io-scheduler ->  debug "
+                   ())),
+        " Log up to debug msgs even in io_scheduler" ) ]
 
 let init_logs = lazy (Internal_event_unix.init ?lwt_log_sink:!log_config ())
 
