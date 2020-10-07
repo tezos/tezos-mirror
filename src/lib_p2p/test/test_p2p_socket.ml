@@ -495,9 +495,15 @@ end
 module Oversized_message = struct
   let encoding = Data_encoding.bytes
 
-  let simple_msg = Rand.generate (1 lsl 17)
+  let rec rand_gen () =
+    try Rand.generate (1 lsl 17)
+    with _ ->
+      log_error "Not enough entropy, retrying to generate random data" ;
+      rand_gen ()
 
-  let simple_msg2 = Rand.generate (1 lsl 17)
+  let simple_msg = rand_gen ()
+
+  let simple_msg2 = rand_gen ()
 
   let server ch sched socket =
     accept sched socket
