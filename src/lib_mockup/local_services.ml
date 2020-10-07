@@ -240,6 +240,16 @@ module Make (E : MENV) = struct
         ~level:Internal_event.Warning
         ~pp1
         ("operations", ops_encoding)
+
+    let warn_mempool_mem =
+      S.declare_0
+        ~section
+        ~name:"mempool_mem"
+        ~msg:
+          "This operation already exists in the mempool and will thus be \
+           ignored."
+        ~level:Internal_event.Warning
+        ()
   end
 
   type write_mode = Append | Zero_truncate
@@ -355,6 +365,24 @@ module Make (E : MENV) = struct
                let set = Block_hash.Set.singleton E.rpc_context.block_hash in
                RPC_answer.return set))
 
+  let simulate_operation (validation_state, preapply_results) op =
+    E.Protocol.apply_operation validation_state op
+    >>=? fun (validation_state, _) ->
+    match
+      Data_encoding.Binary.to_bytes
+        E.Protocol.operation_data_encoding
+        op.protocol_data
+    with
+    | Error _ ->
+        failwith "mockup preapply_block"
+    | Ok proto ->
+        let op_t = {Operation.shell = op.shell; proto} in
+        let hash = Operation.hash op_t in
+        return
+          ( validation_state,
+            Preapply_result.{empty with applied = [(hash, op_t)]}
+            :: preapply_results )
+
   let preapply_block () =
     Directory.prefix
       (Tezos_rpc.RPC_path.prefix
@@ -370,27 +398,7 @@ module Make (E : MENV) = struct
                begin_construction ()
                >>=? (fun validation_state ->
                       fold_left_s
-                        (fold_left_s
-                           (fun (validation_state, preapply_results) op ->
-                             E.Protocol.apply_operation validation_state op
-                             >>=? fun (validation_state, _) ->
-                             match
-                               Data_encoding.Binary.to_bytes
-                                 E.Protocol.operation_data_encoding
-                                 op.protocol_data
-                             with
-                             | Error _ ->
-                                 failwith "mockup preapply_block"
-                             | Ok proto ->
-                                 let op_t =
-                                   {Operation.shell = op.shell; proto}
-                                 in
-                                 let hash = Operation.hash op_t in
-                                 return
-                                   ( validation_state,
-                                     Preapply_result.
-                                       {empty with applied = [(hash, op_t)]}
-                                     :: preapply_results )))
+                        (fold_left_s simulate_operation)
                         (validation_state, [])
                         operations
                       >>=? fun (validation_state, preapply_results) ->
@@ -468,6 +476,23 @@ module Make (E : MENV) = struct
                | Error errs ->
                    RPC_answer.fail errs)))
 
+  let need_operation shell_header operation_data =
+    Mempool.read ()
+    >>=? fun mempool_operations ->
+    let op = (shell_header, operation_data) in
+    if List.mem op mempool_operations then return_false
+    else
+      let operations = op :: mempool_operations in
+      begin_construction ()
+      >>=? fun validation_state ->
+      fold_left_s
+        (fun rstate (shell, protocol_data) ->
+          simulate_operation rstate E.Protocol.{shell; protocol_data})
+        (validation_state, [])
+        operations
+      >>=? fun (validation_state, _) ->
+      E.Protocol.finalize_block validation_state >>=? fun _ -> return_true
+
   let inject_operation_with_mempool operation_bytes =
     match Data_encoding.Binary.of_bytes Operation.encoding operation_bytes with
     | Error _ ->
@@ -483,12 +508,24 @@ module Make (E : MENV) = struct
         | Error _ ->
             RPC_answer.fail [Cannot_parse_op]
         | Ok operation_data -> (
-            Mempool.append [(shell_header, operation_data)]
+            need_operation shell_header operation_data
+            >>=? (function
+                   | true ->
+                       Mempool.append [(shell_header, operation_data)]
+                   | false ->
+                       L.(S.emit warn_mempool_mem) ()
+                       >>= fun _ ->
+                       Trashpool.append [(shell_header, operation_data)])
             >>= function
             | Ok _ ->
                 RPC_answer.return operation_hash
-            | Error errs ->
-                RPC_answer.fail errs ) )
+            | Error errs -> (
+                Trashpool.append [(shell_header, operation_data)]
+                >>= function
+                | Ok _ ->
+                    RPC_answer.fail errs
+                | Error errs2 ->
+                    RPC_answer.fail (errs @ errs2) ) ) )
 
   let inject_operation_without_mempool
       (write_context_callback :
