@@ -113,14 +113,13 @@ val check_header_proof_of_work_stamp :
   Block_header.shell_header -> Block_header.contents -> int64 -> bool
 
 (** verify if the proof of work stamp is valid *)
-val check_proof_of_work_stamp :
-  context -> Block_header.t -> unit tzresult Lwt.t
+val check_proof_of_work_stamp : context -> Block_header.t -> unit tzresult
 
 (** check if the gap between the fitness of the current context
     and the given block is within the protocol parameters *)
 val check_fitness_gap : context -> Block_header.t -> unit tzresult
 
-val dawn_of_a_new_cycle : context -> Cycle.t option tzresult Lwt.t
+val dawn_of_a_new_cycle : context -> Cycle.t option
 
 val earlier_predecessor_timestamp : context -> Level.t -> Timestamp.t tzresult
 

@@ -1370,8 +1370,7 @@ let may_snapshot_roll ctxt =
   else return ctxt
 
 let may_start_new_cycle ctxt =
-  Baking.dawn_of_a_new_cycle ctxt
-  >>=? function
+  match Baking.dawn_of_a_new_cycle ctxt with
   | None ->
       return (ctxt, [], [])
   | Some last_cycle ->
@@ -1417,7 +1416,7 @@ let begin_application ctxt chain_id block_header pred_timestamp =
   >>=? fun ctxt ->
   let current_level = Alpha_context.Level.current ctxt in
   Baking.check_proof_of_work_stamp ctxt block_header
-  >>=? fun () ->
+  >>?= fun () ->
   Baking.check_fitness_gap ctxt block_header
   >>?= fun () ->
   Baking.check_baking_rights

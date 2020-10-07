@@ -327,8 +327,8 @@ let check_proof_of_work_stamp ctxt block =
       block.Block_header.shell
       block.protocol_data.contents
       proof_of_work_threshold
-  then return_unit
-  else fail Invalid_stamp
+  then ok_unit
+  else error Invalid_stamp
 
 let check_signature block chain_id key =
   let check_signature key
@@ -367,7 +367,7 @@ let last_of_a_cycle ctxt (l : Level.t) =
 
 let dawn_of_a_new_cycle ctxt =
   let level = Level.current ctxt in
-  if last_of_a_cycle ctxt level then return_some level.cycle else return_none
+  if last_of_a_cycle ctxt level then Some level.cycle else None
 
 let minimum_allowed_endorsements ctxt ~block_delay =
   let minimum = Constants.initial_endorsers ctxt in
