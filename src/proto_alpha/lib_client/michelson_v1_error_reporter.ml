@@ -122,6 +122,8 @@ let collect_error_locations errs =
         | Comparable_type_expected (loc, _)
         | Overflow (loc, _)
         | Reject (loc, _, _)
+        | Pair_bad_argument loc
+        | Unpair_bad_argument loc
         | Dup_n_bad_argument loc )
       :: rest ->
         collect (loc :: acc) rest
@@ -617,6 +619,18 @@ let report_errors ~details ~show_source ?parsed ppf errs =
               loc
               size
               maximum_size
+        | Pair_bad_argument loc ->
+            Format.fprintf
+              ppf
+              "%aPAIR expects an argument of at least 2."
+              print_loc
+              loc
+        | Unpair_bad_argument loc ->
+            Format.fprintf
+              ppf
+              "%aUNPAIR expects an argument of at least 2."
+              print_loc
+              loc
         | Dup_n_bad_argument loc ->
             Format.fprintf
               ppf
