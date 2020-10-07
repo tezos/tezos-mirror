@@ -18,9 +18,9 @@ To build the documentation, you can use the main Makefile target ``doc-html``
 The documentation is built by Sphinx, and uses the Read The Docs theme.
 
 Dependencies to build the documentation should be obtained with
-`poetry <https://python-poetry.org/>`. We refer
-to the :ref:`python testing framework<python_testing_framework>` page
-for instruction on how to obtain python and poetry. Once this is done,
+`poetry <https://python-poetry.org/>`_. For instruction on how to 
+obtain python and poetry, see ``developers/python_testing_framework.rst``. 
+Once this is done,
 you can install the needed dependencies:
 
 .. code-block:: bash
