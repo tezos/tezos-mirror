@@ -180,27 +180,47 @@ module External_validator_process = struct
       (* We assume that there is only one validation process per socket *)
       (* TODO spawn the socket in $XDG_RUNTIME_DIR while making sure
          it's portable *)
-      let process =
-        Lwt_process.open_process_none
-          (vp.process_path, [|"tezos-validator"; "--socket-dir"; vp.data_dir|])
-      in
-      let socket_path =
-        External_validation.socket_path ~data_dir:vp.data_dir ~pid:process#pid
-      in
-      External_validation.create_socket_listen
-        ~canceler
-        ~max_requests:1
-        ~socket_path
-      >>= fun process_socket ->
-      Lwt_unix.accept process_socket
-      >>= fun (process_socket, _) ->
-      (* As the external validation process is now started, we can
+      (let process =
+         Lwt_process.open_process_none
+           (vp.process_path, [|"tezos-validator"; "--socket-dir"; vp.data_dir|])
+       in
+       let socket_path =
+         External_validation.socket_path ~data_dir:vp.data_dir ~pid:process#pid
+       in
+       (* Make sure that the mimicked anonymous file descriptor is
+          removed if the spawn of the process is interupted. Thus, we
+          avoids generating potential garbage in the [vp.data_dir]. *)
+       let clean_process_fd () =
+         Lwt.catch
+           (fun () -> Lwt_unix.unlink socket_path)
+           (function
+             | Unix.Unix_error (ENOENT, _, _) ->
+                 (* The file does not exist *)
+                 Lwt.return_unit
+             | exn ->
+                 Lwt.fail exn)
+       in
+       let process_fd_cleaner =
+         Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
+             clean_process_fd ())
+       in
+       External_validation.create_socket_listen
+         ~canceler
+         ~max_requests:1
+         ~socket_path
+       >>= fun process_socket ->
+       Lwt_unix.accept process_socket
+       >>= fun (process_socket, _) ->
+       (* As the external validation process is now started, we can
          unlink the named socket. Indeed, the file descriptor will
          remain valid until at least one process keep it open. This
          method mimics an anonymous file descriptor without relying on
          Linux specific features. *)
-      Lwt_unix.unlink socket_path
-      >>= fun () ->
+       Lwt.protected (clean_process_fd ())
+       >>= fun () ->
+       Lwt_exit.unregister_clean_up_callback process_fd_cleaner ;
+       Lwt.return (process, process_socket))
+      >>= fun (process, process_socket) ->
       let process_stdin = Lwt_io.of_fd ~mode:Output process_socket in
       let process_stdout = Lwt_io.of_fd ~mode:Input process_socket in
       lwt_emit (Validator_started process#pid)
