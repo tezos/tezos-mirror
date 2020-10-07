@@ -18,7 +18,7 @@ for i in $(seq 1 $NUM)
 do
     rm -f tmp/*
     echo Execution $i/$NUM
-    if ! pytest $TEST --log-dir=tmp --tb=short -v; then
+    if ! poetry run pytest $TEST --log-dir=tmp --tb=short -v; then
         exit 1
     fi
 done
