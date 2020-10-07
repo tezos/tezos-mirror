@@ -140,11 +140,12 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
          | _ ->
              return_unit)
   >>=? fun () ->
-  let (chain, block, confirmations, password_filename, protocol) =
+  let (chain, block, confirmations, password_filename, protocol, _sources) =
     match parsed_args with
     | None ->
         ( Client_config.default_chain,
           Client_config.default_block,
+          None,
           None,
           None,
           None )
@@ -153,7 +154,8 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
           p.Client_config.block,
           p.Client_config.confirmations,
           p.Client_config.password_filename,
-          p.Client_config.protocol )
+          p.Client_config.protocol,
+          p.Client_config.sources )
   in
   match mode with
   | `Mode_client ->

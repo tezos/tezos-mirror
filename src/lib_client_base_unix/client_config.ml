@@ -30,6 +30,7 @@ type cli_args = {
   chain : Chain_services.chain;
   block : Shell_services.block;
   confirmations : int option;
+  sources : Tezos_proxy.Light.sources_config option;
   password_filename : string option;
   protocol : Protocol_hash.t option;
   print_timings : bool;
@@ -291,6 +292,7 @@ let default_cli_args =
     chain = default_chain;
     block = default_block;
     confirmations = Some 0;
+    sources = None;
     password_filename = None;
     protocol = None;
     print_timings = false;
@@ -929,7 +931,7 @@ let parse_config_args (ctx : #Client_context.full) argv =
                node_port,
                tls,
                endpoint,
-               _sources,
+               sources,
                remote_signer,
                password_filename,
                client_mode ),
@@ -956,6 +958,14 @@ let parse_config_args (ctx : #Client_context.full) argv =
         return dir ) )
   >>=? fun base_dir ->
   check_base_dir_for_mode ctx client_mode base_dir
+  >>=? fun () ->
+  when_
+    (Option.is_some sources && client_mode <> `Mode_light)
+    (fun () ->
+      failwith
+        "--sources is specific to --mode light, please do not specify it with \
+         --mode %s."
+      @@ client_mode_to_string client_mode)
   >>=? fun () ->
   ( match config_file with
   | None ->
@@ -1062,6 +1072,7 @@ let parse_config_args (ctx : #Client_context.full) argv =
       chain;
       block;
       confirmations;
+      sources;
       print_timings = timings;
       log_requests;
       password_filename;
