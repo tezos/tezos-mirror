@@ -366,6 +366,13 @@ class TestContracts:
         # field annotation mismatch with UNPAIR
         ("unpair_field_annotation_mismatch.tz",
          r'The field access annotation does not match'),
+        # COMB, UNCOMB, and DUP cannot take 0 as argument
+        ("comb0.tz",
+         r"COMB expects an argument of at least 1"),
+        ("uncomb0.tz",
+         r"UNCOMB expects an argument of at least 1"),
+        ("dup0.tz",
+         r"DUP n expects an argument of at least 1"),
     ])
     def test_ill_typecheck(self, client: Client, contract, error_pattern):
         with utils.assert_run_failure(error_pattern):
