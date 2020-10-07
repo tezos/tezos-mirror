@@ -23,7 +23,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:    Protocol Environment
+    Invocation:   dune build @src/lib_protocol_environment/runtest
+    Dependencies: src/lib_protocol_environment/test/assert.ml
+    Subject:      Low-level operations on memory contexts.
+*)
+
 (** Context creation *)
+
+(*
+  Genesis -- block2 -- block3a
+                  \
+                   \-- block3b
+*)
 
 let create_block2 ctxt =
   Context.set ctxt ["a"; "b"] (Bytes.of_string "Novembre")
@@ -66,6 +80,12 @@ let wrap_context_init f _ () =
 
 let c = function None -> None | Some s -> Some (Bytes.to_string s)
 
+(** Restore the context applied until [block2]. It is asserted that
+    the following key-values are present:
+    - (["version"], ["0.0"])
+    - (["a"; "b"], ["Novembre"])
+    - [(["a"; "c"], "Juin")]
+*)
 let test_simple {block2 = ctxt; _} =
   Context.get ctxt ["version"]
   >>= fun version ->
@@ -78,6 +98,14 @@ let test_simple {block2 = ctxt; _} =
   Assert.equal_string_option ~msg:__LOC__ (Some "Juin") (c juin) ;
   Lwt.return_unit
 
+(** Restore the context applied until [block3a]. It is asserted that
+    the following key-values are present:
+    - (["version"], ["0.0"])
+    - (["a"; "c"], ["Juin"])
+    - (["a"; "d"], ["Mars"])
+    Additionally, the key ["a"; "b"] is associated with nothing as it
+    has been removed by block [block3a].
+*)
 let test_continuation {block3a = ctxt; _} =
   Context.get ctxt ["version"]
   >>= fun version ->
@@ -93,6 +121,14 @@ let test_continuation {block3a = ctxt; _} =
   Assert.equal_string_option ~msg:__LOC__ (Some "Mars") (c mars) ;
   Lwt.return_unit
 
+(** Restore the context applied until [block3b]. It is asserted that
+    the following key-values are present:
+    - (["version"], ["0.0"])
+    - (["a"; "b"], ["Novembre"])
+    - (["a"; "d"], ["Février"])
+    Additionally, the key ["a"; "c"] is associated with nothing as it
+    has been removed by block [block3b].
+*)
 let test_fork {block3b = ctxt; _} =
   Context.get ctxt ["version"]
   >>= fun version ->
@@ -108,6 +144,9 @@ let test_fork {block3b = ctxt; _} =
   Assert.equal_string_option ~msg:__LOC__ (Some "Février") (c mars) ;
   Lwt.return_unit
 
+(** Restore the context at [genesis] and explicitly replay
+    setting/getting key-values.
+*)
 let test_replay {genesis = ctxt0; _} =
   Context.set ctxt0 ["version"] (Bytes.of_string "0.0")
   >>= fun ctxt1 ->
@@ -147,6 +186,9 @@ let fold_keys s k ~init ~f =
 
 let keys t = fold_keys t ~init:[] ~f:(fun k acc -> Lwt.return (k :: acc))
 
+(** Restore the context at [genesis] and fold upon a context a series
+    of key prefixes using {!Context.fold}.
+*)
 let test_fold {genesis = ctxt; _} =
   Context.set ctxt ["a"; "b"] (Bytes.of_string "Novembre")
   >>= fun ctxt ->
