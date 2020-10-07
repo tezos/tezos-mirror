@@ -322,6 +322,30 @@ let endpoint_parameter () =
             (Invalid_endpoint_arg
                ("endpoint uri should not have query string or fragment: " ^ x)))
 
+let sources_parameter () =
+  parameter (fun _ path ->
+      Lwt_utils_unix.Json.read_file path
+      >>= function
+      | Error errs ->
+          failwith
+            "Can't parse the file specified by --sources as JSON: %s@,%a"
+            path
+            pp_print_error
+            errs
+      | Ok json -> (
+        try
+          match Tezos_proxy.Light.destruct_sources_config json with
+          | Ok sources_cfg ->
+              return sources_cfg
+          | Error msg ->
+              failwith "%s" msg
+        with exn ->
+          failwith
+            "Can't parse the file specified by --sources: %s@,%a"
+            path
+            (fun ppf exn -> Json_encoding.print_error ppf exn)
+            exn ))
+
 let chain_parameter () =
   parameter (fun _ chain ->
       match Chain_services.parse_chain chain with
@@ -475,6 +499,15 @@ let endpoint_arg () =
     ~doc:
       "HTTP(S) endpoint of the node RPC interface; e.g. 'http://localhost:8732'"
     (endpoint_parameter ())
+
+let sources_arg () =
+  arg
+    ~long:"sources"
+    ~short:'s'
+    ~placeholder:"path"
+    ~doc:
+      {|path to JSON file containing sources for --mode light. Example file content: {"min_agreement": 1.0, "uris": ["http://localhost:8732", "https://localhost:8733"]}|}
+    (sources_parameter ())
 
 let remote_signer_arg () =
   arg
@@ -750,7 +783,7 @@ let commands config_file cfg (client_mode : client_mode)
               base_dir) ]
 
 let global_options () =
-  args15
+  args16
     (base_dir_arg ())
     (config_file_arg ())
     (timings_switch ())
@@ -763,6 +796,7 @@ let global_options () =
     (port_arg ())
     (tls_switch ())
     (endpoint_arg ())
+    (sources_arg ())
     (remote_signer_arg ())
     (password_filename_arg ())
     (client_mode_arg ())
@@ -895,6 +929,7 @@ let parse_config_args (ctx : #Client_context.full) argv =
                node_port,
                tls,
                endpoint,
+               _sources,
                remote_signer,
                password_filename,
                client_mode ),
@@ -1057,6 +1092,7 @@ type t =
   * int option
   * bool
   * Uri.t option
+  * Tezos_proxy.Light.sources_config option
   * Uri.t option
   * string option
   * client_mode
