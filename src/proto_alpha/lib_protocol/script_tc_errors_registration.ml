@@ -618,10 +618,9 @@ let () =
     ~id:"michelson_v1.bad_dupn_argument"
     ~title:"0 passed to DUP n"
     ~description:"DUP expects an argument of at least 1 (passed 0)"
-    (obj2 (req "loc" Script.location_encoding) (req "argument" int32))
-    (function
-      | Dup_n_bad_argument (x, y) -> Some (x, Int32.of_int y) | _ -> None)
-    (fun (x, y) -> Dup_n_bad_argument (x, Int32.to_int y)) ;
+    (obj1 (req "loc" Script.location_encoding))
+    (function Dup_n_bad_argument loc -> Some loc | _ -> None)
+    (fun loc -> Dup_n_bad_argument loc) ;
   (* Bad dup_n stack *)
   register_error_kind
     `Permanent

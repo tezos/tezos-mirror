@@ -3028,7 +3028,7 @@ and parse_instr :
       >>?= fun n ->
       Gas.consume ctxt (Typecheck_costs.proof_argument n)
       >>?= fun ctxt ->
-      error_unless (Compare.Int.( > ) n 0) (Dup_n_bad_argument (loc, n))
+      error_unless (Compare.Int.( > ) n 0) (Dup_n_bad_argument loc)
       >>?= fun () ->
       record_trace (Dup_n_bad_stack loc) (make_proof_argument n stack_ty)
       >>?= fun (Dup_n_proof_argument (witness, after_ty)) ->
