@@ -121,7 +121,8 @@ let collect_error_locations errs =
         | Invalid_contract (loc, _)
         | Comparable_type_expected (loc, _)
         | Overflow (loc, _)
-        | Reject (loc, _, _) )
+        | Reject (loc, _, _)
+        | Dup_n_bad_argument loc )
       :: rest ->
         collect (loc :: acc) rest
     | _ :: rest ->
@@ -616,6 +617,12 @@ let report_errors ~details ~show_source ?parsed ppf errs =
               loc
               size
               maximum_size
+        | Dup_n_bad_argument loc ->
+            Format.fprintf
+              ppf
+              "%aDUP n expects an argument of at least 1 (passed 0)."
+              print_loc
+              loc
         | Self_in_lambda loc ->
             Format.fprintf
               ppf
