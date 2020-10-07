@@ -623,7 +623,7 @@ module Fitness : sig
 
   type fitness = t
 
-  val increase : ?gap:int -> context -> context
+  val increase : context -> context
 
   val current : context -> int64
 
