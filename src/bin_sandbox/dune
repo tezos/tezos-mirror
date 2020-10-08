@@ -56,13 +56,13 @@
          --number-of-b 2
          --with-timestamp
          --until 20
-         --protocol-hash PsCARTHAGazKbHtnKfLzQg3kms52kSRpgnDY982a9oYsSXRLQEb
-         --protocol-kind Carthage
+         --protocol-hash PsDELPH1Kxsxt8f9eWbxQeRxkjfbxoqM52jvs5Y5fBxWWh4ifpo
+         --protocol-kind Delphi
          --tezos-client %{bin:tezos-client}
          --tezos-node %{bin:tezos-node}
-         --tezos-baker %{bin:tezos-baker-006-PsCARTHA}
-         --tezos-endorser %{bin:tezos-endorser-006-PsCARTHA}
-         --tezos-accuser %{bin:tezos-accuser-006-PsCARTHA}
+         --tezos-baker %{bin:tezos-baker-007-PsDELPH1}
+         --tezos-endorser %{bin:tezos-endorser-007-PsDELPH1}
+         --tezos-accuser %{bin:tezos-accuser-007-PsDELPH1}
          --hard-fork 10:ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
          --hard-fork-baker %{bin:tezos-baker-alpha}
          --hard-fork-endorser %{bin:tezos-endorser-alpha}
@@ -85,14 +85,14 @@
          --time-betw 3
          --blocks-per-vot 14
          --with-timestamp
-         --protocol-hash PsCARTHAGazKbHtnKfLzQg3kms52kSRpgnDY982a9oYsSXRLQEb
-         --protocol-kind Carthage
+         --protocol-hash PsDELPH1Kxsxt8f9eWbxQeRxkjfbxoqM52jvs5Y5fBxWWh4ifpo
+         --protocol-kind Delphi
          --tezos-client %{bin:tezos-client}
          --tezos-admin %{bin:tezos-admin-client}
          --tezos-node %{bin:tezos-node}
-         --first-baker %{bin:tezos-baker-006-PsCARTHA}
-         --first-endorser %{bin:tezos-endorser-006-PsCARTHA}
-         --first-accuser %{bin:tezos-accuser-006-PsCARTHA}
+         --first-baker %{bin:tezos-baker-007-PsDELPH1}
+         --first-endorser %{bin:tezos-endorser-007-PsDELPH1}
+         --first-accuser %{bin:tezos-accuser-007-PsDELPH1}
          --second-baker %{bin:tezos-baker-alpha}
          --second-endorser %{bin:tezos-endorser-alpha}
          --second-accuser %{bin:tezos-accuser-alpha}
