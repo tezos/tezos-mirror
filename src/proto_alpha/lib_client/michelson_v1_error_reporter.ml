@@ -647,6 +647,18 @@ let report_errors ~details ~show_source ?parsed ppf errs =
               "%aThe SELF instruction cannot appear in a lambda."
               print_loc
               loc
+        | Non_dupable_type loc ->
+            Format.fprintf
+              ppf
+              "%aDUP used on a non-dupable type (e.g. tickets)."
+              print_loc
+              loc
+        | Unexpected_ticket loc ->
+            Format.fprintf
+              ppf
+              "%aTicket in unauthorized position (type error)."
+              print_loc
+              loc
         | Bad_stack_length ->
             Format.fprintf ppf "Bad stack length."
         | Bad_stack_item lvl ->

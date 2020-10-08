@@ -193,7 +193,13 @@ and 'elt boxed_list = {elements : 'elt list; length : int}
    construction is accepted by OCaml's type-checker is guaranteed to
    be type-safe. Overloadings of the concrete syntax are already
    resolved in this representation, either by using different
-   constructors or type witness parameters. *)
+   constructors or type witness parameters.
+
+   When adding a new instruction, please check whether it is duplicating a data
+   (rule of thumb: the type variable appears twice in the after stack, beware
+   it might be hidden a witness).
+   If it is, please protect it with [check_dupable_ty].
+*)
 and ('bef, 'aft) instr =
   (* stack ops *)
   | Drop : (_ * 'rest, 'rest) instr
