@@ -75,7 +75,7 @@ type error += Data_dir_needs_upgrade of {expected : t; actual : t}
 let () =
   register_error_kind
     `Permanent
-    ~id:"invalidDataDir"
+    ~id:"main.data_version.invalid_data_dir"
     ~title:"Invalid data directory"
     ~description:"The data directory cannot be accessed or created"
     ~pp:(fun ppf path ->
@@ -85,7 +85,7 @@ let () =
     (fun path -> Invalid_data_dir path) ;
   register_error_kind
     `Permanent
-    ~id:"invalidDataDirVersion"
+    ~id:"main.data_version.invalid_data_dir_version"
     ~title:"Invalid data directory version"
     ~description:"The data directory version was not the one that was expected"
     ~pp:(fun ppf (exp, got) ->
@@ -105,7 +105,7 @@ let () =
     (fun (expected, actual) -> Invalid_data_dir_version (expected, actual)) ;
   register_error_kind
     `Permanent
-    ~id:"couldNotReadDataDirVersion"
+    ~id:"main.data_version.could_not_read_data_dir_version"
     ~title:"Could not read data directory version file"
     ~description:"Data directory version file was invalid."
     Data_encoding.(obj1 (req "version_path" string))
@@ -118,7 +118,7 @@ let () =
     (fun path -> Could_not_read_data_dir_version path) ;
   register_error_kind
     `Permanent
-    ~id:"couldNotWriteVersionFile"
+    ~id:"main.data_version.could_not_write_version_file"
     ~title:"Could not write version file"
     ~description:"Version file cannot be written."
     Data_encoding.(obj1 (req "file_path" string))
@@ -133,7 +133,7 @@ let () =
     (fun file_path -> Could_not_write_version_file file_path) ;
   register_error_kind
     `Permanent
-    ~id:"dataDirNeedsUpgrade"
+    ~id:"main.data_version.data_dir_needs_upgrade"
     ~title:"The data directory needs to be upgraded"
     ~description:"The data directory needs to be upgraded"
     ~pp:(fun ppf (exp, got) ->
