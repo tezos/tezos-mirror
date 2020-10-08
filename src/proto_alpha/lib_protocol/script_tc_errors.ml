@@ -180,4 +180,9 @@ type error += Typechecking_too_many_recursive_calls
 
 type error += Unparsing_too_many_recursive_calls
 
+(* Ticket errors *)
+type error += Unexpected_ticket of Script.location
+
 type error += Unexpected_forged_value of Script.location
+
+type error += Non_dupable_type of Script.location

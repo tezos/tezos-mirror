@@ -757,4 +757,22 @@ let () =
       "A forged value was encountered but disallowed for that position."
     (obj1 (req "location" Script.location_encoding))
     (function Unexpected_forged_value loc -> Some loc | _ -> None)
-    (fun loc -> Unexpected_forged_value loc)
+    (fun loc -> Unexpected_forged_value loc) ;
+  (* Unexpected ticket *)
+  register_error_kind
+    `Permanent
+    ~id:"michelson_v1.unexpected_ticket"
+    ~title:"Ticket in unauthorized position (type error)"
+    ~description:"A ticket type has been found"
+    (obj1 (req "loc" location_encoding))
+    (function Unexpected_ticket loc -> Some loc | _ -> None)
+    (fun loc -> Unexpected_ticket loc) ;
+  (* Attempt to duplicate a non-dupable type *)
+  register_error_kind
+    `Permanent
+    ~id:"michelson_v1.non_dupable_type"
+    ~title:"Non-dupable type duplication attempt"
+    ~description:"DUP was used on a non-dupable type (e.g. tickets)."
+    (obj1 (req "loc" location_encoding))
+    (function Non_dupable_type loc -> Some loc | _ -> None)
+    (fun loc -> Non_dupable_type loc)

@@ -1165,6 +1165,104 @@ let name_of_ty : type a. a ty -> type_annot option = function
   | Sapling_transaction_t (_, tname) ->
       tname
 
+(* ---- Tickets ------------------------------------------------------------ *)
+
+(*
+   All comparable types are dupable, this function exists only to not forget
+   checking this property when adding new types.
+*)
+let check_dupable_comparable_ty : type a. a comparable_ty -> unit = function
+  | Unit_key _
+  | Never_key _
+  | Int_key _
+  | Nat_key _
+  | Signature_key _
+  | String_key _
+  | Bytes_key _
+  | Mutez_key _
+  | Bool_key _
+  | Key_hash_key _
+  | Key_key _
+  | Timestamp_key _
+  | Chain_id_key _
+  | Address_key _
+  | Pair_key _
+  | Union_key _
+  | Option_key _ ->
+      ()
+
+let rec check_dupable_ty :
+    type a. context -> location -> a ty -> context tzresult =
+ fun ctxt loc ty ->
+  Gas.consume ctxt Typecheck_costs.check_dupable_cycle
+  >>? fun ctxt ->
+  match ty with
+  | Unit_t _ ->
+      ok ctxt
+  | Int_t _ ->
+      ok ctxt
+  | Nat_t _ ->
+      ok ctxt
+  | Signature_t _ ->
+      ok ctxt
+  | String_t _ ->
+      ok ctxt
+  | Bytes_t _ ->
+      ok ctxt
+  | Mutez_t _ ->
+      ok ctxt
+  | Key_hash_t _ ->
+      ok ctxt
+  | Key_t _ ->
+      ok ctxt
+  | Timestamp_t _ ->
+      ok ctxt
+  | Address_t _ ->
+      ok ctxt
+  | Bool_t _ ->
+      ok ctxt
+  | Contract_t (_, _) ->
+      ok ctxt
+  | Operation_t _ ->
+      ok ctxt
+  | Chain_id_t _ ->
+      ok ctxt
+  | Never_t _ ->
+      ok ctxt
+  | Bls12_381_g1_t _ ->
+      ok ctxt
+  | Bls12_381_g2_t _ ->
+      ok ctxt
+  | Bls12_381_fr_t _ ->
+      ok ctxt
+  | Sapling_state_t _ ->
+      ok ctxt
+  | Sapling_transaction_t _ ->
+      ok ctxt
+  | Ticket_t _ ->
+      error (Unexpected_ticket loc)
+  | Pair_t ((ty_a, _, _), (ty_b, _, _), _) ->
+      check_dupable_ty ctxt loc ty_a
+      >>? fun ctxt -> check_dupable_ty ctxt loc ty_b
+  | Union_t ((ty_a, _), (ty_b, _), _) ->
+      check_dupable_ty ctxt loc ty_a
+      >>? fun ctxt -> check_dupable_ty ctxt loc ty_b
+  | Lambda_t (_, _, _) ->
+      ok ctxt
+  | Option_t (ty, _) ->
+      check_dupable_ty ctxt loc ty
+  | List_t (ty, _) ->
+      check_dupable_ty ctxt loc ty
+  | Set_t (key_ty, _) ->
+      let () = check_dupable_comparable_ty key_ty in
+      ok ctxt
+  | Map_t (key_ty, val_ty, _) ->
+      let () = check_dupable_comparable_ty key_ty in
+      check_dupable_ty ctxt loc val_ty
+  | Big_map_t (key_ty, val_ty, _) ->
+      let () = check_dupable_comparable_ty key_ty in
+      check_dupable_ty ctxt loc val_ty
+
 (* ---- Equality witnesses --------------------------------------------------*)
 
 type ('ta, 'tb) eq = Eq : ('same, 'same) eq
@@ -3326,6 +3424,8 @@ and parse_instr :
   | (Prim (loc, I_DUP, [], annot), Item_t (v, rest, stack_annot)) ->
       parse_var_annot loc annot ~default:stack_annot
       >>?= fun annot ->
+      record_trace (Non_dupable_type loc) (check_dupable_ty ctxt loc v)
+      >>?= fun ctxt ->
       typed ctxt loc Dup (Item_t (v, Item_t (v, rest, stack_annot), annot))
   | (Prim (loc, I_DUP, [n], v_annot), stack_ty) ->
       parse_var_annot loc v_annot
@@ -3354,6 +3454,8 @@ and parse_instr :
       >>?= fun () ->
       record_trace (Dup_n_bad_stack loc) (make_proof_argument n stack_ty)
       >>?= fun (Dup_n_proof_argument (witness, after_ty)) ->
+      record_trace (Non_dupable_type loc) (check_dupable_ty ctxt loc after_ty)
+      >>?= fun ctxt ->
       typed ctxt loc (Dup_n (n, witness)) (Item_t (after_ty, stack_ty, annot))
   | (Prim (loc, I_DIG, [n], result_annot), stack) ->
       let rec make_proof_argument :

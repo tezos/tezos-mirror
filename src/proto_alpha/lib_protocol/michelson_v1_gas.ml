@@ -1289,6 +1289,10 @@ module Cost_of = struct
 
     let parse_data_cycle = atomic_step_cost cost_TYPECHECKING_DATA
 
+    (* Cost of a cycle of checking that a type is dupable *)
+    (* TODO: bench *)
+    let check_dupable_cycle = atomic_step_cost cost_TYPECHECKING_DATA
+
     let bool = free
 
     let unit = free

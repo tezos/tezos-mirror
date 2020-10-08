@@ -325,6 +325,8 @@ module Cost_of : sig
 
     val parse_data_cycle : Gas.cost
 
+    val check_dupable_cycle : Gas.cost
+
     val bool : Gas.cost
 
     val unit : Gas.cost
