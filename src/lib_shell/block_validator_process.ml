@@ -296,12 +296,15 @@ module External_validator_process = struct
             lwt_emit (Process_status status) >>= fun () -> return res)
       (function
         | errors ->
-            process#status
-            >>= fun status ->
-            lwt_emit (Process_status status)
-            >>= fun () ->
-            vp.validator_process <- None ;
-            Lwt.return (error_exn errors))
+            ( match process#state with
+            | Running ->
+                Lwt.return_unit
+            | Exited status ->
+                lwt_emit (Process_status status)
+                >>= fun () ->
+                vp.validator_process <- None ;
+                Lwt.return_unit )
+            >>= fun () -> Lwt.return (error_exn errors))
 
   let init
       ({genesis; user_activated_upgrades; user_activated_protocol_overrides} :
