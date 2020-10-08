@@ -540,7 +540,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
     internal_nonces_used = Int_set.empty;
   }
 
-type previous_protocol = Genesis of Parameters_repr.t | Carthage_006
+type previous_protocol = Genesis of Parameters_repr.t | Delphi_007
 
 let check_and_update_protocol_version ctxt =
   Context.get ctxt version_key
@@ -555,8 +555,8 @@ let check_and_update_protocol_version ctxt =
             else if Compare.String.(s = "genesis") then
               get_proto_param ctxt
               >|=? fun (param, ctxt) -> (Genesis param, ctxt)
-            else if Compare.String.(s = "carthage_006") then
-              return (Carthage_006, ctxt)
+            else if Compare.String.(s = "delphi_007") then
+              return (Delphi_007, ctxt)
             else Lwt.return @@ storage_error (Incompatible_protocol_version s))
   >>=? fun (previous_proto, ctxt) ->
   Context.set ctxt version_key (Bytes.of_string version_value)
@@ -573,7 +573,7 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
       >>=? fun ctxt ->
       set_constants ctxt param.constants
       >|= fun ctxt -> ok (ctxt, param.constants.blocks_per_voting_period)
-  | Carthage_006 ->
+  | Delphi_007 ->
       get_constants ctxt
       >>=? fun c ->
       let prev_blocks_per_voting_period = c.blocks_per_voting_period in

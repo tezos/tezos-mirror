@@ -66,7 +66,7 @@ val prepare :
   Context.t ->
   context tzresult Lwt.t
 
-type previous_protocol = Genesis of Parameters_repr.t | Carthage_006
+type previous_protocol = Genesis of Parameters_repr.t | Delphi_007
 
 val prepare_first_block :
   level:int32 ->
