@@ -122,7 +122,6 @@ struct
   module Map = Stdlib.Map
   module Int32 = Int32
   module Int64 = Int64
-  module Nativeint = Nativeint
   module Buffer = Buffer
   module Format = Format
   module Option = Tezos_base.TzPervasives.Option
