@@ -54,7 +54,7 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
       >>=? fun ctxt ->
       Storage.Block_priority.init ctxt 0
       >>=? fun ctxt -> Vote_storage.update_listings ctxt
-  | Carthage_006 ->
+  | Delphi_007 ->
       Storage.Vote.Current_period_kind_007.delete ctxt
       >>=? fun ctxt ->
       let level_position = (Level_storage.current ctxt).level_position in
