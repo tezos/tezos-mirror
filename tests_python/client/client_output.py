@@ -305,8 +305,8 @@ def extract_environment_protocol(client_output: str) -> str:
         if match is None:
             raise InvalidClientOutput(client_output)
         return match.groups()[0]
-    except Exception:
-        raise InvalidClientOutput(client_output)
+    except Exception as exception:
+        raise InvalidClientOutput(client_output) from exception
 
 
 class PointInfo:
