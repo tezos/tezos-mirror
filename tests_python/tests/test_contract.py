@@ -387,6 +387,9 @@ class TestContracts:
         # sapling_state is not packable
         ("unpack_sapling_state.tz",
          r"big_map or sapling_state type not expected here"),
+        # Ticket duplication attempt
+        ("ticket_dup.tz",
+         r'DUP used on a non-dupable type'),
     ])
     def test_ill_typecheck(self, client: Client, contract, error_pattern):
         with utils.assert_run_failure(error_pattern):
