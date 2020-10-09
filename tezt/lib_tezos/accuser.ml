@@ -25,6 +25,7 @@
 
 module Parameters = struct
   type persistent_state = {
+    base_dir : string;
     node_rpc_port : int;
     mutable pending_ready : unit option Lwt.u list;
   }
@@ -64,10 +65,20 @@ let handle_raw_stdout accuser line =
   | _ ->
       ()
 
-let create ?(path = Constant.alpha_accuser) ?name ?color ?event_pipe ~node =
+let create ?(path = Constant.alpha_accuser) ?name ?color ?event_pipe ?base_dir
+    ~node =
   let node_rpc_port = Node.rpc_port node in
+  let name = match name with None -> fresh_name () | Some name -> name in
+  let base_dir =
+    match base_dir with None -> Temp.dir name | Some dir -> dir
+  in
   let accuser =
-    create ~path ?name ?color ?event_pipe {node_rpc_port; pending_ready = []}
+    create
+      ~path
+      ?name:(Some name)
+      ?color
+      ?event_pipe
+      {base_dir; node_rpc_port; pending_ready = []}
   in
   on_stdout accuser (handle_raw_stdout accuser) ;
   accuser
@@ -82,6 +93,8 @@ let run accuser =
     [ "-E";
       "http://localhost:"
       ^ string_of_int accuser.persistent_state.node_rpc_port;
+      "--base-dir";
+      accuser.persistent_state.base_dir;
       "run" ]
   in
   let on_terminate _ =
@@ -109,9 +122,9 @@ let wait_for_ready accuser =
         resolver :: accuser.persistent_state.pending_ready ;
       check_event accuser "Accuser started." promise
 
-let init ?path ?name ?color ?event_pipe ~node () =
+let init ?path ?name ?color ?event_pipe ?base_dir ~node () =
   let* () = Node.wait_for_ready node in
-  let accuser = create ?path ?name ?color ?event_pipe ~node in
+  let accuser = create ?path ?name ?color ?event_pipe ?base_dir ~node in
   let* () = run accuser in
   return accuser
 

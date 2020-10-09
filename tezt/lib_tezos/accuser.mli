@@ -41,6 +41,9 @@ type t
     from [name]. It will be created as a named pipe so that accuser
     events can be received.
 
+    [base_dir] corresponds to the (useless) "--base-dir" argument of
+    the tezos-accuser command.
+
     The [node] parameter is the accuser's node target. The accusser
     will be configured to be synchronised with the given node, and
     will communicate with it. *)
@@ -49,6 +52,7 @@ val create :
   ?name:string ->
   ?color:Log.Color.t ->
   ?event_pipe:string ->
+  ?base_dir:string ->
   node:Node.t ->
   t
 
@@ -133,6 +137,9 @@ val wait_for :
     from [name]. It will be created as a named pipe so that accuser
     events can be received.
 
+    [base_dir] corresponds to the (useless) "--base-dir" argument of
+    the tezos-accuser command.
+
     The [node] parameter is the accuser's node target. The accusser
     will be configured to be synchronised with the given node, and
     will communicate with it. *)
@@ -141,6 +148,7 @@ val init :
   ?name:string ->
   ?color:Log.Color.t ->
   ?event_pipe:string ->
+  ?base_dir:string ->
   node:Node.t ->
   unit ->
   t Lwt.t
