@@ -2746,17 +2746,23 @@ let rec parse_data :
             Lwt.return
               ( ( match last_value with
                 | Some value ->
-                    if Compare.Int.(0 <= compare_comparable key_type value k)
-                    then
-                      if Compare.Int.(0 = compare_comparable key_type value k)
-                      then
+                    Gas.consume
+                      ctxt
+                      (Michelson_v1_gas.Cost_of.Interpreter.compare
+                         key_type
+                         value
+                         k)
+                    >>? fun ctxt ->
+                    let c = compare_comparable key_type value k in
+                    if Compare.Int.(0 <= c) then
+                      if Compare.Int.(0 = c) then
                         error (Duplicate_map_keys (loc, strip_locations expr))
                       else
                         error (Unordered_map_keys (loc, strip_locations expr))
-                    else ok_unit
+                    else ok ctxt
                 | None ->
-                    ok_unit )
-              >>? fun () ->
+                    ok ctxt )
+              >>? fun ctxt ->
               Gas.consume
                 ctxt
                 (Michelson_v1_gas.Cost_of.Interpreter.map_update k map)
@@ -2872,17 +2878,22 @@ let rec parse_data :
              Lwt.return
                ( ( match last_value with
                  | Some value ->
-                     if Compare.Int.(0 <= compare_comparable t value v) then
-                       if Compare.Int.(0 = compare_comparable t value v) then
+                     Gas.consume
+                       ctxt
+                       (Michelson_v1_gas.Cost_of.Interpreter.compare t value v)
+                     >>? fun ctxt ->
+                     let c = compare_comparable t value v in
+                     if Compare.Int.(0 <= c) then
+                       if Compare.Int.(0 = c) then
                          error
                            (Duplicate_set_values (loc, strip_locations expr))
                        else
                          error
                            (Unordered_set_values (loc, strip_locations expr))
-                     else ok_unit
+                     else ok ctxt
                  | None ->
-                     ok_unit )
-               >>? fun () ->
+                     ok ctxt )
+               >>? fun ctxt ->
                Gas.consume
                  ctxt
                  (Michelson_v1_gas.Cost_of.Interpreter.set_update v set)
