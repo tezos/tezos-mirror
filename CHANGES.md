@@ -19,6 +19,10 @@ here either.
   chain is stuck for example. More information is available in the
   whitedoc.
 
+- Node option `--bootstrap-threshold` is now deprecated and may be
+  removed starting from version 9.0. Use `--synchronisation-threshold`
+  instead.
+
 - Fixed an issue which prevented using of ports higher than 32767 in tezos-client config file
 
 - Fixed an issue which caused `tezos-client rpc get /errors`
