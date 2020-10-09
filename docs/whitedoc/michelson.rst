@@ -2189,6 +2189,8 @@ by another ticketer.
 
 The amount is a meta-data that can be used to implement UTXOs.
 
+Tickets cannot be duplicated using the ``DUP`` instruction.
+
 For example, a ticket could represent a Non Fungible Token (NFT) or a Unspent
 Transaction Output (UTXO) which can then be passed around and behave like a value.
 This process can happen without the need to interact with a centralized NFT contract,
