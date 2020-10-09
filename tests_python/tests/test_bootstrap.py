@@ -8,7 +8,7 @@ LOG_LEVEL = {"validator.chain":  "debug", "validator.peer": "debug"}
 
 
 def params(threshold=0):
-    return ['--sync-latency', '3', '--bootstrap-threshold',
+    return ['--sync-latency', '3', '--synchronisation-threshold',
             str(threshold), '--connections', '100']
 
 

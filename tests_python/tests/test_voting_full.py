@@ -35,7 +35,7 @@ with open(PARAMETERS_FILE) as f:
 
 
 def node_params(threshold=0):
-    return ['--sync-latency', '2', '--bootstrap-threshold',
+    return ['--sync-latency', '2', '--synchronisation-threshold',
             str(threshold), '--connections', '500', '--enable-testchain']
 
 
@@ -64,7 +64,7 @@ class TestVotingFull:
         sandbox.add_baker(10, 'bootstrap1', proto=PROTO_A_DAEMON)
 
     def test_add_initial_nodes(self, sandbox: Sandbox):
-        """ We launch nodes with non-null bootstrap-threshold.
+        """ We launch nodes with non-null synchronisation-threshold.
             This is to test the bootstrap heuristics with the testchain. """
         sandbox.add_node(0, params=node_params(2))
         sandbox.add_node(1, params=node_params(2))
