@@ -101,3 +101,7 @@ let read_all io =
   let* () = Lwt_stream.iter (Buffer.add_string buffer) stream in
   let result = Buffer.contents buffer in
   Buffer.reset buffer ; return result
+
+let read_file filename =
+  let* ic = Lwt_io.open_file ~mode:Lwt_io.Input filename in
+  Lwt_io.read ic

@@ -36,6 +36,10 @@ type mockup_sync_mode = Asynchronous | Synchronous
 (** Tezos client states. *)
 type t
 
+(** [base_dir t] retrieves the base directory (aka the location/path of its
+    configuration files) of client [t] *)
+val base_dir : t -> string
+
 (** Create a client.
 
     The standard output and standard error output of the node will

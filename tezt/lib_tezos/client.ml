@@ -36,6 +36,8 @@ type t = {
   mode : mode;
 }
 
+let base_dir t = t.base_dir
+
 let next_name = ref 1
 
 let fresh_name () =
