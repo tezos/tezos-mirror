@@ -140,7 +140,7 @@ let run_command state t =
     | None -> Environment_configuration.default_cors_origin state in
   node_command state t ["run"]
     ( flag "private-mode" @ flag "no-bootstrap-peers" @ peers
-    @ optf "bootstrap-threshold" "0"
+    @ optf "synchronisation-threshold" "0"
     @ optf "connections" "%d" t.expected_connections
     @ (if t.single_process then flag "singleprocess" else [])
     @ Option.value_map cors_origin
