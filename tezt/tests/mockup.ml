@@ -111,6 +111,70 @@ let test_simple_baking_event ~protocol =
   Log.info "Baking pending operations..." ;
   Client.bake_for ~key:giver client
 
+let test_same_transfer_twice ~protocol =
+  Test.register
+    ~__FILE__
+    ~title:
+      ("same-transfer-twice (mockup / asynchronous / " ^ (Protocol.name protocol) ^ ")")
+    ~tags:["mockup"; "client"; "transfer"; Protocol.tag protocol; "asynchronous"]
+  @@ fun () ->
+  let (giver, amount, receiver) = transfer_data in
+  let* client =
+    Client.init_mockup ~sync_mode:Client.Asynchronous ~protocol ()
+  in
+  let mempool_file = Client.base_dir client // "mockup" // "mempool.json" in
+  Log.info "Transfer %d from %s to %s" amount giver receiver ;
+  let* () = Client.transfer ~amount ~giver ~receiver client in
+  let* mempool1 = read_file mempool_file in
+  Log.info "Transfer %d from %s to %s" amount giver receiver ;
+  let* () = Client.transfer ~amount ~giver ~receiver client in
+  let* mempool2 = read_file mempool_file in
+  Log.info "Checking that mempool is unchanged" ;
+  if mempool1 <> mempool2 then
+    Test.fail
+      "Expected mempool to stay unchanged\n--\n%s--\n %s"
+      mempool1
+      mempool2 ;
+  return ()
+
+let test_transfer_same_participants ~protocol =
+  Test.register
+    ~__FILE__
+    ~title:
+      ( "transfer-same-participants (mockup / asynchronous / " ^ (Protocol.name protocol)
+      ^ ")" )
+    ~tags:["mockup"; "client"; "transfer"; Protocol.tag protocol; "asynchronous"]
+  @@ fun () ->
+  let (giver, amount, receiver) = transfer_data in
+  let* client =
+    Client.init_mockup ~sync_mode:Client.Asynchronous ~protocol ()
+  in
+  let base_dir = Client.base_dir client in
+  let mempool_file = base_dir // "mockup" // "mempool.json" in
+  let thrashpool_file = base_dir // "mockup" // "trashpool.json" in
+  Log.info "Transfer %d from %s to %s" amount giver receiver ;
+  let* () = Client.transfer ~amount ~giver ~receiver client in
+  let* mempool1 = read_file mempool_file in
+  Log.info "Transfer %d from %s to %s" (amount + 1) giver receiver ;
+  (* The next process is expected to fail *)
+  let process =
+    Client.spawn_transfer ~amount:(amount + 1) ~giver ~receiver client
+  in
+  let* _status = Process.wait process in
+  let* mempool2 = read_file mempool_file in
+  Log.info "Checking that mempool is unchanged" ;
+  if mempool1 <> mempool2 then
+    Test.fail
+      "Expected mempool to stay unchanged\n--\n%s\n--\n %s"
+      mempool1
+      mempool2 ;
+  Log.info
+    "Checking that last operation was discarded into a newly created trashpool" ;
+  let* str = read_file thrashpool_file in
+  if String.equal str "" then
+    Test.fail "Expected thrashpool to have one operation." ;
+  return ()
+
 let test_multiple_baking ~protocol =
   Test.register
     ~__FILE__
@@ -147,6 +211,8 @@ let test_multiple_baking ~protocol =
 
 let register protocol =
   test_rpc_list ~protocol ;
+  test_same_transfer_twice ~protocol ;
+  test_transfer_same_participants ~protocol ;
   test_transfer ~protocol ;
   test_asynchronous ~protocol ;
   test_simple_baking_event ~protocol ;
