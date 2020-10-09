@@ -884,9 +884,40 @@ let chain_validator_limits_encoding =
       (synchronisation, worker_limits))
     (fun (synchronisation, worker_limits) -> {synchronisation; worker_limits})
     (merge_objs
-       (synchronisation_heuristic_encoding
-          default_shell.chain_validator_limits.synchronisation.latency
-          default_shell.chain_validator_limits.synchronisation.threshold)
+       (* Use a union to support both the deprecated
+          bootstrap_threshold and the new synchronisation_threshold
+          options when parsing.  When printing, use the new
+          synchronisation_threshold option. *)
+       (union
+          [ case
+              ~title:"synchronisation_heuristic_encoding"
+              Json_only
+              (synchronisation_heuristic_encoding
+                 default_shell.chain_validator_limits.synchronisation.latency
+                 default_shell.chain_validator_limits.synchronisation.threshold)
+              (fun x -> Some x)
+              (fun x -> x);
+            case
+              ~title:"legacy_bootstrap_threshold_encoding"
+              Json_only
+              (obj1
+                 (dft
+                    "bootstrap_threshold"
+                    ~description:
+                      "[DEPRECATED] Set the number of peers with whom a chain \
+                       synchronisation must be completed to bootstrap the \
+                       node."
+                    uint8
+                    4))
+              (fun _ -> None) (* This is used for legacy *)
+              (fun x ->
+                Chain_validator.
+                  {
+                    threshold = x;
+                    latency =
+                      default_shell.chain_validator_limits.synchronisation
+                        .latency;
+                  }) ])
        (worker_limits_encoding
           default_shell.chain_validator_limits.worker_limits.backlog_size
           default_shell.chain_validator_limits.worker_limits.backlog_level))
