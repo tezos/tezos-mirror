@@ -1,7 +1,7 @@
 tests/test_contract_onchain_opcodes.py::TestContractOnchainOpcodes::test_split_bytes
 
 Node is bootstrapped.
-Estimated gas: 2602.901 units (will add 100 + 90 for safety)
+Estimated gas: 2604.341 units (will add 100 + 90 for safety)
 Estimated storage: 511 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -14,7 +14,7 @@ This sequence of operations was run:
     From: [CONTRACT_HASH]
     Fee to the baker: ꜩ0.000765
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 2793
+    Gas limit: 2795
     Storage limit: 531 bytes
     Balance updates:
       [CONTRACT_HASH] ................ -ꜩ0.000765
@@ -55,7 +55,7 @@ This sequence of operations was run:
           [CONTRACT_HASH]
         Storage size: 254 bytes
         Paid storage size diff: 254 bytes
-        Consumed gas: 2602.901
+        Consumed gas: 2604.341
         Balance updates:
           [CONTRACT_HASH] ... -ꜩ0.0635
           [CONTRACT_HASH] ... -ꜩ0.06425
@@ -66,7 +66,7 @@ New contract [CONTRACT_HASH] originated.
 Contract memorized as split_bytes.
 Injected block [BLOCK_HASH]
 Node is bootstrapped.
-Estimated gas: 3517.107 units (will add 100 for safety)
+Estimated gas: 3518.547 units (will add 100 for safety)
 Estimated storage: 18 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -79,7 +79,7 @@ This sequence of operations was run:
     From: [CONTRACT_HASH]
     Fee to the baker: ꜩ0.000623
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 3618
+    Gas limit: 3619
     Storage limit: 38 bytes
     Balance updates:
       [CONTRACT_HASH] ................ -ꜩ0.000623
@@ -93,14 +93,14 @@ This sequence of operations was run:
       Updated storage: { 0xaa ; 0xbb ; 0xcc }
       Storage size: 272 bytes
       Paid storage size diff: 18 bytes
-      Consumed gas: 3517.107
+      Consumed gas: 3518.547
       Balance updates:
         [CONTRACT_HASH] ... -ꜩ0.0045
 
 Injected block [BLOCK_HASH]
 { 0xaa ; 0xbb ; 0xcc }
 Node is bootstrapped.
-Estimated gas: 3657.957 units (will add 100 for safety)
+Estimated gas: 3659.397 units (will add 100 for safety)
 Estimated storage: 18 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -113,7 +113,7 @@ This sequence of operations was run:
     From: [CONTRACT_HASH]
     Fee to the baker: ꜩ0.000637
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 3758
+    Gas limit: 3760
     Storage limit: 38 bytes
     Balance updates:
       [CONTRACT_HASH] ................ -ꜩ0.000637
@@ -127,7 +127,7 @@ This sequence of operations was run:
       Updated storage: { 0xaa ; 0xbb ; 0xcc ; 0xdd ; 0xee ; 0xff }
       Storage size: 290 bytes
       Paid storage size diff: 18 bytes
-      Consumed gas: 3657.957
+      Consumed gas: 3659.397
       Balance updates:
         [CONTRACT_HASH] ... -ꜩ0.0045
 
