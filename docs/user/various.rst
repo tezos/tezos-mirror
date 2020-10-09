@@ -28,7 +28,7 @@ hardware wallet.
 
    tezos-node run --rpc-addr [::] --private-mode \
                                   --no-bootstrap-peers \
-                                  --bootstrap-threshold=1 \
+                                  --synchronisation-threshold=1 \
                                   --connections 1 \
                                   --peer <public-node-ip>
 
@@ -207,7 +207,12 @@ writing your own configuration file if needed.
          /* The number of peers to synchronize with
             before declaring the node 'bootstrapped'. */
 
-         "bootstrap_threshold": 4,
+         "synchronisation_threshold": 4,
+
+         /* Latency in seconds used for the synchronisation
+         heuristic. */
+
+         "latency": 120,
 
          /* The history mode configuration you want to run. */
          "history_mode": "full"
