@@ -136,6 +136,7 @@ val run :
   ?expected_pow:int ->
   ?single_process:bool ->
   ?bootstrap_threshold:int ->
+  ?synchronisation_threshold:int ->
   ?connections:int ->
   t ->
   unit Lwt.t
@@ -227,6 +228,7 @@ val init :
   ?history_mode:history_mode ->
   ?single_process:bool ->
   ?bootstrap_threshold:int ->
+  ?synchronisation_threshold:int ->
   ?connections:int ->
   unit ->
   t Lwt.t
@@ -243,6 +245,7 @@ val restart :
   ?expected_pow:int ->
   ?single_process:bool ->
   ?bootstrap_threshold:int ->
+  ?synchronisation_threshold:int ->
   ?connections:int ->
   t ->
   unit Lwt.t

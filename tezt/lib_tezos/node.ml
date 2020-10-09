@@ -330,7 +330,7 @@ let handle_raw_event node line =
           () )
 
 let run ?(expected_pow = 0) ?(single_process = false) ?bootstrap_threshold
-    ?connections node =
+    ?synchronisation_threshold ?connections node =
   ( match node.status with
   | Not_running ->
       ()
@@ -345,6 +345,11 @@ let run ?(expected_pow = 0) ?(single_process = false) ?bootstrap_threshold
         []
     | Some x ->
         ["--bootstrap-threshold"; string_of_int x] )
+    @ ( match synchronisation_threshold with
+      | None ->
+          []
+      | Some x ->
+          ["--synchronisation-threshold"; string_of_int x] )
     @ ( match connections with
       | None ->
           []
@@ -504,20 +509,32 @@ let on_event node handler =
 
 let init ?path ?name ?color ?data_dir ?event_pipe ?expected_pow ?network
     ?net_port ?rpc_port ?history_mode ?single_process ?bootstrap_threshold
-    ?connections () =
+    ?synchronisation_threshold ?connections () =
   let node = create ?path ?name ?color ?data_dir ?event_pipe () in
   let* () = identity_generate ?expected_pow node in
   let* () = config_init ?network ?net_port ?rpc_port ?history_mode node in
   let* () =
-    run ?expected_pow ?single_process ?bootstrap_threshold ?connections node
+    run
+      ?expected_pow
+      ?single_process
+      ?bootstrap_threshold
+      ?synchronisation_threshold
+      ?connections
+      node
   in
   let* () = wait_for_ready node in
   return node
 
-let restart ?expected_pow ?single_process ?bootstrap_threshold ?connections
-    node =
+let restart ?expected_pow ?single_process ?bootstrap_threshold
+    ?synchronisation_threshold ?connections node =
   let* () = terminate node in
   let* () =
-    run ?expected_pow ?single_process ?bootstrap_threshold ?connections node
+    run
+      ?expected_pow
+      ?single_process
+      ?bootstrap_threshold
+      ?synchronisation_threshold
+      ?connections
+      node
   in
   wait_for_ready node
