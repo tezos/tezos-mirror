@@ -115,7 +115,7 @@ val update :
   ?cors_headers:string list ->
   ?rpc_tls:tls ->
   ?log_output:Lwt_log_sink_unix.Output.t ->
-  ?bootstrap_threshold:int ->
+  ?synchronisation_threshold:int ->
   ?history_mode:History_mode.t ->
   ?network:blockchain_network ->
   ?latency:int ->

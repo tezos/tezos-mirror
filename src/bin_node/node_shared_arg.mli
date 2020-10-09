@@ -50,6 +50,7 @@ type t = {
   log_output : Lwt_log_sink_unix.Output.t option;
   bootstrap_threshold : int option;
   history_mode : History_mode.t option;
+  synchronisation_threshold : int option;
   latency : int option;
 }
 

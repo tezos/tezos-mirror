@@ -1126,8 +1126,8 @@ let update ?data_dir ?min_connections ?expected_connections ?max_connections
     ?expected_pow ?bootstrap_peers ?listen_addr ?discovery_addr
     ?(rpc_listen_addrs = []) ?(private_mode = false) ?(disable_mempool = false)
     ?(enable_testchain = false) ?(cors_origins = []) ?(cors_headers = [])
-    ?rpc_tls ?log_output ?bootstrap_threshold ?history_mode ?network ?latency
-    cfg =
+    ?rpc_tls ?log_output ?synchronisation_threshold ?history_mode ?network
+    ?latency cfg =
   let data_dir = Option.value ~default:cfg.data_dir data_dir in
   Node_data_version.ensure_data_dir data_dir
   >>=? fun () ->
@@ -1194,7 +1194,7 @@ let update ?data_dir ?min_connections ?expected_connections ?max_connections
                Option.value
                  ~default:
                    cfg.shell.chain_validator_limits.synchronisation.threshold
-                 bootstrap_threshold;
+                 synchronisation_threshold;
            }
          in
          {cfg.shell.chain_validator_limits with synchronisation});
