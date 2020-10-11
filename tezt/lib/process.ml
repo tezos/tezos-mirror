@@ -357,15 +357,14 @@ let stderr process = get_echo_lwt_channel process.stderr
 
 let name process = process.name
 
-let check_and_read_stdout ?expect_failure process =
+let check_and_read ?expect_failure ~channel_getter process =
   let* () = check ?expect_failure process
-  and* output = read_all (stdout process) in
+  and* output = Lwt_io.read (channel_getter process) in
   return output
 
-let check_and_read_stderr ?expect_failure process =
-  let* () = check ?expect_failure process
-  and* output = read_all (stderr process) in
-  return output
+let check_and_read_stdout = check_and_read ~channel_getter:stdout
+
+let check_and_read_stderr = check_and_read ~channel_getter:stderr
 
 let run_and_read_stdout ?log_status_on_exit ?name ?color ?env ?expect_failure
     command arguments =

@@ -275,7 +275,7 @@ let get_balance_for ?node ~account client =
   in
   let process = spawn_get_balance_for ?node ~account client in
   let* () = Process.check process
-  and* output = read_all (Process.stdout process) in
+  and* output = Lwt_io.read (Process.stdout process) in
   return @@ extract_balance output
 
 let spawn_create_mockup ?(sync_mode = Synchronous) ~protocol client =

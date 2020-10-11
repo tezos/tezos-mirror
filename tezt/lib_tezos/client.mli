@@ -28,16 +28,19 @@
 (** Mode of the client *)
 type mode = Client of Node.t option | Mockup
 
-(** The synchronization mode of the client
-    Asynchronous mode is when transfer doesn't bake the block
-    Synchronous is the default mode (no flag passed at create mockup) *)
+(** The synchronization mode of the client.
+
+    - [Asynchronous] mode is when transfer doesn't bake the block.
+    - [Synchronous] is the default mode (no flag passed to [create mockup]). *)
 type mockup_sync_mode = Asynchronous | Synchronous
 
 (** Tezos client states. *)
 type t
 
-(** [base_dir t] retrieves the base directory (aka the location/path of its
-    configuration files) of client [t] *)
+(** Get the base directory of a client.
+
+    The base directory is the location where clients store their
+    configuration files. It corresponds to the [--base-dir] option. *)
 val base_dir : t -> string
 
 (** Create a client.
