@@ -191,14 +191,22 @@ let pp_base_dir_class ppf bclass =
 let is_directory_empty dir = Array.length (Sys.readdir dir) = 0
 
 let classify_base_dir base_dir =
-  if not (Sys.file_exists base_dir) then Base_dir_does_not_exist
-  else if not (Sys.is_directory base_dir) then Base_dir_is_file
-  else if is_directory_empty base_dir then Base_dir_is_empty
+  if not (Sys.file_exists base_dir) then return Base_dir_does_not_exist
+  else if not (Sys.is_directory base_dir) then return Base_dir_is_file
+  else if is_directory_empty base_dir then return Base_dir_is_empty
   else
     let dirname = base_dir in
-    if Files.exists_mockup_directory ~dirname && Files.Context.exists ~dirname
-    then Base_dir_is_mockup
-    else Base_dir_is_nonempty
+    Files.exists_mockup_directory ~dirname
+    >>= function
+    | true -> (
+        Files.Context.exists ~dirname
+        >>= function
+        | true ->
+            return Base_dir_is_mockup
+        | false ->
+            return Base_dir_is_nonempty )
+    | false ->
+        return Base_dir_is_nonempty
 
 let create_mockup ~(cctxt : Tezos_client_base.Client_context.full)
     ~protocol_hash ~constants_overrides_json ~bootstrap_accounts_json
@@ -210,17 +218,20 @@ let create_mockup ~(cctxt : Tezos_client_base.Client_context.full)
     cctxt#message "Created mockup client base dir in %s" base_dir
     >>= fun () -> return_unit
   in
-  ( match classify_base_dir base_dir with
-  | Base_dir_does_not_exist | Base_dir_is_empty ->
-      create_base_dir ()
-  | Base_dir_is_file ->
-      failwith "%s is a file" base_dir
-  | Base_dir_is_mockup ->
-      failwith "%s is already initialized as a mockup directory" base_dir
-  | Base_dir_is_nonempty ->
-      failwith
-        "%s is not empty, please specify a fresh base directory"
-        base_dir )
+  classify_base_dir base_dir
+  >>=? (function
+         | Base_dir_does_not_exist | Base_dir_is_empty ->
+             create_base_dir ()
+         | Base_dir_is_file ->
+             failwith "%s is a file" base_dir
+         | Base_dir_is_mockup ->
+             failwith
+               "%s is already initialized as a mockup directory"
+               base_dir
+         | Base_dir_is_nonempty ->
+             failwith
+               "%s is not empty, please specify a fresh base directory"
+               base_dir)
   >>=? fun () ->
   init_mockup_context_by_protocol_hash
     ~cctxt

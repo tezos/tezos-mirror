@@ -69,7 +69,7 @@ val overwrite_mockup :
   base_dir:string ->
   unit tzresult Lwt.t
 
-(** {2 Base diretory states} *)
+(** {2 Base directory states} *)
 
 type base_dir_class =
   | Base_dir_does_not_exist
@@ -82,4 +82,4 @@ val pp_base_dir_class : Format.formatter -> base_dir_class -> unit
 
 (** Test whether base directory is a valid target for loading or creating
     a mockup environment. *)
-val classify_base_dir : string -> base_dir_class
+val classify_base_dir : string -> base_dir_class tzresult Lwt.t

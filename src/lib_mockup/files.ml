@@ -31,7 +31,12 @@ let get_mockup_directory ~dirname = Filename.concat dirname mockup_subdirectory
 
 let exists_mockup_directory ~dirname =
   let filename = get_mockup_directory ~dirname in
-  Sys.file_exists filename && Sys.is_directory filename
+  Lwt_unix.file_exists filename
+  >>= fun b ->
+  if b then
+    Lwt_unix.stat filename
+    >>= fun stat -> Lwt.return (stat.st_kind = Lwt_unix.S_DIR)
+  else Lwt.return_false
 
 let subdir_file = Filename.concat mockup_subdirectory
 
@@ -44,7 +49,7 @@ end
 module type ACCESSOR = sig
   val get : dirname:string -> t
 
-  val exists : dirname:string -> bool
+  val exists : dirname:string -> bool Lwt.t
 end
 
 module Make (F : File_descr) : ACCESSOR = struct
@@ -52,7 +57,7 @@ module Make (F : File_descr) : ACCESSOR = struct
 
   let get ~dirname = dir_file ~dirname file
 
-  let exists ~dirname = Sys.file_exists @@ get ~dirname
+  let exists ~dirname = Lwt_unix.file_exists @@ get ~dirname
 end
 
 module Context = Make (struct

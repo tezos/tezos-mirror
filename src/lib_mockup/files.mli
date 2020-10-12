@@ -34,7 +34,7 @@ val get_mockup_directory : dirname:string -> t
 
 (** [has_mockup_directory ~dirname] checks whether a mockup subdirectory exists
     in directory [dirname] *)
-val exists_mockup_directory : dirname:string -> bool
+val exists_mockup_directory : dirname:string -> bool Lwt.t
 
 (** Generic signature to access files located inside mockup subdirectory *)
 module type ACCESSOR = sig
@@ -43,7 +43,7 @@ module type ACCESSOR = sig
   val get : dirname:string -> t
 
   (** [exists ~dirname] checks whether [file] is present under [dirname] *)
-  val exists : dirname:string -> bool
+  val exists : dirname:string -> bool Lwt.t
 end
 
 (** Accessor for [context.json] *)

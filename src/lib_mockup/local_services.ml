@@ -262,8 +262,8 @@ module Make (E : MENV) = struct
       >>=? fun json -> return @@ Data_encoding.Json.destruct ops_encoding json
 
     let read () =
-      if File_accessor.exists ~dirname:E.base_dir then unsafe_read ()
-      else return []
+      File_accessor.exists ~dirname:E.base_dir
+      >>= function true -> unsafe_read () | false -> return []
 
     let write ~mode operations =
       ( match mode with
@@ -622,7 +622,7 @@ module Make (E : MENV) = struct
       Tezos_shell_services.Injection_services.S.block
       (* See injection_directory.ml for vanilla implementation *)
       (fun () _ (bytes, operations) ->
-        assert (Files.Mempool.exists ~dirname:E.base_dir) ;
+        (* assert (Files.Mempool.exists ~dirname:E.base_dir) ; *)
         let block_hash = Block_hash.hash_bytes [bytes] in
         match Block_header.of_bytes bytes with
         | None ->
@@ -700,7 +700,7 @@ module Make (E : MENV) = struct
       Tezos_shell_services.Injection_services.S.operation
       (fun _q _contents operation_bytes ->
         if mem_only then RPC_answer.fail [Injection_not_possible]
-        else if
+        else
           (* Looking at the implementations of the two inject_operation_*
            functions it looks like there is code to share (proto_op_opt,
            operation_data), but it's not that easy to do;
@@ -708,11 +708,13 @@ module Make (E : MENV) = struct
            which cannot cross functions boundaries without putting all that in
            Mockup_sig *)
           Files.Mempool.exists ~dirname:E.base_dir
-        then inject_operation_with_mempool operation_bytes
-        else
-          inject_operation_without_mempool
-            write_context_callback
-            operation_bytes)
+          >>= function
+          | true ->
+              inject_operation_with_mempool operation_bytes
+          | false ->
+              inject_operation_without_mempool
+                write_context_callback
+                operation_bytes)
 
   let build_shell_directory (mem_only : bool)
       (write_context_callback :

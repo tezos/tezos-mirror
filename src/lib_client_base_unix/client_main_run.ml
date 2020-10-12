@@ -131,13 +131,14 @@ let setup_remote_signer (module C : M) client_config
 
 let setup_http_rpc_client_config parsed_args base_dir rpc_config =
   (* Make sure that base_dir is not a mockup. *)
-  ( match Tezos_mockup.Persistence.classify_base_dir base_dir with
-  | Base_dir_is_mockup ->
-      failwith
-        "%s is setup as a mockup, yet mockup mode is not active"
-        base_dir
-  | _ ->
-      return_unit )
+  Tezos_mockup.Persistence.classify_base_dir base_dir
+  >>=? (function
+         | Base_dir_is_mockup ->
+             failwith
+               "%s is setup as a mockup, yet mockup mode is not active"
+               base_dir
+         | _ ->
+             return_unit)
   >>=? fun () ->
   return
   @@ new unix_full
@@ -182,20 +183,20 @@ let setup_mockup_rpc_client_config
           ~constants_overrides_json:None
           ~bootstrap_accounts_json:None
   in
-  let base_dir_class = Tezos_mockup.Persistence.classify_base_dir base_dir in
-  ( match base_dir_class with
-  | Tezos_mockup.Persistence.Base_dir_is_empty
-  | Tezos_mockup.Persistence.Base_dir_is_file
-  | Tezos_mockup.Persistence.Base_dir_is_nonempty
-  | Tezos_mockup.Persistence.Base_dir_does_not_exist ->
-      let mem_only = true in
-      in_memory_mockup args >>=? fun res -> return (res, mem_only)
-  | Tezos_mockup.Persistence.Base_dir_is_mockup ->
-      let mem_only = false in
-      Tezos_mockup.Persistence.get_mockup_context_from_disk
-        ~base_dir
-        ~protocol_hash:args.protocol
-      >>=? fun res -> return (res, mem_only) )
+  Tezos_mockup.Persistence.classify_base_dir base_dir
+  >>=? (function
+         | Tezos_mockup.Persistence.Base_dir_is_empty
+         | Tezos_mockup.Persistence.Base_dir_is_file
+         | Tezos_mockup.Persistence.Base_dir_is_nonempty
+         | Tezos_mockup.Persistence.Base_dir_does_not_exist ->
+             let mem_only = true in
+             in_memory_mockup args >>=? fun res -> return (res, mem_only)
+         | Tezos_mockup.Persistence.Base_dir_is_mockup ->
+             let mem_only = false in
+             Tezos_mockup.Persistence.get_mockup_context_from_disk
+               ~base_dir
+               ~protocol_hash:args.protocol
+             >>=? fun res -> return (res, mem_only))
   >>=? fun ((mockup_env, (chain_id, rpc_context)), mem_only) ->
   return
     (new unix_mockup ~base_dir ~mem_only ~mockup_env ~chain_id ~rpc_context)

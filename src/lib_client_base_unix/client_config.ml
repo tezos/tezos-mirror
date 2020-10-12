@@ -508,7 +508,9 @@ let read_config_file config_file =
 
 let fail_on_non_mockup_dir (cctxt : #Client_context.full) =
   let base_dir = cctxt#get_base_dir in
-  match Tezos_mockup.Persistence.classify_base_dir base_dir with
+  let open Tezos_mockup.Persistence in
+  classify_base_dir base_dir
+  >>=? function
   | Base_dir_does_not_exist
   | Base_dir_is_file
   | Base_dir_is_nonempty
@@ -759,7 +761,8 @@ let default_parsed_config_args =
  *)
 let check_base_dir_for_mode (ctx : #Client_context.full) client_mode base_dir =
   let open Tezos_mockup.Persistence in
-  let base_dir_class = classify_base_dir base_dir in
+  classify_base_dir base_dir
+  >>=? fun base_dir_class ->
   match client_mode with
   | Mode_client -> (
     match base_dir_class with
