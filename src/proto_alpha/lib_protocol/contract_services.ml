@@ -304,7 +304,7 @@ let register () =
       match script with
       | None ->
           raise Not_found
-      | Some script ->
+      | Some script -> (
           let ctxt = Gas.set_unlimited ctxt in
           let open Script_ir_translator in
           parse_script ctxt ~legacy:true script
@@ -314,15 +314,12 @@ let register () =
             script.storage_type
             script.storage
           >>?= fun (ids, _ctxt) ->
-          let ids = Script_ir_translator.list_of_big_map_ids ids in
-          let rec find = function
-            | [] ->
-                return_none
-            | (id : Big_map.Id.t) :: ids -> (
-              try do_big_map_get ctxt id key >>=? return_some
-              with Not_found -> find ids )
-          in
-          find ids) ;
+          match Script_ir_translator.list_of_big_map_ids ids with
+          | [] | _ :: _ :: _ ->
+              return_none
+          | [id] -> (
+            try do_big_map_get ctxt id key >>=? return_some
+            with Not_found -> return_none ) )) ;
   register2 S.big_map_get (fun ctxt id key () () -> do_big_map_get ctxt id key) ;
   register_field S.info (fun ctxt contract ->
       Contract.get_balance ctxt contract
