@@ -119,7 +119,7 @@ end
 type ('id, 'alloc, 'updates) t =
   | Big_map : (Big_map.Id.t, Big_map.alloc, Big_map.updates) t
 
-type ex = E : (_, _, _) t -> ex
+type ex = Ex_Kind : (_, _, _) t -> ex
 
 val all : (int * ex) list
 

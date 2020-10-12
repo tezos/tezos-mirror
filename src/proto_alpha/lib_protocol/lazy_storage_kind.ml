@@ -201,10 +201,10 @@ end
 type ('id, 'alloc, 'updates) t =
   | Big_map : (Big_map.Id.t, Big_map.alloc, Big_map.updates) t
 
-type ex = E : (_, _, _) t -> ex
+type ex = Ex_Kind : (_, _, _) t -> ex
 
 (* /!\ Don't forget to add new lazy storage kinds here. /!\ *)
-let all = [(0, E Big_map)]
+let all = [(0, Ex_Kind Big_map)]
 
 type (_, _) cmp = Eq : ('a, 'a) cmp | Neq
 
@@ -278,7 +278,7 @@ module IdSet = struct
 
   let fold_all f set acc =
     List.fold_left
-      (fun acc (_, E kind) -> fold kind (f.f kind) set acc)
+      (fun acc (_, Ex_Kind kind) -> fold kind (f.f kind) set acc)
       acc
       all
 end

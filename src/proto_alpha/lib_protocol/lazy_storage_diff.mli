@@ -35,8 +35,11 @@ type ('id, 'alloc, 'updates) diff =
   | Remove
   | Update of {init : ('id, 'alloc) init; updates : 'updates}
 
+(* Exposing this type is needed only for legacy big map diff. *)
 type diffs_item = private
-  | E : ('i, 'a, 'u) Lazy_storage_kind.t * 'i * ('i, 'a, 'u) diff -> diffs_item
+  | Item :
+      ('i, 'a, 'u) Lazy_storage_kind.t * 'i * ('i, 'a, 'u) diff
+      -> diffs_item
 
 val make :
   ('i, 'a, 'u) Lazy_storage_kind.t -> 'i -> ('i, 'a, 'u) diff -> diffs_item

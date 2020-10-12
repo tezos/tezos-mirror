@@ -421,7 +421,7 @@ module Legacy_big_map_diff = struct
 
   let of_lazy_storage_diff diffs =
     List.fold_left
-      (fun legacy_diffs (Lazy_storage_diff.E (kind, id, diff)) ->
+      (fun legacy_diffs (Lazy_storage_diff.Item (kind, id, diff)) ->
         let diffs =
           match kind with
           | Lazy_storage_kind.Big_map -> (
