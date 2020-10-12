@@ -35,18 +35,20 @@ dashboard.new(
       title='Node stats',
       repeat='',
       showTitle=true,
-    ),
-    node.buildInfo { gridPos: { h: 3, w: 4, x: 0, y: 0 } },
-    node.headLevel { gridPos: { h: 3, w: 4, x: 0, y: 3 } },
-    node.checkpointLevel { gridPos: { h: 3, w: 4, x: 0, y: 6 } },
-    node.headCycleLevel { gridPos: { h: 3, w: 4, x: 0, y: 9 } },
-    p2p.trustedPoints { gridPos: { h: 2, w: 4, x: 0, y: 12 } },
-    p2p.privateConnections { gridPos: { h: 2, w: 4, x: 0, y: 14 } },
+    ) ,
+    node.buildInfo           + {gridPos: {h: 3, w: 4, x: 0, y: 0}},
+    node.uptime              + {gridPos: {h: 2, w: 4, x: 0, y: 3}},
+    node.headLevel           + {gridPos: {h: 3, w: 4, x: 0, y: 5}},
+    node.checkpointLevel     + {gridPos: {h: 3, w: 4, x: 0, y: 7}},
+    node.headCycleLevel      + {gridPos: {h: 3, w: 4, x: 0, y: 9}},
+    p2p.trustedPoints        + {gridPos: {h: 2, w: 4, x: 0, y: 11}},
+    p2p.privateConnections   + {gridPos: {h: 2, w: 4, x: 0, y: 13}},
 
-    node.headHistory { gridPos: { h: 8, w: 10, x: 4, y: 0 } },
-    node.invalidBlocksHistory { gridPos: { h: 8, w: 10, x: 4, y: 8 } },
 
-    node.logs { gridPos: { h: 16, w: 10, x: 14, y: 0 } },
+    node.headHistory                                                + {gridPos: {h: 10, w: 10, x: 4, y: 0}},
+    node.invalidBlocksHistory                                       + {gridPos: {h: 8, w: 10, x: 4, y: 10}},
+
+    node.logs                                                                                               + {gridPos: {h: 18, w: 10, x: 14, y: 0}},
 
 
     node.headOperations { gridPos: { h: 8, w: 24, x: 0, y: 14 } },
