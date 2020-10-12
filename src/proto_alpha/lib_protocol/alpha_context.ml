@@ -151,6 +151,7 @@ end
 
 module Lazy_storage = struct
   module Kind = Lazy_storage_kind
+  module IdSet = Kind.IdSet
   include Lazy_storage_diff
 
   let legacy_big_map_diff_encoding =

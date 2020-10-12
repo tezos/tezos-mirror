@@ -139,21 +139,6 @@ let get_ops : type i a u. (i, a, u) Lazy_storage_kind.t -> (i, a, u) ops =
       (module Big_map)
   [@@coq_axiom "gadt"]
 
-module KId = struct
-  type t = E : ('id, _, _) Lazy_storage_kind.t * 'id -> t
-
-  let compare (E (kind1, id1)) (E (kind2, id2)) =
-    match Lazy_storage_kind.compare kind1 kind2 with
-    | Lt ->
-        -1
-    | Gt ->
-        1
-    | Eq ->
-        let (module OPS) = get_ops kind1 in
-        OPS.Id.compare id1 id2
-    [@@coq_axiom "gadt"]
-end
-
 type ('id, 'alloc) init = Existing | Copy of {src : 'id} | Alloc of 'alloc
 
 type ('id, 'alloc, 'updates) diff =
@@ -302,8 +287,6 @@ let make :
     (i, a, u) Lazy_storage_kind.t -> i -> (i, a, u) diff -> diffs_item =
  fun k id diff -> E (k, id, diff)
 
-let make_remove (KId.E (k, id)) = E (k, id, Remove) [@@coq_axiom "gadt"]
-
 let item_encoding =
   let open Data_encoding in
   union
@@ -320,10 +303,10 @@ let item_encoding =
               (req "id" OPS.Id.encoding)
               (req "diff" (diff_encoding ops)))
            (fun (E (kind, id, diff)) ->
-             match Lazy_storage_kind.compare k kind with
+             match Lazy_storage_kind.equal k kind with
              | Eq ->
                  Some ((), id, diff)
-             | Lt | Gt ->
+             | Neq ->
                  None)
            (fun ((), id, diff) -> E (k, id, diff)))
        Lazy_storage_kind.all

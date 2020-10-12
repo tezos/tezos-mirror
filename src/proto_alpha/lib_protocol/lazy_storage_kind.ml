@@ -77,6 +77,8 @@ module type TitleWithId = sig
 
     module Temp : Temp_id with type t = private t
   end
+
+  module IdSet : S.SET with type elt = Id.t
 end
 
 module MakeId (Title : Title) : TitleWithId = struct
@@ -145,6 +147,8 @@ module MakeId (Title : Title) : TitleWithId = struct
       | [z] ->
           Some (Z.of_string z)
   end
+
+  module IdSet = Set.Make (Id)
 end
 
 module Big_map = struct
@@ -193,16 +197,16 @@ type ex = E : (_, _, _) t -> ex
 
 let all = [(0, E Big_map)]
 
-type (_, _) cmp = Eq : ('a, 'a) cmp | Lt : (_, _) cmp | Gt : (_, _) cmp
+type (_, _) cmp = Eq : ('a, 'a) cmp | Neq
 
-let compare :
+let equal :
     type i1 a1 u1 i2 a2 u2.
     (i1, a1, u1) t -> (i2, a2, u2) t -> (i1 * a1 * u1, i2 * a2 * u2) cmp =
  fun k1 k2 -> match (k1, k2) with (Big_map, Big_map) -> Eq
 
-module Temp_ids = struct
-  type ('i, 'a, 'u) kind = ('i, 'a, 'u) t
+type ('i, 'a, 'u) kind = ('i, 'a, 'u) t
 
+module Temp_ids = struct
   type t = {big_map : Big_map.Id.Temp.t}
 
   let init = {big_map = Big_map.Id.Temp.init}
@@ -233,4 +237,39 @@ module Temp_ids = struct
           ~last:temp_ids.big_map
           (fun acc temp_id -> f acc (temp_id :> i))
    [@@coq_axiom "gadt"]
+end
+
+module IdSet = struct
+  type t = {big_map : Big_map.IdSet.t}
+
+  type 'acc fold_f = {f : 'i 'a 'u. ('i, 'a, 'u) kind -> 'i -> 'acc -> 'acc}
+
+  let empty = {big_map = Big_map.IdSet.empty}
+
+  let mem (type i a u) (kind : (i, a, u) kind) (id : i) set =
+    match (kind, set) with
+    | (Big_map, {big_map}) ->
+        Big_map.IdSet.mem id big_map
+
+  let add (type i a u) (kind : (i, a, u) kind) (id : i) set =
+    match (kind, set) with
+    | (Big_map, {big_map}) ->
+        let big_map = Big_map.IdSet.add id big_map in
+        {big_map}
+
+  let diff set1 set2 =
+    let big_map = Big_map.IdSet.diff set1.big_map set2.big_map in
+    {big_map}
+
+  let fold (type i a u) (kind : (i, a, u) kind) (f : i -> 'acc -> 'acc) set
+      (acc : 'acc) =
+    match (kind, set) with
+    | (Big_map, {big_map}) ->
+        Big_map.IdSet.fold f big_map acc
+
+  let fold_all f set acc =
+    List.fold_left
+      (fun acc (_, E kind) -> fold kind (f.f kind) set acc)
+      acc
+      all
 end

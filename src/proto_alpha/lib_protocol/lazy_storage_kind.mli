@@ -84,16 +84,16 @@ type ex = E : (_, _, _) t -> ex
 
 val all : (int * ex) list
 
-type (_, _) cmp = Eq : ('a, 'a) cmp | Lt : (_, _) cmp | Gt : (_, _) cmp
+type (_, _) cmp = Eq : ('a, 'a) cmp | Neq
 
-val compare :
+val equal :
   ('i1, 'a1, 'u1) t ->
   ('i2, 'a2, 'u2) t ->
   ('i1 * 'a1 * 'u1, 'i2 * 'a2 * 'u2) cmp
 
-module Temp_ids : sig
-  type ('i, 'a, 'u) kind = ('i, 'a, 'u) t
+type ('i, 'a, 'u) kind = ('i, 'a, 'u) t
 
+module Temp_ids : sig
   type t
 
   val init : t
@@ -102,4 +102,22 @@ module Temp_ids : sig
 
   val fold_s :
     ('i, 'a, 'u) kind -> ('acc -> 'i -> 'acc Lwt.t) -> t -> 'acc -> 'acc Lwt.t
+end
+
+module IdSet : sig
+  type t
+
+  type 'acc fold_f = {f : 'i 'a 'u. ('i, 'a, 'u) kind -> 'i -> 'acc -> 'acc}
+
+  val empty : t
+
+  val mem : ('i, 'a, 'u) kind -> 'i -> t -> bool
+
+  val add : ('i, 'a, 'u) kind -> 'i -> t -> t
+
+  val diff : t -> t -> t
+
+  val fold : ('i, 'a, 'u) kind -> ('i -> 'acc -> 'acc) -> t -> 'acc -> 'acc
+
+  val fold_all : 'acc fold_f -> t -> 'acc -> 'acc
 end
