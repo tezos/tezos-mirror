@@ -23,6 +23,32 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(**
+  Lazy_storage offers a unified interface for specific Michelson datatype that
+  behave somewhat lazily, because they are intended to be quite big.
+  Instead of serializing/deserializing the whole value to/from the storage,
+  only an identifier is used. The identifier acts like a pointer.
+  When using the value in a Michelson script, some part of it may be read from
+  the storage, and a lightweight diff is computed.
+  The diff is effectively applied to the storage at the end of the execution.
+
+  This module defines the different kinds of lazy storages and their basic
+  properties. See also [Lazy_storage_diff].
+
+  Lazy storage types are:
+   - Big_map
+*)
+
+(**
+  Lazy storage ids are kept as abstract as possible to avoid mixing them up.
+
+  Behind the scene they are [Z.t]s but, within the protocol, only [parse_data]/
+  [unparse_data] are allowed convert from/to it.
+
+  Temporary ids may be used to pass values between contracts that won't be kept
+  longer than the lifetime of the operation.
+  Behind the scene, temporary ids are negative [Z.t]s.
+*)
 module type ID = sig
   type t
 
@@ -32,6 +58,7 @@ module type ID = sig
 
   val rpc_arg : t RPC_arg.arg
 
+  (** Initial value for ids: zero. *)
   val init : t
 
   (** In the protocol, to be used in parse_data only *)
@@ -42,17 +69,21 @@ module type ID = sig
 
   val next : t -> t
 
-  val of_legacy_USE_ONLY_IN_Legacy_big_map_diff : Z.t -> t
-
-  val to_legacy_USE_ONLY_IN_Legacy_big_map_diff : t -> Z.t
-
   val is_temp : t -> bool
+
+  (* To be used in storage: *)
 
   val path_length : int
 
   val to_path : t -> string list -> string list
 
   val of_path : string list -> t option
+
+  (* To be removed once legacy big map diff is removed: *)
+
+  val of_legacy_USE_ONLY_IN_Legacy_big_map_diff : Z.t -> t
+
+  val to_legacy_USE_ONLY_IN_Legacy_big_map_diff : t -> Z.t
 end
 
 module Big_map : sig
@@ -77,6 +108,14 @@ module Big_map : sig
   val updates_encoding : updates Data_encoding.t
 end
 
+(**
+  Kinds of lazy storage.
+  The GADT ensures operations are properly applied to the correct kind.
+
+  ['id] the abstract type for the identifier of the kind.
+  ['alloc] is the type used to construct a new value.
+  ['updates] is the type used to update a value.
+*)
 type ('id, 'alloc, 'updates) t =
   | Big_map : (Big_map.Id.t, Big_map.alloc, Big_map.updates) t
 
@@ -93,6 +132,10 @@ val equal :
 
 type ('i, 'a, 'u) kind = ('i, 'a, 'u) t
 
+(**
+  Type to manage temporary ids.
+  Used only in the context.
+*)
 module Temp_ids : sig
   type t
 
