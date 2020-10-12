@@ -288,18 +288,20 @@ let apply_diff :
       return (ctxt, Z.add init_size updates_size)
 
 type diffs_item =
-  | E : ('i, 'a, 'u) Lazy_storage_kind.t * 'i * ('i, 'a, 'u) diff -> diffs_item
+  | Item :
+      ('i, 'a, 'u) Lazy_storage_kind.t * 'i * ('i, 'a, 'u) diff
+      -> diffs_item
 
 let make :
     type i a u.
     (i, a, u) Lazy_storage_kind.t -> i -> (i, a, u) diff -> diffs_item =
- fun k id diff -> E (k, id, diff)
+ fun k id diff -> Item (k, id, diff)
 
 let item_encoding =
   let open Data_encoding in
   union
   @@ List.map
-       (fun (tag, Lazy_storage_kind.E k) ->
+       (fun (tag, Lazy_storage_kind.Ex_Kind k) ->
          let ops = get_ops k in
          let (module OPS) = ops in
          let title = OPS.title in
@@ -310,13 +312,13 @@ let item_encoding =
               (req "kind" (constant title))
               (req "id" OPS.Id.encoding)
               (req "diff" (diff_encoding ops)))
-           (fun (E (kind, id, diff)) ->
+           (fun (Item (kind, id, diff)) ->
              match Lazy_storage_kind.equal k kind with
              | Eq ->
                  Some ((), id, diff)
              | Neq ->
                  None)
-           (fun ((), id, diff) -> E (k, id, diff)))
+           (fun ((), id, diff) -> Item (k, id, diff)))
        Lazy_storage_kind.all
   [@@coq_axiom "gadt"]
 
@@ -328,7 +330,7 @@ let encoding =
 
 let apply ctxt diffs =
   fold_left_s
-    (fun (ctxt, total_size) (E (k, id, diff)) ->
+    (fun (ctxt, total_size) (Item (k, id, diff)) ->
       let ops = get_ops k in
       apply_diff ctxt ops id diff
       >|=? fun (ctxt, added_size) ->
@@ -357,7 +359,7 @@ let fresh :
 
 let init ctxt =
   fold_left_s
-    (fun ctxt (_tag, Lazy_storage_kind.E k) ->
+    (fun ctxt (_tag, Lazy_storage_kind.Ex_Kind k) ->
       let (module OPS) = get_ops k in
       OPS.Next.init ctxt)
     ctxt
@@ -367,7 +369,7 @@ let init ctxt =
 let cleanup_temporaries ctxt =
   Raw_context.map_temporary_lazy_storage_ids_s ctxt (fun temp_ids ->
       Lwt_list.fold_left_s
-        (fun ctxt (_tag, Lazy_storage_kind.E k) ->
+        (fun ctxt (_tag, Lazy_storage_kind.Ex_Kind k) ->
           let (module OPS) = get_ops k in
           Lazy_storage_kind.Temp_ids.fold_s k OPS.remove_rec temp_ids ctxt)
         ctxt
