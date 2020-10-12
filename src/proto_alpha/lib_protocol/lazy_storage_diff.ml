@@ -208,6 +208,11 @@ let diff_encoding : type i a u. (i, a, u) ops -> (i, a, u) diff Data_encoding.t
               None)
         (fun (((), updates), alloc) -> Update {init = Alloc alloc; updates}) ]
 
+(**
+  [apply_updates ctxt ops ~id init] applies the updates [updates] on lazy
+  storage [id] on storage context [ctxt] using operations [ops] and returns the
+  updated storage context and the added size in bytes (may be negative).
+*)
 let apply_updates :
     type i a u.
     Raw_context.t ->
@@ -225,6 +230,13 @@ let apply_updates :
     OPS.Total_bytes.set ctxt id (Z.add size updates_size)
     >|=? fun ctxt -> (ctxt, updates_size)
 
+(**
+  [apply_init ctxt ops ~id init] applies the initialization [init] on lazy
+  storage [id] on storage context [ctxt] using operations [ops] and returns the
+  updated storage context and the added size in bytes (may be negative).
+
+  If [id] represents a temporary lazy storage, the added size may be wrong.
+*)
 let apply_init :
     type i a u.
     Raw_context.t ->
@@ -239,15 +251,24 @@ let apply_init :
   | Copy {src} ->
       OPS.copy ctxt ~from:src ~to_:id
       >>=? fun ctxt ->
-      OPS.Total_bytes.get ctxt src
-      >>=? fun copy_size ->
-      return (ctxt, Z.add copy_size OPS.bytes_size_for_empty)
+      if OPS.Id.is_temp id then return (ctxt, Z.zero)
+      else
+        OPS.Total_bytes.get ctxt src
+        >>=? fun copy_size ->
+        return (ctxt, Z.add copy_size OPS.bytes_size_for_empty)
   | Alloc alloc ->
       OPS.Total_bytes.init ctxt id Z.zero
       >>=? fun ctxt ->
       OPS.alloc ctxt id alloc
       >>=? fun ctxt -> return (ctxt, OPS.bytes_size_for_empty)
 
+(**
+  [apply_diff ctxt ops ~id diff] applies the diff [diff] on lazy storage [id]
+  on storage context [ctxt] using operations [ops] and returns the updated
+  storage context and the added size in bytes (may be negative).
+
+  If [id] represents a temporary lazy storage, the added size may be wrong.
+*)
 let apply_diff :
     type i a u.
     Raw_context.t ->
@@ -258,10 +279,14 @@ let apply_diff :
  fun ctxt ((module OPS) as ops) ~id diff ->
   match diff with
   | Remove ->
-      OPS.Total_bytes.get ctxt id
-      >>=? fun size ->
-      OPS.remove_rec ctxt id
-      >>= fun ctxt -> return (ctxt, Z.neg (Z.add size OPS.bytes_size_for_empty))
+      if OPS.Id.is_temp id then
+        OPS.remove_rec ctxt id >|= fun ctxt -> ok (ctxt, Z.zero)
+      else
+        OPS.Total_bytes.get ctxt id
+        >>=? fun size ->
+        OPS.remove_rec ctxt id
+        >>= fun ctxt ->
+        return (ctxt, Z.neg (Z.add size OPS.bytes_size_for_empty))
   | Update {init; updates} ->
       apply_init ctxt ops ~id init
       >>=? fun (ctxt, init_size) ->
