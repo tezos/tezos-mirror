@@ -23,12 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module KId : sig
-  type t = E : ('id, _, _) Lazy_storage_kind.t * 'id -> t
-
-  val compare : t -> t -> int
-end
-
 type ('id, 'alloc) init = Existing | Copy of {src : 'id} | Alloc of 'alloc
 
 type ('id, 'alloc, 'updates) diff =
@@ -40,8 +34,6 @@ type diffs_item = private
 
 val make :
   ('i, 'a, 'u) Lazy_storage_kind.t -> 'i -> ('i, 'a, 'u) diff -> diffs_item
-
-val make_remove : KId.t -> diffs_item
 
 type diffs = diffs_item list
 

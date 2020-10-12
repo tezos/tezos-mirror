@@ -728,10 +728,24 @@ module Lazy_storage : sig
       | Big_map : (Big_map.Id.t, Big_map.alloc, Big_map.updates) t
   end
 
-  module KId : sig
-    type t = E : ('id, _, _) Kind.t * 'id -> t
+  module IdSet : sig
+    type t
 
-    val compare : t -> t -> int
+    type 'acc fold_f = {
+      f : 'i 'a 'u. ('i, 'a, 'u) Kind.t -> 'i -> 'acc -> 'acc;
+    }
+
+    val empty : t
+
+    val mem : ('i, 'a, 'u) Kind.t -> 'i -> t -> bool
+
+    val add : ('i, 'a, 'u) Kind.t -> 'i -> t -> t
+
+    val diff : t -> t -> t
+
+    val fold : ('i, 'a, 'u) Kind.t -> ('i -> 'acc -> 'acc) -> t -> 'acc -> 'acc
+
+    val fold_all : 'acc fold_f -> t -> 'acc -> 'acc
   end
 
   type ('id, 'alloc) init = Existing | Copy of {src : 'id} | Alloc of 'alloc
@@ -743,8 +757,6 @@ module Lazy_storage : sig
   type diffs_item
 
   val make : ('i, 'a, 'u) Kind.t -> 'i -> ('i, 'a, 'u) diff -> diffs_item
-
-  val make_remove : KId.t -> diffs_item
 
   type diffs = diffs_item list
 

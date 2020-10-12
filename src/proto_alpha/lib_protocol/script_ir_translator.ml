@@ -5497,18 +5497,15 @@ let big_map_get ctxt key {id; diff; key_type; value_type} =
 let big_map_update key value ({diff; _} as map) =
   {map with diff = map_set key value diff}
 
-module Ids = Set.Make (Lazy_storage.KId)
+type lazy_storage_ids = Lazy_storage.IdSet.t
 
-type lazy_storage_ids = Ids.t
-
-let no_lazy_storage_id = Ids.empty
+let no_lazy_storage_id = Lazy_storage.IdSet.empty
 
 let diff_of_big_map ctxt mode ~temporary ~ids {id; key_type; value_type; diff}
     =
   ( match id with
   | Some id ->
-      let kid = Lazy_storage.KId.E (Big_map, id) in
-      if Ids.mem kid ids then
+      if Lazy_storage.IdSet.mem Big_map id ids then
         Big_map.fresh ~temporary ctxt
         >|=? fun (ctxt, duplicate) ->
         (ctxt, Lazy_storage.Copy {src = id}, duplicate)
@@ -5664,12 +5661,13 @@ let extract_lazy_storage_updates ctxt mode ~temporary ids acc ty x =
       context ->
       unparsing_mode ->
       temporary:bool ->
-      Ids.t ->
+      Lazy_storage.IdSet.t ->
       Lazy_storage.diffs ->
       a ty ->
       a ->
       has_lazy_storage:a has_lazy_storage ->
-      (context * a * Ids.t * Lazy_storage.diffs) tzresult Lwt.t =
+      (context * a * Lazy_storage.IdSet.t * Lazy_storage.diffs) tzresult Lwt.t
+      =
    fun ctxt mode ~temporary ids acc ty x ~has_lazy_storage ->
     Gas.consume ctxt Typecheck_costs.parse_instr_cycle
     >>?= fun ctxt ->
@@ -5682,8 +5680,7 @@ let extract_lazy_storage_updates ctxt mode ~temporary ids acc ty x =
         let (module Map) = map.diff in
         let map = {map with diff = empty_map Map.key_ty; id = Some id} in
         let diff = Lazy_storage.make Big_map id diff in
-        let kid = Lazy_storage.KId.E (Big_map, id) in
-        (ctxt, map, Ids.add kid ids, diff :: acc)
+        (ctxt, map, Lazy_storage.IdSet.add Big_map id ids, diff :: acc)
     | (Pair_f (hl, hr), Pair_t ((tyl, _, _), (tyr, _, _), _), (xl, xr)) ->
         aux ctxt mode ~temporary ids acc tyl xl ~has_lazy_storage:hl
         >>=? fun (ctxt, xl, ids, acc) ->
@@ -5742,7 +5739,7 @@ let extract_lazy_storage_updates ctxt mode ~temporary ids acc ty x =
 
 let rec fold_lazy_storage :
     type a.
-    f:(Ids.elt -> 'acc -> 'acc) ->
+    f:'acc Lazy_storage.IdSet.fold_f ->
     init:'acc ->
     context ->
     a ty ->
@@ -5757,9 +5754,7 @@ let rec fold_lazy_storage :
       ok (init, ctxt)
   | (_, Big_map_t (_, _, _), {id = Some id}) ->
       Gas.consume ctxt Typecheck_costs.parse_instr_cycle
-      >>? fun ctxt ->
-      let kid = Lazy_storage.KId.E (Big_map, id) in
-      ok (f kid init, ctxt)
+      >>? fun ctxt -> ok (f.f Big_map id init, ctxt)
   | (_, Big_map_t (_, _, _), {id = None}) ->
       ok (init, ctxt)
   | (Pair_f (hl, hr), Pair_t ((tyl, _, _), (tyr, _, _), _), (xl, xr)) ->
@@ -5796,7 +5791,7 @@ let rec fold_lazy_storage :
 let collect_lazy_storage ctxt ty x =
   let has_lazy_storage = has_lazy_storage ty in
   fold_lazy_storage
-    ~f:(fun id acc -> Ids.add id acc)
+    ~f:{f = (fun kind id acc -> Lazy_storage.IdSet.add kind id acc)}
     ~init:no_lazy_storage_id
     ctxt
     ty
@@ -5805,14 +5800,17 @@ let collect_lazy_storage ctxt ty x =
 
 let extract_lazy_storage_diff ctxt mode ~temporary ~to_duplicate ~to_update ty
     v =
-  let to_duplicate = Ids.diff to_duplicate to_update in
+  let to_duplicate = Lazy_storage.IdSet.diff to_duplicate to_update in
   extract_lazy_storage_updates ctxt mode ~temporary to_duplicate [] ty v
   >|=? fun (ctxt, v, alive, diffs) ->
   let diffs =
     if temporary then diffs
     else
-      let dead = Ids.diff to_update alive in
-      Ids.fold (fun kid acc -> Lazy_storage.make_remove kid :: acc) dead diffs
+      let dead = Lazy_storage.IdSet.diff to_update alive in
+      Lazy_storage.IdSet.fold_all
+        {f = (fun kind id acc -> Lazy_storage.make kind id Remove :: acc)}
+        dead
+        diffs
   in
   match diffs with
   | [] ->
@@ -5820,12 +5818,8 @@ let extract_lazy_storage_diff ctxt mode ~temporary ~to_duplicate ~to_update ty
   | diffs ->
       (v, Some diffs (* do not reverse *), ctxt)
 
-let list_of_big_map_ids kids =
-  Ids.fold
-    (fun (Lazy_storage.KId.E (kind, id)) acc ->
-      match kind with Lazy_storage.Kind.Big_map -> (id : Big_map.Id.t) :: acc)
-    kids
-    []
+let list_of_big_map_ids ids =
+  Lazy_storage.IdSet.fold Big_map (fun id acc -> id :: acc) ids []
 
 let parse_data = parse_data ~stack_depth:0
 
