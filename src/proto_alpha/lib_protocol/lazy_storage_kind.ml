@@ -56,8 +56,6 @@ module type ID = sig
 
   val to_legacy_USE_ONLY_IN_Legacy_big_map_diff : t -> Z.t
 
-  module Temp : Temp_id with type t = private t
-
   val is_temp : t -> bool
 
   val path_length : int
@@ -74,7 +72,11 @@ end
 module type TitleWithId = sig
   val title : string
 
-  module Id : ID
+  module Id : sig
+    include ID
+
+    module Temp : Temp_id with type t = private t
+  end
 end
 
 module MakeId (Title : Title) : TitleWithId = struct

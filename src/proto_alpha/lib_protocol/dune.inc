@@ -52,7 +52,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    manager_repr.mli manager_repr.ml
    commitment_repr.mli commitment_repr.ml
    parameters_repr.mli parameters_repr.ml
-   lazy_storage_kind.ml
+   lazy_storage_kind.mli lazy_storage_kind.ml
    raw_context.mli raw_context.ml
    storage_costs.mli storage_costs.ml
    storage_sigs.ml
@@ -133,7 +133,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    manager_repr.mli manager_repr.ml
    commitment_repr.mli commitment_repr.ml
    parameters_repr.mli parameters_repr.ml
-   lazy_storage_kind.ml
+   lazy_storage_kind.mli lazy_storage_kind.ml
    raw_context.mli raw_context.ml
    storage_costs.mli storage_costs.ml
    storage_sigs.ml
@@ -214,7 +214,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    manager_repr.mli manager_repr.ml
    commitment_repr.mli commitment_repr.ml
    parameters_repr.mli parameters_repr.ml
-   lazy_storage_kind.ml
+   lazy_storage_kind.mli lazy_storage_kind.ml
    raw_context.mli raw_context.ml
    storage_costs.mli storage_costs.ml
    storage_sigs.ml
@@ -432,7 +432,7 @@ include Tezos_raw_protocol_alpha.Main
    manager_repr.mli manager_repr.ml
    commitment_repr.mli commitment_repr.ml
    parameters_repr.mli parameters_repr.ml
-   lazy_storage_kind.ml
+   lazy_storage_kind.mli lazy_storage_kind.ml
    raw_context.mli raw_context.ml
    storage_costs.mli storage_costs.ml
    storage_sigs.ml
