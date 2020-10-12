@@ -52,10 +52,6 @@ module type ID = sig
 
   val next : t -> t
 
-  val of_legacy_USE_ONLY_IN_Legacy_big_map_diff : Z.t -> t
-
-  val to_legacy_USE_ONLY_IN_Legacy_big_map_diff : t -> Z.t
-
   val is_temp : t -> bool
 
   val path_length : int
@@ -63,6 +59,10 @@ module type ID = sig
   val to_path : t -> string list -> string list
 
   val of_path : string list -> t option
+
+  val of_legacy_USE_ONLY_IN_Legacy_big_map_diff : Z.t -> t
+
+  val to_legacy_USE_ONLY_IN_Legacy_big_map_diff : t -> Z.t
 end
 
 module type Title = sig
@@ -190,11 +190,20 @@ module Big_map = struct
   let updates_encoding = Data_encoding.list update_encoding
 end
 
+(*
+  When adding cases to this type, grep for [new lazy storage kind] in the code
+  for locations to update.
+  It must be:
+    - the value [all] right below,
+    - modules [Temp_ids], [IdSet] below,
+    - the rest should be guided by type errors.
+*)
 type ('id, 'alloc, 'updates) t =
   | Big_map : (Big_map.Id.t, Big_map.alloc, Big_map.updates) t
 
 type ex = E : (_, _, _) t -> ex
 
+(* /!\ Don't forget to add new lazy storage kinds here. /!\ *)
 let all = [(0, E Big_map)]
 
 type (_, _) cmp = Eq : ('a, 'a) cmp | Neq

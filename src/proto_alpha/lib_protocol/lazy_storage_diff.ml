@@ -41,6 +41,7 @@ module type Total_bytes = sig
   val set : Raw_context.t -> id -> Z.t -> Raw_context.t tzresult Lwt.t
 end
 
+(** Operations to be defined on a lazy storage type. *)
 module type OPS = sig
   module Id : Lazy_storage_kind.ID
 
@@ -65,9 +66,11 @@ module type OPS = sig
 
   module Total_bytes : Total_bytes with type id := Id.t
 
+  (** Deep copy. *)
   val copy :
     Raw_context.t -> from:Id.t -> to_:Id.t -> Raw_context.t tzresult Lwt.t
 
+  (** Deep deletion. *)
   val remove_rec : Raw_context.t -> Id.t -> Raw_context.t Lwt.t
 end
 
@@ -84,7 +87,7 @@ module Big_map = struct
     (* Annotations are erased to allow sharing on [Copy]. The types from the
        contract code are used, these ones are only used to make sure they are
        compatible during transmissions between contracts, and only need to be
-       compatible, annotations nonwhistanding. *)
+       compatible, annotations notwithstanding. *)
     let key_type =
       Micheline.strip_locations
         (Script_repr.strip_annotations (Micheline.root key_type))
@@ -132,6 +135,11 @@ type ('id, 'alloc, 'updates) ops =
      with type Id.t = 'id
       and type alloc = 'alloc
       and type updates = 'updates)
+
+(*
+  To add a new lazy storage kind here, you only need to create a module similar
+  to [Big_map] above and add a case to [get_ops] below.
+*)
 
 let get_ops : type i a u. (i, a, u) Lazy_storage_kind.t -> (i, a, u) ops =
   function

@@ -1622,6 +1622,12 @@ and parse_ty :
       >>? fun (Ex_ty tr, ctxt) ->
       parse_type_annot loc annot
       >>? fun ty_name -> ok (Ex_ty (Map_t (ta, tr, ty_name)), ctxt)
+  (*
+    /!\ When adding new lazy storage kinds, be careful to use
+    [when allow_lazy_storage] /!\
+    Lazy storage should not be packable to avoid stealing a lazy storage
+    from another contract with `PUSH t id` or `UNPACK`.
+  *)
   | Prim (loc, T_big_map, args, annot) when allow_lazy_storage ->
       parse_big_map_ty ctxt ~legacy loc args annot
       >>? fun (big_map_ty, ctxt) -> ok (big_map_ty, ctxt)
@@ -1733,6 +1739,8 @@ and parse_storage_ty :
 
 let check_packable ~legacy loc root =
   let rec check : type t. t ty -> unit tzresult = function
+    (* /!\ When adding new lazy storage kinds, be sure to return an error. /!\
+    Lazy storage should not be packable. *)
     | Big_map_t _ ->
         error (Unexpected_big_map loc)
     | Operation_t _ ->
@@ -5497,6 +5505,8 @@ let big_map_get ctxt key {id; diff; key_type; value_type} =
 let big_map_update key value ({diff; _} as map) =
   {map with diff = map_set key value diff}
 
+(* ---------------- Lazy storage---------------------------------------------*)
+
 type lazy_storage_ids = Lazy_storage.IdSet.t
 
 let no_lazy_storage_id = Lazy_storage.IdSet.empty
@@ -5575,6 +5585,8 @@ let diff_of_big_map ctxt mode ~temporary ~ids {id; key_type; value_type; diff}
     This flag is necessary to avoid these two functions to have a quadratic
     complexity in the size of the type.
 
+    Add new lazy storage kinds here.
+
     Please keep the usage of this GADT local.
 *)
 type 'ty has_lazy_storage =
@@ -5590,7 +5602,7 @@ type 'ty has_lazy_storage =
   | List_f : 'a has_lazy_storage -> 'a boxed_list has_lazy_storage
   | Map_f : 'v has_lazy_storage -> (_, 'v) map has_lazy_storage
 
-(*
+(**
     This function is called only on storage and parameter types of contracts,
     once per typechecked contract. It has a complexity linear in the size of
     the types, which happen to be literally written types, so the gas for them

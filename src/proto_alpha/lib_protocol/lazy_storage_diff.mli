@@ -23,6 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(**
+  See [Lazy_storage_kind] for an introduction on lazy storage.
+
+  This module defines operations on lazy storage types and diffs.
+*)
+
 type ('id, 'alloc) init = Existing | Copy of {src : 'id} | Alloc of 'alloc
 
 type ('id, 'alloc, 'updates) diff =
@@ -50,6 +56,11 @@ val fresh :
   Raw_context.t ->
   (Raw_context.t * 'id) tzresult Lwt.t
 
+(**
+  Initializes the storage for all lazy storage kind. 
+  This is useful for genesis only.
+  Protocol updates need to initialize new lazy storage kinds.
+*)
 val init : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
 val cleanup_temporaries : Raw_context.t -> Raw_context.t Lwt.t
