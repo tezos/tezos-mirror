@@ -562,24 +562,6 @@ module Constants : sig
   val encoding : t Data_encoding.t
 end
 
-module Voting_period : sig
-  include BASIC_DATA
-
-  type voting_period = t
-
-  val rpc_arg : voting_period RPC_arg.arg
-
-  val root : voting_period
-
-  val succ : voting_period -> voting_period
-
-  type kind = Proposal | Testing_vote | Testing | Promotion_vote | Adoption
-
-  val kind_encoding : kind Data_encoding.encoding
-
-  val to_int32 : voting_period -> int32
-end
-
 module Level : sig
   type t = private {
     level : Raw_level.t;
@@ -955,6 +937,24 @@ module Delegate : sig
 
   val grace_period :
     context -> Signature.Public_key_hash.t -> Cycle.t tzresult Lwt.t
+end
+
+module Voting_period : sig
+  include BASIC_DATA
+
+  type voting_period = t
+
+  val rpc_arg : voting_period RPC_arg.arg
+
+  val root : voting_period
+
+  val succ : voting_period -> voting_period
+
+  type kind = Proposal | Testing_vote | Testing | Promotion_vote | Adoption
+
+  val kind_encoding : kind Data_encoding.encoding
+
+  val to_int32 : voting_period -> int32
 end
 
 module Vote : sig
