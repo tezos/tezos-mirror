@@ -467,6 +467,8 @@ Core data types and notations
 -  ``pair (l) (r)``: A pair of values ``a`` and ``b`` of types ``(l)``
    and ``(r)``, that we write ``(Pair a b)``.
 
+-  ``pair (t{1}) ... (t{n})`` with ``n > 2``: A shorthand for ``pair (t{1}) (pair (t{2}) ... (pair (t{n-1}) (t{n})) ...)``.
+
 -  ``option (t)``: Optional value of type ``(t)`` that we write ``None``
    or ``(Some v)``.
 
@@ -1104,9 +1106,15 @@ is, concatenate or splice them, and use them as keys.
 Operations on pairs
 ~~~~~~~~~~~~~~~~~~~
 
+The type ``pair l r`` is the type of binary pairs composed of a left
+element of type ``l`` and a right element of type ``r``. A value of
+type ``pair l r`` is written ``Pair x y`` where ``x`` is a value of
+type ``l`` and ``y`` is a value of type ``r``.
+
 To build tuples of length greater than 2, right combs have specific
-optimized operations.
-The
+optimized operations. For any ``n > 2``, the compact notations ``pair
+t{0} t{1} ... t{n-2} t{n-1}`` is provided for the type of right combs
+``pair t{0} (pair t{1} ... (pair t{n-2} t{n-1}) ...)``. Similarly, the
 compact notation ``Pair x{0} x{1} ... x{n-2} x{n-1}`` is provided for
 the right-comb value ``Pair x{0} (Pair x{1} ... (Pair x{n-2} x{n-1})
 ...)``. Right-comb values can also be written using sequences; ``Pair
@@ -3315,7 +3323,7 @@ Full grammar
       | set <comparable type>
       | operation
       | contract <type>
-      | pair <type> <type>
+      | pair <type> <type> ...
       | or <type> <type>
       | lambda <type> <type>
       | map <comparable type> <type>
@@ -3340,7 +3348,7 @@ Full grammar
       | address
       | option <comparable type>
       | or <comparable type> <comparable type>
-      | pair <comparable type> <comparable type>
+      | pair <comparable type> <comparable type> ...
 
 
 Reference implementation
