@@ -903,10 +903,17 @@ let rec unparse_comparable_ty : type a. a comparable_ty -> Script.node =
       Prim (-1, T_address, [], unparse_type_annot tname)
   | Chain_id_key tname ->
       Prim (-1, T_chain_id, [], unparse_type_annot tname)
-  | Pair_key ((l, al), (r, ar), pname) ->
+  | Pair_key ((l, al), (r, ar), pname) -> (
       let tl = add_field_annot al None (unparse_comparable_ty l) in
       let tr = add_field_annot ar None (unparse_comparable_ty r) in
-      Prim (-1, T_pair, [tl; tr], unparse_type_annot pname)
+      (* Fold [pair a1 (pair ... (pair an-1 an))] into [pair a1 ... an] *)
+      (* Note that the folding does not happen if the pair on the right has a
+         field annotation because this annotation would be lost *)
+      match tr with
+      | Prim (_, T_pair, ts, []) ->
+          Prim (-1, T_pair, tl :: ts, unparse_type_annot pname)
+      | _ ->
+          Prim (-1, T_pair, [tl; tr], unparse_type_annot pname) )
   | Union_key ((l, al), (r, ar), tname) ->
       let tl = add_field_annot al None (unparse_comparable_ty l) in
       let tr = add_field_annot ar None (unparse_comparable_ty r) in
@@ -972,7 +979,16 @@ let rec unparse_ty :
       unparse_ty ctxt utr
       >>? fun (utr, ctxt) ->
       let tr = add_field_annot r_field r_var utr in
-      return ctxt (T_pair, [tl; tr], annot)
+      (* Fold [pair a1 (pair ... (pair an-1 an))] into [pair a1 ... an] *)
+      (* Note that the folding does not happen if the pair on the right has an
+         annotation because this annotation would be lost *)
+      return
+        ctxt
+        ( match tr with
+        | Prim (_, T_pair, ts, []) ->
+            (T_pair, tl :: ts, annot)
+        | _ ->
+            (T_pair, [tl; tr], annot) )
   | Union_t ((utl, l_field), (utr, r_field), tname) ->
       let annot = unparse_type_annot tname in
       unparse_ty ctxt utl
@@ -1550,12 +1566,17 @@ let rec parse_comparable_ty :
         l,
         _ ) ->
       error (Invalid_arity (loc, prim, 0, List.length l))
-  | Prim (loc, T_pair, [left; right], annot) ->
+  | Prim (loc, T_pair, left :: right, annot) ->
       parse_type_annot loc annot
       >>? fun pname ->
       extract_field_annot left
       >>? fun (left, left_annot) ->
-      extract_field_annot right
+      ( match right with
+      | [right] ->
+          extract_field_annot right
+      | right ->
+          (* Unfold [pair t1 ... tn] as [pair t1 (... (pair tn-1 tn))] *)
+          ok (Prim (loc, T_pair, right, []), None) )
       >>? fun (right, right_annot) ->
       parse_comparable_ty ctxt right
       >>? fun (Ex_comparable_ty right, ctxt) ->
@@ -1733,11 +1754,9 @@ and parse_ty :
         parse_type_annot loc annot
         >>? fun ty_name -> ok (Ex_ty (Contract_t (tl, ty_name)), ctxt)
       else error (Unexpected_contract loc)
-  | Prim (loc, T_pair, [utl; utr], annot) ->
+  | Prim (loc, T_pair, utl :: utr, annot) ->
       extract_field_annot utl
       >>? fun (utl, left_field) ->
-      extract_field_annot utr
-      >>? fun (utr, right_field) ->
       parse_ty
         ctxt
         ~legacy
@@ -1746,6 +1765,13 @@ and parse_ty :
         ~allow_contract
         utl
       >>? fun (Ex_ty tl, ctxt) ->
+      ( match utr with
+      | [utr] ->
+          extract_field_annot utr
+      | utr ->
+          (* Unfold [pair t1 ... tn] as [pair t1 (... (pair tn-1 tn))] *)
+          ok (Prim (loc, T_pair, utr, []), None) )
+      >>? fun (utr, right_field) ->
       parse_ty
         ctxt
         ~legacy
