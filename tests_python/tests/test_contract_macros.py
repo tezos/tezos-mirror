@@ -69,12 +69,12 @@ class TestContractMacros:
 
             # Tests the SET_CAR and SET_CDR instructions
             ('set_caddaadr.tz',
-             '(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 0) 4) 5))) 6)',
+             '(Pair (Pair 1 2 (Pair (Pair 3 0) 4) 5) 6)',
              '3000000',
-             '(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 3000000) 4) 5))) 6)'),
+             '(Pair (Pair 1 2 (Pair (Pair 3 3000000) 4) 5) 6)'),
             ('map_caddaadr.tz',
-             '(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 0) 4) 5))) 6)', 'Unit',
-             '(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 1000000) 4) 5))) 6)'),
+             '(Pair (Pair 1 2 (Pair (Pair 3 0) 4) 5) 6)', 'Unit',
+             '(Pair (Pair 1 2 (Pair (Pair 3 1000000) 4) 5) 6)'),
 
             # Test comparisons on bytes { EQ ; GT ; LT ; GE ; LE }
             ('compare_bytes.tz', '{}', '(Pair 0x33 0x34)',
