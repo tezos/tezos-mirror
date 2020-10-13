@@ -187,8 +187,10 @@ module External_validator_process = struct
        External_validation.socket_path ~data_dir:vp.data_dir ~pid:process#pid
      in
      (* Make sure that the mimicked anonymous file descriptor is
-          removed if the spawn of the process is interupted. Thus, we
-          avoid generating potential garbage in the [vp.data_dir]. *)
+        removed if the spawn of the process is interupted. Thus, we
+        avoid generating potential garbage in the [vp.data_dir].
+        No interruption can occur since the resource was created
+        because there are no yield points. *)
      let clean_process_fd () =
        Lwt.catch
          (fun () -> Lwt_unix.unlink socket_path)
