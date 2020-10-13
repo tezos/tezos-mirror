@@ -176,7 +176,10 @@ unit:alltest:
 #    when: on_failure
   script:
     - scripts/test_wrapper.sh src/bin_client client
+    - scripts/test_wrapper.sh src/bin_snoop/latex snoop_latex
     - scripts/test_wrapper.sh src/lib_base base
+    - scripts/test_wrapper.sh src/lib_benchmark/lib_micheline_rewriting benchmark_lib_micheline_rewriting
+    - scripts/test_wrapper.sh src/lib_benchmark benchmark
     - scripts/test_wrapper.sh src/lib_client_base client_base
     - scripts/test_wrapper.sh src/lib_crypto crypto
     - scripts/test_wrapper.sh src/lib_error_monad error_monad
@@ -675,6 +678,11 @@ documentation:linkcheck:
 ##BEGIN_OPAM##
 # this section is updated using the script scripts/update_opam_test.sh
 
+opam:benchmark-utils:
+  <<: *opam_definition
+  variables:
+    package: benchmark-utils
+
 opam:bls12-381:
   <<: *opam_definition
   variables:
@@ -684,6 +692,11 @@ opam:flextesa:
   <<: *opam_definition
   variables:
     package: flextesa
+
+opam:latex:
+  <<: *opam_definition
+  variables:
+    package: latex
 
 opam:ledgerwallet:
   <<: *opam_definition
@@ -695,10 +708,25 @@ opam:ledgerwallet-tezos:
   variables:
     package: ledgerwallet-tezos
 
+opam:numerics:
+  <<: *opam_definition
+  variables:
+    package: numerics
+
+opam:pyml-plot:
+  <<: *opam_definition
+  variables:
+    package: pyml-plot
+
 opam:sapling:
   <<: *opam_definition
   variables:
     package: sapling
+
+opam:staTz:
+  <<: *opam_definition
+  variables:
+    package: staTz
 
 opam:tezos-006-PsCARTHA-test-helpers:
   <<: *opam_definition
@@ -799,6 +827,16 @@ opam:tezos-benchmark:
   <<: *opam_definition
   variables:
     package: tezos-benchmark
+
+opam:tezos-benchmark-examples:
+  <<: *opam_definition
+  variables:
+    package: tezos-benchmark-examples
+
+opam:tezos-benchmark-tests:
+  <<: *opam_definition
+  variables:
+    package: tezos-benchmark-tests
 
 opam:tezos-clic:
   <<: *opam_definition
@@ -1085,6 +1123,11 @@ opam:tezos-micheline:
   variables:
     package: tezos-micheline
 
+opam:tezos-micheline-rewriting:
+  <<: *opam_definition
+  variables:
+    package: tezos-micheline-rewriting
+
 opam:tezos-mockup:
   <<: *opam_definition
   variables:
@@ -1304,6 +1347,11 @@ opam:tezos-signer-services:
   <<: *opam_definition
   variables:
     package: tezos-signer-services
+
+opam:tezos-snoop:
+  <<: *opam_definition
+  variables:
+    package: tezos-snoop
 
 opam:tezos-stdlib:
   <<: *opam_definition
