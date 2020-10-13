@@ -9,7 +9,7 @@ depends: [
   "tezos-tooling" { with-test }
   ## ocaml should be in sync with `script/version.sh`
   "ocaml" { = "4.09.1" }
-  "dune" { >= "1.11" }
+  "dune" { >= "2.0" }
   "base-unix"
   "tezos-base"
   "tezos-protocol-environment"

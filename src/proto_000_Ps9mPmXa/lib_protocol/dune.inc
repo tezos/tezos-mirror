@@ -116,8 +116,8 @@ include Tezos_raw_protocol_000_Ps9mPmXa.Main
                    -warn-error +a))
  (modules Registerer))
 
-(alias
- (name runtest_compile_protocol)
+(rule
+ (alias runtest_compile_protocol)
  (deps
    data.ml
    services.ml
@@ -125,11 +125,13 @@ include Tezos_raw_protocol_000_Ps9mPmXa.Main
   (:src_dir TEZOS_PROTOCOL))
  (action (run %{bin:tezos-protocol-compiler}  .)))
 
-(alias
- (name runtest_sandbox)
- (deps .tezos_protocol_000_Ps9mPmXa.objs/native/tezos_protocol_000_Ps9mPmXa.cmx))
+(rule
+ (alias runtest_sandbox)
+ (deps .tezos_protocol_000_Ps9mPmXa.objs/native/tezos_protocol_000_Ps9mPmXa.cmx)
+ (action (progn)))
 
-(alias
- (name runtest)
+(rule
+ (alias runtest)
  (package tezos-protocol-000-Ps9mPmXa)
- (deps (alias runtest_sandbox)))
+ (deps (alias runtest_sandbox))
+ (action (progn)))

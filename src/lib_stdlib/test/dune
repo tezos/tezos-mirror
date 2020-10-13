@@ -10,32 +10,34 @@
             lwt.unix)
  (flags (:standard -open Tezos_stdlib)))
 
-(alias
- (name buildtest)
+(rule
+ (alias buildtest)
  (deps test_tzList.exe
        test_tzString.exe
-       test_lwt_pipe.exe))
+       test_lwt_pipe.exe)
+ (action (progn)))
 
-(alias
- (name runtest_tzList)
+(rule
+ (alias runtest_tzList)
  (action (run %{exe:test_tzList.exe})))
 
-(alias
- (name runtest_tzString)
+(rule
+ (alias runtest_tzString)
  (action (run %{exe:test_tzString.exe})))
 
-(alias
- (name runtest_lwt_pipe)
+(rule
+ (alias runtest_lwt_pipe)
  (action (run %{exe:test_lwt_pipe.exe})))
 
-(alias
- (name runtest)
+(rule
+ (alias runtest)
  (package tezos-stdlib)
  (deps (alias runtest_tzList)
        (alias runtest_tzString)
-       (alias runtest_lwt_pipe)))
+       (alias runtest_lwt_pipe))
+ (action (progn)))
 
-(alias
- (name runtest_lint)
+(rule
+ (alias runtest_lint)
  (deps (glob_files *.ml{,i}))
  (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

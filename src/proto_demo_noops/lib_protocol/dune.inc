@@ -108,18 +108,20 @@ include Tezos_raw_protocol_demo_noops.Main
                    -warn-error +a))
  (modules Registerer))
 
-(alias
- (name runtest_compile_protocol)
+(rule
+ (alias runtest_compile_protocol)
  (deps
    main.mli main.ml
   (:src_dir TEZOS_PROTOCOL))
  (action (run %{bin:tezos-protocol-compiler} -no-hash-check .)))
 
-(alias
- (name runtest_sandbox)
- (deps .tezos_protocol_demo_noops.objs/native/tezos_protocol_demo_noops.cmx))
+(rule
+ (alias runtest_sandbox)
+ (deps .tezos_protocol_demo_noops.objs/native/tezos_protocol_demo_noops.cmx)
+ (action (progn)))
 
-(alias
- (name runtest)
+(rule
+ (alias runtest)
  (package tezos-protocol-demo-noops)
- (deps (alias runtest_sandbox)))
+ (deps (alias runtest_sandbox))
+ (action (progn)))

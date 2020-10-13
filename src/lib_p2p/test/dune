@@ -16,44 +16,45 @@
                    -open Tezos_stdlib
                    -open Tezos_p2p)))
 
-(alias
- (name buildtest)
+(rule
+ (alias buildtest)
  (deps test_p2p_socket.exe
        test_p2p_pool.exe
        test_p2p_io_scheduler.exe
        test_p2p_peerset.exe
        test_p2p_ipv6set.exe
        test_p2p_banned_peers.exe
-       ))
+       )
+ (action (progn)))
 
-(alias
- (name runtest_p2p_socket)
+(rule
+ (alias runtest_p2p_socket)
  (action (run %{exe:test_p2p_socket.exe} -v)))
 
-(alias
- (name runtest_p2p_pool)
+(rule
+ (alias runtest_p2p_pool)
  (action (run %{exe:test_p2p_pool.exe} --clients 10 --repeat 5 -v)))
 
-(alias
- (name runtest_p2p_io_scheduler)
+(rule
+ (alias runtest_p2p_io_scheduler)
  (action (run %{exe:test_p2p_io_scheduler.exe}
               --delay 5 --clients 8
               --max-upload-speed 262144 ;; 1 << 18 = 256kB
               --max-download-speed 1048576 ;; 1 << 20 = 1MB
               )))
 
-(alias
- (name runtest_p2p_socket_ipv4)
+(rule
+ (alias runtest_p2p_socket_ipv4)
  (action (run %{exe:test_p2p_socket.exe} -v
               --addr "::ffff:127.0.0.1")))
 
-(alias
- (name runtest_p2p_pool_ipv4)
+(rule
+ (alias runtest_p2p_pool_ipv4)
  (action (run %{exe:test_p2p_pool.exe} --clients 10 --repeat 5 -v
               --addr "::ffff:127.0.0.1")))
 
-(alias
- (name runtest_p2p_io_scheduler_ipv4)
+(rule
+ (alias runtest_p2p_io_scheduler_ipv4)
  (action (run %{exe:test_p2p_io_scheduler.exe}
               --delay 5 --clients 8
               --max-upload-speed 262144 ;; 1 << 18 = 256kB
@@ -61,20 +62,20 @@
               --addr "::ffff:127.0.0.1"
               )))
 
-(alias
- (name runtest_p2p_ipv6set)
+(rule
+ (alias runtest_p2p_ipv6set)
  (action (run %{exe:test_p2p_ipv6set.exe} -v)))
 
-(alias
- (name runtest_p2p_peerset)
+(rule
+ (alias runtest_p2p_peerset)
  (action (run %{exe:test_p2p_peerset.exe} -v)))
 
-(alias
- (name runtest_p2p_banned_peers)
+(rule
+ (alias runtest_p2p_banned_peers)
  (action (run %{exe:test_p2p_banned_peers.exe} -v)))
 
-(alias
- (name runtest)
+(rule
+ (alias runtest)
  (package tezos-p2p)
  (deps (alias runtest_p2p_socket_ipv4)
        (alias runtest_p2p_pool_ipv4)
@@ -82,9 +83,10 @@
        (alias runtest_p2p_peerset)
        (alias runtest_p2p_ipv6set)
        (alias runtest_p2p_banned_peers)
-       ))
+       )
+ (action (progn)))
 
-(alias
- (name runtest_lint)
+(rule
+ (alias runtest_lint)
  (deps (glob_files *.ml{,i}))
  (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

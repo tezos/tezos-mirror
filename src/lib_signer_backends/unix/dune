@@ -1,7 +1,7 @@
 (library
  (name tezos_signer_backends_unix)
  (public_name tezos-signer-backends.unix)
- (modules (:standard \ no_ledger with_ledger))
+ (modules (:standard))
  (libraries ocplib-endian.bigstring
             tezos-signer-backends
             tezos-base
@@ -9,8 +9,8 @@
             tezos-stdlib-unix
             tezos-rpc-http-client-unix
             (select ledger.ml from
-              (ledgerwallet-tezos -> with_ledger.ml)
-              (-> no_ledger.ml)))
+              (ledgerwallet-tezos -> ledger.available.ml)
+              (-> ledger.none.ml)))
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_stdlib_unix
                    -open Tezos_stdlib
@@ -22,7 +22,7 @@
                    -open Tezos_signer_backends
                    -open Tezos_shell_services)))
 
-(alias
- (name runtest_lint)
+(rule
+ (alias runtest_lint)
  (deps (glob_files *.ml{,i}))
  (action (run %{lib:tezos-tooling:lint.sh} %{deps} --ignore ledger.ml)))

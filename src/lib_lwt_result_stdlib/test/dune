@@ -6,15 +6,17 @@
             alcotest-lwt)
  (flags (:standard -open Tezos_lwt_result_stdlib)))
 
-(alias
- (name buildtest)
- (deps test_hashtbl.exe))
+(rule
+ (alias buildtest)
+ (deps test_hashtbl.exe)
+ (action (progn)))
 
-(alias
- (name runtest_hashtbl)
+(rule
+ (alias runtest_hashtbl)
  (action (run %{exe:test_hashtbl.exe})))
 
-(alias
- (name runtest)
+(rule
+ (alias runtest)
  (package tezos-lwt-result-stdlib)
- (deps (alias runtest_hashtbl)))
+ (deps (alias runtest_hashtbl))
+ (action (progn)))

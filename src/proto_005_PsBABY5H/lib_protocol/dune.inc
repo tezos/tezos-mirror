@@ -380,8 +380,8 @@ include Tezos_raw_protocol_005_PsBABY5H.Main
                    -warn-error +a))
  (modules Registerer))
 
-(alias
- (name runtest_compile_protocol)
+(rule
+ (alias runtest_compile_protocol)
  (deps
    misc.mli misc.ml
    storage_description.mli storage_description.ml
@@ -455,11 +455,13 @@ include Tezos_raw_protocol_005_PsBABY5H.Main
   (:src_dir TEZOS_PROTOCOL))
  (action (run %{bin:tezos-protocol-compiler}  .)))
 
-(alias
- (name runtest_sandbox)
- (deps .tezos_protocol_005_PsBABY5H.objs/native/tezos_protocol_005_PsBABY5H.cmx))
+(rule
+ (alias runtest_sandbox)
+ (deps .tezos_protocol_005_PsBABY5H.objs/native/tezos_protocol_005_PsBABY5H.cmx)
+ (action (progn)))
 
-(alias
- (name runtest)
+(rule
+ (alias runtest)
  (package tezos-protocol-005-PsBABY5H)
- (deps (alias runtest_sandbox)))
+ (deps (alias runtest_sandbox))
+ (action (progn)))

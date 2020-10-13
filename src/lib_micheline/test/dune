@@ -4,20 +4,22 @@
             alcotest-lwt)
  (flags (:standard -open Tezos_micheline)))
 
-(alias
-  (name buildtest)
-  (deps test_parser.exe))
+(rule
+  (alias buildtest)
+  (deps test_parser.exe)
+  (action progn))
 
-(alias
-  (name runtest_micheline_parser)
+(rule
+  (alias runtest_micheline_parser)
   (action (run %{exe:test_parser.exe})))
 
-(alias
-  (name runtest)
+(rule
+  (alias runtest)
   (package tezos-micheline)
-  (deps (alias runtest_micheline_parser)))
+  (deps (alias runtest_micheline_parser))
+  (action progn))
 
-(alias
- (name runtest_lint)
+(rule
+ (alias runtest_lint)
  (deps (glob_files *.ml{,i}))
  (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

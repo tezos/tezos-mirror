@@ -380,8 +380,8 @@ include Tezos_raw_protocol_alpha.Main
                    -warn-error +a))
  (modules Registerer))
 
-(alias
- (name runtest_compile_protocol)
+(rule
+ (alias runtest_compile_protocol)
  (deps
    misc.mli misc.ml
    storage_description.mli storage_description.ml
@@ -455,11 +455,13 @@ include Tezos_raw_protocol_alpha.Main
   (:src_dir TEZOS_PROTOCOL))
  (action (run %{bin:tezos-protocol-compiler} -no-hash-check .)))
 
-(alias
- (name runtest_sandbox)
- (deps .tezos_protocol_alpha.objs/native/tezos_protocol_alpha.cmx))
+(rule
+ (alias runtest_sandbox)
+ (deps .tezos_protocol_alpha.objs/native/tezos_protocol_alpha.cmx)
+ (action (progn)))
 
-(alias
- (name runtest)
+(rule
+ (alias runtest)
  (package tezos-protocol-alpha)
- (deps (alias runtest_sandbox)))
+ (deps (alias runtest_sandbox))
+ (action (progn)))

@@ -13,12 +13,13 @@
                    -open Tezos_protocol_updater
                    -linkall)))
 
-(alias
- (name buildtest)
+(rule
+ (alias buildtest)
  (deps rpc_doc.exe
-       p2p_doc.exe))
+       p2p_doc.exe)
+ (action (progn)))
 
-(alias
- (name runtest_lint)
+(rule
+ (alias runtest_lint)
  (deps (glob_files *.ml{,i}))
  (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

@@ -8,20 +8,22 @@
                    -open Tezos_client_base
                    -open Tezos_signer_backends)))
 
-(alias
- (name buildtest)
- (deps test_encrypted.exe))
+(rule
+ (alias buildtest)
+ (deps test_encrypted.exe)
+ (action (progn)))
 
-(alias
- (name runtest_signer_encrypted)
+(rule
+ (alias runtest_signer_encrypted)
  (action (run %{exe:test_encrypted.exe})))
 
-(alias
- (name runtest)
+(rule
+ (alias runtest)
  (package tezos-signer-backends)
- (deps (alias runtest_signer_encrypted)))
+ (deps (alias runtest_signer_encrypted))
+ (action (progn)))
 
-(alias
- (name runtest_lint)
+(rule
+ (alias runtest_lint)
  (deps (glob_files *.ml{,i}))
  (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

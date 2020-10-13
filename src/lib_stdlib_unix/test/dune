@@ -17,96 +17,107 @@
             lwt.unix)
  (flags (:standard -open Tezos_stdlib_unix)))
 
-(alias
- (name buildtest)
- (deps test_lwt_exit_exit.exe))
+(rule
+ (alias buildtest)
+ (deps test_lwt_exit_exit.exe)
+ (action (progn)))
 
-(alias
- (name runtest_lwt_exit_exit)
+(rule
+ (alias runtest_lwt_exit_exit)
  (action (run %{exe:test_lwt_exit_exit.exe})))
 
-(alias
- (name buildtest)
- (deps test_lwt_exit_exit_escape.exe))
+(rule
+ (alias buildtest)
+ (deps test_lwt_exit_exit_escape.exe)
+ (action (progn)))
 
-(alias
- (name runtest_lwt_exit_exit_escape)
+(rule
+ (alias runtest_lwt_exit_exit_escape)
  (action (run %{exe:test_lwt_exit_exit_escape.exe})))
 
-(alias
- (name buildtest)
- (deps test_lwt_exit_return.exe))
+(rule
+ (alias buildtest)
+ (deps test_lwt_exit_return.exe)
+ (action (progn)))
 
-(alias
- (name runtest_lwt_exit_return)
+(rule
+ (alias runtest_lwt_exit_return)
  (action (run %{exe:test_lwt_exit_return.exe})))
 
-(alias
- (name buildtest)
- (deps test_lwt_exit_after.exe))
+(rule
+ (alias buildtest)
+ (deps test_lwt_exit_after.exe)
+ (action (progn)))
 
-(alias
- (name runtest_lwt_exit_after)
+(rule
+ (alias runtest_lwt_exit_after)
  (action (run %{exe:test_lwt_exit_after.exe})))
 
-(alias
- (name buildtest)
- (deps test_lwt_exit_signal.exe))
+(rule
+ (alias buildtest)
+ (deps test_lwt_exit_signal.exe)
+ (action (progn)))
 
-(alias
- (name runtest_lwt_exit_signal)
+(rule
+ (alias runtest_lwt_exit_signal)
  (action (run %{exe:test_lwt_exit_signal.exe})))
 
-(alias
- (name buildtest)
- (deps test_lwt_exit_clean_up.exe))
+(rule
+ (alias buildtest)
+ (deps test_lwt_exit_clean_up.exe)
+ (action (progn)))
 
-(alias
- (name runtest_lwt_exit_clean_up)
+(rule
+ (alias runtest_lwt_exit_clean_up)
  (action (run %{exe:test_lwt_exit_clean_up.exe})))
 
-(alias
- (name buildtest)
- (deps test_lwt_exit_unregister_clean_up.exe))
+(rule
+ (alias buildtest)
+ (deps test_lwt_exit_unregister_clean_up.exe)
+ (action (progn)))
 
-(alias
- (name runtest_test_lwt_exit_unregister_clean_up)
+(rule
+ (alias runtest_test_lwt_exit_unregister_clean_up)
  (action (run %{exe:test_lwt_exit_unregister_clean_up.exe})))
 
-(alias
- (name buildtest)
- (deps test_lwt_exit_unregister_clean_up_with_after.exe))
+(rule
+ (alias buildtest)
+ (deps test_lwt_exit_unregister_clean_up_with_after.exe)
+ (action (progn)))
 
-(alias
- (name runtest_test_lwt_exit_unregister_clean_up_with_after)
+(rule
+ (alias runtest_test_lwt_exit_unregister_clean_up_with_after)
  (action (run %{exe:test_lwt_exit_unregister_clean_up_with_after.exe})))
 
-(alias
- (name buildtest)
- (deps test_lwt_exit_raise.exe))
+(rule
+ (alias buildtest)
+ (deps test_lwt_exit_raise.exe)
+ (action (progn)))
 
-(alias
- (name runtest_test_lwt_exit_raise)
+(rule
+ (alias runtest_test_lwt_exit_raise)
  (action (run %{exe:test_lwt_exit_raise.exe})))
 
-(alias
- (name buildtest)
- (deps test_lwt_exit_raise_exit.exe))
+(rule
+ (alias buildtest)
+ (deps test_lwt_exit_raise_exit.exe)
+ (action (progn)))
 
-(alias
- (name runtest_test_lwt_exit_raise_exit)
+(rule
+ (alias runtest_test_lwt_exit_raise_exit)
  (action (run %{exe:test_lwt_exit_raise_exit.exe})))
 
-(alias
- (name buildtest)
- (deps test_lwt_exit_range_of_signals.exe))
+(rule
+ (alias buildtest)
+ (deps test_lwt_exit_range_of_signals.exe)
+ (action (progn)))
 
-(alias
- (name runtest_test_lwt_exit_range_of_signals)
+(rule
+ (alias runtest_test_lwt_exit_range_of_signals)
  (action (run %{exe:test_lwt_exit_range_of_signals.exe})))
 
-(alias
- (name runtest)
+(rule
+ (alias runtest)
  (package tezos-stdlib-unix)
  (deps (alias runtest_lwt_exit_exit)
        (alias runtest_lwt_exit_exit_escape)
@@ -119,9 +130,10 @@
        (alias runtest_test_lwt_exit_raise)
        (alias runtest_test_lwt_exit_raise_exit)
        (alias runtest_test_lwt_exit_range_of_signals)
- ))
+ )
+ (action (progn)))
 
-(alias
- (name runtest_lint)
+(rule
+ (alias runtest_lint)
  (deps (glob_files *.ml{,i}))
  (action (run %{lib:tezos-tooling:lint.sh} %{deps})))
