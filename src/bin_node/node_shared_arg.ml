@@ -31,9 +31,7 @@ type t = {
   data_dir : string option;
   config_file : string;
   network : Node_config_file.blockchain_network option;
-  min_connections : int option;
-  expected_connections : int option;
-  max_connections : int option;
+  connections : int option;
   max_download_speed : int option;
   max_upload_speed : int option;
   binary_chunks_size : int option;
@@ -74,42 +72,11 @@ let wrap data_dir config_file network connections max_download_speed
   let rpc_tls =
     Option.map (fun (cert, key) -> {Node_config_file.cert; key}) rpc_tls
   in
-  (* when `--connections` is used,
-     override all the bounds defined in the configuration file. *)
-  let ( synchronisation_threshold,
-        min_connections,
-        expected_connections,
-        max_connections,
-        peer_table_size ) =
-    match connections with
-    | None ->
-        (synchronisation_threshold, None, None, None, peer_table_size)
-    | Some x -> (
-        let peer_table_size =
-          match peer_table_size with
-          | None ->
-              Some (8 * x)
-          | Some _ ->
-              peer_table_size
-        in
-        match synchronisation_threshold with
-        | None ->
-            ( Some (min (x / 4) 2),
-              Some (x / 2),
-              Some x,
-              Some (3 * x / 2),
-              peer_table_size )
-        | Some bs ->
-            (Some bs, Some (x / 2), Some x, Some (3 * x / 2), peer_table_size)
-        )
-  in
   {
     data_dir;
     config_file;
     network;
-    min_connections;
-    expected_connections;
-    max_connections;
+    connections;
     max_download_speed;
     max_upload_speed;
     binary_chunks_size;
@@ -269,9 +236,9 @@ module Term = struct
     let doc =
       "Sets min_connections, expected_connections, max_connections to NUM / \
        2, NUM, (3 * NUM) / 2, respectively. Sets peer_table_size to 8 * NUM \
-       unless it is already defined in the configuration file. Sets \
+       unless it is already defined on the command line. Sets \
        synchronisation_threshold to min(NUM / 4, 2) unless it is already \
-       defined in the configuration file."
+       defined on the command line."
     in
     Arg.(
       value & opt (some int) None & info ~docs ~doc ~docv:"NUM" ["connections"])
@@ -537,9 +504,7 @@ let read_and_patch_config_file ?(may_override_network = false)
   read_config_file args
   >>=? fun cfg ->
   let { data_dir;
-        min_connections;
-        expected_connections;
-        max_connections;
+        connections;
         max_download_speed;
         max_upload_speed;
         binary_chunks_size;
@@ -618,6 +583,41 @@ let read_and_patch_config_file ?(may_override_network = false)
     in
     return (cfg_peers @ peers) )
   >>=? fun bootstrap_peers ->
+  (* when `--connections` is used,
+     override all the bounds defined in the configuration file. *)
+  let ( synchronisation_threshold,
+        min_connections,
+        expected_connections,
+        max_connections,
+        peer_table_size ) =
+    match connections with
+    | None ->
+        (synchronisation_threshold, None, None, None, peer_table_size)
+    | Some x -> (
+        let peer_table_size =
+          match peer_table_size with
+          | None ->
+              Some (8 * x)
+          | Some _ ->
+              peer_table_size
+        in
+        (* connections sets a new value for the
+           [synchronisation_threshold] except if a value for it was
+           specified on the command line. *)
+        match synchronisation_threshold with
+        | None ->
+            ( Some (min (x / 4) 2),
+              Some (x / 2),
+              Some x,
+              Some (3 * x / 2),
+              peer_table_size )
+        | Some threshold ->
+            ( Some threshold,
+              Some (x / 2),
+              Some x,
+              Some (3 * x / 2),
+              peer_table_size ) )
+  in
   Node_config_file.update
     ?data_dir
     ?min_connections
