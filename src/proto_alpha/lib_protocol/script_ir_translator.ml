@@ -2570,14 +2570,26 @@ let rec parse_data :
       traced_fail
         (Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr))
   (* Pairs *)
-  | (Pair_t ((ta, _, _), (tb, _, _), _), Prim (loc, D_Pair, [va; vb], annot))
-    ->
-      (if legacy then ok_unit else error_unexpected_annot loc annot)
-      >>?= fun () ->
-      traced @@ non_terminal_recursion ?type_logger ctxt ~legacy ta va
-      >>=? fun (va, ctxt) ->
-      non_terminal_recursion ?type_logger ctxt ~legacy tb vb
-      >|=? fun (vb, ctxt) -> ((va, vb), ctxt)
+  | (Pair_t ((ta, _, _), (tb, _, _), _), Prim (loc, D_Pair, va :: l, annot)) ->
+      traced
+      @@ ( (if legacy then ok_unit else error_unexpected_annot loc annot)
+         >>?= fun () ->
+         non_terminal_recursion ?type_logger ctxt ~legacy ta va
+         >>=? fun (va, ctxt) ->
+         ( match (l, tb) with
+         | ([vb], _) ->
+             ok vb
+         | ([], _) ->
+             error @@ Invalid_arity (loc, D_Pair, 2, 1)
+         | (_ :: _, Pair_t _) ->
+             (* Unfold [Pair x1 ... xn] as [Pair x1 (Pair x2 ... xn-1 xn))]
+               for type [pair ta (pair tb1 tb2)] and n >= 3 only *)
+             ok @@ Prim (loc, D_Pair, l, [])
+         | _ ->
+             error @@ Invalid_arity (loc, D_Pair, 2, 1 + List.length l) )
+         >>?= fun vb ->
+         non_terminal_recursion ?type_logger ctxt ~legacy tb vb
+         >|=? fun (vb, ctxt) -> ((va, vb), ctxt) )
   | (Pair_t _, Prim (loc, D_Pair, l, _)) ->
       fail @@ Invalid_arity (loc, D_Pair, 2, List.length l)
   | (Pair_t _, expr) ->
@@ -5633,11 +5645,17 @@ let rec unparse_data :
         >|? fun ctxt ->
         let bytes = Bls12_381.Fr.to_bytes x in
         (Bytes (-1, bytes), ctxt) )
-  | (Pair_t ((tl, _, _), (tr, _, _), _), (l, r)) ->
+  | (Pair_t ((tl, _, _), (tr, _, _), _), (l, r)) -> (
       non_terminal_recursion ctxt mode tl l
       >>=? fun (l, ctxt) ->
       non_terminal_recursion ctxt mode tr r
-      >|=? fun (r, ctxt) -> (Prim (-1, D_Pair, [l; r], []), ctxt)
+      >|=? fun (r, ctxt) ->
+      (* Fold [Pair x1 (Pair x2 ... (Pair xn-1 xn))] as [Pair x1 ... xn] *)
+      match r with
+      | Prim (_, D_Pair, xs, []) ->
+          (Prim (-1, D_Pair, l :: xs, []), ctxt)
+      | _ ->
+          (Prim (-1, D_Pair, [l; r], []), ctxt) )
   | (Union_t ((tl, _), _, _), L l) ->
       non_terminal_recursion ctxt mode tl l
       >|=? fun (l, ctxt) -> (Prim (-1, D_Left, [l], []), ctxt)
