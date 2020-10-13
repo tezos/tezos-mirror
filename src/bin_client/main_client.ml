@@ -37,33 +37,17 @@ let disable_disclaimer =
   | _ ->
       false
 
-let zeronet () =
+let testnet_disclaimer () =
   if not disable_disclaimer then
     Format.eprintf
       "@[<v 2>@{<warning>@{<title>Warning@}@}@,\
        @,\
       \               This is @{<warning>NOT@} the Tezos Mainnet.@,\
        @,\
-      \    The node you are connecting to claims to be running on the@,\
-      \               @{<warning>Tezos Zeronet DEVELOPMENT NETWORK@}.@,\
-      \         Do @{<warning>NOT@} use your fundraiser keys on this network.@,\
-       Zeronet is a testing network, with free tokens and frequent resets.@]@\n\
+      \         Do @{<warning>NOT@} use your fundraiser keys on this network.\n\
        @."
 
-let alphanet () =
-  if not disable_disclaimer then
-    Format.eprintf
-      "@[<v 2>@{<warning>@{<title>Warning@}@}@,\
-       @,\
-      \               This is @{<warning>NOT@} the Tezos Mainnet.@,\
-       @,\
-      \   The node you are connecting to claims to be running on the@,\
-      \             @{<warning>Tezos Alphanet DEVELOPMENT NETWORK.@}@,\
-      \        Do @{<warning>NOT@} use your fundraiser keys on this network.@,\
-      \        Alphanet is a testing network, with free tokens.@]@\n\
-       @."
-
-let mainnet () =
+let mainnet_disclaimer () =
   if not disable_disclaimer then
     Format.eprintf
       "@[<v 2>@{<warning>@{<title>Disclaimer@}@}@,\
@@ -75,17 +59,6 @@ let mainnet () =
        care in their network interactions.@]@\n\
        @."
 
-let sandbox () =
-  if not disable_disclaimer then
-    Format.eprintf
-      "@[<v 2>@{<warning>@{<title>Warning@}@}@,\
-       @,\
-      \ The node you are connecting to claims to be running in a@,\
-      \                  @{<warning>Tezos TEST SANDBOX@}.@,\
-      \    Do @{<warning>NOT@} use your fundraiser keys on this network.@,\
-       You should not see this message if you are not a developer.@]@\n\
-       @."
-
 let check_network ctxt =
   Version_services.version ctxt
   >>= function
@@ -95,19 +68,10 @@ let check_network ctxt =
       let has_prefix prefix =
         String.has_prefix ~prefix (network_version.chain_name :> string)
       in
-      if has_prefix "SANDBOXED" then (
-        sandbox () ;
-        Lwt.return_some `Sandbox )
-      else if has_prefix "TEZOS_ZERONET" then (
-        zeronet () ;
-        Lwt.return_some `Zeronet )
-      else if has_prefix "TEZOS_ALPHANET" then (
-        alphanet () ;
-        Lwt.return_some `Alphanet )
-      else if has_prefix "TEZOS_BETANET" || has_prefix "TEZOS_MAINNET" then (
-        mainnet () ;
+      if has_prefix "TEZOS_BETANET" || has_prefix "TEZOS_MAINNET" then (
+        mainnet_disclaimer () ;
         Lwt.return_some `Mainnet )
-      else Lwt.return_none
+      else (testnet_disclaimer () ; Lwt.return_none)
 
 let get_commands_for_version ctxt network chain block protocol =
   Shell_services.Blocks.protocols ctxt ~chain ~block ()
