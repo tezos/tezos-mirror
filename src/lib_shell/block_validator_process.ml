@@ -188,7 +188,7 @@ module External_validator_process = struct
      in
      (* Make sure that the mimicked anonymous file descriptor is
           removed if the spawn of the process is interupted. Thus, we
-          avoids generating potential garbage in the [vp.data_dir]. *)
+          avoid generating potential garbage in the [vp.data_dir]. *)
      let clean_process_fd () =
        Lwt.catch
          (fun () -> Lwt_unix.unlink socket_path)
@@ -211,10 +211,10 @@ module External_validator_process = struct
      Lwt_unix.accept process_socket
      >>= fun (process_socket, _) ->
      (* As the external validation process is now started, we can
-         unlink the named socket. Indeed, the file descriptor will
-         remain valid until at least one process keep it open. This
-         method mimics an anonymous file descriptor without relying on
-         Linux specific features. *)
+        unlink the named socket. Indeed, the file descriptor will
+        remain valid as long as at least one process keeps it
+        open. This method mimics an anonymous file descriptor without
+        relying on Linux specific features. *)
      Lwt.protected (clean_process_fd ())
      >>= fun () ->
      Lwt_exit.unregister_clean_up_callback process_fd_cleaner ;
