@@ -35,10 +35,10 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    constants_repr.ml
    fitness_repr.ml
    raw_level_repr.mli raw_level_repr.ml
-   voting_period_repr.mli voting_period_repr.ml
    cycle_repr.mli cycle_repr.ml
    level_repr.mli level_repr.ml
    seed_repr.mli seed_repr.ml
+   voting_period_repr.mli voting_period_repr.ml
    script_int_repr.mli script_int_repr.ml
    script_timestamp_repr.mli script_timestamp_repr.ml
    michelson_v1_primitives.mli michelson_v1_primitives.ml
@@ -115,10 +115,10 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    constants_repr.ml
    fitness_repr.ml
    raw_level_repr.mli raw_level_repr.ml
-   voting_period_repr.mli voting_period_repr.ml
    cycle_repr.mli cycle_repr.ml
    level_repr.mli level_repr.ml
    seed_repr.mli seed_repr.ml
+   voting_period_repr.mli voting_period_repr.ml
    script_int_repr.mli script_int_repr.ml
    script_timestamp_repr.mli script_timestamp_repr.ml
    michelson_v1_primitives.mli michelson_v1_primitives.ml
@@ -195,10 +195,10 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    constants_repr.ml
    fitness_repr.ml
    raw_level_repr.mli raw_level_repr.ml
-   voting_period_repr.mli voting_period_repr.ml
    cycle_repr.mli cycle_repr.ml
    level_repr.mli level_repr.ml
    seed_repr.mli seed_repr.ml
+   voting_period_repr.mli voting_period_repr.ml
    script_int_repr.mli script_int_repr.ml
    script_timestamp_repr.mli script_timestamp_repr.ml
    michelson_v1_primitives.mli michelson_v1_primitives.ml
@@ -295,10 +295,10 @@ include Tezos_raw_protocol_alpha.Main
    Constants_repr
    Fitness_repr
    Raw_level_repr
-   Voting_period_repr
    Cycle_repr
    Level_repr
    Seed_repr
+   Voting_period_repr
    Script_int_repr
    Script_timestamp_repr
    Michelson_v1_primitives
@@ -411,10 +411,10 @@ include Tezos_raw_protocol_alpha.Main
    constants_repr.ml
    fitness_repr.ml
    raw_level_repr.mli raw_level_repr.ml
-   voting_period_repr.mli voting_period_repr.ml
    cycle_repr.mli cycle_repr.ml
    level_repr.mli level_repr.ml
    seed_repr.mli seed_repr.ml
+   voting_period_repr.mli voting_period_repr.ml
    script_int_repr.mli script_int_repr.ml
    script_timestamp_repr.mli script_timestamp_repr.ml
    michelson_v1_primitives.mli michelson_v1_primitives.ml
