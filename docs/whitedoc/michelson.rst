@@ -1104,13 +1104,20 @@ is, concatenate or splice them, and use them as keys.
 Operations on pairs
 ~~~~~~~~~~~~~~~~~~~
 
+To build tuples of length greater than 2, right combs have specific
+optimized operations.
+The
+compact notation ``Pair x{0} x{1} ... x{n-2} x{n-1}`` is provided for
+the right-comb value ``Pair x{0} (Pair x{1} ... (Pair x{n-2} x{n-1})
+...)``.
+
 -  ``PAIR``: Build a pair from the stack's top two elements.
 
 ::
 
     :: 'a : 'b : 'S   ->   pair 'a 'b : 'S
 
-    > PAIR / a : b : S  =>  (Pair a b) : S
+    > PAIR / x : y : S  =>  Pair x y : S
 
 -  ``UNPAIR``: Split a pair into its components.
 
@@ -3181,7 +3188,7 @@ Full grammar
       | Unit
       | True
       | False
-      | Pair <data> <data>
+      | Pair <data> <data> ...
       | Left <data>
       | Right <data>
       | Some <data>
