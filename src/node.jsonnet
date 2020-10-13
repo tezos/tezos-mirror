@@ -25,6 +25,22 @@ local prometheus = grafana.prometheus;
       )
     ),
 
+  # Reflects the uptime of the monitoring of the job, not the uptime
+  # of the process.
+  uptime:
+    singlestat.new(
+      title='Node uptime',
+      datasource='Prometheus',
+      format='dtdhms',
+      valueName='max',
+      description= 'Reflects the uptime of the monitoring of the job, not the uptime of the process.',
+    ).addTarget(
+      prometheus.target(
+	'time()-(process_start_time_seconds{job="node"})',
+	legendFormat='node uptime'
+      )
+    ),
+
   headLevel:
     singlestat.new(
       title='Current head level',
