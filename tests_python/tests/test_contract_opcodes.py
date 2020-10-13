@@ -532,19 +532,19 @@ class TestContractOpcodes:
 
             # Test EDIV on nat and int
             ('ediv.tz',
-             '(Pair None (Pair None (Pair None None)))',
+             '(Pair None None None None)',
              '(Pair 10 -3)',
-             '(Pair (Some (Pair -3 1)) (Pair (Some (Pair 3 1)) ' +
-             '(Pair (Some (Pair -3 1)) (Some (Pair 3 1)))))'),
+             '(Pair (Some (Pair -3 1)) (Some (Pair 3 1)) ' +
+             '(Some (Pair -3 1)) (Some (Pair 3 1)))'),
             ('ediv.tz',
-             '(Pair None (Pair None (Pair None None)))',
+             '(Pair None None None None)',
              '(Pair 10 0)',
-             '(Pair None (Pair None (Pair None None)))'),
+             '(Pair None None None None)'),
             ('ediv.tz',
-             '(Pair None (Pair None (Pair None None)))',
+             '(Pair None None None None)',
              '(Pair -8 2)',
-             '(Pair (Some (Pair -4 0)) (Pair (Some (Pair -4 0)) ' +
-             '(Pair (Some (Pair 4 0)) (Some (Pair 4 0)))))'),
+             '(Pair (Some (Pair -4 0)) (Some (Pair -4 0)) ' +
+             '(Some (Pair 4 0)) (Some (Pair 4 0)))'),
 
             # Test EDIV on mutez
             ('ediv_mutez.tz', '(Left None)', '(Pair 10 (Left 10))',
