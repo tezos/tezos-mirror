@@ -144,6 +144,14 @@ val rpc_port : t -> int
 (** Get the data-dir of a node. *)
 val data_dir : t -> string
 
+(** Get the stderr channel of the node. If the node is not running, make the
+   test fail. *)
+val stderr : t -> Lwt_io.input_channel
+
+(** Wait until a node terminates and return its status. If the node is not
+   running, make the test fail. *)
+val wait : t -> Unix.process_status Lwt.t
+
 (** Send SIGTERM to a node and wait for it to terminate. *)
 val terminate : t -> unit Lwt.t
 

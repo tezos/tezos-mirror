@@ -90,6 +90,22 @@ end
 open Parameters
 include Daemon.Make (Parameters)
 
+let stderr node =
+  match node.status with
+  | Not_running ->
+      Test.fail "node %s is not running, it has no stderr" (name node)
+  | Running {process; _} ->
+      Process.stderr process
+
+let wait node =
+  match node.status with
+  | Not_running ->
+      Test.fail
+        "node %s is not running, cannot wait for it to terminate"
+        (name node)
+  | Running {process; _} ->
+      Process.wait process
+
 let name node = node.name
 
 let net_port node = node.persistent_state.net_port
