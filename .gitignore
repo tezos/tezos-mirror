@@ -28,6 +28,7 @@ __pycache__
 /tezos-signer
 /tezos-sandbox
 /tezos-codec
+/tezos-snoop
 
 /src/proto_*/parameters/*-parameters.json
 
