@@ -223,7 +223,7 @@ let rec input_fundraiser_params (cctxt : #Client_context.io_wallet) =
       >>=? function
       | true -> return sk | false -> input_fundraiser_params cctxt )
 
-let commands version : Client_context.full Clic.command list =
+let commands network : Client_context.full Clic.command list =
   let open Clic in
   let encrypted_switch () =
     if
@@ -265,7 +265,7 @@ let commands version : Client_context.full Clic.command list =
               S.description)
           signers
         >>= return);
-    ( match version with
+    ( match network with
     | Some `Mainnet ->
         command
           ~group
@@ -281,7 +281,7 @@ let commands version : Client_context.full Clic.command list =
             Tezos_signer_backends.Encrypted.encrypt cctxt sk
             >>=? fun sk_uri ->
             register_key cctxt ~force (pkh, pk_uri, sk_uri) name)
-    | _ ->
+    | Some `Testnet | None ->
         command
           ~group
           ~desc:"Generate a pair of keys."
@@ -300,7 +300,7 @@ let commands version : Client_context.full Clic.command list =
             else Tezos_signer_backends.Unencrypted.make_sk sk )
             >>=? fun sk_uri ->
             register_key cctxt ~force (pkh, pk_uri, sk_uri) name) );
-    ( match version with
+    ( match network with
     | Some `Mainnet ->
         command
           ~group
@@ -328,7 +328,7 @@ let commands version : Client_context.full Clic.command list =
               ~containing
               ~name
               cctxt)
-    | _ ->
+    | Some `Testnet | None ->
         command
           ~group
           ~desc:"Generate keys including the given string."
@@ -416,39 +416,41 @@ let commands version : Client_context.full Clic.command list =
           pkh
         >>= fun () ->
         register_key cctxt ~force (pkh, pk_uri, sk_uri) ?public_key name) ]
-  @ ( if version <> Some `Mainnet then []
-    else
-      [ command
-          ~group
-          ~desc:"Add a fundraiser secret key to the wallet."
-          (args1 (Secret_key.force_switch ()))
-          ( prefix "import"
-          @@ prefixes ["fundraiser"; "secret"; "key"]
-          @@ Secret_key.fresh_alias_param @@ stop )
-          (fun force name (cctxt : Client_context.full) ->
-            Secret_key.of_fresh cctxt force name
-            >>=? fun name ->
-            input_fundraiser_params cctxt
-            >>=? fun sk ->
-            Tezos_signer_backends.Encrypted.encrypt cctxt sk
-            >>=? fun sk_uri ->
-            Client_keys.neuterize sk_uri
-            >>=? fun pk_uri ->
-            Public_key.find_opt cctxt name
-            >>=? (function
-                   | None ->
-                       return_unit
-                   | Some (pk_uri_found, _) ->
-                       fail_unless
-                         (pk_uri = pk_uri_found || force)
-                         (failure
-                            "public and secret keys '%s' don't correspond, \
-                             please don't use --force"
-                            name))
-            >>=? fun () ->
-            Client_keys.public_key_hash pk_uri
-            >>=? fun (pkh, _public_key) ->
-            register_key cctxt ~force (pkh, pk_uri, sk_uri) name) ] )
+  @ ( match network with
+    | Some `Testnet | None ->
+        []
+    | Some `Mainnet ->
+        [ command
+            ~group
+            ~desc:"Add a fundraiser secret key to the wallet."
+            (args1 (Secret_key.force_switch ()))
+            ( prefix "import"
+            @@ prefixes ["fundraiser"; "secret"; "key"]
+            @@ Secret_key.fresh_alias_param @@ stop )
+            (fun force name (cctxt : Client_context.full) ->
+              Secret_key.of_fresh cctxt force name
+              >>=? fun name ->
+              input_fundraiser_params cctxt
+              >>=? fun sk ->
+              Tezos_signer_backends.Encrypted.encrypt cctxt sk
+              >>=? fun sk_uri ->
+              Client_keys.neuterize sk_uri
+              >>=? fun pk_uri ->
+              Public_key.find_opt cctxt name
+              >>=? (function
+                     | None ->
+                         return_unit
+                     | Some (pk_uri_found, _) ->
+                         fail_unless
+                           (pk_uri = pk_uri_found || force)
+                           (failure
+                              "public and secret keys '%s' don't correspond, \
+                               please don't use --force"
+                              name))
+              >>=? fun () ->
+              Client_keys.public_key_hash pk_uri
+              >>=? fun (pkh, _public_key) ->
+              register_key cctxt ~force (pkh, pk_uri, sk_uri) name) ] )
   @ [ command
         ~group
         ~desc:"Add a public key to the wallet."

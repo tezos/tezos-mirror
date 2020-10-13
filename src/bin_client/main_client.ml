@@ -68,10 +68,12 @@ let check_network ctxt =
       let has_prefix prefix =
         String.has_prefix ~prefix (network_version.chain_name :> string)
       in
-      if has_prefix "TEZOS_BETANET" || has_prefix "TEZOS_MAINNET" then (
+      if List.exists has_prefix ["TEZOS_BETANET"; "TEZOS_MAINNET"] then (
         mainnet_disclaimer () ;
         Lwt.return_some `Mainnet )
-      else (testnet_disclaimer () ; Lwt.return_none)
+      else (
+        testnet_disclaimer () ;
+        Lwt.return_some `Testnet )
 
 let get_commands_for_version ctxt network chain block protocol =
   Shell_services.Blocks.protocols ctxt ~chain ~block ()
