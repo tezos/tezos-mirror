@@ -174,89 +174,88 @@ module External_validator_process = struct
     sandbox_parameters : Data_encoding.json option;
   }
 
-  let send_request vp request result_encoding =
-    let start_process () =
-      let canceler = Lwt_canceler.create () in
-      (* We assume that there is only one validation process per socket *)
-      (* TODO spawn the socket in $XDG_RUNTIME_DIR while making sure
+  let start_process vp =
+    let canceler = Lwt_canceler.create () in
+    (* We assume that there is only one validation process per socket *)
+    (* TODO spawn the socket in $XDG_RUNTIME_DIR while making sure
          it's portable *)
-      (let process =
-         Lwt_process.open_process_none
-           (vp.process_path, [|"tezos-validator"; "--socket-dir"; vp.data_dir|])
-       in
-       let socket_path =
-         External_validation.socket_path ~data_dir:vp.data_dir ~pid:process#pid
-       in
-       (* Make sure that the mimicked anonymous file descriptor is
+    (let process =
+       Lwt_process.open_process_none
+         (vp.process_path, [|"tezos-validator"; "--socket-dir"; vp.data_dir|])
+     in
+     let socket_path =
+       External_validation.socket_path ~data_dir:vp.data_dir ~pid:process#pid
+     in
+     (* Make sure that the mimicked anonymous file descriptor is
           removed if the spawn of the process is interupted. Thus, we
           avoids generating potential garbage in the [vp.data_dir]. *)
-       let clean_process_fd () =
-         Lwt.catch
-           (fun () -> Lwt_unix.unlink socket_path)
-           (function
-             | Unix.Unix_error (ENOENT, _, _) ->
-                 (* The file does not exist *)
-                 Lwt.return_unit
-             | exn ->
-                 Lwt.fail exn)
-       in
-       let process_fd_cleaner =
-         Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
-             clean_process_fd ())
-       in
-       External_validation.create_socket_listen
-         ~canceler
-         ~max_requests:1
-         ~socket_path
-       >>= fun process_socket ->
-       Lwt_unix.accept process_socket
-       >>= fun (process_socket, _) ->
-       (* As the external validation process is now started, we can
+     let clean_process_fd () =
+       Lwt.catch
+         (fun () -> Lwt_unix.unlink socket_path)
+         (function
+           | Unix.Unix_error (ENOENT, _, _) ->
+               (* The file does not exist *)
+               Lwt.return_unit
+           | exn ->
+               Lwt.fail exn)
+     in
+     let process_fd_cleaner =
+       Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
+           clean_process_fd ())
+     in
+     External_validation.create_socket_listen
+       ~canceler
+       ~max_requests:1
+       ~socket_path
+     >>= fun process_socket ->
+     Lwt_unix.accept process_socket
+     >>= fun (process_socket, _) ->
+     (* As the external validation process is now started, we can
          unlink the named socket. Indeed, the file descriptor will
          remain valid until at least one process keep it open. This
          method mimics an anonymous file descriptor without relying on
          Linux specific features. *)
-       Lwt.protected (clean_process_fd ())
-       >>= fun () ->
-       Lwt_exit.unregister_clean_up_callback process_fd_cleaner ;
-       Lwt.return (process, process_socket))
-      >>= fun (process, process_socket) ->
-      let process_stdin = Lwt_io.of_fd ~mode:Output process_socket in
-      let process_stdout = Lwt_io.of_fd ~mode:Input process_socket in
-      lwt_emit (Validator_started process#pid)
-      >>= fun () ->
-      let parameters =
-        {
-          External_validation.context_root = vp.context_root;
-          protocol_root = vp.protocol_root;
-          sandbox_parameters = vp.sandbox_parameters;
-          genesis = vp.genesis;
-          user_activated_upgrades = vp.user_activated_upgrades;
-          user_activated_protocol_overrides =
-            vp.user_activated_protocol_overrides;
-        }
-      in
-      vp.validator_process <-
-        Some
-          {process; stdin = process_stdin; stdout = process_stdout; canceler} ;
-      External_validation.send
-        process_stdin
-        Data_encoding.Variable.bytes
-        External_validation.magic
-      >>= fun () ->
-      External_validation.recv process_stdout Data_encoding.Variable.bytes
-      >>= fun magic ->
-      fail_when
-        (not (Bytes.equal magic External_validation.magic))
-        (Block_validator_errors.Validation_process_failed
-           (Inconsistent_handshake "bad magic"))
-      >>=? fun () ->
-      External_validation.send
-        process_stdin
-        External_validation.parameters_encoding
-        parameters
-      >>= fun () -> return (process, process_stdin, process_stdout)
+     Lwt.protected (clean_process_fd ())
+     >>= fun () ->
+     Lwt_exit.unregister_clean_up_callback process_fd_cleaner ;
+     Lwt.return (process, process_socket))
+    >>= fun (process, process_socket) ->
+    let process_stdin = Lwt_io.of_fd ~mode:Output process_socket in
+    let process_stdout = Lwt_io.of_fd ~mode:Input process_socket in
+    lwt_emit (Validator_started process#pid)
+    >>= fun () ->
+    let parameters =
+      {
+        External_validation.context_root = vp.context_root;
+        protocol_root = vp.protocol_root;
+        sandbox_parameters = vp.sandbox_parameters;
+        genesis = vp.genesis;
+        user_activated_upgrades = vp.user_activated_upgrades;
+        user_activated_protocol_overrides =
+          vp.user_activated_protocol_overrides;
+      }
     in
+    vp.validator_process <-
+      Some {process; stdin = process_stdin; stdout = process_stdout; canceler} ;
+    External_validation.send
+      process_stdin
+      Data_encoding.Variable.bytes
+      External_validation.magic
+    >>= fun () ->
+    External_validation.recv process_stdout Data_encoding.Variable.bytes
+    >>= fun magic ->
+    fail_when
+      (not (Bytes.equal magic External_validation.magic))
+      (Block_validator_errors.Validation_process_failed
+         (Inconsistent_handshake "bad magic"))
+    >>=? fun () ->
+    External_validation.send
+      process_stdin
+      External_validation.parameters_encoding
+      parameters
+    >>= fun () -> return (process, process_stdin, process_stdout)
+
+  let send_request vp request result_encoding =
     ( match vp.validator_process with
     | Some {process; stdin = process_stdin; stdout = process_stdout; canceler}
       -> (
@@ -267,9 +266,9 @@ module External_validator_process = struct
           Lwt_canceler.cancel canceler
           >>= fun () ->
           vp.validator_process <- None ;
-          lwt_emit (Process_status status) >>= fun () -> start_process () )
+          lwt_emit (Process_status status) >>= fun () -> start_process vp )
     | None ->
-        start_process () )
+        start_process vp )
     >>=? fun (process, process_stdin, process_stdout) ->
     Lwt.catch
       (fun () ->
