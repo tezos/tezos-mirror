@@ -163,6 +163,7 @@ in the :ref:`introduction <howtoget>`.
    releases/december-2019
    releases/january-2020
    releases/version-7
+   releases/version-8
 
 .. toctree::
    :maxdepth: 2
