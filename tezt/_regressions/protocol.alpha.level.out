@@ -5,13 +5,10 @@ tezt/_regressions/protocol.alpha.level.out
   "level_position": 2147483647,
   "cycle": 300,
   "cycle_position": 600,
-  "voting_period": 719,
-  "voting_period_position": 900,
   "expected_commitment": true
 }'
-000005337fffffff0000012c00000258000002cf00000384ff
+000005337fffffff0000012c00000258ff
 
-./tezos-codec decode alpha.level from 000005337fffffff0000012c00000258000002cf00000384ff
+./tezos-codec decode alpha.level from 000005337fffffff0000012c00000258ff
 { "level": 1331, "level_position": 2147483647, "cycle": 300,
-  "cycle_position": 600, "voting_period": 719, "voting_period_position": 900,
-  "expected_commitment": true }
+  "cycle_position": 600, "expected_commitment": true }
