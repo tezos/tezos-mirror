@@ -2592,6 +2592,12 @@ let rec parse_data :
          >|=? fun (vb, ctxt) -> ((va, vb), ctxt) )
   | (Pair_t _, Prim (loc, D_Pair, l, _)) ->
       fail @@ Invalid_arity (loc, D_Pair, 2, List.length l)
+  (* Unfold [{x1; ...; xn}] as [Pair x1 x2 ... xn-1 xn] for n >= 2 *)
+  | (Pair_t _, Seq (loc, (_ :: _ :: _ as vs))) ->
+      let data = Prim (loc, D_Pair, vs, []) in
+      traced @@ non_terminal_recursion ?type_logger ctxt ~legacy ty data
+  | (Pair_t _, Seq (loc, l)) ->
+      traced_fail @@ Invalid_seq_arity (loc, 2, List.length l)
   | (Pair_t _, expr) ->
       traced_fail (unexpected expr [] Constant_namespace [D_Pair])
   (* Unions *)
@@ -5650,11 +5656,34 @@ let rec unparse_data :
       >>=? fun (l, ctxt) ->
       non_terminal_recursion ctxt mode tr r
       >|=? fun (r, ctxt) ->
-      (* Fold [Pair x1 (Pair x2 ... (Pair xn-1 xn))] as [Pair x1 ... xn] *)
-      match r with
-      | Prim (_, D_Pair, xs, []) ->
+      (* Fold combs.
+         For combs, three notations are supported:
+         - a) [Pair x1 (Pair x2 ... (Pair xn-1 xn) ...)],
+         - b) [Pair x1 x2 ... xn-1 xn], and
+         - c) [{x1; x2; ...; xn-1; xn}].
+         In readable mode, we always use b),
+         in optimized mode we use the shortest to serialize:
+         - for n=2, [Pair x1 x2],
+         - for n=3, [Pair x1 (Pair x2 x3)],
+         - for n>=4, [{x1; x2; ...; xn}].
+      *)
+      match (mode, tr, r) with
+      | (Optimized, Pair_t _, Micheline.Seq (_, r)) ->
+          (* Optimized case n > 4 *)
+          (Micheline.Seq (-1, l :: r), ctxt)
+      | ( Optimized,
+          Pair_t (_, (Pair_t _, _, _), _),
+          Prim (_, D_Pair, [x2; Prim (_, D_Pair, [x3; x4], [])], []) ) ->
+          (* Optimized case n = 4 *)
+          (Micheline.Seq (-1, [l; x2; x3; x4]), ctxt)
+      | (Readable, Pair_t _, Prim (_, D_Pair, xs, [])) ->
+          (* Readable case n > 2 *)
           (Prim (-1, D_Pair, l :: xs, []), ctxt)
       | _ ->
+          (* The remaining cases are:
+              - Optimized n = 2,
+              - Optimized n = 3, and
+              - Readable n = 2 *)
           (Prim (-1, D_Pair, [l; r], []), ctxt) )
   | (Union_t ((tl, _), _, _), L l) ->
       non_terminal_recursion ctxt mode tl l
