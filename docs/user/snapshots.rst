@@ -5,7 +5,7 @@ Snapshots
 
 As the chain invariably grows every day, retrieving a full chain from
 the peer-to-peer network can be a very long process.  Thanks to the
-implementation of history modes, it is now possible to propose an
+implementation of :ref:`history modes<history-modes>`, it is now possible to propose an
 import/export feature: snapshots.  This procedure allows to gather all
 the data necessary to bootstrap a node from a single file within few
 minutes.

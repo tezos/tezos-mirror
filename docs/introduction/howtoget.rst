@@ -237,7 +237,7 @@ command instead:
 
    make build-dev-deps
 
-This command creates a local opam switch (``_opam`` folder at the ro
+This command creates a local opam switch (``_opam`` folder at the root
 of the repository) where the right version of OCaml and OCaml tezos
 dependencies are compiled and installed (this takes a while but it's
 only done once).
