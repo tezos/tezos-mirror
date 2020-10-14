@@ -333,7 +333,7 @@ let wait_parameter () =
 let protocol_parameter () =
   parameter (fun _ arg ->
       match
-        Seq.find_first
+        Seq.find
           (fun (hash, _commands) ->
             String.has_prefix ~prefix:arg (Protocol_hash.to_b58check hash))
           (Client_commands.get_versions ())

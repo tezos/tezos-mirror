@@ -314,52 +314,49 @@ struct
             filter_map_es f seq
             >>=? fun seq -> Monad.return (fun () -> Cons (item, seq)) )
 
-  let rec find_first f seq =
+  let rec find f seq =
     match seq () with
     | Nil ->
         None
     | Cons (item, seq) ->
-        if f item then Some item else find_first f seq
+        if f item then Some item else find f seq
 
-  let rec find_first_e f seq =
+  let rec find_e f seq =
     match seq () with
     | Nil ->
         ok_none
     | Cons (item, seq) -> (
-        f item
-        >>? function true -> ok_some item | false -> find_first_e f seq )
+        f item >>? function true -> ok_some item | false -> find_e f seq )
 
-  let rec find_first_s f seq =
+  let rec find_s f seq =
     match seq () with
     | Nil ->
         Lwt.return_none
     | Cons (item, seq) -> (
         f item
-        >>= function
-        | true -> Lwt.return_some item | false -> find_first_s f seq )
+        >>= function true -> Lwt.return_some item | false -> find_s f seq )
 
-  let find_first_s f seq =
+  let find_s f seq =
     match seq () with
     | Nil ->
         Lwt.return_none
     | Cons (item, seq) -> (
         Lwt.apply f item
-        >>= function
-        | true -> Lwt.return_some item | false -> find_first_s f seq )
+        >>= function true -> Lwt.return_some item | false -> find_s f seq )
 
-  let rec find_first_es f seq =
+  let rec find_es f seq =
     match seq () with
     | Nil ->
         return_none
     | Cons (item, seq) -> (
         f item
-        >>=? function true -> return_some item | false -> find_first_es f seq )
+        >>=? function true -> return_some item | false -> find_es f seq )
 
-  let find_first_es f seq =
+  let find_es f seq =
     match seq () with
     | Nil ->
         return_none
     | Cons (item, seq) -> (
         Lwt.apply f item
-        >>=? function true -> return_some item | false -> find_first_es f seq )
+        >>=? function true -> return_some item | false -> find_es f seq )
 end
