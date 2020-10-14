@@ -356,7 +356,14 @@ module Overcrowded = struct
            %d, remote: %d).@."
           port
           (snd target)
-        >>= fun () -> P2p_conn.disconnect conn >>= fun () -> return_unit
+        >>= fun () ->
+        P2p_conn.disconnect conn
+        >>= fun () ->
+        Error_monad.failwith
+          "Overcrowded error: connection should be rejected (local: %d, \
+           remote: %d).@."
+          port
+          (snd target)
     | Error
         [ Tezos_p2p_services.P2p_errors.Rejected_by_nack
             {alternative_points = None; _} ] as err ->
