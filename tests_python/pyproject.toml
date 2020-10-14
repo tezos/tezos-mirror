@@ -32,4 +32,9 @@ pytest = "*"
 pytest-regtest = { "git" = "https://gitlab.com/nomadic-labs/pytest-regtest", branch="fc5bd9b2" }
 pytest-timeout = "*"
 requests = "*"
-black = "19.10b0"
+black = "^20.8b1"
+
+[tool.black]
+line-length = 80
+skip-string-normalization = true
+
