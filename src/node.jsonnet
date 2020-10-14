@@ -196,7 +196,7 @@ local prometheus = grafana.prometheus;
     local major = 'Major collections';
     local compact = 'Heap compactions';
     graphPanel.new(
-      title='CG maintenance operations',
+      title='GC maintenance operations',
       datasource='Prometheus',
       linewidth=1,
       format='none',
@@ -226,7 +226,7 @@ local prometheus = grafana.prometheus;
     local major = 'Major heap';
     local top = 'Top major heap';
     graphPanel.new(
-      title='CG minor and mjor word sizes',
+      title='GC minor and major word sizes',
       datasource='Prometheus',
       linewidth=1,
       format='bytes',
