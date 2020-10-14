@@ -997,31 +997,32 @@ let shell_prevalidation (cctxt : #Protocol_client_context.full) ~chain ~block
       return_some
         (bi, priority, shell_header, raw_ops, delegate, seed_nonce_hash)
 
-let filter_outdated_endorsements expected_level ops =
-  List.filter
+let remove_hash_and_filter_outdated_endorsements expected_level ops =
+  List.filter_map
     (function
-      | {
-          Alpha_context.protocol_data =
-            Operation_data
-              {
-                contents =
-                  Single
-                    (Endorsement_with_slot
-                      {
-                        endorsement =
-                          {
-                            protocol_data =
-                              {contents = Single (Endorsement {level; _}); _};
-                            _;
-                          };
-                        _;
-                      });
-                _;
-              };
-          _;
-        } ->
-          Raw_level.equal expected_level level
-      | _ -> true)
+      | ( _,
+          ({
+             Alpha_context.protocol_data =
+               Operation_data
+                 {
+                   contents =
+                     Single
+                       (Endorsement_with_slot
+                         {
+                           endorsement =
+                             {
+                               protocol_data =
+                                 {contents = Single (Endorsement {level; _}); _};
+                               _;
+                             };
+                           _;
+                         });
+                   _;
+                 };
+             _;
+           } as op) ) ->
+          if Raw_level.equal expected_level level then Some op else None
+      | (_, op) -> Some op)
     ops
 
 (** [fetch_operations] retrieve the operations present in the
@@ -1046,7 +1047,10 @@ let fetch_operations (cctxt : #Protocol_client_context.full) ~chain
   | Some current_mempool ->
       let block = `Hash (head.Client_baking_blocks.hash, 0) in
       let operations =
-        ref (filter_outdated_endorsements head.level current_mempool)
+        ref
+          (remove_hash_and_filter_outdated_endorsements
+             head.level
+             current_mempool)
       in
       (* Actively request our peers' for missing operations *)
       Shell_services.Mempool.request_operations cctxt ~chain () >>=? fun () ->
@@ -1083,14 +1087,16 @@ let fetch_operations (cctxt : #Protocol_client_context.full) ~chain
         >>= function
         | `Event (Some op_list) ->
             last_get_event := None ;
-            let op_list = filter_outdated_endorsements head.level op_list in
+            let op_list =
+              remove_hash_and_filter_outdated_endorsements head.level op_list
+            in
             operations := op_list @ !operations ;
             loop ()
         | `Timeout ->
             (* Retrieve the remaining operations present in the stream
                before block construction *)
             let remaining_operations =
-              filter_outdated_endorsements
+              remove_hash_and_filter_outdated_endorsements
                 head.level
                 (List.flatten (Lwt_stream.get_available operation_stream))
             in
