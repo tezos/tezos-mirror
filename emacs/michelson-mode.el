@@ -866,8 +866,7 @@ Enables or disables stack and error display."
   (interactive)
   (when (and michelson-live-editing
              (get-buffer michelson-output-buffer-name))
-    (save-excursion
-      (set-buffer michelson-output-buffer-name)
+    (with-current-buffer michelson-output-buffer-name
       (kill-buffer-and-window)))
   (setq michelson-live-editing (not michelson-live-editing)))
 
