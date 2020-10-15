@@ -28,7 +28,7 @@
 ;; URL: https://gitlab.com/tezos/tezos
 ;; Version: 0.1
 ;; Licence: MIT
-;; Package-Requires: ((deferred "0.5.1") (emacs "24.3"))
+;; Package-Requires: ((deferred "0.5.1") (emacs "24.4"))
 
 ;; This file is not part of GNU Emacs.
 
