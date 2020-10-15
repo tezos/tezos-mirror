@@ -1,4 +1,4 @@
-;;; michelson-mode.el --- Major mode for editing Michelson smart contracts.  -*- lexical-binding: t -*-
+;;; michelson-mode.el --- Major mode for editing Michelson smart contracts  -*- lexical-binding: t -*-
 
 ;; Open Source License
 ;; Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>
