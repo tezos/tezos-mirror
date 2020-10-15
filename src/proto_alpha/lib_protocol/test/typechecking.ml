@@ -138,6 +138,332 @@ let test_unparse_stack_overflow () =
   | Error _ ->
       Alcotest.failf "Unexpected error: %s" __LOC__
 
+let location = function
+  | Prim (loc, _, _, _)
+  | Int (loc, _)
+  | String (loc, _)
+  | Bytes (loc, _)
+  | Seq (loc, _) ->
+      loc
+
+let test_parse_ty ctxt node expected =
+  let legacy = false in
+  let allow_lazy_storage = true in
+  let allow_operation = true in
+  let allow_contract = true in
+  Environment.wrap_error
+    ( Script_ir_translator.parse_ty
+        ctxt
+        ~legacy
+        ~allow_lazy_storage
+        ~allow_operation
+        ~allow_contract
+        node
+    >>? fun (Script_ir_translator.Ex_ty actual, ctxt) ->
+    Script_ir_translator.ty_eq ctxt (location node) actual expected
+    >|? fun (_, ctxt) -> ctxt )
+
+let test_parse_comb_type () =
+  let open Script in
+  let open Script_typed_ir in
+  let nat_prim = Prim (-1, T_nat, [], []) in
+  let nat_prim_a = Prim (-1, T_nat, [], ["%a"]) in
+  let nat_prim_b = Prim (-1, T_nat, [], ["%b"]) in
+  let nat_prim_c = Prim (-1, T_nat, [], ["%c"]) in
+  let nat_ty = Nat_t None in
+  let pair_prim l = Prim (-1, T_pair, l, []) in
+  let pair_ty ty1 ty2 = Pair_t ((ty1, None, None), (ty2, None, None), None) in
+  let pair_prim2 a b = pair_prim [a; b] in
+  let pair_nat_nat_prim = pair_prim2 nat_prim nat_prim in
+  let pair_nat_nat_ty = pair_ty nat_ty nat_ty in
+  test_context ()
+  >>=? fun ctxt ->
+  (* pair nat nat *)
+  test_parse_ty ctxt pair_nat_nat_prim pair_nat_nat_ty
+  >>?= fun ctxt ->
+  (* pair (pair nat nat) nat *)
+  test_parse_ty
+    ctxt
+    (pair_prim2 pair_nat_nat_prim nat_prim)
+    (pair_ty pair_nat_nat_ty nat_ty)
+  >>?= fun ctxt ->
+  (* pair nat (pair nat nat) *)
+  test_parse_ty
+    ctxt
+    (pair_prim2 nat_prim pair_nat_nat_prim)
+    (pair_ty nat_ty pair_nat_nat_ty)
+  >>?= fun ctxt ->
+  (* pair nat nat nat *)
+  test_parse_ty
+    ctxt
+    (pair_prim [nat_prim; nat_prim; nat_prim])
+    (pair_ty nat_ty pair_nat_nat_ty)
+  >>?= fun ctxt ->
+  (* pair (nat %a) nat *)
+  test_parse_ty
+    ctxt
+    (pair_prim2 nat_prim_a nat_prim)
+    (Pair_t ((nat_ty, Some (Field_annot "a"), None), (nat_ty, None, None), None))
+  >>?= fun ctxt ->
+  (* pair nat (nat %b) *)
+  test_parse_ty
+    ctxt
+    (pair_prim2 nat_prim nat_prim_b)
+    (Pair_t ((nat_ty, None, None), (nat_ty, Some (Field_annot "b"), None), None))
+  >>?= fun ctxt ->
+  (* pair (nat %a) (nat %b) *)
+  test_parse_ty
+    ctxt
+    (pair_prim2 nat_prim_a nat_prim_b)
+    (Pair_t
+       ( (nat_ty, Some (Field_annot "a"), None),
+         (nat_ty, Some (Field_annot "b"), None),
+         None ))
+  >>?= fun ctxt ->
+  (* pair (nat %a) (nat %b) (nat %c) *)
+  test_parse_ty
+    ctxt
+    (pair_prim [nat_prim_a; nat_prim_b; nat_prim_c])
+    (Pair_t
+       ( (nat_ty, Some (Field_annot "a"), None),
+         ( Pair_t
+             ( (nat_ty, Some (Field_annot "b"), None),
+               (nat_ty, Some (Field_annot "c"), None),
+               None ),
+           None,
+           None ),
+         None ))
+  >>?= fun ctxt ->
+  (* pair (nat %a) (pair %b nat nat) *)
+  test_parse_ty
+    ctxt
+    (pair_prim2 nat_prim_a (Prim (-1, T_pair, [nat_prim; nat_prim], ["%b"])))
+    (Pair_t
+       ( (nat_ty, Some (Field_annot "a"), None),
+         ( Pair_t ((nat_ty, None, None), (nat_ty, None, None), None),
+           Some (Field_annot "b"),
+           None ),
+         None ))
+  >>?= fun _ -> return_unit
+
+let test_unparse_ty loc ctxt expected ty =
+  Environment.wrap_error
+    ( Script_ir_translator.unparse_ty ctxt ty
+    >>? fun (actual, ctxt) ->
+    if actual = expected then ok ctxt
+    else Alcotest.failf "Unexpected error: %s" loc )
+
+let test_unparse_comb_type () =
+  let open Script in
+  let open Script_typed_ir in
+  let nat_prim = Prim (-1, T_nat, [], []) in
+  let nat_prim_a = Prim (-1, T_nat, [], ["%a"]) in
+  let nat_prim_b = Prim (-1, T_nat, [], ["%b"]) in
+  let nat_prim_c = Prim (-1, T_nat, [], ["%c"]) in
+  let nat_ty = Nat_t None in
+  let pair_prim l = Prim (-1, T_pair, l, []) in
+  let pair_ty ty1 ty2 = Pair_t ((ty1, None, None), (ty2, None, None), None) in
+  let pair_prim2 a b = pair_prim [a; b] in
+  let pair_nat_nat_prim = pair_prim2 nat_prim nat_prim in
+  let pair_nat_nat_ty = pair_ty nat_ty nat_ty in
+  test_context ()
+  >>=? fun ctxt ->
+  (* pair nat nat *)
+  test_unparse_ty __LOC__ ctxt pair_nat_nat_prim pair_nat_nat_ty
+  >>?= fun ctxt ->
+  (* pair (pair nat nat) nat *)
+  test_unparse_ty
+    __LOC__
+    ctxt
+    (pair_prim2 pair_nat_nat_prim nat_prim)
+    (pair_ty pair_nat_nat_ty nat_ty)
+  >>?= fun ctxt ->
+  (* pair nat nat nat *)
+  test_unparse_ty
+    __LOC__
+    ctxt
+    (pair_prim [nat_prim; nat_prim; nat_prim])
+    (pair_ty nat_ty pair_nat_nat_ty)
+  >>?= fun ctxt ->
+  (* pair (nat %a) nat *)
+  test_unparse_ty
+    __LOC__
+    ctxt
+    (pair_prim2 nat_prim_a nat_prim)
+    (Pair_t ((nat_ty, Some (Field_annot "a"), None), (nat_ty, None, None), None))
+  >>?= fun ctxt ->
+  (* pair nat (nat %b) *)
+  test_unparse_ty
+    __LOC__
+    ctxt
+    (pair_prim2 nat_prim nat_prim_b)
+    (Pair_t ((nat_ty, None, None), (nat_ty, Some (Field_annot "b"), None), None))
+  >>?= fun ctxt ->
+  (* pair (nat %a) (nat %b) *)
+  test_unparse_ty
+    __LOC__
+    ctxt
+    (pair_prim2 nat_prim_a nat_prim_b)
+    (Pair_t
+       ( (nat_ty, Some (Field_annot "a"), None),
+         (nat_ty, Some (Field_annot "b"), None),
+         None ))
+  >>?= fun ctxt ->
+  (* pair (nat %a) (nat %b) (nat %c) *)
+  test_unparse_ty
+    __LOC__
+    ctxt
+    (pair_prim [nat_prim_a; nat_prim_b; nat_prim_c])
+    (Pair_t
+       ( (nat_ty, Some (Field_annot "a"), None),
+         ( Pair_t
+             ( (nat_ty, Some (Field_annot "b"), None),
+               (nat_ty, Some (Field_annot "c"), None),
+               None ),
+           None,
+           None ),
+         None ))
+  >>?= fun ctxt ->
+  (* pair (nat %a) (pair %b nat nat) *)
+  test_unparse_ty
+    __LOC__
+    ctxt
+    (pair_prim2 nat_prim_a (Prim (-1, T_pair, [nat_prim; nat_prim], ["%b"])))
+    (Pair_t
+       ( (nat_ty, Some (Field_annot "a"), None),
+         ( Pair_t ((nat_ty, None, None), (nat_ty, None, None), None),
+           Some (Field_annot "b"),
+           None ),
+         None ))
+  >>?= fun ctxt ->
+  (* pair nat (pair @b nat nat) *)
+  test_unparse_ty
+    __LOC__
+    ctxt
+    (pair_prim2 nat_prim (Prim (-1, T_pair, [nat_prim; nat_prim], ["@b"])))
+    (Pair_t
+       ( (nat_ty, None, None),
+         ( Pair_t ((nat_ty, None, None), (nat_ty, None, None), None),
+           None,
+           Some (Var_annot "b") ),
+         None ))
+  >>?= fun ctxt ->
+  (* pair nat (pair :b nat nat) *)
+  test_unparse_ty
+    __LOC__
+    ctxt
+    (pair_prim2 nat_prim (Prim (-1, T_pair, [nat_prim; nat_prim], [":b"])))
+    (Pair_t
+       ( (nat_ty, None, None),
+         ( Pair_t
+             ((nat_ty, None, None), (nat_ty, None, None), Some (Type_annot "b")),
+           None,
+           None ),
+         None ))
+  >>?= fun _ -> return_unit
+
+let test_unparse_comparable_ty loc ctxt expected ty =
+  (* unparse_comparable_ty is not exported, the simplest way to call it is to
+     call parse_ty on a set type *)
+  Environment.wrap_error
+    ( Script_ir_translator.unparse_ty ctxt (Set_t (ty, None))
+    >>? fun (actual, ctxt) ->
+    if actual = Prim (-1, T_set, [expected], []) then ok ctxt
+    else Alcotest.failf "Unexpected error: %s" loc )
+
+let test_unparse_comb_comparable_type () =
+  let open Script in
+  let open Script_typed_ir in
+  let nat_prim = Prim (-1, T_nat, [], []) in
+  let nat_prim_a = Prim (-1, T_nat, [], ["%a"]) in
+  let nat_prim_b = Prim (-1, T_nat, [], ["%b"]) in
+  let nat_prim_c = Prim (-1, T_nat, [], ["%c"]) in
+  let nat_ty = Nat_key None in
+  let pair_prim l = Prim (-1, T_pair, l, []) in
+  let pair_ty ty1 ty2 = Pair_key ((ty1, None), (ty2, None), None) in
+  let pair_prim2 a b = pair_prim [a; b] in
+  let pair_nat_nat_prim = pair_prim2 nat_prim nat_prim in
+  let pair_nat_nat_ty = pair_ty nat_ty nat_ty in
+  test_context ()
+  >>=? fun ctxt ->
+  (* pair nat nat *)
+  test_unparse_comparable_ty __LOC__ ctxt pair_nat_nat_prim pair_nat_nat_ty
+  >>?= fun ctxt ->
+  (* pair (pair nat nat) nat *)
+  test_unparse_comparable_ty
+    __LOC__
+    ctxt
+    (pair_prim2 pair_nat_nat_prim nat_prim)
+    (pair_ty pair_nat_nat_ty nat_ty)
+  >>?= fun ctxt ->
+  (* pair nat nat nat *)
+  test_unparse_comparable_ty
+    __LOC__
+    ctxt
+    (pair_prim [nat_prim; nat_prim; nat_prim])
+    (pair_ty nat_ty pair_nat_nat_ty)
+  >>?= fun ctxt ->
+  (* pair (nat %a) nat *)
+  test_unparse_comparable_ty
+    __LOC__
+    ctxt
+    (pair_prim2 nat_prim_a nat_prim)
+    (Pair_key ((nat_ty, Some (Field_annot "a")), (nat_ty, None), None))
+  >>?= fun ctxt ->
+  (* pair nat (nat %b) *)
+  test_unparse_comparable_ty
+    __LOC__
+    ctxt
+    (pair_prim2 nat_prim nat_prim_b)
+    (Pair_key ((nat_ty, None), (nat_ty, Some (Field_annot "b")), None))
+  >>?= fun ctxt ->
+  (* pair (nat %a) (nat %b) *)
+  test_unparse_comparable_ty
+    __LOC__
+    ctxt
+    (pair_prim2 nat_prim_a nat_prim_b)
+    (Pair_key
+       ( (nat_ty, Some (Field_annot "a")),
+         (nat_ty, Some (Field_annot "b")),
+         None ))
+  >>?= fun ctxt ->
+  (* pair (nat %a) (nat %b) (nat %c) *)
+  test_unparse_comparable_ty
+    __LOC__
+    ctxt
+    (pair_prim [nat_prim_a; nat_prim_b; nat_prim_c])
+    (Pair_key
+       ( (nat_ty, Some (Field_annot "a")),
+         ( Pair_key
+             ( (nat_ty, Some (Field_annot "b")),
+               (nat_ty, Some (Field_annot "c")),
+               None ),
+           None ),
+         None ))
+  >>?= fun ctxt ->
+  (* pair (nat %a) (pair %b nat nat) *)
+  test_unparse_comparable_ty
+    __LOC__
+    ctxt
+    (pair_prim2 nat_prim_a (Prim (-1, T_pair, [nat_prim; nat_prim], ["%b"])))
+    (Pair_key
+       ( (nat_ty, Some (Field_annot "a")),
+         ( Pair_key ((nat_ty, None), (nat_ty, None), None),
+           Some (Field_annot "b") ),
+         None ))
+  >>?= fun ctxt ->
+  (* pair nat (pair :b nat nat) *)
+  test_unparse_comparable_ty
+    __LOC__
+    ctxt
+    (pair_prim2 nat_prim (Prim (-1, T_pair, [nat_prim; nat_prim], [":b"])))
+    (Pair_key
+       ( (nat_ty, None),
+         ( Pair_key ((nat_ty, None), (nat_ty, None), Some (Type_annot "b")),
+           None ),
+         None ))
+  >>?= fun _ -> return_unit
+
 let test_parse_data ?(equal = Stdlib.( = )) loc ctxt ty node expected =
   let legacy = false in
   wrap_error_lwt
@@ -443,6 +769,12 @@ let tests =
       "test unparsing stack overflow error"
       `Quick
       test_typecheck_stack_overflow;
+    Test.tztest "test comb type parsing" `Quick test_parse_comb_type;
+    Test.tztest "test comb type unparsing" `Quick test_unparse_comb_type;
+    Test.tztest
+      "test comb comparable type unparsing"
+      `Quick
+      test_unparse_comb_comparable_type;
     Test.tztest "test comb data parsing" `Quick test_parse_comb_data;
     Test.tztest "test comb data unparsing" `Quick test_unparse_comb_data;
     Test.tztest "test optimal comb data unparsing" `Quick test_optimal_comb ]
