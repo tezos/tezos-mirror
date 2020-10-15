@@ -684,9 +684,10 @@ buffer."
              t)))
         (t nil)))
 
-(defmacro forall (vars matching-stack)
+(defmacro michelson-forall (vars matching-stack)
+  (declare (indent defun))
   (unless (listp ',vars)
-    (error "forall must take a list of vars"))
+    (error "michelson-forall must take a list of vars"))
   `(lambda (stack)
      (let ((tbl (make-hash-table :test 'equal)))
        ,@(mapcar (lambda (var) `(puthash ',var ',var tbl)) vars)
@@ -785,14 +786,14 @@ buffer."
 
 (defvar michelson-type-completion-list
   (list
-   (michelson-make-suggest "EXEC" (forall (arg ret) (arg (lambda arg ret))))
-   (michelson-make-suggest "MEM" (forall (val-type) (val-type (set val-type))))
-   (michelson-make-suggest "MEM" (forall (key-type val-type) (key-type (map key-type val-type))))
-   (michelson-make-suggest "UPDATE" (forall (val-type) (val-type bool (set val-type))))
-   (michelson-make-suggest "UPDATE" (forall (key-type val-type)
-                                            (key-type (option val-type) (map key-type val-type))))
-   (michelson-make-suggest "MAP" (forall (lt rt) ((lambda lt rt) (list lt))))
-   (michelson-make-suggest "MAP" (forall (k v b) ((lambda (pair k v) b) (map k v))))
+   (michelson-make-suggest "EXEC" (michelson-forall (arg ret) (arg (lambda arg ret))))
+   (michelson-make-suggest "MEM" (michelson-forall (val-type) (val-type (set val-type))))
+   (michelson-make-suggest "MEM" (michelson-forall (key-type val-type) (key-type (map key-type val-type))))
+   (michelson-make-suggest "UPDATE" (michelson-forall (val-type) (val-type bool (set val-type))))
+   (michelson-make-suggest "UPDATE" (michelson-forall (key-type val-type)
+                                      (key-type (option val-type) (map key-type val-type))))
+   (michelson-make-suggest "MAP" (michelson-forall (lt rt) ((lambda lt rt) (list lt))))
+   (michelson-make-suggest "MAP" (michelson-forall (k v b) ((lambda (pair k v) b) (map k v))))
    (michelson-suggest-literals "IF" 'bool)
    (michelson-suggest-literals "LOOP" 'bool)
    (michelson-suggest-literals michelson-comparison-operations 'int)
@@ -829,26 +830,24 @@ buffer."
    (michelson-suggest-depth '("DROP" "H") 1)
    (michelson-suggest-literals "CHECK_SIGNATURE" 'key '(pair signature string))
    (michelson-suggest-literals "CREATE_ACCOUNT" 'key '(option key) 'bool 'tez)
-   (michelson-make-suggest "IF_NONE" (forall (x) (option x)))
-   (michelson-make-suggest "IF_LEFT" (forall (x y) (or x y)))
+   (michelson-make-suggest "IF_NONE" (michelson-forall (x) (option x)))
+   (michelson-make-suggest "IF_LEFT" (michelson-forall (x y) (or x y)))
    ;; This is not exactly the type of TRANSFER_TOKENS.
    ;; It will be changed once the concurrency model is worked out
-   (michelson-make-suggest "TRANSFER_TOKENS" (forall (p r g) (p tez (contract p r) g)))
+   (michelson-make-suggest "TRANSFER_TOKENS" (michelson-forall (p r g) (p tez (contract p r) g)))
    (michelson-make-suggest
     "CREATE_CONTRACT"
-    (forall (p r g) (key (option key) bool bool tez (lambda (pair p g) (pair r g)) g)))
-   (michelson-make-suggest "MANAGER" (forall (p r) ((contract p r))))
-   (michelson-make-suggest "CONS" (forall (a) (a (list a))))
-   (michelson-make-suggest "IF_CONS" (forall (a) (list a)))
-   (michelson-make-suggest "GET" (forall (k v) (k (map k v))))
-   (michelson-make-suggest "UPDATE" (forall (v) (v bool (set v))))
-   (michelson-make-suggest "UPDATE" (forall (k v) (k (option v) (map k v))))
-   (michelson-make-suggest "REDUCE" (forall (elt b) ((lambda (pair elt b) b) (set elt) b)))
-   (michelson-make-suggest "REDUCE" (forall (key val b) ((lambda (pair (pair key val) b) b) (map key val) b)))
-   (michelson-make-suggest "REDUCE" (forall (a b) ((lambda (pair a b) b) (list a) b)))
-
-
-))
+    (michelson-forall (p r g) (key (option key) bool bool tez (lambda (pair p g) (pair r g)) g)))
+   (michelson-make-suggest "MANAGER" (michelson-forall (p r) ((contract p r))))
+   (michelson-make-suggest "CONS" (michelson-forall (a) (a (list a))))
+   (michelson-make-suggest "IF_CONS" (michelson-forall (a) (list a)))
+   (michelson-make-suggest "GET" (michelson-forall (k v) (k (map k v))))
+   (michelson-make-suggest "UPDATE" (michelson-forall (v) (v bool (set v))))
+   (michelson-make-suggest "UPDATE" (michelson-forall (k v) (k (option v) (map k v))))
+   (michelson-make-suggest "REDUCE" (michelson-forall (elt b) ((lambda (pair elt b) b) (set elt) b)))
+   (michelson-make-suggest "REDUCE" (michelson-forall (key val b) ((lambda (pair (pair key val) b) b) (map key val) b)))
+   (michelson-make-suggest "REDUCE" (michelson-forall (a b) ((lambda (pair a b) b) (list a) b)))
+   ))
 
 ;; Special handling
 ;; PA+IR
