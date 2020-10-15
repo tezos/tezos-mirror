@@ -239,10 +239,10 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
     (modify-syntax-entry ?\n ">b" michelson-mode-syntax-table)
     michelson-mode-syntax-table))
 
-(defun in-space ()
-  (or (looking-at "[[:space:]\n]")
-      (equal (get-text-property (point) 'face)
-             'michelson-face-comment)))
+(defun michelson-in-space-or-comment ()
+  (or (nth 4 (syntax-ppss))                       ; inside comment
+      (memq (char-syntax (char-after)) '(?> ?\s)) ; space or eol
+      ))
 
 (defun michelson-goto-previous-token ()
   (interactive)
@@ -250,7 +250,7 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
       (cons 0 nil)
     (progn
       (backward-char 1)
-      (while (and (not (bobp)) (in-space)) (backward-char 1))
+      (while (and (not (bobp)) (michelson-in-space-or-comment)) (backward-char 1))
       (let ((token-face (get-text-property (point) 'face)))
         (forward-char 1)
         (let ((end-of-token (point)))
@@ -268,7 +268,7 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
   (if (eobp)
       (cons (point) nil)
     (progn
-      (while (and (not (eobp)) (in-space)) (forward-char 1))
+      (while (and (not (eobp)) (michelson-in-space-or-comment)) (forward-char 1))
       (let ((token-face (get-text-property (point) 'face)))
         (let ((start-of-token (point)))
           (if (looking-at "[{()};]")
