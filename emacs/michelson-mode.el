@@ -902,7 +902,6 @@ Enables or disables stack and error display."
   "Major mode for editing Michelson smart contracts."
   (setq-local font-lock-defaults michelson-font-lock-defaults)
   (setq-local indent-line-function 'michelson-indent)
-  (setq-local indent-for-tab-command 'michelson-indent)
   (setq-local michelson-state (list 0 0 nil))
   (setq-local michelson-cached-buffer-info
               (make-cache :types nil
