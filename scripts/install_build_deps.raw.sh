@@ -5,7 +5,7 @@ src_dir="$(dirname "$script_dir")"
 
 . "$script_dir"/version.sh
 
-opams=$(find "$src_dir/vendors" "$src_dir/src" -name \*.opam -print)
+opams=$(find "$src_dir/vendors" "$src_dir/src" -name \*.opam -print | grep -v vendors/ocaml-bls12-381/bls12-381.opam)
 
 export OPAMYES=${OPAMYES:=true}
 
