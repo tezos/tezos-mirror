@@ -387,6 +387,9 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
       (beginning-of-line)
       (forward-char new-indentation))))
 
+(defvar michelson-output-buffer-name
+  "*Michelson*")
+
 (defun michelson-token-at-point ()
   "Display the token closest to the cursor."
   (interactive)
@@ -462,9 +465,6 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
            ((error err)
             (let ((inhibit-message t))
               (message output)))))))))
-
-(defvar michelson-output-buffer-name
-  "*Michelson*")
 
 (defun michelson-output-width ()
   (let* ((buffer (get-buffer-create michelson-output-buffer-name))
