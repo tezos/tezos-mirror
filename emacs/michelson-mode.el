@@ -42,7 +42,6 @@
 
 ;;; Code:
 
-(require 'cl)
 (require 'cl-lib)
 (require 'deferred)
 (require 'font-lock)
@@ -427,7 +426,7 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
         (errors (cache-errors michelson-cached-buffer-info))
         (clean-cache-entry
          (lambda (alist)
-           (remove-if (lambda (entry)
+           (cl-remove-if (lambda (entry)
                         (let ((tok-end (cadr entry)))
                           (> tok-end (point))))
                       alist))))
@@ -645,7 +644,7 @@ buffer."
   (interactive)
   (let ((errors (cache-errors michelson-cached-buffer-info)))
     (if errors
-        (let ((next (find-if
+        (let ((next (cl-find-if
                      (lambda (err) (> (car err) (point)) errors nil)
                      errors
                      )))
@@ -775,7 +774,7 @@ buffer."
 
 (defun michelson-suggest-prefix-depth (prefix additional suffix)
   (lambda (stack)
-    (reverse (car (reduce
+    (reverse (car (cl-reduce
                    (lambda (acc ele)
                      (let ((existing (car acc))
                            (prefix (concat (cdr acc) additional)))
@@ -856,10 +855,10 @@ buffer."
 
 
 (defun michelson-get-suggestion-list (stack)
-  (reduce (lambda (func acc) (append (funcall func stack) acc))
-          michelson-type-completion-list
-          :from-end t
-          :initial-value michelson-suggest-always-available))
+  (cl-reduce (lambda (func acc) (append (funcall func stack) acc))
+             michelson-type-completion-list
+             :from-end t
+             :initial-value michelson-suggest-always-available))
 
 
 (defun michelson-toggle-live-editing ()
