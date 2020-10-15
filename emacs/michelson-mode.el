@@ -1,4 +1,4 @@
-;;; michelson-mode.el --- Major mode for editing Michelson smart contracts.
+;;; michelson-mode.el --- Major mode for editing Michelson smart contracts.  -*- lexical-binding: t -*-
 
 ;; Open Source License
 ;; Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>
@@ -414,14 +414,12 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
 
 (defun michelson-async-command-to-string (command callback)
   "Asynchronously execute `COMMAND' and call the `CALLBACK' on the resulting string."
-  (lexical-let ((shell-command (append command '("2>" "/dev/null")))
-                (callback-fun callback))
+  (deferred:$
     (deferred:$
-      (deferred:$
-          (apply 'deferred:process-shell shell-command)
-          (deferred:nextc it callback-fun))
-      ;; TODO: make this show only the client error
-      (deferred:error it (lambda (err) (michelson-write-output-buffer (cadr err)))))))
+      (apply 'deferred:process-shell (append command '("2>" "/dev/null")))
+      (deferred:nextc it callback))
+    ;; TODO: make this show only the client error
+    (deferred:error it (lambda (err) (michelson-write-output-buffer (cadr err))))))
 
 (defun michelson-clean-cache ()
   "Clean the buffer's program info cache."
@@ -439,7 +437,7 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
 
 (defun michelson-get-info (buffer-name)
   "Refresh the info about the program in `BUFFER-NAME' from the command."
-  (lexical-let ((tmp-file (make-temp-file buffer-name)))
+  (let ((tmp-file (make-temp-file buffer-name)))
     (set-file-modes tmp-file #o644)
     (write-region (point-min) (point-max) tmp-file nil 'no-message)
     (let ((command
@@ -452,25 +450,25 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
                          tmp-file))
                      "-details"
                      "--emacs"))))
-          (michelson-async-command-to-string
-           command
-           (lambda (output)
-             (condition-case err
-                 (let*
-                     ((record (car (read-from-string output)))
-                      (errors (cdr (assoc 'errors record)))
-                      (types  (cdr (assoc 'types record))))
-                   (setq michelson-cached-buffer-info (make-cache :types types :errors errors))
-                   (delete-file tmp-file))
-               ((error err)
-                (let ((inhibit-message t))
-                  (message output)))))))))
+      (michelson-async-command-to-string
+       command
+       (lambda (output)
+         (condition-case err
+             (let*
+                 ((record (car (read-from-string output)))
+                  (errors (cdr (assoc 'errors record)))
+                  (types  (cdr (assoc 'types record))))
+               (setq michelson-cached-buffer-info (make-cache :types types :errors errors))
+               (delete-file tmp-file))
+           ((error err)
+            (let ((inhibit-message t))
+              (message output)))))))))
 
 (defvar michelson-output-buffer-name
   "*Michelson*")
 
 (defun michelson-output-width ()
-  (lexical-let* ((buffer (get-buffer-create michelson-output-buffer-name))
+  (let* ((buffer (get-buffer-create michelson-output-buffer-name))
          (message-window
           (or (get-buffer-window buffer)
               (display-buffer-below-selected buffer nil))))
@@ -502,12 +500,11 @@ overwriting the data in the buffer.
 If `DATA' is a list of strings, the strings are written into the buffer,
 with alternating lines highlighted.
 If `DO-NOT-OVERWRITE' is non-nil, the existing contents of the buffer are maintained."
-  (lexical-let*
-      ((buffer (get-buffer-create michelson-output-buffer-name))
-       (message-window
-        (or (get-buffer-window buffer)
-            (display-buffer-below-selected buffer nil)))
-       (lines 0))
+  (let* ((buffer (get-buffer-create michelson-output-buffer-name))
+         (message-window
+          (or (get-buffer-window buffer)
+              (display-buffer-below-selected buffer nil)))
+         (lines 0))
     (when (get-buffer-window buffer)
       (set-window-dedicated-p message-window t))
     (save-excursion
@@ -518,9 +515,9 @@ If `DO-NOT-OVERWRITE' is non-nil, the existing contents of the buffer are mainta
       (goto-char (point-min))
       (remove-overlays)
       (if (listp data)
-          (lexical-let ((michelson-highlighting t))
+          (let ((michelson-highlighting t))
             (dolist (ele (reverse data))
-              (lexical-let ((prev-point (point)))
+              (let ((prev-point (point)))
                 (insert ele)
                 (when michelson-highlighting
                   (overlay-put (make-overlay prev-point (point))
@@ -541,7 +538,7 @@ If `DO-NOT-OVERWRITE' is non-nil, the existing contents of the buffer are mainta
                2))))))
 
 (defun michelson-format-stack-top (bef-ele aft-ele width)
-  (lexical-let*
+  (let*
       ((pp-no-trailing-newline
         (lambda (sexp)
           (let* ((str (replace-regexp-in-string "\\\\\." "." (pp-to-string sexp)))
@@ -582,9 +579,9 @@ If `DO-NOT-OVERWRITE' is non-nil, the existing contents of the buffer are mainta
 (defun michelson-get-previous-stack ()
   (save-excursion
     (michelson-goto-previous-token)
-    (lexical-let ((stacks nil)
-                  (brace-count 0)
-                  (break nil))
+    (let ((stacks nil)
+          (brace-count 0)
+          (break nil))
       (while (and (not break)
                   (not stacks)
                   (> (point) 0)
@@ -628,10 +625,10 @@ If `DO-NOT-OVERWRITE' is non-nil, the existing contents of the buffer are mainta
   "Show the program's `TYPES' and `ERRORS'."
   (interactive)
   (remove-overlays)
-  (lexical-let* ((stacks (michelson-stacks-at-loc (point)))
-                 (types-info (and stacks (michelson-format-stacks (michelson-stacks-bef stacks)
-                                                                  (michelson-stacks-aft stacks))))
-                 (errors-info nil))
+  (let* ((stacks (michelson-stacks-at-loc (point)))
+         (types-info (and stacks (michelson-format-stacks (michelson-stacks-bef stacks)
+                                                          (michelson-stacks-aft stacks))))
+         (errors-info nil))
     (when michelson-highlight-errors
       (dolist (elt (cache-errors michelson-cached-buffer-info))
         (overlay-put (make-overlay (car elt) (cadr elt)) 'face 'michelson-face-error)
@@ -677,14 +674,12 @@ buffer."
 
 (defun michelson-make-suggest (instr pred)
   "Suggest `INSTR' if `PRED' is not nil."
-  (lexical-let ((instr instr)
-                (pred pred))
-    (lambda (stack)
-      (if (funcall pred stack)
-          (if (listp instr)
-              instr
-            `(,instr))
-        nil))))
+  (lambda (stack)
+    (if (funcall pred stack)
+        (if (listp instr)
+            instr
+          `(,instr))
+      nil)))
 
 
 (defun michelson-constrained-p (var hash)
@@ -715,12 +710,11 @@ buffer."
 
 (defun michelson-literals-match-p (types)
   "Generate a predicate that matches `TYPES' against the top of the stack."
-  (lexical-let ((types types))
-    (lambda (stack)
-      (michelson-polymorphic-match
-       (make-hash-table :test 'equal)
-       types
-       stack))))
+  (lambda (stack)
+    (michelson-polymorphic-match
+     (make-hash-table :test 'equal)
+     types
+     stack)))
 
 (defun michelson-suggest-literals (instr &rest types)
   "Suggest `INSTR' when `TYPES' are on the top of the stack."
@@ -730,11 +724,9 @@ buffer."
 
 
 (defun michelson-suggest-or (instr pred1 pred2)
-  (lexical-let ((pred1 pred1)
-                (pred2 pred2))
-    (michelson-make-suggest
-     instr
-     (lambda (stack) (or (funcall pred1 stack) (funcall pred2 stack))))))
+  (michelson-make-suggest
+   instr
+   (lambda (stack) (or (funcall pred1 stack) (funcall pred2 stack)))))
 
 (defun michelson-suggest-reorderable (instr type1 type2)
   (michelson-suggest-or instr
@@ -794,22 +786,18 @@ buffer."
   "Suggest `INSTRS' if the stack depth is greater than or equal to `DEPTH'."
   (michelson-make-suggest
    instrs
-   (lexical-let ((depth depth))
-     (lambda (stack) (>= (length stack) depth)))))
+   (lambda (stack) (>= (length stack) depth))))
 
 (defun michelson-suggest-prefix-depth (prefix additional suffix)
-  (lexical-let ((prefix prefix)
-                (additional additional)
-                (suffix suffix))
-    (lambda (stack)
-      (reverse (car (reduce
-                     (lambda (acc ele)
-                       (lexical-let ((existing (car acc))
-                                     (prefix (concat (cdr acc) additional)))
-                         (cons (cons (concat prefix suffix) existing)
-                               prefix)))
-                     stack
-                     :initial-value (cons nil "D")))))))
+  (lambda (stack)
+    (reverse (car (reduce
+                   (lambda (acc ele)
+                     (let ((existing (car acc))
+                           (prefix (concat (cdr acc) additional)))
+                       (cons (cons (concat prefix suffix) existing)
+                             prefix)))
+                   stack
+                   :initial-value (cons nil "D"))))))
 
 (defvar michelson-type-completion-list
   (list
@@ -883,11 +871,10 @@ buffer."
 
 
 (defun michelson-get-suggestion-list (stack)
-  (lexical-let ((stack stack))
-    (reduce (lambda (func acc) (append (funcall func stack) acc))
-            michelson-type-completion-list
-            :from-end t
-            :initial-value michelson-suggest-always-available)))
+  (reduce (lambda (func acc) (append (funcall func stack) acc))
+          michelson-type-completion-list
+          :from-end t
+          :initial-value michelson-suggest-always-available))
 
 
 (defun michelson-toggle-live-editing ()
