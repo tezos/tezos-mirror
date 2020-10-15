@@ -939,7 +939,6 @@ Enables or disables stack and error display."
   (add-hook 'pre-command-hook 'michelson-update-minibuffer-info nil 'local)
   (add-hook 'focus-in-hook 'michelson-update-minibuffer-info nil 'local)
   (add-hook 'post-self-insert-hook 'michelson-clean-cache)
-  (add-hook 'kill-buffer-hook 'michelson-close-output-buffer t t)
   (setq indent-tabs-mode nil)
   (setq show-trailing-whitespace t)
   (setq buffer-file-coding-system 'utf-8-unix)
