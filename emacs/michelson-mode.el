@@ -929,27 +929,15 @@ Enables or disables stack and error display."
 ;;;###autoload
 (define-derived-mode michelson-mode prog-mode "Michelson"
   "Major mode for editing Michelson smart contracts."
-  (set
-   (make-local-variable 'font-lock-defaults)
-   michelson-font-lock-defaults)
-  (set
-   (make-local-variable 'indent-line-function)
-   'michelson-indent)
-  (set
-   (make-local-variable 'indent-for-tab-command)
-   'michelson-indent)
-  (set
-   (make-local-variable 'michelson-state)
-   (list 0 0 nil))
-  (set (make-local-variable 'michelson-cached-buffer-info)
-       (make-cache :types nil
-                   :errors nil))
-  (add-to-list
-   (make-local-variable 'pre-command-hook)
-   'michelson-update-minibuffer-info)
-  (add-to-list
-   (make-local-variable 'focus-in-hook)
-   'michelson-update-minibuffer-info)
+  (setq-local font-lock-defaults michelson-font-lock-defaults)
+  (setq-local indent-line-function 'michelson-indent)
+  (setq-local indent-for-tab-command 'michelson-indent)
+  (setq-local michelson-state (list 0 0 nil))
+  (setq-local michelson-cached-buffer-info
+              (make-cache :types nil
+                          :errors nil))
+  (add-hook 'pre-command-hook 'michelson-update-minibuffer-info nil 'local)
+  (add-hook 'focus-in-hook 'michelson-update-minibuffer-info nil 'local)
   (add-hook 'post-self-insert-hook 'michelson-clean-cache)
   (add-hook 'kill-buffer-hook 'michelson-close-output-buffer t t)
   (setq indent-tabs-mode nil)
