@@ -944,7 +944,6 @@ Enables or disables stack and error display."
   (setq show-trailing-whitespace t)
   (setq buffer-file-coding-system 'utf-8-unix)
   (add-hook 'completion-at-point-functions 'michelson-completion-at-point nil 'local)
-  (setq-local company-backends '(company-capf))
   (setq-local process-environment
               (cons "TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER=Y"
                     (cons "ALPHANET_EMACS=true"
