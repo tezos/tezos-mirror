@@ -872,6 +872,7 @@ Enables or disables stack and error display."
       (kill-buffer-and-window)))
   (setq michelson-live-editing (not michelson-live-editing)))
 
+(defvar-local michelson-state nil)
 
 (defun michelson-update-minibuffer-info ()
   (when (nth 2 michelson-state)
