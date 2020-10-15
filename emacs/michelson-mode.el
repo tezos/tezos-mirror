@@ -455,14 +455,14 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
       (michelson-async-command-to-string
        command
        (lambda (output)
-         (condition-case err
+         (condition-case _err
              (let*
                  ((record (car (read-from-string output)))
                   (errors (cdr (assoc 'errors record)))
                   (types  (cdr (assoc 'types record))))
                (setq michelson-cached-buffer-info (make-cache :types types :errors errors))
                (delete-file tmp-file))
-           ((error err)
+           (error
             (let ((inhibit-message t))
               (message output)))))))))
 
