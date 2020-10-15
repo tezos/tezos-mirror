@@ -474,23 +474,10 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
               (display-buffer-below-selected buffer nil))))
     (window-body-width message-window)))
 
-(defvar michelson-output-buffer-map
-  (let ((map (make-sparse-keymap)))
-    (set-keymap-parent map special-mode-map)
-    (define-key map "g" nil)
-    map)
-  "Keymap for types buffer.")
-
-(define-derived-mode michelson-stack-mode fundamental-mode "Michelson-stack"
+(define-derived-mode michelson-stack-mode special-mode "Michelson-stack"
   "Major mode for visualizing the Michelson stack."
-  (interactive)
-  (use-local-map michelson-output-buffer-map)
-  (set-syntax-table michelson-mode-syntax-table)
-  (set
-   (make-local-variable 'font-lock-defaults)
-   michelson-font-lock-defaults)
-  (setq major-mode 'michelson-stack-mode)
-  (setq mode-name "Michelson-stack")
+  :syntax-table michelson-mode-syntax-table
+  (setq font-lock-defaults michelson-font-lock-defaults)
   (setq indent-tabs-mode nil))
 
 (defun michelson-write-output-buffer (data &optional do-not-overwrite)
@@ -507,35 +494,33 @@ If `DO-NOT-OVERWRITE' is non-nil, the existing contents of the buffer are mainta
          (lines 0))
     (when (get-buffer-window buffer)
       (set-window-dedicated-p message-window t))
-    (save-excursion
-      (set-buffer michelson-output-buffer-name)
-      (read-only-mode -1)
-      (unless do-not-overwrite
-        (erase-buffer))
-      (goto-char (point-min))
-      (remove-overlays)
-      (if (listp data)
-          (let ((michelson-highlighting t))
-            (dolist (ele (reverse data))
-              (let ((prev-point (point)))
-                (insert ele)
-                (when michelson-highlighting
-                  (overlay-put (make-overlay prev-point (point))
-                               'face 'michelson-stack-highlight-face))
-                (setq michelson-highlighting (not michelson-highlighting)))))
-        (insert data))
-      (with-current-buffer buffer (michelson-stack-mode))
-      (read-only-mode 1)
-      (goto-char (point-min))
-      (while (not (eobp))
-        (vertical-motion 1)
-        (setq lines (+ 1 lines)))
-      (window-resize
-       message-window
-       (min (- (window-total-height) 5)
-            (+ (- (max 4 lines)
-                  (window-size message-window))
-               2))))))
+    (with-current-buffer michelson-output-buffer-name
+      (let ((inhibit-read-only t))
+        (unless do-not-overwrite
+          (erase-buffer))
+        (goto-char (point-min))
+        (remove-overlays)
+        (if (listp data)
+            (let ((michelson-highlighting t))
+              (dolist (ele (reverse data))
+                (let ((prev-point (point)))
+                  (insert ele)
+                  (when michelson-highlighting
+                    (overlay-put (make-overlay prev-point (point))
+                                 'face 'michelson-stack-highlight-face))
+                  (setq michelson-highlighting (not michelson-highlighting)))))
+          (insert data))
+        (michelson-stack-mode)
+        (goto-char (point-min))
+        (while (not (eobp))
+          (vertical-motion 1)
+          (setq lines (+ 1 lines)))
+        (window-resize
+         message-window
+         (min (- (window-total-height) 5)
+              (+ (- (max 4 lines)
+                    (window-size message-window))
+                 2)))))))
 
 (defun michelson-format-stack-top (bef-ele aft-ele width)
   (let*
