@@ -646,15 +646,11 @@ buffer."
     (if errors
         (let ((next (cl-find-if
                      (lambda (err) (> (car err) (point)) errors nil)
-                     errors
-                     )))
+                     errors)))
           (if next
               (goto-char next)
-            (goto-char (caar errors)))
-          )
-      (message "no error"))
-    )
-  )
+            (goto-char (caar errors))))
+      (message "no error"))))
 
 (defun michelson-make-suggest (instr pred)
   "Suggest `INSTR' if `PRED' is not nil."
@@ -846,8 +842,7 @@ buffer."
    (michelson-make-suggest "UPDATE" (michelson-forall (k v) (k (option v) (map k v))))
    (michelson-make-suggest "REDUCE" (michelson-forall (elt b) ((lambda (pair elt b) b) (set elt) b)))
    (michelson-make-suggest "REDUCE" (michelson-forall (key val b) ((lambda (pair (pair key val) b) b) (map key val) b)))
-   (michelson-make-suggest "REDUCE" (michelson-forall (a b) ((lambda (pair a b) b) (list a) b)))
-   ))
+   (michelson-make-suggest "REDUCE" (michelson-forall (a b) ((lambda (pair a b) b) (list a) b)))))
 
 ;; Special handling
 ;; PA+IR
