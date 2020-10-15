@@ -47,8 +47,6 @@
 (require 'deferred)
 (require 'font-lock)
 
-(defvar michelson-mode-hook nil)
-
 (defgroup michelson nil
   "Major mode for editing Michelson smart contracts."
   :prefix "michelson-"
@@ -931,10 +929,6 @@ Enables or disables stack and error display."
 ;;;###autoload
 (define-derived-mode michelson-mode prog-mode "Michelson"
   "Major mode for editing Michelson smart contracts."
-  (interactive)
-  (kill-all-local-variables)
-  (use-local-map michelson-mode-map)
-  (set-syntax-table michelson-mode-syntax-table)
   (set
    (make-local-variable 'font-lock-defaults)
    michelson-font-lock-defaults)
@@ -958,8 +952,6 @@ Enables or disables stack and error display."
    'michelson-update-minibuffer-info)
   (add-hook 'post-self-insert-hook 'michelson-clean-cache)
   (add-hook 'kill-buffer-hook 'michelson-close-output-buffer t t)
-  (setq major-mode 'michelson-mode)
-  (setq mode-name "Michelson")
   (setq indent-tabs-mode nil)
   (setq show-trailing-whitespace t)
   (setq buffer-file-coding-system 'utf-8-unix)
@@ -969,8 +961,7 @@ Enables or disables stack and error display."
               (cons "TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER=Y"
                     (cons "ALPHANET_EMACS=true"
                           (cons "TEZOS_ALPHANET_DO_NOT_PULL=yes"
-                                process-environment))))
-  (run-hooks 'michelson-mode-hook))
+                                process-environment)))))
 
 ;;;###autoload
 (add-to-list 'auto-mode-alist '("\\.tz\\'" . michelson-mode))
