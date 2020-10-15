@@ -1,6 +1,7 @@
 open Protocol
 open Alpha_context
 open Script_interpreter
+open Micheline
 
 exception Expression_from_string
 
@@ -106,6 +107,110 @@ let test_unparse_stack_overflow () =
   | Error _ ->
       Alcotest.failf "Unexpected error: %s" __LOC__
 
+let wrap_error_lwt x = x >>= fun x -> Lwt.return @@ Environment.wrap_error x
+
+let test_parse_data loc ctxt ty node expected =
+  let legacy = false in
+  wrap_error_lwt
+    ( Script_ir_translator.parse_data ctxt ~legacy ty node
+    >>=? fun (actual, ctxt) ->
+    if actual = expected then return ctxt
+    else Alcotest.failf "Unexpected error: %s" loc )
+
+let test_parse_comb_data () =
+  let open Script in
+  let open Script_typed_ir in
+  let z = Script_int.zero_n in
+  let z_prim = Micheline.Int (-1, Z.zero) in
+  let nat_ty = Nat_t None in
+  let pair_prim l = Prim (-1, D_Pair, l, []) in
+  let pair_ty ty1 ty2 = Pair_t ((ty1, None, None), (ty2, None, None), None) in
+  let pair_nat_nat_ty = pair_ty nat_ty nat_ty in
+  let pair_prim2 a b = pair_prim [a; b] in
+  let pair_z_z_prim = pair_prim2 z_prim z_prim in
+  test_context ()
+  >>=? fun ctxt ->
+  (* Pair 0 0 *)
+  test_parse_data __LOC__ ctxt (pair_ty nat_ty nat_ty) pair_z_z_prim (z, z)
+  >>=? fun ctxt ->
+  (* Pair (Pair 0 0) 0 *)
+  test_parse_data
+    __LOC__
+    ctxt
+    (pair_ty pair_nat_nat_ty nat_ty)
+    (pair_prim2 pair_z_z_prim z_prim)
+    ((z, z), z)
+  >>=? fun ctxt ->
+  (* Pair 0 (Pair 0 0) *)
+  test_parse_data
+    __LOC__
+    ctxt
+    (pair_ty nat_ty pair_nat_nat_ty)
+    (pair_prim2 z_prim pair_z_z_prim)
+    (z, (z, z))
+  >>=? fun ctxt ->
+  (* Pair 0 0 0 *)
+  test_parse_data
+    __LOC__
+    ctxt
+    (pair_ty nat_ty pair_nat_nat_ty)
+    (pair_prim [z_prim; z_prim; z_prim])
+    (z, (z, z))
+  >>=? fun _ -> return_unit
+
+let test_unparse_data loc ctxt ty x ~expected_readable ~expected_optimized =
+  wrap_error_lwt
+    ( Script_ir_translator.unparse_data ctxt Script_ir_translator.Readable ty x
+    >>=? fun (actual_readable, ctxt) ->
+    ( if actual_readable = expected_readable then return ctxt
+    else Alcotest.failf "Error in readable unparsing: %s" loc )
+    >>=? fun ctxt ->
+    Script_ir_translator.unparse_data ctxt Script_ir_translator.Optimized ty x
+    >>=? fun (actual_optimized, ctxt) ->
+    if actual_optimized = expected_optimized then return ctxt
+    else Alcotest.failf "Error in optimized unparsing: %s" loc )
+
+let test_unparse_comb_data () =
+  let open Script in
+  let open Script_typed_ir in
+  let z = Script_int.zero_n in
+  let z_prim = Micheline.Int (-1, Z.zero) in
+  let nat_ty = Nat_t None in
+  let pair_prim l = Prim (-1, D_Pair, l, []) in
+  let pair_ty ty1 ty2 = Pair_t ((ty1, None, None), (ty2, None, None), None) in
+  let pair_nat_nat_ty = pair_ty nat_ty nat_ty in
+  let pair_prim2 a b = pair_prim [a; b] in
+  let pair_z_z_prim = pair_prim2 z_prim z_prim in
+  test_context ()
+  >>=? fun ctxt ->
+  (* Pair 0 0 *)
+  test_unparse_data
+    __LOC__
+    ctxt
+    (pair_ty nat_ty nat_ty)
+    (z, z)
+    ~expected_readable:pair_z_z_prim
+    ~expected_optimized:pair_z_z_prim
+  >>=? fun ctxt ->
+  (* Pair (Pair 0 0) 0 *)
+  test_unparse_data
+    __LOC__
+    ctxt
+    (pair_ty pair_nat_nat_ty nat_ty)
+    ((z, z), z)
+    ~expected_readable:(pair_prim2 pair_z_z_prim z_prim)
+    ~expected_optimized:(pair_prim2 pair_z_z_prim z_prim)
+  >>=? fun ctxt ->
+  (* Readable: Pair 0 0 0; Optimized: Pair 0 (Pair 0 0) *)
+  test_unparse_data
+    __LOC__
+    ctxt
+    (pair_ty nat_ty pair_nat_nat_ty)
+    (z, (z, z))
+    ~expected_readable:(pair_prim [z_prim; z_prim; z_prim])
+    ~expected_optimized:(pair_prim2 z_prim pair_z_z_prim)
+  >>=? fun _ -> return_unit
+
 let tests =
   [ Test.tztest
       "test typecheck stack overflow error"
@@ -114,4 +219,6 @@ let tests =
     Test.tztest
       "test unparsing stack overflow error"
       `Quick
-      test_typecheck_stack_overflow ]
+      test_typecheck_stack_overflow;
+    Test.tztest "test comb data parsing" `Quick test_parse_comb_data;
+    Test.tztest "test comb data unparsing" `Quick test_unparse_comb_data ]
