@@ -75,7 +75,8 @@
 (defcustom michelson-live-editing t
   "Toggles live types and error printing.
 Overrides `michelson-print-errors' and `michelson-highlight-errors'"
-  :group 'michelson-options)
+  :group 'michelson-options
+  :type 'boolean)
 
 (defcustom michelson-print-errors t
   "Print the errors in the output buffer."
