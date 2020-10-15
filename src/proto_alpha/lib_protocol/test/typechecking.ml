@@ -176,6 +176,14 @@ let test_parse_comb_data () =
   (* Pair 0 0 *)
   test_parse_data __LOC__ ctxt (pair_ty nat_ty nat_ty) pair_z_z_prim (z, z)
   >>=? fun ctxt ->
+  (* {0; 0} *)
+  test_parse_data
+    __LOC__
+    ctxt
+    (pair_ty nat_ty nat_ty)
+    (Micheline.Seq (-1, [z_prim; z_prim]))
+    (z, z)
+  >>=? fun ctxt ->
   (* Pair (Pair 0 0) 0 *)
   test_parse_data
     __LOC__
@@ -198,6 +206,14 @@ let test_parse_comb_data () =
     ctxt
     (pair_ty nat_ty pair_nat_nat_ty)
     (pair_prim [z_prim; z_prim; z_prim])
+    (z, (z, z))
+  >>=? fun ctxt ->
+  (* {0; 0; 0} *)
+  test_parse_data
+    __LOC__
+    ctxt
+    (pair_ty nat_ty pair_nat_nat_ty)
+    (Micheline.Seq (-1, [z_prim; z_prim; z_prim]))
     (z, (z, z))
   >>=? fun ctxt ->
   (* check Pair 0 (Pair 0 {}) against pair nat (big_map nat nat)
@@ -309,6 +325,15 @@ let test_unparse_comb_data () =
     (z, (z, z))
     ~expected_readable:(pair_prim [z_prim; z_prim; z_prim])
     ~expected_optimized:(pair_prim2 z_prim pair_z_z_prim)
+  >>=? fun ctxt ->
+  (* Readable: Pair 0 0 0 0; Optimized: {0; 0; 0; 0} *)
+  test_unparse_data
+    __LOC__
+    ctxt
+    (pair_ty nat_ty (pair_ty nat_ty pair_nat_nat_ty))
+    (z, (z, (z, z)))
+    ~expected_readable:(pair_prim [z_prim; z_prim; z_prim; z_prim])
+    ~expected_optimized:(Micheline.Seq (-1, [z_prim; z_prim; z_prim; z_prim]))
   >>=? fun _ -> return_unit
 
 let tests =
