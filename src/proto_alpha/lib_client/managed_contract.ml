@@ -47,7 +47,7 @@ let get_contract_manager (cctxt : #full) contract =
       cctxt#error "This is not a smart contract."
   | Some storage -> (
     match root storage with
-    | Prim (_, D_Pair, [Bytes (_, bytes); _], _) | Bytes (_, bytes) -> (
+    | Prim (_, D_Pair, Bytes (_, bytes) :: _, _) | Bytes (_, bytes) -> (
       match
         Data_encoding.Binary.of_bytes_opt
           Signature.Public_key_hash.encoding
@@ -61,7 +61,7 @@ let get_contract_manager (cctxt : #full) contract =
              failed).\n\
              Transfer from scripted contract are currently only supported for \
              \"manager\" contract." )
-    | Prim (_, D_Pair, [String (_, value); _], _) | String (_, value) -> (
+    | Prim (_, D_Pair, String (_, value) :: _, _) | String (_, value) -> (
       match Signature.Public_key_hash.of_b58check_opt value with
       | Some k ->
           return k
