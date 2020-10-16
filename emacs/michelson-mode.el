@@ -735,15 +735,13 @@ buffer."
                (michelson-suggest-pairs-help car-ele
                                              (concat accessor-prefix "A"))
                (michelson-suggest-pairs-help car-ele
-                                             (concat accessor-prefix "D"))
-               '())))))
+                                             (concat accessor-prefix "D")))))))
 
 (defun michelson-suggest-pairs (stack)
   "Suggest all possible pair accessors on the given `STACK'."
   (if (and (consp (car stack)) (equal (caar stack) 'pair))
       (append (michelson-suggest-pairs-help (cadar stack) "CA")
-              (michelson-suggest-pairs-help (caddar stack) "CD")
-      nil)))
+              (michelson-suggest-pairs-help (caddar stack) "CD"))))
 
 (defconst michelson-comparison-operations
   '("EQ" "NEQ" "LT" "LE" "GT" "GE"))
