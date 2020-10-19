@@ -47,9 +47,20 @@ module S = struct
                (req "ballot" Vote.ballot_encoding)))
       RPC_path.(path / "ballot_list")
 
-  let current_period_kind =
+  let current_period =
     RPC_service.get_service
-      ~description:"Current period kind."
+      ~description:
+        "Returns the voting period (index, kind, starting position) and \
+         related information (position, remaining) of the interrogated block."
+      ~query:RPC_query.empty
+      ~output:Voting_period.info_encoding
+      RPC_path.(path / "current_period")
+
+  let current_period_kind_deprecated =
+    RPC_service.get_service
+      ~description:
+        "Current period kind. This RPC is DEPRECATED: use \
+         `..<block_id>/votes/current_period` RPC instead."
       ~query:RPC_query.empty
       ~output:Voting_period.kind_encoding
       RPC_path.(path / "current_period_kind")
@@ -96,8 +107,11 @@ let register () =
   let open Services_registration in
   register0 S.ballots (fun ctxt () () -> Vote.get_ballots ctxt) ;
   register0 S.ballot_list (fun ctxt () () -> Vote.get_ballot_list ctxt >|= ok) ;
-  register0 S.current_period_kind (fun ctxt () () ->
-      Vote.get_current_period_kind ctxt) ;
+  register0 S.current_period (fun ctxt () () ->
+      Voting_period.get_rpc_fixed_current_info ctxt) ;
+  register0 S.current_period_kind_deprecated (fun ctxt () () ->
+      Voting_period.get_rpc_fixed_current_info ctxt
+      >|=? fun {voting_period; _} -> voting_period.kind) ;
   register0 S.current_quorum (fun ctxt () () -> Vote.get_current_quorum ctxt) ;
   register0 S.proposals (fun ctxt () () -> Vote.get_proposals ctxt) ;
   register0 S.listings (fun ctxt () () -> Vote.get_listings ctxt >|= ok) ;
@@ -119,8 +133,8 @@ let ballots ctxt block = RPC_context.make_call0 S.ballots ctxt block () ()
 let ballot_list ctxt block =
   RPC_context.make_call0 S.ballot_list ctxt block () ()
 
-let current_period_kind ctxt block =
-  RPC_context.make_call0 S.current_period_kind ctxt block () ()
+let current_period ctxt block =
+  RPC_context.make_call0 S.current_period ctxt block () ()
 
 let current_quorum ctxt block =
   RPC_context.make_call0 S.current_quorum ctxt block () ()
