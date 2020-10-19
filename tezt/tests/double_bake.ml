@@ -115,16 +115,18 @@ let wait_for_denunciation_injection node client oph_promise =
 (* This tests aims to detect a double baking evidence with an accuser.
    The scenario is the following:
 
-   1. Node 1 activates a protocol and bakes one block,
+   1. Node 1 activates a protocol,
 
    2. Node 2 catches up with Node 1,
 
-   3. Node 2 is terminated. Then, Node 1 bakes one block at level 1
+   3. Node 2 is terminated. Then, Node 1 bakes two blocks from level 1
       with bootstrap1 key,
 
-   4. Node 1 is terminated. Then, Node 2 is restarted and bake one
-      block at level 1 too with the same bootstrap1 key. The block at
-      level 1 is double baked,
+   4. Node 1 is terminated. Then, Node 2 is restarted and bakes two
+      blocks from level 1; the first one with the bootstrap2 key and
+      the second one with the bootstrap1 key. Thus, the block at level
+      3 is double baked (and we ensure that the double baked blocks
+      are different as they emanate from two distinct branches),
 
    5. Node 1 came back in the dance,
 
@@ -150,25 +152,28 @@ let double_bake () =
   let* () = Client.Admin.connect_address client_1 ~peer:node_2 in
   let* () = Client.activate_protocol client_1 in
   Log.info "Activated protocol." ;
-  (* At least one block must be baked *)
-  let common_ancestor = 1 in
-  (* The key used to produce the double baked block *)
-  let key = Constant.bootstrap1.identity in
-  let* () = Client.bake_for ~key client_1 in
+  let common_ancestor = 0 in
+  let bootstrap1_key = Constant.bootstrap1.identity in
+  let bootstrap2_key = Constant.bootstrap2.identity in
   let* _ = Node.wait_for_level node_1 (common_ancestor + 1)
   and* _ = Node.wait_for_level node_2 (common_ancestor + 1) in
   Log.info "Both nodes are at level %d." (common_ancestor + 1) ;
   (* Step 3 *)
   let* () = Node.terminate node_2 in
-  let* () = Client.bake_for ~key client_1 in
-  let* _ = Node.wait_for_level node_1 (common_ancestor + 2) in
+  (* Craft a branch of size 2, baked by bootstrap1 *)
+  let* () = Client.bake_for ~key:bootstrap1_key client_1 in
+  let* () = Client.bake_for ~key:bootstrap1_key client_1 in
+  let* _ = Node.wait_for_level node_1 (common_ancestor + 3) in
   (* Step 4 *)
   let* () = Node.terminate node_1 in
   let* () = Node.run ~bootstrap_threshold:0 node_2 in
   let* () = Node.wait_for_ready node_2 in
-  (* Client 2 bake a block with bootstrap1's key to simulate a double bake *)
-  let* () = Client.bake_for ~minimal_timestamp:false ~key client_2 in
-  let* _ = Node.wait_for_level node_2 (common_ancestor + 2) in
+  (* Craft a branch of size 2, the first block is baked by bootstrap2 *)
+  let* () = Client.bake_for ~key:bootstrap2_key client_2 in
+  (* The second block is double baked by bootstrap1 to simulate a
+     double bake *)
+  let* () = Client.bake_for ~key:bootstrap1_key client_2 in
+  let* _ = Node.wait_for_level node_2 (common_ancestor + 3) in
   (* Step 5 *)
   let* () = Node.run ~bootstrap_threshold:0 node_1 in
   let* () = Node.wait_for_ready node_1 in
@@ -188,9 +193,9 @@ let double_bake () =
   (* Ensure that the denunciation is in node_3's mempool *)
   let* _ = denunciation_injection in
   (* Step 7 *)
-  let* () = Client.bake_for ~minimal_timestamp:false ~key client_3 in
-  let* _ = Node.wait_for_level node_2 (common_ancestor + 3)
-  and* _ = Node.wait_for_level node_3 (common_ancestor + 3) in
+  let* () = Client.bake_for ~key:bootstrap1_key client_3 in
+  let* _ = Node.wait_for_level node_2 (common_ancestor + 4)
+  and* _ = Node.wait_for_level node_3 (common_ancestor + 4) in
   (* Getting the operations of the current head *)
   let* ops = RPC.get_operations client_1 in
   let* () = Accuser.terminate accuser_3 in
