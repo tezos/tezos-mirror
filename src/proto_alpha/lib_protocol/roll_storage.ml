@@ -165,13 +165,13 @@ module Random = struct
     let b = Bytes.make 4 '0' in
     TzEndian.set_int32 b 0 i ; b
 
-  let level_random seed use level =
+  let level_random seed use (level : Level_repr.t) =
     let position = level.Level_repr.cycle_position in
     Seed_repr.initialize_new
       seed
       [Bytes.of_string ("level " ^ use ^ ":"); int32_to_bytes position]
 
-  let owner c kind level offset =
+  let owner c kind (level : Level_repr.t) offset =
     let cycle = level.Level_repr.cycle in
     Seed_storage.for_cycle c cycle
     >>=? fun random_seed ->
@@ -344,7 +344,7 @@ module Delegate = struct
         (Contract_repr.implicit_contract delegate)
       >|=? function
       | Some last_active_cycle ->
-          let {Level_repr.cycle = current_cycle} =
+          let ({Level_repr.cycle = current_cycle} : Level_repr.t) =
             Raw_context.current_level ctxt
           in
           Cycle_repr.(last_active_cycle < current_cycle)

@@ -28,7 +28,10 @@ open Alpha_context
 type error += Cannot_parse_operation (* `Branch *)
 
 val current_level :
-  'a #RPC_context.simple -> ?offset:int32 -> 'a -> Level.t shell_tzresult Lwt.t
+  'a #RPC_context.simple ->
+  ?offset:int32 ->
+  'a ->
+  Level.compat_t shell_tzresult Lwt.t
 
 val levels_in_current_cycle :
   'a #RPC_context.simple ->
@@ -208,7 +211,7 @@ module Forge : sig
     'a ->
     branch:Block_hash.t ->
     source:public_key_hash ->
-    period:Voting_period.index ->
+    period:int32 ->
     proposals:Protocol_hash.t list ->
     unit ->
     bytes shell_tzresult Lwt.t
@@ -218,7 +221,7 @@ module Forge : sig
     'a ->
     branch:Block_hash.t ->
     source:public_key_hash ->
-    period:Voting_period.index ->
+    period:int32 ->
     proposal:Protocol_hash.t ->
     ballot:Vote.ballot ->
     unit ->

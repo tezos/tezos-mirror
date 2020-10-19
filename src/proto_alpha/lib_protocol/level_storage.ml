@@ -43,9 +43,9 @@ let from_raw c ?offset l =
 
 let root c = Level_repr.root_level (Raw_context.first_level c)
 
-let succ c l = from_raw c (Raw_level_repr.succ l.level)
+let succ c (l : Level_repr.t) = from_raw c (Raw_level_repr.succ l.level)
 
-let pred c l =
+let pred c (l : Level_repr.t) =
   match Raw_level_repr.pred l.Level_repr.level with
   | None ->
       None
@@ -83,7 +83,7 @@ let last_level_in_cycle ctxt c =
 
 let levels_in_cycle ctxt cycle =
   let first = first_level_in_cycle ctxt cycle in
-  let rec loop n acc =
+  let rec loop (n : Level_repr.t) acc =
     if Cycle_repr.(n.cycle = first.cycle) then loop (succ ctxt n) (n :: acc)
     else acc
   in
@@ -99,7 +99,7 @@ let levels_in_current_cycle ctxt ?(offset = 0l) () =
 
 let levels_with_commitments_in_cycle ctxt c =
   let first = first_level_in_cycle ctxt c in
-  let rec loop n acc =
+  let rec loop (n : Level_repr.t) acc =
     if Cycle_repr.(n.cycle = first.cycle) then
       if n.expected_commitment then loop (succ ctxt n) (n :: acc)
       else loop (succ ctxt n) acc

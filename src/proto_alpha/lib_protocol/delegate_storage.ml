@@ -379,7 +379,7 @@ let credit_frozen_deposit ctxt delegate cycle amount =
   Storage.Delegates_with_frozen_balance.add (ctxt, cycle) delegate >|= ok
 
 let freeze_deposit ctxt delegate amount =
-  let {Level_repr.cycle; _} = Level_storage.current ctxt in
+  let ({Level_repr.cycle; _} : Level_repr.t) = Level_storage.current ctxt in
   Roll_storage.Delegate.set_active ctxt delegate
   >>=? fun ctxt ->
   let contract = Contract_repr.implicit_contract delegate in
@@ -407,7 +407,7 @@ let credit_frozen_fees ctxt delegate cycle amount =
   Storage.Delegates_with_frozen_balance.add (ctxt, cycle) delegate >|= ok
 
 let freeze_fees ctxt delegate amount =
-  let {Level_repr.cycle; _} = Level_storage.current ctxt in
+  let ({Level_repr.cycle; _} : Level_repr.t) = Level_storage.current ctxt in
   Roll_storage.Delegate.add_amount ctxt delegate amount
   >>=? fun ctxt -> credit_frozen_fees ctxt delegate cycle amount
 
@@ -441,7 +441,7 @@ let credit_frozen_rewards ctxt delegate cycle amount =
   Storage.Delegates_with_frozen_balance.add (ctxt, cycle) delegate >|= ok
 
 let freeze_rewards ctxt delegate amount =
-  let {Level_repr.cycle; _} = Level_storage.current ctxt in
+  let ({Level_repr.cycle; _} : Level_repr.t) = Level_storage.current ctxt in
   credit_frozen_rewards ctxt delegate cycle amount
 
 let burn_rewards ctxt delegate cycle amount =
