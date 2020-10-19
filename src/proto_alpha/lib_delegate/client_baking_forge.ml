@@ -1113,7 +1113,7 @@ let build_block cctxt ~user_activated_upgrades state seed_nonce_hash
   Alpha_services.Helpers.current_level cctxt ~offset:1l (chain, block)
   >>=? fun next_level ->
   let seed_nonce_hash =
-    if next_level.Level.expected_commitment then Some seed_nonce_hash else None
+    if next_level.expected_commitment then Some seed_nonce_hash else None
   in
   Client_keys.Public_key_hash.name cctxt delegate
   >>=? fun name ->
@@ -1154,7 +1154,7 @@ let build_block cctxt ~user_activated_upgrades state seed_nonce_hash
         match
           Tezos_base.Block_header.get_forced_protocol_upgrade
             ~user_activated_upgrades
-            ~level:(Raw_level.to_int32 next_level.Level.level)
+            ~level:(Raw_level.to_int32 next_level.level)
         with
         | None ->
             bi.next_protocol
