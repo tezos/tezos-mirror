@@ -140,6 +140,7 @@ in the :ref:`introduction <howtoget>`.
    developer/tezt
    developer/proposal_testing
    developer/profiling
+   developer/snoop
    developer/contributing
    developer/merge_team
    developer/guidelines

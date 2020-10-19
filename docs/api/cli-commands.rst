@@ -64,3 +64,11 @@ Accuser manual
 
 .. raw:: html
          :file: tezos-accuser-alpha.html
+
+.. _benchmark_tool_manual:
+
+Benchmark tool manual
+=====================
+
+.. raw:: html
+         :file: tezos-snoop.html
