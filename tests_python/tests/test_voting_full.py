@@ -5,13 +5,14 @@ bootstrap heuristics.
 """
 
 import datetime
-import time
-import os
 import json
-import pytest
-from tools import utils, constants, paths
-from launchers.sandbox import Sandbox
+import os
+import time
 
+import pytest
+
+from launchers.sandbox import Sandbox
+from tools import constants, paths, utils
 
 ERROR_PATTERN = r"Uncaught|registered|error"
 BLOCKS_PER_VOTING_PERIOD = 20
@@ -38,6 +39,11 @@ with open(PARAMETERS_FILE) as f:
 def node_params(threshold=0):
     return ['--sync-latency', '2', '--synchronisation-threshold',
             str(threshold), '--connections', '500', '--enable-testchain']
+
+
+def get_current_period_kind_delphi(client) -> dict:
+    return client.rpc('get',
+                      'chains/main/blocks/head/votes/current_period_kind')
 
 
 @pytest.mark.vote
@@ -105,7 +111,7 @@ class TestVotingFull:
 
     def test_proposal_period(self, sandbox: Sandbox):
         client = sandbox.client(0)
-        assert client.get_current_period_kind() == 'proposal'
+        assert get_current_period_kind_delphi(client) == 'proposal'
 
     def test_submit_proto_b_proposal(self, sandbox, session):
         client = sandbox.client(0)
@@ -124,7 +130,7 @@ class TestVotingFull:
     @pytest.mark.timeout(60)
     def test_wait_for_voting_period(self, sandbox: Sandbox):
         client = sandbox.client(0)
-        while client.get_current_period_kind() != 'testing_vote':
+        while get_current_period_kind_delphi(client) != 'testing_vote':
             time.sleep(POLLING_TIME)
 
     def test_delegates_vote_proto_b(self, sandbox: Sandbox):
@@ -135,12 +141,12 @@ class TestVotingFull:
     @pytest.mark.timeout(60)
     def test_wait_for_testing(self, sandbox: Sandbox):
         for client in sandbox.all_clients():
-            while client.get_current_period_kind() != 'testing':
+            while get_current_period_kind_delphi(client) != 'testing':
                 time.sleep(POLLING_TIME)
 
     def test_make_sure_all_clients_testing_period(self, sandbox: Sandbox):
         for client in sandbox.all_clients():
-            assert client.get_current_period_kind() == 'testing'
+            assert get_current_period_kind_delphi(client) == 'testing'
 
     def test_start_baker_testchain(self, sandbox: Sandbox):
         sandbox.add_baker(3, 'bootstrap1', proto=PROTO_B_DAEMON,
@@ -173,7 +179,7 @@ class TestVotingFull:
     @pytest.mark.timeout(60)
     def test_wait_for_promotion_vote_period(self, sandbox: Sandbox):
         client = sandbox.client(0)
-        while client.get_current_period_kind() != 'promotion_vote':
+        while get_current_period_kind_delphi(client) != 'promotion_vote':
             client.rpc('get', '/chains/main/blocks/head/header/shell')
             time.sleep(2)
 
@@ -181,12 +187,13 @@ class TestVotingFull:
         client = sandbox.client(0)
         for i in range(1, 5):
             client.submit_ballot(f'bootstrap{i}', PROTO_B, 'yay')
+        while client.get_level() < 4 * BLOCKS_PER_VOTING_PERIOD:
+            time.sleep(POLLING_TIME)
 
     @pytest.mark.timeout(60)
     def test_wait_for_proto_b(self, sandbox: Sandbox):
         client = sandbox.client(1)
         while client.get_level() < 5 * BLOCKS_PER_VOTING_PERIOD:
-            client.rpc('get', '/chains/main/blocks/head/header/shell')
             time.sleep(POLLING_TIME)
 
     @pytest.mark.timeout(40)
@@ -196,7 +203,16 @@ class TestVotingFull:
             clients = sandbox.all_clients()
             all_have_proto = all(client.get_next_protocol() == PROTO_B
                                  for client in clients)
-            time.sleep(POLLING_TIME)
+            (time).sleep(POLLING_TIME)
+        client = sandbox.client(1)
+        constants = client.rpc(
+            'get', '/chains/main/blocks/head/context/constants'
+        )
+        client.show_voting_period()
+        blocks_per_voting_period = int(constants["blocks_per_voting_period"])
+        remaining = client.get_current_period()["remaining"]
+        position = client.get_current_period()["position"]
+        assert remaining == blocks_per_voting_period - (position + 1)
 
     def test_stop_old_bakers(self, sandbox: Sandbox):
         """Stop old protocol baker, and test chain baker"""
