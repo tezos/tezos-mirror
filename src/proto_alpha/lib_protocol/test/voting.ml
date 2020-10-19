@@ -103,20 +103,64 @@ let protos =
        "ProtoALphaALphaALphaALphaALphaALphaALpha841f2cQqajX" |]
 
 (** helper functions *)
-let period_kind_to_string kind =
-  Data_encoding.Json.construct Alpha_context.Voting_period.kind_encoding kind
-  |> Data_encoding.Json.to_string
 
-let assert_period_kind expected b loc =
-  Context.Vote.get_current_period_kind (B b)
-  >>=? fun kind ->
-  if Stdlib.(expected = kind) then return_unit
+let assert_period_kind expected_kind kind loc =
+  if Stdlib.(expected_kind = kind) then return_unit
   else
-    failwith
-      "%s - Unexpected period kind - expected %s, got %s"
+    Alcotest.failf
+      "%s - Unexpected voting period kind - expected %a, got %a"
       loc
-      (period_kind_to_string expected)
-      (period_kind_to_string kind)
+      Alpha_context.Voting_period.pp_kind
+      expected_kind
+      Alpha_context.Voting_period.pp_kind
+      kind
+
+let assert_period_index expected_index index loc =
+  if expected_index = index then return_unit
+  else
+    Alcotest.failf
+      "%s - Unexpected voting period index - expected %ld, got %ld"
+      loc
+      expected_index
+      index
+
+let assert_period_position expected_position position loc =
+  if position = expected_position then return_unit
+  else
+    Alcotest.failf
+      "%s - Unexpected voting period position blocks - expected %ld, got %ld"
+      loc
+      expected_position
+      position
+
+let assert_period_remaining expected_remaining remaining loc =
+  if remaining = expected_remaining then return_unit
+  else
+    Alcotest.failf
+      "%s - Unexpected voting period remaining blocks - expected %ld, got %ld"
+      loc
+      expected_remaining
+      remaining
+
+let assert_period ?expected_kind ?expected_index ?expected_position
+    ?expected_remaining b loc =
+  Context.Vote.get_current_period (B b)
+  >>=? fun {voting_period; position; remaining} ->
+  ( if Option.is_some expected_kind then
+    assert_period_kind (Option.get expected_kind) voting_period.kind loc
+  else return_unit )
+  >>=? fun () ->
+  ( if Option.is_some expected_index then
+    assert_period_index (Option.get expected_index) voting_period.index loc
+  else return_unit )
+  >>=? fun () ->
+  ( if Option.is_some expected_position then
+    assert_period_position (Option.get expected_position) position loc
+  else return_unit )
+  >>=? fun () ->
+  if Option.is_some expected_remaining then
+    assert_period_remaining (Option.get expected_remaining) remaining loc
+  else return_unit
 
 let mk_contracts_from_pkh pkh_list =
   List.map Alpha_context.Contract.implicit_contract pkh_list
@@ -147,12 +191,15 @@ let assert_listings_not_empty b ~loc =
   >>=? function
   | [] -> failwith "Unexpected empty listings (%s)" loc | _ -> return_unit
 
+let bake_until_first_block_of_next_period b =
+  Context.Vote.get_current_period (B b)
+  >>=? fun {remaining; _} -> Block.bake_n Int32.(add remaining one |> to_int) b
+
 let test_successful_vote num_delegates () =
+  let open Alpha_context in
   let min_proposal_quorum = Int32.(of_int @@ (100_00 / num_delegates)) in
   Context.init ~min_proposal_quorum num_delegates
   >>=? fun (b, _) ->
-  Context.get_constants (B b)
-  >>=? fun {parametric = {blocks_per_voting_period; _}; _} ->
   (* no ballots in proposal period *)
   Context.Vote.get_ballots (B b)
   >>=? fun v ->
@@ -172,19 +219,13 @@ let test_successful_vote num_delegates () =
          | _ ->
              failwith "%s - Unexpected ballot list" __LOC__)
   >>=? fun () ->
-  (* period 0 *)
-  Context.Vote.get_voting_period (B b)
-  >>=? fun v ->
-  let open Alpha_context in
-  Assert.equal
-    ~loc:__LOC__
-    Voting_period.equal
-    "Unexpected period"
-    Voting_period.pp
-    v
-    Voting_period.(root)
-  >>=? fun () ->
-  assert_period_kind Proposal b __LOC__
+  (* Last baked block is first block of period Proposal *)
+  assert_period
+    ~expected_kind:Proposal
+    ~expected_index:0l
+    ~expected_position:0l
+    b
+    __LOC__
   >>=? fun () ->
   assert_listings_not_empty b ~loc:__LOC__
   >>=? fun () ->
@@ -259,26 +300,13 @@ let test_successful_vote num_delegates () =
       | _ ->
           false)
   >>=? fun () ->
-  (* skip to testing_vote period
-     -1 because we already baked one block with the proposal *)
-  Block.bake_n (Int32.to_int blocks_per_voting_period - 2) b
+  (* first block of testing_vote period *)
+  bake_until_first_block_of_next_period b
   >>=? fun b ->
-  (* we moved to a testing_vote period with one proposal *)
-  assert_period_kind Testing_vote b __LOC__
+  (* next block is first block of Testing_vote *)
+  assert_period ~expected_kind:Testing_vote ~expected_index:1l b __LOC__
   >>=? fun () ->
   assert_listings_not_empty b ~loc:__LOC__
-  >>=? fun () ->
-  (* period 1 *)
-  Context.Vote.get_voting_period (B b)
-  >>=? fun v ->
-  let open Alpha_context in
-  Assert.equal
-    ~loc:__LOC__
-    Voting_period.equal
-    "Unexpected period"
-    Voting_period.pp
-    v
-    Voting_period.(succ root)
   >>=? fun () ->
   (* listings must be populated in proposal period before moving to testing_vote period *)
   assert_listings_not_empty b ~loc:__LOC__
@@ -352,23 +380,10 @@ let test_successful_vote num_delegates () =
                      failwith "%s - Wrong ballot" __LOC__)
                delegates_p2)
   >>=? fun () ->
-  (* skip to testing period
-     -1 because we already baked one block with the ballot *)
-  Block.bake_n (Int32.to_int blocks_per_voting_period - 1) b
+  (* skip to testing period *)
+  bake_until_first_block_of_next_period b
   >>=? fun b ->
-  assert_period_kind Testing b __LOC__
-  >>=? fun () ->
-  (* period 2 *)
-  Context.Vote.get_voting_period (B b)
-  >>=? fun v ->
-  let open Alpha_context in
-  Assert.equal
-    ~loc:__LOC__
-    Voting_period.equal
-    "Unexpected period"
-    Voting_period.pp
-    v
-    Voting_period.(succ (succ root))
+  assert_period ~expected_index:2l ~expected_kind:Testing b __LOC__
   >>=? fun () ->
   (* no ballots in testing period *)
   Context.Vote.get_ballots (B b)
@@ -385,24 +400,13 @@ let test_successful_vote num_delegates () =
   assert_listings_not_empty b ~loc:__LOC__
   >>=? fun () ->
   (* skip to promotion_vote period *)
-  Block.bake_n (Int32.to_int blocks_per_voting_period) b
+  bake_until_first_block_of_next_period b
   >>=? fun b ->
-  assert_period_kind Promotion_vote b __LOC__
+  assert_period ~expected_kind:Promotion_vote ~expected_index:3l b __LOC__
   >>=? fun () ->
   assert_listings_not_empty b ~loc:__LOC__
   >>=? fun () ->
   (* period 3 *)
-  Context.Vote.get_voting_period (B b)
-  >>=? fun v ->
-  let open Alpha_context in
-  Assert.equal
-    ~loc:__LOC__
-    Voting_period.equal
-    "Unexpected period"
-    Voting_period.pp
-    v
-    Voting_period.(succ (succ (succ root)))
-  >>=? fun () ->
   (* listings must be populated in promotion_vote period *)
   assert_listings_not_empty b ~loc:__LOC__
   >>=? fun () ->
@@ -464,15 +468,15 @@ let test_successful_vote num_delegates () =
                      failwith "%s - Wrong ballot" __LOC__)
                delegates_p4)
   >>=? fun () ->
-  (* skip to Adoption period *)
-  Block.bake_n Int32.(to_int blocks_per_voting_period - 1) b
+  (* skip to end of promotion_vote period and activation*)
+  bake_until_first_block_of_next_period b
   >>=? fun b ->
-  assert_period_kind Adoption b __LOC__
+  assert_period ~expected_kind:Adoption ~expected_index:4l b __LOC__
   >>=? fun () ->
-  (* skip to end of Adoption period to activate *)
-  Block.bake_n Int32.(to_int blocks_per_voting_period) b
+  (* skip to end of Adoption period and bake 1 more to activate *)
+  bake_until_first_block_of_next_period b
   >>=? fun b ->
-  assert_period_kind Proposal b __LOC__
+  assert_period ~expected_kind:Proposal ~expected_index:5l b __LOC__
   >>=? fun () ->
   assert_listings_not_empty b ~loc:__LOC__
   >>=? fun () ->
@@ -534,23 +538,20 @@ let test_not_enough_quorum_in_testing_vote num_delegates () =
   let min_proposal_quorum = Int32.(of_int @@ (100_00 / num_delegates)) in
   Context.init ~min_proposal_quorum num_delegates
   >>=? fun (b, delegates) ->
-  Context.get_constants (B b)
-  >>=? fun {parametric = {blocks_per_voting_period; _}; _} ->
   (* proposal period *)
   let open Alpha_context in
-  assert_period_kind Proposal b __LOC__
+  assert_period ~expected_kind:Proposal b __LOC__
   >>=? fun () ->
   let proposer = List.nth delegates 0 in
   Op.proposals (B b) proposer [Protocol_hash.zero]
   >>=? fun ops ->
   Block.bake ~operations:[ops] b
   >>=? fun b ->
-  (* skip to vote_testing period
-     -1 because we already baked one block with the proposal *)
-  Block.bake_n (Int32.to_int blocks_per_voting_period - 2) b
+  (* skip to vote_testing period *)
+  bake_until_first_block_of_next_period b
   >>=? fun b ->
   (* we moved to a testing_vote period with one proposal *)
-  assert_period_kind Testing_vote b __LOC__
+  assert_period ~expected_kind:Testing_vote b __LOC__
   >>=? fun () ->
   Context.Vote.get_participation_ema b
   >>=? fun initial_participation_ema ->
@@ -574,11 +575,11 @@ let test_not_enough_quorum_in_testing_vote num_delegates () =
   >>=? fun operations ->
   Block.bake ~operations b
   >>=? fun b ->
-  (* skip to testing period *)
-  Block.bake_n (Int32.to_int blocks_per_voting_period - 1) b
+  (* bake to next period *)
+  bake_until_first_block_of_next_period b
   >>=? fun b ->
   (* we move back to the proposal period because not enough quorum *)
-  assert_period_kind Proposal b __LOC__
+  assert_period ~expected_kind:Proposal b __LOC__
   >>=? fun () ->
   (* check participation_ema update *)
   get_expected_participation_ema
@@ -601,21 +602,18 @@ let test_not_enough_quorum_in_promotion_vote num_delegates () =
   let min_proposal_quorum = Int32.(of_int @@ (100_00 / num_delegates)) in
   Context.init ~min_proposal_quorum num_delegates
   >>=? fun (b, delegates) ->
-  Context.get_constants (B b)
-  >>=? fun {parametric = {blocks_per_voting_period; _}; _} ->
-  assert_period_kind Proposal b __LOC__
+  assert_period ~expected_kind:Proposal b __LOC__
   >>=? fun () ->
   let proposer = List.nth delegates 0 in
   Op.proposals (B b) proposer [Protocol_hash.zero]
   >>=? fun ops ->
   Block.bake ~operations:[ops] b
   >>=? fun b ->
-  (* skip to vote_testing period
-     -1 because we already baked one block with the proposal *)
-  Block.bake_n (Int32.to_int blocks_per_voting_period - 2) b
+  (* skip to vote_testing period *)
+  bake_until_first_block_of_next_period b
   >>=? fun b ->
   (* we moved to a testing_vote period with one proposal *)
-  assert_period_kind Testing_vote b __LOC__
+  assert_period ~expected_kind:Testing_vote b __LOC__
   >>=? fun () ->
   (* beginning of testing_vote period, denoted by _p2;
      take a snapshot of the active delegates and their rolls from listings *)
@@ -632,16 +630,19 @@ let test_not_enough_quorum_in_promotion_vote num_delegates () =
   >>=? fun operations ->
   Block.bake ~operations b
   >>=? fun b ->
-  (* skip to testing period *)
-  Block.bake_n (Int32.to_int blocks_per_voting_period - 1) b
+  (* skip to first block testing period *)
+  bake_until_first_block_of_next_period b
   >>=? fun b ->
   (* we move to testing because we have supermajority and enough quorum *)
-  assert_period_kind Testing b __LOC__
+  assert_period ~expected_kind:Testing b __LOC__
   >>=? fun () ->
-  (* skip to promotion_vote period *)
-  Block.bake_n (Int32.to_int blocks_per_voting_period) b
+  (* skip to first block of promotion_vote period *)
+  bake_until_first_block_of_next_period b
   >>=? fun b ->
-  assert_period_kind Promotion_vote b __LOC__
+  assert_period ~expected_kind:Promotion_vote b __LOC__
+  (* bake_until_first_block_of_next_period ~offset:1l b
+   * >>=? fun b ->
+   * assert_period ~expected_kind:Promotion_vote b __LOC__ *)
   >>=? fun () ->
   Context.Vote.get_participation_ema b
   >>=? fun initial_participation_ema ->
@@ -666,7 +667,7 @@ let test_not_enough_quorum_in_promotion_vote num_delegates () =
   Block.bake ~operations b
   >>=? fun b ->
   (* skip to end of promotion_vote period *)
-  Block.bake_n (Int32.to_int blocks_per_voting_period - 1) b
+  bake_until_first_block_of_next_period b
   >>=? fun b ->
   get_expected_participation_ema rolls_p4 voter_rolls initial_participation_ema
   |> fun expected_participation_ema ->
@@ -679,14 +680,14 @@ let test_not_enough_quorum_in_promotion_vote num_delegates () =
     (Int32.to_int new_participation_ema)
   >>=? fun () ->
   (* we move back to the proposal period because not enough quorum *)
-  assert_period_kind Proposal b __LOC__
+  assert_period ~expected_kind:Proposal b __LOC__
   >>=? fun () ->
   assert_listings_not_empty b ~loc:__LOC__ >>=? fun () -> return_unit
 
 let test_multiple_identical_proposals_count_as_one () =
   Context.init 1
   >>=? fun (b, delegates) ->
-  assert_period_kind Proposal b __LOC__
+  assert_period ~expected_kind:Proposal b __LOC__
   >>=? fun () ->
   let proposer = List.hd delegates in
   Op.proposals (B b) proposer [Protocol_hash.zero; Protocol_hash.zero]
@@ -729,7 +730,7 @@ let test_supermajority_in_proposal there_is_a_winner () =
   >>=? fun (b, delegates) ->
   Context.get_constants (B b)
   >>=? fun { parametric =
-               {blocks_per_cycle; blocks_per_voting_period; tokens_per_roll; _};
+               {blocks_per_cycle; tokens_per_roll; blocks_per_voting_period; _};
              _ } ->
   let del1 = List.nth delegates 0 in
   let del2 = List.nth delegates 1 in
@@ -773,12 +774,13 @@ let test_supermajority_in_proposal there_is_a_winner () =
   >>=? fun ops3 ->
   Block.bake ~policy ~operations:[ops1; ops2; ops3] b
   >>=? fun b ->
-  Block.bake_n ~policy (Int32.to_int blocks_per_voting_period - 1) b
+  bake_until_first_block_of_next_period b
   >>=? fun b ->
   (* we remain in the proposal period when there is no winner,
      otherwise we move to the testing vote period *)
-  ( if there_is_a_winner then assert_period_kind Testing_vote b __LOC__
-  else assert_period_kind Proposal b __LOC__ )
+  ( if there_is_a_winner then
+    assert_period ~expected_kind:Testing_vote b __LOC__
+  else assert_period ~expected_kind:Proposal b __LOC__ )
   >>=? fun () -> return_unit
 
 let test_quorum_in_proposal has_quorum () =
@@ -789,8 +791,8 @@ let test_quorum_in_proposal has_quorum () =
   Context.get_constants (B b)
   >>=? fun { parametric =
                { blocks_per_cycle;
-                 blocks_per_voting_period;
                  min_proposal_quorum;
+                 blocks_per_voting_period;
                  _ };
              _ } ->
   let del1 = List.nth delegates 0 in
@@ -830,30 +832,28 @@ let test_quorum_in_proposal has_quorum () =
   >>=? fun ops ->
   Block.bake ~policy ~operations:[ops] b
   >>=? fun b ->
-  Block.bake_n ~policy (Int32.to_int blocks_per_voting_period - 1) b
+  bake_until_first_block_of_next_period b
   >>=? fun b ->
   (* we remain in the proposal period when there is no quorum,
      otherwise we move to the testing vote period *)
-  ( if has_quorum then assert_period_kind Testing_vote b __LOC__
-  else assert_period_kind Proposal b __LOC__ )
+  ( if has_quorum then assert_period ~expected_kind:Testing_vote b __LOC__
+  else assert_period ~expected_kind:Proposal b __LOC__ )
   >>=? fun () -> return_unit
 
 let test_supermajority_in_testing_vote supermajority () =
   let min_proposal_quorum = Int32.(of_int @@ (100_00 / 100)) in
   Context.init ~min_proposal_quorum 100
   >>=? fun (b, delegates) ->
-  Context.get_constants (B b)
-  >>=? fun {parametric = {blocks_per_voting_period; _}; _} ->
   let del1 = List.nth delegates 0 in
   let proposal = protos.(0) in
   Op.proposals (B b) del1 [proposal]
   >>=? fun ops1 ->
   Block.bake ~operations:[ops1] b
   >>=? fun b ->
-  Block.bake_n (Int32.to_int blocks_per_voting_period - 1) b
+  bake_until_first_block_of_next_period b
   >>=? fun b ->
   (* move to testing_vote *)
-  assert_period_kind Testing_vote b __LOC__
+  assert_period ~expected_kind:Testing_vote b __LOC__
   >>=? fun () ->
   (* assert our proposal won *)
   Context.Vote.get_current_proposal (B b)
@@ -886,10 +886,10 @@ let test_supermajority_in_testing_vote supermajority () =
   let operations = operations_yays @ operations_nays in
   Block.bake ~operations b
   >>=? fun b ->
-  Block.bake_n (Int32.to_int blocks_per_voting_period - 1) b
+  bake_until_first_block_of_next_period b
   >>=? fun b ->
-  ( if supermajority then assert_period_kind Testing b __LOC__
-  else assert_period_kind Proposal b __LOC__ )
+  ( if supermajority then assert_period ~expected_kind:Testing b __LOC__
+  else assert_period ~expected_kind:Proposal b __LOC__ )
   >>=? fun () -> return_unit
 
 (* test also how the selection scales: all delegates propose max proposals *)
@@ -897,8 +897,6 @@ let test_no_winning_proposal num_delegates () =
   let min_proposal_quorum = Int32.(of_int @@ (100_00 / num_delegates)) in
   Context.init ~min_proposal_quorum num_delegates
   >>=? fun (b, _) ->
-  Context.get_constants (B b)
-  >>=? fun {parametric = {blocks_per_voting_period; _}; _} ->
   (* beginning of proposal, denoted by _p1;
      take a snapshot of the active delegates and their rolls from listings *)
   get_delegates_and_rolls_from_listings b
@@ -912,12 +910,11 @@ let test_no_winning_proposal num_delegates () =
   >>=? fun ops_list ->
   Block.bake ~operations:ops_list b
   >>=? fun b ->
-  (* skip to testing_vote period
-     -1 because we already baked one block with the proposal *)
-  Block.bake_n (Int32.to_int blocks_per_voting_period - 2) b
+  (* skip to testing_vote period *)
+  bake_until_first_block_of_next_period b
   >>=? fun b ->
   (* we stay in the same proposal period because no winning proposal *)
-  assert_period_kind Proposal b __LOC__ >>=? fun () -> return_unit
+  assert_period ~expected_kind:Proposal b __LOC__ >>=? fun () -> return_unit
 
 (** Test that for the vote to pass with maximum possible participation_ema
     (100%), it is sufficient for the vote quorum to be equal or greater than
@@ -930,10 +927,10 @@ let test_quorum_capped_maximum num_delegates () =
   Context.Vote.set_participation_ema b 100_00l
   >>= fun b ->
   Context.get_constants (B b)
-  >>=? fun {parametric = {blocks_per_voting_period; quorum_max; _}; _} ->
+  >>=? fun {parametric = {quorum_max; _}; _} ->
   (* proposal period *)
   let open Alpha_context in
-  assert_period_kind Proposal b __LOC__
+  assert_period ~expected_kind:Proposal b __LOC__
   >>=? fun () ->
   (* propose a new protocol *)
   let protocol = Protocol_hash.zero in
@@ -942,12 +939,11 @@ let test_quorum_capped_maximum num_delegates () =
   >>=? fun ops ->
   Block.bake ~operations:[ops] b
   >>=? fun b ->
-  (* skip to vote_testing period
-     -1 because we already baked one block with the proposal *)
-  Block.bake_n (Int32.to_int blocks_per_voting_period - 1) b
+  (* skip to vote_testing period *)
+  bake_until_first_block_of_next_period b
   >>=? fun b ->
   (* we moved to a testing_vote period with one proposal *)
-  assert_period_kind Testing_vote b __LOC__
+  assert_period ~expected_kind:Testing_vote b __LOC__
   >>=? fun () ->
   (* take percentage of the delegates equal or greater than quorum_max *)
   let minimum_to_pass =
@@ -963,10 +959,10 @@ let test_quorum_capped_maximum num_delegates () =
   Block.bake ~operations b
   >>=? fun b ->
   (* skip to next period *)
-  Block.bake_n (Int32.to_int blocks_per_voting_period - 1) b
+  bake_until_first_block_of_next_period b
   >>=? fun b ->
   (* expect to move to testing because we have supermajority and enough quorum *)
-  assert_period_kind Testing b __LOC__
+  assert_period ~expected_kind:Testing b __LOC__
 
 (** Test that for the vote to pass with minimum possible participation_ema
     (0%), it is sufficient for the vote quorum to be equal or greater than
@@ -979,10 +975,10 @@ let test_quorum_capped_minimum num_delegates () =
   Context.Vote.set_participation_ema b 0l
   >>= fun b ->
   Context.get_constants (B b)
-  >>=? fun {parametric = {blocks_per_voting_period; quorum_min; _}; _} ->
+  >>=? fun {parametric = {quorum_min; _}; _} ->
   (* proposal period *)
   let open Alpha_context in
-  assert_period_kind Proposal b __LOC__
+  assert_period ~expected_kind:Proposal b __LOC__
   >>=? fun () ->
   (* propose a new protocol *)
   let protocol = Protocol_hash.zero in
@@ -991,12 +987,11 @@ let test_quorum_capped_minimum num_delegates () =
   >>=? fun ops ->
   Block.bake ~operations:[ops] b
   >>=? fun b ->
-  (* skip to vote_testing period
-     -1 because we already baked one block with the proposal *)
-  Block.bake_n (Int32.to_int blocks_per_voting_period - 1) b
+  (* skip to vote_testing period *)
+  bake_until_first_block_of_next_period b
   >>=? fun b ->
   (* we moved to a testing_vote period with one proposal *)
-  assert_period_kind Testing_vote b __LOC__
+  assert_period ~expected_kind:Testing_vote b __LOC__
   >>=? fun () ->
   (* take percentage of the delegates equal or greater than quorum_min *)
   let minimum_to_pass =
@@ -1012,10 +1007,10 @@ let test_quorum_capped_minimum num_delegates () =
   Block.bake ~operations b
   >>=? fun b ->
   (* skip to next period *)
-  Block.bake_n (Int32.to_int blocks_per_voting_period - 1) b
+  bake_until_first_block_of_next_period b
   >>=? fun b ->
   (* expect to move to testing because we have supermajority and enough quorum *)
-  assert_period_kind Testing b __LOC__
+  assert_period ~expected_kind:Testing b __LOC__
 
 (* gets the voting power *)
 let get_voting_power block pkhash =
@@ -1051,7 +1046,7 @@ let test_voting_power_updated_each_voting_period () =
   >>=? fun balance3 ->
   (* Retrieve constants blocks_per_voting_period and tokens_per_roll *)
   Context.get_constants (B block)
-  >>=? fun {parametric = {blocks_per_voting_period; tokens_per_roll; _}; _} ->
+  >>=? fun {parametric = {tokens_per_roll; _}; _} ->
   (* Get the key hashes of the bakers *)
   Context.get_bakers (B block)
   >>=? fun bakers ->
@@ -1102,9 +1097,9 @@ let test_voting_power_updated_each_voting_period () =
   tokens_per_roll *? num_rolls
   >>?= fun amount ->
   Op.transaction (B block) con1 con2 amount
-  >>=? fun _op ->
+  >>=? fun op ->
   (* Bake the block containing the transaction *)
-  Block.bake ~policy ~operations:[_op] block
+  Block.bake ~policy ~operations:[op] block
   >>=? fun block ->
   (* Retrieve balance of con1 *)
   Context.Contract.balance (B block) con1
@@ -1123,18 +1118,16 @@ let test_voting_power_updated_each_voting_period () =
   >>?= fun rolls ->
   of_mutez_exn 48_000_000_000L +? rolls
   >>?= Assert.equal_tez ~loc:__LOC__ balance2
-  >>=? fun _ ->
-  (* Bake blocks_per_voting_period - 3, i.e., right before next voting period,
-     since 2 blocks have been baked already *)
-  Block.bake_n ~policy Int32.(to_int (sub blocks_per_voting_period 3l)) block
+  >>=? fun () ->
+  Block.bake block
   >>=? fun block ->
   (* Assert voting power (and total) remains the same before next voting period *)
   assert_voting_power ~loc:__LOC__ expected_power_of_baker_1 block baker1
-  >>=? fun _ ->
+  >>=? fun () ->
   assert_voting_power ~loc:__LOC__ expected_power_of_baker_2 block baker2
-  >>=? fun _ ->
+  >>=? fun () ->
   assert_voting_power ~loc:__LOC__ expected_power_of_baker_3 block baker3
-  >>=? fun _ ->
+  >>=? fun () ->
   assert_total_voting_power
     ~loc:__LOC__
     Int.(
@@ -1143,8 +1136,7 @@ let test_voting_power_updated_each_voting_period () =
         expected_power_of_baker_3)
     block
   >>=? fun _ ->
-  (* Bake one more block to move to next voting period *)
-  Block.bake ~policy block
+  bake_until_first_block_of_next_period block
   >>=? fun block ->
   (* Assert voting power of baker1 has decreased by num_rolls *)
   let expected_power_of_baker_1 =

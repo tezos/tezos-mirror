@@ -179,16 +179,8 @@ module Vote = struct
 
   let get_ballot_list ctxt = Alpha_services.Voting.ballot_list rpc_ctxt ctxt
 
-  let get_voting_period ctxt =
-    Alpha_services.Helpers.current_level rpc_ctxt ~offset:1l ctxt
-    >|=? fun l -> l.voting_period
-
-  let get_voting_period_position ctxt =
-    Alpha_services.Helpers.current_level rpc_ctxt ~offset:1l ctxt
-    >|=? fun l -> l.voting_period_position
-
-  let get_current_period_kind ctxt =
-    Alpha_services.Voting.current_period_kind rpc_ctxt ctxt
+  let get_current_period ctxt =
+    Alpha_services.Voting.current_period rpc_ctxt ctxt
 
   let get_current_quorum ctxt =
     Alpha_services.Voting.current_quorum rpc_ctxt ctxt
