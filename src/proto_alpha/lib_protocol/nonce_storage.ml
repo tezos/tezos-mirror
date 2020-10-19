@@ -82,7 +82,7 @@ let () =
 
 (* checks that the level of a revelation is not too early or too late wrt to the
    current context and that a nonce has not been already revealed for that level *)
-let get_unrevealed ctxt level =
+let get_unrevealed ctxt (level : Level_repr.t) =
   let cur_level = Level_storage.current ctxt in
   match Cycle_repr.pred cur_level.cycle with
   | None ->

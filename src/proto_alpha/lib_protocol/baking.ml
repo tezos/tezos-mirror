@@ -361,7 +361,7 @@ let check_fitness_gap ctxt (block : Block_header.t) =
     error (Invalid_fitness_gap (max_fitness_gap ctxt, gap))
   else ok_unit
 
-let last_of_a_cycle ctxt l =
+let last_of_a_cycle ctxt (l : Level.t) =
   Compare.Int32.(
     Int32.succ l.Level.cycle_position = Constants.blocks_per_cycle ctxt)
 

@@ -820,23 +820,30 @@ module Seed = struct
 
     type context = Raw_context.t
 
-    let mem ctxt l = Cycle.Nonce.mem (ctxt, l.cycle) l.level
+    let mem ctxt (l : Level_repr.t) = Cycle.Nonce.mem (ctxt, l.cycle) l.level
 
-    let get ctxt l = Cycle.Nonce.get (ctxt, l.cycle) l.level
+    let get ctxt (l : Level_repr.t) = Cycle.Nonce.get (ctxt, l.cycle) l.level
 
-    let get_option ctxt l = Cycle.Nonce.get_option (ctxt, l.cycle) l.level
+    let get_option ctxt (l : Level_repr.t) =
+      Cycle.Nonce.get_option (ctxt, l.cycle) l.level
 
-    let set ctxt l v = Cycle.Nonce.set (ctxt, l.cycle) l.level v
+    let set ctxt (l : Level_repr.t) v =
+      Cycle.Nonce.set (ctxt, l.cycle) l.level v
 
-    let init ctxt l v = Cycle.Nonce.init (ctxt, l.cycle) l.level v
+    let init ctxt (l : Level_repr.t) v =
+      Cycle.Nonce.init (ctxt, l.cycle) l.level v
 
-    let init_set ctxt l v = Cycle.Nonce.init_set (ctxt, l.cycle) l.level v
+    let init_set ctxt (l : Level_repr.t) v =
+      Cycle.Nonce.init_set (ctxt, l.cycle) l.level v
 
-    let set_option ctxt l v = Cycle.Nonce.set_option (ctxt, l.cycle) l.level v
+    let set_option ctxt (l : Level_repr.t) v =
+      Cycle.Nonce.set_option (ctxt, l.cycle) l.level v
 
-    let delete ctxt l = Cycle.Nonce.delete (ctxt, l.cycle) l.level
+    let delete ctxt (l : Level_repr.t) =
+      Cycle.Nonce.delete (ctxt, l.cycle) l.level
 
-    let remove ctxt l = Cycle.Nonce.remove (ctxt, l.cycle) l.level
+    let remove ctxt (l : Level_repr.t) =
+      Cycle.Nonce.remove (ctxt, l.cycle) l.level
   end
 
   module For_cycle = Cycle.Seed
