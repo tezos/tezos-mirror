@@ -32,7 +32,7 @@ let constants_mainnet =
       blocks_per_cycle = 4096l;
       blocks_per_commitment = 32l;
       blocks_per_roll_snapshot = 256l;
-      blocks_per_voting_period = 32768l;
+      blocks_per_voting_period = 20480l;
       time_between_blocks = List.map Period_repr.of_seconds_exn [60L; 40L];
       endorsers_per_block = 32;
       hard_gas_limit_per_operation =
@@ -53,7 +53,7 @@ let constants_mainnet =
         Tez_repr.[of_mutez_exn 1_250_000L; of_mutez_exn 833_333L];
       hard_storage_limit_per_operation = Z.of_int 60_000;
       cost_per_byte = Tez_repr.of_mutez_exn 250L;
-      test_chain_duration = Int64.mul 32768L 60L;
+      test_chain_duration = Int64.mul 20480L 60L;
       quorum_min = 20_00l;
       (* quorum is in centile of a percentage *)
       quorum_max = 70_00l;
