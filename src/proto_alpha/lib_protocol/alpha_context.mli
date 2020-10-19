@@ -568,8 +568,6 @@ module Level : sig
     level_position : int32;
     cycle : Cycle.t;
     cycle_position : int32;
-    voting_period : Voting_period.t;
-    voting_period_position : int32;
     expected_commitment : bool;
   }
 

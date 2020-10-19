@@ -38,7 +38,6 @@ let from_raw c ?offset l =
   Level_repr.level_from_raw
     ~first_level
     ~blocks_per_cycle:constants.Constants_repr.blocks_per_cycle
-    ~blocks_per_voting_period:constants.Constants_repr.blocks_per_voting_period
     ~blocks_per_commitment:constants.Constants_repr.blocks_per_commitment
     l
 
