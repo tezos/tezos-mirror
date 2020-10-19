@@ -642,10 +642,10 @@ class TestRPCsExistence:
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
                               'votes/ballots')
 
-    def test_chain_block_votes_current_period_kind(self, sandbox: Sandbox):
+    def test_chain_block_votes_current_period(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              'votes/current_period_kind')
+                              'votes/current_period')
 
     def test_chain_block_votes_current_proposal(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',

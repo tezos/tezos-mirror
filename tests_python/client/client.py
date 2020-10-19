@@ -3,9 +3,9 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
-import sys
 from typing import Any, List, Optional, Tuple
 
 from . import client_output
@@ -542,9 +542,9 @@ class Client:
             ['list', 'known', 'addresses']
         ))
 
-    def get_current_period_kind(self) -> dict:
+    def get_current_period(self) -> dict:
         return self.rpc('get',
-                        'chains/main/blocks/head/votes/current_period_kind')
+                        'chains/main/blocks/head/votes/current_period')
 
     def get_current_proposal(self) -> dict:
         return self.rpc('get',
@@ -571,10 +571,11 @@ class Client:
         metadata = self.get_metadata(params=params)
         return metadata['next_protocol']
 
-    def get_period_position(self) -> str:
-        rpc_res = self.rpc(
-            'get', '/chains/main/blocks/head/helpers/current_level?offset=1')
-        return rpc_res['voting_period_position']
+    def get_current_level(self, offset=0) -> dict:
+        return self.rpc('get',
+                        '/chains/main/blocks/head/helpers/current_level' +
+                        '?offset='
+                        + str(offset))
 
     def get_level(self, params: List[str] = None, chain: str = 'main') -> int:
         assert chain in {'main', 'test'}
