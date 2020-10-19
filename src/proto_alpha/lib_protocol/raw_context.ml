@@ -513,8 +513,6 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
     Level_repr.level_from_raw
       ~first_level
       ~blocks_per_cycle:constants.Constants_repr.blocks_per_cycle
-      ~blocks_per_voting_period:
-        constants.Constants_repr.blocks_per_voting_period
       ~blocks_per_commitment:constants.Constants_repr.blocks_per_commitment
       level
   in

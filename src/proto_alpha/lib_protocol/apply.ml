@@ -1310,10 +1310,11 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
       >>=? fun delegate ->
       Operation.check_signature delegate chain_id operation
       >>?= fun () ->
-      let level = Level.current ctxt in
+      Voting_period.get_current ctxt
+      >>=? fun {index = current_period; _} ->
       error_unless
-        Compare.Int32.(level.current_period = period)
-        (Wrong_voting_period (level.current_period, period))
+        Compare.Int32.(current_period = period)
+        (Wrong_voting_period (current_period, period))
       >>?= fun () ->
       Amendment.record_proposals ctxt source proposals
       >|=? fun ctxt -> (ctxt, Single_result Proposals_result)
@@ -1322,10 +1323,11 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
       >>=? fun delegate ->
       Operation.check_signature delegate chain_id operation
       >>?= fun () ->
-      let level = Level.current ctxt in
+      Voting_period.get_current ctxt
+      >>=? fun {index = current_period; _} ->
       error_unless
-        Compare.Int32.(level.voting_period = period)
-        (Wrong_voting_period (level.voting_period, period))
+        Compare.Int32.(current_period = period)
+        (Wrong_voting_period (current_period, period))
       >>?= fun () ->
       Amendment.record_ballot ctxt source proposal ballot
       >|=? fun ctxt -> (ctxt, Single_result Ballot_result)
@@ -1518,7 +1520,7 @@ let finalize_application ctxt protocol_data delegate ~block_delay =
       (Gas.Arith.fp @@ Constants.hard_gas_limit_per_block ctxt)
       (Alpha_context.Gas.block_level ctxt)
   in
-  Alpha_context.Vote.get_current_period_kind ctxt
+  Alpha_context.Voting_period.get_current_kind ctxt
   >|=? fun voting_period_kind ->
   let receipt =
     Apply_results.
