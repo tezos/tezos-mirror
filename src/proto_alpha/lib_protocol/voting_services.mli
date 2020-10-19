@@ -32,8 +32,8 @@ val ballot_list :
   'a ->
   (Signature.Public_key_hash.t * Vote.ballot) list shell_tzresult Lwt.t
 
-val current_period_kind :
-  'a #RPC_context.simple -> 'a -> Voting_period.kind shell_tzresult Lwt.t
+val current_period :
+  'a #RPC_context.simple -> 'a -> Voting_period.info shell_tzresult Lwt.t
 
 val current_quorum :
   'a #RPC_context.simple -> 'a -> Int32.t shell_tzresult Lwt.t
