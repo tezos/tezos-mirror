@@ -244,7 +244,7 @@ let step gen_state blk : Block.t tzresult Lwt.t =
   (* Nonce *)
   Alpha_services.Helpers.current_level ~offset:1l Block.rpc_ctxt blk
   >|=? (function
-         | Level.{expected_commitment = true; cycle; level; _} ->
+         | {expected_commitment = true; cycle; level; _} ->
              if_debug (fun () ->
                  Format.printf "[DEBUG] Committing a nonce\n%!") ;
              let (hash, nonce) = Helpers_Nonce.generate () in
