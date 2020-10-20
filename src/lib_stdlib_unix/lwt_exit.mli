@@ -57,9 +57,9 @@ type clean_up_callback_id
     changes, gracefully close connections with peers, etc.
 
     The call to [f] receives an argument [n] that indicates the status the
-    process will exit with at the end of clean-up: [0] is for success, [64] for
-    interruption by signals, [32] for uncaught exceptions, other values are also
-    available.
+    process will exit with at the end of clean-up: [0] is for success, [127] for
+    interruption by signals, [126] for uncaught exceptions, other values are
+    available for the application's own exit codes.
 
     The argument [after], if passed, delays the call to this clean-up callback
     until the clean-up callbacks identified by [after] have resolved. Apart
@@ -166,9 +166,9 @@ val signal_name : int -> string
     - the process terminates as soon as clean-up ends with exit code [code].
 
     If [p] is rejected (and [exit_and_raise] was not called), it is equivalent
-    to calling [exit_and_raise 32]. I.e.,
+    to calling [exit_and_raise 126]. I.e.,
     - the clean-up starts,
-    - the process terminates as soon as clean-up ends with exit code [32].
+    - the process terminates as soon as clean-up ends with exit code [126].
 
     EXIT CODE:
 
@@ -188,13 +188,13 @@ val signal_name : int -> string
     (see {!signal_setup}).
 
     Any hard-signal that is received triggers an immediate process termination
-    with exit code [64 lor 128].
+    with exit code [127 lor 128 = 255].
 
-    Any soft-signal that is received triggers a call to [exit_and_raise 64]
+    Any soft-signal that is received triggers a call to [exit_and_raise 127]
     (the consequences of which are described above).
 
     Note that if the same soft-signal is sent a second-time, the process
-    terminates immediately with code [64 lor 128].
+    terminates immediately with code [127 lor 128 = 255].
 
     To summarize, the exit code can be thought of as a 8-bit integer with the
     following properties:

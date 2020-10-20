@@ -151,9 +151,9 @@ let exit_and_wait n = exit n ; clean_up_ends
 
 let incomplete_clean_up_mask = 128
 
-let signal_exit_code = 64
+let signal_exit_code = 127
 
-let uncaught_exception_exit_code = 32
+let uncaught_exception_exit_code = 126
 
 let mask_code_bc_incomplete_clean_up code = code lor incomplete_clean_up_mask
 

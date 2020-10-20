@@ -60,7 +60,7 @@ let test_one_signal (signal, name) =
       Lwt_unix.waitpid [] pid
       >|= fun (_, status) ->
       match status with
-      | WEXITED s when s = 128 lor 64 ->
+      | WEXITED s when s = 128 lor 127 ->
           ()
       | WEXITED s ->
           Format.kasprintf failwith "WEXITED(%d) on %s" s name
