@@ -30,53 +30,31 @@ tool.
 High-level description
 ----------------------
 
-``tezos-snoop`` is a tool for benchmarking and fitting statistical models
-predicting performance of any piece of code of interest. It relies on
-the ``tezos-benchmark`` library. Using ``tezos-benchmark`` requires to provide,
-for each benchmark, the following main items:
+``tezos-snoop`` is a tool for benchmarking and fitting statistical models which predict the performance of any piece of code of interest.
+
+More concretely, let us consider a piece of code for which we wish to predict its performance. To understand the performance profile of this piece of code, we must execute it with different arguments, varying the size of the problem to be solved. As "the size of the problem to be solved" is a long expression, we will use the shorter term *workload* for that.
+
+The notion of workload is abstract here, and indeed, it is not necessarily a scalar. Here are a few examples of workloads:
+
+- Timer benchmarks measure the latency of the timer itself and the associated workloads record nothing.
+- IO benchmarks measure the execution time of performing specific read and write patterns to the underlying key-value store and the associated workloads record the size of the storage as well as the parameters (bytes read/written, length of keys, etc) of these accesses.
+- Translator benchmarks measure the execution time of various pieces of ``Script_ir_translator`` (the *translator* for short, which handles typechecking/unparsing of code and data) as well as Micheline serialization, and corresponding workloads record the size of the typechecked/unparsed/(de)serialized terms.
+- Michelson benchmarks measure the execution time of the interpreter on specific programs and the associated workloads record the list of all executed instructions together with, for each instruction, the sizes of the operands as encountered on the stack.
+
+Once this notion of workload is clear, we can describe Snoop's user interface.
+
+Using ``tezos-benchmark`` requires to provide, for each benchmark, the following main items:
 
 - a type of execution ``workload``;
-- a statistical model, corresponding to a function which to each
-  ``workload`` associates an expression (possibly with free variables)
-  denoting the predicted execution time for that workload.
-  In simple cases, the model consists in a single expression
-  computing a predicted execution time for any given workload.
-- A family of pieces of code (ie closures) to be benchmarked, each associated
-  to its ``workload``. We assume that the execution time of each closure
-  has a well-defined distribution.
-  In most cases these closures correspond to executing a single piece of code
-  of interest with different inputs.
-
-The intuition here is that there is a piece of code for which we wish to predict
-performances. To understand the performance profile of this piece of code, we
-must execute it with arguments of varying sizes (the notion of 'size' is abstract
-here: it is not necessarily a scalar!). Each closure contains the application of
-this piece of a code to an argument of some definite size. The workload associated
-to the closure records this size.
+- a statistical model, corresponding to a function which to each ``workload`` associates an expression (possibly with free variables) denoting the predicted execution time for that workload. In simple cases, the model consists in *a single* expression computing a predicted execution time for any given workload.
+- A family of pieces of code (ie closures) to be benchmarked, each associated to its ``workload``. Thus, each closure contains the application of a piece of a code to arguments instantiating a specific workload. We assume that the execution time of each closure has a well-defined distribution. In most cases, these closures correspond to executing *a single* piece of code of interest with different inputs.
 
 From this input, ``tezos-benchmark`` can perform for you the following tasks:
+
 - perform the timing measurements;
 - infer the free parameters of the statistical model;
 - display the results of benchmarking and inference;
 - generate code from the model.
-
-The notion of workload might seem a bit abstract. Here are a few examples:
-
-- Timer benchmarks measure the latency of the timer itself and
-  the associated workloads record nothing.
-- IO benchmarks measure the execution time of performing specific read
-  and write patterns to the underlying key-value store and the associated
-  workloads record the size of the storage as well as the parameters
-  (bytes read/written, length of keys, etc) of these accesses.
-- Translator benchmarks measure the execution time of various pieces of
-  ``Script_ir_translator`` (the *translator* for short, which handles
-  typechecking/unparsing of code and data)
-  as well as Micheline serialization, and corresponding workloads record
-  the size of the typechecked/unparsed/(de)serialized terms.
-- Michelson benchmarks measure the execution time of the interpreter on specific
-  programs and the associated workloads record the list of all executed instructions
-  together with, for each instruction, the sizes of the operands as
-  encountered on the stack.
 
 Code organization
 -----------------
@@ -576,7 +554,7 @@ library. The ``solution`` type is defined as follows:
 .. code-block:: ocaml
 
    type solution = {
-     mapping : (string * float) list;
+     mapping : (Free_variable.t * float) list;
      weights : Scikit.Matrix.t;
    }
 
