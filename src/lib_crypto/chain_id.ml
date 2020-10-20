@@ -133,11 +133,7 @@ let raw_encoding =
 
 let of_block_hash bh = hash_bytes [Block_hash.to_bytes bh]
 
-include Compare.Make (struct
-  type nonrec t = t
-
-  let compare = String.compare
-end)
+include (Compare.String : Compare.S with type t := t)
 
 let hash = Stdlib.Hashtbl.hash
 

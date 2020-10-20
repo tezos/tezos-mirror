@@ -369,8 +369,4 @@ let deterministic_nonce sk msg =
 let deterministic_nonce_hash sk msg =
   Blake2B.to_bytes (Blake2B.hash_bytes [deterministic_nonce sk msg])
 
-include Compare.Make (struct
-  type nonrec t = t
-
-  let compare = Bytes.compare
-end)
+include (Compare.Bytes : Compare.S with type t := t)
