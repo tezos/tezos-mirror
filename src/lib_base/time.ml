@@ -27,6 +27,8 @@
 module Protocol = struct
   type t = int64
 
+  include (Compare.Int64 : Compare.S with type t := int64)
+
   let epoch = 0L
 
   let diff = Int64.sub
@@ -121,28 +123,29 @@ module Protocol = struct
     RPC_arg.make
       ~name:(Format.asprintf "date")
       ~descr:(Format.asprintf "A date in seconds from epoch")
-      ~destruct:(fun s ->
-        if s = "none" || s = "epoch" then Ok epoch
-        else
+      ~destruct:(function
+        | "none" | "epoch" ->
+            Ok epoch
+        | s -> (
           match Int64.of_string s with
           | t ->
               Ok t
           | exception _ ->
-              Error (Format.asprintf "failed to parse time (epoch): %S" s))
+              Error (Format.asprintf "failed to parse time (epoch): %S" s) ))
       ~construct:Int64.to_string
       ()
 
   let pp ppf t = Format.fprintf ppf "%Ld" t
 
   let pp_hum ppf t = Ptime.pp_rfc3339 () ppf (to_ptime t)
-
-  include Compare.Make (Int64)
 end
 
 module System = struct
   let frac_s = 3 (* sub-second fractional precision for pretty-printing *)
 
   type t = Ptime.t
+
+  include Compare.Make (Ptime)
 
   let epoch = Ptime.epoch
 
@@ -203,7 +206,9 @@ module System = struct
     | None ->
         None
     | Some span ->
-        let span = if seconds < 0L then Ptime.Span.neg span else span in
+        let span =
+          if Compare.Int64.(seconds < 0L) then Ptime.Span.neg span else span
+        in
         Ptime.of_span span
 
   let of_seconds_exn x =
@@ -281,9 +286,10 @@ module System = struct
     RPC_arg.make
       ~name:(Format.asprintf "date")
       ~descr:(Format.asprintf "A date in seconds from epoch")
-      ~destruct:(fun s ->
-        if s = "none" || s = "epoch" then Ok Ptime.epoch
-        else
+      ~destruct:(function
+        | "none" | "epoch" ->
+            Ok Ptime.epoch
+        | s -> (
           match of_notation_opt s with
           | Some t ->
               Ok t
@@ -292,7 +298,8 @@ module System = struct
             | t ->
                 Ok t
             | exception _ ->
-                Error (Format.asprintf "failed to parse time (epoch): %S" s) ))
+                Error (Format.asprintf "failed to parse time (epoch): %S" s) )
+          ))
       ~construct:to_notation
       ()
 
@@ -319,11 +326,10 @@ module System = struct
     | (None, (Some _ as a)) | ((Some _ as a), None) ->
         a
     | (Some (_, t1), Some (_, t2)) ->
-        if Ptime.compare t1 t2 < 0 then a2 else a1
+        if t1 < t2 then a2 else a1
 
   let hash t = Int64.to_int (to_seconds t)
 
-  include Compare.Make (Ptime)
   module Set = Set.Make (Ptime)
   module Map = Map.Make (Ptime)
 
