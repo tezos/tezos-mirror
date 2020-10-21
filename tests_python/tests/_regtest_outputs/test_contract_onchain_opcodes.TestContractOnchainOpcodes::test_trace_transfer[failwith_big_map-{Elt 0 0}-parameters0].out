@@ -85,7 +85,7 @@ with { Elt 1 1 }
 Fatal error:
   transfer simulation failed
 Node is bootstrapped.
-"Assert_failure src/proto_alpha/lib_protocol/script_ir_translator.ml:5353:8"
+"Assert_failure src/proto_alpha/lib_protocol/script_ir_translator.ml:5336:8"
 Fatal error:
   transfer simulation failed
 Node is bootstrapped.
