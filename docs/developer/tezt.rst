@@ -102,7 +102,8 @@ Tezt is composed of some generic, non-Tezos-related modules:
 - a ``Cli`` module which reads command-line options on startup, such
   as the list of tests to run and the verbosity level;
 
-- a ``Test`` module with a ``Test.run`` function, which starts tests and cleans up after them.
+- a ``Test`` module with a ``Test.register`` function to register tests
+  and a ``Test.run`` function to run them and clean up after them.
 
 All those modules are part of the ``tezt`` library which can be found in directory
 ``tezt/lib`` of the Tezos repository.
@@ -147,7 +148,8 @@ Then, let's launch the test from ``tezt/tests/main.ml`` by calling:
 
 .. code-block:: ocaml
 
-    Basic.run ()
+    Basic.register () ;
+    Test.run () (* This call should already be there. *)
 
 Finally, let's try it with::
 
@@ -185,11 +187,11 @@ Let's review what our basic test in the previous section does.
   The Base module contains useful functions such as ``let*`` (which is ``Lwt.bind``)
   or ``sf`` (a short-hand for ``Printf.sprintf``).
 
-- Then, we define a function ``run`` which runs one test.
+- Then, we define a function ``check_node_initialization`` which registers one test.
   It is parameterized by the history mode, so it is easy to run this test
-  with all three modes (this is what ``run_all`` does).
+  with all three modes (this is what ``register`` does).
 
-- Function ``Test.run`` declares a test.
+- Function ``Test.register`` registers a test.
   The ``~__FILE__`` argument gives the source filename so that one can select this
   file with the ``--file`` argument, to only run tests declared in this file.
   Each test has a title which is used in logs and on the command-line with the ``--test``
@@ -199,7 +201,7 @@ Let's review what our basic test in the previous section does.
   No other test has this tag, so it is easy to run all of the tests of our new ``Basic``
   module, and only them, by adding ``basic`` on the command-line.
 
-- Function ``Test.run`` takes a function as an argument.
+- Function ``Test.register`` takes a function as an argument.
   This function contains the implementation of the test.
 
 - First, we initialize a node with ``Node.init``.
@@ -262,7 +264,7 @@ Let's review what our basic test in the previous section does.
   and the base directory of the client.
 
 - We run this test three times, once per history mode: ``archive``, ``full`` and ``rolling``.
-  Note that we added the history mode as a tag to ``Test.run``, so if we want
+  Note that we added the history mode as a tag to ``Test.register``, so if we want
   to run only the test for history mode ``full``, for instance,
   we can simply run ``dune exec tezt/tests/main.exe -- basic full``.
   You can see our list of basic tests and their tags

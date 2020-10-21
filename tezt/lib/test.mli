@@ -34,7 +34,7 @@ val declare_reset_function : (unit -> unit) -> unit
 (** Log an error and stop the test right here. *)
 val fail : ('a, unit, string, 'b) format4 -> 'a
 
-(** Run a test.
+(** Register a test.
 
     The [__FILE__] argument, which should be equal to [__FILE__]
     (i.e. just write [Test.run ~__FILE__]), is used to let the user
@@ -57,12 +57,21 @@ val fail : ('a, unit, string, 'b) format4 -> 'a
     If [f] raises an exception, act as if [fail] was called (without the
     error location unfortunately).
 
-    You can call [run] several times in the same executable if you want
+    You can call [register] several times in the same executable if you want
     it to run several tests. Each of those tests should be standalone, as
-    the user is able to specify the list of tests to run on the command-line. *)
-val run :
+    the user is able to specify the list of tests to run on the command-line.
+
+    The test is not actually run until you call {!run}. *)
+val register :
   __FILE__:string ->
   title:string ->
   tags:string list ->
   (unit -> unit Lwt.t) ->
   unit
+
+(** Run registered tests that should be run.
+
+    Call this once you have registered all tests.
+    This will check command-line options and run the tests that have been selected,
+    or display the list of tests. *)
+val run : unit -> unit

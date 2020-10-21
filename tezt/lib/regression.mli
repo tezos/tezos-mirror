@@ -29,16 +29,16 @@
     https://dune.readthedocs.io/en/stable/tests.html#cram-tests
 *)
 
-(** Run a regression test.
+(** Register a regression test.
 
-    This function is a wrapper around [Test.run]. It adds the "regression" tag
+    This function is a wrapper around [Test.register]. It adds the "regression" tag
     to the [tags] list provided by the argument.
 
     The [output_file] is a filename, where the output of the test is stored and
     read to be compared on subsequent runs. The output file with ".out"
     filename extension added is placed in the [regression_output_path],
     which is by default "tezt/_regressions". *)
-val run :
+val register :
   __FILE__:string ->
   title:string ->
   tags:string list ->

@@ -24,7 +24,10 @@
 (*****************************************************************************)
 
 let check_dump_encodings () =
-  Test.run ~__FILE__ ~title:"tezos-codec dump encodings" ~tags:["codec"; "dump"]
+  Test.register
+    ~__FILE__
+    ~title:"tezos-codec dump encodings"
+    ~tags:["codec"; "dump"]
   @@ fun () ->
   let* _ : JSON.t = Codec.dump_encodings () in
   unit
@@ -74,7 +77,7 @@ let check_sample ~name ~file =
 let check_samples_encoding ~group_name ~samples =
   List.iter
     (fun sample ->
-      Regression.run
+      Regression.register
         ~__FILE__
         ~title:(sf "%s encoding regression test: %s" group_name sample)
         ~tags:["encoding"; group_name]
@@ -88,7 +91,7 @@ let check_samples_encoding ~group_name ~samples =
              check_sample ~name:sample ~file:(base_path // file)))
     samples
 
-let run () =
+let register () =
   check_dump_encodings () ;
   check_samples_encoding
     ~group_name:"protocol"

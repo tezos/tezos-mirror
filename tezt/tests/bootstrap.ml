@@ -100,7 +100,7 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
   let bakes_during_kill = 100 in
   let hmode1s = Node.show_history_mode hmode1 in
   let hmode2s = Node.show_history_mode hmode2 in
-  Test.run
+  Test.register
     ~__FILE__
     ~title:(Format.sprintf "node synchronization (%s / %s)" hmode1s hmode2s)
     ~tags:
@@ -182,7 +182,7 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
     if b then Test.fail "expected the two nodes NOT to be connected" else unit
 
 let check_rpc_force_bootstrapped () =
-  Test.run
+  Test.register
     ~__FILE__
     ~title:(sf "RPC force bootstrapped")
     ~tags:["rpc"; "bootstrapped"]
@@ -198,7 +198,7 @@ let check_rpc_force_bootstrapped () =
   let* () = bootstrapped_promise in
   unit
 
-let run () =
+let register () =
   check_bootstrap_with_history_modes Archive Archive ;
   check_bootstrap_with_history_modes Archive Full ;
   check_bootstrap_with_history_modes Archive Rolling ;

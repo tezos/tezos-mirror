@@ -43,7 +43,7 @@ let wait_for_sync node =
 let check_node_synchronization_state () =
   let n = 4 in
   let blocks_to_bake = 5 in
-  Test.run
+  Test.register
     ~__FILE__
     ~title:"Check synchronization state"
     ~tags:["bootstrap"; "node"; "sync"]
@@ -88,4 +88,4 @@ let check_node_synchronization_state () =
   in
   unit
 
-let run () = check_node_synchronization_state ()
+let register () = check_node_synchronization_state ()

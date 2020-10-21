@@ -139,7 +139,7 @@ let wait_for_denunciation_injection node client oph_promise =
    The test is successful if the double baking evidence can be found
    in the last baked block. *)
 let double_bake () =
-  Test.run
+  Test.register
     ~__FILE__
     ~title:"Test double baking with accuser"
     ~tags:["double"; "baking"; "accuser"; "node"]
@@ -202,4 +202,4 @@ let double_bake () =
   if is_operation_in_operations ops denunciation_oph then unit
   else Test.fail "Double baking evidence was not found"
 
-let run () = double_bake ()
+let register () = double_bake ()

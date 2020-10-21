@@ -99,7 +99,7 @@ let create_yes_wallet () =
    of that test and how to use it. The documentation can be found at this
    address: https://tezos.gitlab.io/developer/proposal_testing.html *)
 let migration ?yes_node_path ?yes_wallet context protocol =
-  Test.run
+  Test.register
     ~__FILE__
     ~title:"migration test"
     ~tags:["node"; "activate"; "user_activated"; "protocol"; "migration"]
@@ -170,4 +170,4 @@ let protocol = Constant.alpha.hash
 
 let context = "~/tezos-node-test"
 
-let run () = migration context protocol
+let register () = migration context protocol
