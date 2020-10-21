@@ -73,6 +73,8 @@ let fail x =
 
 let global_starting_time = Unix.gettimeofday ()
 
+let a_test_failed = ref false
+
 let really_run title f =
   Log.info "Starting test: %s" title ;
   List.iter (fun reset -> reset ()) !reset_functions ;
@@ -193,7 +195,7 @@ let really_run title f =
         Sys.argv.(0)
         (Log.quote_shell title) ;
       if Cli.options.keep_going then (
-        at_exit (fun () -> exit 1) ;
+        a_test_failed := true ;
         unit )
       else exit 1
   | Aborted ->
@@ -368,4 +370,5 @@ let run () =
         "You can use --list to get the list of tests and their tags." ) ;
   (* Actually run the tests (or list them). *)
   if Cli.options.list then list_tests ()
-  else List.iter (fun {title; body; _} -> really_run title body) !list
+  else List.iter (fun {title; body; _} -> really_run title body) !list ;
+  if !a_test_failed then exit 1
