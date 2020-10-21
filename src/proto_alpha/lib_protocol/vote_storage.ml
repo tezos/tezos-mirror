@@ -100,6 +100,8 @@ let listings_encoding =
       (obj2 (req "pkh" Signature.Public_key_hash.encoding) (req "rolls" int32)))
 
 let freeze_listings ctxt =
+  Storage.Vote.Listings.clear ctxt
+  >>= fun ctxt ->
   Roll_storage.fold ctxt (ctxt, 0l) ~f:(fun _roll delegate (ctxt, total) ->
       (* TODO use snapshots *)
       let delegate = Signature.Public_key.hash delegate in
@@ -108,7 +110,8 @@ let freeze_listings ctxt =
       >>=? fun count ->
       Storage.Vote.Listings.init_set ctxt delegate (Int32.succ count)
       >|= fun ctxt -> ok (ctxt, Int32.succ total))
-  >>=? fun (ctxt, total) -> Storage.Vote.Listings_size.init ctxt total
+  >>=? fun (ctxt, total) ->
+  Storage.Vote.Listings_size.init_set ctxt total >>= fun ctxt -> return ctxt
 
 let listing_size = Storage.Vote.Listings_size.get
 
@@ -116,10 +119,8 @@ let in_listings = Storage.Vote.Listings.mem
 
 let get_listings = Storage.Vote.Listings.bindings
 
-let clear_listings ctxt =
-  Storage.Vote.Listings.clear ctxt
-  >>= fun ctxt ->
-  Storage.Vote.Listings_size.remove ctxt >>= fun ctxt -> return ctxt
+let get_voting_power ctxt owner =
+  Storage.Vote.Listings.get_option ctxt owner >|=? Option.value ~default:0l
 
 let get_current_period_kind = Storage.Vote.Current_period_kind.get
 
