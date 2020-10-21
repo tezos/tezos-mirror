@@ -535,21 +535,18 @@ let get_ballots_info (cctxt : #full) ~chain ~block =
   return {current_quorum; participation; supermajority; ballots}
 
 let get_period_info (cctxt : #full) ~chain ~block =
-  (* Get the next level, not the current *)
   let cb = (chain, block) in
-  Alpha_services.Helpers.current_level cctxt ~offset:1l cb
-  >>=? fun level ->
-  Alpha_services.Constants.all cctxt cb
-  >>=? fun constants ->
+  Alpha_services.Voting.current_period cctxt cb
+  >>=? fun voting_period ->
   Alpha_services.Voting.current_proposal cctxt cb
   >>=? fun current_proposal ->
-  let position = level.voting_period_position in
-  let remaining =
-    Int32.(sub constants.parametric.blocks_per_voting_period position)
-  in
-  Alpha_services.Voting.current_period_kind cctxt cb
-  >>=? fun current_period_kind ->
-  return {current_period_kind; position; remaining; current_proposal}
+  return
+    {
+      current_period_kind = voting_period.voting_period.kind;
+      position = voting_period.position;
+      remaining = voting_period.remaining;
+      current_proposal;
+    }
 
 let get_proposals (cctxt : #full) ~chain ~block =
   let cb = (chain, block) in
@@ -557,11 +554,9 @@ let get_proposals (cctxt : #full) ~chain ~block =
 
 let submit_proposals ?dry_run ?verbose_signing (cctxt : #full) ~chain ~block
     ?confirmations ~src_sk source proposals =
-  (* We need the next level, not the current *)
-  Alpha_services.Helpers.current_level cctxt ~offset:1l (chain, block)
-  >>=? fun (level : Level.t) ->
-  let period = level.voting_period in
-  let contents = Single (Proposals {source; period; proposals}) in
+  Alpha_services.Voting.current_period cctxt (chain, block)
+  >>=? fun {voting_period = {index; _}; _} ->
+  let contents = Single (Proposals {source; period = index; proposals}) in
   Injection.inject_operation
     cctxt
     ~chain
@@ -577,10 +572,9 @@ let submit_ballot ?dry_run ?verbose_signing (cctxt : #full) ~chain ~block
     ?confirmations ~src_sk source proposal ballot =
   (* The user must provide the proposal explicitly to make himself sure
      for what he is voting. *)
-  Alpha_services.Helpers.current_level cctxt ~offset:1l (chain, block)
-  >>=? fun (level : Level.t) ->
-  let period = level.voting_period in
-  let contents = Single (Ballot {source; period; proposal; ballot}) in
+  Alpha_services.Voting.current_period cctxt (chain, block)
+  >>=? fun {voting_period = {index; _}; _} ->
+  let contents = Single (Ballot {source; period = index; proposal; ballot}) in
   Injection.inject_operation
     cctxt
     ~chain

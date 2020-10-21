@@ -469,10 +469,13 @@ let rec pp_contents_and_result_list :
     ->
       Format.fprintf
         ppf
-        "@[<v 2>Proposals:@,From: %a@,Period: %a@,Protocols:@,  @[<v 0>%a@]@]"
+        "@[<v 2>Proposals:@,\
+         From: %a@,\
+         Period: %ld@,\
+         Protocols:@,\
+        \  @[<v 0>%a@]@]"
         Signature.Public_key_hash.pp
         source
-        Voting_period.pp
         period
         (Format.pp_print_list Protocol_hash.pp)
         proposals
@@ -480,10 +483,9 @@ let rec pp_contents_and_result_list :
     ->
       Format.fprintf
         ppf
-        "@[<v 2>Ballot:@,From: %a@,Period: %a@,Protocol: %a@,Vote: %a@]"
+        "@[<v 2>Ballot:@,From: %a@,Period: %ld@,Protocol: %a@,Vote: %a@]"
         Signature.Public_key_hash.pp
         source
-        Voting_period.pp
         period
         Protocol_hash.pp
         proposal
