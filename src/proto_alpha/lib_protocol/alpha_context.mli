@@ -967,8 +967,6 @@ module Vote : sig
 
   val freeze_listings : context -> context tzresult Lwt.t
 
-  val clear_listings : context -> context tzresult Lwt.t
-
   val listing_size : context -> int32 tzresult Lwt.t
 
   val in_listings : context -> public_key_hash -> bool Lwt.t
