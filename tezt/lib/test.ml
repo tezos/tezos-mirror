@@ -324,8 +324,6 @@ let list_tests () =
   if list <> [] then print_string line ;
   ()
 
-let found_a_test = ref false
-
 let run ~__FILE__ ~title ~tags body =
   let file = Filename.basename __FILE__ in
   check_tags tags ;
@@ -333,7 +331,6 @@ let run ~__FILE__ ~title ~tags body =
   register_title title ;
   List.iter register_tag tags ;
   if test_should_be_run ~file ~title ~tags then (
-    found_a_test := true ;
     list := {file; title; tags; body} :: !list ;
     if not Cli.options.list then really_run title body )
 
@@ -356,7 +353,7 @@ let () =
   if (not all_files_exist) || (not all_titles_exist) || not all_tags_exist then
     exit 1 ;
   if Cli.options.list then list_tests () ;
-  if not !found_a_test then (
+  if !list = [] then (
     Printf.eprintf
       "No test found for filters: %s\n%!"
       (String.concat
