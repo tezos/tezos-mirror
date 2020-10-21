@@ -253,9 +253,15 @@ let check_existence kind known specified =
       List.iter (Printf.eprintf "Unknown %s: %s\n" kind) unknown ;
       false
 
-(* List of tests, filled if --list is specified on the command-line,
-   and displayed as a table at exit. *)
-let list = ref []
+type test = {
+  file : string;
+  title : string;
+  tags : string list;
+  body : unit -> unit Lwt.t;
+}
+
+(* List of tests added using [add] and that match command-line filters. *)
+let list : test list ref = ref []
 
 let list_tests () =
   let file_header = "FILE" in
@@ -263,7 +269,7 @@ let list_tests () =
   let tags_header = "TAGS" in
   let list =
     List.map
-      (fun (file, title, tags) -> (file, title, String.concat ", " tags))
+      (fun {file; title; tags; _} -> (file, title, String.concat ", " tags))
       !list
   in
   (* Compute the size of each column. *)
@@ -320,7 +326,7 @@ let list_tests () =
 
 let found_a_test = ref false
 
-let run ~__FILE__ ~title ~tags f =
+let run ~__FILE__ ~title ~tags body =
   let file = Filename.basename __FILE__ in
   check_tags tags ;
   register_file file ;
@@ -328,8 +334,8 @@ let run ~__FILE__ ~title ~tags f =
   List.iter register_tag tags ;
   if test_should_be_run ~file ~title ~tags then (
     found_a_test := true ;
-    if Cli.options.list then list := (file, title, tags) :: !list
-    else really_run title f )
+    list := {file; title; tags; body} :: !list ;
+    if not Cli.options.list then really_run title body )
 
 (* The list of files / tests / tags is only known at the very end. *)
 let () =
