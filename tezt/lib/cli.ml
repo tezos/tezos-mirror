@@ -44,6 +44,7 @@ type options = {
   global_timeout : float option;
   test_timeout : float option;
   reset_regressions : bool;
+  loop : bool;
 }
 
 let options =
@@ -64,6 +65,7 @@ let options =
   let global_timeout = ref None in
   let test_timeout = ref None in
   let reset_regressions = ref false in
+  let loop = ref false in
   let set_log_level = function
     | "quiet" ->
         log_level := Quiet
@@ -158,7 +160,14 @@ let options =
         ( "--reset-regressions",
           Arg.Set reset_regressions,
           " Remove regression test outputs if they exist, and regenerate them."
-        ) ]
+        );
+        ( "--loop",
+          Arg.Set loop,
+          " Restart from the beginning once all tests are done. All tests are \
+           repeated until one of them fails or if you interrupt with Ctrl+C. \
+           This is useful to reproduce non-deterministic failures. When used \
+           in conjunction with --keep-going, tests are repeated even if they \
+           fail, until you interrupt them with Ctrl+C." ) ]
   in
   let usage =
     (* This was formatted by ocamlformat. Sorry for all the slashes. *)
@@ -211,4 +220,5 @@ let options =
     global_timeout = !global_timeout;
     test_timeout = !test_timeout;
     reset_regressions = !reset_regressions;
+    loop = !loop;
   }

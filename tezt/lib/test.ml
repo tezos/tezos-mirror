@@ -369,6 +369,11 @@ let run () =
       prerr_endline
         "You can use --list to get the list of tests and their tags." ) ;
   (* Actually run the tests (or list them). *)
-  if Cli.options.list then list_tests ()
-  else List.iter (fun {title; body; _} -> really_run title body) !list ;
+  ( if Cli.options.list then list_tests ()
+  else
+    let rec run () =
+      List.iter (fun {title; body; _} -> really_run title body) !list ;
+      if Cli.options.loop then run ()
+    in
+    run () ) ;
   if !a_test_failed then exit 1
