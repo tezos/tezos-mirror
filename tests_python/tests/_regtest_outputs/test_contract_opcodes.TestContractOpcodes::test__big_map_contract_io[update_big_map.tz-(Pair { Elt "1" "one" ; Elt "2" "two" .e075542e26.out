@@ -11,7 +11,7 @@ big_map diff
   Set map(0)["3"] to "three"
 trace
   - location: 13 (remaining gas: 1039984.581 units remaining)
-    [ (Pair { Elt "3" (Some "three") } (Pair { Elt "1" "one" ; Elt "2" "two" } Unit))  	 ]
+    [ (Pair { Elt "3" (Some "three") } { Elt "1" "one" ; Elt "2" "two" } Unit)  	 ]
   - location: 15 (remaining gas: 1039984.381 units remaining)
     [ { Elt "3" (Some "three") }  	@parameter
       (Pair { Elt "1" "one" ; Elt "2" "two" } Unit)  	@storage ]
@@ -49,7 +49,7 @@ trace
     [ {}  	
       (Pair { Elt "1" "one" ; Elt "2" "two" ; Elt "3" "three" } Unit)  	 ]
   - location: 26 (remaining gas: 1039982.991 units remaining)
-    [ (Pair {} (Pair { Elt "1" "one" ; Elt "2" "two" ; Elt "3" "three" } Unit))  	 ]
+    [ (Pair {} { Elt "1" "one" ; Elt "2" "two" ; Elt "3" "three" } Unit)  	 ]
   - location: -1 (remaining gas: 1039982.921 units remaining)
-    [ (Pair {} (Pair { Elt "1" "one" ; Elt "2" "two" ; Elt "3" "three" } Unit))  	 ]
+    [ (Pair {} { Elt "1" "one" ; Elt "2" "two" ; Elt "3" "three" } Unit)  	 ]
 

@@ -1,14 +1,14 @@
-tests/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[ediv.tz-(Pair None (Pair None (Pair None None)))-(Pair 10 0)-(Pair None (Pair None (Pair None None)))]
+tests/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[ediv.tz-(Pair None None None None)-(Pair 10 0)-(Pair None None None None)]
 
 storage
-  (Pair None (Pair None (Pair None None)))
+  (Pair None None None None)
 emitted operations
   
 big_map diff
   
 trace
   - location: 26 (remaining gas: 1039968.605 units remaining)
-    [ (Pair (Pair 10 0) (Pair None (Pair None (Pair None None))))  	 ]
+    [ (Pair (Pair 10 0) None None None None)  	 ]
   - location: 27 (remaining gas: 1039968.465 units remaining)
     [ (Pair 10 0)  	@parameter ]
   - location: 28 (remaining gas: 1039968.325 units remaining)
@@ -117,21 +117,21 @@ trace
       None  	
       (Pair None None)  	 ]
   - location: 57 (remaining gas: 1039963.897 units remaining)
-    [ (Pair None (Pair None None))  	 ]
+    [ (Pair None None None)  	 ]
   - location: 56 (remaining gas: 1039963.827 units remaining)
-    [ (Pair None (Pair None None))  	 ]
+    [ (Pair None None None)  	 ]
   - location: 55 (remaining gas: 1039963.827 units remaining)
     [ None  	
-      (Pair None (Pair None None))  	 ]
+      (Pair None None None)  	 ]
   - location: 58 (remaining gas: 1039963.687 units remaining)
-    [ (Pair None (Pair None (Pair None None)))  	 ]
+    [ (Pair None None None None)  	 ]
   - location: -1 (remaining gas: 1039963.617 units remaining)
-    [ (Pair None (Pair None (Pair None None)))  	 ]
+    [ (Pair None None None None)  	 ]
   - location: 59 (remaining gas: 1039963.477 units remaining)
     [ {}  	
-      (Pair None (Pair None (Pair None None)))  	 ]
+      (Pair None None None None)  	 ]
   - location: 61 (remaining gas: 1039963.337 units remaining)
-    [ (Pair {} (Pair None (Pair None (Pair None None))))  	 ]
+    [ (Pair {} None None None None)  	 ]
   - location: -1 (remaining gas: 1039963.267 units remaining)
-    [ (Pair {} (Pair None (Pair None (Pair None None))))  	 ]
+    [ (Pair {} None None None None)  	 ]
 

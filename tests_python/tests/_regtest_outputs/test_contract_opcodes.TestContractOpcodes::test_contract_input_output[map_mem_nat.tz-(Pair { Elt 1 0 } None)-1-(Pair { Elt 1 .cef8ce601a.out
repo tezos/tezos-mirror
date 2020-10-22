@@ -8,7 +8,7 @@ big_map diff
   
 trace
   - location: 11 (remaining gas: 1039987.570 units remaining)
-    [ (Pair 1 (Pair { Elt 1 0 } None))  	 ]
+    [ (Pair 1 { Elt 1 0 } None)  	 ]
   - location: 12 (remaining gas: 1039987.430 units remaining)
     [ 1  	@parameter
       (Pair { Elt 1 0 } None)  	@storage ]
@@ -39,7 +39,7 @@ trace
     [ {}  	
       (Pair { Elt 1 0 } (Some True))  	 ]
   - location: 23 (remaining gas: 1039986.090 units remaining)
-    [ (Pair {} (Pair { Elt 1 0 } (Some True)))  	 ]
+    [ (Pair {} { Elt 1 0 } (Some True))  	 ]
   - location: -1 (remaining gas: 1039986.020 units remaining)
-    [ (Pair {} (Pair { Elt 1 0 } (Some True)))  	 ]
+    [ (Pair {} { Elt 1 0 } (Some True))  	 ]
 

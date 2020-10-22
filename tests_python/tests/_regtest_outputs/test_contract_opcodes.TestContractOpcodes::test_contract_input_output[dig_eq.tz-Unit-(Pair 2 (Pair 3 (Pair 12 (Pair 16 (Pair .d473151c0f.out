@@ -8,232 +8,82 @@ big_map diff
   
 trace
   - location: 38 (remaining gas: 1039873.080 units remaining)
-    [ (Pair (Pair 2
-                  (Pair 3
-                        (Pair 12
-                              (Pair 16
-                                    (Pair 10
-                                          (Pair 14
-                                                (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))
-            Unit)  	 ]
+    [ (Pair (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) Unit)  	 ]
   - location: 39 (remaining gas: 1039872.940 units remaining)
-    [ (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+    [ (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 40 (remaining gas: 1039872.800 units remaining)
-    [ (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+    [ (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 42 (remaining gas: 1039872.600 units remaining)
     [ 2  	
-      (Pair 3
-            (Pair 12
-                  (Pair 16
-                        (Pair 10
-                              (Pair 14
-                                    (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1)))))))))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 45 (remaining gas: 1039872.300 units remaining)
     [ 3  	
-      (Pair 12
-            (Pair 16
-                  (Pair 10
-                        (Pair 14
-                              (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 44 (remaining gas: 1039872.230 units remaining)
     [ 3  	
-      (Pair 12
-            (Pair 16
-                  (Pair 10
-                        (Pair 14
-                              (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 43 (remaining gas: 1039872.230 units remaining)
     [ 2  	
       3  	
-      (Pair 12
-            (Pair 16
-                  (Pair 10
-                        (Pair 14
-                              (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 49 (remaining gas: 1039871.922 units remaining)
     [ 12  	
-      (Pair 16
-            (Pair 10
-                  (Pair 14
-                        (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1)))))))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 48 (remaining gas: 1039871.852 units remaining)
     [ 12  	
-      (Pair 16
-            (Pair 10
-                  (Pair 14
-                        (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1)))))))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 46 (remaining gas: 1039871.852 units remaining)
     [ 2  	
       3  	
       12  	
-      (Pair 16
-            (Pair 10
-                  (Pair 14
-                        (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1)))))))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 53 (remaining gas: 1039871.540 units remaining)
     [ 16  	
-      (Pair 10
-            (Pair 14
-                  (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 52 (remaining gas: 1039871.470 units remaining)
     [ 16  	
-      (Pair 10
-            (Pair 14
-                  (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 50 (remaining gas: 1039871.470 units remaining)
     [ 2  	
       3  	
       12  	
       16  	
-      (Pair 10
-            (Pair 14
-                  (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 57 (remaining gas: 1039871.154 units remaining)
     [ 10  	
-      (Pair 14
-            (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1)))))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 56 (remaining gas: 1039871.084 units remaining)
     [ 10  	
-      (Pair 14
-            (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1)))))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 54 (remaining gas: 1039871.084 units remaining)
     [ 2  	
       3  	
       12  	
       16  	
       10  	
-      (Pair 14
-            (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1)))))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 61 (remaining gas: 1039870.764 units remaining)
     [ 14  	
-      (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 60 (remaining gas: 1039870.694 units remaining)
     [ 14  	
-      (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 58 (remaining gas: 1039870.694 units remaining)
     [ 2  	
       3  	
@@ -241,34 +91,16 @@ trace
       16  	
       10  	
       14  	
-      (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 65 (remaining gas: 1039870.370 units remaining)
     [ 19  	
-      (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1)))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 64 (remaining gas: 1039870.300 units remaining)
     [ 19  	
-      (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1)))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 62 (remaining gas: 1039870.300 units remaining)
     [ 2  	
       3  	
@@ -277,34 +109,16 @@ trace
       10  	
       14  	
       19  	
-      (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1)))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 69 (remaining gas: 1039869.972 units remaining)
     [ 9  	
-      (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 68 (remaining gas: 1039869.902 units remaining)
     [ 9  	
-      (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 66 (remaining gas: 1039869.902 units remaining)
     [ 2  	
       3  	
@@ -314,34 +128,16 @@ trace
       14  	
       19  	
       9  	
-      (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 73 (remaining gas: 1039869.570 units remaining)
     [ 18  	
-      (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1)))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 72 (remaining gas: 1039869.500 units remaining)
     [ 18  	
-      (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1)))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 70 (remaining gas: 1039869.500 units remaining)
     [ 2  	
       3  	
@@ -352,34 +148,16 @@ trace
       19  	
       9  	
       18  	
-      (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1)))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 77 (remaining gas: 1039869.164 units remaining)
     [ 6  	
-      (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 76 (remaining gas: 1039869.094 units remaining)
     [ 6  	
-      (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 74 (remaining gas: 1039869.094 units remaining)
     [ 2  	
       3  	
@@ -391,34 +169,16 @@ trace
       9  	
       18  	
       6  	
-      (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 81 (remaining gas: 1039868.754 units remaining)
     [ 8  	
-      (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1)))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 80 (remaining gas: 1039868.684 units remaining)
     [ 8  	
-      (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1)))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 78 (remaining gas: 1039868.684 units remaining)
     [ 2  	
       3  	
@@ -431,34 +191,16 @@ trace
       18  	
       6  	
       8  	
-      (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1)))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 85 (remaining gas: 1039868.340 units remaining)
     [ 11  	
-      (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 84 (remaining gas: 1039868.270 units remaining)
     [ 11  	
-      (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 82 (remaining gas: 1039868.270 units remaining)
     [ 2  	
       3  	
@@ -472,34 +214,16 @@ trace
       6  	
       8  	
       11  	
-      (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 89 (remaining gas: 1039867.922 units remaining)
     [ 4  	
-      (Pair 13 (Pair 15 (Pair 5 1)))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 88 (remaining gas: 1039867.852 units remaining)
     [ 4  	
-      (Pair 13 (Pair 15 (Pair 5 1)))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 86 (remaining gas: 1039867.852 units remaining)
     [ 2  	
       3  	
@@ -514,34 +238,16 @@ trace
       8  	
       11  	
       4  	
-      (Pair 13 (Pair 15 (Pair 5 1)))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 93 (remaining gas: 1039867.500 units remaining)
     [ 13  	
-      (Pair 15 (Pair 5 1))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 92 (remaining gas: 1039867.430 units remaining)
     [ 13  	
-      (Pair 15 (Pair 5 1))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 90 (remaining gas: 1039867.430 units remaining)
     [ 2  	
       3  	
@@ -557,34 +263,16 @@ trace
       11  	
       4  	
       13  	
-      (Pair 15 (Pair 5 1))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 97 (remaining gas: 1039867.074 units remaining)
     [ 15  	
       (Pair 5 1)  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 96 (remaining gas: 1039867.004 units remaining)
     [ 15  	
       (Pair 5 1)  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 94 (remaining gas: 1039867.004 units remaining)
     [ 2  	
       3  	
@@ -602,33 +290,15 @@ trace
       13  	
       15  	
       (Pair 5 1)  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 101 (remaining gas: 1039866.644 units remaining)
     [ 5  	
       1  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 100 (remaining gas: 1039866.574 units remaining)
     [ 5  	
       1  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 98 (remaining gas: 1039866.574 units remaining)
     [ 2  	
       3  	
@@ -647,13 +317,7 @@ trace
       15  	
       5  	
       1  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: -1 (remaining gas: 1039866.504 units remaining)
     [ 2  	
       3  	
@@ -672,13 +336,7 @@ trace
       15  	
       5  	
       1  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 102 (remaining gas: 1039866.344 units remaining)
     [ 2  	
       3  	
@@ -697,13 +355,7 @@ trace
       15  	
       5  	
       1  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 104 (remaining gas: 1039866.180 units remaining)
     [ 3  	
       2  	
@@ -722,13 +374,7 @@ trace
       15  	
       5  	
       1  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 106 (remaining gas: 1039866.012 units remaining)
     [ 12  	
       3  	
@@ -747,13 +393,7 @@ trace
       15  	
       5  	
       1  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 108 (remaining gas: 1039865.840 units remaining)
     [ 16  	
       12  	
@@ -772,13 +412,7 @@ trace
       15  	
       5  	
       1  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 110 (remaining gas: 1039865.664 units remaining)
     [ 10  	
       16  	
@@ -797,13 +431,7 @@ trace
       15  	
       5  	
       1  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 112 (remaining gas: 1039865.484 units remaining)
     [ 14  	
       10  	
@@ -822,13 +450,7 @@ trace
       15  	
       5  	
       1  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 114 (remaining gas: 1039865.300 units remaining)
     [ 19  	
       14  	
@@ -847,13 +469,7 @@ trace
       15  	
       5  	
       1  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 116 (remaining gas: 1039865.112 units remaining)
     [ 9  	
       19  	
@@ -872,13 +488,7 @@ trace
       15  	
       5  	
       1  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 118 (remaining gas: 1039864.920 units remaining)
     [ 18  	
       9  	
@@ -897,13 +507,7 @@ trace
       15  	
       5  	
       1  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 120 (remaining gas: 1039864.724 units remaining)
     [ 6  	
       18  	
@@ -922,13 +526,7 @@ trace
       15  	
       5  	
       1  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 122 (remaining gas: 1039864.524 units remaining)
     [ 8  	
       6  	
@@ -947,13 +545,7 @@ trace
       15  	
       5  	
       1  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 124 (remaining gas: 1039864.320 units remaining)
     [ 11  	
       8  	
@@ -972,13 +564,7 @@ trace
       15  	
       5  	
       1  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 126 (remaining gas: 1039864.112 units remaining)
     [ 4  	
       11  	
@@ -997,13 +583,7 @@ trace
       15  	
       5  	
       1  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 128 (remaining gas: 1039863.900 units remaining)
     [ 13  	
       4  	
@@ -1022,13 +602,7 @@ trace
       15  	
       5  	
       1  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 130 (remaining gas: 1039863.684 units remaining)
     [ 15  	
       13  	
@@ -1047,13 +621,7 @@ trace
       2  	
       5  	
       1  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 132 (remaining gas: 1039863.464 units remaining)
     [ 5  	
       15  	
@@ -1072,13 +640,7 @@ trace
       3  	
       2  	
       1  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 134 (remaining gas: 1039863.240 units remaining)
     [ 1  	
       5  	
@@ -1097,13 +659,7 @@ trace
       12  	
       3  	
       2  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 136 (remaining gas: 1039863.080 units remaining)
     [ 1  	
       5  	
@@ -1122,13 +678,7 @@ trace
       12  	
       3  	
       2  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 138 (remaining gas: 1039862.916 units remaining)
     [ 5  	
       1  	
@@ -1147,13 +697,7 @@ trace
       12  	
       3  	
       2  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 140 (remaining gas: 1039862.748 units remaining)
     [ 15  	
       5  	
@@ -1172,13 +716,7 @@ trace
       12  	
       3  	
       2  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 142 (remaining gas: 1039862.576 units remaining)
     [ 13  	
       15  	
@@ -1197,13 +735,7 @@ trace
       12  	
       3  	
       2  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 144 (remaining gas: 1039862.400 units remaining)
     [ 4  	
       13  	
@@ -1222,13 +754,7 @@ trace
       12  	
       3  	
       2  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 146 (remaining gas: 1039862.220 units remaining)
     [ 11  	
       4  	
@@ -1247,13 +773,7 @@ trace
       12  	
       3  	
       2  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 148 (remaining gas: 1039862.036 units remaining)
     [ 8  	
       11  	
@@ -1272,13 +792,7 @@ trace
       12  	
       3  	
       2  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 150 (remaining gas: 1039861.848 units remaining)
     [ 6  	
       8  	
@@ -1297,13 +811,7 @@ trace
       12  	
       3  	
       2  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 152 (remaining gas: 1039861.656 units remaining)
     [ 18  	
       6  	
@@ -1322,13 +830,7 @@ trace
       12  	
       3  	
       2  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 154 (remaining gas: 1039861.460 units remaining)
     [ 9  	
       18  	
@@ -1347,13 +849,7 @@ trace
       12  	
       3  	
       2  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 156 (remaining gas: 1039861.260 units remaining)
     [ 19  	
       9  	
@@ -1372,13 +868,7 @@ trace
       12  	
       3  	
       2  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 158 (remaining gas: 1039861.056 units remaining)
     [ 14  	
       19  	
@@ -1397,13 +887,7 @@ trace
       12  	
       3  	
       2  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 160 (remaining gas: 1039860.848 units remaining)
     [ 10  	
       14  	
@@ -1422,13 +906,7 @@ trace
       12  	
       3  	
       2  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 162 (remaining gas: 1039860.636 units remaining)
     [ 16  	
       10  	
@@ -1447,13 +925,7 @@ trace
       12  	
       3  	
       2  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 164 (remaining gas: 1039860.420 units remaining)
     [ 12  	
       16  	
@@ -1472,13 +944,7 @@ trace
       1  	
       3  	
       2  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 166 (remaining gas: 1039860.200 units remaining)
     [ 3  	
       12  	
@@ -1497,13 +963,7 @@ trace
       5  	
       1  	
       2  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 168 (remaining gas: 1039859.976 units remaining)
     [ 2  	
       3  	
@@ -1522,31 +982,13 @@ trace
       15  	
       5  	
       1  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 174 (remaining gas: 1039859.556 units remaining)
     [ (Pair 5 1)  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 173 (remaining gas: 1039859.486 units remaining)
     [ (Pair 5 1)  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 171 (remaining gas: 1039859.486 units remaining)
     [ 2  	
       3  	
@@ -1564,31 +1006,13 @@ trace
       13  	
       15  	
       (Pair 5 1)  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 178 (remaining gas: 1039859.130 units remaining)
-    [ (Pair 15 (Pair 5 1))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+    [ (Pair 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 177 (remaining gas: 1039859.060 units remaining)
-    [ (Pair 15 (Pair 5 1))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+    [ (Pair 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 175 (remaining gas: 1039859.060 units remaining)
     [ 2  	
       3  	
@@ -1604,32 +1028,14 @@ trace
       11  	
       4  	
       13  	
-      (Pair 15 (Pair 5 1))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 182 (remaining gas: 1039858.708 units remaining)
-    [ (Pair 13 (Pair 15 (Pair 5 1)))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+    [ (Pair 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 181 (remaining gas: 1039858.638 units remaining)
-    [ (Pair 13 (Pair 15 (Pair 5 1)))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+    [ (Pair 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 179 (remaining gas: 1039858.638 units remaining)
     [ 2  	
       3  	
@@ -1644,32 +1050,14 @@ trace
       8  	
       11  	
       4  	
-      (Pair 13 (Pair 15 (Pair 5 1)))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 186 (remaining gas: 1039858.290 units remaining)
-    [ (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+    [ (Pair 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 185 (remaining gas: 1039858.220 units remaining)
-    [ (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+    [ (Pair 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 183 (remaining gas: 1039858.220 units remaining)
     [ 2  	
       3  	
@@ -1683,32 +1071,14 @@ trace
       6  	
       8  	
       11  	
-      (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 190 (remaining gas: 1039857.876 units remaining)
-    [ (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1)))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+    [ (Pair 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 189 (remaining gas: 1039857.806 units remaining)
-    [ (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1)))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+    [ (Pair 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 187 (remaining gas: 1039857.806 units remaining)
     [ 2  	
       3  	
@@ -1721,32 +1091,14 @@ trace
       18  	
       6  	
       8  	
-      (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1)))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 194 (remaining gas: 1039857.466 units remaining)
-    [ (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+    [ (Pair 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 193 (remaining gas: 1039857.396 units remaining)
-    [ (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+    [ (Pair 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 191 (remaining gas: 1039857.396 units remaining)
     [ 2  	
       3  	
@@ -1758,32 +1110,14 @@ trace
       9  	
       18  	
       6  	
-      (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 198 (remaining gas: 1039857.060 units remaining)
-    [ (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1)))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+    [ (Pair 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 197 (remaining gas: 1039856.990 units remaining)
-    [ (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1)))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+    [ (Pair 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 195 (remaining gas: 1039856.990 units remaining)
     [ 2  	
       3  	
@@ -1794,32 +1128,14 @@ trace
       19  	
       9  	
       18  	
-      (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1)))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 202 (remaining gas: 1039856.658 units remaining)
-    [ (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+    [ (Pair 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 201 (remaining gas: 1039856.588 units remaining)
-    [ (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+    [ (Pair 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 199 (remaining gas: 1039856.588 units remaining)
     [ 2  	
       3  	
@@ -1829,32 +1145,14 @@ trace
       14  	
       19  	
       9  	
-      (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 206 (remaining gas: 1039856.260 units remaining)
-    [ (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1)))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+    [ (Pair 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 205 (remaining gas: 1039856.190 units remaining)
-    [ (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1)))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+    [ (Pair 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 203 (remaining gas: 1039856.190 units remaining)
     [ 2  	
       3  	
@@ -1863,32 +1161,14 @@ trace
       10  	
       14  	
       19  	
-      (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1)))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 210 (remaining gas: 1039855.866 units remaining)
-    [ (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+    [ (Pair 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 209 (remaining gas: 1039855.796 units remaining)
-    [ (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+    [ (Pair 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 207 (remaining gas: 1039855.796 units remaining)
     [ 2  	
       3  	
@@ -1896,239 +1176,74 @@ trace
       16  	
       10  	
       14  	
-      (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 214 (remaining gas: 1039855.476 units remaining)
-    [ (Pair 14
-            (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1)))))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+    [ (Pair 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 213 (remaining gas: 1039855.406 units remaining)
-    [ (Pair 14
-            (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1)))))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+    [ (Pair 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 211 (remaining gas: 1039855.406 units remaining)
     [ 2  	
       3  	
       12  	
       16  	
       10  	
-      (Pair 14
-            (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1)))))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 218 (remaining gas: 1039855.090 units remaining)
-    [ (Pair 10
-            (Pair 14
-                  (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+    [ (Pair 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 217 (remaining gas: 1039855.020 units remaining)
-    [ (Pair 10
-            (Pair 14
-                  (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+    [ (Pair 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 215 (remaining gas: 1039855.020 units remaining)
     [ 2  	
       3  	
       12  	
       16  	
-      (Pair 10
-            (Pair 14
-                  (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 222 (remaining gas: 1039854.708 units remaining)
-    [ (Pair 16
-            (Pair 10
-                  (Pair 14
-                        (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1)))))))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+    [ (Pair 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 221 (remaining gas: 1039854.638 units remaining)
-    [ (Pair 16
-            (Pair 10
-                  (Pair 14
-                        (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1)))))))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+    [ (Pair 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 219 (remaining gas: 1039854.638 units remaining)
     [ 2  	
       3  	
       12  	
-      (Pair 16
-            (Pair 10
-                  (Pair 14
-                        (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1)))))))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 226 (remaining gas: 1039854.330 units remaining)
-    [ (Pair 12
-            (Pair 16
-                  (Pair 10
-                        (Pair 14
-                              (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+    [ (Pair 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 225 (remaining gas: 1039854.260 units remaining)
-    [ (Pair 12
-            (Pair 16
-                  (Pair 10
-                        (Pair 14
-                              (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+    [ (Pair 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 223 (remaining gas: 1039854.260 units remaining)
     [ 2  	
       3  	
-      (Pair 12
-            (Pair 16
-                  (Pair 10
-                        (Pair 14
-                              (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 229 (remaining gas: 1039853.960 units remaining)
-    [ (Pair 3
-            (Pair 12
-                  (Pair 16
-                        (Pair 10
-                              (Pair 14
-                                    (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1)))))))))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+    [ (Pair 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 228 (remaining gas: 1039853.890 units remaining)
-    [ (Pair 3
-            (Pair 12
-                  (Pair 16
-                        (Pair 10
-                              (Pair 14
-                                    (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1)))))))))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+    [ (Pair 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 227 (remaining gas: 1039853.890 units remaining)
     [ 2  	
-      (Pair 3
-            (Pair 12
-                  (Pair 16
-                        (Pair 10
-                              (Pair 14
-                                    (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1)))))))))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+      (Pair 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 230 (remaining gas: 1039853.750 units remaining)
-    [ (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+    [ (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: -1 (remaining gas: 1039853.680 units remaining)
-    [ (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	
-      (Pair 2
-            (Pair 3
-                  (Pair 12
-                        (Pair 16
-                              (Pair 10
-                                    (Pair 14
-                                          (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))  	@parameter ]
+    [ (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
   - location: 233 (remaining gas: 1039850.950 units remaining)
     [ 0  	 ]
   - location: 234 (remaining gas: 1039850.810 units remaining)

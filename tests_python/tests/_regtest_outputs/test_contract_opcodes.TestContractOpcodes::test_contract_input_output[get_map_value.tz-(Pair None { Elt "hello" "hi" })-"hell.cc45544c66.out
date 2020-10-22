@@ -8,13 +8,13 @@ big_map diff
   
 trace
   - location: 11 (remaining gas: 1039987.033 units remaining)
-    [ (Pair "hello" (Pair None { Elt "hello" "hi" }))  	 ]
+    [ (Pair "hello" None { Elt "hello" "hi" })  	 ]
   - location: 12 (remaining gas: 1039986.893 units remaining)
-    [ (Pair "hello" (Pair None { Elt "hello" "hi" }))  	
-      (Pair "hello" (Pair None { Elt "hello" "hi" }))  	 ]
+    [ (Pair "hello" None { Elt "hello" "hi" })  	
+      (Pair "hello" None { Elt "hello" "hi" })  	 ]
   - location: 13 (remaining gas: 1039986.753 units remaining)
     [ "hello"  	@parameter
-      (Pair "hello" (Pair None { Elt "hello" "hi" }))  	 ]
+      (Pair "hello" None { Elt "hello" "hi" })  	 ]
   - location: 17 (remaining gas: 1039986.393 units remaining)
     [ (Pair None { Elt "hello" "hi" })  	@storage ]
   - location: 18 (remaining gas: 1039986.253 units remaining)
@@ -40,7 +40,7 @@ trace
     [ {}  	
       (Pair (Some "hi") { Elt "hello" "hi" })  	 ]
   - location: 24 (remaining gas: 1039985.413 units remaining)
-    [ (Pair {} (Pair (Some "hi") { Elt "hello" "hi" }))  	 ]
+    [ (Pair {} (Some "hi") { Elt "hello" "hi" })  	 ]
   - location: -1 (remaining gas: 1039985.343 units remaining)
-    [ (Pair {} (Pair (Some "hi") { Elt "hello" "hi" }))  	 ]
+    [ (Pair {} (Some "hi") { Elt "hello" "hi" })  	 ]
 
