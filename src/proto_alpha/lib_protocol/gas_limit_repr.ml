@@ -79,23 +79,21 @@ let byte_written_weight = Z.of_int (scaling_factor * 15)
 
 let cost_to_milligas (cost : cost) : Arith.fp = Arith.unsafe_fp cost
 
-let raw_consume block_gas operation_gas cost =
-  match operation_gas with
-  | Unaccounted ->
-      ok (block_gas, Unaccounted)
-  | Limited {remaining} ->
-      let gas = cost_to_milligas cost in
-      if Arith.(gas > zero) then
-        let remaining = Arith.sub remaining gas in
-        let block_remaining = Arith.sub block_gas gas in
-        if Arith.(remaining < zero) then error Operation_quota_exceeded
-        else if Arith.(block_remaining < zero) then error Block_quota_exceeded
-        else ok (block_remaining, Limited {remaining})
-      else ok (block_gas, operation_gas)
+let raw_consume gas_counter cost =
+  let gas = cost_to_milligas cost in
+  let remaining = Arith.sub gas_counter gas in
+  if Arith.(remaining < zero) then None else Some remaining
 
-let raw_check_enough block_gas operation_gas cost =
-  raw_consume block_gas operation_gas cost
-  >|? fun (_block_remaining, _remaining) -> ()
+let gas_exhausted_error ~count_block_gas =
+  if count_block_gas then error Block_quota_exceeded
+  else error Operation_quota_exceeded
+
+let raw_check_enough gas_counter ~count_block_gas cost =
+  match raw_consume gas_counter cost with
+  | None ->
+      gas_exhausted_error ~count_block_gas
+  | Some _ ->
+      Ok ()
 
 let alloc_cost n = Z.mul allocation_weight (Z.succ n)
 

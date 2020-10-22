@@ -41,9 +41,12 @@ type error += Block_quota_exceeded (* `Temporary *)
 
 type error += Operation_quota_exceeded (* `Temporary *)
 
-val raw_consume : Arith.fp -> t -> cost -> (Arith.fp * t) tzresult
+val raw_consume : Arith.fp -> cost -> Arith.fp option
 
-val raw_check_enough : Arith.fp -> t -> cost -> unit tzresult
+val gas_exhausted_error : count_block_gas:bool -> 'a tzresult
+
+val raw_check_enough :
+  Arith.fp -> count_block_gas:bool -> cost -> unit tzresult
 
 val free : cost
 

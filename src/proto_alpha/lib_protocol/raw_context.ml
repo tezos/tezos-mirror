@@ -25,6 +25,35 @@
 
 module Int_set = Set.Make (Compare.Int)
 
+(*
+
+   Gas levels maintainance
+   =======================
+
+   The context maintains two levels of gas, one corresponds to the gas
+   available for the current operation while the other is the gas
+   available for the current block.
+
+   When gas is consumed, we must morally decrement these two levels to
+   check if one of them hits zero. However, since these decrements are
+   the same on both levels, it is not strictly necessary to update the
+   two levels: we can simply maintain the minimum of both levels in a
+   [gas_counter]. The meaning of [gas_counter] is denoted by
+   [gas_counter_status], it can be:
+
+   - [Unlimited] when the operation gas is unaccounted.
+   - [CountingOperationGas] when the operation gas level is the minimum.
+   - [CountingBlockGas] when the block gas level is the minimum.
+
+   In each case, we keep enough information in [gas_counter_status] to
+   reconstruct the level that is not represented by [gas_counter].
+
+   [Raw_context] interface provides two accessors for the operation
+   gas level and the block gas level. These accessors compute these values
+   on-the-fly based on the current value of [gas_counter] and
+   [gas_counter_status].
+
+*)
 type t = {
   context : Context.t;
   constants : Constants_repr.parametric;
@@ -39,15 +68,23 @@ type t = {
     (Signature.Public_key.t * int list * bool) Signature.Public_key_hash.Map.t;
   fees : Tez_repr.t;
   rewards : Tez_repr.t;
-  block_gas : Gas_limit_repr.Arith.fp;
-  operation_gas : Gas_limit_repr.t;
   storage_space_to_pay : Z.t option;
   allocated_contracts : int option;
   origination_nonce : Contract_repr.origination_nonce option;
   temporary_lazy_storage_ids : Lazy_storage_kind.Temp_ids.t;
   internal_nonce : int;
   internal_nonces_used : Int_set.t;
+  gas_counter : Gas_limit_repr.Arith.fp;
+  gas_counter_status : gas_counter_status;
 }
+
+and gas_counter_status =
+  | UnlimitedOperationGas of {block_gas : Gas_limit_repr.Arith.fp}
+  | CountingOperationGas of {block_gas_delta : Gas_limit_repr.Arith.fp}
+  | CountingBlockGas of {operation_gas_delta : Gas_limit_repr.Arith.fp}
+
+let update_gas_counter_status ctxt gas_counter_status =
+  {ctxt with gas_counter_status}
 
 type context = t
 
@@ -209,6 +246,26 @@ let () =
     (function Gas_limit_too_high -> Some () | _ -> None)
     (fun () -> Gas_limit_too_high)
 
+let gas_level ctxt =
+  let open Gas_limit_repr in
+  match ctxt.gas_counter_status with
+  | UnlimitedOperationGas _ ->
+      Unaccounted
+  | CountingBlockGas {operation_gas_delta} ->
+      Limited {remaining = Arith.(add ctxt.gas_counter operation_gas_delta)}
+  | CountingOperationGas _ ->
+      Limited {remaining = ctxt.gas_counter}
+
+let block_gas_level ctxt =
+  let open Gas_limit_repr in
+  match ctxt.gas_counter_status with
+  | UnlimitedOperationGas {block_gas} ->
+      block_gas
+  | CountingBlockGas _ ->
+      ctxt.gas_counter
+  | CountingOperationGas {block_gas_delta} ->
+      Arith.(add ctxt.gas_counter block_gas_delta)
+
 let check_gas_limit ctxt (remaining : 'a Gas_limit_repr.Arith.t) =
   if
     Gas_limit_repr.Arith.(
@@ -218,21 +275,51 @@ let check_gas_limit ctxt (remaining : 'a Gas_limit_repr.Arith.t) =
   else ok_unit
 
 let set_gas_limit ctxt (remaining : 'a Gas_limit_repr.Arith.t) =
-  let remaining = Gas_limit_repr.Arith.fp remaining in
-  {ctxt with operation_gas = Limited {remaining}}
+  let open Gas_limit_repr in
+  let remaining = Arith.fp remaining in
+  let block_gas = block_gas_level ctxt in
+  let (gas_counter_status, gas_counter) =
+    if Arith.(remaining < block_gas) then
+      let block_gas_delta = Arith.sub block_gas remaining in
+      (CountingOperationGas {block_gas_delta}, remaining)
+    else
+      let operation_gas_delta = Arith.sub remaining block_gas in
+      (CountingBlockGas {operation_gas_delta}, block_gas)
+  in
+  let ctxt = update_gas_counter_status ctxt gas_counter_status in
+  {ctxt with gas_counter}
 
-let set_gas_unlimited ctxt = {ctxt with operation_gas = Unaccounted}
+let set_gas_unlimited ctxt =
+  let block_gas = block_gas_level ctxt in
+  update_gas_counter_status ctxt (UnlimitedOperationGas {block_gas})
+
+let is_gas_unlimited ctxt =
+  match ctxt.gas_counter_status with
+  | UnlimitedOperationGas _ ->
+      true
+  | _ ->
+      false
+
+let is_counting_block_gas ctxt =
+  match ctxt.gas_counter_status with CountingBlockGas _ -> true | _ -> false
 
 let consume_gas ctxt cost =
-  Gas_limit_repr.raw_consume ctxt.block_gas ctxt.operation_gas cost
-  >>? fun (block_gas, operation_gas) -> ok {ctxt with block_gas; operation_gas}
+  if is_gas_unlimited ctxt then ok ctxt
+  else
+    match Gas_limit_repr.raw_consume ctxt.gas_counter cost with
+    | Some gas_counter ->
+        Ok {ctxt with gas_counter}
+    | None ->
+        Gas_limit_repr.gas_exhausted_error
+          ~count_block_gas:(is_counting_block_gas ctxt)
 
 let check_enough_gas ctxt cost =
-  Gas_limit_repr.raw_check_enough ctxt.block_gas ctxt.operation_gas cost
-
-let gas_level ctxt = ctxt.operation_gas
-
-let block_gas_level ctxt = ctxt.block_gas
+  if is_gas_unlimited ctxt then ok_unit
+  else
+    Gas_limit_repr.raw_check_enough
+      ctxt.gas_counter
+      ~count_block_gas:(is_counting_block_gas ctxt)
+      cost
 
 let gas_consumed ~since ~until =
   match (gas_level since, gas_level until) with
@@ -530,15 +617,20 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
     fees = Tez_repr.zero;
     rewards = Tez_repr.zero;
     deposits = Signature.Public_key_hash.Map.empty;
-    operation_gas = Unaccounted;
     storage_space_to_pay = None;
     allocated_contracts = None;
-    block_gas =
-      Gas_limit_repr.Arith.fp constants.Constants_repr.hard_gas_limit_per_block;
+    gas_counter = Gas_limit_repr.Arith.zero;
     origination_nonce = None;
     temporary_lazy_storage_ids = Lazy_storage_kind.Temp_ids.init;
     internal_nonce = 0;
     internal_nonces_used = Int_set.empty;
+    gas_counter_status =
+      UnlimitedOperationGas
+        {
+          block_gas =
+            Gas_limit_repr.Arith.fp
+              constants.Constants_repr.hard_gas_limit_per_block;
+        };
   }
 
 type previous_protocol = Genesis of Parameters_repr.t | Edo_008
