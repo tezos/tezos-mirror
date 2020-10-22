@@ -26,7 +26,7 @@
 (* This is the genesis protocol: initialise the state *)
 let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
   Raw_context.prepare_first_block ~level ~timestamp ~fitness ctxt
-  >>=? fun (previous_protocol, ctxt) ->
+  >>=? fun (previous_protocol, ctxt, prev_blocks_per_voting_period) ->
   match previous_protocol with
   | Genesis param ->
       Commitment_storage.init ctxt param.commitments
@@ -56,12 +56,9 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
   | Carthage_006 ->
       Storage.Vote.Current_period_kind_007.delete ctxt
       >>=? fun ctxt ->
-      let blocks_per_voting_period =
-        Constants_storage.blocks_per_voting_period ctxt
-      in
       let level_position = (Level_storage.current ctxt).level_position in
       let voting_period_index =
-        Int32.(div (succ level_position) blocks_per_voting_period)
+        Int32.(div (succ level_position) prev_blocks_per_voting_period)
       in
       let start_position = level_position in
       Storage.Vote.Current_period.init
