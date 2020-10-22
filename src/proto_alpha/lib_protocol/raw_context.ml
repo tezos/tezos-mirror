@@ -570,12 +570,26 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
       Raw_level_repr.of_int32 level
       >>?= fun first_level ->
       set_first_level ctxt first_level
-      >>=? fun ctxt -> set_constants ctxt param.constants >|= ok
+      >>=? fun ctxt ->
+      set_constants ctxt param.constants
+      >|= fun ctxt -> ok (ctxt, param.constants.blocks_per_voting_period)
   | Carthage_006 ->
-      return ctxt )
-  >>=? fun ctxt ->
+      get_constants ctxt
+      >>=? fun c ->
+      let prev_blocks_per_voting_period = c.blocks_per_voting_period in
+      let constants =
+        Constants_repr.
+          {
+            c with
+            blocks_per_voting_period = 20480l;
+            test_chain_duration = 1_228_800L;
+          }
+      in
+      set_constants ctxt constants
+      >>= fun ctxt -> return (ctxt, prev_blocks_per_voting_period) )
+  >>=? fun (ctxt, prev_blocks_per_voting_period) ->
   prepare ctxt ~level ~predecessor_timestamp:timestamp ~timestamp ~fitness
-  >|=? fun ctxt -> (previous_proto, ctxt)
+  >|=? fun ctxt -> (previous_proto, ctxt, prev_blocks_per_voting_period)
 
 let activate ({context = c; _} as s) h =
   Updater.activate c h >|= fun c -> {s with context = c}

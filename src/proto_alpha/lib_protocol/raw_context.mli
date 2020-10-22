@@ -73,7 +73,7 @@ val prepare_first_block :
   timestamp:Time.t ->
   fitness:Fitness.t ->
   Context.t ->
-  (previous_protocol * context) tzresult Lwt.t
+  (previous_protocol * context * Int32.t) tzresult Lwt.t
 
 val activate : context -> Protocol_hash.t -> t Lwt.t
 
