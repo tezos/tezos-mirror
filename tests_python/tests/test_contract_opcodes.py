@@ -662,7 +662,7 @@ class TestContractOpcodes:
                                            storage, trace_stack=True)
         assert run_script_res.storage == expected
 
-    @pytest.mark.parametrize("balance", [0, 0.000001, 0.5, 1, 5, 1000])
+    @pytest.mark.parametrize("balance", [0, 0.000001, 0.5, 1, 5, 1000, 8e12])
     def test_balance(self, client_regtest: ClientRegression, balance: float):
         client = client_regtest
         contract = 'balance.tz'
