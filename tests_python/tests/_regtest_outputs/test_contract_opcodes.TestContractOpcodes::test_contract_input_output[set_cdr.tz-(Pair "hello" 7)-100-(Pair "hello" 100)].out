@@ -8,13 +8,13 @@ big_map diff
   
 trace
   - location: 8 (remaining gas: 1039987.971 units remaining)
-    [ (Pair 100 (Pair "hello" 7))  	 ]
+    [ (Pair 100 "hello" 7)  	 ]
   - location: 9 (remaining gas: 1039987.831 units remaining)
-    [ (Pair 100 (Pair "hello" 7))  	
-      (Pair 100 (Pair "hello" 7))  	 ]
+    [ (Pair 100 "hello" 7)  	
+      (Pair 100 "hello" 7)  	 ]
   - location: 10 (remaining gas: 1039987.691 units remaining)
     [ (Pair "hello" 7)  	@storage
-      (Pair 100 (Pair "hello" 7))  	 ]
+      (Pair 100 "hello" 7)  	 ]
   - location: 13 (remaining gas: 1039987.391 units remaining)
     [ 100  	@parameter ]
   - location: 12 (remaining gas: 1039987.321 units remaining)
@@ -44,7 +44,7 @@ trace
     [ {}  	
       (Pair "hello" 100)  	@storage ]
   - location: 22 (remaining gas: 1039986.211 units remaining)
-    [ (Pair {} (Pair "hello" 100))  	 ]
+    [ (Pair {} "hello" 100)  	 ]
   - location: -1 (remaining gas: 1039986.141 units remaining)
-    [ (Pair {} (Pair "hello" 100))  	 ]
+    [ (Pair {} "hello" 100)  	 ]
 

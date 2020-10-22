@@ -8,7 +8,7 @@ big_map diff
   New map(0) of type (big_map nat nat)
 trace
   - location: 11 (remaining gas: 1039987.210 units remaining)
-    [ (Pair 1 (Pair {} None))  	 ]
+    [ (Pair 1 {} None)  	 ]
   - location: 12 (remaining gas: 1039987.070 units remaining)
     [ 1  	@parameter
       (Pair {} None)  	@storage ]
@@ -39,7 +39,7 @@ trace
     [ {}  	
       (Pair {} (Some False))  	 ]
   - location: 23 (remaining gas: 1039985.730 units remaining)
-    [ (Pair {} (Pair {} (Some False)))  	 ]
+    [ (Pair {} {} (Some False))  	 ]
   - location: -1 (remaining gas: 1039985.660 units remaining)
-    [ (Pair {} (Pair {} (Some False)))  	 ]
+    [ (Pair {} {} (Some False))  	 ]
 

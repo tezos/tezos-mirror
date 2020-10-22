@@ -8,40 +8,40 @@ big_map diff
   
 trace
   - location: 10 (remaining gas: 1039983.896 units remaining)
-    [ (Pair "Hi" (Pair {} None))  	 ]
+    [ (Pair "Hi" {} None)  	 ]
   - location: 11 (remaining gas: 1039983.756 units remaining)
-    [ (Pair "Hi" (Pair {} None))  	
-      (Pair "Hi" (Pair {} None))  	 ]
+    [ (Pair "Hi" {} None)  	
+      (Pair "Hi" {} None)  	 ]
   - location: 12 (remaining gas: 1039983.616 units remaining)
-    [ (Pair "Hi" (Pair {} None))  	
-      (Pair "Hi" (Pair {} None))  	
-      (Pair "Hi" (Pair {} None))  	 ]
+    [ (Pair "Hi" {} None)  	
+      (Pair "Hi" {} None)  	
+      (Pair "Hi" {} None)  	 ]
   - location: 13 (remaining gas: 1039983.476 units remaining)
     [ "Hi"  	@parameter
-      (Pair "Hi" (Pair {} None))  	
-      (Pair "Hi" (Pair {} None))  	 ]
+      (Pair "Hi" {} None)  	
+      (Pair "Hi" {} None)  	 ]
   - location: 17 (remaining gas: 1039983.116 units remaining)
     [ (Pair {} None)  	@storage
-      (Pair "Hi" (Pair {} None))  	 ]
+      (Pair "Hi" {} None)  	 ]
   - location: 18 (remaining gas: 1039982.976 units remaining)
     [ {}  	
-      (Pair "Hi" (Pair {} None))  	 ]
+      (Pair "Hi" {} None)  	 ]
   - location: -1 (remaining gas: 1039982.906 units remaining)
     [ {}  	
-      (Pair "Hi" (Pair {} None))  	 ]
+      (Pair "Hi" {} None)  	 ]
   - location: 15 (remaining gas: 1039982.836 units remaining)
     [ {}  	
-      (Pair "Hi" (Pair {} None))  	 ]
+      (Pair "Hi" {} None)  	 ]
   - location: 14 (remaining gas: 1039982.836 units remaining)
     [ "Hi"  	@parameter
       {}  	
-      (Pair "Hi" (Pair {} None))  	 ]
+      (Pair "Hi" {} None)  	 ]
   - location: 19 (remaining gas: 1039982.696 units remaining)
     [ False  	
-      (Pair "Hi" (Pair {} None))  	 ]
+      (Pair "Hi" {} None)  	 ]
   - location: 20 (remaining gas: 1039982.556 units remaining)
     [ (Some False)  	
-      (Pair "Hi" (Pair {} None))  	 ]
+      (Pair "Hi" {} None)  	 ]
   - location: 24 (remaining gas: 1039982.196 units remaining)
     [ (Pair {} None)  	@storage ]
   - location: 25 (remaining gas: 1039982.056 units remaining)
@@ -62,7 +62,7 @@ trace
     [ {}  	
       (Pair {} (Some False))  	 ]
   - location: 30 (remaining gas: 1039981.366 units remaining)
-    [ (Pair {} (Pair {} (Some False)))  	 ]
+    [ (Pair {} {} (Some False))  	 ]
   - location: -1 (remaining gas: 1039981.296 units remaining)
-    [ (Pair {} (Pair {} (Some False)))  	 ]
+    [ (Pair {} {} (Some False))  	 ]
 

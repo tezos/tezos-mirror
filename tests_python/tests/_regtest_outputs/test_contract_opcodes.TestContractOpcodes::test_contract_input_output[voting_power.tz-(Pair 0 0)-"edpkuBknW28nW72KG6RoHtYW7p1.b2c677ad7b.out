@@ -8,7 +8,7 @@ big_map diff
   
 trace
   - location: 8 (remaining gas: 1039961.660 units remaining)
-    [ (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav" (Pair 0 0))  	 ]
+    [ (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav" 0 0)  	 ]
   - location: 9 (remaining gas: 1039961.520 units remaining)
     [ "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"  	@parameter ]
   - location: 10 (remaining gas: 1039960.880 units remaining)
@@ -28,7 +28,7 @@ trace
     [ {}  	
       (Pair 500 2500)  	 ]
   - location: 18 (remaining gas: 1039534.294 units remaining)
-    [ (Pair {} (Pair 500 2500))  	 ]
+    [ (Pair {} 500 2500)  	 ]
   - location: -1 (remaining gas: 1039534.224 units remaining)
-    [ (Pair {} (Pair 500 2500))  	 ]
+    [ (Pair {} 500 2500)  	 ]
 

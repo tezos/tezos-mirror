@@ -9,13 +9,13 @@ big_map diff
   Set map(0)["hello"] to "hi"
 trace
   - location: 11 (remaining gas: 1039985.413 units remaining)
-    [ (Pair "" (Pair { Elt "hello" "hi" } None))  	 ]
+    [ (Pair "" { Elt "hello" "hi" } None)  	 ]
   - location: 12 (remaining gas: 1039985.273 units remaining)
-    [ (Pair "" (Pair { Elt "hello" "hi" } None))  	
-      (Pair "" (Pair { Elt "hello" "hi" } None))  	 ]
+    [ (Pair "" { Elt "hello" "hi" } None)  	
+      (Pair "" { Elt "hello" "hi" } None)  	 ]
   - location: 13 (remaining gas: 1039985.133 units remaining)
     [ ""  	@parameter
-      (Pair "" (Pair { Elt "hello" "hi" } None))  	 ]
+      (Pair "" { Elt "hello" "hi" } None)  	 ]
   - location: 17 (remaining gas: 1039984.773 units remaining)
     [ (Pair { Elt "hello" "hi" } None)  	@storage ]
   - location: 18 (remaining gas: 1039984.633 units remaining)
@@ -44,7 +44,7 @@ trace
     [ {}  	
       (Pair { Elt "hello" "hi" } None)  	 ]
   - location: 25 (remaining gas: 1039983.663 units remaining)
-    [ (Pair {} (Pair { Elt "hello" "hi" } None))  	 ]
+    [ (Pair {} { Elt "hello" "hi" } None)  	 ]
   - location: -1 (remaining gas: 1039983.593 units remaining)
-    [ (Pair {} (Pair { Elt "hello" "hi" } None))  	 ]
+    [ (Pair {} { Elt "hello" "hi" } None)  	 ]
 

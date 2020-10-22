@@ -70,7 +70,7 @@ trace
     [ 4  	
       (Pair 3 0)  	 ]
   - location: 16 (remaining gas: 1039973.992 units remaining)
-    [ (Pair 4 (Pair 3 0))  	 ]
+    [ (Pair 4 3 0)  	 ]
   - location: 17 (remaining gas: 1039973.852 units remaining)
     [ 4  	
       (Pair 3 0)  	 ]
@@ -134,7 +134,7 @@ trace
     [ 4  	
       (Pair 3 1)  	 ]
   - location: 16 (remaining gas: 1039971.970 units remaining)
-    [ (Pair 4 (Pair 3 1))  	 ]
+    [ (Pair 4 3 1)  	 ]
   - location: 17 (remaining gas: 1039971.830 units remaining)
     [ 4  	
       (Pair 3 1)  	 ]
@@ -198,7 +198,7 @@ trace
     [ 4  	
       (Pair 3 2)  	 ]
   - location: 16 (remaining gas: 1039969.944 units remaining)
-    [ (Pair 4 (Pair 3 2))  	 ]
+    [ (Pair 4 3 2)  	 ]
   - location: 17 (remaining gas: 1039969.804 units remaining)
     [ 4  	
       (Pair 3 2)  	 ]
@@ -262,7 +262,7 @@ trace
     [ 4  	
       (Pair 3 3)  	 ]
   - location: 16 (remaining gas: 1039967.918 units remaining)
-    [ (Pair 4 (Pair 3 3))  	 ]
+    [ (Pair 4 3 3)  	 ]
   - location: 17 (remaining gas: 1039967.778 units remaining)
     [ 4  	
       (Pair 3 3)  	 ]
