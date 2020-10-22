@@ -127,7 +127,7 @@ let parse_block s =
         Ok (`Hash (Block_hash.of_b58check_exn h, -int_of_string n))
     | _ ->
         raise Exit
-  with _ -> Error "Cannot parse block identifier."
+  with _ -> Error ("Cannot parse block identifier: " ^ s)
 
 let alias_to_string = function
   | `Checkpoint ->
@@ -773,7 +773,9 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
     end
 
     module Context = struct
-      let path = RPC_path.(path / "context" / "raw" / "bytes")
+      let path = RPC_path.(path / "context")
+
+      let raw_bytes_path = RPC_path.(path / "raw" / "bytes")
 
       let context_path_arg : string RPC_arg.t =
         let name = "context_path" in
@@ -796,7 +798,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           ~description:"Returns the raw context."
           ~query:raw_context_query
           ~output:raw_context_encoding
-          RPC_path.(path /:* context_path_arg)
+          RPC_path.(raw_bytes_path /:* context_path_arg)
     end
 
     let info =
