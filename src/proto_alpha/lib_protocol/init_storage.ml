@@ -47,12 +47,27 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
       >>=? fun ctxt ->
       Roll_storage.init_first_cycles ctxt
       >>=? fun ctxt ->
-      Vote_storage.init ctxt
+      Vote_storage.init
+        ctxt
+        ~start_position:(Level_storage.current ctxt).level_position
       >>=? fun ctxt ->
       Storage.Block_priority.init ctxt 0
       >>=? fun ctxt -> Vote_storage.update_listings ctxt
   | Carthage_006 ->
-      return ctxt
+      Storage.Vote.Current_period_kind_007.delete ctxt
+      >>=? fun ctxt ->
+      let blocks_per_voting_period =
+        Constants_storage.blocks_per_voting_period ctxt
+      in
+      let level_position = (Level_storage.current ctxt).level_position in
+      let voting_period_index =
+        Int32.(div (succ level_position) blocks_per_voting_period)
+      in
+      let start_position = level_position in
+      Storage.Vote.Current_period.init
+        ctxt
+        {index = voting_period_index; kind = Proposal; start_position}
+      >>=? fun ctxt -> Storage.Vote.Pred_period_kind.init ctxt Promotion_vote
 
 let prepare ctxt ~level ~predecessor_timestamp ~timestamp ~fitness =
   Raw_context.prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt
