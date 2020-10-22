@@ -123,9 +123,7 @@ let test_event msg (level1, section1, status1) (level2, section2, json2) =
     level1
     level2 ;
   match json2 with
-  | `O
-      [ ( "shell-node.v0",
-          `O [("time-stamp", `Float _ts); ("status", `String status2)] ) ] ->
+  | `O [("shell-node.v0", `String status2)] ->
       Alcotest.(check string)
         (msg ^ ". Should have correct status")
         status1

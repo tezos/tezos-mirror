@@ -32,17 +32,12 @@ let section_root = ["node"]
 let section = section_root
 
 let p2p_event =
-  declare_2
+  declare_1
     ~section
     ~name:"shell-node"
     ~msg:"shell-node initialization: {status}"
     ~level:Notice
-    ("time-stamp", Data_encoding.float)
     ("status", Data_encoding.string)
-
-let emit_tagged (f : (float * string) t) (status : string) =
-  let time_stamp = Unix.gettimeofday () in
-  emit f (time_stamp, status)
 
 let section = section_root @ ["protocol_store"]
 
