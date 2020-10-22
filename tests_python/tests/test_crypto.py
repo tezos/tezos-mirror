@@ -1,4 +1,3 @@
-
 from random import getrandbits
 
 from os import path
@@ -9,35 +8,37 @@ from Crypto.Hash import keccak, SHA3_256
 
 from tools.paths import OPCODES_CONTRACT_PATH
 
-RANDOM_ITERATIONS = 100
+RANDOM_ITERATIONS = 50
+
+HASH_FUNCTIONS = {
+    "keccak": lambda bytes_to_hash: keccak.new(digest_bits=256)
+                                          .update(bytes_to_hash)
+                                          .hexdigest(),
+    "sha3": lambda bytes_to_hash: SHA3_256.new().update(bytes_to_hash)
+                                                .hexdigest(),
+}
+
+
+@pytest.fixture(params=HASH_FUNCTIONS.keys())
+def hash_fun(request):
+    return request.param
 
 
 @pytest.mark.contract
-class TestKeccak:
+class TestHash:
+    @pytest.mark.parametrize(
+        "bytes_to_hash",
+        [
+            getrandbits(bytes_length * 8).to_bytes(bytes_length,
+                                                   byteorder="little")
+            for bytes_length in [32]
+            for _ in range(RANDOM_ITERATIONS)
+        ],
+    )
+    def test_hash(self, client, hash_fun, bytes_to_hash):
+        contract = path.join(OPCODES_CONTRACT_PATH, f"{hash_fun}.tz")
 
-    def test_keccak(self, client):
-
-        contract = path.join(OPCODES_CONTRACT_PATH, 'keccak.tz')
-
-        for _ in range(RANDOM_ITERATIONS):
-            rand_bytes = getrandbits(256).to_bytes(32, byteorder='little')
-            keccak_hash = keccak.new(digest_bits=256).update(rand_bytes)
-            arg = f'0x{rand_bytes.hex()}'
-            result = client.run_script(contract, 'None', arg)
-            assert result.storage == f'(Some 0x{keccak_hash.hexdigest()})'
-
-
-@pytest.mark.contract
-class TestSha3:
-
-    def test_sha3(self, client):
-
-        contract = path.join(OPCODES_CONTRACT_PATH, 'sha3.tz')
-
-        # Check that the contract output is correct
-        for _ in range(RANDOM_ITERATIONS):
-            rand_bytes = getrandbits(256).to_bytes(32, byteorder='little')
-            sha3_hash = SHA3_256.new().update(rand_bytes).hexdigest()
-            arg = f'0x{rand_bytes.hex()}'
-            result = client.run_script(contract, 'None', arg)
-            assert result.storage == f'(Some 0x{sha3_hash})'
+        hashed = HASH_FUNCTIONS[hash_fun](bytes_to_hash)
+        arg = f"0x{bytes_to_hash.hex()}"
+        result = client.run_script(contract, "None", arg)
+        assert result.storage == f"(Some 0x{hashed})"
