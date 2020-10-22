@@ -28,7 +28,8 @@ def hash_fun(request):
 class TestHash:
     @pytest.mark.parametrize(
         "bytes_to_hash",
-        [
+        [b"", b"a"]
+        + [
             getrandbits(bytes_length * 8).to_bytes(bytes_length,
                                                    byteorder="little")
             for bytes_length in [32]
