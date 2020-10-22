@@ -68,13 +68,13 @@ let init_p2p chain_name p2p_params disable_mempool =
   match p2p_params with
   | None ->
       let c_meta = init_connection_metadata None disable_mempool in
-      Node_event.(emit_tagged p2p_event) "p2p_layer_disabled"
+      Node_event.(emit p2p_event) "p2p_layer_disabled"
       >>= fun () ->
       return (P2p.faked_network message_cfg peer_metadata_cfg c_meta)
   | Some (config, limits) ->
       let c_meta = init_connection_metadata (Some config) disable_mempool in
       let conn_metadata_cfg = connection_metadata_cfg c_meta in
-      Node_event.(emit_tagged p2p_event) "bootstrapping"
+      Node_event.(emit p2p_event) "bootstrapping"
       >>= fun () ->
       P2p.create
         ~config
@@ -83,7 +83,7 @@ let init_p2p chain_name p2p_params disable_mempool =
         conn_metadata_cfg
         message_cfg
       >>=? fun p2p ->
-      Node_event.(emit_tagged p2p_event) "p2p_maintain_started"
+      Node_event.(emit p2p_event) "p2p_maintain_started"
       >>= fun () -> return p2p
 
 type config = {
