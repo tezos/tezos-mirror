@@ -231,7 +231,7 @@ let error x = log ~level:Error ~color:Color.FG.red ~prefix:"error" x
 
 type test_result = Successful | Failed | Aborted
 
-let test_result test_result test_name =
+let test_result ~iteration test_result test_name =
   let (prefix, prefix_color) =
     match test_result with
     | Successful ->
@@ -241,7 +241,11 @@ let test_result test_result test_name =
     | Aborted ->
         ("ABORTED", Color.(FG.red ++ bold))
   in
-  log_string ~level:Report ~prefix ~prefix_color test_name
+  let message =
+    if Cli.options.loop then Printf.sprintf "(loop %d) %s" iteration test_name
+    else test_name
+  in
+  log_string ~level:Report ~prefix ~prefix_color message
 
 let command ?color ?prefix command arguments =
   let message = quote_shell_command command arguments in

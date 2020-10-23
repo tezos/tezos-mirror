@@ -75,7 +75,7 @@ let global_starting_time = Unix.gettimeofday ()
 
 let a_test_failed = ref false
 
-let really_run title f =
+let really_run ~iteration title f =
   Log.info "Starting test: %s" title ;
   List.iter (fun reset -> reset ()) !reset_functions ;
   Lwt_main.run
@@ -185,7 +185,7 @@ let really_run title f =
     Lwt.catch wait_for_async handle_exception
   in
   (* Display test result. *)
-  Log.test_result !test_result title ;
+  Log.test_result ~iteration !test_result title ;
   match !test_result with
   | Successful ->
       unit
@@ -371,9 +371,11 @@ let run () =
   (* Actually run the tests (or list them). *)
   ( if Cli.options.list then list_tests ()
   else
-    let rec run () =
-      List.iter (fun {title; body; _} -> really_run title body) !list ;
-      if Cli.options.loop then run ()
+    let rec run iteration =
+      List.iter
+        (fun {title; body; _} -> really_run ~iteration title body)
+        !list ;
+      if Cli.options.loop then run (iteration + 1)
     in
-    run () ) ;
+    run 1 ) ;
   if !a_test_failed then exit 1
