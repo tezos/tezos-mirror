@@ -66,6 +66,41 @@ the client. Every command to the ``tezos-client`` can be equivalently
 executed using ``./carthagenet.sh client``. Similarly, ``tezos-admin-client``
 can be executed using ``./carthagenet.sh admin-client``.
 
+Get static binaries
+-------------------
+
+You can get static Linux binaries from the
+`latest release in the tezos-packaging repository <https://github.com/serokell/tezos-packaging/releases/latest>`__.
+
+This repository provides static binaries for x86_64 and arm64 architectures. Since these binaries
+are static, they can be used on any Linux without any additional prerequisites.
+
+Ubuntu Launchpad PPA with Tezos packages
+----------------------------------------
+
+If you're using Ubuntu, you can install packages with Tezos binaries from the Launchpad PPA.
+Currently it supports Focal and Bionic versions. In order to do that run the following commands:
+
+::
+
+   sudo add-apt-repository ppa:serokell/tezos && sudo apt-get update
+   sudo apt-get install tezos-client
+   sudo apt-get install tezos-node
+   sudo apt-get install tezos-baker-007-psdelph1
+
+Fedora Copr repository with Tezos packages
+------------------------------------------
+
+If you're using Fedora, you can install packages with Tezos binaries from the Copr repository.
+Currently it supports Fedora 32 and 31. In order to do that run the following commands:
+
+::
+
+   dnf copr enable @Serokell/Tezos && dnf update
+   dnf install tezos-client
+   dnf install tezos-node
+   dnf install tezos-baker-007-PsDELPH1
+
 .. _build_from_sources:
 
 Build from sources
@@ -188,7 +223,6 @@ Identified situations where it will be more tricky are
 
 * When there are Rust dependencies involved. The way to go is still
   unclear.
-
 
 Set up the development environment
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
