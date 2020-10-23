@@ -24,8 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-[@@@ocaml.warning "-30"]
-
 type chain_name = Distributed_db_version.Name.t
 
 type blockchain_network = {

@@ -24,8 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-[@@@ocaml.warning "-30"]
-
 open Filename.Infix
 
 let home = try Sys.getenv "HOME" with Not_found -> "/root"
