@@ -37,6 +37,10 @@ sanity:
       fi
     - scripts/check_opam_test.sh
     - src/tooling/lint.sh --check-gitlab-ci-yml
+    # Ensures that the local poetry.lock and pyproject.toml are synchronized 
+    # with those of the base image.
+    - diff tests_python/poetry.lock /home/tezos/poetry.lock
+    - diff tests_python/pyproject.toml /home/tezos/pyproject.toml
   interruptible: true
 
 ############################################################
