@@ -42,16 +42,16 @@
               (tezos-embedded-protocol-000-Ps9mPmXa -> void_for_linking-000-Ps9mPmXa.empty)
               (-> void_for_linking-000-Ps9mPmXa.empty))
             (select void_for_linking-001-PtCJ7pwo from
-              (tezos-embedded-protocol-001-PtCJ7pwo-commands.registration -> void_for_linking-001-PtCJ7pwo.empty)
+              (tezos-embedded-protocol-001-PtCJ7pwo -> void_for_linking-001-PtCJ7pwo.empty)
               (-> void_for_linking-001-PtCJ7pwo.empty))
             (select void_for_linking-002-PsYLVpVv from
-              (tezos-embedded-protocol-002-PsYLVpVv-commands.registration -> void_for_linking-002-PsYLVpVv.empty)
+              (tezos-embedded-protocol-002-PsYLVpVv -> void_for_linking-002-PsYLVpVv.empty)
               (-> void_for_linking-002-PsYLVpVv.empty))
             (select void_for_linking-003-PsddFKi3 from
-              (tezos-embedded-protocol-003-PsddFKi3-commands.registration -> void_for_linking-003-PsddFKi3.empty)
+              (tezos-embedded-protocol-003-PsddFKi3 -> void_for_linking-003-PsddFKi3.empty)
               (-> void_for_linking-003-PsddFKi3.empty))
             (select void_for_linking-004-Pt24m4xi from
-              (tezos-embedded-protocol-004-Pt24m4xi-commands.registration -> void_for_linking-004-Pt24m4xi.empty)
+              (tezos-embedded-protocol-004-Pt24m4xi -> void_for_linking-004-Pt24m4xi.empty)
               (-> void_for_linking-004-Pt24m4xi.empty))
             (select void_for_linking-005-PsBABY5H from
               (tezos-embedded-protocol-005-PsBABY5H -> void_for_linking-005-PsBABY5H.empty)
