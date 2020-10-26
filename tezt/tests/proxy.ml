@@ -163,6 +163,7 @@ let starts_with ~(prefix : string) (s : string) : bool =
     where [P] is [/chains/<main>/blocks/<head>/context/raw/bytes]
  *)
 let test_context_suffix_no_rpc ?query_string path =
+  (* This test's implementation is similar to [Light.NoUselessRpc.test] *)
   Protocol.register_test
     ~__FILE__
     ~title:

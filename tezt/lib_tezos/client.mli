@@ -26,7 +26,11 @@
 (** Run Tezos client commands. *)
 
 (** Mode of the client *)
-type mode = Client of Node.t option | Mockup | Proxy of Node.t
+type mode =
+  | Client of Node.t option
+  | Mockup
+  | Light of float * Node.t list
+  | Proxy of Node.t
 
 (** The synchronization mode of the client.
 
@@ -77,6 +81,10 @@ val create_with_mode :
   ?base_dir:string ->
   mode ->
   t
+
+(** Get a client's mode. Used with [set_mode] to temporarily change
+    a client's mode *)
+val get_mode : t -> mode
 
 (** Change the client's mode. This function is required for example because
     we wanna keep a client's wallet. This is impossible if we created
@@ -248,6 +256,14 @@ val spawn_show_address : ?show_secret:bool -> alias:string -> t -> Process.t
 (** A helper to run [tezos-client gen keys] followed by
     [tezos-client show address] to get the generated key. *)
 val gen_and_show_keys : alias:string -> t -> Account.key Lwt.t
+
+(** Run [tezos-client endorse for].
+
+    Default [key] is {!Constant.bootstrap2.alias}. *)
+val endorse_for : ?node:Node.t -> ?key:string -> t -> unit Lwt.t
+
+(** Same as [endorse_for], but do not wait for the process to exit. *)
+val spawn_endorse_for : ?node:Node.t -> ?key:string -> t -> Process.t
 
 (** Run [tezos-client transfer amount from giver to receiver]. *)
 val transfer :
@@ -472,3 +488,17 @@ val init_mockup :
   protocol:Protocol.t ->
   unit ->
   t Lwt.t
+
+(** Create a client with mode [Light]. In addition to the client, the list
+    of nodes is returned, as it was potentially created by this call; and
+    the light mode needs tight interaction with the nodes. *)
+val init_light :
+  ?path:string ->
+  ?admin_path:string ->
+  ?name:string ->
+  ?color:Log.Color.t ->
+  ?base_dir:string ->
+  ?nodes:Node.t list ->
+  ?min_agreement:float ->
+  unit ->
+  (t * Node.t list) Lwt.t
