@@ -24,10 +24,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(**
-
-  This is a basic test for the Clic library.
-
+(** Testing
+    -------
+    Component:    Clic library
+    Invocation:   dune build @runtest_clic
+    Subject:      Test the functionality of the Clic library, such as CLI
+                  command dispatch, parameters and auto-completion.
 *)
 
 open Tezos_error_monad.Error_monad
@@ -113,9 +115,9 @@ let expect_result line pr exp got =
          pr_got
          got)
 
-(* basic *)
-
-let prefix () =
+(** Test the dispatch of basic commands with no parameters and with [prefix]
+    parameters. *)
+let test_dispatch_basic () =
   let empty return =
     Clic.command ~desc:"empty" Clic.no_options Clic.stop (fun () () ->
         return "empty")
@@ -153,9 +155,8 @@ let prefix () =
     (dispatch cmds ["one"; "two"; "three"])
   >>= fun () -> Lwt.return_unit
 
-(* advanced *)
-
-let ntseq () =
+(** Test the dispatch of commands with non-terminal sequence parameters. *)
+let test_dispatch_advanced () =
   let en return =
     Clic.command
       ~desc:"seq-abcd-en"
@@ -215,7 +216,8 @@ let ntseq () =
   >>= fun () ->
   expect __LINE__ (Ok "FCB") (dispatch [fr] ["c"; "b"; "la"; "fin"])
   >>= fun () ->
-  (* the following two should probably either all work, or all fail with a command clash error *)
+  (* the following two should probably either all work, or all fail with a
+     command clash error *)
   expect
     __LINE__
     (Error "non_terminal_seq")
@@ -283,7 +285,10 @@ let test_autocompletion_case ~commands ~args ~expected () =
          expected
          next)
 
-(* Test the auto-completion suggestions of commands' parameters *)
+(** Test the suggestions given by the auto-completion of commands' parameters.
+    The different types of parameters are being tested: [param], [prefix], [seq]
+    and [non_terminal_seq].
+*)
 let test_parameters_autocompletion =
   let param_commands =
     Clic.
@@ -534,8 +539,9 @@ let wrap (n, f) =
 let () =
   Alcotest_lwt.run
     "Clic"
-    [ ("prefix", [("prefix", `Quick, prefix)]);
-      ("advanced", [("ntseq", `Quick, ntseq)]);
+    [ ( "dispatch",
+        [ ("basic", `Quick, test_dispatch_basic);
+          ("advanced", `Quick, test_dispatch_advanced) ] );
       ( "auto-completion-parameters",
         List.map wrap test_parameters_autocompletion ) ]
   |> Lwt_main.run
