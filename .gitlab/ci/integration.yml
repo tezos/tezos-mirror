@@ -102,7 +102,7 @@ integration:sandboxes:daemons-upgrade:
     - mkdir tests_python/tmp
     - cd tests_python
   after_script:
-    - tail -n +1 tmp/*
+    - tail -n +1 tests_python/tmp/*
   # python scripts don't need the _build directory
   # but only the binaries in the artifacts
   cache: {}
