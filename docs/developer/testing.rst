@@ -4,8 +4,8 @@ Overview of Testing in Tezos
 ============================
 
 Testing is important to ensure the quality of the Tezos codebase by
-detecting bugs and ensuring the absence of regressions. Tezos and its
-components use a variety of tools and framework for testing. The goal
+detecting bugs and avoiding regressions. Tezos and its
+components use a variety of tools and frameworks for testing. The goal
 of this document is to give an overview on how testing is done in
 Tezos, and to help Tezos contributors use the test suite and
 write tests by pointing them towards the most
@@ -15,7 +15,7 @@ explains how tests can be :ref:`run automatically in the Tezos CI
 <measuring-test-coverage>`.
 
 The frameworks used in Tezos can be categorized along two axes: the
-type of component they test, and the type of test they perform. We
+type of component they test, and the type of testing they perform. We
 distinguish the following components:
 
  - Node
@@ -33,7 +33,7 @@ distinguish the following components:
 
 Secondly, these components can be tested at different levels of
 granularity. Additionally, tests can verify functionality, but also
-other non-functional properties such as performance (execution time, memory and disk
+non-functional properties such as performance (execution time, memory and disk
 usage). We distinguish:
 
 Unit testing
@@ -46,9 +46,8 @@ Regression testing
    In general, regression testing aims to detect the re-introduction
    of previously identified bugs. It can also refer to a
    coarse-grained type of testing where the output of a test execution
-   is compared to a pre-recorded log of expected output. Tezos uses
-   tests that bugs are not re-introduced, but in this document we use
-   regression testing to refer to the second meaning.
+   is compared to a pre-recorded log of expected output. We here use
+   "regression testing" to refer to the second meaning.
 Property testing / Fuzzing
    Both property testing and fuzzing test
    code with automatically generated inputs. Property testing is
@@ -74,26 +73,27 @@ Acceptance testing
       production builds.
 
 
-We obtain the following matrix. Each cell contains the frameworks
+By combining the two axes,
+we obtain the following matrix. Each cell contains the frameworks
 appropriate for the corresponding component and testing type. The frameworks
 are linked to a sub-section of this page where the framework is presented
-in more detail, with pointers to more details.
+in more detail.
 
                     ..
                        MT: :ref:`Michelson unit tests <michelson_unit_tests>`.
 
 
 .. csv-table:: Testing frameworks and their applications in Tezos. PT:
-               :ref:`Python testing and execution framework <pytest_section>`, AT: :ref:`alcotest_section`, CB: :ref:`crowbar_test`, FT: :ref:`flextesa`,
+               :ref:`Python testing and execution framework <pytest_section>`, AT: :ref:`alcotest_section`, CB: :ref:`crowbar_test`, FT: :ref:`flextesa_section`, TZ: :ref:`tezt_section`
    :header: "Component","Unit","Property","Integration","System","Regression"
 
-   "Node",":ref:`AT <alcotest_section>`",":ref:`CB <crowbar_test>`",":ref:`AT <alcotest_section>`",":ref:`PT <pytest_section>`, :ref:`FT <flextesa>`"
+   "Node",":ref:`AT <alcotest_section>`",":ref:`CB <crowbar_test>`",":ref:`AT <alcotest_section>`",":ref:`PT <pytest_section>`, :ref:`FT <flextesa_section>`, :ref:`TZ <tezt_section>`"
    "-- Protocol",":ref:`AT <alcotest_section>`","",""
    "-- -- Michelson interpreter",":ref:`AT <alcotest_section>`","","",":ref:`PT <pytest_section>`",":ref:`PT <pytest_section>`"
-   "Client","","","",":ref:`PT <pytest_section>`, :ref:`FT <flextesa>`"
-   "Networked nodes","--","",":ref:`PT <pytest_section>`, :ref:`FT <flextesa>`","", ""
-   "Endorser","","","",":ref:`FT <flextesa>`"
-   "Baker","","","",":ref:`FT <flextesa>`"
+   "Client","","","",":ref:`PT <pytest_section>`, :ref:`FT <flextesa_section>`, :ref:`TZ <tezt_section>`"
+   "Networked nodes","--","",":ref:`PT <pytest_section>`, :ref:`FT <flextesa_section>`","", ""
+   "Endorser","","","",":ref:`FT <flextesa_section>`"
+   "Baker","","","",":ref:`FT <flextesa_section>`"
 
 
 Testing frameworks
@@ -106,7 +106,7 @@ Alcotest
 
 `Alcotest <https://github.com/mirage/alcotest>`_ is a library for unit
 and integration testing in OCaml. Alcotest is the primary tool in
-Tezos for unit and integration for testing OCaml code.
+Tezos for unit and integration testing of OCaml code.
 
 Typical use cases:
  - Verifying simple input-output specifications for functions with a
@@ -119,13 +119,15 @@ Example tests:
    the Tezos root. To execute them on :ref:`your own machine
    <executing_gitlab_ci_locally>` using the GitLab CI system, run
    ``gitlab-runner exec docker unit:requester``.
- - Integration tests for P2P in the shell.  For instance
+ - Integration tests for the P2P layer in the shell.  For instance
    :src:`src/lib_p2p/test/test_p2p_pool.ml`. This test forks a set of
    processes that exercise large parts of the P2P layer.  To execute
    it locally, run ``dune build @runtest_p2p_pool`` in the Tezos
-   root. To execute all P2P tests on :ref:`your own machine
+   root. To execute the P2P tests on :ref:`your own machine
    <executing_gitlab_ci_locally>` using the GitLab CI system, run
-   ``gitlab-runner exec docker unit:p2p``.
+   ``gitlab-runner exec docker unit:p2p``. The job-name
+   ``unit:p2p`` is ill-chosen, since the test is in fact an
+   integration test.
 
 References:
  - `Alcotest README <https://github.com/mirage/alcotest>`_.
@@ -182,9 +184,11 @@ Typical use cases:
    ``pytest-regtest``.
 
 Example tests:
- - Testing the node's script interpreter through ``tezos-client run script`` (in :src:`pytest tests_python/tests/test_contract_opcodes.py`).
-   To execute it locally, run ``cd tests_python && poetry run pytest tests/test_contract_opcodes.py`` in
-   the Tezos root. To execute them on :ref:`your own machine
+ - Detecting unintended changes in the behavior of the node's Michelson
+   interpreter (in
+   :src:`tests_python/tests/test_contract_opcodes.py`).  To execute it
+   locally, run ``cd tests_python && poetry run pytest tests/test_contract_opcodes.py``
+   in the Tezos root. To execute them on :ref:`your own machine
    <executing_gitlab_ci_locally>` using the GitLab CI system, run
    ``gitlab-runner exec docker integration:contract_opcodes``.
  - Setting up networks of nodes and ensuring their connection
@@ -193,22 +197,15 @@ Example tests:
    the Tezos root. To execute them on :ref:`your own machine
    <executing_gitlab_ci_locally>` using the GitLab CI system, run
    ``gitlab-runner exec docker integration:p2p``.
- - Detecting unintended changes in the behavior of the Michelson
-   interpreter (in
-   :src:`tests_python/tests/test_contract_opcodes.py`).  To execute it
-   locally, run ``cd tests_python && poetry run pytest tests/test_contract_opcodes.py``
-   in the Tezos root. To execute them on :ref:`your own machine
-   <executing_gitlab_ci_locally>` using the GitLab CI system, run
-   ``gitlab-runner exec docker integration:contract_opcodes``.
 
 References:
  - `Pytest Documentation <https://github.com/stedolan/crowbar>`_
  - :ref:`python_testing_framework`
  - `pytest-regtest README <https://gitlab.com/uweschmitt/pytest-regtest>`_
  - `pytest-regtest pip package <https://pypi.org/project/pytest-regtest/>`_
- - `Section in Tezos documentation on pytest-regtest <pytest_regression_testing>`_
+ - :ref:`Section in Tezos Developer Documentation on pytest-regtest <pytest_regression_testing>`
 
-.. _flextesa:
+.. _flextesa_section:
 
 Flextesa
 ~~~~~~~~
@@ -220,20 +217,56 @@ for instance, in some tests that require the user to interact with the
 Ledger application.
 
 Typical use cases:
- - In terms of use cases, Flextesa is similar to the `Python testing
-   and execution framework <pytest>`_.
+ - In terms of use cases, Flextesa is similar to the :ref:`Python testing
+   and execution framework <pytest_section>`.
 
 Example test:
- - Testing double baking and double endorsement scenarios (in
-   :src:`bin_flextesa/command_accusations.ml`)
+ - Testing double baking, accusations and double-baking accusation
+   scenarios (in :src:`src/bin_sandbox/command_accusations.ml`)
 
 References:
- - :ref:`Section in Tezos Developer Documentation <flexible_network_sandboxes>`
+ - :ref:`Section in Tezos Developer Documentation on Flextesa <flexible_network_sandboxes>`
  - `Blog post introducing Flextesa
    <https://medium.com/@obsidian.systems/introducing-flextesa-robust-testing-tools-for-tezos-and-its-applications-edc1e336a209>`_
  - `GitLab repository <https://gitlab.com/tezos/flextesa>`_
  - `An example setting up a Babylon docker sandbox <https://assets.tqtezos.com/docs/setup/2-sandbox/>`_
  - `API documentation <https://tezos.gitlab.io/flextesa/lib-index.html>`_
+
+.. _tezt_section:
+
+Tezt
+~~~~
+
+:ref:`Tezt <tezt>` is a system testing framework for Tezos. It is
+intended as a replacement to Flextesa and as an OCaml-based alternative
+to :ref:`Python testing and execution framework
+<pytest_section>`. Like the latter, Tezt is also capable of regression
+testing. Tezt focuses on tests that run in the CI, although it is also
+used for some manual tests (see the :src:`tezt/manual_tests`
+folder). Its main strengths are summarized in its :ref:`section in the
+Tezos Developer Documentation <tezt>`. Conceptually Tezt consists of a
+generic framework for writing tests interacting with external
+processes, and a set of Tezos-specific modules for interacting with
+the Tezos binaries: the client, baker, etc.
+
+Typical use cases:
+ - In terms of use cases, Tezt is similar to the :ref:`Python testing and
+   execution framework <pytest_section>` and :ref:`Flextesa
+   <flextesa_section>`. It can be used by authors that prefer OCaml
+   for writing system tests.
+
+Example tests:
+ - Testing baking (in :src:`tezt/tests/basic.ml`)
+ - Testing double baking and double endorsement scenarios (in
+   :src:`tezt/tests/double_bake.ml`). This test is a rewrite of the
+   Flextesa double baking scenario mentioned above, that demonstrates
+   the difference between the two frameworks.
+ - Testing absence of regressions in encodings (in :src:`tezt/tests/encoding.ml`)
+
+References:
+ - :ref:`Section in Tezos Developer Documentation on Tezt <tezt>`
+ - `General API documentation <http://tezos.gitlab.io/api/odoc/_html/tezt/index.html>`_
+ - `Tezos-specific API documentation <http://tezos.gitlab.io/api/odoc/_html/tezt-tezos/index.html>`_
 
 ..
    .. _michelson_unit_tests:
@@ -265,7 +298,7 @@ Executing tests locally
 ~~~~~~~~~~~~~~~~~~~~~~~
 
 Whereas executing the tests through the CI, as described below, is the
-standard and most convenient way of running the full test suite, it
+standard and most convenient way of running the full test suite, they
 can also be executed locally.
 
 All tests can be run with ``make test`` in the project root. However, this
@@ -289,7 +322,7 @@ code aren't tested.
 We describe here how ``bisect_ppx`` can be used locally. See below for usage
 with CI.
 
-To install ``bisect_ppx``. Run the following command from the root of the
+To install ``bisect_ppx``, run the following command from the root of the
 project directory:
 
 ::
@@ -342,13 +375,13 @@ Clean up coverage data (output and report) with:
     make coverage-clean
 
 
-Reset the updated ``dune`` files using ``git``. For instance:
+To reset the updated ``dune`` files, you may either use ``git``:
 
 ::
 
     git checkout -- src/lib_p2p/dune src/proto_alpha/lib_protocol/dune.inc
 
-Or
+or use the ``--remove`` option of the instrumentation script:
 
 ::
 
@@ -450,8 +483,8 @@ For example, if you want to run the job ``check_python_linting`` which checks th
 
 Note that the first time you execute a job, it may take a long time because it
 requires downloading the docker image, and ``gitlab-runner`` is not verbose on this
-subject. It may be the case if the opam repository Tezos uses has been changed, requiring
-the refresh of the locally cached docker image.
+subject. For instance, if Tezos' opam repository has changed, requiring
+a refresh of the locally cached docker image.
 
 Local changes must be committed (but not necessarily pushed remotely)
 before executing the job locally. Indeed, ``gitlab-runner`` will clone
@@ -491,14 +524,14 @@ follow these guidelines:
 
 2. For each test in the unit test module, add a small doc comment that
    explains what the test actually asserts (2-4 lines are enough). It
-   should start with word ``Test``. These lines should appear at the
+   should start with the word ``Test``. These lines should appear at the
    beginning of each test unit function that is called by
    ``Alcotest_lwt.test_case``. For instance,
 
 ::
 
     (* Test.
-       Transfer to an unactivated account and then activating it.
+       Transfer to an unactivated account and then activate it.
     *)
     let transfer_to_unactivated_then_activate () =
     ...
