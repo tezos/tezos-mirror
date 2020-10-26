@@ -71,6 +71,9 @@ class TestRPCsExistence:
 
     block_hash = ""
 
+    def test_config_file(self, sandbox: Sandbox):
+        sandbox.client(1).rpc('get', '/config')
+
     def test_network_self(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get', '/network/self')
 
