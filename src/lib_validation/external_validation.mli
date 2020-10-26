@@ -64,6 +64,12 @@ val recv : Lwt_io.input_channel -> 'a Data_encoding.t -> 'a Lwt.t
 val recv_result :
   Lwt_io.input_channel -> 'a Data_encoding.t -> 'a tzresult Lwt.t
 
+(** The prefix for the validation socket filename.
+
+    Do not use it directly except for documentation purposes; use
+    [socket_path] instead. *)
+val socket_path_prefix : string
+
 val socket_path : data_dir:string -> pid:int -> string
 
 val create_socket_listen :
