@@ -191,7 +191,7 @@ module External_validator_process = struct
         avoid generating potential garbage in the [vp.data_dir].
         No interruption can occur since the resource was created
         because there are no yield points. *)
-     let clean_process_fd () =
+     let clean_process_fd socket_path =
        Lwt.catch
          (fun () -> Lwt_unix.unlink socket_path)
          (function
@@ -203,22 +203,25 @@ module External_validator_process = struct
      in
      let process_fd_cleaner =
        Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
-           clean_process_fd ())
+           clean_process_fd socket_path)
      in
-     External_validation.create_socket_listen
-       ~canceler
-       ~max_requests:1
-       ~socket_path
-     >>= fun process_socket ->
-     Lwt_unix.accept process_socket
+     Lwt.finalize
+       (fun () ->
+         External_validation.create_socket_listen
+           ~canceler
+           ~max_requests:1
+           ~socket_path
+         >>= fun process_socket -> Lwt_unix.accept process_socket)
+       (fun () ->
+         (* As the external validation process is now started, we can
+            unlink the named socket. Indeed, the file descriptor will
+            remain valid as long as at least one process keeps it
+            open. This method mimics an anonymous file descriptor
+            without relying on Linux specific features. It also
+            trigger the clean up procedure if some sockets related
+            errors are thrown. *)
+         clean_process_fd socket_path)
      >>= fun (process_socket, _) ->
-     (* As the external validation process is now started, we can
-        unlink the named socket. Indeed, the file descriptor will
-        remain valid as long as at least one process keeps it
-        open. This method mimics an anonymous file descriptor without
-        relying on Linux specific features. *)
-     Lwt.protected (clean_process_fd ())
-     >>= fun () ->
      Lwt_exit.unregister_clean_up_callback process_fd_cleaner ;
      Lwt.return (process, process_socket))
     >>= fun (process, process_socket) ->
