@@ -23,11 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Testing
-   -------
-   Component:    P2P
-   Invocation:   dune build @src/lib_p2p/test/runtest_p2p_ipv6set
-   Subject:      Sets of IPV6 addresses (as keys in Patricia Trees).
+(** Testing
+    -------
+    Component:    P2P
+    Invocation:   dune build @src/lib_p2p/test/runtest_p2p_ipv6set
+    Subject:      Sets of IPV6 addresses (as keys in Patricia Trees).
 *)
 
 include Internal_event.Legacy_logging.Make (struct
@@ -58,9 +58,7 @@ let of_list l =
     P2p_acl.IpSet.empty
     l
 
-(* Test.
-   An empty set does not contain any IP address.
-*)
+(** An empty set does not contain any IP address. *)
 let test_empty _ =
   let addrs = List.map a ["::"; "ffff::"; "a::2"] in
   List.iter
@@ -71,10 +69,9 @@ let test_empty _ =
         (P2p_acl.IpSet.mem addr P2p_acl.IpSet.empty))
     addrs
 
-(* Test.
-   Adds address prefixes to the set, and verifies that addresses with
-   that prefix (resp. without that prefix) are included (resp. not
-   included).
+(** Adds address prefixes to the set, and verifies that addresses with
+    that prefix (resp. without that prefix) are included (resp. not
+    included).
 *)
 let test_inclusion _ =
   let set =
@@ -120,9 +117,7 @@ let test_inclusion _ =
   assert_equal ~msg:__LOC__ false (P2p_acl.IpSet.mem (a "b111:8000::1") set) ;
   assert_equal ~msg:__LOC__ false (P2p_acl.IpSet.mem (a "1234:5678::100") set)
 
-(* Test.
-   Contiguous prefixes preserve consistency of IP sets.
-*)
+(** Contiguous prefixes preserve consistency of IP sets. *)
 let test_contiguous _ =
   let set = of_list [p "::/1"; p "8000::/1"] in
   List.iter
@@ -134,9 +129,8 @@ module PSet = Set.Make (Ipaddr.V6.Prefix)
 let print_pset ppf pset =
   PSet.iter (fun p -> Format.fprintf ppf "%a " Ipaddr.V6.Prefix.pp p) pset
 
-(* Test.
-   A set created with [Pset.of_list] has the same elements as if it
-   was successively created with [Pset.add] from [Pset.empty].
+(** A set created with [Pset.of_list] has the same elements as if it
+    was successively created with [Pset.add] from [Pset.empty].
 *)
 let test_fold _ =
   let addr_list = [p "::/1"; p "8000::/2"; p "ffff:ffff::/32"] in
@@ -152,9 +146,7 @@ let test_fold _ =
 let print_list ppf l =
   List.iter (fun p -> Format.fprintf ppf "%a " Ipaddr.V6.Prefix.pp p) l
 
-(* Test.
-   Creating a list from a set preserves the elements of the set.
-*)
+(** Creating a list from a set preserves the elements of the set. *)
 let test_to_list _ =
   let to_list s = P2p_acl.IpSet.fold (fun k _v acc -> k :: acc) s [] in
   let list_eq = List.for_all2 (fun x y -> Ipaddr.V6.Prefix.compare x y = 0) in

@@ -24,12 +24,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Testing
-   -------
-   Component:    P2P
-   Invocation:   dune build @src/lib_p2p/test/runtest_p2p_io_scheduler_ipv4
-   Dependencies: src/lib_p2p/test/process.ml
-   Subject:      On I/O scheduling of client-server connections.
+(** Testing
+    -------
+    Component:    P2P
+    Invocation:   dune build @src/lib_p2p/test/runtest_p2p_io_scheduler_ipv4
+    Dependencies: src/lib_p2p/test/process.ml
+    Subject:      On I/O scheduling of client-server connections.
 *)
 
 include Internal_event.Legacy_logging.Make (struct
@@ -168,10 +168,9 @@ let client ?max_upload_speed ?write_queue_size addr port time _n =
   let stat = P2p_io_scheduler.stat conn in
   lwt_log_notice "Client OK %a" P2p_stat.pp stat >>= fun () -> return_unit
 
-(* Test.
-   Listens to address [addr] on port [port] to open a socket [main_socket].
-   Spawns a server on it, and [n] clients connecting to the server. Then,
-   the server will close all connections.
+(** Listens to address [addr] on port [port] to open a socket [main_socket].
+    Spawns a server on it, and [n] clients connecting to the server. Then,
+    the server will close all connections.
 *)
 let run ?display_client_stat ?max_download_speed ?max_upload_speed
     ~read_buffer_size ?read_queue_size ?write_queue_size addr port time n =
