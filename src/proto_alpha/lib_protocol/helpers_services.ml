@@ -566,16 +566,14 @@ module Scripts = struct
                 | None ->
                     assert false
               in
-              (* Fail quickly if not enough gas for minimal deserialization cost *)
               Lwt.return
               @@ record_trace Apply.Gas_quota_exceeded_init_deserialize
-              @@ ( Gas.consume
-                     ctxt
-                     (Script.minimal_deserialize_cost script.code)
-                 >>? fun ctxt ->
-                 Gas.check_enough
-                   ctxt
-                   (Script.minimal_deserialize_cost script.storage)
+              @@ ( Gas.(
+                     check_enough
+                       (* Fail quickly if not enough gas for minimal deserialization cost *)
+                       ctxt
+                       ( Script.minimal_deserialize_cost script.code
+                       +@ Script.minimal_deserialize_cost script.storage ))
                  >>? fun () ->
                  (* Fail if not enough gas for complete deserialization cost *)
                  Script.force_decode_in_context ctxt script.code

@@ -816,12 +816,14 @@ let precheck_manager_contents (type kind) ctxt
          Script.force_decode_in_context ctxt parameters
          >|? fun (_arg, ctxt) -> ctxt )
   | Origination {script; _} ->
-      (* Fail quickly if not enough gas for minimal deserialization cost *)
       Lwt.return
       @@ record_trace Gas_quota_exceeded_init_deserialize
-      @@ ( Gas.consume ctxt (Script.minimal_deserialize_cost script.code)
-         >>? fun ctxt ->
-         Gas.check_enough ctxt (Script.minimal_deserialize_cost script.storage)
+      @@ (* Fail quickly if not enough gas for minimal deserialization cost *)
+         ( Gas.(
+             check_enough
+               ctxt
+               ( Script.minimal_deserialize_cost script.code
+               +@ Script.minimal_deserialize_cost script.storage ))
          >>? fun () ->
          (* Fail if not enough gas for complete deserialization cost *)
          Script.force_decode_in_context ctxt script.code
