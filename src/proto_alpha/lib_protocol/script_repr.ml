@@ -163,7 +163,7 @@ let deserialized_cost expr = cost_of_size (expr_size expr)
 
 let serialized_cost bytes =
   let open Gas_limit_repr in
-  alloc_mbytes_cost (Bytes.length bytes)
+  alloc_bytes_cost (Bytes.length bytes)
 
 let force_decode lexpr =
   let account_deserialization_cost =
