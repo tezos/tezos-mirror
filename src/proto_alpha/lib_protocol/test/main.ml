@@ -47,5 +47,6 @@ let () =
       ("gas cost functions", Gas_costs.tests);
       ("lazy storage diff", Lazy_storage_diff.tests);
       ("sapling", Test_sapling.tests);
-      ("helpers rpcs", Test_helpers_rpcs.tests) ]
+      ("helpers rpcs", Test_helpers_rpcs.tests);
+      ("script deserialize gas", Script_gas.tests) ]
   |> Lwt_main.run
