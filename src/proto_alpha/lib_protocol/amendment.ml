@@ -98,6 +98,8 @@ let get_approval_and_update_participation_ema ctxt =
   >>=? fun participation_ema ->
   Vote.get_current_quorum ctxt
   >>=? fun expected_quorum ->
+  Vote.clear_ballots ctxt
+  >>= fun ctxt ->
   let (approval, new_participation_ema) =
     approval_and_participation_ema
       ballots
@@ -132,8 +134,6 @@ let start_new_voting_period ctxt =
   | Testing_vote ->
       get_approval_and_update_participation_ema ctxt
       >>=? fun (ctxt, approved) ->
-      Vote.clear_ballots ctxt
-      >>= fun ctxt ->
       if approved then
         let expiration =
           (* in two days maximum... *)
@@ -159,8 +159,6 @@ let start_new_voting_period ctxt =
         >>=? fun proposal -> activate ctxt proposal >>= fun ctxt -> return ctxt
       else return ctxt )
       >>=? fun ctxt ->
-      Vote.clear_ballots ctxt
-      >>= fun ctxt ->
       Vote.clear_current_proposal ctxt
       >>=? fun ctxt -> Vote.set_current_period_kind ctxt Proposal )
   >>=? fun ctxt -> Vote.update_listings ctxt
