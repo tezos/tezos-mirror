@@ -23,21 +23,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Testing
-   -------
-   Component:    Requester
-   Invocation:   dune build @src/lib_requester/runtest
-   Subject:      Basic behaviors of the API for generic resource
-                 fetching/requesting service. Instantiating the [Requester]
-                 functor with simple mocks.
-
-                 [Memory_table] and [Disk_table] are hash tables from string
-                 to int.
-                 [Precheck] either accepts or reject notified values based on
-                 a boolean validation clue [Precheck.param], regardless of
-                 the key.
-                 [Request] simply logs the requests made to [Request.send],
-                 and considers only a unique, statically defined, active peer.
+(** Testing
+    -------
+    Component:    Requester
+    Invocation:   dune build @src/lib_requester/runtest
+    Subject:      Basic behaviors of the API for generic resource
+                  fetching/requesting service. Instantiating the [Requester]
+                  functor with simple mocks.
+   
+                  [Memory_table] and [Disk_table] are hash tables from string
+                  to int.
+                  [Precheck] either accepts or reject notified values based on
+                  a boolean validation clue [Precheck.param], regardless of
+                  the key.
+                  [Request] simply logs the requests made to [Request.send],
+                  and considers only a unique, statically defined, active peer.
 *)
 
 (** Setup mocks *)
@@ -178,16 +178,13 @@ let is_failed p = match Lwt.state p with Fail _ -> true | _ -> false
 
 (** Start tests *)
 
-(* Test.
-   Creates a requester with [Disk_table] (of size 16) as the store.
-*)
+(** Creates a requester with [Disk_table] (of size 16) as the store. *)
 let test_full_requester () = ignore (init_full_requester ())
 
-(* Test.
-   Creates a requester with [Disk_table] (of size 16) as the store.
-   Injects the key-value ("foo", 1), the operation result is
-   disregarded.  Then, asserts that the key "foo" is present in memory
-   table or disk.
+(** Creates a requester with [Disk_table] (of size 16) as the store.
+    Injects the key-value ("foo", 1), the operation result is
+    disregarded.  Then, asserts that the key "foo" is present in memory
+    table or disk.
 *)
 let test_full_requester_create _ () =
   let requester = init_full_requester () in
@@ -198,12 +195,11 @@ let test_full_requester_create _ () =
   assert_true "injected value is known" r ;
   Lwt.return_unit
 
-(* Test.
-   Creates a full requester with a Lwt_watcher [global_input]. Fetches
-   the value for keys "foo" and "bar" whenever they are
-   known. Notifies the requester that a given value has been received
-   for these keys. Finally, checks that this Lwt_watcher receives all
-   notified values.
+(** Creates a full requester with a Lwt_watcher [global_input]. Fetches
+    the value for keys "foo" and "bar" whenever they are
+    known. Notifies the requester that a given value has been received
+    for these keys. Finally, checks that this Lwt_watcher receives all
+    notified values.
 *)
 let test_full_requester_create_with_global_input _ () =
   let (global_input : (test_key * test_value) Lwt_watcher.input) =
@@ -234,12 +230,12 @@ let test_full_requester_create_with_global_input _ () =
   Lwt_watcher.shutdown stopper ;
   Lwt.return_unit
 
-(* Test.
-   Creates a requester. At first, no key "baz" is known. When reading
-   it with {!Test_Requester.read}, it shall fail with error
-   [Missing_data]. When reading with {!Test_Requester.read_opt}, it
-   returns [None]. Then, the key-value ("baz", 1) is injected, and
-   this key is now known and can be read by both functions.  *)
+(** Creates a requester. At first, no key "baz" is known. When reading
+    it with {!Test_Requester.read}, it shall fail with error
+    [Missing_data]. When reading with {!Test_Requester.read_opt}, it
+    returns [None]. Then, the key-value ("baz", 1) is injected, and
+    this key is now known and can be read by both functions.
+*)
 let test_read_known_read_opt _ () =
   let requester = init_full_requester () in
   Test_Requester.known requester "baz"
@@ -268,11 +264,10 @@ let test_read_known_read_opt _ () =
   check (option testable_test_value) "read_opt baz is (Some 1)" (Some 1) ro ;
   Lwt.return_unit
 
-(* Test.
-   Creates a requester. At first, no key "boo" is known to the
-   requester. It adds the key-value ("boo", 15) to the disk table and
-   it is asserted that it is known by the latter. Hence, the requester
-   now knows this key.
+(** Creates a requester. At first, no key "boo" is known to the
+    requester. It adds the key-value ("boo", 15) to the disk table and
+    it is asserted that it is known by the latter. Hence, the requester
+    now knows this key.
 *)
 let test_full_requester_disk_found_value _ () =
   let (requester, store) = init_full_requester_disk () in
@@ -288,10 +283,9 @@ let test_full_requester_disk_found_value _ () =
   Test_Requester.known requester "boo"
   >>= lwt_assert_true "requester now knows value"
 
-(* Test.
-   Creates a requester. Perform key fetching with timeout of [0] at
-   first, then with [0.1] picoseconds. Both tests are supposed to
-   timeout (as the requester is empty).
+(** Creates a requester. Perform key fetching with timeout of [0] at
+    first, then with [0.1] picoseconds. Both tests are supposed to
+    timeout (as the requester is empty).
 *)
 let test_full_requester_fetch_timeout _ () =
   let requester = init_full_requester () in
@@ -309,11 +303,10 @@ let test_full_requester_fetch_timeout _ () =
   >>= fun () ->
   do_timeout (Option.unopt_exn Not_found (Ptime.Span.of_float_s 0.1)) "foo"
 
-(* Test.
-   Creates a requester. Clears registered requests, then asserts that
-   [!Test_request.registered_requests] is empty. Fetches the key "baz".
-   At this point, it is expected that the number of registered requests
-   is 5, and that "baz" is part of them.
+(** Creates a requester. Clears registered requests, then asserts that
+    [!Test_request.registered_requests] is empty. Fetches the key "baz".
+    At this point, it is expected that the number of registered requests
+    is 5, and that "baz" is part of them.
 *)
 let test_full_fetch_issues_request _ () =
   let requester = init_full_requester () in
@@ -346,9 +339,8 @@ let test_full_fetch_issues_request _ () =
   Lwt.cancel f1 ;
   Lwt.return_unit
 
-(* Test.
-   Creates a requester. Injects ("foo", 1), key "foo" is known.
-   Removes this data from the memory table. This key is now unknown.
+(** Creates a requester. Injects ("foo", 1), key "foo" is known.
+    Removes this data from the memory table. This key is now unknown.
 *)
 let test_clear_or_cancel_removes _ () =
   let requester = init_full_requester () in
@@ -360,11 +352,10 @@ let test_clear_or_cancel_removes _ () =
   Test_Requester.known requester "foo"
   >>= fun r -> lwt_assert_false "injected value is cleared" r
 
-(* Test.
-   Creates a requester. Key "foo" is unknown yet. It is fetched,
-   thereby pending. It is cancelled, thereby no longer pending. As of
-   now, "foo" still remains unknown. The fetch operation itself
-   indicates that is has been cancelled.
+(** Creates a requester. Key "foo" is unknown yet. It is fetched,
+    thereby pending. It is cancelled, thereby no longer pending. As of
+    now, "foo" still remains unknown. The fetch operation itself
+    indicates that is has been cancelled.
 *)
 let test_clear_or_cancel_cancels _ () =
   let requester = init_full_requester () in
@@ -392,10 +383,9 @@ let test_clear_or_cancel_cancels _ () =
 
 (** Test pending *)
 
-(* Test.
-   Creates a requester. Initially, no key "foo" is pending. After
-   calling the fetch operation, the key becomes pending. After
-   cancelling, the key is no longer pending.
+(** Creates a requester. Initially, no key "foo" is pending. After
+    calling the fetch operation, the key becomes pending. After
+    cancelling, the key is no longer pending.
 *)
 let test_pending_cancelled _ () =
   let requester = init_full_requester () in
@@ -411,9 +401,7 @@ let test_pending_cancelled _ () =
     "value is no longer pending after cancellation"
     (Test_Requester.pending requester "foo")
 
-(* Test.
-   Checks that values are not pending after notification
-*)
+(** Checks that values are not pending after notification *)
 let test_pending_notified _ () =
   let requester = init_full_requester () in
   assert_false
@@ -429,9 +417,7 @@ let test_pending_notified _ () =
     "value is no longer pending after notification"
     (Test_Requester.pending requester "foo")
 
-(* Test.
-   Check that values are not pending after timeout
-*)
+(** Check that values are not pending after timeout *)
 let test_pending_timeout _ () =
   let requester = init_full_requester () in
   assert_false
@@ -456,10 +442,9 @@ let test_pending_timeout _ () =
 
 (** Test watch *)
 
-(* Test.
-   Creates a requester. Adds a watcher to the requester. Fetch
-   keys "foo", "bar". Notify both values to the requester. Finally,
-   ensures that both are watched.
+(** Creates a requester. Adds a watcher to the requester. Fetch keys
+   "foo", "bar". Notify both values to the requester. Finally, ensures
+   that both are watched.
 *)
 let test_full_requester_test_simple_watch _ () =
   let requester = init_full_requester () in
@@ -487,9 +472,8 @@ let test_full_requester_test_simple_watch _ () =
   Lwt_watcher.shutdown stopper ;
   Lwt.return_unit
 
-(* Test.
-   Add a watcher, notify a value that is not requested. The stream
-   that is watched will remain empty in the end.
+(** Add a watcher, notify a value that is not requested. The
+    stream that is watched will remain empty in the end.
 *)
 let test_full_requester_test_notify_non_fetched_watch _ () =
   let requester = init_full_requester () in
@@ -502,9 +486,8 @@ let test_full_requester_test_notify_non_fetched_watch _ () =
   Lwt_stream.is_empty stream
   >>= lwt_assert_true "obtained stream should be empty"
 
-(* Test.
-   Add two watchers, verify that both receive notified values.
-   Stop one watcher, verify that the remaining receives notified values.
+(** Add two watchers, verify that both receive notified values.
+    Stop one watcher, verify that the remaining receives notified values.
 *)
 let test_full_requester_test_double_watcher _ () =
   let requester = init_full_requester () in
@@ -550,9 +533,8 @@ let test_full_requester_test_double_watcher _ () =
 
 (** Test inject *)
 
-(* Test.
-   Injects a value already present in memory: false should be
-   returned.
+(** Injects a value already present in memory: false should be
+    returned.
 *)
 let test_full_requester_test_inject_memory _ () =
   let req = init_full_requester () in
@@ -565,18 +547,14 @@ let test_full_requester_test_inject_memory _ () =
   Test_Requester.inject req "foo" 2
   >>= lwt_assert_false "Inject is false third time with new value"
 
-(* Test.
-   Injects a value present on disk: false should be returned.
-*)
+(** Injects a value present on disk: false should be returned. *)
 let test_full_requester_test_inject_disk _ () =
   let (req, store) = init_full_requester_disk () in
   Test_disk_table_hash.add store "foo" 1 ;
   Test_Requester.inject req "foo" 1
   >>= lwt_assert_false "Inject is false when present on disk"
 
-(* Test.
-   Injects a value already requested: false should be returned.
-*)
+(** Injects a value already requested: false should be returned. *)
 let test_full_requester_test_inject_requested _ () =
   let req = init_full_requester () in
   (* Fetch a value *)
@@ -587,9 +565,7 @@ let test_full_requester_test_inject_requested _ () =
   Test_Requester.clear_or_cancel req "foo" ;
   Lwt.return_unit
 
-(* Test.
-   Injects a value not yet requested: true is returned
-*)
+(** Injects a value not yet requested: true is returned *)
 let test_full_requester_test_inject _ () =
   let req = init_full_requester () in
   Test_Requester.inject req "foo" 1
@@ -599,9 +575,8 @@ let test_full_requester_test_inject _ () =
 
 (** Test notify *)
 
-(* Test.
-   Notifies a value with an invalid value. The memory table should not
-   be updated and the promises not resolved.
+(** Notifies a value with an invalid value. The memory table should not
+    be updated and the promises not resolved.
 *)
 let test_full_requester_test_notify_invalid _ () =
   let req = init_full_requester () in
@@ -617,9 +592,8 @@ let test_full_requester_test_notify_invalid _ () =
   >>= lwt_assert_false "fetched value is still not known"
   >>= fun () -> lwt_assert_true "promise is still pending" (is_pending f1)
 
-(* Test.
-   Notifies a value with a valid value. The memory table should be
-   updated, the promise resolved.
+(** Notifies a value with a valid value. The memory table should be
+    updated, the promise resolved.
 *)
 let test_full_requester_test_notify_valid _ () =
   let req = init_full_requester () in
@@ -633,9 +607,8 @@ let test_full_requester_test_notify_valid _ () =
   >>= Lwt_unix.yield (* Ensure that [f1] is scheduled *)
   >>= fun () -> lwt_assert_true "promise is resolved" (is_resolved f1)
 
-(* Test.
-   Notifies a value that has not been fetched. The notification is
-   simply ignored, and value remains unknown.
+(** Notifies a value that has not been fetched. The notification is
+    simply ignored, and value remains unknown.
 *)
 let test_full_requester_test_notify_unfetched _ () =
   let req = init_full_requester () in
@@ -645,10 +618,9 @@ let test_full_requester_test_notify_unfetched _ () =
   Test_Requester.known req "foo"
   >>= lwt_assert_false "fetched value is not known"
 
-(* Test.
-   Notifies a value that is already on disk. The notification should
-   be ignored (not sure how to test this, but this code runs through
-   that code path).  *)
+(** Notifies a value that is already on disk. The notification should
+    be ignored (not sure how to test this, but this code runs through
+    that code path).  *)
 let test_full_requester_test_notify_disk_duplicate _ () =
   let (req, store) = init_full_requester_disk () in
   (* Put value on disk *)
@@ -658,10 +630,9 @@ let test_full_requester_test_notify_disk_duplicate _ () =
   (* Notify the value *)
   Test_Requester.notify req P2p_peer.Id.zero "foo" 1
 
-(* Test.
-   Notifies a value that is already in memory. The notification should
-   be ignored (not sure how to test this, but this code runs through
-   that code path).
+(** Notifies a value that is already in memory. The notification should
+    be ignored (not sure how to test this, but this code runs through
+    that code path).
 *)
 let test_full_requester_test_notify_memory_duplicate _ () =
   let req = init_full_requester () in
@@ -675,9 +646,8 @@ let test_full_requester_test_notify_memory_duplicate _ () =
 
 (** Test pending requests *)
 
-(* Test.
-   Notifies a value that has not been fetched. The notification should
-   be ignored.
+(** Notifies a value that has not been fetched. The notification should
+    be ignored.
 *)
 let test_full_requester_test_pending_requests _ () =
   let req = init_full_requester () in
@@ -717,9 +687,7 @@ let test_full_requester_test_pending_requests _ () =
 
 (** Test memory_table_length *)
 
-(* Test.
-   Injects some values and checks the length of the memory table.
-*)
+(** Injects some values and checks the length of the memory table. *)
 let test_full_requester_test_memory_table_length _ () =
   let req = init_full_requester () in
   (check int) "0 cached values" 0 (Test_Requester.memory_table_length req) ;
