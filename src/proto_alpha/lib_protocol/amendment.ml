@@ -65,15 +65,8 @@ let select_winning_proposal ctxt =
     participation EMA and the current participation./
     The expected quorum is calculated using the last participation EMA, capped
     by the min/max quorum protocol constants. *)
-let check_approval_and_update_participation_ema ctxt =
-  Vote.get_ballots ctxt
-  >>=? fun ballots ->
-  Vote.listing_size ctxt
-  >>=? fun maximum_vote ->
-  Vote.get_participation_ema ctxt
-  >>=? fun participation_ema ->
-  Vote.get_current_quorum ctxt
-  >>=? fun expected_quorum ->
+let approval_and_participation_ema (ballots : Vote.ballots) ~maximum_vote
+    ~participation_ema ~expected_quorum =
   (* Note overflows: considering a maximum of 8e8 tokens, with roll size as
      small as 1e3, there is a maximum of 8e5 rolls and thus votes.
      In 'participation' an Int64 is used because in the worst case 'all_votes is
@@ -87,15 +80,33 @@ let check_approval_and_update_participation_ema ctxt =
     Int64.(
       to_int32 (div (mul (of_int32 all_votes) 100_00L) (of_int32 maximum_vote)))
   in
-  let outcome =
+  let approval =
     Compare.Int32.(
       participation >= expected_quorum && ballots.yay >= supermajority)
   in
   let new_participation_ema =
     Int32.(div (add (mul 8l participation_ema) (mul 2l participation)) 10l)
   in
+  (approval, new_participation_ema)
+
+let get_approval_and_update_participation_ema ctxt =
+  Vote.get_ballots ctxt
+  >>=? fun ballots ->
+  Vote.listing_size ctxt
+  >>=? fun maximum_vote ->
+  Vote.get_participation_ema ctxt
+  >>=? fun participation_ema ->
+  Vote.get_current_quorum ctxt
+  >>=? fun expected_quorum ->
+  let (approval, new_participation_ema) =
+    approval_and_participation_ema
+      ballots
+      ~maximum_vote
+      ~participation_ema
+      ~expected_quorum
+  in
   Vote.set_participation_ema ctxt new_participation_ema
-  >|=? fun ctxt -> (ctxt, outcome)
+  >|=? fun ctxt -> (ctxt, approval)
 
 (** Implements the state machine of the amendment procedure.
     Note that [update_listings], that computes the vote weight of each delegate,
@@ -119,7 +130,7 @@ let start_new_voting_period ctxt =
           Vote.set_current_period_kind ctxt Testing_vote
           >>=? fun ctxt -> return ctxt )
   | Testing_vote ->
-      check_approval_and_update_participation_ema ctxt
+      get_approval_and_update_participation_ema ctxt
       >>=? fun (ctxt, approved) ->
       Vote.clear_ballots ctxt
       >>= fun ctxt ->
@@ -141,7 +152,7 @@ let start_new_voting_period ctxt =
   | Testing ->
       Vote.set_current_period_kind ctxt Promotion_vote
   | Promotion_vote ->
-      check_approval_and_update_participation_ema ctxt
+      get_approval_and_update_participation_ema ctxt
       >>=? fun (ctxt, approved) ->
       ( if approved then
         Vote.get_current_proposal ctxt
