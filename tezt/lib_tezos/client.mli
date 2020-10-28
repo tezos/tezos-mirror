@@ -26,7 +26,7 @@
 (** Run Tezos client commands. *)
 
 (** Mode of the client *)
-type mode = Client of Node.t option | Mockup
+type mode = Client of Node.t option | Mockup | Proxy of Node.t
 
 (** The synchronization mode of the client.
 

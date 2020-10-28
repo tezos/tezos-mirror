@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type mode = Client of Node.t option | Mockup
+type mode = Client of Node.t option | Mockup | Proxy of Node.t
 
 type mockup_sync_mode = Asynchronous | Synchronous
 
@@ -67,11 +67,20 @@ let endpoint_arg ?node client =
   match (client.mode, node) with
   | (Mockup, _) | (Client None, None) ->
       []
-  | (Client _, Some node) | (Client (Some node), None) ->
+  | (Client _, Some node)
+  | (Client (Some node), None)
+  | (Proxy _, Some node)
+  | (Proxy node, None) ->
       ["--endpoint"; "http://localhost:" ^ string_of_int (Node.rpc_port node)]
 
 let mode_arg client =
-  match client.mode with Client _ -> [] | Mockup -> ["--mode"; "mockup"]
+  match client.mode with
+  | Client _ ->
+      []
+  | Mockup ->
+      ["--mode"; "mockup"]
+  | Proxy _ ->
+      ["--mode"; "proxy"]
 
 let spawn_command ?(admin = false) client command =
   Process.spawn
