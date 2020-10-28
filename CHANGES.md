@@ -107,6 +107,8 @@ here either.
 - Fixed the node which sent too many "get current branch" messages to its peers
   on testchain activation.
 
+- Add new RPC `/config` to query the configuration of a node
+
 ## Client
 
 - The `tezos-client config show` command now takes into account
