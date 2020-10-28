@@ -75,6 +75,11 @@ val create_with_mode :
   mode ->
   t
 
+(** Change the client's mode. This function is required for example because
+    we wanna keep a client's wallet. This is impossible if we created
+    a new client from scratch. *)
+val set_mode : mode -> t -> unit
+
 (** {2 RPC calls} *)
 
 (** Paths for RPCs.
@@ -196,6 +201,7 @@ val spawn_bake_for :
 (** Run [tezos-client transfer amount from giver to receiver]. *)
 val transfer :
   ?node:Node.t ->
+  ?wait:string ->
   amount:int ->
   giver:string ->
   receiver:string ->
@@ -205,6 +211,7 @@ val transfer :
 (** Same as [transfer], but do not wait for the process to exit. *)
 val spawn_transfer :
   ?node:Node.t ->
+  ?wait:string ->
   amount:int ->
   giver:string ->
   receiver:string ->

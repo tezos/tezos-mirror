@@ -33,10 +33,12 @@ type t = {
   name : string;
   color : Log.Color.t;
   base_dir : string;
-  mode : mode;
+  mutable mode : mode;
 }
 
 let base_dir t = t.base_dir
+
+let set_mode mode t = t.mode <- mode
 
 let next_name = ref 1
 
@@ -259,14 +261,15 @@ let spawn_bake_for ?node ?(key = Constant.bootstrap1.alias)
 let bake_for ?node ?key ?minimal_timestamp client =
   spawn_bake_for ?node ?key ?minimal_timestamp client |> Process.check
 
-let spawn_transfer ?node ~amount ~giver ~receiver client =
+let spawn_transfer ?node ?wait ~amount ~giver ~receiver client =
+  let wait_arg = match wait with None -> [] | Some w -> ["--wait"; w] in
   spawn_command
     client
-    ( endpoint_arg ?node client @ mode_arg client
+    ( endpoint_arg ?node client @ mode_arg client @ wait_arg
     @ ["transfer"; string_of_int amount; "from"; giver; "to"; receiver] )
 
-let transfer ?node ~amount ~giver ~receiver client =
-  spawn_transfer ?node ~amount ~giver ~receiver client |> Process.check
+let transfer ?node ?wait ~amount ~giver ~receiver client =
+  spawn_transfer ?node ?wait ~amount ~giver ~receiver client |> Process.check
 
 let spawn_get_balance_for ?node ~account client =
   spawn_command
