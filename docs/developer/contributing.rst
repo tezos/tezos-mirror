@@ -13,11 +13,13 @@ Reporting issues
 
 The simplest way to contribute to Tezos is to report issues that you may
 find with the software on `gitlab <https://gitlab.com/tezos/tezos/-/issues>`__.
-If you are unsure about an issue ask on IRC first and always make sure
+If you are unsure about an issue
+consult the :ref:`technical support sources <support>`
+first and always make sure
 to search the existing issues before reporting a new one.
 Some info that are probably important to include in the description:
 the architecture (e.g. *ARM64*), the operating system (e.g. *Debian
-Stretch*), the network you are connected to (e.g. *Zeronet*), the
+Stretch*), the network you are connected to (e.g. *Carthagenet*), the
 binary or component (e.g. *tezos-node crashes* or *rpc X returns Y
 while Z was expected*).
 
@@ -71,26 +73,39 @@ rebase your branch on it, so that your patches always sit on top of
 master. When that happens, you may have to edit your patches during the
 rebase, and then use ``push -f`` in your branch to rewrite the history.
 
-We also enforce a few hygiene rules, so make sure your MR respects them:
+Preparing a Merge Request
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
--  Prefer small atomic commits over a large one that do many things.
+While working on your branch to prepare a Merge Request (MR), make sure you respect the following rules:
+
+-  Prefer small atomic commits over a large one that does many things.
 -  Don’t mix refactoring and new features.
 -  Never mix reindentation, whitespace deletion, or other style changes
    with actual code changes.
 -  Try as much as possible to make every patch compile, not only the last one.
--  If you add new functions into a documented interface, don’t forget to
-   extend the documentation for your addition.
+-  Adhere to the :ref:`coding guidelines <coding_guidelines>`.
+-  If you add new functions to an interface, don’t forget to
+   document the function in the interface (in the corresponding .mli file; or,
+   if there is no .mli file, directly in the .ml file)
+-  Check whether your changes need to be reflected in changes to the
+   corresponding README file (the one in the directory of the patched
+   files). If your changes concern several directories, check all the
+   corresponding README files.
 -  For parts that have specifications in the repository (e.g., Michelson),
-   make sure to keep it in sync with the implementation.
+   make sure to keep them in sync with the implementation.
 -  Try and mimic the style of commit messages, and for non trivial
    commits, add an extended commit message.
 
-As per the hygiene of MRs themselves:
+Creating the Merge Request
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When creating your MR, observe the following rules:
 
 -  Give appropriate titles to the MRs, and when non-trivial add a
-   detailed motivated explanation.
+   detailed and motivated explanation.
 -  Give meaningful and consistent names to branches.
--  Don’t forget to put a ``WIP:`` flag when it is a work in progress
+-  Don't forget to put a ``WIP:`` flag when it is a work in progress
+   and remove it only when the MR is ready for review.
 
 Some extra CI tests are only done on demand for branches other that
 master. You can (should) activate these tests by including keywords in
@@ -121,7 +136,10 @@ painful for everybody. The reviewer is your ally, not your enemy.
   Did I leave a ``TODO`` or an old comment?
 
 - Docstrings: Did I export a new function? Each exported
-  function should be documented in the corresponding ``mli`` .
+  function should be documented in the corresponding ``mli`` (or directly in the ``ml`` file if there is no ``mli``).
+
+- README: Did I check whether my changes impact the corresponding README
+  file(s)?
 
 - Readability: Is the code easy to understand? Is it worth adding
   a comment to the code to explain a particular operation and its
@@ -195,8 +213,10 @@ pitfalls a code reviewer should avoid.
   have a different reactions to it and impact on the quality of this work. This
   general remark is valid for any comment.
 
-Practicalities : how to ask for a code review.
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. _submitting:
+
+Detailed worflow of a MR
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 Our code review process uses GitLab. First a developer creates a new
 branch (it is often useful to prefix the name of the branch with the name of
@@ -220,14 +240,14 @@ rewrite history (but he/she can add new commits) and to rebase the branch
 without notice. At this point the developer waits for the reviewer to add his
 comments and suggestions.
 
-Gitlab allows to comment both on the code and to add general comments on the
+Gitlab allows both to comment on the code and to add general comments on the
 MR.  Each comment should be addressed by the developer. He/she can add
 additional commits to address each comment. This incremental approach will make
 it easier for the reviewer to keep interacting till each discussion is
 resolved. When the reviewer is satisfied, he/she will mark the discussion resolved.
 
-When all discussions are resolved, the reviewer will rebase the branch,
-possibly squash commits and merge the MR in the master branch.
+When all discussions are resolved, you should squash any fix-up commits that were applied (don't forget to edit the commit message appropriately).
+Then, the reviewer will rebase the branch and merge the MR in the master branch.
 
 Various recommendations while contributing to the Tezos codebase
 -----------------------------------------------------------------
@@ -245,7 +265,7 @@ level (here listed from most to least verbose) for each event:
 - ``Debug`` level -- the most verbose -- it is used by developers to follow
   the flow of execution of the node at the lowest granularity.
 - ``Info`` level is about all the additional information that you might want to
-  have, but they are not important to have if you node is running OK
+  have, but they are not important to have if your node is running OK
   (and definitely do not require any action).
 - ``Notice`` level (the default) should be about things that the node
   admin should be concerned, but that does not require any action.
@@ -260,5 +280,5 @@ of possible problems and errors:
   administrator or that signal some exceptional circumstance.
 
 It's also important to notice that from the node administrator's point of view,
-it is possible to selectively choose a specific log level for a given component
+it is possible to choose a specific log level for a given component
 by setting the environment variable ``TEZOS_LOG`` accordingly while running the node.
