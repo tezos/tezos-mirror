@@ -27,4 +27,7 @@
    Each module defines tests which are thematically related,
    as functions to be called here. *)
 
-let () = Migration.register () ; Test.run ()
+let () =
+  Migration.register () ;
+  (* Test.run () should be the last statement, don't register afterwards! *)
+  Test.run ()

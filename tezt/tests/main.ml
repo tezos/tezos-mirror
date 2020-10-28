@@ -43,4 +43,5 @@ let () =
   Encoding.register () ;
   Mockup.register () ;
   Double_bake.register () ;
+  (* Test.run () should be the last statement, don't register afterwards! *)
   Test.run ()
