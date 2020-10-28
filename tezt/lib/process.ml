@@ -294,12 +294,13 @@ exception
     command : string;
     arguments : string list;
     status : Unix.process_status;
+    expect_failure : bool;
   }
 
 let () =
   Printexc.register_printer
   @@ function
-  | Failed {name; command; arguments; status} ->
+  | Failed {name; command; arguments; status; expect_failure} ->
       let reason =
         match status with
         | WEXITED code ->
@@ -311,17 +312,19 @@ let () =
       in
       Some
         (Printf.sprintf
-           "%s %s (full command: %s)"
+           "%s%s %s (full command: %s)"
            name
+           (if expect_failure then " was expected to fail," else "")
            reason
            (String.concat " " (List.map Log.quote_shell (command :: arguments))))
   | _ ->
       None
 
-let check process =
+let check ?(expect_failure = false) process =
   let* status = wait process in
   match status with
-  | WEXITED 0 ->
+  | WEXITED n when (n = 0 && not expect_failure) || (n <> 0 && expect_failure)
+    ->
       unit
   | _ ->
       raise
@@ -331,10 +334,13 @@ let check process =
              command = process.command;
              arguments = process.arguments;
              status;
+             expect_failure;
            })
 
-let run ?log_status_on_exit ?name ?color ?env command arguments =
-  spawn ?log_status_on_exit ?name ?color ?env command arguments |> check
+let run ?log_status_on_exit ?name ?color ?env ?expect_failure command arguments
+    =
+  spawn ?log_status_on_exit ?name ?color ?env command arguments
+  |> check ?expect_failure
 
 let clean_up () =
   let list = ID_map.bindings !live_processes |> List.map snd in
@@ -351,13 +357,26 @@ let stderr process = get_echo_lwt_channel process.stderr
 
 let name process = process.name
 
-let check_and_read_stdout process =
-  let* () = check process and* output = read_all (stdout process) in
+let check_and_read_stdout ?expect_failure process =
+  let* () = check ?expect_failure process
+  and* output = read_all (stdout process) in
   return output
 
-let run_and_read_stdout ?log_status_on_exit ?name ?color ?env command arguments
-    =
+let check_and_read_stderr ?expect_failure process =
+  let* () = check ?expect_failure process
+  and* output = read_all (stderr process) in
+  return output
+
+let run_and_read_stdout ?log_status_on_exit ?name ?color ?env ?expect_failure
+    command arguments =
   let process =
     spawn ?log_status_on_exit ?name ?color ?env command arguments
   in
-  check_and_read_stdout process
+  check_and_read_stdout ?expect_failure process
+
+let run_and_read_stderr ?log_status_on_exit ?name ?color ?env ?expect_failure
+    command arguments =
+  let process =
+    spawn ?log_status_on_exit ?name ?color ?env command arguments
+  in
+  check_and_read_stdout ?expect_failure process
