@@ -41,6 +41,7 @@ let register protocol =
   Bootstrap.register protocol ;
   Synchronisation_heuristic.register protocol ;
   Mockup.register protocol ;
+  Proxy.register protocol ;
   Double_bake.register protocol
 
 let () =
