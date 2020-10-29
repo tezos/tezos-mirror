@@ -48,10 +48,10 @@ let check_node_synchronization_state () =
     ~title:"Check synchronization state"
     ~tags:["bootstrap"; "node"; "sync"]
   @@ fun () ->
-  let* main_node = Node.init ~name:"main_node" () in
+  let* main_node = Node.init ~name:"main_node" [] in
   let* nodes =
     Lwt_list.map_p
-      (fun i -> Node.init ~name:("node" ^ string_of_int i) ())
+      (fun i -> Node.init ~name:("node" ^ string_of_int i) [])
       (range 1 n)
   in
   Log.info "%d nodes initiated." (n + 1) ;
@@ -80,7 +80,7 @@ let check_node_synchronization_state () =
   in
   Log.info "Restarting the nodes..." ;
   let* _ =
-    Lwt_list.iter_p (fun node -> Node.restart node) (main_node :: nodes)
+    Lwt_list.iter_p (fun node -> Node.restart node []) (main_node :: nodes)
   in
   Log.info "Waiting for nodes to be synchronized." ;
   let* () =

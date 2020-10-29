@@ -23,6 +23,42 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type history_mode = Archive | Full | Rolling
+
+type argument =
+  | Network of string
+  | History_mode of history_mode
+  | Expected_pow of int
+  | Singleprocess
+  | Bootstrap_threshold of int
+  | Synchronisation_threshold of int
+  | Connections of int
+  | Private_mode
+
+let make_argument = function
+  | Network x ->
+      ["--network"; x]
+  | History_mode Archive ->
+      ["--history-mode"; "archive"]
+  | History_mode Full ->
+      ["--history-mode"; "full"]
+  | History_mode Rolling ->
+      ["--history-mode"; "experimental-rolling"]
+  | Expected_pow x ->
+      ["--expected-pow"; string_of_int x]
+  | Singleprocess ->
+      ["--singleprocess"]
+  | Bootstrap_threshold x ->
+      ["--bootstrap-threshold"; string_of_int x]
+  | Synchronisation_threshold x ->
+      ["--synchronisation-threshold"; string_of_int x]
+  | Connections x ->
+      ["--connections"; string_of_int x]
+  | Private_mode ->
+      ["--private-mode"]
+
+let make_arguments arguments = List.flatten (List.map make_argument arguments)
+
 type 'a known = Unknown | Known of 'a
 
 module Parameters = struct
@@ -80,8 +116,6 @@ let spawn_identity_generate ?(expected_pow = 0) node =
 let identity_generate ?expected_pow node =
   spawn_identity_generate ?expected_pow node |> Process.check
 
-type history_mode = Archive | Full | Rolling
-
 let show_history_mode = function
   | Archive ->
       "archive"
@@ -90,27 +124,24 @@ let show_history_mode = function
   | Rolling ->
       "rolling"
 
-let spawn_config_init ?(network = "sandbox") ?history_mode node =
+let spawn_config_init node arguments =
+  let arguments =
+    (* Give a default value of "sandbox" to --network. *)
+    if List.exists (function Network _ -> true | _ -> false) arguments then
+      arguments
+    else Network "sandbox" :: arguments
+  in
   spawn_command
     node
     ( "config" :: "init" :: "--data-dir" :: node.persistent_state.data_dir
-    :: "--network" :: network :: "--net-addr"
+    :: "--net-addr"
     :: ("127.0.0.1:" ^ string_of_int node.persistent_state.net_port)
     :: "--rpc-addr"
     :: ("localhost:" ^ string_of_int node.persistent_state.rpc_port)
-    ::
-    ( match history_mode with
-    | None ->
-        []
-    | Some Full ->
-        ["--history-mode"; "full"]
-    | Some Archive ->
-        ["--history-mode"; "archive"]
-    | Some Rolling ->
-        ["--history-mode"; "experimental-rolling"] ) )
+    :: make_arguments arguments )
 
-let config_init ?network ?history_mode node =
-  spawn_config_init ?network ?history_mode node |> Process.check
+let config_init node arguments =
+  spawn_config_init node arguments |> Process.check
 
 let trigger_ready node value =
   let pending = node.persistent_state.pending_ready in
@@ -214,34 +245,21 @@ let create ?(path = Constant.tezos_node) ?name ?color ?data_dir ?event_pipe
   on_event node (handle_event node) ;
   node
 
-let run ?(expected_pow = 0) ?(single_process = false) ?bootstrap_threshold
-    ?synchronisation_threshold ?connections ?(private_mode = false) node =
+let run node arguments =
   ( match node.status with
   | Not_running ->
       ()
   | Running _ ->
       Test.fail "node %s is already running" node.name ) ;
   let arguments =
-    "run" :: "--expected-pow" :: string_of_int expected_pow :: "--data-dir"
-    :: node.persistent_state.data_dir
-    ::
-    ( match bootstrap_threshold with
-    | None ->
-        []
-    | Some x ->
-        ["--bootstrap-threshold"; string_of_int x] )
-    @ ( match synchronisation_threshold with
-      | None ->
-          []
-      | Some x ->
-          ["--synchronisation-threshold"; string_of_int x] )
-    @ ( match connections with
-      | None ->
-          []
-      | Some x ->
-          ["--connections"; string_of_int x] )
-    @ (if single_process then ["--singleprocess"] else [])
-    @ if private_mode then ["--private-mode"] else []
+    (* Give a default value of 0 to --expected-pow. *)
+    if List.exists (function Expected_pow _ -> true | _ -> false) arguments
+    then arguments
+    else Expected_pow 0 :: arguments
+  in
+  let arguments =
+    "run" :: "--data-dir" :: node.persistent_state.data_dir
+    :: make_arguments arguments
   in
   let on_terminate _ =
     (* Cancel all [Ready] event listeners. *)
@@ -305,38 +323,23 @@ let wait_for_identity node =
         resolver :: node.persistent_state.pending_identity ;
       check_event node "read_identity.v0" promise
 
-let init ?path ?name ?color ?data_dir ?event_pipe ?expected_pow ?network
-    ?net_port ?rpc_port ?history_mode ?single_process ?bootstrap_threshold
-    ?synchronisation_threshold ?connections ?private_mode () =
+let init ?path ?name ?color ?data_dir ?event_pipe ?net_port ?rpc_port arguments
+    =
   let node =
     create ?path ?name ?color ?data_dir ?event_pipe ?net_port ?rpc_port ()
   in
-  let* () = identity_generate ?expected_pow node in
-  let* () = config_init ?network ?history_mode node in
   let* () =
-    run
-      ?expected_pow
-      ?single_process
-      ?bootstrap_threshold
-      ?synchronisation_threshold
-      ?connections
-      ?private_mode
-      node
+    let expected_pow =
+      list_find_map (function Expected_pow x -> Some x | _ -> None) arguments
+    in
+    identity_generate ?expected_pow node
   in
+  let* () = config_init node arguments in
+  let* () = run node [] in
   let* () = wait_for_ready node in
   return node
 
-let restart ?expected_pow ?single_process ?bootstrap_threshold
-    ?synchronisation_threshold ?connections ?private_mode node =
+let restart node arguments =
   let* () = terminate node in
-  let* () =
-    run
-      ?expected_pow
-      ?single_process
-      ?bootstrap_threshold
-      ?synchronisation_threshold
-      ?connections
-      ?private_mode
-      node
-  in
+  let* () = run node arguments in
   wait_for_ready node

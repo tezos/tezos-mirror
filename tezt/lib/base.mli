@@ -61,6 +61,9 @@ val some : 'a -> 'a option Lwt.t
     return the empty list. *)
 val range : int -> int -> int list
 
+(** Backport of [List.find_map] from OCaml 4.10. *)
+val list_find_map : ('a -> 'b option) -> 'a list -> 'b option
+
 (** {2 Regular Expressions} *)
 
 (** Compiled regular expressions. *)

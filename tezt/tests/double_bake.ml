@@ -149,8 +149,8 @@ let double_bake () =
      command from [node_2] to [node_3] from failing due to an "already connected"
      error that could otherwise non-deterministically occur due to P2P propagation.
      This means that we need to use [trust address] too. *)
-  let* node_1 = Node.init ~bootstrap_threshold:0 ~private_mode:true ()
-  and* node_2 = Node.init ~bootstrap_threshold:0 ~private_mode:true () in
+  let* node_1 = Node.init [Bootstrap_threshold 0; Private_mode]
+  and* node_2 = Node.init [Bootstrap_threshold 0; Private_mode] in
   let* client_1 = Client.init ~node:node_1 ()
   and* client_2 = Client.init ~node:node_2 () in
   let* () = Client.Admin.trust_address client_1 ~peer:node_2
@@ -172,7 +172,7 @@ let double_bake () =
   let* _ = Node.wait_for_level node_1 (common_ancestor + 3) in
   (* Step 4 *)
   let* () = Node.terminate node_1 in
-  let* () = Node.run ~bootstrap_threshold:0 node_2 in
+  let* () = Node.run node_2 [Bootstrap_threshold 0] in
   let* () = Node.wait_for_ready node_2 in
   (* Craft a branch of size 2, the first block is baked by bootstrap2 *)
   let* () = Client.bake_for ~key:bootstrap2_key client_2 in
@@ -181,10 +181,10 @@ let double_bake () =
   let* () = Client.bake_for ~key:bootstrap1_key client_2 in
   let* _ = Node.wait_for_level node_2 (common_ancestor + 3) in
   (* Step 5 *)
-  let* () = Node.run ~bootstrap_threshold:0 node_1 in
+  let* () = Node.run node_1 [Bootstrap_threshold 0] in
   let* () = Node.wait_for_ready node_1 in
   (* Step 6 *)
-  let* node_3 = Node.init ~bootstrap_threshold:0 ~private_mode:true () in
+  let* node_3 = Node.init [Bootstrap_threshold 0; Private_mode] in
   let* client_3 = Client.init ~node:node_3 () in
   let* accuser_3 = Accuser.init node_3 in
   let denunciation = wait_for_denunciation accuser_3 in

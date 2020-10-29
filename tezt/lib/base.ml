@@ -45,6 +45,16 @@ let range a b =
   in
   range a b
 
+let rec list_find_map f = function
+  | [] ->
+      None
+  | head :: tail ->
+      match f head with
+        | None ->
+            list_find_map f tail
+        | Some _ as x ->
+            x
+
 type rex = Re.re
 
 let rex r = Re.compile (Re.Perl.re r)
