@@ -115,21 +115,11 @@ val show_history_mode : history_mode -> string
     which was chosen by [create]. They will change
     the result of the {!net_port} and {!rpc_port} functions. *)
 val config_init :
-  ?network:string ->
-  ?net_port:int ->
-  ?rpc_port:int ->
-  ?history_mode:history_mode ->
-  t ->
-  unit Lwt.t
+  ?network:string -> ?history_mode:history_mode -> t -> unit Lwt.t
 
 (** Same as [config_init], but do not wait for the process to exit. *)
 val spawn_config_init :
-  ?network:string ->
-  ?net_port:int ->
-  ?rpc_port:int ->
-  ?history_mode:history_mode ->
-  t ->
-  Process.t
+  ?network:string -> ?history_mode:history_mode -> t -> Process.t
 
 (** Spawn [tezos-node run].
 

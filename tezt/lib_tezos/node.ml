@@ -90,18 +90,7 @@ let show_history_mode = function
   | Rolling ->
       "rolling"
 
-let spawn_config_init ?(network = "sandbox") ?net_port ?rpc_port ?history_mode
-    node =
-  ( match net_port with
-  | None ->
-      ()
-  | Some port ->
-      node.persistent_state.net_port <- port ) ;
-  ( match rpc_port with
-  | None ->
-      ()
-  | Some port ->
-      node.persistent_state.rpc_port <- port ) ;
+let spawn_config_init ?(network = "sandbox") ?history_mode node =
   spawn_command
     node
     ( "config" :: "init" :: "--data-dir" :: node.persistent_state.data_dir
@@ -120,9 +109,8 @@ let spawn_config_init ?(network = "sandbox") ?net_port ?rpc_port ?history_mode
     | Some Rolling ->
         ["--history-mode"; "experimental-rolling"] ) )
 
-let config_init ?network ?net_port ?rpc_port ?history_mode node =
-  spawn_config_init ?network ?net_port ?rpc_port ?history_mode node
-  |> Process.check
+let config_init ?network ?history_mode node =
+  spawn_config_init ?network ?history_mode node |> Process.check
 
 let trigger_ready node value =
   let pending = node.persistent_state.pending_ready in
@@ -320,9 +308,11 @@ let wait_for_identity node =
 let init ?path ?name ?color ?data_dir ?event_pipe ?expected_pow ?network
     ?net_port ?rpc_port ?history_mode ?single_process ?bootstrap_threshold
     ?synchronisation_threshold ?connections ?private_mode () =
-  let node = create ?path ?name ?color ?data_dir ?event_pipe () in
+  let node =
+    create ?path ?name ?color ?data_dir ?event_pipe ?net_port ?rpc_port ()
+  in
   let* () = identity_generate ?expected_pow node in
-  let* () = config_init ?network ?net_port ?rpc_port ?history_mode node in
+  let* () = config_init ?network ?history_mode node in
   let* () =
     run
       ?expected_pow
