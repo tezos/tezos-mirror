@@ -1,4 +1,4 @@
-parameter (pair key (pair unit (pair signature (pair (option signature) (pair (list unit) (pair (set bool) (pair (pair int int) (pair (or key_hash timestamp) (pair (map int string) (lambda string bytes))))))))));
+parameter (pair key unit signature (option signature) (list unit) (set bool) (pair int int) (or key_hash timestamp) (map int string) (lambda string bytes));
 storage unit ;
 # for each uncomparable type t (we take an arbitrary parameter for
 # parametric data-types e.g. pair, list),

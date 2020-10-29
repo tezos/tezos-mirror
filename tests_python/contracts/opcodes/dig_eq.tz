@@ -1,4 +1,4 @@
-parameter (pair nat (pair nat (pair nat (pair nat (pair nat (pair nat (pair nat (pair nat (pair nat (pair nat (pair nat (pair nat (pair nat (pair nat (pair nat (pair nat nat))))))))))))))));
+parameter (pair nat nat nat nat nat nat nat nat nat nat nat nat nat nat nat nat nat);
 storage unit;
 # this contract receives a 17-tuple, unpairs it, reverses the order, reverses it again, and pairs it and verifies that the result is the same as the original tuple.
 code { CAR;

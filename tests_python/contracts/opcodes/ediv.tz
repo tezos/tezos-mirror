@@ -1,5 +1,5 @@
 parameter (pair int int);
-storage (pair (option (pair int nat)) (pair (option (pair int nat)) (pair (option (pair int nat)) (option (pair nat nat)))));
+storage (pair (option (pair int nat)) (option (pair int nat)) (option (pair int nat)) (option (pair nat nat)));
 code { CAR;
        # :: nat : nat : 'S   ->   option (pair nat nat) : 'S
        DUP; UNPAIR; ABS; DIP { ABS; }; EDIV; SWAP;
