@@ -187,6 +187,26 @@ let test_dispatch_advanced () =
       (fun () l () ->
         return ("F" ^ String.concat "" (List.map string_of_abcd l)))
   in
+  let prefixed_en return =
+    Clic.command
+      ~desc:"en-seq-abcd"
+      Clic.no_options
+      ( Clic.prefix "en"
+      @@ Clic.non_terminal_seq ~suffix:["the"; "end"] (abcd_param ~name:"item")
+      @@ Clic.stop )
+      (fun () l () ->
+        return ("E" ^ String.concat "" (List.map string_of_abcd l)))
+  in
+  let prefixed_fr return =
+    Clic.command
+      ~desc:"fr-seq-abcd"
+      Clic.no_options
+      ( Clic.prefix "fr"
+      @@ Clic.non_terminal_seq ~suffix:["la"; "fin"] (abcd_param ~name:"item")
+      @@ Clic.stop )
+      (fun () l () ->
+        return ("F" ^ String.concat "" (List.map string_of_abcd l)))
+  in
   let expect line = expect_result line Format.pp_print_string in
   expect __LINE__ (Error "Unterminated_command") (dispatch [en] ["saucisse"])
   >>= fun () ->
@@ -216,28 +236,34 @@ let test_dispatch_advanced () =
   >>= fun () ->
   expect __LINE__ (Ok "FCB") (dispatch [fr] ["c"; "b"; "la"; "fin"])
   >>= fun () ->
-  (* the following two should probably either all work, or all fail with a
-     command clash error *)
   expect
     __LINE__
-    (Error "non_terminal_seq")
-    (dispatch [en; fr] ["b"; "the"; "end"])
+    (Ok "EA")
+    (dispatch [prefixed_en; prefixed_fr] ["en"; "a"; "the"; "end"])
   >>= fun () ->
   expect
     __LINE__
-    (Error "non_terminal_seq")
-    (dispatch [fr; en] ["b"; "the"; "end"])
+    (Ok "FA")
+    (dispatch [prefixed_en; prefixed_fr] ["fr"; "a"; "la"; "fin"])
   >>= fun () ->
   expect
     __LINE__
-    (Error "non_terminal_seq")
-    (dispatch [en; fr] ["a"; "la"; "fin"])
+    (Error "Unterminated_command")
+    (dispatch [prefixed_en; prefixed_fr] ["fr"; "a"; "the"; "end"])
   >>= fun () ->
-  expect
-    __LINE__
-    (Error "non_terminal_seq")
-    (dispatch [fr; en] ["a"; "la"; "fin"])
-  >>= fun () -> Lwt.return_unit
+  (* the following two should  all fail with a command clash error *)
+  let expected_error =
+    Error
+      "Command cannot have different non_terminal_seq_level at the same \
+       position"
+  in
+  expect __LINE__ expected_error (dispatch [en; fr] ["b"; "the"; "end"])
+  >>= fun () ->
+  expect __LINE__ expected_error (dispatch [fr; en] ["b"; "the"; "end"])
+  >>= fun () ->
+  expect __LINE__ expected_error (dispatch [en; fr] ["a"; "la"; "fin"])
+  >>= fun () ->
+  expect __LINE__ expected_error (dispatch [fr; en] ["a"; "la"; "fin"])
 
 let string_param ~autocomplete next =
   Clic.(
