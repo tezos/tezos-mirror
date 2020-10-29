@@ -85,7 +85,13 @@ type t
     with values starting from 19732. They are used by [config_init]
     and by functions from the [Client] module. They are not used by [run],
     so if you do not call [config_init] or generate the configuration file
-    through some other means, your node will not listen. *)
+    through some other means, your node will not listen.
+
+    The argument list is a list of configuration options that the node
+    should run with. It is passed to the first run of [tezos-node config init].
+    It is also passed to all runs of [tezos-node run] that occur before
+    [tezos-node config init]. If [Expected_pow] is given, it is also used as
+    the default value for {!identity_generate}. *)
 val create :
   ?path:string ->
   ?name:string ->
@@ -94,7 +100,7 @@ val create :
   ?event_pipe:string ->
   ?net_port:int ->
   ?rpc_port:int ->
-  unit ->
+  argument list ->
   t
 
 (** Get the name of a node. *)

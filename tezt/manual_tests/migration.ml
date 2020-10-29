@@ -126,7 +126,7 @@ let migration ?yes_node_path ?yes_wallet context protocol =
       ~rpc_port:19731
       ~net_port:18731
       ~data_dir
-      ()
+      []
   in
   let* () = Node.run node [Connections 0] in
   let* () = Node.wait_for_ready node in

@@ -66,6 +66,8 @@ module Parameters = struct
     data_dir : string;
     mutable net_port : int;
     mutable rpc_port : int;
+    default_expected_pow : int;
+    mutable arguments : argument list;
     mutable pending_ready : unit option Lwt.u list;
     mutable pending_level : (int * int option Lwt.u) list;
     mutable pending_identity : string option Lwt.u list;
@@ -104,14 +106,17 @@ let () = Test.declare_reset_function @@ fun () -> next_port := 19732
 let spawn_command node =
   Process.spawn ~name:node.name ~color:node.color node.path
 
-let spawn_identity_generate ?(expected_pow = 0) node =
+let spawn_identity_generate ?expected_pow node =
   spawn_command
     node
     [ "identity";
       "generate";
       "--data-dir";
       node.persistent_state.data_dir;
-      string_of_int expected_pow ]
+      string_of_int
+        (Option.value
+           expected_pow
+           ~default:node.persistent_state.default_expected_pow) ]
 
 let identity_generate ?expected_pow node =
   spawn_identity_generate ?expected_pow node |> Process.check
@@ -125,6 +130,9 @@ let show_history_mode = function
       "rolling"
 
 let spawn_config_init node arguments =
+  let arguments = node.persistent_state.arguments @ arguments in
+  (* Since arguments will be in the configuration file, we will not need them after this. *)
+  node.persistent_state.arguments <- [] ;
   let arguments =
     (* Give a default value of "sandbox" to --network. *)
     if List.exists (function Network _ -> true | _ -> false) arguments then
@@ -216,7 +224,7 @@ let handle_event node {name; value} =
       ()
 
 let create ?(path = Constant.tezos_node) ?name ?color ?data_dir ?event_pipe
-    ?net_port ?rpc_port () =
+    ?net_port ?rpc_port arguments =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir name | Some dir -> dir
@@ -226,6 +234,16 @@ let create ?(path = Constant.tezos_node) ?name ?color ?data_dir ?event_pipe
   in
   let rpc_port =
     match rpc_port with None -> fresh_port () | Some port -> port
+  in
+  let arguments =
+    (* Give a default value of 0 to --expected-pow. *)
+    if List.exists (function Expected_pow _ -> true | _ -> false) arguments
+    then arguments
+    else Expected_pow 0 :: arguments
+  in
+  let default_expected_pow =
+    list_find_map (function Expected_pow x -> Some x | _ -> None) arguments
+    |> Option.value ~default:0
   in
   let node =
     create
@@ -237,6 +255,8 @@ let create ?(path = Constant.tezos_node) ?name ?color ?data_dir ?event_pipe
         data_dir;
         net_port;
         rpc_port;
+        arguments;
+        default_expected_pow;
         pending_ready = [];
         pending_level = [];
         pending_identity = [];
@@ -251,12 +271,7 @@ let run node arguments =
       ()
   | Running _ ->
       Test.fail "node %s is already running" node.name ) ;
-  let arguments =
-    (* Give a default value of 0 to --expected-pow. *)
-    if List.exists (function Expected_pow _ -> true | _ -> false) arguments
-    then arguments
-    else Expected_pow 0 :: arguments
-  in
+  let arguments = node.persistent_state.arguments @ arguments in
   let arguments =
     "run" :: "--data-dir" :: node.persistent_state.data_dir
     :: make_arguments arguments
@@ -326,15 +341,18 @@ let wait_for_identity node =
 let init ?path ?name ?color ?data_dir ?event_pipe ?net_port ?rpc_port arguments
     =
   let node =
-    create ?path ?name ?color ?data_dir ?event_pipe ?net_port ?rpc_port ()
+    create
+      ?path
+      ?name
+      ?color
+      ?data_dir
+      ?event_pipe
+      ?net_port
+      ?rpc_port
+      arguments
   in
-  let* () =
-    let expected_pow =
-      list_find_map (function Expected_pow x -> Some x | _ -> None) arguments
-    in
-    identity_generate ?expected_pow node
-  in
-  let* () = config_init node arguments in
+  let* () = identity_generate node in
+  let* () = config_init node [] in
   let* () = run node [] in
   let* () = wait_for_ready node in
   return node
