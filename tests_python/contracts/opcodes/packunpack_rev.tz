@@ -1,10 +1,12 @@
 parameter (pair
              int
-             (pair
-                nat
-                (pair
-                   string
-                   (pair bytes (pair mutez (pair bool (pair key_hash (pair timestamp address))))))));
+             nat
+             string
+             bytes
+             mutez
+             bool
+             key_hash
+             timestamp address);
 storage unit ;
 code { CAR;
        # Check the int
