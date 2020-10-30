@@ -57,5 +57,5 @@ module type PROTO_RPC = sig
   val do_rpc :
     Proxy.proxy_getter_input ->
     Proxy_context.M.key ->
-    Proxy_context.M.tree option tzresult Lwt.t
+    Tezos_shell_services.Block_services.raw_context tzresult Lwt.t
 end

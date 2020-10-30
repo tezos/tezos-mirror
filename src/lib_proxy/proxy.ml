@@ -35,3 +35,25 @@ type proxy_getter_input = {
   chain : Tezos_shell_services.Block_services.chain;
   block : Tezos_shell_services.Block_services.block;
 }
+
+(** The result of setting a leaf. A mutation if done in place, otherwise
+    a fresh value. We need this type because the proxy implementation
+    returns a value whereas the light mode's implementation
+    performs a mutation (because of Irmin under the hood). *)
+type 'a update = Mutation | Value of 'a
+
+module type TREE = sig
+  type t
+
+  type key
+
+  val empty : t Lwt.t
+
+  val get : t -> key -> Proxy_context.M.tree option Lwt.t
+
+  val set_leaf :
+    t ->
+    key ->
+    Tezos_shell_services.Block_services.raw_context ->
+    t update tzresult Lwt.t
+end

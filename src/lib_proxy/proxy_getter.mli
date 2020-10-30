@@ -23,11 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Converts a tree as returned by the RPC to a tree in terms of the
-    client's context *)
-val raw_context_to_tree :
-  Tezos_shell_services.Block_services.raw_context ->
-  Proxy_context.M.tree option
+(** The size of a tree, for logging *)
+val raw_context_size : Tezos_shell_services.Block_services.raw_context -> int
 
 module StringMap = TzString.Map
 

@@ -63,26 +63,16 @@ let mock_proto_rpc () =
           None
 
     let do_rpc _chain_n_block (k : Proxy_context.M.key) =
-      let rec please_error = function
+      let rec mock_raw_context = function
         | [] ->
-            false
-        (* This constant is used in tests below *)
-        | "please_error" :: _ ->
-            true
-        | _ :: tail ->
-            please_error tail
-      in
-      let rec mock_tree = function
-        | [] ->
-            `Value Bytes.empty
+            Tezos_shell_services.Block_services.Key Bytes.empty
         | hd :: tail ->
-            `Tree (StringMap.add hd (mock_tree tail) StringMap.empty)
+            Tezos_shell_services.Block_services.Dir
+              [(hd, mock_raw_context tail)]
       in
-      if please_error k then return_none
-      else (
-        (* Remember call *)
-        Stack.push k calls ;
-        return_some @@ mock_tree k )
+      (* Remember call *)
+      Stack.push k calls ;
+      return @@ mock_raw_context k
   end : MOCKED_PROTO_RPC )
 
 class mock_rpc_context : RPC_context.simple =
@@ -141,30 +131,6 @@ let test_tree _ () =
     "Adding a;b;d into (a;b ∪ a;c) doesn't cause a change"
     (add a_b_and_a_c ["a"; "b"; "d"] = a_b_and_a_c) ;
   Lwt.return_unit
-
-(* Tests that [Proxy_getter] returns None
-   if the underlying [do_rpc] implementation returns None *)
-let test_do_rpc_none () =
-  let (module MockedProtoRPC) = mock_proto_rpc () in
-  let module MockedGetter = Tezos_proxy.Proxy_getter.Make (MockedProtoRPC) in
-  MockedGetter.proxy_get mock_input ["A"; "b"; "2"]
-  >>=? fun _ ->
-  MockedGetter.proxy_get mock_input ["please_error"]
-  >>=? (fun get_result ->
-         match get_result with Some _ -> assert false | _ -> return_unit)
-  >>=? fun () ->
-  MockedGetter.proxy_dir_mem mock_input ["please_error"]
-  >>=? fun dir_mem_result ->
-  lwt_assert_false
-    "proxy_dir_mem should return false when do_rpc returns None"
-    dir_mem_result
-  >>= fun () ->
-  MockedGetter.proxy_mem mock_input ["please_error"]
-  >>=? fun mem_result ->
-  lwt_assert_false
-    "proxy_mem should return false when do_rpc returns None"
-    mem_result
-  >>= fun () -> return_unit
 
 (* Tests that [Proxy_getter]
    uses a cached value when requesting a key longer

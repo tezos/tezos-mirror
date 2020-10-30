@@ -43,23 +43,13 @@ module Events = struct
       ~msg:"Cache miss: ({key})"
       ~level:Debug
       ("key", Data_encoding.string)
-
-  let cache_node_miss =
-    declare_1
-      ~section
-      ~name:"cache_node_miss"
-      ~msg:"Cache node miss: ({key})"
-      ~level:Debug
-      ("key", Data_encoding.string)
-
-  let cache_node_hit =
-    declare_1
-      ~section
-      ~name:"cache_node_hit"
-      ~msg:"Cache node hit: ({key})"
-      ~level:Debug
-      ("key", Data_encoding.string)
 end
+
+let rec raw_context_size = function
+  | Tezos_shell_services.Block_services.Key _ | Cut ->
+      0
+  | Dir map ->
+      List.fold_left (fun sz (_, v) -> sz + 1 + raw_context_size v) 0 map
 
 let rec raw_context_to_tree
     (raw : Tezos_shell_services.Block_services.raw_context) :
@@ -96,21 +86,26 @@ end
 
 module StringMap = TzString.Map
 
-module Tree = struct
-  let empty = Proxy_context.M.empty
+module Tree :
+  Proxy.TREE
+    with type t = Proxy_context.M.tree
+    with type key = Proxy_context.M.key = struct
+  type t = Proxy_context.M.tree
 
-  let rec raw_get m k =
+  type key = Proxy_context.M.key
+
+  let empty = Lwt.return Proxy_context.M.empty
+
+  let rec get (m : t) k =
     match (k, m) with
     | ([], m) ->
         Some m
     | (n :: k, `Tree m) -> (
-      match StringMap.find_opt n m with
-      | Some res ->
-          raw_get res k
-      | None ->
-          None )
+      match StringMap.find_opt n m with Some res -> get res k | None -> None )
     | (_ :: _, `Value _) ->
         None
+
+  let get m k = Lwt.return @@ get m k
 
   let rec comb (k : StringMap.key list) (v : Proxy_context.M.tree) :
       Proxy_context.M.tree =
@@ -138,6 +133,16 @@ module Tree = struct
                 set_leaf k_hd_tree k_tail v
           in
           `Tree (StringMap.add k_hd k_m map) )
+
+  let set_leaf m k raw_context =
+    let m' =
+      match raw_context_to_tree raw_context with
+      | None ->
+          m
+      | Some v ->
+          set_leaf m k v
+    in
+    return @@ Proxy.Value m'
 end
 
 module type REQUESTS_TREE = sig
@@ -188,8 +193,10 @@ end
 
 module StringSet = TzString.Set
 
-module Make (X : Proxy_proto.PROTO_RPC) : M = struct
-  let cache = ref Tree.empty
+module Make'
+    (T : Proxy.TREE with type key = string list)
+    (X : Proxy_proto.PROTO_RPC) : M = struct
+  let cache = ref None
 
   let requests = ref RequestsTree.empty
 
@@ -203,6 +210,16 @@ module Make (X : Proxy_proto.PROTO_RPC) : M = struct
         false
 
   type kind = Get | Mem
+
+  let get_cache () =
+    match !cache with
+    | None ->
+        T.empty
+        >>= fun e ->
+        cache := Some e ;
+        Lwt.return e
+    | Some e ->
+        Lwt.return e
 
   (** Handles the application of [X.split_key]. Performs
       the RPC call and updates [cache] accordingly. *)
@@ -229,21 +246,21 @@ module Make (X : Proxy_proto.PROTO_RPC) : M = struct
     if split && is_all key then return_unit
     else
       X.do_rpc pgi key
-      >>=? fun tree_opt ->
-      let pped_key = pp_key key in
+      >>=? fun tree ->
       (* Remember request was done: map key to [All] in !requests
          (see [REQUESTS_TREE]'s mli for further details) *)
       requests := RequestsTree.add !requests key ;
-      match tree_opt with
-      | None ->
-          (* This is not an error, the caller may be requesting with
-             Proxy_context.mem whether some key is mapped *)
-          Events.(emit cache_node_miss pped_key) >>= fun () -> return_unit
-      | Some tree ->
-          Events.(emit cache_node_hit pped_key)
-          >>= fun () ->
-          cache := Tree.set_leaf !cache key tree ;
-          return_unit
+      get_cache ()
+      >>= fun c ->
+      (* Update cache with data obtained *)
+      T.set_leaf c key tree
+      >>=? fun updated ->
+      ( match updated with
+      | Mutation ->
+          ()
+      | Value cache' ->
+          cache := Some cache' ) ;
+      return_unit
 
   (* [generic_call] and [do_rpc] above go hand in hand. do_rpc takes
      care of performing the RPC call and updating [cache].
@@ -273,7 +290,7 @@ module Make (X : Proxy_proto.PROTO_RPC) : M = struct
          was done or no related request was done at all).
          An RPC MUST be done. *)
       Events.(emit cache_miss pped_key) >>= fun () -> do_rpc pgi kind key )
-    >>=? fun () -> return @@ Tree.raw_get !cache key
+    >>=? fun () -> get_cache () >>= fun c -> T.get c key >>= return
 
   let proxy_get = generic_call Get
 
@@ -299,3 +316,5 @@ module Make (X : Proxy_proto.PROTO_RPC) : M = struct
     | Some (`Tree _) ->
         return_false
 end
+
+module Make (X : Proxy_proto.PROTO_RPC) : M = Make' (Tree) (X)

@@ -80,12 +80,9 @@ module ProtoRpc : Tezos_proxy.Proxy_proto.PROTO_RPC = struct
       ~block
       key
     >>=? fun (raw_context : Block_services.raw_context) ->
-    match Tezos_proxy.Proxy_getter.raw_context_to_tree raw_context with
-    | None ->
-        L.emit L.no_tree_received () >>= fun () -> return_none
-    | Some u ->
-        L.emit L.tree_received @@ Int64.of_int (Proxy_context.M.tree_size u)
-        >>= fun () -> return_some u
+    L.emit L.tree_received
+    @@ Int64.of_int (Tezos_proxy.Proxy_getter.raw_context_size raw_context)
+    >>= fun () -> return raw_context
 end
 
 let initial_context (rpc_context : RPC_context.json)
