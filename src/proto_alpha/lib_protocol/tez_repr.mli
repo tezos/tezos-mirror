@@ -27,17 +27,6 @@ type t
 
 type tez = t
 
-type error +=
-  | Addition_overflow of t * t (* `Temporary *)
-  | Subtraction_underflow of t * t (* `Temporary *)
-  | Multiplication_overflow of t * int64 (* `Temporary *)
-  | Negative_multiplicator of t * int64 (* `Temporary *)
-  | Invalid_divisor of t * int64
-
-(* `Temporary *)
-
-val id : string
-
 val zero : t
 
 val one_mutez : t
@@ -64,9 +53,6 @@ val of_mutez : int64 -> t option
 (** [of_mutez_exn n] fails if n is negative.
     It should only be used at toplevel for constants. *)
 val of_mutez_exn : int64 -> t
-
-(** It should only be used at toplevel for constants. *)
-val add_exn : t -> t -> t
 
 (** It should only be used at toplevel for constants. *)
 val mul_exn : t -> int -> t
