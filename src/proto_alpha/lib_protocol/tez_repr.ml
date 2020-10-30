@@ -23,11 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module T = struct
-  let id = "tez"
+let id = "tez"
 
-  let name = "mutez"
-end
+let name = "mutez"
 
 include Compare.Int64 (* invariant: positive *)
 
@@ -51,8 +49,6 @@ let fifty_cents = Int64.mul one_cent 50L
 
 (* 1 tez = 100 cents = 1_000_000 mutez *)
 let one = Int64.mul one_cent 100L
-
-let id = T.id
 
 let of_string s =
   let triplets = function
@@ -178,95 +174,94 @@ let to_mutez t = t
 let encoding =
   let open Data_encoding in
   Data_encoding.def
-    T.name
+    name
     (check_size 10 (conv Z.of_int64 (Json.wrap_error Z.to_int64) n))
 
 let () =
   let open Data_encoding in
   register_error_kind
     `Temporary
-    ~id:(T.id ^ ".addition_overflow")
-    ~title:("Overflowing " ^ T.id ^ " addition")
+    ~id:(id ^ ".addition_overflow")
+    ~title:("Overflowing " ^ id ^ " addition")
     ~pp:(fun ppf (opa, opb) ->
       Format.fprintf
         ppf
         "Overflowing addition of %a %s and %a %s"
         pp
         opa
-        T.id
+        id
         pp
         opb
-        T.id)
-    ~description:("An addition of two " ^ T.id ^ " amounts overflowed")
+        id)
+    ~description:("An addition of two " ^ id ^ " amounts overflowed")
     (obj1 (req "amounts" (tup2 encoding encoding)))
     (function Addition_overflow (a, b) -> Some (a, b) | _ -> None)
     (fun (a, b) -> Addition_overflow (a, b)) ;
   register_error_kind
     `Temporary
-    ~id:(T.id ^ ".subtraction_underflow")
-    ~title:("Underflowing " ^ T.id ^ " subtraction")
+    ~id:(id ^ ".subtraction_underflow")
+    ~title:("Underflowing " ^ id ^ " subtraction")
     ~pp:(fun ppf (opa, opb) ->
       Format.fprintf
         ppf
         "Underflowing subtraction of %a %s and %a %s"
         pp
         opa
-        T.id
+        id
         pp
         opb
-        T.id)
-    ~description:("An subtraction of two " ^ T.id ^ " amounts underflowed")
+        id)
+    ~description:("An subtraction of two " ^ id ^ " amounts underflowed")
     (obj1 (req "amounts" (tup2 encoding encoding)))
     (function Subtraction_underflow (a, b) -> Some (a, b) | _ -> None)
     (fun (a, b) -> Subtraction_underflow (a, b)) ;
   register_error_kind
     `Temporary
-    ~id:(T.id ^ ".multiplication_overflow")
-    ~title:("Overflowing " ^ T.id ^ " multiplication")
+    ~id:(id ^ ".multiplication_overflow")
+    ~title:("Overflowing " ^ id ^ " multiplication")
     ~pp:(fun ppf (opa, opb) ->
       Format.fprintf
         ppf
         "Overflowing multiplication of %a %s and %Ld"
         pp
         opa
-        T.id
+        id
         opb)
     ~description:
-      ("A multiplication of a " ^ T.id ^ " amount by an integer overflowed")
+      ("A multiplication of a " ^ id ^ " amount by an integer overflowed")
     (obj2 (req "amount" encoding) (req "multiplicator" int64))
     (function Multiplication_overflow (a, b) -> Some (a, b) | _ -> None)
     (fun (a, b) -> Multiplication_overflow (a, b)) ;
   register_error_kind
     `Temporary
-    ~id:(T.id ^ ".negative_multiplicator")
-    ~title:("Negative " ^ T.id ^ " multiplicator")
+    ~id:(id ^ ".negative_multiplicator")
+    ~title:("Negative " ^ id ^ " multiplicator")
     ~pp:(fun ppf (opa, opb) ->
       Format.fprintf
         ppf
         "Multiplication of %a %s by negative integer %Ld"
         pp
         opa
-        T.id
+        id
         opb)
-    ~description:
-      ("Multiplication of a " ^ T.id ^ " amount by a negative integer")
+    ~description:("Multiplication of a " ^ id ^ " amount by a negative integer")
     (obj2 (req "amount" encoding) (req "multiplicator" int64))
     (function Negative_multiplicator (a, b) -> Some (a, b) | _ -> None)
     (fun (a, b) -> Negative_multiplicator (a, b)) ;
   register_error_kind
     `Temporary
-    ~id:(T.id ^ ".invalid_divisor")
-    ~title:("Invalid " ^ T.id ^ " divisor")
+    ~id:(id ^ ".invalid_divisor")
+    ~title:("Invalid " ^ id ^ " divisor")
     ~pp:(fun ppf (opa, opb) ->
       Format.fprintf
         ppf
         "Division of %a %s by non positive integer %Ld"
         pp
         opa
-        T.id
+        id
         opb)
     ~description:
-      ("Multiplication of a " ^ T.id ^ " amount by a non positive integer")
+      ("Multiplication of a " ^ id ^ " amount by a non positive integer")
     (obj2 (req "amount" encoding) (req "divisor" int64))
     (function Invalid_divisor (a, b) -> Some (a, b) | _ -> None)
     (fun (a, b) -> Invalid_divisor (a, b))
