@@ -29,18 +29,16 @@ module T = struct
   let name = "mutez"
 end
 
-type qty = int64 (* invariant: positive *)
+include Compare.Int64 (* invariant: positive *)
 
 type error +=
-  | Addition_overflow of qty * qty (* `Temporary *)
-  | Subtraction_underflow of qty * qty (* `Temporary *)
-  | Multiplication_overflow of qty * int64 (* `Temporary *)
-  | Negative_multiplicator of qty * int64 (* `Temporary *)
-  | Invalid_divisor of qty * int64
+  | Addition_overflow of t * t (* `Temporary *)
+  | Subtraction_underflow of t * t (* `Temporary *)
+  | Multiplication_overflow of t * int64 (* `Temporary *)
+  | Negative_multiplicator of t * int64 (* `Temporary *)
+  | Invalid_divisor of t * int64
 
 (* `Temporary *)
-
-include Compare.Int64
 
 let zero = 0L
 
@@ -273,6 +271,4 @@ let () =
     (function Invalid_divisor (a, b) -> Some (a, b) | _ -> None)
     (fun (a, b) -> Invalid_divisor (a, b))
 
-type t = qty
-
-type tez = qty
+type tez = t
