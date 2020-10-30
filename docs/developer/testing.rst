@@ -504,8 +504,8 @@ Conventions
 
 Besides implementing tests, it is necessary to comment test files as
 much as possible to keep a maintainable project for future
-contributors. As part of this effort, we require from contributors to
-follow these guidelines:
+contributors. As part of this effort, we require that contributors 
+follow this convention:
 
 1. For each unit test module, add a header that explains the overall
    goal of the tests in the file (i.e., tested component and nature of
@@ -514,27 +514,28 @@ follow these guidelines:
 
 ::
 
-    (* Testing
-       -------
-       Component:    (component to test, e.g. Shell, Micheline)
-       Invocation:   (command to invoke tests)
-       Dependencies: (e.g., helper files, optional so this line can be removed)
-       Subject:      (brief description of the test goals)
+    (** Testing
+        -------
+        Component:    (component to test, e.g. Shell, Micheline)
+        Invocation:   (command to invoke tests)
+        Dependencies: (e.g., helper files, optional so this line can be removed)
+        Subject:      (brief description of the test goals)
     *)
 
-2. For each test in the unit test module, add a small doc comment that
-   explains what the test actually asserts (2-4 lines are enough). It
-   should start with the word ``Test``. These lines should appear at the
-   beginning of each test unit function that is called by
-   ``Alcotest_lwt.test_case``. For instance,
+2. For each test in the unit test module, the function name shall
+   start with `test_` and one must add a small doc comment that
+   explains what the test actually asserts (2-4 lines are
+   enough). These lines should appear at the beginning of each test
+   unit function that is called by e.g. ``Alcotest_lwt.test_case``. For
+   instance,
 
 ::
 
-    (* Test.
-       Transfer to an unactivated account and then activate it.
-    *)
-    let transfer_to_unactivated_then_activate () =
+    (** Transfer to an unactivated account and then activate it. *)
+    let test_transfer_to_unactivated_then_activate () =
     ...
 
-3. For alcotests, each file name must be prefixed by ``test_`` to
-   preserve a uniform directory structure.
+3. Each file name must be prefixed by ``test_`` to preserve a uniform
+   directory structure.
+
+4. OCaml comments must be valid ``ocamldoc`` `special comments <https://caml.inria.fr/pub/docs/manual-ocaml/ocamldoc.html#s:ocamldoc-comments>`_.
