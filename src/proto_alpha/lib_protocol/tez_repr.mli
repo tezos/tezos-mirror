@@ -27,63 +27,58 @@ type t
 
 type tez = t
 
-include sig
-    type qty
+type error +=
+  | Addition_overflow of t * t (* `Temporary *)
+  | Subtraction_underflow of t * t (* `Temporary *)
+  | Multiplication_overflow of t * int64 (* `Temporary *)
+  | Negative_multiplicator of t * int64 (* `Temporary *)
+  | Invalid_divisor of t * int64
 
-    type error +=
-      | Addition_overflow of qty * qty (* `Temporary *)
-      | Subtraction_underflow of qty * qty (* `Temporary *)
-      | Multiplication_overflow of qty * int64 (* `Temporary *)
-      | Negative_multiplicator of qty * int64 (* `Temporary *)
-      | Invalid_divisor of qty * int64
+(* `Temporary *)
 
-    (* `Temporary *)
+val id : string
 
-    val id : string
+val zero : t
 
-    val zero : qty
+val one_mutez : t
 
-    val one_mutez : qty
+val one_cent : t
 
-    val one_cent : qty
+val fifty_cents : t
 
-    val fifty_cents : qty
+val one : t
 
-    val one : qty
+val ( -? ) : t -> t -> t tzresult
 
-    val ( -? ) : qty -> qty -> qty tzresult
+val ( +? ) : t -> t -> t tzresult
 
-    val ( +? ) : qty -> qty -> qty tzresult
+val ( *? ) : t -> int64 -> t tzresult
 
-    val ( *? ) : qty -> int64 -> qty tzresult
+val ( /? ) : t -> int64 -> t tzresult
 
-    val ( /? ) : qty -> int64 -> qty tzresult
+val to_mutez : t -> int64
 
-    val to_mutez : qty -> int64
+(** [of_mutez n] (micro tez) is None if n is negative *)
+val of_mutez : int64 -> t option
 
-    (** [of_mutez n] (micro tez) is None if n is negative *)
-    val of_mutez : int64 -> qty option
-
-    (** [of_mutez_exn n] fails if n is negative.
+(** [of_mutez_exn n] fails if n is negative.
     It should only be used at toplevel for constants. *)
-    val of_mutez_exn : int64 -> qty
+val of_mutez_exn : int64 -> t
 
-    (** It should only be used at toplevel for constants. *)
-    val add_exn : qty -> qty -> qty
+(** It should only be used at toplevel for constants. *)
+val add_exn : t -> t -> t
 
-    (** It should only be used at toplevel for constants. *)
-    val mul_exn : qty -> int -> qty
+(** It should only be used at toplevel for constants. *)
+val mul_exn : t -> int -> t
 
-    val encoding : qty Data_encoding.t
+val encoding : t Data_encoding.t
 
-    val to_int64 : qty -> int64
+val to_int64 : t -> int64
 
-    include Compare.S with type t := qty
+include Compare.S with type t := t
 
-    val pp : Format.formatter -> qty -> unit
+val pp : Format.formatter -> t -> unit
 
-    val of_string : string -> qty option
+val of_string : string -> t option
 
-    val to_string : qty -> string
-  end
-  with type qty := t
+val to_string : t -> string
