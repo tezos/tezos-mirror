@@ -151,10 +151,6 @@ let ( *? ) t m =
 let ( /? ) t d =
   if d <= 0L then error (Invalid_divisor (t, d)) else ok (Int64.div t d)
 
-let add_exn t1 t2 =
-  let t = Int64.add t1 t2 in
-  if t <= 0L then invalid_arg "add_exn" else t
-
 let mul_exn t m =
   match t *? Int64.(of_int m) with
   | Ok v ->
