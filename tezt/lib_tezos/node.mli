@@ -62,6 +62,7 @@ type argument =
   | Synchronisation_threshold of int  (** [--synchronisation-threshold] *)
   | Connections of int  (** [--connections] *)
   | Private_mode  (** [--private-mode] *)
+  | Peer of string  (** [--peer] *)
 
 (** Tezos node states. *)
 type t
@@ -102,6 +103,21 @@ val create :
   ?rpc_port:int ->
   argument list ->
   t
+
+(** Add an argument to a node as if it was passed to {!create}.
+
+    The argument is passed to the next run of [tezos-node config init].
+    It is also passed to all runs of [tezos-node run] that occur before
+    the next [tezos-node config init]. *)
+val add_argument : t -> argument -> unit
+
+(** Add a [--peer] argument to a node.
+
+    Usage: [add_peer node peer]
+
+    Same as [add_argument node (Peer "127.0.0.1:<PORT>")]
+    where [<PORT>] is the P2P port of [peer]. *)
+val add_peer : t -> t -> unit
 
 (** Get the name of a node. *)
 val name : t -> string

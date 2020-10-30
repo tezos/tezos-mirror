@@ -34,6 +34,7 @@ type argument =
   | Synchronisation_threshold of int
   | Connections of int
   | Private_mode
+  | Peer of string
 
 let make_argument = function
   | Network x ->
@@ -56,6 +57,8 @@ let make_argument = function
       ["--connections"; string_of_int x]
   | Private_mode ->
       ["--private-mode"]
+  | Peer x ->
+      ["--peer"; x]
 
 let make_arguments arguments = List.flatten (List.map make_argument arguments)
 
@@ -264,6 +267,13 @@ let create ?(path = Constant.tezos_node) ?name ?color ?data_dir ?event_pipe
   in
   on_event node (handle_event node) ;
   node
+
+let add_argument node argument =
+  node.persistent_state.arguments <-
+    argument :: node.persistent_state.arguments
+
+let add_peer node peer =
+  add_argument node (Peer ("127.0.0.1:" ^ string_of_int (net_port peer)))
 
 let run node arguments =
   ( match node.status with
