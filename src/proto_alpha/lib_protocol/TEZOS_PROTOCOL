@@ -10,7 +10,6 @@
         "Contract_hash",
         "Blinded_public_key_hash",
 
-        "Qty_repr",
         "Tez_repr",
         "Period_repr",
         "Time_repr",
