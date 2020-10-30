@@ -29,6 +29,12 @@ module type QTY = sig
   val name : string
 end
 
+module T = struct
+  let id = "tez"
+
+  let name = "mutez"
+end
+
 module Make (T : QTY) = struct
   type qty = int64 (* invariant: positive *)
 
@@ -277,11 +283,7 @@ module Make (T : QTY) = struct
       (fun (a, b) -> Invalid_divisor (a, b))
 end
 
-include Make (struct
-  let id = "tez"
-
-  let name = "mutez"
-end)
+include Make (T)
 
 type t = qty
 
