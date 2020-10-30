@@ -26,7 +26,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_expr_hash.ml
    contract_hash.ml
    blinded_public_key_hash.mli blinded_public_key_hash.ml
-   qty_repr.ml
    tez_repr.mli tez_repr.ml
    period_repr.mli period_repr.ml
    time_repr.mli time_repr.ml
@@ -111,7 +110,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_expr_hash.ml
    contract_hash.ml
    blinded_public_key_hash.mli blinded_public_key_hash.ml
-   qty_repr.ml
    tez_repr.mli tez_repr.ml
    period_repr.mli period_repr.ml
    time_repr.mli time_repr.ml
@@ -196,7 +194,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_expr_hash.ml
    contract_hash.ml
    blinded_public_key_hash.mli blinded_public_key_hash.ml
-   qty_repr.ml
    tez_repr.mli tez_repr.ml
    period_repr.mli period_repr.ml
    time_repr.mli time_repr.ml
@@ -301,7 +298,6 @@ include Tezos_raw_protocol_alpha.Main
    Script_expr_hash
    Contract_hash
    Blinded_public_key_hash
-   Qty_repr
    Tez_repr
    Period_repr
    Time_repr
@@ -422,7 +418,6 @@ include Tezos_raw_protocol_alpha.Main
    script_expr_hash.ml
    contract_hash.ml
    blinded_public_key_hash.mli blinded_public_key_hash.ml
-   qty_repr.ml
    tez_repr.mli tez_repr.ml
    period_repr.mli period_repr.ml
    time_repr.mli time_repr.ml
