@@ -1747,7 +1747,7 @@ Cryptographic primitives
     :: key : 'S   ->   key_hash : 'S
 
 -  ``BLAKE2B``: Compute a cryptographic hash of the value contents using the
-   Blake2B cryptographic hash function.
+   Blake2b-256 cryptographic hash function.
 
 ::
 
