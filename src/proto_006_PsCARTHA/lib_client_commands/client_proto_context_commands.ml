@@ -422,8 +422,8 @@ let commands network () =
       ( prefixes ["set"; "delegate"; "for"]
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ prefix "to"
-      @@ Public_key_hash.alias_param
-           ~name:"mgr"
+      @@ Public_key_hash.source_param
+           ~name:"dlgt"
            ~desc:"new delegate of the contract"
       @@ stop )
       (fun ( fee,
@@ -436,7 +436,7 @@ let commands network () =
              fee_cap,
              burn_cap )
            (_, contract)
-           (_, delegate)
+           delegate
            (cctxt : Protocol_client_context.full) ->
         let fee_parameter =
           {
