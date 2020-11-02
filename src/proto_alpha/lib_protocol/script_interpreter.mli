@@ -37,8 +37,6 @@ type error += Runtime_contract_error : Contract.t * Script.expr -> error
 
 type error += Bad_contract_parameter of Contract.t (* `Permanent *)
 
-type error += Cannot_serialize_log
-
 type error += Cannot_serialize_failure
 
 type error += Cannot_serialize_storage
@@ -105,12 +103,3 @@ val execute :
   entrypoint:string ->
   parameter:Script.expr ->
   execution_result tzresult Lwt.t
-
-val trace :
-  Alpha_context.t ->
-  Script_ir_translator.unparsing_mode ->
-  step_constants ->
-  script:Script.t ->
-  entrypoint:string ->
-  parameter:Script.expr ->
-  (execution_result * execution_trace) tzresult Lwt.t

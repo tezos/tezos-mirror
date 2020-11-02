@@ -40,6 +40,10 @@ val levels_in_current_cycle :
   (Raw_level.t * Raw_level.t) shell_tzresult Lwt.t
 
 module Scripts : sig
+  module Traced_interpreter : sig
+    type error += Cannot_serialize_log
+  end
+
   val run_code :
     'a #RPC_context.simple ->
     'a ->
