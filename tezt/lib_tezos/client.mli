@@ -228,6 +228,32 @@ val spawn_transfer :
   t ->
   Process.t
 
+(** Run [tezos-client set delegate for <src> to <delegate>]. *)
+val set_delegate :
+  ?node:Node.t ->
+  ?wait:string ->
+  src:string ->
+  delegate:string ->
+  t ->
+  unit Lwt.t
+
+(** Same as [set_delegate], but do not wait for the process to exit. *)
+val spawn_set_delegate :
+  ?node:Node.t ->
+  ?wait:string ->
+  src:string ->
+  delegate:string ->
+  t ->
+  Process.t
+
+(** Run [tezos-client withdraw delegate from <src>]. *)
+val withdraw_delegate :
+  ?node:Node.t -> ?wait:string -> src:string -> t -> unit Lwt.t
+
+(** Same as [withdraw_delegate], but do not wait for the process to exit. *)
+val spawn_withdraw_delegate :
+  ?node:Node.t -> ?wait:string -> src:string -> t -> Process.t
+
 (** Run [tezos-client get balance for]. *)
 val get_balance_for : ?node:Node.t -> account:string -> t -> float Lwt.t
 
@@ -245,10 +271,12 @@ val spawn_create_mockup :
 (** Run [tezos-client submit proposals for].
 
     Default [key] is {!Constant.bootstrap1.alias}. *)
-val submit_proposals : ?key:string -> proto_hash:string -> t -> unit Lwt.t
+val submit_proposals :
+  ?key:string -> ?wait:string -> proto_hash:string -> t -> unit Lwt.t
 
 (** Same as [submit_proposals], but do not wait for the process to exit. *)
-val spawn_submit_proposals : ?key:string -> proto_hash:string -> t -> Process.t
+val spawn_submit_proposals :
+  ?key:string -> ?wait:string -> proto_hash:string -> t -> Process.t
 
 type ballot = Nay | Pass | Yay
 
@@ -256,11 +284,11 @@ type ballot = Nay | Pass | Yay
 
     Default [key] is {!Constant.bootstrap1.alias}. *)
 val submit_ballot :
-  ?key:string -> proto_hash:string -> ballot -> t -> unit Lwt.t
+  ?key:string -> ?wait:string -> proto_hash:string -> ballot -> t -> unit Lwt.t
 
 (** Same as [submit_ballot], but do not wait for the process to exit. *)
 val spawn_submit_ballot :
-  ?key:string -> proto_hash:string -> ballot -> t -> Process.t
+  ?key:string -> ?wait:string -> proto_hash:string -> ballot -> t -> Process.t
 
 (** {2 High-Level Functions} *)
 

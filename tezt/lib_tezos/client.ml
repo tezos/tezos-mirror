@@ -286,16 +286,33 @@ let gen_and_show_keys ~alias client =
   let* () = gen_keys ~alias client in
   show_address ~show_secret:true ~alias client
 
-let spawn_transfer ?node ?wait ~amount ~giver ~receiver client =
-  let wait_arg = match wait with None -> [] | Some w -> ["--wait"; w] in
+let spawn_transfer ?node ?(wait = "none") ~amount ~giver ~receiver client =
   spawn_command
     ?node
     client
-    ( wait_arg
+    ( ["--wait"; wait]
     @ ["transfer"; string_of_int amount; "from"; giver; "to"; receiver] )
 
 let transfer ?node ?wait ~amount ~giver ~receiver client =
   spawn_transfer ?node ?wait ~amount ~giver ~receiver client |> Process.check
+
+let spawn_set_delegate ?node ?(wait = "none") ~src ~delegate client =
+  spawn_command
+    ?node
+    client
+    (["--wait"; wait] @ ["set"; "delegate"; "for"; src; "to"; delegate])
+
+let set_delegate ?node ?wait ~src ~delegate client =
+  spawn_set_delegate ?node ?wait ~src ~delegate client |> Process.check
+
+let spawn_withdraw_delegate ?node ?(wait = "none") ~src client =
+  spawn_command
+    ?node
+    client
+    (["--wait"; wait] @ ["withdraw"; "delegate"; "for"; src])
+
+let withdraw_delegate ?node ?wait ~src client =
+  spawn_withdraw_delegate ?node ?wait ~src client |> Process.check
 
 let spawn_get_balance_for ?node ~account client =
   spawn_command ?node client ["get"; "balance"; "for"; account]
@@ -327,17 +344,19 @@ let spawn_create_mockup ?(sync_mode = Synchronous) ~protocol client =
 let create_mockup ?sync_mode ~protocol client =
   spawn_create_mockup ?sync_mode ~protocol client |> Process.check
 
-let spawn_submit_proposals ?(key = Constant.bootstrap1.alias) ~proto_hash
-    client =
-  spawn_command client ["submit"; "proposals"; "for"; key; proto_hash]
+let spawn_submit_proposals ?(key = Constant.bootstrap1.alias) ?(wait = "none")
+    ~proto_hash client =
+  spawn_command
+    client
+    (["--wait"; wait] @ ["submit"; "proposals"; "for"; key; proto_hash])
 
-let submit_proposals ?key ~proto_hash client =
-  spawn_submit_proposals ?key ~proto_hash client |> Process.check
+let submit_proposals ?key ?wait ~proto_hash client =
+  spawn_submit_proposals ?key ?wait ~proto_hash client |> Process.check
 
 type ballot = Nay | Pass | Yay
 
-let spawn_submit_ballot ?(key = Constant.bootstrap1.alias) ~proto_hash vote
-    client =
+let spawn_submit_ballot ?(key = Constant.bootstrap1.alias) ?(wait = "none")
+    ~proto_hash vote client =
   let string_of_vote = function
     | Yay ->
         "yay"
@@ -348,10 +367,11 @@ let spawn_submit_ballot ?(key = Constant.bootstrap1.alias) ~proto_hash vote
   in
   spawn_command
     client
-    ["submit"; "ballot"; "for"; key; proto_hash; string_of_vote vote]
+    ( ["--wait"; wait]
+    @ ["submit"; "ballot"; "for"; key; proto_hash; string_of_vote vote] )
 
-let submit_ballot ?key ~proto_hash vote client =
-  spawn_submit_ballot ?key ~proto_hash vote client |> Process.check
+let submit_ballot ?key ?wait ~proto_hash vote client =
+  spawn_submit_ballot ?key ?wait ~proto_hash vote client |> Process.check
 
 let init ?path ?admin_path ?name ?color ?base_dir ?node () =
   let client = create ?path ?admin_path ?name ?color ?base_dir ?node () in
