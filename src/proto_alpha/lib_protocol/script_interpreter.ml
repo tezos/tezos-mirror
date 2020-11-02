@@ -1538,8 +1538,8 @@ let trace ctxt mode step_constants ~script ~entrypoint ~parameter =
   let trace = Option.value ~default:[] trace in
   ({ctxt; storage; lazy_storage_diff; operations}, trace)
 
-let execute ctxt mode step_constants ~script ~entrypoint ~parameter =
-  let logger = (module No_trace : STEP_LOGGER) in
+let execute ?(logger = (module No_trace : STEP_LOGGER)) ctxt mode
+    step_constants ~script ~entrypoint ~parameter =
   execute
     logger
     ctxt
