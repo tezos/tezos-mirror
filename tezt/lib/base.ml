@@ -70,6 +70,8 @@ let ( =~* ) s r =
   | Some group ->
       Some (Re.Group.get group 1)
 
+let replace_string = Re.replace_string
+
 let async_promises = ref []
 
 let async promise = async_promises := promise :: !async_promises

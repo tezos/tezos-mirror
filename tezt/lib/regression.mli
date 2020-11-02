@@ -53,3 +53,7 @@ val register :
     The hooks will capture the spawned command, its arguments and the output of
     its execution into the registered [output_file]. *)
 val hooks : Process.hooks
+
+(** Similar to [hooks], but the captured output is pre-processed to remove
+    or replace potential variables that may change between runs. *)
+val scrubbing_hooks : Process.hooks
