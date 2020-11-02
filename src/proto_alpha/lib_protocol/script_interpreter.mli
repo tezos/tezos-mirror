@@ -97,6 +97,7 @@ val step :
   ('aft * context) tzresult Lwt.t
 
 val execute :
+  ?logger:logger ->
   Alpha_context.t ->
   Script_ir_translator.unparsing_mode ->
   step_constants ->
