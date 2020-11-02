@@ -180,7 +180,7 @@ let double_bake () =
   (* Step 6 *)
   let* node_3 = Node.init ~bootstrap_threshold:0 () in
   let* client_3 = Client.init ~node:node_3 () in
-  let* accuser_3 = Accuser.init ~node:node_3 () in
+  let* accuser_3 = Accuser.init node_3 in
   let denunciation = wait_for_denunciation accuser_3 in
   let denunciation_injection =
     wait_for_denunciation_injection node_3 client_3 denunciation

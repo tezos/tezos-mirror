@@ -44,7 +44,7 @@ type t
     [base_dir] corresponds to the (useless) "--base-dir" argument of
     the tezos-accuser command.
 
-    The [node] parameter is the accuser's node target. The accusser
+    The [Node.t] parameter is the accuser's node target. The accuser
     will be configured to be synchronised with the given node, and
     will communicate with it. *)
 val create :
@@ -53,7 +53,7 @@ val create :
   ?color:Log.Color.t ->
   ?event_pipe:string ->
   ?base_dir:string ->
-  node:Node.t ->
+  Node.t ->
   t
 
 (** Get the name of an accuser. *)
@@ -140,7 +140,7 @@ val wait_for :
     [base_dir] corresponds to the (useless) "--base-dir" argument of
     the tezos-accuser command.
 
-    The [node] parameter is the accuser's node target. The accusser
+    The [Node.t] parameter is the accuser's node target. The accuser
     will be configured to be synchronised with the given node, and
     will communicate with it. *)
 val init :
@@ -149,8 +149,7 @@ val init :
   ?color:Log.Color.t ->
   ?event_pipe:string ->
   ?base_dir:string ->
-  node:Node.t ->
-  unit ->
+  Node.t ->
   t Lwt.t
 
 (** Restart an accuser.
