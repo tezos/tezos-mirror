@@ -198,6 +198,16 @@ val bake_for :
 val spawn_bake_for :
   ?node:Node.t -> ?key:string -> ?minimal_timestamp:bool -> t -> Process.t
 
+(** Run [tezos-client show address]. *)
+val show_address : ?show_secret:bool -> alias:string -> t -> Account.key Lwt.t
+
+(** Same as [show_address], but do not wait for the process to exit. *)
+val spawn_show_address : ?show_secret:bool -> alias:string -> t -> Process.t
+
+(** A helper to run [tezos-client gen keys] followed by
+    [tezos-client show address] to get the generated key. *)
+val gen_and_show_keys : alias:string -> t -> Account.key Lwt.t
+
 (** Run [tezos-client transfer amount from giver to receiver]. *)
 val transfer :
   ?node:Node.t ->

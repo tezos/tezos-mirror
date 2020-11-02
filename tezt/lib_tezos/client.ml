@@ -253,6 +253,39 @@ let spawn_bake_for ?node ?(key = Constant.bootstrap1.alias)
 let bake_for ?node ?key ?minimal_timestamp client =
   spawn_bake_for ?node ?key ?minimal_timestamp client |> Process.check
 
+let spawn_gen_keys ~alias client = spawn_command client ["gen"; "keys"; alias]
+
+let gen_keys ~alias client = spawn_gen_keys ~alias client |> Process.check
+
+let spawn_show_address ?(show_secret = true) ~alias client =
+  spawn_command client
+  @@
+  if show_secret then ["show"; "address"; alias; "--show-secret"]
+  else ["show"; "address"; alias]
+
+let show_address ?show_secret ~alias client =
+  let extract_key (client_output : string) : Account.key =
+    let public_key_hash =
+      match client_output =~* rex "Hash: ?(\\w*)" with
+      | None ->
+          Test.fail "Cannot extract key from client_output: %s" client_output
+      | Some hash ->
+          hash
+    in
+    let public_key = client_output =~* rex "Public key: ?(\\w*)" in
+    let secret_key = client_output =~* rex "Secret key: ?(\\w*)" in
+    {alias; public_key_hash; public_key; secret_key}
+  in
+  let* output =
+    spawn_show_address ?show_secret ~alias client
+    |> Process.check_and_read_stdout
+  in
+  return @@ extract_key output
+
+let gen_and_show_keys ~alias client =
+  let* () = gen_keys ~alias client in
+  show_address ~show_secret:true ~alias client
+
 let spawn_transfer ?node ?wait ~amount ~giver ~receiver client =
   let wait_arg = match wait with None -> [] | Some w -> ["--wait"; w] in
   spawn_command
