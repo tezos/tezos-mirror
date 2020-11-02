@@ -109,19 +109,14 @@ let pp ppf amount =
   let (ints, decs) =
     (Int64.(div amount mult_int), Int64.(to_int (rem amount mult_int)))
   in
-  Format.fprintf ppf "%a" left ints ;
+  left ppf ints ;
   if Compare.Int.(decs > 0) then Format.fprintf ppf ".%a" right decs
 
 let to_string t = Format.asprintf "%a" pp t
 
-let ( - ) t1 t2 = if t2 <= t1 then Some (Int64.sub t1 t2) else None
-
 let ( -? ) t1 t2 =
-  match t1 - t2 with
-  | None ->
-      error (Subtraction_underflow (t1, t2))
-  | Some v ->
-      ok v
+  if t2 <= t1 then ok (Int64.sub t1 t2)
+  else error (Subtraction_underflow (t1, t2))
 
 let ( +? ) t1 t2 =
   let t = Int64.add t1 t2 in
