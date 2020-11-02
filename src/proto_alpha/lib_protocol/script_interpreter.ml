@@ -43,8 +43,6 @@ type error += Runtime_contract_error : Contract.t * Script.expr -> error
 
 type error += Bad_contract_parameter of Contract.t (* `Permanent *)
 
-type error += Cannot_serialize_log
-
 type error += Cannot_serialize_failure
 
 type error += Cannot_serialize_storage
@@ -113,17 +111,6 @@ let () =
     Data_encoding.(obj1 (req "contract" Contract.encoding))
     (function Bad_contract_parameter c -> Some c | _ -> None)
     (fun c -> Bad_contract_parameter c) ;
-  (* Cannot serialize log *)
-  register_error_kind
-    `Temporary
-    ~id:"michelson_v1.cannot_serialize_log"
-    ~title:"Not enough gas to serialize execution trace"
-    ~description:
-      "Execution trace with stacks was to big to be serialized with the \
-       provided gas"
-    Data_encoding.empty
-    (function Cannot_serialize_log -> Some () | _ -> None)
-    (fun () -> Cannot_serialize_log) ;
   (* Cannot serialize failure *)
   register_error_kind
     `Temporary
@@ -157,34 +144,6 @@ let () =
     (fun () -> Michelson_too_many_recursive_calls)
 
 (* ---- interpreter ---------------------------------------------------------*)
-
-let unparse_stack ctxt (stack, stack_ty) =
-  (* We drop the gas limit as this function is only used for debugging/errors. *)
-  let ctxt = Gas.set_unlimited ctxt in
-  let rec unparse_stack :
-      type a.
-      a stack_ty * a -> (Script.expr * string option) list tzresult Lwt.t =
-    function
-    | (Empty_t, ()) ->
-        return_nil
-    | (Item_t (ty, rest_ty, annot), (v, rest)) ->
-        unparse_data ctxt Readable ty v
-        >>=? fun (data, _ctxt) ->
-        unparse_stack (rest_ty, rest)
-        >|=? fun rest ->
-        let annot =
-          match Script_ir_annot.unparse_var_annot annot with
-          | [] ->
-              None
-          | [a] ->
-              Some a
-          | _ ->
-              assert false
-        in
-        let data = Micheline.strip_locations data in
-        (data, annot) :: rest
-  in
-  unparse_stack (stack_ty, stack)
 
 module Interp_costs = Michelson_v1_gas.Cost_of.Interpreter
 
@@ -247,11 +206,6 @@ type step_constants = {
   chain_id : Chain_id.t;
 }
 
-type log_element =
-  | Log :
-      context * Script.location * 'a * 'a Script_typed_ir.stack_ty
-      -> log_element
-
 module type STEP_LOGGER = sig
   val log_interp :
     context -> ('bef, 'aft) Script_typed_ir.descr -> 'bef -> unit
@@ -264,26 +218,6 @@ module type STEP_LOGGER = sig
 end
 
 type logger = (module STEP_LOGGER)
-
-module Trace_logger () : STEP_LOGGER = struct
-  let log : log_element list ref = ref []
-
-  let log_interp ctxt descr stack =
-    log := Log (ctxt, descr.loc, stack, descr.bef) :: !log
-
-  let log_entry _ctxt _descr _stack = ()
-
-  let log_exit ctxt descr stack =
-    log := Log (ctxt, descr.loc, stack, descr.aft) :: !log
-
-  let get_log () =
-    map_s
-      (fun (Log (ctxt, loc, stack, stack_ty)) ->
-        trace Cannot_serialize_log (unparse_stack ctxt (stack, stack_ty))
-        >>=? fun stack -> return (loc, Gas.level ctxt, stack))
-      !log
-    >>=? fun res -> return (Some (List.rev res))
-end
 
 module No_trace : STEP_LOGGER = struct
   let log_interp _ctxt _descr _stack = ()
@@ -1533,13 +1467,3 @@ let execute ?(logger = (module No_trace : STEP_LOGGER)) ctxt mode
     (Micheline.root parameter)
   >|=? fun (storage, operations, ctxt, lazy_storage_diff) ->
   {ctxt; storage; lazy_storage_diff; operations}
-
-let trace ctxt mode step_constants ~script ~entrypoint ~parameter =
-  let module Logger = Trace_logger () in
-  let logger = (module Logger : STEP_LOGGER) in
-  execute ~logger ctxt mode step_constants ~script ~entrypoint ~parameter
-  >>=? fun {ctxt; storage; lazy_storage_diff; operations} ->
-  Logger.get_log ()
-  >|=? fun trace ->
-  let trace = Option.value ~default:[] trace in
-  ({ctxt; storage; lazy_storage_diff; operations}, trace)

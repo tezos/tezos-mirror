@@ -219,6 +219,87 @@ module Scripts = struct
         RPC_path.(path / "entrypoints")
   end
 
+  module Traced_interpreter = struct
+    type error += Cannot_serialize_log
+
+    let () =
+      (* Cannot serialize log *)
+      register_error_kind
+        `Temporary
+        ~id:"michelson_v1.cannot_serialize_log"
+        ~title:"Not enough gas to serialize execution trace"
+        ~description:
+          "Execution trace with stacks was to big to be serialized with the \
+           provided gas"
+        Data_encoding.empty
+        (function Cannot_serialize_log -> Some () | _ -> None)
+        (fun () -> Cannot_serialize_log)
+
+    type log_element =
+      | Log :
+          context * Script.location * 'a * 'a Script_typed_ir.stack_ty
+          -> log_element
+
+    let unparse_stack ctxt (stack, stack_ty) =
+      (* We drop the gas limit as this function is only used for debugging/errors. *)
+      let ctxt = Gas.set_unlimited ctxt in
+      let rec unparse_stack :
+          type a.
+          a Script_typed_ir.stack_ty * a ->
+          (Script.expr * string option) list tzresult Lwt.t = function
+        | (Empty_t, ()) ->
+            return_nil
+        | (Item_t (ty, rest_ty, annot), (v, rest)) ->
+            Script_ir_translator.unparse_data ctxt Readable ty v
+            >>=? fun (data, _ctxt) ->
+            unparse_stack (rest_ty, rest)
+            >|=? fun rest ->
+            let annot =
+              match Script_ir_annot.unparse_var_annot annot with
+              | [] ->
+                  None
+              | [a] ->
+                  Some a
+              | _ ->
+                  assert false
+            in
+            let data = Micheline.strip_locations data in
+            (data, annot) :: rest
+      in
+      unparse_stack (stack_ty, stack)
+
+    module Trace_logger () : Script_interpreter.STEP_LOGGER = struct
+      let log : log_element list ref = ref []
+
+      let log_interp ctxt (descr : (_, _) Script_typed_ir.descr) stack =
+        log := Log (ctxt, descr.loc, stack, descr.bef) :: !log
+
+      let log_entry _ctxt _descr _stack = ()
+
+      let log_exit ctxt (descr : (_, _) Script_typed_ir.descr) stack =
+        log := Log (ctxt, descr.loc, stack, descr.aft) :: !log
+
+      let get_log () =
+        map_s
+          (fun (Log (ctxt, loc, stack, stack_ty)) ->
+            trace Cannot_serialize_log (unparse_stack ctxt (stack, stack_ty))
+            >>=? fun stack -> return (loc, Gas.level ctxt, stack))
+          !log
+        >>=? fun res -> return (Some (List.rev res))
+    end
+
+    let execute ctxt mode step_constants ~script ~entrypoint ~parameter =
+      let module Logger = Trace_logger () in
+      let open Script_interpreter in
+      let logger = (module Logger : STEP_LOGGER) in
+      execute ~logger ctxt mode step_constants ~script ~entrypoint ~parameter
+      >>=? fun {ctxt; storage; lazy_storage_diff; operations} ->
+      Logger.get_log ()
+      >|=? fun trace ->
+      let trace = Option.value ~default:[] trace in
+      ({ctxt; storage; lazy_storage_diff; operations}, trace)
+  end
+
   let register () =
     let open Services_registration in
     let originate_dummy_contract ctxt script balance =
@@ -326,7 +407,7 @@ module Scripts = struct
           let open Script_interpreter in
           {source; payer; self = dummy_contract; amount; chain_id}
         in
-        Script_interpreter.trace
+        Traced_interpreter.execute
           ctxt
           Readable
           step_constants
