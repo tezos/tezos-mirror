@@ -1521,23 +1521,6 @@ type execution_result = {
   operations : packed_internal_operation list;
 }
 
-let trace ctxt mode step_constants ~script ~entrypoint ~parameter =
-  let module Logger = Trace_logger () in
-  let logger = (module Logger : STEP_LOGGER) in
-  execute
-    logger
-    ctxt
-    mode
-    step_constants
-    ~entrypoint
-    script
-    (Micheline.root parameter)
-  >>=? fun (storage, operations, ctxt, lazy_storage_diff) ->
-  Logger.get_log ()
-  >|=? fun trace ->
-  let trace = Option.value ~default:[] trace in
-  ({ctxt; storage; lazy_storage_diff; operations}, trace)
-
 let execute ?(logger = (module No_trace : STEP_LOGGER)) ctxt mode
     step_constants ~script ~entrypoint ~parameter =
   execute
@@ -1550,3 +1533,13 @@ let execute ?(logger = (module No_trace : STEP_LOGGER)) ctxt mode
     (Micheline.root parameter)
   >|=? fun (storage, operations, ctxt, lazy_storage_diff) ->
   {ctxt; storage; lazy_storage_diff; operations}
+
+let trace ctxt mode step_constants ~script ~entrypoint ~parameter =
+  let module Logger = Trace_logger () in
+  let logger = (module Logger : STEP_LOGGER) in
+  execute ~logger ctxt mode step_constants ~script ~entrypoint ~parameter
+  >>=? fun {ctxt; storage; lazy_storage_diff; operations} ->
+  Logger.get_log ()
+  >|=? fun trace ->
+  let trace = Option.value ~default:[] trace in
+  ({ctxt; storage; lazy_storage_diff; operations}, trace)
