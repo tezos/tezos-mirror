@@ -25,6 +25,9 @@ here either.
 - You can now specify the base directory using environment variable `TEZOS_CLIENT_DIR`.
   If you both set this environment variable and specify `--base-dir`, the latter will be used.
 
+- Fix command `set delegate for <SRC> to <DLGT>` to accept public key hashes for
+  the `<DLGT>` field.
+
 ## Baker / Endorser / Accuser
 
 - Fixed a crash (assertion error) that could happen at exit, in particular if a baker were connected.
