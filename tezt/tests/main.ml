@@ -49,5 +49,6 @@ let () =
   P2p.register Alpha ;
   Bootstrap.register_protocol_independent () ;
   Encoding.register () ;
+  RPC_test.register () ;
   (* Test.run () should be the last statement, don't register afterwards! *)
   Test.run ()
