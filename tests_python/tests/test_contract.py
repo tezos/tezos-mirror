@@ -85,7 +85,8 @@ class TestManager:
     def test_manager_set_delegate(self, client: Client):
         client.set_delegate('manager', 'bootstrap2', [])
         client.bake('bootstrap5', BAKE_ARGS)
-        client.set_delegate('delegatable_target', 'bootstrap2', [])
+        bootstrap2_pkh = IDENTITIES['bootstrap2']['identity']
+        client.set_delegate('delegatable_target', bootstrap2_pkh, [])
         client.bake('bootstrap5', BAKE_ARGS)
         delegate = IDENTITIES['bootstrap2']['identity']
         assert client.get_delegate('manager', []).delegate \
