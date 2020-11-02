@@ -13,8 +13,8 @@ protocol before activating it.
 Delegates take part in the amendment procedure with an influence
 proportional to their stake, one roll one vote.
 
-The procedure consists of five periods, each of 32768 blocks (or
-~three weeks), for a total of approximately four months.
+The procedure consists of five periods, each of 20480 blocks (or
+~two weeks), for a total of approximately 2 months and a half.
 
 Other than this page, there is an excellent overview from `Jacob
 Arluck on medium.
