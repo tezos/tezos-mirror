@@ -141,14 +141,20 @@ let wait_for_denunciation_injection node client oph_promise =
 let double_bake () =
   Test.register
     ~__FILE__
-    ~title:"Test double baking with accuser"
+    ~title:"double baking with accuser"
     ~tags:["double"; "baking"; "accuser"; "node"]
   @@ fun () ->
   (* Step 1 and 2 *)
-  let* node_1 = Node.init ~bootstrap_threshold:0 ()
-  and* node_2 = Node.init ~bootstrap_threshold:0 () in
+  (* Note: we start all nodes with [--private] to prevent the [connect address]
+     command from [node_2] to [node_3] from failing due to an "already connected"
+     error that could otherwise non-deterministically occur due to P2P propagation.
+     This means that we need to use [trust address] too. *)
+  let* node_1 = Node.init ~bootstrap_threshold:0 ~private_mode:true ()
+  and* node_2 = Node.init ~bootstrap_threshold:0 ~private_mode:true () in
   let* client_1 = Client.init ~node:node_1 ()
   and* client_2 = Client.init ~node:node_2 () in
+  let* () = Client.Admin.trust_address client_1 ~peer:node_2
+  and* () = Client.Admin.trust_address client_2 ~peer:node_1 in
   let* () = Client.Admin.connect_address client_1 ~peer:node_2 in
   let* () = Client.activate_protocol client_1 in
   Log.info "Activated protocol." ;
@@ -178,17 +184,22 @@ let double_bake () =
   let* () = Node.run ~bootstrap_threshold:0 node_1 in
   let* () = Node.wait_for_ready node_1 in
   (* Step 6 *)
-  let* node_3 = Node.init ~bootstrap_threshold:0 () in
+  let* node_3 = Node.init ~bootstrap_threshold:0 ~private_mode:true () in
   let* client_3 = Client.init ~node:node_3 () in
   let* accuser_3 = Accuser.init node_3 in
   let denunciation = wait_for_denunciation accuser_3 in
   let denunciation_injection =
     wait_for_denunciation_injection node_3 client_3 denunciation
   in
+  let* () = Client.Admin.trust_address client_1 ~peer:node_3
+  and* () = Client.Admin.trust_address client_3 ~peer:node_1
+  and* () = Client.Admin.trust_address client_2 ~peer:node_3
+  and* () = Client.Admin.trust_address client_3 ~peer:node_2 in
   let* () = Client.Admin.connect_address client_1 ~peer:node_3
   and* () = Client.Admin.connect_address client_2 ~peer:node_3 in
-  let* _ = Node.wait_for_level node_3 (common_ancestor + 2) in
+  let* level = Node.wait_for_level node_3 (common_ancestor + 2) in
   (* Ensure that the denunciation was emitted by the accuser *)
+  Log.info "Level of node3 is %d, waiting for denunciation operation..." level ;
   let* denunciation_oph = denunciation in
   (* Ensure that the denunciation is in node_3's mempool *)
   let* _ = denunciation_injection in

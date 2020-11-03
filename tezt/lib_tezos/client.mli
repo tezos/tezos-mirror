@@ -114,6 +114,12 @@ val spawn_rpc_list : ?node:Node.t -> t -> Process.t
 module Admin : sig
   (** Run tezos-admin-client commands. *)
 
+  (** Ask a node to trust the address and port of another node. *)
+  val trust_address : ?node:Node.t -> peer:Node.t -> t -> unit Lwt.t
+
+  (** Same as [trust_address], but do not wait for the process to exit. *)
+  val spawn_trust_address : ?node:Node.t -> peer:Node.t -> t -> Process.t
+
   (** Connect a node to another peer. *)
   val connect_address : ?node:Node.t -> peer:Node.t -> t -> unit Lwt.t
 

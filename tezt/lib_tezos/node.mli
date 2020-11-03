@@ -141,6 +141,7 @@ val run :
   ?bootstrap_threshold:int ->
   ?synchronisation_threshold:int ->
   ?connections:int ->
+  ?private_mode:bool ->
   t ->
   unit Lwt.t
 
@@ -233,6 +234,7 @@ val init :
   ?bootstrap_threshold:int ->
   ?synchronisation_threshold:int ->
   ?connections:int ->
+  ?private_mode:bool ->
   unit ->
   t Lwt.t
 
@@ -250,5 +252,6 @@ val restart :
   ?bootstrap_threshold:int ->
   ?synchronisation_threshold:int ->
   ?connections:int ->
+  ?private_mode:bool ->
   t ->
   unit Lwt.t

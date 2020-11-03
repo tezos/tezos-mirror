@@ -227,7 +227,7 @@ let create ?(path = Constant.tezos_node) ?name ?color ?data_dir ?event_pipe
   node
 
 let run ?(expected_pow = 0) ?(single_process = false) ?bootstrap_threshold
-    ?synchronisation_threshold ?connections node =
+    ?synchronisation_threshold ?connections ?(private_mode = false) node =
   ( match node.status with
   | Not_running ->
       ()
@@ -252,7 +252,8 @@ let run ?(expected_pow = 0) ?(single_process = false) ?bootstrap_threshold
           []
       | Some x ->
           ["--connections"; string_of_int x] )
-    @ if single_process then ["--singleprocess"] else []
+    @ (if single_process then ["--singleprocess"] else [])
+    @ if private_mode then ["--private-mode"] else []
   in
   let on_terminate _ =
     (* Cancel all [Ready] event listeners. *)
@@ -318,7 +319,7 @@ let wait_for_identity node =
 
 let init ?path ?name ?color ?data_dir ?event_pipe ?expected_pow ?network
     ?net_port ?rpc_port ?history_mode ?single_process ?bootstrap_threshold
-    ?synchronisation_threshold ?connections () =
+    ?synchronisation_threshold ?connections ?private_mode () =
   let node = create ?path ?name ?color ?data_dir ?event_pipe () in
   let* () = identity_generate ?expected_pow node in
   let* () = config_init ?network ?net_port ?rpc_port ?history_mode node in
@@ -329,13 +330,14 @@ let init ?path ?name ?color ?data_dir ?event_pipe ?expected_pow ?network
       ?bootstrap_threshold
       ?synchronisation_threshold
       ?connections
+      ?private_mode
       node
   in
   let* () = wait_for_ready node in
   return node
 
 let restart ?expected_pow ?single_process ?bootstrap_threshold
-    ?synchronisation_threshold ?connections node =
+    ?synchronisation_threshold ?connections ?private_mode node =
   let* () = terminate node in
   let* () =
     run
@@ -344,6 +346,7 @@ let restart ?expected_pow ?single_process ?bootstrap_threshold
       ?bootstrap_threshold
       ?synchronisation_threshold
       ?connections
+      ?private_mode
       node
   in
   wait_for_ready node
