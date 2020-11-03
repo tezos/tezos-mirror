@@ -92,7 +92,8 @@ let clean_up status =
         let promise = pre >>= fun () -> callback status in
         Lwt.on_failure promise (fun exc ->
             Format.eprintf
-              "Exit: uncaught exception during clean-up (%s): %s\n%!"
+              "(%s) Exit: uncaught exception during clean-up (%s): %s\n%!"
+              Sys.executable_name
               loc
               (Printexc.to_string exc)) ;
         Callbacks_map.add id (loc, promise) promises)
@@ -218,7 +219,10 @@ let sleep_span s = Lwt_unix.sleep (Ptime.Span.to_float_s s)
 
 let set_already_received_once double_signal_safety already_received_once name =
   if Ptime.Span.(equal double_signal_safety zero) then (
-    Format.eprintf "%s: send signal again to force-quit.\n%!" name ;
+    Format.eprintf
+      "(%s) %s: send signal again to force-quit.\n%!"
+      Sys.executable_name
+      name ;
     already_received_once := true )
   else
     Lwt_utils.dont_wait
@@ -227,7 +231,10 @@ let set_already_received_once double_signal_safety already_received_once name =
         (* Wait one second for safety, then set force-quitting *)
         sleep_span double_signal_safety
         >>= fun () ->
-        Format.eprintf "%s: send signal again to force-quit.\n%!" name ;
+        Format.eprintf
+          "(%s) %s: send signal again to force-quit.\n%!"
+          Sys.executable_name
+          name ;
         already_received_once := true ;
         Lwt.return_unit)
 
@@ -241,20 +248,27 @@ let set_soft_handler ?(double_signal_safety = default_double_signal_safety)
   Lwt_unix.on_signal signal (fun _signal ->
       if !already_received_once then (
         Format.eprintf
-          "%s: signal received again, forcing immediate termination.\n%!"
+          "(%s) %s: signal received again, forcing immediate termination.\n%!"
+          Sys.executable_name
           name ;
         Stdlib.exit (mask_code_bc_incomplete_clean_up signal_exit_code) )
       else
         match Lwt.state clean_up_starts with
         | Sleep ->
-            Format.eprintf "%s: triggering shutdown.\n%!" name ;
+            Format.eprintf
+              "(%s) %s: triggering shutdown.\n%!"
+              Sys.executable_name
+              name ;
             exit signal_exit_code ;
             set_already_received_once
               double_signal_safety
               already_received_once
               name
         | Return _ ->
-            Format.eprintf "%s: already in shutdown.\n%!" name ;
+            Format.eprintf
+              "(%s) %s: already in shutdown.\n%!"
+              Sys.executable_name
+              name ;
             set_already_received_once
               double_signal_safety
               already_received_once
@@ -265,7 +279,7 @@ let set_soft_handler ?(double_signal_safety = default_double_signal_safety)
 (* hard handling: immediately terminate process *)
 let set_hard_handler signal name =
   Lwt_unix.on_signal signal (fun _signal ->
-      Format.eprintf "%s: force-quiting.\n%!" name ;
+      Format.eprintf "(%s) %s: force-quiting.\n%!" Sys.executable_name name ;
       Stdlib.exit (mask_code_bc_incomplete_clean_up signal_exit_code))
 
 let setup_signal_handlers ?double_signal_safety signal_setup =
@@ -323,12 +337,14 @@ let wait_for_clean_up max_clean_up_time =
           | Lwt.Sleep ->
               assert (max_clean_up_time <> None) ;
               Format.eprintf
-                "Exit: timeout, clean-up callback not terminated (%s)\n%!"
+                "(%s) Exit: timeout, clean-up callback not terminated (%s)\n%!"
+                Sys.executable_name
                 id ;
               false
           | Lwt.Fail exc ->
               Format.eprintf
-                "Exit: clean-up callback failed (%s): %s\n%!"
+                "(%s) Exit: clean-up callback failed (%s): %s\n%!"
+                Sys.executable_name
                 id
                 (Printexc.to_string exc) ;
               false
@@ -386,7 +402,8 @@ let wrap_and_error ?(signal_setup = default_signal_setup) ?double_signal_safety
           | Sleep ->
               exit uncaught_exception_exit_code ;
               Format.eprintf
-                "Exit: exit because of uncaught exception: %s\n%!"
+                "(%s) Exit: exit because of uncaught exception: %s\n%!"
+                Sys.executable_name
                 (Printexc.to_string Exit) ;
               wait_for_clean_up max_clean_up_time
               >>= fun complete ->
@@ -400,7 +417,8 @@ let wrap_and_error ?(signal_setup = default_signal_setup) ?double_signal_safety
       | exc ->
           exit uncaught_exception_exit_code ;
           Format.eprintf
-            "Exit: exit because of uncaught exception: %s\n%!"
+            "(%s) Exit: exit because of uncaught exception: %s\n%!"
+            Sys.executable_name
             (Printexc.to_string exc) ;
           wait_for_clean_up max_clean_up_time
           >>= fun complete ->
