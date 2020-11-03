@@ -110,12 +110,12 @@ let get_approval_and_update_participation_ema ctxt =
   Vote.set_participation_ema ctxt new_participation_ema
   >|=? fun ctxt -> (ctxt, approval)
 
-(** Implements the state machine of the amendment procedure.
-    Note that [update_listings], that computes the vote weight of each delegate,
-    is run at the beginning of each voting period.
-*)
+(** Implements the state machine of the amendment procedure. Note that
+   [update_listings], that computes the vote weight of each delegate, is run at
+   the end of each voting period. This state-machine prepare the voting_period
+   for the next block. *)
 let start_new_voting_period ctxt =
-  Vote.get_current_period_kind ctxt
+  Voting_period.get_current_kind ctxt
   >>=? fun kind ->
   ( match kind with
   | Proposal -> (
@@ -125,12 +125,9 @@ let start_new_voting_period ctxt =
       >>= fun ctxt ->
       match proposal with
       | None ->
-          return ctxt
+          Voting_period.reset ctxt
       | Some proposal ->
-          Vote.init_current_proposal ctxt proposal
-          >>=? fun ctxt ->
-          Vote.set_current_period_kind ctxt Testing_vote
-          >>=? fun ctxt -> return ctxt )
+          Vote.init_current_proposal ctxt proposal >>=? Voting_period.succ )
   | Testing_vote ->
       get_approval_and_update_participation_ema ctxt
       >>=? fun (ctxt, approved) ->
@@ -142,28 +139,23 @@ let start_new_voting_period ctxt =
         in
         Vote.get_current_proposal ctxt
         >>=? fun proposal ->
-        fork_test_chain ctxt proposal expiration
-        >>= fun ctxt -> Vote.set_current_period_kind ctxt Testing
+        fork_test_chain ctxt proposal expiration >>= Voting_period.succ
       else
         Vote.clear_current_proposal ctxt
-        >>=? fun ctxt ->
-        Vote.set_current_period_kind ctxt Proposal >>=? fun ctxt -> return ctxt
+        >>=? fun ctxt -> Voting_period.reset ctxt
   | Testing ->
-      Vote.set_current_period_kind ctxt Promotion_vote
+      Voting_period.succ ctxt
   | Promotion_vote ->
       get_approval_and_update_participation_ema ctxt
       >>=? fun (ctxt, approved) ->
-      if approved then Vote.set_current_period_kind ctxt Adoption
-      else
-        Vote.clear_current_proposal ctxt
-        >>=? fun ctxt -> Vote.set_current_period_kind ctxt Proposal
+      if approved then Voting_period.succ ctxt
+      else Vote.clear_current_proposal ctxt >>=? Voting_period.reset
   | Adoption ->
       Vote.get_current_proposal ctxt
       >>=? fun proposal ->
       activate ctxt proposal
-      >>= fun ctxt ->
-      Vote.clear_current_proposal ctxt
-      >>=? fun ctxt -> Vote.set_current_period_kind ctxt Proposal )
+      >>= fun ctxt -> Vote.clear_current_proposal ctxt >>=? Voting_period.reset
+  )
   >>=? fun ctxt -> Vote.update_listings ctxt
 
 type error +=
@@ -267,7 +259,7 @@ let rec longer_than l n =
 let record_proposals ctxt delegate proposals =
   (match proposals with [] -> error Empty_proposal | _ :: _ -> ok_unit)
   >>?= fun () ->
-  Vote.get_current_period_kind ctxt
+  Voting_period.get_current_kind ctxt
   >>=? function
   | Proposal ->
       Vote.in_listings ctxt delegate
@@ -288,7 +280,7 @@ let record_proposals ctxt delegate proposals =
       fail Unexpected_proposal
 
 let record_ballot ctxt delegate proposal ballot =
-  Vote.get_current_period_kind ctxt
+  Voting_period.get_current_kind ctxt
   >>=? function
   | Testing_vote | Promotion_vote ->
       Vote.get_current_proposal ctxt
@@ -308,12 +300,7 @@ let record_ballot ctxt delegate proposal ballot =
   | Testing | Proposal | Adoption ->
       fail Unexpected_ballot
 
-let last_of_a_voting_period ctxt l =
-  Compare.Int32.(
-    Int32.succ l.Level.voting_period_position
-    = Constants.blocks_per_voting_period ctxt)
-
 let may_start_new_voting_period ctxt =
-  let level = Level.current ctxt in
-  if last_of_a_voting_period ctxt level then start_new_voting_period ctxt
-  else return ctxt
+  Voting_period.is_last_block ctxt
+  >>=? fun is_last ->
+  if is_last then start_new_voting_period ctxt else return ctxt
