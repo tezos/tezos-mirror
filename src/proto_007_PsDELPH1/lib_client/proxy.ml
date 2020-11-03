@@ -89,7 +89,7 @@ let initial_context (rpc_context : RPC_context.json)
     (chain : Tezos_shell_services.Block_services.chain)
     (block : Tezos_shell_services.Block_services.block) :
     Environment_context.Context.t Lwt.t =
-  let module M = Tezos_proxy.Proxy_getter.Make (ProtoRpc) in
+  let module M = Tezos_proxy.Proxy_getter.MakeProxy (ProtoRpc) in
   L.emit
     L.proxy_getter_created
     ( Tezos_shell_services.Block_services.chain_to_string chain,

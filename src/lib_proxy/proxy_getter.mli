@@ -88,4 +88,6 @@ module type M = sig
     Proxy.proxy_getter_input -> Proxy_context.M.key -> bool tzresult Lwt.t
 end
 
-module Make (X : Proxy_proto.PROTO_RPC) : M
+(** Functor to obtain the implementation of [M] for the proxy
+    mode (as opposed to the light mode implementation) *)
+module MakeProxy (X : Proxy_proto.PROTO_RPC) : M

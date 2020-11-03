@@ -191,13 +191,39 @@ module RequestsTree : REQUESTS_TREE = struct
           match k_tail with [] -> Some sub_t | _ -> find_opt sub_t k_tail ) )
 end
 
-module StringSet = TzString.Set
+module Core
+    (T : Proxy.TREE with type key = Proxy_context.M.key)
+    (X : Proxy_proto.PROTO_RPC) : Proxy.CORE = struct
+  (** Do not access directly, use [get_store] instead *)
+  let store = ref None
 
-module Make'
-    (T : Proxy.TREE with type key = string list)
-    (X : Proxy_proto.PROTO_RPC) : M = struct
-  let cache = ref None
+  let get_store () =
+    match !store with
+    | None ->
+        T.empty
+        >>= fun s ->
+        store := Some s ;
+        Lwt.return s
+    | Some s ->
+        Lwt.return s
 
+  let get key = get_store () >>= fun store -> T.get store key >>= Lwt.return
+
+  let do_rpc :
+      Proxy.proxy_getter_input -> Proxy_context.M.key -> unit tzresult Lwt.t =
+   fun pgi key ->
+    X.do_rpc pgi key
+    >>=? fun tree ->
+    get_store ()
+    >>= fun s ->
+    (* Update cache with data obtained *)
+    T.set_leaf s key tree
+    >>=? fun updated ->
+    (match updated with Mutation -> () | Value cache' -> store := Some cache') ;
+    return_unit
+end
+
+module Make (C : Proxy.CORE) (X : Proxy_proto.PROTO_RPC) : M = struct
   let requests = ref RequestsTree.empty
 
   let pp_key k = String.concat ";" k
@@ -211,18 +237,7 @@ module Make'
 
   type kind = Get | Mem
 
-  let get_cache () =
-    match !cache with
-    | None ->
-        T.empty
-        >>= fun e ->
-        cache := Some e ;
-        Lwt.return e
-    | Some e ->
-        Lwt.return e
-
-  (** Handles the application of [X.split_key]. Performs
-      the RPC call and updates [cache] accordingly. *)
+  (** Handles the application of [X.split_key]. *)
   let do_rpc (pgi : Proxy.proxy_getter_input) (kind : kind)
       (key : Proxy_context.M.key) : unit tzresult Lwt.t =
     let (key, split) =
@@ -245,21 +260,11 @@ module Make'
        and hence 'key' here differs from the key received as parameter) *)
     if split && is_all key then return_unit
     else
-      X.do_rpc pgi key
-      >>=? fun tree ->
+      C.do_rpc pgi key
+      >>=? fun () ->
       (* Remember request was done: map key to [All] in !requests
          (see [REQUESTS_TREE]'s mli for further details) *)
       requests := RequestsTree.add !requests key ;
-      get_cache ()
-      >>= fun c ->
-      (* Update cache with data obtained *)
-      T.set_leaf c key tree
-      >>=? fun updated ->
-      ( match updated with
-      | Mutation ->
-          ()
-      | Value cache' ->
-          cache := Some cache' ) ;
       return_unit
 
   (* [generic_call] and [do_rpc] above go hand in hand. do_rpc takes
@@ -290,7 +295,7 @@ module Make'
          was done or no related request was done at all).
          An RPC MUST be done. *)
       Events.(emit cache_miss pped_key) >>= fun () -> do_rpc pgi kind key )
-    >>=? fun () -> get_cache () >>= fun c -> T.get c key >>= return
+    >>=? fun () -> C.get key >>= return
 
   let proxy_get = generic_call Get
 
@@ -317,4 +322,4 @@ module Make'
         return_false
 end
 
-module Make (X : Proxy_proto.PROTO_RPC) : M = Make' (Tree) (X)
+module MakeProxy (X : Proxy_proto.PROTO_RPC) : M = Make (Core (Tree) (X)) (X)

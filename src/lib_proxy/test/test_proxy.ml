@@ -137,7 +137,7 @@ let test_tree _ () =
    than a key already obtained *)
 let test_do_rpc_no_longer_key () =
   let (module MockedProtoRPC) = mock_proto_rpc () in
-  let module MockedGetter = Tezos_proxy.Proxy_getter.Make (MockedProtoRPC) in
+  let module MockedGetter = Tezos_proxy.Proxy_getter.MakeProxy (MockedProtoRPC) in
   MockedGetter.proxy_get mock_input ["A"; "b"; "1"]
   >>=? fun a_b_1_tree_opt ->
   lwt_assert_true
@@ -187,7 +187,7 @@ let test_do_rpc_no_longer_key () =
 
 let test_split_key_triggers () =
   let (module MockedProtoRPC) = mock_proto_rpc () in
-  let module MockedGetter = Tezos_proxy.Proxy_getter.Make (MockedProtoRPC) in
+  let module MockedGetter = Tezos_proxy.Proxy_getter.MakeProxy (MockedProtoRPC) in
   MockedGetter.proxy_get
     mock_input
     ["split"; "key"; "trigger_now!"; "whatever"; "more"]

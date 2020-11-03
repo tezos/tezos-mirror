@@ -57,3 +57,12 @@ module type TREE = sig
     Tezos_shell_services.Block_services.raw_context ->
     t update tzresult Lwt.t
 end
+
+(** Module used by implementations of [Proxy_getter.M]. *)
+module type CORE = sig
+  (* Get the data associated to the given key *)
+  val get : Proxy_context.M.key -> Proxy_context.M.tree option Lwt.t
+
+  (* Retrieves the data for the given key *)
+  val do_rpc : proxy_getter_input -> Proxy_context.M.key -> unit tzresult Lwt.t
+end
