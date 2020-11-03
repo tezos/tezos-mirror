@@ -7,7 +7,8 @@
   tezos-mockup-proxy
   tezos-protocol-environment
   tezos-rpc
-  tezos-shell-services)
+  tezos-shell-services
+  tezos-context)
  (flags
   (:standard -open Tezos_base__TzPervasives)))
 

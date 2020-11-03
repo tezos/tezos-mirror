@@ -43,44 +43,38 @@ let sources_config_encoding =
       })
     sources_encoding
 
-let min_agreement_error sources_cfg =
-  let f = sources_cfg.min_agreement in
-  if 0.0 < f && f <= 1.0 then None
-  else
-    Some "min_agreement value must be within 0 (exclusive) and 1 (inclusive)"
-
-let endpoints_error sources_cfg =
-  match List.length sources_cfg.uris with
-  | 0 ->
-      Some
-        "Endpoints list in file specified with --sources should not be empty. \
-         It should be of size 2 or more."
-  | 1 ->
-      Some
-        "Endpoints list in file specified with --sources should not be of \
-         size 1. At least two endpoints are required to validate the data of \
-         one endpoint against the data of another endpoint."
-  | _ ->
-      None
+let mk_sources_config ~min_agreement ~uris =
+  if min_agreement <= 0.0 || 1.0 < min_agreement then
+    Error
+      Format.(
+        sprintf
+          "min_agreement value must be within 0 (exclusive) and 1 (inclusive) \
+           but you provided %f"
+          min_agreement)
+  else if List.length uris < 2 then
+    Error
+      Format.(
+        asprintf
+          "A minimum of 2 endpoints is required in Light mode: one endpoint \
+           to retrieve data and one to validate data. You only provided %a"
+          (pp_print_list Uri.pp_hum)
+          uris)
+  else Ok {min_agreement; uris}
 
 let destruct_sources_config json =
-  let sources_cfg = Data_encoding.Json.destruct sources_config_encoding json in
-  match (min_agreement_error sources_cfg, endpoints_error sources_cfg) with
-  | (Some err, _) | (_, Some err) ->
-      Error err
-  | _ ->
-      Ok sources_cfg
+  let {min_agreement; uris} =
+    Data_encoding.Json.destruct sources_config_encoding json
+  in
+  mk_sources_config ~min_agreement ~uris
 
 type sources = {
   min_agreement : float;
   endpoints : (Uri.t * RPC_context.simple) list;
 }
 
-let sources_config_to_sources sources_config rpc_context_builder =
-  let endpoints =
-    List.map (fun u -> (u, rpc_context_builder u)) sources_config.uris
-  in
-  {min_agreement = sources_config.min_agreement; endpoints}
+let sources_config_to_sources rpc_context_builder {min_agreement; uris} =
+  let endpoints = List.map (fun u -> (u, rpc_context_builder u)) uris in
+  {min_agreement; endpoints}
 
 let hash_of_block (block : Tezos_shell_services.Block_services.block) :
     Block_hash.t option =

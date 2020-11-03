@@ -23,20 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Whether using the light mode or the proxy mode (remember that
-    the light mode is a different instance of the proxy mode
-    (see srcs/lib_proxy/README_LIGHT.md for documentation). *)
-type mode = Light of Light.sources | Proxy
-
-(** [build_directory printer rpc_context mode env] returns the directory
-    of RPCs that is served locally by the proxy mode
-    and the light mode. [printer] is used for logging. [rpc_context] is
-    used to perform RPCs to distant endpoints. [mode] specifies whether
-    to use the proxy mode or the light mode. [env] is a protocol-specific
-    module used to create the context passed when executing a RPC. *)
-val build_directory :
-  Tezos_client_base.Client_context.printer ->
-  RPC_context.json ->
-  mode ->
-  Registration.proxy_environment ->
-  unit RPC_directory.t
+module M : Tezos_proxy.Light_proto.PROTO_RPCS = struct
+  let merkle_tree (pgi : Tezos_proxy.Proxy.proxy_getter_input) key leaf_kind =
+    Protocol_client_context.Alpha_block_services.Context.merkle_tree
+      pgi.rpc_context
+      ~chain:pgi.chain
+      ~block:pgi.block
+      ~holey:
+        ( match leaf_kind with
+        | Tezos_shell_services.Block_services.Hole ->
+            true
+        | Tezos_shell_services.Block_services.Raw_context ->
+            false )
+      key
+end

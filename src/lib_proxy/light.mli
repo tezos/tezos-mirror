@@ -23,27 +23,43 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Code related to the light mode that is not protocol-dependent.
-    See `src/proto_*/lib_client/light.ml` files for protocol-dependent code. *)
+(** Code related to the light mode that is protocol-independent.
+    See [src/proto_*/lib_client/light.ml] files for protocol-dependent code. *)
 
+(** See [mk_sources_config] smart constructor to build values. *)
 type sources_config = private {
   min_agreement : float;
       (** A float between 0 (exclusive) and 1 (inclusive), representing
-          the minimum percentage of endpoints that must agree on data
-          for said data to be accepted. Pass 1 to require all enpoints
-          to agree (the default). *)
+          the minimum ratio of endpoints that must agree on data
+          for said data to be accepted. 1 means "require all enpoints
+          to agree" (the default). *)
   uris : Uri.t list;
+      (** The list of endpoint URIs used for Light mode consensus.
+          This list must contain at least 2 endpoints (one for data retrieval,
+          one for check). *)
 }
 
+(** See [sources_config_to_sources] to build values. *)
 type sources = private {
   min_agreement : float;
       (** A float between 0 (exclusive) and 1 (inclusive), representing
-          the minimum percentage of endpoints that must agree on data
-          for said data to be accepted. Pass 1 to require all enpoints
-          to agree (the default). *)
+          the minimum ratio of endpoints that must agree on data
+          for said data to be accepted. 1 means "require all enpoints
+          to agree" (the default). *)
   endpoints : (Uri.t * RPC_context.simple) list;
+      (** The list of endpoint URIs used for Light mode consensus.
+          This list must contain at least 2 endpoints
+          (one for data retrieval, one for check). *)
 }
 
+(** [sources_config] smart constructor: checks that passed values
+    fulfill the required invariants, return [Error] otherwise.
+    See [sources_config] for documentation of these invariants. *)
+val mk_sources_config :
+  min_agreement:float -> uris:Uri.t list -> (sources_config, string) result
+
+(** Ad-hoc type safe JSON parsing function until [json-data-encoding]
+    library provides a [result]-returning alternative. *)
 val destruct_sources_config :
   Data_encoding.json -> (sources_config, string) result
 
@@ -51,8 +67,8 @@ val destruct_sources_config :
     (which was obtained by parsing the CLI) into a value used
     by core algorithms of the light mode. *)
 val sources_config_to_sources :
-  sources_config -> (Uri.t -> RPC_context.simple) -> sources
+  (Uri.t -> RPC_context.simple) -> sources_config -> sources
 
-(** [None] if the given block is symbolic, otherwise it's concrete hash *)
+(** [None] if the given block is symbolic, otherwise its concrete hash. *)
 val hash_of_block :
   Tezos_shell_services.Block_services.block -> Block_hash.t option

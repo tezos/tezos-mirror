@@ -216,7 +216,7 @@ class unix_mockup ~base_dir ~mem_only ~mockup_env ~chain_id ~rpc_context :
   end
 
 class unix_proxy ~base_dir ~chain ~block ~confirmations ~password_filename
-  ~rpc_config ~proxy_env : Client_context.full =
+  ~rpc_config ~mode ~proxy_env : Client_context.full =
   object
     inherit unix_logger ~base_dir
 
@@ -230,7 +230,7 @@ class unix_proxy ~base_dir ~chain ~block ~confirmations ~password_filename
         (new Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
            rpc_config
            Media_type.all_media_types)
-        proxy_env
+        mode proxy_env
 
     inherit unix_ui
 

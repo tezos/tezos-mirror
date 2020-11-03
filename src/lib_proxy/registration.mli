@@ -50,10 +50,15 @@ module type Proxy_sig = sig
     *)
   val init_env_rpc_context :
     Tezos_client_base.Client_context.printer ->
+    (Proxy_proto.proto_rpc -> Proxy_getter.proxy_m Lwt.t) ->
     RPC_context.json ->
     Tezos_shell_services.Block_services.chain ->
     Tezos_shell_services.Block_services.block ->
     Tezos_protocol_environment.rpc_context tzresult Lwt.t
+
+  (** Functions used to implement the light mode *)
+  include
+    Light_proto.PROTO_RPCS
 end
 
 type proxy_environment = (module Proxy_sig)
@@ -66,6 +71,7 @@ val register_proxy_context : proxy_environment -> unit
 val get_registered_proxy :
   Tezos_client_base.Client_context.printer ->
   #RPC_context.simple ->
+  [< `Mode_light | `Mode_proxy] ->
   Protocol_hash.t option ->
   Tezos_shell_services.Block_services.chain ->
   Tezos_shell_services.Block_services.block ->

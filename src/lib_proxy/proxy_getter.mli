@@ -51,7 +51,7 @@ module type REQUESTS_TREE = sig
       (missing) keys of the form rolls;owner;snapshot;10;1;74;5;1354
       while the parent key rolls;owner;snapshot;10;1 has been obtained before.
 
-      This structure has the invariant that all leafs are [All] nodes.
+      This structure has the invariant that all leaves are [All] nodes.
       If requests A;B and A;C have been done, the tree is as follows:
 
       A[Partial] -> B[All]
@@ -87,9 +87,14 @@ module type M = sig
   val proxy_mem : Proxy.proxy_getter_input -> Local.key -> bool tzresult Lwt.t
 end
 
+type proxy_m = (module M)
+
 (** Functor to obtain the implementation of [M] for the proxy
     mode (as opposed to the light mode implementation) *)
 module MakeProxy (X : Proxy_proto.PROTO_RPC) : M
+
+(** Functor to obtain a generic implementation. Used by the light mode *)
+module Make (C : Proxy.CORE) (X : Proxy_proto.PROTO_RPC) : M
 
 (** Exposed for testing purpose only, you should not use it directly *)
 module Internal : sig

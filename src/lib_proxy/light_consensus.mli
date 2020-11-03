@@ -23,20 +23,43 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Whether using the light mode or the proxy mode (remember that
-    the light mode is a different instance of the proxy mode
-    (see srcs/lib_proxy/README_LIGHT.md for documentation). *)
-type mode = Light of Light.sources | Proxy
+(** A container of input data needed to process a consensus. *)
+type input = {
+  printer : Tezos_client_base.Client_context.printer;
+  min_agreement : float;
+      (** The same value as [Light.sources.min_agreement] *)
+  chain : Tezos_shell_services.Block_services.chain;
+      (** The chain considered *)
+  block : Tezos_shell_services.Block_services.block;
+      (** The block considered *)
+  key : string list;
+      (** The key of the context for which data is being requested *)
+  mtree : Tezos_shell_services.Block_services.merkle_tree;
+      (** The tree received from the endpoint providing data.
+          It is much smaller than [tree]. *)
+  tree : Tezos_context_memory.Context.tree;
+      (** The current data tree. The call to [M.consensus]
+      will check that validating endpoints send data
+      which agree with this tree. *)
+}
 
-(** [build_directory printer rpc_context mode env] returns the directory
-    of RPCs that is served locally by the proxy mode
-    and the light mode. [printer] is used for logging. [rpc_context] is
-    used to perform RPCs to distant endpoints. [mode] specifies whether
-    to use the proxy mode or the light mode. [env] is a protocol-specific
-    module used to create the context passed when executing a RPC. *)
-val build_directory :
-  Tezos_client_base.Client_context.printer ->
-  RPC_context.json ->
-  mode ->
-  Registration.proxy_environment ->
-  unit RPC_directory.t
+(** [min_agreeing_endpoints min_agreement nb_endpoints] returns
+    the minimum number of endpoints that must agree for [Make.consensus]
+    to return [true]. The first parameter should be
+    [Light.sources.min_agreement] while the second
+    parameter should be the length of [Light.sources.endpoints]. *)
+val min_agreeing_endpoints : float -> int -> int
+
+(** Given RPCs specific to the light mode, obtain the consensus
+    algorithm *)
+module Make (Light_proto : Light_proto.PROTO_RPCS) : sig
+  (** Whether consensus on data can be achieved. Parameters are:
+
+      - The data to consider
+      - The endpoints to contact for validating
+
+      Returns: whether consensus was attained or an error message.
+    *)
+  val consensus :
+    input -> (Uri.t * RPC_context.simple) list -> (bool, string) result Lwt.t
+end

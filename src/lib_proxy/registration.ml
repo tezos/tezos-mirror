@@ -62,10 +62,13 @@ module type Proxy_sig = sig
   (** How to build the context to execute RPCs on *)
   val init_env_rpc_context :
     Tezos_client_base.Client_context.printer ->
+    (Proxy_proto.proto_rpc -> Proxy_getter.proxy_m Lwt.t) ->
     RPC_context.json ->
     Tezos_shell_services.Block_services.chain ->
     Tezos_shell_services.Block_services.block ->
     Tezos_protocol_environment.rpc_context tzresult Lwt.t
+
+  include Light_proto.PROTO_RPCS
 end
 
 type proxy_environment = (module Proxy_sig)
@@ -89,17 +92,21 @@ let register_proxy_context m =
   else registered := m :: !registered
 
 let get_registered_proxy (printer : Tezos_client_base.Client_context.printer)
-    (rpc_context : #RPC_context.simple)
+    (rpc_context : #RPC_context.simple) (mode : [< `Mode_light | `Mode_proxy])
     (protocol_hash_opt : Protocol_hash.t option)
     (chain : Tezos_shell_services.Block_services.chain)
     (block : Tezos_shell_services.Block_services.block) :
     proxy_environment tzresult Lwt.t =
+  let mode_str =
+    match mode with `Mode_light -> "light mode" | `Mode_proxy -> "proxy"
+  in
   ( match protocol_hash_opt with
   | None ->
       get_node_protocol rpc_context chain block
       >>=? fun protocol_hash ->
       printer#warning
-        "protocol of proxy unspecified, using the node's protocol: %a"
+        "protocol of %s unspecified, using the node's protocol: %a"
+        mode_str
         Protocol_hash.pp
         protocol_hash
       >>= fun _ -> return protocol_hash

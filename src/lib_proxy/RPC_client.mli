@@ -33,5 +33,6 @@
 class http_local_ctxt :
   Tezos_client_base.Client_context.printer
   -> RPC_context.json
+  -> Proxy_services.mode
   -> Registration.proxy_environment
   -> RPC_context.json

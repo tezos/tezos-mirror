@@ -140,7 +140,7 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
          | _ ->
              return_unit)
   >>=? fun () ->
-  let (chain, block, confirmations, password_filename, protocol, _sources) =
+  let (chain, block, confirmations, password_filename, protocol, sources) =
     match parsed_args with
     | None ->
         ( Client_config.default_chain,
@@ -167,20 +167,44 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
            ~password_filename
            ~base_dir
            ~rpc_config
-  | `Mode_light | `Mode_proxy ->
+  | (`Mode_light | `Mode_proxy) as mode ->
       let printer = new unix_logger ~base_dir in
       let rpc_context =
         new Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
           rpc_config
           Media_type.all_media_types
       in
+      let get_mode () =
+        match (mode, sources) with
+        | (`Mode_proxy, _) ->
+            return Tezos_proxy.Proxy_services.Proxy
+        | (`Mode_light, None) ->
+            failwith
+              "--sources MUST be specified when --mode light is specified"
+        | (`Mode_light, Some sources_config) ->
+            let rpc_builder endpoint =
+              ( new Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
+                  {rpc_config with endpoint}
+                  Media_type.all_media_types
+                :> RPC_context.simple )
+            in
+            let sources =
+              Tezos_proxy.Light.sources_config_to_sources
+                rpc_builder
+                sources_config
+            in
+            return (Tezos_proxy.Proxy_services.Light sources)
+      in
       Tezos_proxy.Registration.get_registered_proxy
         printer
         rpc_context
+        mode
         protocol
         chain
         block
       >>=? fun proxy_env ->
+      get_mode ()
+      >>=? fun mode ->
       return
       @@ new unix_proxy
            ~chain
@@ -189,6 +213,7 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
            ~password_filename
            ~base_dir
            ~rpc_config
+           ~mode
            ~proxy_env
 
 let setup_mockup_rpc_client_config

@@ -898,7 +898,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
 
       let merkle_tree =
         RPC_service.get_service
-          ~description:"Returns the merkle comb of a piece of context."
+          ~description:"Returns the merkle tree of a piece of context."
           ~query:merkle_tree_query
           ~output:Data_encoding.(option merkle_tree_encoding)
           RPC_path.(merkle_tree_path /:* context_path_arg)

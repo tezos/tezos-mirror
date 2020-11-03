@@ -59,3 +59,5 @@ module type PROTO_RPC = sig
     Proxy_context.M.key ->
     Tezos_shell_services.Block_services.raw_context tzresult Lwt.t
 end
+
+type proto_rpc = (module PROTO_RPC)
