@@ -116,6 +116,7 @@ let first_error_location errs =
       | Unexpected_annotation loc
       | Ill_formed_type (_, _, loc)
       | Invalid_arity (loc, _, _, _)
+      | Invalid_seq_arity (loc, _, _)
       | Invalid_namespace (loc, _, _, _)
       | Invalid_primitive (loc, _, _)
       | Invalid_kind (loc, _, _)
