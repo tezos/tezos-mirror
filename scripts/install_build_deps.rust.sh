@@ -11,7 +11,17 @@ script_dir="$(cd "$(dirname "$0")" && pwd -P)"
 # parameters. It assumes that cargo is installed in the system, use your package
 # manager or https://rustup.rs
 
-rust_version=1.39.0
+# by specifying the env var RUST_VERSION the user can decide to use a
+# different version of rust
+recommended_rust_version=1.39.0
+rust_version=${RUST_VERSION:-$recommended_rust_version}
+
+if [ "$recommended_rust_version" != "$rust_version" ]; then
+  echo "\
+WARNING: you selected a different version of rust. Tezos is tested only
+with rust $recommended_rust_version. Do this at your own peril."
+  sleep 3
+fi
 
 if ! [[ "$(rustc --version | cut -d' ' -f2)" == *"$rust_version"* ]]; then
     echo "\
@@ -21,12 +31,12 @@ $ rustup default $rust_version"
     exit 1
 fi
 
-install_dir="${OPAM_SWITCH_PREFIX}/lib"
+install_dir="${OPAM_SWITCH_PREFIX}/lib/rustc-bls12-381"
 # Install the headers in `include`
-HEADER_DIR="${OPAM_SWITCH_PREFIX}/include"
+HEADER_DIR="${OPAM_SWITCH_PREFIX}/include/rustc-bls12-381"
 zcash_params="${OPAM_SWITCH_PREFIX}/share/zcash-params"
 
-BUILD_DIR="$(mktemp -d)"
+BUILD_DIR=_build_rust
 function cleanup () {
     echo "Cleaning up build directory ${BUILD_DIR}"
     rm -rf "${BUILD_DIR}"
@@ -34,11 +44,16 @@ function cleanup () {
 trap cleanup EXIT INT
 
 mkdir -p "${HEADER_DIR}"
+mkdir -p "$install_dir"
 mkdir -p "${BUILD_DIR}/opam-repository"
 cd "${BUILD_DIR}/opam-repository"
-git init
-git config --local protocol.version 2
-git remote add origin "$opam_repository_url"
+
+if [ ! -d .git ] ; then
+  git init
+  git config --local protocol.version 2
+  git remote add origin "$opam_repository_url"
+fi
+
 git fetch --depth 1 origin "$opam_repository_tag"
 git reset --hard "$opam_repository_tag"
 
@@ -56,6 +71,3 @@ echo "Installing zcash parameters in ${zcash_params}"
 rm -rf "${zcash_params}"
 mkdir -p "${zcash_params}"
 cp zcash-params/* "${zcash_params}"
-
-cd "${script_dir}"
-rm -rf "${BUILD_DIR}"
