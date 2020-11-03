@@ -7,13 +7,16 @@
         test_blake2b
         test_pvss
         test_crypto_box
+        test_prop_signature
+        test_prop_hacl_hash
         test_deterministic_nonce
         test_signature)
  (libraries tezos-stdlib
             tezos-crypto
             data-encoding
             alcotest
-            alcotest-lwt)
+            alcotest-lwt
+            crowbar)
  (flags (:standard -open Tezos_stdlib
                    -open Tezos_crypto
                    -open Tezos_lwt_result_stdlib.Lwtreslib
