@@ -239,21 +239,24 @@ let socket_path ~socket_dir ~pid =
 let make_socket socket_path = Unix.ADDR_UNIX socket_path
 
 let create_socket ~canceler =
-  Lwt.catch
-    (fun () ->
-      let socket = Lwt_unix.socket PF_UNIX SOCK_STREAM 0o000 in
-      Lwt_canceler.on_cancel canceler (fun () ->
-          Lwt_utils_unix.safe_close socket >>= fun _ -> Lwt.return_unit) ;
-      Lwt_unix.setsockopt socket SO_REUSEADDR true ;
-      Lwt.return socket)
-    (fun exn ->
-      Format.printf "Error creating a socket" ;
-      Lwt.fail exn)
+  let socket = Lwt_unix.socket PF_UNIX SOCK_STREAM 0o000 in
+  Lwt_canceler.on_cancel canceler (fun () ->
+      Lwt_utils_unix.safe_close socket >>= fun _ -> Lwt.return_unit) ;
+  Lwt_unix.setsockopt socket SO_REUSEADDR true ;
+  Lwt.return socket
 
 let create_socket_listen ~canceler ~max_requests ~socket_path =
   create_socket ~canceler
   >>= fun socket ->
-  Lwt_unix.bind socket (make_socket socket_path)
+  Lwt.catch
+    (fun () -> Lwt_unix.bind socket (make_socket socket_path))
+    (function
+      | Unix.Unix_error (ENAMETOOLONG, _, _) as exn ->
+          External_validation_event.(
+            emit socket_path_too_long_event socket_path)
+          >>= fun () -> Lwt.fail exn
+      | exn ->
+          Lwt.fail exn)
   >>= fun () ->
   Lwt_unix.listen socket max_requests ;
   Lwt.return socket
