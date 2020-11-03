@@ -378,10 +378,12 @@ module Baking_rights = struct
            block.\n\
            Parameters `level` and `cycle` can be used to specify the (valid) \
            level(s) in the past or future at which the baking rights have to \
-           be returned. Parameter `delegate` can be used to restrict the \
-           results to the given delegates. If parameter `all` is set, all the \
-           baking opportunities for each baker at each level are returned, \
-           instead of just the first one.\n\
+           be returned. When asked for (a) whole cycle(s), baking \
+           opportunities are given by default up to the priority 8.\n\
+           Parameter `delegate` can be used to restrict the results to the \
+           given delegates. If parameter `all` is set, all the baking \
+           opportunities for each baker at each level are returned, instead \
+           of just the first one.\n\
            Returns the list of baking slots. Also returns the minimal \
            timestamps that correspond to these slots. The timestamps are \
            omitted for levels in the past, and are only estimates for levels \
@@ -474,7 +476,11 @@ module Baking_rights = struct
           q.levels
         >>?= fun levels ->
         let max_priority =
-          match q.max_priority with None -> 64 | Some max -> max
+          match q.max_priority with
+          | Some max ->
+              max
+          | None -> (
+            match q.cycles with [] -> 64 | _ :: _ -> 8 )
         in
         match q.delegates with
         | [] ->
