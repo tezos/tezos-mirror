@@ -364,9 +364,7 @@ let main ?socket_dir () =
       Internal_event_unix.init ()
       >>= fun () ->
       let pid = Unix.getpid () in
-      let socket_path =
-        External_validation.socket_path ~data_dir:socket_dir ~pid
-      in
+      let socket_path = External_validation.socket_path ~socket_dir ~pid in
       External_validation.create_socket_connect ~canceler ~socket_path
       >>= fun socket_process ->
       let socket_in = Lwt_io.of_fd ~mode:Input socket_process in

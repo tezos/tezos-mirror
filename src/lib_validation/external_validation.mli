@@ -70,7 +70,11 @@ val recv_result :
     [socket_path] instead. *)
 val socket_path_prefix : string
 
-val socket_path : data_dir:string -> pid:int -> string
+(** Get the validation socket path.
+
+    [socket_dir] is the directory where the file should be put.
+    [pid] is the process ID of the validator process. *)
+val socket_path : socket_dir:string -> pid:int -> string
 
 val create_socket_listen :
   canceler:Lwt_canceler.t ->

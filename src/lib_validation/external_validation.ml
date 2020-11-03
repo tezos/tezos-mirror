@@ -230,9 +230,9 @@ let recv pout encoding =
 
 let socket_path_prefix = "tezos-validation-socket-"
 
-let socket_path ~data_dir ~pid =
+let socket_path ~socket_dir ~pid =
   let filename = Format.sprintf "%s%d" socket_path_prefix pid in
-  Filename.concat data_dir filename
+  Filename.concat socket_dir filename
 
 (* To get optimized socket communication of processes on the same
    machine, we use Unix domain sockets: ADDR_UNIX. *)

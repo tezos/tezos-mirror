@@ -174,21 +174,30 @@ module External_validator_process = struct
     sandbox_parameters : Data_encoding.json option;
   }
 
+  (* Returns a temporary path for the socket to be
+     spawned. $XDG_RUNTIME_DIR is returned if the environment variable
+     is defined. Otherwise, the default temporary directory is used. *)
+  let get_temporary_socket_dir () =
+    match Sys.getenv_opt "XDG_RUNTIME_DIR" with
+    | Some xdg_runtime_dir when xdg_runtime_dir <> "" ->
+        xdg_runtime_dir
+    | Some _ | None ->
+        Filename.get_temp_dir_name ()
+
   let start_process vp =
     let canceler = Lwt_canceler.create () in
     (* We assume that there is only one validation process per socket *)
-    (* TODO spawn the socket in $XDG_RUNTIME_DIR while making sure
-         it's portable *)
-    (let process =
+    (let socket_dir = get_temporary_socket_dir () in
+     let process =
        Lwt_process.open_process_none
-         (vp.process_path, [|"tezos-validator"; "--socket-dir"; vp.data_dir|])
+         (vp.process_path, [|"tezos-validator"; "--socket-dir"; socket_dir|])
      in
      let socket_path =
-       External_validation.socket_path ~data_dir:vp.data_dir ~pid:process#pid
+       External_validation.socket_path ~socket_dir ~pid:process#pid
      in
      (* Make sure that the mimicked anonymous file descriptor is
         removed if the spawn of the process is interupted. Thus, we
-        avoid generating potential garbage in the [vp.data_dir].
+        avoid generating potential garbage in the [socket_dir].
         No interruption can occur since the resource was created
         because there are no yield points. *)
      let clean_process_fd socket_path =
