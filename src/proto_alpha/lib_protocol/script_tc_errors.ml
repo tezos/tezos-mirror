@@ -37,6 +37,8 @@ type type_map = (int * (unparsed_stack_ty * unparsed_stack_ty)) list
 (* Structure errors *)
 type error += Invalid_arity of Script.location * prim * int * int
 
+type error += Invalid_seq_arity of Script.location * int * int
+
 type error +=
   | Invalid_namespace of
       Script.location

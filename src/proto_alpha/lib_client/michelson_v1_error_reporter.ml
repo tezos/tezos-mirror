@@ -97,6 +97,7 @@ let collect_error_locations errs =
         acc
     | Environment.Ecoproto_error
         ( Invalid_arity (loc, _, _, _)
+        | Invalid_seq_arity (loc, _, _)
         | Inconsistent_type_annotations (loc, _, _)
         | Unexpected_annotation loc
         | Ungrouped_annotations loc
@@ -412,6 +413,14 @@ let report_errors ~details ~show_source ?parsed ppf errs =
               print_loc
               loc
               (Michelson_v1_primitives.string_of_prim name)
+              exp
+              got
+        | Invalid_seq_arity (loc, exp, got) ->
+            Format.fprintf
+              ppf
+              "%asequence expects at least %d elements but is given %d."
+              print_loc
+              loc
               exp
               got
         | Invalid_namespace (loc, name, exp, got) ->

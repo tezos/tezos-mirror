@@ -98,6 +98,20 @@ let () =
       | _ ->
           None)
     (fun (loc, (name, exp, got)) -> Invalid_arity (loc, name, exp, got)) ;
+  register_error_kind
+    `Permanent
+    ~id:"michelson_v1.invalid_seq_arity"
+    ~title:"Invalid sequence arity"
+    ~description:
+      "In a script or data expression, a sequence was used with a number of \
+       elements too small."
+    (located
+       (obj2
+          (req "minimal_expected_arity" arity_enc)
+          (req "wrong_arity" arity_enc)))
+    (function
+      | Invalid_seq_arity (loc, exp, got) -> Some (loc, (exp, got)) | _ -> None)
+    (fun (loc, (exp, got)) -> Invalid_seq_arity (loc, exp, got)) ;
   (* Missing field *)
   register_error_kind
     `Permanent
