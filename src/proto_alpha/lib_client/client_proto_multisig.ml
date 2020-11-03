@@ -606,8 +606,7 @@ let multisig_get_information (cctxt : #Protocol_client_context.full) ~chain
     | Prim
         ( _,
           D_Pair,
-          [ Int (_, counter);
-            Prim (_, D_Pair, [Int (_, threshold); Seq (_, key_nodes)], _) ],
+          [Int (_, counter); Int (_, threshold); Seq (_, key_nodes)],
           _ ) ->
         map_s
           (function
