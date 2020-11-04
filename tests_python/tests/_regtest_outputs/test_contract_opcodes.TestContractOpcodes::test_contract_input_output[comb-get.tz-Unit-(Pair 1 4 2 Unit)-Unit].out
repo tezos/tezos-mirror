@@ -1,0 +1,140 @@
+tests/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[comb-get.tz-Unit-(Pair 1 4 2 Unit)-Unit]
+
+storage
+  Unit
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 10 (remaining gas: 1039950.990 units remaining)
+    [ (Pair (Pair 1 4 2 Unit) Unit)  	 ]
+  - location: 11 (remaining gas: 1039950.850 units remaining)
+    [ (Pair 1 4 2 Unit)  	@parameter ]
+  - location: 12 (remaining gas: 1039950.710 units remaining)
+    [ (Pair 1 4 2 Unit)  	@parameter
+      (Pair 1 4 2 Unit)  	@parameter ]
+  - location: 13 (remaining gas: 1039950.570 units remaining)
+    [ 1  	
+      (Pair 1 4 2 Unit)  	@parameter ]
+  - location: 14 (remaining gas: 1039950.430 units remaining)
+    [ 1  	
+      1  	
+      (Pair 1 4 2 Unit)  	@parameter ]
+  - location: 19 (remaining gas: 1039950.100 units remaining)
+    [ 0  	
+      (Pair 1 4 2 Unit)  	@parameter ]
+  - location: 20 (remaining gas: 1039949.960 units remaining)
+    [ True  	
+      (Pair 1 4 2 Unit)  	@parameter ]
+  - location: -1 (remaining gas: 1039949.890 units remaining)
+    [ True  	
+      (Pair 1 4 2 Unit)  	@parameter ]
+  - location: 22 (remaining gas: 1039949.700 units remaining)
+    [ (Pair 1 4 2 Unit)  	@parameter ]
+  - location: -1 (remaining gas: 1039949.630 units remaining)
+    [ (Pair 1 4 2 Unit)  	@parameter ]
+  - location: 27 (remaining gas: 1039949.490 units remaining)
+    [ (Pair 1 4 2 Unit)  	@parameter
+      (Pair 1 4 2 Unit)  	@parameter ]
+  - location: 28 (remaining gas: 1039949.363 units remaining)
+    [ 1  	
+      (Pair 1 4 2 Unit)  	@parameter ]
+  - location: 30 (remaining gas: 1039949.223 units remaining)
+    [ 1  	
+      1  	
+      (Pair 1 4 2 Unit)  	@parameter ]
+  - location: 35 (remaining gas: 1039948.893 units remaining)
+    [ 0  	
+      (Pair 1 4 2 Unit)  	@parameter ]
+  - location: 36 (remaining gas: 1039948.753 units remaining)
+    [ True  	
+      (Pair 1 4 2 Unit)  	@parameter ]
+  - location: -1 (remaining gas: 1039948.683 units remaining)
+    [ True  	
+      (Pair 1 4 2 Unit)  	@parameter ]
+  - location: 38 (remaining gas: 1039948.493 units remaining)
+    [ (Pair 1 4 2 Unit)  	@parameter ]
+  - location: -1 (remaining gas: 1039948.423 units remaining)
+    [ (Pair 1 4 2 Unit)  	@parameter ]
+  - location: 43 (remaining gas: 1039948.283 units remaining)
+    [ (Pair 1 4 2 Unit)  	@parameter
+      (Pair 1 4 2 Unit)  	@parameter ]
+  - location: 44 (remaining gas: 1039948.151 units remaining)
+    [ 4  	
+      (Pair 1 4 2 Unit)  	@parameter ]
+  - location: 46 (remaining gas: 1039948.011 units remaining)
+    [ 4  	
+      4  	
+      (Pair 1 4 2 Unit)  	@parameter ]
+  - location: 51 (remaining gas: 1039947.681 units remaining)
+    [ 0  	
+      (Pair 1 4 2 Unit)  	@parameter ]
+  - location: 52 (remaining gas: 1039947.541 units remaining)
+    [ True  	
+      (Pair 1 4 2 Unit)  	@parameter ]
+  - location: -1 (remaining gas: 1039947.471 units remaining)
+    [ True  	
+      (Pair 1 4 2 Unit)  	@parameter ]
+  - location: 54 (remaining gas: 1039947.281 units remaining)
+    [ (Pair 1 4 2 Unit)  	@parameter ]
+  - location: -1 (remaining gas: 1039947.211 units remaining)
+    [ (Pair 1 4 2 Unit)  	@parameter ]
+  - location: 59 (remaining gas: 1039947.071 units remaining)
+    [ (Pair 1 4 2 Unit)  	@parameter
+      (Pair 1 4 2 Unit)  	@parameter ]
+  - location: 60 (remaining gas: 1039946.934 units remaining)
+    [ 2  	
+      (Pair 1 4 2 Unit)  	@parameter ]
+  - location: 62 (remaining gas: 1039946.794 units remaining)
+    [ 2  	
+      2  	
+      (Pair 1 4 2 Unit)  	@parameter ]
+  - location: 67 (remaining gas: 1039946.464 units remaining)
+    [ 0  	
+      (Pair 1 4 2 Unit)  	@parameter ]
+  - location: 68 (remaining gas: 1039946.324 units remaining)
+    [ True  	
+      (Pair 1 4 2 Unit)  	@parameter ]
+  - location: -1 (remaining gas: 1039946.254 units remaining)
+    [ True  	
+      (Pair 1 4 2 Unit)  	@parameter ]
+  - location: 70 (remaining gas: 1039946.064 units remaining)
+    [ (Pair 1 4 2 Unit)  	@parameter ]
+  - location: -1 (remaining gas: 1039945.994 units remaining)
+    [ (Pair 1 4 2 Unit)  	@parameter ]
+  - location: 75 (remaining gas: 1039945.854 units remaining)
+    [ (Pair 1 4 2 Unit)  	@parameter
+      (Pair 1 4 2 Unit)  	@parameter ]
+  - location: 76 (remaining gas: 1039945.714 units remaining)
+    [ Unit  	
+      (Pair 1 4 2 Unit)  	@parameter ]
+  - location: 78 (remaining gas: 1039945.574 units remaining)
+    [ Unit  	
+      Unit  	
+      (Pair 1 4 2 Unit)  	@parameter ]
+  - location: 81 (remaining gas: 1039945.384 units remaining)
+    [ 0  	
+      (Pair 1 4 2 Unit)  	@parameter ]
+  - location: 82 (remaining gas: 1039945.244 units remaining)
+    [ True  	
+      (Pair 1 4 2 Unit)  	@parameter ]
+  - location: -1 (remaining gas: 1039945.174 units remaining)
+    [ True  	
+      (Pair 1 4 2 Unit)  	@parameter ]
+  - location: 84 (remaining gas: 1039944.984 units remaining)
+    [ (Pair 1 4 2 Unit)  	@parameter ]
+  - location: -1 (remaining gas: 1039944.914 units remaining)
+    [ (Pair 1 4 2 Unit)  	@parameter ]
+  - location: 89 (remaining gas: 1039944.774 units remaining)
+    [  ]
+  - location: 90 (remaining gas: 1039944.634 units remaining)
+    [ Unit  	 ]
+  - location: 91 (remaining gas: 1039944.494 units remaining)
+    [ {}  	
+      Unit  	 ]
+  - location: 93 (remaining gas: 1039944.354 units remaining)
+    [ (Pair {} Unit)  	 ]
+  - location: -1 (remaining gas: 1039944.284 units remaining)
+    [ (Pair {} Unit)  	 ]
+
