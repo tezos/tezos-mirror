@@ -109,6 +109,8 @@ val fast_box_noalloc : channel_key -> nonce -> Bytes.t -> Bytes.t -> unit
     returns true if successful. *)
 val fast_box_open_noalloc : channel_key -> nonce -> Bytes.t -> Bytes.t -> bool
 
+(** [check_proof_of_work pk pow target] returns true if [pow] is proof of work
+    following [target] for the public key [pk].*)
 val check_proof_of_work : public_key -> nonce -> pow_target -> bool
 
 (** [generate_proof_of_work pk pow_target] generates a proof of work for the public

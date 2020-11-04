@@ -348,8 +348,16 @@ module type SIGNATURE = sig
   val generate_key :
     ?seed:Bytes.t -> unit -> Public_key_hash.t * Public_key.t * Secret_key.t
 
+  (** [deterministic_nonce sk msg] returns a nonce that is determined
+      by [sk] and [msg] *)
   val deterministic_nonce : Secret_key.t -> Bytes.t -> Bytes.t
 
+  (** [deterministic_nonce_hash sk msg] returns the BLAKE2b hash of a nonce that
+     is determined by [sk] and [msg].
+
+     In other words, [Blake2b.digest (deterministic_nonce sk msg) =
+     deterministic_nonce_hash sk msg]
+   *)
   val deterministic_nonce_hash : Secret_key.t -> Bytes.t -> Bytes.t
 end
 

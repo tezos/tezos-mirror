@@ -49,14 +49,16 @@ module Hash : sig
         freed when no longer required. *)
     type state
 
+    (** [init ()] initializes and returns an internal state of the hash
+        algorithm *)
     val init : unit -> state
 
     (** [update st msg] updates the internal state of the hash algorithm [st]
         with buffer [msg]. *)
     val update : state -> Bytes.t -> unit
 
-    (** [finish st] generates a digest, without invalidating the state, meaning
-        that further calls to [update] can be made *)
+    (** [finish st] generates and returns a digest, without invalidating the
+        state, meaning that further calls to [update] can be made *)
     val finish : state -> Bytes.t
   end
 
@@ -124,6 +126,7 @@ module Secretbox : sig
   (** @raise Invalid_argument if argument is not [keybytes] bytes long *)
   val blit_of_bytes : Bytes.t -> int -> key
 
+  (** [genkey ()] generates a secretbox key. *)
   val genkey : unit -> key
 
   (** [secretbox key nonce msg cmsg] encrypts and authenticates the data in
