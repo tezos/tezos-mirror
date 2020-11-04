@@ -307,12 +307,13 @@ module Ack = struct
 end
 
 type 'meta authenticated_connection = {
-  fd : P2p_io_scheduler.connection;
+  scheduled_conn : P2p_io_scheduler.connection;
   info : 'meta P2p_connection.Info.t;
   cryptobox_data : Crypto.data;
 }
 
-let nack {fd; cryptobox_data; info} motive potential_peers_to_connect =
+let nack {scheduled_conn; cryptobox_data; info} motive
+    potential_peers_to_connect =
   let nack =
     if
       P2p_version.feature_available
@@ -333,13 +334,14 @@ let nack {fd; cryptobox_data; info} motive potential_peers_to_connect =
         info.id_point ;
       Ack.Nack_v_0 )
   in
-  Ack.write fd cryptobox_data nack
-  >>= fun _ -> P2p_io_scheduler.close fd >>= fun _ -> Lwt.return_unit
+  Ack.write scheduled_conn cryptobox_data nack
+  >>= fun _ ->
+  P2p_io_scheduler.close scheduled_conn >>= fun _ -> Lwt.return_unit
 
 (* First step: write and read credentials, makes no difference
    whether we're trying to connect to a peer or checking an incoming
    connection, both parties must first introduce themselves. *)
-let authenticate ~canceler ~proof_of_work_target ~incoming fd
+let authenticate ~canceler ~proof_of_work_target ~incoming scheduled_conn
     ((remote_addr, remote_socket_port) as point) ?listening_port identity
     announced_version metadata_config =
   let local_nonce_seed = Crypto_box.random_nonce () in
@@ -347,7 +349,7 @@ let authenticate ~canceler ~proof_of_work_target ~incoming fd
   >>= fun () ->
   Connection_message.write
     ~canceler
-    fd
+    scheduled_conn
     {
       public_key = identity.P2p_identity.public_key;
       proof_of_work_stamp = identity.proof_of_work_stamp;
@@ -356,7 +358,7 @@ let authenticate ~canceler ~proof_of_work_target ~incoming fd
       version = announced_version;
     }
   >>=? fun sent_msg ->
-  Connection_message.read ~canceler fd
+  Connection_message.read ~canceler scheduled_conn
   >>=? fun (msg, recv_msg) ->
   let remote_listening_port =
     if incoming then msg.port else Some remote_socket_port
@@ -382,9 +384,14 @@ let authenticate ~canceler ~proof_of_work_target ~incoming fd
   in
   let cryptobox_data = {Crypto.channel_key; local_nonce; remote_nonce} in
   let local_metadata = metadata_config.P2p_params.conn_meta_value () in
-  Metadata.write ~canceler metadata_config fd cryptobox_data local_metadata
+  Metadata.write
+    ~canceler
+    metadata_config
+    scheduled_conn
+    cryptobox_data
+    local_metadata
   >>=? fun () ->
-  Metadata.read ~canceler metadata_config fd cryptobox_data
+  Metadata.read ~canceler metadata_config scheduled_conn cryptobox_data
   >>=? fun remote_metadata ->
   let info =
     {
@@ -398,7 +405,7 @@ let authenticate ~canceler ~proof_of_work_target ~incoming fd
       remote_metadata;
     }
   in
-  return (info, {fd; info; cryptobox_data})
+  return (info, {scheduled_conn; info; cryptobox_data})
 
 module Reader = struct
   type ('msg, 'meta) t = {
@@ -423,7 +430,7 @@ module Reader = struct
       | Await decode_next_buf ->
           Crypto.read_chunk
             ~canceler:st.canceler
-            st.conn.fd
+            st.conn.scheduled_conn
             st.conn.cryptobox_data
           >>=? fun buf ->
           lwt_debug
@@ -504,7 +511,7 @@ module Writer = struct
       | buf :: l ->
           Crypto.write_chunk
             ~canceler:st.canceler
-            st.conn.fd
+            st.conn.scheduled_conn
             st.conn.cryptobox_data
             buf
           >>=? fun () ->
@@ -639,8 +646,9 @@ type ('msg, 'meta) t = {
   writer : ('msg, 'meta) Writer.t;
 }
 
-let equal {conn = {fd = fd2; _}; _} {conn = {fd = fd1; _}; _} =
-  P2p_io_scheduler.id fd1 = P2p_io_scheduler.id fd2
+let equal {conn = {scheduled_conn = conn2; _}; _}
+    {conn = {scheduled_conn = conn1; _}; _} =
+  P2p_io_scheduler.id conn1 = P2p_io_scheduler.id conn2
 
 let pp ppf {conn; _} = P2p_connection.Info.pp (fun _ _ -> ()) ppf conn.info
 
@@ -656,10 +664,10 @@ let accept ?incoming_message_queue_size ?outgoing_message_queue_size
     ?binary_chunks_size ~canceler conn encoding =
   protect
     (fun () ->
-      Ack.write ~canceler conn.fd conn.cryptobox_data Ack
-      >>=? fun () -> Ack.read ~canceler conn.fd conn.cryptobox_data)
+      Ack.write ~canceler conn.scheduled_conn conn.cryptobox_data Ack
+      >>=? fun () -> Ack.read ~canceler conn.scheduled_conn conn.cryptobox_data)
     ~on_error:(fun err ->
-      P2p_io_scheduler.close conn.fd
+      P2p_io_scheduler.close conn.scheduled_conn
       >>= fun _ ->
       match err with
       | [P2p_errors.Connection_closed] ->
@@ -683,7 +691,8 @@ let accept ?incoming_message_queue_size ?outgoing_message_queue_size
       in
       let conn = {conn; reader; writer} in
       Lwt_canceler.on_cancel canceler (fun () ->
-          P2p_io_scheduler.close conn.conn.fd >>= fun _ -> Lwt.return_unit) ;
+          P2p_io_scheduler.close conn.conn.scheduled_conn
+          >>= fun _ -> Lwt.return_unit) ;
       return conn
   | Nack_v_0 ->
       fail
@@ -765,7 +774,7 @@ let read_now {reader; _} =
   try Lwt_pipe.pop_now reader.messages
   with Lwt_pipe.Closed -> Some (error P2p_errors.Connection_closed)
 
-let stat {conn = {fd; _}; _} = P2p_io_scheduler.stat fd
+let stat {conn = {scheduled_conn; _}; _} = P2p_io_scheduler.stat scheduled_conn
 
 let close ?(wait = false) st =
   ( if not wait then Lwt.return_unit
@@ -777,4 +786,5 @@ let close ?(wait = false) st =
   Reader.shutdown st.reader
   >>= fun () ->
   Writer.shutdown st.writer
-  >>= fun () -> P2p_io_scheduler.close st.conn.fd >>= fun _ -> Lwt.return_unit
+  >>= fun () ->
+  P2p_io_scheduler.close st.conn.scheduled_conn >>= fun _ -> Lwt.return_unit
