@@ -94,11 +94,15 @@ module Generic_Merkle_tree (H : sig
 
   val node : t -> t -> t
 end) : sig
+  (** See {!S.MERKLE_TREE.compute}. *)
   val compute : H.elt list -> H.t
 
+  (** See {!S.MERKLE_TREE.path}. *)
   type path = Left of path * H.t | Right of H.t * path | Op
 
+  (** See {!S.MERKLE_TREE.compute_path}. *)
   val compute_path : H.elt list -> int -> path
 
+  (** See {!S.MERKLE_TREE.check_path}. *)
   val check_path : path -> H.elt -> H.t * int
 end

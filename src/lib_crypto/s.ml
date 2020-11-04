@@ -251,24 +251,85 @@ module type HASH = sig
 end
 
 module type MERKLE_TREE = sig
+  (** The element type [elt] of the Merkle tree. *)
   type elt
 
+  (** [elt_bytes x] returns the byte sequence representation of the
+     element [x]. *)
   val elt_bytes : elt -> Bytes.t
 
   include HASH
 
+  (** [compute xs] computes a full binary tree from the list [xs].
+
+     In this tree the ith leaf (from left to right) is the ith element of the
+     list [xs]. If [xs] is the empty list, then the result is the empty tree.  If the
+     length of [xs] is not a power of 2, then the tree is padded with leaves
+     containing the last element of [xs] such that a full tree is obtained.
+
+     Example: given the list [[1; 2; 3]], the tree
+
+     {v
+           /\
+          /  \
+         /\  /\
+        1 2  3 3
+     v}
+
+     is built.
+
+   *)
   val compute : elt list -> t
 
+  (** The [empty] Merkle tree. *)
   val empty : t
 
+  (** A [path] to an element in a Merkle tree.
+
+      A [path] is either:
+        - [Left (p, r)], indicating that the element is in the left subtree,
+          from which the path [p] should be taken to find the element. [r] is
+          the left subtree where this branching decision is made.
+        - [Right (l, p)], indicating that the element is in the right subtree,
+          from which the path [p] should be taken to find the element. [l] is
+          the left subtree where this branching decision is made.
+        - [Op], indicating that the path traversal has reached the element.
+
+      Example:
+
+      {v
+           /\
+          /  \
+         /\  /\
+        4 5  6 7
+      v}
+
+      The path to the third leaf, containing [6] will be:
+
+      {v Right (node (leaf 4, leaf 5), Left (Op, leaf 7)) v}
+
+      Consequently, the path will contain all the information to reconstruct the
+      full tree, except the element to which the path lead.
+   *)
   type path = Left of path * t | Right of t * path | Op
 
+  (** Encoding of a path. *)
   val path_encoding : path Data_encoding.t
 
+  (** Encoding of a path, with optional bound [max_length].
+
+      The encoding is bounded to [log2(max_length) * (size + 1) + 1] bytes. *)
   val bounded_path_encoding : ?max_length:int -> unit -> path Data_encoding.t
 
+  (** [compute_path xs i] computes the path to the [i]th leaf of the
+      Merkle tree computed from [xs], that will also contain the ith element
+      of [xs]. *)
   val compute_path : elt list -> int -> path
 
+  (** [check_path p x] returns a pair [(t, i)] where [t] is the full
+      Merkle tree reconstructed from the path [t] with [x] at the last
+      position of the path, and [i] is the index of [x] in that tree.
+   *)
   val check_path : path -> elt -> t * int
 end
 
