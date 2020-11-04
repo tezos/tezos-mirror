@@ -1181,7 +1181,8 @@ let operation_data_and_metadata_encoding =
 
 type block_metadata = {
   baker : Signature.Public_key_hash.t;
-  level : Level.t;
+  level : Level.compat_t;
+  level_info : Level.t;
   voting_period_kind : Voting_period.kind;
   nonce_hash : Nonce_hash.t option;
   consumed_gas : Gas.Arith.fp;
@@ -1195,6 +1196,7 @@ let block_metadata_encoding =
   @@ conv
        (fun { baker;
               level;
+              level_info;
               voting_period_kind;
               nonce_hash;
               consumed_gas;
@@ -1202,6 +1204,7 @@ let block_metadata_encoding =
               balance_updates } ->
          ( baker,
            level,
+           level_info,
            voting_period_kind,
            nonce_hash,
            consumed_gas,
@@ -1209,6 +1212,7 @@ let block_metadata_encoding =
            balance_updates ))
        (fun ( baker,
               level,
+              level_info,
               voting_period_kind,
               nonce_hash,
               consumed_gas,
@@ -1217,15 +1221,20 @@ let block_metadata_encoding =
          {
            baker;
            level;
+           level_info;
            voting_period_kind;
            nonce_hash;
            consumed_gas;
            deactivated;
            balance_updates;
          })
-       (obj7
+       (obj8
           (req "baker" Signature.Public_key_hash.encoding)
-          (req "level" Level.encoding)
+          (req
+             ~description:"This field is DEPRECATED: use level_info instead"
+             "level"
+             Level.compat_encoding)
+          (req "level_info" Level.encoding)
           (req "voting_period_kind" Voting_period.kind_encoding)
           (req "nonce_hash" (option Nonce_hash.encoding))
           (req "consumed_gas" Gas.Arith.n_fp_encoding)

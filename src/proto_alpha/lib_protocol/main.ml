@@ -214,9 +214,9 @@ let apply_operation ({mode; chain_id; ctxt; op_count; _} as data)
 let finalize_block {mode; ctxt; op_count} =
   match mode with
   | Partial_construction _ ->
-      let level = Alpha_context.Level.current ctxt in
-      Alpha_context.Voting_period.get_current_kind ctxt
-      >>=? fun voting_period_kind ->
+      Alpha_context.Voting_period.get_rpc_fixed_current_info ctxt
+      >>=? fun {voting_period; position; _} ->
+      let level_info = Alpha_context.Level.current ctxt in
       let baker = Signature.Public_key_hash.zero in
       Signature.Public_key_hash.Map.fold
         (fun delegate deposit ctxt ->
@@ -231,15 +231,19 @@ let finalize_block {mode; ctxt; op_count} =
         Apply_results.
           {
             baker;
-            level;
-            voting_period_kind;
+            level =
+              Alpha_context.Level.to_deprecated_type
+                level_info
+                ~voting_period_index:voting_period.index
+                ~voting_period_position:position;
+            level_info;
+            voting_period_kind = voting_period.kind;
             nonce_hash = None;
             consumed_gas = Alpha_context.Gas.Arith.zero;
             deactivated = [];
             balance_updates = [];
           } )
   | Partial_application {block_header; baker; block_delay} ->
-      let level = Alpha_context.Level.current ctxt in
       let included_endorsements = Alpha_context.included_endorsements ctxt in
       Apply.check_minimum_endorsements
         ctxt
@@ -247,15 +251,21 @@ let finalize_block {mode; ctxt; op_count} =
         block_delay
         included_endorsements
       >>?= fun () ->
-      Alpha_context.Voting_period.get_current_kind ctxt
-      >|=? fun voting_period_kind ->
+      Alpha_context.Voting_period.get_rpc_fixed_current_info ctxt
+      >|=? fun {voting_period; position; _} ->
+      let level_info = Alpha_context.Level.current ctxt in
       let ctxt = Alpha_context.finalize ctxt in
       ( ctxt,
         Apply_results.
           {
             baker;
-            level;
-            voting_period_kind;
+            level =
+              Alpha_context.Level.to_deprecated_type
+                level_info
+                ~voting_period_index:voting_period.index
+                ~voting_period_position:position;
+            level_info;
+            voting_period_kind = voting_period.kind;
             nonce_hash = None;
             consumed_gas = Alpha_context.Gas.Arith.zero;
             deactivated = [];

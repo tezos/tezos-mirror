@@ -1520,14 +1520,20 @@ let finalize_application ctxt protocol_data delegate ~block_delay =
       (Gas.Arith.fp @@ Constants.hard_gas_limit_per_block ctxt)
       (Alpha_context.Gas.block_level ctxt)
   in
-  Alpha_context.Voting_period.get_current_kind ctxt
-  >|=? fun voting_period_kind ->
+  Alpha_context.Voting_period.get_rpc_fixed_current_info ctxt
+  >|=? fun {voting_period; position; _} ->
+  let level_info = Alpha_context.Level.current ctxt in
   let receipt =
     Apply_results.
       {
         baker = delegate;
-        level = Level.current ctxt;
-        voting_period_kind;
+        level =
+          Level.to_deprecated_type
+            level_info
+            ~voting_period_index:voting_period.index
+            ~voting_period_position:position;
+        level_info;
+        voting_period_kind = voting_period.kind;
         nonce_hash = protocol_data.seed_nonce_hash;
         consumed_gas;
         deactivated;
