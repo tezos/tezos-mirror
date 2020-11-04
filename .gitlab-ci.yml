@@ -658,6 +658,33 @@ documentation:linkcheck:
   interruptible: true
 
 ############################################################
+## Stage: building static tezos binaries                  ##
+############################################################
+
+static-x86-linux-binaries:
+  stage: packaging
+  image: ${build_deps_image_name}:${build_deps_image_version}
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master"'
+      when: on_success
+    - if: '$CI_COMMIT_BRANCH =~ /-release$/'
+      when: on_success
+  script:
+    - sudo apk --no-cache --virtual add unzip wget eudev-dev autoconf automake libtool linux-headers upx
+    # TODO: include static version of this libraries to the default docker image
+    - packaging/build/build-libusb-and-hidapi.sh
+    # TODO: patch approach is very fragile, we should think about something
+    # more reliable
+    - git apply packaging/build/static_libs.patch
+    - dune build @install
+    - dune install --prefix install_root
+    # Compress resulting binaries
+    - upx install_root/bin/*
+  artifacts:
+    paths:
+      - install_root/bin/*
+
+############################################################
 ## Stage: building opam packages (only master and *opam*) ##
 ############################################################
 
