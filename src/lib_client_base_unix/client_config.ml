@@ -781,20 +781,57 @@ let check_base_dir_for_mode (ctx : #Client_context.full) client_mode base_dir =
     | _ ->
         return_unit )
   | Mode_mockup -> (
-    match base_dir_class with
-    | Base_dir_is_empty
-    | Base_dir_does_not_exist
-    | Base_dir_is_nonempty
-    | Base_dir_is_file ->
+      let warn_might_not_work explain =
         ctx#warning
-          "@[<hv>Base dir %s has state `%a`.@ Some commands (e.g., transfer) \
-           might not work correctly.@]"
+          "@[<hv>Base directory %s %a@ Some commands (e.g., transfer) might \
+           not work correctly.@]"
           base_dir
-          pp_base_dir_class
-          base_dir_class
+          explain
+          ()
         >>= fun () -> return_unit
-    | Base_dir_is_mockup ->
-        return_unit )
+      in
+      let show_cmd ppf () =
+        Format.fprintf
+          ppf
+          "./tezos-client --mode mockup --base-dir %s create mockup"
+          base_dir
+      in
+      match base_dir_class with
+      | Base_dir_is_empty ->
+          warn_might_not_work (fun ppf () ->
+              Format.fprintf
+                ppf
+                "is empty.@ Move directory %s away and create it anew with:@ \
+                 %a@ or use another directory name."
+                base_dir
+                show_cmd
+                ())
+      | Base_dir_does_not_exist ->
+          warn_might_not_work (fun ppf () ->
+              Format.fprintf
+                ppf
+                "does not exist.@ Create it with:@ %a"
+                show_cmd
+                ())
+      | Base_dir_is_nonempty ->
+          warn_might_not_work (fun ppf () ->
+              Format.fprintf
+                ppf
+                "is non empty.@ Move directory %s away and create it anew \
+                 with:@ %a@ or use another directory name."
+                base_dir
+                show_cmd
+                ())
+      | Base_dir_is_file ->
+          warn_might_not_work (fun ppf () ->
+              Format.fprintf
+                ppf
+                "is a file.@ This is expected to be a directory.@ It can be \
+                 created with:@ %a"
+                show_cmd
+                ())
+      | Base_dir_is_mockup ->
+          return_unit )
 
 let build_endpoint addr port tls =
   let updatecomp updatef ov uri =
