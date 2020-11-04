@@ -321,6 +321,20 @@ let test_caddadr_expansion () =
   >>? fun () ->
   assert_expands (Prim (zero_loc, "CDAR", [], [])) (Seq (zero_loc, [cdr; car]))
 
+let test_carn_cdrn_expansion () =
+  let car n = Prim (zero_loc, "CAR", [Int (zero_loc, Z.of_int n)], []) in
+  let cdr n = Prim (zero_loc, "CDR", [Int (zero_loc, Z.of_int n)], []) in
+  let get n =
+    Seq (zero_loc, [Prim (zero_loc, "GET", [Int (zero_loc, Z.of_int n)], [])])
+  in
+  assert_expands (cdr 0) (get 0)
+  >>? fun () ->
+  assert_expands (car 0) (get 1)
+  >>? fun () ->
+  assert_expands (cdr 1) (get 2)
+  >>? fun () ->
+  assert_expands (car 1) (get 3) >>? fun () -> assert_expands (cdr 2) (get 4)
+
 (* if_some *)
 
 let test_if_some () =
@@ -698,6 +712,21 @@ let test_unexpand_caddadr () =
     (Seq (zero_loc, [cdr; car]))
     (Prim (zero_loc, "CDAR", [], []))
 
+let test_unexpand_carn_cdrn () =
+  let car n = Prim (zero_loc, "CAR", [Int (zero_loc, Z.of_int n)], []) in
+  let cdr n = Prim (zero_loc, "CDR", [Int (zero_loc, Z.of_int n)], []) in
+  let get n =
+    Seq (zero_loc, [Prim (zero_loc, "GET", [Int (zero_loc, Z.of_int n)], [])])
+  in
+  assert_unexpansion (get 0) (cdr 0)
+  >>? fun () ->
+  assert_unexpansion (get 1) (car 0)
+  >>? fun () ->
+  assert_unexpansion (get 2) (cdr 1)
+  >>? fun () ->
+  assert_unexpansion (get 3) (car 1)
+  >>? fun () -> assert_unexpansion (get 4) (cdr 2)
+
 let test_unexpand_set_car () =
   assert_unexpansion
     (Seq
@@ -968,6 +997,8 @@ let tests =
     ("pappaiir expansion", fun _ -> Lwt.return (test_pappaiir ()));
     ("unpair expansion", fun _ -> Lwt.return (test_unpair ()));
     ("caddadr expansion", fun _ -> Lwt.return (test_caddadr_expansion ()));
+    ( "carn and cdrn expansion",
+      fun _ -> Lwt.return (test_carn_cdrn_expansion ()) );
     ("if_some expansion", fun _ -> Lwt.return (test_if_some ()));
     ("set_car expansion", fun _ -> Lwt.return (test_set_car_expansion ()));
     ("set_cdr expansion", fun _ -> Lwt.return (test_set_cdr_expansion ()));
@@ -1004,6 +1035,8 @@ let tests =
     ("pappaiir unexpansion", fun _ -> Lwt.return (test_unexpand_pappaiir ()));
     ("duup unexpansion", fun _ -> Lwt.return (test_unexpand_duup ()));
     ("caddadr unexpansion", fun _ -> Lwt.return (test_unexpand_caddadr ()));
+    ( "carn and cdrn unexpansion",
+      fun _ -> Lwt.return (test_unexpand_carn_cdrn ()) );
     ("set_car unexpansion", fun _ -> Lwt.return (test_unexpand_set_car ()));
     ("set_cdr unexpansion", fun _ -> Lwt.return (test_unexpand_set_cdr ()));
     ("set_cadr unexpansion", fun _ -> Lwt.return (test_unexpand_set_cadr ()));
