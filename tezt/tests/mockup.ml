@@ -70,7 +70,7 @@ let test_balances_after_transfer giver amount receiver =
 (* Test.
    Transfer some tz and check balance changes are as expected.
  *)
-let test_transfer protocol =
+let test_transfer ~protocol =
   Test.register
     ~__FILE__
     ~title:(sf "%s: mockup transfer" (Protocol.name protocol))
@@ -115,8 +115,10 @@ let test_same_transfer_twice ~protocol =
   Test.register
     ~__FILE__
     ~title:
-      ("same-transfer-twice (mockup / asynchronous / " ^ (Protocol.name protocol) ^ ")")
-    ~tags:["mockup"; "client"; "transfer"; Protocol.tag protocol; "asynchronous"]
+      ( "same-transfer-twice (mockup / asynchronous / " ^ Protocol.name protocol
+      ^ ")" )
+    ~tags:
+      ["mockup"; "client"; "transfer"; Protocol.tag protocol; "asynchronous"]
   @@ fun () ->
   let (giver, amount, receiver) = transfer_data in
   let* client =
@@ -141,9 +143,10 @@ let test_transfer_same_participants ~protocol =
   Test.register
     ~__FILE__
     ~title:
-      ( "transfer-same-participants (mockup / asynchronous / " ^ (Protocol.name protocol)
-      ^ ")" )
-    ~tags:["mockup"; "client"; "transfer"; Protocol.tag protocol; "asynchronous"]
+      ( "transfer-same-participants (mockup / asynchronous / "
+      ^ Protocol.name protocol ^ ")" )
+    ~tags:
+      ["mockup"; "client"; "transfer"; Protocol.tag protocol; "asynchronous"]
   @@ fun () ->
   let (giver, amount, receiver) = transfer_data in
   let* client =

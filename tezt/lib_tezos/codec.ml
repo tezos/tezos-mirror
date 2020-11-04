@@ -12,7 +12,8 @@ let spawn_decode ?path ~name binary =
 
 let decode ?path ~name binary =
   let* json =
-    spawn_decode ?path ~name binary |> Process.check_and_read_stdout
+    String.trim binary |> spawn_decode ?path ~name
+    |> Process.check_and_read_stdout
   in
   return (JSON.parse ~origin:("tezos-codec encode " ^ name) json)
 
