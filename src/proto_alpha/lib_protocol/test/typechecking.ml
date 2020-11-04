@@ -170,6 +170,7 @@ let test_parse_comb_data () =
   let pair_nat_nat_ty = pair_ty nat_ty nat_ty in
   let pair_prim2 a b = pair_prim [a; b] in
   let pair_z_z_prim = pair_prim2 z_prim z_prim in
+  let list_nat_ty = List_t (nat_ty, None) in
   let big_map_nat_nat_ty = Big_map_t (Nat_key None, nat_ty, None) in
   test_context_with_nat_nat_big_map ()
   >>=? fun (ctxt, big_map_id) ->
@@ -216,6 +217,13 @@ let test_parse_comb_data () =
     (Micheline.Seq (-1, [z_prim; z_prim; z_prim]))
     (z, (z, z))
   >>=? fun ctxt ->
+  (* Should fail: {0} against pair nat (list nat) *)
+  test_parse_data_fails
+    __LOC__
+    ctxt
+    (pair_ty nat_ty list_nat_ty)
+    (Micheline.Seq (-1, [z_prim]))
+  >>=? fun () ->
   (* check Pair 0 (Pair 0 {}) against pair nat (big_map nat nat)
      so that the following test fails for the good reason and not because
      the big map doesn't exist
