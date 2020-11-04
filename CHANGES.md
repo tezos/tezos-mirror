@@ -12,19 +12,6 @@ here either.
 
 ## Node
 
-- Improved how the node stores buffered messages from peers to consume less memory.
-
-- Enforce loading of non-embedded protocols before starting the node
-  allowing the prevalidator to start correctly.
-
-- Optimized the I/O and CPU usage by removing an unnecessary access to
-  the context during block validation.
-
-- Fixes a bug where any event would allocate more memory than needed
-  when it were not to be printed.
-
-- Added two new bootstrap peers for Mainnet and one for Edonet.
-
 ## Client
 
 ## Baker / Endorser / Accuser
@@ -32,6 +19,27 @@ here either.
 ## Protocol Compiler And Environment
 
 ## Codec
+
+## Docker Images
+
+## Miscellaneous
+
+# Version 8.0
+
+## Node
+
+- Added two new bootstrap peers for Mainnet and one for Edonet.
+
+- Fixes a bug where any event would allocate more memory than needed
+  when it were not to be printed.
+
+- Improved how the node stores buffered messages from peers to consume less memory.
+
+- Enforce loading of non-embedded protocols before starting the node
+  allowing the prevalidator to start correctly.
+
+- Optimized the I/O and CPU usage by removing an unnecessary access to
+  the context during block validation.
 
 ## Docker Images
 

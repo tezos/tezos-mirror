@@ -1,12 +1,9 @@
 .. _version-8:
 
-Version 8.0~rc2
-===============
+Version 8.0
+===========
 
-Version 8.0~rc2 is the second release candidate of version 8.0.
-If it proves to be stable, it will become the next major release.
-
-Version 8.0~rc2 contains a new version (V1) of the protocol
+Version 8.0 contains a new version (V1) of the protocol
 environment, which is the set of functions that protocols can call. Up
 to Delphi, all protocols used protocol environment V0. The new version
 (V1) is used by Edo, which is a proposal for the next protocol after
@@ -23,18 +20,43 @@ Update Instructions
 -------------------
 
 Starting from version 8.0, compiling Tezos requires the Rust compiler,
-version 1.39.0, and the Cargo package manager to be installed.
+version 1.44.0, and the Cargo package manager to be installed.
 See :ref:`instructions to set up Rust<setup_rust>`.
 
 To update from sources::
 
   git fetch
-  git checkout v8.0-rc2
+  git checkout v8.0
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``v8.0-rc2`` Docker images of Tezos.
+If you are using Docker instead, use the ``v8.0`` Docker images of Tezos.
+
+Changelog — Version 8.0
+-----------------------
+
+Node
+~~~~
+
+- Added two new bootstrap peers for Mainnet and one for Edonet.
+
+- Fixes a bug where any event would allocate more memory than needed
+  when it were not to be printed.
+
+- Improved how the node stores buffered messages from peers to consume less memory.
+
+- Enforce loading of non-embedded protocols before starting the node
+  allowing the prevalidator to start correctly.
+
+- Optimized the I/O and CPU usage by removing an unnecessary access to
+  the context during block validation.
+
+Docker Images
+~~~~~~~~~~~~~
+
+- Bump up base image to ``alpine:12``. In particular, it changes rust and python
+  versions to 1.44.0 and 3.8.5 respectively.
 
 Changelog — Version 8.0~rc2
 ---------------------------
