@@ -395,17 +395,30 @@ let init ctx id ~memo_size =
   >>= fun ctx ->
   Roots.init ctx id >>=? fun ctx -> Ciphertexts.init ctx id >|= ok
 
+(* Gas costs for apply_diff. *)
+let sapling_apply_diff_cost ~inputs ~outputs =
+  Z.add
+    (Z.of_int 1_300_000)
+    (Z.add
+       (Z.mul (Z.of_int inputs) (Z.of_int 5_000))
+       (Z.mul (Z.of_int outputs) (Z.of_int 55_000)))
+
 (** Applies a diff to a state id stored in the context. Updates Commitments,
     Ciphertexts and Nullifiers using the diff and updates the Roots using the
     new Commitments tree. *)
 let apply_diff ctx id diff =
   let open Sapling_repr in
+  let nb_commitments = List.length diff.commitments_and_ciphertexts in
+  let nb_nullifiers = List.length diff.nullifiers in
+  Raw_context.consume_gas
+    ctx
+    (sapling_apply_diff_cost ~inputs:nb_nullifiers ~outputs:nb_commitments)
+  >>?= fun ctx ->
   Storage.Sapling.Commitments_size.get (ctx, id)
   >>=? fun cm_start_pos ->
   let cms = List.rev_map fst diff.commitments_and_ciphertexts in
   Commitments.add ctx id cms cm_start_pos
   >>=? fun (ctx, size) ->
-  let nb_commitments = List.length diff.commitments_and_ciphertexts in
   Storage.Sapling.Commitments_size.set
     (ctx, id)
     (Int64.add cm_start_pos (Int64.of_int nb_commitments))

@@ -984,6 +984,13 @@ module Cost_of = struct
 
     let dupn n = atomic_step_cost (cost_N_DupN n)
 
+    let sapling_verify_update ~inputs ~outputs =
+      let open Z_syntax in
+      atomic_step_cost
+        ( Z.of_int 85_000
+        + (Z.of_int inputs * Z.of_int 4)
+        + (Z.of_int outputs * Z.of_int 30) )
+
     (* --------------------------------------------------------------------- *)
     (* Semi-hand-crafted models *)
     let compare_unit = atomic_step_cost (Z.of_int 10)
@@ -1098,9 +1105,7 @@ module Cost_of = struct
     (* The cost functions below where not benchmarked, a cost model was derived
        from looking at similar instructions. *)
 
-    let sapling_empty_state = step_cost Z.one (* TODO *)
-
-    let sapling_verify_update = step_cost Z.one (* TODO *)
+    let sapling_empty_state = empty_map
 
     (* Cost for Concat_string is paid in two steps: when entering the interpreter,
        the user pays for the cost of computing the information necessary to compute

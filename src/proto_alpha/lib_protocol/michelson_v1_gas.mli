@@ -283,7 +283,7 @@ module Cost_of : sig
 
     val sapling_empty_state : Gas.cost
 
-    val sapling_verify_update : Gas.cost
+    val sapling_verify_update : inputs:int -> outputs:int -> Gas.cost
   end
 
   module Typechecking : sig
