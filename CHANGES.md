@@ -15,6 +15,11 @@ here either.
 - You can now specify the data directory using environment variable `TEZOS_NODE_DIR`.
   If you both set this environment variable and specify `--data-dir`, the latter will be used.
 
+- Added new RPC `/config` to query the configuration of a node.
+
+- Changed signal handling and exit codes for most binaries. The codes'
+  significance are detailed in [the user documentation](http://tezos.gitlab.io/user/various.html#tezos_binaries_signals_and_exit_codes).
+
 ## Client
 
 - You can now specify the base directory using environment variable `TEZOS_CLIENT_DIR`.
@@ -35,9 +40,6 @@ here either.
 ## Node
 
 - Fixed all known cases where the node would not stop when interrupted with Ctrl+C.
-
-- Changed signal handling and exit codes for most binaries. The codes'
-  significance are detailed in [the user documentation](http://tezos.gitlab.io/user/various.html#tezos_binaries_signals_and_exit_codes).
 
 - The node's mempool relies on a new synchronisation heuristic. The
   node's behaviour, especially at startup, may differ slightly; log
@@ -106,8 +108,6 @@ here either.
 
 - Fixed the node which sent too many "get current branch" messages to its peers
   on testchain activation.
-
-- Add new RPC `/config` to query the configuration of a node
 
 ## Client
 
