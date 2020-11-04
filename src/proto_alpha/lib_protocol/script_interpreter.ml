@@ -594,8 +594,10 @@ let cost_of_instr : type b a. (b, a) descr -> b -> Gas.cost =
       Interp_costs.dupn n
   | (Sapling_empty_state _, _) ->
       Interp_costs.sapling_empty_state
-  | (Sapling_verify_update, _) ->
-      Interp_costs.sapling_verify_update
+  | (Sapling_verify_update, (tx, _)) ->
+      let inputs = List.length tx.inputs in
+      let outputs = List.length tx.outputs in
+      Interp_costs.sapling_verify_update ~inputs ~outputs
 
 let rec step_bounded :
     type b a.
