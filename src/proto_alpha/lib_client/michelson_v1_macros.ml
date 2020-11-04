@@ -80,6 +80,31 @@ let expand_caddadr original =
   | _ ->
       ok None
 
+let expand_carn original =
+  match original with
+  | Prim (loc, "CAR", [Int (loc2, n)], annot) ->
+      ok
+        (Some
+           (Seq
+              ( loc,
+                [ Prim
+                    ( loc,
+                      "GET",
+                      [Int (loc2, Z.(of_int 1 + (n * of_int 2)))],
+                      annot ) ] )))
+  | _ ->
+      ok None
+
+let expand_cdrn original =
+  match original with
+  | Prim (loc, "CDR", [Int (loc2, n)], annot) ->
+      ok
+        (Some
+           (Seq
+              (loc, [Prim (loc, "GET", [Int (loc2, Z.(n * of_int 2))], annot)])))
+  | _ ->
+      ok None
+
 let extract_field_annots annot =
   List.partition
     (fun a ->
@@ -772,7 +797,9 @@ let expand original =
         | None -> try_expansions expanders | Some rewritten -> ok rewritten )
   in
   try_expansions
-    [ expand_caddadr;
+    [ expand_carn;
+      expand_cdrn;
+      expand_caddadr;
       expand_set_caddadr;
       expand_map_caddadr;
       expand_deprecated_dxiiivp;
@@ -815,6 +842,16 @@ let expand_rec expr =
         (expr, errors)
   in
   expand_rec expr
+
+let unexpand_carn_and_cdrn expanded =
+  match expanded with
+  | Seq (loc, [Prim (_, "GET", [Int (locn, n)], annot)]) ->
+      let (half, parity) = Z.ediv_rem n (Z.of_int 2) in
+      if Z.(parity = zero) then
+        Some (Prim (loc, "CDR", [Int (locn, half)], annot))
+      else Some (Prim (loc, "CAR", [Int (locn, half)], annot))
+  | _ ->
+      None
 
 let unexpand_caddadr expanded =
   let rec rsteps acc = function
@@ -1422,6 +1459,7 @@ let unexpand original =
   in
   try_unexpansions
     [ unexpand_asserts;
+      unexpand_carn_and_cdrn;
       unexpand_caddadr;
       unexpand_set_caddadr;
       unexpand_map_caddadr;
