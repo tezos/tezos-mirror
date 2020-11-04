@@ -351,6 +351,89 @@ let test_unparse_comb_data () =
     ~expected_optimized:(Micheline.Seq (-1, [z_prim; z_prim; z_prim; z_prim]))
   >>=? fun _ -> return_unit
 
+(* Generate all the possible syntaxes for pairs *)
+let gen_pairs left right =
+  [Prim (-1, Script.D_Pair, [left; right], []); Seq (-1, [left; right])]
+
+(* Generate all the possible syntaxes for combs *)
+let rec gen_combs leaf arity =
+  assert (arity >= 2) ;
+  if arity = 2 then gen_pairs leaf leaf
+  else
+    gen_combs leaf (arity - 1)
+    |> List.map (fun smaller ->
+           ( match smaller with
+           | Prim (loc, Script.D_Pair, vs, []) ->
+               Prim (loc, Script.D_Pair, leaf :: vs, [])
+           | Seq (loc, vs) ->
+               Seq (loc, leaf :: vs)
+           | _ ->
+               assert false )
+           :: gen_pairs leaf smaller)
+    |> List.flatten
+
+(* Checks the optimality of the Optimized Micheline representation for combs *)
+let test_optimal_comb () =
+  let open Script_typed_ir in
+  let leaf_ty = Nat_t None in
+  let leaf_mich = Int (-1, Z.zero) in
+  let leaf_v = Script_int.zero_n in
+  let size_of_micheline mich =
+    let canonical = Micheline.strip_locations mich in
+    ( canonical,
+      Bytes.length
+      @@ Data_encoding.Binary.to_bytes_exn Script.expr_encoding canonical )
+  in
+  let check_optimal_comb loc ctxt ty v arity =
+    wrap_error_lwt
+      ( Script_ir_translator.unparse_data
+          ctxt
+          Script_ir_translator.Optimized
+          ty
+          v
+      >>=? fun (unparsed, ctxt) ->
+      let (unparsed_canonical, unparsed_size) = size_of_micheline unparsed in
+      Error_monad.iter_s (fun other_repr ->
+          let (other_repr_canonical, other_repr_size) =
+            size_of_micheline other_repr
+          in
+          if other_repr_size < unparsed_size then
+            Alcotest.failf
+              "At %s, for comb of arity %d, representation %a (size %d bytes) \
+               is shorter than representation %a (size %d bytes) returned by \
+               unparse_data in Optimized mode"
+              loc
+              arity
+              Michelson_v1_printer.print_expr
+              other_repr_canonical
+              other_repr_size
+              Michelson_v1_printer.print_expr
+              unparsed_canonical
+              unparsed_size
+          else return_unit)
+      @@ gen_combs leaf_mich arity
+      >>=? fun () -> return ctxt )
+  in
+  let pair_ty ty1 ty2 = Pair_t ((ty1, None, None), (ty2, None, None), None) in
+  test_context ()
+  >>=? fun ctxt ->
+  let comb2_ty = pair_ty leaf_ty leaf_ty in
+  let comb2_v = (leaf_v, leaf_v) in
+  check_optimal_comb __LOC__ ctxt comb2_ty comb2_v 2
+  >>=? fun ctxt ->
+  let comb3_ty = pair_ty leaf_ty comb2_ty in
+  let comb3_v = (leaf_v, comb2_v) in
+  check_optimal_comb __LOC__ ctxt comb3_ty comb3_v 3
+  >>=? fun ctxt ->
+  let comb4_ty = pair_ty leaf_ty comb3_ty in
+  let comb4_v = (leaf_v, comb3_v) in
+  check_optimal_comb __LOC__ ctxt comb4_ty comb4_v 4
+  >>=? fun ctxt ->
+  let comb5_ty = pair_ty leaf_ty comb4_ty in
+  let comb5_v = (leaf_v, comb4_v) in
+  check_optimal_comb __LOC__ ctxt comb5_ty comb5_v 5
+  >>=? fun _ctxt -> return_unit
+
 let tests =
   [ Test.tztest
       "test typecheck stack overflow error"
@@ -361,4 +444,5 @@ let tests =
       `Quick
       test_typecheck_stack_overflow;
     Test.tztest "test comb data parsing" `Quick test_parse_comb_data;
-    Test.tztest "test comb data unparsing" `Quick test_unparse_comb_data ]
+    Test.tztest "test comb data unparsing" `Quick test_unparse_comb_data;
+    Test.tztest "test optimal comb data unparsing" `Quick test_optimal_comb ]
