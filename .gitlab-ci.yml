@@ -13,6 +13,7 @@ variables:
 stages:
   - sanity
   - build
+  - build-extra
   - test
   - doc
   - packaging
@@ -662,13 +663,13 @@ documentation:linkcheck:
 ############################################################
 
 static-x86-linux-binaries:
-  stage: packaging
+  stage: build
   image: ${build_deps_image_name}:${build_deps_image_version}
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "master"'
-      when: on_success
-    - if: '$CI_COMMIT_BRANCH =~ /-release$/'
-      when: on_success
+  # rules:
+  #   - if: '$CI_COMMIT_BRANCH == "master"'
+  #     when: on_success
+  #   - if: '$CI_COMMIT_BRANCH =~ /-release$/'
+  #     when: on_success
   script:
     - sudo apk --no-cache --virtual add unzip wget eudev-dev autoconf automake libtool linux-headers upx
     # TODO: include static version of this libraries to the default docker image
@@ -1455,8 +1456,8 @@ opam:uecc:
 publish:static-binaries:
   image: registry.gitlab.com/gitlab-org/release-cli
   when: manual
-  only: master@tezos/tezos
-  stage: publish
+  stage: build-extra
+  # only: master@tezos/tezos
   dependencies:
     - static-x86-linux-binaries
   artifacts:
