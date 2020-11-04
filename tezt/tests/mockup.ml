@@ -163,7 +163,9 @@ let test_transfer_same_participants ~protocol =
   let process =
     Client.spawn_transfer ~amount:(amount + 1) ~giver ~receiver client
   in
-  let* _status = Process.wait process in
+  let* status = Process.wait process in
+  if status = Unix.WEXITED 0 then
+    Test.fail "Last transfer was successful but was expected to fail ..." ;
   let* mempool2 = read_file mempool_file in
   Log.info "Checking that mempool is unchanged" ;
   if mempool1 <> mempool2 then
