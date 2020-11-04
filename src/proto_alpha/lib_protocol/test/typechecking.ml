@@ -169,7 +169,13 @@ let test_parse_comb_data () =
     (pair_ty nat_ty pair_nat_nat_ty)
     (pair_prim [z_prim; z_prim; z_prim])
     (z, (z, z))
-  >>=? fun _ -> return_unit
+  >>=? fun ctxt ->
+  (* Should fail: Pair 0 0 {} against pair nat (big_map nat nat) *)
+  test_parse_data_fails
+    __LOC__
+    ctxt
+    (pair_ty nat_ty big_map_nat_nat_ty)
+    (pair_prim [z_prim; z_prim; Micheline.Seq (-1, [])])
 
 let test_unparse_data loc ctxt ty x ~expected_readable ~expected_optimized =
   wrap_error_lwt
