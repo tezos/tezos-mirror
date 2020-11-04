@@ -7,6 +7,13 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(** Testing
+    -------
+    Component:    Remote-signature Backends
+    Invocation:   dune build @src/lib_signer_backends/runtest
+    Subject:      On secret keys and URIs.
+*)
+
 open Error_monad
 
 let loops = 10
@@ -143,11 +150,22 @@ let test_random algo =
   in
   inner 0
 
+(** For each of the algorithms [Ed25519; Secp256k1; P256], creates a
+    dummy context. It randomly generates a Base58-encoded secret key,
+    then encrypts it into a URI and decrypts it. It it asserted that
+    the secret key is preserved after Base58-decoding comparison. This
+    process is repeated 10 times.
+*)
 let test_random _switch () =
   iter_s test_random Signature.[Ed25519; Secp256k1; P256]
   >>= function
   | Ok _ -> Lwt.return_unit | Error _ -> Lwt.fail_with "test_random"
 
+(** For each of the algorithms [Ed25519; Secp256k1; P256], creates a
+    dummy context, uses it to decrypt a list of secret key URIs
+    [...__sks_encrypted]. It is asserted that the decrypted keys shall
+    match the list [..._sks]. 
+*)
 let test_vectors _switch () =
   test_vectors ()
   >>= function
