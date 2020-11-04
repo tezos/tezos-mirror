@@ -16,7 +16,7 @@ depends: [
   "tezos-rpc"
   "tezos-clic"
   "lwt"
-  "hacl-star"
+  "hacl-star" { >= "0.3" }
   "zarith"
   "secp256k1-internal"
   "ringo" { = "0.5" }

@@ -14,7 +14,7 @@ depends: [
   "tezos-event-logging"
   "tezos-stdlib"
   "re" { >= "1.7.2" }
-  "lwt" { >= "3.0.0" }
+  "lwt"
   "ptime" { >= "0.8.4" }
   "mtime" { >= "1.0.0" }
   "conf-libev"

@@ -34,7 +34,7 @@ depends: [
   "tezos-mempool-006-PsCARTHA"
   "tezos-mempool-007-PsDELPH1"
   "cmdliner"
-  "tls"
+  "tls" { >= "0.10" }
   "cstruct"
 ]
 build: [

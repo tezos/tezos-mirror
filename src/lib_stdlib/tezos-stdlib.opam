@@ -9,7 +9,7 @@ depends: [
   "tezos-tooling" { with-test }
   "dune" { >= "2.0" }
   "hex"
-  "lwt"
+  "lwt" { >= "4.0.0" }
   "zarith"
   "ppx_inline_test"
   "bigstring" { with-test }
