@@ -117,6 +117,19 @@ let test_parse_data loc ctxt ty node expected =
     if actual = expected then return ctxt
     else Alcotest.failf "Unexpected error: %s" loc )
 
+let test_parse_data_fails loc ctxt ty node =
+  let legacy = false in
+  wrap_error_lwt
+    ( Script_ir_translator.parse_data ctxt ~legacy ty node
+    >>= function
+    | Ok _ ->
+        Alcotest.failf "Unexpected typechecking success: %s" loc
+    | Error (Tezos_raw_protocol_alpha.Script_tc_errors.Invalid_constant _ :: _)
+      ->
+        return_unit
+    | Error _ as res ->
+        Lwt.return res )
+
 let test_parse_comb_data () =
   let open Script in
   let open Script_typed_ir in
