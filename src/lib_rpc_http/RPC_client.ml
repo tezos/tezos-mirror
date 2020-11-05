@@ -394,7 +394,11 @@ module Make (Client : Cohttp_lwt.S.Client) = struct
     object
       method generic_json_call meth ?body uri =
         let path = Uri.path uri and query = Uri.query uri in
-        let uri = Uri.with_path base path in
+        let prefix = Uri.path base in
+        let prefixed_path =
+          if prefix = "" then path else prefix ^ "/" ^ path
+        in
+        let uri = Uri.with_path base prefixed_path in
         let uri = Uri.with_query uri query in
         generic_json_call meth ?body uri
 
