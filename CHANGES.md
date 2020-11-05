@@ -27,6 +27,8 @@ here either.
 
 ## Baker / Endorser / Accuser
 
+- Fixed a crash (assertion error) that could happen at exit, in particular if a baker were connected.
+
 ## Protocol Compiler And Environment
 
 ## Codec
