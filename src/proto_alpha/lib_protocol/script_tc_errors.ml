@@ -179,3 +179,5 @@ type error += Deprecated_instruction of prim
 type error += Typechecking_too_many_recursive_calls
 
 type error += Unparsing_too_many_recursive_calls
+
+type error += Unexpected_forged_value of Script.location

@@ -3024,22 +3024,24 @@ let rec parse_data :
       ( match id_opt with
       | None ->
           return @@ (None, ctxt)
-      | Some (id, loc) -> (
-          let id = Big_map.Id.parse_z id in
-          Big_map.exists ctxt id
-          >>=? function
-          | (_, None) ->
-              traced_fail (Invalid_big_map (loc, id))
-          | (ctxt, Some (btk, btv)) ->
-              Lwt.return
-                ( parse_comparable_ty ctxt (Micheline.root btk)
-                >>? fun (Ex_comparable_ty btk, ctxt) ->
-                parse_packable_ty ctxt ~legacy (Micheline.root btv)
-                >>? fun (Ex_ty btv, ctxt) ->
-                comparable_ty_eq ctxt tk btk
-                >>? fun (Eq, ctxt) ->
-                ty_eq ctxt loc tv btv >>? fun (Eq, ctxt) -> ok (Some id, ctxt)
-                ) ) )
+      | Some (id, loc) ->
+          if allow_forged then
+            let id = Big_map.Id.parse_z id in
+            Big_map.exists ctxt id
+            >>=? function
+            | (_, None) ->
+                traced_fail (Invalid_big_map (loc, id))
+            | (ctxt, Some (btk, btv)) ->
+                Lwt.return
+                  ( parse_comparable_ty ctxt (Micheline.root btk)
+                  >>? fun (Ex_comparable_ty btk, ctxt) ->
+                  parse_packable_ty ctxt ~legacy (Micheline.root btv)
+                  >>? fun (Ex_ty btv, ctxt) ->
+                  comparable_ty_eq ctxt tk btk
+                  >>? fun (Eq, ctxt) ->
+                  ty_eq ctxt loc tv btv >>? fun (Eq, ctxt) -> ok (Some id, ctxt)
+                  )
+          else traced_fail (Unexpected_forged_value loc) )
       >|=? fun (id, ctxt) -> ({id; diff; key_type = tk; value_type = tv}, ctxt)
   | (Never_t _, expr) ->
       Lwt.return @@ traced_no_lwt @@ parse_never expr

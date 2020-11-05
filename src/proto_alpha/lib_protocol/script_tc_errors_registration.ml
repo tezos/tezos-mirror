@@ -747,4 +747,14 @@ let () =
     ~description:"Too many recursive calls were needed for unparsing"
     Data_encoding.empty
     (function Unparsing_too_many_recursive_calls -> Some () | _ -> None)
-    (fun () -> Unparsing_too_many_recursive_calls)
+    (fun () -> Unparsing_too_many_recursive_calls) ;
+  (* Unexpected forged value *)
+  register_error_kind
+    `Permanent
+    ~id:"michelson_v1.unexpected_forged_value"
+    ~title:"Unexpected forged value"
+    ~description:
+      "A forged value was encountered but disallowed for that position."
+    (obj1 (req "location" Script.location_encoding))
+    (function Unexpected_forged_value loc -> Some loc | _ -> None)
+    (fun loc -> Unexpected_forged_value loc)
