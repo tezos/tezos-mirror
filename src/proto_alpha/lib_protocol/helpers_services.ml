@@ -300,6 +300,32 @@ module Scripts = struct
       ({ctxt; storage; lazy_storage_diff; operations}, trace)
   end
 
+  let typecheck_data :
+      legacy:bool ->
+      context ->
+      Script.expr * Script.expr ->
+      context tzresult Lwt.t =
+   fun ~legacy ctxt (data, exp_ty) ->
+    record_trace
+      (Script_tc_errors.Ill_formed_type (None, exp_ty, 0))
+      (Script_ir_translator.parse_parameter_ty
+         ctxt
+         ~legacy
+         (Micheline.root exp_ty))
+    >>?= fun (Ex_ty exp_ty, ctxt) ->
+    trace_eval
+      (fun () ->
+        Lwt.return
+          ( Script_ir_translator.serialize_ty_for_error ctxt exp_ty
+          >|? fun (exp_ty, _ctxt) ->
+          Script_tc_errors.Ill_typed_data (None, data, exp_ty) ))
+      (Script_ir_translator.parse_data
+         ctxt
+         ~legacy
+         exp_ty
+         (Micheline.root data))
+    >|=? fun (_, ctxt) -> ctxt
+
   let register () =
     let open Services_registration in
     let originate_dummy_contract ctxt script balance =
@@ -440,8 +466,7 @@ module Scripts = struct
           | Some gas ->
               Gas.set_limit ctxt gas
         in
-        Script_ir_translator.typecheck_data ~legacy ctxt (data, ty)
-        >|=? fun ctxt -> Gas.level ctxt) ;
+        typecheck_data ~legacy ctxt (data, ty) >|=? fun ctxt -> Gas.level ctxt) ;
     register0 S.pack_data (fun ctxt () (expr, typ, maybe_gas) ->
         let open Script_ir_translator in
         let ctxt =
