@@ -258,7 +258,6 @@ end = struct
         | Some (WEM.Unclassified _) ->
             None
         | Some (WEM.Unregistered_error _) ->
-            Format.eprintf "What %s@." name ;
             None
         | res ->
             res
