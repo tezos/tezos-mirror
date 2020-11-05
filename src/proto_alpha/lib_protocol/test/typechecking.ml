@@ -24,11 +24,42 @@ let ( >>=?? ) x y =
       Lwt.return
       @@ Error (List.map (fun x -> Environment.Ecoproto_error x) errs)
 
+let wrap_error_lwt x = x >>= fun x -> Lwt.return @@ Environment.wrap_error x
+
 let test_context () =
   Context.init 3
   >>=? fun (b, _cs) ->
   Incremental.begin_construction b
   >>=? fun v -> return (Incremental.alpha_ctxt v)
+
+let test_context_with_nat_nat_big_map () =
+  Context.init 3
+  >>=? fun (b, contracts) ->
+  let source = List.hd contracts in
+  Op.origination (B b) source ~script:Op.dummy_script
+  >>=? fun (operation, originated) ->
+  Block.bake ~operation b
+  >>=? fun b ->
+  Incremental.begin_construction b
+  >>=? fun v ->
+  let ctxt = Incremental.alpha_ctxt v in
+  wrap_error_lwt @@ Big_map.fresh ~temporary:false ctxt
+  >>=? fun (ctxt, id) ->
+  let nat_ty = Script_typed_ir.Nat_t None in
+  wrap_error_lwt @@ Lwt.return @@ Script_ir_translator.unparse_ty ctxt nat_ty
+  >>=? fun (nat_ty_node, ctxt) ->
+  let nat_ty_expr = Micheline.strip_locations nat_ty_node in
+  let alloc = Big_map.{key_type = nat_ty_expr; value_type = nat_ty_expr} in
+  let init = Lazy_storage.Alloc alloc in
+  let diffs =
+    [ Lazy_storage.make
+        Lazy_storage.Kind.Big_map
+        id
+        (Update {init; updates = []}) ]
+  in
+  wrap_error_lwt
+  @@ Contract.update_script_storage ctxt originated nat_ty_expr (Some diffs)
+  >>=? fun ctxt -> return (ctxt, id)
 
 let default_source = Contract.implicit_contract Signature.Public_key_hash.zero
 
@@ -107,14 +138,12 @@ let test_unparse_stack_overflow () =
   | Error _ ->
       Alcotest.failf "Unexpected error: %s" __LOC__
 
-let wrap_error_lwt x = x >>= fun x -> Lwt.return @@ Environment.wrap_error x
-
-let test_parse_data loc ctxt ty node expected =
+let test_parse_data ?(equal = Stdlib.( = )) loc ctxt ty node expected =
   let legacy = false in
   wrap_error_lwt
     ( Script_ir_translator.parse_data ctxt ~legacy ty node
     >>=? fun (actual, ctxt) ->
-    if actual = expected then return ctxt
+    if equal actual expected then return ctxt
     else Alcotest.failf "Unexpected error: %s" loc )
 
 let test_parse_data_fails loc ctxt ty node =
@@ -141,8 +170,9 @@ let test_parse_comb_data () =
   let pair_nat_nat_ty = pair_ty nat_ty nat_ty in
   let pair_prim2 a b = pair_prim [a; b] in
   let pair_z_z_prim = pair_prim2 z_prim z_prim in
-  test_context ()
-  >>=? fun ctxt ->
+  let big_map_nat_nat_ty = Big_map_t (Nat_key None, nat_ty, None) in
+  test_context_with_nat_nat_big_map ()
+  >>=? fun (ctxt, big_map_id) ->
   (* Pair 0 0 *)
   test_parse_data __LOC__ ctxt (pair_ty nat_ty nat_ty) pair_z_z_prim (z, z)
   >>=? fun ctxt ->
@@ -170,12 +200,63 @@ let test_parse_comb_data () =
     (pair_prim [z_prim; z_prim; z_prim])
     (z, (z, z))
   >>=? fun ctxt ->
+  (* check Pair 0 (Pair 0 {}) against pair nat (big_map nat nat)
+     so that the following test fails for the good reason and not because
+     the big map doesn't exist
+   *)
+  let id_z = Big_map.Id.unparse_to_z big_map_id in
+  let id_prim = Int (-1, id_z) in
+  let module M = struct
+    open Script_int
+
+    type key = n num
+
+    type value = n num option
+
+    let key_ty = Nat_key None
+
+    module OPS = Environment.Map.Make (struct
+      type t = key
+
+      let compare = compare
+    end)
+
+    let boxed = (OPS.empty, 0)
+
+    module type S =
+      Boxed_map with type key = n num and type value = n num option
+  end in
+  let expected_big_map =
+    let open Script_typed_ir in
+    let diff = (module M : M.S) in
+    {id = Some big_map_id; diff; key_type = nat_ty; value_type = nat_ty}
+  in
+  let equal (nat1, big_map1) (nat2, big_map2) =
+    (* Custom equal needed because big maps contain boxed maps containing functional values *)
+    nat1 = nat2 && big_map1.id = big_map2.id
+    && big_map1.key_type = big_map2.key_type
+    && big_map1.value_type = big_map2.value_type
+    &&
+    let module Diff1 = (val big_map1.diff : M.S) in
+    let module Diff2 = (val big_map2.diff : M.S) in
+    snd Diff1.boxed = snd Diff2.boxed
+    && Diff1.OPS.bindings (fst Diff1.boxed)
+       = Diff2.OPS.bindings (fst Diff2.boxed)
+  in
+  test_parse_data
+    ~equal
+    __LOC__
+    ctxt
+    (pair_ty nat_ty big_map_nat_nat_ty)
+    (pair_prim2 z_prim (pair_prim2 id_prim (Seq (-1, []))))
+    (Script_int.zero_n, expected_big_map)
+  >>=? fun ctxt ->
   (* Should fail: Pair 0 0 {} against pair nat (big_map nat nat) *)
   test_parse_data_fails
     __LOC__
     ctxt
     (pair_ty nat_ty big_map_nat_nat_ty)
-    (pair_prim [z_prim; z_prim; Micheline.Seq (-1, [])])
+    (pair_prim [z_prim; id_prim; Seq (-1, [])])
 
 let test_unparse_data loc ctxt ty x ~expected_readable ~expected_optimized =
   wrap_error_lwt
