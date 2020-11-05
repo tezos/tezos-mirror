@@ -40,7 +40,13 @@
 
 (** A global promise that resolves when clean-up starts. Note that there is no
     way to "just" start clean-up. Specifically, it is only possible to start the
-    clean-up as a side-effect of triggering an exit. *)
+    clean-up as a side-effect of triggering an exit.
+
+    It is safe to use [clean_up_starts], even in the "main" promise. See example
+    below in {!Misc recommendations}-{!Cleanly interrupting a main loop}. It is
+    safe because [Lwt_exit] always witnesses the resolution of this promise
+    before users of the library.
+*)
 val clean_up_starts : int Lwt.t
 
 (** A global promise that resolves when clean-up ends. *)
@@ -158,11 +164,12 @@ val signal_name : int -> string
     NORMAL OPERATION:
 
     If [p] is fulfilled with value [v] (and [exit_and_raise] was not called)
-    then [q] also is fulfilled with [v]. The process does not exit.
+    then
+    - [q] also is fulfilled with [v]. The process does not exit.
 
     If [exit_and_raise code] is called before [p] is resolved, then
     - the clean-up starts,
-    - [q] is canceled,
+    - [p] is canceled,
     - the process terminates as soon as clean-up ends with exit code [code].
 
     If [p] is rejected (and [exit_and_raise] was not called), it is equivalent
@@ -206,6 +213,12 @@ val signal_name : int -> string
 
     Note that if the second (signal) or third (exception) highest bits are set,
     then only the highest (incomplete clean-up) may also be set.
+
+    EXCEPTIONS:
+
+    @raise {!Invalid_argument} if called after clean-up has already started. See
+    {!Misc recommendations}({!One-shot}) below for details about the
+    consequences of this.
 
     OPTIONAL PARAMETERS:
 
@@ -322,8 +335,7 @@ val wrap_and_forward :
   {3 One-shot}
 
   [Lwt_exit] is one-shot: once the clean-up has started, further uses of
-  [wrap_and_*] are unsound. (Note that this is not stated anywhere specifically,
-  but it is implied by the fact that clean-up is a global concept.)
+  [wrap_and_*] will raise {!Invalid_argument}.
 
   Note, for example, how in the {!wrap_and_error} example, [wrap_and_error] is
   called multiple time, but on [Ok] branches where clean-up has {e not}
@@ -398,5 +410,31 @@ val wrap_and_forward :
   set is empty. It's ok because the clean-up will be a very fast no-op. Coming
   up with a solution that allows unregistering of the clean-up callback is left
   as an exercise to the reader.
+
+  {3 Cleanly interrupting a main loop}
+
+  In a program that does not normally exit, you might want to interrupt the main
+  loop (to avoid further processing) as soon as clean-up has started (either
+  because a signal was received or because a fatal exception deep within the
+  program was handled by calling {!exit_and_raise}).
+
+  This is easily achieved by passing the main-loop to [wrap_and_*]. As
+  mentioned in the documentation of {!wrap_and_exit}, the promise passed as
+  argument is cancelled as soon as the clean-up starts.
+
+  However, there may be other loops that are not syntactically available to the
+  main wrapper. In this case, the simple pattern below is safe and the loop,
+  provided it is cancelable, will stop when the clean-up starts.
+
+  [let rec loop () =
+     get_task () >>= fun task ->
+     process task >>= fun () ->
+     loop ()
+   in
+   Lwt.pick [loop (); Lwt_exit.clean_up_starts]]
+
+  Arguably, for such a simple case, you can replace the pattern above by a
+  simple clean-up callback that cancels the loop. However, for more complex
+  arrangements, the [pick]-with-[clean_up_starts] pattern above can be useful.
 
 *)
