@@ -13,6 +13,7 @@
    test_lwt_exit_signal
    test_lwt_exit_unregister_clean_up
    test_lwt_exit_unregister_clean_up_with_after
+   test_lwt_exit_main_is_clean_up
    )
  (libraries tezos-stdlib-unix
             tezos-stdlib
@@ -35,6 +36,7 @@
        test_lwt_exit_signal.exe
        test_lwt_exit_unregister_clean_up.exe
        test_lwt_exit_unregister_clean_up_with_after.exe
+       test_lwt_exit_main_is_clean_up.exe
  ))
 
 (rule
@@ -68,6 +70,10 @@
 (rule
  (alias runtest_test_lwt_exit_unregister_clean_up_with_after)
  (action (run %{exe:test_lwt_exit_unregister_clean_up_with_after.exe})))
+
+(rule
+ (alias runtest_test_lwt_exit_main_is_clean_up)
+ (action (run %{exe:test_lwt_exit_main_is_clean_up.exe})))
 
 (rule
  (alias runtest_test_lwt_exit_raise)
@@ -106,6 +112,7 @@
        (alias runtest_test_lwt_exit_range_of_signals)
        (alias runtest_test_lwt_exit_unregister_clean_up)
        (alias runtest_test_lwt_exit_unregister_clean_up_with_after)
+       (alias runtest_test_lwt_exit_main_is_clean_up)
  )
 )
 
