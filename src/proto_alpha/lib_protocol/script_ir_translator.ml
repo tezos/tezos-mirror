@@ -5855,25 +5855,6 @@ let typecheck_code :
   trace (Ill_typed_contract (code, !type_map)) result
   >|=? fun (Lam _, ctxt) -> (!type_map, ctxt)
 
-let typecheck_data :
-    legacy:bool ->
-    ?type_logger:type_logger ->
-    context ->
-    Script.expr * Script.expr ->
-    context tzresult Lwt.t =
- fun ~legacy ?type_logger ctxt (data, exp_ty) ->
-  record_trace
-    (Ill_formed_type (None, exp_ty, 0))
-    (parse_parameter_ty ctxt ~legacy (root exp_ty))
-  >>?= fun (Ex_ty exp_ty, ctxt) ->
-  trace_eval
-    (fun () ->
-      Lwt.return
-        ( serialize_ty_for_error ctxt exp_ty
-        >|? fun (exp_ty, _ctxt) -> Ill_typed_data (None, data, exp_ty) ))
-    (parse_data ?type_logger ~stack_depth:0 ctxt ~legacy exp_ty (root data))
-  >|=? fun (_, ctxt) -> ctxt
-
 module Entrypoints_map = Map.Make (String)
 
 let list_entrypoints (type full) (full : full ty) ctxt ~root_name =
