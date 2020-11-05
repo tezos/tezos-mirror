@@ -103,7 +103,10 @@ Tezt is composed of some generic, non-Tezos-related modules:
   as the list of tests to run and the verbosity level;
 
 - a ``Test`` module with a ``Test.register`` function to register tests
-  and a ``Test.run`` function to run them and clean up after them.
+  and a ``Test.run`` function to run them and clean up after them;
+
+- a ``Regression`` module for regression testing by comparing command outputs
+  with previous runs.
 
 All those modules are part of the ``tezt`` library which can be found in directory
 ``tezt/lib`` of the Tezos repository.
@@ -116,7 +119,10 @@ Tezt also contains the following Tezos-specific modules:
 
 - a ``Node`` module to run node commands and to manage node daemons;
 
-- an ``RPC`` module with some RPC implementations.
+- an ``RPC`` module with some RPC implementations;
+
+- a ``Cluster`` module to start networks with many nodes with topologies
+  ranging from simple cliques to complex arrangements of rings, stars, etc.
 
 All those modules are part of the ``tezt-tezos`` library, which depends on ``tezt``
 and which can be found in directory ``tezt/lib_tezos`` of the Tezos repository.
