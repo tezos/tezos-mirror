@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,53 +23,32 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The voting period kinds are ordered as follows:
-    Proposal -> Testing_vote -> Testing -> Promotion_vote -> Adoption.
-    This order is the one used be the function [succ] below.
- *)
-type kind =
-  | Proposal  (** protocols can be proposed *)
-  | Testing_vote  (** a proposal can be voted *)
-  | Testing  (** winning proposal is forked on a testnet *)
-  | Promotion_vote  (** activation can be voted *)
-  | Adoption  (** a delay before activation *)
+val init :
+  Raw_context.t -> Voting_period_repr.t -> Raw_context.t tzresult Lwt.t
 
-val kind_encoding : kind Data_encoding.t
+(** Sets the initial period to [{voting_period = root; kind = Proposal;
+    start_position}]. *)
+val init_first_period :
+  Raw_context.t -> start_position:Int32.t -> Raw_context.t tzresult Lwt.t
 
-(** A voting period can be of 5 kinds and is uniquely identified by a counter
-    since the root. *)
-type voting_period = {index : Int32.t; kind : kind; start_position : Int32.t}
+(** Increment the index by one and set the kind to Proposal. *)
+val reset : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
-type t = voting_period
+(** Increment the index by one and set the kind to its successor. *)
+val succ : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
-type info = {voting_period : t; position : Int32.t; remaining : Int32.t}
+val get_current : Raw_context.t -> Voting_period_repr.t tzresult Lwt.t
 
-val root : start_position:Int32.t -> t
+val get_current_kind : Raw_context.t -> Voting_period_repr.kind tzresult Lwt.t
 
-include Compare.S with type t := voting_period
+val get_current_info : Raw_context.t -> Voting_period_repr.info tzresult Lwt.t
 
-val encoding : t Data_encoding.t
+(** Returns true if the context level is the last of current voting period.  *)
+val is_last_block : Raw_context.t -> bool tzresult Lwt.t
 
-val info_encoding : info Data_encoding.t
-
-val pp : Format.formatter -> t -> unit
-
-val pp_info : Format.formatter -> info -> unit
-
-val pp_kind : Format.formatter -> kind -> unit
-
-(** [reset period ~start_position] increment the index by one and set the kind
-    to Proposal which is the period kind that start the voting
-    process. [start_position] is the level at wich this voting_period started.
-*)
-val reset : t -> start_position:Int32.t -> t
-
-(** [succ period ~start_position] increment the index by one and set the kind to
-    its successor. [start_position] is the level at which this voting_period
-    started. *)
-val succ : t -> start_position:Int32.t -> t
-
-val position_since : Level_repr.t -> t -> Int32.t
-
-val remaining_blocks :
-  Level_repr.t -> t -> blocks_per_voting_period:Int32.t -> Int32.t
+(* TODO The info return in the last block if a voting period is a bit
+         confusing because we prepared the context for next block.  To fix this
+         the voting_period should be change at a beginning of the next block
+         (first block of the voting period) *)
+val get_rpc_fixed_current_info :
+  Raw_context.t -> Voting_period_repr.info tzresult Lwt.t

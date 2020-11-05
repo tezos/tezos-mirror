@@ -99,13 +99,13 @@ and _ contents =
       -> Kind.activate_account contents
   | Proposals : {
       source : Signature.Public_key_hash.t;
-      period : Voting_period_repr.t;
+      period : int32;
       proposals : Protocol_hash.t list;
     }
       -> Kind.proposals contents
   | Ballot : {
       source : Signature.Public_key_hash.t;
-      period : Voting_period_repr.t;
+      period : int32;
       proposal : Protocol_hash.t;
       ballot : Vote_repr.ballot;
     }
@@ -494,7 +494,7 @@ module Encoding = struct
         encoding =
           obj3
             (req "source" Signature.Public_key_hash.encoding)
-            (req "period" Voting_period_repr.encoding)
+            (req "period" int32)
             (req "proposals" (list Protocol_hash.encoding));
         select =
           (function Contents (Proposals _ as op) -> Some op | _ -> None);
@@ -514,7 +514,7 @@ module Encoding = struct
         encoding =
           obj4
             (req "source" Signature.Public_key_hash.encoding)
-            (req "period" Voting_period_repr.encoding)
+            (req "period" int32)
             (req "proposal" Protocol_hash.encoding)
             (req "ballot" Vote_repr.ballot_encoding);
         select = (function Contents (Ballot _ as op) -> Some op | _ -> None);

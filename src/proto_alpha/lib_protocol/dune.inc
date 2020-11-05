@@ -67,6 +67,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    contract_storage.mli contract_storage.ml
    bootstrap_storage.mli bootstrap_storage.ml
    fitness_storage.ml
+   voting_period_storage.mli voting_period_storage.ml
    vote_storage.mli vote_storage.ml
    commitment_storage.mli commitment_storage.ml
    init_storage.ml
@@ -147,6 +148,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    contract_storage.mli contract_storage.ml
    bootstrap_storage.mli bootstrap_storage.ml
    fitness_storage.ml
+   voting_period_storage.mli voting_period_storage.ml
    vote_storage.mli vote_storage.ml
    commitment_storage.mli commitment_storage.ml
    init_storage.ml
@@ -227,6 +229,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    contract_storage.mli contract_storage.ml
    bootstrap_storage.mli bootstrap_storage.ml
    fitness_storage.ml
+   voting_period_storage.mli voting_period_storage.ml
    vote_storage.mli vote_storage.ml
    commitment_storage.mli commitment_storage.ml
    init_storage.ml
@@ -327,6 +330,7 @@ include Tezos_raw_protocol_alpha.Main
    Contract_storage
    Bootstrap_storage
    Fitness_storage
+   Voting_period_storage
    Vote_storage
    Commitment_storage
    Init_storage
@@ -443,6 +447,7 @@ include Tezos_raw_protocol_alpha.Main
    contract_storage.mli contract_storage.ml
    bootstrap_storage.mli bootstrap_storage.ml
    fitness_storage.ml
+   voting_period_storage.mli voting_period_storage.ml
    vote_storage.mli vote_storage.ml
    commitment_storage.mli commitment_storage.ml
    init_storage.ml

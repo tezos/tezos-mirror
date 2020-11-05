@@ -99,13 +99,13 @@ and _ contents =
       -> Kind.activate_account contents
   | Proposals : {
       source : Signature.Public_key_hash.t;
-      period : Voting_period_repr.t;
+      period : int32;
       proposals : Protocol_hash.t list;
     }
       -> Kind.proposals contents
   | Ballot : {
       source : Signature.Public_key_hash.t;
-      period : Voting_period_repr.t;
+      period : int32;
       proposal : Protocol_hash.t;
       ballot : Vote_repr.ballot;
     }

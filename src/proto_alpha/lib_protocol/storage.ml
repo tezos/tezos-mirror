@@ -715,15 +715,26 @@ module Vote = struct
         let name = ["votes"]
       end)
 
-  module Current_period_kind =
+  module Pred_period_kind =
     Make_single_data_storage (Registered) (Raw_context)
       (struct
-        let name = ["current_period_kind"]
+        let name = ["pred_period_kind"]
       end)
       (struct
         type t = Voting_period_repr.kind
 
         let encoding = Voting_period_repr.kind_encoding
+      end)
+
+  module Current_period =
+    Make_single_data_storage (Registered) (Raw_context)
+      (struct
+        let name = ["current_period"]
+      end)
+      (struct
+        type t = Voting_period_repr.t
+
+        let encoding = Voting_period_repr.encoding
       end)
 
   module Participation_ema =

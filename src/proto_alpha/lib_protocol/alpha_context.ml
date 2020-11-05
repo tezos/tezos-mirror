@@ -115,7 +115,10 @@ module Constants = struct
   include Constants_storage
 end
 
-module Voting_period = Voting_period_repr
+module Voting_period = struct
+  include Voting_period_repr
+  include Voting_period_storage
+end
 
 module Gas = struct
   include Gas_limit_repr

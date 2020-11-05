@@ -23,40 +23,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = int32
-
-type voting_period = t
-
-include (Compare.Int32 : Compare.S with type t := t)
-
-let encoding = Data_encoding.int32
-
-let pp ppf level = Format.fprintf ppf "%ld" level
-
-let rpc_arg =
-  let construct voting_period = Int32.to_string voting_period in
-  let destruct str =
-    Int32.of_string_opt str
-    |> Option.to_result ~none:"Cannot parse voting period"
-  in
-  RPC_arg.make
-    ~descr:"A voting period"
-    ~name:"voting_period"
-    ~construct
-    ~destruct
-    ()
-
-let root = 0l
-
-let succ = Int32.succ
-
-let to_int32 l = l
-
-let of_int32_exn l =
-  if Compare.Int32.(l >= 0l) then l
-  else invalid_arg "Voting_period_repr.of_int32"
-
 type kind = Proposal | Testing_vote | Testing | Promotion_vote | Adoption
+
+let string_of_kind = function
+  | Proposal ->
+      "proposal"
+  | Testing_vote ->
+      "testing_vote"
+  | Testing ->
+      "testing"
+  | Promotion_vote ->
+      "promotion_vote"
+  | Adoption ->
+      "adoption"
+
+let pp_kind ppf kind = Format.fprintf ppf "%s" @@ string_of_kind kind
 
 let kind_encoding =
   let open Data_encoding in
@@ -92,3 +73,92 @@ let kind_encoding =
         (constant "adoption")
         (function Adoption -> Some () | _ -> None)
         (fun () -> Adoption) ]
+
+let succ_kind = function
+  | Proposal ->
+      Testing_vote
+  | Testing_vote ->
+      Testing
+  | Testing ->
+      Promotion_vote
+  | Promotion_vote ->
+      Adoption
+  | Adoption ->
+      Proposal
+
+type voting_period = {index : int32; kind : kind; start_position : int32}
+
+type t = voting_period
+
+type info = {voting_period : t; position : int32; remaining : int32}
+
+let root ~start_position = {index = 0l; kind = Proposal; start_position}
+
+let pp ppf {index; kind; start_position} =
+  Format.fprintf
+    ppf
+    "@[<hv 2>index: %ld@ ,kind:%a@, start_position: %ld@]"
+    index
+    pp_kind
+    kind
+    start_position
+
+let pp_info ppf {voting_period; position; remaining} =
+  Format.fprintf
+    ppf
+    "@[<hv 2>voting_period: %a@ ,position:%ld@, remaining: %ld@]"
+    pp
+    voting_period
+    position
+    remaining
+
+let encoding =
+  let open Data_encoding in
+  conv
+    (fun {index; kind; start_position} -> (index, kind, start_position))
+    (fun (index, kind, start_position) -> {index; kind; start_position})
+    (obj3
+       (req
+          "index"
+          ~description:
+            "The voting period's index. Starts at 0 with the first block of \
+             protocol alpha."
+          int32)
+       (req "kind" kind_encoding)
+       (req "start_position" int32))
+
+let info_encoding =
+  let open Data_encoding in
+  conv
+    (fun {voting_period; position; remaining} ->
+      (voting_period, position, remaining))
+    (fun (voting_period, position, remaining) ->
+      {voting_period; position; remaining})
+    (obj3
+       (req "voting_period" encoding)
+       (req "position" int32)
+       (req "remaining" int32))
+
+include Compare.Make (struct
+  type nonrec t = t
+
+  let compare p p' = Compare.Int32.compare p.index p'.index
+end)
+
+let reset period ~start_position =
+  let index = Int32.succ period.index in
+  let kind = Proposal in
+  {index; kind; start_position}
+
+let succ period ~start_position =
+  let index = Int32.succ period.index in
+  let kind = succ_kind period.kind in
+  {index; kind; start_position}
+
+let position_since (level : Level_repr.t) (voting_period : t) =
+  Int32.(sub level.level_position voting_period.start_position)
+
+let remaining_blocks (level : Level_repr.t) (voting_period : t)
+    ~blocks_per_voting_period =
+  let position = position_since level voting_period in
+  Int32.(sub blocks_per_voting_period (succ position))

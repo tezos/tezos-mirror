@@ -101,12 +101,6 @@ val get_participation_ema : Raw_context.t -> int32 tzresult Lwt.t
 val set_participation_ema :
   Raw_context.t -> int32 -> Raw_context.t tzresult Lwt.t
 
-val get_current_period_kind :
-  Raw_context.t -> Voting_period_repr.kind tzresult Lwt.t
-
-val set_current_period_kind :
-  Raw_context.t -> Voting_period_repr.kind -> Raw_context.t tzresult Lwt.t
-
 val get_current_proposal : Raw_context.t -> Protocol_hash.t tzresult Lwt.t
 
 val init_current_proposal :
@@ -115,4 +109,5 @@ val init_current_proposal :
 val clear_current_proposal : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
 (** Sets the initial quorum to 80% and period kind to proposal. *)
-val init : Raw_context.t -> Raw_context.t tzresult Lwt.t
+val init :
+  Raw_context.t -> start_position:Int32.t -> Raw_context.t tzresult Lwt.t
