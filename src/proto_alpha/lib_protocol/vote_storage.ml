@@ -147,10 +147,6 @@ let get_total_voting_power ctxt =
   get_total_voting_power_free ctxt
   >|=? fun total_voting_power -> (ctxt, total_voting_power)
 
-let get_current_period_kind = Storage.Vote.Current_period_kind.get
-
-let set_current_period_kind = Storage.Vote.Current_period_kind.set
-
 let get_current_quorum ctxt =
   Storage.Vote.Participation_ema.get ctxt
   >|=? fun participation_ema ->
@@ -169,8 +165,8 @@ let init_current_proposal = Storage.Vote.Current_proposal.init
 
 let clear_current_proposal = Storage.Vote.Current_proposal.delete
 
-let init ctxt =
+let init ctxt ~start_position =
   (* participation EMA is in centile of a percentage *)
   let participation_ema = Constants_storage.quorum_max ctxt in
   Storage.Vote.Participation_ema.init ctxt participation_ema
-  >>=? fun ctxt -> Storage.Vote.Current_period_kind.init ctxt Proposal
+  >>=? fun ctxt -> Voting_period_storage.init_first_period ctxt ~start_position

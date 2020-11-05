@@ -940,21 +940,46 @@ module Delegate : sig
 end
 
 module Voting_period : sig
-  include BASIC_DATA
-
-  type voting_period = t
-
-  val rpc_arg : voting_period RPC_arg.arg
-
-  val root : voting_period
-
-  val succ : voting_period -> voting_period
-
   type kind = Proposal | Testing_vote | Testing | Promotion_vote | Adoption
 
   val kind_encoding : kind Data_encoding.encoding
 
-  val to_int32 : voting_period -> int32
+  val pp_kind : Format.formatter -> kind -> unit
+
+  (* This type should be abstract *)
+  type voting_period = private {
+    index : int32;
+    kind : kind;
+    start_position : int32;
+  }
+
+  type t = voting_period
+
+  include BASIC_DATA with type t := t
+
+  val encoding : voting_period Data_encoding.t
+
+  val pp : Format.formatter -> voting_period -> unit
+
+  val reset : context -> context tzresult Lwt.t
+
+  val succ : context -> context tzresult Lwt.t
+
+  val get_current : context -> voting_period tzresult Lwt.t
+
+  val get_current_kind : context -> kind tzresult Lwt.t
+
+  val is_last_block : context -> bool tzresult Lwt.t
+
+  type info = {voting_period : t; position : int32; remaining : int32}
+
+  val info_encoding : info Data_encoding.t
+
+  val pp_info : Format.formatter -> info -> unit
+
+  val get_current_info : context -> info tzresult Lwt.t
+
+  val get_rpc_fixed_current_info : context -> info tzresult Lwt.t
 end
 
 module Vote : sig
@@ -1010,11 +1035,6 @@ module Vote : sig
     context -> (Signature.Public_key_hash.t * ballot) list Lwt.t
 
   val clear_ballots : context -> context Lwt.t
-
-  val get_current_period_kind : context -> Voting_period.kind tzresult Lwt.t
-
-  val set_current_period_kind :
-    context -> Voting_period.kind -> context tzresult Lwt.t
 
   val get_current_quorum : context -> int32 tzresult Lwt.t
 
@@ -1138,13 +1158,13 @@ and _ contents =
       -> Kind.activate_account contents
   | Proposals : {
       source : Signature.Public_key_hash.t;
-      period : Voting_period.t;
+      period : int32;
       proposals : Protocol_hash.t list;
     }
       -> Kind.proposals contents
   | Ballot : {
       source : Signature.Public_key_hash.t;
-      period : Voting_period.t;
+      period : int32;
       proposal : Protocol_hash.t;
       ballot : Vote.ballot;
     }

@@ -27,7 +27,7 @@
 
 open Alpha_context
 
-type error += Wrong_voting_period of Voting_period.t * Voting_period.t
+type error += Wrong_voting_period of int32 * int32
 
 (* `Temporary *)
 
@@ -155,17 +155,9 @@ let () =
     ~description:
       "Trying to include a proposal or ballot meant for another voting period"
     ~pp:(fun ppf (e, p) ->
-      Format.fprintf
-        ppf
-        "Wrong voting period %a, current is %a"
-        Voting_period.pp
-        p
-        Voting_period.pp
-        e)
+      Format.fprintf ppf "Wrong voting period %ld, current is %ld" p e)
     Data_encoding.(
-      obj2
-        (req "current" Voting_period.encoding)
-        (req "provided" Voting_period.encoding))
+      obj2 (req "current_index" int32) (req "provided_index" int32))
     (function Wrong_voting_period (e, p) -> Some (e, p) | _ -> None)
     (fun (e, p) -> Wrong_voting_period (e, p)) ;
   register_error_kind
@@ -1320,8 +1312,8 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
       >>?= fun () ->
       let level = Level.current ctxt in
       error_unless
-        Voting_period.(level.voting_period = period)
-        (Wrong_voting_period (level.voting_period, period))
+        Compare.Int32.(level.current_period = period)
+        (Wrong_voting_period (level.current_period, period))
       >>?= fun () ->
       Amendment.record_proposals ctxt source proposals
       >|=? fun ctxt -> (ctxt, Single_result Proposals_result)
@@ -1332,7 +1324,7 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
       >>?= fun () ->
       let level = Level.current ctxt in
       error_unless
-        Voting_period.(level.voting_period = period)
+        Compare.Int32.(level.voting_period = period)
         (Wrong_voting_period (level.voting_period, period))
       >>?= fun () ->
       Amendment.record_ballot ctxt source proposal ballot

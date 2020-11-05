@@ -215,7 +215,7 @@ let finalize_block {mode; ctxt; op_count} =
   match mode with
   | Partial_construction _ ->
       let level = Alpha_context.Level.current ctxt in
-      Alpha_context.Vote.get_current_period_kind ctxt
+      Alpha_context.Voting_period.get_current_kind ctxt
       >>=? fun voting_period_kind ->
       let baker = Signature.Public_key_hash.zero in
       Signature.Public_key_hash.Map.fold
@@ -247,7 +247,7 @@ let finalize_block {mode; ctxt; op_count} =
         block_delay
         included_endorsements
       >>?= fun () ->
-      Alpha_context.Vote.get_current_period_kind ctxt
+      Alpha_context.Voting_period.get_current_kind ctxt
       >|=? fun voting_period_kind ->
       let ctxt = Alpha_context.finalize ctxt in
       ( ctxt,

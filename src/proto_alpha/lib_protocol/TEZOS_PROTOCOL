@@ -53,6 +53,7 @@
         "Contract_storage",
         "Bootstrap_storage",
         "Fitness_storage",
+        "Voting_period_storage",
         "Vote_storage",
         "Commitment_storage",
         "Init_storage",

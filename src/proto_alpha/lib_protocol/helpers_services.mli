@@ -208,7 +208,7 @@ module Forge : sig
     'a ->
     branch:Block_hash.t ->
     source:public_key_hash ->
-    period:Voting_period.t ->
+    period:Voting_period.index ->
     proposals:Protocol_hash.t list ->
     unit ->
     bytes shell_tzresult Lwt.t
@@ -218,7 +218,7 @@ module Forge : sig
     'a ->
     branch:Block_hash.t ->
     source:public_key_hash ->
-    period:Voting_period.t ->
+    period:Voting_period.index ->
     proposal:Protocol_hash.t ->
     ballot:Vote.ballot ->
     unit ->

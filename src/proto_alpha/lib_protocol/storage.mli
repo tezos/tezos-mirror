@@ -288,9 +288,14 @@ module Delegates_with_frozen_balance :
 (** Votes *)
 
 module Vote : sig
-  module Current_period_kind :
+  module Pred_period_kind :
     Single_data_storage
       with type value = Voting_period_repr.kind
+       and type t := Raw_context.t
+
+  module Current_period :
+    Single_data_storage
+      with type value = Voting_period_repr.t
        and type t := Raw_context.t
 
   (** Participation exponential moving average, in centile of percentage *)
