@@ -2237,6 +2237,20 @@ let well_formed_entrypoints (type full) (full : full ty) ~root_name =
   | Too_long name ->
       error (Entrypoint_name_too_long name)
 
+let parse_uint10 (n : (location, prim) Micheline.node) : int tzresult =
+  let max_uint10 = 0x3ff in
+  match n with
+  | Micheline.Int (_, n')
+    when Compare.Z.(Z.zero <= n') && Compare.Z.(n' <= Z.of_int max_uint10) ->
+      ok (Z.to_int n')
+  | _ ->
+      error
+      @@ Invalid_syntactic_constant
+           ( location n,
+             strip_locations n,
+             "a positive 10-bit integer (between 0 and "
+             ^ string_of_int max_uint10 ^ ")" )
+
 let rec parse_data :
     type a.
     ?type_logger:type_logger ->
@@ -2871,20 +2885,6 @@ and parse_returning :
         ( ( Lam (descr (Item_t (ret, Empty_t, None)), script_instr)
             : (arg, ret) lambda ),
           ctxt )
-
-and parse_uint10 (n : (location, prim) Micheline.node) : int tzresult =
-  let max_uint10 = 0x3ff in
-  match n with
-  | Micheline.Int (_, n')
-    when Compare.Z.(Z.zero <= n') && Compare.Z.(n' <= Z.of_int max_uint10) ->
-      ok (Z.to_int n')
-  | _ ->
-      error
-      @@ Invalid_syntactic_constant
-           ( location n,
-             strip_locations n,
-             "a positive 10-bit integer (between 0 and "
-             ^ string_of_int max_uint10 ^ ")" )
 
 and parse_instr :
     type bef.
