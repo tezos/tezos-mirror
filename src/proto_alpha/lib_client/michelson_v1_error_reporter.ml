@@ -651,6 +651,8 @@ let report_errors ~details ~show_source ?parsed ppf errs =
             Format.fprintf ppf "Bad stack length."
         | Bad_stack_item lvl ->
             Format.fprintf ppf "Bad stack item %d." lvl
+        | Unexpected_forged_value loc ->
+            Format.fprintf ppf "%aUnexpected forged value." print_loc loc
         | Invalid_constant (loc, got, exp) ->
             Format.fprintf
               ppf
