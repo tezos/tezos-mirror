@@ -411,6 +411,7 @@ type error +=
   | System_error of {errno : string; fn : string; msg : string}
   | Missing_test_protocol of Protocol_hash.t
   | Validation_process_failed of validation_process_error
+  | Cannot_validate_while_shutting_down
 
 let () =
   Error_monad.register_recursive_error_kind
@@ -544,6 +545,18 @@ let () =
         error)
     Data_encoding.(obj1 (req "error" validation_process_error_encoding))
     (function Validation_process_failed error -> Some error | _ -> None)
-    (fun error -> Validation_process_failed error)
+    (fun error -> Validation_process_failed error) ;
+  Error_monad.register_error_kind
+    `Temporary
+    ~id:"validator.cannot_validate_while_shutting_down"
+    ~title:"Cannot validate while shutting down"
+    ~description:"Cannot validate block while the node is shutting down."
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "Cannot validate block while the node is shutting down.")
+    Data_encoding.empty
+    (function Cannot_validate_while_shutting_down -> Some () | _ -> None)
+    (fun () -> Cannot_validate_while_shutting_down)
 
 let invalid_block block error = Invalid_block {block; error}

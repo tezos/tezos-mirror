@@ -303,6 +303,14 @@ module External_validator_process = struct
         ~msg:"cannot close the block validation process: connection failed"
         ()
 
+    let cannot_start_process =
+      declare_0
+        ~section
+        ~level:Info
+        ~name:"cannot_start_process"
+        ~msg:"cannot start validation process: the node is shutting down"
+        ()
+
     let request_for =
       declare_1
         ~section
@@ -333,6 +341,11 @@ module External_validator_process = struct
     canceler : Lwt_canceler.t;
   }
 
+  type process_status =
+    | Uninitialized
+    | Running of validator_process
+    | Exiting
+
   type t = {
     data_dir : string;
     genesis : Genesis.t;
@@ -341,7 +354,7 @@ module External_validator_process = struct
     user_activated_upgrades : User_activated.upgrades;
     user_activated_protocol_overrides : User_activated.protocol_overrides;
     process_path : string;
-    mutable validator_process : validator_process option;
+    mutable validator_process : process_status;
     lock : Lwt_mutex.t;
     sandbox_parameters : Data_encoding.json option;
   }
@@ -425,7 +438,8 @@ module External_validator_process = struct
       }
     in
     vp.validator_process <-
-      Some {process; stdin = process_stdin; stdout = process_stdout; canceler} ;
+      Running
+        {process; stdin = process_stdin; stdout = process_stdout; canceler} ;
     External_validation.send
       process_stdin
       Data_encoding.Variable.bytes
@@ -446,7 +460,8 @@ module External_validator_process = struct
 
   let send_request vp request result_encoding =
     ( match vp.validator_process with
-    | Some {process; stdin = process_stdin; stdout = process_stdout; canceler}
+    | Running
+        {process; stdin = process_stdin; stdout = process_stdout; canceler}
       -> (
       match process#state with
       | Running ->
@@ -454,11 +469,15 @@ module External_validator_process = struct
       | Exited status ->
           Error_monad.cancel_with_exceptions canceler
           >>= fun () ->
-          vp.validator_process <- None ;
+          vp.validator_process <- Uninitialized ;
           Events.(emit process_exited_abnormally status)
           >>= fun () -> start_process vp )
-    | None ->
-        start_process vp )
+    | Uninitialized ->
+        start_process vp
+    | Exiting ->
+        Events.(emit cannot_start_process ())
+        >>= fun () ->
+        fail Block_validator_errors.Cannot_validate_while_shutting_down )
     >>=? fun (process, process_stdin, process_stdout) ->
     Lwt.catch
       (fun () ->
@@ -486,7 +505,7 @@ module External_validator_process = struct
         | Running ->
             return res
         | Exited status ->
-            vp.validator_process <- None ;
+            vp.validator_process <- Uninitialized ;
             Events.(emit process_exited_abnormally status)
             >>= fun () -> return res)
       (function
@@ -497,7 +516,7 @@ module External_validator_process = struct
             | Exited status ->
                 Events.(emit process_exited_abnormally status)
                 >>= fun () ->
-                vp.validator_process <- None ;
+                vp.validator_process <- Uninitialized ;
                 Lwt.return_unit )
             >>= fun () -> Lwt.return (error_exn errors))
 
@@ -516,7 +535,7 @@ module External_validator_process = struct
         user_activated_upgrades;
         user_activated_protocol_overrides;
         process_path;
-        validator_process = None;
+        validator_process = Uninitialized;
         lock = Lwt_mutex.create ();
         sandbox_parameters;
       }
@@ -568,12 +587,13 @@ module External_validator_process = struct
     Events.(emit close ())
     >>= fun () ->
     match vp.validator_process with
-    | Some {process; stdin = process_stdin; canceler; _} ->
+    | Running {process; stdin = process_stdin; canceler; _} ->
         let request = External_validation.Terminate in
         Events.(emit request_for request)
         >>= fun () ->
         Lwt.catch
           (fun () ->
+            vp.validator_process <- Exiting ;
             (* Try to trigger the clean shutdown of the validation
                process. *)
             External_validation.send
@@ -601,10 +621,8 @@ module External_validator_process = struct
                   >>= fun () -> process#terminate ; Lwt.return_unit)
         >>= fun () ->
         Error_monad.cancel_with_exceptions canceler
-        >>= fun () ->
-        vp.validator_process <- None ;
-        Lwt.return_unit
-    | None ->
+        >>= fun () -> Lwt.return_unit
+    | Uninitialized | Exiting ->
         Lwt.return_unit
 end
 
