@@ -106,7 +106,8 @@
    (write-file void_for_linking-006-PsCARTHA.empty "")
    (write-file void_for_linking-007-PsDELPH1.empty "")
    (write-file void_for_linking-006-PsCARTHA-mempool.empty "")
-   (write-file void_for_linking-007-PsDELPH1-mempool.empty ""))))
+   (write-file void_for_linking-007-PsDELPH1-mempool.empty "")
+)))
 
 (install
  (package tezos-node)

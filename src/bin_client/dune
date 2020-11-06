@@ -94,7 +94,8 @@
    (write-file void_for_linking-demo-counter.empty "")
    (write-file void_for_linking-baking-alpha.empty "")
    (write-file void_for_linking-baking-006-PsCARTHA.empty "")
-   (write-file void_for_linking-baking-007-PsDELPH1.empty ""))))
+   (write-file void_for_linking-baking-007-PsDELPH1.empty "")
+)))
 
 (install
  (package tezos-client)
