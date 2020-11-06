@@ -295,6 +295,14 @@ module External_validator_process = struct
         ~pp1:Format.pp_print_int
         ("pid", Data_encoding.int31)
 
+    let cannot_close =
+      declare_0
+        ~section
+        ~level:Info
+        ~name:"cannot_close"
+        ~msg:"cannot close the block validation process: connection failed"
+        ()
+
     let request_for =
       declare_1
         ~section
@@ -564,10 +572,24 @@ module External_validator_process = struct
         let request = External_validation.Terminate in
         Events.(emit request_for request)
         >>= fun () ->
-        External_validation.send
-          process_stdin
-          External_validation.request_encoding
-          request
+        Lwt.catch
+          (fun () ->
+            (* Try to trigger the clean shutdown of the validation
+               process. *)
+            External_validation.send
+              process_stdin
+              External_validation.request_encoding
+              request)
+          (function
+            | Unix.Unix_error (ECONNREFUSED, _, _)
+            | Unix.Unix_error (EPIPE, _, _)
+            | Unix.Unix_error (ENOTCONN, _, _) ->
+                (* It may fail if the validation process is not
+                   responding (connection already closed) and is
+                   killed afterward. No need to propagate the error. *)
+                Events.(emit cannot_close ()) >>= fun () -> Lwt.return_unit
+            | e ->
+                Lwt.fail e)
         >>= fun () ->
         process#status
         >>= (function
