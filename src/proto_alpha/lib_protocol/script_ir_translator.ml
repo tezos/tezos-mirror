@@ -588,6 +588,10 @@ let wrap_compare compare a b =
   let res = compare a b in
   if Compare.Int.(res = 0) then 0 else if Compare.Int.(res > 0) then 1 else -1
 
+let compare_address (x, ex) (y, ey) =
+  let lres = Contract.compare x y in
+  if Compare.Int.(lres = 0) then Compare.String.compare ex ey else lres
+
 let rec compare_comparable : type a. a comparable_ty -> a -> a -> int =
  fun kind ->
   match kind with
@@ -614,10 +618,7 @@ let rec compare_comparable : type a. a comparable_ty -> a -> a -> int =
   | Timestamp_key _ ->
       wrap_compare Script_timestamp.compare
   | Address_key _ ->
-      wrap_compare
-      @@ fun (x, ex) (y, ey) ->
-      let lres = Contract.compare x y in
-      if Compare.Int.(lres = 0) then Compare.String.compare ex ey else lres
+      wrap_compare compare_address
   | Bytes_key _ ->
       wrap_compare Compare.Bytes.compare
   | Chain_id_key _ ->
