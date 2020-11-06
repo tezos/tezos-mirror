@@ -35,7 +35,7 @@ fi
 if [[ $1 =~ ^.*/proto_[0-9]{3}_.*$ ]]
 then
     version=$(echo "$1" | sed 's/.*proto_\([0-9]\{3\}\)_.*/\1/')
-    pred=$(printf "%03d" $(($version -1)))
+    pred=$(printf "%03d" $((10#$version -1)))
     pred_full_hash=$(jq -r .hash < src/proto_${pred}_*/lib_protocol/TEZOS_PROTOCOL)
     pred_short_hash=$(echo $pred_full_hash | head -c 8)
 
