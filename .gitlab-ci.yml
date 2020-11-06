@@ -331,6 +331,19 @@ integration:compiler-rejections:
     - dune build @runtest_rejections
 
 ############################################################
+## Stage: run scripts to check they are working properly  ##
+############################################################
+script:prepare_migration_test:
+  <<: *test_definition
+  before_script:
+    - last_proto_name=$(find src -name "proto_[0-9][0-9][0-9]_*" | awk -F'/' '{print $NF}' | sort -r | head -1)
+    - last_proto_version=$(echo $last_proto_name | cut -d'_' -f2)
+    - new_proto_version=$(printf "%03d" $((last_proto_version + 1)))
+    - make
+  script:
+    - ./scripts/prepare_migration_test.sh manual "next_$new_proto_version" 1
+
+############################################################
 ## Stage: run OCaml integration tests                     ##
 ############################################################
 
