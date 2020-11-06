@@ -58,10 +58,17 @@ mv $daemons tmp
 cd tmp
 
 # rename main_*.ml{,i} files of the binaries
-rename s/_alpha/_${version}_${short_hash}/ $(find . -name main_\*.ml -or -name main_\*.mli)
+for file in $(find . -name main_\*.ml -or -name main_\*.mli)
+do
+    mv "$file" $(echo "$file" | sed s/_alpha/_${version}_${short_hash}/g)
+done
+
 
 # rename .opam files
-rename s/alpha/${version}-${short_hash}/ $(find . -name \*.opam)
+for file in $(find . -name \*.opam)
+do
+    mv "$file" $(echo "$file" | sed s/alpha/${version}-${short_hash}/g)
+done
 
 # fix content of dune and opam files
 sed -i.old -e s/_alpha/_${version}_${short_hash}/g \
@@ -92,7 +99,10 @@ sed -i.old -e 's/"alpha"/"'${version}_${short_hash}'"/' \
            -e 's/alpha/'${version}-${short_hash}'/' \
     $(find . -name \*.opam)
 
-rename s/alpha/${version}-${short_hash}/ $(find . -name \*.opam)
+for file in  $(find . -name \*.opam)
+do
+    mv "$file" $(echo "$file" | sed s/alpha/${version}-${short_hash}/g)
+done
 
 dune exec ../../lib_protocol_compiler/replace.exe ../../lib_protocol_compiler/dune_protocol.template dune.inc ../../lib_protocol_compiler/final_protocol_versions ${version}_${short_hash}
 
