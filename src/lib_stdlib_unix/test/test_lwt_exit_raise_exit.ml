@@ -25,6 +25,10 @@
 
 open Lwt.Infix
 
+let devnull = Lwt_main.run (Lwt_unix.openfile "/dev/null" [O_WRONLY] 0)
+
+let () = Lwt_unix.dup2 devnull Lwt_unix.stderr
+
 let () =
   match
     Lwt_main.run
