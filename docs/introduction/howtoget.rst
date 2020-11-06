@@ -94,7 +94,7 @@ update it for your current session::
 
     rustup set profile minimal
     rustup toolchain install 1.39.0
-    rustup default 1.39.0
+    rustup override set 1.39.0
     source $HOME/.cargo/env
 
 
