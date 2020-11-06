@@ -537,11 +537,12 @@ end = struct
             ()
         | Some (Found _) ->
             ()
-        | Some (Pending data) ->
+        | Some (Pending ({wakener = w; _} as data)) ->
             data.waiters <- data.waiters - 1 ;
             if data.waiters = 0 then (
               Memory_table.remove s.memory k ;
-              Scheduler.notify_cancellation s.scheduler k )) ;
+              Scheduler.notify_cancellation s.scheduler k ;
+              Lwt.wakeup_later w (error (Canceled k)) )) ;
     match timeout with
     | None ->
         t
