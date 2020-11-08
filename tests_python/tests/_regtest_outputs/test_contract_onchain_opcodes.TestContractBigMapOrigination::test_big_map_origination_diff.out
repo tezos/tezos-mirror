@@ -1,24 +1,13 @@
 tests/test_contract_onchain_opcodes.py::TestContractBigMapOrigination::test_big_map_origination_diff
 
 Node is bootstrapped.
-Estimated gas: 2122.255 units (will add 100 + 38 for safety)
-Estimated storage: 470 bytes added (will add 20 for safety)
-Operation successfully injected in the node.
-Operation hash is '[BLOCK_HASH]'
-NOT waiting for the operation to be included.
-Use command
-  tezos-client wait for [BLOCK_HASH] to be included --confirmations 30 --branch [BLOCK_HASH]
-and/or an external block explorer to make sure that it has been included.
-This sequence of operations was run:
+This simulation failed:
   Manager signed operations:
     From: [CONTRACT_HASH]
-    Fee to the baker: ꜩ0.000519
+    Fee to the baker: ꜩ0
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 2261
-    Storage limit: 490 bytes
-    Balance updates:
-      [CONTRACT_HASH] ................ -ꜩ0.000519
-      fees(the baker who will include this operation,0) ... +ꜩ0.000519
+    Gas limit: 1040000
+    Storage limit: 60000 bytes
     Origination:
       From: [CONTRACT_HASH]
       Credit: ꜩ1000
@@ -28,21 +17,13 @@ This sequence of operations was run:
           code { CAR ; NIL operation ; PAIR } }
         Initial storage: (Pair 0 { Elt 1 (Some 4) })
         No delegate for this contract
-        This origination was successfully applied
-        Originated contracts:
-          [CONTRACT_HASH]
-        Storage size: 213 bytes
-        Updated big_maps:
-          Copy map(0) to map(2)
-          Set map(2)[1] to 4
-        Paid storage size diff: 213 bytes
-        Consumed gas: 2122.255
-        Balance updates:
-          [CONTRACT_HASH] ... -ꜩ0.05325
-          [CONTRACT_HASH] ... -ꜩ0.06425
-          [CONTRACT_HASH] ... -ꜩ1000
-          [CONTRACT_HASH] ... +ꜩ1000
+        This operation FAILED.
 
-New contract [CONTRACT_HASH] originated.
-Contract memorized as originate_big_map_diff.
-Injected block [BLOCK_HASH]
+Ill typed data: 1: (Pair 0 { Elt 1 (Some 4) })
+is not an expression of type big_map int int
+At line 1 characters 0 to 26, value (Pair 0 { Elt 1 (Some 4) })
+is invalid for type big_map int int.
+At line 1 characters 6 to 7,
+Unexpected forged value.
+Fatal error:
+  origination simulation failed

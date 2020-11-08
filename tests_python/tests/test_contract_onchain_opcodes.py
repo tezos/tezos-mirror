@@ -345,19 +345,37 @@ class TestContractBigMapOrigination:
     def test_big_map_origination_id(self, client_regtest_scrubbed):
         client = client_regtest_scrubbed
         # originate again the same script from the big-map id 0
-        init_with_transfer(client,
-                           ORIGINATE_BIG_MAP_FILE,
-                           '0', 1000, 'bootstrap1',
-                           contract_name='originate_big_map_id')
+        with assert_run_failure(r'Unexpected forged value'):
+            init_with_transfer(client,
+                               ORIGINATE_BIG_MAP_FILE,
+                               '0', 1000, 'bootstrap1',
+                               contract_name='originate_big_map_id')
 
     def test_big_map_origination_diff(self, client_regtest_scrubbed):
         client = client_regtest_scrubbed
 
         # originate again the same script from a big-diff
-        init_with_transfer(client,
-                           ORIGINATE_BIG_MAP_FILE,
-                           'Pair 0 {Elt 1 (Some 4)}', 1000, 'bootstrap1',
-                           contract_name='originate_big_map_diff')
+        with assert_run_failure(r'Unexpected forged value'):
+            init_with_transfer(client,
+                               ORIGINATE_BIG_MAP_FILE,
+                               'Pair 0 {Elt 1 (Some 4)}', 1000, 'bootstrap1',
+                               contract_name='originate_big_map_diff')
+
+    def test_big_map_transfer_id(self, client_regtest_scrubbed):
+        client = client_regtest_scrubbed
+        # call the first contract, passing an id as parameter
+        with assert_run_failure(r'Unexpected forged value'):
+            client.call(source='bootstrap1',
+                        destination='originate_big_map_literal',
+                        args=['--arg', '0'])
+
+    def test_big_map_transfer_diff(self, client_regtest_scrubbed):
+        client = client_regtest_scrubbed
+        # call the first contract, passing a diff as parameter
+        with assert_run_failure(r'Unexpected forged value'):
+            client.call(source='bootstrap1',
+                        destination='originate_big_map_literal',
+                        args=['--arg', 'Pair 0 {Elt 1 (Some 4)}'])
 
 
 @pytest.mark.incremental
