@@ -56,7 +56,7 @@ let close dropbox =
     dropbox.closed <- true ;
     notify_put dropbox )
 
-let wait_put ~timeout dropbox =
+let wait_put_with_timeout ~timeout dropbox =
   match dropbox.put_waiter with
   | Some (waiter, _wakener) ->
       Lwt.pick [timeout; Lwt.protected waiter]
@@ -65,6 +65,22 @@ let wait_put ~timeout dropbox =
       dropbox.put_waiter <- Some (waiter, wakener) ;
       Lwt.pick [timeout; Lwt.protected waiter]
 
+let wait_put_no_timeout dropbox =
+  match dropbox.put_waiter with
+  | Some (waiter, _wakener) ->
+      Lwt.protected waiter
+  | None ->
+      let (waiter, wakener) = Lwt.wait () in
+      dropbox.put_waiter <- Some (waiter, wakener) ;
+      Lwt.protected waiter
+
+let wait_put ?timeout dropbox =
+  match timeout with
+  | None ->
+      wait_put_no_timeout dropbox
+  | Some timeout ->
+      wait_put_with_timeout ~timeout dropbox
+
 let rec take dropbox =
   match dropbox.data with
   | Some elt ->
@@ -72,9 +88,7 @@ let rec take dropbox =
       Lwt.return elt
   | None ->
       if dropbox.closed then Lwt.fail Closed
-      else
-        wait_put ~timeout:(Lwt_utils.never_ending ()) dropbox
-        >>= fun () -> take dropbox
+      else wait_put dropbox >>= fun () -> take dropbox
 
 let rec take_with_timeout timeout dropbox =
   match dropbox.data with
