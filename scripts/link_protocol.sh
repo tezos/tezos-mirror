@@ -54,20 +54,44 @@ duplicate_and_replace() {
         }}' PATTERN=$PATTERN REPLACEMENT=$REPLACEMENT $*
 }
 
-duplicate_and_replace_when_2_occ() {
+duplicate_and_replace_only_1_occ() {
     PATTERN=$1
     REPLACEMENT=$2
     shift 2
 
     awk -i inplace '{
+        if (   prevlast !~ PATTERN\
+            &&      last ~ PATTERN\
+            &&       $0 !~ PATTERN) {
+           gsub(PATTERN,REPLACEMENT,last)
+           print last
+        }
         print
-        if (prevlast ~ pattern && last ~ PATTERN && $0 !~ PATTERN) {
-           sub(PATTERN,REPLACEMENT,prevlast)
-           sub(PATTERN,REPLACEMENT,last)
+        {prevlast = last}
+        {last = $0}
+
+       }' PATTERN=$PATTERN REPLACEMENT=$REPLACEMENT $*
+}
+
+duplicate_and_replace_when_3_occ() {
+    PATTERN=$1
+    REPLACEMENT=$2
+    shift 2
+
+    awk -i inplace '{
+        if (   prevprevlast ~ PATTERN\
+            &&     prevlast ~ PATTERN\
+            &&         last ~ PATTERN\
+            &&          $0 !~ PATTERN) {
+           gsub(PATTERN, REPLACEMENT, prevprevlast)
+           gsub(PATTERN, REPLACEMENT, prevlast)
+           gsub(PATTERN, REPLACEMENT, last)
+           {print prevprevlast}
            {print prevlast}
            {print last}
-           print
         }
+        print
+        {prevprevlast = prevlast}
         {prevlast = last}
         {last = $0}
 
@@ -78,13 +102,17 @@ duplicate_and_replace_when_2_occ() {
 duplicate_and_replace ${pattern} ${replacement} active_protocol_versions
 
 # activate in client to bake and use RPCs
+duplicate_and_replace_when_3_occ -${pattern} -${replacement} \
+    src/bin_client/dune
+duplicate_and_replace_only_1_occ -${pattern} -${replacement} \
+  src/bin_client/dune
 duplicate_and_replace -${pattern} -${replacement} \
     src/bin_client/tezos-client.opam
-duplicate_and_replace_when_2_occ -${pattern} -${replacement} \
-    src/bin_client/dune
 
 # activate in node
-duplicate_and_replace_when_2_occ -${pattern} -${replacement} \
+duplicate_and_replace_when_3_occ -${pattern} -${replacement} \
+    src/bin_node/dune
+duplicate_and_replace_only_1_occ -${pattern} -${replacement} \
     src/bin_node/dune
 duplicate_and_replace -${pattern} -${replacement} \
     src/bin_node/tezos-node.opam
