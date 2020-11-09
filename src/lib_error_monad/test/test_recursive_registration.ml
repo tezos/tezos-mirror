@@ -23,6 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:    Error Monad
+    Invocation:   dune build @src/lib_error_monad/runtest
+    Subject:      On the registration and serialization of shallow, deep
+                  and recursive errors.
+*)
+
 module Make () = struct
   open TzCore
 
@@ -55,6 +63,9 @@ module Make () = struct
   let () =
     assert (parsha = Data_encoding.Binary.of_bytes_exn error_encoding b_par_nil)
 
+  (** Checks that the pretty-printer doesn't fail. That pretty-printer
+      relies on at least one global reference and has an assert false
+      in its body. *)
   let (_ : string) = Format.asprintf "%a" pp parsha
 
   let parsha_cube = ParSha [ParSha []]
@@ -146,6 +157,10 @@ module Make () = struct
   let main () = ()
 end
 
+(** Asserts that roundtrips [of/to_bytes_exn] preserve the error
+    values [ParSha []], [ParSha [ParSha []]], [ParSha [A; A]], as
+    well as deep recursion.
+*)
 let test_register_rec () =
   let module M = Make () in
   M.main ()
