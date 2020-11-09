@@ -136,6 +136,10 @@ let included_endorsements ctxt = ctxt.included_endorsements
 
 type error += Too_many_internal_operations (* `Permanent *)
 
+type error += Block_quota_exceeded (* `Temporary *)
+
+type error += Operation_quota_exceeded (* `Temporary *)
+
 let () =
   let open Data_encoding in
   register_error_kind
@@ -146,7 +150,27 @@ let () =
       "A transaction exceeded the hard limit of internal operations it can emit"
     empty
     (function Too_many_internal_operations -> Some () | _ -> None)
-    (fun () -> Too_many_internal_operations)
+    (fun () -> Too_many_internal_operations) ;
+  register_error_kind
+    `Temporary
+    ~id:"gas_exhausted.operation"
+    ~title:"Gas quota exceeded for the operation"
+    ~description:
+      "A script or one of its callee took more time than the operation said \
+       it would"
+    empty
+    (function Operation_quota_exceeded -> Some () | _ -> None)
+    (fun () -> Operation_quota_exceeded) ;
+  register_error_kind
+    `Temporary
+    ~id:"gas_exhausted.block"
+    ~title:"Gas quota exceeded for the block"
+    ~description:
+      "The sum of gas consumed by all the operations in the block exceeds the \
+       hard gas limit per block"
+    empty
+    (function Block_quota_exceeded -> Some () | _ -> None)
+    (fun () -> Block_quota_exceeded)
 
 let fresh_internal_nonce ctxt =
   if Compare.Int.(ctxt.internal_nonce >= 65_535) then
@@ -310,16 +334,10 @@ let consume_gas ctxt cost =
     | Some gas_counter ->
         Ok {ctxt with gas_counter}
     | None ->
-        Gas_limit_repr.gas_exhausted_error
-          ~count_block_gas:(is_counting_block_gas ctxt)
+        if is_counting_block_gas ctxt then error Block_quota_exceeded
+        else error Operation_quota_exceeded
 
-let check_enough_gas ctxt cost =
-  if is_gas_unlimited ctxt then ok_unit
-  else
-    Gas_limit_repr.raw_check_enough
-      ctxt.gas_counter
-      ~count_block_gas:(is_counting_block_gas ctxt)
-      cost
+let check_enough_gas ctxt cost = consume_gas ctxt cost >>? fun _ -> ok_unit
 
 let gas_consumed ~since ~until =
   match (gas_level since, gas_level until) with
@@ -726,6 +744,10 @@ module type T = sig
   val project : context -> root_context
 
   val absolute_key : context -> key -> key
+
+  type error += Block_quota_exceeded
+
+  type error += Operation_quota_exceeded
 
   val consume_gas : context -> Gas_limit_repr.cost -> context tzresult
 

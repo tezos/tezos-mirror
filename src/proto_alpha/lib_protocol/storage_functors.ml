@@ -115,6 +115,10 @@ module Make_subcontext (R : REGISTER) (C : Raw_context.T) (N : NAME) :
 
   let absolute_key c k = C.absolute_key c (to_key k)
 
+  type error += Block_quota_exceeded = C.Block_quota_exceeded
+
+  type error += Operation_quota_exceeded = C.Operation_quota_exceeded
+
   let consume_gas = C.consume_gas
 
   let check_enough_gas = C.check_enough_gas
@@ -770,6 +774,10 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
     let absolute_key c k =
       let (t, i) = unpack c in
       C.absolute_key t (to_key i k)
+
+    type error += Block_quota_exceeded = C.Block_quota_exceeded
+
+    type error += Operation_quota_exceeded = C.Operation_quota_exceeded
 
     let consume_gas c g =
       let (t, i) = unpack c in

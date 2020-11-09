@@ -61,10 +61,6 @@ let cost_encoding = Data_encoding.z
 
 let pp_cost fmt z = Z.pp_print fmt z
 
-type error += Block_quota_exceeded (* `Temporary *)
-
-type error += Operation_quota_exceeded (* `Temporary *)
-
 let allocation_weight = Z.of_int (scaling_factor * 2)
 
 let step_weight = Z.of_int scaling_factor
@@ -83,17 +79,6 @@ let raw_consume gas_counter cost =
   let gas = cost_to_milligas cost in
   let remaining = Arith.sub gas_counter gas in
   if Arith.(remaining < zero) then None else Some remaining
-
-let gas_exhausted_error ~count_block_gas =
-  if count_block_gas then error Block_quota_exceeded
-  else error Operation_quota_exceeded
-
-let raw_check_enough gas_counter ~count_block_gas cost =
-  match raw_consume gas_counter cost with
-  | None ->
-      gas_exhausted_error ~count_block_gas
-  | Some _ ->
-      Ok ()
 
 let alloc_cost n = Z.mul allocation_weight (Z.succ n)
 
@@ -114,26 +99,3 @@ let ( +@ ) x y = Z.add x y
 let ( *@ ) x y = Z.mul x y
 
 let alloc_mbytes_cost n = alloc_cost (Z.of_int 12) +@ alloc_bytes_cost n
-
-let () =
-  let open Data_encoding in
-  register_error_kind
-    `Temporary
-    ~id:"gas_exhausted.operation"
-    ~title:"Gas quota exceeded for the operation"
-    ~description:
-      "A script or one of its callee took more time than the operation said \
-       it would"
-    empty
-    (function Operation_quota_exceeded -> Some () | _ -> None)
-    (fun () -> Operation_quota_exceeded) ;
-  register_error_kind
-    `Temporary
-    ~id:"gas_exhausted.block"
-    ~title:"Gas quota exceeded for the block"
-    ~description:
-      "The sum of gas consumed by all the operations in the block exceeds the \
-       hard gas limit per block"
-    empty
-    (function Block_quota_exceeded -> Some () | _ -> None)
-    (fun () -> Block_quota_exceeded)

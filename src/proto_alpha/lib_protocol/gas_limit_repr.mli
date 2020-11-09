@@ -37,16 +37,7 @@ val cost_encoding : cost Data_encoding.encoding
 
 val pp_cost : Format.formatter -> cost -> unit
 
-type error += Block_quota_exceeded (* `Temporary *)
-
-type error += Operation_quota_exceeded (* `Temporary *)
-
 val raw_consume : Arith.fp -> cost -> Arith.fp option
-
-val gas_exhausted_error : count_block_gas:bool -> 'a tzresult
-
-val raw_check_enough :
-  Arith.fp -> count_block_gas:bool -> cost -> unit tzresult
 
 val free : cost
 

@@ -236,8 +236,16 @@ module type T = sig
       from partial key relative a view. *)
   val absolute_key : context -> key -> key
 
+  (** Raised if block gas quota is exhausted during gas
+     consumption. *)
+  type error += Block_quota_exceeded
+
+  (** Raised if operation gas quota is exhausted during gas
+     consumption. *)
+  type error += Operation_quota_exceeded
+
   (** Internally used in {!Storage_functors} to consume gas from
-      within a view. *)
+      within a view. May raise {!Block_quota_exceeded} or {!Operation_quota_exceeded}. *)
   val consume_gas : context -> Gas_limit_repr.cost -> context tzresult
 
   (** Check if consume_gas will fail *)
