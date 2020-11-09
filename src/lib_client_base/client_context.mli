@@ -63,6 +63,11 @@ class type prompter =
     method prompt : ('a, string tzresult) lwt_format -> 'a
 
     method prompt_password : ('a, Bytes.t tzresult) lwt_format -> 'a
+
+    (** when [multiple_password_retries] is [true], password
+        prompt should retries more than once. [true] is the default
+        value. *)
+    method multiple_password_retries : bool
   end
 
 class type io =

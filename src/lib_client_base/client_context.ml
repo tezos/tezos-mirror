@@ -44,6 +44,8 @@ class type prompter =
     method prompt : ('a, string tzresult) lwt_format -> 'a
 
     method prompt_password : ('a, Bytes.t tzresult) lwt_format -> 'a
+
+    method multiple_password_retries : bool
   end
 
 class type io =
@@ -196,6 +198,8 @@ class proxy_context (obj : full) =
 
     method prompt_password : type a. (a, Bytes.t tzresult) lwt_format -> a =
       obj#prompt_password
+
+    method multiple_password_retries : bool = obj#multiple_password_retries
 
     method sleep : float -> unit Lwt.t = obj#sleep
 

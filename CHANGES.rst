@@ -118,6 +118,9 @@ Client
 
 - Rename ``--block`` option of ``sign message`` command to ``--branch``.
 
+-  Commands using an encrypted key now fail after the user fails to give the correct
+   password three times
+
 Baker / Endorser / Accuser
 --------------------------
 
