@@ -502,77 +502,115 @@ struct
     end
 
     module type FIELD = sig
+      exception Not_in_field of Bytes.t
+
       type t
 
+      (** The order of the finite field *)
+      val order : Z.t
+
+      (** minimal number of bytes required to encode a value of the field. *)
       val size_in_bytes : int
 
-      val to_bytes : t -> bytes
+      (** [check_bytes bs] returns [true] if [bs] is a correct byte
+      representation of a field element *)
+      val check_bytes : Bytes.t -> bool
 
-      val of_bytes_opt : bytes -> t option
-
-      val of_bytes_exn : bytes -> t
-
-      (* Check if a point, represented as a byte array, is in the field *)
-      val check_bytes : bytes -> bool
-
-      (* The zero point *)
+      (** The neutral element for the addition *)
       val zero : t
 
-      (* The one point *)
+      (** The neutral element for the multiplication *)
       val one : t
 
-      (* Add a pair of points *)
+      (** [add a b] returns [a + b mod order] *)
       val add : t -> t -> t
 
-      (* Multiply a pair of points *)
+      (** [mul a b] returns [a * b mod order] *)
       val mul : t -> t -> t
 
-      (* Negate a point *)
+      (** [eq a b] returns [true] if [a = b mod order], else [false] *)
+      val eq : t -> t -> bool
+
+      (** [negate x] returns [-x mod order]. Equivalently, [negate x] returns the
+      unique [y] such that [x + y mod order = 0]
+  *)
       val negate : t -> t
 
-      (* Try to compute the inverse of a point *)
+      (** [inverse_exn x] returns [x^-1] if [x] is not [0], else raise
+      [Division_by_zero]
+  *)
       val inverse_exn : t -> t
 
-      (* Try to compute the inverse of a point *)
+      (** [inverse_opt x] returns [x^-1] if [x] is not [0] as an option, else [None] *)
       val inverse_opt : t -> t option
 
-      (* Equality check *)
-      val eq : t -> t -> bool
+      (** [pow x n] returns [x^n] *)
+      val pow : t -> Z.t -> t
+
+      (** From a predefined bytes representation, construct a value t. It is not
+      required that to_bytes of_bytes_exn t = t.
+      Raise [Not_in_field] if the bytes do not represent an element in the field.
+  *)
+      val of_bytes_exn : Bytes.t -> t
+
+      (** From a predefined bytes representation, construct a value t. It is not
+      required that to_bytes (Option.get (of_bytes_opt t)) = t. By default, little endian encoding
+      is used and the given element is modulo the prime order *)
+      val of_bytes_opt : Bytes.t -> t option
+
+      (** Convert the value t to a bytes representation which can be used for
+      hashing for instance. It is not required that to_bytes of_bytes_exn t = t. By
+      default, little endian encoding is used, and length of the resulting bytes
+      may vary depending on the order.
+  *)
+      val to_bytes : t -> Bytes.t
     end
 
     module type CURVE = sig
+      exception Not_on_curve of Bytes.t
+
+      (** The type of the element in the elliptic curve *)
       type t
 
+      (** The size of a point representation, in bytes *)
       val size_in_bytes : int
-
-      val to_bytes : t -> bytes
-
-      val of_bytes_opt : bytes -> t option
-
-      val of_bytes_exn : bytes -> t
 
       module Scalar : FIELD
 
-      (* Check if a point, represented as a byte array, is on the curve *)
-      val check_bytes : bytes -> bool
+      (** Check if a point, represented as a byte array, is on the curve **)
+      val check_bytes : Bytes.t -> bool
 
-      (* The zero point on the curve *)
+      (** Attempt to construct a point from a byte array *)
+      val of_bytes_opt : Bytes.t -> t option
+
+      (** Attempt to construct a point from a byte array.
+      Raise [Not_on_curve] if the point is not on the curve
+  *)
+      val of_bytes_exn : Bytes.t -> t
+
+      (** Return a representation in bytes *)
+      val to_bytes : t -> Bytes.t
+
+      (** Zero of the elliptic curve *)
       val zero : t
 
-      (* A fixed generator of the elliptic curve *)
+      (** A fixed generator of the elliptic curve *)
       val one : t
 
-      (* Add a pair of points on the curve *)
+      (** Return the addition of two element *)
       val add : t -> t -> t
 
-      (* Multiply a point by a scalar *)
-      val mul : t -> Scalar.t -> t
+      (** Double the element *)
+      val double : t -> t
 
-      (* Negate a point on the curve *)
+      (** Return the opposite of the element *)
       val negate : t -> t
 
-      (* Equality test *)
+      (** Return [true] if the two elements are algebraically the same *)
       val eq : t -> t -> bool
+
+      (** Multiply an element by a scalar *)
+      val mul : t -> Scalar.t -> t
     end
 
     module type PAIRING = sig
