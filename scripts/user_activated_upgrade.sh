@@ -56,7 +56,7 @@ if (( $level > 28082 )); then
 # we are on a real network and we need a yes-node and yes-wallet to bake
 
     # replace existing upgrades
-    awk -i inplace -v level=$level -v full_hash=$full_hash '
+    awk -v level=$level -v full_hash=$full_hash '
 BEGIN{found=0}{
 if (!found && $0 ~ "~user_activated_upgrades")
   {found=1; printf "    ~user_activated_upgrades:\n      [ (%dl, \"%s\") ]\n", level, full_hash}
@@ -65,17 +65,19 @@ else {
     {found=0; print }
   else
     { if (!found){print}}
-}}' src/bin_node/node_config_file.ml
+}}' src/bin_node/node_config_file.ml > tmp_file
+    mv tmp_file src/bin_node/node_config_file.ml
 
     echo "The sandbox will now switch to $full_hash at level $level."
 else # we are in sandbox
 
     # add upgrade to the sandbox
-    awk -i inplace -v level=$level -v full_hash=$full_hash '
+    awk -v level=$level -v full_hash=$full_hash '
 { print
   if ($0 ~ "~alias:\"sandbox\"")
   { printf "    ~user_activated_upgrades:\n      [ (%dl, \"%s\") ]\n", level, full_hash }
-}' src/bin_node/node_config_file.ml
+}' src/bin_node/node_config_file.ml > tmp_file
+    mv tmp_file src/bin_node/node_config_file.ml
 
     sed -i.old "s/\$bin_dir\/..\/proto_alpha\/parameters\/sandbox-parameters.json/\$bin_dir\/..\/proto_${pred}_${pred_short_hash}\/parameters\/sandbox-parameters.json/" src/bin_client/tezos-init-sandboxed-client.sh
     sed -i.old "s/activate_alpha()/activate_${pred}_${pred_short_hash}()/" src/bin_client/tezos-init-sandboxed-client.sh

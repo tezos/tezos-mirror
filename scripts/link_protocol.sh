@@ -46,12 +46,16 @@ duplicate_and_replace() {
     REPLACEMENT=$2
     shift 2
 
-    awk -i inplace '{
+    for file in $*
+    do
+        awk '{
         print
         if ($0 ~ PATTERN) {
            sub(PATTERN,REPLACEMENT)
            print
-        }}' PATTERN=$PATTERN REPLACEMENT=$REPLACEMENT $*
+        }}' PATTERN=$PATTERN REPLACEMENT=$REPLACEMENT "$file" > tmp_file
+        mv tmp_file "$file"
+    done
 }
 
 duplicate_and_replace_only_1_occ() {
@@ -59,7 +63,9 @@ duplicate_and_replace_only_1_occ() {
     REPLACEMENT=$2
     shift 2
 
-    awk -i inplace '{
+    for file in $*
+    do
+        awk '{
         if (   prevlast !~ PATTERN\
             &&      last ~ PATTERN\
             &&       $0 !~ PATTERN) {
@@ -70,7 +76,9 @@ duplicate_and_replace_only_1_occ() {
         {prevlast = last}
         {last = $0}
 
-       }' PATTERN=$PATTERN REPLACEMENT=$REPLACEMENT $*
+       }' PATTERN=$PATTERN REPLACEMENT=$REPLACEMENT "$file" > tmp_file
+        mv tmp_file "$file"
+    done
 }
 
 duplicate_and_replace_when_3_occ() {
@@ -78,7 +86,9 @@ duplicate_and_replace_when_3_occ() {
     REPLACEMENT=$2
     shift 2
 
-    awk -i inplace '{
+    for file in $*
+    do
+        awk '{
         if (   prevprevlast ~ PATTERN\
             &&     prevlast ~ PATTERN\
             &&         last ~ PATTERN\
@@ -95,7 +105,9 @@ duplicate_and_replace_when_3_occ() {
         {prevlast = last}
         {last = $0}
 
-       }' PATTERN=$PATTERN REPLACEMENT=$REPLACEMENT $*
+       }' PATTERN=$PATTERN REPLACEMENT=$REPLACEMENT "$file" > tmp_file
+        mv tmp_file "$file"
+    done
 }
 
 # the minimum needed, although you can't bake
@@ -103,18 +115,18 @@ duplicate_and_replace ${pattern} ${replacement} active_protocol_versions
 
 # activate in client to bake and use RPCs
 duplicate_and_replace_when_3_occ -${pattern} -${replacement} \
-    src/bin_client/dune
+                                 src/bin_client/dune
 duplicate_and_replace_only_1_occ -${pattern} -${replacement} \
-  src/bin_client/dune
+                                 src/bin_client/dune
 duplicate_and_replace -${pattern} -${replacement} \
-    src/bin_client/tezos-client.opam
+                      src/bin_client/tezos-client.opam
 
 # activate in node
 duplicate_and_replace_when_3_occ -${pattern} -${replacement} \
-    src/bin_node/dune
+                                 src/bin_node/dune
 duplicate_and_replace_only_1_occ -${pattern} -${replacement} \
-    src/bin_node/dune
+                                 src/bin_node/dune
 duplicate_and_replace -${pattern} -${replacement} \
-    src/bin_node/tezos-node.opam
+                      src/bin_node/tezos-node.opam
 duplicate_and_replace -${pattern} -${replacement} \
-    src/bin_validation/{dune,tezos-validator.opam}
+                      src/bin_validation/{dune,tezos-validator.opam}
