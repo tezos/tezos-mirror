@@ -1317,12 +1317,15 @@ module Block = struct
           (0 -- (header.shell.validation_passes - 1)))
 
   let context_exn {chain_state; hash; _} =
-    Shared.use chain_state.block_store (fun block_store ->
-        Store.Block.Contents.read_opt (block_store, hash))
-    >|= Option.unopt_assert ~loc:__POS__
-    >>= fun {context = commit; _} ->
-    Shared.use chain_state.context_index (fun context_index ->
-        Context.checkout_exn context_index commit)
+    Lwt.catch
+      (fun () ->
+        Shared.use chain_state.block_store (fun block_store ->
+            Store.Block.Contents.read_opt (block_store, hash))
+        >|= Option.unopt_assert ~loc:__POS__
+        >>= fun {context = commit; _} ->
+        Shared.use chain_state.context_index (fun context_index ->
+            Context.checkout_exn context_index commit))
+      (fun _ -> Lwt.fail Not_found)
 
   let context_opt {chain_state; hash; _} =
     Shared.use chain_state.block_store (fun block_store ->
@@ -1338,10 +1341,7 @@ module Block = struct
     | Some context ->
         return context
     | None ->
-        failwith
-          "State.Block.context failed to checkout context for block %a"
-          Block_hash.pp
-          block.hash
+        fail (Block_contents_not_found block.hash)
 
   let context_exists {chain_state; hash; _} =
     Shared.use chain_state.block_store (fun block_store ->

@@ -262,8 +262,8 @@ let build_raw_rpc_directory ~user_activated_upgrades
         (depth >= 0)
         (Tezos_shell_services.Block_services.Invalid_depth_arg depth)
       >>=? fun () ->
-      State.Block.context_exn block
-      >>= fun context ->
+      State.Block.context block
+      >>=? fun context ->
       Context.mem context path
       >>= fun mem ->
       Context.dir_mem context path
@@ -336,8 +336,8 @@ let build_raw_rpc_directory ~user_activated_upgrades
         ~protocol_data
         operations) ;
   register0 S.Helpers.Preapply.operations (fun block () ops ->
-      State.Block.context_exn block
-      >>= fun ctxt ->
+      State.Block.context block
+      >>=? fun ctxt ->
       let predecessor = State.Block.hash block in
       let header = State.Block.shell_header block in
       let predecessor_context = Shell_context.wrap_disk_context ctxt in
@@ -361,8 +361,8 @@ let build_raw_rpc_directory ~user_activated_upgrades
       >>=? fun (state, acc) ->
       Next_proto.finalize_block state >>=? fun _ -> return (List.rev acc)) ;
   register1 S.Helpers.complete (fun block prefix () () ->
-      State.Block.context_exn block
-      >>= fun ctxt ->
+      State.Block.context block
+      >>=? fun ctxt ->
       Base58.complete prefix
       >>= fun l1 ->
       let ctxt = Shell_context.wrap_disk_context ctxt in
