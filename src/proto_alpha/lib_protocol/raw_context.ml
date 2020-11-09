@@ -46,7 +46,8 @@ module Int_set = Set.Make (Compare.Int)
    - [CountingBlockGas] when the block gas level is the minimum.
 
    In each case, we keep enough information in [gas_counter_status] to
-   reconstruct the level that is not represented by [gas_counter].
+   reconstruct the level that is not represented by [gas_counter]. In
+   the gas [Unlimited], the block gas level is stored in [gas_counter].
 
    [Raw_context] interface provides two accessors for the operation
    gas level and the block gas level. These accessors compute these values
@@ -79,7 +80,7 @@ type t = {
 }
 
 and gas_counter_status =
-  | UnlimitedOperationGas of {block_gas : Gas_limit_repr.Arith.fp}
+  | UnlimitedOperationGas
   | CountingOperationGas of {block_gas_delta : Gas_limit_repr.Arith.fp}
   | CountingBlockGas of {operation_gas_delta : Gas_limit_repr.Arith.fp}
 
@@ -273,7 +274,7 @@ let () =
 let gas_level ctxt =
   let open Gas_limit_repr in
   match ctxt.gas_counter_status with
-  | UnlimitedOperationGas _ ->
+  | UnlimitedOperationGas ->
       Unaccounted
   | CountingBlockGas {operation_gas_delta} ->
       Limited {remaining = Arith.(add ctxt.gas_counter operation_gas_delta)}
@@ -283,9 +284,7 @@ let gas_level ctxt =
 let block_gas_level ctxt =
   let open Gas_limit_repr in
   match ctxt.gas_counter_status with
-  | UnlimitedOperationGas {block_gas} ->
-      block_gas
-  | CountingBlockGas _ ->
+  | UnlimitedOperationGas | CountingBlockGas _ ->
       ctxt.gas_counter
   | CountingOperationGas {block_gas_delta} ->
       Arith.(add ctxt.gas_counter block_gas_delta)
@@ -315,11 +314,12 @@ let set_gas_limit ctxt (remaining : 'a Gas_limit_repr.Arith.t) =
 
 let set_gas_unlimited ctxt =
   let block_gas = block_gas_level ctxt in
-  update_gas_counter_status ctxt (UnlimitedOperationGas {block_gas})
+  let ctxt = {ctxt with gas_counter = block_gas} in
+  update_gas_counter_status ctxt UnlimitedOperationGas
 
 let is_gas_unlimited ctxt =
   match ctxt.gas_counter_status with
-  | UnlimitedOperationGas _ ->
+  | UnlimitedOperationGas ->
       true
   | _ ->
       false
@@ -637,18 +637,13 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
     deposits = Signature.Public_key_hash.Map.empty;
     storage_space_to_pay = None;
     allocated_contracts = None;
-    gas_counter = Gas_limit_repr.Arith.zero;
+    gas_counter =
+      Gas_limit_repr.Arith.fp constants.Constants_repr.hard_gas_limit_per_block;
     origination_nonce = None;
     temporary_lazy_storage_ids = Lazy_storage_kind.Temp_ids.init;
     internal_nonce = 0;
     internal_nonces_used = Int_set.empty;
-    gas_counter_status =
-      UnlimitedOperationGas
-        {
-          block_gas =
-            Gas_limit_repr.Arith.fp
-              constants.Constants_repr.hard_gas_limit_per_block;
-        };
+    gas_counter_status = UnlimitedOperationGas;
   }
 
 type previous_protocol = Genesis of Parameters_repr.t | Edo_008
