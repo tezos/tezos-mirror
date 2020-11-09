@@ -814,89 +814,6 @@ let rec ty_of_comparable_ty : type a. a comparable_ty -> a ty = function
   | Option_key (t, tname) ->
       Option_t (ty_of_comparable_ty t, tname)
 
-let rec comparable_ty_of_ty_no_gas : type a. a ty -> a comparable_ty option =
-  function
-  | Unit_t tname ->
-      Some (Unit_key tname)
-  | Never_t tname ->
-      Some (Never_key tname)
-  | Int_t tname ->
-      Some (Int_key tname)
-  | Nat_t tname ->
-      Some (Nat_key tname)
-  | Signature_t tname ->
-      Some (Signature_key tname)
-  | String_t tname ->
-      Some (String_key tname)
-  | Bytes_t tname ->
-      Some (Bytes_key tname)
-  | Mutez_t tname ->
-      Some (Mutez_key tname)
-  | Bool_t tname ->
-      Some (Bool_key tname)
-  | Key_hash_t tname ->
-      Some (Key_hash_key tname)
-  | Key_t tname ->
-      Some (Key_key tname)
-  | Timestamp_t tname ->
-      Some (Timestamp_key tname)
-  | Address_t tname ->
-      Some (Address_key tname)
-  | Chain_id_t tname ->
-      Some (Chain_id_key tname)
-  | Pair_t ((l, al, _), (r, ar, _), pname) -> (
-    match comparable_ty_of_ty_no_gas l with
-    | None ->
-        None
-    | Some lty -> (
-      match comparable_ty_of_ty_no_gas r with
-      | None ->
-          None
-      | Some rty ->
-          Some (Pair_key ((lty, al), (rty, ar), pname)) ) )
-  | Union_t ((l, al), (r, ar), tname) -> (
-    match comparable_ty_of_ty_no_gas l with
-    | None ->
-        None
-    | Some lty -> (
-      match comparable_ty_of_ty_no_gas r with
-      | None ->
-          None
-      | Some rty ->
-          Some (Union_key ((lty, al), (rty, ar), tname)) ) )
-  | Option_t (tt, tname) -> (
-    match comparable_ty_of_ty_no_gas tt with
-    | None ->
-        None
-    | Some ty ->
-        Some (Option_key (ty, tname)) )
-  | Lambda_t _ ->
-      None
-  | List_t _ ->
-      None
-  | Ticket_t _ ->
-      None
-  | Set_t _ ->
-      None
-  | Map_t _ ->
-      None
-  | Big_map_t _ ->
-      None
-  | Contract_t _ ->
-      None
-  | Operation_t _ ->
-      None
-  | Bls12_381_fr_t _ ->
-      None
-  | Bls12_381_g1_t _ ->
-      None
-  | Bls12_381_g2_t _ ->
-      None
-  | Sapling_state_t _ ->
-      None
-  | Sapling_transaction_t _ ->
-      None
-
 let add_field_annot a var = function
   | Prim (loc, prim, args, annots) ->
       Prim
@@ -1094,6 +1011,71 @@ let serialize_ty_for_error ctxt ty =
         Gas.consume ctxt (Script.strip_locations_cost ty)
         >|? fun ctxt -> (Micheline.strip_locations (strip_var_annots ty), ctxt))
   |> record_trace Cannot_serialize_error
+
+let rec comparable_ty_of_ty :
+    type a.
+    context -> Script.location -> a ty -> (a comparable_ty * context) tzresult
+    =
+ fun ctxt loc ty ->
+  Gas.consume ctxt Typecheck_costs.comparable_ty_of_ty_cycle
+  >>? fun ctxt ->
+  match ty with
+  | Unit_t tname ->
+      ok ((Unit_key tname : a comparable_ty), ctxt)
+  | Never_t tname ->
+      ok (Never_key tname, ctxt)
+  | Int_t tname ->
+      ok (Int_key tname, ctxt)
+  | Nat_t tname ->
+      ok (Nat_key tname, ctxt)
+  | Signature_t tname ->
+      ok (Signature_key tname, ctxt)
+  | String_t tname ->
+      ok (String_key tname, ctxt)
+  | Bytes_t tname ->
+      ok (Bytes_key tname, ctxt)
+  | Mutez_t tname ->
+      ok (Mutez_key tname, ctxt)
+  | Bool_t tname ->
+      ok (Bool_key tname, ctxt)
+  | Key_hash_t tname ->
+      ok (Key_hash_key tname, ctxt)
+  | Key_t tname ->
+      ok (Key_key tname, ctxt)
+  | Timestamp_t tname ->
+      ok (Timestamp_key tname, ctxt)
+  | Address_t tname ->
+      ok (Address_key tname, ctxt)
+  | Chain_id_t tname ->
+      ok (Chain_id_key tname, ctxt)
+  | Pair_t ((l, al, _), (r, ar, _), pname) ->
+      comparable_ty_of_ty ctxt loc l
+      >>? fun (lty, ctxt) ->
+      comparable_ty_of_ty ctxt loc r
+      >|? fun (rty, ctxt) -> (Pair_key ((lty, al), (rty, ar), pname), ctxt)
+  | Union_t ((l, al), (r, ar), tname) ->
+      comparable_ty_of_ty ctxt loc l
+      >>? fun (lty, ctxt) ->
+      comparable_ty_of_ty ctxt loc r
+      >|? fun (rty, ctxt) -> (Union_key ((lty, al), (rty, ar), tname), ctxt)
+  | Option_t (tt, tname) ->
+      comparable_ty_of_ty ctxt loc tt
+      >|? fun (ty, ctxt) -> (Option_key (ty, tname), ctxt)
+  | Lambda_t _
+  | List_t _
+  | Ticket_t _
+  | Set_t _
+  | Map_t _
+  | Big_map_t _
+  | Contract_t _
+  | Operation_t _
+  | Bls12_381_fr_t _
+  | Bls12_381_g1_t _
+  | Bls12_381_g2_t _
+  | Sapling_state_t _
+  | Sapling_transaction_t _ ->
+      serialize_ty_for_error ctxt ty
+      >>? fun (t, _ctxt) -> error (Comparable_type_expected (loc, t))
 
 let rec unparse_stack :
     type a.
@@ -4900,20 +4882,14 @@ and parse_instr :
       >>?= fun annot ->
       typed ctxt loc Not_nat (Item_t (Int_t None, rest, annot))
   (* comparison *)
-  | (Prim (loc, I_COMPARE, [], annot), Item_t (t1, Item_t (t2, rest, _), _))
-    -> (
+  | (Prim (loc, I_COMPARE, [], annot), Item_t (t1, Item_t (t2, rest, _), _)) ->
       parse_var_annot loc annot
       >>?= fun annot ->
       check_item_ty ctxt t1 t2 loc I_COMPARE 1 2
       >>?= fun (Eq, t, ctxt) ->
-      (* gas for [comparable_ty_of_ty_no_gas] is somehow already counted in
-         [check_item_ty] because it traverses the types to merge them *)
-      match comparable_ty_of_ty_no_gas t with
-      | None ->
-          serialize_ty_for_error ctxt t
-          >>?= fun (t, _ctxt) -> fail (Comparable_type_expected (loc, t))
-      | Some key ->
-          typed ctxt loc (Compare key) (Item_t (Int_t None, rest, annot)) )
+      comparable_ty_of_ty ctxt loc t
+      >>?= fun (key, ctxt) ->
+      typed ctxt loc (Compare key) (Item_t (Int_t None, rest, annot))
   (* comparators *)
   | (Prim (loc, I_EQ, [], annot), Item_t (Int_t _, rest, _)) ->
       parse_var_annot loc annot
@@ -5317,16 +5293,12 @@ and parse_instr :
         (Item_t (Bool_t None, rest, annot))
   (* Tickets *)
   | (Prim (loc, I_TICKET, [], annot), Item_t (t, Item_t (Nat_t _, rest, _), _))
-    -> (
+    ->
       parse_var_annot loc annot
       >>?= fun annot ->
-      (* TODO: carbonated this *)
-      match comparable_ty_of_ty_no_gas t with
-      | None ->
-          serialize_ty_for_error ctxt t
-          >>?= fun (t, _ctxt) -> fail (Comparable_type_expected (loc, t))
-      | Some ty ->
-          typed ctxt loc Ticket (Item_t (Ticket_t (ty, None), rest, annot)) )
+      comparable_ty_of_ty ctxt loc t
+      >>?= fun (ty, ctxt) ->
+      typed ctxt loc Ticket (Item_t (Ticket_t (ty, None), rest, annot))
   | ( Prim (loc, I_READ_TICKET, [], annot),
       (Item_t (Ticket_t (t, _), _, _) as full_stack) ) ->
       parse_var_annot loc annot
