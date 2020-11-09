@@ -723,6 +723,9 @@ module Cost_of = struct
        This is the cost of one iteration of unparse_ty, extracted by hand from the
        parameter fit for the UNPARSE_TYPE benchmark. *)
     let cost_UNPARSE_TYPE = Z.of_int 185
+
+    (* TODO: benchmark *)
+    let cost_COMPARABLE_TY_OF_TY = Z.of_int 120
   end
 
   module Interpreter = struct
@@ -1311,6 +1314,8 @@ module Cost_of = struct
     let parse_instr_cycle = atomic_step_cost cost_TYPECHECKING_CODE
 
     let parse_data_cycle = atomic_step_cost cost_TYPECHECKING_DATA
+
+    let comparable_ty_of_ty_cycle = atomic_step_cost cost_COMPARABLE_TY_OF_TY
 
     (* Cost of a cycle of checking that a type is dupable *)
     (* TODO: bench *)
