@@ -60,9 +60,9 @@ let run state ~node_exec ~client_exec ~primary_history_mode
   let pp_hm = function
     | Some `Archive ->
         "archive"
-    | Some `Full ->
+    | Some (`Full _) ->
         "full"
-    | Some `Rolling ->
+    | Some (`Rolling _) ->
         "rolling"
     | None ->
         "full"
@@ -116,15 +116,15 @@ let run state ~node_exec ~client_exec ~primary_history_mode
   ( match primary_history_mode with
   | `Archive ->
       return ()
-  | `Rolling ->
+  | `Rolling _ ->
       let caboose_level = Jqo.(get_int @@ field ~k:"caboose" json) in
       if not (caboose_level > starting_level) then
         fail
           (`Scenario_error
             "Caboose level is lower or equal to the starting level")
       else return ()
-  | `Full ->
-      let save_point_level = Jqo.(get_int @@ field ~k:"save_point" json) in
+  | `Full _ ->
+      let save_point_level = Jqo.(get_int @@ field ~k:"savepoint" json) in
       if not (save_point_level > starting_level) then
         fail
           (`Scenario_error
@@ -208,7 +208,7 @@ let cmd () =
   let open Term in
   let pp_error = Test_command_line.Common_errors.pp in
   let hm_arg =
-    Arg.enum [("archive", `Archive); ("full", `Full); ("rolling", `Rolling)]
+    Arg.enum [("archive", `Archive); ("full", `Full 5); ("rolling", `Rolling 5)]
   in
   let base_state =
     Test_command_line.Command_making_state.make
@@ -241,7 +241,7 @@ let cmd () =
     $ Tezos_executable.cli_term base_state `Client "tezos"
     $ Arg.(
         value
-        & opt hm_arg `Full
+        & opt hm_arg (`Full 5)
         & info
             ["primary-history-mode"]
             ~docv:"STRING"
@@ -252,7 +252,7 @@ let cmd () =
                  number_of_lonely_bakes))
     $ Arg.(
         value
-        & opt hm_arg `Full
+        & opt hm_arg (`Full 5)
         & info
             ["secondary-history-mode"]
             ~docv:"STRING"
