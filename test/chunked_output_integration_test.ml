@@ -23,13 +23,31 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let () = Printexc.record_backtrace true
+
 open Lwt.Infix
 module Encoding = Resto_json.Encoding
 module Service = Resto.MakeService (Encoding)
 module Directory = Resto_directory.Make (Encoding)
 module Media_type = Resto_cohttp.Media_type.Make (Encoding)
 
-let json =
+(* This tests that the server and client of resto manage to communicate even
+   when the output is chunked. *)
+
+let seqing chunk_size s =
+  let b = Bytes.unsafe_of_string s in
+  let rec aux offset () =
+    if offset + chunk_size > Bytes.length b then
+      Seq.Cons ((b, offset, Bytes.length b - offset), Seq.empty)
+    else Seq.Cons ((b, offset, chunk_size), aux (offset + chunk_size))
+  in
+  aux 0
+
+let json chunk_size =
+  let construct enc v =
+    Ezjsonm.value_to_string @@ Json_repr.Ezjsonm.repr
+    @@ Json_encoding.construct enc v
+  in
   {
     Media_type.name = Cohttp.Accept.MediaType ("application", "json");
     q = Some 1000;
@@ -37,17 +55,11 @@ let json =
       (fun _enc ppf raw ->
         let json = Ezjsonm.from_string raw in
         Format.fprintf ppf "%s" (Ezjsonm.to_string json));
-    construct =
-      (fun enc v ->
-        Ezjsonm.value_to_string @@ Json_repr.Ezjsonm.repr
-        @@ Json_encoding.construct enc v);
+    construct;
     construct_seq =
       (fun enc v ->
-        let item =
-          Ezjsonm.value_to_string @@ Json_repr.Ezjsonm.repr
-          @@ Json_encoding.construct enc v
-        in
-        Seq.return (Bytes.of_string item, 0, String.length item));
+        let item = construct enc v in
+        seqing chunk_size item);
     destruct =
       (fun enc body ->
         let json = Ezjsonm.from_string body in
@@ -55,7 +67,7 @@ let json =
         with exc -> Error (Printexc.to_string exc));
   }
 
-let media_types = [json]
+let media_types chunk_size = [json chunk_size]
 
 module Logger : Resto_cohttp_server.Server.LOGGING = struct
   let debug fmt = Format.kasprintf (Format.printf "[DEBUG]: %s\n%!") fmt
@@ -84,6 +96,10 @@ module Logger : Resto_cohttp_server.Server.LOGGING = struct
     Format.kasprintf Lwt_fmt.(fprintf stderr "[ERROR]: %s\n%!") fmt
 end
 
+let kv_list_encoding =
+  let open Json_encoding in
+  list (tup2 string int32)
+
 let foo_bar =
   let open Resto.Path in
   List.fold_left add_suffix root ["foo"; "bar"]
@@ -91,9 +107,11 @@ let foo_bar =
 let get_foo_bar =
   Service.get_service
     ~query:Resto.Query.empty
-    ~output:Encoding.unit
+    ~output:kv_list_encoding
     ~error:Encoding.unit
     foo_bar
+
+let val_foo_bar = []
 
 let foo_blah =
   let open Resto.Path in
@@ -102,9 +120,11 @@ let foo_blah =
 let get_foo_blah =
   Service.get_service
     ~query:Resto.Query.empty
-    ~output:Encoding.unit
+    ~output:kv_list_encoding
     ~error:Encoding.unit
     foo_blah
+
+let val_foo_blah = List.init 10 (fun i -> (string_of_int i, Int32.of_int i))
 
 let bwraf =
   let open Resto.Path in
@@ -114,23 +134,36 @@ let post_bwraf =
   Service.post_service
     ~query:Resto.Query.empty
     ~input:Encoding.unit
-    ~output:Encoding.unit
+    ~output:kv_list_encoding
     ~error:Encoding.unit
     bwraf
+
+let val_bwraf top = List.init top (fun i -> (string_of_int i, Int32.of_int i))
 
 let directory =
   let open Directory in
   let dir = empty in
-  let dir = register0 dir get_foo_bar (fun () () -> Lwt.return @@ `Ok ()) in
-  let dir = register0 dir get_foo_blah (fun () () -> Lwt.return @@ `Ok ()) in
-  let dir = register0 dir post_bwraf (fun () () -> Lwt.return @@ `Ok ()) in
+  let dir =
+    register0 dir get_foo_bar (fun () () -> Lwt.return @@ `OkChunk val_foo_bar)
+  in
+  let dir =
+    register0 dir get_foo_blah (fun () () ->
+        Lwt.return @@ `OkChunk val_foo_blah)
+  in
+  let dir =
+    register0 dir post_bwraf (fun () () ->
+        Lwt.return @@ `OkChunk (val_bwraf 7))
+  in
   dir
 
-let port = 8000
+let port = 8001
 
-let uri = "http://localhost:8000"
+let uri = "http://localhost:8001"
 
-let child expect_foo_bar expect_foo_blah expect_bwraf =
+let is_ok_result r v =
+  match r with `Ok (Some w) -> assert (v = w) | _ -> assert false
+
+let child () =
   let module Client =
     Resto_cohttp_client.Client.Make
       (Encoding)
@@ -138,94 +171,53 @@ let child expect_foo_bar expect_foo_blah expect_bwraf =
   in
   let logger = Client.full_logger Format.err_formatter in
   let base = Uri.of_string uri in
+  let media_types = media_types 1 in
   let open Lwt.Infix in
   Client.call_service media_types ~base ~logger get_foo_bar () () ()
   >>= fun (_, _, r) ->
-  assert (r = expect_foo_bar) ;
+  is_ok_result r val_foo_bar ;
   Client.call_service media_types ~base ~logger get_foo_blah () () ()
   >>= fun (_, _, r) ->
-  assert (r = expect_foo_blah) ;
+  is_ok_result r val_foo_blah ;
   Client.call_service media_types ~base ~logger post_bwraf () () ()
   >>= fun (_, _, r) ->
-  assert (r = expect_bwraf) ;
+  is_ok_result r (val_bwraf 7) ;
   Stdlib.exit 0
-
-let parent pid =
-  Lwt_unix.waitpid [] pid
-  >>= function (_, WEXITED 0) -> Lwt.return () | _ -> assert false
 
 module Server = Resto_cohttp_server.Server.Make (Encoding) (Logger)
 
-(* A signal setup with both soft and hard exits to test both behaviours *)
-let main () =
-  (* set up and start the server *)
-  let open Lwt.Infix in
+let parent pid chunk_size =
+  let media_types = media_types chunk_size in
   Server.launch ~media_types (`TCP (`Port port)) directory
   >>= fun server ->
-  (* first test *)
-  Server.set_acl server
-  @@ Resto_acl.Acl.Allow_all
-       {except = [{meth = Any; path = Exact [Literal "foo"; Wildcard]}]} ;
-  ( match Lwt_unix.fork () with
-  | 0 ->
-      Lwt_unix.sleep 1.0
-      >>= fun () ->
-      child (`Unauthorized None) (`Unauthorized None) (`Ok (Some ()))
-  | pid ->
-      parent pid )
+  ignore server ;
+  Lwt_unix.waitpid [] pid
+  >>= function (_, WEXITED 0) -> Lwt.return () | _ -> assert false
+
+let test_one_size chunk_size =
+  match Lwt_unix.fork () with
+  | 0 -> (
+    match Lwt_unix.fork () with
+    | 0 ->
+        Lwt_unix.sleep 2.0 (* leave time for the server to start *)
+        >>= fun () -> child ()
+    | pid ->
+        parent pid chunk_size )
+  | pid -> (
+      Lwt_unix.waitpid [] pid
+      >>= function (_, WEXITED 0) -> Lwt.return () | _ -> assert false )
+
+let main () =
+  (* test smaller and smaller, more and more numerous chunks *)
+  let open Lwt.Infix in
+  Printf.printf "Testing chunking with size %d\n%!" (16 * 1024) ;
+  test_one_size (16 * 1024)
   >>= fun () ->
-  (* second test *)
-  Server.set_acl server
-  @@ Resto_acl.Acl.Deny_all
-       {except = [{meth = Any; path = FollowedByAnySuffix [Literal "foo"]}]} ;
-  ( match Lwt_unix.fork () with
-  | 0 ->
-      Lwt_unix.sleep 1.0
-      >>= fun () -> child (`Ok (Some ())) (`Ok (Some ())) (`Unauthorized None)
-  | pid ->
-      parent pid )
+  Printf.printf "Testing chunking with size %d\n%!" 64 ;
+  test_one_size 64
   >>= fun () ->
-  (* third test *)
-  Server.set_acl server
-  @@ Resto_acl.Acl.Deny_all
-       {
-         except =
-           [ {meth = Exact `GET; path = FollowedByAnySuffix [Literal "foo"]};
-             {meth = Exact `DELETE; path = FollowedByAnySuffix []} ];
-       } ;
-  ( match Lwt_unix.fork () with
-  | 0 ->
-      Lwt_unix.sleep 1.0
-      >>= fun () -> child (`Ok (Some ())) (`Ok (Some ())) (`Unauthorized None)
-  | pid ->
-      parent pid )
-  >>= fun () ->
-  (* fourth test *)
-  Server.set_acl server
-  @@ Resto_acl.Acl.Deny_all
-       {
-         except =
-           [ {
-               meth = Exact `POST;
-               path =
-                 FollowedByAnySuffix
-                   [ Literal "blue";
-                     Literal "white";
-                     Wildcard;
-                     Wildcard;
-                     Literal "fuchsia" ];
-             } ];
-       } ;
-  ( match Lwt_unix.fork () with
-  | 0 ->
-      Lwt_unix.sleep 1.0
-      >>= fun () ->
-      child (`Unauthorized None) (`Unauthorized None) (`Ok (Some ()))
-  | pid ->
-      parent pid )
-  >>= fun () ->
-  (* end of tests *)
-  Lwt.return ()
+  Printf.printf "Testing chunking with size %d\n%!" 1 ;
+  test_one_size 1 >>= fun () -> Lwt.return_unit
 
 let () =
   Lwt_main.run @@ main () ;

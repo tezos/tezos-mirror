@@ -33,6 +33,18 @@
   (run %{exe:acl_integration_test.exe})))
 
 (executable
+ (name chunked_output_integration_test)
+ (modules chunked_output_integration_test)
+ (libraries lwt lwt.unix json-data-encoding ezjsonm cohttp cohttp-lwt
+   cohttp-lwt-unix resto-json resto resto-acl resto-cohttp-server
+   resto-cohttp-client))
+
+(alias
+ (name runtest_chunked_output_integration_test)
+ (action
+  (run %{exe:chunked_output_integration_test.exe})))
+
+(executable
  (name resto_test)
  (modules directory resto_test services)
  (libraries resto-directory resto-json json-data-encoding
@@ -62,4 +74,5 @@
   (alias runtest_ezresto)
   (alias runtest_acl_unit_test)
   (alias runtest_acl_integration_test)
-  (alias runtest_self_serving_client)))
+  (alias runtest_self_serving_client)
+  (alias runtest_chunked_output_integration_test)))

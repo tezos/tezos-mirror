@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*  Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,6 +26,33 @@
 
 open Lwt.Infix
 module ConnectionMap = Map.Make (Cohttp.Connection)
+
+let ( >>? ) v f =
+  match v with Ok x -> f x | Error err -> Lwt.return_error err
+
+let lwt_return_ok_response r = Lwt.return_ok (`Response r)
+
+let lwt_return_response r = Lwt.return (`Response r)
+
+let wchunk oc (item, offset, length) =
+  if length = 0 then Lwt.return_unit
+  else
+    Lwt_io.fprintf oc "%X\r\n" length
+    >>= fun () ->
+    Lwt_io.write_from_exactly oc item offset length
+    >>= fun () ->
+    Lwt_io.write_from_string_exactly oc "\r\n" 0 2
+    >>= fun () -> Lwt_io.flush oc
+
+let rec wseq ic oc seq =
+  match seq () with
+  | Seq.Nil ->
+      Lwt_io.write_from_string_exactly oc "0\r\n\r\n" 0 5
+      >>= fun () -> Lwt_io.flush oc >>= fun () -> Lwt_io.close ic
+  | Seq.Cons (chunk, seq) ->
+      wchunk oc chunk
+      >>= fun () ->
+      Lwt.pause () >>= fun () -> (wseq [@ocaml.tailcall]) ic oc seq
 
 module type LOGGING = sig
   val debug : ('a, Format.formatter, unit, unit) format4 -> 'a
@@ -120,8 +148,7 @@ module Make_selfserver (Encoding : Resto.ENCODING) = struct
           (Format.asprintf "X-%s-CORS-Error" agent)
           "invalid host"
       in
-      Lwt.return_ok
-        (Response.make ~headers ~status:`Forbidden (), Cohttp_lwt.Body.empty)
+      (Response.make ~headers ~status:`Forbidden (), Cohttp_lwt.Body.empty)
 
     let handle_error medias
         (error :
@@ -192,9 +219,8 @@ module Make_selfserver (Encoding : Resto.ENCODING) = struct
       | `Ok o ->
           let body = output o in
           let encoding = Transfer.Fixed (Int64.of_int (String.length body)) in
-          Lwt.return_ok
-            ( Response.make ~status:`OK ~encoding ?headers (),
-              Cohttp_lwt.Body.of_string body )
+          ( Response.make ~status:`OK ~encoding ?headers (),
+            Cohttp_lwt.Body.of_string body )
       | `Created s ->
           let headers = Header.init () in
           let headers =
@@ -204,35 +230,41 @@ module Make_selfserver (Encoding : Resto.ENCODING) = struct
             | Some s ->
                 Header.add headers "location" s
           in
-          Lwt.return_ok
-            (Response.make ~status:`Created ~headers (), Cohttp_lwt.Body.empty)
+          (Response.make ~status:`Created ~headers (), Cohttp_lwt.Body.empty)
       | `No_content ->
-          Lwt.return_ok
-            (Response.make ~status:`No_content (), Cohttp_lwt.Body.empty)
+          (Response.make ~status:`No_content (), Cohttp_lwt.Body.empty)
       | `Unauthorized e ->
           let (body, encoding) = error e in
           let status = `Unauthorized in
-          Lwt.return_ok (Response.make ~status ~encoding ?headers (), body)
+          (Response.make ~status ~encoding ?headers (), body)
       | `Forbidden e ->
           let (body, encoding) = error e in
           let status = `Forbidden in
-          Lwt.return_ok (Response.make ~status ~encoding ?headers (), body)
+          (Response.make ~status ~encoding ?headers (), body)
       | `Gone e ->
           let (body, encoding) = error e in
           let status = `Gone in
-          Lwt.return_ok (Response.make ~status ~encoding ?headers (), body)
+          (Response.make ~status ~encoding ?headers (), body)
       | `Not_found e ->
           let (body, encoding) = error e in
           let status = `Not_found in
-          Lwt.return_ok (Response.make ~status ~encoding ?headers (), body)
+          (Response.make ~status ~encoding ?headers (), body)
       | `Conflict e ->
           let (body, encoding) = error e in
           let status = `Conflict in
-          Lwt.return_ok (Response.make ~status ~encoding ?headers (), body)
+          (Response.make ~status ~encoding ?headers (), body)
       | `Error e ->
           let (body, encoding) = error e in
           let status = `Internal_server_error in
-          Lwt.return_ok (Response.make ~status ~encoding ?headers (), body)
+          (Response.make ~status ~encoding ?headers (), body)
+
+    let handle_rpc_answer_chunk ?headers output_seq answer =
+      match answer with
+      | `OkChunk o ->
+          let body = output_seq o in
+          let encoding = Transfer.Chunked in
+          ( Response.make ~status:`OK ~encoding ?headers (),
+            fun ic oc -> wseq ic oc body )
 
     let handle_options root cors headers path =
       let origin_header = Header.get headers "origin" in
@@ -297,9 +329,6 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
     server.streams <- ConnectionMap.add con shutdown server.streams ;
     stream
 
-  let ( >>? ) v f =
-    match v with Ok x -> f x | Error err -> Lwt.return_error err
-
   let callback server ((_io, con) : Cohttp_lwt_unix.Server.conn) req body =
     let uri = Request.uri req in
     let path = Uri.path uri in
@@ -309,7 +338,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
     let req_headers = Request.headers req in
     ( match Request.meth req with
     | #Resto.meth when Handlers.invalid_cors server.cors req_headers ->
-        Handlers.invalid_cors_response server.agent
+        lwt_return_ok_response @@ Handlers.invalid_cors_response server.agent
     | #Resto.meth as meth -> (
         Directory.lookup server.root () meth path
         >>=? fun (Directory.Service s) ->
@@ -363,6 +392,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
                   s.handler query body >>= Lwt.return_ok ) )
         >>=? fun answer ->
         let output = output_media_type.construct s.types.output
+        and output_seq = output_media_type.construct_seq s.types.output
         and error = function
           | None ->
               (Cohttp_lwt.Body.empty, Transfer.Fixed 0L)
@@ -381,28 +411,38 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
           | `Not_found _
           | `Conflict _
           | `Error _ ) as a ->
-            Handlers.handle_rpc_answer ~headers output error a
+            lwt_return_ok_response
+            @@ Handlers.handle_rpc_answer ~headers output error a
+        | `OkChunk _ as a ->
+            Lwt.return_ok
+              (`Expert
+                (Handlers.handle_rpc_answer_chunk ~headers output_seq a))
         | `OkStream o ->
             let body = create_stream server con output o in
             let encoding = Transfer.Chunked in
-            Lwt.return_ok
+            lwt_return_ok_response
               ( Response.make ~status:`OK ~encoding ~headers (),
                 Cohttp_lwt.Body.of_stream body ) )
     | `HEAD ->
         (* TODO ??? *)
         Lwt.return_error `Not_implemented
-    | `OPTIONS ->
+    | `OPTIONS -> (
         Handlers.handle_options server.root server.cors req_headers path
         >>= fun res ->
         lwt_log_info "(%s) RPC preflight" (Connection.to_string con)
-        >>= fun () -> Lwt.return res
+        >>= fun () ->
+        match res with
+        | Ok res ->
+            lwt_return_ok_response res
+        | Error _ as e ->
+            Lwt.return e )
     | _ ->
         Lwt.return_error `Not_implemented )
     >>= function
     | Ok answer ->
         Lwt.return answer
     | Error err ->
-        Lwt.return @@ Handlers.handle_error server.medias err
+        lwt_return_response @@ Handlers.handle_error server.medias err
 
   (* Promise a running RPC server. *)
 
@@ -451,7 +491,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
              | Not_found ->
                  let status = `Not_found in
                  let body = Cohttp_lwt.Body.empty in
-                 Lwt.return (Response.make ~status (), body)
+                 Lwt.return (`Response (Response.make ~status (), body))
              | exn ->
                  let headers = Header.init () in
                  let headers =
@@ -461,14 +501,15 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
                  let body =
                    Cohttp_lwt.Body.of_string (Printexc.to_string exn)
                  in
-                 Lwt.return (Response.make ~status ~headers (), body))
+                 Lwt.return
+                   (`Response (Response.make ~status ~headers (), body)))
        in
        Cohttp_lwt_unix.Server.create
          ~stop
          ~ctx
          ~mode
          ~on_exn
-         (Cohttp_lwt_unix.Server.make ~callback ~conn_closed ())) ;
+         (Cohttp_lwt_unix.Server.make_response_action ~callback ~conn_closed ())) ;
     lwt_log_info "Server started (agent: %s)" server.agent
     >>= fun () -> Lwt.return server
 

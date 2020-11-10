@@ -34,6 +34,16 @@ include Resto_directory.Make (Encoding)
 module Service = MakeService (Resto_json.Encoding)
 open Service
 
+let seqing s =
+  let chunk_size = 32 in
+  let b = Bytes.unsafe_of_string s in
+  let rec aux offset () =
+    if offset + chunk_size > Bytes.length b then
+      Seq.Cons ((b, offset, Bytes.length b - offset), Seq.empty)
+    else Seq.Cons ((b, offset, chunk_size), aux (offset + chunk_size))
+  in
+  aux 0
+
 let json : Media_type.t =
   let to_string ?(newline = false) ?minify j =
     Format.asprintf
@@ -51,6 +61,10 @@ let json : Media_type.t =
     | _ ->
         Error "Malformed value"
   in
+  let construct enc v =
+    let x : Json_repr.ezjsonm = Json_encoding.construct enc v in
+    to_string ~newline:true ~minify:true x
+  in
   {
     name = Cohttp.Accept.MediaType ("application", "json");
     q = Some 1000;
@@ -66,10 +80,8 @@ let json : Media_type.t =
               raw
         | Ok json ->
             Json_repr.(pp (module Ezjsonm) ppf json));
-    construct =
-      (fun enc v ->
-        let x : Json_repr.ezjsonm = Json_encoding.construct enc v in
-        to_string ~newline:true ~minify:true x);
+    construct;
+    construct_seq = (fun enc v -> seqing @@ construct enc v);
     destruct =
       (fun enc body ->
         match from_string body with

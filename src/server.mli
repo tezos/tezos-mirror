@@ -100,8 +100,7 @@ module Make_selfserver (Encoding : Resto.ENCODING) : sig
   module Handlers : sig
     val invalid_cors : Resto_cohttp.Cors.t -> Cohttp.Header.t -> bool
 
-    val invalid_cors_response :
-      string -> (Cohttp.Response.t * Cohttp_lwt.Body.t, 'a) Result.result Lwt.t
+    val invalid_cors_response : string -> Cohttp.Response.t * Cohttp_lwt.Body.t
 
     val handle_error :
       Media.medias ->
@@ -128,7 +127,14 @@ module Make_selfserver (Encoding : Resto.ENCODING) : sig
       | `Not_found of 'e
       | `Ok of 'o
       | `Unauthorized of 'e ] ->
-      (Cohttp.Response.t * Cohttp_lwt.Body.t, 'c) Result.result Lwt.t
+      Cohttp_lwt_unix.Response.t * Cohttp_lwt.Body.t
+
+    val handle_rpc_answer_chunk :
+      ?headers:Cohttp.Header.t ->
+      ('o -> (bytes * int * int) Seq.t) ->
+      [< `OkChunk of 'o] ->
+      Cohttp_lwt_unix.Response.t
+      * ('d Lwt_io.channel -> Lwt_io.output_channel -> unit Lwt.t)
 
     val handle_options :
       unit Directory.t ->

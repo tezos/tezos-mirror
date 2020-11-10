@@ -103,7 +103,18 @@ module Make (Encoding : Resto.ENCODING) = struct
               | `Not_found _
               | `Conflict _
               | `Error _ ) as a ->
-                Server.Handlers.handle_rpc_answer ~headers output error a
+                Lwt.return_ok
+                @@ Server.Handlers.handle_rpc_answer ~headers output error a
+            | `OkChunk v ->
+                (* When in self-serving mode, there is no point in
+                   constructing a sequence just to mash it all together, we
+                   ignore Chunk *)
+                Lwt.return_ok
+                @@ Server.Handlers.handle_rpc_answer
+                     ~headers
+                     output
+                     error
+                     (`Ok v)
             | `OkStream o ->
                 let body = create_stream output o in
                 let encoding = Cohttp.Transfer.Chunked in
@@ -118,7 +129,7 @@ module Make (Encoding : Resto.ENCODING) = struct
         let headers = Option.value headers ~default:(Cohttp.Header.init ()) in
         ( match meth with
         | #Resto.meth when Server.Handlers.invalid_cors server.cors headers ->
-            Server.Handlers.invalid_cors_response server.agent
+            Lwt.return_ok (Server.Handlers.invalid_cors_response server.agent)
         | #Resto.meth as meth ->
             call ~headers ?body meth uri path
         | `OPTIONS ->

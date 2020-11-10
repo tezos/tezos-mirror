@@ -1,6 +1,7 @@
 (**************************************************************************)
 (*  resto                                                                 *)
 (*  Copyright (C) 2016, OCamlPro.                                         *)
+(*  Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>            *)
 (*                                                                        *)
 (*    All rights reserved.  This file is distributed under the terms      *)
 (*    of the GNU Lesser General Public License version 2.1, with the      *)
@@ -20,6 +21,7 @@ module Answer = struct
   (** Return type for service handler *)
   type ('o, 'e) t =
     [ `Ok of 'o (* 200 *)
+    | `OkChunk of 'o (* 200 *)
     | `OkStream of 'o stream (* 200 *)
     | `Created of string option (* 201 *)
     | `No_content (* 204 *)

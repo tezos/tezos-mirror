@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*  Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -127,6 +128,7 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) = struct
         (fun _enc ppf s ->
           Format.fprintf ppf "@[<h 0>%a@]" Format.pp_print_text s);
       construct = (fun _ -> assert false);
+      construct_seq = (fun _ -> assert false);
       destruct = (fun _ -> assert false);
     }
 

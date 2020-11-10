@@ -1,6 +1,7 @@
 (**************************************************************************)
 (*  resto                                                                 *)
 (*  Copyright (C) 2016, OCamlPro.                                         *)
+(*  Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>            *)
 (*                                                                        *)
 (*    All rights reserved.  This file is distributed under the terms      *)
 (*    of the GNU Lesser General Public License version 2.1, with the      *)
@@ -16,6 +17,7 @@ module Make (Encoding : Resto.ENCODING) = struct
     q : int option;
     pp : 'a. 'a Encoding.t -> Format.formatter -> string -> unit;
     construct : 'a. 'a Encoding.t -> 'a -> string;
+    construct_seq : 'a. 'a Encoding.t -> 'a -> (Bytes.t * int * int) Seq.t;
     destruct : 'a. 'a Encoding.t -> string -> ('a, string) result;
   }
 

@@ -1,6 +1,7 @@
 (**************************************************************************)
 (*  resto                                                                 *)
 (*  Copyright (C) 2016, OCamlPro.                                         *)
+(*  Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>            *)
 (*                                                                        *)
 (*    All rights reserved.  This file is distributed under the terms      *)
 (*    of the GNU Lesser General Public License version 2.1, with the      *)
@@ -14,9 +15,22 @@ open EzResto
     [Server]) that reply to requests for all their registered services. *)
 
 module Answer : sig
-  (** Return type for service handler *)
+  (** Return type for service handler
+
+      Note about the three distinct [300]-code constructor:
+      - [`Ok] is for RPCs that return a value that the server should encode as
+        one blob of data. This should be the most common answer for successful
+        returns of simple, reasonably-sized values.
+      - [`OkChunk] is for RPCs that return a value that the server should encode
+        as chunks: multiple blobs, the concatenation of which represents the
+        data. This should be reserved for values that can be fairly large
+        (typically over 4Kb, but this threshold may vary depending on your
+        setup). Data is then transfered using chunked transfer encoding.
+      - [`OkStream] is for RPCs that return a stream of values, not all of which
+        are determined at the time of call. *)
   type ('o, 'e) t =
     [ `Ok of 'o (* 200 *)
+    | `OkChunk of 'o (* 200 *)
     | `OkStream of 'o stream (* 200 *)
     | `Created of string option (* 201 *)
     | `No_content (* 204 *)
