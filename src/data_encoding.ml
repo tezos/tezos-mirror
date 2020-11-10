@@ -135,7 +135,12 @@ end
 include Encoding
 module With_version = With_version
 module Registration = Registration
-module Json = Json
+
+module Json = struct
+  include Json
+  include Json_stream
+end
+
 module Bson = Bson
 module Binary_schema = Binary_schema
 

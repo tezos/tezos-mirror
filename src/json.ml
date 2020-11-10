@@ -394,6 +394,19 @@ include Json_encoding
 
 let construct e v = construct (get_json e) v
 
+type jsonm_lexeme =
+  [ `Null
+  | `Bool of bool
+  | `String of string
+  | `Float of float
+  | `Name of string
+  | `As
+  | `Ae
+  | `Os
+  | `Oe ]
+
+let construct_seq e v = construct_seq (get_json e) v
+
 let destruct e v = destruct (get_json e) v
 
 let schema ?definitions_path e = schema ?definitions_path (get_json e)

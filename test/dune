@@ -1,11 +1,13 @@
 (executables
- (names test test_generated bench_data_encoding)
+ (names test test_generated test_json_stream test_json_stream_sizes
+   bench_data_encoding)
  (libraries data_encoding alcotest crowbar)
  (flags :standard))
 
 (alias
  (name buildtest)
- (deps test.exe test_generated.exe bench_data_encoding.exe))
+ (deps test.exe test_generated.exe test_json_stream.exe
+   test_json_stream_sizes.exe bench_data_encoding.exe))
 
 (alias
  (name runtest_test)
@@ -18,10 +20,22 @@
   (run %{exe:test_generated.exe})))
 
 (alias
+ (name runtest_test_json_stream)
+ (action
+  (run %{exe:test_json_stream.exe})))
+
+(alias
+ (name runtest_test_json_stream_sizes)
+ (action
+  (run %{exe:test_json_stream_sizes.exe})))
+
+(alias
  (name runtest)
  (deps
   (alias runtest_test)
-  (alias runtest_test_generated)))
+  (alias runtest_test_generated)
+  (alias runtest_test_json_stream)
+  (alias runtest_test_json_stream_sizes)))
 
 (alias
  (name run_bench)

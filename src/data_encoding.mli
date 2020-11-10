@@ -804,6 +804,68 @@ module Json : sig
   (** Construct a JSON object from an encoding. *)
   val construct : 't Encoding.t -> 't -> json
 
+  type jsonm_lexeme =
+    [ `Null
+    | `Bool of bool
+    | `String of string
+    | `Float of float
+    | `Name of string
+    | `As
+    | `Ae
+    | `Os
+    | `Oe ]
+
+  (** [construct_seq enc t] is a representation of [t] as a sequence of json
+      lexeme ([jsonm_lexeme Seq.t]). This sequence is lazy: lexemes are computed
+      on-demand. *)
+  val construct_seq : 't Encoding.t -> 't -> jsonm_lexeme Seq.t
+
+  (** [string_seq_of_jsonm_lexeme_seq ~newline ~chunk_size_hint s] is a sequence
+      of strings, the concatenation of which is a valid textual representation
+      of the json value represented by [s]. Each string chunk is roughly
+      [chunk_size_hint] long (except the last one that may be shorter).
+
+      With the [newline] parameter set to [true], a single newline character is
+      appended to the textual representation.
+
+      Forcing one element of the resulting string sequence forces multiple
+      elements of the underlying lexeme sequence. Once enough lexemes have been
+      forced that roughly [chunk_size_hint] characters are needed to reprensent
+      them, the representation is returned and the rest of the sequence is held
+      lazily.
+
+      Note that most chunks split at a lexeme boundary. This may not be true for
+      string literals or float literals, the representation of which may be
+      spread across multiple chunks. *)
+  val string_seq_of_jsonm_lexeme_seq :
+    newline:bool -> chunk_size_hint:int -> jsonm_lexeme Seq.t -> string Seq.t
+
+  val small_string_seq_of_jsonm_lexeme_seq :
+    newline:bool -> jsonm_lexeme Seq.t -> string Seq.t
+
+  (** [blit_instructions_seq_of_jsonm_lexeme_seq ~newline ~buffer json]
+      is a sequence of [(buff, offset, length)] such that the concatenation of the
+      sub-strings thus designated represents the json value in text form.
+
+      @raise [Invalid_argument _] if [Bytes.length buffer] is less than 32.
+
+      The intended use is to blit each of the substring onto whatever output the
+      consumer decides. In most cases, the Sequence's [buff] is physically equal
+      to [buffer]. This is not always true and one cannot rely on that fact. E.g.,
+      when the json includes a long string literal, the function might instruct
+      the consumer to blit from that literal directly.
+
+      This function performs few allocations, especially of fresh strings.
+
+      Note that once the next element of the sequence is forced, the blit
+      instructions become invalid: the content of [buff] may have been rewritten
+      by the side effect of forcing the next element. *)
+  val blit_instructions_seq_of_jsonm_lexeme_seq :
+    newline:bool ->
+    buffer:bytes ->
+    jsonm_lexeme Seq.t ->
+    (Bytes.t * int * int) Seq.t
+
   (** Destruct a JSON object into a value.
       Fail with an exception if the JSON object and encoding do not match.. *)
   val destruct : 't Encoding.t -> json -> 't
