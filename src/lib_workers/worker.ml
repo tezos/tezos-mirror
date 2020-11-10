@@ -564,9 +564,9 @@ struct
       Lwt_canceler.cancel w.canceler
       >>= fun () ->
       w.status <- Closed (t0, Systime_os.now (), errs) ;
-      Nametbl.remove w.table.instances w.name ;
       Handlers.on_close w
       >>= fun () ->
+      Nametbl.remove w.table.instances w.name ;
       w.state <- None ;
       Lwt.ignore_result
         ( List.iter (fun (_, ring) -> Ringo.Ring.clear ring) w.event_log ;
