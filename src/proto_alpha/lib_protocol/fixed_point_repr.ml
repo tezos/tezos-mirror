@@ -100,11 +100,7 @@ module Make (Arg : Decimals) : Full = struct
 
   type 'a t = Z.t
 
-  (* FIXME Add [Z.pow] to the environment v1 *)
-  let rec z_pow v e =
-    if Compare.Int.(e = 0) then Z.one else Z.mul v (z_pow v (e - 1))
-
-  let scaling_factor = z_pow (Z.of_int 10) Arg.decimals
+  let scaling_factor = Z.pow (Z.of_int 10) Arg.decimals
 
   type fp = fp_tag t
 
@@ -114,8 +110,7 @@ module Make (Arg : Decimals) : Full = struct
 
   let integral_of_int int = integral @@ Z.of_int int
 
-  (* FIXME Add [Z.ediv] to the environment v1 *)
-  let integral_to_z x = Z.ediv_rem x scaling_factor |> fst
+  let integral_to_z x = Z.ediv x scaling_factor
 
   let unsafe_fp x = x
 
@@ -125,9 +120,8 @@ module Make (Arg : Decimals) : Full = struct
 
   let sub = Z.sub
 
-  (* FIXME Add [Z.erem] to the environment v1 *)
   let ceil x =
-    let r = Z.ediv_rem x scaling_factor |> snd in
+    let r = Z.erem x scaling_factor in
     if Z.equal r Z.zero then x else Z.add x (Z.sub scaling_factor r)
 
   let floor x =
