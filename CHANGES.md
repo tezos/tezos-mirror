@@ -33,6 +33,9 @@ here either.
 
 ## Codec
 
+- Fixed the name of the `big_map_diff` encoding from `<protocol_name>` to 
+  `<protocol_name>.contract.big_map_diff`.
+
 ## Docker Images
 
 ## Miscellaneous
