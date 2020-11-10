@@ -100,6 +100,7 @@ let register () =
         "alpha.block_header.raw";
         "alpha.block_header.unsigned";
         "alpha.contract";
+        "alpha.contract.big_map_diff";
         "alpha.cycle";
         "alpha.delegate.balance_updates";
         "alpha.delegate.frozen_balance";
