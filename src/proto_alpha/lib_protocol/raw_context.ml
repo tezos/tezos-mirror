@@ -60,8 +60,25 @@ type gas_counter_status =
    on-the-fly based on the current value of [gas_counter] and
    [gas_counter_status].
 
-*)
-type t = {
+   A layered context
+   =================
+
+   Updating the context [gas_counter] is a critical routine called
+   very frequently by the operations performed by the protocol.
+   On the contrary, other fields are less frequently updated.
+
+   In a previous version of the context datatype definition, all
+   the fields were represented at the toplevel. To update the
+   [gas_counter], we had to copy ~25 fields (that is 200 bytes).
+
+   With the following layered representation, we only have to
+   copy 2 fields (16 bytes) during [gas_counter] update. This
+   has a significant impact on the Michelson runtime efficiency.
+
+   Here are the fields on the [back] of the context:
+
+ *)
+type back = {
   context : Context.t;
   constants : Constants_repr.parametric;
   first_level : Raw_level_repr.t;
@@ -81,60 +98,150 @@ type t = {
   temporary_lazy_storage_ids : Lazy_storage_kind.Temp_ids.t;
   internal_nonce : int;
   internal_nonces_used : Int_set.t;
-  gas_counter : Gas_limit_repr.Arith.fp;
   gas_counter_status : gas_counter_status;
 }
 
-let update_gas_counter_status ctxt gas_counter_status =
-  {ctxt with gas_counter_status}
+(*
+
+   The context is simply a record with two fields which
+   limits the cost of updating the [gas_counter].
+
+*)
+type t = {gas_counter : Gas_limit_repr.Arith.fp; back : back}
 
 type context = t
 
 type root_context = t
 
-let current_level ctxt = ctxt.level
+(*
 
-let predecessor_timestamp ctxt = ctxt.predecessor_timestamp
+   Context fields accessors
+   ========================
 
-let current_timestamp ctxt = ctxt.timestamp
+   To have the context related code more robust to evolutions,
+   we introduce accessors to get and to update the context
+   components.
 
-let current_fitness ctxt = ctxt.fitness
+*)
+let[@inline] context ctxt = ctxt.back.context
 
-let first_level ctxt = ctxt.first_level
+let[@inline] current_level ctxt = ctxt.back.level
 
-let constants ctxt = ctxt.constants
+let[@inline] storage_space_to_pay ctxt = ctxt.back.storage_space_to_pay
 
-let recover ctxt = ctxt.context
+let[@inline] predecessor_timestamp ctxt = ctxt.back.predecessor_timestamp
+
+let[@inline] current_timestamp ctxt = ctxt.back.timestamp
+
+let[@inline] current_fitness ctxt = ctxt.back.fitness
+
+let[@inline] first_level ctxt = ctxt.back.first_level
+
+let[@inline] constants ctxt = ctxt.back.constants
+
+let[@inline] recover ctxt = ctxt.back.context
+
+let[@inline] fees ctxt = ctxt.back.fees
+
+let[@inline] origination_nonce ctxt = ctxt.back.origination_nonce
+
+let[@inline] deposits ctxt = ctxt.back.deposits
+
+let[@inline] allowed_endorsements ctxt = ctxt.back.allowed_endorsements
+
+let[@inline] included_endorsements ctxt = ctxt.back.included_endorsements
+
+let[@inline] internal_nonce ctxt = ctxt.back.internal_nonce
+
+let[@inline] internal_nonces_used ctxt = ctxt.back.internal_nonces_used
+
+let[@inline] gas_counter_status ctxt = ctxt.back.gas_counter_status
+
+let[@inline] rewards ctxt = ctxt.back.rewards
+
+let[@inline] allocated_contracts ctxt = ctxt.back.allocated_contracts
+
+let[@inline] temporary_lazy_storage_ids ctxt =
+  ctxt.back.temporary_lazy_storage_ids
+
+let[@inline] gas_counter ctxt = ctxt.gas_counter
+
+let[@inline] update_gas_counter ctxt gas_counter = {ctxt with gas_counter}
+
+let[@inline] update_back ctxt back = {ctxt with back}
+
+let[@inline] update_gas_counter_status ctxt gas_counter_status =
+  update_back ctxt {ctxt.back with gas_counter_status}
+
+let[@inline] update_context ctxt context =
+  update_back ctxt {ctxt.back with context}
+
+let[@inline] update_constants ctxt constants =
+  update_back ctxt {ctxt.back with constants}
+
+let[@inline] update_fitness ctxt fitness =
+  update_back ctxt {ctxt.back with fitness}
+
+let[@inline] update_deposits ctxt deposits =
+  update_back ctxt {ctxt.back with deposits}
+
+let[@inline] update_allowed_endorsements ctxt allowed_endorsements =
+  update_back ctxt {ctxt.back with allowed_endorsements}
+
+let[@inline] update_rewards ctxt rewards =
+  update_back ctxt {ctxt.back with rewards}
+
+let[@inline] update_storage_space_to_pay ctxt storage_space_to_pay =
+  update_back ctxt {ctxt.back with storage_space_to_pay}
+
+let[@inline] update_allocated_contracts ctxt allocated_contracts =
+  update_back ctxt {ctxt.back with allocated_contracts}
+
+let[@inline] update_origination_nonce ctxt origination_nonce =
+  update_back ctxt {ctxt.back with origination_nonce}
+
+let[@inline] update_internal_nonce ctxt internal_nonce =
+  update_back ctxt {ctxt.back with internal_nonce}
+
+let[@inline] update_internal_nonces_used ctxt internal_nonces_used =
+  update_back ctxt {ctxt.back with internal_nonces_used}
+
+let[@inline] update_included_endorsements ctxt included_endorsements =
+  update_back ctxt {ctxt.back with included_endorsements}
+
+let[@inline] update_fees ctxt fees = update_back ctxt {ctxt.back with fees}
+
+let[@inline] update_temporary_lazy_storage_ids ctxt temporary_lazy_storage_ids
+    =
+  update_back ctxt {ctxt.back with temporary_lazy_storage_ids}
 
 let record_endorsement ctxt k =
-  match Signature.Public_key_hash.Map.find_opt k ctxt.allowed_endorsements with
+  match
+    Signature.Public_key_hash.Map.find_opt k (allowed_endorsements ctxt)
+  with
   | None ->
       assert false
   | Some (_, _, true) ->
       assert false (* right already used *)
   | Some (d, s, false) ->
-      {
-        ctxt with
-        included_endorsements = ctxt.included_endorsements + List.length s;
-        allowed_endorsements =
-          Signature.Public_key_hash.Map.add
-            k
-            (d, s, true)
-            ctxt.allowed_endorsements;
-      }
+      let ctxt =
+        update_included_endorsements
+          ctxt
+          (included_endorsements ctxt + List.length s)
+      in
+      update_allowed_endorsements
+        ctxt
+        (Signature.Public_key_hash.Map.add
+           k
+           (d, s, true)
+           (allowed_endorsements ctxt))
 
-let init_endorsements ctxt allowed_endorsements =
-  if Signature.Public_key_hash.Map.is_empty allowed_endorsements then
+let init_endorsements ctxt allowed_endorsements' =
+  if Signature.Public_key_hash.Map.is_empty allowed_endorsements' then
     assert false (* can't initialize to empty *)
-  else if Signature.Public_key_hash.Map.is_empty ctxt.allowed_endorsements then
-    {ctxt with allowed_endorsements}
+  else if Signature.Public_key_hash.Map.is_empty (allowed_endorsements ctxt)
+  then update_allowed_endorsements ctxt allowed_endorsements'
   else assert false
-
-(* can't initialize twice *)
-
-let allowed_endorsements ctxt = ctxt.allowed_endorsements
-
-let included_endorsements ctxt = ctxt.included_endorsements
 
 type error += Too_many_internal_operations (* `Permanent *)
 
@@ -175,33 +282,34 @@ let () =
     (fun () -> Block_quota_exceeded)
 
 let fresh_internal_nonce ctxt =
-  if Compare.Int.(ctxt.internal_nonce >= 65_535) then
+  if Compare.Int.(internal_nonce ctxt >= 65_535) then
     error Too_many_internal_operations
   else
     ok
-      ( {ctxt with internal_nonce = ctxt.internal_nonce + 1},
-        ctxt.internal_nonce )
+      ( update_internal_nonce ctxt (internal_nonce ctxt + 1),
+        internal_nonce ctxt )
 
 let reset_internal_nonce ctxt =
-  {ctxt with internal_nonces_used = Int_set.empty; internal_nonce = 0}
+  let ctxt = update_internal_nonce ctxt 0 in
+  update_internal_nonces_used ctxt Int_set.empty
 
 let record_internal_nonce ctxt k =
-  {ctxt with internal_nonces_used = Int_set.add k ctxt.internal_nonces_used}
+  update_internal_nonces_used ctxt (Int_set.add k (internal_nonces_used ctxt))
 
 let internal_nonce_already_recorded ctxt k =
-  Int_set.mem k ctxt.internal_nonces_used
+  Int_set.mem k (internal_nonces_used ctxt)
 
-let set_current_fitness ctxt fitness = {ctxt with fitness}
+let set_current_fitness ctxt fitness = update_fitness ctxt fitness
 
-let add_fees ctxt fees =
-  Tez_repr.(ctxt.fees +? fees) >|? fun fees -> {ctxt with fees}
+let add_fees ctxt fees' = Tez_repr.(fees ctxt +? fees') >|? update_fees ctxt
 
-let add_rewards ctxt rewards =
-  Tez_repr.(ctxt.rewards +? rewards) >|? fun rewards -> {ctxt with rewards}
+let add_rewards ctxt rewards' =
+  Tez_repr.(rewards ctxt +? rewards') >|? update_rewards ctxt
 
 let add_deposit ctxt delegate deposit =
+  let open Signature.Public_key_hash.Map in
   let previous =
-    match Signature.Public_key_hash.Map.find_opt delegate ctxt.deposits with
+    match find_opt delegate (deposits ctxt) with
     | Some tz ->
         tz
     | None ->
@@ -209,16 +317,14 @@ let add_deposit ctxt delegate deposit =
   in
   Tez_repr.(previous +? deposit)
   >|? fun deposit ->
-  let deposits =
-    Signature.Public_key_hash.Map.add delegate deposit ctxt.deposits
-  in
-  {ctxt with deposits}
+  let deposits = add delegate deposit (deposits ctxt) in
+  update_deposits ctxt deposits
 
-let get_deposits ctxt = ctxt.deposits
+let get_deposits = deposits
 
-let get_rewards ctxt = ctxt.rewards
+let get_rewards = rewards
 
-let get_fees ctxt = ctxt.fees
+let get_fees = fees
 
 type error += Undefined_operation_nonce (* `Permanent *)
 
@@ -238,26 +344,27 @@ let init_origination_nonce ctxt operation_hash =
   let origination_nonce =
     Some (Contract_repr.initial_origination_nonce operation_hash)
   in
-  {ctxt with origination_nonce}
-
-let origination_nonce ctxt =
-  match ctxt.origination_nonce with
-  | None ->
-      error Undefined_operation_nonce
-  | Some origination_nonce ->
-      ok origination_nonce
+  update_origination_nonce ctxt origination_nonce
 
 let increment_origination_nonce ctxt =
-  match ctxt.origination_nonce with
+  match origination_nonce ctxt with
   | None ->
       error Undefined_operation_nonce
   | Some cur_origination_nonce ->
       let origination_nonce =
         Some (Contract_repr.incr_origination_nonce cur_origination_nonce)
       in
-      ok ({ctxt with origination_nonce}, cur_origination_nonce)
+      let ctxt = update_origination_nonce ctxt origination_nonce in
+      ok (ctxt, cur_origination_nonce)
 
-let unset_origination_nonce ctxt = {ctxt with origination_nonce = None}
+let origination_nonce ctxt =
+  match origination_nonce ctxt with
+  | None ->
+      error Undefined_operation_nonce
+  | Some origination_nonce ->
+      ok origination_nonce
+
+let unset_origination_nonce ctxt = update_origination_nonce ctxt None
 
 type error += Gas_limit_too_high (* `Permanent *)
 
@@ -274,26 +381,26 @@ let () =
 
 let gas_level ctxt =
   let open Gas_limit_repr in
-  match ctxt.gas_counter_status with
+  match gas_counter_status ctxt with
   | Unlimited_operation_gas ->
       Unaccounted
   | Count_block_gas {operation_gas_delta} ->
-      Limited {remaining = Arith.(add ctxt.gas_counter operation_gas_delta)}
+      Limited {remaining = Arith.(add (gas_counter ctxt) operation_gas_delta)}
   | Count_operation_gas _ ->
-      Limited {remaining = ctxt.gas_counter}
+      Limited {remaining = gas_counter ctxt}
 
 let block_gas_level ctxt =
   let open Gas_limit_repr in
-  match ctxt.gas_counter_status with
+  match gas_counter_status ctxt with
   | Unlimited_operation_gas | Count_block_gas _ ->
-      ctxt.gas_counter
+      gas_counter ctxt
   | Count_operation_gas {block_gas_delta} ->
-      Arith.(add ctxt.gas_counter block_gas_delta)
+      Arith.(add (gas_counter ctxt) block_gas_delta)
 
 let check_gas_limit ctxt (remaining : 'a Gas_limit_repr.Arith.t) =
   if
     Gas_limit_repr.Arith.(
-      remaining > ctxt.constants.hard_gas_limit_per_operation
+      remaining > (constants ctxt).hard_gas_limit_per_operation
       || remaining < zero)
   then error Gas_limit_too_high
   else ok_unit
@@ -319,21 +426,21 @@ let set_gas_unlimited ctxt =
   update_gas_counter_status ctxt Unlimited_operation_gas
 
 let is_gas_unlimited ctxt =
-  match ctxt.gas_counter_status with
+  match ctxt.back.gas_counter_status with
   | Unlimited_operation_gas ->
       true
   | _ ->
       false
 
 let is_counting_block_gas ctxt =
-  match ctxt.gas_counter_status with Count_block_gas _ -> true | _ -> false
+  match gas_counter_status ctxt with Count_block_gas _ -> true | _ -> false
 
 let consume_gas ctxt cost =
   if is_gas_unlimited ctxt then ok ctxt
   else
-    match Gas_limit_repr.raw_consume ctxt.gas_counter cost with
+    match Gas_limit_repr.raw_consume (gas_counter ctxt) cost with
     | Some gas_counter ->
-        Ok {ctxt with gas_counter}
+        Ok (update_gas_counter ctxt gas_counter)
     | None ->
         if is_counting_block_gas ctxt then error Block_quota_exceeded
         else error Operation_quota_exceeded
@@ -348,38 +455,35 @@ let gas_consumed ~since ~until =
       Gas_limit_repr.Arith.zero
 
 let init_storage_space_to_pay ctxt =
-  match ctxt.storage_space_to_pay with
+  match storage_space_to_pay ctxt with
   | Some _ ->
       assert false
   | None ->
-      {
-        ctxt with
-        storage_space_to_pay = Some Z.zero;
-        allocated_contracts = Some 0;
-      }
-
-let update_storage_space_to_pay ctxt n =
-  match ctxt.storage_space_to_pay with
-  | None ->
-      assert false
-  | Some storage_space_to_pay ->
-      {ctxt with storage_space_to_pay = Some (Z.add n storage_space_to_pay)}
-
-let update_allocated_contracts_count ctxt =
-  match ctxt.allocated_contracts with
-  | None ->
-      assert false
-  | Some allocated_contracts ->
-      {ctxt with allocated_contracts = Some (succ allocated_contracts)}
+      let ctxt = update_storage_space_to_pay ctxt (Some Z.zero) in
+      update_allocated_contracts ctxt (Some 0)
 
 let clear_storage_space_to_pay ctxt =
-  match (ctxt.storage_space_to_pay, ctxt.allocated_contracts) with
+  match (storage_space_to_pay ctxt, allocated_contracts ctxt) with
   | (None, _) | (_, None) ->
       assert false
   | (Some storage_space_to_pay, Some allocated_contracts) ->
-      ( {ctxt with storage_space_to_pay = None; allocated_contracts = None},
-        storage_space_to_pay,
-        allocated_contracts )
+      let ctxt = update_storage_space_to_pay ctxt None in
+      let ctxt = update_allocated_contracts ctxt None in
+      (ctxt, storage_space_to_pay, allocated_contracts)
+
+let update_storage_space_to_pay ctxt n =
+  match storage_space_to_pay ctxt with
+  | None ->
+      assert false
+  | Some storage_space_to_pay ->
+      update_storage_space_to_pay ctxt (Some (Z.add n storage_space_to_pay))
+
+let update_allocated_contracts_count ctxt =
+  match allocated_contracts ctxt with
+  | None ->
+      assert false
+  | Some allocated_contracts ->
+      update_allocated_contracts ctxt (Some (succ allocated_contracts))
 
 type missing_key_kind = Get | Set | Del | Copy
 
@@ -591,9 +695,11 @@ let get_constants ctxt =
         ok constants )
 
 let patch_constants ctxt f =
-  let constants = f ctxt.constants in
-  set_constants ctxt.context constants
-  >|= fun context -> {ctxt with context; constants}
+  let constants = f (constants ctxt) in
+  set_constants (context ctxt) constants
+  >|= fun context ->
+  let ctxt = update_context ctxt context in
+  update_constants ctxt constants
 
 let check_inited ctxt =
   Context.get ctxt version_key
@@ -624,27 +730,30 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
       level
   in
   {
-    context = ctxt;
-    constants;
-    level;
-    predecessor_timestamp;
-    timestamp;
-    fitness;
-    first_level;
-    allowed_endorsements = Signature.Public_key_hash.Map.empty;
-    included_endorsements = 0;
-    fees = Tez_repr.zero;
-    rewards = Tez_repr.zero;
-    deposits = Signature.Public_key_hash.Map.empty;
-    storage_space_to_pay = None;
-    allocated_contracts = None;
     gas_counter =
       Gas_limit_repr.Arith.fp constants.Constants_repr.hard_gas_limit_per_block;
-    origination_nonce = None;
-    temporary_lazy_storage_ids = Lazy_storage_kind.Temp_ids.init;
-    internal_nonce = 0;
-    internal_nonces_used = Int_set.empty;
-    gas_counter_status = Unlimited_operation_gas;
+    back =
+      {
+        context = ctxt;
+        constants;
+        level;
+        predecessor_timestamp;
+        timestamp;
+        fitness;
+        first_level;
+        allowed_endorsements = Signature.Public_key_hash.Map.empty;
+        included_endorsements = 0;
+        fees = Tez_repr.zero;
+        rewards = Tez_repr.zero;
+        deposits = Signature.Public_key_hash.Map.empty;
+        storage_space_to_pay = None;
+        allocated_contracts = None;
+        origination_nonce = None;
+        temporary_lazy_storage_ids = Lazy_storage_kind.Temp_ids.init;
+        internal_nonce = 0;
+        internal_nonces_used = Int_set.empty;
+        gas_counter_status = Unlimited_operation_gas;
+      };
   }
 
 type previous_protocol = Genesis of Parameters_repr.t | Edo_008
@@ -683,12 +792,11 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
   prepare ctxt ~level ~predecessor_timestamp:timestamp ~timestamp ~fitness
   >|=? fun ctxt -> (previous_proto, ctxt)
 
-let activate ({context = c; _} as s) h =
-  Updater.activate c h >|= fun c -> {s with context = c}
+let activate ctxt h = Updater.activate (context ctxt) h >|= update_context ctxt
 
-let fork_test_chain ({context = c; _} as s) protocol expiration =
-  Updater.fork_test_chain c ~protocol ~expiration
-  >|= fun c -> {s with context = c}
+let fork_test_chain ctxt protocol expiration =
+  Updater.fork_test_chain (context ctxt) ~protocol ~expiration
+  >|= update_context ctxt
 
 (* Generic context ********************************************************)
 
@@ -752,51 +860,51 @@ module type T = sig
   val description : context Storage_description.t
 end
 
-let mem ctxt k = Context.mem ctxt.context k
+let mem ctxt k = Context.mem (context ctxt) k
 
-let dir_mem ctxt k = Context.dir_mem ctxt.context k
+let dir_mem ctxt k = Context.dir_mem (context ctxt) k
 
 let get ctxt k =
-  Context.get ctxt.context k
+  Context.get (context ctxt) k
   >|= function None -> storage_error (Missing_key (k, Get)) | Some v -> ok v
 
-let get_option ctxt k = Context.get ctxt.context k
+let get_option ctxt k = Context.get (context ctxt) k
 
 (* Verify that the k is present before modifying *)
 let set ctxt k v =
-  Context.mem ctxt.context k
+  Context.mem (context ctxt) k
   >>= function
   | false ->
       Lwt.return @@ storage_error (Missing_key (k, Set))
   | true ->
-      Context.set ctxt.context k v >|= fun context -> ok {ctxt with context}
+      Context.set (context ctxt) k v
+      >|= fun context -> ok (update_context ctxt context)
 
 (* Verify that the k is not present before inserting *)
 let init ctxt k v =
-  Context.mem ctxt.context k
+  Context.mem (context ctxt) k
   >>= function
   | true ->
       Lwt.return @@ storage_error (Existing_key k)
   | false ->
-      Context.set ctxt.context k v >|= fun context -> ok {ctxt with context}
+      Context.set (context ctxt) k v
+      >|= fun context -> ok (update_context ctxt context)
 
 (* Does not verify that the key is present or not *)
-let init_set ctxt k v =
-  Context.set ctxt.context k v >|= fun context -> {ctxt with context}
+let init_set ctxt k v = Context.set (context ctxt) k v >|= update_context ctxt
 
 (* Verify that the key is present before deleting *)
 let delete ctxt k =
-  Context.mem ctxt.context k
+  Context.mem (context ctxt) k
   >>= function
   | false ->
       Lwt.return @@ storage_error (Missing_key (k, Del))
   | true ->
-      Context.remove_rec ctxt.context k
-      >|= fun context -> ok {ctxt with context}
+      Context.remove_rec (context ctxt) k
+      >|= fun context -> ok (update_context ctxt context)
 
 (* Do not verify before deleting *)
-let remove ctxt k =
-  Context.remove_rec ctxt.context k >|= fun context -> {ctxt with context}
+let remove ctxt k = Context.remove_rec (context ctxt) k >|= update_context ctxt
 
 let set_option ctxt k = function
   | None ->
@@ -805,21 +913,21 @@ let set_option ctxt k = function
       init_set ctxt k v
 
 let remove_rec ctxt k =
-  Context.remove_rec ctxt.context k >|= fun context -> {ctxt with context}
+  Context.remove_rec (context ctxt) k >|= update_context ctxt
 
 let copy ctxt ~from ~to_ =
-  Context.copy ctxt.context ~from ~to_
+  Context.copy (context ctxt) ~from ~to_
   >|= function
   | None ->
       storage_error (Missing_key (from, Copy))
   | Some context ->
-      ok {ctxt with context}
+      ok (update_context ctxt context)
 
-let fold ctxt k ~init ~f = Context.fold ctxt.context k ~init ~f
+let fold ctxt k ~init ~f = Context.fold (context ctxt) k ~init ~f
 
-let keys ctxt k = Context.keys ctxt.context k
+let keys ctxt k = Context.keys (context ctxt) k
 
-let fold_keys ctxt k ~init ~f = Context.fold_keys ctxt.context k ~init ~f
+let fold_keys ctxt k ~init ~f = Context.fold_keys (context ctxt) k ~init ~f
 
 let project x = x
 
@@ -828,11 +936,11 @@ let absolute_key _ k = k
 let description = Storage_description.create ()
 
 let fold_map_temporary_lazy_storage_ids ctxt f =
-  f ctxt.temporary_lazy_storage_ids
+  f (temporary_lazy_storage_ids ctxt)
   |> fun (temporary_lazy_storage_ids, x) ->
-  ({ctxt with temporary_lazy_storage_ids}, x)
+  (update_temporary_lazy_storage_ids ctxt temporary_lazy_storage_ids, x)
 
 let map_temporary_lazy_storage_ids_s ctxt f =
-  f ctxt.temporary_lazy_storage_ids
+  f (temporary_lazy_storage_ids ctxt)
   >|= fun (ctxt, temporary_lazy_storage_ids) ->
-  {ctxt with temporary_lazy_storage_ids}
+  update_temporary_lazy_storage_ids ctxt temporary_lazy_storage_ids
