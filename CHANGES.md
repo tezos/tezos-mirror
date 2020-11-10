@@ -1,3 +1,9 @@
+# Version 7.5
+
+## Client
+
+- Fixed gas cost estimation for Delphi for contract origination and revelation.
+
 # Version 7.4
 
 - Added the Delphi protocol.
