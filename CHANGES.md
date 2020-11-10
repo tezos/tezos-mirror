@@ -4,6 +4,11 @@
 
 - Fixed gas cost estimation for Delphi for contract origination and revelation.
 
+## Codec
+
+- Fixed the name of the `big_map_diff` encoding from `<protocol_name>` to
+  `<protocol_name>.contract.big_map_diff`.
+
 # Version 7.4
 
 - Added the Delphi protocol.
