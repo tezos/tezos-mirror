@@ -3437,7 +3437,11 @@ and parse_instr :
   | (Prim (loc, I_DUP, [], annot), Item_t (v, rest, stack_annot)) ->
       parse_var_annot loc annot ~default:stack_annot
       >>?= fun annot ->
-      record_trace (Non_dupable_type loc) (check_dupable_ty ctxt loc v)
+      record_trace_eval
+        (fun () ->
+          serialize_ty_for_error ctxt v
+          >|? fun (t, _ctxt) -> Non_dupable_type (loc, t))
+        (check_dupable_ty ctxt loc v)
       >>?= fun ctxt ->
       typed ctxt loc Dup (Item_t (v, Item_t (v, rest, stack_annot), annot))
   | (Prim (loc, I_DUP, [n], v_annot), stack_ty) ->
@@ -3467,7 +3471,11 @@ and parse_instr :
       >>?= fun () ->
       record_trace (Dup_n_bad_stack loc) (make_proof_argument n stack_ty)
       >>?= fun (Dup_n_proof_argument (witness, after_ty)) ->
-      record_trace (Non_dupable_type loc) (check_dupable_ty ctxt loc after_ty)
+      record_trace_eval
+        (fun () ->
+          serialize_ty_for_error ctxt after_ty
+          >|? fun (t, _ctxt) -> Non_dupable_type (loc, t))
+        (check_dupable_ty ctxt loc after_ty)
       >>?= fun ctxt ->
       typed ctxt loc (Dup_n (n, witness)) (Item_t (after_ty, stack_ty, annot))
   | (Prim (loc, I_DIG, [n], result_annot), stack) ->
