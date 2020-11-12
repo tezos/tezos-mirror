@@ -5817,7 +5817,72 @@ let unparse_bls12_381_fr ctxt x =
   let bytes = Bls12_381.Fr.to_bytes x in
   (Bytes (-1, bytes), ctxt)
 
+(* -- Unparsing data of complex types -- *)
+
+type _ comb_witness =
+  | Comb_Pair : 't comb_witness -> (_ * 't) comb_witness
+  | Comb_Any : _ comb_witness
+
+let unparse_pair (type r) unparse_l unparse_r ctxt mode
+    (r_comb_witness : r comb_witness) (l, (r : r)) =
+  unparse_l ctxt l
+  >>=? fun (l, ctxt) ->
+  unparse_r ctxt r
+  >|=? fun (r, ctxt) ->
+  (* Fold combs.
+     For combs, three notations are supported:
+     - a) [Pair x1 (Pair x2 ... (Pair xn-1 xn) ...)],
+     - b) [Pair x1 x2 ... xn-1 xn], and
+     - c) [{x1; x2; ...; xn-1; xn}].
+     In readable mode, we always use b),
+     in optimized mode we use the shortest to serialize:
+     - for n=2, [Pair x1 x2],
+     - for n=3, [Pair x1 (Pair x2 x3)],
+     - for n>=4, [{x1; x2; ...; xn}].
+     *)
+  let res =
+    match (mode, r_comb_witness, r) with
+    | (Optimized, Comb_Pair _, Micheline.Seq (_, r)) ->
+        (* Optimized case n > 4 *)
+        Micheline.Seq (-1, l :: r)
+    | ( Optimized,
+        Comb_Pair (Comb_Pair _),
+        Prim (_, D_Pair, [x2; Prim (_, D_Pair, [x3; x4], [])], []) ) ->
+        (* Optimized case n = 4 *)
+        Micheline.Seq (-1, [l; x2; x3; x4])
+    | (Readable, Comb_Pair _, Prim (_, D_Pair, xs, [])) ->
+        (* Readable case n > 2 *)
+        Prim (-1, D_Pair, l :: xs, [])
+    | _ ->
+        (* The remaining cases are:
+            - Optimized n = 2,
+            - Optimized n = 3, and
+            - Readable n = 2 *)
+        Prim (-1, D_Pair, [l; r], [])
+  in
+  (res, ctxt)
+
+let unparse_union unparse_l unparse_r ctxt = function
+  | L l ->
+      unparse_l ctxt l >|=? fun (l, ctxt) -> (Prim (-1, D_Left, [l], []), ctxt)
+  | R r ->
+      unparse_r ctxt r >|=? fun (r, ctxt) -> (Prim (-1, D_Right, [r], []), ctxt)
+
+let unparse_option unparse_v ctxt = function
+  | Some v ->
+      unparse_v ctxt v >|=? fun (v, ctxt) -> (Prim (-1, D_Some, [v], []), ctxt)
+  | None ->
+      return (Prim (-1, D_None, [], []), ctxt)
+
 (* -- Unparsing data of any type -- *)
+
+let comb_witness2 : type t. t ty -> t comb_witness = function
+  | Pair_t (_, (Pair_t _, _, _), _) ->
+      Comb_Pair (Comb_Pair Comb_Any)
+  | Pair_t _ ->
+      Comb_Pair Comb_Any
+  | _ ->
+      Comb_Any
 
 let rec unparse_data :
     type a.
@@ -5872,51 +5937,18 @@ let rec unparse_data :
       Lwt.return @@ unparse_bls12_381_g2 ctxt x
   | (Bls12_381_fr_t _, x) ->
       Lwt.return @@ unparse_bls12_381_fr ctxt x
-  | (Pair_t ((tl, _, _), (tr, _, _), _), (l, r)) -> (
-      non_terminal_recursion ctxt mode tl l
-      >>=? fun (l, ctxt) ->
-      non_terminal_recursion ctxt mode tr r
-      >|=? fun (r, ctxt) ->
-      (* Fold combs.
-         For combs, three notations are supported:
-         - a) [Pair x1 (Pair x2 ... (Pair xn-1 xn) ...)],
-         - b) [Pair x1 x2 ... xn-1 xn], and
-         - c) [{x1; x2; ...; xn-1; xn}].
-         In readable mode, we always use b),
-         in optimized mode we use the shortest to serialize:
-         - for n=2, [Pair x1 x2],
-         - for n=3, [Pair x1 (Pair x2 x3)],
-         - for n>=4, [{x1; x2; ...; xn}].
-      *)
-      match (mode, tr, r) with
-      | (Optimized, Pair_t _, Micheline.Seq (_, r)) ->
-          (* Optimized case n > 4 *)
-          (Micheline.Seq (-1, l :: r), ctxt)
-      | ( Optimized,
-          Pair_t (_, (Pair_t _, _, _), _),
-          Prim (_, D_Pair, [x2; Prim (_, D_Pair, [x3; x4], [])], []) ) ->
-          (* Optimized case n = 4 *)
-          (Micheline.Seq (-1, [l; x2; x3; x4]), ctxt)
-      | (Readable, Pair_t _, Prim (_, D_Pair, xs, [])) ->
-          (* Readable case n > 2 *)
-          (Prim (-1, D_Pair, l :: xs, []), ctxt)
-      | _ ->
-          (* The remaining cases are:
-              - Optimized n = 2,
-              - Optimized n = 3, and
-              - Readable n = 2 *)
-          (Prim (-1, D_Pair, [l; r], []), ctxt) )
-  | (Union_t ((tl, _), _, _), L l) ->
-      non_terminal_recursion ctxt mode tl l
-      >|=? fun (l, ctxt) -> (Prim (-1, D_Left, [l], []), ctxt)
-  | (Union_t (_, (tr, _), _), R r) ->
-      non_terminal_recursion ctxt mode tr r
-      >|=? fun (r, ctxt) -> (Prim (-1, D_Right, [r], []), ctxt)
-  | (Option_t (t, _), Some v) ->
-      non_terminal_recursion ctxt mode t v
-      >|=? fun (v, ctxt) -> (Prim (-1, D_Some, [v], []), ctxt)
-  | (Option_t _, None) ->
-      return (Prim (-1, D_None, [], []), ctxt)
+  | (Pair_t ((tl, _, _), (tr, _, _), _), pair) ->
+      let r_witness = comb_witness2 tr in
+      let unparse_l ctxt v = non_terminal_recursion ctxt mode tl v in
+      let unparse_r ctxt v = non_terminal_recursion ctxt mode tr v in
+      unparse_pair unparse_l unparse_r ctxt mode r_witness pair
+  | (Union_t ((tl, _), (tr, _), _), v) ->
+      let unparse_l ctxt v = non_terminal_recursion ctxt mode tl v in
+      let unparse_r ctxt v = non_terminal_recursion ctxt mode tr v in
+      unparse_union unparse_l unparse_r ctxt v
+  | (Option_t (t, _), v) ->
+      let unparse_v ctxt v = non_terminal_recursion ctxt mode t v in
+      unparse_option unparse_v ctxt v
   | (List_t (t, _), items) ->
       fold_left_s
         (fun (l, ctxt) element ->
