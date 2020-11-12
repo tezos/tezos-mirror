@@ -2129,7 +2129,7 @@ and parse_big_map_ty ctxt ~legacy big_map_loc args map_annot =
   | [key_ty; value_ty] ->
       parse_comparable_ty ctxt key_ty
       >>? fun (Ex_comparable_ty key_ty, ctxt) ->
-      parse_packable_ty ctxt ~legacy value_ty
+      parse_big_map_value_ty ctxt ~legacy value_ty
       >>? fun (Ex_ty value_ty, ctxt) ->
       parse_type_annot big_map_loc map_annot
       >|? fun map_name ->
@@ -2137,6 +2137,15 @@ and parse_big_map_ty ctxt ~legacy big_map_loc args map_annot =
       (Ex_ty big_map_ty, ctxt)
   | args ->
       error @@ Invalid_arity (big_map_loc, T_big_map, 2, List.length args)
+
+and parse_big_map_value_ty ctxt ~legacy value_ty =
+  parse_ty
+    ctxt
+    ~legacy
+    ~allow_lazy_storage:false
+    ~allow_operation:false
+    ~allow_contract:legacy
+    value_ty
 
 and parse_storage_ty :
     context -> legacy:bool -> Script.node -> (ex_ty * context) tzresult =
@@ -3175,7 +3184,7 @@ let rec parse_data :
                 Lwt.return
                   ( parse_comparable_ty ctxt (Micheline.root btk)
                   >>? fun (Ex_comparable_ty btk, ctxt) ->
-                  parse_packable_ty ctxt ~legacy (Micheline.root btv)
+                  parse_big_map_value_ty ctxt ~legacy (Micheline.root btv)
                   >>? fun (Ex_ty btv, ctxt) ->
                   comparable_ty_eq ctxt tk btk
                   >>? fun (Eq, ctxt) ->
@@ -4166,7 +4175,7 @@ and parse_instr :
   | (Prim (loc, I_EMPTY_BIG_MAP, [tk; tv], annot), stack) ->
       parse_comparable_ty ctxt tk
       >>?= fun (Ex_comparable_ty tk, ctxt) ->
-      parse_packable_ty ctxt ~legacy tv
+      parse_big_map_value_ty ctxt ~legacy tv
       >>?= fun (Ex_ty tv, ctxt) ->
       parse_var_type_annot loc annot
       >>?= fun (annot, ty_name) ->
