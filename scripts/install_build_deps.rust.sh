@@ -39,9 +39,9 @@ $ rustup override set $rust_version"
     exit 1
 fi
 
-install_dir="${OPAM_SWITCH_PREFIX}/lib/rustc-bls12-381"
+install_dir="${OPAM_SWITCH_PREFIX}/lib"
 # Install the headers in `include`
-HEADER_DIR="${OPAM_SWITCH_PREFIX}/include/rustc-bls12-381"
+HEADER_DIR="${OPAM_SWITCH_PREFIX}/include"
 zcash_params="${OPAM_SWITCH_PREFIX}/share/zcash-params"
 
 BUILD_DIR=_build_rust
