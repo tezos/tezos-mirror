@@ -502,8 +502,6 @@ struct
     end
 
     module type FIELD = sig
-      exception Not_in_field of Bytes.t
-
       type t
 
       (** The order of the finite field *)
@@ -533,13 +531,8 @@ struct
 
       (** [negate x] returns [-x mod order]. Equivalently, [negate x] returns the
       unique [y] such that [x + y mod order = 0]
-  *)
+      *)
       val negate : t -> t
-
-      (** [inverse_exn x] returns [x^-1] if [x] is not [0], else raise
-      [Division_by_zero]
-  *)
-      val inverse_exn : t -> t
 
       (** [inverse_opt x] returns [x^-1] if [x] is not [0] as an option, else [None] *)
       val inverse_opt : t -> t option
@@ -548,27 +541,33 @@ struct
       val pow : t -> Z.t -> t
 
       (** From a predefined bytes representation, construct a value t. It is not
-      required that to_bytes of_bytes_exn t = t.
-      Raise [Not_in_field] if the bytes do not represent an element in the field.
-  *)
-      val of_bytes_exn : Bytes.t -> t
-
-      (** From a predefined bytes representation, construct a value t. It is not
-      required that to_bytes (Option.get (of_bytes_opt t)) = t. By default, little endian encoding
+      required that to_bytes [(Option.get (of_bytes_opt t)) = t]. By default, little endian encoding
       is used and the given element is modulo the prime order *)
       val of_bytes_opt : Bytes.t -> t option
 
       (** Convert the value t to a bytes representation which can be used for
-      hashing for instance. It is not required that to_bytes of_bytes_exn t = t. By
-      default, little endian encoding is used, and length of the resulting bytes
-      may vary depending on the order.
-  *)
+      hashing for instance. It is not required that [Option.get (to_bytes
+      (of_bytes_opt t)) = t]. By default, little endian encoding is used, and
+      length of the resulting bytes may vary depending on the order.
+      *)
       val to_bytes : t -> Bytes.t
     end
 
-    module type CURVE = sig
-      exception Not_on_curve of Bytes.t
+    (** Module type for the prime fields GF(p) *)
+    module type PRIME_FIELD = sig
+      include FIELD
 
+      (** [of_z x] builds an element t from the Zarith element [x]. [mod order] is
+      applied if [x >= order] or [x < 0]. *)
+      val of_z : Z.t -> t
+
+      (** [to_z x] builds a Zarith element, using the decimal representation.
+      Arithmetic on the result can be done using the modular functions on
+      integers *)
+      val to_z : t -> Z.t
+    end
+
+    module type CURVE = sig
       (** The type of the element in the elliptic curve *)
       type t
 
@@ -582,11 +581,6 @@ struct
 
       (** Attempt to construct a point from a byte array *)
       val of_bytes_opt : Bytes.t -> t option
-
-      (** Attempt to construct a point from a byte array.
-      Raise [Not_on_curve] if the point is not on the curve
-  *)
-      val of_bytes_exn : Bytes.t -> t
 
       (** Return a representation in bytes *)
       val to_bytes : t -> Bytes.t
