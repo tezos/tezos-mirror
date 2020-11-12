@@ -1820,6 +1820,7 @@ and parse_packable_ty :
     ~allow_lazy_storage:false
     ~allow_operation:false
     ~allow_contract:legacy
+    ~allow_ticket:true
 
 and parse_parameter_ty :
     context -> legacy:bool -> Script.node -> (ex_ty * context) tzresult =
@@ -1830,6 +1831,7 @@ and parse_parameter_ty :
     ~allow_lazy_storage:true
     ~allow_operation:false
     ~allow_contract:true
+    ~allow_ticket:true
 
 and parse_normal_storage_ty :
     context -> legacy:bool -> Script.node -> (ex_ty * context) tzresult =
@@ -1840,6 +1842,7 @@ and parse_normal_storage_ty :
     ~allow_lazy_storage:true
     ~allow_operation:false
     ~allow_contract:legacy
+    ~allow_ticket:true
 
 and parse_any_ty :
     context -> legacy:bool -> Script.node -> (ex_ty * context) tzresult =
@@ -1850,6 +1853,7 @@ and parse_any_ty :
     ~allow_lazy_storage:true
     ~allow_operation:true
     ~allow_contract:true
+    ~allow_ticket:true
 
 and parse_ty :
     context ->
@@ -1857,9 +1861,16 @@ and parse_ty :
     allow_lazy_storage:bool ->
     allow_operation:bool ->
     allow_contract:bool ->
+    allow_ticket:bool ->
     Script.node ->
     (ex_ty * context) tzresult =
- fun ctxt ~legacy ~allow_lazy_storage ~allow_operation ~allow_contract node ->
+ fun ctxt
+     ~legacy
+     ~allow_lazy_storage
+     ~allow_operation
+     ~allow_contract
+     ~allow_ticket
+     node ->
   Gas.consume ctxt Typecheck_costs.parse_type_cycle
   >>? fun ctxt ->
   match node with
@@ -1935,6 +1946,7 @@ and parse_ty :
         ~allow_lazy_storage
         ~allow_operation
         ~allow_contract
+        ~allow_ticket
         utl
       >>? fun (Ex_ty tl, ctxt) ->
       ( match utr with
@@ -1950,6 +1962,7 @@ and parse_ty :
         ~allow_lazy_storage
         ~allow_operation
         ~allow_contract
+        ~allow_ticket
         utr
       >>? fun (Ex_ty tr, ctxt) ->
       parse_type_annot loc annot
@@ -1969,6 +1982,7 @@ and parse_ty :
         ~allow_lazy_storage
         ~allow_operation
         ~allow_contract
+        ~allow_ticket
         utl
       >>? fun (Ex_ty tl, ctxt) ->
       parse_ty
@@ -1977,6 +1991,7 @@ and parse_ty :
         ~allow_lazy_storage
         ~allow_operation
         ~allow_contract
+        ~allow_ticket
         utr
       >>? fun (Ex_ty tr, ctxt) ->
       parse_type_annot loc annot
@@ -2005,6 +2020,7 @@ and parse_ty :
         ~allow_lazy_storage
         ~allow_operation
         ~allow_contract
+        ~allow_ticket
         ut
       >>? fun (Ex_ty t, ctxt) -> ok (Ex_ty (Option_t (t, ty_name)), ctxt)
   | Prim (loc, T_list, [ut], annot) ->
@@ -2014,15 +2030,18 @@ and parse_ty :
         ~allow_lazy_storage
         ~allow_operation
         ~allow_contract
+        ~allow_ticket
         ut
       >>? fun (Ex_ty t, ctxt) ->
       parse_type_annot loc annot
       >>? fun ty_name -> ok (Ex_ty (List_t (t, ty_name)), ctxt)
   | Prim (loc, T_ticket, [ut], annot) ->
-      parse_comparable_ty ctxt ut
-      >>? fun (Ex_comparable_ty t, ctxt) ->
-      parse_type_annot loc annot
-      >>? fun ty_name -> ok (Ex_ty (Ticket_t (t, ty_name)), ctxt)
+      if allow_ticket then
+        parse_comparable_ty ctxt ut
+        >>? fun (Ex_comparable_ty t, ctxt) ->
+        parse_type_annot loc annot
+        >>? fun ty_name -> ok (Ex_ty (Ticket_t (t, ty_name)), ctxt)
+      else error (Unexpected_ticket loc)
   | Prim (loc, T_set, [ut], annot) ->
       parse_comparable_ty ctxt ut
       >>? fun (Ex_comparable_ty t, ctxt) ->
@@ -2037,6 +2056,7 @@ and parse_ty :
         ~allow_lazy_storage
         ~allow_operation
         ~allow_contract
+        ~allow_ticket
         utr
       >>? fun (Ex_ty tr, ctxt) ->
       parse_type_annot loc annot
@@ -2145,6 +2165,7 @@ and parse_big_map_value_ty ctxt ~legacy value_ty =
     ~allow_lazy_storage:false
     ~allow_operation:false
     ~allow_contract:legacy
+    ~allow_ticket:true
     value_ty
 
 and parse_storage_ty :
