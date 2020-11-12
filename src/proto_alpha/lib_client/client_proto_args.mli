@@ -42,6 +42,8 @@ val gas_limit_arg : (Gas.Arith.integral option, full) Clic.arg
 
 val default_gas_limit_arg : (Gas.Arith.integral option, full) Clic.arg
 
+val run_gas_limit_arg : (Gas.Arith.integral option, full) Clic.arg
+
 val storage_limit_arg : (Z.t option, full) Clic.arg
 
 val default_storage_limit_arg : (Z.t option, full) Clic.arg
@@ -114,6 +116,8 @@ val string_parameter : (string, full) Clic.parameter
 val bytes_of_prefixed_string : string -> Bytes.t tzresult Lwt.t
 
 val bytes_parameter : (Bytes.t, full) Clic.parameter
+
+val data_parameter : (Michelson_v1_parser.parsed, full) Clic.parameter
 
 val unparsing_mode_arg :
   default:string -> (Script_ir_translator.unparsing_mode, full) Clic.arg

@@ -82,12 +82,6 @@ let json_file_or_text_parameter =
             with Ezjsonm.Parse_error _ ->
               failwith "Neither an existing file nor valid JSON: '%s'" p))
 
-let data_parameter =
-  Clic.parameter (fun _ data ->
-      Lwt.return
-        (Micheline_parser.no_parsing_error
-        @@ Michelson_v1_parser.parse_expression data))
-
 let non_negative_param =
   Clic.parameter (fun _ s ->
       match int_of_string_opt s with
