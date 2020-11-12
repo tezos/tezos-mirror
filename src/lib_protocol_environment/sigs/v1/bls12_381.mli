@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Fr : S.FIELD
+module Fr : S.PRIME_FIELD
 
 module Fq12 : S.FIELD
 
