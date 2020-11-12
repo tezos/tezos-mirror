@@ -140,10 +140,6 @@ let validate_block v ?(force = false) ?chain_id bytes operations =
         return (hash, validation)
 
 let shutdown {active_chains; block_validator; _} =
-  let block_validator_job =
-    Validator_event.(emit shutdown_block_validator) ()
-    >>= fun () -> Block_validator.shutdown block_validator
-  in
   let chain_validator_jobs =
     List.of_seq
     @@ Seq.map
@@ -152,7 +148,12 @@ let shutdown {active_chains; block_validator; _} =
            >>= fun () -> Chain_validator.shutdown nv)
          (Chain_id.Table.to_seq active_chains)
   in
-  Lwt.join (block_validator_job :: chain_validator_jobs)
+  (* Shutdown the chain_validator (peer_validators, prevalidator,
+     etc.) before the block_validator *)
+  Lwt.join chain_validator_jobs
+  >>= fun () ->
+  Validator_event.(emit shutdown_block_validator) ()
+  >>= fun () -> Block_validator.shutdown block_validator
 
 let watcher {valid_block_input; _} =
   Lwt_watcher.create_stream valid_block_input
