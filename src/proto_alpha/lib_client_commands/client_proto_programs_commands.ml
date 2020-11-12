@@ -89,19 +89,6 @@ let commands () =
       ~doc:"balance of run contract in \xEA\x9C\xA9"
       ~default:"4_000_000"
   in
-  let custom_gas_flag =
-    arg
-      ~long:"gas"
-      ~short:'G'
-      ~doc:"Initial quantity of gas for typechecking and execution"
-      ~placeholder:"gas"
-      (parameter (fun _ctx str ->
-           try
-             let v = Z.of_string str in
-             assert (Compare.Z.(v >= Z.zero)) ;
-             return (Alpha_context.Gas.Arith.integral_exn v)
-           with _ -> failwith "invalid gas limit (must be a positive number)"))
-  in
   let resolve_max_gas cctxt block = function
     | None ->
         Alpha_services.Constants.all cctxt (cctxt#chain, block)
@@ -113,7 +100,6 @@ let commands () =
     Lwt.return @@ Micheline_parser.no_parsing_error
     @@ Michelson_v1_parser.parse_expression expr
   in
-  let data_parameter = parameter (fun _ data -> parse_expr data) in
   let data_type_arg =
     arg
       ~doc:"the given data will be type-checked against this type"
@@ -217,7 +203,7 @@ let commands () =
          source_arg
          payer_arg
          no_print_source_flag
-         custom_gas_flag
+         run_gas_limit_arg
          entrypoint_arg
          (unparsing_mode_arg ~default:"Readable"))
       (prefixes ["run"; "script"]
@@ -287,7 +273,7 @@ let commands () =
          show_types_switch
          emacs_mode_switch
          no_print_source_flag
-         custom_gas_flag
+         run_gas_limit_arg
          legacy_switch)
       (prefixes ["typecheck"; "script"] @@ Program.source_param @@ stop)
       (fun (show_types, emacs_mode, no_print_source, original_gas, legacy)
@@ -333,7 +319,7 @@ let commands () =
     command
       ~group
       ~desc:"Ask the node to typecheck a data expression."
-      (args3 no_print_source_flag custom_gas_flag legacy_switch)
+      (args3 no_print_source_flag run_gas_limit_arg legacy_switch)
       (prefixes ["typecheck"; "data"]
       @@ param ~name:"data" ~desc:"the data to typecheck" data_parameter
       @@ prefixes ["against"; "type"]
@@ -374,7 +360,7 @@ let commands () =
          would have produced.\n\
          Also displays the result of hashing this packed data with `BLAKE2B`, \
          `SHA256` or `SHA512` instruction."
-      (args2 custom_gas_flag (Tezos_clic_unix.Scriptable.clic_arg ()))
+      (args2 run_gas_limit_arg (Tezos_clic_unix.Scriptable.clic_arg ()))
       (prefixes ["hash"; "data"]
       @@ param ~name:"data" ~desc:"the data to hash" data_parameter
       @@ prefixes ["of"; "type"]
@@ -920,7 +906,7 @@ let commands () =
       (args4
          source_arg
          payer_arg
-         custom_gas_flag
+         run_gas_limit_arg
          (unparsing_mode_arg ~default:"Readable"))
       (prefixes ["run"; "tzip4"; "view"]
       @@ param ~name:"entrypoint" ~desc:"the name of the view" string_parameter
