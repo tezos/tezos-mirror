@@ -1820,7 +1820,7 @@ and parse_packable_ty :
     ~allow_lazy_storage:false
     ~allow_operation:false
     ~allow_contract:legacy
-    ~allow_ticket:true
+    ~allow_ticket:false
 
 and parse_parameter_ty :
     context -> legacy:bool -> Script.node -> (ex_ty * context) tzresult =
@@ -2246,7 +2246,7 @@ let check_packable ~legacy loc root =
     | Set_t (_, _) ->
         ok_unit
     | Ticket_t _ ->
-        ok_unit
+        error (Unexpected_ticket loc)
     | Lambda_t (_, _, _) ->
         ok_unit
     | Bls12_381_g1_t _ ->
