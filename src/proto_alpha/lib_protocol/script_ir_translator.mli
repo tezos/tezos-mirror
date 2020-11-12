@@ -218,6 +218,7 @@ val parse_ty :
   allow_lazy_storage:bool ->
   allow_operation:bool ->
   allow_contract:bool ->
+  allow_ticket:bool ->
   Script.node ->
   (ex_ty * context) tzresult
 
