@@ -2507,14 +2507,10 @@ let parse_uint11 = parse_uint ~nb_bits:11
 (* This type is used to:
    - serialize and deserialize tickets when they are stored or transferred,
    - type the READ_TICKET instruction. *)
-let opened_ticket_type t =
-  let ty =
-    ty_of_comparable_ty t
-    (* TODO: avoid this conversion every time *)
-  in
-  Pair_t
-    ( (Address_t None, None, None),
-      (Pair_t ((ty, None, None), (Nat_t None, None, None), None), None, None),
+let opened_ticket_type ty =
+  Pair_key
+    ( (Address_key None, None),
+      (Pair_key ((ty, None), (Nat_key None, None), None), None),
       None )
 
 (* -- parse data of primitive types -- *)
@@ -3118,12 +3114,7 @@ let rec parse_data :
   (* Tickets *)
   | (Ticket_t (t, _ty_name), expr) ->
       if allow_forged then
-        non_terminal_recursion
-          ?type_logger
-          ctxt
-          ~legacy
-          (opened_ticket_type t)
-          expr
+        parse_comparable_data ?type_logger ctxt (opened_ticket_type t) expr
         >|=? fun ((ticketer, (contents, amount)), ctxt) ->
         ({ticketer; contents; amount}, ctxt)
       else traced_fail (Unexpected_forged_value (location expr))
@@ -5334,7 +5325,7 @@ and parse_instr :
       parse_var_annot loc annot
       >>?= fun annot ->
       let () = check_dupable_comparable_ty t in
-      let result = opened_ticket_type t in
+      let result = ty_of_comparable_ty @@ opened_ticket_type t in
       typed ctxt loc Read_ticket (Item_t (result, full_stack, annot))
   | ( Prim (loc, I_SPLIT_TICKET, [], annot),
       Item_t
@@ -6524,11 +6515,8 @@ let rec unparse_data :
         items.elements
       >|=? fun (items, ctxt) -> (Micheline.Seq (-1, List.rev items), ctxt)
   | (Ticket_t (t, _), {ticketer; contents; amount}) ->
-      non_terminal_recursion
-        ctxt
-        mode
-        (opened_ticket_type t)
-        (ticketer, (contents, amount))
+      let t = ty_of_comparable_ty @@ opened_ticket_type t in
+      unparse_data ctxt ~stack_depth mode t (ticketer, (contents, amount))
   | (Set_t (t, _), set) ->
       fold_left_s
         (fun (l, ctxt) item ->
