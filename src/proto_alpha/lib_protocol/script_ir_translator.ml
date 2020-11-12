@@ -5685,6 +5685,140 @@ let list_entrypoints (type full) (full : full ty) ctxt ~root_name =
 
 (* ---- Unparsing (Typed IR -> Untyped expressions) --------------------------*)
 
+(* -- Unparsing data of primitive types -- *)
+
+let unparse_unit ctxt () = ok (Prim (-1, D_Unit, [], []), ctxt)
+
+let unparse_int ctxt v = ok (Int (-1, Script_int.to_zint v), ctxt)
+
+let unparse_nat ctxt v = ok (Int (-1, Script_int.to_zint v), ctxt)
+
+let unparse_string ctxt s = ok (String (-1, s), ctxt)
+
+let unparse_bytes ctxt s = ok (Bytes (-1, s), ctxt)
+
+let unparse_bool ctxt b =
+  ok (Prim (-1, (if b then D_True else D_False), [], []), ctxt)
+
+let unparse_timestamp ctxt mode t =
+  match mode with
+  | Optimized ->
+      ok (Int (-1, Script_timestamp.to_zint t), ctxt)
+  | Readable -> (
+      Gas.consume ctxt Unparse_costs.timestamp_readable
+      >>? fun ctxt ->
+      match Script_timestamp.to_notation t with
+      | None ->
+          ok (Int (-1, Script_timestamp.to_zint t), ctxt)
+      | Some s ->
+          ok (String (-1, s), ctxt) )
+
+let unparse_address ctxt mode (c, entrypoint) =
+  Gas.consume ctxt Unparse_costs.contract
+  >|? fun ctxt ->
+  match mode with
+  | Optimized ->
+      let entrypoint =
+        match entrypoint with "default" -> "" | name -> name
+      in
+      let bytes =
+        Data_encoding.Binary.to_bytes_exn
+          Data_encoding.(tup2 Contract.encoding Variable.string)
+          (c, entrypoint)
+      in
+      (Bytes (-1, bytes), ctxt)
+  | Readable ->
+      let notation =
+        match entrypoint with
+        | "default" ->
+            Contract.to_b58check c
+        | entrypoint ->
+            Contract.to_b58check c ^ "%" ^ entrypoint
+      in
+      (String (-1, notation), ctxt)
+
+let unparse_contract ctxt mode (_, address) = unparse_address ctxt mode address
+
+let unparse_signature ctxt mode s =
+  match mode with
+  | Optimized ->
+      Gas.consume ctxt Unparse_costs.signature_optimized
+      >|? fun ctxt ->
+      let bytes = Data_encoding.Binary.to_bytes_exn Signature.encoding s in
+      (Bytes (-1, bytes), ctxt)
+  | Readable ->
+      Gas.consume ctxt Unparse_costs.signature_readable
+      >|? fun ctxt -> (String (-1, Signature.to_b58check s), ctxt)
+
+let unparse_mutez ctxt v = ok (Int (-1, Z.of_int64 (Tez.to_mutez v)), ctxt)
+
+let unparse_key ctxt mode k =
+  match mode with
+  | Optimized ->
+      Gas.consume ctxt Unparse_costs.public_key_optimized
+      >|? fun ctxt ->
+      let bytes =
+        Data_encoding.Binary.to_bytes_exn Signature.Public_key.encoding k
+      in
+      (Bytes (-1, bytes), ctxt)
+  | Readable ->
+      Gas.consume ctxt Unparse_costs.public_key_readable
+      >|? fun ctxt -> (String (-1, Signature.Public_key.to_b58check k), ctxt)
+
+let unparse_key_hash ctxt mode k =
+  match mode with
+  | Optimized ->
+      Gas.consume ctxt Unparse_costs.key_hash_optimized
+      >|? fun ctxt ->
+      let bytes =
+        Data_encoding.Binary.to_bytes_exn Signature.Public_key_hash.encoding k
+      in
+      (Bytes (-1, bytes), ctxt)
+  | Readable ->
+      Gas.consume ctxt Unparse_costs.key_hash_readable
+      >|? fun ctxt ->
+      (String (-1, Signature.Public_key_hash.to_b58check k), ctxt)
+
+let unparse_operation ctxt (op, _big_map_diff) =
+  let bytes =
+    Data_encoding.Binary.to_bytes_exn Operation.internal_operation_encoding op
+  in
+  Gas.consume ctxt (Unparse_costs.operation bytes)
+  >|? fun ctxt -> (Bytes (-1, bytes), ctxt)
+
+let unparse_chain_id ctxt mode chain_id =
+  match mode with
+  | Optimized ->
+      Gas.consume ctxt Unparse_costs.chain_id_optimized
+      >|? fun ctxt ->
+      let bytes =
+        Data_encoding.Binary.to_bytes_exn Chain_id.encoding chain_id
+      in
+      (Bytes (-1, bytes), ctxt)
+  | Readable ->
+      Gas.consume ctxt Unparse_costs.chain_id_readable
+      >|? fun ctxt -> (String (-1, Chain_id.to_b58check chain_id), ctxt)
+
+let unparse_bls12_381_g1 ctxt x =
+  Gas.consume ctxt Unparse_costs.bls12_381_g1
+  >|? fun ctxt ->
+  let bytes = Bls12_381.G1.to_bytes x in
+  (Bytes (-1, bytes), ctxt)
+
+let unparse_bls12_381_g2 ctxt x =
+  Gas.consume ctxt Unparse_costs.bls12_381_g2
+  >|? fun ctxt ->
+  let bytes = Bls12_381.G2.to_bytes x in
+  (Bytes (-1, bytes), ctxt)
+
+let unparse_bls12_381_fr ctxt x =
+  Gas.consume ctxt Unparse_costs.bls12_381_fr
+  >|? fun ctxt ->
+  let bytes = Bls12_381.Fr.to_bytes x in
+  (Bytes (-1, bytes), ctxt)
+
+(* -- Unparsing data of any type -- *)
+
 let rec unparse_data :
     type a.
     context ->
@@ -5702,167 +5836,42 @@ let rec unparse_data :
     else unparse_data ctxt ~stack_depth:(stack_depth + 1) mode ty a
   in
   match (ty, a) with
-  | (Unit_t _, ()) ->
-      return (Prim (-1, D_Unit, [], []), ctxt)
+  | (Unit_t _, v) ->
+      Lwt.return @@ unparse_unit ctxt v
   | (Int_t _, v) ->
-      return (Int (-1, Script_int.to_zint v), ctxt)
+      Lwt.return @@ unparse_int ctxt v
   | (Nat_t _, v) ->
-      return (Int (-1, Script_int.to_zint v), ctxt)
+      Lwt.return @@ unparse_nat ctxt v
   | (String_t _, s) ->
-      return (String (-1, s), ctxt)
+      Lwt.return @@ unparse_string ctxt s
   | (Bytes_t _, s) ->
-      return (Bytes (-1, s), ctxt)
-  | (Bool_t _, true) ->
-      return (Prim (-1, D_True, [], []), ctxt)
-  | (Bool_t _, false) ->
-      return (Prim (-1, D_False, [], []), ctxt)
+      Lwt.return @@ unparse_bytes ctxt s
+  | (Bool_t _, b) ->
+      Lwt.return @@ unparse_bool ctxt b
   | (Timestamp_t _, t) ->
-      Lwt.return
-        ( match mode with
-        | Optimized ->
-            ok (Int (-1, Script_timestamp.to_zint t), ctxt)
-        | Readable -> (
-            Gas.consume ctxt Unparse_costs.timestamp_readable
-            >>? fun ctxt ->
-            match Script_timestamp.to_notation t with
-            | None ->
-                ok (Int (-1, Script_timestamp.to_zint t), ctxt)
-            | Some s ->
-                ok (String (-1, s), ctxt) ) )
-  | (Address_t _, (c, entrypoint)) ->
-      Lwt.return
-        ( Gas.consume ctxt Unparse_costs.contract
-        >|? fun ctxt ->
-        match mode with
-        | Optimized ->
-            let entrypoint =
-              match entrypoint with "default" -> "" | name -> name
-            in
-            let bytes =
-              Data_encoding.Binary.to_bytes_exn
-                Data_encoding.(tup2 Contract.encoding Variable.string)
-                (c, entrypoint)
-            in
-            (Bytes (-1, bytes), ctxt)
-        | Readable ->
-            let notation =
-              match entrypoint with
-              | "default" ->
-                  Contract.to_b58check c
-              | entrypoint ->
-                  Contract.to_b58check c ^ "%" ^ entrypoint
-            in
-            (String (-1, notation), ctxt) )
-  | (Contract_t _, (_, (c, entrypoint))) ->
-      Lwt.return
-        ( Gas.consume ctxt Unparse_costs.contract
-        >|? fun ctxt ->
-        match mode with
-        | Optimized ->
-            let entrypoint =
-              match entrypoint with "default" -> "" | name -> name
-            in
-            let bytes =
-              Data_encoding.Binary.to_bytes_exn
-                Data_encoding.(tup2 Contract.encoding Variable.string)
-                (c, entrypoint)
-            in
-            (Bytes (-1, bytes), ctxt)
-        | Readable ->
-            let notation =
-              match entrypoint with
-              | "default" ->
-                  Contract.to_b58check c
-              | entrypoint ->
-                  Contract.to_b58check c ^ "%" ^ entrypoint
-            in
-            (String (-1, notation), ctxt) )
+      Lwt.return @@ unparse_timestamp ctxt mode t
+  | (Address_t _, address) ->
+      Lwt.return @@ unparse_address ctxt mode address
+  | (Contract_t _, contract) ->
+      Lwt.return @@ unparse_contract ctxt mode contract
   | (Signature_t _, s) ->
-      Lwt.return
-        ( match mode with
-        | Optimized ->
-            Gas.consume ctxt Unparse_costs.signature_optimized
-            >|? fun ctxt ->
-            let bytes =
-              Data_encoding.Binary.to_bytes_exn Signature.encoding s
-            in
-            (Bytes (-1, bytes), ctxt)
-        | Readable ->
-            Gas.consume ctxt Unparse_costs.signature_readable
-            >|? fun ctxt -> (String (-1, Signature.to_b58check s), ctxt) )
+      Lwt.return @@ unparse_signature ctxt mode s
   | (Mutez_t _, v) ->
-      return (Int (-1, Z.of_int64 (Tez.to_mutez v)), ctxt)
+      Lwt.return @@ unparse_mutez ctxt v
   | (Key_t _, k) ->
-      Lwt.return
-        ( match mode with
-        | Optimized ->
-            Gas.consume ctxt Unparse_costs.public_key_optimized
-            >|? fun ctxt ->
-            let bytes =
-              Data_encoding.Binary.to_bytes_exn Signature.Public_key.encoding k
-            in
-            (Bytes (-1, bytes), ctxt)
-        | Readable ->
-            Gas.consume ctxt Unparse_costs.public_key_readable
-            >|? fun ctxt ->
-            (String (-1, Signature.Public_key.to_b58check k), ctxt) )
+      Lwt.return @@ unparse_key ctxt mode k
   | (Key_hash_t _, k) ->
-      Lwt.return
-        ( match mode with
-        | Optimized ->
-            Gas.consume ctxt Unparse_costs.key_hash_optimized
-            >|? fun ctxt ->
-            let bytes =
-              Data_encoding.Binary.to_bytes_exn
-                Signature.Public_key_hash.encoding
-                k
-            in
-            (Bytes (-1, bytes), ctxt)
-        | Readable ->
-            Gas.consume ctxt Unparse_costs.key_hash_readable
-            >|? fun ctxt ->
-            (String (-1, Signature.Public_key_hash.to_b58check k), ctxt) )
-  | (Operation_t _, (op, _big_map_diff)) ->
-      let bytes =
-        Data_encoding.Binary.to_bytes_exn
-          Operation.internal_operation_encoding
-          op
-      in
-      Lwt.return
-        ( Gas.consume ctxt (Unparse_costs.operation bytes)
-        >|? fun ctxt -> (Bytes (-1, bytes), ctxt) )
+      Lwt.return @@ unparse_key_hash ctxt mode k
+  | (Operation_t _, operation) ->
+      Lwt.return @@ unparse_operation ctxt operation
   | (Chain_id_t _, chain_id) ->
-      Lwt.return
-        ( match mode with
-        | Optimized ->
-            Gas.consume ctxt Unparse_costs.chain_id_optimized
-            >|? fun ctxt ->
-            let bytes =
-              Data_encoding.Binary.to_bytes_exn Chain_id.encoding chain_id
-            in
-            (Bytes (-1, bytes), ctxt)
-        | Readable ->
-            Gas.consume ctxt Unparse_costs.chain_id_readable
-            >|? fun ctxt -> (String (-1, Chain_id.to_b58check chain_id), ctxt)
-        )
+      Lwt.return @@ unparse_chain_id ctxt mode chain_id
   | (Bls12_381_g1_t _, x) ->
-      Lwt.return
-        ( Gas.consume ctxt Unparse_costs.bls12_381_g1
-        >|? fun ctxt ->
-        let bytes = Bls12_381.G1.to_bytes x in
-        (Bytes (-1, bytes), ctxt) )
+      Lwt.return @@ unparse_bls12_381_g1 ctxt x
   | (Bls12_381_g2_t _, x) ->
-      Lwt.return
-        ( Gas.consume ctxt Unparse_costs.bls12_381_g2
-        >|? fun ctxt ->
-        let bytes = Bls12_381.G2.to_bytes x in
-        (Bytes (-1, bytes), ctxt) )
+      Lwt.return @@ unparse_bls12_381_g2 ctxt x
   | (Bls12_381_fr_t _, x) ->
-      Lwt.return
-        ( Gas.consume ctxt Unparse_costs.bls12_381_fr
-        >|? fun ctxt ->
-        let bytes = Bls12_381.Fr.to_bytes x in
-        (Bytes (-1, bytes), ctxt) )
+      Lwt.return @@ unparse_bls12_381_fr ctxt x
   | (Pair_t ((tl, _, _), (tr, _, _), _), (l, r)) -> (
       non_terminal_recursion ctxt mode tl l
       >>=? fun (l, ctxt) ->
