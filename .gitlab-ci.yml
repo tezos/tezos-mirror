@@ -27,6 +27,9 @@ stages:
 sanity:
   image: ${build_deps_image_name}:${build_deps_image_version}
   stage: sanity
+  except:
+    - tags@tezos/tezos
+    - /-release$/@tezos/tezos
   before_script:
     - . ./scripts/version.sh
   script:
@@ -58,8 +61,8 @@ sanity:
     - mainnet-staging
     - zeronet-snapshots
     - mainnet-snapshots
-    - latest-release
-    - tags
+    - tags@tezos/tezos
+    - /-release$/@tezos/tezos
   before_script:
     - . ./scripts/version.sh
     # Load the environment poetry previously created in the docker image.
@@ -144,8 +147,8 @@ test-script-gen-genesis:
     - mainnet-staging
     - zeronet-snapshots
     - mainnet-snapshots
-    - latest-release
-    - tags
+    - tags@tezos/tezos
+    - /-release$/@tezos/tezos
   before_script:
     - cd scripts/gen-genesis
   script:
@@ -706,8 +709,8 @@ documentation:build:
     - mainnet-staging
     - zeronet-snapshots
     - mainnet-snapshots
-    - /-release$/
-    - tags
+    - tags@tezos/tezos
+    - /-release$/@tezos/tezos
   script:
     - make doc-html
   artifacts:
@@ -723,11 +726,13 @@ documentation:linkcheck:
   dependencies:
     - build
   rules:
+    - if: '$CI_COMMIT_TAG && $CI_PROJECT_NAMESPACE == "tezos"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH =~ /-release$/ && $CI_PROJECT_NAMESPACE == "tezos"'
+      when: never
     - if: '$CI_COMMIT_BRANCH == "master"'
       when: on_success
     - if: '$CI_COMMIT_BRANCH =~ /doc/'
-      when: on_success
-    - if: '$CI_COMMIT_BRANCH =~ /-release$/'
       when: on_success
     - changes:
         - /docs
@@ -746,11 +751,13 @@ documentation:linkcheck:
   stage: packaging
   dependencies: []
   rules:
+    - if: '$CI_COMMIT_TAG && $CI_PROJECT_NAMESPACE == "tezos"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH =~ /-release$/ && $CI_PROJECT_NAMESPACE == "tezos"'
+      when: never
     - if: '$CI_COMMIT_BRANCH == "master"'
       when: on_success
     - if: '$CI_COMMIT_BRANCH =~ /opam/'
-      when: on_success
-    - if: '$CI_COMMIT_BRANCH =~ /-release$/'
       when: on_success
     - changes:
         - /**/*.opam
@@ -1551,6 +1558,9 @@ pages:
     paths:
       - public
   stage: publish_coverage
+  except:
+    - tags@tezos/tezos
+    - /-release$/@tezos/tezos
   dependencies:
     - test_coverage
   script:
@@ -1576,6 +1586,9 @@ pages:
 test_coverage:
   image: ${build_deps_image_name}:${build_deps_image_version}
   stage: test_coverage
+  except:
+    - tags@tezos/tezos
+    - /-release$/@tezos/tezos
   when: manual
   variables:
     # We exclude from coverage old protocols and code that can't be
