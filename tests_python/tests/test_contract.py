@@ -390,6 +390,9 @@ class TestContracts:
         # Ticket duplication attempt
         ("ticket_dup.tz",
          r'DUP used on a non-dupable type'),
+        # error message for ticket unpack
+        ("ticket_unpack.tz",
+         r'Ticket in unauthorized position'),
     ])
     def test_ill_typecheck(self, client: Client, contract, error_pattern):
         with utils.assert_run_failure(error_pattern):
