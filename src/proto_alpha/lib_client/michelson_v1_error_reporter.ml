@@ -647,12 +647,14 @@ let report_errors ~details ~show_source ?parsed ppf errs =
               "%aThe SELF instruction cannot appear in a lambda."
               print_loc
               loc
-        | Non_dupable_type loc ->
+        | Non_dupable_type (loc, ty) ->
             Format.fprintf
               ppf
-              "%aDUP used on a non-dupable type (e.g. tickets)."
+              "%aDUP used on the non-dupable type %a."
               print_loc
               loc
+              print_ty
+              ty
         | Unexpected_ticket loc ->
             Format.fprintf
               ppf
