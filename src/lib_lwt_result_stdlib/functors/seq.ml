@@ -40,6 +40,9 @@ struct
 
   let lwt_empty = Lwt.return empty
 
+  (* Like Lwt.apply but specialised for three parameters *)
+  let apply3 f x y = try f x y with exn -> Lwt.fail exn
+
   let rec fold_left_e f acc seq =
     match seq () with
     | Nil ->
@@ -54,12 +57,26 @@ struct
     | Cons (item, seq) ->
         f acc item >>= fun acc -> fold_left_s f acc seq
 
+  let fold_left_s f acc seq =
+    match seq () with
+    | Nil ->
+        Lwt.return acc
+    | Cons (item, seq) ->
+        apply3 f acc item >>= fun acc -> fold_left_s f acc seq
+
   let rec fold_left_es f acc seq =
     match seq () with
     | Nil ->
         Monad.return acc
     | Cons (item, seq) ->
         f acc item >>=? fun acc -> fold_left_es f acc seq
+
+  let fold_left_es f acc seq =
+    match seq () with
+    | Nil ->
+        Monad.return acc
+    | Cons (item, seq) ->
+        apply3 f acc item >>=? fun acc -> fold_left_es f acc seq
 
   let rec iter_e f seq =
     match seq () with
@@ -75,6 +92,13 @@ struct
     | Cons (item, seq) ->
         f item >>= fun () -> iter_s f seq
 
+  let iter_s f seq =
+    match seq () with
+    | Nil ->
+        Lwt.return_unit
+    | Cons (item, seq) ->
+        Lwt.apply f item >>= fun () -> iter_s f seq
+
   let rec iter_es f seq =
     match seq () with
     | Nil ->
@@ -82,13 +106,20 @@ struct
     | Cons (item, seq) ->
         f item >>=? fun () -> iter_es f seq
 
+  let iter_es f seq =
+    match seq () with
+    | Nil ->
+        return_unit
+    | Cons (item, seq) ->
+        Lwt.apply f item >>=? fun () -> iter_es f seq
+
   let iter_p f seq =
     let rec iter_p f seq acc =
       match seq () with
       | Nil ->
           join_p acc
       | Cons (item, seq) ->
-          iter_p f seq (f item :: acc)
+          iter_p f seq (Lwt.apply f item :: acc)
     in
     iter_p f seq []
 
@@ -98,7 +129,7 @@ struct
       | Nil ->
           join_ep acc
       | Cons (item, seq) ->
-          iter_ep f seq (f item :: acc)
+          iter_ep f seq (Lwt.apply f item :: acc)
     in
     iter_ep f seq []
 
@@ -120,6 +151,15 @@ struct
         >>= fun item ->
         map_s f seq >>= fun seq -> Lwt.return (fun () -> Cons (item, seq))
 
+  let map_s f seq =
+    match seq () with
+    | Nil ->
+        lwt_empty
+    | Cons (item, seq) ->
+        Lwt.apply f item
+        >>= fun item ->
+        map_s f seq >>= fun seq -> Lwt.return (fun () -> Cons (item, seq))
+
   let rec map_es f seq =
     match seq () with
     | Nil ->
@@ -129,11 +169,22 @@ struct
         >>=? fun item ->
         map_es f seq >>=? fun seq -> Monad.return (fun () -> Cons (item, seq))
 
+  let map_es f seq =
+    match seq () with
+    | Nil ->
+        return_empty
+    | Cons (item, seq) ->
+        Lwt.apply f item
+        >>=? fun item ->
+        map_es f seq >>=? fun seq -> Monad.return (fun () -> Cons (item, seq))
+
   let map_p f seq =
-    all_p (fold_left (fun acc x -> f x :: acc) [] seq) >|= List.to_seq
+    all_p (fold_left (fun acc x -> Lwt.apply f x :: acc) [] seq)
+    >|= Stdlib.List.to_seq
 
   let map_ep f seq =
-    all_ep (fold_left (fun acc x -> f x :: acc) [] seq) >|=? List.to_seq
+    all_ep (fold_left (fun acc x -> Lwt.apply f x :: acc) [] seq)
+    >|=? Stdlib.List.to_seq
 
   let rec filter_e f seq =
     match seq () with
@@ -160,12 +211,38 @@ struct
             filter_s f seq
             >>= fun seq -> Lwt.return (fun () -> Cons (item, seq)) )
 
+  let filter_s f seq =
+    match seq () with
+    | Nil ->
+        lwt_empty
+    | Cons (item, seq) -> (
+        Lwt.apply f item
+        >>= function
+        | false ->
+            filter_s f seq
+        | true ->
+            filter_s f seq
+            >>= fun seq -> Lwt.return (fun () -> Cons (item, seq)) )
+
   let rec filter_es f seq =
     match seq () with
     | Nil ->
         return_empty
     | Cons (item, seq) -> (
         f item
+        >>=? function
+        | false ->
+            filter_es f seq
+        | true ->
+            filter_es f seq
+            >>=? fun seq -> Monad.return (fun () -> Cons (item, seq)) )
+
+  let filter_es f seq =
+    match seq () with
+    | Nil ->
+        return_empty
+    | Cons (item, seq) -> (
+        Lwt.apply f item
         >>=? function
         | false ->
             filter_es f seq
@@ -198,12 +275,38 @@ struct
             filter_map_s f seq
             >>= fun seq -> Lwt.return (fun () -> Cons (item, seq)) )
 
+  let filter_map_s f seq =
+    match seq () with
+    | Nil ->
+        lwt_empty
+    | Cons (item, seq) -> (
+        Lwt.apply f item
+        >>= function
+        | None ->
+            filter_map_s f seq
+        | Some item ->
+            filter_map_s f seq
+            >>= fun seq -> Lwt.return (fun () -> Cons (item, seq)) )
+
   let rec filter_map_es f seq =
     match seq () with
     | Nil ->
         return_empty
     | Cons (item, seq) -> (
         f item
+        >>=? function
+        | None ->
+            filter_map_es f seq
+        | Some item ->
+            filter_map_es f seq
+            >>=? fun seq -> Monad.return (fun () -> Cons (item, seq)) )
+
+  let filter_map_es f seq =
+    match seq () with
+    | Nil ->
+        return_empty
+    | Cons (item, seq) -> (
+        Lwt.apply f item
         >>=? function
         | None ->
             filter_map_es f seq
@@ -235,11 +338,28 @@ struct
         >>= function
         | true -> Lwt.return_some item | false -> find_first_s f seq )
 
+  let find_first_s f seq =
+    match seq () with
+    | Nil ->
+        Lwt.return_none
+    | Cons (item, seq) -> (
+        Lwt.apply f item
+        >>= function
+        | true -> Lwt.return_some item | false -> find_first_s f seq )
+
   let rec find_first_es f seq =
     match seq () with
     | Nil ->
         return_none
     | Cons (item, seq) -> (
         f item
+        >>=? function true -> return_some item | false -> find_first_es f seq )
+
+  let find_first_es f seq =
+    match seq () with
+    | Nil ->
+        return_none
+    | Cons (item, seq) -> (
+        Lwt.apply f item
         >>=? function true -> return_some item | false -> find_first_es f seq )
 end
