@@ -5927,15 +5927,8 @@ let rec unparse_data :
       >|=? fun (items, ctxt) -> (Micheline.Seq (-1, items), ctxt)
   | (Map_t (kt, vt, _), map) ->
       let kt = ty_of_comparable_ty kt in
-      fold_left_s
-        (fun (l, ctxt) (k, v) ->
-          non_terminal_recursion ctxt mode kt k
-          >>=? fun (key, ctxt) ->
-          non_terminal_recursion ctxt mode vt v
-          >|=? fun (value, ctxt) ->
-          (Prim (-1, D_Elt, [key; value], []) :: l, ctxt))
-        ([], ctxt)
-        (map_fold (fun k v acc -> (k, v) :: acc) map [])
+      let items = map_fold (fun k v acc -> (k, v) :: acc) map [] in
+      unparse_items ctxt ~stack_depth:(stack_depth + 1) mode kt vt items
       >|=? fun (items, ctxt) -> (Micheline.Seq (-1, items), ctxt)
   | (Big_map_t (_kt, _vt, _), {id = Some id; diff = (module Diff); _})
     when Diff.OPS.is_empty (fst Diff.boxed) ->
