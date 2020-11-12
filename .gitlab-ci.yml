@@ -298,6 +298,11 @@ unit:ocaml-lmdb:
   script:
     - dune build @vendors/ocaml-lmdb/runtest
 
+unit:ocaml-uecc:
+  <<: *test_definition
+  script:
+    - dune build @vendors/ocaml-uecc/runtest
+
 ##END_UNITTEST##
 
 unit:protocol_compiles:
@@ -1416,6 +1421,11 @@ opam:tezos-workers:
   <<: *opam_definition
   variables:
     package: tezos-workers
+
+opam:uecc:
+  <<: *opam_definition
+  variables:
+    package: uecc
 
 ##END_OPAM##
 
