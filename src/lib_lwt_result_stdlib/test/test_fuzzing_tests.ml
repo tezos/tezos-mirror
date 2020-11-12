@@ -213,6 +213,61 @@ struct
           (Lwt.return_ok @@ with_stdlib_iter fn init input))
 end
 
+module TestIteriAgainstStdlibList (M : sig
+  include BASE with type 'a elt := int
+
+  include
+    Traits.ITERI_SEQUENTIAL with type 'a elt := int and type 'a t := int t
+end) =
+struct
+  let with_stdlib_iteri fn init input =
+    let acc = ref init in
+    Stdlib.List.iteri (IteriOf.fn acc fn) input ;
+    !acc
+
+  let () =
+    Crowbar.add_test
+      ~name:(Format.asprintf "%s.iteri, Stdlib.List.iteri" M.name)
+      [Fn.arith; one; many]
+      (fun fn init input ->
+        eq
+          (let acc = ref init in
+           M.iteri (IteriOf.fn acc fn) (M.of_list input) ;
+           !acc)
+          (with_stdlib_iteri fn init input))
+
+  let () =
+    Crowbar.add_test
+      ~name:(Format.asprintf "%s.iteri_e, Stdlib.List.iteri" M.name)
+      [Fn.arith; one; many]
+      (fun fn init input ->
+        eq_e
+          (let acc = ref init in
+           M.iteri_e (IteriEOf.fn acc fn) (M.of_list input) >|? fun () -> !acc)
+          (Ok (with_stdlib_iteri fn init input)))
+
+  let () =
+    Crowbar.add_test
+      ~name:(Format.asprintf "%s.iteri_s, Stdlib.List.iteri" M.name)
+      [Fn.arith; one; many]
+      (fun fn init input ->
+        eq_s
+          (let acc = ref init in
+           M.iteri_s (IteriSOf.fn acc fn) (M.of_list input) >|= fun () -> !acc)
+          (Lwt.return @@ with_stdlib_iteri fn init input))
+
+  let () =
+    Crowbar.add_test
+      ~name:(Format.asprintf "%s.iteri_es, Stdlib.List.iteri" M.name)
+      [Fn.arith; one; many]
+      (fun fn init input ->
+        eq_es
+          (let acc = ref init in
+           M.iteri_es (IteriESOf.fn acc fn) (M.of_list input)
+           >|=? fun () -> !acc)
+          (Lwt.return_ok @@ with_stdlib_iteri fn init input))
+end
+
 module TestIterMonotoneAgainstStdlibList (M : sig
   include BASE with type 'a elt := int
 

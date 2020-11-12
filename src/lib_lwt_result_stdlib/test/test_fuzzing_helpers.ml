@@ -91,6 +91,10 @@ module IterOf = struct
   let fn r fn y = r := fn !r y
 end
 
+module IteriOf = struct
+  let fn r fn i y = r := fn !r (fn i y)
+end
+
 module Iter2Of = struct
   let fn r fn x y = r := fn !r (fn x y)
 end
@@ -119,6 +123,14 @@ module IterEOf = struct
     Ok ()
 
   let fn_e r fn y = fn !r y >|? fun t -> r := t
+end
+
+module IteriEOf = struct
+  let fn r fn i y =
+    r := fn !r (fn i y) ;
+    Ok ()
+
+  let fn_e r fn i y = fn i y >>? fun z -> fn !r z >|? fun t -> r := t
 end
 
 module Iter2EOf = struct
@@ -181,6 +193,14 @@ module IterSOf = struct
     Lwt.return_unit
 
   let fn_s r fn y = fn !r y >|= fun t -> r := t
+end
+
+module IteriSOf = struct
+  let fn r fn i y =
+    r := fn !r (fn i y) ;
+    Lwt.return_unit
+
+  let fn_s r fn i y = fn i y >>= fun z -> fn !r z >|= fun t -> r := t
 end
 
 module Iter2SOf = struct
@@ -251,6 +271,26 @@ module IterESOf = struct
     Ok ()
 
   let fn_es r fn y = fn !r y >|=? fun t -> r := t
+end
+
+module IteriESOf = struct
+  let fn r fn i y =
+    r := fn !r (fn i y) ;
+    return_unit
+
+  let fn_e r fn i y =
+    Lwt.return @@ fn i y
+    >>=? fun z -> Lwt.return @@ fn !r z >|=? fun t -> r := t
+
+  let fn_s r fn i y =
+    fn i y
+    >>= fun z ->
+    fn !r z
+    >|= fun t ->
+    r := t ;
+    Ok ()
+
+  let fn_es r fn i y = fn i y >>=? fun z -> fn !r z >|=? fun t -> r := t
 end
 
 module Iter2ESOf = struct

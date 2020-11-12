@@ -70,6 +70,28 @@ module type ITER_PARALLEL = sig
     (unit, 'error trace) result Lwt.t
 end
 
+module type ITERI_VANILLA = sig
+  type 'a elt
+
+  type 'a t
+
+  val iteri : (int -> 'a elt -> unit) -> 'a t -> unit
+end
+
+module type ITERI_SEQUENTIAL = sig
+  include ITERI_VANILLA
+
+  val iteri_e :
+    (int -> 'a elt -> (unit, 'trace) result) -> 'a t -> (unit, 'trace) result
+
+  val iteri_s : (int -> 'a elt -> unit Lwt.t) -> 'a t -> unit Lwt.t
+
+  val iteri_es :
+    (int -> 'a elt -> (unit, 'trace) result Lwt.t) ->
+    'a t ->
+    (unit, 'trace) result Lwt.t
+end
+
 module type MAP_VANILLA = sig
   type 'a t
 
