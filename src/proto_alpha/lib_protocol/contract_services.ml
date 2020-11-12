@@ -229,7 +229,7 @@ let register () =
     | None ->
         raise Not_found
     | Some (_, value_type) -> (
-        parse_packable_ty ctxt ~legacy:true (Micheline.root value_type)
+        parse_big_map_value_ty ctxt ~legacy:true (Micheline.root value_type)
         >>?= fun (Ex_ty value_type, ctxt) ->
         Big_map.get_opt ctxt id key
         >>=? fun (_ctxt, value) ->

@@ -193,6 +193,13 @@ val parse_instr :
   'bef Script_typed_ir.stack_ty ->
   ('bef judgement * context) tzresult Lwt.t
 
+(**
+  [parse_ty] specialized for the right-hand side part of a big map type, i.e.
+  the `value` in `big_map key value`.
+*)
+val parse_big_map_value_ty :
+  context -> legacy:bool -> Script.node -> (ex_ty * context) tzresult
+
 val parse_packable_ty :
   context -> legacy:bool -> Script.node -> (ex_ty * context) tzresult
 
@@ -203,8 +210,8 @@ val parse_comparable_ty :
   context -> Script.node -> (ex_comparable_ty * context) tzresult
 
 (** We expose [parse_ty] for convenience to external tools. Please use
-    specialized versions such as [parse_packable_ty], [parse_parameter_ty], or
-    [parse_comparable_ty] if possible. *)
+    specialized versions such as [parse_packable_ty], [parse_parameter_ty],
+    [parse_comparable_ty], or [parse_big_map_value_ty] if possible. *)
 val parse_ty :
   context ->
   legacy:bool ->
