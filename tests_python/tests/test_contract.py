@@ -389,7 +389,7 @@ class TestContracts:
          r"big_map or sapling_state type not expected here"),
         # Ticket duplication attempt
         ("ticket_dup.tz",
-         r'DUP used on a non-dupable type'),
+         r'DUP used on the non-dupable type ticket nat'),
         # error message for ticket unpack
         ("ticket_unpack.tz",
          r'Ticket in unauthorized position'),
