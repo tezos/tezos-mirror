@@ -4179,6 +4179,8 @@ and parse_instr :
   | (Prim (loc, I_FAILWITH, [], annot), Item_t (v, _rest, _)) ->
       error_unexpected_annot loc annot
       >>?= fun () ->
+      (if legacy then ok_unit else check_packable ~legacy:false loc v)
+      >>?= fun () ->
       let descr aft = {loc; instr = Failwith v; bef = stack_ty; aft} in
       log_stack ctxt loc stack_ty Empty_t
       >>?= fun () -> return ctxt (Failed {descr})
