@@ -39,12 +39,13 @@ $ rustup override set $rust_version"
     exit 1
 fi
 
-install_dir="${OPAM_SWITCH_PREFIX}/lib"
+LIBRARY_DIR="${OPAM_SWITCH_PREFIX}/lib"
 # Install the headers in `include`
 HEADER_DIR="${OPAM_SWITCH_PREFIX}/include"
-zcash_params="${OPAM_SWITCH_PREFIX}/share/zcash-params"
+ZCASH_PARAMS="${OPAM_SWITCH_PREFIX}/share/zcash-params"
 
 BUILD_DIR=_build_rust
+
 function cleanup () {
     echo "Cleaning up build directory ${BUILD_DIR}"
     rm -rf "${BUILD_DIR}"
@@ -52,9 +53,9 @@ function cleanup () {
 trap cleanup EXIT INT
 
 mkdir -p "${HEADER_DIR}"
-mkdir -p "$install_dir"
+mkdir -p "${LIBRARY_DIR}"
 mkdir -p "${BUILD_DIR}/opam-repository"
-cd "${BUILD_DIR}/opam-repository"
+cd "${BUILD_DIR}"/opam-repository
 
 if [ ! -d .git ] ; then
   git init
@@ -65,17 +66,26 @@ fi
 git fetch --depth 1 origin "$opam_repository_tag"
 git reset --hard "$opam_repository_tag"
 
-echo "Installing Rust dependencies in ${install_dir}"
 # this compilation option is important for the CI to avoid linking
 # statically musl, here is just for consistency
 RUSTFLAGS='-C target-feature=-crt-static' $CARGO build --release --manifest-path rust/Cargo.toml
-cp rust/target/release/*.a "${install_dir}"
-# NB: Add the headers that bindings require while compiling the C stubs.
-echo "Installing headers in ${HEADER_DIR}"
-cp rust/librustzcash/include/librustzcash.h "${HEADER_DIR}"
-cp rust/rustc-bls12-381/include/rustc_bls12_381.h "${HEADER_DIR}"
 
-echo "Installing zcash parameters in ${zcash_params}"
-rm -rf "${zcash_params}"
-mkdir -p "${zcash_params}"
-cp zcash-params/* "${zcash_params}"
+## librustzcash (Sapling)
+echo "Installing Rust libraries of Sapling in ${LIBRARY_DIR}/librustzcash and headers in ${HEADER_DIR}/librustzcash"
+mkdir -p "${LIBRARY_DIR}"/librustzcash
+mkdir -p "${HEADER_DIR}"/librustzcash
+cp rust/target/release/librustzcash.a "${LIBRARY_DIR}/librustzcash"
+cp rust/librustzcash/include/librustzcash.h "${HEADER_DIR}/librustzcash"
+
+## BLS12-381
+echo "Installing Rust libraries of BLS12-381 in ${LIBRARY_DIR}/rustc-bls12-381 and headers in ${HEADER_DIR}/rustc-bls12-381"
+mkdir -p "${LIBRARY_DIR}"/rustc-bls12-381
+mkdir -p "${HEADER_DIR}"/rustc-bls12-381
+cp rust/rustc-bls12-381/include/rustc_bls12_381.h "${HEADER_DIR}/rustc-bls12-381"
+cp rust/target/release/librustc_bls12_381.a "${LIBRARY_DIR}/rustc-bls12-381"
+
+## Required for Sapling.
+echo "Installing Sapling parameters in ${ZCASH_PARAMS}"
+rm -rf "${ZCASH_PARAMS}"
+mkdir -p "${ZCASH_PARAMS}"
+cp zcash-params/* "${ZCASH_PARAMS}"
