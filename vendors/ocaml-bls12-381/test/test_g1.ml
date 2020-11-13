@@ -254,6 +254,80 @@ module Constructors = struct
         test_case "test vectors add" `Quick test_vectors_add ] )
 end
 
+module UncompressedRepresentation = struct
+  let test_uncompressed_zero_has_first_byte_at_64 () =
+    assert (
+      int_of_char (Bytes.get Bls12_381.G1.Uncompressed.(to_bytes zero) 0) = 64
+    )
+
+  let test_uncompressed_random_has_first_byte_strictly_lower_than_64 () =
+    assert (
+      int_of_char (Bytes.get Bls12_381.G1.Uncompressed.(to_bytes (random ())) 0)
+      < 64 )
+
+  let test_of_bytes_exn_to_bytes_consistent_on_random () =
+    let r = Bls12_381.G1.Uncompressed.random () in
+    assert (Bls12_381.G1.Uncompressed.(eq (of_bytes_exn (to_bytes r)) r))
+
+  let test_bytes () =
+    let test_vectors =
+      [ ( Bls12_381.G1.Uncompressed.one,
+          Bytes.of_string
+            "\023\241\211\1671\151\215\148&\149c\140O\169\172\015\195h\140O\151t\185\005\161N:?\023\027\172XlU\232?\249z\026\239\251:\240\n\
+             \219\"\198\187\b\179\244\129\227\170\160\241\160\1580\237t\029\138\228\252\245\224\149\213\208\n\
+             \246\000\219\024\203,\004\179\237\208<\199D\162\136\138\228\012\170#)F\197\231\225"
+        );
+        ( Bls12_381.G1.Uncompressed.zero,
+          Bytes.of_string
+            "@\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000"
+        ) ]
+    in
+    List.iter
+      (fun (v, expected_value) ->
+        assert (
+          Bls12_381.G1.Uncompressed.(
+            eq v (Bls12_381.G1.Uncompressed.of_bytes_exn expected_value)) ))
+      test_vectors
+
+  let test_of_bytes_exn_to_bytes_consistent_on_one () =
+    let r = Bls12_381.G1.Uncompressed.one in
+    assert (Bls12_381.G1.Uncompressed.(eq (of_bytes_exn (to_bytes r)) r))
+
+  let test_of_bytes_exn_to_bytes_consistent_on_zero () =
+    let r = Bls12_381.G1.Uncompressed.zero in
+    assert (Bls12_381.G1.Uncompressed.(eq (of_bytes_exn (to_bytes r)) r))
+
+  let get_tests () =
+    let open Alcotest in
+    ( "Representation of G1 uncompressed",
+      [ test_case
+          "zero has first byte at 64"
+          `Quick
+          test_uncompressed_zero_has_first_byte_at_64;
+        test_case
+          "of bytes and to bytes are consistent on random"
+          `Quick
+          (Test_ec_make.repeat
+             1000
+             test_of_bytes_exn_to_bytes_consistent_on_random);
+        test_case "bytes encoding" `Quick test_bytes;
+        test_case
+          "of bytes and to bytes are consistent on one"
+          `Quick
+          test_of_bytes_exn_to_bytes_consistent_on_one;
+        test_case
+          "of bytes and to bytes are consistent on zero"
+          `Quick
+          test_of_bytes_exn_to_bytes_consistent_on_zero;
+        test_case
+          "random has first byte strictly lower than 64"
+          `Quick
+          (Test_ec_make.repeat
+             1000
+             test_uncompressed_random_has_first_byte_strictly_lower_than_64) ]
+    )
+end
+
 let () =
   let open Alcotest in
   run
@@ -262,6 +336,7 @@ let () =
       ValueGeneration.get_tests ();
       Equality.get_tests ();
       ECProperties.get_tests ();
+      UncompressedRepresentation.get_tests ();
       Constructors.get_tests () ] ;
   run
     "G1 Compressed"

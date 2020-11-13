@@ -13,14 +13,24 @@ type t = Bytes.t
 
 let empty () = Bytes.make size_in_bytes '\000'
 
+let pad_if_require bs =
+  if Bytes.length bs < size_in_bytes then (
+    let padded_bytes = Bytes.make size_in_bytes '\000' in
+    Bytes.blit bs 0 padded_bytes 0 (Bytes.length bs) ;
+    padded_bytes )
+  else bs
+
 let check_bytes bs =
   if Bytes.length bs = size_in_bytes then
     Fr_stubs.check_bytes (Ctypes.ocaml_bytes_start bs)
   else false
 
-let of_bytes_opt bs = if check_bytes bs then Some bs else None
+let of_bytes_opt bs =
+  let bs = pad_if_require bs in
+  if check_bytes bs then Some bs else None
 
 let of_bytes_exn (g : Bytes.t) : t =
+  let g = pad_if_require g in
   if check_bytes g then g else raise (Not_in_field g)
 
 let to_bytes g = g
@@ -119,6 +129,8 @@ let double g =
 let eq x y =
   (* IMPORTANT: DO NOT USE THE BYTES representation because we use 384 bits
      instead of 381 bits. We trust the binding offered by the library *)
+  assert (Bytes.length x = size_in_bytes) ;
+  assert (Bytes.length y = size_in_bytes) ;
   Fr_stubs.eq (Ctypes.ocaml_bytes_start x) (Ctypes.ocaml_bytes_start y)
 
 let ( = ) = eq
