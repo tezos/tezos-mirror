@@ -2815,8 +2815,7 @@ let rec parse_data :
                 >>? fun (Eq, ctxt) ->
                 ty_eq ctxt loc tv btv >>? fun (Eq, ctxt) -> ok (Some id, ctxt)
                 ) ) )
-      >|=? fun (id, ctxt) ->
-      ({id; diff; key_type = ty_of_comparable_ty tk; value_type = tv}, ctxt)
+      >|=? fun (id, ctxt) -> ({id; diff; key_type = tk; value_type = tv}, ctxt)
   | (Never_t _, expr) ->
       traced_fail (Invalid_never_expr (location expr))
   (* Bls12_381 types *)
@@ -6201,20 +6200,15 @@ let hash_comparable_data ctxt typ data =
 
 (* ---------------- Big map -------------------------------------------------*)
 
-let empty_big_map tk tv =
-  {
-    id = None;
-    diff = empty_map tk;
-    key_type = ty_of_comparable_ty tk;
-    value_type = tv;
-  }
+let empty_big_map key_type value_type =
+  {id = None; diff = empty_map key_type; key_type; value_type}
 
 let big_map_mem ctxt key {id; diff; key_type; _} =
   match (map_get key diff, id) with
   | (None, None) ->
       return (false, ctxt)
   | (None, Some id) ->
-      hash_data ctxt key_type key
+      hash_comparable_data ctxt key_type key
       >>=? fun (hash, ctxt) ->
       Alpha_context.Big_map.mem ctxt id hash >|=? fun (ctxt, res) -> (res, ctxt)
   | (Some None, _) ->
@@ -6229,7 +6223,7 @@ let big_map_get ctxt key {id; diff; key_type; value_type} =
   | (None, None) ->
       return (None, ctxt)
   | (None, Some id) -> (
-      hash_data ctxt key_type key
+      hash_comparable_data ctxt key_type key
       >>=? fun (hash, ctxt) ->
       Alpha_context.Big_map.get_opt ctxt id hash
       >>=? function
@@ -6275,26 +6269,25 @@ let diff_of_big_map ctxt mode ~temporary ~ids_to_copy
       Big_map.fresh ~temporary ctxt
       >>=? fun (ctxt, id) ->
       Lwt.return
-        ( unparse_ty ctxt key_type
-        >>? fun (kt, ctxt) ->
-        unparse_ty ctxt value_type
-        >>? fun (kv, ctxt) ->
-        Gas.consume ctxt (Script.strip_locations_cost kt)
-        >>? fun ctxt ->
-        Gas.consume ctxt (Script.strip_locations_cost kv)
-        >|? fun ctxt ->
-        let key_type = Micheline.strip_locations kt in
-        let value_type = Micheline.strip_locations kv in
-        (ctxt, Lazy_storage.(Alloc Big_map.{key_type; value_type}), id) ) )
+        (let kt = unparse_comparable_ty key_type in
+         Gas.consume ctxt (Script.strip_locations_cost kt)
+         >>? fun ctxt ->
+         unparse_ty ctxt value_type
+         >>? fun (kv, ctxt) ->
+         Gas.consume ctxt (Script.strip_locations_cost kv)
+         >|? fun ctxt ->
+         let key_type = Micheline.strip_locations kt in
+         let value_type = Micheline.strip_locations kv in
+         (ctxt, Lazy_storage.(Alloc Big_map.{key_type; value_type}), id)) )
   >>=? fun (ctxt, init, id) ->
   let pairs = map_fold (fun key value acc -> (key, value) :: acc) diff [] in
   fold_left_s
     (fun (acc, ctxt) (key, value) ->
       Gas.consume ctxt Typecheck_costs.parse_instr_cycle
       >>?= fun ctxt ->
-      hash_data ctxt key_type key
+      hash_comparable_data ctxt key_type key
       >>=? fun (key_hash, ctxt) ->
-      unparse_data ~stack_depth:0 ctxt mode key_type key
+      unparse_comparable_data ctxt mode key_type key
       >>=? fun (key_node, ctxt) ->
       Gas.consume ctxt (Script.strip_locations_cost key_node)
       >>?= fun ctxt ->

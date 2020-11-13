@@ -168,7 +168,7 @@ and 'ty stack_ty =
 and ('key, 'value) big_map = {
   id : Big_map.Id.t option;
   diff : ('key, 'value option) map;
-  key_type : 'key ty;
+  key_type : 'key comparable_ty;
   value_type : 'value ty;
 }
 
