@@ -2544,7 +2544,80 @@ let parse_address ctxt = function
 
 let parse_never expr = error @@ Invalid_never_expr (location expr)
 
+(* -- parse data of complex types -- *)
+
+type ('ty, 'depth) comb_witness =
+  | Comb_Pair : ('t, 'd) comb_witness -> (_ * 't, unit -> 'd) comb_witness
+  | Comb_Any : (_, _) comb_witness
+
+let parse_pair (type r) parse_l parse_r ctxt ~legacy
+    (r_comb_witness : (r, unit -> _) comb_witness) expr =
+  let parse_comb loc l rs =
+    parse_l ctxt l
+    >>=? fun (l, ctxt) ->
+    ( match (rs, r_comb_witness) with
+    | ([r], _) ->
+        ok r
+    | ([], _) ->
+        error @@ Invalid_arity (loc, D_Pair, 2, 1)
+    | (_ :: _, Comb_Pair _) ->
+        (* Unfold [Pair x1 ... xn] as [Pair x1 (Pair x2 ... xn-1 xn))]
+          for type [pair ta (pair tb1 tb2)] and n >= 3 only *)
+        ok (Prim (loc, D_Pair, rs, []))
+    | _ ->
+        error @@ Invalid_arity (loc, D_Pair, 2, 1 + List.length rs) )
+    >>?= fun r -> parse_r ctxt r >|=? fun (r, ctxt) -> ((l, r), ctxt)
+  in
+  match expr with
+  | Prim (loc, D_Pair, l :: rs, annot) ->
+      (if legacy then ok_unit else error_unexpected_annot loc annot)
+      >>?= fun () -> parse_comb loc l rs
+  | Prim (loc, D_Pair, l, _) ->
+      fail @@ Invalid_arity (loc, D_Pair, 2, List.length l)
+  (* Unfold [{x1; ...; xn}] as [Pair x1 x2 ... xn-1 xn] for n >= 2 *)
+  | Seq (loc, l :: (_ :: _ as rs)) ->
+      parse_comb loc l rs
+  | Seq (loc, l) ->
+      fail @@ Invalid_seq_arity (loc, 2, List.length l)
+  | expr ->
+      fail @@ unexpected expr [] Constant_namespace [D_Pair]
+
+let parse_union parse_l parse_r ctxt ~legacy = function
+  | Prim (loc, D_Left, [v], annot) ->
+      (if legacy then ok_unit else error_unexpected_annot loc annot)
+      >>?= fun () -> parse_l ctxt v >|=? fun (v, ctxt) -> (L v, ctxt)
+  | Prim (loc, D_Left, l, _) ->
+      fail @@ Invalid_arity (loc, D_Left, 1, List.length l)
+  | Prim (loc, D_Right, [v], annot) ->
+      (if legacy then ok_unit else error_unexpected_annot loc annot)
+      >>?= fun () -> parse_r ctxt v >|=? fun (v, ctxt) -> (R v, ctxt)
+  | Prim (loc, D_Right, l, _) ->
+      fail @@ Invalid_arity (loc, D_Right, 1, List.length l)
+  | expr ->
+      fail @@ unexpected expr [] Constant_namespace [D_Left; D_Right]
+
+let parse_option parse_v ctxt ~legacy = function
+  | Prim (loc, D_Some, [v], annot) ->
+      (if legacy then ok_unit else error_unexpected_annot loc annot)
+      >>?= fun () -> parse_v ctxt v >|=? fun (v, ctxt) -> (Some v, ctxt)
+  | Prim (loc, D_Some, l, _) ->
+      fail @@ Invalid_arity (loc, D_Some, 1, List.length l)
+  | Prim (loc, D_None, [], annot) ->
+      Lwt.return
+        ( (if legacy then ok_unit else error_unexpected_annot loc annot)
+        >|? fun () -> (None, ctxt) )
+  | Prim (loc, D_None, l, _) ->
+      fail @@ Invalid_arity (loc, D_None, 0, List.length l)
+  | expr ->
+      fail @@ unexpected expr [] Constant_namespace [D_Some; D_None]
+
 (* -- parse data of any type -- *)
+
+let comb_witness1 : type t. t ty -> (t, unit -> unit) comb_witness = function
+  | Pair_t _ ->
+      Comb_Pair Comb_Any
+  | _ ->
+      Comb_Any
 
 let rec parse_data :
     type a.
@@ -2668,53 +2741,24 @@ let rec parse_data :
         parse_contract ~legacy ctxt loc ty c ~entrypoint
         >|=? fun (ctxt, _) -> ((ty, (c, entrypoint)), ctxt) )
   (* Pairs *)
-  | (Pair_t ((ta, _, _), (tb, _, _), _), Prim (loc, D_Pair, va :: l, annot)) ->
-      traced
-      @@ ( (if legacy then ok_unit else error_unexpected_annot loc annot)
-         >>?= fun () ->
-         non_terminal_recursion ?type_logger ctxt ~legacy ta va
-         >>=? fun (va, ctxt) ->
-         ( match (l, tb) with
-         | ([vb], _) ->
-             ok vb
-         | ([], _) ->
-             error @@ Invalid_arity (loc, D_Pair, 2, 1)
-         | (_ :: _, Pair_t _) ->
-             (* Unfold [Pair x1 ... xn] as [Pair x1 (Pair x2 ... xn-1 xn))]
-               for type [pair ta (pair tb1 tb2)] and n >= 3 only *)
-             ok @@ Prim (loc, D_Pair, l, [])
-         | _ ->
-             error @@ Invalid_arity (loc, D_Pair, 2, 1 + List.length l) )
-         >>?= fun vb ->
-         non_terminal_recursion ?type_logger ctxt ~legacy tb vb
-         >|=? fun (vb, ctxt) -> ((va, vb), ctxt) )
-  | (Pair_t _, Prim (loc, D_Pair, l, _)) ->
-      fail @@ Invalid_arity (loc, D_Pair, 2, List.length l)
-  (* Unfold [{x1; ...; xn}] as [Pair x1 x2 ... xn-1 xn] for n >= 2 *)
-  | (Pair_t _, Seq (loc, (_ :: _ :: _ as vs))) ->
-      let data = Prim (loc, D_Pair, vs, []) in
-      traced @@ non_terminal_recursion ?type_logger ctxt ~legacy ty data
-  | (Pair_t _, Seq (loc, l)) ->
-      traced_fail @@ Invalid_seq_arity (loc, 2, List.length l)
-  | (Pair_t _, expr) ->
-      traced_fail (unexpected expr [] Constant_namespace [D_Pair])
+  | (Pair_t ((tl, _, _), (tr, _, _), _), expr) ->
+      let r_witness = comb_witness1 tr in
+      let parse_l ctxt v =
+        non_terminal_recursion ?type_logger ctxt ~legacy tl v
+      in
+      let parse_r ctxt v =
+        non_terminal_recursion ?type_logger ctxt ~legacy tr v
+      in
+      traced @@ parse_pair parse_l parse_r ctxt ~legacy r_witness expr
   (* Unions *)
-  | (Union_t ((tl, _), _, _), Prim (loc, D_Left, [v], annot)) ->
-      (if legacy then ok_unit else error_unexpected_annot loc annot)
-      >>?= fun () ->
-      traced @@ non_terminal_recursion ?type_logger ctxt ~legacy tl v
-      >|=? fun (v, ctxt) -> (L v, ctxt)
-  | (Union_t _, Prim (loc, D_Left, l, _)) ->
-      fail @@ Invalid_arity (loc, D_Left, 1, List.length l)
-  | (Union_t (_, (tr, _), _), Prim (loc, D_Right, [v], annot)) ->
-      (if legacy then ok_unit else error_unexpected_annot loc annot)
-      >>?= fun () ->
-      traced @@ non_terminal_recursion ?type_logger ctxt ~legacy tr v
-      >|=? fun (v, ctxt) -> (R v, ctxt)
-  | (Union_t _, Prim (loc, D_Right, l, _)) ->
-      fail @@ Invalid_arity (loc, D_Right, 1, List.length l)
-  | (Union_t _, expr) ->
-      traced_fail (unexpected expr [] Constant_namespace [D_Left; D_Right])
+  | (Union_t ((tl, _), (tr, _), _), expr) ->
+      let parse_l ctxt v =
+        non_terminal_recursion ?type_logger ctxt ~legacy tl v
+      in
+      let parse_r ctxt v =
+        non_terminal_recursion ?type_logger ctxt ~legacy tr v
+      in
+      traced @@ parse_union parse_l parse_r ctxt ~legacy expr
   (* Lambdas *)
   | (Lambda_t (ta, tr, _ty_name), (Seq (_loc, _) as script_instr)) ->
       traced
@@ -2730,21 +2774,11 @@ let rec parse_data :
   | (Lambda_t _, expr) ->
       traced_fail (Invalid_kind (location expr, [Seq_kind], kind expr))
   (* Options *)
-  | (Option_t (t, _), Prim (loc, D_Some, [v], annot)) ->
-      (if legacy then ok_unit else error_unexpected_annot loc annot)
-      >>?= fun () ->
-      traced @@ non_terminal_recursion ?type_logger ctxt ~legacy t v
-      >|=? fun (v, ctxt) -> (Some v, ctxt)
-  | (Option_t _, Prim (loc, D_Some, l, _)) ->
-      fail @@ Invalid_arity (loc, D_Some, 1, List.length l)
-  | (Option_t (_, _), Prim (loc, D_None, [], annot)) ->
-      Lwt.return
-        ( (if legacy then ok_unit else error_unexpected_annot loc annot)
-        >>? fun () -> ok (None, ctxt) )
-  | (Option_t _, Prim (loc, D_None, l, _)) ->
-      fail @@ Invalid_arity (loc, D_None, 0, List.length l)
-  | (Option_t _, expr) ->
-      traced_fail (unexpected expr [] Constant_namespace [D_Some; D_None])
+  | (Option_t (t, _), expr) ->
+      let parse_v ctxt v =
+        non_terminal_recursion ?type_logger ctxt ~legacy t v
+      in
+      traced @@ parse_option parse_v ctxt ~legacy expr
   (* Lists *)
   | (List_t (t, _ty_name), Seq (_loc, items)) ->
       traced
@@ -5841,10 +5875,6 @@ let unparse_bls12_381_fr ctxt x =
   (Bytes (-1, bytes), ctxt)
 
 (* -- Unparsing data of complex types -- *)
-
-type ('ty, 'depth) comb_witness =
-  | Comb_Pair : ('t, 'd) comb_witness -> (_ * 't, unit -> 'd) comb_witness
-  | Comb_Any : (_, _) comb_witness
 
 let unparse_pair (type r) unparse_l unparse_r ctxt mode
     (r_comb_witness : (r, unit -> unit -> _) comb_witness) (l, (r : r)) =
