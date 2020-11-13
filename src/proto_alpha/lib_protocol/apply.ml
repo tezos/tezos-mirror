@@ -551,11 +551,12 @@ let apply_manager_operation_content :
           | true ->
               return (ctxt, [], false)
           | false ->
-              Lwt.return (Fees.origination_burn ctxt)
-              >|=? fun (ctxt, origination_burn) ->
-              ( ctxt,
-                [(Delegate.Contract payer, Delegate.Debited origination_burn)],
-                true ) ) )
+              Lwt.return
+                ( Fees.origination_burn ctxt
+                >|? fun (ctxt, origination_burn) ->
+                ( ctxt,
+                  [(Delegate.Contract payer, Delegate.Debited origination_burn)],
+                  true ) ) ) )
       >>=? fun (ctxt, maybe_burn_balance_update, allocated_destination_contract)
                ->
       Contract.credit ctxt destination amount
