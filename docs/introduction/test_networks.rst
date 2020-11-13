@@ -114,6 +114,19 @@ This results in a chain which moves faster than Mainnet:
 - a cycle should last about 1.5 hour;
 - a voting period lasts 8 cycle and should thus last about 12 hours.
 
+Future Networks
+---------------
+
+At some point, there will be a proposal for a successor to the current
+protocol (let's call this new protocol P). After P is injected, a new test network
+(let's call it P-net) will be spawned. It will run alongside the latest
+test network until either P is rejected or activated. If P is rejected, P-net will
+end, unless P is immediately re-submitted for injection. If, however,
+P is activated, the previous test network will end and P-net will continue on its own.
+
+Old Networks
+============
+
 Carthagenet
 -----------
 
@@ -121,7 +134,8 @@ Carthagenet
 - Run Docker image: ``wget -O carthagenet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh``
 
 Carthagenet is a test network running the Carthage protocol.
-Carthagenet will run until Carthage is replaced by another protocol on Mainnet.
+Following the activation of the Delphi protocol replacing Carthage on Mainnet,
+Carthagenet will stop being maintained on December 12th, 2020.
 
 On Carthagenet, the following constants differ from Mainnet:
 
@@ -137,19 +151,6 @@ This results in a faster chain than Mainnet:
 - 2 blocks per minute;
 - a cycle should last about 17 hours;
 - a voting period lasts 1 cycle and should thus also last about 17 hours.
-
-Future Networks
----------------
-
-At some point, there will be a proposal for a successor to the current
-protocol (let's call this new protocol P). After P is injected, a new test network
-(let's call it P-net) will be spawned. It will run alongside the latest
-test network until either P is rejected or activated. If P is rejected, P-net will
-end, unless P is immediately re-submitted for injection. If, however,
-P is activated, the previous test network will end and P-net will continue on its own.
-
-Old Networks
-============
 
 Babylonnet
 ----------
