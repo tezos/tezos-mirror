@@ -5874,6 +5874,75 @@ let unparse_option unparse_v ctxt = function
   | None ->
       return (Prim (-1, D_None, [], []), ctxt)
 
+(* -- Unparsing data of comparable types -- *)
+
+let comparable_comb_witness2 : type t. t comparable_ty -> t comb_witness =
+  function
+  | Pair_key (_, (Pair_key _, _), _) ->
+      Comb_Pair (Comb_Pair Comb_Any)
+  | Pair_key _ ->
+      Comb_Pair Comb_Any
+  | _ ->
+      Comb_Any
+
+let rec unparse_comparable_data :
+    type a.
+    context ->
+    unparsing_mode ->
+    a comparable_ty ->
+    a ->
+    (Script.node * context) tzresult Lwt.t =
+ fun ctxt mode ty a ->
+  (* No need for stack_depth here. Unlike [unparse_data],
+     [unparse_comparable_data] doesn't call [unparse_code].
+     The stack depth is bounded by the type depth, currently bounded
+     by 1000 (michelson_maximum_type_size). *)
+  Gas.consume ctxt Unparse_costs.unparse_data_cycle
+  (* We could have a smaller cost but let's keep it consistent with
+     [unparse_data] for now. *)
+  >>?= fun ctxt ->
+  match (ty, a) with
+  | (Unit_key _, v) ->
+      Lwt.return @@ unparse_unit ctxt v
+  | (Int_key _, v) ->
+      Lwt.return @@ unparse_int ctxt v
+  | (Nat_key _, v) ->
+      Lwt.return @@ unparse_nat ctxt v
+  | (String_key _, s) ->
+      Lwt.return @@ unparse_string ctxt s
+  | (Bytes_key _, s) ->
+      Lwt.return @@ unparse_bytes ctxt s
+  | (Bool_key _, b) ->
+      Lwt.return @@ unparse_bool ctxt b
+  | (Timestamp_key _, t) ->
+      Lwt.return @@ unparse_timestamp ctxt mode t
+  | (Address_key _, address) ->
+      Lwt.return @@ unparse_address ctxt mode address
+  | (Signature_key _, s) ->
+      Lwt.return @@ unparse_signature ctxt mode s
+  | (Mutez_key _, v) ->
+      Lwt.return @@ unparse_mutez ctxt v
+  | (Key_key _, k) ->
+      Lwt.return @@ unparse_key ctxt mode k
+  | (Key_hash_key _, k) ->
+      Lwt.return @@ unparse_key_hash ctxt mode k
+  | (Chain_id_key _, chain_id) ->
+      Lwt.return @@ unparse_chain_id ctxt mode chain_id
+  | (Pair_key ((tl, _), (tr, _), _), pair) ->
+      let r_witness = comparable_comb_witness2 tr in
+      let unparse_l ctxt v = unparse_comparable_data ctxt mode tl v in
+      let unparse_r ctxt v = unparse_comparable_data ctxt mode tr v in
+      unparse_pair unparse_l unparse_r ctxt mode r_witness pair
+  | (Union_key ((tl, _), (tr, _), _), v) ->
+      let unparse_l ctxt v = unparse_comparable_data ctxt mode tl v in
+      let unparse_r ctxt v = unparse_comparable_data ctxt mode tr v in
+      unparse_union unparse_l unparse_r ctxt v
+  | (Option_key (t, _), v) ->
+      let unparse_v ctxt v = unparse_comparable_data ctxt mode t v in
+      unparse_option unparse_v ctxt v
+  | (Never_key _, _) ->
+      .
+
 (* -- Unparsing data of any type -- *)
 
 let comb_witness2 : type t. t ty -> t comb_witness = function
