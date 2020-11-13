@@ -153,6 +153,13 @@ val ty_eq :
 
 val compare_comparable : 'a Script_typed_ir.comparable_ty -> 'a -> 'a -> int
 
+val parse_comparable_data :
+  ?type_logger:type_logger ->
+  context ->
+  'a Script_typed_ir.comparable_ty ->
+  Script.node ->
+  ('a * context) tzresult Lwt.t
+
 val parse_data :
   ?type_logger:type_logger ->
   context ->
@@ -189,9 +196,12 @@ val parse_packable_ty :
 val parse_parameter_ty :
   context -> legacy:bool -> Script.node -> (ex_ty * context) tzresult
 
+val parse_comparable_ty :
+  context -> Script.node -> (ex_comparable_ty * context) tzresult
+
 (** We expose [parse_ty] for convenience to external tools. Please use
-    specialized versions such as [parse_packable_ty] and [parse_parameter_ty]
-    if possible. *)
+    specialized versions such as [parse_packable_ty], [parse_parameter_ty], or
+    [parse_comparable_ty] if possible. *)
 val parse_ty :
   context ->
   legacy:bool ->
@@ -292,6 +302,12 @@ val list_entrypoints :
 
 val pack_data :
   context -> 'a Script_typed_ir.ty -> 'a -> (bytes * context) tzresult Lwt.t
+
+val hash_comparable_data :
+  context ->
+  'a Script_typed_ir.comparable_ty ->
+  'a ->
+  (Script_expr_hash.t * context) tzresult Lwt.t
 
 val hash_data :
   context ->
