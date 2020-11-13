@@ -9,8 +9,8 @@ from tools import constants, paths
 BAKE_ARGS = ['--minimal-fees', '0', '--minimal-nanotez-per-byte', '0',
              '--minimal-nanotez-per-gas-unit', '0', '--max-priority', '512',
              '--minimal-timestamp']
-PROTO_A = constants.CARTHAGE
-PROTO_A_DAEMON = constants.CARTHAGE_DAEMON
+PROTO_A = constants.DELPHI
+PROTO_A_DAEMON = constants.DELPHI_DAEMON
 PROTO_A_PATH = f"proto_{PROTO_A_DAEMON.replace('-','_')}"
 PROTO_B = constants.ALPHA
 
