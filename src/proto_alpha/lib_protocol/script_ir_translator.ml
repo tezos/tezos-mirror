@@ -6166,22 +6166,22 @@ let unparse_script ctxt mode {code; arg_type; storage; storage_type; root_name}
       },
       ctxt ) )
 
-let pack_data ctxt typ data =
-  unparse_data ~stack_depth:0 ctxt Optimized typ data
-  >>=? fun (unparsed, ctxt) ->
+let pack_node unparsed ctxt =
   Gas.consume ctxt (Script.strip_locations_cost unparsed)
-  >>?= fun ctxt ->
+  >>? fun ctxt ->
   let bytes =
     Data_encoding.Binary.to_bytes_exn
       expr_encoding
       (Micheline.strip_locations unparsed)
   in
-  Lwt.return
-    ( Gas.consume ctxt (Script.serialized_cost bytes)
-    >>? fun ctxt ->
-    let bytes = Bytes.cat (Bytes.of_string "\005") bytes in
-    Gas.consume ctxt (Script.serialized_cost bytes)
-    >|? fun ctxt -> (bytes, ctxt) )
+  Gas.consume ctxt (Script.serialized_cost bytes)
+  >>? fun ctxt ->
+  let bytes = Bytes.cat (Bytes.of_string "\005") bytes in
+  Gas.consume ctxt (Script.serialized_cost bytes) >|? fun ctxt -> (bytes, ctxt)
+
+let pack_data ctxt typ data =
+  unparse_data ~stack_depth:0 ctxt Optimized typ data
+  >>=? fun (unparsed, ctxt) -> Lwt.return @@ pack_node unparsed ctxt
 
 let hash_data ctxt typ data =
   pack_data ctxt typ data
