@@ -6599,6 +6599,8 @@ let extract_lazy_storage_diff ctxt mode ~temporary ~to_duplicate ~to_update ty
 let list_of_big_map_ids ids =
   Lazy_storage.IdSet.fold Big_map (fun id acc -> id :: acc) ids []
 
+let parse_comparable_data = parse_comparable_data ~stack_depth:0
+
 let parse_data = parse_data ~stack_depth:0
 
 let parse_instr = parse_instr ~stack_depth:0
