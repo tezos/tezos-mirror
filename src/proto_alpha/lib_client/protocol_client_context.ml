@@ -110,6 +110,9 @@ let register_error_kind category ~id ~title ~description ?pp encoding
 
 let () =
   let open Data_encoding.Registration in
+  register Protocol.Alpha_context.Lazy_storage.encoding ;
+  (* These encodings are missing a def field which we add before registering them.
+     These defs should be moved inside their encodings in the protocol code. *)
   let def id ids ?title ?description encoding =
     Data_encoding.def
       (String.concat "." (Protocol.name :: id :: ids))
