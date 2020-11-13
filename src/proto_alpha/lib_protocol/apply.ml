@@ -944,21 +944,12 @@ let check_manager_signature ctxt chain_id (op : _ Kind.manager contents_list)
   let check_same_manager (source, source_key) manager =
     match manager with
     | None ->
-        ok (source, source_key)
         (* Consistency already checked by
            [reveal_manager_key] in [precheck_manager_contents]. *)
+        ok (source, source_key)
     | Some (manager, manager_key) ->
         if Signature.Public_key_hash.equal source manager then
-          let key =
-            match (manager_key, source_key) with
-            | (Some _, _) ->
-                manager_key
-            | (_, Some _) ->
-                source_key
-            | _ ->
-                None
-          in
-          ok (source, key)
+          ok (source, Option.first_some manager_key source_key)
         else error Inconsistent_sources
   in
   let rec find_source :
@@ -1384,6 +1375,13 @@ let may_start_new_cycle ctxt =
       Bootstrap.cycle_end ctxt last_cycle
       >|=? fun ctxt -> (ctxt, update_balances, deactivated)
 
+let endorsement_rights_of_pred_level ctxt =
+  match Level.pred ctxt (Level.current ctxt) with
+  | None ->
+      assert false (* genesis *)
+  | Some pred_level ->
+      Baking.endorsement_rights ctxt pred_level
+
 let begin_full_construction ctxt pred_timestamp protocol_data =
   Alpha_context.Global.set_block_priority
     ctxt
@@ -1392,23 +1390,15 @@ let begin_full_construction ctxt pred_timestamp protocol_data =
   Baking.check_baking_rights ctxt protocol_data pred_timestamp
   >>=? fun (delegate_pk, block_delay) ->
   let ctxt = Fitness.increase ctxt in
-  match Level.pred ctxt (Level.current ctxt) with
-  | None ->
-      assert false (* genesis *)
-  | Some pred_level ->
-      Baking.endorsement_rights ctxt pred_level
-      >|=? fun rights ->
-      let ctxt = init_endorsements ctxt rights in
-      (ctxt, protocol_data, delegate_pk, block_delay)
+  endorsement_rights_of_pred_level ctxt
+  >|=? fun rights ->
+  let ctxt = init_endorsements ctxt rights in
+  (ctxt, protocol_data, delegate_pk, block_delay)
 
 let begin_partial_construction ctxt =
   let ctxt = Fitness.increase ctxt in
-  match Level.pred ctxt (Level.current ctxt) with
-  | None ->
-      assert false (* genesis *)
-  | Some pred_level ->
-      Baking.endorsement_rights ctxt pred_level
-      >|=? fun rights -> init_endorsements ctxt rights
+  endorsement_rights_of_pred_level ctxt
+  >|=? fun rights -> init_endorsements ctxt rights
 
 let begin_application ctxt chain_id block_header pred_timestamp =
   Alpha_context.Global.set_block_priority
@@ -1428,25 +1418,17 @@ let begin_application ctxt chain_id block_header pred_timestamp =
   Baking.check_signature block_header chain_id delegate_pk
   >>=? fun () ->
   let has_commitment =
-    match block_header.protocol_data.contents.seed_nonce_hash with
-    | None ->
-        false
-    | Some _ ->
-        true
+    Option.is_some block_header.protocol_data.contents.seed_nonce_hash
   in
   error_unless
     Compare.Bool.(has_commitment = current_level.expected_commitment)
     (Invalid_commitment {expected = current_level.expected_commitment})
   >>?= fun () ->
   let ctxt = Fitness.increase ctxt in
-  match Level.pred ctxt (Level.current ctxt) with
-  | None ->
-      assert false (* genesis *)
-  | Some pred_level ->
-      Baking.endorsement_rights ctxt pred_level
-      >|=? fun rights ->
-      let ctxt = init_endorsements ctxt rights in
-      (ctxt, delegate_pk, block_delay)
+  endorsement_rights_of_pred_level ctxt
+  >|=? fun rights ->
+  let ctxt = init_endorsements ctxt rights in
+  (ctxt, delegate_pk, block_delay)
 
 let check_minimum_endorsements ctxt protocol_data block_delay
     included_endorsements =
