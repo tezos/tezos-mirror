@@ -586,7 +586,8 @@ let test_parse_comb_data () =
   let expected_big_map =
     let open Script_typed_ir in
     let diff = (module M : M.S) in
-    {id = Some big_map_id; diff; key_type = nat_ty; value_type = nat_ty}
+    let nat_key_ty = Nat_key None in
+    {id = Some big_map_id; diff; key_type = nat_key_ty; value_type = nat_ty}
   in
   let equal (nat1, big_map1) (nat2, big_map2) =
     (* Custom equal needed because big maps contain boxed maps containing functional values *)
