@@ -2285,6 +2285,267 @@ let parse_uint10 = parse_uint ~nb_bits:10
 
 let parse_uint11 = parse_uint ~nb_bits:11
 
+(* -- parse data of primitive types -- *)
+
+let parse_unit ctxt ~legacy = function
+  | Prim (loc, D_Unit, [], annot) ->
+      (if legacy then ok_unit else error_unexpected_annot loc annot)
+      >>? fun () ->
+      Gas.consume ctxt Typecheck_costs.unit >|? fun ctxt -> ((), ctxt)
+  | Prim (loc, D_Unit, l, _) ->
+      error @@ Invalid_arity (loc, D_Unit, 0, List.length l)
+  | expr ->
+      error @@ unexpected expr [] Constant_namespace [D_Unit]
+
+let parse_bool ctxt ~legacy = function
+  | Prim (loc, D_True, [], annot) ->
+      (if legacy then ok_unit else error_unexpected_annot loc annot)
+      >>? fun () ->
+      Gas.consume ctxt Typecheck_costs.bool >|? fun ctxt -> (true, ctxt)
+  | Prim (loc, D_False, [], annot) ->
+      (if legacy then ok_unit else error_unexpected_annot loc annot)
+      >>? fun () ->
+      Gas.consume ctxt Typecheck_costs.bool >|? fun ctxt -> (false, ctxt)
+  | Prim (loc, ((D_True | D_False) as c), l, _) ->
+      error @@ Invalid_arity (loc, c, 0, List.length l)
+  | expr ->
+      error @@ unexpected expr [] Constant_namespace [D_True; D_False]
+
+let parse_string ctxt = function
+  | String (loc, v) as expr ->
+      Gas.consume ctxt (Typecheck_costs.check_printable v)
+      >>? fun ctxt ->
+      let rec check_printable_ascii i =
+        if Compare.Int.(i < 0) then true
+        else
+          match v.[i] with
+          | '\n' | '\x20' .. '\x7E' ->
+              check_printable_ascii (i - 1)
+          | _ ->
+              false
+      in
+      if check_printable_ascii (String.length v - 1) then ok (v, ctxt)
+      else
+        error
+        @@ Invalid_syntactic_constant
+             (loc, strip_locations expr, "a printable ascii string")
+  | expr ->
+      error @@ Invalid_kind (location expr, [String_kind], kind expr)
+
+let parse_bytes ctxt = function
+  | Bytes (_, v) ->
+      ok (v, ctxt)
+  | expr ->
+      error @@ Invalid_kind (location expr, [Bytes_kind], kind expr)
+
+let parse_int ctxt = function
+  | Int (_, v) ->
+      ok (Script_int.of_zint v, ctxt)
+  | expr ->
+      error @@ Invalid_kind (location expr, [Int_kind], kind expr)
+
+let parse_nat ctxt = function
+  | Int (loc, v) as expr -> (
+      let v = Script_int.of_zint v in
+      match Script_int.is_nat v with
+      | Some nat ->
+          ok (nat, ctxt)
+      | None ->
+          error
+          @@ Invalid_syntactic_constant
+               (loc, strip_locations expr, "a non-negative integer") )
+  | expr ->
+      error @@ Invalid_kind (location expr, [Int_kind], kind expr)
+
+let parse_mutez ctxt = function
+  | Int (loc, v) as expr -> (
+    try
+      match Tez.of_mutez (Z.to_int64 v) with
+      | None ->
+          raise Exit
+      | Some tez ->
+          ok (tez, ctxt)
+    with _ ->
+      error
+      @@ Invalid_syntactic_constant
+           (loc, strip_locations expr, "a valid mutez amount") )
+  | expr ->
+      error @@ Invalid_kind (location expr, [Int_kind], kind expr)
+
+let parse_timestamp ctxt = function
+  | Int (_, v) (* As unparsed with [Optimized] or out of bounds [Readable]. *)
+    ->
+      ok (Script_timestamp.of_zint v, ctxt)
+  | String (loc, s) as expr (* As unparsed with [Readable]. *) -> (
+      Gas.consume ctxt Typecheck_costs.timestamp_readable
+      >>? fun ctxt ->
+      match Script_timestamp.of_string s with
+      | Some v ->
+          ok (v, ctxt)
+      | None ->
+          error
+          @@ Invalid_syntactic_constant
+               (loc, strip_locations expr, "a valid timestamp") )
+  | expr ->
+      error @@ Invalid_kind (location expr, [String_kind; Int_kind], kind expr)
+
+let parse_key ctxt = function
+  | Bytes (loc, bytes) as expr -> (
+      (* As unparsed with [Optimized]. *)
+      Gas.consume ctxt Typecheck_costs.public_key_optimized
+      >>? fun ctxt ->
+      match
+        Data_encoding.Binary.of_bytes Signature.Public_key.encoding bytes
+      with
+      | Some k ->
+          ok (k, ctxt)
+      | None ->
+          error
+          @@ Invalid_syntactic_constant
+               (loc, strip_locations expr, "a valid public key") )
+  | String (loc, s) as expr -> (
+      (* As unparsed with [Readable]. *)
+      Gas.consume ctxt Typecheck_costs.public_key_readable
+      >>? fun ctxt ->
+      match Signature.Public_key.of_b58check_opt s with
+      | Some k ->
+          ok (k, ctxt)
+      | None ->
+          error
+          @@ Invalid_syntactic_constant
+               (loc, strip_locations expr, "a valid public key") )
+  | expr ->
+      error
+      @@ Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr)
+
+let parse_key_hash ctxt = function
+  | Bytes (loc, bytes) as expr -> (
+      (* As unparsed with [Optimized]. *)
+      Gas.consume ctxt Typecheck_costs.key_hash_optimized
+      >>? fun ctxt ->
+      match
+        Data_encoding.Binary.of_bytes Signature.Public_key_hash.encoding bytes
+      with
+      | Some k ->
+          ok (k, ctxt)
+      | None ->
+          error
+          @@ Invalid_syntactic_constant
+               (loc, strip_locations expr, "a valid key hash") )
+  | String (loc, s) as expr (* As unparsed with [Readable]. *) -> (
+      Gas.consume ctxt Typecheck_costs.key_hash_readable
+      >>? fun ctxt ->
+      match Signature.Public_key_hash.of_b58check_opt s with
+      | Some k ->
+          ok (k, ctxt)
+      | None ->
+          error
+          @@ Invalid_syntactic_constant
+               (loc, strip_locations expr, "a valid key hash") )
+  | expr ->
+      error
+      @@ Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr)
+
+let parse_signature ctxt = function
+  | Bytes (loc, bytes) as expr (* As unparsed with [Optimized]. *) -> (
+      Gas.consume ctxt Typecheck_costs.signature_optimized
+      >>? fun ctxt ->
+      match Data_encoding.Binary.of_bytes Signature.encoding bytes with
+      | Some k ->
+          ok (k, ctxt)
+      | None ->
+          error
+          @@ Invalid_syntactic_constant
+               (loc, strip_locations expr, "a valid signature") )
+  | String (loc, s) as expr (* As unparsed with [Readable]. *) -> (
+      Gas.consume ctxt Typecheck_costs.signature_readable
+      >>? fun ctxt ->
+      match Signature.of_b58check_opt s with
+      | Some s ->
+          ok (s, ctxt)
+      | None ->
+          error
+          @@ Invalid_syntactic_constant
+               (loc, strip_locations expr, "a valid signature") )
+  | expr ->
+      error
+      @@ Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr)
+
+let parse_chain_id ctxt = function
+  | Bytes (loc, bytes) as expr -> (
+      Gas.consume ctxt Typecheck_costs.chain_id_optimized
+      >>? fun ctxt ->
+      match Data_encoding.Binary.of_bytes Chain_id.encoding bytes with
+      | Some k ->
+          ok (k, ctxt)
+      | None ->
+          error
+          @@ Invalid_syntactic_constant
+               (loc, strip_locations expr, "a valid chain id") )
+  | String (loc, s) as expr -> (
+      Gas.consume ctxt Typecheck_costs.chain_id_readable
+      >>? fun ctxt ->
+      match Chain_id.of_b58check_opt s with
+      | Some s ->
+          ok (s, ctxt)
+      | None ->
+          error
+          @@ Invalid_syntactic_constant
+               (loc, strip_locations expr, "a valid chain id") )
+  | expr ->
+      error
+      @@ Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr)
+
+let parse_address ctxt = function
+  | Bytes (loc, bytes) as expr (* As unparsed with [Optimized]. *) -> (
+      Gas.consume ctxt Typecheck_costs.contract
+      >>? fun ctxt ->
+      match
+        Data_encoding.Binary.of_bytes
+          Data_encoding.(tup2 Contract.encoding Variable.string)
+          bytes
+      with
+      | Some (c, entrypoint) -> (
+          if Compare.Int.(String.length entrypoint > 31) then
+            error (Entrypoint_name_too_long entrypoint)
+          else
+            match entrypoint with
+            | "" ->
+                ok ((c, "default"), ctxt)
+            | "default" ->
+                error (Unexpected_annotation loc)
+            | name ->
+                ok ((c, name), ctxt) )
+      | None ->
+          error
+          @@ Invalid_syntactic_constant
+               (loc, strip_locations expr, "a valid address") )
+  | String (loc, s) (* As unparsed with [Readable]. *) ->
+      Gas.consume ctxt Typecheck_costs.contract
+      >>? fun ctxt ->
+      ( match String.index_opt s '%' with
+      | None ->
+          ok (s, "default")
+      | Some pos -> (
+          let len = String.length s - pos - 1 in
+          let name = String.sub s (pos + 1) len in
+          if Compare.Int.(len > 31) then error (Entrypoint_name_too_long name)
+          else
+            match (String.sub s 0 pos, name) with
+            | (_, "default") ->
+                error @@ Unexpected_annotation loc
+            | addr_and_name ->
+                ok addr_and_name ) )
+      >>? fun (addr, entrypoint) ->
+      Contract.of_b58check addr >|? fun c -> ((c, entrypoint), ctxt)
+  | expr ->
+      error
+      @@ Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr)
+
+let parse_never expr = error @@ Invalid_never_expr (location expr)
+
+(* -- parse data of any type -- *)
+
 let rec parse_data :
     type a.
     ?type_logger:type_logger ->
@@ -2368,281 +2629,44 @@ let rec parse_data :
     >|=? fun (_, items, ctxt) -> (items, ctxt)
   in
   match (ty, script_data) with
-  (* Unit *)
-  | (Unit_t _, Prim (loc, D_Unit, [], annot)) ->
-      Lwt.return
-        ( (if legacy then ok_unit else error_unexpected_annot loc annot)
-        >>? fun () ->
-        Gas.consume ctxt Typecheck_costs.unit >|? fun ctxt -> ((() : a), ctxt)
-        )
-  | (Unit_t _, Prim (loc, D_Unit, l, _)) ->
-      traced_fail (Invalid_arity (loc, D_Unit, 0, List.length l))
   | (Unit_t _, expr) ->
-      traced_fail (unexpected expr [] Constant_namespace [D_Unit])
-  (* Booleans *)
-  | (Bool_t _, Prim (loc, D_True, [], annot)) ->
-      Lwt.return
-        ( (if legacy then ok_unit else error_unexpected_annot loc annot)
-        >>? fun () ->
-        Gas.consume ctxt Typecheck_costs.bool >|? fun ctxt -> (true, ctxt) )
-  | (Bool_t _, Prim (loc, D_False, [], annot)) ->
-      Lwt.return
-        ( (if legacy then ok_unit else error_unexpected_annot loc annot)
-        >>? fun () ->
-        Gas.consume ctxt Typecheck_costs.bool >|? fun ctxt -> (false, ctxt) )
-  | (Bool_t _, Prim (loc, ((D_True | D_False) as c), l, _)) ->
-      traced_fail (Invalid_arity (loc, c, 0, List.length l))
+      Lwt.return @@ traced_no_lwt
+      @@ (parse_unit ctxt ~legacy expr : (a * context) tzresult)
   | (Bool_t _, expr) ->
-      traced_fail (unexpected expr [] Constant_namespace [D_True; D_False])
-  (* Strings *)
-  | (String_t _, String (_, v)) ->
-      Gas.consume ctxt (Typecheck_costs.check_printable v)
-      >>?= fun ctxt ->
-      let rec check_printable_ascii i =
-        if Compare.Int.(i < 0) then true
-        else
-          match v.[i] with
-          | '\n' | '\x20' .. '\x7E' ->
-              check_printable_ascii (i - 1)
-          | _ ->
-              false
-      in
-      if check_printable_ascii (String.length v - 1) then return (v, ctxt)
-      else fail_parse_data ()
+      Lwt.return @@ traced_no_lwt @@ parse_bool ctxt ~legacy expr
   | (String_t _, expr) ->
-      traced_fail (Invalid_kind (location expr, [String_kind], kind expr))
-  (* Byte sequences *)
-  | (Bytes_t _, Bytes (_, v)) ->
-      return (v, ctxt)
+      Lwt.return @@ traced_no_lwt @@ parse_string ctxt expr
   | (Bytes_t _, expr) ->
-      traced_fail (Invalid_kind (location expr, [Bytes_kind], kind expr))
-  (* Integers *)
-  | (Int_t _, Int (_, v)) ->
-      return (Script_int.of_zint v, ctxt)
-  | (Nat_t _, Int (_, v)) -> (
-      let v = Script_int.of_zint v in
-      match Script_int.is_nat v with
-      | Some nat ->
-          return (nat, ctxt)
-      | None ->
-          fail_parse_data () )
+      Lwt.return @@ traced_no_lwt @@ parse_bytes ctxt expr
   | (Int_t _, expr) ->
-      traced_fail (Invalid_kind (location expr, [Int_kind], kind expr))
+      Lwt.return @@ traced_no_lwt @@ parse_int ctxt expr
   | (Nat_t _, expr) ->
-      traced_fail (Invalid_kind (location expr, [Int_kind], kind expr))
-  (* Tez amounts *)
-  | (Mutez_t _, Int (_, v)) -> (
-    try
-      match Tez.of_mutez (Z.to_int64 v) with
-      | None ->
-          raise Exit
-      | Some tez ->
-          return (tez, ctxt)
-    with _ -> fail_parse_data () )
+      Lwt.return @@ traced_no_lwt @@ parse_nat ctxt expr
   | (Mutez_t _, expr) ->
-      traced_fail (Invalid_kind (location expr, [Int_kind], kind expr))
-  (* Timestamps *)
-  | (Timestamp_t _, Int (_, v))
-  (* As unparsed with [Optimized] or out of bounds [Readable]. *) ->
-      return (Script_timestamp.of_zint v, ctxt)
-  | (Timestamp_t _, String (_, s)) (* As unparsed with [Readable]. *) -> (
-      Gas.consume ctxt Typecheck_costs.timestamp_readable
-      >>?= fun ctxt ->
-      match Script_timestamp.of_string s with
-      | Some v ->
-          return (v, ctxt)
-      | None ->
-          fail_parse_data () )
+      Lwt.return @@ traced_no_lwt @@ parse_mutez ctxt expr
   | (Timestamp_t _, expr) ->
-      traced_fail
-        (Invalid_kind (location expr, [String_kind; Int_kind], kind expr))
-  (* IDs *)
-  | (Key_t _, Bytes (_, bytes)) -> (
-      (* As unparsed with [Optimized]. *)
-      Gas.consume ctxt Typecheck_costs.public_key_optimized
-      >>?= fun ctxt ->
-      match
-        Data_encoding.Binary.of_bytes Signature.Public_key.encoding bytes
-      with
-      | Some k ->
-          return (k, ctxt)
-      | None ->
-          fail_parse_data () )
-  | (Key_t _, String (_, s)) -> (
-      (* As unparsed with [Readable]. *)
-      Gas.consume ctxt Typecheck_costs.public_key_readable
-      >>?= fun ctxt ->
-      match Signature.Public_key.of_b58check_opt s with
-      | Some k ->
-          return (k, ctxt)
-      | None ->
-          fail_parse_data () )
+      Lwt.return @@ traced_no_lwt @@ parse_timestamp ctxt expr
   | (Key_t _, expr) ->
-      traced_fail
-        (Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr))
-  | (Key_hash_t _, Bytes (_, bytes)) -> (
-      (* As unparsed with [Optimized]. *)
-      Gas.consume ctxt Typecheck_costs.key_hash_optimized
-      >>?= fun ctxt ->
-      match
-        Data_encoding.Binary.of_bytes Signature.Public_key_hash.encoding bytes
-      with
-      | Some k ->
-          return (k, ctxt)
-      | None ->
-          fail_parse_data () )
-  | (Key_hash_t _, String (_, s)) (* As unparsed with [Readable]. *) -> (
-      Gas.consume ctxt Typecheck_costs.key_hash_readable
-      >>?= fun ctxt ->
-      match Signature.Public_key_hash.of_b58check_opt s with
-      | Some k ->
-          return (k, ctxt)
-      | None ->
-          fail_parse_data () )
+      Lwt.return @@ traced_no_lwt @@ parse_key ctxt expr
   | (Key_hash_t _, expr) ->
-      traced_fail
-        (Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr))
-  (* Signatures *)
-  | (Signature_t _, Bytes (_, bytes)) (* As unparsed with [Optimized]. *) -> (
-      Gas.consume ctxt Typecheck_costs.signature_optimized
-      >>?= fun ctxt ->
-      match Data_encoding.Binary.of_bytes Signature.encoding bytes with
-      | Some k ->
-          return (k, ctxt)
-      | None ->
-          fail_parse_data () )
-  | (Signature_t _, String (_, s)) (* As unparsed with [Readable]. *) -> (
-      Gas.consume ctxt Typecheck_costs.signature_readable
-      >>?= fun ctxt ->
-      match Signature.of_b58check_opt s with
-      | Some s ->
-          return (s, ctxt)
-      | None ->
-          fail_parse_data () )
+      Lwt.return @@ traced_no_lwt @@ parse_key_hash ctxt expr
   | (Signature_t _, expr) ->
-      traced_fail
-        (Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr))
-  (* Operations *)
+      Lwt.return @@ traced_no_lwt @@ parse_signature ctxt expr
   | (Operation_t _, _) ->
       (* operations cannot appear in parameters or storage,
-           the protocol should never parse the bytes of an operation *)
+         the protocol should never parse the bytes of an operation *)
       assert false
-  (* Chain_ids *)
-  | (Chain_id_t _, Bytes (_, bytes)) -> (
-      Gas.consume ctxt Typecheck_costs.chain_id_optimized
-      >>?= fun ctxt ->
-      match Data_encoding.Binary.of_bytes Chain_id.encoding bytes with
-      | Some k ->
-          return (k, ctxt)
-      | None ->
-          fail_parse_data () )
-  | (Chain_id_t _, String (_, s)) -> (
-      Gas.consume ctxt Typecheck_costs.chain_id_readable
-      >>?= fun ctxt ->
-      match Chain_id.of_b58check_opt s with
-      | Some s ->
-          return (s, ctxt)
-      | None ->
-          fail_parse_data () )
   | (Chain_id_t _, expr) ->
-      traced_fail
-        (Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr))
-  (* Addresses *)
-  | (Address_t _, Bytes (loc, bytes)) (* As unparsed with [Optimized]. *) -> (
-      Gas.consume ctxt Typecheck_costs.contract
-      >>?= fun ctxt ->
-      match
-        Data_encoding.Binary.of_bytes
-          Data_encoding.(tup2 Contract.encoding Variable.string)
-          bytes
-      with
-      | Some (c, entrypoint) -> (
-          Lwt.return
-          @@
-          if Compare.Int.(String.length entrypoint > 31) then
-            error (Entrypoint_name_too_long entrypoint)
-          else
-            match entrypoint with
-            | "" ->
-                ok ((c, "default"), ctxt)
-            | "default" ->
-                error (Unexpected_annotation loc)
-            | name ->
-                ok ((c, name), ctxt) )
-      | None ->
-          fail_parse_data () )
-  | (Address_t _, String (loc, s)) (* As unparsed with [Readable]. *) ->
-      Gas.consume ctxt Typecheck_costs.contract
-      >>?= fun ctxt ->
-      ( match String.index_opt s '%' with
-      | None ->
-          ok (s, "default")
-      | Some pos -> (
-          let len = String.length s - pos - 1 in
-          let name = String.sub s (pos + 1) len in
-          if Compare.Int.(len > 31) then error (Entrypoint_name_too_long name)
-          else
-            match (String.sub s 0 pos, name) with
-            | (_, "default") ->
-                traced_no_lwt (error (Unexpected_annotation loc))
-            | addr_and_name ->
-                ok addr_and_name ) )
-      >>?= fun (addr, entrypoint) ->
-      Lwt.return
-        (Contract.of_b58check addr >|? fun c -> ((c, entrypoint), ctxt))
+      Lwt.return @@ traced_no_lwt @@ parse_chain_id ctxt expr
   | (Address_t _, expr) ->
-      traced_fail
-        (Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr))
-  (* Contracts *)
-  | (Contract_t (ty, _), Bytes (loc, bytes))
-  (* As unparsed with [Optimized]. *) -> (
-      Gas.consume ctxt Typecheck_costs.contract
-      >>?= fun ctxt ->
-      match
-        Data_encoding.Binary.of_bytes
-          Data_encoding.(tup2 Contract.encoding Variable.string)
-          bytes
-      with
-      | Some (c, entrypoint) ->
-          ( if Compare.Int.(String.length entrypoint > 31) then
-            error (Entrypoint_name_too_long entrypoint)
-          else
-            match entrypoint with
-            | "" ->
-                ok "default"
-            | "default" ->
-                error (Unexpected_annotation loc)
-            | name ->
-                ok name )
-          >>?= fun entrypoint ->
-          traced (parse_contract ~legacy ctxt loc ty c ~entrypoint)
-          >|=? fun (ctxt, _) -> ((ty, (c, entrypoint)), ctxt)
-      | None ->
-          fail_parse_data () )
-  | (Contract_t (ty, _), String (loc, s)) (* As unparsed with [Readable]. *) ->
-      Gas.consume ctxt Typecheck_costs.contract
-      >>?= fun ctxt ->
-      ( match String.index_opt s '%' with
-      | None ->
-          ok (s, "default")
-      | Some pos -> (
-          let len = String.length s - pos - 1 in
-          let name = String.sub s (pos + 1) len in
-          if Compare.Int.(len > 31) then error (Entrypoint_name_too_long name)
-          else
-            match (String.sub s 0 pos, name) with
-            | (_, "default") ->
-                traced_no_lwt @@ error (Unexpected_annotation loc)
-            | addr_and_name ->
-                ok addr_and_name ) )
-      >>?= fun (addr, entrypoint) ->
-      traced_no_lwt (Contract.of_b58check addr)
-      >>?= fun c ->
-      parse_contract ~legacy ctxt loc ty c ~entrypoint
-      >|=? fun (ctxt, _) -> ((ty, (c, entrypoint)), ctxt)
-  | (Contract_t _, expr) ->
-      traced_fail
-        (Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr))
+      Lwt.return @@ traced_no_lwt @@ parse_address ctxt expr
+  | (Contract_t (ty, _), expr) ->
+      traced
+        ( parse_address ctxt expr
+        >>?= fun ((c, entrypoint), ctxt) ->
+        let loc = location expr in
+        parse_contract ~legacy ctxt loc ty c ~entrypoint
+        >|=? fun (ctxt, _) -> ((ty, (c, entrypoint)), ctxt) )
   (* Pairs *)
   | (Pair_t ((ta, _, _), (tb, _, _), _), Prim (loc, D_Pair, va :: l, annot)) ->
       traced
@@ -2817,7 +2841,7 @@ let rec parse_data :
                 ) ) )
       >|=? fun (id, ctxt) -> ({id; diff; key_type = tk; value_type = tv}, ctxt)
   | (Never_t _, expr) ->
-      traced_fail (Invalid_never_expr (location expr))
+      Lwt.return @@ traced_no_lwt @@ parse_never expr
   (* Bls12_381 types *)
   | (Bls12_381_g1_t _, Bytes (_, bs)) -> (
       Gas.consume ctxt Typecheck_costs.bls12_381_g1
