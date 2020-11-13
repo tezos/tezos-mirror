@@ -28,6 +28,7 @@ open Alpha_context
 open Script
 open Script_typed_ir
 open Script_ir_translator
+module S = Saturation_repr
 
 (* ---- Run-time errors -----------------------------------------------------*)
 
@@ -775,8 +776,10 @@ let rec step_bounded :
       (* The cost for this fold_left has been paid upfront *)
       let total_length =
         List.fold_left
-          (fun acc s -> Z.add acc (Z.of_int (String.length s)))
-          Z.zero
+          (fun acc s ->
+            let len = S.of_int_opt (String.length s) |> S.saturate_if_undef in
+            S.add acc len)
+          (S.zero |> S.may_saturate)
           ss.elements
       in
       Gas.consume ctxt (Interp_costs.concat_string total_length)
@@ -802,8 +805,10 @@ let rec step_bounded :
       (* The cost for this fold_left has been paid upfront *)
       let total_length =
         List.fold_left
-          (fun acc s -> Z.add acc (Z.of_int (Bytes.length s)))
-          Z.zero
+          (fun acc s ->
+            let len = S.of_int_opt (Bytes.length s) |> S.saturate_if_undef in
+            S.add acc len)
+          (S.zero |> S.may_saturate)
           ss.elements
       in
       Gas.consume ctxt (Interp_costs.concat_string total_length)

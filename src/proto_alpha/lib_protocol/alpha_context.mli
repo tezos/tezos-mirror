@@ -189,21 +189,21 @@ module Gas : sig
 
   val free : cost
 
-  val atomic_step_cost : Z.t -> cost
+  val atomic_step_cost : 'a Saturation_repr.t -> cost
 
-  val step_cost : Z.t -> cost
+  val step_cost : 'a Saturation_repr.t -> cost
 
-  val alloc_cost : Z.t -> cost
+  val alloc_cost : 'a Saturation_repr.t -> cost
 
   val alloc_bytes_cost : int -> cost
 
   val alloc_mbytes_cost : int -> cost
 
-  val read_bytes_cost : Z.t -> cost
+  val read_bytes_cost : int -> cost
 
-  val write_bytes_cost : Z.t -> cost
+  val write_bytes_cost : int -> cost
 
-  val ( *@ ) : Z.t -> cost -> cost
+  val ( *@ ) : 'a Saturation_repr.t -> cost -> cost
 
   val ( +@ ) : cost -> cost -> cost
 

@@ -34,6 +34,7 @@
 
 open Protocol
 open Script_ir_translator
+module S = Saturation_repr
 
 let dummy_list = list_cons 42 list_empty
 
@@ -145,8 +146,8 @@ let all_interpreter_costs =
     ("compare", compare Script_typed_ir.(Int_key None) forty_two forty_two);
     ( "concat_string_precheck",
       concat_string_precheck (list_cons "42" list_empty) );
-    ("concat_string", concat_string (Z.of_int 42));
-    ("concat_bytes", concat_bytes (Z.of_int 42));
+    ("concat_string", concat_string (S.safe_int 42));
+    ("concat_bytes", concat_bytes (S.safe_int 42));
     ("exec", exec);
     ("apply", apply);
     ("lambda", lambda);
@@ -228,17 +229,17 @@ let all_io_costs =
     ("write_access 1", write_access ~written_bytes:1) ]
 
 (* Here we're using knowledge of the internal representation of costs to
-   cast them to Z ... *)
-let cast_cost_to_z (c : Alpha_context.Gas.cost) : Z.t =
+   cast them to S ... *)
+let cast_cost_to_s (c : Alpha_context.Gas.cost) : _ S.t =
   Data_encoding.Binary.to_bytes_exn Alpha_context.Gas.cost_encoding c
-  |> Data_encoding.Binary.of_bytes_exn Data_encoding.z
+  |> Data_encoding.Binary.of_bytes_exn S.n_encoding
 
 (** Checks that all costs are positive values. *)
 let test_cost_reprs_are_all_positive list () =
   List.iter_es
     (fun (cost_name, cost) ->
-      if Z.gt cost Z.zero then return_unit
-      else if Z.equal cost Z.zero && List.mem cost_name free then return_unit
+      if S.(cost > S.zero) then return_unit
+      else if S.equal cost S.zero && List.mem cost_name free then return_unit
       else
         fail
           (Exn
@@ -248,7 +249,7 @@ let test_cost_reprs_are_all_positive list () =
 (** Checks that all costs are positive values. *)
 let test_costs_are_all_positive list () =
   let list =
-    List.map (fun (cost_name, cost) -> (cost_name, cast_cost_to_z cost)) list
+    List.map (fun (cost_name, cost) -> (cost_name, cast_cost_to_s cost)) list
   in
   test_cost_reprs_are_all_positive list ()
 

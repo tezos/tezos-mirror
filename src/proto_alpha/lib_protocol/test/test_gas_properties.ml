@@ -31,6 +31,7 @@
 *)
 
 open Protocol
+module S = Saturation_repr
 
 type cost_kind =
   | Atomic_step
@@ -66,19 +67,19 @@ let random_cost_of_kind (cost_kind : cost_kind) =
   let rand = Random.int 1000 in
   match cost_kind with
   | Atomic_step ->
-      atomic_step_cost (Z.of_int rand)
+      atomic_step_cost (S.safe_int rand)
   | Step ->
-      step_cost (Z.of_int rand)
+      step_cost (S.safe_int rand)
   | Alloc ->
-      alloc_cost (Z.of_int rand)
+      alloc_cost (S.safe_int rand)
   | Alloc_bytes ->
       alloc_bytes_cost rand
   | Alloc_mbytes ->
       alloc_mbytes_cost rand
   | Read_bytes ->
-      read_bytes_cost (Z.of_int rand)
+      read_bytes_cost rand
   | Write_bytes ->
-      write_bytes_cost (Z.of_int rand)
+      write_bytes_cost rand
 
 let random_cost () = random_cost_of_kind (random_cost_kind ())
 

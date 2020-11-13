@@ -411,9 +411,11 @@ let apply_diff ctx id diff =
   let open Sapling_repr in
   let nb_commitments = List.length diff.commitments_and_ciphertexts in
   let nb_nullifiers = List.length diff.nullifiers in
-  Raw_context.consume_gas
-    ctx
-    (sapling_apply_diff_cost ~inputs:nb_nullifiers ~outputs:nb_commitments)
+  let sapling_cost =
+    sapling_apply_diff_cost ~inputs:nb_nullifiers ~outputs:nb_commitments
+    |> Saturation_repr.of_z_opt |> Saturation_repr.saturate_if_undef
+  in
+  Raw_context.consume_gas ctx sapling_cost
   >>?= fun ctx ->
   Storage.Sapling.Commitments_size.get (ctx, id)
   >>=? fun cm_start_pos ->

@@ -29,7 +29,22 @@ type fp_tag
 
 type integral_tag
 
-let scaling_factor = 1000
+let safe_const x =
+  match Saturation_repr.(Option.bind (of_int_opt x) mul_safe) with
+  | None ->
+      (* because [safe_const] is always called with small enough constants. *)
+      assert false
+  | Some x ->
+      x
+
+let safe_int x =
+  match Saturation_repr.(of_int_opt x) with
+  | None ->
+      Saturation_repr.saturated
+  | Some x ->
+      x
+
+let scaling_factor = safe_const 1000
 
 module Arith = struct
   type 'a t = Saturation_repr.may_saturate Saturation_repr.t
@@ -38,14 +53,7 @@ module Arith = struct
 
   type integral = integral_tag t
 
-  let scaling_factor =
-    match
-      Saturation_repr.(Option.bind (of_int_opt scaling_factor) mul_safe)
-    with
-    | None ->
-        (* since 1000 is not saturated and mul_safe. *) assert false
-    | Some x ->
-        x
+  let scaling_factor = scaling_factor
 
   let sub = Saturation_repr.sub
 
@@ -145,7 +153,9 @@ end
 
 type t = Unaccounted | Limited of {remaining : Arith.fp}
 
-type cost = Z.t
+module S = Saturation_repr
+
+type cost = S.may_saturate S.t
 
 let encoding =
   let open Data_encoding in
@@ -169,44 +179,54 @@ let pp ppf = function
   | Limited {remaining} ->
       Format.fprintf ppf "%a units remaining" Arith.pp remaining
 
-let cost_encoding = Data_encoding.z
+let cost_encoding = S.z_encoding
 
-let pp_cost fmt z = Z.pp_print fmt z
+let pp_cost fmt z = S.pp fmt z
 
-let allocation_weight = Z.of_int (scaling_factor * 2)
+let allocation_weight = S.(mul_fast scaling_factor (safe_const 2))
 
-let step_weight = Z.of_int scaling_factor
+let step_weight = scaling_factor
 
-let read_base_weight = Z.of_int (scaling_factor * 100)
+let read_base_weight = S.(mul_fast scaling_factor (safe_const 100))
 
-let write_base_weight = Z.of_int (scaling_factor * 160)
+let write_base_weight = S.(mul_fast scaling_factor (safe_const 160))
 
-let byte_read_weight = Z.of_int (scaling_factor * 10)
+let byte_read_weight = S.(mul_fast scaling_factor (safe_const 10))
 
-let byte_written_weight = Z.of_int (scaling_factor * 15)
+let byte_written_weight = S.(mul_fast scaling_factor (safe_const 15))
 
-let cost_to_milligas (cost : cost) : Arith.fp = Arith.safe_fp cost
+let cost_to_milligas (cost : cost) : Arith.fp = cost
 
 let raw_consume gas_counter cost =
   let gas = cost_to_milligas cost in
   Arith.sub_opt gas_counter gas
 
-let alloc_cost n = Z.mul allocation_weight (Z.succ n)
+let alloc_cost n = S.mul allocation_weight S.(add n (safe_const 1))
 
-let alloc_bytes_cost n = alloc_cost (Z.of_int ((n + 7) / 8))
+let alloc_bytes_cost n =
+  match S.of_int_opt ((n + 7) / 8) with
+  | None ->
+      (* Since [n] is supposed to be positive, the following case should
+         never occur. In case this assumption does not hold, we return
+         [saturated], which is always a safe cost. *)
+      S.saturated
+  | Some x ->
+      alloc_cost x
 
-let atomic_step_cost n = n
+let atomic_step_cost : 'a S.t -> cost = S.may_saturate
 
-let step_cost n = Z.mul step_weight n
+let step_cost n = S.mul step_weight n
 
-let free = Z.zero
+let free = S.zero |> S.may_saturate
 
-let read_bytes_cost n = Z.add read_base_weight (Z.mul byte_read_weight n)
+let read_bytes_cost n =
+  S.add read_base_weight (S.mul byte_read_weight (safe_int n))
 
-let write_bytes_cost n = Z.add write_base_weight (Z.mul byte_written_weight n)
+let write_bytes_cost n =
+  S.add write_base_weight (S.mul byte_written_weight (safe_int n))
 
-let ( +@ ) x y = Z.add x y
+let ( +@ ) x y = S.add x y
 
-let ( *@ ) x y = Z.mul x y
+let ( *@ ) x y = S.mul x y
 
-let alloc_mbytes_cost n = alloc_cost (Z.of_int 12) +@ alloc_bytes_cost n
+let alloc_mbytes_cost n = alloc_cost (safe_const 12) +@ alloc_bytes_cost n

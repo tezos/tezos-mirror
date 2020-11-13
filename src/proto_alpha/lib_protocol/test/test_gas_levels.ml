@@ -32,6 +32,7 @@
 
 open Protocol
 open Raw_context
+module S = Saturation_repr
 
 (* This value is supposed to be larger than the block gas level limit
    but not saturated. *)
@@ -60,7 +61,7 @@ let test_detect_gas_exhaustion_in_fresh_context () =
   dummy_context ()
   >>=? fun context ->
   fail_unless
-    (consume_gas context (Z.of_int opg) |> succeed)
+    (consume_gas context (S.safe_int opg) |> succeed)
     (err "In a fresh context, gas consumption is unlimited.")
 
 let make_context initial_operation_gas =
@@ -74,14 +75,14 @@ let test_detect_gas_exhaustion_when_operation_gas_hits_zero () =
   make_context 10
   >>=? fun context ->
   fail_unless
-    (consume_gas context (Z.of_int opg) |> failed)
+    (consume_gas context (S.safe_int opg) |> failed)
     (err "Fail when consuming more than the remaining operation gas.")
 
 let test_detect_gas_exhaustion_when_block_gas_hits_zero () =
   make_context opg
   >>=? fun context ->
   fail_unless
-    (consume_gas context (Z.of_int opg) |> failed)
+    (consume_gas context (S.safe_int opg) |> failed)
     (err "Fail when consuming more than the remaining block gas.")
 
 let monitor initial_operation_level gas_level expectation () =
@@ -89,7 +90,7 @@ let monitor initial_operation_level gas_level expectation () =
   make_context initial_operation_level
   >>=? fun context ->
   fail_unless
-    ( match consume_gas context (Z.of_int 10000) (* in milligas. *) with
+    ( match consume_gas context (S.safe_int 10000) (* in milligas. *) with
     | Ok context ->
         let remaining = gas_level context in
         remaining = integral_of_int_exn expectation

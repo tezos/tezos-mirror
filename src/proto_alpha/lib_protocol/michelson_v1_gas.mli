@@ -243,9 +243,11 @@ module Cost_of : sig
 
     val concat_string_precheck : 'a Script_typed_ir.boxed_list -> Gas.cost
 
-    val concat_string : Z.t -> Gas.cost
+    val concat_string :
+      Saturation_repr.may_saturate Saturation_repr.t -> Gas.cost
 
-    val concat_bytes : Z.t -> Gas.cost
+    val concat_bytes :
+      Saturation_repr.may_saturate Saturation_repr.t -> Gas.cost
 
     val exec : Gas.cost
 

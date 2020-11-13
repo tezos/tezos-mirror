@@ -32,6 +32,7 @@
 *)
 
 open Protocol
+module S = Saturation_repr
 
 module Tested_terms () = struct
   open Micheline
@@ -106,14 +107,14 @@ module Tested_terms () = struct
     List.iter2_e
       ~when_different_lengths:
         (TzTrace.make @@ Exn (Failure "differently sized cost lists"))
-      (fun min full ->
-        if Z.leq min full then ok_unit
+      (fun smin full ->
+        if S.(smin <= full) then ok_unit
         else
           generic_error
             "Script_repr: inconsistent costs %a vs %a@."
-            Z.pp_print
-            min
-            Z.pp_print
+            S.pp
+            smin
+            S.pp
             full)
       minimal_costs
       full_costs

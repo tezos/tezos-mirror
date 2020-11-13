@@ -190,7 +190,7 @@ module Big_map = struct
   let get_opt c m k = Storage.Big_map.Contents.find (c, m) k
 
   let exists c id =
-    Raw_context.consume_gas c (Gas_limit_repr.read_bytes_cost Z.zero)
+    Raw_context.consume_gas c (Gas_limit_repr.read_bytes_cost 0)
     >>?= fun c ->
     Storage.Big_map.Key_type.find c id
     >>=? fun kt ->

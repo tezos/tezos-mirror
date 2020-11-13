@@ -150,6 +150,13 @@ val of_int_opt : int -> may_saturate t option
     and [None] otherwise. *)
 val of_z_opt : Z.t -> may_saturate t option
 
+(** [saturate_if_undef o] is [saturated] if [o] is [None] and [x] if [o = Some
+   x]. *)
+val saturate_if_undef : may_saturate t option -> may_saturate t
+
+(** [safe_int x] is [of_int_opt x |> saturate_if_undef]. *)
+val safe_int : int -> may_saturate t
+
 (** [to_z z] is [Z.of_int]. *)
 val to_z : _ t -> Z.t
 

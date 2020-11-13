@@ -28,14 +28,16 @@
    cost(path_length, read_bytes) = 200_000 + 5000 * path_length + 2 * read_bytes
 *)
 let read_access ~path_length ~read_bytes =
-  let base_cost = Z.of_int (200_000 + (5000 * path_length)) in
+  let open Saturation_repr in
+  let base_cost = safe_int (200_000 + (5000 * path_length)) in
   Gas_limit_repr.atomic_step_cost
-    (Z.add base_cost (Z.mul (Z.of_int 2) (Z.of_int read_bytes)))
+    (add base_cost (mul (safe_int 2) (safe_int read_bytes)))
 
 (* The model for write accesses is the following:
 
    cost(written_bytes) = 200_000 + 4 * written_bytes
 *)
 let write_access ~written_bytes =
+  let open Saturation_repr in
   Gas_limit_repr.atomic_step_cost
-    (Z.add (Z.of_int 200_000) (Z.mul (Z.of_int 4) (Z.of_int written_bytes)))
+    (add (safe_int 200_000) (mul (safe_int 4) (safe_int written_bytes)))

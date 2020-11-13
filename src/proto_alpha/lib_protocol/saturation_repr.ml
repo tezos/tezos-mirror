@@ -64,6 +64,10 @@ let of_z_opt z =
 
 let to_z x = Z.of_int x
 
+let saturate_if_undef = function None -> saturated | Some x -> x
+
+let safe_int x = of_int_opt x |> saturate_if_undef
+
 let zero = 0
 
 let small_enough z =

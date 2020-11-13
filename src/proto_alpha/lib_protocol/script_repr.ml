@@ -98,7 +98,11 @@ let seq_node_size_nonrec args =
   let n_args = List.length args in
   seq_node_size_nonrec_of_length n_args
 
-let convert_pair (i1, i2) = (Z.of_int i1, Z.of_int i2)
+module S = Saturation_repr
+
+let safe_int x = S.of_int_opt x |> S.saturate_if_undef
+
+let convert_pair (i1, i2) = (safe_int i1, safe_int i2)
 
 let rec node_size node =
   let open Micheline in
@@ -113,14 +117,14 @@ let rec node_size node =
       List.fold_left
         (fun (blocks, words) node ->
           let (nblocks, nwords) = node_size node in
-          (Z.add blocks nblocks, Z.add words nwords))
+          (S.add blocks nblocks, S.add words nwords))
         (convert_pair (prim_node_size_nonrec args annot))
         args
   | Seq (_, args) ->
       List.fold_left
         (fun (blocks, words) node ->
           let (nblocks, nwords) = node_size node in
-          (Z.add blocks nblocks, Z.add words nwords))
+          (S.add blocks nblocks, S.add words nwords))
         (convert_pair (seq_node_size_nonrec args))
         args
 
@@ -132,7 +136,7 @@ let traversal_cost node =
 
 let cost_of_size (blocks, words) =
   let open Gas_limit_repr in
-  (Compare.Z.max Z.zero (Z.sub blocks Z.one) *@ alloc_cost Z.zero)
+  (S.max S.zero (S.sub blocks (safe_int 1)) *@ alloc_cost S.zero)
   +@ alloc_cost words +@ step_cost blocks
 
 let cost_of_size_int pair = cost_of_size (convert_pair pair)
@@ -255,7 +259,7 @@ and micheline_nodes_list subterms acc k =
 
 let micheline_nodes node = micheline_nodes node 0 (fun x -> x)
 
-let cost_MICHELINE_STRIP_LOCATIONS size = Z.mul (Z.of_int size) (Z.of_int 100)
+let cost_MICHELINE_STRIP_LOCATIONS size = S.mul (safe_int size) (safe_int 100)
 
 let strip_locations_cost node =
   let nodes = micheline_nodes node in
