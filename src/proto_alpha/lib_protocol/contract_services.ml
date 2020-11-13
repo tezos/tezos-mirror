@@ -288,18 +288,14 @@ let register () =
   register1 S.contract_big_map_get_opt (fun ctxt contract () (key, key_type) ->
       Contract.get_script ctxt contract
       >>=? fun (ctxt, script) ->
-      Script_ir_translator.parse_packable_ty
+      Script_ir_translator.parse_comparable_ty ctxt (Micheline.root key_type)
+      >>?= fun (Ex_comparable_ty key_type, ctxt) ->
+      Script_ir_translator.parse_comparable_data
         ctxt
-        ~legacy:true
-        (Micheline.root key_type)
-      >>?= fun (Ex_ty key_type, ctxt) ->
-      Script_ir_translator.parse_data
-        ctxt
-        ~legacy:true
         key_type
         (Micheline.root key)
       >>=? fun (key, ctxt) ->
-      Script_ir_translator.hash_data ctxt key_type key
+      Script_ir_translator.hash_comparable_data ctxt key_type key
       >>=? fun (key, ctxt) ->
       match script with
       | None ->
