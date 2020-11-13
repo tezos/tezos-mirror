@@ -6027,16 +6027,14 @@ let rec unparse_data :
         items.elements
       >|=? fun (items, ctxt) -> (Micheline.Seq (-1, List.rev items), ctxt)
   | (Set_t (t, _), set) ->
-      let t = ty_of_comparable_ty t in
       fold_left_s
         (fun (l, ctxt) item ->
-          non_terminal_recursion ctxt mode t item
+          unparse_comparable_data ctxt mode t item
           >|=? fun (item, ctxt) -> (item :: l, ctxt))
         ([], ctxt)
         (set_fold (fun e acc -> e :: acc) set [])
       >|=? fun (items, ctxt) -> (Micheline.Seq (-1, items), ctxt)
   | (Map_t (kt, vt, _), map) ->
-      let kt = ty_of_comparable_ty kt in
       let items = map_fold (fun k v acc -> (k, v) :: acc) map [] in
       unparse_items ctxt ~stack_depth:(stack_depth + 1) mode kt vt items
       >|=? fun (items, ctxt) -> (Micheline.Seq (-1, items), ctxt)
@@ -6044,7 +6042,6 @@ let rec unparse_data :
     when Diff.OPS.is_empty (fst Diff.boxed) ->
       return (Micheline.Int (-1, Big_map.Id.unparse_to_z id), ctxt)
   | (Big_map_t (kt, vt, _), {id = Some id; diff = (module Diff); _}) ->
-      let kt = ty_of_comparable_ty kt in
       let items =
         Diff.OPS.fold (fun k v acc -> (k, v) :: acc) (fst Diff.boxed) []
       in
@@ -6058,7 +6055,6 @@ let rec unparse_data :
             [] ),
         ctxt )
   | (Big_map_t (kt, vt, _), {id = None; diff = (module Diff); _}) ->
-      let kt = ty_of_comparable_ty kt in
       let items =
         Diff.OPS.fold
           (fun k v acc -> match v with None -> acc | Some v -> (k, v) :: acc)
@@ -6077,14 +6073,14 @@ and unparse_items :
     context ->
     stack_depth:int ->
     unparsing_mode ->
-    k ty ->
+    k comparable_ty ->
     v ty ->
     (k * v) list ->
     (Script.node list * context) tzresult Lwt.t =
  fun ctxt ~stack_depth mode kt vt items ->
   fold_left_s
     (fun (l, ctxt) (k, v) ->
-      unparse_data ctxt ~stack_depth:(stack_depth + 1) mode kt k
+      unparse_comparable_data ctxt mode kt k
       >>=? fun (key, ctxt) ->
       unparse_data ctxt ~stack_depth:(stack_depth + 1) mode vt v
       >|=? fun (value, ctxt) -> (Prim (-1, D_Elt, [key; value], []) :: l, ctxt))
