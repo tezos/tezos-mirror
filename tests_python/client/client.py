@@ -113,7 +113,9 @@ class Client:
                     params: List[str],
                     admin: bool = False,
                     check: bool = True,
-                    trace: bool = False) -> Tuple[str, str, int]:
+                    trace: bool = False,
+                    stdin: str = "",
+                    ) -> Tuple[str, str, int]:
         """Run an arbitrary command
 
         Args:
@@ -122,6 +124,8 @@ class Client:
                           tezos-admin-client
             check (bool): raises an exception if client call fails
             trace (bool): use '-l' option to trace RPCs
+            stdin (string): string that will be passed as standard
+                            input to the process
         Returns:
             (stdout of command, stderr of command, return code)
 
@@ -138,22 +142,23 @@ class Client:
         new_env = os.environ.copy()
         if self._disable_disclaimer:
             new_env["TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER"] = "Y"
-        completed_process = subprocess.run(cmd,
-                                           capture_output=True,
-                                           text=True,
-                                           check=False,
-                                           env=new_env)
-        stdout = completed_process.stdout
-        stderr = completed_process.stderr
+        process = subprocess.Popen(
+            cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, env=new_env)
+        outstream, errstream = process.communicate(input=stdin.encode())
+        stdout = outstream.decode('utf-8')
+        stderr = errstream.decode('utf-8')
         if stdout:
             print(stdout)
         if stderr:
             print(stderr, file=sys.stderr)
         if check:
-            completed_process.check_returncode()
+            if process.returncode != 0:
+                raise subprocess.CalledProcessError(
+                    process.returncode, cmd, stdout, stderr)
         # `+ ""` makes pylint happy. It can't infer stdout/stderr can't
         # be `None` thanks to the `capture_output=True` option.
-        return (stdout + "", stderr + "", completed_process.returncode)
+        return (stdout + "", stderr + "", process.returncode)
 
     def run(self,
             params: List[str],
