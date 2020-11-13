@@ -21,19 +21,22 @@ csplit --quiet --prefix="$tmp" "$src_dir/.gitlab-ci.yml" /##BEGIN_UNITTEST##/+1
 mv "$tmp"00 "$tmp"
 rm "$tmp"0*
 
+cat >> "$tmp" <<EOF
+unit:alltest:
+  <<: *test_definition
+  script:
+EOF
+
 # 2: Find each test folder and add the matching incantation to the temporary
 # file.
-for lib in `find src/ vendors/ -name test -type d | LC_COLLATE=C sort` ; do
-  if git ls-files --error-unmatch $lib  > /dev/null 2>&1; then
+for lib in $(find src/ vendors/ -name test -type d | LC_COLLATE=C sort) ; do
+  if git ls-files --error-unmatch "$lib"  > /dev/null 2>&1; then
     nametest=${lib%%/test}
     name=$nametest
     name=${name##src/bin_}
     name=${name##src/lib_}
     name=${name##vendors/}
-    cat >> $tmp <<EOF
-unit:$name:
-  <<: *test_definition
-  script:
+    cat >> "$tmp" <<EOF
     - dune build @$nametest/runtest
 
 EOF
@@ -48,5 +51,5 @@ cat "$tmp"00 >> "$tmp"
 rm "$tmp"0*
 
 # 4: The temporary file is swapped in place of the CI configuration file.
-mv $tmp "$src_dir/.gitlab-ci.yml"
+mv "$tmp" "$src_dir/.gitlab-ci.yml"
 
