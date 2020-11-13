@@ -5842,12 +5842,12 @@ let unparse_bls12_381_fr ctxt x =
 
 (* -- Unparsing data of complex types -- *)
 
-type _ comb_witness =
-  | Comb_Pair : 't comb_witness -> (_ * 't) comb_witness
-  | Comb_Any : _ comb_witness
+type ('ty, 'depth) comb_witness =
+  | Comb_Pair : ('t, 'd) comb_witness -> (_ * 't, unit -> 'd) comb_witness
+  | Comb_Any : (_, _) comb_witness
 
 let unparse_pair (type r) unparse_l unparse_r ctxt mode
-    (r_comb_witness : r comb_witness) (l, (r : r)) =
+    (r_comb_witness : (r, unit -> unit -> _) comb_witness) (l, (r : r)) =
   unparse_l ctxt l
   >>=? fun (l, ctxt) ->
   unparse_r ctxt r
@@ -5899,7 +5899,8 @@ let unparse_option unparse_v ctxt = function
 
 (* -- Unparsing data of comparable types -- *)
 
-let comparable_comb_witness2 : type t. t comparable_ty -> t comb_witness =
+let comparable_comb_witness2 :
+    type t. t comparable_ty -> (t, unit -> unit -> unit) comb_witness =
   function
   | Pair_key (_, (Pair_key _, _), _) ->
       Comb_Pair (Comb_Pair Comb_Any)
@@ -5968,7 +5969,8 @@ let rec unparse_comparable_data :
 
 (* -- Unparsing data of any type -- *)
 
-let comb_witness2 : type t. t ty -> t comb_witness = function
+let comb_witness2 : type t. t ty -> (t, unit -> unit -> unit) comb_witness =
+  function
   | Pair_t (_, (Pair_t _, _, _), _) ->
       Comb_Pair (Comb_Pair Comb_Any)
   | Pair_t _ ->
