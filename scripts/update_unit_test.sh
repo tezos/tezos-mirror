@@ -1,4 +1,4 @@
-#! /bin/sh
+#! /bin/bash
 
 # This script is for automatically updating the tests in `.gitlab-ci.yml`. This
 # script specifically updates the unit tests, the script
@@ -24,6 +24,12 @@ rm "$tmp"0*
 cat >> "$tmp" <<EOF
 unit:alltest:
   <<: *test_definition
+  artifacts:
+    name: "alltest-\${CI_COMMIT_SHA}"
+    paths:
+      - test_results
+    expire_in: 1 day
+#    when: on_failure
   script:
 EOF
 
@@ -35,10 +41,11 @@ for lib in $(find src/ vendors/ -name test -type d | LC_COLLATE=C sort) ; do
     name=$nametest
     name=${name##src/bin_}
     name=${name##src/lib_}
+    name=${name##src/proto_}
     name=${name##vendors/}
+    name=${name//\//_}
     cat >> "$tmp" <<EOF
-    - dune build @$nametest/runtest
-
+    - scripts/test_wrapper.sh $nametest $name
 EOF
   fi
 done
