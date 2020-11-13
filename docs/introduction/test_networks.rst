@@ -52,68 +52,6 @@ This results in a faster chain than Mainnet:
 - a cycle should last about 17 hours;
 - a voting period lasts 1 cycle and should thus also last about 17 hours.
 
-Dalphanet
----------
-
-- Git branch: ``dalpha-release``
-- Built-in :ref:`multinetwork` alias: ``dalphanet``
-- Run Docker image: ``docker run --name tezos-dalpha-release tezos/tezos:dalpha-release tezos-node --history-mode archive --network dalphanet``
-
-Dalphanet is an experimental test network for the upcoming protocol
-proposal. It may be reset to allow testing of the protocol under
-development, and in particular, to test migration from the Mainnet
-protocol.
-
-The Dalphanet configuration and the necessary modified protocol
-environment is only available in the ``dalpha-release`` branch, and
-not on the ``latest-release`` nor the ``master`` branches. You can
-either participate in Dalphanet using the pre-built Docker image as
-shown above, or run Dalpha net from a source distribution, as shown
-below.
-
-Running Dalphanet from a source distribution
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-To build a ``tezos-node`` for Dalphanet, you will need to set up the
-Rust environment and then build as usual but using the branch
-``dalpha-release`` instead of ``latest-release``. In other words,
-follow the process described in :ref:`Build from
-source<build_from_sources>`, but replace the command::
-
-    git checkout latest-release
-
-with::
-
-    git checkout dalpha-release
-
-Then use the built-in :ref:`multinetwork` alias ``dalphanet`` to configure
-``tezos-node`` to use Dalphanet: ::
-
-    tezos-node config init --network dalphanet
-
-Constants
-~~~~~~~~~
-
-On Dalphanet, the following constants differ from Mainnet:
-
-- ``blocks_per_cycle`` is 256 instead of 4096;
-- ``blocks_per_roll_snapshot`` is 16 instead of 256;
-- ``blocks_per_voting_period`` is 2048 instead of 32768;
-- ``time_between_blocks`` is ``[ 20, 15 ]`` instead of ``[ 60, 40 ]``;
-- ``test_chain_duration`` is 43200 instead of 1966080;
-- ``quorum_min`` is 3000 (i.e. 30%) instead of 2000 (i.e. 20%);
-- ``delay_per_missing_endorsement`` is 1 instead of 8;
-- ``hard_gas_limit_per_block`` is 10400000000 instead of 10400000;
-- ``hard_gas_limit_per_operation`` is 1040000000 instead of 1040000;
-- ``preserved_cycles`` is 3 instead of 5;
-- ``test_chain_duration`` is 43200 instead of 1966080.
-
-This results in a chain which moves faster than Mainnet:
-
-- 3 blocks per minute;
-- a cycle should last about 1.5 hour;
-- a voting period lasts 8 cycle and should thus last about 12 hours.
-
 Future Networks
 ---------------
 
@@ -126,6 +64,14 @@ P is activated, the previous test network will end and P-net will continue on it
 
 Old Networks
 ============
+
+Dalphanet
+---------
+
+Dalphanet was an experimental test network spawned during summer 2020
+featuring Sapling and baking accounts. Since this test network required
+a modified protocol environment, it was not available in any release branch.
+It was available in experimental branch ``dalpha-release``.
 
 Carthagenet
 -----------
