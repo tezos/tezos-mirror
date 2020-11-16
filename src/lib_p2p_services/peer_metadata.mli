@@ -47,6 +47,7 @@ type requests_kind =
   | Protocols
   | Operation_hashes_for_block
   | Operations_for_block
+  | Checkpoint
   | Other
 
 type resource_kind = Block | Operations | Protocol

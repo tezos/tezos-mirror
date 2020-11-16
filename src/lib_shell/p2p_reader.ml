@@ -365,6 +365,21 @@ let handle_msg state msg =
         >>= fun () ->
         Peer_metadata.incr meta @@ Received_response Operations_for_block ;
         Lwt.return_unit )
+  | Get_checkpoint chain_id ->
+      Peer_metadata.incr meta @@ Received_request Checkpoint ;
+      may_handle_global state chain_id
+      @@ fun chain_db ->
+      State.Chain.checkpoint chain_db.chain_state
+      >>= fun checkpoint ->
+      Peer_metadata.update_responses meta Checkpoint
+      @@ P2p.try_send state.p2p state.conn
+      @@ Checkpoint (chain_id, checkpoint) ;
+      Lwt.return_unit
+  | Checkpoint _ ->
+      (* This message is currently unused: it will be used for future
+         bootstrap heuristics. *)
+      Peer_metadata.incr meta @@ Received_response Checkpoint ;
+      Lwt.return_unit
 
 let rec worker_loop state =
   protect ~canceler:state.canceler (fun () -> P2p.recv state.p2p state.conn)

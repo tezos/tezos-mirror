@@ -42,6 +42,7 @@ type messages = {
   mutable protocols : counter;
   mutable operation_hashes_for_block : counter;
   mutable operations_for_block : counter;
+  mutable checkpoint : counter;
   mutable other : counter;
 }
 
@@ -55,6 +56,7 @@ let sent_requests_encoding =
             protocols;
             operation_hashes_for_block;
             operations_for_block;
+            checkpoint;
             other } ->
        ( branch,
          head,
@@ -63,6 +65,7 @@ let sent_requests_encoding =
          protocols,
          operation_hashes_for_block,
          operations_for_block,
+         checkpoint,
          other ))
      (fun ( branch,
             head,
@@ -71,6 +74,7 @@ let sent_requests_encoding =
             protocols,
             operation_hashes_for_block,
             operations_for_block,
+            checkpoint,
             other ) ->
        {
          branch;
@@ -80,9 +84,10 @@ let sent_requests_encoding =
          protocols;
          operation_hashes_for_block;
          operations_for_block;
+         checkpoint;
          other;
        }))
-    (obj8
+    (obj9
        (req "branch" counter)
        (req "head" counter)
        (req "block_header" counter)
@@ -90,6 +95,7 @@ let sent_requests_encoding =
        (req "protocols" counter)
        (req "operation_hashes_for_block" counter)
        (req "operations_for_block" counter)
+       (req "checkpoint" counter)
        (req "other" counter))
 
 type requests_kind =
@@ -100,6 +106,7 @@ type requests_kind =
   | Protocols
   | Operation_hashes_for_block
   | Operations_for_block
+  | Checkpoint
   | Other
 
 type requests = {
@@ -319,6 +326,7 @@ let empty () =
       protocols = zero;
       operation_hashes_for_block = zero;
       operations_for_block = zero;
+      checkpoint = zero;
       other = zero;
     }
   in
@@ -437,6 +445,8 @@ let incr_requests (msgs : messages) (req : requests_kind) =
       msgs.operation_hashes_for_block <- msgs.operation_hashes_for_block + one
   | Operations_for_block ->
       msgs.operations_for_block <- msgs.operations_for_block + one
+  | Checkpoint ->
+      msgs.checkpoint <- msgs.checkpoint + one
   | Other ->
       msgs.other <- msgs.other + one
 

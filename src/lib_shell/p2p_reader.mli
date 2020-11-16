@@ -88,6 +88,13 @@
     the message is ignored.
     Otherwise, calls [callback.notify_head].
 
+  - [Get_checkpoint chain_id]:
+    message is ignored if the chain [chain_id] is inactive for the remote peer.
+    Otherwise, replies with [Checkpoint (chain_id, checkpoint)] where [checkpoint]
+    is the current checkpoint for the requested chain.
+
+  - [Checkpoint chain_id header] is a no-op
+
   3. "Database" messages
 
   These messages are used for peers to exchange "static" resources such

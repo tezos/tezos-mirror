@@ -153,6 +153,8 @@ type t =
   | Get_operations_for_blocks of (Block_hash.t * int) list
   | Operations_for_block of
       Block_hash.t * int * Operation.t list * Operation_list_list_hash.path
+  | Get_checkpoint of Chain_id.t
+  | Checkpoint of Chain_id.t * Block_header.t
 
 let encoding =
   let open Data_encoding in
@@ -271,7 +273,25 @@ let encoding =
         | _ ->
             None)
       (fun ((block, ofs), (path, ops)) ->
-        Operations_for_block (block, ofs, ops, path)) ]
+        Operations_for_block (block, ofs, ops, path));
+    case
+      ~tag:0x70
+      ~title:"Get_checkpoint"
+      (obj1 (req "get_checkpoint" Chain_id.encoding))
+      (function Get_checkpoint chain -> Some chain | _ -> None)
+      (fun chain -> Get_checkpoint chain);
+    case
+      ~tag:0x71
+      ~title:"Checkpoint"
+      (obj1
+         (req
+            "checkpoint"
+            (obj2
+               (req "chain_id" Chain_id.encoding)
+               (req "header" Bounded_encoding.block_header))))
+      (function
+        | Checkpoint (chain_id, header) -> Some (chain_id, header) | _ -> None)
+      (fun (chain_id, header) -> Checkpoint (chain_id, header)) ]
 
 let distributed_db_versions = [Distributed_db_version.zero]
 
