@@ -64,8 +64,9 @@ class TransferResult:
         pattern = r"--branch ?(\w*)"
         match = re.search(pattern, client_output)
         if match is None:
-            raise InvalidClientOutput(client_output)
-        self.branch_hash = match.groups()[0]
+            self.branch_hash = None
+        else:
+            self.branch_hash = match.groups()[0]
         pattern = r"Fee to the baker: ꜩ(.*)"
         match = re.search(pattern, client_output)
         if match is None:
