@@ -97,25 +97,45 @@ let sent_requests_encoding =
          predecessor_header;
          other;
        }))
-    (conv
-       (fun (b, h, bh, ops, p, ophs, opb, cp, pb, ph, o) ->
-         ((b, h, bh, ops, p, ophs), (opb, cp, pb, ph, o)))
-       (fun ((b, h, bh, ops, p, ophs), (opb, cp, pb, ph, o)) ->
-         (b, h, bh, ops, p, ophs, opb, cp, pb, ph, o))
-       (merge_objs
-          (obj6
-             (req "branch" counter)
-             (req "head" counter)
-             (req "block_header" counter)
-             (req "operations" counter)
-             (req "protocols" counter)
-             (req "operation_hashes_for_block" counter))
-          (obj5
-             (req "operations_for_block" counter)
-             (req "checkpoint" counter)
-             (req "protocol_branch" counter)
-             (req "predecessor_header" counter)
-             (req "other" counter))))
+    (union
+       [ case
+           ~title:"peer_metadata.v1"
+           Json_only
+           (merge_objs
+              (obj10
+                 (req "branch" counter)
+                 (req "head" counter)
+                 (req "block_header" counter)
+                 (req "operations" counter)
+                 (req "protocols" counter)
+                 (req "operation_hashes_for_block" counter)
+                 (req "operations_for_block" counter)
+                 (req "checkpoint" counter)
+                 (req "protocol_branch" counter)
+                 (req "predecessor_header" counter))
+              (obj1 (req "other" counter)))
+           (fun (b, h, bh, ops, p, ophs, opb, cp, pb, ph, o) ->
+             Some ((b, h, bh, ops, p, ophs, opb, cp, pb, ph), o))
+           (fun ((b, h, bh, ops, p, ophs, opb, cp, pb, ph), o) ->
+             (b, h, bh, ops, p, ophs, opb, cp, pb, ph, o));
+         (* This legacy encoding may be removed once every node
+            upgrade to the DDB v1. This encoding is currently only
+            being used to decode the peers json file. *)
+         case
+           ~title:"peer_metadata.legacy_v0"
+           Json_only
+           (obj8
+              (req "branch" counter)
+              (req "head" counter)
+              (req "block_header" counter)
+              (req "operations" counter)
+              (req "protocols" counter)
+              (req "operation_hashes_for_block" counter)
+              (req "operations_for_block" counter)
+              (req "other" counter))
+           (fun _ -> None) (* Never used for encoding *)
+           (fun (a, b, c, d, e, f, g, h) ->
+             (a, b, c, d, e, f, g, zero, zero, zero, h)) ])
 
 type requests_kind =
   | Branch
