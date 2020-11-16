@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# This script launches a sandbox node, activates Carthage, gets the RPC descriptions
+# This script launches a sandbox node, activates Delphi, gets the RPC descriptions
 # as JSON, and converts this JSON into an OpenAPI specification.
 # You must compile the node and the client before running it.
 #
@@ -17,9 +17,9 @@ tezos_node=./tezos-node
 tezos_client=./tezos-client
 
 # Protocol configuration.
-protocol_hash=PsCARTHAGazKbHtnKfLzQg3kms52kSRpgnDY982a9oYsSXRLQEb
-protocol_parameters=src/proto_006_PsCARTHA/parameters/sandbox-parameters.json
-protocol_name=carthage
+protocol_hash=PsDELPH1Kxsxt8f9eWbxQeRxkjfbxoqM52jvs5Y5fBxWWh4ifpo
+protocol_parameters=src/proto_007_PsDELPH1/parameters/sandbox-parameters.json
+protocol_name=delphi
 
 # Secret key to activate the protocol.
 activator_secret_key="unencrypted:edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6"
