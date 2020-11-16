@@ -283,25 +283,6 @@ let predecessor_n ?(below_save_point = false) block_store block_hash distance =
       >>= function
       | false -> Lwt.return_none | true -> Lwt.return_some predecessor )
 
-let compute_locator_from_hash chain_state ?(size = 200) head_hash seed =
-  Shared.use chain_state.chain_data (fun state ->
-      Lwt.return state.data.caboose)
-  >>= fun (_lvl, caboose) ->
-  Shared.use chain_state.block_store (fun block_store ->
-      Header.read_opt (block_store, head_hash)
-      >|= Option.unopt_assert ~loc:__POS__
-      >>= fun header ->
-      Block_locator.compute
-        ~get_predecessor:(predecessor_n ~below_save_point:true block_store)
-        ~caboose
-        ~size
-        head_hash
-        header
-        seed)
-
-let compute_locator chain ?size head seed =
-  compute_locator_from_hash chain ?size head.hash seed
-
 type t = global_state
 
 module Locked_block = struct
@@ -1805,6 +1786,132 @@ let read global_store context_index main_chain =
     }
   in
   Chain.read_all state >>=? fun () -> return state
+
+(* FIXME: this should not be hard-coded *)
+let max_locator_size = 200
+
+let compute_locator_from_hash chain_state ?(max_size = max_locator_size)
+    ?min_level (head_hash, head_header) seed =
+  Shared.use chain_state.block_store (fun block_store ->
+      read_chain_data chain_state (fun _ chain_data ->
+          match min_level with
+          | None ->
+              Lwt.return chain_data.caboose
+          | Some level -> (
+              let head_level = head_header.Block_header.shell.level in
+              let distance = Int32.sub head_level level in
+              predecessor_n
+                ~below_save_point:true
+                block_store
+                head_hash
+                (Int32.to_int distance)
+              >>= function
+              | None ->
+                  Lwt.return chain_data.caboose
+              | Some hash ->
+                  Lwt.return (level, hash) ))
+      >>= fun (_lvl, caboose) ->
+      let get_predecessor =
+        match min_level with
+        | None ->
+            predecessor_n ~below_save_point:true block_store
+        | Some min_level -> (
+            fun block_hash distance ->
+              predecessor_n
+                ~below_save_point:true
+                block_store
+                block_hash
+                distance
+              >>= function
+              | None ->
+                  Lwt.return_none
+              | Some pred_hash -> (
+                  Header.read_opt (block_store, pred_hash)
+                  >>= function
+                  | None ->
+                      Lwt.return_none
+                  | Some pred_header
+                    when Compare.Int32.(pred_header.shell.level < min_level) ->
+                      Lwt.return_none
+                  | Some _ ->
+                      Lwt.return_some pred_hash ) )
+      in
+      Block_locator.compute
+        ~get_predecessor
+        ~caboose
+        ~size:max_size
+        head_hash
+        head_header
+        seed)
+
+let compute_locator chain ?max_size head seed =
+  compute_locator_from_hash chain ?max_size (head.hash, Block.header head) seed
+
+let compute_protocol_locator chain_state ?max_size ~proto_level seed =
+  Chain.store chain_state
+  >>= fun global_store ->
+  let chain_store = Store.Chain.get global_store chain_state.chain_id in
+  read_chain_data chain_state (fun _chain_store chain_data ->
+      Store.Chain.Protocol_info.read_opt chain_store proto_level
+      >>= function
+      | None ->
+          Lwt.return_none
+      | Some (_protocol_hash, block_activation_level) -> (
+          (* proto level's lower bound found, now retrieving the upper bound *)
+          let head_proto_level =
+            Block.protocol_level chain_data.current_head
+          in
+          if Compare.Int.(proto_level = head_proto_level) then
+            Lwt.return_some
+              ( block_activation_level,
+                Block.
+                  (hash chain_data.current_head, header chain_data.current_head)
+              )
+          else
+            Store.Chain.Protocol_info.read_opt chain_store (succ proto_level)
+            >>= function
+            | None ->
+                Lwt.return_none
+            | Some (_, next_activation_level) -> (
+                let last_level_in_protocol =
+                  Int32.(pred next_activation_level)
+                in
+                let delta =
+                  Int32.(
+                    sub
+                      (Block.level chain_data.current_head)
+                      last_level_in_protocol)
+                in
+                Shared.use chain_state.block_store (fun block_store ->
+                    predecessor_n
+                      ~below_save_point:true
+                      block_store
+                      (Block.hash chain_data.current_head)
+                      (Int32.to_int delta))
+                >>= function
+                | None ->
+                    Lwt.return_none
+                | Some pred_hash ->
+                    Shared.use chain_state.block_store (fun block_store ->
+                        Header.read_opt (block_store, pred_hash)
+                        >>= function
+                        | None ->
+                            Lwt.return_none
+                        | Some pred_header ->
+                            Lwt.return_some
+                              (block_activation_level, (pred_hash, pred_header)))
+                ) ))
+  >>= function
+  | None ->
+      Lwt.return_none
+  | Some (block_activation_level, upper_block) ->
+      compute_locator_from_hash
+        chain_state
+        ?max_size
+        ~min_level:block_activation_level
+        upper_block
+        seed
+      >>= Lwt.return_some
 
 type error +=
   | Incorrect_history_mode_switch of {

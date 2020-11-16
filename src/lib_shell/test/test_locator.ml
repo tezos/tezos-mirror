@@ -345,15 +345,16 @@ let test_locator base_dir =
   in
   res
   >>= fun head ->
-  let check_locator size : unit tzresult Lwt.t =
+  let check_locator max_size : unit tzresult Lwt.t =
     State.read_chain_data chain (fun _ data ->
         Lwt.return (data.caboose, data.save_point))
     >>= fun ((_, caboose), _save_point) ->
     State.Block.read chain head
     >>=? fun block ->
-    time ~runs (fun () -> State.compute_locator chain ~size block seed)
+    time ~runs (fun () -> State.compute_locator chain ~max_size block seed)
     |> fun (l_exp, t_exp) ->
-    time ~runs (fun () -> compute_linear_locator chain ~caboose ~size block)
+    time ~runs (fun () ->
+        compute_linear_locator chain ~caboose ~size:max_size block)
     |> fun (l_lin, t_lin) ->
     l_exp
     >>= fun l_exp ->
@@ -361,11 +362,11 @@ let test_locator base_dir =
     >>= fun l_lin ->
     let (_, l_exp) = (l_exp : Block_locator.t :> _ * _) in
     let (_, l_lin) = (l_lin : Block_locator.t :> _ * _) in
-    let _ = Printf.printf "%10i %f %f\n" size t_exp t_lin in
+    let _ = Printf.printf "%10i %f %f\n" max_size t_exp t_lin in
     List.iter2
       (fun hn ho ->
         if not (Block_hash.equal hn ho) then
-          Assert.fail_msg "Invalid locator %i" size)
+          Assert.fail_msg "Invalid locator %i" max_size)
       l_exp
       l_lin ;
     return_unit

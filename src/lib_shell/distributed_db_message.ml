@@ -155,6 +155,9 @@ type t =
       Block_hash.t * int * Operation.t list * Operation_list_list_hash.path
   | Get_checkpoint of Chain_id.t
   | Checkpoint of Chain_id.t * Block_header.t
+  | Get_protocol_branch of Chain_id.t * int (* proto_level: uint8 *)
+  | Protocol_branch of
+      Chain_id.t * int (* proto_level: uint8 *) * Block_locator.t
 
 let encoding =
   let open Data_encoding in
@@ -291,7 +294,37 @@ let encoding =
                (req "header" Bounded_encoding.block_header))))
       (function
         | Checkpoint (chain_id, header) -> Some (chain_id, header) | _ -> None)
-      (fun (chain_id, header) -> Checkpoint (chain_id, header)) ]
+      (fun (chain_id, header) -> Checkpoint (chain_id, header));
+    case
+      ~tag:0x80
+      ~title:"Get_protocol_branch"
+      (obj1
+         (req
+            "get_protocol_branch"
+            (obj2 (req "chain" Chain_id.encoding) (req "proto_level" uint8))))
+      (function
+        | Get_protocol_branch (chain, protocol) ->
+            Some (chain, protocol)
+        | _ ->
+            None)
+      (fun (chain, protocol) -> Get_protocol_branch (chain, protocol));
+    case
+      ~tag:0x81
+      ~title:"Protocol_branch"
+      (obj1
+         (req
+            "protocol_branch"
+            (obj3
+               (req "chain" Chain_id.encoding)
+               (req "proto_level" uint8)
+               (req "locator" Bounded_encoding.block_locator))))
+      (function
+        | Protocol_branch (chain, proto_level, locator) ->
+            Some (chain, proto_level, locator)
+        | _ ->
+            None)
+      (fun (chain, proto_level, locator) ->
+        Protocol_branch (chain, proto_level, locator)) ]
 
 let distributed_db_versions = [Distributed_db_version.zero]
 

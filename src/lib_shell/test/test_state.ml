@@ -509,7 +509,7 @@ let seed =
 
 let test_locator s =
   let check_locator length h1 expected =
-    State.compute_locator s.chain ~size:length (vblock s h1) seed
+    State.compute_locator s.chain ~max_size:length (vblock s h1) seed
     >>= fun l ->
     let (_, l) = (l : Block_locator.t :> _ * _) in
     if List.length l <> List.length expected then

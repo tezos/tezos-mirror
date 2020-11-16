@@ -380,6 +380,28 @@ let handle_msg state msg =
          bootstrap heuristics. *)
       Peer_metadata.incr meta @@ Received_response Checkpoint ;
       Lwt.return_unit
+  | Get_protocol_branch (chain_id, proto_level) -> (
+      Peer_metadata.incr meta @@ Received_request Protocol_branch ;
+      may_handle_global state chain_id
+      @@ fun chain_db ->
+      activate state chain_id chain_db ;
+      let seed =
+        {Block_locator.receiver_id = state.gid; sender_id = my_peer_id state}
+      in
+      State.compute_protocol_locator chain_db.chain_state ~proto_level seed
+      >>= function
+      | Some locator ->
+          Peer_metadata.update_responses meta Protocol_branch
+          @@ P2p.try_send state.p2p state.conn
+          @@ Protocol_branch (chain_id, proto_level, locator) ;
+          Lwt.return_unit
+      | None ->
+          Lwt.return_unit )
+  | Protocol_branch (_chain, _proto_level, _locator) ->
+      (* This message is currently unused: it will be used for future
+         multipass. *)
+      Peer_metadata.incr meta @@ Received_response Protocol_branch ;
+      Lwt.return_unit
 
 let rec worker_loop state =
   protect ~canceler:state.canceler (fun () -> P2p.recv state.p2p state.conn)

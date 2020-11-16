@@ -324,13 +324,6 @@ val watcher : t -> Block.t Lwt_stream.t * Lwt_watcher.stopper
     which are compatible with the given checkpoint. *)
 val best_known_head_for_checkpoint : Chain.t -> Block_header.t -> Block.t Lwt.t
 
-val compute_locator :
-  Chain.t ->
-  ?size:int ->
-  Block.t ->
-  Block_locator.seed ->
-  Block_locator.t Lwt.t
-
 val update_testchain : Block.t -> testchain_state:Chain.t -> unit Lwt.t
 
 val fork_testchain :
@@ -407,6 +400,29 @@ type error +=
     }
 
 val history_mode : global_state -> History_mode.t Lwt.t
+
+(** [compute_locator chain ?max_size block seed] computes a
+    locator of the [chain] from [head] to the chain's caboose or until
+    the locator contains [max_size] steps.
+    [max_size] defaults to 200. *)
+val compute_locator :
+  Chain.t ->
+  ?max_size:int ->
+  Block.t ->
+  Block_locator.seed ->
+  Block_locator.t Lwt.t
+
+(** [compute_protocol_locator chain ?max_size ~proto_level seed]
+    computes a locator for a specific protocol of level [proto_level]
+    in the [chain] from the latest block with this protocol to its
+    activation block or until the locator contains [max_size] steps.
+    [max_size] defaults to 200. *)
+val compute_protocol_locator :
+  Chain.t ->
+  ?max_size:int ->
+  proto_level:int ->
+  Block_locator.seed ->
+  Block_locator.t option Lwt.t
 
 (** Read the internal state of the node and initialize
     the databases. *)
