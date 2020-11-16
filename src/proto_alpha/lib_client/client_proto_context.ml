@@ -393,7 +393,7 @@ let batch_transfer_operation_encoding =
     (obj7
        (req "destination" string)
        (opt "fee" string)
-       (opt "gas-limit" Gas.Arith.z_integral_encoding)
+       (opt "gas-limit" Gas.Arith.n_integral_encoding)
        (opt "storage-limit" z)
        (req "amount" string)
        (opt "arg" string)
