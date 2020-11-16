@@ -112,6 +112,8 @@ Client
 
 -  Added support for a new generic version of the multisig contract.
 
+-  Added a new flag, ``--simulation``, which simulates operations instead of preapplying them.
+
 Baker / Endorser / Accuser
 --------------------------
 

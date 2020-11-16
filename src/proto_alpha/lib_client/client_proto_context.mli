@@ -93,6 +93,7 @@ val set_delegate :
   ?confirmations:int ->
   ?dry_run:bool ->
   ?verbose_signing:bool ->
+  ?simulation:bool ->
   ?fee:Tez.tez ->
   public_key_hash ->
   src_pk:public_key ->
@@ -162,6 +163,7 @@ val transfer :
   ?confirmations:int ->
   ?dry_run:bool ->
   ?verbose_signing:bool ->
+  ?simulation:bool ->
   ?branch:int ->
   source:public_key_hash ->
   src_pk:public_key ->

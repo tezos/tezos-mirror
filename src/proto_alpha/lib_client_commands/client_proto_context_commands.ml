@@ -49,6 +49,13 @@ let verbose_signing_switch =
     ~doc:"display extra information before signing the operation"
     ()
 
+let simulate_switch =
+  Clic.switch
+    ~long:"simulation"
+    ~doc:
+      "Simulate the execution of the command, without needing any signatures."
+    ()
+
 let report_michelson_errors ?(no_print_source = false) ~msg
     (cctxt : #Client_context.printer) = function
   | Error errs ->
@@ -111,6 +118,7 @@ let transfer_command amount source destination cctxt
     ( fee,
       dry_run,
       verbose_signing,
+      simulation,
       gas_limit,
       storage_limit,
       counter,
@@ -147,6 +155,7 @@ let transfer_command amount source destination cctxt
         ?confirmations:cctxt#confirmations
         ~dry_run
         ~verbose_signing
+        ~simulation
         ~fee_parameter
         ?fee
         ~contract
@@ -170,6 +179,7 @@ let transfer_command amount source destination cctxt
         ~block:cctxt#block
         ?confirmations:cctxt#confirmations
         ~dry_run
+        ~simulation
         ~verbose_signing
         ~fee_parameter
         ~source
@@ -492,10 +502,11 @@ let commands network () =
     command
       ~group
       ~desc:"Set the delegate of a contract."
-      (args9
+      (args10
          fee_arg
          dry_run_switch
          verbose_signing_switch
+         simulate_switch
          minimal_fees_arg
          minimal_nanotez_per_byte_arg
          minimal_nanotez_per_gas_unit_arg
@@ -512,6 +523,7 @@ let commands network () =
       (fun ( fee,
              dry_run,
              verbose_signing,
+             simulation,
              minimal_fees,
              minimal_nanotez_per_byte,
              minimal_nanotez_per_gas_unit,
@@ -544,6 +556,7 @@ let commands network () =
               ?confirmations:cctxt#confirmations
               ~dry_run
               ~verbose_signing
+              ~simulation
               ~fee_parameter
               ?fee
               ~source
@@ -568,6 +581,7 @@ let commands network () =
               ?confirmations:cctxt#confirmations
               ~dry_run
               ~verbose_signing
+              ~simulation
               ~fee_parameter
               ?fee
               mgr
@@ -771,10 +785,11 @@ let commands network () =
       ~desc:
         "Execute multiple transfers from a single source account.\n\
          If one of the transfers fails, none of them get executed."
-      (args15
+      (args16
          default_fee_arg
          dry_run_switch
          verbose_signing_switch
+         simulate_switch
          default_gas_limit_arg
          default_storage_limit_arg
          counter_arg
@@ -806,6 +821,7 @@ let commands network () =
       (fun ( fee,
              dry_run,
              verbose_signing,
+             simulation,
              gas_limit,
              storage_limit,
              counter,
@@ -874,6 +890,7 @@ let commands network () =
               ?confirmations:cctxt#confirmations
               ~dry_run
               ~verbose_signing
+              ~simulation
               ~source
               ~fee:(Limit.of_option fee)
               ~gas_limit:(Limit.of_option gas_limit)
@@ -917,10 +934,11 @@ let commands network () =
     command
       ~group
       ~desc:"Transfer tokens / call a smart contract."
-      (args15
+      (args16
          fee_arg
          dry_run_switch
          verbose_signing_switch
+         simulate_switch
          gas_limit_arg
          storage_limit_arg
          counter_arg
@@ -947,6 +965,7 @@ let commands network () =
       (fun ( fee,
              dry_run,
              verbose_signing,
+             simulation,
              gas_limit,
              storage_limit,
              counter,
@@ -971,6 +990,7 @@ let commands network () =
           ( fee,
             dry_run,
             verbose_signing,
+            simulation,
             gas_limit,
             storage_limit,
             counter,
@@ -986,10 +1006,11 @@ let commands network () =
     command
       ~group
       ~desc:"Call a smart contract (same as 'transfer 0')."
-      (args15
+      (args16
          fee_arg
          dry_run_switch
          verbose_signing_switch
+         simulate_switch
          gas_limit_arg
          storage_limit_arg
          counter_arg
@@ -1014,6 +1035,7 @@ let commands network () =
       (fun ( fee,
              dry_run,
              verbose_signing,
+             simulation,
              gas_limit,
              storage_limit,
              counter,
@@ -1038,6 +1060,7 @@ let commands network () =
           ( fee,
             dry_run,
             verbose_signing,
+            simulation,
             gas_limit,
             storage_limit,
             counter,
