@@ -79,7 +79,7 @@ update_all_dot_ocamlformats () {
             src/proto_demo_noops/lib_protocol )
                 make_dot_ocamlformat "$ofmt"
                 ;;
-            src/proto_*/lib_protocol )
+            src/proto_00{0..6}_*/lib_protocol )
                 make_dot_ocamlformat "$ofmt"
                 ( cd "$d" ; ls -1 *.mli *.ml | LC_COLLATE=C sort > .ocamlformat-ignore ; )
                 git add "$d/.ocamlformat-ignore"
