@@ -96,11 +96,8 @@ let process_endorsements (cctxt : #Protocol_client_context.full) state
             {shell; protocol_data}
           in
           let map =
-            match HLevel.find state.endorsements_table (chain_id, level) with
-            | None ->
-                Delegate_Map.empty
-            | Some x ->
-                x
+            Option.value ~default:Delegate_Map.empty
+            @@ HLevel.find state.endorsements_table (chain_id, level)
           in
           (* If a previous endorsement made by this pkh is found for
              the same level we inject a double_endorsement *)
