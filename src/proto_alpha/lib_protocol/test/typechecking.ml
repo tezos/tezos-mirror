@@ -469,7 +469,7 @@ let test_unparse_comb_comparable_type () =
 
 let test_parse_data ?(equal = Stdlib.( = )) loc ctxt ty node expected =
   let legacy = false in
-  let allow_forged = false in
+  let allow_forged = true in
   wrap_error_lwt
     ( Script_ir_translator.parse_data ctxt ~legacy ~allow_forged ty node
     >>=? fun (actual, ctxt) ->
