@@ -3,12 +3,12 @@
   "info": {
     "title": "Tezos RPC",
     "description": "Tezos client RPC API.",
-    "version": "7.4"
+    "version": "7.5"
   },
   "paths": {
-    "/chains/{chain_id}/blocks": {
-      "get": {
-        "description": "Lists known heads of the blockchain sorted with decreasing fitness. Optional arguments allows to returns the list of predecessors for known heads or the list of predecessors for a given list of blocks.",
+    "/chains/{chain_id}": {
+      "patch": {
+        "description": "Forcefully set the bootstrapped flag of the node",
         "parameters": [
           {
             "name": "chain_id",
@@ -18,30 +18,56 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "name": "length",
-            "in": "query",
-            "description": "The requested number of predecessors to returns (per requested head).",
-            "required": false,
-            "schema": {
-              "type": "string"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "bootstrapped": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "bootstrapped"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
             }
           },
-          {
-            "name": "head",
-            "in": "query",
-            "description": "block_hash (Base58Check-encoded) An empty argument requests blocks from the current heads. A non empty list allow to request specific fragment of the chain.",
-            "required": false,
-            "schema": {
-              "type": "string"
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error"
+                }
+              }
             }
-          },
+          }
+        }
+      }
+    },
+    "/chains/{chain_id}/blocks": {
+      "get": {
+        "description": "Lists block hashes from '<chain>', up to the last checkpoint, sorted with decreasing fitness. Without arguments it returns the head of the chain. Optional arguments allow to return the list of predecessors of a given block or of a set of blocks.",
+        "parameters": [
           {
-            "name": "min_date",
-            "in": "query",
-            "description": "A date in seconds from epoch When `min_date` is provided, heads with a timestamp before `min_date` are filtered out",
-            "required": false,
+            "name": "chain_id",
+            "in": "path",
+            "description": "A chain identifier. This is either a chain hash in Base58Check notation or a one the predefined aliases: 'main', 'test'.",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -352,6 +378,56 @@
         }
       }
     },
+    "/chains/{chain_id}/is_bootstrapped": {
+      "get": {
+        "description": "The bootstrap status of a chain",
+        "parameters": [
+          {
+            "name": "chain_id",
+            "in": "path",
+            "description": "A chain identifier. This is either a chain hash in Base58Check notation or a one the predefined aliases: 'main', 'test'.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "bootstrapped": {
+                      "type": "boolean"
+                    },
+                    "sync_state": {
+                      "$ref": "#/components/schemas/chain_status"
+                    }
+                  },
+                  "required": [
+                    "bootstrapped",
+                    "sync_state"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/config/network/user_activated_protocol_overrides": {
       "get": {
         "description": "List of protocols which replace other protocols",
@@ -470,33 +546,6 @@
     "/injection/block": {
       "post": {
         "description": "Inject a block in the node and broadcast it. The `operations` embedded in `blockHeader` might be pre-validated using a contextual RPCs from the latest block (e.g. '/blocks/head/context/preapply'). Returns the ID of the block. By default, the RPC will wait for the block to be validated before answering. If ?async is true, the function returns immediately. Otherwise, the block will be validated before the result is returned. If ?force is true, it will be injected even on non strictly increasing fitness. An optional ?chain parameter can be used to specify whether to inject on the test chain or the main chain.",
-        "parameters": [
-          {
-            "name": "async",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "force",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "chain",
-            "in": "query",
-            "description": "A chain identifier. This is either a chain hash in Base58Check notation or a one the predefined aliases: 'main', 'test'.",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -552,25 +601,6 @@
     "/injection/operation": {
       "post": {
         "description": "Inject an operation in node and broadcast it. Returns the ID of the operation. The `signedOperationContents` should be constructed using a contextual RPCs from the latest block and signed by the client. By default, the RPC will wait for the operation to be (pre-)validated before answering. See RPCs under /blocks/prevalidation for more details on the prevalidation context. If ?async is true, the function returns immediately. Otherwise, the operation will be validated before the result is returned. An optional ?chain parameter can be used to specify whether to inject on the test chain or the main chain.",
-        "parameters": [
-          {
-            "name": "async",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "chain",
-            "in": "query",
-            "description": "A chain identifier. This is either a chain hash in Base58Check notation or a one the predefined aliases: 'main', 'test'.",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -608,16 +638,6 @@
     "/injection/protocol": {
       "post": {
         "description": "Inject a protocol in node. Returns the ID of the protocol. If ?async is true, the function returns immediately. Otherwise, the protocol will be validated before the result is returned.",
-        "parameters": [
-          {
-            "name": "async",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -804,15 +824,6 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "name": "next_protocol",
-            "in": "query",
-            "description": "Protocol_hash (Base58Check-encoded)",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
           }
         ],
         "responses": {
@@ -920,35 +931,6 @@
     "/monitor/valid_blocks": {
       "get": {
         "description": "Monitor all blocks that are successfully validated by the node, disregarding whether they were selected as the new head or not.",
-        "parameters": [
-          {
-            "name": "protocol",
-            "in": "query",
-            "description": "Protocol_hash (Base58Check-encoded)",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "next_protocol",
-            "in": "query",
-            "description": "Protocol_hash (Base58Check-encoded)",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "chain",
-            "in": "query",
-            "description": "A chain identifier. This is either a chain hash in Base58Check notation or a one the predefined aliases: 'main', 'test'.",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "description": "",
@@ -1230,14 +1212,6 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "name": "wait",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
           }
         ],
         "responses": {
@@ -1323,16 +1297,6 @@
     "/network/peers": {
       "get": {
         "description": "List the peers the node ever met.",
-        "parameters": [
-          {
-            "name": "filter",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "description": "",
@@ -2609,14 +2573,6 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "name": "monitor",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
           }
         ],
         "responses": {
@@ -2766,16 +2722,6 @@
     "/network/points": {
       "get": {
         "description": "List the pool of known `IP:port` used for establishing P2P connections.",
-        "parameters": [
-          {
-            "name": "filter",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "description": "",
@@ -2857,15 +2803,6 @@
             "name": "point",
             "in": "path",
             "description": "A network point (ipv4:port or [ipv6]:port).",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "timeout",
-            "in": "query",
-            "description": "A span of time in seconds",
             "required": true,
             "schema": {
               "type": "string"
@@ -2993,14 +2930,6 @@
             "in": "path",
             "description": "A network point (ipv4:port or [ipv6]:port).",
             "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "monitor",
-            "in": "query",
-            "required": false,
             "schema": {
               "type": "string"
             }
@@ -4313,8 +4242,8 @@
                       },
                       "pipelines": {
                         "type": "integer",
-                        "minimum": -128,
-                        "maximum": 127
+                        "minimum": -32768,
+                        "maximum": 32767
                       }
                     },
                     "required": [
@@ -4578,6 +4507,57 @@
                                       "$ref": "#/components/schemas/error"
                                     }
                                   ]
+                                },
+                                {
+                                  "title": "Bootstrapped"
+                                },
+                                {
+                                  "title": "Sync_status",
+                                  "oneOf": [
+                                    {
+                                      "$ref": "#/components/schemas/chain_status"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "title": "Bootstrap_active_peers",
+                                  "type": "object",
+                                  "properties": {
+                                    "active": {
+                                      "type": "integer",
+                                      "minimum": -1073741824,
+                                      "maximum": 1073741823
+                                    },
+                                    "needed": {
+                                      "type": "integer",
+                                      "minimum": -1073741824,
+                                      "maximum": 1073741823
+                                    }
+                                  },
+                                  "required": [
+                                    "active",
+                                    "needed"
+                                  ]
+                                },
+                                {
+                                  "title": "Bootstrap_active_peers_heads_time",
+                                  "type": "object",
+                                  "properties": {
+                                    "min_head_time": {
+                                      "$ref": "#/components/schemas/timestamp.protocol"
+                                    },
+                                    "max_head_time": {
+                                      "$ref": "#/components/schemas/timestamp.protocol"
+                                    },
+                                    "most_recent_validation": {
+                                      "$ref": "#/components/schemas/timestamp.protocol"
+                                    }
+                                  },
+                                  "required": [
+                                    "min_head_time",
+                                    "max_head_time",
+                                    "most_recent_validation"
+                                  ]
                                 }
                               ]
                             }
@@ -4720,25 +4700,6 @@
                         "scheduler_length"
                       ]
                     },
-                    "operations_hashed_db": {
-                      "type": "object",
-                      "properties": {
-                        "table_length": {
-                          "type": "integer",
-                          "minimum": -1073741824,
-                          "maximum": 1073741823
-                        },
-                        "scheduler_length": {
-                          "type": "integer",
-                          "minimum": -1073741824,
-                          "maximum": 1073741823
-                        }
-                      },
-                      "required": [
-                        "table_length",
-                        "scheduler_length"
-                      ]
-                    },
                     "active_connections": {
                       "type": "integer",
                       "minimum": -1073741824,
@@ -4756,7 +4717,6 @@
                     "operation_db",
                     "operations_db",
                     "block_header_db",
-                    "operations_hashed_db",
                     "active_connections",
                     "active_peers"
                   ]
@@ -5862,8 +5822,8 @@
                       },
                       "pipelines": {
                         "type": "integer",
-                        "minimum": -128,
-                        "maximum": 127
+                        "minimum": -32768,
+                        "maximum": 32767
                       }
                     },
                     "required": [
@@ -6773,6 +6733,15 @@
           "protocol_data"
         ]
       },
+      "chain_status": {
+        "description": "If 'unsynced', the node is not currently synchronized with of its peers (it is probably still bootstrapping and its head is lagging behind the chain's).\nIf 'synced', the node considers itself synchronized with its peers and the current head timestamp is recent.\nIf 'stuck', the node considers itself synchronized with its peers but the chain seems to be halted from its viewpoint.",
+        "type": "string",
+        "enum": [
+          "stuck",
+          "synced",
+          "unsynced"
+        ]
+      },
       "distributed_db_version": {
         "description": "A version number for the distributed DB protocol",
         "type": "integer",
@@ -7325,6 +7294,82 @@
               "event",
               "source"
             ]
+          },
+          {
+            "title": "Bootstrap_sent",
+            "type": "object",
+            "properties": {
+              "event": {
+                "type": "string",
+                "enum": [
+                  "bootstrap_sent"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+              }
+            },
+            "required": [
+              "event",
+              "source"
+            ]
+          },
+          {
+            "title": "Bootstrap_received",
+            "type": "object",
+            "properties": {
+              "event": {
+                "type": "string",
+                "enum": [
+                  "bootstrap_received"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+              }
+            },
+            "required": [
+              "event",
+              "source"
+            ]
+          },
+          {
+            "title": "Advertise_sent",
+            "type": "object",
+            "properties": {
+              "event": {
+                "type": "string",
+                "enum": [
+                  "advertise_sent"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+              }
+            },
+            "required": [
+              "event",
+              "source"
+            ]
+          },
+          {
+            "title": "Advertise_received",
+            "type": "object",
+            "properties": {
+              "event": {
+                "type": "string",
+                "enum": [
+                  "advertise_received"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+              }
+            },
+            "required": [
+              "event",
+              "source"
+            ]
           }
         ]
       },
@@ -7755,20 +7800,7 @@
         "description": "A timestamp as seen by the protocol: second-level precision, epoch based.",
         "oneOf": [
           {
-            "title": "RFC encoding",
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/timestamp.rfc"
-              }
-            ]
-          },
-          {
-            "title": "Second since epoch",
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/int64"
-              }
-            ]
+            "$ref": "#/components/schemas/unistring"
           }
         ]
       },
