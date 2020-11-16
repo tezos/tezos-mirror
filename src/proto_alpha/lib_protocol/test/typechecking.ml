@@ -152,6 +152,7 @@ let test_parse_ty ctxt node expected =
   let allow_lazy_storage = true in
   let allow_operation = true in
   let allow_contract = true in
+  let allow_ticket = true in
   Environment.wrap_error
     ( Script_ir_translator.parse_ty
         ctxt
@@ -159,6 +160,7 @@ let test_parse_ty ctxt node expected =
         ~allow_lazy_storage
         ~allow_operation
         ~allow_contract
+        ~allow_ticket
         node
     >>? fun (Script_ir_translator.Ex_ty actual, ctxt) ->
     Script_ir_translator.ty_eq ctxt (location node) actual expected
