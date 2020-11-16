@@ -12,8 +12,8 @@ script_dir="$(cd "$(dirname "$0")" && pwd -P)"
 # manager or https://rustup.rs
 
 # by specifying the env var RUST_VERSION the user can decide to use a
-# different version of rust
-recommended_rust_version=1.39.0
+# different version of rust (recommended_rust_version is a variable
+# declared in scripts/version.sh)
 rust_version=${RUST_VERSION:-$recommended_rust_version}
 
 if [ "$recommended_rust_version" != "$rust_version" ]; then
