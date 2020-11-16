@@ -534,9 +534,12 @@ let get_ballots_info (cctxt : #full) ~chain ~block =
   let supermajority = Int32.(div (mul 8l (add ballots.yay ballots.nay)) 10l) in
   return {current_quorum; participation; supermajority; ballots}
 
-let get_period_info (cctxt : #full) ~chain ~block =
+let get_period_info ?(successor = false) (cctxt : #full) ~chain ~block =
   let cb = (chain, block) in
-  Alpha_services.Voting.current_period cctxt cb
+  ( if successor then Alpha_services.Voting.successor_period
+  else Alpha_services.Voting.current_period )
+    cctxt
+    cb
   >>=? fun voting_period ->
   Alpha_services.Voting.current_proposal cctxt cb
   >>=? fun current_proposal ->
@@ -554,7 +557,7 @@ let get_proposals (cctxt : #full) ~chain ~block =
 
 let submit_proposals ?dry_run ?verbose_signing (cctxt : #full) ~chain ~block
     ?confirmations ~src_sk source proposals =
-  Alpha_services.Voting.current_period cctxt (chain, block)
+  Alpha_services.Voting.successor_period cctxt (chain, block)
   >>=? fun {voting_period = {index; _}; _} ->
   let contents = Single (Proposals {source; period = index; proposals}) in
   Injection.inject_operation
@@ -572,7 +575,7 @@ let submit_ballot ?dry_run ?verbose_signing (cctxt : #full) ~chain ~block
     ?confirmations ~src_sk source proposal ballot =
   (* The user must provide the proposal explicitly to make himself sure
      for what he is voting. *)
-  Alpha_services.Voting.current_period cctxt (chain, block)
+  Alpha_services.Voting.successor_period cctxt (chain, block)
   >>=? fun {voting_period = {index; _}; _} ->
   let contents = Single (Ballot {source; period = index; proposal; ballot}) in
   Injection.inject_operation
