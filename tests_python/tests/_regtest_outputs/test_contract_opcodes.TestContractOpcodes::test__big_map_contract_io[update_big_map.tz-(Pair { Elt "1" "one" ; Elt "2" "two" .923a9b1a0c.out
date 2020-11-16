@@ -9,46 +9,46 @@ big_map diff
   Set map(0)["1"] to "two"
   Set map(0)["2"] to "two"
 trace
-  - location: 13 (remaining gas: 1039984.601 units remaining)
+  - location: 13 (remaining gas: 1039984.481 units remaining)
     [ (Pair { Elt "1" (Some "two") } { Elt "1" "one" ; Elt "2" "two" } Unit)  	 ]
-  - location: 15 (remaining gas: 1039984.401 units remaining)
+  - location: 15 (remaining gas: 1039984.281 units remaining)
     [ { Elt "1" (Some "two") }  	@parameter
       (Pair { Elt "1" "one" ; Elt "2" "two" } Unit)  	@storage ]
-  - location: 18 (remaining gas: 1039984.101 units remaining)
+  - location: 18 (remaining gas: 1039983.981 units remaining)
     [ { Elt "1" "one" ; Elt "2" "two" }  	
       Unit  	 ]
-  - location: 17 (remaining gas: 1039984.031 units remaining)
+  - location: 17 (remaining gas: 1039983.911 units remaining)
     [ { Elt "1" "one" ; Elt "2" "two" }  	
       Unit  	 ]
-  - location: 16 (remaining gas: 1039984.031 units remaining)
+  - location: 16 (remaining gas: 1039983.911 units remaining)
     [ { Elt "1" (Some "two") }  	@parameter
       { Elt "1" "one" ; Elt "2" "two" }  	
       Unit  	 ]
-  - location: -1 (remaining gas: 1039983.961 units remaining)
+  - location: -1 (remaining gas: 1039983.841 units remaining)
     [ { Elt "1" (Some "two") }  	@parameter
       { Elt "1" "one" ; Elt "2" "two" }  	
       Unit  	 ]
-  - location: 21 (remaining gas: 1039983.641 units remaining)
+  - location: 21 (remaining gas: 1039983.521 units remaining)
     [ "1"  	@key
       (Some "two")  	@elt
       { Elt "1" "one" ; Elt "2" "two" }  	
       Unit  	 ]
-  - location: 22 (remaining gas: 1039983.501 units remaining)
+  - location: 22 (remaining gas: 1039983.381 units remaining)
     [ { Elt "1" "two" ; Elt "2" "two" }  	
       Unit  	 ]
-  - location: -1 (remaining gas: 1039983.431 units remaining)
+  - location: -1 (remaining gas: 1039983.311 units remaining)
     [ { Elt "1" "two" ; Elt "2" "two" }  	
       Unit  	 ]
-  - location: 19 (remaining gas: 1039983.431 units remaining)
+  - location: 19 (remaining gas: 1039983.311 units remaining)
     [ { Elt "1" "two" ; Elt "2" "two" }  	
       Unit  	 ]
-  - location: 23 (remaining gas: 1039983.291 units remaining)
+  - location: 23 (remaining gas: 1039983.171 units remaining)
     [ (Pair { Elt "1" "two" ; Elt "2" "two" } Unit)  	 ]
-  - location: 24 (remaining gas: 1039983.151 units remaining)
+  - location: 24 (remaining gas: 1039983.031 units remaining)
     [ {}  	
       (Pair { Elt "1" "two" ; Elt "2" "two" } Unit)  	 ]
-  - location: 26 (remaining gas: 1039983.011 units remaining)
+  - location: 26 (remaining gas: 1039982.891 units remaining)
     [ (Pair {} { Elt "1" "two" ; Elt "2" "two" } Unit)  	 ]
-  - location: -1 (remaining gas: 1039982.941 units remaining)
+  - location: -1 (remaining gas: 1039982.821 units remaining)
     [ (Pair {} { Elt "1" "two" ; Elt "2" "two" } Unit)  	 ]
 
