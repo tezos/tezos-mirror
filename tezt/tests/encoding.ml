@@ -119,14 +119,14 @@ let register () =
   check_samples_encoding
     ~group_name:"alpha"
     ~samples:
-      [ "alpha.block_header";
+      [ "alpha.baker.frozen_balance";
+        "alpha.baker.frozen_balance_by_cycles";
+        "alpha.block_header";
         "alpha.block_header.raw";
         "alpha.block_header.unsigned";
         "alpha.contract";
         "alpha.contract.big_map_diff";
         "alpha.cycle";
-        "alpha.delegate.frozen_balance";
-        "alpha.delegate.frozen_balance_by_cycles";
         "alpha.fitness";
         "alpha.gas.cost";
         "alpha.gas";

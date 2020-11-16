@@ -1,7 +1,7 @@
 [{
   "kind": "freezer",
   "category": "deposits",
-  "delegate": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
+  "baker": "SG1fpFaowYY8G7PfkYdKkGmsMziHKUfrHRHW",
   "cycle": 5,
   "change": "-1",
   "origin": "block"
