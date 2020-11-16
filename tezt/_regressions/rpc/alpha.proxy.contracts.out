@@ -3,31 +3,273 @@ tezt/_regressions/rpc/alpha.proxy.contracts.out
 ./tezos-client --mode proxy rpc get /chains/main/blocks/head/context/contracts
 protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 [ "[PUBLIC_KEY_HASH]",
+  "[BAKER_HASH]",
+  "[BAKER_HASH]",
   "[PUBLIC_KEY_HASH]",
+  "[BAKER_HASH]",
   "[PUBLIC_KEY_HASH]",
+  "[BAKER_HASH]",
+  "[BAKER_HASH]",
   "[PUBLIC_KEY_HASH]",
   "[PUBLIC_KEY_HASH]" ]
 
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
+./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[BAKER_HASH]'
 protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 { "balance": "4000000000000",
-  "delegate": "[PUBLIC_KEY_HASH]", "counter": "0" }
+  "delegate": "[BAKER_HASH]",
+  "script":
+    { "code":
+        [ { "prim": "parameter",
+            "args":
+              [ { "prim": "or",
+                  "args":
+                    [ { "prim": "unit", "annots": [ "%default" ] },
+                      { "prim": "pair",
+                        "args":
+                          [ { "prim": "pair",
+                              "args":
+                                [ { "prim": "nat", "annots": [ "%counter" ] },
+                                  { "prim": "or",
+                                    "args":
+                                      [ { "prim": "lambda",
+                                          "args":
+                                            [ { "prim": "unit" },
+                                              { "prim": "pair",
+                                                "args":
+                                                  [ { "prim": "list",
+                                                      "args":
+                                                        [ { "prim":
+                                                              "operation" } ] },
+                                                    { "prim": "list",
+                                                      "args":
+                                                        [ { "prim":
+                                                              "baker_operation" } ] } ] } ],
+                                          "annots": [ "%operation" ] },
+                                        { "prim": "pair",
+                                          "args":
+                                            [ { "prim": "nat",
+                                                "annots": [ "%threshold" ] },
+                                              { "prim": "list",
+                                                "args": [ { "prim": "key" } ],
+                                                "annots": [ "%keys" ] } ],
+                                          "annots": [ "%change_keys" ] } ],
+                                    "annots": [ ":action" ] } ],
+                              "annots": [ ":payload" ] },
+                            { "prim": "list",
+                              "args":
+                                [ { "prim": "option",
+                                    "args": [ { "prim": "signature" } ] } ],
+                              "annots": [ "%sigs" ] } ],
+                        "annots": [ "%main" ] } ], "annots": [ "%root" ] } ] },
+          { "prim": "storage",
+            "args":
+              [ { "prim": "pair",
+                  "args":
+                    [ { "prim": "nat", "annots": [ "%stored_counter" ] },
+                      { "prim": "nat", "annots": [ "%threshold" ] },
+                      { "prim": "list", "args": [ { "prim": "key" } ],
+                        "annots": [ "%keys" ] } ] } ] },
+          { "prim": "code",
+            "args":
+              [ [ [ [ { "prim": "DUP" }, { "prim": "CAR" },
+                      { "prim": "DIP", "args": [ [ { "prim": "CDR" } ] ] } ] ],
+                  { "prim": "IF_LEFT",
+                    "args":
+                      [ [ { "prim": "DROP" },
+                          { "prim": "NIL",
+                            "args": [ { "prim": "baker_operation" } ] },
+                          { "prim": "NIL",
+                            "args": [ { "prim": "operation" } ] },
+                          { "prim": "PAIR" }, { "prim": "PAIR" } ],
+                        [ { "prim": "PUSH",
+                            "args": [ { "prim": "mutez" }, { "int": "0" } ] },
+                          { "prim": "AMOUNT" },
+                          [ [ { "prim": "COMPARE" }, { "prim": "EQ" } ],
+                            { "prim": "IF",
+                              "args":
+                                [ [],
+                                  [ [ { "prim": "UNIT" },
+                                      { "prim": "FAILWITH" } ] ] ] } ],
+                          { "prim": "SWAP" }, { "prim": "DUP" },
+                          { "prim": "DIP",
+                            "args": [ [ { "prim": "SWAP" } ] ] },
+                          { "prim": "DIP",
+                            "args":
+                              [ [ [ [ { "prim": "DUP" }, { "prim": "CAR" },
+                                      { "prim": "DIP",
+                                        "args": [ [ { "prim": "CDR" } ] ] } ] ],
+                                  { "prim": "DUP" },
+                                  { "prim": "SELF_ADDRESS" },
+                                  { "prim": "CHAIN_ID" }, { "prim": "PAIR" },
+                                  { "prim": "PAIR" }, { "prim": "PACK" },
+                                  { "prim": "DIP",
+                                    "args":
+                                      [ [ [ [ { "prim": "DUP" },
+                                              { "prim": "CAR",
+                                                "annots": [ "@counter" ] },
+                                              { "prim": "DIP",
+                                                "args":
+                                                  [ [ { "prim": "CDR" } ] ] } ] ],
+                                          { "prim": "DIP",
+                                            "args":
+                                              [ [ { "prim": "SWAP" } ] ] } ] ] },
+                                  { "prim": "SWAP" } ] ] },
+                          [ [ { "prim": "DUP" },
+                              { "prim": "CAR",
+                                "annots": [ "@stored_counter" ] },
+                              { "prim": "DIP",
+                                "args": [ [ { "prim": "CDR" } ] ] } ] ],
+                          { "prim": "DIP",
+                            "args": [ [ { "prim": "SWAP" } ] ] },
+                          [ [ { "prim": "COMPARE" }, { "prim": "EQ" } ],
+                            { "prim": "IF",
+                              "args":
+                                [ [],
+                                  [ [ { "prim": "UNIT" },
+                                      { "prim": "FAILWITH" } ] ] ] } ],
+                          { "prim": "DIP",
+                            "args": [ [ { "prim": "SWAP" } ] ] },
+                          [ [ { "prim": "DUP" },
+                              { "prim": "CAR", "annots": [ "@threshold" ] },
+                              { "prim": "DIP",
+                                "args":
+                                  [ [ { "prim": "CDR",
+                                        "annots": [ "@keys" ] } ] ] } ] ],
+                          { "prim": "DIP",
+                            "args":
+                              [ [ { "prim": "PUSH",
+                                    "args":
+                                      [ { "prim": "nat" }, { "int": "0" } ],
+                                    "annots": [ "@valid" ] },
+                                  { "prim": "SWAP" },
+                                  { "prim": "ITER",
+                                    "args":
+                                      [ [ { "prim": "DIP",
+                                            "args":
+                                              [ [ { "prim": "SWAP" } ] ] },
+                                          { "prim": "SWAP" },
+                                          { "prim": "IF_CONS",
+                                            "args":
+                                              [ [ [ { "prim": "IF_NONE",
+                                                      "args":
+                                                        [ [ { "prim": "SWAP" },
+                                                            { "prim": "DROP" } ],
+                                                          [ { "prim": "SWAP" },
+                                                            { "prim": "DIP",
+                                                              "args":
+                                                                [ [ { "prim":
+                                                                    "SWAP" },
+                                                                    { "prim":
+                                                                    "DIP",
+                                                                    "args":
+                                                                    [ { "int":
+                                                                    "2" },
+                                                                    [ [ { "prim":
+                                                                    "DIP",
+                                                                    "args":
+                                                                    [ [ { "prim":
+                                                                    "DUP" } ] ] },
+                                                                    { "prim":
+                                                                    "SWAP" } ] ] ] },
+                                                                    [ [ { "prim":
+                                                                    "DIP",
+                                                                    "args":
+                                                                    [ { "int":
+                                                                    "2" },
+                                                                    [ { "prim":
+                                                                    "DUP" } ] ] },
+                                                                    { "prim":
+                                                                    "DIG",
+                                                                    "args":
+                                                                    [ { "int":
+                                                                    "3" } ] } ],
+                                                                    { "prim":
+                                                                    "DIP",
+                                                                    "args":
+                                                                    [ [ { "prim":
+                                                                    "CHECK_SIGNATURE" } ] ] },
+                                                                    { "prim":
+                                                                    "SWAP" },
+                                                                    { "prim":
+                                                                    "IF",
+                                                                    "args":
+                                                                    [ [ { "prim":
+                                                                    "DROP" } ],
+                                                                    [ { "prim":
+                                                                    "FAILWITH" } ] ] } ],
+                                                                    { "prim":
+                                                                    "PUSH",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "nat" },
+                                                                    { "int":
+                                                                    "1" } ] },
+                                                                    { "prim":
+                                                                    "ADD",
+                                                                    "annots":
+                                                                    [ "@valid" ] } ] ] } ] ] } ] ],
+                                                [ [ { "prim": "UNIT" },
+                                                    { "prim": "FAILWITH" } ] ] ] },
+                                          { "prim": "SWAP" } ] ] } ] ] },
+                          [ [ { "prim": "COMPARE" }, { "prim": "LE" } ],
+                            { "prim": "IF",
+                              "args":
+                                [ [],
+                                  [ [ { "prim": "UNIT" },
+                                      { "prim": "FAILWITH" } ] ] ] } ],
+                          { "prim": "IF_CONS",
+                            "args":
+                              [ [ [ { "prim": "UNIT" },
+                                    { "prim": "FAILWITH" } ] ], [] ] },
+                          { "prim": "DROP" },
+                          { "prim": "DIP",
+                            "args":
+                              [ [ [ [ { "prim": "DUP" }, { "prim": "CAR" },
+                                      { "prim": "DIP",
+                                        "args": [ [ { "prim": "CDR" } ] ] } ] ],
+                                  { "prim": "PUSH",
+                                    "args":
+                                      [ { "prim": "nat" }, { "int": "1" } ] },
+                                  { "prim": "ADD",
+                                    "annots": [ "@new_counter" ] },
+                                  { "prim": "PAIR" } ] ] },
+                          { "prim": "IF_LEFT",
+                            "args":
+                              [ [ { "prim": "UNIT" }, { "prim": "EXEC" } ],
+                                [ { "prim": "DIP",
+                                    "args": [ [ { "prim": "CAR" } ] ] },
+                                  { "prim": "SWAP" }, { "prim": "PAIR" },
+                                  { "prim": "NIL",
+                                    "args": [ { "prim": "baker_operation" } ] },
+                                  { "prim": "NIL",
+                                    "args": [ { "prim": "operation" } ] },
+                                  { "prim": "PAIR" } ] ] },
+                          { "prim": "PAIR" } ] ] } ] ] } ],
+      "storage":
+        { "prim": "Pair",
+          "args":
+            [ { "int": "0" }, { "int": "1" },
+              [ { "string":
+                    "[PUBLIC_KEY]" } ] ] } },
+  "counter": "0" }
 
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
+./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[BAKER_HASH]/balance'
 protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 "4000000000000"
 
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/counter'
+./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[BAKER_HASH]/counter'
 protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 "0"
 
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/manager_key'
+./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[BAKER_HASH]/manager_key'
 protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
-"[PUBLIC_KEY]"
+Fatal error:
+  No service found at this URL
+  
 
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/delegate'
+./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[BAKER_HASH]/delegate'
 protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
-"[PUBLIC_KEY_HASH]"
+"[BAKER_HASH]"
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
 protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
@@ -75,12 +317,12 @@ Fatal error:
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
-{ "balance": "99999383", "delegate": "[PUBLIC_KEY_HASH]",
+{ "balance": "99999384", "delegate": "[BAKER_HASH]",
   "counter": "4" }
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
-"99999383"
+"99999384"
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/counter'
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
@@ -92,7 +334,7 @@ protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaAL
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/delegate'
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
-"[PUBLIC_KEY_HASH]"
+"[BAKER_HASH]"
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/entrypoints'
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
@@ -236,7 +478,7 @@ protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaAL
                           { "prim": "PUSH",
                             "args": [ { "prim": "mutez" }, { "int": "0" } ] },
                           { "prim": "NONE",
-                            "args": [ { "prim": "key_hash" } ] },
+                            "args": [ { "prim": "baker_hash" } ] },
                           { "prim": "CREATE_CONTRACT",
                             "args":
                               [ [ { "prim": "parameter",
@@ -458,7 +700,8 @@ protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaAL
                       { "prim": "CAR" },
                       { "prim": "PUSH",
                         "args": [ { "prim": "mutez" }, { "int": "0" } ] },
-                      { "prim": "NONE", "args": [ { "prim": "key_hash" } ] },
+                      { "prim": "NONE",
+                        "args": [ { "prim": "baker_hash" } ] },
                       { "prim": "CREATE_CONTRACT",
                         "args":
                           [ [ { "prim": "parameter",

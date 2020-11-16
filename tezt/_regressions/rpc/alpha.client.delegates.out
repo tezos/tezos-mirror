@@ -3,9 +3,8 @@ tezt/_regressions/rpc/alpha.client.delegates.out
 ./tezos-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
 { "balance": "4000000000000", "frozen_balance": "0",
   "frozen_balance_by_cycle": [], "staking_balance": "4000000000000",
-  "delegated_contracts": [ "[PUBLIC_KEY_HASH]" ],
-  "delegated_balance": "0", "deactivated": false, "grace_period": 5,
-  "voting_power": 500 }
+  "delegated_contracts": [], "delegated_balance": "0", "deactivated": false,
+  "grace_period": 5, "voting_power": 500 }
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/balance'
 "4000000000000"
@@ -17,7 +16,7 @@ false
 "0"
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/delegated_contracts'
-[ "[PUBLIC_KEY_HASH]" ]
+[]
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/frozen_balance'
 "0"
@@ -36,14 +35,12 @@ false
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
 Fatal error:
-  Command failed : Storage error:
-                     Missing key 'contracts/index/63/cb/4c/cb/6c/4c/0000b443c2c85e0aeb6a4c0a37783f4d8251a956e8ad/balance'.
+  No service found at this URL
   
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/balance'
 Fatal error:
-  Command failed : Storage error:
-                     Missing key 'contracts/index/63/cb/4c/cb/6c/4c/0000b443c2c85e0aeb6a4c0a37783f4d8251a956e8ad/balance'.
+  No service found at this URL
   
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/deactivated'
@@ -51,8 +48,7 @@ false
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/delegated_balance'
 Fatal error:
-  Command failed : Storage error:
-                     Missing key 'contracts/index/63/cb/4c/cb/6c/4c/0000b443c2c85e0aeb6a4c0a37783f4d8251a956e8ad/balance'.
+  No service found at this URL
   
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/delegated_contracts'
@@ -66,8 +62,7 @@ Fatal error:
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/grace_period'
 Fatal error:
-  Command failed : Storage error:
-                     Missing key 'contracts/index/63/cb/4c/cb/6c/4c/0000b443c2c85e0aeb6a4c0a37783f4d8251a956e8ad/delegate_desactivation'.
+  No service found at this URL
   
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/staking_balance'

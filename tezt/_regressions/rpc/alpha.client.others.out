@@ -20,15 +20,15 @@ tezt/_regressions/rpc/alpha.client.others.out
   "initial_endorsers": 1, "delay_per_missing_endorsement": "1" }
 
 ./tezos-client rpc get /chains/main/blocks/head/helpers/baking_rights
-[ { "level": 2, "delegate": "[PUBLIC_KEY_HASH]",
+[ { "level": 2, "baker": "[BAKER_HASH]",
     "priority": 0, "estimated_time": "[TIMESTAMP]" },
-  { "level": 2, "delegate": "[PUBLIC_KEY_HASH]",
+  { "level": 2, "baker": "[BAKER_HASH]",
     "priority": 2, "estimated_time": "[TIMESTAMP]" },
-  { "level": 2, "delegate": "[PUBLIC_KEY_HASH]",
+  { "level": 2, "baker": "[BAKER_HASH]",
     "priority": 4, "estimated_time": "[TIMESTAMP]" },
-  { "level": 2, "delegate": "[PUBLIC_KEY_HASH]",
+  { "level": 2, "baker": "[BAKER_HASH]",
     "priority": 6, "estimated_time": "[TIMESTAMP]" },
-  { "level": 2, "delegate": "[PUBLIC_KEY_HASH]",
+  { "level": 2, "baker": "[BAKER_HASH]",
     "priority": 8, "estimated_time": "[TIMESTAMP]" } ]
 
 ./tezos-client rpc get '/chains/main/blocks/head/helpers/current_level?offset=0'
@@ -37,20 +37,20 @@ tezt/_regressions/rpc/alpha.client.others.out
   "expected_commitment": false }
 
 ./tezos-client rpc get /chains/main/blocks/head/helpers/endorsing_rights
-[ { "level": 1, "delegate": "[PUBLIC_KEY_HASH]",
-    "slots": [ 2, 13, 17, 19, 23, 24, 31 ],
-    "estimated_time": "[TIMESTAMP]" },
-  { "level": 1, "delegate": "[PUBLIC_KEY_HASH]",
-    "slots": [ 0, 4, 6, 11, 15, 20, 22 ],
-    "estimated_time": "[TIMESTAMP]" },
-  { "level": 1, "delegate": "[PUBLIC_KEY_HASH]",
-    "slots": [ 1, 7, 8, 10, 18, 25, 28 ],
-    "estimated_time": "[TIMESTAMP]" },
-  { "level": 1, "delegate": "[PUBLIC_KEY_HASH]",
+[ { "level": 1, "baker": "[BAKER_HASH]",
     "slots": [ 3, 5, 12, 16, 27, 30 ],
     "estimated_time": "[TIMESTAMP]" },
-  { "level": 1, "delegate": "[PUBLIC_KEY_HASH]",
+  { "level": 1, "baker": "[BAKER_HASH]",
+    "slots": [ 1, 7, 8, 10, 18, 25, 28 ],
+    "estimated_time": "[TIMESTAMP]" },
+  { "level": 1, "baker": "[BAKER_HASH]",
+    "slots": [ 0, 4, 6, 11, 15, 20, 22 ],
+    "estimated_time": "[TIMESTAMP]" },
+  { "level": 1, "baker": "[BAKER_HASH]",
     "slots": [ 9, 14, 21, 26, 29 ],
+    "estimated_time": "[TIMESTAMP]" },
+  { "level": 1, "baker": "[BAKER_HASH]",
+    "slots": [ 2, 13, 17, 19, 23, 24, 31 ],
     "estimated_time": "[TIMESTAMP]" } ]
 
 ./tezos-client rpc get /chains/main/blocks/head/helpers/levels_in_current_cycle
