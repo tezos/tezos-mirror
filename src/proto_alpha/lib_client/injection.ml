@@ -952,7 +952,9 @@ let inject_manager_operation cctxt ~chain ~block ?branch ?confirmations
                 source;
                 fee = Tez.zero;
                 counter;
-                gas_limit = Gas.Arith.integral_of_int 10_000;
+                (* [gas_limit] must correspond to
+                   [Michelson_v1_gas.Cost_of.manager_operation] *)
+                gas_limit = Gas.Arith.integral_of_int 1_000;
                 storage_limit = Z.zero;
                 operation = Reveal src_pk;
               },
