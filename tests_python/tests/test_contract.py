@@ -396,6 +396,9 @@ class TestContracts:
         # error message for attempting to use APPLY to capture a ticket
         ("ticket_apply.tz",
          r'Ticket in unauthorized position'),
+        # error message for attempting to wrap a ticket in a ticket
+        ("ticket_in_ticket.tz",
+         r'comparable type expected.Type ticket unit is not comparable'),
     ])
     def test_ill_typecheck(self, client: Client, contract, error_pattern):
         with utils.assert_run_failure(error_pattern):
