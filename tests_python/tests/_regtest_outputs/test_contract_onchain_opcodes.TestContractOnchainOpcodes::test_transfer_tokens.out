@@ -1,7 +1,7 @@
 tests/test_contract_onchain_opcodes.py::TestContractOnchainOpcodes::test_transfer_tokens
 
 Node is bootstrapped.
-Estimated gas: 1589.562 units (will add 100 for safety)
+Estimated gas: 1589.562 units (will add 100 + 36 for safety)
 Estimated storage: 295 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -12,13 +12,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [CONTRACT_HASH]
-    Fee to the baker: ꜩ0.000437
+    Fee to the baker: ꜩ0.000441
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 1690
+    Gas limit: 1726
     Storage limit: 315 bytes
     Balance updates:
-      [CONTRACT_HASH] ................ -ꜩ0.000437
-      fees(the baker who will include this operation,1) ... +ꜩ0.000437
+      [CONTRACT_HASH] ................ -ꜩ0.000441
+      fees(the baker who will include this operation,1) ... +ꜩ0.000441
     Origination:
       From: [CONTRACT_HASH]
       Credit: ꜩ100
@@ -42,7 +42,7 @@ New contract [CONTRACT_HASH] originated.
 Contract memorized as test_transfer_account1.
 Injected block [BLOCK_HASH]
 Node is bootstrapped.
-Estimated gas: 1589.562 units (will add 100 for safety)
+Estimated gas: 1589.562 units (will add 100 + 36 for safety)
 Estimated storage: 295 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -53,13 +53,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [CONTRACT_HASH]
-    Fee to the baker: ꜩ0.000437
+    Fee to the baker: ꜩ0.000441
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 1690
+    Gas limit: 1726
     Storage limit: 315 bytes
     Balance updates:
-      [CONTRACT_HASH] ................ -ꜩ0.000437
-      fees(the baker who will include this operation,1) ... +ꜩ0.000437
+      [CONTRACT_HASH] ................ -ꜩ0.000441
+      fees(the baker who will include this operation,1) ... +ꜩ0.000441
     Origination:
       From: [CONTRACT_HASH]
       Credit: ꜩ20
@@ -83,7 +83,7 @@ New contract [CONTRACT_HASH] originated.
 Contract memorized as test_transfer_account2.
 Injected block [BLOCK_HASH]
 Node is bootstrapped.
-Estimated gas: 1749.764 units (will add 100 for safety)
+Estimated gas: 1749.764 units (will add 100 + 42 for safety)
 Estimated storage: 323 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -94,13 +94,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [CONTRACT_HASH]
-    Fee to the baker: ꜩ0.000482
+    Fee to the baker: ꜩ0.000487
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 1850
+    Gas limit: 1892
     Storage limit: 343 bytes
     Balance updates:
-      [CONTRACT_HASH] ................ -ꜩ0.000482
-      fees(the baker who will include this operation,1) ... +ꜩ0.000482
+      [CONTRACT_HASH] ................ -ꜩ0.000487
+      fees(the baker who will include this operation,1) ... +ꜩ0.000487
     Origination:
       From: [CONTRACT_HASH]
       Credit: ꜩ1000

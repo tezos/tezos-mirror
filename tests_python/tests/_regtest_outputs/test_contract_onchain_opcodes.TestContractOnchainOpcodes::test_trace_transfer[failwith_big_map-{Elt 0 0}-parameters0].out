@@ -1,7 +1,7 @@
 tests/test_contract_onchain_opcodes.py::TestContractOnchainOpcodes::test_trace_transfer[failwith_big_map-{Elt 0 0}-parameters0]
 
 Node is bootstrapped.
-Estimated gas: 12090 units (will add 100 for safety)
+Estimated gas: 2193.270 units (will add 100 + 46 for safety)
 Estimated storage: 433 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -12,13 +12,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [CONTRACT_HASH]
-    Fee to the baker: ꜩ0.001535
+    Fee to the baker: ꜩ0.00055
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 12190
+    Gas limit: 2340
     Storage limit: 453 bytes
     Balance updates:
-      [CONTRACT_HASH] ................ -ꜩ0.001535
-      fees(the baker who will include this operation,4) ... +ꜩ0.001535
+      [CONTRACT_HASH] ................ -ꜩ0.00055
+      fees(the baker who will include this operation,4) ... +ꜩ0.00055
     Origination:
       From: [CONTRACT_HASH]
       Credit: ꜩ1000
@@ -43,10 +43,10 @@ This sequence of operations was run:
           New map(0) of type (big_map int int)
           Set map(0)[0] to 0
         Paid storage size diff: 176 bytes
-        Consumed gas: 12090
+        Consumed gas: 2193.270
         Balance updates:
-          [CONTRACT_HASH] ... -ꜩ0.176
-          [CONTRACT_HASH] ... -ꜩ0.257
+          [CONTRACT_HASH] ... -ꜩ0.044
+          [CONTRACT_HASH] ... -ꜩ0.06425
           [CONTRACT_HASH] ... -ꜩ1000
           [CONTRACT_HASH] ... +ꜩ1000
 
@@ -85,7 +85,7 @@ with { Elt 1 1 }
 Fatal error:
   transfer simulation failed
 Node is bootstrapped.
-"Assert_failure src/proto_alpha/lib_protocol/script_ir_translator.ml:5650:8"
+"Assert_failure src/proto_alpha/lib_protocol/script_ir_translator.ml:5135:8"
 Fatal error:
   transfer simulation failed
 Node is bootstrapped.
