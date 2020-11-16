@@ -56,6 +56,15 @@ module S = struct
       ~output:Voting_period.info_encoding
       RPC_path.(path / "current_period")
 
+  let successor_period =
+    RPC_service.get_service
+      ~description:
+        "Returns the voting period (index, kind, starting position) and \
+         related information (position, remaining) of the next block."
+      ~query:RPC_query.empty
+      ~output:Voting_period.info_encoding
+      RPC_path.(path / "successor_period")
+
   let current_period_kind_deprecated =
     RPC_service.get_service
       ~description:
@@ -109,6 +118,8 @@ let register () =
   register0 S.ballot_list (fun ctxt () () -> Vote.get_ballot_list ctxt >|= ok) ;
   register0 S.current_period (fun ctxt () () ->
       Voting_period.get_rpc_fixed_current_info ctxt) ;
+  register0 S.successor_period (fun ctxt () () ->
+      Voting_period.get_current_info ctxt) ;
   register0 S.current_period_kind_deprecated (fun ctxt () () ->
       Voting_period.get_rpc_fixed_current_info ctxt
       >|=? fun {voting_period; _} -> voting_period.kind) ;
@@ -135,6 +146,9 @@ let ballot_list ctxt block =
 
 let current_period ctxt block =
   RPC_context.make_call0 S.current_period ctxt block () ()
+
+let successor_period ctxt block =
+  RPC_context.make_call0 S.successor_period ctxt block () ()
 
 let current_quorum ctxt block =
   RPC_context.make_call0 S.current_quorum ctxt block () ()

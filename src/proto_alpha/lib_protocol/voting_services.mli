@@ -35,6 +35,9 @@ val ballot_list :
 val current_period :
   'a #RPC_context.simple -> 'a -> Voting_period.info shell_tzresult Lwt.t
 
+val successor_period :
+  'a #RPC_context.simple -> 'a -> Voting_period.info shell_tzresult Lwt.t
+
 val current_quorum :
   'a #RPC_context.simple -> 'a -> Int32.t shell_tzresult Lwt.t
 
