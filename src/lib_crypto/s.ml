@@ -359,6 +359,20 @@ module type FIELD = sig
   val to_bytes : t -> Bytes.t
 end
 
+(** Module type for the prime fields GF(p) *)
+module type PRIME_FIELD = sig
+  include FIELD
+
+  (** [of_z x] builds an element t from the Zarith element [x]. [mod order] is
+      applied if [x >= order] or [x < 0]. *)
+  val of_z : Z.t -> t
+
+  (** [to_z x] builds a Zarith element, using the decimal representation.
+      Arithmetic on the result can be done using the modular functions on
+      integers *)
+  val to_z : t -> Z.t
+end
+
 module type CURVE = sig
   exception Not_on_curve of Bytes.t
 

@@ -24,12 +24,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Fr : S.FIELD
+module Fr : S.PRIME_FIELD
 
 module Fq12 : S.FIELD
 
-module G1 : S.CURVE with module Scalar = Fr
+module G1 : S.CURVE with type Scalar.t = Fr.t
 
-module G2 : S.CURVE with module Scalar = Fr
+module G2 : S.CURVE with type Scalar.t = Fr.t
 
 include S.PAIRING with module Gt = Fq12 and module G1 := G1 and module G2 := G2
