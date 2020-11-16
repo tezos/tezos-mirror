@@ -631,8 +631,7 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
       type op. op Alpha_context.manager_operation -> Gas.Arith.fp option =
    fun operation ->
     match operation with
-    | Tezos_protocol_007_PsDELPH1.Protocol.Alpha_context.Origination {script; _}
-      ->
+    | Protocol.Alpha_context.Origination {script; _} ->
         let code_bytes =
           Data_encoding.Binary.to_bytes_exn
             Script.lazy_expr_encoding
