@@ -1354,7 +1354,13 @@ let commands network () =
           | Some src_pkh -> (
               Client_keys.get_key cctxt src_pkh
               >>=? fun (src_name, _src_pk, src_sk) ->
-              get_period_info ~chain:cctxt#chain ~block:cctxt#block cctxt
+              get_period_info
+              (* Find period info of the successor, because the operation will
+                 be injected on the next block at the earliest *)
+                ~successor:true
+                ~chain:cctxt#chain
+                ~block:cctxt#block
+                cctxt
               >>=? fun info ->
               ( match info.current_period_kind with
               | Proposal ->
@@ -1534,7 +1540,13 @@ let commands network () =
           | Some src_pkh ->
               Client_keys.get_key cctxt src_pkh
               >>=? fun (_src_name, _src_pk, src_sk) ->
-              get_period_info ~chain:cctxt#chain ~block:cctxt#block cctxt
+              get_period_info
+              (* Find period info of the successor, because the operation will
+                 be injected on the next block at the earliest *)
+                ~successor:true
+                ~chain:cctxt#chain
+                ~block:cctxt#block
+                cctxt
               >>=? fun info ->
               ( match info.current_period_kind with
               | Testing_vote | Promotion_vote ->

@@ -253,6 +253,7 @@ type ballots_info = {
 }
 
 val get_period_info :
+  ?successor:bool ->
   #Protocol_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
