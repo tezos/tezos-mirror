@@ -46,7 +46,8 @@ here either.
 
 ## Node
 
-- Fixed all known cases where the node would not stop when interrupted with Ctrl+C.
+- Fixed some cases where the node would not stop when interrupted with
+  Ctrl+C.
 
 - The node's mempool relies on a new synchronisation heuristic. The
   node's behaviour, especially at startup, may differ slightly; log
