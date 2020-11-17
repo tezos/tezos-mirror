@@ -535,7 +535,7 @@ let cost_of_instr : type b a. (b, a) descr -> b -> Gas.cost =
   | (Ticket, _) ->
       Interp_costs.ticket
   | (Read_ticket, _) ->
-      Interp_costs.ticket
+      Interp_costs.read_ticket
 
 let unpack ctxt ~ty ~bytes =
   Gas.check_enough ctxt (Script.serialized_cost bytes)

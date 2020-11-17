@@ -1203,6 +1203,9 @@ module Cost_of = struct
 
     (* TODO benchmark *)
     let ticket = atomic_step_cost (Z.of_int 200)
+
+    (* TODO benchmark *)
+    let read_ticket = atomic_step_cost (Z.of_int 200)
   end
 
   module Typechecking = struct
