@@ -281,14 +281,12 @@ type protocols = {
 let raw_protocol_encoding =
   conv
     (fun {current_protocol; next_protocol} ->
-      ((current_protocol, next_protocol), ()))
-    (fun ((current_protocol, next_protocol), ()) ->
+      (current_protocol, next_protocol))
+    (fun (current_protocol, next_protocol) ->
       {current_protocol; next_protocol})
-    (merge_objs
-       (obj2
-          (req "protocol" Protocol_hash.encoding)
-          (req "next_protocol" Protocol_hash.encoding))
-       unit)
+    (obj2
+       (req "protocol" Protocol_hash.encoding)
+       (req "next_protocol" Protocol_hash.encoding))
 
 module Make (Proto : PROTO) (Next_proto : PROTO) = struct
   let protocol_hash = Protocol_hash.to_b58check Proto.hash
