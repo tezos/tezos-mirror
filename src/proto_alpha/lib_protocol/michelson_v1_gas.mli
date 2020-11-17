@@ -213,6 +213,8 @@ module Cost_of : sig
 
     val mul_bls12_381_fr : Gas.cost
 
+    val mul_bls12_381_fr_z : Gas.cost
+
     val int_bls12_381_fr : Gas.cost
 
     val neg_bls12_381_g1 : Gas.cost

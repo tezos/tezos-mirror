@@ -513,13 +513,9 @@ let cost_of_instr : type b a. (b, a) descr -> b -> Gas.cost =
   | (Mul_bls12_381_fr, _) ->
       Interp_costs.mul_bls12_381_fr
   | (Mul_bls12_381_fr_z, _) ->
-      (* FIXME: This is not correct because there is a serialisation from Z and
-      deserialisation to Fr cost *)
-      Interp_costs.mul_bls12_381_fr
+      Interp_costs.mul_bls12_381_fr_z
   | (Mul_bls12_381_z_fr, _) ->
-      (* FIXME: This is not correct because there is a serialisation from Z and
-      deserialisation to Fr cost *)
-      Interp_costs.mul_bls12_381_fr
+      Interp_costs.mul_bls12_381_fr_z
   | (Int_bls12_381_fr, _) ->
       Interp_costs.int_bls12_381_fr
   | (Neg_bls12_381_g1, _) ->
