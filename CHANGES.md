@@ -79,6 +79,12 @@ here either.
 
 ## Node
 
+- Added six messages to the distributed database protocol and bumped
+  its version from 0 to 1. These new messages allow to request for: a
+  peer's checkpoint, the branch of a given protocol and a block's
+  predecessor for a given offset. These messages are not yet used but
+  will be useful for future optimizations.
+
 - Fixed some cases where the node would not stop when interrupted with
   Ctrl+C.
 
