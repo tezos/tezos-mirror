@@ -2182,6 +2182,12 @@ BLS12-381 primitives
     :: bls12_381_fr : nat : 'S -> bls12_381_fr : 'S
     :: bls12_381_fr : int : 'S -> bls12_381_fr : 'S
 
+- ``INT``: Convert a field element to type ``int``. The returned value is always between ``0`` (inclusive) and the order of Fr (exclusive).
+
+::
+
+    :: bls12_381_fr : 'S   ->   int : 'S
+
 -  ``PAIRING_CHECK``:
    Verify that the product of pairings of the given list of points is equal to 1 in Fq12. Returns ``true`` if the list is empty.
    Can be used to verify if two pairings P1 and P2 are equal by verifying P1 * P2^(-1) = 1.
