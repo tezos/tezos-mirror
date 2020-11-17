@@ -7,6 +7,9 @@ parameter (big_map int int);
 # it can still be accessed by its big-map id and sent as parameter so
 # it is important that the type of the storage matches the type of the
 # parameter.
+
+# This test is now ill-typed because FAILWITH accepts only packable types
+
 storage (big_map int int);
 
 code { CAR;

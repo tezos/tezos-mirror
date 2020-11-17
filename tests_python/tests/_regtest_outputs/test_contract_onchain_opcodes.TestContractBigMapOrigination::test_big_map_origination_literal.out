@@ -1,8 +1,8 @@
 tests/test_contract_onchain_opcodes.py::TestContractBigMapOrigination::test_big_map_origination_literal
 
 Node is bootstrapped.
-Estimated gas: 2193.085 units (will add 100 + 46 for safety)
-Estimated storage: 433 bytes added (will add 20 for safety)
+Estimated gas: 1977.425 units (will add 100 + 38 for safety)
+Estimated storage: 403 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
 NOT waiting for the operation to be included.
@@ -12,44 +12,37 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [CONTRACT_HASH]
-    Fee to the baker: ꜩ0.00055
+    Fee to the baker: ꜩ0.000498
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 2340
-    Storage limit: 453 bytes
+    Gas limit: 2116
+    Storage limit: 423 bytes
     Balance updates:
-      [CONTRACT_HASH] ................ -ꜩ0.00055
-      fees(the baker who will include this operation,0) ... +ꜩ0.00055
+      [CONTRACT_HASH] ................ -ꜩ0.000498
+      fees(the baker who will include this operation,0) ... +ꜩ0.000498
     Origination:
       From: [CONTRACT_HASH]
       Credit: ꜩ1000
       Script:
         { parameter (big_map int int) ;
           storage (big_map int int) ;
-          code { CAR ;
-                 PUSH (option int) (Some 1) ;
-                 PUSH int 1 ;
-                 UPDATE ;
-                 PUSH (option int) None ;
-                 PUSH int 2 ;
-                 UPDATE ;
-                 FAILWITH } }
+          code { CAR ; NIL operation ; PAIR } }
         Initial storage: { Elt 0 0 }
         No delegate for this contract
         This origination was successfully applied
         Originated contracts:
           [CONTRACT_HASH]
-        Storage size: 176 bytes
+        Storage size: 146 bytes
         Updated big_maps:
           New map(0) of type (big_map int int)
           Set map(0)[0] to 0
-        Paid storage size diff: 176 bytes
-        Consumed gas: 2193.085
+        Paid storage size diff: 146 bytes
+        Consumed gas: 1977.425
         Balance updates:
-          [CONTRACT_HASH] ... -ꜩ0.044
+          [CONTRACT_HASH] ... -ꜩ0.0365
           [CONTRACT_HASH] ... -ꜩ0.06425
           [CONTRACT_HASH] ... -ꜩ1000
           [CONTRACT_HASH] ... +ꜩ1000
 
 New contract [CONTRACT_HASH] originated.
-Contract memorized as failwith_big_map_literal.
+Contract memorized as originate_big_map_literal.
 Injected block [BLOCK_HASH]

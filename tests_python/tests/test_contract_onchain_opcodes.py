@@ -323,32 +323,9 @@ class TestContractOnchainOpcodes:
                            'Unit', 1000, 'bootstrap1')
         bake(client)
 
-    @pytest.mark.parametrize('contract,init_storage,parameters', [
-        ('failwith_big_map', '{Elt 0 0}', [
-            '{}',
-            '0',
-            '99999999',
-            'Pair 0 {}',
-            'Pair 0 {Elt 0 None}',
-            'Pair 0 {Elt 0 (Some 4)}',
-            'Pair 0 {Elt 1 (Some 4)}']),
-    ])
-    def test_trace_transfer(self, client_regtest_scrubbed, contract,
-                            init_storage, parameters):
-        client = client_regtest_scrubbed
-        init_with_transfer(client,
-                           path.join(OPCODES_CONTRACT_PATH, f'{contract}.tz'),
-                           init_storage, 1000, 'bootstrap1')
-        for parameter in parameters:
-            try:
-                client.transfer(0, 'bootstrap1', contract,
-                                ['-arg', parameter, '--burn-cap', '10'])
-            except subprocess.CalledProcessError:
-                pass
-        bake(client)
 
-
-FAILWITH_BIG_MAP_FILE = path.join(OPCODES_CONTRACT_PATH, 'failwith_big_map.tz')
+ORIGINATE_BIG_MAP_FILE = path.join(OPCODES_CONTRACT_PATH,
+                                   'originate_big_map.tz')
 
 
 @pytest.mark.incremental
@@ -361,26 +338,26 @@ class TestContractBigMapOrigination:
         # originate a first version of the contract from a literal so
         # that a big_map with id 0 exists
         init_with_transfer(client,
-                           FAILWITH_BIG_MAP_FILE,
+                           ORIGINATE_BIG_MAP_FILE,
                            '{Elt 0 0}', 1000, 'bootstrap1',
-                           contract_name='failwith_big_map_literal')
+                           contract_name='originate_big_map_literal')
 
     def test_big_map_origination_id(self, client_regtest_scrubbed):
         client = client_regtest_scrubbed
         # originate again the same script from the big-map id 0
         init_with_transfer(client,
-                           FAILWITH_BIG_MAP_FILE,
+                           ORIGINATE_BIG_MAP_FILE,
                            '0', 1000, 'bootstrap1',
-                           contract_name='failwith_big_map_id')
+                           contract_name='originate_big_map_id')
 
     def test_big_map_origination_diff(self, client_regtest_scrubbed):
         client = client_regtest_scrubbed
 
         # originate again the same script from a big-diff
         init_with_transfer(client,
-                           FAILWITH_BIG_MAP_FILE,
+                           ORIGINATE_BIG_MAP_FILE,
                            'Pair 0 {Elt 1 (Some 4)}', 1000, 'bootstrap1',
-                           contract_name='failwith_big_map_diff')
+                           contract_name='originate_big_map_diff')
 
 
 @pytest.mark.incremental
