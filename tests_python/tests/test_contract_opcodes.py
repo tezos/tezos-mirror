@@ -1018,6 +1018,27 @@ class TestContractOpcodes:
              'Unit',
              '(Some 0x100000000000000000000000000000000000000000000000000000' +
              '0000000000)'),
+            ('bls12_381_fr_to_int.tz', '0',
+             '0x00',
+             '0'),
+            ('bls12_381_fr_to_int.tz', '0',
+             '0x01',
+             '1'),
+            # Generated using
+            # let r = Bls12_381.Fr.(random ()) in
+            # Printf.printf "%s = 0x%s"
+            #   (Bls12_381.Fr.to_string r)
+            #   (Hex.(show (of_bytes (Bls12_381.Fr.to_bytes r))))
+            ('bls12_381_fr_to_int.tz', '0',
+             '0x28db8e57af88d9576acd181b89f24e50a89a6423f939026ed91349fc9' +
+             'af16c27',
+             '1783268807701357777652478449446472851821391321341286660405373' +
+             '5695200962927400'),
+            ('bls12_381_fr_to_int.tz', '0',
+             '0xb9e8abf8dc324a010007addde986fe0f7c81fab16d26819d0534b7691c' +
+             '0b0719',
+             '1132026582925658583078152196614952946047676740821044523890286' +
+             '9222031333517497'),
         ])
     def test_contract_input_output(self,
                                    client_regtest: ClientRegression,
