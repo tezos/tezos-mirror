@@ -1039,6 +1039,20 @@ class TestContractOpcodes:
              '0b0719',
              '1132026582925658583078152196614952946047676740821044523890286' +
              '9222031333517497'),
+            # Mutez -> Fr
+            ('mutez_to_bls12_381_fr.tz', '0x02',
+             '16',
+             '0x100000000000000000000000000000000000000000000000000000000' +
+             '0000000'),
+            # # would fail if trying to PACK mutez and UNPACK to Fr
+            ('mutez_to_bls12_381_fr.tz', '0x00',
+             '257',
+             '0x010100000000000000000000000000000000000000000000000000000' +
+             '0000000'),
+            # Fr -> Mutez
+            ('bls12_381_fr_to_mutez.tz', '0',
+             '0x10',
+             '16'),
         ])
     def test_contract_input_output(self,
                                    client_regtest: ClientRegression,
