@@ -400,7 +400,7 @@ module type FIELD = sig
   val pow : t -> Z.t -> t
 
   (** From a predefined bytes representation, construct a value t. It is not
-      required that to_bytes of_bytes_exn t = t.
+      required that to_bytes (of_bytes_exn t) = t.
       Raise [Not_in_field] if the bytes do not represent an element in the field.
   *)
   val of_bytes_exn : Bytes.t -> t
@@ -411,7 +411,7 @@ module type FIELD = sig
   val of_bytes_opt : Bytes.t -> t option
 
   (** Convert the value t to a bytes representation which can be used for
-      hashing for instance. It is not required that to_bytes of_bytes_exn t = t. By
+      hashing for instance. It is not required that to_bytes (of_bytes_exn t) = t. By
       default, little endian encoding is used, and length of the resulting bytes
       may vary depending on the order.
   *)
