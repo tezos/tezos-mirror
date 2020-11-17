@@ -273,15 +273,18 @@ let predecessor_n_raw store block_hash distance =
     loop block_hash distance
 
 let predecessor_n ?(below_save_point = false) block_store block_hash distance =
-  predecessor_n_raw block_store block_hash distance
-  >>= function
-  | None ->
-      Lwt.return_none
-  | Some predecessor -> (
-      ( if below_save_point then Header.known (block_store, predecessor)
-      else Store.Block.Contents.known (block_store, predecessor) )
+  Lwt.catch
+    (fun () ->
+      predecessor_n_raw block_store block_hash distance
       >>= function
-      | false -> Lwt.return_none | true -> Lwt.return_some predecessor )
+      | None ->
+          Lwt.return_none
+      | Some predecessor -> (
+          ( if below_save_point then Header.known (block_store, predecessor)
+          else Store.Block.Contents.known (block_store, predecessor) )
+          >>= function
+          | false -> Lwt.return_none | true -> Lwt.return_some predecessor ))
+    (fun _exn -> Lwt.return_none)
 
 type t = global_state
 

@@ -122,6 +122,29 @@ let read_block_header {disk; _} h =
   | None ->
       Lwt.return_none
 
+let read_predecessor_header {disk; _} h offset =
+  if Compare.Int32.(offset < 0l) then Lwt.return_none
+  else
+    State.read_block disk h
+    >>= function
+    | None ->
+        Lwt.return_none
+    | Some block -> (
+        if Compare.Int32.(offset > State.Block.level block) then
+          Lwt.return_none
+        else
+          State.Block.predecessor_n block (Int32.to_int offset)
+          >>= function
+          | None ->
+              Lwt.return_none
+          | Some pred_hash -> (
+              State.read_block disk pred_hash
+              >>= function
+              | None ->
+                  Lwt.return_none
+              | Some b ->
+                  Lwt.return_some (State.Block.header b) ) )
+
 let find_pending_block_header {peer_active_chains; _} h =
   Chain_id.Table.to_seq_values peer_active_chains
   |> Seq.find (fun chain_db ->
@@ -401,6 +424,25 @@ let handle_msg state msg =
       (* This message is currently unused: it will be used for future
          multipass. *)
       Peer_metadata.incr meta @@ Received_response Protocol_branch ;
+      Lwt.return_unit
+  | Get_predecessor_header (block_hash, offset) -> (
+      Peer_metadata.incr meta @@ Received_request Predecessor_header ;
+      read_predecessor_header state block_hash offset
+      >>= function
+      | None ->
+          (* The peer is not expected to request blocks that are beyond
+             our locator. *)
+          Peer_metadata.incr meta @@ Unadvertised Block ;
+          Lwt.return_unit
+      | Some header ->
+          Peer_metadata.update_responses meta Predecessor_header
+          @@ P2p.try_send state.p2p state.conn
+          @@ Predecessor_header (block_hash, offset, header) ;
+          Lwt.return_unit )
+  | Predecessor_header (_block_hash, _offset, _header) ->
+      (* This message is currently unused: it will be used to improve
+         bootstrapping. *)
+      Peer_metadata.incr meta @@ Received_response Predecessor_header ;
       Lwt.return_unit
 
 let rec worker_loop state =

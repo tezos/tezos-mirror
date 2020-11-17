@@ -49,6 +49,7 @@ type requests_kind =
   | Operations_for_block
   | Checkpoint
   | Protocol_branch
+  | Predecessor_header
   | Other
 
 type resource_kind = Block | Operations | Protocol

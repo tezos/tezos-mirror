@@ -47,6 +47,8 @@ type t =
   | Checkpoint of Chain_id.t * Block_header.t
   | Get_protocol_branch of Chain_id.t * int
   | Protocol_branch of Chain_id.t * int * Block_locator.t
+  | Get_predecessor_header of Block_hash.t * int32
+  | Predecessor_header of Block_hash.t * int32 * Block_header.t
 
 val encoding : t P2p_params.app_message_encoding list
 

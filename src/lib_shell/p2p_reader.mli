@@ -124,6 +124,12 @@
     notifies the requester that the value has been received. Ignores message if
     value wasn't requested.
 
+  - [Get_predecessor_header hash n]
+    Sends [Predecessor_header hash n header] where [header] is the header of the
+    [n]th predecessor of the block [hash].
+
+  - [Predecessor_header hash n header] is a no-op.
+
   The other database messages work similarly
   - [Get_operations hashes]/[Operation operation]
   - [Get_protocols hashes]/[Protocol]

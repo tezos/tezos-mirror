@@ -44,6 +44,7 @@ type messages = {
   mutable operations_for_block : counter;
   mutable checkpoint : counter;
   mutable protocol_branch : counter;
+  mutable predecessor_header : counter;
   mutable other : counter;
 }
 
@@ -59,6 +60,7 @@ let sent_requests_encoding =
             operations_for_block;
             checkpoint;
             protocol_branch;
+            predecessor_header;
             other } ->
        ( branch,
          head,
@@ -69,6 +71,7 @@ let sent_requests_encoding =
          operations_for_block,
          checkpoint,
          protocol_branch,
+         predecessor_header,
          other ))
      (fun ( branch,
             head,
@@ -79,6 +82,7 @@ let sent_requests_encoding =
             operations_for_block,
             checkpoint,
             protocol_branch,
+            predecessor_header,
             other ) ->
        {
          branch;
@@ -89,20 +93,29 @@ let sent_requests_encoding =
          operation_hashes_for_block;
          operations_for_block;
          checkpoint;
-         other;
          protocol_branch;
+         predecessor_header;
+         other;
        }))
-    (obj10
-       (req "branch" counter)
-       (req "head" counter)
-       (req "block_header" counter)
-       (req "operations" counter)
-       (req "protocols" counter)
-       (req "operation_hashes_for_block" counter)
-       (req "operations_for_block" counter)
-       (req "checkpoint" counter)
-       (req "protocol_branch" counter)
-       (req "other" counter))
+    (conv
+       (fun (b, h, bh, ops, p, ophs, opb, cp, pb, ph, o) ->
+         ((b, h, bh, ops, p, ophs), (opb, cp, pb, ph, o)))
+       (fun ((b, h, bh, ops, p, ophs), (opb, cp, pb, ph, o)) ->
+         (b, h, bh, ops, p, ophs, opb, cp, pb, ph, o))
+       (merge_objs
+          (obj6
+             (req "branch" counter)
+             (req "head" counter)
+             (req "block_header" counter)
+             (req "operations" counter)
+             (req "protocols" counter)
+             (req "operation_hashes_for_block" counter))
+          (obj5
+             (req "operations_for_block" counter)
+             (req "checkpoint" counter)
+             (req "protocol_branch" counter)
+             (req "predecessor_header" counter)
+             (req "other" counter))))
 
 type requests_kind =
   | Branch
@@ -114,6 +127,7 @@ type requests_kind =
   | Operations_for_block
   | Checkpoint
   | Protocol_branch
+  | Predecessor_header
   | Other
 
 type requests = {
@@ -334,8 +348,9 @@ let empty () =
       operation_hashes_for_block = zero;
       operations_for_block = zero;
       checkpoint = zero;
-      other = zero;
       protocol_branch = zero;
+      predecessor_header = zero;
+      other = zero;
     }
   in
   {
@@ -455,10 +470,12 @@ let incr_requests (msgs : messages) (req : requests_kind) =
       msgs.operations_for_block <- msgs.operations_for_block + one
   | Checkpoint ->
       msgs.checkpoint <- msgs.checkpoint + one
-  | Other ->
-      msgs.other <- msgs.other + one
   | Protocol_branch ->
       msgs.protocol_branch <- msgs.protocol_branch + one
+  | Predecessor_header ->
+      msgs.predecessor_header <- msgs.predecessor_header + one
+  | Other ->
+      msgs.other <- msgs.other + one
 
 let incr_unadvertised {unadvertised = u; _} = function
   | Block ->

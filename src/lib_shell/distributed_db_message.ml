@@ -158,6 +158,8 @@ type t =
   | Get_protocol_branch of Chain_id.t * int (* proto_level: uint8 *)
   | Protocol_branch of
       Chain_id.t * int (* proto_level: uint8 *) * Block_locator.t
+  | Get_predecessor_header of Block_hash.t * int32
+  | Predecessor_header of Block_hash.t * int32 * Block_header.t
 
 let encoding =
   let open Data_encoding in
@@ -324,7 +326,37 @@ let encoding =
         | _ ->
             None)
       (fun (chain, proto_level, locator) ->
-        Protocol_branch (chain, proto_level, locator)) ]
+        Protocol_branch (chain, proto_level, locator));
+    case
+      ~tag:0x90
+      ~title:"Get_predecessor_header"
+      (obj1
+         (req
+            "get_predecessor_header"
+            (obj2 (req "block" Block_hash.encoding) (req "offset" int32))))
+      (function
+        | Get_predecessor_header (block, offset) ->
+            Some (block, offset)
+        | _ ->
+            None)
+      (fun (block, offset) -> Get_predecessor_header (block, offset));
+    case
+      ~tag:0x91
+      ~title:"Predecessor_header"
+      (obj1
+         (req
+            "predecessor_header"
+            (obj3
+               (req "block" Block_hash.encoding)
+               (req "offset" int32)
+               (req "header" Bounded_encoding.block_header))))
+      (function
+        | Predecessor_header (hash, offset, header) ->
+            Some (hash, offset, header)
+        | _ ->
+            None)
+      (fun (hash, offset, header) -> Predecessor_header (hash, offset, header))
+  ]
 
 let distributed_db_versions = [Distributed_db_version.zero]
 
