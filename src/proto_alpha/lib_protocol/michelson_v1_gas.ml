@@ -390,6 +390,9 @@ module Cost_of = struct
 
     let cost_N_Mul_bls12_381_g2 = Z.of_int 850_000
 
+    (* FIXME *)
+    let cost_N_Int_bls12_381_fr = Z.of_int 5
+
     (* model N_Mul_intint *)
     let cost_N_Mul_intint size1 size2 =
       let open Z_syntax in
@@ -967,6 +970,8 @@ module Cost_of = struct
     let mul_bls12_381_g2 = atomic_step_cost cost_N_Mul_bls12_381_g2
 
     let mul_bls12_381_fr = atomic_step_cost cost_N_Mul_bls12_381_fr
+
+    let int_bls12_381_fr = atomic_step_cost cost_N_Int_bls12_381_fr
 
     let neg_bls12_381_g1 = atomic_step_cost cost_N_Neg_bls12_381_g1
 
