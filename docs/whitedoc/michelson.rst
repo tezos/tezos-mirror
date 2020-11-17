@@ -2167,13 +2167,20 @@ BLS12-381 primitives
     :: bls12_381_g2 : bls12_381_g2 : 'S -> bls12_381_g2 : 'S
     :: bls12_381_fr : bls12_381_fr : 'S -> bls12_381_fr : 'S
 
--  ``MUL``: Multiply a curve point or field element by a scalar field element.
+- ``MUL``: Multiply a curve point or field element by a scalar field element. Fr
+   elements can be built from naturals by multiplying by the unit of Fr using ``PUSH bls12_381_fr 1; MUL``. Note
+   that the multiplication will be computed using the natural modulo the order
+   of Fr.
 
 ::
 
     :: bls12_381_g1 : bls12_381_fr : 'S -> bls12_381_g1 : 'S
     :: bls12_381_g2 : bls12_381_fr : 'S -> bls12_381_g2 : 'S
     :: bls12_381_fr : bls12_381_fr : 'S -> bls12_381_fr : 'S
+    :: nat : bls12_381_fr : 'S -> bls12_381_fr : 'S
+    :: int : bls12_381_fr : 'S -> bls12_381_fr : 'S
+    :: bls12_381_fr : nat : 'S -> bls12_381_fr : 'S
+    :: bls12_381_fr : int : 'S -> bls12_381_fr : 'S
 
 -  ``PAIRING_CHECK``:
    Verify that the product of pairings of the given list of points is equal to 1 in Fq12. Returns ``true`` if the list is empty.
