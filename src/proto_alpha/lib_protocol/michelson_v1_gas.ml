@@ -172,17 +172,16 @@ module Cost_of = struct
       Z.of_int 60_000 + (size + (size lsr 2))
 
     (* model N_Comb *)
-
-    let cost_N_Comb size = Z.of_int (80 + (6 * size))
+    (* Approximating 3.275337 x term *)
+    let cost_N_Comb size = Z.of_int (80 + ((3 * size) + (size lsr 2)))
 
     (* model N_Comb_get *)
-    (* Approximating 2.506050 x term *)
-
-    let cost_N_Comb_get size = Z.of_int (65 + ((size lsl 1) + (size lsr 1)))
+    (* Approximating 0.553178 x term *)
+    let cost_N_Comb_get size = Z.of_int (80 + ((size lsr 1) + (size lsr 4)))
 
     (* model N_Comb_set *)
-
-    let cost_N_Comb_set size = Z.of_int (70 + (4 * size))
+    (* Approximating 1.282976 x term *)
+    let cost_N_Comb_set size = Z.of_int (80 + (size + (size lsr 2)))
 
     (* model N_Compare_address *)
     let cost_N_Compare_address size1 size2 =
@@ -513,9 +512,9 @@ module Cost_of = struct
     let cost_N_Total_voting_power = Z.of_int 400
 
     (* model N_Uncomb *)
-    (* Approximating 0.661861 x term *)
-
-    let cost_N_Uncomb size = Z.of_int (100 + ((size lsr 1) + (size lsr 3)))
+    (* Approximating 3.666332 x term *)
+    let cost_N_Uncomb size =
+      Z.of_int (80 + ((3 * size) + (size lsr 1) + (size lsr 3)))
 
     (* model N_Unpair *)
     let cost_N_Unpair = Z.of_int 80
