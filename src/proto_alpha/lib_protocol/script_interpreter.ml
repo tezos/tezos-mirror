@@ -512,6 +512,14 @@ let cost_of_instr : type b a. (b, a) descr -> b -> Gas.cost =
       Interp_costs.mul_bls12_381_g2
   | (Mul_bls12_381_fr, _) ->
       Interp_costs.mul_bls12_381_fr
+  | (Mul_bls12_381_fr_z, _) ->
+      (* FIXME: This is not correct because there is a serialisation from Z and
+      deserialisation to Fr cost *)
+      Interp_costs.mul_bls12_381_fr
+  | (Mul_bls12_381_z_fr, _) ->
+      (* FIXME: This is not correct because there is a serialisation from Z and
+      deserialisation to Fr cost *)
+      Interp_costs.mul_bls12_381_fr
   | (Neg_bls12_381_g1, _) ->
       Interp_costs.neg_bls12_381_g1
   | (Neg_bls12_381_g2, _) ->
@@ -1308,6 +1316,14 @@ let rec step_bounded :
       logged_return ((Bls12_381.G2.mul x y, rest), ctxt)
   | (Mul_bls12_381_fr, (x, (y, rest))) ->
       logged_return ((Bls12_381.Fr.mul x y, rest), ctxt)
+  | (Mul_bls12_381_fr_z, (x, (y, rest))) ->
+      let x = Bls12_381.Fr.of_z (Script_int.to_zint x) in
+      let res = (Bls12_381.Fr.mul x y, rest) in
+      logged_return (res, ctxt)
+  | (Mul_bls12_381_z_fr, (y, (x, rest))) ->
+      let x = Bls12_381.Fr.of_z (Script_int.to_zint x) in
+      let res = (Bls12_381.Fr.mul x y, rest) in
+      logged_return (res, ctxt)
   | (Neg_bls12_381_g1, (x, rest)) ->
       logged_return ((Bls12_381.G1.negate x, rest), ctxt)
   | (Neg_bls12_381_g2, (x, rest)) ->

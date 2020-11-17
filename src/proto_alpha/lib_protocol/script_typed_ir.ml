@@ -461,6 +461,10 @@ and ('bef, 'aft) instr =
       : ( Bls12_381.Fr.t * (Bls12_381.Fr.t * 'rest),
           Bls12_381.Fr.t * 'rest )
         instr
+  | Mul_bls12_381_z_fr
+      : (Bls12_381.Fr.t * (_ num * 'rest), Bls12_381.Fr.t * 'rest) instr
+  | Mul_bls12_381_fr_z
+      : (_ num * (Bls12_381.Fr.t * 'rest), Bls12_381.Fr.t * 'rest) instr
   | Neg_bls12_381_g1 : (Bls12_381.G1.t * 'rest, Bls12_381.G1.t * 'rest) instr
   | Neg_bls12_381_g2 : (Bls12_381.G2.t * 'rest, Bls12_381.G2.t * 'rest) instr
   | Neg_bls12_381_fr : (Bls12_381.Fr.t * 'rest, Bls12_381.Fr.t * 'rest) instr
