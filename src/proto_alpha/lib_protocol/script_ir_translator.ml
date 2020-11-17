@@ -3239,6 +3239,9 @@ let rec parse_data :
           return (pt, ctxt)
       | None ->
           fail_parse_data () )
+  | (Bls12_381_fr_t _, Int (_, v)) ->
+      Gas.consume ctxt Typecheck_costs.bls12_381_fr
+      >>?= fun ctxt -> return (Bls12_381.Fr.of_z v, ctxt)
   | (Bls12_381_fr_t _, expr) ->
       traced_fail (Invalid_kind (location expr, [Bytes_kind], kind expr))
   (* Sapling *)
