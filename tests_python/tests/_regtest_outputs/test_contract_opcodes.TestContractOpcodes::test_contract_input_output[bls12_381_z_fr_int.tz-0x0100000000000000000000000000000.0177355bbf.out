@@ -15,13 +15,13 @@ trace
   - location: 8 (remaining gas: 1039993.670 units remaining)
     [ 0x0100000000000000000000000000000000000000000000000000000000000000  	@storage
       2  	@parameter ]
-  - location: 9 (remaining gas: 1039993.350 units remaining)
+  - location: 9 (remaining gas: 1039993.220 units remaining)
     [ 0x0200000000000000000000000000000000000000000000000000000000000000  	 ]
-  - location: 10 (remaining gas: 1039993.210 units remaining)
+  - location: 10 (remaining gas: 1039993.080 units remaining)
     [ {}  	
       0x0200000000000000000000000000000000000000000000000000000000000000  	 ]
-  - location: 12 (remaining gas: 1039993.070 units remaining)
+  - location: 12 (remaining gas: 1039992.940 units remaining)
     [ (Pair {} 0x0200000000000000000000000000000000000000000000000000000000000000)  	 ]
-  - location: -1 (remaining gas: 1039993 units remaining)
+  - location: -1 (remaining gas: 1039992.870 units remaining)
     [ (Pair {} 0x0200000000000000000000000000000000000000000000000000000000000000)  	 ]
 
