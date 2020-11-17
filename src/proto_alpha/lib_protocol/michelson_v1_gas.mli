@@ -286,6 +286,8 @@ module Cost_of : sig
     val sapling_verify_update : inputs:int -> outputs:int -> Gas.cost
 
     val ticket : Gas.cost
+
+    val read_ticket : Gas.cost
   end
 
   module Typechecking : sig
