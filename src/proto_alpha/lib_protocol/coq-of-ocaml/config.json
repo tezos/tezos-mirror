@@ -34,7 +34,8 @@
     "storage_functors.mli",
     "storage.ml",
     "storage_sigs.ml",
-    "tez_repr.ml"
+    "tez_repr.ml",
+    "voting_period_repr.ml"
   ],
   "error_message_blacklist": [
     "Unbound module Tezos_protocol_alpha_functor"
