@@ -124,6 +124,24 @@ angry spin ostrich round dress acoustic"
             client.run_generic(prms, stdin=stdin)
 
 
+class TestStopLoopPassword:
+    """Tests that the client stops asking for the password after
+    three erroneous passwords given by the user"""
+
+    @pytest.mark.parametrize('stdin', ["\n\n\n", "\n\n\nign", "\n\n\npassword"])
+    def test_stops_after_three_tries(self, client: Client, stdin):
+        with assert_run_failure("3 incorrect password attempts"):
+            client.transfer(
+                0.1, 'bootstrap_encrypted', 'bootstrap1', stdin=stdin
+            )
+
+    @pytest.mark.parametrize(
+        'stdin', ["password\n", "\npassword\n", "\n\npassword\n"]
+    )
+    def test_password_succeed_before_three_tries(self, client: Client, stdin):
+        client.transfer(0.1, 'encrypted_account', 'bootstrap1', stdin=stdin)
+
+
 @pytest.mark.client
 class TestChainId:
     def test_chain_id_block_hash(self, nodeless_client: Client):
