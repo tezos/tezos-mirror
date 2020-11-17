@@ -501,6 +501,8 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int =
       0
   | Mul_bls12_381_z_fr ->
       0
+  | Int_bls12_381_fr ->
+      0
   | Neg_bls12_381_g1 ->
       0
   | Neg_bls12_381_g2 ->
@@ -5377,6 +5379,10 @@ and parse_instr :
         loc
         Mul_bls12_381_z_fr
         (Item_t (Bls12_381_fr_t tname, rest, annot))
+  | (Prim (loc, I_INT, [], annot), Item_t (Bls12_381_fr_t _, rest, _)) ->
+      parse_var_annot loc annot
+      >>?= fun annot ->
+      typed ctxt loc Int_bls12_381_fr (Item_t (Int_t None, rest, annot))
   | (Prim (loc, I_NEG, [], annot), Item_t (Bls12_381_g1_t tname, rest, _)) ->
       parse_var_annot loc annot
       >>?= fun annot ->
