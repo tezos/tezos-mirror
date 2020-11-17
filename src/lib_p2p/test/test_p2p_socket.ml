@@ -58,7 +58,7 @@ let version =
   {
     Network_version.chain_name =
       Distributed_db_version.Name.of_string "SANDBOXED_TEZOS";
-    distributed_db_version = Distributed_db_version.zero;
+    distributed_db_version = Distributed_db_version.one;
     p2p_version = P2p_version.zero;
   }
 

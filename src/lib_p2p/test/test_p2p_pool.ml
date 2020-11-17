@@ -53,7 +53,7 @@ let msg_config : message P2p_params.message_config =
             max_length = None;
           } ];
     chain_name = Distributed_db_version.Name.of_string "SANDBOXED_TEZOS";
-    distributed_db_versions = [Distributed_db_version.zero];
+    distributed_db_versions = Distributed_db_version.[zero; one];
   }
 
 type metadata = unit

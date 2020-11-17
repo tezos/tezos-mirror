@@ -48,3 +48,5 @@ val pp : Format.formatter -> t -> unit
 val encoding : t Data_encoding.t
 
 val zero : t
+
+val one : t
