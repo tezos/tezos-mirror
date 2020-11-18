@@ -1,7 +1,7 @@
 tests/test_contract_onchain_opcodes.py::TestContractOnchainOpcodes::test_set_delegate
 
 Node is bootstrapped.
-Estimated gas: 1662.164 units (will add 100 + 40 for safety)
+Estimated gas: 1636.164 units (will add 100 + 14 for safety)
 Estimated storage: 308 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -12,13 +12,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [CONTRACT_HASH]
-    Fee to the baker: ꜩ0.000463
+    Fee to the baker: ꜩ0.000458
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 1803
+    Gas limit: 1751
     Storage limit: 328 bytes
     Balance updates:
-      [CONTRACT_HASH] ................ -ꜩ0.000463
-      fees(the baker who will include this operation,4) ... +ꜩ0.000463
+      [CONTRACT_HASH] ................ -ꜩ0.000458
+      fees(the baker who will include this operation,4) ... +ꜩ0.000458
     Origination:
       From: [CONTRACT_HASH]
       Credit: ꜩ1000
@@ -33,7 +33,7 @@ This sequence of operations was run:
           [CONTRACT_HASH]
         Storage size: 51 bytes
         Paid storage size diff: 51 bytes
-        Consumed gas: 1662.164
+        Consumed gas: 1636.164
         Balance updates:
           [CONTRACT_HASH] ... -ꜩ0.01275
           [CONTRACT_HASH] ... -ꜩ0.06425
@@ -46,7 +46,7 @@ Injected block [BLOCK_HASH]
 Injected block [BLOCK_HASH]
 none
 Node is bootstrapped.
-Estimated gas: 3546.421 units (will add 100 for safety)
+Estimated gas: 3520.421 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -57,13 +57,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [CONTRACT_HASH]
-    Fee to the baker: ꜩ0.000661
+    Fee to the baker: ꜩ0.000659
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 3647
+    Gas limit: 3621
     Storage limit: 0 bytes
     Balance updates:
-      [CONTRACT_HASH] ................ -ꜩ0.000661
-      fees(the baker who will include this operation,4) ... +ꜩ0.000661
+      [CONTRACT_HASH] ................ -ꜩ0.000659
+      fees(the baker who will include this operation,4) ... +ꜩ0.000659
     Transaction:
       Amount: ꜩ0
       From: [CONTRACT_HASH]
@@ -72,7 +72,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: Unit
       Storage size: 51 bytes
-      Consumed gas: 2546.421
+      Consumed gas: 2520.421
     Internal operations:
       Delegation:
         Contract: [CONTRACT_HASH]
@@ -83,7 +83,7 @@ This sequence of operations was run:
 Injected block [BLOCK_HASH]
 [CONTRACT_HASH] (known as bootstrap5)
 Node is bootstrapped.
-Estimated gas: 3520.881 units (will add 100 for safety)
+Estimated gas: 3494.881 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -94,13 +94,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [CONTRACT_HASH]
-    Fee to the baker: ꜩ0.000618
+    Fee to the baker: ꜩ0.000615
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 3621
+    Gas limit: 3595
     Storage limit: 0 bytes
     Balance updates:
-      [CONTRACT_HASH] ................ -ꜩ0.000618
-      fees(the baker who will include this operation,4) ... +ꜩ0.000618
+      [CONTRACT_HASH] ................ -ꜩ0.000615
+      fees(the baker who will include this operation,4) ... +ꜩ0.000615
     Transaction:
       Amount: ꜩ0
       From: [CONTRACT_HASH]
@@ -109,7 +109,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: Unit
       Storage size: 51 bytes
-      Consumed gas: 2520.881
+      Consumed gas: 2494.881
     Internal operations:
       Delegation:
         Contract: [CONTRACT_HASH]
