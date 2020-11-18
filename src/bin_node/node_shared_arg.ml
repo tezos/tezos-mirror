@@ -238,7 +238,7 @@ module Term = struct
       "Sets min_connections, expected_connections, max_connections to NUM / \
        2, NUM, (3 * NUM) / 2, respectively. Sets peer_table_size to 8 * NUM \
        unless it is already defined on the command line. Sets \
-       synchronisation_threshold to min(NUM / 4, 2) unless it is already \
+       synchronisation_threshold to max(NUM / 4, 2) unless it is already \
        defined on the command line."
     in
     Arg.(
@@ -607,7 +607,13 @@ let read_and_patch_config_file ?(may_override_network = false)
            specified on the command line. *)
         match synchronisation_threshold with
         | None ->
-            ( Some (min (x / 4) 2),
+            (* We want to synchronise with at least 2 peers and to a
+              number of people proportional to the number of peers we
+              are connected with. Because a heuristic is used, we only
+              need to be synchronised with a sufficiently large number
+              of our peers. (x/4) is enough if the
+              `synchronisation-threshold` is not set. *)
+            ( Some (max (x / 4) 2),
               Some (x / 2),
               Some x,
               Some (3 * x / 2),
