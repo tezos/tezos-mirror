@@ -19,7 +19,7 @@ rust_version=${RUST_VERSION:-$recommended_rust_version}
 if [ "$recommended_rust_version" != "$rust_version" ]; then
   echo "\
 WARNING: you selected a different version of rust. Tezos is tested only
-with rust $recommended_rust_version. Do this at your own peril."
+with Rust $recommended_rust_version. Do this at your own peril."
   sleep 3
 fi
 
@@ -27,8 +27,14 @@ if [ -x "$(command -v rustup)" ]; then
   RUSTC="$(rustup which rustc)"
   CARGO="$(rustup which cargo)"
 else
-  RUSTC="$(command -v rustc)"
-  CARGO="$(command -v cargo)"
+  if [ -x "$(command -v rustc)" -a -x "$(command -v cargo)" ]; then
+    RUSTC="$(command -v rustc)"
+    CARGO="$(command -v cargo)"
+  else
+    echo "The Rust compiler is not installed. Please install Rust $recommended_rust_version."
+    echo "See instructions at: https://tezos.gitlab.io/introduction/howtoget.html#environment"
+    exit 1
+  fi
 fi
 
 if ! [[ "$($RUSTC --version | cut -d' ' -f2)" == *"$rust_version"* ]]; then
