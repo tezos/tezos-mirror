@@ -1491,7 +1491,7 @@ test_coverage:
     # We exclude from coverage old protocols and code that can't be
     # instrumented because of current limitations of bisect_ppx.
     OLD_PROTOCOLS: "src/proto_000_Ps9mPmXa src/proto_001_PtCJ7pwo src/proto_002_PsYLVpVv src/proto_003_PsddFKi3 src/proto_004_Pt24m4xi src/proto_005_PsBABY5H src/proto_005_PsBabyM1 src/proto_006_PsCARTHA"
-    NOT_INSTRUMENTABLE: "src/proto_007_PsDELPH1"
+    NOT_INSTRUMENTABLE: "src/proto_007_PsDELPH1 src/proto_alpha"
     COVERAGE_EXCLUDE: "$OLD_PROTOCOLS $NOT_INSTRUMENTABLE"
   script:
     - scripts/instrument_dune_bisect.sh src/ --except $COVERAGE_EXCLUDE
