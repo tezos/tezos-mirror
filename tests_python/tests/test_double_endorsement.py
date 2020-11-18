@@ -15,7 +15,8 @@ class TestDoubleEndorsement:
     def test_init(self, sandbox: Sandbox):
         for i in range(NUM_NODES):
             sandbox.add_node(i, params=constants.NODE_PARAMS)
-        utils.activate_alpha(sandbox.client(0))
+        utils.activate_alpha(sandbox.client(0),
+                             activate_in_the_past=True)
         sandbox.client(0).bake('bootstrap1', BAKE_ARGS)
 
     def test_level(self, sandbox: Sandbox):

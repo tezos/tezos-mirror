@@ -1,4 +1,3 @@
-import datetime
 import time
 import pytest
 from tools import constants, utils
@@ -35,8 +34,7 @@ class TestThresholdOne:
 
     def test_setup_network(self, sandbox: Sandbox):
         sandbox.add_node(0, params=params(), log_levels=LOG_LEVEL)
-        delay = datetime.timedelta(seconds=0)
-        utils.activate_alpha(sandbox.client(0), delay=delay)
+        utils.activate_alpha(sandbox.client(0))
         sandbox.add_baker(0, 'bootstrap5', proto=constants.ALPHA_DAEMON)
 
     def test_bootstrap(self, sandbox: Sandbox):
@@ -56,8 +54,7 @@ class TestThresholdTwo:
 
     def test_setup_network(self, sandbox: Sandbox):
         sandbox.add_node(0, params=params(0), log_levels=LOG_LEVEL)
-        delay = datetime.timedelta(seconds=0)
-        utils.activate_alpha(sandbox.client(0), delay=delay)
+        utils.activate_alpha(sandbox.client(0))
         sandbox.add_baker(0, 'bootstrap5', proto=constants.ALPHA_DAEMON)
 
     def test_add_nodes(self, sandbox: Sandbox):
@@ -86,8 +83,7 @@ class TestStuck:
     def test_setup_network(self, sandbox: Sandbox):
         sandbox.add_node(0, params=params(),
                          log_levels=LOG_LEVEL)
-        delay = datetime.timedelta(seconds=0)
-        utils.activate_alpha(sandbox.client(0), delay=delay)
+        utils.activate_alpha(sandbox.client(0))
         sandbox.add_baker(0, 'bootstrap5', proto=constants.ALPHA_DAEMON)
 
     def test_kill_baker(self, sandbox: Sandbox):
@@ -119,8 +115,7 @@ class TestStuck:
 class TestSplitView:
     def test_setup_network(self, sandbox: Sandbox):
         sandbox.add_node(0, params=params(), log_levels=LOG_LEVEL)
-        delay = datetime.timedelta(seconds=0)
-        utils.activate_alpha(sandbox.client(0), delay=delay)
+        utils.activate_alpha(sandbox.client(0))
         sandbox.add_node(1, params=params(), config_client=False,
                          log_levels=LOG_LEVEL)
         sandbox.add_node(2, params=params(2), config_client=False,
@@ -163,8 +158,7 @@ class TestManyNodesBootstrap:
         sandbox.add_node(0, params=params(), log_levels=LOG_LEVEL)
         parameters = dict(constants.PARAMETERS)
         parameters["time_between_blocks"] = ["1", "0"]
-        delay = datetime.timedelta(seconds=0)
-        utils.activate_alpha(sandbox.client(0), parameters, delay=delay)
+        utils.activate_alpha(sandbox.client(0))
         sandbox.add_baker(0, 'bootstrap1', proto=constants.ALPHA_DAEMON)
         sandbox.add_node(1, params=params(), log_levels=LOG_LEVEL,
                          config_client=False)

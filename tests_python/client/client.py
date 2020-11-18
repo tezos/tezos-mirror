@@ -266,11 +266,12 @@ class Client:
                           fitness: str = '1',
                           key: str = 'activator',
                           timestamp: str = None,
-                          delay: datetime.timedelta =
-                          datetime.timedelta(seconds=3600 * 24 * 365)
+                          delay: datetime.timedelta = None,
                           ) -> client_output.ActivationResult:
         assert os.path.isfile(parameter_file), f'{parameter_file} not a file'
         if timestamp is None:
+            if delay is None:
+                delay = datetime.timedelta(seconds=0)
             utc_now = datetime.datetime.utcnow() - delay
             timestamp = utc_now.strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -285,9 +286,10 @@ class Client:
                                fitness: str = '1',
                                key: str = 'activator',
                                timestamp: str = None,
-                               delay: datetime.timedelta =
-                               datetime.timedelta(seconds=3600 * 24 * 365)
+                               delay: datetime.timedelta = None,
                                ) -> client_output.ActivationResult:
+        if delay is None:
+            delay = datetime.timedelta(seconds=0)
         with tempfile.NamedTemporaryFile(mode='w+', delete=False) as params:
             param_json = json.dumps(parameters)
             params.write(param_json)

@@ -1,8 +1,8 @@
 """ Utility functions to check time-dependent assertions in the tests.
 Assertions are retried to avoid using arbitrary time constants in test.
 """
-from typing import Any, List
 import datetime
+from typing import Any, List
 import hashlib
 import contextlib
 import json
@@ -194,10 +194,17 @@ def check_logs_counts(logs: List[str], pattern: str) -> int:
 
 
 def activate_alpha(client, parameters=None, timestamp=None,
-                   delay=datetime.timedelta(seconds=3600 * 24 * 365),
+                   activate_in_the_past=False,
                    proto=constants.ALPHA):
+    """Activates a protocol.
+
+    If `activate_in_the_past` is True, protocol is activated with a timestamp
+    one year in the past."""
     if parameters is None:
         parameters = constants.PARAMETERS
+    delay = None
+    if activate_in_the_past:
+        delay = datetime.timedelta(seconds=3600 * 24 * 365)
     client.activate_protocol_json(proto, parameters, timestamp=timestamp,
                                   delay=delay)
 

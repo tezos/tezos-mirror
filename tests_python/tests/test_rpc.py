@@ -43,7 +43,7 @@ def sandbox(sandbox: Sandbox, contract_name, session: dict):
     sandbox.add_node(1, params=constants.NODE_PARAMS)
     sandbox.add_node(2, params=constants.NODE_PARAMS)
     client = sandbox.client(1)
-    utils.activate_alpha(sandbox.client(1))
+    utils.activate_alpha(sandbox.client(1), activate_in_the_past=True)
     client.bake("bootstrap1", BAKE_ARGS)
     time.sleep(2)
     # Deploy a contract
