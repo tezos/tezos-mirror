@@ -347,7 +347,7 @@ class TestContracts:
          r'duplicate contract field: storage'),
         # error message for set update on non-comparable type
         ("set_update_non_comparable.tz",
-         r'comparable type expected'),
+         r'Type nat is not compatible with type list operation'),
         # error message for the arity of the chain_id type
         ("chain_id_arity.tz",
          r'primitive chain_id expects 0 arguments but is given 1'),
