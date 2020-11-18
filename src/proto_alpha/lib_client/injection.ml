@@ -626,31 +626,6 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
     | c ->
         c
   in
-  (* The following code is a temporary fix for a minor but annoying
-     protocol bug, fixed in 008. To be removed in 008. *)
-  let delphi_specific_origination_patch :
-      type op. op Alpha_context.manager_operation -> Gas.Arith.fp option =
-   fun operation ->
-    match operation with
-    | Protocol.Alpha_context.Origination {script; _} ->
-        let code_bytes =
-          Data_encoding.Binary.to_bytes_exn
-            Script.lazy_expr_encoding
-            script.code
-        in
-        let lazy_code =
-          Data_encoding.Binary.of_bytes_exn
-            Script.lazy_expr_encoding
-            code_bytes
-        in
-        (* [extra_cost] is the spurious cost being consumed in Delphi. *)
-        let extra_cost = Script.minimal_deserialize_cost lazy_code in
-        (* Klakplok made me do it. This is safe because in delphi, milligas = fp = cost. *)
-        let extra_gas : Alpha_context.Gas.Arith.fp = Obj.magic extra_cost in
-        Some extra_gas
-    | _ ->
-        None
-  in
   let patch :
       type kind.
       bool ->
@@ -665,22 +640,11 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
             cctxt#message "Estimated gas: none"
             >>= fun () -> return Gas.Arith.zero
           else
-            ( match delphi_specific_origination_patch c.operation with
-            | None ->
-                cctxt#message
-                  "Estimated gas: %a units (will add 100 for safety)"
-                  Gas.Arith.pp
-                  gas
-                >>= fun () -> return gas
-            | Some extra_gas ->
-                cctxt#message
-                  "Estimated gas: %a units (will add 100 + %a for safety)"
-                  Gas.Arith.pp
-                  gas
-                  Gas.Arith.pp
-                  extra_gas
-                >>= fun () -> return (Gas.Arith.add gas extra_gas) )
-            >>=? fun gas ->
+            cctxt#message
+              "Estimated gas: %a units (will add 100 for safety)"
+              Gas.Arith.pp
+              gas
+            >>= fun () ->
             let gas_plus_100 =
               Gas.Arith.(add (ceil gas) (integral_of_int 100))
             in
