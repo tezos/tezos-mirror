@@ -122,7 +122,7 @@ class TestManager:
         client.bake('bootstrap5', BAKE_ARGS)
         new_balance = client.get_mutez_balance('manager')
         new_balance_bootstrap = client.get_mutez_balance('bootstrap2')
-        fee = 0.00055
+        fee = 0.000548
         fee_mutez = utils.mutez_of_tez(fee)
         assert balance + amount_mutez == new_balance
         assert (balance_bootstrap - fee_mutez - amount_mutez
@@ -138,7 +138,7 @@ class TestManager:
         client.bake('bootstrap5', BAKE_ARGS)
         new_balance = client.get_mutez_balance('manager')
         new_balance_bootstrap = client.get_mutez_balance('bootstrap2')
-        fee = 0.000797
+        fee = 0.000794
         fee_mutez = utils.mutez_of_tez(fee)
         assert balance - amount_mutez == new_balance
         assert (balance_bootstrap + amount_mutez - fee_mutez
@@ -156,7 +156,7 @@ class TestManager:
         new_balance = client.get_mutez_balance('manager')
         new_balance_dest = client.get_mutez_balance('manager2')
         new_balance_bootstrap = client.get_mutez_balance('bootstrap2')
-        fee = 0.001129
+        fee = 0.001124
         fee_mutez = utils.mutez_of_tez(fee)
         assert balance_bootstrap - fee_mutez == new_balance_bootstrap
         assert balance - amount_mutez == new_balance
@@ -273,7 +273,7 @@ class TestManager:
         new_balance = client.get_mutez_balance('manager')
         new_balance_bootstrap2 = client.get_mutez_balance('bootstrap2')
         new_balance_bootstrap3 = client.get_mutez_balance('bootstrap3')
-        fee_mutez = 797 + 701
+        fee_mutez = 794 + 698
         assert balance - amount_mutez_2 - amount_mutez_3 == new_balance
         assert (balance_bootstrap2 + amount_mutez_2 - fee_mutez
                 == new_balance_bootstrap2)
@@ -482,7 +482,7 @@ class TestGasBound:
         name = 'first_explosion.tz'
         contract = session[name]
         client.typecheck(contract)
-        args = ['-G', f'{1896}', '--burn-cap', '10']
+        args = ['-G', f'{1870}', '--burn-cap', '10']
 
         expected_error = "Gas limit exceeded during typechecking or execution"
         with utils.assert_run_failure(expected_error):
