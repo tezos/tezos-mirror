@@ -166,146 +166,43 @@ test-script-gen-genesis:
 
 # this section is updated using the script scripts/update_unit_test.sh
 ##BEGIN_UNITTEST##
-unit:client:
+unit:alltest:
   <<: *test_definition
+  artifacts:
+    name: "alltest-${CI_COMMIT_SHA}"
+    paths:
+      - test_results
+    expire_in: 1 day
+#    when: on_failure
   script:
-    - dune build @src/bin_client/runtest
-
-unit:base:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_base/runtest
-
-unit:client_base:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_client_base/runtest
-
-unit:crypto:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_crypto/runtest
-
-unit:error_monad:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_error_monad/runtest
-
-unit:lwt_result_stdlib:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_lwt_result_stdlib/runtest
-
-unit:micheline:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_micheline/runtest
-
-unit:p2p:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_p2p/runtest
-
-unit:protocol_compiler:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_protocol_compiler/runtest
-
-unit:protocol_environment:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_protocol_environment/runtest
-
-unit:requester:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_requester/runtest
-
-unit:shell:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_shell/runtest
-
-unit:signer_backends:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_signer_backends/runtest
-
-unit:signer_backends/unix:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_signer_backends/unix/runtest
-
-unit:stdlib:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_stdlib/runtest
-
-unit:stdlib_unix:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_stdlib_unix/runtest
-
-unit:storage:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_storage/runtest
-
-unit:src/proto_006_PsCARTHA/lib_client:
-  <<: *test_definition
-  script:
-    - dune build @src/proto_006_PsCARTHA/lib_client/runtest
-
-unit:src/proto_006_PsCARTHA/lib_protocol:
-  <<: *test_definition
-  script:
-    - dune build @src/proto_006_PsCARTHA/lib_protocol/runtest
-
-unit:src/proto_007_PsDELPH1/lib_client:
-  <<: *test_definition
-  script:
-    - dune build @src/proto_007_PsDELPH1/lib_client/runtest
-
-unit:src/proto_007_PsDELPH1/lib_protocol:
-  <<: *test_definition
-  script:
-    - dune build @src/proto_007_PsDELPH1/lib_protocol/runtest
-
-unit:src/proto_alpha/lib_client:
-  <<: *test_definition
-  script:
-    - dune build @src/proto_alpha/lib_client/runtest
-
-unit:src/proto_alpha/lib_protocol:
-  <<: *test_definition
-  script:
-    - dune build @src/proto_alpha/lib_protocol/runtest
-
-unit:src/tooling:
-  <<: *test_definition
-  script:
-    - dune build @src/tooling/runtest
-
-unit:ocaml-bls12-381:
-  <<: *test_definition
-  script:
-    - dune build @vendors/ocaml-bls12-381/runtest
-
-unit:ocaml-ledger-wallet:
-  <<: *test_definition
-  script:
-    - dune build @vendors/ocaml-ledger-wallet/runtest
-
-unit:ocaml-lmdb:
-  <<: *test_definition
-  script:
-    - dune build @vendors/ocaml-lmdb/runtest
-
-unit:ocaml-uecc:
-  <<: *test_definition
-  script:
-    - dune build @vendors/ocaml-uecc/runtest
-
+    - scripts/test_wrapper.sh src/bin_client client
+    - scripts/test_wrapper.sh src/lib_base base
+    - scripts/test_wrapper.sh src/lib_client_base client_base
+    - scripts/test_wrapper.sh src/lib_crypto crypto
+    - scripts/test_wrapper.sh src/lib_error_monad error_monad
+    - scripts/test_wrapper.sh src/lib_lwt_result_stdlib lwt_result_stdlib
+    - scripts/test_wrapper.sh src/lib_micheline micheline
+    - scripts/test_wrapper.sh src/lib_p2p p2p
+    - scripts/test_wrapper.sh src/lib_protocol_compiler protocol_compiler
+    - scripts/test_wrapper.sh src/lib_protocol_environment protocol_environment
+    - scripts/test_wrapper.sh src/lib_requester requester
+    - scripts/test_wrapper.sh src/lib_shell shell
+    - scripts/test_wrapper.sh src/lib_signer_backends signer_backends
+    - scripts/test_wrapper.sh src/lib_signer_backends/unix signer_backends_unix
+    - scripts/test_wrapper.sh src/lib_stdlib stdlib
+    - scripts/test_wrapper.sh src/lib_stdlib_unix stdlib_unix
+    - scripts/test_wrapper.sh src/lib_storage storage
+    - scripts/test_wrapper.sh src/proto_006_PsCARTHA/lib_client 006_PsCARTHA_lib_client
+    - scripts/test_wrapper.sh src/proto_006_PsCARTHA/lib_protocol 006_PsCARTHA_lib_protocol
+    - scripts/test_wrapper.sh src/proto_007_PsDELPH1/lib_client 007_PsDELPH1_lib_client
+    - scripts/test_wrapper.sh src/proto_007_PsDELPH1/lib_protocol 007_PsDELPH1_lib_protocol
+    - scripts/test_wrapper.sh src/proto_alpha/lib_client alpha_lib_client
+    - scripts/test_wrapper.sh src/proto_alpha/lib_protocol alpha_lib_protocol
+    - scripts/test_wrapper.sh src/tooling src_tooling
+    - scripts/test_wrapper.sh vendors/ocaml-bls12-381 ocaml-bls12-381
+    - scripts/test_wrapper.sh vendors/ocaml-ledger-wallet ocaml-ledger-wallet
+    - scripts/test_wrapper.sh vendors/ocaml-lmdb ocaml-lmdb
+    - scripts/test_wrapper.sh vendors/ocaml-uecc ocaml-uecc
 ##END_UNITTEST##
 
 unit:protocol_compiles:
