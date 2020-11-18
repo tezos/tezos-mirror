@@ -1205,19 +1205,15 @@ module Cost_of = struct
          *@ ( Z.of_int (Z.numbits len)
             *@ (alloc_cost (Z.of_int 3) +@ step_cost Z.one) )
 
-    (* TODO benchmark *)
-    let ticket = atomic_step_cost (Z.of_int 200)
+    let ticket = atomic_step_cost (Z.of_int 80)
 
-    (* TODO benchmark *)
-    let read_ticket = atomic_step_cost (Z.of_int 200)
+    let read_ticket = atomic_step_cost (Z.of_int 80)
 
-    (* TODO benchmark *)
     let split_ticket ticket_amount amount_a amount_b =
       ticket
       +@ add_bigint amount_a amount_b
       +@ compare_nat ticket_amount ticket_amount
 
-    (* TODO benchmark *)
     let join_tickets :
         'a Script_typed_ir.comparable_ty ->
         'a Script_typed_ir.ticket ->
