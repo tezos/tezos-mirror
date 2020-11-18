@@ -23,15 +23,6 @@ separated by marking them with the tag ``Migration:``. The first step when
 developing a new protocol is to revert the migration commits from the previous
 protocol. The rest of the commits are used as a base for current proposals.
 
-
-..
-   The commits in ``proto-proposal`` are mostly confined to the directory
-   ``src/proto_alpha``. Any change outside this directory is to adapt the client,
-   the daemons or the test frameworks to the new protocol.
-
-   Conversely, the commits in the ``master`` branch should never touch the
-   directory ``src/proto_alpha/lib_protocol``.
-
 We next describe how to run unit tests and how to activate the Alpha protocol in
 sandboxed node.
 
@@ -42,6 +33,7 @@ The first step for tweaking and testing the current proposal is to checkout the
 latest code and run unit tests::
 
   $ git checkout master
+  $ git pull
   $ make
   $ make test
 
@@ -130,10 +122,10 @@ of the Alpha protocol to which we migrate is ``007``.
 Checkout Latest Code and Tweak Migration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-We start by checking out the latest code for the Alpha protocol in the
-``master`` branch::
+We start by checking out the latest code for the Alpha protocol::
 
   $ git checkout master
+  $ git pull
 
 Now we could tweak our migration by adding any desired feature. For instance, we
 could log the point at which migration takes place by editing the file
@@ -601,9 +593,10 @@ migration, both on the sandbox and on a context imported from Mainnet.
 Migration on the Sandbox
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-Check latest code in branch ``master``::
+Check out latest code::
 
   $ git checkout master
+  $ git pull
 
 Tweak migration by checking that
 ``src/proto_alpha/lib_protocol/init_storage.ml`` includes the following lines::
@@ -611,7 +604,7 @@ Tweak migration by checking that
   | Carthage_006 ->
       Logging.log_notice "\nSTITCHING!\n" ;
 
-Commit the feature back to branch ``master``::
+Commit the feature::
 
   $ git commit -am 'My awesome feature'
 
@@ -667,9 +660,10 @@ You should see the ``STITCHING!`` message again!
 Migration on a Context Imported From Mainnet
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Check latest code in branch ``master``::
+Check out latest code::
 
   $ git checkout master
+  $ git pull
 
 Tweak migration by checking that
 ``src/proto_alpha/lib_protocol/init_storage.ml`` includes the
@@ -678,7 +672,7 @@ following lines::
   | Carthage_006 ->
       Logging.log_notice "\nSTITCHING!\n" ;
 
-Commit the feature back to branch ``master``::
+Commit the feature::
 
   $ git commit -am 'My awesome feature'
 
@@ -864,9 +858,10 @@ There is no need to prepare the migration again.
 Wrap up the Automatic Migration Procedure With Tezt
 ---------------------------------------------------
 
-Check latest code in branch ``master``::
+Check out latest code::
 
   $ git checkout master
+  $ git pull
 
 Tweak migration by checking that
 ``src/proto_alpha/lib_protocol/init_storage.ml`` includes the
@@ -875,7 +870,7 @@ following lines::
   | Carthage_006 ->
       Logging.log_notice "\nSTITCHING!\n" ;
 
-Commit the feature back to branch ``master``::
+Commit the feature::
 
   $ git commit -am 'My awesome feature'
 
