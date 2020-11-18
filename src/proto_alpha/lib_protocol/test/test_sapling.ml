@@ -954,7 +954,11 @@ module Interpreter_tests = struct
       Alpha_services.Contract.script Block.rpc_ctxt block dst
       >>=? fun script ->
       let ctx_without_gas_2 = Alpha_context.Gas.set_unlimited ctx_2 in
-      Script_ir_translator.parse_script ctx_without_gas_2 ~legacy:true script
+      Script_ir_translator.parse_script
+        ctx_without_gas_2
+        ~legacy:true
+        ~allow_forged_in_storage:true
+        script
       >>= wrap
       >>=? fun (Ex_script script, ctxt) ->
       Script_ir_translator.get_single_sapling_state
@@ -1087,6 +1091,7 @@ module Interpreter_tests = struct
     Script_ir_translator.parse_storage
       ctx_without_gas
       ~legacy:true
+      ~allow_forged:true
       tytype
       ~storage:storage_lazy_expr
     >>= wrap

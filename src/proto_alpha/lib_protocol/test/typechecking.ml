@@ -93,6 +93,7 @@ let run_script ctx ?(step_constants = default_step_constants) contract
     ~script
     ~entrypoint
     ~parameter:parameter_expr
+    ~internal:false
   >>=?? fun res -> return res
 
 let read_file filename =
@@ -466,16 +467,18 @@ let test_unparse_comb_comparable_type () =
 
 let test_parse_data ?(equal = Stdlib.( = )) loc ctxt ty node expected =
   let legacy = false in
+  let allow_forged = false in
   wrap_error_lwt
-    ( Script_ir_translator.parse_data ctxt ~legacy ty node
+    ( Script_ir_translator.parse_data ctxt ~legacy ~allow_forged ty node
     >>=? fun (actual, ctxt) ->
     if equal actual expected then return ctxt
     else Alcotest.failf "Unexpected error: %s" loc )
 
 let test_parse_data_fails loc ctxt ty node =
   let legacy = false in
+  let allow_forged = false in
   wrap_error_lwt
-    ( Script_ir_translator.parse_data ctxt ~legacy ty node
+    ( Script_ir_translator.parse_data ctxt ~legacy ~allow_forged ty node
     >>= function
     | Ok _ ->
         Alcotest.failf "Unexpected typechecking success: %s" loc
