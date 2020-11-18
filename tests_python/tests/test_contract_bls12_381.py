@@ -1,11 +1,11 @@
 from os import path
-
 import random
 from hashlib import blake2b
 import pytest
 
 from tools.paths import MINI_SCENARIOS_CONTRACT_PATH, OPCODES_CONTRACT_PATH
 from tools.bls12_381 import G1, G2, Fr, pairing_check
+from tools.utils import assert_run_failure
 
 BAKE_ARGS = ['--minimal-timestamp']
 
@@ -298,3 +298,10 @@ class TestBls12_381:
 
         contract = path.join(MINI_SCENARIOS_CONTRACT_PATH, 'groth16.tz')
         client_regtest.run_script(contract, 'Unit', arg)
+
+    def test_fr_bytes_parameters_more_than_32_bytes(self, client_regtest):
+        random_bytes = "0xf7ef66f95c90b2f953eb0555af65f22095d4f54b40ea8c6d" + \
+            "cc2014740e8662c16bb8786723"
+        contract = path.join(OPCODES_CONTRACT_PATH, 'bls12_381_fr_to_int.tz')
+        with assert_run_failure(r'error running script'):
+            client_regtest.run_script(contract, storage='0', inp=random_bytes)
