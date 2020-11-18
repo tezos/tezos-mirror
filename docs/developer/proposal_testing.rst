@@ -1,6 +1,6 @@
 .. _proposal_testing:
 
-How to test a protocol proposal
+How to Test a Protocol Proposal
 ===============================
 
 In this tutorial we show how to test a newly developed protocol and, in
@@ -10,7 +10,7 @@ provide a short guide on how to read the migration code.
 We start by describing the branch that contains the protocol proposal that is
 under development.
 
-The branch ``master``
+The ``master`` Branch
 ---------------------
 
 The current proposal is developed in the branch ``master``, which
@@ -35,10 +35,8 @@ protocol. The rest of the commits are used as a base for current proposals.
 We next describe how to run unit tests and how to activate the Alpha protocol in
 sandboxed node.
 
-Testing the protocol
---------------------
-Unit tests and sandboxed mode
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Unit Tests and Sandboxed Mode
+-----------------------------
 
 The first step for tweaking and testing the current proposal is to checkout the
 latest code and run unit tests::
@@ -96,7 +94,8 @@ test the migration. To conclude, Section `Tips and tricks`_ indicates how to use
 the shell to inspect the context, and Section `Anatomy of migration code`_
 contains a primer on how to read and write migration code.
 
-Manual migration testing
+
+Manual Migration Testing
 ------------------------
 
 The most delicate part of migrating to a new protocol is to produce a new
@@ -128,7 +127,7 @@ We will illustrate the migration procedure through an example where the version
 of the Alpha protocol to which we migrate is ``007``.
 
 
-Checkout latest code and tweak migration
+Checkout Latest Code and Tweak Migration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 We start by checking out the latest code for the Alpha protocol in the
@@ -154,7 +153,7 @@ The next section summarises how to prepare the migration once we have tweaked
 the Alpha protocol.
 
 
-Prepare the migration
+Prepare the Migration
 ~~~~~~~~~~~~~~~~~~~~~
 
 Preparing the migration comprises the following steps:
@@ -207,7 +206,7 @@ which was taken at level ``1039318``.
 The next subsections explain each of the individual steps 1--7.
 
 
-1. Snapshot the Alpha protocol
+1. Snapshot the Alpha Protocol
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Snapshoting the Alpha protocol is an optional procedure whose objective is to
@@ -238,7 +237,7 @@ the snapshot code in the build system. Otherwise proceed directly to Section
 `3. Set user-activated upgrade`_.
 
 
-2. Link the snapshot Alpha protocol in the build system
+2. Link the Snapshot Alpha Protocol in the Build System
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If the Alpha protocol was snapshot into
@@ -266,7 +265,7 @@ To run it, pass the protocol version number and name as follows::
   $ ./scripts/snapshot_alpha_and_link.sh 007 delphi
 
 
-3. Set user-activated upgrade
+3. Set User-Activated Upgrade
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The current Alpha protocol supports self-amending through the voting procedure
@@ -333,7 +332,7 @@ two subsections detail how to produce credentials that will allow us to make the
 chain that we imported from Mainnet progress.
 
 
-4. Patch the shell to obtain a yes-node
+4. Patch the Shell to Obtain a Yes-Node
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If we would start a node imported from Mainnet, how could we bake new blocks and
@@ -360,7 +359,7 @@ we would revert it::
   Apply anyway? [n] n
 
 
-5. Create a yes-wallet
+5. Create a Yes-Wallet
 ~~~~~~~~~~~~~~~~~~~~~~
 
 We also need to create a `yes-wallet`, which is a special wallet where secret
@@ -377,7 +376,7 @@ system's temp directory (in our example, ``/tmp``) as given by the path argument
 yes-wallet folder in the default path ``./yes-wallet``.
 
 
-6. Compile the project
+6. Compile the Project
 ~~~~~~~~~~~~~~~~~~~~~~
 
 At this point we have to compile the Alpha protocol (or the snapshot Alpha
@@ -388,7 +387,7 @@ project under the ``src`` folder by invoking::
   $ make
 
 
-7. Import a context from Mainnet
+7. Import a Context From Mainnet
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If we wish to test the migration in a realistic scenario, we need to import a
@@ -426,7 +425,7 @@ only if we want to test the migration on a realistic context from
 Mainnet. Otherwise the migration will run on the sandbox.
 
 
-Batch steps 1--7 above
+Batch Steps 1--7 Above
 ~~~~~~~~~~~~~~~~~~~~~~
 
 The script ``scripts/prepare_migration_test.sh`` batches steps 1--7 above. The
@@ -485,7 +484,7 @@ next two subsections respectively detail how to run the migration on the sandbox
 and on a context imported from Mainnet.
 
 
-Run the migration on the sandbox
+Run the Migration on the Sandbox
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If we run the migration on an empty context, then we would start a sandboxed
@@ -528,7 +527,7 @@ The migration can be tested again by restarting the sandboxed node and client,
 by activating the predecessor of the Alpha protocol, and by baking two blocks.
 
 
-Run the migration on a context imported form Mainnet
+Run the Migration on a Context Imported From Mainnet
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If we run the migration on a context imported from Mainnet, then we would start
@@ -593,13 +592,13 @@ upgrade, with the command::
   $ ./tezos-client -d /tmp/yes-wallet bake for foundation1 --minimal-timestamp
 
 
-Wrap up the manual migration procedure
+Wrap up the Manual Migration Procedure
 --------------------------------------
 
 For convenience, this section collects all the steps needed to test the
 migration, both on the sandbox and on a context imported from Mainnet.
 
-Migration on the sandbox
+Migration on the Sandbox
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 Check latest code in branch ``master``::
@@ -665,7 +664,7 @@ Bake two blocks by using account ``bootstrap1``::
 You should see the ``STITCHING!`` message again!
 
 
-Migration on a context imported from Mainnet
+Migration on a Context Imported From Mainnet
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Check latest code in branch ``master``::
@@ -745,7 +744,7 @@ And bake three blocks::
 You should see the ``STITCHING!`` message again!
 
 
-Automatic migration testing with Tezt
+Automatic Migration Testing With Tezt
 -------------------------------------
 
 The migration can be automatically tested inside the Tezt framework (see
@@ -862,7 +861,7 @@ running the test file with::
 There is no need to prepare the migration again.
 
 
-Wrap up the automatic migration procedure with Tezt
+Wrap up the Automatic Migration Procedure With Tezt
 ---------------------------------------------------
 
 Check latest code in branch ``master``::
@@ -910,7 +909,7 @@ And run the migration test::
   $ dune exec ./tezt/manual_tests/main.exe -- --keep-temp migration
 
 
-Tips and tricks
+Tips and Tricks
 ---------------
 
 Migrating a context mostly concerns editing existing data structures.  For this
@@ -1034,7 +1033,7 @@ value reveals that the field containing such an empty ``big_map`` is not stored
 at all.
 
 
-Anatomy of migration code
+Anatomy of Migration Code
 -------------------------
 
 The migration code is triggered in ``init_storage.ml:prepare_first_block``, so
