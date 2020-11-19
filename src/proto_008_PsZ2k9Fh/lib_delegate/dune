@@ -1,0 +1,85 @@
+(library
+ (name tezos_baking_008_PsZ2k9Fh)
+ (public_name tezos-baking-008-PsZ2k9Fh)
+ (libraries tezos-base
+            tezos-version
+            tezos-protocol-008-PsZ2k9Fh
+            tezos-protocol-environment
+            tezos-shell-context
+            tezos-shell-services
+            tezos-client-base
+            tezos-client-008-PsZ2k9Fh
+            tezos-client-commands
+            tezos-stdlib-unix
+            tezos-storage
+            tezos-rpc-http
+            tezos-rpc
+            lwt-canceler)
+ (library_flags (:standard -linkall))
+ (modules (:standard \
+                     delegate_commands
+                     delegate_commands_registration))
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_protocol_008_PsZ2k9Fh
+                   -open Tezos_shell_services
+                   -open Tezos_client_base
+                   -open Tezos_client_008_PsZ2k9Fh
+                   -open Tezos_client_commands
+                   -open Tezos_stdlib_unix
+                   -open Tezos_shell_context
+                   -open Tezos_storage
+                   -open Tezos_rpc
+                   -open Tezos_rpc_http)))
+
+(library
+ (name tezos_baking_008_PsZ2k9Fh_commands)
+ (public_name tezos-baking-008-PsZ2k9Fh-commands)
+ (libraries tezos-base
+            tezos-protocol-008-PsZ2k9Fh
+            tezos-protocol-environment
+            tezos-shell-services
+            tezos-client-base
+            tezos-client-008-PsZ2k9Fh
+            tezos-client-commands
+            tezos-baking-008-PsZ2k9Fh)
+ (library_flags (:standard -linkall))
+ (modules delegate_commands)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_protocol_008_PsZ2k9Fh
+                   -open Tezos_stdlib_unix
+                   -open Tezos_shell_services
+                   -open Tezos_client_base
+                   -open Tezos_client_008_PsZ2k9Fh
+                   -open Tezos_client_commands
+                   -open Tezos_baking_008_PsZ2k9Fh
+                   -open Tezos_rpc)))
+
+(library
+ (name tezos_baking_008_PsZ2k9Fh_commands_registration)
+ (public_name tezos-baking-008-PsZ2k9Fh-commands.registration)
+ (libraries tezos-base
+            tezos-protocol-008-PsZ2k9Fh
+            tezos-protocol-environment
+            tezos-shell-services
+            tezos-client-base
+            tezos-client-008-PsZ2k9Fh
+            tezos-client-commands
+            tezos-baking-008-PsZ2k9Fh
+            tezos-baking-008-PsZ2k9Fh-commands
+            tezos-rpc)
+ (library_flags (:standard -linkall))
+ (modules delegate_commands_registration)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_protocol_008_PsZ2k9Fh
+                   -open Tezos_shell_services
+                   -open Tezos_client_base
+                   -open Tezos_client_008_PsZ2k9Fh
+                   -open Tezos_client_commands
+                   -open Tezos_baking_008_PsZ2k9Fh
+                   -open Tezos_baking_008_PsZ2k9Fh_commands
+                   -open Tezos_rpc)))
+
+(rule
+ (alias runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

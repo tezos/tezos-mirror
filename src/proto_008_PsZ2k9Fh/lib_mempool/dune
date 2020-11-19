@@ -1,0 +1,14 @@
+(library
+ (name tezos_mempool_008_PsZ2k9Fh)
+ (public_name tezos-mempool-008-PsZ2k9Fh)
+ (libraries tezos-base
+            tezos-embedded-protocol-008-PsZ2k9Fh
+            tezos-protocol-008-PsZ2k9Fh)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_embedded_protocol_008_PsZ2k9Fh
+                   -open Tezos_protocol_008_PsZ2k9Fh)))
+
+(rule
+ (alias runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

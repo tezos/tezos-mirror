@@ -1,0 +1,18 @@
+(executable
+ (name main_baker_008_PsZ2k9Fh)
+ (public_name tezos-baker-008-PsZ2k9Fh)
+ (libraries tezos-client-base-unix
+            tezos-client-commands
+            tezos-baking-008-PsZ2k9Fh-commands)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_protocol_008_PsZ2k9Fh
+                   -open Tezos_client_008_PsZ2k9Fh
+                   -open Tezos_client_commands
+                   -open Tezos_baking_008_PsZ2k9Fh_commands
+                   -open Tezos_stdlib_unix
+                   -open Tezos_client_base_unix)))
+
+(rule
+ (alias runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

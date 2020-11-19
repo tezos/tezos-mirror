@@ -1,0 +1,23 @@
+(library
+ (name tezos_008_PsZ2k9Fh_test_helpers)
+ (public_name tezos-008-PsZ2k9Fh-test-helpers)
+ (libraries alcotest-lwt
+            tezos-base
+            tezos-stdlib-unix
+            tezos-shell-services
+            tezos-protocol-environment
+            tezos-protocol-008-PsZ2k9Fh
+            tezos-protocol-008-PsZ2k9Fh-parameters
+            tezos-client-008-PsZ2k9Fh)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_micheline
+                   -open Tezos_stdlib_unix
+                   -open Tezos_protocol_008_PsZ2k9Fh
+                   -open Tezos_client_008_PsZ2k9Fh
+                   -open Tezos_protocol_environment_008_PsZ2k9Fh
+                   -open Tezos_shell_services)))
+
+(rule
+ (alias runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))
