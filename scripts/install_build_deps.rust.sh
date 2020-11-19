@@ -23,21 +23,14 @@ with Rust $recommended_rust_version. Do this at your own peril."
   sleep 3
 fi
 
-if [ -x "$(command -v rustup)" ]; then
-  RUSTC="$(rustup which rustc)"
-  CARGO="$(rustup which cargo)"
-else
-  if [ -x "$(command -v rustc)" -a -x "$(command -v cargo)" ]; then
-    RUSTC="$(command -v rustc)"
-    CARGO="$(command -v cargo)"
-  else
+if [ ! -x "$(command -v rustup)" ] && \
+   [[ ! -x "$(command -v rustc)" || ! -x "$(command -v cargo)" ]]; then
     echo "The Rust compiler is not installed. Please install Rust $recommended_rust_version."
     echo "See instructions at: https://tezos.gitlab.io/introduction/howtoget.html#environment"
     exit 1
-  fi
 fi
 
-if ! [[ "$($RUSTC --version | cut -d' ' -f2)" == *"$rust_version"* ]]; then
+if ! [[ "$(rustc --version | cut -d' ' -f2)" == *"$rust_version"* ]]; then
     echo "\
 Wrong Rust version, run the following command in your favorite shell:
 $ rustup toolchain install $rust_version
@@ -74,7 +67,7 @@ git reset --hard "$opam_repository_tag"
 
 # this compilation option is important for the CI to avoid linking
 # statically musl, here is just for consistency
-RUSTFLAGS='-C target-feature=-crt-static' $CARGO build --release --manifest-path rust/Cargo.toml
+RUSTFLAGS='-C target-feature=-crt-static' cargo build --release --manifest-path rust/Cargo.toml
 
 ## librustzcash (Sapling)
 echo "Installing Rust libraries of Sapling in ${LIBRARY_DIR}/librustzcash and headers in ${HEADER_DIR}/librustzcash"
