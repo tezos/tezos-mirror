@@ -65,12 +65,18 @@
             (select void_for_linking-007-PsDELPH1 from
               (tezos-embedded-protocol-007-PsDELPH1 -> void_for_linking-007-PsDELPH1.empty)
               (-> void_for_linking-007-PsDELPH1.empty))
+            (select void_for_linking-008-PsZ2k9Fh from
+              (tezos-embedded-protocol-008-PsZ2k9Fh -> void_for_linking-008-PsZ2k9Fh.empty)
+              (-> void_for_linking-008-PsZ2k9Fh.empty))
             (select void_for_linking-006-PsCARTHA-mempool from
               (tezos-mempool-006-PsCARTHA -> void_for_linking-006-PsCARTHA-mempool.empty)
               (-> void_for_linking-006-PsCARTHA-mempool.empty))
             (select void_for_linking-007-PsDELPH1-mempool from
               (tezos-mempool-007-PsDELPH1 -> void_for_linking-007-PsDELPH1-mempool.empty)
               (-> void_for_linking-007-PsDELPH1-mempool.empty))
+            (select void_for_linking-008-PsZ2k9Fh-mempool from
+              (tezos-mempool-008-PsZ2k9Fh -> void_for_linking-008-PsZ2k9Fh-mempool.empty)
+              (-> void_for_linking-008-PsZ2k9Fh-mempool.empty))
             cmdliner
             tls)
  (flags (:standard -open Tezos_base__TzPervasives
@@ -105,8 +111,10 @@
    (write-file void_for_linking-005-PsBabyM1.empty "")
    (write-file void_for_linking-006-PsCARTHA.empty "")
    (write-file void_for_linking-007-PsDELPH1.empty "")
+   (write-file void_for_linking-008-PsZ2k9Fh.empty "")
    (write-file void_for_linking-006-PsCARTHA-mempool.empty "")
    (write-file void_for_linking-007-PsDELPH1-mempool.empty "")
+   (write-file void_for_linking-008-PsZ2k9Fh-mempool.empty "")
 )))
 
 (install

@@ -22,6 +22,9 @@
             (select void_for_linking-007-PsDELPH1 from
               (tezos-client-007-PsDELPH1 -> void_for_linking-007-PsDELPH1.empty)
               (-> void_for_linking-007-PsDELPH1.empty))
+            (select void_for_linking-008-PsZ2k9Fh from
+              (tezos-client-008-PsZ2k9Fh -> void_for_linking-008-PsZ2k9Fh.empty)
+              (-> void_for_linking-008-PsZ2k9Fh.empty))
  )
  (flags (:standard -open Data_encoding
                    -open Tezos_base__TzPervasives
@@ -38,7 +41,8 @@
    (write-file void_for_linking-alpha.empty "")
    (write-file void_for_linking-005-PsBabyM1.empty "")
    (write-file void_for_linking-006-PsCARTHA.empty "")
-   (write-file void_for_linking-007-PsDELPH1.empty ""))))
+   (write-file void_for_linking-007-PsDELPH1.empty "")
+   (write-file void_for_linking-008-PsZ2k9Fh.empty ""))))
 
 (rule
  (alias runtest_lint)
