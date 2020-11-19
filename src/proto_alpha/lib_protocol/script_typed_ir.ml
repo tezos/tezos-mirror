@@ -197,7 +197,7 @@ and 'elt boxed_list = {elements : 'elt list; length : int}
 
    When adding a new instruction, please check whether it is duplicating a data
    (rule of thumb: the type variable appears twice in the after stack, beware
-   it might be hidden a witness).
+   it might be hidden in a witness).
    If it is, please protect it with [check_dupable_ty].
 *)
 and ('bef, 'aft) instr =
