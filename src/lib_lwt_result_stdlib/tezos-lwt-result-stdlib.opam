@@ -12,6 +12,7 @@ depends: [
   "tezos-error-monad"
   "lwt"
   "alcotest-lwt" { with-test & >= "1.1.0" }
+  "crowbar" { with-test }
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
