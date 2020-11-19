@@ -1,0 +1,264 @@
+.. _008_edo:
+.. _proto-008: https://gitlab.com/metastatedev/tezos/-/tree/proto-008
+
+Protocol 008_<TODO> Edo
+=======================
+
+This page contains all the relevant information for protocol 008 Edo.
+Each of the main changes is briefly described with links to relevant
+external documentation and merge requests.
+There are dedicated sections for all the changes to RPCs and
+operations.
+The changelog section contains all the Merge Requests and instructions
+to regenerate the protocol sources from the Gitlab branch.
+
+Test network Edonet is available to test Edo.
+See details in :ref:`Test Networks<test-networks>`
+and instructions to join in :ref:`How to get Tezos<howtoget>`.
+
+The code can be found in the Gitlab branch `proto-008`_ and its full
+hash is ``<TODO>``.
+
+.. contents:: Summary of changes
+
+Environment V1
+--------------
+
+Edo is the first protocol that relies on a new environment V1 which
+introduces the new cryptographic libraries that Edo relies on for its
+features. Because of this, in case of a positive vote, all nodes will
+have to be updated to a shell containing V1 in order to run Edo.
+
+- update to OCaml 4.09 standard library
+- update of all libraries, Tezos specific or not (e.g. Lwt)
+- addition of Keccak and SHA3
+- addition of BLS12-381
+- addition of PVSS
+- addition of lib_sapling
+
+RPCs
+----
+
+As usual refer to the :ref:`RPC documentation page<rpc>` or the
+:ref:`OpenAPI specification page<openapi_specification>` which are
+automatically generated with each protocol.
+
+Voting
+~~~~~~
+
+- addition of ``votes/current_period``
+- addition of ``votes/successor_period``
+- deprecation of ``votes/current_period_kind`` in favor of ``votes/current_period``
+
+Metadata
+~~~~~~~~
+
+``<block>/metadata`` reflects the changes described later for the
+encoding block_metadata_.
+It is advised to stop relying on deprecated fields and use the new ones.
+
+Baking right
+~~~~~~~~~~~~
+
+- reduce default max_priority to 8 when querying for whole cycles
+- more efficient when asking for a restricted set of delegates
+
+Michelson
+~~~~~~~~~
+
+- added mandatory balance field to run_code
+- added optional legacy switch to typecheck
+
+
+Encodings
+---------
+
+Two encodings change in 008, some fields were deprecated and some added
+in their place.
+If your software relies on the deprecated fields it should remain
+compatible with 008, however it is strongly suggested to use the new
+ones as the deprecated will be removed in a future protocol.
+If your software parses the encodings then it is not compatible with
+008 because of the new added fields.
+
+You can always use the binary ``tezos-codec`` for more details on each
+encoding, binary or json.
+
+``block_metadata``
+~~~~~~~~~~~~~~~~~~
+
+.. _block_metadata:
+
+The following fields are deprecated
+
+- ``metadata.level``
+- ``metadata.voting_period_kind``
+
+in favor of
+
+- ``metadata.level_info``
+- ``metadata.voting_period_info``
+
+``operation_receipt``
+~~~~~~~~~~~~~~~~~~~~~
+
+- new field ``lazy_storage_diff`` in operation receipt
+- ``big_map_diff`` is deprecated, and will be removed in a future version
+
+
+Voting procedure
+----------------
+
+- Addition of 5th period called "Adoption", at the end of which it is
+  already established that the voted proposal will be activated. This
+  period requires no action and serves purely as buffer time for users
+  to update their infrastructure to the new protocol.
+- Reduction of a period length from 8 cycles to 5 cycles.
+  The total duration of the voting procedure goes from 32 cycles (~3
+  months) to 25 cycles (~2 months and 10 days).
+- Reduction of the duration of the testchain to 5 cycles to match the
+  new duration of voting periods.
+- The function freeze_listings, which updates the voting weight of
+  each delegate, is now called also at the end of the testing period.
+
+Smart contracts/Michelson
+-------------------------
+
+Sapling
+~~~~~~~
+Integration of the Sapling protocol into the Michelson language.
+More information can be found in the documentation.
+
+TODO link to sapling doc
+
+Bls12-381
+~~~~~~~~~
+
+Addition of Michelson opcodes for the pairing friendly elliptic curve BLS12-381.
+
+TODO link to michelson doc
+
+Tickets
+~~~~~~~
+
+- Type ``ticket 'a``
+- Instructions ``TICKET``, ``READ_TICKET``, ``SPLIT_TICKET``, ``JOIN_TICKETS``
+- Instruction ``GET_AND_UPDATE``
+
+TODO link to ticket doc
+
+Comb pairs
+~~~~~~~~~~
+
+- New instructions ``PAIR n``, ``UNPAIR n``, ``GET 2*k+b``, ``UPDATE 2*k+b``
+  to respectively build a comb pair of size ``n`` from ``n`` stack
+  elements, decompose a comb pair of size ``n`` into ``n`` stack elements,
+  access the ``k`` -th element in a comb pair, replace the ``k`` -th element
+  in a comb pair
+- Optimized notations for comb pair types and values
+
+Type system
+~~~~~~~~~~~
+
+- Empty type ``never`` and instruction ``NEVER``
+- Types ``chain_id``, ``key``, ``pair``s, ``option``s, ``or``s,
+  ``signature``, ``unit`` made comparable
+- ``FAILWITH`` restricted to packable types
+
+Macros promoted as instructions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``UNPAIR``
+- n-ary version of ``DUP``
+
+New instructions
+~~~~~~~~~~~~~~~~
+
+TODO?
+
+Minor
+~~~~~
+
+- New hash functions: instructions ``KECCAK`` and ``SHA3``
+- Instruction ``LEVEL`` to query the level of the current block
+- Instructions ``VOTING_POWER`` (and resp. ``TOTAL_VOTING_POWER``) to
+  query the voting power of a particular delegate (resp. of all
+  delegates)
+- Instruction ``SELF_ADDRESS`` equivalent to ``SELF; ADDRESS`` but allowed in lambdas
+- Removed legacy instructions ``STEPS_TO_QUOTA``, ``CREATE_ACCOUNT``,
+  and the legacy version of ``CREATE_CONTACT``
+
+
+Internal
+--------
+
+The following changes are not visible to the users but reflect
+improvements of the codebase or preparation for future features not
+yet completed.
+
+- PVSS in environment V1
+- be friendly with ``coq-of-ocaml``
+- unification of big maps and sapling states as *lazy storage*
+- representation for bigmaps with id and diff (for trace mode)
+- tests
+- be friendly with ``bisect_ppx``
+- comments
+- refactorings
+- dead code removal
+
+
+Changelog
+---------
+
+List of Merge Requests
+~~~~~~~~~~~~~~~~~~~~~~
+
+This is the full list of Merge Requests that compose 008.
+
+* `Proto: Split cases with different type parameters <https://gitlab.com/metastatedev/tezos/-/merge_requests/304>`_
+* `add environment v1 <https://gitlab.com/metastatedev/tezos/-/merge_requests/306>`_
+* `Updates to environment v1 <https://gitlab.com/metastatedev/tezos/-/merge_requests/307>`_
+* `Remove poly variant from apply.ml for coq-of-ocaml <https://gitlab.com/metastatedev/tezos/-/merge_requests/312>`_
+* `Env1: use Lib_base Option <https://gitlab.com/metastatedev/tezos/-/merge_requests/323>`_
+* `Environment: add keccak and bls12 <https://gitlab.com/metastatedev/tezos/-/merge_requests/317>`_
+* `Lazy storage <https://gitlab.com/metastatedev/tezos/-/merge_requests/316>`_
+* `CI: always test opam on the proto-proposal branch <https://gitlab.com/metastatedev/tezos/-/merge_requests/346>`_
+* `Michelsoneries <https://gitlab.com/metastatedev/tezos/-/merge_requests/321>`_
+* `Refactor signature check source look-up <https://gitlab.com/metastatedev/tezos/-/merge_requests/297>`_
+* `Michelsoneries part 2 <https://gitlab.com/metastatedev/tezos/-/merge_requests/345>`_
+* `Add PVSS modules to the protocol environment <https://gitlab.com/metastatedev/tezos/-/merge_requests/334>`_
+* `Add 5th period for protocol "Adoption" and reduce voting period to 5 cycle <https://gitlab.com/metastatedev/tezos/-/merge_requests/333>`_
+* `Optimized notations for pairs <https://gitlab.com/metastatedev/tezos/-/merge_requests/353>`_
+* `Parsimonious Combs <https://gitlab.com/metastatedev/tezos/-/merge_requests/325>`_
+* `De-duplicate protocol encodings <https://gitlab.com/metastatedev/tezos/-/merge_requests/369>`_
+* `Shell context commit to operation receipts hash <https://gitlab.com/metastatedev/tezos/-/merge_requests/329>`_
+* `Proper (un_parse comparable data <https://gitlab.com/metastatedev/tezos/-/merge_requests/373>`_
+* `Ilias'  better accounting set map literals <https://gitlab.com/metastatedev/tezos/-/merge_requests/376>`_
+* `Update gas models for Combs <https://gitlab.com/metastatedev/tezos/-/merge_requests/378>`_
+* `Compile the protocol's environment with coq-of-ocaml <https://gitlab.com/metastatedev/tezos/-/merge_requests/311>`_
+* `Restrict FAILWITH to packable types <https://gitlab.com/metastatedev/tezos/-/merge_requests/383>`_
+* `Sapling integration <https://gitlab.com/metastatedev/tezos/-/merge_requests/375>`_
+* `add and use successor's voting period RPC - follow-up on "reduce voting period to 5 cycle" <https://gitlab.com/metastatedev/tezos/-/merge_requests/381>`_
+* `Slight improvements in baking_rights RPC <https://gitlab.com/metastatedev/tezos/-/merge_requests/358>`_
+* `Various cleanups <https://gitlab.com/metastatedev/tezos/-/merge_requests/356>`_
+* `update previous protocol of alpha to delphi and update voting test <https://gitlab.com/metastatedev/tezos/-/merge_requests/327>`_
+* `Linear tickets <https://gitlab.com/metastatedev/tezos/-/merge_requests/328>`_
+* `Linear operators on maps and big maps <https://gitlab.com/metastatedev/tezos/-/merge_requests/303>`_
+* `Add typing rule for MUL to allow building Fr elements from naturals <https://gitlab.com/metastatedev/tezos/-/merge_requests/367>`_
+* `Fix deserialization gas precheck <https://gitlab.com/metastatedev/tezos/-/merge_requests/352>`_
+* `Fix costs of KECCAK <https://gitlab.com/metastatedev/tezos/-/merge_requests/386>`_
+* `Sapling state id is forged <https://gitlab.com/metastatedev/tezos/-/merge_requests/387>`_
+
+
+Instructions to reproduce the source tarball
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Development of 008 is frozen in the branch `proto-008`_.
+The sources are contained in the directory
+``src/proto_alpha/lib_protocol``, which is a rolling home for protocol
+development.
+This directory is snapshotted each time a new proposal is prepared
+using the following instructions::
+
+  $ ./scripts/snapshot_alpha.sh edo_008
+  $ ls src/proto_008_*
