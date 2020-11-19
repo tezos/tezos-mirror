@@ -40,6 +40,8 @@ old_dir=$(ls -d src/proto_${old_version}_*)
 old_hash=$(basename $old_dir | awk -F'_' '{print $3}')
 pattern=${old_version}-${old_hash}
 
+echo "Pattern to duplicate / substitute: $pattern"
+
 # if a line matches PATTERN, a new line is printed where the pattern is replaced
 duplicate_and_replace() {
     PATTERN=$1
@@ -48,6 +50,7 @@ duplicate_and_replace() {
 
     for file in $*
     do
+        echo "Adding $replacement in: $file"
         awk '{
         print
         if ($0 ~ PATTERN) {
@@ -65,6 +68,7 @@ duplicate_and_replace_only_1_occ() {
 
     for file in $*
     do
+        echo "Adding $replacement in: $file (only one occurrence)"
         awk '{
         if (   prevlast !~ PATTERN\
             &&      last ~ PATTERN\
@@ -77,7 +81,7 @@ duplicate_and_replace_only_1_occ() {
         {last = $0}
 
        }' PATTERN=$PATTERN REPLACEMENT=$REPLACEMENT "$file" > tmp_file
-        mv tmp_file "$file"
+       mv tmp_file "$file"
     done
 }
 
@@ -88,6 +92,7 @@ duplicate_and_replace_when_3_occ() {
 
     for file in $*
     do
+        echo "Adding $replacement in: $file (when 3 occurrences)"
         awk '{
         if (   prevprevlast ~ PATTERN\
             &&     prevlast ~ PATTERN\
@@ -106,7 +111,7 @@ duplicate_and_replace_when_3_occ() {
         {last = $0}
 
        }' PATTERN=$PATTERN REPLACEMENT=$REPLACEMENT "$file" > tmp_file
-        mv tmp_file "$file"
+       mv tmp_file "$file"
     done
 }
 
@@ -133,3 +138,11 @@ duplicate_and_replace $(echo $pattern | sed 's/-/_/') \
                       src/bin_node/node_config_command.ml
 duplicate_and_replace -${pattern} -${replacement} \
                       src/bin_validation/{dune,tezos-validator.opam}
+
+# activate in codec
+duplicate_and_replace_when_3_occ -${pattern} -${replacement} \
+                                 src/bin_codec/dune
+duplicate_and_replace_only_1_occ -${pattern} -${replacement} \
+                                 src/bin_codec/dune
+duplicate_and_replace -${pattern} -${replacement} \
+                      src/bin_codec/tezos-codec.opam

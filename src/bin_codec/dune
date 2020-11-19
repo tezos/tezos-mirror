@@ -38,7 +38,8 @@
    (write-file void_for_linking-alpha.empty "")
    (write-file void_for_linking-005-PsBabyM1.empty "")
    (write-file void_for_linking-006-PsCARTHA.empty "")
-   (write-file void_for_linking-007-PsDELPH1.empty ""))))
+   (write-file void_for_linking-007-PsDELPH1.empty "")
+)))
 
 (rule
  (alias runtest_lint)
