@@ -104,6 +104,6 @@ let () =
   | `Help ->
       exit 0
   | `Version ->
-      exit 1
+      exit 0
   | `Ok () ->
       exit 0
