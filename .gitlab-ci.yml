@@ -94,6 +94,10 @@ check_precommit_hook:
   <<: *build_definition
   script:
     - ./scripts/pre_commit/pre_commit.py --test-itself
+    - cd tests_python
+    - poetry run pylint ../scripts/pre_commit/pre_commit.py
+    - poetry run pycodestyle ../scripts/pre_commit/pre_commit.py
+    - poetry run mypy ../scripts/pre_commit/pre_commit.py
 
 check_scripts_b58_prefix:
   # Can be changed to a python image, but using the build docker image to keep
