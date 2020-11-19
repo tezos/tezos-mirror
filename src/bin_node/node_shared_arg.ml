@@ -349,6 +349,28 @@ module Term = struct
     in
     Arg.(value & flag & info ~docs ~doc ["enable-testchain"])
 
+  let synchronisation_threshold =
+    let doc =
+      "Set the number of peers with whom a chain synchronization must be \
+       completed to bootstrap the node"
+    in
+    Arg.(
+      value
+      & opt (some int) None
+      & info ~docs ~doc ~docv:"NUM" ["synchronisation-threshold"])
+
+  let latency =
+    let doc =
+      "[latency] is the time interval (in seconds) used to determine if a \
+       peer is synchronized with a chain. For instance, a peer whose known \
+       head has a timestamp T is considered synchronized if T >= now - \
+       max_latency. This parameter's default value was set with the chain's \
+       current protocol's baking rate in mind (and some allowance for network \
+       latency)."
+    in
+    Arg.(
+      value & opt (some int) None & info ~docs ~doc ~docv:"NUM" ["sync-latency"])
+
   (* rpc args *)
   let docs = Manpage.rpc_section
 
@@ -383,28 +405,6 @@ module Term = struct
     in
     Arg.(
       value & opt_all string [] & info ~docs ~doc ~docv:"HEADER" ["cors-header"])
-
-  let synchronisation_threshold =
-    let doc =
-      "Set the number of peers with whom a chain synchronization must be \
-       completed to bootstrap the node"
-    in
-    Arg.(
-      value
-      & opt (some int) None
-      & info ~docs ~doc ~docv:"NUM" ["synchronisation-threshold"])
-
-  let latency =
-    let doc =
-      "[latency] is the time interval (in seconds) used to determine if a \
-       peer is synchronized with a chain. For instance, a peer whose known \
-       head has a timestamp T is considered synchronized if T >= now - \
-       max_latency. This parameter's default value was set with the chain's \
-       current protocol's baking rate in mind (and some allowance for network \
-       latency)."
-    in
-    Arg.(
-      value & opt (some int) None & info ~docs ~doc ~docv:"NUM" ["sync-latency"])
 
   (* Args. *)
 
