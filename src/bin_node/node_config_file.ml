@@ -148,6 +148,31 @@ let blockchain_network_delphinet =
         "delphinet.kaml.fr";
         "13.53.41.201" ]
 
+let blockchain_network_ebetanet =
+  make_blockchain_network
+    ~alias:"ebetanet"
+    {
+      time = Time.Protocol.of_notation_exn "2020-11-19T15:01:32Z";
+      block =
+        Block_hash.of_b58check_exn
+          "BLockGenesisGenesisGenesisGenesisGenesis83f6eec6eyV";
+      protocol =
+        Protocol_hash.of_b58check_exn
+          "PtYuensgYBb3G3x1hLLbCmcav8ue8Kyd2khADcL5LsT5R1hcXex";
+    }
+    ~genesis_parameters:
+      {
+        context_key = "sandbox_parameter";
+        values =
+          `O
+            [ ( "genesis_pubkey",
+                `String
+                  "edpkugeDwmwuwyyD3Q5enapgEYDxZLtEUFFSrvVwXASQMVEqsvTqWu" ) ];
+      }
+    ~chain_name:"TEZOS_EBETANET_2020-11-19T15:01:32Z"
+    ~sandboxed_chain_name:"SANDBOXED_TEZOS"
+    ~default_bootstrap_peers:["etanet.kaml.fr"; "51.75.246.56"]
+
 let blockchain_network_sandbox =
   make_blockchain_network
     ~alias:"sandbox"
@@ -241,7 +266,8 @@ let builtin_blockchain_networks_with_tags =
   [ (1, blockchain_network_sandbox);
     (4, blockchain_network_mainnet);
     (6, blockchain_network_carthagenet);
-    (9, blockchain_network_delphinet) ]
+    (9, blockchain_network_delphinet);
+    (10, blockchain_network_ebetanet) ]
   |> List.map (fun (tag, network) ->
          match network.alias with
          | None ->
