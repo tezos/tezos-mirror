@@ -792,9 +792,9 @@ module Interpreter_tests = struct
     (* Originating the contracts *)
     >>=? fun (block, baker, src, _) ->
     let memo_size = 8 in
-    originate_contract "contracts/sapling_contract.tz" "{ }" src block baker
-    >>=? fun (shielded_pool_contract_address, block, _anti_replay_shielded_pool)
-             ->
+    (* originate_contract "contracts/sapling_contract.tz" "{ }" src block baker
+    >>=? fun (_shielded_pool_contract_address, block, _anti_replay_shielded_pool)
+             -> *)
     originate_contract
       "contracts/sapling_use_existing_state.tz"
       "{ }"
@@ -827,28 +827,21 @@ module Interpreter_tests = struct
       src
       existing_state_contract_address
       baker
-    >>=? fun (block, _ctxt, _state) ->
-    (* Let's get the state of the first contract *)
-    Alpha_services.Contract.single_sapling_get_diff
-      Block.rpc_ctxt
-      block
-      shielded_pool_contract_address
-      ~offset_commitment:0L
-      ~offset_nullifier:0L
-      ()
-    >>=? fun (_root, diff) ->
-    assert (Compare.Int.(List.length diff.commitments_and_ciphertexts = 0)) ;
-    (* However, the second contract gets the diff *)
-    Alpha_services.Contract.single_sapling_get_diff
-      Block.rpc_ctxt
-      block
-      existing_state_contract_address
-      ~offset_commitment:0L
-      ~offset_nullifier:0L
-      ()
-    >>=? fun (_root, diff) ->
-    assert (Compare.Int.(List.length diff.commitments_and_ciphertexts <> 0)) ;
-    return_unit
+    >|= function
+    | Ok _ ->
+        Alcotest.failf "Unexpected operations success"
+    | Error errs ->
+        assert (
+          List.exists
+            (function
+              | Environment.Ecoproto_error
+                  (Tezos_raw_protocol_alpha.Script_tc_errors
+                   .Unexpected_forged_value _) ->
+                  true
+              | _ ->
+                  false)
+            errs ) ;
+        ok_unit
 
   (* In this test we do two transactions in one block and same two in two block.
      We check that the sate is the same expect for roots.
