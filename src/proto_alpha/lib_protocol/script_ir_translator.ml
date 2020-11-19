@@ -3250,6 +3250,10 @@ let rec parse_data :
       >>?= fun ctxt -> return (Bls12_381.Fr.of_z v, ctxt)
   | (Bls12_381_fr_t _, expr) ->
       traced_fail (Invalid_kind (location expr, [Bytes_kind], kind expr))
+  (*
+    /!\ When adding new lazy storage kinds, you may want to guard the parsing
+    of identifiers with [allow_forged].
+  *)
   (* Sapling *)
   | (Sapling_transaction_t (memo_size, _), Bytes (_, bytes)) -> (
     match Data_encoding.Binary.of_bytes Sapling.transaction_encoding bytes with
@@ -3265,13 +3269,15 @@ let rec parse_data :
         fail_parse_data () )
   | (Sapling_transaction_t _, expr) ->
       traced_fail (Invalid_kind (location expr, [Bytes_kind], kind expr))
-  | (Sapling_state_t (memo_size, _), Int (_, id)) ->
-      let id = Sapling.Id.parse_z id in
-      Sapling.state_from_id ctxt id
-      >>=? fun (state, ctxt) ->
-      Lwt.return
-        ( traced_no_lwt @@ merge_memo_sizes memo_size state.Sapling.memo_size
-        >|? fun _memo_size -> (state, ctxt) )
+  | (Sapling_state_t (memo_size, _), Int (loc, id)) ->
+      if allow_forged then
+        let id = Sapling.Id.parse_z id in
+        Sapling.state_from_id ctxt id
+        >>=? fun (state, ctxt) ->
+        Lwt.return
+          ( traced_no_lwt @@ merge_memo_sizes memo_size state.Sapling.memo_size
+          >|? fun _memo_size -> (state, ctxt) )
+      else traced_fail (Unexpected_forged_value loc)
   | (Sapling_state_t (memo_size, _), Seq (_, [])) ->
       return (Sapling.empty_state ~memo_size (), ctxt)
   | (Sapling_state_t _, expr) ->
