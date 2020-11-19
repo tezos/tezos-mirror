@@ -1250,6 +1250,14 @@ let rec check_dupable_ty :
       check_dupable_ty ctxt loc ty_a
       >>? fun ctxt -> check_dupable_ty ctxt loc ty_b
   | Lambda_t (_, _, _) ->
+      (*
+        Lambda are dupable as long as:
+          - they don't contain non-dupable values, e.g. in `PUSH`
+            (mosty non-dupable values should probably be considered forged)
+          - they are not the result of a partial application on a non-dupable
+            value. `APPLY` rejects non-packable types (because of `PUSH`).
+            Hence non-dupable should imply non-packable.
+      *)
       ok ctxt
   | Option_t (ty, _) ->
       check_dupable_ty ctxt loc ty
