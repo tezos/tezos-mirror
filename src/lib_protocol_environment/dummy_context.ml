@@ -42,6 +42,8 @@ module M = struct
 
   let remove_rec _ _ = assert false
 
+  type key_or_dir = [`Key of key | `Dir of key]
+
   let fold _ _ ~init:_ ~f:_ = assert false
 
   let set_protocol _ _ = assert false
