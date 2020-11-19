@@ -1,5 +1,6 @@
 import json
 import re
+from os import path
 import pytest
 from tools import utils, paths
 from tools.utils import assert_run_failure
@@ -693,6 +694,7 @@ code {
             )
 
 
+@pytest.mark.incremental
 class TestSaplingStateCorruption:
     @pytest.fixture(scope="session")
     def tmpdir(self, tmpdir_factory):
@@ -719,6 +721,33 @@ class TestSaplingStateCorruption:
                 sender=sender,
                 contract=contract_name,
                 args=["--init", "Unit", "--burn-cap", "3.0"]
+            )
+
+    def test_originate_with_empty(self, client):
+        """
+        Makes sure sapling state with id 0 exists
+        """
+        contract = path.join(paths.OPCODES_CONTRACT_PATH,
+                             "sapling_empty_state.tz")
+        client.originate(
+            amount=0,
+            sender="bootstrap1",
+            contract=contract,
+            contract_name="sapling_empty_state",
+            args=["--init", "{}", "--burn-cap", "3.0"]
+        )
+        client.bake("bootstrap1")
+
+    def test_originate_with_id_is_forbidden(self, client):
+        contract = path.join(paths.OPCODES_CONTRACT_PATH,
+                             "sapling_empty_state.tz")
+        with assert_run_failure(r'Unexpected forged value'):
+            client.originate(
+                amount=0,
+                sender="bootstrap1",
+                contract=contract,
+                contract_name="sapling_empty_state2",
+                args=["--init", "0", "--burn-cap", "3.0"]
             )
 
 
