@@ -312,7 +312,7 @@ module Cost_of = struct
     (* model N_Keccak *)
     let cost_N_Keccak size =
       let open Z_syntax in
-      Z.of_int 4_000 + (Z.of_int 30 * Z.of_int size)
+      Z.of_int 1_400 + (Z.of_int 30 * Z.of_int size)
 
     (* model N_Left *)
     let cost_N_Left = Z.of_int 80
@@ -493,7 +493,7 @@ module Cost_of = struct
     (* model N_Sha3 *)
     let cost_N_Sha3 size =
       let open Z_syntax in
-      Z.of_int 500 + (Z.of_int 32 * Z.of_int size)
+      Z.of_int 1_400 + (Z.of_int 32 * Z.of_int size)
 
     (* model N_Sha512 *)
     let cost_N_Sha512 size =
@@ -1239,6 +1239,7 @@ module Cost_of = struct
         Gas.cost =
      fun ty ticket_a ticket_b ->
       ticket +@ compare_address
+      +@ add_bigint ticket_a.amount ticket_b.amount
       +@ compare ty ticket_a.contents ticket_b.contents
   end
 
