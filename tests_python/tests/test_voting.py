@@ -37,6 +37,14 @@ class TestManualBaking:
         assert period_info["position"] == 0
         assert period_info["remaining"] == 3
 
+    def test_succ_period(self, client: Client):
+        period_info = client.get_succ_period()
+        assert period_info["voting_period"]["index"] == 0
+        assert period_info["voting_period"]["kind"] == "proposal"
+        assert period_info["voting_period"]["start_position"] == 0
+        assert period_info["position"] == 1
+        assert period_info["remaining"] == 2
+
     def test_level_info_period_offset(self, client: Client):
         level = client.get_current_level(offset=1)
         assert level["level_position"] == 1
@@ -148,8 +156,9 @@ class TestManualBaking:
         metadata = client.get_metadata()
         meta_level = metadata["level"]
         level_info = metadata["level_info"]
+        meta_period_info = metadata["voting_period_info"]
         expected_commitment = meta_level["expected_commitment"]
-        period_kind = metadata["voting_period_kind"]
+        deprecated_period_kind = metadata["voting_period_kind"]
         period_index = metadata["level"]["voting_period"]
         period_position = metadata["level"]["voting_period_position"]
         level = client.get_current_level()
@@ -164,7 +173,7 @@ class TestManualBaking:
         assert level["cycle_position"] == level_info["cycle_position"]
         assert expected_commitment == level_info["expected_commitment"]
         assert period_index == period_info["voting_period"]["index"]
-        assert period_kind == period_info["voting_period"]["kind"]
+        assert deprecated_period_kind == "testing_vote"
         assert period_position == period_info["position"]
         assert level["level_position"] == 7
         assert period_info["voting_period"]["index"] == 1
@@ -172,6 +181,7 @@ class TestManualBaking:
         assert period_info["voting_period"]["start_position"] == 4
         assert period_info["position"] == 3
         assert period_info["remaining"] == 0
+        assert meta_period_info == period_info
 
     def test_listing_is_not_empty2(self, client: Client):
         assert client.get_listings() != []
@@ -237,11 +247,13 @@ class TestManualBaking:
         metadata = client.get_metadata()
         meta_level = metadata["level"]
         level_info = metadata["level_info"]
+        meta_period_info = metadata["voting_period_info"]
         expected_commitment = meta_level["expected_commitment"]
         period_kind = metadata["voting_period_kind"]
         period_index = metadata["level"]["voting_period"]
         period_position = metadata["level"]["voting_period_position"]
         level = client.get_current_level()
+        deprecated_kind = client.get_current_period_kind()
         # check if metadata has the same value as the level and voting period,
         # see inline comment in alpha apply.ml. This is tested here because the
         # level of metadata and current level use the compatibility encoding
@@ -253,7 +265,8 @@ class TestManualBaking:
         assert level["cycle_position"] == level_info["cycle_position"]
         assert expected_commitment == level_info["expected_commitment"]
         assert period_index == period_info["voting_period"]["index"]
-        assert period_kind == period_info["voting_period"]["kind"]
+        assert period_kind == "proposal"
+        assert period_kind == deprecated_kind
         assert period_position == period_info["position"]
         assert level["level_position"] == 11
         assert period_info["voting_period"]["index"] == 2
@@ -261,6 +274,7 @@ class TestManualBaking:
         assert period_info["voting_period"]["start_position"] == 8
         assert period_info["position"] == 3
         assert period_info["remaining"] == 0
+        assert meta_period_info == period_info
         client.bake('bootstrap1', BAKE_ARGS)
         period_info = client.get_current_period()
         level = client.get_current_level()

@@ -546,6 +546,14 @@ class Client:
         return self.rpc('get',
                         'chains/main/blocks/head/votes/current_period')
 
+    def get_current_period_kind(self) -> dict:
+        return self.rpc('get',
+                        'chains/main/blocks/head/votes/current_period_kind')
+
+    def get_succ_period(self) -> dict:
+        return self.rpc('get',
+                        'chains/main/blocks/head/votes/successor_period')
+
     def get_current_proposal(self) -> dict:
         return self.rpc('get',
                         '/chains/main/blocks/head/votes/current_proposal')
