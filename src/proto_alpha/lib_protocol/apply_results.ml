@@ -1184,6 +1184,7 @@ type block_metadata = {
   level : Level.compat_t;
   level_info : Level.t;
   voting_period_kind : Voting_period.kind;
+  voting_period_info : Voting_period.info;
   nonce_hash : Nonce_hash.t option;
   consumed_gas : Gas.Arith.fp;
   deactivated : Signature.Public_key_hash.t list;
@@ -1198,6 +1199,7 @@ let block_metadata_encoding =
               level;
               level_info;
               voting_period_kind;
+              voting_period_info;
               nonce_hash;
               consumed_gas;
               deactivated;
@@ -1206,6 +1208,7 @@ let block_metadata_encoding =
            level,
            level_info,
            voting_period_kind,
+           voting_period_info,
            nonce_hash,
            consumed_gas,
            deactivated,
@@ -1214,6 +1217,7 @@ let block_metadata_encoding =
               level,
               level_info,
               voting_period_kind,
+              voting_period_info,
               nonce_hash,
               consumed_gas,
               deactivated,
@@ -1223,19 +1227,25 @@ let block_metadata_encoding =
            level;
            level_info;
            voting_period_kind;
+           voting_period_info;
            nonce_hash;
            consumed_gas;
            deactivated;
            balance_updates;
          })
-       (obj8
+       (obj9
           (req "baker" Signature.Public_key_hash.encoding)
           (req
              ~description:"This field is DEPRECATED: use level_info instead"
              "level"
              Level.compat_encoding)
           (req "level_info" Level.encoding)
-          (req "voting_period_kind" Voting_period.kind_encoding)
+          (req
+             ~description:
+               "This field is DEPRECATED: use voting_period_info instead"
+             "voting_period_kind"
+             Voting_period.kind_encoding)
+          (req "voting_period_info" Voting_period.info_encoding)
           (req "nonce_hash" (option Nonce_hash.encoding))
           (req "consumed_gas" Gas.Arith.n_fp_encoding)
           (req "deactivated" (list Signature.Public_key_hash.encoding))

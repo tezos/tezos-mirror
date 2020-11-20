@@ -214,8 +214,10 @@ let apply_operation ({mode; chain_id; ctxt; op_count; _} as data)
 let finalize_block {mode; ctxt; op_count} =
   match mode with
   | Partial_construction _ ->
+      Alpha_context.Voting_period.get_current_info ctxt
+      >>=? fun {voting_period = {kind; _}; _} ->
       Alpha_context.Voting_period.get_rpc_fixed_current_info ctxt
-      >>=? fun {voting_period; position; _} ->
+      >>=? fun ({voting_period; position; _} as voting_period_info) ->
       let level_info = Alpha_context.Level.current ctxt in
       let baker = Signature.Public_key_hash.zero in
       Signature.Public_key_hash.Map.fold
@@ -237,7 +239,8 @@ let finalize_block {mode; ctxt; op_count} =
                 ~voting_period_index:voting_period.index
                 ~voting_period_position:position;
             level_info;
-            voting_period_kind = voting_period.kind;
+            voting_period_kind = kind;
+            voting_period_info;
             nonce_hash = None;
             consumed_gas = Alpha_context.Gas.Arith.zero;
             deactivated = [];
@@ -251,8 +254,10 @@ let finalize_block {mode; ctxt; op_count} =
         block_delay
         included_endorsements
       >>?= fun () ->
+      Alpha_context.Voting_period.get_current_info ctxt
+      >>=? fun {voting_period = {kind; _}; _} ->
       Alpha_context.Voting_period.get_rpc_fixed_current_info ctxt
-      >|=? fun {voting_period; position; _} ->
+      >|=? fun ({voting_period; position; _} as voting_period_info) ->
       let level_info = Alpha_context.Level.current ctxt in
       let ctxt = Alpha_context.finalize ctxt in
       ( ctxt,
@@ -265,7 +270,8 @@ let finalize_block {mode; ctxt; op_count} =
                 ~voting_period_index:voting_period.index
                 ~voting_period_position:position;
             level_info;
-            voting_period_kind = voting_period.kind;
+            voting_period_kind = kind;
+            voting_period_info;
             nonce_hash = None;
             consumed_gas = Alpha_context.Gas.Arith.zero;
             deactivated = [];

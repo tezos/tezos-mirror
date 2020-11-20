@@ -1509,8 +1509,13 @@ let finalize_application ctxt protocol_data delegate ~block_delay =
       (Gas.Arith.fp @@ Constants.hard_gas_limit_per_block ctxt)
       (Alpha_context.Gas.block_level ctxt)
   in
+  (* This value is different than the new [voting_period_info] below for
+     compatibility reasons, the field [voting_period_kind] is deprecated and will
+     be removed in a future version. *)
+  Alpha_context.Voting_period.get_current_info ctxt
+  >>=? fun {voting_period = {kind; _}; _} ->
   Alpha_context.Voting_period.get_rpc_fixed_current_info ctxt
-  >|=? fun {voting_period; position; _} ->
+  >|=? fun ({voting_period; position; _} as voting_period_info) ->
   let level_info = Alpha_context.Level.current ctxt in
   let receipt =
     Apply_results.
@@ -1522,7 +1527,8 @@ let finalize_application ctxt protocol_data delegate ~block_delay =
             ~voting_period_index:voting_period.index
             ~voting_period_position:position;
         level_info;
-        voting_period_kind = voting_period.kind;
+        voting_period_info;
+        voting_period_kind = kind;
         nonce_hash = protocol_data.seed_nonce_hash;
         consumed_gas;
         deactivated;
