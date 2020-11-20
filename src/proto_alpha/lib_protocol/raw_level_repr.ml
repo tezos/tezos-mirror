@@ -36,10 +36,10 @@ let pp ppf level = Format.fprintf ppf "%ld" level
 let rpc_arg =
   let construct raw_level = Int32.to_string raw_level in
   let destruct str =
-    match Int32.of_string str with
-    | exception _ ->
+    match Int32.of_string_opt str with
+    | None ->
         Error "Cannot parse level"
-    | raw_level ->
+    | Some raw_level ->
         Ok raw_level
   in
   RPC_arg.make
@@ -88,11 +88,7 @@ module Index = struct
 
   let to_path level l = Int32.to_string level :: l
 
-  let of_path = function
-    | [s] -> (
-      try Some (Int32.of_string s) with _ -> None )
-    | _ ->
-        None
+  let of_path = function [s] -> Int32.of_string_opt s | _ -> None
 
   let rpc_arg = rpc_arg
 

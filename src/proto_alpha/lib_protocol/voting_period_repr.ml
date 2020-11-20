@@ -36,10 +36,10 @@ let pp ppf level = Format.fprintf ppf "%ld" level
 let rpc_arg =
   let construct voting_period = Int32.to_string voting_period in
   let destruct str =
-    match Int32.of_string str with
-    | exception _ ->
+    match Int32.of_string_opt str with
+    | None ->
         Error "Cannot parse voting period"
-    | voting_period ->
+    | Some voting_period ->
         Ok voting_period
   in
   RPC_arg.make
