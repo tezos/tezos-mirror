@@ -434,7 +434,6 @@ end = struct
     let rec find e = function
       | [] ->
           `Temporary
-      (* assert false (\* See "Generic error" *\) *)
       | Error_kind {from_error; category; _} :: rest -> (
         match from_error e with
         | Some _ -> (
@@ -455,7 +454,10 @@ end = struct
   let pp ppf error =
     let rec find = function
       | [] ->
-          assert false (* See "Generic error" *)
+          Format.fprintf
+            ppf
+            "An unspecified error happened, the component that threw it did \
+             not provide a specific trace. This should be reported."
       | Error_kind {from_error; pp; _} :: errors -> (
         match from_error error with None -> find errors | Some x -> pp ppf x )
     in
