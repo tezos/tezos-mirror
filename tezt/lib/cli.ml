@@ -45,6 +45,7 @@ type options = {
   test_timeout : float option;
   reset_regressions : bool;
   loop : bool;
+  time : bool;
 }
 
 let options =
@@ -66,6 +67,7 @@ let options =
   let test_timeout = ref None in
   let reset_regressions = ref false in
   let loop = ref false in
+  let time = ref false in
   let set_log_level = function
     | "quiet" ->
         log_level := Quiet
@@ -167,7 +169,11 @@ let options =
            repeated until one of them fails or if you interrupt with Ctrl+C. \
            This is useful to reproduce non-deterministic failures. When used \
            in conjunction with --keep-going, tests are repeated even if they \
-           fail, until you interrupt them with Ctrl+C." ) ]
+           fail, until you interrupt them with Ctrl+C." );
+        ( "--time",
+          Arg.Set time,
+          " Print a summary of the time taken by each test. Ignored if a test \
+           failed." ) ]
   in
   let usage =
     (* This was formatted by ocamlformat. Sorry for all the slashes. *)
@@ -221,4 +227,5 @@ let options =
     test_timeout = !test_timeout;
     reset_regressions = !reset_regressions;
     loop = !loop;
+    time = !time;
   }

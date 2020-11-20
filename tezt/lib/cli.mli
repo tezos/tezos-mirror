@@ -76,6 +76,7 @@ type options = {
   test_timeout : float option;
   reset_regressions : bool;
   loop : bool;
+  time : bool;
 }
 
 (** Values for command-line options. *)
