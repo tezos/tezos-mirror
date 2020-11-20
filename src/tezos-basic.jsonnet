@@ -65,10 +65,10 @@ dashboard.new(
 
 
     hardware.diskFreeSpace { gridPos: { h: 8, w: 2, x: 0, y: 30 } },
-    hardware.storage { gridPos: { h: 8, w: 11, x: 4, y: 30 } },
+    hardware.storage { gridPos: { h: 8, w: 11, x: 2, y: 30 } },
     hardware.ios { gridPos: { h: 8, w: 11, x: 13, y: 30 } },
 
-    hardware.fileDescriptors { gridPos: { h: 8, w: 12, x: 0, y: 38 } },
+    hardware.networkIOS { gridPos: { h: 8, w: 12, x: 0, y: 38 } },
     hardware.fileDescriptors { gridPos: { h: 8, w: 12, x: 12, y: 38 } },
 
     //#######
