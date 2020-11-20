@@ -1089,6 +1089,8 @@ module Voting_period : sig
   val get_current_info : context -> info tzresult Lwt.t
 
   val get_rpc_fixed_current_info : context -> info tzresult Lwt.t
+
+  val get_rpc_fixed_succ_info : context -> info tzresult Lwt.t
 end
 
 module Vote : sig

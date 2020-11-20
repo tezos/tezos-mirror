@@ -169,3 +169,21 @@ let get_rpc_fixed_current_info ctxt =
     in
     ({voting_period; remaining; position} : Voting_period_repr.info)
   else return voting_period_info
+
+let get_rpc_fixed_succ_info ctxt =
+  get_current ctxt
+  >|=? fun voting_period ->
+  let blocks_per_voting_period =
+    Constants_storage.blocks_per_voting_period ctxt
+  in
+  let level =
+    Level_storage.from_raw ctxt ~offset:1l (Level_storage.current ctxt).level
+  in
+  let position = Voting_period_repr.position_since level voting_period in
+  let remaining =
+    Voting_period_repr.remaining_blocks
+      level
+      voting_period
+      blocks_per_voting_period
+  in
+  Voting_period_repr.{voting_period; position; remaining}

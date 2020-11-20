@@ -119,7 +119,7 @@ let register () =
   register0 S.current_period (fun ctxt () () ->
       Voting_period.get_rpc_fixed_current_info ctxt) ;
   register0 S.successor_period (fun ctxt () () ->
-      Voting_period.get_current_info ctxt) ;
+      Voting_period.get_rpc_fixed_succ_info ctxt) ;
   register0 S.current_period_kind_deprecated (fun ctxt () () ->
       Voting_period.get_rpc_fixed_current_info ctxt
       >|=? fun {voting_period; _} -> voting_period.kind) ;

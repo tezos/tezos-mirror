@@ -41,14 +41,30 @@ val get_current : Raw_context.t -> Voting_period_repr.t tzresult Lwt.t
 
 val get_current_kind : Raw_context.t -> Voting_period_repr.kind tzresult Lwt.t
 
-val get_current_info : Raw_context.t -> Voting_period_repr.info tzresult Lwt.t
-
 (** Returns true if the context level is the last of current voting period.  *)
 val is_last_block : Raw_context.t -> bool tzresult Lwt.t
 
-(* TODO The info return in the last block if a voting period is a bit
-         confusing because we prepared the context for next block.  To fix this
-         the voting_period should be change at a beginning of the next block
-         (first block of the voting period) *)
+(* Given the issue explained in voting_period_storage.ml this function behaves
+   currectly during the validation of a block but returns inconsistent info if
+   called after the finalization of the block.
+   For this reason when used by the RPC `votes/current_period_kind` gives an
+   unintuitive result: after the validation of the last block of a voting period
+   (e.g. proposal), it returns the kind of the next period (e.g. testing_vote).
+   To fix this, at least part of the current vote finalization should be moved
+   at the beginning of the block validation.
+   For retro-compatibility, we keep this function but we provide two new fixed
+   functions to reply correctly to RPCs [get_rpc_fixed_current_info] and
+   [get_rpc_fixed_succ_info]. *)
+val get_current_info : Raw_context.t -> Voting_period_repr.info tzresult Lwt.t
+
+(* In order to avoid the problem of `get_current_info` explained above, this
+   function provides the corrent behavior for the new RPC `votes/current_period`.
+*)
 val get_rpc_fixed_current_info :
+  Raw_context.t -> Voting_period_repr.info tzresult Lwt.t
+
+(* In order to avoid the problem of `get_current_info` explained above, this
+   function provides the corrent behavior for the new RPC `votes/successor_period`.
+*)
+val get_rpc_fixed_succ_info :
   Raw_context.t -> Voting_period_repr.info tzresult Lwt.t
