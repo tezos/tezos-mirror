@@ -1,7 +1,7 @@
 .. _008_edo:
-.. _proto-008: https://gitlab.com/metastatedev/tezos/-/tree/proto-008
+.. _proto-008: https://gitlab.com/metastatedev/tezos/-/tree/proto-proposal
 
-Protocol 008_<TODO> Edo
+Protocol 008_<TBD> Edo
 =======================
 
 This page contains all the relevant information for protocol 008 Edo.
@@ -12,14 +12,23 @@ operations.
 The changelog section contains all the Merge Requests and instructions
 to regenerate the protocol sources from the Gitlab branch.
 
-Test network Edonet is available to test Edo.
-See details in :ref:`Test Networks<test-networks>`
-and instructions to join in :ref:`How to get Tezos<howtoget>`.
-
 The code can be found in the Gitlab branch `proto-008`_ and its full
-hash is ``<TODO>``.
+hash is ``<TBD>``.
 
-.. contents:: Summary of changes
+**This page is Work In Progress while the protocol receives some finishing touches.**
+
+**When the proposal is ready the hash will be announced.**
+
+The main novelties in the Edo protocol are:
+
+- An implementation of `Sapling`_, enabling privacy-preserving
+  transactions
+- The notion of `tickets`_, making it easier for developers to write
+  secure and composable contracts
+- An extended `Voting procedure`_ with a 5th period, ensuring smoother
+  protocol upgrades
+
+.. contents:: Here is the complete list of changes:
 
 Environment V1
 --------------
@@ -46,22 +55,34 @@ automatically generated with each protocol.
 Voting
 ~~~~~~
 
-- addition of ``votes/current_period``
-- addition of ``votes/successor_period``
-- deprecation of ``votes/current_period_kind`` in favor of ``votes/current_period``
+The RPC ``votes/current_period_kind`` when called on the last block of
+a voting period has always returned the kind of the following period.
+This behavior is partly due to the need of the client to know the next
+period kind in order to prepare operations that are valid for it.
+However it was often the source of confusion and for this reason
+``votes/current_period_kind`` is deprecated in favor of two additional
+RPCs:
+
+- ``votes/current_period`` which returns information on the voting
+  period of the current block and
+- ``votes/successor_period`` which returns information on the voting
+  period of the successor block, which can be used by the client to
+  forge operations for example.
 
 Metadata
 ~~~~~~~~
 
-``<block>/metadata`` reflects the changes described later for the
+``<block_id>/metadata`` reflects the changes described later for the
 encoding block_metadata_.
 It is advised to stop relying on deprecated fields and use the new ones.
 
 Baking right
 ~~~~~~~~~~~~
 
-- reduce default max_priority to 8 when querying for whole cycles
-- more efficient when asking for a restricted set of delegates
+The RPC ``<block_id>/helpers/baking_rights`` when querying for whole
+cycles now returns priorities up to 8 instead of 64.
+Furthermore it is now more efficient when querying for a restricted set
+of delegates.
 
 Michelson
 ~~~~~~~~~
@@ -73,12 +94,12 @@ Michelson
 Encodings
 ---------
 
-Two encodings change in 008, some fields were deprecated and some added
-in their place.
+Two encodings changed in 008, some fields were deprecated in favor of
+some new fields.
 If your software relies on the deprecated fields it should remain
 compatible with 008, however it is strongly suggested to use the new
 ones as the deprecated will be removed in a future protocol.
-If your software parses the encodings then it is not compatible with
+If your software parses the entire encodings then it is not compatible with
 008 because of the new added fields.
 
 You can always use the binary ``tezos-codec`` for more details on each
@@ -89,7 +110,10 @@ encoding, binary or json.
 
 .. _block_metadata:
 
-The following fields are deprecated
+This encoding is returned by the RPC ``<block_id>/metadata`` and is
+included in the receipts of block validation.
+
+The following fields are deprecated:
 
 - ``metadata.level``
 - ``metadata.voting_period_kind``
@@ -109,34 +133,37 @@ in favor of
 Voting procedure
 ----------------
 
-- Addition of 5th period called "Adoption", at the end of which it is
-  already established that the voted proposal will be activated. This
-  period requires no action and serves purely as buffer time for users
-  to update their infrastructure to the new protocol.
-- Reduction of a period length from 8 cycles to 5 cycles.
-  The total duration of the voting procedure goes from 32 cycles (~3
-  months) to 25 cycles (~2 months and 10 days).
-- Reduction of the duration of the testchain to 5 cycles to match the
-  new duration of voting periods.
-- The function freeze_listings, which updates the voting weight of
-  each delegate, is now called also at the end of the testing period.
+The voting procedure has an additional 5th period called "Adoption",
+at the end of which it is already established that the voted proposal
+will be activated. This period requires no action and serves purely as
+buffer time for users to update their infrastructure to the new
+protocol.
+
+The length of each period has been reduced from 8 cycles to 5 cycles.
+The total duration of the voting procedure goes from 32 cycles (~3
+months) to 25 cycles (~2 months and 10 days).
+
+The duration of the testchain is also reduced to 5 cycles to match the
+new duration of voting periods.
+
+The function freeze_listings, which updates the voting weight of
+each delegate, is now called also at the end of the testing period.
+
 
 Smart contracts/Michelson
 -------------------------
 
 Sapling
 ~~~~~~~
-Integration of the Sapling protocol into the Michelson language.
-More information can be found in the documentation.
 
-TODO link to sapling doc
+Integration of the Sapling protocol into the Michelson language.
+More information can be found in the `Sapling documentation page
+<https://gitlab.com/metastatedev/tezos/-/blob/proto-proposal/docs/developer/sapling.rst>`_.
 
 Bls12-381
 ~~~~~~~~~
 
 Addition of Michelson opcodes for the pairing friendly elliptic curve BLS12-381.
-
-TODO link to michelson doc
 
 Tickets
 ~~~~~~~
@@ -144,8 +171,6 @@ Tickets
 - Type ``ticket 'a``
 - Instructions ``TICKET``, ``READ_TICKET``, ``SPLIT_TICKET``, ``JOIN_TICKETS``
 - Instruction ``GET_AND_UPDATE``
-
-TODO link to ticket doc
 
 Comb pairs
 ~~~~~~~~~~
@@ -174,7 +199,7 @@ Macros promoted as instructions
 New instructions
 ~~~~~~~~~~~~~~~~
 
-TODO?
+TBD
 
 Minor
 ~~~~~
@@ -193,18 +218,12 @@ Internal
 --------
 
 The following changes are not visible to the users but reflect
-improvements of the codebase or preparation for future features not
-yet completed.
+improvements of the codebase.
 
-- PVSS in environment V1
-- be friendly with ``coq-of-ocaml``
+- improvements to support the tool ``coq-of-ocaml``
 - unification of big maps and sapling states as *lazy storage*
 - representation for bigmaps with id and diff (for trace mode)
-- tests
-- be friendly with ``bisect_ppx``
-- comments
-- refactorings
-- dead code removal
+- improvements to support the tool ``bisect_ppx`` to compute code coverage
 
 
 Changelog
@@ -248,7 +267,7 @@ This is the full list of Merge Requests that compose 008.
 * `Fix deserialization gas precheck <https://gitlab.com/metastatedev/tezos/-/merge_requests/352>`_
 * `Fix costs of KECCAK <https://gitlab.com/metastatedev/tezos/-/merge_requests/386>`_
 * `Sapling state id is forged <https://gitlab.com/metastatedev/tezos/-/merge_requests/387>`_
-
+* `fix successor period rpc <https://gitlab.com/metastatedev/tezos/-/merge_requests/391>`_
 
 Instructions to reproduce the source tarball
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
