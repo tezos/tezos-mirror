@@ -382,11 +382,7 @@ module Make (I : Dump_interface) = struct
 
   (* Getter and setters *)
 
-  let get_command version rbuf =
-    let encoding =
-      if version = "tezos-snapshot-1.0.0" then command_encoding_1_0_0
-      else command_encoding
-    in
+  let get_command encoding rbuf =
     get_mbytes rbuf
     >|=? fun bytes -> Data_encoding.Binary.of_bytes_exn encoding bytes
 
@@ -577,6 +573,10 @@ module Make (I : Dump_interface) = struct
       | None -> fail Restore_context_failure | Some tree -> return tree
     in
     let restore version =
+      let encoding =
+        if version.version = "tezos-snapshot-1.0.0" then command_encoding_1_0_0
+        else command_encoding
+      in
       let history_mode = version.mode in
       let rec first_pass batch ctxt cpt =
         Tezos_stdlib_unix.Utils.display_progress
@@ -586,7 +586,7 @@ module Make (I : Dump_interface) = struct
               "Context: %dK elements, %dMiB read"
               (cpt / 1_000)
               (!read / 1_048_576)) ;
-        get_command version.version rbuf
+        get_command encoding rbuf
         >>=? function
         | Root
             { block_header;
@@ -625,7 +625,7 @@ module Make (I : Dump_interface) = struct
               "Store: %dK elements, %dMiB read"
               (cpt / 1_000)
               (!read / 1_048_576)) ;
-        get_command version.version rbuf
+        get_command encoding rbuf
         >>=? function
         | Proot pruned_block ->
             let header = I.Pruned_block.header pruned_block in
