@@ -46,12 +46,13 @@ dashboard.new(
 
 
     node.headHistory                                                + {gridPos: {h: 10, w: 10, x: 4, y: 0}},
-    node.invalidBlocksHistory                                       + {gridPos: {h: 8, w: 10, x: 4, y: 10}},
+
+    node.blocksPerSecond                                            + {gridPos: {h: 8, w: 10, x: 4, y: 10 }},
 
     node.logs                                                                                               + {gridPos: {h: 18, w: 10, x: 14, y: 0}},
 
 
-    node.headOperations { gridPos: { h: 8, w: 24, x: 0, y: 14 } },
+    node.headOperations { gridPos: { h: 8, w: 14, x: 0, y: 14 } }, node.invalidBlocksHistory {gridPos: {h: 8, w: 10, x: 14, y: 14}},
 
     //#######
     row.new(
@@ -100,7 +101,7 @@ dashboard.new(
       showTitle=true,
     ) + { gridPos: { h: 0, w: 8, x: 0, y: 78 } },
     node.gcOperations { gridPos: { h: 8, w: 12, x: 0, y: 78 } },
-    node.gcMajorHeap { gridPos: { h: 8, w: 12, x: 12, y: 78 } },
+    node.gcMajorHeap { gridPos: { h: 8, w: 12, x: 12, y: 78 } }
 
   ]
 )
