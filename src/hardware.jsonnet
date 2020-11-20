@@ -1,5 +1,5 @@
 local grafana = import '../vendors/grafonnet-lib/grafonnet/grafana.libsonnet';
-local singlestat = grafana.singlestat;
+local stat = grafana.statPanel;
 local graphPanel = grafana.graphPanel;
 local prometheus = grafana.prometheus;
 
@@ -120,6 +120,19 @@ local prometheus = grafana.prometheus;
       prometheus.target(
         'tezos_metrics_storage_store',
         legendFormat=store,
+      )
+    ),
+
+  diskFreeSpace:
+    stat.new(
+      title='Disk free space',
+      graphMode='area',
+      unit='decbytes',
+      reducerFunction='lastNotNull'
+    ).addTarget(
+      prometheus.target(
+	'node_filesystem_free_bytes{mountpoint=\"/\"}',
+	legendFormat= 'Available bytes on disk.',
       )
     ),
 
