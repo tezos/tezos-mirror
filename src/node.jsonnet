@@ -4,6 +4,7 @@ local template = grafana.template;
 local singlestat = grafana.singlestat;
 local graphPanel = grafana.graphPanel;
 local logPanel = grafana.logPanel;
+local heatmapPanel = grafana.heatmapPanel;
 local loki = grafana.loki;
 local prometheus = grafana.prometheus;
 
@@ -112,6 +113,21 @@ local prometheus = grafana.prometheus;
         'tezos_metrics_chain_invalid_blocks',
         legendFormat=blocks,
       )
+    ),
+
+  blocksPerSecond:
+    heatmapPanel.new(
+      title='Blocks per second',
+      datasource='Prometheus',
+      hideZeroBuckets=false,
+      highlightCards=true,
+      tooltip_show=true,
+      tooltip_showHistogram=true,
+    ).addTarget(
+      prometheus.target(
+	'rate(tezos_metrics_chain_current_level[5m])',
+	format='time_series',
+	legendFormat='5 minutes mean',)
     ),
 
   headOperations:
