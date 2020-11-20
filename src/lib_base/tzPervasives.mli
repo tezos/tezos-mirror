@@ -50,7 +50,7 @@ module Option : sig
 end
 
 module List : sig
-  include module type of List
+  include module type of Stdlib.List
 
   include module type of Tezos_stdlib.TzList
 end
