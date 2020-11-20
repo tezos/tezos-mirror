@@ -182,4 +182,31 @@ local prometheus = grafana.prometheus;
         legendFormat=pipes,
       )
     ),
+
+  networkIOS:
+    graphPanel.new(
+      title='Network traffic',
+      format='Bps',
+      legend_alignAsTable=true,
+      legend_current=true,
+      legend_avg=true,
+      legend_max=true,
+      legend_show=true,
+      legend_values=true,
+    ).addTarget(
+      prometheus.target(
+	"irate(node_network_receive_bytes_total[5m]) > 0",
+	legendFormat="Bytes received",
+      )
+    ).addTarget(
+      prometheus.target(
+	"irate(node_network_transmit_bytes_total[5m]) > 0",
+	legendFormat="Bytes transmitted",
+      )
+    ).addSeriesOverride(
+      {
+	alias:'/.*received/',
+	transform:'negative-Y',
+      }
+    ),
 }
