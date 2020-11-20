@@ -5,7 +5,7 @@ tezt:main:
   before_script:
     - make
   script:
-    - dune exec tezt/tests/main.exe -- --color --log-buffer-size 5000 --log-file tezt.log --global-timeout 3300
+    - dune exec tezt/tests/main.exe -- --color --log-buffer-size 5000 --log-file tezt.log --global-timeout 3300 --time
   artifacts:
     paths:
       - tezt.log
