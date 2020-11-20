@@ -1,20 +1,29 @@
 (executables
- (names test)
+ (names test test_mem_context_array_theory)
  (libraries tezos-base
             tezos-protocol-environment
-            alcotest-lwt)
+            alcotest-lwt
+            crowbar
+            lwt.unix)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_protocol_environment)))
 
 (rule
- (alias buildtest)
- (deps test.exe)
+ (alias runtest)
+ (package tezos-protocol-environment)
+ (deps (alias runtest_mem_context)
+       (alias runtest_mem_context_array_theory))
  (action (progn)))
 
 (rule
- (alias runtest)
+ (alias runtest_mem_context)
  (package tezos-protocol-environment)
  (action (run %{exe:test.exe})))
+
+(rule
+ (alias runtest_mem_context_array_theory)
+ (package tezos-protocol-environment)
+ (action (run %{exe:test_mem_context_array_theory.exe})))
 
 (rule
  (alias runtest_lint)
