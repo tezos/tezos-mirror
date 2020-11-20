@@ -363,7 +363,7 @@ let raw_get_key (cctxt : #Client_context.wallet) pkh =
          | Some keys ->
              return keys)
   >>= function
-  | (Ok (_, None, None) | Error _) as initial_result -> (
+  | (Ok (_, _, None) | Error _) as initial_result -> (
       (* try to lookup for a remote key *)
       find_signer_for_key ~scheme:"remote"
       >>=? (fun signer ->
