@@ -74,7 +74,7 @@ type config = {
       (** Maximum time allowed to the establishment of a connection. *)
   reconnection_config : P2p_point_state.Info.reconnection_config;
       (** Delay granted to a peer to perform authentication. *)
-  proof_of_work_target : Crypto_box.target;
+  proof_of_work_target : Crypto_box.pow_target;
       (** The greylisting configuration. *)
   listening_port : P2p_addr.port option;
       (** The proof of work target we require from peers. *)

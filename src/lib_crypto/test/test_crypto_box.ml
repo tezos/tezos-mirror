@@ -45,7 +45,7 @@ let chkey = Crypto_box.precompute sk pk
 *)
 let test_check_pow () =
   let open Lwt.Infix in
-  let target = Crypto_box.make_target 2. in
+  let target = Crypto_box.make_pow_target 2. in
   Crypto_box.generate_proof_of_work pk target
   >|= fun pow ->
   Alcotest.(check bool)

@@ -237,7 +237,8 @@ let init_node ?sandbox ?checkpoint ~identity ~singleprocess
           private_mode = config.p2p.private_mode;
           reconnection_config = config.p2p.reconnection_config;
           identity;
-          proof_of_work_target = Crypto_box.make_target config.p2p.expected_pow;
+          proof_of_work_target =
+            Crypto_box.make_pow_target config.p2p.expected_pow;
           trust_discovered_peers = sandbox <> None;
         }
       in

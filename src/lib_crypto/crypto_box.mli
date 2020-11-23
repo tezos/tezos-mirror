@@ -65,11 +65,11 @@ module Secretbox : sig
   val secretbox_open : key -> Bytes.t -> nonce -> Bytes.t option
 end
 
-type target
+type pow_target
 
-val default_target : target
+val default_pow_target : pow_target
 
-val make_target : float -> target
+val make_pow_target : float -> pow_target
 
 type secret_key
 
@@ -109,10 +109,10 @@ val fast_box_noalloc : channel_key -> nonce -> Bytes.t -> Bytes.t -> unit
     returns true if successful. *)
 val fast_box_open_noalloc : channel_key -> nonce -> Bytes.t -> Bytes.t -> bool
 
-val check_proof_of_work : public_key -> nonce -> target -> bool
+val check_proof_of_work : public_key -> nonce -> pow_target -> bool
 
-(** [generate_proof_of_work pk target] generates a proof of work for the public
-    key [pk] following the [target].
+(** [generate_proof_of_work pk pow_target] generates a proof of work for the public
+    key [pk] following the [pow_target].
 
     The parameter [yield_every] (defaults to [500]) inserts a cooperation point
     ([Lwt.pause ()]) every so many attempts. This allows other promises to make
@@ -124,7 +124,7 @@ val check_proof_of_work : public_key -> nonce -> target -> bool
     and no pow has been found, the exception [Not_found] is raised.
   *)
 val generate_proof_of_work :
-  ?yield_every:int -> ?max:int -> public_key -> target -> nonce Lwt.t
+  ?yield_every:int -> ?max:int -> public_key -> pow_target -> nonce Lwt.t
 
 val generate_proof_of_work_with_target_0 : public_key -> nonce
 

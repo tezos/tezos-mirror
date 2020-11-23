@@ -97,7 +97,7 @@ type config = {
       these peers that the identity of this node should not be revealed to
       the rest of the network. *)
   identity : P2p_identity.t;  (** Cryptographic identity of the peer. *)
-  proof_of_work_target : Crypto_box.target;
+  proof_of_work_target : Crypto_box.pow_target;
       (** Expected level of proof of work of peers' identity. *)
   trust_discovered_peers : bool;
       (** If [true], peers discovered on the local network will be trusted. *)

@@ -35,7 +35,7 @@ type channel_key = Box.combined Box.key
 
 type nonce = Bytes.t
 
-type target = Z.t
+type pow_target = Z.t
 
 module Secretbox = struct
   include Hacl.Secretbox
@@ -125,11 +125,11 @@ let fast_box_open k nonce cmsg =
   let msg = Bytes.create (cmsglen - tag_length) in
   if Box.box_open ~k ~nonce ~cmsg ~msg then Some msg else None
 
-let compare_target hash target =
+let compare_pow_target hash pow_target =
   let hash = Z.of_bits (Blake2B.to_string hash) in
-  Z.compare hash target <= 0
+  Z.compare hash pow_target <= 0
 
-let make_target f =
+let make_pow_target f =
   if f < 0. || 256. < f then invalid_arg "Cryptobox.target_of_float" ;
   let (frac, shift) = modf f in
   let shift = int_of_float shift in
@@ -145,22 +145,22 @@ let make_target f =
       (Z.pred @@ Z.shift_left Z.one (202 - shift))
   else Z.shift_right m (shift - 202)
 
-let default_target = make_target 24.
+let default_pow_target = make_pow_target 24.
 
-let target_0 = make_target 0.
+let target_0 = make_pow_target 0.
 
-let check_proof_of_work pk nonce target =
+let check_proof_of_work pk nonce pow_target =
   let hash = Blake2B.hash_bytes [Box.unsafe_to_bytes pk; nonce] in
-  compare_target hash target
+  compare_pow_target hash pow_target
 
 (* This is the non-yielding function to generate an identity. It performs a
    bounded number of attempts ([n]). This function is not exported. Instead, the
    wrapper below, [generate_proof_of_work], uses this function repeatedly but it
    intersperses calls to [Lwt.pause] to yield explicitly. *)
-let generate_proof_of_work_n_attempts n pk target =
+let generate_proof_of_work_n_attempts n pk pow_target =
   let rec loop nonce attempts =
     if attempts > n then raise Not_found
-    else if check_proof_of_work pk nonce target then nonce
+    else if check_proof_of_work pk nonce pow_target then nonce
     else loop (Nonce.increment nonce) (attempts + 1)
   in
   loop (random_nonce ()) 0
@@ -168,28 +168,28 @@ let generate_proof_of_work_n_attempts n pk target =
 let generate_proof_of_work_with_target_0 pk =
   generate_proof_of_work_n_attempts 1 pk target_0
 
-let rec generate_proof_of_work ?(yield_every = 10000) ?max pk target =
+let rec generate_proof_of_work ?(yield_every = 10000) ?max pk pow_target =
   let open Lwt.Infix in
   match max with
   | None -> (
     try
-      let pow = generate_proof_of_work_n_attempts yield_every pk target in
+      let pow = generate_proof_of_work_n_attempts yield_every pk pow_target in
       Lwt.return pow
     with Not_found ->
-      Lwt.pause () >>= fun () -> generate_proof_of_work ~yield_every pk target
-    )
+      Lwt.pause ()
+      >>= fun () -> generate_proof_of_work ~yield_every pk pow_target )
   | Some max -> (
       if max <= 0 then Lwt.apply raise Not_found
       else
         let attempts = min max yield_every in
         try
-          let pow = generate_proof_of_work_n_attempts attempts pk target in
+          let pow = generate_proof_of_work_n_attempts attempts pk pow_target in
           Lwt.return pow
         with Not_found ->
           Lwt.pause ()
           >>= fun () ->
           let max = max - attempts in
-          generate_proof_of_work ~yield_every ~max pk target )
+          generate_proof_of_work ~yield_every ~max pk pow_target )
 
 let public_key_to_bytes pk = Bytes.copy (Box.unsafe_to_bytes pk)
 

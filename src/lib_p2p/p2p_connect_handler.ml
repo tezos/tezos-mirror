@@ -38,7 +38,7 @@ type config = {
   connection_timeout : Time.System.Span.t;
   authentication_timeout : Time.System.Span.t;
   reconnection_config : P2p_point_state.Info.reconnection_config;
-  proof_of_work_target : Crypto_box.target;
+  proof_of_work_target : Crypto_box.pow_target;
   listening_port : P2p_addr.port option;
 }
 

@@ -37,7 +37,7 @@ type config = {
   peers_file : string;
   private_mode : bool;
   identity : P2p_identity.t;
-  proof_of_work_target : Crypto_box.target;
+  proof_of_work_target : Crypto_box.pow_target;
   trust_discovered_peers : bool;
   reconnection_config : P2p_point_state.Info.reconnection_config;
 }
@@ -408,7 +408,7 @@ module Real = struct
 end
 
 module Fake = struct
-  let id = P2p_identity.generate_with_target_0 ()
+  let id = P2p_identity.generate_with_pow_target_0 ()
 
   let empty_stat =
     {

@@ -154,7 +154,7 @@ let read ?expected_pow filename =
         | None ->
             return id
         | Some expected ->
-            let target = Crypto_box.make_target expected in
+            let target = Crypto_box.make_pow_target expected in
             if
               not
                 (Crypto_box.check_proof_of_work
@@ -215,7 +215,7 @@ let generate identity_file expected_pow =
   if Sys.file_exists identity_file then
     fail (Existent_identity_file identity_file)
   else
-    let target = Crypto_box.make_target expected_pow in
+    let target = Crypto_box.make_pow_target expected_pow in
     Format.eprintf "Generating a new identity... (level: %.2f) " expected_pow ;
     generate_with_animation Format.err_formatter target
     >>= fun id ->

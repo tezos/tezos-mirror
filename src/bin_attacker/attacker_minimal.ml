@@ -144,7 +144,7 @@ let ballot_forged period prop vote =
   in
   forge {chain_id = network} op
 
-let identity = P2p_identity.generate Crypto_box.default_target
+let identity = P2p_identity.generate Crypto_box.default_pow_target
 
 (* connect to the network, run an action and then disconnect *)
 let try_action addr port action =
@@ -155,7 +155,7 @@ let try_action addr port action =
   let io_sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 14) () in
   let conn = P2p_io_scheduler.register io_sched socket in
   P2p_connection.authenticate
-    ~proof_of_work_target:Crypto_box.default_target
+    ~proof_of_work_target:Crypto_box.default_pow_target
     ~incoming:false
     conn
     (addr, port)

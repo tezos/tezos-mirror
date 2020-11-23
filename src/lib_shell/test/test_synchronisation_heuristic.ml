@@ -58,7 +58,7 @@ let prn = function
       "Synchronised (not stuck)"
 
 let forge_peer_id () =
-  let identity = P2p_identity.generate_with_target_0 () in
+  let identity = P2p_identity.generate_with_pow_target_0 () in
   identity.peer_id
 
 let forge_timestamp ?(delay = 0) () =
