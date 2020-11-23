@@ -44,6 +44,7 @@ let () =
       ("typechecking", Typechecking.tests);
       ("gas properties", Gas_properties.tests);
       ("fixed point computation", Fixed_point.tests);
+      ("gas levels", Gas_levels.tests);
       ("gas cost functions", Gas_costs.tests);
       ("lazy storage diff", Lazy_storage_diff.tests);
       ("sapling", Test_sapling.tests);
