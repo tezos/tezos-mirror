@@ -2,7 +2,7 @@ import json
 import re
 from os import path
 import pytest
-from tools import utils, paths
+from tools import utils, paths, constants
 from tools.utils import assert_run_failure
 
 
@@ -14,7 +14,7 @@ def contract_path():
 
 @pytest.fixture(scope="class")
 def sandbox(sandbox):
-    sandbox.add_node(0, params=['--connections', '1'])
+    sandbox.add_node(0, params=constants.NODE_PARAMS)
     utils.activate_alpha(sandbox.client(0))
     return sandbox
 
