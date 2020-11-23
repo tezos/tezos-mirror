@@ -39,15 +39,21 @@ module Int_set = Set.Make (Compare.Int)
    the same on both levels, it is not strictly necessary to update the
    two levels: we can simply maintain the minimum of both levels in a
    [gas_counter]. The meaning of [gas_counter] is denoted by
-   [gas_counter_status], it can be:
+   [gas_counter_status]: *)
 
-   - [Unlimited] when the operation gas is unaccounted.
-   - [CountingOperationGas] when the operation gas level is the minimum.
-   - [CountingBlockGas] when the block gas level is the minimum.
+type gas_counter_status =
+  (* When the operation gas is unaccounted: *)
+  | UnlimitedOperationGas
+  (* When the operation gas level is the minimum: *)
+  | CountingOperationGas of {block_gas_delta : Gas_limit_repr.Arith.fp}
+  (* When the block gas level is the minimum. *)
+  | CountingBlockGas of {operation_gas_delta : Gas_limit_repr.Arith.fp}
 
+(*
    In each case, we keep enough information in [gas_counter_status] to
    reconstruct the level that is not represented by [gas_counter]. In
-   the gas [Unlimited], the block gas level is stored in [gas_counter].
+   the gas [UnlimitedOperationGas], the block gas level is stored
+   in [gas_counter].
 
    [Raw_context] interface provides two accessors for the operation
    gas level and the block gas level. These accessors compute these values
@@ -78,11 +84,6 @@ type t = {
   gas_counter : Gas_limit_repr.Arith.fp;
   gas_counter_status : gas_counter_status;
 }
-
-and gas_counter_status =
-  | UnlimitedOperationGas
-  | CountingOperationGas of {block_gas_delta : Gas_limit_repr.Arith.fp}
-  | CountingBlockGas of {operation_gas_delta : Gas_limit_repr.Arith.fp}
 
 let update_gas_counter_status ctxt gas_counter_status =
   {ctxt with gas_counter_status}
