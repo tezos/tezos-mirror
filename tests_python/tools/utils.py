@@ -201,7 +201,7 @@ def activate_alpha(client, parameters=None, timestamp=None,
     If `activate_in_the_past` is True, protocol is activated with a timestamp
     one year in the past."""
     if parameters is None:
-        parameters = constants.PARAMETERS
+        parameters = constants.ALPHA_PARAMETERS
     delay = None
     if activate_in_the_past:
         delay = datetime.timedelta(seconds=3600 * 24 * 365)

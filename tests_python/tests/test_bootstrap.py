@@ -156,7 +156,7 @@ class TestManyNodesBootstrap:
 
     def test_init(self, sandbox: Sandbox):
         sandbox.add_node(0, params=params(), log_levels=LOG_LEVEL)
-        parameters = dict(constants.PARAMETERS)
+        parameters = dict(constants.ALPHA_PARAMETERS)
         parameters["time_between_blocks"] = ["1", "0"]
         utils.activate_alpha(sandbox.client(0))
         sandbox.add_baker(0, 'bootstrap1', proto=constants.ALPHA_DAEMON)

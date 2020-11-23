@@ -18,7 +18,7 @@ def scenario(contract, storage, time_between_blocks, proto):
     if storage is None:
         storage = 'unit'
     with Sandbox(paths.TEZOS_HOME, constants.IDENTITIES) as sandbox:
-        parameters = dict(constants.PARAMETERS)
+        parameters = dict(constants.ALPHA_PARAMETERS)
         parameters["time_between_blocks"] = [str(time_between_blocks), "0"]
 
         sandbox.add_node(1, params=constants.NODE_PARAMS)

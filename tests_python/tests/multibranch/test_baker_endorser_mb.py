@@ -82,7 +82,7 @@ class TestAllDaemonsWithOperations:
         # Set appropriate time to avoid double-baking
         for i in range(NUM_NODES):
             sandbox_multibranch.add_node(i, params=params(i))
-        parameters = dict(constants.PARAMETERS)
+        parameters = dict(constants.ALPHA_PARAMETERS)
         parameters["time_between_blocks"] = ["10", "0"]
         sandbox_multibranch.client(0).activate_protocol_json(ALPHA, parameters)
         sandbox_multibranch.add_baker(0, 'bootstrap5',

@@ -13,7 +13,7 @@ BAKE_ARGS = ['--minimal-fees', '0', '--minimal-nanotez-per-byte', '0',
 @pytest.fixture(scope="class")
 def client(sandbox):
     """One node, 4 blocks per voting period."""
-    parameters = dict(constants.PARAMETERS)
+    parameters = dict(constants.ALPHA_PARAMETERS)
     parameters["time_between_blocks"] = ["1", "0"]
     parameters["blocks_per_voting_period"] = 4
     sandbox.add_node(0, params=constants.NODE_PARAMS)

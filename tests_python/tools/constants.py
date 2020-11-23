@@ -3,19 +3,26 @@ import os.path
 
 from tools import paths
 
-PARAMETERS_FILE = (f'{paths.TEZOS_HOME}src/proto_alpha/parameters/'
+
+def get_parameters(proto: str) -> dict:
+    """ Takes a protocol suffix ('alpha', '005_PsBabyM1'...) and
+    retrieve json test parameters for that protocol. Assertion failure
+    if parameters can't be found. """
+
+    params_file = (f'{paths.TEZOS_HOME}src/proto_{proto}/parameters/'
                    'test-parameters.json')
-assert os.path.isfile(PARAMETERS_FILE), (f'{PARAMETERS_FILE}'
+    assert os.path.isfile(params_file), (f'{params_file}'
                                          ' cannot be found; please first run'
                                          ' `make` in TEZOS_HOME.')
-with open(PARAMETERS_FILE) as f:
-    PARAMETERS = json.load(f)
+    with open(params_file) as params:
+        return json.load(params)
 
 
 # This is the secret key used to activate a protocol from genesis in sandbox
 # mode. The corresponding public key is hard-coded in the tezos node.
 GENESIS_SK = "edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6"
 GENESIS_PK = "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2"
+
 
 IDENTITIES = {
     'bootstrap1': {
@@ -63,6 +70,7 @@ IDENTITIES_SHORT = {
 
 ALPHA = "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
 ALPHA_DAEMON = "alpha"  # tezos-baker-alpha
+ALPHA_PARAMETERS = get_parameters("alpha")
 
 BABYLON = "PsBabyM1eUXZseaJdmXFApDSBqj8YBfwELoxZHHW77EMcAbbwAS"
 BABYLON_DAEMON = "005-PsBabyM1"

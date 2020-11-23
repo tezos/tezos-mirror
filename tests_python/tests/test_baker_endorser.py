@@ -35,7 +35,7 @@ class TestAllDaemonsWithOperations:
        we kill the bakers and check everyone synchronize to the same head. '''
 
     def test_setup_network(self, sandbox: Sandbox):
-        parameters = dict(constants.PARAMETERS)
+        parameters = dict(constants.ALPHA_PARAMETERS)
         # each priority has a delay of 1 sec
         parameters["time_between_blocks"] = ["1"]
         for i in range(NUM_NODES):
