@@ -420,6 +420,12 @@ integration:crypto:
     - poetry run pytest tests/test_crypto.py -s --log-dir=tmp
   stage: test
 
+integration:deprecated_rpc:
+  <<: *integration_python_definition
+  script:
+    - poetry run pytest tests/test_deprecated_rpc.py -s --log-dir=tmp
+  stage: test
+
 integration:double_endorsement:
   <<: *integration_python_definition
   script:
