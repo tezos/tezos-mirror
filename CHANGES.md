@@ -222,6 +222,31 @@ be documented here either.
 - Fixed the targeted number of connections which did not respect the
   constraints expressed with --connections settings.
 
+- RPC: the semantics of ban and unban has changed:
+  + instead of just affecting the banned/unbanned point, they affect all associated
+    cryptographic identities;
+  + additionally, ban now removes the cryptographic identity / point from the whitelist,
+    which was not previously the case.
+
+- RPC: the following RPCs are now deprecated:
+  + GET: `/network/peers/<peer_id>/ban`
+  + GET: `/network/peers/<peer_id>/unban`
+  + GET: `/network/peers/<peer_id>/trust`
+  + GET: `/network/peers/<peer_id>/untrust`
+  + GET: `/network/points/<point>/ban`
+  + GET: `/network/points/<point>/unban`
+  + GET: `/network/points/<point>/trust`
+  + GET: `/network/points/<point>/untrust`
+- RPC: the following RPCs are added and replace those above:
+  + PATCH: `/network/peers/<peer_id>` payload `{ acl: [ban,trust,open] }`
+  + PATCH: `/network/point/<point>` payload `{ acl: [ban,trust,open], peer_id: <peer_id> }`
+  where
+    - `{acl : ban}`: blacklist the given address/peer and remove it from 
+      the whitelist if present
+    - `{acl: trust}`: trust a given address/peer permanently and remove it 
+      from the blacklist if present.
+    - `{acl: open}`: removes an address/peer from the blacklist and whitelist.
+
 ## Client
 
 - Added client command `import keys from mnemonic`, which allows to
