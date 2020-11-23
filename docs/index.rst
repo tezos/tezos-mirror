@@ -113,16 +113,31 @@ in the :ref:`introduction <howtoget>`.
 
 .. toctree::
    :maxdepth: 2
-   :caption: White doc:
+   :caption: Shell doc:
 
-   whitedoc/the_big_picture
-   whitedoc/p2p
-   whitedoc/validation
-   whitedoc/sync
-   whitedoc/micheline
-   whitedoc/michelson
-   whitedoc/proof_of_stake
-   whitedoc/voting
+   shell/the_big_picture
+   shell/p2p
+   shell/validation
+   shell/sync
+
+.. toctree::
+   :maxdepth: 2
+   :caption: 007 Delphi doc:
+
+   007/micheline
+   007/michelson
+   007/proof_of_stake
+   007/voting
+
+.. toctree::
+   :maxdepth: 2
+   :caption: 008 Edo doc:
+
+   008/micheline
+   008/michelson
+   008/proof_of_stake
+   008/sapling
+   008/voting
 
 .. toctree::
    :maxdepth: 2
@@ -144,7 +159,6 @@ in the :ref:`introduction <howtoget>`.
    developer/contributing
    developer/merge_team
    developer/guidelines
-   developer/sapling
 
 .. toctree::
    :maxdepth: 2
