@@ -32,6 +32,12 @@ module M = struct
 
   type t = Dir of t StringMap.t | Key of value
 
+  let pp_key =
+    Format.(
+      pp_print_list
+        ~pp_sep:(fun ppf () -> pp_print_string ppf " / ")
+        pp_print_string)
+
   let empty = Dir StringMap.empty
 
   let rec raw_get m k =
@@ -62,7 +68,12 @@ module M = struct
     | (_ :: _, Key _, None) ->
         None
     | (_ :: _, Key _, Some _) ->
-        Stdlib.failwith "Mem_context.set"
+        Format.kasprintf
+          Stdlib.failwith
+          "Mem_context.set: cannot set value below key %a, because there's a \
+           Key value here. A value can only be nested below a Dir, not a Key"
+          pp_key
+          k
 
   let mem m k =
     match raw_get m k with
@@ -100,32 +111,26 @@ module M = struct
     | None ->
         Lwt.return_none
     | Some v -> (
-        let pp_path =
-          Format.(
-            pp_print_list
-              ~pp_sep:(fun ppf () -> pp_print_string ppf " / ")
-              pp_print_string)
-        in
-        match raw_set m to_ (Some v) with
-        | Some _ as v ->
-            Lwt.return v
-        | None ->
-            Format.kasprintf
-              Lwt.fail_with
-              "Mem_context.copy %a %a: The value is already set."
-              pp_path
-              from
-              pp_path
-              to_
-        | exception Failure s ->
-            Format.kasprintf
-              Lwt.fail_with
-              "Mem_context.copy %a %a: Failed with %s"
-              pp_path
-              from
-              pp_path
-              to_
-              s )
+      match raw_set m to_ (Some v) with
+      | Some _ as v ->
+          Lwt.return v
+      | None ->
+          Format.kasprintf
+            Lwt.fail_with
+            "Mem_context.copy %a %a: The value is already set."
+            pp_key
+            from
+            pp_key
+            to_
+      | exception Failure s ->
+          Format.kasprintf
+            Lwt.fail_with
+            "Mem_context.copy %a %a: Failed with %s"
+            pp_key
+            from
+            pp_key
+            to_
+            s )
 
   type key_or_dir = [`Key of key | `Dir of key]
 
