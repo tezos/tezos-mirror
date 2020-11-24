@@ -183,5 +183,6 @@ linkcheck_anchors = False
 linkcheck_ignore = [
     r'https://www.reddit.com.*/',
     'https://www.michelson-lang.com/',
-    r'https://gitlab.com/nomadic-labs/tezos/-/merge_requests/*'
+    r'https://gitlab.com/nomadic-labs/tezos/-/merge_requests/*',
+    r'http(s)?://localhost:\d+/?'
 ]

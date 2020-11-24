@@ -36,7 +36,6 @@ The Community
 - Several community-built block explorers are available:
 
     - https://tzstats.com
-    - https://tezos.id
     - https://tezblock.io
     - https://teztracker.everstake.one
     - https://tzkt.io (Baking focused Explorer)
