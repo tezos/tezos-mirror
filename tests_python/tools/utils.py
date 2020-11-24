@@ -193,9 +193,8 @@ def check_logs_counts(logs: List[str], pattern: str) -> int:
     return count
 
 
-def activate_alpha(client, parameters=None, timestamp=None,
-                   activate_in_the_past=False,
-                   proto=constants.ALPHA):
+def activate_protocol(client, proto, parameters=None, timestamp=None,
+                      activate_in_the_past=False):
     """Activates a protocol.
 
     If `activate_in_the_past` is True, protocol is activated with a timestamp
@@ -207,6 +206,18 @@ def activate_alpha(client, parameters=None, timestamp=None,
         delay = datetime.timedelta(seconds=3600 * 24 * 365)
     client.activate_protocol_json(proto, parameters, timestamp=timestamp,
                                   delay=delay)
+
+
+def activate_delphi_007(client, parameters=None, timestamp=None,
+                        activate_in_the_past=False):
+    activate_protocol(client, constants.DELPHI, parameters, timestamp,
+                      activate_in_the_past)
+
+
+def activate_alpha(client, parameters=None, timestamp=None,
+                   activate_in_the_past=False):
+    activate_protocol(client, constants.ALPHA, parameters, timestamp,
+                      activate_in_the_past)
 
 
 def pprint(json_data: dict) -> None:

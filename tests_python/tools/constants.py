@@ -80,6 +80,7 @@ CARTHAGE_DAEMON = "006-PsCARTHA"
 
 DELPHI = "PsDELPH1Kxsxt8f9eWbxQeRxkjfbxoqM52jvs5Y5fBxWWh4ifpo"
 DELPHI_DAEMON = "007-PsDELPH1"
+DELPHI_PARAMETERS = get_parameters("007_PsDELPH1")
 
 # Protocols supported by the mockup mode
 MOCKUP_PROTOCOLS = [ALPHA, CARTHAGE, DELPHI]
