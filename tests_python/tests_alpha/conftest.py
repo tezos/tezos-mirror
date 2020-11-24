@@ -102,6 +102,7 @@ def client(sandbox: Sandbox) -> Iterator[Client]:
     sandbox.add_node(0, params=constants.NODE_PARAMS)
     client = sandbox.client(0)
     utils.activate_alpha(client, activate_in_the_past=True)
+    assert client.get_next_protocol() == constants.ALPHA
     yield client
 
 

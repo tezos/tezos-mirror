@@ -101,7 +101,7 @@ def client(sandbox: Sandbox) -> Iterator[Client]:
     """
     sandbox.add_node(0, params=constants.NODE_PARAMS)
     client = sandbox.client(0)
-    utils.activate_alpha(client, activate_in_the_past=True)
+    utils.activate_delphi_007(client, activate_in_the_past=True)
     yield client
 
 
@@ -133,7 +133,8 @@ def client_regtest_bis(sandbox: Sandbox) -> Iterator[Client]:
     sandbox.add_node(1, client_factory=reg_client_factory,
                      params=constants.NODE_PARAMS)
     client = sandbox.client(1)
-    utils.activate_alpha(client, activate_in_the_past=True)
+    utils.activate_delphi_007(client, activate_in_the_past=True)
+    assert client.get_next_protocol() == constants.DELPHI
     yield client
 
 
@@ -172,7 +173,7 @@ def clients(sandbox: Sandbox, request) -> Iterator[List[Client]]:
     for i in range(num_nodes):
         # Large number may increases peers connection time
         sandbox.add_node(i, params=constants.NODE_PARAMS)
-    utils.activate_alpha(sandbox.client(0), activate_in_the_past=True)
+    utils.activate_delphi_007(sandbox.client(0), activate_in_the_past=True)
     clients = sandbox.all_clients()
     for client in clients:
         proto = constants.ALPHA
