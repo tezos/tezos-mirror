@@ -286,8 +286,8 @@ let check_constants_consistency constants =
     (fun () ->
       failwith "initial_endorsers should be smaller than endorsers_per_block")
 
-let initial_context ?(with_commitments = false) ?bootstrap_contracts constants
-    header initial_accounts =
+let prepare_main_init_params ?bootstrap_contracts with_commitments constants
+    initial_accounts =
   let open Tezos_protocol_alpha_parameters in
   let bootstrap_accounts =
     List.map
@@ -310,9 +310,59 @@ let initial_context ?(with_commitments = false) ?bootstrap_contracts constants
     let empty = Memory_context.empty in
     add empty ["version"] (Bytes.of_string "genesis")
     >>= fun ctxt -> add ctxt protocol_param_key proto_params)
+
+let initial_context ?(with_commitments = false) ?bootstrap_contracts constants
+    header initial_accounts =
+  prepare_main_init_params
+    ?bootstrap_contracts
+    with_commitments
+    constants
+    initial_accounts
   >>= fun ctxt ->
   Main.init ctxt header >|= Environment.wrap_tzresult
   >|=? fun {context; _} -> context
+
+let initial_alpha_context ?(with_commitments = false) constants
+    (block_header : Block_header.shell_header) initial_accounts =
+  prepare_main_init_params with_commitments constants initial_accounts
+  >>= fun ctxt ->
+  let level = block_header.level in
+  let fitness = block_header.fitness in
+  let timestamp = block_header.timestamp in
+  let typecheck (ctxt : Alpha_context.context)
+      (script : Alpha_context.Script.t) =
+    let allow_forged_in_storage =
+      false
+      (* There should be no forged value in bootstrap contracts. *)
+    in
+    Script_ir_translator.parse_script
+      ctxt
+      ~legacy:false
+      ~allow_forged_in_storage
+      script
+    >>=? fun (Ex_script parsed_script, ctxt) ->
+    Script_ir_translator.extract_lazy_storage_diff
+      ctxt
+      Optimized
+      parsed_script.storage_type
+      parsed_script.storage
+      ~to_duplicate:Script_ir_translator.no_lazy_storage_id
+      ~to_update:Script_ir_translator.no_lazy_storage_id
+      ~temporary:false
+    >>=? fun (storage, lazy_storage_diff, ctxt) ->
+    Script_ir_translator.unparse_data
+      ctxt
+      Optimized
+      parsed_script.storage_type
+      storage
+    >|=? fun (storage, ctxt) ->
+    let storage =
+      Alpha_context.Script.lazy_expr (Micheline.strip_locations storage)
+    in
+    (({script with storage}, lazy_storage_diff), ctxt)
+  in
+  Alpha_context.prepare_first_block ~typecheck ~level ~timestamp ~fitness ctxt
+  >|= Environment.wrap_tzresult
 
 let genesis_with_parameters parameters =
   let hash =
@@ -347,14 +397,27 @@ let genesis_with_parameters parameters =
     context;
   }
 
-(* if no parameter file is passed we check in the current directory
-   where the test is run *)
-let genesis ?with_commitments ?endorsers_per_block ?initial_endorsers
-    ?min_proposal_quorum ?time_between_blocks ?minimal_block_delay
-    ?delay_per_missing_endorsement ?bootstrap_contracts
-    (initial_accounts : (Account.t * Tez.t) list) =
+let validate_initial_accounts (initial_accounts : (Account.t * Tez.t) list)
+    tokens_per_roll =
   if initial_accounts = [] then
     Stdlib.failwith "Must have one account with a roll to bake" ;
+  (* Check there is at least one roll *)
+  Lwt.catch
+    (fun () ->
+      List.fold_left_es
+        (fun acc (_, amount) ->
+          Environment.wrap_tzresult @@ Tez.( +? ) acc amount
+          >>?= fun acc ->
+          if acc >= tokens_per_roll then raise Exit else return acc)
+        Tez.zero
+        initial_accounts
+      >>=? fun _ ->
+      failwith "Insufficient tokens in initial accounts to create one roll")
+    (function Exit -> return_unit | exc -> raise exc)
+
+let prepare_initial_context_params ?endorsers_per_block ?initial_endorsers
+    ?time_between_blocks ?minimal_block_delay ?delay_per_missing_endorsement
+    ?min_proposal_quorum initial_accounts =
   let open Tezos_protocol_alpha_parameters in
   let constants = Default_parameters.constants_test in
   let endorsers_per_block =
@@ -416,7 +479,25 @@ let genesis ?with_commitments ?endorsers_per_block ?initial_endorsers
       ~fitness:(Fitness.from_int64 0L)
       ~operations_hash:Operation_list_list_hash.zero
   in
-  let contents = Forge.make_contents ~priority:0 ~seed_nonce_hash:None () in
+  validate_initial_accounts initial_accounts constants.tokens_per_roll
+  (* Perhaps this could return a new type  signifying its name *)
+  >|=? fun _initial_accounts -> (constants, shell, hash)
+
+(* if no parameter file is passed we check in the current directory
+   where the test is run *)
+let genesis ?with_commitments ?endorsers_per_block ?initial_endorsers
+    ?min_proposal_quorum ?time_between_blocks ?minimal_block_delay
+    ?delay_per_missing_endorsement ?bootstrap_contracts
+    (initial_accounts : (Account.t * Tez.t) list) =
+  prepare_initial_context_params
+    ?endorsers_per_block
+    ?initial_endorsers
+    ?min_proposal_quorum
+    ?time_between_blocks
+    ?minimal_block_delay
+    ?delay_per_missing_endorsement
+    initial_accounts
+  >>=? fun (constants, shell, hash) ->
   initial_context
     ?with_commitments
     ?bootstrap_contracts
@@ -424,12 +505,23 @@ let genesis ?with_commitments ?endorsers_per_block ?initial_endorsers
     shell
     initial_accounts
   >|=? fun context ->
+  let contents = Forge.make_contents ~priority:0 ~seed_nonce_hash:None () in
   {
     hash;
     header = {shell; protocol_data = {contents; signature = Signature.zero}};
     operations = [];
     context;
   }
+
+let alpha_context ?with_commitments ?endorsers_per_block ?initial_endorsers
+    ?min_proposal_quorum (initial_accounts : (Account.t * Tez.t) list) =
+  prepare_initial_context_params
+    ?endorsers_per_block
+    ?initial_endorsers
+    ?min_proposal_quorum
+    initial_accounts
+  >>=? fun (constants, shell, _hash) ->
+  initial_alpha_context ?with_commitments constants shell initial_accounts
 
 (********* Baking *************)
 
