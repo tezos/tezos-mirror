@@ -433,7 +433,7 @@ Other
   For other types of tests, you need to manually modify the
   :src:`.gitlab-ci.yml`. Please refer to the `GitLab CI Pipeline
   Reference <https://docs.gitlab.com/ee/ci/>`_. A helpful tool for
-  this task is the `CI linter <https://gitlab.com/ci/lint>`_, and ``gitlab-runner``,
+  this task is the `CI Lint tool <https://docs.gitlab.com/ee/ci/lint.html>`_, and ``gitlab-runner``,
   introduced in the :ref:`next section <executing_gitlab_ci_locally>`.
 
 A second way to run the tests is to trigger manually the job
