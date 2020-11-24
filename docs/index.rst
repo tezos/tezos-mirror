@@ -116,9 +116,10 @@ in the :ref:`introduction <howtoget>`.
    :caption: Shell doc:
 
    shell/the_big_picture
-   shell/p2p
    shell/validation
    shell/sync
+   shell/p2p
+   shell/p2p_api
 
 .. toctree::
    :maxdepth: 2
@@ -193,7 +194,6 @@ in the :ref:`introduction <howtoget>`.
    api/rpc
    api/openapi
    api/errors
-   api/p2p
 
 
 Indices and tables
