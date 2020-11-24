@@ -1,6 +1,7 @@
 import pytest
 from tools import utils, constants
 from launchers.sandbox import Sandbox
+from . import protocol
 
 
 BAKE_ARGS = ['--max-priority', '512', '--minimal-timestamp']
@@ -17,7 +18,7 @@ class TestFork:
     def test_init(self, sandbox: Sandbox):
         for i in range(NUM_NODES):
             sandbox.add_node(i, params=constants.NODE_PARAMS)
-        utils.activate_alpha(sandbox.client(0))
+        protocol.activate(sandbox.client(0))
 
     def test_level(self, sandbox: Sandbox):
         level = 1

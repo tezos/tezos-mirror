@@ -3,7 +3,9 @@ import shutil
 import pytest
 
 from client.client import Client
-from tools import constants, paths, utils
+from tools import constants, paths
+
+from . import protocol
 
 BAKE_ARGS = ['--minimal-fees', '0', '--minimal-nanotez-per-byte', '0',
              '--minimal-nanotez-per-gas-unit', '0', '--max-priority', '512',
@@ -13,12 +15,12 @@ BAKE_ARGS = ['--minimal-fees', '0', '--minimal-nanotez-per-byte', '0',
 @pytest.fixture(scope="class")
 def client(sandbox):
     """One node, 4 blocks per voting period."""
-    parameters = dict(constants.PARAMETERS)
+    parameters = dict(protocol.PARAMETERS)
     parameters["time_between_blocks"] = ["1", "0"]
     parameters["blocks_per_voting_period"] = 4
     sandbox.add_node(0, params=constants.NODE_PARAMS)
-    utils.activate_alpha(sandbox.client(0), parameters,
-                         activate_in_the_past=True)
+    protocol.activate(sandbox.client(0), parameters,
+                      activate_in_the_past=True)
     yield sandbox.client(0)
 
 

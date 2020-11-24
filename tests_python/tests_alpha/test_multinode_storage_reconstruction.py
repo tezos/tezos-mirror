@@ -2,6 +2,7 @@ import time
 import pytest
 from tools import utils, constants
 from launchers.sandbox import Sandbox
+from . import protocol
 
 BAKE_ARGS = ['--max-priority', '512', '--minimal-timestamp']
 PARAMS = constants.NODE_PARAMS + ['--history-mode', 'full']
@@ -16,7 +17,7 @@ class TestMultiNodeStorageReconstruction:
 
     def test_init(self, sandbox: Sandbox):
         sandbox.add_node(0, params=PARAMS)
-        utils.activate_alpha(sandbox.client(0), activate_in_the_past=True)
+        protocol.activate(sandbox.client(0), activate_in_the_past=True)
 
     def test_bake_node0_level_a(self, sandbox: Sandbox, session: dict):
         for _ in range(BATCH - 1):

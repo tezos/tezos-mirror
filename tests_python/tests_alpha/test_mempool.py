@@ -2,6 +2,8 @@ import pytest
 from tools import utils, constants
 from launchers.sandbox import Sandbox
 
+from . import protocol
+
 BAKE_ARGS = ['--max-priority', '512', '--minimal-timestamp']
 
 
@@ -16,7 +18,7 @@ class TestMempool:
         sandbox.add_node(1, params=constants.NODE_PARAMS)
         sandbox.add_node(2, params=constants.NODE_PARAMS)
         sandbox.add_node(3, params=constants.NODE_PARAMS+['--disable-mempool'])
-        utils.activate_alpha(sandbox.client(1), activate_in_the_past=True)
+        protocol.activate(sandbox.client(1), activate_in_the_past=True)
 
     def test_level1(self, sandbox: Sandbox):
         level = 1

@@ -17,6 +17,8 @@ from tools.client_regression import ClientRegression
 from client.client import Client
 from client.client_output import CreateMockupResult
 
+from . import protocol
+
 
 @pytest.fixture(scope="session", autouse=True)
 def sanity_check(request) -> None:
@@ -101,8 +103,7 @@ def client(sandbox: Sandbox) -> Iterator[Client]:
     """
     sandbox.add_node(0, params=constants.NODE_PARAMS)
     client = sandbox.client(0)
-    utils.activate_alpha(client, activate_in_the_past=True)
-    assert client.get_next_protocol() == constants.ALPHA
+    protocol.activate(client, activate_in_the_past=True)
     yield client
 
 
@@ -134,7 +135,7 @@ def client_regtest_bis(sandbox: Sandbox) -> Iterator[Client]:
     sandbox.add_node(1, client_factory=reg_client_factory,
                      params=constants.NODE_PARAMS)
     client = sandbox.client(1)
-    utils.activate_alpha(client, activate_in_the_past=True)
+    protocol.activate(client, activate_in_the_past=True)
     yield client
 
 
@@ -173,10 +174,10 @@ def clients(sandbox: Sandbox, request) -> Iterator[List[Client]]:
     for i in range(num_nodes):
         # Large number may increases peers connection time
         sandbox.add_node(i, params=constants.NODE_PARAMS)
-    utils.activate_alpha(sandbox.client(0), activate_in_the_past=True)
+    protocol.activate(sandbox.client(0), activate_in_the_past=True)
     clients = sandbox.all_clients()
     for client in clients:
-        proto = constants.ALPHA
+        proto = protocol.HASH
         assert utils.check_protocol(client, proto)
     yield clients
 

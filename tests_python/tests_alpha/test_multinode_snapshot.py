@@ -2,6 +2,7 @@ import time
 import pytest
 from tools import utils, constants
 from launchers.sandbox import Sandbox
+from . import protocol
 
 
 BAKE_ARGS = ['--max-priority', '512', '--minimal-timestamp']
@@ -21,8 +22,8 @@ class TestMultiNodeSnapshot:
     def test_init(self, sandbox: Sandbox):
         for i in GROUP1:
             sandbox.add_node(i, params=PARAMS)
-        utils.activate_alpha(sandbox.client(GROUP1[0]),
-                             activate_in_the_past=True)
+        protocol.activate(sandbox.client(GROUP1[0]),
+                          activate_in_the_past=True)
 
     def test_bake_group1_level_a(self, sandbox: Sandbox):
         for _ in range(LEVEL_A - 1):
