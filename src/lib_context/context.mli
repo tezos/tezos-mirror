@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018-2020 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2018-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2018-2020 Tarides <contact@tarides.com>                     *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
@@ -28,6 +28,12 @@
 
 (** Tezos - Versioned, block indexed (key x value) store *)
 
+type error +=
+  | Cannot_create_file of string
+  | Cannot_open_file of string
+  | Cannot_find_protocol
+  | Suspicious_file of int
+
 (** {2 Generic interface} *)
 
 module type S = sig
@@ -45,7 +51,6 @@ type index
 (** Open or initialize a versioned store at a given path. *)
 val init :
   ?patch_context:(context -> context tzresult Lwt.t) ->
-  ?mapsize:int64 ->
   ?readonly:bool ->
   string ->
   index Lwt.t
@@ -129,7 +134,39 @@ val add_predecessor_ops_metadata_hash :
 
 (** {2 Context dumping} *)
 
-module Pruned_block : sig
+module Protocol_data_legacy : sig
+  type t = Int32.t * data
+
+  and info = {author : string; message : string; timestamp : Time.Protocol.t}
+
+  and data = {
+    info : info;
+    protocol_hash : Protocol_hash.t;
+    test_chain_status : Test_chain_status.t;
+    data_key : Context_hash.t;
+    predecessor_block_metadata_hash : Block_metadata_hash.t option;
+    predecessor_ops_metadata_hash : Operation_metadata_list_list_hash.t option;
+    parents : Context_hash.t list;
+  }
+
+  val to_bytes : t -> Bytes.t
+
+  val of_bytes : Bytes.t -> t option
+
+  val encoding : t Data_encoding.t
+end
+
+module Block_data_legacy : sig
+  type t = {block_header : Block_header.t; operations : Operation.t list list}
+
+  val to_bytes : t -> Bytes.t
+
+  val of_bytes : Bytes.t -> t option
+
+  val encoding : t Data_encoding.t
+end
+
+module Pruned_block_legacy : sig
   type t = {
     block_header : Block_header.t;
     operations : (int * Operation.t list) list;
@@ -143,73 +180,108 @@ module Pruned_block : sig
   val of_bytes : Bytes.t -> t option
 end
 
-module Block_data : sig
-  type t = {block_header : Block_header.t; operations : Operation.t list list}
+val dump_context :
+  index -> Context_hash.t -> fd:Lwt_unix.file_descr -> int tzresult Lwt.t
 
-  val to_bytes : t -> Bytes.t
-
-  val of_bytes : Bytes.t -> t option
-
-  val encoding : t Data_encoding.t
-end
-
-module Protocol_data : sig
-  type t = Int32.t * data
-
-  and info = {author : string; message : string; timestamp : Time.Protocol.t}
-
-  and data = {
-    predecessor_block_metadata_hash : Block_metadata_hash.t option;
-    predecessor_ops_metadata_hash : Operation_metadata_list_list_hash.t option;
-    info : info;
-    protocol_hash : Protocol_hash.t;
-    test_chain_status : Test_chain_status.t;
-    data_key : Context_hash.t;
-    parents : Context_hash.t list;
-  }
-
-  val to_bytes : t -> Bytes.t
-
-  val of_bytes : Bytes.t -> t option
-
-  val encoding : t Data_encoding.t
-
-  val encoding_1_0_0 : t Data_encoding.t
-end
-
-val get_protocol_data_from_header :
-  index -> Block_header.t -> Protocol_data.t Lwt.t
-
-val dump_contexts :
+val restore_context :
   index ->
-  Block_header.t
-  * Block_data.t
-  * Block_metadata_hash.t option
-  * Operation_metadata_hash.t list list option
-  * History_mode.Legacy.t
-  * (Block_header.t ->
-    (Pruned_block.t option * Protocol_data.t option) tzresult Lwt.t) ->
-  filename:string ->
+  expected_context_hash:Context_hash.t ->
+  nb_context_elements:int ->
+  fd:Lwt_unix.file_descr ->
   unit tzresult Lwt.t
 
-val restore_contexts :
+val legacy_restore_context :
+  ?expected_block:string ->
+  index ->
+  snapshot_file:string ->
+  handle_block:(History_mode.Legacy.t ->
+               Block_hash.t * Pruned_block_legacy.t ->
+               unit tzresult Lwt.t) ->
+  handle_protocol_data:(Protocol_data_legacy.t -> unit tzresult Lwt.t) ->
+  block_validation:(Block_header.t option ->
+                   Block_hash.t ->
+                   Pruned_block_legacy.t ->
+                   unit tzresult Lwt.t) ->
+  ( Block_header.t
+  * Block_data_legacy.t
+  * Block_metadata_hash.t option
+  * Tezos_crypto.Operation_metadata_hash.t list list option
+  * Block_header.t option
+  * History_mode.Legacy.t )
+  tzresult
+  Lwt.t
+
+val legacy_read_metadata :
+  snapshot_file:string -> (string * History_mode.Legacy.t) tzresult Lwt.t
+
+(* Interface exposed for the lib_store/legacy_store *)
+val legacy_restore_contexts :
   index ->
   filename:string ->
-  ((Block_hash.t * Pruned_block.t) list -> unit tzresult Lwt.t) ->
+  ((Block_hash.t * Pruned_block_legacy.t) list -> unit tzresult Lwt.t) ->
   (Block_header.t option ->
   Block_hash.t ->
-  Pruned_block.t ->
+  Pruned_block_legacy.t ->
   unit tzresult Lwt.t) ->
   ( Block_header.t
-  * Block_data.t
+  * Block_data_legacy.t
   * Block_metadata_hash.t option
   * Operation_metadata_hash.t list list option
   * History_mode.Legacy.t
   * Block_header.t option
   * Block_hash.t list
-  * Protocol_data.t list )
+  * Protocol_data_legacy.t list )
   tzresult
   Lwt.t
+
+val retrieve_commit_info :
+  index ->
+  Block_header.t ->
+  ( Protocol_hash.t
+  * string
+  * string
+  * Time.Protocol.t
+  * Test_chain_status.t
+  * Context_hash.t
+  * Block_metadata_hash.t option
+  * Operation_metadata_list_list_hash.t option
+  * Context_hash.t list )
+  tzresult
+  Lwt.t
+
+val check_protocol_commit_consistency :
+  index ->
+  expected_context_hash:Context_hash.t ->
+  given_protocol_hash:Protocol_hash.t ->
+  author:string ->
+  message:string ->
+  timestamp:Time.Protocol.t ->
+  test_chain_status:Test_chain_status.t ->
+  predecessor_block_metadata_hash:Block_metadata_hash.t option ->
+  predecessor_ops_metadata_hash:Operation_metadata_list_list_hash.t option ->
+  data_merkle_root:Context_hash.t ->
+  parents_contexts:Context_hash.t list ->
+  bool Lwt.t
+
+(**/**)
+
+(** {b Warning} For testing purposes only *)
+
+val legacy_get_protocol_data_from_header :
+  index -> Block_header.t -> Protocol_data_legacy.t Lwt.t
+
+val legacy_dump_snapshot :
+  index ->
+  Block_header.t
+  * Block_data_legacy.t
+  * Block_metadata_hash.t option
+  * Operation_metadata_hash.t list list option
+  * History_mode.Legacy.t
+  * (Block_header.t ->
+    (Pruned_block_legacy.t option * Protocol_data_legacy.t option) tzresult
+    Lwt.t) ->
+  filename:string ->
+  unit tzresult Lwt.t
 
 val validate_context_hash_consistency_and_commit :
   data_hash:Context_hash.t ->
@@ -224,8 +296,6 @@ val validate_context_hash_consistency_and_commit :
   predecessor_ops_metadata_hash:Operation_metadata_list_list_hash.t option ->
   index:index ->
   bool Lwt.t
-
-val upgrade_0_0_3 : context_dir:string -> unit tzresult Lwt.t
 
 (** Offline integrity checking and statistics for contexts. *)
 module Checks : sig

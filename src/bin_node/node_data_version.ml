@@ -55,10 +55,7 @@ let data_version = "0.0.4"
    much, an idea would be to have triples (version, version,
    converter), and to sequence them dynamically instead of
    statically. *)
-let upgradable_data_version =
-  [ ( "0.0.3",
-      fun ~data_dir ->
-        Context.upgrade_0_0_3 ~context_dir:(context_dir data_dir) ) ]
+let upgradable_data_version = []
 
 let version_encoding = Data_encoding.(obj1 (req "version" string))
 

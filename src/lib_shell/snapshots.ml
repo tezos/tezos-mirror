@@ -464,7 +464,7 @@ let compute_export_limit block_store chain_data_store block_header
     level changing block) or when there is no more predecessor. *)
 let pruned_block_iterator index block_store limit header =
   if header.Block_header.shell.level <= limit then
-    Context.get_protocol_data_from_header index header
+    Context.legacy_get_protocol_data_from_header index header
     >>= fun protocol_data -> return (None, Some protocol_data)
   else
     let pred_hash = header.Block_header.shell.predecessor in
@@ -476,7 +476,7 @@ let pruned_block_iterator index block_store limit header =
     >>= fun pred_operation_hashes ->
     let pruned_block =
       {
-        Context.Pruned_block.block_header = pred_header;
+        Context.Pruned_block_legacy.block_header = pred_header;
         operations = pred_operations;
         operation_hashes = pred_operation_hashes;
       }
@@ -484,7 +484,7 @@ let pruned_block_iterator index block_store limit header =
     let header_proto_level = header.Block_header.shell.proto_level in
     let pred_header_proto_level = pred_header.Block_header.shell.proto_level in
     if header_proto_level <> pred_header_proto_level then
-      Context.get_protocol_data_from_header index header
+      Context.legacy_get_protocol_data_from_header index header
       >>= fun proto_data -> return (Some pruned_block, Some proto_data)
     else return (Some pruned_block, None)
 
@@ -593,7 +593,9 @@ let export ?(export_rolling = false) ~context_root ~store_root ~genesis
             let iterator =
               pruned_block_iterator context_index block_store export_limit
             in
-            let block_data = {Context.Block_data.block_header; operations} in
+            let block_data =
+              {Context.Block_data_legacy.block_header; operations}
+            in
             return
               ( pred_block_header,
                 block_data,
@@ -602,7 +604,7 @@ let export ?(export_rolling = false) ~context_root ~store_root ~genesis
                 export_mode,
                 iterator ))
   >>=? fun data_to_dump ->
-  Context.dump_contexts context_index data_to_dump ~filename
+  Context.legacy_dump_snapshot context_index data_to_dump ~filename
   >>=? fun () ->
   lwt_emit (Export_success filename)
   >>= fun () ->
@@ -752,7 +754,7 @@ let import_protocol_data index store block_hash_arr level_oldest_block
   >>= fun block_header ->
   let expected_context_hash = block_header.Block_header.shell.context in
   (* Retrieve the input info. *)
-  let info = protocol_data.Context.Protocol_data.info in
+  let info = protocol_data.Context.Protocol_data_legacy.info in
   let test_chain = protocol_data.test_chain_status in
   let data_hash = protocol_data.data_key in
   let parents = protocol_data.parents in
@@ -826,7 +828,7 @@ let verify_oldest_header oldest_header genesis_hash =
     (Snapshot_import_failure "oldest level inconsistency")
 
 let block_validation succ_header_opt header_hash
-    {Context.Pruned_block.block_header; operations; operation_hashes} =
+    {Context.Pruned_block_legacy.block_header; operations; operation_hashes} =
   verify_predecessors succ_header_opt header_hash
   >>=? fun () ->
   check_operations_consistency block_header operations operation_hashes
@@ -1061,7 +1063,10 @@ let import ?(reconstruct = false) ?patch_context ~data_dir
               (fun (pruned_header_hash, pruned_block) ->
                 Store.Block.Pruned_contents.store
                   (block_store, pruned_header_hash)
-                  {header = pruned_block.Context.Pruned_block.block_header}
+                  {
+                    header =
+                      pruned_block.Context.Pruned_block_legacy.block_header;
+                  }
                 >>= fun () ->
                 List.iter_s
                   (fun (i, v) ->
@@ -1082,7 +1087,7 @@ let import ?(reconstruct = false) ?patch_context ~data_dir
         >>= fun () -> return_unit
       in
       (* Restore context and fetch data *)
-      Context.restore_contexts
+      Context.legacy_restore_contexts
         context_index
         ~filename
         k_store_pruned_blocks
@@ -1147,7 +1152,7 @@ let import ?(reconstruct = false) ?patch_context ~data_dir
       >>= fun () ->
       Tezos_stdlib_unix.Utils.display_progress_end () ;
       (* Process data imported from snapshot *)
-      let {Context.Block_data.block_header; operations} = meta in
+      let {Context.Block_data_legacy.block_header; operations} = meta in
       let block_hash = Block_header.hash block_header in
       (* Checks that the block hash imported by the snapshot is the expected one *)
       parse_block_arg block

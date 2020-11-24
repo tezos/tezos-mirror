@@ -230,7 +230,6 @@ let wrap_state_init f base_dir =
   let context_root = base_dir // "context" in
   State.init
     ~store_mapsize:4_096_000_000L
-    ~context_mapsize:4_096_000_000L
     ~store_root
     ~context_root
     Shell_test_helpers.genesis

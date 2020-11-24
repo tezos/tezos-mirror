@@ -35,10 +35,7 @@ let assert_ok ~msg = function
       exit 1
 
 let prepare_genesis base_dir =
-  Tezos_context.Context.init
-    ~mapsize:40_960_000_000_000L
-    ~readonly:false
-    base_dir
+  Tezos_context.Context.init ~readonly:false base_dir
   >>= fun index ->
   let genesis_block =
     Block_hash.of_b58check_exn
@@ -78,10 +75,7 @@ let prepare_empty_context base_dir =
   Tezos_context.Context.close index >>= fun () -> return context_hash
 
 let load_context_from_disk_lwt base_dir context_hash =
-  Tezos_context.Context.init
-    ~mapsize:40_960_000_000_000L
-    ~readonly:false
-    base_dir
+  Tezos_context.Context.init ~readonly:false base_dir
   >>= fun index ->
   Tezos_context.Context.checkout index context_hash
   >>= function

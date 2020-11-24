@@ -430,7 +430,6 @@ val init :
   ?patch_context:(Context.t -> Context.t tzresult Lwt.t) ->
   ?commit_genesis:(chain_id:Chain_id.t -> Context_hash.t tzresult Lwt.t) ->
   ?store_mapsize:int64 ->
-  ?context_mapsize:int64 ->
   store_root:string ->
   context_root:string ->
   ?history_mode:History_mode.Legacy.t ->

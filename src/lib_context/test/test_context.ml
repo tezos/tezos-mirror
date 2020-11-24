@@ -109,7 +109,7 @@ type t = {
 let wrap_context_init f _ () =
   Lwt_utils_unix.with_tempdir "tezos_test_" (fun base_dir ->
       let root = base_dir // "context" in
-      Context.init ~mapsize:4_096_000L root
+      Context.init root
       >>= fun idx ->
       Context.commit_genesis
         idx
@@ -534,8 +534,7 @@ let test_dump {idx; block3b; _} =
   Lwt_utils_unix.with_tempdir "tezos_test_" (fun base_dir2 ->
       let dumpfile = base_dir2 // "dump" in
       let ctxt_hash = block3b in
-      let history_mode = Tezos_shell_services.History_mode.Legacy.Full in
-      let empty_block_header context =
+      let mk_empty_block_header context =
         Block_header.
           {
             protocol_data = Bytes.empty;
@@ -552,47 +551,29 @@ let test_dump {idx; block3b; _} =
               };
           }
       in
-      let _empty_pruned_block =
-        ( {
-            block_header = empty_block_header Context_hash.zero;
-            operations = [];
-            operation_hashes = [];
-          }
-          : Context.Pruned_block.t )
-      in
-      let empty =
-        {
-          Context.Block_data.block_header = empty_block_header Context_hash.zero;
-          operations = [[]];
-        }
-      in
-      let empty_block_metadata_hash = None in
-      let empty_ops_metadata_hashes = None in
-      let bhs =
-        (fun context ->
-          ( empty_block_header context,
-            empty,
-            empty_block_metadata_hash,
-            empty_ops_metadata_hashes,
-            history_mode,
-            fun _ -> return (None, None) ))
-          ctxt_hash
-      in
-      Context.dump_contexts idx bhs ~filename:dumpfile
-      >>=? fun () ->
+      let empty_block_header = mk_empty_block_header ctxt_hash in
+      let nb_context_elements = 0 in
+      let target_context_hash = empty_block_header.shell.context in
+      Lwt_unix.openfile dumpfile Lwt_unix.[O_WRONLY; O_CREAT; O_TRUNC] 0o644
+      >>= (fun context_fd ->
+            Lwt.finalize
+              (fun () ->
+                Context.dump_context idx target_context_hash ~fd:context_fd)
+              (fun () -> Lwt_unix.close context_fd))
+      >>=? fun _ ->
       let root = base_dir2 // "context" in
       Context.init ?patch_context:None root
       >>= fun idx2 ->
-      Context.restore_contexts
-        idx2
-        ~filename:dumpfile
-        (fun _ -> return_unit)
-        (fun _ _ _ -> return_unit)
-      >>=? fun imported ->
-      let (bh, _, _, _, _, _, _, _) = imported in
-      let expected_ctxt_hash = bh.Block_header.shell.context in
-      assert (Context_hash.equal ctxt_hash expected_ctxt_hash) ;
-      return ())
+      Lwt_unix.openfile dumpfile Lwt_unix.[O_RDONLY] 0o444
+      >>= fun context_fd ->
+      Lwt.finalize
+        (fun () ->
+          Context.restore_context
+            idx2
+            ~expected_context_hash:target_context_hash
+            ~nb_context_elements
+            ~fd:context_fd)
+        (fun () -> Lwt_unix.close context_fd))
   >>=! Lwt.return
 
 (******************************************************************************)
