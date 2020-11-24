@@ -21,8 +21,10 @@ api/errors.rst: $(DOCERRORDIR)/error_doc.ml
 $(DOCGENDIR)/rpc_doc.exe:
 	@cd .. && dune build docs/$(DOCGENDIR)/rpc_doc.exe
 
-api/rpc.rst: $(DOCGENDIR)/rpc_doc.exe
-	@dune exec $(DOCGENDIR)/rpc_doc.exe > api/rpc.rst
+rpc: $(DOCGENDIR)/rpc_doc.exe
+	@dune exec $(DOCGENDIR)/rpc_doc.exe "" > 007/rpc.rst
+	@dune exec $(DOCGENDIR)/rpc_doc.exe 008 > 008/rpc.rst
+	@dune exec $(DOCGENDIR)/rpc_doc.exe shell > shell/rpc.rst
 
 $(DOCGENDIR)/p2p_doc.exe:
 	@cd .. && dune build docs/$(DOCGENDIR)/p2p_doc.exe
@@ -34,9 +36,9 @@ p2p: $(DOCGENDIR)/p2p_doc.exe shell/p2p_usage.rst.inc
 
 # Catch-all target: route all unknown targets to Sphinx using the new
 # "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
-html: Makefile api/errors.rst api/rpc.rst p2p
+html: Makefile api/errors.rst rpc p2p
 	@$(SPHINXBUILD) -b html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
 
 clean:
 	@-rm -Rf "$(BUILDDIR)"
-	@-rm -Rf api/errors.rst api/rpc.rst shell/p2p_api.rst
+	@-rm -Rf api/errors.rst 007/rpc.rst 008/rpc.rst shell/rpc.rst shell/p2p_api.rst

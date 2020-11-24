@@ -24,7 +24,10 @@
 (*****************************************************************************)
 
 let protocols =
-  [("Alpha", "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK")]
+  (* version, title that appears in the doc, protocol hash *)
+  [ ("008", "008 Edo", "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK");
+    ("", "007 Delphi", "PsDELPH1Kxsxt8f9eWbxQeRxkjfbxoqM52jvs5Y5fBxWWh4ifpo")
+  ]
 
 let pp_name ppf = function
   | [] | [""] ->
@@ -325,7 +328,7 @@ module Description = struct
     Tabs.pp ppf prefix service
 end
 
-let pp_document ppf descriptions =
+let pp_document ppf descriptions version =
   (* Style : hack *)
   Format.fprintf ppf "%a@." Rst.pp_raw_html Rst.style ;
   (* Script : hack *)
@@ -333,7 +336,7 @@ let pp_document ppf descriptions =
   (* Index *)
   Format.pp_set_margin ppf 10000 ;
   Format.pp_set_max_indent ppf 9000 ;
-  Format.fprintf ppf "%a" Rst.pp_ref "rpc_index" ;
+  Format.fprintf ppf "%a" Rst.pp_ref ("rpc_index" ^ version) ;
   Rst.pp_h2 ppf "RPCs - Index" ;
   List.iter
     (fun (name, prefix, rpc_dir) ->
@@ -352,10 +355,11 @@ let pp_document ppf descriptions =
     descriptions
 
 let main node =
+  let required_version = Sys.argv.(1) in
   let shell_dir = Node.build_rpc_directory node in
   let protocol_dirs =
     List.map
-      (fun (name, hash) ->
+      (fun (version, name, hash) ->
         let hash = Protocol_hash.of_b58check_exn hash in
         let (module Proto) =
           match Registered_protocol.get hash with
@@ -364,7 +368,8 @@ let main node =
           | Some proto ->
               proto
         in
-        ( "Protocol " ^ name,
+        ( version,
+          "Protocol " ^ name,
           [".."; "<block_id>"],
           RPC_directory.map (fun () -> assert false)
           @@ Block_directory.build_raw_rpc_directory
@@ -374,15 +379,16 @@ let main node =
                (module Proto) ))
       protocols
   in
-  let dirs = ("Shell", [""], shell_dir) :: protocol_dirs in
-  Lwt_list.map_p
-    (fun (name, path, dir) ->
-      RPC_directory.describe_directory ~recurse:true ~arg:() dir
-      >>= fun dir -> Lwt.return (name, path, dir))
-    dirs
-  >>= fun descriptions ->
+  let dirs = ("shell", "Shell", [""], shell_dir) :: protocol_dirs in
+  let (_version, name, path, dir) =
+    List.find
+      (fun (version, _name, _path, _dir) -> version = required_version)
+      dirs
+  in
+  RPC_directory.describe_directory ~recurse:true ~arg:() dir
+  >>= fun dir ->
   let ppf = Format.std_formatter in
-  pp_document ppf descriptions ;
+  pp_document ppf [(name, path, dir)] required_version ;
   return ()
 
 let () = Lwt_main.run (Node_helpers.with_node main)

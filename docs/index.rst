@@ -120,6 +120,7 @@ in the :ref:`introduction <howtoget>`.
    shell/sync
    shell/p2p
    shell/p2p_api
+   shell/rpc
 
 .. toctree::
    :maxdepth: 2
@@ -129,6 +130,7 @@ in the :ref:`introduction <howtoget>`.
    007/michelson
    007/proof_of_stake
    007/voting
+   007/rpc
 
 .. toctree::
    :maxdepth: 2
@@ -139,6 +141,7 @@ in the :ref:`introduction <howtoget>`.
    008/proof_of_stake
    008/sapling
    008/voting
+   008/rpc
 
 .. toctree::
    :maxdepth: 2
@@ -191,7 +194,6 @@ in the :ref:`introduction <howtoget>`.
    README
    api/api-inline
    api/cli-commands
-   api/rpc
    api/openapi
    api/errors
 
