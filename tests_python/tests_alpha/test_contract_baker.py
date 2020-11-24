@@ -1,20 +1,11 @@
 import os
 import pytest
-from tools import utils, constants
+from tools import utils
 from client.client import Client
-from . import protocol
 from . import contract_paths
 
 
 BAKE_ARGS = ['--minimal-timestamp']
-
-
-@pytest.fixture(scope="class")
-def client(sandbox):
-    """One node running protocol alpha and a baker."""
-    sandbox.add_node(0, params=constants.NODE_PARAMS)
-    protocol.activate(sandbox.client(0), activate_in_the_past=True)
-    yield sandbox.client(0)
 
 
 @pytest.mark.contract
@@ -35,7 +26,7 @@ class TestOriginationCall:
         session['contract'] = origination.contract
         client.bake('bootstrap5', BAKE_ARGS)
 
-        # Unsolved mistery:
+        # Unsolved mystery:
         #    client.wait_for_inclusion(origination.operation_hash)
         # fails sometimes with tezos-client crashing. Maybe caused with
         # subprocess captured of forked process output?
