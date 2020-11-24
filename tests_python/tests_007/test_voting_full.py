@@ -9,8 +9,9 @@ import time
 import os
 import json
 import pytest
-from tools import utils, constants, paths
+from tools import utils, paths
 from launchers.sandbox import Sandbox
+from . import protocol
 
 
 ERROR_PATTERN = r"Uncaught|registered|error"
@@ -18,11 +19,11 @@ BLOCKS_PER_VOTING_PERIOD = 20
 POLLING_TIME = 5
 BAKING_RATE = 1
 
-PROTO_A = constants.CARTHAGE
-PROTO_A_DAEMON = constants.CARTHAGE_DAEMON
+PROTO_A = protocol.PREV_HASH
+PROTO_A_DAEMON = protocol.PREV_DAEMON
 PROTO_A_PATH = f"proto_{PROTO_A_DAEMON.replace('-','_')}"
-PROTO_B = constants.ALPHA
-PROTO_B_DAEMON = constants.ALPHA_DAEMON
+PROTO_B = protocol.HASH
+PROTO_B_DAEMON = protocol.DAEMON
 
 PARAMETERS_FILE = (f'{paths.TEZOS_HOME}src/{PROTO_A_PATH}/parameters/'
                    'test-parameters.json')

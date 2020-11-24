@@ -4,12 +4,13 @@ import pytest
 from tools import utils, constants, paths
 from client.client_output import InvalidClientOutput
 from launchers.sandbox import Sandbox
+from . import protocol
 
 BAKE_ARGS = ['--max-priority', '512', '--minimal-timestamp']
 CHAIN_ID = "main"
 BLOCK_ID = "head"
 PKH = "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
-PROTOCOL_HASH = "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
+PROTOCOL_HASH = protocol.HASH
 BLOCK_LEVEL = "3"
 LIST_OFFSET = "0"
 OPERATION_OFFSET = "0"
@@ -43,7 +44,7 @@ def sandbox(sandbox: Sandbox, contract_name, session: dict):
     sandbox.add_node(1, params=constants.NODE_PARAMS)
     sandbox.add_node(2, params=constants.NODE_PARAMS)
     client = sandbox.client(1)
-    utils.activate_alpha(sandbox.client(1), activate_in_the_past=True)
+    protocol.activate(sandbox.client(1), activate_in_the_past=True)
     client.bake("bootstrap1", BAKE_ARGS)
     time.sleep(2)
     # Deploy a contract

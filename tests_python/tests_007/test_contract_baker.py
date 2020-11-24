@@ -2,6 +2,8 @@ import os
 import pytest
 from tools import paths, utils, constants
 from client.client import Client
+from . import protocol
+
 
 BAKE_ARGS = ['--minimal-timestamp']
 
@@ -10,7 +12,7 @@ BAKE_ARGS = ['--minimal-timestamp']
 def client(sandbox):
     """One node running protocol alpha and a baker."""
     sandbox.add_node(0, params=constants.NODE_PARAMS)
-    utils.activate_alpha(sandbox.client(0), activate_in_the_past=True)
+    protocol.activate(sandbox.client(0), activate_in_the_past=True)
     yield sandbox.client(0)
 
 

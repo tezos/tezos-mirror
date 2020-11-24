@@ -1,7 +1,7 @@
 import time
 import pytest
-from tools import constants, utils
 from launchers.sandbox import Sandbox
+from . import protocol
 
 
 LOG_LEVEL = {"validator.chain":  "debug", "validator.peer": "debug"}
@@ -19,7 +19,7 @@ class TestThresholdZero:
 
     def test_setup_network(self, sandbox: Sandbox):
         sandbox.add_node(0, params=params(), log_levels=LOG_LEVEL)
-        sandbox.add_baker(0, 'bootstrap5', proto=constants.ALPHA_DAEMON)
+        sandbox.add_baker(0, 'bootstrap5', proto=protocol.DAEMON)
 
     def test_bootstrap(self, sandbox: Sandbox):
         client = sandbox.client(0)
@@ -34,8 +34,8 @@ class TestThresholdOne:
 
     def test_setup_network(self, sandbox: Sandbox):
         sandbox.add_node(0, params=params(), log_levels=LOG_LEVEL)
-        utils.activate_alpha(sandbox.client(0))
-        sandbox.add_baker(0, 'bootstrap5', proto=constants.ALPHA_DAEMON)
+        protocol.activate(sandbox.client(0))
+        sandbox.add_baker(0, 'bootstrap5', proto=protocol.DAEMON)
 
     def test_bootstrap(self, sandbox: Sandbox):
         client = sandbox.client(0)
@@ -54,8 +54,8 @@ class TestThresholdTwo:
 
     def test_setup_network(self, sandbox: Sandbox):
         sandbox.add_node(0, params=params(0), log_levels=LOG_LEVEL)
-        utils.activate_alpha(sandbox.client(0))
-        sandbox.add_baker(0, 'bootstrap5', proto=constants.ALPHA_DAEMON)
+        protocol.activate(sandbox.client(0))
+        sandbox.add_baker(0, 'bootstrap5', proto=protocol.DAEMON)
 
     def test_add_nodes(self, sandbox: Sandbox):
         sandbox.add_node(1, params=params(2), log_levels=LOG_LEVEL,
@@ -83,13 +83,13 @@ class TestStuck:
     def test_setup_network(self, sandbox: Sandbox):
         sandbox.add_node(0, params=params(),
                          log_levels=LOG_LEVEL)
-        utils.activate_alpha(sandbox.client(0))
-        sandbox.add_baker(0, 'bootstrap5', proto=constants.ALPHA_DAEMON)
+        protocol.activate(sandbox.client(0))
+        sandbox.add_baker(0, 'bootstrap5', proto=protocol.DAEMON)
 
     def test_kill_baker(self, sandbox: Sandbox):
         """Bake a few blocks and kill baker"""
         time.sleep(2)
-        sandbox.rm_baker(0, proto=constants.ALPHA_DAEMON)
+        sandbox.rm_baker(0, proto=protocol.DAEMON)
         time.sleep(5)
 
     def test_progress(self, sandbox: Sandbox):
@@ -115,12 +115,12 @@ class TestStuck:
 class TestSplitView:
     def test_setup_network(self, sandbox: Sandbox):
         sandbox.add_node(0, params=params(), log_levels=LOG_LEVEL)
-        utils.activate_alpha(sandbox.client(0))
+        protocol.activate(sandbox.client(0))
         sandbox.add_node(1, params=params(), config_client=False,
                          log_levels=LOG_LEVEL)
         sandbox.add_node(2, params=params(2), config_client=False,
                          log_levels=LOG_LEVEL)
-        sandbox.add_baker(0, 'bootstrap5', proto=constants.ALPHA_DAEMON)
+        sandbox.add_baker(0, 'bootstrap5', proto=protocol.DAEMON)
 
     @pytest.mark.timeout(10)
     def test_all_nodes_boostrap(self, sandbox: Sandbox):
@@ -156,10 +156,10 @@ class TestManyNodesBootstrap:
 
     def test_init(self, sandbox: Sandbox):
         sandbox.add_node(0, params=params(), log_levels=LOG_LEVEL)
-        parameters = dict(constants.ALPHA_PARAMETERS)
+        parameters = dict(protocol.PARAMETERS)
         parameters["time_between_blocks"] = ["1", "0"]
-        utils.activate_alpha(sandbox.client(0))
-        sandbox.add_baker(0, 'bootstrap1', proto=constants.ALPHA_DAEMON)
+        protocol.activate(sandbox.client(0))
+        sandbox.add_baker(0, 'bootstrap1', proto=protocol.DAEMON)
         sandbox.add_node(1, params=params(), log_levels=LOG_LEVEL,
                          config_client=False)
 

@@ -3,6 +3,7 @@ import time
 import pytest
 from tools import utils, constants
 from launchers.sandbox import Sandbox
+from . import protocol
 
 NUM_NODES = 2
 NEW_NODES = 2
@@ -19,12 +20,12 @@ class TestManyNodesBootstrap:
 
     def test_init(self, sandbox: Sandbox):
         sandbox.add_node(0, params=constants.NODE_PARAMS)
-        parameters = dict(constants.ALPHA_PARAMETERS)
+        parameters = dict(protocol.PARAMETERS)
         parameters["time_between_blocks"] = ["1", "0"]
-        utils.activate_alpha(sandbox.client(0), parameters)
-        sandbox.add_baker(0, 'bootstrap1', proto=constants.ALPHA_DAEMON)
+        protocol.activate(sandbox.client(0), parameters)
+        sandbox.add_baker(0, 'bootstrap1', proto=protocol.DAEMON)
         sandbox.add_node(1, params=constants.NODE_PARAMS)
-        sandbox.add_baker(1, 'bootstrap2', proto=constants.ALPHA_DAEMON)
+        sandbox.add_baker(1, 'bootstrap2', proto=protocol.DAEMON)
 
     def test_add_nodes(self, sandbox: Sandbox):
         for i in range(2, NUM_NODES):
@@ -45,8 +46,8 @@ class TestManyNodesBootstrap:
 
     def test_kill_baker(self, sandbox: Sandbox):
         assert utils.check_logs(sandbox.logs, ERROR_PATTERN)
-        sandbox.rm_baker(0, proto=constants.ALPHA_DAEMON)
-        sandbox.rm_baker(1, proto=constants.ALPHA_DAEMON)
+        sandbox.rm_baker(0, proto=protocol.DAEMON)
+        sandbox.rm_baker(1, proto=protocol.DAEMON)
 
     def test_synchronize(self, sandbox: Sandbox):
         utils.synchronize(sandbox.all_clients())

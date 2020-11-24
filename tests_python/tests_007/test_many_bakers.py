@@ -2,6 +2,7 @@ import time
 import pytest
 from tools import utils, constants
 from launchers.sandbox import Sandbox
+from . import protocol
 
 
 # TODO parameterize test
@@ -17,10 +18,10 @@ class TestManyBakers:
     def test_init(self, sandbox: Sandbox):
         for i in range(10):
             sandbox.add_node(i, params=constants.NODE_PARAMS)
-        utils.activate_alpha(sandbox.client(0))
+        protocol.activate(sandbox.client(0))
         for i in range(5):
             sandbox.add_baker(i, f'bootstrap{i + 1}',
-                              proto=constants.ALPHA_DAEMON)
+                              proto=protocol.DAEMON)
 
     def test_wait(self):
         time.sleep(5)

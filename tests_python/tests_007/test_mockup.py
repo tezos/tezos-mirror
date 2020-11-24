@@ -19,7 +19,8 @@ from launchers.sandbox import Sandbox
 from client.client import Client
 from client.client_output import CreateMockupResult
 
-from tools.constants import ALPHA, CARTHAGE, MOCKUP_PROTOCOLS
+from tools.constants import MOCKUP_PROTOCOLS
+from . import protocol
 
 _BA_FLAG = "bootstrap-accounts"
 _PC_FLAG = "protocol-constants"
@@ -593,8 +594,10 @@ def test_transfer_rpc(mockup_client: Client):
 
 @pytest.mark.parametrize('protos',
                          [(proto1, proto2)
-                          for proto1 in [ALPHA, CARTHAGE]
-                          for proto2 in [ALPHA, CARTHAGE, ""]])
+                          for proto1 in [protocol.HASH,
+                                         protocol.PREV_HASH]
+                          for proto2 in [protocol.HASH,
+                                         protocol.PREV_HASH, ""]])
 @pytest.mark.parametrize('command',
                          [["config", "show"],
                           ["config", "init"],

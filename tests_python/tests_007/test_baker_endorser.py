@@ -5,6 +5,7 @@ import subprocess
 import pytest
 from tools import utils, constants
 from launchers.sandbox import Sandbox
+from . import protocol
 
 random.seed(42)
 KEYS = [f'bootstrap{i}' for i in range(1, 6)]
@@ -35,23 +36,23 @@ class TestAllDaemonsWithOperations:
        we kill the bakers and check everyone synchronize to the same head. '''
 
     def test_setup_network(self, sandbox: Sandbox):
-        parameters = dict(constants.ALPHA_PARAMETERS)
+        parameters = dict(protocol.PARAMETERS)
         # each priority has a delay of 1 sec
         parameters["time_between_blocks"] = ["1"]
         for i in range(NUM_NODES):
             sandbox.add_node(i, params=constants.NODE_PARAMS)
-        utils.activate_alpha(sandbox.client(0), parameters)
-        sandbox.add_baker(0, 'bootstrap5', proto=constants.ALPHA_DAEMON)
-        sandbox.add_baker(1, 'bootstrap4', proto=constants.ALPHA_DAEMON)
+        protocol.activate(sandbox.client(0), parameters)
+        sandbox.add_baker(0, 'bootstrap5', proto=protocol.DAEMON)
+        sandbox.add_baker(1, 'bootstrap4', proto=protocol.DAEMON)
         sandbox.add_endorser(0, account='bootstrap1', endorsement_delay=1,
-                             proto=constants.ALPHA_DAEMON)
+                             proto=protocol.DAEMON)
         sandbox.add_endorser(1, account='bootstrap2', endorsement_delay=1,
-                             proto=constants.ALPHA_DAEMON)
+                             proto=protocol.DAEMON)
 
-    def test_wait_for_alpha(self, sandbox: Sandbox):
+    def test_wait_for_protocol(self, sandbox: Sandbox):
         clients = sandbox.all_clients()
         for client in clients:
-            proto = constants.ALPHA
+            proto = protocol.HASH
             assert utils.check_protocol(client, proto)
 
     def test_network_gen_operations_and_add_nodes(self, sandbox: Sandbox,
@@ -78,13 +79,13 @@ class TestAllDaemonsWithOperations:
                     sandbox.rm_node(random.choice(running_nodes))
                 sandbox.add_node(new_node,
                                  params=constants.NODE_PARAMS)
-                proto = constants.ALPHA
+                proto = protocol.HASH
                 assert utils.check_protocol(sandbox.client(new_node), proto)
             time.sleep(TIME_BETWEEN_CYCLE)
 
     def test_kill_baker(self, sandbox: Sandbox):
-        sandbox.rm_baker(0, proto=constants.ALPHA_DAEMON)
-        sandbox.rm_baker(1, proto=constants.ALPHA_DAEMON)
+        sandbox.rm_baker(0, proto=protocol.DAEMON)
+        sandbox.rm_baker(1, proto=protocol.DAEMON)
 
     def test_synchronize(self, sandbox: Sandbox):
         utils.synchronize(sandbox.all_clients())
