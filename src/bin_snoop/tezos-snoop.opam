@@ -10,6 +10,7 @@ depends: [
   "dune" { >= "1.11" }
   "tezos-base"
   "tezos-benchmark"
+  "tezos-benchmark-examples"
   "tezos-stdlib-unix"
   "tezos-clic"
   "pyml"

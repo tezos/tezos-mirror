@@ -1,3 +1,6 @@
+let _ =
+  {| This test cannot be run on the CI, and is hence deactivated. |}
+(*
 open Pyplot
 
 let () =
@@ -114,3 +117,4 @@ let line_plots =
       suptitle ~title:"Interesting title" ~fontsize:(Some 16) >>= fun () ->
       show ()
     ))
+*)

@@ -15,5 +15,8 @@ depends: [
   "zarith"
   "tezos-stdlib"
   "tezos-error-monad"
+  "alcotest-lwt" {with-test}
+  "tezos-client-alpha" {with-test}
+  "tezos-protocol-alpha" {with-test}
 ]
 synopsis: "Tezos: library for rewriting Micheline expressions"
