@@ -8,6 +8,7 @@ import pytest
 
 from launchers.sandbox import Sandbox
 from tools import constants, paths, utils
+from client import client_output
 
 BAKE_ARGS = ['--minimal-fees', '0', '--minimal-nanotez-per-byte', '0',
              '--minimal-nanotez-per-gas-unit', '0', '--max-priority', '512',
@@ -97,10 +98,12 @@ class TestMigration:
         metadata = client.get_metadata()
         assert metadata['balance_updates'] == DEPOSIT_RECEIPTS
         # PROTO_A is using env. V0, metadata hashes should not be present
-        ops_metadata_hash = client.get_operations_metadata_hash()
-        assert ops_metadata_hash is None
-        block_metadata_hash = client.get_block_metadata_hash()
-        assert block_metadata_hash is None
+        with pytest.raises(client_output.InvalidClientOutput) as exc:
+            _ops_metadata_hash = client.get_operations_metadata_hash()
+        assert exc.value.client_output == 'No service found at this URL\n\n'
+        with pytest.raises(client_output.InvalidClientOutput) as exc:
+            _block_metadata_hash = client.get_block_metadata_hash()
+        assert exc.value.client_output == 'No service found at this URL\n\n'
 
     def test_migration(self, client, sandbox):
         # 3: last block of PROTO_A, runs migration code (MIGRATION_LEVEL)
@@ -109,10 +112,8 @@ class TestMigration:
         assert metadata['next_protocol'] == PROTO_B
         assert metadata['balance_updates'] == DEPOSIT_RECEIPTS
         # PROTO_B is using env. V1, metadata hashes should be present
-        ops_metadata_hash = client.get_operations_metadata_hash()
-        assert ops_metadata_hash is not None
-        block_metadata_hash = client.get_block_metadata_hash()
-        assert block_metadata_hash is not None
+        _ops_metadata_hash = client.get_operations_metadata_hash()
+        _block_metadata_hash = client.get_block_metadata_hash()
         assert sandbox.client(0).get_head()['header']['proto'] == 2
 
     def test_new_proto(self, client, sandbox):
@@ -125,10 +126,8 @@ class TestMigration:
         metadata = client.get_metadata()
         assert metadata['balance_updates'] == (DEPOSIT_RECEIPTS +
                                                MIGRATION_RECEIPTS)
-        ops_metadata_hash = client.get_operations_metadata_hash()
-        assert ops_metadata_hash is not None
-        block_metadata_hash = client.get_block_metadata_hash()
-        assert block_metadata_hash is not None
+        _ops_metadata_hash = client.get_operations_metadata_hash()
+        _block_metadata_hash = client.get_block_metadata_hash()
 
     def test_new_proto_second(self, client):
         # 5: second block of PROTO_B
