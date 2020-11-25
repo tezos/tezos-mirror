@@ -1,0 +1,13 @@
+tezt/_regressions/007.007-PsDELPH1.period.out
+
+./tezos-codec encode 007-PsDELPH1.period from '"2789"'
+0000000000000ae5
+
+./tezos-codec decode 007-PsDELPH1.period from 0000000000000ae5
+"2789"
+
+./tezos-codec encode 007-PsDELPH1.period from '"0"'
+0000000000000000
+
+./tezos-codec decode 007-PsDELPH1.period from 0000000000000000
+"0"

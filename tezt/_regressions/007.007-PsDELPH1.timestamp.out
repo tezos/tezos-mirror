@@ -1,0 +1,7 @@
+tezt/_regressions/007.007-PsDELPH1.timestamp.out
+
+./tezos-codec encode 007-PsDELPH1.timestamp from '"2020-04-20T16:19:59Z"'
+000000005e9dcbaf
+
+./tezos-codec decode 007-PsDELPH1.timestamp from 000000005e9dcbaf
+"2020-04-20T16:19:59Z"
