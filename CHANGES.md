@@ -12,6 +12,23 @@ here either.
 
 ## Node
 
+- Added a new version (version 1) of the protocol environment.
+  The environment is the set of functions and types that the economic protocol can use.
+  Protocols up to Delphi used environment version 0.
+  The Edo protocol uses environment version 1.
+
+- Added the Edo protocol: the node, client and codec now comes linked with Edo,
+  and the Edo daemons (baker, endorser and accuser) are available.
+
+- Added a built-in configuration for Edonet, a test network that runs Edo.
+  You can configure your node to use this test network with `--network edonet`.
+
+- The bootstrap pipeline no longer tries to concurrently download
+  steps from other peers. The result is actually a more efficient
+  bootstrap, because those concurrent downloads resulted in the same
+  block headers being attempted to be downloaded several times. It
+  also resulted in more memory usage than necessary.
+
 - You can now specify the data directory using environment variable `TEZOS_NODE_DIR`.
   If you both set this environment variable and specify `--data-dir`, the latter will be used.
 
@@ -22,13 +39,29 @@ here either.
 
 - Command `tezos-node --version` now exits with exit code 0 instead of 1.
 
+- Fixed the synchronisation threshold which was wrongly capped with an
+  upper bound of 2 instead of a lower bound of 2 when `--connections`
+  was explicitely specified while the synchronisation threshold itself
+  was not specified.
+
 ## Client
+
+- Added client command `import keys from mnemonic`, which allows to
+  import a key from a mnemonic following the BIP39 standard.
+
+- When the client asks for a password, it no longer tries to hide its
+  input if the client was not run from a terminal, which allows for
+  use in a script.
 
 - You can now specify the base directory using environment variable `TEZOS_CLIENT_DIR`.
   If you both set this environment variable and specify `--base-dir`, the latter will be used.
 
-- Fix command `set delegate for <SRC> to <DLGT>` to accept public key hashes for
+- Fixed command `set delegate for <SRC> to <DLGT>` to accept public key hashes for
   the `<DLGT>` field.
+
+- Fixed the `rpc` command that did not use the full path of the URL provided to `--endpoint`.
+  For instance, `--endpoint http://localhost:8732/node/rpc` actually meant
+  `--endpoint http://localhost:8732`.
 
 ## Baker / Endorser / Accuser
 
@@ -42,7 +75,7 @@ here either.
 
 ## Miscellaneous
 
-# Version 8.0
+# Version 8.0~rc1
 
 ## Node
 
