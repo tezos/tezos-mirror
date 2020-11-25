@@ -585,6 +585,10 @@ class Client:
                         '?offset='
                         + str(offset))
 
+    def get_period_position(self) -> str:
+        rpc_res = self.get_current_level(offset=1)
+        return rpc_res['voting_period_position']
+
     def get_level(self, params: List[str] = None, chain: str = 'main') -> int:
         assert chain in {'main', 'test'}
         rpc_res = self.rpc('get', f'/chains/{chain}/blocks/head/header/shell',
