@@ -124,4 +124,36 @@ let register () =
         "alpha.vote.ballots";
         "alpha.vote.listings";
         "alpha.voting_period.kind";
-        "alpha.voting_period" ]
+        "alpha.voting_period" ] ;
+  check_samples_encoding
+    ~group_name:"007"
+    ~samples:
+      [ "007-PsDELPH1.block_header";
+        "007-PsDELPH1.block_header.raw";
+        "007-PsDELPH1.block_header.unsigned";
+        "007-PsDELPH1.contract";
+        "007-PsDELPH1.contract.big_map_diff";
+        "007-PsDELPH1.cycle";
+        "007-PsDELPH1.delegate.balance_updates";
+        "007-PsDELPH1.delegate.frozen_balance";
+        "007-PsDELPH1.delegate.frozen_balance_by_cycles";
+        "007-PsDELPH1.fitness";
+        "007-PsDELPH1.gas.cost";
+        "007-PsDELPH1.gas";
+        "007-PsDELPH1.level";
+        "007-PsDELPH1.nonce";
+        "007-PsDELPH1.operation.internal";
+        "007-PsDELPH1.operation";
+        "007-PsDELPH1.operation.raw";
+        "007-PsDELPH1.operation.unsigned";
+        "007-PsDELPH1.period";
+        "007-PsDELPH1.raw_level";
+        "007-PsDELPH1.roll";
+        "007-PsDELPH1.seed";
+        "007-PsDELPH1.tez";
+        "007-PsDELPH1.timestamp";
+        "007-PsDELPH1.vote.ballot";
+        "007-PsDELPH1.vote.ballots";
+        "007-PsDELPH1.vote.listings";
+        "007-PsDELPH1.voting_period.kind";
+        "007-PsDELPH1.voting_period" ]
