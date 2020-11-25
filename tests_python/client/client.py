@@ -278,12 +278,16 @@ class Client:
         params = ['get', 'contract', 'script', 'hash', 'for', contract]
         return self.run(params)
 
-    def gen_key(self, alias: str, args: List[str] = None) -> str:
+    def gen_key(self,
+                alias: str,
+                args: List[str] = None,
+                stdin: str = "") -> str:
         cmd = ['gen', 'keys', alias]
         if args is None:
             args = []
         cmd += args
-        return self.run(cmd)
+        stdout, _, _ = self.run_generic(cmd, stdin=stdin)
+        return stdout
 
     def import_secret_key(self,
                           name: str,
