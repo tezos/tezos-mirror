@@ -1,4 +1,4 @@
-tests/test_contract_macros.py::TestMacroExpansion::test_macro_expansion[macros/compare.tz]
+tests_alpha/test_contract_macros.py::TestMacroExpansion::test_macro_expansion[macros/compare.tz]
 
 { parameter (pair mutez mutez) ;
   storage (list bool) ;

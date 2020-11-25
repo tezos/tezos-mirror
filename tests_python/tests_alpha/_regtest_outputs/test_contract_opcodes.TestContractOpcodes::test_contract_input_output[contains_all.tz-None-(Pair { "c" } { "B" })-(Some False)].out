@@ -1,4 +1,4 @@
-tests/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[contains_all.tz-None-(Pair { "c" } { "B" })-(Some False)]
+tests_alpha/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[contains_all.tz-None-(Pair { "c" } { "B" })-(Some False)]
 
 storage
   (Some False)

@@ -1,4 +1,4 @@
-tests/test_contract.py::TestSelfAddressTransfer::test_self_address_originate_sender
+tests_alpha/test_contract.py::TestSelfAddressTransfer::test_self_address_originate_sender
 
 Node is bootstrapped.
 Estimated gas: 1781.238 units (will add 100 for safety)

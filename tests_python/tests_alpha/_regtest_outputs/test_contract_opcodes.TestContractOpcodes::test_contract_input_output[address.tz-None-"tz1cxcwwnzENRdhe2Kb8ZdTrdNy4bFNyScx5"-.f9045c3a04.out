@@ -1,4 +1,4 @@
-tests/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[address.tz-None-"tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"-(Some "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5")]
+tests_alpha/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[address.tz-None-"tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"-(Some "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5")]
 
 storage
   (Some "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5")

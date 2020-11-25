@@ -1,4 +1,4 @@
-tests/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[map_size.tz-111-{ Elt "a" 1 }-1]
+tests_alpha/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[map_size.tz-111-{ Elt "a" 1 }-1]
 
 storage
   1

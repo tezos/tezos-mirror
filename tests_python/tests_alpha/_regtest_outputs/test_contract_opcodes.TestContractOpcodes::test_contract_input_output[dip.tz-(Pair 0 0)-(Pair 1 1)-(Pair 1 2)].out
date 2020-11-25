@@ -1,4 +1,4 @@
-tests/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[dip.tz-(Pair 0 0)-(Pair 1 1)-(Pair 1 2)]
+tests_alpha/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[dip.tz-(Pair 0 0)-(Pair 1 1)-(Pair 1 2)]
 
 storage
   (Pair 1 2)

@@ -1,4 +1,4 @@
-tests/test_contract_macros.py::TestMacroExpansion::test_macro_expansion[macros/unpair_macro.tz]
+tests_alpha/test_contract_macros.py::TestMacroExpansion::test_macro_expansion[macros/unpair_macro.tz]
 
 { parameter (unit :param_unit) ;
   storage (unit :u1) ;

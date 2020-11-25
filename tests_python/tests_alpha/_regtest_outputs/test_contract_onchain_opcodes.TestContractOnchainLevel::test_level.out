@@ -1,4 +1,4 @@
-tests/test_contract_onchain_opcodes.py::TestContractOnchainLevel::test_level
+tests_alpha/test_contract_onchain_opcodes.py::TestContractOnchainLevel::test_level
 
 Node is bootstrapped.
 Estimated gas: 1578.332 units (will add 100 for safety)

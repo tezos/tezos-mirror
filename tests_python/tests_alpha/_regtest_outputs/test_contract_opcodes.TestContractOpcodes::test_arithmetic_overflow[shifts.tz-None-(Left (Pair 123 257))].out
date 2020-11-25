@@ -1,4 +1,4 @@
-tests/test_contract_opcodes.py::TestContractOpcodes::test_arithmetic_overflow[shifts.tz-None-(Left (Pair 123 257))]
+tests_alpha/test_contract_opcodes.py::TestContractOpcodes::test_arithmetic_overflow[shifts.tz-None-(Left (Pair 123 257))]
 
 Runtime error in contract [CONTRACT_HASH]:
   01: parameter (or (pair nat nat) (pair nat nat));

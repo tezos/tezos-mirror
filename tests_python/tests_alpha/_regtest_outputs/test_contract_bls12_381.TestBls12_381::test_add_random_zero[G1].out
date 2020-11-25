@@ -1,4 +1,4 @@
-tests/test_contract_bls12_381.py::TestBls12_381::test_add_random_zero[G1]
+tests_alpha/test_contract_bls12_381.py::TestBls12_381::test_add_random_zero[G1]
 
 storage
   (Some 0x0e134832be250ddb5839670997abb5d7a89811c1335e7db37a321efe001c35422abe6a14ac850eea1acee01cad17c0330c5437362450b8d760a2d1f0e07fb3dc465a4ef1ceb1b026e6314e5a53a7aa4e7c8e5fc77472c691498680d465c593c9)

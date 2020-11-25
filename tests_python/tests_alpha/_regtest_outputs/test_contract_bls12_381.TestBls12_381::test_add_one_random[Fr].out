@@ -1,4 +1,4 @@
-tests/test_contract_bls12_381.py::TestBls12_381::test_add_one_random[Fr]
+tests_alpha/test_contract_bls12_381.py::TestBls12_381::test_add_one_random[Fr]
 
 storage
   (Some 0x660dec4a316a24f34cad26e886cb480da89c55113f5c1a2b6bfdaab82d737708)

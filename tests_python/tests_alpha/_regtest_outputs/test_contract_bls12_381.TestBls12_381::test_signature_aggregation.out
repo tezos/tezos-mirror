@@ -1,4 +1,4 @@
-tests/test_contract_bls12_381.py::TestBls12_381::test_signature_aggregation
+tests_alpha/test_contract_bls12_381.py::TestBls12_381::test_signature_aggregation
 
 storage
   (Some True)

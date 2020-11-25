@@ -1,4 +1,4 @@
-tests/test_contract_bls12_381.py::TestBls12_381::test_mul_one_one[Fr]
+tests_alpha/test_contract_bls12_381.py::TestBls12_381::test_mul_one_one[Fr]
 
 storage
   (Some 0x0100000000000000000000000000000000000000000000000000000000000000)

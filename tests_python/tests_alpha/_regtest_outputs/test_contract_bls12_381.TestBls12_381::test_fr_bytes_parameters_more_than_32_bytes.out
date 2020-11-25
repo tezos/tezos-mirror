@@ -1,4 +1,4 @@
-tests/test_contract_bls12_381.py::TestBls12_381::test_fr_bytes_parameters_more_than_32_bytes
+tests_alpha/test_contract_bls12_381.py::TestBls12_381::test_fr_bytes_parameters_more_than_32_bytes
 
 Invalid argument passed to contract KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi.
 At (unshown) location 0, value

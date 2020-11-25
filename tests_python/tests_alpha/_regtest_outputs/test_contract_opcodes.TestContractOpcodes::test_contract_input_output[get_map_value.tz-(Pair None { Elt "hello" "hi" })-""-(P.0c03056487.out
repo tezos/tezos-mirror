@@ -1,4 +1,4 @@
-tests/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[get_map_value.tz-(Pair None { Elt "hello" "hi" })-""-(Pair None { Elt "hello" "hi" })]
+tests_alpha/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[get_map_value.tz-(Pair None { Elt "hello" "hi" })-""-(Pair None { Elt "hello" "hi" })]
 
 storage
   (Pair None { Elt "hello" "hi" })

@@ -1,4 +1,4 @@
-tests/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[comb-set.tz-(Pair 1 4 2 Unit)-Unit-(Pair 2 12 8 Unit)]
+tests_alpha/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[comb-set.tz-(Pair 1 4 2 Unit)-Unit-(Pair 2 12 8 Unit)]
 
 storage
   (Pair 2 12 8 Unit)

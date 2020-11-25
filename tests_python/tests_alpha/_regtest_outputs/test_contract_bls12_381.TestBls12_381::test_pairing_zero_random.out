@@ -1,4 +1,4 @@
-tests/test_contract_bls12_381.py::TestBls12_381::test_pairing_zero_random
+tests_alpha/test_contract_bls12_381.py::TestBls12_381::test_pairing_zero_random
 
 storage
   (Some True)

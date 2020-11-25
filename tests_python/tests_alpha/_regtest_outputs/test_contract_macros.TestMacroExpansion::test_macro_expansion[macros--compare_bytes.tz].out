@@ -1,4 +1,4 @@
-tests/test_contract_macros.py::TestMacroExpansion::test_macro_expansion[macros/compare_bytes.tz]
+tests_alpha/test_contract_macros.py::TestMacroExpansion::test_macro_expansion[macros/compare_bytes.tz]
 
 { parameter (pair bytes bytes) ;
   storage (list bool) ;
