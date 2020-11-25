@@ -94,7 +94,7 @@ let check_samples_encoding ~group_name ~samples =
 let register () =
   check_dump_encodings () ;
   check_samples_encoding
-    ~group_name:"protocol"
+    ~group_name:"alpha"
     ~samples:
       [ "alpha.block_header";
         "alpha.block_header.raw";
