@@ -69,6 +69,9 @@ here either.
   was explicitely specified while the synchronisation threshold itself
   was not specified.
 
+- Added RPC `DELETE /network/greylist` to clear the greylist tables.
+  RPC `GET /network/greylist/clear` is now deprecated.
+
 ## Client
 
 - Added client command `import keys from mnemonic`, which allows to
