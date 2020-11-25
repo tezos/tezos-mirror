@@ -12,6 +12,22 @@ here either.
 
 ## Node
 
+## Client
+
+## Baker / Endorser / Accuser
+
+## Protocol Compiler And Environment
+
+## Codec
+
+## Docker Images
+
+## Miscellaneous
+
+# Version 8.0~rc2
+
+## Node
+
 - Added a new version (version 1) of the protocol environment.
   The environment is the set of functions and types that the economic protocol can use.
   Protocols up to Delphi used environment version 0.
@@ -23,11 +39,20 @@ here either.
 - Added a built-in configuration for Edonet, a test network that runs Edo.
   You can configure your node to use this test network with `--network edonet`.
 
+- Removed the built-in configuration for Carthagenet, which ends its life on
+  December 12th 2020. You can no longer configure your node with `--network carthagenet`.
+
 - The bootstrap pipeline no longer tries to concurrently download
   steps from other peers. The result is actually a more efficient
   bootstrap, because those concurrent downloads resulted in the same
   block headers being attempted to be downloaded several times. It
   also resulted in more memory usage than necessary.
+
+- Added six messages to the distributed database protocol and bumped
+  its version from 0 to 1. These new messages allow to request for: a
+  peer's checkpoint, the branch of a given protocol and a block's
+  predecessor for a given offset. These messages are not yet used but
+  will be useful for future optimizations.
 
 - You can now specify the data directory using environment variable `TEZOS_NODE_DIR`.
   If you both set this environment variable and specify `--data-dir`, the latter will be used.
@@ -63,30 +88,22 @@ here either.
   For instance, `--endpoint http://localhost:8732/node/rpc` actually meant
   `--endpoint http://localhost:8732`.
 
+- Fixed an issue where the client would try to sign with a key for which
+  the private counterpart was unknown even though a remote signer was connected.
+
 ## Baker / Endorser / Accuser
 
-- Fixed a crash (assertion error) that could happen at exit, in particular if a baker were connected.
-
-## Protocol Compiler And Environment
-
-## Codec
+- Fixed a crash (assertion error) that could happen at exit, in particular
+  if a baker were connected.
 
 ## Docker Images
 
 - Docker images are now available for arm64. Image tags stay the same
   but now refer to "multi-arch" manifests.
 
-## Miscellaneous
-
 # Version 8.0~rc1
 
 ## Node
-
-- Added six messages to the distributed database protocol and bumped
-  its version from 0 to 1. These new messages allow to request for: a
-  peer's checkpoint, the branch of a given protocol and a block's
-  predecessor for a given offset. These messages are not yet used but
-  will be useful for future optimizations.
 
 - Fixed some cases where the node would not stop when interrupted with
   Ctrl+C.
