@@ -34,7 +34,7 @@ depends: [
   "tezos-mempool-006-PsCARTHA"
   "tezos-mempool-007-PsDELPH1"
   "cmdliner"
-  "tls" { >= "0.10" < "0.11" } # remove the upper bond when the compatibility with hacl-star is restored
+  "tls" { >= "0.11" < "0.12" } # remove the upper bond when the compatibility with hacl-star is restored
   "cstruct"
 ]
 build: [

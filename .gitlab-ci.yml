@@ -2,7 +2,7 @@
 
 variables:
   ## Please update `scripts/version.sh` accordingly
-  build_deps_image_version: 605cefe2c938b3995ef1a82ff2701bafd5d634cb
+  build_deps_image_version: c916fd9f0698d7ae0d30114a328c78608b693d6a
   build_deps_image_name: registry.gitlab.com/tezos/opam-repository
   public_docker_image_name: docker.io/${CI_PROJECT_PATH}
   GIT_STRATEGY: fetch
