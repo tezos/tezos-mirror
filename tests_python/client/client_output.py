@@ -271,9 +271,7 @@ class SetDelegateResult:
         self.operation_hash = match.groups()[0]
         pattern = r"--branch ?(\w*)"
         match = re.search(pattern, client_output)
-        if match is None:
-            raise InvalidClientOutput(client_output)
-        self.branch_hash = match.groups()[0]
+        self.branch_hash = None if match is None else match.groups()[0]
 
 
 class GetDelegateResult:
