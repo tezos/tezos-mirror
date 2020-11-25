@@ -109,7 +109,7 @@ Defining benchmarks: the ``Generator`` module
 ---------------------------------------------
 
 The ``Generator.benchmark`` type defines the interface that each benchmark
-must implement. At the time of writing, this type specifies two ways
+must implement. At the time of writing, this type specifies three ways
 to provide a benchmark (but more could be easily added):
 
 .. code-block:: ocaml
@@ -121,6 +121,12 @@ to provide a benchmark (but more could be easily added):
          closure : 'context -> unit;
          with_context : 'a. ('context -> 'a) -> 'a;
        } -> 'workload benchmark
+     | With_probe : {
+         workload : 'aspect -> 'workload;
+         probe : 'aspect probe;
+         closure : 'aspect probe -> unit;
+       }
+         -> 'workload benchmark
 
 Plain benchmarks
 ~~~~~~~~~~~~~~~~
@@ -139,6 +145,42 @@ the closure. An example (which prompted the addition of this feature)
 is the case of storage benchmarks, where we need to create a directory
 and set up some files before executing a closure containing eg
 a read or write access, after which the directory must be removed.
+
+With_probe benchmarks
+~~~~~~~~~~~~~~~~~~~~~
+
+The ``With_probe`` constructor allows fine-grained benchmarking by
+inverting control: the user is in charge of calling the pieces of code
+to be benchmarked using the provided ``probe``. The definition of a
+probe consists in a small object with three methods:
+
+.. code-block:: ocaml
+
+   type 'aspect probe = {
+     apply : 'a. 'aspect -> (unit -> 'a) -> 'a;
+     aspects : unit -> 'aspect list;
+     get : 'aspect -> float list;
+   }
+
+The intended semantics of each method is as follows:
+
+- calling ``probe.apply aspect f`` executes ``f``, performing e.g. a
+  timing measurement of ``f``'s execution time and returns the result
+  of the evaluation. The measurement is associated to the specified
+  ``aspect`` in a side-effecting way.
+- ``probe.aspects`` returns the list of all aspects.
+- Finally, ``probe.get aspect`` returns all the measurements associated
+  to ``aspect``.
+
+Note that ``With_probe`` benchmarks do not come with a fixed workload,
+but rather with an aspect-indexed family of workloads. This reflects
+the fact that this kind of benchmark can measure in the same run
+several different pieces of code, each potentially associated to its
+own cost model.
+
+The function ``Measure.make_timing_probe`` provides a basic probe
+implementation. The unit test in ``src/lib_benchmark/test/test_probe.ml``
+contains an example.
 
 Defining a predictive model: the ``Model`` module
 -------------------------------------------------
