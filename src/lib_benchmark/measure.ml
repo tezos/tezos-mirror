@@ -402,6 +402,44 @@ let load : filename:string -> packed_measurement =
      | Error err ->
          cant_load err )
 
+let to_csv :
+    type c t.
+    filename:string ->
+    bench:(c, t) Benchmark.poly ->
+    workload_data:t workload_data ->
+    unit =
+ fun ~filename ~bench ~workload_data ->
+  let (module Bench) = bench in
+  let lines =
+    List.map
+      (fun {workload; qty} -> (Bench.workload_to_vector workload, qty))
+      workload_data
+  in
+  let domain vec =
+    vec |> String.Map.to_seq |> Seq.map fst |> String.Set.of_seq
+  in
+  let names =
+    List.fold_left
+      (fun set (vec, _) -> String.Set.union (domain vec) set)
+      String.Set.empty
+      lines
+    |> String.Set.elements
+  in
+  let rows =
+    List.map
+      (fun (vec, qty) ->
+        let row =
+          List.map
+            (fun name -> string_of_float (Sparse_vec.String.get vec name))
+            names
+        in
+        row @ [string_of_float qty])
+      lines
+  in
+  let names = names @ ["timings"] in
+  let csv = names :: rows in
+  Csv.export ~filename csv
+
 (* ------------------------------------------------------------------------- *)
 (* Stats on execution times *)
 
