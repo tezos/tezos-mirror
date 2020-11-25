@@ -18,7 +18,7 @@ Client manual
 =============
 
 .. raw:: html
-         :file: tezos-client.html
+         :file: tezos-client-007.html
 
 
 .. _admin_client_manual:
@@ -27,7 +27,7 @@ Admin-client manual
 ===================
 
 .. raw:: html
-         :file: tezos-admin-client.html
+         :file: ../api/tezos-admin-client.html
 
 
 .. _signer_manual:
@@ -36,7 +36,7 @@ Signer manual
 =============
 
 .. raw:: html
-         :file: tezos-signer.html
+         :file: ../api/tezos-signer.html
 
 
 .. _baker_manual:
@@ -45,7 +45,7 @@ Baker manual
 ============
 
 .. raw:: html
-         :file: tezos-baker-alpha.html
+         :file: tezos-baker-007.html
 
 
 .. _endorser_manual:
@@ -54,7 +54,7 @@ Endorser manual
 ===============
 
 .. raw:: html
-         :file: tezos-endorser-alpha.html
+         :file: tezos-endorser-007.html
 
 
 .. _accuser_manual:
@@ -63,12 +63,4 @@ Accuser manual
 ==============
 
 .. raw:: html
-         :file: tezos-accuser-alpha.html
-
-.. _benchmark_tool_manual:
-
-Benchmark tool manual
-=====================
-
-.. raw:: html
-         :file: tezos-snoop.html
+         :file: tezos-accuser-007.html
