@@ -505,7 +505,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           "Hash of the metadata associated to the block. This is only set on \
            blocks starting from environment V1."
         ~query:RPC_query.empty
-        ~output:(option Block_metadata_hash.encoding)
+        ~output:Block_metadata_hash.encoding
         RPC_path.(path / "metadata_hash")
 
     let protocols =
@@ -634,7 +634,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
             "The root hash of the operations metadata from the block. This is \
              only set on blocks starting from environment V1."
           ~query:RPC_query.empty
-          ~output:(option Operation_metadata_list_list_hash.encoding)
+          ~output:Operation_metadata_list_list_hash.encoding
           RPC_path.(path / "operations_metadata_hash")
 
       let path = RPC_path.(path / "operation_metadata_hashes")
@@ -645,7 +645,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
             "The hashes of all the operation metadata included in the block. \
              This is only set on blocks starting from environment V1."
           ~query:RPC_query.empty
-          ~output:(option (list (list Operation_metadata_hash.encoding)))
+          ~output:(list (list Operation_metadata_hash.encoding))
           path
 
       let operation_metadata_hashes_in_pass =
@@ -655,7 +655,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
              the block. This is only set on blocks starting from environment \
              V1."
           ~query:RPC_query.empty
-          ~output:(option (list Operation_metadata_hash.encoding))
+          ~output:(list Operation_metadata_hash.encoding)
           RPC_path.(path /: Operations.list_arg)
 
       let operation_metadata_hash =
@@ -665,7 +665,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
              validation pass of the block. This is only set on blocks \
              starting from environment V1."
           ~query:RPC_query.empty
-          ~output:(option Operation_metadata_hash.encoding)
+          ~output:Operation_metadata_hash.encoding
           RPC_path.(path /: Operations.list_arg /: Operations.offset_arg)
     end
 

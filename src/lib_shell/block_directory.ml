@@ -165,8 +165,9 @@ let build_raw_rpc_directory ~user_activated_upgrades
       }
   in
   register0 S.metadata (fun block () () -> block_metadata block) ;
+  let fail_opt = function None -> Lwt.fail Not_found | Some v -> return v in
   register0 S.metadata_hash (fun block () () ->
-      State.Block.metadata_hash block >|= ok) ;
+      State.Block.metadata_hash block >>= fail_opt) ;
   (* operations *)
   let convert_with_metadata chain_id (op : Operation.t) metadata :
       Block_services.operation =
@@ -259,21 +260,22 @@ let build_raw_rpc_directory ~user_activated_upgrades
       >>= fun op -> return op) ;
   (* operation_metadata_hashes *)
   register0 S.Operation_metadata_hashes.root (fun block () () ->
-      State.Block.all_operations_metadata_hash block >>= return) ;
+      State.Block.all_operations_metadata_hash block >>= fail_opt) ;
   register0
     S.Operation_metadata_hashes.operation_metadata_hashes
     (fun block () () ->
-      State.Block.all_operations_metadata_hashes block >>= return) ;
+      State.Block.all_operations_metadata_hashes block >>= fail_opt) ;
   register1
     S.Operation_metadata_hashes.operation_metadata_hashes_in_pass
     (fun block i () () ->
-      State.Block.operations_metadata_hashes block i >>= return) ;
+      State.Block.operations_metadata_hashes block i >>= fail_opt) ;
   register2
     S.Operation_metadata_hashes.operation_metadata_hash
     (fun block i j () () ->
       State.Block.operations_metadata_hashes block i
       >>= fun hashes ->
-      return @@ Option.map (fun hashes -> List.nth hashes j) hashes) ;
+      Lwt.return (Option.map (fun hashes -> List.nth hashes j) hashes)
+      >>= fail_opt) ;
   (* context *)
   register1 S.Context.read (fun block path q () ->
       let depth = Option.value ~default:max_int q#depth in
