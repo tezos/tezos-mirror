@@ -277,7 +277,7 @@ constructors is fixed by this specification. Michelson does not let the
 programmer introduce its own types.
 
 Be aware that the syntax used in the specification may differ from
-the :ref:`concrete syntax <ConcreteSyntax>`. In particular
+the :ref:`concrete syntax <ConcreteSyntax_008>`. In particular
 some instructions are annotated with types that are not present in the
 concrete language because they are synthesized by the typechecker.
 
@@ -489,7 +489,7 @@ Core data types and notations
    intends to store large amounts of data in a map. They have higher
    gas costs than standard maps as data is lazily deserialized. A
    ``big_map`` cannot appear inside another ``big_map``. See the
-   section on :ref:``operations on big maps <OperationsOnBigMaps>``
+   section on :ref:``operations on big maps <OperationsOnBigMaps_008>``
    for a description of the syntax of values of type ``big_map (k)
    (t)`` and available operations.
 
@@ -1484,7 +1484,7 @@ value that was previously stored in the ``map`` at the same key as
 
 Operations on ``big_maps``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-.. _OperationsOnBigMaps:
+.. _OperationsOnBigMaps_008:
 
 Big maps have three possible representations. A map literal is always
 a valid representation for a big map. Big maps can also be represented
@@ -1716,9 +1716,9 @@ Domain specific data types
 
 -  ``bls12_381_fr`` : An element of the scalar field F\ :sub:`r`\ , used for scalar multiplication on the BLS12-381 curves G\ :sub:`1`\  and G\ :sub:`2`\ .
 
--  ``sapling_transaction ms``: A :ref:`Sapling<sapling_dev>` transaction
+-  ``sapling_transaction ms``: A :ref:`Sapling<sapling_dev_008>` transaction
 
--  ``sapling_state ms``: A :ref:`Sapling<sapling_dev>` state
+-  ``sapling_state ms``: A :ref:`Sapling<sapling_dev_008>` state
 
 -  ``ticket (t)``: A ticket used to authenticate information of type ``(t)`` on-chain.
 
@@ -1861,7 +1861,7 @@ until it is actually originated.
 The parameter must be consistent with the one expected by the
 contract, unit for an account.
 
-.. _MichelsonSetDelegate:
+.. _MichelsonSetDelegate_008:
 
 -  ``SET_DELEGATE``: Set or withdraw the contract's delegation.
 
@@ -2200,7 +2200,7 @@ BLS12-381 primitives
 Sapling operations
 ~~~~~~~~~~~~~~~~~~
 
-Please see the :ref:`Sapling integration<sapling_dev>` page for a more
+Please see the :ref:`Sapling integration<sapling_dev_008>` page for a more
 comprehensive description of the Sapling protocol.
 
 -  ``SAPLING_VERIFY_UPDATE``: verify and apply a transaction on a Sapling state.
@@ -2543,7 +2543,7 @@ A typing rule can be inferred:
 
 Concrete syntax
 ---------------
-.. _ConcreteSyntax:
+.. _ConcreteSyntax_008:
 
 The concrete language is very close to the formal notation of the
 specification. Its structure is extremely simple: an expression in the
@@ -2934,7 +2934,7 @@ Primitive applications can receive one or many annotations.
 An annotation is a sequence of characters that matches the regular
 expression ``@%|@%%|%@|[@:%][_0-9a-zA-Z][_0-9a-zA-Z\.%@]*``.
 Note however that ``@%``, ``@%%`` and ``%@`` are
-:ref:`special annotations <SpecialAnnotations>` and are not allowed everywhere.
+:ref:`special annotations <SpecialAnnotations_008>` and are not allowed everywhere.
 
 Annotations come after the primitive name and before its potential arguments.
 
@@ -3088,7 +3088,7 @@ type (which can be changed). For instance the annotated typing rule for
 
 Special annotations
 ~~~~~~~~~~~~~~~~~~~
-.. _SpecialAnnotations:
+.. _SpecialAnnotations_008:
 
 The special variable annotations ``@%`` and ``@%%`` can be used on instructions
 ``CAR``, ``CDR``, and ``UNPAIR``. It means to use the accessed field name (if any) as
