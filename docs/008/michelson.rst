@@ -1,4 +1,4 @@
-.. _michelson:
+.. _michelson_008:
 
 Michelson: the language of Smart Contracts in Tezos
 ===================================================

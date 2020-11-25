@@ -1,4 +1,4 @@
-.. _proof-of-stake:
+.. _proof-of-stake_008:
 
 Proof-of-stake in Tezos
 =======================
