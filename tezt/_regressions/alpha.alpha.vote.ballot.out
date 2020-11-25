@@ -1,4 +1,4 @@
-tezt/_regressions/protocol.alpha.vote.ballot.out
+tezt/_regressions/alpha.alpha.vote.ballot.out
 
 ./tezos-codec encode alpha.vote.ballot from '"nay"'
 01

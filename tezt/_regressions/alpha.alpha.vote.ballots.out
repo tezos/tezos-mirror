@@ -1,4 +1,4 @@
-tezt/_regressions/protocol.alpha.vote.ballots.out
+tezt/_regressions/alpha.alpha.vote.ballots.out
 
 ./tezos-codec encode alpha.vote.ballots from '{
   "yay": 2147483647,

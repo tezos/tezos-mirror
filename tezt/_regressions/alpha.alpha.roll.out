@@ -1,4 +1,4 @@
-tezt/_regressions/protocol.alpha.roll.out
+tezt/_regressions/alpha.alpha.roll.out
 
 ./tezos-codec encode alpha.roll from 2147483647
 7fffffff

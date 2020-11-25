@@ -1,4 +1,4 @@
-tezt/_regressions/protocol.alpha.gas.out
+tezt/_regressions/alpha.alpha.gas.out
 
 ./tezos-codec encode alpha.gas from '"1238"'
 009613

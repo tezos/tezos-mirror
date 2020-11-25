@@ -1,4 +1,4 @@
-tezt/_regressions/protocol.alpha.tez.out
+tezt/_regressions/alpha.alpha.tez.out
 
 ./tezos-codec encode alpha.tez from '"7322135"'
 97f4be03
