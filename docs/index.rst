@@ -108,7 +108,6 @@ in the :ref:`introduction <howtoget>`.
    user/history_modes
    user/snapshots
    user/various
-   user/glossary
    user/multinetwork
 
 .. toctree::
@@ -130,6 +129,7 @@ in the :ref:`introduction <howtoget>`.
    007/michelson
    007/proof_of_stake
    007/voting
+   007/glossary
    007/cli-commands
    007/rpc
 
@@ -142,6 +142,7 @@ in the :ref:`introduction <howtoget>`.
    008/proof_of_stake
    008/sapling
    008/voting
+   008/glossary
    008/cli-commands
    008/rpc
 
