@@ -7,8 +7,8 @@ import pytest
 from client.client import Client
 from tools import utils
 from tools.constants import IDENTITIES
-from tools.paths import (CONTRACT_PATH, ILLTYPED_CONTRACT_PATH, all_contracts,
-                         all_legacy_contracts)
+from .contract_paths import (CONTRACT_PATH, ILLTYPED_CONTRACT_PATH,
+                             all_contracts, all_legacy_contracts)
 
 BAKE_ARGS = ['--minimal-timestamp']
 

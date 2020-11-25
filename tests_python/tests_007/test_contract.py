@@ -3,11 +3,11 @@ import re
 import json
 import itertools
 import pytest
-from tools.paths import CONTRACT_PATH, ILLTYPED_CONTRACT_PATH, \
-    all_contracts
 from tools import utils
 from tools.constants import IDENTITIES
 from client.client import Client
+from .contract_paths import CONTRACT_PATH, ILLTYPED_CONTRACT_PATH, \
+    all_contracts
 
 BAKE_ARGS = ['--minimal-timestamp']
 

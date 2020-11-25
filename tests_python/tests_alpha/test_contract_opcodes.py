@@ -4,9 +4,9 @@ import pytest
 
 from tools.client_regression import ClientRegression
 from tools.constants import IDENTITIES
-from tools.paths import MINI_SCENARIOS_CONTRACT_PATH, OPCODES_CONTRACT_PATH
 from tools.utils import (assert_run_failure, assert_run_script_failwith,
                          assert_run_script_success)
+from .contract_paths import MINI_SCENARIOS_CONTRACT_PATH, OPCODES_CONTRACT_PATH
 
 
 PUBLIC_KEY = IDENTITIES['bootstrap1']['public']

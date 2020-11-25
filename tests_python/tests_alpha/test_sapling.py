@@ -4,6 +4,7 @@ from os import path
 import pytest
 from tools import utils, paths, constants
 from tools.utils import assert_run_failure
+from . import contract_paths
 
 
 # TODO: Use a random valid memo size for shielded-tez and others
@@ -727,7 +728,7 @@ class TestSaplingStateCorruption:
         """
         Makes sure sapling state with id 0 exists
         """
-        contract = path.join(paths.OPCODES_CONTRACT_PATH,
+        contract = path.join(contract_paths.OPCODES_CONTRACT_PATH,
                              "sapling_empty_state.tz")
         client.originate(
             amount=0,
@@ -739,7 +740,7 @@ class TestSaplingStateCorruption:
         client.bake("bootstrap1")
 
     def test_originate_with_id_is_forbidden(self, client):
-        contract = path.join(paths.OPCODES_CONTRACT_PATH,
+        contract = path.join(contract_paths.OPCODES_CONTRACT_PATH,
                              "sapling_empty_state.tz")
         with assert_run_failure(r'Unexpected forged value'):
             client.originate(

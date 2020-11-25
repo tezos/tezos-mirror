@@ -1,8 +1,9 @@
 import os
 import pytest
-from tools import paths, utils, constants
+from tools import utils, constants
 from client.client import Client
 from . import protocol
+from . import contract_paths
 
 
 BAKE_ARGS = ['--minimal-timestamp']
@@ -24,7 +25,7 @@ class TestOriginationCall:
 
     def test_originate(self, client: Client, session: dict):
         initial_storage = 'Unit'
-        contract = os.path.join(paths.OPCODES_CONTRACT_PATH,
+        contract = os.path.join(contract_paths.OPCODES_CONTRACT_PATH,
                                 'transfer_tokens.tz')
         args = ['--init', initial_storage, '--burn-cap', '0.400']
         origination = client.originate('foobar', 1000,

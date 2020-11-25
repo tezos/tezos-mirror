@@ -6,7 +6,7 @@ import pytest
 
 from Crypto.Hash import keccak, SHA3_256
 
-from tools.paths import OPCODES_CONTRACT_PATH
+from .contract_paths import OPCODES_CONTRACT_PATH
 
 RANDOM_ITERATIONS = 50
 

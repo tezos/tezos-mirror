@@ -1,7 +1,7 @@
 from os import path
 import pytest
 from tools import utils
-from tools.paths import all_legacy_contracts, CONTRACT_PATH, \
+from .contract_paths import all_legacy_contracts, CONTRACT_PATH, \
     LEGACY_CONTRACT_PATH
 
 

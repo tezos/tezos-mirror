@@ -1,11 +1,11 @@
 from os import path
 import pytest
-from tools.paths import MACROS_CONTRACT_PATH, CONTRACT_PATH, all_contracts
 from tools.utils import assert_run_script_failwith, \
     assert_transfer_failwith, init_with_transfer, bake, \
     assert_storage_contains
 from tools.client_regression import ClientRegression
 from client.client import Client
+from .contract_paths import MACROS_CONTRACT_PATH, CONTRACT_PATH, all_contracts
 
 
 BAKE_ARGS = ['--minimal-timestamp']

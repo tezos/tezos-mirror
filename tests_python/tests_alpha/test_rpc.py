@@ -1,10 +1,11 @@
 import os
 import time
 import pytest
-from tools import utils, constants, paths
+from tools import utils, constants
 from client.client_output import InvalidClientOutput
 from launchers.sandbox import Sandbox
 from . import protocol
+from . import contract_paths
 
 BAKE_ARGS = ['--max-priority', '512', '--minimal-timestamp']
 CHAIN_ID = "main"
@@ -48,7 +49,7 @@ def sandbox(sandbox: Sandbox, contract_name, session: dict):
     client.bake("bootstrap1", BAKE_ARGS)
     time.sleep(2)
     # Deploy a contract
-    contract = os.path.join(paths.CONTRACT_PATH, 'attic',
+    contract = os.path.join(contract_paths.CONTRACT_PATH, 'attic',
                             'id.tz')
     args = ['--init', "\"tezos\"", '--burn-cap', '10.0']
     origination = client.originate(contract_name, 10.0,

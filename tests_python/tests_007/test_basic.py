@@ -2,8 +2,9 @@ from os import path
 import pytest
 from client import client_output
 from client.client import Client
-from tools.paths import CONTRACT_PATH, ACCOUNT_PATH
+from tools.paths import ACCOUNT_PATH
 from tools.utils import assert_run_failure
+from .contract_paths import CONTRACT_PATH
 
 
 BAKE_ARGS = ['--max-priority', '512', '--minimal-timestamp']

@@ -3,10 +3,10 @@ import subprocess
 import pytest
 from tools.client_regression import ClientRegression
 from tools import paths
-from tools.paths import OPCODES_CONTRACT_PATH, MINI_SCENARIOS_CONTRACT_PATH
 from tools.utils import assert_run_failure, assert_storage_contains, bake, \
     init_with_transfer, assert_balance
 from tools.constants import IDENTITIES
+from .contract_paths import OPCODES_CONTRACT_PATH, MINI_SCENARIOS_CONTRACT_PATH
 
 KEY1 = 'foo'
 KEY2 = 'bar'
