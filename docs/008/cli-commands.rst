@@ -12,7 +12,7 @@ using the following shell commands.
    tezos-admin-client man -verbosity 3
 
 
-.. _client_manual:
+.. _client_manual_008:
 
 Client manual
 =============
@@ -21,7 +21,7 @@ Client manual
          :file: tezos-client-alpha.html
 
 
-.. _admin_client_manual:
+.. _admin_client_manual_008:
 
 Admin-client manual
 ===================
@@ -30,7 +30,7 @@ Admin-client manual
          :file: ../api/tezos-admin-client.html
 
 
-.. _signer_manual:
+.. _signer_manual_008:
 
 Signer manual
 =============
@@ -39,7 +39,7 @@ Signer manual
          :file: ../api/tezos-signer.html
 
 
-.. _baker_manual:
+.. _baker_manual_008:
 
 Baker manual
 ============
@@ -48,7 +48,7 @@ Baker manual
          :file: tezos-baker-alpha.html
 
 
-.. _endorser_manual:
+.. _endorser_manual_008:
 
 Endorser manual
 ===============
@@ -57,7 +57,7 @@ Endorser manual
          :file: tezos-endorser-alpha.html
 
 
-.. _accuser_manual:
+.. _accuser_manual_008:
 
 Accuser manual
 ==============
