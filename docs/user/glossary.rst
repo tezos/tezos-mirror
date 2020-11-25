@@ -200,7 +200,7 @@ _`Voting period`
 
 _`Voting listings`
     The list calculated at the beginning of each `voting period`_ that contains
-    the staking balance (in number of rolls_) of each delegate_ that owns more
+    the staking balance (in number of rolls) of each delegate_ that owns more
     than one roll_ at that moment. For each delegate_, The voting listings
     reflects the weight of the vote emitted by the delegate_ when ammending the
     `economic protocol`_.
