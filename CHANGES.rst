@@ -155,6 +155,10 @@ Client
 -  Commands using an encrypted key now fail after the user fails to give the correct
    password three times
 
+-  Added support for FA1.2 standard, allowing to interact with fungible
+   assets contracts using the ``from fa1.2 contract ...`` commands, and
+   support for running the view entrypoints offchain.
+
 Baker / Endorser / Accuser
 --------------------------
 
