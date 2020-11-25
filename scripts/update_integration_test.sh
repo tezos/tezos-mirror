@@ -13,13 +13,13 @@ csplit --quiet --prefix="$tmp" "$src_dir/.gitlab-ci.yml" /##BEGIN_INTEGRATION_PY
 mv "$tmp"00 "$tmp"
 rm "$tmp"0*
 
-for test in $(find tests_python/tests/ -name 'test_*.py' | LC_COLLATE=C sort); do
+for test in $(find tests_python/tests_007/ tests_python/tests_alpha/ -name 'test_*.py' | LC_COLLATE=C sort); do
     case "$test" in
       */multibranch/*)
         # skip multibranch tests for now
         ;;
       *)
-        testname=${test##*/test_}
+        testname=$(printf '%s' "$test" | sed -e 's@tests_python/tests_\(.*\)/test_\(.*\).py@\1_\2@g')
         testname=${testname%%.py}
         cat >> $tmp <<EOF
 integration:$testname:
