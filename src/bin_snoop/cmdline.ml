@@ -42,6 +42,7 @@ type benchmark_options = {
   options : Measure.options;
   save_file : string;
   storage : storage_kind;
+  csv_export : string option;
 }
 
 type codegen_options =
@@ -123,12 +124,15 @@ let benchmark_options_encoding =
   let open Data_encoding in
   def "benchmark_options_encoding"
   @@ conv
-       (fun {options; save_file; storage} -> (options, save_file, storage))
-       (fun (options, save_file, storage) -> {options; save_file; storage})
-       (obj3
+       (fun {options; save_file; storage; csv_export} ->
+         (options, save_file, storage, csv_export))
+       (fun (options, save_file, storage, csv_export) ->
+         {options; save_file; storage; csv_export})
+       (obj4
           (req "options" Measure.options_encoding)
           (req "save_file" string)
-          (req "storage" storage_kind_encoding))
+          (req "storage" storage_kind_encoding)
+          (opt "csv-export" string))
 
 (* -------------------------------------------------------------------------- *)
 (* Global state set by command line parsing. Custom benchmark commands need
