@@ -63,16 +63,6 @@ def pytest_runtest_setup(item) -> None:
             pytest.xfail("previous test failed (%s)" % previousfailed.name)
 
 
-def pytest_addoption(parser) -> None:
-    parser.addoption(
-        "--log-dir", action="store", help="specify log directory"
-    )
-    parser.addoption(
-        "--singleprocess", action='store_true', default=False,
-        help="the node validates blocks using only one process,\
-        useful for debugging")
-
-
 DEAD_DAEMONS_WARN = '''
 It seems some daemons terminated unexpectedly, or didn't launch properly.
 You can investigate daemon logs by running this test using the
