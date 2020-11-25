@@ -41,7 +41,7 @@ class TestContractLegacy:
 
         contract = path.join(LEGACY_CONTRACT_PATH, contract)
         run_script_res = client.run_script(contract, param,
-                                           storage, None, True)
+                                           storage, trace_stack=True)
         assert run_script_res.storage == expected
 
     @pytest.mark.parametrize(

@@ -641,7 +641,7 @@ class TestContractOpcodes:
             "test contract should have .tz extension"
         contract = path.join(OPCODES_CONTRACT_PATH, contract)
         run_script_res = client.run_script(contract, param,
-                                           storage, None, True)
+                                           storage, trace_stack=True)
         assert run_script_res.storage == expected
 
     @pytest.mark.parametrize(
@@ -716,7 +716,7 @@ class TestContractOpcodes:
         client = client_regtest
         contract = path.join(OPCODES_CONTRACT_PATH, contract)
         run_script_res = client.run_script(contract, param, storage,
-                                           None, True)
+                                           trace_stack=True)
         assert run_script_res.storage == expected
         assert run_script_res.big_map_diff == big_map_diff
 
@@ -781,7 +781,7 @@ class TestContractOpcodes:
         contract = path.join(MINI_SCENARIOS_CONTRACT_PATH,
                              'big_map_magic.tz')
         run_script_res = client.run_script(contract, storage, param,
-                                           None, True)
+                                           trace_stack=True)
         assert run_script_res.storage == expected
         assert run_script_res.big_map_diff == big_map_diff
 
