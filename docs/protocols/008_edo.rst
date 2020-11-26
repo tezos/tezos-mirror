@@ -168,9 +168,8 @@ Addition of Michelson opcodes for the pairing friendly elliptic curve BLS12-381.
 Tickets
 ~~~~~~~
 
-- Type ``ticket 'a``
-- Instructions ``TICKET``, ``READ_TICKET``, ``SPLIT_TICKET``, ``JOIN_TICKETS``
-- Instruction ``GET_AND_UPDATE``
+Tickets are a generic and composable mechanism for authenticating data
+from smart contracts, managing permissions, and representing assets. More information can be found in the `Ticket documentation <https://metastatedev.gitlab.io/-/tezos/-/jobs/867541464/artifacts/docs/_build/whitedoc/michelson.html#operations-on-tickets>`_.
 
 Comb pairs
 ~~~~~~~~~~
@@ -179,15 +178,15 @@ Comb pairs
   to respectively build a comb pair of size ``n`` from ``n`` stack
   elements, decompose a comb pair of size ``n`` into ``n`` stack elements,
   access the ``k`` -th element in a comb pair, replace the ``k`` -th element
-  in a comb pair
-- Optimized notations for comb pair types and values
+  in a comb pair.
+- Optimized notations for comb pair types and values.
 
 Type system
 ~~~~~~~~~~~
 
-- Empty type ``never`` and instruction ``NEVER``
-- Types ``chain_id``, ``key``, ``pair``s, ``option``s, ``or``s,
-  ``signature``, ``unit`` made comparable
+- Empty type ``never`` and instruction ``NEVER``.
+- Types ``chain_id``, ``key``, ``pair``, ``option``, ``or``,
+  ``signature``, and ``unit`` made comparable
 - ``FAILWITH`` restricted to packable types
 
 Macros promoted as instructions
@@ -199,19 +198,20 @@ Macros promoted as instructions
 New instructions
 ~~~~~~~~~~~~~~~~
 
-TBD
-
-Minor
-~~~~~
-
 - New hash functions: instructions ``KECCAK`` and ``SHA3``
 - Instruction ``LEVEL`` to query the level of the current block
 - Instructions ``VOTING_POWER`` (and resp. ``TOTAL_VOTING_POWER``) to
   query the voting power of a particular delegate (resp. of all
   delegates)
 - Instruction ``SELF_ADDRESS`` equivalent to ``SELF; ADDRESS`` but allowed in lambdas
+
+Legacy
+~~~~~~
+
 - Removed legacy instructions ``STEPS_TO_QUOTA``, ``CREATE_ACCOUNT``,
-  and the legacy version of ``CREATE_CONTACT``
+  and the legacy version of ``CREATE_CONTACT``. These instructions are
+  deprecated since Babylon and have not been used on Mainnet before
+  their deprecation.
 
 
 Internal
