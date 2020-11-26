@@ -73,6 +73,9 @@ here either.
 
 ## Docker Images
 
+- Docker images are now available for arm64. Image tags stay the same
+  but now refer to "multi-arch" manifests.
+
 ## Miscellaneous
 
 # Version 8.0~rc1
