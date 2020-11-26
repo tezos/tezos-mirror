@@ -108,34 +108,34 @@ external of_substring_base
 
 (** {1 Basic arithmetic operations} *)
 
-external succ: t -> t = "ml_z_succ" "ml_as_z_succ"
+val succ: t -> t
 (** Returns its argument plus one. *)
 
-external pred: t -> t = "ml_z_pred" "ml_as_z_pred"
+val pred: t -> t
 (** Returns its argument minus one. *)
 
-external abs: t -> t = "ml_z_abs" "ml_as_z_abs"
+val abs: t -> t
 (** Absolute value. *)
 
-external neg: t -> t = "ml_z_neg" "ml_as_z_neg"
+val neg: t -> t
 (** Unary negation. *)
 
-external add: t -> t -> t = "ml_z_add" "ml_as_z_add"
+val add: t -> t -> t
 (** Addition. *)
 
-external sub: t -> t -> t = "ml_z_sub" "ml_as_z_sub"
+val sub: t -> t -> t
 (** Subtraction. *)
 
-external mul: t -> t -> t = "ml_z_mul" "ml_as_z_mul"
+val mul: t -> t -> t
 (** Multiplication. *)
 
-external div: t -> t -> t = "ml_z_div" "ml_as_z_div"
+val div: t -> t -> t
 (** Integer division. The result is truncated towards zero
     and obeys the rule of signs.
     Raises [Division_by_zero] if the divisor (second argument) is 0.
  *)
 
-external rem: t -> t -> t = "ml_z_rem" "ml_as_z_rem"
+val rem: t -> t -> t
 (** Integer remainder. Can raise a [Division_by_zero].
     The result of [rem a b] has the sign of [a], and its absolute value is
     strictly smaller than the absolute value of [b].
@@ -176,7 +176,7 @@ val erem: t -> t -> t
     [a = b * ediv a b + erem a b].  Raises [Division_by_zero] if [b = 0].
  *)
 
-external divexact: t -> t -> t = "ml_z_divexact" "ml_as_z_divexact"
+val divexact: t -> t -> t
 (** [divexact a b] divides [a] by [b], only producing correct result when the
     division is exact, i.e., when [b] evenly divides [a].
     It should be faster than general division.
@@ -205,27 +205,27 @@ external congruent: t -> t -> t -> bool = "ml_z_congruent"
     1s.
  *)
 
-external logand: t -> t -> t = "ml_z_logand" "ml_as_z_logand"
+val logand: t -> t -> t
 (** Bitwise logical and. *)
 
-external logor: t -> t -> t = "ml_z_logor" "ml_as_z_logor"
+val logor: t -> t -> t
 (** Bitwise logical or. *)
 
-external logxor: t -> t -> t = "ml_z_logxor" "ml_as_z_logxor"
+val logxor: t -> t -> t
 (** Bitwise logical exclusive or. *)
 
-external lognot: t -> t = "ml_z_lognot" "ml_as_z_lognot"
+val lognot: t -> t
 (** Bitwise logical negation.
     The identity [lognot a]=[-a-1] always hold.
  *)
 
-external shift_left: t -> int -> t = "ml_z_shift_left" "ml_as_z_shift_left"
+val shift_left: t -> int -> t
 (** Shifts to the left.
     Equivalent to a multiplication by a power of 2.
     The second argument must be nonnegative.
  *)
 
-external shift_right: t -> int -> t = "ml_z_shift_right" "ml_as_z_shift_right"
+val shift_right: t -> int -> t
 (** Shifts to the right.
     This is an arithmetic shift,
     equivalent to a division by a power of 2 with rounding towards -oo.
