@@ -18,10 +18,6 @@
                    -linkall)))
 
 (rule
-  (target void_for_linking)
-  (action (write-file ${target} "")))
-
-(rule
  (alias runtest_lint)
  (deps (glob_files *.ml{,i}))
  (action (run %{lib:tezos-tooling:lint.sh} %{deps})))
