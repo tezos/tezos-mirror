@@ -132,6 +132,20 @@ build:
     expire_in: 1 day
     when: on_success
 
+build_arm64:
+  <<: *build_definition
+  when: manual
+  script:
+    - . ./scripts/version.sh
+    - dune build @all
+    - dune install --prefix install_root
+  artifacts:
+    name: "build-$CI_COMMIT_REF_SLUG"
+    paths:
+      - install_root/bin/tezos-*
+  tags:
+    - arm64
+
 ############################################################
 ## Stage: test (only MR)                                  ##
 ############################################################
