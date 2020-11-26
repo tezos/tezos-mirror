@@ -22,7 +22,7 @@ def scenario(contract, storage, time_between_blocks, proto):
         parameters["time_between_blocks"] = [str(time_between_blocks), "0"]
 
         sandbox.add_node(1, params=constants.NODE_PARAMS)
-        utils.activate_alpha(sandbox.client(1), parameters, proto=proto_hash)
+        utils.activate_alpha(sandbox.client(1), proto_hash, parameters)
         sandbox.add_baker(1, 'bootstrap5', proto=proto_daemon)
         client = sandbox.client(1)
         if contract:
