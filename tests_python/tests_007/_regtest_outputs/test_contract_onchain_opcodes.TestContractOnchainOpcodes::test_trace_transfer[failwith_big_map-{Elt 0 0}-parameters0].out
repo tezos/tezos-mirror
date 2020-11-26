@@ -85,7 +85,7 @@ with { Elt 1 1 }
 Fatal error:
   transfer simulation failed
 Node is bootstrapped.
-"Assert_failure src/proto_alpha/lib_protocol/script_ir_translator.ml:5135:8"
+"Assert_failure src/proto_007_PsDELPH1/lib_protocol/script_ir_translator.ml:5135:8"
 Fatal error:
   transfer simulation failed
 Node is bootstrapped.
@@ -105,7 +105,7 @@ This simulation failed:
 
 Invalid argument passed to contract [CONTRACT_HASH].
 At (unshown) location 0, value 99999999 is invalid for type big_map int int.
-{ "id": "proto.alpha.michelson_v1.invalid_big_map",
+{ "id": "proto.007-PsDELPH1.michelson_v1.invalid_big_map",
   "description":
     "A script or data expression references a big_map that does not exist or assumes a wrong type for an existing big_map.",
   "data": { "location": 0, "big_map": "99999999" } }
