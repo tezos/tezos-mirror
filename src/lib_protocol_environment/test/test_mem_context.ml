@@ -223,6 +223,110 @@ let test_fold {genesis = ctxt; _} =
   Assert.equal_string_list_list ~msg:__LOC__ [] l ;
   Lwt.return_unit
 
+(* We now test the [keys] function.
+ *
+ * These tests are important for [Test_mem_context_array_theory] that
+ * relies on this function. We don't want the tests of [keys] to be
+ * in [Test_mem_context_array_theory] because it uses Crowbar.
+ *
+ * We need [keys] to be correct, because it's at the core of checking
+ * the second axiom of array theory in [Test_mem_context_array_theory].
+ *)
+
+module StringListOrd : Stdlib.Set.OrderedType with type t = string list =
+struct
+  type t = string list
+
+  let compare = Stdlib.compare
+end
+
+module StringListSet = Set.Make (StringListOrd)
+
+module PP = struct
+  let key ppf k =
+    let atom_pp fmt s = Format.fprintf fmt "%s" s in
+    Format.pp_print_list
+      atom_pp
+      ppf
+      ~pp_sep:(fun fmt () -> Format.fprintf fmt "->")
+      k
+
+  let domain ppf d =
+    let l = StringListSet.to_seq d |> List.of_seq in
+    Format.pp_print_list
+      key
+      ppf
+      ~pp_sep:(fun fmt () -> Format.fprintf fmt "; ")
+      l
+
+  let domain ppf d = Format.fprintf ppf "[%a]" domain d
+
+  let domain_to_string d = Format.asprintf "%a" domain d
+end
+
+let domain ctxt = keys ctxt []
+
+let check_eq_domains d1 d2 =
+  let eq d d' = StringListSet.subset d d' && StringListSet.subset d' d in
+  Assert.equal ~eq ~prn:PP.domain_to_string d1 d2
+
+let test_domain0 () =
+  let b0 = Bytes.of_string "0" in
+  let k1 = ["a"] in
+  let k2 = ["b"] in
+  let k3 = ["c"] in
+  let ctxt = Memory_context.empty in
+  Context.set ctxt k1 b0
+  >>= fun ctxt ->
+  Context.set ctxt k2 b0
+  >>= fun ctxt ->
+  Context.set ctxt k3 b0
+  >>= fun ctxt ->
+  let expected_domain = [k1; k2; k3] |> StringListSet.of_list in
+  domain ctxt
+  >>= fun actual_domain ->
+  let actual_domain = StringListSet.of_list actual_domain in
+  check_eq_domains expected_domain actual_domain ;
+  Lwt.return_unit
+
+let test_domain1 () =
+  let b0 = Bytes.of_string "0" in
+  let k1 = ["a"; "b"] in
+  let k2 = ["a"; "c"; "d"] in
+  let ctxt = Memory_context.empty in
+  Context.set ctxt k1 b0
+  >>= fun ctxt ->
+  Context.set ctxt k2 b0
+  >>= fun ctxt ->
+  let expected_domain = [k1; k2] |> StringListSet.of_list in
+  domain ctxt
+  >>= fun actual_domain ->
+  let actual_domain = StringListSet.of_list actual_domain in
+  check_eq_domains expected_domain actual_domain ;
+  Lwt.return_unit
+
+let test_domain2 () =
+  let b0 = Bytes.of_string "0" in
+  let k1 = ["a"; "b"] in
+  let k2 = ["a"; "c"; "d"] in
+  let k3 = ["a"; "c"; "e"] in
+  let k4 = ["x"] in
+  let ctxt = Memory_context.empty in
+  Context.set ctxt k1 b0
+  >>= fun ctxt ->
+  Context.set ctxt k2 b0
+  >>= fun ctxt ->
+  Context.set ctxt k3 b0
+  >>= fun ctxt ->
+  Context.set ctxt k4 b0
+  >>= fun ctxt ->
+  let expected_domain = [k1; k2; k3; k4] |> StringListSet.of_list in
+  domain ctxt
+  >>= fun actual_domain ->
+  let actual_domain = StringListSet.of_list actual_domain in
+  check_eq_domains expected_domain actual_domain ;
+  Lwt.return_unit
+
 (******************************************************************************)
 
 let tests =
@@ -232,7 +336,15 @@ let tests =
     ("replay", test_replay);
     ("fold", test_fold) ]
 
+let domain_tests =
+  [ ("domain0", test_domain0);
+    ("domain1", test_domain1);
+    ("domain2", test_domain2) ]
+
 let tests =
   List.map
     (fun (n, f) -> Alcotest_lwt.test_case n `Quick (wrap_context_init f))
     tests
+  @ List.map
+      (fun (n, f) -> Alcotest_lwt.test_case n `Quick (fun _ _ -> f ()))
+      domain_tests
