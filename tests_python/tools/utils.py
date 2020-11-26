@@ -634,3 +634,36 @@ def rolling_node_blocks_availability(
     # [savepoint;…;head] are available with metadata
     for i in range(savepoint + 1, head):
         get_block_header_at_level(sandbox.client(node_id), i)
+
+
+def file_basename(path):
+    return os.path.splitext(os.path.basename(path))[0]
+
+
+# pylint: disable=dangerous-default-value
+# Generic piece of code to originate a contract
+def originate(
+    client: Client,
+    session: dict,
+    contract: str,
+    init_storage: str,
+    amount: int,
+    contract_name=None,
+    sender='bootstrap1',
+    baker='bootstrap5',
+    burn_cap='10.0',
+    arguments=None,
+):
+    if contract_name is None:
+        contract_name = file_basename(contract)
+
+    args = ['--init', init_storage, '--burn-cap', burn_cap]
+    if arguments is not None:
+        args += arguments
+    origination = client.originate(
+        contract_name, amount, sender, contract, args
+    )
+    session['contract'] = origination.contract
+    bake(client, baker)
+    assert check_block_contains_operations(client, [origination.operation_hash])
+    return origination
