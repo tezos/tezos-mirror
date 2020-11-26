@@ -1445,7 +1445,7 @@ publish:docker:
   before_script:
     - apk add git binutils
     - mkdir ~/.docker || true
-    - echo "${CI_DOCKER_AUTH}" > ~/.docker/config.json
+    - echo "{ \"auths\":{ \"https://index.docker.io/v1/\":{ \"auth\":\"${CI_DOCKER_AUTH}\" } } }" > ~/.docker/config.json
   script:
     - LAST_COMMIT_DATE_TIME=$(git log --pretty=format:"%cd" -1 --date="format:%Y%m%d%H%M%S" 2>&1)
     - ./scripts/create_docker_image.sh
