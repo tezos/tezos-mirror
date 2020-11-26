@@ -55,12 +55,6 @@ sanity:
   stage: build
   except:
     - master
-    - zeronet
-    - mainnet
-    - zeronet-staging
-    - mainnet-staging
-    - zeronet-snapshots
-    - mainnet-snapshots
     - tags@tezos/tezos
     - /-release$/@tezos/tezos
   before_script:
@@ -155,12 +149,6 @@ test-script-gen-genesis:
   stage: test
   except:
     - master
-    - zeronet
-    - mainnet
-    - zeronet-staging
-    - mainnet-staging
-    - zeronet-snapshots
-    - mainnet-snapshots
     - tags@tezos/tezos
     - /-release$/@tezos/tezos
   before_script:
@@ -618,12 +606,6 @@ documentation:build:
   stage: doc
   except:
     - master
-    - zeronet
-    - mainnet
-    - zeronet-staging
-    - mainnet-staging
-    - zeronet-snapshots
-    - mainnet-snapshots
     - tags@tezos/tezos
     - /-release$/@tezos/tezos
   script:
@@ -1436,12 +1418,6 @@ publish:docker:
     - master@tezos/tezos
     - tags@tezos/tezos
     - /-release$/@tezos/tezos
-    - zeronet@tezos/tezos
-    - mainnet@tezos/tezos
-    - zeronet-staging@tezos/tezos
-    - mainnet-staging@tezos/tezos
-    - zeronet-snapshots@tezos/tezos
-    - mainnet-snapshots@tezos/tezos
   before_script:
     - apk add git binutils
     - mkdir ~/.docker || true
