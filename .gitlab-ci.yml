@@ -296,7 +296,8 @@ integration:sandboxes:acc-endorsement:
 integration:sandboxes:u-a-u:
   <<: *integration_definition
   script:
-    - ROOT_PATH=$PWD/flextesa-hard-fork dune build @src/bin_sandbox/runtest_sandbox_user_activated_upgrade
+    - ROOT_PATH=$PWD/flextesa-hard-fork dune build @src/bin_sandbox/runtest_sandbox_user_activated_upgrade_active
+    - ROOT_PATH=$PWD/flextesa-hard-fork dune build @src/bin_sandbox/runtest_sandbox_user_activated_upgrade_alpha
   artifacts:
     paths:
       - flextesa-hard-fork
@@ -306,7 +307,8 @@ integration:sandboxes:u-a-u:
 integration:sandboxes:daemons-upgrade:
   <<: *integration_definition
   script:
-    - ROOT_PATH=$PWD/flextesa-daemons-upgrade dune build @src/bin_sandbox/runtest_sandbox_daemons_upgrade
+    - ROOT_PATH=$PWD/flextesa-daemons-upgrade dune build @src/bin_sandbox/runtest_sandbox_daemons_upgrade_active
+    - ROOT_PATH=$PWD/flextesa-daemons-upgrade dune build @src/bin_sandbox/runtest_sandbox_daemons_upgrade_alpha
   artifacts:
     paths:
       - flextesa-daemons-upgrade
