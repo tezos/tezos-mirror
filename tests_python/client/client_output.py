@@ -534,3 +534,33 @@ class ViewResult:
 
     def __init__(self, client_output: str):
         self.result = client_output
+
+
+class FA12CheckResult:
+    """Result of a 'check contract .. has fa1.2 interface` command."""
+
+    def __init__(self, client_output: str):
+        pattern = r"has an FA1.2 interface."
+        match = re.search(pattern, client_output)
+        if match is None:
+            pattern = r"Not a supported FA1.2 contract."
+            match = re.search(pattern, client_output)
+            if match is None:
+                raise InvalidClientOutput(client_output)
+            self.check = False
+        else:
+            self.check = True
+
+
+class FA12ViewResult:
+    """Result of a 'from fa1.2 contract .. get ..` command."""
+
+    def __init__(self, client_output: str):
+        try:
+            pattern = r"([\w.]*)"
+            match = re.search(pattern, client_output)
+            if match is None:
+                raise InvalidClientOutput(client_output)
+            self.amount = int(match.groups()[0])
+        except Exception as exception:
+            raise InvalidClientOutput(client_output) from exception
