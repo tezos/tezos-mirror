@@ -7,10 +7,10 @@ from . import protocol
 LOG_LEVEL = {"validator.chain": "debug", "validator.peer": "debug"}
 
 
-def params(threshold=0):
+def params(threshold=0, latency=3):
     return [
         '--sync-latency',
-        '3',
+        str(latency),
         '--synchronisation-threshold',
         str(threshold),
         '--connections',
@@ -129,7 +129,10 @@ class TestSplitView:
             1, params=params(), config_client=False, log_levels=LOG_LEVEL
         )
         sandbox.add_node(
-            2, params=params(2), config_client=False, log_levels=LOG_LEVEL
+            2,
+            params=params(2, latency=15),
+            config_client=False,
+            log_levels=LOG_LEVEL,
         )
         sandbox.add_baker(0, 'bootstrap5', proto=protocol.DAEMON)
 
