@@ -131,6 +131,38 @@ let blockchain_network_delphinet =
         "delphinet.kaml.fr";
         "13.53.41.201" ]
 
+let blockchain_network_edonet =
+  make_blockchain_network
+    ~alias:"edonet"
+    {
+      time = Time.Protocol.of_notation_exn "2020-11-30T12:00:00Z";
+      block =
+        Block_hash.of_b58check_exn
+          "BLockGenesisGenesisGenesisGenesisGenesis2431bbUwV2a";
+      protocol =
+        Protocol_hash.of_b58check_exn
+          "PtYuensgYBb3G3x1hLLbCmcav8ue8Kyd2khADcL5LsT5R1hcXex";
+    }
+    ~genesis_parameters:
+      {
+        context_key = "sandbox_parameter";
+        values =
+          `O
+            [ ( "genesis_pubkey",
+                `String
+                  "edpkugeDwmwuwyyD3Q5enapgEYDxZLtEUFFSrvVwXASQMVEqsvTqWu" ) ];
+      }
+    ~chain_name:"TEZOS_EDONET_2020-11-30T12:00:00Z"
+    ~sandboxed_chain_name:"SANDBOXED_TEZOS"
+    ~default_bootstrap_peers:
+      [ "51.75.246.56:9733";
+        "edonet.tezos.co.il";
+        "46.245.179.161:9733";
+        "edonet.smartpy.io";
+        "188.40.128.216:29732";
+        "51.79.165.131";
+        "edonet.boot.tezostaquito.io" ]
+
 let blockchain_network_sandbox =
   make_blockchain_network
     ~alias:"sandbox"
@@ -223,7 +255,8 @@ let blockchain_network_encoding : blockchain_network Data_encoding.t =
 let builtin_blockchain_networks_with_tags =
   [ (1, blockchain_network_sandbox);
     (4, blockchain_network_mainnet);
-    (9, blockchain_network_delphinet) ]
+    (9, blockchain_network_delphinet);
+    (11, blockchain_network_edonet) ]
   |> List.map (fun (tag, network) ->
          match network.alias with
          | None ->
