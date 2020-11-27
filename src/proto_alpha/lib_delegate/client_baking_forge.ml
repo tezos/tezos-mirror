@@ -901,21 +901,13 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
       Context.get_protocol context
       >>= fun next_protocol ->
       if Protocol_hash.equal current_protocol next_protocol then
-        Alpha_block_services.metadata_hash cctxt ~chain ~block ()
-        >>=? fun predecessor_block_metadata_hash ->
-        Alpha_block_services.Operation_metadata_hashes.root
-          cctxt
-          ~chain
-          ~block
-          ()
-        >>=? fun predecessor_ops_metadata_hash ->
         finalize_block_header
           final_context.header
           ~timestamp:min_valid_timestamp
           validation_result
           operations
-          predecessor_block_metadata_hash
-          predecessor_ops_metadata_hash
+          bi.predecessor_block_metadata_hash
+          bi.predecessor_operations_metadata_hash
         >>= function
         | Error (Forking_test_chain :: _) ->
             Alpha_block_services.Helpers.Preapply.block
@@ -1278,21 +1270,13 @@ let build_block cctxt ~user_activated_upgrades state seed_nonce_hash
             Context.get_protocol context
             >>= fun next_protocol ->
             if Protocol_hash.equal current_protocol next_protocol then
-              Alpha_block_services.metadata_hash cctxt ~chain ~block ()
-              >>=? fun predecessor_block_metadata_hash ->
-              Alpha_block_services.Operation_metadata_hashes.root
-                cctxt
-                ~chain
-                ~block
-                ()
-              >>=? fun predecessor_ops_metadata_hash ->
               finalize_block_header
                 final_context.header
                 ~timestamp:valid_timestamp
                 validation_result
                 operations
-                predecessor_block_metadata_hash
-                predecessor_ops_metadata_hash
+                bi.predecessor_block_metadata_hash
+                bi.predecessor_operations_metadata_hash
               >>= function
               | Error (Forking_test_chain :: _) ->
                   shell_prevalidation

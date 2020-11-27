@@ -37,6 +37,9 @@ type block_info = {
   proto_level : int;
   level : Raw_level.t;
   context : Context_hash.t;
+  predecessor_block_metadata_hash : Block_metadata_hash.t option;
+  predecessor_operations_metadata_hash :
+    Operation_metadata_list_list_hash.t option;
 }
 
 let raw_info cctxt ?(chain = `Main) hash shell_header =
@@ -45,6 +48,20 @@ let raw_info cctxt ?(chain = `Main) hash shell_header =
   >>=? fun chain_id ->
   Shell_services.Blocks.protocols cctxt ~chain ~block ()
   >>=? fun {current_protocol = protocol; next_protocol} ->
+  Shell_services.Blocks.metadata_hash cctxt ~chain ~block ()
+  >>= (function
+        | Ok predecessor_block_metadata_hash ->
+            return_some predecessor_block_metadata_hash
+        | Error _ ->
+            return_none)
+  >>=? fun predecessor_block_metadata_hash ->
+  Shell_services.Blocks.Operation_metadata_hashes.root cctxt ~chain ~block ()
+  >>= (function
+        | Ok predecessor_operations_metadata_hash ->
+            return_some predecessor_operations_metadata_hash
+        | Error _ ->
+            return_none)
+  >>=? fun predecessor_operations_metadata_hash ->
   let { Tezos_base.Block_header.predecessor;
         fitness;
         timestamp;
@@ -68,6 +85,8 @@ let raw_info cctxt ?(chain = `Main) hash shell_header =
           proto_level;
           level;
           context;
+          predecessor_block_metadata_hash;
+          predecessor_operations_metadata_hash;
         }
   | Error _ ->
       failwith "Cannot convert level into int32"
