@@ -26,7 +26,7 @@ stages:
 ############################################################
 
 sanity:
-  image: ${build_deps_image_name}:${build_deps_image_version}
+  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
   stage: sanity
   except:
     - tags@tezos/tezos
@@ -52,7 +52,7 @@ sanity:
 ############################################################
 
 .build_template: &build_definition
-  image: ${build_deps_image_name}:${build_deps_image_version}
+  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
   stage: build
   except:
     - master
@@ -150,7 +150,7 @@ build_arm64:
 ############################################################
 
 test-script-gen-genesis:
-  image: ${build_deps_image_name}:${build_deps_image_version}
+  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
   stage: test
   except:
     - master
@@ -860,7 +860,7 @@ documentation:build:
     expire_in: 1 week
 
 documentation:linkcheck:
-  image: ${build_deps_image_name}:${build_deps_image_version}
+  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
   stage: doc
   before_script:
     - . ./scripts/version.sh
@@ -888,7 +888,7 @@ documentation:linkcheck:
 ############################################################
 
 .opam_template: &opam_definition
-  image: ${build_deps_image_name}:opam--${build_deps_image_version}
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
   stage: packaging
   dependencies: []
   rules:
@@ -1831,7 +1831,7 @@ merge-manifest:
   interruptible: false
 
 publish:doc:
-  image: ${build_deps_image_name}:${build_deps_image_version}
+  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
   stage: doc
   only:
     - master@tezos/tezos
@@ -1906,7 +1906,7 @@ pages:
 # (sequentially).
 
 test_coverage:
-  image: ${build_deps_image_name}:${build_deps_image_version}
+  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
   stage: test_coverage
   except:
     - tags@tezos/tezos
