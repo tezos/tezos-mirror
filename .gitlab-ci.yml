@@ -1452,6 +1452,22 @@ opam:uecc:
 ## Stage: publish                                         ##
 ############################################################
 
+publish:static-binaries:
+  image: registry.gitlab.com/gitlab-org/release-cli
+  when: manual
+  only: master@tezos/tezos
+  stage: publish
+  dependencies:
+    - static-x86-linux-binaries
+  artifacts:
+    # should be sufficient
+    expire_in: 100 yrs
+    paths:
+      - install_root/bin/*
+  script:
+    - apk --no-cache --virtual add bash
+    - packaging/create-release-with-static-binaries.sh
+
 publish:docker:
   image: docker:latest
   services:
