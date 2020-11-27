@@ -256,6 +256,80 @@ let encrypt cctxt sk =
   let path = Base58.simple_encode encoding payload in
   Client_keys.make_sk_uri (Uri.make ~scheme ~path ())
 
+module Sapling_raw = struct
+  let salt_len = 8
+
+  (* 193 *)
+  let encrypted_size = Crypto_box.tag_length + salt_len + 169
+
+  let nonce = Crypto_box.zero_nonce
+
+  let pbkdf ~salt ~password =
+    Pbkdf.SHA512.pbkdf2 ~count:32768 ~dk_len:32l ~salt ~password
+
+  let encrypt ~password msg =
+    let msg = Sapling.Core.Wallet.Spending_key.to_bytes msg in
+    let salt = Hacl.Rand.gen salt_len in
+    let key = Crypto_box.Secretbox.unsafe_of_bytes (pbkdf ~salt ~password) in
+    Bytes.(to_string (cat salt (Crypto_box.Secretbox.secretbox key msg nonce)))
+
+  let decrypt ~password payload =
+    let ebytes = Bytes.of_string payload in
+    let salt = Bytes.sub ebytes 0 salt_len in
+    let encrypted_sk = Bytes.sub ebytes salt_len (encrypted_size - salt_len) in
+    let key = Crypto_box.Secretbox.unsafe_of_bytes (pbkdf ~salt ~password) in
+    Option.(
+      Crypto_box.Secretbox.secretbox_open key encrypted_sk nonce
+      >>= Sapling.Core.Wallet.Spending_key.of_bytes)
+
+  type Base58.data += Data of Sapling.Core.Wallet.Spending_key.t
+
+  let encrypted_b58_encoding password =
+    Base58.register_encoding
+      ~prefix:Base58.Prefix.sapling_spending_key
+      ~length:encrypted_size
+      ~to_raw:(encrypt ~password)
+      ~of_raw:(decrypt ~password)
+      ~wrap:(fun x -> Data x)
+end
+
+let encrypt_sapling_key cctxt sk =
+  read_password cctxt
+  >>=? fun password ->
+  let path =
+    Base58.simple_encode (Sapling_raw.encrypted_b58_encoding password) sk
+  in
+  return (Client_keys.make_sapling_uri (Uri.make ~scheme ~path ()))
+
+let decrypt_sapling_key (cctxt : #Client_context.io) (sk_uri : sapling_uri) =
+  let uri = (sk_uri :> Uri.t) in
+  let payload = Uri.path uri in
+  if Uri.scheme uri = Some scheme then
+    cctxt#prompt_password "Enter password to decrypt your key: "
+    >>=? fun password ->
+    match
+      Base58.simple_decode
+        (Sapling_raw.encrypted_b58_encoding password)
+        payload
+    with
+    | None ->
+        failwith
+          "Password incorrect or corrupted wallet, could not decipher \
+           encrypted Sapling spending key."
+    | Some sapling_key ->
+        return sapling_key
+  else
+    match
+      Base58.simple_decode
+        Sapling.Core.Wallet.Spending_key.b58check_encoding
+        payload
+    with
+    | None ->
+        failwith
+          "Corrupted wallet, could not read unencrypted Sapling spending key."
+    | Some sapling_key ->
+        return sapling_key
+
 module Make (C : sig
   val cctxt : Client_context.prompter
 end) =
