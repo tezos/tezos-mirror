@@ -17,7 +17,6 @@ from . import protocol
 ERROR_PATTERN = r"Uncaught|registered|error"
 BLOCKS_PER_VOTING_PERIOD = 20
 POLLING_TIME = 5
-BAKING_RATE = 1
 
 PROTO_A = protocol.PREV_HASH
 PROTO_A_DAEMON = protocol.PREV_DAEMON
@@ -35,7 +34,6 @@ assert os.path.isfile(PARAMETERS_FILE), (
 )
 with open(PARAMETERS_FILE) as f:
     PARAMETERS = dict(json.load(f))
-    PARAMETERS["time_between_blocks"] = [str(BAKING_RATE), "0"]
     PARAMETERS["blocks_per_voting_period"] = BLOCKS_PER_VOTING_PERIOD
 
 
@@ -140,8 +138,10 @@ class TestVotingFull:
 
     def test_delegates_vote_proto_b(self, sandbox: Sandbox):
         client = sandbox.client(0)
-        for i in range(1, 5):
-            client.submit_ballot(f'bootstrap{i}', PROTO_B, 'yay')
+        listings = client.get_listings()
+        # submit ballot for all bakers with listings
+        for listing in listings:
+            client.submit_ballot(listing["pkh"], PROTO_B, 'yay')
 
     @pytest.mark.timeout(60)
     def test_wait_for_testing(self, sandbox: Sandbox):
@@ -191,8 +191,9 @@ class TestVotingFull:
 
     def test_vote_in_promotion_phase(self, sandbox: Sandbox):
         client = sandbox.client(0)
-        for i in range(1, 5):
-            client.submit_ballot(f'bootstrap{i}', PROTO_B, 'yay')
+        listings = client.get_listings()
+        for listing in listings:
+            client.submit_ballot(listing["pkh"], PROTO_B, 'yay')
 
     @pytest.mark.timeout(60)
     def test_wait_for_proto_b(self, sandbox: Sandbox):
@@ -201,7 +202,7 @@ class TestVotingFull:
             client.rpc('get', '/chains/main/blocks/head/header/shell')
             time.sleep(POLLING_TIME)
 
-    @pytest.mark.timeout(40)
+    @pytest.mark.timeout(60)
     def test_all_nodes_run_proto_b(self, sandbox: Sandbox):
         all_have_proto = False
         while not all_have_proto:
