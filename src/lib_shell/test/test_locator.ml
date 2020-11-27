@@ -209,13 +209,17 @@ let make_multiple_protocol_chain (chain : State.Chain.t) ~(chain_length : int)
             };
         }
       in
+      let block_metadata = zero in
+      let block_metadata_hash =
+        Option.some @@ Block_metadata_hash.hash_bytes [block_metadata]
+      in
       State.Block.store
         chain
         header
         zero
         []
         []
-        None
+        block_metadata_hash
         None
         empty_result
         ~forking_testchain:false
