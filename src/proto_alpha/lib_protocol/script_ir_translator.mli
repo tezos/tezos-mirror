@@ -71,7 +71,7 @@ type 'bef judgement =
     }
       -> 'bef judgement
 
-type unparsing_mode = Optimized | Readable
+type unparsing_mode = Optimized | Readable | Optimized_legacy
 
 type type_logger =
   int ->
