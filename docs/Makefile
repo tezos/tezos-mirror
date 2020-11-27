@@ -9,7 +9,7 @@ DOCGENDIR     = doc_gen
 DOCERRORDIR   = $(DOCGENDIR)/errors
 DOCRPCDIR     = $(DOCGENDIR)/rpcs
 
-all: manuals odoc html
+all: manuals odoc html redirects
 
 main:
 	@${MAKE} -C .. all
@@ -62,6 +62,10 @@ $(DOCGENDIR)/p2p_doc.exe:
 
 p2p: $(DOCGENDIR)/p2p_doc.exe shell/p2p_usage.rst.inc
 	@dune exec $(DOCGENDIR)/p2p_doc.exe < shell/p2p_usage.rst.inc > shell/p2p_api.rst
+
+.PHONY: redirects
+redirects:
+	@cp $$(pwd)/_redirects "$(BUILDDIR)"
 
 .PHONY: help Makefile
 
