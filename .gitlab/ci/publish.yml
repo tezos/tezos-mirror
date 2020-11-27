@@ -41,6 +41,22 @@ publish:docker_arm64:
   tags:
     - arm64
 
+release-static-binaries:
+  image: registry.gitlab.com/gitlab-org/release-cli
+  only:
+    - tags@tezos/tezos
+    - tags@serokell/morley/tezos
+  variables:
+    PACKAGE_REGISTRY_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/tezos/${CI_COMMIT_TAG}"
+  stage: publish
+  dependencies:
+    - build_release:static-x86-linux-binaries
+  script:
+    - apk --no-cache --virtual add bash jq
+    - apk --no-cache --virtual add bash jq curl
+    - scripts/release/upload-static-binaries-to-package-registry.sh
+    - scripts/release/create-release-with-static-binaries.sh
+
 merge-manifest:
   image: docker:latest
   services:

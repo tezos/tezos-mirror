@@ -28,6 +28,7 @@ stages:
   - test
   - doc
   - packaging
+  - upload
   - publish
   - publish_manifest
   - test_coverage
