@@ -24,137 +24,81 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type status =
-  | Initialized
-  | Dynload_protocol of Protocol_hash.t
-  | Validation_request of Block_header.t
-  | Commit_genesis_request of Block_hash.t
-  | Initialization_request
-  | Fork_test_chain_request of Block_header.t
-  | Termination_request
-  | Terminated
+module Events = struct
+  open Internal_event.Simple
 
-let status_pp ppf = function
-  | Initialized ->
-      Format.fprintf ppf "Validator initialized and listening"
-  | Dynload_protocol h ->
-      Format.fprintf ppf "Dynamic loading of protocol %a" Protocol_hash.pp h
-  | Validation_request bh ->
-      Format.fprintf
-        ppf
-        "Validating block %a"
-        Block_hash.pp
-        (Block_header.hash bh)
-  | Commit_genesis_request h ->
-      Format.fprintf ppf "Committing genesis block %a" Block_hash.pp h
-  | Initialization_request ->
-      Format.fprintf ppf "Initializing validator's environment"
-  | Fork_test_chain_request bh ->
-      Format.fprintf
-        ppf
-        "Forking test chain at block %a"
-        Block_hash.pp
-        (Block_header.hash bh)
-  | Termination_request ->
-      Format.fprintf ppf "Terminating external validator"
-  | Terminated ->
-      Format.fprintf ppf "Validator terminated"
+  let section = ["external_validator"]
 
-type s = status Time.System.stamped
+  let initialized =
+    declare_0
+      ~section
+      ~level:Info
+      ~name:"initialized"
+      ~msg:"validator initialized and listening"
+      ()
 
-module Validator_event_definition = struct
-  let name = "external_validator"
+  let terminated =
+    declare_0
+      ~section
+      ~level:Info
+      ~name:"terminated_request"
+      ~msg:"validator terminated"
+      ()
 
-  type t = s
+  let dynload_protocol =
+    declare_1
+      ~section
+      ~level:Debug
+      ~name:"dynload_protocol"
+      ~msg:"dynamic loading of protocol {protocol}"
+      ~pp1:Protocol_hash.pp
+      ("protocol", Protocol_hash.encoding)
 
-  let encoding =
-    let open Data_encoding in
-    Time.System.stamped_encoding
-    @@ union
-         [ case
-             (Tag 0)
-             ~title:"Initialized"
-             empty
-             (function Initialized -> Some () | _ -> None)
-             (fun () -> Initialized);
-           case
-             (Tag 1)
-             ~title:"Dynload protocol"
-             Protocol_hash.encoding
-             (function Dynload_protocol h -> Some h | _ -> None)
-             (fun h -> Dynload_protocol h);
-           case
-             (Tag 2)
-             ~title:"Validation request"
-             Block_header.encoding
-             (function Validation_request h -> Some h | _ -> None)
-             (fun h -> Validation_request h);
-           case
-             (Tag 3)
-             ~title:"Commit genesis request"
-             Block_hash.encoding
-             (function Commit_genesis_request h -> Some h | _ -> None)
-             (fun h -> Commit_genesis_request h);
-           case
-             (Tag 4)
-             ~title:"Initialization request"
-             empty
-             (function Initialization_request -> Some () | _ -> None)
-             (fun () -> Initialization_request);
-           case
-             (Tag 5)
-             ~title:"Fork test chain request"
-             Block_header.encoding
-             (function Fork_test_chain_request h -> Some h | _ -> None)
-             (fun h -> Fork_test_chain_request h);
-           case
-             (Tag 6)
-             ~title:"Termination request"
-             empty
-             (function Termination_request -> Some () | _ -> None)
-             (fun () -> Termination_request);
-           case
-             (Tag 7)
-             ~title:"Terminated"
-             empty
-             (function Terminated -> Some () | _ -> None)
-             (fun () -> Terminated) ]
+  let validation_request =
+    declare_1
+      ~section
+      ~level:Debug
+      ~name:"validation_request"
+      ~msg:"validating block {block}"
+      ~pp1:(fun fmt header -> Block_hash.pp fmt (Block_header.hash header))
+      ("block", Block_header.encoding)
 
-  let pp ~short:_ ppf (status : t) =
-    Format.fprintf ppf "%a" status_pp status.data
+  let commit_genesis_request =
+    declare_1
+      ~section
+      ~level:Debug
+      ~name:"commit_genesis_request"
+      ~msg:"committing genesis block {genesis}"
+      ~pp1:Block_hash.pp
+      ("genesis", Block_hash.encoding)
 
-  let doc = "External validator status."
+  let initialization_request =
+    declare_0
+      ~section
+      ~level:Debug
+      ~name:"initialization_request"
+      ~msg:"initializing validator's environment"
+      ()
 
-  let level (status : t) =
-    match status.data with
-    | Initialized | Terminated ->
-        Internal_event.Info
-    | Dynload_protocol _
-    | Validation_request _
-    | Commit_genesis_request _
-    | Initialization_request
-    | Fork_test_chain_request _
-    | Termination_request ->
-        Internal_event.Debug
+  let fork_test_chain_request =
+    declare_1
+      ~section
+      ~level:Debug
+      ~name:"fork_testchain_request"
+      ~msg:"forking test chain at block {block}"
+      ~pp1:Block_header.pp
+      ("block", Block_header.encoding)
+
+  let termination_request =
+    declare_0
+      ~section
+      ~level:Debug
+      ~name:"termination_request"
+      ~msg:"validator terminated"
+      ()
+
+  let emit = Internal_event.Simple.emit
 end
-
-module Validator_event = Internal_event.Make (Validator_event_definition)
-
-let lwt_emit (status : status) =
-  let time = Systime_os.now () in
-  Validator_event.emit
-    ~section:
-      (Internal_event.Section.make_sanitized [Validator_event_definition.name])
-    (fun () -> Time.System.stamp ~time status)
-  >>= function
-  | Ok () ->
-      Lwt.return_unit
-  | Error el ->
-      Format.kasprintf
-        Lwt.fail_with
-        "External_validator_event.emit: %a"
-        pp_print_error
-        el
 
 open Filename.Infix
 
@@ -166,7 +110,7 @@ let load_protocol proto protocol_root =
       // Protocol_hash.to_short_b58check proto
       // Format.asprintf "protocol_%a.cmxs" Protocol_hash.pp proto
     in
-    lwt_emit (Dynload_protocol proto)
+    Events.(emit dynload_protocol proto)
     >|= fun () ->
     try
       Dynlink.loadfile_private cmxs_file ;
@@ -198,7 +142,7 @@ let handshake input output =
     (inconsistent_handshake "bad magic")
 
 let init input =
-  lwt_emit Initialization_request
+  Events.(emit initialization_request ())
   >>= fun () ->
   External_validation.recv input External_validation.parameters_encoding
   >>= fun { context_root;
@@ -243,7 +187,7 @@ let run input output =
         init >>= loop
     | External_validation.Commit_genesis {chain_id} ->
         let commit_genesis : unit Lwt.t =
-          lwt_emit (Commit_genesis_request genesis.block)
+          Events.(emit commit_genesis_request genesis.block)
           >>= fun () ->
           Error_monad.protect (fun () ->
               Context.commit_genesis
@@ -276,7 +220,7 @@ let run input output =
           operations;
           max_operations_ttl } ->
         let validate : unit Lwt.t =
-          lwt_emit (Validation_request block_header)
+          Events.(emit validation_request block_header)
           >>= fun () ->
           Error_monad.protect (fun () ->
               let pred_context_hash = predecessor_block_header.shell.context in
@@ -328,7 +272,7 @@ let run input output =
         validate >>= loop
     | External_validation.Fork_test_chain {context_hash; forked_header} ->
         let fork_test_chain : unit Lwt.t =
-          lwt_emit (Fork_test_chain_request forked_header)
+          Events.(emit fork_test_chain_request forked_header)
           >>= fun () ->
           Context.checkout context_index context_hash
           >>= function
@@ -358,7 +302,7 @@ let run input output =
         in
         fork_test_chain >>= loop
     | External_validation.Terminate ->
-        Lwt_io.flush_all () >>= fun () -> lwt_emit Termination_request
+        Lwt_io.flush_all () >>= fun () -> Events.(emit termination_request ())
   in
   loop () >>= fun () -> return_unit
 
@@ -378,7 +322,7 @@ let main ?socket_dir () =
   | None ->
       Lwt.return (Lwt_io.stdin, Lwt_io.stdout) )
   >>= fun (in_channel, out_channel) ->
-  lwt_emit Initialized
+  Events.(emit initialized ())
   >>= fun () ->
   Lwt.catch
     (fun () ->
@@ -387,7 +331,7 @@ let main ?socket_dir () =
     (fun e -> Lwt.return (error_exn e))
   >>= function
   | Ok () ->
-      lwt_emit Terminated >>= fun () -> return_unit
+      Events.(emit terminated ()) >>= fun () -> return_unit
   | Error _ as errs ->
       External_validation.send
         out_channel
