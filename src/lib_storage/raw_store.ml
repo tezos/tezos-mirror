@@ -289,6 +289,8 @@ module Hashtbl = Hashtbl.MakeSeeded (struct
   let equal (d1 : string list) d2 = d1 = d2
 end)
 
+type key_or_dir = [`Key of key | `Dir of key]
+
 let fold t k ~init ~f =
   let base_len = List.length k in
   let rec inner ht cursor acc =

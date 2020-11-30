@@ -44,6 +44,26 @@
 
     These conventions are also followed in the [Client] module. *)
 
+(** History modes for the node. *)
+type history_mode = Archive | Full | Rolling
+
+(** Tezos node command-line arguments.
+
+    Not all arguments are available here.
+    Some are simply not implemented, and some are handled separately
+    because they need special care. The latter are implemented as optional
+    labeled arguments (e.g. [?net_port] and [?data_dir]). *)
+type argument =
+  | Network of string  (** [--network] *)
+  | History_mode of history_mode  (** [--history-mode] *)
+  | Expected_pow of int  (** [--expected-pow] *)
+  | Singleprocess  (** [--singleprocess] *)
+  | Bootstrap_threshold of int  (** [--bootstrap-threshold] (deprecated) *)
+  | Synchronisation_threshold of int  (** [--synchronisation-threshold] *)
+  | Connections of int  (** [--connections] *)
+  | Private_mode  (** [--private-mode] *)
+  | Peer of string  (** [--peer] *)
+
 (** Tezos node states. *)
 type t
 
@@ -66,7 +86,13 @@ type t
     with values starting from 19732. They are used by [config_init]
     and by functions from the [Client] module. They are not used by [run],
     so if you do not call [config_init] or generate the configuration file
-    through some other means, your node will not listen. *)
+    through some other means, your node will not listen.
+
+    The argument list is a list of configuration options that the node
+    should run with. It is passed to the first run of [tezos-node config init].
+    It is also passed to all runs of [tezos-node run] that occur before
+    [tezos-node config init]. If [Expected_pow] is given, it is also used as
+    the default value for {!identity_generate}. *)
 val create :
   ?path:string ->
   ?name:string ->
@@ -75,8 +101,23 @@ val create :
   ?event_pipe:string ->
   ?net_port:int ->
   ?rpc_port:int ->
-  unit ->
+  argument list ->
   t
+
+(** Add an argument to a node as if it was passed to {!create}.
+
+    The argument is passed to the next run of [tezos-node config init].
+    It is also passed to all runs of [tezos-node run] that occur before
+    the next [tezos-node config init]. *)
+val add_argument : t -> argument -> unit
+
+(** Add a [--peer] argument to a node.
+
+    Usage: [add_peer node peer]
+
+    Same as [add_argument node (Peer "127.0.0.1:<PORT>")]
+    where [<PORT>] is the P2P port of [peer]. *)
+val add_peer : t -> t -> unit
 
 (** Get the name of a node. *)
 val name : t -> string
@@ -86,6 +127,9 @@ val net_port : t -> int
 
 (** Get the RPC port given as [--rpc-addr] to a node. *)
 val rpc_port : t -> int
+
+(** Get the data-dir of a node. *)
+val data_dir : t -> string
 
 (** Send SIGTERM to a node and wait for it to terminate. *)
 val terminate : t -> unit Lwt.t
@@ -98,60 +142,34 @@ val identity_generate : ?expected_pow:int -> t -> unit Lwt.t
 (** Same as [identity_generate], but do not wait for the process to exit. *)
 val spawn_identity_generate : ?expected_pow:int -> t -> Process.t
 
-(** History modes for the node. *)
-type history_mode = Archive | Full | Rolling
-
 (** Convert an history mode into a string.
 
     The result is suitable to be passed to the node on the command-line. *)
 val show_history_mode : history_mode -> string
 
-(** Run [tezos-node config init].
-
-    [net_port] and [rpc_port] can be used to override the port
-    which was chosen by [create]. They will change
-    the result of the {!net_port} and {!rpc_port} functions. *)
-val config_init :
-  ?network:string ->
-  ?net_port:int ->
-  ?rpc_port:int ->
-  ?history_mode:history_mode ->
-  t ->
-  unit Lwt.t
+(** Run [tezos-node config init]. *)
+val config_init : t -> argument list -> unit Lwt.t
 
 (** Same as [config_init], but do not wait for the process to exit. *)
-val spawn_config_init :
-  ?network:string ->
-  ?net_port:int ->
-  ?rpc_port:int ->
-  ?history_mode:history_mode ->
-  t ->
-  Process.t
+val spawn_config_init : t -> argument list -> Process.t
 
 (** Spawn [tezos-node run].
 
     The resulting promise is fulfilled as soon as the node has been spawned.
     It continues running in the background. *)
-val run :
-  ?expected_pow:int ->
-  ?single_process:bool ->
-  ?bootstrap_threshold:int ->
-  ?synchronisation_threshold:int ->
-  ?connections:int ->
-  t ->
-  unit Lwt.t
+val run : t -> argument list -> unit Lwt.t
 
 (** {2 Events} *)
 
 (** Exception raised by [wait_for] functions if the node terminates before the event.
 
     You may catch or let it propagate to cause the test to fail.
-    [node] is the name of the node.
+    [daemon] is the name of the node.
     [event] is the name of the event.
     [where] is an additional optional constraint, such as ["level >= 10"]. *)
 exception
   Terminated_before_event of {
-    node : string;
+    daemon : string;
     event : string;
     where : string option;
   }
@@ -214,38 +232,29 @@ val on_event : t -> (event -> unit) -> unit
 (** Initialize a node.
 
     This {!create}s a node, runs {!identity_generate}, {!config_init} and {!run},
-    then waits for the node to be ready, and finally returns the node. *)
+    then waits for the node to be ready, and finally returns the node.
+
+    Arguments are passed to {!config_init}. If you specified [Expected_pow],
+    it is also passed to {!identity_generate}. Arguments are not passed to {!run}.
+    If you do not wish the arguments to be stored in the configuration file
+    (which will affect future runs too), do not use [init]. *)
 val init :
   ?path:string ->
   ?name:string ->
   ?color:Log.Color.t ->
   ?data_dir:string ->
   ?event_pipe:string ->
-  ?expected_pow:int ->
-  ?network:string ->
   ?net_port:int ->
   ?rpc_port:int ->
-  ?history_mode:history_mode ->
-  ?single_process:bool ->
-  ?bootstrap_threshold:int ->
-  ?synchronisation_threshold:int ->
-  ?connections:int ->
-  unit ->
+  argument list ->
   t Lwt.t
 
 (** Restart a node.
 
     This {!terminate}s a node, then {!run}s it again and waits for it to be ready.
 
-    If you passed arguments such as [expected_pow] or [single_process]
-    to {!run} (or {!init}) they are not automatically passed again.
+    If you passed arguments such as [Expected_pow] or [Singleprocess]
+    to {!run} they are not automatically passed again.
     You can pass them to [restart], or you can pass other values if you want
     to restart with other parameters. *)
-val restart :
-  ?expected_pow:int ->
-  ?single_process:bool ->
-  ?bootstrap_threshold:int ->
-  ?synchronisation_threshold:int ->
-  ?connections:int ->
-  t ->
-  unit Lwt.t
+val restart : t -> argument list -> unit Lwt.t

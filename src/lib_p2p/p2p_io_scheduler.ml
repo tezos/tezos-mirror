@@ -44,6 +44,8 @@ module type IO = sig
 end
 
 module Scheduler (IO : IO) = struct
+  (* Two labels or constructors of the same name are defined in two mutually
+     recursive types: fields canceler, counter and quota *)
   [@@@ocaml.warning "-30"]
 
   type t = {
@@ -70,6 +72,8 @@ module Scheduler (IO : IO) = struct
     counter : Moving_average.t;
     mutable quota : int;
   }
+
+  [@@@ocaml.warning "+30"]
 
   let cancel (conn : connection) err =
     if conn.closed then Lwt.return_unit
@@ -287,7 +291,6 @@ module WriteScheduler = Scheduler (struct
 end)
 
 type connection = {
-  sched : t;
   fd : P2p_fd.t;
   canceler : Lwt_canceler.t;
   read_conn : ReadScheduler.connection;
@@ -295,9 +298,10 @@ type connection = {
   write_conn : WriteScheduler.connection;
   write_queue : Bytes.t Lwt_pipe.t;
   mutable partial_read : Bytes.t option;
+  remove_from_connection_table : unit -> unit;
 }
 
-and t = {
+type t = {
   mutable closed : bool;
   ma_state : Moving_average.state;
   connected : connection P2p_fd.Table.t;
@@ -417,7 +421,6 @@ let register st fd =
             Lwt.return_unit) ;
     let conn =
       {
-        sched = st;
         fd;
         canceler;
         read_queue;
@@ -425,6 +428,8 @@ let register st fd =
         write_queue;
         write_conn;
         partial_read = None;
+        remove_from_connection_table =
+          (fun () -> P2p_fd.Table.remove st.connected fd);
       }
     in
     P2p_fd.Table.add st.connected conn.fd conn ;
@@ -513,7 +518,7 @@ let stat {read_conn; write_conn; _} =
 
 let close ?timeout conn =
   let id = P2p_fd.id conn.fd in
-  P2p_fd.Table.remove conn.sched.connected conn.fd ;
+  conn.remove_from_connection_table () ;
   Lwt_pipe.close conn.write_queue ;
   ( match timeout with
   | None ->

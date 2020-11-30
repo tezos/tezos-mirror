@@ -24,8 +24,10 @@
 (*****************************************************************************)
 
 open Storage_functors
+open Misc.Syntax
+module Z' = Z
 
-module Int = struct
+module UInt16 = struct
   type t = int
 
   let encoding = Data_encoding.uint16
@@ -38,12 +40,12 @@ module Int32 = struct
 end
 
 module Z = struct
-  include Z
+  type t = Z.t
 
   let encoding = Data_encoding.z
 end
 
-module Int_index = struct
+module Int31_index : INDEX with type t = int = struct
   type t = int
 
   let path_length = 1
@@ -81,7 +83,7 @@ module Block_priority =
     (struct
       let name = ["block_priority"]
     end)
-    (Int)
+    (UInt16)
 
 (** Contracts handling *)
 
@@ -190,9 +192,13 @@ module Contract = struct
       end)
       (Z)
 
-  (* Consume gas for serilization and deserialization of expr in this
+  (* Consume gas for serialization and deserialization of expr in this
      module *)
-  module Make_carbonated_map_expr (N : Storage_sigs.NAME) = struct
+  module Make_carbonated_map_expr (N : Storage_sigs.NAME) :
+    Storage_sigs.Non_iterable_indexed_carbonated_data_storage
+      with type key = Contract_repr.t
+       and type value = Script_repr.lazy_expr
+       and type t := Raw_context.t = struct
     module I =
       Indexed_context.Make_carbonated_map
         (N)
@@ -215,38 +221,37 @@ module Contract = struct
     let remove = I.remove
 
     let consume_deserialize_gas ctxt value =
-      Lwt.return
-      @@ ( Raw_context.check_enough_gas
-             ctxt
-             (Script_repr.minimal_deserialize_cost value)
-         >>? fun () ->
-         Script_repr.force_decode value
-         >>? fun (_value, value_cost) ->
-         Raw_context.consume_gas ctxt value_cost )
+      Raw_context.check_enough_gas
+        ctxt
+        (Script_repr.minimal_deserialize_cost value)
+      >>? fun () ->
+      Script_repr.force_decode value
+      >>? fun (_value, value_cost) -> Raw_context.consume_gas ctxt value_cost
 
     let consume_serialize_gas ctxt value =
-      Lwt.return
-      @@ ( Script_repr.force_bytes value
-         >>? fun (_value, value_cost) ->
-         Raw_context.consume_gas ctxt value_cost )
+      Script_repr.force_bytes value
+      >>? fun (_value, value_cost) -> Raw_context.consume_gas ctxt value_cost
 
     let get ctxt contract =
       I.get ctxt contract
       >>=? fun (ctxt, value) ->
-      consume_deserialize_gas ctxt value >>|? fun ctxt -> (ctxt, value)
+      Lwt.return
+        (consume_deserialize_gas ctxt value >|? fun ctxt -> (ctxt, value))
 
     let get_option ctxt contract =
       I.get_option ctxt contract
       >>=? fun (ctxt, value_opt) ->
+      Lwt.return
+      @@
       match value_opt with
       | None ->
-          return (ctxt, None)
+          ok (ctxt, None)
       | Some value ->
-          consume_deserialize_gas ctxt value >>|? fun ctxt -> (ctxt, value_opt)
+          consume_deserialize_gas ctxt value >|? fun ctxt -> (ctxt, value_opt)
 
     let set ctxt contract value =
       consume_serialize_gas ctxt value
-      >>=? fun ctxt -> I.set ctxt contract value
+      >>?= fun ctxt -> I.set ctxt contract value
 
     let set_option ctxt contract value_opt =
       match value_opt with
@@ -254,15 +259,15 @@ module Contract = struct
           I.set_option ctxt contract None
       | Some value ->
           consume_serialize_gas ctxt value
-          >>=? fun ctxt -> I.set_option ctxt contract value_opt
+          >>?= fun ctxt -> I.set_option ctxt contract value_opt
 
     let init ctxt contract value =
       consume_serialize_gas ctxt value
-      >>=? fun ctxt -> I.init ctxt contract value
+      >>?= fun ctxt -> I.init ctxt contract value
 
     let init_set ctxt contract value =
       consume_serialize_gas ctxt value
-      >>=? fun ctxt -> I.init_set ctxt contract value
+      >>?= fun ctxt -> I.init_set ctxt contract value
   end
 
   module Code = Make_carbonated_map_expr (struct
@@ -319,19 +324,18 @@ module Big_map = struct
               (Z)
 
     let incr ctxt =
-      get ctxt
-      >>=? fun i -> set ctxt (Z.succ i) >>=? fun ctxt -> return (ctxt, i)
+      get ctxt >>=? fun i -> set ctxt (Z'.succ i) >|=? fun ctxt -> (ctxt, i)
 
-    let init ctxt = init ctxt Z.zero
+    let init ctxt = init ctxt Z'.zero
   end
 
   module Index = struct
     type t = Z.t
 
     let rpc_arg =
-      let construct = Z.to_string in
+      let construct = Z'.to_string in
       let destruct hash =
-        match Z.of_string hash with
+        match Z'.of_string hash with
         | exception _ ->
             Error "Cannot parse big map id"
         | id ->
@@ -360,8 +364,8 @@ module Big_map = struct
       let (`Hex index_key) = MBytes.to_hex (Raw_hashes.blake2b raw_key) in
       String.sub index_key 0 2 :: String.sub index_key 2 2
       :: String.sub index_key 4 2 :: String.sub index_key 6 2
-      :: String.sub index_key 8 2 :: String.sub index_key 10 2 :: Z.to_string c
-      :: l
+      :: String.sub index_key 8 2 :: String.sub index_key 10 2
+      :: Z'.to_string c :: l
 
     let of_path = function
       | []
@@ -374,7 +378,7 @@ module Big_map = struct
       | _ :: _ :: _ :: _ :: _ :: _ :: _ :: _ :: _ ->
           None
       | [index1; index2; index3; index4; index5; index6; key] ->
-          let c = Z.of_string key in
+          let c = Z'.of_string key in
           let raw_key = Data_encoding.Binary.to_bytes_exn encoding c in
           let (`Hex index_key) = MBytes.to_hex (Raw_hashes.blake2b raw_key) in
           assert (Compare.String.(String.sub index_key 0 2 = index1)) ;
@@ -470,22 +474,24 @@ module Big_map = struct
     let init_set = I.init_set
 
     let consume_deserialize_gas ctxt value =
-      Lwt.return
-      @@ Raw_context.consume_gas ctxt (Script_repr.deserialized_cost value)
+      Raw_context.consume_gas ctxt (Script_repr.deserialized_cost value)
 
     let get ctxt contract =
       I.get ctxt contract
       >>=? fun (ctxt, value) ->
-      consume_deserialize_gas ctxt value >>|? fun ctxt -> (ctxt, value)
+      Lwt.return
+        (consume_deserialize_gas ctxt value >|? fun ctxt -> (ctxt, value))
 
     let get_option ctxt contract =
       I.get_option ctxt contract
       >>=? fun (ctxt, value_opt) ->
+      Lwt.return
+      @@
       match value_opt with
       | None ->
-          return (ctxt, None)
+          ok (ctxt, None)
       | Some value ->
-          consume_deserialize_gas ctxt value >>|? fun ctxt -> (ctxt, value_opt)
+          consume_deserialize_gas ctxt value >|? fun ctxt -> (ctxt, value_opt)
   end
 end
 
@@ -535,7 +541,7 @@ module Cycle = struct
          (struct
            let name = ["last_roll"]
          end))
-         (Int_index)
+         (Int31_index)
       (Roll_repr)
 
   module Roll_snapshot =
@@ -543,7 +549,7 @@ module Cycle = struct
       (struct
         let name = ["roll_snapshot"]
       end)
-      (Int)
+      (UInt16)
 
   type unrevealed_nonce = {
     nonce_hash : Nonce_hash.t;
@@ -787,7 +793,7 @@ module Vote = struct
            let name = ["proposals_count"]
          end))
          (Make_index (Signature.Public_key_hash))
-         (Int)
+         (UInt16)
 
   module Ballots =
     Make_indexed_data_storage

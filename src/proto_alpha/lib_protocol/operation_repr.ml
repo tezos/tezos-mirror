@@ -115,7 +115,7 @@ and _ contents =
       fee : Tez_repr.tez;
       counter : counter;
       operation : 'kind manager_operation;
-      gas_limit : Z.t;
+      gas_limit : Gas_limit_repr.Arith.integral;
       storage_limit : Z.t;
     }
       -> 'kind Kind.manager contents
@@ -532,7 +532,7 @@ module Encoding = struct
       (req "source" Signature.Public_key_hash.encoding)
       (req "fee" Tez_repr.encoding)
       (req "counter" (check_size 10 n))
-      (req "gas_limit" (check_size 10 n))
+      (req "gas_limit" (check_size 10 Gas_limit_repr.Arith.n_integral_encoding))
       (req "storage_limit" (check_size 10 n))
 
   let extract (type kind)
@@ -717,7 +717,7 @@ let () =
     (function Missing_signature -> Some () | _ -> None)
     (fun () -> Missing_signature)
 
-let check_signature_sync (type kind) key chain_id
+let check_signature (type kind) key chain_id
     ({shell; protocol_data} : kind operation) =
   let check ~watermark contents signature =
     let unsigned_operation =
@@ -742,9 +742,6 @@ let check_signature_sync (type kind) key chain_id
       check ~watermark:Generic_operation (Contents_list contents) signature
   | ((Cons _ as contents), Some signature) ->
       check ~watermark:Generic_operation (Contents_list contents) signature
-
-let check_signature pk chain_id op =
-  Lwt.return (check_signature_sync pk chain_id op)
 
 let hash_raw = Operation.hash
 

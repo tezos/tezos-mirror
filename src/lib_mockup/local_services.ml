@@ -92,7 +92,7 @@ let init_fake_p2p =
       encoding = [];
       chain_name = Distributed_db_version.Name.of_string "TEZOS_CLIENT_MOCKUP";
       (* The following cannot be empty. *)
-      distributed_db_versions = [Distributed_db_version.zero];
+      distributed_db_versions = Distributed_db_version.[zero; one];
     }
   in
   fun () ->

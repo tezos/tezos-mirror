@@ -11,17 +11,20 @@
             tezos-clic
             tezos-signer-services
             (select void_for_linking-alpha from
-              (tezos-client-alpha -> void_for_linking)
-              (-> void_for_linking))
+              (tezos-client-alpha -> void_for_linking-alpha.empty)
+              (-> void_for_linking-alpha.empty))
             (select void_for_linking-005-PsBabyM1 from
-              (tezos-client-005-PsBabyM1 -> void_for_linking)
-              (-> void_for_linking))
+              (tezos-client-005-PsBabyM1 -> void_for_linking-005-PsBabyM1.empty)
+              (-> void_for_linking-005-PsBabyM1.empty))
             (select void_for_linking-006-PsCARTHA from
-              (tezos-client-006-PsCARTHA -> void_for_linking)
-              (-> void_for_linking))
+              (tezos-client-006-PsCARTHA -> void_for_linking-006-PsCARTHA.empty)
+              (-> void_for_linking-006-PsCARTHA.empty))
             (select void_for_linking-007-PsDELPH1 from
-              (tezos-client-007-PsDELPH1 -> void_for_linking)
-              (-> void_for_linking))
+              (tezos-client-007-PsDELPH1 -> void_for_linking-007-PsDELPH1.empty)
+              (-> void_for_linking-007-PsDELPH1.empty))
+            (select void_for_linking-008-PtEdoTez from
+              (tezos-client-008-PtEdoTez -> void_for_linking-008-PtEdoTez.empty)
+              (-> void_for_linking-008-PtEdoTez.empty))
  )
  (flags (:standard -open Data_encoding
                    -open Tezos_base__TzPervasives
@@ -33,10 +36,16 @@
                    -linkall)))
 
 (rule
-  (target void_for_linking)
-  (action (write-file ${target} "")))
+ (action
+  (progn
+   (write-file void_for_linking-alpha.empty "")
+   (write-file void_for_linking-005-PsBabyM1.empty "")
+   (write-file void_for_linking-006-PsCARTHA.empty "")
+   (write-file void_for_linking-007-PsDELPH1.empty "")
+   (write-file void_for_linking-008-PtEdoTez.empty "")
+)))
 
-(alias
- (name runtest_lint)
+(rule
+ (alias runtest_lint)
  (deps (glob_files *.ml{,i}))
  (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

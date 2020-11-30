@@ -70,9 +70,7 @@ class GetReceiptResult:
 
 
 class GetAddressesResult:
-    """Result of 'list known addresses' operation.
-
-    """
+    """Result of 'list known addresses' operation."""
 
     def __init__(self, client_output: str):
 
@@ -153,18 +151,18 @@ class ShowAddressResult:
     """Result of a 'show address' command."""
 
     def __init__(self, client_output: str):
-        pattern = r"Hash: ?(\w*)"
+        pattern = r"Hash: ?(\w+)"
         match = re.search(pattern, client_output)
         if match is None:
             raise InvalidClientOutput(client_output)
         self.hash = match.groups()[0]
-        pattern = r"Public Key: ?(\w*)"
+        pattern = r"Public Key: ?(\w+)"
         match = re.search(pattern, client_output)
         if match is None:
             self.public_key = None
         else:
             self.public_key = match.groups()[0]
-        pattern = r"Secret Key: ?(\w*)"
+        pattern = r"Secret Key: ?(\w+:\w+)"
         match = re.search(pattern, client_output)
         if match is None:
             self.secret_key = None

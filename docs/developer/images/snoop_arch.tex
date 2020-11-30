@@ -1,0 +1,51 @@
+\documentclass[10pt]{article}  %% ,twocolumn
+
+\usepackage[
+        paperwidth=\textwidth,
+        paperheight=\textheight,
+        text={\textwidth,\textheight}
+     ]{geometry}
+
+\usepackage{subfig}
+\usepackage{stmaryrd} %% pour les crochets de transformation [| |]
+\usepackage{times}
+\usepackage{listings}
+\usepackage{url,xspace}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{bbm}
+\usepackage{amsthm}
+%\usepackage{mathpartir}
+\usepackage{color}
+\usepackage{bussproofs}
+\usepackage{rotating}
+\usepackage[absolute]{textpos}
+\usepackage{helvet}
+\usepackage{wrapfig}
+\usepackage{extarrows}
+\usepackage{array}
+\usepackage{hyperref}
+\usepackage[all]{xy}
+\usepackage{mathrsfs}
+\usepackage{yfonts}
+
+\begin{document}
+
+\thispagestyle{empty}
+
+
+\eject \pdfpagewidth=10cm \pdfpageheight=10cm
+
+\xymatrix{
+& \framebox{\text{Code of interest}} \ar@{-}[d] \\
+& \text{Benchmark} \ar[d] \\
+\text{Data cleaning} \ar@/_1pc/[r] & \framebox{\text{Trace}} \ar@{-}[d] \ar@/_1pc/@{-}[l] & \framebox{\text{Cost model}} \ar@/^1pc/@{-}[dl] \\
+& \text{Inference} \ar[d]  \\
+& \framebox{\text{Parameter fit}} \ar@/_1pc/@{-}[dl] \ar@{-}[d] \ar@/^1pc/@{-}[dr] \\
+\text{Codegen} \ar[d]  & \text{Plot generation} \ar[d]  & \text{Report generation} \ar[d]  \\
+\framebox{\text{Code}} & \framebox{\text{Plot}} & \framebox{\text{Report}} \\
+}
+
+\end{document}

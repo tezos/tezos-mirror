@@ -1,6 +1,6 @@
 .. _version-7:
 
-Version 7.4
+Version 7.5
 ===========
 
 Version 7.0 notably introduces the multinetwork node.
@@ -16,18 +16,20 @@ Version 7.3 fixes a couple of security issues.
 
 Version 7.4 adds the Delphi protocol and the Delphinet built-in network configuration.
 
+Version 7.5 fixes some issues with gas cost computation in the client for Delphi.
+
 Update Instructions
 -------------------
 
 To update from sources::
 
   git fetch
-  git checkout v7.4
+  git checkout v7.5
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``v7.4`` Docker images of Tezos.
+If you are using Docker instead, use the ``v7.5`` Docker images of Tezos.
 
 New Versioning Scheme
 ---------------------
@@ -48,7 +50,7 @@ Additionnally, we provide a ``latest-release`` branch which will always
 be equal to the latest release. Release candidates are not considered
 to be releases in this sense, so ``latest-release`` will never
 point to a release candidate. In other words, ``latest-release`` points
-to the latest stable release. Currently, it thus points to version 7.4.
+to the latest stable release. Currently, it thus points to version 7.5.
 
 If you are used to the ``mainnet`` and ``mainnet-staging`` branches,
 you can consider release candidates to be the new ``mainnet-staging``
@@ -80,6 +82,20 @@ If you are using the Docker script (``alphanet.sh``), note that
 this script has been renamed ``tezos-docker-manager.sh``. The ``alphanet.sh``
 script is still available in the Docker image for the auto-update mechanism.
 See :ref:`howtoget` for more information.
+
+Changelog — Version 7.5
+-----------------------
+
+Client
+~~~~~~
+
+- Fixed gas cost estimation for Delphi for contract origination and revelation.
+
+Codec
+~~~~~
+
+- Fixed the name of the ``big_map_diff`` encoding from ``<protocol_name>`` to
+  ``<protocol_name>.contract.big_map_diff``.
 
 Changelog — Version 7.4
 -----------------------

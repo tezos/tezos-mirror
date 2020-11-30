@@ -146,7 +146,11 @@ let () =
 
 let home = try Sys.getenv "HOME" with Not_found -> "/root"
 
-let default_base_dir = Filename.concat home ".tezos-client"
+let base_dir_env_name = "TEZOS_CLIENT_DIR"
+
+let default_base_dir =
+  try Sys.getenv base_dir_env_name
+  with Not_found -> Filename.concat home ".tezos-client"
 
 let default_chain = `Main
 
@@ -329,7 +333,7 @@ let wait_parameter () =
 let protocol_parameter () =
   parameter (fun _ arg ->
       match
-        Seq.find_first
+        Seq.find
           (fun (hash, _commands) ->
             String.has_prefix ~prefix:arg (Protocol_hash.to_b58check hash))
           (Client_commands.get_versions ())
@@ -346,9 +350,15 @@ let base_dir_arg () =
     ~short:'d'
     ~placeholder:"path"
     ~doc:
-      ( "client data directory\n\
-         The directory where the Tezos client will store all its data.\n\
-         By default: '" ^ default_base_dir ^ "'." )
+      (Format.asprintf
+         "@[<v>@[<2>client data directory@,\
+          The directory where the Tezos client will store all its data.@,\
+          If absent, its value is the value of the %s@,\
+          environment variable. If %s is itself not specified,@,\
+          defaults to %s@]@]@."
+         base_dir_env_name
+         base_dir_env_name
+         default_base_dir)
     (string_parameter ())
 
 let config_file_arg () =
@@ -771,20 +781,57 @@ let check_base_dir_for_mode (ctx : #Client_context.full) client_mode base_dir =
     | _ ->
         return_unit )
   | Mode_mockup -> (
-    match base_dir_class with
-    | Base_dir_is_empty
-    | Base_dir_does_not_exist
-    | Base_dir_is_nonempty
-    | Base_dir_is_file ->
+      let warn_might_not_work explain =
         ctx#warning
-          "@[<hv>Base dir %s has state `%a`.@ Some commands (e.g., transfer) \
-           might not work correctly.@]"
+          "@[<hv>Base directory %s %a@ Some commands (e.g., transfer) might \
+           not work correctly.@]"
           base_dir
-          pp_base_dir_class
-          base_dir_class
+          explain
+          ()
         >>= fun () -> return_unit
-    | Base_dir_is_mockup ->
-        return_unit )
+      in
+      let show_cmd ppf () =
+        Format.fprintf
+          ppf
+          "./tezos-client --mode mockup --base-dir %s create mockup"
+          base_dir
+      in
+      match base_dir_class with
+      | Base_dir_is_empty ->
+          warn_might_not_work (fun ppf () ->
+              Format.fprintf
+                ppf
+                "is empty.@ Move directory %s away and create it anew with:@ \
+                 %a@ or use another directory name."
+                base_dir
+                show_cmd
+                ())
+      | Base_dir_does_not_exist ->
+          warn_might_not_work (fun ppf () ->
+              Format.fprintf
+                ppf
+                "does not exist.@ Create it with:@ %a"
+                show_cmd
+                ())
+      | Base_dir_is_nonempty ->
+          warn_might_not_work (fun ppf () ->
+              Format.fprintf
+                ppf
+                "is non empty.@ Move directory %s away and create it anew \
+                 with:@ %a@ or use another directory name."
+                base_dir
+                show_cmd
+                ())
+      | Base_dir_is_file ->
+          warn_might_not_work (fun ppf () ->
+              Format.fprintf
+                ppf
+                "is a file.@ This is expected to be a directory.@ It can be \
+                 created with:@ %a"
+                show_cmd
+                ())
+      | Base_dir_is_mockup ->
+          return_unit )
 
 let build_endpoint addr port tls =
   let updatecomp updatef ov uri =

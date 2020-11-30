@@ -140,8 +140,8 @@ include Tezos_raw_protocol_demo_counter.Main
                    -warn-error +a))
  (modules Registerer))
 
-(alias
- (name runtest_compile_protocol)
+(rule
+ (alias runtest_compile_protocol)
  (deps
    error.mli error.ml
    proto_params.mli proto_params.ml
@@ -155,11 +155,13 @@ include Tezos_raw_protocol_demo_counter.Main
   (:src_dir TEZOS_PROTOCOL))
  (action (run %{bin:tezos-protocol-compiler} -no-hash-check .)))
 
-(alias
- (name runtest_sandbox)
- (deps .tezos_protocol_demo_counter.objs/native/tezos_protocol_demo_counter.cmx))
+(rule
+ (alias runtest_sandbox)
+ (deps .tezos_protocol_demo_counter.objs/native/tezos_protocol_demo_counter.cmx)
+ (action (progn)))
 
-(alias
- (name runtest)
+(rule
+ (alias runtest)
  (package tezos-protocol-demo-counter)
- (deps (alias runtest_sandbox)))
+ (deps (alias runtest_sandbox))
+ (action (progn)))

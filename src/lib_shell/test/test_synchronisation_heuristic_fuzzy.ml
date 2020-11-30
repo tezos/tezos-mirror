@@ -124,7 +124,7 @@ end
 let latency = 100
 
 let forge_peer_id () =
-  let identity = P2p_identity.generate_with_target_0 () in
+  let identity = P2p_identity.generate_with_pow_target_0 () in
   identity.peer_id
 
 let peer_id =

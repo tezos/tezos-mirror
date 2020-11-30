@@ -24,14 +24,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Testing
-   -------
-   Component:    P2P
-   Invocation:   dune build @src/lib_p2p/test/runtest_p2p_ipv6set
-   Dependencies: src/lib_p2p/test/process.ml
-   Subject:      Testing of the Pool
-                 Each test launches nodes in separate process, each node
-                 has its own pool and is given a function to be executed.
+(** Testing
+    -------
+    Component:    P2P
+    Invocation:   dune build @src/lib_p2p/test/runtest_p2p_ipv6set
+    Dependencies: src/lib_p2p/test/process.ml
+    Subject:      Testing of the Pool
+                  Each test launches nodes in separate process, each node
+                  has its own pool and is given a function to be executed.
 *)
 
 include Internal_event.Legacy_logging.Make (struct
@@ -53,7 +53,7 @@ let msg_config : message P2p_params.message_config =
             max_length = None;
           } ];
     chain_name = Distributed_db_version.Name.of_string "SANDBOXED_TEZOS";
-    distributed_db_versions = [Distributed_db_version.zero];
+    distributed_db_versions = Distributed_db_version.[zero; one];
   }
 
 type metadata = unit
@@ -103,8 +103,8 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
       (fun p -> not (P2p_point.Id.equal (addr, port) p))
       trusted_points
   in
-  let proof_of_work_target = Crypto_box.make_target 0. in
-  let identity = P2p_identity.generate_with_target_0 () in
+  let proof_of_work_target = Crypto_box.make_pow_target 0. in
+  let identity = P2p_identity.generate_with_pow_target_0 () in
   let private_mode = false in
   let nb_points = List.length trusted_points in
   let unopt = Option.value ~default:nb_points in
@@ -259,9 +259,8 @@ let detach_nodes ?prefix ?timeout ?min_connections ?max_connections
 
 type error += Connect | Write | Read
 
-(* Test.
-   Detaches [!client] nodes. Each of them will send a [Ping] to each
-   other node, then await for reading one from each other node.
+(** Detaches [!client] nodes. Each of them will send a [Ping] to each
+    other node, then await for reading one from each other node.
 *)
 module Simple = struct
   let rec connect ~timeout connect_handler pool point =
@@ -372,11 +371,10 @@ module Simple = struct
   let run points = detach_nodes (fun _ -> node) points
 end
 
-(* Test.
-   Detaches a number of nodes (which is [!clients]). Each of them will
-   connect to each other node at random points in time, to send a
-   ping, await for a message, then disconnect. This process is
-   repeated [repeat] times.
+(** Detaches a number of nodes (which is [!clients]). Each of them will
+    connect to each other node at random points in time, to send a
+    ping, await for a message, then disconnect. This process is
+    repeated [repeat] times.
 *)
 module Random_connections = struct
   let rec connect_random connect_handler pool total rem point n =
@@ -421,12 +419,11 @@ module Random_connections = struct
   let run points repeat = detach_nodes (fun _ _ -> node repeat) points
 end
 
-(* Test.
-   Detaches a number of nodes. Each will connect to all other nodes
-   (peers) of the pool, sync, write garbled data, then await for
-   reading a message. Their process will finish whenever all
-   connections are closed. It is asserted that each closed connection
-   comes with an error.
+(** Detaches a number of nodes. Each will connect to all other nodes
+    (peers) of the pool, sync, write garbled data, then await for
+    reading a message. Their process will finish whenever all
+    connections are closed. It is asserted that each closed connection
+    comes with an error.
 *)
 module Garbled = struct
   let is_connection_closed = function
@@ -717,14 +714,13 @@ module Overcrowded = struct
 
   let trusted i points = if i = 0 then points else [List.hd points]
 
-  (* Test.
-     Detaches a number of nodes: one of them is the target (its
-     max_incoming_connections is set to zero), and all the rest are
-     clients (knowing only the target). The target will be overcrowded
-     by the other clients connecting to it. All clients should have
-     their pool populated with the list of points. Specifically for
-     this test function, each client use p2p v.1 and check that they
-     eventually know all other nodes thanks to the node reply.
+  (** Detaches a number of nodes: one of them is the target (its
+      max_incoming_connections is set to zero), and all the rest are
+      clients (knowing only the target). The target will be overcrowded
+      by the other clients connecting to it. All clients should have
+      their pool populated with the list of points. Specifically for
+      this test function, each client use p2p v.1 and check that they
+      eventually know all other nodes thanks to the node reply.
   *)
   let run points =
     (* setting connections to -1 ensure there will be no random
@@ -743,11 +739,10 @@ module Overcrowded = struct
       points
       ~trusted
 
-  (* Test.
-     Same as previously but by mixing different protocol version
-     tags. Half the clients do as in run and half of the clients use
-     p2p v.0 and check that they didn't receive new nodes (meaning
-     that [target] actually sent a Nack_v_0.
+  (** Same as previously but by mixing different protocol version
+      tags. Half the clients do as in run and half of the clients use
+      p2p v.0 and check that they didn't receive new nodes (meaning
+      that [target] actually sent a Nack_v_0.
   *)
   let run_mixed_versions points =
     let prefix = function
@@ -774,11 +769,10 @@ module Overcrowded = struct
       ~trusted
 end
 
-(* Test.
-   Detaches a number of nodes (one target, the rest being clients) on
-   a different network. It is asserted that the connection must be
-   rejected due to the fact that the target is not on a common
-   network.
+(** Detaches a number of nodes (one target, the rest being clients) on
+    a different network. It is asserted that the connection must be
+    rejected due to the fact that the target is not on a common
+    network.
 *)
 module No_common_network = struct
   let rec connect ?iter_count ~timeout connect_handler pool point =

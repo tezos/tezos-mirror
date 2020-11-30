@@ -1,5 +1,4 @@
 import time
-from datetime import datetime, timedelta
 import pytest
 from tools import utils, constants
 from launchers.sandbox import Sandbox
@@ -17,10 +16,7 @@ class TestMultiNodeStorageReconstruction:
 
     def test_init(self, sandbox: Sandbox):
         sandbox.add_node(0, params=PARAMS)
-        # Allow fast `bake for` by activating the protocol in the past
-        last_hour_date_time = datetime.utcnow() - timedelta(hours=1)
-        timestamp = last_hour_date_time.strftime("%Y-%m-%dT%H:%M:%SZ")
-        utils.activate_alpha(sandbox.client(0), timestamp=timestamp)
+        utils.activate_alpha(sandbox.client(0), activate_in_the_past=True)
 
     def test_bake_node0_level_a(self, sandbox: Sandbox, session: dict):
         for _ in range(BATCH - 1):

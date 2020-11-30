@@ -73,7 +73,9 @@ let fail x =
 
 let global_starting_time = Unix.gettimeofday ()
 
-let really_run title f =
+let a_test_failed = ref false
+
+let really_run ~iteration title f =
   Log.info "Starting test: %s" title ;
   List.iter (fun reset -> reset ()) !reset_functions ;
   Lwt_main.run
@@ -183,7 +185,7 @@ let really_run title f =
     Lwt.catch wait_for_async handle_exception
   in
   (* Display test result. *)
-  Log.test_result !test_result title ;
+  Log.test_result ~iteration !test_result title ;
   match !test_result with
   | Successful ->
       unit
@@ -193,7 +195,7 @@ let really_run title f =
         Sys.argv.(0)
         (Log.quote_shell title) ;
       if Cli.options.keep_going then (
-        at_exit (fun () -> exit 1) ;
+        a_test_failed := true ;
         unit )
       else exit 1
   | Aborted ->
@@ -253,9 +255,15 @@ let check_existence kind known specified =
       List.iter (Printf.eprintf "Unknown %s: %s\n" kind) unknown ;
       false
 
-(* List of tests, filled if --list is specified on the command-line,
-   and displayed as a table at exit. *)
-let list = ref []
+type test = {
+  file : string;
+  title : string;
+  tags : string list;
+  body : unit -> unit Lwt.t;
+}
+
+(* List of tests added using [add] and that match command-line filters. *)
+let list : test list ref = ref []
 
 let list_tests () =
   let file_header = "FILE" in
@@ -263,7 +271,7 @@ let list_tests () =
   let tags_header = "TAGS" in
   let list =
     List.map
-      (fun (file, title, tags) -> (file, title, String.concat ", " tags))
+      (fun {file; title; tags; _} -> (file, title, String.concat ", " tags))
       !list
   in
   (* Compute the size of each column. *)
@@ -318,23 +326,17 @@ let list_tests () =
   if list <> [] then print_string line ;
   ()
 
-let found_a_test = ref false
-
-let run ~__FILE__ ~title ~tags f =
+let register ~__FILE__ ~title ~tags body =
   let file = Filename.basename __FILE__ in
   check_tags tags ;
   register_file file ;
   register_title title ;
   List.iter register_tag tags ;
-  if test_should_be_run ~file ~title ~tags then (
-    found_a_test := true ;
-    if Cli.options.list then list := (file, title, tags) :: !list
-    else really_run title f )
+  if test_should_be_run ~file ~title ~tags then
+    list := {file; title; tags; body} :: !list
 
-(* The list of files / tests / tags is only known at the very end. *)
-let () =
-  at_exit
-  @@ fun () ->
+let run () =
+  (* Check command-line options. *)
   let all_files_exist =
     check_existence "--file" known_files Cli.options.files_to_run
   in
@@ -349,8 +351,8 @@ let () =
   in
   if (not all_files_exist) || (not all_titles_exist) || not all_tags_exist then
     exit 1 ;
-  if Cli.options.list then list_tests () ;
-  if not !found_a_test then (
+  (* Print a warning if no test was selected. *)
+  if !list = [] then (
     Printf.eprintf
       "No test found for filters: %s\n%!"
       (String.concat
@@ -365,4 +367,15 @@ let () =
          @ List.map (sf "/%s") Cli.options.tags_not_to_run )) ;
     if not Cli.options.list then
       prerr_endline
-        "You can use --list to get the list of tests and their tags." )
+        "You can use --list to get the list of tests and their tags." ) ;
+  (* Actually run the tests (or list them). *)
+  ( if Cli.options.list then list_tests ()
+  else
+    let rec run iteration =
+      List.iter
+        (fun {title; body; _} -> really_run ~iteration title body)
+        !list ;
+      if Cli.options.loop then run (iteration + 1)
+    in
+    run 1 ) ;
+  if !a_test_failed then exit 1

@@ -140,8 +140,10 @@ in the :ref:`introduction <howtoget>`.
    developer/tezt
    developer/proposal_testing
    developer/profiling
+   developer/snoop
    developer/contributing
    developer/merge_team
+   developer/guidelines
 
 .. toctree::
    :maxdepth: 2
@@ -151,6 +153,7 @@ in the :ref:`introduction <howtoget>`.
    protocols/004_Pt24m4xi
    protocols/005_babylon
    protocols/006_carthage
+   protocols/008_edo
 
 .. toctree::
    :maxdepth: 2
@@ -163,6 +166,7 @@ in the :ref:`introduction <howtoget>`.
    releases/december-2019
    releases/january-2020
    releases/version-7
+   releases/version-8
 
 .. toctree::
    :maxdepth: 2

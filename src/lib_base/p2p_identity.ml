@@ -55,16 +55,17 @@ let encoding =
           (req "secret_key" Crypto_box.secret_key_encoding)
           (req "proof_of_work_stamp" Crypto_box.nonce_encoding))
 
-let generate_with_bound ?yield_every ?max target =
+let generate_with_bound ?yield_every ?max pow_target =
   let open Lwt.Infix in
   let (secret_key, public_key, peer_id) = Crypto_box.random_keypair () in
-  Crypto_box.generate_proof_of_work ?yield_every ?max public_key target
+  Crypto_box.generate_proof_of_work ?yield_every ?max public_key pow_target
   >|= fun proof_of_work_stamp ->
   {peer_id; public_key; secret_key; proof_of_work_stamp}
 
-let generate ?yield_every target = generate_with_bound ?yield_every target
+let generate ?yield_every pow_target =
+  generate_with_bound ?yield_every pow_target
 
-let generate_with_target_0 () =
+let generate_with_pow_target_0 () =
   let (secret_key, public_key, peer_id) = Crypto_box.random_keypair () in
   let proof_of_work_stamp =
     Crypto_box.generate_proof_of_work_with_target_0 public_key

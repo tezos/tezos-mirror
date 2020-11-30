@@ -110,7 +110,7 @@ module Timestamp : sig
 
   val to_notation : time -> string
 
-  val of_seconds : string -> time option
+  val of_seconds_string : string -> time option
 
   val to_seconds_string : time -> string
 
@@ -160,7 +160,9 @@ module Cycle : sig
 end
 
 module Gas : sig
-  type t = private Unaccounted | Limited of {remaining : Z.t}
+  module Arith : Fixed_point_repr.Safe
+
+  type t = private Unaccounted | Limited of {remaining : Arith.fp}
 
   val encoding : t Data_encoding.encoding
 
@@ -180,29 +182,27 @@ module Gas : sig
 
   val free : cost
 
-  val atomic_step_cost : int -> cost
+  val atomic_step_cost : Z.t -> cost
 
-  val step_cost : int -> cost
+  val step_cost : Z.t -> cost
 
-  val alloc_cost : int -> cost
+  val alloc_cost : Z.t -> cost
 
   val alloc_bytes_cost : int -> cost
 
   val alloc_mbytes_cost : int -> cost
 
-  val alloc_bits_cost : int -> cost
-
   val read_bytes_cost : Z.t -> cost
 
   val write_bytes_cost : Z.t -> cost
 
-  val ( *@ ) : int -> cost -> cost
+  val ( *@ ) : Z.t -> cost -> cost
 
   val ( +@ ) : cost -> cost -> cost
 
-  val check_limit : context -> Z.t -> unit tzresult
+  val check_limit : context -> 'a Arith.t -> unit tzresult
 
-  val set_limit : context -> Z.t -> context
+  val set_limit : context -> 'a Arith.t -> context
 
   val set_unlimited : context -> context
 
@@ -212,9 +212,11 @@ module Gas : sig
 
   val level : context -> t
 
-  val consumed : since:context -> until:context -> Z.t
+  val consumed : since:context -> until:context -> Arith.fp
 
-  val block_level : context -> Z.t
+  val block_level : context -> Arith.fp
+
+  val cost_of_repr : Gas_limit_repr.cost -> cost
 end
 
 module Script_int : module type of Script_int_repr
@@ -398,8 +400,6 @@ module Script : sig
 
   val traversal_cost : node -> Gas.cost
 
-  val node_cost : node -> Gas.cost
-
   val int_node_cost : Z.t -> Gas.cost
 
   val int_node_cost_of_numbits : int -> Gas.cost
@@ -414,17 +414,17 @@ module Script : sig
 
   val prim_node_cost_nonrec : expr list -> annot -> Gas.cost
 
-  val prim_node_cost_nonrec_of_length : int -> annot -> Gas.cost
-
   val seq_node_cost_nonrec : expr list -> Gas.cost
 
   val seq_node_cost_nonrec_of_length : int -> Gas.cost
 
   val minimal_deserialize_cost : lazy_expr -> Gas.cost
 
-  val force_decode : context -> lazy_expr -> (expr * context) tzresult Lwt.t
+  val force_decode_in_context :
+    context -> lazy_expr -> (expr * context) tzresult
 
-  val force_bytes : context -> lazy_expr -> (MBytes.t * context) tzresult Lwt.t
+  val force_bytes_in_context :
+    context -> lazy_expr -> (MBytes.t * context) tzresult
 
   val unit_parameter : lazy_expr
 
@@ -447,6 +447,10 @@ module Script : sig
 
     val add_root_entrypoint : script_code:lazy_expr -> lazy_expr tzresult Lwt.t
   end
+
+  val micheline_nodes : node -> int
+
+  val strip_locations_cost : node -> Gas.cost
 end
 
 module Constants : sig
@@ -454,7 +458,7 @@ module Constants : sig
   type fixed = {
     proof_of_work_nonce_size : int;
     nonce_length : int;
-    max_revelations_per_block : int;
+    max_anon_ops_per_block : int;
     max_operation_data_length : int;
     max_proposals_per_delegate : int;
   }
@@ -467,7 +471,7 @@ module Constants : sig
 
   val nonce_length : int
 
-  val max_revelations_per_block : int
+  val max_anon_ops_per_block : int
 
   val max_operation_data_length : int
 
@@ -482,8 +486,8 @@ module Constants : sig
     blocks_per_voting_period : int32;
     time_between_blocks : Period.t list;
     endorsers_per_block : int;
-    hard_gas_limit_per_operation : Z.t;
-    hard_gas_limit_per_block : Z.t;
+    hard_gas_limit_per_operation : Gas.Arith.integral;
+    hard_gas_limit_per_block : Gas.Arith.integral;
     proof_of_work_threshold : int64;
     tokens_per_roll : Tez.t;
     michelson_maximum_type_size : int;
@@ -525,9 +529,9 @@ module Constants : sig
 
   val delay_per_missing_endorsement : context -> Period.t
 
-  val hard_gas_limit_per_operation : context -> Z.t
+  val hard_gas_limit_per_operation : context -> Gas.Arith.integral
 
-  val hard_gas_limit_per_block : context -> Z.t
+  val hard_gas_limit_per_block : context -> Gas.Arith.integral
 
   val cost_per_byte : context -> Tez.t
 
@@ -679,9 +683,7 @@ end
 module Big_map : sig
   type id = Z.t
 
-  val fresh : context -> (context * id) tzresult Lwt.t
-
-  val fresh_temporary : context -> context * id
+  val fresh : temporary:bool -> context -> (context * id) tzresult Lwt.t
 
   val mem :
     context -> id -> Script_expr_hash.t -> (context * bool) tzresult Lwt.t
@@ -748,12 +750,14 @@ module Contract : sig
 
   val get_balance : context -> contract -> Tez.t tzresult Lwt.t
 
+  val get_balance_carbonated :
+    context -> contract -> (context * Tez.t) tzresult Lwt.t
+
   val init_origination_nonce : context -> Operation_hash.t -> context
 
   val unset_origination_nonce : context -> context
 
-  val fresh_contract_from_current_nonce :
-    context -> (context * t) tzresult Lwt.t
+  val fresh_contract_from_current_nonce : context -> (context * t) tzresult
 
   val originated_from_current_nonce :
     since:context -> until:context -> contract list tzresult Lwt.t
@@ -766,7 +770,7 @@ module Contract : sig
         diff_value : Script.expr option;
       }
     | Clear of Big_map.id
-    | Copy of Big_map.id * Big_map.id
+    | Copy of {src : Big_map.id; dst : Big_map.id}
     | Alloc of {
         big_map : Big_map.id;
         key_type : Script.expr;
@@ -1084,7 +1088,7 @@ and _ contents =
       fee : Tez.tez;
       counter : counter;
       operation : 'kind manager_operation;
-      gas_limit : Z.t;
+      gas_limit : Gas.Arith.integral;
       storage_limit : Z.t;
     }
       -> 'kind Kind.manager contents
@@ -1139,7 +1143,7 @@ type packed_internal_operation =
 val manager_kind : 'kind manager_operation -> 'kind Kind.manager
 
 module Fees : sig
-  val origination_burn : context -> (context * Tez.t) tzresult Lwt.t
+  val origination_burn : context -> (context * Tez.t) tzresult
 
   val record_paid_storage_space :
     context -> Contract.t -> (context * Z.t * Z.t * Tez.t) tzresult Lwt.t
@@ -1204,9 +1208,6 @@ module Operation : sig
   type error += Invalid_signature (* `Permanent *)
 
   val check_signature :
-    public_key -> Chain_id.t -> _ operation -> unit tzresult Lwt.t
-
-  val check_signature_sync :
     public_key -> Chain_id.t -> _ operation -> unit tzresult
 
   val internal_operation_encoding : packed_internal_operation Data_encoding.t
@@ -1374,12 +1375,12 @@ val record_internal_nonce : context -> int -> context
 
 val internal_nonce_already_recorded : context -> int -> bool
 
-val add_fees : context -> Tez.t -> context tzresult Lwt.t
+val add_fees : context -> Tez.t -> context tzresult
 
-val add_rewards : context -> Tez.t -> context tzresult Lwt.t
+val add_rewards : context -> Tez.t -> context tzresult
 
 val add_deposit :
-  context -> Signature.Public_key_hash.t -> Tez.t -> context tzresult Lwt.t
+  context -> Signature.Public_key_hash.t -> Tez.t -> context tzresult
 
 val get_fees : context -> Tez.t
 

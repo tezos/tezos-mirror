@@ -281,14 +281,12 @@ type protocols = {
 let raw_protocol_encoding =
   conv
     (fun {current_protocol; next_protocol} ->
-      ((current_protocol, next_protocol), ()))
-    (fun ((current_protocol, next_protocol), ()) ->
+      (current_protocol, next_protocol))
+    (fun (current_protocol, next_protocol) ->
       {current_protocol; next_protocol})
-    (merge_objs
-       (obj2
-          (req "protocol" Protocol_hash.encoding)
-          (req "next_protocol" Protocol_hash.encoding))
-       unit)
+    (obj2
+       (req "protocol" Protocol_hash.encoding)
+       (req "next_protocol" Protocol_hash.encoding))
 
 module Make (Proto : PROTO) (Next_proto : PROTO) = struct
   let protocol_hash = Protocol_hash.to_b58check Proto.hash
@@ -501,6 +499,15 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         ~output:block_metadata_encoding
         RPC_path.(path / "metadata")
 
+    let metadata_hash =
+      RPC_service.get_service
+        ~description:
+          "Hash of the metadata associated to the block. This is only set on \
+           blocks starting from environment V1."
+        ~query:RPC_query.empty
+        ~output:Block_metadata_hash.encoding
+        RPC_path.(path / "metadata_hash")
+
     let protocols =
       RPC_service.get_service
         ~description:"Current and next protocol."
@@ -617,6 +624,48 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
              of the block."
           ~query:RPC_query.empty
           ~output:Operation_hash.encoding
+          RPC_path.(path /: Operations.list_arg /: Operations.offset_arg)
+    end
+
+    module Operation_metadata_hashes = struct
+      let root =
+        RPC_service.get_service
+          ~description:
+            "The root hash of the operations metadata from the block. This is \
+             only set on blocks starting from environment V1."
+          ~query:RPC_query.empty
+          ~output:Operation_metadata_list_list_hash.encoding
+          RPC_path.(path / "operations_metadata_hash")
+
+      let path = RPC_path.(path / "operation_metadata_hashes")
+
+      let operation_metadata_hashes =
+        RPC_service.get_service
+          ~description:
+            "The hashes of all the operation metadata included in the block. \
+             This is only set on blocks starting from environment V1."
+          ~query:RPC_query.empty
+          ~output:(list (list Operation_metadata_hash.encoding))
+          path
+
+      let operation_metadata_hashes_in_pass =
+        RPC_service.get_service
+          ~description:
+            "All the operation metadata included in `n-th` validation pass of \
+             the block. This is only set on blocks starting from environment \
+             V1."
+          ~query:RPC_query.empty
+          ~output:(list Operation_metadata_hash.encoding)
+          RPC_path.(path /: Operations.list_arg)
+
+      let operation_metadata_hash =
+        RPC_service.get_service
+          ~description:
+            "The hash of then `m-th` operation metadata in the `n-th` \
+             validation pass of the block. This is only set on blocks \
+             starting from environment V1."
+          ~query:RPC_query.empty
+          ~output:Operation_metadata_hash.encoding
           RPC_path.(path /: Operations.list_arg /: Operations.offset_arg)
     end
 
@@ -924,6 +973,10 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
     let f = make_call0 S.metadata ctxt in
     fun ?(chain = `Main) ?(block = `Head 0) () -> f chain block () ()
 
+  let metadata_hash ctxt =
+    let f = make_call0 S.metadata_hash ctxt in
+    fun ?(chain = `Main) ?(block = `Head 0) () -> f chain block () ()
+
   let protocols ctxt =
     let f = make_call0 S.protocols ctxt in
     fun ?(chain = `Main) ?(block = `Head 0) () -> f chain block () ()
@@ -973,6 +1026,26 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
 
     let operation_hash ctxt =
       let f = make_call2 S.operation_hash ctxt in
+      fun ?(chain = `Main) ?(block = `Head 0) n m -> f chain block n m () ()
+  end
+
+  module Operation_metadata_hashes = struct
+    module S = S.Operation_metadata_hashes
+
+    let root ctxt =
+      let f = make_call0 S.root ctxt in
+      fun ?(chain = `Main) ?(block = `Head 0) () -> f chain block () ()
+
+    let operation_metadata_hashes ctxt =
+      let f = make_call0 S.operation_metadata_hashes ctxt in
+      fun ?(chain = `Main) ?(block = `Head 0) () -> f chain block () ()
+
+    let operation_metadata_hashes_in_pass ctxt =
+      let f = make_call1 S.operation_metadata_hashes_in_pass ctxt in
+      fun ?(chain = `Main) ?(block = `Head 0) n -> f chain block n () ()
+
+    let operation_metadata_hash ctxt =
+      let f = make_call2 S.operation_metadata_hash ctxt in
       fun ?(chain = `Main) ?(block = `Head 0) n m -> f chain block n m () ()
   end
 

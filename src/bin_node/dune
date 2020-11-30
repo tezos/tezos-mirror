@@ -23,54 +23,60 @@
             tezos-validator
             tezos-shell-context
             tezos-protocol-updater
-            (select void_for_linking-genesis from
-              (tezos-embedded-protocol-genesis -> void_for_linking)
-              (-> void_for_linking))
-            (select void_for_linking-genesis-carthagenet from
-              (tezos-embedded-protocol-genesis-carthagenet -> void_for_linking)
-              (-> void_for_linking))
+            (select void_for_linking-embedded-protocol-genesis from
+              (tezos-embedded-protocol-genesis -> void_for_linking-embedded-protocol-genesis.empty)
+              (-> void_for_linking-embedded-protocol-genesis.empty))
+            (select void_for_linking-embedded-protocol-genesis-carthagenet from
+              (tezos-embedded-protocol-genesis-carthagenet -> void_for_linking-embedded-protocol-genesis-carthagenet.empty)
+              (-> void_for_linking-embedded-protocol-genesis-carthagenet.empty))
             (select void_for_linking-demo-noops from
-              (tezos-embedded-protocol-demo-noops -> void_for_linking)
-              (-> void_for_linking))
+              (tezos-embedded-protocol-demo-noops -> void_for_linking-demo-noops.empty)
+              (-> void_for_linking-demo-noops.empty))
             (select void_for_linking-demo-counter from
-              (tezos-embedded-protocol-demo-counter -> void_for_linking)
-              (-> void_for_linking))
+              (tezos-embedded-protocol-demo-counter -> void_for_linking-demo-counter.empty)
+              (-> void_for_linking-demo-counter.empty))
             (select void_for_linking-alpha from
-              (tezos-embedded-protocol-alpha -> void_for_linking)
-              (-> void_for_linking))
+              (tezos-embedded-protocol-alpha -> void_for_linking-alpha.empty)
+              (-> void_for_linking-alpha.empty))
             (select void_for_linking-000-Ps9mPmXa from
-              (tezos-embedded-protocol-000-Ps9mPmXa -> void_for_linking)
-              (-> void_for_linking))
+              (tezos-embedded-protocol-000-Ps9mPmXa -> void_for_linking-000-Ps9mPmXa.empty)
+              (-> void_for_linking-000-Ps9mPmXa.empty))
             (select void_for_linking-001-PtCJ7pwo from
-              (tezos-embedded-protocol-001-PtCJ7pwo -> void_for_linking)
-              (-> void_for_linking))
+              (tezos-embedded-protocol-001-PtCJ7pwo -> void_for_linking-001-PtCJ7pwo.empty)
+              (-> void_for_linking-001-PtCJ7pwo.empty))
             (select void_for_linking-002-PsYLVpVv from
-              (tezos-embedded-protocol-002-PsYLVpVv -> void_for_linking)
-              (-> void_for_linking))
+              (tezos-embedded-protocol-002-PsYLVpVv -> void_for_linking-002-PsYLVpVv.empty)
+              (-> void_for_linking-002-PsYLVpVv.empty))
             (select void_for_linking-003-PsddFKi3 from
-              (tezos-embedded-protocol-003-PsddFKi3 -> void_for_linking)
-              (-> void_for_linking))
+              (tezos-embedded-protocol-003-PsddFKi3 -> void_for_linking-003-PsddFKi3.empty)
+              (-> void_for_linking-003-PsddFKi3.empty))
             (select void_for_linking-004-Pt24m4xi from
-              (tezos-embedded-protocol-004-Pt24m4xi -> void_for_linking)
-              (-> void_for_linking))
+              (tezos-embedded-protocol-004-Pt24m4xi -> void_for_linking-004-Pt24m4xi.empty)
+              (-> void_for_linking-004-Pt24m4xi.empty))
             (select void_for_linking-005-PsBABY5H from
-              (tezos-embedded-protocol-005-PsBABY5H -> void_for_linking)
-              (-> void_for_linking))
+              (tezos-embedded-protocol-005-PsBABY5H -> void_for_linking-005-PsBABY5H.empty)
+              (-> void_for_linking-005-PsBABY5H.empty))
             (select void_for_linking-005-PsBabyM1 from
-              (tezos-embedded-protocol-005-PsBabyM1 -> void_for_linking)
-              (-> void_for_linking))
+              (tezos-embedded-protocol-005-PsBabyM1 -> void_for_linking-005-PsBabyM1.empty)
+              (-> void_for_linking-005-PsBabyM1.empty))
             (select void_for_linking-006-PsCARTHA from
-              (tezos-embedded-protocol-006-PsCARTHA -> void_for_linking)
-              (-> void_for_linking))
+              (tezos-embedded-protocol-006-PsCARTHA -> void_for_linking-006-PsCARTHA.empty)
+              (-> void_for_linking-006-PsCARTHA.empty))
             (select void_for_linking-007-PsDELPH1 from
-              (tezos-embedded-protocol-007-PsDELPH1 -> void_for_linking)
-              (-> void_for_linking))
+              (tezos-embedded-protocol-007-PsDELPH1 -> void_for_linking-007-PsDELPH1.empty)
+              (-> void_for_linking-007-PsDELPH1.empty))
+            (select void_for_linking-008-PtEdoTez from
+              (tezos-embedded-protocol-008-PtEdoTez -> void_for_linking-008-PtEdoTez.empty)
+              (-> void_for_linking-008-PtEdoTez.empty))
             (select void_for_linking-006-PsCARTHA-mempool from
-              (tezos-mempool-006-PsCARTHA -> void_for_linking)
-              (-> void_for_linking))
+              (tezos-mempool-006-PsCARTHA -> void_for_linking-006-PsCARTHA-mempool.empty)
+              (-> void_for_linking-006-PsCARTHA-mempool.empty))
             (select void_for_linking-007-PsDELPH1-mempool from
-              (tezos-mempool-007-PsDELPH1 -> void_for_linking)
-              (-> void_for_linking))
+              (tezos-mempool-007-PsDELPH1 -> void_for_linking-007-PsDELPH1-mempool.empty)
+              (-> void_for_linking-007-PsDELPH1-mempool.empty))
+            (select void_for_linking-008-PtEdoTez-mempool from
+              (tezos-mempool-008-PtEdoTez -> void_for_linking-008-PtEdoTez-mempool.empty)
+              (-> void_for_linking-008-PtEdoTez-mempool.empty))
             cmdliner
             tls)
  (flags (:standard -open Tezos_base__TzPervasives
@@ -89,15 +95,34 @@
                    -linkall)))
 
 (rule
-  (target void_for_linking)
-  (action (write-file ${target} "")))
+ (action
+  (progn
+   (write-file void_for_linking-embedded-protocol-genesis.empty "")
+   (write-file void_for_linking-embedded-protocol-genesis-carthagenet.empty "")
+   (write-file void_for_linking-demo-noops.empty "")
+   (write-file void_for_linking-demo-counter.empty "")
+   (write-file void_for_linking-alpha.empty "")
+   (write-file void_for_linking-000-Ps9mPmXa.empty "")
+   (write-file void_for_linking-001-PtCJ7pwo.empty "")
+   (write-file void_for_linking-002-PsYLVpVv.empty "")
+   (write-file void_for_linking-003-PsddFKi3.empty "")
+   (write-file void_for_linking-004-Pt24m4xi.empty "")
+   (write-file void_for_linking-005-PsBABY5H.empty "")
+   (write-file void_for_linking-005-PsBabyM1.empty "")
+   (write-file void_for_linking-006-PsCARTHA.empty "")
+   (write-file void_for_linking-007-PsDELPH1.empty "")
+   (write-file void_for_linking-008-PtEdoTez.empty "")
+   (write-file void_for_linking-006-PsCARTHA-mempool.empty "")
+   (write-file void_for_linking-007-PsDELPH1-mempool.empty "")
+   (write-file void_for_linking-008-PtEdoTez-mempool.empty "")
+)))
 
 (install
  (package tezos-node)
  (section bin)
  (files (tezos-sandboxed-node.sh as tezos-sandboxed-node.sh)))
 
-(alias
- (name runtest_lint)
+(rule
+ (alias runtest_lint)
  (deps (glob_files *.ml{,i}))
  (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

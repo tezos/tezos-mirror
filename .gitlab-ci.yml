@@ -2,7 +2,7 @@
 
 variables:
   ## Please update `scripts/version.sh` accordingly
-  build_deps_image_version: 1adce2a7a54b71fe114c56c979beb15aec7b313f
+  build_deps_image_version: c916fd9f0698d7ae0d30114a328c78608b693d6a
   build_deps_image_name: registry.gitlab.com/tezos/opam-repository
   public_docker_image_name: docker.io/${CI_PROJECT_PATH}
   GIT_STRATEGY: fetch
@@ -17,6 +17,7 @@ stages:
   - doc
   - packaging
   - publish
+  - publish_manifest
   - test_coverage
   - publish_coverage
 
@@ -27,6 +28,9 @@ stages:
 sanity:
   image: ${build_deps_image_name}:${build_deps_image_version}
   stage: sanity
+  except:
+    - tags@tezos/tezos
+    - /-release$/@tezos/tezos
   before_script:
     - . ./scripts/version.sh
   script:
@@ -37,6 +41,11 @@ sanity:
       fi
     - scripts/check_opam_test.sh
     - src/tooling/lint.sh --check-gitlab-ci-yml
+    # Ensures that the local poetry.lock and pyproject.toml are synchronized
+    # with those of the base image.
+    - diff tests_python/poetry.lock /home/tezos/poetry.lock
+    - diff tests_python/pyproject.toml /home/tezos/pyproject.toml
+  interruptible: true
 
 ############################################################
 ## Stage: build (only MR)                                 ##
@@ -47,19 +56,14 @@ sanity:
   stage: build
   except:
     - master
-    - zeronet
-    - mainnet
-    - zeronet-staging
-    - mainnet-staging
-    - zeronet-snapshots
-    - mainnet-snapshots
-    - latest-release
-    - tags
+    - tags@tezos/tezos
+    - /-release$/@tezos/tezos
   before_script:
     - . ./scripts/version.sh
     # Load the environment poetry previously created in the docker image.
     # Give access to the Python dependencies/executables
     - . $HOME/.venv/bin/activate
+  interruptible: true
 
 check_opam_deps:
   <<: *build_definition
@@ -90,6 +94,10 @@ check_precommit_hook:
   <<: *build_definition
   script:
     - ./scripts/pre_commit/pre_commit.py --test-itself
+    - cd tests_python
+    - poetry run pylint ../scripts/pre_commit/pre_commit.py
+    - poetry run pycodestyle ../scripts/pre_commit/pre_commit.py
+    - poetry run mypy ../scripts/pre_commit/pre_commit.py
 
 check_scripts_b58_prefix:
   # Can be changed to a python image, but using the build docker image to keep
@@ -123,6 +131,20 @@ build:
     expire_in: 1 day
     when: on_success
 
+build_arm64:
+  <<: *build_definition
+  when: manual
+  script:
+    - . ./scripts/version.sh
+    - dune build @all
+    - dune install --prefix install_root
+  artifacts:
+    name: "build-$CI_COMMIT_REF_SLUG"
+    paths:
+      - install_root/bin/tezos-*
+  tags:
+    - arm64
+
 ############################################################
 ## Stage: test (only MR)                                  ##
 ############################################################
@@ -132,18 +154,13 @@ test-script-gen-genesis:
   stage: test
   except:
     - master
-    - zeronet
-    - mainnet
-    - zeronet-staging
-    - mainnet-staging
-    - zeronet-snapshots
-    - mainnet-snapshots
-    - latest-release
-    - tags
+    - tags@tezos/tezos
+    - /-release$/@tezos/tezos
   before_script:
     - cd scripts/gen-genesis
   script:
     - dune build gen_genesis.exe
+  interruptible: true
 
 .test_template: &test_definition
   <<: *build_definition
@@ -156,146 +173,49 @@ test-script-gen-genesis:
 
 # this section is updated using the script scripts/update_unit_test.sh
 ##BEGIN_UNITTEST##
-unit:client:
+unit:alltest:
   <<: *test_definition
+  artifacts:
+    name: "alltest-${CI_COMMIT_SHA}"
+    paths:
+      - test_results
+    expire_in: 1 day
+#    when: on_failure
   script:
-    - dune build @src/bin_client/runtest
-
-unit:base:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_base/runtest
-
-unit:client_base:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_client_base/runtest
-
-unit:crypto:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_crypto/runtest
-
-unit:error_monad:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_error_monad/runtest
-
-unit:lwt_result_stdlib:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_lwt_result_stdlib/runtest
-
-unit:micheline:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_micheline/runtest
-
-unit:p2p:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_p2p/runtest
-
-unit:protocol_compiler:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_protocol_compiler/runtest
-
-unit:protocol_environment:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_protocol_environment/runtest
-
-unit:requester:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_requester/runtest
-
-unit:shell:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_shell/runtest
-
-unit:signer_backends:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_signer_backends/runtest
-
-unit:signer_backends/unix:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_signer_backends/unix/runtest
-
-unit:stdlib:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_stdlib/runtest
-
-unit:stdlib_unix:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_stdlib_unix/runtest
-
-unit:storage:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_storage/runtest
-
-unit:src/proto_006_PsCARTHA/lib_client:
-  <<: *test_definition
-  script:
-    - dune build @src/proto_006_PsCARTHA/lib_client/runtest
-
-unit:src/proto_006_PsCARTHA/lib_protocol:
-  <<: *test_definition
-  script:
-    - dune build @src/proto_006_PsCARTHA/lib_protocol/runtest
-
-unit:src/proto_007_PsDELPH1/lib_client:
-  <<: *test_definition
-  script:
-    - dune build @src/proto_007_PsDELPH1/lib_client/runtest
-
-unit:src/proto_007_PsDELPH1/lib_protocol:
-  <<: *test_definition
-  script:
-    - dune build @src/proto_007_PsDELPH1/lib_protocol/runtest
-
-unit:src/proto_alpha/lib_client:
-  <<: *test_definition
-  script:
-    - dune build @src/proto_alpha/lib_client/runtest
-
-unit:src/proto_alpha/lib_protocol:
-  <<: *test_definition
-  script:
-    - dune build @src/proto_alpha/lib_protocol/runtest
-
-unit:src/tooling:
-  <<: *test_definition
-  script:
-    - dune build @src/tooling/runtest
-
-unit:ocaml-bls12-381:
-  <<: *test_definition
-  script:
-    - dune build @vendors/ocaml-bls12-381/runtest
-
-unit:ocaml-ledger-wallet:
-  <<: *test_definition
-  script:
-    - dune build @vendors/ocaml-ledger-wallet/runtest
-
-unit:ocaml-lmdb:
-  <<: *test_definition
-  script:
-    - dune build @vendors/ocaml-lmdb/runtest
-
-unit:ocaml-uecc:
-  <<: *test_definition
-  script:
-    - dune build @vendors/ocaml-uecc/runtest
-
+    - scripts/test_wrapper.sh src/bin_client client
+    - scripts/test_wrapper.sh src/bin_snoop/latex snoop_latex
+    - scripts/test_wrapper.sh src/lib_base base
+    - scripts/test_wrapper.sh src/lib_benchmark/lib_micheline_rewriting benchmark_lib_micheline_rewriting
+    - scripts/test_wrapper.sh src/lib_benchmark benchmark
+    - scripts/test_wrapper.sh src/lib_client_base client_base
+    - scripts/test_wrapper.sh src/lib_crypto crypto
+    - scripts/test_wrapper.sh src/lib_error_monad error_monad
+    - scripts/test_wrapper.sh src/lib_lwt_result_stdlib lwt_result_stdlib
+    - scripts/test_wrapper.sh src/lib_micheline micheline
+    - scripts/test_wrapper.sh src/lib_p2p p2p
+    - scripts/test_wrapper.sh src/lib_protocol_compiler protocol_compiler
+    - scripts/test_wrapper.sh src/lib_protocol_environment protocol_environment
+    - scripts/test_wrapper.sh src/lib_requester requester
+    - scripts/test_wrapper.sh src/lib_sapling sapling
+    - scripts/test_wrapper.sh src/lib_shell shell
+    - scripts/test_wrapper.sh src/lib_signer_backends signer_backends
+    - scripts/test_wrapper.sh src/lib_signer_backends/unix signer_backends_unix
+    - scripts/test_wrapper.sh src/lib_stdlib stdlib
+    - scripts/test_wrapper.sh src/lib_stdlib_unix stdlib_unix
+    - scripts/test_wrapper.sh src/lib_storage storage
+    - scripts/test_wrapper.sh src/proto_006_PsCARTHA/lib_client 006_PsCARTHA_lib_client
+    - scripts/test_wrapper.sh src/proto_006_PsCARTHA/lib_protocol 006_PsCARTHA_lib_protocol
+    - scripts/test_wrapper.sh src/proto_007_PsDELPH1/lib_client 007_PsDELPH1_lib_client
+    - scripts/test_wrapper.sh src/proto_007_PsDELPH1/lib_protocol 007_PsDELPH1_lib_protocol
+    - scripts/test_wrapper.sh src/proto_008_PtEdoTez/lib_client 008_PtEdoTez_lib_client
+    - scripts/test_wrapper.sh src/proto_008_PtEdoTez/lib_protocol 008_PtEdoTez_lib_protocol
+    - scripts/test_wrapper.sh src/proto_alpha/lib_client alpha_lib_client
+    - scripts/test_wrapper.sh src/proto_alpha/lib_protocol alpha_lib_protocol
+    - scripts/test_wrapper.sh src/tooling src_tooling
+    - scripts/test_wrapper.sh vendors/ocaml-bls12-381 ocaml-bls12-381
+    - scripts/test_wrapper.sh vendors/ocaml-ledger-wallet ocaml-ledger-wallet
+    - scripts/test_wrapper.sh vendors/ocaml-lmdb ocaml-lmdb
+    - scripts/test_wrapper.sh vendors/ocaml-uecc ocaml-uecc
 ##END_UNITTEST##
 
 unit:protocol_compiles:
@@ -322,6 +242,21 @@ integration:compiler-rejections:
   <<: *integration_definition
   script:
     - dune build @runtest_rejections
+
+############################################################
+## Stage: run scripts to check they are working properly  ##
+############################################################
+
+script:prepare_migration_test:
+  <<: *test_definition
+  before_script:
+    - last_proto_name=$(find src -name "proto_[0-9][0-9][0-9]_*" | awk -F'/' '{print $NF}' | sort -r | head -1)
+    - last_proto_version=$(echo $last_proto_name | cut -d'_' -f2)
+    - new_proto_version=$(printf "%03d" $((last_proto_version + 1)))
+    - make
+  script:
+    - ./scripts/prepare_migration_test.sh manual "next_$new_proto_version" 1
+  allow_failure: true # This test fails starting from 008 because bash thinks 008 is octal
 
 ############################################################
 ## Stage: run OCaml integration tests                     ##
@@ -483,6 +418,12 @@ integration:double_endorsement:
   <<: *integration_python_definition
   script:
     - poetry run pytest tests/test_double_endorsement.py -s --log-dir=tmp
+  stage: test
+
+integration:forge_block:
+  <<: *integration_python_definition
+  script:
+    - poetry run pytest tests/test_forge_block.py -s --log-dir=tmp
   stage: test
 
 integration:fork:
@@ -649,13 +590,15 @@ tezt:main:
 tezt:manual:migration:
   <<: *test_definition
   when: manual
-  script:
+  before_script:
     - export TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER=Y
-    - block_hash=$(wget https://snaps.tulip.tools/snapshots.json -O - | jq -r .Snapshots.mainnet_rolling.Blockhash)
-    - filename=$(wget https://snaps.tulip.tools/snapshots.json -O - | jq -r .Snapshots.mainnet_rolling.Filename)
-    - wget https://snaps.tulip.tools/$filename
+    - curl -s https://api.github.com/repos/Phlogi/tezos-snapshots/releases/latest | jq -r ".assets[] | select(.name) | .browser_download_url" | grep roll | xargs wget -q
+    - block_hash=$(echo mainnet.roll.* | sed -r 's/mainnet\.roll\.[0-9_-]+\.(.*)\.[0-9]+\.chain\.xz/\1/g')
+    - cat mainnet.roll.* | xz -d -v -T0 > mainnet.rolling
+
     - make
-    - scripts/prepare_migration_test.sh auto mainnet_*.rolling "$block_hash"
+    - scripts/prepare_migration_test.sh auto mainnet.rolling "$block_hash"
+  script:
     - dune exec ./tezt/manual_tests/main.exe -- migration --color --log-buffer-size 5000 --log-file tezt-migration.log
   artifacts:
     when: always
@@ -672,14 +615,8 @@ documentation:build:
   stage: doc
   except:
     - master
-    - zeronet
-    - mainnet
-    - zeronet-staging
-    - mainnet-staging
-    - zeronet-snapshots
-    - mainnet-snapshots
-    - /-release$/
-    - tags
+    - tags@tezos/tezos
+    - /-release$/@tezos/tezos
   script:
     - make doc-html
   artifacts:
@@ -695,11 +632,13 @@ documentation:linkcheck:
   dependencies:
     - build
   rules:
+    - if: '$CI_COMMIT_TAG && $CI_PROJECT_NAMESPACE == "tezos"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH =~ /-release$/ && $CI_PROJECT_NAMESPACE == "tezos"'
+      when: never
     - if: '$CI_COMMIT_BRANCH == "master"'
       when: on_success
     - if: '$CI_COMMIT_BRANCH =~ /doc/'
-      when: on_success
-    - if: '$CI_COMMIT_BRANCH =~ /-release$/'
       when: on_success
     - changes:
         - /docs
@@ -707,6 +646,7 @@ documentation:linkcheck:
   script:
     - make doc-html-and-linkcheck
   allow_failure: true
+  interruptible: true
 
 ############################################################
 ## Stage: building opam packages (only master and *opam*) ##
@@ -717,11 +657,13 @@ documentation:linkcheck:
   stage: packaging
   dependencies: []
   rules:
+    - if: '$CI_COMMIT_TAG && $CI_PROJECT_NAMESPACE == "tezos"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH =~ /-release$/ && $CI_PROJECT_NAMESPACE == "tezos"'
+      when: never
     - if: '$CI_COMMIT_BRANCH == "master"'
       when: on_success
     - if: '$CI_COMMIT_BRANCH =~ /opam/'
-      when: on_success
-    - if: '$CI_COMMIT_BRANCH =~ /-release$/'
       when: on_success
     - changes:
         - /**/*.opam
@@ -736,9 +678,15 @@ documentation:linkcheck:
     - opam depext --yes ${package}
     - opam install --yes ${package}
     - opam reinstall --yes --with-test ${package}
+  interruptible: true
 
 ##BEGIN_OPAM##
 # this section is updated using the script scripts/update_opam_test.sh
+
+opam:benchmark-utils:
+  <<: *opam_definition
+  variables:
+    package: benchmark-utils
 
 opam:bls12-381:
   <<: *opam_definition
@@ -750,6 +698,11 @@ opam:flextesa:
   variables:
     package: flextesa
 
+opam:latex:
+  <<: *opam_definition
+  variables:
+    package: latex
+
 opam:ledgerwallet:
   <<: *opam_definition
   variables:
@@ -760,6 +713,26 @@ opam:ledgerwallet-tezos:
   variables:
     package: ledgerwallet-tezos
 
+opam:numerics:
+  <<: *opam_definition
+  variables:
+    package: numerics
+
+opam:pyml-plot:
+  <<: *opam_definition
+  variables:
+    package: pyml-plot
+
+opam:sapling:
+  <<: *opam_definition
+  variables:
+    package: sapling
+
+opam:staTz:
+  <<: *opam_definition
+  variables:
+    package: staTz
+
 opam:tezos-006-PsCARTHA-test-helpers:
   <<: *opam_definition
   variables:
@@ -769,6 +742,11 @@ opam:tezos-007-PsDELPH1-test-helpers:
   <<: *opam_definition
   variables:
     package: tezos-007-PsDELPH1-test-helpers
+
+opam:tezos-008-PtEdoTez-test-helpers:
+  <<: *opam_definition
+  variables:
+    package: tezos-008-PtEdoTez-test-helpers
 
 opam:tezos-accuser-006-PsCARTHA:
   <<: *opam_definition
@@ -789,6 +767,16 @@ opam:tezos-accuser-007-PsDELPH1-commands:
   <<: *opam_definition
   variables:
     package: tezos-accuser-007-PsDELPH1-commands
+
+opam:tezos-accuser-008-PtEdoTez:
+  <<: *opam_definition
+  variables:
+    package: tezos-accuser-008-PtEdoTez
+
+opam:tezos-accuser-008-PtEdoTez-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-accuser-008-PtEdoTez-commands
 
 opam:tezos-accuser-alpha:
   <<: *opam_definition
@@ -815,6 +803,11 @@ opam:tezos-baker-007-PsDELPH1:
   variables:
     package: tezos-baker-007-PsDELPH1
 
+opam:tezos-baker-008-PtEdoTez:
+  <<: *opam_definition
+  variables:
+    package: tezos-baker-008-PtEdoTez
+
 opam:tezos-baker-alpha:
   <<: *opam_definition
   variables:
@@ -840,6 +833,16 @@ opam:tezos-baking-007-PsDELPH1-commands:
   variables:
     package: tezos-baking-007-PsDELPH1-commands
 
+opam:tezos-baking-008-PtEdoTez:
+  <<: *opam_definition
+  variables:
+    package: tezos-baking-008-PtEdoTez
+
+opam:tezos-baking-008-PtEdoTez-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-baking-008-PtEdoTez-commands
+
 opam:tezos-baking-alpha:
   <<: *opam_definition
   variables:
@@ -859,6 +862,16 @@ opam:tezos-benchmark:
   <<: *opam_definition
   variables:
     package: tezos-benchmark
+
+opam:tezos-benchmark-examples:
+  <<: *opam_definition
+  variables:
+    package: tezos-benchmark-examples
+
+opam:tezos-benchmark-tests:
+  <<: *opam_definition
+  variables:
+    package: tezos-benchmark-tests
 
 opam:tezos-clic:
   <<: *opam_definition
@@ -950,6 +963,21 @@ opam:tezos-client-007-PsDELPH1-commands-registration:
   variables:
     package: tezos-client-007-PsDELPH1-commands-registration
 
+opam:tezos-client-008-PtEdoTez:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-008-PtEdoTez
+
+opam:tezos-client-008-PtEdoTez-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-008-PtEdoTez-commands
+
+opam:tezos-client-008-PtEdoTez-commands-registration:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-008-PtEdoTez-commands-registration
+
 opam:tezos-client-alpha:
   <<: *opam_definition
   variables:
@@ -959,6 +987,11 @@ opam:tezos-client-alpha-commands:
   <<: *opam_definition
   variables:
     package: tezos-client-alpha-commands
+
+opam:tezos-client-alpha-commands-registration:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-alpha-commands-registration
 
 opam:tezos-client-base:
   <<: *opam_definition
@@ -989,6 +1022,11 @@ opam:tezos-client-genesis-carthagenet:
   <<: *opam_definition
   variables:
     package: tezos-client-genesis-carthagenet
+
+opam:tezos-client-sapling-008-PtEdoTez:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-sapling-008-PtEdoTez
 
 opam:tezos-codec:
   <<: *opam_definition
@@ -1045,6 +1083,11 @@ opam:tezos-embedded-protocol-007-PsDELPH1:
   variables:
     package: tezos-embedded-protocol-007-PsDELPH1
 
+opam:tezos-embedded-protocol-008-PtEdoTez:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-008-PtEdoTez
+
 opam:tezos-embedded-protocol-alpha:
   <<: *opam_definition
   variables:
@@ -1090,6 +1133,16 @@ opam:tezos-endorser-007-PsDELPH1-commands:
   variables:
     package: tezos-endorser-007-PsDELPH1-commands
 
+opam:tezos-endorser-008-PtEdoTez:
+  <<: *opam_definition
+  variables:
+    package: tezos-endorser-008-PtEdoTez
+
+opam:tezos-endorser-008-PtEdoTez-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-endorser-008-PtEdoTez-commands
+
 opam:tezos-endorser-alpha:
   <<: *opam_definition
   variables:
@@ -1130,6 +1183,11 @@ opam:tezos-mempool-007-PsDELPH1:
   variables:
     package: tezos-mempool-007-PsDELPH1
 
+opam:tezos-mempool-008-PtEdoTez:
+  <<: *opam_definition
+  variables:
+    package: tezos-mempool-008-PtEdoTez
+
 opam:tezos-mempool-alpha:
   <<: *opam_definition
   variables:
@@ -1139,6 +1197,11 @@ opam:tezos-micheline:
   <<: *opam_definition
   variables:
     package: tezos-micheline
+
+opam:tezos-micheline-rewriting:
+  <<: *opam_definition
+  variables:
+    package: tezos-micheline-rewriting
 
 opam:tezos-mockup:
   <<: *opam_definition
@@ -1234,6 +1297,21 @@ opam:tezos-protocol-007-PsDELPH1-tests:
   <<: *opam_definition
   variables:
     package: tezos-protocol-007-PsDELPH1-tests
+
+opam:tezos-protocol-008-PtEdoTez:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-008-PtEdoTez
+
+opam:tezos-protocol-008-PtEdoTez-parameters:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-008-PtEdoTez-parameters
+
+opam:tezos-protocol-008-PtEdoTez-tests:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-008-PtEdoTez-tests
 
 opam:tezos-protocol-alpha:
   <<: *opam_definition
@@ -1360,6 +1438,11 @@ opam:tezos-signer-services:
   variables:
     package: tezos-signer-services
 
+opam:tezos-snoop:
+  <<: *opam_definition
+  variables:
+    package: tezos-snoop
+
 opam:tezos-stdlib:
   <<: *opam_definition
   variables:
@@ -1418,52 +1501,92 @@ opam:uecc:
 ## Stage: publish                                         ##
 ############################################################
 
-publish:docker:
+.publish_template: &publish_definition
   image: docker:latest
   services:
     - docker:dind
   variables:
     DOCKER_DRIVER: overlay2
+    IMAGE_ARCH_PREFIX: ""
   stage: publish
   only:
     - master@tezos/tezos
     - tags@tezos/tezos
     - /-release$/@tezos/tezos
-    - zeronet@tezos/tezos
-    - mainnet@tezos/tezos
-    - zeronet-staging@tezos/tezos
-    - mainnet-staging@tezos/tezos
-    - zeronet-snapshots@tezos/tezos
-    - mainnet-snapshots@tezos/tezos
   before_script:
-    - apk add git binutils
     - mkdir ~/.docker || true
-    - echo "${CI_DOCKER_AUTH}" > ~/.docker/config.json
+    - echo "{ \"auths\":{ \"https://index.docker.io/v1/\":{ \"auth\":\"${CI_DOCKER_AUTH}\" } } }" > ~/.docker/config.json
   script:
-    - LAST_COMMIT_DATE_TIME=$(git log --pretty=format:"%cd" -1 --date="format:%Y%m%d%H%M%S" 2>&1)
     - ./scripts/create_docker_image.sh
         "${public_docker_image_name}"
-        "${CI_COMMIT_REF_NAME}"
+        "${IMAGE_ARCH_PREFIX}${CI_COMMIT_REF_NAME}"
         "${build_deps_image_name}"
         "${build_deps_image_version}"
         "${CI_COMMIT_SHORT_SHA}"
-    - docker push "${public_docker_image_name}:${CI_COMMIT_REF_NAME}"
-    - docker push "${public_docker_image_name}-bare:${CI_COMMIT_REF_NAME}"
-    - docker push "${public_docker_image_name}-debug:${CI_COMMIT_REF_NAME}"
-    - docker tag
-      "${public_docker_image_name}:${CI_COMMIT_REF_NAME}"
-      "${public_docker_image_name}:${CI_COMMIT_REF_NAME}_${CI_COMMIT_SHORT_SHA}_${LAST_COMMIT_DATE_TIME}"
-    - docker tag
-      "${public_docker_image_name}-bare:${CI_COMMIT_REF_NAME}"
-      "${public_docker_image_name}-bare:${CI_COMMIT_REF_NAME}_${CI_COMMIT_SHORT_SHA}_${LAST_COMMIT_DATE_TIME}"
-    - docker tag
-      "${public_docker_image_name}-debug:${CI_COMMIT_REF_NAME}"
-      "${public_docker_image_name}-debug:${CI_COMMIT_REF_NAME}_${CI_COMMIT_SHORT_SHA}_${LAST_COMMIT_DATE_TIME}"
-    - docker push "${public_docker_image_name}:${CI_COMMIT_REF_NAME}_${CI_COMMIT_SHORT_SHA}_${LAST_COMMIT_DATE_TIME}"
-    - docker push "${public_docker_image_name}-bare:${CI_COMMIT_REF_NAME}_${CI_COMMIT_SHORT_SHA}_${LAST_COMMIT_DATE_TIME}"
-    - docker push "${public_docker_image_name}-debug:${CI_COMMIT_REF_NAME}_${CI_COMMIT_SHORT_SHA}_${LAST_COMMIT_DATE_TIME}"
+    - docker push "${public_docker_image_name}:${IMAGE_ARCH_PREFIX}${CI_COMMIT_REF_NAME}"
+    - docker push "${public_docker_image_name}-bare:${IMAGE_ARCH_PREFIX}${CI_COMMIT_REF_NAME}"
+    - docker push "${public_docker_image_name}-debug:${IMAGE_ARCH_PREFIX}${CI_COMMIT_REF_NAME}"
+  interruptible: false
+
+publish:docker_amd64:
+  <<: *publish_definition
+  variables:
+    DOCKER_DRIVER: overlay2
+    IMAGE_ARCH_PREFIX: "amd64-"
   tags:
     - safe_docker
+
+publish:docker_arm64:
+  <<: *publish_definition
+  variables:
+    DOCKER_DRIVER: overlay2
+    IMAGE_ARCH_PREFIX: "arm64-"
+  tags:
+    - arm64
+
+merge-manifest:
+  image: docker:latest
+  services:
+    - name: "docker:dind"
+      command: ["--experimental"]
+  variables:
+    DOCKER_DRIVER: overlay2
+  stage: publish_manifest
+  only:
+    - master@tezos/tezos
+    - tags@tezos/tezos
+    - /-release$/@tezos/tezos
+  before_script:
+    - apk add git binutils
+    - mkdir ~/.docker || true
+    - echo "{ \"experimental\":\"enabled\", \"auths\":{ \"https://index.docker.io/v1/\":{ \"auth\":\"${CI_DOCKER_AUTH}\" } } }" > ~/.docker/config.json
+  script:
+    - LAST_COMMIT_DATE_TIME=$(git log --pretty=format:"%cd" -1 --date="format:%Y%m%d%H%M%S" 2>&1)
+    - docker manifest create "${public_docker_image_name}-bare:${CI_COMMIT_REF_NAME}"
+      --amend "${public_docker_image_name}-bare:amd64-${CI_COMMIT_REF_NAME}"
+      --amend "${public_docker_image_name}-bare:arm64-${CI_COMMIT_REF_NAME}"
+    - docker manifest push "${public_docker_image_name}-bare:${CI_COMMIT_REF_NAME}"
+    - docker manifest create "${public_docker_image_name}-bare:${CI_COMMIT_REF_NAME}_${CI_COMMIT_SHORT_SHA}_${LAST_COMMIT_DATE_TIME}"
+      --amend "${public_docker_image_name}-bare:amd64-${CI_COMMIT_REF_NAME}"
+      --amend "${public_docker_image_name}-bare:arm64-${CI_COMMIT_REF_NAME}"
+    - docker manifest push "${public_docker_image_name}-bare:${CI_COMMIT_REF_NAME}_${CI_COMMIT_SHORT_SHA}_${LAST_COMMIT_DATE_TIME}"
+    - docker manifest create "${public_docker_image_name}-debug:${CI_COMMIT_REF_NAME}"
+      --amend "${public_docker_image_name}-debug:amd64-${CI_COMMIT_REF_NAME}"
+      --amend "${public_docker_image_name}-debug:arm64-${CI_COMMIT_REF_NAME}"
+    - docker manifest push "${public_docker_image_name}-debug:${CI_COMMIT_REF_NAME}"
+    - docker manifest create "${public_docker_image_name}-debug:${CI_COMMIT_REF_NAME}_${CI_COMMIT_SHORT_SHA}_${LAST_COMMIT_DATE_TIME}"
+      --amend "${public_docker_image_name}-debug:amd64-${CI_COMMIT_REF_NAME}"
+      --amend "${public_docker_image_name}-debug:arm64-${CI_COMMIT_REF_NAME}"
+    - docker manifest push "${public_docker_image_name}-debug:${CI_COMMIT_REF_NAME}_${CI_COMMIT_SHORT_SHA}_${LAST_COMMIT_DATE_TIME}"
+    - docker manifest create "${public_docker_image_name}:${CI_COMMIT_REF_NAME}"
+      --amend "${public_docker_image_name}:amd64-${CI_COMMIT_REF_NAME}"
+      --amend "${public_docker_image_name}:arm64-${CI_COMMIT_REF_NAME}"
+    - docker manifest push "${public_docker_image_name}:${CI_COMMIT_REF_NAME}"
+    - docker manifest create "${public_docker_image_name}:${CI_COMMIT_REF_NAME}_${CI_COMMIT_SHORT_SHA}_${LAST_COMMIT_DATE_TIME}"
+      --amend "${public_docker_image_name}:amd64-${CI_COMMIT_REF_NAME}"
+      --amend "${public_docker_image_name}:arm64-${CI_COMMIT_REF_NAME}"
+    - docker manifest push "${public_docker_image_name}:${CI_COMMIT_REF_NAME}_${CI_COMMIT_SHORT_SHA}_${LAST_COMMIT_DATE_TIME}"
+  interruptible: false
 
 publish:doc:
   image: ${build_deps_image_name}:${build_deps_image_version}
@@ -1489,6 +1612,7 @@ publish:doc:
         git commit -m "Import doc of ${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}:${CI_COMMIT_SHA}" ;
         git push origin master ;
       fi
+  interruptible: false
 
 # This job publishes the html report generated by the coverage job.
 # It is accessible on the gitlab page associated to the project
@@ -1514,6 +1638,9 @@ pages:
     paths:
       - public
   stage: publish_coverage
+  except:
+    - tags@tezos/tezos
+    - /-release$/@tezos/tezos
   dependencies:
     - test_coverage
   script:
@@ -1526,6 +1653,7 @@ pages:
     # This is the minimum time the public artifact will remain available.
     # Everytime a pages job is launched, this time period is reset
     expire_in: 7 days
+  interruptible: false
 
 ############################################################
 ## Stage: coverage                                        ##
@@ -1538,12 +1666,15 @@ pages:
 test_coverage:
   image: ${build_deps_image_name}:${build_deps_image_version}
   stage: test_coverage
+  except:
+    - tags@tezos/tezos
+    - /-release$/@tezos/tezos
   when: manual
   variables:
     # We exclude from coverage old protocols and code that can't be
     # instrumented because of current limitations of bisect_ppx.
     OLD_PROTOCOLS: "src/proto_000_Ps9mPmXa src/proto_001_PtCJ7pwo src/proto_002_PsYLVpVv src/proto_003_PsddFKi3 src/proto_004_Pt24m4xi src/proto_005_PsBABY5H src/proto_005_PsBabyM1 src/proto_006_PsCARTHA"
-    NOT_INSTRUMENTABLE: ""
+    NOT_INSTRUMENTABLE: "src/proto_007_PsDELPH1 src/proto_alpha"
     COVERAGE_EXCLUDE: "$OLD_PROTOCOLS $NOT_INSTRUMENTABLE"
   script:
     - scripts/instrument_dune_bisect.sh src/ --except $COVERAGE_EXCLUDE

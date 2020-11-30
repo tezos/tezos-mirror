@@ -30,6 +30,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tez_repr.mli tez_repr.ml
    period_repr.mli period_repr.ml
    time_repr.mli time_repr.ml
+   fixed_point_repr.mli fixed_point_repr.ml
+   gas_limit_repr.mli gas_limit_repr.ml
    constants_repr.ml
    fitness_repr.ml
    raw_level_repr.mli raw_level_repr.ml
@@ -37,7 +39,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    cycle_repr.mli cycle_repr.ml
    level_repr.mli level_repr.ml
    seed_repr.mli seed_repr.ml
-   gas_limit_repr.mli gas_limit_repr.ml
    script_int_repr.mli script_int_repr.ml
    script_timestamp_repr.mli script_timestamp_repr.ml
    michelson_v1_primitives.mli michelson_v1_primitives.ml
@@ -52,6 +53,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    commitment_repr.mli commitment_repr.ml
    parameters_repr.mli parameters_repr.ml
    raw_context.mli raw_context.ml
+   storage_costs.mli storage_costs.ml
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
    storage.mli storage.ml
@@ -107,6 +109,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tez_repr.mli tez_repr.ml
    period_repr.mli period_repr.ml
    time_repr.mli time_repr.ml
+   fixed_point_repr.mli fixed_point_repr.ml
+   gas_limit_repr.mli gas_limit_repr.ml
    constants_repr.ml
    fitness_repr.ml
    raw_level_repr.mli raw_level_repr.ml
@@ -114,7 +118,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    cycle_repr.mli cycle_repr.ml
    level_repr.mli level_repr.ml
    seed_repr.mli seed_repr.ml
-   gas_limit_repr.mli gas_limit_repr.ml
    script_int_repr.mli script_int_repr.ml
    script_timestamp_repr.mli script_timestamp_repr.ml
    michelson_v1_primitives.mli michelson_v1_primitives.ml
@@ -129,6 +132,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    commitment_repr.mli commitment_repr.ml
    parameters_repr.mli parameters_repr.ml
    raw_context.mli raw_context.ml
+   storage_costs.mli storage_costs.ml
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
    storage.mli storage.ml
@@ -184,6 +188,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tez_repr.mli tez_repr.ml
    period_repr.mli period_repr.ml
    time_repr.mli time_repr.ml
+   fixed_point_repr.mli fixed_point_repr.ml
+   gas_limit_repr.mli gas_limit_repr.ml
    constants_repr.ml
    fitness_repr.ml
    raw_level_repr.mli raw_level_repr.ml
@@ -191,7 +197,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    cycle_repr.mli cycle_repr.ml
    level_repr.mli level_repr.ml
    seed_repr.mli seed_repr.ml
-   gas_limit_repr.mli gas_limit_repr.ml
    script_int_repr.mli script_int_repr.ml
    script_timestamp_repr.mli script_timestamp_repr.ml
    michelson_v1_primitives.mli michelson_v1_primitives.ml
@@ -206,6 +211,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    commitment_repr.mli commitment_repr.ml
    parameters_repr.mli parameters_repr.ml
    raw_context.mli raw_context.ml
+   storage_costs.mli storage_costs.ml
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
    storage.mli storage.ml
@@ -281,6 +287,8 @@ include Tezos_raw_protocol_alpha.Main
    Tez_repr
    Period_repr
    Time_repr
+   Fixed_point_repr
+   Gas_limit_repr
    Constants_repr
    Fitness_repr
    Raw_level_repr
@@ -288,7 +296,6 @@ include Tezos_raw_protocol_alpha.Main
    Cycle_repr
    Level_repr
    Seed_repr
-   Gas_limit_repr
    Script_int_repr
    Script_timestamp_repr
    Michelson_v1_primitives
@@ -303,6 +310,7 @@ include Tezos_raw_protocol_alpha.Main
    Commitment_repr
    Parameters_repr
    Raw_context
+   Storage_costs
    Storage_sigs
    Storage_functors
    Storage
@@ -380,8 +388,8 @@ include Tezos_raw_protocol_alpha.Main
                    -warn-error +a))
  (modules Registerer))
 
-(alias
- (name runtest_compile_protocol)
+(rule
+ (alias runtest_compile_protocol)
  (deps
    misc.mli misc.ml
    storage_description.mli storage_description.ml
@@ -394,6 +402,8 @@ include Tezos_raw_protocol_alpha.Main
    tez_repr.mli tez_repr.ml
    period_repr.mli period_repr.ml
    time_repr.mli time_repr.ml
+   fixed_point_repr.mli fixed_point_repr.ml
+   gas_limit_repr.mli gas_limit_repr.ml
    constants_repr.ml
    fitness_repr.ml
    raw_level_repr.mli raw_level_repr.ml
@@ -401,7 +411,6 @@ include Tezos_raw_protocol_alpha.Main
    cycle_repr.mli cycle_repr.ml
    level_repr.mli level_repr.ml
    seed_repr.mli seed_repr.ml
-   gas_limit_repr.mli gas_limit_repr.ml
    script_int_repr.mli script_int_repr.ml
    script_timestamp_repr.mli script_timestamp_repr.ml
    michelson_v1_primitives.mli michelson_v1_primitives.ml
@@ -416,6 +425,7 @@ include Tezos_raw_protocol_alpha.Main
    commitment_repr.mli commitment_repr.ml
    parameters_repr.mli parameters_repr.ml
    raw_context.mli raw_context.ml
+   storage_costs.mli storage_costs.ml
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
    storage.mli storage.ml
@@ -455,11 +465,13 @@ include Tezos_raw_protocol_alpha.Main
   (:src_dir TEZOS_PROTOCOL))
  (action (run %{bin:tezos-protocol-compiler} -no-hash-check .)))
 
-(alias
- (name runtest_sandbox)
- (deps .tezos_protocol_alpha.objs/native/tezos_protocol_alpha.cmx))
+(rule
+ (alias runtest_sandbox)
+ (deps .tezos_protocol_alpha.objs/native/tezos_protocol_alpha.cmx)
+ (action (progn)))
 
-(alias
- (name runtest)
+(rule
+ (alias runtest)
  (package tezos-protocol-alpha)
- (deps (alias runtest_sandbox)))
+ (deps (alias runtest_sandbox))
+ (action (progn)))

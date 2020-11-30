@@ -24,8 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-[@@@ocaml.warning "-30"]
-
 open Lwt.Infix
 open Tezos_base
 
@@ -364,19 +362,21 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
     mainchain_state
   >>=? fun mainchain_validator ->
   let shutdown () =
-    Node_event.(emit shutdown_p2p_layer) ()
+    (* Shutdown workers in the reverse order of creation *)
+    Node_event.(emit shutdown_validator) ()
     >>= fun () ->
-    P2p.shutdown p2p
+    Validator.shutdown validator
     >>= fun () ->
     Node_event.(emit shutdown_ddb) ()
     >>= fun () ->
     Distributed_db.shutdown distributed_db
     >>= fun () ->
-    Node_event.(emit shutdown_validator) ()
+    Node_event.(emit shutdown_state) ()
     >>= fun () ->
-    Validator.shutdown validator
+    State.close state
     >>= fun () ->
-    Node_event.(emit shutdown_state) () >>= fun () -> State.close state
+    Node_event.(emit shutdown_p2p_layer) ()
+    >>= fun () -> P2p.shutdown p2p >>= fun () -> Lwt.return_unit
   in
   return
     {
@@ -424,6 +424,4 @@ let build_rpc_directory node =
   merge (Version_directory.rpc_directory node.p2p) ;
   register0 RPC_service.error_service (fun () () ->
       return (Data_encoding.Json.schema Error_monad.error_encoding)) ;
-  RPC_directory.register_describe_directory_service
-    !dir
-    RPC_service.description_service
+  !dir

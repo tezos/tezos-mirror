@@ -2,4 +2,8 @@
  (release
   (ocamlopt_flags (:standard -O3))))
 
+(alias
+ (name runtest)
+ (deps (alias_rec runtest_lint)))
+
 (vendored_dirs vendors)

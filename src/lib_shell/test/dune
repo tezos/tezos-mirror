@@ -29,36 +29,38 @@
                    -open Tezos_validation)))
 
 
-(alias
- (name buildtest)
+(rule
+ (alias buildtest)
  (deps test.exe
        test_locator.exe
-       test_synchronisation_heuristic_fuzzy.exe))
+       test_synchronisation_heuristic_fuzzy.exe)
+ (action (progn)))
 
-(alias
- (name runtest_shell)
+(rule
+ (alias runtest_shell)
  (action (run %{exe:test.exe})))
 
-(alias
- (name runtest_locator)
+(rule
+ (alias runtest_locator)
  (action (run %{exe:test_locator.exe} --no-bench)))
 
-(alias
- (name runtest_synchronisation)
+(rule
+ (alias runtest_synchronisation)
  (action (run %{exe:test_synchronisation_heuristic_fuzzy.exe})))
 
-(alias
- (name runbench_locator)
+(rule
+ (alias runbench_locator)
  (action (run %{exe:test_locator.exe})))
 
-(alias
- (name runtest)
+(rule
+ (alias runtest)
  (package tezos-shell)
  (deps (alias runtest_shell)
        (alias runtest_locator)
-       (alias runtest_synchronisation)))
+       (alias runtest_synchronisation))
+ (action (progn)))
 
-(alias
- (name runtest_lint)
+(rule
+ (alias runtest_lint)
  (deps (glob_files *.ml{,i}))
  (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

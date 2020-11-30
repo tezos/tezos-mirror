@@ -39,6 +39,7 @@ def originate(client,
 
 
 @pytest.mark.contract
+@pytest.mark.incremental
 class TestManager:
 
     def test_manager_origination(self, client: Client, session: dict):
@@ -85,7 +86,8 @@ class TestManager:
     def test_manager_set_delegate(self, client: Client):
         client.set_delegate('manager', 'bootstrap2', [])
         client.bake('bootstrap5', BAKE_ARGS)
-        client.set_delegate('delegatable_target', 'bootstrap2', [])
+        bootstrap2_pkh = IDENTITIES['bootstrap2']['identity']
+        client.set_delegate('delegatable_target', bootstrap2_pkh, [])
         client.bake('bootstrap5', BAKE_ARGS)
         delegate = IDENTITIES['bootstrap2']['identity']
         assert client.get_delegate('manager', []).delegate \
@@ -115,11 +117,11 @@ class TestManager:
         amount = 10.001
         amount_mutez = utils.mutez_of_tez(amount)
         client.transfer(amount, 'bootstrap2', 'manager',
-                        ['--gas-limit', '15285'])
+                        ['--gas-limit', f'{15450 + 108}'])
         client.bake('bootstrap5', BAKE_ARGS)
         new_balance = client.get_mutez_balance('manager')
         new_balance_bootstrap = client.get_mutez_balance('bootstrap2')
-        fee = 0.00178
+        fee = 0.001807
         fee_mutez = utils.mutez_of_tez(fee)
         assert balance + amount_mutez == new_balance
         assert (balance_bootstrap - fee_mutez - amount_mutez
@@ -131,11 +133,11 @@ class TestManager:
         amount = 10.1
         amount_mutez = utils.mutez_of_tez(amount)
         client.transfer(amount, 'manager', 'bootstrap2',
-                        ['--gas-limit', '26183'])
+                        ['--gas-limit', f'{26350 + 12}'])
         client.bake('bootstrap5', BAKE_ARGS)
         new_balance = client.get_mutez_balance('manager')
         new_balance_bootstrap = client.get_mutez_balance('bootstrap2')
-        fee = 0.002931
+        fee = 0.002948 + 0.000001
         fee_mutez = utils.mutez_of_tez(fee)
         assert balance - amount_mutez == new_balance
         assert (balance_bootstrap + amount_mutez - fee_mutez
@@ -164,12 +166,12 @@ class TestManager:
         amount = 10
         amount_mutez = utils.mutez_of_tez(amount)
         client.transfer(amount, 'manager', 'manager2',
-                        ['--gas-limit', '44625'])
+                        ['--gas-limit', f'{44950 + 112}'])
         client.bake('bootstrap5', BAKE_ARGS)
         new_balance = client.get_mutez_balance('manager')
         new_balance_dest = client.get_mutez_balance('manager2')
         new_balance_bootstrap = client.get_mutez_balance('bootstrap2')
-        fee = 0.004804
+        fee = 0.004848
         fee_mutez = utils.mutez_of_tez(fee)
         assert balance_bootstrap - fee_mutez == new_balance_bootstrap
         assert balance - amount_mutez == new_balance
@@ -286,7 +288,7 @@ class TestManager:
         new_balance = client.get_mutez_balance('manager')
         new_balance_bootstrap2 = client.get_mutez_balance('bootstrap2')
         new_balance_bootstrap3 = client.get_mutez_balance('bootstrap3')
-        fee_mutez = 2941+2845
+        fee_mutez = 810+714
         assert balance - amount_mutez_2 - amount_mutez_3 == new_balance
         assert (balance_bootstrap2 + amount_mutez_2 - fee_mutez
                 == new_balance_bootstrap2)
@@ -316,10 +318,53 @@ class TestContracts:
          r'Contract has no entrypoint named D'),
         ("contract_annotation_default.tz",
          r'unexpected annotation'),
+        # Missing field
+        ("missing_only_storage_field.tz",
+         r'Missing contract field: storage'),
+        ("missing_only_code_field.tz",
+         r'Missing contract field: code'),
+        ("missing_only_parameter_field.tz",
+         r'Missing contract field: parameter'),
+        ("missing_parameter_and_storage_fields.tz",
+         r'Missing contract field: parameter'),
+        # Duplicated field
+        ("multiple_parameter_field.tz",
+         r'duplicate contract field: parameter'),
+        ("multiple_code_field.tz", r'duplicate contract field: code'),
+        ("multiple_storage_field.tz",
+         r'duplicate contract field: storage'),
+        # The first duplicated field is reported, storage in this case
+        ("multiple_storage_and_code_fields.tz",
+         r'duplicate contract field: storage'),
+        # error message for set update on non-comparable type
+        ("set_update_non_comparable.tz",
+         r'comparable type expected'),
+        # error message for the arity of the chain_id type
+        ("chain_id_arity.tz",
+         r'primitive chain_id expects 0 arguments but is given 1'),
+        # error message for DIP over the limit
+        ("big_dip.tz",
+         r'expected a positive 10-bit integer'),
+        # error message for DROP over the limit
+        ("big_drop.tz",
+         r'expected a positive 10-bit integer'),
     ])
     def test_ill_typecheck(self, client: Client, contract, error_pattern):
         with utils.assert_run_failure(error_pattern):
             client.typecheck(os.path.join(ILLTYPED_CONTRACT_PATH, contract))
+
+    def test_zero_transfer_to_implicit_contract(self, client):
+        pubkey = IDENTITIES['bootstrap3']['identity']
+        err = ('Transaction of 0ꜩ towards a contract without code are '
+               rf'forbidden \({pubkey}\).')
+        with utils.assert_run_failure(err):
+            client.transfer(0, 'bootstrap2', 'bootstrap3', [])
+
+    def test_zero_transfer_to_nonexistent_contract(self, client):
+        nonexistent = "KT1Fcq4inD44aMhmUiTEHR1QMQwJT7p2u641"
+        err = rf'Contract {nonexistent} does not exist'
+        with utils.assert_run_failure(err):
+            client.transfer(0, 'bootstrap2', nonexistent, [])
 
 
 FIRST_EXPLOSION = '''
@@ -386,7 +431,7 @@ class TestGasBound:
         name = 'first_explosion.tz'
         contract = session[name]
         client.typecheck(contract)
-        args = ['-G', '8000', '--burn-cap', '10']
+        args = ['-G', f'{1896}', '--burn-cap', '10']
 
         expected_error = "Gas limit exceeded during typechecking or execution"
         with utils.assert_run_failure(expected_error):
@@ -421,7 +466,7 @@ class TestGasBound:
             ("Cannot serialize the resulting storage" +
              " value within the provided gas bounds.")
         with utils.assert_run_failure(expected_error):
-            client.run_script(contract, storage, inp)
+            client.run_script(contract, storage, inp, gas=9290)
 
     def test_typecheck_map_dup_key(self, client: Client):
 
@@ -855,29 +900,6 @@ class TestComparablePairs:
         # tests that non-comb pairs are rejected by the typechecker
         utils.assert_typecheck_data_failure(
             client, '{}', '(set (pair (pair nat nat) nat))')
-
-    # This should be moved to test_contract_opcodes.py once MR !1261 is merged
-    @pytest.mark.parametrize(
-        "contract,param,storage,expected",
-        [   # FORMAT: assert_output contract_file storage input expected_result
-            # Mapping over maps
-            ('map_map_sideeffect.tz',
-             '(Pair {} 0)', '10', '(Pair {} 0)'),
-            ('map_map_sideeffect.tz',
-             '(Pair { Elt "foo" 1 } 1)', '10', '(Pair { Elt "foo" 11 } 11)'),
-            ('map_map_sideeffect.tz',
-             '(Pair { Elt "bar" 5 ; Elt "foo" 1 } 6)', '15',
-             '(Pair { Elt "bar" 20 ; Elt "foo" 16 } 36)')
-        ])
-    def test_map_map_sideeffect(self,
-                                client,
-                                contract,
-                                param,
-                                storage,
-                                expected):
-        contract = f'{CONTRACT_PATH}/opcodes/{contract}'
-        run_script_res = client.run_script(contract, param, storage)
-        assert run_script_res.storage == expected
 
 
 @pytest.mark.contract

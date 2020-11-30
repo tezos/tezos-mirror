@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:    Micheline
+    Invocation:   dune build @src/lib_micheline/runtest
+    Subject:      Helpers.
+*)
+
 (* Mini compatibility layer to avoid circular dependency *)
 module Compat = struct
   let failwith fmt = Format.kasprintf (fun s -> Lwt.return_error s) fmt

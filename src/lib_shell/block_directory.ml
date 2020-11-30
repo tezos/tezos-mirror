@@ -165,6 +165,9 @@ let build_raw_rpc_directory ~user_activated_upgrades
       }
   in
   register0 S.metadata (fun block () () -> block_metadata block) ;
+  let fail_opt = function None -> Lwt.fail Not_found | Some v -> return v in
+  register0 S.metadata_hash (fun block () () ->
+      State.Block.metadata_hash block >>= fail_opt) ;
   (* operations *)
   let convert_with_metadata chain_id (op : Operation.t) metadata :
       Block_services.operation =
@@ -255,6 +258,24 @@ let build_raw_rpc_directory ~user_activated_upgrades
           >|= fun (ops, _) -> List.nth ops j)
         (fun _ -> raise Not_found)
       >>= fun op -> return op) ;
+  (* operation_metadata_hashes *)
+  register0 S.Operation_metadata_hashes.root (fun block () () ->
+      State.Block.all_operations_metadata_hash block >>= fail_opt) ;
+  register0
+    S.Operation_metadata_hashes.operation_metadata_hashes
+    (fun block () () ->
+      State.Block.all_operations_metadata_hashes block >>= fail_opt) ;
+  register1
+    S.Operation_metadata_hashes.operation_metadata_hashes_in_pass
+    (fun block i () () ->
+      State.Block.operations_metadata_hashes block i >>= fail_opt) ;
+  register2
+    S.Operation_metadata_hashes.operation_metadata_hash
+    (fun block i j () () ->
+      State.Block.operations_metadata_hashes block i
+      >>= fun hashes ->
+      Lwt.return (Option.map (fun hashes -> List.nth hashes j) hashes)
+      >>= fail_opt) ;
   (* context *)
   register1 S.Context.read (fun block path q () ->
       let depth = Option.value ~default:max_int q#depth in
@@ -262,8 +283,8 @@ let build_raw_rpc_directory ~user_activated_upgrades
         (depth >= 0)
         (Tezos_shell_services.Block_services.Invalid_depth_arg depth)
       >>=? fun () ->
-      State.Block.context_exn block
-      >>= fun context ->
+      State.Block.context block
+      >>=? fun context ->
       Context.mem context path
       >>= fun mem ->
       Context.dir_mem context path
@@ -336,8 +357,8 @@ let build_raw_rpc_directory ~user_activated_upgrades
         ~protocol_data
         operations) ;
   register0 S.Helpers.Preapply.operations (fun block () ops ->
-      State.Block.context_exn block
-      >>= fun ctxt ->
+      State.Block.context block
+      >>=? fun ctxt ->
       let predecessor = State.Block.hash block in
       let header = State.Block.shell_header block in
       let predecessor_context = Shell_context.wrap_disk_context ctxt in
@@ -361,8 +382,8 @@ let build_raw_rpc_directory ~user_activated_upgrades
       >>=? fun (state, acc) ->
       Next_proto.finalize_block state >>=? fun _ -> return (List.rev acc)) ;
   register1 S.Helpers.complete (fun block prefix () () ->
-      State.Block.context_exn block
-      >>= fun ctxt ->
+      State.Block.context block
+      >>=? fun ctxt ->
       Base58.complete prefix
       >>= fun l1 ->
       let ctxt = Shell_context.wrap_disk_context ctxt in

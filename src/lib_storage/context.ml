@@ -4,6 +4,7 @@
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2018-2020 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2018-2020 Tarides <contact@tarides.com>                     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -241,6 +242,12 @@ let current_test_chain_key = ["test_chain"]
 
 let current_data_key = ["data"]
 
+let current_predecessor_block_metadata_hash_key =
+  ["predecessor_block_metadata_hash"]
+
+let current_predecessor_ops_metadata_hash_key =
+  ["predecessor_ops_metadata_hash"]
+
 let restore_integrity ?ppf index =
   match Store.integrity_check ?ppf ~auto_repair:true index.repo with
   | Ok (`Fixed n) ->
@@ -359,6 +366,8 @@ let copy ctxt ~from ~to_ =
       Store.Tree.add_tree ctxt.tree (data_key to_) sub_tree
       >>= fun tree -> Lwt.return_some {ctxt with tree}
 
+type key_or_dir = [`Key of key | `Dir of key]
+
 let fold ctxt key ~init ~f =
   Store.Tree.list ctxt.tree (data_key key)
   >>= fun keys ->
@@ -413,6 +422,54 @@ let del_test_chain v = raw_del v current_test_chain_key
 
 let fork_test_chain v ~protocol ~expiration =
   set_test_chain v (Forking {protocol; expiration})
+
+let get_predecessor_block_metadata_hash v =
+  raw_get v current_predecessor_block_metadata_hash_key
+  >>= function
+  | None ->
+      Lwt.return_none
+  | Some data -> (
+    match
+      Data_encoding.Binary.of_bytes_opt Block_metadata_hash.encoding data
+    with
+    | None ->
+        Lwt.fail
+          (Failure
+             "Unexpected error (Context.get_predecessor_block_metadata_hash)")
+    | Some r ->
+        Lwt.return_some r )
+
+let set_predecessor_block_metadata_hash v hash =
+  let data =
+    Data_encoding.Binary.to_bytes_exn Block_metadata_hash.encoding hash
+  in
+  raw_set v current_predecessor_block_metadata_hash_key data
+
+let get_predecessor_ops_metadata_hash v =
+  raw_get v current_predecessor_ops_metadata_hash_key
+  >>= function
+  | None ->
+      Lwt.return_none
+  | Some data -> (
+    match
+      Data_encoding.Binary.of_bytes_opt
+        Operation_metadata_list_list_hash.encoding
+        data
+    with
+    | None ->
+        Lwt.fail
+          (Failure
+             "Unexpected error (Context.get_predecessor_ops_metadata_hash)")
+    | Some r ->
+        Lwt.return_some r )
+
+let set_predecessor_ops_metadata_hash v hash =
+  let data =
+    Data_encoding.Binary.to_bytes_exn
+      Operation_metadata_list_list_hash.encoding
+      hash
+  in
+  raw_set v current_predecessor_ops_metadata_hash_key data
 
 (*-- Initialisation ----------------------------------------------------------*)
 
@@ -571,6 +628,8 @@ module Protocol_data = struct
          (req "timestamp" Time.Protocol.encoding))
 
   type data = {
+    predecessor_block_metadata_hash : Block_metadata_hash.t option;
+    predecessor_ops_metadata_hash : Operation_metadata_list_list_hash.t option;
     info : info;
     protocol_hash : Protocol_hash.t;
     test_chain_status : Test_chain_status.t;
@@ -581,10 +640,71 @@ module Protocol_data = struct
   let data_encoding =
     let open Data_encoding in
     conv
-      (fun {info; protocol_hash; test_chain_status; data_key; parents} ->
+      (fun { predecessor_block_metadata_hash;
+             predecessor_ops_metadata_hash;
+             info;
+             protocol_hash;
+             test_chain_status;
+             data_key;
+             parents } ->
+        ( predecessor_block_metadata_hash,
+          predecessor_ops_metadata_hash,
+          info,
+          protocol_hash,
+          test_chain_status,
+          data_key,
+          parents ))
+      (fun ( predecessor_block_metadata_hash,
+             predecessor_ops_metadata_hash,
+             info,
+             protocol_hash,
+             test_chain_status,
+             data_key,
+             parents ) ->
+        {
+          predecessor_block_metadata_hash;
+          predecessor_ops_metadata_hash;
+          info;
+          protocol_hash;
+          test_chain_status;
+          data_key;
+          parents;
+        })
+      (obj7
+         (opt "predecessor_block_metadata_hash" Block_metadata_hash.encoding)
+         (opt
+            "predecessor_ops_metadata_hash"
+            Operation_metadata_list_list_hash.encoding)
+         (req "info" info_encoding)
+         (req "protocol_hash" Protocol_hash.encoding)
+         (req "test_chain_status" Test_chain_status.encoding)
+         (req "data_key" Context_hash.encoding)
+         (req "parents" (list Context_hash.encoding)))
+
+  (* This version didn't include the optional fields
+     [predecessor_block_metadata_hash] and [predecessor_ops_metadata_hashes],
+     but we can still restore this version by setting these to [None]. *)
+  let data_encoding_1_0_0 =
+    let open Data_encoding in
+    conv
+      (fun { predecessor_block_metadata_hash = _;
+             predecessor_ops_metadata_hash = _;
+             info;
+             protocol_hash;
+             test_chain_status;
+             data_key;
+             parents } ->
         (info, protocol_hash, test_chain_status, data_key, parents))
       (fun (info, protocol_hash, test_chain_status, data_key, parents) ->
-        {info; protocol_hash; test_chain_status; data_key; parents})
+        {
+          predecessor_block_metadata_hash = None;
+          predecessor_ops_metadata_hash = None;
+          info;
+          protocol_hash;
+          test_chain_status;
+          data_key;
+          parents;
+        })
       (obj5
          (req "info" info_encoding)
          (req "protocol_hash" Protocol_hash.encoding)
@@ -597,6 +717,10 @@ module Protocol_data = struct
   let encoding =
     let open Data_encoding in
     tup2 int32 data_encoding
+
+  let encoding_1_0_0 =
+    let open Data_encoding in
+    tup2 int32 data_encoding_1_0_0
 
   let to_bytes = Data_encoding.Binary.to_bytes_exn encoding
 
@@ -827,16 +951,28 @@ let get_protocol_data_from_header index block_header =
   >>= fun protocol_hash ->
   get_test_chain context
   >>= fun test_chain_status ->
+  get_predecessor_block_metadata_hash context
+  >>= fun predecessor_block_metadata_hash ->
+  get_predecessor_ops_metadata_hash context
+  >>= fun predecessor_ops_metadata_hash ->
   data_node_hash context
   >>= fun data_key ->
   Lwt.return
     ( level,
-      {Protocol_data.parents; protocol_hash; test_chain_status; data_key; info}
-    )
+      {
+        predecessor_block_metadata_hash;
+        predecessor_ops_metadata_hash;
+        Protocol_data.parents;
+        protocol_hash;
+        test_chain_status;
+        data_key;
+        info;
+      } )
 
 let validate_context_hash_consistency_and_commit ~data_hash
     ~expected_context_hash ~timestamp ~test_chain ~protocol_hash ~message
-    ~author ~parents ~index =
+    ~author ~parents ~predecessor_block_metadata_hash
+    ~predecessor_ops_metadata_hash ~index =
   let data_hash = Hash.of_context_hash data_hash in
   let parents = List.map Hash.of_context_hash parents in
   let protocol_value = Protocol_hash.to_bytes protocol_hash in
@@ -847,6 +983,31 @@ let validate_context_hash_consistency_and_commit ~data_hash
   Store.Tree.add tree current_protocol_key (Bytes.to_string protocol_value)
   >>= fun tree ->
   Store.Tree.add tree current_test_chain_key (Bytes.to_string test_chain_value)
+  >>= fun tree ->
+  ( match predecessor_block_metadata_hash with
+  | Some predecessor_block_metadata_hash ->
+      let predecessor_block_metadata_hash_value =
+        Block_metadata_hash.to_bytes predecessor_block_metadata_hash
+      in
+      Store.Tree.add
+        tree
+        current_predecessor_block_metadata_hash_key
+        (Bytes.to_string predecessor_block_metadata_hash_value)
+  | None ->
+      Lwt.return tree )
+  >>= fun tree ->
+  ( match predecessor_ops_metadata_hash with
+  | Some predecessor_ops_metadata_hash ->
+      let predecessor_ops_metadata_hash_value =
+        Operation_metadata_list_list_hash.to_bytes
+          predecessor_ops_metadata_hash
+      in
+      Store.Tree.add
+        tree
+        current_predecessor_ops_metadata_hash_key
+        (Bytes.to_string predecessor_ops_metadata_hash_value)
+  | None ->
+      Lwt.return tree )
   >>= fun tree ->
   let info =
     Irmin.Info.v ~date:(Time.Protocol.to_seconds timestamp) ~author message
@@ -867,6 +1028,20 @@ let validate_context_hash_consistency_and_commit ~data_hash
     set_test_chain ctxt test_chain
     >>= fun ctxt ->
     set_protocol ctxt protocol_hash
+    >>= fun ctxt ->
+    ( match predecessor_block_metadata_hash with
+    | Some predecessor_block_metadata_hash ->
+        set_predecessor_block_metadata_hash
+          ctxt
+          predecessor_block_metadata_hash
+    | None ->
+        Lwt.return ctxt )
+    >>= fun ctxt ->
+    ( match predecessor_ops_metadata_hash with
+    | Some predecessor_ops_metadata_hash ->
+        set_predecessor_ops_metadata_hash ctxt predecessor_ops_metadata_hash
+    | None ->
+        Lwt.return ctxt )
     >>= fun ctxt ->
     let data_t = Store.Tree.shallow index.repo data_hash in
     Store.Tree.add_tree ctxt.tree current_data_key data_t

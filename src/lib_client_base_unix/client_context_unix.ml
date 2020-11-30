@@ -128,7 +128,10 @@ class unix_prompter : Client_context.prompter =
         (a, Bytes.t tzresult) Client_context.lwt_format -> a =
       Format.kasprintf (fun msg ->
           print_string msg ;
-          let line = Lwt_utils_unix.getpass () in
+          let line =
+            if Unix.isatty Unix.stdin then Lwt_utils_unix.getpass ()
+            else read_line ()
+          in
           return (Bytes.of_string line))
   end
 

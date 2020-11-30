@@ -199,10 +199,11 @@ module Term = struct
       "The directory where the Tezos node will store all its data. Parent \
        directories are created if necessary."
     in
+    let env = Arg.env_var Node_config_file.data_dir_env_name in
     Arg.(
       value
       & opt (some string) None
-      & info ~docs ~doc ~docv:"DIR" ["data-dir"; "d"])
+      & info ~docs ~env ~doc ~docv:"DIR" ["data-dir"; "d"])
 
   let config_file =
     let doc = "The main configuration file." in
@@ -237,7 +238,7 @@ module Term = struct
       "Sets min_connections, expected_connections, max_connections to NUM / \
        2, NUM, (3 * NUM) / 2, respectively. Sets peer_table_size to 8 * NUM \
        unless it is already defined on the command line. Sets \
-       synchronisation_threshold to min(NUM / 4, 2) unless it is already \
+       synchronisation_threshold to max(NUM / 4, 2) unless it is already \
        defined on the command line."
     in
     Arg.(
@@ -348,6 +349,28 @@ module Term = struct
     in
     Arg.(value & flag & info ~docs ~doc ["enable-testchain"])
 
+  let synchronisation_threshold =
+    let doc =
+      "Set the number of peers with whom a chain synchronization must be \
+       completed to bootstrap the node"
+    in
+    Arg.(
+      value
+      & opt (some int) None
+      & info ~docs ~doc ~docv:"NUM" ["synchronisation-threshold"])
+
+  let latency =
+    let doc =
+      "[latency] is the time interval (in seconds) used to determine if a \
+       peer is synchronized with a chain. For instance, a peer whose known \
+       head has a timestamp T is considered synchronized if T >= now - \
+       max_latency. This parameter's default value was set with the chain's \
+       current protocol's baking rate in mind (and some allowance for network \
+       latency)."
+    in
+    Arg.(
+      value & opt (some int) None & info ~docs ~doc ~docv:"NUM" ["sync-latency"])
+
   (* rpc args *)
   let docs = Manpage.rpc_section
 
@@ -382,28 +405,6 @@ module Term = struct
     in
     Arg.(
       value & opt_all string [] & info ~docs ~doc ~docv:"HEADER" ["cors-header"])
-
-  let synchronisation_threshold =
-    let doc =
-      "Set the number of peers with whom a chain synchronization must be \
-       completed to bootstrap the node"
-    in
-    Arg.(
-      value
-      & opt (some int) None
-      & info ~docs ~doc ~docv:"NUM" ["synchronisation-threshold"])
-
-  let latency =
-    let doc =
-      "[latency] is the time interval (in seconds) used to determine if a \
-       peer is synchronized with a chain. For instance, a peer whose known \
-       head has a timestamp T is considered synchronized if T >= now - \
-       max_latency. This parameter's default value was set with the chain's \
-       current protocol's baking rate in mind (and some allowance for network \
-       latency)."
-    in
-    Arg.(
-      value & opt (some int) None & info ~docs ~doc ~docv:"NUM" ["sync-latency"])
 
   (* Args. *)
 
@@ -606,7 +607,13 @@ let read_and_patch_config_file ?(may_override_network = false)
            specified on the command line. *)
         match synchronisation_threshold with
         | None ->
-            ( Some (min (x / 4) 2),
+            (* We want to synchronise with at least 2 peers and to a
+              number of people proportional to the number of peers we
+              are connected with. Because a heuristic is used, we only
+              need to be synchronised with a sufficiently large number
+              of our peers. (x/4) is enough if the
+              `synchronisation-threshold` is not set. *)
+            ( Some (max (x / 4) 2),
               Some (x / 2),
               Some x,
               Some (3 * x / 2),

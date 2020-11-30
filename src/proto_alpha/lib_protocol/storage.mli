@@ -129,7 +129,7 @@ module Contract : sig
 
   val list : Raw_context.t -> Contract_repr.t list Lwt.t
 
-  (** All the tez possesed by a contract, including rolls and change *)
+  (** All the tez possessed by a contract, including rolls and change *)
   module Balance :
     Indexed_data_storage
       with type key = Contract_repr.t
@@ -179,7 +179,7 @@ module Contract : sig
   module Inactive_delegate :
     Data_set_storage with type elt = Contract_repr.t and type t = Raw_context.t
 
-  (** The cycle where the delegate should be desactivated. *)
+  (** The cycle where the delegate should be deactivated. *)
   module Delegate_desactivation :
     Indexed_data_storage
       with type key = Contract_repr.t

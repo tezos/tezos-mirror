@@ -23,17 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Misc.Syntax
+
 let recorded_proposal_count_for_delegate ctxt proposer =
   Storage.Vote.Proposals_count.get_option ctxt proposer
-  >>=? function None -> return 0 | Some count -> return count
+  >|=? Option.unopt ~default:0
 
 let record_proposal ctxt proposal proposer =
   recorded_proposal_count_for_delegate ctxt proposer
   >>=? fun count ->
   Storage.Vote.Proposals_count.init_set ctxt proposer (count + 1)
-  >>= fun ctxt ->
-  Storage.Vote.Proposals.add ctxt (proposal, proposer)
-  >>= fun ctxt -> return ctxt
+  >>= fun ctxt -> Storage.Vote.Proposals.add ctxt (proposal, proposer) >|= ok
 
 let get_proposals ctxt =
   Storage.Vote.Proposals.fold
@@ -45,7 +45,7 @@ let get_proposals ctxt =
       >>=? fun weight ->
       Lwt.return
         ( acc
-        >>? fun acc ->
+        >|? fun acc ->
         let previous =
           match Protocol_hash.Map.find_opt proposal acc with
           | None ->
@@ -53,7 +53,7 @@ let get_proposals ctxt =
           | Some x ->
               x
         in
-        ok (Protocol_hash.Map.add proposal (Int32.add weight previous) acc) ))
+        Protocol_hash.Map.add proposal (Int32.add weight previous) acc ))
 
 let clear_proposals ctxt =
   Storage.Vote.Proposals_count.clear ctxt
@@ -82,14 +82,14 @@ let get_ballots ctxt =
       let count = Int32.add weight in
       Lwt.return
         ( ballots
-        >>? fun ballots ->
+        >|? fun ballots ->
         match ballot with
         | Yay ->
-            ok {ballots with yay = count ballots.yay}
+            {ballots with yay = count ballots.yay}
         | Nay ->
-            ok {ballots with nay = count ballots.nay}
+            {ballots with nay = count ballots.nay}
         | Pass ->
-            ok {ballots with pass = count ballots.pass} ))
+            {ballots with pass = count ballots.pass} ))
     ~init:(ok {yay = 0l; nay = 0l; pass = 0l})
 
 let get_ballot_list = Storage.Vote.Ballots.bindings
@@ -106,12 +106,11 @@ let freeze_listings ctxt =
       (* TODO use snapshots *)
       let delegate = Signature.Public_key.hash delegate in
       Storage.Vote.Listings.get_option ctxt delegate
-      >>=? (function None -> return 0l | Some count -> return count)
+      >|=? Option.unopt ~default:0l
       >>=? fun count ->
       Storage.Vote.Listings.init_set ctxt delegate (Int32.succ count)
-      >>= fun ctxt -> return (ctxt, Int32.succ total))
-  >>=? fun (ctxt, total) ->
-  Storage.Vote.Listings_size.init ctxt total >>=? fun ctxt -> return ctxt
+      >|= fun ctxt -> ok (ctxt, Int32.succ total))
+  >>=? fun (ctxt, total) -> Storage.Vote.Listings_size.init ctxt total
 
 let listing_size = Storage.Vote.Listings_size.get
 
@@ -130,12 +129,11 @@ let set_current_period_kind = Storage.Vote.Current_period_kind.set
 
 let get_current_quorum ctxt =
   Storage.Vote.Participation_ema.get ctxt
-  >>=? fun participation_ema ->
+  >|=? fun participation_ema ->
   let quorum_min = Constants_storage.quorum_min ctxt in
   let quorum_max = Constants_storage.quorum_max ctxt in
   let quorum_diff = Int32.sub quorum_max quorum_min in
-  return
-    Int32.(add quorum_min (div (mul participation_ema quorum_diff) 100_00l))
+  Int32.(add quorum_min (div (mul participation_ema quorum_diff) 100_00l))
 
 let get_participation_ema = Storage.Vote.Participation_ema.get
 
@@ -151,6 +149,4 @@ let init ctxt =
   (* participation EMA is in centile of a percentage *)
   let participation_ema = Constants_storage.quorum_max ctxt in
   Storage.Vote.Participation_ema.init ctxt participation_ema
-  >>=? fun ctxt ->
-  Storage.Vote.Current_period_kind.init ctxt Proposal
-  >>=? fun ctxt -> return ctxt
+  >>=? fun ctxt -> Storage.Vote.Current_period_kind.init ctxt Proposal

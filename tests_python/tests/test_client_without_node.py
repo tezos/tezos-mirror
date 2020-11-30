@@ -10,6 +10,7 @@ import tempfile
 from typing import List, Optional
 import pytest
 from client.client import Client
+from tools.utils import assert_run_failure
 
 # Note that specifying "endpoint" and "web_port" is required
 # for the final assertion of test_config_init_roundtrip to pass. That's because
@@ -26,6 +27,90 @@ _CMD_LINE_ARGS = {"--endpoint": "http://127.0.0.1:9732",
                   "--remote-signer": "http://10.0.0.2",
                   "--password-filename": "/tmp/doesnt_exist_either"}
 _CONFIG_FILE_FLAG = "--config-file"
+
+
+@pytest.mark.client
+class TestImportKeyMnemonic:
+    """ Checks that the keys are correctly imported from a mnemonic. """
+
+    @pytest.fixture
+    def mnemonic(self):
+        return (
+            "seek paddle siege sting siege sick kidney "
+            + "detect coral because comfort long enforce napkin enter"
+        )
+
+    @pytest.fixture
+    def passphrase(self):
+        return "very_secure_passphrase"
+
+    def test_import_simple(self, client: Client):
+        """ Tests a simple import. """
+        mnemonic = "release easy pulp drop select attack false math cook \
+angry spin ostrich round dress acoustic"
+        prms = ["import", "keys", "from", "mnemonic", "zebra", "--force"]
+        stdin = mnemonic + "\n\n"
+        client.run_generic(prms, stdin=stdin)
+        addr = client.get_known_addresses()
+        assert addr.wallet["zebra"] == "tz1aGUKE72eN21iWztoDEeH4FeKaxWb7SAUb"
+
+    def test_import_already_present_alias(self, client: Client, mnemonic):
+        """ Tests that importing fails if the alias is already present. """
+        prms = ["import", "keys", "from",
+                "mnemonic", "super_original", "--force"]
+        stdin = mnemonic + "\n\n"
+        client.run_generic(prms, stdin=stdin)
+        prms = ["import", "keys", "from", "mnemonic", "super_original"]
+        expected_error = "The secret_key alias super_original already exists."
+        with assert_run_failure(expected_error):
+            client.run_generic(prms, stdin=stdin)
+
+    def test_import_passphrase(self, client: Client, mnemonic, passphrase):
+        """ Tests an import where the user specifies a passphrase. """
+        stdin = mnemonic + "\n" + passphrase + "\n"
+        prms = ["import", "keys", "from", "mnemonic", "key", "--force"]
+        client.run_generic(prms, stdin=stdin)
+        addr = client.get_known_addresses()
+        assert addr.wallet["key"] == "tz1QSF4TSVzaosgbaxnFJpRbs7798Skeb8Re"
+
+    def test_encrypted(self, client: Client, mnemonic, passphrase):
+        """ Tests an import where the user wants to encrypt the key. """
+        encrypt_pwd = "imgonnaencryptthiskeysohard"
+        stdin = (
+            mnemonic
+            + "\n"
+            + passphrase
+            + "\n"
+            + encrypt_pwd
+            + "\n"
+            + encrypt_pwd
+            + "\n"
+        )
+        prms = [
+            "import",
+            "keys",
+            "from",
+            "mnemonic",
+            "cryptkey",
+            "--encrypt",
+            "--force",
+        ]
+        client.run_generic(prms, stdin=stdin)
+        addr = client.get_known_addresses()
+        pkh = addr.wallet["cryptkey"]
+        secret_key = client.show_address(
+            "cryptkey", show_secret=True).secret_key
+        assert secret_key is not None
+        assert secret_key.startswith("encrypted:")
+        assert pkh == "tz1QSF4TSVzaosgbaxnFJpRbs7798Skeb8Re"
+
+    def test_gen_key_from_menmonic_bad_mnemonic(self, client: Client):
+        """ Tests that the command fails if the user gives a bad mnemonic. """
+        prms = ["import", "keys", "from", "mnemonic", "alias", "--force"]
+        stdin = "hello\n\n"
+        expected_error = '"hello" is not a valid BIP39 mnemonic.'
+        with assert_run_failure(expected_error):
+            client.run_generic(prms, stdin=stdin)
 
 
 @pytest.mark.client
@@ -257,6 +342,7 @@ class TestConfigShow:
 @pytest.mark.client
 class TestConfigValid:
     """ Tests of validity of tezos-client config """
+
     def test_config_node_port(self, nodeless_client: Client):
         """
             Tests that calling `config show` works, with a valid node port

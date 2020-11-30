@@ -21,11 +21,9 @@ For the moment this script:
   execute a required subset of the CI and
   this is most useful when working on the tezt tests themselves.
 * lints and typechecks staged tests_python/*.py files.
-* calls ocamlformat on staged *.ml, *.mli files in a way
-  faster than `make fmt`.
-  If staged files are being inspected (i.e. if --unstaged is not passed,
-  see below), formatted files are added before creating the commit;
-  hereby autoformatting the files upon committing.
+* checks formatting of staged tests_python/*.py, *.ml, *.mli in
+  a fast manner (because it only checks exactly those files not the entire
+  worktree).
 
 The first three points are blocking, if the corresponding check fails
 the commit is aborted.
@@ -187,55 +185,55 @@ def _get_py_files(tests_python_path: str, staged_or_modified: bool,
     return git_diff_result
 
 
-def _call_ocamlformat(files: List[str], staged_or_modified: bool):
+def _ocamlformat_check(files: List[str]) -> bool:
     """
     Args:
         files (list(str)): The files on which to call ocamlformat
         staged_or_modified (bool) Whether staged files are considered (True)
                                   or modified ones (False)
+    Returns: Whether all files are correctly formatted (True) or not (False).
     """
-    if staged_or_modified:
-        # If we're dealing with staged files, we don't want to call
-        # ocamlformat if the file has unstaged modifications; because
-        # adding (in git) the file after having formatted would stage
-        # those modifications
-        cmd = ["git", "diff", "--name-only"]
-        modified_files_result = subprocess.run(cmd,
-                                               stdout=subprocess.PIPE,
-                                               universal_newlines=True,
-                                               check=True)
-        trimmed_files = [
-            x for x in files
-            if x not in modified_files_result.stdout.split("\n")
-        ]
-        excluded = [x for x in files if x not in trimmed_files]
-        if excluded:
-            print("Not formatting some files because"
-                  " they have unstaged modifications"
-                  "\n(formatting them and readding them"
-                  " would stage unwanted modifications)."
-                  "\nConcerned files:")
-            for exclude in excluded:
-                print("  " + exclude)
-        files = trimmed_files
+    result = True
+
+    if not files:
+        # Nothing to do
+        return result
+
+    formatting_fails: List[str] = []
+    unknown_fails: List[str] = []
+
     for file_ in files:
-        cmd = ["ocamlformat", "--inplace", file_]
+        cmd = ["ocamlformat", "--check", file_]
         print(" ".join(cmd))
-        # check=False: we don't want to fail if ocamlformat fails because
-        # a file cannot be parsed. And we neither want to track this error.
-        subprocess.run(cmd, check=False)
-        if staged_or_modified:
-            # git add file, so that formatting makes it to the commit
-            # This is safe, because of the previous check having
-            # no unstaged modification. Hence adding it only stages
-            # formatting changes
-            #
-            # On another topic, we have no way to know if ocamlformat did
-            # a modification. Hence we're always readding. If we had
-            # this information, we would be able to avoid these calls.
-            cmd = ["git", "add", file_]
-            print(" ".join(cmd))
-            subprocess.run(cmd, check=True)
+        res = subprocess.run(cmd, check=False, text=True,
+                             stderr=subprocess.PIPE)
+        if res.returncode > 0:
+            # If the file is solely badly formatted (as opposed to not
+            # being parseable), ocamlformat will write nothing to stderr.
+            # We use that to distinguish the two cases.
+            (unknown_fails if res.stderr else formatting_fails).append(file_)
+            result = False
+
+    if unknown_fails:
+        plural = "" if len(unknown_fails) == 1 else "s"
+        print(f"Formatting of the following file{plural}"
+              " could not be verified:", file=sys.stderr)
+        for file_ in sorted(unknown_fails):
+            print(f"  {file_}", file=sys.stderr)
+        print("This likely means the concerned files"
+              " are syntactically invalid. Please fix them.", file=sys.stderr)
+
+    if formatting_fails:
+        plural = "" if len(formatting_fails) == 1 else "s"
+        print(f"Badly formatted file{plural}:", file=sys.stderr)
+        for file_ in sorted(formatting_fails):
+            print(f"  {file_}", file=sys.stderr)
+        formatting_fails = [f'"{f}"' if " " in f else f
+                            for f in formatting_fails]
+        fix = "ocamlformat --inplace " + " ".join(formatting_fails)
+        print(f"To fix that, run from the repo's root: {fix}", file=sys.stderr)
+
+    return result
 
 
 def _call_pytest(tests_python_path: str, files: List[str]) -> int:
@@ -319,7 +317,7 @@ def _call_tezt(files: List[str], staged_or_modified: bool) -> int:
         if not file_.endswith(".ml"):
             continue
         with open(file_, 'r') as handle:
-            pattern = re.escape("let run () =")
+            pattern = re.escape("let register () =")
             match = re.search(pattern, handle.read())
             if match is None:
                 continue
@@ -454,7 +452,8 @@ def main() -> int:
     ml_extensions = ["ml", "mli"]
     relevant_ocaml_files = _git_diff_many(staged, ml_extensions)
     if relevant_ocaml_files:
-        _call_ocamlformat(relevant_ocaml_files, staged)
+        ocamlformat_res = _ocamlformat_check(relevant_ocaml_files)
+        return_code = max(return_code, 0 if ocamlformat_res else 1)
         if lint_only:
             print(f"{_LINT_ONLY} passed: not calling tezt")
         else:

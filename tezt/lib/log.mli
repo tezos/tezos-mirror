@@ -125,8 +125,10 @@ type test_result = Successful | Failed | Aborted
 
 (** Log the result of a test.
 
+    [iteration] is the index of the iteration count to display in [--loop] mode.
+
     The [string] argument is the name of the test. *)
-val test_result : test_result -> string -> unit
+val test_result : iteration:int -> test_result -> string -> unit
 
 (** Log a command which will be run.
 

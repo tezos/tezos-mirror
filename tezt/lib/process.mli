@@ -75,11 +75,22 @@ val wait : t -> Unix.process_status Lwt.t
 
 (** Wait until a process terminates and check its status.
 
-    If the exit code is not 0, or if the process was killed, fail the test. *)
-val check : t -> unit Lwt.t
+    If [not expect_failure] and exit code is not 0,
+    or if [expect_failure] and exit code is 0,
+    or if the process was killed, fail the test. *)
+val check : ?expect_failure:bool -> t -> unit Lwt.t
 
-(** Wait until a process terminates and read its standard output if it did not fail. *)
-val check_and_read_stdout : t -> string Lwt.t
+(** Wait until a process terminates and read its standard output.
+
+    Fail the test if the process failed, unless [expect_failure],
+    in which case fail if the process succeeds. *)
+val check_and_read_stdout : ?expect_failure:bool -> t -> string Lwt.t
+
+(** Wait until a process terminates and read its standard error.
+
+    Fail the test if the process failed, unless [expect_failure],
+    in which case fail if the process succeeds. *)
+val check_and_read_stderr : ?expect_failure:bool -> t -> string Lwt.t
 
 (** Spawn a process, wait for it to terminate, and check its status. *)
 val run :
@@ -87,6 +98,7 @@ val run :
   ?name:string ->
   ?color:Log.Color.t ->
   ?env:(string * string) list ->
+  ?expect_failure:bool ->
   string ->
   string list ->
   unit Lwt.t
@@ -103,13 +115,30 @@ val stderr : t -> Lwt_io.input_channel
 (** Get the name which was given to {!spawn}. *)
 val name : t -> string
 
-(** Spawn a process such as [run]. If the exit code is 0,
-    it also returns the output of the command.  *)
+(** Spawn a process such as [run] and return its standard output.
+
+    Fail the test if the process failed, unless [expect_failure],
+    in which case fail if the process succeeds. *)
 val run_and_read_stdout :
   ?log_status_on_exit:bool ->
   ?name:string ->
   ?color:Log.Color.t ->
   ?env:(string * string) list ->
+  ?expect_failure:bool ->
+  string ->
+  string list ->
+  string Lwt.t
+
+(** Spawn a process such as [run] and return its standard error.
+
+    Fail the test if the process failed, unless [expect_failure],
+    in which case fail if the process succeeds. *)
+val run_and_read_stderr :
+  ?log_status_on_exit:bool ->
+  ?name:string ->
+  ?color:Log.Color.t ->
+  ?env:(string * string) list ->
+  ?expect_failure:bool ->
   string ->
   string list ->
   string Lwt.t

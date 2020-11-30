@@ -167,11 +167,9 @@ module MakeDleq (G : CYCLIC_GROUP) :
   let check_proof (b1, h1_n, b2_n, h2_n) (c, r_n) =
     (* First check that the lists have the same sizes. *)
     let same_sizes =
-      List.(
-        Compare.Int.(
-          length h1_n = length b2_n
-          && length b2_n = length h2_n
-          && length h2_n = length r_n))
+      (Compare.Int.equal 0 @@ List.compare_lengths h1_n b2_n)
+      && (Compare.Int.equal 0 @@ List.compare_lengths b2_n h2_n)
+      && (Compare.Int.equal 0 @@ List.compare_lengths h2_n r_n)
     in
     if not same_sizes then false
     else

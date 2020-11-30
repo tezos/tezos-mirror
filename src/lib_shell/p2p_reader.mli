@@ -73,6 +73,19 @@
     system time, the message is ignored.
     Otherwise calls [callback.notify_branch locator].
 
+  - [Get_protocol_branch chain_id proto_level]
+    If [chain_id] is not active for this peer, or if [proto_level] is
+    unknown simply ignores message and returns. A [proto_level] is unknown
+    if it is non-positive or if it is strictly higher than the one of the
+    current head.
+
+    Otherwise, sends a message [Protocol_branch (chain_id, protocol_locator)]
+    where [protocol_locator] encodes the longest branch where all the blocks
+    are on [proto_level]. This branch is a subbranch of the current branch
+    for the requested [chain_id].
+
+  - [Protocol_branch chain_id proto_level locator] is a no-op
+
   - [Get_current_head chain_id]:
     message is ignored if the chain [chain_id] is inactive for the remote peer.
     Otherwise, replies with [Current_head (chain_id, head, mempool)] where
@@ -87,6 +100,13 @@
     If [header]'s timestamp is more than 15s ahead of this peer system time,
     the message is ignored.
     Otherwise, calls [callback.notify_head].
+
+  - [Get_checkpoint chain_id]:
+    message is ignored if the chain [chain_id] is inactive for the remote peer.
+    Otherwise, replies with [Checkpoint (chain_id, checkpoint)] where [checkpoint]
+    is the current checkpoint for the requested chain.
+
+  - [Checkpoint chain_id header] is a no-op
 
   3. "Database" messages
 
@@ -103,6 +123,12 @@
   - [Block_header block]
     notifies the requester that the value has been received. Ignores message if
     value wasn't requested.
+
+  - [Get_predecessor_header hash n]
+    Sends [Predecessor_header hash n header] where [header] is the header of the
+    [n]th predecessor of the block [hash].
+
+  - [Predecessor_header hash n header] is a no-op.
 
   The other database messages work similarly
   - [Get_operations hashes]/[Operation operation]

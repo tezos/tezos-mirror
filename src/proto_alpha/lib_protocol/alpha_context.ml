@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Misc.Syntax
+
 type t = Raw_context.t
 
 type context = t
@@ -91,17 +93,15 @@ module Script = struct
   include Michelson_v1_primitives
   include Script_repr
 
-  let force_decode ctxt lexpr =
-    Lwt.return
-      ( Script_repr.force_decode lexpr
-      >>? fun (v, cost) ->
-      Raw_context.consume_gas ctxt cost >|? fun ctxt -> (v, ctxt) )
+  let force_decode_in_context ctxt lexpr =
+    Script_repr.force_decode lexpr
+    >>? fun (v, cost) ->
+    Raw_context.consume_gas ctxt cost >|? fun ctxt -> (v, ctxt)
 
-  let force_bytes ctxt lexpr =
-    Lwt.return
-      ( Script_repr.force_bytes lexpr
-      >>? fun (b, cost) ->
-      Raw_context.consume_gas ctxt cost >|? fun ctxt -> (b, ctxt) )
+  let force_bytes_in_context ctxt lexpr =
+    Script_repr.force_bytes lexpr
+    >>? fun (b, cost) ->
+    Raw_context.consume_gas ctxt cost >|? fun ctxt -> (b, ctxt)
 
   module Legacy_support = Legacy_script_support_repr
 end
@@ -141,6 +141,9 @@ module Gas = struct
   let consumed = Raw_context.gas_consumed
 
   let block_level = Raw_context.block_gas_level
+
+  (* Necessary to inject costs for Storage_costs into Gas.cost *)
+  let cost_of_repr cost = cost
 end
 
 module Level = struct
@@ -153,7 +156,7 @@ module Contract = struct
   include Contract_storage
 
   let originate c contract ~balance ~script ~delegate =
-    originate c contract ~balance ~script ~delegate
+    raw_originate c contract ~balance ~script ~delegate
 
   let init_origination_nonce = Raw_context.init_origination_nonce
 
@@ -163,9 +166,9 @@ end
 module Big_map = struct
   type id = Z.t
 
-  let fresh = Storage.Big_map.Next.incr
-
-  let fresh_temporary = Raw_context.fresh_temporary_big_map
+  let fresh ~temporary c =
+    if temporary then return (Raw_context.fresh_temporary_big_map c)
+    else Storage.Big_map.Next.incr c
 
   let mem c m k = Storage.Big_map.Contents.mem (c, m) k
 
@@ -178,17 +181,15 @@ module Big_map = struct
     >>= fun c -> Lwt.return (Raw_context.reset_temporary_big_map c)
 
   let exists c id =
-    Lwt.return
-      (Raw_context.consume_gas c (Gas_limit_repr.read_bytes_cost Z.zero))
-    >>=? fun c ->
+    Raw_context.consume_gas c (Gas_limit_repr.read_bytes_cost Z.zero)
+    >>?= fun c ->
     Storage.Big_map.Key_type.get_option c id
     >>=? fun kt ->
     match kt with
     | None ->
         return (c, None)
     | Some kt ->
-        Storage.Big_map.Value_type.get c id
-        >>=? fun kv -> return (c, Some (kt, kv))
+        Storage.Big_map.Value_type.get c id >|=? fun kv -> (c, Some (kt, kv))
 end
 
 module Delegate = Delegate_storage

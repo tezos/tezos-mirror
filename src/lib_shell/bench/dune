@@ -9,21 +9,22 @@
                    -open Tezos_protocol_alpha_parameters
                    -open Tezos_alpha_test_helpers)))
 
-(alias
- (name buildtest)
- (deps bench_tool.exe bench_simple.exe))
+(rule
+ (alias buildtest)
+ (deps bench_tool.exe bench_simple.exe)
+ (action progn))
 
-(alias
- (name runbench_alpha_simple)
+(rule
+ (alias runbench_alpha_simple)
  (deps bench_simple.exe)
  (action (chdir %{workspace_root} (run %{exe:bench_simple.exe}))))
 
-(alias
- (name runbench_alpha)
+(rule
+ (alias runbench_alpha)
  (deps bench_tool.exe)
  (action (chdir %{workspace_root} (run %{exe:bench_tool.exe}))))
 
-(alias
- (name runtest_lint)
+(rule
+ (alias runtest_lint)
  (deps (glob_files *.ml{,i}))
  (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

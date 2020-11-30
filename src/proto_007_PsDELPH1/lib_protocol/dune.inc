@@ -388,8 +388,8 @@ include Tezos_raw_protocol_007_PsDELPH1.Main
                    -warn-error +a))
  (modules Registerer))
 
-(alias
- (name runtest_compile_protocol)
+(rule
+ (alias runtest_compile_protocol)
  (deps
    misc.mli misc.ml
    storage_description.mli storage_description.ml
@@ -465,11 +465,13 @@ include Tezos_raw_protocol_007_PsDELPH1.Main
   (:src_dir TEZOS_PROTOCOL))
  (action (run %{bin:tezos-protocol-compiler}  .)))
 
-(alias
- (name runtest_sandbox)
- (deps .tezos_protocol_007_PsDELPH1.objs/native/tezos_protocol_007_PsDELPH1.cmx))
+(rule
+ (alias runtest_sandbox)
+ (deps .tezos_protocol_007_PsDELPH1.objs/native/tezos_protocol_007_PsDELPH1.cmx)
+ (action (progn)))
 
-(alias
- (name runtest)
+(rule
+ (alias runtest)
  (package tezos-protocol-007-PsDELPH1)
- (deps (alias runtest_sandbox)))
+ (deps (alias runtest_sandbox))
+ (action (progn)))

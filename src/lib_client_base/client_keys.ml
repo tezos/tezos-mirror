@@ -105,6 +105,15 @@ let make_sk_uri (x : Uri.t) : sk_uri tzresult Lwt.t =
   | Some _ ->
       return x
 
+type sapling_uri = Uri.t
+
+let make_sapling_uri (x : Uri.t) : sapling_uri =
+  match Uri.scheme x with
+  | None ->
+      Stdlib.failwith "SAPLING_URI needs a scheme"
+  | Some _ ->
+      x
+
 let pk_uri_parameter () =
   Clic.parameter (fun _ s -> make_pk_uri @@ Uri.of_string s)
 
@@ -174,6 +183,44 @@ module Public_key = Client_aliases.Alias (struct
              (req "key" Signature.Public_key.encoding))
           (function (uri, Some key) -> Some (uri, key) | (_, None) -> None)
           (fun (uri, key) -> (uri, Some key)) ]
+end)
+
+type sapling_key = {
+  sk : sapling_uri;
+  (* zip32 derivation path *)
+  path : int32 list;
+  (* index of the next address to generate *)
+  address_index : Sapling.Core.Client.Viewing_key.index;
+}
+
+module Sapling_key = Client_aliases.Alias (struct
+  module S = Sapling.Core.Client
+
+  let name = "sapling_key"
+
+  type t = sapling_key
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun k -> (k.sk, k.path, k.address_index))
+      (fun (sk, path, address_index) -> {sk; path; address_index})
+      (obj3
+         (req "sk" uri_encoding)
+         (req "path" (list int32))
+         (req "address_index" S.Viewing_key.index_encoding))
+
+  let of_source s =
+    let open Data_encoding in
+    match Json.from_string s with
+    | Error _ ->
+        failwith "corrupted wallet"
+    | Ok s ->
+        return (Json.destruct encoding s)
+
+  let to_source k =
+    let open Data_encoding in
+    return @@ Json.to_string (Json.construct encoding k)
 end)
 
 module type SIGNER = sig
@@ -363,7 +410,7 @@ let raw_get_key (cctxt : #Client_context.wallet) pkh =
          | Some keys ->
              return keys)
   >>= function
-  | (Ok (_, None, None) | Error _) as initial_result -> (
+  | (Ok (_, _, None) | Error _) as initial_result -> (
       (* try to lookup for a remote key *)
       find_signer_for_key ~scheme:"remote"
       >>=? (fun signer ->

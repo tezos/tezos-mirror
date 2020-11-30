@@ -20,7 +20,6 @@ init_sandboxed_client() {
         alpha_baker="$local_alpha_baker -base-dir $client_dir -endpoint https://$host:$rpc"
         alpha_endorser="$local_alpha_endorser -base-dir $client_dir -endpoint https://$host:$rpc"
         alpha_accuser="$local_alpha_accuser -base-dir $client_dir -endpoint https://$host:$rpc"
-        signer="$local_signer -base-dir $client_dir -endpoint https://$host:$rpc"
         compiler="$local_compiler"
     else
         client="$local_client -base-dir $client_dir -endpoint http://$host:$rpc"
@@ -28,7 +27,6 @@ init_sandboxed_client() {
         alpha_baker="$local_alpha_baker -base-dir $client_dir -endpoint http://$host:$rpc"
         alpha_endorser="$local_alpha_endorser -base-dir $client_dir -endpoint http://$host:$rpc"
         alpha_accuser="$local_alpha_accuser -base-dir $client_dir -endpoint http://$host:$rpc"
-        signer="$local_signer -base-dir $client_dir -endpoint http://$host:$rpc"
         compiler="$local_compiler"
     fi
 }

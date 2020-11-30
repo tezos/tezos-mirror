@@ -1,4 +1,5 @@
 from os import path
+import subprocess
 import pytest
 from tools.client_regression import ClientRegression
 from tools import paths
@@ -310,3 +311,27 @@ class TestContractOnchainOpcodes:
         bake(client)
 
         assert client.get_delegate('set_delegate').delegate is None
+
+    @pytest.mark.parametrize('contract,init_storage,parameters', [
+        ('failwith_big_map', '{Elt 0 0}', [
+            '{}',
+            '0',
+            '99999999',
+            'Pair 0 {}',
+            'Pair 0 {Elt 0 None}',
+            'Pair 0 {Elt 0 (Some 4)}',
+            'Pair 0 {Elt 1 (Some 4)}']),
+    ])
+    def test_trace_transfer(self, client_regtest_scrubbed, contract,
+                            init_storage, parameters):
+        client = client_regtest_scrubbed
+        init_with_transfer(client,
+                           path.join(OPCODES_CONTRACT_PATH, f'{contract}.tz'),
+                           init_storage, 1000, 'bootstrap1')
+        for parameter in parameters:
+            try:
+                client.transfer(0, 'bootstrap1', contract,
+                                ['-arg', parameter, '--burn-cap', '10'])
+            except subprocess.CalledProcessError:
+                pass
+        bake(client)

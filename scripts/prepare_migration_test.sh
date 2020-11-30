@@ -179,7 +179,7 @@ then
 
     proto_dir="src/proto_${proto_version}_*/"
 
-    pred_proto_version=$(printf "%03d" $(($proto_version -1)))
+    pred_proto_version=$(printf "%03d" $((10#$proto_version -1)))
 else
     pred_proto_name=$(find src -name "proto_[0-9][0-9][0-9]_*" | awk -F'/' '{print $NF}' | sort -r | head -1)
     pred_proto_version=$(echo $pred_proto_name | cut -d'_' -f2)

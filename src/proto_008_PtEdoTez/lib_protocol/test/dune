@@ -1,0 +1,54 @@
+(executable
+ (name main)
+ (libraries tezos-base
+            tezos-micheline
+            tezos-protocol-environment
+            alcotest-lwt
+            tezos-008-PtEdoTez-test-helpers
+            tezos-stdlib-unix
+            tezos-client-base
+            tezos-protocol-008-PtEdoTez-parameters
+            tezos-test-services
+            sapling)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_micheline
+                   -open Tezos_client_008_PtEdoTez
+                   -open Tezos_protocol_008_PtEdoTez
+                   -open Tezos_protocol_environment_008_PtEdoTez
+                   -open Tezos_008_PtEdoTez_test_helpers
+                   -open Tezos_test_services)))
+
+(rule
+ (alias buildtest)
+ (package tezos-protocol-008-PtEdoTez-tests)
+ (deps main.exe)
+ (action (progn)))
+
+(rule
+ (copy %{lib:tezos-protocol-008-PtEdoTez-parameters:test-parameters.json}
+       protocol_parameters.json))
+
+; runs only the `Quick tests
+(rule
+ (alias runtest_proto_008_PtEdoTez)
+ (deps (glob_files contracts/*))
+ (package tezos-protocol-008-PtEdoTez-tests)
+ (action (run %{exe:main.exe} -v -q)))
+
+; runs both `Quick and `Slow tests
+(rule
+ (alias runtest_slow)
+ (deps (glob_files contracts/*))
+ (package tezos-protocol-008-PtEdoTez-tests)
+ (action (run %{exe:main.exe} -v)))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-008-PtEdoTez-tests)
+ (deps (alias runtest_proto_008_PtEdoTez))
+ (action (progn)))
+
+(rule
+ (alias runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

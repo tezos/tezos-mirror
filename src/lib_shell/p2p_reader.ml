@@ -85,19 +85,19 @@ let may_handle_global state chain_id f =
 
 let find_pending_operations {peer_active_chains; _} h i =
   Chain_id.Table.to_seq_values peer_active_chains
-  |> Seq.find_first (fun chain_db ->
+  |> Seq.find (fun chain_db ->
          Distributed_db_requester.Raw_operations.pending
            chain_db.operations_db
            (h, i))
 
 let find_pending_operation {peer_active_chains; _} h =
   Chain_id.Table.to_seq_values peer_active_chains
-  |> Seq.find_first (fun chain_db ->
+  |> Seq.find (fun chain_db ->
          Distributed_db_requester.Raw_operation.pending chain_db.operation_db h)
 
 let read_operation state h =
   (* NOTE: to optimise this into an early-return map-and-search we need either a
-     special [Seq.find_first_map : ('a -> 'b option) -> 'a Seq.t -> 'b option]
+     special [Seq.find_map : ('a -> 'b option) -> 'a Seq.t -> 'b option]
      or we need a [Seq.map_s] that is lazy. *)
   Chain_id.Table.fold_s
     (fun chain_id chain_db acc ->
@@ -122,9 +122,32 @@ let read_block_header {disk; _} h =
   | None ->
       Lwt.return_none
 
+let read_predecessor_header {disk; _} h offset =
+  if Compare.Int32.(offset < 0l) then Lwt.return_none
+  else
+    State.read_block disk h
+    >>= function
+    | None ->
+        Lwt.return_none
+    | Some block -> (
+        if Compare.Int32.(offset > State.Block.level block) then
+          Lwt.return_none
+        else
+          State.Block.predecessor_n block (Int32.to_int offset)
+          >>= function
+          | None ->
+              Lwt.return_none
+          | Some pred_hash -> (
+              State.read_block disk pred_hash
+              >>= function
+              | None ->
+                  Lwt.return_none
+              | Some b ->
+                  Lwt.return_some (State.Block.header b) ) )
+
 let find_pending_block_header {peer_active_chains; _} h =
   Chain_id.Table.to_seq_values peer_active_chains
-  |> Seq.find_first (fun chain_db ->
+  |> Seq.find (fun chain_db ->
          Distributed_db_requester.Raw_block_header.pending
            chain_db.block_header_db
            h)
@@ -133,14 +156,6 @@ let deactivate gid chain_db =
   chain_db.callback.disconnection gid ;
   chain_db.active_peers := P2p_peer.Set.remove gid !(chain_db.active_peers) ;
   P2p_peer.Table.remove chain_db.active_connections gid
-
-let soon () =
-  let now = Systime_os.now () in
-  match Ptime.add_span now (Ptime.Span.of_int_s 15) with
-  | Some s ->
-      s
-  | None ->
-      invalid_arg "Distributed_db.handle_msg: end of time"
 
 (* Active the chain_id for the remote peer. Is a nop if it is already activated. *)
 let activate state chain_id chain_db =
@@ -192,7 +207,9 @@ let handle_msg state msg =
         >>= fun () ->
         P2p.greylist_peer state.p2p state.gid ;
         Lwt.return_unit )
-      else if Time.System.(soon () < of_protocol_exn head.shell.timestamp) then (
+      else if
+        not (Clock_drift.is_not_too_far_in_the_future head.shell.timestamp)
+      then (
         Peer_metadata.incr meta Future_block ;
         P2p_reader_event.(emit received_future_block)
           (Block_header.hash head, state.gid) )
@@ -245,7 +262,8 @@ let handle_msg state msg =
         >>= fun () ->
         P2p.greylist_peer state.p2p state.gid ;
         Lwt.return_unit )
-      else if Time.System.(soon () < of_protocol_exn header.shell.timestamp)
+      else if
+        not (Clock_drift.is_not_too_far_in_the_future header.shell.timestamp)
       then (
         Peer_metadata.incr meta Future_block ;
         P2p_reader_event.(emit received_future_block) (head, state.gid) )
@@ -370,6 +388,62 @@ let handle_msg state msg =
         >>= fun () ->
         Peer_metadata.incr meta @@ Received_response Operations_for_block ;
         Lwt.return_unit )
+  | Get_checkpoint chain_id ->
+      Peer_metadata.incr meta @@ Received_request Checkpoint ;
+      may_handle_global state chain_id
+      @@ fun chain_db ->
+      State.Chain.checkpoint chain_db.chain_state
+      >>= fun checkpoint ->
+      Peer_metadata.update_responses meta Checkpoint
+      @@ P2p.try_send state.p2p state.conn
+      @@ Checkpoint (chain_id, checkpoint) ;
+      Lwt.return_unit
+  | Checkpoint _ ->
+      (* This message is currently unused: it will be used for future
+         bootstrap heuristics. *)
+      Peer_metadata.incr meta @@ Received_response Checkpoint ;
+      Lwt.return_unit
+  | Get_protocol_branch (chain_id, proto_level) -> (
+      Peer_metadata.incr meta @@ Received_request Protocol_branch ;
+      may_handle_global state chain_id
+      @@ fun chain_db ->
+      activate state chain_id chain_db ;
+      let seed =
+        {Block_locator.receiver_id = state.gid; sender_id = my_peer_id state}
+      in
+      State.compute_protocol_locator chain_db.chain_state ~proto_level seed
+      >>= function
+      | Some locator ->
+          Peer_metadata.update_responses meta Protocol_branch
+          @@ P2p.try_send state.p2p state.conn
+          @@ Protocol_branch (chain_id, proto_level, locator) ;
+          Lwt.return_unit
+      | None ->
+          Lwt.return_unit )
+  | Protocol_branch (_chain, _proto_level, _locator) ->
+      (* This message is currently unused: it will be used for future
+         multipass. *)
+      Peer_metadata.incr meta @@ Received_response Protocol_branch ;
+      Lwt.return_unit
+  | Get_predecessor_header (block_hash, offset) -> (
+      Peer_metadata.incr meta @@ Received_request Predecessor_header ;
+      read_predecessor_header state block_hash offset
+      >>= function
+      | None ->
+          (* The peer is not expected to request blocks that are beyond
+             our locator. *)
+          Peer_metadata.incr meta @@ Unadvertised Block ;
+          Lwt.return_unit
+      | Some header ->
+          Peer_metadata.update_responses meta Predecessor_header
+          @@ P2p.try_send state.p2p state.conn
+          @@ Predecessor_header (block_hash, offset, header) ;
+          Lwt.return_unit )
+  | Predecessor_header (_block_hash, _offset, _header) ->
+      (* This message is currently unused: it will be used to improve
+         bootstrapping. *)
+      Peer_metadata.incr meta @@ Received_response Predecessor_header ;
+      Lwt.return_unit
 
 let rec worker_loop state =
   protect ~canceler:state.canceler (fun () -> P2p.recv state.p2p state.conn)

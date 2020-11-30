@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Misc.Syntax
+
 type error += Cannot_pay_storage_fee (* `Temporary *)
 
 type error += Operation_quota_exceeded (* `Temporary *)
@@ -63,9 +65,9 @@ let origination_burn c =
   let origination_size = Constants_storage.origination_size c in
   let cost_per_byte = Constants_storage.cost_per_byte c in
   (* the origination burn, measured in bytes *)
-  Lwt.return Tez_repr.(cost_per_byte *? Int64.of_int origination_size)
-  >>=? fun to_be_paid ->
-  return (Raw_context.update_allocated_contracts_count c, to_be_paid)
+  Tez_repr.(cost_per_byte *? Int64.of_int origination_size)
+  >|? fun to_be_paid ->
+  (Raw_context.update_allocated_contracts_count c, to_be_paid)
 
 let record_paid_storage_space c contract =
   Contract_storage.used_storage_space c contract
@@ -77,8 +79,9 @@ let record_paid_storage_space c contract =
   >>=? fun (to_be_paid, c) ->
   let c = Raw_context.update_storage_space_to_pay c to_be_paid in
   let cost_per_byte = Constants_storage.cost_per_byte c in
-  Lwt.return Tez_repr.(cost_per_byte *? Z.to_int64 to_be_paid)
-  >>=? fun to_burn -> return (c, size, to_be_paid, to_burn)
+  Lwt.return
+    ( Tez_repr.(cost_per_byte *? Z.to_int64 to_be_paid)
+    >|? fun to_burn -> (c, size, to_be_paid, to_burn) )
 
 let burn_storage_fees c ~storage_limit ~payer =
   let origination_size = Constants_storage.origination_size c in
@@ -95,11 +98,11 @@ let burn_storage_fees c ~storage_limit ~payer =
   if Compare.Z.(remaining < Z.zero) then fail Operation_quota_exceeded
   else
     let cost_per_byte = Constants_storage.cost_per_byte c in
-    Lwt.return Tez_repr.(cost_per_byte *? Z.to_int64 consumed)
-    >>=? fun to_burn ->
+    Tez_repr.(cost_per_byte *? Z.to_int64 consumed)
+    >>?= fun to_burn ->
     (* Burning the fees... *)
     if Tez_repr.(to_burn = Tez_repr.zero) then
-      (* If the payer was was deleted by transfering all its balance, and no space was used,
+      (* If the payer was was deleted by transferring all its balance, and no space was used,
          burning zero would fail *)
       return c
     else
@@ -107,7 +110,6 @@ let burn_storage_fees c ~storage_limit ~payer =
         Cannot_pay_storage_fee
         ( Contract_storage.must_exist c payer
         >>=? fun () -> Contract_storage.spend c payer to_burn )
-      >>=? fun c -> return c
 
 let check_storage_limit c ~storage_limit =
   if
@@ -116,6 +118,6 @@ let check_storage_limit c ~storage_limit =
       > (Raw_context.constants c).hard_storage_limit_per_operation)
     || Compare.Z.(storage_limit < Z.zero)
   then error Storage_limit_too_high
-  else ok ()
+  else ok_unit
 
 let start_counting_storage_fees c = Raw_context.init_storage_space_to_pay c

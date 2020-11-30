@@ -177,6 +177,13 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
     unit ->
     block_metadata tzresult Lwt.t
 
+  val metadata_hash :
+    #simple ->
+    ?chain:chain ->
+    ?block:block ->
+    unit ->
+    Block_metadata_hash.t tzresult Lwt.t
+
   module Header : sig
     val shell_header :
       #simple ->
@@ -242,6 +249,37 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       int ->
       int ->
       Operation_hash.t tzresult Lwt.t
+  end
+
+  module Operation_metadata_hashes : sig
+    val root :
+      #simple ->
+      ?chain:chain ->
+      ?block:block ->
+      unit ->
+      Operation_metadata_list_list_hash.t tzresult Lwt.t
+
+    val operation_metadata_hashes :
+      #simple ->
+      ?chain:chain ->
+      ?block:block ->
+      unit ->
+      Operation_metadata_hash.t list list tzresult Lwt.t
+
+    val operation_metadata_hashes_in_pass :
+      #simple ->
+      ?chain:chain ->
+      ?block:block ->
+      int ->
+      Operation_metadata_hash.t list tzresult Lwt.t
+
+    val operation_metadata_hash :
+      #simple ->
+      ?chain:chain ->
+      ?block:block ->
+      int ->
+      int ->
+      Operation_metadata_hash.t tzresult Lwt.t
   end
 
   module Context : sig
@@ -343,6 +381,9 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
     val metadata :
       ([`GET], prefix, prefix, unit, unit, block_metadata) RPC_service.t
 
+    val metadata_hash :
+      ([`GET], prefix, prefix, unit, unit, Block_metadata_hash.t) RPC_service.t
+
     val protocols :
       ([`GET], prefix, prefix, unit, unit, protocols) RPC_service.t
 
@@ -418,6 +459,44 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           unit,
           unit,
           Tezos_crypto.Operation_hash.t )
+        RPC_service.t
+    end
+
+    module Operation_metadata_hashes : sig
+      val root :
+        ( [`GET],
+          prefix,
+          prefix,
+          unit,
+          unit,
+          Operation_metadata_list_list_hash.t )
+        RPC_service.t
+
+      val operation_metadata_hashes :
+        ( [`GET],
+          prefix,
+          prefix,
+          unit,
+          unit,
+          Tezos_crypto.Operation_metadata_hash.t list list )
+        RPC_service.t
+
+      val operation_metadata_hashes_in_pass :
+        ( [`GET],
+          prefix,
+          prefix * int,
+          unit,
+          unit,
+          Tezos_crypto.Operation_metadata_hash.t list )
+        RPC_service.t
+
+      val operation_metadata_hash :
+        ( [`GET],
+          prefix,
+          (prefix * int) * int,
+          unit,
+          unit,
+          Tezos_crypto.Operation_metadata_hash.t )
         RPC_service.t
     end
 

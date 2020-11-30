@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Alpha_context
+open Misc.Syntax
 
 type error += Cannot_parse_operation (* `Branch *)
 
@@ -64,7 +65,7 @@ module Scripts = struct
         (req "chain_id" Chain_id.encoding)
         (opt "source" Contract.encoding)
         (opt "payer" Contract.encoding)
-        (opt "gas" z)
+        (opt "gas" Gas.Arith.z_integral_encoding)
         (dft "entrypoint" string "default")
 
     let trace_encoding =
@@ -107,7 +108,10 @@ module Scripts = struct
       RPC_service.post_service
         ~description:"Typecheck a piece of code in the current context"
         ~query:RPC_query.empty
-        ~input:(obj2 (req "program" Script.expr_encoding) (opt "gas" z))
+        ~input:
+          (obj2
+             (req "program" Script.expr_encoding)
+             (opt "gas" Gas.Arith.z_integral_encoding))
         ~output:
           (obj2
              (req "type_map" Script_tc_errors_registration.type_map_enc)
@@ -124,7 +128,7 @@ module Scripts = struct
           (obj3
              (req "data" Script.expr_encoding)
              (req "type" Script.expr_encoding)
-             (opt "gas" z))
+             (opt "gas" Gas.Arith.z_integral_encoding))
         ~output:(obj1 (req "gas" Gas.encoding))
         RPC_path.(path / "typecheck_data")
 
@@ -137,7 +141,7 @@ module Scripts = struct
           (obj3
              (req "data" Script.expr_encoding)
              (req "type" Script.expr_encoding)
-             (opt "gas" z))
+             (opt "gas" Gas.Arith.z_integral_encoding))
         ~output:(obj2 (req "packed" bytes) (req "gas" Gas.encoding))
         ~query:RPC_query.empty
         RPC_path.(path / "pack_data")
@@ -188,7 +192,7 @@ module Scripts = struct
     let open Services_registration in
     let originate_dummy_contract ctxt script =
       let ctxt = Contract.init_origination_nonce ctxt Operation_hash.zero in
-      Contract.fresh_contract_from_current_nonce ctxt
+      Lwt.return (Contract.fresh_contract_from_current_nonce ctxt)
       >>=? fun (ctxt, dummy_contract) ->
       let balance =
         match Tez.of_mutez 4_000_000_000_000L with
@@ -253,8 +257,8 @@ module Scripts = struct
           ~script:{storage; code}
           ~entrypoint
           ~parameter
-        >>=? fun {Script_interpreter.storage; operations; big_map_diff; _} ->
-        return (storage, operations, big_map_diff)) ;
+        >|=? fun {Script_interpreter.storage; operations; big_map_diff; _} ->
+        (storage, operations, big_map_diff)) ;
     register0
       S.trace_code
       (fun ctxt
@@ -303,9 +307,9 @@ module Scripts = struct
           ~script:{storage; code}
           ~entrypoint
           ~parameter
-        >>=? fun ( {Script_interpreter.storage; operations; big_map_diff; _},
+        >|=? fun ( {Script_interpreter.storage; operations; big_map_diff; _},
                    trace ) ->
-        return (storage, operations, trace, big_map_diff)) ;
+        (storage, operations, trace, big_map_diff)) ;
     register0 S.typecheck_code (fun ctxt () (expr, maybe_gas) ->
         let ctxt =
           match maybe_gas with
@@ -315,7 +319,7 @@ module Scripts = struct
               Gas.set_limit ctxt gas
         in
         Script_ir_translator.typecheck_code ctxt expr
-        >>=? fun (res, ctxt) -> return (res, Gas.level ctxt)) ;
+        >|=? fun (res, ctxt) -> (res, Gas.level ctxt)) ;
     register0 S.typecheck_data (fun ctxt () (data, ty, maybe_gas) ->
         let ctxt =
           match maybe_gas with
@@ -325,7 +329,7 @@ module Scripts = struct
               Gas.set_limit ctxt gas
         in
         Script_ir_translator.typecheck_data ctxt (data, ty)
-        >>=? fun ctxt -> return (Gas.level ctxt)) ;
+        >|=? fun ctxt -> Gas.level ctxt) ;
     register0 S.pack_data (fun ctxt () (expr, typ, maybe_gas) ->
         let open Script_ir_translator in
         let ctxt =
@@ -335,12 +339,12 @@ module Scripts = struct
           | Some gas ->
               Gas.set_limit ctxt gas
         in
-        Lwt.return (parse_packable_ty ctxt ~legacy:true (Micheline.root typ))
-        >>=? fun (Ex_ty typ, ctxt) ->
+        parse_packable_ty ctxt ~legacy:true (Micheline.root typ)
+        >>?= fun (Ex_ty typ, ctxt) ->
         parse_data ctxt ~legacy:true typ (Micheline.root expr)
         >>=? fun (data, ctxt) ->
         Script_ir_translator.pack_data ctxt typ data
-        >>=? fun (bytes, ctxt) -> return (bytes, Gas.level ctxt)) ;
+        >|=? fun (bytes, ctxt) -> (bytes, Gas.level ctxt)) ;
     register0
       S.run_operation
       (fun ctxt
@@ -354,11 +358,11 @@ module Scripts = struct
                 {source; fee; counter; operation; gas_limit; storage_limit}) =
             op
           in
-          Lwt.return (Gas.check_limit ctxt gas_limit)
-          >>=? fun () ->
+          Gas.check_limit ctxt gas_limit
+          >>?= fun () ->
           let ctxt = Gas.set_limit ctxt gas_limit in
-          Lwt.return (Fees.check_storage_limit ctxt storage_limit)
-          >>=? fun () ->
+          Fees.check_storage_limit ctxt storage_limit
+          >>?= fun () ->
           Contract.must_be_allocated ctxt (Contract.implicit_contract source)
           >>=? fun () ->
           Contract.check_counter_increment ctxt source counter
@@ -387,12 +391,11 @@ module Scripts = struct
               (* Fail quickly if not enough gas for minimal deserialization cost *)
               Lwt.return
               @@ record_trace Apply.Gas_quota_exceeded_init_deserialize
-              @@ Gas.check_enough ctxt (Script.minimal_deserialize_cost arg)
-              >>=? fun () ->
-              (* Fail if not enough gas for complete deserialization cost *)
-              trace Apply.Gas_quota_exceeded_init_deserialize
-              @@ Script.force_decode ctxt arg
-              >>|? fun (_arg, ctxt) -> ctxt
+              @@ ( Gas.check_enough ctxt (Script.minimal_deserialize_cost arg)
+                 >>? fun () ->
+                 (* Fail if not enough gas for complete deserialization cost *)
+                 Script.force_decode_in_context ctxt arg
+                 >|? fun (_arg, ctxt) -> ctxt )
           | Origination {script; _} ->
               (* Here the data comes already deserialized, so we need to fake the deserialization to mimic apply *)
               let script_bytes =
@@ -416,15 +419,13 @@ module Scripts = struct
                  >>? fun ctxt ->
                  Gas.check_enough
                    ctxt
-                   (Script.minimal_deserialize_cost script.storage) )
-              >>=? fun () ->
-              (* Fail if not enough gas for complete deserialization cost *)
-              trace Apply.Gas_quota_exceeded_init_deserialize
-              @@ Script.force_decode ctxt script.code
-              >>=? fun (_code, ctxt) ->
-              trace Apply.Gas_quota_exceeded_init_deserialize
-              @@ Script.force_decode ctxt script.storage
-              >>|? fun (_storage, ctxt) -> ctxt
+                   (Script.minimal_deserialize_cost script.storage)
+                 >>? fun () ->
+                 (* Fail if not enough gas for complete deserialization cost *)
+                 Script.force_decode_in_context ctxt script.code
+                 >>? fun (_code, ctxt) ->
+                 Script.force_decode_in_context ctxt script.storage
+                 >|? fun (_storage, ctxt) -> ctxt )
           | _ ->
               return ctxt )
           >>=? fun ctxt ->
@@ -434,7 +435,6 @@ module Scripts = struct
           Contract.increment_counter ctxt source
           >>=? fun ctxt ->
           Contract.spend ctxt (Contract.implicit_contract source) fee
-          >>=? fun ctxt -> return ctxt
         in
         let rec partial_precheck_manager_contents_list :
             type kind.
@@ -449,10 +449,9 @@ module Scripts = struct
               partial_precheck_manager_contents ctxt op
               >>=? fun ctxt -> partial_precheck_manager_contents_list ctxt rest
         in
-        let return contents =
-          return
-            ( Operation_data protocol_data,
-              Apply_results.Operation_metadata {contents} )
+        let ret contents =
+          ( Operation_data protocol_data,
+            Apply_results.Operation_metadata {contents} )
         in
         let operation : _ operation = {shell; protocol_data} in
         let hash = Operation.hash {shell; protocol_data} in
@@ -463,12 +462,12 @@ module Scripts = struct
             partial_precheck_manager_contents_list ctxt op
             >>=? fun ctxt ->
             Apply.apply_manager_contents_list ctxt Optimized baker chain_id op
-            >>= fun (_ctxt, result) -> return result
+            >|= fun (_ctxt, result) -> ok @@ ret result
         | Cons (Manager_operation _, _) as op ->
             partial_precheck_manager_contents_list ctxt op
             >>=? fun ctxt ->
             Apply.apply_manager_contents_list ctxt Optimized baker chain_id op
-            >>= fun (_ctxt, result) -> return result
+            >|= fun (_ctxt, result) -> ok @@ ret result
         | _ ->
             Apply.apply_contents_list
               ctxt
@@ -478,27 +477,23 @@ module Scripts = struct
               baker
               operation
               operation.protocol_data.contents
-            >>=? fun (_ctxt, result) -> return result) ;
+            >|=? fun (_ctxt, result) -> ret result) ;
     register0 S.entrypoint_type (fun ctxt () (expr, entrypoint) ->
         let ctxt = Gas.set_unlimited ctxt in
         let legacy = false in
         let open Script_ir_translator in
         Lwt.return
           ( parse_toplevel ~legacy expr
-          >>? fun (arg_type, _, _, root_name) ->
-          parse_ty
-            ctxt
-            ~legacy
-            ~allow_big_map:true
-            ~allow_operation:false
-            ~allow_contract:true
-            arg_type
-          >>? fun (Ex_ty arg_type, _) ->
-          Script_ir_translator.find_entrypoint ~root_name arg_type entrypoint
-          )
-        >>=? fun (_f, Ex_ty ty) ->
-        unparse_ty ctxt ty
-        >>=? fun (ty_node, _) -> return (Micheline.strip_locations ty_node)) ;
+          >>? (fun (arg_type, _, _, root_name) ->
+                parse_parameter_ty ctxt ~legacy arg_type
+                >>? fun (Ex_ty arg_type, _) ->
+                Script_ir_translator.find_entrypoint
+                  ~root_name
+                  arg_type
+                  entrypoint)
+          >>? fun (_f, Ex_ty ty) ->
+          unparse_ty ctxt ty
+          >|? fun (ty_node, _) -> Micheline.strip_locations ty_node )) ;
     register0 S.list_entrypoints (fun ctxt () expr ->
         let ctxt = Gas.set_unlimited ctxt in
         let legacy = false in
@@ -506,23 +501,16 @@ module Scripts = struct
         Lwt.return
           ( parse_toplevel ~legacy expr
           >>? fun (arg_type, _, _, root_name) ->
-          parse_ty
-            ctxt
-            ~legacy
-            ~allow_big_map:true
-            ~allow_operation:false
-            ~allow_contract:true
-            arg_type
+          parse_parameter_ty ctxt ~legacy arg_type
           >>? fun (Ex_ty arg_type, _) ->
-          Script_ir_translator.list_entrypoints ~root_name arg_type ctxt )
-        >>=? fun (unreachable_entrypoint, map) ->
-        return
+          Script_ir_translator.list_entrypoints ~root_name arg_type ctxt
+          >|? fun (unreachable_entrypoint, map) ->
           ( unreachable_entrypoint,
             Entrypoints_map.fold
               (fun entry (_, ty) acc ->
                 (entry, Micheline.strip_locations ty) :: acc)
               map
-              [] ))
+              [] ) ))
 
   let run_code ctxt block code
       (storage, input, amount, chain_id, source, payer, gas, entrypoint) =
@@ -666,7 +654,7 @@ module Forge = struct
         ~sourcePubKey
         ~counter
         ~fee
-        ~gas_limit:Z.zero
+        ~gas_limit:Gas.Arith.zero
         ~storage_limit:Z.zero
         []
 
@@ -722,7 +710,7 @@ module Forge = struct
         ?sourcePubKey
         ~counter
         ~fee
-        ~gas_limit:Z.zero
+        ~gas_limit:Gas.Arith.zero
         ~storage_limit:Z.zero
         [Manager (Delegation delegate)]
   end
@@ -802,15 +790,15 @@ module Parse = struct
     | None ->
         failwith "Cant_parse_protocol_data"
     | Some protocol_data ->
-        return protocol_data
+        protocol_data
 
   let register () =
     let open Services_registration in
     register0 S.operations (fun _ctxt () (operations, check) ->
         map_s
           (fun raw ->
-            Lwt.return (parse_operation raw)
-            >>=? fun op ->
+            parse_operation raw
+            >>?= fun op ->
             ( match check with
             | Some true ->
                 return_unit (* FIXME *)
@@ -818,10 +806,10 @@ module Parse = struct
             (* op.protocol_data.signature op.shell op.protocol_data.contents *)
             | Some false | None ->
                 return_unit )
-            >>|? fun () -> op)
+            >|=? fun () -> op)
           operations) ;
     register0_noctxt S.block (fun () raw_block ->
-        parse_protocol_data raw_block.protocol_data)
+        return @@ parse_protocol_data raw_block.protocol_data)
 
   let operations ctxt block ?check operations =
     RPC_context.make_call0 S.operations ctxt block () (operations, check)

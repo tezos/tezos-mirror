@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -173,6 +174,8 @@ val commit_block :
   Bytes.t ->
   Operation.t list list ->
   Bytes.t list list ->
+  Block_metadata_hash.t option ->
+  Operation_metadata_hash.t list list option ->
   Block_validation.validation_store ->
   forking_testchain:bool ->
   State.Block.t option tzresult Lwt.t

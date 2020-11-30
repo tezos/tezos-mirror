@@ -24,8 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-[@@@ocaml.warning "-30"]
-
 type chain_name = Distributed_db_version.Name.t
 
 type blockchain_network = {
@@ -83,6 +81,8 @@ and shell = {
   chain_validator_limits : Chain_validator.limits;
   history_mode : History_mode.t option;
 }
+
+val data_dir_env_name : string
 
 val default_data_dir : string
 

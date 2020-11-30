@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -168,6 +169,10 @@ let () =
 
 type error += Inconsistent_hash of Context_hash.t * Context_hash.t
 
+type error += Missing_block_metadata_hash of Block_hash.t
+
+type error += Missing_operation_metadata_hashes of Block_hash.t
+
 let () =
   (* Inconsistent hash *)
   register_error_kind
@@ -190,7 +195,40 @@ let () =
         (req "wrong_context_hash" Context_hash.encoding)
         (req "expected_context_hash" Context_hash.encoding))
     (function Inconsistent_hash (got, exp) -> Some (got, exp) | _ -> None)
-    (fun (got, exp) -> Inconsistent_hash (got, exp))
+    (fun (got, exp) -> Inconsistent_hash (got, exp)) ;
+  register_error_kind
+    `Permanent
+    ~id:"node.state.block.missing_block_metadata_hash"
+    ~title:"Missing block metadata hash"
+    ~description:
+      "A block was expected to commit to a block metadata hash, however none \
+       was given."
+    ~pp:(fun ppf block ->
+      Format.fprintf
+        ppf
+        "@[<v 2>Missing block metadata hash at block: %a"
+        Block_hash.pp
+        block)
+    Data_encoding.(obj1 (req "block" Block_hash.encoding))
+    (function Missing_block_metadata_hash block -> Some block | _ -> None)
+    (fun block -> Missing_block_metadata_hash block) ;
+  register_error_kind
+    `Permanent
+    ~id:"node.state.block.missing_operation_metadata_hashes"
+    ~title:"Missing operation metadata hashes"
+    ~description:
+      "A block was expected to commit to operation metadata hashes, however \
+       none were given."
+    ~pp:(fun ppf block ->
+      Format.fprintf
+        ppf
+        "@[<v 2>Missing operation metadata hashes at block: %a"
+        Block_hash.pp
+        block)
+    Data_encoding.(obj1 (req "block" Block_hash.encoding))
+    (function
+      | Missing_operation_metadata_hashes block -> Some block | _ -> None)
+    (fun block -> Missing_operation_metadata_hashes block)
 
 (******************* Bootstrap pipeline errors ****************************)
 

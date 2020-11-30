@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2018 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -112,11 +113,17 @@ module Internal_validator_process = struct
           | Some ctx ->
               return ctx)
     >>=? fun predecessor_context ->
+    State.Block.metadata_hash predecessor
+    >>= fun predecessor_block_metadata_hash ->
+    State.Block.all_operations_metadata_hash predecessor
+    >>= fun predecessor_ops_metadata_hash ->
     return
       {
         Block_validation.max_operations_ttl;
         chain_id;
         predecessor_block_header;
+        predecessor_block_metadata_hash;
+        predecessor_ops_metadata_hash;
         predecessor_context;
         user_activated_upgrades;
         user_activated_protocol_overrides;
@@ -347,12 +354,18 @@ module External_validator_process = struct
     let chain_state = State.Block.chain_state predecessor in
     let predecessor_block_header = State.Block.header predecessor in
     let chain_id = State.Chain.id chain_state in
+    State.Block.metadata_hash predecessor
+    >>= fun predecessor_block_metadata_hash ->
+    State.Block.all_operations_metadata_hash predecessor
+    >>= fun predecessor_ops_metadata_hash ->
     let request =
       External_validation.Validate
         {
           chain_id;
           block_header;
           predecessor_block_header;
+          predecessor_block_metadata_hash;
+          predecessor_ops_metadata_hash;
           operations;
           max_operations_ttl;
         }

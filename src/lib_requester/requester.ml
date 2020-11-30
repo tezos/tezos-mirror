@@ -537,11 +537,12 @@ end = struct
             ()
         | Some (Found _) ->
             ()
-        | Some (Pending data) ->
+        | Some (Pending ({wakener = w; _} as data)) ->
             data.waiters <- data.waiters - 1 ;
             if data.waiters = 0 then (
               Memory_table.remove s.memory k ;
-              Scheduler.notify_cancellation s.scheduler k )) ;
+              Scheduler.notify_cancellation s.scheduler k ;
+              Lwt.wakeup_later w (error (Canceled k)) )) ;
     match timeout with
     | None ->
         t
@@ -557,6 +558,9 @@ end = struct
         | Some v ->
             return v
         | None -> (
+          (* It is necessary to check the memory-table again in case another
+            promise has altered it whilst this one was waiting for the
+            disk-table query. *)
           match Memory_table.find s.memory k with
           | None ->
               let (waiter, wakener) = Lwt.wait () in
@@ -579,6 +583,21 @@ end = struct
     | Some (Found v) ->
         return v
 
+  let notify_when_pending s p k w param v =
+    match Precheck.precheck k param v with
+    | None ->
+        Scheduler.notify_invalid s.scheduler p k
+    | Some v ->
+        Scheduler.notify s.scheduler p k
+        >>= fun () ->
+        Memory_table.replace s.memory k (Found v) ;
+        Lwt.wakeup_later w (Ok v) ;
+        Option.iter
+          (fun input -> Lwt_watcher.notify input (k, v))
+          s.global_input ;
+        Lwt_watcher.notify s.input (k, v) ;
+        Lwt.return_unit
+
   let notify s p k v =
     match Memory_table.find s.memory k with
     | None -> (
@@ -586,22 +605,19 @@ end = struct
         >>= function
         | true ->
             Scheduler.notify_duplicate s.scheduler p k
-        | false ->
-            Scheduler.notify_unrequested s.scheduler p k )
-    | Some (Pending {wakener = w; param; _}) -> (
-      match Precheck.precheck k param v with
-      | None ->
-          Scheduler.notify_invalid s.scheduler p k
-      | Some v ->
-          Scheduler.notify s.scheduler p k
-          >>= fun () ->
-          Memory_table.replace s.memory k (Found v) ;
-          Lwt.wakeup_later w (Ok v) ;
-          Option.iter
-            (fun input -> Lwt_watcher.notify input (k, v))
-            s.global_input ;
-          Lwt_watcher.notify s.input (k, v) ;
-          Lwt.return_unit )
+        | false -> (
+          (* It is necessary to check the memory-table again in case another
+            promise has altered it whilst this one was waiting for the
+            disk-table query. *)
+          match Memory_table.find s.memory k with
+          | None ->
+              Scheduler.notify_unrequested s.scheduler p k
+          | Some (Pending {wakener = w; param; _}) ->
+              notify_when_pending s p k w param v
+          | Some (Found _) ->
+              Scheduler.notify_duplicate s.scheduler p k ) )
+    | Some (Pending {wakener = w; param; _}) ->
+        notify_when_pending s p k w param v
     | Some (Found _) ->
         Scheduler.notify_duplicate s.scheduler p k
 
@@ -612,9 +628,16 @@ end = struct
         >>= function
         | true ->
             Lwt.return_false
-        | false ->
-            Memory_table.add s.memory k (Found v) ;
-            Lwt.return_true )
+        | false -> (
+          (* It is necessary to check the memory-table again in case another
+            promise has altered it whilst this one was waiting for the
+            disk-table query. *)
+          match Memory_table.find s.memory k with
+          | None ->
+              Memory_table.add s.memory k (Found v) ;
+              Lwt.return_true
+          | Some (Pending _) | Some (Found _) ->
+              Lwt.return_false ) )
     | Some (Pending _) | Some (Found _) ->
         Lwt.return_false
 

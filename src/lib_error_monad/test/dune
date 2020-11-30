@@ -6,15 +6,17 @@
             alcotest-lwt)
  (flags (:standard -open Tezos_error_monad)))
 
-(alias
- (name buildtest)
- (deps test_recursive_registration.exe))
+(rule
+ (alias buildtest)
+ (deps test_recursive_registration.exe)
+ (action (progn)))
 
-(alias
- (name runtest_recursive_registration)
+(rule
+ (alias runtest_recursive_registration)
  (action (run %{exe:test_recursive_registration.exe})))
 
-(alias
- (name runtest)
+(rule
+ (alias runtest)
  (package tezos-error-monad)
- (deps (alias runtest_recursive_registration)))
+ (deps (alias runtest_recursive_registration))
+ (action (progn)))

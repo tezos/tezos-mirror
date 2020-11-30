@@ -158,7 +158,7 @@ class TestManyNodesBootstrap:
         sandbox.add_node(0, params=params(), log_levels=LOG_LEVEL)
         parameters = dict(constants.PARAMETERS)
         parameters["time_between_blocks"] = ["1", "0"]
-        utils.activate_alpha(sandbox.client(0), parameters)
+        utils.activate_alpha(sandbox.client(0))
         sandbox.add_baker(0, 'bootstrap1', proto=constants.ALPHA_DAEMON)
         sandbox.add_node(1, params=params(), log_levels=LOG_LEVEL,
                          config_client=False)

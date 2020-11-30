@@ -63,26 +63,23 @@ let run_script ctx ?(step_constants = default_step_constants) contract
     ~parameter:parameter_expr
   >>=?? fun res -> return res
 
-(** Runs a script using the STEPS_TO_QUOTA instruction. As no gas metering is
-   enabled, it is verified that the placeholer value 99999999 is returned *)
-let test_unaccounted_steps_to_quota () =
-  test_context ()
-  >>=? fun ctx ->
-  run_script
-    ctx
-    "{parameter unit; storage nat; code { DROP; STEPS_TO_QUOTA; NIL \
-     operation; PAIR }}"
-    ~storage:"0"
-    ~parameter:"Unit"
-    ()
-  >>=? fun res ->
-  expression_from_string "99999999"
-  >>=? fun expected_storage ->
-  Test_services.(check Testable.script_expr)
-    "Expected remaining steps  99999999 in unmetered mode"
-    res.storage
-    expected_storage ;
-  return ()
+module Logger : STEP_LOGGER = struct
+  let log_interp _ctxt _descr _stack = ()
+
+  let log_entry _ctxt _descr _stack = ()
+
+  let log_exit _ctxt _descr _stack = ()
+
+  let get_log () = Lwt.return (Ok None)
+end
+
+let run_step ctxt code param =
+  Script_interpreter.step
+    (module Logger)
+    ctxt
+    default_step_constants
+    code
+    param
 
 (** Runs a script with an ill-typed parameter and verifies that a
    Bad_contract_parameter error is returned *)
@@ -104,9 +101,37 @@ let test_bad_contract_parameter () =
         "incorrect field in Bad_contract_parameter"
         default_source
         source' ;
-      return ()
+      return_unit
   | Error errs ->
       Alcotest.failf "Unexpected error: %a" Error_monad.pp_print_error errs
+
+let read_file filename =
+  let ch = open_in filename in
+  let s = really_input_string ch (in_channel_length ch) in
+  close_in ch ; s
+
+(* Check that too many recursive calls of the Michelson interpreter result in an error *)
+let test_stack_overflow () =
+  test_context ()
+  >>=? fun ctxt ->
+  let descr instr =
+    Script_typed_ir.{loc = 0; bef = Empty_t; aft = Empty_t; instr}
+  in
+  let enorme_et_seq n =
+    let rec aux n acc =
+      if n = 0 then acc else aux (n - 1) (descr (Seq (acc, descr Nop)))
+    in
+    aux n (descr Nop)
+  in
+  run_step ctxt (enorme_et_seq 10_001) ()
+  >>= function
+  | Ok _ ->
+      Alcotest.fail "expected an error"
+  | Error lst
+    when List.mem Script_interpreter.Michelson_too_many_recursive_calls lst ->
+      return ()
+  | Error _ ->
+      Alcotest.failf "Unexpected error (%s)" __LOC__
 
 (** Test the encoding/decoding of script_interpreter.ml specific errors *)
 
@@ -152,8 +177,5 @@ let error_encoding_tests =
 
 let tests =
   [ Test.tztest "test bad contract error" `Quick test_bad_contract_parameter;
-    Test.tztest
-      "test unaccounted steps to quota"
-      `Quick
-      test_unaccounted_steps_to_quota ]
+    Test.tztest "test stack overflow error" `Slow test_stack_overflow ]
   @ error_encoding_tests

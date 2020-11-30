@@ -23,7 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* pvss tests here *)
+(** Testing
+    -------
+    Component:    Crypto
+    Invocation:   dune build @src/lib_crypto/runtest
+    Subject:      On Publicly Verifiable Secret Sharing [Schoenmakers, 1999]
+*)
 
 module Pvss = Pvss_secp256k1
 module Sp = Secp256k1_group
@@ -57,6 +62,8 @@ module Setup : sig
   val public_keys : Pvss.Public_key.t list
 
   val keypairs : keypair list
+
+  val random_keypairs : int -> keypair list
 
   val reveals :
     (Pvss.Encrypted_share.t * (Pvss.Clear_share.t * Pvss.proof)) list
@@ -135,6 +142,7 @@ end = struct
       keypairs
 end
 
+(** Checks the dealer's proof of validity of encrypted shares. *)
 let test_dealer_proof () =
   let shr = (Setup.shares, Setup.other_shares)
   and cmt = (Setup.commitments, Setup.other_commitments)
@@ -169,6 +177,9 @@ module Proof = struct
   let mangle : t -> t = fun (e, es) -> (G.Scalar.(mul e e), es)
 end
 
+(** A dealer's proof which is meant to be invalid by falsifying it
+    with [mangle].
+*)
 let test_invalid_dealer_proof () =
   let proof : Proof.t =
     Setup.convert_encoding Pvss.proof_encoding Proof.encoding Setup.proof
@@ -185,8 +196,10 @@ let test_invalid_dealer_proof () =
          ~proof:mangled
          ~public_keys:Setup.public_keys) )
 
+(** Checks revealing shares, i.e. each participant honestly decrypts
+    its share.
+*)
 let test_share_reveal () =
-  (* check reveal shares *)
   let shares_valid =
     List.map2
       (fun (share, (reveal, proof)) public_key ->
@@ -206,6 +219,7 @@ module Encrypted_share = struct
   let mangle : t -> t = fun share -> Sp.Group.(share + share)
 end
 
+(** A dishonestly-revealed share can be checked. *)
 let test_invalid_share_reveal () =
   let mangle_share : Pvss.Encrypted_share.t -> Pvss.Encrypted_share.t =
    fun share ->
@@ -235,6 +249,7 @@ let test_invalid_share_reveal () =
       assert (not b))
     shares_valid
 
+(** Reconstruct the shared secret. *)
 let test_reconstruct () =
   let indices = [0; 1; 2; 3; 4] in
   let reconstructed =
@@ -257,8 +272,8 @@ let test_reconstruct () =
          Setup.group_encoding
          Setup.public_secret) )
 
+(** Try to reconstruct with n < threshold. *)
 let test_invalid_reconstruct () =
-  (* try to reconstruct with n < threshold *)
   let indices = [0; 1; 2; 3] in
   let reconstructed =
     Pvss.reconstruct
@@ -279,12 +294,84 @@ let test_invalid_reconstruct () =
          Setup.group_encoding
          Setup.public_secret )
 
+(** Test:
+    This test covers a scenario of using PVSS for randomness generation in the
+    Tezos protocol given in 3 steps.
+*)
+let test_randomness_commitment_protocol () =
+  (* 1st step: cycle `n - 2` *)
+  let threshold = 3 in
+  (* 30 bakers *)
+  let bakers = Setup.random_keypairs 30 in
+  (* 10 endorsers *)
+  let endorsers = [0; 1; 2; 3; 4; 5; 6; 7; 8; 9] in
+  let endorsers_public_keys =
+    List.map
+      (fun endorser -> (List.nth bakers endorser).Setup.public_key)
+      endorsers
+  in
+  (* Client: A baker creates a randomness commitment *)
+  let (secret_nonce, public_nonce) =
+    Setup.random_keypairs 1 |> List.hd
+    |> fun Setup.{secret_key; public_key} -> (secret_key, public_key)
+  in
+  (* Client: A baker creates shares for block endorsers, a list of commitments
+     of length equal to the threshold and a proof *)
+  let (shares, commitments, proof) =
+    Pvss.dealer_shares_and_proof
+      ~secret:secret_nonce
+      ~threshold
+      ~public_keys:endorsers_public_keys
+  in
+  (* Protocol: The protocol verifies the shares and commitments with the proof,
+     the number of commitments and stores them together with the public nonce. *)
+  assert (
+    Pvss.check_dealer_proof
+      shares
+      commitments
+      ~proof
+      ~public_keys:endorsers_public_keys ) ;
+  assert (List.length commitments = threshold) ;
+  (* 2nd step: first half of cycle `n - 1` *)
+  (* Protocol: The revealed nonce, if any, is checked by converting it to public
+     key and comparing it with the secret nonce. *)
+  let revealed_nonce = Pvss.Secret_key.to_public_key secret_nonce in
+  assert (Pvss.Public_key.(public_nonce = revealed_nonce)) ;
+  (* 3rd step: second half of cycle `n - 1` *)
+  let revealed_shares = [1; 4; 8] in
+  assert (List.length revealed_shares >= threshold) ;
+  let clear_shares =
+    List.map
+      (fun index ->
+        let encrypted_share = List.nth shares index in
+        let Setup.{secret_key; public_key} = List.nth bakers index in
+        (* Client: Endorsers may reveal their shares *)
+        let (clear_share, proof) =
+          Pvss.reveal_share encrypted_share ~secret_key ~public_key
+        in
+        (* Protocol: The revealed shares are verified with the proof *)
+        assert (
+          Pvss.check_revealed_share
+            encrypted_share
+            clear_share
+            ~public_key
+            proof ) ;
+        clear_share)
+      revealed_shares
+  in
+  (* Protocol: The protocol may reconstruct the nonce from the revealed shares *)
+  let reconstructed_nonce = Pvss.reconstruct clear_shares revealed_shares in
+  assert (Pvss.Public_key.(public_nonce = reconstructed_nonce))
+
 let tests =
   [ ("dealer proof", `Quick, test_dealer_proof);
     ("invalid dealer proof", `Quick, test_invalid_dealer_proof);
     ("reveal", `Quick, test_share_reveal);
     ("invalid reveal", `Quick, test_invalid_share_reveal);
     ("reconstruct", `Quick, test_reconstruct);
-    ("invalid reconstruct", `Quick, test_invalid_reconstruct) ]
+    ("invalid reconstruct", `Quick, test_invalid_reconstruct);
+    ( "randomness commitment protocol",
+      `Quick,
+      test_randomness_commitment_protocol ) ]
 
 let () = Alcotest.run "test-pvss" [("pvss", tests)]

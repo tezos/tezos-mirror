@@ -148,6 +148,16 @@ let rpc_list ?node client =
 module Admin = struct
   let spawn_command = spawn_command ~admin:true
 
+  let spawn_trust_address ?node ~peer client =
+    spawn_command
+      client
+      ( endpoint_arg ?node client @ mode_arg client
+      @ ["trust"; "address"; "127.0.0.1:" ^ string_of_int (Node.net_port peer)]
+      )
+
+  let trust_address ?node ~peer client =
+    spawn_trust_address ?node ~peer client |> Process.check
+
   let spawn_connect_address ?node ~peer client =
     spawn_command
       client

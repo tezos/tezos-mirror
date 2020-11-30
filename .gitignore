@@ -6,6 +6,7 @@ __pycache__
 *.pyc
 
 /_build
+/_build_rust
 /_opam
 /_docker_build
 /docs/_build
@@ -27,6 +28,7 @@ __pycache__
 /tezos-signer
 /tezos-sandbox
 /tezos-codec
+/tezos-snoop
 
 /src/proto_*/parameters/*-parameters.json
 
@@ -60,3 +62,4 @@ __pycache__
 .idea
 # .venv directories are created by poetry if the option in-project is set to true.
 **/.venv
+**/.mypy_cache/

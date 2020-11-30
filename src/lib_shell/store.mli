@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -152,6 +153,13 @@ module Block : sig
       with type t = store * Block_hash.t
        and type value := pruned_contents
 
+  (* The hash of block header metadata, only set on blocks starting from
+     environment V1. *)
+  module Block_metadata_hash :
+    SINGLE_STORE
+      with type t = store * Block_hash.t
+       and type value := Block_metadata_hash.t
+
   module Operation_hashes :
     MAP_STORE
       with type t = store * Block_hash.t
@@ -169,6 +177,14 @@ module Block : sig
       with type t = store * Block_hash.t
        and type key = int
        and type value = Bytes.t list
+
+  (* The hashes of operations metadata, only set on blocks starting from
+     environment V1. *)
+  module Operations_metadata_hashes :
+    MAP_STORE
+      with type t = store * Block_hash.t
+       and type key = int
+       and type value = Operation_metadata_hash.t list
 
   type invalid_block = {level : int32; errors : Error_monad.error list}
 

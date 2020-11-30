@@ -37,13 +37,27 @@ type ex_stack_ty = Ex_stack_ty : 'a Script_typed_ir.stack_ty -> ex_stack_ty
 
 type ex_script = Ex_script : ('a, 'b) Script_typed_ir.script -> ex_script
 
+type ('arg, 'storage) code = {
+  code :
+    ( ('arg, 'storage) Script_typed_ir.pair,
+      ( Script_typed_ir.operation Script_typed_ir.boxed_list,
+        'storage )
+      Script_typed_ir.pair )
+    Script_typed_ir.lambda;
+  arg_type : 'arg Script_typed_ir.ty;
+  storage_type : 'storage Script_typed_ir.ty;
+  root_name : Script_typed_ir.field_annot option;
+}
+
+type ex_code = Ex_code : ('a, 'c) code -> ex_code
+
 type tc_context =
   | Lambda : tc_context
   | Dip : 'a Script_typed_ir.stack_ty * tc_context -> tc_context
   | Toplevel : {
       storage_type : 'sto Script_typed_ir.ty;
       param_type : 'param Script_typed_ir.ty;
-      root_name : string option;
+      root_name : Script_typed_ir.field_annot option;
       legacy_create_contract_literal : bool;
     }
       -> tc_context
@@ -65,7 +79,12 @@ type type_logger =
   (Script.expr * Script.annot) list ->
   unit
 
-(* ---- Sets and Maps -------------------------------------------------------*)
+(* ---- Lists, Sets and Maps ----------------------------------------------- *)
+
+val list_empty : 'a Script_typed_ir.boxed_list
+
+val list_cons :
+  'a -> 'a Script_typed_ir.boxed_list -> 'a Script_typed_ir.boxed_list
 
 val empty_set : 'a Script_typed_ir.comparable_ty -> 'a Script_typed_ir.set
 
@@ -127,6 +146,7 @@ val big_map_update :
 
 val ty_eq :
   context ->
+  Script.location ->
   'ta Script_typed_ir.ty ->
   'tb Script_typed_ir.ty ->
   (('ta Script_typed_ir.ty, 'tb Script_typed_ir.ty) eq * context) tzresult
@@ -148,6 +168,12 @@ val unparse_data :
   'a ->
   (Script.node * context) tzresult Lwt.t
 
+val unparse_code :
+  context ->
+  unparsing_mode ->
+  Script.node ->
+  (Script.node * context) tzresult Lwt.t
+
 val parse_instr :
   ?type_logger:type_logger ->
   tc_context ->
@@ -157,6 +183,15 @@ val parse_instr :
   'bef Script_typed_ir.stack_ty ->
   ('bef judgement * context) tzresult Lwt.t
 
+val parse_packable_ty :
+  context -> legacy:bool -> Script.node -> (ex_ty * context) tzresult
+
+val parse_parameter_ty :
+  context -> legacy:bool -> Script.node -> (ex_ty * context) tzresult
+
+(** We expose [parse_ty] for convenience to external tools. Please use
+    specialized versions such as [parse_packable_ty] and [parse_parameter_ty]
+    if possible. *)
 val parse_ty :
   context ->
   legacy:bool ->
@@ -166,20 +201,18 @@ val parse_ty :
   Script.node ->
   (ex_ty * context) tzresult
 
-val parse_packable_ty :
-  context -> legacy:bool -> Script.node -> (ex_ty * context) tzresult
-
 val unparse_ty :
-  context -> 'a Script_typed_ir.ty -> (Script.node * context) tzresult Lwt.t
+  context -> 'a Script_typed_ir.ty -> (Script.node * context) tzresult
 
 val parse_toplevel :
   legacy:bool ->
   Script.expr ->
-  (Script.node * Script.node * Script.node * string option) tzresult
+  (Script.node * Script.node * Script.node * Script_typed_ir.field_annot option)
+  tzresult
 
 val add_field_annot :
-  [`Field_annot of string] option ->
-  [`Var_annot of string] option ->
+  Script_typed_ir.field_annot option ->
+  Script_typed_ir.var_annot option ->
   Script.node ->
   Script.node
 
@@ -192,6 +225,22 @@ val typecheck_data :
   Script.expr * Script.expr ->
   context tzresult Lwt.t
 
+val parse_code :
+  ?type_logger:type_logger ->
+  context ->
+  legacy:bool ->
+  code:Script.lazy_expr ->
+  (ex_code * context) tzresult Lwt.t
+
+val parse_storage :
+  ?type_logger:type_logger ->
+  context ->
+  legacy:bool ->
+  'storage Script_typed_ir.ty ->
+  storage:Script.lazy_expr ->
+  ('storage * context) tzresult Lwt.t
+
+(** Combines [parse_code] and [parse_storage] *)
 val parse_script :
   ?type_logger:type_logger ->
   context ->
@@ -226,7 +275,7 @@ val parse_contract_for_script :
 
 val find_entrypoint :
   't Script_typed_ir.ty ->
-  root_name:string option ->
+  root_name:Script_typed_ir.field_annot option ->
   string ->
   ((Script.node -> Script.node) * ex_ty) tzresult
 
@@ -235,7 +284,7 @@ module Entrypoints_map : S.MAP with type key = string
 val list_entrypoints :
   't Script_typed_ir.ty ->
   context ->
-  root_name:string option ->
+  root_name:Script_typed_ir.field_annot option ->
   ( Michelson_v1_primitives.prim list list
   * (Michelson_v1_primitives.prim list * Script.node) Entrypoints_map.t )
   tzresult
@@ -254,10 +303,7 @@ type big_map_ids
 val no_big_map_id : big_map_ids
 
 val collect_big_maps :
-  context ->
-  'a Script_typed_ir.ty ->
-  'a ->
-  (big_map_ids * context) tzresult Lwt.t
+  context -> 'a Script_typed_ir.ty -> 'a -> (big_map_ids * context) tzresult
 
 val list_of_big_map_ids : big_map_ids -> Z.t list
 

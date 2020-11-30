@@ -9,7 +9,7 @@
  (foreign_stubs
   (language c)
   (names rustc_bls12_381_ctypes_c_stubs )
-  (flags (-I%{env:OPAM_SWITCH_PREFIX=}/include))
+  (flags (-I%{env:OPAM_SWITCH_PREFIX=}/include/rustc-bls12-381))
  )
- (c_library_flags (-L%{env:OPAM_SWITCH_PREFIX=}/lib -lrustc_bls12_381 -lpthread))
+ (c_library_flags (-L%{env:OPAM_SWITCH_PREFIX=}/lib/rustc-bls12-381 -lrustc_bls12_381 -lpthread))
 )

@@ -1,4 +1,5 @@
 (include v0.dune.inc)
+(include v1.dune.inc)
 
 (library
  (name tezos_protocol_environment_structs)
@@ -6,4 +7,4 @@
  (flags :standard)
  (libraries tezos-stdlib
             tezos-crypto)
- (modules ("V0")))
+ (modules ("V0") ("V1")))

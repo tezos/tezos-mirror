@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -38,6 +39,9 @@ type request =
       chain_id : Chain_id.t;
       block_header : Block_header.t;
       predecessor_block_header : Block_header.t;
+      predecessor_block_metadata_hash : Block_metadata_hash.t option;
+      predecessor_ops_metadata_hash :
+        Operation_metadata_list_list_hash.t option;
       operations : Operation.t list list;
       max_operations_ttl : int;
     }
@@ -130,10 +134,14 @@ let request_encoding =
       case
         (Tag 1)
         ~title:"validate"
-        (obj5
+        (obj7
            (req "chain_id" Chain_id.encoding)
            (req "block_header" (dynamic_size Block_header.encoding))
            (req "pred_header" (dynamic_size Block_header.encoding))
+           (opt "pred_block_metadata_hash" Block_metadata_hash.encoding)
+           (opt
+              "pred_ops_metadata_hash"
+              Operation_metadata_list_list_hash.encoding)
            (req "max_operations_ttl" int31)
            (req "operations" (list (list (dynamic_size Operation.encoding)))))
         (function
@@ -141,12 +149,16 @@ let request_encoding =
               { chain_id;
                 block_header;
                 predecessor_block_header;
+                predecessor_block_metadata_hash;
+                predecessor_ops_metadata_hash;
                 max_operations_ttl;
                 operations } ->
               Some
                 ( chain_id,
                   block_header,
                   predecessor_block_header,
+                  predecessor_block_metadata_hash,
+                  predecessor_ops_metadata_hash,
                   max_operations_ttl,
                   operations )
           | _ ->
@@ -154,6 +166,8 @@ let request_encoding =
         (fun ( chain_id,
                block_header,
                predecessor_block_header,
+               predecessor_block_metadata_hash,
+               predecessor_ops_metadata_hash,
                max_operations_ttl,
                operations ) ->
           Validate
@@ -161,6 +175,8 @@ let request_encoding =
               chain_id;
               block_header;
               predecessor_block_header;
+              predecessor_block_metadata_hash;
+              predecessor_ops_metadata_hash;
               max_operations_ttl;
               operations;
             });

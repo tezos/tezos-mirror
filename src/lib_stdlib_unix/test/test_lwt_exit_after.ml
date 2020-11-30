@@ -36,7 +36,7 @@ let first =
       Lwt.return_unit)
 
 let second =
-  Lwt_exit.register_clean_up_callback ~after:first ~loc:__LOC__ (fun _ ->
+  Lwt_exit.register_clean_up_callback ~after:[first] ~loc:__LOC__ (fun _ ->
       Lwt_unix.sleep 0.1
       >>= fun () ->
       assert (!r = 1) ;
@@ -44,7 +44,7 @@ let second =
       Lwt.return_unit)
 
 let _third =
-  Lwt_exit.register_clean_up_callback ~after:second ~loc:__LOC__ (fun _ ->
+  Lwt_exit.register_clean_up_callback ~after:[second] ~loc:__LOC__ (fun _ ->
       assert (!r = 2) ;
       incr r ;
       Lwt.return_unit)

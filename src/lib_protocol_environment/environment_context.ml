@@ -44,12 +44,10 @@ module type CONTEXT = sig
 
   val remove_rec : t -> key -> t Lwt.t
 
+  type key_or_dir = [`Key of key | `Dir of key]
+
   val fold :
-    t ->
-    key ->
-    init:'a ->
-    f:([`Key of key | `Dir of key] -> 'a -> 'a Lwt.t) ->
-    'a Lwt.t
+    t -> key -> init:'a -> f:(key_or_dir -> 'a -> 'a Lwt.t) -> 'a Lwt.t
 
   val set_protocol : t -> Protocol_hash.t -> t Lwt.t
 
@@ -90,6 +88,8 @@ module Context = struct
   let remove_rec (Context {ops = (module Ops) as ops; ctxt; kind}) key =
     Ops.remove_rec ctxt key
     >>= fun ctxt -> Lwt.return (Context {ops; ctxt; kind})
+
+  type key_or_dir = [`Key of key | `Dir of key]
 
   let fold (Context {ops = (module Ops); ctxt; _}) key ~init ~f =
     Ops.fold ctxt key ~init ~f

@@ -19,7 +19,7 @@ After a successful compilation, you should have the following binaries:
 - ``tezos-signer``: a client to remotely sign operations or blocks
   (see :ref:`signer`);
 
-The daemons are suffixed with the name of the protocol that they are
+The daemons are suffixed with the name of the protocol they are
 bound to. For instance, ``tezos-baker-006-PsCARTHA`` is the baker
 for the Carthage protocol. See also the `Node Protocol`_ section below.
 
@@ -170,7 +170,7 @@ synchronizing using::
 
 This call will hang and return only when the node is synchronized.
 We can now check what is the current timestamp of the head of the
-chain (time is in UTC so it may differ from your local)::
+chain (time is in UTC so it may differ from your local time)::
 
    tezos-client get timestamp
 
@@ -520,7 +520,7 @@ constants in Tezos, which may differ between Mainnet and other
    {
      "proof_of_work_nonce_size": 8,
      "nonce_length": 32,
-     "max_revelations_per_block": 32,
+     "max_anon_ops_per_block": 132,
      "max_operation_data_length": 16384,
      "preserved_cycles": 5,
      "blocks_per_cycle": 4096,

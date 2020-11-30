@@ -1,3 +1,11 @@
+(** Testing
+    -------
+    Component:    Client Base
+    Invocation:   dune build @src/lib_client_base/runtest
+    Subject:      On Password-Based Key Derivation Function 2 (PBKDF2)
+                  when using hash functions SHA256 and SHA512.
+*)
+
 open Tezos_crypto
 
 (* PBKDF2 *)
@@ -23,6 +31,11 @@ let test_pbkdf2 (module A : Hacl.Hash.S) ~password ~salt ~count ~dk_len ~dk =
 
 (* Taken from https://github.com/randombit/botan/blob/master/src/tests/data/pbkdf/pbkdf2.vec *)
 
+(** Using SHA256 hash. From password "xyz" and salt
+   "0001020304050607", iterates 10,000 times the derivation algorithm
+   to derive a 48-byte key. The expected derived key shall equal to
+   [~dk].
+*)
 let pbkdf2_test11 =
   test_pbkdf2
     (module Hacl.Hash.SHA256)
@@ -33,6 +46,11 @@ let pbkdf2_test11 =
     ~dk:
       "defd2987fa26a4672f4d16d98398432ad95e896bf619f6a6b8d4ed1faf98e8b531b39ffb66966d0e115a6cd8e70b72d0"
 
+(** Using SHA512 hash. From password "xyz" and salt
+   "0001020304050607", iterates 10,000 times the derivation algorithm
+   to derive a 48-byte key. The expected derived key shall equal to
+   [~dk].
+*)
 let pbkdf2_test13 =
   test_pbkdf2
     (module Hacl.Hash.SHA512)

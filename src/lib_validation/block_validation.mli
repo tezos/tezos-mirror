@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2018 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -53,6 +54,8 @@ type result = {
   validation_store : validation_store;
   block_metadata : Bytes.t;
   ops_metadata : Bytes.t list list;
+  block_metadata_hash : Block_metadata_hash.t option;
+  ops_metadata_hashes : Operation_metadata_hash.t list list option;
   forking_testchain : bool;
 }
 
@@ -74,6 +77,10 @@ type apply_environment = {
       (** header of the predecessor block being validated *)
   predecessor_context : Context.t;
       (** context associated to the predecessor block *)
+  predecessor_block_metadata_hash : Block_metadata_hash.t option;
+      (** hash of block header metadata of the predecessor block *)
+  predecessor_ops_metadata_hash : Operation_metadata_list_list_hash.t option;
+      (** hash of operation metadata of the predecessor block *)
   user_activated_upgrades : User_activated.upgrades;
       (** user activated upgrades *)
   user_activated_protocol_overrides : User_activated.protocol_overrides;

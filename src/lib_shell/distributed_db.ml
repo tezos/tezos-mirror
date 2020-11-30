@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -287,7 +288,7 @@ let clear_block chain_db hash n =
     hash
 
 let commit_block chain_db hash header header_data operations operations_data
-    result ~forking_testchain =
+    block_metadata_hash ops_metadata_hashes result ~forking_testchain =
   assert (Block_hash.equal hash (Block_header.hash header)) ;
   assert (List.length operations = header.shell.validation_passes) ;
   State.Block.store
@@ -296,6 +297,8 @@ let commit_block chain_db hash header header_data operations operations_data
     header_data
     operations
     operations_data
+    block_metadata_hash
+    ops_metadata_hashes
     result
     ~forking_testchain
   >>=? fun res ->

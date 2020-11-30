@@ -10,12 +10,16 @@
                    -open Tezos_requester
                    -open Tezos_test_services)))
 
-
 (alias
- (name runtest_requester)
+  (name buildtest)
+  (deps test_requester.exe))
+
+(rule
+ (alias runtest_requester)
  (action (run %{exe:test_requester.exe})))
 
-(alias
- (name runtest)
+(rule
+ (alias runtest)
  (package tezos-requester)
- (deps (alias runtest_requester)))
+ (deps (alias runtest_requester))
+ (action (progn)))

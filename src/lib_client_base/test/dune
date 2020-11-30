@@ -4,8 +4,8 @@
  (libraries tezos-client-base alcotest)
  (flags (:standard -open Tezos_client_base)))
 
-(alias
- (name    runtest)
+(rule
+ (alias    runtest)
  (package tezos-client-base)
  (deps    (:exe bip39_tests.exe))
  (action  (run %{exe})))
@@ -16,7 +16,7 @@
  (libraries tezos-client-base alcotest)
  (flags (:standard -open Tezos_client_base)))
 
-(alias
- (name    runtest)
+(rule
+ (alias    runtest)
  (package tezos-client-base)
  (action  (run %{exe:pbkdf_tests.exe})))

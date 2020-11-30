@@ -12,6 +12,6 @@
     "dune.inc.gen"
     %{libexec:tezos-protocol-compiler:final_protocol_versions})))
 
-(alias
- (name   runtest_dune_template)
+(rule
+ (alias   runtest_dune_template)
  (action (diff dune.inc dune.inc.gen)))

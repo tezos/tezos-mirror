@@ -120,11 +120,10 @@ let validator_events validator block_validator chain _switch () =
         ~filter
         [ ( Internal_event.Notice,
             section,
-            `O [("shutdown_block_validator.v0", `O [])] );
+            `O [("shutdown_chain_validator.v0", `String "NetXJCwCkKLtb7s")] );
           ( Internal_event.Notice,
             section,
-            `O [("shutdown_chain_validator.v0", `String "NetXJCwCkKLtb7s")] )
-        ] ;
+            `O [("shutdown_block_validator.v0", `O [])] ) ] ;
       Lwt.return_unit
 
 let tests =

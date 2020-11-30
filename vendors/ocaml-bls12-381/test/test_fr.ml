@@ -17,6 +17,13 @@ let test_vectors =
     "65363576374567456780984059630856836098740965874094860978";
     "546574608450909809809809824360345639808560937" ]
 
+let rec random_z () =
+  let size = Random.int Bls12_381.Fr.size_in_bytes in
+  if size = 0 then random_z ()
+  else
+    let r = Bytes.init size (fun _ -> char_of_int (Random.int 256)) in
+    Z.erem (Z.of_bits (Bytes.to_string r)) Bls12_381.Fr.order
+
 let rec repeat n f =
   if n <= 0 then
     let f () = () in
@@ -81,7 +88,7 @@ module ZRepresentation = struct
     assert (Bls12_381.Fr.eq x (Bls12_381.Fr.of_z (Bls12_381.Fr.to_z x)))
 
   let test_random_to_z_and_of_z () =
-    let x = Z.of_int (Random.int 2_000_000) in
+    let x = random_z () in
     assert (Z.equal (Bls12_381.Fr.to_z (Bls12_381.Fr.of_z x)) x)
 
   let test_vectors_to_z_and_of_z () =
@@ -107,6 +114,61 @@ module ZRepresentation = struct
           "to z and of z with random small numbers"
           `Quick
           (repeat 1000 test_random_to_z_and_of_z) ] )
+end
+
+module BytesRepresentation = struct
+  let test_bytes_repr_is_zarith_encoding_using_to_bits () =
+    (* Pad zarith repr *)
+    let r_z = random_z () in
+    let bytes_z = Bytes.of_string (Z.to_bits r_z) in
+    let bytes = Bytes.make Bls12_381.Fr.size_in_bytes '\000' in
+    Bytes.blit
+      bytes_z
+      0
+      bytes
+      0
+      (min (Bytes.length bytes_z) Bls12_381.Fr.size_in_bytes) ;
+    assert (
+      Bls12_381.Fr.eq
+        (Bls12_381.Fr.of_bytes_exn bytes)
+        (Bls12_381.Fr.of_string (Z.to_string r_z)) ) ;
+    let r = Bls12_381.Fr.random () in
+    (* Use Fr repr *)
+    let bytes_r = Bls12_381.Fr.to_bytes r in
+    (* Use the Fr repr to convert in a Z element *)
+    let z_r = Z.of_bits (Bytes.to_string bytes_r) in
+    (* We should get the same value, using both ways *)
+    assert (Z.equal z_r (Bls12_381.Fr.to_z r)) ;
+    assert (Bls12_381.Fr.(eq (of_z z_r) r))
+
+  let test_padding_is_done_automatically_with_of_bytes () =
+    let z = Z.of_string "32343543534" in
+    let z_bytes = Bytes.of_string (Z.to_bits z) in
+    (* Checking we are in the case requiring a padding *)
+    assert (Bytes.length z_bytes < Bls12_381.Fr.size_in_bytes) ;
+    (* Should not raise an exception *)
+    let e = Bls12_381.Fr.of_bytes_exn z_bytes in
+    (* Should not be an option *)
+    assert (Option.is_some (Bls12_381.Fr.of_bytes_opt z_bytes)) ;
+    (* Equality in Fr should be fine (require to check to verify the
+       internal representation is the same). In the current implementation, we
+       verify the internal representation is the padded version.
+    *)
+    assert (Bls12_381.Fr.(eq (of_z z) e)) ;
+    (* And as zarith elements, we also have the equality *)
+    assert (Z.equal (Bls12_381.Fr.to_z e) z)
+
+  let get_tests () =
+    let open Alcotest in
+    ( "Bytes representation",
+      [ test_case
+          "bytes representation is the same than zarith using Z.to_bits"
+          `Quick
+          (repeat 1000 test_bytes_repr_is_zarith_encoding_using_to_bits);
+        test_case
+          "Padding is done automatically with of_bytes"
+          `Quick
+          test_padding_is_done_automatically_with_of_bytes ] )
 end
 
 module TestVector = struct
@@ -301,4 +363,6 @@ let () =
       Equality.get_tests ();
       FieldProperties.get_tests ();
       TestVector.get_tests ();
+      ZRepresentation.get_tests ();
+      BytesRepresentation.get_tests ();
       StringRepresentation.get_tests () ]

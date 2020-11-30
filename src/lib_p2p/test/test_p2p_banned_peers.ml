@@ -23,12 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Testing
-   -------
-   Component:    P2P
-   Invocation:   dune build @src/lib_p2p/test/runtest_p2p_banned_peers
-   Subject:      On banning peers and usage of Access Control Lists (ACL)
-                 using sets and POSIX timestamps.
+(** Testing
+    -------
+    Component:    P2P
+    Invocation:   dune build @src/lib_p2p/test/runtest_p2p_banned_peers
+    Subject:      On banning peers and usage of Access Control Lists (ACL)
+                  using sets and POSIX timestamps.
 *)
 
 include Internal_event.Legacy_logging.Make (struct
@@ -48,9 +48,8 @@ let baz = a ("baz", "a::2")
 
 let peers = [foo; bar; baz]
 
-(* Test.
-   In an empty ACL of size 10, nobody is tagged as blacklisted or
-   greylisted yet.
+(** In an empty ACL of size 10, nobody is tagged as blacklisted or
+    greylisted yet.
 *)
 let test_empty _ =
   let empty = P2p_acl.create 10 in
@@ -60,9 +59,8 @@ let test_empty _ =
     peers ;
   Lwt.return_unit
 
-(* Test.
-   From an empty ACL of size 10, peers [foo], [bar] and [baz] are
-   greylisted.
+(** From an empty ACL of size 10, peers [foo], [bar] and [baz] are
+    greylisted.
 *)
 let test_ban _ =
   let set = P2p_acl.create 10 in
@@ -75,11 +73,10 @@ let test_ban _ =
     peers ;
   Lwt.return_unit
 
-(* Test.
-   From an empty ACL of size 10, peers [peers] are greylisted since
-   epoch, then a garbage collection is triggered on the table at the
-   [Ptime.max] date (e.g., far in the future).  All point should have
-   been removed.
+(** From an empty ACL of size 10, peers [peers] are greylisted since
+    epoch, then a garbage collection is triggered on the table at the
+    [Ptime.max] date (e.g., far in the future).  All point should have
+    been removed.
 *)
 let test_gc _ =
   let set = P2p_acl.create 10 in

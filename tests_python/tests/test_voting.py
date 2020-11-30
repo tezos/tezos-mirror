@@ -15,7 +15,8 @@ def client(sandbox):
     parameters["time_between_blocks"] = ["1", "0"]
     parameters["blocks_per_voting_period"] = 4
     sandbox.add_node(0, params=constants.NODE_PARAMS)
-    utils.activate_alpha(sandbox.client(0), parameters)
+    utils.activate_alpha(sandbox.client(0), parameters,
+                         activate_in_the_past=True)
     yield sandbox.client(0)
 
 

@@ -138,12 +138,18 @@ let make_empty_chain (chain : State.Chain.t) n : Block_hash.t Lwt.t =
             {header.shell with predecessor = pred; level = Int32.of_int lvl};
         }
       in
+      let block_metadata = zero in
+      let block_metadata_hash =
+        Option.some @@ Block_metadata_hash.hash_bytes [block_metadata]
+      in
       State.Block.store
         chain
         header
-        zero
+        block_metadata
         []
         []
+        block_metadata_hash
+        None
         empty_result
         ~forking_testchain:false
       >>=? fun _ -> loop (lvl + 1) (Block_header.hash header)
@@ -152,6 +158,85 @@ let make_empty_chain (chain : State.Chain.t) n : Block_hash.t Lwt.t =
   >>= function
   | Ok b ->
       Lwt.return b
+  | Error err ->
+      Error_monad.pp_print_error Format.err_formatter err ;
+      assert false
+
+(* adds n blocks on top of an initialized chain and bump block's
+   proto_level at given fork points *)
+let make_multiple_protocol_chain (chain : State.Chain.t) ~(chain_length : int)
+    ~fork_points =
+  State.Block.read_opt chain genesis_hash
+  >|= Option.unopt_assert ~loc:__POS__
+  >>= fun genesis ->
+  State.Block.context_exn genesis
+  >>= fun empty_context ->
+  let header = State.Block.header genesis in
+  let timestamp = State.Block.timestamp genesis in
+  let empty_context_hash = Context.hash ~time:timestamp empty_context in
+  Context.commit ~time:header.shell.timestamp empty_context
+  >>= fun context ->
+  let genesis_header = {header with shell = {header.shell with context}} in
+  let empty_result =
+    {
+      Block_validation.context_hash = empty_context_hash;
+      message = None;
+      max_operations_ttl = 0;
+      last_allowed_fork_level = 0l;
+    }
+  in
+  let rec loop remaining_fork_points lvl (pred_header : Block_header.t) =
+    if lvl > chain_length then return pred_header
+    else
+      let (proto_level, remaining_fork_points) =
+        match remaining_fork_points with
+        | h :: t when h = lvl ->
+            (pred_header.shell.proto_level + 1, t)
+        | remaining_fork_points ->
+            (pred_header.shell.proto_level, remaining_fork_points)
+      in
+      let header =
+        {
+          pred_header with
+          shell =
+            {
+              pred_header.shell with
+              predecessor =
+                ( if lvl = 1 then genesis_hash
+                else Block_header.hash pred_header );
+              level = Int32.of_int lvl;
+              proto_level;
+            };
+        }
+      in
+      State.Block.store
+        chain
+        header
+        zero
+        []
+        []
+        None
+        None
+        empty_result
+        ~forking_testchain:false
+      >>=? function
+      | None ->
+          assert false
+      | Some b ->
+          Chain.set_head chain b
+          >>=? fun _pred_head ->
+          State.Chain.update_level_indexed_protocol_store
+            chain
+            chain_id
+            proto_level
+            genesis_protocol
+            header
+          >>= fun () -> loop remaining_fork_points (lvl + 1) header
+  in
+  loop fork_points 1 genesis_header
+  >>= function
+  | Ok b ->
+      Lwt.return (Block_header.hash b)
   | Error err ->
       Error_monad.pp_print_error Format.err_formatter err ;
       assert false
@@ -339,15 +424,16 @@ let test_locator base_dir =
   in
   res
   >>= fun head ->
-  let check_locator size : unit tzresult Lwt.t =
+  let check_locator max_size : unit tzresult Lwt.t =
     State.read_chain_data chain (fun _ data ->
         Lwt.return (data.caboose, data.save_point))
     >>= fun ((_, caboose), _save_point) ->
     State.Block.read chain head
     >>=? fun block ->
-    time ~runs (fun () -> State.compute_locator chain ~size block seed)
+    time ~runs (fun () -> State.compute_locator chain ~max_size block seed)
     |> fun (l_exp, t_exp) ->
-    time ~runs (fun () -> compute_linear_locator chain ~caboose ~size block)
+    time ~runs (fun () ->
+        compute_linear_locator chain ~caboose ~size:max_size block)
     |> fun (l_lin, t_lin) ->
     l_exp
     >>= fun l_exp ->
@@ -355,11 +441,11 @@ let test_locator base_dir =
     >>= fun l_lin ->
     let (_, l_exp) = (l_exp : Block_locator.t :> _ * _) in
     let (_, l_lin) = (l_lin : Block_locator.t :> _ * _) in
-    let _ = Printf.printf "%10i %f %f\n" size t_exp t_lin in
+    let _ = Printf.printf "%10i %f %f\n" max_size t_exp t_lin in
     List.iter2
       (fun hn ho ->
         if not (Block_hash.equal hn ho) then
-          Assert.fail_msg "Invalid locator %i" size)
+          Assert.fail_msg "Invalid locator %i" max_size)
       l_exp
       l_lin ;
     return_unit
@@ -371,6 +457,147 @@ let test_locator base_dir =
   in
   loop 1
 
+let test_protocol_locator base_dir =
+  init_chain base_dir
+  >>= fun chain ->
+  let chain_length = 200 in
+  let fork_points = [1; 10; 50; 66; 150] in
+  let fork_points_assoc =
+    List.map2
+      (fun x y -> (x, y))
+      fork_points
+      (List.tl fork_points @ [chain_length])
+    |> List.mapi (fun i x -> (i + 1, x))
+  in
+  make_multiple_protocol_chain chain ~chain_length ~fork_points
+  >>= fun head_hash ->
+  Lwt_list.iter_s
+    (fun (proto_level, (inf, sup)) ->
+      State.compute_protocol_locator chain ~proto_level seed
+      >>= function
+      | None ->
+          Assert.fail_msg
+            "bad locator for proto level %d (%d, %d)"
+            proto_level
+            inf
+            sup
+      | Some locator -> (
+          let open Block_locator in
+          let steps = to_steps seed locator in
+          let has_lower_bound = ref false in
+          iter_s
+            (fun {block; predecessor; _} ->
+              State.Block.read chain block
+              >>=? fun block ->
+              State.Block.read chain predecessor
+              >>=? fun predecessor ->
+              has_lower_bound :=
+                !has_lower_bound
+                || Int32.to_int (State.Block.level predecessor) = inf ;
+              Assert.is_true
+                ~msg:"same proto_level"
+                ( State.Block.protocol_level block
+                  = State.Block.protocol_level predecessor
+                && State.Block.protocol_level block = proto_level ) ;
+              Assert.is_true
+                ~msg:"increasing levels"
+                Compare.Int32.(
+                  State.Block.level block >= State.Block.level predecessor
+                  && State.Block.level predecessor >= Int32.of_int inf
+                  && State.Block.level block <= Int32.of_int sup) ;
+              return_unit)
+            steps
+          >>= function
+          | Error error ->
+              Format.kasprintf Stdlib.failwith "%a" pp_print_error error
+          | Ok () ->
+              Assert.is_true
+                ~msg:"locator contains the lower bound block"
+                !has_lower_bound ;
+              Lwt.return_unit ))
+    fork_points_assoc
+  >>= fun () ->
+  State.compute_protocol_locator chain ~proto_level:0 seed
+  >>= (function
+        | Some locator ->
+            let (block_header, hash_list) =
+              (locator :> Block_header.t * Block_hash.t list)
+            in
+            Assert.is_true
+              ~msg:"no block in locator"
+              (List.length hash_list = 0) ;
+            State.Block.read chain genesis_hash
+            >>=? fun b ->
+            Assert.is_true
+              ~msg:"single header is genesis"
+              (Block_header.equal (State.Block.header b) block_header) ;
+            return_unit
+        | None ->
+            Alcotest.fail "missing genesis locator")
+  >>=? fun () ->
+  State.compute_protocol_locator chain ~proto_level:6 seed
+  >>= (function
+        | Some _ -> Alcotest.fail "unexpected locator" | None -> return_unit)
+  >>=? fun () ->
+  (* Delete some blocks: only the last protocol remains with only 30+1 blocks *)
+  State.Block.read_predecessor chain ~pred:30 head_hash
+  >>= (function Some pred -> return pred | None -> assert false)
+  >>=? fun pred ->
+  State.Chain.set_checkpoint_then_purge_rolling chain (State.Block.header pred)
+  >>=? fun () ->
+  iter_s
+    (fun i ->
+      State.compute_protocol_locator chain ~proto_level:i seed
+      >>= function
+      | Some _ ->
+          Alcotest.fail "unexpected pruned locator"
+      | None ->
+          return_unit)
+    (1 -- 4)
+  >>=? fun () ->
+  State.compute_protocol_locator chain ~proto_level:5 seed
+  >>= function
+  | None ->
+      Alcotest.fail "unexpected missing locator after pruning"
+  | Some locator ->
+      let open Block_locator in
+      let steps = to_steps seed locator in
+      let has_lower_bound = ref false in
+      let inf = 170 in
+      let sup = 200 in
+      iter_s
+        (fun {block; predecessor; _} ->
+          State.Block.read chain block
+          >>=? fun block ->
+          State.Block.read chain predecessor
+          >>=? fun predecessor ->
+          has_lower_bound :=
+            !has_lower_bound
+            || Int32.to_int (State.Block.level predecessor) = inf ;
+          Assert.is_true
+            ~msg:"same proto_level after pruning"
+            ( State.Block.protocol_level block
+              = State.Block.protocol_level predecessor
+            && State.Block.protocol_level block = 5 ) ;
+          Assert.is_true
+            ~msg:"increasing levels after pruning"
+            Compare.Int32.(
+              State.Block.level block >= State.Block.level predecessor
+              && State.Block.level predecessor >= Int32.of_int inf
+              && State.Block.level block <= Int32.of_int sup) ;
+          return_unit)
+        steps
+      >>=? fun () ->
+      let last_hash = (List.hd steps).predecessor in
+      Assert.is_true
+        ~msg:"last block in locator is the checkpoint"
+        (Block_hash.equal last_hash (State.Block.hash pred)) ;
+      let first_hash = (List.hd (List.rev steps)).block in
+      Assert.is_true
+        ~msg:"first block in locator is the head"
+        (Block_hash.equal first_hash head_hash) ;
+      return_unit
+
 let wrap n f =
   Alcotest_lwt.test_case n `Quick (fun _ () ->
       Lwt_utils_unix.with_tempdir "tezos_test_" (fun dir ->
@@ -381,7 +608,9 @@ let wrap n f =
           | Error error ->
               Format.kasprintf Stdlib.failwith "%a" pp_print_error error))
 
-let tests = [wrap "test pred" test_pred]
+let tests =
+  [ wrap "test pred" test_pred;
+    wrap "test protocol locator" test_protocol_locator ]
 
 let bench = [wrap "test locator" test_locator]
 

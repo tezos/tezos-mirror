@@ -24,12 +24,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Testing
-   -------
-   Component:    P2P
-   Invocation:   dune build @src/lib_p2p/test/runtest_p2p_socket_ipv4
-   Dependencies: src/lib_p2p/test/process.ml
-   Subject:      Sockets and client-server communications.
+(** Testing
+    -------
+    Component:    P2P
+    Invocation:   dune build @src/lib_p2p/test/runtest_p2p_socket_ipv4
+    Dependencies: src/lib_p2p/test/process.ml
+    Subject:      Sockets and client-server communications.
 *)
 
 include Internal_event.Legacy_logging.Make (struct
@@ -44,7 +44,7 @@ let addr = ref Ipaddr.V6.localhost
 
 let canceler = Lwt_canceler.create () (* unused *)
 
-let proof_of_work_target = Crypto_box.make_target 16.
+let proof_of_work_target = Crypto_box.make_pow_target 16.
 
 let id1 = P2p_identity.generate proof_of_work_target
 
@@ -52,13 +52,13 @@ let id2 = P2p_identity.generate proof_of_work_target
 
 let id0 =
   (* Luckily, this will be an insufficient proof of work! *)
-  P2p_identity.generate (Crypto_box.make_target 0.)
+  P2p_identity.generate (Crypto_box.make_pow_target 0.)
 
 let version =
   {
     Network_version.chain_name =
       Distributed_db_version.Name.of_string "SANDBOXED_TEZOS";
-    distributed_db_version = Distributed_db_version.zero;
+    distributed_db_version = Distributed_db_version.one;
     p2p_version = P2p_version.zero;
   }
 
@@ -210,9 +210,8 @@ let is_decoding_error = function
       log_notice "Error: %a" pp_print_error err ;
       false
 
-(* Test.
-   Writing then reading through the same pipe a chunk of message [msg]
-   with encryption/decryption.
+(** Writing then reading through the same pipe a chunk of message [msg]
+    with encryption/decryption.
 *)
 module Crypto_test = struct
   (* maximal size of the buffer *)
@@ -320,11 +319,10 @@ module Crypto_test = struct
                Format.kasprintf Stdlib.failwith "%a" pp_print_error error))
 end
 
-(* Test.
-   Spawns a client and a server. After the client getting connected to
-   the server, it reads a message [simple_msg] sent by the server and
-   stores in [msg] of fixed same size. It asserts that both messages
-   and identical.
+(** Spawns a client and a server. After the client getting connected to
+    the server, it reads a message [simple_msg] sent by the server and
+    stores in [msg] of fixed same size. It asserts that both messages
+    and identical.
 *)
 module Low_level = struct
   let simple_msg = Rand.generate (1 lsl 4)
@@ -347,11 +345,10 @@ module Low_level = struct
   let run _dir = run_nodes client server
 end
 
-(* Test.
-   Spawns a client and a server. The client connects to the server
-   using identity [id2], this identity is checked on server-side. The
-   server sends a Nack message with no rejection motive. The client
-   asserts that its connection has been rejected by Nack.
+(** Spawns a client and a server. The client connects to the server
+    using identity [id2], this identity is checked on server-side. The
+    server sends a Nack message with no rejection motive. The client
+    asserts that its connection has been rejected by Nack.
 *)
 module Nack = struct
   let encoding = Data_encoding.bytes
@@ -386,10 +383,9 @@ module Nack = struct
   let run _dir = run_nodes client server
 end
 
-(* Test.
-   Spawns a client and a server. A client trying to connect to a
-   server receives and Ack message but replies with a Nack. The
-   connection is hence rejected by the client.
+(** Spawns a client and a server. A client trying to connect to a
+    server receives and Ack message but replies with a Nack. The
+    connection is hence rejected by the client.
 *)
 module Nacked = struct
   let encoding = Data_encoding.bytes
@@ -410,11 +406,10 @@ module Nacked = struct
   let run _dir = return_unit
 end
 
-(* Test.
-   Spawns a client and a server. A client tries to connect to a
-   server. Both parties acknowledge. The server sends [simple_msg],
-   while the client sends [simple_msg2]. Both messages are checked for
-   consistency. Then, the connection is closed.
+(** Spawns a client and a server. A client tries to connect to a
+    server. Both parties acknowledge. The server sends [simple_msg],
+    while the client sends [simple_msg2]. Both messages are checked for
+    consistency. Then, the connection is closed.
 *)
 module Simple_message = struct
   let encoding = Data_encoding.bytes
@@ -452,11 +447,10 @@ module Simple_message = struct
   let run _dir = run_nodes client server
 end
 
-(* Test.
-   Spawns a client and a server. A client tries to connect to a
-   server. Both parties acknowledge. The server sends [simple_msg] and
-   the client sends [simple_msg2] with a binary chunk size of 21. Both
-   messages are checked for consistency.
+(** Spawns a client and a server. A client tries to connect to a
+    server. Both parties acknowledge. The server sends [simple_msg] and
+    the client sends [simple_msg2] with a binary chunk size of 21. Both
+    messages are checked for consistency.
 *)
 module Chunked_message = struct
   let encoding = Data_encoding.bytes
@@ -494,9 +488,8 @@ module Chunked_message = struct
   let run _dir = run_nodes client server
 end
 
-(* Test.
-   Two messages of size 131072 bytes are randomly generated. After
-   successful connection, both parties send the latter messages.
+(** Two messages of size 131072 bytes are randomly generated. After
+    successful connection, both parties send the latter messages.
 *)
 module Oversized_message = struct
   let encoding = Data_encoding.bytes
@@ -534,10 +527,9 @@ module Oversized_message = struct
   let run _dir = run_nodes client server
 end
 
-(* Test.
-   After then successful connection of a client to a server, the client
-   attempts to read a message. However, the server decides to close
-   the connection.
+(** After then successful connection of a client to a server, the client
+    attempts to read a message. However, the server decides to close
+    the connection.
 *)
 module Close_on_read = struct
   let encoding = Data_encoding.bytes
@@ -566,10 +558,9 @@ module Close_on_read = struct
   let run _dir = run_nodes client server
 end
 
-(* Test.
-   After the successful connection of a client to a server, the client
-   attempts to send a message. However, the server decides to close
-   the connection.
+(** After the successful connection of a client to a server, the client
+    attempts to send a message. However, the server decides to close
+    the connection.
 *)
 module Close_on_write = struct
   let encoding = Data_encoding.bytes
@@ -600,13 +591,11 @@ module Close_on_write = struct
   let run _dir = run_nodes client server
 end
 
-(* Test.
-   A dummy message is generated into [garbled_msg]. After the
-   successful connection of a client to a server, the server sends
-   [garbled_msg] and waits by reading a close connection is declared
-   by the client.  On the side of the client, it is asserted that the
-   message cannot be decoded.
-
+(** A dummy message is generated into [garbled_msg]. After the
+    successful connection of a client to a server, the server sends
+    [garbled_msg] and waits by reading a close connection is declared
+    by the client.  On the side of the client, it is asserted that the
+    message cannot be decoded.
 *)
 module Garbled_data = struct
   let encoding =

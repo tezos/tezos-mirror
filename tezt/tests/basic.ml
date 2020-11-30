@@ -27,13 +27,13 @@
    It is part of the tests to ensure we keep it up-to-date. *)
 
 let check_node_initialization history_mode =
-  Test.run
+  Test.register
     ~__FILE__
     ~title:
       (sf "node initialization (%s mode)" (Node.show_history_mode history_mode))
     ~tags:["basic"; "node"; Node.show_history_mode history_mode]
   @@ fun () ->
-  let* node = Node.init ~history_mode () in
+  let* node = Node.init [History_mode history_mode] in
   let* client = Client.init ~node () in
   let* () = Client.activate_protocol client in
   Log.info "Activated protocol." ;
@@ -46,7 +46,7 @@ let check_node_initialization history_mode =
   Log.info "Identity is not empty." ;
   return ()
 
-let run () =
+let register () =
   check_node_initialization Archive ;
   check_node_initialization Full ;
   check_node_initialization Rolling

@@ -37,7 +37,7 @@ let clean_up_callback_id =
 let _ =
   Lwt_exit.register_clean_up_callback
     ~loc:__LOC__
-    ~after:clean_up_callback_id
+    ~after:[clean_up_callback_id]
     (fun _ ->
       Lwt_unix.sleep 0.01
       >>= fun () ->

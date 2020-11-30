@@ -62,8 +62,8 @@ let default_p2p : P2p.config =
     trusted_points = [];
     peers_file = "";
     private_mode = true;
-    identity = P2p_identity.generate_with_target_0 ();
-    proof_of_work_target = Crypto_box.default_target;
+    identity = P2p_identity.generate_with_pow_target_0 ();
+    proof_of_work_target = Crypto_box.default_pow_target;
     trust_discovered_peers = false;
     reconnection_config = P2p_point_state.Info.default_reconnection_config;
   }

@@ -32,13 +32,21 @@ let tezos_node = "./tezos-node"
 
 let tezos_codec = "./tezos-codec"
 
-type protocol = {hash : string; parameter_file : string; tag : string}
+let alpha_accuser = "./tezos-accuser-alpha"
+
+type protocol = {
+  hash : string;
+  parameter_file : string;
+  tag : string;
+  accuser : string option;
+}
 
 let alpha =
   {
     hash = "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK";
     parameter_file = "src/proto_alpha/parameters/sandbox-parameters.json";
     tag = "alpha";
+    accuser = Some alpha_accuser;
   }
 
 let carthage =
@@ -47,6 +55,7 @@ let carthage =
     parameter_file =
       "src/proto_006_PsCARTHA/parameters/sandbox-parameters.json";
     tag = "carthage";
+    accuser = Some "./tezos-accuser-006-PsCARTHA";
   }
 
 type key = {identity : string; alias : string; secret : string}

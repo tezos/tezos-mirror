@@ -223,6 +223,19 @@ let rec input_fundraiser_params (cctxt : #Client_context.io_wallet) =
       >>=? function
       | true -> return sk | false -> input_fundraiser_params cctxt )
 
+let fail_if_already_registered cctxt force pk_uri name =
+  Public_key.find_opt cctxt name
+  >>=? function
+  | None ->
+      return_unit
+  | Some (pk_uri_found, _) ->
+      fail_unless
+        (pk_uri = pk_uri_found || force)
+        (failure
+           "public and secret keys '%s' don't correspond, please don't use \
+            --force"
+           name)
+
 let commands network : Client_context.full Clic.command list =
   let open Clic in
   let encrypted_switch () =
@@ -394,17 +407,7 @@ let commands network : Client_context.full Clic.command list =
         >>=? fun name ->
         Client_keys.neuterize sk_uri
         >>=? fun pk_uri ->
-        Public_key.find_opt cctxt name
-        >>=? (function
-               | None ->
-                   return_unit
-               | Some (pk_uri_found, _) ->
-                   fail_unless
-                     (pk_uri = pk_uri_found || force)
-                     (failure
-                        "public and secret keys '%s' don't correspond, please \
-                         don't use --force"
-                        name))
+        fail_if_already_registered cctxt force pk_uri name
         >>=? fun () ->
         Client_keys.import_secret_key
           ~io:(cctxt :> Client_context.io_wallet)
@@ -416,41 +419,29 @@ let commands network : Client_context.full Clic.command list =
           pkh
         >>= fun () ->
         register_key cctxt ~force (pkh, pk_uri, sk_uri) ?public_key name) ]
-  @ ( match network with
-    | Some `Testnet | None ->
-        []
-    | Some `Mainnet ->
-        [ command
-            ~group
-            ~desc:"Add a fundraiser secret key to the wallet."
-            (args1 (Secret_key.force_switch ()))
-            ( prefix "import"
-            @@ prefixes ["fundraiser"; "secret"; "key"]
-            @@ Secret_key.fresh_alias_param @@ stop )
-            (fun force name (cctxt : Client_context.full) ->
-              Secret_key.of_fresh cctxt force name
-              >>=? fun name ->
-              input_fundraiser_params cctxt
-              >>=? fun sk ->
-              Tezos_signer_backends.Encrypted.encrypt cctxt sk
-              >>=? fun sk_uri ->
-              Client_keys.neuterize sk_uri
-              >>=? fun pk_uri ->
-              Public_key.find_opt cctxt name
-              >>=? (function
-                     | None ->
-                         return_unit
-                     | Some (pk_uri_found, _) ->
-                         fail_unless
-                           (pk_uri = pk_uri_found || force)
-                           (failure
-                              "public and secret keys '%s' don't correspond, \
-                               please don't use --force"
-                              name))
-              >>=? fun () ->
-              Client_keys.public_key_hash pk_uri
-              >>=? fun (pkh, _public_key) ->
-              register_key cctxt ~force (pkh, pk_uri, sk_uri) name) ] )
+  @ ( if network <> Some `Mainnet then []
+    else
+      [ command
+          ~group
+          ~desc:"Add a fundraiser secret key to the wallet."
+          (args1 (Secret_key.force_switch ()))
+          ( prefix "import"
+          @@ prefixes ["fundraiser"; "secret"; "key"]
+          @@ Secret_key.fresh_alias_param @@ stop )
+          (fun force name (cctxt : Client_context.full) ->
+            Secret_key.of_fresh cctxt force name
+            >>=? fun name ->
+            input_fundraiser_params cctxt
+            >>=? fun sk ->
+            Tezos_signer_backends.Encrypted.encrypt cctxt sk
+            >>=? fun sk_uri ->
+            Client_keys.neuterize sk_uri
+            >>=? fun pk_uri ->
+            fail_if_already_registered cctxt force pk_uri name
+            >>=? fun () ->
+            Client_keys.public_key_hash pk_uri
+            >>=? fun (pkh, _public_key) ->
+            register_key cctxt ~force (pkh, pk_uri, sk_uri) name) ] )
   @ [ command
         ~group
         ~desc:"Add a public key to the wallet."
@@ -625,4 +616,67 @@ let commands network : Client_context.full Clic.command list =
           Client_keys.deterministic_nonce_hash sk_uri data
           >>=? fun nonce_hash ->
           cctxt#message "%a" Hex.pp (Hex.of_bytes nonce_hash)
-          >>= fun () -> return_unit) ]
+          >>= fun () -> return_unit);
+      command
+        ~group
+        ~desc:
+          "Import a pair of keys to the wallet from a mnemonic phrase. This \
+           command uses the BIP39 algorithm, and therefore imports \
+           public/secret keys that may be different from a Ledger \
+           application, depending on the BIP32 derivation path used in the \
+           Ledger. This command also uses the Ed25519 algorithm, which means \
+           it generates tz1 public key hashes."
+        (args2
+           (Secret_key.force_switch ())
+           (switch ~doc:"encrypt the secret key" ~long:"encrypt" ()))
+        ( prefix "import"
+        @@ prefixes ["keys"; "from"; "mnemonic"]
+        @@ Secret_key.fresh_alias_param @@ stop )
+        (fun (force, encrypt) name (cctxt : Client_context.full) ->
+          Secret_key.of_fresh cctxt force name
+          >>=? fun name ->
+          cctxt#prompt "Enter your mnemonic: "
+          >>=? fun mnemonic ->
+          let mnemonic = String.trim mnemonic |> String.split_on_char ' ' in
+          match Bip39.of_words mnemonic with
+          | None ->
+              failwith
+                "\"%s\" is not a valid BIP39 mnemonic. Please ensure that \
+                 your mnemonic is of correct length, and that each word is \
+                 separated by a single space. For reference, a correct \
+                 mnemonic is comprised of 12, 15, 18, 21, or 24 words where \
+                 the last is a checksum. Do not try to write your own \
+                 mnemonic."
+                (String.concat " " mnemonic)
+          | Some t ->
+              cctxt#prompt_password "Enter your passphrase: "
+              >>=? fun passphrase ->
+              let sk = Bip39.to_seed ~passphrase t in
+              let sk = Bytes.sub sk 0 32 in
+              let sk : Signature.Secret_key.t =
+                Ed25519
+                  (Data_encoding.Binary.of_bytes_exn
+                     Ed25519.Secret_key.encoding
+                     sk)
+              in
+              Tezos_signer_backends.Unencrypted.make_sk sk
+              >>=? fun unencrypted_sk_uri ->
+              ( match encrypt with
+              | true ->
+                  Tezos_signer_backends.Encrypted.encrypt cctxt sk
+              | false ->
+                  return unencrypted_sk_uri )
+              >>=? fun sk_uri ->
+              neuterize unencrypted_sk_uri
+              >>=? fun pk_uri ->
+              fail_if_already_registered cctxt force pk_uri name
+              >>=? fun () ->
+              import_secret_key ~io:(cctxt :> Client_context.io_wallet) pk_uri
+              >>=? fun (pkh, public_key) ->
+              register_key cctxt ~force (pkh, pk_uri, sk_uri) ?public_key name
+              >>=? fun () ->
+              cctxt#message
+                "Tezos address added: %a"
+                Signature.Public_key_hash.pp
+                pkh
+              >>= fun () -> return_unit) ]

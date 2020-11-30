@@ -12,24 +12,26 @@
           -open Tezos_base
         )))
 
-(alias
- (name buildtest)
+(rule
+ (alias buildtest)
  (deps
    test_time.exe
    test_p2p_addr.exe
- ))
+ )
+ (action (progn)))
 
-(alias
- (name runtest_time)
+(rule
+ (alias runtest_time)
  (action (run %{exe:test_time.exe})))
-(alias
- (name runtest_p2p_addr)
+(rule
+ (alias runtest_p2p_addr)
  (action (run %{exe:test_p2p_addr.exe})))
 
-(alias
- (name runtest)
+(rule
+ (alias runtest)
  (package tezos-base)
  (deps
    (alias runtest_time)
    (alias runtest_p2p_addr)
- ))
+ )
+ (action (progn)))

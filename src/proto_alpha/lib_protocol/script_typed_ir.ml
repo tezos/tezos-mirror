@@ -28,13 +28,11 @@ open Script_int
 
 (* ---- Auxiliary types -----------------------------------------------------*)
 
-type var_annot = [`Var_annot of string]
+type var_annot = Var_annot of string
 
-type type_annot = [`Type_annot of string]
+type type_annot = Type_annot of string
 
-type field_annot = [`Field_annot of string]
-
-type annot = [var_annot | type_annot | field_annot]
+type field_annot = Field_annot of string
 
 type address = Contract.t * string
 
@@ -98,11 +96,11 @@ type ('key, 'value) map =
 type operation = packed_internal_operation * Contract.big_map_diff option
 
 type ('arg, 'storage) script = {
-  code : (('arg, 'storage) pair, (operation list, 'storage) pair) lambda;
+  code : (('arg, 'storage) pair, (operation boxed_list, 'storage) pair) lambda;
   arg_type : 'arg ty;
   storage : 'storage;
   storage_type : 'storage ty;
-  root_name : string option;
+  root_name : field_annot option;
 }
 
 and end_of_stack = unit
@@ -131,21 +129,17 @@ and 'ty ty =
       ('a ty * field_annot option * var_annot option)
       * ('b ty * field_annot option * var_annot option)
       * type_annot option
-      * bool
       -> ('a, 'b) pair ty
   | Union_t :
       ('a ty * field_annot option)
       * ('b ty * field_annot option)
       * type_annot option
-      * bool
       -> ('a, 'b) union ty
   | Lambda_t : 'arg ty * 'ret ty * type_annot option -> ('arg, 'ret) lambda ty
-  | Option_t : 'v ty * type_annot option * bool -> 'v option ty
-  | List_t : 'v ty * type_annot option * bool -> 'v list ty
+  | Option_t : 'v ty * type_annot option -> 'v option ty
+  | List_t : 'v ty * type_annot option -> 'v boxed_list ty
   | Set_t : 'v comparable_ty * type_annot option -> 'v set ty
-  | Map_t :
-      'k comparable_ty * 'v ty * type_annot option * bool
-      -> ('k, 'v) map ty
+  | Map_t : 'k comparable_ty * 'v ty * type_annot option -> ('k, 'v) map ty
   | Big_map_t :
       'k comparable_ty * 'v ty * type_annot option
       -> ('k, 'v) big_map ty
@@ -165,6 +159,8 @@ and ('key, 'value) big_map = {
   key_type : 'key ty;
   value_type : 'value ty;
 }
+
+and 'elt boxed_list = {elements : 'elt list; length : int}
 
 (* ---- Instructions --------------------------------------------------------*)
 
@@ -194,22 +190,24 @@ and ('bef, 'aft) instr =
       ('bef, 'aft) descr * ('a * 'bef, 'aft) descr
       -> ('a option * 'bef, 'aft) instr
   (* unions *)
-  | Left : ('l * 'rest, ('l, 'r) union * 'rest) instr
-  | Right : ('r * 'rest, ('l, 'r) union * 'rest) instr
+  | Cons_left : ('l * 'rest, ('l, 'r) union * 'rest) instr
+  | Cons_right : ('r * 'rest, ('l, 'r) union * 'rest) instr
   | If_left :
       ('l * 'bef, 'aft) descr * ('r * 'bef, 'aft) descr
       -> (('l, 'r) union * 'bef, 'aft) instr
   (* lists *)
-  | Cons_list : ('a * ('a list * 'rest), 'a list * 'rest) instr
-  | Nil : ('rest, 'a list * 'rest) instr
+  | Cons_list : ('a * ('a boxed_list * 'rest), 'a boxed_list * 'rest) instr
+  | Nil : ('rest, 'a boxed_list * 'rest) instr
   | If_cons :
-      ('a * ('a list * 'bef), 'aft) descr * ('bef, 'aft) descr
-      -> ('a list * 'bef, 'aft) instr
+      ('a * ('a boxed_list * 'bef), 'aft) descr * ('bef, 'aft) descr
+      -> ('a boxed_list * 'bef, 'aft) instr
   | List_map :
       ('a * 'rest, 'b * 'rest) descr
-      -> ('a list * 'rest, 'b list * 'rest) instr
-  | List_iter : ('a * 'rest, 'rest) descr -> ('a list * 'rest, 'rest) instr
-  | List_size : ('a list * 'rest, n num * 'rest) instr
+      -> ('a boxed_list * 'rest, 'b boxed_list * 'rest) instr
+  | List_iter :
+      ('a * 'rest, 'rest) descr
+      -> ('a boxed_list * 'rest, 'rest) instr
+  | List_size : ('a boxed_list * 'rest, n num * 'rest) instr
   (* sets *)
   | Empty_set : 'a comparable_ty -> ('rest, 'a set * 'rest) instr
   | Set_iter : ('a * 'rest, 'rest) descr -> ('a set * 'rest, 'rest) instr
@@ -240,13 +238,13 @@ and ('bef, 'aft) instr =
           ('key, 'value) big_map * 'rest )
         instr
   (* string operations *)
-  | Concat_string : (string list * 'rest, string * 'rest) instr
+  | Concat_string : (string boxed_list * 'rest, string * 'rest) instr
   | Concat_string_pair : (string * (string * 'rest), string * 'rest) instr
   | Slice_string
       : (n num * (n num * (string * 'rest)), string option * 'rest) instr
   | String_size : (string * 'rest, n num * 'rest) instr
   (* bytes operations *)
-  | Concat_bytes : (MBytes.t list * 'rest, MBytes.t * 'rest) instr
+  | Concat_bytes : (MBytes.t boxed_list * 'rest, MBytes.t * 'rest) instr
   | Concat_bytes_pair : (MBytes.t * (MBytes.t * 'rest), MBytes.t * 'rest) instr
   | Slice_bytes
       : (n num * (n num * (MBytes.t * 'rest)), MBytes.t option * 'rest) instr
@@ -355,13 +353,19 @@ and ('bef, 'aft) instr =
   | Implicit_account
       : (public_key_hash * 'rest, unit typed_contract * 'rest) instr
   | Create_contract :
-      'g ty * 'p ty * ('p * 'g, operation list * 'g) lambda * string option
+      'g ty
+      * 'p ty
+      * ('p * 'g, operation boxed_list * 'g) lambda
+      * field_annot option
       -> ( public_key_hash
            * (public_key_hash option * (bool * (bool * (Tez.t * ('g * 'rest))))),
            operation * (address * 'rest) )
          instr
   | Create_contract_2 :
-      'g ty * 'p ty * ('p * 'g, operation list * 'g) lambda * string option
+      'g ty
+      * 'p ty
+      * ('p * 'g, operation boxed_list * 'g) lambda
+      * field_annot option
       -> ( public_key_hash option * (Tez.t * ('g * 'rest)),
            operation * (address * 'rest) )
          instr
@@ -418,5 +422,3 @@ and ('bef, 'aft) descr = {
   aft : 'aft stack_ty;
   instr : ('bef, 'aft) instr;
 }
-
-type ex_big_map = Ex_bm : ('key, 'value) big_map -> ex_big_map

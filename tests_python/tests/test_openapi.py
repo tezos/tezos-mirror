@@ -1,7 +1,7 @@
 """ Tests generating the implementation of openapi/swagger:
     https://swagger.io/
 
-    This script launches a sandbox node, activates Carthage,
+    This script launches a sandbox node, activates Delphi,
     gets the RPC descriptions as JSON, and converts this JSON into
     an OpenAPI specification.
 
@@ -14,8 +14,8 @@ import subprocess
 import tempfile
 import requests
 from launchers.sandbox import Sandbox
-from tools.constants import CARTHAGE, NODE_PARAMS
-from tools import utils
+from tools.constants import DELPHI, NODE_PARAMS
+from tools import paths
 
 
 def _get_version() -> str:
@@ -50,7 +50,14 @@ def test_openapi(sandbox: Sandbox):
     node = sandbox.node(node_idx)
 
     client = sandbox.client(0)
-    utils.activate_alpha(client, proto=CARTHAGE)
+    parameters_file = (f'{paths.TEZOS_HOME}src/proto_007_PsDELPH1/parameters/'
+                       'test-parameters.json')
+    assert os.path.isfile(parameters_file), (
+        f'{parameters_file} cannot be found; please first run `make` in '
+        'TEZOS_HOME.')
+    with open(parameters_file) as pfile:
+        parameters = json.load(pfile)
+        client.activate_protocol_json(DELPHI, parameters)
 
     api_addr = f"http://localhost:{node.rpc_port}/describe/?recurse=yes"
     api = requests.get(api_addr).text

@@ -37,8 +37,11 @@
    as functions to be called here. *)
 
 let () =
-  Basic.run () ;
-  Bootstrap.run () ;
-  Synchronisation_heuristic.run () ;
-  Encoding.run () ;
-  Mockup.run ()
+  Basic.register () ;
+  Bootstrap.register () ;
+  Synchronisation_heuristic.register () ;
+  Encoding.register () ;
+  Mockup.register () ;
+  Double_bake.register () ;
+  (* Test.run () should be the last statement, don't register afterwards! *)
+  Test.run ()

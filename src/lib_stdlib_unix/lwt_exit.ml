@@ -41,14 +41,14 @@ module Callbacks_map = Map.Make (Int)
 
 type callback = {
   callback : int -> unit Lwt.t;
-  after : clean_up_callback_id option;
+  after : clean_up_callback_id list;
   loc : string;
 }
 
 let clean_up_callbacks : callback Callbacks_map.t ref = ref Callbacks_map.empty
 
 (* adding and removing clean-up callbacks affects the global reference map *)
-let register_clean_up_callback ?after ~loc callback =
+let register_clean_up_callback ?(after = []) ~loc callback =
   let id = new_clean_up_callback_id () in
   let callback = {callback; after; loc} in
   clean_up_callbacks := Callbacks_map.add id callback !clean_up_callbacks ;
@@ -61,62 +61,93 @@ let unregister_clean_up_callback id =
 
 (* cleaning-up is just calling all the clean-up callbacks, note that the
    function is not exported: it cannot be called directly, it can only be
-   triggered as a side effect to calling [exit_and_raise] or [exit_and_wait] *)
+   triggered as a side effect to calling [exit_and_raise] or [exit_and_wait]
+
+   Returns a seq of clean-up promises along with their identifiers. *)
 let clean_up status =
+  (* NOTE: [to_seq] iterates in increasing order of keys *)
   let callbacks = Callbacks_map.to_seq !clean_up_callbacks in
   clean_up_callbacks := Callbacks_map.empty ;
-  let promises : unit Lwt.t Callbacks_map.t =
+  let promises : (string * unit Lwt.t) Callbacks_map.t =
     Seq.fold_left
       (fun promises (id, {callback; after; loc}) ->
         let pre =
           match after with
-          | None ->
+          | [] ->
               Lwt.return_unit
-          | Some after -> (
-            match Callbacks_map.find_opt after promises with
-            | None ->
-                (* This can happen if the callback was unregistered *)
-                Lwt.return_unit
-            | Some p ->
-                p )
+          | _ :: _ as after -> (
+              Callbacks_map.to_seq promises
+              |> Seq.filter_map (fun (id, (_, p)) ->
+                     if List.mem id after then Some p else None)
+              |> List.of_seq
+              |> function
+              | [] ->
+                  (* This can happen if all after-callbacks were unregistered *)
+                  Lwt.return_unit
+              | [p] ->
+                  p
+              | _ :: _ :: _ as ps ->
+                  Lwt.join ps )
         in
-        let promise =
-          Lwt.catch
-            (fun () -> pre >>= fun () -> callback status)
-            (fun exc ->
-              Format.eprintf
-                "Exit: uncaught exception during clean-up (%s): %s\n%!"
-                loc
-                (Printexc.to_string exc) ;
-              Lwt.return_unit)
-        in
-        Callbacks_map.add id promise promises)
+        let promise = pre >>= fun () -> callback status in
+        Lwt.on_failure promise (fun exc ->
+            Format.eprintf
+              "(%s) Exit: uncaught exception during clean-up (%s): %s\n%!"
+              Sys.executable_name
+              loc
+              (Printexc.to_string exc)) ;
+        Callbacks_map.add id (loc, promise) promises)
       Callbacks_map.empty
       callbacks
   in
-  Lwt.join (List.of_seq @@ Seq.map snd @@ Callbacks_map.to_seq promises)
+  Seq.map snd @@ Callbacks_map.to_seq promises
 
 (* 3. synchronisation primitives *)
 
 (* [clean_up_starts] an exported promise that resolves when the clean-up starts.
-   [start_exiting] a non-exported resolver for the promise *)
-let (clean_up_starts, start_clean_up) = Lwt.wait ()
+   [start_clean_up] a non-exported resolver for the promise.
+
+   Note that the promise is not cancelable and we never pass an exception to the
+   resolver. Consequently, the promise cannot be rejected. *)
+let (clean_up_starts_internal, start_clean_up) = Lwt.wait ()
+
+(* [clean_up_starts] is exported with a delay to ensure that [wrap_and_*]
+   function witness the start of the cleaning up before users of the library. *)
+let clean_up_starts =
+  Lwt.no_cancel
+    ( clean_up_starts_internal
+    >>= fun v -> Lwt.pause () >>= fun () -> Lwt.return v )
+
+let clean_up_promises =
+  clean_up_starts_internal >>= fun status -> Lwt.return @@ clean_up status
 
 (* [clean_up_ends] is a promise that resolves once the clean-up is finished. *)
 let clean_up_ends =
-  clean_up_starts
-  >>= fun status -> clean_up status >>= fun () -> Lwt.return status
+  clean_up_starts_internal
+  >>= fun status ->
+  clean_up_promises
+  >>= fun promises ->
+  Lwt.join @@ List.of_seq
+  @@ Seq.map
+       (fun (_, promise) ->
+         Lwt.try_bind
+           (fun () -> promise)
+           (fun () -> Lwt.return_unit)
+           (fun _ -> Lwt.return_unit))
+       promises
+  >>= fun () -> Lwt.return status
 
 (* 4. exiting *)
 
 (* simple exit is not exported, it is just to factor out exiting *)
 let exit n =
-  match Lwt.state clean_up_starts with
+  match Lwt.state clean_up_starts_internal with
   | Sleep ->
       Lwt.wakeup start_clean_up n
   | Return _ ->
       ()
   | Fail _ ->
+      (* Remember [clean_up_starts_internal] cannot be rejected. *)
       assert false
 
 (* [exit_and_raise] is meant to be used deep inside the program after having
@@ -127,6 +158,19 @@ let exit_and_raise n = exit n ; raise Exit
 (* [exit_and_wait] is meant to be used near the main invocation of the program,
    right inside of [Lwt_main.run] but presumably after [wrap_and_error]. *)
 let exit_and_wait n = exit n ; clean_up_ends
+
+(* exit codes *)
+
+let incomplete_clean_up_mask = 128
+
+let signal_exit_code = 127
+
+let uncaught_exception_exit_code = 126
+
+let mask_code_bc_incomplete_clean_up code = code lor incomplete_clean_up_mask
+
+let mask_code_if_incomplete_clean_up ~complete:all_fine code =
+  if all_fine then code else mask_code_bc_incomplete_clean_up code
 
 (* 5. signals *)
 
@@ -186,7 +230,10 @@ let sleep_span s = Lwt_unix.sleep (Ptime.Span.to_float_s s)
 
 let set_already_received_once double_signal_safety already_received_once name =
   if Ptime.Span.(equal double_signal_safety zero) then (
-    Format.eprintf "%s: send signal again to force-quit.\n%!" name ;
+    Format.eprintf
+      "(%s) %s: send signal again to force-quit.\n%!"
+      Sys.executable_name
+      name ;
     already_received_once := true )
   else
     Lwt_utils.dont_wait
@@ -195,7 +242,10 @@ let set_already_received_once double_signal_safety already_received_once name =
         (* Wait one second for safety, then set force-quitting *)
         sleep_span double_signal_safety
         >>= fun () ->
-        Format.eprintf "%s: send signal again to force-quit.\n%!" name ;
+        Format.eprintf
+          "(%s) %s: send signal again to force-quit.\n%!"
+          Sys.executable_name
+          name ;
         already_received_once := true ;
         Lwt.return_unit)
 
@@ -209,32 +259,40 @@ let set_soft_handler ?(double_signal_safety = default_double_signal_safety)
   Lwt_unix.on_signal signal (fun _signal ->
       if !already_received_once then (
         Format.eprintf
-          "%s: signal received again, forcing immediate termination.\n%!"
+          "(%s) %s: signal received again, forcing immediate termination.\n%!"
+          Sys.executable_name
           name ;
-        Stdlib.exit 1 )
+        Stdlib.exit (mask_code_bc_incomplete_clean_up signal_exit_code) )
       else
-        match Lwt.state clean_up_starts with
+        match Lwt.state clean_up_starts_internal with
         | Sleep ->
-            Format.eprintf "%s: triggering shutdown.\n%!" name ;
-            exit 1 ;
+            Format.eprintf
+              "(%s) %s: triggering shutdown.\n%!"
+              Sys.executable_name
+              name ;
+            exit signal_exit_code ;
             set_already_received_once
               double_signal_safety
               already_received_once
               name
         | Return _ ->
-            Format.eprintf "%s: already in shutdown.\n%!" name ;
+            Format.eprintf
+              "(%s) %s: already in shutdown.\n%!"
+              Sys.executable_name
+              name ;
             set_already_received_once
               double_signal_safety
               already_received_once
               name
         | Fail _ ->
+            (* Remember [clean_up_starts_internal] cannot be rejected. *)
             assert false)
 
 (* hard handling: immediately terminate process *)
 let set_hard_handler signal name =
   Lwt_unix.on_signal signal (fun _signal ->
-      Format.eprintf "%s: force-quiting.\n%!" name ;
-      Stdlib.exit 1)
+      Format.eprintf "(%s) %s: force-quiting.\n%!" Sys.executable_name name ;
+      Stdlib.exit (mask_code_bc_incomplete_clean_up signal_exit_code))
 
 let setup_signal_handlers ?double_signal_safety signal_setup =
   let soft_handler_ids =
@@ -257,23 +315,79 @@ let unset_handlers = List.iter Lwt_unix.disable_signal_handler
 (* 6. internal synchronisation *)
 
 let wait_for_clean_up max_clean_up_time =
-  (match Lwt.state clean_up_starts with Return _ -> () | _ -> assert false) ;
-  match Lwt.state clean_up_ends with
+  ( match Lwt.state clean_up_starts_internal with
+  | Return _ ->
+      ()
+  | Fail _ ->
+      (* Remember [clean_up_starts_internal] cannot be rejected. *)
+      assert false
+  | Sleep ->
+      (* We only call this function after the clean-up has started, and we do
+         not export the function *)
+      assert false ) ;
+  Lwt.pause ()
+  >>= fun () ->
+  ( match Lwt.state clean_up_promises with
+  | Return _ ->
+      ()
+  | Fail _ ->
+      (* the promises are a promise that cannot be rejected *)
+      assert false
+  | Sleep ->
+      (* One tick after the clean-up has started, all the promises have been
+         collected. *)
+      assert false ) ;
+  ( match Lwt.state clean_up_ends with
   | Fail _ ->
       assert false
   | Return _ ->
-      Lwt.pause ()
-  | Sleep ->
-      ( match max_clean_up_time with
-      | None ->
-          (* without timeout: just wait *)
-          clean_up_ends >>= fun _ -> Lwt.return_unit
-      | Some s ->
-          (* with timeout: pick first to finish *)
-          Lwt.pick [(clean_up_ends >>= fun _ -> Lwt.return_unit); sleep_span s]
-      )
-      (* pause in case timeout and clean-up needs to deal with cancellation *)
-      >>= Lwt.pause
+      (* This happens when there are no callbacks registered: the clean-up is
+         immediate. *)
+      Lwt.return_unit
+  | Sleep -> (
+    match max_clean_up_time with
+    | None ->
+        (* without timeout: just wait *)
+        clean_up_ends >>= fun _ -> Lwt.return_unit
+    | Some s ->
+        (* with timeout: pick first to finish *)
+        Lwt.choose [(clean_up_ends >>= fun _ -> Lwt.return_unit); sleep_span s]
+    ) )
+  (* pause in case timeout and clean-up needs to deal with cancellation *)
+  >>= Lwt.pause
+  >|= fun () ->
+  match Lwt.state clean_up_promises with
+  | Lwt.Sleep ->
+      (* we have already asserted this earlier in the function *)
+      assert false
+  | Lwt.Fail _ ->
+      (* we have already asserted this earlier in the function *)
+      assert false
+  | Lwt.Return promises ->
+      (* check (and log) whether all clean-up is done successfully *)
+      Seq.fold_left
+        (fun all_fine (id, promise) ->
+          match Lwt.state promise with
+          | Lwt.Sleep ->
+              (* if a promise has not been given enough time to resolve, then it
+                 means it was interupted by a timeout: [max_clean_up_time] *)
+              assert (max_clean_up_time <> None) ;
+              Format.eprintf
+                "(%s) Exit: timeout, clean-up callback not terminated (%s)\n%!"
+                Sys.executable_name
+                id ;
+              false
+          | Lwt.Fail exc ->
+              Format.eprintf
+                "(%s) Exit: clean-up callback failed (%s): %s\n%!"
+                Sys.executable_name
+                id
+                (Printexc.to_string exc) ;
+              false
+          | Lwt.Return () ->
+              all_fine)
+        true
+        promises
 
 (* 7. main interface: wrapping promises *)
 
@@ -281,55 +395,99 @@ let wait_for_clean_up max_clean_up_time =
    in `Error` *)
 let wrap_and_error ?(signal_setup = default_signal_setup) ?double_signal_safety
     ?max_clean_up_time p =
-  let handler_ids = setup_signal_handlers ?double_signal_safety signal_setup in
-  Lwt.try_bind
-    (fun () ->
-      (* Watch out for both [p] and the start of clean-up *)
-      Lwt.choose [p >>= Lwt.return_ok; clean_up_starts >>= Lwt.return_error])
-    (function
-      | Ok v ->
-          ( match Lwt.state clean_up_starts with
-          | Sleep ->
-              ()
-          | _ ->
-              assert false ) ;
-          unset_handlers handler_ids ; Lwt.return (Ok v)
-      | Error status ->
-          ( match Lwt.state clean_up_starts with
-          | Return s ->
-              assert (s = status)
-          | _ ->
-              assert false ) ;
-          Lwt.cancel p ;
-          wait_for_clean_up max_clean_up_time
-          >>= fun () -> unset_handlers handler_ids ; Lwt.return (Error status))
-    (function
-      | Exit -> (
-          (* When [Exit] bubbles from the wrapped promise, maybe it called
+  ( match Lwt.state clean_up_starts_internal with
+  | Lwt.Fail _ ->
+      (* Remember [clean_up_starts_internal] cannot be rejected. *)
+      assert false
+  | Lwt.Return _ ->
+      raise (Invalid_argument "Lwt_exit.wrap")
+  | Lwt.Sleep ->
+      () ) ;
+  match Lwt.state p with
+  | Lwt.Fail _ | Lwt.Return _ ->
+      p >>= Lwt.return_ok
+  | Lwt.Sleep ->
+      let handler_ids =
+        setup_signal_handlers ?double_signal_safety signal_setup
+      in
+      Lwt.try_bind
+        (fun () ->
+          (* Watch out for both [p] and the start of clean-up *)
+          Lwt.choose
+            [p >>= Lwt.return_ok; clean_up_starts_internal >>= Lwt.return_error])
+        (function
+          | Ok v ->
+              (* In this branch, the [Ok] indicates that [p] was resolved before
+                 [clean_up_starts_internal]. As a result,
+                 [clean_up_starts_internal] must still be pending.
+
+                 It is only possible for two promises to resolve simultaneously
+                 if they are physically equal, if one is a proxy for the other,
+                 or some other similar situation. Because
+                 [clean_up_starts_internal] is not exported, this is not
+                 possible. *)
+              assert (Lwt.state clean_up_starts_internal = Lwt.Sleep) ;
+              unset_handlers handler_ids ;
+              Lwt.return (Ok v)
+          | Error status ->
+              (* Conversely to the previous comment: when
+                 [clean_up_starts_internal] resolves first, then [p] cannot have
+                 resolved yet. *)
+              assert (Lwt.state clean_up_starts_internal = Lwt.Return status) ;
+              Lwt.cancel p ;
+              wait_for_clean_up max_clean_up_time
+              >>= fun complete ->
+              unset_handlers handler_ids ;
+              let status = mask_code_if_incomplete_clean_up ~complete status in
+              Lwt.return (Error status))
+        (function
+          | Exit -> (
+              (* When [Exit] bubbles from the wrapped promise, maybe it called
                 [exit_and_raise] *)
-          Lwt.pause ()
-          >>= fun () ->
-          match Lwt.state clean_up_starts with
-          | Return status ->
-              wait_for_clean_up max_clean_up_time
+              Lwt.pause ()
               >>= fun () ->
-              unset_handlers handler_ids ; Lwt.return (Error status)
-          | Fail _ ->
-              assert false
-          | Sleep ->
-              exit 2 ;
+              match Lwt.state clean_up_starts_internal with
+              | Return status ->
+                  wait_for_clean_up max_clean_up_time
+                  >>= fun complete ->
+                  unset_handlers handler_ids ;
+                  let status =
+                    mask_code_if_incomplete_clean_up ~complete status
+                  in
+                  Lwt.return (Error status)
+              | Fail _ ->
+                  (* Remember [clean_up_starts_internal] cannot be rejected. *)
+                  assert false
+              | Sleep ->
+                  exit uncaught_exception_exit_code ;
+                  Format.eprintf
+                    "(%s) Exit: exit because of uncaught exception: %s\n%!"
+                    Sys.executable_name
+                    (Printexc.to_string Exit) ;
+                  wait_for_clean_up max_clean_up_time
+                  >>= fun complete ->
+                  unset_handlers handler_ids ;
+                  let status =
+                    mask_code_if_incomplete_clean_up
+                      ~complete
+                      uncaught_exception_exit_code
+                  in
+                  Lwt.return (Error status) )
+          | exc ->
+              exit uncaught_exception_exit_code ;
               Format.eprintf
-                "Exit: exit because of uncaught exception: %s\n%!"
-                (Printexc.to_string Exit) ;
+                "(%s) Exit: exit because of uncaught exception: %s\n%!"
+                Sys.executable_name
+                (Printexc.to_string exc) ;
               wait_for_clean_up max_clean_up_time
-              >>= fun () -> unset_handlers handler_ids ; Lwt.return (Error 2) )
-      | exc ->
-          exit 2 ;
-          Format.eprintf
-            "Exit: exit because of uncaught exception: %s\n%!"
-            (Printexc.to_string exc) ;
-          wait_for_clean_up max_clean_up_time
-          >>= fun () -> unset_handlers handler_ids ; Lwt.return (Error 2))
+              >>= fun complete ->
+              unset_handlers handler_ids ;
+              let status =
+                mask_code_if_incomplete_clean_up
+                  ~complete
+                  uncaught_exception_exit_code
+              in
+              Lwt.return (Error status))
 
 (* same but exit on error *)
 let wrap_and_exit ?signal_setup ?double_signal_safety ?max_clean_up_time p =

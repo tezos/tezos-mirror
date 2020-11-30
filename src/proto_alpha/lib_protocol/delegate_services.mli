@@ -203,9 +203,8 @@ val endorsing_power :
   Alpha_context.packed_operation * Chain_id.t ->
   int tzresult Lwt.t
 
-val required_endorsements :
-  Alpha_context.t -> Alpha_context.Period.t -> int tzresult Lwt.t
+val required_endorsements : Alpha_context.t -> Alpha_context.Period.t -> int
 
-val minimal_valid_time : Alpha_context.t -> int -> int -> Time.t tzresult Lwt.t
+val minimal_valid_time : Alpha_context.t -> int -> int -> Time.t tzresult
 
 val register : unit -> unit

@@ -66,13 +66,9 @@ let pp_print_paragraph ppf description =
     (split ' ' description)
 
 let take n l =
-  let rec loop acc n = function
-    | xs when Compare.Int.(n <= 0) ->
-        Some (List.rev acc, xs)
-    | [] ->
-        None
-    | x :: xs ->
-        loop (x :: acc) (n - 1) xs
+  let rec loop acc n xs =
+    if Compare.Int.(n <= 0) then Some (List.rev acc, xs)
+    else match xs with [] -> None | x :: xs -> loop (x :: acc) (n - 1) xs
   in
   loop [] n l
 
@@ -86,7 +82,45 @@ let remove_prefix ~prefix s =
 let rec remove_elem_from_list nb = function
   | [] ->
       []
-  | l when Compare.Int.(nb <= 0) ->
+  | _ :: _ as l when Compare.Int.(nb <= 0) ->
       l
   | _ :: tl ->
       remove_elem_from_list (nb - 1) tl
+
+module Syntax = struct
+  (* To be upstreamed in environment v1 *)
+  let ( >|=? ) = ( >>|? )
+
+  let ( >>?= ) v f = match v with Error _ as e -> Lwt.return e | Ok v -> f v
+
+  let ok_unit = Ok ()
+
+  let ok_none = Ok None
+
+  let[@inline] ok_some x = Ok (Some x)
+
+  let ok_nil = Ok []
+
+  let error_unless cond exn = if cond then ok_unit else error exn
+
+  let error_when cond exn = if cond then error exn else ok_unit
+
+  let rec filter_s f l =
+    match l with
+    | [] ->
+        return_nil
+    | h :: t -> (
+        f h
+        >>=? function
+        | false ->
+            filter_s f t
+        | true ->
+            filter_s f t >>=? fun t -> return (h :: t) )
+
+  let rec map f l =
+    match l with
+    | [] ->
+        ok_nil
+    | h :: t ->
+        f h >>? fun rh -> map f t >>? fun rt -> Ok (rh :: rt)
+end

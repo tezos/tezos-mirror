@@ -43,6 +43,8 @@ type error += Cannot_serialize_failure
 
 type error += Cannot_serialize_storage
 
+type error += Michelson_too_many_recursive_calls
+
 type execution_result = {
   ctxt : context;
   storage : Script.expr;
@@ -58,17 +60,41 @@ type step_constants = {
   chain_id : Chain_id.t;
 }
 
-type 'tys stack =
-  | Item : 'ty * 'rest stack -> ('ty * 'rest) stack
-  | Empty : Script_typed_ir.end_of_stack stack
+(** [STEP_LOGGER] is the module type of logging
+    modules as passed to the Michelson interpreter.
+    Note that logging must be performed by side-effects
+    on an underlying log structure. *)
+module type STEP_LOGGER = sig
+  (** [log_interp] is called at each call of the internal
+      function [interp]. [interp] is called when starting
+      the interpretation of a script and subsequently
+      at each [Exec] instruction. *)
+  val log_interp :
+    context -> ('bef, 'aft) Script_typed_ir.descr -> 'bef -> unit
+
+  (** [log_entry] is called {i before} executing
+      each instruction but {i after} gas for
+      this instruction has been successfully consumed. *)
+  val log_entry : context -> ('bef, 'aft) Script_typed_ir.descr -> 'bef -> unit
+
+  (** [log_exit] is called {i after} executing each
+      instruction. *)
+  val log_exit : context -> ('bef, 'aft) Script_typed_ir.descr -> 'aft -> unit
+
+  (** [get_log] allows to obtain an execution trace, if
+      any was produced. *)
+  val get_log : unit -> execution_trace option tzresult Lwt.t
+end
+
+type logger = (module STEP_LOGGER)
 
 val step :
-  ?log:execution_trace ref ->
+  logger ->
   context ->
   step_constants ->
   ('bef, 'aft) Script_typed_ir.descr ->
-  'bef stack ->
-  ('aft stack * context) tzresult Lwt.t
+  'bef ->
+  ('aft * context) tzresult Lwt.t
 
 val execute :
   Alpha_context.t ->

@@ -1,6 +1,7 @@
 """ Utility functions to check time-dependent assertions in the tests.
 Assertions are retried to avoid using arbitrary time constants in test.
 """
+import datetime
 from typing import Any, List
 import hashlib
 import contextlib
@@ -193,10 +194,19 @@ def check_logs_counts(logs: List[str], pattern: str) -> int:
 
 
 def activate_alpha(client, parameters=None, timestamp=None,
+                   activate_in_the_past=False,
                    proto=constants.ALPHA):
+    """Activates a protocol.
+
+    If `activate_in_the_past` is True, protocol is activated with a timestamp
+    one year in the past."""
     if parameters is None:
         parameters = constants.PARAMETERS
-    client.activate_protocol_json(proto, parameters, timestamp=timestamp)
+    delay = None
+    if activate_in_the_past:
+        delay = datetime.timedelta(seconds=3600 * 24 * 365)
+    client.activate_protocol_json(proto, parameters, timestamp=timestamp,
+                                  delay=delay)
 
 
 def pprint(json_data: dict) -> None:
@@ -358,7 +368,7 @@ def assert_run_failure(pattern: str,
             if re.search(pattern, line):
                 return
         data_pretty = "\n".join(data)
-        assert False, f"Could not find '{pattern}' in {data_pretty}"
+        assert False, f"Could not find '{pattern}' in '{data_pretty}'"
     except Exception as exc:  # pylint: disable=broad-except
         assert_msg = f'Expected CalledProcessError but got {type(exc)}'
         assert False, assert_msg
@@ -388,8 +398,11 @@ def init_with_transfer(client: Client,
                        contract: str,
                        initial_storage: str,
                        amount: float,
-                       sender: str):
-    client.originate(contract_name_of_file(contract), amount,
+                       sender: str,
+                       contract_name: str = None):
+    if contract_name is None:
+        contract_name = contract_name_of_file(contract)
+    client.originate(contract_name, amount,
                      sender, contract,
                      ['-init', initial_storage, '--burn-cap', '10'])
     bake(client)
@@ -428,6 +441,15 @@ def assert_typecheck_data_failure(
         client.typecheck_data(data, typ)
 
 
+def assert_typecheck_failure(
+        client: Client,
+        script: str,
+        err: str = 'ill-typed script',
+        file: bool = True) -> None:
+    with assert_run_failure(err):
+        client.typecheck(script, file=file)
+
+
 def client_output_converter(pre):
     """Remove variable substrings from client output for regression testing.
 
@@ -439,6 +461,14 @@ def client_output_converter(pre):
        For example, a timestamp such as 2019-09-23T10:59:00Z is
        replaced by [TIMESTAMP].
     """
+
+    # Scrub constants
+    pre = re.sub(r'"proof_of_work_nonce": "\w{16}"',
+                 '"proof_of_work_nonce": "[NONCE]"', pre)
+    pre = re.sub(r'"context": "\w{52}"', '"context": "[CONTEXT]"', pre)
+    pre = re.sub(r'"level": \d+', '"level": [LEVEL]', pre)
+    pre = re.sub(r'"priority": \d+', '"priority": "[PRIORITY]"', pre)
+    pre = re.sub(r'"fitness": \[.*\]', '"fitness": "[FITNESS]"', pre)
 
     # Scrub hashes
     pre = re.sub(r'sig\w{93}', '[SIGNATURE]', pre)
@@ -458,14 +488,6 @@ def client_output_converter(pre):
     pre = re.sub(r'Injected block \w{12}', 'Injected block [BLOCK_HASH]', pre)
     pre = re.sub(r'Expected counter: \w+',
                  'Expected counter: [EXPECTED_COUNTER]', pre)
-
-    # Scrub constants
-    pre = re.sub(r'"proof_of_work_nonce": "\w{16}"',
-                 '"proof_of_work_nonce": "[NONCE]"', pre)
-    pre = re.sub(r'"context": "\w{52}"', '"context": "[CONTEXT]"', pre)
-    pre = re.sub(r'"level": \d+', '"level": [LEVEL]', pre)
-    pre = re.sub(r'"priority": \d+', '"priority": "[PRIORITY]"', pre)
-    pre = re.sub(r'"fitness": \[.*\]', '"fitness": "[FITNESS]"', pre)
 
     # Scrub timestamps
     pre = re.sub(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z', '[TIMESTAMP]', pre)

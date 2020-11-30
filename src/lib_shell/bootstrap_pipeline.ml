@@ -155,10 +155,7 @@ let assert_acceptable_header pipeline hash (header : Block_header.t) =
   let chain_state = Distributed_db.chain_state pipeline.chain_db in
   let time_now = Systime_os.now () in
   fail_unless
-    ( Time.Protocol.compare
-        (Time.Protocol.add (Time.System.to_protocol (Systime_os.now ())) 15L)
-        header.shell.timestamp
-    >= 0 )
+    (Clock_drift.is_not_too_far_in_the_future header.shell.timestamp)
     (Future_block_header
        {block = hash; time = time_now; block_time = header.shell.timestamp})
   >>=? fun () ->
@@ -298,7 +295,7 @@ let headers_fetch_worker_loop pipeline =
    match steps with
    | [] ->
        fail (Too_short_locator (sender_id, pipeline.locator))
-   | {Block_locator.predecessor; _} :: _ -> (
+   | {Block_locator.predecessor; _} :: _ ->
        State.Block.known chain_state predecessor
        >>= fun predecessor_known ->
        (* Check that the locator is anchored in a block locally
@@ -324,51 +321,25 @@ let headers_fetch_worker_loop pipeline =
          | _ ->
              process_headers remaining_headers
        in
-       match steps with
-       | [] ->
-           return_unit
-       | [single] ->
-           Bootstrap_pipeline_event.(emit fetching_step_from_peer)
-             ( 1,
-               number_of_steps,
-               single.step,
-               single.block,
-               single.predecessor,
-               pipeline.peer_id )
-           >>= fun () -> fetch_step pipeline single >>=? process_headers
-       | first :: (_ :: _ as rest) ->
-           (* With respect to concurrency, [pipe] sits between [iter_s]
-            and [iter_p]: it keeps up to two promises pending. This is
-            acheived by passing the promise started at the current
-            step as argument in the next recursive call. *)
-           (* counter only used for logging *)
-           let step_counter = ref 1 in
-           Bootstrap_pipeline_event.(emit fetching_step_from_peer)
-             ( !step_counter,
-               number_of_steps,
-               first.step,
-               first.block,
-               first.predecessor,
-               pipeline.peer_id )
-           >>= fun () ->
-           let first = fetch_step pipeline first in
-           let rec pipe previous = function
-             | [] ->
-                 previous >>=? process_headers
-             | current :: rest ->
-                 incr step_counter ;
-                 Bootstrap_pipeline_event.(emit fetching_step_from_peer)
-                   ( !step_counter,
-                     number_of_steps,
-                     current.Block_locator.step,
-                     current.block,
-                     current.predecessor,
-                     pipeline.peer_id )
-                 >>= fun () ->
-                 let current = fetch_step pipeline current in
-                 previous >>=? process_headers >>=? fun () -> pipe current rest
-           in
-           pipe first rest ))
+       let rec loop counter steps =
+         match steps with
+         | [] ->
+             return_unit
+         | current :: rest ->
+             let open Block_locator in
+             Bootstrap_pipeline_event.(emit fetching_step_from_peer)
+               ( counter,
+                 number_of_steps,
+                 current.step,
+                 current.block,
+                 current.predecessor,
+                 pipeline.peer_id )
+             >>= fun () ->
+             fetch_step pipeline current
+             >>=? process_headers
+             >>=? fun () -> loop (succ counter) rest
+       in
+       loop 1 steps)
   >>= function
   | Ok () ->
       Bootstrap_pipeline_event.(emit fetching_all_steps_from_peer)

@@ -2,6 +2,7 @@
  (name tezos_protocol_environment)
  (public_name tezos-protocol-environment)
  (libraries tezos-base
+            sapling
             tezos-protocol-environment-sigs
             tezos-protocol-environment-structs
             tezos-micheline)
@@ -10,9 +11,11 @@
  (wrapped false)
  (modules Tezos_protocol_environment
           Environment_V0
+          Environment_V1
           Environment_context
           Environment_protocol_T
           Environment_protocol_T_V0
+          Environment_protocol_T_V1
           Dummy_context
           Memory_context))
 
@@ -24,7 +27,7 @@
             tezos-storage)
  (modules Shell_context))
 
-(alias
- (name runtest_lint)
+(rule
+ (alias runtest_lint)
  (deps (glob_files *.ml{,i}))
  (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

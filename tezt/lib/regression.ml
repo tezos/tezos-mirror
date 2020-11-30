@@ -79,12 +79,12 @@ let log_regression_diff diff =
         Log.log ~level:Error ~color "%s" line)
     (String.split_on_char '\n' diff)
 
-let run ~__FILE__ ~title ~tags ~output_file
+let register ~__FILE__ ~title ~tags ~output_file
     ?(regression_output_path = "tezt/_regressions") f =
   let tags = "regression" :: tags in
   let output_file = Format.asprintf "%s.out" output_file in
   let stored_output_file = regression_output_path // output_file in
-  Test.run ~__FILE__ ~title ~tags (fun () ->
+  Test.register ~__FILE__ ~title ~tags (fun () ->
       (* when the stored output doesn't already exists, must reset regressions *)
       if
         not

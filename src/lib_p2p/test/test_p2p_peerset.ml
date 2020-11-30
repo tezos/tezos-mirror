@@ -23,12 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Testing
-   -------
-   Component:    P2P
-   Invocation:   dune build @src/lib_p2p/test/runtest_p2p_peerset
-   Subject:      On banning peers and usage of Access Control Lists (ACL)
-                 using FIFO caches filled with peers' ids.
+(** Testing
+    -------
+    Component:    P2P
+    Invocation:   dune build @src/lib_p2p/test/runtest_p2p_peerset
+    Subject:      On banning peers and usage of Access Control Lists (ACL)
+                  using FIFO caches filled with peers' ids.
 *)
 
 include Internal_event.Legacy_logging.Make (struct
@@ -39,9 +39,7 @@ let assert_equal_bool ~msg a b = if a <> b then Alcotest.fail msg
 
 let a s = P2p_peer.Id.hash_string [s]
 
-(* Test.
-   An empty ACL (built as a FIFO cache) initially contains no peer.
-*)
+(** An empty ACL (built as a FIFO cache) initially contains no peer. *)
 let test_empty _ =
   let peers = List.map a ["foo"; "bar"; "baz"] in
   let empty = P2p_acl.PeerFIFOCache.create 10 in
@@ -53,9 +51,7 @@ let test_empty _ =
         (P2p_acl.PeerFIFOCache.mem empty peer))
     peers
 
-(* Test.
-   From an empty ACL cache, we successively add "foo", "bar", "baz".
-*)
+(** From an empty ACL cache, we successively add "foo", "bar", "baz". *)
 let test_add _ =
   let peers = List.map a ["foo"; "bar"; "baz"] in
   let set = P2p_acl.PeerFIFOCache.create 10 in
@@ -65,10 +61,9 @@ let test_add _ =
       assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerFIFOCache.mem set peer))
     peers
 
-(* Test.
-   From an empty ACL cache, we successively add "foo", "bar", "baz".
-   We test that "bar" exists, then remove it. Hence, it does not exist
-   in the cache anymore.
+(** From an empty ACL cache, we successively add "foo", "bar", "baz".
+    We test that "bar" exists, then remove it. Hence, it does not exist
+    in the cache anymore.
 *)
 let test_remove _ =
   let peers = List.map a ["foo"; "bar"; "baz"] in
@@ -81,10 +76,9 @@ let test_remove _ =
     false
     (P2p_acl.PeerFIFOCache.mem set (a "bar"))
 
-(* Test.
-   An initial cache of size 3 is filled with 3 peer ids. Additionaly,
-   we add "foo" and "zor", hence they are cached but not for "bar"
-   anymore. "baz" is the FIFO head and so on...
+(** An initial cache of size 3 is filled with 3 peer ids. Additionaly,
+    we add "foo" and "zor", hence they are cached but not for "bar"
+    anymore. "baz" is the FIFO head and so on...
 *)
 let test_LRU_overflow _ =
   let peers = List.map a ["foo"; "bar"; "baz"] in

@@ -2,6 +2,9 @@ from docutils import nodes
 import os
 import os.path
 import re
+from pathlib import Path
+
+TEZOS_HOME = '../'
 
 def setup(app):
     app.add_role('package', package_role)
@@ -70,8 +73,18 @@ def src_role(name, rawtext, text, lineno, inliner, options={}, content=[]):
     else:
       src = text
       text = text
+
+    # raise a warning if the file does not exist
+    if not Path(TEZOS_HOME, src).exists():
+        msg = [inliner.reporter.warning(
+            f'source file {src} does not exist in the repo',
+            line=lineno
+        )]
+    else:
+        msg = []
+
     branch = os.environ.get('CI_COMMIT_REF_NAME', 'master')
     project_url = os.environ.get('CI_PROJECT_URL', 'https://gitlab.com/tezos/tezos')
     url = project_url + "/tree/" + branch + "/" + src
     node = nodes.reference(rawtext, text, refuri=url, **options)
-    return [node], []
+    return [node], msg

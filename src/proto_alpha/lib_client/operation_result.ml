@@ -191,6 +191,16 @@ let pp_manager_operation_contents_and_result ppf
         {source; fee; operation; counter; gas_limit; storage_limit},
       Manager_operation_result
         {balance_updates; operation_result; internal_operation_results} ) =
+  let pp_big_map_diff = function
+    | None | Some [] ->
+        ()
+    | Some diff ->
+        Format.fprintf
+          ppf
+          "@,@[<v 2>Updated big_maps:@ %a@]"
+          Michelson_v1_printer.print_big_map_diff
+          diff
+  in
   let pp_transaction_result
       (Transaction_result
         { balance_updates;
@@ -219,15 +229,7 @@ let pp_manager_operation_contents_and_result ppf
           "@,@[<hv 2>Updated storage:@ %a@]"
           Michelson_v1_printer.print_expr
           expr ) ;
-    ( match big_map_diff with
-    | None | Some [] ->
-        ()
-    | Some diff ->
-        Format.fprintf
-          ppf
-          "@,@[<v 2>Updated big_maps:@ %a@]"
-          Michelson_v1_printer.print_big_map_diff
-          diff ) ;
+    pp_big_map_diff big_map_diff ;
     if storage_size <> Z.zero then
       Format.fprintf ppf "@,Storage size: %s bytes" (Z.to_string storage_size) ;
     if paid_storage_size_diff <> Z.zero then
@@ -235,7 +237,7 @@ let pp_manager_operation_contents_and_result ppf
         ppf
         "@,Paid storage size diff: %s bytes"
         (Z.to_string paid_storage_size_diff) ;
-    Format.fprintf ppf "@,Consumed gas: %s" (Z.to_string consumed_gas) ;
+    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
     match balance_updates with
     | [] ->
         ()
@@ -265,21 +267,13 @@ let pp_manager_operation_contents_and_result ppf
           contracts ) ;
     if storage_size <> Z.zero then
       Format.fprintf ppf "@,Storage size: %s bytes" (Z.to_string storage_size) ;
-    ( match big_map_diff with
-    | None | Some [] ->
-        ()
-    | Some diff ->
-        Format.fprintf
-          ppf
-          "@,@[<v 2>Updated big_maps:@ %a@]"
-          Michelson_v1_printer.print_big_map_diff
-          diff ) ;
+    pp_big_map_diff big_map_diff ;
     if paid_storage_size_diff <> Z.zero then
       Format.fprintf
         ppf
         "@,Paid storage size diff: %s bytes"
         (Z.to_string paid_storage_size_diff) ;
-    Format.fprintf ppf "@,Consumed gas: %s" (Z.to_string consumed_gas) ;
+    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
     match balance_updates with
     | [] ->
         ()
@@ -299,7 +293,7 @@ let pp_manager_operation_contents_and_result ppf
         Format.fprintf ppf "This operation FAILED."
     | Applied (Reveal_result {consumed_gas}) ->
         Format.fprintf ppf "This revelation was successfully applied" ;
-        Format.fprintf ppf "@,Consumed gas: %s" (Z.to_string consumed_gas)
+        Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas
     | Backtracked (Reveal_result _, _) ->
         Format.fprintf
           ppf
@@ -307,7 +301,7 @@ let pp_manager_operation_contents_and_result ppf
            NOT applied.@]"
     | Applied (Delegation_result {consumed_gas}) ->
         Format.fprintf ppf "This delegation was successfully applied" ;
-        Format.fprintf ppf "@,Consumed gas: %s" (Z.to_string consumed_gas)
+        Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas
     | Backtracked (Delegation_result _, _) ->
         Format.fprintf
           ppf
@@ -338,7 +332,7 @@ let pp_manager_operation_contents_and_result ppf
      From: %a@,\
      Fee to the baker: %s%a@,\
      Expected counter: %s@,\
-     Gas limit: %s@,\
+     Gas limit: %a@,\
      Storage limit: %s bytes"
     Signature.Public_key_hash.pp
     source
@@ -346,7 +340,8 @@ let pp_manager_operation_contents_and_result ppf
     Tez.pp
     fee
     (Z.to_string counter)
-    (Z.to_string gas_limit)
+    Gas.Arith.pp_integral
+    gas_limit
     (Z.to_string storage_limit) ;
   ( match balance_updates with
   | [] ->

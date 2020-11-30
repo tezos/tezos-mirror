@@ -87,7 +87,7 @@ let commands () =
            try
              let v = Z.of_string str in
              assert (Compare.Z.(v >= Z.zero)) ;
-             return v
+             return (Alpha_context.Gas.Arith.integral v)
            with _ -> failwith "invalid gas limit (must be a positive number)"))
   in
   let resolve_max_gas cctxt block = function

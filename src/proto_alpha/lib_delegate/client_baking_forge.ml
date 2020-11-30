@@ -50,9 +50,9 @@ let default_max_priority = 64
 let default_minimal_fees =
   match Tez.of_mutez 100L with None -> assert false | Some t -> t
 
-let default_minimal_nanotez_per_gas_unit = Z.of_int 100
+let default_minimal_nanotez_per_gas_unit = Q.of_int 100
 
-let default_minimal_nanotez_per_byte = Z.of_int 1000
+let default_minimal_nanotez_per_byte = Q.of_int 1000
 
 let default_retry_counter = 5
 
@@ -71,9 +71,9 @@ type state = {
   (* Minimal operation fee required to include an operation in a block *)
   minimal_fees : Tez.t;
   (* Minimal operation fee per gas required to include an operation in a block *)
-  minimal_nanotez_per_gas_unit : Z.t;
+  minimal_nanotez_per_gas_unit : Q.t;
   (* Minimal operation fee per byte required to include an operation in a block *)
-  minimal_nanotez_per_byte : Z.t;
+  minimal_nanotez_per_byte : Q.t;
   (* truly mutable *)
   mutable best_slot : slot option;
   mutable retry_counter : int;
@@ -264,9 +264,10 @@ let get_manager_operation_gas_and_fee op =
     (fun ((total_fee, total_gas) as acc) -> function
       | Contents (Manager_operation {fee; gas_limit; _}) ->
           (Lwt.return @@ Environment.wrap_error @@ Tez.(total_fee +? fee))
-          >>=? fun total_fee -> return (total_fee, Z.add total_gas gas_limit)
-      | _ -> return acc)
-    (Tez.zero, Z.zero)
+          >>=? fun total_fee ->
+          return (total_fee, Gas.Arith.add total_gas gas_limit) | _ ->
+          return acc)
+    (Tez.zero, Gas.Arith.zero)
     l
 
 (* Sort operation considering potential gas and storage usage.
@@ -277,10 +278,13 @@ let sort_manager_operations ~max_size ~hard_gas_limit_per_block ~minimal_fees
   let compute_weight op (fee, gas) =
     let size = Data_encoding.Binary.length Operation.encoding op in
     let size_f = Q.of_int size in
-    let gas_f = Q.of_bigint gas in
+    let gas_f = Q.of_bigint (Gas.Arith.integral_to_z gas) in
     let fee_f = Q.of_int64 (Tez.to_mutez fee) in
     let size_ratio = Q.(size_f / Q.of_int max_size) in
-    let gas_ratio = Q.(gas_f / Q.of_bigint hard_gas_limit_per_block) in
+    let gas_ratio =
+      Q.(
+        gas_f / Q.of_bigint (Gas.Arith.integral_to_z hard_gas_limit_per_block))
+    in
     (size, gas, Q.(fee_f / max size_ratio gas_ratio))
   in
   filter_map_s
@@ -290,21 +294,22 @@ let sort_manager_operations ~max_size ~hard_gas_limit_per_block ~minimal_fees
       if Tez.(fee < minimal_fees) then return_none
       else
         let ((size, gas, _ratio) as weight) = compute_weight op (fee, gas) in
-        let open Environment in
         let fees_in_nanotez =
-          Z.mul (Z.of_int64 (Tez.to_mutez fee)) (Z.of_int 1000)
+          Q.mul (Q.of_int64 (Tez.to_mutez fee)) (Q.of_int 1000)
         in
         let enough_fees_for_gas =
           let minimal_fees_in_nanotez =
-            Z.mul minimal_nanotez_per_gas_unit gas
+            Q.mul
+              minimal_nanotez_per_gas_unit
+              (Q.of_bigint @@ Gas.Arith.integral_to_z gas)
           in
-          Z.compare minimal_fees_in_nanotez fees_in_nanotez <= 0
+          Q.compare minimal_fees_in_nanotez fees_in_nanotez <= 0
         in
         let enough_fees_for_size =
           let minimal_fees_in_nanotez =
-            Z.mul minimal_nanotez_per_byte (Z.of_int size)
+            Q.mul minimal_nanotez_per_byte (Q.of_int size)
           in
-          Z.compare minimal_fees_in_nanotez fees_in_nanotez <= 0
+          Q.compare minimal_fees_in_nanotez fees_in_nanotez <= 0
         in
         if enough_fees_for_size && enough_fees_for_gas then
           return_some (op, weight)
@@ -353,11 +358,11 @@ let trim_manager_operations ~max_size ~hard_gas_limit_per_block
   List.fold_left
     (fun (total_size, total_gas, (good_ops, bad_ops)) (op, (size, gas)) ->
       let new_size = total_size + size in
-      let new_gas = Z.(total_gas + gas) in
-      if new_size > max_size || Z.gt new_gas hard_gas_limit_per_block then
-        (new_size, new_gas, (good_ops, op :: bad_ops))
+      let new_gas = Gas.Arith.(add total_gas gas) in
+      if new_size > max_size || Gas.Arith.(new_gas > hard_gas_limit_per_block)
+      then (new_size, new_gas, (good_ops, op :: bad_ops))
       else (new_size, new_gas, (op :: good_ops, bad_ops)))
-    (0, Z.zero, ([], []))
+    (0, Gas.Arith.zero, ([], []))
     manager_operations
   |> fun (_, _, (good_ops, bad_ops)) ->
   (* We keep the overflowing operations, it may be used for client-side validation *)
@@ -1134,13 +1139,11 @@ let build_block cctxt ~user_activated_upgrades state seed_nonce_hash
             -% t event "new_head_received")
       >>= fun () -> return_none
   | Some (operations, timestamp) -> (
-      let hard_gas_limit_per_block =
-        state.constants.parametric.hard_gas_limit_per_block
-      in
       classify_operations
         cctxt
         ~chain
-        ~hard_gas_limit_per_block
+        ~hard_gas_limit_per_block:
+          state.constants.parametric.hard_gas_limit_per_block
         ~minimal_fees:state.minimal_fees
         ~minimal_nanotez_per_gas_unit:state.minimal_nanotez_per_gas_unit
         ~minimal_nanotez_per_byte:state.minimal_nanotez_per_byte

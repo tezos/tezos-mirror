@@ -1,3 +1,5 @@
+.. _openapi_specification:
+
 OpenAPI Specification
 =====================
 
@@ -17,21 +19,21 @@ Shell RPCs
 .. As soon as an actual release has this specification we should update
 .. this section and the next one. The idea would be to link to all release tags,
 .. and have an additional link at the top to the latest-release branch.
-.. We'll probably remove the link to the specification for version 7.4 at this point
+.. We'll probably remove the link to the specification for version 7.5 at this point
 .. since it does not make sense to keep it in master forever.
 
 The node provide some RPCs which are independent of the protocol.
 Their OpenAPI specification can be found at:
 
-- `openapi/rpc-openapi.json (version 7.4) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/rpc-openapi.json>`_
+- `openapi/rpc-openapi.json (version 7.5) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/rpc-openapi.json>`_
 
-Carthage RPCs
+Delphi RPCs
 -------------
 
 The OpenAPI specification for RPCs which are specific
-to the Carthage protocol can be found at:
+to the Delphi protocol can be found at:
 
-- `openapi/carthage-openapi.json (version 7.4) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/carthage-openapi.json>`_
+- `openapi/delphi-openapi.json (version 7.5) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/delphi-openapi.json>`_
 
 How to Generate
 ---------------

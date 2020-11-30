@@ -23,6 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:    Crypto
+    Invocation:   dune build @src/lib_crypto/runtest
+    Dependencies: src/lib_crypto/test/roundtrips.ml
+    Subject:      Encoding in Base58
+*)
+
 let test_roundtrip_safe input =
   Roundtrips.test_rt_opt
     "safe base58"
@@ -66,8 +74,12 @@ let inputs =
     String.init 1000 (fun i -> Char.chr (32 + (i mod (126 - 32))));
     "" ]
 
+(** Safe Base58Check-encoding then decoding (provided with error
+    detections)
+*)
 let test_roundtrip_safes () = List.iter test_roundtrip_safe inputs
 
+(** Base58-encoding then decoding (no error detection) *)
 let test_roundtrip_raws () = List.iter test_roundtrip_raw inputs
 
 let test_safety input =
@@ -77,6 +89,7 @@ let test_safety input =
     Base58.safe_decode
     input
 
+(** Safe Base58Check-decoding (provided with error detections) *)
 let test_safetys () = List.iter test_safety inputs
 
 let tests =

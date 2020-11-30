@@ -37,7 +37,7 @@
    Call `tezos-client rpc list` and check that return code is 0.
  *)
 let test_rpc_list protocol =
-  Test.run
+  Test.register
     ~__FILE__
     ~title:"rpc list (mockup)"
     ~tags:["mockup"; "client"; "rpc"]
@@ -71,7 +71,7 @@ let test_balances_after_transfer giver amount receiver =
    Transfer some tz and check balance changes are as expected.
  *)
 let test_transfer ~(protocol : Constant.protocol) =
-  Test.run
+  Test.register
     ~__FILE__
     ~title:(Printf.sprintf "transfer (mockup / %s)" protocol.tag)
     ~tags:["mockup"; "client"; "transfer"; protocol.tag]
@@ -94,7 +94,7 @@ let test_transfer ~(protocol : Constant.protocol) =
     (receiver_balance_before, receiver_balance_after) ;
   return ()
 
-let run () =
+let register () =
   test_rpc_list Constant.alpha ;
   test_transfer ~protocol:Constant.alpha ;
   test_transfer ~protocol:Constant.carthage

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -341,6 +342,14 @@ struct
 end
 
 module Prefix = struct
+  (* These encoded prefixes are computed using scripts/base58_prefix.py
+     $ ./scripts/base58_prefix.py tz1 20
+     36 434591 [6L, 161L, 159L]
+     $ dune utop src/lib_crypto
+     utop # Tezos_crypto.Base58.make_encoded_prefix "\006\161\159" 20 ;;
+     - : string * int = ("tz1", 36)
+   *)
+
   (* 32 *)
   let block_hash = "\001\052" (* B(51) *)
 
@@ -353,6 +362,14 @@ module Prefix = struct
   let protocol_hash = "\002\170" (* P(51) *)
 
   let context_hash = "\079\199" (* Co(52) *)
+
+  let block_metadata_hash = "\234\249" (* bm(52) *)
+
+  let operation_metadata_hash = "\005\183" (* r(51) *)
+
+  let operation_metadata_list_hash = "\134\039" (* Lr(52) *)
+
+  let operation_metadata_list_list_hash = "\029\159\182" (* LLr(53) *)
 
   (* 20 *)
   let ed25519_public_key_hash = "\006\161\159" (* tz1(36) *)
@@ -401,7 +418,11 @@ module Prefix = struct
   let generic_signature = "\004\130\043" (* sig(96) *)
 
   (* 4 *)
-  let chain_id = "\087\082\000"
+  let chain_id = "\087\082\000" (* Net(15) *)
 
-  (* Net(15) *)
+  (* 169 *)
+  let sapling_spending_key = "\011\237\020\092" (* sask(241) *)
+
+  (* 43 *)
+  let sapling_address = "\018\071\040\223" (* zet1(69) *)
 end

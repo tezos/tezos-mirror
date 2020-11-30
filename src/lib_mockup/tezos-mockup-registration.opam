@@ -6,8 +6,8 @@ bug-reports: "https://gitlab.com/tezos/tezos/issues"
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
-  "ocamlfind" { build }
-  "dune" { >= "1.7" }
+  "tezos-tooling" { with-test }
+  "dune" { >= "2.0" }
   "tezos-base"
   "tezos-client-base"
   "tezos-shell-services"

@@ -153,6 +153,13 @@ type t =
   | Get_operations_for_blocks of (Block_hash.t * int) list
   | Operations_for_block of
       Block_hash.t * int * Operation.t list * Operation_list_list_hash.path
+  | Get_checkpoint of Chain_id.t
+  | Checkpoint of Chain_id.t * Block_header.t
+  | Get_protocol_branch of Chain_id.t * int (* proto_level: uint8 *)
+  | Protocol_branch of
+      Chain_id.t * int (* proto_level: uint8 *) * Block_locator.t
+  | Get_predecessor_header of Block_hash.t * int32
+  | Predecessor_header of Block_hash.t * int32 * Block_header.t
 
 let encoding =
   let open Data_encoding in
@@ -271,9 +278,87 @@ let encoding =
         | _ ->
             None)
       (fun ((block, ofs), (path, ops)) ->
-        Operations_for_block (block, ofs, ops, path)) ]
+        Operations_for_block (block, ofs, ops, path));
+    case
+      ~tag:0x70
+      ~title:"Get_checkpoint"
+      (obj1 (req "get_checkpoint" Chain_id.encoding))
+      (function Get_checkpoint chain -> Some chain | _ -> None)
+      (fun chain -> Get_checkpoint chain);
+    case
+      ~tag:0x71
+      ~title:"Checkpoint"
+      (obj1
+         (req
+            "checkpoint"
+            (obj2
+               (req "chain_id" Chain_id.encoding)
+               (req "header" Bounded_encoding.block_header))))
+      (function
+        | Checkpoint (chain_id, header) -> Some (chain_id, header) | _ -> None)
+      (fun (chain_id, header) -> Checkpoint (chain_id, header));
+    case
+      ~tag:0x80
+      ~title:"Get_protocol_branch"
+      (obj1
+         (req
+            "get_protocol_branch"
+            (obj2 (req "chain" Chain_id.encoding) (req "proto_level" uint8))))
+      (function
+        | Get_protocol_branch (chain, protocol) ->
+            Some (chain, protocol)
+        | _ ->
+            None)
+      (fun (chain, protocol) -> Get_protocol_branch (chain, protocol));
+    case
+      ~tag:0x81
+      ~title:"Protocol_branch"
+      (obj1
+         (req
+            "protocol_branch"
+            (obj3
+               (req "chain" Chain_id.encoding)
+               (req "proto_level" uint8)
+               (req "locator" Bounded_encoding.block_locator))))
+      (function
+        | Protocol_branch (chain, proto_level, locator) ->
+            Some (chain, proto_level, locator)
+        | _ ->
+            None)
+      (fun (chain, proto_level, locator) ->
+        Protocol_branch (chain, proto_level, locator));
+    case
+      ~tag:0x90
+      ~title:"Get_predecessor_header"
+      (obj1
+         (req
+            "get_predecessor_header"
+            (obj2 (req "block" Block_hash.encoding) (req "offset" int32))))
+      (function
+        | Get_predecessor_header (block, offset) ->
+            Some (block, offset)
+        | _ ->
+            None)
+      (fun (block, offset) -> Get_predecessor_header (block, offset));
+    case
+      ~tag:0x91
+      ~title:"Predecessor_header"
+      (obj1
+         (req
+            "predecessor_header"
+            (obj3
+               (req "block" Block_hash.encoding)
+               (req "offset" int32)
+               (req "header" Bounded_encoding.block_header))))
+      (function
+        | Predecessor_header (hash, offset, header) ->
+            Some (hash, offset, header)
+        | _ ->
+            None)
+      (fun (hash, offset, header) -> Predecessor_header (hash, offset, header))
+  ]
 
-let distributed_db_versions = [Distributed_db_version.zero]
+let distributed_db_versions = Distributed_db_version.[zero; one]
 
 let cfg chain_name : _ P2p_params.message_config =
   {encoding; chain_name; distributed_db_versions}

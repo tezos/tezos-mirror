@@ -101,6 +101,8 @@ module Make_substore (S : STORE) (N : NAME) : STORE with type t = S.t = struct
 
   let remove t k = S.remove t (to_key k)
 
+  type key_or_dir = [`Key of key | `Dir of key]
+
   let fold t k ~init ~f =
     S.fold t (to_key k) ~init ~f:(fun k acc -> f (map_key of_key k) acc)
 
@@ -141,6 +143,8 @@ module Make_indexed_substore (S : STORE) (I : INDEX) = struct
     let store (t, i) k v = S.store t (to_key i k) v
 
     let remove (t, i) k = S.remove t (to_key i k)
+
+    type key_or_dir = [`Key of key | `Dir of key]
 
     let fold (t, i) k ~init ~f =
       S.fold t (to_key i k) ~init ~f:(fun k acc -> f (map_key of_key k) acc)

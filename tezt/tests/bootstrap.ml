@@ -100,7 +100,7 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
   let bakes_during_kill = 100 in
   let hmode1s = Node.show_history_mode hmode1 in
   let hmode2s = Node.show_history_mode hmode2 in
-  Test.run
+  Test.register
     ~__FILE__
     ~title:(Format.sprintf "node synchronization (%s / %s)" hmode1s hmode2s)
     ~tags:
@@ -114,12 +114,8 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
   @@ fun () ->
   (* Initialize nodes and client. *)
   let* node_1 =
-    Node.init
-      ~synchronisation_threshold:0
-      ~connections:1
-      ~history_mode:hmode1
-      ()
-  and* node_2 = Node.init ~connections:1 ~history_mode:hmode2 () in
+    Node.init [Synchronisation_threshold 0; Connections 1; History_mode hmode1]
+  and* node_2 = Node.init [Connections 1; History_mode hmode2] in
   let* node2_identity = Node.wait_for_identity node_2 in
   let* client = Client.init ~node:node_1 () in
   (* Connect node 1 to node 2 and start baking. *)
@@ -135,7 +131,7 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
   let* () = repeat bakes_during_kill (fun () -> Client.bake_for client) in
   (* Restart node 2 and let it catch up. *)
   Log.info "Baked %d times with node_2 down, restart node_2." bakes_during_kill ;
-  let* () = Node.run ~synchronisation_threshold:1 ~connections:1 node_2 in
+  let* () = Node.run node_2 [Synchronisation_threshold 1; Connections 1] in
   let* _ = Node.wait_for_ready node_2 in
   let final_level = 1 + bakes_before_kill + bakes_during_kill in
   let* _ = Node.wait_for_level node_1 final_level in
@@ -182,13 +178,13 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
     if b then Test.fail "expected the two nodes NOT to be connected" else unit
 
 let check_rpc_force_bootstrapped () =
-  Test.run
+  Test.register
     ~__FILE__
     ~title:(sf "RPC force bootstrapped")
     ~tags:["rpc"; "bootstrapped"]
   @@ fun () ->
   Log.info "Start a node." ;
-  let* node = Node.init ~synchronisation_threshold:10000 () in
+  let* node = Node.init [Synchronisation_threshold 255] in
   let* client = Client.init ~node () in
   let (bootstrapped_promise, bootstrapped_resolver) = Lwt.task () in
   Node.on_event node (bootstrapped_event bootstrapped_resolver) ;
@@ -198,7 +194,7 @@ let check_rpc_force_bootstrapped () =
   let* () = bootstrapped_promise in
   unit
 
-let run () =
+let register () =
   check_bootstrap_with_history_modes Archive Archive ;
   check_bootstrap_with_history_modes Archive Full ;
   check_bootstrap_with_history_modes Archive Rolling ;
