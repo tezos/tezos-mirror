@@ -1,8 +1,8 @@
 .. _008_edo:
-.. _proto-008: https://gitlab.com/metastatedev/tezos/-/tree/proto-proposal
+.. _proto-008: https://gitlab.com/metastatedev/tezos/-/tree/proto-008
 
-Protocol 008_<TBD> Edo
-=======================
+Protocol 008_PtEdoTez Edo
+=========================
 
 This page contains all the relevant information for protocol 008 Edo.
 Each of the main changes is briefly described with links to relevant
@@ -12,12 +12,11 @@ operations.
 The changelog section contains all the Merge Requests and instructions
 to regenerate the protocol sources from the Gitlab branch.
 
-The code can be found in the Gitlab branch `proto-008`_ and its full
-hash is ``<TBD>``.
-
-**This page is Work In Progress while the protocol receives some finishing touches.**
-
-**When the proposal is ready the hash will be announced.**
+The code can be found in the Gitlab branch `proto-008`_ or in the
+release 8.0~rc2 and its full hash is
+``PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq``.
+As usual a :ref:`testnet <test-networks>` called `Edonet` will be available
+for the whole life of the protocol.
 
 The main novelties in the Edo protocol are:
 
