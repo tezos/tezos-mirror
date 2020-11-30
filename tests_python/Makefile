@@ -1,7 +1,7 @@
 TYPECHECK=poetry run mypy
 LINT=poetry run pylint
 LINT2=poetry run pycodestyle
-PACKAGES=daemons launchers client tools scripts tests_alpha examples codec
+PACKAGES=daemons launchers client tools scripts tests_007 tests_alpha examples tests_007/multibranch codec
 LOG_DIR=tmp
 
 install-dependencies:
