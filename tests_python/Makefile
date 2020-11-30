@@ -38,10 +38,8 @@ all:
 
 lint: pylint pycodestyle lint_black
 
-# Analyses that we want to run as part of pre-commit hook. Target "black"
-# is not in there, because the hook needs finer control regarding git adding
-# formatted files.
-pre_commit_targets: lint typecheck
+# Analyses that we want to run as part of pre-commit hook.
+pre_commit_targets: lint typecheck lint_black
 
 fmt: black
 
