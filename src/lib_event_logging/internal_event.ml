@@ -49,6 +49,9 @@ let check_name_exn : string -> (string -> char -> exn) -> unit =
     name ;
   ()
 
+(* Levels are declared from the lowest to the highest so that
+   polymorphic comparison can be used to check whether a message
+   should be printed. *)
 type level = Lwt_log_core.level =
   | Debug
   | Info
@@ -56,6 +59,8 @@ type level = Lwt_log_core.level =
   | Warning
   | Error
   | Fatal
+
+let should_log ~level ~sink_level = level >= sink_level
 
 module Level = struct
   type t = level
@@ -1189,23 +1194,33 @@ module Legacy_logging = struct
     module Event = Make (Definition)
 
     let emit_async level fmt ?tags =
-      Format.kasprintf
-        (fun message ->
-          Lwt.ignore_result
-            (Event.emit ~section (fun () ->
-                 Definition.make ?tags level message)))
-        fmt
+      (* Hack to prevent massive calls to kasprintf *)
+      let log_section = Section.to_lwt_log section in
+      if should_log ~level ~sink_level:(Lwt_log_core.Section.level log_section)
+      then Format.ifprintf Format.std_formatter fmt
+      else
+        Format.kasprintf
+          (fun message ->
+            Lwt.ignore_result
+              (Event.emit ~section (fun () ->
+                   Definition.make ?tags level message)))
+          fmt
 
     let emit_lwt level fmt ?tags =
-      Format.kasprintf
-        (fun message ->
-          Event.emit ~section (fun () -> Definition.make ?tags level message)
-          >>= function
-          | Ok () ->
-              Lwt.return_unit
-          | Error el ->
-              Format.kasprintf Lwt.fail_with "%a" pp_print_error el)
-        fmt
+      (* Hack to prevent massive calls to kasprintf *)
+      let log_section = Section.to_lwt_log section in
+      if should_log ~level ~sink_level:(Lwt_log_core.Section.level log_section)
+      then Format.ikfprintf (fun _ -> Lwt.return_unit) Format.std_formatter fmt
+      else
+        Format.kasprintf
+          (fun message ->
+            Event.emit ~section (fun () -> Definition.make ?tags level message)
+            >>= function
+            | Ok () ->
+                Lwt.return_unit
+            | Error el ->
+                Format.kasprintf Lwt.fail_with "%a" pp_print_error el)
+          fmt
   end
 
   module Make (P : sig
@@ -1475,16 +1490,20 @@ module Lwt_log_sink = struct
       let module M = (val m : EVENT_DEFINITION with type t = a) in
       protect (fun () ->
           let ev = v () in
+          let level = M.level ev in
           let section =
             Option.fold ~some:Section.to_lwt_log section ~none:default_section
           in
-          let level = M.level ev in
-          Format.kasprintf
-            (Lwt_log_core.log ~section ~level)
-            "%a"
-            (M.pp ~short:false)
-            ev
-          >>= fun () -> return_unit)
+          (* Only call printf if the event is to be printed. *)
+          if should_log ~level ~sink_level:(Lwt_log_core.Section.level section)
+          then
+            Format.kasprintf
+              (Lwt_log_core.log ~section ~level)
+              "%a"
+              (M.pp ~short:false)
+              ev
+            >>= fun () -> return_unit
+          else return_unit)
 
     let close _ =
       Lwt_log_core.close !Lwt_log_core.default >>= fun () -> return_unit
