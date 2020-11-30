@@ -23,47 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_clic
-
-let group =
-  {Clic.name = "mockup"; title = "Commands for creating mockup environments"}
-
-let list_mockup_command_handler _ _ =
-  let available = Registration.get_registered_environments () in
-  List.iter
-    (fun (mockup : (module Registration.Mockup_sig)) ->
-      let module Mockup = (val mockup) in
-      Format.printf "%a@." Protocol_hash.pp Mockup.protocol_hash)
-    available ;
-  return ()
-
-let list_mockup_command : Tezos_client_base.Client_context.full Clic.command =
-  let open Clic in
-  command
-    ~group
-    ~desc:"List available protocols available for mockup construction."
-    no_options
-    (prefixes ["list"; "mockup"; "protocols"] @@ stop)
-    list_mockup_command_handler
-
-let migrate_mockup_command_handler () next_protococol_hash
-    (cctxt : Tezos_client_base.Client_context.full) =
-  match Protocol_hash.of_b58check next_protococol_hash with
-  | Error _ as result ->
-      Lwt.return result
-  | Ok next_protocol_hash ->
-      Migration.migrate_mockup ~cctxt ~protocol_hash:None ~next_protocol_hash
-
-let migrate_mockup_command : Tezos_client_base.Client_context.full Clic.command
-    =
-  let open Clic in
-  command
-    ~group
-    ~desc:"Migrates an on-disk mockup context from a protocol to another."
-    no_options
-    ( prefixes ["migrate"; "mockup"; "to"]
-    @@ string ~name:"hash" ~desc:"Protocol hash of the next protocol"
-    @@ stop )
-    migrate_mockup_command_handler
-
-let commands () = [list_mockup_command; migrate_mockup_command]
+(** Migrates the protocol version of an on-disk mockup environment.
+    The effect is protocol-dependent. *)
+val migrate_mockup :
+  cctxt:Tezos_client_base.Client_context.full ->
+  protocol_hash:Tezos_base.TzPervasives.Protocol_hash.t option ->
+  next_protocol_hash:Tezos_base.TzPervasives.Protocol_hash.t ->
+  unit tzresult Lwt.t

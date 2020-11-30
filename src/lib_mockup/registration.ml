@@ -67,6 +67,8 @@ module type Mockup_sig = sig
     constants_overrides_json:Data_encoding.json option ->
     bootstrap_accounts_json:Data_encoding.json option ->
     mockup_context tzresult Lwt.t
+
+  val migrate : mockup_context -> mockup_context tzresult Lwt.t
 end
 
 type mockup_environment = (module Mockup_sig)

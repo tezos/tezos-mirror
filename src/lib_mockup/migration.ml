@@ -23,47 +23,46 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_clic
+open Persistence
 
-let group =
-  {Clic.name = "mockup"; title = "Commands for creating mockup environments"}
-
-let list_mockup_command_handler _ _ =
-  let available = Registration.get_registered_environments () in
-  List.iter
-    (fun (mockup : (module Registration.Mockup_sig)) ->
-      let module Mockup = (val mockup) in
-      Format.printf "%a@." Protocol_hash.pp Mockup.protocol_hash)
-    available ;
-  return ()
-
-let list_mockup_command : Tezos_client_base.Client_context.full Clic.command =
-  let open Clic in
-  command
-    ~group
-    ~desc:"List available protocols available for mockup construction."
-    no_options
-    (prefixes ["list"; "mockup"; "protocols"] @@ stop)
-    list_mockup_command_handler
-
-let migrate_mockup_command_handler () next_protococol_hash
-    (cctxt : Tezos_client_base.Client_context.full) =
-  match Protocol_hash.of_b58check next_protococol_hash with
-  | Error _ as result ->
-      Lwt.return result
-  | Ok next_protocol_hash ->
-      Migration.migrate_mockup ~cctxt ~protocol_hash:None ~next_protocol_hash
-
-let migrate_mockup_command : Tezos_client_base.Client_context.full Clic.command
-    =
-  let open Clic in
-  command
-    ~group
-    ~desc:"Migrates an on-disk mockup context from a protocol to another."
-    no_options
-    ( prefixes ["migrate"; "mockup"; "to"]
-    @@ string ~name:"hash" ~desc:"Protocol hash of the next protocol"
-    @@ stop )
-    migrate_mockup_command_handler
-
-let commands () = [list_mockup_command; migrate_mockup_command]
+let migrate_mockup ~(cctxt : Tezos_client_base.Client_context.full)
+    ~protocol_hash ~next_protocol_hash =
+  let base_dir = cctxt#get_base_dir in
+  let explain_will_not_work explain =
+    cctxt#error
+      "@[<hv>Base directory %s %a@ This command will not work.@ Please \
+       specify a correct mockup base directory.@]"
+      base_dir
+      explain
+      ()
+    >>= fun () -> return_unit
+  in
+  classify_base_dir base_dir
+  >>=? fun base_dir_class ->
+  ( match base_dir_class with
+  | Base_dir_does_not_exist ->
+      explain_will_not_work (fun fmtr () ->
+          Format.fprintf fmtr "does not exist.")
+  | Base_dir_is_empty ->
+      explain_will_not_work (fun fmtr () -> Format.fprintf fmtr "is empty.")
+  | Base_dir_is_file ->
+      explain_will_not_work (fun fmtr () -> Format.fprintf fmtr "is a file.")
+  | Base_dir_is_nonempty ->
+      explain_will_not_work (fun fmtr () ->
+          Format.fprintf fmtr "is not a mockup base directory.")
+  | Base_dir_is_mockup ->
+      return_unit )
+  >>=? fun () ->
+  get_mockup_context_from_disk ~base_dir ~protocol_hash
+  >>=? fun ((module Current_mockup_env), (chain_id, rpc_context)) ->
+  get_registered_mockup (Some next_protocol_hash)
+  >>=? fun (module Next_mockup_env) ->
+  Next_mockup_env.migrate (chain_id, rpc_context)
+  >>=? fun (chain_id, rpc_context) ->
+  overwrite_mockup
+    ~protocol_hash:next_protocol_hash
+    ~chain_id
+    ~rpc_context
+    ~base_dir
+  >>=? fun () ->
+  cctxt#message "Migration successful." >>= fun () -> return_unit

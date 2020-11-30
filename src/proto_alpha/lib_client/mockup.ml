@@ -455,6 +455,21 @@ let mem_init :
         context;
       } )
 
+let migrate :
+    Chain_id.t * Tezos_protocol_environment.rpc_context ->
+    (Chain_id.t * Tezos_protocol_environment.rpc_context) tzresult Lwt.t =
+ fun (chain_id, rpc_context) ->
+  let {Tezos_protocol_environment.block_hash; context; block_header} =
+    rpc_context
+  in
+  Protocol.Main.init context block_header
+  >|= Protocol.Environment.wrap_error
+  >>=? fun {context; _} ->
+  let rpc_context =
+    {Tezos_protocol_environment.block_hash; block_header; context}
+  in
+  return (chain_id, rpc_context)
+
 (* ------------------------------------------------------------------------- *)
 (* Register mockup *)
 
@@ -483,5 +498,7 @@ let () =
     let directory = Protocol.rpc_services
 
     let init = mem_init
+
+    let migrate = migrate
   end in
   register_mockup_environment (module M)
