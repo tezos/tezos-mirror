@@ -22,6 +22,9 @@
             (select void_for_linking-007-PsDELPH1 from
               (tezos-client-007-PsDELPH1 -> void_for_linking-007-PsDELPH1.empty)
               (-> void_for_linking-007-PsDELPH1.empty))
+            (select void_for_linking-008-PtEdoTez from
+              (tezos-client-008-PtEdoTez -> void_for_linking-008-PtEdoTez.empty)
+              (-> void_for_linking-008-PtEdoTez.empty))
  )
  (flags (:standard -open Data_encoding
                    -open Tezos_base__TzPervasives
@@ -39,6 +42,7 @@
    (write-file void_for_linking-005-PsBabyM1.empty "")
    (write-file void_for_linking-006-PsCARTHA.empty "")
    (write-file void_for_linking-007-PsDELPH1.empty "")
+   (write-file void_for_linking-008-PtEdoTez.empty "")
 )))
 
 (rule

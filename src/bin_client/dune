@@ -45,6 +45,9 @@
             (select void_for_linking-007-PsDELPH1 from
               (tezos-client-007-PsDELPH1-commands-registration -> void_for_linking-007-PsDELPH1.empty)
               (-> void_for_linking-007-PsDELPH1.empty))
+            (select void_for_linking-008-PtEdoTez from
+              (tezos-client-008-PtEdoTez-commands-registration -> void_for_linking-008-PtEdoTez.empty)
+              (-> void_for_linking-008-PtEdoTez.empty))
 
             (select void_for_linking-alpha from
               (tezos-client-alpha-commands-registration -> void_for_linking-alpha.empty)
@@ -62,6 +65,9 @@
             (select void_for_linking-baking-007-PsDELPH1 from
               (tezos-baking-007-PsDELPH1-commands.registration -> void_for_linking-baking-007-PsDELPH1.empty)
               (-> void_for_linking-baking-007-PsDELPH1.empty))
+            (select void_for_linking-baking-008-PtEdoTez from
+              (tezos-baking-008-PtEdoTez-commands.registration -> void_for_linking-baking-008-PtEdoTez.empty)
+              (-> void_for_linking-baking-008-PtEdoTez.empty))
 
             tezos-stdlib-unix
             tezos-client-base-unix
@@ -90,11 +96,13 @@
    (write-file void_for_linking-005-PsBabyM1.empty "")
    (write-file void_for_linking-006-PsCARTHA.empty "")
    (write-file void_for_linking-007-PsDELPH1.empty "")
+   (write-file void_for_linking-008-PtEdoTez.empty "")
    (write-file void_for_linking-alpha.empty "")
    (write-file void_for_linking-demo-counter.empty "")
    (write-file void_for_linking-baking-alpha.empty "")
    (write-file void_for_linking-baking-006-PsCARTHA.empty "")
    (write-file void_for_linking-baking-007-PsDELPH1.empty "")
+   (write-file void_for_linking-baking-008-PtEdoTez.empty "")
 )))
 
 (install
