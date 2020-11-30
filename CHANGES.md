@@ -12,6 +12,9 @@ here either.
 
 ## Node
 
+- Fixes a bug where any event would allocate more memory than needed
+  when it were not to be printed.
+
 ## Client
 
 ## Baker / Endorser / Accuser
