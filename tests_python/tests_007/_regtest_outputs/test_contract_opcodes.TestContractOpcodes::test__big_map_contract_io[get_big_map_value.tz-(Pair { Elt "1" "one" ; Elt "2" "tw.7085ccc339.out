@@ -1,4 +1,4 @@
-tests/test_contract_opcodes.py::TestContractOpcodes::test__big_map_contract_io[get_big_map_value.tz-(Pair { Elt "1" "one" ; Elt "2" "two" } None)-"1"-(Pair 0 (Some "one"))-big_map_diff2]
+tests_007/test_contract_opcodes.py::TestContractOpcodes::test__big_map_contract_io[get_big_map_value.tz-(Pair { Elt "1" "one" ; Elt "2" "two" } None)-"1"-(Pair 0 (Some "one"))-big_map_diff2]
 
 storage
   (Pair 0 (Some "one"))

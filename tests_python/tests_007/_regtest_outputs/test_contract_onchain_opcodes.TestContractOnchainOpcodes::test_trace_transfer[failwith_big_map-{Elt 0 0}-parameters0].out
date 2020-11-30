@@ -1,4 +1,4 @@
-tests/test_contract_onchain_opcodes.py::TestContractOnchainOpcodes::test_trace_transfer[failwith_big_map-{Elt 0 0}-parameters0]
+tests_007/test_contract_onchain_opcodes.py::TestContractOnchainOpcodes::test_trace_transfer[failwith_big_map-{Elt 0 0}-parameters0]
 
 Node is bootstrapped.
 Estimated gas: 2193.270 units (will add 100 + 46 for safety)

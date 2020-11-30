@@ -1,4 +1,4 @@
-tests/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[big_map_mem_string.tz-(Pair { Elt "foo" 1 } None)-"bar"-(Pair 0 (Some False))]
+tests_007/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[big_map_mem_string.tz-(Pair { Elt "foo" 1 } None)-"bar"-(Pair 0 (Some False))]
 
 storage
   (Pair 0 (Some False))

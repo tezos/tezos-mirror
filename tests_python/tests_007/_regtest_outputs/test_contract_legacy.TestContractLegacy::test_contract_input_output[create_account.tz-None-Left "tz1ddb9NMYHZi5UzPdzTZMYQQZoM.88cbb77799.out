@@ -1,4 +1,4 @@
-tests/test_contract_legacy.py::TestContractLegacy::test_contract_input_output[create_account.tz-None-Left "tz1ddb9NMYHZi5UzPdzTZMYQQZoMub195zgv"-None]
+tests_007/test_contract_legacy.py::TestContractLegacy::test_contract_input_output[create_account.tz-None-Left "tz1ddb9NMYHZi5UzPdzTZMYQQZoMub195zgv"-None]
 
 storage
   None

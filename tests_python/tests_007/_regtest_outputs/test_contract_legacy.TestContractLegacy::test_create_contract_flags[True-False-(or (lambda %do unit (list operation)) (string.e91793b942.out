@@ -1,4 +1,4 @@
-tests/test_contract_legacy.py::TestContractLegacy::test_create_contract_flags[True-False-(or (lambda %do unit (list operation)) (string %default %default))-Spendable, non-delegatable contracts should have the %do entrypoint]
+tests_007/test_contract_legacy.py::TestContractLegacy::test_create_contract_flags[True-False-(or (lambda %do unit (list operation)) (string %default %default))-Spendable, non-delegatable contracts should have the %do entrypoint]
 
 storage
   Unit

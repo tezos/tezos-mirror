@@ -1,4 +1,4 @@
-tests/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[map_mem_string.tz-(Pair { Elt "bar" 4 ; Elt "foo" 11 } None)-"foo"-(Pair { Elt "bar" 4 ; Elt "foo" 11 } (Some True))]
+tests_007/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[map_mem_string.tz-(Pair { Elt "bar" 4 ; Elt "foo" 11 } None)-"foo"-(Pair { Elt "bar" 4 ; Elt "foo" 11 } (Some True))]
 
 storage
   (Pair { Elt "bar" 4 ; Elt "foo" 11 } (Some True))

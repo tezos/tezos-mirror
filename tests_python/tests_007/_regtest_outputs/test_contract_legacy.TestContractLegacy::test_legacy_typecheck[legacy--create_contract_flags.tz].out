@@ -1,4 +1,4 @@
-tests/test_contract_legacy.py::TestContractLegacy::test_legacy_typecheck[legacy/create_contract_flags.tz]
+tests_007/test_contract_legacy.py::TestContractLegacy::test_legacy_typecheck[legacy/create_contract_flags.tz]
 
 Ill typed contract:
   01: parameter (pair key_hash (pair bool bool));

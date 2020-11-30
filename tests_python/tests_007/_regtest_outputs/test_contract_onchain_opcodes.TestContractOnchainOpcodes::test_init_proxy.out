@@ -1,4 +1,4 @@
-tests/test_contract_onchain_opcodes.py::TestContractOnchainOpcodes::test_init_proxy
+tests_007/test_contract_onchain_opcodes.py::TestContractOnchainOpcodes::test_init_proxy
 
 Node is bootstrapped.
 Estimated gas: 1778.894 units (will add 100 + 46 for safety)

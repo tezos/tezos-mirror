@@ -1,4 +1,4 @@
-tests/test_contract_legacy.py::TestContractLegacy::test_contract_input_output[create_contract_rootname.tz-Unit-Left "tz1ddb9NMYHZi5UzPdzTZMYQQZoMub195zgv"-Unit]
+tests_007/test_contract_legacy.py::TestContractLegacy::test_contract_input_output[create_contract_rootname.tz-Unit-Left "tz1ddb9NMYHZi5UzPdzTZMYQQZoMub195zgv"-Unit]
 
 storage
   Unit

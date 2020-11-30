@@ -1,4 +1,4 @@
-tests/test_contract_legacy.py::TestContractLegacy::test_create_contract_flags[False-False-%root (string %default)-Non-Spendable and non-delegatable are unmodified]
+tests_007/test_contract_legacy.py::TestContractLegacy::test_create_contract_flags[False-False-%root (string %default)-Non-Spendable and non-delegatable are unmodified]
 
 storage
   Unit

@@ -1,4 +1,4 @@
-tests/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[sub_timestamp_delta.tz-111-(Pair 100 100)-"1970-01-01T00:00:00Z"]
+tests_007/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[sub_timestamp_delta.tz-111-(Pair 100 100)-"1970-01-01T00:00:00Z"]
 
 storage
   "1970-01-01T00:00:00Z"

@@ -1,4 +1,4 @@
-tests/test_contract_legacy.py::TestContractLegacy::test_contract_input_output[steps_to_quota.tz-0-100-0]
+tests_007/test_contract_legacy.py::TestContractLegacy::test_contract_input_output[steps_to_quota.tz-0-100-0]
 
 storage
   0

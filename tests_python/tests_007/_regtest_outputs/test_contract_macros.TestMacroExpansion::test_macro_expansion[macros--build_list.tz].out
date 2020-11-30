@@ -1,4 +1,4 @@
-tests/test_contract_macros.py::TestMacroExpansion::test_macro_expansion[macros/build_list.tz]
+tests_007/test_contract_macros.py::TestMacroExpansion::test_macro_expansion[macros/build_list.tz]
 
 { parameter nat ;
   storage (list nat) ;

@@ -1,4 +1,4 @@
-tests/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[cdr.tz-0-(Pair 34 17)-17]
+tests_007/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[cdr.tz-0-(Pair 34 17)-17]
 
 storage
   17

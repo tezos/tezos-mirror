@@ -1,4 +1,4 @@
-tests/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[comparisons.tz-{}-{ -9999999; -1 ; 0 ; 1 ; 9999999 }-{ { False ; False ; False ; True ; True } ;\n    { False ; False ; True ; True ; True } ;\n    { True ; True ; False ; False ; False } ;\n    { True ; True ; True ; False ; False } ;\n    { True ; True ; False ; True ; True } ;\n    { False ; False ; True ; False ; False } }]
+tests_007/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[comparisons.tz-{}-{ -9999999; -1 ; 0 ; 1 ; 9999999 }-{ { False ; False ; False ; True ; True } ;\n    { False ; False ; True ; True ; True } ;\n    { True ; True ; False ; False ; False } ;\n    { True ; True ; True ; False ; False } ;\n    { True ; True ; False ; True ; True } ;\n    { False ; False ; True ; False ; False } }]
 
 storage
   { { False ; False ; False ; True ; True } ;

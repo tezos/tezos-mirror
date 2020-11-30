@@ -1,4 +1,4 @@
-tests/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[hash_string.tz-0x00-"abcdefg"-0x46fdbcb4ea4eadad5615cdaa17d67f783e01e21149ce2b27de497600b4cd8f4e]
+tests_007/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[hash_string.tz-0x00-"abcdefg"-0x46fdbcb4ea4eadad5615cdaa17d67f783e01e21149ce2b27de497600b4cd8f4e]
 
 storage
   0x46fdbcb4ea4eadad5615cdaa17d67f783e01e21149ce2b27de497600b4cd8f4e

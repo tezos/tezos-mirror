@@ -1,4 +1,4 @@
-tests/test_contract_macros.py::TestMacroExpansion::test_macro_expansion[macros/min.tz]
+tests_007/test_contract_macros.py::TestMacroExpansion::test_macro_expansion[macros/min.tz]
 
 { parameter (pair int int) ;
   storage int ;

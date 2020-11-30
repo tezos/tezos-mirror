@@ -1,4 +1,4 @@
-tests/test_contract_macros.py::TestMacroExpansion::test_macro_expansion[macros/big_map_get_add.tz]
+tests_007/test_contract_macros.py::TestMacroExpansion::test_macro_expansion[macros/big_map_get_add.tz]
 
 { parameter (pair (pair %set_pair int (option int)) (pair %check_pair int (option int))) ;
   storage (pair (big_map int int) unit) ;

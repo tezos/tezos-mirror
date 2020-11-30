@@ -1,4 +1,4 @@
-tests/test_contract_legacy.py::TestContractLegacy::test_create_contract_flags[False-True-(or (or (key_hash %set_delegate) (unit %remove_delegate)) (string %default %default))-Non-spendable, delegatable contracts should have the %set/remove_delegate entrypoint]
+tests_007/test_contract_legacy.py::TestContractLegacy::test_create_contract_flags[False-True-(or (or (key_hash %set_delegate) (unit %remove_delegate)) (string %default %default))-Non-spendable, delegatable contracts should have the %set/remove_delegate entrypoint]
 
 storage
   Unit

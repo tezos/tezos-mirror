@@ -1,2 +1,2 @@
-tests/test_contract_onchain_opcodes.py::TestContractOnchainOpcodes::test_gen_keys
+tests_007/test_contract_onchain_opcodes.py::TestContractOnchainOpcodes::test_gen_keys
 

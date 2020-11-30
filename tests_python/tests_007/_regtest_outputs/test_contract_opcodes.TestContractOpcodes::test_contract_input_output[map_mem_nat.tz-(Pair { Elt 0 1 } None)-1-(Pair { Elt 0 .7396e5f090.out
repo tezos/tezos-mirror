@@ -1,4 +1,4 @@
-tests/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[map_mem_nat.tz-(Pair { Elt 0 1 } None)-1-(Pair { Elt 0 1 } (Some False))]
+tests_007/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[map_mem_nat.tz-(Pair { Elt 0 1 } None)-1-(Pair { Elt 0 1 } (Some False))]
 
 storage
   (Pair { Elt 0 1 } (Some False))

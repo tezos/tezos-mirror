@@ -1,4 +1,4 @@
-tests/test_contract_legacy.py::TestContractLegacy::test_legacy_typecheck[legacy/create_contract_rootname.tz]
+tests_007/test_contract_legacy.py::TestContractLegacy::test_legacy_typecheck[legacy/create_contract_rootname.tz]
 
 Ill typed contract:
   01: parameter (or key_hash address);
