@@ -1466,7 +1466,7 @@ publish:static-binaries:
     paths:
       - install_root/bin/*
   script:
-    - apk --no-cache --virtual add bash
+    - apk --no-cache --virtual add bash jq
     - packaging/create-release-with-static-binaries.sh
 
 publish:docker:

@@ -11,8 +11,10 @@ done
 
 assets=()
 for binary in "${binaries[@]}"; do
-    asset_link="--assets-link='{\"name\": \"$binary\", \"url\":\"$CI_PROJECT_URL/-/jobs/$CI_JOB_ID/artifacts/raw/install_root/bin/$binary\"}'"
-    assets+=("$asset_link")
+    asset_json="$(jq -n --arg name "$binary" \
+                        --arg url "$CI_PROJECT_URL/-/jobs/$CI_JOB_ID/artifacts/raw/install_root/bin/$binary" \
+                        '{name: $name, url: $url}')"
+    assets+=("--assets-link=$asset_json")
 done
 
 release-cli create --name "Release $VERSION" --tag-name "v$VERSION" "${assets[@]}"
