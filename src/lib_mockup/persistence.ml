@@ -250,7 +250,7 @@ let create_mockup ~(cctxt : Tezos_client_base.Client_context.full)
   if asynchronous then
     (* Setup a local persistent mempool *)
     let mempool_file = (Files.Mempool.get ~dirname:base_dir :> string) in
-    cctxt#message "creating persistent mempool_file at %s" mempool_file
+    cctxt#message "creating persistent mempool file at %s" mempool_file
     >>= fun () ->
     Lwt_io.with_file ~mode:Lwt_io.Output mempool_file (fun oc ->
         Lwt_io.write oc "[]" >|= ok)
