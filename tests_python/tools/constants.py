@@ -91,6 +91,10 @@ DELPHI = "PsDELPH1Kxsxt8f9eWbxQeRxkjfbxoqM52jvs5Y5fBxWWh4ifpo"
 DELPHI_DAEMON = "007-PsDELPH1"
 DELPHI_PARAMETERS = get_parameters("007_PsDELPH1")
 
+EDO = "PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq"
+EDO_DAEMON = "008-PtEdoTez"
+EDO_PARAMETERS = get_parameters("008_PtEdoTez")
+
 # Protocols supported by the mockup mode
 MOCKUP_PROTOCOLS = [ALPHA, CARTHAGE, DELPHI]
 
