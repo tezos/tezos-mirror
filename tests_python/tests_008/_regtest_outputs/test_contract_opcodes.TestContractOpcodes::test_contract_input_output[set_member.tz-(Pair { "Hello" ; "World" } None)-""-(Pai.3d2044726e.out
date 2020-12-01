@@ -1,4 +1,4 @@
-tests_alpha/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[set_member.tz-(Pair { "Hello" ; "World" } None)-""-(Pair { "Hello" ; "World" } (Some False))]
+tests_008/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[set_member.tz-(Pair { "Hello" ; "World" } None)-""-(Pair { "Hello" ; "World" } (Some False))]
 
 storage
   (Pair { "Hello" ; "World" } (Some False))

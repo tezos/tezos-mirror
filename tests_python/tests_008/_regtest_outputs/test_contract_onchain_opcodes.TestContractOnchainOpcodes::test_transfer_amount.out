@@ -1,4 +1,4 @@
-tests_alpha/test_contract_onchain_opcodes.py::TestContractOnchainOpcodes::test_transfer_amount
+tests_008/test_contract_onchain_opcodes.py::TestContractOnchainOpcodes::test_transfer_amount
 
 Node is bootstrapped.
 Estimated gas: 1576.320 units (will add 100 for safety)

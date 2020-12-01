@@ -1,4 +1,4 @@
-tests_alpha/test_contract_onchain_opcodes.py::TestContractOnchainOpcodes::test_slice_fails[(Pair 0xe009ab79e8b84ef0 "spsig1PPUFZucuAQybs5wsqsNQ68QNgFaBnVKMFaoZZfi1BtNnuCAWnmL9wVy5HfHkR6AeodjVGxpBVVSYcJKyMURn6K1yknYLm")]
+tests_008/test_contract_onchain_opcodes.py::TestContractOnchainOpcodes::test_slice_fails[(Pair 0xe009ab79e8b84ef0 "spsig1PPUFZucuAQybs5wsqsNQ68QNgFaBnVKMFaoZZfi1BtNnuCAWnmL9wVy5HfHkR6AeodjVGxpBVVSYcJKyMURn6K1yknYLm")]
 
 Node is bootstrapped.
 This simulation failed:

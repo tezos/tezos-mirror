@@ -1,4 +1,4 @@
-tests_alpha/test_contract_onchain_opcodes.py::TestContractOnchainOpcodes::test_set_delegate
+tests_008/test_contract_onchain_opcodes.py::TestContractOnchainOpcodes::test_set_delegate
 
 Node is bootstrapped.
 Estimated gas: 1636.164 units (will add 100 for safety)

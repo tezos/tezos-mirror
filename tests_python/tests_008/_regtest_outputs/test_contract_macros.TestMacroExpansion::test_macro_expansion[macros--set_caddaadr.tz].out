@@ -1,4 +1,4 @@
-tests_alpha/test_contract_macros.py::TestMacroExpansion::test_macro_expansion[macros/set_caddaadr.tz]
+tests_008/test_contract_macros.py::TestMacroExpansion::test_macro_expansion[macros/set_caddaadr.tz]
 
 { parameter mutez ;
   storage (pair (pair nat (pair nat (pair (pair (pair (nat %p) (mutez %value)) nat) nat))) nat) ;

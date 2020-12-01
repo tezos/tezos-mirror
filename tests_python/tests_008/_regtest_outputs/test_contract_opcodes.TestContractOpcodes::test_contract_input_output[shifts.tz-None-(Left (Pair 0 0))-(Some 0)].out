@@ -1,4 +1,4 @@
-tests_alpha/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[shifts.tz-None-(Left (Pair 0 0))-(Some 0)]
+tests_008/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[shifts.tz-None-(Left (Pair 0 0))-(Some 0)]
 
 storage
   (Some 0)

@@ -1,4 +1,4 @@
-tests_alpha/test_contract_onchain_opcodes.py::TestContractBigMapOrigination::test_big_map_origination_literal
+tests_008/test_contract_onchain_opcodes.py::TestContractBigMapOrigination::test_big_map_origination_literal
 
 Node is bootstrapped.
 Estimated gas: 1899.425 units (will add 100 for safety)

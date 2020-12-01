@@ -1,4 +1,4 @@
-tests_alpha/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[unpair.tz-Unit-Unit-Unit]
+tests_008/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[unpair.tz-Unit-Unit-Unit]
 
 storage
   Unit

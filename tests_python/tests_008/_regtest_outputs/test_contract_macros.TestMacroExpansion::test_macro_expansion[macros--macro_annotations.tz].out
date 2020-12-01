@@ -1,4 +1,4 @@
-tests_alpha/test_contract_macros.py::TestMacroExpansion::test_macro_expansion[macros/macro_annotations.tz]
+tests_008/test_contract_macros.py::TestMacroExpansion::test_macro_expansion[macros/macro_annotations.tz]
 
 { parameter unit ;
   storage (pair (unit %truc) unit) ;

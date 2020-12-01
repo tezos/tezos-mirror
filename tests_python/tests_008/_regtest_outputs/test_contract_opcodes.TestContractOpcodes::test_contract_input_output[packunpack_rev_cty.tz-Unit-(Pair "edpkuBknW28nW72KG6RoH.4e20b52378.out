@@ -1,4 +1,4 @@
-tests_alpha/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[packunpack_rev_cty.tz-Unit-(Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav" (Pair Unit (Pair "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7" (Pair None (Pair {  }  (Pair {  }  (Pair (Pair 40 -10) (Pair (Right "2019-09-09T08:35:33Z") (Pair {  }  { DUP ; DROP ; PACK } )))))))))-Unit]
+tests_008/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[packunpack_rev_cty.tz-Unit-(Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav" (Pair Unit (Pair "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7" (Pair None (Pair {  }  (Pair {  }  (Pair (Pair 40 -10) (Pair (Right "2019-09-09T08:35:33Z") (Pair {  }  { DUP ; DROP ; PACK } )))))))))-Unit]
 
 storage
   Unit

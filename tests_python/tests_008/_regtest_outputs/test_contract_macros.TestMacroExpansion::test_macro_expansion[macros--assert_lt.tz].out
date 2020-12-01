@@ -1,4 +1,4 @@
-tests_alpha/test_contract_macros.py::TestMacroExpansion::test_macro_expansion[macros/assert_lt.tz]
+tests_008/test_contract_macros.py::TestMacroExpansion::test_macro_expansion[macros/assert_lt.tz]
 
 { parameter (pair int int) ;
   storage unit ;

@@ -1,4 +1,4 @@
-tests_alpha/test_contract_onchain_opcodes.py::TestContractBigMapOrigination::test_big_map_transfer_diff
+tests_008/test_contract_onchain_opcodes.py::TestContractBigMapOrigination::test_big_map_transfer_diff
 
 Node is bootstrapped.
 This simulation failed:

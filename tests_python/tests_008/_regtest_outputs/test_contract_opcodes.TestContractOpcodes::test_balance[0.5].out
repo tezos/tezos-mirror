@@ -1,4 +1,4 @@
-tests_alpha/test_contract_opcodes.py::TestContractOpcodes::test_balance[0.5]
+tests_008/test_contract_opcodes.py::TestContractOpcodes::test_balance[0.5]
 
 storage
   500000

@@ -1,4 +1,4 @@
-tests_alpha/test_contract_onchain_opcodes.py::TestContractOnchainOpcodes::test_trace_origination[compare_big_type.tz]
+tests_008/test_contract_onchain_opcodes.py::TestContractOnchainOpcodes::test_trace_origination[compare_big_type.tz]
 
 Node is bootstrapped.
 Estimated gas: 4583.242 units (will add 100 for safety)
