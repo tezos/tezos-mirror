@@ -323,6 +323,19 @@ val spawn_originate_contract :
   t ->
   Process.t
 
+(** Run [tezos-client list mockup protocols]. *)
+val list_mockup_protocols : t -> string list Lwt.t
+
+(** Same as [list_mockup_protocols], but do not wait for the process to exit
+    and do not process stdout. *)
+val spawn_list_mockup_protocols : t -> Process.t
+
+(** Run [tezos-client migrate mockup to]. *)
+val migrate_mockup : next_protocol:Protocol.t -> t -> unit Lwt.t
+
+(** Same as [migrate_mockup], but do not wait for the process to exit. *)
+val spawn_migrate_mockup : next_protocol:Protocol.t -> t -> Process.t
+
 (** {2 High-Level Functions} *)
 
 (** Create a client with mode [Client] and import all secret keys

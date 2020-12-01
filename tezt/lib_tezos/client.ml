@@ -430,6 +430,23 @@ let originate_contract ?node ?wait ?init ?burn_cap ~alias ~amount ~src ~prg
   | Some hash ->
       return hash
 
+let spawn_list_mockup_protocols client =
+  spawn_command client (mode_arg client @ ["list"; "mockup"; "protocols"])
+
+let list_mockup_protocols client =
+  let process = spawn_list_mockup_protocols client in
+  let* () = Process.check process
+  and* output = Lwt_io.read (Process.stdout process) in
+  return (String.split_on_char '\n' output)
+
+let spawn_migrate_mockup ~next_protocol client =
+  spawn_command
+    client
+    (mode_arg client @ ["migrate"; "mockup"; "to"; Protocol.hash next_protocol])
+
+let migrate_mockup ~next_protocol client =
+  spawn_migrate_mockup ~next_protocol client |> Process.check
+
 let init ?path ?admin_path ?name ?color ?base_dir ?node () =
   let client = create ?path ?admin_path ?name ?color ?base_dir ?node () in
   let* () =
