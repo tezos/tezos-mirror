@@ -22,6 +22,10 @@ join Edonet: just configure your node with
 Update Instructions
 -------------------
 
+Starting from version 8.0, compiling Tezos requires the Rust compiler,
+version 1.39.0, and the Cargo package manager to be installed.
+See :ref:`instructions to set up Rust<setup_rust>`.
+
 To update from sources::
 
   git fetch
