@@ -13,41 +13,54 @@ csplit --quiet --prefix="$tmp" "$src_dir/.gitlab/ci/integration.yml" /##BEGIN_IN
 mv "$tmp"00 "$tmp"
 rm "$tmp"0*
 
-for test in $(find tests_python/tests_*/ -name 'test_*.py' | LC_COLLATE=C sort); do
-    case "$test" in
-      */multibranch/*)
-        # skip multibranch tests for now
-        ;;
-      *)
-        testname=$(printf '%s' "$test" | sed -e 's@tests_python/tests_\(.*\)/test_\(.*\).py@\1_\2@g')
-        testname=${testname%%.py}
-        cat >> $tmp <<EOF
-integration:$testname:
+for PROTO_DIR in $(find tests_python/ -maxdepth 1 -mindepth 1 -iname 'tests_*' | LC_COLLATE=C sort); do
+    PROTO_DIR_BASE=${PROTO_DIR##tests_python/tests_}
+
+    # Add fast python integration tests grouped in one job
+    cat >> "$tmp" <<EOF
+integration:${PROTO_DIR_BASE}_fast:
   extends: .integration_python_template
   script:
-    - poetry run pytest ${test#tests_python/} -s --log-dir=tmp
+    - poetry run pytest ${PROTO_DIR##tests_python/} -k "not slow" -s --log-dir=tmp
   stage: test
 
 EOF
-    esac
+
+    # Add slow python integration tests, one per job
+    slow_tests=$(cd "$PROTO_DIR";
+                 for i in $(poetry run pytest -m slow --collect-only -qq); do
+                     echo "${i%%\:\:*}" ;
+                 done | grep ^tests_.*\.py | uniq | LC_COLLATE=C sort)
+
+    for test in $slow_tests; do
+     case "$test" in
+       */multibranch/*)
+         # skip multibranch tests for now
+         ;;
+       *)
+
+        testname=${test##*/test_}
+        testname=${testname%%.py}
+
+        cat >> "$tmp" <<EOF
+integration:${PROTO_DIR_BASE}_${testname}:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest ${test} -s --log-dir=tmp
+  stage: test
+
+EOF
+     esac
+    done
+
 done
 
 cat >> $tmp <<EOF
-integration:examples_forge_transfer:
+integration:examples:
   extends: .integration_python_template
   script:
     - PYTHONPATH=\$PYTHONPATH:./ poetry run python examples/forge_transfer.py
-  stage: test
-
-integration:examples_example:
-  extends: .integration_python_template
-  script:
     - PYTHONPATH=\$PYTHONPATH:./ poetry run python examples/example.py
-  stage: test
-
-integration:examples_test_example:
-  extends: .integration_python_template
-  script:
     - PYTHONPATH=./ poetry run pytest examples/test_example.py
   stage: test
 EOF
