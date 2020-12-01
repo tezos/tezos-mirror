@@ -11,7 +11,7 @@ def all_legacy_contracts() -> List[str]:
     return all_contracts(['legacy'])
 
 
-CONTRACT_PATH = path.join(paths.TEZOS_HOME, 'tests_python', 'contracts_alpha')
+CONTRACT_PATH = path.join(paths.TEZOS_HOME, 'tests_python', 'contracts_008')
 MACROS_CONTRACT_PATH = path.join(CONTRACT_PATH, 'macros')
 ILLTYPED_CONTRACT_PATH = path.join(CONTRACT_PATH, 'ill_typed')
 LEGACY_CONTRACT_PATH = path.join(CONTRACT_PATH, 'legacy')

@@ -223,14 +223,6 @@ def activate_protocol(
     )
 
 
-def activate_delphi_007(
-    client, parameters=None, timestamp=None, activate_in_the_past=False
-):
-    activate_protocol(
-        client, constants.DELPHI, parameters, timestamp, activate_in_the_past
-    )
-
-
 def activate_alpha(
     client, parameters=None, timestamp=None, activate_in_the_past=False
 ):
