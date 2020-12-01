@@ -223,10 +223,108 @@ let test_multiple_baking ~protocol =
       return ())
     (range 1 10)
 
+let perform_migration ~protocol ~next_protocol ~pre_migration ~post_migration =
+  let* client = Client.init_mockup ~protocol () in
+  let* pre_result = pre_migration client in
+  Log.info
+    "Migrating from %s to %s"
+    (Protocol.hash protocol)
+    (Protocol.hash next_protocol) ;
+  let* () = Client.migrate_mockup ~next_protocol client in
+  post_migration client pre_result
+
+let get_candidates_to_migration () =
+  let* mockup_protocols =
+    let transient = Client.create_with_mode Client.Mockup in
+    Client.list_mockup_protocols transient
+  in
+  (* Find all registered mockup protocols which declare a next protocol *)
+  let result =
+    List.filter_map
+      (fun (protocol : Protocol.t) ->
+        match Protocol.next_protocol protocol with
+        | None ->
+            None
+        | Some next ->
+            let next_hash = Protocol.hash next in
+            if
+              List.exists
+                (String.equal (Protocol.hash protocol))
+                mockup_protocols
+              && List.exists (String.equal next_hash) mockup_protocols
+            then Some (protocol, next)
+            else None)
+      Protocol.all_protocols
+  in
+  return result
+
+(* Test mockup migration. *)
+let test_migration ?(migration_spec : (Protocol.t * Protocol.t) option)
+    ~pre_migration ~post_migration ~info () =
+  Test.register
+    ~__FILE__
+    ~title:(Printf.sprintf "migration (mockup, %s)" info)
+    ~tags:["mockup"; "migration"]
+    (fun () ->
+      match migration_spec with
+      | None -> (
+          Log.info "Searching for protocols to migrate..." ;
+          let* protocols = get_candidates_to_migration () in
+          match protocols with
+          | [] ->
+              Test.fail "No protocol can be tested for migration!"
+          | (protocol, next_protocol) :: _ ->
+              perform_migration
+                ~protocol
+                ~next_protocol
+                ~pre_migration
+                ~post_migration )
+      | Some (protocol, next_protocol) ->
+          perform_migration
+            ~protocol
+            ~next_protocol
+            ~pre_migration
+            ~post_migration)
+
+let test_migration_transfer ?migration_spec () =
+  let (giver, amount, receiver) = transfer_data in
+  test_migration
+    ?migration_spec
+    ~pre_migration:(fun client ->
+      Log.info
+        "About to transfer %s from %s to %s"
+        (Tez.to_string amount)
+        giver
+        receiver ;
+      let* giver_balance_before =
+        Client.get_balance_for ~account:giver client
+      in
+      let* receiver_balance_before =
+        Client.get_balance_for ~account:receiver client
+      in
+      let* () = Client.transfer ~amount ~giver ~receiver client in
+      return (giver_balance_before, receiver_balance_before))
+    ~post_migration:
+      (fun client (giver_balance_before, receiver_balance_before) ->
+      let* giver_balance_after =
+        Client.get_balance_for ~account:giver client
+      in
+      let* receiver_balance_after =
+        Client.get_balance_for ~account:receiver client
+      in
+      test_balances_after_transfer
+        (giver_balance_before, giver_balance_after)
+        (Tez.to_float amount)
+        (receiver_balance_before, receiver_balance_after) ;
+      return ())
+    ~info:"transfer"
+    ()
+
 let register protocol =
   test_rpc_list ~protocol ;
   test_same_transfer_twice ~protocol ;
   test_transfer_same_participants ~protocol ;
   test_transfer ~protocol ;
   test_simple_baking_event ~protocol ;
-  test_multiple_baking ~protocol
+  test_multiple_baking ~protocol ;
+  test_migration_transfer ()
