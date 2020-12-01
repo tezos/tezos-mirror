@@ -22,7 +22,7 @@ PYCODESTYLE_OPTIONS=\
 # black is configured in pyproject.toml
 BLACK=poetry run black
 
-SRCS?=daemons launchers client tools scripts tests_007 tests_alpha tests_alpha/multibranch examples codec
+SRCS?=daemons launchers client tools scripts tests_*  tests_alpha/multibranch examples codec
 
 LOG_DIR=tmp
 
