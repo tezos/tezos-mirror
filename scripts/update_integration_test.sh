@@ -13,7 +13,7 @@ csplit --quiet --prefix="$tmp" "$src_dir/.gitlab/ci/integration.yml" /##BEGIN_IN
 mv "$tmp"00 "$tmp"
 rm "$tmp"0*
 
-for test in $(find tests_python/tests_007/ tests_python/tests_alpha/ -name 'test_*.py' | LC_COLLATE=C sort); do
+for test in $(find tests_python/tests_*/ -name 'test_*.py' | LC_COLLATE=C sort); do
     case "$test" in
       */multibranch/*)
         # skip multibranch tests for now
