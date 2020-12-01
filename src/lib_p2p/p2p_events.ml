@@ -519,7 +519,7 @@ module P2p_io_scheduler = struct
       ~section
       ~name:"shutdown_connection"
       ~msg:"shutdown {name}"
-      ~level:Debug
+      ~level:Info
       ("name", Data_encoding.string)
 
   let shutdown_scheduler =
@@ -527,6 +527,6 @@ module P2p_io_scheduler = struct
       ~section
       ~name:"shutdown_scheduler"
       ~msg:"shutdown scheduler"
-      ~level:Debug
+      ~level:Info
       ()
 end
