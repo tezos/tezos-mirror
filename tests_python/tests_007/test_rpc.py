@@ -27,7 +27,6 @@ def session():
         "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU",
         "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
     ]
-    session["originated_accounts"] = []
     return session
 
 
@@ -36,14 +35,14 @@ def contract_name():
     return "contract_identity"
 
 
-@pytest.fixture(scope="class")
-def sandbox(sandbox: Sandbox, contract_name, session: dict):
+@pytest.fixture(scope="class", params=[None, "proxy"])
+def sandbox(request, sandbox: Sandbox, contract_name, session: dict):
     """Adds two nodes to sandbox. Using the first node, originates the
     identity contract `id.tz` with the name contract_name and makes it
     address available under session['originated_accounts'].
     """
-    sandbox.add_node(1, params=constants.NODE_PARAMS)
-    sandbox.add_node(2, params=constants.NODE_PARAMS)
+    sandbox.add_node(1, params=constants.NODE_PARAMS, mode=request.param)
+    sandbox.add_node(2, params=constants.NODE_PARAMS, mode=request.param)
     client = sandbox.client(1)
     protocol.activate(sandbox.client(1), activate_in_the_past=True)
     client.bake("bootstrap1", BAKE_ARGS)
@@ -54,7 +53,7 @@ def sandbox(sandbox: Sandbox, contract_name, session: dict):
     origination = client.originate(
         contract_name, 10.0, "bootstrap1", contract, args
     )
-    session['originated_accounts'].append(origination.contract)
+    session['originated_accounts'] = [origination.contract]
     client.bake("bootstrap1", ["--minimal-timestamp"])
     assert utils.check_block_contains_operations(
         client, [origination.operation_hash]
