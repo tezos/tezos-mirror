@@ -81,6 +81,8 @@ module Prefix : sig
 
   val p256_encrypted_secret_key : string
 
+  val secp256k1_encrypted_scalar : string
+
   val generic_signature : string
 
   val chain_id : string

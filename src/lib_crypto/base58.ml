@@ -397,6 +397,9 @@ module Prefix = struct
 
   let p256_encrypted_secret_key = "\009\048\057\115\171" (* p2esk(88) *)
 
+  (* 60 *)
+  let secp256k1_encrypted_scalar = "\001\131\036\086\248" (* seesk(93) *)
+
   (* 33 *)
   let secp256k1_public_key = "\003\254\226\086" (* sppk(55) *)
 
