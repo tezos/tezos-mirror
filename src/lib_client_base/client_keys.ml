@@ -114,6 +114,15 @@ let make_sapling_uri (x : Uri.t) : sapling_uri =
   | Some _ ->
       x
 
+type pvss_sk_uri = Uri.t
+
+let make_pvss_sk_uri (x : Uri.t) : pvss_sk_uri tzresult Lwt.t =
+  match Uri.scheme x with
+  | None ->
+      failwith "Error while parsing URI: PVSS_URI needs a scheme"
+  | Some _ ->
+      return x
+
 let pk_uri_parameter () =
   Clic.parameter (fun _ s -> make_pk_uri @@ Uri.of_string s)
 
@@ -221,6 +230,30 @@ module Sapling_key = Client_aliases.Alias (struct
   let to_source k =
     let open Data_encoding in
     return @@ Json.to_string (Json.construct encoding k)
+end)
+
+module PVSS_public_key = Client_aliases.Alias (struct
+  let name = "PVSS public key"
+
+  type t = Pvss_secp256k1.Public_key.t
+
+  let encoding = Pvss_secp256k1.Public_key.encoding
+
+  let of_source s = Lwt.return (Pvss_secp256k1.Public_key.of_b58check s)
+
+  let to_source t = return (Pvss_secp256k1.Public_key.to_b58check t)
+end)
+
+module PVSS_secret_key = Client_aliases.Alias (struct
+  let name = "PVSS secret key"
+
+  type t = pvss_sk_uri
+
+  let encoding = uri_encoding
+
+  let of_source s = make_pvss_sk_uri @@ Uri.of_string s
+
+  let to_source t = return (Uri.to_string t)
 end)
 
 module type SIGNER = sig
