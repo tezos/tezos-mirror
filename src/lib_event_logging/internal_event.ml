@@ -60,7 +60,9 @@ type level = Lwt_log_core.level =
   | Error
   | Fatal
 
-let should_log ~level ~sink_level = level >= sink_level
+let should_log ~level ~sink_level =
+  (* Same criteria as [Lwt_log_core.log] *)
+  level >= sink_level
 
 module Level = struct
   type t = level
@@ -84,7 +86,7 @@ module Level = struct
 end
 
 module Section : sig
-  type t = private string list
+  type t
 
   val empty : t
 
@@ -98,9 +100,9 @@ module Section : sig
 
   val to_string_list : t -> string list
 end = struct
-  type t = string list
+  type t = {path : string list; lwt_log_section : Lwt_log_core.section}
 
-  let empty = []
+  let empty = {path = []; lwt_log_section = Lwt_log_core.Section.make ""}
 
   let make sl =
     List.iter
@@ -112,18 +114,21 @@ end = struct
               name
               char))
       sl ;
-    sl
+    {
+      path = sl;
+      lwt_log_section = Lwt_log_core.Section.make (String.concat "." sl);
+    }
 
   let make_sanitized sl =
     List.map (String.map (fun c -> if valid_char c then c else '_')) sl |> make
 
-  let to_lwt_log s = Lwt_log_core.Section.make (String.concat "." s)
+  let to_string_list s = s.path
 
-  let to_string_list t = t
+  let to_lwt_log s = s.lwt_log_section
 
   let encoding =
     let open Data_encoding in
-    list string
+    conv (fun {path; _} -> path) (fun l -> make l) (list string)
 end
 
 let registered_sections = ref TzString.Set.empty
@@ -1194,24 +1199,23 @@ module Legacy_logging = struct
     module Event = Make (Definition)
 
     let emit_async level fmt ?tags =
-      (* Hack to prevent massive calls to kasprintf *)
+      (* Prevent massive calls to kasprintf *)
       let log_section = Section.to_lwt_log section in
       if should_log ~level ~sink_level:(Lwt_log_core.Section.level log_section)
-      then Format.ifprintf Format.std_formatter fmt
-      else
+      then
         Format.kasprintf
           (fun message ->
             Lwt.ignore_result
               (Event.emit ~section (fun () ->
                    Definition.make ?tags level message)))
           fmt
+      else Format.ifprintf Format.std_formatter fmt
 
     let emit_lwt level fmt ?tags =
-      (* Hack to prevent massive calls to kasprintf *)
+      (* Prevent massive calls to kasprintf *)
       let log_section = Section.to_lwt_log section in
       if should_log ~level ~sink_level:(Lwt_log_core.Section.level log_section)
-      then Format.ikfprintf (fun _ -> Lwt.return_unit) Format.std_formatter fmt
-      else
+      then
         Format.kasprintf
           (fun message ->
             Event.emit ~section (fun () -> Definition.make ?tags level message)
@@ -1221,6 +1225,7 @@ module Legacy_logging = struct
             | Error el ->
                 Format.kasprintf Lwt.fail_with "%a" pp_print_error el)
           fmt
+      else Format.ikfprintf (fun _ -> Lwt.return_unit) Format.std_formatter fmt
   end
 
   module Make (P : sig
