@@ -256,8 +256,6 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
 
   type worker = Worker.infinite Worker.queue Worker.t
 
-  let debug w = Format.kasprintf (fun msg -> Worker.record_event w (Debug msg))
-
   let list_pendings chain_db ~from_block ~to_block ~live_blocks old_mempool =
     let rec pop_blocks ancestor block mempool =
       let hash = State.Block.hash block in
@@ -362,26 +360,34 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
     try
       match Protocol_hash.Map.find Proto.hash pv.filter_config with
       | Some config ->
-          Data_encoding.Json.destruct Filter.config_encoding config
+          Lwt.return
+            (Data_encoding.Json.destruct Filter.config_encoding config)
       | None ->
-          Filter.default_config
+          Lwt.return Filter.default_config
     with _ ->
-      debug w "invalid mempool filter configuration" ;
-      Filter.default_config
+      Worker.log_event w Invalid_mempool_filter_configuration
+      >>= fun () -> Lwt.return Filter.default_config
 
-  let pre_filter w pv op =
+  let pre_filter w pv oph op =
     match decode_operation_data op.Operation.proto with
     | None ->
-        debug w "unparsable operation %a" Operation_hash.pp (Operation.hash op) ;
-        false
+        Worker.log_event w (Unparsable_operation oph)
+        >>= fun () -> Lwt.return false
     | Some protocol_data ->
         let op = {Filter.Proto.shell = op.shell; protocol_data} in
-        let config = filter_config w pv in
-        Filter.pre_filter config op.Filter.Proto.protocol_data
+        filter_config w pv
+        >>= fun config ->
+        Lwt.return (Filter.pre_filter config op.Filter.Proto.protocol_data)
 
-  let post_filter w pv op receipt =
-    let config = filter_config w pv in
-    Filter.post_filter config (op, receipt)
+  let post_filter w pv ~validation_state_before ~validation_state_after op
+      receipt =
+    filter_config w pv
+    >>= fun config ->
+    Filter.post_filter
+      config
+      ~validation_state_before
+      ~validation_state_after
+      (op, receipt)
 
   let handle_branch_refused pv op oph errors =
     notify_operation pv `Branch_refused op ;
@@ -416,7 +422,8 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       | 0 ->
           Lwt.return_unit
       | n ->
-          debug w "processing %d operations" n ;
+          Worker.log_event w (Processing_n_operations n)
+          >>= fun () ->
           let operations =
             List.map snd (Operation_hash.Map.bindings pv.pending)
           in
@@ -567,7 +574,8 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
     >>= fun () -> Lwt_main.yield ()
 
   let fetch_operation w pv ?peer oph =
-    debug w "fetching operation %a" Operation_hash.pp_short oph ;
+    Worker.log_event w (Fetching_operation oph)
+    >>= fun () ->
     Distributed_db.Operation.fetch
       ~timeout:pv.limits.operation_timeout
       pv.chain_db
@@ -579,12 +587,8 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
         Worker.Queue.push_request_now w (Arrived (oph, op)) ;
         Lwt.return_unit
     | Error (Distributed_db.Operation.Canceled _ :: _) ->
-        debug
-          w
-          "operation %a included before being prevalidated"
-          Operation_hash.pp_short
-          oph ;
-        Lwt.return_unit
+        Worker.log_event w (Operation_included oph)
+        >>= fun () -> Lwt.return_unit
     | Error _ ->
         (* should not happen *)
         Lwt.return_unit
@@ -593,10 +597,6 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
     lazy
       (let dir : state RPC_directory.t ref = ref RPC_directory.empty in
        let module Proto_services = Block_services.Make (Proto) (Proto) in
-       (* TODO
-       refused => Operation_hash.Set.t ;
-       kick le peer
-    *)
        dir :=
          RPC_directory.register
            !dir
@@ -793,11 +793,15 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
         return_unit )
       else if
         not (already_handled pv oph) (* prevent double inclusion on flush *)
-      then (
-        if pre_filter w pv op then
-          (* TODO: should this have an influence on the peer's score ? *)
-          pv.pending <- Operation_hash.Map.add oph op pv.pending ;
-        return_unit )
+      then
+        pre_filter w pv oph op
+        >>= function
+        | true ->
+            (* TODO: should this have an influence on the peer's score ? *)
+            pv.pending <- Operation_hash.Map.add oph op pv.pending ;
+            return_unit
+        | false ->
+            return_unit
       else return_unit
 
     let on_inject _w pv op =
@@ -858,10 +862,10 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       let timestamp = Time.System.to_protocol timestamp_system in
       Prevalidation.create ~predecessor ~timestamp ()
       >>= fun validation_state ->
-      debug
+      Worker.log_event
         w
-        "%d operations were not washed by the flush"
-        (Operation_hash.Map.cardinal pending) ;
+        (Operations_not_flushed (Operation_hash.Map.cardinal pending))
+      >>= fun () ->
       pv.predecessor <- predecessor ;
       pv.live_blocks <- new_live_blocks ;
       pv.live_operations <- new_live_operations ;
