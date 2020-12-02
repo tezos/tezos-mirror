@@ -52,6 +52,8 @@ be documented here either.
   <bytes> were signed by <pkh>` to differentiate from new command `check that
   message <string> was signed by <pkh>`
 
+- Added wallet support for PVSS keys.
+
 ## Baker / Endorser / Accuser
 
 - Add `--version` flag
