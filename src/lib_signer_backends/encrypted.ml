@@ -30,6 +30,8 @@ type Base58.data += Encrypted_secp256k1 of Bytes.t
 
 type Base58.data += Encrypted_p256 of Bytes.t
 
+type Base58.data += Encrypted_secp256k1_element of Bytes.t
+
 open Client_keys
 
 let scheme = "encrypted"
@@ -58,6 +60,14 @@ module Raw = struct
           Data_encoding.Binary.to_bytes_exn Secp256k1.Secret_key.encoding sk
       | P256 sk ->
           Data_encoding.Binary.to_bytes_exn P256.Secret_key.encoding sk
+    in
+    Bytes.cat salt (Crypto_box.Secretbox.secretbox key msg nonce)
+
+  let encrypt_pvss ~password sk =
+    let salt = Hacl.Rand.gen salt_len in
+    let key = Crypto_box.Secretbox.unsafe_of_bytes (pbkdf ~salt ~password) in
+    let msg =
+      Data_encoding.Binary.to_bytes_exn Pvss_secp256k1.Secret_key.encoding sk
     in
     Bytes.cat salt (Crypto_box.Secretbox.secretbox key msg nonce)
 
@@ -136,10 +146,22 @@ module Encodings = struct
         else Some (Bytes.of_string buf))
       ~wrap:(fun sk -> Encrypted_p256 sk)
 
+  let secp256k1_scalar =
+    let length = 36 + Crypto_box.tag_length + Raw.salt_len in
+    Base58.register_encoding
+      ~prefix:Base58.Prefix.secp256k1_encrypted_scalar
+      ~length
+      ~to_raw:(fun sk -> Bytes.to_string sk)
+      ~of_raw:(fun buf ->
+        if String.length buf <> length then None
+        else Some (Bytes.of_string buf))
+      ~wrap:(fun sk -> Encrypted_secp256k1_element sk)
+
   let () =
     Base58.check_encoded_prefix ed25519 "edesk" 88 ;
     Base58.check_encoded_prefix secp256k1 "spesk" 88 ;
-    Base58.check_encoded_prefix p256 "p2esk" 88
+    Base58.check_encoded_prefix p256 "p2esk" 88 ;
+    Base58.check_encoded_prefix secp256k1_scalar "seesk" 93
 end
 
 (* we cache the password in this list to avoid
@@ -371,3 +393,11 @@ struct
 
   let supports_deterministic_nonces _ = return_true
 end
+
+let encrypt_pvss_key cctxt sk =
+  read_password cctxt
+  >>=? fun password ->
+  let payload = Raw.encrypt_pvss ~password sk in
+  let encoding = Encodings.secp256k1_scalar in
+  let path = Base58.simple_encode encoding payload in
+  Client_keys.make_pvss_sk_uri (Uri.make ~scheme ~path ())

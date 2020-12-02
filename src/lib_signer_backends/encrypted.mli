@@ -52,3 +52,8 @@ val decrypt_sapling_key :
   #Client_context.io ->
   Client_keys.sapling_uri ->
   Tezos_sapling.Core.Wallet.Spending_key.t tzresult Lwt.t
+
+val encrypt_pvss_key :
+  #Client_context.io ->
+  Pvss_secp256k1.Secret_key.t ->
+  Client_keys.pvss_sk_uri tzresult Lwt.t
