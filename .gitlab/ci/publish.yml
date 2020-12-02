@@ -1,11 +1,11 @@
-.publish_template:
+.build_release_template:
   image: docker:latest
   services:
     - docker:dind
   variables:
     DOCKER_DRIVER: overlay2
     IMAGE_ARCH_PREFIX: ""
-  stage: publish
+  stage: build_release
   only:
     - master@tezos/tezos
     - tags@tezos/tezos
@@ -25,30 +25,56 @@
     - docker push "${public_docker_image_name}-debug:${IMAGE_ARCH_PREFIX}${CI_COMMIT_REF_NAME}"
   interruptible: false
 
-publish:docker_amd64:
-  extends: .publish_template
+build_release:docker_amd64:
+  extends: .build_release_template
   variables:
     DOCKER_DRIVER: overlay2
     IMAGE_ARCH_PREFIX: "amd64-"
   tags:
     - safe_docker
 
-publish:docker_arm64:
-  extends: .publish_template
+build_release:docker_arm64:
+  extends: .build_release_template
   variables:
     DOCKER_DRIVER: overlay2
     IMAGE_ARCH_PREFIX: "arm64-"
   tags:
     - arm64
 
+build_release:static-x86-linux-binaries:
+  stage: build_release
+  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master"'
+      when: on_success
+    - if: '$CI_COMMIT_BRANCH =~ /-release$/'
+      when: on_success
+    - if: '$CI_COMMIT_TAG != null'
+      when: on_success
+  script:
+    - sudo apk --no-cache --virtual add unzip wget eudev-dev autoconf automake libtool linux-headers upx binutils
+    # TODO: include static version of this libraries to the default docker image
+    - packaging/build/build-libusb-and-hidapi.sh
+    # TODO: patch approach is very fragile, we should think about something
+    # more reliable
+    - git apply packaging/build/static_libs.patch
+    - dune build @install --profile release
+    - dune install --prefix install_root
+    # Strip debug symbols in binaries
+    - find . -maxdepth 1 -type f ! -name "*.*" -exec strip --strip-debug {} \;
+    # Compress resulting binaries
+    - find . -maxdepth 1 -type f ! -name "*.*" -exec upx {} \;
+  artifacts:
+    paths:
+      - install_root/bin/*
+
 release-static-binaries:
   image: registry.gitlab.com/gitlab-org/release-cli
   only:
     - tags@tezos/tezos
-    - tags@serokell/morley/tezos
   variables:
     PACKAGE_REGISTRY_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/tezos/${CI_COMMIT_TAG}"
-  stage: publish
+  stage: publish_release
   dependencies:
     - build_release:static-x86-linux-binaries
   script:
@@ -64,7 +90,7 @@ merge-manifest:
       command: ["--experimental"]
   variables:
     DOCKER_DRIVER: overlay2
-  stage: publish_manifest
+  stage: publish_release
   only:
     - master@tezos/tezos
     - tags@tezos/tezos
