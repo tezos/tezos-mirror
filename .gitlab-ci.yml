@@ -30,9 +30,8 @@ stages:
   - test
   - doc
   - packaging
-  - upload
-  - publish
-  - publish_manifest
+  - build_release
+  - publish_release
   - test_coverage
   - publish_coverage
 
