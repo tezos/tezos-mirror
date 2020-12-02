@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019-2020 Nomadic Labs, <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2019-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -79,6 +79,8 @@ module Id : sig
   val parse_addr_port_id : string -> (addr_port_id, parsing_error) result
 
   val addr_port_id_to_string : addr_port_id -> string
+
+  val hash : t -> int
 end
 
 module Map : Map.S with type key = Id.t
