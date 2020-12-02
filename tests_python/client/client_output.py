@@ -518,3 +518,12 @@ class FindBakerWithConsensusKeyResult:
         if match is None:
             raise InvalidClientOutput(client_output)
         self.baker = match.groups()[0]
+
+
+class ListPvssKeysResult:
+    """Result of 'list pvss keys' operation."""
+
+    def __init__(self, client_output: str):
+
+        pattern = re.compile(r"^(\w+):\s*(\w+).*$", re.MULTILINE)
+        self.keys = dict(re.findall(pattern, client_output))

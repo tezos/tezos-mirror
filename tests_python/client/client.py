@@ -178,9 +178,10 @@ class Client:
         admin: bool = False,
         check: bool = True,
         trace: bool = False,
+        stdin: str = "",
     ) -> str:
         """Like 'run_generic' but returns just stdout."""
-        (stdout, _, _) = self.run_generic(params, admin, check, trace)
+        (stdout, _, _) = self.run_generic(params, admin, check, trace, stdin)
         return stdout
 
     def rpc(
@@ -1557,4 +1558,28 @@ class Client:
     def toggle_baker_delegations(self, account: str, accept: bool) -> str:
         accept_str = 'accepting' if accept else 'declining'
         cmd = ['set', 'baker', account, accept_str, 'new', 'delegations']
+        return self.run(cmd)
+
+    def gen_pvss_keys(self, alias: str, pwd: str = 'password') -> str:
+        cmd = ['pvss', 'gen', 'keys', alias]
+        # password and password confirmation
+        stdin = f'{pwd}\n{pwd}\n'
+        return self.run(cmd, stdin=stdin)
+
+    def list_pvss_keys(self) -> dict:
+        cmd = ['pvss', 'list', 'keys']
+        return client_output.ListPvssKeysResult(self.run(cmd)).keys
+
+    def forget_pvss_keys(self, alias: str, args: List[str] = None) -> str:
+        cmd = ['pvss', 'forget', 'keys', alias]
+        if args is None:
+            args = ['--force']
+        cmd += args
+        return self.run(cmd)
+
+    def forget_all_pvss_keys(self, args: List[str] = None) -> str:
+        cmd = ['pvss', 'forget', 'all', 'keys']
+        if args is None:
+            args = ['--force']
+        cmd += args
         return self.run(cmd)

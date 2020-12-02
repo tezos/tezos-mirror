@@ -341,23 +341,23 @@ class TestRememberContract:
         client.remember('bytes', contract)
         client.typecheck(contract)
         client.originate(
-            'bytes', 1000, 'bootstrap1', contract, ['--burn-cap', '0.295']
+            'bytes', 1000, 'baker1', contract, ['--burn-cap', '0.295']
         )
-        client.bake('bootstrap1', BAKE_ARGS)
+        client.bake('baker1', BAKE_ARGS)
 
     # Test that operations under 16KB can be injected in the node.
     def test_operation_size_small(self, client: Client):
         bytes_arg = "0x" + ("00" * 6 * 1024)  # 6 KB of data.
 
         client.transfer(10, 'bootstrap1', 'bytes', ['--arg', bytes_arg])
-        client.bake('bootstrap1', BAKE_ARGS)
+        client.bake('baker1', BAKE_ARGS)
 
     # Test that operations between 16KB and 32KB can be injected in the node.
     def test_operation_size_medium(self, client: Client):
         bytes_arg = "0x" + ("00" * 24 * 1024)  # 24 KB of data.
 
         client.transfer(10, 'bootstrap1', 'bytes', ['--arg', bytes_arg])
-        client.bake('bootstrap1', BAKE_ARGS)
+        client.bake('baker1', BAKE_ARGS)
 
     # Test that operations above 32KB fail to be injected.
     def test_operation_size_oversized(self, client: Client):
@@ -373,9 +373,9 @@ class TestRememberContract:
         client.remember('munch', contract)
         client.typecheck(contract)
         client.originate(
-            'munch', 1000, 'bootstrap1', contract, ['--burn-cap', '0.295']
+            'munch', 1000, 'baker1', contract, ['--burn-cap', '0.295']
         )
-        client.bake('bootstrap1', BAKE_ARGS)
+        client.bake('baker1', BAKE_ARGS)
 
     # Test that a large operation under 32KB can be injected in the node
     # (variant using a lambda with deep nesting).
@@ -390,7 +390,7 @@ class TestRememberContract:
             'munch',
             ['--arg', big_arg, "--entrypoint", "lambda"],
         )
-        client.bake('bootstrap1', BAKE_ARGS)
+        client.bake('baker1', BAKE_ARGS)
 
     # Test that a large operation over 32KB cannot be injected in the node,
     # and the error is not a stack overflow
@@ -421,7 +421,7 @@ class TestRememberContract:
             'munch',
             ['--arg', big_arg, "--entrypoint", "list_nat"],
         )
-        client.bake('bootstrap1', BAKE_ARGS)
+        client.bake('baker1', BAKE_ARGS)
 
     def test_operation_size_with_list_syntax_error(self, client: Client):
         # Each element in the list takes 2 bytes so about 30KB in total
@@ -478,7 +478,7 @@ class TestRememberContract:
             'munch',
             ['--arg', f"{big_arg}", "--entrypoint", "nat"],
         )
-        client.bake('bootstrap1', BAKE_ARGS)
+        client.bake('baker1', BAKE_ARGS)
 
     # Test that a large operation over 32KB cannot be injected in the node,
     # and the error is not a stack overflow
@@ -496,3 +496,28 @@ class TestRememberContract:
                 'munch',
                 ['--arg', f"{big_arg}", "--entrypoint", "nat"],
             )
+
+    def test_pvss_keys_wallet(self, client: Client):
+        keys = ['foo', 'bar', 'boo']
+        for key in keys:
+            client.gen_pvss_keys(key)
+
+        expected_error = 'this can only be used with option --force'
+        with assert_run_failure(expected_error):
+            client.forget_pvss_keys(keys[0], args=[])
+        with assert_run_failure(expected_error):
+            client.forget_all_pvss_keys(args=[])
+
+        known_keys = client.list_pvss_keys()
+        assert len(known_keys) == len(keys)
+        for key_alias in known_keys.keys():
+            assert key_alias in keys
+
+        client.forget_pvss_keys(keys[0])
+
+        known_keys = client.list_pvss_keys()
+        assert len(known_keys) == len(keys) - 1
+
+        client.forget_all_pvss_keys()
+        known_keys = client.list_pvss_keys()
+        assert len(known_keys) == 0
