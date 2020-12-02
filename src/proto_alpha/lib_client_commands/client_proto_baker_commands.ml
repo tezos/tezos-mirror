@@ -163,6 +163,11 @@ let signature_param () =
     ~desc:"Each signer of the multisig contract"
     Client_proto_args.signature_parameter
 
+let pvss_key_param () =
+  Client_keys.PVSS_public_key.source_param
+    ~name:"key"
+    ~desc:"the new PVSS key of the baker contract"
+
 let parse_expr expr =
   Lwt.return @@ Micheline_parser.no_parsing_error
   @@ Michelson_v1_parser.parse_expression expr
@@ -711,6 +716,64 @@ let singlesig_commands () : #Protocol_client_context.full Clic.command list =
           | None -> return_unit | Some (_res, _contracts) -> return_unit);
       command
         ~group:singlesig_group
+        ~desc:"Set baker PVSS key using a single-signature baker contract"
+        generic_options
+        ( prefixes ["set"; "baker"]
+        @@ Baker_alias.source_param
+        @@ prefixes ["pvss"; "to"]
+        @@ pvss_key_param () @@ stop )
+        (fun ( fee,
+               dry_run,
+               gas_limit,
+               storage_limit,
+               counter,
+               no_print_source,
+               minimal_fees,
+               minimal_nanotez_per_byte,
+               minimal_nanotez_per_gas_unit,
+               force_low_fee,
+               fee_cap,
+               burn_cap )
+             baker
+             pvss_key
+             (cctxt : #Protocol_client_context.full) ->
+          get_baker_consensus_key cctxt ~chain:cctxt#chain baker
+          >>=? fun (_alias, source, src_pk, src_sk) ->
+          let fee_parameter =
+            {
+              Injection.minimal_fees;
+              minimal_nanotez_per_byte;
+              minimal_nanotez_per_gas_unit;
+              force_low_fee;
+              fee_cap;
+              burn_cap;
+            }
+          in
+          Client_proto_baker.call_singlesig
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            ?confirmations:cctxt#confirmations
+            ~dry_run
+            ~fee_parameter
+            ~source
+            ?fee
+            ~src_pk
+            ~src_sk
+            ~baker
+            ~action:(Client_proto_baker.Set_pvss_key pvss_key)
+            ?gas_limit
+            ?storage_limit
+            ?counter
+            ()
+          >>= Client_proto_context_commands.report_michelson_errors
+                ~no_print_source
+                ~msg:"transfer simulation failed"
+                cctxt
+          >>= function
+          | None -> return_unit | Some (_res, _contracts) -> return_unit);
+      command
+        ~group:singlesig_group
         ~desc:
           "Set baker owner keys and threshold using a single-signature baker \
            contract"
@@ -834,9 +897,7 @@ let singlesig_commands () : #Protocol_client_context.full Clic.command list =
                 ~msg:"transfer simulation failed"
                 cctxt
           >>= function
-          | None -> return_unit | Some (_res, _contracts) -> return_unit)
-      (* TODO add set pvss key *)
-     ]
+          | None -> return_unit | Some (_res, _contracts) -> return_unit) ]
 
 let print_prepared_command :
     bool -> Client_proto_baker.multisig_prepared_action -> unit =
@@ -1020,6 +1081,28 @@ let multisig_commands () : #Protocol_client_context.full Clic.command list =
             ~block:cctxt#block
             ~baker
             ~action:(Client_proto_baker.Set_consensus_key new_key)
+            ()
+          >|=? print_prepared_command bytes_only);
+      command
+        ~group:multisig_group
+        ~desc:
+          (Format.sprintf
+             "%s %s"
+             "Display the threshold, public keys, and byte sequence to sign \
+              to set PVSS key of a multi-signature baker contract."
+             set_consensus_key_desc)
+        (args1 bytes_only_switch)
+        ( prefixes ["prepare"; "baker"; "transaction"; "on"]
+        @@ Baker_alias.source_param
+        @@ prefixes ["setting"; "pvss"; "to"]
+        @@ pvss_key_param () @@ stop )
+        (fun bytes_only baker pvss_key (cctxt : #Protocol_client_context.full) ->
+          Client_proto_baker.prepare_multisig_transaction
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            ~baker
+            ~action:(Client_proto_baker.Set_pvss_key pvss_key)
             ()
           >|=? print_prepared_command bytes_only);
       command
@@ -1237,6 +1320,31 @@ let multisig_commands () : #Protocol_client_context.full Clic.command list =
             ~block:cctxt#block
             ~baker
             ~action:(Client_proto_baker.Set_consensus_key new_key)
+            ()
+          >>=? fun prepared_command ->
+          Client_keys.sign cctxt sk prepared_command.bytes
+          >|=? Format.printf "%a@." Signature.pp);
+      command
+        ~group:multisig_group
+        ~desc:
+          (Format.sprintf
+             "%s %s"
+             "Sign setting PVSS key of a multi-signature baker contract."
+             set_consensus_key_desc)
+        no_options
+        ( prefixes ["sign"; "baker"; "transaction"; "on"]
+        @@ Baker_alias.source_param
+        @@ prefixes ["setting"; "pvss"; "to"]
+        @@ pvss_key_param ()
+        @@ prefixes ["with"; "key"]
+        @@ owner_key_param () @@ stop )
+        (fun () baker pvss_key (_, sk) (cctxt : #Protocol_client_context.full) ->
+          Client_proto_baker.prepare_multisig_transaction
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            ~baker
+            ~action:(Client_proto_baker.Set_pvss_key pvss_key)
             ()
           >>=? fun prepared_command ->
           Client_keys.sign cctxt sk prepared_command.bytes
@@ -1870,6 +1978,80 @@ let multisig_commands () : #Protocol_client_context.full Clic.command list =
                 ~baker
                 ~signatures
                 ~action:(Client_proto_baker.Set_consensus_key new_key)
+                ?gas_limit
+                ?storage_limit
+                ?counter
+                ()
+              >>= Client_proto_context_commands.report_michelson_errors
+                    ~no_print_source
+                    ~msg:"transfer simulation failed"
+                    cctxt
+              >>= function
+              | None -> return_unit | Some (_res, _contracts) -> return_unit ));
+      command
+        ~group:multisig_group
+        ~desc:
+          (Format.sprintf
+             "%s %s"
+             "Set baker PVSS key using a multi-signature baker contract."
+             set_consensus_key_desc)
+        generic_options
+        ( prefixes ["set"; "multisig"; "baker"]
+        @@ Baker_alias.source_param
+        @@ prefixes ["pvss"; "to"]
+        @@ pvss_key_param ()
+        @@ prefixes ["on"; "behalf"; "of"]
+        @@ implicit_source_param ()
+        @@ prefixes ["with"; "signatures"]
+        @@ seq_of_param (signature_param ()) )
+        (fun ( fee,
+               dry_run,
+               gas_limit,
+               storage_limit,
+               counter,
+               no_print_source,
+               minimal_fees,
+               minimal_nanotez_per_byte,
+               minimal_nanotez_per_gas_unit,
+               force_low_fee,
+               fee_cap,
+               burn_cap )
+             baker
+             pvss_key
+             (_, source)
+             signatures
+             (cctxt : #Protocol_client_context.full) ->
+          get_source_keys cctxt source
+          >>=? function
+          | None ->
+              failwith
+                "only implicit and baker accounts can be the source of a \
+                 contract call"
+          | Some (_name, source, src_pk, src_sk) -> (
+              let fee_parameter =
+                {
+                  Injection.minimal_fees;
+                  minimal_nanotez_per_byte;
+                  minimal_nanotez_per_gas_unit;
+                  force_low_fee;
+                  fee_cap;
+                  burn_cap;
+                }
+              in
+              Client_proto_baker.call_multisig
+                cctxt
+                ~chain:cctxt#chain
+                ~block:cctxt#block
+                ?confirmations:cctxt#confirmations
+                ~dry_run
+                ~fee_parameter
+                ~source
+                ?fee
+                ~src_pk
+                ~src_sk
+                ~baker
+                ~signatures
+                ~action:(Client_proto_baker.Set_pvss_key pvss_key)
                 ?gas_limit
                 ?storage_limit
                 ?counter
