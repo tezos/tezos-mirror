@@ -188,7 +188,10 @@ module IPGreylist = struct
   let life_expectancy_histogram acl =
     Bloomer.life_expectancy_histogram acl.greylist_ips.bloomer
 
-  let encoding = Data_encoding.(list P2p_addr.encoding)
+  let list acl =
+    IpFIFOCache.fold (fun e acc -> e :: acc) acl.greylist_ips.fifo []
+
+  let list_not_reliable_since acl = acl.greylist_ips.fifo_not_reliable_since
 end
 
 module IPBlacklist = struct
@@ -207,4 +210,7 @@ module PeerGreylist = struct
   let add acl peer_id = PeerFIFOCache.add acl.greylist_peers peer_id
 
   let mem acl peer_id = PeerFIFOCache.mem acl.greylist_peers peer_id
+
+  let list acl =
+    PeerFIFOCache.fold (fun e acc -> e :: acc) acl.greylist_peers []
 end
