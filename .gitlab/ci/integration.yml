@@ -193,6 +193,12 @@ integration:007_multinode_storage_reconstruction:
     - poetry run pytest tests_007/test_multinode_storage_reconstruction.py -s --log-dir=tmp
   stage: test
 
+integration:007_proxy:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_007/test_proxy.py -s --log-dir=tmp
+  stage: test
+
 integration:007_rpc:
   extends: .integration_python_template
   script:
