@@ -72,7 +72,7 @@ end
 (** Sections are a simple way of classifying events at the time of
     their emission. *)
 module Section : sig
-  type t = private string list
+  type t
 
   val empty : t
 
