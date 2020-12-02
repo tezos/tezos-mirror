@@ -381,9 +381,10 @@ let main node =
   in
   let dirs = ("shell", "Shell", [""], shell_dir) :: protocol_dirs in
   let (_version, name, path, dir) =
-    List.find
-      (fun (version, _name, _path, _dir) -> version = required_version)
-      dirs
+    Option.get
+    @@ List.find
+         (fun (version, _name, _path, _dir) -> version = required_version)
+         dirs
   in
   RPC_directory.describe_directory ~recurse:true ~arg:() dir
   >>= fun dir ->
