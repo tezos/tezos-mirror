@@ -50,7 +50,7 @@ class ClientRegression(client.Client):
         check: bool = True,
         trace: bool = False,
         stdin: str = "",
-    ):
+    ) -> str:
         stderr_output = ''
         caught_exc = None
         try:

@@ -1583,3 +1583,7 @@ class Client:
             args = ['--force']
         cmd += args
         return self.run(cmd)
+
+    def set_baker_pvss(self, account: str, key_alias: str) -> str:
+        cmd = ['set', 'baker', account, 'pvss', 'to', key_alias]
+        return self.run(cmd)

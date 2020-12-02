@@ -353,6 +353,56 @@ class TestBakerMultisig:
         client.run(call_set_consensus_key)
         client.bake('baker1', BAKE_ARGS)
 
+    def test_set_pvss_keys(self, client: Client):
+        new_key0 = 'new_pvss_key'
+        client.gen_pvss_keys(new_key0)
+        prep_set_pvss_keys = [
+            'prepare',
+            'baker',
+            'transaction',
+            'on',
+            BAKER,
+            'setting',
+            'pvss',
+            'to',
+            new_key0,
+        ]
+        client.run(prep_set_pvss_keys)
+        sign_set_pvss_keys = [
+            'sign',
+            'baker',
+            'transaction',
+            'on',
+            BAKER,
+            'setting',
+            'pvss',
+            'to',
+            new_key0,
+            'with',
+            'key',
+        ]
+        sig0 = client.run(sign_set_pvss_keys + [KEY1])[:-1]
+        sig1 = client.run(sign_set_pvss_keys + [KEY2])[:-1]
+        call_set_pvss_keys = [
+            'set',
+            'multisig',
+            'baker',
+            BAKER,
+            'pvss',
+            'to',
+            new_key0,
+            'on',
+            'behalf',
+            'of',
+            SRC,
+            'with',
+            'signatures',
+            sig0,
+            sig1,
+        ]
+        client.run(call_set_pvss_keys)
+        client.bake('baker1', BAKE_ARGS)
+
     def test_generic_call(self, client: Client):
         # generic lambda type is:
         # `lambda unit (pair (list operation) (list baker_operation))`

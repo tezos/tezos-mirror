@@ -493,3 +493,9 @@ class TestBaker:
         new_balance_target = client.get_mutez_balance(target)
         assert balance_source - fee_mutez - amount_mutez == new_balance_source
         assert balance_target + amount_mutez == new_balance_target
+
+    def test_set_pvss_key(self, client: Client):
+        pvss_key = 'new_pvss_key'
+        client.gen_pvss_keys(pvss_key)
+        client.set_baker_pvss('baker3', pvss_key)
+        client.bake('baker5', BAKE_ARGS)
