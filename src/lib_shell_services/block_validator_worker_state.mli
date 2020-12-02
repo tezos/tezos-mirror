@@ -40,7 +40,9 @@ module Event : sig
     | Validation_success of Request.view * Worker_types.request_status
     | Validation_failure of
         Request.view * Worker_types.request_status * error list
-    | Debug of string
+    | Could_not_find_context of Block_hash.t
+    | Previously_validated of Block_hash.t
+    | Validating_block of Block_hash.t
 
   type view = t
 
