@@ -34,6 +34,21 @@ val valid_amount : int64 -> bool
 
 val valid_balance : int64 -> bool
 
+(** Raised by {!init_params} if it failed to find parameters.
+
+    The string list is the list of locations where they were looked up. *)
+exception Params_not_found of string list
+
+(** Loads the parameters for our instance of Groth16.
+
+    The parameters are searched in:
+    - [/usr/share/zcash-params]
+    - [${OPAM_SWITCH_PREFIX}/share/zcash-params]
+    - [${HOME}/.zcash-params]
+
+    @raise Params_not_found if parameters could not be found at any of those locations.
+
+    Only sapling parameters are loaded. *)
 val init_params : unit -> unit
 
 (** Derives the nullifier pk corresponding to a nullifier sk *)

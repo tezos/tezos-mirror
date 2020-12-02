@@ -103,7 +103,13 @@ let commands =
    parameters files are there at the start and avoid failing much later while
    validating an operation. Plus paying this cost upfront means that the first
    validation will not be more expensive. *)
-let () = Sapling.Core.Validator.init_params ()
+let () =
+  try Sapling.Core.Validator.init_params ()
+  with exn ->
+    Printf.eprintf
+      "Failed to initialize Zcash parameters: %s"
+      (Printexc.to_string exn) ;
+    exit 1
 
 let () =
   Random.self_init () ;

@@ -671,6 +671,22 @@ let zip32_xfvk_derive parent index =
   in
   if res then Some (to_zip32_full_viewing_key derived) else None
 
+exception Params_not_found of string list
+
+let () =
+  Printexc.register_printer
+  @@ function
+  | Params_not_found locations ->
+      Some
+        (Format.asprintf
+           "@[<v>cannot find Zcash params in any of:@,\
+            %a@ You may download them using \
+            https://raw.githubusercontent.com/zcash/zcash/master/zcutil/fetch-params.sh@]@."
+           (Format.pp_print_list (fun fmt -> Format.fprintf fmt "- %s"))
+           locations)
+  | _ ->
+      None
+
 let init_params () =
   let home = Option.value (Sys.getenv_opt "HOME") ~default:"/" in
   let opam_switch =
@@ -729,15 +745,7 @@ let init_params () =
     | Some p ->
         p
     | None ->
-        Format.eprintf
-          "@[Cannot find zcash params in any of @[%a@].@ You may download \
-           them using \
-           https://raw.githubusercontent.com/zcash/zcash/master/zcutil/fetch-params.sh@]@."
-          (Format.pp_print_list
-             ~pp_sep:Format.pp_print_space
-             Format.pp_print_string)
-          candidates ;
-        raise Not_found
+        raise (Params_not_found candidates)
   in
   let spend_path = prefix ^ "/sapling-spend.params" in
   let spend_hash =
