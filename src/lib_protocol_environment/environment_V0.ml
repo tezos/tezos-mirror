@@ -433,6 +433,8 @@ struct
 
     let return x = Lwt.return (`Ok x)
 
+    let return_chunked x = Lwt.return (`OkChunk x)
+
     let return_stream x = Lwt.return (`OkStream x)
 
     let not_found = Lwt.return (`Not_found None)
@@ -448,7 +450,7 @@ struct
           handler p q i
           >>= function
           | `Ok o ->
-              RPC_answer.return o
+              RPC_answer.return_chunked o
           | `OkStream s ->
               RPC_answer.return_stream s
           | `Created s ->
