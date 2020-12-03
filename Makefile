@@ -200,9 +200,13 @@ check-linting:
 check-python-linting:
 	@make -C tests_python lint
 
-.PHONY: fmt
-fmt:
+.PHONY: fmt fmt-ocaml fmt-python
+fmt: fmt-ocaml fmt-python
+
+fmt-ocaml:
 	@src/tooling/lint.sh --format --ignore src/tooling/test/test_not_well_formatted.ml src/tooling/test/test_not_well_formatted.mli tezt/lib/base.ml tezt/lib/base.mli
+
+fmt-python:
 	@make -C tests_python fmt
 
 .PHONY: build-deps
