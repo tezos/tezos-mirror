@@ -23,23 +23,23 @@ with architecture **x86_64**.  Although we only officially support
 Linux, the script has been tested with success in the past on
 windows/mac/linux.
 
-The same script can be used to run Mainnet, Carthagenet or Zeronet, it
+The same script can be used to run Mainnet, Delphinet or Zeronet, it
 suffices to rename it as it downloads a different image based on its
 name.
-For example, to run Carthagenet test network with the latest release::
+For example, to run Delphinet test network with the latest release::
 
-    wget -O carthagenet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh
-    chmod +x carthagenet.sh
+    wget -O delphinet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh
+    chmod +x delphinet.sh
 
 Alternatively, to run Mainnet::
 
     wget -O mainnet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh
     chmod +x mainnet.sh
 
-In the following we assume you are running Carthagenet test network.
+In the following we assume you are running Delphinet test network.
 You are now one step away from a working node::
 
-    ./carthagenet.sh start
+    ./delphinet.sh start
 
 This will download the right docker image for your chosen network, launch 3
 docker containers running the node, the baker and the endorser. Keep in mind
@@ -48,23 +48,23 @@ synchronize the chain. This can be *lengthy* on the first launch
 considering the chain takes up several gigabytes of data. See
 :ref:`how to use Tezos<howtouse>` for more details.
 
-Every call to ``carthagenet.sh`` will check for updates of the node and
+Every call to ``delphinet.sh`` will check for updates of the node and
 will fail if your node is not up-to-date. For updating the node, simply
 run::
 
-    ./carthagenet.sh restart
+    ./delphinet.sh restart
 
 If you prefer to temporarily disable automatic updates, you just have to
 set an environment variable::
 
     export TEZOS_ALPHANET_DO_NOT_PULL=yes
 
-See ``./carthagenet.sh --help`` for more information about the
-script. In particular see ``./carthagenet.sh client --help`` or the
+See ``./delphinet.sh --help`` for more information about the
+script. In particular see ``./delphinet.sh client --help`` or the
 :ref:`online manual<client_manual>` for more information about
 the client. Every command to the ``tezos-client`` can be equivalently
-executed using ``./carthagenet.sh client``. Similarly, ``tezos-admin-client``
-can be executed using ``./carthagenet.sh admin-client``.
+executed using ``./delphinet.sh client``. Similarly, ``tezos-admin-client``
+can be executed using ``./delphinet.sh admin-client``.
 
 Get static binaries
 -------------------
