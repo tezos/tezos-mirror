@@ -43,6 +43,12 @@ let register dir service handler =
       handler p q i
       >>= function Ok o -> RPC_answer.return o | Error e -> RPC_answer.fail e)
 
+let register_chunked dir service handler =
+  gen_register dir service (fun p q i ->
+      handler p q i
+      >>= function
+      | Ok o -> RPC_answer.return_chunked o | Error e -> RPC_answer.fail e)
+
 let opt_register dir service handler =
   gen_register dir service (fun p q i ->
       handler p q i
@@ -61,6 +67,8 @@ let lwt_register dir service handler =
 open Curry
 
 let register0 root s f = register root s (curry Z f)
+
+let register0_chunked root s f = register_chunked root s (curry Z f)
 
 let register1 root s f = register root s (curry (S Z) f)
 

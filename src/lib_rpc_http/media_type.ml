@@ -25,6 +25,9 @@
 
 include Resto_cohttp.Media_type.Make (RPC_encoding)
 
+(* emits chunks of size approx chunk_size_hint but occasionally a bit bigger *)
+let chunk_size_hint = 4096
+
 let json =
   {
     name = Cohttp.Accept.MediaType ("application", "json");
@@ -47,7 +50,7 @@ let json =
         @@ Data_encoding.Json.construct enc v);
     construct_seq =
       (fun enc v ->
-        let buffer = Bytes.create 4096 in
+        let buffer = Bytes.create chunk_size_hint in
         Data_encoding.Json.blit_instructions_seq_of_jsonm_lexeme_seq
           ~newline:true
           ~buffer
@@ -68,6 +71,10 @@ let json =
   }
 
 let bson =
+  let construct enc v =
+    Bytes.unsafe_to_string @@ Json_repr_bson.bson_to_bytes
+    @@ Data_encoding.Bson.construct enc v
+  in
   {
     name = Cohttp.Accept.MediaType ("application", "bson");
     q = Some 100;
@@ -89,16 +96,11 @@ let bson =
                 bson
             in
             Data_encoding.Json.pp ppf json);
-    construct =
-      (fun enc v ->
-        Bytes.unsafe_to_string @@ Json_repr_bson.bson_to_bytes
-        @@ Data_encoding.Bson.construct enc v);
+    construct;
     construct_seq =
       (fun enc v ->
-        let bytes =
-          Json_repr_bson.bson_to_bytes @@ Data_encoding.Bson.construct enc v
-        in
-        Seq.return (bytes, 0, Bytes.length bytes));
+        let s = construct enc v in
+        Seq.return (Bytes.unsafe_of_string s, 0, String.length s));
     destruct =
       (fun enc body ->
         match
@@ -120,6 +122,9 @@ let bson =
   }
 
 let octet_stream =
+  let construct enc v =
+    Bytes.to_string @@ Data_encoding.Binary.to_bytes_exn enc v
+  in
   {
     name = Cohttp.Accept.MediaType ("application", "octet-stream");
     q = Some 200;
@@ -138,11 +143,11 @@ let octet_stream =
               ";; binary equivalent of the following json@.%a"
               Data_encoding.Json.pp
               (Data_encoding.Json.construct enc v));
-    construct = (fun enc v -> Data_encoding.Binary.to_string_exn enc v);
+    construct;
     construct_seq =
       (fun enc v ->
-        let bytes = Data_encoding.Binary.to_bytes_exn enc v in
-        Seq.return (bytes, 0, Bytes.length bytes));
+        let s = construct enc v in
+        Seq.return (Bytes.unsafe_of_string s, 0, String.length s));
     destruct =
       (fun enc s ->
         match Data_encoding.Binary.of_bytes enc (Bytes.of_string s) with

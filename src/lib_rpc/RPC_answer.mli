@@ -26,6 +26,7 @@
 (** Return type for service handler *)
 type 'o t =
   [ `Ok of 'o (* 200 *)
+  | `OkChunk of 'o (* 200 *)
   | `OkStream of 'o stream (* 200 *)
   | `Created of string option (* 201 *)
   | `No_content (* 204 *)
@@ -42,6 +43,8 @@ and 'a stream = 'a Resto_directory.Answer.stream = {
 }
 
 val return : 'o -> 'o t Lwt.t
+
+val return_chunked : 'o -> 'o t Lwt.t
 
 val return_unit : unit t Lwt.t
 
