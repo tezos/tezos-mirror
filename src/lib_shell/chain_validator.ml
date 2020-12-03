@@ -66,6 +66,7 @@ module Types = struct
     block_validator_process : Block_validator_process.t;
     global_valid_block_input : State.Block.t Lwt_watcher.input;
     global_chains_input : (Chain_id.t * bool) Lwt_watcher.input;
+    start_prevalidator : bool;
     prevalidator_limits : Prevalidator.limits;
     peer_validator_limits : Peer_validator.limits;
     limits : limits;
@@ -78,6 +79,7 @@ module Types = struct
        with a known head. Because the chain validator does not handle
        directly these messages, this is done through callbacks. *)
     synchronisation_state : Synchronisation_heuristic.t;
+    mutable current_status : Synchronisation_heuristic.status option;
     (* This should be true if after updating the synchronisatio_state,
        the status was [Synchronized] at least once. When this flag is
        true, the node starts its mempool. *)
@@ -136,27 +138,23 @@ let shutdown_child nv active_chains =
    - [peer_id] is not us.
 
    - [block] is known as valid. *)
-let update_synchronisation_state =
-  (* Used to detect and log when the status changes. *)
-  let old_status = ref None in
-  fun w ((block, peer_id) : Block_header.t * P2p_peer.Id.t) ->
-    let nv = Worker.state w in
-    Synchronisation_heuristic.update
-      nv.synchronisation_state
-      (block.shell.timestamp, peer_id) ;
-    let status =
-      Synchronisation_heuristic.get_status nv.synchronisation_state
-    in
-    ( match status with
-    | Synchronised _ when nv.bootstrapped = false ->
-        nv.bootstrapped <- true ;
-        Lwt.wakeup_later nv.bootstrapped_wakener () ;
-        Worker.record_event w Bootstrapped
-    | _ ->
-        () ) ;
-    if !old_status <> Some status then (
-      old_status := Some status ;
-      Worker.record_event w (Sync_status status) )
+let update_synchronisation_state w
+    ((block, peer_id) : Block_header.t * P2p_peer.Id.t) =
+  let nv = Worker.state w in
+  Synchronisation_heuristic.update
+    nv.synchronisation_state
+    (block.shell.timestamp, peer_id) ;
+  let status = Synchronisation_heuristic.get_status nv.synchronisation_state in
+  ( match status with
+  | Synchronised _ when nv.bootstrapped = false ->
+      nv.bootstrapped <- true ;
+      Lwt.wakeup_later nv.bootstrapped_wakener () ;
+      Worker.record_event w Bootstrapped
+  | _ ->
+      () ) ;
+  if nv.current_status <> Some status then (
+    nv.current_status <- Some status ;
+    Worker.record_event w (Sync_status status) )
 
 (* The synchronisation state is updated only for blocks known as
    valid. Assume:
@@ -165,9 +163,14 @@ let update_synchronisation_state =
 let check_and_update_synchronisation_state w (block, peer_id) : unit Lwt.t =
   let nv = Worker.state w in
   let hash = Block_header.hash block in
-  State.Block.known_valid nv.parameters.chain_state hash
+  let chain_state = nv.parameters.chain_state in
+  State.Block.known_valid chain_state hash
   >>= fun known_valid ->
-  if known_valid then (
+  let known_valid_or_genesis =
+    known_valid
+    || Block_hash.equal (State.Chain.faked_genesis_hash chain_state) hash
+  in
+  if known_valid_or_genesis then (
     update_synchronisation_state w (block, peer_id) ;
     Lwt.return_unit )
   else Lwt.return_unit
@@ -340,6 +343,7 @@ let may_switch_test_chain w active_chains spawn_child block =
          adding the chain to the correct tables, ...) *)
       spawn_child
         ~parent:(State.Chain.id chain_state)
+        nv.parameters.start_prevalidator
         nv.parameters.peer_validator_limits
         nv.parameters.prevalidator_limits
         nv.parameters.block_validator
@@ -406,33 +410,45 @@ let safe_get_prevalidator_filter hash =
         let module Filter = Prevalidator_filters.No_filter (Proto) in
         return (module Filter : Prevalidator_filters.FILTER) )
 
-let may_instanciate_new_prevalidator nv ~prev ~block =
+let instantiate_prevalidator nv block (limits, chain_db) =
+  State.Block.protocol_hash block
+  >>=? (fun new_protocol ->
+         safe_get_prevalidator_filter new_protocol
+         >>=? fun (module Filter) ->
+         Prevalidator.create limits (module Filter) chain_db)
+  >>= function
+  | Error errs ->
+      Chain_validator_event.(emit prevalidator_reinstantiation_failure) errs
+      >>= fun () ->
+      nv.prevalidator <- None ;
+      Lwt.return_unit
+  | Ok prevalidator ->
+      nv.prevalidator <- Some prevalidator ;
+      Lwt.return_unit
+
+let may_flush_or_update_prevalidator nv ~prev ~block =
   match nv.prevalidator with
+  | None ->
+      return_unit
   | Some old_prevalidator ->
       let prev_proto_level = State.Block.protocol_level prev in
       let new_proto_level = State.Block.protocol_level block in
-      if Compare.Int.(prev_proto_level < new_proto_level) then (
-        State.Block.protocol_hash block
-        >>=? fun new_protocol ->
-        safe_get_prevalidator_filter new_protocol
-        >>=? fun (module Filter) ->
-        let (limits, chain_db) = Prevalidator.parameters old_prevalidator in
+      if Compare.Int.(prev_proto_level < new_proto_level) then
         (* TODO inject in the new prevalidator the operation
            from the previous one. *)
-        Prevalidator.create limits (module Filter) chain_db
-        >>= function
-        | Error errs ->
-            Chain_validator_event.(emit prevalidator_reinstantiation_failure)
-              errs
-            >>= fun () ->
-            nv.prevalidator <- None ;
-            Prevalidator.shutdown old_prevalidator >>= fun () -> return_unit
-        | Ok prevalidator ->
-            nv.prevalidator <- Some prevalidator ;
-            Prevalidator.shutdown old_prevalidator >>= fun () -> return_unit )
+        let parameters = Prevalidator.parameters old_prevalidator in
+        instantiate_prevalidator nv block parameters
+        >>= fun () ->
+        Prevalidator.shutdown old_prevalidator >>= fun () -> return_unit
       else Prevalidator.flush old_prevalidator (State.Block.hash block)
-  | None ->
-      return_unit
+
+let may_instantiate_prevalidator nv ~head =
+  if nv.parameters.start_prevalidator && nv.bootstrapped then
+    instantiate_prevalidator
+      nv
+      head
+      (nv.parameters.prevalidator_limits, nv.parameters.chain_db)
+  else Lwt.return_unit
 
 let on_request (type a) w start_testchain active_chains spawn_child
     (req : a Request.t) : a tzresult Lwt.t =
@@ -466,7 +482,7 @@ let on_request (type a) w start_testchain active_chains spawn_child
     >>=? fun () ->
     broadcast_head w ~previous block
     >>= fun () ->
-    may_instanciate_new_prevalidator nv ~prev:previous ~block
+    may_flush_or_update_prevalidator nv ~prev:previous ~block
     >>=? fun () ->
     ( if start_testchain then
       may_switch_test_chain w active_chains spawn_child block
@@ -533,35 +549,9 @@ let may_load_protocols parameters =
               >>=? fun _ -> return_unit ))
     indexed_protocols
 
-let on_launch start_prevalidator w _ parameters =
+let on_launch w _ parameters =
   may_load_protocols parameters
   >>=? fun () ->
-  ( if start_prevalidator then
-    State.read_chain_data
-      parameters.chain_state
-      (fun _ {State.current_head; _} -> Lwt.return current_head)
-    >>= fun head ->
-    State.Block.protocol_hash head
-    >>=? fun head_protocol_hash ->
-    safe_get_prevalidator_filter head_protocol_hash
-    >>= function
-    | Ok (module Proto_filters) -> (
-        Prevalidator.create
-          parameters.prevalidator_limits
-          (module Proto_filters)
-          parameters.chain_db
-        >>= function
-        | Error errs ->
-            Chain_validator_event.(emit prevalidator_instantiation_failure)
-              errs
-            >>= fun () -> return_none
-        | Ok prevalidator ->
-            return_some prevalidator )
-    | Error errs ->
-        Chain_validator_event.(emit prevalidator_instantiation_failure) errs
-        >>= fun () -> return_none
-  else return_none )
-  >>=? fun prevalidator ->
   let valid_block_input = Lwt_watcher.create_input () in
   let new_head_input = Lwt_watcher.create_input () in
   let (bootstrapped_waiter, bootstrapped_wakener) = Lwt.wait () in
@@ -586,12 +576,21 @@ let on_launch start_prevalidator w _ parameters =
       bootstrapped_waiter;
       bootstrapped;
       synchronisation_state;
+      current_status = None;
       active_peers = P2p_peer.Error_table.create 50;
       (* TODO use [2 * max_connection] *)
       child = None;
-      prevalidator;
+      prevalidator = None (* the prevalidator may be instantiated next *);
     }
   in
+  (* Start the prevalidator when the chain becomes bootstrapped *)
+  Lwt.on_success bootstrapped_waiter (fun () ->
+      (* ignore errors *)
+      Lwt.dont_wait
+        (fun () ->
+          Chain.head parameters.chain_state
+          >>= fun head -> may_instantiate_prevalidator nv ~head)
+        (fun exc -> ignore exc)) ;
   if nv.bootstrapped then Lwt.wakeup_later nv.bootstrapped_wakener () ;
   Distributed_db.set_callback
     parameters.chain_db
@@ -664,17 +663,17 @@ let on_launch start_prevalidator w _ parameters =
     } ;
   return nv
 
-let rec create ~start_prevalidator ~start_testchain ~active_chains ?parent
-    ~block_validator_process peer_validator_limits prevalidator_limits
+let rec create ~start_testchain ~active_chains ?parent ~block_validator_process
+    start_prevalidator peer_validator_limits prevalidator_limits
     block_validator global_valid_block_input global_chains_input db chain_state
     limits =
-  let spawn_child ~parent pvl pl bl gvbi gci db n l =
+  let spawn_child ~parent epv pvl pl bl gvbi gci db n l =
     create
-      ~start_prevalidator
       ~start_testchain
       ~active_chains
       ~parent
       ~block_validator_process
+      epv
       pvl
       pl
       bl
@@ -688,7 +687,7 @@ let rec create ~start_prevalidator ~start_testchain ~active_chains ?parent
   let module Handlers = struct
     type self = t
 
-    let on_launch = on_launch start_prevalidator
+    let on_launch = on_launch
 
     let on_request w = on_request w start_testchain active_chains spawn_child
 
@@ -704,6 +703,7 @@ let rec create ~start_prevalidator ~start_testchain ~active_chains ?parent
     {
       parent;
       peer_validator_limits;
+      start_prevalidator;
       prevalidator_limits;
       block_validator;
       block_validator_process;
@@ -736,10 +736,10 @@ let create ~start_prevalidator ~start_testchain ~active_chains
     state limits =
   (* hide the optional ?parent *)
   create
-    ~start_prevalidator
     ~start_testchain
     ~active_chains
     ~block_validator_process
+    start_prevalidator
     peer_validator_limits
     prevalidator_limits
     block_validator
