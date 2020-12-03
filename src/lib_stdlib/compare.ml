@@ -108,6 +108,23 @@ module Option (P : COMPARABLE) = Make (struct
         P.compare x y
 end)
 
+module Result (Ok : COMPARABLE) (Error : COMPARABLE) = Make (struct
+  type t = (Ok.t, Error.t) result
+
+  (* Note: [Ok _ < Error _] for compatibility with the Stdlib's polymorphic
+           comparison. *)
+  let compare ra rb =
+    match (ra, rb) with
+    | (Ok a, Ok b) ->
+        Ok.compare a b
+    | (Error a, Error b) ->
+        Error.compare a b
+    | (Ok _, Error _) ->
+        -1
+    | (Error _, Ok _) ->
+        1
+end)
+
 module Char = Make (Char)
 
 module Bool = Make (struct

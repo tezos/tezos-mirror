@@ -23,12 +23,28 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** {1 [Compare]}
+
+    Monomorphic comparison for common ground types and common type constructors.
+
+    [Compare] provides a module signature for the standard comparison functions
+    and operators as well as modules of that signature for the common OCaml
+    ground types ([int], [bool], etc.) and type constructors ([list], [option],
+    etc.). *)
+
+(** {2 Signatures and a functor} *)
+
+(** [COMPARABLE] is a signature for basic comparison. It is used only for
+    instantiating full comparison modules of signature {!S} via the functor
+    {!Make}. *)
 module type COMPARABLE = sig
   type t
 
   val compare : t -> t -> int
 end
 
+(** [S] is a signature for a fully-fledge comparison module. It includes all the
+    functions and operators derived from a [compare] function. *)
 module type S = sig
   type t
 
@@ -54,6 +70,12 @@ module type S = sig
 end
 
 module Make (P : COMPARABLE) : S with type t := P.t
+
+(** {2 Base types}
+
+    The specialised comparison and all the specialised functions and operators
+    on the base types are compatible with the polymorphic comparison and all the
+    polymorphic functions and operators from the {!Stdlib}. *)
 
 module Char : S with type t = char
 
@@ -99,6 +121,17 @@ module Bytes : S with type t = bytes
 
 module Z : S with type t = Z.t
 
+(** {2 Type constructors}
+
+    Provided the functor argument(s) are compatible with the polymorphic
+    comparison of the {!Stdlib}, then the specialised comparison and all the
+    specialised functions and operators on the derived types are compatible with
+    the polymorphic comparison and all the polymorphic functions and operators
+    from the {!Stdlib}. *)
+
 module List (P : COMPARABLE) : S with type t = P.t list
 
 module Option (P : COMPARABLE) : S with type t = P.t option
+
+module Result (Ok : COMPARABLE) (Error : COMPARABLE) :
+  S with type t = (Ok.t, Error.t) result
