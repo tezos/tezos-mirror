@@ -32,7 +32,6 @@ depends: [
   "tezos-embedded-protocol-006-PsCARTHA"
   "tezos-embedded-protocol-007-PsDELPH1"
   "tezos-embedded-protocol-008-PtEdoTez"
-  "tezos-mempool-006-PsCARTHA"
   "tezos-mempool-007-PsDELPH1"
   "tezos-mempool-008-PtEdoTez"
   "cmdliner"

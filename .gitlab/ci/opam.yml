@@ -96,16 +96,6 @@ opam:tezos-008-PtEdoTez-test-helpers:
   variables:
     package: tezos-008-PtEdoTez-test-helpers
 
-opam:tezos-accuser-006-PsCARTHA:
-  extends: .opam_template
-  variables:
-    package: tezos-accuser-006-PsCARTHA
-
-opam:tezos-accuser-006-PsCARTHA-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-accuser-006-PsCARTHA-commands
-
 opam:tezos-accuser-007-PsDELPH1:
   extends: .opam_template
   variables:
@@ -141,11 +131,6 @@ opam:tezos-alpha-test-helpers:
   variables:
     package: tezos-alpha-test-helpers
 
-opam:tezos-baker-006-PsCARTHA:
-  extends: .opam_template
-  variables:
-    package: tezos-baker-006-PsCARTHA
-
 opam:tezos-baker-007-PsDELPH1:
   extends: .opam_template
   variables:
@@ -160,16 +145,6 @@ opam:tezos-baker-alpha:
   extends: .opam_template
   variables:
     package: tezos-baker-alpha
-
-opam:tezos-baking-006-PsCARTHA:
-  extends: .opam_template
-  variables:
-    package: tezos-baking-006-PsCARTHA
-
-opam:tezos-baking-006-PsCARTHA-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-baking-006-PsCARTHA-commands
 
 opam:tezos-baking-007-PsDELPH1:
   extends: .opam_template
@@ -466,16 +441,6 @@ opam:tezos-embedded-protocol-genesis-carthagenet:
   variables:
     package: tezos-embedded-protocol-genesis-carthagenet
 
-opam:tezos-endorser-006-PsCARTHA:
-  extends: .opam_template
-  variables:
-    package: tezos-endorser-006-PsCARTHA
-
-opam:tezos-endorser-006-PsCARTHA-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-endorser-006-PsCARTHA-commands
-
 opam:tezos-endorser-007-PsDELPH1:
   extends: .opam_template
   variables:
@@ -525,11 +490,6 @@ opam:tezos-lwt-result-stdlib:
   extends: .opam_template
   variables:
     package: tezos-lwt-result-stdlib
-
-opam:tezos-mempool-006-PsCARTHA:
-  extends: .opam_template
-  variables:
-    package: tezos-mempool-006-PsCARTHA
 
 opam:tezos-mempool-007-PsDELPH1:
   extends: .opam_template

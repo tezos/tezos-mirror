@@ -59,9 +59,6 @@
             (select void_for_linking-baking-alpha from
               (tezos-baking-alpha-commands.registration -> void_for_linking-baking-alpha.empty)
               (-> void_for_linking-baking-alpha.empty))
-            (select void_for_linking-baking-006-PsCARTHA from
-              (tezos-baking-006-PsCARTHA-commands.registration -> void_for_linking-baking-006-PsCARTHA.empty)
-              (-> void_for_linking-baking-006-PsCARTHA.empty))
             (select void_for_linking-baking-007-PsDELPH1 from
               (tezos-baking-007-PsDELPH1-commands.registration -> void_for_linking-baking-007-PsDELPH1.empty)
               (-> void_for_linking-baking-007-PsDELPH1.empty))
@@ -100,7 +97,6 @@
    (write-file void_for_linking-alpha.empty "")
    (write-file void_for_linking-demo-counter.empty "")
    (write-file void_for_linking-baking-alpha.empty "")
-   (write-file void_for_linking-baking-006-PsCARTHA.empty "")
    (write-file void_for_linking-baking-007-PsDELPH1.empty "")
    (write-file void_for_linking-baking-008-PtEdoTez.empty "")
 )))
