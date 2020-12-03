@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -337,6 +337,17 @@ let build_rpc_directory net =
         | Some pool ->
             return (P2p_pool.Peers.banned pool peer_id))
   in
+  let dir =
+    RPC_directory.register0
+      dir
+      P2p_services.ACL.S.get_greylisted_peers
+      (fun () () ->
+        match P2p.pool net with
+        | None ->
+            fail P2p_errors.P2p_layer_disabled
+        | Some pool ->
+            return (P2p_pool.Peers.get_greylisted_list pool))
+  in
   (* Network : Point *)
   let dir =
     RPC_directory.register0 dir P2p_services.Points.S.list (fun q () ->
@@ -490,6 +501,22 @@ let build_rpc_directory net =
             RPC_answer.return false
         | Some pool ->
             RPC_answer.return (P2p_pool.Points.banned pool point))
+  in
+  let dir =
+    RPC_directory.register0
+      dir
+      P2p_services.ACL.S.get_greylisted_ips
+      (fun () () ->
+        match P2p.pool net with
+        | None ->
+            fail P2p_errors.P2p_layer_disabled
+        | Some pool ->
+            return
+              {
+                P2p_services.ACL.ips = P2p_pool.Points.get_greylisted_list pool;
+                not_reliable_since =
+                  P2p_pool.Points.greylisted_list_not_reliable_since pool;
+              })
   in
   (* Network : Greylist *)
   let dir =

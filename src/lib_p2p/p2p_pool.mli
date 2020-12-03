@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019-2020 Nomadic Labs, <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2019-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -254,6 +254,9 @@ module Peers : sig
   (** [untrust t peer_id] set the peer info for this peer to not trusted.
       Does nothing if this peer isn't known. *)
   val untrust : ('msg, 'peer, 'conn) t -> P2p_peer.Id.t -> unit
+
+  (** [get_greylisted_list t] returns the list of all the greylisted peers *)
+  val get_greylisted_list : ('msg, 'peer, 'conn) t -> P2p_peer.Id.t list
 end
 
 (** {1 Functions on [Points]} *)
@@ -320,6 +323,17 @@ module Points : sig
   (** [untrust t point_id] sets the point info peer info for this point
       to not trusted. Does nothing if point isn't known. *)
   val untrust : ('msg, 'peer, 'conn) t -> P2p_point.Id.t -> unit
+
+  (** [get_greylisted_list t] if [greylisted_list_not_reliable_since t] returns
+      [None], returns the list of currently greylisted IPs. *)
+  val get_greylisted_list : ('msg, 'peer, 'conn) t -> P2p_addr.t list
+
+  (* The list returned by [get_greylisted_list t] can be overflowed. When it
+     has been overflowed, it is no more reliable. The date of the first
+     overflow is memorized to indicate that it is no more reliable. This is
+     reset by calling [acl_clear t]. *)
+  val greylisted_list_not_reliable_since :
+    ('msg, 'peer, 'conn) t -> Time.System.t option
 end
 
 (** {1 Misc functions} *)
