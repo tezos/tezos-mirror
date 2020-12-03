@@ -726,6 +726,7 @@ struct
     include Local_monad
     include Tezos_error_monad.Monad_ext_maker.Make (Error_core) (TzTrace)
               (Local_monad)
+    include Error_monad_traversors
 
     type 'err trace = 'err TzTrace.trace
   end
