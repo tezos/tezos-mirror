@@ -16,7 +16,7 @@ The code can be found in the Gitlab branch `proto-008`_ or in the
 release 8.0~rc2 and its full hash is
 ``PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq``.
 As usual a :ref:`testnet <test-networks>` called `Edonet` will be available
-for the whole life of the protocol.
+during the full lifetime of the protocol.
 
 The main novelties in the Edo protocol are:
 

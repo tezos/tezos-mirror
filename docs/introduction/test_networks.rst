@@ -13,7 +13,7 @@ former is obviously important as users need to test their development
 with the current protocol. The latter is also needed to test the proposed
 protocol and its new features, both to decide whether to vote yes and
 to prepare for its activation. After the intended protocol of a test
-network is activated (such as Carthage for Carthagenet), the protocol
+network is activated (such as Delphi for Delphinet), the protocol
 no longer changes because this could break the workflow of some users
 while they are testing their development, as they may not be ready for
 the new protocol. So every time a new protocol is proposed on Mainnet,
@@ -31,7 +31,10 @@ The keys obtained from this faucet can be used in all test networks.
 Delphinet
 ---------
 
-- Built-in :ref:`multinetwork` alias: ``delphinet`` (available since version 7.4)
+- Built-in network alias: ``delphinet`` (see :ref:`builtin_networks`)
+
+  * Available since version 7.4
+
 - Run Docker image: ``wget -O delphinet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh``
 
 Delphinet is a test network running the Delphi protocol.
@@ -55,7 +58,10 @@ This results in a faster chain than Mainnet:
 Edonet
 ------
 
-- Built-in :ref:`multinetwork` alias: ``edonet`` (available since version 8.0~rc2)
+- Built-in network alias: ``edonet`` (see :ref:`builtin_networks`)
+
+  * Available since version 8.0~rc2
+
 - Run Docker image: ``wget -O edonet.sh https://gitlab.com/tezos/tezos/raw/v8.0-rc2/scripts/tezos-docker-manager.sh``
 
 Edonet is a test network running the Edo protocol.
@@ -100,7 +106,7 @@ It was available in experimental branch ``dalpha-release``.
 Carthagenet
 -----------
 
-- Built-in :ref:`multinetwork` alias: ``carthagenet``
+- Built-in network alias: ``carthagenet``
 - Run Docker image: ``wget -O carthagenet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh``
 
 Carthagenet is a test network running the Carthage protocol.

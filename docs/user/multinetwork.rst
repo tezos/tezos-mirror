@@ -26,17 +26,19 @@ To connect to other networks, you can either use one of the
 See also `Alias Versus Explicit Configuration`_ for a discussion
 regarding what happens when you update your node.
 
+.. _builtin_networks:
+
 Built-In Networks
 -----------------
 
 The simplest way to select the network to connect to is to use the ``--network``
-option when you initialize your node configuration. For instance, to run on Carthagenet::
+option when you initialize your node configuration. For instance, to run on Delphinet::
 
-  tezos-node config init --data-dir ~/tezos-carthagenet --network carthagenet
-  tezos-node identity generate --data-dir ~/tezos-carthagenet
-  tezos-node run --data-dir ~/tezos-carthagenet
+  tezos-node config init --data-dir ~/tezos-delphinet --network delphinet
+  tezos-node identity generate --data-dir ~/tezos-delphinet
+  tezos-node run --data-dir ~/tezos-delphinet
 
-The ``--network`` option is non case-sensitive and can be used with
+The ``--network`` option is not case-sensitive and can be used with
 the following built-in networks:
 
 - ``mainnet`` (this is the default)

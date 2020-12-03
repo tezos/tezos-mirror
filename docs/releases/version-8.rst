@@ -58,8 +58,8 @@ Node
 
 - The bootstrap pipeline no longer tries to concurrently download
   steps from other peers. The result is actually a more efficient
-  bootstrap, because those concurrent downloads resulted in the same
-  block headers being attempted to be downloaded several times. It
+  bootstrap, because those concurrent downloads resulted in multiple
+  attempts to download the same block headers. It
   also resulted in more memory usage than necessary.
 
 - Added six messages to the distributed database protocol and bumped
@@ -102,8 +102,8 @@ Client
   the ``<DLGT>`` field.
 
 - Fixed the ``rpc`` command that did not use the full path of the URL provided
-  to ``--endpoint``. For instance, ``--endpoint http://localhost:8732/node/rpc``
-  actually meant ``--endpoint http://localhost:8732``.
+  to ``--endpoint``. Before this, ``--endpoint http://localhost:8732/node/rpc``
+  would have been equivalent to ``--endpoint http://localhost:8732``.
 
 - Fixed an issue where the client would try to sign with a key for which
   the private counterpart was unknown even though a remote signer was connected.
