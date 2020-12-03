@@ -88,7 +88,7 @@ val validate_block :
   Block_hash.t ->
   Block_header.t ->
   Operation.t list list ->
-  State.Block.t option tzresult Lwt.t
+  unit tzresult Lwt.t
 
 val shutdown : t -> unit Lwt.t
 

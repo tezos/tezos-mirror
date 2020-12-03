@@ -33,6 +33,12 @@ type limits = {
   worker_limits : Worker_types.limits;
 }
 
+type result =
+  | Already_commited
+  | Outdated_block
+  | Validated
+  | Validation_error of error trace
+
 module Name = struct
   type t = unit
 
@@ -74,7 +80,7 @@ module Request = struct
         header : Block_header.t;
         operations : Operation.t list list;
       }
-        -> State.Block.t option tzresult t
+        -> result t
 
   let view : type a. a t -> view =
    fun (Request_validation {chain_db; peer; hash; _}) ->
@@ -106,20 +112,7 @@ let check_chain_liveness chain_db hash (header : Block_header.t) =
   | None | Some _ ->
       return_unit
 
-let should_validate_block w chain_state hash =
-  State.Block.read_opt chain_state hash
-  >>= function
-  | None ->
-      Lwt.return_none
-  | Some block ->
-      State.Block.context_exists block
-      >>= fun context_exists ->
-      ( if not context_exists then
-        Worker.log_event w (Could_not_find_context hash)
-      else Lwt.return_unit )
-      >>= fun () ->
-      let should_validate = not context_exists in
-      Lwt.return_some (block, should_validate)
+let is_already_validated chain_state hash = State.Block.known chain_state hash
 
 let on_request : type r. t -> r Request.t -> r tzresult Lwt.t =
  fun w
@@ -127,31 +120,24 @@ let on_request : type r. t -> r Request.t -> r tzresult Lwt.t =
        {chain_db; notify_new_block; canceler; peer; hash; header; operations}) ->
   let bv = Worker.state w in
   let chain_state = Distributed_db.chain_state chain_db in
-  should_validate_block w chain_state hash
-  >>= function
-  | Some (block, false) ->
-      Worker.log_event w (Previously_validated hash)
-      >>= fun () ->
-      Protocol_validator.prefetch_and_compile_protocols
-        bv.protocol_validator
-        ?peer
-        ~timeout:bv.limits.protocol_timeout
-        block ;
-      return (Ok None)
-  | Some (_, true) | None -> (
-      State.Block.read_invalid chain_state hash
-      >>= function
-      | Some {errors; _} ->
-          return (Error errors)
-      | None -> (
-          State.Chain.save_point chain_state
-          >>= fun (save_point_lvl, _) ->
-          (* Safety and late workers in partial mode. *)
-          if Compare.Int32.(header.shell.level < save_point_lvl) then
-            return (Ok None)
-          else
-            Worker.log_event w (Validating_block hash)
-            >>= (fun () ->
+  is_already_validated chain_state hash
+  >>= (function
+        | true ->
+            return Already_commited
+        | false -> (
+            State.Block.read_invalid chain_state hash
+            >>= function
+            | Some {errors; _} ->
+                return (Validation_error errors)
+            | None -> (
+                State.Chain.checkpoint chain_state
+                >>= fun checkpoint ->
+                (* Safety and late workers in partial mode. *)
+                if Compare.Int32.(header.shell.level < checkpoint.shell.level)
+                then return Outdated_block
+                else
+                  Worker.log_event w (Validating_block hash)
+                  >>= fun () ->
                   State.Block.read chain_state header.shell.predecessor
                   >>=? fun pred ->
                   Worker.protect w (fun () ->
@@ -164,83 +150,67 @@ let on_request : type r. t -> r Request.t -> r tzresult Lwt.t =
                           >>= function
                           | Ok x ->
                               return x
-                          | Error (Missing_test_protocol protocol :: _) ->
+                          (* [Unavailable_protocol] is expected to be the
+                             first error in the trace *)
+                          | Error (Unavailable_protocol {protocol; _} :: _) ->
                               Protocol_validator.fetch_and_compile_protocol
                                 bv.protocol_validator
                                 ?peer
                                 ~timeout:bv.limits.protocol_timeout
                                 protocol
                               >>=? fun _ ->
+                              (* Retry validating after fetching the protocol *)
                               Block_validator_process.apply_block
                                 bv.validation_process
                                 ~predecessor:pred
                                 header
                                 operations
                           | Error _ as x ->
-                              Lwt.return x)
-                      >>=? fun { validation_store;
-                                 block_metadata;
-                                 ops_metadata;
-                                 block_metadata_hash;
-                                 ops_metadata_hashes;
-                                 forking_testchain } ->
-                      let validation_store =
-                        ( {
-                            context_hash = validation_store.context_hash;
-                            message = validation_store.message;
-                            max_operations_ttl =
-                              validation_store.max_operations_ttl;
-                            last_allowed_fork_level =
-                              validation_store.last_allowed_fork_level;
-                          }
-                          : Block_validation.validation_store )
-                      in
-                      Distributed_db.commit_block
-                        chain_db
-                        hash
-                        header
-                        block_metadata
-                        operations
-                        ops_metadata
-                        block_metadata_hash
-                        ops_metadata_hashes
-                        validation_store
-                        ~forking_testchain
-                      >>=? function
-                      | None ->
-                          (* This case can be reached if the block was
-                         previously validated but its associated
-                         context has not been written on disk and
-                         therefore it means that it already exists in
-                         the store. *)
-                          State.Block.read chain_state hash
-                      | Some block ->
-                          return block))
-            >>= function
-            | Ok block ->
-                Protocol_validator.prefetch_and_compile_protocols
-                  bv.protocol_validator
-                  ?peer
-                  ~timeout:bv.limits.protocol_timeout
-                  block ;
-                notify_new_block block ;
-                return (Ok (Some block))
-            | Error err as error ->
-                if
-                  List.exists
-                    (function Invalid_block _ -> true | _ -> false)
-                    err
-                then (
-                  Worker.protect w (fun () ->
-                      Distributed_db.commit_invalid_block
-                        chain_db
-                        hash
-                        header
-                        err)
-                  >>=? fun committed ->
-                  assert committed ;
-                  return error )
-                else return error ) )
+                              Lwt.return x))
+                  >>=? fun { validation_store;
+                             block_metadata;
+                             ops_metadata;
+                             block_metadata_hash;
+                             ops_metadata_hashes;
+                             forking_testchain } ->
+                  let validation_store =
+                    ( {
+                        context_hash = validation_store.context_hash;
+                        message = validation_store.message;
+                        max_operations_ttl =
+                          validation_store.max_operations_ttl;
+                        last_allowed_fork_level =
+                          validation_store.last_allowed_fork_level;
+                      }
+                      : Block_validation.validation_store )
+                  in
+                  Distributed_db.commit_block
+                    chain_db
+                    hash
+                    header
+                    block_metadata
+                    operations
+                    ops_metadata
+                    block_metadata_hash
+                    ops_metadata_hashes
+                    validation_store
+                    ~forking_testchain
+                  >>=? function
+                  | Some block ->
+                      notify_new_block block ; return Validated
+                  | None ->
+                      return Already_commited ) ))
+  >>= function
+  | Ok r ->
+      return r
+  | Error err ->
+      if List.exists (function Invalid_block _ -> true | _ -> false) err then (
+        Worker.protect w (fun () ->
+            Distributed_db.commit_invalid_block chain_db hash header err)
+        >>=? fun committed ->
+        assert committed ;
+        return (Validation_error err) )
+      else return (Validation_error err)
 
 let on_launch _ _ (limits, start_testchain, db, validation_process) =
   let protocol_validator = Protocol_validator.create db in
@@ -249,21 +219,22 @@ let on_launch _ _ (limits, start_testchain, db, validation_process) =
 
 let on_error w r st errs =
   Worker.log_event w (Validation_failure (r, st, errs))
-  >>= fun () -> Lwt.return_error errs
+  >>= fun () ->
+  (* Keep the worker alive. *)
+  return_unit
 
 let on_completion :
     type a. t -> a Request.t -> a -> Worker_types.request_status -> unit Lwt.t
     =
- fun w (Request.Request_validation _ as r) v st ->
+ fun w (Request.Request_validation {hash; _} as r) v st ->
   match v with
-  | Ok (Some _) ->
+  | Already_commited | Outdated_block ->
+      Worker.log_event w (Previously_validated hash)
+      >>= fun () -> Lwt.return_unit
+  | Validated ->
       Worker.log_event w (Validation_success (Request.view r, st))
-      >>= fun () -> Lwt.return_unit
-  | Ok None ->
-      Lwt.return_unit
-  | Error errs ->
+  | Validation_error errs ->
       Worker.log_event w (Event.Validation_failure (Request.view r, st, errs))
-      >>= fun () -> Lwt.return_unit
 
 let on_close w =
   let bv = Worker.state w in
@@ -298,20 +269,12 @@ let shutdown = Worker.shutdown
 
 let validate w ?canceler ?peer ?(notify_new_block = fun _ -> ()) chain_db hash
     (header : Block_header.t) operations =
-  let bv = Worker.state w in
   let chain_state = Distributed_db.chain_state chain_db in
-  should_validate_block w chain_state hash
+  is_already_validated chain_state hash
   >>= function
-  | Some (block, false) ->
-      Worker.log_event w (Previously_validated hash)
-      >>= fun () ->
-      Protocol_validator.prefetch_and_compile_protocols
-        bv.protocol_validator
-        ?peer
-        ~timeout:bv.limits.protocol_timeout
-        block ;
-      return_none
-  | Some (_, true) | None ->
+  | true ->
+      Worker.log_event w (Previously_validated hash) >>= fun () -> return_unit
+  | false -> (
       let hashes = List.map (List.map Operation.hash) operations in
       let computed_hash =
         Operation_list_list_hash.compute
@@ -343,7 +306,11 @@ let validate w ?canceler ?peer ?(notify_new_block = fun _ -> ()) chain_db hash
              header;
              operations;
            })
-      >>=? fun result -> Lwt.return result
+      >>= function
+      | Ok (Validated | Already_commited | Outdated_block) ->
+          return_unit
+      | Ok (Validation_error errs) | Error errs ->
+          Lwt.return_error errs )
 
 let fetch_and_compile_protocol w =
   let bv = Worker.state w in

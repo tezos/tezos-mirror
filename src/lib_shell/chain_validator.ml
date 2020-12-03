@@ -252,6 +252,21 @@ let may_update_checkpoint chain_state new_head =
                   chain_state
                   new_checkpoint ) )
 
+let may_update_protocol_levels chain_state ~prev ~block =
+  let prev_proto_level = State.Block.protocol_level prev in
+  let new_proto_level = State.Block.protocol_level block in
+  if Compare.Int.(prev_proto_level < new_proto_level) then
+    State.Block.protocol_hash block
+    >>=? fun new_protocol ->
+    State.Chain.update_level_indexed_protocol_store
+      chain_state
+      (State.Chain.id chain_state)
+      new_proto_level
+      new_protocol
+      (State.Block.header block)
+    >>= fun () -> return_unit
+  else return_unit
+
 let may_switch_test_chain w active_chains spawn_child block =
   let nv = Worker.state w in
   let create_child block protocol expiration forking_block =
@@ -392,6 +407,34 @@ let safe_get_prevalidator_filter hash =
         let module Filter = Prevalidator_filters.No_filter (Proto) in
         return (module Filter : Prevalidator_filters.FILTER) )
 
+let may_instanciate_new_prevalidator nv ~prev ~block =
+  match nv.prevalidator with
+  | Some old_prevalidator ->
+      let prev_proto_level = State.Block.protocol_level prev in
+      let new_proto_level = State.Block.protocol_level block in
+      if Compare.Int.(prev_proto_level < new_proto_level) then (
+        State.Block.protocol_hash block
+        >>=? fun new_protocol ->
+        safe_get_prevalidator_filter new_protocol
+        >>=? fun (module Filter) ->
+        let (limits, chain_db) = Prevalidator.parameters old_prevalidator in
+        (* TODO inject in the new prevalidator the operation
+           from the previous one. *)
+        Prevalidator.create limits (module Filter) chain_db
+        >>= function
+        | Error errs ->
+            Chain_validator_event.(emit prevalidator_reinstantiation_failure)
+              errs
+            >>= fun () ->
+            nv.prevalidator <- None ;
+            Prevalidator.shutdown old_prevalidator >>= fun () -> return_unit
+        | Ok prevalidator ->
+            nv.prevalidator <- Some prevalidator ;
+            Prevalidator.shutdown old_prevalidator >>= fun () -> return_unit )
+      else Prevalidator.flush old_prevalidator (State.Block.hash block)
+  | None ->
+      return_unit
+
 let on_request (type a) w start_testchain active_chains spawn_child
     (req : a Request.t) : a tzresult Lwt.t =
   let (Request.Validated block) = req in
@@ -400,8 +443,7 @@ let on_request (type a) w start_testchain active_chains spawn_child
   >>= fun head ->
   let head_header = State.Block.header head
   and head_hash = State.Block.hash head
-  and block_header = State.Block.header block
-  and block_hash = State.Block.hash block in
+  and block_header = State.Block.header block in
   ( match nv.prevalidator with
   | None ->
       Lwt.return head_header.shell.fitness
@@ -421,34 +463,11 @@ let on_request (type a) w start_testchain active_chains spawn_child
     >>=? fun previous ->
     may_update_checkpoint nv.parameters.chain_state block
     >>=? fun () ->
+    may_update_protocol_levels nv.parameters.chain_state ~prev:previous ~block
+    >>=? fun () ->
     broadcast_head w ~previous block
     >>= fun () ->
-    ( match nv.prevalidator with
-    | Some old_prevalidator ->
-        State.Block.protocol_hash block
-        >>=? fun new_protocol ->
-        let old_protocol = Prevalidator.protocol_hash old_prevalidator in
-        if not (Protocol_hash.equal old_protocol new_protocol) then (
-          safe_get_prevalidator_filter new_protocol
-          >>=? fun (module Filter) ->
-          let (limits, chain_db) = Prevalidator.parameters old_prevalidator in
-          (* TODO inject in the new prevalidator the operation
-                 from the previous one. *)
-          Prevalidator.create limits (module Filter) chain_db
-          >>= function
-          | Error errs ->
-              Chain_validator_event.(emit prevalidator_reinstantiation_failure)
-                errs
-              >>= fun () ->
-              nv.prevalidator <- None ;
-              Prevalidator.shutdown old_prevalidator >>= fun () -> return_unit
-          | Ok prevalidator ->
-              nv.prevalidator <- Some prevalidator ;
-              Prevalidator.shutdown old_prevalidator >>= fun () -> return_unit
-          )
-        else Prevalidator.flush old_prevalidator block_hash
-    | None ->
-        return_unit )
+    may_instanciate_new_prevalidator nv ~prev:previous ~block
     >>=? fun () ->
     ( if start_testchain then
       may_switch_test_chain w active_chains spawn_child block
