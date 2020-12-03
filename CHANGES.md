@@ -12,6 +12,12 @@ here either.
 
 ## Node
 
+- Enforce loading of non-embedded protocols before starting the node
+  allowing the prevalidator to start correctly.
+
+- Optimized the I/O and CPU usage by removing an unnecessary access to
+  the context during block validation.
+
 - Fixes a bug where any event would allocate more memory than needed
   when it were not to be printed.
 
