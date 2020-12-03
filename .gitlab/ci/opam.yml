@@ -81,11 +81,6 @@ opam:staTz:
   variables:
     package: staTz
 
-opam:tezos-006-PsCARTHA-test-helpers:
-  extends: .opam_template
-  variables:
-    package: tezos-006-PsCARTHA-test-helpers
-
 opam:tezos-007-PsDELPH1-test-helpers:
   extends: .opam_template
   variables:
@@ -590,11 +585,6 @@ opam:tezos-protocol-006-PsCARTHA-parameters:
   extends: .opam_template
   variables:
     package: tezos-protocol-006-PsCARTHA-parameters
-
-opam:tezos-protocol-006-PsCARTHA-tests:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-006-PsCARTHA-tests
 
 opam:tezos-protocol-007-PsDELPH1:
   extends: .opam_template

@@ -54,7 +54,6 @@ unit:alltest:
     - scripts/test_wrapper.sh src/lib_stdlib_unix stdlib_unix
     - scripts/test_wrapper.sh src/lib_storage storage
     - scripts/test_wrapper.sh src/proto_006_PsCARTHA/lib_client 006_PsCARTHA_lib_client
-    - scripts/test_wrapper.sh src/proto_006_PsCARTHA/lib_protocol 006_PsCARTHA_lib_protocol
     - scripts/test_wrapper.sh src/proto_007_PsDELPH1/lib_client 007_PsDELPH1_lib_client
     - scripts/test_wrapper.sh src/proto_007_PsDELPH1/lib_protocol 007_PsDELPH1_lib_protocol
     - scripts/test_wrapper.sh src/proto_008_PtEdoTez/lib_client 008_PtEdoTez_lib_client
