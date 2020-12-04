@@ -39,8 +39,8 @@
 let test_rpc_list protocol =
   Test.register
     ~__FILE__
-    ~title:"rpc list (mockup)"
-    ~tags:["mockup"; "client"; "rpc"]
+    ~title:(sf "%s: rpc list (mockup)" (Protocol.name protocol))
+    ~tags:[Protocol.tag protocol; "mockup"; "client"; "rpc"]
   @@ fun () ->
   let* client = Client.init_mockup ~protocol () in
   let* _ = Client.rpc_list client in
@@ -70,11 +70,11 @@ let test_balances_after_transfer giver amount receiver =
 (* Test.
    Transfer some tz and check balance changes are as expected.
  *)
-let test_transfer ~(protocol : Constant.protocol) =
+let test_transfer protocol =
   Test.register
     ~__FILE__
-    ~title:(Printf.sprintf "transfer (mockup / %s)" protocol.tag)
-    ~tags:["mockup"; "client"; "transfer"; protocol.tag]
+    ~title:(sf "%s: mockup transfer" (Protocol.name protocol))
+    ~tags:[Protocol.tag protocol; "mockup"; "client"; "transfer"]
   @@ fun () ->
   let (giver, amount, receiver) = transfer_data in
   let* client = Client.init_mockup ~protocol () in
@@ -94,7 +94,4 @@ let test_transfer ~(protocol : Constant.protocol) =
     (receiver_balance_before, receiver_balance_after) ;
   return ()
 
-let register () =
-  test_rpc_list Constant.alpha ;
-  test_transfer ~protocol:Constant.alpha ;
-  test_transfer ~protocol:Constant.carthage
+let register protocol = test_rpc_list protocol ; test_transfer protocol

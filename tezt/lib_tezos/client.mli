@@ -152,7 +152,7 @@ val spawn_import_secret_key : ?node:Node.t -> t -> Constant.key -> Process.t
     between each block so that peers do not reject them for being in the future). *)
 val activate_protocol :
   ?node:Node.t ->
-  ?protocol:Constant.protocol ->
+  protocol:Protocol.t ->
   ?fitness:int ->
   ?key:string ->
   ?timestamp:string ->
@@ -163,7 +163,7 @@ val activate_protocol :
 (** Same as [activate_protocol], but do not wait for the process to exit. *)
 val spawn_activate_protocol :
   ?node:Node.t ->
-  ?protocol:Constant.protocol ->
+  protocol:Protocol.t ->
   ?fitness:int ->
   ?key:string ->
   ?timestamp:string ->
@@ -205,13 +205,11 @@ val get_balance_for : ?node:Node.t -> account:string -> t -> float Lwt.t
 (** Same as [get_balance_for], but do not wait for the process to exit. *)
 val spawn_get_balance_for : ?node:Node.t -> account:string -> t -> Process.t
 
-(** Run [tezos-client create mockup].
-
-    Default [protocol] is {!Constant.alpha}. *)
-val create_mockup : ?protocol:Constant.protocol -> t -> unit Lwt.t
+(** Run [tezos-client create mockup]. *)
+val create_mockup : protocol:Protocol.t -> t -> unit Lwt.t
 
 (** Same as [create_mockup], but do not wait for the process to exit. *)
-val spawn_create_mockup : ?protocol:Constant.protocol -> t -> Process.t
+val spawn_create_mockup : protocol:Protocol.t -> t -> Process.t
 
 (** Run [tezos-client submit proposals for].
 
@@ -257,6 +255,6 @@ val init_mockup :
   ?name:string ->
   ?color:Log.Color.t ->
   ?base_dir:string ->
-  ?protocol:Constant.protocol ->
+  protocol:Protocol.t ->
   unit ->
   t Lwt.t

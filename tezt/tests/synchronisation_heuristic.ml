@@ -40,13 +40,13 @@ let wait_for_sync node =
    synchronize themselves. Then we restart all the nodes and check
    they are all in the state mode `sync`. *)
 
-let check_node_synchronization_state () =
+let check_node_synchronization_state protocol =
   let n = 4 in
   let blocks_to_bake = 5 in
   Test.register
     ~__FILE__
-    ~title:"Check synchronization state"
-    ~tags:["bootstrap"; "node"; "sync"]
+    ~title:(sf "%s: check synchronization state" (Protocol.name protocol))
+    ~tags:[Protocol.tag protocol; "bootstrap"; "node"; "sync"]
   @@ fun () ->
   let* main_node = Node.init ~name:"main_node" [] in
   let* nodes =
@@ -58,8 +58,9 @@ let check_node_synchronization_state () =
   let* client = Client.init ~node:main_node () in
   let* () =
     Client.activate_protocol
-      client
+      ~protocol
       ~timestamp_delay:(float_of_int blocks_to_bake)
+      client
   in
   Log.info "Activated protocol." ;
   let* () = repeat blocks_to_bake (fun () -> Client.bake_for client) in
@@ -88,4 +89,4 @@ let check_node_synchronization_state () =
   in
   unit
 
-let register () = check_node_synchronization_state ()
+let register protocol = check_node_synchronization_state protocol

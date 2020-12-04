@@ -36,12 +36,16 @@
    Each module defines tests which are thematically related,
    as functions to be called here. *)
 
+let register protocol =
+  Basic.register protocol ;
+  Bootstrap.register protocol ;
+  Synchronisation_heuristic.register protocol ;
+  Mockup.register protocol ;
+  Double_bake.register protocol
+
 let () =
-  Basic.register () ;
-  Bootstrap.register () ;
-  Synchronisation_heuristic.register () ;
+  register Alpha ;
+  Bootstrap.register_protocol_independent () ;
   Encoding.register () ;
-  Mockup.register () ;
-  Double_bake.register () ;
   (* Test.run () should be the last statement, don't register afterwards! *)
   Test.run ()

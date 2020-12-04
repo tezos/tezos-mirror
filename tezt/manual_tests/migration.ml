@@ -44,7 +44,8 @@ let update_config_with_user_activated config_file level protocol =
             list
               dict
               [ [ ("level", int level);
-                  ("replacement_protocol", string protocol) ] ] ) ])
+                  ("replacement_protocol", string (Protocol.hash protocol)) ]
+              ] ) ])
   in
   let config_json = JSON.parse_file config_file in
   let config_json =
@@ -166,7 +167,7 @@ let migration ?yes_node_path ?yes_wallet context protocol =
       after_cycle
   else unit
 
-let protocol = Constant.alpha.hash
+let protocol = Protocol.Alpha
 
 let context = "~/tezos-node-test"
 

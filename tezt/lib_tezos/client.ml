@@ -187,7 +187,7 @@ let spawn_import_secret_key ?node client (key : Constant.key) =
 let import_secret_key ?node client key =
   spawn_import_secret_key ?node client key |> Process.check
 
-let spawn_activate_protocol ?node ?(protocol = Constant.alpha) ?(fitness = 1)
+let spawn_activate_protocol ?node ~protocol ?(fitness = 1)
     ?(key = Constant.activator.alias) ?timestamp
     ?(timestamp_delay = 3600. *. 24. *. 365.) client =
   let timestamp =
@@ -210,7 +210,7 @@ let spawn_activate_protocol ?node ?(protocol = Constant.alpha) ?(fitness = 1)
     ( endpoint_arg ?node client @ mode_arg client
     @ [ "activate";
         "protocol";
-        protocol.hash;
+        Protocol.hash protocol;
         "with";
         "fitness";
         string_of_int fitness;
@@ -219,15 +219,15 @@ let spawn_activate_protocol ?node ?(protocol = Constant.alpha) ?(fitness = 1)
         key;
         "and";
         "parameters";
-        protocol.parameter_file;
+        Protocol.parameter_file protocol;
         "--timestamp";
         timestamp ] )
 
-let activate_protocol ?node ?protocol ?fitness ?key ?timestamp ?timestamp_delay
+let activate_protocol ?node ~protocol ?fitness ?key ?timestamp ?timestamp_delay
     client =
   spawn_activate_protocol
     ?node
-    ?protocol
+    ~protocol
     ?fitness
     ?key
     ?timestamp
@@ -274,11 +274,13 @@ let get_balance_for ?node ~account client =
   and* output = read_all (Process.stdout process) in
   return @@ extract_balance output
 
-let spawn_create_mockup ?(protocol = Constant.alpha) client =
-  spawn_command client ["--protocol"; protocol.hash; "create"; "mockup"]
+let spawn_create_mockup ~protocol client =
+  spawn_command
+    client
+    ["--protocol"; Protocol.hash protocol; "create"; "mockup"]
 
-let create_mockup ?protocol client =
-  spawn_create_mockup ?protocol client |> Process.check
+let create_mockup ~protocol client =
+  spawn_create_mockup ~protocol client |> Process.check
 
 let spawn_submit_proposals ?(key = Constant.bootstrap1.alias) ~proto_hash
     client =
@@ -313,9 +315,9 @@ let init ?path ?admin_path ?name ?color ?base_dir ?node () =
   in
   return client
 
-let init_mockup ?path ?admin_path ?name ?color ?base_dir ?protocol () =
+let init_mockup ?path ?admin_path ?name ?color ?base_dir ~protocol () =
   let client =
     create_with_mode ?path ?admin_path ?name ?color ?base_dir Mockup
   in
-  let* () = create_mockup ?protocol client in
+  let* () = create_mockup ~protocol client in
   return client
