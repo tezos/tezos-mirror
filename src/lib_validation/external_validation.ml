@@ -265,17 +265,30 @@ let create_socket_listen ~canceler ~max_requests ~socket_path =
   create_socket ~canceler
   >>= fun socket ->
   Lwt.catch
-    (fun () -> Lwt_unix.bind socket (make_socket socket_path))
+    (fun () -> Lwt_unix.bind socket (make_socket socket_path) >>= return)
     (function
-      | Unix.Unix_error (ENAMETOOLONG, _, _) as exn ->
-          External_validation_event.(
-            emit socket_path_too_long_event socket_path)
-          >>= fun () -> Lwt.fail exn
+      | Unix.Unix_error (ENAMETOOLONG, _, _) ->
+          (* Unix.ENAMETOOLONG (Filename too long (POSIX.1-2001)) can
+            be thrown if the given directory has a too long path. *)
+          fail
+            Block_validator_errors.(
+              Validation_process_failed (Socket_path_too_long socket_path))
+      | Unix.Unix_error (EACCES, _, _) ->
+          (* Unix.EACCES (Permission denied (POSIX.1-2001)) can be
+            thrown when the given directory has wrong access rights.
+            Unix.EPERM (Operation not permitted (POSIX.1-2001)) should
+            not be thrown in this case. *)
+          fail
+            Block_validator_errors.(
+              Validation_process_failed
+                (Socket_path_wrong_permission socket_path))
       | exn ->
-          Lwt.fail exn)
-  >>= fun () ->
+          fail
+            (Block_validator_errors.Validation_process_failed
+               (Cannot_run_external_validator (Printexc.to_string exn))))
+  >>=? fun () ->
   Lwt_unix.listen socket max_requests ;
-  Lwt.return socket
+  return socket
 
 let create_socket_connect ~canceler ~socket_path =
   create_socket ~canceler

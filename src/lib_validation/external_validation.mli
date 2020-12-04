@@ -84,7 +84,7 @@ val create_socket_listen :
   canceler:Lwt_canceler.t ->
   max_requests:int ->
   socket_path:string ->
-  Lwt_unix.file_descr Lwt.t
+  Lwt_unix.file_descr tzresult Lwt.t
 
 val create_socket_connect :
   canceler:Lwt_canceler.t -> socket_path:string -> Lwt_unix.file_descr Lwt.t
