@@ -11,9 +11,9 @@ cd "$src_dir"
 
 image_name="${1:-tezos_build}"
 image_version="${2:-latest}"
-base_image="${3-${image_name}_deps}"
-base_image_version="${4:-latest}"
-commit_short_sha="${5:-unknown}"
+base_image="${3:-registry.gitlab.com/tezos/opam-repository}"
+base_image_version="${4:-runtime-build-dependencies--${opam_repository_tag}}"
+commit_short_sha="${5:-$(git rev-parse --short HEAD)}"
 
 echo
 echo "### Building tezos..."
