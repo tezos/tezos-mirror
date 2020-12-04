@@ -282,7 +282,7 @@ let stringmap_encoding value_encoding =
         l)
     (list (tup2 string value_encoding))
 
-let _merkle_tree_encoding : merkle_tree Data_encoding.t =
+let merkle_tree_encoding : merkle_tree Data_encoding.t =
   let open Data_encoding in
   let hash_tag = 0 and hash_encoding = tup2 bool string in
   let data_tag = 1 and data_encoding = raw_context_encoding in
@@ -858,6 +858,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
 
       let raw_bytes_path = RPC_path.(path / "raw" / "bytes")
 
+      let merkle_tree_path = RPC_path.(path / "merkle_tree")
+
       let context_path_arg : string RPC_arg.t =
         let name = "context_path" in
         let descr = "A path inside the context" in
@@ -880,6 +882,26 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           ~query:raw_context_query
           ~output:raw_context_encoding
           RPC_path.(raw_bytes_path /:* context_path_arg)
+
+      let merkle_tree_query : < holey : bool option > RPC_query.t =
+        let open RPC_query in
+        query (fun holey ->
+            object
+              method holey = holey
+            end)
+        |+ opt_field
+             ~descr:"Send only hashes, omit data of key"
+             "holey"
+             RPC_arg.bool
+             (fun t -> t#holey)
+        |> seal
+
+      let merkle_tree =
+        RPC_service.get_service
+          ~description:"Returns the merkle comb of a piece of context."
+          ~query:merkle_tree_query
+          ~output:Data_encoding.(option merkle_tree_encoding)
+          RPC_path.(merkle_tree_path /:* context_path_arg)
     end
 
     let info =
@@ -1153,6 +1175,18 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           path
           (object
              method depth = depth
+          end)
+          ()
+
+    let merkle_tree ctxt =
+      let f = make_call1 S.merkle_tree ctxt in
+      fun ?(chain = `Main) ?(block = `Head 0) ?holey path ->
+        f
+          chain
+          block
+          path
+          (object
+             method holey = holey
           end)
           ()
   end

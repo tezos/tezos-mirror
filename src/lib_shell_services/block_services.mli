@@ -324,6 +324,14 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       ?depth:int ->
       string list ->
       raw_context tzresult Lwt.t
+
+    val merkle_tree :
+      #simple ->
+      ?chain:chain ->
+      ?block:block ->
+      ?holey:bool ->
+      string list ->
+      merkle_tree option tzresult Lwt.t
   end
 
   module Helpers : sig
@@ -542,6 +550,15 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           < depth : int option >,
           unit,
           raw_context )
+        RPC_service.t
+
+      val merkle_tree :
+        ( [`GET],
+          prefix,
+          prefix * string list,
+          < holey : bool option >,
+          unit,
+          merkle_tree option )
         RPC_service.t
     end
 

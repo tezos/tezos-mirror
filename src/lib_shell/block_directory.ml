@@ -346,6 +346,18 @@ let build_raw_rpc_directory ~user_activated_upgrades
       >>= fun dir_mem ->
       if not (mem || dir_mem) then Lwt.fail Not_found
       else read_partial_context context path depth >>= fun dir -> return dir) ;
+  register1 S.Context.merkle_tree (fun (chain_store, block) path query () ->
+      Store.Block.context_opt chain_store block
+      >>= function
+      | None ->
+          return None
+      | Some context ->
+          let holey = Option.value ~default:false query#holey in
+          let leaf_kind =
+            let open Tezos_shell_services.Block_services in
+            if holey then Hole else Raw_context
+          in
+          Context.merkle_tree context leaf_kind path >>= return_some) ;
   (* info *)
   register0 S.info (fun (chain_store, block) () () ->
       let chain_id = Store.Chain.chain_id chain_store in

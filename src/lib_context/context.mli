@@ -76,6 +76,18 @@ val commit_genesis :
 val commit_test_chain_genesis :
   context -> Block_header.t -> Block_header.t Lwt.t
 
+(** [merkle_tree t leaf_kind key] returns a Merkle proof for [key] (i.e.
+    whose hashes reach [key]). If [leaf_kind] is [Block_services.Hole], the value
+    at [key] is a hash. If [leaf_kind] is [Block_services.Raw_context],
+    the value at [key] is a [Block_services.raw_context]. Values higher
+    in the returned tree are hashes of the siblings on the path to
+    reach [key]. *)
+val merkle_tree :
+  t ->
+  Block_services.merkle_leaf_kind ->
+  key ->
+  Block_services.merkle_tree Lwt.t
+
 (** {2 Accessing and Updating Versions} *)
 
 (** [restore_integrity ppf index] attempts to restore the context
