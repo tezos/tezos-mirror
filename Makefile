@@ -92,37 +92,6 @@ $(addsuffix .test,${PACKAGES}): %.test:
 	@dune build \
 	    @$(patsubst %/$*.opam,%,$(shell find src vendors -name $*.opam))/runtest
 
-.PHONY: doc-html
-doc-html: all
-	@dune build @doc
-    # alpha protocol
-	@./tezos-client -protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > docs/008/tezos-client-alpha.html
-	@./tezos-baker-alpha man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > docs/008/tezos-baker-alpha.html
-	@./tezos-endorser-alpha man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > docs/008/tezos-endorser-alpha.html
-	@./tezos-accuser-alpha man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > docs/008/tezos-accuser-alpha.html
-    # 007 delphi
-	@./tezos-client -protocol PsDELPH1Kxsxt8f9eWbxQeRxkjfbxoqM52jvs5Y5fBxWWh4ifpo man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > docs/007/tezos-client-007.html
-	@./tezos-baker-alpha man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > docs/007/tezos-baker-007.html
-	@./tezos-endorser-alpha man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > docs/007/tezos-endorser-007.html
-	@./tezos-accuser-alpha man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > docs/007/tezos-accuser-007.html
-    # generic
-	@./tezos-admin-client man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > docs/api/tezos-admin-client.html
-	@./tezos-signer man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > docs/api/tezos-signer.html
-	@./tezos-snoop man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > docs/api/tezos-snoop.html
-	@mkdir -p $$(pwd)/docs/_build/api/odoc
-	@rm -rf $$(pwd)/docs/_build/api/odoc/*
-	@cp -r $$(pwd)/_build/default/_doc/* $$(pwd)/docs/_build/api/odoc/
-	@${MAKE} -C docs html
-	@echo '.toc {position: static}' >> $$(pwd)/docs/_build/api/odoc/_html/odoc.css
-	@echo '.content { margin-left: 4ex }' >> $$(pwd)/docs/_build/api/odoc/_html/odoc.css
-	@echo '@media (min-width: 745px) {.content {margin-left: 4ex}}' >> $$(pwd)/docs/_build/api/odoc/_html/odoc.css
-	@sed -e 's/@media only screen and (max-width: 95ex) {/@media only screen and (max-width: 744px) {/' $$(pwd)/docs/_build/api/odoc/_html/odoc.css > $$(pwd)/docs/_build/api/odoc/_html/odoc.css2
-	@mv $$(pwd)/docs/_build/api/odoc/_html/odoc.css2  $$(pwd)/docs/_build/api/odoc/_html/odoc.css
-
-.PHONY: dock-html-and-linkcheck
-doc-html-and-linkcheck: doc-html
-	@${MAKE} -C docs all
-
 .PHONY: coverage-report
 coverage-report:
 	@bisect-ppx-report html -o ${COVERAGE_REPORT} --coverage-path ${COVERAGE_OUTPUT}
