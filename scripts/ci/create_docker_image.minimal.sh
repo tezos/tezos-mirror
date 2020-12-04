@@ -18,10 +18,11 @@ cd "$src_dir"
 
 image_name="${1:-tezos}"
 image_version="${2:-latest}"
-build_image="${3:-registry.gitlab.com/tezos/opam-repository}"
-base_image="${4-registry.gitlab.com/tezos/opam-repository}"
-base_version="${5-minimal--${opam_repository_tag}}"
-commit_short_sha="${6:-$(git rev-parse --short HEAD)}"
+build_image="${3:-tezos_build}"
+base_image="${4:-registry.gitlab.com/tezos/opam-repository}"
+base_version="${5:-runtime-dependencies--${opam_repository_tag}}"
+base_build_version="${6:-runtime-build-dependencies--${opam_repository_tag}}"
+commit_short_sha="${7:-$(git rev-parse --short HEAD)}"
 
 echo
 echo "### Building minimal docker images..."
@@ -31,7 +32,7 @@ docker build \
   -t "$image_name-debug:$image_version" \
   --build-arg "BASE_IMAGE=$base_image" \
   --build-arg "BASE_IMAGE_VERSION=$base_version" \
-  --build-arg "BASE_IMAGE_VERSION_NON_MIN=$opam_repository_tag" \
+  --build-arg "BASE_IMAGE_VERSION_NON_MIN=$base_build_version" \
   --build-arg "BUILD_IMAGE=${build_image}" \
   --build-arg "BUILD_IMAGE_VERSION=${image_version}" \
   --build-arg "COMMIT_SHORT_SHA=${commit_short_sha}" \
@@ -48,7 +49,7 @@ docker build \
   --build-arg "BASE_IMAGE_VERSION=$base_version" \
   --build-arg "BUILD_IMAGE=${build_image}" \
   --build-arg "BUILD_IMAGE_VERSION=${image_version}" \
-  --build-arg "BASE_IMAGE_VERSION_NON_MIN=$opam_repository_tag" \
+  --build-arg "BASE_IMAGE_VERSION_NON_MIN=$base_build_version" \
   --build-arg "COMMIT_SHORT_SHA=${commit_short_sha}" \
   --target=bare \
   "$src_dir"
@@ -64,7 +65,7 @@ docker build \
   --build-arg "BASE_IMAGE_VERSION=$base_version" \
   --build-arg "BUILD_IMAGE=${build_image}" \
   --build-arg "BUILD_IMAGE_VERSION=${image_version}" \
-  --build-arg "BASE_IMAGE_VERSION_NON_MIN=$opam_repository_tag" \
+  --build-arg "BASE_IMAGE_VERSION_NON_MIN=$base_build_version" \
   --build-arg "COMMIT_SHORT_SHA=${commit_short_sha}" \
   "$src_dir"
 
