@@ -156,8 +156,8 @@ Sapling
 ~~~~~~~
 
 Integration of the Sapling protocol into the Michelson language.
-More information can be found in the `Sapling documentation page
-<https://gitlab.com/metastatedev/tezos/-/blob/proto-proposal/docs/developer/sapling.rst>`_.
+More information can be found in the :ref:`Sapling documentation page
+<sapling_dev_008>`.
 
 Bls12-381
 ~~~~~~~~~
@@ -168,7 +168,8 @@ Tickets
 ~~~~~~~
 
 Tickets are a generic and composable mechanism for authenticating data
-from smart contracts, managing permissions, and representing assets. More information can be found in the `Ticket documentation <https://metastatedev.gitlab.io/-/tezos/-/jobs/867541464/artifacts/docs/_build/whitedoc/michelson.html#operations-on-tickets>`_.
+from smart contracts, managing permissions, and representing assets.
+More information can be found in the :ref:`Ticket documentation <MichelsonTickets_008>`.
 
 Comb pairs
 ~~~~~~~~~~

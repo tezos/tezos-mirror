@@ -2226,6 +2226,8 @@ comprehensive description of the Sapling protocol.
         with memo_size `ms`
 
 
+.. _MichelsonTickets_008:
+
 Operations on tickets
 ~~~~~~~~~~~~~~~~~~~~~
 
