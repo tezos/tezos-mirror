@@ -665,6 +665,40 @@ let check ?watermark public_key signature message =
       P256.check ?watermark pk signature message
   | _ -> false
 
+(* The following cache is a hack to work around a quadratic algorithm
+   in Tezos Mainnet protocols up to Edo. *)
+
+module Make_endorsement_cache =
+(val Ringo.(map_maker ~replacement:FIFO ~overflow:Strong ~accounting:Sloppy))
+
+module Endorsement_cache = Make_endorsement_cache (struct
+  type nonrec t = t
+
+  let equal = equal
+
+  let hash = Hashtbl.hash
+end)
+
+let endorsement_cache = Endorsement_cache.create 300
+
+let check ?watermark public_key signature message =
+  match watermark with
+  | Some (Endorsement _) -> (
+      (* signature check cache only applies to endorsements *)
+      match Endorsement_cache.find_opt endorsement_cache signature with
+      | Some (key, msg) ->
+          (* we rely on this property : signature_1 = signature_2 => key_1 = key_2 /\ message_1 = message_2 *)
+          Public_key.equal public_key key && Bytes.equal msg message
+      | None ->
+          let res = check ?watermark public_key signature message in
+          if res then
+            Endorsement_cache.replace
+              endorsement_cache
+              signature
+              (public_key, message) ;
+          res)
+  | _ -> check ?watermark public_key signature message
+
 let append ?watermark sk msg = Bytes.cat msg (to_bytes (sign ?watermark sk msg))
 
 let concat msg signature = Bytes.cat msg (to_bytes signature)
