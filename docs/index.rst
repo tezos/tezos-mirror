@@ -119,12 +119,12 @@ in the :ref:`introduction <howtoget>`.
    shell/p2p
    shell/p2p_api
    shell/rpc
+   shell/micheline
 
 .. toctree::
    :maxdepth: 2
    :caption: 007 Delphi doc:
 
-   007/micheline
    007/michelson
    007/proof_of_stake
    007/voting
@@ -136,7 +136,6 @@ in the :ref:`introduction <howtoget>`.
    :maxdepth: 2
    :caption: 008 Edo doc:
 
-   008/micheline
    008/michelson
    008/proof_of_stake
    008/sapling
