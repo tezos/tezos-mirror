@@ -45,6 +45,10 @@ odoc: main
 linkcheck:
 	$(SPHINXBUILD) -b linkcheck "$(SOURCEDIR)" "$(BUILDDIR)"
 
+.PHONY: redirectcheck
+redirectcheck:
+	@cd $$(pwd)/.. ; ./src/tooling/lint.sh --check-redirects
+
 api/errors.rst: $(DOCERRORDIR)/error_doc.ml
 	@cd .. && dune build docs/$(DOCERRORDIR)/error_doc.exe
 	../_build/default/docs/$(DOCERRORDIR)/error_doc.exe > api/errors.rst

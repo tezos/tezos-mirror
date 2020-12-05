@@ -31,7 +31,7 @@ documentation:linkcheck:
         - /docs
       when: on_success
   script:
-    - make -C docs linkcheck
+    - make -C docs redirectcheck linkcheck
   allow_failure: true
   interruptible: true
 
