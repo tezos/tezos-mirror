@@ -2592,7 +2592,7 @@ readable one in a string and an optimized.
 -  ``contract``\ s, ``address``\ es, ``key``\ s and ``signature``\ s
    are written as strings, in their usual Base58 encoded versions
    (readable), or as their raw bytes (optimized).
--  ``bls12_381_g1``\ s and ``bls12_381_g2``\ s are written as their raw bytes, using a big-endian point encoding, `as specified here <https://github.com/zkcrypto/pairing/blob/master/src/bls12_381/README.md#serialization>`__.
+-  ``bls12_381_g1``\ s and ``bls12_381_g2``\ s are written as their raw bytes, using a big-endian point encoding, `as specified here <https://docs.rs/bls12_381/latest/bls12_381/notes/serialization/index.html#bls12-381-serialization>`__.
 -  ``bls12_381_fr``\ s are written as their raw bytes, using a little-endian encoding.
 
 The optimized versions should not reach the RPCs, the protocol code
