@@ -188,7 +188,7 @@ Other resources
 For more details on the client commands refer to the manual at
 :ref:`client_manual`.
 
-For vote related RPCs check the :ref:`rpc_index` under the prefix
+For vote related RPCs check the :ref:`rpc_index_008` under the prefix
 ``vote/``.
 
 For Ledger support refer to Obsidian Systems' `documentation

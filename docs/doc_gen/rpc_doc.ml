@@ -24,10 +24,17 @@
 (*****************************************************************************)
 
 let protocols =
-  (* version, title that appears in the doc, protocol hash *)
-  [ ("008", "008 Edo", "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK");
-    ("", "007 Delphi", "PsDELPH1Kxsxt8f9eWbxQeRxkjfbxoqM52jvs5Y5fBxWWh4ifpo")
-  ]
+  (* version, title that appears in the doc, an optional path to an introduction, protocol hash *)
+  (* the optional introduction is inserted between the title "RPCs index"
+     and the generated directory description *)
+  [ ( "008",
+      "008 Edo",
+      Some "/include/rpc_introduction.rst.inc",
+      "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" );
+    ( "",
+      "007 Delphi",
+      Some "/include/rpc_introduction.rst.inc",
+      "PsDELPH1Kxsxt8f9eWbxQeRxkjfbxoqM52jvs5Y5fBxWWh4ifpo" ) ]
 
 let pp_name ppf = function
   | [] | [""] ->
@@ -336,10 +343,16 @@ let pp_document ppf descriptions version =
   (* Index *)
   Format.pp_set_margin ppf 10000 ;
   Format.pp_set_max_indent ppf 9000 ;
-  Format.fprintf ppf "%a" Rst.pp_ref ("rpc_index" ^ version) ;
+  let version_suffix = if version = "" then "" else "_" ^ version in
+  Format.fprintf ppf "%a" Rst.pp_ref ("rpc_index" ^ version_suffix) ;
   Rst.pp_h2 ppf "RPCs - Index" ;
   List.iter
-    (fun (name, prefix, rpc_dir) ->
+    (fun (name, intro, prefix, rpc_dir) ->
+      (* If provided, insert the introductory include *)
+      Option.fold
+        ~none:()
+        ~some:(Format.fprintf ppf ".. include:: %s@\n@\n")
+        intro ;
       Rst.pp_h3 ppf name ;
       Format.fprintf ppf "%a@\n@\n" (Index.pp prefix) rpc_dir)
     descriptions ;
@@ -349,7 +362,7 @@ let pp_document ppf descriptions version =
   Format.pp_set_margin ppf 80 ;
   Format.pp_set_max_indent ppf 76 ;
   List.iter
-    (fun (name, prefix, rpc_dir) ->
+    (fun (name, _, prefix, rpc_dir) ->
       Rst.pp_h3 ppf name ;
       Format.fprintf ppf "%a@\n@\n" (Description.pp prefix) rpc_dir)
     descriptions
@@ -359,7 +372,7 @@ let main node =
   let shell_dir = Node.build_rpc_directory node in
   let protocol_dirs =
     List.map
-      (fun (version, name, hash) ->
+      (fun (version, name, intro, hash) ->
         let hash = Protocol_hash.of_b58check_exn hash in
         let (module Proto) =
           match Registered_protocol.get hash with
@@ -370,6 +383,7 @@ let main node =
         in
         ( version,
           "Protocol " ^ name,
+          intro,
           [".."; "<block_id>"],
           RPC_directory.map (fun () -> assert false)
           @@ Block_directory.build_raw_rpc_directory
@@ -379,17 +393,21 @@ let main node =
                (module Proto) ))
       protocols
   in
-  let dirs = ("shell", "Shell", [""], shell_dir) :: protocol_dirs in
-  let (_version, name, path, dir) =
+  let dirs =
+    ("shell", "Shell", Some "/shell/rpc_introduction.rst.inc", [""], shell_dir)
+    :: protocol_dirs
+  in
+  let (_version, name, intro, path, dir) =
     Option.get
     @@ List.find
-         (fun (version, _name, _path, _dir) -> version = required_version)
+         (fun (version, _name, _intro, _path, _dir) ->
+           version = required_version)
          dirs
   in
   RPC_directory.describe_directory ~recurse:true ~arg:() dir
   >>= fun dir ->
   let ppf = Format.std_formatter in
-  pp_document ppf [(name, path, dir)] required_version ;
+  pp_document ppf [(name, intro, path, dir)] required_version ;
   return ()
 
 let () = Lwt_main.run (Node_helpers.with_node main)
