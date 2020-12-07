@@ -45,6 +45,3 @@ val fetch_and_compile_protocols :
   ?timeout:Ptime.Span.t ->
   State.Block.t ->
   unit tzresult Lwt.t
-
-val prefetch_and_compile_protocols :
-  t -> ?peer:P2p_peer.Id.t -> ?timeout:Ptime.Span.t -> State.Block.t -> unit
