@@ -1,6 +1,6 @@
 (library
- (name tezos_mempool_008_PtEdoTez)
- (public_name tezos-mempool-008-PtEdoTez)
+ (name tezos_filters_008_PtEdoTez)
+ (public_name tezos-filters-008-PtEdoTez)
  (libraries tezos-base
             tezos-embedded-protocol-008-PtEdoTez
             tezos-protocol-008-PtEdoTez)
