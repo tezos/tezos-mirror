@@ -90,3 +90,13 @@ let write_parameter_file : protocol:t -> parameter_overrides -> string Lwt.t =
     Lwt_io.write overriden_parameters_out @@ JSON.encode_u parameters
   in
   Lwt.return overriden_parameters
+
+let next_protocol = function
+  | Carthage ->
+      Some Delphi
+  | Delphi ->
+      Some Alpha
+  | Alpha ->
+      None
+
+let all_protocols = [Alpha; Delphi; Carthage]
