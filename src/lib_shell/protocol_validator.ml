@@ -172,7 +172,3 @@ let fetch_and_compile_protocols pv ?peer ?timeout (block : State.Block.t) =
         >>= fun () -> return_unit
   in
   protocol >>=? fun () -> test_protocol
-
-let prefetch_and_compile_protocols pv ?peer ?timeout block =
-  try ignore (fetch_and_compile_protocols pv ?peer ?timeout block)
-  with _ -> ()
