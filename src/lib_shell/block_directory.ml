@@ -397,6 +397,13 @@ let build_raw_rpc_directory ~user_activated_upgrades
          let header = State.Block.header block in
          Lwt.return (chain_state, hash, header))
        (build_raw_header_rpc_directory (module Proto))) ;
+  let proto_services =
+    match Prevalidator_filters.find Next_proto.hash with
+    | Some (module Filters) ->
+        Filters.RPC.rpc_services
+    | None ->
+        Next_proto.rpc_services
+  in
   merge
     (RPC_directory.map
        (fun block ->
@@ -408,7 +415,7 @@ let build_raw_rpc_directory ~user_activated_upgrades
            block_header = State.Block.shell_header block;
            context;
          })
-       Next_proto.rpc_services) ;
+       proto_services) ;
   !dir
 
 let get_protocol hash =

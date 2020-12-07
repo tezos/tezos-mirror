@@ -361,12 +361,12 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       match Protocol_hash.Map.find Proto.hash pv.filter_config with
       | Some config ->
           Lwt.return
-            (Data_encoding.Json.destruct Filter.config_encoding config)
+            (Data_encoding.Json.destruct Filter.Mempool.config_encoding config)
       | None ->
-          Lwt.return Filter.default_config
+          Lwt.return Filter.Mempool.default_config
     with _ ->
       Worker.log_event w Invalid_mempool_filter_configuration
-      >>= fun () -> Lwt.return Filter.default_config
+      >>= fun () -> Lwt.return Filter.Mempool.default_config
 
   let pre_filter w pv oph op =
     match decode_operation_data op.Operation.proto with
@@ -377,13 +377,14 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
         let op = {Filter.Proto.shell = op.shell; protocol_data} in
         filter_config w pv
         >>= fun config ->
-        Lwt.return (Filter.pre_filter config op.Filter.Proto.protocol_data)
+        Lwt.return
+          (Filter.Mempool.pre_filter config op.Filter.Proto.protocol_data)
 
   let post_filter w pv ~validation_state_before ~validation_state_after op
       receipt =
     filter_config w pv
     >>= fun config ->
-    Filter.post_filter
+    Filter.Mempool.post_filter
       config
       ~validation_state_before
       ~validation_state_after
@@ -612,8 +613,8 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
                | Some (module Filter) ->
                    let default =
                      Data_encoding.Json.construct
-                       Filter.config_encoding
-                       Filter.default_config
+                       Filter.Mempool.config_encoding
+                       Filter.Mempool.default_config
                    in
                    return default )) ;
        dir :=

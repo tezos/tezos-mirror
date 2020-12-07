@@ -1,6 +1,6 @@
 (library
- (name tezos_mempool_alpha)
- (public_name tezos-mempool-alpha)
+ (name tezos_filters_alpha)
+ (public_name tezos-filters-alpha)
  (libraries tezos-base
             tezos-embedded-protocol-alpha
             tezos-protocol-alpha)

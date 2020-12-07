@@ -16,4 +16,4 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos/Protocol: mempool-filters"
+synopsis: "Tezos/Protocol: filters"
