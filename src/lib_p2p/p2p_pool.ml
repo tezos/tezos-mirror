@@ -612,6 +612,8 @@ let compare_known_point_info p1 p2 =
 let list_known_points ~ignore_private ?(size = 50) pool =
   if size < 0 then Lwt.fail (Invalid_argument "P2p_pool.list_known_points")
   else
+    let other = size * 2 / 5 in
+    let best = size - other in
     P2p_point.Table.fold
       (fun point_id point_info acc ->
         if
@@ -622,6 +624,6 @@ let list_known_points ~ignore_private ?(size = 50) pool =
       pool.known_points
       []
     |> List.sort compare_known_point_info
-    |> sample (size * 3 / 5) (size * 2 / 5)
+    |> sample best other
     |> List.map P2p_point_state.Info.point
     |> Lwt.return
