@@ -205,7 +205,7 @@ operation.  The ``cost_per_byte`` is used to compute the amount of tokens to be
 burnt proportionally to the fresh storage consumed by the execution of an
 operation.  The ``chain_id`` is used to prevent replay of operations between
 chains.  You can pick a chain id for your mockup environment using the following
-command: 
+command:
 
 .. code-block:: shell-session
 
@@ -245,7 +245,7 @@ transactions at any point.
 
 Let us make that clearer with an example. We will start by creating a mockup
 directory supporting *asynchronous* transfers, i.e., where transfers do not
-immediately bake the block. 
+immediately bake the block.
 
 .. code-block:: shell-session
 
@@ -253,7 +253,7 @@ immediately bake the block.
 
 This will create a fresh mockup directory.  Notice that, in addition to the
 ``mockup/context.json`` file, you now also have a ``mockup/mempool.json``, which
-is initially empty.  
+is initially empty.
 
 Now, let us add 2 transactions, that we will label respectively ``t1`` and
 ``t2``, to the mempool.
@@ -290,7 +290,7 @@ case by visiting ``mockup/mempool.json``. This should look like
                  "destination": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" } ],
            "signature":
              "sigTBpkXw6tC72L2nJ2r2Jm5iB6uidTWqoMNd4oEawUbGBf5mHVfKawFYL8X8MJECpL73oBnfujyUZNLK2LQWD1FaCkYMP4j" } } ]
-                
+
 Now let's simulate a selective baker, like so
 
 .. code-block:: shell-session
@@ -300,7 +300,7 @@ Now let's simulate a selective baker, like so
 The effect of successfully baking the new head will be to include ``t1`` but
 discard ``t2``. You can check that ``t2`` has been added to the file
 ``mockup/trashpool.json``, since we know it cannot be added to further
-blocks of the mockup chain. 
+blocks of the mockup chain.
 
 .. code-block:: JSON
 
@@ -357,3 +357,23 @@ looks like.
               "destination": "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" } ],
         "signature":
           "sigeFcabZTE8Y2LXv19Fe7TbRtkjzVpBy2qhABp263Xnj8TJtA6XpRRMfGeD5YxwCJiTr9r6ZFGBdLnpxL9Y9CG3bpbXmu7E" } } ]
+
+Performing protocol migrations of persistent mockup states
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The persistent state of the mockup mode is highly protocol-dependent.
+But Tezos is self-amending: protocols regularly evolve from one to the next.
+When a protocol switch happens on-chain, the protocol state is automatically
+migrated to the format used by the new protocol.
+
+A command is provided to do the same on the persistent mockup state:
+
+::
+
+   $ mockup-client migrate mockup to <protocol hash>
+
+The protocol corresponding to the hash must know how to migrate from the current protocol.
+
+This is mostly useful for protocol developers, but also eg for developers
+wanting to check the robustness of their application against new features
+or breaking changes to the protocol.
