@@ -209,6 +209,12 @@ val parse_parameter_ty :
 val parse_comparable_ty :
   context -> Script.node -> (ex_comparable_ty * context) tzresult
 
+(**
+  [parse_ty] allowing big_map values, operations, contract and tickets.
+*)
+val parse_any_ty :
+  context -> legacy:bool -> Script.node -> (ex_ty * context) tzresult
+
 (** We expose [parse_ty] for convenience to external tools. Please use
     specialized versions such as [parse_packable_ty], [parse_parameter_ty],
     [parse_comparable_ty], or [parse_big_map_value_ty] if possible. *)

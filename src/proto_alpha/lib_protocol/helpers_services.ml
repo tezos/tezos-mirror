@@ -547,15 +547,7 @@ module Scripts = struct
         let open Script_ir_translator in
         let legacy = Option.value ~default:false legacy in
         let ctxt = Gas.set_unlimited ctxt in
-        (* Unfortunately, Script_ir_translator.parse_any_ty is not exported *)
-        Script_ir_translator.parse_ty
-          ctxt
-          ~legacy
-          ~allow_lazy_storage:true
-          ~allow_operation:true
-          ~allow_contract:true
-          ~allow_ticket:true
-          (Micheline.root typ)
+        Script_ir_translator.parse_any_ty ctxt ~legacy (Micheline.root typ)
         >>?= fun (Ex_ty typ, ctxt) ->
         parse_data ctxt ~legacy ~allow_forged:true typ (Micheline.root expr)
         >>=? fun (data, ctxt) ->
