@@ -98,7 +98,7 @@ let test_simple_baking_event ~protocol =
   Test.register
     ~__FILE__
     ~title:
-      (sf "transfer (mockup / aysynchronous / %s)" (Protocol.name protocol))
+      (sf "transfer (mockup / asynchronous / %s)" (Protocol.name protocol))
     ~tags:
       ["mockup"; "client"; "transfer"; Protocol.tag protocol; "asynchronous"]
   @@ fun () ->
@@ -219,6 +219,5 @@ let register protocol =
   test_same_transfer_twice ~protocol ;
   test_transfer_same_participants ~protocol ;
   test_transfer ~protocol ;
-  test_asynchronous ~protocol ;
   test_simple_baking_event ~protocol ;
   test_multiple_baking ~protocol
