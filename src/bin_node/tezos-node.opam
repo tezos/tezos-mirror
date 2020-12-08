@@ -35,6 +35,7 @@ depends: [
   "tezos-mempool-007-PsDELPH1"
   "tezos-mempool-008-PtEdoTez"
   "cmdliner"
+  "lwt-exit"
   "tls" { >= "0.10" < "0.11" } # remove the upper bond when the compatibility with hacl-star is restored
   "cstruct"
 ]

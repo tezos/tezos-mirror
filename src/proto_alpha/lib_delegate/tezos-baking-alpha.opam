@@ -18,6 +18,7 @@ depends: [
   "tezos-client-commands"
   "tezos-client-alpha"
   "lwt-canceler" { = "0.2" }
+  "lwt-exit"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

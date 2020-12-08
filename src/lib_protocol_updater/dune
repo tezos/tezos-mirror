@@ -10,6 +10,7 @@
             tezos-protocol-compiler.registerer
             tezos-protocol-compiler.native
             tezos-storage
+            lwt-exit
             dynlink)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_stdlib_unix

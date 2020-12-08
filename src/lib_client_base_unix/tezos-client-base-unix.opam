@@ -17,6 +17,7 @@ depends: [
   "tezos-mockup-registration"
   "tezos-mockup-commands"
   "tezos-proxy"
+  "lwt-exit"
   "tezos-test-services" { with-test }
 ]
 build: [

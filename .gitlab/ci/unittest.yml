@@ -64,7 +64,6 @@ unit:alltest:
     - scripts/test_wrapper.sh src/lib_signer_backends signer_backends
     - scripts/test_wrapper.sh src/lib_signer_backends/unix signer_backends_unix
     - scripts/test_wrapper.sh src/lib_stdlib stdlib
-    - scripts/test_wrapper.sh src/lib_stdlib_unix stdlib_unix
     - scripts/test_wrapper.sh src/lib_storage storage
     - scripts/test_wrapper.sh src/proto_006_PsCARTHA/lib_client 006_PsCARTHA_lib_client
     - scripts/test_wrapper.sh src/proto_007_PsDELPH1/lib_client 007_PsDELPH1_lib_client

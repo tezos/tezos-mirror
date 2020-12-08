@@ -15,6 +15,7 @@ depends: [
   "tezos-shell"
   "tezos-shell-context"
   "tezos-validation"
+  "lwt-exit"
 ]
 build: [
   [ "dune" "build" "-p" name "-j" jobs ]

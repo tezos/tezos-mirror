@@ -75,7 +75,8 @@
               (tezos-mempool-008-PtEdoTez -> void_for_linking-008-PtEdoTez-mempool.empty)
               (-> void_for_linking-008-PtEdoTez-mempool.empty))
             cmdliner
-            tls)
+            tls
+            lwt-exit)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_base
                    -open Tezos_stdlib_unix

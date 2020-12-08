@@ -19,6 +19,7 @@ depends: [
   "tezos-requester"
   "lwt-watcher" { = "0.1" }
   "lwt-canceler" { = "0.2" }
+  "lwt-exit"
   "alcotest-lwt" { with-test & >= "1.1.0" }
   "crowbar" { with-test }
   "tezos-workers"
