@@ -50,6 +50,8 @@ module Kind : sig
 
   type delegation = Delegation_kind
 
+  type failing_noop = Failing_noop_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
@@ -118,6 +120,7 @@ and _ contents =
       ballot : Vote_repr.ballot;
     }
       -> Kind.ballot contents
+  | Failing_noop : string -> Kind.failing_noop contents
   | Manager_operation : {
       source : Signature.Public_key_hash.t;
       fee : Tez_repr.tez;
@@ -244,6 +247,8 @@ module Encoding : sig
   val proposals_case : Kind.proposals case
 
   val ballot_case : Kind.ballot case
+
+  val failing_noop_case : Kind.failing_noop case
 
   val reveal_case : Kind.reveal Kind.manager case
 

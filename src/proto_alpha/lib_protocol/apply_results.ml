@@ -1016,6 +1016,9 @@ let kind_equal :
       Some Eq
   | (Ballot _, _) ->
       None
+  | (Failing_noop _, _) ->
+      (* the Failing_noop operation always fails and can't have result *)
+      None
   | ( Manager_operation {operation = Reveal _; _},
       Manager_operation_result {operation_result = Applied (Reveal_result _); _}
     ) ->
