@@ -35,7 +35,7 @@ Run a mockup client with persistent state
 To see the list of supported protocols in mockup mode, issue the
 following command:
 
-::.. code-block:: shell-session
+.. code-block:: shell-session
 
     $ tezos-client list mockup protocols
 
@@ -106,7 +106,7 @@ You can now use standard commands, such as:
             tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ100
             tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN ... +ꜩ100
 
-::.. code-block:: shell-session
+.. code-block:: shell-session
 
     $ mockup-client get balance for bootstrap1
     3999898.997437 ꜩ
@@ -318,7 +318,6 @@ blocks of the mockup chain.
 If we repeat somewhat similar steps
 
 .. code-block:: shell-session
-
 
    $ tezos-client transfer 1 from bootstrap4 to bootstrap5 --fee 1
    $ tezos-client transfer 2 from bootstrap2 to bootstrap3 --fee 0.5
