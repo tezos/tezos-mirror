@@ -390,18 +390,20 @@ let preapply ~user_activated_upgrades ~user_activated_protocol_overrides
          | Protocol.V0 ->
              return context
          | Protocol.V1 | Protocol.V2 -> (
+             (* Block and operation metadata hashes may not be set on
+                the testchain genesis block and activation block, even
+                when they are using environment V1, they contain no
+                operations. *)
+             let is_from_genesis =
+               (State.Block.header predecessor).shell.validation_passes = 0
+             in
              State.Block.all_operations_metadata_hash predecessor
              >>= (function
-                   | None
-                     when (State.Block.header predecessor).shell
-                            .validation_passes > 0 ->
-                       fail
-                       @@ Missing_operation_metadata_hashes pred_block_hash
                    | None ->
-                       (* Operation metadata hash is not be set on testchain genesis
-                          block and activation block, even when they are using
-                          environment V1, they contain no operations. *)
-                       return context
+                       if is_from_genesis then return context
+                       else
+                         fail
+                         @@ Missing_operation_metadata_hashes pred_block_hash
                    | Some hash ->
                        Context.add_predecessor_ops_metadata_hash context hash
                        >|= ok)
@@ -409,8 +411,8 @@ let preapply ~user_activated_upgrades ~user_activated_protocol_overrides
              State.Block.metadata_hash predecessor
              >>= function
              | None ->
-                 (* Block metadata hash should always be set in environment V1. *)
-                 fail @@ Missing_block_metadata_hash pred_block_hash
+                 if is_from_genesis then return context
+                 else fail @@ Missing_operation_metadata_hashes pred_block_hash
              | Some predecessor_block_metadata_hash ->
                  Context.add_predecessor_block_metadata_hash
                    context
