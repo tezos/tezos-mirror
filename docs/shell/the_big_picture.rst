@@ -275,7 +275,7 @@ The tests are split into various packages, testing more and more
 elements while following the dependency chain. Use ``make test`` to
 run them.
 
- - :src:`tests_python/tests`:
+ - :src:`tests_python/`:
    end-to-end tests as python scripts that launch a local sandboxed node
    and performs various tasks using the client
  - :package-name:`tezos-p2p`

@@ -467,7 +467,7 @@ usage. Otherwise, you can force a low fee operation using the
 `--force-low-fee`, with the risk that no baker will include it.
 
 More test contracts can be found in directory
-:src:`tests_python/contracts/`.
+:src:`tests_python/contracts_007/`.
 Advanced documentation of the smart contract language is available
 :ref:`here<michelson>`.
 
