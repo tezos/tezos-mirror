@@ -1,5 +1,5 @@
 (executables
- (names main_ci)
+ (names main main_ci)
  (libraries alcotest-lwt
             tezos-base
             tezos-stdlib-unix
@@ -11,7 +11,7 @@
 
 (rule
  (alias buildtest)
- (deps main_ci.exe)
+ (deps main.exe main_ci.exe)
  (action (progn)))
 
 (rule
