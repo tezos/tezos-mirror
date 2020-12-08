@@ -94,9 +94,9 @@ module T () = struct
       problem
       (Inference.Lasso {alpha = 1.0; normalize = false; positive = false})
 
-  let const = List.assoc fv_const mapping
+  let const = List.assoc fv_const mapping |> Option.get
 
-  let quadratic_term = List.assoc fv_quad mapping
+  let quadratic_term = List.assoc fv_quad mapping |> Option.get
 end
 
 (* ------------------------------------------------------------------------- *)

@@ -69,7 +69,7 @@ let measurement =
 let solution =
   match measurement with
   | Measure.Measurement ((module Bench), {workload_data; _}) ->
-      let model = List.assoc "blake2b" Bench.models in
+      let model = List.assoc "blake2b" Bench.models |> Option.get in
       let problem =
         Inference.make_problem ~data:workload_data ~model ~overrides:(fun _ ->
             None)
@@ -89,7 +89,7 @@ let solution =
 let () =
   match measurement with
   | Measure.Measurement ((module Bench), _) -> (
-      let model = List.assoc "blake2b" Bench.models in
+      let model = List.assoc "blake2b" Bench.models |> Option.get in
       let solution = Free_variable.Map.of_seq (List.to_seq solution.mapping) in
       ( match Codegen.codegen model solution (module Costlang.Identity) with
       | None ->
