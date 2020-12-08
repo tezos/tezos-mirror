@@ -121,7 +121,7 @@ class TestManualBaking:
 
     def test_bake_first_block_of_proposal_period(self, client: Client):
         # using the client it's not possible to add voting operation on the
-        # first block of a voting period. This is to be fixed in a futur
+        # first block of a voting period. This is to be fixed in a future
         # protocol
         client.bake('bootstrap1', BAKE_ARGS)
         period_info = client.get_current_period()
@@ -202,7 +202,7 @@ class TestManualBaking:
 
     def test_bake_first_block_of_cooldown_vote_period(self, client: Client):
         # using the client it's not possible to add voting operation on the
-        # first block of a voting period. This is to be fixed in a futur
+        # first block of a voting period. This is to be fixed in a future
         # protocol
         client.bake('bootstrap1', BAKE_ARGS)
         period_info = client.get_current_period()
