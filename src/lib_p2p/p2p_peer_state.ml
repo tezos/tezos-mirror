@@ -199,8 +199,15 @@ module Info = struct
 
     let save path peer_metadata_encoding peers =
       let open Data_encoding in
-      Lwt_utils_unix.Json.write_file path
+      (* [Lwt_unix.rename source target] function requires to have [source] and
+         [target] in the same hard disk partition. To almost ensure that, the
+         temporary file is created in the same directory as the final file. *)
+      let tempfile = path ^ ".tmp" in
+      Lwt_utils_unix.Json.write_file tempfile
       @@ Json.construct (list (encoding peer_metadata_encoding)) peers
+      >>=? fun () ->
+      protect (fun () ->
+          Lwt_unix.rename tempfile path >>= fun () -> return_unit)
   end
 
   let watch {watchers; _} = Lwt_watcher.create_stream watchers
