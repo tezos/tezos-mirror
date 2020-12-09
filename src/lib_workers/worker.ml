@@ -562,7 +562,7 @@ struct
       in
       w.status <- Closing (t0, Systime_os.now ()) ;
       close w ;
-      Lwt_canceler.cancel w.canceler
+      Error_monad.cancel_with_exceptions w.canceler
       >>= fun () ->
       w.status <- Closed (t0, Systime_os.now (), errs) ;
       Handlers.on_close w
@@ -729,7 +729,7 @@ struct
           full_name
           ~on_event:Internal_event.Lwt_worker_event.on_event
           ~run:(fun () -> worker_loop (module Handlers) w)
-          ~cancel:(fun () -> Lwt_canceler.cancel w.canceler) ;
+          ~cancel:(fun () -> Error_monad.cancel_with_exceptions w.canceler) ;
       return w
 
   let shutdown w =
@@ -738,7 +738,8 @@ struct
        worker ([w.worker]) resolves only once the ongoing request has resolved
        (if any) and some clean-up operations have completed. *)
     lwt_emit w Triggering_shutdown
-    >>= fun () -> Lwt_canceler.cancel w.canceler >>= fun () -> w.worker
+    >>= fun () ->
+    Error_monad.cancel_with_exceptions w.canceler >>= fun () -> w.worker
 
   let state w =
     match (w.state, w.status) with

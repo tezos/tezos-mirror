@@ -315,7 +315,7 @@ end = struct
         Events.(emit notify_duplicate) (key, peer)
 
   let worker_loop state =
-    let shutdown = Lwt_canceler.cancellation state.canceler in
+    let shutdown = Lwt_canceler.when_canceling state.canceler in
     let rec loop state =
       let timeout = compute_timeout state in
       Lwt.choose [(state.events >|= fun _ -> ()); timeout; shutdown]
@@ -399,10 +399,10 @@ end = struct
         "db_request_scheduler"
         ~on_event:Internal_event.Lwt_worker_event.on_event
         ~run:(fun () -> worker_loop state)
-        ~cancel:(fun () -> Lwt_canceler.cancel state.canceler) ;
+        ~cancel:(fun () -> Error_monad.cancel_with_exceptions state.canceler) ;
     state
 
-  let shutdown s = Lwt_canceler.cancel s.canceler >>= fun () -> s.worker
+  let shutdown s = Error_monad.cancel_with_exceptions s.canceler
 
   let pending_requests s = Table.length s.pending
 end

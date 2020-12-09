@@ -339,7 +339,7 @@ let activate t =
       "maintenance"
       ~on_event:Internal_event.Lwt_worker_event.on_event
       ~run:(fun () -> worker_loop t)
-      ~cancel:(fun () -> Lwt_canceler.cancel t.canceler) ;
+      ~cancel:(fun () -> Error_monad.cancel_with_exceptions t.canceler) ;
   Option.iter P2p_discovery.activate t.discovery
 
 let maintain t =
@@ -348,7 +348,7 @@ let maintain t =
   wait
 
 let shutdown {canceler; discovery; maintain_worker; just_maintained; _} =
-  Lwt_canceler.cancel canceler
+  Error_monad.cancel_with_exceptions canceler
   >>= fun () ->
   Option.iter_s P2p_discovery.shutdown discovery
   >>= fun () ->

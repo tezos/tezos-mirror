@@ -87,7 +87,7 @@ module Scheduler (IO : IO) = struct
       Lwt.catch
         (fun () -> IO.close conn.out_param err)
         (fun _ -> Lwt.return_unit)
-      >>= fun () -> Lwt_canceler.cancel conn.canceler
+      >>= fun () -> Error_monad.cancel_with_exceptions conn.canceler
 
   let waiter st conn =
     assert (Lwt.state conn.current_pop <> Sleep) ;
@@ -127,7 +127,7 @@ module Scheduler (IO : IO) = struct
     >>= fun () ->
     Events.(emit wait) IO.name
     >>= fun () ->
-    Lwt.pick [Lwt_canceler.cancellation st.canceler; wait_data st]
+    Lwt.pick [Lwt_canceler.when_canceling st.canceler; wait_data st]
     >>= fun () ->
     if Lwt_canceler.canceled st.canceler then Lwt.return_unit
     else
@@ -193,7 +193,7 @@ module Scheduler (IO : IO) = struct
         IO.name
         ~on_event:Internal_event.Lwt_worker_event.on_event
         ~run:(fun () -> worker_loop st)
-        ~cancel:(fun () -> Lwt_canceler.cancel st.canceler) ;
+        ~cancel:(fun () -> Error_monad.cancel_with_exceptions st.canceler) ;
     st
 
   let create_connection st in_param out_param canceler id =
@@ -231,7 +231,7 @@ module Scheduler (IO : IO) = struct
       Queue.transfer tmp st.readys_low )
 
   let shutdown st =
-    Lwt_canceler.cancel st.canceler
+    Error_monad.cancel_with_exceptions st.canceler
     >>= fun () -> st.worker >>= fun () -> Events.(emit shutdown) IO.name
 end
 
@@ -559,14 +559,31 @@ let close ?timeout conn =
   conn.remove_from_connection_table () ;
   Lwt_pipe.close conn.write_queue ;
   ( match timeout with
-  | None ->
-      return (Lwt_canceler.cancellation conn.canceler)
+  | None -> (
+      Lwt_canceler.when_canceled conn.canceler
+      >>= function
+      | Ok () | Error [] ->
+          return_unit
+      | Error excs ->
+          (* Do not prevent the closing if an exception is raised *)
+          List.iter_p
+            (fun exc -> Events.(emit close_error) (id, Error_monad.Exn exc))
+            excs
+          >>= fun () -> return_unit )
   | Some timeout ->
       with_timeout
         ~canceler:conn.canceler
         (Lwt_unix.sleep timeout)
-        (fun canceler -> return (Lwt_canceler.cancellation canceler)) )
-  >>=? fun _ ->
+        (fun canceler ->
+          Lwt_canceler.when_canceled canceler
+          >>= function
+          | Ok () | Error [] ->
+              return_unit
+          | Error (exn :: _) ->
+              (* Do not prevent the closing if an exception is raised *)
+              Events.(emit close_error) (id, Error_monad.Exn exn) >>= return)
+  )
+  >>=? fun () ->
   conn.write_conn.current_push
   >>= fun res -> Events.(emit close) id >>= fun () -> Lwt.return res
 

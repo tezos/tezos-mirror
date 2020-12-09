@@ -111,7 +111,7 @@ let protect_no_canceler ?on_error t =
 
 let protect_canceler ?on_error canceler t =
   let cancellation =
-    Lwt_canceler.cancellation canceler >>= fun () -> fail Canceled
+    Lwt_canceler.when_canceling canceler >>= fun () -> fail Canceled
   in
   let res = Lwt.pick [cancellation; Lwt.catch t (fun exn -> fail (Exn exn))] in
   res
@@ -153,6 +153,13 @@ let with_timeout ?(canceler = Lwt_canceler.create ()) timeout f =
   Lwt.choose [timeout; (target >|= fun _ -> ())]
   >>= fun () ->
   if Lwt.state target <> Lwt.Sleep then (Lwt.cancel timeout ; target)
-  else Lwt_canceler.cancel canceler >>= fun () -> fail Timeout
+  else
+    Lwt_canceler.cancel canceler
+    >>= function Ok () | Error [] -> fail Timeout | Error (h :: _) -> raise h
 
 let errs_tag = Tag.def ~doc:"Errors" "errs" pp_print_error
+
+let cancel_with_exceptions canceler =
+  Lwt_canceler.cancel canceler
+  >>= function
+  | Ok () | Error [] -> Lwt.return_unit | Error (h :: _) -> raise h

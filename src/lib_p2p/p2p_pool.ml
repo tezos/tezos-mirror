@@ -555,7 +555,7 @@ let destroy {config; peer_meta_config; known_peer_ids; known_points; _} =
     (fun _peer_id peer_info ->
       match P2p_peer_state.get peer_info with
       | Accepted {cancel; _} ->
-          Lwt_canceler.cancel cancel
+          Error_monad.cancel_with_exceptions cancel
       | Running {data = conn; _} ->
           P2p_conn.disconnect conn
       | Disconnected ->
@@ -566,7 +566,7 @@ let destroy {config; peer_meta_config; known_peer_ids; known_points; _} =
     (fun _point point_info ->
       match P2p_point_state.get point_info with
       | Requested {cancel} | Accepted {cancel; _} ->
-          Lwt_canceler.cancel cancel
+          Error_monad.cancel_with_exceptions cancel
       | Running {data = conn; _} ->
           P2p_conn.disconnect conn
       | Disconnected ->

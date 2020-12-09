@@ -73,7 +73,7 @@ let rec worker_loop bv =
       Event.(emit validator_terminated) ()
   | Error err ->
       Event.(emit unexpected_worker_error) err
-      >>= fun () -> Lwt_canceler.cancel bv.canceler
+      >>= fun () -> Error_monad.cancel_with_exceptions bv.canceler
 
 let create db =
   let canceler = Lwt_canceler.create () in
@@ -88,11 +88,11 @@ let create db =
       "block_validator"
       ~on_event:Internal_event.Lwt_worker_event.on_event
       ~run:(fun () -> worker_loop bv)
-      ~cancel:(fun () -> Lwt_canceler.cancel bv.canceler) ;
+      ~cancel:(fun () -> Error_monad.cancel_with_exceptions bv.canceler) ;
   bv
 
 let shutdown {canceler; worker; _} =
-  Lwt_canceler.cancel canceler >>= fun () -> worker
+  Error_monad.cancel_with_exceptions canceler >>= fun () -> worker
 
 let validate state hash protocol =
   match Registered_protocol.get hash with

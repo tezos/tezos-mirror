@@ -529,6 +529,15 @@ module P2p_io_scheduler = struct
       ~level:Debug
       ("connection_id", Data_encoding.int31)
 
+  let close_error =
+    declare_2
+      ~section
+      ~name:"close_connection_error"
+      ~msg:"close {connection_id} failed with {error}"
+      ~level:Warning
+      ("connection_id", Data_encoding.int31)
+      ("error", Error_monad.error_encoding)
+
   let close =
     declare_1
       ~section

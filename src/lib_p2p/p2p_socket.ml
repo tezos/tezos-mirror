@@ -476,7 +476,7 @@ module Reader = struct
     | Ok (Some stream) ->
         worker_loop st (Some stream)
     | Ok None ->
-        Lwt_canceler.cancel st.canceler
+        Error_monad.cancel_with_exceptions st.canceler
     | Error (Canceled :: _) | Error (Exn Lwt_pipe.Closed :: _) ->
         lwt_debug "connection closed to %a" P2p_peer.Id.pp st.conn.info.peer_id
     | Error _ as err ->
@@ -484,7 +484,7 @@ module Reader = struct
         else
           (* best-effort push to the messages, we ignore failures *)
           (ignore : bool -> unit) @@ Lwt_pipe.push_now st.messages err ;
-        Lwt_canceler.cancel st.canceler
+        Error_monad.cancel_with_exceptions st.canceler
 
   let run ?size conn encoding canceler =
     let compute_size = function
@@ -512,10 +512,10 @@ module Reader = struct
         "reader"
         ~on_event:Internal_event.Lwt_worker_event.on_event
         ~run:(fun () -> worker_loop st None)
-        ~cancel:(fun () -> Lwt_canceler.cancel st.canceler) ;
+        ~cancel:(fun () -> Error_monad.cancel_with_exceptions st.canceler) ;
     st
 
-  let shutdown st = Lwt_canceler.cancel st.canceler >>= fun () -> st.worker
+  let shutdown st = Error_monad.cancel_with_exceptions st.canceler
 end
 
 module Writer = struct
@@ -570,7 +570,7 @@ module Writer = struct
           st.conn.info.peer_id
           pp_print_error
           err
-        >>= fun () -> Lwt_canceler.cancel st.canceler
+        >>= fun () -> Error_monad.cancel_with_exceptions st.canceler
     | Ok (buf, wakener) -> (
         send_message st buf
         >>= fun res ->
@@ -594,7 +594,7 @@ module Writer = struct
                   "connection closed to %a"
                   P2p_peer.Id.pp
                   st.conn.info.peer_id
-                >>= fun () -> Lwt_canceler.cancel st.canceler
+                >>= fun () -> Error_monad.cancel_with_exceptions st.canceler
             | err ->
                 lwt_log_error
                   "@[<v 2>error writing to %a@ %a@]"
@@ -602,7 +602,8 @@ module Writer = struct
                   st.conn.info.peer_id
                   pp_print_error
                   err
-                >>= fun () -> Lwt_canceler.cancel st.canceler ) )
+                >>= fun () -> Error_monad.cancel_with_exceptions st.canceler )
+        )
 
   let run ?size ?binary_chunks_size conn encoding canceler =
     let binary_chunks_size =
@@ -658,10 +659,11 @@ module Writer = struct
         "writer"
         ~on_event:Internal_event.Lwt_worker_event.on_event
         ~run:(fun () -> worker_loop st)
-        ~cancel:(fun () -> Lwt_canceler.cancel st.canceler) ;
+        ~cancel:(fun () -> Error_monad.cancel_with_exceptions st.canceler) ;
     st
 
-  let shutdown st = Lwt_canceler.cancel st.canceler >>= fun () -> st.worker
+  let shutdown st =
+    Error_monad.cancel_with_exceptions st.canceler >>= fun () -> st.worker
 end
 
 type ('msg, 'meta) t = {

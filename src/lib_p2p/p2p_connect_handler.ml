@@ -592,5 +592,5 @@ let on_new_connection t f = t.new_connection_hook <- f :: t.new_connection_hook
 
 let destroy t =
   P2p_point.Table.iter_p
-    (fun _point canceler -> Lwt_canceler.cancel canceler)
+    (fun _point canceler -> Error_monad.cancel_with_exceptions canceler)
     t.incoming

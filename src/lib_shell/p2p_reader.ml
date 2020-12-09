@@ -493,7 +493,7 @@ let run ~register ~unregister p2p disk protocol_db active_chains gid conn =
       (Format.asprintf "db_network_reader.%a" P2p_peer.Id.pp_short gid)
       ~on_event:Internal_event.Lwt_worker_event.on_event
       ~run:(fun () -> worker_loop state)
-      ~cancel:(fun () -> Lwt_canceler.cancel canceler) ;
+      ~cancel:(fun () -> Error_monad.cancel_with_exceptions canceler) ;
   register state
 
-let shutdown s = Lwt_canceler.cancel s.canceler >>= fun () -> s.worker
+let shutdown s = Error_monad.cancel_with_exceptions s.canceler

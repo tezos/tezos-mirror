@@ -109,3 +109,13 @@ val with_timeout :
 (**/**)
 
 val errs_tag : error trace Tag.def
+
+(** A wrapper around {!Lwt_canceler.cancel}.
+
+   If {!Lwt_canceler.cancel} fails with a non-empty list of exception, the first
+   one is raised. This behaviour attempts to follow the previous version (0.2)
+   of {!Lwt_canceler} as closely as possible. This function is used temporarily
+   until exceptions are explicitely handled by callers of {!Lwt_canceler.cancel}
+   and it will be removed once this is done. Use of this function is
+   discouraged. *)
+val cancel_with_exceptions : Lwt_canceler.t -> unit Lwt.t

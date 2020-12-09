@@ -327,7 +327,18 @@ let main ?socket_dir () =
   Lwt.catch
     (fun () ->
       run in_channel out_channel
-      >>=? fun () -> Lwt_canceler.cancel canceler >>= fun () -> return_unit)
+      >>=? fun () ->
+      Lwt_canceler.cancel canceler
+      >>= function
+      | Ok () | Error [] ->
+          return_unit
+      | Error (exc :: excs) ->
+          let texc = TzTrace.make (Error_monad.Exn exc) in
+          let texcs =
+            List.map (fun exc -> TzTrace.make (Error_monad.Exn exc)) excs
+          in
+          let t = List.fold_left TzTrace.conp texc texcs in
+          Lwt.return (Error t))
     (fun e -> Lwt.return (error_exn e))
   >>= function
   | Ok () ->

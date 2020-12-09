@@ -147,6 +147,6 @@ let activate st =
       "welcome"
       ~on_event:Internal_event.Lwt_worker_event.on_event
       ~run:(fun () -> worker_loop st)
-      ~cancel:(fun () -> Lwt_canceler.cancel st.canceler)
+      ~cancel:(fun () -> Error_monad.cancel_with_exceptions st.canceler)
 
-let shutdown st = Lwt_canceler.cancel st.canceler >>= fun () -> st.worker
+let shutdown st = Error_monad.cancel_with_exceptions st.canceler

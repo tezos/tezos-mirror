@@ -443,7 +443,7 @@ module External_validator_process = struct
       | Running ->
           return (process, process_stdin, process_stdout)
       | Exited status ->
-          Lwt_canceler.cancel canceler
+          Error_monad.cancel_with_exceptions canceler
           >>= fun () ->
           vp.validator_process <- None ;
           Events.(emit process_exited_abnormally status)
@@ -576,7 +576,7 @@ module External_validator_process = struct
                   Events.(emit process_exited_abnormally status)
                   >>= fun () -> process#terminate ; Lwt.return_unit)
         >>= fun () ->
-        Lwt_canceler.cancel canceler
+        Error_monad.cancel_with_exceptions canceler
         >>= fun () ->
         vp.validator_process <- None ;
         Lwt.return_unit

@@ -189,10 +189,10 @@ module Answer = struct
         Lwt.return_unit
     | Error err ->
         Events.(emit unexpected_error) ("answer", err)
-        >>= fun () -> Lwt_canceler.cancel st.canceler
+        >>= fun () -> Error_monad.cancel_with_exceptions st.canceler
     | Ok () ->
         Events.(emit unexpected_exit) ()
-        >>= fun () -> Lwt_canceler.cancel st.canceler
+        >>= fun () -> Error_monad.cancel_with_exceptions st.canceler
 
   let create my_peer_id pool ~trust_discovered_peers ~discovery_port =
     {
@@ -210,7 +210,7 @@ module Answer = struct
         "discovery_answer"
         ~on_event:Internal_event.Lwt_worker_event.on_event
         ~run:(fun () -> worker_loop st)
-        ~cancel:(fun () -> Lwt_canceler.cancel st.canceler)
+        ~cancel:(fun () -> Error_monad.cancel_with_exceptions st.canceler)
 end
 
 (* ************************************************************ *)
@@ -293,7 +293,7 @@ module Sender = struct
         Lwt.return_unit
     | Error err ->
         Events.(emit unexpected_error) ("sender", err)
-        >>= fun () -> Lwt_canceler.cancel st.canceler
+        >>= fun () -> Error_monad.cancel_with_exceptions st.canceler
 
   let create my_peer_id pool ~listening_port ~discovery_port ~discovery_addr =
     {
@@ -313,7 +313,7 @@ module Sender = struct
         "discovery_sender"
         ~on_event:Internal_event.Lwt_worker_event.on_event
         ~run:(fun () -> worker_loop Config.initial st)
-        ~cancel:(fun () -> Lwt_canceler.cancel st.canceler)
+        ~cancel:(fun () -> Error_monad.cancel_with_exceptions st.canceler)
 end
 
 (* ********************************************************************** *)
@@ -341,5 +341,5 @@ let wakeup t = Lwt_condition.signal t.sender.restart_discovery ()
 
 let shutdown t =
   Lwt.join
-    [ Lwt_canceler.cancel t.answer.canceler;
-      Lwt_canceler.cancel t.sender.canceler ]
+    [ Error_monad.cancel_with_exceptions t.answer.canceler;
+      Error_monad.cancel_with_exceptions t.sender.canceler ]
