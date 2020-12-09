@@ -2022,7 +2022,7 @@ let complete_next_tree cctxt = function
       >|=? fun completions -> completions @ list_command_args command
   | TNonTerminalSeq {autocomplete; suffix; _} ->
       complete_func autocomplete cctxt
-      >|=? fun completions -> completions @ [Option.get @@ List.hd suffix]
+      >|=? fun completions -> completions @ [Unsafe.Option.get ~loc:__LOC__ @@ List.hd suffix]
   | TParam {autocomplete; _} ->
       complete_func autocomplete cctxt
   | TStop command ->
