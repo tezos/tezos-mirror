@@ -1,10 +1,8 @@
 import re
 import pytest
 from client.client import Client
-from tools import constants
+from tools import constants, utils
 from . import protocol
-
-BAKE_ARGS = ['--minimal-timestamp', '--max-priority', '1024']
 
 ENDORSING_SLOTS_PER_BLOCK = 2048
 NUM_ACCOUNTS = 256
@@ -44,10 +42,10 @@ class TestManualBaking:
     spurious fails due to slow CI."""
 
     def test_endorse(self, client: Client):
-        client.bake('bootstrap1', BAKE_ARGS)
+        utils.bake(client)
         for account in ACCOUNTS:
             client.endorse(account)
-        client.bake('bootstrap1', BAKE_ARGS)
+        utils.bake(client)
 
     def test_check_baking_time_from_log(self, client):
         assert client.logs, 'test must be run with "--log-dir LOG_DIR: option'

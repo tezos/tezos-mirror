@@ -2,7 +2,6 @@ import shutil
 import pytest
 from tools import utils, paths, constants
 
-BAKE_ARGS = ['--max-priority', '512', '--minimal-timestamp']
 PARAMS = constants.NODE_PARAMS
 BATCH = 100
 
@@ -217,7 +216,7 @@ class TestLegacy:
     def test_bake_to_catch_up(self, sandbox, session, legacy_stores):
         # pylint: disable=unused-argument
         for _ in range(BATCH):
-            sandbox.client(1).bake('bootstrap1', BAKE_ARGS)
+            utils.bake(sandbox.client(1))
         session['head_level'] = sandbox.client(1).get_head()['header']['level']
         for i in GROUP:
             assert utils.check_level(sandbox.client(i), session['head_level'])

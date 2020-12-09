@@ -419,12 +419,12 @@ def contract_name_of_file(contract_path: str) -> str:
     return os.path.splitext(os.path.basename(contract_path))[0]
 
 
-def bake(client: Client) -> BakeForResult:
+def bake(client: Client, bake_for='bootstrap1') -> BakeForResult:
     return client.bake(
-        'bootstrap1',
+        bake_for,
         [
             '--max-priority',
-            '512',
+            '1024',
             '--minimal-timestamp',
             '--minimal-fees',
             '0',

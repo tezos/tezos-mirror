@@ -3,21 +3,20 @@ from tools import utils, constants
 from launchers.sandbox import Sandbox
 from . import protocol
 
-
-BAKE_ARGS = ['--max-priority', '512', '--minimal-timestamp']
 NUM_NODES = 3
+PATH_FORGE_OPERATION = '/chains/main/blocks/head/helpers/forge/operations'
 
 
 @pytest.mark.multinode
 @pytest.mark.incremental
 class TestDoubleEndorsement:
-    """Constructs a double endorsement, and build evidence."""
+    """Constructs a double endorsement and builds evidence."""
 
     def test_init(self, sandbox: Sandbox):
         for i in range(NUM_NODES):
             sandbox.add_node(i, params=constants.NODE_PARAMS)
         protocol.activate(sandbox.client(0), activate_in_the_past=True)
-        sandbox.client(0).bake('bootstrap1', BAKE_ARGS)
+        utils.bake(sandbox.client(0))
 
     def test_level(self, sandbox: Sandbox):
         level = 2
@@ -32,7 +31,7 @@ class TestDoubleEndorsement:
         """Client 0 bakes block A at level 3, not communicated to 1 and 2
         Inject an endorsement to ensure a different hash"""
         sandbox.client(0).endorse('bootstrap1')
-        sandbox.client(0).bake('bootstrap1', BAKE_ARGS)
+        utils.bake(sandbox.client(0))
 
     def test_endorse_node_0(self, sandbox: Sandbox, session: dict):
         """bootstrap1 builds an endorsement for block A"""
@@ -51,7 +50,7 @@ class TestDoubleEndorsement:
 
     def test_bake_node_2(self, sandbox: Sandbox):
         """Client 2 bakes block B at level 3, not communicated to 0 and 1"""
-        sandbox.client(2).bake('bootstrap1', BAKE_ARGS)
+        utils.bake(sandbox.client(2))
 
     def test_endorse_node_2(self, sandbox: Sandbox, session: dict):
         """bootstrap1 builds an endorsement for block B"""
@@ -97,11 +96,8 @@ class TestDoubleEndorsement:
             ],
         }
 
-        path_forge_operation = (
-            '/chains/main/blocks/head/helpers/forge/operations'
-        )
         operation_hex_string = client.rpc(
-            'post', path_forge_operation, data=operation
+            'post', PATH_FORGE_OPERATION, data=operation
         )
         assert isinstance(operation_hex_string, str)
         sender_sk_long = constants.IDENTITIES['bootstrap1']['secret']

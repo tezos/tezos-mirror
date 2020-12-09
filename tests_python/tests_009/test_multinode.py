@@ -5,7 +5,6 @@ from client.client import Client
 from . import protocol
 
 
-BAKE_ARGS = ['--max-priority', '512', '--minimal-timestamp']
 TRANSFER_AMOUNT = 500
 
 
@@ -30,7 +29,7 @@ class TestManualBaking:
         for i in range(1, 6):
             account = f'bootstrap{i}'
             client_i = level % len(clients)
-            clients[client_i].bake(account, BAKE_ARGS)
+            utils.bake(clients[client_i], account)
             for client in clients:
                 assert utils.check_level(client, level)
             level += 1
@@ -59,7 +58,7 @@ class TestManualBaking:
             )
 
     def test_bake(self, clients: List[Client]):
-        clients[3 % len(clients)].bake('bootstrap4', BAKE_ARGS)
+        utils.bake(clients[3 % len(clients)], 'bootstrap4')
 
     def test_block_contains_endorse_and_transfer(
         self, clients: List[Client], session

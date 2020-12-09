@@ -5,7 +5,6 @@ from tools import utils, constants
 from launchers.sandbox import Sandbox
 from . import protocol
 
-BAKE_ARGS = ['--max-priority', '512', '--minimal-timestamp']
 PARAMS = constants.NODE_PARAMS
 
 BATCH_1 = 48
@@ -61,7 +60,7 @@ class TestMultiNodeSnapshot:
 
     def test_bake_batch_1(self, sandbox, session):
         for _ in range(BATCH_1):
-            sandbox.client(0).bake('bootstrap1', BAKE_ARGS)
+            utils.bake(sandbox.client(0))
             sandbox.client(0).endorse('bootstrap2')
         session['head_hash'] = sandbox.client(0).get_head()['hash']
         session['head_level'] = sandbox.client(0).get_head()['header']['level']
@@ -253,7 +252,7 @@ class TestMultiNodeSnapshot:
     # Bake a few blocks
     def test_bake_batch_2(self, sandbox, session):
         for _ in range(BATCH_2):
-            sandbox.client(0).bake('bootstrap1', BAKE_ARGS)
+            utils.bake(sandbox.client(0))
             sandbox.client(0).endorse('bootstrap2')
         session['head_hash'] = sandbox.client(0).get_head()['hash']
         session['head_level'] = sandbox.client(0).get_head()['header']['level']
@@ -390,7 +389,7 @@ class TestMultiNodeSnapshot:
     # Bake a few blocks
     def test_bake_batch_3(self, sandbox, session):
         for _ in range(BATCH_3):
-            sandbox.client(0).bake('bootstrap1', BAKE_ARGS)
+            utils.bake(sandbox.client(0))
             sandbox.client(0).endorse('bootstrap2')
         session['head_hash'] = sandbox.client(0).get_head()['hash']
         session['head_level'] = sandbox.client(0).get_head()['header']['level']

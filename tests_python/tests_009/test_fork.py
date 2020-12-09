@@ -4,7 +4,6 @@ from launchers.sandbox import Sandbox
 from . import protocol
 
 
-BAKE_ARGS = ['--max-priority', '512', '--minimal-timestamp']
 NUM_NODES = 3
 
 
@@ -31,7 +30,7 @@ class TestFork:
 
     def test_bake_node_0(self, sandbox: Sandbox):
         """Client 0 bakes block A at level 2, not communicated to 1 and 2"""
-        sandbox.client(0).bake('bootstrap1', BAKE_ARGS)
+        utils.bake(sandbox.client(0))
 
     def test_endorse_node_0(self, sandbox: Sandbox, session: dict):
         """bootstrap1 builds an endorsement for block A"""
@@ -43,7 +42,7 @@ class TestFork:
 
     def test_bake_node_0_again(self, sandbox: Sandbox):
         """Client 0 bakes block A' at level 3, not communicated to 1 and 2"""
-        sandbox.client(0).bake('bootstrap1', BAKE_ARGS)
+        utils.bake(sandbox.client(0))
 
     def test_first_branch(self, sandbox: Sandbox, session: dict):
         head = sandbox.client(0).get_head()
@@ -60,11 +59,11 @@ class TestFork:
 
     def test_bake_node_2(self, sandbox: Sandbox):
         """Client 2 bakes block B at level 2, not communicated to 0 and 1"""
-        sandbox.client(2).bake('bootstrap1', BAKE_ARGS)
+        utils.bake(sandbox.client(2))
 
     def test_bake_node_2_again(self, sandbox: Sandbox):
         """Client 2 bakes block B' at level 3, not communicated to 0 and 1"""
-        sandbox.client(2).bake('bootstrap1', BAKE_ARGS)
+        utils.bake(sandbox.client(2))
 
     def test_second_branch(self, sandbox: Sandbox, session: dict):
         head = sandbox.client(2).get_head()

@@ -7,18 +7,6 @@ from tools import constants, utils
 from tools.constants import PROTO_GENESIS
 from . import protocol
 
-BAKE_ARGS = [
-    '--minimal-fees',
-    '0',
-    '--minimal-nanotez-per-byte',
-    '0',
-    '--minimal-nanotez-per-gas-unit',
-    '0',
-    '--max-priority',
-    '512',
-    '--minimal-timestamp',
-]
-
 MIGRATION_LEVEL = 3
 BAKER = 'bootstrap1'
 BAKER_PKH = constants.IDENTITIES[BAKER]['identity']
@@ -117,7 +105,7 @@ class TestMigration:
 
     def test_activate(self, client, sandbox):
         # 2: activated PROTO_A
-        client.bake(BAKER, BAKE_ARGS)
+        utils.bake(client, BAKER)
         assert client.get_protocol() == protocol.PREV_HASH
         assert sandbox.client(0).get_head()['header']['proto'] == 1
         metadata = client.get_metadata()
@@ -128,7 +116,7 @@ class TestMigration:
 
     def test_migration(self, client, sandbox):
         # 3: last block of PROTO_A, runs migration code (MIGRATION_LEVEL)
-        client.bake(BAKER, BAKE_ARGS)
+        utils.bake(client, BAKER)
         metadata = client.get_metadata()
         assert metadata['next_protocol'] == protocol.HASH
         assert metadata['balance_updates'] == PREV_DEPOSIT_RECEIPTS
@@ -139,7 +127,7 @@ class TestMigration:
 
     def test_new_proto(self, client, sandbox):
         # 4: first block of PROTO_B
-        client.bake(BAKER, BAKE_ARGS)
+        utils.bake(client, BAKER)
         assert client.get_protocol() == protocol.HASH
         assert sandbox.client(0).get_head()['header']['proto'] == 2
 
@@ -153,7 +141,7 @@ class TestMigration:
 
     def test_new_proto_second(self, client):
         # 5: second block of PROTO_B
-        client.bake(BAKER, BAKE_ARGS)
+        utils.bake(client, BAKER)
         metadata = client.get_metadata()
         assert metadata['balance_updates'] == DEPOSIT_RECEIPTS
 
@@ -162,7 +150,7 @@ class TestMigration:
         # (see `max_operations_ttl`)
         level = client.get_head()['header']['level']
         for _ in range(60 - level + 1):
-            client.bake(BAKER, BAKE_ARGS)
+            utils.bake(client, BAKER)
         assert client.get_head()['header']['level'] == 61
 
         # terminate node0
@@ -187,7 +175,7 @@ class TestMigration:
             1, snapshot=session['snapshot_full'], node_config=NODE_CONFIG
         )
         client = sandbox.client(1)
-        client.bake(BAKER, BAKE_ARGS)
+        utils.bake(client, BAKER)
 
     def test_import_rolling_snapshot_node2(self, sandbox, session):
         sandbox.add_node(
@@ -195,7 +183,7 @@ class TestMigration:
         )
         client = sandbox.client(2)
         utils.synchronize([sandbox.client(1), client], max_diff=0)
-        client.bake(BAKER, BAKE_ARGS)
+        utils.bake(client, BAKER)
 
     def test_reconstruct_full_node3(self, sandbox, session):
         sandbox.add_node(
@@ -210,7 +198,7 @@ class TestMigration:
         utils.synchronize(
             [sandbox.client(1), sandbox.client(2), client], max_diff=0
         )
-        client.bake(BAKER, BAKE_ARGS)
+        utils.bake(client, BAKER)
 
     def test_rerun_node0(self, sandbox):
         sandbox.node(0).run()

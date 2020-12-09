@@ -1,7 +1,6 @@
 import pytest
 from tools import utils, paths
 
-BAKE_ARGS = ['--max-priority', '512', '--minimal-timestamp']
 BATCH = 100
 
 EXPECTED_LEVEL = 101
@@ -166,7 +165,7 @@ class TestLegacy:
     def test_bake_to_catch_up(self, sandbox, nodes_legacy_store):
         # pylint: disable=unused-argument
         for _ in range(BATCH):
-            sandbox.client(1).bake('bootstrap1', BAKE_ARGS)
+            utils.bake(sandbox.client(1))
 
     def test_archive_catch_up(self, sandbox, nodes_legacy_store):
         # pylint: disable=unused-argument

@@ -3,7 +3,6 @@ from tools import utils
 from launchers.sandbox import Sandbox
 from . import protocol
 
-BAKE_ARGS = ['--max-priority', '512', '--minimal-timestamp']
 PARAMS = ['--bootstrap-threshold', '0']
 # 2*cycle_size - (protocol_activation)
 CEMENTED_LIMIT = 2 * 8 - 1
@@ -41,7 +40,7 @@ class TestMultiNodeStorageReconstruction:
     # Node 0 bakes a few blocks
     def test_bake_node0_level_a(self, sandbox: Sandbox, session: dict):
         for _ in range(BATCH_1):
-            sandbox.client(0).bake('bootstrap1', BAKE_ARGS)
+            utils.bake(sandbox.client(0))
         session['head_hash'] = sandbox.client(0).get_head()['hash']
         session['head_level'] = sandbox.client(0).get_head()['header']['level']
 
@@ -124,7 +123,7 @@ class TestMultiNodeStorageReconstruction:
     # Bake a few blocks
     def test_bake_node0_level_b(self, sandbox: Sandbox, session: dict):
         for _ in range(BATCH_2 - BATCH_1):
-            sandbox.client(0).bake('bootstrap1', BAKE_ARGS)
+            utils.bake(sandbox.client(0))
         session['head_hash'] = sandbox.client(0).get_head()['hash']
         session['head_level'] = sandbox.client(0).get_head()['header']['level']
         assert utils.check_level(sandbox.client(0), session['head_level'])

@@ -6,7 +6,6 @@ from launchers.sandbox import Sandbox
 from . import protocol
 
 
-BAKE_ARGS = ['--max-priority', '512', '--minimal-timestamp']
 NUM_NODES = 2
 
 
@@ -26,7 +25,7 @@ class TestAccuser:
         # head; however the node might change branch, and then the operation
         # becomes invalid, namely "branch refused".)
         for i in range(3):
-            sandbox.client(0).bake('bootstrap1', BAKE_ARGS)
+            utils.bake(sandbox.client(0))
 
     def test_level(self, sandbox: Sandbox):
         level = 4
@@ -40,7 +39,7 @@ class TestAccuser:
         """Client 0 bakes block A at level 5, not communicated to node 1.
         Inject an endorsement to ensure a different hash"""
         sandbox.client(0).endorse('bootstrap1')
-        sandbox.client(0).bake('bootstrap1', BAKE_ARGS)
+        utils.bake(sandbox.client(0))
 
     def test_endorse_node_0(self, sandbox: Sandbox, session: dict):
         """bootstrap1 builds an endorsement for block A"""
@@ -49,7 +48,7 @@ class TestAccuser:
         mempool = client.get_mempool()
         endorsement = mempool['applied'][0]
         session['endorsement1'] = endorsement
-        client.bake('bootstrap1', BAKE_ARGS)
+        utils.bake(client)
 
     def test_terminate_node_0(self, sandbox: Sandbox):
         sandbox.node(0).terminate()
@@ -67,7 +66,7 @@ class TestAccuser:
 
     def test_bake_node_1(self, sandbox: Sandbox):
         """Client 1 bakes block B at level 5, not communicated to node 0"""
-        sandbox.client(1).bake('bootstrap1', BAKE_ARGS)
+        utils.bake(sandbox.client(1))
 
     def test_endorse_node_2(self, sandbox: Sandbox, session: dict):
         """bootstrap1 builds an endorsement for block B, which is included in
@@ -77,7 +76,7 @@ class TestAccuser:
         mempool = client.get_mempool()
         endorsement = mempool['applied'][0]
         session['endorsement2'] = endorsement
-        client.bake('bootstrap2', BAKE_ARGS)
+        utils.bake(client, 'bootstrap2')
         client.get_operations("4")
 
     def test_restart_node_0(self, sandbox: Sandbox):
@@ -95,7 +94,7 @@ class TestAccuser:
         this way, we make sure that node 1 sees the block at level 6,
         which containts the conflicting endorsement.
         """
-        sandbox.client(0).bake('bootstrap1', BAKE_ARGS)
+        utils.bake(sandbox.client(0))
 
     def test_double_endorsement_evidence_generated(self, sandbox: Sandbox):
         """Check that the double endorsement evidence operation is in the

@@ -3,21 +3,9 @@ import shutil
 import pytest
 
 from client.client import Client
-from tools import constants, paths
+from tools import constants, paths, utils
 
 from . import protocol
-
-BAKE_ARGS = [
-    '--minimal-fees',
-    '0',
-    '--minimal-nanotez-per-byte',
-    '0',
-    '--minimal-nanotez-per-gas-unit',
-    '0',
-    '--max-priority',
-    '512',
-    '--minimal-timestamp',
-]
 
 
 @pytest.fixture(scope="class")
@@ -69,8 +57,8 @@ class TestManualBaking:
         assert level["voting_period_position"] == 2
 
     def test_bake_two_blocks(self, client: Client):
-        client.bake('bootstrap1', BAKE_ARGS)
-        client.bake('bootstrap1', BAKE_ARGS)
+        utils.bake(client)
+        utils.bake(client)
         period_info = client.get_current_period()
         level = client.get_current_level()
         assert level["level_position"] == 2
@@ -82,7 +70,7 @@ class TestManualBaking:
 
     def test_last_block_of_proposal_period(self, client: Client):
         # last block of voting period 0
-        client.bake('bootstrap1', BAKE_ARGS)
+        utils.bake(client)
         period_info = client.get_current_period()
         assert period_info["voting_period"]["index"] == 0
         assert period_info["voting_period"]["kind"] == "proposal"
@@ -123,7 +111,7 @@ class TestManualBaking:
         # using the client it's not possible to add voting operation on the
         # first block of a voting period. This is to be fixed in a future
         # protocol
-        client.bake('bootstrap1', BAKE_ARGS)
+        utils.bake(client)
         period_info = client.get_current_period()
         assert period_info["voting_period"]["index"] == 1
         assert period_info["voting_period"]["kind"] == "proposal"
@@ -139,7 +127,7 @@ class TestManualBaking:
         client.submit_proposals('bootstrap4', [protos[2]])
 
     def test_bake_one_block(self, client: Client):
-        client.bake('bootstrap1', BAKE_ARGS)
+        utils.bake(client)
         period_info = client.get_current_period()
         assert period_info["voting_period"]["index"] == 1
         assert period_info["voting_period"]["kind"] == "proposal"
@@ -151,7 +139,7 @@ class TestManualBaking:
         assert client.get_proposals() != []
 
     def test_bake_until_prev_last_block_of_voting_period(self, client: Client):
-        client.bake('bootstrap1', BAKE_ARGS)
+        utils.bake(client)
         period_info = client.get_current_period()
         assert period_info["position"] == 2
         assert period_info["remaining"] == 1
@@ -161,7 +149,7 @@ class TestManualBaking:
         client.submit_proposals('bootstrap4', [protos[1]])
 
     def test_bake_last_block_of_proposal_period(self, client: Client):
-        client.bake('bootstrap1', BAKE_ARGS)
+        utils.bake(client)
         period_info = client.get_current_period()
         metadata = client.get_metadata()
         meta_level = metadata["level"]
@@ -204,7 +192,7 @@ class TestManualBaking:
         # using the client it's not possible to add voting operation on the
         # first block of a voting period. This is to be fixed in a future
         # protocol
-        client.bake('bootstrap1', BAKE_ARGS)
+        utils.bake(client)
         period_info = client.get_current_period()
         assert period_info["voting_period"]["index"] == 2
         assert period_info["voting_period"]["kind"] == "testing_vote"
@@ -219,8 +207,8 @@ class TestManualBaking:
             client.submit_ballot(f'bootstrap{i}', proto, 'yay')
 
     def test_bake_until_prev_last_block_of_voting_period2(self, client: Client):
-        client.bake('bootstrap1', BAKE_ARGS)
-        client.bake('bootstrap1', BAKE_ARGS)
+        utils.bake(client)
+        utils.bake(client)
         period_info = client.get_current_period()
         level = client.get_current_level()
         assert level["level_position"] == 10
@@ -249,7 +237,7 @@ class TestManualBaking:
         assert level["voting_period_position"] == 0
 
     def test_bake_first_block_of_new_proposal_period(self, client: Client):
-        client.bake('bootstrap1', BAKE_ARGS)
+        utils.bake(client)
         # Because of the current hack in proposal here we make sure we get the
         # correct value
         period_info = client.get_current_period()
@@ -284,7 +272,7 @@ class TestManualBaking:
         assert period_info["position"] == 3
         assert period_info["remaining"] == 0
         assert meta_period_info == period_info
-        client.bake('bootstrap1', BAKE_ARGS)
+        utils.bake(client)
         period_info = client.get_current_period()
         level = client.get_current_level()
         assert level["level_position"] == 12

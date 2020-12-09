@@ -4,8 +4,6 @@ from launchers.sandbox import Sandbox
 
 from . import protocol
 
-BAKE_ARGS = ['--max-priority', '512', '--minimal-timestamp']
-
 
 @pytest.mark.mempool
 @pytest.mark.multinode
@@ -52,7 +50,7 @@ class TestMempool:
         assert sandbox.client(3).mempool_is_empty()
 
     def test_bake_for1(self, sandbox: Sandbox):
-        sandbox.client(1).bake('bootstrap1', BAKE_ARGS)
+        utils.bake(sandbox.client(1))
 
     def test_level2(self, sandbox: Sandbox):
         level = 2
