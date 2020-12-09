@@ -9,7 +9,7 @@ src_dir="$(dirname "$script_dir")"
 
 tmp=$(mktemp)
 
-csplit --quiet --prefix="$tmp" "$src_dir/.gitlab-ci.yml" /##BEGIN_INTEGRATION_PYTHON##/+1
+csplit --quiet --prefix="$tmp" "$src_dir/.gitlab/ci/integration.yml" /##BEGIN_INTEGRATION_PYTHON##/+1
 mv "$tmp"00 "$tmp"
 rm "$tmp"0*
 
@@ -52,8 +52,8 @@ integration:examples_test_example:
   stage: test
 EOF
 
-csplit --quiet --prefix="$tmp" "$src_dir/.gitlab-ci.yml" %##END_INTEGRATION_PYTHON##%
+csplit --quiet --prefix="$tmp" "$src_dir/.gitlab/ci/integration.yml" %##END_INTEGRATION_PYTHON##%
 cat "$tmp"00 >> "$tmp"
 rm "$tmp"0*
 
-mv $tmp "$src_dir/.gitlab-ci.yml"
+mv $tmp "$src_dir/.gitlab/ci/integration.yml"
