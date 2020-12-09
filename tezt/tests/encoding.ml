@@ -60,8 +60,10 @@ let rec equal_json (a : JSON.u) (b : JSON.u) =
 let check_sample ~name ~file =
   let* json_string = Tezos_stdlib_unix.Lwt_utils_unix.read_file file in
   let json = JSON.parse ~origin:json_string json_string in
-  let* binary = Codec.encode ~name (JSON.unannotate json) in
-  let* decoded_json = Codec.decode ~name binary in
+  let* binary =
+    Codec.encode ~hooks:Regression.hooks ~name (JSON.unannotate json)
+  in
+  let* decoded_json = Codec.decode ~hooks:Regression.hooks ~name binary in
   if not @@ equal_json (JSON.unannotate json) (JSON.unannotate decoded_json)
   then
     Test.fail

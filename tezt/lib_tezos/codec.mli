@@ -29,16 +29,20 @@
     to [tezos-codec], which is [Constant.tezos_codec] by default. *)
 
 (** Run [tezos-codec encode <name> from <json>]. *)
-val encode : ?path:string -> name:string -> JSON.u -> string Lwt.t
+val encode :
+  ?path:string -> ?hooks:Process.hooks -> name:string -> JSON.u -> string Lwt.t
 
 (** Same as [encode], but do not wait for the process to exit. *)
-val spawn_encode : ?path:string -> name:string -> JSON.u -> Process.t
+val spawn_encode :
+  ?path:string -> ?hooks:Process.hooks -> name:string -> JSON.u -> Process.t
 
 (** Run [tezos-codec decode <name> from <binary>]. *)
-val decode : ?path:string -> name:string -> string -> JSON.t Lwt.t
+val decode :
+  ?path:string -> ?hooks:Process.hooks -> name:string -> string -> JSON.t Lwt.t
 
 (** Same as [decode], but do not wait for the process to exit. *)
-val spawn_decode : ?path:string -> name:string -> string -> Process.t
+val spawn_decode :
+  ?path:string -> ?hooks:Process.hooks -> name:string -> string -> Process.t
 
 (** Run [tezos-codec dump encodings]. *)
 val dump_encodings : ?path:string -> unit -> JSON.t Lwt.t

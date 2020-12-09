@@ -39,10 +39,6 @@ type echo = {
   mutable pending : unit Lwt.u list;
 }
 
-let on_log = ref None
-
-let on_spawn = ref None
-
 let wake_up_echo echo =
   let pending = echo.pending in
   echo.pending <- [] ;
@@ -106,6 +102,11 @@ let get_echo_lwt_channel echo =
   | Some lwt_channel ->
       lwt_channel
 
+type hooks = {
+  on_log : string -> unit;
+  on_spawn : string -> string list -> unit;
+}
+
 type t = {
   id : int;
   name : string;
@@ -116,6 +117,7 @@ type t = {
   log_status_on_exit : bool;
   stdout : echo;
   stderr : echo;
+  hooks : hooks option;
 }
 
 let get_unique_name =
@@ -205,7 +207,7 @@ let handle_process ~log_output process =
     | Some line ->
         if log_output then (
           Log.debug ~prefix:name ~color:process.color "%s" line ;
-          Option.iter (fun f -> f line) !on_log ) ;
+          Option.iter (fun hooks -> hooks.on_log line) process.hooks ) ;
         push_to_echo echo line ;
         (* TODO: here we assume that all lines end with "\n",
              but it may not always be the case:
@@ -222,11 +224,11 @@ let handle_process ~log_output process =
   unit
 
 let spawn_with_stdin ?(log_status_on_exit = true) ?(log_output = true) ?name
-    ?(color = Log.Color.FG.cyan) ?(env = []) command arguments =
+    ?(color = Log.Color.FG.cyan) ?(env = []) ?hooks command arguments =
   let name =
     match name with None -> get_unique_name command | Some name -> name
   in
-  Option.iter (fun f -> f command arguments) !on_spawn ;
+  Option.iter (fun hooks -> hooks.on_spawn command arguments) hooks ;
   Log.command ~color:Log.Color.bold ~prefix:name command arguments ;
   let old_env =
     let not_modified item =
@@ -260,13 +262,15 @@ let spawn_with_stdin ?(log_status_on_exit = true) ?(log_output = true) ?name
       log_status_on_exit;
       stdout = create_echo ();
       stderr = create_echo ();
+      hooks;
     }
   in
   live_processes := ID_map.add process.id process !live_processes ;
   async (handle_process ~log_output process) ;
   (process, (process.lwt_process)#stdin)
 
-let spawn ?log_status_on_exit ?log_output ?name ?color ?env command arguments =
+let spawn ?log_status_on_exit ?log_output ?name ?color ?env ?hooks command
+    arguments =
   let (process, stdin) =
     spawn_with_stdin
       ?log_status_on_exit
@@ -274,6 +278,7 @@ let spawn ?log_status_on_exit ?log_output ?name ?color ?env command arguments =
       ?name
       ?color
       ?env
+      ?hooks
       command
       arguments
   in

@@ -28,6 +28,15 @@
 (** A process which was {!spawn}ed. *)
 type t
 
+(** Process can have some hooks attached when {!spawn}ed. *)
+type hooks = {
+  on_log : string -> unit;
+      (** A hook that is called with every line that is being logged. *)
+  on_spawn : string -> string list -> unit;
+      (** A hook that is called whenever a process is being spawned. The first
+          parameter is the command and the second are its arguments. *)
+}
+
 (** Create a process which starts running in the background.
 
     Usage: [spawn command arguments]
@@ -42,6 +51,8 @@ type t
     each logged output line. Parameter [color] specifies the color of those
     output lines.
 
+    Parameter [hooks] allow to attach some hooks to the process.
+
     Example: [spawn "git" [ "log"; "-p" ]] *)
 val spawn :
   ?log_status_on_exit:bool ->
@@ -49,6 +60,7 @@ val spawn :
   ?name:string ->
   ?color:Log.Color.t ->
   ?env:(string * string) list ->
+  ?hooks:hooks ->
   string ->
   string list ->
   t
@@ -60,6 +72,7 @@ val spawn_with_stdin :
   ?name:string ->
   ?color:Log.Color.t ->
   ?env:(string * string) list ->
+  ?hooks:hooks ->
   string ->
   string list ->
   t * Lwt_io.output_channel
@@ -142,9 +155,3 @@ val run_and_read_stderr :
   string ->
   string list ->
   string Lwt.t
-
-(** A hook that is called with every line that is being logged. *)
-val on_log : (string -> unit) option ref
-
-(** A hook that is called whenever a process is being spawned. *)
-val on_spawn : (string -> string list -> unit) option ref
