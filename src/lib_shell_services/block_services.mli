@@ -73,6 +73,29 @@ val pp_raw_context : Format.formatter -> raw_context -> unit
 
 type error += Invalid_depth_arg of int
 
+(** The kind of a [merkle_node] *)
+type merkle_hash_kind =
+  | Contents  (** The kind associated to leaves *)
+  | Node  (** The kind associated to directories *)
+
+(** A node in a [merkle_tree] *)
+type merkle_node =
+  | Hash of (merkle_hash_kind * string)  (** A shallow node: just a hash *)
+  | Data of raw_context  (** A full-fledged node containing actual data *)
+  | Continue of merkle_tree  (** An edge to a more nested tree *)
+
+(** The type of Merkle tree used by the light mode *)
+and merkle_tree = merkle_node TzString.Map.t
+
+(** Whether an RPC caller requests an entirely shallow Merkle tree ([Hole])
+    or whether the returned tree should contain data at the given key
+    ([Raw_context]) *)
+type merkle_leaf_kind = Hole | Raw_context
+
+val pp_merkle_node : Format.formatter -> merkle_node -> unit
+
+val pp_merkle_tree : Format.formatter -> merkle_tree -> unit
+
 module type PROTO = sig
   val hash : Protocol_hash.t
 
