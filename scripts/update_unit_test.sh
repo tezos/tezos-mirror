@@ -17,7 +17,7 @@ tmp=$(mktemp)
 
 # 1: Extract the beginning of the CI configuration file. Everything up to
 # the line ##BEGIN_UNITTEST## is added to the temporary file.
-csplit --quiet --prefix="$tmp" "$src_dir/.gitlab-ci.yml" /##BEGIN_UNITTEST##/+1
+csplit --quiet --prefix="$tmp" "$src_dir/.gitlab/ci/unittest.yml" /##BEGIN_UNITTEST##/+1
 mv "$tmp"00 "$tmp"
 rm "$tmp"0*
 
@@ -53,10 +53,10 @@ done
 
 # 3: Extract the end of the CI configuration file. Everything after the line
 # ##END_UNITTEST## is added to the temporary file.
-csplit --quiet --prefix="$tmp" "$src_dir/.gitlab-ci.yml" %##END_UNITTEST##%
+csplit --quiet --prefix="$tmp" "$src_dir/.gitlab/ci/unittest.yml" %##END_UNITTEST##%
 cat "$tmp"00 >> "$tmp"
 rm "$tmp"0*
 
 # 4: The temporary file is swapped in place of the CI configuration file.
-mv "$tmp" "$src_dir/.gitlab-ci.yml"
+mv "$tmp" "$src_dir/.gitlab/ci/unittest.yml"
 
