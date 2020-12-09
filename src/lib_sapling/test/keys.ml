@@ -45,7 +45,7 @@ module Vector = struct
         ak = R.to_ak @@ ba_of_hex ak;
         nk = R.to_nk @@ ba_of_hex nk;
         ivk = R.to_ivk @@ ba_of_hex ivk;
-        default_d = R.to_diversifier @@ ba_of_hex default_d;
+        default_d = Option.get @@ R.to_diversifier @@ ba_of_hex default_d;
         default_pk_d = R.to_pkd @@ ba_of_hex default_pk_d;
         note_v;
         note_r = R.to_rcm @@ ba_of_hex note_r;
@@ -110,23 +110,24 @@ let vectors_zip32 =
   let open R in
   let vector_of_strings ask nsk ovk dk c ak nk ivk xsk xfvk fp d0 d1 d2 dmax =
     let opt s = if s = "None" then None else Some (ba_of_hex s) in
-    let open TzOption in
+    let ( >?| ) x f = Stdlib.Option.map f x in
+    let ( >?? ) = Stdlib.Option.bind in
     {
-      ask = opt ask >>| to_ask;
-      nsk = opt nsk >>| to_nsk;
+      ask = opt ask >?| to_ask;
+      nsk = opt nsk >?| to_nsk;
       ovk = to_ovk @@ ba_of_hex ovk;
       dk = ba_of_hex dk;
       c = ba_of_hex c;
       ak = to_ak @@ ba_of_hex ak;
       nk = to_nk @@ ba_of_hex nk;
       ivk = to_ivk @@ ba_of_hex ivk;
-      xsk = opt xsk >>= Sk.of_bytes;
-      xfvk = unopt_assert ~loc:__POS__ @@ Vk.of_bytes @@ ba_of_hex xfvk;
+      xsk = opt xsk >?? Sk.of_bytes;
+      xfvk = Stdlib.Option.get @@ Vk.of_bytes @@ ba_of_hex xfvk;
       fp = ba_of_hex fp;
-      d0 = opt d0 >>| to_diversifier;
-      d1 = opt d1 >>| to_diversifier;
-      d2 = opt d2 >>| to_diversifier;
-      dmax = opt dmax >>| to_diversifier;
+      d0 = opt d0 >?? to_diversifier;
+      d1 = opt d1 >?? to_diversifier;
+      d2 = opt d2 >?? to_diversifier;
+      dmax = opt dmax >?? to_diversifier;
     }
   in
   (* read file in memory skipping lines with # *)
@@ -170,7 +171,7 @@ let xsks_raw =
           acc
       | Some xsk ->
           xsk |> R.of_zip32_expanded_spending_key |> Sk.of_bytes
-          |> TzOption.unopt_assert ~loc:__POS__
+          |> Stdlib.Option.get
           |> fun xsk -> xsk :: acc)
     []
     vectors_zip32
@@ -179,6 +180,5 @@ let xsks =
   List.map
     (fun x ->
       R.of_zip32_expanded_spending_key x
-      |> Core.Wallet.Spending_key.of_bytes
-      |> TzOption.unopt_assert ~loc:__POS__)
+      |> Core.Wallet.Spending_key.of_bytes |> Stdlib.Option.get)
     xsks_raw

@@ -138,7 +138,15 @@ module Raw = struct
     let diversifier_encoding =
       let open Data_encoding in
       def "sapling.wallet.diversifier"
-      @@ conv R.of_diversifier R.to_diversifier (Fixed.bytes 11)
+      @@ conv
+           R.of_diversifier
+           (fun b ->
+             match R.to_diversifier b with
+             | Some diversifier ->
+                 diversifier
+             | None ->
+                 raise (Invalid_argument "diversifier_encoding: decoding"))
+           (Fixed.bytes 11)
 
     (** Full viewing key contains ak, nsk, ovk *)
     type full_viewing_key = R.full_viewing_key = {ak : ak; nk : nk; ovk : ovk}
@@ -284,21 +292,24 @@ module Raw = struct
 
     (* Creates an unspendable address since the ivk is generated at random *)
     let dummy_address () =
+      (* NOTE: the density of valid diversifiers is roughly half. This loop is
+         likely to be short. *)
       let rec random_diversifier () =
-        let res = R.to_diversifier @@ Hacl.Rand.gen 11 in
-        if R.check_diversifier res then res else random_diversifier ()
+        match R.to_diversifier @@ Hacl.Rand.gen 11 with
+        | Some diversifier ->
+            diversifier
+        | None ->
+            random_diversifier ()
       in
       let diversifier = random_diversifier () in
       (* A random ivk is 32 bytes with the first 5 bits set to 0 *)
       let rand = Hacl.Rand.gen 32 in
-      let mask = 7 (* 00000111 *) in
+      let mask = 0b00000111 in
       let int = Char.code @@ Bytes.get rand 0 in
       let int_masked = int land mask in
       Bytes.set rand 0 (Char.chr int_masked) ;
       let ivk = R.to_ivk rand in
-      let pkd =
-        R.ivk_to_pkd ivk diversifier |> TzOption.unopt_assert ~loc:__POS__
-      in
+      let pkd = R.ivk_to_pkd ivk diversifier in
       {diversifier; pkd}
   end
 
@@ -322,7 +333,6 @@ module Raw = struct
        (ie. epk is used for symkey_receiver). *)
     let derive_ephemeral address esk =
       R.ka_derivepublic Viewing_key.(address.diversifier) esk
-      |> TzOption.unopt_assert ~loc:__POS__
 
     (* used to derive symmetric keys from the diffie hellman. *)
     let kdf_key = Bytes.of_string "KDFSaplingForTezosV1"
@@ -330,20 +340,12 @@ module Raw = struct
     (** Derives a symmetric key to be used to create the ciphertext on the
         sender side. *)
     let symkey_sender esk pkd =
-      let symkey =
-        R.of_symkey
-        @@ TzOption.unopt_assert ~loc:__POS__
-        @@ R.ka_agree_sender pkd esk
-      in
+      let symkey = R.of_symkey @@ R.ka_agree_sender pkd esk in
       let hash = Blake2B.(to_bytes @@ hash_bytes ~key:kdf_key [symkey]) in
       Crypto_box.Secretbox.unsafe_of_bytes hash
 
     let symkey_receiver epk ivk =
-      let symkey =
-        R.of_symkey
-        @@ TzOption.unopt_assert ~loc:__POS__
-        @@ R.ka_agree_receiver epk ivk
-      in
+      let symkey = R.of_symkey @@ R.ka_agree_receiver epk ivk in
       let hash = Blake2B.(to_bytes @@ hash_bytes ~key:kdf_key [symkey]) in
       Crypto_box.Secretbox.unsafe_of_bytes hash
 
@@ -409,9 +411,7 @@ module Raw = struct
 
     let compute address xfvk ~amount rcm ~position =
       let open Viewing_key in
-      let open TzOption in
-      R.ivk_to_pkd (to_ivk xfvk) address.diversifier
-      >>= fun pkd ->
+      let pkd = R.ivk_to_pkd (to_ivk xfvk) address.diversifier in
       R.compute_nf
         address.diversifier
         pkd
@@ -569,18 +569,16 @@ module Raw = struct
     let decrypt ciphertext xfvk =
       let ivk = Viewing_key.to_ivk xfvk in
       let symkey = DH.symkey_receiver ciphertext.epk ivk in
-      let open TzOption in
+      let ( >?? ) = Stdlib.Option.bind in
       Crypto_box.Secretbox.secretbox_open
         symkey
         ciphertext.payload_enc
         ciphertext.nonce_enc
-      >>= fun plaintext ->
+      >?? fun plaintext ->
       let {diversifier; amount; rcm; memo} =
         Data_encoding.Binary.of_bytes_exn plaintext_encoding plaintext
       in
-      let pkd =
-        R.ivk_to_pkd ivk diversifier |> TzOption.unopt_assert ~loc:__POS__
-      in
+      let pkd = R.ivk_to_pkd ivk diversifier in
       Some (Viewing_key.{pkd; diversifier}, amount, rcm, memo)
 
     (* Get ciphertext with only the outgoing viewing key,
@@ -588,12 +586,12 @@ module Raw = struct
     let decrypt_ovk ciphertext ovk (cm, epk) =
       (* symkey for payload_out *)
       let symkey = DH.symkey_out ovk (ciphertext.cv, cm, epk) in
-      let open TzOption in
+      let ( >?? ) = Stdlib.Option.bind in
       Crypto_box.Secretbox.secretbox_open
         symkey
         ciphertext.payload_out
         ciphertext.nonce_out
-      >>= fun plaintext ->
+      >?? fun plaintext ->
       let (pkd, esk) = decompose_plaintext_out plaintext in
       (* symkey for payload_enc *)
       let symkey = DH.symkey_sender esk pkd in
@@ -601,7 +599,7 @@ module Raw = struct
         symkey
         ciphertext.payload_enc
         ciphertext.nonce_enc
-      >>= fun plaintext ->
+      >?? fun plaintext ->
       let {diversifier; amount; rcm; memo} =
         Data_encoding.Binary.of_bytes_exn plaintext_encoding plaintext
       in
@@ -814,7 +812,6 @@ module Raw = struct
         ~amount
         ~root
         ~witness
-      |> TzOption.unopt_assert ~loc:__POS__
 
     let spend_sig xsp ar cv nf rk proof key_string =
       let sighash = UTXO.hash_input cv nf rk proof key_string in
@@ -828,7 +825,6 @@ module Raw = struct
         address.pkd
         rcm
         ~amount
-      |> TzOption.unopt_assert ~loc:__POS__
 
     let make_binding_sig ctx inputs outputs ~balance key =
       let sighash = UTXO.hash_transaction inputs outputs key in
@@ -932,8 +928,7 @@ module Raw = struct
       let check_cm i existing_cm =
         Rcm.assert_valid i.rcm ;
         let computed_cm =
-          TzOption.unopt_assert ~loc:__POS__
-          @@ Commitment.compute i.address ~amount:i.amount i.rcm
+          Commitment.compute i.address ~amount:i.amount i.rcm
         in
         if existing_cm = computed_cm then true else false
     end
@@ -944,10 +939,7 @@ module Raw = struct
 
       (* Prepare the ciphertext and the commitment *)
       let to_ciphertext o cv vk rcm esk =
-        let cm =
-          Commitment.compute o.address ~amount:o.amount rcm
-          |> TzOption.unopt_assert ~loc:__POS__
-        in
+        let cm = Commitment.compute o.address ~amount:o.amount rcm in
         let epk = DH.derive_ephemeral o.address esk in
         let to_be_hashed = (cv, cm, epk) in
         let ciphertext =
@@ -957,10 +949,7 @@ module Raw = struct
 
       (* Prepare the ciphertext that won't decrypt under ovk and the commitment *)
       let to_ciphertext_without_ovk o rcm esk cv =
-        let cm =
-          Commitment.compute o.address ~amount:o.amount rcm
-          |> TzOption.unopt_assert ~loc:__POS__
-        in
+        let cm = Commitment.compute o.address ~amount:o.amount rcm in
         let ciphertext =
           Ciphertext.encrypt_without_ovk o.amount o.address rcm o.memo esk cv
         in

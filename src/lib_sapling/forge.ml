@@ -40,7 +40,6 @@ module Input = struct
         ~amount:forge_input.amount
         forge_input.rcm
         ~position:forge_input.pos
-      |> TzOption.unopt_assert ~loc:__POS__
     in
     S.mem_nullifier state nf
 
@@ -75,10 +74,7 @@ let dummy_input anti_replay ctx dummy_witness root =
   let sk = Core.Spending_key.of_seed seed in
   let vk = Core.Viewing_key.of_sk sk in
   let addr = Core.Viewing_key.dummy_address () in
-  let nf =
-    Core.Nullifier.compute addr vk ~amount:0L rcm ~position:0L
-    |> TzOption.unopt_assert ~loc:__POS__
-  in
+  let nf = Core.Nullifier.compute addr vk ~amount:0L rcm ~position:0L in
   let ar = Core.Proving.ar_random () in
   (* The proof is considered valid even with a dummy witness if the amount
        given is 0. *)
@@ -94,10 +90,7 @@ let dummy_input anti_replay ctx dummy_witness root =
       ~root
       ~witness:dummy_witness
   in
-  let signature =
-    Core.Proving.spend_sig sk ar cv nf rk proof_i anti_replay
-    |> TzOption.unopt_assert ~loc:__POS__
-  in
+  let signature = Core.Proving.spend_sig sk ar cv nf rk proof_i anti_replay in
   Core.UTXO.{cv; nf; rk; proof_i; signature}
 
 let create_dummy_inputs n state anti_replay ctx =
@@ -159,11 +152,9 @@ let forge_transaction ?(number_dummy_inputs = 0) ?(number_dummy_outputs = 0)
                 ~amount:i.amount
                 i.rcm
                 ~position:i.pos
-              |> TzOption.unopt_assert ~loc:__POS__
             in
             let signature =
               Core.Proving.spend_sig sp ar cv nf rk proof_i anti_replay
-              |> TzOption.unopt_assert ~loc:__POS__
             in
             Core.UTXO.{cv; nf; rk; proof_i; signature})
           forge_inputs
@@ -215,13 +206,7 @@ let forge_transaction ?(number_dummy_inputs = 0) ?(number_dummy_outputs = 0)
       in
       let outputs = real_outputs @ dummy_outputs in
       let binding_sig =
-        TzOption.unopt_assert ~loc:__POS__
-        @@ Core.Proving.make_binding_sig
-             ctx
-             inputs
-             outputs
-             ~balance
-             anti_replay
+        Core.Proving.make_binding_sig ctx inputs outputs ~balance anti_replay
       in
       Core.UTXO.{inputs; outputs; binding_sig; balance; root})
 
@@ -280,12 +265,11 @@ let forge_shield_transaction ?(number_dummy_inputs = 0)
       in
       let outputs = real_outputs @ dummy_outputs in
       let binding_sig =
-        TzOption.unopt_assert ~loc:__POS__
-        @@ Core.Proving.make_binding_sig
-             ctx
-             []
-             outputs
-             ~balance:balance_outputs
-             anti_replay
+        Core.Proving.make_binding_sig
+          ctx
+          []
+          outputs
+          ~balance:balance_outputs
+          anti_replay
       in
       Core.UTXO.{inputs = dummy_inputs; outputs; binding_sig; balance; root})

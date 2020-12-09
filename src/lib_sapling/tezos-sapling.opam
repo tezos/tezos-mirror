@@ -17,7 +17,6 @@ depends: [
   "tezos-crypto"
   "tezos-stdlib"
   "tezos-error-monad"
-  "tezos-lwt-result-stdlib" { with-test }
   "alcotest-lwt" { with-test & >= "1.1.0" }
 ]
 build: [[ "dune" "build" "-j" jobs "-p" name "@install" ]]
