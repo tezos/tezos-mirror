@@ -56,17 +56,17 @@
          --number-of-b 2
          --with-timestamp
          --until 20
-         --protocol-hash PsCARTHAGazKbHtnKfLzQg3kms52kSRpgnDY982a9oYsSXRLQEb
-         --protocol-kind Carthage
+         --protocol-hash PsDELPH1Kxsxt8f9eWbxQeRxkjfbxoqM52jvs5Y5fBxWWh4ifpo
+         --protocol-kind Delphi
          --tezos-client %{bin:tezos-client}
          --tezos-node %{bin:tezos-node}
-         --tezos-baker %{bin:tezos-baker-006-PsCARTHA}
-         --tezos-endorser %{bin:tezos-endorser-006-PsCARTHA}
-         --tezos-accuser %{bin:tezos-accuser-006-PsCARTHA}
-         --hard-fork 10:PsDELPH1Kxsxt8f9eWbxQeRxkjfbxoqM52jvs5Y5fBxWWh4ifpo
-         --hard-fork-baker %{bin:tezos-baker-007-PsDELPH1}
-         --hard-fork-endorser %{bin:tezos-endorser-007-PsDELPH1}
-         --hard-fork-accuser %{bin:tezos-accuser-007-PsDELPH1}
+         --tezos-baker %{bin:tezos-baker-007-PsDELPH1}
+         --tezos-endorser %{bin:tezos-endorser-007-PsDELPH1}
+         --tezos-accuser %{bin:tezos-accuser-007-PsDELPH1}
+         --hard-fork 10:PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq
+         --hard-fork-baker %{bin:tezos-baker-008-PtEdoTez}
+         --hard-fork-endorser %{bin:tezos-endorser-008-PtEdoTez}
+         --hard-fork-accuser %{bin:tezos-accuser-008-PtEdoTez}
          )))
 
 (rule
@@ -80,13 +80,13 @@
          --number-of-b 2
          --with-timestamp
          --until 20
-         --protocol-hash PsDELPH1Kxsxt8f9eWbxQeRxkjfbxoqM52jvs5Y5fBxWWh4ifpo
-         --protocol-kind Delphi
+         --protocol-hash PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq
+         --protocol-kind Edo
          --tezos-client %{bin:tezos-client}
          --tezos-node %{bin:tezos-node}
-         --tezos-baker %{bin:tezos-baker-007-PsDELPH1}
-         --tezos-endorser %{bin:tezos-endorser-007-PsDELPH1}
-         --tezos-accuser %{bin:tezos-accuser-007-PsDELPH1}
+         --tezos-baker %{bin:tezos-baker-008-PtEdoTez}
+         --tezos-endorser %{bin:tezos-endorser-008-PtEdoTez}
+         --tezos-accuser %{bin:tezos-accuser-008-PtEdoTez}
          --hard-fork 10:ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
          --hard-fork-baker %{bin:tezos-baker-alpha}
          --hard-fork-endorser %{bin:tezos-endorser-alpha}
@@ -108,17 +108,17 @@
          --time-betw 3
          --blocks-per-vot 14
          --with-timestamp
-         --protocol-hash PsCARTHAGazKbHtnKfLzQg3kms52kSRpgnDY982a9oYsSXRLQEb
-         --protocol-kind Carthage
+         --protocol-hash PsDELPH1Kxsxt8f9eWbxQeRxkjfbxoqM52jvs5Y5fBxWWh4ifpo
+         --protocol-kind Delphi
          --tezos-client %{bin:tezos-client}
          --tezos-admin %{bin:tezos-admin-client}
          --tezos-node %{bin:tezos-node}
-         --first-baker %{bin:tezos-baker-006-PsCARTHA}
-         --first-endorser %{bin:tezos-endorser-006-PsCARTHA}
-         --first-accuser %{bin:tezos-accuser-006-PsCARTHA}
-         --second-baker %{bin:tezos-baker-007-PsDELPH1}
-         --second-endorser %{bin:tezos-endorser-007-PsDELPH1}
-         --second-accuser %{bin:tezos-accuser-007-PsDELPH1}
+         --first-baker %{bin:tezos-baker-007-PsDELPH1}
+         --first-endorser %{bin:tezos-endorser-007-PsDELPH1}
+         --first-accuser %{bin:tezos-accuser-007-PsDELPH1}
+         --second-baker %{bin:tezos-baker-008-PtEdoTez}
+         --second-endorser %{bin:tezos-endorser-008-PtEdoTez}
+         --second-accuser %{bin:tezos-accuser-008-PtEdoTez}
          )))
 
 (rule
@@ -136,14 +136,14 @@
          --time-betw 3
          --blocks-per-vot 14
          --with-timestamp
-         --protocol-hash PsDELPH1Kxsxt8f9eWbxQeRxkjfbxoqM52jvs5Y5fBxWWh4ifpo
-         --protocol-kind Delphi
+         --protocol-hash PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq
+         --protocol-kind Edo
          --tezos-client %{bin:tezos-client}
          --tezos-admin %{bin:tezos-admin-client}
          --tezos-node %{bin:tezos-node}
-         --first-baker %{bin:tezos-baker-007-PsDELPH1}
-         --first-endorser %{bin:tezos-endorser-007-PsDELPH1}
-         --first-accuser %{bin:tezos-accuser-007-PsDELPH1}
+         --first-baker %{bin:tezos-baker-008-PtEdoTez}
+         --first-endorser %{bin:tezos-endorser-008-PtEdoTez}
+         --first-accuser %{bin:tezos-accuser-008-PtEdoTez}
          --second-baker %{bin:tezos-baker-alpha}
          --second-endorser %{bin:tezos-endorser-alpha}
          --second-accuser %{bin:tezos-accuser-alpha}
