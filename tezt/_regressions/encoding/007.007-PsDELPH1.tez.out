@@ -1,0 +1,13 @@
+tezt/_regressions/encoding/007.007-PsDELPH1.tez.out
+
+./tezos-codec encode 007-PsDELPH1.tez from '"7322135"'
+97f4be03
+
+./tezos-codec decode 007-PsDELPH1.tez from 97f4be03
+"7322135"
+
+./tezos-codec encode 007-PsDELPH1.tez from '"0"'
+00
+
+./tezos-codec decode 007-PsDELPH1.tez from 00
+"0"

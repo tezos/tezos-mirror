@@ -1,0 +1,10 @@
+tezt/_regressions/encoding/007.007-PsDELPH1.fitness.out
+
+./tezos-codec encode 007-PsDELPH1.fitness from '[
+  "01",
+  "000000000000000a"
+]'
+00000011000000010100000008000000000000000a
+
+./tezos-codec decode 007-PsDELPH1.fitness from 00000011000000010100000008000000000000000a
+[ "01", "000000000000000a" ]

@@ -83,7 +83,7 @@ let check_samples_encoding ~group_name ~samples =
         ~__FILE__
         ~title:(sf "%s encoding regression test: %s" group_name sample)
         ~tags:["encoding"; group_name]
-        ~output_file:(sf "%s.%s" group_name sample)
+        ~output_file:("encoding" // sf "%s.%s" group_name sample)
       @@ fun () ->
       let base_path =
         "tezt" // "tests" // "encoding_samples" // group_name // sample

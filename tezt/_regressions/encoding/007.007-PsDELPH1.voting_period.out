@@ -1,0 +1,13 @@
+tezt/_regressions/encoding/007.007-PsDELPH1.voting_period.out
+
+./tezos-codec encode 007-PsDELPH1.voting_period from 2147483647
+7fffffff
+
+./tezos-codec decode 007-PsDELPH1.voting_period from 7fffffff
+2147483647
+
+./tezos-codec encode 007-PsDELPH1.voting_period from 0
+00000000
+
+./tezos-codec decode 007-PsDELPH1.voting_period from 00000000
+0
