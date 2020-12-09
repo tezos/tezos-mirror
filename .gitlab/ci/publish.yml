@@ -1,0 +1,154 @@
+.publish_template:
+  image: docker:latest
+  services:
+    - docker:dind
+  variables:
+    DOCKER_DRIVER: overlay2
+    IMAGE_ARCH_PREFIX: ""
+  stage: publish
+  only:
+    - master@tezos/tezos
+    - tags@tezos/tezos
+    - /-release$/@tezos/tezos
+  before_script:
+    - mkdir ~/.docker || true
+    - echo "{ \"auths\":{ \"https://index.docker.io/v1/\":{ \"auth\":\"${CI_DOCKER_AUTH}\" } } }" > ~/.docker/config.json
+  script:
+    - ./scripts/create_docker_image.sh
+        "${public_docker_image_name}"
+        "${IMAGE_ARCH_PREFIX}${CI_COMMIT_REF_NAME}"
+        "${build_deps_image_name}"
+        "${build_deps_image_version}"
+        "${CI_COMMIT_SHORT_SHA}"
+    - docker push "${public_docker_image_name}:${IMAGE_ARCH_PREFIX}${CI_COMMIT_REF_NAME}"
+    - docker push "${public_docker_image_name}-bare:${IMAGE_ARCH_PREFIX}${CI_COMMIT_REF_NAME}"
+    - docker push "${public_docker_image_name}-debug:${IMAGE_ARCH_PREFIX}${CI_COMMIT_REF_NAME}"
+  interruptible: false
+
+publish:docker_amd64:
+  extends: .publish_template
+  variables:
+    DOCKER_DRIVER: overlay2
+    IMAGE_ARCH_PREFIX: "amd64-"
+  tags:
+    - safe_docker
+
+publish:docker_arm64:
+  extends: .publish_template
+  variables:
+    DOCKER_DRIVER: overlay2
+    IMAGE_ARCH_PREFIX: "arm64-"
+  tags:
+    - arm64
+
+merge-manifest:
+  image: docker:latest
+  services:
+    - name: "docker:dind"
+      command: ["--experimental"]
+  variables:
+    DOCKER_DRIVER: overlay2
+  stage: publish_manifest
+  only:
+    - master@tezos/tezos
+    - tags@tezos/tezos
+    - /-release$/@tezos/tezos
+  before_script:
+    - apk add git binutils
+    - mkdir ~/.docker || true
+    - echo "{ \"experimental\":\"enabled\", \"auths\":{ \"https://index.docker.io/v1/\":{ \"auth\":\"${CI_DOCKER_AUTH}\" } } }" > ~/.docker/config.json
+  script:
+    - LAST_COMMIT_DATE_TIME=$(git log --pretty=format:"%cd" -1 --date="format:%Y%m%d%H%M%S" 2>&1)
+    - docker manifest create "${public_docker_image_name}-bare:${CI_COMMIT_REF_NAME}"
+      --amend "${public_docker_image_name}-bare:amd64-${CI_COMMIT_REF_NAME}"
+      --amend "${public_docker_image_name}-bare:arm64-${CI_COMMIT_REF_NAME}"
+    - docker manifest push "${public_docker_image_name}-bare:${CI_COMMIT_REF_NAME}"
+    - docker manifest create "${public_docker_image_name}-bare:${CI_COMMIT_REF_NAME}_${CI_COMMIT_SHORT_SHA}_${LAST_COMMIT_DATE_TIME}"
+      --amend "${public_docker_image_name}-bare:amd64-${CI_COMMIT_REF_NAME}"
+      --amend "${public_docker_image_name}-bare:arm64-${CI_COMMIT_REF_NAME}"
+    - docker manifest push "${public_docker_image_name}-bare:${CI_COMMIT_REF_NAME}_${CI_COMMIT_SHORT_SHA}_${LAST_COMMIT_DATE_TIME}"
+    - docker manifest create "${public_docker_image_name}-debug:${CI_COMMIT_REF_NAME}"
+      --amend "${public_docker_image_name}-debug:amd64-${CI_COMMIT_REF_NAME}"
+      --amend "${public_docker_image_name}-debug:arm64-${CI_COMMIT_REF_NAME}"
+    - docker manifest push "${public_docker_image_name}-debug:${CI_COMMIT_REF_NAME}"
+    - docker manifest create "${public_docker_image_name}-debug:${CI_COMMIT_REF_NAME}_${CI_COMMIT_SHORT_SHA}_${LAST_COMMIT_DATE_TIME}"
+      --amend "${public_docker_image_name}-debug:amd64-${CI_COMMIT_REF_NAME}"
+      --amend "${public_docker_image_name}-debug:arm64-${CI_COMMIT_REF_NAME}"
+    - docker manifest push "${public_docker_image_name}-debug:${CI_COMMIT_REF_NAME}_${CI_COMMIT_SHORT_SHA}_${LAST_COMMIT_DATE_TIME}"
+    - docker manifest create "${public_docker_image_name}:${CI_COMMIT_REF_NAME}"
+      --amend "${public_docker_image_name}:amd64-${CI_COMMIT_REF_NAME}"
+      --amend "${public_docker_image_name}:arm64-${CI_COMMIT_REF_NAME}"
+    - docker manifest push "${public_docker_image_name}:${CI_COMMIT_REF_NAME}"
+    - docker manifest create "${public_docker_image_name}:${CI_COMMIT_REF_NAME}_${CI_COMMIT_SHORT_SHA}_${LAST_COMMIT_DATE_TIME}"
+      --amend "${public_docker_image_name}:amd64-${CI_COMMIT_REF_NAME}"
+      --amend "${public_docker_image_name}:arm64-${CI_COMMIT_REF_NAME}"
+    - docker manifest push "${public_docker_image_name}:${CI_COMMIT_REF_NAME}_${CI_COMMIT_SHORT_SHA}_${LAST_COMMIT_DATE_TIME}"
+  interruptible: false
+
+publish:doc:
+  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+  stage: doc
+  only:
+    - master@tezos/tezos
+  before_script:
+    - sudo apk add --no-cache openssh-client rsync
+    - echo "${CI_PK_GITLAB_DOC}" > ~/.ssh/id_ed25519
+    - echo "${CI_KH}" > ~/.ssh/known_hosts
+    - chmod 400 ~/.ssh/id_ed25519
+  script:
+    - make doc-html
+    - git clone --depth 5 git@gitlab.com:${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAMESPACE}.gitlab.io gitlab.io
+    - rsync --recursive --links --perms --delete --verbose
+        --exclude=.doctrees --exclude={{main,alpha,zero}net,master}/index.html
+        docs/_build/ gitlab.io/public/
+    - cd gitlab.io
+    - if [ -z "$(git status -s)" ] ; then
+        echo "Nothing to commit!" ;
+      else
+        git add public ;
+        git commit -m "Import doc of ${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}:${CI_COMMIT_SHA}" ;
+        git push origin master ;
+      fi
+  interruptible: false
+
+# This job publishes the html report generated by the coverage job.
+# It is accessible on the gitlab page associated to the project
+# via URL $CI_PAGES_URL/$CI_PIPELINE_ID
+#
+# for instance https://nomadic-labs.gitlab.io/tezos/${CI_PIPELINE_ID}
+# https://tezos.gitlab.io/tezos/${CI_PIPELINE_ID}
+#
+# It is run manually from the Gitlab CI interface.
+#
+# Note that this job is somewhat redundant. It is already possible to browse
+# the html report artefact generated by the test_coverage job.
+#
+
+pages:
+  when: manual
+  # The cache rule ensures public (i.e. the static website) isn't erased
+  # whenever we start a new pipeline
+  # https://docs.gitlab.com/ee/ci/caching/
+  # The pages job retrieves the old public dir from the cache, adds a new
+  # report, and publishes the new public dir.
+  cache:
+    paths:
+      - public
+  stage: publish_coverage
+  except:
+    - tags@tezos/tezos
+    - /-release$/@tezos/tezos
+  dependencies:
+    - test_coverage
+  script:
+    - mkdir -p public
+    - mv _coverage_report public/$CI_PIPELINE_ID
+    - echo "Coverage report published at $CI_PAGES_URL/$CI_PIPELINE_ID"
+  artifacts:
+    paths:
+      - public
+    # This is the minimum time the public artifact will remain available.
+    # Everytime a pages job is launched, this time period is reset
+    expire_in: 7 days
+  interruptible: false
+
