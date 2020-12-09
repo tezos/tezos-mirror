@@ -1,9 +1,8 @@
 import datetime
 import pytest
 from tools import constants
+from tools.constants import PROTO_DEMO_NOOPS
 from launchers.sandbox import Sandbox
-
-PROTO_DEMO = 'ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp'
 
 
 @pytest.mark.slow
@@ -17,13 +16,13 @@ class TestForgeBlock:
     def test_protocol_exists(self, sandbox: Sandbox):
         client = sandbox.client(1)
         protocols = client.list_protocols()
-        assert PROTO_DEMO in protocols
+        assert PROTO_DEMO_NOOPS in protocols
 
     def test_activate_proto_demo_time_shifted_ok(self, sandbox: Sandbox):
         parameters = {}  # type: dict
         delta = datetime.timedelta(seconds=5)
         sandbox.client(1).activate_protocol_json(
-            PROTO_DEMO,
+            PROTO_DEMO_NOOPS,
             parameters,
             key='activator',
             timestamp=(datetime.datetime.utcnow() + delta).strftime(
@@ -37,7 +36,7 @@ class TestForgeBlock:
         parameters = {}  # type: dict
         delta = datetime.timedelta(seconds=30)
         sandbox.client(1).activate_protocol_json(
-            PROTO_DEMO,
+            PROTO_DEMO_NOOPS,
             parameters,
             key='activator',
             timestamp=(datetime.datetime.utcnow() + delta).strftime(

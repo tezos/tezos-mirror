@@ -2,9 +2,8 @@ import time
 import pytest
 from client.client import Client
 from tools import constants
+from tools.constants import PROTO_DEMO_COUNTER, PROTO_GENESIS
 
-PROTO = 'ProtoDemoCounterDemoCounterDemoCounterDemoCou4LSpdT'
-PROTO_GENESIS = 'ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im'
 PARAMS = ['-p', PROTO_GENESIS]
 
 
@@ -26,11 +25,11 @@ class TestProtoDemo:
 
     def test_proto_known(self, client: Client):
         res = client.list_protocols()
-        assert PROTO in res
+        assert PROTO_DEMO_COUNTER in res
 
     def test_proto_client_known(self, client: Client):
         res = client.list_understood_protocols()
-        assert 'ProtoDemoCou' in res
+        assert PROTO_DEMO_COUNTER[:12] in res
 
     def test_first_protocol(self, client: Client):
         proto = 'PrihK96nBAFSxVL1GLJTVhu9YnzkMFiBeuJRPA8NwuZVZCE1L6i'
@@ -39,7 +38,7 @@ class TestProtoDemo:
     def test_activate_proto(self, client: Client):
         parameters = {'init_a': 100, 'init_b': 100}
         res = client.activate_protocol_json(
-            PROTO, parameters, key='activator', fitness='1'
+            PROTO_DEMO_COUNTER, parameters, key='activator', fitness='1'
         )
         assert res.block_hash
 

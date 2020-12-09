@@ -3,6 +3,7 @@ from typing import List
 import subprocess
 import pytest
 from tools import utils, paths, constants
+from tools.constants import PROTO_DEMO_NOOPS, PROTO_GENESIS
 from client.client import Client
 
 
@@ -20,7 +21,7 @@ COMPILER = (
     f'{paths.TEZOS_HOME}/_build/default/src/lib_protocol_compiler/'
     'main_native.exe'
 )
-PARAMS = ['-p', 'ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im']
+PARAMS = ['-p', PROTO_GENESIS]
 
 
 @pytest.mark.incremental
@@ -80,14 +81,14 @@ class TestActivation:
 
     def test_proto_known(self, client: Client):
         res = client.list_protocols()
-        assert 'ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp' in res
+        assert PROTO_DEMO_NOOPS in res
 
     def test_first_protocol(self, client: Client):
         proto = 'PrihK96nBAFSxVL1GLJTVhu9YnzkMFiBeuJRPA8NwuZVZCE1L6i'
         assert client.get_protocol() == proto
 
     def test_activate_demo(self, client: Client):
-        proto = 'ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp'
+        proto = PROTO_DEMO_NOOPS
         parameters = {}  # type: dict
         res = client.activate_protocol_json(
             proto, parameters, key='activator', fitness='1'
@@ -98,5 +99,5 @@ class TestActivation:
         assert client.get_level(params=PARAMS) == 1
 
     def test_protocol_genesis(self, client: Client):
-        proto = 'ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im'
+        proto = PROTO_GENESIS
         assert client.get_protocol(params=PARAMS) == proto
