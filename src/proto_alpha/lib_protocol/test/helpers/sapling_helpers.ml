@@ -101,7 +101,6 @@ module Common = struct
     let rcm = Tezos_sapling.Core.Client.Rcm.random () in
     let position = 10L in
     Tezos_sapling.Core.Client.Nullifier.compute addr vk ~amount rcm ~position
-    |> TzOption.unopt_assert ~loc:__POS__
 
   let gen_cm_cipher ~memo_size () =
     let open Tezos_sapling.Core.Client in
@@ -112,9 +111,7 @@ module Common = struct
     in
     let amount = 10L in
     let rcm = Tezos_sapling.Core.Client.Rcm.random () in
-    let cm =
-      Commitment.compute addr ~amount rcm |> TzOption.unopt_assert ~loc:__POS__
-    in
+    let cm = Commitment.compute addr ~amount rcm in
     let cipher =
       let payload_enc =
         Data_encoding.Binary.to_bytes_exn
