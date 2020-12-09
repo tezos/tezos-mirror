@@ -1,19 +1,18 @@
+---
+
 documentation:build:
-  extends: .test_template
-  stage: doc
+  extends: .runtime_build_test_dependencies_template
+  interruptible: true
+  stage: build
   except:
     - master
     - tags@tezos/tezos
     - /-release$/@tezos/tezos
   script:
-    - make doc-html
-  artifacts:
-    paths:
-      - docs
-    expire_in: 1 week
+    - make -C docs html
 
 documentation:linkcheck:
-  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+  extends: .runtime_build_test_dependencies_template
   stage: doc
   before_script:
     - . ./scripts/version.sh
@@ -32,7 +31,7 @@ documentation:linkcheck:
         - /docs
       when: on_success
   script:
-    - make doc-html-and-linkcheck
+    - make -C docs linkcheck
   allow_failure: true
   interruptible: true
 
