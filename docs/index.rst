@@ -147,6 +147,18 @@ in the :ref:`introduction <howtoget>`.
 
 .. toctree::
    :maxdepth: 2
+   :caption: Alpha Development Protocol doc:
+
+   alpha/michelson
+   alpha/proof_of_stake
+   alpha/sapling
+   alpha/voting
+   alpha/glossary
+   alpha/cli-commands
+   alpha/rpc
+
+.. toctree::
+   :maxdepth: 2
    :caption: Developer Tutorials:
 
    developer/rpc
@@ -175,6 +187,7 @@ in the :ref:`introduction <howtoget>`.
    protocols/005_babylon
    protocols/006_carthage
    protocols/008_edo
+   protocols/alpha
 
 .. toctree::
    :maxdepth: 2
