@@ -1,0 +1,11 @@
+coq:lint:
+  extends: .test_template
+  script:
+    - make
+    - cd src/proto_alpha/lib_protocol
+    - for source in *.{ml,mli} ; do
+        coq-of-ocaml -config coq-of-ocaml/config.json $source ;
+      done
+  allow_failure: true
+  retry: 0
+
