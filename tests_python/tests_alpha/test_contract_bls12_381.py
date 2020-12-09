@@ -7,8 +7,6 @@ from tools.bls12_381 import G1, G2, Fr, pairing_check
 from tools.utils import assert_run_failure
 from .contract_paths import MINI_SCENARIOS_CONTRACT_PATH, OPCODES_CONTRACT_PATH
 
-BAKE_ARGS = ['--minimal-timestamp']
-
 
 def check_contract(client, contract_name, arg, expected_storage):
     contract_path = path.join(OPCODES_CONTRACT_PATH, f'{contract_name}.tz')

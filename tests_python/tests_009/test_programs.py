@@ -1,7 +1,6 @@
 import itertools
 from client.client import Client
 
-BAKE_ARGS = ['--minimal-timestamp']
 CONVERT_INPUT_FORMATS = ["michelson", "json", "binary"]
 CONVERT_OUTPUT_FORMATS = ["michelson", "json", "binary", "ocaml"]
 CONVERT_SCRIPT = {
