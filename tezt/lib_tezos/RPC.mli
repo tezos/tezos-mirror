@@ -28,28 +28,49 @@
 (** Call RPC /network/connections if [peer_id] is [None].
     Call RPC /network/connections/[peer_id] otherwise. *)
 val get_connections :
-  ?node:Node.t -> ?peer_id:string -> Client.t -> JSON.t Lwt.t
+  ?node:Node.t ->
+  ?hooks:Process.hooks ->
+  ?peer_id:string ->
+  Client.t ->
+  JSON.t Lwt.t
 
 (** Call RPC /chain/[chain]/chain_id *)
-val get_chain_id : ?node:Node.t -> ?chain:string -> Client.t -> JSON.t Lwt.t
+val get_chain_id :
+  ?node:Node.t ->
+  ?hooks:Process.hooks ->
+  ?chain:string ->
+  Client.t ->
+  JSON.t Lwt.t
 
 (** Call RPC /chain/[chain] *)
 val force_bootstrapped :
   ?node:Node.t ->
+  ?hooks:Process.hooks ->
   ?chain:string ->
   ?bootstrapped:bool ->
   Client.t ->
   JSON.t Lwt.t
 
 (** Call RPC /chain/[chain]/checkpoint *)
-val get_checkpoint : ?node:Node.t -> ?chain:string -> Client.t -> JSON.t Lwt.t
+val get_checkpoint :
+  ?node:Node.t ->
+  ?hooks:Process.hooks ->
+  ?chain:string ->
+  Client.t ->
+  JSON.t Lwt.t
 
 (** Call RPC /injection/block *)
-val inject_block : ?node:Node.t -> data:JSON.u -> Client.t -> JSON.t Lwt.t
+val inject_block :
+  ?node:Node.t ->
+  ?hooks:Process.hooks ->
+  data:JSON.u ->
+  Client.t ->
+  JSON.t Lwt.t
 
 (** Call RPC /chain/[chain]/blocks/[block]/helpers/baking_rights *)
 val get_baking_rights :
   ?node:Node.t ->
+  ?hooks:Process.hooks ->
   ?chain:string ->
   ?block:string ->
   delegate:string ->
@@ -59,6 +80,7 @@ val get_baking_rights :
 (** Call RPC /chain/[chain]/blocks/[block]/helpers/current_level *)
 val get_current_level :
   ?node:Node.t ->
+  ?hooks:Process.hooks ->
   ?chain:string ->
   ?block:string ->
   ?offset:int ->
@@ -68,6 +90,7 @@ val get_current_level :
 (** Call RPC /chain/[chain]/blocks/[block]/header/protocol_data *)
 val get_protocol_data :
   ?node:Node.t ->
+  ?hooks:Process.hooks ->
   ?chain:string ->
   ?block:string ->
   ?offset:int ->
@@ -76,19 +99,34 @@ val get_protocol_data :
 
 (** Call RPC /chain/[chain]/blocks/[block]/helpers/levels_in_current_cycle *)
 val get_levels_in_curent_cycle :
-  ?node:Node.t -> ?chain:string -> ?block:string -> Client.t -> JSON.t Lwt.t
+  ?node:Node.t ->
+  ?hooks:Process.hooks ->
+  ?chain:string ->
+  ?block:string ->
+  Client.t ->
+  JSON.t Lwt.t
 
 (** Call RPC /chain/[chain]/blocks/[block]/operations *)
 val get_operations :
-  ?node:Node.t -> ?chain:string -> ?block:string -> Client.t -> JSON.t Lwt.t
+  ?node:Node.t ->
+  ?hooks:Process.hooks ->
+  ?chain:string ->
+  ?block:string ->
+  Client.t ->
+  JSON.t Lwt.t
 
 (** Call RPC /chains/[chain]/mempool/pending_operations *)
 val get_mempool_pending_operations :
-  ?node:Node.t -> ?chain:string -> Client.t -> JSON.t Lwt.t
+  ?node:Node.t ->
+  ?hooks:Process.hooks ->
+  ?chain:string ->
+  Client.t ->
+  JSON.t Lwt.t
 
 (** Call RPC /chain/[chain]/blocks/[block]/helpers/preapply/block *)
 val preapply_block :
   ?node:Node.t ->
+  ?hooks:Process.hooks ->
   ?chain:string ->
   ?block:string ->
   data:JSON.u ->

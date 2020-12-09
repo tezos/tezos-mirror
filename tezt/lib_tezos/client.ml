@@ -84,11 +84,12 @@ let mode_arg client =
   | Proxy _ ->
       ["--mode"; "proxy"]
 
-let spawn_command ?node ?(admin = false) client command =
+let spawn_command ?node ?hooks ?(admin = false) client command =
   Process.spawn
     ~name:client.name
     ~color:client.color
     ~env:[("TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER", "Y")]
+    ?hooks
     (if admin then client.admin_path else client.path)
   @@ endpoint_arg ?node client @ mode_arg client @ base_dir_arg client
   @ command
@@ -132,7 +133,7 @@ let string_of_query_string = function
       let qs' = List.map (fun (k, v) -> (url_encode k, url_encode v)) qs in
       "?" ^ String.concat "&" @@ List.map (fun (k, v) -> k ^ "=" ^ v) qs'
 
-let spawn_rpc ?node ?data ?query_string meth path client =
+let spawn_rpc ?node ?hooks ?data ?query_string meth path client =
   let data =
     Option.fold ~none:[] ~some:(fun x -> ["with"; JSON.encode_u x]) data
   in
@@ -141,11 +142,15 @@ let spawn_rpc ?node ?data ?query_string meth path client =
   in
   let path = string_of_path path in
   let full_path = path ^ query_string in
-  spawn_command ?node client (["rpc"; string_of_meth meth; full_path] @ data)
+  spawn_command
+    ?node
+    ?hooks
+    client
+    (["rpc"; string_of_meth meth; full_path] @ data)
 
-let rpc ?node ?data ?query_string meth path client =
+let rpc ?node ?hooks ?data ?query_string meth path client =
   let* output =
-    spawn_rpc ?node ?data ?query_string meth path client
+    spawn_rpc ?node ?hooks ?data ?query_string meth path client
     |> Process.check_and_read_stdout
   in
   return (JSON.parse ~origin:(string_of_path path ^ " response") output)

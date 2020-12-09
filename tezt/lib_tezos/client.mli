@@ -103,6 +103,7 @@ type meth = GET | PUT | POST | PATCH
     Fail the test if the RPC call failed. *)
 val rpc :
   ?node:Node.t ->
+  ?hooks:Process.hooks ->
   ?data:JSON.u ->
   ?query_string:query_string ->
   meth ->
@@ -113,6 +114,7 @@ val rpc :
 (** Same as [rpc], but do not wait for the process to exit. *)
 val spawn_rpc :
   ?node:Node.t ->
+  ?hooks:Process.hooks ->
   ?data:JSON.u ->
   ?query_string:query_string ->
   meth ->
