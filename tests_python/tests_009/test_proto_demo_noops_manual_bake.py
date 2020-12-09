@@ -1,9 +1,8 @@
 import time
 import pytest
+from tools.constants import PROTO_DEMO_NOOPS, PROTO_GENESIS
 from client.client import Client
 
-PROTO = 'ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp'
-PROTO_GENESIS = 'ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im'
 PARAMS = ['-p', PROTO_GENESIS]
 
 
@@ -41,7 +40,7 @@ class TestProtoDemo:
 
     def test_proto_known(self, client: Client):
         res = client.list_protocols()
-        assert PROTO in res
+        assert PROTO_DEMO_NOOPS in res
 
     def test_first_protocol(self, client: Client):
         proto = 'PrihK96nBAFSxVL1GLJTVhu9YnzkMFiBeuJRPA8NwuZVZCE1L6i'
@@ -50,7 +49,7 @@ class TestProtoDemo:
     def test_activate_proto(self, client: Client):
         parameters = {}  # type: dict
         res = client.activate_protocol_json(
-            PROTO, parameters, key='activator', fitness='1'
+            PROTO_DEMO_NOOPS, parameters, key='activator', fitness='1'
         )
         assert res.block_hash
 
@@ -65,7 +64,10 @@ class TestProtoDemo:
         message = "hello world"
 
         data = {
-            "protocol_data": {"protocol": PROTO, "block_header_data": message},
+            "protocol_data": {
+                "protocol": PROTO_DEMO_NOOPS,
+                "block_header_data": message,
+            },
             "operations": [],
         }
         block = client.rpc(

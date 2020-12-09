@@ -75,6 +75,10 @@ IDENTITIES = {
 
 IDENTITIES_SHORT = {'activator': {'secret': "unencrypted:" + GENESIS_SK}}
 
+PROTO_GENESIS = 'ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im'
+
+PROTO_DEMO_NOOPS = 'ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp'
+PROTO_DEMO_COUNTER = 'ProtoDemoCounterDemoCounterDemoCounterDemoCou4LSpdT'
 
 ALPHA = "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
 ALPHA_DAEMON = "alpha"  # tezos-baker-alpha

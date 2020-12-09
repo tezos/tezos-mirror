@@ -8,6 +8,7 @@ import pytest
 
 from launchers.sandbox import Sandbox
 from tools import constants, paths, utils
+from tools.constants import PROTO_GENESIS
 
 BAKE_ARGS = [
     '--minimal-fees',
@@ -81,7 +82,7 @@ NODE_CONFIG = {
         'genesis': {
             'timestamp': '2018-06-30T16:07:32Z',
             'block': 'BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2',
-            'protocol': 'ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im',
+            'protocol': PROTO_GENESIS,
         },
         'genesis_parameters': {
             'values': {'genesis_pubkey': constants.GENESIS_PK}

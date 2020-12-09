@@ -1,10 +1,10 @@
 import time
 from tools import constants, paths
+from tools.constants import PROTO_DEMO_NOOPS, PROTO_GENESIS
 from launchers.sandbox import Sandbox
 
 
-PROTO_DEMO = 'ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp'
-PROTO_GENESIS = 'ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im'
+PROTO_DEMO = PROTO_DEMO_NOOPS
 PARAMS = ['-p', PROTO_GENESIS]
 
 
