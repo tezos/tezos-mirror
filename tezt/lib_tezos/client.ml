@@ -286,15 +286,18 @@ let gen_and_show_keys ~alias client =
   let* () = gen_keys ~alias client in
   show_address ~show_secret:true ~alias client
 
-let spawn_transfer ?node ?(wait = "none") ~amount ~giver ~receiver client =
+let spawn_transfer ?node ?(wait = "none") ?(args = []) ~amount ~giver ~receiver
+    client =
   spawn_command
     ?node
     client
     ( ["--wait"; wait]
-    @ ["transfer"; string_of_int amount; "from"; giver; "to"; receiver] )
+    @ ["transfer"; string_of_int amount; "from"; giver; "to"; receiver]
+    @ args )
 
-let transfer ?node ?wait ~amount ~giver ~receiver client =
-  spawn_transfer ?node ?wait ~amount ~giver ~receiver client |> Process.check
+let transfer ?node ?wait ?args ~amount ~giver ~receiver client =
+  spawn_transfer ?node ?wait ?args ~amount ~giver ~receiver client
+  |> Process.check
 
 let spawn_set_delegate ?node ?(wait = "none") ~src ~delegate client =
   spawn_command

@@ -212,6 +212,7 @@ val gen_and_show_keys : alias:string -> t -> Account.key Lwt.t
 val transfer :
   ?node:Node.t ->
   ?wait:string ->
+  ?args:string list ->
   amount:int ->
   giver:string ->
   receiver:string ->
@@ -222,6 +223,7 @@ val transfer :
 val spawn_transfer :
   ?node:Node.t ->
   ?wait:string ->
+  ?args:string list ->
   amount:int ->
   giver:string ->
   receiver:string ->
