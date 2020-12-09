@@ -1,5 +1,5 @@
 .opam_template:
-  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  extends: .runtime_build_test_dependencies_template
   stage: packaging
   dependencies: []
   rules:

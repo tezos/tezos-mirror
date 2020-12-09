@@ -3,7 +3,7 @@
 # (sequentially).
 
 test_coverage:
-  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+  extends: .runtime_build_test_dependencies_template
   stage: test_coverage
   except:
     - tags@tezos/tezos

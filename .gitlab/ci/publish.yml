@@ -86,7 +86,7 @@ merge-manifest:
   interruptible: false
 
 publish:doc:
-  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+  extends: .runtime_build_test_dependencies_template
   stage: doc
   only:
     - master@tezos/tezos
