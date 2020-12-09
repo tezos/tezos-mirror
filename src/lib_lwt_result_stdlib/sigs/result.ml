@@ -77,7 +77,7 @@ module type S = sig
   val map_error_s :
     ('e -> 'f Lwt.t) -> ('a, 'e) result -> ('a, 'f) result Lwt.t
 
-  (* NOTE: [map_error_e] is [bind_error_s] *)
+  (* NOTE: [map_error_es] is [bind_error_s] *)
   val map_error_es :
     ('e -> ('a, 'f) result Lwt.t) -> ('a, 'e) result -> ('a, 'f) result Lwt.t
 

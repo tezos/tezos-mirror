@@ -446,7 +446,7 @@ let test_raw {idx; genesis; _} =
       >>= fun ctxt ->
       find_tree ctxt []
       >>= fun tree ->
-      let tree = Option.get tree in
+      let tree = WithExceptions.Option.get ~loc:__LOC__ tree in
       Tree.to_raw tree
       >>= fun raw ->
       let a = TzString.Map.singleton "toto" (`Value foo1) in

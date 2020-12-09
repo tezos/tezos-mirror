@@ -125,7 +125,10 @@ module Adversarial = struct
     let common_prefix = string state ~size:prefix_size in
     let rand_suffix = salt state card in
     let elements =
-      Stdlib.List.init card (fun _ -> common_prefix ^ rand_suffix ())
+      List.init ~when_negative_length:() card (fun _ ->
+          common_prefix ^ rand_suffix ())
+      |> (* see [invalid_arg] above *)
+         WithExceptions.Result.get_ok ~loc:__LOC__
     in
     (common_prefix, elements)
 

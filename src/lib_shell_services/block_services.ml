@@ -76,7 +76,9 @@ let parse_block s =
     | 0 ->
         ([s], ' ')
     | 1 ->
-        let delim = Option.unopt_assert ~loc:__POS__ @@ List.assoc 1 counts in
+        let delim =
+          WithExceptions.Option.get ~loc:__LOC__ @@ List.assoc 1 counts
+        in
         (String.split delim s, delim)
     | _ ->
         raise Exit

@@ -159,7 +159,7 @@ module Term = struct
     in
     let printer ppf ({alias; _} : Node_config_file.blockchain_network) =
       (* Should not fail by construction of Node_config_file.block_chain_network *)
-      let alias = Option.unopt_assert ~loc:__POS__ alias in
+      let alias = WithExceptions.Option.get ~loc:__LOC__ alias in
       Format.fprintf ppf "%s" alias
     in
     ( (of_string : string -> ('a, [`Msg of string]) result),

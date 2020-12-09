@@ -592,7 +592,8 @@ let sample best other points =
   else
     (* This is safe because we checked the value of [best] and [other] *)
     let list_init n f =
-      Result.get_ok @@ List.init ~when_negative_length:() n f
+      WithExceptions.Result.get_ok ~loc:__LOC__
+      @@ List.init ~when_negative_length:() n f
     in
     let best_indexes = list_init best Fun.id in
     let other_indexes =

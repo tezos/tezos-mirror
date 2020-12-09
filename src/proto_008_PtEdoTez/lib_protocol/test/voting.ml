@@ -147,19 +147,31 @@ let assert_period ?expected_kind ?expected_index ?expected_position
   Context.Vote.get_current_period (B b)
   >>=? fun {voting_period; position; remaining} ->
   ( if Option.is_some expected_kind then
-    assert_period_kind (Option.get expected_kind) voting_period.kind loc
+    assert_period_kind
+      (WithExceptions.Option.get ~loc:__LOC__ expected_kind)
+      voting_period.kind
+      loc
   else return_unit )
   >>=? fun () ->
   ( if Option.is_some expected_index then
-    assert_period_index (Option.get expected_index) voting_period.index loc
+    assert_period_index
+      (WithExceptions.Option.get ~loc:__LOC__ expected_index)
+      voting_period.index
+      loc
   else return_unit )
   >>=? fun () ->
   ( if Option.is_some expected_position then
-    assert_period_position (Option.get expected_position) position loc
+    assert_period_position
+      (WithExceptions.Option.get ~loc:__LOC__ expected_position)
+      position
+      loc
   else return_unit )
   >>=? fun () ->
   if Option.is_some expected_remaining then
-    assert_period_remaining (Option.get expected_remaining) remaining loc
+    assert_period_remaining
+      (WithExceptions.Option.get ~loc:__LOC__ expected_remaining)
+      remaining
+      loc
   else return_unit
 
 let mk_contracts_from_pkh pkh_list =
@@ -255,8 +267,12 @@ let test_successful_vote num_delegates () =
          | Some _ ->
              failwith "%s - Unexpected proposal" __LOC__)
   >>=? fun () ->
-  let del1 = Option.get @@ List.nth delegates_p1 0 in
-  let del2 = Option.get @@ List.nth delegates_p1 1 in
+  let del1 =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates_p1 0
+  in
+  let del2 =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates_p1 1
+  in
   let props =
     List.map (fun i -> protos.(i)) (2 -- Constants.max_proposals_per_delegate)
   in
@@ -272,8 +288,8 @@ let test_successful_vote num_delegates () =
   (* correctly count the double proposal for zero *)
   (let weight =
      Int32.add
-       (Option.get @@ List.nth rolls_p1 0)
-       (Option.get @@ List.nth rolls_p1 1)
+       (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth rolls_p1 0)
+       (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth rolls_p1 1)
    in
    match Environment.Protocol_hash.(Map.find_opt zero ps) with
    | Some v ->
@@ -546,7 +562,9 @@ let test_not_enough_quorum_in_testing_vote num_delegates () =
   let open Alpha_context in
   assert_period ~expected_kind:Proposal b __LOC__
   >>=? fun () ->
-  let proposer = Option.get @@ List.nth delegates 0 in
+  let proposer =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 0
+  in
   Op.proposals (B b) proposer [Protocol_hash.zero]
   >>=? fun ops ->
   Block.bake ~operations:[ops] b
@@ -568,7 +586,9 @@ let test_not_enough_quorum_in_testing_vote num_delegates () =
   get_smallest_prefix_voters_for_quorum delegates_p2 rolls_p2 participation_ema
   |> fun voters ->
   (* take the first two voters out so there cannot be quorum *)
-  let voters_without_quorum = Option.get @@ List.tl voters in
+  let voters_without_quorum =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.tl voters
+  in
   get_rolls b voters_without_quorum __LOC__
   >>=? fun voters_rolls_in_testing_vote ->
   (* all voters_without_quorum vote, for yays;
@@ -608,7 +628,9 @@ let test_not_enough_quorum_in_promotion_vote num_delegates () =
   >>=? fun (b, delegates) ->
   assert_period ~expected_kind:Proposal b __LOC__
   >>=? fun () ->
-  let proposer = Option.get @@ List.nth delegates 0 in
+  let proposer =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 0
+  in
   Op.proposals (B b) proposer [Protocol_hash.zero]
   >>=? fun ops ->
   Block.bake ~operations:[ops] b
@@ -661,7 +683,9 @@ let test_not_enough_quorum_in_promotion_vote num_delegates () =
   get_smallest_prefix_voters_for_quorum delegates_p4 rolls_p4 participation_ema
   |> fun voters ->
   (* take the first voter out so there cannot be quorum *)
-  let voters_without_quorum = Option.get @@ List.tl voters in
+  let voters_without_quorum =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.tl voters
+  in
   get_rolls b voters_without_quorum __LOC__
   >>=? fun voter_rolls ->
   (* all voters_without_quorum vote, for yays;
@@ -695,7 +719,7 @@ let test_multiple_identical_proposals_count_as_one () =
   >>=? fun (b, delegates) ->
   assert_period ~expected_kind:Proposal b __LOC__
   >>=? fun () ->
-  let proposer = Option.get @@ List.hd delegates in
+  let proposer = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd delegates in
   Op.proposals (B b) proposer [Protocol_hash.zero; Protocol_hash.zero]
   >>=? fun ops ->
   Block.bake ~operations:[ops] b
@@ -738,28 +762,32 @@ let test_supermajority_in_proposal there_is_a_winner () =
   >>=? fun { parametric =
                {blocks_per_cycle; tokens_per_roll; blocks_per_voting_period; _};
              _ } ->
-  let del1 = Option.get @@ List.nth delegates 0 in
-  let del2 = Option.get @@ List.nth delegates 1 in
-  let del3 = Option.get @@ List.nth delegates 2 in
+  let del1 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 0 in
+  let del2 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 1 in
+  let del3 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 2 in
   List.map_es (fun del -> Context.Contract.pkh del) [del1; del2; del3]
   >>=? fun pkhs ->
   let policy = Block.Excluding pkhs in
   Op.transaction
     (B b)
-    (Option.get @@ List.nth delegates 3)
+    (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 3)
     del1
     tokens_per_roll
   >>=? fun op1 ->
   Op.transaction
     (B b)
-    (Option.get @@ List.nth delegates 4)
+    (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 4)
     del2
     tokens_per_roll
   >>=? fun op2 ->
   ( if there_is_a_winner then Test_tez.Tez.( *? ) tokens_per_roll 3L
   else Test_tez.Tez.( *? ) tokens_per_roll 2L )
   >>?= fun bal3 ->
-  Op.transaction (B b) (Option.get @@ List.nth delegates 5) del3 bal3
+  Op.transaction
+    (B b)
+    (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 5)
+    del3
+    bal3
   >>=? fun op3 ->
   Block.bake ~policy ~operations:[op1; op2; op3] b
   >>=? fun b ->
@@ -809,8 +837,8 @@ let test_quorum_in_proposal has_quorum () =
                  blocks_per_voting_period;
                  _ };
              _ } ->
-  let del1 = Option.get @@ List.nth delegates 0 in
-  let del2 = Option.get @@ List.nth delegates 1 in
+  let del1 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 0 in
+  let del2 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 1 in
   List.map_es (fun del -> Context.Contract.pkh del) [del1; del2]
   >>=? fun pkhs ->
   let policy = Block.Excluding pkhs in
@@ -858,7 +886,7 @@ let test_supermajority_in_testing_vote supermajority () =
   let min_proposal_quorum = Int32.(of_int @@ (100_00 / 100)) in
   Context.init ~min_proposal_quorum 100
   >>=? fun (b, delegates) ->
-  let del1 = Option.get @@ List.nth delegates 0 in
+  let del1 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 0 in
   let proposal = protos.(0) in
   Op.proposals (B b) del1 [proposal]
   >>=? fun ops1 ->
@@ -948,7 +976,9 @@ let test_quorum_capped_maximum num_delegates () =
   >>=? fun () ->
   (* propose a new protocol *)
   let protocol = Protocol_hash.zero in
-  let proposer = Option.get @@ List.nth delegates 0 in
+  let proposer =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 0
+  in
   Op.proposals (B b) proposer [protocol]
   >>=? fun ops ->
   Block.bake ~operations:[ops] b
@@ -996,7 +1026,9 @@ let test_quorum_capped_minimum num_delegates () =
   >>=? fun () ->
   (* propose a new protocol *)
   let protocol = Protocol_hash.zero in
-  let proposer = Option.get @@ List.nth delegates 0 in
+  let proposer =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 0
+  in
   Op.proposals (B b) proposer [protocol]
   >>=? fun ops ->
   Block.bake ~operations:[ops] b
@@ -1042,9 +1074,9 @@ let test_voting_power_updated_each_voting_period () =
     ~initial_balances:[80_000_000_000L; 48_000_000_000L; 4_000_000_000_000L]
     3
   >>=? fun (block, contracts) ->
-  let con1 = Option.get @@ List.nth contracts 0 in
-  let con2 = Option.get @@ List.nth contracts 1 in
-  let con3 = Option.get @@ List.nth contracts 2 in
+  let con1 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0 in
+  let con2 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 1 in
+  let con3 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 2 in
   (* Retrieve balance of con1 *)
   Context.Contract.balance (B block) con1
   >>=? fun balance1 ->
@@ -1065,9 +1097,9 @@ let test_voting_power_updated_each_voting_period () =
   Context.get_bakers (B block)
   >>=? fun bakers ->
   (* [Context.init] and [Context.get_bakers] store the accounts in reversed orders *)
-  let baker1 = Option.get @@ List.nth bakers 2 in
-  let baker2 = Option.get @@ List.nth bakers 1 in
-  let baker3 = Option.get @@ List.nth bakers 0 in
+  let baker1 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth bakers 2 in
+  let baker2 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth bakers 1 in
+  let baker3 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth bakers 0 in
   (* Auxiliary assert_voting_power *)
   let assert_voting_power ~loc n block baker =
     get_voting_power block baker

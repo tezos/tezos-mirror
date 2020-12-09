@@ -102,9 +102,10 @@ let create_dummy_inputs n state anti_replay ctx =
     (* Doesn't make sense to create dummy_inputs with an empty storage *)
     let dummy_witness = S.get_witness state 0L in
     let root = S.get_root state in
-    List.init ~when_negative_length:() n (fun _ ->
-        dummy_input anti_replay ctx dummy_witness root)
-    |> Result.get_ok
+    WithExceptions.Result.get_ok ~loc:__LOC__
+    @@ (* n is checked above *)
+       List.init ~when_negative_length:() n (fun _ ->
+           dummy_input anti_replay ctx dummy_witness root)
   else []
 
 let dummy_output pctx ~memo_size =
@@ -216,10 +217,10 @@ let forge_transaction ?(number_dummy_inputs = 0) ?(number_dummy_outputs = 0)
       in
       let inputs = real_inputs @ dummy_inputs in
       let dummy_outputs =
-        List.init ~when_negative_length:() number_dummy_outputs (fun _ ->
-            dummy_output ctx ~memo_size)
-        |> Result.get_ok
-        (* checked at entrance of function *)
+        WithExceptions.Result.get_ok ~loc:__LOC__
+        @@ (* checked at entrance of function *)
+           List.init ~when_negative_length:() number_dummy_outputs (fun _ ->
+               dummy_output ctx ~memo_size)
       in
       let outputs = real_outputs @ dummy_outputs in
       let binding_sig =
@@ -288,10 +289,10 @@ let forge_shield_transaction ?(number_dummy_inputs = 0)
         create_dummy_inputs number_dummy_inputs state anti_replay ctx
       in
       let dummy_outputs =
-        List.init ~when_negative_length:() number_dummy_outputs (fun _ ->
-            dummy_output ctx ~memo_size)
-        |> Result.get_ok
-        (* checked at entrance of function *)
+        WithExceptions.Result.get_ok ~loc:__LOC__
+        @@ (* checked at entrance of function *)
+           List.init ~when_negative_length:() number_dummy_outputs (fun _ ->
+               dummy_output ctx ~memo_size)
       in
       let outputs = real_outputs @ dummy_outputs in
       let binding_sig =

@@ -40,7 +40,7 @@ let ten_tez = Tez.of_int 10
 let test_simple_reveal () =
   Context.init 1
   >>=? fun (blk, contracts) ->
-  let c = Option.get @@ List.hd contracts in
+  let c = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
   let new_c = Account.new_account () in
   let new_contract = Alpha_context.Contract.implicit_contract new_c.pkh in
   (* Create the contract *)
@@ -64,7 +64,7 @@ let test_simple_reveal () =
 let test_empty_account_on_reveal () =
   Context.init 1
   >>=? fun (blk, contracts) ->
-  let c = Option.get @@ List.hd contracts in
+  let c = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
   let new_c = Account.new_account () in
   let new_contract = Alpha_context.Contract.implicit_contract new_c.pkh in
   let amount = Tez.one_mutez in
@@ -96,7 +96,7 @@ let test_empty_account_on_reveal () =
 let test_not_enough_found_for_reveal () =
   Context.init 1
   >>=? fun (blk, contracts) ->
-  let c = Option.get @@ List.hd contracts in
+  let c = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
   let new_c = Account.new_account () in
   let new_contract = Alpha_context.Contract.implicit_contract new_c.pkh in
   (* Create the contract *)

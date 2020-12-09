@@ -54,7 +54,7 @@ end = struct
   let of_tez t =
     let i = Tez.to_mutez t in
     assert (UTXO.valid_amount i) ;
-    Option.unopt_assert ~loc:__POS__ @@ of_mutez i
+    WithExceptions.Option.get ~loc:__LOC__ @@ of_mutez i
 end
 
 module Shielded_tez_contract_input = struct
@@ -200,7 +200,7 @@ module Account = struct
 
   let add_unspent c input =
     let amount =
-      Option.unopt_assert ~loc:__POS__
+      WithExceptions.Option.get ~loc:__LOC__
       @@ Shielded_tez.of_mutez (F.Input.amount input)
     in
     match Shielded_tez.(c.balance +? amount) with
@@ -212,7 +212,7 @@ module Account = struct
 
   let remove_unspent c input =
     let amount =
-      Option.unopt_assert ~loc:__POS__
+      WithExceptions.Option.get ~loc:__LOC__
       @@ Shielded_tez.of_mutez (F.Input.amount input)
     in
     match Shielded_tez.(c.balance -? amount) with
@@ -232,11 +232,11 @@ module Account = struct
       account
 
   let pick_input c =
-    Option.(
-      Input_set.choose c.unspents
-      >>| fun unspent ->
-      let c = remove_unspent c unspent in
-      (unspent, c))
+    let ( >|? ) x f = Option.map f x in
+    Input_set.choose c.unspents
+    >|? fun unspent ->
+    let c = remove_unspent c unspent in
+    (unspent, c)
 
   let pp_unspent : Format.formatter -> t -> unit =
    fun ppf a ->
@@ -296,7 +296,7 @@ module Contract_state = struct
 
   let add_unspent vk input accounts =
     let account =
-      Accounts.find vk accounts |> Option.unopt_assert ~loc:__POS__
+      Accounts.find vk accounts |> WithExceptions.Option.get ~loc:__LOC__
     in
     let account = Account.add_unspent account input in
     Accounts.replace account accounts
@@ -501,7 +501,7 @@ let get_shielded_amount amount account =
           loop rest_to_pay (next_in :: chosen_inputs) account
     else
       let change =
-        Option.unopt_assert ~loc:__POS__
+        WithExceptions.Option.get ~loc:__LOC__
         @@ Shielded_tez.of_mutez @@ Int64.abs to_pay
       in
       (chosen_inputs, change)
@@ -517,7 +517,8 @@ let create_payback ~memo_size address amount =
 let unshield ~src ~dst ~backdst amount (state : Contract_state.t) anti_replay =
   let vk = Viewing_key.of_sk src in
   let account =
-    Contract_state.find_account vk state |> Option.unopt_assert ~loc:__POS__
+    Contract_state.find_account vk state
+    |> WithExceptions.Option.get ~loc:__LOC__
   in
   get_shielded_amount amount account
   >|? fun (inputs, change) ->
@@ -554,7 +555,8 @@ let transfer cctxt ~src ~dst ~backdst ?message amount
     (state : Contract_state.t) anti_replay =
   let vk = Viewing_key.of_sk src in
   let account =
-    Contract_state.find_account vk state |> Option.unopt_assert ~loc:__POS__
+    Contract_state.find_account vk state
+    |> WithExceptions.Option.get ~loc:__LOC__
   in
   let memo_size = Storage.get_memo_size state.storage in
   adjust_message_length cctxt ?message memo_size

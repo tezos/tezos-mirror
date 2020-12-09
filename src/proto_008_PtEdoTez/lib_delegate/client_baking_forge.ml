@@ -402,7 +402,8 @@ let classify_operations (cctxt : #Protocol_client_context.full) ~chain ~block
   (* Retrieve the optimist maximum paying manager operations *)
   let manager_operations = t.(managers_index) in
   let {Environment.Updater.max_size; _} =
-    Option.get @@ List.nth Main.validation_passes managers_index
+    WithExceptions.Option.get ~loc:__LOC__
+    @@ List.nth Main.validation_passes managers_index
   in
   sort_manager_operations
     ~max_size
@@ -606,10 +607,21 @@ let filter_and_apply_operations cctxt state ~chain ~block block_info ~priority
             state.index <- index ;
             return inc)
   >>=? fun initial_inc ->
-  let endorsements = Option.get @@ List.nth operations endorsements_index in
-  let votes = Option.get @@ List.nth operations votes_index in
-  let anonymous = Option.get @@ List.nth operations anonymous_index in
-  let managers = Option.get @@ List.nth operations managers_index in
+  let endorsements =
+    WithExceptions.Option.get ~loc:__LOC__
+    @@ List.nth operations endorsements_index
+  in
+  let votes =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth operations votes_index
+  in
+  let anonymous =
+    WithExceptions.Option.get ~loc:__LOC__
+    @@ List.nth operations anonymous_index
+  in
+  let managers =
+    WithExceptions.Option.get ~loc:__LOC__
+    @@ List.nth operations managers_index
+  in
   let validate_operation inc op =
     protect (fun () -> add_operation inc op)
     >>= function
@@ -675,15 +687,17 @@ let filter_and_apply_operations cctxt state ~chain ~block block_info ~priority
   let votes =
     retain_operations_up_to_quota
       (List.rev votes)
-      (Option.get @@ List.nth quota votes_index)
+      (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth quota votes_index)
   in
   let anonymous =
     retain_operations_up_to_quota
       (List.rev anonymous)
-      (Option.get @@ List.nth quota anonymous_index)
+      (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth quota anonymous_index)
   in
   trim_manager_operations
-    ~max_size:(Option.get @@ List.nth quota managers_index).max_size
+    ~max_size:
+      (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth quota managers_index)
+        .max_size
     ~hard_gas_limit_per_block
     managers
   >>=? fun (accepted_managers, _overflowing_managers) ->
@@ -816,21 +830,27 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
   let quota : Environment.Updater.quota list = Main.validation_passes in
   let endorsements =
     List.sub
-      (Option.get @@ List.nth operations endorsements_index)
+      ( WithExceptions.Option.get ~loc:__LOC__
+      @@ List.nth operations endorsements_index )
       endorsers_per_block
   in
   let votes =
     retain_operations_up_to_quota
-      (Option.get @@ List.nth operations votes_index)
-      (Option.get @@ List.nth quota votes_index)
+      ( WithExceptions.Option.get ~loc:__LOC__
+      @@ List.nth operations votes_index )
+      (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth quota votes_index)
   in
   let anonymous =
     retain_operations_up_to_quota
-      (Option.get @@ List.nth operations anonymous_index)
-      (Option.get @@ List.nth quota anonymous_index)
+      ( WithExceptions.Option.get ~loc:__LOC__
+      @@ List.nth operations anonymous_index )
+      (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth quota anonymous_index)
   in
   (* Size/Gas check already occurred in classify operations *)
-  let managers = Option.get @@ List.nth operations managers_index in
+  let managers =
+    WithExceptions.Option.get ~loc:__LOC__
+    @@ List.nth operations managers_index
+  in
   let operations = [endorsements; votes; anonymous; managers] in
   ( match context_path with
   | None ->

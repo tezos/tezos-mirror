@@ -332,7 +332,10 @@ let reward_retrieval_two_endorsers () =
     Signature.Public_key_hash.(
       endorser.Delegate_services.Endorsing_rights.delegate = endorser2.delegate)
   in
-  let endorser2 = Option.get @@ List.find same_endorser2 endorsers in
+  let endorser2 =
+    WithExceptions.Option.get ~loc:__LOC__
+    @@ List.find same_endorser2 endorsers
+  in
   (* No exception raised: in sandboxed mode endorsers do not change between blocks *)
   Tez.(
     endorsement_security_deposit *? Int64.of_int (List.length endorser2.slots))
@@ -494,14 +497,14 @@ let not_enough_for_deposit () =
   Context.get_endorser (B b)
   >>=? fun (endorser, _slots) ->
   let (_, contract_other_than_endorser) =
-    Option.get
+    WithExceptions.Option.get ~loc:__LOC__
     @@ List.find
          (fun (c, _) ->
            not (Signature.Public_key_hash.equal c.Account.pkh endorser))
          managers
   in
   let (_, contract_of_endorser) =
-    Option.get
+    WithExceptions.Option.get ~loc:__LOC__
     @@ List.find
          (fun (c, _) -> Signature.Public_key_hash.equal c.Account.pkh endorser)
          managers

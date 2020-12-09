@@ -38,7 +38,7 @@ let test_context () =
 let test_context_with_nat_nat_big_map () =
   Context.init 3
   >>=? fun (b, contracts) ->
-  let source = Option.get @@ List.hd contracts in
+  let source = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
   Op.origination (B b) source ~script:Op.dummy_script
   >>=? fun (operation, originated) ->
   Block.bake ~operation b

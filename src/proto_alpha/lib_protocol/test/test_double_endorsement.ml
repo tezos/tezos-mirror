@@ -41,7 +41,7 @@ open Alpha_context
 let get_hd_hd = function x :: y :: _ -> (x, y) | _ -> assert false
 
 let get_first_different_baker baker bakers =
-  Option.get
+  WithExceptions.Option.get ~loc:__LOC__
   @@ List.find
        (fun baker' -> Signature.Public_key_hash.( <> ) baker baker')
        bakers

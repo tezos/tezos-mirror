@@ -239,7 +239,7 @@ module Alpha_context_helpers = struct
       List.map
         (fun i ->
           Tezos_sapling.Forge.Input.get cs (Int64.of_int i) w.vk
-          |> Option.unopt_assert ~loc:__POS__
+          |> WithExceptions.Option.get ~loc:__LOC__
           |> snd)
         is
     in

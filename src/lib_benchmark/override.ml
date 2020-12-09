@@ -57,7 +57,8 @@ let load_file ~filename map =
     map
     header
     values
-  |> (* {!Csv.import} fails before this can *) Result.get_ok
+  |> (* {!Csv.import} fails before this can *)
+     WithExceptions.Result.get_ok ~loc:__LOC__
 
 let load ~filenames : t =
   List.fold_left

@@ -42,7 +42,7 @@ module List = struct
 end
 
 module Result = Tezos_lwt_result_stdlib.Lwtreslib.Result
-module Unsafe = Tezos_lwt_result_stdlib.Lwtreslib.Unsafe
+module WithExceptions = Tezos_lwt_result_stdlib.Lwtreslib.WithExceptions
 
 module String = struct
   include String

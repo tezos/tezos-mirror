@@ -231,7 +231,11 @@ let trigger_greylist_gc t =
   let minus_greylist_timeout = Ptime.Span.neg t.config.greylist_timeout in
   let time = Ptime.add_span now minus_greylist_timeout in
   let older_than =
-    Option.unopt_exn (Failure "P2p_maintenance.maintain: time overflow") time
+    Option.fold_f
+      ~none:(fun () ->
+        raise (Failure "P2p_maintenance.maintain: time overflow"))
+      ~some:Fun.id
+      time
   in
   P2p_pool.gc_greylist t.pool ~older_than
 
@@ -346,7 +350,7 @@ let maintain t =
 let shutdown {canceler; discovery; maintain_worker; just_maintained; _} =
   Lwt_canceler.cancel canceler
   >>= fun () ->
-  Lwt_utils.may ~f:P2p_discovery.shutdown discovery
+  Option.iter_s P2p_discovery.shutdown discovery
   >>= fun () ->
   maintain_worker
   >>= fun () ->

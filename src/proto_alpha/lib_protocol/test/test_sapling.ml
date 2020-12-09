@@ -245,7 +245,10 @@ module Raw_context_tests = struct
         >>=? fun result ->
         let expected_cm = List.map fst expected in
         assert (result = expected_cm) ;
-        test_from (Int64.succ from) until (Option.get @@ List.tl expected)
+        test_from
+          (Int64.succ from)
+          until
+          (WithExceptions.Option.get ~loc:__LOC__ @@ List.tl expected)
     in
     test_from 0L 9L list_added
 
@@ -286,7 +289,8 @@ module Raw_context_tests = struct
         Sapling_storage.Commitments.add
           ctx
           id_one_by_one
-          [Option.get @@ List.nth list_to_add counter]
+          [ WithExceptions.Option.get ~loc:__LOC__
+            @@ List.nth list_to_add counter ]
           (Int64.of_int counter)
         >>= wrap
         (* create a new tree and add a list of cms *)
@@ -304,7 +308,8 @@ module Raw_context_tests = struct
           ctx
           id_all_at_once
           ( List.init ~when_negative_length:() (counter + 1) (fun i ->
-                Option.get @@ List.nth list_to_add i)
+                WithExceptions.Option.get ~loc:__LOC__
+                @@ List.nth list_to_add i)
           |> function Error () -> assert false (* counter >= 0*) | Ok r -> r )
           0L
         >>= wrap
@@ -585,7 +590,7 @@ module Alpha_context_tests = struct
     (* randomize one output to fail check outputs *)
     (* don't randomize the ciphertext as it is not part of the proof *)
     let open Tezos_sapling.Core.Client.UTXO in
-    let o = Option.get @@ List.hd vt.outputs in
+    let o = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd vt.outputs in
     let o_wrong_cm =
       {
         o with
@@ -714,7 +719,7 @@ module Interpreter_tests = struct
           let forge_input =
             snd
               ( Tezos_sapling.Forge.Input.get state pos wa.vk
-              |> Option.unopt_assert ~loc:__POS__ )
+              |> WithExceptions.Option.get ~loc:__LOC__ )
           in
           forge_input)
       |> function
@@ -743,7 +748,7 @@ module Interpreter_tests = struct
     let hex_pkh =
       to_hex
         ( Alpha_context.Contract.is_implicit src1
-        |> Option.unopt_assert ~loc:__POS__ )
+        |> WithExceptions.Option.get ~loc:__LOC__ )
         Signature.Public_key_hash.encoding
     in
     let string =
@@ -771,7 +776,7 @@ module Interpreter_tests = struct
           let forge_input =
             snd
               ( Tezos_sapling.Forge.Input.get state pos wb.vk
-              |> Option.unopt_assert ~loc:__POS__ )
+              |> WithExceptions.Option.get ~loc:__LOC__ )
           in
           forge_input)
       |> function
@@ -871,7 +876,9 @@ module Interpreter_tests = struct
         (Format.sprintf "(Pair 0x%s 0)")
         anti_replay_2
     in
-    let transaction = Option.get @@ List.hd transactions in
+    let transaction =
+      WithExceptions.Option.get ~loc:__LOC__ @@ List.hd transactions
+    in
     let parameters =
       Alpha_context.Script.(lazy_expr (expression_from_string transaction))
     in
@@ -928,7 +935,7 @@ module Interpreter_tests = struct
           (Tezos_sapling.Forge.forge_transaction
              [ snd
                  ( Tezos_sapling.Forge.Input.get state 0L vk
-                 |> Option.unopt_assert ~loc:__POS__ ) ]
+                 |> WithExceptions.Option.get ~loc:__LOC__ ) ]
              [output]
              sk
              anti_replay
@@ -969,7 +976,7 @@ module Interpreter_tests = struct
     let ctx = Incremental.alpha_ctxt incr in
     let pkh =
       Alpha_context.Contract.is_implicit src
-      |> Option.unopt_assert ~loc:__POS__
+      |> WithExceptions.Option.get ~loc:__LOC__
     in
     Alpha_context.Contract.get_counter ctx pkh
     >>= wrap
@@ -1150,7 +1157,7 @@ module Interpreter_tests = struct
     let local_state_from_disk disk_state ctx =
       let id =
         Alpha_context.Sapling.(disk_state.id)
-        |> Option.unopt_assert ~loc:__POS__
+        |> WithExceptions.Option.get ~loc:__LOC__
       in
       Alpha_context.Sapling.get_diff
         ctx

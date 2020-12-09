@@ -186,7 +186,8 @@ type state = {
   chain : State.Chain.t;
 }
 
-let vblock s k = Option.get @@ String.Hashtbl.find s.vblock k
+let vblock s k =
+  WithExceptions.Option.get ~loc:__LOC__ @@ String.Hashtbl.find s.vblock k
 
 exception Found of string
 
@@ -210,7 +211,9 @@ let build_example_tree chain =
   let c = ["A1"; "A2"; "A3"; "A4"; "A5"; "A6"; "A7"; "A8"] in
   build_valid_chain chain vtbl genesis c
   >>= fun () ->
-  let a3 = Option.get @@ String.Hashtbl.find vtbl "A3" in
+  let a3 =
+    WithExceptions.Option.get ~loc:__LOC__ @@ String.Hashtbl.find vtbl "A3"
+  in
   let c = ["B1"; "B2"; "B3"; "B4"; "B5"; "B6"; "B7"; "B8"] in
   build_valid_chain chain vtbl a3 c >>= fun () -> Lwt.return vtbl
 

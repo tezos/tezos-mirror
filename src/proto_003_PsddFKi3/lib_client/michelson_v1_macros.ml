@@ -1012,7 +1012,7 @@ let dxiiivp_roman_of_decimal decimal =
     (* too short for D*P, fall back to IIIII... *)
     String.concat
       ""
-      ( Result.get_ok
+      ( WithExceptions.Result.get_ok ~loc:__LOC__
       @@ List.init ~when_negative_length:() decimal (fun _ -> "I") )
   else roman
 

@@ -523,7 +523,7 @@ let export ?(export_rolling = false) ~context_root ~store_root ~genesis
                  return (State.Block.hash bh) )
          | None ->
              Store.Chain_data.Checkpoint.read_opt chain_data_store
-             >|= Option.unopt_assert ~loc:__POS__
+             >|= WithExceptions.Option.get ~loc:__LOC__
              >>= fun last_checkpoint ->
              if last_checkpoint.shell.level = 0l then
                fail (Wrong_block_export (Too_few_predecessors genesis.block))
@@ -1095,7 +1095,9 @@ let import ?(reconstruct = false) ?patch_context ~data_dir
                  oldest_header_opt,
                  rev_block_hashes,
                  protocol_data ) ->
-      let oldest_header = Option.unopt_assert ~loc:__POS__ oldest_header_opt in
+      let oldest_header =
+        WithExceptions.Option.get ~loc:__LOC__ oldest_header_opt
+      in
       let block_hashes_arr = Array.of_list rev_block_hashes in
       let write_predecessors_table to_write =
         Store.with_atomic_rw store (fun () ->

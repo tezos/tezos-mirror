@@ -52,7 +52,7 @@ let test_baking_rights () =
   (* filtering by delegate *)
   let d =
     Option.bind (List.nth contracts 0) Contract.is_implicit
-    |> Option.unopt_assert ~loc:__POS__
+    |> WithExceptions.Option.get ~loc:__LOC__
   in
   get Block.rpc_ctxt b ~all:true ~delegates:[d]
   >>=? fun rights ->

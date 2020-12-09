@@ -278,9 +278,9 @@ module Sapling_raw = struct
     let salt = Bytes.sub ebytes 0 salt_len in
     let encrypted_sk = Bytes.sub ebytes salt_len (encrypted_size - salt_len) in
     let key = Crypto_box.Secretbox.unsafe_of_bytes (pbkdf ~salt ~password) in
-    Option.(
-      Crypto_box.Secretbox.secretbox_open key encrypted_sk nonce
-      >>= Tezos_sapling.Core.Wallet.Spending_key.of_bytes)
+    Option.bind
+      (Crypto_box.Secretbox.secretbox_open key encrypted_sk nonce)
+      Tezos_sapling.Core.Wallet.Spending_key.of_bytes
 
   type Base58.data += Data of Tezos_sapling.Core.Wallet.Spending_key.t
 

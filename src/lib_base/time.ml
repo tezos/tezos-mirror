@@ -154,8 +154,8 @@ module System = struct
 
     let multiply_exn f s =
       let open Ptime.Span in
-      TzOption.unopt_exn
-        (Failure "Time.System.Span.multiply_exn")
+      WithExceptions.Option.to_exn
+        ~none:(Failure "Time.System.Span.multiply_exn")
         (of_float_s (f *. Ptime.Span.to_float_s s))
 
     let of_seconds_exn f =

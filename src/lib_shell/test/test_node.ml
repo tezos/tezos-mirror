@@ -161,7 +161,7 @@ let node_sandbox_initialization_events sandbox_parameters config _switch () =
   test_event
     "Should have an p2p_layer_disabled"
     (Internal_event.Notice, section, "p2p_layer_disabled")
-    (Option.get @@ List.nth evs 0) ;
+    (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth evs 0) ;
   (* End tests *)
   Node.shutdown n
 
@@ -189,11 +189,11 @@ let node_initialization_events _sandbox_parameters config _switch () =
   test_event
     "Should have a p2p bootstrapping event"
     (Internal_event.Notice, section, "bootstrapping")
-    (Option.get @@ List.nth evs 0) ;
+    (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth evs 0) ;
   test_event
     "Should have a p2p_maintain_started event"
     (Internal_event.Notice, section, "p2p_maintain_started")
-    (Option.get @@ List.nth evs 1) ;
+    (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth evs 1) ;
   (* End tests *)
   Node.shutdown n
 

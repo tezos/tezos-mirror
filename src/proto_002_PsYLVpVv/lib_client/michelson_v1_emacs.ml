@@ -152,10 +152,12 @@ let report_errors ppf (parsed, errs) =
     (fun ppf errs ->
       let find_location loc =
         let oloc =
-          Option.get
+          WithExceptions.Option.get ~loc:__LOC__
           @@ List.assoc loc parsed.Michelson_v1_parser.unexpansion_table
         in
-        fst (Option.get @@ List.assoc oloc parsed.expansion_table)
+        fst
+          ( WithExceptions.Option.get ~loc:__LOC__
+          @@ List.assoc oloc parsed.expansion_table )
       in
       match errs with
       | top :: errs ->
@@ -193,10 +195,12 @@ let report_errors ppf (parsed, errs) =
     (Format.pp_print_list (fun ppf err ->
          let find_location loc =
            let oloc =
-             Option.get
+             WithExceptions.Option.get ~loc:__LOC__
              @@ List.assoc loc parsed.Michelson_v1_parser.unexpansion_table
            in
-           fst (Option.get @@ List.assoc oloc parsed.expansion_table)
+           fst
+             ( WithExceptions.Option.get ~loc:__LOC__
+             @@ List.assoc oloc parsed.expansion_table )
          in
          let loc =
            match err with

@@ -52,7 +52,7 @@ let concat (csv1 : csv) (csv2 : csv) : csv =
         (fun line1 line2 -> line1 @ line2)
         csv1
         csv2
-      |> (* see top if condition *) Result.get_ok
+      |> (* see top if condition *) WithExceptions.Result.get_ok ~loc:__LOC__
 
 let export ~filename ?(separator = ',') ?(linebreak = '\n') (data : csv) =
   Format.eprintf "Exporting to %s@." filename ;

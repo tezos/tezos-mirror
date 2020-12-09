@@ -44,5 +44,5 @@ let register name commands =
       commands network_opt @ previous network_opt)
 
 let commands_for_version version =
-  Option.unopt_exn Version_not_found
+  WithExceptions.Option.to_exn ~none:Version_not_found
   @@ Protocol_hash.Table.find versions version

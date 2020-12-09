@@ -256,7 +256,7 @@ let test_voting_power_cache () =
   >>=? fun (block, _contracts) ->
   Context.get_bakers (B block)
   >>=? fun bakers ->
-  let baker = Option.get @@ List.hd bakers in
+  let baker = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bakers in
   let assert_voting_power n block =
     get_voting_power block baker
     >>=? fun voting_power ->

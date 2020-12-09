@@ -185,7 +185,7 @@ let test_transfer_zero_tez () =
 let test_transfer_zero_implicit () =
   Context.init 1
   >>=? fun (b, contracts) ->
-  let dest = Option.get @@ List.nth contracts 0 in
+  let dest = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0 in
   let account = Account.new_account () in
   Incremental.begin_construction b
   >>=? fun i ->
@@ -204,7 +204,9 @@ let test_transfer_zero_implicit () =
 let test_transfer_to_originate_with_fee () =
   Context.init 1
   >>=? fun (b, contracts) ->
-  let contract = Option.get @@ List.nth contracts 0 in
+  let contract =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
+  in
   Incremental.begin_construction b
   >>=? fun b ->
   two_over_n_of_balance b contract 10L
@@ -240,7 +242,9 @@ let test_transfer_amount_of_contract_balance () =
 let test_transfers_to_self () =
   Context.init 1
   >>=? fun (b, contracts) ->
-  let contract = Option.get @@ List.nth contracts 0 in
+  let contract =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
+  in
   Incremental.begin_construction b
   >>=? fun b ->
   two_over_n_of_balance b contract 3L
@@ -284,7 +288,9 @@ let test_missing_transaction () =
 let test_transfer_from_implicit_to_implicit_contract () =
   Context.init 1
   >>=? fun (b, contracts) ->
-  let bootstrap_contract = Option.get @@ List.nth contracts 0 in
+  let bootstrap_contract =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
+  in
   let account_a = Account.new_account () in
   let account_b = Account.new_account () in
   Incremental.begin_construction b
@@ -324,8 +330,12 @@ let test_transfer_from_implicit_to_implicit_contract () =
 let test_transfer_from_implicit_to_originated_contract () =
   Context.init 1
   >>=? fun (b, contracts) ->
-  let bootstrap_contract = Option.get @@ List.nth contracts 0 in
-  let contract = Option.get @@ List.nth contracts 0 in
+  let bootstrap_contract =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
+  in
+  let contract =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
+  in
   let account = Account.new_account () in
   let src = Contract.implicit_contract account.Account.pkh in
   Incremental.begin_construction b
@@ -442,7 +452,7 @@ let test_build_a_chain () =
 let test_empty_implicit () =
   Context.init 1
   >>=? fun (b, contracts) ->
-  let dest = Option.get @@ List.nth contracts 0 in
+  let dest = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0 in
   let account = Account.new_account () in
   Incremental.begin_construction b
   >>=? fun incr ->
@@ -501,9 +511,15 @@ let test_balance_too_low fee () =
 let test_balance_too_low_two_transfers fee () =
   Context.init 3
   >>=? fun (b, contracts) ->
-  let contract_1 = Option.get @@ List.nth contracts 0 in
-  let contract_2 = Option.get @@ List.nth contracts 1 in
-  let contract_3 = Option.get @@ List.nth contracts 2 in
+  let contract_1 =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
+  in
+  let contract_2 =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 1
+  in
+  let contract_3 =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 2
+  in
   Incremental.begin_construction b
   >>=? fun i ->
   Context.Contract.balance (I i) contract_1

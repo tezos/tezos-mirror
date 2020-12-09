@@ -68,11 +68,13 @@ let fake_ctx () =
           match distributed with
           | false ->
               distributed <- true ;
-              return (Option.get @@ List.nth passwords 0)
+              return
+                (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth passwords 0)
           | true ->
               i <- (if i = nb_passwds - 1 then 0 else succ i) ;
               distributed <- false ;
-              return (Option.get @@ List.nth passwords i))
+              return
+                (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth passwords i))
   end
 
 let make_sk_uris =

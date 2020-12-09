@@ -170,7 +170,7 @@ let empirical_data (workload_data : (Sparse_vec.String.t * float) list) =
       let named_columns =
         List.combine ~when_different_lengths:() vars columns
         |> (* [columns = Array.to_list (Array.init (List.length vars))] *)
-           Result.get_ok
+           WithExceptions.Result.get_ok ~loc:__LOC__
       in
       Ok (named_columns, timings)
 
@@ -198,7 +198,7 @@ let prune_problem problem : (Free_variable.t * Matrix.t) list * Matrix.t =
             let col = Matrix.column input c in
             (name, col))
         |> (* column count cannot be negative *)
-           Result.get_ok
+           WithExceptions.Result.get_ok ~loc:__LOC__
       in
       let columns =
         List.filter
@@ -268,7 +268,9 @@ let validator_empirical workload_data (problem : Inference.problem)
     (solution : Inference.solution) :
     (int * (col:int -> unit Plot.t), string) result =
   let {Inference.mapping; _} = solution in
-  let valuation name = Option.get @@ List.assoc name mapping in
+  let valuation name =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.assoc name mapping
+  in
   let predicted =
     match problem with
     | Inference.Degenerate {predicted; _} ->

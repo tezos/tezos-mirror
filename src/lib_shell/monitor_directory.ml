@@ -201,13 +201,14 @@ let build_rpc_directory validator mainchain_validator =
             >>= fun chain_state ->
             let {Genesis.protocol; _} = State.Chain.genesis chain_state in
             let expiration_date =
-              Option.unopt_exn
-                (Invalid_argument
-                   (Format.asprintf
-                      "Monitor.active_chains: no expiration date for the \
-                       chain %a"
-                      Chain_id.pp
-                      chain_id))
+              WithExceptions.Option.to_exn_f
+                ~none:(fun () ->
+                  Invalid_argument
+                    (Format.asprintf
+                       "Monitor.active_chains: no expiration date for the \
+                        chain %a"
+                       Chain_id.pp
+                       chain_id))
                 (State.Chain.expiration chain_state)
             in
             Lwt.return

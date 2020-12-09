@@ -28,7 +28,7 @@ module Events = State_events
 let genesis chain_state =
   let genesis = State.Chain.genesis chain_state in
   State.Block.read_opt chain_state genesis.block
-  >|= Option.unopt_assert ~loc:__POS__
+  >|= WithExceptions.Option.get ~loc:__LOC__
 
 let known_heads chain_state =
   State.read_chain_data chain_state (fun chain_store _data ->
@@ -36,7 +36,8 @@ let known_heads chain_state =
   >>= fun hashes ->
   List.map_p
     (fun h ->
-      State.Block.read_opt chain_state h >|= Option.unopt_assert ~loc:__POS__)
+      State.Block.read_opt chain_state h
+      >|= WithExceptions.Option.get ~loc:__LOC__)
     hashes
 
 let head chain_state =

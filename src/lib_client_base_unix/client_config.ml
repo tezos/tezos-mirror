@@ -865,13 +865,12 @@ let build_endpoint addr port tls =
   let updatecomp updatef ov uri =
     match ov with Some x -> updatef uri (Some x) | None -> uri
   in
+  let scheme = Option.map (function true -> "https" | false -> "http") tls in
   let url = default_endpoint in
   url
   |> updatecomp Uri.with_host addr
   |> updatecomp Uri.with_port port
-  |> updatecomp
-       Uri.with_scheme
-       Option.(tls >>| function true -> "https" | false -> "http")
+  |> updatecomp Uri.with_scheme scheme
 
 let parse_config_args (ctx : #Client_context.full) argv =
   parse_global_options (global_options ()) ctx argv
@@ -959,10 +958,9 @@ let parse_config_args (ctx : #Client_context.full) argv =
   | Some endpt ->
       check_absence node_addr node_port tls >>=? fun _ -> return endpt
   | None -> (
-      let merge = Option.first_some in
-      let node_addr = merge node_addr cfg.node_addr in
-      let node_port = merge node_port cfg.node_port in
-      let tls = merge tls cfg.tls in
+      let node_addr = Option.either node_addr cfg.node_addr in
+      let node_port = Option.either node_port cfg.node_port in
+      let tls = Option.either tls cfg.tls in
       match cfg.endpoint with
       | Some endpt ->
           check_absence node_addr node_port tls >>=? fun _ -> return endpt
@@ -984,14 +982,14 @@ let parse_config_args (ctx : #Client_context.full) argv =
   Tezos_signer_backends_unix.Remote.read_base_uri_from_env ()
   >>=? fun remote_signer_env ->
   let remote_signer =
-    let open Option in
-    first_some remote_signer @@ first_some remote_signer_env cfg.remote_signer
+    Option.either remote_signer
+    @@ Option.either remote_signer_env cfg.remote_signer
   in
   let confirmations = Option.value ~default:cfg.confirmations confirmations in
   (* --password-filename has precedence over --config-file's
      "password-filename" json field *)
   let password_filename =
-    Option.first_some password_filename cfg.password_filename
+    Option.either password_filename cfg.password_filename
   in
   let cfg =
     {

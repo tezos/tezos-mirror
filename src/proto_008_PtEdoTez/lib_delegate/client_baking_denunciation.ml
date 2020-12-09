@@ -333,7 +333,8 @@ let process_new_block (cctxt : #Protocol_client_context.full) state
           | Ok operations ->
               if List.length operations > endorsements_index then
                 let endorsements =
-                  Option.get @@ List.nth operations endorsements_index
+                  WithExceptions.Option.get ~loc:__LOC__
+                  @@ List.nth operations endorsements_index
                 in
                 process_endorsements cctxt state endorsements level
               else return_unit

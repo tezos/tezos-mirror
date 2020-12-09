@@ -117,9 +117,8 @@ let table = Worker.create_table Queue
 let shutdown w = Worker.shutdown w
 
 let shutdown_child nv active_chains =
-  Lwt_utils.may
-    ~f:
-      (fun ({parameters = {chain_state; global_chains_input; _}; _}, shutdown) ->
+  Option.iter_s
+    (fun ({parameters = {chain_state; global_chains_input; _}; _}, shutdown) ->
       Lwt_watcher.notify global_chains_input (State.Chain.id chain_state, false) ;
       Chain_id.Table.remove active_chains (State.Chain.id chain_state) ;
       State.update_chain_data nv.parameters.chain_state (fun _ chain_data ->
@@ -505,8 +504,8 @@ let on_close w =
       []
   in
   Lwt.join
-    ( Lwt_utils.may ~f:Prevalidator.shutdown nv.prevalidator
-    :: Lwt_utils.may ~f:(fun (_, shutdown) -> shutdown ()) nv.child
+    ( Option.iter_s Prevalidator.shutdown nv.prevalidator
+    :: Option.iter_s (fun (_, shutdown) -> shutdown ()) nv.child
     :: pvs )
 
 let may_load_protocols parameters =

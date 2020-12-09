@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,50 +23,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
-
-(* Test the baking_rights RPC.
-   Future levels or cycles are not tested because it's hard in this framework,
-   using only RPCs, to fabricate them. *)
-let test_baking_rights () =
-  Context.init 2
-  >>=? fun (b, contracts) ->
-  let open Alpha_services.Delegate.Baking_rights in
-  (* default max_priority returns 65 results *)
-  get Block.rpc_ctxt b ~all:true
-  >>=? fun rights ->
-  assert (List.length rights = 65) ;
-  (* arbitrary max_priority *)
-  let max_priority = 15 in
-  get Block.rpc_ctxt b ~all:true ~max_priority
-  >>=? fun rights ->
-  assert (List.length rights = max_priority + 1) ;
-  (* filtering by delegate *)
-  let d =
-    Contract.is_implicit
-      (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0)
-    |> WithExceptions.Option.get ~loc:__LOC__
-  in
-  get Block.rpc_ctxt b ~all:true ~delegates:[d]
-  >>=? fun rights ->
-  assert (List.for_all (fun {delegate; _} -> delegate = d) rights) ;
-  (* filtering by cycle *)
-  Alpha_services.Helpers.current_level Block.rpc_ctxt b
-  >>=? fun {cycle; _} ->
-  get Block.rpc_ctxt b ~all:true ~cycles:[cycle]
-  >>=? fun rights ->
-  Alpha_services.Helpers.levels_in_current_cycle Block.rpc_ctxt b
-  >>=? fun (first, last) ->
-  assert (
-    List.for_all (fun {level; _} -> level >= first && level <= last) rights ) ;
-  (* filtering by level *)
-  Alpha_services.Helpers.current_level Block.rpc_ctxt b
-  >>=? fun {level; _} ->
-  get Block.rpc_ctxt b ~all:true ~levels:[level]
-  >>=? fun rights ->
-  let espected_level = level in
-  assert (List.for_all (fun {level; _} -> level = espected_level) rights) ;
-  return_unit
-
-let tests = [Test.tztest "baking_rights" `Quick test_baking_rights]
+module M : Sigs.Result.S

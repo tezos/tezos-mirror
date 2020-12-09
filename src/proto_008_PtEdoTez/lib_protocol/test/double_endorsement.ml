@@ -34,7 +34,7 @@ open Alpha_context
 (****************************************************************)
 
 let get_first_different_baker baker bakers =
-  Option.get
+  WithExceptions.Option.get ~loc:__LOC__
   @@ List.find
        (fun baker' -> Signature.Public_key_hash.( <> ) baker baker')
        bakers
@@ -42,15 +42,22 @@ let get_first_different_baker baker bakers =
 let get_first_different_bakers ctxt =
   Context.get_bakers ctxt
   >|=? fun bakers ->
-  let baker_1 = Option.get @@ List.hd bakers in
-  get_first_different_baker baker_1 (Option.get @@ List.tl bakers)
+  let baker_1 = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bakers in
+  get_first_different_baker
+    baker_1
+    (WithExceptions.Option.get ~loc:__LOC__ @@ List.tl bakers)
   |> fun baker_2 -> (baker_1, baker_2)
 
 let get_first_different_endorsers ctxt =
   Context.get_endorsers ctxt
   >|=? fun endorsers ->
-  let endorser_1 = Option.get @@ List.hd endorsers in
-  let endorser_2 = Option.get @@ List.hd (Option.get @@ List.tl endorsers) in
+  let endorser_1 =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd endorsers
+  in
+  let endorser_2 =
+    WithExceptions.Option.get ~loc:__LOC__
+    @@ List.hd (WithExceptions.Option.get ~loc:__LOC__ @@ List.tl endorsers)
+  in
   (endorser_1, endorser_2)
 
 let block_fork b =
@@ -216,8 +223,12 @@ let wrong_delegate () =
   >>=? fun (b, contracts) ->
   List.map_es (Context.Contract.manager (B b)) contracts
   >>=? fun accounts ->
-  let pkh1 = (Option.get @@ List.nth accounts 0).Account.pkh in
-  let pkh2 = (Option.get @@ List.nth accounts 1).Account.pkh in
+  let pkh1 =
+    (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth accounts 0).Account.pkh
+  in
+  let pkh2 =
+    (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth accounts 1).Account.pkh
+  in
   block_fork b
   >>=? fun (blk_a, blk_b) ->
   Context.get_endorser (B blk_a)

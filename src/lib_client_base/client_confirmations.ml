@@ -87,7 +87,8 @@ let wait_for_operation_inclusion (ctxt : #Client_context.full) ~chain
     let block = `Hash (hash, 0) in
     let predecessor = header.Tezos_base.Block_header.predecessor in
     let pred_block =
-      Option.unopt_exn Not_found @@ Block_hash.Table.find blocks predecessor
+      WithExceptions.Option.to_exn ~none:Not_found
+      @@ Block_hash.Table.find blocks predecessor
     in
     match pred_block with
     | Some (block_with_op, n) ->

@@ -216,11 +216,11 @@ let prepare_batch_operation cctxt ?arg ?fee ?gas_limit ?storage_limit
   >>=? fun amount ->
   tez_of_opt_string_exn index "fee" batch.fee
   >>=? fun batch_fee ->
-  let fee = Option.first_some batch_fee fee in
-  let arg = Option.first_some batch.arg arg in
-  let gas_limit = Option.first_some batch.gas_limit gas_limit in
-  let storage_limit = Option.first_some batch.storage_limit storage_limit in
-  let entrypoint = Option.first_some batch.entrypoint entrypoint in
+  let fee = Option.either batch_fee fee in
+  let arg = Option.either batch.arg arg in
+  let gas_limit = Option.either batch.gas_limit gas_limit in
+  let storage_limit = Option.either batch.storage_limit storage_limit in
+  let entrypoint = Option.either batch.entrypoint entrypoint in
   parse_arg_transfer arg
   >>=? fun parameters ->
   ( match Contract.is_implicit source with

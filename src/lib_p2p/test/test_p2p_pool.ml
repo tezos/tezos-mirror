@@ -268,9 +268,8 @@ module Overcrowded = struct
   let rec connect ?iter_count ~timeout connect_handler pool point =
     lwt_log_info
       "Connect%a to %a@."
-      (Option.pp ~default:"" (fun ppf ->
-           Format.pp_print_string ppf " to peer " ;
-           Format.pp_print_int ppf))
+      (fun ppf iter_count ->
+        Option.iter (Format.fprintf ppf " to peer %d") iter_count)
       iter_count
       P2p_point.Id.pp
       point
@@ -292,9 +291,8 @@ module Overcrowded = struct
             | Tezos_p2p_services.P2p_errors.Rejected _ ) as err ) ] ->
         lwt_log_info
           "Connection to%a %a failed (%a)@."
-          (Option.pp ~default:"" (fun ppf ->
-               Format.pp_print_string ppf " peer " ;
-               Format.pp_print_int ppf))
+          (fun ppf iter_count ->
+            Option.iter (Format.fprintf ppf " peer %d") iter_count)
           iter_count
           P2p_point.Id.pp
           point
@@ -342,7 +340,9 @@ module Overcrowded = struct
         ~default:0
         (P2p_connect_handler.config connect_handler).listening_port
     in
-    let target = Option.get @@ List.hd trusted_points in
+    let target =
+      WithExceptions.Option.get ~loc:__LOC__ @@ List.hd trusted_points
+    in
     connect
       ~iter_count:0
       ~timeout:(Time.System.Span.of_seconds_exn 2.)
@@ -509,7 +509,8 @@ module Overcrowded = struct
   let node_mixed i = if i = 0 then target else client (i mod 2 = 1)
 
   let trusted i points =
-    if i = 0 then points else [Option.get @@ List.hd points]
+    if i = 0 then points
+    else [WithExceptions.Option.get ~loc:__LOC__ @@ List.hd points]
 
   (** Detaches a number of nodes: one of them is the target (its
       max_incoming_connections is set to zero), and all the rest are
@@ -575,9 +576,8 @@ module No_common_network = struct
   let rec connect ?iter_count ~timeout connect_handler pool point =
     lwt_log_info
       "Connect%a to @[%a@]@."
-      (Option.pp ~default:"" (fun ppf ->
-           Format.pp_print_string ppf " to peer " ;
-           Format.pp_print_int ppf))
+      (fun ppf iter_count ->
+        Option.iter (Format.fprintf ppf " to peer %d") iter_count)
       iter_count
       P2p_point.Id.pp
       point
@@ -599,9 +599,8 @@ module No_common_network = struct
             | Tezos_p2p_services.P2p_errors.Rejected _ ) as err ) ] ->
         lwt_log_info
           "Connection to%a %a failed (%a)@."
-          (Option.pp ~default:"" (fun ppf ->
-               Format.pp_print_string ppf " peer " ;
-               Format.pp_print_int ppf))
+          (fun ppf iter_count ->
+            Option.iter (Format.fprintf ppf " peer %d") iter_count)
           iter_count
           P2p_point.Id.pp
           point
@@ -649,7 +648,7 @@ module No_common_network = struct
       ~timeout:(Time.System.Span.of_seconds_exn 2.)
       connect_handler
       pool
-      (Option.get @@ List.hd trusted_points)
+      (WithExceptions.Option.get ~loc:__LOC__ @@ List.hd trusted_points)
     >>= function
     | Ok conn ->
         lwt_log_info
@@ -691,7 +690,8 @@ module No_common_network = struct
   let node i = if i = 0 then target else client
 
   let trusted i points =
-    if i = 0 then points else [Option.get @@ List.hd points]
+    if i = 0 then points
+    else [WithExceptions.Option.get ~loc:__LOC__ @@ List.hd points]
 
   (** Running the target and the clients.
       All clients should have their pool populated with the list of points.

@@ -41,7 +41,7 @@ open Alpha_context
 let get_hd_hd = function x :: y :: _ -> (x, y) | _ -> assert false
 
 let get_first_different_baker baker bakers =
-  Option.get
+  WithExceptions.Option.get ~loc:__LOC__
   @@ List.find
        (fun baker' -> Signature.Public_key_hash.( <> ) baker baker')
        bakers
@@ -77,7 +77,9 @@ let test_valid_double_baking_evidence () =
   >>=? fun (b, contracts) ->
   Context.get_bakers (B b)
   >>=? fun bakers ->
-  let priority_0_baker = Option.get @@ List.hd bakers in
+  let priority_0_baker =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bakers
+  in
   block_fork ~policy:(By_priority 0) contracts b
   >>=? fun (blk_a, blk_b) ->
   Op.double_baking (B blk_a) blk_a.header blk_b.header

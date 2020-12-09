@@ -68,13 +68,13 @@ let get_next_baker_by_priority priority block =
     block
   >|=? fun bakers ->
   let {Alpha_services.Delegate.Baking_rights.delegate = pkh; timestamp; _} =
-    Option.get
+    WithExceptions.Option.get ~loc:__LOC__
     @@ List.find
          (fun {Alpha_services.Delegate.Baking_rights.priority = p; _} ->
            p = priority)
          bakers
   in
-  (pkh, priority, Option.unopt_exn (Failure "") timestamp)
+  (pkh, priority, WithExceptions.Option.to_exn ~none:(Failure "") timestamp)
 
 let get_next_baker_by_account pkh block =
   Alpha_services.Delegate.Baking_rights.get
@@ -87,9 +87,9 @@ let get_next_baker_by_account pkh block =
         timestamp;
         priority;
         _ } =
-    Option.get @@ List.hd bakers
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bakers
   in
-  (pkh, priority, Option.unopt_exn (Failure "") timestamp)
+  (pkh, priority, WithExceptions.Option.to_exn ~none:(Failure "") timestamp)
 
 let get_next_baker_excluding excludes block =
   Alpha_services.Delegate.Baking_rights.get rpc_ctxt ~max_priority:256 block
@@ -98,13 +98,13 @@ let get_next_baker_excluding excludes block =
         timestamp;
         priority;
         _ } =
-    Option.get
+    WithExceptions.Option.get ~loc:__LOC__
     @@ List.find
          (fun {Alpha_services.Delegate.Baking_rights.delegate; _} ->
            not (List.mem delegate excludes))
          bakers
   in
-  (pkh, priority, Option.unopt_exn (Failure "") timestamp)
+  (pkh, priority, WithExceptions.Option.to_exn ~none:(Failure "") timestamp)
 
 let dispatch_policy = function
   | By_priority p ->

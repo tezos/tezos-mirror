@@ -657,7 +657,7 @@ let zip32_xfvk_address xfvk j =
     Bytes.blit addr 11 pkd 0 32 ;
     let diversifier =
       (* This value is returned from the lib, it is a valid diversifier *)
-      Option.get @@ to_diversifier diversifier
+      WithExceptions.Option.get ~loc:__LOC__ @@ to_diversifier diversifier
     in
     Some (to_diversifier_index j_ret, diversifier, to_pkd pkd) )
   else None

@@ -173,7 +173,9 @@ module Event_filter = struct
             fun l -> Some (l :: s))
       None
       levels_in_order
-    |> TzOption.unopt_exn (Failure "level_at_least not found")
+    |> Option.fold_f
+         ~none:(fun () -> raise (Failure "level_at_least not found"))
+         ~some:Fun.id
     |> level_in
 end
 
@@ -235,21 +237,21 @@ module Sink_implementation : Internal_event.SINK with type t = t = struct
         Uri.get_query_param' uri "name" |> Option.value ~default:[]
       in
       let levels =
-        TzOption.(
-          Uri.get_query_param uri "level-at-least"
-          >>= Internal_event.Level.of_string
-          >>= fun l ->
-          (* some (fun all more -> all [Event_filter.level_at_least l ; more ]) *)
-          Some [Event_filter.level_at_least l])
-        |> Option.value ~default:[]
+        let ( >?? ) = Option.bind in
+        Uri.get_query_param uri "level-at-least"
+        >?? Internal_event.Level.of_string
+        |> Option.fold ~none:[] ~some:(fun l ->
+               [Event_filter.level_at_least l])
       in
       let sections =
         let somes =
           Uri.get_query_param' uri "section"
-          |> Option.value ~default:[]
-          |> List.map (fun s ->
-                 Internal_event.Section.make_sanitized
-                   (String.split_on_char '.' s))
+          |> Option.fold
+               ~none:[]
+               ~some:
+                 (List.map (fun s ->
+                      Internal_event.Section.make_sanitized
+                        (String.split_on_char '.' s)))
         in
         let none =
           match Uri.get_query_param uri "no-section" with

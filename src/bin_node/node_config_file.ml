@@ -1132,13 +1132,13 @@ let update ?data_dir ?min_connections ?expected_connections ?max_connections
       max_connections =
         Option.value ~default:cfg.p2p.limits.max_connections max_connections;
       max_download_speed =
-        Option.first_some max_download_speed cfg.p2p.limits.max_download_speed;
+        Option.either max_download_speed cfg.p2p.limits.max_download_speed;
       max_upload_speed =
-        Option.first_some max_upload_speed cfg.p2p.limits.max_upload_speed;
+        Option.either max_upload_speed cfg.p2p.limits.max_upload_speed;
       max_known_points =
-        Option.first_some peer_table_size cfg.p2p.limits.max_known_points;
+        Option.either peer_table_size cfg.p2p.limits.max_known_points;
       max_known_peer_ids =
-        Option.first_some peer_table_size cfg.p2p.limits.max_known_peer_ids;
+        Option.either peer_table_size cfg.p2p.limits.max_known_peer_ids;
       binary_chunks_size = Option.map (fun x -> x lsl 10) binary_chunks_size;
     }
   in
@@ -1147,8 +1147,8 @@ let update ?data_dir ?min_connections ?expected_connections ?max_connections
       expected_pow = Option.value ~default:cfg.p2p.expected_pow expected_pow;
       bootstrap_peers =
         Option.value ~default:cfg.p2p.bootstrap_peers bootstrap_peers;
-      listen_addr = Option.first_some listen_addr cfg.p2p.listen_addr;
-      discovery_addr = Option.first_some discovery_addr cfg.p2p.discovery_addr;
+      listen_addr = Option.either listen_addr cfg.p2p.listen_addr;
+      discovery_addr = Option.either discovery_addr cfg.p2p.discovery_addr;
       private_mode = cfg.p2p.private_mode || private_mode;
       limits;
       disable_mempool = cfg.p2p.disable_mempool || disable_mempool;
@@ -1160,7 +1160,7 @@ let update ?data_dir ?min_connections ?expected_connections ?max_connections
       listen_addrs = unopt_list ~default:cfg.rpc.listen_addrs rpc_listen_addrs;
       cors_origins = unopt_list ~default:cfg.rpc.cors_origins cors_origins;
       cors_headers = unopt_list ~default:cfg.rpc.cors_headers cors_headers;
-      tls = Option.first_some rpc_tls cfg.rpc.tls;
+      tls = Option.either rpc_tls cfg.rpc.tls;
     }
   and log : Lwt_log_sink_unix.cfg =
     {cfg.log with output = Option.value ~default:cfg.log.output log_output}
@@ -1185,7 +1185,7 @@ let update ?data_dir ?min_connections ?expected_connections ?max_connections
            }
          in
          {cfg.shell.chain_validator_limits with synchronisation});
-      history_mode = Option.first_some history_mode cfg.shell.history_mode;
+      history_mode = Option.either history_mode cfg.shell.history_mode;
     }
   in
   (* If --network is specified it overrides the "network" entry of the

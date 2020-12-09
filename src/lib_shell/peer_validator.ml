@@ -400,7 +400,7 @@ let on_close w =
 let on_launch _ name parameters =
   let chain_state = Distributed_db.chain_state parameters.chain_db in
   State.Block.read_opt chain_state (State.Chain.genesis chain_state).block
-  >|= Option.unopt_assert ~loc:__POS__
+  >|= WithExceptions.Option.get ~loc:__LOC__
   >>= fun genesis ->
   let rec pv =
     {

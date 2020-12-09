@@ -162,8 +162,8 @@ type 'a encoding = {
 let prefix {prefix; _} = prefix
 
 let simple_decode ?alphabet {prefix; of_raw; _} s =
-  let open TzOption in
-  safe_decode ?alphabet s >>= TzString.remove_prefix ~prefix >>= of_raw
+  let ( >?? ) = Option.bind in
+  safe_decode ?alphabet s >?? TzString.remove_prefix ~prefix >?? of_raw
 
 let simple_encode ?alphabet {prefix; to_raw; _} d =
   safe_encode ?alphabet (prefix ^ to_raw d)

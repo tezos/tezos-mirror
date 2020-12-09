@@ -97,8 +97,8 @@ let secrets () =
         account = account.pkh;
         activation_code = Blinded_public_key_hash.activation_code_of_hex secret;
         amount =
-          Option.unopt_exn
-            (Invalid_argument "tez conversion")
+          WithExceptions.Option.to_exn
+            ~none:(Invalid_argument "tez conversion")
             (Tez.of_mutez (Int64.of_string amount));
       })
     [ ( [ "envelope";
@@ -316,7 +316,7 @@ let single_activation () =
   activation_init ()
   >>=? fun (blk, _contracts, secrets) ->
   let ({account; activation_code; amount = expected_amount; _} as _first_one) =
-    Option.get @@ List.hd secrets
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd secrets
   in
   (* Contract does not exist *)
   Assert.balance_is
@@ -383,9 +383,11 @@ let activation_and_transfer () =
   activation_init ()
   >>=? fun (blk, contracts, secrets) ->
   let ({account; activation_code; _} as _first_one) =
-    Option.get @@ List.hd secrets
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd secrets
   in
-  let bootstrap_contract = Option.get @@ List.hd contracts in
+  let bootstrap_contract =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts
+  in
   let first_contract = Contract.implicit_contract account in
   Op.activation (B blk) account activation_code
   >>=? fun operation ->
@@ -413,9 +415,11 @@ let transfer_to_unactivated_then_activate () =
   activation_init ()
   >>=? fun (blk, contracts, secrets) ->
   let ({account; activation_code; amount} as _first_one) =
-    Option.get @@ List.hd secrets
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd secrets
   in
-  let bootstrap_contract = Option.get @@ List.hd contracts in
+  let bootstrap_contract =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts
+  in
   let unactivated_commitment_contract = Contract.implicit_contract account in
   Context.Contract.balance (B blk) bootstrap_contract
   >>=? fun b_amount ->
@@ -455,7 +459,7 @@ let invalid_activation_with_no_commitments () =
   >>=? fun (blk, _) ->
   let secrets = secrets () in
   let ({account; activation_code; _} as _first_one) =
-    Option.get @@ List.hd secrets
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd secrets
   in
   Op.activation (B blk) account activation_code
   >>=? fun operation ->
@@ -471,9 +475,11 @@ let invalid_activation_with_no_commitments () =
 let invalid_activation_wrong_secret () =
   activation_init ()
   >>=? fun (blk, _, secrets) ->
-  let ({account; _} as _first_one) = Option.get @@ List.nth secrets 0 in
+  let ({account; _} as _first_one) =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth secrets 0
+  in
   let ({activation_code; _} as _second_one) =
-    Option.get @@ List.nth secrets 1
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth secrets 1
   in
   Op.activation (B blk) account activation_code
   >>=? fun operation ->
@@ -490,7 +496,9 @@ let invalid_activation_wrong_secret () =
 let invalid_activation_inexistent_pkh () =
   activation_init ()
   >>=? fun (blk, _, secrets) ->
-  let ({activation_code; _} as _first_one) = Option.get @@ List.hd secrets in
+  let ({activation_code; _} as _first_one) =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd secrets
+  in
   let inexistent_pkh =
     Signature.Public_key_hash.of_b58check_exn
       "tz1PeQHGKPWSpNoozvxgqLN9TFsj6rDqNV3o"
@@ -511,7 +519,7 @@ let invalid_double_activation () =
   activation_init ()
   >>=? fun (blk, _, secrets) ->
   let ({account; activation_code; _} as _first_one) =
-    Option.get @@ List.hd secrets
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd secrets
   in
   Incremental.begin_construction blk
   >>=? fun inc ->
@@ -533,8 +541,12 @@ let invalid_double_activation () =
 let invalid_transfer_from_unactivated_account () =
   activation_init ()
   >>=? fun (blk, contracts, secrets) ->
-  let ({account; _} as _first_one) = Option.get @@ List.hd secrets in
-  let bootstrap_contract = Option.get @@ List.hd contracts in
+  let ({account; _} as _first_one) =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd secrets
+  in
+  let bootstrap_contract =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts
+  in
   let unactivated_commitment_contract = Contract.implicit_contract account in
   (* No activation *)
   Op.transaction

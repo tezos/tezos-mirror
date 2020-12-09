@@ -77,7 +77,8 @@ let fill_in ?(show_optionals = true) input schema =
     | Combine ((One_of | Any_of), elts) ->
         let nb = List.length elts in
         input.int 0 (nb - 1) (Some "Select the schema to follow") path
-        >>= fun n -> element path (Option.get @@ List.nth elts n)
+        >>= fun n ->
+        element path (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth elts n)
     | Combine ((All_of | Not), _) ->
         Lwt.fail Unsupported_construct
     | Def_ref name ->

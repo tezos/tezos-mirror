@@ -122,7 +122,7 @@ let test_revelation_early_wrong_right_twice () =
   Op.seed_nonce_revelation
     (B b)
     level_commitment
-    (Option.unopt_exn Not_found @@ Nonce.get committed_hash)
+    (WithExceptions.Option.to_exn ~none:Not_found @@ Nonce.get committed_hash)
   |> fun operation ->
   Block.bake ~policy ~operation b
   >>= fun e ->
@@ -142,7 +142,7 @@ let test_revelation_early_wrong_right_twice () =
   Op.seed_nonce_revelation
     (B b)
     level_commitment
-    (Option.unopt_exn Not_found @@ Nonce.get wrong_hash)
+    (WithExceptions.Option.to_exn ~none:Not_found @@ Nonce.get wrong_hash)
   |> fun operation ->
   Block.bake ~operation b
   >>= fun e ->
@@ -156,7 +156,7 @@ let test_revelation_early_wrong_right_twice () =
   Op.seed_nonce_revelation
     (B b)
     level_commitment
-    (Option.unopt_exn Not_found @@ Nonce.get committed_hash)
+    (WithExceptions.Option.to_exn ~none:Not_found @@ Nonce.get committed_hash)
   |> fun operation ->
   Block.get_next_baker ~policy b
   >>=? fun (baker_pkh, _, _) ->
@@ -197,7 +197,7 @@ let test_revelation_early_wrong_right_twice () =
   Op.seed_nonce_revelation
     (B b)
     level_commitment
-    (Option.unopt_exn Not_found @@ Nonce.get wrong_hash)
+    (WithExceptions.Option.to_exn ~none:Not_found @@ Nonce.get wrong_hash)
   |> fun operation ->
   Block.bake ~operation ~policy b
   >>= fun e ->
@@ -274,7 +274,7 @@ let test_revelation_missing_and_late () =
   Op.seed_nonce_revelation
     (B b)
     level_commitment
-    (Option.unopt_exn Not_found @@ Nonce.get committed_hash)
+    (WithExceptions.Option.to_exn ~none:Not_found @@ Nonce.get committed_hash)
   |> fun operation ->
   Block.bake ~operation b
   >>= fun e ->

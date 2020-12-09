@@ -262,7 +262,7 @@ module Real = struct
   let shutdown net () =
     lwt_log_notice "Shutting down the p2p's welcome worker..."
     >>= fun () ->
-    Lwt_utils.may ~f:P2p_welcome.shutdown net.welcome
+    Option.iter_s P2p_welcome.shutdown net.welcome
     >>= fun () ->
     lwt_log_notice "Shutting down the p2p's network maintenance worker..."
     >>= fun () ->

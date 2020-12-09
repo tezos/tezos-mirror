@@ -88,7 +88,11 @@ let key_value_gen kmode =
 let safe_set m k v =
   let prefix l =
     if l = [] then None
-    else Some (List.rev l |> List.tl |> Option.get |> List.rev)
+    else
+      Some
+        ( List.rev l |> List.tl
+        |> WithExceptions.Option.get ~loc:__LOC__
+        |> List.rev )
   in
   let rec any_prefix_mem m k =
     let prefix = prefix k in

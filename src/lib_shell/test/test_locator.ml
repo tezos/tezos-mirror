@@ -110,7 +110,7 @@ let zero = Bytes.create 0
 (* adds n blocks on top of an initialized chain *)
 let make_empty_chain (chain : State.Chain.t) n : Block_hash.t Lwt.t =
   State.Block.read_opt chain genesis_hash
-  >|= Option.unopt_assert ~loc:__POS__
+  >|= WithExceptions.Option.get ~loc:__LOC__
   >>= fun genesis ->
   State.Block.context_exn genesis
   >>= fun empty_context ->
@@ -167,7 +167,7 @@ let make_empty_chain (chain : State.Chain.t) n : Block_hash.t Lwt.t =
 let make_multiple_protocol_chain (chain : State.Chain.t) ~(chain_length : int)
     ~fork_points =
   State.Block.read_opt chain genesis_hash
-  >|= Option.unopt_assert ~loc:__POS__
+  >|= WithExceptions.Option.get ~loc:__LOC__
   >>= fun genesis ->
   State.Block.context_exn genesis
   >>= fun empty_context ->
@@ -285,13 +285,13 @@ let print_block b =
 
 let print_block_h chain bh =
   State.Block.read_opt chain bh
-  >|= Option.unopt_assert ~loc:__POS__
+  >|= WithExceptions.Option.get ~loc:__LOC__
   >|= fun b -> print_block b
 
 (* returns the predecessor at distance one, reading the header *)
 let linear_predecessor chain (bh : Block_hash.t) : Block_hash.t option Lwt.t =
   State.Block.read_opt chain bh
-  >|= Option.unopt_assert ~loc:__POS__
+  >|= WithExceptions.Option.get ~loc:__LOC__
   >>= fun b ->
   State.Block.predecessor b
   >|= function None -> None | Some pred -> Some (State.Block.hash pred)
@@ -333,7 +333,7 @@ let test_pred (base_dir : string) : unit tzresult Lwt.t =
     linear_predecessor_n chain head distance
     >>= fun lin_res ->
     State.Block.read_opt chain head
-    >|= Option.unopt_assert ~loc:__POS__
+    >|= WithExceptions.Option.get ~loc:__LOC__
     >>= fun head_block ->
     State.Block.predecessor_n head_block distance
     >>= fun exp_res ->
@@ -346,11 +346,11 @@ let test_pred (base_dir : string) : unit tzresult Lwt.t =
         (* check that the two results are the same *)
         assert (lin_res = exp_res) ;
         State.Block.read_opt chain lin_res
-        >|= Option.unopt_assert ~loc:__POS__
+        >|= WithExceptions.Option.get ~loc:__LOC__
         >>= fun pred ->
         let level_pred = Int32.to_int (State.Block.level pred) in
         State.Block.read_opt chain head
-        >|= Option.unopt_assert ~loc:__POS__
+        >|= WithExceptions.Option.get ~loc:__LOC__
         >>= fun head ->
         let level_start = Int32.to_int (State.Block.level head) in
         (* check distance using the level *)
@@ -603,11 +603,15 @@ let test_protocol_locator base_dir =
           return_unit)
         steps
       >>=? fun () ->
-      let last_hash = (Option.get @@ List.hd steps).predecessor in
+      let last_hash =
+        (WithExceptions.Option.get ~loc:__LOC__ @@ List.hd steps).predecessor
+      in
       Assert.is_true
         ~msg:"last block in locator is the checkpoint"
         (Block_hash.equal last_hash (State.Block.hash pred)) ;
-      let first_hash = (Option.get @@ List.last_opt steps).block in
+      let first_hash =
+        (WithExceptions.Option.get ~loc:__LOC__ @@ List.last_opt steps).block
+      in
       Assert.is_true
         ~msg:"first block in locator is the head"
         (Block_hash.equal first_hash head_hash) ;

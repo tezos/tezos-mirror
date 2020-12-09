@@ -71,9 +71,9 @@ end) : Internal_event.SINK with type t = t = struct
 
   let configure uri =
     let level_at_least =
-      TzOption.(
-        Uri.get_query_param uri "level-at-least"
-        >>= Internal_event.Level.of_string)
+      let ( >?? ) = Option.bind in
+      Uri.get_query_param uri "level-at-least"
+      >?? Internal_event.Level.of_string
       |> Option.value ~default:Internal_event.Level.default
     in
     let fail_parsing fmt =

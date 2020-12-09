@@ -569,7 +569,7 @@ module Raw = struct
     let decrypt ciphertext xfvk =
       let ivk = Viewing_key.to_ivk xfvk in
       let symkey = DH.symkey_receiver ciphertext.epk ivk in
-      let ( >?? ) = Stdlib.Option.bind in
+      let ( >?? ) = Option.bind in
       Crypto_box.Secretbox.secretbox_open
         symkey
         ciphertext.payload_enc
@@ -586,7 +586,7 @@ module Raw = struct
     let decrypt_ovk ciphertext ovk (cm, epk) =
       (* symkey for payload_out *)
       let symkey = DH.symkey_out ovk (ciphertext.cv, cm, epk) in
-      let ( >?? ) = Stdlib.Option.bind in
+      let ( >?? ) = Option.bind in
       Crypto_box.Secretbox.secretbox_open
         symkey
         ciphertext.payload_out

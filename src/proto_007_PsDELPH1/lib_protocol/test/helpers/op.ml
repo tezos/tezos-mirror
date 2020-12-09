@@ -67,7 +67,7 @@ let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
   assert (List.length packed_operations > 0) ;
   (* Hypothesis : each operation must have the same branch (is this really true?) *)
   let {Tezos_base.Operation.branch} =
-    (Option.get @@ List.hd packed_operations).shell
+    (WithExceptions.Option.get ~loc:__LOC__ @@ List.hd packed_operations).shell
   in
   assert (
     List.for_all
@@ -253,7 +253,9 @@ let origination ?counter ?delegate ~script ?(preorigination = None) ?public_key
   Context.Contract.manager ctxt source
   >>=? fun account ->
   let default_credit = Tez.of_mutez @@ Int64.of_int 1000001 in
-  let default_credit = Option.unopt_exn Impossible default_credit in
+  let default_credit =
+    WithExceptions.Option.to_exn ~none:Impossible default_credit
+  in
   let credit = Option.value ~default:default_credit credit in
   let operation = Origination {delegate; script; credit; preorigination} in
   manager_operation

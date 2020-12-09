@@ -178,10 +178,10 @@ let test_do_rpc_no_longer_key () =
     "A;b;1 is mapped to tree of size 4"
     (nb_nodes a_b_1_tree_opt = 4)
   >>= fun _ ->
-  let a_b_1_tree = Option.get a_b_1_tree_opt in
+  let a_b_1_tree = WithExceptions.Option.get ~loc:__LOC__ a_b_1_tree_opt in
   MockedGetter.proxy_get mock_input ["A"; "b"; "1"]
   >>=? fun a_b_1_tree_opt' ->
-  let a_b_1_tree' = Option.get a_b_1_tree_opt' in
+  let a_b_1_tree' = WithExceptions.Option.get ~loc:__LOC__ a_b_1_tree_opt' in
   lwt_assert_true "Tree is physically cached" (a_b_1_tree == a_b_1_tree')
   >>= fun _ ->
   lwt_assert_true "Done one RPC" (Stack.length MockedProtoRPC.calls = 1)
@@ -193,7 +193,7 @@ let test_do_rpc_no_longer_key () =
   (* Let's check that value mapped by A;b;1 was unaffected by getting A;b;2 *)
   MockedGetter.proxy_get mock_input ["A"; "b"; "1"]
   >>=? fun a_b_1_tree_opt' ->
-  let a_b_1_tree' = Option.get a_b_1_tree_opt' in
+  let a_b_1_tree' = WithExceptions.Option.get ~loc:__LOC__ a_b_1_tree_opt' in
   lwt_assert_true "Orthogonal tree stayed the same" (a_b_1_tree == a_b_1_tree')
   >>= fun _ ->
   MockedGetter.proxy_get mock_input ["A"]

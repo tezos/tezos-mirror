@@ -104,7 +104,10 @@ module Client = struct
     assert (Int64.add wallet.balance tez >= 0L) ;
     let rec gather_input to_pay balance inputs unspent_inputs =
       if to_pay > 0L then
-        let input_to_add = Option.get @@ InputSet.choose unspent_inputs in
+        let input_to_add =
+          WithExceptions.Option.get ~loc:__LOC__
+          @@ InputSet.choose unspent_inputs
+        in
         let amount = Forge.Input.amount input_to_add in
         gather_input
           (Int64.sub to_pay amount)
@@ -153,7 +156,10 @@ module Client = struct
     assert (Int64.(add wallet.balance tez) >= amount) ;
     let rec gather_input to_pay balance inputs unspent_input =
       if to_pay > 0L then
-        let input_to_add = Option.get @@ InputSet.choose unspent_input in
+        let input_to_add =
+          WithExceptions.Option.get ~loc:__LOC__
+          @@ InputSet.choose unspent_input
+        in
         let amount = Forge.Input.amount input_to_add in
         gather_input
           (Int64.sub to_pay amount)

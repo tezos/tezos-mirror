@@ -247,12 +247,14 @@ let build_raw_rpc_directory ~user_activated_upgrades
         (fun () ->
           State.Block.operations block i
           >>= fun (ops, _path) ->
-          let op = Option.get @@ List.nth ops j in
+          let op = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth ops j in
           Lwt.catch
             (fun () ->
               State.Block.operations_metadata block i
               >>= fun metadata ->
-              let op_metadata = Option.get @@ List.nth metadata j in
+              let op_metadata =
+                WithExceptions.Option.get ~loc:__LOC__ @@ List.nth metadata j
+              in
               return (convert_with_metadata chain_id op op_metadata))
             (fun _ -> return (convert_without_metadata chain_id op)))
         (fun _ -> raise Not_found)) ;

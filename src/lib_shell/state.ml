@@ -164,10 +164,8 @@ let update_chain_data {chain_data; _} f =
   Shared.use chain_data (fun state ->
       f state.chain_data_store state.data
       >>= fun (data, res) ->
-      Lwt_utils.may data ~f:(fun data ->
-          state.data <- data ;
-          Lwt.return_unit)
-      >>= fun () -> Lwt.return res)
+      Option.iter (fun data -> state.data <- data) data ;
+      Lwt.return res)
 
 (** The number of predecessors stored per block.
     This value chosen to compute efficiently block locators that
@@ -206,7 +204,7 @@ let store_predecessors (store : Store.Block.store) (b : Block_hash.t) :
   in
   (* the first predecessor is fetched from the header *)
   Header.read_opt (store, b)
-  >|= Option.unopt_assert ~loc:__POS__
+  >|= WithExceptions.Option.get ~loc:__LOC__
   >>= fun header ->
   let pred = header.shell.predecessor in
   if Block_hash.equal b pred then Lwt.return_unit (* genesis *)
@@ -340,7 +338,7 @@ module Locked_block = struct
         block_store
         hash
         (Int32.to_int @@ Int32.sub header.shell.level checkpoint.shell.level)
-      >|= Option.unopt_assert ~loc:__POS__
+      >|= WithExceptions.Option.get ~loc:__LOC__
       >>= fun predecessor ->
       if Block_hash.equal predecessor (Block_header.hash checkpoint) then
         Lwt.return_true
@@ -355,7 +353,7 @@ let locked_valid_heads_for_checkpoint block_store data checkpoint =
   Block_hash.Set.fold_s
     (fun head (valid_heads, invalid_heads) ->
       Header.read_opt (block_store, head)
-      >|= Option.unopt_assert ~loc:__POS__
+      >|= WithExceptions.Option.get ~loc:__LOC__
       >>= fun header ->
       Locked_block.is_valid_for_checkpoint block_store head header checkpoint
       >>= fun valid ->
@@ -517,7 +515,7 @@ module Chain = struct
       ~allow_forked_chain ~current_head ~checkpoint ~chain_id global_state
       context_index chain_data_store block_store =
     Header.read_opt (block_store, current_head)
-    >|= Option.unopt_assert ~loc:__POS__
+    >|= WithExceptions.Option.get ~loc:__LOC__
     >>= fun current_block_head ->
     let rec chain_data =
       {
@@ -698,7 +696,8 @@ module Chain = struct
     Shared.use state.global_data (fun data ->
         Lwt.return (Chain_id.Table.find data.chains id))
 
-  let get_exn state id = get_opt state id >|= Option.unopt_exn Not_found
+  let get_exn state id =
+    get_opt state id >|= WithExceptions.Option.to_exn ~none:Not_found
 
   let get state id =
     get_opt state id
@@ -744,7 +743,7 @@ module Chain = struct
       else Lwt.return (n_blocks, blocks) )
       >>= fun (n_blocks, blocks) ->
       Header.read_opt (store, block_hash)
-      >|= Option.unopt_assert ~loc:__POS__
+      >|= WithExceptions.Option.get ~loc:__LOC__
       >>= fun header ->
       if Block_hash.equal block_hash genesis_hash then do_prune blocks
       else if header.shell.level = caboose_level then
@@ -752,7 +751,7 @@ module Chain = struct
       else loop header.shell.predecessor (n_blocks + 1, block_hash :: blocks)
     in
     Header.read_opt (store, block_hash)
-    >|= Option.unopt_assert ~loc:__POS__
+    >|= WithExceptions.Option.get ~loc:__LOC__
     >>= fun header -> loop header.shell.predecessor (0, [])
 
   let purge_full chain_state (lvl, hash) =
@@ -817,7 +816,7 @@ module Chain = struct
               (n_blocks + 1, block_hash :: blocks)
     in
     Header.read_opt (store, block_hash)
-    >|= Option.unopt_assert ~loc:__POS__
+    >|= WithExceptions.Option.get ~loc:__LOC__
     >>= fun header ->
     if limit = 0 then
       delete_loop header.shell.predecessor (0, [])
@@ -1299,18 +1298,20 @@ module Block = struct
         List.map_p
           (fun n ->
             Store.Block.Operation_hashes.read_opt (store, hash) n
-            >|= Option.unopt_assert ~loc:__POS__)
+            >|= WithExceptions.Option.get ~loc:__LOC__)
           (0 -- (header.shell.validation_passes - 1))
         >>= fun hashes ->
         let path = compute_operation_path hashes in
-        Lwt.return (Option.unopt_exn Not_found @@ List.nth hashes i, path i))
+        Lwt.return
+          ( WithExceptions.Option.to_exn ~none:Not_found @@ List.nth hashes i,
+            path i ))
 
   let all_operation_hashes {chain_state; hash; header; _} =
     Shared.use chain_state.block_store (fun store ->
         List.map_p
           (fun i ->
             Store.Block.Operation_hashes.read_opt (store, hash) i
-            >|= Option.unopt_assert ~loc:__POS__)
+            >|= WithExceptions.Option.get ~loc:__LOC__)
           (0 -- (header.shell.validation_passes - 1)))
 
   let operations {chain_state; hash; header; _} i =
@@ -1320,12 +1321,12 @@ module Block = struct
         List.map_p
           (fun n ->
             Store.Block.Operation_hashes.read_opt (store, hash) n
-            >|= Option.unopt_assert ~loc:__POS__)
+            >|= WithExceptions.Option.get ~loc:__LOC__)
           (0 -- (header.shell.validation_passes - 1))
         >>= fun hashes ->
         let path = compute_operation_path hashes in
         Store.Block.Operations.read_opt (store, hash) i
-        >|= Option.unopt_assert ~loc:__POS__
+        >|= WithExceptions.Option.get ~loc:__LOC__
         >>= fun ops -> Lwt.return (ops, path i))
 
   let operations_metadata {chain_state; hash; header; _} i =
@@ -1333,14 +1334,14 @@ module Block = struct
       invalid_arg "State.Block.operations_metadata" ;
     Shared.use chain_state.block_store (fun store ->
         Store.Block.Operations_metadata.read_opt (store, hash) i
-        >|= Option.unopt_assert ~loc:__POS__)
+        >|= WithExceptions.Option.get ~loc:__LOC__)
 
   let all_operations {chain_state; hash; header; _} =
     Shared.use chain_state.block_store (fun store ->
         List.map_p
           (fun i ->
             Store.Block.Operations.read_opt (store, hash) i
-            >|= Option.unopt_assert ~loc:__POS__)
+            >|= WithExceptions.Option.get ~loc:__LOC__)
           (0 -- (header.shell.validation_passes - 1)))
 
   let all_operations_metadata {chain_state; hash; header; _} =
@@ -1348,7 +1349,7 @@ module Block = struct
         List.map_p
           (fun i ->
             Store.Block.Operations_metadata.read_opt (store, hash) i
-            >|= Option.unopt_assert ~loc:__POS__)
+            >|= WithExceptions.Option.get ~loc:__LOC__)
           (0 -- (header.shell.validation_passes - 1)))
 
   let metadata_hash {chain_state; hash; _} =
@@ -1368,12 +1369,12 @@ module Block = struct
           | false ->
               Lwt.return_none
           | true ->
-              Lwt_list.map_p
+              List.map_p
                 (fun i ->
                   Store.Block.Operations_metadata_hashes.read_opt
                     (store, hash)
                     i
-                  >|= Option.unopt_assert ~loc:__POS__)
+                  >|= WithExceptions.Option.get ~loc:__LOC__)
                 (0 -- (header.shell.validation_passes - 1))
               >|= fun hashes -> Some hashes)
 
@@ -1391,7 +1392,7 @@ module Block = struct
       (fun () ->
         Shared.use chain_state.block_store (fun block_store ->
             Store.Block.Contents.read_opt (block_store, hash))
-        >|= Option.unopt_assert ~loc:__POS__
+        >|= WithExceptions.Option.get ~loc:__LOC__
         >>= fun {context = commit; _} ->
         Shared.use chain_state.context_index (fun context_index ->
             Context.checkout_exn context_index commit))
@@ -1400,7 +1401,7 @@ module Block = struct
   let context_opt {chain_state; hash; _} =
     Shared.use chain_state.block_store (fun block_store ->
         Store.Block.Contents.read_opt (block_store, hash))
-    >|= Option.unopt_assert ~loc:__POS__
+    >|= WithExceptions.Option.get ~loc:__LOC__
     >>= fun {context = commit; _} ->
     Shared.use chain_state.context_index (fun context_index ->
         Context.checkout context_index commit)
@@ -1416,7 +1417,7 @@ module Block = struct
   let context_exists {chain_state; hash; _} =
     Shared.use chain_state.block_store (fun block_store ->
         Store.Block.Contents.read_opt (block_store, hash))
-    >|= Option.unopt_assert ~loc:__POS__
+    >|= WithExceptions.Option.get ~loc:__LOC__
     >>= fun {context = commit; _} ->
     Shared.use chain_state.context_index (fun context_index ->
         Context.exists context_index commit)
@@ -1511,7 +1512,7 @@ module Block = struct
 
   let set_rpc_directory ({chain_state; _} as block) dir =
     read_opt chain_state block.header.shell.predecessor
-    >|= Option.unopt_assert ~loc:__POS__
+    >|= WithExceptions.Option.get ~loc:__LOC__
     >>= fun pred ->
     protocol_hash_exn block
     >>= fun next_protocol ->
@@ -1660,7 +1661,7 @@ let best_known_head_for_checkpoint chain_state checkpoint =
           else
             let find_valid_predecessor hash =
               Header.read_opt (store, hash)
-              >|= Option.unopt_assert ~loc:__POS__
+              >|= WithExceptions.Option.get ~loc:__LOC__
               >>= fun header ->
               if Compare.Int32.(header.shell.level < checkpoint.shell.level)
               then Lwt.return {hash; chain_state; header}
@@ -1671,17 +1672,17 @@ let best_known_head_for_checkpoint chain_state checkpoint =
                   ( 1
                   + ( Int32.to_int
                     @@ Int32.sub header.shell.level checkpoint.shell.level ) )
-                >|= Option.unopt_assert ~loc:__POS__
+                >|= WithExceptions.Option.get ~loc:__LOC__
                 >>= fun pred ->
                 Header.read_opt (store, pred)
-                >|= Option.unopt_assert ~loc:__POS__
+                >|= WithExceptions.Option.get ~loc:__LOC__
                 >>= fun pred_header ->
                 Lwt.return {hash = pred; chain_state; header = pred_header}
             in
             Store.Chain_data.Known_heads.read_all data.chain_data_store
             >>= fun heads ->
             Header.read_opt (store, chain_state.genesis.block)
-            >|= Option.unopt_assert ~loc:__POS__
+            >|= WithExceptions.Option.get ~loc:__LOC__
             >>= fun genesis_header ->
             let genesis =
               {
@@ -2005,7 +2006,7 @@ let init ?patch_context ?commit_genesis ?(store_mapsize = 40_960_000_000L)
 let history_mode {global_data; _} =
   Shared.use global_data (fun {global_store; _} ->
       Store.Configuration.History_mode.read_opt global_store
-      >|= Option.unopt_assert ~loc:__POS__)
+      >|= WithExceptions.Option.get ~loc:__LOC__)
 
 let close {global_data; _} =
   Shared.use global_data (fun {global_store; context_index; _} ->

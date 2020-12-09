@@ -104,35 +104,6 @@ let with_context ~base_dir ~context_hash f =
 let prepare_base_dir base_dir =
   Unix.unlink base_dir ; Unix.mkdir base_dir 0o700
 
-(* This function prepares a context of depth [depth] where each node
-     has a width [fan_out], with only one non-trivial recursive node
-     at each leave. *)
-let initialize_context_with_fan_out rng_state context fan_out depth
-    storage_size =
-  assert (fan_out > 0) ;
-  let populate_dummy path fan_out =
-    List.init ~when_negative_length:() fan_out (fun i -> string_of_int i)
-    >>?= fun keys ->
-    List.fold_left_es
-      (fun ctxt key ->
-        let path = path @ [key] in
-        let bytes = Base_samplers.uniform_bytes rng_state ~nbytes:8 in
-        Tezos_storage.Context.add ctxt path bytes >>= return)
-      context
-      keys
-    >>=? fun context -> return (List.hd keys |> Option.get, context)
-  in
-  let rec loop context path depth =
-    if depth = 0 then
-      let bytes = Base_samplers.uniform_bytes rng_state ~nbytes:storage_size in
-      Tezos_storage.Context.add context path bytes
-      >>= fun context -> return (context, path)
-    else
-      populate_dummy path fan_out
-      >>=? fun (key, context) -> loop context (path @ [key]) (depth - 1)
-  in
-  loop context [] depth
-
 (* This function updates the context with random bytes at a given depth. *)
 let initialize_key rng_state context path storage_size =
   let bytes = Base_samplers.uniform_bytes rng_state ~nbytes:storage_size in

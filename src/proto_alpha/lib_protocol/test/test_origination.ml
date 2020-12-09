@@ -44,7 +44,7 @@ let ten_tez = Tez.of_int 10
 let register_origination ?(fee = Tez.zero) ?(credit = Tez.zero) () =
   Context.init 1
   >>=? fun (b, contracts) ->
-  let source = Option.get @@ List.hd contracts in
+  let source = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
   Context.Contract.balance (B b) source
   >>=? fun source_balance ->
   Op.origination (B b) source ~fee ~credit ~script:Op.dummy_script
@@ -88,7 +88,7 @@ let test_origination_balances ~loc:_ ?(fee = Tez.zero) ?(credit = Tez.zero) ()
     =
   Context.init 1
   >>=? fun (b, contracts) ->
-  let contract = Option.get @@ List.hd contracts in
+  let contract = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
   Context.Contract.balance (B b) contract
   >>=? fun balance ->
   Op.origination (B b) contract ~fee ~credit ~script:Op.dummy_script
@@ -160,8 +160,12 @@ let test_pay_fee () =
 let test_not_tez_in_contract_to_pay_fee () =
   Context.init 2
   >>=? fun (b, contracts) ->
-  let contract_1 = Option.get @@ List.nth contracts 0 in
-  let contract_2 = Option.get @@ List.nth contracts 1 in
+  let contract_1 =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
+  in
+  let contract_2 =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 1
+  in
   Incremental.begin_construction b
   >>=? fun inc ->
   (* transfer everything but one tez from 1 to 2 and check balance of 1 *)
@@ -197,7 +201,7 @@ let test_not_tez_in_contract_to_pay_fee () =
 let register_contract_get_endorser () =
   Context.init 1
   >>=? fun (b, contracts) ->
-  let contract = Option.get @@ List.hd contracts in
+  let contract = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
   Incremental.begin_construction b
   >>=? fun inc ->
   Context.get_endorser (I inc)
@@ -222,7 +226,7 @@ let test_multiple_originations () =
 let test_counter () =
   Context.init 1
   >>=? fun (b, contracts) ->
-  let contract = Option.get @@ List.hd contracts in
+  let contract = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
   Incremental.begin_construction b
   >>=? fun inc ->
   Op.origination (I inc) ~credit:Tez.one contract ~script:Op.dummy_script

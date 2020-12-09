@@ -133,8 +133,12 @@ let () =
          proposed %a alternative peers."
         P2p_rejection.pp
         motive
-        (Option.pp ~default:"no" (fun ppf l ->
-             Format.pp_print_int ppf @@ List.length l))
+        (fun ppf alt_points ->
+          match alt_points with
+          | None ->
+              Format.pp_print_string ppf "no"
+          | Some l ->
+              Format.pp_print_int ppf @@ List.length l)
         alt_points)
     Data_encoding.(
       obj2
