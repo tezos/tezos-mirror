@@ -66,14 +66,14 @@ val prepare :
   Context.t ->
   context tzresult Lwt.t
 
-type previous_protocol = Genesis of Parameters_repr.t | Delphi_007
+type previous_protocol = Genesis of Parameters_repr.t | Edo_008
 
 val prepare_first_block :
   level:int32 ->
   timestamp:Time.t ->
   fitness:Fitness.t ->
   Context.t ->
-  (previous_protocol * context * Int32.t) tzresult Lwt.t
+  (previous_protocol * context) tzresult Lwt.t
 
 val activate : context -> Protocol_hash.t -> t Lwt.t
 

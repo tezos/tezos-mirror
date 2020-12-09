@@ -374,6 +374,7 @@ let storage_error err = error (Storage_error err)
    protocol.  It's absence meaning that the context is empty. *)
 let version_key = ["version"]
 
+(* This value is set by the snapshot_alpha.sh script, don't change it. *)
 let version_value = "alpha_current"
 
 let version = "v1"
@@ -540,7 +541,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
     internal_nonces_used = Int_set.empty;
   }
 
-type previous_protocol = Genesis of Parameters_repr.t | Delphi_007
+type previous_protocol = Genesis of Parameters_repr.t | Edo_008
 
 let check_and_update_protocol_version ctxt =
   Context.get ctxt version_key
@@ -555,8 +556,7 @@ let check_and_update_protocol_version ctxt =
             else if Compare.String.(s = "genesis") then
               get_proto_param ctxt
               >|=? fun (param, ctxt) -> (Genesis param, ctxt)
-            else if Compare.String.(s = "delphi_007") then
-              return (Delphi_007, ctxt)
+            else if Compare.String.(s = "edo_008") then return (Edo_008, ctxt)
             else Lwt.return @@ storage_error (Incompatible_protocol_version s))
   >>=? fun (previous_proto, ctxt) ->
   Context.set ctxt version_key (Bytes.of_string version_value)
@@ -570,26 +570,12 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
       Raw_level_repr.of_int32 level
       >>?= fun first_level ->
       set_first_level ctxt first_level
-      >>=? fun ctxt ->
-      set_constants ctxt param.constants
-      >|= fun ctxt -> ok (ctxt, param.constants.blocks_per_voting_period)
-  | Delphi_007 ->
-      get_constants ctxt
-      >>=? fun c ->
-      let prev_blocks_per_voting_period = c.blocks_per_voting_period in
-      let constants =
-        Constants_repr.
-          {
-            c with
-            blocks_per_voting_period = 20480l;
-            test_chain_duration = 1_228_800L;
-          }
-      in
-      set_constants ctxt constants
-      >>= fun ctxt -> return (ctxt, prev_blocks_per_voting_period) )
-  >>=? fun (ctxt, prev_blocks_per_voting_period) ->
+      >>=? fun ctxt -> set_constants ctxt param.constants >|= ok
+  | Edo_008 ->
+      return ctxt )
+  >>=? fun ctxt ->
   prepare ctxt ~level ~predecessor_timestamp:timestamp ~timestamp ~fitness
-  >|=? fun ctxt -> (previous_proto, ctxt, prev_blocks_per_voting_period)
+  >|=? fun ctxt -> (previous_proto, ctxt)
 
 let activate ({context = c; _} as s) h =
   Updater.activate c h >|= fun c -> {s with context = c}

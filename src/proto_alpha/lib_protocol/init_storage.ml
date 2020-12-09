@@ -27,7 +27,7 @@
 (* This is the genesis protocol: initialise the state *)
 let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
   Raw_context.prepare_first_block ~level ~timestamp ~fitness ctxt
-  >>=? fun (previous_protocol, ctxt, prev_blocks_per_voting_period) ->
+  >>=? fun (previous_protocol, ctxt) ->
   match previous_protocol with
   | Genesis param ->
       Commitment_storage.init ctxt param.commitments
@@ -54,20 +54,8 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
       >>=? fun ctxt ->
       Storage.Block_priority.init ctxt 0
       >>=? fun ctxt -> Vote_storage.update_listings ctxt
-  | Delphi_007 ->
-      Storage.Vote.Current_period_kind_007.delete ctxt
-      >>=? fun ctxt ->
-      let level_position = (Level_storage.current ctxt).level_position in
-      let voting_period_index =
-        Int32.(div (succ level_position) prev_blocks_per_voting_period)
-      in
-      let start_position = level_position in
-      Storage.Vote.Current_period.init
-        ctxt
-        {index = voting_period_index; kind = Proposal; start_position}
-      >>=? fun ctxt ->
-      Storage.Vote.Pred_period_kind.init ctxt Promotion_vote
-      >>=? fun ctxt -> Storage.Sapling.Next.init ctxt
+  | Edo_008 ->
+      return ctxt
 
 let prepare ctxt ~level ~predecessor_timestamp ~timestamp ~fitness =
   Raw_context.prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt

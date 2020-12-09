@@ -374,11 +374,6 @@ module Vote : sig
       with type value = Voting_period_repr.kind
        and type t := Raw_context.t
 
-  module Current_period_kind_007 :
-    Single_data_storage
-      with type value = Voting_period_repr.kind
-       and type t := Raw_context.t
-
   module Current_period :
     Single_data_storage
       with type value = Voting_period_repr.t
