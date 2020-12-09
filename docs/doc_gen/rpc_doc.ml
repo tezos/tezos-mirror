@@ -406,7 +406,7 @@ let main node =
     :: protocol_dirs
   in
   let (_version, name, intro, path, dir) =
-    Option.get
+    WithExceptions.Option.get ~loc:__LOC__
     @@ List.find
          (fun (version, _name, _intro, _path, _dir) ->
            version = required_version)
