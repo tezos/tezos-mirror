@@ -23,7 +23,7 @@ rm "$tmp"0*
 
 cat >> "$tmp" <<EOF
 unit:alltest:
-  <<: *test_definition
+  extends: .test_template
   artifacts:
     name: "alltest-\${CI_COMMIT_SHA}"
     paths:

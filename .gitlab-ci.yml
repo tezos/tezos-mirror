@@ -35,7 +35,7 @@ sanity:
 ## Stage: build (only MR)                                 ##
 ############################################################
 
-.build_template: &build_definition
+.build_template:
   image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
   stage: build
   except:
@@ -50,22 +50,22 @@ sanity:
   interruptible: true
 
 check_opam_deps:
-  <<: *build_definition
+  extends: .build_template
   script:
     - ./scripts/opam-check.sh
 
 check_opam_lint:
-  <<: *build_definition
+  extends: .build_template
   script:
     - find . ! -path "./_opam/*" -name "*.opam" -exec opam lint {} +;
 
 check_linting:
-  <<: *build_definition
+  extends: .build_template
   script:
     - make check-linting
 
 check_precommit_hook:
-  <<: *build_definition
+  extends: .build_template
   script:
     - ./scripts/pre_commit/pre_commit.py --test-itself
     - cd tests_python
@@ -74,19 +74,19 @@ check_precommit_hook:
     - poetry run mypy ../scripts/pre_commit/pre_commit.py
 
 check_python_linting:
-  <<: *build_definition
+  extends: .build_template
   script:
     - make check-python-linting
 
 check_python_types:
-  <<: *build_definition
+  extends: .build_template
   script:
     - make -C tests_python typecheck
 
 check_scripts_b58_prefix:
   # Can be changed to a python image, but using the build docker image to keep
   # in sync with the python version used for the tests
-  <<: *build_definition
+  extends: .build_template
   before_script:
     - cd scripts/b58_prefix
     - poetry install
@@ -95,7 +95,7 @@ check_scripts_b58_prefix:
     - poetry run pytest test_b58_prefix.py -v
 
 build:
-  <<: *build_definition
+  extends: .build_template
   script:
     - . ./scripts/version.sh
     - dune build @runtest_dune_template
@@ -116,7 +116,7 @@ build:
     when: on_success
 
 build_arm64:
-  <<: *build_definition
+  extends: .build_template
   when: manual
   script:
     - . ./scripts/version.sh
@@ -146,8 +146,8 @@ test-script-gen-genesis:
     - dune build gen_genesis.exe
   interruptible: true
 
-.test_template: &test_definition
-  <<: *build_definition
+.test_template:
+  extends: .build_template
   stage: test
   retry: 2
   # avoid pushing cache for testing stage
@@ -158,7 +158,7 @@ test-script-gen-genesis:
 # this section is updated using the script scripts/update_unit_test.sh
 ##BEGIN_UNITTEST##
 unit:alltest:
-  <<: *test_definition
+  extends: .test_template
   artifacts:
     name: "alltest-${CI_COMMIT_SHA}"
     paths:
@@ -204,7 +204,7 @@ unit:alltest:
 ##END_UNITTEST##
 
 unit:protocol_compiles:
-  <<: *test_definition
+  extends: .test_template
   script:
     - dune build @runtest_compile_protocol
 
@@ -213,18 +213,18 @@ unit:protocol_compiles:
 ############################################################
 
 # definition for the environment to run all integration tests
-.integration_template: &integration_definition
-  <<: *test_definition
+.integration_template:
+  extends: .test_template
   before_script:
     - make
 
 integration:proto:sandbox:
-  <<: *integration_definition
+  extends: .integration_template
   script:
     - dune build @runtest_sandbox
 
 integration:compiler-rejections:
-  <<: *integration_definition
+  extends: .integration_template
   script:
     - dune build @runtest_rejections
 
@@ -233,7 +233,7 @@ integration:compiler-rejections:
 ############################################################
 
 script:prepare_migration_test:
-  <<: *test_definition
+  extends: .test_template
   before_script:
     - last_proto_name=$(find src -name "proto_[0-9][0-9][0-9]_*" | awk -F'/' '{print $NF}' | sort -r | head -1)
     - last_proto_version=$(echo $last_proto_name | cut -d'_' -f2)
@@ -248,7 +248,7 @@ script:prepare_migration_test:
 ############################################################
 
 integration:sandboxes:voting:
-  <<: *integration_definition
+  extends: .integration_template
   script:
     - ROOT_PATH=$PWD/flextesa-voting-demo-noops dune build @src/bin_sandbox/runtest_sandbox_voting_demo_noops
   artifacts:
@@ -259,7 +259,7 @@ integration:sandboxes:voting:
   allow_failure: true # This test uses too much resources for GitLab's workers
 
 integration:sandboxes:acc-baking:
-  <<: *integration_definition
+  extends: .integration_template
   script:
     - ROOT_PATH=$PWD/flextesa-acc-sdb dune build @src/bin_sandbox/runtest_sandbox_accusations_simple_double_baking
   artifacts:
@@ -269,7 +269,7 @@ integration:sandboxes:acc-baking:
     when: on_failure
 
 integration:sandboxes:acc-endorsement:
-  <<: *integration_definition
+  extends: .integration_template
   script:
     - ROOT_PATH=$PWD/flextesa-acc-sde dune build @src/bin_sandbox/runtest_sandbox_accusations_simple_double_endorsing
   artifacts:
@@ -279,7 +279,7 @@ integration:sandboxes:acc-endorsement:
     when: on_failure
 
 integration:sandboxes:u-a-u:
-  <<: *integration_definition
+  extends: .integration_template
   script:
     - ROOT_PATH=$PWD/flextesa-hard-fork dune build @src/bin_sandbox/runtest_sandbox_user_activated_upgrade_active
     - ROOT_PATH=$PWD/flextesa-hard-fork dune build @src/bin_sandbox/runtest_sandbox_user_activated_upgrade_alpha
@@ -290,7 +290,7 @@ integration:sandboxes:u-a-u:
     when: on_failure
 
 integration:sandboxes:daemons-upgrade:
-  <<: *integration_definition
+  extends: .integration_template
   script:
     - ROOT_PATH=$PWD/flextesa-daemons-upgrade dune build @src/bin_sandbox/runtest_sandbox_daemons_upgrade_active
     - ROOT_PATH=$PWD/flextesa-daemons-upgrade dune build @src/bin_sandbox/runtest_sandbox_daemons_upgrade_alpha
@@ -305,8 +305,8 @@ integration:sandboxes:daemons-upgrade:
 ############################################################
 
 # definition for the environment to run all integration tests
-.integration_template: &integration_python_definition
-  <<: *test_definition
+.integration_python_template:
+  extends: .test_template
   dependencies:
     - build
   before_script:
@@ -324,451 +324,451 @@ integration:sandboxes:daemons-upgrade:
 # this section is updated using the script scripts/update_integration_test.sh
 ##BEGIN_INTEGRATION_PYTHON##
 integration:007_baker_endorser:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_007/test_baker_endorser.py -s --log-dir=tmp
   stage: test
 
 integration:007_basic:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_007/test_basic.py -s --log-dir=tmp
   stage: test
 
 integration:007_bootstrap:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_007/test_bootstrap.py -s --log-dir=tmp
   stage: test
 
 integration:007_client_without_node:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_007/test_client_without_node.py -s --log-dir=tmp
   stage: test
 
 integration:007_codec:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_007/test_codec.py -s --log-dir=tmp
   stage: test
 
 integration:007_contract:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_007/test_contract.py -s --log-dir=tmp
   stage: test
 
 integration:007_contract_annotations:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_007/test_contract_annotations.py -s --log-dir=tmp
   stage: test
 
 integration:007_contract_baker:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_007/test_contract_baker.py -s --log-dir=tmp
   stage: test
 
 integration:007_contract_legacy:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_007/test_contract_legacy.py -s --log-dir=tmp
   stage: test
 
 integration:007_contract_macros:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_007/test_contract_macros.py -s --log-dir=tmp
   stage: test
 
 integration:007_contract_onchain_opcodes:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_007/test_contract_onchain_opcodes.py -s --log-dir=tmp
   stage: test
 
 integration:007_contract_opcodes:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_007/test_contract_opcodes.py -s --log-dir=tmp
   stage: test
 
 integration:007_cors:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_007/test_cors.py -s --log-dir=tmp
   stage: test
 
 integration:007_double_endorsement:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_007/test_double_endorsement.py -s --log-dir=tmp
   stage: test
 
 integration:007_forge_block:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_007/test_forge_block.py -s --log-dir=tmp
   stage: test
 
 integration:007_fork:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_007/test_fork.py -s --log-dir=tmp
   stage: test
 
 integration:007_injection:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_007/test_injection.py -s --log-dir=tmp
   stage: test
 
 integration:007_many_bakers:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_007/test_many_bakers.py -s --log-dir=tmp
   stage: test
 
 integration:007_many_nodes:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_007/test_many_nodes.py -s --log-dir=tmp
   stage: test
 
 integration:007_mempool:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_007/test_mempool.py -s --log-dir=tmp
   stage: test
 
 integration:007_mockup:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_007/test_mockup.py -s --log-dir=tmp
   stage: test
 
 integration:007_multinode:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_007/test_multinode.py -s --log-dir=tmp
   stage: test
 
 integration:007_multinode_snapshot:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_007/test_multinode_snapshot.py -s --log-dir=tmp
   stage: test
 
 integration:007_multinode_storage_reconstruction:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_007/test_multinode_storage_reconstruction.py -s --log-dir=tmp
   stage: test
 
 integration:007_multisig:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_007/test_multisig.py -s --log-dir=tmp
   stage: test
 
 integration:007_openapi:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_007/test_openapi.py -s --log-dir=tmp
   stage: test
 
 integration:007_p2p:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_007/test_p2p.py -s --log-dir=tmp
   stage: test
 
 integration:007_programs:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_007/test_programs.py -s --log-dir=tmp
   stage: test
 
 integration:007_proto_demo_counter:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_007/test_proto_demo_counter.py -s --log-dir=tmp
   stage: test
 
 integration:007_proto_demo_noops_manual_bake:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_007/test_proto_demo_noops_manual_bake.py -s --log-dir=tmp
   stage: test
 
 integration:007_rpc:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_007/test_rpc.py -s --log-dir=tmp
   stage: test
 
 integration:007_tls:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_007/test_tls.py -s --log-dir=tmp
   stage: test
 
 integration:007_voting:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_007/test_voting.py -s --log-dir=tmp
   stage: test
 
 integration:007_voting_full:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_007/test_voting_full.py -s --log-dir=tmp
   stage: test
 
 integration:alpha_baker_endorser:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_alpha/test_baker_endorser.py -s --log-dir=tmp
   stage: test
 
 integration:alpha_basic:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_alpha/test_basic.py -s --log-dir=tmp
   stage: test
 
 integration:alpha_bootstrap:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_alpha/test_bootstrap.py -s --log-dir=tmp
   stage: test
 
 integration:alpha_client_without_node:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_alpha/test_client_without_node.py -s --log-dir=tmp
   stage: test
 
 integration:alpha_codec:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_alpha/test_codec.py -s --log-dir=tmp
   stage: test
 
 integration:alpha_contract:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_alpha/test_contract.py -s --log-dir=tmp
   stage: test
 
 integration:alpha_contract_annotations:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_alpha/test_contract_annotations.py -s --log-dir=tmp
   stage: test
 
 integration:alpha_contract_baker:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_alpha/test_contract_baker.py -s --log-dir=tmp
   stage: test
 
 integration:alpha_contract_bls12_381:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_alpha/test_contract_bls12_381.py -s --log-dir=tmp
   stage: test
 
 integration:alpha_contract_macros:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_alpha/test_contract_macros.py -s --log-dir=tmp
   stage: test
 
 integration:alpha_contract_onchain_opcodes:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_alpha/test_contract_onchain_opcodes.py -s --log-dir=tmp
   stage: test
 
 integration:alpha_contract_opcodes:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_alpha/test_contract_opcodes.py -s --log-dir=tmp
   stage: test
 
 integration:alpha_cors:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_alpha/test_cors.py -s --log-dir=tmp
   stage: test
 
 integration:alpha_crypto:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_alpha/test_crypto.py -s --log-dir=tmp
   stage: test
 
 integration:alpha_deprecated_rpc:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_alpha/test_deprecated_rpc.py -s --log-dir=tmp
   stage: test
 
 integration:alpha_double_endorsement:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_alpha/test_double_endorsement.py -s --log-dir=tmp
   stage: test
 
 integration:alpha_forge_block:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_alpha/test_forge_block.py -s --log-dir=tmp
   stage: test
 
 integration:alpha_fork:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_alpha/test_fork.py -s --log-dir=tmp
   stage: test
 
 integration:alpha_injection:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_alpha/test_injection.py -s --log-dir=tmp
   stage: test
 
 integration:alpha_many_bakers:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_alpha/test_many_bakers.py -s --log-dir=tmp
   stage: test
 
 integration:alpha_many_nodes:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_alpha/test_many_nodes.py -s --log-dir=tmp
   stage: test
 
 integration:alpha_mempool:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_alpha/test_mempool.py -s --log-dir=tmp
   stage: test
 
 integration:alpha_migration:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_alpha/test_migration.py -s --log-dir=tmp
   stage: test
 
 integration:alpha_mockup:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_alpha/test_mockup.py -s --log-dir=tmp
   stage: test
 
 integration:alpha_multinode:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_alpha/test_multinode.py -s --log-dir=tmp
   stage: test
 
 integration:alpha_multinode_snapshot:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_alpha/test_multinode_snapshot.py -s --log-dir=tmp
   stage: test
 
 integration:alpha_multinode_storage_reconstruction:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_alpha/test_multinode_storage_reconstruction.py -s --log-dir=tmp
   stage: test
 
 integration:alpha_multisig:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_alpha/test_multisig.py -s --log-dir=tmp
   stage: test
 
 integration:alpha_openapi:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_alpha/test_openapi.py -s --log-dir=tmp
   stage: test
 
 integration:alpha_p2p:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_alpha/test_p2p.py -s --log-dir=tmp
   stage: test
 
 integration:alpha_programs:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_alpha/test_programs.py -s --log-dir=tmp
   stage: test
 
 integration:alpha_proto_demo_counter:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_alpha/test_proto_demo_counter.py -s --log-dir=tmp
   stage: test
 
 integration:alpha_proto_demo_noops_manual_bake:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_alpha/test_proto_demo_noops_manual_bake.py -s --log-dir=tmp
   stage: test
 
 integration:alpha_rpc:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_alpha/test_rpc.py -s --log-dir=tmp
   stage: test
 
 integration:alpha_sapling:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_alpha/test_sapling.py -s --log-dir=tmp
   stage: test
 
 integration:alpha_tls:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_alpha/test_tls.py -s --log-dir=tmp
   stage: test
 
 integration:alpha_voting:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_alpha/test_voting.py -s --log-dir=tmp
   stage: test
 
 integration:alpha_voting_full:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest tests_alpha/test_voting_full.py -s --log-dir=tmp
   stage: test
 
 integration:examples_forge_transfer:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - PYTHONPATH=$PYTHONPATH:./ poetry run python examples/forge_transfer.py
   stage: test
 
 integration:examples_example:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - PYTHONPATH=$PYTHONPATH:./ poetry run python examples/example.py
   stage: test
 
 integration:examples_test_example:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - PYTHONPATH=./ poetry run pytest examples/test_example.py
   stage: test
@@ -779,7 +779,7 @@ integration:examples_test_example:
 ############################################################
 
 coq:lint:
-  <<: *test_definition
+  extends: .test_template
   script:
     - make
     - cd src/proto_alpha/lib_protocol
@@ -796,7 +796,7 @@ coq:lint:
 # We set a global timeout of 55min (3300s) so that in case of timeout,
 # we still get the artifact (CI timeouts cause artifacts to not be uploaded).
 tezt:main:
-  <<: *test_definition
+  extends: .test_template
   before_script:
     - make
   script:
@@ -808,7 +808,7 @@ tezt:main:
     when: on_failure
 
 tezt:manual:migration:
-  <<: *test_definition
+  extends: .test_template
   when: manual
   before_script:
     - export TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER=Y
@@ -831,7 +831,7 @@ tezt:manual:migration:
 ############################################################
 
 documentation:build:
-  <<: *test_definition
+  extends: .test_template
   stage: doc
   except:
     - master
@@ -872,7 +872,7 @@ documentation:linkcheck:
 ## Stage: building opam packages (only master and *opam*) ##
 ############################################################
 
-.opam_template: &opam_definition
+.opam_template:
   image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
   stage: packaging
   dependencies: []
@@ -906,817 +906,817 @@ documentation:linkcheck:
 # this section is updated using the script scripts/update_opam_test.sh
 
 opam:benchmark-utils:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: benchmark-utils
 
 opam:bls12-381:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: bls12-381
 
 opam:flextesa:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: flextesa
 
 opam:latex:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: latex
 
 opam:ledgerwallet:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: ledgerwallet
 
 opam:ledgerwallet-tezos:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: ledgerwallet-tezos
 
 opam:numerics:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: numerics
 
 opam:pyml-plot:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: pyml-plot
 
 opam:sapling:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: sapling
 
 opam:staTz:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: staTz
 
 opam:tezos-006-PsCARTHA-test-helpers:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-006-PsCARTHA-test-helpers
 
 opam:tezos-007-PsDELPH1-test-helpers:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-007-PsDELPH1-test-helpers
 
 opam:tezos-008-PtEdoTez-test-helpers:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-008-PtEdoTez-test-helpers
 
 opam:tezos-accuser-006-PsCARTHA:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-accuser-006-PsCARTHA
 
 opam:tezos-accuser-006-PsCARTHA-commands:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-accuser-006-PsCARTHA-commands
 
 opam:tezos-accuser-007-PsDELPH1:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-accuser-007-PsDELPH1
 
 opam:tezos-accuser-007-PsDELPH1-commands:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-accuser-007-PsDELPH1-commands
 
 opam:tezos-accuser-008-PtEdoTez:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-accuser-008-PtEdoTez
 
 opam:tezos-accuser-008-PtEdoTez-commands:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-accuser-008-PtEdoTez-commands
 
 opam:tezos-accuser-alpha:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-accuser-alpha
 
 opam:tezos-accuser-alpha-commands:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-accuser-alpha-commands
 
 opam:tezos-alpha-test-helpers:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-alpha-test-helpers
 
 opam:tezos-baker-006-PsCARTHA:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-baker-006-PsCARTHA
 
 opam:tezos-baker-007-PsDELPH1:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-baker-007-PsDELPH1
 
 opam:tezos-baker-008-PtEdoTez:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-baker-008-PtEdoTez
 
 opam:tezos-baker-alpha:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-baker-alpha
 
 opam:tezos-baking-006-PsCARTHA:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-baking-006-PsCARTHA
 
 opam:tezos-baking-006-PsCARTHA-commands:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-baking-006-PsCARTHA-commands
 
 opam:tezos-baking-007-PsDELPH1:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-baking-007-PsDELPH1
 
 opam:tezos-baking-007-PsDELPH1-commands:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-baking-007-PsDELPH1-commands
 
 opam:tezos-baking-008-PtEdoTez:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-baking-008-PtEdoTez
 
 opam:tezos-baking-008-PtEdoTez-commands:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-baking-008-PtEdoTez-commands
 
 opam:tezos-baking-alpha:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-baking-alpha
 
 opam:tezos-baking-alpha-commands:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-baking-alpha-commands
 
 opam:tezos-base:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-base
 
 opam:tezos-benchmark:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-benchmark
 
 opam:tezos-benchmark-examples:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-benchmark-examples
 
 opam:tezos-benchmark-tests:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-benchmark-tests
 
 opam:tezos-clic:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-clic
 
 opam:tezos-client:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-client
 
 opam:tezos-client-000-Ps9mPmXa:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-client-000-Ps9mPmXa
 
 opam:tezos-client-001-PtCJ7pwo:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-client-001-PtCJ7pwo
 
 opam:tezos-client-001-PtCJ7pwo-commands:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-client-001-PtCJ7pwo-commands
 
 opam:tezos-client-002-PsYLVpVv:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-client-002-PsYLVpVv
 
 opam:tezos-client-002-PsYLVpVv-commands:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-client-002-PsYLVpVv-commands
 
 opam:tezos-client-003-PsddFKi3:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-client-003-PsddFKi3
 
 opam:tezos-client-003-PsddFKi3-commands:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-client-003-PsddFKi3-commands
 
 opam:tezos-client-004-Pt24m4xi:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-client-004-Pt24m4xi
 
 opam:tezos-client-004-Pt24m4xi-commands:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-client-004-Pt24m4xi-commands
 
 opam:tezos-client-005-PsBabyM1:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-client-005-PsBabyM1
 
 opam:tezos-client-005-PsBabyM1-commands:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-client-005-PsBabyM1-commands
 
 opam:tezos-client-006-PsCARTHA:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-client-006-PsCARTHA
 
 opam:tezos-client-006-PsCARTHA-commands:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-client-006-PsCARTHA-commands
 
 opam:tezos-client-007-PsDELPH1:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-client-007-PsDELPH1
 
 opam:tezos-client-007-PsDELPH1-commands:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-client-007-PsDELPH1-commands
 
 opam:tezos-client-007-PsDELPH1-commands-registration:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-client-007-PsDELPH1-commands-registration
 
 opam:tezos-client-008-PtEdoTez:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-client-008-PtEdoTez
 
 opam:tezos-client-008-PtEdoTez-commands:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-client-008-PtEdoTez-commands
 
 opam:tezos-client-008-PtEdoTez-commands-registration:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-client-008-PtEdoTez-commands-registration
 
 opam:tezos-client-alpha:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-client-alpha
 
 opam:tezos-client-alpha-commands:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-client-alpha-commands
 
 opam:tezos-client-alpha-commands-registration:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-client-alpha-commands-registration
 
 opam:tezos-client-base:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-client-base
 
 opam:tezos-client-base-unix:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-client-base-unix
 
 opam:tezos-client-commands:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-client-commands
 
 opam:tezos-client-demo-counter:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-client-demo-counter
 
 opam:tezos-client-genesis:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-client-genesis
 
 opam:tezos-client-genesis-carthagenet:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-client-genesis-carthagenet
 
 opam:tezos-client-sapling-008-PtEdoTez:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-client-sapling-008-PtEdoTez
 
 opam:tezos-client-sapling-alpha:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-client-sapling-alpha
 
 opam:tezos-codec:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-codec
 
 opam:tezos-crypto:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-crypto
 
 opam:tezos-embedded-protocol-000-Ps9mPmXa:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-embedded-protocol-000-Ps9mPmXa
 
 opam:tezos-embedded-protocol-001-PtCJ7pwo:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-embedded-protocol-001-PtCJ7pwo
 
 opam:tezos-embedded-protocol-002-PsYLVpVv:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-embedded-protocol-002-PsYLVpVv
 
 opam:tezos-embedded-protocol-003-PsddFKi3:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-embedded-protocol-003-PsddFKi3
 
 opam:tezos-embedded-protocol-004-Pt24m4xi:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-embedded-protocol-004-Pt24m4xi
 
 opam:tezos-embedded-protocol-005-PsBABY5H:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-embedded-protocol-005-PsBABY5H
 
 opam:tezos-embedded-protocol-005-PsBabyM1:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-embedded-protocol-005-PsBabyM1
 
 opam:tezos-embedded-protocol-006-PsCARTHA:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-embedded-protocol-006-PsCARTHA
 
 opam:tezos-embedded-protocol-007-PsDELPH1:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-embedded-protocol-007-PsDELPH1
 
 opam:tezos-embedded-protocol-008-PtEdoTez:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-embedded-protocol-008-PtEdoTez
 
 opam:tezos-embedded-protocol-alpha:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-embedded-protocol-alpha
 
 opam:tezos-embedded-protocol-demo-counter:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-embedded-protocol-demo-counter
 
 opam:tezos-embedded-protocol-demo-noops:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-embedded-protocol-demo-noops
 
 opam:tezos-embedded-protocol-genesis:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-embedded-protocol-genesis
 
 opam:tezos-embedded-protocol-genesis-carthagenet:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-embedded-protocol-genesis-carthagenet
 
 opam:tezos-endorser-006-PsCARTHA:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-endorser-006-PsCARTHA
 
 opam:tezos-endorser-006-PsCARTHA-commands:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-endorser-006-PsCARTHA-commands
 
 opam:tezos-endorser-007-PsDELPH1:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-endorser-007-PsDELPH1
 
 opam:tezos-endorser-007-PsDELPH1-commands:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-endorser-007-PsDELPH1-commands
 
 opam:tezos-endorser-008-PtEdoTez:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-endorser-008-PtEdoTez
 
 opam:tezos-endorser-008-PtEdoTez-commands:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-endorser-008-PtEdoTez-commands
 
 opam:tezos-endorser-alpha:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-endorser-alpha
 
 opam:tezos-endorser-alpha-commands:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-endorser-alpha-commands
 
 opam:tezos-error-monad:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-error-monad
 
 opam:tezos-event-logging:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-event-logging
 
 opam:tezos-lmdb:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-lmdb
 
 opam:tezos-lwt-result-stdlib:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-lwt-result-stdlib
 
 opam:tezos-mempool-006-PsCARTHA:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-mempool-006-PsCARTHA
 
 opam:tezos-mempool-007-PsDELPH1:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-mempool-007-PsDELPH1
 
 opam:tezos-mempool-008-PtEdoTez:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-mempool-008-PtEdoTez
 
 opam:tezos-mempool-alpha:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-mempool-alpha
 
 opam:tezos-micheline:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-micheline
 
 opam:tezos-micheline-rewriting:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-micheline-rewriting
 
 opam:tezos-mockup:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-mockup
 
 opam:tezos-mockup-commands:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-mockup-commands
 
 opam:tezos-mockup-registration:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-mockup-registration
 
 opam:tezos-node:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-node
 
 opam:tezos-p2p:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-p2p
 
 opam:tezos-p2p-services:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-p2p-services
 
 opam:tezos-protocol-000-Ps9mPmXa:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-protocol-000-Ps9mPmXa
 
 opam:tezos-protocol-001-PtCJ7pwo:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-protocol-001-PtCJ7pwo
 
 opam:tezos-protocol-002-PsYLVpVv:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-protocol-002-PsYLVpVv
 
 opam:tezos-protocol-003-PsddFKi3:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-protocol-003-PsddFKi3
 
 opam:tezos-protocol-004-Pt24m4xi:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-protocol-004-Pt24m4xi
 
 opam:tezos-protocol-005-PsBABY5H:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-protocol-005-PsBABY5H
 
 opam:tezos-protocol-005-PsBabyM1:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-protocol-005-PsBabyM1
 
 opam:tezos-protocol-006-PsCARTHA:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-protocol-006-PsCARTHA
 
 opam:tezos-protocol-006-PsCARTHA-parameters:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-protocol-006-PsCARTHA-parameters
 
 opam:tezos-protocol-006-PsCARTHA-tests:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-protocol-006-PsCARTHA-tests
 
 opam:tezos-protocol-007-PsDELPH1:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-protocol-007-PsDELPH1
 
 opam:tezos-protocol-007-PsDELPH1-parameters:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-protocol-007-PsDELPH1-parameters
 
 opam:tezos-protocol-007-PsDELPH1-tests:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-protocol-007-PsDELPH1-tests
 
 opam:tezos-protocol-008-PtEdoTez:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-protocol-008-PtEdoTez
 
 opam:tezos-protocol-008-PtEdoTez-parameters:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-protocol-008-PtEdoTez-parameters
 
 opam:tezos-protocol-008-PtEdoTez-tests:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-protocol-008-PtEdoTez-tests
 
 opam:tezos-protocol-alpha:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-protocol-alpha
 
 opam:tezos-protocol-alpha-parameters:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-protocol-alpha-parameters
 
 opam:tezos-protocol-alpha-tests:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-protocol-alpha-tests
 
 opam:tezos-protocol-compiler:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-protocol-compiler
 
 opam:tezos-protocol-demo-counter:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-protocol-demo-counter
 
 opam:tezos-protocol-demo-noops:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-protocol-demo-noops
 
 opam:tezos-protocol-environment:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-protocol-environment
 
 opam:tezos-protocol-environment-packer:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-protocol-environment-packer
 
 opam:tezos-protocol-environment-sigs:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-protocol-environment-sigs
 
 opam:tezos-protocol-environment-structs:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-protocol-environment-structs
 
 opam:tezos-protocol-genesis:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-protocol-genesis
 
 opam:tezos-protocol-genesis-carthagenet:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-protocol-genesis-carthagenet
 
 opam:tezos-protocol-updater:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-protocol-updater
 
 opam:tezos-requester:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-requester
 
 opam:tezos-rpc:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-rpc
 
 opam:tezos-rpc-http:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-rpc-http
 
 opam:tezos-rpc-http-client:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-rpc-http-client
 
 opam:tezos-rpc-http-client-unix:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-rpc-http-client-unix
 
 opam:tezos-rpc-http-server:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-rpc-http-server
 
 opam:tezos-shell:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-shell
 
 opam:tezos-shell-context:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-shell-context
 
 opam:tezos-shell-services:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-shell-services
 
 opam:tezos-signer:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-signer
 
 opam:tezos-signer-backends:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-signer-backends
 
 opam:tezos-signer-services:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-signer-services
 
 opam:tezos-snoop:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-snoop
 
 opam:tezos-stdlib:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-stdlib
 
 opam:tezos-stdlib-unix:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-stdlib-unix
 
 opam:tezos-storage:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-storage
 
 opam:tezos-test-services:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-test-services
 
 opam:tezos-tooling:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-tooling
 
 opam:tezos-validation:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-validation
 
 opam:tezos-validator:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-validator
 
 opam:tezos-version:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-version
 
 opam:tezos-workers:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: tezos-workers
 
 opam:uecc:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: uecc
 
@@ -1728,7 +1728,7 @@ opam:uecc:
 ## Stage: publish                                         ##
 ############################################################
 
-.publish_template: &publish_definition
+.publish_template:
   image: docker:latest
   services:
     - docker:dind
@@ -1756,7 +1756,7 @@ opam:uecc:
   interruptible: false
 
 publish:docker_amd64:
-  <<: *publish_definition
+  extends: .publish_template
   variables:
     DOCKER_DRIVER: overlay2
     IMAGE_ARCH_PREFIX: "amd64-"
@@ -1764,7 +1764,7 @@ publish:docker_amd64:
     - safe_docker
 
 publish:docker_arm64:
-  <<: *publish_definition
+  extends: .publish_template
   variables:
     DOCKER_DRIVER: overlay2
     IMAGE_ARCH_PREFIX: "arm64-"

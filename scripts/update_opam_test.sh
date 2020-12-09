@@ -24,7 +24,7 @@ packages=$(echo "$packages" | LC_COLLATE=C sort)
   for package in $packages; do
       cat <<EOF
 opam:$package:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: $package
 

@@ -23,7 +23,7 @@ for test in $(find tests_python/tests_007/ tests_python/tests_alpha/ -name 'test
         testname=${testname%%.py}
         cat >> $tmp <<EOF
 integration:$testname:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - poetry run pytest ${test#tests_python/} -s --log-dir=tmp
   stage: test
@@ -34,19 +34,19 @@ done
 
 cat >> $tmp <<EOF
 integration:examples_forge_transfer:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - PYTHONPATH=\$PYTHONPATH:./ poetry run python examples/forge_transfer.py
   stage: test
 
 integration:examples_example:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - PYTHONPATH=\$PYTHONPATH:./ poetry run python examples/example.py
   stage: test
 
 integration:examples_test_example:
-  <<: *integration_python_definition
+  extends: .integration_python_template
   script:
     - PYTHONPATH=./ poetry run pytest examples/test_example.py
   stage: test
