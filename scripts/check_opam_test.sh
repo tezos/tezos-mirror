@@ -19,7 +19,7 @@ src_dir="$(dirname "$script_dir")"
 
 opams=$(find "$src_dir/vendors" "$src_dir/src" -name \*.opam -print)
 
-yml="${1:-$src_dir/.gitlab-ci.yml}"
+yml="${1:-$src_dir/.gitlab/ci/opam.yml}"
 
 missing=
 for opam in $opams; do
@@ -42,7 +42,7 @@ done
 
 if ! [ -z "$missing" ]; then
     echo
-    echo "You should update .gitlab-ci.yml by running: ./scripts/update_opam_test.sh"
+    echo "You should update .gitlab/ci/opam.yml by running: ./scripts/update_opam_test.sh"
     echo
     exit 1
 fi

@@ -1,0 +1,38 @@
+documentation:build:
+  extends: .test_template
+  stage: doc
+  except:
+    - master
+    - tags@tezos/tezos
+    - /-release$/@tezos/tezos
+  script:
+    - make doc-html
+  artifacts:
+    paths:
+      - docs
+    expire_in: 1 week
+
+documentation:linkcheck:
+  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+  stage: doc
+  before_script:
+    - . ./scripts/version.sh
+  dependencies:
+    - build
+  rules:
+    - if: '$CI_COMMIT_TAG && $CI_PROJECT_NAMESPACE == "tezos"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH =~ /-release$/ && $CI_PROJECT_NAMESPACE == "tezos"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "master"'
+      when: on_success
+    - if: '$CI_COMMIT_BRANCH =~ /doc/'
+      when: on_success
+    - changes:
+        - /docs
+      when: on_success
+  script:
+    - make doc-html-and-linkcheck
+  allow_failure: true
+  interruptible: true
+
