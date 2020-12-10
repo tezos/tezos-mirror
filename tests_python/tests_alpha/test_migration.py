@@ -110,15 +110,6 @@ class TestMigration:
         _ops_metadata_hash = client.get_operations_metadata_hash()
         _block_metadata_hash = client.get_block_metadata_hash()
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="this test, and all that follows except "
-        "test_check_logs, will fail until Edo becomes "
-        "the active mainnet protocol. This is since protocol Alpha"
-        "contains a check that says that it can only migrate"
-        "from the active mainnet protocol. That is currently Delphi,"
-        "and not Edo, which is running in the sandbox in this test.",
-    )
     def test_migration(self, client, sandbox):
         # 3: last block of PROTO_A, runs migration code (MIGRATION_LEVEL)
         client.bake(BAKER, BAKE_ARGS)
@@ -130,7 +121,6 @@ class TestMigration:
         _block_metadata_hash = client.get_block_metadata_hash()
         assert sandbox.client(0).get_head()['header']['proto'] == 2
 
-    @pytest.mark.xfail(reason="see above")
     def test_new_proto(self, client, sandbox):
         # 4: first block of PROTO_B
         client.bake(BAKER, BAKE_ARGS)
@@ -145,14 +135,12 @@ class TestMigration:
         _ops_metadata_hash = client.get_operations_metadata_hash()
         _block_metadata_hash = client.get_block_metadata_hash()
 
-    @pytest.mark.xfail(reason="see above")
     def test_new_proto_second(self, client):
         # 5: second block of PROTO_B
         client.bake(BAKER, BAKE_ARGS)
         metadata = client.get_metadata()
         assert metadata['balance_updates'] == DEPOSIT_RECEIPTS
 
-    @pytest.mark.xfail(reason="see above")
     def test_terminate_node0(self, client, sandbox: Sandbox, session: dict):
         # # to export rolling snapshot, we need to be at level > 60
         # (see `max_operations_ttl`)
@@ -166,7 +154,6 @@ class TestMigration:
         sandbox.node(0).terminate()
         time.sleep(1)
 
-    @pytest.mark.xfail(reason="see above")
     def test_export_snapshots(self, sandbox, tmpdir, session: dict):
         node_export = sandbox.node(0)
         file_full = f'{tmpdir}/FILE.full'
@@ -179,7 +166,6 @@ class TestMigration:
             file_rolling, params=['--block', head_hash, '--rolling']
         )
 
-    @pytest.mark.xfail(reason="see above")
     def test_import_full_snapshot_node1(self, sandbox, session):
         sandbox.add_node(
             1, snapshot=session['snapshot_full'], node_config=NODE_CONFIG
@@ -187,7 +173,6 @@ class TestMigration:
         client = sandbox.client(1)
         client.bake(BAKER, BAKE_ARGS)
 
-    @pytest.mark.xfail(reason="see above")
     def test_import_rolling_snapshot_node2(self, sandbox, session):
         sandbox.add_node(
             2, snapshot=session['snapshot_rolling'], node_config=NODE_CONFIG
@@ -196,7 +181,6 @@ class TestMigration:
         utils.synchronize([sandbox.client(1), client], max_diff=0)
         client.bake(BAKER, BAKE_ARGS)
 
-    @pytest.mark.xfail(reason="see above")
     def test_reconstruct_full_node3(self, sandbox, session):
         sandbox.add_node(
             3, snapshot=session['snapshot_full'], node_config=NODE_CONFIG
@@ -212,7 +196,6 @@ class TestMigration:
         )
         client.bake(BAKER, BAKE_ARGS)
 
-    @pytest.mark.xfail(reason="see above")
     def test_rerun_node0(self, sandbox):
         sandbox.node(0).run()
         sandbox.client(0).check_node_listening()
