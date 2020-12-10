@@ -88,6 +88,7 @@ let spawn_command ?node ?(admin = false) client command =
   Process.spawn
     ~name:client.name
     ~color:client.color
+    ~env:[("TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER", "Y")]
     (if admin then client.admin_path else client.path)
   @@ endpoint_arg ?node client @ mode_arg client @ base_dir_arg client
   @ command
