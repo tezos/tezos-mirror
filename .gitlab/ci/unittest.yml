@@ -11,6 +11,16 @@ test-script-gen-genesis:
     - dune build gen_genesis.exe
   interruptible: true
 
+test-static-libs-patch:
+  extends: .runtime_build_test_dependencies_template
+  stage: test
+  except:
+    - master
+    - tags@tezos/tezos
+    - /-release$/@tezos/tezos
+  script:
+    - git apply packaging/build/static_libs.patch
+
 .test_template:
   extends: .build_template
   stage: test
