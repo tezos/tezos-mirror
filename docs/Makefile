@@ -32,8 +32,9 @@ manuals: main
 
 .PHONY: odoc
 odoc: main
-	@cd .. ; dune build @doc
+	@cd $$(pwd)/.. ; dune build @doc
 	@rm -rf $$(pwd)/_build/api/odoc
+	@mkdir -p $$(pwd)/_build/api
 	@cp -r $$(pwd)/../_build/default/_doc $$(pwd)/_build/api/odoc
 	@echo '.toc {position: static}' >> $$(pwd)/_build/api/odoc/_html/odoc.css
 	@echo '.content { margin-left: 4ex }' >> $$(pwd)/_build/api/odoc/_html/odoc.css
