@@ -8,7 +8,7 @@ import pytest
 
 from launchers.sandbox import Sandbox
 from tools import constants, paths, utils
-from client import client_output
+from tools.utils import assert_run_failure
 
 BAKE_ARGS = [
     '--minimal-fees',
@@ -108,12 +108,10 @@ class TestMigration:
         metadata = client.get_metadata()
         assert metadata['balance_updates'] == DEPOSIT_RECEIPTS
         # PROTO_A is using env. V0, metadata hashes should not be present
-        with pytest.raises(client_output.InvalidClientOutput) as exc:
+        with assert_run_failure('No service found at this URL'):
             _ops_metadata_hash = client.get_operations_metadata_hash()
-        assert exc.value.client_output == 'No service found at this URL\n\n'
-        with pytest.raises(client_output.InvalidClientOutput) as exc:
+        with assert_run_failure('No service found at this URL'):
             _block_metadata_hash = client.get_block_metadata_hash()
-        assert exc.value.client_output == 'No service found at this URL\n\n'
 
     def test_migration(self, client, sandbox):
         # 3: last block of PROTO_A, runs migration code (MIGRATION_LEVEL)

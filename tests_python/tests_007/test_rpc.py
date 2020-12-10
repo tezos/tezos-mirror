@@ -2,7 +2,6 @@ import os
 import time
 import pytest
 from tools import utils, constants
-from client.client_output import InvalidClientOutput
 from launchers.sandbox import Sandbox
 from . import protocol
 from . import contract_paths
@@ -336,11 +335,9 @@ class TestRPCsExistence:
     def test_chain_block_context_contract_script_implicit(
         self, sandbox: Sandbox, session: dict
     ):
-        # FIXME: It looks like the RPC is not returning a JSON. Hence, the
-        # current Python client in the library raises InvalidClientOutput.
         accounts = session["implicit_accounts"]
         for contract_id in accounts:
-            with pytest.raises(InvalidClientOutput):
+            with utils.assert_run_failure('No service found at this URL'):
                 sandbox.client(1).rpc(
                     'get',
                     f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
@@ -366,7 +363,7 @@ class TestRPCsExistence:
         # only implicit contracts
         accounts = session["implicit_accounts"]
         for contract_id in accounts:
-            with pytest.raises(InvalidClientOutput):
+            with utils.assert_run_failure('No service found at this URL'):
                 sandbox.client(1).rpc(
                     'get',
                     f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'

@@ -1,6 +1,5 @@
 from os import path
 import pytest
-from client import client_output
 from client.client import Client
 from tools.paths import ACCOUNT_PATH
 from tools.utils import assert_run_failure
@@ -29,25 +28,22 @@ class TestRawContext:
 
     def test_no_service_1(self, client: Client):
         path = '/chains/main/blocks/head/context/raw/bytes/non-existent'
-        with pytest.raises(client_output.InvalidClientOutput) as exc:
+        with assert_run_failure('No service found at this URL'):
             client.rpc('get', path)
-        assert exc.value.client_output == 'No service found at this URL\n\n'
 
     def test_no_service_2(self, client: Client):
         path = (
             '/chains/main/blocks/head/context/raw/bytes/'
             'non-existent?depth=-1'
         )
-        with pytest.raises(client_output.InvalidClientOutput) as exc:
+        expected = 'Command failed : Extraction depth -1 is invalid'
+        with assert_run_failure(expected):
             client.rpc('get', path)
-        expected = 'Command failed : Extraction depth -1 is invalid\n\n'
-        assert exc.value.client_output == expected
 
     def test_no_service_3(self, client: Client):
         path = '/chains/main/blocks/head/context/raw/bytes/non-existent?depth=0'
-        with pytest.raises(client_output.InvalidClientOutput) as exc:
+        with assert_run_failure('No service found at this URL'):
             client.rpc('get', path)
-        assert exc.value.client_output == 'No service found at this URL\n\n'
 
     def test_bake(self, client: Client):
         client.bake('bootstrap4', BAKE_ARGS)
