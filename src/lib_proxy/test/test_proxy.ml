@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Client
-    Invocation:   dune build @src/lib_proxy/runtest
+    Invocation:   dune build @src/lib_proxy/runtest_proxy
     Subject:      --mode proxy of the client
 *)
 
