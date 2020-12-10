@@ -334,6 +334,7 @@ of the new head whereas the second will be appended to the trashpool, which now
 looks like.
 
 .. code-block:: JSON
+
    [ { "shell_header":
       { "branch": "BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU" },
     "protocol_data":

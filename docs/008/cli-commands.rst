@@ -71,4 +71,4 @@ Benchmark tool manual
 =====================
 
 .. raw:: html
-         :file: tezos-snoop.html
+         :file: ../api/tezos-snoop.html
