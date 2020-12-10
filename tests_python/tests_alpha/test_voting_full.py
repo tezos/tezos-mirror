@@ -165,15 +165,26 @@ class TestVotingFull:
             3, 'bootstrap1', proto=PROTO_B_DAEMON, params=['--chain', 'test']
         )
 
+    @pytest.mark.xfail(
+        strict=True,
+        reason="this test, and all that follows except "
+        "test_check_logs, will fail until Edo becomes "
+        "the active mainnet protocol. This is since protocol Alpha"
+        "contains a check that says that it can only migrate"
+        "from the active mainnet protocol. That is currently Delphi,"
+        "and not Edo, which is running in the sandbox in this test.",
+    )
     def test_testchain_rpc(self, sandbox: Sandbox):
         """Check all clients know both chains"""
         for client in sandbox.all_clients():
             assert utils.check_two_chains(client)
 
+    @pytest.mark.xfail(reason="see above")
     def test_testchain_transfer(self, sandbox: Sandbox):
         client = sandbox.client(0)
         client.transfer(10, 'bootstrap1', 'bootstrap2', chain='test')
 
+    @pytest.mark.xfail(reason="see above")
     def test_testchain_progress(self, sandbox: Sandbox):
         """Make sure testchain is moving forward"""
         client = sandbox.client(0)
@@ -182,6 +193,7 @@ class TestVotingFull:
             client, level_testchain_before + 1, chain='test'
         )
 
+    @pytest.mark.xfail(reason="see above")
     def test_reactivate_all_delegates(self, sandbox: Sandbox):
         """Delegates may have become unactive"""
         client = sandbox.client(0)
@@ -189,6 +201,7 @@ class TestVotingFull:
             account = f'bootstrap{i}'
             client.set_delegate(account, account)
 
+    @pytest.mark.xfail(reason="see above")
     @pytest.mark.timeout(60)
     def test_wait_for_promotion_vote_period(self, sandbox: Sandbox):
         client = sandbox.client(0)
@@ -196,6 +209,7 @@ class TestVotingFull:
             client.rpc('get', '/chains/main/blocks/head/header/shell')
             time.sleep(2)
 
+    @pytest.mark.xfail(reason="see above")
     def test_vote_in_promotion_phase(self, sandbox: Sandbox):
         client = sandbox.client(0)
         listings = client.get_listings()
@@ -204,12 +218,14 @@ class TestVotingFull:
         while client.get_level() < 4 * BLOCKS_PER_VOTING_PERIOD:
             time.sleep(POLLING_TIME)
 
+    @pytest.mark.xfail(reason="see above")
     @pytest.mark.timeout(60)
     def test_wait_for_proto_b(self, sandbox: Sandbox):
         client = sandbox.client(1)
         while client.get_level() < 5 * BLOCKS_PER_VOTING_PERIOD:
             time.sleep(POLLING_TIME)
 
+    @pytest.mark.xfail(reason="see above")
     @pytest.mark.timeout(60)
     def test_all_nodes_run_proto_b(self, sandbox: Sandbox):
         all_have_proto = False
@@ -229,16 +245,19 @@ class TestVotingFull:
         position = client.get_current_period()["position"]
         assert remaining == blocks_per_voting_period - (position + 1)
 
+    @pytest.mark.xfail(reason="see above")
     def test_stop_old_bakers(self, sandbox: Sandbox):
         """Stop old protocol baker, and test chain baker"""
         sandbox.rm_baker(0, PROTO_A_DAEMON)
         sandbox.rm_baker(3, PROTO_B_DAEMON)
         time.sleep(1)
 
+    @pytest.mark.xfail(reason="see above")
     def test_start_proto_b_baker(self, sandbox: Sandbox):
         """Proto_B will be elected, launch a new Proto_B baker"""
         sandbox.add_baker(1, 'bootstrap1', proto=PROTO_B_DAEMON)
 
+    @pytest.mark.xfail(reason="see above")
     def test_new_chain_progress(self, sandbox: Sandbox):
         client = sandbox.client(0)
         level_before = client.get_level()
