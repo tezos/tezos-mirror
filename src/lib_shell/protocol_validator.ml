@@ -24,10 +24,7 @@
 (*****************************************************************************)
 
 open Validation_errors
-
-include Internal_event.Legacy_logging.Make_semantic (struct
-  let name = "node.validator.block"
-end)
+module Event = Protocol_validator_event
 
 type t = {
   db : Distributed_db.t;
@@ -73,9 +70,9 @@ let rec worker_loop bv =
   | Ok () ->
       worker_loop bv
   | Error (Canceled :: _) | Error (Exn Lwt_pipe.Closed :: _) ->
-      Protocol_validator_event.(emit validator_terminated) ()
+      Event.(emit validator_terminated) ()
   | Error err ->
-      Protocol_validator_event.(emit unexpected_worker_error) err
+      Event.(emit unexpected_worker_error) err
       >>= fun () -> Lwt_canceler.cancel bv.canceler
 
 let create db =
@@ -126,7 +123,7 @@ let fetch_and_compile_protocol pv ?peer ?timeout hash =
             | Some protocol ->
                 return protocol
             | None ->
-                Protocol_validator_event.(emit fetching_protocol) (hash, peer)
+                Event.(emit fetching_protocol) (hash, peer)
                 >>= fun () ->
                 Distributed_db.Protocol.fetch pv.db ?peer ?timeout hash ())
       >>=? fun protocol ->

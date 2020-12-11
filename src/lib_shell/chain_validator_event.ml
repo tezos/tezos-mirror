@@ -53,6 +53,15 @@ let prevalidator_reinstantiation_failure =
     ~pp1:pp_print_error_first
     ("trace", trace_encoding)
 
+let prevalidator_instantiation_failure =
+  declare_1
+    ~section
+    ~name:"prevalidator_instantiation_failure"
+    ~msg:"failed to instantiate the prevalidator: {trace}"
+    ~level:Error
+    ~pp1:pp_print_error_first
+    ("trace", trace_encoding)
+
 let loading_protocol =
   declare_1
     ~section
