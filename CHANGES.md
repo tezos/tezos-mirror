@@ -14,6 +14,8 @@ here either.
 
 ## Client
 
+- Fixed the return code of errors in the client calls to be non-zero.
+
 ## Baker / Endorser / Accuser
 
 ## Protocol Compiler And Environment
