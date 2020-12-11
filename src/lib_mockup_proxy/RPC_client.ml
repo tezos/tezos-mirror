@@ -329,11 +329,7 @@ class local_ctxt (directory : unit RPC_directory.t) : RPC_context.json =
         : 'm 'p 'q 'i 'o.
           (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) RPC_service.t -> 'p ->
           'q -> 'i -> 'o tzresult Lwt.t =
-      fun (type p q i o)
-          (service : (_, _, p, q, i, o) Service.t)
-          (params : p)
-          (query : q)
-          (input : i) ->
+      fun service params query input ->
         let fail_not_found () =
           let description = print_service service in
           (* The proxy mode relies on this code, because it matches
@@ -356,13 +352,7 @@ class local_ctxt (directory : unit RPC_directory.t) : RPC_context.json =
           (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) RPC_service.t ->
           on_chunk:('o -> unit) -> on_close:(unit -> unit) -> 'p -> 'q -> 'i ->
           (unit -> unit) tzresult Lwt.t =
-      fun (type p q i o)
-          (service : (_, _, p, q, i, o) Service.t)
-          ~on_chunk
-          ~on_close
-          (params : p)
-          (query : q)
-          (input : i) ->
+      fun service ~on_chunk ~on_close params query input ->
         LocalClient.call_streamed_service
           service
           ~on_chunk
