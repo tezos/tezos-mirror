@@ -290,6 +290,33 @@ val submit_ballot :
 val spawn_submit_ballot :
   ?key:string -> ?wait:string -> proto_hash:string -> ballot -> t -> Process.t
 
+(** Run [tezos-client originate contract alias transferring amount from src
+    running prg]. Returns the originated contract hash *)
+val originate_contract :
+  ?node:Node.t ->
+  ?wait:string ->
+  ?init:string ->
+  ?burn_cap:int ->
+  alias:string ->
+  amount:int ->
+  src:string ->
+  prg:string ->
+  t ->
+  string Lwt.t
+
+(** Same as [originate_contract], but do not wait for the process to exit. *)
+val spawn_originate_contract :
+  ?node:Node.t ->
+  ?wait:string ->
+  ?init:string ->
+  ?burn_cap:int ->
+  alias:string ->
+  amount:int ->
+  src:string ->
+  prg:string ->
+  t ->
+  Process.t
+
 (** {2 High-Level Functions} *)
 
 (** Create a client with mode [Client] and import all secret keys

@@ -373,6 +373,50 @@ let spawn_submit_ballot ?(key = Constant.bootstrap1.alias) ?(wait = "none")
 let submit_ballot ?key ?wait ~proto_hash vote client =
   spawn_submit_ballot ?key ?wait ~proto_hash vote client |> Process.check
 
+let spawn_originate_contract ?node ?(wait = "none") ?init ?burn_cap ~alias
+    ~amount ~src ~prg client =
+  spawn_command
+    ?node
+    client
+    ( ["--wait"; wait]
+    @ [ "originate";
+        "contract";
+        alias;
+        "transferring";
+        Int.to_string amount;
+        "from";
+        src;
+        "running";
+        prg ]
+    @ Option.fold ~none:[] ~some:(fun init -> ["--init"; init]) init
+    @ Option.fold
+        ~none:[]
+        ~some:(fun burn_cap -> ["--burn-cap"; string_of_int burn_cap])
+        burn_cap )
+
+let originate_contract ?node ?wait ?init ?burn_cap ~alias ~amount ~src ~prg
+    client =
+  let* client_output =
+    spawn_originate_contract
+      ?node
+      ?wait
+      ?init
+      ?burn_cap
+      ~alias
+      ~amount
+      ~src
+      ~prg
+      client
+    |> Process.check_and_read_stdout
+  in
+  match client_output =~* rex "New contract ?(KT1\\w{33})" with
+  | None ->
+      Test.fail
+        "Cannot extract contract hash from client_output: %s"
+        client_output
+  | Some hash ->
+      return hash
+
 let init ?path ?admin_path ?name ?color ?base_dir ?node () =
   let client = create ?path ?admin_path ?name ?color ?base_dir ?node () in
   let* () =
