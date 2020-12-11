@@ -330,6 +330,25 @@ let () =
       | Invalid_protocol {hash; error} -> Some (hash, error) | _ -> None)
     (fun (hash, error) -> Invalid_protocol {hash; error})
 
+type error += Cannot_load_protocol of Protocol_hash.t
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"node.protocol_validator.cannot_load_protocol"
+    ~title:"Cannot load protocol"
+    ~description:"Cannot load protocol from disk"
+    ~pp:(fun ppf protocol ->
+      Format.fprintf
+        ppf
+        "Failed to load the protocol %a from disk: the corresponding files \
+         might be missing or corrupted."
+        Protocol_hash.pp
+        protocol)
+    Data_encoding.(obj1 (req "protocol" Protocol_hash.encoding))
+    (function Cannot_load_protocol protocol -> Some protocol | _ -> None)
+    (fun protocol -> Cannot_load_protocol protocol)
+
 (********************* Peer validator errors ******************************)
 
 type error += Unknown_ancestor | Known_invalid

@@ -70,6 +70,8 @@ type protocol_error = Compilation_failed | Dynlinking_failed
 type error +=
   | Invalid_protocol of {hash : Protocol_hash.t; error : protocol_error}
 
+type error += Cannot_load_protocol of Protocol_hash.t
+
 (********************* Peer validator errors ******************************)
 
 type error += Unknown_ancestor | Known_invalid

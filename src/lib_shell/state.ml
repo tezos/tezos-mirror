@@ -472,6 +472,14 @@ module Chain = struct
     read_chain_data chain_state (fun _ chain_data ->
         Lwt.return chain_data.test_chain)
 
+  let all_indexed_protocols chain_state =
+    let chain_id = chain_state.chain_id in
+    let global_state = chain_state.global_state in
+    Shared.use global_state.global_data (fun global_data ->
+        let global_store = global_data.global_store in
+        let chain_store = Store.Chain.get global_store chain_id in
+        Store.Chain.Protocol_info.bindings chain_store)
+
   let get_level_indexed_protocol chain_state header =
     let chain_id = chain_state.chain_id in
     let protocol_level = header.Block_header.shell.proto_level in

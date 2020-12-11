@@ -509,7 +509,34 @@ let on_close w =
     :: Lwt_utils.may ~f:(fun (_, shutdown) -> shutdown ()) nv.child
     :: pvs )
 
+let may_load_protocols parameters =
+  let chain_state = Distributed_db.chain_state parameters.chain_db in
+  let state = Distributed_db.state parameters.db in
+  State.Chain.all_indexed_protocols chain_state
+  >>= fun indexed_protocols ->
+  List.iter_es
+    (fun (_proto_level, (proto_hash, _activation_block)) ->
+      if Registered_protocol.mem proto_hash then return_unit
+      else
+        State.Protocol.known state proto_hash
+        >>= function
+        | false ->
+            return_unit
+        | true ->
+            (* Only compile protocols that are on-disk *)
+            Chain_validator_event.(emit loading_protocol proto_hash)
+            >>= fun () ->
+            trace
+              (Validation_errors.Cannot_load_protocol proto_hash)
+              ( Block_validator.fetch_and_compile_protocol
+                  parameters.block_validator
+                  proto_hash
+              >>=? fun _ -> return_unit ))
+    indexed_protocols
+
 let on_launch start_prevalidator w _ parameters =
+  may_load_protocols parameters
+  >>=? fun () ->
   ( if start_prevalidator then
     State.read_chain_data
       parameters.chain_state
