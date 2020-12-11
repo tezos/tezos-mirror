@@ -119,6 +119,12 @@ module Chain : sig
       This function assumes that the predecessor is known valid. *)
   val acceptable_block : chain_state -> Block_header.t -> bool Lwt.t
 
+  (** List all the indexed protocols in the chain. The resulting list
+     contains elements of the form [<proto_level>, (<proto_hash>,
+     <activation_level>)]. *)
+  val all_indexed_protocols :
+    chain_state -> (int * (Protocol_hash.t * int32)) list Lwt.t
+
   (** Get the level indexed chain protocol store for the given header. *)
   val get_level_indexed_protocol :
     chain_state -> Block_header.t -> Protocol_hash.t Lwt.t
