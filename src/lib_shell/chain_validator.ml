@@ -543,23 +543,23 @@ let on_launch start_prevalidator w _ parameters =
       (fun _ {State.current_head; _} -> Lwt.return current_head)
     >>= fun head ->
     State.Block.protocol_hash head
-    >>=? fun head_hash ->
-    safe_get_prevalidator_filter head_hash
+    >>=? fun head_protocol_hash ->
+    safe_get_prevalidator_filter head_protocol_hash
     >>= function
-    | Ok (module Proto) -> (
+    | Ok (module Proto_filters) -> (
         Prevalidator.create
           parameters.prevalidator_limits
-          (module Proto)
+          (module Proto_filters)
           parameters.chain_db
         >>= function
         | Error errs ->
-            Chain_validator_event.(emit prevalidator_reinstantiation_failure)
+            Chain_validator_event.(emit prevalidator_instantiation_failure)
               errs
             >>= fun () -> return_none
         | Ok prevalidator ->
             return_some prevalidator )
     | Error errs ->
-        Chain_validator_event.(emit prevalidator_reinstantiation_failure) errs
+        Chain_validator_event.(emit prevalidator_instantiation_failure) errs
         >>= fun () -> return_none
   else return_none )
   >>=? fun prevalidator ->
