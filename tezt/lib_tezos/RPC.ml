@@ -224,6 +224,127 @@ module Proto_alpha = struct
         ~contract_id client =
       get_sub ?node ?hooks ~chain ~block ~contract_id "storage" client
   end
+
+  module Delegate = struct
+    let spawn_get_all ?node ?hooks ?(chain = "main") ?(block = "head") client =
+      let path = ["chains"; chain; "blocks"; block; "context"; "delegates"] in
+      Client.spawn_rpc ?node ?hooks GET path client
+
+    let get_all ?node ?hooks ?(chain = "main") ?(block = "head") client =
+      let path = ["chains"; chain; "blocks"; block; "context"; "delegates"] in
+      let* contracts = Client.rpc ?node ?hooks GET path client in
+      return (JSON.as_list contracts |> List.map JSON.as_string)
+
+    let spawn_get ?node ?hooks ?(chain = "main") ?(block = "head") ~pkh client
+        =
+      let path =
+        ["chains"; chain; "blocks"; block; "context"; "delegates"; pkh]
+      in
+      Client.spawn_rpc ?node ?hooks GET path client
+
+    let get ?node ?hooks ?(chain = "main") ?(block = "head") ~pkh client =
+      let path =
+        ["chains"; chain; "blocks"; block; "context"; "delegates"; pkh]
+      in
+      Client.rpc ?node ?hooks GET path client
+
+    let sub_path ~chain ~block ~pkh field =
+      ["chains"; chain; "blocks"; block; "context"; "delegates"; pkh; field]
+
+    let spawn_get_sub ?node ?hooks ~chain ~block ~pkh field client =
+      let path = sub_path ~chain ~block ~pkh field in
+      Client.spawn_rpc ?node ?hooks GET path client
+
+    let get_sub ?node ?hooks ~chain ~block ~pkh field client =
+      let path = sub_path ~chain ~block ~pkh field in
+      Client.rpc ?node ?hooks GET path client
+
+    let spawn_get_balance ?node ?hooks ?(chain = "main") ?(block = "head") ~pkh
+        client =
+      spawn_get_sub ?node ?hooks ~chain ~block ~pkh "balance" client
+
+    let get_balance ?node ?hooks ?(chain = "main") ?(block = "head") ~pkh
+        client =
+      get_sub ?node ?hooks ~chain ~block ~pkh "balance" client
+
+    let spawn_get_deactivated ?node ?hooks ?(chain = "main") ?(block = "head")
+        ~pkh client =
+      spawn_get_sub ?node ?hooks ~chain ~block ~pkh "deactivated" client
+
+    let get_deactivated ?node ?hooks ?(chain = "main") ?(block = "head") ~pkh
+        client =
+      get_sub ?node ?hooks ~chain ~block ~pkh "deactivated" client
+
+    let spawn_get_delegated_balance ?node ?hooks ?(chain = "main")
+        ?(block = "head") ~pkh client =
+      spawn_get_sub ?node ?hooks ~chain ~block ~pkh "delegated_balance" client
+
+    let get_delegated_balance ?node ?hooks ?(chain = "main") ?(block = "head")
+        ~pkh client =
+      get_sub ?node ?hooks ~chain ~block ~pkh "delegated_balance" client
+
+    let spawn_get_delegated_contracts ?node ?hooks ?(chain = "main")
+        ?(block = "head") ~pkh client =
+      spawn_get_sub
+        ?node
+        ?hooks
+        ~chain
+        ~block
+        ~pkh
+        "delegated_contracts"
+        client
+
+    let get_delegated_contracts ?node ?hooks ?(chain = "main")
+        ?(block = "head") ~pkh client =
+      get_sub ?node ?hooks ~chain ~block ~pkh "delegated_contracts" client
+
+    let spawn_get_frozen_balance ?node ?hooks ?(chain = "main")
+        ?(block = "head") ~pkh client =
+      spawn_get_sub ?node ?hooks ~chain ~block ~pkh "frozen_balance" client
+
+    let get_frozen_balance ?node ?hooks ?(chain = "main") ?(block = "head")
+        ~pkh client =
+      get_sub ?node ?hooks ~chain ~block ~pkh "frozen_balance" client
+
+    let spawn_get_frozen_balance_by_cycle ?node ?hooks ?(chain = "main")
+        ?(block = "head") ~pkh client =
+      spawn_get_sub
+        ?node
+        ?hooks
+        ~chain
+        ~block
+        ~pkh
+        "frozen_balance_by_cycle"
+        client
+
+    let get_frozen_balance_by_cycle ?node ?hooks ?(chain = "main")
+        ?(block = "head") ~pkh client =
+      get_sub ?node ?hooks ~chain ~block ~pkh "frozen_balance_by_cycle" client
+
+    let spawn_get_grace_period ?node ?hooks ?(chain = "main") ?(block = "head")
+        ~pkh client =
+      spawn_get_sub ?node ?hooks ~chain ~block ~pkh "grace_period" client
+
+    let get_grace_period ?node ?hooks ?(chain = "main") ?(block = "head") ~pkh
+        client =
+      get_sub ?node ?hooks ~chain ~block ~pkh "grace_period" client
+
+    let spawn_get_staking_balance ?node ?hooks ?(chain = "main")
+        ?(block = "head") ~pkh client =
+      spawn_get_sub ?node ?hooks ~chain ~block ~pkh "staking_balance" client
+
+    let get_staking_balance ?node ?hooks ?(chain = "main") ?(block = "head")
+        ~pkh client =
+      get_sub ?node ?hooks ~chain ~block ~pkh "staking_balance" client
+
+    let spawn_get_voting_power ?node ?hooks ?(chain = "main") ?(block = "head")
+        ~pkh client =
+      spawn_get_sub ?node ?hooks ~chain ~block ~pkh "voting_power" client
+
+    let get_voting_power ?node ?hooks ?(chain = "main") ?(block = "head") ~pkh
+        client =
+      get_sub ?node ?hooks ~chain ~block ~pkh "voting_power" client
+  end
 end
 
 module Proto_007 = struct
@@ -359,5 +480,118 @@ module Proto_007 = struct
     let get_storage ?node ?hooks ?(chain = "main") ?(block = "head")
         ~contract_id client =
       get_sub ?node ?hooks ~chain ~block ~contract_id "storage" client
+  end
+
+  module Delegate = struct
+    let spawn_get_all ?node ?hooks ?(chain = "main") ?(block = "head") client =
+      let path = ["chains"; chain; "blocks"; block; "context"; "delegates"] in
+      Client.spawn_rpc ?node ?hooks GET path client
+
+    let get_all ?node ?hooks ?(chain = "main") ?(block = "head") client =
+      let path = ["chains"; chain; "blocks"; block; "context"; "delegates"] in
+      let* contracts = Client.rpc ?node ?hooks GET path client in
+      return (JSON.as_list contracts |> List.map JSON.as_string)
+
+    let spawn_get ?node ?hooks ?(chain = "main") ?(block = "head") ~pkh client
+        =
+      let path =
+        ["chains"; chain; "blocks"; block; "context"; "delegates"; pkh]
+      in
+      Client.spawn_rpc ?node ?hooks GET path client
+
+    let get ?node ?hooks ?(chain = "main") ?(block = "head") ~pkh client =
+      let path =
+        ["chains"; chain; "blocks"; block; "context"; "delegates"; pkh]
+      in
+      Client.rpc ?node ?hooks GET path client
+
+    let sub_path ~chain ~block ~pkh field =
+      ["chains"; chain; "blocks"; block; "context"; "delegates"; pkh; field]
+
+    let spawn_get_sub ?node ?hooks ~chain ~block ~pkh field client =
+      let path = sub_path ~chain ~block ~pkh field in
+      Client.spawn_rpc ?node ?hooks GET path client
+
+    let get_sub ?node ?hooks ~chain ~block ~pkh field client =
+      let path = sub_path ~chain ~block ~pkh field in
+      Client.rpc ?node ?hooks GET path client
+
+    let spawn_get_balance ?node ?hooks ?(chain = "main") ?(block = "head") ~pkh
+        client =
+      spawn_get_sub ?node ?hooks ~chain ~block ~pkh "balance" client
+
+    let get_balance ?node ?hooks ?(chain = "main") ?(block = "head") ~pkh
+        client =
+      get_sub ?node ?hooks ~chain ~block ~pkh "balance" client
+
+    let spawn_get_deactivated ?node ?hooks ?(chain = "main") ?(block = "head")
+        ~pkh client =
+      spawn_get_sub ?node ?hooks ~chain ~block ~pkh "deactivated" client
+
+    let get_deactivated ?node ?hooks ?(chain = "main") ?(block = "head") ~pkh
+        client =
+      get_sub ?node ?hooks ~chain ~block ~pkh "deactivated" client
+
+    let spawn_get_delegated_balance ?node ?hooks ?(chain = "main")
+        ?(block = "head") ~pkh client =
+      spawn_get_sub ?node ?hooks ~chain ~block ~pkh "delegated_balance" client
+
+    let get_delegated_balance ?node ?hooks ?(chain = "main") ?(block = "head")
+        ~pkh client =
+      get_sub ?node ?hooks ~chain ~block ~pkh "delegated_balance" client
+
+    let spawn_get_delegated_contracts ?node ?hooks ?(chain = "main")
+        ?(block = "head") ~pkh client =
+      spawn_get_sub
+        ?node
+        ?hooks
+        ~chain
+        ~block
+        ~pkh
+        "delegated_contracts"
+        client
+
+    let get_delegated_contracts ?node ?hooks ?(chain = "main")
+        ?(block = "head") ~pkh client =
+      get_sub ?node ?hooks ~chain ~block ~pkh "delegated_contracts" client
+
+    let spawn_get_frozen_balance ?node ?hooks ?(chain = "main")
+        ?(block = "head") ~pkh client =
+      spawn_get_sub ?node ?hooks ~chain ~block ~pkh "frozen_balance" client
+
+    let get_frozen_balance ?node ?hooks ?(chain = "main") ?(block = "head")
+        ~pkh client =
+      get_sub ?node ?hooks ~chain ~block ~pkh "frozen_balance" client
+
+    let spawn_get_frozen_balance_by_cycle ?node ?hooks ?(chain = "main")
+        ?(block = "head") ~pkh client =
+      spawn_get_sub
+        ?node
+        ?hooks
+        ~chain
+        ~block
+        ~pkh
+        "frozen_balance_by_cycle"
+        client
+
+    let get_frozen_balance_by_cycle ?node ?hooks ?(chain = "main")
+        ?(block = "head") ~pkh client =
+      get_sub ?node ?hooks ~chain ~block ~pkh "frozen_balance_by_cycle" client
+
+    let spawn_get_grace_period ?node ?hooks ?(chain = "main") ?(block = "head")
+        ~pkh client =
+      spawn_get_sub ?node ?hooks ~chain ~block ~pkh "grace_period" client
+
+    let get_grace_period ?node ?hooks ?(chain = "main") ?(block = "head") ~pkh
+        client =
+      get_sub ?node ?hooks ~chain ~block ~pkh "grace_period" client
+
+    let spawn_get_staking_balance ?node ?hooks ?(chain = "main")
+        ?(block = "head") ~pkh client =
+      spawn_get_sub ?node ?hooks ~chain ~block ~pkh "staking_balance" client
+
+    let get_staking_balance ?node ?hooks ?(chain = "main") ?(block = "head")
+        ~pkh client =
+      get_sub ?node ?hooks ~chain ~block ~pkh "staking_balance" client
   end
 end

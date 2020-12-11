@@ -353,6 +353,226 @@ module Proto_alpha : sig
       Client.t ->
       Process.t
   end
+
+  module Delegate : sig
+    (** Call RPC /chain/[chain]/blocks/[block]/context/delegates *)
+    val get_all :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      Client.t ->
+      string list Lwt.t
+
+    (** Same as [get_all], but do not wait for the process to exit. *)
+    val spawn_get_all :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      Client.t ->
+      Process.t
+
+    (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh] *)
+    val get :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      pkh:string ->
+      Client.t ->
+      JSON.t Lwt.t
+
+    (** Same as [get], but do not wait for the process to exit. *)
+    val spawn_get :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      pkh:string ->
+      Client.t ->
+      Process.t
+
+    (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/balance *)
+    val get_balance :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      pkh:string ->
+      Client.t ->
+      JSON.t Lwt.t
+
+    (** Same as [get_balance], but do not wait for the process to exit. *)
+    val spawn_get_balance :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      pkh:string ->
+      Client.t ->
+      Process.t
+
+    (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/deactivated *)
+    val get_deactivated :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      pkh:string ->
+      Client.t ->
+      JSON.t Lwt.t
+
+    (** Same as [get_deactivated], but do not wait for the process to exit. *)
+    val spawn_get_deactivated :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      pkh:string ->
+      Client.t ->
+      Process.t
+
+    (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/delegated_balance *)
+    val get_delegated_balance :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      pkh:string ->
+      Client.t ->
+      JSON.t Lwt.t
+
+    (** Same as [get_delegated_balance], but do not wait for the process to exit. *)
+    val spawn_get_delegated_balance :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      pkh:string ->
+      Client.t ->
+      Process.t
+
+    (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/delegated_contracts *)
+    val get_delegated_contracts :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      pkh:string ->
+      Client.t ->
+      JSON.t Lwt.t
+
+    (** Same as [get_delegated_contracts], but do not wait for the process to exit. *)
+    val spawn_get_delegated_contracts :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      pkh:string ->
+      Client.t ->
+      Process.t
+
+    (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/frozen_balance *)
+    val get_frozen_balance :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      pkh:string ->
+      Client.t ->
+      JSON.t Lwt.t
+
+    (** Same as [get_frozen_balance], but do not wait for the process to exit. *)
+    val spawn_get_frozen_balance :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      pkh:string ->
+      Client.t ->
+      Process.t
+
+    (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/frozen_balance_by_cycle *)
+    val get_frozen_balance_by_cycle :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      pkh:string ->
+      Client.t ->
+      JSON.t Lwt.t
+
+    (** Same as [get_frozen_balance_by_cycle], but do not wait for the process to exit. *)
+    val spawn_get_frozen_balance_by_cycle :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      pkh:string ->
+      Client.t ->
+      Process.t
+
+    (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/grace_period *)
+    val get_grace_period :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      pkh:string ->
+      Client.t ->
+      JSON.t Lwt.t
+
+    (** Same as [get_grace_period], but do not wait for the process to exit. *)
+    val spawn_get_grace_period :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      pkh:string ->
+      Client.t ->
+      Process.t
+
+    (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/staking_balance *)
+    val get_staking_balance :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      pkh:string ->
+      Client.t ->
+      JSON.t Lwt.t
+
+    (** Same as [get_staking_balance], but do not wait for the process to exit. *)
+    val spawn_get_staking_balance :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      pkh:string ->
+      Client.t ->
+      Process.t
+
+    (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/voting_power *)
+    val get_voting_power :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      pkh:string ->
+      Client.t ->
+      JSON.t Lwt.t
+
+    (** Same as [get_voting_power], but do not wait for the process to exit. *)
+    val spawn_get_voting_power :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      pkh:string ->
+      Client.t ->
+      Process.t
+  end
 end
 
 module Proto_007 : sig
@@ -572,6 +792,206 @@ module Proto_007 : sig
       ?chain:string ->
       ?block:string ->
       contract_id:string ->
+      Client.t ->
+      Process.t
+  end
+
+  module Delegate : sig
+    (** Call RPC /chain/[chain]/blocks/[block]/context/delegates *)
+    val get_all :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      Client.t ->
+      string list Lwt.t
+
+    (** Same as [get_all], but do not wait for the process to exit. *)
+    val spawn_get_all :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      Client.t ->
+      Process.t
+
+    (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh] *)
+    val get :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      pkh:string ->
+      Client.t ->
+      JSON.t Lwt.t
+
+    (** Same as [get], but do not wait for the process to exit. *)
+    val spawn_get :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      pkh:string ->
+      Client.t ->
+      Process.t
+
+    (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/balance *)
+    val get_balance :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      pkh:string ->
+      Client.t ->
+      JSON.t Lwt.t
+
+    (** Same as [get_balance], but do not wait for the process to exit. *)
+    val spawn_get_balance :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      pkh:string ->
+      Client.t ->
+      Process.t
+
+    (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/deactivated *)
+    val get_deactivated :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      pkh:string ->
+      Client.t ->
+      JSON.t Lwt.t
+
+    (** Same as [get_deactivated], but do not wait for the process to exit. *)
+    val spawn_get_deactivated :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      pkh:string ->
+      Client.t ->
+      Process.t
+
+    (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/delegated_balance *)
+    val get_delegated_balance :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      pkh:string ->
+      Client.t ->
+      JSON.t Lwt.t
+
+    (** Same as [get_delegated_balance], but do not wait for the process to exit. *)
+    val spawn_get_delegated_balance :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      pkh:string ->
+      Client.t ->
+      Process.t
+
+    (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/delegated_contracts *)
+    val get_delegated_contracts :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      pkh:string ->
+      Client.t ->
+      JSON.t Lwt.t
+
+    (** Same as [get_delegated_contracts], but do not wait for the process to exit. *)
+    val spawn_get_delegated_contracts :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      pkh:string ->
+      Client.t ->
+      Process.t
+
+    (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/frozen_balance *)
+    val get_frozen_balance :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      pkh:string ->
+      Client.t ->
+      JSON.t Lwt.t
+
+    (** Same as [get_frozen_balance], but do not wait for the process to exit. *)
+    val spawn_get_frozen_balance :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      pkh:string ->
+      Client.t ->
+      Process.t
+
+    (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/frozen_balance_by_cycle *)
+    val get_frozen_balance_by_cycle :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      pkh:string ->
+      Client.t ->
+      JSON.t Lwt.t
+
+    (** Same as [get_frozen_balance_by_cycle], but do not wait for the process to exit. *)
+    val spawn_get_frozen_balance_by_cycle :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      pkh:string ->
+      Client.t ->
+      Process.t
+
+    (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/grace_period *)
+    val get_grace_period :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      pkh:string ->
+      Client.t ->
+      JSON.t Lwt.t
+
+    (** Same as [get_grace_period], but do not wait for the process to exit. *)
+    val spawn_get_grace_period :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      pkh:string ->
+      Client.t ->
+      Process.t
+
+    (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/staking_balance *)
+    val get_staking_balance :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      pkh:string ->
+      Client.t ->
+      JSON.t Lwt.t
+
+    (** Same as [get_staking_balance], but do not wait for the process to exit. *)
+    val spawn_get_staking_balance :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      pkh:string ->
       Client.t ->
       Process.t
   end
