@@ -23,6 +23,27 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Testing
+   -------
+   Component: encoding tests
+   Invocation: [dune exec tezt/tests/main.exe encoding]
+
+               To only run the regression tests:
+               [dune exec tezt/tests/main.exe encoding regression]
+
+               Note that to reset the regression outputs, one can use
+               the [--reset-regressions] option. When doing so, it is
+               recommended to clear the output directory
+               [tezt/_regressions/encoding] first to remove unused files in case
+               some paths change.
+   Subject: Encoding regression tests capture the output of encoding/decoding
+            using the [tezos-codec] and compare it with the output from the
+            previous run. The test passes only if the outputs match exactly.
+
+            The other test checks that the [tezos-codec] can successfully dump
+            the list of encodings.
+  *)
+
 let check_dump_encodings () =
   Test.register
     ~__FILE__
