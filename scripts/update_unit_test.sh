@@ -29,7 +29,6 @@ unit:alltest:
     paths:
       - test_results
     expire_in: 1 day
-#    when: on_failure
   script:
 EOF
 
@@ -45,7 +44,7 @@ for lib in $(find src/ vendors/ -name test -type d | LC_COLLATE=C sort) ; do
     name=${name##vendors/}
     name=${name//\//_}
     cat >> "$tmp" <<EOF
-    - scripts/test_wrapper.sh $nametest $name
+    - scripts/test_wrapper.sh dune $nametest $name
 EOF
   fi
 done

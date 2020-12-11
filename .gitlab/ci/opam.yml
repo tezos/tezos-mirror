@@ -1,3 +1,5 @@
+---
+
 .opam_template:
   extends: .runtime_build_test_dependencies_template
   stage: packaging
@@ -21,869 +23,354 @@
         - /scripts/version.sh
         - /.gitlab-ci.yml
       when: on_success
-  script:
-    - ./scripts/opam-pin.sh
-    - opam depext --yes ${package}
-    - opam install --yes ${package}
-    - opam reinstall --yes --with-test ${package}
   interruptible: true
 
 ##BEGIN_OPAM##
-# this section is updated using the script scripts/update_opam_test.sh
 
-opam:benchmark-utils:
-  extends: .opam_template
-  variables:
-    package: benchmark-utils
-
-opam:bls12-381:
-  extends: .opam_template
-  variables:
-    package: bls12-381
-
-opam:flextesa:
-  extends: .opam_template
-  variables:
-    package: flextesa
-
-opam:latex:
-  extends: .opam_template
-  variables:
-    package: latex
-
-opam:ledgerwallet:
-  extends: .opam_template
-  variables:
-    package: ledgerwallet
-
-opam:ledgerwallet-tezos:
-  extends: .opam_template
-  variables:
-    package: ledgerwallet-tezos
-
-opam:numerics:
-  extends: .opam_template
-  variables:
-    package: numerics
-
-opam:pyml-plot:
-  extends: .opam_template
-  variables:
-    package: pyml-plot
-
-opam:staTz:
-  extends: .opam_template
-  variables:
-    package: staTz
-
-opam:tezos-007-PsDELPH1-test-helpers:
-  extends: .opam_template
-  variables:
-    package: tezos-007-PsDELPH1-test-helpers
-
-opam:tezos-008-PtEdoTez-test-helpers:
-  extends: .opam_template
-  variables:
-    package: tezos-008-PtEdoTez-test-helpers
-
-opam:tezos-accuser-007-PsDELPH1:
-  extends: .opam_template
-  variables:
-    package: tezos-accuser-007-PsDELPH1
-
-opam:tezos-accuser-007-PsDELPH1-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-accuser-007-PsDELPH1-commands
-
-opam:tezos-accuser-008-PtEdoTez:
-  extends: .opam_template
-  variables:
-    package: tezos-accuser-008-PtEdoTez
-
-opam:tezos-accuser-008-PtEdoTez-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-accuser-008-PtEdoTez-commands
-
-opam:tezos-accuser-alpha:
-  extends: .opam_template
-  variables:
-    package: tezos-accuser-alpha
-
-opam:tezos-accuser-alpha-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-accuser-alpha-commands
-
-opam:tezos-alpha-test-helpers:
-  extends: .opam_template
-  variables:
-    package: tezos-alpha-test-helpers
-
-opam:tezos-baker-007-PsDELPH1:
-  extends: .opam_template
-  variables:
-    package: tezos-baker-007-PsDELPH1
-
-opam:tezos-baker-008-PtEdoTez:
-  extends: .opam_template
-  variables:
-    package: tezos-baker-008-PtEdoTez
-
-opam:tezos-baker-alpha:
-  extends: .opam_template
-  variables:
-    package: tezos-baker-alpha
-
-opam:tezos-baking-007-PsDELPH1:
-  extends: .opam_template
-  variables:
-    package: tezos-baking-007-PsDELPH1
-
-opam:tezos-baking-007-PsDELPH1-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-baking-007-PsDELPH1-commands
-
-opam:tezos-baking-008-PtEdoTez:
-  extends: .opam_template
-  variables:
-    package: tezos-baking-008-PtEdoTez
-
-opam:tezos-baking-008-PtEdoTez-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-baking-008-PtEdoTez-commands
-
-opam:tezos-baking-alpha:
-  extends: .opam_template
-  variables:
-    package: tezos-baking-alpha
-
-opam:tezos-baking-alpha-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-baking-alpha-commands
-
-opam:tezos-base:
-  extends: .opam_template
-  variables:
-    package: tezos-base
-
-opam:tezos-benchmark:
-  extends: .opam_template
-  variables:
-    package: tezos-benchmark
-
-opam:tezos-benchmark-examples:
-  extends: .opam_template
-  variables:
-    package: tezos-benchmark-examples
-
-opam:tezos-benchmark-tests:
-  extends: .opam_template
-  variables:
-    package: tezos-benchmark-tests
-
-opam:tezos-clic:
-  extends: .opam_template
-  variables:
-    package: tezos-clic
-
-opam:tezos-client:
-  extends: .opam_template
-  variables:
-    package: tezos-client
-
-opam:tezos-client-000-Ps9mPmXa:
-  extends: .opam_template
-  variables:
-    package: tezos-client-000-Ps9mPmXa
-
-opam:tezos-client-001-PtCJ7pwo:
-  extends: .opam_template
-  variables:
-    package: tezos-client-001-PtCJ7pwo
-
-opam:tezos-client-001-PtCJ7pwo-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-client-001-PtCJ7pwo-commands
-
-opam:tezos-client-002-PsYLVpVv:
-  extends: .opam_template
-  variables:
-    package: tezos-client-002-PsYLVpVv
-
-opam:tezos-client-002-PsYLVpVv-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-client-002-PsYLVpVv-commands
-
-opam:tezos-client-003-PsddFKi3:
-  extends: .opam_template
-  variables:
-    package: tezos-client-003-PsddFKi3
-
-opam:tezos-client-003-PsddFKi3-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-client-003-PsddFKi3-commands
-
-opam:tezos-client-004-Pt24m4xi:
-  extends: .opam_template
-  variables:
-    package: tezos-client-004-Pt24m4xi
-
-opam:tezos-client-004-Pt24m4xi-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-client-004-Pt24m4xi-commands
-
-opam:tezos-client-005-PsBabyM1:
-  extends: .opam_template
-  variables:
-    package: tezos-client-005-PsBabyM1
-
-opam:tezos-client-005-PsBabyM1-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-client-005-PsBabyM1-commands
-
-opam:tezos-client-006-PsCARTHA:
-  extends: .opam_template
-  variables:
-    package: tezos-client-006-PsCARTHA
-
-opam:tezos-client-006-PsCARTHA-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-client-006-PsCARTHA-commands
-
-opam:tezos-client-007-PsDELPH1:
-  extends: .opam_template
-  variables:
-    package: tezos-client-007-PsDELPH1
-
-opam:tezos-client-007-PsDELPH1-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-client-007-PsDELPH1-commands
-
-opam:tezos-client-007-PsDELPH1-commands-registration:
-  extends: .opam_template
-  variables:
-    package: tezos-client-007-PsDELPH1-commands-registration
-
-opam:tezos-client-008-PtEdoTez:
-  extends: .opam_template
-  variables:
-    package: tezos-client-008-PtEdoTez
-
-opam:tezos-client-008-PtEdoTez-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-client-008-PtEdoTez-commands
-
-opam:tezos-client-008-PtEdoTez-commands-registration:
-  extends: .opam_template
-  variables:
-    package: tezos-client-008-PtEdoTez-commands-registration
-
-opam:tezos-client-alpha:
-  extends: .opam_template
-  variables:
-    package: tezos-client-alpha
-
-opam:tezos-client-alpha-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-client-alpha-commands
-
-opam:tezos-client-alpha-commands-registration:
-  extends: .opam_template
-  variables:
-    package: tezos-client-alpha-commands-registration
-
-opam:tezos-client-base:
-  extends: .opam_template
-  variables:
-    package: tezos-client-base
-
-opam:tezos-client-base-unix:
-  extends: .opam_template
-  variables:
-    package: tezos-client-base-unix
-
-opam:tezos-client-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-client-commands
-
-opam:tezos-client-demo-counter:
-  extends: .opam_template
-  variables:
-    package: tezos-client-demo-counter
-
-opam:tezos-client-genesis:
-  extends: .opam_template
-  variables:
-    package: tezos-client-genesis
-
-opam:tezos-client-genesis-carthagenet:
-  extends: .opam_template
-  variables:
-    package: tezos-client-genesis-carthagenet
-
-opam:tezos-client-sapling-008-PtEdoTez:
-  extends: .opam_template
-  variables:
-    package: tezos-client-sapling-008-PtEdoTez
-
-opam:tezos-client-sapling-alpha:
-  extends: .opam_template
-  variables:
-    package: tezos-client-sapling-alpha
-
-opam:tezos-codec:
-  extends: .opam_template
-  variables:
-    package: tezos-codec
-
-opam:tezos-crypto:
-  extends: .opam_template
-  variables:
-    package: tezos-crypto
-
-opam:tezos-embedded-protocol-000-Ps9mPmXa:
-  extends: .opam_template
-  variables:
-    package: tezos-embedded-protocol-000-Ps9mPmXa
-
-opam:tezos-embedded-protocol-001-PtCJ7pwo:
-  extends: .opam_template
-  variables:
-    package: tezos-embedded-protocol-001-PtCJ7pwo
-
-opam:tezos-embedded-protocol-002-PsYLVpVv:
-  extends: .opam_template
-  variables:
-    package: tezos-embedded-protocol-002-PsYLVpVv
-
-opam:tezos-embedded-protocol-003-PsddFKi3:
-  extends: .opam_template
-  variables:
-    package: tezos-embedded-protocol-003-PsddFKi3
-
-opam:tezos-embedded-protocol-004-Pt24m4xi:
-  extends: .opam_template
-  variables:
-    package: tezos-embedded-protocol-004-Pt24m4xi
-
-opam:tezos-embedded-protocol-005-PsBABY5H:
-  extends: .opam_template
-  variables:
-    package: tezos-embedded-protocol-005-PsBABY5H
-
-opam:tezos-embedded-protocol-005-PsBabyM1:
-  extends: .opam_template
-  variables:
-    package: tezos-embedded-protocol-005-PsBabyM1
-
-opam:tezos-embedded-protocol-006-PsCARTHA:
-  extends: .opam_template
-  variables:
-    package: tezos-embedded-protocol-006-PsCARTHA
-
-opam:tezos-embedded-protocol-007-PsDELPH1:
-  extends: .opam_template
-  variables:
-    package: tezos-embedded-protocol-007-PsDELPH1
-
-opam:tezos-embedded-protocol-008-PtEdoTez:
-  extends: .opam_template
-  variables:
-    package: tezos-embedded-protocol-008-PtEdoTez
-
-opam:tezos-embedded-protocol-alpha:
-  extends: .opam_template
-  variables:
-    package: tezos-embedded-protocol-alpha
-
-opam:tezos-embedded-protocol-demo-counter:
-  extends: .opam_template
-  variables:
-    package: tezos-embedded-protocol-demo-counter
-
-opam:tezos-embedded-protocol-demo-noops:
-  extends: .opam_template
-  variables:
-    package: tezos-embedded-protocol-demo-noops
-
-opam:tezos-embedded-protocol-genesis:
-  extends: .opam_template
-  variables:
-    package: tezos-embedded-protocol-genesis
-
-opam:tezos-embedded-protocol-genesis-carthagenet:
-  extends: .opam_template
-  variables:
-    package: tezos-embedded-protocol-genesis-carthagenet
-
-opam:tezos-endorser-007-PsDELPH1:
-  extends: .opam_template
-  variables:
-    package: tezos-endorser-007-PsDELPH1
-
-opam:tezos-endorser-007-PsDELPH1-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-endorser-007-PsDELPH1-commands
-
-opam:tezos-endorser-008-PtEdoTez:
-  extends: .opam_template
-  variables:
-    package: tezos-endorser-008-PtEdoTez
-
-opam:tezos-endorser-008-PtEdoTez-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-endorser-008-PtEdoTez-commands
-
-opam:tezos-endorser-alpha:
-  extends: .opam_template
-  variables:
-    package: tezos-endorser-alpha
-
-opam:tezos-endorser-alpha-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-endorser-alpha-commands
-
-opam:tezos-error-monad:
-  extends: .opam_template
-  variables:
-    package: tezos-error-monad
-
-opam:tezos-event-logging:
-  extends: .opam_template
-  variables:
-    package: tezos-event-logging
-
-opam:tezos-lmdb:
-  extends: .opam_template
-  variables:
-    package: tezos-lmdb
-
-opam:tezos-lwt-result-stdlib:
-  extends: .opam_template
-  variables:
-    package: tezos-lwt-result-stdlib
-
-opam:tezos-mempool-007-PsDELPH1:
-  extends: .opam_template
-  variables:
-    package: tezos-mempool-007-PsDELPH1
-
-opam:tezos-mempool-008-PtEdoTez:
-  extends: .opam_template
-  variables:
-    package: tezos-mempool-008-PtEdoTez
-
-opam:tezos-mempool-alpha:
-  extends: .opam_template
-  variables:
-    package: tezos-mempool-alpha
-
-opam:tezos-micheline:
-  extends: .opam_template
-  variables:
-    package: tezos-micheline
-
-opam:tezos-micheline-rewriting:
-  extends: .opam_template
-  variables:
-    package: tezos-micheline-rewriting
-
-opam:tezos-mockup:
-  extends: .opam_template
-  variables:
-    package: tezos-mockup
-
-opam:tezos-mockup-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-mockup-commands
-
-opam:tezos-mockup-proxy:
-  extends: .opam_template
-  variables:
-    package: tezos-mockup-proxy
-
-opam:tezos-mockup-registration:
-  extends: .opam_template
-  variables:
-    package: tezos-mockup-registration
-
-opam:tezos-node:
-  extends: .opam_template
-  variables:
-    package: tezos-node
-
-opam:tezos-p2p:
-  extends: .opam_template
-  variables:
-    package: tezos-p2p
-
-opam:tezos-p2p-services:
-  extends: .opam_template
-  variables:
-    package: tezos-p2p-services
-
-opam:tezos-protocol-000-Ps9mPmXa:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-000-Ps9mPmXa
-
-opam:tezos-protocol-001-PtCJ7pwo:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-001-PtCJ7pwo
-
-opam:tezos-protocol-002-PsYLVpVv:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-002-PsYLVpVv
-
-opam:tezos-protocol-003-PsddFKi3:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-003-PsddFKi3
-
-opam:tezos-protocol-004-Pt24m4xi:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-004-Pt24m4xi
-
-opam:tezos-protocol-005-PsBABY5H:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-005-PsBABY5H
-
-opam:tezos-protocol-005-PsBabyM1:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-005-PsBabyM1
-
-opam:tezos-protocol-006-PsCARTHA:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-006-PsCARTHA
-
-opam:tezos-protocol-006-PsCARTHA-parameters:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-006-PsCARTHA-parameters
-
-opam:tezos-protocol-007-PsDELPH1:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-007-PsDELPH1
-
-opam:tezos-protocol-007-PsDELPH1-parameters:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-007-PsDELPH1-parameters
-
-opam:tezos-protocol-007-PsDELPH1-tests:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-007-PsDELPH1-tests
-
-opam:tezos-protocol-008-PtEdoTez:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-008-PtEdoTez
-
-opam:tezos-protocol-008-PtEdoTez-parameters:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-008-PtEdoTez-parameters
-
-opam:tezos-protocol-008-PtEdoTez-tests:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-008-PtEdoTez-tests
-
-opam:tezos-protocol-alpha:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-alpha
-
-opam:tezos-protocol-alpha-parameters:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-alpha-parameters
-
-opam:tezos-protocol-alpha-tests:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-alpha-tests
-
-opam:tezos-protocol-compiler:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-compiler
-
-opam:tezos-protocol-demo-counter:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-demo-counter
-
-opam:tezos-protocol-demo-noops:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-demo-noops
-
-opam:tezos-protocol-environment:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-environment
-
-opam:tezos-protocol-environment-packer:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-environment-packer
-
-opam:tezos-protocol-environment-sigs:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-environment-sigs
-
-opam:tezos-protocol-environment-structs:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-environment-structs
-
-opam:tezos-protocol-functor-000-Ps9mPmXa:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-functor-000-Ps9mPmXa
-
-opam:tezos-protocol-functor-001-PtCJ7pwo:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-functor-001-PtCJ7pwo
-
-opam:tezos-protocol-functor-002-PsYLVpVv:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-functor-002-PsYLVpVv
-
-opam:tezos-protocol-functor-003-PsddFKi3:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-functor-003-PsddFKi3
-
-opam:tezos-protocol-functor-004-Pt24m4xi:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-functor-004-Pt24m4xi
-
-opam:tezos-protocol-functor-005-PsBABY5H:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-functor-005-PsBABY5H
-
-opam:tezos-protocol-functor-005-PsBabyM1:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-functor-005-PsBabyM1
-
-opam:tezos-protocol-functor-006-PsCARTHA:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-functor-006-PsCARTHA
-
-opam:tezos-protocol-functor-007-PsDELPH1:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-functor-007-PsDELPH1
-
-opam:tezos-protocol-functor-008-PtEdoTez:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-functor-008-PtEdoTez
-
-opam:tezos-protocol-functor-alpha:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-functor-alpha
-
-opam:tezos-protocol-functor-demo-counter:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-functor-demo-counter
-
-opam:tezos-protocol-functor-demo-noops:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-functor-demo-noops
-
-opam:tezos-protocol-functor-genesis:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-functor-genesis
-
-opam:tezos-protocol-functor-genesis-carthagenet:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-functor-genesis-carthagenet
-
-opam:tezos-protocol-genesis:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-genesis
-
-opam:tezos-protocol-genesis-carthagenet:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-genesis-carthagenet
-
-opam:tezos-protocol-updater:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-updater
-
-opam:tezos-proxy:
-  extends: .opam_template
-  variables:
-    package: tezos-proxy
-
-opam:tezos-requester:
-  extends: .opam_template
-  variables:
-    package: tezos-requester
-
-opam:tezos-rpc:
-  extends: .opam_template
-  variables:
-    package: tezos-rpc
-
-opam:tezos-rpc-http:
-  extends: .opam_template
-  variables:
-    package: tezos-rpc-http
-
-opam:tezos-rpc-http-client:
-  extends: .opam_template
-  variables:
-    package: tezos-rpc-http-client
-
-opam:tezos-rpc-http-client-unix:
-  extends: .opam_template
-  variables:
-    package: tezos-rpc-http-client-unix
-
-opam:tezos-rpc-http-server:
-  extends: .opam_template
-  variables:
-    package: tezos-rpc-http-server
-
-opam:tezos-sapling:
-  extends: .opam_template
-  variables:
-    package: tezos-sapling
-
-opam:tezos-shell:
-  extends: .opam_template
-  variables:
-    package: tezos-shell
-
-opam:tezos-shell-benchmarks:
-  extends: .opam_template
-  variables:
-    package: tezos-shell-benchmarks
-
-opam:tezos-shell-context:
-  extends: .opam_template
-  variables:
-    package: tezos-shell-context
-
-opam:tezos-shell-services:
-  extends: .opam_template
-  variables:
-    package: tezos-shell-services
-
-opam:tezos-signer:
-  extends: .opam_template
-  variables:
-    package: tezos-signer
-
-opam:tezos-signer-backends:
-  extends: .opam_template
-  variables:
-    package: tezos-signer-backends
-
-opam:tezos-signer-services:
-  extends: .opam_template
-  variables:
-    package: tezos-signer-services
-
-opam:tezos-snoop:
-  extends: .opam_template
-  variables:
-    package: tezos-snoop
-
-opam:tezos-stdlib:
-  extends: .opam_template
-  variables:
-    package: tezos-stdlib
-
-opam:tezos-stdlib-unix:
-  extends: .opam_template
-  variables:
-    package: tezos-stdlib-unix
-
-opam:tezos-storage:
-  extends: .opam_template
-  variables:
-    package: tezos-storage
-
-opam:tezos-test-services:
-  extends: .opam_template
-  variables:
-    package: tezos-test-services
-
-opam:tezos-tooling:
-  extends: .opam_template
-  variables:
-    package: tezos-tooling
-
-opam:tezos-validation:
-  extends: .opam_template
-  variables:
-    package: tezos-validation
-
-opam:tezos-validator:
-  extends: .opam_template
-  variables:
-    package: tezos-validator
-
-opam:tezos-version:
-  extends: .opam_template
-  variables:
-    package: tezos-version
-
-opam:tezos-workers:
-  extends: .opam_template
-  variables:
-    package: tezos-workers
-
-opam:uecc:
-  extends: .opam_template
-  variables:
-    package: uecc
-
+opam:tests:group0:
+  extends: .opam_template
+  needs:
+    - check_opam_lint
+    - check_opam_deps
+  script:
+    - ./scripts/opam-pin.sh
+    - scripts/test_wrapper.sh opam benchmark-utils
+    - scripts/test_wrapper.sh opam bls12-381
+    - scripts/test_wrapper.sh opam flextesa
+    - scripts/test_wrapper.sh opam latex
+    - scripts/test_wrapper.sh opam ledgerwallet
+    - scripts/test_wrapper.sh opam ledgerwallet-tezos
+    - scripts/test_wrapper.sh opam numerics
+    - scripts/test_wrapper.sh opam pyml-plot
+
+opam:tests:group8:
+  extends: .opam_template
+  needs:
+    - check_opam_lint
+    - check_opam_deps
+  script:
+    - ./scripts/opam-pin.sh
+    - scripts/test_wrapper.sh opam staTz
+    - scripts/test_wrapper.sh opam tezos-007-PsDELPH1-test-helpers
+    - scripts/test_wrapper.sh opam tezos-008-PtEdoTez-test-helpers
+    - scripts/test_wrapper.sh opam tezos-accuser-007-PsDELPH1
+    - scripts/test_wrapper.sh opam tezos-accuser-007-PsDELPH1-commands
+    - scripts/test_wrapper.sh opam tezos-accuser-008-PtEdoTez
+    - scripts/test_wrapper.sh opam tezos-accuser-008-PtEdoTez-commands
+    - scripts/test_wrapper.sh opam tezos-accuser-alpha
+
+opam:tests:group16:
+  extends: .opam_template
+  needs:
+    - check_opam_lint
+    - check_opam_deps
+  script:
+    - ./scripts/opam-pin.sh
+    - scripts/test_wrapper.sh opam tezos-accuser-alpha-commands
+    - scripts/test_wrapper.sh opam tezos-alpha-test-helpers
+    - scripts/test_wrapper.sh opam tezos-baker-007-PsDELPH1
+    - scripts/test_wrapper.sh opam tezos-baker-008-PtEdoTez
+    - scripts/test_wrapper.sh opam tezos-baker-alpha
+    - scripts/test_wrapper.sh opam tezos-baking-007-PsDELPH1
+    - scripts/test_wrapper.sh opam tezos-baking-007-PsDELPH1-commands
+    - scripts/test_wrapper.sh opam tezos-baking-008-PtEdoTez
+
+opam:tests:group24:
+  extends: .opam_template
+  needs:
+    - check_opam_lint
+    - check_opam_deps
+  script:
+    - ./scripts/opam-pin.sh
+    - scripts/test_wrapper.sh opam tezos-baking-008-PtEdoTez-commands
+    - scripts/test_wrapper.sh opam tezos-baking-alpha
+    - scripts/test_wrapper.sh opam tezos-baking-alpha-commands
+    - scripts/test_wrapper.sh opam tezos-base
+    - scripts/test_wrapper.sh opam tezos-benchmark
+    - scripts/test_wrapper.sh opam tezos-benchmark-examples
+    - scripts/test_wrapper.sh opam tezos-benchmark-tests
+    - scripts/test_wrapper.sh opam tezos-clic
+
+opam:tests:group32:
+  extends: .opam_template
+  needs:
+    - check_opam_lint
+    - check_opam_deps
+  script:
+    - ./scripts/opam-pin.sh
+    - scripts/test_wrapper.sh opam tezos-client
+    - scripts/test_wrapper.sh opam tezos-client-000-Ps9mPmXa
+    - scripts/test_wrapper.sh opam tezos-client-001-PtCJ7pwo
+    - scripts/test_wrapper.sh opam tezos-client-001-PtCJ7pwo-commands
+    - scripts/test_wrapper.sh opam tezos-client-002-PsYLVpVv
+    - scripts/test_wrapper.sh opam tezos-client-002-PsYLVpVv-commands
+    - scripts/test_wrapper.sh opam tezos-client-003-PsddFKi3
+    - scripts/test_wrapper.sh opam tezos-client-003-PsddFKi3-commands
+
+opam:tests:group40:
+  extends: .opam_template
+  needs:
+    - check_opam_lint
+    - check_opam_deps
+  script:
+    - ./scripts/opam-pin.sh
+    - scripts/test_wrapper.sh opam tezos-client-004-Pt24m4xi
+    - scripts/test_wrapper.sh opam tezos-client-004-Pt24m4xi-commands
+    - scripts/test_wrapper.sh opam tezos-client-005-PsBabyM1
+    - scripts/test_wrapper.sh opam tezos-client-005-PsBabyM1-commands
+    - scripts/test_wrapper.sh opam tezos-client-006-PsCARTHA
+    - scripts/test_wrapper.sh opam tezos-client-006-PsCARTHA-commands
+    - scripts/test_wrapper.sh opam tezos-client-007-PsDELPH1
+    - scripts/test_wrapper.sh opam tezos-client-007-PsDELPH1-commands
+
+opam:tests:group48:
+  extends: .opam_template
+  needs:
+    - check_opam_lint
+    - check_opam_deps
+  script:
+    - ./scripts/opam-pin.sh
+    - scripts/test_wrapper.sh opam tezos-client-007-PsDELPH1-commands-registration
+    - scripts/test_wrapper.sh opam tezos-client-008-PtEdoTez
+    - scripts/test_wrapper.sh opam tezos-client-008-PtEdoTez-commands
+    - scripts/test_wrapper.sh opam tezos-client-008-PtEdoTez-commands-registration
+    - scripts/test_wrapper.sh opam tezos-client-alpha
+    - scripts/test_wrapper.sh opam tezos-client-alpha-commands
+    - scripts/test_wrapper.sh opam tezos-client-alpha-commands-registration
+    - scripts/test_wrapper.sh opam tezos-client-base
+
+opam:tests:group56:
+  extends: .opam_template
+  needs:
+    - check_opam_lint
+    - check_opam_deps
+  script:
+    - ./scripts/opam-pin.sh
+    - scripts/test_wrapper.sh opam tezos-client-base-unix
+    - scripts/test_wrapper.sh opam tezos-client-commands
+    - scripts/test_wrapper.sh opam tezos-client-demo-counter
+    - scripts/test_wrapper.sh opam tezos-client-genesis
+    - scripts/test_wrapper.sh opam tezos-client-genesis-carthagenet
+    - scripts/test_wrapper.sh opam tezos-client-sapling-008-PtEdoTez
+    - scripts/test_wrapper.sh opam tezos-client-sapling-alpha
+    - scripts/test_wrapper.sh opam tezos-codec
+
+opam:tests:group64:
+  extends: .opam_template
+  needs:
+    - check_opam_lint
+    - check_opam_deps
+  script:
+    - ./scripts/opam-pin.sh
+    - scripts/test_wrapper.sh opam tezos-crypto
+    - scripts/test_wrapper.sh opam tezos-embedded-protocol-000-Ps9mPmXa
+    - scripts/test_wrapper.sh opam tezos-embedded-protocol-001-PtCJ7pwo
+    - scripts/test_wrapper.sh opam tezos-embedded-protocol-002-PsYLVpVv
+    - scripts/test_wrapper.sh opam tezos-embedded-protocol-003-PsddFKi3
+    - scripts/test_wrapper.sh opam tezos-embedded-protocol-004-Pt24m4xi
+    - scripts/test_wrapper.sh opam tezos-embedded-protocol-005-PsBABY5H
+    - scripts/test_wrapper.sh opam tezos-embedded-protocol-005-PsBabyM1
+
+opam:tests:group72:
+  extends: .opam_template
+  needs:
+    - check_opam_lint
+    - check_opam_deps
+  script:
+    - ./scripts/opam-pin.sh
+    - scripts/test_wrapper.sh opam tezos-embedded-protocol-006-PsCARTHA
+    - scripts/test_wrapper.sh opam tezos-embedded-protocol-007-PsDELPH1
+    - scripts/test_wrapper.sh opam tezos-embedded-protocol-008-PtEdoTez
+    - scripts/test_wrapper.sh opam tezos-embedded-protocol-alpha
+    - scripts/test_wrapper.sh opam tezos-embedded-protocol-demo-counter
+    - scripts/test_wrapper.sh opam tezos-embedded-protocol-demo-noops
+    - scripts/test_wrapper.sh opam tezos-embedded-protocol-genesis
+    - scripts/test_wrapper.sh opam tezos-embedded-protocol-genesis-carthagenet
+
+opam:tests:group80:
+  extends: .opam_template
+  needs:
+    - check_opam_lint
+    - check_opam_deps
+  script:
+    - ./scripts/opam-pin.sh
+    - scripts/test_wrapper.sh opam tezos-endorser-007-PsDELPH1
+    - scripts/test_wrapper.sh opam tezos-endorser-007-PsDELPH1-commands
+    - scripts/test_wrapper.sh opam tezos-endorser-008-PtEdoTez
+    - scripts/test_wrapper.sh opam tezos-endorser-008-PtEdoTez-commands
+    - scripts/test_wrapper.sh opam tezos-endorser-alpha
+    - scripts/test_wrapper.sh opam tezos-endorser-alpha-commands
+    - scripts/test_wrapper.sh opam tezos-error-monad
+    - scripts/test_wrapper.sh opam tezos-event-logging
+
+opam:tests:group88:
+  extends: .opam_template
+  needs:
+    - check_opam_lint
+    - check_opam_deps
+  script:
+    - ./scripts/opam-pin.sh
+    - scripts/test_wrapper.sh opam tezos-lmdb
+    - scripts/test_wrapper.sh opam tezos-lwt-result-stdlib
+    - scripts/test_wrapper.sh opam tezos-mempool-007-PsDELPH1
+    - scripts/test_wrapper.sh opam tezos-mempool-008-PtEdoTez
+    - scripts/test_wrapper.sh opam tezos-mempool-alpha
+    - scripts/test_wrapper.sh opam tezos-micheline
+    - scripts/test_wrapper.sh opam tezos-micheline-rewriting
+    - scripts/test_wrapper.sh opam tezos-mockup
+
+opam:tests:group96:
+  extends: .opam_template
+  needs:
+    - check_opam_lint
+    - check_opam_deps
+  script:
+    - ./scripts/opam-pin.sh
+    - scripts/test_wrapper.sh opam tezos-mockup-commands
+    - scripts/test_wrapper.sh opam tezos-mockup-proxy
+    - scripts/test_wrapper.sh opam tezos-mockup-registration
+    - scripts/test_wrapper.sh opam tezos-node
+    - scripts/test_wrapper.sh opam tezos-p2p
+    - scripts/test_wrapper.sh opam tezos-p2p-services
+    - scripts/test_wrapper.sh opam tezos-protocol-000-Ps9mPmXa
+    - scripts/test_wrapper.sh opam tezos-protocol-001-PtCJ7pwo
+
+opam:tests:group104:
+  extends: .opam_template
+  needs:
+    - check_opam_lint
+    - check_opam_deps
+  script:
+    - ./scripts/opam-pin.sh
+    - scripts/test_wrapper.sh opam tezos-protocol-002-PsYLVpVv
+    - scripts/test_wrapper.sh opam tezos-protocol-003-PsddFKi3
+    - scripts/test_wrapper.sh opam tezos-protocol-004-Pt24m4xi
+    - scripts/test_wrapper.sh opam tezos-protocol-005-PsBABY5H
+    - scripts/test_wrapper.sh opam tezos-protocol-005-PsBabyM1
+    - scripts/test_wrapper.sh opam tezos-protocol-006-PsCARTHA
+    - scripts/test_wrapper.sh opam tezos-protocol-006-PsCARTHA-parameters
+    - scripts/test_wrapper.sh opam tezos-protocol-007-PsDELPH1
+
+opam:tests:group112:
+  extends: .opam_template
+  needs:
+    - check_opam_lint
+    - check_opam_deps
+  script:
+    - ./scripts/opam-pin.sh
+    - scripts/test_wrapper.sh opam tezos-protocol-007-PsDELPH1-parameters
+    - scripts/test_wrapper.sh opam tezos-protocol-007-PsDELPH1-tests
+    - scripts/test_wrapper.sh opam tezos-protocol-008-PtEdoTez
+    - scripts/test_wrapper.sh opam tezos-protocol-008-PtEdoTez-parameters
+    - scripts/test_wrapper.sh opam tezos-protocol-008-PtEdoTez-tests
+    - scripts/test_wrapper.sh opam tezos-protocol-alpha
+    - scripts/test_wrapper.sh opam tezos-protocol-alpha-parameters
+    - scripts/test_wrapper.sh opam tezos-protocol-alpha-tests
+
+opam:tests:group120:
+  extends: .opam_template
+  needs:
+    - check_opam_lint
+    - check_opam_deps
+  script:
+    - ./scripts/opam-pin.sh
+    - scripts/test_wrapper.sh opam tezos-protocol-compiler
+    - scripts/test_wrapper.sh opam tezos-protocol-demo-counter
+    - scripts/test_wrapper.sh opam tezos-protocol-demo-noops
+    - scripts/test_wrapper.sh opam tezos-protocol-environment
+    - scripts/test_wrapper.sh opam tezos-protocol-environment-packer
+    - scripts/test_wrapper.sh opam tezos-protocol-environment-sigs
+    - scripts/test_wrapper.sh opam tezos-protocol-environment-structs
+    - scripts/test_wrapper.sh opam tezos-protocol-functor-000-Ps9mPmXa
+
+opam:tests:group128:
+  extends: .opam_template
+  needs:
+    - check_opam_lint
+    - check_opam_deps
+  script:
+    - ./scripts/opam-pin.sh
+    - scripts/test_wrapper.sh opam tezos-protocol-functor-001-PtCJ7pwo
+    - scripts/test_wrapper.sh opam tezos-protocol-functor-002-PsYLVpVv
+    - scripts/test_wrapper.sh opam tezos-protocol-functor-003-PsddFKi3
+    - scripts/test_wrapper.sh opam tezos-protocol-functor-004-Pt24m4xi
+    - scripts/test_wrapper.sh opam tezos-protocol-functor-005-PsBABY5H
+    - scripts/test_wrapper.sh opam tezos-protocol-functor-005-PsBabyM1
+    - scripts/test_wrapper.sh opam tezos-protocol-functor-006-PsCARTHA
+    - scripts/test_wrapper.sh opam tezos-protocol-functor-007-PsDELPH1
+
+opam:tests:group136:
+  extends: .opam_template
+  needs:
+    - check_opam_lint
+    - check_opam_deps
+  script:
+    - ./scripts/opam-pin.sh
+    - scripts/test_wrapper.sh opam tezos-protocol-functor-008-PtEdoTez
+    - scripts/test_wrapper.sh opam tezos-protocol-functor-alpha
+    - scripts/test_wrapper.sh opam tezos-protocol-functor-demo-counter
+    - scripts/test_wrapper.sh opam tezos-protocol-functor-demo-noops
+    - scripts/test_wrapper.sh opam tezos-protocol-functor-genesis
+    - scripts/test_wrapper.sh opam tezos-protocol-functor-genesis-carthagenet
+    - scripts/test_wrapper.sh opam tezos-protocol-genesis
+    - scripts/test_wrapper.sh opam tezos-protocol-genesis-carthagenet
+
+opam:tests:group144:
+  extends: .opam_template
+  needs:
+    - check_opam_lint
+    - check_opam_deps
+  script:
+    - ./scripts/opam-pin.sh
+    - scripts/test_wrapper.sh opam tezos-protocol-updater
+    - scripts/test_wrapper.sh opam tezos-proxy
+    - scripts/test_wrapper.sh opam tezos-requester
+    - scripts/test_wrapper.sh opam tezos-rpc
+    - scripts/test_wrapper.sh opam tezos-rpc-http
+    - scripts/test_wrapper.sh opam tezos-rpc-http-client
+    - scripts/test_wrapper.sh opam tezos-rpc-http-client-unix
+    - scripts/test_wrapper.sh opam tezos-rpc-http-server
+
+opam:tests:group152:
+  extends: .opam_template
+  needs:
+    - check_opam_lint
+    - check_opam_deps
+  script:
+    - ./scripts/opam-pin.sh
+    - scripts/test_wrapper.sh opam tezos-sapling
+    - scripts/test_wrapper.sh opam tezos-shell
+    - scripts/test_wrapper.sh opam tezos-shell-benchmarks
+    - scripts/test_wrapper.sh opam tezos-shell-context
+    - scripts/test_wrapper.sh opam tezos-shell-services
+    - scripts/test_wrapper.sh opam tezos-signer
+    - scripts/test_wrapper.sh opam tezos-signer-backends
+    - scripts/test_wrapper.sh opam tezos-signer-services
+
+opam:tests:group160:
+  extends: .opam_template
+  needs:
+    - check_opam_lint
+    - check_opam_deps
+  script:
+    - ./scripts/opam-pin.sh
+    - scripts/test_wrapper.sh opam tezos-snoop
+    - scripts/test_wrapper.sh opam tezos-stdlib
+    - scripts/test_wrapper.sh opam tezos-stdlib-unix
+    - scripts/test_wrapper.sh opam tezos-storage
+    - scripts/test_wrapper.sh opam tezos-test-services
+    - scripts/test_wrapper.sh opam tezos-tooling
+    - scripts/test_wrapper.sh opam tezos-validation
+    - scripts/test_wrapper.sh opam tezos-validator
+
+opam:tests:group168:
+  extends: .opam_template
+  needs:
+    - check_opam_lint
+    - check_opam_deps
+  script:
+    - ./scripts/opam-pin.sh
+    - scripts/test_wrapper.sh opam tezos-version
+    - scripts/test_wrapper.sh opam tezos-workers
+    - scripts/test_wrapper.sh opam uecc
 ##END_OPAM##
