@@ -144,6 +144,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
     operations : operation list list;
   }
 
+  val block_info_encoding : block_info Data_encoding.t
+
   open RPC_context
 
   val info :
