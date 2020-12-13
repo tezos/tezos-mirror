@@ -38,9 +38,7 @@ $ rustup override set $rust_version"
     exit 1
 fi
 
-LIBRARY_DIR="${OPAM_SWITCH_PREFIX}/lib"
-# Install the headers in `include`
-HEADER_DIR="${OPAM_SWITCH_PREFIX}/include"
+LIBRARY_DIR="${OPAM_SWITCH_PREFIX}/lib/tezos-rust-libs"
 ZCASH_PARAMS="${OPAM_SWITCH_PREFIX}/share/zcash-params"
 
 BUILD_DIR=_build_rust
@@ -51,7 +49,6 @@ function cleanup () {
 }
 trap cleanup EXIT INT
 
-mkdir -p "${HEADER_DIR}"
 mkdir -p "${LIBRARY_DIR}"
 mkdir -p "${BUILD_DIR}/opam-repository"
 cd "${BUILD_DIR}"/opam-repository
@@ -70,18 +67,14 @@ git reset --hard "$opam_repository_tag"
 RUSTFLAGS='-C target-feature=-crt-static' cargo build --release --manifest-path rust/Cargo.toml
 
 ## librustzcash (Sapling)
-echo "Installing Rust libraries of Sapling in ${LIBRARY_DIR}/librustzcash and headers in ${HEADER_DIR}/librustzcash"
-mkdir -p "${LIBRARY_DIR}"/librustzcash
-mkdir -p "${HEADER_DIR}"/librustzcash
-cp rust/target/release/librustzcash.a "${LIBRARY_DIR}/librustzcash"
-cp rust/librustzcash/include/librustzcash.h "${HEADER_DIR}/librustzcash"
+echo "Installing Rust libraries of Sapling and their header in ${LIBRARY_DIR}"
+cp rust/target/release/librustzcash.a "${LIBRARY_DIR}"
+cp rust/librustzcash/include/librustzcash.h "${LIBRARY_DIR}"
 
 ## BLS12-381
-echo "Installing Rust libraries of BLS12-381 in ${LIBRARY_DIR}/rustc-bls12-381 and headers in ${HEADER_DIR}/rustc-bls12-381"
-mkdir -p "${LIBRARY_DIR}"/rustc-bls12-381
-mkdir -p "${HEADER_DIR}"/rustc-bls12-381
-cp rust/rustc-bls12-381/include/rustc_bls12_381.h "${HEADER_DIR}/rustc-bls12-381"
-cp rust/target/release/librustc_bls12_381.a "${LIBRARY_DIR}/rustc-bls12-381"
+echo "Installing Rust libraries of BLS12-381 and their header in ${LIBRARY_DIR}"
+cp rust/rustc-bls12-381/include/rustc_bls12_381.h "${LIBRARY_DIR}"
+cp rust/target/release/librustc_bls12_381.a "${LIBRARY_DIR}"
 
 ## Required for Sapling.
 echo "Installing Sapling parameters in ${ZCASH_PARAMS}"
