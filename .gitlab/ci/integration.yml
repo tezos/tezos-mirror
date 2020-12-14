@@ -307,12 +307,6 @@ integration:007_voting:
     - poetry run pytest tests_007/test_voting.py -s --log-dir=tmp
   stage: test
 
-integration:007_voting_full:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest tests_007/test_voting_full.py -s --log-dir=tmp
-  stage: test
-
 integration:008_baker_endorser:
   extends: .integration_python_template
   script:
