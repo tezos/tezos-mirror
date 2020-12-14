@@ -46,30 +46,11 @@ let get_checkpoint ?node ?hooks ?(chain = "main") client =
   let path = ["chains"; chain; "checkpoint"] in
   Client.rpc ?node ?hooks GET path client
 
-let get_baking_rights ?node ?hooks ?(chain = "main") ?(block = "head")
-    ~delegate client =
-  let path = ["chains"; chain; "blocks"; block; "helpers"; "baking_rights"] in
-  let query_string = [("delegate", delegate)] in
-  Client.rpc ?node ?hooks ~query_string GET path client
-
-let get_current_level ?node ?hooks ?(chain = "main") ?(block = "head")
-    ?(offset = 0) client =
-  let path = ["chains"; chain; "blocks"; block; "helpers"; "current_level"] in
-  let query_string = [("offset", string_of_int offset)] in
-  Client.rpc ?node ?hooks ~query_string GET path client
-
 let get_protocol_data ?node ?hooks ?(chain = "main") ?(block = "head")
     ?(offset = 0) client =
   let path = ["chains"; chain; "blocks"; block; "header"; "protocol_data"] in
   let query_string = [("offset", string_of_int offset)] in
   Client.rpc ?node ?hooks GET path ~query_string client
-
-let get_levels_in_curent_cycle ?node ?hooks ?(chain = "main") ?(block = "head")
-    client =
-  let path =
-    ["chains"; chain; "blocks"; block; "helpers"; "levels_in_current_cycle"]
-  in
-  Client.rpc ?node ?hooks GET path client
 
 let get_operations ?node ?hooks ?(chain = "main") ?(block = "head") client =
   let path = ["chains"; chain; "blocks"; block; "operations"] in
@@ -99,6 +80,37 @@ module Proto_alpha = struct
       client =
     let path =
       ["chains"; chain; "blocks"; block; "context"; "constants"; "errors"]
+    in
+    Client.rpc ?node ?hooks GET path client
+
+  let get_baking_rights ?node ?hooks ?(chain = "main") ?(block = "head")
+      ?delegate client =
+    let path =
+      ["chains"; chain; "blocks"; block; "helpers"; "baking_rights"]
+    in
+    let query_string = Option.map (fun d -> [("delegate", d)]) delegate in
+    Client.rpc ?node ?hooks ?query_string GET path client
+
+  let get_current_level ?node ?hooks ?(chain = "main") ?(block = "head")
+      ?(offset = 0) client =
+    let path =
+      ["chains"; chain; "blocks"; block; "helpers"; "current_level"]
+    in
+    let query_string = [("offset", string_of_int offset)] in
+    Client.rpc ?node ?hooks ~query_string GET path client
+
+  let get_endorsing_rights ?node ?hooks ?(chain = "main") ?(block = "head")
+      ?delegate client =
+    let path =
+      ["chains"; chain; "blocks"; block; "helpers"; "endorsing_rights"]
+    in
+    let query_string = Option.map (fun d -> [("delegate", d)]) delegate in
+    Client.rpc ?node ?hooks ?query_string GET path client
+
+  let get_levels_in_current_cycle ?node ?hooks ?(chain = "main")
+      ?(block = "head") client =
+    let path =
+      ["chains"; chain; "blocks"; block; "helpers"; "levels_in_current_cycle"]
     in
     Client.rpc ?node ?hooks GET path client
 
@@ -408,6 +420,37 @@ module Proto_007 = struct
       client =
     let path =
       ["chains"; chain; "blocks"; block; "context"; "constants"; "errors"]
+    in
+    Client.rpc ?node ?hooks GET path client
+
+  let get_baking_rights ?node ?hooks ?(chain = "main") ?(block = "head")
+      ?delegate client =
+    let path =
+      ["chains"; chain; "blocks"; block; "helpers"; "baking_rights"]
+    in
+    let query_string = Option.map (fun d -> [("delegate", d)]) delegate in
+    Client.rpc ?node ?hooks ?query_string GET path client
+
+  let get_current_level ?node ?hooks ?(chain = "main") ?(block = "head")
+      ?(offset = 0) client =
+    let path =
+      ["chains"; chain; "blocks"; block; "helpers"; "current_level"]
+    in
+    let query_string = [("offset", string_of_int offset)] in
+    Client.rpc ?node ?hooks ~query_string GET path client
+
+  let get_endorsing_rights ?node ?hooks ?(chain = "main") ?(block = "head")
+      ?delegate client =
+    let path =
+      ["chains"; chain; "blocks"; block; "helpers"; "endorsing_rights"]
+    in
+    let query_string = Option.map (fun d -> [("delegate", d)]) delegate in
+    Client.rpc ?node ?hooks ?query_string GET path client
+
+  let get_levels_in_current_cycle ?node ?hooks ?(chain = "main")
+      ?(block = "head") client =
+    let path =
+      ["chains"; chain; "blocks"; block; "helpers"; "levels_in_current_cycle"]
     in
     Client.rpc ?node ?hooks GET path client
 

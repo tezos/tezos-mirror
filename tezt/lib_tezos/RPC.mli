@@ -67,26 +67,6 @@ val inject_block :
   Client.t ->
   JSON.t Lwt.t
 
-(** Call RPC /chain/[chain]/blocks/[block]/helpers/baking_rights *)
-val get_baking_rights :
-  ?node:Node.t ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?block:string ->
-  delegate:string ->
-  Client.t ->
-  JSON.t Lwt.t
-
-(** Call RPC /chain/[chain]/blocks/[block]/helpers/current_level *)
-val get_current_level :
-  ?node:Node.t ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?block:string ->
-  ?offset:int ->
-  Client.t ->
-  JSON.t Lwt.t
-
 (** Call RPC /chain/[chain]/blocks/[block]/header/protocol_data *)
 val get_protocol_data :
   ?node:Node.t ->
@@ -94,15 +74,6 @@ val get_protocol_data :
   ?chain:string ->
   ?block:string ->
   ?offset:int ->
-  Client.t ->
-  JSON.t Lwt.t
-
-(** Call RPC /chain/[chain]/blocks/[block]/helpers/levels_in_current_cycle *)
-val get_levels_in_curent_cycle :
-  ?node:Node.t ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?block:string ->
   Client.t ->
   JSON.t Lwt.t
 
@@ -145,6 +116,45 @@ module Proto_alpha : sig
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/constants/errors *)
   val get_constants_errors :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/helpers/baking_rights *)
+  val get_baking_rights :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    ?delegate:string ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/helpers/current_level *)
+  val get_current_level :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    ?offset:int ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/helpers/endorsing_rights *)
+  val get_endorsing_rights :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    ?delegate:string ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/helpers/levels_in_current_cycle *)
+  val get_levels_in_current_cycle :
     ?node:Node.t ->
     ?hooks:Process.hooks ->
     ?chain:string ->
@@ -679,6 +689,45 @@ module Proto_007 : sig
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/constants/errors *)
   val get_constants_errors :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/helpers/baking_rights *)
+  val get_baking_rights :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    ?delegate:string ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/helpers/current_level *)
+  val get_current_level :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    ?offset:int ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/helpers/endorsing_rights *)
+  val get_endorsing_rights :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    ?delegate:string ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/helpers/levels_in_current_cycle *)
+  val get_levels_in_current_cycle :
     ?node:Node.t ->
     ?hooks:Process.hooks ->
     ?chain:string ->

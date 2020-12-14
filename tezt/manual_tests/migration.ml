@@ -112,7 +112,8 @@ let migration ?yes_node_path ?yes_wallet context protocol =
     Node.init ~rpc_port:19731 ~net_port:18731 ~data_dir [Connections 0]
   in
   let* client = Client.init ~node () in
-  let* json = RPC.get_current_level ~node client in
+  (* Starting on protocol 007 before migration *)
+  let* json = RPC.Proto_007.get_current_level ~node client in
   let level = JSON.(json |-> "level" |> as_int) in
   let* () = Node.terminate node in
   Log.info "Updating node config with user_activated_upgrade" ;
@@ -145,11 +146,20 @@ let migration ?yes_node_path ?yes_wallet context protocol =
   Log.info "Bake and wait until migration is finished" ;
   let* () = bake_with_foundation client in
   let* _until_mig = Node.wait_for_level node migration_level in
-  let* levels_in_current_cycle = RPC.get_levels_in_curent_cycle client in
+  let (get_current_level, get_levels_in_current_cycle) =
+    match protocol with
+    | Protocol.Carthage ->
+        ( RPC.Proto_007.get_current_level,
+          RPC.Proto_007.get_levels_in_current_cycle )
+    | Delphi | Alpha ->
+        ( RPC.Proto_alpha.get_current_level,
+          RPC.Proto_alpha.get_levels_in_current_cycle )
+  in
+  let* levels_in_current_cycle = get_levels_in_current_cycle client in
   let last_block_of_cycle =
     JSON.(levels_in_current_cycle |-> "last" |> as_int)
   in
-  let* prev_level = RPC.get_current_level client in
+  let* prev_level = get_current_level client in
   let prev_cycle = JSON.(prev_level |-> "cycle" |> as_int) in
   Log.info "Bake until new cycle" ;
   let* () =
@@ -158,7 +168,7 @@ let migration ?yes_node_path ?yes_wallet context protocol =
       (fun () -> bake_with_foundation client)
   in
   let* _until_end_of_cycle = Node.wait_for_level node last_block_of_cycle in
-  let* after_level = RPC.get_current_level client in
+  let* after_level = get_current_level client in
   let after_cycle = JSON.(after_level |-> "cycle" |> as_int) in
   if prev_cycle + 1 <> after_cycle then
     Test.fail
