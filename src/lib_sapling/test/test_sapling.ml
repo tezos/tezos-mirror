@@ -51,6 +51,7 @@ let test_proof_raw () =
   let signature =
     TzOption.unopt_assert ~loc:__POS__ (R.spend_sig xsk.expsk.ask ar sighash)
   in
+  R.init_params () ;
   let ctx_prove = R.proving_ctx_init () in
   let ctx_verif = R.verification_ctx_init () in
   let (cv_spend, rk, zkproof_spend) =
@@ -148,6 +149,7 @@ let test_full_transaction () =
     Nullifier.compute addr1 xfvk1 ~amount:10L rcm_1 ~position:0L
     |> TzOption.unopt_assert ~loc:__POS__
   in
+  R.init_params () ;
   (* Creation of a context to kep track of some info *)
   let ctx_prove_1 = R.proving_ctx_init () in
   (* Commitment value, randomised signature key, ZK proof that cm_1 is in the

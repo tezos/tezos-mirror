@@ -275,6 +275,22 @@ end
 
 (** Regroups what needs to be exposed to a Validator **)
 module type Validator = sig
+  (** Loads the ZCash parameters for Groth16, searching them in:
+      - [/usr/share/zcash-params]
+      - [${OPAM_SWITCH_PREFIX}/share/zcash-params]
+      - [${HOME}/.zcash-params]
+      Only Sapling's parameters are loaded, not Sprout's.
+
+     This function must be called before any of the proving and verification
+     functions requiring a context.
+     Usually you should not need to call this function directly as it is done
+     by the fist call to `with_{proving,verification}_ctx`.
+     However you can call this function in order to:
+     - pay its cost upfront and have more predictable latency later
+     - make sure that the parameters are present in the system and avoid a
+       failure later. *)
+  val init_params : unit -> unit
+
   module Ciphertext : sig
     include T_encoding
 

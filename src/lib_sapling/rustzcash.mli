@@ -34,12 +34,6 @@ val valid_amount : int64 -> bool
 
 val valid_balance : int64 -> bool
 
-(** Loads the parameters for our instance of Groth16.
-    The parameters are search in:
-    - [/usr/share/zcash-params]
-    - [${OPAM_SWITCH_PREFIX}/share/zcash-params]
-    - [${HOME}/.zcash-params]
-      Only sapling parameters are loaded. *)
 val init_params : unit -> unit
 
 (** Derives the nullifier pk corresponding to a nullifier sk *)

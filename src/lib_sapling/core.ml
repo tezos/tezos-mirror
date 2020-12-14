@@ -20,21 +20,14 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE. *)
 
-(* OCaml guarantees that this init is called once. The librustzcash assumes that
-   it is not called several times with different values.
-   Potential problems:
-   - some code linked with this library and running on JSOO, even if it doesn't
-     really use the library, would still crash with missing primitives or
-     wrong setup.
-   - multiple inits because of Dynlink *)
-let () = Rustzcash.init_params ()
-
 (** This module implements all the core functionalities. It contains also the low
     level Rustzcash type equalities and should be used in its Raw form only for
     testing.
     For all other uses refer to its Client or Validator interfaces. *)
 module Raw = struct
   module R = Rustzcash
+
+  let init_params = R.init_params
 
   module Spending_key = struct
     (** Authorisation spending key: secret key used to sign once randomized. *)
