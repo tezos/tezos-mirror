@@ -1037,22 +1037,17 @@ let filter_outdated_endorsements expected_level ops =
     (function
       | { Alpha_context.protocol_data =
             Operation_data
-              {contents = Single (Endorsement_with_slot {endorsement; _}); _};
-          _ } -> (
-          let raw_endorsement = Alpha_context.Operation.raw endorsement in
-          let decoded =
-            Data_encoding.Binary.of_bytes
-              Operation.protocol_data_encoding
-              raw_endorsement.proto
-          in
-          match decoded with
-          | Error _ ->
-              false
-          | Ok (Operation_data {contents = Single (Endorsement {level; _}); _})
-            ->
-              Raw_level.equal expected_level level
-          | _ ->
-              assert false )
+              { contents =
+                  Single
+                    (Endorsement_with_slot
+                      { endorsement =
+                          { protocol_data =
+                              {contents = Single (Endorsement {level; _}); _};
+                            _ };
+                        _ });
+                _ };
+          _ } ->
+          Raw_level.equal expected_level level
       | _ ->
           true)
     ops

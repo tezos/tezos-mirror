@@ -568,15 +568,26 @@ class Client:
         res = self.run(['get', 'timestamp'])
         return res[:-1]
 
+    def get_block_timestamp(
+        self, params: List[str] = None, chain: str = 'main', block: str = 'head'
+    ) -> datetime.datetime:
+        assert chain in {'main', 'test'}
+        rpc_res = self.rpc(
+            'get', f'/chains/{chain}/blocks/{block}/header/shell', params=params
+        )
+        timestamp = rpc_res['timestamp']
+
+        rfc3399_format = "%Y-%m-%dT%H:%M:%SZ"
+        timestamp_date = datetime.datetime.strptime(timestamp, rfc3399_format)
+        timestamp_date = timestamp_date.replace(tzinfo=datetime.timezone.utc)
+
+        return timestamp_date
+
     def get_now(self) -> str:
         """Returns the timestamp of next-to-last block,
         offset by time_between_blocks"""
-        rfc3399_format = "%Y-%m-%dT%H:%M:%SZ"
-        timestamp = self.rpc('get', '/chains/main/blocks/head~1/header')[
-            'timestamp'
-        ]
-        timestamp_date = datetime.datetime.strptime(timestamp, rfc3399_format)
-        timestamp_date = timestamp_date.replace(tzinfo=datetime.timezone.utc)
+
+        timestamp_date = self.get_block_timestamp(block='head~1')
 
         constants = self.rpc(
             'get', '/chains/main/blocks/head/context/constants'
@@ -587,6 +598,7 @@ class Client:
 
         now_date = timestamp_date + delta
 
+        rfc3399_format = "%Y-%m-%dT%H:%M:%SZ"
         return now_date.strftime(rfc3399_format)
 
     def get_receipt(
