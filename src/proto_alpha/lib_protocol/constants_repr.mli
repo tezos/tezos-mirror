@@ -85,3 +85,6 @@ val parametric_encoding : parametric Data_encoding.encoding
 type t = {fixed : fixed; parametric : parametric}
 
 val encoding : t Data_encoding.encoding
+
+(** performs some consistency on the protocol parameters *)
+val check_constants : parametric -> unit tzresult

@@ -668,7 +668,8 @@ let get_proto_param ctxt =
               Data_encoding.Json.pp
               json
         | param ->
-            ok (param, ctxt) ) )
+            Parameters_repr.check_params param >>? fun () -> ok (param, ctxt) )
+    )
 
 let add_constants ctxt constants =
   let bytes =

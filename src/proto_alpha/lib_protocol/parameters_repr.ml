@@ -125,3 +125,5 @@ let encoding =
           (opt "security_deposit_ramp_up_cycles" int31)
           (opt "no_reward_cycles" int31))
        Constants_repr.parametric_encoding)
+
+let check_params params = Constants_repr.check_constants params.constants

@@ -45,3 +45,5 @@ type t = {
 }
 
 val encoding : t Data_encoding.t
+
+val check_params : t -> unit tzresult

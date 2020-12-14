@@ -254,3 +254,42 @@ let encoding =
     (fun {fixed; parametric} -> (fixed, parametric))
     (fun (fixed, parametric) -> {fixed; parametric})
     (merge_objs fixed_encoding parametric_encoding)
+
+type error += Invalid_protocol_constants of string (* `Permanent *)
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"constants.invalid_protocol_constants"
+    ~title:"Invalid protocol constants"
+    ~description:"The provided protocol constants are not coherent."
+    ~pp:(fun ppf reason ->
+      Format.fprintf ppf "Invalid protocol constants: %s" reason)
+    Data_encoding.(obj1 (req "reason" string))
+    (function Invalid_protocol_constants reason -> Some reason | _ -> None)
+    (fun reason -> Invalid_protocol_constants reason)
+
+let check_constants constants =
+  let min_time_between_blocks =
+    match constants.time_between_blocks with
+    | first_time_between_blocks :: _ ->
+        first_time_between_blocks
+    | [] ->
+        (* this constant is used in the Baking module *)
+        Period_repr.one_minute
+  in
+  error_unless
+    Compare.Int64.(
+      Period_repr.to_seconds min_time_between_blocks
+      >= Period_repr.to_seconds constants.minimal_block_delay)
+    (Invalid_protocol_constants
+       (Format.asprintf
+          "minimal_block_delay value (%Ld) should be smaller than \
+           time_between_blocks[0] value (%Ld)"
+          (Period_repr.to_seconds constants.minimal_block_delay)
+          (Period_repr.to_seconds min_time_between_blocks)))
+  >>? fun () ->
+  error_unless
+    Compare.Int.(constants.endorsers_per_block >= constants.initial_endorsers)
+    (Invalid_protocol_constants
+       "initial_endorsers should be smaller than endorsers_per_block")
