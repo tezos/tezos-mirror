@@ -505,19 +505,11 @@ let proving_ctx_init () = RS.proving_ctx_init ()
 
 let proving_ctx_free ctx = RS.proving_ctx_free ctx
 
-let with_proving_ctx f =
-  let ctx = proving_ctx_init () in
-  Fun.protect ~finally:(fun () -> proving_ctx_free ctx) (fun () -> f ctx)
-
 type verification_ctx = unit Ctypes_static.ptr
 
 let verification_ctx_init () = RS.verification_ctx_init ()
 
 let verification_ctx_free ctx = RS.verification_ctx_free ctx
-
-let with_verification_ctx f =
-  let ctx = verification_ctx_init () in
-  Fun.protect ~finally:(fun () -> verification_ctx_free ctx) (fun () -> f ctx)
 
 let tree_uncommitted =
   to_hash
@@ -756,3 +748,15 @@ let init_params () =
     "657e3d38dbb5cb5e7dd2970e8b03d69b4787dd907285b5a7f0790dcc8072f60bf593b32cc2d1c030e00ff5ae64bf84c5c3beb84ddc841d48264b4a171744d028\000"
   in
   init_zksnark_params ~spend_path ~spend_hash ~output_path ~output_hash
+
+let init_params_lazy = Lazy.from_fun init_params
+
+let with_proving_ctx f =
+  let () = Lazy.force init_params_lazy in
+  let ctx = proving_ctx_init () in
+  Fun.protect ~finally:(fun () -> proving_ctx_free ctx) (fun () -> f ctx)
+
+let with_verification_ctx f =
+  let () = Lazy.force init_params_lazy in
+  let ctx = verification_ctx_init () in
+  Fun.protect ~finally:(fun () -> verification_ctx_free ctx) (fun () -> f ctx)
