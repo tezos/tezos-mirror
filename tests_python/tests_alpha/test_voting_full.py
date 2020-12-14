@@ -16,7 +16,7 @@ from tools import paths, utils
 from . import protocol
 
 ERROR_PATTERN = r"Uncaught|registered|error"
-BLOCKS_PER_VOTING_PERIOD = 20
+BLOCKS_PER_VOTING_PERIOD = 24
 POLLING_TIME = 5
 
 PROTO_A = protocol.PREV_HASH
@@ -50,10 +50,9 @@ def node_params(threshold=0):
     ]
 
 
-def get_current_period_kind_delphi(client) -> dict:
-    return client.rpc(
-        'get', 'chains/main/blocks/head/votes/current_period_kind'
-    )
+def client_get_current_period_kind(client) -> dict:
+    res = client.get_current_period()
+    return res['voting_period']['kind']
 
 
 @pytest.mark.vote
@@ -103,25 +102,18 @@ class TestVotingFull:
         sandbox.rm_node(10)
         sandbox.rm_node(11)
 
-    def test_add_baker(self, sandbox: Sandbox):
+    def test_add_bakers(self, sandbox: Sandbox):
         sandbox.add_baker(0, 'bootstrap1', proto=PROTO_A_DAEMON)
+        sandbox.add_baker(0, 'bootstrap1', proto=PROTO_B_DAEMON)
 
     def test_client_knows_proto_b(self, sandbox: Sandbox):
         client = sandbox.client(0)
         protos = client.list_protocols()
         assert PROTO_B in protos
 
-    @pytest.mark.timeout(60)
-    def test_wait_second_proposal_period(self, sandbox: Sandbox):
-        """Polling until the second proposal period, avoid bug
-        that prevents to make proposals in the first proposal period"""
-        client = sandbox.client(0)
-        while client.get_level() <= BLOCKS_PER_VOTING_PERIOD:
-            time.sleep(POLLING_TIME)
-
     def test_proposal_period(self, sandbox: Sandbox):
         client = sandbox.client(0)
-        assert get_current_period_kind_delphi(client) == 'proposal'
+        assert client_get_current_period_kind(client) == 'proposal'
 
     def test_submit_proto_b_proposal(self, sandbox, session):
         client = sandbox.client(0)
@@ -130,18 +122,23 @@ class TestVotingFull:
 
     def test_wait_for_operation_inclusion(self, sandbox, session):
         client = sandbox.client(0)
+        time.sleep(3 * POLLING_TIME)
         client.wait_for_inclusion(session['prop_hash'])
 
+    @pytest.mark.timeout(60)
     def test_check_proto_b_proposed(self, sandbox: Sandbox):
         client = sandbox.client(0)
         proposals = client.get_proposals()
+        while proposals == []:
+            time.sleep(POLLING_TIME)
         assert PROTO_B in [proto for (proto, _) in proposals]
 
     @pytest.mark.timeout(60)
     def test_wait_for_voting_period(self, sandbox: Sandbox):
         client = sandbox.client(0)
-        while get_current_period_kind_delphi(client) != 'testing_vote':
+        while client.get_level() <= BLOCKS_PER_VOTING_PERIOD + 1:
             time.sleep(POLLING_TIME)
+        assert client_get_current_period_kind(client) == 'testing_vote'
 
     def test_delegates_vote_proto_b(self, sandbox: Sandbox):
         client = sandbox.client(0)
@@ -153,12 +150,9 @@ class TestVotingFull:
     @pytest.mark.timeout(60)
     def test_wait_for_testing(self, sandbox: Sandbox):
         for client in sandbox.all_clients():
-            while get_current_period_kind_delphi(client) != 'testing':
+            while client.get_level() <= 2 * BLOCKS_PER_VOTING_PERIOD + 1:
                 time.sleep(POLLING_TIME)
-
-    def test_make_sure_all_clients_testing_period(self, sandbox: Sandbox):
-        for client in sandbox.all_clients():
-            assert get_current_period_kind_delphi(client) == 'testing'
+            assert client_get_current_period_kind(client) == 'testing'
 
     def test_start_baker_testchain(self, sandbox: Sandbox):
         sandbox.add_baker(
@@ -182,62 +176,42 @@ class TestVotingFull:
             client, level_testchain_before + 1, chain='test'
         )
 
-    def test_reactivate_all_delegates(self, sandbox: Sandbox):
-        """Delegates may have become unactive"""
-        client = sandbox.client(0)
-        for i in range(2, 5):
-            account = f'bootstrap{i}'
-            client.set_delegate(account, account)
-
     @pytest.mark.timeout(60)
     def test_wait_for_promotion_vote_period(self, sandbox: Sandbox):
         client = sandbox.client(0)
-        while get_current_period_kind_delphi(client) != 'promotion_vote':
-            client.rpc('get', '/chains/main/blocks/head/header/shell')
-            time.sleep(2)
+        while client.get_level() <= 3 * BLOCKS_PER_VOTING_PERIOD + 1:
+            time.sleep(POLLING_TIME)
+        assert client_get_current_period_kind(client) == 'promotion_vote'
 
     def test_vote_in_promotion_phase(self, sandbox: Sandbox):
         client = sandbox.client(0)
         listings = client.get_listings()
         for listing in listings:
             client.submit_ballot(listing["pkh"], PROTO_B, 'yay')
-        while client.get_level() < 4 * BLOCKS_PER_VOTING_PERIOD:
-            time.sleep(POLLING_TIME)
 
-    @pytest.mark.timeout(60)
-    def test_wait_for_proto_b(self, sandbox: Sandbox):
+    @pytest.mark.timeout(90)
+    def test_wait_for_adoption(self, sandbox: Sandbox):
         client = sandbox.client(1)
-        while client.get_level() < 5 * BLOCKS_PER_VOTING_PERIOD:
+        while client.get_level() <= 4 * BLOCKS_PER_VOTING_PERIOD + 1:
             time.sleep(POLLING_TIME)
+        assert client_get_current_period_kind(client) == 'adoption'
+
+    @pytest.mark.timeout(90)
+    def test_wait_for_proposal(self, sandbox: Sandbox):
+        client = sandbox.client(1)
+        while client.get_level() <= 5 * BLOCKS_PER_VOTING_PERIOD + 1:
+            time.sleep(POLLING_TIME)
+        assert client_get_current_period_kind(client) == 'proposal'
 
     @pytest.mark.timeout(60)
     def test_all_nodes_run_proto_b(self, sandbox: Sandbox):
+        clients = sandbox.all_clients()
         all_have_proto = False
         while not all_have_proto:
-            clients = sandbox.all_clients()
             all_have_proto = all(
-                client.get_next_protocol() == PROTO_B for client in clients
+                client.get_protocol() == PROTO_B for client in clients
             )
             (time).sleep(POLLING_TIME)
-        client = sandbox.client(1)
-        constants = client.rpc(
-            'get', '/chains/main/blocks/head/context/constants'
-        )
-        client.show_voting_period()
-        blocks_per_voting_period = int(constants["blocks_per_voting_period"])
-        remaining = client.get_current_period()["remaining"]
-        position = client.get_current_period()["position"]
-        assert remaining == blocks_per_voting_period - (position + 1)
-
-    def test_stop_old_bakers(self, sandbox: Sandbox):
-        """Stop old protocol baker, and test chain baker"""
-        sandbox.rm_baker(0, PROTO_A_DAEMON)
-        sandbox.rm_baker(3, PROTO_B_DAEMON)
-        time.sleep(1)
-
-    def test_start_proto_b_baker(self, sandbox: Sandbox):
-        """Proto_B will be elected, launch a new Proto_B baker"""
-        sandbox.add_baker(1, 'bootstrap1', proto=PROTO_B_DAEMON)
 
     def test_new_chain_progress(self, sandbox: Sandbox):
         client = sandbox.client(0)
