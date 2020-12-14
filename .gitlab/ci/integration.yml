@@ -313,6 +313,12 @@ integration:alpha_baker_endorser:
     - poetry run pytest tests_alpha/test_baker_endorser.py -s --log-dir=tmp
   stage: test
 
+integration:alpha_block_times_ideal_scenario:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_alpha/test_block_times_ideal_scenario.py -s --log-dir=tmp
+  stage: test
+
 integration:alpha_bootstrap:
   extends: .integration_python_template
   script:
