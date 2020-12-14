@@ -345,6 +345,58 @@ module Proto_alpha = struct
         client =
       get_sub ?node ?hooks ~chain ~block ~pkh "voting_power" client
   end
+
+  module Votes = struct
+    let sub_path ~chain ~block sub =
+      ["chains"; chain; "blocks"; block; "votes"; sub]
+
+    let get_ballot_list ?node ?hooks ?(chain = "main") ?(block = "head") client
+        =
+      let path = sub_path ~chain ~block "ballot_list" in
+      Client.rpc ?node ?hooks GET path client
+
+    let get_ballots ?node ?hooks ?(chain = "main") ?(block = "head") client =
+      let path = sub_path ~chain ~block "ballots" in
+      Client.rpc ?node ?hooks GET path client
+
+    let get_current_period ?node ?hooks ?(chain = "main") ?(block = "head")
+        client =
+      let path = sub_path ~chain ~block "current_period" in
+      Client.rpc ?node ?hooks GET path client
+
+    let get_current_period_kind ?node ?hooks ?(chain = "main")
+        ?(block = "head") client =
+      let path = sub_path ~chain ~block "current_period_kind" in
+      Client.rpc ?node ?hooks GET path client
+
+    let get_current_proposal ?node ?hooks ?(chain = "main") ?(block = "head")
+        client =
+      let path = sub_path ~chain ~block "current_proposal" in
+      Client.rpc ?node ?hooks GET path client
+
+    let get_current_quorum ?node ?hooks ?(chain = "main") ?(block = "head")
+        client =
+      let path = sub_path ~chain ~block "current_quorum" in
+      Client.rpc ?node ?hooks GET path client
+
+    let get_listings ?node ?hooks ?(chain = "main") ?(block = "head") client =
+      let path = sub_path ~chain ~block "listings" in
+      Client.rpc ?node ?hooks GET path client
+
+    let get_proposals ?node ?hooks ?(chain = "main") ?(block = "head") client =
+      let path = sub_path ~chain ~block "proposals" in
+      Client.rpc ?node ?hooks GET path client
+
+    let get_successor_period ?node ?hooks ?(chain = "main") ?(block = "head")
+        client =
+      let path = sub_path ~chain ~block "successor_period" in
+      Client.rpc ?node ?hooks GET path client
+
+    let get_total_voting_power ?node ?hooks ?(chain = "main") ?(block = "head")
+        client =
+      let path = sub_path ~chain ~block "total_voting_power" in
+      Client.rpc ?node ?hooks GET path client
+  end
 end
 
 module Proto_007 = struct
@@ -593,5 +645,42 @@ module Proto_007 = struct
     let get_staking_balance ?node ?hooks ?(chain = "main") ?(block = "head")
         ~pkh client =
       get_sub ?node ?hooks ~chain ~block ~pkh "staking_balance" client
+  end
+
+  module Votes = struct
+    let sub_path ~chain ~block sub =
+      ["chains"; chain; "blocks"; block; "votes"; sub]
+
+    let get_ballot_list ?node ?hooks ?(chain = "main") ?(block = "head") client
+        =
+      let path = sub_path ~chain ~block "ballot_list" in
+      Client.rpc ?node ?hooks GET path client
+
+    let get_ballots ?node ?hooks ?(chain = "main") ?(block = "head") client =
+      let path = sub_path ~chain ~block "ballots" in
+      Client.rpc ?node ?hooks GET path client
+
+    let get_current_period_kind ?node ?hooks ?(chain = "main")
+        ?(block = "head") client =
+      let path = sub_path ~chain ~block "current_period_kind" in
+      Client.rpc ?node ?hooks GET path client
+
+    let get_current_proposal ?node ?hooks ?(chain = "main") ?(block = "head")
+        client =
+      let path = sub_path ~chain ~block "current_proposal" in
+      Client.rpc ?node ?hooks GET path client
+
+    let get_current_quorum ?node ?hooks ?(chain = "main") ?(block = "head")
+        client =
+      let path = sub_path ~chain ~block "current_quorum" in
+      Client.rpc ?node ?hooks GET path client
+
+    let get_listings ?node ?hooks ?(chain = "main") ?(block = "head") client =
+      let path = sub_path ~chain ~block "listings" in
+      Client.rpc ?node ?hooks GET path client
+
+    let get_proposals ?node ?hooks ?(chain = "main") ?(block = "head") client =
+      let path = sub_path ~chain ~block "proposals" in
+      Client.rpc ?node ?hooks GET path client
   end
 end

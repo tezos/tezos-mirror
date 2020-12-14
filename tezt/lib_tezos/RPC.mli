@@ -573,6 +573,98 @@ module Proto_alpha : sig
       Client.t ->
       Process.t
   end
+
+  module Votes : sig
+    (** Call RPC /chain/[chain]/blocks/[block]/votes/ballot_list *)
+    val get_ballot_list :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      Client.t ->
+      JSON.t Lwt.t
+
+    (** Call RPC /chain/[chain]/blocks/[block]/votes/ballots *)
+    val get_ballots :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      Client.t ->
+      JSON.t Lwt.t
+
+    (** Call RPC /chain/[chain]/blocks/[block]/votes/current_period *)
+    val get_current_period :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      Client.t ->
+      JSON.t Lwt.t
+
+    (** Call RPC /chain/[chain]/blocks/[block]/votes/current_period_kind *)
+    val get_current_period_kind :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      Client.t ->
+      JSON.t Lwt.t
+
+    (** Call RPC /chain/[chain]/blocks/[block]/votes/current_proposal *)
+    val get_current_proposal :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      Client.t ->
+      JSON.t Lwt.t
+
+    (** Call RPC /chain/[chain]/blocks/[block]/votes/current_quorum *)
+    val get_current_quorum :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      Client.t ->
+      JSON.t Lwt.t
+
+    (** Call RPC /chain/[chain]/blocks/[block]/votes/listings *)
+    val get_listings :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      Client.t ->
+      JSON.t Lwt.t
+
+    (** Call RPC /chain/[chain]/blocks/[block]/votes/proposals *)
+    val get_proposals :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      Client.t ->
+      JSON.t Lwt.t
+
+    (** Call RPC /chain/[chain]/blocks/[block]/votes/successor_period *)
+    val get_successor_period :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      Client.t ->
+      JSON.t Lwt.t
+
+    (** Call RPC /chain/[chain]/blocks/[block]/votes/total_voting_power *)
+    val get_total_voting_power :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      Client.t ->
+      JSON.t Lwt.t
+  end
 end
 
 module Proto_007 : sig
@@ -994,5 +1086,70 @@ module Proto_007 : sig
       pkh:string ->
       Client.t ->
       Process.t
+  end
+
+  module Votes : sig
+    (** Call RPC /chain/[chain]/blocks/[block]/votes/ballot_list *)
+    val get_ballot_list :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      Client.t ->
+      JSON.t Lwt.t
+
+    (** Call RPC /chain/[chain]/blocks/[block]/votes/ballots *)
+    val get_ballots :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      Client.t ->
+      JSON.t Lwt.t
+
+    (** Call RPC /chain/[chain]/blocks/[block]/votes/current_period_kind *)
+    val get_current_period_kind :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      Client.t ->
+      JSON.t Lwt.t
+
+    (** Call RPC /chain/[chain]/blocks/[block]/votes/current_proposal *)
+    val get_current_proposal :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      Client.t ->
+      JSON.t Lwt.t
+
+    (** Call RPC /chain/[chain]/blocks/[block]/votes/current_quorum *)
+    val get_current_quorum :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      Client.t ->
+      JSON.t Lwt.t
+
+    (** Call RPC /chain/[chain]/blocks/[block]/votes/listings *)
+    val get_listings :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      Client.t ->
+      JSON.t Lwt.t
+
+    (** Call RPC /chain/[chain]/blocks/[block]/votes/proposals *)
+    val get_proposals :
+      ?node:Node.t ->
+      ?hooks:Process.hooks ->
+      ?chain:string ->
+      ?block:string ->
+      Client.t ->
+      JSON.t Lwt.t
   end
 end
