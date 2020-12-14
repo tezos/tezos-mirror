@@ -634,6 +634,9 @@ class Client:
     def get_head(self) -> dict:
         return self.rpc('get', '/chains/main/blocks/head')
 
+    def get_header(self, block='head') -> dict:
+        return self.rpc('get', f'/chains/main/blocks/{block}/header')
+
     def get_block(self, block_hash) -> dict:
         return self.rpc('get', f'/chains/main/blocks/{block_hash}')
 
