@@ -25,9 +25,10 @@ class TestBakers:
 
     def test_setup_network(self, sandbox: Sandbox):
         parameters = dict(protocol.PARAMETERS)
-
         parameters["time_between_blocks"] = [str(BD), str(PD)]
         parameters["initial_endorsers"] = IE
+        parameters["minimal_block_delay"] = "1"
+        assert parameters["delay_per_missing_endorsement"] == '1'
         for i in range(NUM_NODES):
             sandbox.add_node(i, params=constants.NODE_PARAMS)
 
@@ -68,7 +69,6 @@ class TestBakers:
         time_diff = (ts2 - ts1).total_seconds()
         # there will be initial_endorsers missing endorsements
         # so the block delay is BD + IE * 1
-        assert protocol.PARAMETERS["delay_per_missing_endorsement"] == '1'
         assert time_diff == BD + IE
 
 
@@ -84,6 +84,7 @@ class TestBakersAndEndorsers:
     def test_setup_network(self, sandbox: Sandbox):
         parameters = dict(protocol.PARAMETERS)
         parameters["time_between_blocks"] = [str(BD), str(PD)]
+        parameters["minimal_block_delay"] = "1"
         # we require all endorsements to be present
         parameters["initial_endorsers"] = parameters["endorsers_per_block"]
         for i in range(NUM_NODES):
@@ -137,4 +138,4 @@ class TestBakersAndEndorsers:
         ts0 = client.get_block_timestamp(block=str(2))
         ts1 = client.get_block_timestamp(block=str(max_level))
         time_diff = (ts1 - ts0).total_seconds()
-        assert time_diff == BD * (max_level - 2)
+        assert time_diff == (max_level - 2)
