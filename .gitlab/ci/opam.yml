@@ -716,6 +716,11 @@ opam:tezos-shell:
   variables:
     package: tezos-shell
 
+opam:tezos-shell-benchmarks:
+  extends: .opam_template
+  variables:
+    package: tezos-shell-benchmarks
+
 opam:tezos-shell-context:
   extends: .opam_template
   variables:
@@ -797,4 +802,3 @@ opam:uecc:
     package: uecc
 
 ##END_OPAM##
-
