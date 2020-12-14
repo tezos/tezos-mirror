@@ -24,7 +24,7 @@ BAKE_ARGS = [
 PROTO_A = constants.DELPHI
 PROTO_A_DAEMON = constants.DELPHI_DAEMON
 PROTO_A_PATH = f"proto_{PROTO_A_DAEMON.replace('-','_')}"
-PROTO_B = constants.ALPHA
+PROTO_B = constants.EDO
 
 PARAMETERS_FILE = (
     f'{paths.TEZOS_HOME}src/{PROTO_A_PATH}/parameters/' 'test-parameters.json'
