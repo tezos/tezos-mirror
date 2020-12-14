@@ -176,6 +176,7 @@ val activate_protocol :
   ?key:string ->
   ?timestamp:string ->
   ?timestamp_delay:float ->
+  ?parameter_file:string ->
   t ->
   unit Lwt.t
 
@@ -187,6 +188,7 @@ val spawn_activate_protocol :
   ?key:string ->
   ?timestamp:string ->
   ?timestamp_delay:float ->
+  ?parameter_file:string ->
   t ->
   Process.t
 

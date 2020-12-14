@@ -202,7 +202,7 @@ let import_secret_key ?node client key =
 
 let spawn_activate_protocol ?node ~protocol ?(fitness = 1)
     ?(key = Constant.activator.alias) ?timestamp
-    ?(timestamp_delay = 3600. *. 24. *. 365.) client =
+    ?(timestamp_delay = 3600. *. 24. *. 365.) ?parameter_file client =
   let timestamp =
     match timestamp with
     | Some timestamp ->
@@ -232,12 +232,12 @@ let spawn_activate_protocol ?node ~protocol ?(fitness = 1)
       key;
       "and";
       "parameters";
-      Protocol.parameter_file protocol;
+      Option.value parameter_file ~default:(Protocol.parameter_file protocol);
       "--timestamp";
       timestamp ]
 
 let activate_protocol ?node ~protocol ?fitness ?key ?timestamp ?timestamp_delay
-    client =
+    ?parameter_file client =
   spawn_activate_protocol
     ?node
     ~protocol
@@ -245,6 +245,7 @@ let activate_protocol ?node ~protocol ?fitness ?key ?timestamp ?timestamp_delay
     ?key
     ?timestamp
     ?timestamp_delay
+    ?parameter_file
     client
   |> Process.check
 
