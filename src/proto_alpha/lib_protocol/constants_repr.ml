@@ -96,6 +96,7 @@ type parametric = {
   blocks_per_roll_snapshot : int32;
   blocks_per_voting_period : int32;
   time_between_blocks : Period_repr.t list;
+  minimal_block_delay : Period_repr.t;
   endorsers_per_block : int;
   hard_gas_limit_per_operation : Gas_limit_repr.Arith.integral;
   hard_gas_limit_per_block : Gas_limit_repr.Arith.integral;
@@ -151,7 +152,8 @@ let parametric_encoding =
             c.quorum_max,
             c.min_proposal_quorum,
             c.initial_endorsers,
-            c.delay_per_missing_endorsement ) ) ))
+            c.delay_per_missing_endorsement,
+            c.minimal_block_delay ) ) ))
     (fun ( ( preserved_cycles,
              blocks_per_cycle,
              blocks_per_commitment,
@@ -177,7 +179,8 @@ let parametric_encoding =
                quorum_max,
                min_proposal_quorum,
                initial_endorsers,
-               delay_per_missing_endorsement ) ) ) ->
+               delay_per_missing_endorsement,
+               minimal_block_delay ) ) ) ->
       {
         preserved_cycles;
         blocks_per_cycle;
@@ -204,6 +207,7 @@ let parametric_encoding =
         min_proposal_quorum;
         initial_endorsers;
         delay_per_missing_endorsement;
+        minimal_block_delay;
       })
     (merge_objs
        (obj9
@@ -230,7 +234,7 @@ let parametric_encoding =
              (req "block_security_deposit" Tez_repr.encoding)
              (req "endorsement_security_deposit" Tez_repr.encoding)
              (req "baking_reward_per_endorsement" (list Tez_repr.encoding)))
-          (obj9
+          (obj10
              (req "endorsement_reward" (list Tez_repr.encoding))
              (req "cost_per_byte" Tez_repr.encoding)
              (req "hard_storage_limit_per_operation" z)
@@ -239,7 +243,8 @@ let parametric_encoding =
              (req "quorum_max" int32)
              (req "min_proposal_quorum" int32)
              (req "initial_endorsers" uint16)
-             (req "delay_per_missing_endorsement" Period_repr.encoding))))
+             (req "delay_per_missing_endorsement" Period_repr.encoding)
+             (req "minimal_block_delay" Period_repr.encoding))))
 
 type t = {fixed : fixed; parametric : parametric}
 

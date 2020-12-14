@@ -36,6 +36,8 @@ val blocks_per_voting_period : Raw_context.t -> int32
 
 val time_between_blocks : Raw_context.t -> Period_repr.t list
 
+val minimal_block_delay : Raw_context.t -> Period_repr.t
+
 val endorsers_per_block : Raw_context.t -> int
 
 val initial_endorsers : Raw_context.t -> int

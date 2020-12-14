@@ -495,6 +495,7 @@ module Constants : sig
     blocks_per_roll_snapshot : int32;
     blocks_per_voting_period : int32;
     time_between_blocks : Period.t list;
+    minimal_block_delay : Period.t;
     endorsers_per_block : int;
     hard_gas_limit_per_operation : Gas.Arith.integral;
     hard_gas_limit_per_block : Gas.Arith.integral;
@@ -531,6 +532,8 @@ module Constants : sig
   val blocks_per_voting_period : context -> int32
 
   val time_between_blocks : context -> Period.t list
+
+  val minimal_block_delay : context -> Period.t
 
   val endorsers_per_block : context -> int
 

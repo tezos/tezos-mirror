@@ -57,6 +57,7 @@ type parametric = {
   blocks_per_roll_snapshot : int32;
   blocks_per_voting_period : int32;
   time_between_blocks : Period_repr.t list;
+  minimal_block_delay : Period_repr.t;
   endorsers_per_block : int;
   hard_gas_limit_per_operation : Gas_limit_repr.Arith.integral;
   hard_gas_limit_per_block : Gas_limit_repr.Arith.integral;
