@@ -121,14 +121,6 @@ type error += Gas_quota_exceeded_init_deserialize (* Permanent *)
 
 type error += (* `Permanent *) Inconsistent_sources
 
-type error +=
-  | Not_enough_endorsements_for_priority of {
-      required : int;
-      priority : int;
-      endorsements : int;
-      timestamp : Time.t;
-    }
-
 type error += (* `Permanent *) Failing_noop_error
 
 let () =
@@ -507,38 +499,6 @@ let () =
     Data_encoding.empty
     (function Inconsistent_sources -> Some () | _ -> None)
     (fun () -> Inconsistent_sources) ;
-  register_error_kind
-    `Permanent
-    ~id:"operation.not_enough_endorsements_for_priority"
-    ~title:"Not enough endorsements for priority"
-    ~description:
-      "The block being validated does not include the required minimum number \
-       of endorsements for this priority."
-    ~pp:(fun ppf (required, endorsements, priority, timestamp) ->
-      Format.fprintf
-        ppf
-        "Wrong number of endorsements (%i) for priority (%i), %i are expected \
-         at %a"
-        endorsements
-        priority
-        required
-        Time.pp_hum
-        timestamp)
-    Data_encoding.(
-      obj4
-        (req "required" int31)
-        (req "endorsements" int31)
-        (req "priority" int31)
-        (req "timestamp" Time.encoding))
-    (function
-      | Not_enough_endorsements_for_priority
-          {required; endorsements; priority; timestamp} ->
-          Some (required, endorsements, priority, timestamp)
-      | _ ->
-          None)
-    (fun (required, endorsements, priority, timestamp) ->
-      Not_enough_endorsements_for_priority
-        {required; endorsements; priority; timestamp}) ;
   register_error_kind
     `Permanent
     ~id:"operation.failing_noop"
@@ -1501,12 +1461,12 @@ let begin_full_construction ctxt pred_timestamp protocol_data =
     protocol_data.Block_header.priority
   >>=? fun ctxt ->
   Baking.check_baking_rights ctxt protocol_data pred_timestamp
-  >>=? fun (delegate_pk, block_delay) ->
+  >>=? fun delegate_pk ->
   let ctxt = Fitness.increase ctxt in
   endorsement_rights_of_pred_level ctxt
   >|=? fun rights ->
   let ctxt = init_endorsements ctxt rights in
-  (ctxt, protocol_data, delegate_pk, block_delay)
+  (ctxt, protocol_data, delegate_pk)
 
 let begin_partial_construction ctxt =
   let ctxt = Fitness.increase ctxt in
@@ -1527,7 +1487,7 @@ let begin_application ctxt chain_id block_header pred_timestamp =
     ctxt
     block_header.protocol_data.contents
     pred_timestamp
-  >>=? fun (delegate_pk, block_delay) ->
+  >>=? fun delegate_pk ->
   Baking.check_signature block_header chain_id delegate_pk
   >>=? fun () ->
   let has_commitment =
@@ -1541,29 +1501,33 @@ let begin_application ctxt chain_id block_header pred_timestamp =
   endorsement_rights_of_pred_level ctxt
   >|=? fun rights ->
   let ctxt = init_endorsements ctxt rights in
-  (ctxt, delegate_pk, block_delay)
+  (ctxt, delegate_pk)
 
-let check_minimum_endorsements ctxt protocol_data block_delay
-    included_endorsements =
-  let minimum = Baking.minimum_allowed_endorsements ctxt ~block_delay in
+let check_minimal_valid_time ctxt ~priority ~endorsing_power =
+  let predecessor_timestamp = Timestamp.predecessor ctxt in
+  Baking.minimal_valid_time
+    (Constants.parametric ctxt)
+    ~priority
+    ~endorsing_power
+    ~predecessor_timestamp
+  >>? fun minimum ->
   let timestamp = Timestamp.current ctxt in
   error_unless
-    Compare.Int.(included_endorsements >= minimum)
-    (Not_enough_endorsements_for_priority
+    Compare.Int64.(Time.to_seconds timestamp >= Time.to_seconds minimum)
+    (Baking.Timestamp_too_early
        {
-         required = minimum;
-         priority = protocol_data.Block_header.priority;
-         endorsements = included_endorsements;
-         timestamp;
+         minimal_time = minimum;
+         provided_time = timestamp;
+         priority;
+         endorsing_power_opt = Some endorsing_power;
        })
 
-let finalize_application ctxt protocol_data delegate ~block_delay
-    migration_balance_updates =
+let finalize_application ctxt protocol_data delegate migration_balance_updates
+    =
   let included_endorsements = included_endorsements ctxt in
-  check_minimum_endorsements
+  check_minimal_valid_time
     ctxt
-    protocol_data
-    block_delay
+    protocol_data.Block_header.priority
     included_endorsements
   >>?= fun () ->
   let deposit = Constants.block_security_deposit ctxt in

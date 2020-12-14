@@ -45,6 +45,8 @@ module Timestamp = struct
   include Time_repr
 
   let current = Raw_context.current_timestamp
+
+  let predecessor = Raw_context.predecessor_timestamp
 end
 
 include Operation_repr

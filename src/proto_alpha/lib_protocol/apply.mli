@@ -91,14 +91,6 @@ type error += Gas_quota_exceeded_init_deserialize
 
 type error += Inconsistent_sources
 
-type error +=
-  | Not_enough_endorsements_for_priority of {
-      required : int;
-      priority : int;
-      endorsements : int;
-      timestamp : Time.t;
-    }
-
 type error += (* `Permanent *) Failing_noop_error
 
 val begin_partial_construction : t -> (t, error trace) result Lwt.t
@@ -107,14 +99,14 @@ val begin_full_construction :
   t ->
   Time.t ->
   Block_header.contents ->
-  (t * Block_header.contents * public_key * Period.t, error trace) result Lwt.t
+  (t * Block_header.contents * public_key, error trace) result Lwt.t
 
 val begin_application :
   t ->
   Chain_id.t ->
   Block_header.t ->
   Time.t ->
-  (t * public_key * Period.t, error trace) result Lwt.t
+  (t * public_key, error trace) result Lwt.t
 
 val apply_operation :
   t ->
@@ -130,7 +122,6 @@ val finalize_application :
   t ->
   Block_header.contents ->
   public_key_hash ->
-  block_delay:Period.t ->
   Receipt.balance_updates ->
   (t * block_metadata, error trace) result Lwt.t
 
@@ -152,5 +143,5 @@ val apply_contents_list :
   'kind contents_list ->
   (t * 'kind contents_result_list) tzresult Lwt.t
 
-val check_minimum_endorsements :
-  t -> Block_header.contents -> Period.t -> int -> (unit, error trace) result
+val check_minimal_valid_time :
+  t -> priority:int -> endorsing_power:int -> (unit, error trace) result

@@ -92,19 +92,16 @@ type validation_mode =
   | Application of {
       block_header : Alpha_context.Block_header.t;
       baker : Alpha_context.public_key_hash;
-      block_delay : Alpha_context.Period.t;
     }
   | Partial_application of {
       block_header : Alpha_context.Block_header.t;
       baker : Alpha_context.public_key_hash;
-      block_delay : Alpha_context.Period.t;
     }
   | Partial_construction of {predecessor : Block_hash.t}
   | Full_construction of {
       predecessor : Block_hash.t;
       protocol_data : Alpha_context.Block_header.contents;
       baker : Alpha_context.public_key_hash;
-      block_delay : Alpha_context.Period.t;
     }
 
 type validation_state = {
@@ -126,10 +123,9 @@ let begin_partial_application ~chain_id ~ancestor_context:ctxt
   Alpha_context.prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt
   >>=? fun (ctxt, migration_balance_updates) ->
   Apply.begin_application ctxt chain_id block_header predecessor_timestamp
-  >|=? fun (ctxt, baker, block_delay) ->
+  >|=? fun (ctxt, baker) ->
   let mode =
-    Partial_application
-      {block_header; baker = Signature.Public_key.hash baker; block_delay}
+    Partial_application {block_header; baker = Signature.Public_key.hash baker}
   in
   {mode; chain_id; ctxt; op_count = 0; migration_balance_updates}
 
@@ -142,10 +138,9 @@ let begin_application ~chain_id ~predecessor_context:ctxt
   Alpha_context.prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt
   >>=? fun (ctxt, migration_balance_updates) ->
   Apply.begin_application ctxt chain_id block_header predecessor_timestamp
-  >|=? fun (ctxt, baker, block_delay) ->
+  >|=? fun (ctxt, baker) ->
   let mode =
-    Application
-      {block_header; baker = Signature.Public_key.hash baker; block_delay}
+    Application {block_header; baker = Signature.Public_key.hash baker}
   in
   {mode; chain_id; ctxt; op_count = 0; migration_balance_updates}
 
@@ -168,10 +163,10 @@ let begin_construction ~chain_id ~predecessor_context:ctxt
         ctxt
         predecessor_timestamp
         proto_header.contents
-      >|=? fun (ctxt, protocol_data, baker, block_delay) ->
+      >|=? fun (ctxt, protocol_data, baker) ->
       let mode =
         let baker = Signature.Public_key.hash baker in
-        Full_construction {predecessor; baker; protocol_data; block_delay}
+        Full_construction {predecessor; baker; protocol_data}
       in
       (mode, ctxt) )
   >|=? fun (mode, ctxt) ->
@@ -248,13 +243,12 @@ let finalize_block {mode; ctxt; op_count; migration_balance_updates} =
             deactivated = [];
             balance_updates = migration_balance_updates;
           } )
-  | Partial_application {block_header; baker; block_delay} ->
+  | Partial_application {block_header; baker} ->
       let included_endorsements = Alpha_context.included_endorsements ctxt in
-      Apply.check_minimum_endorsements
+      Apply.check_minimal_valid_time
         ctxt
-        block_header.protocol_data.contents
-        block_delay
-        included_endorsements
+        ~priority:block_header.protocol_data.contents.priority
+        ~endorsing_power:included_endorsements
       >>?= fun () ->
       Alpha_context.Voting_period.get_current_info ctxt
       >>=? fun {voting_period = {kind; _}; _} ->
@@ -280,15 +274,12 @@ let finalize_block {mode; ctxt; op_count; migration_balance_updates} =
             balance_updates = migration_balance_updates;
           } )
   | Application
-      { baker;
-        block_delay;
-        block_header = {protocol_data = {contents = protocol_data; _}; _} }
-  | Full_construction {protocol_data; baker; block_delay; _} ->
+      {baker; block_header = {protocol_data = {contents = protocol_data; _}; _}}
+  | Full_construction {protocol_data; baker; _} ->
       Apply.finalize_application
         ctxt
         protocol_data
         baker
-        ~block_delay
         migration_balance_updates
       >|=? fun (ctxt, receipt) ->
       let level = Alpha_context.Level.current ctxt in

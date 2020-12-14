@@ -28,7 +28,13 @@ open Misc
 
 type error += Invalid_fitness_gap of int64 * int64 (* `Permanent *)
 
-type error += Timestamp_too_early of Timestamp.t * Timestamp.t
+type error +=
+  | Timestamp_too_early of {
+      minimal_time : Timestamp.t;
+      provided_time : Timestamp.t;
+      priority : int;
+      endorsing_power_opt : int option;
+    }
 
 (* `Permanent *)
 
@@ -48,21 +54,19 @@ type error += Invalid_signature (* `Permanent *)
 type error += Invalid_stamp (* `Permanent *)
 
 (** [minimal_time ctxt priority pred_block_time] returns the minimal
-    time, given the predecessor block timestamp [pred_block_time],
-    after which a baker with priority [priority] is allowed to
-    bake. Fail with [Invalid_time_between_blocks_constant] if the minimal
-    time cannot be computed. *)
-val minimal_time : context -> int -> Time.t -> Time.t tzresult
+   time, given the predecessor block timestamp [pred_block_time],
+   after which a baker with priority [priority] is allowed to bake in
+   principle, that is, assuming the block will contain enough
+   endorsements. *)
+val minimal_time :
+  Constants.parametric -> priority:int -> Time.t -> Time.t tzresult
 
 (** [check_baking_rights ctxt block pred_timestamp] verifies that:
-    * the contract that owned the roll at cycle start has the block signer as delegate.
-    * the timestamp is coherent with the announced slot.
-*)
+    * the contract that owned the roll at cycle start has the block signer 
+      as delegate.
+  * the timestamp is coherent with the announced baking slot. *)
 val check_baking_rights :
-  context ->
-  Block_header.contents ->
-  Time.t ->
-  (public_key * Period.t) tzresult Lwt.t
+  context -> Block_header.contents -> Time.t -> public_key tzresult Lwt.t
 
 (** For a given level computes who has the right to
     include an endorsement in the next block.
@@ -150,15 +154,12 @@ val earlier_predecessor_timestamp : context -> Level.t -> Timestamp.t tzresult
     such a decision, because the baker cannot publish a block too
     early. *)
 
-(** Given a delay of a block's timestamp with respect to the minimum
-    time to bake at the block's priority (as returned by
-    `minimum_time`), it returns the minimum number of endorsements that
-    the block has to contain *)
-val minimum_allowed_endorsements : context -> block_delay:Period.t -> int
-
-(** This is the somehow the dual of the previous function. Given a
-    block priority and a number of endorsement slots (given by the
-    `endorsing_power` argument), it returns the minimum time at which
-    the next block can be baked. *)
+(** Given a block priority and a number of endorsement slots (given by
+   the `endorsing_power` argument), it returns the minimum time at
+   which the next block can be baked. *)
 val minimal_valid_time :
-  context -> priority:int -> endorsing_power:int -> Time.t tzresult
+  Constants.parametric ->
+  priority:int ->
+  endorsing_power:int ->
+  predecessor_timestamp:Time.t ->
+  Time.t tzresult

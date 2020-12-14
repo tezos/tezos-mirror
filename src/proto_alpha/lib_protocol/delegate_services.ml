@@ -406,7 +406,10 @@ module Baking_rights = struct
         | None ->
             ok_none
         | Some pred_timestamp ->
-            Baking.minimal_time ctxt priority pred_timestamp
+            Baking.minimal_time
+              (Constants.parametric ctxt)
+              priority
+              pred_timestamp
             >|? fun t -> Some t )
         >>?= fun timestamp ->
         let acc =
@@ -442,7 +445,10 @@ module Baking_rights = struct
                 | None ->
                     ok_none
                 | Some pred_timestamp ->
-                    Baking.minimal_time ctxt priority pred_timestamp
+                    Baking.minimal_time
+                      (Constants.parametric ctxt)
+                      priority
+                      pred_timestamp
                     >|? fun t -> Some t )
                 >>?= fun timestamp ->
                 let acc =
@@ -660,44 +666,14 @@ module Endorsing_power = struct
     RPC_context.make_call0 S.endorsing_power ctxt block () (op, chain_id)
 end
 
-module Required_endorsements = struct
-  let required_endorsements ctxt block_delay =
-    Baking.minimum_allowed_endorsements ctxt ~block_delay
-
-  module S = struct
-    type t = {block_delay : Period.t}
-
-    let required_endorsements_query =
-      let open RPC_query in
-      query (fun block_delay -> {block_delay})
-      |+ field "block_delay" Period.rpc_arg Period.zero (fun t ->
-             t.block_delay)
-      |> seal
-
-    let required_endorsements =
-      let open Data_encoding in
-      RPC_service.get_service
-        ~description:
-          "Minimum number of endorsements for a block to be valid, given a \
-           delay of the block's timestamp with respect to the minimum time to \
-           bake at the block's priority"
-        ~query:required_endorsements_query
-        ~output:int31
-        RPC_path.(open_root / "required_endorsements")
-  end
-
-  let register () =
-    let open Services_registration in
-    register0 S.required_endorsements (fun ctxt {block_delay} () ->
-        return @@ required_endorsements ctxt block_delay)
-
-  let get ctxt block block_delay =
-    RPC_context.make_call0 S.required_endorsements ctxt block {block_delay} ()
-end
-
 module Minimal_valid_time = struct
-  let minimal_valid_time ctxt ~priority ~endorsing_power =
-    Baking.minimal_valid_time ctxt ~priority ~endorsing_power
+  let minimal_valid_time ctxt ~priority ~endorsing_power ~predecessor_timestamp
+      =
+    Baking.minimal_valid_time
+      (Constants.parametric ctxt)
+      ~priority
+      ~endorsing_power
+      ~predecessor_timestamp
 
   module S = struct
     type t = {priority : int; endorsing_power : int}
@@ -722,7 +698,13 @@ module Minimal_valid_time = struct
   let register () =
     let open Services_registration in
     register0 S.minimal_valid_time (fun ctxt {priority; endorsing_power} () ->
-        Lwt.return @@ minimal_valid_time ctxt ~priority ~endorsing_power)
+        let predecessor_timestamp = Timestamp.predecessor ctxt in
+        Lwt.return
+        @@ minimal_valid_time
+             ctxt
+             ~priority
+             ~endorsing_power
+             ~predecessor_timestamp)
 
   let get ctxt block priority endorsing_power =
     RPC_context.make_call0
@@ -738,7 +720,6 @@ let register () =
   Baking_rights.register () ;
   Endorsing_rights.register () ;
   Endorsing_power.register () ;
-  Required_endorsements.register () ;
   Minimal_valid_time.register ()
 
 let endorsement_rights ctxt level =
@@ -758,8 +739,9 @@ let baking_rights ctxt max_priority =
 let endorsing_power ctxt operation =
   Endorsing_power.endorsing_power ctxt operation
 
-let required_endorsements ctxt delay =
-  Required_endorsements.required_endorsements ctxt delay
-
-let minimal_valid_time ctxt priority endorsing_power =
-  Minimal_valid_time.minimal_valid_time ctxt priority endorsing_power
+let minimal_valid_time ctxt priority endorsing_power predecessor_timestamp =
+  Minimal_valid_time.minimal_valid_time
+    ctxt
+    ~priority
+    ~endorsing_power
+    ~predecessor_timestamp

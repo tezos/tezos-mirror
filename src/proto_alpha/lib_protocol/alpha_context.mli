@@ -93,6 +93,8 @@ module Period : sig
 
   val to_seconds : period -> int64
 
+  val add : period -> period -> period tzresult
+
   val mult : int32 -> period -> period tzresult
 
   val zero : period
@@ -102,6 +104,8 @@ module Period : sig
   val one_minute : period
 
   val one_hour : period
+
+  val compare : period -> period -> int
 end
 
 module Timestamp : sig
@@ -122,6 +126,8 @@ module Timestamp : sig
   val to_seconds_string : time -> string
 
   val current : context -> time
+
+  val predecessor : context -> time
 end
 
 module Raw_level : sig
