@@ -1190,6 +1190,7 @@ let run state ~pp_error ~protocol ~protocol_kind ~node_exec ~client_exec
         d with
         kind = protocol_kind;
         time_between_blocks = [1; 0];
+        minimal_block_delay = 1;
         bootstrap_accounts =
           List.map d.bootstrap_accounts ~f:(fun (n, v) ->
               if Poly.(fst baker = n) then (n, v) else (n, 1_000L));

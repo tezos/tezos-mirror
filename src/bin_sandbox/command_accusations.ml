@@ -20,6 +20,7 @@ let little_mesh_with_bakers ?base_port ?generate_kiln_config state ~protocol
     ( {
         d with
         time_between_blocks = [block_interval; 0];
+        minimal_block_delay = block_interval;
         bootstrap_accounts =
           List.map d.bootstrap_accounts ~f:(fun (n, v) ->
               if List.exists bakers ~f:(fun baker -> Poly.equal n (fst baker))
@@ -497,6 +498,7 @@ let with_accusers ~state ~protocol ~base_port node_exec accuser_exec
     ( {
         d with
         time_between_blocks = [block_interval; block_interval * 2];
+        minimal_block_delay = block_interval;
         bootstrap_accounts =
           List.map d.bootstrap_accounts ~f:(fun (n, v) ->
               if Poly.(n = fst baker) then (n, v) else (n, 1_000L));

@@ -163,6 +163,7 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
     ( {
         protocol with
         time_between_blocks = [1; 0];
+        minimal_block_delay = 1;
         bootstrap_accounts =
           List.map protocol.bootstrap_accounts ~f:(fun (n, v) ->
               if Poly.(fst baker = n) then (n, v) else (n, 1_000L));

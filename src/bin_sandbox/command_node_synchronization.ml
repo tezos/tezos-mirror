@@ -24,6 +24,7 @@ let run state ~node_exec ~client_exec ~primary_history_mode
       timestamp_delay = Some (-3600);
       expected_pow = 0;
       time_between_blocks = [block_interval; 0];
+      minimal_block_delay = block_interval;
     }
   in
   let primary_node =

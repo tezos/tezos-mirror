@@ -316,6 +316,7 @@ let run state ~protocol ~node_exec ~client_exec ~admin_exec ~size ~base_port
     {
       protocol with
       time_between_blocks = [1; 2];
+      minimal_block_delay = 1;
       bootstrap_accounts =
         (ledger_account, 1_000_000_000_000L) :: protocol.bootstrap_accounts;
     }
