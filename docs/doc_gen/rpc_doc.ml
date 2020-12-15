@@ -381,6 +381,10 @@ let main node =
         let (module Proto) =
           match Registered_protocol.get hash with
           | None ->
+              (* This is probably an indication that a line for the
+                 requested protocol is missing in the dune file of
+                 this repository *)
+              Format.eprintf "Hash not found: %a" Protocol_hash.pp hash ;
               assert false
           | Some proto ->
               proto
