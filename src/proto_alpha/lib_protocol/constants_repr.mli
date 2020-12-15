@@ -88,3 +88,37 @@ val encoding : t Data_encoding.encoding
 
 (** performs some consistency on the protocol parameters *)
 val check_constants : parametric -> unit tzresult
+
+module Proto_previous : sig
+  type parametric = {
+    preserved_cycles : int;
+    blocks_per_cycle : int32;
+    blocks_per_commitment : int32;
+    blocks_per_roll_snapshot : int32;
+    blocks_per_voting_period : int32;
+    time_between_blocks : Period_repr.t list;
+    endorsers_per_block : int;
+    hard_gas_limit_per_operation : Gas_limit_repr.Arith.integral;
+    hard_gas_limit_per_block : Gas_limit_repr.Arith.integral;
+    proof_of_work_threshold : int64;
+    tokens_per_roll : Tez_repr.t;
+    michelson_maximum_type_size : int;
+    seed_nonce_revelation_tip : Tez_repr.t;
+    origination_size : int;
+    block_security_deposit : Tez_repr.t;
+    endorsement_security_deposit : Tez_repr.t;
+    baking_reward_per_endorsement : Tez_repr.t list;
+    endorsement_reward : Tez_repr.t list;
+    cost_per_byte : Tez_repr.t;
+    hard_storage_limit_per_operation : Z.t;
+    test_chain_duration : int64;
+    (* in seconds *)
+    quorum_min : int32;
+    quorum_max : int32;
+    min_proposal_quorum : int32;
+    initial_endorsers : int;
+    delay_per_missing_endorsement : Period_repr.t;
+  }
+
+  val parametric_encoding : parametric Data_encoding.encoding
+end

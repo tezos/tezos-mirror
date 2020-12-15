@@ -776,6 +776,25 @@ let check_and_update_protocol_version ctxt =
   Context.add ctxt version_key (Bytes.of_string version_value)
   >|= fun ctxt -> ok (previous_proto, ctxt)
 
+(* only for the migration *)
+let get_previous_protocol_constants ctxt =
+  Context.find ctxt constants_key
+  >>= function
+  | None ->
+      failwith
+        "Internal error: cannot read previous protocol constants in context."
+  | Some bytes -> (
+    match
+      Data_encoding.Binary.of_bytes
+        Constants_repr.Proto_previous.parametric_encoding
+        bytes
+    with
+    | None ->
+        failwith
+          "Internal error: cannot parse previous protocol constants in context."
+    | Some constants ->
+        Lwt.return constants )
+
 (* You should ensure that if the type `Constant_repr.parametric` is
    different from the previous protocol or the value of these
    constants is modified, is changed from the previous protocol, then
@@ -797,7 +816,53 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
       set_first_level ctxt first_level
       >>=? fun ctxt -> add_constants ctxt param.constants >|= ok
   | Edo_008 ->
-      return ctxt )
+      get_previous_protocol_constants ctxt
+      >>= fun c ->
+      let time_between_blocks_at_first_priority =
+        ( match c.time_between_blocks with
+        | [] ->
+            Period_repr.one_minute
+        | first_time_between_blocks :: _ ->
+            first_time_between_blocks )
+        |> Period_repr.to_seconds
+      in
+      let constants =
+        Constants_repr.
+          {
+            minimal_block_delay =
+              Period_repr.of_seconds_exn
+                ( if Compare.Int64.(time_between_blocks_at_first_priority = 1L)
+                then 1L
+                else (Int64.div time_between_blocks_at_first_priority) 2L );
+            preserved_cycles = c.preserved_cycles;
+            blocks_per_cycle = c.blocks_per_cycle;
+            blocks_per_commitment = c.blocks_per_commitment;
+            blocks_per_roll_snapshot = c.blocks_per_roll_snapshot;
+            blocks_per_voting_period = c.blocks_per_voting_period;
+            time_between_blocks = c.time_between_blocks;
+            endorsers_per_block = c.endorsers_per_block;
+            hard_gas_limit_per_operation = c.hard_gas_limit_per_operation;
+            hard_gas_limit_per_block = c.hard_gas_limit_per_block;
+            proof_of_work_threshold = c.proof_of_work_threshold;
+            tokens_per_roll = c.tokens_per_roll;
+            michelson_maximum_type_size = c.michelson_maximum_type_size;
+            seed_nonce_revelation_tip = c.seed_nonce_revelation_tip;
+            origination_size = c.origination_size;
+            block_security_deposit = c.block_security_deposit;
+            endorsement_security_deposit = c.endorsement_security_deposit;
+            baking_reward_per_endorsement = c.baking_reward_per_endorsement;
+            endorsement_reward = c.endorsement_reward;
+            hard_storage_limit_per_operation =
+              c.hard_storage_limit_per_operation;
+            cost_per_byte = c.cost_per_byte;
+            quorum_min = c.quorum_min;
+            quorum_max = c.quorum_max;
+            min_proposal_quorum = c.min_proposal_quorum;
+            initial_endorsers = c.initial_endorsers;
+            delay_per_missing_endorsement = c.delay_per_missing_endorsement;
+          }
+      in
+      add_constants ctxt constants >|= ok )
   >>=? fun ctxt ->
   prepare ctxt ~level ~predecessor_timestamp:timestamp ~timestamp ~fitness
   >|=? fun ctxt -> (previous_proto, ctxt)
