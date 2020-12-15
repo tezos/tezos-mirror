@@ -6,6 +6,7 @@
             tezos-shell
             tezos-protocol-updater
             tezos-embedded-protocol-007-PsDELPH1
+            tezos-embedded-protocol-008-PtEdoTez
             tezos-embedded-protocol-alpha
             re)
  (flags (:standard -open Tezos_base__TzPervasives

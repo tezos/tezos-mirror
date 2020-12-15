@@ -59,6 +59,7 @@ $(DOCGENDIR)/rpc_doc.exe:
 rpc: $(DOCGENDIR)/rpc_doc.exe
 	@dune exec $(DOCGENDIR)/rpc_doc.exe "" > 007/rpc.rst
 	@dune exec $(DOCGENDIR)/rpc_doc.exe 008 > 008/rpc.rst
+	@dune exec $(DOCGENDIR)/rpc_doc.exe alpha > alpha/rpc.rst
 	@dune exec $(DOCGENDIR)/rpc_doc.exe shell > shell/rpc.rst
 
 $(DOCGENDIR)/p2p_doc.exe:

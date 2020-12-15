@@ -27,10 +27,14 @@ let protocols =
   (* version, title that appears in the doc, an optional path to an introduction, protocol hash *)
   (* the optional introduction is inserted between the title "RPCs index"
      and the generated directory description *)
-  [ ( "008",
-      "008 Edo",
+  [ ( "alpha",
+      "Alpha",
       Some "/include/rpc_introduction.rst.inc",
       "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" );
+    ( "008",
+      "008 Edo",
+      Some "/include/rpc_introduction.rst.inc",
+      "PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq" );
     ( "",
       "007 Delphi",
       Some "/include/rpc_introduction.rst.inc",
