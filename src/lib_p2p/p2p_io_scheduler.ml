@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,8 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* TODO decide whether we need to preallocate buffers or not. *)
-
 module Events = P2p_events.P2p_io_scheduler
 
 let alpha = 0.2
@@ -34,11 +33,15 @@ module type IO = sig
 
   type in_param
 
-  val pop : in_param -> Bytes.t tzresult Lwt.t
+  type data
+
+  val length : data -> int
+
+  val pop : in_param -> data tzresult Lwt.t
 
   type out_param
 
-  val push : out_param -> Bytes.t -> unit tzresult Lwt.t
+  val push : out_param -> data -> unit tzresult Lwt.t
 
   val close : out_param -> error list -> unit Lwt.t
 end
@@ -57,8 +60,8 @@ module Scheduler (IO : IO) = struct
     mutable quota : int;
     quota_updated : unit Lwt_condition.t;
     readys : unit Lwt_condition.t;
-    readys_high : (connection * Bytes.t tzresult) Queue.t;
-    readys_low : (connection * Bytes.t tzresult) Queue.t;
+    readys_high : (connection * IO.data tzresult) Queue.t;
+    readys_low : (connection * IO.data tzresult) Queue.t;
   }
 
   and connection = {
@@ -67,7 +70,7 @@ module Scheduler (IO : IO) = struct
     canceler : Lwt_canceler.t;
     in_param : IO.in_param;
     out_param : IO.out_param;
-    mutable current_pop : Bytes.t tzresult Lwt.t;
+    mutable current_pop : IO.data tzresult Lwt.t;
     mutable current_push : unit tzresult Lwt.t;
     counter : Moving_average.t;
     mutable quota : int;
@@ -93,6 +96,8 @@ module Scheduler (IO : IO) = struct
       (fun exc ->
         Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
       (fun () ->
+        (* To ensure that there is no concurrent calls to IO.pop, we
+           wait for the promise to be fulfilled. *)
         conn.current_pop
         >>= fun res ->
         conn.current_push
@@ -158,7 +163,7 @@ module Scheduler (IO : IO) = struct
                 Events.(emit unexpected_error) ("push", conn.id, IO.name, err)
                 >>= fun () ->
                 cancel conn err >>= fun () -> Lwt.return_error err ) ;
-          let len = Bytes.length msg in
+          let len = IO.length msg in
           Events.(emit handle_connection) (len, conn.id, IO.name)
           >>= fun () ->
           Moving_average.add st.counter len ;
@@ -230,26 +235,38 @@ module Scheduler (IO : IO) = struct
     >>= fun () -> st.worker >>= fun () -> Events.(emit shutdown) IO.name
 end
 
-module ReadScheduler = Scheduler (struct
+module ReadIO = struct
   let name = "io_scheduler(read)"
 
-  type in_param = P2p_fd.t * int
+  type in_param = {
+    fd : P2p_fd.t;
+    (* File descriptor from which data are read *)
+    maxlen : int;
+    (* Length of data we want to read from the file descriptor *)
+    read_buffer : Circular_buffer.t; (* Cache where data will be stored *)
+  }
 
-  let pop (fd, maxlen) =
+  type data = Circular_buffer.data
+
+  let length = Circular_buffer.length
+
+  (* Invariant: Given a connection, there is not concurrent call to
+     pop *)
+  let pop {fd; maxlen; read_buffer} =
     Lwt.catch
       (fun () ->
-        let buf = Bytes.create maxlen in
-        P2p_fd.read fd buf 0 maxlen
-        >>= fun len ->
-        if len = 0 then fail P2p_errors.Connection_closed
-        else return (Bytes.sub buf 0 len))
+        Circular_buffer.write ~maxlen ~fill_using:(P2p_fd.read fd) read_buffer
+        >>= fun data ->
+        if Circular_buffer.length data = 0 then
+          fail P2p_errors.Connection_closed
+        else return data)
       (function
         | Unix.Unix_error (Unix.ECONNRESET, _, _) ->
             fail P2p_errors.Connection_closed
         | exn ->
             Lwt.return (error_exn exn))
 
-  type out_param = Bytes.t tzresult Lwt_pipe.t
+  type out_param = Circular_buffer.data tzresult Lwt_pipe.t
 
   let push p msg =
     Lwt.catch
@@ -260,12 +277,18 @@ module ReadScheduler = Scheduler (struct
     Lwt.catch
       (fun () -> Lwt_pipe.push p (Error err))
       (fun _ -> Lwt.return_unit)
-end)
+end
 
-module WriteScheduler = Scheduler (struct
+module ReadScheduler = Scheduler (ReadIO)
+
+module WriteIO = struct
   let name = "io_scheduler(write)"
 
   type in_param = Bytes.t Lwt_pipe.t
+
+  type data = Bytes.t
+
+  let length = Bytes.length
 
   let pop p =
     Lwt.catch
@@ -288,16 +311,19 @@ module WriteScheduler = Scheduler (struct
             Lwt.return (error_exn exn))
 
   let close _p _err = Lwt.return_unit
-end)
+end
+
+module WriteScheduler = Scheduler (WriteIO)
 
 type connection = {
   fd : P2p_fd.t;
   canceler : Lwt_canceler.t;
   read_conn : ReadScheduler.connection;
-  read_queue : Bytes.t tzresult Lwt_pipe.t;
+  read_buffer : Circular_buffer.t;
+  read_queue : Circular_buffer.data tzresult Lwt_pipe.t;
   write_conn : WriteScheduler.connection;
   write_queue : Bytes.t Lwt_pipe.t;
-  mutable partial_read : Bytes.t option;
+  mutable partial_read : Circular_buffer.data option;
   remove_from_connection_table : unit -> unit;
 }
 
@@ -362,8 +388,10 @@ let ma_state {ma_state; _} = ma_state
 exception Closed
 
 let read_size = function
-  | Ok buf ->
-      (Sys.word_size / 8 * 8) + Bytes.length buf + Lwt_pipe.push_overhead
+  | Ok data ->
+      (Sys.word_size / 8 * 8)
+      + Circular_buffer.length data
+      + Lwt_pipe.push_overhead
   | Error _ ->
       0
 
@@ -391,10 +419,15 @@ let register st fd =
     in
     let read_queue = Lwt_pipe.create ?size:read_size () in
     let write_queue = Lwt_pipe.create ?size:write_size () in
+    (* This buffer is allocated once and is reused everytime we read a
+       message from the corresponding file descriptor. *)
+    let read_buffer =
+      Circular_buffer.create ~maxlength:(st.read_buffer_size * 4) ()
+    in
     let read_conn =
       ReadScheduler.create_connection
         st.read_scheduler
-        (fd, st.read_buffer_size)
+        {fd; maxlen = st.read_buffer_size; read_buffer}
         read_queue
         canceler
         id
@@ -424,6 +457,7 @@ let register st fd =
         fd;
         canceler;
         read_queue;
+        read_buffer;
         read_conn;
         write_queue;
         write_conn;
@@ -443,19 +477,23 @@ let write ?canceler {write_queue; _} msg =
 
 let write_now {write_queue; _} msg = Lwt_pipe.push_now write_queue msg
 
-let read_from conn ?pos ?len buf msg =
+let read_from conn ?pos ?len buf data =
   let maxlen = Bytes.length buf in
   let pos = Option.value ~default:0 pos in
   assert (0 <= pos && pos < maxlen) ;
   let len = Option.value ~default:(maxlen - pos) len in
   assert (len <= maxlen - pos) ;
-  match msg with
-  | Ok msg ->
-      let msg_len = Bytes.length msg in
-      let read_len = min len msg_len in
-      Bytes.blit msg 0 buf pos read_len ;
-      if read_len < msg_len then
-        conn.partial_read <- Some (Bytes.sub msg read_len (msg_len - read_len)) ;
+  match data with
+  | Ok data ->
+      let read_len = min len (Circular_buffer.length data) in
+      Option.iter
+        (fun data -> conn.partial_read <- Some data)
+        (Circular_buffer.read
+           data
+           conn.read_buffer
+           ~len:read_len
+           ~into:buf
+           ~offset:pos) ;
       Ok read_len
   | Error _ ->
       error P2p_errors.Connection_closed

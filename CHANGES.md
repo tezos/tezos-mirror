@@ -7,6 +7,8 @@
 - Fixes a bug where any event would allocate more memory than needed
   when it were not to be printed.
 
+- Improved how the node stores buffered messages from peers to consume less memory.
+
 - Enforce loading of non-embedded protocols before starting the node
   allowing the prevalidator to start correctly.
 
