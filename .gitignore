@@ -38,6 +38,7 @@ __pycache__
 /docs/introduction/readme.rst
 /docs/api/errors.rst
 /docs/0*/rpc.rst
+/docs/alpha/rpc.rst
 /docs/shell/rpc.rst
 /docs/shell/p2p_api.rst
 
