@@ -43,16 +43,16 @@ module Int_set = Set.Make (Compare.Int)
 
 type gas_counter_status =
   (* When the operation gas is unaccounted: *)
-  | UnlimitedOperationGas
+  | Unlimited_operation_gas
   (* When the operation gas level is the minimum: *)
-  | CountingOperationGas of {block_gas_delta : Gas_limit_repr.Arith.fp}
+  | Count_operation_gas of {block_gas_delta : Gas_limit_repr.Arith.fp}
   (* When the block gas level is the minimum. *)
-  | CountingBlockGas of {operation_gas_delta : Gas_limit_repr.Arith.fp}
+  | Count_block_gas of {operation_gas_delta : Gas_limit_repr.Arith.fp}
 
 (*
    In each case, we keep enough information in [gas_counter_status] to
    reconstruct the level that is not represented by [gas_counter]. In
-   the gas [UnlimitedOperationGas], the block gas level is stored
+   the gas [Unlimited_operation_gas], the block gas level is stored
    in [gas_counter].
 
    [Raw_context] interface provides two accessors for the operation
@@ -275,19 +275,19 @@ let () =
 let gas_level ctxt =
   let open Gas_limit_repr in
   match ctxt.gas_counter_status with
-  | UnlimitedOperationGas ->
+  | Unlimited_operation_gas ->
       Unaccounted
-  | CountingBlockGas {operation_gas_delta} ->
+  | Count_block_gas {operation_gas_delta} ->
       Limited {remaining = Arith.(add ctxt.gas_counter operation_gas_delta)}
-  | CountingOperationGas _ ->
+  | Count_operation_gas _ ->
       Limited {remaining = ctxt.gas_counter}
 
 let block_gas_level ctxt =
   let open Gas_limit_repr in
   match ctxt.gas_counter_status with
-  | UnlimitedOperationGas | CountingBlockGas _ ->
+  | Unlimited_operation_gas | Count_block_gas _ ->
       ctxt.gas_counter
-  | CountingOperationGas {block_gas_delta} ->
+  | Count_operation_gas {block_gas_delta} ->
       Arith.(add ctxt.gas_counter block_gas_delta)
 
 let check_gas_limit ctxt (remaining : 'a Gas_limit_repr.Arith.t) =
@@ -305,10 +305,10 @@ let set_gas_limit ctxt (remaining : 'a Gas_limit_repr.Arith.t) =
   let (gas_counter_status, gas_counter) =
     if Arith.(remaining < block_gas) then
       let block_gas_delta = Arith.sub block_gas remaining in
-      (CountingOperationGas {block_gas_delta}, remaining)
+      (Count_operation_gas {block_gas_delta}, remaining)
     else
       let operation_gas_delta = Arith.sub remaining block_gas in
-      (CountingBlockGas {operation_gas_delta}, block_gas)
+      (Count_block_gas {operation_gas_delta}, block_gas)
   in
   let ctxt = update_gas_counter_status ctxt gas_counter_status in
   {ctxt with gas_counter}
@@ -316,17 +316,17 @@ let set_gas_limit ctxt (remaining : 'a Gas_limit_repr.Arith.t) =
 let set_gas_unlimited ctxt =
   let block_gas = block_gas_level ctxt in
   let ctxt = {ctxt with gas_counter = block_gas} in
-  update_gas_counter_status ctxt UnlimitedOperationGas
+  update_gas_counter_status ctxt Unlimited_operation_gas
 
 let is_gas_unlimited ctxt =
   match ctxt.gas_counter_status with
-  | UnlimitedOperationGas ->
+  | Unlimited_operation_gas ->
       true
   | _ ->
       false
 
 let is_counting_block_gas ctxt =
-  match ctxt.gas_counter_status with CountingBlockGas _ -> true | _ -> false
+  match ctxt.gas_counter_status with Count_block_gas _ -> true | _ -> false
 
 let consume_gas ctxt cost =
   if is_gas_unlimited ctxt then ok ctxt
@@ -644,7 +644,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
     temporary_lazy_storage_ids = Lazy_storage_kind.Temp_ids.init;
     internal_nonce = 0;
     internal_nonces_used = Int_set.empty;
-    gas_counter_status = UnlimitedOperationGas;
+    gas_counter_status = Unlimited_operation_gas;
   }
 
 type previous_protocol = Genesis of Parameters_repr.t | Edo_008
