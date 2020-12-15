@@ -1,0 +1,40 @@
+## This is a very simplified example of ticket exchange; the exchange
+## rate is fixed to 1 mutez per token.
+
+parameter
+  (or
+     (contract %xtzToToken (ticket unit))
+     (pair %tokenToXtz
+        (ticket %tkt_tokens_sold unit)
+        (contract %destination unit)));
+storage (ticket unit);
+code
+  {
+    UNPAIR;
+    IF_LEFT
+      {
+        # %xtzToToken entrypoint
+        SWAP;
+        READ_TICKET;
+        GET @token_balance 4;
+        PUSH mutez 1; AMOUNT; EDIV; ASSERT_SOME; CAR @amount;
+        DUP @amount; DIG 2; SUB; ISNAT;
+        IF_NONE
+          {PUSH string "Not enough tokens"; FAILWITH}
+          {};
+        PAIR; SWAP; SPLIT_TICKET; ASSERT_SOME; UNPAIR @to_keep @to_send;
+        DUG 2;
+        PUSH mutez 0; SWAP; TRANSFER_TOKENS
+      }
+      {
+        # %tokenToXtz entrypoint
+        UNPAIR @tkt_tokens_sold @dest;
+        READ_TICKET;
+        GET @tokens_sold 4;
+        PUSH mutez 1; MUL @mutez_bought;
+        SWAP; DIG 3;
+        PAIR; JOIN_TICKETS; ASSERT_SOME; DUG 2;
+        UNIT; TRANSFER_TOKENS;
+      };
+    NIL operation; SWAP; CONS; PAIR
+  }
