@@ -119,8 +119,10 @@ The following OSes are also reported to work:
 
 A Windows port is feasible and might be developed in the future.
 
-Additionally, the ``master`` branch requires the Rust compiler,
-version 1.39.0, and the Cargo package manager to be installed. You can use
+.. _setup_rust:
+
+Additionally, starting from version 8.0, compiling Tezos requires the Rust compiler,
+version 1.44.0, and the Cargo package manager to be installed. You can use
 `rustup <https://github.com/rust-lang/rustup>`_ to install both.
 Note that ``rustup`` can update your ``.profile`` to update your ``PATH``
 environment variable, but this does not take effect until you restart
@@ -128,8 +130,8 @@ your desktop environment or window manager, so you may have to manually
 update it for your current session::
 
     rustup set profile minimal
-    rustup toolchain install 1.39.0
-    rustup override set 1.39.0
+    rustup toolchain install 1.44.0
+    rustup override set 1.44.0
     source $HOME/.cargo/env
 
 
