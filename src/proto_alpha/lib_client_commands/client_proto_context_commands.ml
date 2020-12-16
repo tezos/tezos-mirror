@@ -1592,48 +1592,64 @@ let commands network () =
           in
           let print_proposal = function
             | None ->
-                assert false (* not called during proposal phase *)
+                cctxt#message "The current proposal has already been cleared."
+            (* The proposal is cleared on the last block of adoption period, and
+               also on the last block of the testing_vote and promotion_vote
+               periods when the proposal is not approved *)
             | Some proposal ->
                 cctxt#message "Current proposal: %a" Protocol_hash.pp proposal
           in
           match info.current_period_kind with
           | Proposal ->
-              cctxt#answer
-                "Current proposals:%t"
-                Format.(
-                  fun ppf ->
-                    pp_print_cut ppf () ;
-                    pp_open_vbox ppf 0 ;
-                    List.iter
-                      (fun (p, w) ->
-                        fprintf
-                          ppf
-                          "* %a %ld (%sknown by the node)@."
-                          Protocol_hash.pp
-                          p
-                          w
-                          (if List.mem p known_protos then "" else "not "))
-                      ranks ;
-                    pp_close_box ppf ())
-              >>= fun () -> return_unit
+              (* the current proposals are cleared on the last block of the
+                proposal period *)
+              if info.remaining <> 0l then
+                cctxt#answer
+                  "Current proposals:%t"
+                  Format.(
+                    fun ppf ->
+                      pp_print_cut ppf () ;
+                      pp_open_vbox ppf 0 ;
+                      List.iter
+                        (fun (p, w) ->
+                          fprintf
+                            ppf
+                            "* %a %ld (%sknown by the node)@."
+                            Protocol_hash.pp
+                            p
+                            w
+                            (if List.mem p known_protos then "" else "not "))
+                        ranks ;
+                      pp_close_box ppf ())
+                >>= fun () -> return_unit
+              else
+                cctxt#message "The proposals have already been cleared."
+                >>= fun () -> return_unit
           | Testing_vote | Promotion_vote ->
               print_proposal info.current_proposal
               >>= fun () ->
-              get_ballots_info ~chain:cctxt#chain ~block:cctxt#block cctxt
-              >>=? fun ballots_info ->
-              cctxt#answer
-                "Ballots: %a@,\
-                 Current participation %.2f%%, necessary quorum %.2f%%@,\
-                 Current in favor %ld, needed supermajority %ld"
-                Data_encoding.Json.pp
-                (Data_encoding.Json.construct
-                   Vote.ballots_encoding
-                   ballots_info.ballots)
-                (Int32.to_float ballots_info.participation /. 100.)
-                (Int32.to_float ballots_info.current_quorum /. 100.)
-                ballots_info.ballots.yay
-                ballots_info.supermajority
-              >>= fun () -> return_unit
-          | Testing | Adoption ->
+              (* the ballots are cleared on the last block of these periods *)
+              if info.remaining <> 0l then
+                get_ballots_info ~chain:cctxt#chain ~block:cctxt#block cctxt
+                >>=? fun ballots_info ->
+                cctxt#answer
+                  "Ballots: %a@,\
+                   Current participation %.2f%%, necessary quorum %.2f%%@,\
+                   Current in favor %ld, needed supermajority %ld"
+                  Data_encoding.Json.pp
+                  (Data_encoding.Json.construct
+                     Vote.ballots_encoding
+                     ballots_info.ballots)
+                  (Int32.to_float ballots_info.participation /. 100.)
+                  (Int32.to_float ballots_info.current_quorum /. 100.)
+                  ballots_info.ballots.yay
+                  ballots_info.supermajority
+                >>= fun () -> return_unit
+              else
+                cctxt#message "The ballots have already been cleared."
+                >>= fun () -> return_unit
+          | Testing ->
+              print_proposal info.current_proposal >>= fun () -> return_unit
+          | Adoption ->
               print_proposal info.current_proposal >>= fun () -> return_unit)
     ]
