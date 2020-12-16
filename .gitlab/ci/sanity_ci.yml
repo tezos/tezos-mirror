@@ -5,6 +5,7 @@ sanity_ci:
   extends: .runtime_build_test_dependencies_template
   stage: sanity_ci
   except:
+    - master
     - tags@tezos/tezos
     - /-release$/@tezos/tezos
   before_script:
