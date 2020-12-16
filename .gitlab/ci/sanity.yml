@@ -4,6 +4,7 @@ sanity:
   extends: .runtime_build_test_dependencies_template
   stage: sanity
   except:
+    - master
     - tags@tezos/tezos
     - /-release$/@tezos/tezos
   before_script:
