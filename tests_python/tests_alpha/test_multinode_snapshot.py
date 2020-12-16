@@ -45,7 +45,7 @@ class TestMultiNodeSnapshot:
         node_export.snapshot_export(file, params=['--block', head_hash])
 
         for i in GROUP2:
-            sandbox.add_node(i, snapshot=file)
+            sandbox.add_node(i, snapshot=file, params=PARAMS)
 
     def test_rerun_group1(self, sandbox: Sandbox):
         for i in GROUP1:

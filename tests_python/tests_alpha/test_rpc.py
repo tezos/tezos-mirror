@@ -726,9 +726,6 @@ class TestRPCsExistence:
     def test_stat_memory(self, sandbox: Sandbox):
         assert sandbox.client(1).rpc('get', "/stats/memory")
 
-    def test_chain_is_bootstrapped(self, sandbox: Sandbox):
-        assert sandbox.client(1).rpc('get', "/chains/main/is_bootstrapped")
-
 
 class TestDeprecatedRPCs:
     def test_chain_block_context_contract_delegatable(

@@ -1,6 +1,7 @@
 import time
 import pytest
 from client.client import Client
+from tools import constants
 
 PROTO = 'ProtoDemoCounterDemoCounterDemoCounterDemoCou4LSpdT'
 PROTO_GENESIS = 'ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im'
@@ -10,7 +11,7 @@ PARAMS = ['-p', PROTO_GENESIS]
 @pytest.fixture(scope="class")
 def client(sandbox):
     """One node with genesis."""
-    sandbox.add_node(0)
+    sandbox.add_node(0, params=constants.NODE_PARAMS)
     client = sandbox.client(0)
     yield client
 
