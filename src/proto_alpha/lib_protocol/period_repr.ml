@@ -78,6 +78,10 @@ let mult i p =
   if Compare.Int32.(i < 0l) then error Invalid_arg
   else ok (Int64.mul (Int64.of_int32 i) p)
 
+let add p1 p2 =
+  (* TODO check overflow *)
+  ok (Int64.add p1 p2)
+
 let zero = of_seconds_exn 0L
 
 let one_second = of_seconds_exn 1L
@@ -85,3 +89,5 @@ let one_second = of_seconds_exn 1L
 let one_minute = of_seconds_exn 60L
 
 let one_hour = of_seconds_exn 3600L
+
+let compare p1 p2 = Compare.Int64.compare p1 p2

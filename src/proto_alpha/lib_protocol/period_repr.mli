@@ -25,6 +25,7 @@
 
 type t
 
+(** A [period] is a non-negative integer. *)
 type period = t
 
 include Compare.S with type t := t
@@ -44,6 +45,8 @@ val of_seconds : int64 -> period tzresult
     It should only be used at toplevel for constants. *)
 val of_seconds_exn : int64 -> period
 
+val add : period -> period -> period tzresult
+
 val mult : int32 -> period -> period tzresult
 
 val zero : period
@@ -53,3 +56,8 @@ val one_second : period
 val one_minute : period
 
 val one_hour : period
+
+(** [compare x y] returns [0] if [x] is equal to [y], a negative
+    integer if [x] is shorter than [y], and a positive integer if [x]
+    is longer than [y]. *)
+val compare : period -> period -> int
