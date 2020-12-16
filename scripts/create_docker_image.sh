@@ -14,7 +14,7 @@ build_deps_image_name=${3:-registry.gitlab.com/tezos/opam-repository}
 build_deps_image_version=${4:-$opam_repository_tag}
 commit_short_sha="${5:-$(git rev-parse --short HEAD)}"
 
-build_image_name="${image_name}_build"
+build_image_name="${image_name}build"
 
 "$script_dir"/ci/create_docker_image.build.sh \
              "$build_image_name" "$image_version" \
