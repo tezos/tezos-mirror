@@ -153,6 +153,8 @@ module Mempool = struct
     in
     match contents with
     | Single (Endorsement _) ->
+        false (* legacy format *)
+    | Single (Endorsement_with_slot _) ->
         true
     | Single (Seed_nonce_revelation _) ->
         true
@@ -206,6 +208,8 @@ module Mempool = struct
     | Operation_metadata {contents} -> (
       match contents with
       | Single_result (Endorsement_result _) ->
+          Lwt.return_false (* legacy format *)
+      | Single_result (Endorsement_with_slot_result _) ->
           Lwt.return_true
       | Single_result (Seed_nonce_revelation_result _) ->
           Lwt.return_true

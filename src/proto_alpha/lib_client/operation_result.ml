@@ -427,7 +427,7 @@ let rec pp_contents_and_result_list :
         pp_balance_updates
         bus
   | Single_and_result
-      ( Double_endorsement_evidence {op1; op2},
+      ( Double_endorsement_evidence {op1; op2; slot = _},
         Double_endorsement_evidence_result bus ) ->
       Format.fprintf
         ppf
@@ -454,6 +454,13 @@ let rec pp_contents_and_result_list :
         id
         pp_balance_updates
         bus
+  | Single_and_result
+      ( Endorsement_with_slot
+          { endorsement =
+              {protocol_data = {contents = Single (Endorsement {level}); _}; _};
+            _ },
+        Endorsement_with_slot_result
+          (Endorsement_result {balance_updates; delegate; slots}) )
   | Single_and_result
       ( Endorsement {level},
         Endorsement_result {balance_updates; delegate; slots} ) ->

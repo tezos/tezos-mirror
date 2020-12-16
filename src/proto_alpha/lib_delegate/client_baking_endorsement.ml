@@ -43,49 +43,100 @@ let get_signing_slots cctxt ~chain ~block delegate level =
 
 let inject_endorsement (cctxt : #Protocol_client_context.full) ?async ~chain
     ~block hash level delegate_sk delegate_pkh =
-  Alpha_services.Forge.endorsement cctxt (chain, block) ~branch:hash ~level ()
-  >>=? fun bytes ->
-  let wallet = (cctxt :> Client_context.wallet) in
-  (* Double-check the right to inject an endorsement *)
-  let open Client_baking_highwatermarks in
-  wallet#with_lock (fun () ->
-      Client_baking_files.resolve_location cctxt ~chain `Endorsement
-      >>=? fun endorsement_location ->
-      may_inject_endorsement
+  Alpha_services.Delegate.Endorsing_rights.get
+    cctxt
+    ~levels:[level]
+    ~delegates:[delegate_pkh]
+    (chain, block)
+  >>=? function
+  | [{slots = []; _}] | [] | _ :: _ :: _ ->
+      assert false
+  | [{slots = slot :: _; _}] ->
+      Alpha_services.Forge.endorsement
         cctxt
-        endorsement_location
-        ~delegate:delegate_pkh
-        level
-      >>=? function
-      | true ->
-          record_endorsement
+        (chain, block)
+        ~branch:hash
+        ~level
+        ()
+      >>=? fun bytes ->
+      let wallet = (cctxt :> Client_context.wallet) in
+      (* Double-check the right to inject an endorsement *)
+      let open Client_baking_highwatermarks in
+      wallet#with_lock (fun () ->
+          Client_baking_files.resolve_location cctxt ~chain `Endorsement
+          >>=? fun endorsement_location ->
+          may_inject_endorsement
             cctxt
             endorsement_location
             ~delegate:delegate_pkh
             level
-          >>=? fun () -> return_true
-      | false ->
-          return_false)
-  >>=? fun is_allowed_to_endorse ->
-  if is_allowed_to_endorse then
-    Chain_services.chain_id cctxt ~chain ()
-    >>=? fun chain_id ->
-    Client_keys.append
-      cctxt
-      delegate_sk
-      ~watermark:(Endorsement chain_id)
-      bytes
-    >>=? fun signed_bytes ->
-    Shell_services.Injection.operation cctxt ?async ~chain signed_bytes
-    >>=? fun oph -> return oph
-  else
-    lwt_log_error
-      Tag.DSL.(
-        fun f ->
-          f "Level %a : previously endorsed."
-          -% t event "double_endorsement_near_miss"
-          -% a level_tag level)
-    >>= fun () -> fail (Level_previously_endorsed level)
+          >>=? function
+          | true ->
+              record_endorsement
+                cctxt
+                endorsement_location
+                ~delegate:delegate_pkh
+                level
+              >>=? fun () -> return_true
+          | false ->
+              return_false)
+      >>=? fun is_allowed_to_endorse ->
+      if is_allowed_to_endorse then
+        Chain_services.chain_id cctxt ~chain ()
+        >>=? fun chain_id ->
+        Client_keys.append
+          cctxt
+          delegate_sk
+          ~watermark:(Endorsement chain_id)
+          bytes
+        >>=? fun signed_bytes ->
+        (* wrap the legacy endorsement in a slot-bearing wrapper *)
+        match
+          Data_encoding.Binary.of_bytes_opt
+            Alpha_context.Operation.encoding
+            signed_bytes
+        with
+        | Some
+            { shell;
+              protocol_data =
+                Operation_data
+                  ({contents = Single (Endorsement _); _} as protocol_data) }
+          ->
+            let wrapped =
+              {
+                shell;
+                protocol_data =
+                  Operation_data
+                    {
+                      contents =
+                        Single
+                          (Endorsement_with_slot
+                             {endorsement = {shell; protocol_data}; slot});
+                      signature = None;
+                    };
+              }
+            in
+            let wrapped_bytes =
+              Data_encoding.Binary.to_bytes_exn
+                Alpha_context.Operation.encoding
+                wrapped
+            in
+            Shell_services.Injection.operation
+              cctxt
+              ?async
+              ~chain
+              wrapped_bytes
+            >>=? fun oph -> return oph
+        | _ ->
+            assert false
+      else
+        lwt_log_error
+          Tag.DSL.(
+            fun f ->
+              f "Level %a : previously endorsed."
+              -% t event "double_endorsement_near_miss"
+              -% a level_tag level)
+        >>= fun () -> fail (Level_previously_endorsed level)
 
 let forge_endorsement (cctxt : #Protocol_client_context.full) ?async ~chain
     ~block ~src_sk src_pk =

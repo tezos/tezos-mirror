@@ -37,7 +37,9 @@ type error +=
 
 (* `Permanent *)
 
-type error += Unexpected_endorsement
+type error += Unexpected_endorsement (* `Permanent *)
+
+type error += Invalid_endorsement_slot of int (* `Permanent *)
 
 type error += Invalid_signature (* `Permanent *)
 
@@ -68,11 +70,13 @@ val endorsement_rights :
   Level.t ->
   (public_key * int list * bool) Signature.Public_key_hash.Map.t tzresult Lwt.t
 
-(** Check that the operation was signed by a delegate allowed
-    to endorse at the level specified by the endorsement. *)
+(** Check that the operation was signed by a the delegate allowed to
+    endorse at the given slot and at the level specified by the
+    endorsement. *)
 val check_endorsement_rights :
   context ->
   Chain_id.t ->
+  slot:int ->
   Kind.endorsement Operation.t ->
   (public_key_hash * int list * bool) tzresult Lwt.t
 

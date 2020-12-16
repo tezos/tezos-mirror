@@ -255,6 +255,7 @@ module Forge : sig
     branch:Block_hash.t ->
     op1:Kind.endorsement operation ->
     op2:Kind.endorsement operation ->
+    slot:int ->
     unit ->
     bytes shell_tzresult Lwt.t
 

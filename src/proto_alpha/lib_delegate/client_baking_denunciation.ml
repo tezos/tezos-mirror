@@ -91,7 +91,9 @@ let process_endorsements (cctxt : #Protocol_client_context.full) state
           Some
             Apply_results.(
               Operation_metadata
-                {contents = Single_result (Endorsement_result {delegate; _})})
+                { contents =
+                    Single_result
+                      (Endorsement_result {delegate; slots = slot :: _; _}) })
         ) -> (
           let new_endorsement : Kind.endorsement Alpha_context.operation =
             {shell; protocol_data}
@@ -123,6 +125,7 @@ let process_endorsements (cctxt : #Protocol_client_context.full) state
                 ~branch:block_hash
                 ~op1:existing_endorsement
                 ~op2:new_endorsement
+                ~slot
                 ()
               >>=? fun bytes ->
               let bytes = Signature.concat bytes Signature.zero in

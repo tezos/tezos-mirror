@@ -61,6 +61,9 @@ and 'kind contents_result =
   | Seed_nonce_revelation_result :
       Receipt.balance_updates
       -> Kind.seed_nonce_revelation contents_result
+  | Endorsement_with_slot_result :
+      Kind.endorsement contents_result
+      -> Kind.endorsement_with_slot contents_result
   | Double_endorsement_evidence_result :
       Receipt.balance_updates
       -> Kind.double_endorsement_evidence contents_result

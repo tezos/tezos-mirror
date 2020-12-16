@@ -1214,6 +1214,8 @@ end
 module Kind : sig
   type seed_nonce_revelation = Seed_nonce_revelation_kind
 
+  type endorsement_with_slot = Endorsement_with_slot_kind
+
   type double_endorsement_evidence = Double_endorsement_evidence_kind
 
   type double_baking_evidence = Double_baking_evidence_kind
@@ -1264,9 +1266,15 @@ and _ contents =
       nonce : Nonce.t;
     }
       -> Kind.seed_nonce_revelation contents
+  | Endorsement_with_slot : {
+      endorsement : Kind.endorsement operation;
+      slot : int;
+    }
+      -> Kind.endorsement_with_slot contents
   | Double_endorsement_evidence : {
       op1 : Kind.endorsement operation;
       op2 : Kind.endorsement operation;
+      slot : int;
     }
       -> Kind.double_endorsement_evidence contents
   | Double_baking_evidence : {
@@ -1442,6 +1450,8 @@ module Operation : sig
     val endorsement_case : Kind.endorsement case
 
     val seed_nonce_revelation_case : Kind.seed_nonce_revelation case
+
+    val endorsement_with_slot_case : Kind.endorsement_with_slot case
 
     val double_endorsement_evidence_case :
       Kind.double_endorsement_evidence case

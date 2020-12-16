@@ -629,14 +629,11 @@ module Endorsing_power = struct
   let endorsing_power ctxt (operation, chain_id) =
     let (Operation_data data) = operation.protocol_data in
     match data.contents with
-    | Single (Endorsement _) ->
-        Baking.check_endorsement_rights
-          ctxt
-          chain_id
-          {shell = operation.shell; protocol_data = data}
+    | Single (Endorsement_with_slot {endorsement; slot}) ->
+        Baking.check_endorsement_rights ctxt chain_id endorsement ~slot
         >|=? fun (_, slots, _) -> List.length slots
     | _ ->
-        failwith "Operation is not an endorsement"
+        failwith "Operation is not a wrapped endorsement"
 
   module S = struct
     let endorsing_power =

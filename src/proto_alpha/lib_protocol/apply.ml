@@ -41,6 +41,8 @@ type error += Duplicate_endorsement of Signature.Public_key_hash.t
 
 type error += Invalid_endorsement_level
 
+type error += Invalid_endorsement_wrapper
+
 type error += Invalid_commitment of {expected : bool}
 
 type error += Internal_operation_replay of packed_internal_operation
@@ -54,6 +56,8 @@ type error +=
     }
 
 (* `Permanent *)
+
+type error += Unwrapped_endorsement (* `Permanent *)
 
 type error += Unrequired_double_endorsement_evidence (* `Branch*)
 
@@ -185,6 +189,36 @@ let () =
     Data_encoding.unit
     (function Invalid_endorsement_level -> Some () | _ -> None)
     (fun () -> Invalid_endorsement_level) ;
+  register_error_kind
+    `Temporary
+    ~id:"operation.invalid_endorsement_wrapper"
+    ~title:"Unexpected wrapper in endorsement"
+    ~description:
+      "The wrapper of an endorsement is inconsistent with the endorsement it \
+       wraps."
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "The endorsement wrapper announces a block hash different from its \
+         wrapped endorsement, or bears a signature.")
+    Data_encoding.unit
+    (function Invalid_endorsement_wrapper -> Some () | _ -> None)
+    (fun () -> Invalid_endorsement_wrapper) ;
+  register_error_kind
+    `Temporary
+    ~id:"operation.unwrapped_endorsement"
+    ~title:"Unwrapped endorsement"
+    ~description:
+      "A legacy endorsement has been applied without its required \
+       slot-bearing wrapper."
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "A legacy endorsement has been applied without its required \
+         slot-bearing wrapper operation.")
+    Data_encoding.unit
+    (function Unwrapped_endorsement -> Some () | _ -> None)
+    (fun () -> Unwrapped_endorsement) ;
   register_error_kind
     `Permanent
     ~id:"block.invalid_commitment"
@@ -1123,52 +1157,71 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
     (operation : kind operation) (contents_list : kind contents_list) :
     (context * kind contents_result_list) tzresult Lwt.t =
   match contents_list with
-  | Single (Endorsement {level}) ->
-      let block = operation.shell.branch in
-      error_unless
-        (Block_hash.equal block pred_block)
-        (Wrong_endorsement_predecessor (pred_block, block))
-      >>?= fun () ->
-      let current_level = (Level.current ctxt).level in
-      error_unless
-        Raw_level.(succ level = current_level)
-        Invalid_endorsement_level
-      >>?= fun () ->
-      Baking.check_endorsement_rights ctxt chain_id operation
-      >>=? fun (delegate, slots, used) ->
-      if used then fail (Duplicate_endorsement delegate)
+  | Single
+      (Endorsement_with_slot
+        { endorsement =
+            { shell = {branch};
+              protocol_data = {contents = Single (Endorsement {level})} } as
+            unslotted;
+          slot }) ->
+      if
+        ( match operation.protocol_data.signature with
+        | None ->
+            false
+        | Some _ ->
+            true )
+        || not (Block_hash.equal operation.shell.branch branch)
+      then fail Invalid_endorsement_wrapper
       else
-        let ctxt = record_endorsement ctxt delegate in
-        let gap = List.length slots in
-        Tez.(Constants.endorsement_security_deposit ctxt *? Int64.of_int gap)
-        >>?= fun deposit ->
-        Delegate.freeze_deposit ctxt delegate deposit
-        >>=? fun ctxt ->
-        Global.get_block_priority ctxt
-        >>=? fun block_priority ->
-        Baking.endorsing_reward ctxt ~block_priority gap
-        >>?= fun reward ->
-        Delegate.freeze_rewards ctxt delegate reward
-        >|=? fun ctxt ->
-        let level = Level.from_raw ctxt level in
-        ( ctxt,
-          Single_result
-            (Endorsement_result
-               {
-                 balance_updates =
-                   Receipt.cleanup_balance_updates
-                     [ ( Contract (Contract.implicit_contract delegate),
-                         Debited deposit,
-                         Block_application );
-                       ( Deposits (delegate, level.cycle),
-                         Credited deposit,
-                         Block_application );
-                       ( Rewards (delegate, level.cycle),
-                         Credited reward,
-                         Block_application ) ];
-                 delegate;
-                 slots;
-               }) )
+        let operation = unslotted (* shadow the slot box *) in
+        let block = operation.shell.branch in
+        error_unless
+          (Block_hash.equal block pred_block)
+          (Wrong_endorsement_predecessor (pred_block, block))
+        >>?= fun () ->
+        let current_level = (Level.current ctxt).level in
+        error_unless
+          Raw_level.(succ level = current_level)
+          Invalid_endorsement_level
+        >>?= fun () ->
+        Baking.check_endorsement_rights ctxt chain_id operation ~slot
+        >>=? fun (delegate, slots, used) ->
+        if used then fail (Duplicate_endorsement delegate)
+        else
+          let ctxt = record_endorsement ctxt delegate in
+          let gap = List.length slots in
+          Tez.(Constants.endorsement_security_deposit ctxt *? Int64.of_int gap)
+          >>?= fun deposit ->
+          Delegate.freeze_deposit ctxt delegate deposit
+          >>=? fun ctxt ->
+          Global.get_block_priority ctxt
+          >>=? fun block_priority ->
+          Baking.endorsing_reward ctxt ~block_priority gap
+          >>?= fun reward ->
+          Delegate.freeze_rewards ctxt delegate reward
+          >|=? fun ctxt ->
+          let level = Level.from_raw ctxt level in
+          ( ctxt,
+            Single_result
+              (Endorsement_with_slot_result
+                 (Endorsement_result
+                    {
+                      balance_updates =
+                        Receipt.cleanup_balance_updates
+                          [ ( Contract (Contract.implicit_contract delegate),
+                              Debited deposit,
+                              Block_application );
+                            ( Deposits (delegate, level.cycle),
+                              Credited deposit,
+                              Block_application );
+                            ( Rewards (delegate, level.cycle),
+                              Credited reward,
+                              Block_application ) ];
+                      delegate;
+                      slots;
+                    })) )
+  | Single (Endorsement _) ->
+      fail Unwrapped_endorsement
   | Single (Seed_nonce_revelation {level; nonce}) ->
       let level = Level.from_raw ctxt level in
       Nonce.reveal ctxt level nonce
@@ -1185,7 +1238,7 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
                [ ( Rewards (baker, level.cycle),
                    Credited seed_nonce_revelation_tip,
                    Block_application ) ]) ) )
-  | Single (Double_endorsement_evidence {op1; op2}) -> (
+  | Single (Double_endorsement_evidence {op1; op2; slot}) -> (
     match (op1.protocol_data.contents, op2.protocol_data.contents) with
     | (Single (Endorsement e1), Single (Endorsement e2))
       when Raw_level.(e1.level = e2.level)
@@ -1202,9 +1255,9 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
           (Outdated_double_endorsement_evidence
              {level = level.level; last = oldest_level})
         >>=? fun () ->
-        Baking.check_endorsement_rights ctxt chain_id op1
+        Baking.check_endorsement_rights ctxt chain_id op1 ~slot
         >>=? fun (delegate1, _, _) ->
-        Baking.check_endorsement_rights ctxt chain_id op2
+        Baking.check_endorsement_rights ctxt chain_id op2 ~slot
         >>=? fun (delegate2, _, _) ->
         fail_unless
           (Signature.Public_key_hash.equal delegate1 delegate2)

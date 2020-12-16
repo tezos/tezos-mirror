@@ -413,6 +413,9 @@ type 'kind contents_result =
   | Seed_nonce_revelation_result :
       Receipt.balance_updates
       -> Kind.seed_nonce_revelation contents_result
+  | Endorsement_with_slot_result :
+      Kind.endorsement contents_result
+      -> Kind.endorsement_with_slot contents_result
   | Double_endorsement_evidence_result :
       Receipt.balance_updates
       -> Kind.double_endorsement_evidence contents_result
@@ -532,6 +535,38 @@ module Encoding = struct
               None);
         proj = (fun (Seed_nonce_revelation_result bus) -> bus);
         inj = (fun bus -> Seed_nonce_revelation_result bus);
+      }
+
+  let endorsement_with_slot_case =
+    Case
+      {
+        op_case = Operation.Encoding.endorsement_with_slot_case;
+        encoding =
+          obj3
+            (req "balance_updates" Receipt.balance_updates_encoding)
+            (req "delegate" Signature.Public_key_hash.encoding)
+            (req "slots" (list uint8));
+        select =
+          (function
+          | Contents_result (Endorsement_with_slot_result _ as op) ->
+              Some op
+          | _ ->
+              None);
+        mselect =
+          (function
+          | Contents_and_result ((Endorsement_with_slot _ as op), res) ->
+              Some (op, res)
+          | _ ->
+              None);
+        proj =
+          (function
+          | Endorsement_with_slot_result
+              (Endorsement_result {balance_updates; delegate; slots}) ->
+              (balance_updates, delegate, slots));
+        inj =
+          (fun (balance_updates, delegate, slots) ->
+            Endorsement_with_slot_result
+              (Endorsement_result {balance_updates; delegate; slots}));
       }
 
   let double_endorsement_evidence_case =
@@ -699,6 +734,8 @@ module Encoding = struct
               None
           | Contents_result (Seed_nonce_revelation_result _) ->
               None
+          | Contents_result (Endorsement_with_slot_result _) ->
+              None
           | Contents_result (Double_endorsement_evidence_result _) ->
               None
           | Contents_result (Double_baking_evidence_result _) ->
@@ -789,6 +826,7 @@ let contents_result_encoding =
   @@ union
        [ make endorsement_case;
          make seed_nonce_revelation_case;
+         make endorsement_with_slot_case;
          make double_endorsement_evidence_case;
          make double_baking_evidence_case;
          make activate_account_case;
@@ -824,6 +862,7 @@ let contents_and_result_encoding =
   @@ union
        [ make endorsement_case;
          make seed_nonce_revelation_case;
+         make endorsement_with_slot_case;
          make double_endorsement_evidence_case;
          make double_baking_evidence_case;
          make activate_account_case;
@@ -952,6 +991,10 @@ let kind_equal :
   | (Seed_nonce_revelation _, Seed_nonce_revelation_result _) ->
       Some Eq
   | (Seed_nonce_revelation _, _) ->
+      None
+  | (Endorsement_with_slot _, Endorsement_with_slot_result _) ->
+      Some Eq
+  | (Endorsement_with_slot _, _) ->
       None
   | (Double_endorsement_evidence _, Double_endorsement_evidence_result _) ->
       Some Eq

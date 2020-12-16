@@ -330,6 +330,12 @@ let compare_operations op1 op2 =
       1
   | (Single (Double_endorsement_evidence _), _) ->
       -1
+  | (Single (Endorsement_with_slot _), Single (Endorsement_with_slot _)) ->
+      0
+  | (_, Single (Endorsement_with_slot _)) ->
+      1
+  | (Single (Endorsement_with_slot _), _) ->
+      -1
   | (Single (Double_baking_evidence _), Single (Double_baking_evidence _)) ->
       0
   | (_, Single (Double_baking_evidence _)) ->

@@ -28,6 +28,8 @@
 module Kind = struct
   type seed_nonce_revelation = Seed_nonce_revelation_kind
 
+  type endorsement_with_slot = Endorsement_with_slot_kind
+
   type double_endorsement_evidence = Double_endorsement_evidence_kind
 
   type double_baking_evidence = Double_baking_evidence_kind
@@ -82,9 +84,15 @@ and _ contents =
       nonce : Seed_repr.nonce;
     }
       -> Kind.seed_nonce_revelation contents
+  | Endorsement_with_slot : {
+      endorsement : Kind.endorsement operation;
+      slot : int;
+    }
+      -> Kind.endorsement_with_slot contents
   | Double_endorsement_evidence : {
       op1 : Kind.endorsement operation;
       op2 : Kind.endorsement operation;
+      slot : int;
     }
       -> Kind.double_endorsement_evidence contents
   | Double_baking_evidence : {
@@ -431,6 +439,26 @@ module Encoding = struct
         inj = (fun (level, nonce) -> Seed_nonce_revelation {level; nonce});
       }
 
+  let endorsement_with_slot_case : Kind.endorsement_with_slot case =
+    Case
+      {
+        tag = 10;
+        name = "endorsement_with_slot";
+        encoding =
+          obj2
+            (req "endorsement" (dynamic_size endorsement_encoding))
+            (req "slot" uint16);
+        select =
+          (function
+          | Contents (Endorsement_with_slot _ as op) -> Some op | _ -> None);
+        proj =
+          (fun (Endorsement_with_slot {endorsement; slot}) ->
+            (endorsement, slot));
+        inj =
+          (fun (endorsement, slot) ->
+            Endorsement_with_slot {endorsement; slot});
+      }
+
   let double_endorsement_evidence_case : Kind.double_endorsement_evidence case
       =
     Case
@@ -438,17 +466,22 @@ module Encoding = struct
         tag = 2;
         name = "double_endorsement_evidence";
         encoding =
-          obj2
+          obj3
             (req "op1" (dynamic_size endorsement_encoding))
-            (req "op2" (dynamic_size endorsement_encoding));
+            (req "op2" (dynamic_size endorsement_encoding))
+            (req "slot" uint16);
         select =
           (function
           | Contents (Double_endorsement_evidence _ as op) ->
               Some op
           | _ ->
               None);
-        proj = (fun (Double_endorsement_evidence {op1; op2}) -> (op1, op2));
-        inj = (fun (op1, op2) -> Double_endorsement_evidence {op1; op2});
+        proj =
+          (fun (Double_endorsement_evidence {op1; op2; slot}) ->
+            (op1, op2, slot));
+        inj =
+          (fun (op1, op2, slot) ->
+            Double_endorsement_evidence {op1; op2; slot});
       }
 
   let double_baking_evidence_case =
@@ -593,6 +626,7 @@ module Encoding = struct
     @@ union
          [ make endorsement_case;
            make seed_nonce_revelation_case;
+           make endorsement_with_slot_case;
            make double_endorsement_evidence_case;
            make double_baking_evidence_case;
            make activate_account_case;
@@ -671,6 +705,8 @@ let acceptable_passes (op : packed_operation) =
   let (Operation_data protocol_data) = op.protocol_data in
   match protocol_data.contents with
   | Single (Endorsement _) ->
+      [0]
+  | Single (Endorsement_with_slot _) ->
       [0]
   | Single (Proposals _) ->
       [1]
@@ -793,6 +829,10 @@ let equal_contents_kind :
   | (Seed_nonce_revelation _, Seed_nonce_revelation _) ->
       Some Eq
   | (Seed_nonce_revelation _, _) ->
+      None
+  | (Endorsement_with_slot _, Endorsement_with_slot _) ->
+      Some Eq
+  | (Endorsement_with_slot _, _) ->
       None
   | (Double_endorsement_evidence _, Double_endorsement_evidence _) ->
       Some Eq

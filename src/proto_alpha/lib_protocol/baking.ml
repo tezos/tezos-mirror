@@ -34,6 +34,8 @@ type error += Timestamp_too_early of Timestamp.t * Timestamp.t
 
 type error += Unexpected_endorsement (* `Permanent *)
 
+type error += Invalid_endorsement_slot of int (* `Permanent *)
+
 type error +=
   | Invalid_block_signature of Block_hash.t * Signature.Public_key_hash.t
 
@@ -123,7 +125,20 @@ let () =
         "The endorsement is signed by a delegate without endorsement rights.")
     Data_encoding.unit
     (function Unexpected_endorsement -> Some () | _ -> None)
-    (fun () -> Unexpected_endorsement)
+    (fun () -> Unexpected_endorsement) ;
+  register_error_kind
+    `Permanent
+    ~id:"baking.invalid_endorsement_slot"
+    ~title:"Endorsement slot out of range"
+    ~description:"The endorsement slot provided is negative or too high."
+    ~pp:(fun ppf v ->
+      Format.fprintf
+        ppf
+        "Endorsement slot %d provided is negative or too high."
+        v)
+    Data_encoding.(obj1 (req "slot" uint16))
+    (function Invalid_endorsement_slot v -> Some v | _ -> None)
+    (fun v -> Invalid_endorsement_slot v)
 
 let minimal_time c priority pred_timestamp =
   let priority = Int32.of_int priority in
@@ -263,29 +278,31 @@ let endorsement_rights ctxt level =
     Signature.Public_key_hash.Map.empty
     (0 --> (Constants.endorsers_per_block ctxt - 1))
 
-let check_endorsement_rights ctxt chain_id (op : Kind.endorsement Operation.t)
-    =
-  let current_level = Level.current ctxt in
-  let (Single (Endorsement {level; _})) = op.protocol_data.contents in
-  ( if Raw_level.(succ level = current_level.level) then
-    return (Alpha_context.allowed_endorsements ctxt)
-  else endorsement_rights ctxt (Level.from_raw ctxt level) )
-  >>=? fun endorsements ->
-  match
-    Signature.Public_key_hash.Map.fold (* no find_first *)
-      (fun pkh (pk, slots, used) acc ->
-        match Operation.check_signature pk chain_id op with
-        | Error _ ->
-            acc
-        | Ok () ->
-            Some (pkh, slots, used))
-      endorsements
-      None
-  with
-  | None ->
-      fail Unexpected_endorsement
-  | Some v ->
-      return v
+let check_endorsement_rights ctxt chain_id ~slot
+    (op : Kind.endorsement Operation.t) =
+  if
+    Compare.Int.(slot < 0 (* should not happen because of binary format *))
+    || Compare.Int.(slot >= Constants.endorsers_per_block ctxt)
+  then fail (Invalid_endorsement_slot slot)
+  else
+    let current_level = Level.current ctxt in
+    let (Single (Endorsement {level; _})) = op.protocol_data.contents in
+    Roll.endorsement_rights_owner ctxt (Level.from_raw ctxt level) ~slot
+    >>=? fun pk ->
+    let pkh = Signature.Public_key.hash pk in
+    match Operation.check_signature pk chain_id op with
+    | Error _ ->
+        fail Unexpected_endorsement
+    | Ok () -> (
+        ( if Raw_level.(succ level = current_level.level) then
+          return (Alpha_context.allowed_endorsements ctxt)
+        else endorsement_rights ctxt (Level.from_raw ctxt level) )
+        >>=? fun endorsements ->
+        match Signature.Public_key_hash.Map.find_opt pkh endorsements with
+        | None ->
+            fail Unexpected_endorsement (* unexpected *)
+        | Some (_pk, slots, v) ->
+            return (pkh, slots, v) )
 
 let select_delegate delegate delegate_list max_priority =
   let rec loop acc l n =
