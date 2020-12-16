@@ -5,7 +5,7 @@
 
 ocaml_version=4.09.1
 opam_version=2.0
-recommended_rust_version=1.39.0
+recommended_rust_version=1.44.0
 
 ## Please update `.gitlab-ci.yml` accordingly
 ## full_opam_repository is a commit hash of the public OPAM repository, i.e.

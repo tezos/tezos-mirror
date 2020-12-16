@@ -35,11 +35,11 @@ Prerequisites:
 
 - A working environment (see `documentation <http://tezos.gitlab.io/introduction/howtoget.html#environment>`_) with the binaries compiled,
 - A local copy of the tezos `repository <https://gitlab.com/tezos/tezos>`_
-- `python 3.8.2`. It is recommended to use `pyenv
+- `python 3.8.5`. It is recommended to use `pyenv
   <https://github.com/pyenv/pyenv>`_ to manage the python versions. If ``pyenv``
-  is used, you can use ``pyenv install 3.8.2`` followed by ``pyenv global 3.8.2`` to
-  set the python version to ``3.8.2`` globally. If you want to use ``python 3.8.2`` only in the
-  current shell, you can use ``pyenv shell 3.8.2``. Be sure ``eval $(pyenv init -)``
+  is used, you can use ``pyenv install 3.8.5`` followed by ``pyenv global 3.8.5`` to
+  set the python version to ``3.8.5`` globally. If you want to use ``python 3.8.5`` only in the
+  current shell, you can use ``pyenv shell 3.8.5``. Be sure ``eval $(pyenv init -)``
   has been executed first during the shell session.
 - `poetry <https://python-poetry.org/>`_ to manage the python dependencies and
   run the tests in a sandboxed python environment. All poetry commands are to be
