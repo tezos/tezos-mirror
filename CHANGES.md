@@ -13,6 +13,15 @@
 - Optimized the I/O and CPU usage by removing an unnecessary access to
   the context during block validation.
 
+## Docker Images
+
+- Bump up base image to `alpine:12`. In particular, it changes rust and python
+  versions to 1.44.0 and 3.8.5 respectively.
+
+## Miscellaneous
+
+- Recommend rust version 1.44.0 instead of 1.39.0.
+
 # Version 8.0~rc2
 
 ## Node
