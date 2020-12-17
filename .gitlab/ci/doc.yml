@@ -10,6 +10,10 @@ documentation:build:
     - /-release$/@tezos/tezos
   script:
     - make -C docs html
+  artifacts:
+    paths:
+      - docs
+    expire_in: 1 week
 
 documentation:linkcheck:
   extends: .runtime_build_test_dependencies_template
