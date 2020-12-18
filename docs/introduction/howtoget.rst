@@ -316,6 +316,19 @@ manually without restarting your session::
 
    source $HOME/.cargo/env
 
+Note that the command line above assumes that rustup
+installed Cargo in ``$HOME/.cargo``, but this may change depending on how
+you installed rustup. See the documentation of your rustup distribution
+if file ``.cargo`` does not exist in your home directory.
+
+Finally, Tezos binaries requires the Zcash parameter files to run.
+Docker images come with those files, and the source distribution also
+includes those files. But if you compile from source and move Tezos to
+another location (such as ``/usr/local/bin``), the Tezos binaries may
+prompt you to install the Zcash parameter files. The easiest way is to
+download and run this script::
+
+   https://raw.githubusercontent.com/zcash/zcash/master/zcutil/fetch-params.sh
 
 Install Tezos dependencies
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
