@@ -6,6 +6,8 @@ How to use Tezos
 This How To illustrates the use of the various Tezos binaries as well
 as some concepts about the network.
 
+.. _tezos_binaries:
+
 The Binaries
 ------------
 
