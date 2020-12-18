@@ -79,6 +79,8 @@ let make_blockchain_network ~alias ~chain_name ?old_chain_name
   }
 
 let blockchain_network_mainnet =
+  let giganode_1 = "116.202.172.21" in
+  let giganode_2 = "95.216.45.62" in
   make_blockchain_network
     ~alias:"mainnet"
     {
@@ -100,7 +102,7 @@ let blockchain_network_mainnet =
     ~user_activated_protocol_overrides:
       [ ( "PsBABY5HQTSkA4297zNHfsZNKtxULfL18y95qb3m53QJiXGmrbU",
           "PsBabyM1eUXZseaJdmXFApDSBqj8YBfwELoxZHHW77EMcAbbwAS" ) ]
-    ~default_bootstrap_peers:["boot.tzbeta.net"]
+    ~default_bootstrap_peers:["boot.tzbeta.net"; giganode_1; giganode_2]
 
 let blockchain_network_delphinet =
   make_blockchain_network
@@ -161,7 +163,8 @@ let blockchain_network_edonet =
         "edonet.smartpy.io";
         "188.40.128.216:29732";
         "51.79.165.131";
-        "edonet.boot.tezostaquito.io" ]
+        "edonet.boot.tezostaquito.io";
+        "95.216.228.228:9733" ]
 
 let blockchain_network_sandbox =
   make_blockchain_network
