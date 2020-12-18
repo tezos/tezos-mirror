@@ -1,28 +1,6 @@
-# Development Version
+# Version 8.0
 
-When you make a commit on master, you can add an item in one of the following
-subsections (node, client, ...) to document your commit or the set of related commits.
-This will ensure that this change is not forgotten in the final changelog.
-By having your commits update this file you also make it easy
-to find the commits which are related to your changes using `git blame`.
-
-Only describe changes which affect users (bug fixes and new features),
-not refactorings or tests. Changes to the documentation do not need to be documented
-here either.
-
-## Node
-
-## Client
-
-## Baker / Endorser / Accuser
-
-## Protocol Compiler And Environment
-
-## Codec
-
-## Docker Images
-
-## Miscellaneous
+- Added two new bootstrap peers for Mainnet and one for Edonet.
 
 # Version 8.0~rc2
 
