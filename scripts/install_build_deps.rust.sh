@@ -32,7 +32,7 @@ fi
 
 if ! [[ "$(rustc --version | cut -d' ' -f2)" == *"$rust_version"* ]]; then
     echo "\
-Wrong Rust version, run the following command in your favorite shell:
+Wrong Rust version, run the following commands in your favorite shell:
 $ rustup toolchain install $rust_version
 $ rustup override set $rust_version"
     exit 1
