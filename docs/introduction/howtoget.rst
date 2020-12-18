@@ -123,17 +123,33 @@ A Windows port is feasible and might be developed in the future.
 
 Additionally, starting from version 8.0, compiling Tezos requires the Rust compiler,
 version 1.44.0, and the Cargo package manager to be installed. You can use
-`rustup <https://github.com/rust-lang/rustup>`_ to install both.
-Note that ``rustup`` can update your ``.profile`` to update your ``PATH``
-environment variable, but this does not take effect until you restart
-your desktop environment or window manager, so you may have to manually
-update it for your current session::
+`rustup <https://rust-lang.github.io/rustup/installation/other.html>`_ to install both::
 
     rustup set profile minimal
     rustup toolchain install 1.44.0
     rustup override set 1.44.0
     source $HOME/.cargo/env
 
+The last line, ``source $HOME/.cargo/env``, assumes that rustup
+installed Cargo in ``$HOME/.cargo``, but this may change depending on how
+you installed rustup. See the documentation of your rustup distribution
+if file ``.cargo`` does not exist in your home directory.
+
+You will have to run the ``source $HOME/.cargo/env`` command every time you
+restart your terminal. Rustup can update your ``.profile`` to avoid having to
+do this every time. Even if you let rustup update your ``.profile``, this does
+not take effect until you restart your desktop environment or window manager,
+so you may have to manually update it for your current session
+with ``source $HOME/.cargo/env``.
+
+Finally, Tezos binaries requires the Zcash parameter files to run.
+Docker images come with those files, and the source distribution also
+includes those files. But if you compile from source and move Tezos to
+another location (such as ``/usr/local/bin``), the Tezos binaries may
+prompt you to install the Zcash parameter files. The easiest way is to
+download and run this script::
+
+    https://raw.githubusercontent.com/zcash/zcash/master/zcutil/fetch-params.sh
 
 Install OPAM
 ~~~~~~~~~~~~
