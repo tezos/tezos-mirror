@@ -116,6 +116,8 @@ let print_service : type p q i o. (_, _, p, q, i, o) Service.t -> string =
   let iserv = Service.Internal.to_service serv in
   String.concat "/" (List.rev (print_path iserv.path))
 
+exception Rpc_dir_creation_failure of tztrace
+
 (** The subset of resto's client.mli that we implement,
     Signatures are slightly different (we have less error cases
     and support a single [Tezos_rpc_http.Media_type]). *)
@@ -177,8 +179,16 @@ module LocalClient : LOCAL_CLIENT = struct
   let generic_call meth ?body uri directory =
     let path = Uri.pct_decode (Uri.path uri) in
     let path = Resto_cohttp.Utils.split_path path in
-    Directory.lookup directory () meth path
-    >>= fun result ->
+    Lwt.catch
+      (fun () -> Directory.lookup directory () meth path >>= return)
+      (function
+        | Rpc_dir_creation_failure errs ->
+            Lwt.return @@ Error errs
+        | exn ->
+            Error_monad.fail
+            @@ Local_RPC_error
+                 (Rpc_generic_error (Some (Printexc.to_string exn))))
+    >>=? fun result ->
     match result with
     | Error (`Cannot_parse_path _) ->
         Error_monad.fail (Local_RPC_error Rpc_cannot_parse_path)

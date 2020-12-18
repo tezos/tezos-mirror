@@ -37,6 +37,15 @@ type rpc_error =
 
 type error += Local_RPC_error of rpc_error
 
+(** Exception used by the proxy mode when creation of the input
+    environment (of the RPC handler) fails. This exception is used
+    to temporarily escape from monad, because at the point
+    of throwing, the code is NOT in tzresult Lwt.t (because it's dealing
+    with resto APIs: it's in an Lwt.t-only monad).
+    Then this exception is injected back in the
+    tzresult Lwt.t monad at the point where it is caught (with Lwt.catch). *)
+exception Rpc_dir_creation_failure of tztrace
+
 (** The class [local_ctxt directory] creates
     an RPC context that executes RPCs locally. *)
 class local_ctxt : unit RPC_directory.t -> RPC_context.json

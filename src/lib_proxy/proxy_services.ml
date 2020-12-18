@@ -133,12 +133,13 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
     match result with
     | Ok x ->
         Lwt.return x
-    | Error err ->
-        Error_monad.pp_print_error Format.err_formatter err ;
-        (* Is there something better we can do!? I'm asking because
-           proto_directory expects a unit Directory.t Lwt.t,
-           we can't give it a unit tzresult Directory.t Lwt.t *)
-        assert false
+    | Error errs ->
+        (* proto_directory expects a unit Directory.t Lwt.t,
+           we can't give it a unit tzresult Directory.t Lwt.t, hence
+           throwing an exception. It's handled in
+           [Tezos_mockup_proxy.RPC_client]. This is not ideal, but
+           it's better than asserting false. *)
+        raise (Tezos_mockup_proxy.RPC_client.Rpc_dir_creation_failure errs)
   in
   let proto_directory =
     let ( // ) = RPC_directory.prefix in
