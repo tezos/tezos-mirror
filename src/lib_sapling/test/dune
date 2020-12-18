@@ -1,4 +1,5 @@
 (tests
+ (package sapling)
  (names test_rustzcash
         test_keys
         test_merkle
