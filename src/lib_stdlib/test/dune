@@ -2,13 +2,15 @@
  (names test_tzList
         test_tzString
         test_lwt_pipe
-        test_circular_buffer)
+        test_circular_buffer
+        test_circular_buffer_fuzzy)
  (libraries tezos-stdlib
             alcotest
             alcotest-lwt
             lwt_log
             bigstring
-            lwt.unix)
+            lwt.unix
+            crowbar)
  (flags (:standard -open Tezos_stdlib)))
 
 (rule
@@ -35,12 +37,17 @@
  (action (run %{exe:test_circular_buffer.exe})))
 
 (rule
+ (alias runtest_circular_buffer_fuzzy)
+ (action (run %{exe:test_circular_buffer_fuzzy.exe})))
+
+(rule
  (alias runtest)
  (package tezos-stdlib)
  (deps (alias runtest_tzList)
        (alias runtest_tzString)
        (alias runtest_lwt_pipe)
-       (alias runtest_circular_buffer))
+       (alias runtest_circular_buffer)
+       (alias runtest_circular_buffer_fuzzy))
  (action (progn)))
 
 (rule
