@@ -509,12 +509,26 @@ let on_close w =
     :: Lwt_utils.may ~f:(fun (_, shutdown) -> shutdown ()) nv.child
     :: pvs )
 
+(* Copied from lwtreslib, which is not available in the v8 release branche. *)
+let rec list_iter_es f = function
+  | [] ->
+      return_unit
+  | h :: t ->
+      f h >>=? fun () -> (list_iter_es [@ocaml.tailcall]) f t
+
+(* Copied from lwtreslib, which is not available in the v8 release branche. *)
+let list_iter_es f = function
+  | [] ->
+      return_unit
+  | h :: t ->
+      Lwt.apply f h >>=? fun () -> (list_iter_es [@ocaml.tailcall]) f t
+
 let may_load_protocols parameters =
   let chain_state = Distributed_db.chain_state parameters.chain_db in
   let state = Distributed_db.state parameters.db in
   State.Chain.all_indexed_protocols chain_state
   >>= fun indexed_protocols ->
-  List.iter_es
+  list_iter_es
     (fun (_proto_level, (proto_hash, _activation_block)) ->
       if Registered_protocol.mem proto_hash then return_unit
       else
