@@ -29,6 +29,7 @@ open Lwt
    We remember the segment which is full in the buffer. *)
 type t = {
   buffer : Bytes.t;
+  fresh_buf_size : int;
   mutable data_start : int;
   mutable data_end : int;
   mutable full : bool;
@@ -38,8 +39,14 @@ type t = {
    fresh buffer if the buffer is full. *)
 type data = {offset : int; length : int; buf : Bytes.t}
 
-let create ?(maxlength = 1 lsl 15) () =
-  {buffer = Bytes.create maxlength; data_start = 0; data_end = 0; full = false}
+let create ?(maxlength = 1 lsl 15) ?(fresh_buf_size = 2000) () =
+  {
+    buffer = Bytes.create maxlength;
+    data_start = 0;
+    data_end = 0;
+    full = false;
+    fresh_buf_size;
+  }
 
 (* Invariant:
    - There is no two concurrent write at the same time
@@ -76,7 +83,13 @@ Multiple situtation can arise
 [ddddddd|dddddddddddddddddddddddddddddd__] => t.full = true
 
  *)
+(* Pre-condition: write_len > 0 *)
 let get_buf_with_offset t write_len =
+  (* Case 3.1 -> put the pointers at the beginning of the buffer which
+     may save some space. *)
+  if t.data_start = t.data_end && not t.full then (
+    t.data_start <- 0 ;
+    t.data_end <- 0 ) ;
   if t.data_start < t.data_end || (t.data_start = t.data_end && not t.full)
   then
     if t.data_end + write_len <= Bytes.length t.buffer then
@@ -86,17 +99,17 @@ let get_buf_with_offset t write_len =
       (* case 1.2: we write before START *)
       (t.buffer, 0)
     else (* case 1.3:  not enough space *)
-      (Bytes.create write_len, 0)
+      (Bytes.create t.fresh_buf_size, 0)
   else if t.data_end < t.data_start then
     if t.data_end + write_len <= t.data_start then
       (* case 2.1: we write between END and START *)
       (t.buffer, t.data_end)
     else (* case 2.2: not enough space *)
-      (Bytes.create write_len, 0)
+      (Bytes.create t.fresh_buf_size, 0)
   else
     (* case 3.3: t.data_start =t.data_end && t.full *)
     (* not enough space *)
-    (Bytes.create write_len, 0)
+    (Bytes.create t.fresh_buf_size, 0)
 
 (* [write ~maxlen ~fill_using:f buffer]
    - first ask a buffer,offset pair with enough space for writting maxlen data
@@ -164,16 +177,22 @@ r.offset=0
                                            r.offset=0
  *)
 let write ~maxlen ~fill_using t =
-  let (buf, offset) = get_buf_with_offset t maxlen in
-  fill_using buf offset maxlen
-  >>= fun written ->
-  if written > maxlen then
-    raise
-      (Invalid_argument "Circular_buffer.write: written more bytes than maxlen") ;
-  if t.buffer == buf then (
-    t.data_end <- written + offset ;
-    if t.data_end = t.data_start then t.full <- true ) ;
-  Lwt.return {offset; length = written; buf}
+  if maxlen < 0 then invalid_arg "Circular_buffer.write: negative length." ;
+  if maxlen = 0 then
+    Lwt.return {offset = t.data_end; length = 0; buf = t.buffer}
+  else
+    let (buf, offset) = get_buf_with_offset t maxlen in
+    let maxlen =
+      if buf == t.buffer then maxlen else min t.fresh_buf_size maxlen
+    in
+    fill_using buf offset maxlen
+    >>= fun written ->
+    if written > maxlen then
+      invalid_arg "Circular_buffer.write: written more bytes than maxlen" ;
+    if t.buffer == buf then (
+      t.data_end <- written + offset ;
+      if t.data_end = t.data_start then t.full <- true ) ;
+    Lwt.return {offset; length = written; buf}
 
 (* [read data ?len t ~into ~offset]  will read [len] data from
    [data.buf]  and update [t.data_start] pointer accordingly.
@@ -237,14 +256,18 @@ begining of the buffer at each read.
 
 let read data ?(len = data.length) t ~into ~offset =
   if len > data.length then
-    raise (Invalid_argument "Circular_buffer.read: len > (length data).") ;
-  (* copying data *)
-  Bytes.blit data.buf data.offset into offset len ;
-  (* updating data_start pointer *)
-  if data.buf == t.buffer then (
-    if len <> 0 then t.full <- false ;
-    t.data_start <- data.offset + len ;
-    (*
+    invalid_arg "Circular_buffer.read: len > (length data)." ;
+  if len < 0 then invalid_arg "Circular_buffer.read: negative length." ;
+  if len = 0 && data.length = 0 then None
+  else if len = 0 then Some data
+  else (
+    (* copying data *)
+    Bytes.blit data.buf data.offset into offset len ;
+    (* updating data_start pointer *)
+    if data.buf == t.buffer then (
+      t.full <- false ;
+      t.data_start <- data.offset + len ;
+      (*
        In the buffer, data is always contiguous (in particular it is not
        splitted when reaching the end: we just leave unused space at
        the end and write at the beginning).
@@ -252,12 +275,16 @@ let read data ?(len = data.length) t ~into ~offset =
        buffer, and [len] is at most the length of data, so we have
        previously written [len] data in [t.buffer] starting at
        [offset]. So the following assertion must hold. *)
-    assert (t.data_start <= Bytes.length t.buffer) ) ;
-  (* computing remainder *)
-  if len = data.length then None
-  else
-    (* Return a new handler if we did not read the whole chunck *)
-    Some
-      {offset = data.offset + len; length = data.length - len; buf = data.buf}
+      assert (t.data_start <= Bytes.length t.buffer) ) ;
+    (* computing remainder *)
+    if len = data.length then None
+    else
+      (* Return a new handler if we did not read the whole chunck *)
+      Some
+        {
+          offset = data.offset + len;
+          length = data.length - len;
+          buf = data.buf;
+        } )
 
 let length {length; _} = length

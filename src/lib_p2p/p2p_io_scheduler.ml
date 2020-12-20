@@ -422,7 +422,7 @@ let register st fd =
     (* This buffer is allocated once and is reused everytime we read a
        message from the corresponding file descriptor. *)
     let read_buffer =
-      Circular_buffer.create ~maxlength:(st.read_buffer_size * 4) ()
+      Circular_buffer.create ~maxlength:(st.read_buffer_size * 2) ()
     in
     let read_conn =
       ReadScheduler.create_connection

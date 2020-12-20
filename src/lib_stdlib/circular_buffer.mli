@@ -43,8 +43,9 @@ type t
 (** An abstraction over a chunk of data written in the buffer. *)
 type data
 
-(** Create a buffer of size maxlength *)
-val create : ?maxlength:int -> unit -> t
+(** Create a buffer of size maxlength. If the buffer is full, a buffer
+   of size [fresh_buf_size] is allocated (by default `2` kb). *)
+val create : ?maxlength:int -> ?fresh_buf_size:int -> unit -> t
 
 (** [write ~maxlen ~fill_using:f buffer] calls [fill_using buf offset
    maxlen] where [buf] is a buffer that has room for [maxlen] data

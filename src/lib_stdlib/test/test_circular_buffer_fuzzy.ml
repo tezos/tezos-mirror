@@ -41,7 +41,7 @@ module type S = sig
 
   type data
 
-  val create : ?maxlength:int -> unit -> t
+  val create : ?maxlength:int -> ?fresh_buf_size:int -> unit -> t
 
   (* Write the output of [fill_using] in [data]. *)
   val write :
@@ -65,7 +65,7 @@ module Reference : S = struct
 
   type data = Bytes.t
 
-  let create ?maxlength:_ () = ()
+  let create ?maxlength:_ ?fresh_buf_size:_ () = ()
 
   let write ~maxlen ~fill_using () =
     let bytes = Bytes.create maxlen in
