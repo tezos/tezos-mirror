@@ -105,10 +105,12 @@ let run (cctxt : #Protocol_client_context.rpc_context)
     ~(chain : Chain_services.chain) ~block ?(amount = Tez.fifty_cents) ~balance
     ~(program : Michelson_v1_parser.parsed)
     ~(storage : Michelson_v1_parser.parsed)
-    ~(input : Michelson_v1_parser.parsed) ?source ?payer ?gas ?entrypoint () =
+    ~(input : Michelson_v1_parser.parsed)
+    ~(unparsing_mode : Script_ir_translator.unparsing_mode) ?source ?payer ?gas
+    ?entrypoint () =
   Chain_services.chain_id cctxt ~chain ()
   >>=? fun chain_id ->
-  Alpha_services.Helpers.Scripts.run_code
+  Filter.RPC.run_code_normalized
     cctxt
     (chain, block)
     ?gas
@@ -121,15 +123,18 @@ let run (cctxt : #Protocol_client_context.rpc_context)
     ~chain_id
     ~source
     ~payer
+    ~unparsing_mode
 
 let trace (cctxt : #Protocol_client_context.rpc_context)
     ~(chain : Chain_services.chain) ~block ?(amount = Tez.fifty_cents) ~balance
     ~(program : Michelson_v1_parser.parsed)
     ~(storage : Michelson_v1_parser.parsed)
-    ~(input : Michelson_v1_parser.parsed) ?source ?payer ?gas ?entrypoint () =
+    ~(input : Michelson_v1_parser.parsed)
+    ~(unparsing_mode : Script_ir_translator.unparsing_mode) ?source ?payer ?gas
+    ?entrypoint () =
   Chain_services.chain_id cctxt ~chain ()
   >>=? fun chain_id ->
-  Alpha_services.Helpers.Scripts.trace_code
+  Filter.RPC.trace_code_normalized
     cctxt
     (chain, block)
     ?gas
@@ -142,6 +147,7 @@ let trace (cctxt : #Protocol_client_context.rpc_context)
     ~chain_id
     ~source
     ~payer
+    ~unparsing_mode
 
 let typecheck_data cctxt ~(chain : Chain_services.chain) ~block ?gas ?legacy
     ~(data : Michelson_v1_parser.parsed) ~(ty : Michelson_v1_parser.parsed) ()

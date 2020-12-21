@@ -220,7 +220,7 @@ let commands () =
     command
       ~group
       ~desc:"Ask the node to run a script."
-      (args8
+      (args9
          trace_stack_switch
          amount_arg
          balance_arg
@@ -228,7 +228,8 @@ let commands () =
          payer_arg
          no_print_source_flag
          custom_gas_flag
-         entrypoint_arg)
+         entrypoint_arg
+         unparsing_mode_arg)
       ( prefixes ["run"; "script"]
       @@ Program.source_param
       @@ prefixes ["on"; "storage"]
@@ -243,13 +244,17 @@ let commands () =
              payer,
              no_print_source,
              gas,
-             entrypoint )
+             entrypoint,
+             unparsing_mode )
            program
            storage
            input
            cctxt ->
         let source = Option.map snd source in
         let payer = Option.map snd payer in
+        let unparsing_mode =
+          Option.value ~default:Script_ir_translator.Readable unparsing_mode
+        in
         Lwt.return @@ Micheline_parser.no_parsing_error program
         >>=? fun program ->
         let show_source = not no_print_source in
@@ -263,6 +268,7 @@ let commands () =
             ~program
             ~storage
             ~input
+            ~unparsing_mode
             ?source
             ?payer
             ?gas
@@ -280,6 +286,7 @@ let commands () =
             ~program
             ~storage
             ~input
+            ~unparsing_mode
             ?source
             ?payer
             ?gas
@@ -494,6 +501,37 @@ let commands () =
                  ?parsed:None)
               errs
             >>= fun () -> cctxt#error "ill-typed data expression");
+    command
+      ~group
+      ~desc:"Ask the node to normalize a Michelson script."
+      (args1 unparsing_mode_arg)
+      (prefixes ["normalize"; "script"] @@ Program.source_param @@ stop)
+      (fun unparsing_mode script cctxt ->
+        let unparsing_mode =
+          Option.value ~default:Script_ir_translator.Readable unparsing_mode
+        in
+        match script with
+        | (script, []) ->
+            Filter.RPC.normalize_script
+              cctxt
+              (cctxt#chain, cctxt#block)
+              ~script:script.expanded
+              ~unparsing_mode
+            >>=? fun expr ->
+            cctxt#message "%a" Michelson_v1_printer.print_expr_unwrapped expr
+            >>= fun () -> return_unit
+        | (parsed, errors) ->
+            cctxt#message
+              "%a"
+              (fun ppf () ->
+                Michelson_v1_error_reporter.report_errors
+                  ~details:true
+                  ~parsed
+                  ~show_source:true
+                  ppf
+                  errors)
+              ()
+            >>= fun () -> cctxt#error "syntax error in program");
     command
       ~group
       ~desc:

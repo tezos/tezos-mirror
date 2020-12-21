@@ -8,6 +8,7 @@
             tezos-mockup-registration
             tezos-proxy
             tezos-rpc
+            tezos-filters-008-PtEdoTez
             tezos-signer-backends
             tezos-protocol-008-PtEdoTez-parameters)
  (library_flags (:standard -linkall))
@@ -16,7 +17,8 @@
                    -open Tezos_client_base
                    -open Tezos_protocol_008_PtEdoTez
                    -open Tezos_protocol_008_PtEdoTez_parameters
-                   -open Tezos_rpc)))
+                   -open Tezos_rpc
+                   -open Tezos_filters_008_PtEdoTez)))
 
 (rule
  (alias runtest_lint)
