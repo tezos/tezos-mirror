@@ -16,6 +16,7 @@
     "apply.ml",
     "contract_hash.ml",
     "contract_repr.ml",
+    "helpers_services.ml",
     "lazy_storage_diff.ml",
     "lazy_storage_kind.ml",
     "level_repr.ml",
