@@ -68,9 +68,6 @@
             (select void_for_linking-008-PtEdoTez from
               (tezos-embedded-protocol-008-PtEdoTez -> void_for_linking-008-PtEdoTez.empty)
               (-> void_for_linking-008-PtEdoTez.empty))
-            (select void_for_linking-006-PsCARTHA-mempool from
-              (tezos-mempool-006-PsCARTHA -> void_for_linking-006-PsCARTHA-mempool.empty)
-              (-> void_for_linking-006-PsCARTHA-mempool.empty))
             (select void_for_linking-007-PsDELPH1-mempool from
               (tezos-mempool-007-PsDELPH1 -> void_for_linking-007-PsDELPH1-mempool.empty)
               (-> void_for_linking-007-PsDELPH1-mempool.empty))
