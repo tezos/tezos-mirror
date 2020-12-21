@@ -2,26 +2,31 @@
 ;; are expected to be ignored.
 (rule
  (alias runtest)
+ (package tezos-tooling)
  (deps test_well_formatted.ml)
  (action (run %{lib:tezos-tooling:lint.sh} %{deps})))
 
 (rule
  (alias runtest)
+ (package tezos-tooling)
  (deps test_well_formatted.mli)
  (action (run %{lib:tezos-tooling:lint.sh} %{deps})))
 
 (rule
  (alias runtest)
+ (package tezos-tooling)
  (deps test.pp.mli)
  (action (run %{lib:tezos-tooling:lint.sh} %{deps})))
 
 (rule
  (alias runtest)
+ (package tezos-tooling)
  (deps test.pp.ml)
  (action (run %{lib:tezos-tooling:lint.sh} %{deps})))
 
 (rule
  (alias runtest)
+ (package tezos-tooling)
  (deps test_well_formatted.ml test_well_formatted.mli test.pp.mli test.pp.ml)
  (action (run %{lib:tezos-tooling:lint.sh} %{deps})))
 
@@ -29,10 +34,12 @@
 ;; with the exit code 1.
 (rule
  (alias runtest)
+ (package tezos-tooling)
  (deps test_not_well_formatted.ml)
  (action (with-accepted-exit-codes 1 (run %{lib:tezos-tooling:lint.sh} %{deps}))))
 
 (rule
  (alias runtest)
+ (package tezos-tooling)
  (deps test_not_well_formatted.mli)
  (action (with-accepted-exit-codes 1 (run %{lib:tezos-tooling:lint.sh} %{deps}))))
