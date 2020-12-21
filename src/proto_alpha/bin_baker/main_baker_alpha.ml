@@ -47,6 +47,6 @@ let select_commands _ _ =
    parameters files are there at the start and avoid failing much later while
    validating an operation. Plus paying this cost upfront means that the first
    validation will not be more expensive. *)
-let () = Sapling.Core.Validator.init_params ()
+let () = Tezos_sapling.Core.Validator.init_params ()
 
 let () = Client_main_run.run (module Client_config) ~select_commands

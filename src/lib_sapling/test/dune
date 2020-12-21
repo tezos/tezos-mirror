@@ -1,15 +1,15 @@
 (tests
- (package sapling)
+ (package tezos-sapling)
  (names test_rustzcash
         test_keys
         test_merkle
         test_sapling)
  (deps vectors.csv vectors-zip32.csv)
- (libraries sapling
+ (libraries tezos-sapling
             str
             tezos-stdlib-unix
             alcotest-lwt)
- (flags (:standard -open Sapling
+ (flags (:standard -open Tezos_sapling
                    -open Tezos_crypto
                    -open Tezos_stdlib
                    -open Data_encoding)))

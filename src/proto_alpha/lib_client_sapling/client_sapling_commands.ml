@@ -22,7 +22,7 @@
 
 open Clic
 open Client_keys
-open Sapling.Core.Client
+open Tezos_sapling.Core.Client
 
 let json_switch = switch ~long:"json" ~doc:"Use JSON format" ()
 

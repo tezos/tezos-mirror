@@ -104,7 +104,7 @@ let commands =
    validating an operation. Plus paying this cost upfront means that the first
    validation will not be more expensive. *)
 let () =
-  try Sapling.Core.Validator.init_params ()
+  try Tezos_sapling.Core.Validator.init_params ()
   with exn ->
     Printf.eprintf
       "Failed to initialize Zcash parameters: %s"

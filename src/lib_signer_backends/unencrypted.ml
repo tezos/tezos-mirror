@@ -48,7 +48,9 @@ let make_sk sk =
 
 let make_sapling_key sk =
   let path =
-    Base58.simple_encode Sapling.Core.Wallet.Spending_key.b58check_encoding sk
+    Base58.simple_encode
+      Tezos_sapling.Core.Wallet.Spending_key.b58check_encoding
+      sk
   in
   Client_keys.make_sapling_uri (Uri.make ~scheme ~path ())
 

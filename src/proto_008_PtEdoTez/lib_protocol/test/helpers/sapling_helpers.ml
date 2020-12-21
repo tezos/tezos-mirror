@@ -68,15 +68,16 @@ module Common = struct
     Data_encoding.Binary.(of_bytes_exn encoding bytes)
 
   type wallet = {
-    sk : Sapling.Core.Wallet.Spending_key.t;
-    vk : Sapling.Core.Wallet.Viewing_key.t;
+    sk : Tezos_sapling.Core.Wallet.Spending_key.t;
+    vk : Tezos_sapling.Core.Wallet.Viewing_key.t;
   }
 
   let wallet_gen () =
     let sk =
-      Sapling.Core.Wallet.Spending_key.of_seed (Tezos_crypto.Hacl.Rand.gen 32)
+      Tezos_sapling.Core.Wallet.Spending_key.of_seed
+        (Tezos_crypto.Hacl.Rand.gen 32)
     in
-    let vk = Sapling.Core.Wallet.Viewing_key.of_sk sk in
+    let vk = Tezos_sapling.Core.Wallet.Viewing_key.of_sk sk in
     {sk; vk}
 
   let gen_addr n vk =
@@ -84,31 +85,33 @@ module Common = struct
       if Compare.Int.( <= ) n 0 then res
       else
         let (new_index, new_addr) =
-          Sapling.Core.Client.Viewing_key.new_address vk index
+          Tezos_sapling.Core.Client.Viewing_key.new_address vk index
         in
         aux (n - 1) new_index (new_addr :: res)
     in
-    aux n Sapling.Core.Client.Viewing_key.default_index []
+    aux n Tezos_sapling.Core.Client.Viewing_key.default_index []
 
   let gen_nf () =
     let {vk; _} = wallet_gen () in
     let addr =
-      snd @@ Sapling.Core.Wallet.Viewing_key.(new_address vk default_index)
+      snd
+      @@ Tezos_sapling.Core.Wallet.Viewing_key.(new_address vk default_index)
     in
     let amount = 10L in
-    let rcm = Sapling.Core.Client.Rcm.random () in
+    let rcm = Tezos_sapling.Core.Client.Rcm.random () in
     let position = 10L in
-    Sapling.Core.Client.Nullifier.compute addr vk ~amount rcm ~position
+    Tezos_sapling.Core.Client.Nullifier.compute addr vk ~amount rcm ~position
     |> TzOption.unopt_assert ~loc:__POS__
 
   let gen_cm_cipher ~memo_size () =
-    let open Sapling.Core.Client in
+    let open Tezos_sapling.Core.Client in
     let {vk; _} = wallet_gen () in
     let addr =
-      snd @@ Sapling.Core.Wallet.Viewing_key.(new_address vk default_index)
+      snd
+      @@ Tezos_sapling.Core.Wallet.Viewing_key.(new_address vk default_index)
     in
     let amount = 10L in
-    let rcm = Sapling.Core.Client.Rcm.random () in
+    let rcm = Tezos_sapling.Core.Client.Rcm.random () in
     let cm =
       Commitment.compute addr ~amount rcm |> TzOption.unopt_assert ~loc:__POS__
     in
@@ -132,13 +135,13 @@ module Common = struct
   let client_state_of_diff ~memo_size (root, diff) =
     let open Alpha_context.Sapling in
     let cs =
-      Sapling.Storage.add
-        (Sapling.Storage.empty ~memo_size)
+      Tezos_sapling.Storage.add
+        (Tezos_sapling.Storage.empty ~memo_size)
         diff.commitments_and_ciphertexts
     in
-    assert (Sapling.Storage.get_root cs = root) ;
+    assert (Tezos_sapling.Storage.get_root cs = root) ;
     List.fold_left
-      (fun s nf -> Sapling.Storage.add_nullifier s nf)
+      (fun s nf -> Tezos_sapling.Storage.add_nullifier s nf)
       cs
       diff.nullifiers
 end
@@ -231,29 +234,32 @@ module Alpha_context_helpers = struct
         >|=? fun ctx -> Some (ctx, id)
 
   let transfer_inputs_outputs w cs is =
-    (* Sapling.Storage.size cs *)
+    (* Tezos_sapling.Storage.size cs *)
     (*   |> fun (a, b) -> *)
     (*   Printf.printf "%Ld %Ld" a b ; *)
     let inputs =
       List.map
         (fun i ->
-          Sapling.Forge.Input.get cs (Int64.of_int i) w.vk
+          Tezos_sapling.Forge.Input.get cs (Int64.of_int i) w.vk
           |> Option.unopt_assert ~loc:__POS__
           |> snd)
         is
     in
     let addr =
-      snd @@ Sapling.Core.Wallet.Viewing_key.(new_address w.vk default_index)
+      snd
+      @@ Tezos_sapling.Core.Wallet.Viewing_key.(new_address w.vk default_index)
     in
-    let memo_size = Sapling.Storage.get_memo_size cs in
-    let o = Sapling.Forge.make_output addr 1000000L (Bytes.create memo_size) in
+    let memo_size = Tezos_sapling.Storage.get_memo_size cs in
+    let o =
+      Tezos_sapling.Forge.make_output addr 1000000L (Bytes.create memo_size)
+    in
     (inputs, [o])
 
   let transfer w cs is =
     let anti_replay = "anti-replay" in
     let (ins, outs) = transfer_inputs_outputs w cs is in
     (* change the wallet of this last line *)
-    Sapling.Forge.forge_transaction ins outs w.sk anti_replay cs
+    Tezos_sapling.Forge.forge_transaction ins outs w.sk anti_replay cs
 
   let client_state_alpha ctx id =
     Alpha_context.Sapling.get_diff ctx id ()
@@ -345,21 +351,31 @@ module Interpreter_helpers = struct
     (dst, b, anti_replay)
 
   let hex_shield ~memo_size wallet anti_replay =
-    let ps = Sapling.Storage.empty ~memo_size in
+    let ps = Tezos_sapling.Storage.empty ~memo_size in
     let addr =
       snd
-      @@ Sapling.Core.Wallet.Viewing_key.(new_address wallet.vk default_index)
+      @@ Tezos_sapling.Core.Wallet.Viewing_key.(
+           new_address wallet.vk default_index)
     in
-    let output = Sapling.Forge.make_output addr 15L (Bytes.create memo_size) in
+    let output =
+      Tezos_sapling.Forge.make_output addr 15L (Bytes.create memo_size)
+    in
     let pt =
-      Sapling.Forge.forge_transaction [] [output] wallet.sk anti_replay ps
+      Tezos_sapling.Forge.forge_transaction
+        []
+        [output]
+        wallet.sk
+        anti_replay
+        ps
     in
     let hex_string =
       "0x"
       ^ Hex.show
           (Hex.of_bytes
              Data_encoding.Binary.(
-               to_bytes_exn Sapling.Core.Client.UTXO.transaction_encoding pt))
+               to_bytes_exn
+                 Tezos_sapling.Core.Client.UTXO.transaction_encoding
+                 pt))
     in
     hex_string
 
@@ -393,16 +409,16 @@ module Interpreter_helpers = struct
 
   (* Returns a list of printed shield transactions and their total amount. *)
   let shield ~memo_size sk number_transac vk printer anti_replay =
-    let state = Sapling.Storage.empty ~memo_size in
+    let state = Tezos_sapling.Storage.empty ~memo_size in
     let rec aux number_transac number_outputs index amount_output total res =
       if Compare.Int.(number_transac <= 0) then (res, total)
       else
         let (new_index, new_addr) =
-          Sapling.Core.Wallet.Viewing_key.(new_address vk index)
+          Tezos_sapling.Core.Wallet.Viewing_key.(new_address vk index)
         in
         let outputs =
           List.init ~when_negative_length:() number_outputs (fun _ ->
-              Sapling.Forge.make_output
+              Tezos_sapling.Forge.make_output
                 new_addr
                 amount_output
                 (Bytes.create memo_size))
@@ -414,7 +430,7 @@ module Interpreter_helpers = struct
         in
         let tr_hex =
           to_hex
-            (Sapling.Forge.forge_transaction
+            (Tezos_sapling.Forge.forge_transaction
                ~number_dummy_inputs:0
                ~number_dummy_outputs:0
                []
@@ -422,7 +438,7 @@ module Interpreter_helpers = struct
                sk
                anti_replay
                state)
-            Sapling.Core.Client.UTXO.transaction_encoding
+            Tezos_sapling.Core.Client.UTXO.transaction_encoding
         in
         aux
           (number_transac - 1)
@@ -432,7 +448,13 @@ module Interpreter_helpers = struct
           (total + (number_outputs * Int64.to_int amount_output))
           (printer tr_hex :: res)
     in
-    aux number_transac 2 Sapling.Core.Wallet.Viewing_key.default_index 20L 0 []
+    aux
+      number_transac
+      2
+      Tezos_sapling.Core.Wallet.Viewing_key.default_index
+      20L
+      0
+      []
 
   (* This fails if the operation is not correct wrt the block *)
   let next_block block operation =

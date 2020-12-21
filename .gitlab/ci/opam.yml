@@ -71,11 +71,6 @@ opam:pyml-plot:
   variables:
     package: pyml-plot
 
-opam:sapling:
-  extends: .opam_template
-  variables:
-    package: sapling
-
 opam:staTz:
   extends: .opam_template
   variables:
@@ -710,6 +705,11 @@ opam:tezos-rpc-http-server:
   extends: .opam_template
   variables:
     package: tezos-rpc-http-server
+
+opam:tezos-sapling:
+  extends: .opam_template
+  variables:
+    package: tezos-sapling
 
 opam:tezos-shell:
   extends: .opam_template

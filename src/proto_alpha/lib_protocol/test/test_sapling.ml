@@ -42,7 +42,7 @@ module Raw_context_tests = struct
       ~fitness:b.header.shell.fitness
     >>= wrap
     >>=? fun ctx ->
-    let module H = Sapling.Core.Client.Hash in
+    let module H = Tezos_sapling.Core.Client.Hash in
     let cm = H.uncommitted ~height:0 in
     let expected_root = H.uncommitted ~height:32 in
     Lazy_storage_diff.fresh
@@ -319,7 +319,7 @@ module Raw_context_tests = struct
      Then it adds 10 at the same level and check that only the last one is
      stored. *)
   let root_test () =
-    let open Sapling.Core in
+    let open Tezos_sapling.Core in
     let gen_root () =
       Data_encoding.Binary.of_bytes_exn
         Validator.Hash.encoding
@@ -445,12 +445,13 @@ module Alpha_context_tests = struct
     init ()
     >>=? fun ctx ->
     let sk =
-      Sapling.Core.Wallet.Spending_key.of_seed (Tezos_crypto.Hacl.Rand.gen 32)
+      Tezos_sapling.Core.Wallet.Spending_key.of_seed
+        (Tezos_crypto.Hacl.Rand.gen 32)
     in
     let vt =
-      let ps = Sapling.Storage.empty ~memo_size:0 in
+      let ps = Tezos_sapling.Storage.empty ~memo_size:0 in
       (* the dummy output will have memo_size 0 *)
-      Sapling.Forge.forge_transaction
+      Tezos_sapling.Forge.forge_transaction
         ~number_dummy_outputs:1
         []
         []
@@ -470,7 +471,7 @@ module Alpha_context_tests = struct
     let rounds = 5 in
     Printf.printf "\nrounds: %d\n" rounds ;
     let w = wallet_gen () in
-    let cs = Sapling.Storage.empty ~memo_size:8 in
+    let cs = Tezos_sapling.Storage.empty ~memo_size:8 in
     (* one verify_update to get the id *)
     let vt = transfer w cs [] in
     verify_update ctx vt |> assert_some
@@ -512,7 +513,7 @@ module Alpha_context_tests = struct
     >>=? fun ctx ->
     let rounds = 5 in
     let w = wallet_gen () in
-    let cs = Sapling.Storage.empty ~memo_size:8 in
+    let cs = Tezos_sapling.Storage.empty ~memo_size:8 in
     (* one verify_update to get the id *)
     let vt = transfer w cs [] in
     verify_update ctx vt |> assert_some
@@ -542,7 +543,7 @@ module Alpha_context_tests = struct
     init ()
     >>=? fun ctx ->
     let w = wallet_gen () in
-    let cs = Sapling.Storage.empty ~memo_size:8 in
+    let cs = Tezos_sapling.Storage.empty ~memo_size:8 in
     (* one verify_update to get the id *)
     let vt = transfer w cs [] in
     verify_update ctx vt |> assert_some
@@ -559,7 +560,7 @@ module Alpha_context_tests = struct
     init ()
     >>=? fun ctx ->
     let w = wallet_gen () in
-    let cs = Sapling.Storage.empty ~memo_size:8 in
+    let cs = Tezos_sapling.Storage.empty ~memo_size:8 in
     let vt = transfer w cs [] in
     verify_update ctx vt |> assert_some
     >>=? fun (ctx, id) ->
@@ -568,23 +569,24 @@ module Alpha_context_tests = struct
     let vt = transfer w cs [0] in
     (* fails sig check because of wrong balance *)
     let vt_broken =
-      Sapling.Core.Validator.UTXO.{vt with balance = Int64.(succ vt.balance)}
+      Tezos_sapling.Core.Validator.UTXO.
+        {vt with balance = Int64.(succ vt.balance)}
     in
     verify_update ctx ~id vt_broken
     |> assert_none
     >>=? fun () ->
     (* randomize one output to fail check outputs *)
     (* don't randomize the ciphertext as it is not part of the proof *)
-    let open Sapling.Core.Client.UTXO in
+    let open Tezos_sapling.Core.Client.UTXO in
     let o = Option.get @@ List.hd vt.outputs in
     let o_wrong_cm =
       {
         o with
-        cm = randomized_byte o.cm Sapling.Core.Client.Commitment.encoding;
+        cm = randomized_byte o.cm Tezos_sapling.Core.Client.Commitment.encoding;
       }
     in
     let vt_broken =
-      Sapling.Core.Validator.UTXO.{vt with outputs = [o_wrong_cm]}
+      Tezos_sapling.Core.Validator.UTXO.{vt with outputs = [o_wrong_cm]}
     in
     verify_update ctx ~id vt_broken
     |> assert_none
@@ -598,11 +600,11 @@ module Alpha_context_tests = struct
           randomized_byte
             ~pos
             o.ciphertext
-            Sapling.Core.Client.Ciphertext.encoding;
+            Tezos_sapling.Core.Client.Ciphertext.encoding;
       }
     in
     let vt_broken =
-      Sapling.Core.Validator.UTXO.{vt with outputs = [o_wrong_cv]}
+      Tezos_sapling.Core.Validator.UTXO.{vt with outputs = [o_wrong_cv]}
     in
     verify_update ctx ~id vt_broken |> assert_none
 
@@ -610,7 +612,7 @@ module Alpha_context_tests = struct
     init ()
     >>=? fun ctx ->
     let w = wallet_gen () in
-    let cs = Sapling.Storage.empty ~memo_size:8 in
+    let cs = Tezos_sapling.Storage.empty ~memo_size:8 in
     (* generate the first storage *)
     let vt = transfer w cs [] in
     verify_update ctx vt |> assert_some
@@ -631,13 +633,15 @@ module Alpha_context_tests = struct
     >>=? fun () ->
     (* Swap the root so that it passes the root_mem check but fails
      the input check *)
-    let vt1_broken = Sapling.Core.Validator.UTXO.{vt2 with root = vt1.root} in
+    let vt1_broken =
+      Tezos_sapling.Core.Validator.UTXO.{vt2 with root = vt1.root}
+    in
     verify_update ctx ~id:id1 vt1_broken
     |> assert_none
     >>=? fun () ->
     (* fail the sig check *)
     let vt1_broken =
-      Sapling.Core.Validator.UTXO.{vt1 with outputs = vt2.outputs}
+      Tezos_sapling.Core.Validator.UTXO.{vt1 with outputs = vt2.outputs}
     in
     verify_update ctx ~id:id1 vt1_broken |> assert_none
 end
@@ -702,7 +706,7 @@ module Interpreter_tests = struct
           let pos = Int64.of_int pos_int in
           let forge_input =
             snd
-              ( Sapling.Forge.Input.get state pos wa.vk
+              ( Tezos_sapling.Forge.Input.get state pos wa.vk
               |> Option.unopt_assert ~loc:__POS__ )
           in
           forge_input)
@@ -714,12 +718,12 @@ module Interpreter_tests = struct
     in
     let list_forge_output =
       List.map
-        (fun addr -> Sapling.Forge.make_output addr 1L (Bytes.create 8))
+        (fun addr -> Tezos_sapling.Forge.make_output addr 1L (Bytes.create 8))
         list_addr
     in
     let hex_transac =
       to_hex
-        (Sapling.Forge.forge_transaction
+        (Tezos_sapling.Forge.forge_transaction
            ~number_dummy_inputs:0
            ~number_dummy_outputs:0
            list_forge_input
@@ -727,7 +731,7 @@ module Interpreter_tests = struct
            wa.sk
            anti_replay
            state)
-        Sapling.Core.Client.UTXO.transaction_encoding
+        Tezos_sapling.Core.Client.UTXO.transaction_encoding
     in
     let hex_pkh =
       to_hex
@@ -759,7 +763,7 @@ module Interpreter_tests = struct
           let pos = Int64.of_int (i + 14 + 14) in
           let forge_input =
             snd
-              ( Sapling.Forge.Input.get state pos wb.vk
+              ( Tezos_sapling.Forge.Input.get state pos wb.vk
               |> Option.unopt_assert ~loc:__POS__ )
           in
           forge_input)
@@ -771,14 +775,14 @@ module Interpreter_tests = struct
     in
     let addr_a =
       snd
-      @@ Sapling.Core.Client.Viewing_key.new_address
+      @@ Tezos_sapling.Core.Client.Viewing_key.new_address
            wa.vk
-           Sapling.Core.Client.Viewing_key.default_index
+           Tezos_sapling.Core.Client.Viewing_key.default_index
     in
-    let output = Sapling.Forge.make_output addr_a 15L (Bytes.create 8) in
+    let output = Tezos_sapling.Forge.make_output addr_a 15L (Bytes.create 8) in
     let hex_transac =
       to_hex
-        (Sapling.Forge.forge_transaction
+        (Tezos_sapling.Forge.forge_transaction
            ~number_dummy_inputs:2
            ~number_dummy_outputs:2
            list_forge_input
@@ -786,7 +790,7 @@ module Interpreter_tests = struct
            wb.sk
            anti_replay
            state)
-        Sapling.Core.Client.UTXO.transaction_encoding
+        Tezos_sapling.Core.Client.UTXO.transaction_encoding
     in
     let string = Format.sprintf "{Pair 0x%s None }" hex_transac in
     let parameters =
@@ -905,23 +909,24 @@ module Interpreter_tests = struct
     in
     transac_and_sync ~memo_size block_start parameters_1 15 src dst baker
     >>=? fun (block_1, _ctx, state) ->
-    let intermediary_root = Sapling.Storage.get_root state in
+    let intermediary_root = Tezos_sapling.Storage.get_root state in
     let addr =
-      snd @@ Sapling.Core.Wallet.Viewing_key.(new_address vk default_index)
+      snd
+      @@ Tezos_sapling.Core.Wallet.Viewing_key.(new_address vk default_index)
     in
-    let output = Sapling.Forge.make_output addr 15L (Bytes.create 8) in
+    let output = Tezos_sapling.Forge.make_output addr 15L (Bytes.create 8) in
     let hex_transac_2 =
       "0x"
       ^ to_hex
-          (Sapling.Forge.forge_transaction
+          (Tezos_sapling.Forge.forge_transaction
              [ snd
-                 ( Sapling.Forge.Input.get state 0L vk
+                 ( Tezos_sapling.Forge.Input.get state 0L vk
                  |> Option.unopt_assert ~loc:__POS__ ) ]
              [output]
              sk
              anti_replay
              state)
-          Sapling.Core.Client.UTXO.transaction_encoding
+          Tezos_sapling.Core.Client.UTXO.transaction_encoding
     in
     let string_2 = Format.sprintf "{Pair %s None }" hex_transac_2 in
     let parameters_2 =
@@ -929,7 +934,7 @@ module Interpreter_tests = struct
     in
     transac_and_sync ~memo_size block_1 parameters_2 0 src dst baker
     >>=? fun (block_1, _ctx, state_1) ->
-    let final_root = Sapling.Storage.get_root state_1 in
+    let final_root = Tezos_sapling.Storage.get_root state_1 in
     Alpha_services.Contract.single_sapling_get_diff
       Block.rpc_ctxt
       block_1
@@ -1154,10 +1159,10 @@ module Interpreter_tests = struct
     local_state_from_disk state_2 ctx
     >|=? fun state_2 ->
     (* we check that first state contains 15 to addr_1 but not 15 to addr_2*)
-    assert (Option.is_some @@ Sapling.Forge.Input.get state_1 0L wa.vk) ;
-    assert (Option.is_some @@ Sapling.Forge.Input.get state_2 0L wa.vk) ;
-    assert (Option.is_none @@ Sapling.Forge.Input.get state_1 0L wb.vk) ;
-    assert (Option.is_none @@ Sapling.Forge.Input.get state_2 0L wb.vk)
+    assert (Option.is_some @@ Tezos_sapling.Forge.Input.get state_1 0L wa.vk) ;
+    assert (Option.is_some @@ Tezos_sapling.Forge.Input.get state_2 0L wa.vk) ;
+    assert (Option.is_none @@ Tezos_sapling.Forge.Input.get state_1 0L wb.vk) ;
+    assert (Option.is_none @@ Tezos_sapling.Forge.Input.get state_2 0L wb.vk)
 
   let test_state_as_arg () =
     init ()

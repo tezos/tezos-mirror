@@ -2,7 +2,7 @@
  (name tezos_protocol_environment)
  (public_name tezos-protocol-environment)
  (libraries tezos-base
-            sapling
+            tezos-sapling
             tezos-protocol-environment-sigs
             tezos-protocol-environment-structs
             tezos-micheline)

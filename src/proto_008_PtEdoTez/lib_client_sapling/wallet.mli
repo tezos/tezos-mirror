@@ -20,7 +20,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE. *)
 
-open Sapling.Core.Client
+open Tezos_sapling.Core.Client
 
 (** Mnemonic of 24 common english words from which a key can be derived.
     The mnemonic follows the BIP-39 spec. *)

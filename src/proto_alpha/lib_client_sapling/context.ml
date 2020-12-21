@@ -20,7 +20,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE. *)
 
-open Sapling.Core.Client
+open Tezos_sapling.Core.Client
 
 let _ = Random.self_init ()
 
@@ -158,8 +158,8 @@ let () =
       | Balance_too_low (balance, amount) -> Some (balance, amount) | _ -> None)
     (fun (balance, amount) -> Balance_too_low (balance, amount))
 
-module Storage = Sapling.Storage
-module F = Sapling.Forge
+module Storage = Tezos_sapling.Storage
+module F = Tezos_sapling.Forge
 
 module Input_set = struct
   include Set.Make (F.Input)
@@ -350,7 +350,7 @@ module Contract_state = struct
   let update_storage contract_state (root, diff) =
     let open Protocol.Alpha_context.Sapling in
     let storage =
-      Sapling.Storage.add
+      Tezos_sapling.Storage.add
         contract_state.storage
         diff.commitments_and_ciphertexts
     in
