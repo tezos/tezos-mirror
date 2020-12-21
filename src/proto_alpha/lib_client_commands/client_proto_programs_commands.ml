@@ -460,6 +460,42 @@ let commands () =
             >>= fun () -> return_unit);
     command
       ~group
+      ~desc:"Ask the node to normalize a data expression."
+      (args2 unparsing_mode_arg legacy_switch)
+      ( prefixes ["normalize"; "data"]
+      @@ param
+           ~name:"data"
+           ~desc:"the data expression to normalize"
+           data_parameter
+      @@ prefixes ["of"; "type"]
+      @@ param ~name:"type" ~desc:"type of the data expression" data_parameter
+      @@ stop )
+      (fun (unparsing_mode, legacy) data typ cctxt ->
+        let unparsing_mode =
+          Option.value ~default:Script_ir_translator.Readable unparsing_mode
+        in
+        Filter.RPC.normalize_data
+          cctxt
+          (cctxt#chain, cctxt#block)
+          ~legacy
+          ~data:data.expanded
+          ~ty:typ.expanded
+          ~unparsing_mode
+        >>= function
+        | Ok expr ->
+            cctxt#message "%a" Michelson_v1_printer.print_expr_unwrapped expr
+            >>= fun () -> return_unit
+        | Error errs ->
+            cctxt#warning
+              "%a"
+              (Michelson_v1_error_reporter.report_errors
+                 ~details:false
+                 ~show_source:false
+                 ?parsed:None)
+              errs
+            >>= fun () -> cctxt#error "ill-typed data expression");
+    command
+      ~group
       ~desc:
         "Sign a raw sequence of bytes and display it using the format \
          expected by Michelson instruction `CHECK_SIGNATURE`."

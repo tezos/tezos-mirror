@@ -11,7 +11,8 @@
             tezos-mockup-commands
             tezos-client-alpha
             tezos-client-commands
-            tezos-rpc)
+            tezos-rpc
+            tezos-filters-alpha)
  (library_flags (:standard -linkall))
  (modules (:standard \ alpha_commands_registration))
  (flags (:standard -open Tezos_base__TzPervasives
@@ -21,7 +22,8 @@
                    -open Tezos_client_base
                    -open Tezos_client_alpha
                    -open Tezos_client_commands
-                   -open Tezos_rpc)))
+                   -open Tezos_rpc
+                   -open Tezos_filters_alpha)))
 
 (library
  (name tezos_client_alpha_commands_registration)
@@ -35,7 +37,8 @@
             tezos-client-commands
             tezos-client-alpha-commands
             tezos-client-sapling-alpha
-            tezos-rpc)
+            tezos-rpc
+            tezos-filters-alpha)
  (library_flags (:standard -linkall))
  (modules alpha_commands_registration)
  (flags (:standard -open Tezos_base__TzPervasives
@@ -46,7 +49,8 @@
                    -open Tezos_client_commands
                    -open Tezos_client_alpha_commands
                    -open Tezos_client_sapling_alpha
-                   -open Tezos_rpc)))
+                   -open Tezos_rpc
+                   -open Tezos_filters_alpha)))
 
 (rule
  (alias runtest_lint)

@@ -468,6 +468,30 @@ let signature_parameter =
       | None ->
           failwith "Not given a valid signature")
 
+let unparsing_mode_parameter =
+  parameter
+    ~autocomplete:(fun _cctxt ->
+      return ["Readable"; "Optimized"; "Optimized_legacy"])
+    (fun _cctxt s ->
+      match s with
+      | "Readable" ->
+          return Script_ir_translator.Readable
+      | "Optimized" ->
+          return Script_ir_translator.Optimized
+      | "Optimized_legacy" ->
+          return Script_ir_translator.Optimized_legacy
+      | _ ->
+          failwith "Unknown unparsing mode %s" s)
+
+let unparsing_mode_arg =
+  arg
+    ~long:"unparsing-mode"
+    ~placeholder:"mode"
+    ~doc:
+      "Unparsing mode to use, one of \"Readable\", \"Optimized\", or \
+       \"Optimized_legacy\"."
+    unparsing_mode_parameter
+
 module Daemon = struct
   let baking_switch =
     switch ~long:"baking" ~short:'B' ~doc:"run the baking daemon" ()
