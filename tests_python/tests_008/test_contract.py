@@ -1370,3 +1370,20 @@ class TestSelfAddressTransfer:
             ['--arg', f'"{receiver_address}"', '--burn-cap', '2'],
         )
         client.bake('bootstrap5', BAKE_ARGS)
+
+
+@pytest.mark.contract
+@pytest.mark.regression
+class TestNormalize:
+    """Regression tests for the "normalize data" command."""
+
+    def test_normalize(self, client_regtest_scrubbed):
+        client = client_regtest_scrubbed
+        input_data = (
+            '{Pair 0 3 6 9; Pair 1 (Pair 4 (Pair 7 10)); {2; 5; 8; 11}}'
+        )
+        input_type = 'list (pair nat nat nat nat)'
+        client.normalize(input_data, input_type)
+        client.normalize(input_data, input_type, 'Readable')
+        client.normalize(input_data, input_type, 'Optimized')
+        client.normalize(input_data, input_type, 'Optimized_legacy')
