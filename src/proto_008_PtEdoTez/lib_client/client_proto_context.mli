@@ -53,6 +53,7 @@ val get_big_map_value :
   block:Shell_services.block ->
   Big_map.Id.t ->
   Script_expr_hash.t ->
+  unparsing_mode:Script_ir_translator.unparsing_mode ->
   Script.expr tzresult Lwt.t
 
 val get_script :
