@@ -190,11 +190,11 @@ type sapling_key = {
   (* zip32 derivation path *)
   path : int32 list;
   (* index of the next address to generate *)
-  address_index : Sapling.Core.Client.Viewing_key.index;
+  address_index : Tezos_sapling.Core.Client.Viewing_key.index;
 }
 
 module Sapling_key = Client_aliases.Alias (struct
-  module S = Sapling.Core.Client
+  module S = Tezos_sapling.Core.Client
 
   let name = "sapling_key"
 

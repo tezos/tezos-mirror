@@ -66,7 +66,7 @@ type sapling_key = {
   (* zip32 derivation path *)
   path : int32 list;
   (* index of the last issued address *)
-  address_index : Sapling.Core.Client.Viewing_key.index;
+  address_index : Tezos_sapling.Core.Client.Viewing_key.index;
 }
 
 module Sapling_key : Client_aliases.Alias with type t = sapling_key

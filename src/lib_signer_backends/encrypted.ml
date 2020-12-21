@@ -268,7 +268,7 @@ module Sapling_raw = struct
     Pbkdf.SHA512.pbkdf2 ~count:32768 ~dk_len:32l ~salt ~password
 
   let encrypt ~password msg =
-    let msg = Sapling.Core.Wallet.Spending_key.to_bytes msg in
+    let msg = Tezos_sapling.Core.Wallet.Spending_key.to_bytes msg in
     let salt = Hacl.Rand.gen salt_len in
     let key = Crypto_box.Secretbox.unsafe_of_bytes (pbkdf ~salt ~password) in
     Bytes.(to_string (cat salt (Crypto_box.Secretbox.secretbox key msg nonce)))
@@ -280,9 +280,9 @@ module Sapling_raw = struct
     let key = Crypto_box.Secretbox.unsafe_of_bytes (pbkdf ~salt ~password) in
     Option.(
       Crypto_box.Secretbox.secretbox_open key encrypted_sk nonce
-      >>= Sapling.Core.Wallet.Spending_key.of_bytes)
+      >>= Tezos_sapling.Core.Wallet.Spending_key.of_bytes)
 
-  type Base58.data += Data of Sapling.Core.Wallet.Spending_key.t
+  type Base58.data += Data of Tezos_sapling.Core.Wallet.Spending_key.t
 
   let encrypted_b58_encoding password =
     Base58.register_encoding
@@ -321,7 +321,7 @@ let decrypt_sapling_key (cctxt : #Client_context.io) (sk_uri : sapling_uri) =
   else
     match
       Base58.simple_decode
-        Sapling.Core.Wallet.Spending_key.b58check_encoding
+        Tezos_sapling.Core.Wallet.Spending_key.b58check_encoding
         payload
     with
     | None ->

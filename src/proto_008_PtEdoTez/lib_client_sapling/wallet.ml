@@ -21,7 +21,7 @@
  * SOFTWARE. *)
 
 open Client_keys
-open Sapling.Core.Client
+open Tezos_sapling.Core.Client
 
 module Mnemonic = struct
   let new_random = Bip39.of_entropy (Hacl.Rand.gen 32)

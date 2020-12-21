@@ -1,5 +1,5 @@
 opam-version: "2.0"
-name: "ocaml-sapling"
+name: "tezos-sapling"
 authors: [ "Nomadic Labs <contact@nomadic-labs.com>" ]
 maintainer: "Nomadic Labs <contact@nomadic-labs.com>"
 synopsis: "OCaml library for the Sapling protocol, using librustzcash"

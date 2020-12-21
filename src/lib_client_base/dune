@@ -3,7 +3,7 @@
  (public_name tezos-client-base)
  (libraries tezos-base
             tezos-shell-services
-            sapling
+            tezos-sapling
             tezos-rpc)
  (modules (:standard bip39_english))
  (library_flags (:standard -linkall))

@@ -78,7 +78,7 @@ module type V1 = sig
        and type (+'m, 'pr, 'p, 'q, 'i, 'o) RPC_service.t =
             ('m, 'pr, 'p, 'q, 'i, 'o) RPC_service.t
        and type Error_monad.shell_error = Error_monad.error
-       and module Sapling = Sapling.Core.Validator
+       and module Sapling = Tezos_sapling.Core.Validator
 
   type error += Ecoproto_error of Error_monad.error
 
@@ -991,7 +991,7 @@ struct
           Lwt.return_ok (Some v)
   end
 
-  module Sapling = Sapling.Core.Validator
+  module Sapling = Tezos_sapling.Core.Validator
 
   module Micheline = struct
     include Micheline

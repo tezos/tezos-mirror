@@ -723,11 +723,6 @@ opam:pyml-plot:
   variables:
     package: pyml-plot
 
-opam:sapling:
-  <<: *opam_definition
-  variables:
-    package: sapling
-
 opam:staTz:
   <<: *opam_definition
   variables:
@@ -1407,6 +1402,11 @@ opam:tezos-rpc-http-server:
   <<: *opam_definition
   variables:
     package: tezos-rpc-http-server
+
+opam:tezos-sapling:
+  <<: *opam_definition
+  variables:
+    package: tezos-sapling
 
 opam:tezos-shell:
   <<: *opam_definition

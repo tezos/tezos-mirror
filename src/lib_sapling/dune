@@ -4,8 +4,8 @@
 (copy_files bindings/{rustzcash_ctypes_c_stubs.c,rustzcash_ctypes_stubs.ml,rustzcash_ctypes_bindings.ml})
 
 (library
- (name sapling)
- (public_name sapling)
+ (name tezos_sapling)
+ (public_name tezos-sapling)
  (libraries ctypes ctypes.foreign ctypes.stubs hex data-encoding tezos-crypto tezos-stdlib tezos-error-monad)
  (foreign_stubs
   (language c)
