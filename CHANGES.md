@@ -12,6 +12,8 @@ here either.
 
 ## Node
 
+- Improved how the node stores buffered messages from peers to consume less memory.
+
 - Enforce loading of non-embedded protocols before starting the node
   allowing the prevalidator to start correctly.
 
