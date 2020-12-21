@@ -1183,21 +1183,6 @@ opam:tezos-mempool-006-PsCARTHA:
   variables:
     package: tezos-mempool-006-PsCARTHA
 
-opam:tezos-mempool-007-PsDELPH1:
-  <<: *opam_definition
-  variables:
-    package: tezos-mempool-007-PsDELPH1
-
-opam:tezos-mempool-008-PtEdoTez:
-  <<: *opam_definition
-  variables:
-    package: tezos-mempool-008-PtEdoTez
-
-opam:tezos-mempool-alpha:
-  <<: *opam_definition
-  variables:
-    package: tezos-mempool-alpha
-
 opam:tezos-micheline:
   <<: *opam_definition
   variables:
@@ -1452,6 +1437,26 @@ opam:tezos-protocol-genesis-carthagenet:
   <<: *opam_definition
   variables:
     package: tezos-protocol-genesis-carthagenet
+
+opam:tezos-protocol-plugin-007-PsDELPH1:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-plugin-007-PsDELPH1
+
+opam:tezos-protocol-plugin-007-PsDELPH1-registerer:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-plugin-007-PsDELPH1-registerer
+
+opam:tezos-protocol-plugin-008-PtEdoTez:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-plugin-008-PtEdoTez
+
+opam:tezos-protocol-plugin-008-PtEdoTez-registerer:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-plugin-008-PtEdoTez-registerer
 
 opam:tezos-protocol-updater:
   <<: *opam_definition
