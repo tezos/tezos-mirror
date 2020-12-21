@@ -16,7 +16,7 @@ def contract_path():
 @pytest.fixture(scope="class")
 def sandbox(sandbox):
     sandbox.add_node(0, params=constants.NODE_PARAMS)
-    utils.activate_alpha(sandbox.client(0))
+    utils.activate_alpha(sandbox.client(0), activate_in_the_past=True)
     return sandbox
 
 
