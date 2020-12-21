@@ -226,6 +226,49 @@ let handle_event node {name; value} =
   | _ ->
       ()
 
+let check_event ?where node name promise =
+  let* result = promise in
+  match result with
+  | None ->
+      raise (Terminated_before_event {daemon = node.name; event = name; where})
+  | Some x ->
+      return x
+
+let wait_for_ready node =
+  match node.status with
+  | Running {session_state = {ready = true; _}; _} ->
+      unit
+  | Not_running | Running {session_state = {ready = false; _}; _} ->
+      let (promise, resolver) = Lwt.task () in
+      node.persistent_state.pending_ready <-
+        resolver :: node.persistent_state.pending_ready ;
+      check_event node "node_is_ready.v0" promise
+
+let wait_for_level node level =
+  match node.status with
+  | Running {session_state = {level = Known current_level; _}; _}
+    when current_level >= level ->
+      return current_level
+  | Not_running | Running _ ->
+      let (promise, resolver) = Lwt.task () in
+      node.persistent_state.pending_level <-
+        (level, resolver) :: node.persistent_state.pending_level ;
+      check_event
+        node
+        "node_chain_validator.v0"
+        ~where:("level >= " ^ string_of_int level)
+        promise
+
+let wait_for_identity node =
+  match node.status with
+  | Running {session_state = {identity = Known identity; _}; _} ->
+      return identity
+  | Not_running | Running _ ->
+      let (promise, resolver) = Lwt.task () in
+      node.persistent_state.pending_identity <-
+        resolver :: node.persistent_state.pending_identity ;
+      check_event node "read_identity.v0" promise
+
 let create ?(path = Constant.tezos_node) ?name ?color ?data_dir ?event_pipe
     ?net_port ?rpc_port arguments =
   let name = match name with None -> fresh_name () | Some name -> name in
@@ -275,6 +318,10 @@ let add_argument node argument =
 let add_peer node peer =
   add_argument node (Peer ("127.0.0.1:" ^ string_of_int (net_port peer)))
 
+let point_and_id node =
+  let* id = wait_for_identity node in
+  Lwt.return ("127.0.0.1:" ^ string_of_int (net_port node) ^ "#" ^ id)
+
 let run node arguments =
   ( match node.status with
   | Not_running ->
@@ -304,49 +351,6 @@ let run node arguments =
     {ready = false; level = Unknown; identity = Unknown}
     arguments
     ~on_terminate
-
-let check_event ?where node name promise =
-  let* result = promise in
-  match result with
-  | None ->
-      raise (Terminated_before_event {daemon = node.name; event = name; where})
-  | Some x ->
-      return x
-
-let wait_for_ready node =
-  match node.status with
-  | Running {session_state = {ready = true; _}; _} ->
-      unit
-  | Not_running | Running {session_state = {ready = false; _}; _} ->
-      let (promise, resolver) = Lwt.task () in
-      node.persistent_state.pending_ready <-
-        resolver :: node.persistent_state.pending_ready ;
-      check_event node "node_is_ready.v0" promise
-
-let wait_for_level node level =
-  match node.status with
-  | Running {session_state = {level = Known current_level; _}; _}
-    when current_level >= level ->
-      return current_level
-  | Not_running | Running _ ->
-      let (promise, resolver) = Lwt.task () in
-      node.persistent_state.pending_level <-
-        (level, resolver) :: node.persistent_state.pending_level ;
-      check_event
-        node
-        "node_chain_validator.v0"
-        ~where:("level >= " ^ string_of_int level)
-        promise
-
-let wait_for_identity node =
-  match node.status with
-  | Running {session_state = {identity = Known identity; _}; _} ->
-      return identity
-  | Not_running | Running _ ->
-      let (promise, resolver) = Lwt.task () in
-      node.persistent_state.pending_identity <-
-        resolver :: node.persistent_state.pending_identity ;
-      check_event node "read_identity.v0" promise
 
 let init ?path ?name ?color ?data_dir ?event_pipe ?net_port ?rpc_port arguments
     =
