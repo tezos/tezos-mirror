@@ -226,6 +226,99 @@ module Mempool = struct
 end
 
 module RPC = struct
-  let rpc_services : Environment.Updater.rpc_context RPC_directory.t =
-    Protocol.rpc_services
+  open Environment
+
+  let path = RPC_path.(open_root / "helpers")
+
+  let unparsing_mode_encoding =
+    let open Data_encoding in
+    union
+      ~tag_size:`Uint8
+      [ case
+          (Tag 0)
+          ~title:"Readable"
+          (constant "Readable")
+          (function
+            | Script_ir_translator.Readable ->
+                Some ()
+            | Script_ir_translator.Optimized
+            | Script_ir_translator.Optimized_legacy ->
+                None)
+          (fun () -> Script_ir_translator.Readable);
+        case
+          (Tag 1)
+          ~title:"Optimized"
+          (constant "Optimized")
+          (function
+            | Script_ir_translator.Optimized ->
+                Some ()
+            | Script_ir_translator.Readable
+            | Script_ir_translator.Optimized_legacy ->
+                None)
+          (fun () -> Script_ir_translator.Optimized);
+        case
+          (Tag 2)
+          ~title:"Optimized_legacy"
+          (constant "Optimized_legacy")
+          (function
+            | Script_ir_translator.Optimized_legacy ->
+                Some ()
+            | Script_ir_translator.Readable | Script_ir_translator.Optimized ->
+                None)
+          (fun () -> Script_ir_translator.Optimized_legacy) ]
+
+  let normalize_data =
+    let open Data_encoding in
+    RPC_service.post_service
+      ~description:
+        "Normalizes some data expression using the requested unparsing mode"
+      ~input:
+        (obj4
+           (req "data" Script.expr_encoding)
+           (req "type" Script.expr_encoding)
+           (req "unparsing_mode" unparsing_mode_encoding)
+           (opt "legacy" bool))
+      ~output:(obj1 (req "normalized" Script.expr_encoding))
+      ~query:RPC_query.empty
+      RPC_path.(path / "normalize_data")
+
+  let rpc_services =
+    let patched_services =
+      let register0_fullctxt s f =
+        RPC_directory.register RPC_directory.empty s (fun ctxt q i ->
+            Services_registration.rpc_init ctxt >>=? fun ctxt -> f ctxt q i)
+      in
+      let register0 s f =
+        register0_fullctxt s (fun {context; _} -> f context)
+      in
+      register0
+        normalize_data
+        (fun ctxt () (expr, typ, unparsing_mode, legacy) ->
+          let open Script_ir_translator in
+          let legacy = Option.value ~default:false legacy in
+          let ctxt = Gas.set_unlimited ctxt in
+          (* Unfortunately, Script_ir_translator.parse_any_ty is not exported *)
+          Script_ir_translator.parse_ty
+            ctxt
+            ~legacy
+            ~allow_lazy_storage:true
+            ~allow_operation:true
+            ~allow_contract:true
+            ~allow_ticket:true
+            (Micheline.root typ)
+          >>?= fun (Ex_ty typ, ctxt) ->
+          parse_data ctxt ~legacy ~allow_forged:true typ (Micheline.root expr)
+          >>=? fun (data, ctxt) ->
+          Script_ir_translator.unparse_data ctxt unparsing_mode typ data
+          >|=? fun (normalized, _ctxt) -> Micheline.strip_locations normalized)
+    in
+    RPC_directory.merge rpc_services patched_services
+
+  let normalize_data ctxt block ?legacy ~data ~ty ~unparsing_mode =
+    RPC_context.make_call0
+      normalize_data
+      ctxt
+      block
+      ()
+      (data, ty, unparsing_mode, legacy)
 end
