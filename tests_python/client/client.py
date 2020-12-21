@@ -414,6 +414,16 @@ class Client:
     def pack(self, data: str, typ: str) -> str:
         return self.hash(data, typ).packed
 
+    def normalize(
+        self, data: str, typ: str, mode: str = None, legacy: bool = False
+    ) -> str:
+        cmd = ['normalize', 'data', data, 'of', 'type', typ]
+        if mode is not None:
+            cmd += ['--unparsing-mode', mode]
+        if legacy:
+            cmd += ['--legacy']
+        return self.run(cmd)
+
     def sign(self, data: str, identity: str) -> str:
         cmd = ['sign', 'bytes', data, 'for', identity]
         return client_output.SignatureResult(self.run(cmd)).sig
