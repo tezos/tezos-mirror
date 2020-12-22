@@ -47,6 +47,10 @@ val init :
 (** Close the index. Does not fail when the context is already closed. *)
 val close : index -> unit Lwt.t
 
+(** Sync the context with disk. Only useful for read-only instances.
+    Does not fail when the context is not in read-only mode. *)
+val sync : index -> unit Lwt.t
+
 val compute_testchain_chain_id : Block_hash.t -> Chain_id.t
 
 val compute_testchain_genesis : Block_hash.t -> Block_hash.t
