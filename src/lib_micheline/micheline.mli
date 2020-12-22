@@ -83,7 +83,7 @@ val canonical_encoding :
   'l Data_encoding.encoding ->
   'l canonical Data_encoding.encoding
 
-(** Old version of {!canonical_encoding} for retrocompatibility.
+(** Old version of {!canonical_encoding} for backward compatibility.
     Do not use in new code. *)
 val canonical_encoding_v0 :
   variant:string ->

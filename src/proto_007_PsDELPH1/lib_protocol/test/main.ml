@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 let () =
-  Alcotest.run
+  Alcotest_lwt.run
     "protocol_007_PsDELPH1"
     [ ("transfer", Transfer.tests);
       ("origination", Origination.tests);
@@ -45,3 +45,4 @@ let () =
       ("gas properties", Gas_properties.tests);
       ("fixed point computation", Fixed_point.tests);
       ("gas cost functions", Gas_costs.tests) ]
+  |> Lwt_main.run

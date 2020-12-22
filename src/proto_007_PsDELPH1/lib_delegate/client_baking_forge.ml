@@ -33,11 +33,6 @@ end)
 
 open Logging
 
-(* Just proving a point *)
-let[@warning "-32"] time_protocol__is__protocol_time :
-    Alpha_context.Timestamp.t -> Time.Protocol.t =
- fun x -> x
-
 (* The index of the different components of the protocol's validation passes *)
 (* TODO: ideally, we would like this to be more abstract and possibly part of
    the protocol, while retaining the generality of lists *)
@@ -59,6 +54,8 @@ let default_minimal_nanotez_per_gas_unit = Q.of_int 100
 
 let default_minimal_nanotez_per_byte = Q.of_int 1000
 
+let default_retry_counter = 5
+
 type slot =
   Time.Protocol.t * (Client_baking_blocks.block_info * int * public_key_hash)
 
@@ -79,12 +76,14 @@ type state = {
   minimal_nanotez_per_byte : Q.t;
   (* truly mutable *)
   mutable best_slot : slot option;
+  mutable retry_counter : int;
 }
 
 let create_state ?(minimal_fees = default_minimal_fees)
     ?(minimal_nanotez_per_gas_unit = default_minimal_nanotez_per_gas_unit)
-    ?(minimal_nanotez_per_byte = default_minimal_nanotez_per_byte) context_path
-    index nonces_location delegates constants =
+    ?(minimal_nanotez_per_byte = default_minimal_nanotez_per_byte)
+    ?(retry_counter = default_retry_counter) context_path index nonces_location
+    delegates constants =
   {
     context_path;
     index;
@@ -95,6 +94,7 @@ let create_state ?(minimal_fees = default_minimal_fees)
     minimal_nanotez_per_gas_unit;
     minimal_nanotez_per_byte;
     best_slot = None;
+    retry_counter;
   }
 
 let get_delegates cctxt state =
@@ -270,7 +270,7 @@ let get_manager_operation_gas_and_fee op =
     (Tez.zero, Gas.Arith.zero)
     l
 
-(* Sort operation consisdering potential gas and storage usage.
+(* Sort operation considering potential gas and storage usage.
    Weight = fee / (max ( (size/size_total), (gas/gas_total))) *)
 let sort_manager_operations ~max_size ~hard_gas_limit_per_block ~minimal_fees
     ~minimal_nanotez_per_gas_unit ~minimal_nanotez_per_byte
@@ -545,20 +545,19 @@ let merge_preapps (old : error Preapply_result.t)
 let error_of_op (result : error Preapply_result.t) op =
   let op = forge op in
   let h = Tezos_base.Operation.hash op in
-  try
-    Some
-      (Failed_to_preapply (op, snd @@ Operation_hash.Map.find h result.refused))
-  with Not_found -> (
-    try
-      Some
-        (Failed_to_preapply
-           (op, snd @@ Operation_hash.Map.find h result.branch_refused))
-    with Not_found -> (
-      try
-        Some
-          (Failed_to_preapply
-             (op, snd @@ Operation_hash.Map.find h result.branch_delayed))
-      with Not_found -> None ) )
+  match Operation_hash.Map.find h result.refused with
+  | Some (_, trace) ->
+      Some (Failed_to_preapply (op, trace))
+  | None -> (
+    match Operation_hash.Map.find h result.branch_refused with
+    | Some (_, trace) ->
+        Some (Failed_to_preapply (op, trace))
+    | None -> (
+      match Operation_hash.Map.find h result.branch_delayed with
+      | Some (_, trace) ->
+          Some (Failed_to_preapply (op, trace))
+      | None ->
+          None ) )
 
 let filter_and_apply_operations cctxt state ~chain ~block block_info ~priority
     ?protocol_data
@@ -815,7 +814,7 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
       (List.nth operations anonymous_index)
       (List.nth quota anonymous_index)
   in
-  (* Size/Gas check already occured in classify operations *)
+  (* Size/Gas check already occurred in classify operations *)
   let managers = List.nth operations managers_index in
   let operations = [endorsements; votes; anonymous; managers] in
   ( match context_path with
@@ -863,6 +862,7 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
           minimal_fees = default_minimal_fees;
           minimal_nanotez_per_gas_unit = default_minimal_nanotez_per_gas_unit;
           minimal_nanotez_per_byte = default_minimal_nanotez_per_byte;
+          retry_counter = default_retry_counter;
         }
       in
       filter_and_apply_operations
@@ -1431,7 +1431,7 @@ let compute_best_slot_on_current_level ?max_priority
         Tag.DSL.(
           fun f ->
             let max_priority =
-              Option.unopt ~default:default_max_priority max_priority
+              Option.value ~default:default_max_priority max_priority
             in
             f "No slot found at level %a (max_priority = %d)"
             -% t event "no_slot_found" -% a level_tag level
@@ -1515,7 +1515,7 @@ let reveal_potential_nonces (cctxt : #Client_context.full) constants ~chain
               | Ok () ->
                   (* If some nonces are to be revealed it means:
                    - We entered a new cycle and we can clear old nonces ;
-                   - A revelation was not included yet in the cycle beggining.
+                   - A revelation was not included yet in the cycle beginning.
                    So, it is safe to only filter outdated_nonces there *)
                   Client_baking_nonces.filter_outdated_nonces
                     cctxt
@@ -1582,11 +1582,30 @@ let create (cctxt : #Protocol_client_context.full) ~user_activated_upgrades
   in
   let timeout_k cctxt state () =
     bake cctxt ~user_activated_upgrades ~chain state
-    >>=? fun () ->
-    (* Stopping the timeout and waiting for the next block *)
-    state.best_slot <- None ;
-    return_unit
+    >>= function
+    | Error err ->
+        if state.retry_counter = 0 then (
+          (* Stop the timeout and wait for the next block *)
+          state.best_slot <- None ;
+          state.retry_counter <- default_retry_counter ;
+          Lwt.return (Error err) )
+        else
+          lwt_log_error
+            Tag.DSL.(
+              fun f ->
+                f "Retrying after baking error %a"
+                -% t event "retrying_on_error"
+                -% a errs_tag err)
+          >>= fun () ->
+          state.retry_counter <- pred state.retry_counter ;
+          return_unit
+    | Ok () ->
+        (* Stop the timeout and wait for the next block *)
+        state.best_slot <- None ;
+        state.retry_counter <- default_retry_counter ;
+        return_unit
   in
+  let finalizer state = Context.close state.index in
   Client_baking_scheduling.main
     ~name:"baker"
     ~cctxt
@@ -1596,3 +1615,4 @@ let create (cctxt : #Protocol_client_context.full) ~user_activated_upgrades
     ~compute_timeout
     ~timeout_k
     ~event_k
+    ~finalizer

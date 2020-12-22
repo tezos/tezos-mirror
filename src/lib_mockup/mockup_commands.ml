@@ -29,7 +29,7 @@ let group =
   {Clic.name = "mockup"; title = "Commands for creating mockup environments"}
 
 let list_mockup_command_handler _ _ =
-  let available = Registration.get_registered_contexts () in
+  let available = Registration.get_registered_environments () in
   List.iter
     (fun (mockup : (module Registration.Mockup_sig)) ->
       let module Mockup = (val mockup) in

@@ -190,7 +190,7 @@ let transfer_command amount source destination cctxt
         cctxt
   >>= function None -> return_unit | Some (_res, _contracts) -> return_unit
 
-let commands version () =
+let commands network () =
   let open Clic in
   [ command
       ~group
@@ -365,7 +365,7 @@ let commands version () =
               ~contract);
     command
       ~group
-      ~desc:"Get the list of unreachable pathsin a contract's parameter type."
+      ~desc:"Get the list of unreachable paths in a contract's parameter type."
       no_options
       ( prefixes ["get"; "contract"; "unreachable"; "paths"; "for"]
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
@@ -422,8 +422,8 @@ let commands version () =
       ( prefixes ["set"; "delegate"; "for"]
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ prefix "to"
-      @@ Public_key_hash.alias_param
-           ~name:"mgr"
+      @@ Public_key_hash.source_param
+           ~name:"dlgt"
            ~desc:"new delegate of the contract"
       @@ stop )
       (fun ( fee,
@@ -436,7 +436,7 @@ let commands version () =
              fee_cap,
              burn_cap )
            (_, contract)
-           (_, delegate)
+           delegate
            (cctxt : Protocol_client_context.full) ->
         let fee_parameter =
           {
@@ -938,76 +938,81 @@ let commands version () =
             >>= fun () -> return_unit
         | Error el ->
             Lwt.return_error el) ]
-  @ ( if version = Some `Mainnet then []
-    else
-      [ command
-          ~group
-          ~desc:"Register and activate an Alphanet/Zeronet faucet account."
-          (args2 (Secret_key.force_switch ()) encrypted_switch)
-          ( prefixes ["activate"; "account"]
-          @@ Secret_key.fresh_alias_param
-          @@ prefixes ["with"]
-          @@ param
-               ~name:"activation_key"
-               ~desc:
-                 "Activate an Alphanet/Zeronet faucet account from the JSON \
-                  (file or directly inlined)."
-               json_file_or_text_parameter
-          @@ stop )
-          (fun (force, encrypted) name activation_json cctxt ->
-            Secret_key.of_fresh cctxt force name
-            >>=? fun name ->
-            match
-              Data_encoding.Json.destruct
-                Client_proto_context.activation_key_encoding
-                activation_json
-            with
-            | exception (Data_encoding.Json.Cannot_destruct _ as exn) ->
-                Format.kasprintf
-                  (fun s -> failwith "%s" s)
-                  "Invalid activation file: %a %a"
-                  (fun ppf -> Data_encoding.Json.print_error ppf)
-                  exn
-                  Data_encoding.Json.pp
+  @ ( match network with
+    | Some `Mainnet ->
+        []
+    | Some `Testnet | None ->
+        [ command
+            ~group
+            ~desc:"Register and activate an Alphanet/Zeronet faucet account."
+            (args2 (Secret_key.force_switch ()) encrypted_switch)
+            ( prefixes ["activate"; "account"]
+            @@ Secret_key.fresh_alias_param
+            @@ prefixes ["with"]
+            @@ param
+                 ~name:"activation_key"
+                 ~desc:
+                   "Activate an Alphanet/Zeronet faucet account from the JSON \
+                    (file or directly inlined)."
+                 json_file_or_text_parameter
+            @@ stop )
+            (fun (force, encrypted) name activation_json cctxt ->
+              Secret_key.of_fresh cctxt force name
+              >>=? fun name ->
+              match
+                Data_encoding.Json.destruct
+                  Client_proto_context.activation_key_encoding
                   activation_json
-            | key ->
-                activate_account
-                  cctxt
-                  ~chain:cctxt#chain
-                  ~block:cctxt#block
-                  ?confirmations:cctxt#confirmations
-                  ~encrypted
-                  ~force
-                  key
-                  name
-                >>=? fun _res -> return_unit) ] )
-  @ ( if version <> Some `Mainnet then []
-    else
-      [ command
-          ~group
-          ~desc:"Activate a fundraiser account."
-          (args1 dry_run_switch)
-          ( prefixes ["activate"; "fundraiser"; "account"]
-          @@ Public_key_hash.alias_param
-          @@ prefixes ["with"]
-          @@ param
-               ~name:"code"
-               (Clic.parameter (fun _ctx code ->
-                    protect (fun () ->
-                        return
-                          (Blinded_public_key_hash.activation_code_of_hex code))))
-               ~desc:"Activation code obtained from the Tezos foundation."
-          @@ stop )
-          (fun dry_run (name, _pkh) code cctxt ->
-            activate_existing_account
-              cctxt
-              ~chain:cctxt#chain
-              ~block:cctxt#block
-              ?confirmations:cctxt#confirmations
-              ~dry_run
-              name
-              code
-            >>=? fun _res -> return_unit) ] )
+              with
+              | exception (Data_encoding.Json.Cannot_destruct _ as exn) ->
+                  Format.kasprintf
+                    (fun s -> failwith "%s" s)
+                    "Invalid activation file: %a %a"
+                    (fun ppf -> Data_encoding.Json.print_error ppf)
+                    exn
+                    Data_encoding.Json.pp
+                    activation_json
+              | key ->
+                  activate_account
+                    cctxt
+                    ~chain:cctxt#chain
+                    ~block:cctxt#block
+                    ?confirmations:cctxt#confirmations
+                    ~encrypted
+                    ~force
+                    key
+                    name
+                  >>=? fun _res -> return_unit) ] )
+  @ ( match network with
+    | Some `Testnet | None ->
+        []
+    | Some `Mainnet ->
+        [ command
+            ~group
+            ~desc:"Activate a fundraiser account."
+            (args1 dry_run_switch)
+            ( prefixes ["activate"; "fundraiser"; "account"]
+            @@ Public_key_hash.alias_param
+            @@ prefixes ["with"]
+            @@ param
+                 ~name:"code"
+                 (Clic.parameter (fun _ctx code ->
+                      protect (fun () ->
+                          return
+                            (Blinded_public_key_hash.activation_code_of_hex
+                               code))))
+                 ~desc:"Activation code obtained from the Tezos foundation."
+            @@ stop )
+            (fun dry_run (name, _pkh) code cctxt ->
+              activate_existing_account
+                cctxt
+                ~chain:cctxt#chain
+                ~block:cctxt#block
+                ?confirmations:cctxt#confirmations
+                ~dry_run
+                name
+                code
+              >>=? fun _res -> return_unit) ] )
   @ [ command
         ~desc:"Wait until an operation is included in a block"
         (args3
@@ -1259,7 +1264,7 @@ let commands version () =
                   return_unit
               | Error errs ->
                   ( match errs with
-                  | [ Unregistred_error
+                  | [ Unregistered_error
                         (`O
                           [("kind", `String "generic"); ("error", `String msg)])
                     ] ->

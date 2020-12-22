@@ -23,8 +23,8 @@ def all_contracts(directories: List[str] = None) -> List[str]:
     return contracts
 
 
-def all_deprecated_contracts() -> List[str]:
-    return all_contracts(['deprecated'])
+def all_legacy_contracts() -> List[str]:
+    return all_contracts(['legacy'])
 
 
 # Use environment variable if tests_python are put outside the tezos
@@ -35,7 +35,7 @@ TEZOS_BINARIES = os.environ.get('TEZOS_BINARIES')
 CONTRACT_PATH = path.join(TEZOS_HOME, 'tests_python', 'contracts')
 MACROS_CONTRACT_PATH = path.join(CONTRACT_PATH, 'macros')
 ILLTYPED_CONTRACT_PATH = path.join(CONTRACT_PATH, 'ill_typed')
-DEPRECATED_CONTRACT_PATH = path.join(CONTRACT_PATH, 'deprecated')
+LEGACY_CONTRACT_PATH = path.join(CONTRACT_PATH, 'legacy')
 OPCODES_CONTRACT_PATH = path.join(CONTRACT_PATH, 'opcodes')
 MINI_SCENARIOS_CONTRACT_PATH = path.join(CONTRACT_PATH,
                                          'mini_scenarios')

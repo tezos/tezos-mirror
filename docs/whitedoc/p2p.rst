@@ -7,17 +7,17 @@ This document explains the inner workings of the peer-to-peer layer of
 the Tezos shell. This part is in charge of establishing and
 maintaining network connections with other nodes (gossip).
 
-The P2P layer is instantiated by the node. It is parametrized by the
+The P2P layer is instantiated by the node. It is parameterized by the
 type of messages that are exchanged over the network (to allow
 different P2P protocol versions/extensions), and the type of metadata
-associated to each peer. The latter is useful to compute a score for
+associated with each peer. The latter is useful to compute a score for
 each peer that reflects the level of trust we have in it. Different
 policies can be used when communicating with peers with different
 score values.
 
 The P2P layer is comprised of a pool of connections, a set of
 operations on those connections, and a set of workers following the
-worker pattern pervasively used in the code base.
+worker pattern pervasively used in the codebase.
 
 The P2P layer is packaged in :package:`tezos-p2p`, which has
 documentation for all modules.
@@ -28,7 +28,7 @@ General operation
 I/O Scheduling
 ~~~~~~~~~~~~~~
 
-The P2P layer uses a scheduling mechanism in order to control its
+The P2P layer uses a scheduling mechanism to control its
 bandwidth usage as well as implementing different policies
 (e.g. read/write quotas) to different peers. For now, each peer is
 granted a fair share of the global allocated bandwidth, but it is
@@ -54,7 +54,7 @@ possible with a peer; when a queue is full, it is not possible to read
 `P2p_socket.connection
 <../api/odoc/tezos-p2p/Tezos_p2p/P2p_socket/index.html#type-connection>`__
 type by the P2P layer is basically a UNIX socket upgraded with I/O
-scheduling, peer metadata, cryptographic keys and two messages queues
+scheduling, peer metadata, cryptographic keys, and two messages queues
 operated by dedicated workers which operate on those queues.
 
 Pool of connections
@@ -65,7 +65,7 @@ All the above modules are used in `P2p_pool
 constitutes the core of the P2P layer, together with the worker
 processes described below. It comprises various tables of connections
 as well as methods to query them, also connections are extended with
-another message queue where lower level messages (like responses to
+another message queue where lower-level messages (like responses to
 ping) are filtered out and only application-level messages are kept.
 
 The main entry point of the P2P layer is in module `P2p
@@ -100,7 +100,7 @@ Maintenance worker
 ------------------
 
 The maintenance worker is in charge of establishing an appropriate
-number of connections with other nodes in order to guarantee a
+number of connections with other nodes to guarantee a
 realistic view of the state of the blockchain. It is created with a
 set of targets to reach regarding the desired amount of peers it needs
 to keep an active connection to.
@@ -115,7 +115,7 @@ Given these bounds, the maintenance worker:
 
 * Will be triggered every two minutes, when asked by the shell, or
   when the minimum or maximum number of acceptable connections is
-  reached, whichever happens first.
+  reached, whichever of these three cases happens first.
 
 * Will perform the following actions when triggered: if the number of
   connections is above ``max_threshold``, it will kill connections

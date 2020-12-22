@@ -35,8 +35,6 @@ type error += Invalid_message_size
 
 type error += Invalid_incoming_ciphertext_size
 
-type error += Encoding_error
-
 type error += Rejected_socket_connection
 
 type error +=
@@ -47,7 +45,7 @@ type error +=
 
 type error += Rejected_no_common_protocol of {announced : Network_version.t}
 
-type error += Decoding_error
+type error += Decoding_error of Data_encoding.Binary.read_error
 
 type error += Myself of P2p_connection.Id.t
 
@@ -74,3 +72,5 @@ type error += Private_mode
 type error += Point_banned of P2p_point.Id.t
 
 type error += Peer_banned of P2p_peer.Id.t
+
+type error += P2p_layer_disabled

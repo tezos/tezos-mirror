@@ -88,16 +88,12 @@ module Deterministic_nonce = struct
   end)
 
   module Response = struct
-    type t = Bigstring.t
-
-    let bigstring =
-      let open Data_encoding in
-      conv Bigstring.to_bytes Bigstring.of_bytes bytes
+    type t = Bytes.t
 
     let encoding =
       let open Data_encoding in
       def "signer_messages.deterministic_nonce.response"
-      @@ obj1 (req "deterministic_nonce" bigstring)
+      @@ obj1 (req "deterministic_nonce" bytes)
   end
 end
 

@@ -25,7 +25,7 @@
 
 (** Tezos - X25519/XSalsa20-Poly1305 cryptography *)
 
-type nonce = Bigstring.t
+type nonce
 
 val nonce_size : int
 
@@ -45,25 +45,31 @@ val increment_nonce : ?step:int -> nonce -> nonce
 val generate_nonces :
   incoming:bool -> sent_msg:Bytes.t -> recv_msg:Bytes.t -> nonce * nonce
 
+(** Size of the message authentication tag. *)
+val tag_length : int
+
 module Secretbox : sig
   type key
 
-  val unsafe_of_bytes : Bigstring.t -> key
+  val unsafe_of_bytes : Bytes.t -> key
 
-  val box_noalloc : key -> nonce -> Bigstring.t -> unit
+  (** [secretbox key msg nonce] encrypts and authenticates the data in
+      [msg] using [key] and [nonce] and returns the authentication tag and the
+      ciphertext in one buffer. For this reason, the returned buffer will be
+      [tag_length] longer than [msg]. *)
+  val secretbox : key -> Bytes.t -> nonce -> Bytes.t
 
-  val box_open_noalloc : key -> nonce -> Bigstring.t -> bool
-
-  val box : key -> Bytes.t -> nonce -> Bigstring.t
-
-  val box_open : key -> Bigstring.t -> nonce -> Bytes.t option
+  (** [secretbox_open key cmsg nonce] verifies and decrypts [cmsg] using [key]
+      and [nonce] and returns the plaintext if successful. As above,
+      the returned buffer will be [tag_length] shorter than [cmsg]. *)
+  val secretbox_open : key -> Bytes.t -> nonce -> Bytes.t option
 end
 
-type target
+type pow_target
 
-val default_target : target
+val default_pow_target : pow_target
 
-val make_target : float -> target
+val make_pow_target : float -> pow_target
 
 type secret_key
 
@@ -75,25 +81,52 @@ type channel_key
 
 val hash : public_key -> Public_key_hash.t
 
-val zerobytes : int
-
-val boxzerobytes : int
-
+(** Generates both a secret key and its corresponding public
+    key, along with a hash of the public key. *)
 val random_keypair : unit -> secret_key * public_key * Public_key_hash.t
 
+(** [precompute pk sk] computes a channel key from the sender's [sk] and the
+    recipient's [pk]. *)
 val precompute : secret_key -> public_key -> channel_key
 
-val fast_box : channel_key -> Bigstring.t -> nonce -> Bigstring.t
+(** [fast_box k nonce msg] authenticates and encrypts [msg] and returns both
+    the message authentication tag and the ciphertext. For this reason, the
+    returned buffer will be [tagbytes] longer than [msg]. *)
+val fast_box : channel_key -> nonce -> Bytes.t -> Bytes.t
 
-val fast_box_open : channel_key -> Bigstring.t -> nonce -> Bigstring.t option
+(** [fast_box_open k nonce cmsg] attempts to verify and decrypt [cmsg] and
+    if successful returns the plaintext. As above, the returned buffer will be
+    [tagbytes] shorter than [cmsg]. *)
+val fast_box_open : channel_key -> nonce -> Bytes.t -> Bytes.t option
 
-val fast_box_noalloc : channel_key -> nonce -> Bytes.t -> unit
+(** [fast_box_noalloc k nonce tag buf] authenticates and encrypts in-place
+    the contents of [buf] using [k] and [nonce] and writes the message
+    authentication tag in [tag]. *)
+val fast_box_noalloc : channel_key -> nonce -> Bytes.t -> Bytes.t -> unit
 
-val fast_box_open_noalloc : channel_key -> nonce -> Bytes.t -> bool
+(** [fast_box_open_noalloc k nonce tag buf] attempts to verify and decrypt
+    the contents of [buf] in-place using [k], [nonce], and [tag] and
+    returns true if successful. *)
+val fast_box_open_noalloc : channel_key -> nonce -> Bytes.t -> Bytes.t -> bool
 
-val check_proof_of_work : public_key -> nonce -> target -> bool
+val check_proof_of_work : public_key -> nonce -> pow_target -> bool
 
-val generate_proof_of_work : ?max:int -> public_key -> target -> nonce
+(** [generate_proof_of_work pk pow_target] generates a proof of work for the public
+    key [pk] following the [pow_target].
+
+    The parameter [yield_every] (defaults to [500]) inserts a cooperation point
+    ([Lwt.pause ()]) every so many attempts. This allows other promises to make
+    progress towards resolution. It also allows Unix signals to be processed so
+    that, say, Ctrl+C can be effective.
+
+    The parameter [max] (not set by default) sets a maximum number of attempts
+    to be made before giving up. When [max] number of attempts have been made
+    and no pow has been found, the exception [Not_found] is raised.
+  *)
+val generate_proof_of_work :
+  ?yield_every:int -> ?max:int -> public_key -> pow_target -> nonce Lwt.t
+
+val generate_proof_of_work_with_target_0 : public_key -> nonce
 
 val public_key_to_bytes : public_key -> Bytes.t
 
@@ -109,8 +142,10 @@ val secret_key_encoding : secret_key Data_encoding.t
 
 val nonce_encoding : nonce Data_encoding.t
 
+(** [neuterize sk] generates the corresponding public key of [sk] *)
 val neuterize : secret_key -> public_key
 
+(** [equal a b] tests keys for equality *)
 val equal : public_key -> public_key -> bool
 
 val pp_pk : Format.formatter -> public_key -> unit

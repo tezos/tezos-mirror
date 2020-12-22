@@ -97,7 +97,7 @@ let combine_operations ?public_key ?counter ~source ctxt
   let counter = Z.succ counter in
   Context.Contract.manager ctxt source
   >>=? fun account ->
-  let public_key = Option.unopt ~default:account.pk public_key in
+  let public_key = Option.value ~default:account.pk public_key in
   Context.Contract.is_manager_key_revealed ctxt source
   >>=? (function
          | false ->
@@ -141,18 +141,18 @@ let manager_operation ?counter ?(fee = Tez.zero) ?gas_limit ?storage_limit
   Context.get_constants ctxt
   >>=? fun c ->
   let gas_limit =
-    Option.unopt
+    Option.value
       ~default:c.parametric.hard_storage_limit_per_operation
       gas_limit
   in
   let storage_limit =
-    Option.unopt
+    Option.value
       ~default:c.parametric.hard_storage_limit_per_operation
       storage_limit
   in
   Context.Contract.manager ctxt source
   >>=? fun account ->
-  let public_key = Option.unopt ~default:account.pk public_key in
+  let public_key = Option.value ~default:account.pk public_key in
   let counter = Z.succ counter in
   Context.Contract.is_manager_key_revealed ctxt source
   >>=? function
@@ -229,7 +229,7 @@ let origination ?counter ?delegate ~script ?(preorigination = None) ?public_key
   >>=? fun account ->
   let default_credit = Tez.of_mutez @@ Int64.of_int 1000001 in
   let default_credit = Option.unopt_exn Impossible default_credit in
-  let credit = Option.unopt ~default:default_credit credit in
+  let credit = Option.value ~default:default_credit credit in
   let operation = Origination {delegate; script; credit; preorigination} in
   manager_operation
     ?counter

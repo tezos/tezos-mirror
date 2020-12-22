@@ -100,6 +100,14 @@ module P2p_event : sig
         (** The remote peer rejected our connection. *)
     | Connection_established of Id.t * P2p_peer_id.t
         (** We successfully established a authentified connection. *)
+    | Bootstrap_received of {source : P2p_peer_id.t}
+        (** A bootstrap message has been received. *)
+    | Bootstrap_sent of {source : P2p_peer_id.t}
+        (** A bootstrap message has been sent. *)
+    | Advertise_received of {source : P2p_peer_id.t}
+        (** An advertise message has been received. *)
+    | Advertise_sent of {source : P2p_peer_id.t}
+        (** An advertise message has been sent. *)
     | Swap_request_received of {source : P2p_peer_id.t}
         (** A swap request has been received. *)
     | Swap_ack_received of {source : P2p_peer_id.t}

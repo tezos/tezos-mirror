@@ -87,25 +87,21 @@ let process_endorsements (cctxt : #Protocol_client_context.full) state
       match (protocol_data, receipt) with
       | ( Operation_data
             ({contents = Single (Endorsement _); _} as protocol_data),
-          Apply_results.(
-            Operation_metadata
-              {contents = Single_result (Endorsement_result {delegate; _})}) )
-        -> (
+          Some
+            Apply_results.(
+              Operation_metadata
+                {contents = Single_result (Endorsement_result {delegate; _})})
+        ) -> (
           let new_endorsement : Kind.endorsement Alpha_context.operation =
             {shell; protocol_data}
           in
           let map =
-            match
-              HLevel.find_opt state.endorsements_table (chain_id, level)
-            with
-            | None ->
-                Delegate_Map.empty
-            | Some x ->
-                x
+            Option.value ~default:Delegate_Map.empty
+            @@ HLevel.find state.endorsements_table (chain_id, level)
           in
           (* If a previous endorsement made by this pkh is found for
              the same level we inject a double_endorsement *)
-          match Delegate_Map.find_opt delegate map with
+          match Delegate_Map.find delegate map with
           | None ->
               return
               @@ HLevel.add
@@ -138,7 +134,7 @@ let process_endorsements (cctxt : #Protocol_client_context.full) state
                          conflicting_endorsements_tag
                          (existing_endorsement, new_endorsement))
               >>= fun () ->
-              (* A denunciation may have already occured *)
+              (* A denunciation may have already occurred *)
               Shell_services.Injection.operation cctxt ~chain bytes
               >>=? fun op_hash ->
               lwt_log_notice
@@ -171,90 +167,99 @@ let process_endorsements (cctxt : #Protocol_client_context.full) state
 
 let process_block (cctxt : #Protocol_client_context.full) state
     (header : Alpha_block_services.block_info) =
-  let { Alpha_block_services.chain_id;
-        hash;
-        metadata = {protocol_data = {baker; level = {level; _}; _}; _};
-        _ } =
-    header
-  in
-  let chain = `Hash chain_id in
-  let map =
-    match HLevel.find_opt state.blocks_table (chain_id, level) with
-    | None ->
-        Delegate_Map.empty
-    | Some x ->
-        x
-  in
-  match Delegate_Map.find_opt baker map with
-  | None ->
-      return
-      @@ HLevel.add
-           state.blocks_table
-           (chain_id, level)
-           (Delegate_Map.add baker hash map)
-  | Some existing_hash when Block_hash.( = ) existing_hash hash ->
-      (* This case should never happen *)
-      lwt_debug
+  match header with
+  | {hash; metadata = None; _} ->
+      lwt_log_error
         Tag.DSL.(
           fun f ->
-            f
-              "Double baking detected but block hashes are equivalent. \
-               Skipping..."
-            -% t event "double_baking_but_not")
-      >>= fun () ->
-      return
-      @@ HLevel.replace
-           state.blocks_table
-           (chain_id, level)
-           (Delegate_Map.add baker hash map)
-  | Some existing_hash ->
-      (* If a previous endorsement made by this pkh is found for
+            f "Unexpected pruned block: %a"
+            -% t event "unexpected_pruned_block"
+            -% a Block_hash.Logging.tag hash)
+      >>= fun () -> return_unit
+  | { Alpha_block_services.chain_id;
+      hash;
+      metadata = Some {protocol_data = {baker; level = {level; _}; _}; _};
+      _ } -> (
+      let chain = `Hash chain_id in
+      let map =
+        match HLevel.find state.blocks_table (chain_id, level) with
+        | None ->
+            Delegate_Map.empty
+        | Some x ->
+            x
+      in
+      match Delegate_Map.find baker map with
+      | None ->
+          return
+          @@ HLevel.add
+               state.blocks_table
+               (chain_id, level)
+               (Delegate_Map.add baker hash map)
+      | Some existing_hash when Block_hash.( = ) existing_hash hash ->
+          (* This case should never happen *)
+          lwt_debug
+            Tag.DSL.(
+              fun f ->
+                f
+                  "Double baking detected but block hashes are equivalent. \
+                   Skipping..."
+                -% t event "double_baking_but_not")
+          >>= fun () ->
+          return
+          @@ HLevel.replace
+               state.blocks_table
+               (chain_id, level)
+               (Delegate_Map.add baker hash map)
+      | Some existing_hash ->
+          (* If a previous endorsement made by this pkh is found for
            the same level we inject a double_endorsement *)
-      Alpha_block_services.header
-        cctxt
-        ~chain
-        ~block:(`Hash (existing_hash, 0))
-        ()
-      >>=? fun ({shell; protocol_data; _} : Alpha_block_services.block_header) ->
-      let bh1 = {Alpha_context.Block_header.shell; protocol_data} in
-      Alpha_block_services.header cctxt ~chain ~block:(`Hash (hash, 0)) ()
-      >>=? fun ({shell; protocol_data; _} : Alpha_block_services.block_header) ->
-      let bh2 = {Alpha_context.Block_header.shell; protocol_data} in
-      (* If the blocks are on different chains then skip it *)
-      get_block_offset level
-      >>= fun block ->
-      Alpha_block_services.hash cctxt ~chain ~block ()
-      >>=? fun block_hash ->
-      Alpha_services.Forge.double_baking_evidence
-        cctxt
-        (chain, block)
-        ~branch:block_hash
-        ~bh1
-        ~bh2
-        ()
-      >>=? fun bytes ->
-      let bytes = Signature.concat bytes Signature.zero in
-      lwt_log_notice
-        Tag.DSL.(
-          fun f ->
-            f "Double baking detected" -% t event "double_baking_detected")
-      >>= fun () ->
-      (* A denunciation may have already occured *)
-      Shell_services.Injection.operation cctxt ~chain bytes
-      >>=? fun op_hash ->
-      lwt_log_notice
-        Tag.DSL.(
-          fun f ->
-            f "Double baking evidence injected %a"
-            -% t event "double_baking_denounced"
-            -% t signed_operation_tag bytes
-            -% a Operation_hash.Logging.tag op_hash)
-      >>= fun () ->
-      return
-      @@ HLevel.replace
-           state.blocks_table
-           (chain_id, level)
-           (Delegate_Map.add baker hash map)
+          Alpha_block_services.header
+            cctxt
+            ~chain
+            ~block:(`Hash (existing_hash, 0))
+            ()
+          >>=? fun ({shell; protocol_data; _} :
+                     Alpha_block_services.block_header) ->
+          let bh1 = {Alpha_context.Block_header.shell; protocol_data} in
+          Alpha_block_services.header cctxt ~chain ~block:(`Hash (hash, 0)) ()
+          >>=? fun ({shell; protocol_data; _} :
+                     Alpha_block_services.block_header) ->
+          let bh2 = {Alpha_context.Block_header.shell; protocol_data} in
+          (* If the blocks are on different chains then skip it *)
+          get_block_offset level
+          >>= fun block ->
+          Alpha_block_services.hash cctxt ~chain ~block ()
+          >>=? fun block_hash ->
+          Alpha_services.Forge.double_baking_evidence
+            cctxt
+            (chain, block)
+            ~branch:block_hash
+            ~bh1
+            ~bh2
+            ()
+          >>=? fun bytes ->
+          let bytes = Signature.concat bytes Signature.zero in
+          lwt_log_notice
+            Tag.DSL.(
+              fun f ->
+                f "Double baking detected" -% t event "double_baking_detected")
+          >>= fun () ->
+          (* A denunciation may have already occurred *)
+          Shell_services.Injection.operation cctxt ~chain bytes
+          >>=? fun op_hash ->
+          lwt_log_notice
+            Tag.DSL.(
+              fun f ->
+                f "Double baking evidence injected %a"
+                -% t event "double_baking_denounced"
+                -% t signed_operation_tag bytes
+                -% a Operation_hash.Logging.tag op_hash)
+          >>= fun () ->
+          return
+          @@ HLevel.replace
+               state.blocks_table
+               (chain_id, level)
+               (Delegate_Map.add baker hash map) )
 
 (* Remove levels that are lower than the [highest_level_encountered] minus [preserved_levels] *)
 let cleanup_old_operations state =
@@ -376,3 +381,4 @@ let create (cctxt : #Protocol_client_context.full) ~preserved_levels
     ~compute_timeout:(fun _ -> Lwt_utils.never_ending ())
     ~timeout_k:(fun _ _ () -> return_unit)
     ~event_k:process_block
+    ~finalizer:(fun _ -> Lwt.return_unit)

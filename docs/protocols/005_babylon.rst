@@ -39,7 +39,7 @@ In particular:
 - changes to the rewards for block and endorsement of priority greater
   than 0.
 
-Detailed informations can be found in the blog
+Detailed information can be found in the blog
 `announcement <https://blog.nomadic-labs.com/emmy-an-improved-consensus-algorithm.html>`_
 and
 `analysis. <https://blog.nomadic-labs.com/analysis-of-emmy.html>`_
@@ -441,7 +441,7 @@ To transfer (spend) tezos from originated contract to an implicit account, use:
 - ``src``: has to be equal to the ``key_hash`` found in the contract's storage,
   i.e. its manager.
 - ``dst``: is the originated contract
-- ``adr``: key_hash of the implicit account recieving the tokens
+- ``adr``: key_hash of the implicit account receiving the tokens
 - ``val``: amount of mutez to transfer
 
 To transfer tezos from originated contract to another originated contract, use:
@@ -477,7 +477,7 @@ false     false       none
 
 For a complete Michelson pseudo-code showing these transformations, together
 with examples of these transformations applied to the `id.tz script <https://gitlab.com/tezos/tezos/blob/794bc16664cbed4057ffbc51631151023af835c0/src/bin_client/test/contracts/attic/id.tz>`_,
-please refer to this `Mi-cho-coq merge request <https://gitlab.com/nomadic-labs/mi-cho-coq/merge_requests/29>`_.
+please refer to this `Mi-cho-coq merge request <https://gitlab.com/nomadic-labs/mi-cho-coq/-/merge_requests/29>`_.
 
 For both ``add_do`` and ``add_set_delegate`` templates, the original script's
 storage gets wrapped in a ``pair``, with the manager of the contract being written
@@ -756,7 +756,7 @@ Michelson
 
     I. Rescaling step cost
     - Rescale step_cost by 2^7 to allow finer cost accounting in the
-      interpeter.
+      interpreter.
     - Expose new function atomic_step_cost exposing finer resolution step
       increments.
 
@@ -795,7 +795,7 @@ Michelson
     this impossible outside of the interpreter (where the element type of
     the set could be accessed elsewhere). This patch fixes that.
 
-- Proto/Michelson: unshare cost functions of the interpeter & the rest of the protocol
+- Proto/Michelson: unshare cost functions of the interpreter & the rest of the protocol
 
 ::
 
@@ -819,7 +819,7 @@ Michelson
 
     This patch lifts that restriction, allowing to compare `pair`s of
     values, as long as their left component remains a simple value,
-    impicitly making comparable values right combs whose leaves are simple
+    implicitly making comparable values right combs whose leaves are simple
     values. The ordering is naturally lexicographic.
 
     This patch also refactors a bit the comparison code to simplify it and
@@ -836,7 +836,7 @@ Michelson
     the type and values.
 
     This semantics should not break any code as the result of `COMPARE` is
-    almost always comsumed by comparison projectors such as `GT` or `LT`
+    almost always consumed by comparison projectors such as `GT` or `LT`
     who only care about the sign. However, for the sake of consistency,
     this patches makes `COMPARE` return only -1, 0 or 1.
 
@@ -901,7 +901,7 @@ Michelson
     could decide after having forged a block to include a late endorsement
     and update the timestamp to an earlier point. With the current
     semantics of `NOW`, this would mean reevaluating all operations to
-    make sure they are still valid everytime such a change is
+    make sure they are still valid every time such a change is
     decided. This patch prevents that issue by fixing the timestamp seen
     by Michelson independently of the number of endorsements.
 
@@ -951,7 +951,7 @@ Michelson
 
 ::
 
-    This patchs adds four new URIs.
+    This patch adds four new URIs.
 
      - `/helpers/entrypoint_type`
      - `/helpers/list_entrypoints`
@@ -1028,7 +1028,7 @@ Michelson
     instruction to typecheck contract references on demand.
 
     All existing contracts that used the feature will continue to work
-    as-is. This is done by introducing a `legacy` flag througout the
+    as-is. This is done by introducing a `legacy` flag throughout the
     typechecking code, with the following trivial semantics:
      - everything already in the chain is considered `legacy` and can
        use deprecated features,
@@ -1042,7 +1042,7 @@ Michelson
 
 ::
 
-    This patch removes a spurious access to the storage when typecheking a
+    This patch removes a spurious access to the storage when typechecking a
     contract reference. It makes this operation cheaper in gas.
 
 - Proto/Michelson: peephole optimization of UNPAIR
@@ -1233,7 +1233,7 @@ Migration
        where <manager> is the key_hash found in the contract's storage
 
     To implement `tezos-client transfer <amount> from <contract> to <destination>`,
-    when the destination is a simple adress or a contract of type `unit`,
+    when the destination is a simple address or a contract of type `unit`,
     it does the equivalent of
     ```
     tezos-client transfer 0 from <manager> to <contract> \

@@ -100,6 +100,18 @@ module S : sig
       Block_header.t * int32 * int32 * History_mode.t )
     RPC_service.t
 
+  val is_bootstrapped :
+    ( [`GET],
+      prefix,
+      prefix,
+      unit,
+      unit,
+      bool * Chain_validator_worker_state.Event.synchronisation_status )
+    RPC_service.t
+
+  val force_bootstrapped :
+    ([`PATCH], prefix, prefix, unit, bool, unit) RPC_service.t
+
   module Blocks : sig
     val path : (prefix, prefix) RPC_path.t
 

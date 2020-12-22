@@ -39,7 +39,7 @@ module Voting_period : sig
 end
 
 module Protocol_kind : sig
-  type t = [`Athens | `Babylon | `Carthage]
+  type t = [`Athens | `Babylon | `Carthage | `Delphi | `Alpha]
 
   val names : (string * t) list
   val cmdliner_term : docs:string -> unit -> t Cmdliner.Term.t

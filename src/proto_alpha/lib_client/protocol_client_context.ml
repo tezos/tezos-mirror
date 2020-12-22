@@ -149,7 +149,11 @@ let () =
   @@ def "script" ["loc"] Protocol.Alpha_context.Script.location_encoding ;
   register ~pp:Protocol.Alpha_context.Contract.pp
   @@ def "contract" [] Protocol.Alpha_context.Contract.encoding ;
-  register Protocol.Alpha_context.Contract.big_map_diff_encoding ;
+  register
+  @@ def
+       "contract"
+       ["big_map_diff"]
+       Protocol.Alpha_context.Contract.big_map_diff_encoding ;
   register
   @@ def
        "delegate"

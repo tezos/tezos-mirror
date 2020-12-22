@@ -37,24 +37,33 @@
 (** Type of one bandwidth counter. *)
 type t
 
-(** [create ~init ~alpha] is a counter with initial value [init] and
-    factor [alpha]. The counter is added to the internal hash table. It is not
-    removed automatically: it must be removed manually. *)
-val create : init:int -> alpha:float -> t
+(** Internal state of the worker handling a family of counters. *)
+type state
 
-(** [destroy t] removes counter [t] from the internal hash table. *)
-val destroy : t -> unit
+(** [fresh_state ~id ~refresh_interval] initializes the state of a worker
+    handling a family of counter. The worker wakes up every [refresh_interval]
+    seconds. [id] is a string identifier used for distinguishing
+    distinct Moving_average workers.. *)
+val fresh_state : id:string -> refresh_interval:float -> state
 
-(** [add t v] adds [v] to the counter [t]. *)
+(** [create state ~init ~alpha] is a counter with initial value [init] and
+    factor [alpha]. The counter is added to the [state]. It is not removed
+    automatically: it must be removed manually. *)
+val create : state -> init:int -> alpha:float -> t
+
+(** [destroy state -> t] removes counter [t] from the internal state. *)
+val destroy : state -> t -> unit
+
+(** [add state t v] adds [v] to the counter [t]. *)
 val add : t -> int -> unit
 
-(** [on_update f] registers [f] to be called on each update of the
-    internal worker (currently every 1s). *)
-val on_update : (unit -> unit) -> unit
+(** [on_update state f] registers [f] to be called on each update of the
+    internal worker associated to [state]. *)
+val on_update : state -> (unit -> unit) -> unit
 
-(** [updated] is a condition variable that gets signaled on each
-    update of the internal worker (currently every 1s). *)
-val updated : unit Lwt_condition.t
+(** [updated state] is a condition variable that gets signaled on each
+    update of the internal worker.. *)
+val updated : state -> unit Lwt_condition.t
 
 type stat = {total : int64; average : int}
 

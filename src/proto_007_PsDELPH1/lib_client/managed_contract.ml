@@ -26,12 +26,22 @@ open Protocol
 open Alpha_context
 open Protocol_client_context
 open Tezos_micheline
-open Client_proto_context
+
+let return_single_manager_result (oph, op, result) =
+  match Apply_results.pack_contents_list op result with
+  | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
+      return (oph, op, result)
+  | _ ->
+      assert false
 
 let get_contract_manager (cctxt : #full) contract =
   let open Micheline in
   let open Michelson_v1_primitives in
-  get_storage cctxt ~chain:cctxt#chain ~block:cctxt#block contract
+  Client_proto_context.get_storage
+    cctxt
+    ~chain:cctxt#chain
+    ~block:cctxt#block
+    contract
   >>=? function
   | None ->
       cctxt#error "This is not a smart contract."
@@ -78,8 +88,7 @@ let parse code =
     >>? fun exp ->
     Error_monad.ok @@ Script.lazy_expr Michelson_v1_parser.(exp.expanded) )
 
-let set_delegate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
-    ?verbose_signing ?branch ~fee_parameter ?fee ~source ~src_pk ~src_sk
+let build_delegate_operation (cctxt : #full) ~chain ~block ?fee
     contract (* the KT1 to delegate *)
     (delegate : Signature.public_key_hash option) =
   let entrypoint = "do" in
@@ -142,10 +151,21 @@ let set_delegate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
                    "Cannot find a %%do or %%set_delegate entrypoint in \
                     contract@." ))
   >>=? fun (parameters, entrypoint) ->
-  let operation =
-    Transaction
-      {amount = Tez.zero; parameters; entrypoint; destination = contract}
-  in
+  return
+    (Client_proto_context.build_transaction_operation
+       ~amount:Tez.zero
+       ~parameters
+       ~entrypoint
+       ?fee
+       contract)
+
+let set_delegate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
+    ?verbose_signing ?branch ~fee_parameter ?fee ~source ~src_pk ~src_sk
+    contract (* the KT1 to delegate *)
+    (delegate : Signature.public_key_hash option) =
+  build_delegate_operation cctxt ~chain ~block ?fee contract delegate
+  >>=? fun operation ->
+  let operation = Injection.Single_manager operation in
   Injection.inject_manager_operation
     cctxt
     ~chain
@@ -161,7 +181,7 @@ let set_delegate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ~src_sk
     ~fee_parameter
     operation
-  >>=? fun res -> return res
+  >>=? return_single_manager_result
 
 let d_unit =
   Micheline.strip_locations (Prim (0, Michelson_v1_primitives.D_Unit, [], []))
@@ -183,7 +203,7 @@ let build_lambda_for_originated ~destination ~entrypoint ~amount
     Data_encoding.Binary.to_bytes_exn Contract.encoding destination
   in
   let amount = Tez.to_mutez amount in
-  let (`Hex destination) = MBytes.to_hex destination in
+  let (`Hex destination) = Hex.of_bytes destination in
   let entrypoint = match entrypoint with "default" -> "" | s -> "%" ^ s in
   if parameter_type = t_unit then
     Format.asprintf
@@ -208,12 +228,9 @@ let build_lambda_for_originated ~destination ~entrypoint ~amount
       Michelson_v1_printer.print_expr
       parameter
 
-let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
-    ?verbose_signing ?branch ~source ~src_pk ~src_sk ~contract ~destination
-    ?(entrypoint = "default") ?arg ~amount ?fee ?gas_limit ?storage_limit
-    ?counter ~fee_parameter () :
-    (Kind.transaction Kind.manager Injection.result * Contract.t list) tzresult
-    Lwt.t =
+let build_transaction_operation (cctxt : #full) ~chain ~block ~contract
+    ~destination ?(entrypoint = "default") ?arg ~amount ?fee ?gas_limit
+    ?storage_limit () =
   ( match Alpha_context.Contract.is_implicit destination with
   | Some delegate when entrypoint = "default" ->
       return @@ build_lambda_for_implicit ~delegate ~amount
@@ -249,7 +266,7 @@ let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
       | None ->
           return_none )
       >>=? fun parameter ->
-      let parameter = Option.unopt ~default:d_unit parameter in
+      let parameter = Option.value ~default:d_unit parameter in
       return
       @@ build_lambda_for_originated
            ~destination
@@ -261,10 +278,37 @@ let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
   parse lambda
   >>=? fun parameters ->
   let entrypoint = "do" in
-  let operation =
-    Transaction
-      {amount = Tez.zero; parameters; entrypoint; destination = contract}
-  in
+  return
+    (Client_proto_context.build_transaction_operation
+       ~amount:Tez.zero
+       ~parameters
+       ~entrypoint
+       ?fee
+       ?gas_limit
+       ?storage_limit
+       contract)
+
+let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
+    ?verbose_signing ?branch ~source ~src_pk ~src_sk ~contract ~destination
+    ?(entrypoint = "default") ?arg ~amount ?fee ?gas_limit ?storage_limit
+    ?counter ~fee_parameter () :
+    (Kind.transaction Kind.manager Injection.result * Contract.t list) tzresult
+    Lwt.t =
+  build_transaction_operation
+    cctxt
+    ~chain
+    ~block
+    ~contract
+    ~destination
+    ~entrypoint
+    ?arg
+    ~amount
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ()
+  >>=? fun operation ->
+  let operation = Injection.Single_manager operation in
   Injection.inject_manager_operation
     cctxt
     ~chain
@@ -282,6 +326,8 @@ let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ~src_sk
     ~fee_parameter
     operation
-  >>=? fun ((_oph, _op, result) as res) ->
-  Lwt.return (Injection.originated_contracts (Single_result result))
-  >>=? fun contracts -> return (res, contracts)
+  >>=? fun (oph, op, result) ->
+  Lwt.return (Injection.originated_contracts result)
+  >>=? fun contracts ->
+  return_single_manager_result (oph, op, result)
+  >>=? fun res -> return (res, contracts)

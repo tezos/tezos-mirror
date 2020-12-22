@@ -25,9 +25,6 @@
 
 let may_cons xs x = match x with None -> xs | Some x -> x :: xs
 
-let filter_map f l =
-  List.rev @@ List.fold_left (fun acc x -> may_cons acc (f x)) [] l
-
 let rev_sub l n =
   if n < 0 then invalid_arg "Utils.rev_sub: `n` must be non-negative." ;
   let rec append_rev_sub acc l = function
@@ -55,15 +52,15 @@ let rec last_exn = function
       last_exn xs
 
 let merge_filter2 ?(finalize = List.rev) ?(compare = compare)
-    ?(f = Option.first_some) l1 l2 =
+    ?(f = TzOption.first_some) l1 l2 =
   let sort = List.sort compare in
   let rec merge_aux acc = function
     | ([], []) ->
         finalize acc
     | (r1, []) ->
-        finalize acc @ filter_map (fun x1 -> f (Some x1) None) r1
+        finalize acc @ List.filter_map (fun x1 -> f (Some x1) None) r1
     | ([], r2) ->
-        finalize acc @ filter_map (fun x2 -> f None (Some x2)) r2
+        finalize acc @ List.filter_map (fun x2 -> f None (Some x2)) r2
     | ((h1 :: t1 as r1), (h2 :: t2 as r2)) ->
         if compare h1 h2 > 0 then
           merge_aux (may_cons acc (f None (Some h2))) (r1, t2)

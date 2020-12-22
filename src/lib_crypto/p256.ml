@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -43,33 +44,31 @@ end
 
 let () = Base58.check_encoded_prefix Public_key_hash.b58check_encoding "tz3" 36
 
-open Uecc
+open Hacl.P256
 
 module Public_key = struct
-  type t = (secp256r1, public) key
+  type t = Hacl.public key
 
   let name = "P256.Public_key"
 
   let title = "A P256 public key"
 
-  let to_bigstring = to_bytes ~compress:true
-
-  let to_bytes b = Bigstring.to_bytes (to_bigstring b)
+  let to_bytes = to_bytes
 
   let to_string s = Bytes.to_string (to_bytes s)
 
-  let of_bytes_opt b = pk_of_bytes secp256r1 (Bigstring.of_bytes b)
+  let of_bytes_opt = pk_of_bytes
 
   let of_string_opt s = of_bytes_opt (Bytes.of_string s)
 
-  let size = compressed_size secp256r1
+  let size _ = pk_size
 
   type Base58.data += Data of t
 
   let b58check_encoding =
     Base58.register_encoding
       ~prefix:Base58.Prefix.p256_public_key
-      ~length:size
+      ~length:(size ())
       ~to_raw:to_string
       ~of_raw:of_string_opt
       ~wrap:(fun x -> Data x)
@@ -81,7 +80,7 @@ module Public_key = struct
   include Compare.Make (struct
     type nonrec t = t
 
-    let compare a b = Bytes.compare (to_bytes a) (to_bytes b)
+    let compare = compare
   end)
 
   include Helpers.MakeRaw (struct
@@ -113,7 +112,7 @@ module Public_key = struct
 
     let raw_encoding =
       let open Data_encoding in
-      conv to_bytes of_bytes_exn (Fixed.bytes size)
+      conv to_bytes of_bytes_exn (Fixed.bytes (size ()))
 
     let of_b58check = of_b58check
 
@@ -130,22 +129,19 @@ module Public_key = struct
 end
 
 module Secret_key = struct
-  type t = (secp256r1, secret) key
+  type t = Hacl.secret key
 
   let name = "P256.Secret_key"
 
   let title = "A P256 secret key"
 
-  let size = sk_size secp256r1
+  let size = sk_size
 
-  let of_bytes_opt buf =
-    Option.map ~f:fst (sk_of_bytes secp256r1 (Bigstring.of_bytes buf))
-
-  let to_bigstring = to_bytes ~compress:true
-
-  let to_bytes t = Bigstring.to_bytes (to_bigstring t)
+  let to_bytes = to_bytes
 
   let to_string s = Bytes.to_string (to_bytes s)
+
+  let of_bytes_opt = sk_of_bytes
 
   let of_string_opt s = of_bytes_opt (Bytes.of_string s)
 
@@ -166,7 +162,7 @@ module Secret_key = struct
   include Compare.Make (struct
     type nonrec t = t
 
-    let compare a b = Bytes.compare (to_bytes a) (to_bytes b)
+    let compare = compare
   end)
 
   include Helpers.MakeRaw (struct
@@ -214,7 +210,7 @@ module Secret_key = struct
   let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
 end
 
-type t = Bigstring.t
+type t = Bytes.t
 
 type watermark = Bytes.t
 
@@ -222,14 +218,13 @@ let name = "P256"
 
 let title = "A P256 signature"
 
-let size = pk_size secp256r1
+let size = size
 
-let of_bytes_opt s =
-  if Bytes.length s = size then Some (Bigstring.of_bytes s) else None
-
-let to_bytes s = Bigstring.to_bytes s
+let to_bytes s = Bytes.copy s
 
 let to_string s = Bytes.to_string (to_bytes s)
+
+let of_bytes_opt s = if Bytes.length s = size then Some s else None
 
 let of_string_opt s = of_bytes_opt (Bytes.of_string s)
 
@@ -289,53 +284,52 @@ end)
 
 let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
 
-let zero = of_bytes_exn (Bytes.make size '\000')
+let zero = Bytes.make size '\000'
 
 let sign ?watermark sk msg =
   let msg =
     Blake2B.to_bytes @@ Blake2B.hash_bytes
     @@ match watermark with None -> [msg] | Some prefix -> [prefix; msg]
   in
-  match sign sk (Bigstring.of_bytes msg) with
-  | None ->
-      (* Will never happen in practice. This can only happen in case
-         of RNG error. *)
-      invalid_arg "P256.sign: internal error"
-  | Some signature ->
-      signature
+  sign ~sk ~msg
 
-let check ?watermark public_key signature msg =
+let check ?watermark pk signature msg =
   let msg =
     Blake2B.to_bytes @@ Blake2B.hash_bytes
     @@ match watermark with None -> [msg] | Some prefix -> [prefix; msg]
   in
-  verify public_key ~msg:(Bigstring.of_bytes msg) ~signature
+  verify ~pk ~msg ~signature
 
-let generate_key ?(seed = Hacl.Rand.gen 32) () =
-  let seedlen = Bigstring.length seed in
-  if seedlen < 32 then
-    invalid_arg
-      (Printf.sprintf
-         "P256.generate_key: seed must be at least 32 bytes long (was %d)"
-         seedlen) ;
-  match sk_of_bytes secp256r1 seed with
+let generate_key ?seed () =
+  match seed with
   | None ->
-      invalid_arg "P256.generate_key: invalid seed (very rare!)"
-  | Some (sk, pk) ->
-      let pkh = Public_key.hash pk in
-      (pkh, pk, sk)
+      let (pk, sk) = keypair () in
+      (Public_key.hash pk, pk, sk)
+  | Some seed -> (
+      let seedlen = Bytes.length seed in
+      if seedlen < Secret_key.size then
+        invalid_arg
+          (Printf.sprintf
+             "P256.generate_key: seed must be at least %d bytes long (got %d)"
+             Secret_key.size
+             seedlen)
+      else
+        match sk_of_bytes (Bytes.sub seed 0 Secret_key.size) with
+        | None ->
+            invalid_arg "P256.generate_key: invalid seed"
+        | Some sk ->
+            let pk = neuterize sk in
+            (Public_key.hash pk, pk, sk) )
 
 let deterministic_nonce sk msg =
-  let msg = Bigstring.of_bytes msg in
-  let key = Secret_key.to_bigstring sk in
+  let key = Secret_key.to_bytes sk in
   Hacl.Hash.SHA256.HMAC.digest ~key ~msg
 
 let deterministic_nonce_hash sk msg =
-  let nonce = deterministic_nonce sk msg in
-  Blake2B.to_bytes (Blake2B.hash_bytes [Bigstring.to_bytes nonce])
+  Blake2B.to_bytes (Blake2B.hash_bytes [deterministic_nonce sk msg])
 
 include Compare.Make (struct
   type nonrec t = t
 
-  let compare = Bigstring.compare
+  let compare = Bytes.compare
 end)

@@ -71,10 +71,10 @@ end) : Internal_event.SINK with type t = t = struct
 
   let configure uri =
     let level_at_least =
-      Option.(
+      TzOption.(
         Uri.get_query_param uri "level-at-least"
         >>= Internal_event.Level.of_string)
-      |> Option.unopt ~default:Internal_event.Level.default
+      |> Option.value ~default:Internal_event.Level.default
     in
     let fail_parsing fmt =
       Format.kasprintf (failwith "Parsing URI: %s: %s" (Uri.to_string uri)) fmt

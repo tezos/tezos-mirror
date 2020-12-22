@@ -53,8 +53,6 @@ val serialized_cost : MBytes.t -> Gas_limit_repr.cost
 
 val traversal_cost : node -> Gas_limit_repr.cost
 
-val node_cost : node -> Gas_limit_repr.cost
-
 val int_node_cost : Z.t -> Gas_limit_repr.cost
 
 val int_node_cost_of_numbits : int -> Gas_limit_repr.cost
@@ -68,8 +66,6 @@ val bytes_node_cost : MBytes.t -> Gas_limit_repr.cost
 val bytes_node_cost_of_length : int -> Gas_limit_repr.cost
 
 val prim_node_cost_nonrec : expr list -> annot -> Gas_limit_repr.cost
-
-val prim_node_cost_nonrec_of_length : int -> annot -> Gas_limit_repr.cost
 
 val seq_node_cost_nonrec : expr list -> Gas_limit_repr.cost
 
@@ -86,3 +82,7 @@ val unit_parameter : lazy_expr
 val is_unit_parameter : lazy_expr -> bool
 
 val strip_annotations : node -> node
+
+val micheline_nodes : node -> int
+
+val strip_locations_cost : node -> Gas_limit_repr.cost

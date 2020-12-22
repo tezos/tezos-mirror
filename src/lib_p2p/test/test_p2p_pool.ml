@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2019-2020 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,29 +24,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Testing of the Pool
-
-    Each test launches nodes in separate process, each node has its own pool and is given a function to be executed.
-
-    [Simple] test: each node pings all other nodes.
-
-    [Random] test: each node pings all other nodes but at random points in time.
-
-    [Garbled] test: each node write garbled data to all peers, then it checks that connections are closed.
-
-    [Overcrowded] tests:
-    both test [run] and [run_mixed_versions] creates one target node which
-    knows all the other points  and has max_incoming_connections set
-    to zero,
-    all other clients know only the target and try to connect to it.
-
-    In [run], each client use p2p v.1 and check that they eventually
-    know all other nodes thanks to the node reply.
-
-    In [run_mixed_versions], half the clients do as in run and half of
-    the clients use p2p v.0 and check that they didn't receive new
-    nodes (meaning that [target] actually sent a Nack_v_0.
-
+(** Testing
+    -------
+    Component:    P2P
+    Invocation:   dune build @src/lib_p2p/test/runtest_p2p_ipv6set
+    Dependencies: src/lib_p2p/test/process.ml
+    Subject:      Testing of the Pool
+                  Each test launches nodes in separate process, each node
+                  has its own pool and is given a function to be executed.
 *)
 
 include Internal_event.Legacy_logging.Make (struct
@@ -68,7 +53,7 @@ let msg_config : message P2p_params.message_config =
             max_length = None;
           } ];
     chain_name = Distributed_db_version.Name.of_string "SANDBOXED_TEZOS";
-    distributed_db_versions = [Distributed_db_version.zero];
+    distributed_db_versions = Distributed_db_version.[zero; one];
   }
 
 type metadata = unit
@@ -87,6 +72,7 @@ let conn_meta_config : metadata P2p_params.conn_meta_config =
     private_node = (fun _ -> false);
   }
 
+(** Syncing inside the detached process *)
 let sync iteration ch =
   incr iteration ;
   lwt_debug "Sync iteration %i" !iteration
@@ -94,12 +80,11 @@ let sync iteration ch =
   Process.Channel.push ch ()
   >>=? fun () -> Process.Channel.pop ch >>=? fun () -> return_unit
 
-(** Syncing everyone until one node fails to sync  *)
+(** Syncing from the main process everyone until one node fails to sync  *)
 let rec sync_nodes nodes =
-  iter_p (fun {Process.channel; _} -> Process.Channel.pop channel) nodes
+  Error_monad.iter_p (fun p -> Process.receive p) nodes
   >>=? fun () ->
-  iter_p (fun {Process.channel; _} -> Process.Channel.push channel ()) nodes
-  >>=? fun () -> sync_nodes nodes
+  iter_p (fun p -> Process.send p ()) nodes >>=? fun () -> sync_nodes nodes
 
 let sync_nodes nodes =
   sync_nodes nodes
@@ -109,19 +94,20 @@ let sync_nodes nodes =
   | Error _ as err ->
       Lwt.return err
 
+(**Detach a process with a p2p_pool and a welcome worker.  *)
 let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
     ?max_connections ?max_incoming_connections ?p2p_versions
-    ?(msg_config = msg_config) f trusted_points all_points addr port =
+    ?(msg_config = msg_config) canceler f trusted_points all_points addr port =
   let trusted_points =
     List.filter
       (fun p -> not (P2p_point.Id.equal (addr, port) p))
       trusted_points
   in
-  let proof_of_work_target = Crypto_box.make_target 0. in
-  let identity = P2p_identity.generate proof_of_work_target in
+  let proof_of_work_target = Crypto_box.make_pow_target 0. in
+  let identity = P2p_identity.generate_with_pow_target_0 () in
   let private_mode = false in
   let nb_points = List.length trusted_points in
-  let unopt = Option.unopt ~default:nb_points in
+  let unopt = Option.value ~default:nb_points in
   let connect_handler_cfg =
     P2p_connect_handler.
       {
@@ -129,7 +115,7 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
         proof_of_work_target;
         listening_port = Some port;
         private_mode;
-        greylisting_config = P2p_point_state.Info.default_greylisting_config;
+        reconnection_config = P2p_point_state.Info.default_reconnection_config;
         min_connections = unopt min_connections;
         max_connections = unopt max_connections;
         max_incoming_connections = unopt max_incoming_connections;
@@ -152,18 +138,22 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
         max_known_peer_ids = None;
       }
   in
-  (* swap_linger = Time.System.Span.of_seconds_exn 0. ; *)
   Process.detach
     ~prefix:
-      (Format.asprintf "%s%a: " prefix P2p_peer.Id.pp_short identity.peer_id)
+      (Format.asprintf
+         "%s%a:%d: "
+         prefix
+         P2p_peer.Id.pp_short
+         identity.peer_id
+         port)
+    ~canceler
     (fun channel ->
-      let canceler = Lwt_canceler.create () in
       let timer ti =
         Lwt_unix.sleep ti >>= fun () -> lwt_debug "Process timeout"
       in
       with_timeout
         ~canceler
-        (Option.unopt_map ~f:timer ~default:(Lwt_utils.never_ending ()) timeout)
+        (Option.fold ~some:timer ~none:(Lwt_utils.never_ending ()) timeout)
         (fun _canceler ->
           let iteration = ref 0 in
           let sched =
@@ -191,7 +181,7 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
           Lwt_list.map_p
             (fun point ->
               P2p_pool.Points.info pool point
-              |> Option.iter ~f:(fun info ->
+              |> Option.iter (fun info ->
                      P2p_point_state.set_private info false) ;
               Lwt.return_unit)
             trusted_points
@@ -203,7 +193,7 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
           >>= fun () ->
           sync iteration channel
           >>=? fun () ->
-          (* Sync interation 1 *)
+          (* Sync interaction 1 *)
           f
             iteration
             channel
@@ -222,19 +212,28 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
           P2p_io_scheduler.shutdown sched
           >>= fun () -> lwt_log_info "Bye.@." >>= fun () -> return_unit))
 
+(**Detach one process per id in [points], each with a p2p_pool and a
+   welcome worker.
+
+   Most arguments are the same as for [detach_node] but they are
+  function that specify the value of the argument for a given position
+  in the list of points, allowing to specify the characteristics of
+  each detached node.
+
+  *)
 let detach_nodes ?prefix ?timeout ?min_connections ?max_connections
     ?max_incoming_connections ?p2p_versions ?msg_config run_node
     ?(trusted = fun _ points -> points) points =
-  let clients = List.length points in
-  Lwt_list.map_p
-    (fun n ->
-      let prefix = Option.map prefix ~f:(fun f -> f n) in
-      let p2p_versions = Option.map p2p_versions ~f:(fun f -> f n) in
-      let msg_config = Option.map msg_config ~f:(fun f -> f n) in
-      let min_connections = Option.map min_connections ~f:(fun f -> f n) in
-      let max_connections = Option.map max_connections ~f:(fun f -> f n) in
+  let canceler = Lwt_canceler.create () in
+  Lwt_list.mapi_s
+    (fun n _ ->
+      let prefix = Option.map (fun f -> f n) prefix in
+      let p2p_versions = Option.map (fun f -> f n) p2p_versions in
+      let msg_config = Option.map (fun f -> f n) msg_config in
+      let min_connections = Option.map (fun f -> f n) min_connections in
+      let max_connections = Option.map (fun f -> f n) max_connections in
       let max_incoming_connections =
-        Option.map max_incoming_connections ~f:(fun f -> f n)
+        Option.map (fun f -> f n) max_incoming_connections
       in
       let ((addr, port), other_points) = List.select n points in
       detach_node
@@ -245,18 +244,24 @@ let detach_nodes ?prefix ?timeout ?min_connections ?max_connections
         ?max_connections
         ?max_incoming_connections
         ?msg_config
+        canceler
         (run_node n)
         (trusted n points)
         other_points
         addr
         port)
-    (0 -- (clients - 1))
+    points
   >>= fun nodes ->
+  Lwt.return @@ Error_monad.map2 (fun p _p -> p) nodes nodes
+  >>=? fun nodes ->
   Lwt.ignore_result (sync_nodes nodes) ;
   Process.wait_all nodes
 
 type error += Connect | Write | Read
 
+(** Detaches [!client] nodes. Each of them will send a [Ping] to each
+    other node, then await for reading one from each other node.
+*)
 module Simple = struct
   let rec connect ~timeout connect_handler pool point =
     lwt_log_info "Connect to %a" P2p_point.Id.pp point
@@ -366,6 +371,11 @@ module Simple = struct
   let run points = detach_nodes (fun _ -> node) points
 end
 
+(** Detaches a number of nodes (which is [!clients]). Each of them will
+    connect to each other node at random points in time, to send a
+    ping, await for a message, then disconnect. This process is
+    repeated [repeat] times.
+*)
 module Random_connections = struct
   let rec connect_random connect_handler pool total rem point n =
     Lwt_unix.sleep (0.2 +. Random.float 1.0)
@@ -409,6 +419,12 @@ module Random_connections = struct
   let run points repeat = detach_nodes (fun _ _ -> node repeat) points
 end
 
+(** Detaches a number of nodes. Each will connect to all other nodes
+    (peers) of the pool, sync, write garbled data, then await for
+    reading a message. Their process will finish whenever all
+    connections are closed. It is asserted that each closed connection
+    comes with an error.
+*)
 module Garbled = struct
   let is_connection_closed = function
     | Error
@@ -438,7 +454,11 @@ module Garbled = struct
     >>=? fun () ->
     write_bad_all conns
     >>=? (fun () -> Simple.read_all conns)
-    >>= fun err -> _assert (is_connection_closed err) __LOC__ ""
+    >>= fun err ->
+    if is_connection_closed err then return_unit
+    else
+      let pos (file, lnum, cnum, _) = (file, lnum, cnum) in
+      fail (Exn (Assert_failure (pos __POS__)))
 
   let run points = detach_nodes (fun _ -> node) points
 end
@@ -535,7 +555,7 @@ module Overcrowded = struct
       P2p_point.Id.pp_list
       all_points ;
     let port =
-      Option.unopt
+      Option.value
         ~default:0
         (P2p_connect_handler.config connect_handler).listening_port
     in
@@ -609,7 +629,7 @@ module Overcrowded = struct
         (if legacy then " legacy" else "")
     else
       log_info
-        "@[<v 2>Not Good: advertisement failure. legacy %b. unkowns :  @[%a@]\n\
+        "@[<v 2>Not Good: advertisement failure. legacy %b. unknowns :  @[%a@]\n\
          \t knowns : @[%a@].@."
         legacy
         P2p_point.Id.pp_list
@@ -647,12 +667,8 @@ module Overcrowded = struct
     lwt_log_info "client closing.@." >>= fun () -> return_unit
 
   (** Code of the target that should be overcrowded by all the clients. *)
-  let target iteration channel stream connect_handler pool trusted_points
+  let target iteration channel stream _connect_handler _pool trusted_points
       all_points =
-    let _trusted = trusted_points
-    and _all_points = all_points
-    and _pool = pool
-    and _connect_handler = connect_handler in
     let unknowns_knowns () =
       P2p_pool.Points.fold_known
         _pool
@@ -674,8 +690,6 @@ module Overcrowded = struct
     lwt_debug "known : %a" P2p_point.Id.pp_list knowns
     >>= fun () ->
     let _pool_watcher =
-      Lwt.return_unit
-      >>= fun () ->
       Lwt_stream.iter
         (debug "p2p event %a" P2p_connection.P2p_event.pp)
         watcher
@@ -700,8 +714,14 @@ module Overcrowded = struct
 
   let trusted i points = if i = 0 then points else [List.hd points]
 
-  (** Running the target and the clients.
-      All clients should have their pool populated with the list of points. *)
+  (** Detaches a number of nodes: one of them is the target (its
+      max_incoming_connections is set to zero), and all the rest are
+      clients (knowing only the target). The target will be overcrowded
+      by the other clients connecting to it. All clients should have
+      their pool populated with the list of points. Specifically for
+      this test function, each client use p2p v.1 and check that they
+      eventually know all other nodes thanks to the node reply.
+  *)
   let run points =
     (* setting connections to -1 ensure there will be no random
        acceptance of connections *)
@@ -719,6 +739,11 @@ module Overcrowded = struct
       points
       ~trusted
 
+  (** Same as previously but by mixing different protocol version
+      tags. Half the clients do as in run and half of the clients use
+      p2p v.0 and check that they didn't receive new nodes (meaning
+      that [target] actually sent a Nack_v_0.
+  *)
   let run_mixed_versions points =
     let prefix = function
       | 0 ->
@@ -744,6 +769,11 @@ module Overcrowded = struct
       ~trusted
 end
 
+(** Detaches a number of nodes (one target, the rest being clients) on
+    a different network. It is asserted that the connection must be
+    rejected due to the fact that the target is not on a common
+    network.
+*)
 module No_common_network = struct
   let rec connect ?iter_count ~timeout connect_handler pool point =
     lwt_log_info
@@ -850,12 +880,8 @@ module No_common_network = struct
     lwt_log_info "client closing.@." >>= fun () -> return_unit
 
   (** Code of the target that should be overcrowded by all the clients. *)
-  let target iteration channel _stream connect_handler pool trusted_points
-      all_points =
-    let _trusted = trusted_points
-    and _all_points = all_points
-    and _pool = pool
-    and _connect_handler = connect_handler in
+  let target iteration channel _stream _connect_handler _pool _trusted_points
+      _all_points =
     lwt_log_info "Target waiting.@."
     >>= fun () ->
     sync iteration channel
@@ -952,15 +978,16 @@ let spec =
 let init_logs = lazy (Internal_event_unix.init ?lwt_log_sink:!log_config ())
 
 let wrap n f =
-  Alcotest_lwt.test_case n `Quick (fun _ () ->
-      Lazy.force init_logs
-      >>= fun () ->
-      f ()
-      >>= function
-      | Ok () ->
-          Lwt.return_unit
-      | Error error ->
-          Format.kasprintf Stdlib.failwith "%a" pp_print_error error)
+  Alcotest.test_case n `Quick (fun () ->
+      Lwt_main.run
+        ( Lazy.force init_logs
+        >>= fun () ->
+        f ()
+        >>= function
+        | Ok () ->
+            Lwt.return_unit
+        | Error error ->
+            Format.kasprintf Stdlib.failwith "%a" pp_print_error error ))
 
 let main () =
   let anon_fun _num_peers = raise (Arg.Bad "No anonymous argument.") in

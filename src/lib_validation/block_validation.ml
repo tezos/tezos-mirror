@@ -2,7 +2,8 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018 Nomadic Labs. <nomadic@tezcore.com>                    *)
+(* Copyright (c) 2018 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -50,6 +51,8 @@ type result = {
   validation_store : validation_store;
   block_metadata : Bytes.t;
   ops_metadata : Bytes.t list list;
+  block_metadata_hash : Block_metadata_hash.t option;
+  ops_metadata_hashes : Operation_metadata_hash.t list list option;
   forking_testchain : bool;
 }
 
@@ -103,14 +106,40 @@ let init_test_chain ctxt forked_header =
 let result_encoding =
   let open Data_encoding in
   conv
-    (fun {validation_store; block_metadata; ops_metadata; forking_testchain} ->
-      (validation_store, block_metadata, ops_metadata, forking_testchain))
-    (fun (validation_store, block_metadata, ops_metadata, forking_testchain) ->
-      {validation_store; block_metadata; ops_metadata; forking_testchain})
-    (obj4
+    (fun { validation_store;
+           block_metadata;
+           ops_metadata;
+           block_metadata_hash;
+           ops_metadata_hashes;
+           forking_testchain } ->
+      ( validation_store,
+        block_metadata,
+        ops_metadata,
+        block_metadata_hash,
+        ops_metadata_hashes,
+        forking_testchain ))
+    (fun ( validation_store,
+           block_metadata,
+           ops_metadata,
+           block_metadata_hash,
+           ops_metadata_hashes,
+           forking_testchain ) ->
+      {
+        validation_store;
+        block_metadata;
+        ops_metadata;
+        block_metadata_hash;
+        ops_metadata_hashes;
+        forking_testchain;
+      })
+    (obj6
        (req "validation_store" validation_store_encoding)
        (req "block_metadata" bytes)
        (req "ops_metadata" (list @@ list @@ bytes))
+       (opt "block_metadata_hash" Block_metadata_hash.encoding)
+       (opt
+          "ops_metadata_hashes"
+          (list @@ list @@ Operation_metadata_hash.encoding))
        (req "forking_testchain" bool))
 
 let may_force_protocol_upgrade ~user_activated_upgrades ~level
@@ -202,11 +231,11 @@ module Make (Proto : Registered_protocol.T) = struct
     iteri2_p
       (fun i ops quota ->
         fail_unless
-          (Option.unopt_map
-             ~default:true
-             ~f:(fun max -> List.length ops <= max)
+          (Option.fold
+             ~none:true
+             ~some:(fun max -> List.length ops <= max)
              quota.Tezos_protocol_environment.max_op)
-          (let max = Option.unopt ~default:~-1 quota.max_op in
+          (let max = Option.value ~default:~-1 quota.max_op in
            invalid_block
              (Too_many_operations {pass = i + 1; found = List.length ops; max}))
         >>=? fun () ->
@@ -252,8 +281,9 @@ module Make (Proto : Registered_protocol.T) = struct
 
   let apply chain_id ~user_activated_upgrades
       ~user_activated_protocol_overrides ~max_operations_ttl
-      ~(predecessor_block_header : Block_header.t) ~predecessor_context
-      ~(block_header : Block_header.t) operations =
+      ~(predecessor_block_header : Block_header.t)
+      ~predecessor_block_metadata_hash ~predecessor_ops_metadata_hash
+      ~predecessor_context ~(block_header : Block_header.t) operations =
     let block_hash = Block_header.hash block_header in
     let invalid_block = invalid_block block_hash in
     check_block_header ~predecessor_block_header block_hash block_header
@@ -269,6 +299,18 @@ module Make (Proto : Registered_protocol.T) = struct
     >>=? fun context ->
     parse_operations block_hash operations
     >>=? fun operations ->
+    ( match predecessor_block_metadata_hash with
+    | None ->
+        Lwt.return context
+    | Some hash ->
+        Context.set_predecessor_block_metadata_hash context hash )
+    >>= fun context ->
+    ( match predecessor_ops_metadata_hash with
+    | None ->
+        Lwt.return context
+    | Some hash ->
+        Context.set_predecessor_ops_metadata_hash context hash )
+    >>= fun context ->
     let context = Shell_context.wrap_disk_context context in
     Proto.begin_application
       ~chain_id
@@ -345,15 +387,17 @@ module Make (Proto : Registered_protocol.T) = struct
             }))
     >>=? fun () ->
     ( if Protocol_hash.equal new_protocol Proto.hash then
-      return validation_result
+      return (validation_result, Proto.environment_version)
     else
       match Registered_protocol.get new_protocol with
       | None ->
           fail
             (Unavailable_protocol {block = block_hash; protocol = new_protocol})
       | Some (module NewProto) ->
-          NewProto.init validation_result.context block_header.shell )
-    >>=? fun validation_result ->
+          NewProto.init validation_result.context block_header.shell
+          >|=? fun validation_result ->
+          (validation_result, NewProto.environment_version) )
+    >>=? fun (validation_result, new_protocol_env_version) ->
     let max_operations_ttl =
       max 0 (min (max_operations_ttl + 1) validation_result.max_operations_ttl)
     in
@@ -389,6 +433,17 @@ module Make (Proto : Registered_protocol.T) = struct
     let context =
       Shell_context.unwrap_disk_context validation_result.context
     in
+    ( match new_protocol_env_version with
+    | Protocol.V0 ->
+        return (None, None)
+    | Protocol.V1 ->
+        return
+          ( Some
+              (List.map
+                 (List.map (fun r -> Operation_metadata_hash.hash_bytes [r]))
+                 ops_metadata),
+            Some (Block_metadata_hash.hash_bytes [block_metadata]) ) )
+    >>=? fun (ops_metadata_hashes, block_metadata_hash) ->
     Context.commit
       ~time:block_header.shell.timestamp
       ?message:validation_result.message
@@ -402,43 +457,76 @@ module Make (Proto : Registered_protocol.T) = struct
         last_allowed_fork_level = validation_result.last_allowed_fork_level;
       }
     in
-    return {validation_store; block_metadata; ops_metadata; forking_testchain}
+    return
+      {
+        validation_store;
+        block_metadata;
+        ops_metadata;
+        block_metadata_hash;
+        ops_metadata_hashes;
+        forking_testchain;
+      }
 end
 
 let assert_no_duplicate_operations block_hash live_operations operations =
-  fold_left_s
-    (fold_left_s (fun live_operations op ->
-         let oph = Operation.hash op in
-         fail_when
-           (Operation_hash.Set.mem oph live_operations)
-           (invalid_block block_hash @@ Replayed_operation oph)
-         >>=? fun () -> return (Operation_hash.Set.add oph live_operations)))
-    live_operations
-    operations
-  >>=? fun _ -> return_unit
+  let exception Duplicate of block_error in
+  try
+    ok
+      (List.fold_left
+         (List.fold_left (fun live_operations op ->
+              let oph = Operation.hash op in
+              if Operation_hash.Set.mem oph live_operations then
+                raise (Duplicate (Replayed_operation oph))
+              else Operation_hash.Set.add oph live_operations))
+         live_operations
+         operations)
+  with Duplicate err -> error (invalid_block block_hash err)
 
 let assert_operation_liveness block_hash live_blocks operations =
-  iter_s
-    (iter_s (fun op ->
-         fail_unless
-           (Block_hash.Set.mem op.Operation.shell.branch live_blocks)
-           ( invalid_block block_hash
-           @@ Outdated_operation
-                {
-                  operation = Operation.hash op;
-                  originating_block = op.shell.branch;
-                } )))
-    operations
+  let exception Outdated of block_error in
+  try
+    ok
+      (List.iter
+         (List.iter (fun op ->
+              if not (Block_hash.Set.mem op.Operation.shell.branch live_blocks)
+              then
+                let error =
+                  Outdated_operation
+                    {
+                      operation = Operation.hash op;
+                      originating_block = op.shell.branch;
+                    }
+                in
+                raise (Outdated error)))
+         operations)
+  with Outdated err -> error (invalid_block block_hash err)
 
+(* Maybe this function should be moved somewhere else since it used
+   once by [Block_validator_process] *)
 let check_liveness ~live_blocks ~live_operations block_hash operations =
   assert_no_duplicate_operations block_hash live_operations operations
-  >>=? fun () ->
-  assert_operation_liveness block_hash live_blocks operations
-  >>=? fun () -> return_unit
+  >>? fun _ -> assert_operation_liveness block_hash live_blocks operations
 
-let apply chain_id ~user_activated_upgrades ~user_activated_protocol_overrides
-    ~max_operations_ttl ~(predecessor_block_header : Block_header.t)
-    ~predecessor_context ~(block_header : Block_header.t) operations =
+type apply_environment = {
+  max_operations_ttl : int;
+  chain_id : Chain_id.t;
+  predecessor_block_header : Block_header.t;
+  predecessor_context : Context.t;
+  predecessor_block_metadata_hash : Block_metadata_hash.t option;
+  predecessor_ops_metadata_hash : Operation_metadata_list_list_hash.t option;
+  user_activated_upgrades : User_activated.upgrades;
+  user_activated_protocol_overrides : User_activated.protocol_overrides;
+}
+
+let apply
+    { chain_id;
+      user_activated_upgrades;
+      user_activated_protocol_overrides;
+      max_operations_ttl;
+      predecessor_block_header;
+      predecessor_block_metadata_hash;
+      predecessor_ops_metadata_hash;
+      predecessor_context } block_header operations =
   let block_hash = Block_header.hash block_header in
   Context.get_protocol predecessor_context
   >>= fun pred_protocol_hash ->
@@ -457,6 +545,8 @@ let apply chain_id ~user_activated_upgrades ~user_activated_protocol_overrides
     ~user_activated_protocol_overrides
     ~max_operations_ttl
     ~predecessor_block_header
+    ~predecessor_block_metadata_hash
+    ~predecessor_ops_metadata_hash
     ~predecessor_context
     ~block_header
     operations

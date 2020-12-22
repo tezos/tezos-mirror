@@ -25,16 +25,13 @@
 (*****************************************************************************)
 
 open Cmdliner
-
-let ( // ) = Filename.concat
+open Filename.Infix
 
 type t = {
   data_dir : string option;
   config_file : string;
   network : Node_config_file.blockchain_network option;
-  min_connections : int option;
-  expected_connections : int option;
-  max_connections : int option;
+  connections : int option;
   max_download_speed : int option;
   max_upload_speed : int option;
   binary_chunks_size : int option;
@@ -54,60 +51,32 @@ type t = {
   log_output : Lwt_log_sink_unix.Output.t option;
   bootstrap_threshold : int option;
   history_mode : History_mode.t option;
+  synchronisation_threshold : int option;
+  latency : int option;
 }
 
 let wrap data_dir config_file network connections max_download_speed
     max_upload_speed binary_chunks_size peer_table_size listen_addr
     discovery_addr peers no_bootstrap_peers bootstrap_threshold private_mode
     disable_mempool enable_testchain expected_pow rpc_listen_addrs rpc_tls
-    cors_origins cors_headers log_output history_mode =
+    cors_origins cors_headers log_output history_mode synchronisation_threshold
+    latency =
   let actual_data_dir =
-    Option.unopt ~default:Node_config_file.default_data_dir data_dir
+    Option.value ~default:Node_config_file.default_data_dir data_dir
   in
   let config_file =
-    Option.unopt
+    Option.value
       ~default:(actual_data_dir // Node_data_version.default_config_file_name)
       config_file
   in
   let rpc_tls =
-    Option.map ~f:(fun (cert, key) -> {Node_config_file.cert; key}) rpc_tls
-  in
-  (* when `--connections` is used,
-     override all the bounds defined in the configuration file. *)
-  let ( bootstrap_threshold,
-        min_connections,
-        expected_connections,
-        max_connections,
-        peer_table_size ) =
-    match connections with
-    | None ->
-        (bootstrap_threshold, None, None, None, peer_table_size)
-    | Some x -> (
-        let peer_table_size =
-          match peer_table_size with
-          | None ->
-              Some (8 * x)
-          | Some _ ->
-              peer_table_size
-        in
-        match bootstrap_threshold with
-        | None ->
-            ( Some (min (x / 4) 2),
-              Some (x / 2),
-              Some x,
-              Some (3 * x / 2),
-              peer_table_size )
-        | Some bs ->
-            (Some bs, Some (x / 2), Some x, Some (3 * x / 2), peer_table_size)
-        )
+    Option.map (fun (cert, key) -> {Node_config_file.cert; key}) rpc_tls
   in
   {
     data_dir;
     config_file;
     network;
-    min_connections;
-    expected_connections;
-    max_connections;
+    connections;
     max_download_speed;
     max_upload_speed;
     binary_chunks_size;
@@ -127,6 +96,8 @@ let wrap data_dir config_file network connections max_download_speed
     peer_table_size;
     bootstrap_threshold;
     history_mode;
+    synchronisation_threshold;
+    latency;
   }
 
 module Manpage = struct
@@ -168,23 +139,23 @@ module Term = struct
 
   let network_name_converter =
     let of_string s =
-      try
-        let ntw =
-          List.assoc
-            (String.lowercase_ascii s)
-            Node_config_file.builtin_blockchain_networks
-        in
-        Ok ntw
-      with Not_found ->
-        Error
-          (`Msg
-            (Format.asprintf
-               "invalid value '%s', expected one of '%a'"
-               s
-               (Format.pp_print_list
-                  ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
-                  Format.pp_print_string)
-               (List.map fst Node_config_file.builtin_blockchain_networks)))
+      match
+        List.assoc_opt
+          (String.lowercase_ascii s)
+          Node_config_file.builtin_blockchain_networks
+      with
+      | Some ntw ->
+          Ok ntw
+      | None ->
+          Error
+            (`Msg
+              (Format.asprintf
+                 "invalid value '%s', expected one of '%a'"
+                 s
+                 (Format.pp_print_list
+                    ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
+                    Format.pp_print_string)
+                 (List.map fst Node_config_file.builtin_blockchain_networks)))
     in
     let printer ppf ({alias; _} : Node_config_file.blockchain_network) =
       (* Should not fail by construction of Node_config_file.block_chain_network *)
@@ -228,8 +199,11 @@ module Term = struct
       "The directory where the Tezos node will store all its data. Parent \
        directories are created if necessary."
     in
+    let env = Arg.env_var Node_config_file.data_dir_env_name in
     Arg.(
-      value & opt (some string) None & info ~docs ~doc ~docv:"DIR" ["data-dir"])
+      value
+      & opt (some string) None
+      & info ~docs ~env ~doc ~docv:"DIR" ["data-dir"; "d"])
 
   let config_file =
     let doc = "The main configuration file." in
@@ -263,9 +237,9 @@ module Term = struct
     let doc =
       "Sets min_connections, expected_connections, max_connections to NUM / \
        2, NUM, (3 * NUM) / 2, respectively. Sets peer_table_size to 8 * NUM \
-       unless it is already defined in the configuration file. Sets \
-       bootstrap_threshold to min(NUM / 4, 2) unless it is already defined in \
-       the configuration file."
+       unless it is already defined on the command line. Sets \
+       synchronisation_threshold to max(NUM / 4, 2) unless it is already \
+       defined on the command line."
     in
     Arg.(
       value & opt (some int) None & info ~docs ~doc ~docv:"NUM" ["connections"])
@@ -328,8 +302,8 @@ module Term = struct
 
   let bootstrap_threshold =
     let doc =
-      "Set the number of peers with whom a chain synchronization must be \
-       completed to bootstrap the node"
+      "[DEPRECATED: use synchronisation_threshold instead] The number of \
+       peers to synchronize with before declaring the node bootstrapped."
     in
     Arg.(
       value
@@ -374,6 +348,28 @@ module Term = struct
        validating the test network blocks."
     in
     Arg.(value & flag & info ~docs ~doc ["enable-testchain"])
+
+  let synchronisation_threshold =
+    let doc =
+      "Set the number of peers with whom a chain synchronization must be \
+       completed to bootstrap the node"
+    in
+    Arg.(
+      value
+      & opt (some int) None
+      & info ~docs ~doc ~docv:"NUM" ["synchronisation-threshold"])
+
+  let latency =
+    let doc =
+      "[latency] is the time interval (in seconds) used to determine if a \
+       peer is synchronized with a chain. For instance, a peer whose known \
+       head has a timestamp T is considered synchronized if T >= now - \
+       max_latency. This parameter's default value was set with the chain's \
+       current protocol's baking rate in mind (and some allowance for network \
+       latency)."
+    in
+    Arg.(
+      value & opt (some int) None & info ~docs ~doc ~docv:"NUM" ["sync-latency"])
 
   (* rpc args *)
   let docs = Manpage.rpc_section
@@ -420,6 +416,7 @@ module Term = struct
     $ no_bootstrap_peers $ bootstrap_threshold $ private_mode $ disable_mempool
     $ enable_testchain $ expected_pow $ rpc_listen_addrs $ rpc_tls
     $ cors_origins $ cors_headers $ log_output $ history_mode
+    $ synchronisation_threshold $ latency
 end
 
 let read_config_file args =
@@ -431,7 +428,7 @@ let read_data_dir args =
   read_config_file args
   >>=? fun cfg ->
   let {data_dir; _} = args in
-  let data_dir = Option.unopt ~default:cfg.data_dir data_dir in
+  let data_dir = Option.value ~default:cfg.data_dir data_dir in
   return data_dir
 
 type error +=
@@ -439,6 +436,8 @@ type error +=
       configuration_file_chain_name : Distributed_db_version.Name.t;
       command_line_chain_name : Distributed_db_version.Name.t;
     }
+
+type error += Invalid_command_line_arguments of string
 
 let () =
   register_error_kind
@@ -475,7 +474,20 @@ let () =
             Distributed_db_version.Name.of_string configuration_file_chain_name;
           command_line_chain_name =
             Distributed_db_version.Name.of_string command_line_chain_name;
-        })
+        }) ;
+  register_error_kind
+    `Permanent
+    ~id:"node.config.invalidcommandlinearguments"
+    ~title:"Invalid command line arguments"
+    ~description:"Given command line arguments are invalid"
+    ~pp:(fun ppf explanation ->
+      Format.fprintf
+        ppf
+        "@[Specified command line arguments are invalid: %s@]"
+        explanation)
+    Data_encoding.(obj1 (req "explanation" string))
+    (function Invalid_command_line_arguments x -> Some x | _ -> None)
+    (fun explanation -> Invalid_command_line_arguments explanation)
 
 module Event = struct
   include Internal_event.Simple
@@ -493,9 +505,7 @@ let read_and_patch_config_file ?(may_override_network = false)
   read_config_file args
   >>=? fun cfg ->
   let { data_dir;
-        min_connections;
-        expected_connections;
-        max_connections;
+        connections;
         max_download_speed;
         max_upload_speed;
         binary_chunks_size;
@@ -516,13 +526,27 @@ let read_and_patch_config_file ?(may_override_network = false)
         bootstrap_threshold;
         history_mode;
         network;
-        config_file = _ } =
+        config_file = _;
+        synchronisation_threshold;
+        latency } =
     args
   in
+  ( match (bootstrap_threshold, synchronisation_threshold) with
+  | (Some _, Some _) ->
+      fail
+        (Invalid_command_line_arguments
+           "--bootstrap-threshold is deprecated; use \
+            --synchronisation-threshold instead. Do not use both at the same \
+            time.")
+  | (None, Some threshold) | (Some threshold, None) ->
+      return_some threshold
+  | (None, None) ->
+      return_none )
+  >>=? fun synchronisation_threshold ->
   (* Overriding the network with [--network] is a bad idea if the configuration
      file already specifies it. Essentially, [--network] tells the node
      "if there is no config file, use this network; otherwise, check that the
-     config file uses the network I expect". This behavior can be overriden
+     config file uses the network I expect". This behavior can be overridden
      by [may_override_network], which is used when doing [config init]. *)
   ( match network with
   | None ->
@@ -560,6 +584,47 @@ let read_and_patch_config_file ?(may_override_network = false)
     in
     return (cfg_peers @ peers) )
   >>=? fun bootstrap_peers ->
+  (* when `--connections` is used,
+     override all the bounds defined in the configuration file. *)
+  let ( synchronisation_threshold,
+        min_connections,
+        expected_connections,
+        max_connections,
+        peer_table_size ) =
+    match connections with
+    | None ->
+        (synchronisation_threshold, None, None, None, peer_table_size)
+    | Some x -> (
+        let peer_table_size =
+          match peer_table_size with
+          | None ->
+              Some (8 * x)
+          | Some _ ->
+              peer_table_size
+        in
+        (* connections sets a new value for the
+           [synchronisation_threshold] except if a value for it was
+           specified on the command line. *)
+        match synchronisation_threshold with
+        | None ->
+            (* We want to synchronise with at least 2 peers and to a
+              number of people proportional to the number of peers we
+              are connected with. Because a heuristic is used, we only
+              need to be synchronised with a sufficiently large number
+              of our peers. (x/4) is enough if the
+              `synchronisation-threshold` is not set. *)
+            ( Some (max (x / 4) 2),
+              Some (x / 2),
+              Some x,
+              Some (3 * x / 2),
+              peer_table_size )
+        | Some threshold ->
+            ( Some threshold,
+              Some (x / 2),
+              Some x,
+              Some (3 * x / 2),
+              peer_table_size ) )
+  in
   Node_config_file.update
     ?data_dir
     ?min_connections
@@ -581,7 +646,8 @@ let read_and_patch_config_file ?(may_override_network = false)
     ~cors_headers
     ?rpc_tls
     ?log_output
-    ?bootstrap_threshold
+    ?synchronisation_threshold
     ?history_mode
     ?network
+    ?latency
     cfg

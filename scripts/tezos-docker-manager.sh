@@ -686,7 +686,7 @@ usage() {
     echo "Container prefix:"
     echo "    container:<FILE>"
     echo "      can be used anywhere 'file:<FILE>' is permitted in client commands."
-    echo "      It will cause the referenced file to be copied into the docker conainer."
+    echo "      It will cause the referenced file to be copied into the docker container."
     echo "      Files will be renamed, which may make errors difficult to read"
 }
 
@@ -702,23 +702,23 @@ command="$1"
 if [ "$#" -eq 0 ] ; then usage ; exit 1;  else shift ; fi
 
 case $(basename "$0") in
-    carthagenet.sh)
-        docker_base_dir="$HOME/.tezos-carthagenet"
-        docker_image=tezos/tezos:v7.5
-        docker_compose_base_name=carthagenet
-        default_port=19732
-        network=carthagenet
-        ;;
     delphinet.sh)
         docker_base_dir="$HOME/.tezos-delphinet"
-        docker_image=tezos/tezos:v7.5
+        docker_image=tezos/tezos:v8.0
         docker_compose_base_name=delphinet
         default_port=9732
         network=delphinet
         ;;
+    edonet.sh)
+        docker_base_dir="$HOME/.tezos-edonet"
+        docker_image=tezos/tezos:v8.0
+        docker_compose_base_name=edonet
+        default_port=9732
+        network=edonet
+        ;;
     *)
         docker_base_dir="$HOME/.tezos-mainnet"
-        docker_image=tezos/tezos:v7.5
+        docker_image=tezos/tezos:v8.0
         docker_compose_base_name="mainnet"
         default_port=9732
         network=mainnet

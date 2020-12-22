@@ -24,11 +24,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module defines some condition values for inter modules synchronization.
+(** This module defines some condition values for inter modules
+   synchronization.
 
-    Conditions are triggered by [P2p_pool] and [P2p_connect_handler].
-    There are used in particular by the maintenance worker in
-    [P2p_maintenance]. *)
+   Conditions are triggered by [P2p_pool] and [P2p_connect_handler].
+   They are used in particular by the maintenance worker in
+   [P2p_maintenance]. Conditions are always broadcast (and not
+   signaled), waiters should take that into account and avoid side
+   effects *)
 
 type t
 

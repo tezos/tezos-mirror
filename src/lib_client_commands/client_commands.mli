@@ -27,7 +27,7 @@ open Client_context
 
 type command = full Clic.command
 
-type network = [`Mainnet | `Alphanet | `Zeronet | `Sandbox]
+type network = [`Mainnet | `Testnet]
 
 exception Version_not_found
 
@@ -36,4 +36,4 @@ val register : Protocol_hash.t -> (network option -> command list) -> unit
 val commands_for_version : Protocol_hash.t -> network option -> command list
 
 val get_versions :
-  unit -> (Protocol_hash.t * (network option -> command list)) list
+  unit -> (Protocol_hash.t * (network option -> command list)) Seq.t

@@ -24,7 +24,9 @@
 (*****************************************************************************)
 
 module Make (Prefix : Sig.PREFIX) : sig
-  include Sig.CORE
+  type error = ..
+
+  include Sig.CORE with type error := error
 
   include Sig.EXT with type error := error
 

@@ -43,7 +43,7 @@ let unexpected_worker_error =
     ~name:"unexpected_worker_error"
     ~msg:"unexpected worker error: {trace}"
     ~level:Notice
-    ~pp1:Event.pp_first_error_of_trace
+    ~pp1:pp_print_error_first
     ("trace", trace_encoding)
 
 let previously_validated_protocol =

@@ -1061,7 +1061,8 @@ let wrap (n, f) =
           Format.kasprintf Stdlib.failwith "%a" pp_print_error error)
 
 let () =
-  Alcotest.run
+  Alcotest_lwt.run
     ~argv:[|""|]
     "tezos-lib-client"
     [("micheline v1 macros", List.map wrap tests)]
+  |> Lwt_main.run

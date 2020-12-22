@@ -52,6 +52,12 @@ end
 module type CYCLIC_GROUP = sig
   type t
 
+  val pp : Format.formatter -> t -> unit
+
+  include Compare.S with type t := t
+
+  include S.RAW_DATA with type t := t
+
   include S.B58_DATA with type t := t
 
   include S.ENCODER with type t := t
@@ -67,8 +73,6 @@ module type CYCLIC_GROUP = sig
   val g2 : t
 
   val ( * ) : t -> t -> t
-
-  val ( = ) : t -> t -> bool
 
   val pow : t -> Z_m.t -> t
 
@@ -104,7 +108,7 @@ module type DLEQ = sig
   (** Creates a zero-knowledge proof of knowledge of the exponent list *)
   val make_proof : equation -> exponent list -> proof
 
-  (** Checkes the proof created by make_proof for a given equation *)
+  (** Checks the proof created by make_proof for a given equation *)
   val check_proof : equation -> proof -> bool
 end
 
@@ -163,24 +167,49 @@ module MakeDleq (G : CYCLIC_GROUP) :
   let check_proof (b1, h1_n, b2_n, h2_n) (c, r_n) =
     (* First check that the lists have the same sizes. *)
     let same_sizes =
-      List.(
-        Compare.Int.(
-          length h1_n = length b2_n
-          && length b2_n = length h2_n
-          && length h2_n = length r_n))
+      (Compare.Int.equal 0 @@ List.compare_lengths h1_n b2_n)
+      && (Compare.Int.equal 0 @@ List.compare_lengths b2_n h2_n)
+      && (Compare.Int.equal 0 @@ List.compare_lengths h2_n r_n)
     in
     if not same_sizes then false
     else
       let a1_n =
+        (* Original, non-optimized form
         List.map2
           G.( * )
           (List.map (G.pow b1) r_n)
           (List.map (fun h1 -> G.pow h1 c) h1_n)
+        *)
+        List.map2
+          (fun r h1 ->
+            let open G in
+            pow b1 r * pow h1 c)
+          r_n
+          h1_n
       and a2_n =
+        (* Original, non-optimized form
         List.map2
           G.( * )
           (List.map2 G.pow b2_n r_n)
           (List.map (fun h2 -> G.pow h2 c) h2_n)
+        *)
+        let rec map3 f xs ys zs =
+          match (xs, ys, zs) with
+          | ([], [], []) ->
+              []
+          | (x :: xs, y :: ys, z :: zs) ->
+              let r = f x y z in
+              r :: map3 f xs ys zs
+          | _ ->
+              invalid_arg "Pvss: List.map3"
+        in
+        map3
+          (fun b2 r h2 ->
+            let open G in
+            pow b2 r * pow h2 c)
+          b2_n
+          r_n
+          h2_n
       in
       G.Z_m.(c = fiat_shamir (List.concat [h1_n; h2_n; a1_n; a2_n]))
 end
@@ -200,7 +229,19 @@ module type PVSS = sig
 
   module Clear_share : ENCODED
 
-  module Public_key : ENCODED
+  module Public_key : sig
+    type t
+
+    val pp : Format.formatter -> t -> unit
+
+    include Compare.S with type t := t
+
+    include S.RAW_DATA with type t := t
+
+    include S.B58_DATA with type t := t
+
+    include S.ENCODER with type t := t
+  end
 
   module Secret_key : sig
     include ENCODED
@@ -214,7 +255,7 @@ module type PVSS = sig
 
   val dealer_shares_and_proof :
     secret:Secret_key.t ->
-    t:int ->
+    threshold:int ->
     public_keys:Public_key.t list ->
     Encrypted_share.t list * Commitment.t list * proof
 
@@ -281,7 +322,7 @@ module MakePvss (G : CYCLIC_GROUP) : PVSS = struct
       [String.concat "||" [G.Z_m.to_bits secret]]
       |> H.hash_string |> H.to_string
     in
-    (* TODO: guard against buffer overlow *)
+    (* TODO: guard against buffer overflow *)
     let rec make_coefs = function
       | 0 ->
           []
@@ -297,11 +338,11 @@ module MakePvss (G : CYCLIC_GROUP) : PVSS = struct
     let poly = PZ_m.of_list coefs in
     (coefs, poly)
 
-  (* Hides secret s in a random polynomial of degree t, publishes t commitments
-     to the polynomial coefficients and n encrypted shares for the holders of
-     the public keys *)
-  let dealer_shares_and_proof ~secret ~t ~public_keys =
-    let (coefs, poly) = random_polynomial secret t in
+  (* Hides secret s in a random polynomial of degree t = threshold, publishes t
+     commitments to the polynomial coefficients and n encrypted shares for the
+     holders of the public keys *)
+  let dealer_shares_and_proof ~secret ~threshold ~public_keys =
+    let (coefs, poly) = random_polynomial secret threshold in
     let
         (*  Cⱼ represents the commitment to the coefficients of the polynomial
           Cⱼ = g₁^(aⱼ) for j in 0 to t-1  *)
@@ -334,8 +375,17 @@ module MakePvss (G : CYCLIC_GROUP) : PVSS = struct
     let x_i =
       (* prod_C_j_to_the__i_to_the_j = i ↦ Πⱼ₌₀ᵗ⁻¹ Cⱼ^(iʲ) *)
       let prod_C_j_to_the__i_to_the_j i =
+        (* Original, non-optimized form
         List.mapi (fun j cC -> G.pow cC (G.Z_m.pow i (Z.of_int j))) cC_j
         |> List.fold_left G.( * ) G.e
+        *)
+        List.fold_left
+          (fun (power, acc) cC ->
+            let open G in
+            (Z_m.( * ) power i, acc * pow cC power))
+          (G.Z_m.one, G.e)
+          cC_j
+        |> snd
       in
       List.mapi
         (fun i _ -> prod_C_j_to_the__i_to_the_j (i + 1 |> G.Z_m.of_int))
@@ -366,6 +416,7 @@ module MakePvss (G : CYCLIC_GROUP) : PVSS = struct
     (* check that there enough reveals *)
     let indices = List.map (fun x -> G.Z_m.of_int (1 + x)) int_indices in
     let lagrange i =
+      (* Original, non-optimized form
       List.fold_left
         G.Z_m.( * )
         G.Z_m.one
@@ -379,7 +430,29 @@ module MakePvss (G : CYCLIC_GROUP) : PVSS = struct
                | Some inverse ->
                    G.Z_m.(j * inverse))
            indices)
+      *)
+      List.fold_left
+        (fun acc indice ->
+          if G.Z_m.( = ) indice i then acc
+          else
+            match G.Z_m.(inv (indice - i)) with
+            | None ->
+                failwith "Unexpected error inverting scalar."
+            | Some inverse ->
+                let open G.Z_m in
+                acc * indice * inverse)
+        G.Z_m.one
+        indices
     in
+    (* Original, non-optimized form
     let lagrange = List.map lagrange indices in
     List.fold_left G.( * ) G.e (List.map2 G.pow reveals lagrange)
+    *)
+    List.fold_left2
+      (fun acc reveal indice ->
+        let open G in
+        acc * pow reveal (lagrange indice))
+      G.e
+      reveals
+      indices
 end

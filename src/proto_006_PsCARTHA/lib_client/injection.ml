@@ -31,7 +31,7 @@ open Protocol_client_context
 
 let get_branch (rpc_config : #Protocol_client_context.full) ~chain
     ~(block : Block_services.block) branch =
-  let branch = Option.unopt ~default:0 branch in
+  let branch = Option.value ~default:0 branch in
   (* TODO export parameter *)
   ( match block with
   | `Head n ->
@@ -761,9 +761,11 @@ let inject_operation (type kind) cctxt ~chain ~block ?confirmations
           j
         >>=? fun op' ->
         match op'.receipt with
-        | No_operation_metadata ->
+        | None ->
+            failwith "Internal error: pruned metadata."
+        | Some No_operation_metadata ->
             failwith "Internal error: unexpected receipt."
-        | Operation_metadata receipt -> (
+        | Some (Operation_metadata receipt) -> (
           match Apply_results.kind_equal_list contents receipt.contents with
           | Some Apply_results.Eq ->
               return (receipt : kind operation_metadata)

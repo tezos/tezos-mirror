@@ -30,7 +30,7 @@ let incr_fitness fitness =
     match fitness with
     | [fitness] ->
         Data_encoding.Binary.of_bytes_opt Data_encoding.int64 fitness
-        |> Option.unopt ~default:0L |> Int64.succ
+        |> Option.value ~default:0L |> Int64.succ
         |> Data_encoding.Binary.to_bytes_exn Data_encoding.int64
     | _ ->
         Data_encoding.Binary.to_bytes_exn Data_encoding.int64 1L
@@ -124,12 +124,22 @@ let build_valid_chain state vtbl pred names =
              }
              : Block_validation.validation_store )
          in
+         let block_metadata = zero in
+         let block_metadata_hash =
+           Option.some @@ Block_metadata_hash.hash_bytes [block_metadata]
+         in
+         let operations_metadata = [[zero]] in
+         let operations_metadata_hashes =
+           Some [[Operation_metadata_hash.hash_bytes [zero]]]
+         in
          State.Block.store
            state
            block
-           zero
+           block_metadata
            [[op]]
-           [[zero]]
+           operations_metadata
+           block_metadata_hash
+           operations_metadata_hashes
            ( {
                context_hash;
                message = validation_store.message;
@@ -142,7 +152,7 @@ let build_valid_chain state vtbl pred names =
          >>=? fun _vblock ->
          State.Block.read state hash
          >>=? fun vblock ->
-         Hashtbl.add vtbl name vblock ;
+         String.Hashtbl.add vtbl name vblock ;
          return vblock)
         >>= function
         | Ok v ->
@@ -171,17 +181,17 @@ let build_valid_chain state vtbl pred names =
   >>= fun _ -> Lwt.return_unit
 
 type state = {
-  vblock : (string, State.Block.t) Hashtbl.t;
+  vblock : State.Block.t String.Hashtbl.t;
   state : State.t;
   chain : State.Chain.t;
 }
 
-let vblock s = Hashtbl.find s.vblock
+let vblock s k = Option.get @@ String.Hashtbl.find s.vblock k
 
 exception Found of string
 
 let vblocks s =
-  Hashtbl.fold (fun k v acc -> (k, v) :: acc) s.vblock []
+  String.Hashtbl.fold (fun k v acc -> (k, v) :: acc) s.vblock []
   |> List.sort Stdlib.compare
 
 (*******************************************************)
@@ -193,19 +203,19 @@ let vblocks s =
 *)
 
 let build_example_tree chain =
-  let vtbl = Hashtbl.create 23 in
+  let vtbl = String.Hashtbl.create 23 in
   Chain.genesis chain
   >>= fun genesis ->
-  Hashtbl.add vtbl "Genesis" genesis ;
+  String.Hashtbl.add vtbl "Genesis" genesis ;
   let c = ["A1"; "A2"; "A3"; "A4"; "A5"; "A6"; "A7"; "A8"] in
   build_valid_chain chain vtbl genesis c
   >>= fun () ->
-  let a3 = Hashtbl.find vtbl "A3" in
+  let a3 = Option.get @@ String.Hashtbl.find vtbl "A3" in
   let c = ["B1"; "B2"; "B3"; "B4"; "B5"; "B6"; "B7"; "B8"] in
   build_valid_chain chain vtbl a3 c >>= fun () -> Lwt.return vtbl
 
 let wrap_state_init f base_dir =
-  let ( // ) = Filename.concat in
+  let open Filename.Infix in
   let store_root = base_dir // "store" in
   let context_root = base_dir // "context" in
   State.init
@@ -296,7 +306,7 @@ let test_set_checkpoint_then_purge_full (s : state) =
   State.Block.read_opt s.chain ha1
   >|= (function Some _header -> assert true | None -> assert false)
   >>= fun () ->
-  (* and is accesible in Store.Block.Header *)
+  (* and is accessible in Store.Block.Header *)
   Store.Block.Pruned_contents.known (block_store, ha1)
   >|= (fun b -> assert b)
   >>= fun () -> return_unit
@@ -499,7 +509,7 @@ let seed =
 
 let test_locator s =
   let check_locator length h1 expected =
-    State.compute_locator s.chain ~size:length (vblock s h1) seed
+    State.compute_locator s.chain ~max_size:length (vblock s h1) seed
     >>= fun l ->
     let (_, l) = (l : Block_locator.t :> _ * _) in
     if List.length l <> List.length expected then

@@ -37,11 +37,15 @@ if [ "$(ocaml -vnum)" != "$ocaml_version" ]; then
     opam install --unlock-base ocaml-base-compiler.$ocaml_version
 fi
 
+# Must be done before install_build_deps.raw.sh because install_build_deps.raw.sh installs
+# opam packages that depend on Rust.
+"$script_dir"/install_build_deps.rust.sh
+
 opam install --yes opam-depext
 
 "$script_dir"/install_build_deps.raw.sh
 
 if [ -n "$dev" ]; then
     opam repository add default --rank=-1 > /dev/null 2>&1 || true
-    opam install merlin odoc bisect_ppx.1.4.2 --criteria="-changed,-removed"
+    opam install merlin odoc --criteria="-changed,-removed"
 fi

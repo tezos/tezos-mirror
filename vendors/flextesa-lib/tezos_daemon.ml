@@ -38,19 +38,19 @@ let to_script state (t : t) =
   | Baker key ->
       let node_path = Tezos_node.data_dir state t.node in
       call t
-        [ "--port"
-        ; sprintf "%d" t.node.Tezos_node.rpc_port
+        [ "--endpoint"
+        ; sprintf "http://localhost:%d" t.node.Tezos_node.rpc_port
         ; "--base-dir"; base_dir; "run"; "with"; "local"; "node"; node_path
         ; key ]
   | Endorser key ->
       call t
-        [ "--port"
-        ; sprintf "%d" t.node.Tezos_node.rpc_port
+        [ "--endpoint"
+        ; sprintf "http://localhost:%d" t.node.Tezos_node.rpc_port
         ; "--base-dir"; base_dir; "run"; key ]
   | Accuser ->
       call t
-        [ "--port"
-        ; sprintf "%d" t.node.Tezos_node.rpc_port
+        [ "--endpoint"
+        ; sprintf "http://localhost:%d" t.node.Tezos_node.rpc_port
         ; "--base-dir"; base_dir; "run"; "--preserved-levels"; "10" ]
 
 let process state (t : t) =

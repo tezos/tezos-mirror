@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018 Nomadic Labs. <nomadic@tezcore.com>                    *)
+(* Copyright (c) 2018 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -85,7 +85,7 @@ module Term = struct
       Store.close store ;
       State.close state >>= fun () -> return_unit
     in
-    match Lwt_main.run run with
+    match Lwt_main.run @@ Lwt_exit.wrap_and_exit run with
     | Ok () ->
         `Ok ()
     | Error err ->

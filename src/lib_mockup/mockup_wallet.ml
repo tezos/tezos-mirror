@@ -27,42 +27,22 @@ open Tezos_client_base
 
 type bootstrap_secret = {name : string; sk_uri : Client_keys.sk_uri}
 
-let bootstrap_accounts =
-  [ {
-      name = "bootstrap1";
-      sk_uri =
-        Client_keys.make_sk_uri
-        @@ Uri.of_string
-             "unencrypted:edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh";
-    };
-    {
-      name = "bootstrap2";
-      sk_uri =
-        Client_keys.make_sk_uri
-        @@ Uri.of_string
-             "unencrypted:edsk39qAm1fiMjgmPkw1EgQYkMzkJezLNewd7PLNHTkr6w9XA2zdfo";
-    };
-    {
-      name = "bootstrap3";
-      sk_uri =
-        Client_keys.make_sk_uri
-        @@ Uri.of_string
-             "unencrypted:edsk4ArLQgBTLWG5FJmnGnT689VKoqhXwmDPBuGx3z4cvwU9MmrPZZ";
-    };
-    {
-      name = "bootstrap4";
-      sk_uri =
-        Client_keys.make_sk_uri
-        @@ Uri.of_string
-             "unencrypted:edsk2uqQB9AY4FvioK2YMdfmyMrer5R8mGFyuaLLFfSRo8EoyNdht3";
-    };
-    {
-      name = "bootstrap5";
-      sk_uri =
-        Client_keys.make_sk_uri
-        @@ Uri.of_string
-             "unencrypted:edsk4QLrcijEffxV31gGdN2HU7UpyJjA8drFoNcmnB28n89YjPNRFm";
-    } ]
+let default_bootstrap_accounts =
+  let unencrypted_keys =
+    [ "edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh";
+      "edsk39qAm1fiMjgmPkw1EgQYkMzkJezLNewd7PLNHTkr6w9XA2zdfo";
+      "edsk4ArLQgBTLWG5FJmnGnT689VKoqhXwmDPBuGx3z4cvwU9MmrPZZ";
+      "edsk2uqQB9AY4FvioK2YMdfmyMrer5R8mGFyuaLLFfSRo8EoyNdht3";
+      "edsk4QLrcijEffxV31gGdN2HU7UpyJjA8drFoNcmnB28n89YjPNRFm" ]
+  in
+  let basename = "bootstrap" in
+  Error_monad.mapi_s
+    (fun i ukey ->
+      Client_keys.make_sk_uri @@ Uri.of_string ("unencrypted:" ^ ukey)
+      >>=? fun sk_uri ->
+      let name = basename ^ string_of_int (i + 1) in
+      return {name; sk_uri})
+    unencrypted_keys
 
 let add_bootstrap_secret cctxt {name; sk_uri} =
   let force = false in
@@ -86,7 +66,31 @@ let add_bootstrap_secret cctxt {name; sk_uri} =
   >>= fun () ->
   Client_keys.register_key cctxt ~force (pkh, pk_uri, sk_uri) ?public_key name
 
-let populate (cctxt : #Tezos_client_base.Client_context.io_wallet) =
-  Tezos_base.TzPervasives.iter_s
-    (add_bootstrap_secret cctxt)
-    bootstrap_accounts
+let bootstrap_secret_encoding =
+  let open Data_encoding in
+  conv
+    (fun p -> (p.name, p.sk_uri, ""))
+    (fun (name, sk_uri, _) -> {name; sk_uri})
+    (obj3
+       (req "name" string)
+       (req "sk_uri" Client_keys.Secret_key.encoding)
+       (req "amount" string))
+
+let bootstrap_secrets_encoding = Data_encoding.list bootstrap_secret_encoding
+
+let populate (cctxt : #Tezos_client_base.Client_context.io_wallet)
+    bootstrap_accounts_file =
+  ( match bootstrap_accounts_file with
+  | None ->
+      default_bootstrap_accounts
+  | Some accounts_file -> (
+      Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file accounts_file
+      >>=? fun json ->
+      match Data_encoding.Json.destruct bootstrap_secrets_encoding json with
+      | accounts ->
+          return accounts
+      | exception _e ->
+          failwith
+            "cannot read definitions of bootstrap accounts in %s"
+            accounts_file ) )
+  >>=? Tezos_base.TzPervasives.iter_s (add_bootstrap_secret cctxt)

@@ -24,8 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-[@@@ocaml.warning "-30"]
-
 type chain_name = Distributed_db_version.Name.t
 
 type blockchain_network = {
@@ -64,7 +62,7 @@ and p2p = {
   limits : P2p.limits;
   disable_mempool : bool;
   enable_testchain : bool;
-  greylisting_config : P2p_point_state.Info.greylisting_config;
+  reconnection_config : P2p_point_state.Info.reconnection_config;
 }
 
 and rpc = {
@@ -77,12 +75,14 @@ and rpc = {
 and tls = {cert : string; key : string}
 
 and shell = {
-  block_validator_limits : Node.block_validator_limits;
-  prevalidator_limits : Node.prevalidator_limits;
-  peer_validator_limits : Node.peer_validator_limits;
-  chain_validator_limits : Node.chain_validator_limits;
+  block_validator_limits : Block_validator.limits;
+  prevalidator_limits : Prevalidator.limits;
+  peer_validator_limits : Peer_validator.limits;
+  chain_validator_limits : Chain_validator.limits;
   history_mode : History_mode.t option;
 }
+
+val data_dir_env_name : string
 
 val default_data_dir : string
 
@@ -115,9 +115,10 @@ val update :
   ?cors_headers:string list ->
   ?rpc_tls:tls ->
   ?log_output:Lwt_log_sink_unix.Output.t ->
-  ?bootstrap_threshold:int ->
+  ?synchronisation_threshold:int ->
   ?history_mode:History_mode.t ->
   ?network:blockchain_network ->
+  ?latency:int ->
   t ->
   t tzresult Lwt.t
 

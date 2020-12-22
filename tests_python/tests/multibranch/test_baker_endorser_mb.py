@@ -28,6 +28,8 @@ import time
 import subprocess
 import pytest
 from tools import utils, constants
+from launchers.sandbox import SandboxMultiBranch
+
 
 random.seed(42)
 KEYS = [f'bootstrap{i}' for i in range(1, 6)]
@@ -76,7 +78,7 @@ class TestAllDaemonsWithOperations:
        add (or replace) new nodes dynamically. After a little while,
        we kill the bakers and check everyone synchronize to the same head. '''
 
-    def test_setup_network(self, sandbox_multibranch):
+    def test_setup_network(self, sandbox_multibranch: SandboxMultiBranch):
         # Set appropriate time to avoid double-baking
         for i in range(NUM_NODES):
             sandbox_multibranch.add_node(i, params=params(i))
@@ -94,14 +96,16 @@ class TestAllDaemonsWithOperations:
                                          endorsement_delay=1,
                                          proto=ALPHA_DAEMON)
 
-    def test_wait_for_alpha(self, sandbox_multibranch):
+    def test_wait_for_alpha(self, sandbox_multibranch: SandboxMultiBranch):
         clients = sandbox_multibranch.all_clients()
         for client in clients:
             proto = ALPHA
             assert utils.check_protocol(client, proto)
 
-    def test_network_gen_operations_and_add_nodes(self, sandbox_multibranch,
-                                                  session):
+    def test_network_gen_operations_and_add_nodes(
+            self,
+            sandbox_multibranch: SandboxMultiBranch,
+            session: dict):
         node_add_period = NUM_CYCLES // NEW_NODES
         for cycle in range(NUM_CYCLES):
             i = random.randrange(NUM_NODES)
@@ -131,14 +135,14 @@ class TestAllDaemonsWithOperations:
                     proto)
             time.sleep(TIME_BETWEEN_CYCLE)
 
-    def test_kill_baker(self, sandbox_multibranch):
+    def test_kill_baker(self, sandbox_multibranch: SandboxMultiBranch):
         sandbox_multibranch.rm_baker(0, proto=ALPHA_DAEMON)
         sandbox_multibranch.rm_baker(1, proto=ALPHA_DAEMON)
 
-    def test_synchronize(self, sandbox_multibranch):
+    def test_synchronize(self, sandbox_multibranch: SandboxMultiBranch):
         utils.synchronize(sandbox_multibranch.all_clients())
 
-    def test_check_operations(self, sandbox_multibranch):
+    def test_check_operations(self, sandbox_multibranch: SandboxMultiBranch):
         min_level = min([client.get_level()
                          for client in sandbox_multibranch.all_clients()])
         heads_hash = set()
@@ -149,7 +153,7 @@ class TestAllDaemonsWithOperations:
         assert len(heads_hash) == 1
         # TODO check for operations inclusion
 
-    def test_check_logs(self, sandbox_multibranch):
+    def test_check_logs(self, sandbox_multibranch: SandboxMultiBranch):
         if not sandbox_multibranch.log_dir:
             pytest.skip()
         assert sandbox_multibranch.logs

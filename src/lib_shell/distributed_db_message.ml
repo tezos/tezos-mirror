@@ -76,13 +76,6 @@ module Bounded_encoding = struct
          ?max_pass:!operation_max_pass
          ())
 
-  let operation_hash_list_cache =
-    ref
-      (Operation.bounded_hash_list_encoding
-         ?max_length:!operation_list_max_length
-         ?max_pass:!operation_max_pass
-         ())
-
   let update_operation_list_encoding () =
     operation_list_cache :=
       Operation.bounded_list_encoding
@@ -126,8 +119,6 @@ module Bounded_encoding = struct
 
   let operation_list = delayed (fun () -> !operation_list_cache)
 
-  let operation_hash_list = delayed (fun () -> !operation_hash_list_cache)
-
   let protocol_max_size = ref (Some (2 * 1024 * 1024)) (* FIXME: arbitrary *)
 
   let protocol_cache =
@@ -159,15 +150,16 @@ type t =
   | Operation of Operation.t
   | Get_protocols of Protocol_hash.t list
   | Protocol of Protocol.t
-  | Get_operation_hashes_for_blocks of (Block_hash.t * int) list
-  | Operation_hashes_for_block of
-      Block_hash.t
-      * int
-      * Operation_hash.t list
-      * Operation_list_list_hash.path
   | Get_operations_for_blocks of (Block_hash.t * int) list
   | Operations_for_block of
       Block_hash.t * int * Operation.t list * Operation_list_list_hash.path
+  | Get_checkpoint of Chain_id.t
+  | Checkpoint of Chain_id.t * Block_header.t
+  | Get_protocol_branch of Chain_id.t * int (* proto_level: uint8 *)
+  | Protocol_branch of
+      Chain_id.t * int (* proto_level: uint8 *) * Block_locator.t
+  | Get_predecessor_header of Block_hash.t * int32
+  | Predecessor_header of Block_hash.t * int32 * Block_header.t
 
 let encoding =
   let open Data_encoding in
@@ -257,34 +249,6 @@ let encoding =
       (function Protocol proto -> Some proto | _ -> None)
       (fun proto -> Protocol proto);
     case
-      ~tag:0x50
-      ~title:"Get_operation_hashes_for_blocks"
-      (obj1
-         (req
-            "get_operation_hashes_for_blocks"
-            (list ~max_length:10 (tup2 Block_hash.encoding int8))))
-      (function
-        | Get_operation_hashes_for_blocks keys -> Some keys | _ -> None)
-      (fun keys -> Get_operation_hashes_for_blocks keys);
-    case
-      ~tag:0x51
-      ~title:"Operation_hashes_for_blocks"
-      (merge_objs
-         (obj1
-            (req
-               "operation_hashes_for_block"
-               (obj2
-                  (req "hash" Block_hash.encoding)
-                  (req "validation_pass" int8))))
-         Bounded_encoding.operation_hash_list)
-      (function
-        | Operation_hashes_for_block (block, ofs, ops, path) ->
-            Some ((block, ofs), (path, ops))
-        | _ ->
-            None)
-      (fun ((block, ofs), (path, ops)) ->
-        Operation_hashes_for_block (block, ofs, ops, path));
-    case
       ~tag:0x60
       ~title:"Get_operations_for_blocks"
       (obj1
@@ -314,9 +278,87 @@ let encoding =
         | _ ->
             None)
       (fun ((block, ofs), (path, ops)) ->
-        Operations_for_block (block, ofs, ops, path)) ]
+        Operations_for_block (block, ofs, ops, path));
+    case
+      ~tag:0x70
+      ~title:"Get_checkpoint"
+      (obj1 (req "get_checkpoint" Chain_id.encoding))
+      (function Get_checkpoint chain -> Some chain | _ -> None)
+      (fun chain -> Get_checkpoint chain);
+    case
+      ~tag:0x71
+      ~title:"Checkpoint"
+      (obj1
+         (req
+            "checkpoint"
+            (obj2
+               (req "chain_id" Chain_id.encoding)
+               (req "header" Bounded_encoding.block_header))))
+      (function
+        | Checkpoint (chain_id, header) -> Some (chain_id, header) | _ -> None)
+      (fun (chain_id, header) -> Checkpoint (chain_id, header));
+    case
+      ~tag:0x80
+      ~title:"Get_protocol_branch"
+      (obj1
+         (req
+            "get_protocol_branch"
+            (obj2 (req "chain" Chain_id.encoding) (req "proto_level" uint8))))
+      (function
+        | Get_protocol_branch (chain, protocol) ->
+            Some (chain, protocol)
+        | _ ->
+            None)
+      (fun (chain, protocol) -> Get_protocol_branch (chain, protocol));
+    case
+      ~tag:0x81
+      ~title:"Protocol_branch"
+      (obj1
+         (req
+            "protocol_branch"
+            (obj3
+               (req "chain" Chain_id.encoding)
+               (req "proto_level" uint8)
+               (req "locator" Bounded_encoding.block_locator))))
+      (function
+        | Protocol_branch (chain, proto_level, locator) ->
+            Some (chain, proto_level, locator)
+        | _ ->
+            None)
+      (fun (chain, proto_level, locator) ->
+        Protocol_branch (chain, proto_level, locator));
+    case
+      ~tag:0x90
+      ~title:"Get_predecessor_header"
+      (obj1
+         (req
+            "get_predecessor_header"
+            (obj2 (req "block" Block_hash.encoding) (req "offset" int32))))
+      (function
+        | Get_predecessor_header (block, offset) ->
+            Some (block, offset)
+        | _ ->
+            None)
+      (fun (block, offset) -> Get_predecessor_header (block, offset));
+    case
+      ~tag:0x91
+      ~title:"Predecessor_header"
+      (obj1
+         (req
+            "predecessor_header"
+            (obj3
+               (req "block" Block_hash.encoding)
+               (req "offset" int32)
+               (req "header" Bounded_encoding.block_header))))
+      (function
+        | Predecessor_header (hash, offset, header) ->
+            Some (hash, offset, header)
+        | _ ->
+            None)
+      (fun (hash, offset, header) -> Predecessor_header (hash, offset, header))
+  ]
 
-let distributed_db_versions = [Distributed_db_version.zero]
+let distributed_db_versions = Distributed_db_version.[zero; one]
 
 let cfg chain_name : _ P2p_params.message_config =
   {encoding; chain_name; distributed_db_versions}
@@ -327,7 +369,3 @@ let pp_json ppf msg =
   Data_encoding.Json.pp
     ppf
     (Data_encoding.Json.construct raw_encoding (Message msg))
-
-module Logging = struct
-  let tag = Tag.def ~doc:"Message" "message" pp_json
-end

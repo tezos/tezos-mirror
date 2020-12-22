@@ -54,7 +54,7 @@ module Level : sig
   (** Alias of {!level}. *)
   type t = level
 
-  (** The default level is {!Info}, it is used in {!Event_defaults}. *)
+  (** The default level is {!Info}. *)
   val default : t
 
   (** Cast the level to a value of {!Lwt_log_core.level}. *)
@@ -72,7 +72,7 @@ end
 (** Sections are a simple way of classifying events at the time of
     their emission. *)
 module Section : sig
-  type t = private string list
+  type t
 
   val empty : t
 
@@ -87,6 +87,12 @@ module Section : sig
   val to_string_list : t -> string list
 end
 
+(** All the section that has been registered. Currently, sections are registered
+    by the `Simple` module and the `Legacy_logging` module. *)
+val get_registered_sections : unit -> TzString.Set.t
+
+val register_section : Section.t -> unit
+
 (** Parameters defining an inspectable type of events. *)
 module type EVENT_DEFINITION = sig
   type t
@@ -98,19 +104,18 @@ module type EVENT_DEFINITION = sig
   (** A display-friendly text which describes what the event means. *)
   val doc : string
 
-  val pp : Format.formatter -> t -> unit
+  (* Pretty printer for log messages.
+     Some sinks output a short message; some output a more detailed message; and
+     some may output both. This function is called with [~short: true] when they
+     want short messages, and [~short: false] when they want detailed ones.
+     Short messages should contain information which is not available in the
+     event encoding, or that looks nice when inlined in the message. *)
+  val pp : short:bool -> Format.formatter -> t -> unit
 
   val encoding : t Data_encoding.t
 
   (** Return the preferred {!level} for a given event instance. *)
   val level : t -> level
-end
-
-(** Default values for fields in {!EVENT_DEFINITION}. *)
-module Event_defaults : sig
-  (** Use this module as needed with [include Event_defaults]. *)
-
-  val level : 'a -> level
 end
 
 (** Events created with {!Make} provide the {!EVENT} API. *)
@@ -232,6 +237,11 @@ module Simple : sig
 
   (** Emit an instance of an event. *)
   val emit : 'a t -> 'a -> unit Lwt.t
+
+  (** Emit an instance of an event but do not wait for completion. Only use if
+      you really need to not wait for logging resolution before continuing. May
+      cause increased memory usage and out-of-order log messages. *)
+  val emit__dont_wait__use_with_care : 'a t -> 'a -> unit
 
   (** Declare an event with no parameters. *)
   val declare_0 :
@@ -585,8 +595,6 @@ module Legacy_logging : sig
 
     include SEMLOG
   end
-
-  val sections : string list ref
 end
 
 (** {3 Common Event-Sink Definitions } *)

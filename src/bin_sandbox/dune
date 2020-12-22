@@ -3,8 +3,8 @@
   (libraries flextesa)
   (flags :standard))
 
-(alias
-  (name runtest_sandbox_accusations_simple_double_baking)
+(rule
+  (alias runtest_sandbox_accusations_simple_double_baking)
   (locks /tcp-port/10000_range)
   (action
     (run %{exe:main.exe} accusations simple-double-baking
@@ -14,8 +14,8 @@
          --tezos-client-binary %{bin:tezos-client}
          --tezos-node-binary %{bin:tezos-node} )))
 
-(alias
-  (name runtest_sandbox_accusations_simple_double_endorsing)
+(rule
+  (alias runtest_sandbox_accusations_simple_double_endorsing)
   (locks /tcp-port/20000_range)
   (action
     (run %{exe:main.exe} accusations simple-double-endorsing
@@ -25,8 +25,8 @@
          --tezos-client-binary %{bin:tezos-client}
          --tezos-node-binary %{bin:tezos-node} )))
 
-(alias
-  (name runtest_sandbox_voting_demo_noops)
+(rule
+  (alias runtest_sandbox_voting_demo_noops)
   (deps (package tezos-protocol-demo-noops))
   (locks /tcp-port/30000_range)
   (action
@@ -42,10 +42,11 @@
          --current-client-binary %{bin:tezos-client}
          --current-admin-client-binary %{bin:tezos-admin-client}
          --current-node-binary %{bin:tezos-node}
+         --timestamp-delay=-600
          )))
 
-(alias
-  (name runtest_sandbox_user_activated_upgrade)
+(rule
+  (alias runtest_sandbox_user_activated_upgrade)
   (locks /tcp-port/40000_range)
   (action
     (run %{exe:main.exe} mini-net
@@ -69,8 +70,8 @@
          )))
 
 
-(alias
-  (name runtest_sandbox_daemons_upgrade)
+(rule
+  (alias runtest_sandbox_daemons_upgrade)
   (locks /tcp-port/50000_range)
   (action
     (run %{exe:main.exe} daemons-upgrade
@@ -97,15 +98,85 @@
          --second-accuser %{bin:tezos-accuser-alpha}
          )))
 
+(rule
+  (alias runtest_sandbox_node_synchronization)
+  (locks /tcp-port/15000_range)
+  (action
+    (run %{exe:main.exe} node-synchronization
+         --tezos-client-binary %{bin:tezos-client}
+         --tezos-node-binary %{bin:tezos-node}
+         --primary-history-mode archive
+         --secondary-history-mode full
+         --should-synch true
+ )))
 
+(rule
+  (alias runtest_sandbox_node_synchronization)
+  (locks /tcp-port/15000_range)
+  (action
+    (run %{exe:main.exe} node-synchronization
+         --tezos-client-binary %{bin:tezos-client}
+         --tezos-node-binary %{bin:tezos-node}
+         --primary-history-mode archive
+         --secondary-history-mode rolling
+         --should-synch true
+ )))
 
+(rule
+  (alias runtest_sandbox_node_synchronization)
+  (locks /tcp-port/15000_range)
+  (action
+    (run %{exe:main.exe} node-synchronization
+         --tezos-client-binary %{bin:tezos-client}
+         --tezos-node-binary %{bin:tezos-node}
+         --primary-history-mode full
+         --secondary-history-mode archive
+         --should-synch true
+ )))
 
-(alias
- (name runtest_flextesa)
+(rule
+  (alias runtest_sandbox_node_synchronization)
+  (locks /tcp-port/15000_range)
+  (action
+    (run %{exe:main.exe} node-synchronization
+         --tezos-client-binary %{bin:tezos-client}
+         --tezos-node-binary %{bin:tezos-node}
+         --primary-history-mode full
+         --secondary-history-mode rolling
+         --should-synch true
+ )))
+
+(rule
+  (alias runtest_sandbox_node_synchronization)
+  (locks /tcp-port/15000_range)
+  (action
+    (run %{exe:main.exe} node-synchronization
+         --tezos-client-binary %{bin:tezos-client}
+         --tezos-node-binary %{bin:tezos-node}
+         --primary-history-mode rolling
+         --secondary-history-mode archive
+         --should-synch false
+ )))
+
+(rule
+  (alias runtest_sandbox_node_synchronization)
+  (locks /tcp-port/15000_range)
+  (action
+    (run %{exe:main.exe} node-synchronization
+         --tezos-client-binary %{bin:tezos-client}
+         --tezos-node-binary %{bin:tezos-node}
+         --primary-history-mode rolling
+         --secondary-history-mode full
+         --should-synch false
+ )))
+
+(rule
+ (alias runtest_flextesa)
  (deps
   (alias runtest_sandbox_accusations_simple_double_baking)
   (alias runtest_sandbox_accusations_simple_double_endorsing)
   (alias runtest_sandbox_voting_demo_noops)
   (alias runtest_sandbox_user_activated_upgrade)
   (alias runtest_sandbox_daemons_upgrade)
-  ))
+  (alias runtest_sandbox_node_synchronization))
+ (action (progn)))

@@ -28,289 +28,303 @@ open Alpha_context
 module Cost_of : sig
   val manager_operation : Gas.cost
 
-  module Legacy : sig
-    val z_to_int64 : Gas.cost
-
-    val hash : MBytes.t -> int -> Gas.cost
-
-    val map_to_list : ('b, 'c) Script_typed_ir.map -> Gas.cost
-
-    val set_update : 'a -> bool -> 'a Script_typed_ir.set -> Gas.cost
-  end
-
   module Interpreter : sig
-    val cycle : Gas.cost
+    val drop : Gas.cost
 
-    val loop_cycle : Gas.cost
+    val dup : Gas.cost
 
-    val loop_size : Gas.cost
+    val swap : Gas.cost
 
-    val loop_iter : Gas.cost
+    val push : Gas.cost
 
-    val loop_map : Gas.cost
+    val cons_some : Gas.cost
 
-    val nop : Gas.cost
+    val cons_none : Gas.cost
 
-    val stack_op : Gas.cost
+    val if_none : Gas.cost
 
-    val stack_n_op : int -> Gas.cost
+    val cons_pair : Gas.cost
 
-    val bool_binop : 'a -> 'b -> Gas.cost
+    val car : Gas.cost
 
-    val bool_unop : 'a -> Gas.cost
+    val cdr : Gas.cost
 
-    val pair : Gas.cost
+    val cons_left : Gas.cost
 
-    val pair_access : Gas.cost
+    val cons_right : Gas.cost
 
-    val cons : Gas.cost
+    val if_left : Gas.cost
 
-    val variant_no_data : Gas.cost
+    val cons_list : Gas.cost
 
-    val branch : Gas.cost
+    val nil : Gas.cost
 
-    val concat_string : string list -> Gas.cost
+    val if_cons : Gas.cost
 
-    val concat_bytes : MBytes.t list -> Gas.cost
+    val list_map : 'a Script_typed_ir.boxed_list -> Gas.cost
 
-    val slice_string : int -> Gas.cost
+    val list_size : Gas.cost
 
-    val map_mem : 'a -> ('a, 'b) Script_typed_ir.map -> Gas.cost
+    val list_iter : 'a Script_typed_ir.boxed_list -> Gas.cost
 
-    val map_to_list : ('a, 'b) Script_typed_ir.map -> Gas.cost
+    val empty_set : Gas.cost
 
-    val map_get : 'a -> ('a, 'b) Script_typed_ir.map -> Gas.cost
-
-    val map_update :
-      'a -> 'b option -> ('a, 'b) Script_typed_ir.map -> Gas.cost
-
-    val map_size : Gas.cost
-
-    val set_to_list : 'a Script_typed_ir.set -> Gas.cost
-
-    val set_update : 'a -> bool -> 'a Script_typed_ir.set -> Gas.cost
+    val set_iter : 'a Script_typed_ir.set -> Gas.cost
 
     val set_mem : 'a -> 'a Script_typed_ir.set -> Gas.cost
 
-    val mul : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
-
-    val div : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
-
-    val add : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
-
-    val sub : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
-
-    val abs : 'a Script_int.num -> Gas.cost
-
-    val neg : 'a Script_int.num -> Gas.cost
-
-    val int : 'a -> Gas.cost
-
-    val add_timestamp : Script_timestamp.t -> 'a Script_int.num -> Gas.cost
-
-    val sub_timestamp : Script_timestamp.t -> 'a Script_int.num -> Gas.cost
-
-    val diff_timestamps : Script_timestamp.t -> Script_timestamp.t -> Gas.cost
-
-    val empty_set : Gas.cost
+    val set_update : 'a -> 'a Script_typed_ir.set -> Gas.cost
 
     val set_size : Gas.cost
 
     val empty_map : Gas.cost
 
-    val int64_op : Gas.cost
+    val map_map : ('k, 'v) Script_typed_ir.map -> Gas.cost
 
-    val z_to_int64 : Gas.cost
+    val map_iter : ('k, 'v) Script_typed_ir.map -> Gas.cost
 
-    val int64_to_z : Gas.cost
+    val map_mem : 'k -> ('k, 'v) Script_typed_ir.map -> Gas.cost
 
-    val logor : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
+    val map_get : 'k -> ('k, 'v) Script_typed_ir.map -> Gas.cost
 
-    val logand : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
+    val map_update : 'k -> ('k, 'v) Script_typed_ir.map -> Gas.cost
 
-    val logxor : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
+    val map_size : Gas.cost
 
-    val lognot : 'a Script_int.num -> Gas.cost
+    val add_seconds_timestamp :
+      'a Script_int.num -> Script_timestamp.t -> Gas.cost
 
-    val shift_left : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
+    val sub_seconds_timestamp :
+      'a Script_int.num -> Script_timestamp.t -> Gas.cost
 
-    val shift_right : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
+    val diff_timestamps : Script_timestamp.t -> Script_timestamp.t -> Gas.cost
+
+    val concat_string_pair : string -> string -> Gas.cost
+
+    val slice_string : string -> Gas.cost
+
+    val string_size : Gas.cost
+
+    val concat_bytes_pair : MBytes.t -> MBytes.t -> Gas.cost
+
+    val slice_bytes : MBytes.t -> Gas.cost
+
+    val bytes_size : Gas.cost
+
+    val add_tez : Gas.cost
+
+    val sub_tez : Gas.cost
+
+    val mul_teznat : 'a Script_int.num -> Gas.cost
+
+    val bool_or : Gas.cost
+
+    val bool_and : Gas.cost
+
+    val bool_xor : Gas.cost
+
+    val bool_not : Gas.cost
+
+    val is_nat : Gas.cost
+
+    val abs_int : 'a Script_int.num -> Gas.cost
+
+    val int_nat : Gas.cost
+
+    val neg_int : 'a Script_int.num -> Gas.cost
+
+    val neg_nat : 'a Script_int.num -> Gas.cost
+
+    val add_bigint : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
+
+    val sub_bigint : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
+
+    val mul_bigint : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
+
+    val ediv_teznat : 'a -> 'b Script_int.num -> Gas.cost
+
+    val ediv_tez : Gas.cost
+
+    val ediv_bigint : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
+
+    val eq : Gas.cost
+
+    val lsl_nat : 'a Script_int.num -> Gas.cost
+
+    val lsr_nat : 'a Script_int.num -> Gas.cost
+
+    val or_nat : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
+
+    val and_nat : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
+
+    val xor_nat : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
+
+    val not_int : 'a Script_int.num -> Gas.cost
+
+    val not_nat : 'a Script_int.num -> Gas.cost
+
+    val seq : Gas.cost
+
+    val if_ : Gas.cost
+
+    val loop : Gas.cost
+
+    val loop_left : Gas.cost
+
+    val dip : Gas.cost
+
+    val check_signature : Signature.public_key -> MBytes.t -> Gas.cost
+
+    val blake2b : MBytes.t -> Gas.cost
+
+    val sha256 : MBytes.t -> Gas.cost
+
+    val sha512 : MBytes.t -> Gas.cost
+
+    val dign : int -> Gas.cost
+
+    val dugn : int -> Gas.cost
+
+    val dipn : int -> Gas.cost
+
+    val dropn : int -> Gas.cost
+
+    val neq : Gas.cost
+
+    val nop : Gas.cost
+
+    val empty_big_map : Gas.cost
+
+    val compare : 'a Script_typed_ir.comparable_ty -> 'a -> 'a -> Gas.cost
+
+    val concat_string_precheck : 'a Script_typed_ir.boxed_list -> Gas.cost
+
+    val concat_string : Z.t -> Gas.cost
+
+    val concat_bytes : Z.t -> Gas.cost
 
     val exec : Gas.cost
 
-    val push : Gas.cost
+    val apply : Gas.cost
 
-    val compare_res : Gas.cost
-
-    val unpack_failed : MBytes.t -> Gas.cost
+    val lambda : Gas.cost
 
     val address : Gas.cost
 
     val contract : Gas.cost
 
-    val transfer : Gas.cost
-
-    val create_account : Gas.cost
-
-    val create_contract : Gas.cost
+    val transfer_tokens : Gas.cost
 
     val implicit_account : Gas.cost
+
+    val create_contract : Gas.cost
 
     val set_delegate : Gas.cost
 
     val balance : Gas.cost
 
+    val level : Gas.cost
+
     val now : Gas.cost
 
-    val check_signature : public_key -> MBytes.t -> Gas.cost
-
-    val hash_key : Gas.cost
-
-    val hash_blake2b : MBytes.t -> Gas.cost
-
-    val hash_sha256 : MBytes.t -> Gas.cost
-
-    val hash_sha512 : MBytes.t -> Gas.cost
-
-    val steps_to_quota : Gas.cost
+    val hash_key : Signature.Public_key.t -> Gas.cost
 
     val source : Gas.cost
 
+    val sender : Gas.cost
+
     val self : Gas.cost
+
+    val self_address : Gas.cost
 
     val amount : Gas.cost
 
     val chain_id : Gas.cost
 
-    val wrap : Gas.cost
-
-    val compare : 'a Script_typed_ir.comparable_ty -> 'a -> 'a -> Gas.cost
-
-    val apply : Gas.cost
+    val unpack_failed : MBytes.t -> Gas.cost
   end
 
   module Typechecking : sig
-    val cycle : Gas.cost
+    val public_key_optimized : Gas.cost
 
-    val unit : Gas.cost
+    val public_key_readable : Gas.cost
+
+    val key_hash_optimized : Gas.cost
+
+    val key_hash_readable : Gas.cost
+
+    val signature_optimized : Gas.cost
+
+    val signature_readable : Gas.cost
+
+    val chain_id_optimized : Gas.cost
+
+    val chain_id_readable : Gas.cost
+
+    val address_optimized : Gas.cost
+
+    val contract_optimized : Gas.cost
+
+    val contract_readable : Gas.cost
+
+    val check_printable : string -> Gas.cost
+
+    val merge_cycle : Gas.cost
+
+    val parse_type_cycle : Gas.cost
+
+    val parse_instr_cycle : Gas.cost
+
+    val parse_data_cycle : Gas.cost
 
     val bool : Gas.cost
 
-    val tez : Gas.cost
+    val unit : Gas.cost
 
-    val z : Z.t -> Gas.cost
-
-    val string : int -> Gas.cost
-
-    val bytes : int -> Gas.cost
-
-    val int_of_string : string -> Gas.cost
-
-    val string_timestamp : Gas.cost
-
-    val key : Gas.cost
-
-    val key_hash : Gas.cost
-
-    val signature : Gas.cost
-
-    val chain_id : Gas.cost
+    val timestamp_readable : Gas.cost
 
     val contract : Gas.cost
-
-    (** Gas.Cost of getting the code for a contract *)
-    val get_script : Gas.cost
 
     val contract_exists : Gas.cost
 
-    (** Additional Gas.cost of parsing a pair over the Gas.cost of parsing each type  *)
-    val pair : Gas.cost
-
-    val union : Gas.cost
-
-    val lambda : Gas.cost
-
-    val some : Gas.cost
-
-    val none : Gas.cost
-
-    val list_element : Gas.cost
-
-    val set_element : int -> Gas.cost
-
-    val map_element : int -> Gas.cost
-
-    val primitive_type : Gas.cost
-
-    val one_arg_type : Gas.cost
-
-    val two_arg_type : Gas.cost
-
-    val operation : int -> Gas.cost
-
-    (** Cost of parsing a type *)
-    val type_ : int -> Gas.cost
-
-    (** Cost of parsing an instruction *)
-    val instr : ('a, 'b) Script_typed_ir.instr -> Gas.cost
+    val proof_argument : int -> Gas.cost
   end
 
-  module Unparse : sig
-    val prim_cost : int -> Script.annot -> Gas.cost
+  module Unparsing : sig
+    val public_key_optimized : Gas.cost
 
-    val seq_cost : int -> Gas.cost
+    val public_key_readable : Gas.cost
 
-    val cycle : Gas.cost
+    val key_hash_optimized : Gas.cost
+
+    val key_hash_readable : Gas.cost
+
+    val signature_optimized : Gas.cost
+
+    val signature_readable : Gas.cost
+
+    val chain_id_optimized : Gas.cost
+
+    val chain_id_readable : Gas.cost
+
+    val timestamp_readable : Gas.cost
+
+    val address_optimized : Gas.cost
+
+    val contract_optimized : Gas.cost
+
+    val contract_readable : Gas.cost
+
+    val unparse_type_cycle : Gas.cost
+
+    val unparse_instr_cycle : Gas.cost
+
+    val unparse_data_cycle : Gas.cost
 
     val unit : Gas.cost
 
-    val bool : Gas.cost
-
-    val z : Z.t -> Gas.cost
-
-    val int : 'a Script_int.num -> Gas.cost
-
-    val tez : Gas.cost
-
-    val string : string -> Gas.cost
-
-    val bytes : MBytes.t -> Gas.cost
-
-    val timestamp : Script_timestamp.t -> Gas.cost
-
-    val key : Gas.cost
-
-    val key_hash : Gas.cost
-
-    val signature : Gas.cost
-
-    val operation : MBytes.t -> Gas.cost
-
-    val chain_id : MBytes.t -> Gas.cost
-
     val contract : Gas.cost
 
-    (** Additional Gas.cost of parsing a pair over the Gas.cost of parsing each type  *)
-    val pair : Gas.cost
-
-    val union : Gas.cost
-
-    val some : Gas.cost
-
-    val none : Gas.cost
-
-    val list_element : Gas.cost
-
-    val set_element : Gas.cost
-
-    val map_element : Gas.cost
-
-    val one_arg_type : Script.annot -> Gas.cost
-
-    val two_arg_type : Script.annot -> Gas.cost
-
-    val set_to_list : 'a Script_typed_ir.set -> Gas.cost
-
-    val map_to_list : ('a, 'b) Script_typed_ir.map -> Gas.cost
+    val operation : MBytes.t -> Gas.cost
   end
 end

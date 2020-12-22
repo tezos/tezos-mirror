@@ -23,10 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type persisted_mockup_environment = {
-  protocol_hash : Protocol_hash.t;
-  rpc_context : Tezos_protocol_environment.rpc_context;
-}
+let mockup_dirname = "mockup"
+
+let context_file = "context.json"
 
 let rpc_context_encoding :
     Tezos_protocol_environment.rpc_context Data_encoding.t =
@@ -42,72 +41,93 @@ let rpc_context_encoding :
        (req "shell_header" Block_header.shell_header_encoding)
        (req "context" Memory_context.encoding))
 
-let persisted_mockup_environment_encoding :
-    persisted_mockup_environment Data_encoding.t =
-  let open Data_encoding in
-  conv
-    (fun {protocol_hash; rpc_context} -> (protocol_hash, rpc_context))
-    (fun (protocol_hash, rpc_context) -> {protocol_hash; rpc_context})
-    (obj2
-       (req "protocol_hash" Protocol_hash.encoding)
-       (req "context" rpc_context_encoding))
+module Persistent_mockup_environment = struct
+  type t = {
+    protocol_hash : Protocol_hash.t;
+    chain_id : Chain_id.t;
+    rpc_context : Tezos_protocol_environment.rpc_context;
+  }
 
-let get_mockup_by_hash :
-    Protocol_hash.t -> Registration.mockup_environment tzresult Lwt.t =
- fun protocol_hash ->
-  let available = Registration.get_registered_contexts () in
-  let mockup_opt =
-    List.find_opt
-      (fun (module Mockup : Tezos_mockup_registration.Registration.Mockup_sig) ->
-        Protocol_hash.equal protocol_hash Mockup.protocol_hash)
-      available
-  in
-  match mockup_opt with
-  | Some mockup ->
-      return mockup
-  | None ->
-      failwith "requested protocol not found in available mockup environments"
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun {protocol_hash; chain_id; rpc_context} ->
+        (protocol_hash, chain_id, rpc_context))
+      (fun (protocol_hash, chain_id, rpc_context) ->
+        {protocol_hash; chain_id; rpc_context})
+      (obj3
+         (req "protocol_hash" Protocol_hash.encoding)
+         (req "chain_id" Chain_id.encoding)
+         (req "context" rpc_context_encoding))
+
+  let to_json = Data_encoding.Json.construct encoding
+
+  let of_json = Data_encoding.Json.destruct encoding
+end
+
+let get_registered_mockup :
+    Protocol_hash.t option -> Registration.mockup_environment tzresult Lwt.t =
+ fun protocol_hash_opt ->
+  let mockup_environments = Registration.get_registered_environments () in
+  match mockup_environments with
+  | [] ->
+      failwith "get_registered_mockup: no registered mockup environment"
+  | fst_mockup :: _ -> (
+    match protocol_hash_opt with
+    | None ->
+        return fst_mockup
+    | Some protocol_hash -> (
+      match
+        List.find_opt
+          (fun (module Mockup : Registration.Mockup_sig) ->
+            Protocol_hash.equal protocol_hash Mockup.protocol_hash)
+          mockup_environments
+      with
+      | Some mockup ->
+          return mockup
+      | None ->
+          failwith
+            "requested protocol not found in available mockup environments" ) )
 
 let default_mockup_context :
-    unit ->
-    (Registration.mockup_environment * Tezos_protocol_environment.rpc_context)
-    tzresult
+    Tezos_client_base.Client_context.full ->
+    (Registration.mockup_environment * Registration.mockup_context) tzresult
     Lwt.t =
- fun () ->
-  match Registration.get_registered_contexts () with
-  | [] ->
-      failwith "default_mockup_context: no registered mockup environment"
-  | mockup :: _ ->
-      let (module Mockup) = mockup in
-      Mockup.init Mockup.default_parameters
-      >>=? fun rpc_context -> return (mockup, rpc_context)
-
-let init_mockup_context_by_protocol_hash :
-    Protocol_hash.t ->
-    (Registration.mockup_environment * Tezos_protocol_environment.rpc_context)
-    tzresult
-    Lwt.t =
- fun proto_hash ->
-  get_mockup_by_hash proto_hash
+ fun cctxt ->
+  get_registered_mockup None
   >>=? fun mockup ->
   let (module Mockup) = mockup in
-  Mockup.init Mockup.default_parameters
+  Mockup.init
+    ~cctxt
+    ~parameters:Mockup.default_parameters
+    ~constants_overrides_json:None
+    ~bootstrap_accounts_json:None
   >>=? fun rpc_context -> return (mockup, rpc_context)
 
-let mockup_dirname = "mockup"
-
-let context_file = "context.json"
-
-let mockup_context_from_persisted {protocol_hash; rpc_context} =
-  get_mockup_by_hash protocol_hash
-  >>=? fun mockup -> return (mockup, rpc_context)
-
-let get_mockup_context_from_disk :
-    base_dir:string ->
-    (Registration.mockup_environment * Tezos_protocol_environment.rpc_context)
-    tzresult
+let init_mockup_context_by_protocol_hash :
+    cctxt:Tezos_client_base.Client_context.full ->
+    protocol_hash:Protocol_hash.t ->
+    constants_overrides_json:Data_encoding.json option ->
+    bootstrap_accounts_json:Data_encoding.json option ->
+    (Registration.mockup_environment * Registration.mockup_context) tzresult
     Lwt.t =
- fun ~base_dir ->
+ fun ~cctxt ~protocol_hash ~constants_overrides_json ~bootstrap_accounts_json ->
+  get_registered_mockup (Some protocol_hash)
+  >>=? fun mockup ->
+  let (module Mockup) = mockup in
+  Mockup.init
+    ~cctxt
+    ~parameters:Mockup.default_parameters
+    ~constants_overrides_json
+    ~bootstrap_accounts_json
+  >>=? fun menv -> return (mockup, menv)
+
+let mockup_context_from_persisted pm_env =
+  let open Persistent_mockup_environment in
+  get_registered_mockup (Some pm_env.protocol_hash)
+  >>=? fun mockup -> return (mockup, (pm_env.chain_id, pm_env.rpc_context))
+
+let get_mockup_context_from_disk ~base_dir ~protocol_hash =
   let file =
     Filename.concat base_dir (Filename.concat mockup_dirname context_file)
   in
@@ -116,28 +136,40 @@ let get_mockup_context_from_disk :
   else
     Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file file
     >>=? fun context_json ->
-    match
-      Data_encoding.Json.destruct
-        persisted_mockup_environment_encoding
-        context_json
-    with
+    match Persistent_mockup_environment.of_json context_json with
     | persisted_mockup ->
         mockup_context_from_persisted persisted_mockup
+        >>=? fun (((module Mockup_environment), _) as res) ->
+        ( match protocol_hash with
+        | None ->
+            return_unit
+        | Some desired_protocol
+          when Protocol_hash.equal
+                 Mockup_environment.protocol_hash
+                 desired_protocol ->
+            return_unit
+        | Some desired_protocol ->
+            failwith
+              "Protocol %a was requested via --protocol\n\
+               yet the mockup at %s was initialized with %a"
+              Protocol_hash.pp_short
+              desired_protocol
+              base_dir
+              Protocol_hash.pp_short
+              Mockup_environment.protocol_hash )
+        >>=? fun () -> return res
     | exception _e ->
         failwith "get_mockup_context_from_disk: could not read %s" file
 
-let overwrite_mockup ~protocol_hash ~rpc_context ~base_dir =
+let overwrite_mockup ~protocol_hash ~chain_id ~rpc_context ~base_dir =
   let mockup_dir = Filename.concat base_dir mockup_dirname in
   let context_file = Filename.concat mockup_dir context_file in
   if not (Sys.file_exists context_file) then
-    failwith "create_mockup: file %s does not exist" context_file
+    failwith "overwrite_mockup: file %s does not exist" context_file
   else
-    let json =
-      Data_encoding.Json.construct
-        persisted_mockup_environment_encoding
-        {protocol_hash; rpc_context}
-    in
-    Tezos_stdlib_unix.Lwt_utils_unix.Json.write_file context_file json
+    Persistent_mockup_environment.(
+      to_json {protocol_hash; chain_id; rpc_context})
+    |> Tezos_stdlib_unix.Lwt_utils_unix.Json.write_file context_file
 
 type base_dir_class =
   | Base_dir_does_not_exist
@@ -145,6 +177,23 @@ type base_dir_class =
   | Base_dir_is_mockup
   | Base_dir_is_nonempty
   | Base_dir_is_empty
+
+let pp_base_dir_class ppf bclass =
+  Format.fprintf
+    ppf
+    "base_dir_%s"
+    ((function
+       | Base_dir_does_not_exist ->
+           "does_not_exist"
+       | Base_dir_is_file ->
+           "is_file"
+       | Base_dir_is_mockup ->
+           "is_mockup"
+       | Base_dir_is_empty ->
+           "is_empty"
+       | Base_dir_is_nonempty ->
+           "is_non_empty")
+       bclass)
 
 let is_directory_empty dir = Array.length (Sys.readdir dir) = 0
 
@@ -163,18 +212,16 @@ let classify_base_dir base_dir =
     else Base_dir_is_nonempty
 
 let create_mockup ~(cctxt : Tezos_client_base.Client_context.full)
-    ~protocol_hash =
+    ~protocol_hash ~constants_overrides_json ~bootstrap_accounts_json =
   let base_dir = cctxt#get_base_dir in
-  let mockup_dir = Filename.concat base_dir mockup_dirname in
-  let context_file = Filename.concat mockup_dir context_file in
   let create_base_dir () =
-    cctxt#message "created mockup client base dir in %s" base_dir
-    >>= fun () ->
     Tezos_stdlib_unix.Lwt_utils_unix.create_dir base_dir
+    >>= fun () ->
+    cctxt#message "Created mockup client base dir in %s" base_dir
     >>= fun () -> return_unit
   in
   ( match classify_base_dir base_dir with
-  | Base_dir_does_not_exist ->
+  | Base_dir_does_not_exist | Base_dir_is_empty ->
       create_base_dir ()
   | Base_dir_is_file ->
       failwith "%s is a file" base_dir
@@ -183,17 +230,18 @@ let create_mockup ~(cctxt : Tezos_client_base.Client_context.full)
   | Base_dir_is_nonempty ->
       failwith
         "%s is not empty, please specify a fresh base directory"
-        base_dir
-  | Base_dir_is_empty ->
-      create_base_dir () )
+        base_dir )
   >>=? fun () ->
+  init_mockup_context_by_protocol_hash
+    ~cctxt
+    ~protocol_hash
+    ~constants_overrides_json
+    ~bootstrap_accounts_json
+  >>=? fun (_mockup_env, (chain_id, rpc_context)) ->
+  let mockup_dir = Filename.concat base_dir mockup_dirname in
   Tezos_stdlib_unix.Lwt_utils_unix.create_dir mockup_dir
   >>= fun () ->
-  init_mockup_context_by_protocol_hash protocol_hash
-  >>=? fun (_mockup_env, rpc_context) ->
-  let json =
-    Data_encoding.Json.construct
-      persisted_mockup_environment_encoding
-      {protocol_hash; rpc_context}
-  in
-  Tezos_stdlib_unix.Lwt_utils_unix.Json.write_file context_file json
+  let context_file = Filename.concat mockup_dir context_file in
+  Persistent_mockup_environment.(
+    to_json {protocol_hash; chain_id; rpc_context})
+  |> Tezos_stdlib_unix.Lwt_utils_unix.Json.write_file context_file

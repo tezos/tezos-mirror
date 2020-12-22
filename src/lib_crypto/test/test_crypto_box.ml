@@ -23,27 +23,49 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:    Crypto
+    Invocation:   dune build @src/lib_crypto/runtest
+    Subject:      Roundtrips for functions built on the HACL* NaCl API.
+*)
+
+let check_bytes =
+  Alcotest.testable (fun fmt x -> Hex.pp fmt (Hex.of_bytes x)) Bytes.equal
+
 let (sk, pk, pkh) = Crypto_box.random_keypair ()
 
 let zero_nonce = Crypto_box.zero_nonce
 
 let chkey = Crypto_box.precompute sk pk
 
+(** The test defines a proof-of-work target, generates a proof-of-work
+    for that target, and then verifies it the proof of work is accepted
+    by [Crypto_box.check_proof_of_work].
+*)
 let test_check_pow () =
-  let target = Crypto_box.make_target 2. in
-  let pow = Crypto_box.generate_proof_of_work pk target in
+  let open Lwt.Infix in
+  let target = Crypto_box.make_pow_target 2. in
+  Crypto_box.generate_proof_of_work pk target
+  >|= fun pow ->
   Alcotest.(check bool)
     "check_pow"
     (Crypto_box.check_proof_of_work pk pow target)
     true
 
-let test_neutrize sk pk () =
+(** Checks the neuterize function, i.e. the [pk] corresponds to the
+    generated public key from secret key [sk].
+*)
+let test_neuterize sk pk () =
   Alcotest.check
     (Alcotest.testable Crypto_box.pp_pk Crypto_box.equal)
     "neuterize"
     (Crypto_box.neuterize sk)
     pk
 
+(** Checks that the [pkh] corresponds to the generated hash of the
+    public key [pk].
+*)
 let test_hash pk pkh () =
   Alcotest.check
     (Alcotest.testable
@@ -53,27 +75,39 @@ let test_hash pk pkh () =
     (Crypto_box.hash pk)
     pkh
 
-let test_fast_box msg () =
-  let msglen = Bytes.length msg in
-  let buf_length = msglen + Crypto_box.zerobytes in
-  let buf = Bytes.make buf_length '\x00' in
-  Bytes.blit msg 0 buf Crypto_box.zerobytes msglen ;
+(** Encrypts then decrypts the message [msg] with authentication
+    (with side-effects, in-place changes).
+*)
+let test_fast_box_noalloc msg () =
+  let buf = Bytes.copy msg in
+  let tag = Bytes.make Crypto_box.tag_length '\x00' in
   (* encryption / decryption *)
-  Crypto_box.fast_box_noalloc chkey zero_nonce buf ;
-  ignore (Crypto_box.fast_box_open_noalloc chkey zero_nonce buf) ;
-  let res =
-    Bytes.sub buf Crypto_box.zerobytes (buf_length - Crypto_box.zerobytes)
-  in
-  Alcotest.check
-    Alcotest.(testable (fun fmt x -> Hex.pp fmt (Hex.of_bytes x)) Bytes.equal)
-    "test_fastbox enc/dec"
-    res
-    msg
+  Crypto_box.fast_box_noalloc chkey zero_nonce tag buf ;
+  assert (Crypto_box.fast_box_open_noalloc chkey zero_nonce tag buf) ;
+  Alcotest.check check_bytes "test_fast_box_noalloc" buf msg
+
+(** Encrypts then decrypts the message [msg] with authentication.
+    Returns a new buffer for ciphertext.
+*)
+let test_fast_box msg () =
+  let cmsg = Crypto_box.fast_box chkey zero_nonce msg in
+  match Crypto_box.fast_box_open chkey zero_nonce cmsg with
+  | Some decrypted_msg ->
+      Alcotest.check check_bytes "test_fast_box" msg decrypted_msg
+  | None ->
+      Alcotest.fail "Box: Decryption error"
 
 let tests =
-  [ ("Neutrize Secret roundtrip", `Quick, test_neutrize sk pk);
+  [ ("Neuterize Secret roundtrip", `Quick, test_neuterize sk pk);
     ("Public Key Hash roundtrip", `Quick, test_hash pk pkh);
-    ("Check PoW", `Slow, test_check_pow);
-    ("Test hacl fastbox", `Quick, test_fast_box (Bytes.of_string "test")) ]
+    ( "HACL* box (noalloc)",
+      `Quick,
+      test_fast_box_noalloc (Bytes.of_string "test") );
+    ("HACL* box", `Quick, test_fast_box (Bytes.of_string "test")) ]
 
 let () = Alcotest.run "tezos-crypto" [("crypto_box", tests)]
+
+let tests_lwt = [("Check PoW", `Slow, test_check_pow)]
+
+let () =
+  Lwt_main.run @@ Alcotest_lwt.run "tezos-crypto" [("crypto_box", tests_lwt)]

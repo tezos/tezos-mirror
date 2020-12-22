@@ -48,7 +48,7 @@ type error += Invalid_stamp (* `Permanent *)
     after which a baker with priority [priority] is allowed to
     bake. Fail with [Invalid_time_between_blocks_constant] if the minimal
     time cannot be computed. *)
-val minimal_time : context -> int -> Time.t -> Time.t tzresult Lwt.t
+val minimal_time : context -> int -> Time.t -> Time.t tzresult
 
 (** [check_baking_rights ctxt block pred_timestamp] verifies that:
     * the contract that owned the roll at cycle start has the block signer as delegate.
@@ -79,14 +79,10 @@ val check_endorsement_rights :
 (** Returns the baking reward calculated w.r.t a given priority [p] and a
     number [e] of included endorsements *)
 val baking_reward :
-  context ->
-  block_priority:int ->
-  included_endorsements:int ->
-  Tez.t tzresult Lwt.t
+  context -> block_priority:int -> included_endorsements:int -> Tez.t tzresult
 
 (** Returns the endorsing reward calculated w.r.t a given priority.  *)
-val endorsing_reward :
-  context -> block_priority:int -> int -> Tez.t tzresult Lwt.t
+val endorsing_reward : context -> block_priority:int -> int -> Tez.t tzresult
 
 (** [baking_priorities ctxt level] is the lazy list of contract's
     public key hashes that are allowed to bake for [level]. *)
@@ -110,7 +106,7 @@ val check_signature :
   Block_header.t -> Chain_id.t -> public_key -> unit tzresult Lwt.t
 
 (** Checks if the header that would be built from the given components
-    is valid for the given diffculty. The signature is not passed as it
+    is valid for the given difficulty. The signature is not passed as it
     is does not impact the proof-of-work stamp. The stamp is checked on
     the hash of a block header whose signature has been zeroed-out. *)
 val check_header_proof_of_work_stamp :
@@ -122,12 +118,11 @@ val check_proof_of_work_stamp :
 
 (** check if the gap between the fitness of the current context
     and the given block is within the protocol parameters *)
-val check_fitness_gap : context -> Block_header.t -> unit tzresult Lwt.t
+val check_fitness_gap : context -> Block_header.t -> unit tzresult
 
 val dawn_of_a_new_cycle : context -> Cycle.t option tzresult Lwt.t
 
-val earlier_predecessor_timestamp :
-  context -> Level.t -> Timestamp.t tzresult Lwt.t
+val earlier_predecessor_timestamp : context -> Level.t -> Timestamp.t tzresult
 
 (** Since Emmy+
 
@@ -160,4 +155,4 @@ val minimum_allowed_endorsements : context -> block_delay:Period.t -> int
     `endorsing_power` argument), it returns the minimum time at which
     the next block can be baked. *)
 val minimal_valid_time :
-  context -> priority:int -> endorsing_power:int -> Time.t tzresult Lwt.t
+  context -> priority:int -> endorsing_power:int -> Time.t tzresult

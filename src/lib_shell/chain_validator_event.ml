@@ -27,14 +27,6 @@ include Internal_event.Simple
 
 let section = ["node"; "chain_validator"]
 
-let chain_bootstrapped =
-  declare_0
-    ~section
-    ~name:"chain_bootstrapped"
-    ~msg:"the chain is bootstrapped"
-    ~level:Info
-    ()
-
 let updated_to_checkpoint =
   declare_2
     ~section
@@ -49,14 +41,32 @@ let prevalidator_filter_not_found =
     ~section
     ~name:"prevalidator_filter_not_found"
     ~msg:"no prevalidator filter found for protocol {protocol_hash}"
-    ~level:Notice
+    ~level:Warning
     ("protocol_hash", Protocol_hash.encoding)
 
 let prevalidator_reinstantiation_failure =
-  declare_2
+  declare_1
     ~section
     ~name:"prevalidator_reinstantiation_failure"
-    ~msg:"failed to reinstantiate prevalidator error {fst_error}"
+    ~msg:"failed to reinstantiate prevalidator error {trace}"
     ~level:Error
-    ("fst_error", Data_encoding.string)
-    ("errors", Data_encoding.list error_encoding)
+    ~pp1:pp_print_error_first
+    ("trace", trace_encoding)
+
+let prevalidator_instantiation_failure =
+  declare_1
+    ~section
+    ~name:"prevalidator_instantiation_failure"
+    ~msg:"failed to instantiate the prevalidator: {trace}"
+    ~level:Error
+    ~pp1:pp_print_error_first
+    ("trace", trace_encoding)
+
+let loading_protocol =
+  declare_1
+    ~section
+    ~name:"loading_protocol"
+    ~level:Notice
+    ~msg:"loading non-embedded protocol {protocol} from disk"
+    ~pp1:Protocol_hash.pp
+    ("protocol", Protocol_hash.encoding)

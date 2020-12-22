@@ -28,7 +28,7 @@ module type CONTEXT = sig
 
   type key = string list
 
-  type value = MBytes.t
+  type value = Bytes.t
 
   val mem : t -> key -> bool Lwt.t
 
@@ -40,16 +40,12 @@ module type CONTEXT = sig
 
   val copy : t -> from:key -> to_:key -> t option Lwt.t
 
-  val del : t -> key -> t Lwt.t
-
   val remove_rec : t -> key -> t Lwt.t
 
+  type key_or_dir = [`Key of key | `Dir of key]
+
   val fold :
-    t ->
-    key ->
-    init:'a ->
-    f:([`Key of key | `Dir of key] -> 'a -> 'a Lwt.t) ->
-    'a Lwt.t
+    t -> key -> init:'a -> f:(key_or_dir -> 'a -> 'a Lwt.t) -> 'a Lwt.t
 
   val set_protocol : t -> Protocol_hash.t -> t Lwt.t
 

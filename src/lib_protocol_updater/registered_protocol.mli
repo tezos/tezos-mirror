@@ -46,20 +46,31 @@ type t = (module T)
 
 val mem : Protocol_hash.t -> bool
 
-val list : unit -> t list
+val seq : unit -> t Seq.t
 
 val get : Protocol_hash.t -> t option
 
 val get_result : Protocol_hash.t -> t tzresult Lwt.t
 
-val list_embedded : unit -> Protocol_hash.t list
+val seq_embedded : unit -> Protocol_hash.t Seq.t
 
 val get_embedded_sources : Protocol_hash.t -> Protocol.t option
 
-val get_embedded_sources_exn : Protocol_hash.t -> Protocol.t
-
 module Register_embedded_V0
     (Env : Tezos_protocol_environment.V0)
+    (Proto : Env.Updater.PROTOCOL) (Source : sig
+      val hash : Protocol_hash.t option
+
+      val sources : Protocol.t
+    end) :
+  T
+    with type P.block_header_data = Proto.block_header_data
+     and type P.operation_data = Proto.operation_data
+     and type P.operation_receipt = Proto.operation_receipt
+     and type P.validation_state = Proto.validation_state
+
+module Register_embedded_V1
+    (Env : Tezos_protocol_environment.V1)
     (Proto : Env.Updater.PROTOCOL) (Source : sig
       val hash : Protocol_hash.t option
 

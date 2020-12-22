@@ -8,16 +8,17 @@
                    -open Tezos_storage
                    -open Tezos_stdlib_unix)))
 
-(alias
- (name buildtest)
- (deps test.exe))
+(rule
+ (alias buildtest)
+ (deps test.exe)
+ (action (progn)))
 
-(alias
- (name runtest)
+(rule
+ (alias runtest)
  (package tezos-storage)
  (action (chdir %{workspace_root} (run %{exe:test.exe}))))
 
-(alias
- (name runtest_lint)
+(rule
+ (alias runtest_lint)
  (deps (glob_files *.ml{,i}))
  (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

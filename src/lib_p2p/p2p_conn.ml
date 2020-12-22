@@ -24,12 +24,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Internal_event.Legacy_logging.Make (struct
-  let name = "p2p.conn"
-end)
+module Events = P2p_events.P2p_conn
 
 type ('msg, 'peer, 'conn) t = {
   canceler : Lwt_canceler.t;
+  greylister : unit -> unit;
   messages : (int * 'msg) Lwt_pipe.t;
   conn : ('msg P2p_message.t, 'conn) P2p_socket.t;
   peer_info : (('msg, 'peer, 'conn) t, 'peer, 'conn) P2p_peer_state.Info.t;
@@ -53,22 +52,13 @@ let rec worker_loop (t : ('msg, 'peer, 'conn) t) callback =
   protect ~canceler:t.canceler (fun () -> P2p_socket.read t.conn)
   >>= function
   | Ok (_, Bootstrap) -> (
-      (* callback.bootstrap will return an empty list if the node
-         is in private mode *)
       callback.bootstrap request_info
       >>= function
-      | [] ->
+      | Ok () ->
           worker_loop t callback
-      | points -> (
-        match P2p_socket.write_now t.conn (Advertise points) with
-        | Ok _sent ->
-            (* if not sent then ?? TODO count dropped message ?? *)
-            worker_loop t callback
-        | Error _ ->
-            Lwt_canceler.cancel t.canceler >>= fun () -> Lwt.return_unit ) )
+      | Error _ ->
+          Lwt_canceler.cancel t.canceler >>= fun () -> Lwt.return_unit )
   | Ok (_, Advertise points) ->
-      (* callback.advertise will ignore the points if the node is
-         in private mode *)
       callback.advertise request_info points
       >>= fun () -> worker_loop t callback
   | Ok (_, Swap_request (point, peer)) ->
@@ -82,16 +72,13 @@ let rec worker_loop (t : ('msg, 'peer, 'conn) t) callback =
       >>= fun () -> worker_loop t callback
   | Ok (_, Disconnect) | Error (P2p_errors.Connection_closed :: _) ->
       Lwt_canceler.cancel t.canceler >>= fun () -> Lwt.return_unit
-  | Error (P2p_errors.Decoding_error :: _) ->
-      (* TODO: Penalize peer... *)
+  | Error (P2p_errors.Decoding_error _ :: _) ->
+      t.greylister () ;
       Lwt_canceler.cancel t.canceler >>= fun () -> Lwt.return_unit
   | Error (Canceled :: _) ->
       Lwt.return_unit
   | Error err ->
-      lwt_log_error
-        "@[Answerer unexpected error:@ %a@]"
-        Error_monad.pp_print_error
-        err
+      Events.(emit unexpected_error) err
       >>= fun () ->
       Lwt_canceler.cancel t.canceler >>= fun () -> Lwt.return_unit
 
@@ -105,15 +92,14 @@ let shutdown t =
 let write_swap_ack t point peer_id =
   P2p_socket.write_now t.conn (Swap_ack (point, peer_id))
 
-let create conn point_info peer_info messages canceler callback
+let write_advertise t points = P2p_socket.write_now t.conn (Advertise points)
+
+let create conn point_info peer_info messages canceler ~greylister callback
     negotiated_version =
   let private_node = P2p_socket.private_node conn in
   let trusted_node =
     P2p_peer_state.Info.trusted peer_info
-    || Option.unopt_map
-         ~default:false
-         ~f:P2p_point_state.Info.trusted
-         point_info
+    || Option.fold ~none:false ~some:P2p_point_state.Info.trusted point_info
   in
   let peer_id = peer_info |> P2p_peer_state.Info.peer_id in
   let t =
@@ -123,6 +109,7 @@ let create conn point_info peer_info messages canceler callback
       peer_info;
       messages;
       canceler;
+      greylister;
       wait_close = false;
       last_sent_swap_request = None;
       negotiated_version;
@@ -137,6 +124,7 @@ let create conn point_info peer_info messages canceler callback
       {
         peer_id = t.peer_info |> P2p_peer_state.Info.peer_id;
         is_private = P2p_socket.private_node t.conn;
+        write_advertise = write_advertise t;
         write_swap_ack = write_swap_ack t;
         messages;
       }
@@ -163,17 +151,14 @@ let read t =
     (fun () ->
       Lwt_pipe.pop t.messages
       >>= fun (s, msg) ->
-      lwt_debug
-        "%d bytes message popped from queue %a\027[0m"
-        s
-        P2p_peer.Id.pp
-        (P2p_socket.info t.conn).peer_id
+      Events.(emit bytes_popped_from_queue)
+        (s, (P2p_socket.info t.conn).peer_id)
       >>= fun () -> return msg)
     pipe_exn_handler
 
 let is_readable t =
   Lwt.catch
-    (fun () -> Lwt_pipe.values_available t.messages >>= return)
+    (fun () -> Lwt_pipe.peek t.messages >>= fun _ -> return_unit)
     pipe_exn_handler
 
 let write t msg = P2p_socket.write t.conn (Message msg)

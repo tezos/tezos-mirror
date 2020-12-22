@@ -10,8 +10,10 @@ assert os.path.isfile(PARAMETERS_FILE), (f'{PARAMETERS_FILE}'
 with open(PARAMETERS_FILE) as f:
     PARAMETERS = json.load(f)
 
+
+# This is the secret key used to activate a protocol from genesis in sandbox
+# mode. The corresponding public key is hard-coded in the tezos node.
 GENESIS_SK = "edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6"
-GENESIS_PK = "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2"
 
 IDENTITIES = {
     'bootstrap1': {
@@ -65,6 +67,12 @@ BABYLON_DAEMON = "005-PsBabyM1"
 
 CARTHAGE = "PsCARTHAGazKbHtnKfLzQg3kms52kSRpgnDY982a9oYsSXRLQEb"
 CARTHAGE_DAEMON = "006-PsCARTHA"
+
+DELPHI = "PsDELPH1Kxsxt8f9eWbxQeRxkjfbxoqM52jvs5Y5fBxWWh4ifpo"
+DELPHI_DAEMON = "007-PsDELPH1"
+
+# Protocols supported by the mockup mode
+MOCKUP_PROTOCOLS = [ALPHA, CARTHAGE, DELPHI]
 
 TEZOS_CRT = """
 Certificate:
@@ -190,8 +198,8 @@ XRWBqNomtTmVA25kchhzSMBQ
 Default node parameters.
 
 A high-number of connections helps triggering the maintenance process
- more often, which speeds up some tests. A bootstrap threshold of 0
+ more often, which speeds up some tests. A synchronisation threshold of 0
  ensures all nodes are bootstrapped when they start, which can avoid
  some spurious deadlocks (e.g. a node not broadcasting its head).
 """
-NODE_PARAMS = ['--connections', '500', '--bootstrap-threshold', '0']
+NODE_PARAMS = ['--connections', '500', '--synchronisation-threshold', '0']

@@ -261,8 +261,8 @@ include Tezos_raw_protocol_004_Pt24m4xi.Main
  (libraries tezos_protocol_environment_004_Pt24m4xi)
  (library_flags (:standard -linkall))
  (flags (:standard -nopervasives -nostdlib
-                   -w +a-4-6-7-9-29-32-40..42-44-45-48
-                   -warn-error -a+8
+                   -w +a-4-6-7-9-29-32-40..42-44-45-48-60-67
+                   -warn-error +a
                    -open Tezos_protocol_environment_004_Pt24m4xi__Environment
                    -open Pervasives
                    -open Error_monad))
@@ -348,8 +348,8 @@ include Tezos_raw_protocol_004_Pt24m4xi.Main
       tezos-protocol-environment
       tezos-protocol-environment-sigs
       tezos_raw_protocol_004_Pt24m4xi)
- (flags -w "+a-4-6-7-9-29-40..42-44-45-48"
-        -warn-error "-a+8"
+ (flags -w "+a-4-6-7-9-29-40..42-44-45-48-60-67"
+        -warn-error "+a"
         -nopervasives)
  (modules Protocol))
 
@@ -360,8 +360,8 @@ include Tezos_raw_protocol_004_Pt24m4xi.Main
       tezos-protocol-environment
       tezos-protocol-environment-sigs
       tezos_raw_protocol_004_Pt24m4xi)
- (flags -w "+a-4-6-7-9-29-40..42-44-45-48"
-        -warn-error "-a+8"
+ (flags -w "+a-4-6-7-9-29-40..42-44-45-48-60-67"
+        -warn-error "+a"
         -nopervasives)
  (modules Functor))
 
@@ -372,19 +372,91 @@ include Tezos_raw_protocol_004_Pt24m4xi.Main
  (libraries tezos-protocol-004-Pt24m4xi
             tezos-protocol-updater
             tezos-protocol-environment)
- (flags (:standard -w +a-4-6-7-9-29-32-40..42-44-45-48
-                   -warn-error -a+8))
+ (flags (:standard -w +a-4-6-7-9-29-32-40..42-44-45-48-60-67
+                   -warn-error +a))
  (modules Registerer))
 
-(alias
- (name runtest_compile_protocol)
+(rule
+ (alias runtest_compile_protocol)
+ (deps
+   misc.mli misc.ml
+   storage_description.mli storage_description.ml
+   state_hash.ml
+   nonce_hash.ml
+   script_expr_hash.ml
+   contract_hash.ml
+   blinded_public_key_hash.mli blinded_public_key_hash.ml
+   qty_repr.ml
+   tez_repr.mli tez_repr.ml
+   period_repr.mli period_repr.ml
+   time_repr.mli time_repr.ml
+   constants_repr.ml
+   fitness_repr.ml
+   raw_level_repr.mli raw_level_repr.ml
+   voting_period_repr.mli voting_period_repr.ml
+   cycle_repr.mli cycle_repr.ml
+   level_repr.mli level_repr.ml
+   seed_repr.mli seed_repr.ml
+   gas_limit_repr.mli gas_limit_repr.ml
+   script_int_repr.mli script_int_repr.ml
+   script_timestamp_repr.mli script_timestamp_repr.ml
+   michelson_v1_primitives.mli michelson_v1_primitives.ml
+   script_repr.mli script_repr.ml
+   contract_repr.mli contract_repr.ml
+   roll_repr.mli roll_repr.ml
+   vote_repr.mli vote_repr.ml
+   block_header_repr.mli block_header_repr.ml
+   operation_repr.mli operation_repr.ml
+   manager_repr.mli manager_repr.ml
+   commitment_repr.mli commitment_repr.ml
+   parameters_repr.mli parameters_repr.ml
+   raw_context.mli raw_context.ml
+   storage_sigs.ml
+   storage_functors.mli storage_functors.ml
+   storage.mli storage.ml
+   constants_storage.ml
+   level_storage.mli level_storage.ml
+   nonce_storage.mli nonce_storage.ml
+   seed_storage.mli seed_storage.ml
+   roll_storage.mli roll_storage.ml
+   delegate_storage.mli delegate_storage.ml
+   contract_storage.mli contract_storage.ml
+   bootstrap_storage.mli bootstrap_storage.ml
+   fitness_storage.ml
+   vote_storage.mli vote_storage.ml
+   commitment_storage.mli commitment_storage.ml
+   init_storage.ml
+   fees_storage.mli fees_storage.ml
+   alpha_context.mli alpha_context.ml
+   script_typed_ir.ml
+   script_tc_errors.ml
+   michelson_v1_gas.mli michelson_v1_gas.ml
+   script_ir_annot.mli script_ir_annot.ml
+   script_ir_translator.mli script_ir_translator.ml
+   script_tc_errors_registration.ml
+   script_interpreter.mli script_interpreter.ml
+   baking.mli baking.ml
+   amendment.mli amendment.ml
+   apply_results.mli apply_results.ml
+   apply.ml
+   services_registration.ml
+   constants_services.mli constants_services.ml
+   contract_services.mli contract_services.ml
+   delegate_services.mli delegate_services.ml
+   helpers_services.mli helpers_services.ml
+   voting_services.mli voting_services.ml
+   alpha_services.mli alpha_services.ml
+   main.mli main.ml
+  (:src_dir TEZOS_PROTOCOL))
  (action (run %{bin:tezos-protocol-compiler}  .)))
 
-(alias
- (name runtest_sandbox)
- (deps .tezos_protocol_004_Pt24m4xi.objs/native/tezos_protocol_004_Pt24m4xi.cmx))
+(rule
+ (alias runtest_sandbox)
+ (deps .tezos_protocol_004_Pt24m4xi.objs/native/tezos_protocol_004_Pt24m4xi.cmx)
+ (action (progn)))
 
-(alias
- (name runtest)
+(rule
+ (alias runtest)
  (package tezos-protocol-004-Pt24m4xi)
- (deps (alias runtest_sandbox)))
+ (deps (alias runtest_sandbox))
+ (action (progn)))

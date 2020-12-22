@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Misc.Syntax
+
 type error +=
   | Balance_too_low of Contract_repr.contract * Tez_repr.t * Tez_repr.t
   | (* `Temporary *)
@@ -280,7 +282,7 @@ type big_map_diff_item =
       diff_value : Script_repr.expr option;
     }
   | Clear of Z.t
-  | Copy of Z.t * Z.t
+  | Copy of {src : Z.t; dst : Z.t}
   | Alloc of {
       big_map : Z.t;
       key_type : Script_repr.expr;
@@ -321,8 +323,8 @@ let big_map_diff_item_encoding =
            (req "action" (constant "copy"))
            (req "source_big_map" z)
            (req "destination_big_map" z))
-        (function Copy (src, dst) -> Some ((), src, dst) | _ -> None)
-        (fun ((), src, dst) -> Copy (src, dst));
+        (function Copy {src; dst} -> Some ((), src, dst) | _ -> None)
+        (fun ((), src, dst) -> Copy {src; dst});
       case
         (Tag 3)
         ~title:"alloc"
@@ -339,9 +341,7 @@ let big_map_diff_item_encoding =
         (fun ((), big_map, key_type, value_type) ->
           Alloc {big_map; key_type; value_type}) ]
 
-let big_map_diff_encoding =
-  let open Data_encoding in
-  def "contract.big_map_diff" @@ list big_map_diff_item_encoding
+let big_map_diff_encoding = Data_encoding.list big_map_diff_item_encoding
 
 let big_map_key_cost = 65
 
@@ -359,7 +359,7 @@ let update_script_big_map c = function
               >>= fun c ->
               if Compare.Z.(id < Z.zero) then return (c, total)
               else return (c, Z.sub (Z.sub total size) (Z.of_int big_map_cost))
-          | Copy (from, to_) ->
+          | Copy {src = from; dst = to_} ->
               Storage.Big_map.copy c ~from ~to_
               >>=? fun c ->
               if Compare.Z.(to_ < Z.zero) then return (c, total)
@@ -375,7 +375,7 @@ let update_script_big_map c = function
                  these ones are only used to make sure they are
                  compatible during transmissions between contracts,
                  and only need to be compatible, annotations
-                 nonwhistanding. *)
+                 notwithstanding. *)
               let key_type =
                 Micheline.strip_locations
                   (Script_repr.strip_annotations (Micheline.root key_type))
@@ -471,8 +471,8 @@ let create_base c ?(prepaid_bootstrap_storage = false)
   | None ->
       return c
 
-let originate c ?prepaid_bootstrap_storage contract ~balance ~script ~delegate
-    =
+let raw_originate c ?prepaid_bootstrap_storage contract ~balance ~script
+    ~delegate =
   create_base
     c
     ?prepaid_bootstrap_storage
@@ -512,9 +512,7 @@ let delete c contract =
       Storage.Contract.Storage.remove c contract
       >>=? fun (c, _, _) ->
       Storage.Contract.Paid_storage_space.remove c contract
-      >>= fun c ->
-      Storage.Contract.Used_storage_space.remove c contract
-      >>= fun c -> return c
+      >>= fun c -> Storage.Contract.Used_storage_space.remove c contract >|= ok
 
 let allocated c contract =
   Storage.Contract.Balance.get_option c contract
@@ -547,18 +545,16 @@ let must_be_allocated c contract =
 let list c = Storage.Contract.list c
 
 let fresh_contract_from_current_nonce c =
-  Lwt.return (Raw_context.increment_origination_nonce c)
-  >>=? fun (c, nonce) -> return (c, Contract_repr.originated_contract nonce)
+  Raw_context.increment_origination_nonce c
+  >|? fun (c, nonce) -> (c, Contract_repr.originated_contract nonce)
 
 let originated_from_current_nonce ~since:ctxt_since ~until:ctxt_until =
-  Lwt.return (Raw_context.origination_nonce ctxt_since)
-  >>=? fun since ->
-  Lwt.return (Raw_context.origination_nonce ctxt_until)
-  >>=? fun until ->
-  filter_map_s
-    (fun contract ->
-      exists ctxt_until contract
-      >>=? function true -> return_some contract | false -> return_none)
+  Raw_context.origination_nonce ctxt_since
+  >>?= fun since ->
+  Raw_context.origination_nonce ctxt_until
+  >>?= fun until ->
+  filter_s
+    (fun contract -> exists ctxt_until contract)
     (Contract_repr.originated_contracts ~since ~until)
 
 let check_counter_increment c manager counter =
@@ -652,7 +648,7 @@ let reveal_manager_key c manager public_key =
       let actual_hash = Signature.Public_key.hash public_key in
       if Signature.Public_key_hash.equal actual_hash v then
         let v = Manager_repr.Public_key public_key in
-        Storage.Contract.Manager.set c contract v >>=? fun c -> return c
+        Storage.Contract.Manager.set c contract v
       else fail (Inconsistent_hash (public_key, v, actual_hash))
 
 let get_balance c contract =
@@ -666,6 +662,14 @@ let get_balance c contract =
         failwith "get_balance" )
   | Some v ->
       return v
+
+let get_balance_carbonated c contract =
+  (* Reading an int64 from /contracts/pkh/balance
+     NB: this cost assumes a flattened storage structure. *)
+  Raw_context.consume_gas
+    c
+    (Storage_costs.read_access ~path_length:3 ~read_bytes:8)
+  >>?= fun c -> get_balance c contract >>=? fun balance -> return (c, balance)
 
 let update_script_storage c contract storage big_map_diff =
   let storage = Script_repr.lazy_expr storage in
@@ -711,10 +715,13 @@ let spend c contract amount =
 let credit c contract amount =
   ( if Tez_repr.(amount <> Tez_repr.zero) then return c
   else
+    must_exist c contract
+    >>=? fun () ->
     Storage.Contract.Code.mem c contract
     >>=? fun (c, target_has_code) ->
-    fail_unless target_has_code (Empty_transaction contract)
-    >>=? fun () -> return c )
+    Lwt.return
+      ( error_unless target_has_code (Empty_transaction contract)
+      >|? fun () -> c ) )
   >>=? fun c ->
   Storage.Contract.Balance.get_option c contract
   >>=? function
@@ -725,8 +732,8 @@ let credit c contract amount =
     | Some manager ->
         create_implicit c manager ~balance:amount )
   | Some balance ->
-      Lwt.return Tez_repr.(amount +? balance)
-      >>=? fun balance ->
+      Tez_repr.(amount +? balance)
+      >>?= fun balance ->
       Storage.Contract.Balance.set c contract balance
       >>=? fun c -> Roll_storage.Contract.add_amount c contract amount
 
@@ -736,11 +743,11 @@ let init c =
 
 let used_storage_space c contract =
   Storage.Contract.Used_storage_space.get_option c contract
-  >>=? function None -> return Z.zero | Some fees -> return fees
+  >|=? Option.unopt ~default:Z.zero
 
 let paid_storage_space c contract =
   Storage.Contract.Paid_storage_space.get_option c contract
-  >>=? function None -> return Z.zero | Some paid_space -> return paid_space
+  >|=? Option.unopt ~default:Z.zero
 
 let set_paid_storage_space_and_return_fees_to_pay c contract new_storage_space
     =
@@ -750,4 +757,4 @@ let set_paid_storage_space_and_return_fees_to_pay c contract new_storage_space
   else
     let to_pay = Z.sub new_storage_space already_paid_space in
     Storage.Contract.Paid_storage_space.set c contract new_storage_space
-    >>=? fun c -> return (to_pay, c)
+    >|=? fun c -> (to_pay, c)

@@ -87,13 +87,16 @@ let assert_hwms state ~client ~uri ~main ~test =
   assert_eq Int.to_string ~actual:main_actual ~expected:main
   >>= fun () -> assert_eq Int.to_string ~actual:test_actual ~expected:test
 
-let get_chain_id state ~client =
+let get_chain_id_string state ~client =
   Tezos_client.rpc state ~client `Get ~path:"/chains/main/chain_id"
-  >>= (function
-        | `String x ->
-            return x
-        | _ ->
-            failf "Failed to parse chain_id JSON from node")
+  >>= function
+  | `String x ->
+      return x
+  | _ ->
+      failf "Failed to parse chain_id JSON from node"
+
+let get_chain_id state ~client =
+  get_chain_id_string state ~client
   >>= fun chain_id_string ->
   return (Tezos_crypto.Chain_id.of_b58check_exn chain_id_string)
 
@@ -170,23 +173,39 @@ let sign state ~client ~bytes () =
   >>= fun _ -> return ()
 
 let originate_account_from state ~client ~account =
-  let orig_account_name =
-    Tezos_protocol.Account.name account ^ "-originated-account"
+  let orig_account_name = "-originated-account" in
+  let id_script parameter =
+    Fmt.strf
+      "parameter %s;\n\
+       storage %s;\n\
+       code\n\
+      \  {\n\
+      \    %s\n\
+      \    { CAR; NIL operation; PAIR }\n\
+      \  };\n"
+      parameter
+      parameter
+      "# No push-drops"
   in
+  let tmp = Caml.Filename.temp_file "little-id-script" ".tz" in
+  System.write_file state tmp ~content:(id_script "unit")
+  >>= fun () ->
   Tezos_client.successful_client_cmd
     state
     ~client
     [ "originate";
-      "account";
+      "contract";
       orig_account_name;
-      "for";
-      Tezos_protocol.Account.name account;
       "transferring";
       Int.to_string 1000;
       "from";
-      Tezos_protocol.Account.name account;
+      Tezos_protocol.Account.pubkey_hash account;
+      "running";
+      tmp;
+      "--init";
+      "Unit";
       "--burn-cap";
-      Float.to_string 0.257 ]
+      Float.to_string 0.300 ]
   >>= fun _ -> return orig_account_name
 
 let setup_baking_ledger state uri ~client ~protocol =
@@ -251,17 +270,18 @@ let setup_baking_ledger state uri ~client ~protocol =
   in
   test_invalid_delegations ()
   >>= fun () ->
+  get_chain_id_string state ~client
+  >>= fun cid ->
   with_ledger_test_reject_and_succeed
     state
     EF.(
-      wf
-        "Setting up %S for baking.\n\
-         Address: %S\n\
-         Chain: mainnet\n\
-         Main Chain HWM: 0\n\
-         Test Chain HWM: 0"
-        uri
-        (Tezos_protocol.Account.pubkey_hash account))
+      list
+        [ wf "Setting up %S for baking" uri;
+          wf "Setup Baking?";
+          wf "Address: %S\n" (Tezos_protocol.Account.pubkey_hash account);
+          wf "Chain: %S" cid;
+          wf "Main Chain HWM: 0";
+          wf "Test Chain HWM: 0" ])
     (fun () ->
       Tezos_client.successful_client_cmd
         state
@@ -276,19 +296,6 @@ let setup_baking_ledger state uri ~client ~protocol =
           "0";
           "--test-hwm";
           "0" ])
-  >>= assert_failure
-        state
-        "signing a 'Withdraw delegate' operation in Baking App should fail"
-        (fun () ->
-          Tezos_client.successful_client_cmd
-            state
-            ~client
-            [ "--wait";
-              "none";
-              "withdraw";
-              "delegate";
-              "from";
-              Tezos_protocol.Account.pubkey_hash account ])
   >>= assert_baking_key (Some uri)
   >>= test_invalid_delegations
   >>= fun () -> return (baker, account)
@@ -360,7 +367,7 @@ let run state ~protocol ~node_exec ~client_exec ~admin_exec ~size ~base_port
   let set_hwm_ level () =
     with_ledger_prompt
       state
-      EF.(wf "Setting HWM to %d" level)
+      EF.(list [wf "Reset HWM"; wf "%d" level])
       `Succeeds
       ~f:(fun () ->
         Tezos_client.Ledger.set_hwm state ~client:(client 0) ~uri ~level)
@@ -381,11 +388,13 @@ let run state ~protocol ~node_exec ~client_exec ~admin_exec ~size ~base_port
   let endorse () =
     Tezos_client.Keyed.endorse state baker "Endorsed by ledger"
   in
+  get_chain_id_string state ~client:(client 0)
+  >>= fun cid ->
   let ask_hwm ~main ~test () =
     assert_hwms_ ~main ~test ()
     >>= ask_assert
           state
-          EF.(wf "Is 'Chain' = %S and 'Last Block Level' = %d" "mainnet" main)
+          EF.(wf "Is 'Chain' = %S and 'Last Block Level' = %d" cid main)
   in
   ( if enable_deterministic_nonce_tests then
     (* Test determinism of nonces *)
@@ -423,14 +432,18 @@ let run state ~protocol ~node_exec ~client_exec ~admin_exec ~size ~base_port
   >>= fun forged_delegation_bytes ->
   with_ledger_test_reject_and_succeed
     state
-    EF.(wf "Self delegating address %s with fee %f" ledger_pkh fee)
+    EF.(
+      list
+        [ wf "Register as delegate?";
+          wf "Address %s" ledger_pkh;
+          wf "Fee %f" fee ])
     (sign state ~client:baker ~bytes:forged_delegation_bytes)
   >>= bake >>= ask_hwm ~main:3 ~test:0
   >>= fun () ->
   (let level = 1 in
    with_ledger_test_reject_and_succeed
      state
-     EF.(wf "Setting HWM to %d" level)
+     EF.(list [wf "Reset HWM"; wf "%d" level])
      (fun () ->
        Tezos_client.Ledger.set_hwm state ~client:(client 0) ~uri ~level))
   >>= assert_hwms_ ~main:1 ~test:1

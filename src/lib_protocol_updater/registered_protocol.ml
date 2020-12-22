@@ -69,6 +69,27 @@ let build hash =
 
           let complete_b58prefix = Env.Context.complete
         end : T )
+  | Some (V1 protocol) ->
+      let (module F) = protocol in
+      let module Name = struct
+        let name = Protocol_hash.to_b58check hash
+      end in
+      let module Env = Tezos_protocol_environment.MakeV1 (Name) () in
+      Some
+        ( module struct
+          module Raw = F (Env)
+
+          module P = struct
+            let hash = hash
+
+            include Env.Lift (Raw)
+          end
+
+          include P
+          module Block_services = Block_services.Make (P) (P)
+
+          let complete_b58prefix = Env.Context.complete
+        end : T )
 
 module VersionTable = Protocol_hash.Table
 
@@ -81,8 +102,10 @@ let mem hash =
   || Tezos_protocol_registerer.Registerer.mem hash
 
 let get hash =
-  try Some (VersionTable.find versions hash)
-  with Not_found -> (
+  match VersionTable.find versions hash with
+  | Some proto ->
+      Some proto
+  | None -> (
     match build hash with
     | Some proto ->
         VersionTable.add versions hash proto ;
@@ -115,14 +138,11 @@ let get_result hash =
   | None ->
       fail (Unregistered_protocol hash)
 
-let list () = VersionTable.fold (fun _ p acc -> p :: acc) versions []
+let seq () = VersionTable.to_seq_values versions
 
-let list_embedded () = VersionTable.fold (fun k _ acc -> k :: acc) sources []
+let seq_embedded () = VersionTable.to_seq_keys sources
 
-let get_embedded_sources_exn hash = VersionTable.find sources hash
-
-let get_embedded_sources hash =
-  try Some (get_embedded_sources_exn hash) with Not_found -> None
+let get_embedded_sources hash = VersionTable.find sources hash
 
 module type Source_sig = sig
   val hash : Protocol_hash.t option
@@ -132,6 +152,38 @@ end
 
 module Register_embedded_V0
     (Env : Tezos_protocol_environment.V0)
+    (Proto : Env.Updater.PROTOCOL)
+    (Source : Source_sig) =
+struct
+  let hash =
+    match Source.hash with
+    | None ->
+        Protocol.hash Source.sources
+    | Some hash ->
+        hash
+
+  module Self = struct
+    module P = struct
+      let hash = hash
+
+      include Env.Lift (Proto)
+    end
+
+    include P
+    module Block_services = Block_services.Make (P) (P)
+
+    let complete_b58prefix = Env.Context.complete
+  end
+
+  let () =
+    VersionTable.add sources hash Source.sources ;
+    VersionTable.add versions hash (module Self : T)
+
+  include Self
+end
+
+module Register_embedded_V1
+    (Env : Tezos_protocol_environment.V1)
     (Proto : Env.Updater.PROTOCOL)
     (Source : Source_sig) =
 struct

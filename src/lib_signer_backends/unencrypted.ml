@@ -46,6 +46,14 @@ let make_sk sk =
   Client_keys.make_sk_uri
     (Uri.make ~scheme ~path:(Signature.Secret_key.to_b58check sk) ())
 
+let make_sapling_key sk =
+  let path =
+    Base58.simple_encode
+      Tezos_sapling.Core.Wallet.Spending_key.b58check_encoding
+      sk
+  in
+  Client_keys.make_sapling_uri (Uri.make ~scheme ~path ())
+
 let public_key pk_uri =
   Lwt.return
     (Signature.Public_key.of_b58check (Uri.path (pk_uri : pk_uri :> Uri.t)))
@@ -56,7 +64,7 @@ let make_pk pk =
 
 let neuterize sk_uri =
   secret_key sk_uri
-  >>=? fun sk -> return (make_pk (Signature.Secret_key.to_public_key sk))
+  >>=? fun sk -> make_pk (Signature.Secret_key.to_public_key sk)
 
 let public_key_hash pk_uri =
   public_key pk_uri

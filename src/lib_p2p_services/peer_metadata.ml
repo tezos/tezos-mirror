@@ -42,6 +42,9 @@ type messages = {
   mutable protocols : counter;
   mutable operation_hashes_for_block : counter;
   mutable operations_for_block : counter;
+  mutable checkpoint : counter;
+  mutable protocol_branch : counter;
+  mutable predecessor_header : counter;
   mutable other : counter;
 }
 
@@ -55,6 +58,9 @@ let sent_requests_encoding =
             protocols;
             operation_hashes_for_block;
             operations_for_block;
+            checkpoint;
+            protocol_branch;
+            predecessor_header;
             other } ->
        ( branch,
          head,
@@ -63,6 +69,9 @@ let sent_requests_encoding =
          protocols,
          operation_hashes_for_block,
          operations_for_block,
+         checkpoint,
+         protocol_branch,
+         predecessor_header,
          other ))
      (fun ( branch,
             head,
@@ -71,6 +80,9 @@ let sent_requests_encoding =
             protocols,
             operation_hashes_for_block,
             operations_for_block,
+            checkpoint,
+            protocol_branch,
+            predecessor_header,
             other ) ->
        {
          branch;
@@ -80,17 +92,50 @@ let sent_requests_encoding =
          protocols;
          operation_hashes_for_block;
          operations_for_block;
+         checkpoint;
+         protocol_branch;
+         predecessor_header;
          other;
        }))
-    (obj8
-       (req "branch" counter)
-       (req "head" counter)
-       (req "block_header" counter)
-       (req "operations" counter)
-       (req "protocols" counter)
-       (req "operation_hashes_for_block" counter)
-       (req "operations_for_block" counter)
-       (req "other" counter))
+    (union
+       [ case
+           ~title:"peer_metadata.v1"
+           Json_only
+           (merge_objs
+              (obj10
+                 (req "branch" counter)
+                 (req "head" counter)
+                 (req "block_header" counter)
+                 (req "operations" counter)
+                 (req "protocols" counter)
+                 (req "operation_hashes_for_block" counter)
+                 (req "operations_for_block" counter)
+                 (req "checkpoint" counter)
+                 (req "protocol_branch" counter)
+                 (req "predecessor_header" counter))
+              (obj1 (req "other" counter)))
+           (fun (b, h, bh, ops, p, ophs, opb, cp, pb, ph, o) ->
+             Some ((b, h, bh, ops, p, ophs, opb, cp, pb, ph), o))
+           (fun ((b, h, bh, ops, p, ophs, opb, cp, pb, ph), o) ->
+             (b, h, bh, ops, p, ophs, opb, cp, pb, ph, o));
+         (* This legacy encoding may be removed once every node
+            upgrade to the DDB v1. This encoding is currently only
+            being used to decode the peers json file. *)
+         case
+           ~title:"peer_metadata.legacy_v0"
+           Json_only
+           (obj8
+              (req "branch" counter)
+              (req "head" counter)
+              (req "block_header" counter)
+              (req "operations" counter)
+              (req "protocols" counter)
+              (req "operation_hashes_for_block" counter)
+              (req "operations_for_block" counter)
+              (req "other" counter))
+           (fun _ -> None) (* Never used for encoding *)
+           (fun (a, b, c, d, e, f, g, h) ->
+             (a, b, c, d, e, f, g, zero, zero, zero, h)) ])
 
 type requests_kind =
   | Branch
@@ -100,6 +145,9 @@ type requests_kind =
   | Protocols
   | Operation_hashes_for_block
   | Operations_for_block
+  | Checkpoint
+  | Protocol_branch
+  | Predecessor_header
   | Other
 
 type requests = {
@@ -319,6 +367,9 @@ let empty () =
       protocols = zero;
       operation_hashes_for_block = zero;
       operations_for_block = zero;
+      checkpoint = zero;
+      protocol_branch = zero;
+      predecessor_header = zero;
       other = zero;
     }
   in
@@ -437,6 +488,12 @@ let incr_requests (msgs : messages) (req : requests_kind) =
       msgs.operation_hashes_for_block <- msgs.operation_hashes_for_block + one
   | Operations_for_block ->
       msgs.operations_for_block <- msgs.operations_for_block + one
+  | Checkpoint ->
+      msgs.checkpoint <- msgs.checkpoint + one
+  | Protocol_branch ->
+      msgs.protocol_branch <- msgs.protocol_branch + one
+  | Predecessor_header ->
+      msgs.predecessor_header <- msgs.predecessor_header + one
   | Other ->
       msgs.other <- msgs.other + one
 

@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-[@@@ocaml.warning "-30"]
-
 open Protocol
 open Alpha_context
 open Protocol_client_context
@@ -114,6 +112,9 @@ let forge_endorsement (cctxt : #Protocol_client_context.full) ?async ~chain
 
 (** Worker *)
 
+(* because of delegates *)
+[@@@ocaml.warning "-30"]
+
 type state = {
   delegates : public_key_hash list;
   delay : int64;
@@ -125,6 +126,8 @@ and endorsements = {
   delegates : public_key_hash list;
   block : Client_baking_blocks.block_info;
 }
+
+[@@@ocaml.warning "+30"]
 
 let create_state delegates delay = {delegates; delay; pending = None}
 
@@ -324,3 +327,4 @@ let create (cctxt : #Protocol_client_context.full) ?(max_past = 110L) ~delay
     ~compute_timeout
     ~timeout_k
     ~event_k
+    ~finalizer:(fun _ -> Lwt.return_unit)

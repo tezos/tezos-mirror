@@ -40,7 +40,7 @@ let ( >>=! ) x f =
 
 let ( >|= ) = Lwt.( >|= )
 
-let ( // ) = Filename.concat
+open Filename.Infix
 
 (** Basic blocks *)
 
@@ -86,7 +86,7 @@ let create_block3a idx block2_commit =
   | None ->
       Assert.fail_msg "checkout block2"
   | Some ctxt ->
-      del ctxt ["a"; "b"]
+      remove_rec ctxt ["a"; "b"]
       >>= fun ctxt ->
       set ctxt ["a"; "d"] (Bytes.of_string "Mars") >>= fun ctxt -> commit ctxt
 
@@ -104,7 +104,7 @@ let create_block3b idx block2_commit =
   | None ->
       Assert.fail_msg "checkout block3b"
   | Some ctxt ->
-      del ctxt ["a"; "c"]
+      remove_rec ctxt ["a"; "c"]
       >>= fun ctxt ->
       set ctxt ["a"; "d"] (Bytes.of_string "Février")
       >>= fun ctxt -> commit ctxt
@@ -315,10 +315,14 @@ let test_dump {idx; block3b; _} =
           operations = [[]];
         }
       in
+      let empty_block_metadata_hash = None in
+      let empty_ops_metadata_hashes = None in
       let bhs =
         (fun context ->
           ( empty_block_header context,
             empty,
+            empty_block_metadata_hash,
+            empty_ops_metadata_hashes,
             history_mode,
             fun _ -> return (None, None) ))
           ctxt_hash
@@ -334,7 +338,7 @@ let test_dump {idx; block3b; _} =
         (fun _ -> return_unit)
         (fun _ _ _ -> return_unit)
       >>=? fun imported ->
-      let (bh, _, _, _, _, _) = imported in
+      let (bh, _, _, _, _, _, _, _) = imported in
       let expected_ctxt_hash = bh.Block_header.shell.context in
       assert (Context_hash.equal ctxt_hash expected_ctxt_hash) ;
       return ())

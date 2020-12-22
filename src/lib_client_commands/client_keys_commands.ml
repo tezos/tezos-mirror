@@ -138,14 +138,11 @@ let gen_keys_containing ?(encrypted = false) ?(prefix = false) ?(force = false)
                 @@ Signature.Public_key.hash public_key
               in
               if matches hash then
-                let pk_uri =
-                  Tezos_signer_backends.Unencrypted.make_pk public_key
-                in
+                Tezos_signer_backends.Unencrypted.make_pk public_key
+                >>=? fun pk_uri ->
                 ( if encrypted then
                   Tezos_signer_backends.Encrypted.encrypt cctxt secret_key
-                else
-                  return (Tezos_signer_backends.Unencrypted.make_sk secret_key)
-                )
+                else Tezos_signer_backends.Unencrypted.make_sk secret_key )
                 >>=? fun sk_uri ->
                 register_key
                   cctxt
@@ -192,7 +189,7 @@ let rec input_fundraiser_params (cctxt : #Client_context.io_wallet) =
     else
       cctxt#prompt_password "Enter word %d: " i
       >>=? fun word ->
-      match Bip39.index_of_word (Bigstring.to_string word) with
+      match Bip39.index_of_word (Bytes.to_string word) with
       | None ->
           loop_words acc i
       | Some wordidx ->
@@ -207,9 +204,9 @@ let rec input_fundraiser_params (cctxt : #Client_context.io_wallet) =
       cctxt#prompt_password "Enter the password used for the paper wallet: "
       >>=? fun password ->
       (* TODO: unicode normalization (NFKD)... *)
-      let passphrase = Bigstring.(concat "" [of_string email; password]) in
+      let passphrase = Bytes.(cat (of_string email) password) in
       let sk = Bip39.to_seed ~passphrase t in
-      let sk = Bigstring.sub_bytes sk 0 32 in
+      let sk = Bytes.sub sk 0 32 in
       let sk : Signature.Secret_key.t =
         Ed25519
           (Data_encoding.Binary.of_bytes_exn Ed25519.Secret_key.encoding sk)
@@ -226,7 +223,20 @@ let rec input_fundraiser_params (cctxt : #Client_context.io_wallet) =
       >>=? function
       | true -> return sk | false -> input_fundraiser_params cctxt )
 
-let commands version : Client_context.full Clic.command list =
+let fail_if_already_registered cctxt force pk_uri name =
+  Public_key.find_opt cctxt name
+  >>=? function
+  | None ->
+      return_unit
+  | Some (pk_uri_found, _) ->
+      fail_unless
+        (pk_uri = pk_uri_found || force)
+        (failure
+           "public and secret keys '%s' don't correspond, please don't use \
+            --force"
+           name)
+
+let commands network : Client_context.full Clic.command list =
   let open Clic in
   let encrypted_switch () =
     if
@@ -268,7 +278,7 @@ let commands version : Client_context.full Clic.command list =
               S.description)
           signers
         >>= return);
-    ( match version with
+    ( match network with
     | Some `Mainnet ->
         command
           ~group
@@ -279,11 +289,12 @@ let commands version : Client_context.full Clic.command list =
             Secret_key.of_fresh cctxt force name
             >>=? fun name ->
             let (pkh, pk, sk) = Signature.generate_key ~algo () in
-            let pk_uri = Tezos_signer_backends.Unencrypted.make_pk pk in
+            Tezos_signer_backends.Unencrypted.make_pk pk
+            >>=? fun pk_uri ->
             Tezos_signer_backends.Encrypted.encrypt cctxt sk
             >>=? fun sk_uri ->
             register_key cctxt ~force (pkh, pk_uri, sk_uri) name)
-    | _ ->
+    | Some `Testnet | None ->
         command
           ~group
           ~desc:"Generate a pair of keys."
@@ -296,12 +307,13 @@ let commands version : Client_context.full Clic.command list =
             Secret_key.of_fresh cctxt force name
             >>=? fun name ->
             let (pkh, pk, sk) = Signature.generate_key ~algo () in
-            let pk_uri = Tezos_signer_backends.Unencrypted.make_pk pk in
+            Tezos_signer_backends.Unencrypted.make_pk pk
+            >>=? fun pk_uri ->
             ( if encrypted then Tezos_signer_backends.Encrypted.encrypt cctxt sk
-            else return (Tezos_signer_backends.Unencrypted.make_sk sk) )
+            else Tezos_signer_backends.Unencrypted.make_sk sk )
             >>=? fun sk_uri ->
             register_key cctxt ~force (pkh, pk_uri, sk_uri) name) );
-    ( match version with
+    ( match network with
     | Some `Mainnet ->
         command
           ~group
@@ -329,7 +341,7 @@ let commands version : Client_context.full Clic.command list =
               ~containing
               ~name
               cctxt)
-    | _ ->
+    | Some `Testnet | None ->
         command
           ~group
           ~desc:"Generate keys including the given string."
@@ -368,7 +380,7 @@ let commands version : Client_context.full Clic.command list =
       (fun () (cctxt : Client_context.full) ->
         cctxt#prompt_password "Enter unencrypted secret key: "
         >>=? fun sk_uri ->
-        let sk_uri = Uri.of_string (Bigstring.to_string sk_uri) in
+        let sk_uri = Uri.of_string (Bytes.to_string sk_uri) in
         ( match Uri.scheme sk_uri with
         | None | Some "unencrypted" ->
             return_unit
@@ -395,17 +407,7 @@ let commands version : Client_context.full Clic.command list =
         >>=? fun name ->
         Client_keys.neuterize sk_uri
         >>=? fun pk_uri ->
-        Public_key.find_opt cctxt name
-        >>=? (function
-               | None ->
-                   return_unit
-               | Some (pk_uri_found, _) ->
-                   fail_unless
-                     (pk_uri = pk_uri_found || force)
-                     (failure
-                        "public and secret keys '%s' don't correspond, please \
-                         don't use --force"
-                        name))
+        fail_if_already_registered cctxt force pk_uri name
         >>=? fun () ->
         Client_keys.import_secret_key
           ~io:(cctxt :> Client_context.io_wallet)
@@ -417,7 +419,7 @@ let commands version : Client_context.full Clic.command list =
           pkh
         >>= fun () ->
         register_key cctxt ~force (pkh, pk_uri, sk_uri) ?public_key name) ]
-  @ ( if version <> Some `Mainnet then []
+  @ ( if network <> Some `Mainnet then []
     else
       [ command
           ~group
@@ -435,17 +437,7 @@ let commands version : Client_context.full Clic.command list =
             >>=? fun sk_uri ->
             Client_keys.neuterize sk_uri
             >>=? fun pk_uri ->
-            Public_key.find_opt cctxt name
-            >>=? (function
-                   | None ->
-                       return_unit
-                   | Some (pk_uri_found, _) ->
-                       fail_unless
-                         (pk_uri = pk_uri_found || force)
-                         (failure
-                            "public and secret keys '%s' don't correspond, \
-                             please don't use --force"
-                            name))
+            fail_if_already_registered cctxt force pk_uri name
             >>=? fun () ->
             Client_keys.public_key_hash pk_uri
             >>=? fun (pkh, _public_key) ->
@@ -496,7 +488,7 @@ let commands version : Client_context.full Clic.command list =
                   cctxt#message "%s: %s" name v
               | (_, Some uri) ->
                   let scheme =
-                    Option.unopt ~default:"unencrypted"
+                    Option.value ~default:"unencrypted"
                     @@ Uri.scheme (uri : sk_uri :> Uri.t)
                   in
                   cctxt#message "%s: %s (%s sk known)" name v scheme
@@ -599,7 +591,7 @@ let commands version : Client_context.full Clic.command list =
           >>=? fun sk_uri ->
           Client_keys.deterministic_nonce sk_uri data
           >>=? fun nonce ->
-          cctxt#message "%a" Hex.pp (Hex.of_bytes (Bigstring.to_bytes nonce))
+          cctxt#message "%a" Hex.pp (Hex.of_bytes nonce)
           >>= fun () -> return_unit);
       command
         ~group
@@ -624,4 +616,67 @@ let commands version : Client_context.full Clic.command list =
           Client_keys.deterministic_nonce_hash sk_uri data
           >>=? fun nonce_hash ->
           cctxt#message "%a" Hex.pp (Hex.of_bytes nonce_hash)
-          >>= fun () -> return_unit) ]
+          >>= fun () -> return_unit);
+      command
+        ~group
+        ~desc:
+          "Import a pair of keys to the wallet from a mnemonic phrase. This \
+           command uses the BIP39 algorithm, and therefore imports \
+           public/secret keys that may be different from a Ledger \
+           application, depending on the BIP32 derivation path used in the \
+           Ledger. This command also uses the Ed25519 algorithm, which means \
+           it generates tz1 public key hashes."
+        (args2
+           (Secret_key.force_switch ())
+           (switch ~doc:"encrypt the secret key" ~long:"encrypt" ()))
+        ( prefix "import"
+        @@ prefixes ["keys"; "from"; "mnemonic"]
+        @@ Secret_key.fresh_alias_param @@ stop )
+        (fun (force, encrypt) name (cctxt : Client_context.full) ->
+          Secret_key.of_fresh cctxt force name
+          >>=? fun name ->
+          cctxt#prompt "Enter your mnemonic: "
+          >>=? fun mnemonic ->
+          let mnemonic = String.trim mnemonic |> String.split_on_char ' ' in
+          match Bip39.of_words mnemonic with
+          | None ->
+              failwith
+                "\"%s\" is not a valid BIP39 mnemonic. Please ensure that \
+                 your mnemonic is of correct length, and that each word is \
+                 separated by a single space. For reference, a correct \
+                 mnemonic is comprised of 12, 15, 18, 21, or 24 words where \
+                 the last is a checksum. Do not try to write your own \
+                 mnemonic."
+                (String.concat " " mnemonic)
+          | Some t ->
+              cctxt#prompt_password "Enter your passphrase: "
+              >>=? fun passphrase ->
+              let sk = Bip39.to_seed ~passphrase t in
+              let sk = Bytes.sub sk 0 32 in
+              let sk : Signature.Secret_key.t =
+                Ed25519
+                  (Data_encoding.Binary.of_bytes_exn
+                     Ed25519.Secret_key.encoding
+                     sk)
+              in
+              Tezos_signer_backends.Unencrypted.make_sk sk
+              >>=? fun unencrypted_sk_uri ->
+              ( match encrypt with
+              | true ->
+                  Tezos_signer_backends.Encrypted.encrypt cctxt sk
+              | false ->
+                  return unencrypted_sk_uri )
+              >>=? fun sk_uri ->
+              neuterize unencrypted_sk_uri
+              >>=? fun pk_uri ->
+              fail_if_already_registered cctxt force pk_uri name
+              >>=? fun () ->
+              import_secret_key ~io:(cctxt :> Client_context.io_wallet) pk_uri
+              >>=? fun (pkh, public_key) ->
+              register_key cctxt ~force (pkh, pk_uri, sk_uri) ?public_key name
+              >>=? fun () ->
+              cctxt#message
+                "Tezos address added: %a"
+                Signature.Public_key_hash.pp
+                pkh
+              >>= fun () -> return_unit) ]

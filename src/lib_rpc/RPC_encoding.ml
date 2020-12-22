@@ -210,9 +210,7 @@ let directory_descr_encoding =
   let static_directory_descr_encoding =
     conv
       (fun {services; subdirs} ->
-        let find s =
-          try Some (Resto.MethMap.find s services) with Not_found -> None
-        in
+        let find s = Resto.MethMap.find_opt s services in
         (find `GET, find `POST, find `DELETE, find `PUT, find `PATCH, subdirs))
       (fun (get, post, delete, put, patch, subdirs) ->
         let add meth s services =

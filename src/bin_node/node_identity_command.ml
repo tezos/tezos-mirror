@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let ( // ) = Filename.concat
+open Filename.Infix
 
 (** Commands *)
 
@@ -37,37 +37,6 @@ let show {Node_config_file.data_dir; _} =
   Format.printf "Peer_id: %a.@." P2p_peer.Id.pp id.peer_id ;
   return_unit
 
-let generate_with_animation ppf target =
-  let duration = 1200 / Animation.number_of_frames in
-  Animation.make_with_animation
-    ppf
-    ~make:(fun count ->
-      try Ok (P2p_identity.generate_with_bound ~max:count target)
-      with Not_found -> Error count)
-    ~on_retry:(fun time count ->
-      let ms = int_of_float (Mtime.Span.to_ms time) in
-      if ms <= 1 then max 10 (count * 10) else count * duration / ms)
-    10000
-
-let generate {Node_config_file.data_dir; p2p; _} =
-  let identity_file = identity_file data_dir in
-  if Sys.file_exists identity_file then
-    fail (Node_identity_file.Existent_identity_file identity_file)
-  else
-    let target = Crypto_box.make_target p2p.expected_pow in
-    Format.eprintf
-      "Generating a new identity... (level: %.2f) "
-      p2p.expected_pow ;
-    let id = generate_with_animation Format.err_formatter target in
-    Node_identity_file.write identity_file id
-    >>=? fun () ->
-    Format.eprintf
-      "Stored the new identity (%a) into '%s'.@."
-      P2p_peer.Id.pp
-      id.peer_id
-      identity_file ;
-    return_unit
-
 let check {Node_config_file.data_dir; p2p = {expected_pow; _}; _} =
   Node_identity_file.read ~expected_pow (identity_file data_dir)
   >>=? fun id ->
@@ -77,6 +46,10 @@ let check {Node_config_file.data_dir; p2p = {expected_pow; _}; _} =
     id.peer_id
     expected_pow ;
   return_unit
+
+let generate {Node_config_file.data_dir; p2p; _} =
+  Node_identity_file.generate (identity_file data_dir) p2p.expected_pow
+  >>=? fun _id -> return_unit
 
 (** Main *)
 
@@ -114,7 +87,7 @@ module Term = struct
       | Check ->
           check cfg
     in
-    match Lwt_main.run res with
+    match Lwt_main.run @@ Lwt_exit.wrap_and_exit res with
     | Ok () ->
         `Ok ()
     | Error err ->

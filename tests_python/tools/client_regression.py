@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 import subprocess
 from client import client
 
@@ -18,10 +18,11 @@ class ClientRegression(client.Client):
     def __init__(self,
                  client_path: str,
                  admin_client_path: str,
-                 host: str = '127.0.0.1',
-                 base_dir: str = None,
-                 rpc_port: int = 8732,
-                 use_tls: int = False,
+                 host: Optional[str] = None,
+                 base_dir: Optional[str] = None,
+                 rpc_port: Optional[int] = None,
+                 use_tls: Optional[bool] = None,
+                 endpoint: Optional[str] = 'http://127.0.0.1:8732',
                  disable_disclaimer: bool = True):
         self.regtest = None
         super().__init__(client_path,
@@ -30,6 +31,7 @@ class ClientRegression(client.Client):
                          base_dir,
                          rpc_port,
                          use_tls,
+                         endpoint,
                          disable_disclaimer)
 
     def set_regtest(self, regtest):

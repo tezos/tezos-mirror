@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -38,6 +39,9 @@ type request =
       chain_id : Chain_id.t;
       block_header : Block_header.t;
       predecessor_block_header : Block_header.t;
+      predecessor_block_metadata_hash : Block_metadata_hash.t option;
+      predecessor_ops_metadata_hash :
+        Operation_metadata_list_list_hash.t option;
       operations : Operation.t list list;
       max_operations_ttl : int;
     }
@@ -51,7 +55,7 @@ type request =
 
 val request_pp : Format.formatter -> request -> unit
 
-val magic : MBytes.t
+val magic : Bytes.t
 
 val parameters_encoding : parameters Data_encoding.t
 
@@ -63,3 +67,24 @@ val recv : Lwt_io.input_channel -> 'a Data_encoding.t -> 'a Lwt.t
 
 val recv_result :
   Lwt_io.input_channel -> 'a Data_encoding.t -> 'a tzresult Lwt.t
+
+(** The prefix for the validation socket filename.
+
+    Do not use it directly except for documentation purposes; use
+    [socket_path] instead. *)
+val socket_path_prefix : string
+
+(** Get the validation socket path.
+
+    [socket_dir] is the directory where the file should be put.
+    [pid] is the process ID of the validator process. *)
+val socket_path : socket_dir:string -> pid:int -> string
+
+val create_socket_listen :
+  canceler:Lwt_canceler.t ->
+  max_requests:int ->
+  socket_path:string ->
+  Lwt_unix.file_descr Lwt.t
+
+val create_socket_connect :
+  canceler:Lwt_canceler.t -> socket_path:string -> Lwt_unix.file_descr Lwt.t

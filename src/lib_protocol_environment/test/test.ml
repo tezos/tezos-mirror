@@ -24,4 +24,7 @@
 (*****************************************************************************)
 
 let () =
-  Alcotest.run "tezos-shell-context" [("mem_context", Test_mem_context.tests)]
+  Alcotest_lwt.run
+    "tezos-shell-context"
+    [("mem_context", Test_mem_context.tests)]
+  |> Lwt_main.run

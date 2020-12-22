@@ -27,23 +27,22 @@ open Client_context
 
 type command = full Clic.command
 
-type network = [`Mainnet | `Alphanet | `Zeronet | `Sandbox]
+type network = [`Mainnet | `Testnet]
 
 exception Version_not_found
 
 let versions = Protocol_hash.Table.create 7
 
-let get_versions () =
-  Protocol_hash.Table.fold (fun k c acc -> (k, c) :: acc) versions []
+let get_versions () = Protocol_hash.Table.to_seq versions
 
 let register name commands =
   let previous =
-    try Protocol_hash.Table.find versions name
-    with Not_found -> fun (_network : network option) -> ([] : command list)
+    Option.value ~default:(fun _network_opt -> [])
+    @@ Protocol_hash.Table.find versions name
   in
-  Protocol_hash.Table.replace versions name (fun (network : network option) ->
-      commands network @ previous network)
+  Protocol_hash.Table.replace versions name (fun network_opt ->
+      commands network_opt @ previous network_opt)
 
 let commands_for_version version =
-  try Protocol_hash.Table.find versions version
-  with Not_found -> raise Version_not_found
+  Option.unopt_exn Version_not_found
+  @@ Protocol_hash.Table.find versions version

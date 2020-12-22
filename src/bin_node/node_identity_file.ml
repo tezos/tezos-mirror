@@ -62,7 +62,7 @@ let () =
     ~id:"main.identity.insufficient_proof_of_work"
     ~title:"Insufficient proof of work"
     ~description:
-      "The proof of work embeded by the current identity is not sufficient"
+      "The proof of work embedded by the current identity is not sufficient"
     ~pp:(fun ppf expected ->
       Format.fprintf
         ppf
@@ -144,7 +144,7 @@ let read ?expected_pow filename =
       (* check public_key hash *)
       if not (Crypto_box.Public_key_hash.equal pkh id.peer_id) then
         fail (Identity_mismatch {filename; peer_id = pkh})
-        (* check public/private keys correspondance *)
+        (* check public/private keys correspondence *)
       else if not Crypto_box.(equal (neuterize id.secret_key) id.public_key)
       then
         fail (Identity_keys_mismatch {filename; expected_key = id.public_key})
@@ -154,7 +154,7 @@ let read ?expected_pow filename =
         | None ->
             return id
         | Some expected ->
-            let target = Crypto_box.make_target expected in
+            let target = Crypto_box.make_pow_target expected in
             if
               not
                 (Crypto_box.check_proof_of_work
@@ -171,12 +171,12 @@ let () =
     `Permanent
     ~id:"main.identity.existent_file"
     ~title:"Cannot overwrite identity file"
-    ~description:"Cannot implicitely overwrite the current identity file"
+    ~description:"Cannot implicitly overwrite the current identity file"
     ~pp:(fun ppf file ->
       Format.fprintf
         ppf
-        "Cannot implicitely overwrite the current identity file: '%s'. See \
-         `%s identity --help` on how to generate a new identity."
+        "Cannot implicitly overwrite the current identity file: '%s'. See `%s \
+         identity --help` on how to generate a new identity."
         file
         Sys.argv.(0))
     Data_encoding.(obj1 (req "file" string))
@@ -191,3 +191,39 @@ let write file identity =
     Lwt_utils_unix.Json.write_file
       file
       (Data_encoding.Json.construct P2p_identity.encoding identity)
+
+let generate_with_animation ppf target =
+  let duration = 1200 / Animation.number_of_frames in
+  Animation.make_with_animation
+    ppf
+    ~make:(fun count ->
+      Lwt.catch
+        (fun () ->
+          P2p_identity.generate_with_bound ~max:count target
+          >|= fun id -> Ok id)
+        (function
+          | Not_found -> Lwt.return @@ Error count | exc -> Lwt.fail exc))
+    ~on_retry:(fun time count ->
+      let ms = int_of_float (Mtime.Span.to_ms time) in
+      let count =
+        if ms <= 1 then max 10 (count * 10) else count * duration / ms
+      in
+      Lwt.pause () >>= fun () -> Lwt.return count)
+    10000
+
+let generate identity_file expected_pow =
+  if Sys.file_exists identity_file then
+    fail (Existent_identity_file identity_file)
+  else
+    let target = Crypto_box.make_pow_target expected_pow in
+    Format.eprintf "Generating a new identity... (level: %.2f) " expected_pow ;
+    generate_with_animation Format.err_formatter target
+    >>= fun id ->
+    write identity_file id
+    >>=? fun () ->
+    Format.eprintf
+      "Stored the new identity (%a) into '%s'.@."
+      P2p_peer.Id.pp
+      id.peer_id
+      identity_file ;
+    return id

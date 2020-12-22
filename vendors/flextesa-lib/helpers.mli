@@ -93,7 +93,7 @@ module System_dependencies : sig
     -> (unit, [> System_error.t | Error.t]) Asynchronous_result.t
 end
 
-module Shell_environement : sig
+module Shell_environment : sig
   type t
 
   val make : aliases:(string * string * string) list -> t

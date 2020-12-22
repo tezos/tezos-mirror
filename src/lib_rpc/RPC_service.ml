@@ -70,6 +70,48 @@ include (
 
 let error_path = ref None
 
+type Error_monad.error += Unparsable_RPC_error of Data_encoding.json
+
+type Error_monad.error += Empty_error_list
+
+let () =
+  let open Error_monad in
+  register_error_kind
+    `Branch
+    ~id:"RPC.Unexpected_error_encoding"
+    ~title:"RPC fails with an unparsable error message"
+    ~description:
+      "The RPC returned with an error code, and the associated body was not a \
+       valid error trace. It is likely that the answer does not comes \
+       directly from a compatible node."
+    ~pp:(fun ppf msg ->
+      Format.fprintf
+        ppf
+        "@[<v 2>The RPC returned with an error code, and the associated body \
+         was not a valid error trace:@[%a@]@ It is likely that the answer \
+         does not comes directly from a compatible node.@]@."
+        Data_encoding.Json.pp
+        msg)
+    Data_encoding.(obj1 (req "unparsable message" json))
+    (function Unparsable_RPC_error msg -> Some msg | _ -> None)
+    (fun msg -> Unparsable_RPC_error msg)
+
+let () =
+  let open Error_monad in
+  register_error_kind
+    `Branch
+    ~id:"RPC.Empty_error_list"
+    ~title:"RPC returned an empty list of errors"
+    ~description:"The RPC returned with an error code but no associated error."
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "@[<v 2>The RPC returned with an error code but no associated \
+         error.@]@.")
+    Data_encoding.empty
+    (function Empty_error_list -> Some () | _ -> None)
+    (fun () -> Empty_error_list)
+
 let error_encoding =
   let open Data_encoding in
   delayed (fun () ->
@@ -85,9 +127,14 @@ let error_encoding =
              (Uri.path_and_query uri))
       @@ conv
            ~schema:Json_schema.any
-           (fun exn -> `A (List.map Error_monad.json_of_error exn))
+           (fun errors -> `A (List.map Error_monad.json_of_error errors))
            (function
-             | `A exns -> List.map Error_monad.error_of_json exns | _ -> [])
+             | `A [] ->
+                 [Empty_error_list]
+             | `A errors ->
+                 List.map Error_monad.error_of_json errors
+             | msg ->
+                 [Unparsable_RPC_error msg])
            json)
 
 let get_service = get_service ~error:error_encoding

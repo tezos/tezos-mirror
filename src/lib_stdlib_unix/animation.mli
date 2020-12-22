@@ -36,10 +36,10 @@
     (b.2) the result is used to attempt the task again. *)
 val make_with_animation :
   Format.formatter ->
-  make:('seed -> ('result, 'failure) result) ->
-  on_retry:(Mtime.Span.t -> 'failure -> 'seed) ->
+  make:('seed -> ('result, 'failure) result Lwt.t) ->
+  on_retry:(Mtime.Span.t -> 'failure -> 'seed Lwt.t) ->
   'seed ->
-  'result
+  'result Lwt.t
 
 (** The number of steps that the animation cycles through. *)
 val number_of_frames : int

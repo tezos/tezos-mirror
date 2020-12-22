@@ -7,7 +7,7 @@ dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "tezos-tooling" { with-test }
-  "dune" { >= "1.11" }
+  "dune" { >= "2.0" }
   "tezos-base"
   "tezos-version"
   "tezos-rpc-http-server"
@@ -31,10 +31,11 @@ depends: [
   "tezos-embedded-protocol-005-PsBabyM1"
   "tezos-embedded-protocol-006-PsCARTHA"
   "tezos-embedded-protocol-007-PsDELPH1"
-  "tezos-mempool-006-PsCARTHA"
+  "tezos-embedded-protocol-008-PtEdoTez"
   "tezos-mempool-007-PsDELPH1"
+  "tezos-mempool-008-PtEdoTez"
   "cmdliner"
-  "tls"
+  "tls" { >= "0.11" < "0.12" } # remove the upper bond when the compatibility with hacl-star is restored
   "cstruct"
 ]
 build: [

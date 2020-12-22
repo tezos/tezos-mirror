@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -34,6 +35,12 @@ end
 module Event : sig
   type update = Ignored_head | Branch_switch | Head_increment
 
+  type synchronisation_status =
+    | Synchronised of {is_chain_stuck : bool}
+    | Not_synchronised
+
+  val sync_status_encoding : synchronisation_status Data_encoding.t
+
   type t =
     | Processed_block of {
         request : Request.view;
@@ -44,6 +51,14 @@ module Event : sig
         timestamp : Time.Protocol.t;
       }
     | Could_not_switch_testchain of error list
+    | Bootstrapped
+    | Sync_status of synchronisation_status
+    | Bootstrap_active_peers of {active : int; needed : int}
+    | Bootstrap_active_peers_heads_time of {
+        min_head_time : Time.Protocol.t;
+        max_head_time : Time.Protocol.t;
+        most_recent_validation : Time.Protocol.t;
+      }
 
   type view = t
 
@@ -57,11 +72,7 @@ module Event : sig
 end
 
 module Worker_state : sig
-  type view = {
-    active_peers : P2p_peer.Id.t list;
-    bootstrapped_peers : P2p_peer.Id.t list;
-    bootstrapped : bool;
-  }
+  type view = {active_peers : P2p_peer.Id.t list; bootstrapped : bool}
 
   val encoding : view Data_encoding.encoding
 
@@ -77,7 +88,6 @@ module Distributed_db_state : sig
     operation_db : table_scheduler;
     operations_db : table_scheduler;
     block_header_db : table_scheduler;
-    operations_hashed_db : table_scheduler;
     active_connections_length : int;
     active_peers_length : int;
   }

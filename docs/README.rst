@@ -3,35 +3,30 @@ Building documentation locally
 ******************************
 
 The documentation is available online at `tezos.gitlab.io <http://tezos.gitlab.io/>`_,
-always up to date with master on `GitLab <https://gitlab.com/tezos/tezos>`_.
+and always up to date with branch ``master`` on `GitLab <https://gitlab.com/tezos/tezos>`_.
 
 Building instructions
 ---------------------
 
-To build the documentation, you can use the main Makefile target ``doc-html``
+To build the documentation, you need to install the Python package manager
+`Poetry <https://python-poetry.org/>`_. For instructions on how to 
+obtain Python and Poetry, see :ref:`python_testing_framework<installation>`. 
+Once this is done, you can install the needed dependencies locally:
 
 .. code-block:: bash
 
-    make html
+    # in the "docs" directory
+    poetry install
 
-The documentation is built by Sphinx, and uses the Read The Docs theme.
-
-On a debian system, you can install the needed dependencies with:
-
-.. code-block:: bash
-
-    sudo apt install \
-      python3-recommonmark \
-      python3-sphinx \
-      python3-sphinx-rtd-theme
-
-If you prefer to use a specific python environment to build the documentation, create a virtualenv with a python3 interpreter and install these PIP packages:
+Then, you can use the main Makefile target ``doc-html`` to generate the HTML:
 
 .. code-block:: bash
 
-   pip install sphinx sphinx-rtd-theme recommonmark
+    # in the project root directory
+    make doc-html
 
-The HTML pages will be available in `docs/_build`.
+The output is generated and available in ``docs/_build``. It is built by
+Sphinx, and uses the Read The Docs theme.
 
 
 Sphinx extensions

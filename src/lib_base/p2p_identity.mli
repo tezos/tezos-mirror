@@ -35,8 +35,26 @@ type t = {
 
 val encoding : t Data_encoding.t
 
-(** [generate target] is a freshly minted identity whose proof of
-    work stamp difficulty is at least equal to [target]. *)
-val generate : Crypto_box.target -> t
+(** [generate pow_target] is a freshly minted identity whose proof of
+    work stamp difficulty is at least equal to [pow_target].
 
-val generate_with_bound : ?max:int -> Crypto_box.target -> t
+    The argument [yield_every] (defaults to [500]) introduces a call to
+    [Lwt.pause] every that many operations. *)
+val generate : ?yield_every:int -> Crypto_box.pow_target -> t Lwt.t
+
+(** [generate_with_bound pow_target] is a freshly minted identity whose proof of
+    work stamp difficulty is at least equal to [pow_target].
+
+    The optional argument [max] sets a maximum number of attempts. If that many
+    attempts are made without finding a successful pow, the function fails with
+    [Not_found]. *)
+val generate_with_bound :
+  ?yield_every:int -> ?max:int -> Crypto_box.pow_target -> t Lwt.t
+
+(** [generate_with_pow_target_0 pk] generates a proof of work for the
+    public key [pk] following a (hard-coded) 0 proof-of-work target.
+
+    NOTICE: This function is meant for generating dummy identities. It is useful
+    for tests and other such controlled environment but it is not suitable for
+    generating identities for an open network. *)
+val generate_with_pow_target_0 : unit -> t

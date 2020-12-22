@@ -1,5 +1,6 @@
 import pytest
 from tools import utils
+from client.client import Client
 
 BAKE_ARGS = ['--max-priority', '512', '--minimal-timestamp']
 
@@ -7,14 +8,14 @@ BAKE_ARGS = ['--max-priority', '512', '--minimal-timestamp']
 @pytest.mark.incremental
 class TestMultisig:
 
-    def test_gen_keys(self, client, session):
+    def test_gen_keys(self, client: Client, session: dict):
         session['keys'] = ['foo', 'bar', 'boo']
-        sig = [None, 'secp256k1', 'ed25519']
-        for key, sig in zip(session['keys'], sig):
+        sigs = [None, 'secp256k1', 'ed25519']
+        for key, sig in zip(session['keys'], sigs):
             args = [] if sig is None else ['--sig', sig]
             client.gen_key(key, args)
 
-    def test_deploy_multisig(self, client, session):
+    def test_deploy_multisig(self, client: Client, session: dict):
         keys = session['keys']
         client.deploy_msig('msig',
                            100,
@@ -22,15 +23,15 @@ class TestMultisig:
                            ['--burn-cap', '100'])
         client.bake('bootstrap1', BAKE_ARGS)
 
-    def test_transfer(self, client, session):
+    def test_transfer(self, client: Client, session: dict):
         key = session['keys'][0]
         session['sig0'] = client.msig_sign_transfer('msig', 10,
                                                     'bootstrap2', key)
 
-    def test_prepare_msig_transfer(self, client):
+    def test_prepare_msig_transfer(self, client: Client):
         client.msig_prepare_transfer('msig', 10, 'bootstrap2')
 
-    def test_prepare_msig_sign(self, client, session):
+    def test_prepare_msig_sign(self, client: Client, session: dict):
         to_sign = client.msig_prepare_transfer('msig', 10,
                                                'bootstrap2',
                                                ['--bytes-only'])
@@ -39,24 +40,22 @@ class TestMultisig:
         sign = client.sign_bytes(to_sign, session['keys'][2])
         session['sig2'] = sign.signature
 
-    def test_transfer_failure(self, client, session):
-        def cmd():
-            client.msig_transfer('msig', 10, 'bootstrap2',
-                                 'bootstrap1',
-                                 [session['sig2']])
-
+    def test_transfer_failure(self, client: Client, session: dict):
         error_pattern = (r"Not enough signatures: " +
                          r"only 1 signatures were given " +
                          r"but the threshold is currently 2")
 
-        utils.assert_run_failure(cmd, error_pattern)
+        with utils.assert_run_failure(error_pattern):
+            client.msig_transfer('msig', 10, 'bootstrap2',
+                                 'bootstrap1',
+                                 [session['sig2']])
 
-    def test_transfer_success(self, client, session):
+    def test_transfer_success(self, client: Client, session: dict):
         client.msig_transfer('msig', 10, 'bootstrap2', 'bootstrap1',
                              [session['sig0'], session['sig2']])
         client.bake('bootstrap1', BAKE_ARGS)
 
-    def test_delegate_change(self, client, session):
+    def test_delegate_change(self, client: Client, session: dict):
         sig0 = client.msig_sign_set_delegate('msig', 'bootstrap5',
                                              session['keys'][0])
         to_sign = client.msig_prepare_set_delegate('msig', 'bootstrap5',
@@ -67,7 +66,7 @@ class TestMultisig:
                                  [sig0, sig2])
         client.bake('bootstrap1', BAKE_ARGS)
 
-    def test_delegate_withdraw(self, client, session):
+    def test_delegate_withdraw(self, client: Client, session: dict):
         sig0 = client.msig_sign_withdrawing_delegate('msig',
                                                      session['keys'][0])
         to_sign = client.msig_prepare_withdrawing_delegate('msig',
@@ -79,7 +78,7 @@ class TestMultisig:
                                          [sig0, sig1])
         client.bake('bootstrap1', BAKE_ARGS)
 
-    def test_change_keys_and_threshold(self, client, session):
+    def test_change_keys_and_threshold(self, client: Client, session: dict):
         keys = session['keys']
         sig0 = client.msig_sign_setting_threshold('msig', keys[0],
                                                   2, [keys[0], keys[2]])
@@ -97,14 +96,14 @@ class TestMultisig:
 @pytest.mark.incremental
 class TestMultisigFromAddress:
 
-    def test_gen_keys(self, client, session):
+    def test_gen_keys(self, client: Client, session: dict):
         session['keys'] = ['foo', 'bar', 'boo']
-        sig = [None, 'secp256k1', 'ed25519']
-        for key, sig in zip(session['keys'], sig):
+        sigs = [None, 'secp256k1', 'ed25519']
+        for key, sig in zip(session['keys'], sigs):
             args = [] if sig is None else ['--sig', sig]
             client.gen_key(key, args)
 
-    def test_deploy_multisig(self, client, session):
+    def test_deploy_multisig(self, client: Client, session: dict):
         keys = session['keys']
         deployment = client.deploy_msig('msig2',
                                         100,
@@ -113,17 +112,17 @@ class TestMultisigFromAddress:
         session['msig'] = deployment.contract
         client.bake('bootstrap1', BAKE_ARGS)
 
-    def test_transfer(self, client, session):
+    def test_transfer(self, client: Client, session: dict):
         key = session['keys'][0]
         msig = session['msig']
         session['sig0'] = client.msig_sign_transfer(msig, 10,
                                                     'bootstrap2', key)
 
-    def test_prepare_msig_transfer(self, client, session):
+    def test_prepare_msig_transfer(self, client: Client, session: dict):
         msig = session['msig']
         client.msig_prepare_transfer(msig, 10, 'bootstrap2')
 
-    def test_prepare_msig_sign(self, client, session):
+    def test_prepare_msig_sign(self, client: Client, session: dict):
         msig = session['msig']
         to_sign = client.msig_prepare_transfer(msig, 10,
                                                'bootstrap2',
@@ -133,7 +132,7 @@ class TestMultisigFromAddress:
         sign = client.sign_bytes(to_sign, session['keys'][2])
         session['sig2'] = sign.signature
 
-    def test_transfer_failure(self, client, session):
+    def test_transfer_failure(self, client: Client, session: dict):
         msig = session['msig']
 
         def cmd():
@@ -145,15 +144,16 @@ class TestMultisigFromAddress:
                          r"only 1 signatures were given " +
                          r"but the threshold is currently 2")
 
-        utils.assert_run_failure(cmd, error_pattern)
+        with utils.assert_run_failure(error_pattern):
+            cmd()
 
-    def test_transfer_success(self, client, session):
+    def test_transfer_success(self, client: Client, session: dict):
         msig = session['msig']
         client.msig_transfer(msig, 10, 'bootstrap2', 'bootstrap1',
                              [session['sig0'], session['sig2']])
         client.bake('bootstrap1', BAKE_ARGS)
 
-    def test_delegate_change(self, client, session):
+    def test_delegate_change(self, client: Client, session: dict):
         msig = session['msig']
         sig0 = client.msig_sign_set_delegate(msig, 'bootstrap5',
                                              session['keys'][0])
@@ -165,7 +165,7 @@ class TestMultisigFromAddress:
                                  [sig0, sig2])
         client.bake('bootstrap1', BAKE_ARGS)
 
-    def test_delegate_withdraw(self, client, session):
+    def test_delegate_withdraw(self, client: Client, session: dict):
         msig = session['msig']
         sig0 = client.msig_sign_withdrawing_delegate(msig,
                                                      session['keys'][0])
@@ -178,7 +178,7 @@ class TestMultisigFromAddress:
                                          [sig0, sig1])
         client.bake('bootstrap1', BAKE_ARGS)
 
-    def test_change_keys_and_threshold(self, client, session):
+    def test_change_keys_and_threshold(self, client: Client, session: dict):
         msig = session['msig']
         keys = session['keys']
         sig0 = client.msig_sign_setting_threshold(msig, keys[0],

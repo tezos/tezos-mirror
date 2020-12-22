@@ -24,8 +24,7 @@
 (*****************************************************************************)
 
 open Updater_logging
-
-let ( // ) = Filename.concat
+open Filename.Infix
 
 (** Compiler *)
 
@@ -35,7 +34,7 @@ let get_datadir () =
   match !datadir with
   | None ->
       fatal_error "Node not initialized" ;
-      Lwt_exit.exit 1
+      Lwt_exit.exit_and_raise 1
   | Some m ->
       m
 
@@ -68,26 +67,26 @@ let do_compile hash p =
            ~stderr:(`FD_move fd)
            compiler_command
          >>= return)
-  >>= function
+  >|= function
   | Error err ->
       log_error "Error %a" pp_print_error err ;
-      Lwt.return_false
+      false
   | Ok (Unix.WSIGNALED _ | Unix.WSTOPPED _) ->
       log_error "INTERRUPTED COMPILATION (%s)" log_file ;
-      Lwt.return_false
+      false
   | Ok (Unix.WEXITED x) when x <> 0 ->
       log_error "COMPILATION ERROR (%s)" log_file ;
-      Lwt.return_false
+      false
   | Ok (Unix.WEXITED _) -> (
     try
       Dynlink.loadfile_private (plugin_file ^ ".cmxs") ;
-      Lwt.return_true
+      true
     with Dynlink.Error err ->
       log_error
         "Can't load plugin: %s (%s)"
         (Dynlink.error_message err)
         plugin_file ;
-      Lwt.return_false )
+      false )
 
 let compile hash p =
   if Tezos_protocol_registerer.Registerer.mem hash then Lwt.return_true

@@ -23,9 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Internal_event.Legacy_logging.Make (struct
-  let name = "p2p.welcome"
-end)
+module Events = P2p_events.P2p_welcome
 
 type connect_handler =
   | Connect_handler :
@@ -67,11 +65,7 @@ let rec worker_loop st =
               _,
               _ ))
         :: _ as err ) ->
-      lwt_log_error
-        "@[<v 2>Incoming connection failed with %a in the\n\
-        \      Welcome worker. Resuming in 5s.@]"
-        pp_print_error
-        err
+      Events.(emit incoming_error) (err, "system")
       >>= fun () ->
       (* These are temporary system errors, giving some time for the system to
          recover *)
@@ -104,18 +98,11 @@ let rec worker_loop st =
               _ ))
         :: _ as err ) ->
       (* These are socket-specific errors, ignoring. *)
-      lwt_log_error
-        "@[<v 2>Incoming connection failed with %a in the Welcome worker@]"
-        pp_print_error
-        err
-      >>= fun () -> worker_loop st
+      Events.(emit incoming_error) (err, "socket") >>= fun () -> worker_loop st
   | Error (Canceled :: _) ->
       Lwt.return_unit
   | Error err ->
-      lwt_log_error
-        "@[<v 2>Unexpected error in the Welcome worker@ %a@]"
-        pp_print_error
-        err
+      Events.(emit unexpected_error) err
 
 let create_listening_socket ~backlog ?(addr = Ipaddr.V6.unspecified) port =
   let main_socket = Lwt_unix.(socket PF_INET6 SOCK_STREAM 0) in
@@ -134,7 +121,13 @@ let create ?addr ~backlog connect_handler port =
       >>= fun socket ->
       let canceler = Lwt_canceler.create () in
       Lwt_canceler.on_cancel canceler (fun () ->
-          Lwt_utils_unix.safe_close socket) ;
+          Lwt_utils_unix.safe_close socket
+          >>= function
+          | Error trace ->
+              Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace ;
+              Lwt.return_unit
+          | Ok () ->
+              Lwt.return_unit) ;
       let st =
         {
           socket;
@@ -145,10 +138,7 @@ let create ?addr ~backlog connect_handler port =
       in
       Lwt.return st)
     (fun exn ->
-      lwt_log_error
-        "@[<v 2>Cannot accept incoming connections@ %a@]"
-        pp_exn
-        exn
+      Events.(emit incoming_connection_error) (Error_monad.Exn exn)
       >>= fun () -> Lwt.fail exn)
 
 let activate st =

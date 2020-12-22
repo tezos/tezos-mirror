@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -22,6 +23,14 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+
+(** Testing
+    -------
+    Component:    P2P
+    Invocation:   dune build @src/lib_p2p/test/runtest_p2p_io_scheduler_ipv4
+    Dependencies: src/lib_p2p/test/process.ml
+    Subject:      On I/O scheduling of client-server connections.
+*)
 
 include Internal_event.Legacy_logging.Make (struct
   let name = "test-p2p-io-scheduler"
@@ -59,7 +68,8 @@ let rec accept_n main_socket n =
     >>=? fun acc -> accept main_socket >>=? fun conn -> return (conn :: acc)
 
 let connect addr port =
-  let fd = P2p_fd.socket PF_INET6 SOCK_STREAM 0 in
+  P2p_fd.socket PF_INET6 SOCK_STREAM 0
+  >>= fun fd ->
   let uaddr = Lwt_unix.ADDR_INET (Ipaddr_unix.V6.to_inet_addr addr, port) in
   P2p_fd.connect fd uaddr >>= fun () -> return fd
 
@@ -101,7 +111,7 @@ let server ?(display_client_stat = true) ?max_download_speed ?read_queue_size
       ~read_buffer_size
       ()
   in
-  Moving_average.on_update (fun () ->
+  Moving_average.on_update (P2p_io_scheduler.ma_state sched) (fun () ->
       log_notice "Stat: %a" P2p_stat.pp (P2p_io_scheduler.global_stat sched) ;
       if display_client_stat then
         P2p_io_scheduler.iter_connection sched (fun conn ->
@@ -114,7 +124,7 @@ let server ?(display_client_stat = true) ?max_download_speed ?read_queue_size
   accept_n main_socket n
   >>=? fun conns ->
   let conns = List.map (P2p_io_scheduler.register sched) conns in
-  Lwt.join (List.map receive conns)
+  Lwt_list.iter_p receive conns
   >>= fun () ->
   iter_p P2p_io_scheduler.close conns
   >>=? fun () ->
@@ -158,13 +168,19 @@ let client ?max_upload_speed ?write_queue_size addr port time _n =
   let stat = P2p_io_scheduler.stat conn in
   lwt_log_notice "Client OK %a" P2p_stat.pp stat >>= fun () -> return_unit
 
+(** Listens to address [addr] on port [port] to open a socket [main_socket].
+    Spawns a server on it, and [n] clients connecting to the server. Then,
+    the server will close all connections.
+*)
 let run ?display_client_stat ?max_download_speed ?max_upload_speed
     ~read_buffer_size ?read_queue_size ?write_queue_size addr port time n =
   Internal_event_unix.init ()
   >>= fun () ->
   listen ?port addr
   >>= fun (main_socket, port) ->
-  Process.detach ~prefix:"server: " (fun _ ->
+  Process.detach
+    ~prefix:"server: "
+    (fun (_ : (unit, unit) Process.Channel.t) ->
       server
         ?display_client_stat
         ?max_download_speed
@@ -172,16 +188,22 @@ let run ?display_client_stat ?max_download_speed ?max_upload_speed
         ?read_queue_size
         main_socket
         n)
-  >>= fun server_node ->
+  >>=? fun server_node ->
   let client n =
     let prefix = Printf.sprintf "client(%d): " n in
     Process.detach ~prefix (fun _ ->
         Lwt_utils_unix.safe_close main_socket
+        >>= (function
+              | Error trace ->
+                  Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace ;
+                  Lwt.return_unit
+              | Ok () ->
+                  Lwt.return_unit)
         >>= fun () ->
         client ?max_upload_speed ?write_queue_size addr port time n)
   in
-  Lwt_list.map_p client (1 -- n)
-  >>= fun client_nodes -> Process.wait_all (server_node :: client_nodes)
+  Error_monad.map_s client (1 -- n)
+  >>=? fun client_nodes -> Process.wait_all (server_node :: client_nodes)
 
 let () = Random.self_init ()
 
@@ -243,15 +265,16 @@ let () =
 let init_logs = lazy (Internal_event_unix.init ())
 
 let wrap n f =
-  Alcotest_lwt.test_case n `Quick (fun _ () ->
-      Lazy.force init_logs
-      >>= fun () ->
-      f ()
-      >>= function
-      | Ok () ->
-          Lwt.return_unit
-      | Error error ->
-          Format.kasprintf Stdlib.failwith "%a" pp_print_error error)
+  Alcotest.test_case n `Quick (fun () ->
+      Lwt_main.run
+        ( Lazy.force init_logs
+        >>= fun () ->
+        f ()
+        >>= function
+        | Ok () ->
+            Lwt.return_unit
+        | Error error ->
+            Format.kasprintf Stdlib.failwith "%a" pp_print_error error ))
 
 let () =
   Alcotest.run

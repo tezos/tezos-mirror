@@ -34,8 +34,8 @@ class Endorser(subprocess.Popen):
 
         if params is None:
             params = []
-        cmd = [endorser, '-base-dir', base_dir, '-addr', '127.0.0.1', '-port',
-               str(rpc_port)]
+        endpoint = f'http://127.0.0.1:{rpc_port}'
+        cmd = [endorser, '-base-dir', base_dir, '-endpoint', endpoint]
         cmd.extend(params)
         cmd_string = utils.format_command(cmd)
         print(cmd_string)

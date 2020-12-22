@@ -74,7 +74,7 @@ let replace ~template ~destination vars =
           (fun s ->
             let matched = Str.matched_string s in
             let var = String.sub matched 2 (String.length matched - 4) in
-            match StringMap.find_opt var vars with
+            match StringMap.find var vars with
             | Some value ->
                 value
             | None ->

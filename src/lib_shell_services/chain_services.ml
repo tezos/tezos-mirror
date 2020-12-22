@@ -59,6 +59,11 @@ let invalid_block_encoding =
        (req "level" int32)
        (req "errors" RPC_error.encoding))
 
+let bootstrap_encoding =
+  obj2
+    (req "bootstrapped" Encoding.bool)
+    (req "sync_state" Chain_validator_worker_state.Event.sync_status_encoding)
+
 module S = struct
   let path : prefix RPC_path.context = RPC_path.open_root
 
@@ -76,6 +81,25 @@ module S = struct
       ~output:checkpoint_encoding
       RPC_path.(path / "checkpoint")
 
+  let is_bootstrapped =
+    RPC_service.get_service
+      ~description:"The bootstrap status of a chain"
+      ~query:RPC_query.empty
+      ~output:bootstrap_encoding
+      RPC_path.(path / "is_bootstrapped")
+
+  let bootstrapped_flag_encoding =
+    let open Data_encoding in
+    obj1 (req "bootstrapped" bool)
+
+  let force_bootstrapped =
+    RPC_service.patch_service
+      ~description:"Forcefully set the bootstrapped flag of the node"
+      ~query:RPC_query.empty
+      ~input:bootstrapped_flag_encoding
+      ~output:unit
+      path
+
   module Blocks = struct
     let list_query =
       let open RPC_query in
@@ -90,21 +114,22 @@ module S = struct
       |+ opt_field
            "length"
            ~descr:
-             "The requested number of predecessors to returns (per requested \
-              head)."
+             "The requested number of predecessors to return (per request; \
+              see next argument)."
            RPC_arg.int
            (fun x -> x#length)
       |+ multi_field
            "head"
            ~descr:
-             "An empty argument requests blocks from the current heads. A non \
-              empty list allow to request specific fragment of the chain."
+             "An empty argument requests blocks starting with the current \
+              head. A non empty list allows to request one or more specific \
+              fragments of the chain."
            Block_hash.rpc_arg
            (fun x -> x#heads)
       |+ opt_field
            "min_date"
            ~descr:
-             "When `min_date` is provided, heads with a timestamp before \
+             "When `min_date` is provided, blocks with a timestamp before \
               `min_date` are filtered out"
            Time.Protocol.rpc_arg
            (fun x -> x#min_date)
@@ -116,10 +141,10 @@ module S = struct
       let open Data_encoding in
       RPC_service.get_service
         ~description:
-          "Lists known heads of the blockchain sorted with decreasing \
-           fitness. Optional arguments allows to returns the list of \
-           predecessors for known heads or the list of predecessors for a \
-           given list of blocks."
+          "Lists block hashes from '<chain>', up to the last checkpoint, \
+           sorted with decreasing fitness. Without arguments it returns the \
+           head of the chain. Optional arguments allow to return the list of \
+           predecessors of a given block or of a set of blocks."
         ~query:list_query
         ~output:(list (list Block_hash.encoding))
         path

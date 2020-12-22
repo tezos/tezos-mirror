@@ -24,10 +24,7 @@
 (*****************************************************************************)
 
 open Validation_errors
-
-include Internal_event.Legacy_logging.Make_semantic (struct
-  let name = "node.validator.block"
-end)
+module Event = Protocol_validator_event
 
 type t = {
   db : Distributed_db.t;
@@ -44,40 +41,38 @@ type t = {
 (** Block validation *)
 
 let rec worker_loop bv =
-  ( if Protocol_hash.Map.cardinal bv.pending = 0 then
-    Lwt_condition.wait bv.request >>= return
-  else
-    let (hash, (protocol, _, wakener)) = Protocol_hash.Map.choose bv.pending in
-    bv.pending <- Protocol_hash.Map.remove hash bv.pending ;
-    Updater.compile hash protocol
-    >>= fun valid ->
-    ( if valid then Distributed_db.commit_protocol bv.db hash protocol
-    else
-      (* no need to tag 'invalid' protocol on disk,
-             the economic protocol prevents us from
-             being spammed with protocol validation. *)
-      return_true )
-    >>=? fun _ ->
-    if valid then
-      match Registered_protocol.get hash with
-      | Some protocol ->
-          Lwt.wakeup_later wakener (Ok protocol)
-      | None ->
-          Lwt.wakeup_later
-            wakener
-            (error (Invalid_protocol {hash; error = Dynlinking_failed}))
-    else
-      Lwt.wakeup_later
-        wakener
-        (error (Invalid_protocol {hash; error = Compilation_failed})) ;
-    return_unit )
+  ( match Protocol_hash.Map.choose bv.pending with
+  | None ->
+      Lwt_condition.wait bv.request >>= return
+  | Some (hash, (protocol, _, wakener)) ->
+      bv.pending <- Protocol_hash.Map.remove hash bv.pending ;
+      Updater.compile hash protocol
+      >>= fun valid ->
+      if valid then (
+        Distributed_db.commit_protocol bv.db hash protocol
+        >>=? fun _ ->
+        ( match Registered_protocol.get hash with
+        | Some protocol ->
+            Lwt.wakeup_later wakener (Ok protocol)
+        | None ->
+            Lwt.wakeup_later
+              wakener
+              (error (Invalid_protocol {hash; error = Dynlinking_failed})) ) ;
+        return_unit )
+      else (
+        (* no need to tag 'invalid' protocol on disk, the economic protocol
+         prevents us from being spammed with protocol validation. *)
+        Lwt.wakeup_later
+          wakener
+          (error (Invalid_protocol {hash; error = Compilation_failed})) ;
+        return_unit ) )
   >>= function
   | Ok () ->
       worker_loop bv
   | Error (Canceled :: _) | Error (Exn Lwt_pipe.Closed :: _) ->
-      Protocol_validator_event.(emit validator_terminated) ()
+      Event.(emit validator_terminated) ()
   | Error err ->
-      Protocol_validator_event.(emit unexpected_worker_error) err
+      Event.(emit unexpected_worker_error) err
       >>= fun () -> Lwt_canceler.cancel bv.canceler
 
 let create db =
@@ -107,7 +102,7 @@ let validate state hash protocol =
   | None -> (
       Protocol_validator_event.(emit pushing_protocol_validation) hash
       >>= fun () ->
-      match Protocol_hash.Map.find_opt hash state.pending with
+      match Protocol_hash.Map.find hash state.pending with
       | None ->
           let (res, wakener) = Lwt.task () in
           let broadcast = Protocol_hash.Map.cardinal state.pending = 0 in
@@ -128,7 +123,7 @@ let fetch_and_compile_protocol pv ?peer ?timeout hash =
             | Some protocol ->
                 return protocol
             | None ->
-                Protocol_validator_event.(emit fetching_protocol) (hash, peer)
+                Event.(emit fetching_protocol) (hash, peer)
                 >>= fun () ->
                 Distributed_db.Protocol.fetch pv.db ?peer ?timeout hash ())
       >>=? fun protocol ->
@@ -174,7 +169,3 @@ let fetch_and_compile_protocols pv ?peer ?timeout (block : State.Block.t) =
         >>= fun () -> return_unit
   in
   protocol >>=? fun () -> test_protocol
-
-let prefetch_and_compile_protocols pv ?peer ?timeout block =
-  try ignore (fetch_and_compile_protocols pv ?peer ?timeout block)
-  with _ -> ()

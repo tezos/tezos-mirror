@@ -37,33 +37,17 @@ let disable_disclaimer =
   | _ ->
       false
 
-let zeronet () =
+let testnet_disclaimer () =
   if not disable_disclaimer then
     Format.eprintf
       "@[<v 2>@{<warning>@{<title>Warning@}@}@,\
        @,\
       \               This is @{<warning>NOT@} the Tezos Mainnet.@,\
        @,\
-      \    The node you are connecting to claims to be running on the@,\
-      \               @{<warning>Tezos Zeronet DEVELOPMENT NETWORK@}.@,\
-      \         Do @{<warning>NOT@} use your fundraiser keys on this network.@,\
-       Zeronet is a testing network, with free tokens and frequent resets.@]@\n\
+      \         Do @{<warning>NOT@} use your fundraiser keys on this network.\n\
        @."
 
-let alphanet () =
-  if not disable_disclaimer then
-    Format.eprintf
-      "@[<v 2>@{<warning>@{<title>Warning@}@}@,\
-       @,\
-      \               This is @{<warning>NOT@} the Tezos Mainnet.@,\
-       @,\
-      \   The node you are connecting to claims to be running on the@,\
-      \             @{<warning>Tezos Alphanet DEVELOPMENT NETWORK.@}@,\
-      \        Do @{<warning>NOT@} use your fundraiser keys on this network.@,\
-      \        Alphanet is a testing network, with free tokens.@]@\n\
-       @."
-
-let mainnet () =
+let mainnet_disclaimer () =
   if not disable_disclaimer then
     Format.eprintf
       "@[<v 2>@{<warning>@{<title>Disclaimer@}@}@,\
@@ -75,17 +59,6 @@ let mainnet () =
        care in their network interactions.@]@\n\
        @."
 
-let sandbox () =
-  if not disable_disclaimer then
-    Format.eprintf
-      "@[<v 2>@{<warning>@{<title>Warning@}@}@,\
-       @,\
-      \ The node you are connecting to claims to be running in a@,\
-      \                  @{<warning>Tezos TEST SANDBOX@}.@,\
-      \    Do @{<warning>NOT@} use your fundraiser keys on this network.@,\
-       You should not see this message if you are not a developer.@]@\n\
-       @."
-
 let check_network ctxt =
   Version_services.version ctxt
   >>= function
@@ -95,19 +68,12 @@ let check_network ctxt =
       let has_prefix prefix =
         String.has_prefix ~prefix (network_version.chain_name :> string)
       in
-      if has_prefix "SANDBOXED" then (
-        sandbox () ;
-        Lwt.return_some `Sandbox )
-      else if has_prefix "TEZOS_ZERONET" then (
-        zeronet () ;
-        Lwt.return_some `Zeronet )
-      else if has_prefix "TEZOS_ALPHANET" then (
-        alphanet () ;
-        Lwt.return_some `Alphanet )
-      else if has_prefix "TEZOS_BETANET" || has_prefix "TEZOS_MAINNET" then (
-        mainnet () ;
+      if List.exists has_prefix ["TEZOS_BETANET"; "TEZOS_MAINNET"] then (
+        mainnet_disclaimer () ;
         Lwt.return_some `Mainnet )
-      else Lwt.return_none
+      else (
+        testnet_disclaimer () ;
+        Lwt.return_some `Testnet )
 
 let get_commands_for_version ctxt network chain block protocol =
   Shell_services.Blocks.protocols ctxt ~chain ~block ()
@@ -151,7 +117,7 @@ let select_commands ctxt {chain; block; protocol; _} =
   check_network ctxt
   >>= fun network ->
   get_commands_for_version ctxt network chain block protocol
-  >>|? fun (_, commands_for_version) ->
+  >|=? fun (_, commands_for_version) ->
   Client_rpc_commands.commands
   @ Tezos_signer_backends_unix.Ledger.commands ()
   @ Client_keys_commands.commands network
@@ -159,8 +125,4 @@ let select_commands ctxt {chain; block; protocol; _} =
   @ Mockup_commands.commands ()
   @ commands_for_version
 
-let () =
-  Client_main_run.run
-    ~log:(Log.fatal_error "%s")
-    (module Client_config)
-    ~select_commands
+let () = Client_main_run.run (module Client_config) ~select_commands

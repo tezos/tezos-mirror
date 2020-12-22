@@ -27,10 +27,12 @@
 
 type error += Too_many_internal_operations (* `Permanent *)
 
+type missing_key_kind = Get | Set | Del | Copy
+
 (** An internal storage error that should not happen *)
 type storage_error =
   | Incompatible_protocol_version of string
-  | Missing_key of string list * [`Get | `Set | `Del | `Copy]
+  | Missing_key of string list * missing_key_kind
   | Existing_key of string list
   | Corrupted_data of string list
 
@@ -40,7 +42,7 @@ type error += Failed_to_parse_parameter of MBytes.t
 
 type error += Failed_to_decode_parameter of Data_encoding.json * string
 
-val storage_error : storage_error -> 'a tzresult Lwt.t
+val storage_error : storage_error -> 'a tzresult
 
 (** {1 Abstract Context} *)
 
@@ -64,10 +66,7 @@ val prepare :
   Context.t ->
   context tzresult Lwt.t
 
-type previous_protocol =
-  | Genesis of Parameters_repr.t
-  | Alpha_previous
-  | Carthage_006
+type previous_protocol = Genesis of Parameters_repr.t | Carthage_006
 
 val prepare_first_block :
   level:int32 ->
@@ -105,19 +104,16 @@ val first_level : context -> Raw_level_repr.t
 
 (** Increment the current block fee stash that will be credited to baker's
     frozen_fees account at finalize_application *)
-val add_fees : context -> Tez_repr.t -> context tzresult Lwt.t
+val add_fees : context -> Tez_repr.t -> context tzresult
 
 (** Increment the current block reward stash that will be credited to baker's
     frozen_fees account at finalize_application *)
-val add_rewards : context -> Tez_repr.t -> context tzresult Lwt.t
+val add_rewards : context -> Tez_repr.t -> context tzresult
 
 (** Increment the current block deposit stash for a specific delegate. All the
     delegates' frozen_deposit accounts are credited at finalize_application *)
 val add_deposit :
-  context ->
-  Signature.Public_key_hash.t ->
-  Tez_repr.t ->
-  context tzresult Lwt.t
+  context -> Signature.Public_key_hash.t -> Tez_repr.t -> context tzresult
 
 val get_fees : context -> Tez_repr.t
 
@@ -127,17 +123,17 @@ val get_deposits : context -> Tez_repr.t Signature.Public_key_hash.Map.t
 
 type error += Gas_limit_too_high (* `Permanent *)
 
-val check_gas_limit : t -> Z.t -> unit tzresult
+val check_gas_limit : t -> 'a Gas_limit_repr.Arith.t -> unit tzresult
 
-val set_gas_limit : t -> Z.t -> t
+val set_gas_limit : t -> 'a Gas_limit_repr.Arith.t -> t
 
 val set_gas_unlimited : t -> t
 
 val gas_level : t -> Gas_limit_repr.t
 
-val gas_consumed : since:t -> until:t -> Z.t
+val gas_consumed : since:t -> until:t -> Gas_limit_repr.Arith.fp
 
-val block_gas_level : t -> Z.t
+val block_gas_level : t -> Gas_limit_repr.Arith.fp
 
 val init_storage_space_to_pay : t -> t
 
@@ -200,7 +196,7 @@ module type T = sig
 
   (** When the value is [Some v], allocates the data and initializes
       it with [v] ; just updates it if the bucket exists. When the
-      valus is [None], delete the storage bucket when the value ; does
+      value is [None], delete the storage bucket when the value ; does
       nothing if the bucket does not exists. *)
   val set_option : context -> key -> value option -> context Lwt.t
 
@@ -281,7 +277,7 @@ val init_endorsements :
   (Signature.Public_key.t * int list * bool) Signature.Public_key_hash.Map.t ->
   context
 
-(** Marks an endorsment in the map as used. *)
+(** Marks an endorsement in the map as used. *)
 val record_endorsement : context -> Signature.Public_key_hash.t -> context
 
 (** Provide a fresh identifier for a temporary big map (negative index). *)

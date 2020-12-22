@@ -32,12 +32,11 @@
     - an amount.
 
     The commitments and the secrets are generated from
-    /scripts/create_genesis/create_genenis.py and should be coherent.
+    /scripts/create_genesis/create_genesis.py and should be coherent.
 *)
 
 open Protocol
 open Alpha_context
-open Test_utils
 open Test_tez
 
 (* Generated commitments and secrets  *)
@@ -76,11 +75,9 @@ let secrets () =
         assert false
     | Some t ->
         (* TODO: unicode normalization (NFKD)... *)
-        let passphrase =
-          Bigstring.(concat "" [of_string email; of_string password])
-        in
+        let passphrase = Bytes.(cat (of_string email) (of_string password)) in
         let sk = Tezos_client_base.Bip39.to_seed ~passphrase t in
-        let sk = Bigstring.sub_bytes sk 0 32 in
+        let sk = Bytes.sub sk 0 32 in
         let sk : Signature.Secret_key.t =
           Ed25519
             (Data_encoding.Binary.of_bytes_exn Ed25519.Secret_key.encoding sk)
@@ -307,7 +304,7 @@ let secrets () =
 
 let activation_init () =
   Context.init ~with_commitments:true 1
-  >>=? fun (b, cs) -> secrets () |> fun ss -> return (b, cs, ss)
+  >|=? fun (b, cs) -> secrets () |> fun ss -> (b, cs, ss)
 
 let simple_init_with_commitments () =
   activation_init ()
@@ -354,7 +351,7 @@ let multi_activation_1 () =
         (B blk)
         (Contract.implicit_contract account)
         expected_amount
-      >>=? fun () -> return blk)
+      >|=? fun () -> blk)
     blk
     secrets
   >>=? fun _ -> return_unit
@@ -365,8 +362,7 @@ let multi_activation_2 () =
   >>=? fun (blk, _contracts, secrets) ->
   Error_monad.fold_left_s
     (fun ops {account; activation_code; _} ->
-      Op.activation (B blk) account activation_code
-      >>=? fun op -> return (op :: ops))
+      Op.activation (B blk) account activation_code >|=? fun op -> op :: ops)
     []
     secrets
   >>=? fun ops ->
@@ -524,7 +520,7 @@ let invalid_double_activation () =
           false)
 
 (** Transfer from an unactivated commitment account *)
-let invalid_transfer_from_unactived_account () =
+let invalid_transfer_from_unactivated_account () =
   activation_init ()
   >>=? fun (blk, contracts, secrets) ->
   let ({account; _} as _first_one) = List.hd secrets in
@@ -568,4 +564,4 @@ let tests =
     Test.tztest
       "invalid transfer from unactivated account"
       `Quick
-      invalid_transfer_from_unactived_account ]
+      invalid_transfer_from_unactivated_account ]

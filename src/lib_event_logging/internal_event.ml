@@ -49,6 +49,9 @@ let check_name_exn : string -> (string -> char -> exn) -> unit =
     name ;
   ()
 
+(* Levels are declared from the lowest to the highest so that
+   polymorphic comparison can be used to check whether a message
+   should be printed. *)
 type level = Lwt_log_core.level =
   | Debug
   | Info
@@ -56,6 +59,10 @@ type level = Lwt_log_core.level =
   | Warning
   | Error
   | Fatal
+
+let should_log ~level ~sink_level =
+  (* Same criteria as [Lwt_log_core.log] *)
+  level >= sink_level
 
 module Level = struct
   type t = level
@@ -79,7 +86,7 @@ module Level = struct
 end
 
 module Section : sig
-  type t = private string list
+  type t
 
   val empty : t
 
@@ -93,9 +100,9 @@ module Section : sig
 
   val to_string_list : t -> string list
 end = struct
-  type t = string list
+  type t = {path : string list; lwt_log_section : Lwt_log_core.section}
 
-  let empty = []
+  let empty = {path = []; lwt_log_section = Lwt_log_core.Section.make ""}
 
   let make sl =
     List.iter
@@ -107,19 +114,32 @@ end = struct
               name
               char))
       sl ;
-    sl
+    {
+      path = sl;
+      lwt_log_section = Lwt_log_core.Section.make (String.concat "." sl);
+    }
 
   let make_sanitized sl =
     List.map (String.map (fun c -> if valid_char c then c else '_')) sl |> make
 
-  let to_lwt_log s = Lwt_log_core.Section.make (String.concat "." s)
+  let to_string_list s = s.path
 
-  let to_string_list t = t
+  let to_lwt_log s = s.lwt_log_section
 
   let encoding =
     let open Data_encoding in
-    list string
+    conv (fun {path; _} -> path) (fun l -> make l) (list string)
 end
+
+let registered_sections = ref TzString.Set.empty
+
+let get_registered_sections () = !registered_sections
+
+let register_section section =
+  registered_sections :=
+    TzString.Set.add
+      (Lwt_log_core.Section.name (Section.to_lwt_log section))
+      !registered_sections
 
 module type EVENT_DEFINITION = sig
   type t
@@ -128,15 +148,11 @@ module type EVENT_DEFINITION = sig
 
   val doc : string
 
-  val pp : Format.formatter -> t -> unit
+  val pp : short:bool -> Format.formatter -> t -> unit
 
   val encoding : t Data_encoding.t
 
   val level : t -> level
-end
-
-module Event_defaults = struct
-  let level _ = Level.default
 end
 
 module type EVENT = sig
@@ -279,10 +295,8 @@ module All_sinks = struct
       let module S = (val definition : SINK with type t = a) in
       S.handle ?section sink def v
     in
-    List.fold_left
-      (fun prev -> function Active {sink; definition; _} ->
-            prev >>=? fun () -> handle sink definition)
-      return_unit
+    iter_s
+      (function Active {sink; definition; _} -> handle sink definition)
       !active
 
   let pp_state fmt () =
@@ -347,7 +361,7 @@ module Generic = struct
 
         method doc = M.doc
 
-        method pp fmt () = M.pp fmt ev
+        method pp fmt () = M.pp ~short:false fmt ev
 
         method json = Data_encoding.Json.construct M.encoding ev
       end
@@ -402,33 +416,51 @@ end
 
 module Simple = struct
   (* This type is mostly there to make usage less error-prone, by
-     explicitely splitting the place where the partial application
+     explicitly splitting the place where the partial application
      takes place. Indeed, it is important that events are declared
      only once. *)
   type 'a t = 'a -> unit tzresult Lwt.t
 
   let emit simple_event parameters =
-    simple_event parameters
-    >>= function
-    | Ok () ->
-        Lwt.return_unit
-    | Error trace ->
-        (* Having to handle errors when sending events would make the
-           code very heavy. We are much more likely to just use [>>=?]
-           to propagate the error, assuming that sending events cannot
-           fail. But consider this example:
-           - we log that we are going to do some cleanup, like remove
-             temporary directories...
-           - and then because we failed to log, we don't actually
-             clean the temporary directories.
-           Instead we just print the error on stderr. *)
+    Lwt.try_bind
+      (fun () -> simple_event parameters)
+      (function
+        | Ok () ->
+            Lwt.return_unit
+        | Error trace ->
+            (* Having to handle errors when sending events would make the
+              code very heavy. We are much more likely to just use [>>=?]
+              to propagate the error, assuming that sending events cannot
+              fail. But consider this example:
+              - we log that we are going to do some cleanup, like remove
+                temporary directories...
+              - and then because we failed to log, we don't actually
+                clean the temporary directories.
+              Instead we just print the error on stderr. *)
+            Format.eprintf
+              "@[<hv 2>Failed to send event:@ %a@]@."
+              Error_monad.pp_print_error
+              trace ;
+            Lwt.return_unit)
+      (fun exc ->
+        (* For the same reason we also just print exceptions *)
         Format.eprintf
-          "@[<hv 2>Failed to send event:@ %a@]@."
-          Error_monad.pp_print_error
-          trace ;
-        Lwt.return_unit
+          "@[<hv 2>Failed to send event:@ %s@]@."
+          (Printexc.to_string exc) ;
+        Lwt.return_unit)
 
-  let make_section = Option.map ~f:Section.make_sanitized
+  let emit__dont_wait__use_with_care simple_event parameters =
+    Lwt_utils.dont_wait
+      (fun exc -> raise exc) (* emit never lets exceptions escape *)
+      (fun () -> emit simple_event parameters)
+
+  let make_section names =
+    match names with
+    | None ->
+        None
+    | Some names ->
+        let section = Section.make_sanitized names in
+        register_section section ; Some section
 
   let pp_print_compact_float fmt value = Format.fprintf fmt "%g" value
 
@@ -533,7 +565,7 @@ module Simple = struct
      | Obj (Req {encoding; _} | Dft {encoding; _}) ->
          pp_human_readable ~never_empty encoding fmt value
      | Obj (Opt {encoding; _}) ->
-         Option.iter ~f:(pp_human_readable ~never_empty encoding fmt) value
+         Option.iter (pp_human_readable ~never_empty encoding fmt) value
      | Objs _ ->
          if never_empty then Format.pp_print_string fmt "<obj>"
      | Tup encoding ->
@@ -645,7 +677,7 @@ module Simple = struct
     in
     find_variable_begin [] 0 0 |> List.rev
 
-  let pp_log_message (msg : msg_atom list) fmt fields =
+  let pp_log_message ~short (msg : msg_atom list) fmt fields =
     (* Add a boolean reference to each field telling whether the field was used. *)
     let fields = List.map (fun field -> (field, ref false)) fields in
     Format.fprintf fmt "@[<hov 2>" ;
@@ -690,7 +722,7 @@ module Simple = struct
             Format.fprintf fmt "@ (%s = %s" name value )
           else Format.fprintf fmt ",@ %s = %s" name value
     in
-    List.iter print_field fields ;
+    if not short then List.iter print_field fields ;
     if !first_field then Format.fprintf fmt "@]" else Format.fprintf fmt ")@]"
 
   let with_version ~name encoding =
@@ -708,7 +740,7 @@ module Simple = struct
 
       let name = name
 
-      let pp fmt () = pp_log_message parsed_msg fmt []
+      let pp ~short fmt () = pp_log_message ~short parsed_msg fmt []
 
       let encoding = with_version ~name Data_encoding.unit
 
@@ -728,8 +760,12 @@ module Simple = struct
 
       let name = name
 
-      let pp fmt f1 =
-        pp_log_message parsed_msg fmt [Parameter (f1_name, f1_enc, f1, pp1)]
+      let pp ~short fmt f1 =
+        pp_log_message
+          ~short
+          parsed_msg
+          fmt
+          [Parameter (f1_name, f1_enc, f1, pp1)]
 
       let encoding = with_version ~name f1_enc
 
@@ -750,8 +786,9 @@ module Simple = struct
 
       let name = name
 
-      let pp fmt (f1, f2) =
+      let pp ~short fmt (f1, f2) =
         pp_log_message
+          ~short
           parsed_msg
           fmt
           [ Parameter (f1_name, f1_enc, f1, pp1);
@@ -781,8 +818,9 @@ module Simple = struct
 
       let name = name
 
-      let pp fmt (f1, f2, f3) =
+      let pp ~short fmt (f1, f2, f3) =
         pp_log_message
+          ~short
           parsed_msg
           fmt
           [ Parameter (f1_name, f1_enc, f1, pp1);
@@ -816,8 +854,9 @@ module Simple = struct
 
       let name = name
 
-      let pp fmt (f1, f2, f3, f4) =
+      let pp ~short fmt (f1, f2, f3, f4) =
         pp_log_message
+          ~short
           parsed_msg
           fmt
           [ Parameter (f1_name, f1_enc, f1, pp1);
@@ -856,8 +895,9 @@ module Simple = struct
 
       let name = name
 
-      let pp fmt (f1, f2, f3, f4, f5) =
+      let pp ~short fmt (f1, f2, f3, f4, f5) =
         pp_log_message
+          ~short
           parsed_msg
           fmt
           [ Parameter (f1_name, f1_enc, f1, pp1);
@@ -899,8 +939,9 @@ module Simple = struct
 
       let name = name
 
-      let pp fmt (f1, f2, f3, f4, f5, f6) =
+      let pp ~short fmt (f1, f2, f3, f4, f5, f6) =
         pp_log_message
+          ~short
           parsed_msg
           fmt
           [ Parameter (f1_name, f1_enc, f1, pp1);
@@ -947,8 +988,9 @@ module Simple = struct
 
       let name = name
 
-      let pp fmt (f1, f2, f3, f4, f5, f6, f7) =
+      let pp ~short fmt (f1, f2, f3, f4, f5, f6, f7) =
         pp_log_message
+          ~short
           parsed_msg
           fmt
           [ Parameter (f1_name, f1_enc, f1, pp1);
@@ -998,8 +1040,9 @@ module Simple = struct
 
       let name = name
 
-      let pp fmt (f1, f2, f3, f4, f5, f6, f7, f8) =
+      let pp ~short fmt (f1, f2, f3, f4, f5, f6, f7, f8) =
         pp_log_message
+          ~short
           parsed_msg
           fmt
           [ Parameter (f1_name, f1_enc, f1, pp1);
@@ -1030,8 +1073,6 @@ module Simple = struct
 end
 
 module Legacy_logging = struct
-  let sections = ref []
-
   module type LOG = sig
     val debug : ('a, Format.formatter, unit, unit) format4 -> 'a
 
@@ -1143,7 +1184,7 @@ module Legacy_logging = struct
       let encoding =
         Data_encoding.With_version.(encoding ~name (first_version v0_encoding))
 
-      let pp ppf {message; _} =
+      let pp ~short:_ ppf {message; _} =
         let open Format in
         fprintf ppf "%s" message
 
@@ -1152,28 +1193,39 @@ module Legacy_logging = struct
       let level {level; _} = level
     end
 
-    let () = sections := P.name :: !sections
+    let () =
+      registered_sections := TzString.Set.add P.name !registered_sections
 
     module Event = Make (Definition)
 
     let emit_async level fmt ?tags =
-      Format.kasprintf
-        (fun message ->
-          Lwt.ignore_result
-            (Event.emit ~section (fun () ->
-                 Definition.make ?tags level message)))
-        fmt
+      (* Prevent massive calls to kasprintf *)
+      let log_section = Section.to_lwt_log section in
+      if should_log ~level ~sink_level:(Lwt_log_core.Section.level log_section)
+      then
+        Format.kasprintf
+          (fun message ->
+            Lwt.ignore_result
+              (Event.emit ~section (fun () ->
+                   Definition.make ?tags level message)))
+          fmt
+      else Format.ifprintf Format.std_formatter fmt
 
     let emit_lwt level fmt ?tags =
-      Format.kasprintf
-        (fun message ->
-          Event.emit ~section (fun () -> Definition.make ?tags level message)
-          >>= function
-          | Ok () ->
-              Lwt.return_unit
-          | Error el ->
-              Format.kasprintf Lwt.fail_with "%a" pp_print_error el)
-        fmt
+      (* Prevent massive calls to kasprintf *)
+      let log_section = Section.to_lwt_log section in
+      if should_log ~level ~sink_level:(Lwt_log_core.Section.level log_section)
+      then
+        Format.kasprintf
+          (fun message ->
+            Event.emit ~section (fun () -> Definition.make ?tags level message)
+            >>= function
+            | Ok () ->
+                Lwt.return_unit
+            | Error el ->
+                Format.kasprintf Lwt.fail_with "%a" pp_print_error el)
+          fmt
+      else Format.ikfprintf (fun _ -> Lwt.return_unit) Format.std_formatter fmt
   end
 
   module Make (P : sig
@@ -1285,7 +1337,7 @@ module Error_event = struct
       in
       With_version.(encoding ~name (first_version v0_encoding))
 
-    let pp f x =
+    let pp ~short:_ f x =
       Format.fprintf
         f
         "%s:@ %s"
@@ -1338,13 +1390,13 @@ module Debug_event = struct
     let encoding =
       Data_encoding.With_version.(encoding ~name (first_version v0_encoding))
 
-    let pp ppf {message; attachment} =
+    let pp ~short:_ ppf {message; attachment} =
       let open Format in
       fprintf ppf "%s:@ %s@ %a" name message Data_encoding.Json.pp attachment
 
     let doc = "Generic event for semi-structured debug information."
 
-    include Event_defaults
+    let level _ = Debug
   end
 
   include (Make (Definition) : EVENT with type t := t)
@@ -1392,7 +1444,7 @@ module Lwt_worker_event = struct
     let encoding =
       Data_encoding.With_version.(encoding ~name (first_version v0_encoding))
 
-    let pp ppf {name; event} =
+    let pp ~short:_ ppf {name; event} =
       let open Format in
       fprintf
         ppf
@@ -1405,7 +1457,7 @@ module Lwt_worker_event = struct
     let doc = "Generic event for callers of the function Lwt_utils.worker."
 
     let level {event; _} =
-      match event with `Failed _ -> Error | `Started | `Ended -> Info
+      match event with `Failed _ -> Error | `Started | `Ended -> Debug
   end
 
   include (Make (Definition) : EVENT with type t := t)
@@ -1416,6 +1468,15 @@ module Lwt_worker_event = struct
       ~message:(Printf.sprintf "Trying to emit worker event for %S" name)
       ~severity:`Fatal
       (fun () -> emit ~section (fun () -> {name; event}))
+
+  let on_event name event =
+    Lwt.catch
+      (fun () -> on_event name event)
+      (fun exc ->
+        Format.eprintf
+          "@[<hv 2>Failed to log event:@ %s@]@."
+          (Printexc.to_string exc) ;
+        Lwt.return_unit)
 end
 
 module Lwt_log_sink = struct
@@ -1434,15 +1495,20 @@ module Lwt_log_sink = struct
       let module M = (val m : EVENT_DEFINITION with type t = a) in
       protect (fun () ->
           let ev = v () in
-          let section =
-            Option.unopt_map
-              ~f:Section.to_lwt_log
-              section
-              ~default:default_section
-          in
           let level = M.level ev in
-          Format.kasprintf (Lwt_log_core.log ~section ~level) "%a" M.pp ev
-          >>= fun () -> return_unit)
+          let section =
+            Option.fold ~some:Section.to_lwt_log section ~none:default_section
+          in
+          (* Only call printf if the event is to be printed. *)
+          if should_log ~level ~sink_level:(Lwt_log_core.Section.level section)
+          then
+            Format.kasprintf
+              (Lwt_log_core.log ~section ~level)
+              "%a"
+              (M.pp ~short:false)
+              ev
+            >>= fun () -> return_unit
+          else return_unit)
 
     let close _ =
       Lwt_log_core.close !Lwt_log_core.default >>= fun () -> return_unit

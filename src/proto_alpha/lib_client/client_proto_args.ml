@@ -131,15 +131,14 @@ let int_parameter =
   parameter (fun _ p ->
       try return (int_of_string p) with _ -> failwith "Cannot read int")
 
-let bytes_parameter =
-  parameter (fun _ s ->
-      try
-        if String.length s < 2 || s.[0] <> '0' || s.[1] <> 'x' then raise Exit
-        else
-          return (Hex.to_bytes (`Hex (String.sub s 2 (String.length s - 2))))
-      with _ ->
-        failwith
-          "Invalid bytes, expecting hexadecimal notation (e.g. 0x1234abcd)")
+let bytes_of_prefixed_string s =
+  try
+    if String.length s < 2 || s.[0] <> '0' || s.[1] <> 'x' then raise Exit
+    else return (Hex.to_bytes (`Hex (String.sub s 2 (String.length s - 2))))
+  with _ ->
+    failwith "Invalid bytes, expecting hexadecimal notation (e.g. 0x1234abcd)"
+
+let bytes_parameter = parameter (fun _ s -> bytes_of_prefixed_string s)
 
 let init_arg =
   default_arg
@@ -154,6 +153,13 @@ let arg_arg =
     ~long:"arg"
     ~placeholder:"data"
     ~doc:"argument passed to the contract's script, if needed"
+    string_parameter
+
+let default_arg_arg =
+  arg
+    ~long:"default-arg"
+    ~placeholder:"data"
+    ~doc:"default argument passed to each contract's script, if needed"
     string_parameter
 
 let delegate_arg =
@@ -175,6 +181,13 @@ let entrypoint_arg =
     ~long:"entrypoint"
     ~placeholder:"name"
     ~doc:"entrypoint of the smart contract"
+    string_parameter
+
+let default_entrypoint_arg =
+  arg
+    ~long:"default-entrypoint"
+    ~placeholder:"name"
+    ~doc:"default entrypoint of the smart contracts"
     string_parameter
 
 let force_switch =
@@ -230,6 +243,21 @@ let fee_arg =
     ~doc:"fee in \xEA\x9C\xA9 to pay to the baker"
     (tez_parameter "--fee")
 
+let default_fee_arg =
+  arg
+    ~long:"default-fee"
+    ~placeholder:"amount"
+    ~doc:"default fee in \xEA\x9C\xA9 to pay to the baker for each transaction"
+    (tez_parameter "--default-fee")
+
+let gas_limit_kind =
+  parameter (fun _ s ->
+      try
+        let v = Z.of_string s in
+        assert (Compare.Z.(v >= Z.zero)) ;
+        return (Gas.Arith.integral v)
+      with _ -> failwith "invalid gas limit (must be a positive number)")
+
 let gas_limit_arg =
   arg
     ~long:"gas-limit"
@@ -238,12 +266,26 @@ let gas_limit_arg =
     ~doc:
       "Set the gas limit of the transaction instead of letting the client \
        decide based on a simulation"
-    (parameter (fun _ s ->
-         try
-           let v = Z.of_string s in
-           assert (Compare.Z.(v >= Z.zero)) ;
-           return v
-         with _ -> failwith "invalid gas limit (must be a positive number)"))
+    gas_limit_kind
+
+let default_gas_limit_arg =
+  arg
+    ~long:"default-gas-limit"
+    ~short:'G'
+    ~placeholder:"amount"
+    ~doc:
+      "Set the default gas limit for each transaction instead of letting the \
+       client decide based on a simulation"
+    gas_limit_kind
+
+let storage_limit_kind =
+  parameter (fun _ s ->
+      try
+        let v = Z.of_string s in
+        assert (Compare.Z.(v >= Z.zero)) ;
+        return v
+      with _ ->
+        failwith "invalid storage limit (must be a positive number of bytes)")
 
 let storage_limit_arg =
   arg
@@ -253,14 +295,17 @@ let storage_limit_arg =
     ~doc:
       "Set the storage limit of the transaction instead of letting the client \
        decide based on a simulation"
-    (parameter (fun _ s ->
-         try
-           let v = Z.of_string s in
-           assert (Compare.Z.(v >= Z.zero)) ;
-           return v
-         with _ ->
-           failwith
-             "invalid storage limit (must be a positive number of bytes)"))
+    storage_limit_kind
+
+let default_storage_limit_arg =
+  arg
+    ~long:"default-storage-limit"
+    ~short:'S'
+    ~placeholder:"amount"
+    ~doc:
+      "Set the default storage limit for each transaction instead of letting \
+       the client decide based on a simulation"
+    storage_limit_kind
 
 let counter_arg =
   arg
@@ -287,9 +332,9 @@ let max_priority_arg =
 let default_minimal_fees =
   match Tez.of_mutez 100L with None -> assert false | Some t -> t
 
-let default_minimal_nanotez_per_gas_unit = Z.of_int 100
+let default_minimal_nanotez_per_gas_unit = Q.of_int 100
 
-let default_minimal_nanotez_per_byte = Z.of_int 1000
+let default_minimal_nanotez_per_byte = Q.of_int 1000
 
 let minimal_fees_arg =
   default_arg
@@ -311,20 +356,20 @@ let minimal_nanotez_per_gas_unit_arg =
     ~doc:
       "exclude operations with fees per gas lower than this threshold (in \
        nanotez)"
-    ~default:(Z.to_string default_minimal_nanotez_per_gas_unit)
+    ~default:(Q.to_string default_minimal_nanotez_per_gas_unit)
     (parameter (fun _ s ->
-         try return (Z.of_string s) with _ -> fail (Bad_minimal_fees s)))
+         try return (Q.of_string s) with _ -> fail (Bad_minimal_fees s)))
 
 let minimal_nanotez_per_byte_arg =
   default_arg
     ~long:"minimal-nanotez-per-byte"
     ~placeholder:"amount"
-    ~default:(Z.to_string default_minimal_nanotez_per_byte)
+    ~default:(Q.to_string default_minimal_nanotez_per_byte)
     ~doc:
       "exclude operations with fees per byte lower than this threshold (in \
        nanotez)"
     (parameter (fun _ s ->
-         try return (Z.of_string s) with _ -> fail (Bad_minimal_fees s)))
+         try return (Q.of_string s) with _ -> fail (Bad_minimal_fees s)))
 
 let force_low_fee_arg =
   switch

@@ -28,13 +28,6 @@ open Script
 
 (* ---- Error definitions ---------------------------------------------------*)
 
-(* Auxiliary types for error documentation *)
-type namespace =
-  | Type_namespace
-  | Constant_namespace
-  | Instr_namespace
-  | Keyword_namespace
-
 type kind = Int_kind | String_kind | Bytes_kind | Prim_kind | Seq_kind
 
 type unparsed_stack_ty = (Script.expr * Script.annot) list
@@ -45,7 +38,11 @@ type type_map = (int * (unparsed_stack_ty * unparsed_stack_ty)) list
 type error += Invalid_arity of Script.location * prim * int * int
 
 type error +=
-  | Invalid_namespace of Script.location * prim * namespace * namespace
+  | Invalid_namespace of
+      Script.location
+      * prim
+      * Michelson_v1_primitives.namespace
+      * Michelson_v1_primitives.namespace
 
 type error += Invalid_primitive of Script.location * prim list * prim
 
@@ -160,3 +157,8 @@ type error += Cannot_serialize_error
 
 (* Deprecation errors *)
 type error += Deprecated_instruction of prim
+
+(* Stackoverflow errors *)
+type error += Typechecking_too_many_recursive_calls
+
+type error += Unparsing_too_many_recursive_calls

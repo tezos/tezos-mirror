@@ -86,6 +86,11 @@ val reveal_manager_key :
 
 val get_balance : Raw_context.t -> Contract_repr.t -> Tez_repr.t tzresult Lwt.t
 
+val get_balance_carbonated :
+  Raw_context.t ->
+  Contract_repr.t ->
+  (Raw_context.t * Tez_repr.t) tzresult Lwt.t
+
 val get_counter :
   Raw_context.t -> Signature.Public_key_hash.t -> Z.t tzresult Lwt.t
 
@@ -112,7 +117,7 @@ type big_map_diff_item =
       diff_value : Script_repr.expr option;
     }
   | Clear of Z.t
-  | Copy of Z.t * Z.t
+  | Copy of {src : Z.t; dst : Z.t}
   | Alloc of {
       big_map : Z.t;
       key_type : Script_repr.expr;
@@ -142,7 +147,7 @@ val spend :
   Tez_repr.t ->
   Raw_context.t tzresult Lwt.t
 
-val originate :
+val raw_originate :
   Raw_context.t ->
   ?prepaid_bootstrap_storage:bool ->
   Contract_repr.t ->
@@ -152,7 +157,7 @@ val originate :
   Raw_context.t tzresult Lwt.t
 
 val fresh_contract_from_current_nonce :
-  Raw_context.t -> (Raw_context.t * Contract_repr.t) tzresult Lwt.t
+  Raw_context.t -> (Raw_context.t * Contract_repr.t) tzresult
 
 val originated_from_current_nonce :
   since:Raw_context.t ->

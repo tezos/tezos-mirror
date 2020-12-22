@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -68,7 +69,7 @@ module Chain : sig
   val test : chain_state -> Chain_id.t option Lwt.t
 
   (** Returns all the known chains. *)
-  val all : global_state -> chain_state list Lwt.t
+  val all : global_state -> chain_state Seq.t Lwt.t
 
   (** Destroy a chain: this completely removes from the local storage all
       the data associated to the chain (this includes blocks and
@@ -117,6 +118,12 @@ module Chain : sig
   (** Check that a block is compatible with the current checkpoint.
       This function assumes that the predecessor is known valid. *)
   val acceptable_block : chain_state -> Block_header.t -> bool Lwt.t
+
+  (** List all the indexed protocols in the chain. The resulting list
+     contains elements of the form [<proto_level>, (<proto_hash>,
+     <activation_level>)]. *)
+  val all_indexed_protocols :
+    chain_state -> (int * (Protocol_hash.t * int32)) list Lwt.t
 
   (** Get the level indexed chain protocol store for the given header. *)
   val get_level_indexed_protocol :
@@ -195,6 +202,8 @@ module Block : sig
     Bytes.t ->
     Operation.t list list ->
     Bytes.t list list ->
+    Block_metadata_hash.t option ->
+    Operation_metadata_hash.t list list option ->
     Block_validation.validation_store ->
     forking_testchain:bool ->
     block option tzresult Lwt.t
@@ -277,22 +286,23 @@ module Block : sig
 
   val all_operations_metadata : t -> Bytes.t list list Lwt.t
 
+  val metadata_hash : t -> Block_metadata_hash.t option Lwt.t
+
+  val operations_metadata_hashes :
+    t -> int -> Operation_metadata_hash.t list option Lwt.t
+
+  val all_operations_metadata_hashes :
+    t -> Operation_metadata_hash.t list list option Lwt.t
+
+  val all_operations_metadata_hash :
+    t -> Operation_metadata_list_list_hash.t option Lwt.t
+
   val watcher : Chain.t -> block Lwt_stream.t * Lwt_watcher.stopper
 
-  (** [known_ancestor chain_state locator] computes the unknown prefix in
-      the [locator] according to [chain_state].
-      It either returns:
-      - [Some (h, hist)] when we find a valid block, where [hist]
-        is the unknown prefix, ending with the first valid block found.
-      - [Some (h, hist)] when we don't find any block known valid nor invalid
-        and the node runs in full or rolling mode. In this case
-        [(h, hist)] is the given [locator].
-      - [None] when the node runs in archive history mode and
-        we find an invalid block or no valid block in the [locator].
-      - [None] when the node runs in full or rolling mode and we find
-        an invalid block in the [locator]. *)
   val known_ancestor :
-    Chain.t -> Block_locator.t -> Block_locator.t option Lwt.t
+    Chain.t ->
+    Block_locator.t ->
+    (Block_locator.validity * Block_locator.t) Lwt.t
 
   val get_rpc_directory : t -> t RPC_directory.t option Lwt.t
 
@@ -319,13 +329,6 @@ val watcher : t -> Block.t Lwt_stream.t * Lwt_watcher.stopper
 (** Computes the block with the best fitness amongst the known blocks
     which are compatible with the given checkpoint. *)
 val best_known_head_for_checkpoint : Chain.t -> Block_header.t -> Block.t Lwt.t
-
-val compute_locator :
-  Chain.t ->
-  ?size:int ->
-  Block.t ->
-  Block_locator.seed ->
-  Block_locator.t Lwt.t
 
 val update_testchain : Block.t -> testchain_state:Chain.t -> unit Lwt.t
 
@@ -403,6 +406,29 @@ type error +=
     }
 
 val history_mode : global_state -> History_mode.t Lwt.t
+
+(** [compute_locator chain ?max_size block seed] computes a
+    locator of the [chain] from [head] to the chain's caboose or until
+    the locator contains [max_size] steps.
+    [max_size] defaults to 200. *)
+val compute_locator :
+  Chain.t ->
+  ?max_size:int ->
+  Block.t ->
+  Block_locator.seed ->
+  Block_locator.t Lwt.t
+
+(** [compute_protocol_locator chain ?max_size ~proto_level seed]
+    computes a locator for a specific protocol of level [proto_level]
+    in the [chain] from the latest block with this protocol to its
+    activation block or until the locator contains [max_size] steps.
+    [max_size] defaults to 200. *)
+val compute_protocol_locator :
+  Chain.t ->
+  ?max_size:int ->
+  proto_level:int ->
+  Block_locator.seed ->
+  Block_locator.t option Lwt.t
 
 (** Read the internal state of the node and initialize
     the databases. *)

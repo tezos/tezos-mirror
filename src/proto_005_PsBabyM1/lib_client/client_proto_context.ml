@@ -83,7 +83,7 @@ let list_contract_labels cctxt ~chain ~block =
       let h_b58 = Contract.to_b58check h in
       return (nm, h_b58, kind))
     contracts
-  >>|? List.rev
+  >|=? List.rev
 
 type period_info = {
   current_period_kind : Voting_period.kind;
@@ -139,7 +139,7 @@ let get_proposals (cctxt : #full) ~chain ~block =
 
 let pp_operation formatter (a : Alpha_block_services.operation) =
   match (a.receipt, a.protocol_data) with
-  | (Apply_results.Operation_metadata omd, Operation_data od) -> (
+  | (Some (Apply_results.Operation_metadata omd), Operation_data od) -> (
     match Apply_results.kind_equal_list od.contents omd.contents with
     | Some Apply_results.Eq ->
         Operation_result.pp_operation_result
@@ -147,6 +147,10 @@ let pp_operation formatter (a : Alpha_block_services.operation) =
           (od.contents, omd.contents)
     | None ->
         Stdlib.failwith "Unexpected result." )
+  | (None, _) ->
+      Stdlib.failwith
+        "Pruned metadata: the operation receipt was removed accordingly to \
+         the node's history mode."
   | _ ->
       Stdlib.failwith "Unexpected result."
 

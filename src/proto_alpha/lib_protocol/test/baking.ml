@@ -25,7 +25,6 @@
 
 open Protocol
 open Alpha_context
-open Test_utils
 
 (** Tests for [bake_n] and [bake_until_end_cycle]. *)
 let test_cycle () =
@@ -42,7 +41,7 @@ let test_cycle () =
   Block.bake_until_cycle_end b
   >>=? fun b ->
   Context.get_level (B b)
-  >>=? fun curr_level ->
+  >>?= fun curr_level ->
   Assert.equal
     ~loc:__LOC__
     Int32.equal
@@ -53,11 +52,11 @@ let test_cycle () =
   >>=? fun () ->
   (* Tests that [bake_n n] bakes [n] blocks. *)
   Context.get_level (B b)
-  >>=? fun l ->
+  >>?= fun l ->
   Block.bake_n 10 b
   >>=? fun b ->
   Context.get_level (B b)
-  >>=? fun curr_level ->
+  >>?= fun curr_level ->
   Assert.equal
     ~loc:__LOC__
     Int32.equal
@@ -110,7 +109,7 @@ let test_rewards_retrieval () =
       map_p
         (fun endorser ->
           Op.endorsement ~delegate:endorser.delegate (B good_b) ()
-          >>=? fun operation -> return (Operation.pack operation))
+          >|=? fun operation -> Operation.pack operation)
         real_endorsers
       >>=? fun operations ->
       let policy = Block.By_priority priority in
@@ -221,21 +220,20 @@ let test_rewards_formulas_equivalence () =
         ctxt
         ~block_priority
         ~included_endorsements:endorsing_power
-      >>= wrap
+      |> wrap
       >>=? fun reward1 ->
       Context.get_baking_reward (B b) ~priority:block_priority ~endorsing_power
       >>=? fun reward2 ->
       Assert.equal_tez ~loc:__LOC__ reward1 reward2
       >>=? fun () ->
       Baking.endorsing_reward ctxt ~block_priority endorsing_power
-      >>= wrap
+      |> wrap
       >>=? fun reward1 ->
       Context.get_endorsing_reward
         (B b)
         ~priority:block_priority
         ~endorsing_power
-      >>=? fun reward2 ->
-      Assert.equal_tez ~loc:__LOC__ reward1 reward2 >>=? fun () -> return_unit)
+      >>=? fun reward2 -> Assert.equal_tez ~loc:__LOC__ reward1 reward2)
     ranges
 
 let tests =

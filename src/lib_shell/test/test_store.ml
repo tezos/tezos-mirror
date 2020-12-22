@@ -29,7 +29,7 @@ let ( >>= ) = Lwt.bind
 
 let ( >|= ) = Lwt.( >|= )
 
-let ( // ) = Filename.concat
+open Filename.Infix
 
 (** Basic blocks *)
 

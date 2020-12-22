@@ -88,7 +88,7 @@ val unparse_var_annot : var_annot option -> string list
 
 val unparse_field_annot : field_annot option -> string list
 
-(** Convertions functions between different annotation kinds *)
+(** Conversion functions between different annotation kinds *)
 
 val field_to_var_annot : field_annot option -> var_annot option
 
@@ -129,9 +129,6 @@ val merge_var_annot : var_annot option -> var_annot option -> var_annot option
 
 (** @return an error {!Unexpected_annotation} in the monad the list is not empty. *)
 val error_unexpected_annot : int -> 'a list -> unit tzresult
-
-(** Same as {!error_unexpected_annot} in Lwt. *)
-val fail_unexpected_annot : int -> 'a list -> unit tzresult Lwt.t
 
 (** Parse a type annotation only. *)
 val parse_type_annot : int -> string list -> type_annot option tzresult

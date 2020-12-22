@@ -36,13 +36,13 @@ module Crypto = struct
 
   let header_length = 2
 
-  let max_content_length = bufsize - Crypto_box.zerobytes
-
   (* The size of extra data added by encryption. *)
-  let boxextrabytes = Crypto_box.zerobytes - Crypto_box.boxzerobytes
+  let tag_length = Crypto_box.tag_length
 
   (* The number of bytes added by encryption + header *)
-  let extrabytes = header_length + boxextrabytes
+  let extrabytes = header_length + tag_length
+
+  let max_content_length = bufsize - extrabytes
 
   type data = {
     channel_key : Crypto_box.channel_key;
@@ -54,22 +54,25 @@ module Crypto = struct
      we also make the assumption, here, that the NaCl library allows
      in-place boxing and unboxing, since we use the same buffer for
      input and output. *)
-  let () = assert (Crypto_box.boxzerobytes >= header_length)
+  let () = assert (tag_length >= header_length)
 
+  (* msg is overwritten and should not be used after this invocation *)
   let write_chunk ?canceler fd cryptobox_data msg =
-    let msglen = Bytes.length msg in
-    fail_unless (msglen <= max_content_length) P2p_errors.Invalid_message_size
+    let msg_length = Bytes.length msg in
+    fail_unless
+      (msg_length <= max_content_length)
+      P2p_errors.Invalid_message_size
     >>=? fun () ->
-    let buf_length = msglen + Crypto_box.zerobytes in
-    let buf = Bytes.make buf_length '\x00' in
-    Bytes.blit msg 0 buf Crypto_box.zerobytes msglen ;
+    let encrypted_length = tag_length + msg_length in
+    let payload_length = header_length + encrypted_length in
+    let tag = Bytes.create tag_length in
     let local_nonce = cryptobox_data.local_nonce in
     cryptobox_data.local_nonce <- Crypto_box.increment_nonce local_nonce ;
-    Crypto_box.fast_box_noalloc cryptobox_data.channel_key local_nonce buf ;
-    let encrypted_length = buf_length - Crypto_box.boxzerobytes in
-    let header_pos = Crypto_box.boxzerobytes - header_length in
-    TzEndian.set_int16 buf header_pos encrypted_length ;
-    let payload = Bytes.sub buf header_pos (buf_length - header_pos) in
+    Crypto_box.fast_box_noalloc cryptobox_data.channel_key local_nonce tag msg ;
+    let payload = Bytes.create payload_length in
+    TzEndian.set_uint16 payload 0 encrypted_length ;
+    Bytes.blit tag 0 payload header_length tag_length ;
+    Bytes.blit msg 0 payload extrabytes msg_length ;
     P2p_io_scheduler.write ?canceler fd payload
 
   let read_chunk ?canceler fd cryptobox_data =
@@ -77,19 +80,19 @@ module Crypto = struct
     P2p_io_scheduler.read_full ?canceler ~len:header_length fd header_buf
     >>=? fun () ->
     let encrypted_length = TzEndian.get_uint16 header_buf 0 in
-    (* Ciphertexts have at least length 16. *)
     fail_unless
-      (encrypted_length >= 16)
+      (encrypted_length >= tag_length)
       P2p_errors.Invalid_incoming_ciphertext_size
     >>=? fun () ->
-    let buf_length = encrypted_length + Crypto_box.boxzerobytes in
-    let buf = Bytes.make buf_length '\x00' in
-    P2p_io_scheduler.read_full
-      ?canceler
-      ~pos:Crypto_box.boxzerobytes
-      ~len:encrypted_length
-      fd
-      buf
+    let tag = Bytes.create tag_length in
+    P2p_io_scheduler.read_full ?canceler ~len:tag_length fd tag
+    >>=? fun () ->
+    let msg_length = encrypted_length - tag_length in
+    let msg = Bytes.create msg_length in
+    (* read_full fails if msg is empty *)
+    ( if msg_length > 0 then
+      P2p_io_scheduler.read_full ?canceler ~len:msg_length fd msg
+    else return_unit )
     >>=? fun () ->
     let remote_nonce = cryptobox_data.remote_nonce in
     cryptobox_data.remote_nonce <- Crypto_box.increment_nonce remote_nonce ;
@@ -97,16 +100,13 @@ module Crypto = struct
       Crypto_box.fast_box_open_noalloc
         cryptobox_data.channel_key
         remote_nonce
-        buf
+        tag
+        msg
     with
     | false ->
         fail P2p_errors.Decipher_error
     | true ->
-        return
-          (Bytes.sub
-             buf
-             Crypto_box.zerobytes
-             (buf_length - Crypto_box.zerobytes))
+        return msg
 end
 
 (* Note: there is an inconsistency here, since we display an error in
@@ -149,22 +149,19 @@ module Connection_message = struct
     let encoded_message_len = Data_encoding.Binary.length encoding message in
     fail_unless
       (encoded_message_len < 1 lsl (Crypto.header_length * 8))
-      P2p_errors.Encoding_error
+      Tezos_base.Data_encoding_wrapper.Unexpected_size_of_decoded_buffer
     >>=? fun () ->
     let len = Crypto.header_length + encoded_message_len in
     let buf = Bytes.create len in
     match
-      Data_encoding.Binary.write_opt
-        encoding
-        message
-        buf
-        Crypto.header_length
-        len
+      Data_encoding.Binary.write encoding message buf Crypto.header_length len
     with
-    | None ->
-        fail P2p_errors.Encoding_error
-    | Some last ->
-        fail_unless (last = len) P2p_errors.Encoding_error
+    | Error we ->
+        fail (Tezos_base.Data_encoding_wrapper.Encoding_error we)
+    | Ok last ->
+        fail_unless
+          (last = len)
+          Tezos_base.Data_encoding_wrapper.Unexpected_size_of_encoded_value
         >>=? fun () ->
         TzEndian.set_int16 buf 0 encoded_message_len ;
         P2p_io_scheduler.write ~canceler fd buf
@@ -187,11 +184,12 @@ module Connection_message = struct
     TzEndian.set_int16 buf 0 len ;
     P2p_io_scheduler.read_full ~canceler ~len ~pos fd buf
     >>=? fun () ->
-    match Data_encoding.Binary.read_opt encoding buf pos len with
-    | None ->
-        fail P2p_errors.Decoding_error
-    | Some (next_pos, message) ->
-        if next_pos <> pos + len then fail P2p_errors.Decoding_error
+    match Data_encoding.Binary.read encoding buf pos len with
+    | Error re ->
+        fail (P2p_errors.Decoding_error re)
+    | Ok (next_pos, message) ->
+        if next_pos <> pos + len then
+          fail (P2p_errors.Decoding_error Data_encoding.Binary.Extra_bytes)
         else return (message, buf)
 end
 
@@ -204,17 +202,19 @@ module Metadata = struct
     in
     let buf = Bytes.create encoded_message_len in
     match
-      Data_encoding.Binary.write_opt
+      Data_encoding.Binary.write
         metadata_config.conn_meta_encoding
         message
         buf
         0
         encoded_message_len
     with
-    | None ->
-        fail P2p_errors.Encoding_error
-    | Some last ->
-        fail_unless (last = encoded_message_len) P2p_errors.Encoding_error
+    | Error we ->
+        fail (Tezos_base.Data_encoding_wrapper.Encoding_error we)
+    | Ok last ->
+        fail_unless
+          (last = encoded_message_len)
+          Tezos_base.Data_encoding_wrapper.Unexpected_size_of_encoded_value
         >>=? fun () -> Crypto.write_chunk ~canceler cryptobox_data fd buf
 
   let read ~canceler metadata_config fd cryptobox_data =
@@ -222,11 +222,12 @@ module Metadata = struct
     >>=? fun buf ->
     let length = Bytes.length buf in
     let encoding = metadata_config.P2p_params.conn_meta_encoding in
-    match Data_encoding.Binary.read_opt encoding buf 0 length with
-    | None ->
-        fail P2p_errors.Decoding_error
-    | Some (read_len, message) ->
-        if read_len <> length then fail P2p_errors.Decoding_error
+    match Data_encoding.Binary.read encoding buf 0 length with
+    | Error re ->
+        fail (P2p_errors.Decoding_error re)
+    | Ok (read_len, message) ->
+        if read_len <> length then
+          fail (P2p_errors.Decoding_error Data_encoding.Binary.Extra_bytes)
         else return message
 end
 
@@ -282,23 +283,26 @@ module Ack = struct
     let encoded_message_len = Data_encoding.Binary.length encoding message in
     let buf = Bytes.create encoded_message_len in
     match
-      Data_encoding.Binary.write_opt encoding message buf 0 encoded_message_len
+      Data_encoding.Binary.write encoding message buf 0 encoded_message_len
     with
-    | None ->
-        fail P2p_errors.Encoding_error
-    | Some last ->
-        fail_unless (last = encoded_message_len) P2p_errors.Encoding_error
+    | Error we ->
+        fail (Tezos_base.Data_encoding_wrapper.Encoding_error we)
+    | Ok last ->
+        fail_unless
+          (last = encoded_message_len)
+          Tezos_base.Data_encoding_wrapper.Unexpected_size_of_encoded_value
         >>=? fun () -> Crypto.write_chunk ?canceler fd cryptobox_data buf
 
   let read ?canceler fd cryptobox_data =
     Crypto.read_chunk ?canceler fd cryptobox_data
     >>=? fun buf ->
     let length = Bytes.length buf in
-    match Data_encoding.Binary.read_opt encoding buf 0 length with
-    | None ->
-        fail P2p_errors.Decoding_error
-    | Some (read_len, message) ->
-        if read_len <> length then fail P2p_errors.Decoding_error
+    match Data_encoding.Binary.read encoding buf 0 length with
+    | Error re ->
+        fail (P2p_errors.Decoding_error re)
+    | Ok (read_len, message) ->
+        if read_len <> length then
+          fail (P2p_errors.Decoding_error Data_encoding.Binary.Extra_bytes)
         else return message
 end
 
@@ -308,7 +312,7 @@ type 'meta authenticated_connection = {
   cryptobox_data : Crypto.data;
 }
 
-let kick {fd; cryptobox_data; info} motive potential_peers_to_connect =
+let nack {fd; cryptobox_data; info} motive potential_peers_to_connect =
   let nack =
     if
       P2p_version.feature_available
@@ -339,7 +343,7 @@ let authenticate ~canceler ~proof_of_work_target ~incoming fd
     ((remote_addr, remote_socket_port) as point) ?listening_port identity
     announced_version metadata_config =
   let local_nonce_seed = Crypto_box.random_nonce () in
-  lwt_debug "Sending authenfication to %a" P2p_point.Id.pp point
+  lwt_debug "Sending authentication to %a" P2p_point.Id.pp point
   >>= fun () ->
   Connection_message.write
     ~canceler
@@ -412,10 +416,10 @@ module Reader = struct
       let open Data_encoding.Binary in
       match status with
       | Success {result; size; stream} ->
-          return_some (result, size, stream)
-      | Error _err ->
+          return (result, size, stream)
+      | Error err ->
           lwt_debug "[read_message] incremental decoding error"
-          >>= fun () -> return_none
+          >>= fun () -> fail (P2p_errors.Decoding_error err)
       | Await decode_next_buf ->
           Crypto.read_chunk
             ~canceler:st.canceler
@@ -433,16 +437,10 @@ module Reader = struct
 
   let rec worker_loop st stream =
     read_message st stream
-    >>=? (fun msg ->
-           match msg with
-           | None ->
-               protect ~canceler:st.canceler (fun () ->
-                   Lwt_pipe.push st.messages (error P2p_errors.Decoding_error)
-                   >>= fun () -> return_none)
-           | Some (msg, size, stream) ->
-               protect ~canceler:st.canceler (fun () ->
-                   Lwt_pipe.push st.messages (Ok (size, msg))
-                   >>= fun () -> return_some stream))
+    >>=? (fun (msg, size, stream) ->
+           protect ~canceler:st.canceler (fun () ->
+               Lwt_pipe.push st.messages (Ok (size, msg))
+               >>= fun () -> return_some stream))
     >>= function
     | Ok (Some stream) ->
         worker_loop st (Some stream)
@@ -451,7 +449,10 @@ module Reader = struct
     | Error (Canceled :: _) | Error (Exn Lwt_pipe.Closed :: _) ->
         lwt_debug "connection closed to %a" P2p_peer.Id.pp st.conn.info.peer_id
     | Error _ as err ->
-        Lwt_pipe.safe_push_now st.messages err ;
+        if Lwt_pipe.is_closed st.messages then ()
+        else
+          (* best-effort push to the messages, we ignore failures *)
+          (ignore : bool -> unit) @@ Lwt_pipe.push_now st.messages err ;
         Lwt_canceler.cancel st.canceler
 
   let run ?size conn encoding canceler =
@@ -463,7 +464,7 @@ module Reader = struct
       (* we push Error only when we close the socket,
                         we don't fear memory leaks in that case... *)
     in
-    let size = Option.map size ~f:(fun max -> (max, compute_size)) in
+    let size = Option.map (fun max -> (max, compute_size)) size in
     let st =
       {
         canceler;
@@ -517,13 +518,11 @@ module Writer = struct
     loop buf
 
   let encode_message st msg =
-    try
-      ok
-        (Utils.cut
-           st.binary_chunks_size
-           (Data_encoding.Binary.to_bytes_exn st.encoding msg))
-    with Data_encoding.Binary.Write_error _ ->
-      error P2p_errors.Encoding_error
+    match Data_encoding.Binary.to_bytes st.encoding msg with
+    | Error we ->
+        error (Tezos_base.Data_encoding_wrapper.Encoding_error we)
+    | Ok bytes ->
+        ok (Utils.cut st.binary_chunks_size bytes)
 
   let rec worker_loop st =
     Lwt_unix.yield ()
@@ -546,11 +545,13 @@ module Writer = struct
         >>= fun res ->
         match res with
         | Ok () ->
-            Option.iter wakener ~f:(fun u -> Lwt.wakeup_later u res) ;
+            Option.iter (fun u -> Lwt.wakeup_later u res) wakener ;
             worker_loop st
         | Error err -> (
-            Option.iter wakener ~f:(fun u ->
-                Lwt.wakeup_later u (error P2p_errors.Connection_closed)) ;
+            Option.iter
+              (fun u ->
+                Lwt.wakeup_later u (error P2p_errors.Connection_closed))
+              wakener ;
             match err with
             | (Canceled | Exn Lwt_pipe.Closed) :: _ ->
                 lwt_debug
@@ -595,7 +596,7 @@ module Writer = struct
       | (buf_l, Some _) ->
           (2 * Sys.word_size) + buf_list_size buf_l + Lwt_pipe.push_overhead
     in
-    let size = Option.map size ~f:(fun max -> (max, compute_size)) in
+    let size = Option.map (fun max -> (max, compute_size)) size in
     let st =
       {
         canceler;
@@ -608,12 +609,19 @@ module Writer = struct
     in
     Lwt_canceler.on_cancel st.canceler (fun () ->
         Lwt_pipe.close st.messages ;
-        while not (Lwt_pipe.is_empty st.messages) do
-          let (_, w) = Lwt_pipe.pop_now_exn st.messages in
-          Option.iter w ~f:(fun u ->
-              Lwt.wakeup_later u (error (Exn Lwt_pipe.Closed)))
-        done ;
-        Lwt.return_unit) ;
+        let rec loop () =
+          match Lwt_pipe.pop_now st.messages with
+          | exception Lwt_pipe.Closed ->
+              ()
+          | None ->
+              ()
+          | Some (_, None) ->
+              loop ()
+          | Some (_, Some w) ->
+              Lwt.wakeup_later w (error (Exn Lwt_pipe.Closed)) ;
+              loop ()
+        in
+        loop () ; Lwt.return_unit) ;
     st.worker <-
       Lwt_utils.worker
         "writer"
@@ -749,12 +757,6 @@ let raw_write_sync {writer; _} bytes =
   catch_closed_pipe (fun () ->
       let (waiter, wakener) = Lwt.wait () in
       Lwt_pipe.push writer.messages (bytes, Some wakener) >>= fun () -> waiter)
-
-let is_readable {reader; _} = not (Lwt_pipe.is_empty reader.messages)
-
-let wait_readable {reader; _} =
-  catch_closed_pipe (fun () ->
-      Lwt_pipe.values_available reader.messages >>= fun () -> return_unit)
 
 let read {reader; _} =
   catch_closed_pipe (fun () -> Lwt_pipe.pop reader.messages)

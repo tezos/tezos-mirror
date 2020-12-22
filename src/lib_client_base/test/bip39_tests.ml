@@ -1,3 +1,11 @@
+(** Testing
+    -------
+    Component:    Client Base
+    Invocation:   dune build @src/lib_client_base/runtest
+    Subject:      BIP39 seed phrases. Mnemonic sentences for the
+                  generation of deterministic wallets.
+*)
+
 type vector = {entropy : Hex.t; words : string; seed : Hex.t}
 
 let vectors =
@@ -248,18 +256,21 @@ let pp_diff ppf (l1, l2) =
                  w2 ;
              succ i)
 
+(** This code tests the BIP39 implementation by 1) checking that
+    feeding the algorithm a given entropy string will result in the
+    expected mnemonic and 2) checking that using this mnemonic with the
+    passphrase "TREZOR" will result in the expected seed.
+*)
 let vectors () =
   ListLabels.iteri vectors ~f:(fun _ {entropy; words; seed} ->
       let words = String.split_on_char ' ' words in
-      let mnemonic =
-        Bip39.of_entropy (Cstruct.to_bigarray (Hex.to_cstruct entropy))
-      in
+      let mnemonic = Bip39.of_entropy (Hex.to_bytes entropy) in
       let words_computed = Bip39.to_words mnemonic in
       assert (words = words_computed) ;
       let seed_computed =
-        Bip39.to_seed ~passphrase:(Bigstring.of_string "TREZOR") mnemonic
+        Bip39.to_seed ~passphrase:(Bytes.of_string "TREZOR") mnemonic
       in
-      assert (Cstruct.to_bigarray (Hex.to_cstruct seed) = seed_computed))
+      assert (Hex.to_bytes seed = seed_computed))
 
 let basic = [("vectors", `Quick, vectors)]
 

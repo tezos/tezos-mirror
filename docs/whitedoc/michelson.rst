@@ -494,13 +494,15 @@ Control structures
 
 -  ``FAILWITH``: Explicitly abort the current program.
 
-   'a :: \_ -> \_
+::
 
-   This special instruction aborts the current program exposing the top
-   element of the stack in its error message (first rule below). It makes the
-   output useless since all subsequent instructions will simply ignore
-   their usual semantics to propagate the failure up to the main result
-   (second rule below). Its type is thus completely generic.
+    :: 'a : \_   ->   \_
+
+This special instruction aborts the current program exposing the top
+element of the stack in its error message (first rule below). It makes
+the output useless since all subsequent instructions will simply
+ignore their usual semantics to propagate the failure up to the main
+result (second rule below). Its type is thus completely generic.
 
 ::
 
@@ -874,7 +876,7 @@ limit is gas.
 
     > MUL / x : y : S  =>  (x * y) : S
 
--  ``EDIV``: Perform Euclidian division
+-  ``EDIV``: Perform Euclidean division
 
 ::
 
@@ -1745,7 +1747,7 @@ Cryptographic primitives
     :: key : 'S   ->   key_hash : 'S
 
 -  ``BLAKE2B``: Compute a cryptographic hash of the value contents using the
-   Blake2B cryptographic hash function.
+   Blake2b-256 cryptographic hash function.
 
 ::
 
@@ -1944,8 +1946,8 @@ operations.
 ::
 
     > PA(\right)R / S => DIP ((\right)R) ; PAIR / S
-    > P(\left)IR / S => PAIR ; (\left)R / S
-    > P(\left)(\right)R => (\right)R ; (\left)R ; PAIR / S
+    > P(\left)IR / S => (\left)R ; PAIR / S
+    > P(\left)(\right)R =>  (\left)R ; DIP ((\right)R) ; PAIR / S
 
 A good way to quickly figure which macro to use is to mentally parse the
 macro as ``P`` for pair constructor, ``A`` for left leaf and ``I`` for
@@ -1975,7 +1977,7 @@ A typing rule can be inferred:
     > UNPAIR / S => DUP ; CAR ; DIP { CDR } / S
     > UNPA(\right)R / S => UNPAIR ; DIP (UN(\right)R) / S
     > UNP(\left)IR / S => UNPAIR ; UN(\left)R / S
-    > UNP(\left)(\right)R => UNPAIR ; UN(\left)R ; UN(\right)R / S
+    > UNP(\left)(\right)R => UNPAIR ; DIP (UN(\right)R) ; UN(\left)R / S
 
 -  ``C[AD]+R``: A syntactic sugar for accessing fields in nested pairs.
 
@@ -2054,10 +2056,7 @@ language can only be one of the five following constructs.
 4. The application of a primitive to a sequence of expressions.
 5. A sequence of expressions.
 
-This simple five cases notation is called Micheline.
-
-The encoding of a Micheline source file must be UTF-8, and non-ASCII
-characters can only appear in comments and strings.
+This simple five cases notation is called :ref:`Micheline`.
 
 Constants
 ~~~~~~~~~
@@ -2066,75 +2065,12 @@ There are three kinds of constants:
 
 1. Integers or naturals in decimal notation.
 2. Strings, with some usual escape sequences: ``\n``, ``\\``,
-   ``\"``. Unescaped line-breaks (both ``\n`` and ``\r``)
-   cannot appear in a string.
+   ``\"``. Unescaped line-breaks (both ``\n`` and ``\r``) cannot
+   appear in a Michelson string. Moreover, the current version of
+   Michelson restricts strings to be the printable subset of 7-bit
+   ASCII, namely characters with codes from within `[32, 126]` range,
+   plus the escaped characters mentioned above.
 3. Byte sequences in hexadecimal notation, prefixed with ``0x``.
-
-The current version of Michelson restricts strings to be the printable
-subset of 7-bit ASCII, namely charactes with codes from within `[32, 126]`
-range, plus the escaped characters mentioned above.
-
-Primitive applications
-~~~~~~~~~~~~~~~~~~~~~~
-
-A primitive application is a name followed by arguments
-
-::
-
-    prim arg1 arg2
-
-When a primitive application is the argument to another primitive
-application, it must be wrapped with parentheses.
-
-::
-
-    prim (prim1 arg11 arg12) (prim2 arg21 arg22)
-
-Sequences
-~~~~~~~~~
-
-Successive expression can be grouped as a single sequence expression
-using curly braces as delimiters and semicolon as separators.
-
-::
-
-    { expr1 ; expr2 ; expr3 ; expr4 }
-
-A sequence can be passed as argument to a primitive.
-
-::
-
-    prim arg1 arg2 { arg3_expr1 ; arg3_expr2 }
-
-Primitive applications right inside a sequence cannot be wrapped.
-
-::
-
-    { (prim arg1 arg2) } # is not ok
-
-Indentation
-~~~~~~~~~~~
-
-To remove ambiguities for human readers, the parser enforces some
-indentation rules.
-
--  For sequences:
-
-   -  All expressions in a sequence must be aligned on the same column.
-   -  An exception is made when consecutive expressions fit on the same
-      line, as long as the first of them is correctly aligned.
-   -  All expressions in a sequence must be indented to the right of the
-      opening curly brace by at least one column.
-   -  The closing curly brace cannot be on the left of the opening one.
-
--  For primitive applications:
-
-   -  All arguments in an application must be aligned on the same
-      column.
-   -  An exception is made when consecutive arguments fit on the same
-      line, as long as the first of them is correctly aligned.
-   -  All arguments in a sequence must be indented to the right of the
-      primitive name by at least one column.
 
 Differences with the formal notation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2177,22 +2113,6 @@ of three primitive applications (in no particular order) that provide its
 ``code``, ``parameter`` and ``storage`` fields.
 
 See the next section for a concrete example.
-
-Comments
-~~~~~~~~
-
-A hash sign (``#``) anywhere outside of a string literal will make the
-rest of the line (and itself) completely ignored, as in the following
-example.
-
-::
-
-    { PUSH nat 1 ; # pushes 1
-      PUSH nat 2 ; # pushes 2
-      ADD }        # computes 2 + 1
-
-Comments that span on multiple lines or that stop before the end of the
-line can also be written, using C-like delimiters (``/* ... */``).
 
 Annotations
 -----------
@@ -2510,7 +2430,7 @@ Syntax
 Primitive applications can receive one or many annotations.
 
 An annotation is a sequence of characters that matches the regular
-expression ``@%|@%%|%@|[@:%][_a-zA-Z][_0-9a-zA-Z\.%@]*``.
+expression ``@%|@%%|%@|[@:%][_0-9a-zA-Z][_0-9a-zA-Z\.%@]*``.
 Note however that ``@%``, ``@%%`` and ``%@`` are
 :ref:`special annotations <SpecialAnnotations>` and are not allowed everywhere.
 
@@ -2797,7 +2717,7 @@ The input values will be wrapped as in the following examples.
    | %default   | Unit                | Right (Left Unit)     |
    | %root      | Right (Right "bob") | Right (Right "bob")   |
    +------------+---------------------+-----------------------+
-   | not given  | Unit                | Right Unit            |
+   | not given  | Unit                | Right (Left Unit)     |
    | %BAD       | _                   | failure, contract not |
    +------------+---------------------+-----------------------+
 
@@ -2972,7 +2892,7 @@ using the Coq proof assistant.
          {
            UNPAIR ;
            # pair the payload with the current contract address, to ensure signatures
-           # can't be replayed accross different contracts if a key is reused.
+           # can't be replayed across different contracts if a key is reused.
            DUP ; SELF ; ADDRESS ; CHAIN_ID ; PAIR ; PAIR ;
            PACK ; # form the binary payload that we expect to be signed
            DIP { UNPAIR @counter ; DIP { SWAP } } ; SWAP

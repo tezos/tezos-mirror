@@ -75,6 +75,6 @@ type algo = Ed25519 | Secp256k1 | P256
 
 val generate_key :
   ?algo:algo ->
-  ?seed:Bigstring.t ->
+  ?seed:Bytes.t ->
   unit ->
   public_key_hash * public_key * secret_key

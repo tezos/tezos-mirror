@@ -28,6 +28,6 @@ open Protocol
 (** Returns a fresh nonce and its corresponding hash (and stores them). *)
 val generate : unit -> Nonce_hash.t * Alpha_context.Nonce.t
 
-val get : Nonce_hash.t -> Alpha_context.Nonce.t
+val get : Nonce_hash.t -> Alpha_context.Nonce.t option
 
 val forget_all : unit -> unit

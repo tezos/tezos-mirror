@@ -26,14 +26,24 @@ open Protocol
 open Alpha_context
 open Protocol_client_context
 
-(** Retreive the manager key in a contract storage.
+(** Retrieve the manager key in a contract storage.
     The storage has to be of type `pair key_hash 'a`.
 *)
 val get_contract_manager :
   #full -> Contract.t -> public_key_hash tzresult Lwt.t
 
+(** Builds a delegation operation ready for injection *)
+val build_delegate_operation :
+  #Protocol_client_context.full ->
+  chain:Chain_services.chain ->
+  block:Block_services.block ->
+  ?fee:Tez.t ->
+  Contract.t ->
+  public_key_hash option ->
+  Kind.transaction Injection.annotated_manager_operation tzresult Lwt.t
+
 (** Set the delegate of a manageable contract.
-    For a contract with a `do`entrypoint, it builds the lamba that set
+    For a contract with a `do`entrypoint, it builds the lambda that set
     the provided delegate.
     `~source` has to be the registered manager of the contract.
 *)
@@ -54,8 +64,24 @@ val set_delegate :
   public_key_hash option ->
   Kind.transaction Kind.manager Injection.result tzresult Lwt.t
 
+(** Builds a transaction operation ready for injection *)
+val build_transaction_operation :
+  #Protocol_client_context.full ->
+  chain:Chain_services.chain ->
+  block:Block_services.block ->
+  contract:Contract.t ->
+  destination:Contract.t ->
+  ?entrypoint:string ->
+  ?arg:string ->
+  amount:Tez.t ->
+  ?fee:Tez.t ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:counter ->
+  unit ->
+  Kind.transaction Injection.annotated_manager_operation tzresult Lwt.t
+
 (** Perform a transfer on behalf of a managed contract .
-    For a contract with a `do`entrypoint, it builds the lamba that
+    For a contract with a `do`entrypoint, it builds the lambda that
     does the requested operation.
     `~source` has to be the registered manager of the contract.
 *)
@@ -76,7 +102,7 @@ val transfer :
   ?arg:string ->
   amount:Tez.t ->
   ?fee:Tez.t ->
-  ?gas_limit:counter ->
+  ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:counter ->
   ?counter:counter ->
   fee_parameter:Injection.fee_parameter ->

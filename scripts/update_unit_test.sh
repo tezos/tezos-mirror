@@ -1,4 +1,4 @@
-#! /bin/sh
+#! /bin/bash
 
 # This script is for automatically updating the tests in `.gitlab-ci.yml`. This
 # script specifically updates the unit tests, the script
@@ -16,45 +16,47 @@ src_dir="$(dirname "$script_dir")"
 tmp=$(mktemp)
 
 # 1: Extract the beginning of the CI configuration file. Everything up to
-# the line ##BEGIN_UNITEST## is added to the temporary file.
-sed -z 's/^\(.*##BEGIN_UNITEST##\n\).*\(\n##END_UNITEST##.*\)$/\1/' "$src_dir/.gitlab-ci.yml" > $tmp
+# the line ##BEGIN_UNITTEST## is added to the temporary file.
+csplit --quiet --prefix="$tmp" "$src_dir/.gitlab-ci.yml" /##BEGIN_UNITTEST##/+1
+mv "$tmp"00 "$tmp"
+rm "$tmp"0*
+
+cat >> "$tmp" <<EOF
+unit:alltest:
+  <<: *test_definition
+  artifacts:
+    name: "alltest-\${CI_COMMIT_SHA}"
+    paths:
+      - test_results
+    expire_in: 1 day
+#    when: on_failure
+  script:
+EOF
 
 # 2: Find each test folder and add the matching incantation to the temporary
 # file.
-for lib in `find src/ -name test -type d` ; do
-  if git ls-files --error-unmatch $lib  > /dev/null 2>&1; then
+for lib in $(find src/ vendors/ -name test -type d | LC_COLLATE=C sort) ; do
+  if git ls-files --error-unmatch "$lib"  > /dev/null 2>&1; then
     nametest=${lib%%/test}
-    name=${nametest##src/lib_}
-    cat >> $tmp <<EOF
-unit:$name:
-  <<: *test_definition
-  script:
-    - dune build @$nametest/runtest
-
-EOF
-  fi
-done
-
-# 2: Do the same for vendor libraries
-for lib in `find vendors/ -name test -type d` ; do
-  if git ls-files --error-unmatch $lib  > /dev/null 2>&1; then
-    nametest=${lib%%/test}
-    name=${nametest##vendors/}
-    cat >> $tmp <<EOF
-unit:$name:
-  <<: *test_definition
-  script:
-    - dune build @$nametest/runtest
-
+    name=$nametest
+    name=${name##src/bin_}
+    name=${name##src/lib_}
+    name=${name##src/proto_}
+    name=${name##vendors/}
+    name=${name//\//_}
+    cat >> "$tmp" <<EOF
+    - scripts/test_wrapper.sh $nametest $name
 EOF
   fi
 done
 
 
 # 3: Extract the end of the CI configuration file. Everything after the line
-# ##END_UNITEST## is added to the temporary file.
-sed -z 's/^\(.*##BEGIN_UNITEST##\n\).*\(\n##END_UNITEST##.*\)$/\2/' "$src_dir/.gitlab-ci.yml" >> $tmp
+# ##END_UNITTEST## is added to the temporary file.
+csplit --quiet --prefix="$tmp" "$src_dir/.gitlab-ci.yml" %##END_UNITTEST##%
+cat "$tmp"00 >> "$tmp"
+rm "$tmp"0*
 
 # 4: The temporary file is swapped in place of the CI configuration file.
-mv $tmp "$src_dir/.gitlab-ci.yml"
+mv "$tmp" "$src_dir/.gitlab-ci.yml"
 

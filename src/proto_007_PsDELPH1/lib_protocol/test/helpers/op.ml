@@ -39,7 +39,7 @@ let sign ?(watermark = Signature.Generic_operation) sk ctxt contents =
 let endorsement ?delegate ?level ctxt ?(signing_context = ctxt) () =
   ( match delegate with
   | None ->
-      Context.get_endorser ctxt >>|? fun (delegate, _slots) -> delegate
+      Context.get_endorser ctxt >|=? fun (delegate, _slots) -> delegate
   | Some delegate ->
       return delegate )
   >>=? fun delegate_pkh ->
@@ -97,9 +97,9 @@ let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
   let counter = Z.succ counter in
   Context.Contract.manager ctxt source
   >>=? fun account ->
-  let public_key = Option.unopt ~default:account.pk public_key in
+  let public_key = Option.value ~default:account.pk public_key in
   Context.Contract.is_manager_key_revealed ctxt source
-  >>|? (function
+  >|=? (function
          | false ->
              let reveal_op =
                Manager_operation
@@ -115,7 +115,7 @@ let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
              (Some (Contents reveal_op), Z.succ counter)
          | true ->
              (None, counter))
-  >>|? fun (manager_op, counter) ->
+  >|=? fun (manager_op, counter) ->
   (* Update counters and transform into a contents_list *)
   let operations =
     List.fold_left
@@ -166,19 +166,19 @@ let manager_operation ?counter ?(fee = Tez.zero) ?gas_limit ?storage_limit
   >>=? fun c ->
   let gas_limit =
     let default = c.parametric.hard_gas_limit_per_operation in
-    Option.unopt ~default gas_limit
+    Option.value ~default gas_limit
   in
   let storage_limit =
-    Option.unopt
+    Option.value
       ~default:c.parametric.hard_storage_limit_per_operation
       storage_limit
   in
   Context.Contract.manager ctxt source
   >>=? fun account ->
-  let public_key = Option.unopt ~default:account.pk public_key in
+  let public_key = Option.value ~default:account.pk public_key in
   let counter = Z.succ counter in
   Context.Contract.is_manager_key_revealed ctxt source
-  >>|? function
+  >|=? function
   | true ->
       let op =
         Manager_operation
@@ -223,7 +223,7 @@ let revelation ?(fee = Tez.zero) ctxt public_key =
   Context.Contract.counter ctxt source
   >>=? fun counter ->
   Context.Contract.manager ctxt source
-  >>|? fun account ->
+  >|=? fun account ->
   let counter = Z.succ counter in
   let sop =
     Contents_list
@@ -252,7 +252,7 @@ let origination ?counter ?delegate ~script ?(preorigination = None) ?public_key
   >>=? fun account ->
   let default_credit = Tez.of_mutez @@ Int64.of_int 1000001 in
   let default_credit = Option.unopt_exn Impossible default_credit in
-  let credit = Option.unopt ~default:default_credit credit in
+  let credit = Option.value ~default:default_credit credit in
   let operation = Origination {delegate; script; credit; preorigination} in
   manager_operation
     ?counter
@@ -263,14 +263,13 @@ let origination ?counter ?delegate ~script ?(preorigination = None) ?public_key
     ~source
     ctxt
     operation
-  >>|? fun sop ->
+  >|=? fun sop ->
   let op = sign account.sk ctxt sop in
   (op, originated_contract op)
 
 let miss_signed_endorsement ?level ctxt =
-  Lwt.return
-    (match level with None -> Context.get_level ctxt | Some level -> ok level)
-  >>=? fun level ->
+  (match level with None -> Context.get_level ctxt | Some level -> ok level)
+  >>?= fun level ->
   Context.get_endorser ctxt
   >>=? fun (real_delegate_pkh, _slots) ->
   let delegate = Account.find_alternate real_delegate_pkh in
@@ -283,14 +282,14 @@ let transaction ?fee ?gas_limit ?storage_limit
   manager_operation ?fee ?gas_limit ?storage_limit ~source:src ctxt top
   >>=? fun sop ->
   Context.Contract.manager ctxt src
-  >>|? fun account -> sign account.sk ctxt sop
+  >|=? fun account -> sign account.sk ctxt sop
 
 let delegation ?fee ctxt source dst =
   let top = Delegation dst in
   manager_operation ?fee ~source ctxt top
   >>=? fun sop ->
   Context.Contract.manager ctxt source
-  >>|? fun account -> sign account.sk ctxt sop
+  >|=? fun account -> sign account.sk ctxt sop
 
 let activation ctxt (pkh : Signature.Public_key_hash.t) activation_code =
   ( match pkh with
@@ -302,7 +301,7 @@ let activation ctxt (pkh : Signature.Public_key_hash.t) activation_code =
          Ed25519 encrypted public key hash"
         Signature.Public_key_hash.pp
         pkh )
-  >>|? fun id ->
+  >|=? fun id ->
   let contents = Single (Activate_account {id; activation_code}) in
   let branch = Context.branch ctxt in
   {
@@ -344,7 +343,7 @@ let proposals ctxt (pkh : Contract.t) proposals =
   >>=? fun period ->
   let op = Proposals {source; period; proposals} in
   Account.find source
-  >>|? fun account -> sign account.sk ctxt (Contents_list (Single op))
+  >|=? fun account -> sign account.sk ctxt (Contents_list (Single op))
 
 let ballot ctxt (pkh : Contract.t) proposal ballot =
   Context.Contract.pkh pkh
@@ -353,7 +352,7 @@ let ballot ctxt (pkh : Contract.t) proposal ballot =
   >>=? fun period ->
   let op = Ballot {source; period; proposal; ballot} in
   Account.find source
-  >>|? fun account -> sign account.sk ctxt (Contents_list (Single op))
+  >|=? fun account -> sign account.sk ctxt (Contents_list (Single op))
 
 let dummy_script =
   let open Micheline in

@@ -3,23 +3,22 @@
  (public_name tezos-stdlib-unix)
  (flags (:standard -open Tezos_error_monad
                    -open Tezos_event_logging
-                   -open Tezos_rpc
                    -open Tezos_stdlib
                    -open Data_encoding))
  (libraries data-encoding
             tezos-error-monad
             tezos-event-logging
-            tezos-rpc
             tezos-stdlib
             lwt.unix
             ipaddr.unix
+            re
             ptime
             ptime.clock.os
             mtime
             mtime.clock.os
             lwt_log))
 
-(alias
- (name runtest_lint)
+(rule
+ (alias runtest_lint)
  (deps (glob_files *.ml{,i}))
  (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

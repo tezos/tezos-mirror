@@ -24,7 +24,6 @@
 (*****************************************************************************)
 
 open Protocol
-open Test_utils
 
 (* missing stuff in Alpha_context.Vote *)
 let ballots_zero = Alpha_context.Vote.{yay = 0l; nay = 0l; pass = 0l}

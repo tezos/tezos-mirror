@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let ( // ) = Filename.concat
+open Filename.Infix
 
 (** Basic blocks *)
 
@@ -58,7 +58,7 @@ let incr_fitness fitness =
     match fitness with
     | [fitness] ->
         Data_encoding.Binary.of_bytes_opt Data_encoding.int64 fitness
-        |> Option.unopt ~default:0L |> Int64.succ
+        |> Option.value ~default:0L |> Int64.succ
         |> Data_encoding.Binary.to_bytes_exn Data_encoding.int64
     | _ ->
         Data_encoding.Binary.to_bytes_exn Data_encoding.int64 1L
@@ -155,18 +155,28 @@ let build_valid_chain state vtbl pred names =
              }
              : Tezos_validation.Block_validation.validation_store )
          in
+         let block_metadata = zero in
+         let block_metadata_hash =
+           Option.some @@ Block_metadata_hash.hash_bytes [block_metadata]
+         in
+         let operations_metadata = [[zero]] in
+         let operations_metadata_hashes =
+           Some [[Operation_metadata_hash.hash_bytes [zero]]]
+         in
          State.Block.store
            state
            block
-           zero
+           block_metadata
            [[op]]
-           [[zero]]
+           operations_metadata
+           block_metadata_hash
+           operations_metadata_hashes
            validation_store
            ~forking_testchain:false
          >>=? fun _vblock ->
          State.Block.read state hash
          >>=? fun vblock ->
-         Hashtbl.add vtbl name vblock ;
+         String.Hashtbl.add vtbl name vblock ;
          return vblock)
         >>= function
         | Ok v ->
@@ -195,17 +205,17 @@ let build_valid_chain state vtbl pred names =
   >>= fun _ -> Lwt.return_unit
 
 type state = {
-  vblock : (string, State.Block.t) Hashtbl.t;
+  vblock : State.Block.t String.Hashtbl.t;
   state : State.t;
   chain : State.Chain.t;
 }
 
-let vblock s = Hashtbl.find s.vblock
+let vblock s k = Option.get @@ String.Hashtbl.find s.vblock k
 
 exception Found of string
 
 let vblocks s =
-  Hashtbl.fold (fun k v acc -> (k, v) :: acc) s.vblock []
+  String.Hashtbl.fold (fun k v acc -> (k, v) :: acc) s.vblock []
   |> List.sort Stdlib.compare
 
 (*******************************************************)
@@ -217,14 +227,14 @@ let vblocks s =
 *)
 
 let build_example_tree chain =
-  let vtbl = Hashtbl.create 23 in
+  let vtbl = String.Hashtbl.create 23 in
   Chain.genesis chain
   >>= fun genesis ->
-  Hashtbl.add vtbl "Genesis" genesis ;
+  String.Hashtbl.add vtbl "Genesis" genesis ;
   let c = ["A1"; "A2"; "A3"; "A4"; "A5"] in
   build_valid_chain chain vtbl genesis c
   >>= fun () ->
-  let a2 = Hashtbl.find vtbl "A2" in
+  let a2 = Option.get @@ String.Hashtbl.find vtbl "A2" in
   let c = ["B1"; "B2"; "B3"; "B4"; "B5"] in
   build_valid_chain chain vtbl a2 c >>= fun () -> Lwt.return vtbl
 
@@ -364,7 +374,7 @@ let test_future_checkpoint s =
    - iv = invalid
   - (0): level of this block in the chain
 
-  Two exammples:
+  Two examples:
     * Genesis (0)- A1 (1) - A2(2) - A3(3) - A4(4) - A5(5) (invalid)
                             \
                             B1(3) - B2(4) - B3 (5)(cp) - B4(6) - B5(7)
@@ -419,13 +429,7 @@ let test_reach_checkpoint s =
   >>= fun () ->
   State.Chain.checkpoint s.chain
   >>= fun checkpoint_header ->
-  let time_now = Time.System.to_protocol (Systime_os.now ()) in
-  if
-    Time.Protocol.compare
-      (Time.Protocol.add time_now 15L)
-      header.shell.timestamp
-    >= 0
-  then
+  if Clock_drift.is_not_too_far_in_the_future header.shell.timestamp then
     let checkpoint_hash = Block_header.hash checkpoint_header in
     if
       Int32.equal header.shell.level checkpoint_header.shell.level

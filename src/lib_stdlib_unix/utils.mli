@@ -23,9 +23,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(**  Print string over the current line *)
+(** Print over the current [stdout] line. Takes a message formatting function of
+    the form [(fun m -> m <format_string>)]. Message formatting occurs only when
+    the line is actually printed (i.e. when [(fst refresh_rate) mod (snd
+    refresh_rate) = 0]). [refresh_rate] defaults to always printing the supplied
+    message.
+
+    {2 Examples:}
+
+    - [display_progress (fun m -> m "Loading... %d/100" percent)].
+
+    - [display_progress ~refresh_rate:(index, 1000) (fun m -> m "Written %d
+      bytes" total)]. Display progress message when [index] is divisible by
+      1000.
+ *)
 val display_progress :
-  ?refresh_rate:int * int -> ('a, Format.formatter, unit, unit) format4 -> 'a
+  ?refresh_rate:int * int ->
+  ((('a, Format.formatter, unit, unit) format4 -> 'a) -> unit) ->
+  unit
 
 (** Finalizes progress display *)
 val display_progress_end : unit -> unit

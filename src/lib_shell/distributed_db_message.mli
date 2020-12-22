@@ -25,6 +25,9 @@
 
 (** Tezos Shell - Network message for the gossip P2P protocol. *)
 
+(** We must make sure that we are able to associate a response to the
+    corresponding request. Thus, we are able to discrimate between
+    expected responses from the unexpected ones. *)
 type t =
   | Get_current_branch of Chain_id.t
   | Current_branch of Chain_id.t * Block_locator.t
@@ -37,15 +40,15 @@ type t =
   | Operation of Operation.t
   | Get_protocols of Protocol_hash.t list
   | Protocol of Protocol.t
-  | Get_operation_hashes_for_blocks of (Block_hash.t * int) list
-  | Operation_hashes_for_block of
-      Block_hash.t
-      * int
-      * Operation_hash.t list
-      * Operation_list_list_hash.path
   | Get_operations_for_blocks of (Block_hash.t * int) list
   | Operations_for_block of
       Block_hash.t * int * Operation.t list * Operation_list_list_hash.path
+  | Get_checkpoint of Chain_id.t
+  | Checkpoint of Chain_id.t * Block_header.t
+  | Get_protocol_branch of Chain_id.t * int
+  | Protocol_branch of Chain_id.t * int * Block_locator.t
+  | Get_predecessor_header of Block_hash.t * int32
+  | Predecessor_header of Block_hash.t * int32 * Block_header.t
 
 val encoding : t P2p_params.app_message_encoding list
 
@@ -69,8 +72,4 @@ module Bounded_encoding : sig
   val set_protocol_max_size : int option -> unit
 
   val set_mempool_max_operations : int option -> unit
-end
-
-module Logging : sig
-  val tag : t Tag.def
 end

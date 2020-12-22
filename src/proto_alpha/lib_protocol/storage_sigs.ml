@@ -63,7 +63,7 @@ module type Single_data_storage = sig
 
   (** When the value is [Some v], allocates the data and initializes
       it with [v] ; just updates it if the bucket exists. When the
-      valus is [None], delete the storage bucket when the value ; does
+      value is [None], delete the storage bucket when the value ; does
       nothing if the bucket does not exists. *)
   val set_option : context -> value option -> Raw_context.t Lwt.t
 
@@ -124,7 +124,7 @@ module type Single_carbonated_data_storage = sig
 
   (** When the value is [Some v], allocates the data and initializes
       it with [v] ; just updates it if the bucket exists. When the
-      valus is [None], delete the storage bucket when the value ; does
+      value is [None], delete the storage bucket when the value ; does
       nothing if the bucket does not exists.
       Consumes the same gas cost as either {!remove} or {!init_set}.
       Returns the difference from the old (maybe 0) to the new size, and a boolean
@@ -186,7 +186,7 @@ module type Non_iterable_indexed_data_storage = sig
 
   (** When the value is [Some v], allocates the data and initializes
       it with [v] ; just updates it if the bucket exists. When the
-      valus is [None], delete the storage bucket when the value ; does
+      value is [None], delete the storage bucket when the value ; does
       nothing if the bucket does not exists. *)
   val set_option : context -> key -> value option -> Raw_context.t Lwt.t
 
@@ -255,7 +255,7 @@ module type Non_iterable_indexed_carbonated_data_storage = sig
 
   (** When the value is [Some v], allocates the data and initializes
       it with [v] ; just updates it if the bucket exists. When the
-      valus is [None], delete the storage bucket when the value ; does
+      value is [None], delete the storage bucket when the value ; does
       nothing if the bucket does not exists.
       Consumes serialization cost.
       Consumes the same gas cost as either {!remove} or {!init_set}.

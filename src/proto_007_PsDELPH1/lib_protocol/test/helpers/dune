@@ -1,7 +1,8 @@
 (library
  (name tezos_007_PsDELPH1_test_helpers)
  (public_name tezos-007-PsDELPH1-test-helpers)
- (libraries tezos-base
+ (libraries alcotest-lwt
+            tezos-base
             tezos-stdlib-unix
             tezos-shell-services
             tezos-protocol-environment
@@ -12,9 +13,11 @@
                    -open Tezos_micheline
                    -open Tezos_stdlib_unix
                    -open Tezos_protocol_007_PsDELPH1
+                   -open Tezos_client_007_PsDELPH1
+                   -open Tezos_protocol_environment_007_PsDELPH1
                    -open Tezos_shell_services)))
 
-(alias
- (name runtest_lint)
+(rule
+ (alias runtest_lint)
  (deps (glob_files *.ml{,i}))
  (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

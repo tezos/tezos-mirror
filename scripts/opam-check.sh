@@ -23,7 +23,7 @@ fi
 
 echo '## Running `./scripts/update_opam_repo.sh`'
 echo
-./scripts/update_opam_repo.sh
+./scripts/update_opam_repo.sh || exit 1
 
 if [ -n "$(cat opam_repo.patch)" ] ; then
 

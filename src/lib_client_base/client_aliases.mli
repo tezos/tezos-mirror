@@ -40,6 +40,8 @@ module type Alias = sig
 
   type fresh_param
 
+  val encoding : t Data_encoding.t
+
   val load : #Client_context.wallet -> (string * t) list tzresult Lwt.t
 
   val set : #Client_context.wallet -> (string * t) list -> unit tzresult Lwt.t
@@ -49,6 +51,8 @@ module type Alias = sig
   val find_opt : #Client_context.wallet -> string -> t option tzresult Lwt.t
 
   val rev_find : #Client_context.wallet -> t -> string option tzresult Lwt.t
+
+  val rev_find_all : #Client_context.wallet -> t -> string list tzresult Lwt.t
 
   val name : #Client_context.wallet -> t -> string tzresult Lwt.t
 

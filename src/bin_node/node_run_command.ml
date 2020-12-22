@@ -103,6 +103,22 @@ module Event = struct
       ~level:Notice
       ("peer_id", P2p_peer.Id.encoding)
 
+  let generating_identity =
+    declare_0
+      ~section
+      ~name:"generating_identity"
+      ~msg:"generating an identity file"
+      ~level:Notice
+      ()
+
+  let identity_generated =
+    declare_1
+      ~section
+      ~name:"identity_generated"
+      ~msg:"identity file generated"
+      ~level:Notice
+      ("peer_id", P2p_peer.Id.encoding)
+
   let starting_rpc_server =
     declare_3
       ~section
@@ -146,20 +162,35 @@ module Event = struct
       ()
 
   let bye =
+    (* Note that "exit_code" may be negative in case of signals. *)
     declare_1
       ~section
       ~name:"bye"
       ~msg:"bye"
       ~level:Notice
       ("exit_code", Data_encoding.int31)
-
-  (* may be negative in case of signals *)
 end
 
-let ( // ) = Filename.concat
+open Filename.Infix
 
-let init_node ?sandbox ?checkpoint ~singleprocess (config : Node_config_file.t)
-    =
+let init_identity_file (config : Node_config_file.t) =
+  let identity_file =
+    config.data_dir // Node_data_version.default_identity_file_name
+  in
+  if Sys.file_exists identity_file then
+    Node_identity_file.read identity_file
+    >>=? fun identity ->
+    Event.(emit read_identity) identity.peer_id >>= fun () -> return identity
+  else
+    Event.(emit generating_identity) ()
+    >>= fun () ->
+    Node_identity_file.generate identity_file config.p2p.expected_pow
+    >>=? fun identity ->
+    Event.(emit identity_generated) identity.peer_id
+    >>= fun () -> return identity
+
+let init_node ?sandbox ?checkpoint ~identity ~singleprocess
+    (config : Node_config_file.t) =
   (* TODO "WARN" when pow is below our expectation. *)
   ( match config.p2p.discovery_addr with
   | None ->
@@ -194,11 +225,6 @@ let init_node ?sandbox ?checkpoint ~singleprocess (config : Node_config_file.t)
       Node_config_file.resolve_bootstrap_addrs
         (Node_config_file.bootstrap_peers config)
       >>= fun trusted_points ->
-      Node_identity_file.read
-        (config.data_dir // Node_data_version.default_identity_file_name)
-      >>=? fun identity ->
-      Event.(emit read_identity) identity.peer_id
-      >>= fun () ->
       let p2p_config : P2p.config =
         {
           listening_addr;
@@ -209,9 +235,10 @@ let init_node ?sandbox ?checkpoint ~singleprocess (config : Node_config_file.t)
           peers_file =
             config.data_dir // Node_data_version.default_peers_file_name;
           private_mode = config.p2p.private_mode;
-          greylisting_config = config.p2p.greylisting_config;
+          reconnection_config = config.p2p.reconnection_config;
           identity;
-          proof_of_work_target = Crypto_box.make_target config.p2p.expected_pow;
+          proof_of_work_target =
+            Crypto_box.make_pow_target config.p2p.expected_pow;
           trust_discovered_peers = sandbox <> None;
         }
       in
@@ -244,6 +271,7 @@ let init_node ?sandbox ?checkpoint ~singleprocess (config : Node_config_file.t)
       user_activated_protocol_overrides =
         config.blockchain_network.user_activated_protocol_overrides;
       patch_context;
+      data_dir = config.data_dir;
       store_root = Node_data_version.store_dir config.data_dir;
       context_root = Node_data_version.context_dir config.data_dir;
       protocol_root = Node_data_version.protocol_dir config.data_dir;
@@ -255,7 +283,7 @@ let init_node ?sandbox ?checkpoint ~singleprocess (config : Node_config_file.t)
   in
   Node.create
     ~sandboxed:(sandbox <> None)
-    ?sandbox_parameters:(Option.map ~f:snd sandbox_param)
+    ?sandbox_parameters:(Option.map snd sandbox_param)
     ~singleprocess
     node_config
     config.shell.peer_validator_limits
@@ -271,9 +299,16 @@ let sanitize_cors_headers ~default headers =
   |> String.Set.(union (of_list default))
   |> String.Set.elements
 
-let launch_rpc_server (rpc_config : Node_config_file.rpc) node (addr, port) =
+let launch_rpc_server (config : Node_config_file.t) node (addr, port) =
+  let rpc_config = config.rpc in
   let host = Ipaddr.V6.to_string addr in
   let dir = Node.build_rpc_directory node in
+  let dir = Node_directory.build_node_directory config dir in
+  let dir =
+    RPC_directory.register_describe_directory_service
+      dir
+      RPC_service.description_service
+  in
   let mode =
     match rpc_config.tls with
     | None ->
@@ -305,7 +340,7 @@ let launch_rpc_server (rpc_config : Node_config_file.rpc) node (addr, port) =
       | exn ->
           Lwt.return (error_exn exn))
 
-let init_rpc (rpc_config : Node_config_file.rpc) node =
+let init_rpc (config : Node_config_file.t) node =
   fold_right_s
     (fun addr acc ->
       Node_config_file.resolve_rpc_listening_addrs addr
@@ -315,10 +350,10 @@ let init_rpc (rpc_config : Node_config_file.rpc) node =
       | addrs ->
           fold_right_s
             (fun x a ->
-              launch_rpc_server rpc_config node x >>=? fun o -> return (o :: a))
+              launch_rpc_server config node x >>=? fun o -> return (o :: a))
             addrs
             acc)
-    rpc_config.listen_addrs
+    config.rpc.listen_addrs
     []
 
 let run ?verbosity ?sandbox ?checkpoint ~singleprocess
@@ -342,10 +377,12 @@ let run ?verbosity ?sandbox ?checkpoint ~singleprocess
     ~configuration:config.internal_events
     ()
   >>= fun () ->
+  init_identity_file config
+  >>=? fun identity ->
   Updater.init (Node_data_version.protocol_dir config.data_dir) ;
   Event.(emit starting_node) config.blockchain_network.chain_name
   >>= fun () ->
-  init_node ?sandbox ?checkpoint ~singleprocess config
+  init_node ?sandbox ?checkpoint ~identity ~singleprocess config
   >>= (function
         | Ok node ->
             return node
@@ -363,33 +400,37 @@ let run ?verbosity ?sandbox ?checkpoint ~singleprocess
         | Error _ as err ->
             Lwt.return err)
   >>=? fun node ->
-  init_rpc config.rpc node
+  let node_downer =
+    Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
+        Event.(emit shutting_down_node) () >>= fun () -> Node.shutdown node)
+  in
+  init_rpc config node
   >>=? fun rpc ->
+  let rpc_downer =
+    Lwt_exit.register_clean_up_callback
+      ~loc:__LOC__
+      ~after:[node_downer]
+      (fun _ ->
+        Event.(emit shutting_down_rpc_server) ()
+        >>= fun () -> Lwt_list.iter_p RPC_server.shutdown rpc)
+  in
   Event.(emit node_is_ready) ()
   >>= fun () ->
-  Lwt_exit.(
-    wrap_promise @@ retcode_of_unit_result_lwt @@ Lwt_utils.never_ending ())
-  >>= fun retcode ->
-  (* Clean-shutdown code *)
-  Lwt_exit.termination_thread
-  >>= fun exit_code ->
-  Event.(emit shutting_down_node) ()
-  >>= fun () ->
-  Node.shutdown node
-  >>= fun () ->
-  Event.(emit shutting_down_rpc_server) ()
-  >>= fun () ->
-  Lwt_list.iter_p RPC_server.shutdown rpc
-  >>= fun () ->
-  Event.(emit bye) exit_code
-  >>= fun () -> Internal_event_unix.close () >>= fun () -> return retcode
+  let _ =
+    Lwt_exit.register_clean_up_callback
+      ~loc:__LOC__
+      ~after:[rpc_downer]
+      (fun exit_status ->
+        Event.(emit bye) exit_status >>= fun () -> Internal_event_unix.close ())
+  in
+  Lwt_utils.never_ending ()
 
 let process sandbox verbosity checkpoint singleprocess args =
   let verbosity =
     let open Internal_event in
     match verbosity with [] -> None | [_] -> Some Info | _ -> Some Debug
   in
-  let run =
+  let main_promise =
     Node_shared_arg.read_and_patch_config_file
       ~ignore_bootstrap_peers:
         (match sandbox with Some _ -> true | None -> false)
@@ -434,14 +475,17 @@ let process sandbox verbosity checkpoint singleprocess args =
     | true ->
         failwith "Data directory is locked by another process"
   in
-  match Lwt_main.run run with
-  | Ok (0 | 2) ->
-      (* 2 means that we exit by a signal that was handled *)
-      `Ok ()
-  | Ok _ ->
-      `Error (false, "")
-  | Error err ->
-      `Error (false, Format.asprintf "%a" pp_print_error err)
+  Lwt_main.run
+    ( Lwt_exit.wrap_and_error main_promise
+    >>= function
+    | Ok (Ok _) ->
+        Lwt_exit.exit_and_wait 0 >>= fun _ -> Lwt.return (`Ok ())
+    | Ok (Error err) ->
+        Lwt_exit.exit_and_wait 2
+        >>= fun _ ->
+        Lwt.return (`Error (false, Format.asprintf "%a" pp_print_error err))
+    | Error exit_status ->
+        Lwt.return (`Error (false, Format.asprintf "Exited %d" exit_status)) )
 
 module Term = struct
   let verbosity =
@@ -519,7 +563,9 @@ module Manpage = struct
 
   let debug =
     let log_sections =
-      String.concat " " (List.rev !Internal_event.Legacy_logging.sections)
+      String.concat
+        " "
+        (TzString.Set.elements (Internal_event.get_registered_sections ()))
     in
     [ `S "DEBUG";
       `P

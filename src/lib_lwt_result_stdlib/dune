@@ -1,0 +1,14 @@
+(library
+ (name tezos_lwt_result_stdlib)
+ (public_name tezos-lwt-result-stdlib)
+ (flags (:standard -open Tezos_error_monad))
+ (libraries tezos-error-monad
+            lwt
+            tezos-lwt-result-stdlib.sigs
+            tezos-lwt-result-stdlib.functors
+            tezos-lwt-result-stdlib.lib))
+
+(rule
+ (alias runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

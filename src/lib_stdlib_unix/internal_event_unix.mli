@@ -38,7 +38,7 @@ module Configuration : sig
   val default : t
 
   (** The serialization format. *)
-  val encoding : t RPC_encoding.t
+  val encoding : t Data_encoding.t
 
   (** Parse a json file at [path] into a configuration. *)
   val of_file : string -> t tzresult Lwt.t

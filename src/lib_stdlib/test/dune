@@ -1,68 +1,56 @@
 (executables
  (names test_tzList
+        test_tzString
         test_lwt_pipe
-        test_lru_cache
-        test_ring_basic
-        test_ring_plus
-        test_weakringtable
-        test_ring_weakness)
+        test_circular_buffer
+        test_circular_buffer_fuzzy)
  (libraries tezos-stdlib
             alcotest
+            alcotest-lwt
             lwt_log
             bigstring
-            lwt.unix)
+            lwt.unix
+            crowbar)
  (flags (:standard -open Tezos_stdlib)))
 
-(alias
- (name buildtest)
+(rule
+ (alias buildtest)
  (deps test_tzList.exe
-       test_lwt_pipe.exe
-       test_ring_basic.exe
-       test_ring_plus.exe
-       test_weakringtable.exe))
+       test_tzString.exe
+       test_lwt_pipe.exe)
+ (action (progn)))
 
-(alias
- (name runtest_tzList)
+(rule
+ (alias runtest_tzList)
  (action (run %{exe:test_tzList.exe})))
 
-(alias
- (name runtest_lwt_pipe)
+(rule
+ (alias runtest_tzString)
+ (action (run %{exe:test_tzString.exe})))
+
+(rule
+ (alias runtest_lwt_pipe)
  (action (run %{exe:test_lwt_pipe.exe})))
 
-(alias
- (name runtest_lru_cache)
- (action (run %{exe:test_lru_cache.exe})))
+(rule
+ (alias runtest_circular_buffer)
+ (action (run %{exe:test_circular_buffer.exe})))
 
-(alias
- (name runtest_ring_basic)
- (action (run %{exe:test_ring_basic.exe})))
+(rule
+ (alias runtest_circular_buffer_fuzzy)
+ (action (run %{exe:test_circular_buffer_fuzzy.exe})))
 
-(alias
- (name runtest_ring_plus)
- (action (run %{exe:test_ring_plus.exe})))
-
-(alias
- (name runtest_weakringtable)
- (action (run %{exe:test_weakringtable.exe})))
-
-(alias
- (name runtest)
+(rule
+ (alias runtest)
  (package tezos-stdlib)
  (deps (alias runtest_tzList)
+       (alias runtest_tzString)
        (alias runtest_lwt_pipe)
-       (alias runtest_lru_cache)
-       (alias runtest_ring_basic)
-       (alias runtest_ring_plus)
-       (alias runtest_weakringtable)))
+       (alias runtest_circular_buffer)
+       (alias runtest_circular_buffer_fuzzy))
+ (action (progn)))
 
-(alias
- (name buildweaknesstest)
- (deps test_ring_weakness.exe))
-(alias
- (name runweaknesstest)
- (action (setenv OCAMLRUNPARAM "o=20,h=16,s=16,i=2" (run %{exe:test_ring_weakness.exe}))))
-
-(alias
- (name runtest_lint)
+(rule
+ (alias runtest_lint)
  (deps (glob_files *.ml{,i}))
  (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

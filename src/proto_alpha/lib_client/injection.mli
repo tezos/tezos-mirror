@@ -27,13 +27,54 @@ open Protocol
 open Alpha_context
 open Apply_results
 
+type _ annotated_manager_operation =
+  | Manager_info : {
+      fee : Tez.t option;
+      operation : 'kind manager_operation;
+      gas_limit : Gas.Arith.integral option;
+      storage_limit : Z.t option;
+    }
+      -> 'kind annotated_manager_operation
+
+type packed_annotated_manager_operation =
+  | Annotated_manager_operation :
+      'kind annotated_manager_operation
+      -> packed_annotated_manager_operation
+
+(** The [annotated_manager_operation_list] type helps making
+    [contents_list] from a list of [manager_operation]s.
+    Its construction mimics [contents_list] in order to keep
+    consistent types when calling [inject_manager_operation]
+    and [inject_operation].*)
+type _ annotated_manager_operation_list =
+  | Single_manager :
+      'kind annotated_manager_operation
+      -> 'kind annotated_manager_operation_list
+  | Cons_manager :
+      'kind annotated_manager_operation
+      * 'rest annotated_manager_operation_list
+      -> ('kind * 'rest) annotated_manager_operation_list
+
+type packed_annotated_manager_operation_list =
+  | Manager_list :
+      'kind annotated_manager_operation_list
+      -> packed_annotated_manager_operation_list
+
+val manager_of_list :
+  packed_annotated_manager_operation list ->
+  packed_annotated_manager_operation_list
+
+val manager_to_list :
+  packed_annotated_manager_operation_list ->
+  packed_annotated_manager_operation list
+
 type 'kind preapply_result =
   Operation_hash.t * 'kind operation * 'kind operation_metadata
 
 type fee_parameter = {
   minimal_fees : Tez.t;
-  minimal_nanotez_per_byte : Z.t;
-  minimal_nanotez_per_gas_unit : Z.t;
+  minimal_nanotez_per_byte : Q.t;
+  minimal_nanotez_per_gas_unit : Q.t;
   force_low_fee : bool;
   fee_cap : Tez.t;
   burn_cap : Tez.t;
@@ -71,6 +112,13 @@ val inject_operation :
 
 type 'kind result = Operation_hash.t * 'kind contents * 'kind contents_result
 
+val prepare_manager_operation :
+  ?fee:Tez.t ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:Z.t ->
+  'kind manager_operation ->
+  'kind annotated_manager_operation
+
 val inject_manager_operation :
   #Protocol_client_context.full ->
   chain:Shell_services.chain ->
@@ -83,12 +131,12 @@ val inject_manager_operation :
   src_pk:Signature.public_key ->
   src_sk:Client_keys.sk_uri ->
   ?fee:Tez.t ->
-  ?gas_limit:Z.t ->
+  ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Z.t ->
   fee_parameter:fee_parameter ->
-  'kind manager_operation ->
-  'kind Kind.manager result tzresult Lwt.t
+  'kind annotated_manager_operation_list ->
+  'kind Kind.manager result_list tzresult Lwt.t
 
 val originated_contracts :
   'kind contents_result_list -> Contract.t list tzresult

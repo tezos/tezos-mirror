@@ -31,7 +31,7 @@ open Protocol_client_context
 
 let get_branch (rpc_config : #Protocol_client_context.full) ~chain
     ~(block : Block_services.block) branch =
-  let branch = Option.unopt ~default:0 branch in
+  let branch = Option.value ~default:0 branch in
   (* TODO export parameter *)
   ( match block with
   | `Head n ->
@@ -58,6 +58,49 @@ type 'kind result_list =
 
 type 'kind result = Operation_hash.t * 'kind contents * 'kind contents_result
 
+type _ annotated_manager_operation =
+  | Manager_info : {
+      fee : Tez.t option;
+      operation : 'kind manager_operation;
+      gas_limit : Gas.Arith.integral option;
+      storage_limit : Z.t option;
+    }
+      -> 'kind annotated_manager_operation
+
+type packed_annotated_manager_operation =
+  | Annotated_manager_operation :
+      'kind annotated_manager_operation
+      -> packed_annotated_manager_operation
+
+type _ annotated_manager_operation_list =
+  | Single_manager :
+      'kind annotated_manager_operation
+      -> 'kind annotated_manager_operation_list
+  | Cons_manager :
+      'kind annotated_manager_operation
+      * 'rest annotated_manager_operation_list
+      -> ('kind * 'rest) annotated_manager_operation_list
+
+type packed_annotated_manager_operation_list =
+  | Manager_list :
+      'kind annotated_manager_operation_list
+      -> packed_annotated_manager_operation_list
+
+let rec manager_to_list = function
+  | Manager_list (Single_manager o) ->
+      [Annotated_manager_operation o]
+  | Manager_list (Cons_manager (o, os)) ->
+      Annotated_manager_operation o :: manager_to_list (Manager_list os)
+
+let rec manager_of_list = function
+  | [] ->
+      assert false
+  | [Annotated_manager_operation o] ->
+      Manager_list (Single_manager o)
+  | Annotated_manager_operation o :: os ->
+      let (Manager_list os) = manager_of_list os in
+      Manager_list (Cons_manager (o, os))
+
 let get_manager_operation_gas_and_fee contents =
   let open Operation in
   let l = to_list (Contents_list contents) in
@@ -70,16 +113,16 @@ let get_manager_operation_gas_and_fee contents =
         | Ok (total_fee, total_gas) -> (
           match Tez.(total_fee +? fee) with
           | Ok total_fee ->
-              Ok (total_fee, Z.add total_gas gas_limit)
+              Ok (total_fee, Gas.Arith.add total_gas gas_limit)
           | Error _ as e ->
               e ) ) | _ -> acc)
-    (Ok (Tez.zero, Z.zero))
+    (Ok (Tez.zero, Gas.Arith.zero))
     l
 
 type fee_parameter = {
   minimal_fees : Tez.t;
-  minimal_nanotez_per_byte : Z.t;
-  minimal_nanotez_per_gas_unit : Z.t;
+  minimal_nanotez_per_byte : Q.t;
+  minimal_nanotez_per_gas_unit : Q.t;
   force_low_fee : bool;
   fee_cap : Tez.t;
   burn_cap : Tez.t;
@@ -88,12 +131,17 @@ type fee_parameter = {
 let dummy_fee_parameter =
   {
     minimal_fees = Tez.zero;
-    minimal_nanotez_per_byte = Z.zero;
-    minimal_nanotez_per_gas_unit = Z.zero;
+    minimal_nanotez_per_byte = Q.zero;
+    minimal_nanotez_per_gas_unit = Q.zero;
     force_low_fee = false;
     fee_cap = Tez.one;
     burn_cap = Tez.zero;
   }
+
+(* Rounding up (see Z.cdiv) *)
+let z_mutez_of_q_nanotez (ntz : Q.t) =
+  let q_mutez = Q.div ntz (Q.of_int 1000) in
+  Z.cdiv q_mutez.Q.num q_mutez.Q.den
 
 let check_fees :
     type t.
@@ -122,34 +170,32 @@ let check_fees :
           fee
         >>= fun () -> exit 1
       else
-        (* *)
         let fees_in_nanotez =
-          Z.mul (Z.of_int64 (Tez.to_mutez fee)) (Z.of_int 1000)
+          Q.mul (Q.of_int64 (Tez.to_mutez fee)) (Q.of_int 1000)
         in
         let minimal_fees_in_nanotez =
-          Z.mul (Z.of_int64 (Tez.to_mutez config.minimal_fees)) (Z.of_int 1000)
+          Q.mul (Q.of_int64 (Tez.to_mutez config.minimal_fees)) (Q.of_int 1000)
         in
         let minimal_fees_for_gas_in_nanotez =
-          Z.mul config.minimal_nanotez_per_gas_unit gas
+          Q.mul
+            config.minimal_nanotez_per_gas_unit
+            (Q.of_bigint (Gas.Arith.integral_to_z gas))
         in
         let minimal_fees_for_size_in_nanotez =
-          Z.mul config.minimal_nanotez_per_byte (Z.of_int size)
+          Q.mul config.minimal_nanotez_per_byte (Q.of_int size)
         in
         let estimated_fees_in_nanotez =
-          Z.add
+          Q.add
             minimal_fees_in_nanotez
-            (Z.add
+            (Q.add
                minimal_fees_for_gas_in_nanotez
                minimal_fees_for_size_in_nanotez)
         in
+        let estimated_fees_in_mutez =
+          z_mutez_of_q_nanotez estimated_fees_in_nanotez
+        in
         let estimated_fees =
-          match
-            Tez.of_mutez
-              (Z.to_int64
-                 (Z.div
-                    (Z.add (Z.of_int 999) estimated_fees_in_nanotez)
-                    (Z.of_int 1000)))
-          with
+          match Tez.of_mutez (Z.to_int64 estimated_fees_in_mutez) with
           | None ->
               assert false
           | Some fee ->
@@ -157,7 +203,7 @@ let check_fees :
         in
         if
           (not config.force_low_fee)
-          && Z.compare fees_in_nanotez estimated_fees_in_nanotez < 0
+          && Q.compare fees_in_nanotez estimated_fees_in_nanotez < 0
         then
           cctxt#error
             "The proposed fee (%s%a) are lower than the fee that baker expect \
@@ -328,7 +374,7 @@ let estimated_gas_single (type kind)
     | Skipped _ ->
         assert false
     | Backtracked (_, None) ->
-        Ok Z.zero (* there must be another error for this to happen *)
+        Ok Gas.Arith.zero (* there must be another error for this to happen *)
     | Backtracked (_, Some errs) ->
         Environment.wrap_error (Error errs)
     | Failed (_, errs) ->
@@ -336,7 +382,8 @@ let estimated_gas_single (type kind)
   in
   List.fold_left
     (fun acc (Internal_operation_result (_, r)) ->
-      acc >>? fun acc -> consumed_gas r >>? fun gas -> Ok (Z.add acc gas))
+      acc
+      >>? fun acc -> consumed_gas r >>? fun gas -> Ok (Gas.Arith.add acc gas))
     (consumed_gas operation_result)
     internal_operation_results
 
@@ -479,24 +526,32 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
     (contents : kind contents_list) : kind contents_list tzresult Lwt.t =
   Alpha_services.Constants.all cctxt (chain, block)
   >>=? fun { parametric =
-               { hard_gas_limit_per_operation = gas_limit;
+               { hard_gas_limit_per_operation;
                  hard_storage_limit_per_operation = storage_limit;
                  origination_size;
                  cost_per_byte;
                  _ };
              _ } ->
+  let user_gas_limit_needs_patching user_gas_limit =
+    Gas.Arith.(user_gas_limit < zero)
+    || Gas.Arith.(hard_gas_limit_per_operation <= user_gas_limit)
+  in
+  let user_storage_limit_needs_patching user_storage_limit =
+    user_storage_limit < Z.zero || storage_limit <= user_storage_limit
+  in
   let may_need_patching_single :
       type kind. kind contents -> kind contents option = function
     | Manager_operation c
-      when compute_fee || c.gas_limit < Z.zero || gas_limit <= c.gas_limit
-           || c.storage_limit < Z.zero
-           || storage_limit <= c.storage_limit ->
+      when (compute_fee && c.fee = Tez.zero)
+           || user_gas_limit_needs_patching c.gas_limit
+           || user_storage_limit_needs_patching c.storage_limit ->
         let gas_limit =
-          if c.gas_limit < Z.zero || gas_limit <= c.gas_limit then gas_limit
+          if user_gas_limit_needs_patching c.gas_limit then
+            hard_gas_limit_per_operation
           else c.gas_limit
         in
         let storage_limit =
-          if c.storage_limit < Z.zero || storage_limit <= c.storage_limit then
+          if user_storage_limit_needs_patching c.storage_limit then
             storage_limit
           else c.storage_limit
         in
@@ -528,7 +583,6 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
   let rec patch_fee : type kind. bool -> kind contents -> kind contents =
    fun first -> function
     | Manager_operation c as op -> (
-        let gas_limit = c.gas_limit in
         let size =
           if first then
             Data_encoding.Binary.fixed_length_exn
@@ -543,27 +597,26 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
               (Contents op)
         in
         let minimal_fees_in_nanotez =
-          Z.mul
-            (Z.of_int64 (Tez.to_mutez fee_parameter.minimal_fees))
-            (Z.of_int 1000)
+          Q.mul
+            (Q.of_int64 (Tez.to_mutez fee_parameter.minimal_fees))
+            (Q.of_int 1000)
         in
         let minimal_fees_for_gas_in_nanotez =
-          Z.mul fee_parameter.minimal_nanotez_per_gas_unit gas_limit
+          Q.mul
+            fee_parameter.minimal_nanotez_per_gas_unit
+            (Q.of_bigint @@ Gas.Arith.integral_to_z c.gas_limit)
         in
         let minimal_fees_for_size_in_nanotez =
-          Z.mul fee_parameter.minimal_nanotez_per_byte (Z.of_int size)
+          Q.mul fee_parameter.minimal_nanotez_per_byte (Q.of_int size)
         in
         let fees_in_nanotez =
-          Z.add minimal_fees_in_nanotez
-          @@ Z.add
+          Q.add minimal_fees_in_nanotez
+          @@ Q.add
                minimal_fees_for_gas_in_nanotez
                minimal_fees_for_size_in_nanotez
         in
-        match
-          Tez.of_mutez
-            (Z.to_int64
-               (Z.div (Z.add (Z.of_int 999) fees_in_nanotez) (Z.of_int 1000)))
-        with
+        let fees_in_mutez = z_mutez_of_q_nanotez fees_in_nanotez in
+        match Tez.of_mutez (Z.to_int64 fees_in_mutez) with
         | None ->
             assert false
         | Some fee ->
@@ -572,6 +625,31 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
     | c ->
         c
   in
+  (* The following code is a temporary fix for a minor but annoying
+     protocol bug, fixed in 008. To be removed in 008. *)
+  let delphi_specific_origination_patch :
+      type op. op Alpha_context.manager_operation -> Gas.Arith.fp option =
+   fun operation ->
+    match operation with
+    | Protocol.Alpha_context.Origination {script; _} ->
+        let code_bytes =
+          Data_encoding.Binary.to_bytes_exn
+            Script.lazy_expr_encoding
+            script.code
+        in
+        let lazy_code =
+          Data_encoding.Binary.of_bytes_exn
+            Script.lazy_expr_encoding
+            code_bytes
+        in
+        (* [extra_cost] is the spurious cost being consumed in Delphi. *)
+        let extra_cost = Script.minimal_deserialize_cost lazy_code in
+        (* Klakplok made me do it. This is safe because in delphi, milligas = fp = cost. *)
+        let extra_gas : Alpha_context.Gas.Arith.fp = Obj.magic extra_cost in
+        Some extra_gas
+    | _ ->
+        None
+  in
   let patch :
       type kind.
       bool ->
@@ -579,16 +657,36 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
       kind contents tzresult Lwt.t =
    fun first -> function
     | (Manager_operation c, (Manager_operation_result _ as result)) ->
-        ( if c.gas_limit < Z.zero || gas_limit <= c.gas_limit then
+        ( if user_gas_limit_needs_patching c.gas_limit then
           Lwt.return (estimated_gas_single result)
           >>=? fun gas ->
-          if Z.equal gas Z.zero then
-            cctxt#message "Estimated gas: none" >>= fun () -> return Z.zero
+          if Gas.Arith.(gas = zero) then
+            cctxt#message "Estimated gas: none"
+            >>= fun () -> return Gas.Arith.zero
           else
-            cctxt#message
-              "Estimated gas: %s units (will add 100 for safety)"
-              (Z.to_string gas)
-            >>= fun () -> return (Z.min (Z.add gas (Z.of_int 100)) gas_limit)
+            ( match delphi_specific_origination_patch c.operation with
+            | None ->
+                cctxt#message
+                  "Estimated gas: %a units (will add 100 for safety)"
+                  Gas.Arith.pp
+                  gas
+                >>= fun () -> return gas
+            | Some extra_gas ->
+                cctxt#message
+                  "Estimated gas: %a units (will add 100 + %a for safety)"
+                  Gas.Arith.pp
+                  gas
+                  Gas.Arith.pp
+                  extra_gas
+                >>= fun () -> return (Gas.Arith.add gas extra_gas) )
+            >>=? fun gas ->
+            let gas_plus_100 =
+              Gas.Arith.(add (ceil gas) (integral_of_int 100))
+            in
+            let patched_gas =
+              Gas.Arith.min gas_plus_100 hard_gas_limit_per_operation
+            in
+            return patched_gas
         else return c.gas_limit )
         >>=? fun gas_limit ->
         ( if c.storage_limit < Z.zero || storage_limit <= c.storage_limit then
@@ -606,8 +704,9 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
             return (Z.min (Z.add storage (Z.of_int 20)) storage_limit)
         else return c.storage_limit )
         >>=? fun storage_limit ->
-        let c = Manager_operation {c with gas_limit; storage_limit} in
-        if compute_fee then return (patch_fee first c) else return c
+        let cm = Manager_operation {c with gas_limit; storage_limit} in
+        if compute_fee && c.fee = Tez.zero then return (patch_fee first cm)
+        else return cm
     | (c, _) ->
         return c
   in
@@ -761,9 +860,11 @@ let inject_operation (type kind) cctxt ~chain ~block ?confirmations
           j
         >>=? fun op' ->
         match op'.receipt with
-        | No_operation_metadata ->
+        | None ->
+            failwith "Internal error: pruned metadata."
+        | Some No_operation_metadata ->
             failwith "Internal error: unexpected receipt."
-        | Operation_metadata receipt -> (
+        | Some (Operation_metadata receipt) -> (
           match Apply_results.kind_equal_list contents receipt.contents with
           | Some Apply_results.Eq ->
               return (receipt : kind operation_metadata)
@@ -804,13 +905,17 @@ let inject_operation (type kind) cctxt ~chain ~block ?confirmations
             op.shell.branch )
     >>= fun () -> return (oph, op.protocol_data.contents, result.contents)
 
+let prepare_manager_operation ?fee ?gas_limit ?storage_limit operation =
+  Manager_info {fee; gas_limit; storage_limit; operation}
+
 let inject_manager_operation cctxt ~chain ~block ?branch ?confirmations
     ?dry_run ?verbose_signing ~source ~src_pk ~src_sk ?fee
-    ?(gas_limit = Z.minus_one) ?(storage_limit = Z.of_int (-1)) ?counter
-    ~fee_parameter (type kind) (operation : kind manager_operation) :
+    ?(gas_limit = Gas.Arith.integral Z.minus_one)
+    ?(storage_limit = Z.of_int (-1)) ?counter ~fee_parameter (type kind)
+    (operations : kind annotated_manager_operation_list) :
     ( Operation_hash.t
-    * kind Kind.manager contents
-    * kind Kind.manager contents_result )
+    * kind Kind.manager contents_list
+    * kind Kind.manager contents_result_list )
     tzresult
     Lwt.t =
   ( match counter with
@@ -824,8 +929,12 @@ let inject_manager_operation cctxt ~chain ~block ?branch ?confirmations
   >>=? fun counter ->
   Alpha_services.Contract.manager_key cctxt (chain, block) source
   >>=? fun key ->
-  let is_reveal : type kind. kind manager_operation -> bool = function
-    | Reveal _ ->
+  (* [is_reveal] assumes that a Reveal operation only appears as the first of a batch *)
+  let is_reveal : type kind. kind annotated_manager_operation_list -> bool =
+    function
+    | Single_manager (Manager_info {operation = Reveal _; _}) ->
+        true
+    | Cons_manager (Manager_info {operation = Reveal _; _}, _) ->
         true
     | _ ->
         false
@@ -833,8 +942,45 @@ let inject_manager_operation cctxt ~chain ~block ?branch ?confirmations
   let (compute_fee, fee) =
     match fee with None -> (true, Tez.zero) | Some fee -> (false, fee)
   in
+  let contents_of_manager ~source ~fee ~counter ~gas_limit ~storage_limit
+      operation =
+    let (Manager_info {fee = f; gas_limit = g; storage_limit = s; operation}) =
+      operation
+    in
+    let fee = Option.value ~default:fee f in
+    let gas_limit = Option.value ~default:gas_limit g in
+    let storage_limit = Option.value ~default:storage_limit s in
+    Manager_operation
+      {source; fee; counter; gas_limit; storage_limit; operation}
+  in
+  let rec build_contents :
+      type kind.
+      Z.t ->
+      kind annotated_manager_operation_list ->
+      kind Kind.manager contents_list =
+   fun counter -> function
+    | Single_manager operation ->
+        Single
+          (contents_of_manager
+             ~source
+             ~fee
+             ~counter
+             ~gas_limit
+             ~storage_limit
+             operation)
+    | Cons_manager (operation, rest) ->
+        Cons
+          ( contents_of_manager
+              ~source
+              ~fee
+              ~counter
+              ~gas_limit
+              ~storage_limit
+              operation,
+            build_contents (Z.succ counter) rest )
+  in
   match key with
-  | None when not (is_reveal operation) -> (
+  | None when not (is_reveal operations) -> (
       let contents =
         Cons
           ( Manager_operation
@@ -842,20 +988,13 @@ let inject_manager_operation cctxt ~chain ~block ?branch ?confirmations
                 source;
                 fee = Tez.zero;
                 counter;
-                gas_limit = Z.of_int 10_000;
+                (* [gas_limit] must correspond to
+                   [Michelson_v1_gas.Cost_of.manager_operation] *)
+                gas_limit = Gas.Arith.integral_of_int 1_000;
                 storage_limit = Z.zero;
                 operation = Reveal src_pk;
               },
-            Single
-              (Manager_operation
-                 {
-                   source;
-                   fee;
-                   counter = Z.succ counter;
-                   gas_limit;
-                   storage_limit;
-                   operation;
-                 }) )
+            build_contents (Z.succ counter) operations )
       in
       inject_operation
         cctxt
@@ -871,36 +1010,24 @@ let inject_manager_operation cctxt ~chain ~block ?branch ?confirmations
         contents
       >>=? fun (oph, op, result) ->
       match pack_contents_list op result with
-      | Cons_and_result (_, _, Single_and_result (op, result)) ->
-          return (oph, op, result)
-      | Single_and_result (Manager_operation _, _) ->
-          .
-      | _ ->
-          assert false
-      (* Grrr... *) )
-  | _ -> (
-      let contents =
-        Single
-          (Manager_operation
-             {source; fee; counter; gas_limit; storage_limit; operation})
-      in
-      inject_operation
-        cctxt
-        ~chain
-        ~block
-        ?confirmations
-        ?dry_run
-        ?verbose_signing
-        ~compute_fee
-        ~fee_parameter
-        ?branch
-        ~src_sk
-        contents
-      >>=? fun (oph, op, result) ->
-      match pack_contents_list op result with
-      | Single_and_result ((Manager_operation _ as op), result) ->
+      | Cons_and_result (_, _, rest) ->
+          let (op, result) = unpack_contents_list rest in
           return (oph, op, result)
       | _ ->
           assert false )
-
-(* Grrr... *)
+  | Some _ when is_reveal operations ->
+      failwith "The manager key was previously revealed."
+  | _ ->
+      let contents = build_contents counter operations in
+      inject_operation
+        cctxt
+        ~chain
+        ~block
+        ?confirmations
+        ?dry_run
+        ?verbose_signing
+        ~compute_fee
+        ~fee_parameter
+        ?branch
+        ~src_sk
+        contents

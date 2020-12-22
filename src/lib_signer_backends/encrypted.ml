@@ -41,8 +41,8 @@ module Raw = struct
   (* Fixed zero nonce *)
   let nonce = Crypto_box.zero_nonce
 
-  (* Secret keys for Ed25519, secp256k1, P256 are 32 bytes long. *)
-  let encrypted_size = Crypto_box.boxzerobytes + 32
+  (* Secret keys for Ed25519, secp256k1, P256 have the same size. *)
+  let encrypted_size = Crypto_box.tag_length + Hacl.Ed25519.sk_size
 
   let pbkdf ~salt ~password =
     Pbkdf.SHA512.pbkdf2 ~count:32768 ~dk_len:32l ~salt ~password
@@ -59,13 +59,15 @@ module Raw = struct
       | P256 sk ->
           Data_encoding.Binary.to_bytes_exn P256.Secret_key.encoding sk
     in
-    Bigstring.concat "" [salt; Crypto_box.Secretbox.box key msg nonce]
+    Bytes.cat salt (Crypto_box.Secretbox.secretbox key msg nonce)
 
   let decrypt algo ~password ~encrypted_sk =
-    let salt = Bigstring.sub encrypted_sk 0 salt_len in
-    let encrypted_sk = Bigstring.sub encrypted_sk salt_len encrypted_size in
+    let salt = Bytes.sub encrypted_sk 0 salt_len in
+    let encrypted_sk = Bytes.sub encrypted_sk salt_len encrypted_size in
     let key = Crypto_box.Secretbox.unsafe_of_bytes (pbkdf ~salt ~password) in
-    match (Crypto_box.Secretbox.box_open key encrypted_sk nonce, algo) with
+    match
+      (Crypto_box.Secretbox.secretbox_open key encrypted_sk nonce, algo)
+    with
     | (None, _) ->
         return_none
     | (Some bytes, Signature.Ed25519) -> (
@@ -101,7 +103,7 @@ end
 
 module Encodings = struct
   let ed25519 =
-    let length = Hacl.Sign.skbytes + Crypto_box.boxzerobytes + Raw.salt_len in
+    let length = Hacl.Ed25519.sk_size + Crypto_box.tag_length + Raw.salt_len in
     Base58.register_encoding
       ~prefix:Base58.Prefix.ed25519_encrypted_seed
       ~length
@@ -113,7 +115,7 @@ module Encodings = struct
 
   let secp256k1 =
     let open Libsecp256k1.External in
-    let length = Key.secret_bytes + Crypto_box.boxzerobytes + Raw.salt_len in
+    let length = Key.secret_bytes + Crypto_box.tag_length + Raw.salt_len in
     Base58.register_encoding
       ~prefix:Base58.Prefix.secp256k1_encrypted_secret_key
       ~length
@@ -124,9 +126,7 @@ module Encodings = struct
       ~wrap:(fun sk -> Encrypted_secp256k1 sk)
 
   let p256 =
-    let length =
-      Uecc.(sk_size secp256r1) + Crypto_box.boxzerobytes + Raw.salt_len
-    in
+    let length = Hacl.P256.sk_size + Crypto_box.tag_length + Raw.salt_len in
     Base58.register_encoding
       ~prefix:Base58.Prefix.p256_encrypted_secret_key
       ~length
@@ -141,8 +141,6 @@ module Encodings = struct
     Base58.check_encoded_prefix secp256k1 "spesk" 88 ;
     Base58.check_encoded_prefix p256 "p2esk" 88
 end
-
-let decrypted = Hashtbl.create 13
 
 (* we cache the password in this list to avoid
    asking the user all the time *)
@@ -169,7 +167,7 @@ let password_file_load ctxt =
   match ctxt#load_passwords with
   | Some stream ->
       Lwt_stream.iter
-        (fun p -> passwords := Bigstring.of_string p :: !passwords)
+        (fun p -> passwords := Bytes.of_string p :: !passwords)
         stream
       >>= fun () -> return_unit
   | None ->
@@ -197,7 +195,6 @@ let decrypt_payload cctxt ?name encrypted_sk =
   | _ ->
       failwith "Not a Base58Check-encoded encrypted key" )
   >>=? fun (algo, encrypted_sk) ->
-  let encrypted_sk = Bigstring.of_bytes encrypted_sk in
   noninteractive_decrypt_loop algo ~encrypted_sk !passwords
   >>=? function
   | Some sk ->
@@ -208,9 +205,6 @@ let decrypt_payload cctxt ?name encrypted_sk =
 let decrypt (cctxt : #Client_context.prompter) ?name sk_uri =
   let payload = Uri.path (sk_uri : sk_uri :> Uri.t) in
   decrypt_payload cctxt ?name payload
-  >>=? fun sk ->
-  Hashtbl.replace decrypted sk_uri sk ;
-  return sk
 
 let decrypt_all (cctxt : #Client_context.io_wallet) =
   Secret_key.load cctxt
@@ -242,7 +236,7 @@ let rec read_password (cctxt : #Client_context.io) =
   >>=? fun password ->
   cctxt#prompt_password "Confirm password: "
   >>=? fun confirm ->
-  if not (Bigstring.equal password confirm) then
+  if not (Bytes.equal password confirm) then
     cctxt#message "Passwords do not match." >>= fun () -> read_password cctxt
   else return password
 
@@ -259,11 +253,82 @@ let encrypt cctxt sk =
     | P256 _ ->
         Encodings.p256
   in
-  let payload = Bigstring.to_bytes payload in
   let path = Base58.simple_encode encoding payload in
-  let sk_uri = Client_keys.make_sk_uri (Uri.make ~scheme ~path ()) in
-  Hashtbl.replace decrypted sk_uri sk ;
-  return sk_uri
+  Client_keys.make_sk_uri (Uri.make ~scheme ~path ())
+
+module Sapling_raw = struct
+  let salt_len = 8
+
+  (* 193 *)
+  let encrypted_size = Crypto_box.tag_length + salt_len + 169
+
+  let nonce = Crypto_box.zero_nonce
+
+  let pbkdf ~salt ~password =
+    Pbkdf.SHA512.pbkdf2 ~count:32768 ~dk_len:32l ~salt ~password
+
+  let encrypt ~password msg =
+    let msg = Tezos_sapling.Core.Wallet.Spending_key.to_bytes msg in
+    let salt = Hacl.Rand.gen salt_len in
+    let key = Crypto_box.Secretbox.unsafe_of_bytes (pbkdf ~salt ~password) in
+    Bytes.(to_string (cat salt (Crypto_box.Secretbox.secretbox key msg nonce)))
+
+  let decrypt ~password payload =
+    let ebytes = Bytes.of_string payload in
+    let salt = Bytes.sub ebytes 0 salt_len in
+    let encrypted_sk = Bytes.sub ebytes salt_len (encrypted_size - salt_len) in
+    let key = Crypto_box.Secretbox.unsafe_of_bytes (pbkdf ~salt ~password) in
+    Option.(
+      Crypto_box.Secretbox.secretbox_open key encrypted_sk nonce
+      >>= Tezos_sapling.Core.Wallet.Spending_key.of_bytes)
+
+  type Base58.data += Data of Tezos_sapling.Core.Wallet.Spending_key.t
+
+  let encrypted_b58_encoding password =
+    Base58.register_encoding
+      ~prefix:Base58.Prefix.sapling_spending_key
+      ~length:encrypted_size
+      ~to_raw:(encrypt ~password)
+      ~of_raw:(decrypt ~password)
+      ~wrap:(fun x -> Data x)
+end
+
+let encrypt_sapling_key cctxt sk =
+  read_password cctxt
+  >>=? fun password ->
+  let path =
+    Base58.simple_encode (Sapling_raw.encrypted_b58_encoding password) sk
+  in
+  return (Client_keys.make_sapling_uri (Uri.make ~scheme ~path ()))
+
+let decrypt_sapling_key (cctxt : #Client_context.io) (sk_uri : sapling_uri) =
+  let uri = (sk_uri :> Uri.t) in
+  let payload = Uri.path uri in
+  if Uri.scheme uri = Some scheme then
+    cctxt#prompt_password "Enter password to decrypt your key: "
+    >>=? fun password ->
+    match
+      Base58.simple_decode
+        (Sapling_raw.encrypted_b58_encoding password)
+        payload
+    with
+    | None ->
+        failwith
+          "Password incorrect or corrupted wallet, could not decipher \
+           encrypted Sapling spending key."
+    | Some sapling_key ->
+        return sapling_key
+  else
+    match
+      Base58.simple_decode
+        Tezos_sapling.Core.Wallet.Spending_key.b58check_encoding
+        payload
+    with
+    | None ->
+        failwith
+          "Corrupted wallet, could not read unencrypted Sapling spending key."
+    | Some sapling_key ->
+        return sapling_key
 
 module Make (C : sig
   val cctxt : Client_context.prompter
@@ -290,8 +355,7 @@ struct
 
   let neuterize sk_uri =
     decrypt C.cctxt sk_uri
-    >>=? fun sk ->
-    return (Unencrypted.make_pk (Signature.Secret_key.to_public_key sk))
+    >>=? fun sk -> Unencrypted.make_pk (Signature.Secret_key.to_public_key sk)
 
   let sign ?watermark sk_uri buf =
     decrypt C.cctxt sk_uri

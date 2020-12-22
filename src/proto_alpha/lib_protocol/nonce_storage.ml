@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Misc.Syntax
+
 type t = Seed_repr.nonce
 
 type nonce = t
@@ -107,12 +109,10 @@ let record_hash ctxt unrevealed =
 let reveal ctxt level nonce =
   get_unrevealed ctxt level
   >>=? fun unrevealed ->
-  fail_unless
+  error_unless
     (Seed_repr.check_hash nonce unrevealed.nonce_hash)
     Unexpected_nonce
-  >>=? fun () ->
-  Storage.Seed.Nonce.set ctxt level (Revealed nonce)
-  >>=? fun ctxt -> return ctxt
+  >>?= fun () -> Storage.Seed.Nonce.set ctxt level (Revealed nonce)
 
 type unrevealed = Storage.Seed.unrevealed_nonce = {
   nonce_hash : Nonce_hash.t;

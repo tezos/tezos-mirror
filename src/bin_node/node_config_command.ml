@@ -24,8 +24,8 @@
 (*****************************************************************************)
 
 let () =
-  Prevalidator_filters.register (module Tezos_mempool_006_PsCARTHA.Filter) ;
   Prevalidator_filters.register (module Tezos_mempool_007_PsDELPH1.Filter) ;
+  Prevalidator_filters.register (module Tezos_mempool_008_PtEdoTez.Filter) ;
   ()
 
 (** Commands *)
@@ -111,7 +111,7 @@ module Term = struct
       | Update ->
           update args
     in
-    match Lwt_main.run res with
+    match Lwt_main.run @@ Lwt_exit.wrap_and_exit res with
     | Ok () ->
         `Ok ()
     | Error err ->

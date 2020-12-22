@@ -94,15 +94,15 @@ type config = {
   private_mode : bool;
       (** If [true], only open outgoing/accept incoming connections
       to/from peers whose addresses are in [trusted_peers], and inform
-      these peers that the identity of this node should be revealed to
+      these peers that the identity of this node should not be revealed to
       the rest of the network. *)
   identity : P2p_identity.t;  (** Cryptographic identity of the peer. *)
-  proof_of_work_target : Crypto_box.target;
+  proof_of_work_target : Crypto_box.pow_target;
       (** Expected level of proof of work of peers' identity. *)
   trust_discovered_peers : bool;
       (** If [true], peers discovered on the local network will be trusted. *)
-  greylisting_config : P2p_point_state.Info.greylisting_config;
-      (** The greylisting configuration. *)
+  reconnection_config : P2p_point_state.Info.reconnection_config;
+      (** The reconnection delat configuration. *)
 }
 
 (** Network capacities *)
@@ -112,7 +112,7 @@ type limits = {
   authentication_timeout : Time.System.Span.t;
       (** Delay granted to a peer to perform authentication. *)
   greylist_timeout : Time.System.Span.t;
-      (** GC delay for the grelists tables. *)
+      (** GC delay for the greylists tables. *)
   maintenance_idle_time : Time.System.Span.t;
       (** How long to wait at most before running a maintenance loop. *)
   min_connections : int;
@@ -136,9 +136,6 @@ type limits = {
   incoming_message_queue_size : int option;
   outgoing_message_queue_size : int option;
       (** Various bounds for internal queues. *)
-  known_peer_ids_history_size : int;
-  known_points_history_size : int;
-      (** Size of circular log buffers, in number of events recorded. *)
   max_known_peer_ids : (int * int) option;
   max_known_points : (int * int) option;
       (** Optional limitation of internal hashtables (max, target) *)

@@ -24,10 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Internal_event.Legacy_logging.Make_semantic (struct
-  let name = "node.validator"
-end)
-
 type t = {
   state : State.t;
   db : Distributed_db.t;
@@ -70,13 +66,9 @@ let create state db peer_validator_limits block_validator_limits
 
 let activate v ~start_prevalidator ~validator_process chain_state =
   let chain_id = State.Chain.id chain_state in
-  lwt_log_notice
-    Tag.DSL.(
-      fun f ->
-        f "activate chain %a" -% t event "active_chain"
-        -% a State_logging.chain_id chain_id)
+  Validator_event.(emit activate_chain) chain_id
   >>= fun () ->
-  match Chain_id.Table.find_opt v.active_chains chain_id with
+  match Chain_id.Table.find v.active_chains chain_id with
   | Some chain ->
       return chain
   | None ->
@@ -94,11 +86,8 @@ let activate v ~start_prevalidator ~validator_process chain_state =
         chain_state
         v.chain_validator_limits
 
-let get_exn {active_chains; _} chain_id =
-  Chain_id.Table.find active_chains chain_id
-
 let get {active_chains; _} chain_id =
-  match Chain_id.Table.find_opt active_chains chain_id with
+  match Chain_id.Table.find active_chains chain_id with
   | Some nv ->
       Ok nv
   | None ->
@@ -114,60 +103,57 @@ let validate_block v ?(force = false) ?chain_id bytes operations =
   | None ->
       failwith "Cannot parse block header."
   | Some block ->
-      ( match chain_id with
-      | None -> (
-          Distributed_db.read_block_header v.db block.shell.predecessor
-          >>= function
-          | None ->
-              failwith
-                "Unknown predecessor (%a), cannot inject the block."
-                Block_hash.pp_short
-                block.shell.predecessor
-          | Some (chain_id, _bh) ->
-              Lwt.return (get v chain_id) )
-      | Some chain_id -> (
-          Lwt.return (get v chain_id)
-          >>=? fun nv ->
-          if force then return nv
-          else
-            Distributed_db.Block_header.known
-              (Chain_validator.chain_db nv)
-              block.shell.predecessor
+      if not (Clock_drift.is_not_too_far_in_the_future block.shell.timestamp)
+      then failwith "Block in the future."
+      else
+        ( match chain_id with
+        | None -> (
+            Distributed_db.read_block_header v.db block.shell.predecessor
             >>= function
-            | true ->
-                return nv
-            | false ->
+            | None ->
                 failwith
                   "Unknown predecessor (%a), cannot inject the block."
                   Block_hash.pp_short
-                  block.shell.predecessor ) )
-      >>=? fun nv ->
-      let validation =
-        Chain_validator.validate_block nv ~force hash block operations
-      in
-      return (hash, validation)
+                  block.shell.predecessor
+            | Some (chain_id, _bh) ->
+                Lwt.return (get v chain_id) )
+        | Some chain_id -> (
+            Lwt.return (get v chain_id)
+            >>=? fun nv ->
+            if force then return nv
+            else
+              Distributed_db.Block_header.known
+                (Chain_validator.chain_db nv)
+                block.shell.predecessor
+              >>= function
+              | true ->
+                  return nv
+              | false ->
+                  failwith
+                    "Unknown predecessor (%a), cannot inject the block."
+                    Block_hash.pp_short
+                    block.shell.predecessor ) )
+        >>=? fun nv ->
+        let validation =
+          Chain_validator.validate_block nv ~force hash block operations
+        in
+        return (hash, validation)
 
 let shutdown {active_chains; block_validator; _} =
-  let block_validator_job =
-    lwt_log_notice
-      Tag.DSL.(
-        fun f -> f "Shutting down the block validator..." -% t event "shutdown")
-    >>= fun () -> Block_validator.shutdown block_validator
-  in
   let chain_validator_jobs =
     List.of_seq
     @@ Seq.map
          (fun (id, nv) ->
-           lwt_log_notice
-             Tag.DSL.(
-               fun f ->
-                 f "Shutting down the chain validator %a..."
-                 -% t event "shutdown"
-                 -% a State_logging.chain_id id)
+           Validator_event.(emit shutdown_chain_validator) id
            >>= fun () -> Chain_validator.shutdown nv)
          (Chain_id.Table.to_seq active_chains)
   in
-  Lwt.join (block_validator_job :: chain_validator_jobs)
+  (* Shutdown the chain_validator (peer_validators, prevalidator,
+     etc.) before the block_validator *)
+  Lwt.join chain_validator_jobs
+  >>= fun () ->
+  Validator_event.(emit shutdown_block_validator) ()
+  >>= fun () -> Block_validator.shutdown block_validator
 
 let watcher {valid_block_input; _} =
   Lwt_watcher.create_stream valid_block_input

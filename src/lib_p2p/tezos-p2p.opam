@@ -7,14 +7,15 @@ dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "tezos-tooling" { with-test }
-  "dune" { >= "1.11" }
+  "dune" { >= "2.0" }
   "tezos-base"
   "tezos-stdlib-unix"
   "tezos-p2p-services"
-  "alcotest-lwt" { with-test & = "0.8.5" }
-  "lwt" { < "4.3" }
+  "alcotest-lwt" { with-test & >= "1.1.0" }
+  "lwt"
   "lwt-watcher" { = "0.1" }
   "lwt-canceler" { = "0.2" }
+  "ringo" { = "0.5" }
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

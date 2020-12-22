@@ -28,9 +28,7 @@ type t = {
   data_dir : string option;
   config_file : string;
   network : Node_config_file.blockchain_network option;
-  min_connections : int option;
-  expected_connections : int option;
-  max_connections : int option;
+  connections : int option;
   max_download_speed : int option;
   max_upload_speed : int option;
   binary_chunks_size : int option;
@@ -50,6 +48,8 @@ type t = {
   log_output : Lwt_log_sink_unix.Output.t option;
   bootstrap_threshold : int option;
   history_mode : History_mode.t option;
+  synchronisation_threshold : int option;
+  latency : int option;
 }
 
 module Term : sig

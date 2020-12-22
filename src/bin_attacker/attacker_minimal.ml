@@ -144,7 +144,7 @@ let ballot_forged period prop vote =
   in
   forge {chain_id = network} op
 
-let identity = P2p_identity.generate Crypto_box.default_target
+let identity = P2p_identity.generate Crypto_box.default_pow_target
 
 (* connect to the network, run an action and then disconnect *)
 let try_action addr port action =
@@ -155,7 +155,7 @@ let try_action addr port action =
   let io_sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 14) () in
   let conn = P2p_io_scheduler.register io_sched socket in
   P2p_connection.authenticate
-    ~proof_of_work_target:Crypto_box.default_target
+    ~proof_of_work_target:Crypto_box.default_pow_target
     ~incoming:false
     conn
     (addr, port)
@@ -281,7 +281,7 @@ let double_spend () conn =
   spend destination_account >>=? fun () -> spend another_account
 
 let long_chain n conn =
-  lwt_log_notice "propogating %d blocks" n
+  lwt_log_notice "propagating %d blocks" n
   >>= fun () ->
   let prev_ref = ref genesis_block_hashed in
   let rec loop k =
@@ -301,7 +301,7 @@ let lots_transactions amount fee n conn =
   in
   let ops = replicate n (Operation_hash.hash_bytes [signed_op]) in
   let signed_block = signed (block_forged ops) in
-  lwt_log_notice "propogating %d transactions" n
+  lwt_log_notice "propagating %d transactions" n
   >>= fun () ->
   loop n
   >>=? fun () ->

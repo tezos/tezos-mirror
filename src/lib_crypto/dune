@@ -4,19 +4,22 @@
  (flags (:standard -open Tezos_stdlib
                    -open Data_encoding
                    -open Tezos_error_monad
+                   -open Tezos_lwt_result_stdlib.Lwtreslib
                    -open Tezos_rpc))
- (libraries tezos-stdlib
-            data-encoding
+ (libraries data-encoding
+            tezos-lwt-result-stdlib
+            lwt
+            hacl-star
+            bls12-381
+            secp256k1-internal
             tezos-error-monad
             tezos-rpc
-            lwt
-            blake2
-            hacl
-            secp256k1-internal
+            tezos-stdlib
             uecc
+            ringo
             zarith))
 
-(alias
- (name runtest_lint)
+(rule
+ (alias runtest_lint)
  (deps (glob_files *.ml{,i}))
  (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let warnings = "+a-4-6-7-9-29-40..42-44-45-48"
+let warnings = "+a-4-6-7-9-29-40..42-44-45-48-60-67"
 
 let warn_error = "-a+8"
 
@@ -33,25 +33,22 @@ let () = Clflags.unsafe_string := false
     with a lookup in locally defined hashtable.
 *)
 
-let preloaded_cmis : (string, Persistent_env.Persistent_signature.t) Hashtbl.t
-    =
-  Hashtbl.create ~random:true 42
+let preloaded_cmis : Persistent_env.Persistent_signature.t String.Hashtbl.t =
+  String.Hashtbl.create ~random:true 42
 
 (* Set hook *)
 let () =
   Persistent_env.Persistent_signature.load :=
     fun ~unit_name ->
-      try
-        Some (Hashtbl.find preloaded_cmis (String.capitalize_ascii unit_name))
-      with Not_found -> None
+      String.Hashtbl.find preloaded_cmis (String.capitalize_ascii unit_name)
 
 let load_cmi_from_file file =
-  Hashtbl.add
+  String.Hashtbl.add
     preloaded_cmis
     (String.capitalize_ascii Filename.(basename (chop_extension file)))
     {filename = file; cmi = Cmi_format.read_cmi file}
 
-let load_embeded_cmi (unit_name, content) =
+let load_embedded_cmi (unit_name, content) =
   let content = Bytes.of_string content in
   (* Read cmi magic *)
   let magic_len = String.length Config.cmi_magic_number in
@@ -67,7 +64,7 @@ let load_embeded_cmi (unit_name, content) =
   (* Read cmi_flags *)
   let cmi_flags = Marshal.from_bytes content pos in
   (* TODO check crcrs... *)
-  Hashtbl.add
+  String.Hashtbl.add
     preloaded_cmis
     (String.capitalize_ascii unit_name)
     {
@@ -75,7 +72,7 @@ let load_embeded_cmi (unit_name, content) =
       cmi = {cmi_name; cmi_sign; cmi_crcs; cmi_flags};
     }
 
-let load_embeded_cmis cmis = List.iter load_embeded_cmi cmis
+let load_embedded_cmis cmis = List.iter load_embedded_cmi cmis
 
 (** Compilation environment.
 
@@ -95,7 +92,9 @@ let tezos_protocol_env =
   [ ("CamlinternalFormatBasics", camlinternalFormatBasics_cmi);
     ("Tezos_protocol_environment_sigs", tezos_protocol_environment_sigs_cmi);
     ( "Tezos_protocol_environment_sigs__V0",
-      tezos_protocol_environment_sigs__V0_cmi ) ]
+      tezos_protocol_environment_sigs__V0_cmi );
+    ( "Tezos_protocol_environment_sigs__V1",
+      tezos_protocol_environment_sigs__V1_cmi ) ]
 
 let register_env =
   let open Embedded_cmis in
@@ -104,7 +103,7 @@ let register_env =
 
 (** Helpers *)
 
-let ( // ) = Filename.concat
+open Filename.Infix
 
 let create_file ?(perm = 0o644) name content =
   let open Unix in
@@ -258,12 +257,12 @@ let main {compile_ml; pack_objects; link_shared} =
   Clflags.include_dirs := [Filename.dirname functor_file] ;
   Warnings.parse_options false warnings ;
   Warnings.parse_options true warn_error ;
-  load_embeded_cmis tezos_protocol_env ;
+  load_embedded_cmis tezos_protocol_env ;
   let packed_protocol_object = compile_ml ~for_pack functor_file in
   let register_objects =
     if not !register then []
     else (
-      load_embeded_cmis register_env ;
+      load_embedded_cmis register_env ;
       load_cmi_from_file proto_cmi ;
       (* Compiler the 'registering module' *)
       let register_file = Filename.dirname functor_file // "register.ml" in

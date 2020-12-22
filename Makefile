@@ -19,7 +19,6 @@ DOCKER_DEPS_IMAGE_NAME := registry.gitlab.com/tezos/opam-repository
 DOCKER_DEPS_IMAGE_VERSION := ${opam_repository_tag}
 DOCKER_DEPS_MINIMAL_IMAGE_VERSION := minimal--${opam_repository_tag}
 COVERAGE_REPORT := _coverage_report
-COVERAGE_OUTPUT := _coverage_output
 MERLIN_INSTALLED := $(shell opam list merlin --installed --silent 2> /dev/null; echo $$?)
 
 ifeq ($(filter ${opam_version}.%,${current_opam_version}),)
@@ -41,6 +40,7 @@ endif
 		src/bin_signer/main_signer.exe \
 		src/bin_codec/codec.exe \
 		src/lib_protocol_compiler/main_native.exe \
+		src/bin_snoop/main_snoop.exe \
 		$(foreach p, $(active_protocol_directories), src/proto_$(p)/bin_baker/main_baker_$(p).exe) \
 		$(foreach p, $(active_protocol_directories), src/proto_$(p)/bin_endorser/main_endorser_$(p).exe) \
 		$(foreach p, $(active_protocol_directories), src/proto_$(p)/bin_accuser/main_accuser_$(p).exe) \
@@ -53,10 +53,12 @@ endif
 	@cp _build/default/src/bin_signer/main_signer.exe tezos-signer
 	@cp _build/default/src/bin_codec/codec.exe tezos-codec
 	@cp _build/default/src/lib_protocol_compiler/main_native.exe tezos-protocol-compiler
+	@cp _build/default/src/bin_snoop/main_snoop.exe tezos-snoop
 	@for p in $(active_protocol_directories) ; do \
 	   cp _build/default/src/proto_$$p/bin_baker/main_baker_$$p.exe tezos-baker-`echo $$p | tr -- _ -` ; \
 	   cp _build/default/src/proto_$$p/bin_endorser/main_endorser_$$p.exe tezos-endorser-`echo $$p | tr -- _ -` ; \
 	   cp _build/default/src/proto_$$p/bin_accuser/main_accuser_$$p.exe tezos-accuser-`echo $$p | tr -- _ -` ; \
+	   mkdir -p src/proto_$$p/parameters ; \
 	   cp _build/default/src/proto_$$p/lib_parameters/sandbox-parameters.json src/proto_$$p/parameters/sandbox-parameters.json ; \
 	   cp _build/default/src/proto_$$p/lib_parameters/test-parameters.json src/proto_$$p/parameters/test-parameters.json ; \
 	 done
@@ -100,10 +102,13 @@ doc-html: all
 	@./tezos-baker-alpha man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > docs/api/tezos-baker-alpha.html
 	@./tezos-endorser-alpha man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > docs/api/tezos-endorser-alpha.html
 	@./tezos-accuser-alpha man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > docs/api/tezos-accuser-alpha.html
+	@./tezos-snoop man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > docs/api/tezos-snoop.html
 	@mkdir -p $$(pwd)/docs/_build/api/odoc
 	@rm -rf $$(pwd)/docs/_build/api/odoc/*
 	@cp -r $$(pwd)/_build/default/_doc/* $$(pwd)/docs/_build/api/odoc/
 	@${MAKE} -C docs html
+	@echo '.toc {position: static}' >> $$(pwd)/docs/_build/api/odoc/_html/odoc.css
+	@echo '.content { margin-left: 4ex }' >> $$(pwd)/docs/_build/api/odoc/_html/odoc.css
 	@echo '@media (min-width: 745px) {.content {margin-left: 4ex}}' >> $$(pwd)/docs/_build/api/odoc/_html/odoc.css
 	@sed -e 's/@media only screen and (max-width: 95ex) {/@media only screen and (max-width: 744px) {/' $$(pwd)/docs/_build/api/odoc/_html/odoc.css > $$(pwd)/docs/_build/api/odoc/_html/odoc.css2
 	@mv $$(pwd)/docs/_build/api/odoc/_html/odoc.css2  $$(pwd)/docs/_build/api/odoc/_html/odoc.css
@@ -112,28 +117,14 @@ doc-html: all
 doc-html-and-linkcheck: doc-html
 	@${MAKE} -C docs all
 
-EXPECTED_BISECT_FILE := ${CURDIR}/${COVERAGE_OUTPUT}/bisect
-
-.PHONY: coverage-setup
-coverage-setup:
-	@mkdir -p ${COVERAGE_OUTPUT}
-	@echo "Before compiling, use ./scripts/instrument_dune_bisect.sh to add the"
-	@echo "bisect_ppx preprocessing directive to the dune files of the packages"
-	@echo "to be analyzed."
-	@echo
-	@echo "Examples:"
-	@echo "  ./scripts/instrument_dune_bisect.sh src/lib_p2p/dune"
-	@echo "  ./scripts/instrument_dune_bisect.sh src/proto_alpha/lib_protocol/dune.inc"
-	@echo
-ifneq (${EXPECTED_BISECT_FILE}, ${BISECT_FILE})
-	@echo "Warning: BISECT_FILE isn't properly set. Run:"
-	@echo "  export BISECT_FILE=${EXPECTED_BISECT_FILE}"
-endif
-
 .PHONY: coverage-report
 coverage-report:
-	@bisect-ppx-report -ignore-missing-files -html ${COVERAGE_REPORT} ${COVERAGE_OUTPUT}/*.out
+	@bisect-ppx-report html -o ${COVERAGE_REPORT} --coverage-path ${COVERAGE_OUTPUT}
 	@echo "Report should be available in ${COVERAGE_REPORT}/index.html"
+
+.PHONY: coverage-report-summary
+coverage-report-summary:
+	@bisect-ppx-report summary --coverage-path ${COVERAGE_OUTPUT}
 
 .PHONY: build-sandbox
 build-sandbox:
@@ -144,23 +135,68 @@ build-sandbox:
 build-test: build-sandbox
 	@dune build @buildtest
 
-.PHONY: test_protocol_compile
-test_protocol_compile:
-	@dune build  @runtest_compile_protocol
+.PHONY: test-protocol-compile
+test-protocol-compile:
+	@dune build @runtest_compile_protocol
+	@dune build @runtest_out_of_opam
 
-test: test_protocol_compile
-	@dune build @runtest_dune_template @runtest @runtest_flextesa
+.PHONY: test-unit
+test-unit:
+	@dune build @runtest
+
+.PHONY: test-python
+test-python: all
+	@make -C tests_python all
+
+.PHONY: test-flextesa
+test-flextesa:
+	@dune build @runtest_flextesa
+
+.PHONY: test-tezt test-tezt-i test-tezt-c test-tezt-v
+test-tezt:
+	@dune exec tezt/tests/main.exe
+test-tezt-i:
+	@dune exec tezt/tests/main.exe -- --info
+test-tezt-c:
+	@dune exec tezt/tests/main.exe -- --commands
+test-tezt-v:
+	@dune exec tezt/tests/main.exe -- --verbose
+
+.PHONY: test-code
+test-code: test-protocol-compile test-unit test-flextesa test-python test-tezt
+
+# This is `make test-code` except for flextesa (which doesn't
+# play well with coverage). We allow failure (prefix "-") because we still want
+# the coverage report even if an individual test happens to fail.
+.PHONY: test-coverage
+test-coverage:
+	-@$(MAKE) test-protocol-compile
+	-@$(MAKE) test-unit
+	-@$(MAKE) test-python
+	-@$(MAKE) test-tezt
+
+.PHONY: lint-opam-dune
+lint-opam-dune:
+	@dune build @runtest_dune_template
 	@./scripts/check_opam_test.sh
 
-.PHONY: test-lint
-test-lint:
+.PHONY: test
+test: lint-opam-dune test-code
+
+.PHONY: check-linting check-python-linting
+
+check-linting:
+	@src/tooling/lint.sh --check-ci --ignore src/tooling/test/test_not_well_formatted.ml src/tooling/test/test_not_well_formatted.mli tezt/lib/base.ml tezt/lib/base.mli
+	@src/tooling/lint.sh --check-scripts
+	@src/tooling/lint.sh --check-ocamlformat
 	@dune build @runtest_lint
-	make -C tests_python lint_all
-	@src/tooling/lint.sh check_scripts
+
+check-python-linting:
+	@make -C tests_python lint_all
 
 .PHONY: fmt
 fmt:
-	@src/tooling/lint.sh format
+	@src/tooling/lint.sh --format --ignore src/tooling/test/test_not_well_formatted.ml src/tooling/test/test_not_well_formatted.mli tezt/lib/base.ml tezt/lib/base.mli
 
 .PHONY: build-deps
 build-deps:
@@ -227,7 +263,7 @@ uninstall:
 
 .PHONY: coverage-clean
 coverage-clean:
-	@-rm -Rf ${COVERAGE_OUTPUT} ${COVERAGE_REPORT}
+	@-rm -Rf ${COVERAGE_OUTPUT}/*.coverage ${COVERAGE_REPORT}
 
 .PHONY: clean
 clean: coverage-clean
@@ -240,8 +276,10 @@ clean: coverage-clean
 		tezos-admin-client \
 		tezos-codec \
 		tezos-protocol-compiler \
+		tezos-snoop \
 		tezos-sandbox \
 	  $(foreach p, $(active_protocol_versions), tezos-baker-$(p) tezos-endorser-$(p) tezos-accuser-$(p)) \
 	  $(foreach p, $(active_protocol_directories), src/proto_$(p)/parameters/sandbox-parameters.json src/proto_$(p)/parameters/test-parameters.json)
 	@-${MAKE} -C docs clean
+	@-${MAKE} -C tests_python clean
 	@-rm -f docs/api/tezos-{baker,endorser,accuser}-alpha.html docs/api/tezos-{admin-,}client.html docs/api/tezos-signer.html

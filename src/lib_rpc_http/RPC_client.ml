@@ -54,7 +54,7 @@ module type S = sig
 
   val full_logger : Format.formatter -> logger
 
-  type config = {host : string; port : int; tls : bool; logger : logger}
+  type config = {endpoint : Uri.t; logger : logger}
 
   val config_encoding : config Data_encoding.t
 
@@ -147,7 +147,7 @@ module Make (Client : Cohttp_lwt.S.Client) = struct
       | `Gone _ ) as v ->
         return v
     | `Unexpected_status_code (code, (content, _, media_type)) ->
-        let media_type = Option.map media_type ~f:Media_type.name in
+        let media_type = Option.map Media_type.name media_type in
         Cohttp_lwt.Body.to_string content
         >>= fun content ->
         request_failed
@@ -158,11 +158,11 @@ module Make (Client : Cohttp_lwt.S.Client) = struct
         let allowed = List.filter_map RPC_service.meth_of_string allowed in
         request_failed meth uri (Method_not_allowed allowed)
     | `Unsupported_media_type ->
-        let media = Option.map media ~f:Media_type.name in
+        let media = Option.map Media_type.name media in
         request_failed meth uri (Unsupported_media_type media)
     | `Not_acceptable acceptable ->
         let proposed =
-          Option.unopt_map accept ~default:"" ~f:Media_type.accept_header
+          Option.fold accept ~none:"" ~some:Media_type.accept_header
         in
         request_failed meth uri (Not_acceptable {proposed; acceptable})
     | `Bad_request msg ->
@@ -213,8 +213,9 @@ module Make (Client : Cohttp_lwt.S.Client) = struct
       (Data_encoding.json, Data_encoding.json option) RPC_context.rest_result
       Lwt.t =
     let body =
-      Option.map body ~f:(fun b ->
-          Cohttp_lwt.Body.of_string (Data_encoding.Json.to_string b))
+      Option.map
+        (fun b -> Cohttp_lwt.Body.of_string (Data_encoding.Json.to_string b))
+        body
     in
     let media = Media_type.json in
     generic_call meth ?headers ~accept:Media_type.[bson; json] ?body ~media uri
@@ -303,7 +304,7 @@ module Make (Client : Cohttp_lwt.S.Client) = struct
     | `Conflict None | `Error None | `Forbidden None | `Unauthorized None ->
         fail (RPC_context.Generic_error {meth; uri})
     | `Unexpected_status_code (code, (content, _, media_type)) ->
-        let media_type = Option.map media_type ~f:Media_type.name in
+        let media_type = Option.map Media_type.name media_type in
         Cohttp_lwt.Body.to_string content
         >>= fun content ->
         request_failed
@@ -323,12 +324,7 @@ module Make (Client : Cohttp_lwt.S.Client) = struct
         in
         request_failed meth uri (Unsupported_media_type name)
     | `Not_acceptable acceptable ->
-        let proposed =
-          Option.unopt_map
-            (Some accept)
-            ~default:""
-            ~f:Media_type.accept_header
-        in
+        let proposed = Media_type.accept_header accept in
         request_failed meth uri (Not_acceptable {proposed; acceptable})
     | `Bad_request msg ->
         request_failed meth uri (Bad_request msg)
@@ -344,7 +340,7 @@ module Make (Client : Cohttp_lwt.S.Client) = struct
         Cohttp_lwt.Body.to_string body
         >>= fun body ->
         let received =
-          Option.unopt_map media ~default:"" ~f:(fun (l, r) -> l ^ "/" ^ r)
+          Option.fold media ~none:"" ~some:(fun (l, r) -> l ^ "/" ^ r)
         in
         request_failed
           meth
@@ -380,31 +376,29 @@ module Make (Client : Cohttp_lwt.S.Client) = struct
     Client.call_service ?logger ?headers ~base accept service params query body
     >>= fun ans -> handle accept ans
 
-  type config = {host : string; port : int; tls : bool; logger : logger}
+  type config = {endpoint : Uri.t; logger : logger}
 
   let config_encoding =
     let open Data_encoding in
     conv
-      (fun {host; port; tls; logger = _} -> (host, port, tls))
-      (fun (host, port, tls) -> {host; port; tls; logger = null_logger})
-      (obj3 (req "host" string) (req "port" uint16) (req "tls" bool))
+      (fun {endpoint; logger = _} -> endpoint)
+      (fun endpoint -> {endpoint; logger = null_logger})
+      (obj1 (req "endpoint" RPC_encoding.uri_encoding))
 
   let default_config =
-    {host = "localhost"; port = 8732; tls = false; logger = null_logger}
+    {endpoint = Uri.of_string "http://localhost:8732"; logger = null_logger}
 
   class http_ctxt config media_types : RPC_context.json =
-    let base =
-      Uri.make
-        ~scheme:(if config.tls then "https" else "http")
-        ~host:config.host
-        ~port:config.port
-        ()
-    in
+    let base = config.endpoint in
     let logger = config.logger in
     object
       method generic_json_call meth ?body uri =
         let path = Uri.path uri and query = Uri.query uri in
-        let uri = Uri.with_path base path in
+        let prefix = Uri.path base in
+        let prefixed_path =
+          if prefix = "" then path else prefix ^ "/" ^ path
+        in
+        let uri = Uri.with_path base prefixed_path in
         let uri = Uri.with_query uri query in
         generic_json_call meth ?body uri
 

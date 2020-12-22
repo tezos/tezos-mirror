@@ -48,5 +48,20 @@ val lookup_operation_in_previous_blocks :
   Operation_list_hash.elt ->
   (Block_hash.t * int * int) option tzresult Lwt.t
 
-(** wait for the node to be bootstrapped *)
-val wait_for_bootstrapped : #Client_context.full -> unit tzresult Lwt.t
+(** returns when the node consider itself as bootstrapped.
+
+    Function [retry] specifies how to behave in order to connect to
+    the node. The default is the identity which correspond to simply
+    calling the RPC. As an example, the endorser tries 5 times with
+    delays in between attempts when the connection fails. *)
+val wait_for_bootstrapped :
+  ?retry:(((#Client_context.full as 'a) ->
+          ((Block_hash.t * Time.Protocol.t) Lwt_stream.t * RPC_context.stopper)
+          tzresult
+          Lwt.t) ->
+         'a ->
+         ((Block_hash.t * Time.Protocol.t) Lwt_stream.t * RPC_context.stopper)
+         tzresult
+         Lwt.t) ->
+  'a ->
+  unit tzresult Lwt.t

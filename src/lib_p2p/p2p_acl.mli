@@ -105,7 +105,7 @@ end
 
 (** / *)
 
-module PeerLRUCache : Ring.TABLE with type v = P2p_peer.Id.t
+module PeerFIFOCache : Ringo.CACHE_SET with type elt = P2p_peer.Id.t
 
 module IpSet : sig
   type t

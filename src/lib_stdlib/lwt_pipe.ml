@@ -36,6 +36,8 @@ type 'a t = {
   empty : unit Lwt_condition.t;
 }
 
+let is_closed {closed; _} = closed
+
 let push_overhead = 4 * (Sys.word_size / 8)
 
 let create ?size () =
@@ -123,12 +125,6 @@ let push_now ({closed; queue; compute_size; current_size; max_size; _} as q)
     notify_push q ;
     true )
 
-exception Full
-
-let push_now_exn q elt = if not (push_now q elt) then raise Full
-
-let safe_push_now q elt = try push_now_exn q elt with Full | Closed -> ()
-
 let rec pop ({closed; queue; empty; current_size; _} as q) =
   if not (Queue.is_empty queue) then (
     let (elt_size, elt) = Queue.pop queue in
@@ -162,30 +158,23 @@ let peek_all {queue; closed; _} =
   if closed then []
   else List.rev (Queue.fold (fun acc (_, e) -> e :: acc) [] queue)
 
-exception Empty
-
-let pop_now_exn ({closed; queue; empty; current_size; _} as q) =
-  if Queue.is_empty queue then if closed then raise Closed else raise Empty ;
-  let (elt_size, elt) = Queue.pop queue in
-  if Queue.length queue = 0 then Lwt_condition.signal empty () ;
-  q.current_size <- current_size - elt_size ;
-  notify_pop q ;
-  elt
-
-let pop_now q =
-  match pop_now_exn q with exception Empty -> None | elt -> Some elt
-
-let rec values_available q =
-  if is_empty q then
-    if q.closed then raise Closed
-    else wait_push q >>= fun () -> values_available q
-  else Lwt.return_unit
+let pop_now ({closed; queue; empty; current_size; _} as q) =
+  (* We only check for closed-ness when the queue is empty to allow reading from
+     a closed pipe. This is because closing is just closing the write-end of the
+     pipe. *)
+  if Queue.is_empty queue && closed then raise Closed ;
+  Queue.take_opt queue
+  |> Stdlib.Option.map (fun (elt_size, elt) ->
+         if Queue.length queue = 0 then Lwt_condition.signal empty () ;
+         q.current_size <- current_size - elt_size ;
+         notify_pop q ;
+         elt)
 
 let rec pop_all_loop q acc =
-  match pop_now_exn q with
-  | exception Empty ->
+  match pop_now q with
+  | None ->
       List.rev acc
-  | e ->
+  | Some e ->
       pop_all_loop q (e :: acc)
 
 let pop_all q = pop q >>= fun e -> Lwt.return (pop_all_loop q [e])
@@ -197,8 +186,3 @@ let close q =
     q.closed <- true ;
     notify_push q ;
     notify_pop q )
-
-let rec iter q ~f =
-  Lwt.catch
-    (fun () -> pop q >>= fun elt -> f elt >>= fun () -> iter q ~f)
-    (function Closed -> Lwt.return_unit | exn -> Lwt.fail exn)

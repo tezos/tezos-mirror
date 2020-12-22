@@ -3,10 +3,10 @@ import json
 import os
 import shutil
 import subprocess
-import sys
 import tempfile
 import time
-from typing import Any, List
+import sys
+from typing import Any, List, Optional, Tuple
 
 from . import client_output
 
@@ -44,21 +44,26 @@ class Client:
     def __init__(self,
                  client_path: str,
                  admin_client_path: str,
-                 host: str = '127.0.0.1',
-                 base_dir: str = None,
-                 rpc_port: int = 8732,
-                 use_tls: int = False,
-                 disable_disclaimer: bool = True):
+                 host: Optional[str] = None,
+                 base_dir: Optional[str] = None,
+                 rpc_port: Optional[int] = None,
+                 use_tls: Optional[bool] = None,
+                 endpoint: Optional[str] = 'http://127.0.0.1:8732',
+                 disable_disclaimer: bool = True,
+                 mode: str = None):
         """
         Args:
             client (str): path to the client executable file
             admin_client (str): path to the admin-client executable file
-            host (str): IP of the host
+            host (str): IP of the host; deprecated: use endpoint instead
             base_dir (str): path to the client dir. If None, a temp file is
                             created.
-            rpc_port (int): port of the server
+            rpc_port (int): port of the server; deprecated: use endpoint
+                            instead
             use_tls (bool): use TLS
+            endpoint (str): the RPC endpoint
             disable_disclaimer (bool): disable disclaimer
+            mode (str): the mode to use, one of "client" or "mockup"
         Returns:
             A Client instance.
         """
@@ -77,24 +82,40 @@ class Client:
             assert base_dir
         self.base_dir = base_dir
 
-        client = [client_path] + ['-base-dir', base_dir, '-addr', host,
-                                  '-port', str(rpc_port)]
-        admin_client = [admin_client_path, '-base-dir', base_dir, '-addr',
-                        host, '-port', str(rpc_port)]
+        connectivity_options = []
+        if host is not None:
+            connectivity_options += ['-addr', host]
+        if rpc_port is not None:
+            connectivity_options += ['-port', str(rpc_port)]
+        if use_tls is True:
+            connectivity_options += ['-S']
+        if endpoint is not None:
+            connectivity_options += ['-endpoint', endpoint]
 
-        if use_tls:
-            client.append('-S')
-            admin_client.append('-S')
+        client = [client_path, '-base-dir', base_dir]
+        if mode is None or mode == "client":
+            client.extend(connectivity_options)
+        elif mode == "mockup":
+            client.extend(['-mode', mode])
+        else:
+            msg = f"Unexpected mode: {mode}." + \
+                  "Expected one of 'client' or 'mockup'."
+            assert False, msg
+        admin_client = [admin_client_path, '-base-dir', base_dir]
+
+        admin_client.extend(connectivity_options)
 
         self._client = client
         self._admin_client = admin_client
         self.rpc_port = rpc_port
 
-    def run(self,
-            params: List[str],
-            admin: bool = False,
-            check: bool = True,
-            trace: bool = False) -> str:
+    def run_generic(self,
+                    params: List[str],
+                    admin: bool = False,
+                    check: bool = True,
+                    trace: bool = False,
+                    stdin: str = "",
+                    ) -> Tuple[str, str, int]:
         """Run an arbitrary command
 
         Args:
@@ -103,8 +124,10 @@ class Client:
                           tezos-admin-client
             check (bool): raises an exception if client call fails
             trace (bool): use '-l' option to trace RPCs
+            stdin (string): string that will be passed as standard
+                            input to the process
         Returns:
-            stdout of client command.
+            (stdout of command, stderr of command, return code)
 
         The actual command will be displayed according to 'format_command'.
         Client output (stdout, stderr) will be displayed unprocessed.
@@ -116,39 +139,41 @@ class Client:
 
         print(format_command(cmd))
 
-        stdout = ""
-        stderr = ""
         new_env = os.environ.copy()
         if self._disable_disclaimer:
             new_env["TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER"] = "Y"
-        # in python3.7, cleaner to use capture_output=true, text=True
-        with subprocess.Popen(cmd,
-                              stdout=subprocess.PIPE,
-                              stderr=subprocess.PIPE,
-                              bufsize=1,
-                              universal_newlines=True,
-                              env=new_env) as process:
-            assert process.stdout is not None
-            assert process.stderr is not None
-            for line in process.stdout:
-                print(line, end='')
-                stdout += line
-            for line in process.stderr:
-                print(line, end='', file=sys.stderr)
-                stderr += line
-        if check and process.returncode:
-            raise subprocess.CalledProcessError(process.returncode,
-                                                process.args,
-                                                stdout,
-                                                stderr)
+        process = subprocess.Popen(
+            cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, env=new_env)
+        outstream, errstream = process.communicate(input=stdin.encode())
+        stdout = outstream.decode('utf-8')
+        stderr = errstream.decode('utf-8')
+        if stdout:
+            print(stdout)
+        if stderr:
+            print(stderr, file=sys.stderr)
+        if check:
+            if process.returncode != 0:
+                raise subprocess.CalledProcessError(
+                    process.returncode, cmd, stdout, stderr)
+        # `+ ""` makes pylint happy. It can't infer stdout/stderr can't
+        # be `None` thanks to the `capture_output=True` option.
+        return (stdout + "", stderr + "", process.returncode)
 
+    def run(self,
+            params: List[str],
+            admin: bool = False,
+            check: bool = True,
+            trace: bool = False) -> str:
+        """Like 'run_generic' but returns just stdout."""
+        (stdout, _, _) = self.run_generic(params, admin, check, trace)
         return stdout
 
     def rpc(self,
             verb: str,
             path: str,
             data: Any = None,
-            params: List[str] = None) -> dict:
+            params: List[str] = None) -> Any:
         """Run an arbitrary RPC command
 
         Args:
@@ -170,6 +195,13 @@ class Client:
         compl_pr = self.run(params)
         return client_output.extract_rpc_answer(compl_pr)
 
+    def remember_contract(self, alias: str, contract_address: str,
+                          force: bool = False):
+        params = ["remember", "contract", alias, contract_address]
+        if force:
+            params.append("--force")
+        return self.run(params)
+
     def remember(self, alias: str, contract: str) -> str:
         assert os.path.isfile(contract), f'{contract} is not a file'
         return self.run(['remember', 'script', alias, f'file:{contract}'])
@@ -188,6 +220,7 @@ class Client:
                    inp: str,
                    amount: float = None,
                    trace_stack: bool = False,
+                   gas: int = None,
                    file: bool = True) -> client_output.RunScriptResult:
         if file:
             assert os.path.isfile(contract), f'{contract} is not a file'
@@ -197,6 +230,8 @@ class Client:
             cmd += ['-z', str(amount)]
         if trace_stack:
             cmd += ['--trace-stack']
+        if gas is not None:
+            cmd += ['--gas', '%d' % gas]
         return client_output.RunScriptResult(self.run(cmd))
 
     def gen_key(self, alias: str, args: List[str] = None) -> str:
@@ -209,17 +244,37 @@ class Client:
     def import_secret_key(self, name: str, secret: str) -> str:
         return self.run(['import', 'secret', 'key', name, secret])
 
+    def add_address(self, name: str, address: str, force: bool = False):
+        cmd = ['add', 'address', name, address]
+        if force:
+            cmd += ['--force']
+        output = self.run(cmd)
+        assert not output
+
+    def show_address(self,
+                     name: str,
+                     show_secret: bool = False
+                     ) -> client_output.ShowAddressResult:
+        cmd = ['show', 'address', name]
+        if show_secret:
+            cmd += ['--show-secret']
+        return client_output.ShowAddressResult(self.run(cmd))
+
     def activate_protocol(self,
                           protocol: str,
                           parameter_file: str,
                           fitness: str = '1',
                           key: str = 'activator',
-                          timestamp: str = None
+                          timestamp: str = None,
+                          delay: datetime.timedelta = None,
                           ) -> client_output.ActivationResult:
         assert os.path.isfile(parameter_file), f'{parameter_file} not a file'
         if timestamp is None:
-            utc_now = datetime.datetime.utcnow()
+            if delay is None:
+                delay = datetime.timedelta(seconds=0)
+            utc_now = datetime.datetime.utcnow() - delay
             timestamp = utc_now.strftime("%Y-%m-%dT%H:%M:%SZ")
+
         cmd = ['-block', 'genesis', 'activate', 'protocol', protocol, 'with',
                'fitness', str(fitness), 'and', 'key', key, 'and', 'parameters',
                parameter_file, '--timestamp', timestamp]
@@ -230,14 +285,17 @@ class Client:
                                parameters: dict,
                                fitness: str = '1',
                                key: str = 'activator',
-                               timestamp: str = None
+                               timestamp: str = None,
+                               delay: datetime.timedelta = None,
                                ) -> client_output.ActivationResult:
+        if delay is None:
+            delay = datetime.timedelta(seconds=0)
         with tempfile.NamedTemporaryFile(mode='w+', delete=False) as params:
             param_json = json.dumps(parameters)
             params.write(param_json)
             params.close()
             return self.activate_protocol(protocol, params.name, fitness,
-                                          key, timestamp)
+                                          key, timestamp, delay)
 
     def show_voting_period(self) -> str:
         return self.run(['show', 'voting', 'period'])
@@ -297,15 +355,38 @@ class Client:
         cmd = ['activate', 'account', manager, 'with', contract]
         return self.run(cmd)
 
+    def cmd_batch(self,
+                  source: str,
+                  json_ops: str) -> List[str]:
+        return ['multiple', 'transfers', 'from', source, 'using', json_ops]
+
     def transfer(self,
                  amount: float,
-                 account1: str,
-                 account2: str,
-                 args: List[str] = None) -> client_output.TransferResult:
-        cmd = ['transfer', str(amount), 'from', account1, 'to', account2]
+                 giver: str,
+                 receiver: str,
+                 args: List[str] = None,
+                 chain: str = None
+                 ) -> client_output.TransferResult:
+        cmd = ['transfer', str(amount), 'from', giver, 'to', receiver]
+        if chain is not None:
+            cmd = ['--chain', chain] + cmd
+
         if args is None:
             args = []
         cmd += args
+        res = self.run(cmd)
+        return client_output.TransferResult(res)
+
+    def transfer_json(self,
+                      amount: int,
+                      giver: str,
+                      receiver: str,
+                      args: List[str] = None) -> client_output.TransferResult:
+        json_obj = [{"destination": receiver, "amount": str(amount)}]
+        json_ops = json.dumps(json_obj, separators=(',', ':'))
+        if args is None:
+            args = []
+        cmd = self.cmd_batch(giver, json_ops) + args
         res = self.run(cmd)
         return client_output.TransferResult(res)
 
@@ -343,6 +424,16 @@ class Client:
         res = self.run(cmd)
         return client_output.GetDelegateResult(res)
 
+    def get_contract_entrypoint_type(
+            self,
+            entrypoint: str,
+            contract_name: str) \
+            -> client_output .GetContractEntrypointTypeResult:
+        cmd = ['get', 'contract', 'entrypoint', 'type',
+               'of', entrypoint,
+               'for', contract_name]
+        return client_output.GetContractEntrypointTypeResult(self.run(cmd))
+
     def withdraw_delegate(
             self,
             account1: str,
@@ -378,13 +469,13 @@ class Client:
         offset by time_between_blocks"""
         rfc3399_format = "%Y-%m-%dT%H:%M:%SZ"
         timestamp = self.rpc(
-            'get', f'/chains/main/blocks/head~1/header'
+            'get', '/chains/main/blocks/head~1/header'
             )['timestamp']
         timestamp_date = datetime.datetime.strptime(timestamp, rfc3399_format)
         timestamp_date = timestamp_date.replace(tzinfo=datetime.timezone.utc)
 
         constants = self.rpc(
-            'get', f'/chains/main/blocks/head/context/constants'
+            'get', '/chains/main/blocks/head/context/constants'
         )
         delta = datetime.timedelta(
             seconds=int(constants['time_between_blocks'][0])
@@ -459,20 +550,40 @@ class Client:
     def get_proposals(self) -> dict:
         return self.rpc('get', '/chains/main/blocks/head/votes/proposals')
 
+    def get_metadata(self, params: List[str] = None) -> dict:
+        return self.rpc('get', '/chains/main/blocks/head/metadata',
+                        params=params)
+
     def get_protocol(self, params: List[str] = None) -> str:
-        rpc_res = self.rpc('get', '/chains/main/blocks/head/metadata',
-                           params=params)
-        return rpc_res['protocol']
+        metadata = self.get_metadata(params=params)
+        return metadata['protocol']
+
+    def get_next_protocol(self, params: List[str] = None) -> str:
+        metadata = self.get_metadata(params=params)
+        return metadata['next_protocol']
 
     def get_period_position(self) -> str:
         rpc_res = self.rpc(
             'get', '/chains/main/blocks/head/helpers/current_level?offset=1')
         return rpc_res['voting_period_position']
 
-    def get_level(self, params: List[str] = None) -> int:
-        rpc_res = self.rpc('get', '/chains/main/blocks/head/header/shell',
+    def get_level(self, params: List[str] = None, chain: str = 'main') -> int:
+        assert chain in {'main', 'test'}
+        rpc_res = self.rpc('get', f'/chains/{chain}/blocks/head/header/shell',
                            params=params)
         return int(rpc_res['level'])
+
+    def get_checkpoint(self) -> dict:
+        rpc_res = self.rpc('get', '/chains/main/checkpoint')
+        return rpc_res
+
+    def get_savepoint(self) -> str:
+        rpc_res = self.get_checkpoint()
+        return rpc_res['savepoint']
+
+    def get_caboose(self) -> str:
+        rpc_res = self.get_checkpoint()
+        return rpc_res['caboose']
 
     def wait_for_inclusion(self,
                            operation_hash: str,
@@ -515,6 +626,15 @@ class Client:
 
     def bootstrapped(self) -> str:
         return self.run(['bootstrapped'])
+
+    def sync_state(self) -> str:
+        res = self.rpc('get', 'chains/main/is_bootstrapped')
+        return res['sync_state']
+
+    def is_bootstrapped(self, chain: str = 'main') -> bool:
+        assert chain in {'main', 'test'}
+        res = self.rpc('get', f'chains/{chain}/is_bootstrapped')
+        return res['bootstrapped']
 
     def cleanup(self) -> None:
         """Remove base dir, only if not provided by user."""
@@ -673,7 +793,7 @@ class Client:
     def check_node_listening(self,
                              timeout: float = 1,
                              attempts: int = 20) -> bool:
-        """ Checks whether the node is reponsive, by polling it
+        """ Checks whether the node is responsive, by polling it
         using the `version` rpc.
 
         Args:
@@ -696,3 +816,22 @@ class Client:
     def expand_macros(self, src: str) -> str:
         cmd = ['expand', 'macros', 'in', src]
         return self.run(cmd)
+
+    def list_mockup_protocols(self) -> client_output.ListMockupProtocols:
+        cmd = ['list', 'mockup', 'protocols']
+        return client_output.ListMockupProtocols(self.run(cmd))
+
+    def create_mockup(self,
+                      protocol: str,
+                      check: bool = True,
+                      protocol_constants_file: str = None,
+                      bootstrap_accounts_file: str = None)\
+            -> client_output.CreateMockup:
+        cmd = ['--protocol', protocol, 'create', 'mockup']
+        if protocol_constants_file is not None:
+            cmd += ["--protocol-constants", protocol_constants_file]
+        if bootstrap_accounts_file is not None:
+            cmd += ["--bootstrap-accounts", bootstrap_accounts_file]
+        (stdout, stderr, exit_code) = self.run_generic(cmd,
+                                                       check=check)
+        return client_output.CreateMockup(stdout, stderr, exit_code)

@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Error_monad
+open Hacl
 
 (*-- Type specific Hash builder ---------------------------------------------*)
 
@@ -42,8 +43,6 @@ module type PrefixedName = sig
 end
 
 module Make_minimal (K : Name) = struct
-  open Blake2
-
   type t = Blake2b.hash
 
   include K
@@ -119,15 +118,13 @@ module Make_minimal (K : Name) = struct
   let to_bytes (Blake2b.Hash h) = h
 
   let hash_bytes ?key l =
-    let state = Blake2b.init ?key size in
-    List.iter (fun b -> Blake2b.update state b) l ;
-    Blake2b.final state
+    let input = Bytes.concat Bytes.empty l in
+    Blake2b.direct ?key input size
 
   let hash_string ?key l =
-    let key = Option.map ~f:Bytes.of_string key in
-    let state = Blake2b.init ?key size in
-    List.iter (fun s -> Blake2b.update state (Bytes.of_string s)) l ;
-    Blake2b.final state
+    let key = Option.map Bytes.of_string key in
+    let input = String.concat "" l in
+    Blake2b.direct ?key (Bytes.of_string input) size
 
   let path_length = 6
 
@@ -172,7 +169,7 @@ module Make_minimal (K : Name) = struct
   end)
 end
 
-module Make (R : sig
+module type Register = sig
   val register_encoding :
     prefix:string ->
     length:int ->
@@ -180,29 +177,20 @@ module Make (R : sig
     of_raw:(string -> 'a option) ->
     wrap:('a -> Base58.data) ->
     'a Base58.encoding
-end)
-(K : PrefixedName) =
-struct
+end
+
+module Make (R : Register) (K : PrefixedName) = struct
   include Make_minimal (K)
+
+  let hash = Stdlib.Hashtbl.hash
+
+  let seeded_hash = Stdlib.Hashtbl.seeded_hash
 
   (* Serializers *)
 
   let raw_encoding =
     let open Data_encoding in
     conv to_bytes of_bytes_exn (Fixed.bytes size)
-
-  let hash =
-    if Compare.Int.(size >= 8) then fun h ->
-      Int64.to_int (TzEndian.get_int64 (to_bytes h) 0)
-    else if Compare.Int.(size >= 4) then fun h ->
-      Int32.to_int (TzEndian.get_int32 (to_bytes h) 0)
-    else fun h ->
-      let r = ref 0 in
-      let h = to_bytes h in
-      for i = 0 to size - 1 do
-        r := TzEndian.get_uint8 h i + (8 * !r)
-      done ;
-      !r
 
   type Base58.data += Data of t
 
@@ -230,6 +218,8 @@ struct
     let equal = equal
 
     let hash = hash
+
+    let seeded_hash = seeded_hash
   end)
 end
 

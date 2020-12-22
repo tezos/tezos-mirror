@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let ( // ) = Filename.concat
+open Filename.Infix
 
 let () =
   Random.self_init () ;

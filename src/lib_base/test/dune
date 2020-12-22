@@ -1,0 +1,37 @@
+(executables
+ (names
+   test_time
+   test_p2p_addr
+ )
+ (libraries
+   tezos-base
+   data-encoding
+   crowbar
+ )
+ (flags (:standard
+          -open Tezos_base
+        )))
+
+(rule
+ (alias buildtest)
+ (deps
+   test_time.exe
+   test_p2p_addr.exe
+ )
+ (action (progn)))
+
+(rule
+ (alias runtest_time)
+ (action (run %{exe:test_time.exe})))
+(rule
+ (alias runtest_p2p_addr)
+ (action (run %{exe:test_p2p_addr.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-base)
+ (deps
+   (alias runtest_time)
+   (alias runtest_p2p_addr)
+ )
+ (action (progn)))

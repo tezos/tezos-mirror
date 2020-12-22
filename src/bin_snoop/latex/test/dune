@@ -1,0 +1,5 @@
+(test
+ (name test)
+ (package latex)
+ (libraries latex)
+)

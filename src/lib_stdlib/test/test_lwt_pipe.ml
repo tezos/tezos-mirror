@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,7 +23,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(**
+
+  This is a test for the Lwt_pipe module.
+
+  It tests mainly the core functionality: pushing/popping, and size limitation.
+  An additional test (introspection) runs through a pre-made scenario, calling
+  functions one after the other, and checks internal state as it evolves.
+
+*)
+
 open Lwt.Infix
+
+(* Basic push/pop test *)
 
 let rec producer queue = function
   | 0 ->
@@ -37,46 +49,176 @@ let rec consumer queue = function
   | n ->
       Lwt_pipe.pop queue >>= fun _ -> consumer queue (pred n)
 
-let rec gen acc f = function 0 -> acc | n -> gen (f () :: acc) f (pred n)
+let rec gen f = function 0 -> [] | n -> f () :: gen f (pred n)
 
-let run qsize nbp nbc p c =
-  let q = Lwt_pipe.create ~size:(qsize, fun () -> qsize) () in
-  let producers = gen [] (fun () -> producer q p) nbp in
-  let consumers = gen [] (fun () -> consumer q c) nbc in
-  Lwt.join producers <&> Lwt.join consumers
+let run capacity unit_weight actors actor_work =
+  let q = Lwt_pipe.create ~size:(capacity, fun () -> unit_weight) () in
+  let producers = gen (fun () -> producer q actor_work) actors in
+  let consumers = gen (fun () -> consumer q actor_work) actors in
+  Lwt.join producers
+  >>= fun () ->
+  Lwt.join consumers
+  >>= fun () ->
+  assert (Lwt_pipe.is_empty q) ;
+  Lwt.return_unit
 
-let main () =
-  let qsize = ref 10 in
-  let nb_producers = ref 10 in
-  let nb_consumers = ref 10 in
-  let produced_per_producer = ref 10 in
-  let consumed_per_consumer = ref 10 in
-  let spec =
-    Arg.
-      [ ("-qsize", Set_int qsize, "<int> Size of the pipe");
-        ("-nc", Set_int nb_consumers, "<int> Number of consumers");
-        ("-np", Set_int nb_producers, "<int> Number of producers");
-        ( "-n",
-          Set_int consumed_per_consumer,
-          "<int> Number of consumed items per consumers" );
-        ( "-p",
-          Set_int produced_per_producer,
-          "<int> Number of produced items per producers" );
-        ( "-v",
-          Unit (fun () -> Lwt_log_core.(add_rule "*" Info)),
-          " Log up to info msgs" );
-        ( "-vv",
-          Unit (fun () -> Lwt_log_core.(add_rule "*" Debug)),
-          " Log up to debug msgs" ) ]
+let push_pop () =
+  Lwt_list.iter_p
+    (fun (capacity, unit_weight, actors, actor_work) ->
+      run capacity unit_weight actors actor_work)
+    [ (max_int, 0, 1, 100);
+      (max_int, 0, 10, 10);
+      (max_int, 0, 100, 1);
+      (10, 1, 20, 20);
+      (10, 3, 10, 10);
+      (10, 3, 1, 100);
+      (10, 9, 1, 3);
+      (10, 6, 3, 1);
+      (1, 1, 10, 10);
+      (1, 1, 50, 2) ]
+
+(* push/pop_all *)
+
+let run capacity unit_weight prods production exp_iterations =
+  let q = Lwt_pipe.create ~size:(capacity, fun () -> unit_weight) () in
+  let producers = gen (fun () -> producer q production) prods in
+  let rec consume iterations =
+    Lwt_unix.sleep 0.01
+    >>= fun () ->
+    match Lwt_pipe.pop_all_now q with
+    | _ :: _ ->
+        consume (iterations + 1)
+    | [] ->
+        Lwt.return iterations
   in
-  let anon_fun _ = () in
-  let usage_msg = "Usage: %s <num_peers>.\nArguments are:" in
-  Arg.parse spec anon_fun usage_msg ;
-  run
-    !qsize
-    !nb_producers
-    !nb_consumers
-    !produced_per_producer
-    !consumed_per_consumer
+  let consumer = consume 0 in
+  Lwt.join producers
+  >>= fun () ->
+  consumer
+  >>= fun iterations ->
+  assert (Lwt_pipe.is_empty q) ;
+  assert (iterations = exp_iterations) ;
+  Lwt.return_unit
 
-let () = Lwt_main.run @@ main ()
+let push_pop_all () =
+  Lwt_list.iter_p
+    (fun (capacity, unit_weight, prods, prodtion, exp) ->
+      run capacity unit_weight prods prodtion exp)
+    [ (max_int, 0, 1, 100, 1);
+      (max_int, 0, 10, 10, 1);
+      (max_int, 0, 100, 1, 1);
+      (10, 1, 10, 10, 12);
+      (10, 9, 1, 3, 3);
+      (10, 6, 3, 1, 3);
+      (1, 1, 2, 2, 4) ]
+
+(* fifo *)
+
+let rec producer q = function
+  | 0 ->
+      Lwt_pipe.push q 0
+  | n ->
+      Lwt_pipe.push q n >>= fun () -> producer q (pred n)
+
+let rec consumer q = function
+  | 0 ->
+      Lwt_pipe.pop q >|= fun m -> assert (0 = m)
+  | n ->
+      Lwt_pipe.pop q
+      >>= fun m ->
+      assert (n = m) ;
+      consumer q (pred n)
+
+let run capacity unit_weight work =
+  let q = Lwt_pipe.create ~size:(capacity, fun _ -> unit_weight) () in
+  let producer = producer q work in
+  let consumer = consumer q work in
+  producer
+  >>= fun () ->
+  consumer
+  >>= fun () ->
+  assert (Lwt_pipe.is_empty q) ;
+  Lwt.return_unit
+
+let count_down () =
+  Lwt_list.iter_p
+    (fun (capacity, unit_weight, work) -> run capacity unit_weight work)
+    [ (max_int, 0, 0);
+      (max_int, 0, 1);
+      (max_int, 0, 10);
+      (max_int, 0, 100);
+      (10, 9, 10);
+      (10, 5, 1);
+      (1, 1, 0);
+      (1, 1, 1);
+      (1, 1, 10);
+      (1, 1, 100) ]
+
+(* introspection *)
+
+let introspect () =
+  let q = Lwt_pipe.create ~size:(4, fun n -> n) () in
+  assert (Lwt_pipe.is_empty q) ;
+  assert (Lwt.state @@ Lwt_pipe.empty q = Lwt.Return ()) ;
+  let peek_0 = Lwt_pipe.peek q in
+  assert (Lwt.state peek_0 = Lwt.Sleep) ;
+  let () = assert (Lwt_pipe.push_now q 0) in
+  Lwt.pause ()
+  >>= fun () ->
+  assert (Lwt.state peek_0 = Lwt.Return 0) ;
+  let () = assert (Lwt_pipe.push_now q 0) in
+  let () = assert (Lwt_pipe.push_now q 0) in
+  (* can push 4 and then even more because of weight 0 *)
+  let () = assert (Lwt_pipe.push_now q 0) in
+  let () = assert (Lwt_pipe.push_now q 0) in
+  let empty_0 = Lwt_pipe.empty q in
+  assert (Lwt.state empty_0 = Lwt.Sleep) ;
+  assert (Lwt_pipe.peek_all q = [0; 0; 0; 0; 0]) ;
+  let pop_0 = Lwt_pipe.pop q in
+  assert (Lwt.state pop_0 = Lwt.Return 0) ;
+  let () = match Lwt_pipe.pop_now q with Some 0 -> () | _ -> assert false in
+  let pop_234 = Lwt_pipe.pop_all q in
+  assert (Lwt.state pop_234 = Lwt.Return [0; 0; 0]) ;
+  Lwt.pause ()
+  >>= fun () ->
+  assert (Lwt.state empty_0 = Lwt.Return ()) ;
+  let () = assert (Lwt_pipe.push_now q 1) in
+  let peek_0 = Lwt_pipe.peek q in
+  assert (Lwt.state peek_0 = Lwt.Return 1) ;
+  let () = assert (Lwt_pipe.push_now q 1) in
+  let () = assert (Lwt_pipe.push_now q 1) in
+  let push_big = Lwt_pipe.push q 4 in
+  let push_small = Lwt_pipe.push q 1 in
+  assert (Lwt.state push_big = Lwt.Sleep) ;
+  assert (Lwt.state push_small = Lwt.Sleep) ;
+  let () = match Lwt_pipe.pop_now q with Some 1 -> () | _ -> assert false in
+  Lwt.pause ()
+  >>= fun () ->
+  assert (Lwt.state push_big = Lwt.Sleep) ;
+  assert (Lwt.state push_small = Lwt.Return ()) ;
+  let () = match Lwt_pipe.pop_now q with Some 1 -> () | _ -> assert false in
+  let () = match Lwt_pipe.pop_now q with Some 1 -> () | _ -> assert false in
+  let () = match Lwt_pipe.pop_now q with Some 1 -> () | _ -> assert false in
+  Lwt.pause ()
+  >>= fun () ->
+  assert (Lwt.state push_big = Lwt.Return ()) ;
+  let () = match Lwt_pipe.pop_now q with Some 4 -> () | _ -> assert false in
+  Lwt.return_unit
+
+(* Scaffolding and main *)
+
+let with_timeout t f () =
+  let timeout = Lwt_unix.sleep t >|= fun () -> Error () in
+  let main = f () >|= fun () -> Ok () in
+  Lwt.pick [main; timeout]
+  >|= function Ok () -> () | Error () -> assert false
+
+let () =
+  Lwt_main.run
+  @@ Alcotest_lwt.run
+       "Lwt_pipe"
+       [ ( "push-pop",
+           [ ("push-pop", `Quick, with_timeout 0.2 push_pop);
+             ("push-pop-all", `Quick, with_timeout 0.5 push_pop_all) ] );
+         ("fifo", [("count-down", `Quick, with_timeout 0.2 count_down)]);
+         ("scenarii", [("introspect", `Quick, introspect)]) ]

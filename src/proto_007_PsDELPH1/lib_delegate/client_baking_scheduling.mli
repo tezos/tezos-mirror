@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type error += Node_connection_lost
+
 val sleep_until : Time.Protocol.t -> unit Lwt.t option
 
 val wait_for_first_event :
@@ -37,6 +39,7 @@ val main :
   compute_timeout:('state -> 'timesup Lwt.t) ->
   timeout_k:('a -> 'state -> 'timesup -> unit tzresult Lwt.t) ->
   event_k:('a -> 'state -> 'event -> unit tzresult Lwt.t) ->
+  finalizer:('state -> unit Lwt.t) ->
   unit tzresult Lwt.t
 
 (** [main ~name ~cctxt ~stream ~state_maker ~pre_loop ~timeout_maker ~timeout_k

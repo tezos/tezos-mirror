@@ -29,20 +29,25 @@ module Make_value (V : ENCODED_VALUE) = struct
   type t = V.t
 
   let of_bytes b =
-    match Data_encoding.Binary.of_bytes_opt V.encoding b with
-    | None ->
-        generic_error "Cannot parse data" (* TODO personalize *)
-    | Some v ->
+    match Data_encoding.Binary.of_bytes V.encoding b with
+    | Error re ->
+        generic_error
+          "Cannot parse data: %a"
+          Data_encoding.Binary.pp_read_error
+          re
+    | Ok v ->
         ok v
 
   let to_bytes v =
-    try Data_encoding.Binary.to_bytes_exn V.encoding v
-    with Data_encoding.Binary.Write_error error ->
-      Store_logging.log_error
-        "Exception while serializing value %a"
-        Data_encoding.Binary.pp_write_error
-        error ;
-      Bytes.create 0
+    match Data_encoding.Binary.to_bytes V.encoding v with
+    | Ok b ->
+        b
+    | Error we ->
+        Store_logging.log_error
+          "Exception while serializing value %a"
+          Data_encoding.Binary.pp_write_error
+          we ;
+        Bytes.create 0
 end
 
 module Raw_value = struct
@@ -96,6 +101,8 @@ module Make_substore (S : STORE) (N : NAME) : STORE with type t = S.t = struct
 
   let remove t k = S.remove t (to_key k)
 
+  type key_or_dir = [`Key of key | `Dir of key]
+
   let fold t k ~init ~f =
     S.fold t (to_key k) ~init ~f:(fun k acc -> f (map_key of_key k) acc)
 
@@ -136,6 +143,8 @@ module Make_indexed_substore (S : STORE) (I : INDEX) = struct
     let store (t, i) k v = S.store t (to_key i k) v
 
     let remove (t, i) k = S.remove t (to_key i k)
+
+    type key_or_dir = [`Key of key | `Dir of key]
 
     let fold (t, i) k ~init ~f =
       S.fold t (to_key i k) ~init ~f:(fun k acc -> f (map_key of_key k) acc)
@@ -255,9 +264,8 @@ module Make_indexed_substore (S : STORE) (I : INDEX) = struct
     let store_all s new_set =
       read_all s
       >>= fun old_set ->
-      Lwt_list.iter_p (remove s) Set.(elements (diff old_set new_set))
-      >>= fun () ->
-      Lwt_list.iter_p (store s) Set.(elements (diff new_set old_set))
+      Set.iter_p (remove s) (Set.diff old_set new_set)
+      >>= fun () -> Set.iter_p (store s) (Set.diff new_set old_set)
   end
 
   module Make_map (N : NAME) (V : VALUE) = struct
@@ -312,15 +320,7 @@ module Make_indexed_substore (S : STORE) (I : INDEX) = struct
     let read_all s =
       fold s ~init:Map.empty ~f:(fun i v set -> Lwt.return (Map.add i v set))
 
-    let store_all s map =
-      remove_all s
-      >>= fun () ->
-      Map.fold
-        (fun k v acc ->
-          let res = store s k v in
-          acc >>= fun () -> res)
-        map
-        Lwt.return_unit
+    let store_all s map = remove_all s >>= fun () -> Map.iter_p (store s) map
   end
 end
 
@@ -381,9 +381,8 @@ struct
   let store_all s new_set =
     read_all s
     >>= fun old_set ->
-    Lwt_list.iter_p (remove s) Set.(elements (diff old_set new_set))
-    >>= fun () ->
-    Lwt_list.iter_p (store s) Set.(elements (diff new_set old_set))
+    Set.iter_p (remove s) (Set.diff old_set new_set)
+    >>= fun () -> Set.iter_p (store s) (Set.diff new_set old_set)
 end
 
 module Make_map (S : STORE) (I : INDEX) (V : VALUE) = struct
@@ -475,15 +474,7 @@ struct
   let read_all s =
     fold s ~init:Map.empty ~f:(fun i v set -> Lwt.return (Map.add i v set))
 
-  let store_all s map =
-    remove_all s
-    >>= fun () ->
-    Map.fold
-      (fun k v acc ->
-        let res = store s k v in
-        acc >>= fun () -> res)
-      map
-      Lwt.return_unit
+  let store_all s map = remove_all s >>= fun () -> Map.iter_p (store s) map
 end
 
 module Integer_index = struct

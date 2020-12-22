@@ -47,7 +47,7 @@ module Scripts : sig
     * Chain_id.t
     * Contract.t option
     * Contract.t option
-    * Z.t option
+    * Gas.Arith.integral option
     * string ->
     ( Script.expr
     * packed_internal_operation list
@@ -65,7 +65,7 @@ module Scripts : sig
     * Chain_id.t
     * Contract.t option
     * Contract.t option
-    * Z.t option
+    * Gas.Arith.integral option
     * string ->
     ( Script.expr
     * packed_internal_operation list
@@ -77,19 +77,19 @@ module Scripts : sig
   val typecheck_code :
     'a #RPC_context.simple ->
     'a ->
-    Script.expr * Z.t option ->
+    Script.expr * Gas.Arith.integral option ->
     (Script_tc_errors.type_map * Gas.t) shell_tzresult Lwt.t
 
   val typecheck_data :
     'a #RPC_context.simple ->
     'a ->
-    Script.expr * Script.expr * Z.t option ->
+    Script.expr * Script.expr * Gas.Arith.integral option ->
     Gas.t shell_tzresult Lwt.t
 
   val pack_data :
     'a #RPC_context.simple ->
     'a ->
-    Script.expr * Script.expr * Z.t option ->
+    Script.expr * Script.expr * Gas.Arith.integral option ->
     (MBytes.t * Gas.t) shell_tzresult Lwt.t
 
   val run_operation :
@@ -125,7 +125,7 @@ module Forge : sig
       ?sourcePubKey:public_key ->
       counter:counter ->
       fee:Tez.t ->
-      gas_limit:Z.t ->
+      gas_limit:Gas.Arith.integral ->
       storage_limit:Z.t ->
       packed_manager_operation list ->
       MBytes.t shell_tzresult Lwt.t
@@ -152,7 +152,7 @@ module Forge : sig
       destination:Contract.t ->
       ?entrypoint:string ->
       ?parameters:Script.expr ->
-      gas_limit:Z.t ->
+      gas_limit:Gas.Arith.integral ->
       storage_limit:Z.t ->
       fee:Tez.t ->
       unit ->
@@ -168,7 +168,7 @@ module Forge : sig
       balance:Tez.t ->
       ?delegatePubKey:public_key_hash ->
       script:Script.t ->
-      gas_limit:Z.t ->
+      gas_limit:Gas.Arith.integral ->
       storage_limit:Z.t ->
       fee:Tez.t ->
       unit ->

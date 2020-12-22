@@ -84,8 +84,8 @@ include Tezos_raw_protocol_demo_counter.Main
  (libraries tezos_protocol_environment_demo_counter)
  (library_flags (:standard -linkall))
  (flags (:standard -nopervasives -nostdlib
-                   -w +a-4-6-7-9-29-32-40..42-44-45-48
-                   -warn-error -a+8
+                   -w +a-4-6-7-9-29-32-40..42-44-45-48-60-67
+                   -warn-error +a
                    -open Tezos_protocol_environment_demo_counter__Environment
                    -open Pervasives
                    -open Error_monad))
@@ -112,8 +112,8 @@ include Tezos_raw_protocol_demo_counter.Main
       tezos-protocol-environment
       tezos-protocol-environment-sigs
       tezos_raw_protocol_demo_counter)
- (flags -w "+a-4-6-7-9-29-40..42-44-45-48"
-        -warn-error "-a+8"
+ (flags -w "+a-4-6-7-9-29-40..42-44-45-48-60-67"
+        -warn-error "+a"
         -nopervasives)
  (modules Protocol))
 
@@ -124,8 +124,8 @@ include Tezos_raw_protocol_demo_counter.Main
       tezos-protocol-environment
       tezos-protocol-environment-sigs
       tezos_raw_protocol_demo_counter)
- (flags -w "+a-4-6-7-9-29-40..42-44-45-48"
-        -warn-error "-a+8"
+ (flags -w "+a-4-6-7-9-29-40..42-44-45-48-60-67"
+        -warn-error "+a"
         -nopervasives)
  (modules Functor))
 
@@ -136,19 +136,32 @@ include Tezos_raw_protocol_demo_counter.Main
  (libraries tezos-protocol-demo-counter
             tezos-protocol-updater
             tezos-protocol-environment)
- (flags (:standard -w +a-4-6-7-9-29-32-40..42-44-45-48
-                   -warn-error -a+8))
+ (flags (:standard -w +a-4-6-7-9-29-32-40..42-44-45-48-60-67
+                   -warn-error +a))
  (modules Registerer))
 
-(alias
- (name runtest_compile_protocol)
+(rule
+ (alias runtest_compile_protocol)
+ (deps
+   error.mli error.ml
+   proto_params.mli proto_params.ml
+   header.mli header.ml
+   state.mli state.ml
+   proto_operation.mli proto_operation.ml
+   receipt.mli receipt.ml
+   apply.mli apply.ml
+   services.mli services.ml
+   main.mli main.ml
+  (:src_dir TEZOS_PROTOCOL))
  (action (run %{bin:tezos-protocol-compiler} -no-hash-check .)))
 
-(alias
- (name runtest_sandbox)
- (deps .tezos_protocol_demo_counter.objs/native/tezos_protocol_demo_counter.cmx))
+(rule
+ (alias runtest_sandbox)
+ (deps .tezos_protocol_demo_counter.objs/native/tezos_protocol_demo_counter.cmx)
+ (action (progn)))
 
-(alias
- (name runtest)
+(rule
+ (alias runtest)
  (package tezos-protocol-demo-counter)
- (deps (alias runtest_sandbox)))
+ (deps (alias runtest_sandbox))
+ (action (progn)))

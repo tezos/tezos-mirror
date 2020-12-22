@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -37,6 +38,14 @@ module Prefix : sig
   val protocol_hash : string
 
   val context_hash : string
+
+  val block_metadata_hash : string
+
+  val operation_metadata_hash : string
+
+  val operation_metadata_list_hash : string
+
+  val operation_metadata_list_list_hash : string
 
   val ed25519_public_key_hash : string
 
@@ -79,6 +88,10 @@ module Prefix : sig
   val secp256k1_element : string
 
   val secp256k1_scalar : string
+
+  val sapling_spending_key : string
+
+  val sapling_address : string
 end
 
 (** An extensible sum-type for decoded data: one case per known
@@ -86,7 +99,7 @@ end
     [Environment.Ed25519.Public_key_hash]. *)
 type data = ..
 
-(** Abstract representation of registered encodings. The type paramater
+(** Abstract representation of registered encodings. The type parameter
     is the type of the encoded data, for instance [Hash.Block_hash.t]. *)
 type 'a encoding = private {
   prefix : string;
@@ -144,7 +157,7 @@ val decode : ?alphabet:Alphabet.t -> string -> data option
 
 (** {2 Completion of partial Base58Check value} *)
 
-(** Register a (global) resolver for a previsously
+(** Register a (global) resolver for a previously
     registered kind af data. *)
 val register_resolver : 'a encoding -> (string -> 'a list Lwt.t) -> unit
 

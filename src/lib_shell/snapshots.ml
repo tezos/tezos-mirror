@@ -2,7 +2,8 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2019 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs. <nomadic@tezcore.com>                    *)
+(* Copyright (c) 2019 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -181,7 +182,8 @@ module Definition = struct
              (function Reconstruct_success -> Some () | _ -> None)
              (fun () -> Reconstruct_success) ]
 
-  let pp ppf (status : t) = Format.fprintf ppf "%a" status_pp status.data
+  let pp ~short:_ ppf (status : t) =
+    Format.fprintf ppf "%a" status_pp status.data
 
   let doc = "Snapshots status."
 
@@ -409,7 +411,7 @@ let () =
     (function Invalid_block_specification s -> Some s | _ -> None)
     (fun s -> Invalid_block_specification s)
 
-let ( // ) = Filename.concat
+open Filename.Infix
 
 let context_dir data_dir = data_dir // "context"
 
@@ -531,7 +533,7 @@ let export ?(export_rolling = false) ~context_root ~store_root ~genesis
             lwt_emit
               (Export_info (export_mode, block_hash, block_header.shell.level))
             >>= fun () ->
-            (* Get block precessor's block header *)
+            (* Get block predecessor's block header *)
             Store.Block.Predecessors.read (block_store, block_hash) 0
             >>=? fun pred_block_hash ->
             State.Block.Header.read (block_store, pred_block_hash)
@@ -543,6 +545,26 @@ let export ?(export_rolling = false) ~context_root ~store_root ~genesis
                 Store.Block.Operations.read (block_store, block_hash) i)
               (0 -- (validations_passes - 1))
             >>=? fun operations ->
+            Store.Block.Block_metadata_hash.read_opt
+              (block_store, pred_block_hash)
+            >>= fun predecessor_block_metadata_hash ->
+            ( if pred_block_header.shell.validation_passes = 0 then return_none
+            else
+              Store.Block.Operations_metadata_hashes.known
+                (block_store, pred_block_hash)
+                0
+              >>= function
+              | false ->
+                  return_none
+              | true ->
+                  map_s
+                    (fun i ->
+                      Store.Block.Operations_metadata_hashes.read
+                        (block_store, pred_block_hash)
+                        i)
+                    (0 -- (pred_block_header.shell.validation_passes - 1))
+                  >|=? Option.some )
+            >>=? fun predecessor_ops_metadata_hashes ->
             compute_export_limit
               block_store
               chain_data_store
@@ -553,7 +575,13 @@ let export ?(export_rolling = false) ~context_root ~store_root ~genesis
               pruned_block_iterator context_index block_store export_limit
             in
             let block_data = {Context.Block_data.block_header; operations} in
-            return (pred_block_header, block_data, export_mode, iterator))
+            return
+              ( pred_block_header,
+                block_data,
+                predecessor_block_metadata_hash,
+                predecessor_ops_metadata_hashes,
+                export_mode,
+                iterator ))
   >>=? fun data_to_dump ->
   Context.dump_contexts context_index data_to_dump ~filename
   >>=? fun () ->
@@ -573,7 +601,7 @@ let check_operations_consistency block_header operations operation_hashes =
         oph)
     operations
     operation_hashes ;
-  (* Check header hashes based on merkel tree *)
+  (* Check header hashes based on Merkle tree *)
   let hashes =
     List.map
       (fun (_, opl) -> List.map Operation.hash opl)
@@ -616,7 +644,12 @@ let set_history_mode store history_mode =
 
 let store_new_head chain_state chain_data ~genesis block_header operations
     block_validation_result =
-  let ({validation_store; block_metadata; ops_metadata; forking_testchain}
+  let ({ validation_store;
+         block_metadata;
+         ops_metadata;
+         block_metadata_hash;
+         ops_metadata_hashes;
+         forking_testchain }
         : Tezos_validation.Block_validation.result) =
     block_validation_result
   in
@@ -626,6 +659,8 @@ let store_new_head chain_state chain_data ~genesis block_header operations
     block_metadata
     operations
     ops_metadata
+    block_metadata_hash
+    ops_metadata_hashes
     ~forking_testchain
     validation_store
   >>=? fun new_head ->
@@ -697,6 +732,12 @@ let import_protocol_data index store block_hash_arr level_oldest_block
   let data_hash = protocol_data.data_key in
   let parents = protocol_data.parents in
   let protocol_hash = protocol_data.protocol_hash in
+  let predecessor_block_metadata_hash =
+    protocol_data.predecessor_block_metadata_hash
+  in
+  let predecessor_ops_metadata_hash =
+    protocol_data.predecessor_ops_metadata_hash
+  in
   (* Validate the context hash consistency, and so the protocol data. *)
   Context.validate_context_hash_consistency_and_commit
     ~author:info.author
@@ -707,6 +748,8 @@ let import_protocol_data index store block_hash_arr level_oldest_block
     ~expected_context_hash
     ~test_chain
     ~protocol_hash
+    ~predecessor_block_metadata_hash
+    ~predecessor_ops_metadata_hash
     ~index
   >>= function
   | true ->
@@ -773,10 +816,8 @@ let reconstruct_storage store context_index chain_id ~user_activated_upgrades
   let rec reconstruct_chunks level =
     Store.with_atomic_rw store (fun () ->
         let rec reconstruct_chunks level =
-          Tezos_stdlib_unix.Utils.display_progress
-            "Reconstructing contexts: %i/%i"
-            level
-            limit ;
+          Tezos_stdlib_unix.Utils.display_progress (fun m ->
+              m "Reconstructing contexts: %i/%i" level limit) ;
           if level = limit then return level
           else
             let block_hash = history.(level) in
@@ -790,19 +831,52 @@ let reconstruct_storage store context_index chain_id ~user_activated_upgrades
             >>=? fun operations ->
             let predecessor_block_hash = block_header.shell.predecessor in
             State.Block.Header.read (block_store, predecessor_block_hash)
-            >>=? fun pred_block_header ->
-            let context_hash = pred_block_header.shell.context in
-            Context.checkout_exn context_index context_hash
-            >>= fun pred_context ->
-            Tezos_validation.Block_validation.apply
-              chain_id
-              ~user_activated_upgrades
-              ~user_activated_protocol_overrides
-              ~max_operations_ttl:(Int32.to_int pred_block_header.shell.level)
-              ~predecessor_block_header:pred_block_header
-              ~predecessor_context:pred_context
-              ~block_header
-              operations
+            >>=? fun predecessor_block_header ->
+            Store.Block.Block_metadata_hash.read_opt
+              (block_store, predecessor_block_hash)
+            >>= fun predecessor_block_metadata_hash ->
+            ( if predecessor_block_header.shell.validation_passes = 0 then
+              return_none
+            else
+              Store.Block.Operations_metadata_hashes.known
+                (block_store, predecessor_block_hash)
+                0
+              >>= function
+              | false ->
+                  return_none
+              | true ->
+                  map_s
+                    (fun i ->
+                      Store.Block.Operations_metadata_hashes.read
+                        (block_store, predecessor_block_hash)
+                        i)
+                    ( 0
+                    -- (predecessor_block_header.shell.validation_passes - 1)
+                    )
+                  >|=? fun hashes ->
+                  Some
+                    ( List.map Operation_metadata_list_hash.compute hashes
+                    |> Operation_metadata_list_list_hash.compute ) )
+            >>=? fun predecessor_ops_metadata_hash ->
+            let pred_context_hash = predecessor_block_header.shell.context in
+            Context.checkout_exn context_index pred_context_hash
+            >>= fun predecessor_context ->
+            let max_operations_ttl =
+              Int32.to_int predecessor_block_header.shell.level
+            in
+            let env =
+              {
+                Block_validation.max_operations_ttl;
+                chain_id;
+                predecessor_block_header;
+                predecessor_block_metadata_hash;
+                predecessor_ops_metadata_hash;
+                predecessor_context;
+                user_activated_upgrades;
+                user_activated_protocol_overrides;
+              }
+            in
+            Tezos_validation.Block_validation.apply env block_header operations
             >>=? fun block_validation_result ->
             check_context_hash_consistency
               block_validation_result.validation_store
@@ -810,7 +884,9 @@ let reconstruct_storage store context_index chain_id ~user_activated_upgrades
             >>=? fun () ->
             let { Tezos_validation.Block_validation.validation_store;
                   block_metadata;
+                  block_metadata_hash;
                   ops_metadata;
+                  ops_metadata_hashes;
                   _ } =
               block_validation_result
             in
@@ -845,6 +921,21 @@ let reconstruct_storage store context_index chain_id ~user_activated_upgrades
             Lwt_list.iteri_p
               (fun i ops -> Store.Block.Operations_metadata.store st i ops)
               ops_metadata
+            >>= fun () ->
+            ( match block_metadata_hash with
+            | Some block_metadata_hash ->
+                Store.Block.Block_metadata_hash.store st block_metadata_hash
+            | None ->
+                Lwt.return_unit )
+            >>= fun () ->
+            ( match ops_metadata_hashes with
+            | Some ops_metadata_hashes ->
+                Lwt_list.iteri_p
+                  (fun i hashes ->
+                    Store.Block.Operations_metadata_hashes.store st i hashes)
+                  ops_metadata_hashes
+            | None ->
+                Lwt.return_unit )
             >>= fun () -> reconstruct_chunks (level + 1)
         in
         if (level + 1) mod 1000 = 0 then return level
@@ -948,7 +1039,7 @@ let import ?(reconstruct = false) ?patch_context ~data_dir
     (fun () ->
       let k_store_pruned_blocks data =
         Store.with_atomic_rw store (fun () ->
-            Error_monad.iter_s
+            Lwt_list.iter_s
               (fun (pruned_header_hash, pruned_block) ->
                 Store.Block.Pruned_contents.store
                   (block_store, pruned_header_hash)
@@ -968,9 +1059,9 @@ let import ?(reconstruct = false) ?patch_context ~data_dir
                       (block_store, pruned_header_hash)
                       i
                       v)
-                  pruned_block.operation_hashes
-                >>= fun () -> return_unit)
+                  pruned_block.operation_hashes)
               data)
+        >>= fun () -> return_unit
       in
       (* Restore context and fetch data *)
       restore_contexts
@@ -980,6 +1071,8 @@ let import ?(reconstruct = false) ?patch_context ~data_dir
         block_validation
       >>=? fun ( predecessor_block_header,
                  meta,
+                 predecessor_block_metadata_hash,
+                 predecessor_ops_metadata_hashes,
                  history_mode,
                  oldest_header_opt,
                  rev_block_hashes,
@@ -1013,8 +1106,8 @@ let import ?(reconstruct = false) ?patch_context ~data_dir
         (fun (cpt, to_write) current_hash ->
           Tezos_stdlib_unix.Utils.display_progress
             ~refresh_rate:(cpt, 1_000)
-            "Computing predecessors table %dK elements%!"
-            (cpt / 1_000) ;
+            (fun f ->
+              f "Computing predecessors table %dK elements%!" (cpt / 1_000)) ;
           ( if (cpt + 1) mod 5_000 = 0 then
             write_predecessors_table to_write >>= fun () -> Lwt.return_nil
           else Lwt.return to_write )
@@ -1057,16 +1150,30 @@ let import ?(reconstruct = false) ?patch_context ~data_dir
       let pred_context_hash = predecessor_block_header.shell.context in
       checkout_exn context_index pred_context_hash
       >>= fun predecessor_context ->
+      let max_operations_ttl =
+        Int32.to_int predecessor_block_header.shell.level
+      in
+      let predecessor_ops_metadata_hash =
+        Option.map
+          (fun hashes ->
+            List.map Operation_metadata_list_hash.compute hashes
+            |> Operation_metadata_list_list_hash.compute)
+          predecessor_ops_metadata_hashes
+      in
+      let env =
+        {
+          Block_validation.max_operations_ttl;
+          chain_id;
+          predecessor_block_header;
+          predecessor_block_metadata_hash;
+          predecessor_ops_metadata_hash;
+          predecessor_context;
+          user_activated_upgrades;
+          user_activated_protocol_overrides;
+        }
+      in
       (* ... we can now call apply ... *)
-      Tezos_validation.Block_validation.apply
-        chain_id
-        ~user_activated_upgrades
-        ~user_activated_protocol_overrides
-        ~max_operations_ttl:(Int32.to_int predecessor_block_header.shell.level)
-        ~predecessor_block_header
-        ~predecessor_context
-        ~block_header
-        operations
+      Tezos_validation.Block_validation.apply env block_header operations
       >>=? fun block_validation_result ->
       check_context_hash_consistency
         block_validation_result.validation_store

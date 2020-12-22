@@ -24,9 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Internal_event.Legacy_logging.Make (struct
-  let name = "p2p.maintenance"
-end)
+module Events = P2p_events.P2p_maintainance
 
 let time_between_looking_for_peers = 5.0 (* TODO put this in config *)
 
@@ -60,16 +58,17 @@ type ('msg, 'meta, 'meta_conn) t = {
   log : P2p_connection.P2p_event.t -> unit;
 }
 
-let broadcast_bootstrap_msg pool =
+let broadcast_bootstrap_msg t =
   P2p_peer.Table.iter
-    (fun _peer_id peer_info ->
+    (fun peer_id peer_info ->
       match P2p_peer_state.get peer_info with
       | Running {data = conn; _} ->
-          if not (P2p_conn.private_node conn) then
-            ignore (P2p_conn.write_bootstrap conn)
+          if not (P2p_conn.private_node conn) then (
+            ignore (P2p_conn.write_bootstrap conn) ;
+            t.log (Bootstrap_sent {source = peer_id}) )
       | _ ->
           ())
-    (P2p_pool.connected_peer_ids pool)
+    (P2p_pool.connected_peer_ids t.pool)
 
 let send_swap_request t =
   match P2p_pool.Connection.propose_swap_request t.pool with
@@ -94,7 +93,7 @@ let classify pool private_mode start_time seen_points point pi =
       match P2p_point_state.Info.last_miss pi with
       | Some last
         when Time.System.(start_time < last)
-             || P2p_point_state.Info.greylisted ~now pi ->
+             || P2p_point_state.Info.can_reconnect ~now pi ->
           `Seen
       | last ->
           `Candidate last )
@@ -105,12 +104,12 @@ let classify pool private_mode start_time seen_points point pi =
     with points in [contactable]. It returns the number of established
     connections *)
 let establish t contactable =
-  let try_to_connect acc point =
+  let try_to_connect count point =
     protect ~canceler:t.canceler (fun () ->
         P2p_connect_handler.connect t.connect_handler point)
-    >>= function Ok _ -> acc >|= succ | Error _ -> acc
+    >|= function Ok _ -> succ count | Error _ -> count
   in
-  List.fold_left try_to_connect (Lwt.return 0) contactable
+  Lwt_list.fold_left_s try_to_connect 0 contactable
 
 (* [connectable t start_time expected seen_points] selects at most
    [expected] connections candidates from the known points, not in [seen]
@@ -202,8 +201,8 @@ let ask_for_more_contacts t =
     protect ~canceler:t.canceler (fun () ->
         Lwt_unix.sleep time_between_looking_for_peers >>= fun () -> return_unit)
   else (
-    broadcast_bootstrap_msg t.pool ;
-    Option.iter ~f:P2p_discovery.wakeup t.discovery ;
+    broadcast_bootstrap_msg t ;
+    Option.iter P2p_discovery.wakeup t.discovery ;
     protect ~canceler:t.canceler (fun () ->
         Lwt.pick
           [ P2p_trigger.wait_new_peer t.triggers;
@@ -250,11 +249,11 @@ let rec do_maintain t =
   else (
     (* end of maintenance when enough users have been reached *)
     Lwt_condition.broadcast t.just_maintained () ;
-    lwt_debug "Maintenance step ended" >>= fun () -> return_unit )
+    Events.(emit maintenance_ended) () >>= fun () -> return_unit )
 
 and too_few_connections t n_connected =
   (* try and contact new peers *)
-  lwt_log_notice "Too few connections (%d)" n_connected
+  Events.(emit too_few_connections) n_connected
   >>= fun () ->
   let min_to_contact = t.bounds.min_target - n_connected in
   let max_to_contact = t.bounds.max_target - n_connected in
@@ -266,7 +265,7 @@ and too_few_connections t n_connected =
 and too_many_connections t n_connected =
   (* kill random connections *)
   let n = n_connected - t.bounds.max_target in
-  lwt_log_notice "Too many connections, will kill %d" n
+  Events.(emit too_many_connections) n
   >>= fun () ->
   let connections = random_connections t.pool n in
   Lwt_list.iter_p P2p_conn.disconnect connections >>= fun () -> do_maintain t
@@ -337,7 +336,7 @@ let activate t =
       ~on_event:Internal_event.Lwt_worker_event.on_event
       ~run:(fun () -> worker_loop t)
       ~cancel:(fun () -> Lwt_canceler.cancel t.canceler) ;
-  Option.iter t.discovery ~f:P2p_discovery.activate
+  Option.iter P2p_discovery.activate t.discovery
 
 let maintain t =
   let wait = Lwt_condition.wait t.just_maintained in

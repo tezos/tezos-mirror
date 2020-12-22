@@ -36,13 +36,8 @@ type limits = {
 
 val peer_id : t -> P2p_peer.Id.t
 
-val bootstrapped : t -> bool
-
-val current_head : t -> Block_header.t
-
 val create :
   ?notify_new_block:(State.Block.t -> unit) ->
-  ?notify_bootstrapped:(unit -> unit) ->
   ?notify_termination:(unit -> unit) ->
   limits ->
   Block_validator.t ->

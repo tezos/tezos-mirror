@@ -1,13 +1,16 @@
 (library
  (name tezos_signer_backends_unix)
  (public_name tezos-signer-backends.unix)
- (modules (:standard \ no_ledger with_ledger))
- (libraries tezos-signer-backends
+ (modules (:standard))
+ (libraries ocplib-endian.bigstring
+            tezos-signer-backends
+            tezos-base
+            tezos-base.unix
             tezos-stdlib-unix
             tezos-rpc-http-client-unix
             (select ledger.ml from
-              (ledgerwallet-tezos -> with_ledger.ml)
-              (-> no_ledger.ml)))
+              (ledgerwallet-tezos -> ledger.available.ml)
+              (-> ledger.none.ml)))
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_stdlib_unix
                    -open Tezos_stdlib
@@ -19,12 +22,7 @@
                    -open Tezos_signer_backends
                    -open Tezos_shell_services)))
 
-(alias
- (name runtest_lint)
-; (deps (glob_files *.ml{,i}))
-; If you find a way to tell either dune to exclude generated file ledger.ml or
-; ocamlformat to not drop first line
-; `# 1 "src/lib_signer_backends/unix/with_ledger.ml"`
-; Be my guest!
- (deps ledger_names.ml remote.mli socket.mli with_ledger.ml ledger.mli ledger_names.mli no_ledger.ml remote.ml socket.ml)
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))
+(rule
+ (alias runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps} --ignore ledger.ml)))

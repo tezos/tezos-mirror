@@ -188,7 +188,7 @@ let expand_set_caddadr original =
                   ( loc,
                     "PAIR",
                     [],
-                    [Option.unopt field_annot ~default:"%"; "%@"] ) ]
+                    [Option.value field_annot ~default:"%"; "%@"] ) ]
             in
             let init = Seq (loc, access_check @ encoding @ pair) in
             ok (Some (parse (len - 3) init))
@@ -208,7 +208,7 @@ let expand_set_caddadr original =
                   ( loc,
                     "PAIR",
                     [],
-                    ["%@"; Option.unopt field_annot ~default:"%"] ) ]
+                    ["%@"; Option.value field_annot ~default:"%"] ) ]
             in
             let init = Seq (loc, access_check @ encoding @ pair) in
             ok (Some (parse (len - 3) init))
@@ -309,7 +309,7 @@ let expand_map_caddadr original =
                       ( loc,
                         "PAIR",
                         [],
-                        [Option.unopt field_annot ~default:"%"; "%@"] ) ] )
+                        [Option.value field_annot ~default:"%"; "%@"] ) ] )
             in
             ok (Some (parse (len - 3) init))
         | 'D' ->
@@ -325,7 +325,7 @@ let expand_map_caddadr original =
                       ( loc,
                         "PAIR",
                         [],
-                        ["%@"; Option.unopt field_annot ~default:"%"] ) ] )
+                        ["%@"; Option.value field_annot ~default:"%"] ) ] )
             in
             ok (Some (parse (len - 3) init))
         | _ ->
@@ -433,7 +433,7 @@ let pappaiir_annots_pos ast annot =
         find_annots_pos i right annots acc
     | (A, a :: annots) ->
         let pos =
-          match IntMap.find_opt p_pos acc with
+          match IntMap.find p_pos acc with
           | None ->
               ([a], [])
           | Some (_, cdr) ->
@@ -442,7 +442,7 @@ let pappaiir_annots_pos ast annot =
         (annots, IntMap.add p_pos pos acc)
     | (I, a :: annots) ->
         let pos =
-          match IntMap.find_opt p_pos acc with
+          match IntMap.find p_pos acc with
           | None ->
               ([], [a])
           | Some (car, _) ->
@@ -474,7 +474,7 @@ let expand_pappaiir original =
             match p with
             | P (i, left, right) ->
                 let annot =
-                  match (i, IntMap.find_opt i field_annots_pos) with
+                  match (i, IntMap.find i field_annots_pos) with
                   | (0, None) ->
                       annot
                   | (_, None) ->
@@ -535,7 +535,7 @@ let expand_unpappaiir original =
             match p with
             | P (i, left, right) ->
                 let (car_annot, cdr_annot) =
-                  match IntMap.find_opt i annots_pos with
+                  match IntMap.find i annots_pos with
                   | None ->
                       ([], [])
                   | Some (car_annot, cdr_annot) ->

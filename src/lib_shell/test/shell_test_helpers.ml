@@ -25,7 +25,7 @@
 
 (** Setup mocks for testing shell, notably state and protocol validation *)
 
-let ( // ) = Filename.concat
+open Filename.Infix
 
 (** Basic blocks *)
 
@@ -181,7 +181,7 @@ end = struct
   let handle (type a) (_ : t) m ?section (f : unit -> a) =
     let module M = (val m : Internal_event.EVENT_DEFINITION with type t = a) in
     let ev = f () in
-    let (s : string) = Format.asprintf "%a" M.pp ev in
+    let (s : string) = Format.asprintf "%a" (M.pp ~short:false) ev in
     let event = Data_encoding.Json.construct M.encoding ev in
     recorded_events := !recorded_events @ [(s, M.level ev, section, event)] ;
     return ()

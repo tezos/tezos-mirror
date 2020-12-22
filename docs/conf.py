@@ -104,6 +104,10 @@ html_logo = "logo.svg"
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
 
+html_css_files = [
+    'css/custom.css',
+]
+
 # Custom sidebar templates, must be a dictionary that maps document names
 # to template names.
 #
@@ -176,4 +180,8 @@ texinfo_documents = [
 # -- Ignore fragments in linkcheck
 
 linkcheck_anchors = False
-linkcheck_ignore = [r'https://www.reddit.com.*/','https://www.michelson-lang.com/']
+linkcheck_ignore = [
+    r'https://www.reddit.com.*/',
+    'https://www.michelson-lang.com/',
+    r'https://gitlab.com/nomadic-labs/tezos/-/merge_requests/*'
+]

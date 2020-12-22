@@ -33,8 +33,6 @@ module Id = struct
 
   let equal p1 p2 = compare p1 p2 = 0
 
-  let hash = Hashtbl.hash
-
   let pp ppf (addr, port) =
     match Ipaddr.v4_of_v6 addr with
     | Some addr ->
@@ -100,7 +98,7 @@ module Id = struct
     let (addr, port) = parse_addr_port str in
     let port =
       if port = "" then
-        Option.unopt_exn
+        TzOption.unopt_exn
           (Invalid_argument "P2p_point.of_string_exn: no port")
           default_port
       else int_of_string port
@@ -140,7 +138,14 @@ end
 
 module Map = Map.Make (Id)
 module Set = Set.Make (Id)
-module Table = Hashtbl.Make (Id)
+
+module Table = Hashtbl.MakeSeeded (struct
+  type t = Id.t
+
+  let equal = Id.equal
+
+  let hash = Hashtbl.seeded_hash
+end)
 
 module Filter = struct
   type t = Requested | Accepted | Running | Disconnected
@@ -281,7 +286,7 @@ end
 module Info = struct
   type t = {
     trusted : bool;
-    greylisted_until : Time.System.t;
+    reconnection_time : Time.System.t option;
     state : State.t;
     last_failed_connection : Time.System.t option;
     last_rejected_connection : (P2p_peer_id.t * Time.System.t) option;
@@ -300,7 +305,7 @@ module Info = struct
          about past events."
     @@ conv
          (fun { trusted;
-                greylisted_until;
+                reconnection_time;
                 state;
                 last_failed_connection;
                 last_rejected_connection;
@@ -310,7 +315,7 @@ module Info = struct
                 last_miss } ->
            let p2p_peer_id = State.of_p2p_peer_id state in
            ( trusted,
-             greylisted_until,
+             reconnection_time,
              state,
              p2p_peer_id,
              last_failed_connection,
@@ -320,7 +325,7 @@ module Info = struct
              last_seen,
              last_miss ))
          (fun ( trusted,
-                greylisted_until,
+                reconnection_time,
                 state,
                 p2p_peer_id,
                 last_failed_connection,
@@ -332,7 +337,7 @@ module Info = struct
            let state = State.of_peerid_state state p2p_peer_id in
            {
              trusted;
-             greylisted_until;
+             reconnection_time;
              state;
              last_failed_connection;
              last_rejected_connection;
@@ -343,7 +348,7 @@ module Info = struct
            })
          (obj10
             (req "trusted" bool)
-            (dft "greylisted_until" Time.System.encoding Time.System.epoch)
+            (opt "greylisted_until" Time.System.encoding)
             (req "state" State.encoding)
             (opt "p2p_peer_id" P2p_peer_id.encoding)
             (opt "last_failed_connection" Time.System.encoding)

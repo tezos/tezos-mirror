@@ -118,7 +118,7 @@ P2P
     - ``10c37f153``: ``Make 2-min sleep configurable (P2p_maintenance)``
     - ``9abcd0e55``: ``P2p: change configuration of P2p_maintenance``
     - ``7e4a70fac``: ``Remove peer from active_peers when Peer_validator.create has failed``
-    - ``52b196a72``: ``P2p: Fix error message from improve cancelation``
+    - ``52b196a72``: ``P2p: Fix error message from improve cancellation``
     - ``983bdee01``: ``P2p: don't kick node which are private and trusted on too_many_connections``
     - ``01d0c880c``: ``p2p: trusted_node is trusted by peer or by point``
     - ``134e1d7a7``: ``P2p: change version selection``
@@ -147,7 +147,7 @@ SHELL
 - support for history modes
 - new ``checkpoint`` RPC to get the current checkpoint for a chain
 - Commits:
-    - ``a3379065e``: ``Distributed_db: fix concurency issue on Peer_validator creation``
+    - ``a3379065e``: ``Distributed_db: fix concurrency issue on Peer_validator creation``
     - ``3e2172b2d``: ``Distributed_db: don't fail when receiving a notification for a closing worker``
     - ``6aec720b0``: ``Shell: propagate prevalidation error (#432)``
     - ``6a7c05118``: ``Shell: ensure that the chain exists when calling the valid_blocks RPC``
@@ -230,7 +230,7 @@ SHELL
     - ``e1d40755d``: ``Shell: add Chain.store in state``
     - ``9c32743c6``: ``Shell: full/rolling purge when setting a new checkpoint``
     - ``485cfa6bc``: ``Shell: improve logging``
-    - ``aa02c8580``: ``Shell: delete block when cuting alternative heads``
+    - ``aa02c8580``: ``Shell: delete block when cutting alternative heads``
     - ``ef3d7c84d``: ``Shell: check and save history mode``
     - ``9025412e7``: ``Shell: disallow switching from an history-mode to another``
     - ``47c36a01f``: ``Shell: use contents_not_found error when reading block contents``
@@ -282,7 +282,7 @@ BINS
     - ``2188d3c34``: ``add some comments``
     - ``ea997b541``: ``rebase on master``
     - ``d5bf06fff``: ``add some code documentation``
-    - ``3967e43b7``: ``sandboxed-node: preverse context if DATA_DIR variable is defined``
+    - ``3967e43b7``: ``sandboxed-node: preserve context if DATA_DIR variable is defined``
     - ``09d1822a8``: ``sandboxed-node: document DATA_DIR capability``
     - ``9f0a9b621``: ``Alpha/Accuser: handle different chain ids for double baking/endorsing``
     - ``580b7aea6``: ``Alpha/Accuser: increase the number of considered levels to a cycle (i.e. 4096)``
@@ -316,8 +316,8 @@ BINS
     - ``2c1fd0270``: ``Baker: improve logging info for endorsement waiting``
     - ``3ecda1d96``: ``Daemon: allow to ^C baker/endorser while waiting for the testchain``
     - ``ff78a6119``: ``Client/Alpha: fix the client's RPCs to use the correct chain id``
-    - ``2d8e8b17d``: ``Daemons: restore nonces file retrocompatibility``
-    - ``57f17e50c``: ``Daemons: restore highwatermarks file retrocompatibility``
+    - ``2d8e8b17d``: ``Daemons: restore nonces file backward compatibility``
+    - ``57f17e50c``: ``Daemons: restore highwatermarks file backward compatibility``
     - ``52b00f650``: ``Baker: restore the --force option for the 'bake for' command``
     - ``e3b604c03``: ``Baker: factor out some code``
     - ``858afda30``: ``Node: escape doclang in doc``
@@ -505,7 +505,7 @@ TOOLING/DOC/TESTS/BUILD/CI/ETC.
     - ``50da261f9``: ``Protocol compiler: remove safe-string from dune_protocol.template``
     - ``9aebc957c``: ``Tests: add python framework``
     - ``54195fe81``: ``Doc: fix undefined label and linkcheck``
-    - ``82e06dab9``: ``Tests: add OCaml framewwork flextesa``
+    - ``82e06dab9``: ``Tests: add OCaml framework flextesa``
     - ``236c779fa``: ``Tests: basic RPC test``
     - ``936e06273``: ``Tests: porting test_tls.sh to test_tls.py``
     - ``05e863295``: ``Tests: test tls added to CI``
@@ -519,7 +519,7 @@ TOOLING/DOC/TESTS/BUILD/CI/ETC.
     - ``a711ac1fc``: ``CI: update opam test``
     - ``18eeec0b4``: ``Alpha/Client: update opam``
     - ``d6a3b46f1``: ``Opam packaging: install TEZOS_PROTOCOL as part of tezos-embedded-protocol-%.raw``
-    - ``4511710d4``: ``Flextesa: voting commmand takes the TEZOS_PROTOCOL file as argument``
+    - ``4511710d4``: ``Flextesa: voting command takes the TEZOS_PROTOCOL file as argument``
     - ``b6619de3a``: ``lib_network_sandbox: Make it 32bits arch compatible``
     - ``6e91d5ec2``: ``Opam packaging: fix tezos-client-alpha-commands deps``
     - ``38e4ae8ed``: ``Opam packaging: fix flextesa build``

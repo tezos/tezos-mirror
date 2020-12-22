@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -38,6 +39,9 @@ type request =
       chain_id : Chain_id.t;
       block_header : Block_header.t;
       predecessor_block_header : Block_header.t;
+      predecessor_block_metadata_hash : Block_metadata_hash.t option;
+      predecessor_ops_metadata_hash :
+        Operation_metadata_list_list_hash.t option;
       operations : Operation.t list list;
       max_operations_ttl : int;
     }
@@ -130,10 +134,14 @@ let request_encoding =
       case
         (Tag 1)
         ~title:"validate"
-        (obj5
+        (obj7
            (req "chain_id" Chain_id.encoding)
            (req "block_header" (dynamic_size Block_header.encoding))
            (req "pred_header" (dynamic_size Block_header.encoding))
+           (opt "pred_block_metadata_hash" Block_metadata_hash.encoding)
+           (opt
+              "pred_ops_metadata_hash"
+              Operation_metadata_list_list_hash.encoding)
            (req "max_operations_ttl" int31)
            (req "operations" (list (list (dynamic_size Operation.encoding)))))
         (function
@@ -141,12 +149,16 @@ let request_encoding =
               { chain_id;
                 block_header;
                 predecessor_block_header;
+                predecessor_block_metadata_hash;
+                predecessor_ops_metadata_hash;
                 max_operations_ttl;
                 operations } ->
               Some
                 ( chain_id,
                   block_header,
                   predecessor_block_header,
+                  predecessor_block_metadata_hash,
+                  predecessor_ops_metadata_hash,
                   max_operations_ttl,
                   operations )
           | _ ->
@@ -154,6 +166,8 @@ let request_encoding =
         (fun ( chain_id,
                block_header,
                predecessor_block_header,
+               predecessor_block_metadata_hash,
+               predecessor_ops_metadata_hash,
                max_operations_ttl,
                operations ) ->
           Validate
@@ -161,6 +175,8 @@ let request_encoding =
               chain_id;
               block_header;
               predecessor_block_header;
+              predecessor_block_metadata_hash;
+              predecessor_ops_metadata_hash;
               max_operations_ttl;
               operations;
             });
@@ -227,3 +243,42 @@ let recv pout encoding =
   let buf = Bytes.create count in
   Lwt_io.read_into_exactly pout buf 0 count
   >>= fun () -> Lwt.return (Data_encoding.Binary.of_bytes_exn encoding buf)
+
+let socket_path_prefix = "tezos-validation-socket-"
+
+let socket_path ~socket_dir ~pid =
+  let filename = Format.sprintf "%s%d" socket_path_prefix pid in
+  Filename.concat socket_dir filename
+
+(* To get optimized socket communication of processes on the same
+   machine, we use Unix domain sockets: ADDR_UNIX. *)
+let make_socket socket_path = Unix.ADDR_UNIX socket_path
+
+let create_socket ~canceler =
+  let socket = Lwt_unix.socket PF_UNIX SOCK_STREAM 0o000 in
+  Lwt_canceler.on_cancel canceler (fun () ->
+      Lwt_utils_unix.safe_close socket >>= fun _ -> Lwt.return_unit) ;
+  Lwt_unix.setsockopt socket SO_REUSEADDR true ;
+  Lwt.return socket
+
+let create_socket_listen ~canceler ~max_requests ~socket_path =
+  create_socket ~canceler
+  >>= fun socket ->
+  Lwt.catch
+    (fun () -> Lwt_unix.bind socket (make_socket socket_path))
+    (function
+      | Unix.Unix_error (ENAMETOOLONG, _, _) as exn ->
+          External_validation_event.(
+            emit socket_path_too_long_event socket_path)
+          >>= fun () -> Lwt.fail exn
+      | exn ->
+          Lwt.fail exn)
+  >>= fun () ->
+  Lwt_unix.listen socket max_requests ;
+  Lwt.return socket
+
+let create_socket_connect ~canceler ~socket_path =
+  create_socket ~canceler
+  >>= fun socket ->
+  Lwt_unix.connect socket (make_socket socket_path)
+  >>= fun () -> Lwt.return socket

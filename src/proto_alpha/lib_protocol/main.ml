@@ -25,6 +25,8 @@
 
 (* Tezos Protocol Implementation - Protocol Signature Instance *)
 
+open Misc.Syntax
+
 type block_header_data = Alpha_context.Block_header.protocol_data
 
 type block_header = Alpha_context.Block_header.t = {
@@ -70,22 +72,19 @@ let max_operation_data_length =
   Alpha_context.Constants.max_operation_data_length
 
 let validation_passes =
-  let max_anonymous_operations =
-    Alpha_context.Constants.max_revelations_per_block
-    + (* allow 100 wallet activations or denunciations per block *) 100
-  in
+  let open Alpha_context.Constants in
   Updater.
-    [ {max_size = 32 * 1024; max_op = Some 32};
-      (* 32 endorsements *)
-      {max_size = 32 * 1024; max_op = None};
+    [ (* 32 endorsements *)
+      {max_size = 32 * 1024; max_op = Some 32};
       (* 32k of voting operations *)
+      {max_size = 32 * 1024; max_op = None};
+      (* revelations, wallet activations and denunciations *)
       {
-        max_size = max_anonymous_operations * 1024;
-        max_op = Some max_anonymous_operations;
+        max_size = max_anon_ops_per_block * 1024;
+        max_op = Some max_anon_ops_per_block;
       };
+      (* 512kB *)
       {max_size = 512 * 1024; max_op = None} ]
-
-(* 512kB *)
 
 let rpc_services =
   Alpha_services.register () ;
@@ -128,12 +127,12 @@ let begin_partial_application ~chain_id ~ancestor_context:ctxt
   Alpha_context.prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt
   >>=? fun ctxt ->
   Apply.begin_application ctxt chain_id block_header predecessor_timestamp
-  >>=? fun (ctxt, baker, block_delay) ->
+  >|=? fun (ctxt, baker, block_delay) ->
   let mode =
     Partial_application
       {block_header; baker = Signature.Public_key.hash baker; block_delay}
   in
-  return {mode; chain_id; ctxt; op_count = 0}
+  {mode; chain_id; ctxt; op_count = 0}
 
 let begin_application ~chain_id ~predecessor_context:ctxt
     ~predecessor_timestamp ~predecessor_fitness
@@ -144,12 +143,12 @@ let begin_application ~chain_id ~predecessor_context:ctxt
   Alpha_context.prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt
   >>=? fun ctxt ->
   Apply.begin_application ctxt chain_id block_header predecessor_timestamp
-  >>=? fun (ctxt, baker, block_delay) ->
+  >|=? fun (ctxt, baker, block_delay) ->
   let mode =
     Application
       {block_header; baker = Signature.Public_key.hash baker; block_delay}
   in
-  return {mode; chain_id; ctxt; op_count = 0}
+  {mode; chain_id; ctxt; op_count = 0}
 
 let begin_construction ~chain_id ~predecessor_context:ctxt
     ~predecessor_timestamp ~predecessor_level:pred_level
@@ -162,21 +161,21 @@ let begin_construction ~chain_id ~predecessor_context:ctxt
   ( match protocol_data with
   | None ->
       Apply.begin_partial_construction ctxt
-      >>=? fun ctxt ->
+      >|=? fun ctxt ->
       let mode = Partial_construction {predecessor} in
-      return (mode, ctxt)
+      (mode, ctxt)
   | Some proto_header ->
       Apply.begin_full_construction
         ctxt
         predecessor_timestamp
         proto_header.contents
-      >>=? fun (ctxt, protocol_data, baker, block_delay) ->
+      >|=? fun (ctxt, protocol_data, baker, block_delay) ->
       let mode =
         let baker = Signature.Public_key.hash baker in
         Full_construction {predecessor; baker; protocol_data; block_delay}
       in
-      return (mode, ctxt) )
-  >>=? fun (mode, ctxt) -> return {mode; chain_id; ctxt; op_count = 0}
+      (mode, ctxt) )
+  >|=? fun (mode, ctxt) -> {mode; chain_id; ctxt; op_count = 0}
 
 let apply_operation ({mode; chain_id; ctxt; op_count; _} as data)
     (operation : Alpha_context.packed_operation) =
@@ -210,9 +209,9 @@ let apply_operation ({mode; chain_id; ctxt; op_count; _} as data)
         baker
         (Alpha_context.Operation.hash operation)
         operation
-      >>=? fun (ctxt, result) ->
+      >|=? fun (ctxt, result) ->
       let op_count = op_count + 1 in
-      return ({data with ctxt; op_count}, Operation_metadata result)
+      ({data with ctxt; op_count}, Operation_metadata result)
 
 let finalize_block {mode; ctxt; op_count} =
   match mode with
@@ -228,20 +227,19 @@ let finalize_block {mode; ctxt; op_count} =
           Alpha_context.Delegate.freeze_deposit ctxt delegate deposit)
         (Alpha_context.get_deposits ctxt)
         (return ctxt)
-      >>=? fun ctxt ->
+      >|=? fun ctxt ->
       let ctxt = Alpha_context.finalize ctxt in
-      return
-        ( ctxt,
-          Apply_results.
-            {
-              baker;
-              level;
-              voting_period_kind;
-              nonce_hash = None;
-              consumed_gas = Z.zero;
-              deactivated = [];
-              balance_updates = [];
-            } )
+      ( ctxt,
+        Apply_results.
+          {
+            baker;
+            level;
+            voting_period_kind;
+            nonce_hash = None;
+            consumed_gas = Alpha_context.Gas.Arith.zero;
+            deactivated = [];
+            balance_updates = [];
+          } )
   | Partial_application {block_header; baker; block_delay} ->
       let level = Alpha_context.Level.current ctxt in
       let included_endorsements = Alpha_context.included_endorsements ctxt in
@@ -250,29 +248,28 @@ let finalize_block {mode; ctxt; op_count} =
         block_header.protocol_data.contents
         block_delay
         included_endorsements
-      >>=? fun () ->
+      >>?= fun () ->
       Alpha_context.Vote.get_current_period_kind ctxt
-      >>=? fun voting_period_kind ->
+      >|=? fun voting_period_kind ->
       let ctxt = Alpha_context.finalize ctxt in
-      return
-        ( ctxt,
-          Apply_results.
-            {
-              baker;
-              level;
-              voting_period_kind;
-              nonce_hash = None;
-              consumed_gas = Z.zero;
-              deactivated = [];
-              balance_updates = [];
-            } )
+      ( ctxt,
+        Apply_results.
+          {
+            baker;
+            level;
+            voting_period_kind;
+            nonce_hash = None;
+            consumed_gas = Alpha_context.Gas.Arith.zero;
+            deactivated = [];
+            balance_updates = [];
+          } )
   | Application
       { baker;
         block_delay;
         block_header = {protocol_data = {contents = protocol_data; _}; _} }
   | Full_construction {protocol_data; baker; block_delay; _} ->
       Apply.finalize_application ctxt protocol_data baker ~block_delay
-      >>=? fun (ctxt, receipt) ->
+      >|=? fun (ctxt, receipt) ->
       let level = Alpha_context.Level.current ctxt in
       let priority = protocol_data.priority in
       let raw_level = Alpha_context.Raw_level.to_int32 level.level in
@@ -286,7 +283,7 @@ let finalize_block {mode; ctxt; op_count} =
           op_count
       in
       let ctxt = Alpha_context.finalize ~commit_message ctxt in
-      return (ctxt, receipt)
+      (ctxt, receipt)
 
 let compare_operations op1 op2 =
   let open Alpha_context in
@@ -368,11 +365,13 @@ let init ctxt block_header =
       Optimized
       parsed_script.storage_type
       storage
-    >>=? fun (storage, ctxt) ->
+    >|=? fun (storage, ctxt) ->
     let storage =
       Alpha_context.Script.lazy_expr (Micheline.strip_locations storage)
     in
-    return (({script with storage}, big_map_diff), ctxt)
+    (({script with storage}, big_map_diff), ctxt)
   in
   Alpha_context.prepare_first_block ~typecheck ~level ~timestamp ~fitness ctxt
-  >>=? fun ctxt -> return (Alpha_context.finalize ctxt)
+  >|=? fun ctxt -> Alpha_context.finalize ctxt
+
+(* Vanity nonce: 1000005472341027 *)

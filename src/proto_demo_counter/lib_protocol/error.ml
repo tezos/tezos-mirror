@@ -60,7 +60,7 @@ let () =
     `Permanent
     ~id:"demo.proto.demo_error"
     ~title:"Demo Example Error"
-    ~description:"Dummy errror to illustrate error definition in the protocol."
+    ~description:"Dummy error to illustrate error definition in the protocol."
     ~pp:(fun ppf i -> Format.fprintf ppf "Expected demo error: %d." i)
     (obj1 (req "data" int31))
     (function Demo_error x -> Some x | _ -> None)

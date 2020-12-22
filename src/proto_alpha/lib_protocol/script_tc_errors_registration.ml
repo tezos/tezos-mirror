@@ -56,12 +56,13 @@ let () =
       "primitiveNamespace"
       ~title:"Primitive namespace"
       ~description:
-        "One of the three possible namespaces of primitive (data constructor, \
-         type name or instruction)."
+        "One of the four possible namespaces of primitive (data constructor, \
+         type name, instruction or keyword)."
     @@ string_enum
-         [ ("type", Type_namespace);
+         [ ("type", Michelson_v1_primitives.Type_namespace);
            ("constant", Constant_namespace);
-           ("instruction", Instr_namespace) ]
+           ("instruction", Instr_namespace);
+           ("keyword", Keyword_namespace) ]
   in
   let kind_enc =
     def
@@ -271,7 +272,7 @@ let () =
     ~id:"michelson_v1.duplicate_set_values_in_literal"
     ~title:"Sets literals cannot contain duplicate elements"
     ~description:
-      "Set literals cannot contain duplicate elements, but a duplicae was \
+      "Set literals cannot contain duplicate elements, but a duplicate was \
        found while parsing."
     (obj2
        (req "location" Script.location_encoding)
@@ -396,7 +397,7 @@ let () =
     `Permanent
     ~id:"michelson_v1.unexpected_annotation"
     ~title:"An annotation was encountered where no annotation is expected"
-    ~description:"A node in the syntax tree was impropperly annotated"
+    ~description:"A node in the syntax tree was improperly annotated"
     (located empty)
     (function Unexpected_annotation loc -> Some (loc, ()) | _ -> None)
     (fun (loc, ()) -> Unexpected_annotation loc) ;
@@ -475,16 +476,20 @@ let () =
   (* Invalid syntactic constant *)
   register_error_kind
     `Permanent
-    ~id:"invalidSyntacticConstantError"
+    ~id:"michelson_v1.invalid_syntactic_constant"
     ~title:"Invalid constant (parse error)"
     ~description:"A compile-time constant was invalid for its expected form."
     (located
        (obj2
-          (req "expectedForm" Script.expr_encoding)
-          (req "wrongExpression" Script.expr_encoding)))
+          (req "expected_form" string)
+          (req "wrong_expression" Script.expr_encoding)))
     (function
-      | Invalid_constant (loc, expr, ty) -> Some (loc, (ty, expr)) | _ -> None)
-    (fun (loc, (ty, expr)) -> Invalid_constant (loc, expr, ty)) ;
+      | Invalid_syntactic_constant (loc, expr, expected) ->
+          Some (loc, (expected, expr))
+      | _ ->
+          None)
+    (fun (loc, (expected, expr)) ->
+      Invalid_syntactic_constant (loc, expr, expected)) ;
   (* Invalid contract *)
   register_error_kind
     `Permanent
@@ -549,7 +554,7 @@ let () =
     ~id:"michelson_v1.invalid_map_block_fail"
     ~title:"FAIL instruction occurred as body of map block"
     ~description:
-      "FAIL cannot be the only instruction in the body. The propper type of \
+      "FAIL cannot be the only instruction in the body. The proper type of \
        the return list cannot be inferred."
     (obj1 (req "loc" Script.location_encoding))
     (function Invalid_map_block_fail loc -> Some loc | _ -> None)
@@ -649,4 +654,22 @@ let () =
       "A deprecated instruction usage is disallowed in newly created contracts"
     (obj1 (req "prim" prim_encoding))
     (function Deprecated_instruction prim -> Some prim | _ -> None)
-    (fun prim -> Deprecated_instruction prim)
+    (fun prim -> Deprecated_instruction prim) ;
+  (* Typechecking stack overflow *)
+  register_error_kind
+    `Temporary
+    ~id:"michelson_v1.typechecking_too_many_recursive_calls"
+    ~title:"Too many recursive calls during typechecking"
+    ~description:"Too many recursive calls were needed for typechecking"
+    Data_encoding.empty
+    (function Typechecking_too_many_recursive_calls -> Some () | _ -> None)
+    (fun () -> Typechecking_too_many_recursive_calls) ;
+  (* Unparsing stack overflow *)
+  register_error_kind
+    `Temporary
+    ~id:"michelson_v1.unparsing_stack_overflow"
+    ~title:"Too many recursive calls during unparsing"
+    ~description:"Too many recursive calls were needed for unparsing"
+    Data_encoding.empty
+    (function Unparsing_too_many_recursive_calls -> Some () | _ -> None)
+    (fun () -> Unparsing_too_many_recursive_calls)

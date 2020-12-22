@@ -28,7 +28,7 @@ module M = struct
 
   type key = string list
 
-  type value = MBytes.t
+  type value = Bytes.t
 
   type t = Dir of t StringMap.t | Key of value
 
@@ -39,11 +39,7 @@ module M = struct
     | ([], m) ->
         Some m
     | (n :: k, Dir m) -> (
-      match StringMap.find_opt n m with
-      | Some res ->
-          raw_get res k
-      | None ->
-          None )
+      match StringMap.find n m with Some res -> raw_get res k | None -> None )
     | (_ :: _, Key _) ->
         None
 
@@ -56,9 +52,7 @@ module M = struct
     | ([], (Key _ | Dir _), None) ->
         Some empty
     | (n :: k, Dir m, _) -> (
-      match
-        raw_set (Option.unopt ~default:empty (StringMap.find_opt n m)) k v
-      with
+      match raw_set (Option.value ~default:empty (StringMap.find n m)) k v with
       | None ->
           None
       | Some rm when rm = empty ->
@@ -98,10 +92,6 @@ module M = struct
     | Some m ->
         Lwt.return m
 
-  let del m k =
-    (* TODO assert key *)
-    match raw_set m k None with None -> Lwt.return m | Some m -> Lwt.return m
-
   let remove_rec m k =
     match raw_set m k None with None -> Lwt.return m | Some m -> Lwt.return m
 
@@ -136,6 +126,8 @@ module M = struct
               pp_path
               to_
               s )
+
+  type key_or_dir = [`Key of key | `Dir of key]
 
   let fold m k ~init ~f =
     match raw_get m k with

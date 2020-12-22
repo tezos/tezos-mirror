@@ -45,16 +45,14 @@ let () =
     `Permanent
     ~id:"timestamp_sub"
     ~title:"Timestamp sub"
-    ~description:"Substracting timestamps resulted in negative period."
+    ~description:"Subtracting timestamps resulted in negative period."
     ~pp:(fun ppf () ->
-      Format.fprintf ppf "Substracting timestamps resulted in negative period.")
+      Format.fprintf ppf "Subtracting timestamps resulted in negative period.")
     Data_encoding.empty
     (function Timestamp_sub -> Some () | _ -> None)
     (fun () -> Timestamp_sub)
 
-let of_seconds s = try Some (of_seconds (Int64.of_string s)) with _ -> None
-
-let to_seconds = to_seconds
+let of_seconds_string s = Option.map ~f:of_seconds (Int64.of_string_opt s)
 
 let to_seconds_string s = Int64.to_string (to_seconds s)
 

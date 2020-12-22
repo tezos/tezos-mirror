@@ -103,7 +103,7 @@ let revelation_early_wrong_right_twice () =
   Block.bake ~policy:(Block.By_account pkh) b
   >>=? fun b ->
   Context.get_level (B b)
-  >>=? fun level_commitment ->
+  >>?= fun level_commitment ->
   Context.get_seed_nonce_hash (B b)
   >>=? fun committed_hash ->
   baking_reward (B b) b
@@ -116,8 +116,11 @@ let revelation_early_wrong_right_twice () =
   balance_was_credited ~loc:__LOC__ (B b) id ~kind:Rewards bal_rewards reward
   >>=? fun () ->
   (* test that revealing too early produces an error *)
-  Op.seed_nonce_revelation (B b) level_commitment (Nonce.get committed_hash)
-  >>=? fun operation ->
+  Op.seed_nonce_revelation
+    (B b)
+    level_commitment
+    (Option.unopt_exn Not_found @@ Nonce.get committed_hash)
+  |> fun operation ->
   Block.bake ~policy ~operation b
   >>= fun e ->
   let expected = function
@@ -133,8 +136,11 @@ let revelation_early_wrong_right_twice () =
   >>=? fun b ->
   (* test that revealing at the right time but the wrong value produces an error *)
   let (wrong_hash, _) = Nonce.generate () in
-  Op.seed_nonce_revelation (B b) level_commitment (Nonce.get wrong_hash)
-  >>=? fun operation ->
+  Op.seed_nonce_revelation
+    (B b)
+    level_commitment
+    (Option.unopt_exn Not_found @@ Nonce.get wrong_hash)
+  |> fun operation ->
   Block.bake ~operation b
   >>= fun e ->
   Assert.proto_error ~loc:__LOC__ e (function
@@ -144,8 +150,11 @@ let revelation_early_wrong_right_twice () =
           false)
   >>=? fun () ->
   (* reveals correctly *)
-  Op.seed_nonce_revelation (B b) level_commitment (Nonce.get committed_hash)
-  >>=? fun operation ->
+  Op.seed_nonce_revelation
+    (B b)
+    level_commitment
+    (Option.unopt_exn Not_found @@ Nonce.get committed_hash)
+  |> fun operation ->
   Block.get_next_baker ~policy b
   >>=? fun (baker_pkh, _, _) ->
   let baker = Alpha_context.Contract.implicit_contract baker_pkh in
@@ -171,8 +180,8 @@ let revelation_early_wrong_right_twice () =
     baker_bal_deposit
     bond
   >>=? fun () ->
-  Lwt.return @@ Tez.( +? ) baker_reward tip
-  >>=? fun expected_rewards ->
+  Tez.( +? ) baker_reward tip
+  >>?= fun expected_rewards ->
   balance_was_credited
     ~loc:__LOC__
     (B b)
@@ -182,8 +191,11 @@ let revelation_early_wrong_right_twice () =
     expected_rewards
   >>=? fun () ->
   (* test that revealing twice produces an error *)
-  Op.seed_nonce_revelation (B b) level_commitment (Nonce.get wrong_hash)
-  >>=? fun operation ->
+  Op.seed_nonce_revelation
+    (B b)
+    level_commitment
+    (Option.unopt_exn Not_found @@ Nonce.get wrong_hash)
+  |> fun operation ->
   Block.bake ~operation ~policy b
   >>= fun e ->
   Assert.proto_error ~loc:__LOC__ e (function
@@ -233,7 +245,7 @@ let revelation_missing_and_late () =
   Block.bake b
   >>=? fun b ->
   Context.get_level (B b)
-  >>=? fun level_commitment ->
+  >>?= fun level_commitment ->
   Context.get_seed_nonce_hash (B b)
   >>=? fun committed_hash ->
   Context.Contract.balance ~kind:Main (B b) id
@@ -258,8 +270,11 @@ let revelation_missing_and_late () =
   balance_was_debited ~loc:__LOC__ (B b) id ~kind:Rewards bal_rewards reward
   >>=? fun () ->
   (* test that revealing too late (after cycle 1) produces an error *)
-  Op.seed_nonce_revelation (B b) level_commitment (Nonce.get committed_hash)
-  >>=? fun operation ->
+  Op.seed_nonce_revelation
+    (B b)
+    level_commitment
+    (Option.unopt_exn Not_found @@ Nonce.get committed_hash)
+  |> fun operation ->
   Block.bake ~operation b
   >>= fun e ->
   Assert.proto_error ~loc:__LOC__ e (function

@@ -48,8 +48,6 @@ type error += Invalid_message_size
 
 type error += Invalid_incoming_ciphertext_size
 
-type error += Encoding_error
-
 type error += Rejected_socket_connection
 
 type error +=
@@ -60,7 +58,7 @@ type error +=
 
 type error += Rejected_no_common_protocol of {announced : Network_version.t}
 
-type error += Decoding_error
+type error += Decoding_error of Data_encoding.Binary.read_error
 
 type error += Myself of P2p_connection.Id.t
 
@@ -106,16 +104,6 @@ let () =
     Data_encoding.empty
     (function Invalid_incoming_ciphertext_size -> Some () | _ -> None)
     (fun () -> Invalid_incoming_ciphertext_size) ;
-  (* Encoding error *)
-  register_error_kind
-    `Permanent
-    ~id:"node.p2p_socket.encoding_error"
-    ~title:"Encoding error"
-    ~description:"An error occurred while encoding."
-    ~pp:(fun ppf () -> Format.fprintf ppf "An error occurred while encoding.")
-    Data_encoding.empty
-    (function Encoding_error -> Some () | _ -> None)
-    (fun () -> Encoding_error) ;
   (* Rejected socket connection *)
   register_error_kind
     `Permanent
@@ -180,10 +168,15 @@ let () =
     ~id:"node.p2p_socket.decoding_error"
     ~title:"Decoding error"
     ~description:"An error occurred while decoding."
-    ~pp:(fun ppf () -> Format.fprintf ppf "An error occurred while decoding.")
-    Data_encoding.empty
-    (function Decoding_error -> Some () | _ -> None)
-    (fun () -> Decoding_error) ;
+    ~pp:(fun ppf re ->
+      Format.fprintf
+        ppf
+        "An error occurred while decoding: %a."
+        Data_encoding.Binary.pp_read_error
+        re)
+    Data_encoding.(obj1 @@ req "read_error" Binary.read_error_encoding)
+    (function Decoding_error re -> Some re | _ -> None)
+    (fun re -> Decoding_error re) ;
   (* Myself *)
   register_error_kind
     `Permanent
@@ -265,6 +258,8 @@ type error += Private_mode
 type error += Point_banned of P2p_point.Id.t
 
 type error += Peer_banned of P2p_peer.Id.t
+
+type error += P2p_layer_disabled
 
 let () =
   (* Pending connection *)
@@ -374,4 +369,14 @@ let () =
         peer_id)
     Data_encoding.(obj1 (req "peer" P2p_peer.Id.encoding))
     (function Peer_banned peer_id -> Some peer_id | _ -> None)
-    (fun peer_id -> Peer_banned peer_id)
+    (fun peer_id -> Peer_banned peer_id) ;
+  (* P2p_layer_disabled *)
+  register_error_kind
+    `Permanent
+    ~id:"node.p2p_pool.disabled"
+    ~title:"P2P layer disabled"
+    ~description:"The P2P layer on this node is not active."
+    ~pp:(fun ppf () -> Format.fprintf ppf "P2P layer disabled.")
+    Data_encoding.empty
+    (function P2p_layer_disabled -> Some () | _ -> None)
+    (fun () -> P2p_layer_disabled)

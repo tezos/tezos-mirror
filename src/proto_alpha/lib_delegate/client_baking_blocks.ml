@@ -128,12 +128,12 @@ module Block_seen_event = struct
       in
       With_version.(encoding ~name (first_version v0_encoding))
 
-    let pp ppf {hash; _} =
+    let pp ~short:_ ppf {hash; _} =
       Format.fprintf ppf "Saw block %a" Block_hash.pp_short hash
 
     let doc = "Block observed while monitoring a blockchain."
 
-    include Internal_event.Event_defaults
+    let level _ = Internal_event.Info
   end
 
   module Event = Internal_event.Make (Definition)

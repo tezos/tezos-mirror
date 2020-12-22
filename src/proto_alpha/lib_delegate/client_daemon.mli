@@ -31,6 +31,7 @@ module Endorser : sig
     #Protocol_client_context.full ->
     chain:Chain_services.chain ->
     delay:int ->
+    keep_alive:bool ->
     public_key_hash list ->
     unit tzresult Lwt.t
 end
@@ -39,11 +40,12 @@ module Baker : sig
   val run :
     #Protocol_client_context.full ->
     ?minimal_fees:Tez.t ->
-    ?minimal_nanotez_per_gas_unit:Z.t ->
-    ?minimal_nanotez_per_byte:Z.t ->
+    ?minimal_nanotez_per_gas_unit:Q.t ->
+    ?minimal_nanotez_per_byte:Q.t ->
     ?max_priority:int ->
     chain:Chain_services.chain ->
     context_path:string ->
+    keep_alive:bool ->
     public_key_hash list ->
     unit tzresult Lwt.t
 end
@@ -53,5 +55,6 @@ module Accuser : sig
     #Protocol_client_context.full ->
     chain:Chain_services.chain ->
     preserved_levels:int ->
+    keep_alive:bool ->
     unit tzresult Lwt.t
 end

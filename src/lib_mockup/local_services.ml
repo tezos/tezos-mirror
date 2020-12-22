@@ -53,7 +53,7 @@ let () =
     ~description:"Cannot parse operation"
     ~pp:(fun ppf () -> Format.pp_print_string ppf "Cannot parse operation.")
     Data_encoding.unit
-    (function Injection_not_possible -> Some () | _ -> None)
+    (function Cannot_parse_op -> Some () | _ -> None)
     (fun () -> Canceled)
 
 (* Since we bypass the node but still use the RPC mechanism for procedure
@@ -92,7 +92,7 @@ let init_fake_p2p =
       encoding = [];
       chain_name = Distributed_db_version.Name.of_string "TEZOS_CLIENT_MOCKUP";
       (* The following cannot be empty. *)
-      distributed_db_versions = [Distributed_db_version.zero];
+      distributed_db_versions = Distributed_db_version.[zero; one];
     }
   in
   fun () ->
@@ -107,13 +107,13 @@ let p2p () =
   let fake_p2p = init_fake_p2p () in
   Tezos_p2p.P2p_directory.build_rpc_directory fake_p2p
 
-let chain () =
+let chain chain_id =
   Directory.prefix
     Tezos_shell_services.Chain_services.path
     (Directory.register
        Directory.empty
        Tezos_shell_services.Chain_services.S.chain_id
-       (fun _ () () -> RPC_answer.return Chain_id.zero))
+       (fun _ () () -> RPC_answer.return chain_id))
 
 let protocols protocol_hash =
   let path =
@@ -152,6 +152,7 @@ let block_hash (rpc_context : Tezos_protocol_environment.rpc_context) =
       RPC_answer.return rpc_context.block_hash)
 
 let preapply (mockup_env : Registration.mockup_environment)
+    (chain_id : Chain_id.t)
     (rpc_context : Tezos_protocol_environment.rpc_context) =
   let (module Mockup_environment) = mockup_env in
   Directory.prefix
@@ -162,35 +163,31 @@ let preapply (mockup_env : Registration.mockup_environment)
        Directory.empty
        Mockup_environment.Block_services.S.Helpers.Preapply.operations
        (fun _prefix () op_list ->
-         let outcome =
-           Lwt_main.run
-             (let predecessor = rpc_context.block_hash in
-              let header = rpc_context.block_header in
-              let predecessor_context = rpc_context.context in
-              let chain_id = Chain_id.zero in
-              Mockup_environment.Protocol.begin_construction
-                ~chain_id
-                ~predecessor_context
-                ~predecessor_timestamp:header.timestamp
-                ~predecessor_level:header.level
-                ~predecessor_fitness:header.fitness
-                ~predecessor
-                ~timestamp:
-                  (Time.System.to_protocol
-                     (Tezos_stdlib_unix.Systime_os.now ()))
-                ()
-              >>=? fun state ->
-              fold_left_s
-                (fun (state, acc) op ->
-                  Mockup_environment.Protocol.apply_operation state op
-                  >>=? fun (state, result) ->
-                  return (state, (op.protocol_data, result) :: acc))
-                (state, [])
-                op_list
-              >>=? fun (state, acc) ->
-              Mockup_environment.Protocol.finalize_block state
-              >>=? fun _ -> return (List.rev acc))
-         in
+         (let predecessor = rpc_context.block_hash in
+          let header = rpc_context.block_header in
+          let predecessor_context = rpc_context.context in
+          Mockup_environment.Protocol.begin_construction
+            ~chain_id
+            ~predecessor_context
+            ~predecessor_timestamp:header.timestamp
+            ~predecessor_level:header.level
+            ~predecessor_fitness:header.fitness
+            ~predecessor
+            ~timestamp:
+              (Time.System.to_protocol (Tezos_stdlib_unix.Systime_os.now ()))
+            ()
+          >>=? fun state ->
+          fold_left_s
+            (fun (state, acc) op ->
+              Mockup_environment.Protocol.apply_operation state op
+              >>=? fun (state, result) ->
+              return (state, (op.protocol_data, result) :: acc))
+            (state, [])
+            op_list
+          >>=? fun (state, acc) ->
+          Mockup_environment.Protocol.finalize_block state
+          >>=? fun _ -> return (List.rev acc))
+         >>= fun outcome ->
          match outcome with
          | Ok result ->
              RPC_answer.return result
@@ -198,6 +195,7 @@ let preapply (mockup_env : Registration.mockup_environment)
              RPC_answer.fail errs))
 
 let inject_operation (mockup_env : Registration.mockup_environment)
+    (chain_id : Chain_id.t)
     (rpc_context : Tezos_protocol_environment.rpc_context) (mem_only : bool)
     (write_context_callback :
       Tezos_protocol_environment.rpc_context -> unit tzresult Lwt.t) =
@@ -233,27 +231,24 @@ let inject_operation (mockup_env : Registration.mockup_environment)
                 let predecessor = rpc_context.block_hash in
                 let header = rpc_context.block_header in
                 let predecessor_context = rpc_context.context in
-                let chain_id = Chain_id.zero in
-                let result =
-                  Lwt_main.run
-                    ( Mockup_environment.Protocol.begin_construction
-                        ~chain_id
-                        ~predecessor_context
-                        ~predecessor_timestamp:header.timestamp
-                        ~predecessor_level:header.level
-                        ~predecessor_fitness:header.fitness
-                        ~predecessor
-                        ~timestamp:
-                          (Time.System.to_protocol
-                             (Tezos_stdlib_unix.Systime_os.now ()))
-                        ()
-                    >>=? fun state ->
-                    Mockup_environment.Protocol.apply_operation state op
-                    >>=? fun (state, receipt) ->
-                    Mockup_environment.Protocol.finalize_block state
-                    >>=? fun (validation_result, _block_header_metadata) ->
-                    return (validation_result, receipt) )
-                in
+                Mockup_environment.Protocol.begin_construction
+                  ~chain_id
+                  ~predecessor_context
+                  ~predecessor_timestamp:header.timestamp
+                  ~predecessor_level:header.level
+                  ~predecessor_fitness:header.fitness
+                  ~predecessor
+                  ~timestamp:
+                    (Time.System.to_protocol
+                       (Tezos_stdlib_unix.Systime_os.now ()))
+                  ()
+                >>=? (fun state ->
+                       Mockup_environment.Protocol.apply_operation state op
+                       >>=? fun (state, receipt) ->
+                       Mockup_environment.Protocol.finalize_block state
+                       >>=? fun (validation_result, _block_header_metadata) ->
+                       return (validation_result, receipt))
+                >>= fun result ->
                 match result with
                 | Ok ({context; _}, _receipt) ->
                     let rpc_context = {rpc_context with context} in
@@ -269,18 +264,24 @@ let inject_operation (mockup_env : Registration.mockup_environment)
                     RPC_answer.fail errs ) ))
 
 let build_shell_directory (mockup_env : Registration.mockup_environment)
-    (rpc_context : Tezos_protocol_environment.rpc_context) (mem_only : bool)
+    chain_id (rpc_context : Tezos_protocol_environment.rpc_context)
+    (mem_only : bool)
     (write_context_callback :
       Tezos_protocol_environment.rpc_context -> unit tzresult Lwt.t) =
   let (module Mockup_environment) = mockup_env in
   let directory = ref Directory.empty in
   let merge dir = directory := Directory.merge dir !directory in
   merge (p2p ()) ;
-  merge (chain ()) ;
+  merge (chain chain_id) ;
   merge (monitor rpc_context) ;
   merge (protocols Mockup_environment.Protocol.hash) ;
   merge (block_hash rpc_context) ;
-  merge (preapply mockup_env rpc_context) ;
+  merge (preapply mockup_env chain_id rpc_context) ;
   merge
-    (inject_operation mockup_env rpc_context mem_only write_context_callback) ;
+    (inject_operation
+       mockup_env
+       chain_id
+       rpc_context
+       mem_only
+       write_context_callback) ;
   !directory

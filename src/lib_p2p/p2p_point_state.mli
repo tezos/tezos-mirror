@@ -45,16 +45,16 @@ module Info : sig
 
   val compare : 'conn point_info -> 'conn point_info -> int
 
-  type greylisting_config = {
+  type reconnection_config = {
     factor : float;
     initial_delay : Time.System.Span.t;
     disconnection_delay : Time.System.Span.t;
     increase_cap : Time.System.Span.t;
   }
 
-  val default_greylisting_config : greylisting_config
+  val default_reconnection_config : reconnection_config
 
-  val greylisting_config_encoding : greylisting_config Data_encoding.encoding
+  val reconnection_config_encoding : reconnection_config Data_encoding.encoding
 
   (** [create ~trusted addr port] is a freshly minted point_info. If
       [trusted] is true, this point is considered trusted and will
@@ -100,14 +100,22 @@ module Info : sig
   *)
   val last_miss : 'conn point_info -> Time.System.t option
 
-  val greylisted : ?now:Time.System.t -> 'conn point_info -> bool
+  (* [reset_reconnection_delay] Reset the reconnection_delay for this point
+     practically allowing the node to try the connection immediately *)
+  val reset_reconnection_delay : 'conn point_info -> unit
 
-  val greylisted_until : 'conn point_info -> Time.System.t
+  (* [can_reconnect] Check if a point is greylisted w.r.t. the current time *)
+  val can_reconnect : now:Time.System.t -> 'conn point_info -> bool
+
+  (* [reconnection_time] Return the time at which the node can try to 
+     reconnect with this point, Or None if the point is already in state 
+     running or can be recontacted immediately *)
+  val reconnection_time : 'conn point_info -> Time.System.t option
 
   val point : 'conn point_info -> Id.t
 
   val log_incoming_rejection :
-    ?timestamp:Time.System.t -> 'conn point_info -> P2p_peer.Id.t -> unit
+    timestamp:Time.System.t -> 'conn point_info -> P2p_peer.Id.t -> unit
 
   val fold : 'conn t -> init:'a -> f:('a -> Pool_event.t -> 'a) -> 'a
 
@@ -119,23 +127,25 @@ val get : 'conn Info.t -> 'conn t
 val is_disconnected : 'conn Info.t -> bool
 
 val set_requested :
-  ?timestamp:Time.System.t -> 'conn Info.t -> Lwt_canceler.t -> unit
+  timestamp:Time.System.t -> 'conn Info.t -> Lwt_canceler.t -> unit
 
 val set_accepted :
-  ?timestamp:Time.System.t ->
+  timestamp:Time.System.t ->
   'conn Info.t ->
   P2p_peer.Id.t ->
   Lwt_canceler.t ->
   unit
 
 val set_running :
-  ?timestamp:Time.System.t -> 'conn Info.t -> P2p_peer.Id.t -> 'conn -> unit
+  timestamp:Time.System.t -> 'conn Info.t -> P2p_peer.Id.t -> 'conn -> unit
 
 val set_private : 'conn Info.t -> bool -> unit
 
+(* [set_disconnected] Change the state of a peer upon disconnection and
+   set the reconnection delay accordingly *)
 val set_disconnected :
-  ?timestamp:Time.System.t ->
+  timestamp:Time.System.t ->
   ?requested:bool ->
-  Info.greylisting_config ->
+  Info.reconnection_config ->
   'conn Info.t ->
   unit

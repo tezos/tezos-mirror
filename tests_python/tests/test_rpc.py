@@ -1,6 +1,9 @@
+import os
 import time
 import pytest
-from tools import utils, constants
+from tools import utils, constants, paths
+from client.client_output import InvalidClientOutput
+from launchers.sandbox import Sandbox
 
 BAKE_ARGS = ['--max-priority', '512', '--minimal-timestamp']
 CHAIN_ID = "main"
@@ -10,159 +13,197 @@ PROTOCOL_HASH = "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
 BLOCK_LEVEL = "3"
 LIST_OFFSET = "0"
 OPERATION_OFFSET = "0"
-CONTRACT_ID = ""  # TODO
+
+
+@pytest.fixture(scope="class")
+def session():
+    session = dict()
+    session["implicit_accounts"] = [
+        "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
+        "tz1ddb9NMYHZi5UzPdzTZMYQQZoMub195zgv",
+        "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv",
+        "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU",
+        "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+    ]
+    session["originated_accounts"] = []
+    return session
+
+
+@pytest.fixture(scope="class")
+def contract_name():
+    return "contract_identity"
+
+
+@pytest.fixture(scope="class")
+def sandbox(sandbox: Sandbox, contract_name, session: dict):
+    """Adds two nodes to sandbox. Using the first node, originates the
+    identity contract `id.tz` with the name contract_name and makes it
+    address available under session['originated_accounts'].
+    """
+    sandbox.add_node(1, params=constants.NODE_PARAMS)
+    sandbox.add_node(2, params=constants.NODE_PARAMS)
+    client = sandbox.client(1)
+    utils.activate_alpha(sandbox.client(1), activate_in_the_past=True)
+    client.bake("bootstrap1", BAKE_ARGS)
+    time.sleep(2)
+    # Deploy a contract
+    contract = os.path.join(paths.CONTRACT_PATH, 'attic',
+                            'id.tz')
+    args = ['--init', "\"tezos\"", '--burn-cap', '10.0']
+    origination = client.originate(contract_name, 10.0,
+                                   "bootstrap1", contract, args)
+    session['originated_accounts'].append(origination.contract)
+    client.bake("bootstrap1", ["--minimal-timestamp"])
+    assert utils.check_block_contains_operations(
+        client, [origination.operation_hash])
+    return sandbox
 
 
 @pytest.mark.mempool
 @pytest.mark.multinode
 @pytest.mark.slow
-class TestRPCs:
-    " Tests RPCs"
+class TestRPCsExistence:
+    """
+    Tests the existence of RPCs. It does not check the output!
+    Existence relying on the storage are tested using bootstrap
+    accounts/originated contracts.
+    """
 
     block_hash = ""
 
-    def test_init(self, sandbox):
-        sandbox.add_node(1, params=constants.NODE_PARAMS)
-        sandbox.add_node(2, params=constants.NODE_PARAMS)
-        utils.activate_alpha(sandbox.client(1))
-        time.sleep(2)
+    def test_config_file(self, sandbox: Sandbox):
+        sandbox.client(1).rpc('get', '/config')
 
-    def test_bake_for(self, sandbox):
-        sandbox.client(1).bake('bootstrap1', BAKE_ARGS)
+    def test_network_self(self, sandbox: Sandbox):
+        sandbox.client(1).rpc('get', '/network/self')
 
-    def test_network_self(self, sandbox):
-        sandbox.client(1).rpc('get', f'/network/self')
-
-    def test_constants(self, sandbox):
+    def test_constants(self, sandbox: Sandbox):
         sandbox.client(2).rpc('get', '/network/self')
         sandbox.client(1).bake('bootstrap1', BAKE_ARGS)
         time.sleep(3)
 
-    def test_chain_blocks(self, sandbox):
+    def test_chain_blocks(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get', f'/chains/{CHAIN_ID}/blocks')
 
-    def test_chain_chain_id(self, sandbox):
+    def test_chain_chain_id(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get', f'/chains/{CHAIN_ID}/chain_id')
 
-    @pytest.mark.skip
-    def test_chain_invalid_blocks(self, sandbox):
+    def test_chain_invalid_blocks(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get', f'/chains/{CHAIN_ID}/invalid_blocks')
 
-    @pytest.mark.skip
-    def test_chain_invalid_blocks_block_hash(self, sandbox):
+    @pytest.mark.skip(reason="TODO")
+    def test_chain_invalid_blocks_block_hash(self, sandbox: Sandbox):
         res = sandbox.client(1).bake('bootstrap1', BAKE_ARGS)
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/invalid_blocks/'
                               f'{res.block_hash}')
 
     @pytest.mark.skip
-    def test_describe(self, sandbox):
-        sandbox.client(1).rpc('get', f'/describe')
+    def test_describe(self, sandbox: Sandbox):
+        sandbox.client(1).rpc('get', '/describe')
 
-    @pytest.mark.skip(reason="bug on double encoding registration")
-    def test_errors(self, sandbox):
+    def test_errors(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get', '/errors')
 
-    def test_fetch_protocol_protocol_hash(self, sandbox):
+    def test_fetch_protocol_protocol_hash(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get', f'/fetch_protocol/{PROTOCOL_HASH}')
 
-    def test_network_connections(self, sandbox):
-        sandbox.client(1).rpc('get', f'/network/connections')
+    def test_network_connections(self, sandbox: Sandbox):
+        sandbox.client(1).rpc('get', '/network/connections')
 
-    def test_network_connections_peer_id(self, sandbox):
+    def test_network_connections_peer_id(self, sandbox: Sandbox):
         peer_id = sandbox.client(2).rpc('get', '/network/self')
         sandbox.client(1).rpc('get', f'/network/connections/{peer_id}')
 
-    def test_network_greylist_clear(self, sandbox):
-        sandbox.client(1).rpc('get', f'/network/greylist/clear')
+    def test_network_greylist_clear(self, sandbox: Sandbox):
+        sandbox.client(1).rpc('get', '/network/greylist/clear')
 
-    def test_network_peers(self, sandbox):
-        sandbox.client(1).rpc('get', f'/network/peers')
+    def test_network_peers(self, sandbox: Sandbox):
+        sandbox.client(1).rpc('get', '/network/peers')
 
-    def test_network_peers_peer_id(self, sandbox):
+    def test_network_peers_peer_id(self, sandbox: Sandbox):
         peer_id = sandbox.client(2).rpc('get', '/network/self')
         sandbox.client(1).rpc('get', f'/network/peers/{peer_id}')
 
-    def test_network_peers_peer_id_ban(self, sandbox):
+    def test_network_peers_peer_id_ban(self, sandbox: Sandbox):
         peer_id = sandbox.client(2).rpc('get', '/network/self')
         sandbox.client(1).rpc('get', f'/network/peers/{peer_id}/ban')
 
-    def test_network_peers_peer_id_banned(self, sandbox):
+    def test_network_peers_peer_id_banned(self, sandbox: Sandbox):
         peer_id = sandbox.client(2).rpc('get', '/network/self')
         sandbox.client(1).rpc('get', f'/network/peers/{peer_id}/banned')
 
-    def test_network_peers_peer_id_unban(self, sandbox):
+    def test_network_peers_peer_id_unban(self, sandbox: Sandbox):
         peer_id = sandbox.client(2).rpc('get', '/network/self')
         sandbox.client(1).rpc('get', f'/network/peers/{peer_id}/unban')
 
-    def test_network_peers_peer_id_untrust(self, sandbox):
+    def test_network_peers_peer_id_untrust(self, sandbox: Sandbox):
         peer_id = sandbox.client(2).rpc('get', '/network/self')
         sandbox.client(1).rpc('get', f'/network/peers/{peer_id}/untrust')
 
-    def test_network_peers_peer_id_trust(self, sandbox):
+    def test_network_peers_peer_id_trust(self, sandbox: Sandbox):
         peer_id = sandbox.client(2).rpc('get', '/network/self')
         sandbox.client(1).rpc('get', f'/network/peers/{peer_id}/trust')
 
-    def test_network_points(self, sandbox):
-        sandbox.client(1).rpc('get', f'/network/points')
+    def test_network_points(self, sandbox: Sandbox):
+        sandbox.client(1).rpc('get', '/network/points')
 
-    def test_network_points_point(self, sandbox):
-        points = sandbox.client(1).rpc('get', f'/network/points')
+    def test_network_points_point(self, sandbox: Sandbox):
+        points = sandbox.client(1).rpc('get', '/network/points')
         point = points[-1][0]
         sandbox.client(1).rpc('get', f'/network/points/{point}')
 
-    def test_network_points_point_ban(self, sandbox):
-        points = sandbox.client(1).rpc('get', f'/network/points')
+    def test_network_points_point_ban(self, sandbox: Sandbox):
+        points = sandbox.client(1).rpc('get', '/network/points')
         point = points[-1][0]
         sandbox.client(1).rpc('get', f'/network/points/{point}/ban')
 
-    def test_network_points_point_banned(self, sandbox):
-        points = sandbox.client(1).rpc('get', f'/network/points')
+    def test_network_points_point_banned(self, sandbox: Sandbox):
+        points = sandbox.client(1).rpc('get', '/network/points')
         point = points[-1][0]
         sandbox.client(1).rpc('get', f'/network/points/{point}/banned')
 
-    def test_network_points_point_trust(self, sandbox):
-        points = sandbox.client(1).rpc('get', f'/network/points')
+    def test_network_points_point_trust(self, sandbox: Sandbox):
+        points = sandbox.client(1).rpc('get', '/network/points')
         point = points[-1][0]
         sandbox.client(1).rpc('get', f'/network/points/{point}/trust')
 
-    def test_network_points_point_unban(self, sandbox):
-        points = sandbox.client(1).rpc('get', f'/network/points')
+    def test_network_points_point_unban(self, sandbox: Sandbox):
+        points = sandbox.client(1).rpc('get', '/network/points')
         point = points[-1][0]
         sandbox.client(1).rpc('get', f'/network/points/{point}/unban')
 
-    def test_network_points_point_untrust(self, sandbox):
-        points = sandbox.client(1).rpc('get', f'/network/points')
+    def test_network_points_point_untrust(self, sandbox: Sandbox):
+        points = sandbox.client(1).rpc('get', '/network/points')
         point = points[-1][0]
         sandbox.client(1).rpc('get', f'/network/points/{point}/untrust')
 
-    def test_network_stat(self, sandbox):
-        sandbox.client(1).rpc('get', f'/network/stat')
+    def test_network_stat(self, sandbox: Sandbox):
+        sandbox.client(1).rpc('get', '/network/stat')
 
-    def test_network_version(self, sandbox):
-        sandbox.client(1).rpc('get', f'/network/version')
+    def test_network_version(self, sandbox: Sandbox):
+        sandbox.client(1).rpc('get', '/network/version')
 
-    @pytest.mark.skip
-    def test_network_versions(self, sandbox):
-        sandbox.client(1).rpc('get', f'/network/versions')
+    def test_network_versions(self, sandbox: Sandbox):
+        sandbox.client(1).rpc('get', '/network/versions')
 
-    def test_protocols(self, sandbox):
-        sandbox.client(1).rpc('get', f'/protocols')
+    def test_protocols(self, sandbox: Sandbox):
+        sandbox.client(1).rpc('get', '/protocols')
 
-    def test_protocols_protocol_hash(self, sandbox):
+    def test_protocols_protocol_hash(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get', f'/protocols/{PROTOCOL_HASH}')
 
-    def test_workers_block_validator(self, sandbox):
-        sandbox.client(1).rpc('get', f'/workers/block_validator')
+    def test_workers_block_validator(self, sandbox: Sandbox):
+        sandbox.client(1).rpc('get', '/workers/block_validator')
 
-    def test_workers_chain_validators(self, sandbox):
-        sandbox.client(1).rpc('get', f'/workers/chain_validators')
+    def test_workers_chain_validators(self, sandbox: Sandbox):
+        sandbox.client(1).rpc('get', '/workers/chain_validators')
 
-    def test_workers_chain_validator(self, sandbox):
+    def test_workers_chain_validator(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/workers/chain_validators/{CHAIN_ID}')
 
-    def test_workers_chain_validator_ddb(self, sandbox):
+    def test_workers_chain_validator_ddb(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/workers/chain_validators/{CHAIN_ID}/ddb')
 
@@ -170,345 +211,490 @@ class TestRPCs:
                                                       sandbox):
         sandbox.client(1).rpc('get',
                               f'/workers/chain_validators/{CHAIN_ID}/'
-                              f'peers_validators')
+                              'peers_validators')
 
     @pytest.mark.skip
-    def test_workers_chain_validator_peer_validator(self, sandbox):
+    def test_workers_chain_validator_peer_validator(self, sandbox: Sandbox):
         peer_id = sandbox.client(2).rpc('get', '/network/self')
-        sandbox.clientœ(1).rpc('get',
-                               f'/workers/chain_validators/{CHAIN_ID}'
-                               f'/peers_validators/{peer_id}')
+        sandbox.client(1).rpc('get',
+                              f'/workers/chain_validators/{CHAIN_ID}'
+                              f'/peers_validators/{peer_id}')
 
-    def test_workers_prevalidators(self, sandbox):
-        sandbox.client(1).rpc('get', f'/workers/prevalidators')
+    def test_workers_prevalidators(self, sandbox: Sandbox):
+        sandbox.client(1).rpc('get', '/workers/prevalidators')
 
-    def test_workers_prevalidators_chain_id(self, sandbox):
+    def test_workers_prevalidators_chain_id(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get', f'/workers/prevalidators/{CHAIN_ID}')
 
-    def test_chain_block(self, sandbox):
+    def test_chain_block(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}')
 
-    def test_chain_block_context_constants(self, sandbox):
+    def test_chain_block_context_constants(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'context/constants')
+                              'context/constants')
 
-    def test_chain_block_context_constants_errors(self, sandbox):
+    def test_chain_block_context_constants_errors(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'context/constants/errors')
+                              'context/constants/errors')
 
-    @pytest.mark.skip
-    # TODO
-    def test_chain_block_context_contracts(self, sandbox):
+    def test_chain_block_context_contracts(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'context/contracts')
+                              'context/contracts')
 
-    @pytest.mark.skip
-    # TODO
-    def test_chain_block_context_contract(self, sandbox):
-        sandbox.client(1).rpc('get',
-                              f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              'context/contracts/{CONTRACT_ID}')
+    def test_chain_block_context_contract_id(self,
+                                             sandbox: Sandbox,
+                                             session: dict):
+        accounts = session["originated_accounts"] + \
+            session["implicit_accounts"]
+        for contract_id in accounts:
+            sandbox.client(1).rpc('get',
+                                  f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
+                                  f'context/contracts/{contract_id}')
 
-    @pytest.mark.skip
-    # TODO
-    def test_chain_block_context_contract_balance(self, sandbox):
-        sandbox.client(1).rpc('get',
-                              f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              'context/contracts/{CONTRACT_ID}/balance')
+    def test_chain_block_context_contract_balance(self, sandbox: Sandbox,
+                                                  session: dict):
+        accounts = session["originated_accounts"] + \
+            session["implicit_accounts"]
+        for contract_id in accounts:
+            sandbox.client(1).rpc('get',
+                                  f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
+                                  f'context/contracts/{contract_id}/balance')
 
-    @pytest.mark.skip
-    # TODO
-    def test_chain_block_context_contract_counter(self, sandbox):
-        sandbox.client(1).rpc('get',
-                              f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              'context/contracts/{CONTRACT_ID}/counter')
+    def test_chain_block_context_contract_counter(self, sandbox: Sandbox,
+                                                  session: dict):
+        # only implicit contracts, see
+        # proto_alpha/lib_protocol/contract_repr.ml
+        for contract_id in session["implicit_accounts"]:
+            sandbox.client(1).rpc('get',
+                                  f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
+                                  f'context/contracts/{contract_id}/counter')
 
-    @pytest.mark.skip
-    # TODO
-    def test_chain_block_context_contract_delegatable(self,
-                                                      sandbox):
-        sandbox.client(1).rpc('get',
-                              f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              'context/contracts/{CONTRACT_ID}/delegatable')
-
-    @pytest.mark.skip
-    # TODO
-    def test_chain_block_context_contract_delegate(self, sandbox):
-        sandbox.client(1).rpc('get',
-                              f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              'context/contracts/{CONTRACT_ID}/delegate')
+    def test_chain_block_context_contract_delegate(self, sandbox: Sandbox,
+                                                   session: dict):
+        for contract_id in session["implicit_accounts"]:
+            sandbox.client(1).rpc('get',
+                                  f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
+                                  f'context/contracts/{contract_id}/delegate')
 
     @pytest.mark.skip
     # TODO
-    def test_chain_block_context_contract_manager(self, sandbox):
-        sandbox.client(1).rpc('get',
-                              f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              'context/contracts/{CONTRACT_ID}/manager')
+    def test_chain_block_context_contract_manager(self, sandbox: Sandbox,
+                                                  session: dict):
+        accounts = session["originated_accounts"] + \
+            session["implicit_accounts"]
+        for contract_id in accounts:
+            sandbox.client(1).rpc('get',
+                                  f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
+                                  f'context/contracts/{contract_id}/manager')
 
-    @pytest.mark.skip
-    # TODO
+    @pytest.mark.skip(reason="TODO")
     def test_chain_block_context_contract_manager_key(self,
-                                                      sandbox):
+                                                      sandbox,
+                                                      session: dict):
+        accounts = session["originated_accounts"] + \
+            session["implicit_accounts"]
+        for contract_id in accounts:
+            sandbox.client(1).rpc('get',
+                                  f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
+                                  f'context/contracts/{contract_id}/'
+                                  'manager_key')
+
+    def test_chain_block_context_contract_script_originated(self,
+                                                            sandbox: Sandbox,
+                                                            session: dict):
+        # only originated contracts
+        accounts = session["originated_accounts"]
+        for contract_id in accounts:
+            sandbox.client(1).rpc('get',
+                                  f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
+                                  f'context/contracts/{contract_id}/script')
+
+    def test_chain_block_context_contract_script_implicit(
+            self, sandbox: Sandbox, session: dict
+    ):
+        # FIXME: It looks like the RPC is not returning a JSON. Hence, the
+        # current Python client in the library raises InvalidClientOutput.
+        accounts = session["implicit_accounts"]
+        for contract_id in accounts:
+            with pytest.raises(InvalidClientOutput):
+                sandbox.client(1).rpc('get',
+                                      f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
+                                      f'context/contracts/{contract_id}/'
+                                      'script')
+
+    def test_chain_block_context_contract_storage_originated(self,
+                                                             sandbox: Sandbox,
+                                                             session: dict):
+        # only originated contracts
+        accounts = session["originated_accounts"]
+        for contract_id in accounts:
+            sandbox.client(1).rpc('get',
+                                  f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
+                                  f'context/contracts/{contract_id}/storage')
+
+    def test_chain_block_context_contract_storage_implicit(
+            self, sandbox: Sandbox, session: dict
+    ):
+        # only implicit contracts
+        accounts = session["implicit_accounts"]
+        for contract_id in accounts:
+            with pytest.raises(InvalidClientOutput):
+                sandbox.client(1).rpc('get',
+                                      f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
+                                      f'context/contracts/{contract_id}/'
+                                      'storage')
+
+    def test_chain_block_context_delegates(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              'context/contracts/{CONTRACT_ID}/manager_key')
+                              'context/delegates')
 
-    @pytest.mark.skip
-    # TODO
-    def test_chain_block_context_contract_script(self, sandbox):
-        sandbox.client(1).rpc('get',
-                              f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              'context/contracts/{CONTRACT_ID}/script')
+    def test_chain_block_context_delegate_implicit(self, sandbox: Sandbox,
+                                                   session: dict):
+        # only implicit accounts
+        accounts = session["implicit_accounts"]
+        for pkh in accounts:
+            sandbox.client(1).rpc('get',
+                                  f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
+                                  f'context/delegates/{pkh}')
 
-    @pytest.mark.skip
-    # TODO
-    def test_chain_block_context_contract_spendable(self, sandbox):
-        sandbox.client(1).rpc('get',
-                              f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              'context/contracts/{CONTRACT_ID}/spendable')
+    @pytest.mark.skip("TODO: Expected behaviour for originated, must exist?")
+    def test_chain_block_context_delegate_originated(self, sandbox: Sandbox):
+        pass
 
-    @pytest.mark.skip
-    # TODO
-    def test_chain_block_context_contract_storage(self, sandbox):
-        sandbox.client(1).rpc('get',
-                              f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              'context/contracts/{CONTRACT_ID}/storage')
+    def test_chain_block_context_delegate_balance_implicit(self,
+                                                           sandbox: Sandbox,
+                                                           session: dict):
+        # only implicit accounts
+        accounts = session["implicit_accounts"]
+        for pkh in accounts:
+            sandbox.client(1).rpc('get',
+                                  f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
+                                  f'context/delegates/{pkh}/balance')
 
-    def test_chain_block_context_delegates(self, sandbox):
-        sandbox.client(1).rpc('get',
-                              f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'context/delegates')
+    @pytest.mark.skip("TODO: Expected behaviour for originated, must exist?")
+    def test_chain_block_context_delegate_balance_originated(self,
+                                                             sandbox: Sandbox):
+        pass
 
-    @pytest.mark.skip
-    # TODO
-    def test_chain_block_context_delegate(self, sandbox):
-        sandbox.client(1).rpc('get',
-                              f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              'context/delegates/{PKH}')
+    def test_chain_block_context_delegate_deactivated_implicit(
+            self, sandbox: Sandbox, session: dict
+    ):
+        # only implicit accounts
+        accounts = session["implicit_accounts"]
+        for pkh in accounts:
+            sandbox.client(1).rpc('get',
+                                  f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
+                                  f'context/delegates/{pkh}/deactivated')
 
-    @pytest.mark.skip
-    # TODO
-    def test_chain_block_context_delegate_balance(self, sandbox):
-        sandbox.client(1).rpc('get',
-                              f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              'context/delegates/{PKH}/balance')
+    @pytest.mark.skip("TODO: Expected behaviour for originated, must exist?")
+    def test_chain_block_context_delegate_deactivated_originated(
+            self, sandbox: Sandbox, session: dict):
+        pass
 
-    @pytest.mark.skip
-    # TODO
-    def test_chain_block_context_delegate_deactivated(self,
-                                                      sandbox):
-        sandbox.client(1).rpc('get',
-                              f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              'context/delegates/{PKH}/deactivated')
+    def test_chain_block_context_delegate_delegated_balance_implicit(
+            self,
+            sandbox: Sandbox,
+            session: dict
+    ):
+        # only implicit accounts
+        accounts = session["implicit_accounts"]
+        for pkh in accounts:
+            sandbox.client(1).rpc('get',
+                                  f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
+                                  f'context/delegates/{pkh}/delegated_balance')
 
-    @pytest.mark.skip
-    # TODO
-    def test_chain_block_context_delegate_delegated_balance(self,
-                                                            sandbox):
-        sandbox.client(1).rpc('get',
-                              f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              'context/delegates/{PKH}/delegated_balance')
+    @pytest.mark.skip("TODO: Expected behaviour for originated, must exist?")
+    def test_chain_block_context_delegate_delegated_balance_originated(
+            self, sandbox: Sandbox, session: dict):
+        pass
 
-    @pytest.mark.skip
-    # TODO
-    def test_chain_block_context_delegate_delegated_contracts(self,
-                                                              sandbox):
-        sandbox.client(1).rpc('get',
-                              f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              'context/delegates/{PKH}/delegated_contracts')
+    def test_chain_block_context_delegate_delegated_contracts_implicit(
+            self,
+            sandbox: Sandbox,
+            session: dict
+    ):
+        # only implicit accounts
+        accounts = session["implicit_accounts"]
+        for pkh in accounts:
+            sandbox.client(1).rpc('get',
+                                  f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
+                                  f'context/delegates/{pkh}/'
+                                  'delegated_contracts')
 
-    @pytest.mark.skip
-    # TODO
-    def test_chain_block_context_delegate_frozen_balance(self, sandbox):
-        sandbox.client(1).rpc('get',
-                              f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              'context/delegates/{PKH}/frozen_balance')
+    @pytest.mark.skip("TODO: Expected behaviour for originated, must exist?")
+    def test_chain_block_context_delegate_delegated_contracts_originated(
+            self,
+            sandbox: Sandbox,
+            session: dict
+    ):
+        pass
 
-    @pytest.mark.skip
-    # TODO
-    def test_chain_block_context_delegate_frozen_balance_by_cycle(self,
-                                                                  sandbox):
-        sandbox.client(1).rpc('get',
-                              f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'context/delegates/{PKH}/'
-                              f'frozen_balance_by_cycle')
+    def test_chain_block_context_delegate_frozen_balance_implicit(
+            self,
+            sandbox: Sandbox,
+            session: dict
+    ):
+        # only implicit accounts
+        accounts = session["implicit_accounts"]
+        for pkh in accounts:
+            sandbox.client(1).rpc('get',
+                                  f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
+                                  f'context/delegates/{pkh}/frozen_balance')
 
-    @pytest.mark.skip
-    # TODO
-    def test_chain_block_context_delegate_grace_period(self, sandbox):
-        sandbox.client(1).rpc('get',
-                              f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              'context/delegates/{PKH}/grace_period')
+    @pytest.mark.skip("TODO: Expected behaviour for originated, must exist?")
+    def test_chain_block_context_delegate_frozen_balance_originated(
+            self,
+            sandbox: Sandbox,
+            session: dict
+    ):
+        pass
 
-    @pytest.mark.skip
-    # TODO
-    def test_chain_block_context_delegate_staking_balance(self, sandbox):
-        sandbox.client(1).rpc('get',
-                              f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              'context/delegates/{PKH}/staking_balance')
+    def test_chain_block_context_delegate_frozen_balance_by_cycle_implicit(
+            self,
+            sandbox: Sandbox,
+            session: dict):
+        # only implicit accounts
+        accounts = session["implicit_accounts"]
+        for pkh in accounts:
+            sandbox.client(1).rpc('get',
+                                  f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
+                                  f'context/delegates/{pkh}/'
+                                  'frozen_balance_by_cycle')
 
-    def test_chain_block_context_nonces_block_level(self, sandbox):
+    @pytest.mark.skip("TODO: Expected behaviour for originated, must exist?")
+    def test_chain_block_context_delegate_frozen_balance_by_cycle_originated(
+            self,
+            sandbox: Sandbox,
+            session: dict):
+        pass
+
+    def test_chain_block_context_delegate_grace_period_implicit(
+            self, sandbox: Sandbox, session: dict
+    ):
+        # only implicit accounts
+        accounts = session["implicit_accounts"]
+        for pkh in accounts:
+            sandbox.client(1).rpc('get',
+                                  f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
+                                  f'context/delegates/{pkh}/grace_period')
+
+    @pytest.mark.skip("TODO: Expected behaviour for originated, must exist?")
+    def test_chain_block_context_delegate_grace_period_originated(
+            self, sandbox: Sandbox, session: dict
+    ):
+        pass
+
+    def test_chain_block_context_delegate_staking_balance_implicit(
+            self,
+            sandbox: Sandbox,
+            session: dict
+    ):
+        # only implicit accounts
+        accounts = session["implicit_accounts"]
+        for pkh in accounts:
+            sandbox.client(1).rpc('get',
+                                  f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
+                                  f'context/delegates/{pkh}/staking_balance')
+
+    @pytest.mark.skip("TODO: Expected behaviour for originated, must exist?")
+    def test_chain_block_context_delegate_staking_balance_originated(
+            self,
+            sandbox: Sandbox,
+            session: dict
+    ):
+        pass
+
+    def test_chain_block_context_nonces_block_level(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
                               f'context/nonces/{BLOCK_LEVEL}')
 
-    def test_chain_block_context_raw_bytes(self, sandbox):
+    def test_chain_block_context_raw_bytes(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'context/raw/bytes')
+                              'context/raw/bytes')
 
-    def test_chain_block_hash(self, sandbox):
+    def test_chain_block_hash(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/hash')
 
-    def test_chain_block_header(self, sandbox):
+    def test_chain_block_header(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'header')
+                              'header')
 
-    def test_chain_block_header_protocol_data(self, sandbox):
+    def test_chain_block_header_protocol_data(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'header/protocol_data')
+                              'header/protocol_data')
 
-    def test_chain_block_header_protocol_data_raw(self, sandbox):
+    def test_chain_block_header_protocol_data_raw(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'header/protocol_data/raw')
+                              'header/protocol_data/raw')
 
-    def test_chain_block_header_raw(self, sandbox):
+    def test_chain_block_header_raw(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'header/raw')
+                              'header/raw')
 
-    def test_chain_block_header_shell(self, sandbox):
+    def test_chain_block_header_shell(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'header/shell')
+                              'header/shell')
 
-    def test_chain_block_helpers_baking_rights(self, sandbox):
+    def test_chain_block_helpers_baking_rights(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'helpers/baking_rights')
+                              'helpers/baking_rights')
 
-    def test_chain_block_helpers_complete_prefix1(self, sandbox):
+    def test_chain_block_helpers_complete_prefix1(self, sandbox: Sandbox):
         prefix = PKH[:10]
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
                               f'helpers/complete/{prefix}')
 
-    def test_chain_block_helpers_complete_prefix2(self, sandbox):
+    def test_chain_block_helpers_complete_prefix2(self, sandbox: Sandbox):
         res = sandbox.client(1).bake('bootstrap1', BAKE_ARGS)
         prefix = res.block_hash[:5]
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
                               f'helpers/complete/{prefix}')
 
-    def test_chain_block_helpers_current_level(self, sandbox):
+    def test_chain_block_helpers_current_level(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'helpers/current_level')
+                              'helpers/current_level')
 
-    def test_chain_block_helpers_endorsing_rights(self, sandbox):
+    def test_chain_block_helpers_endorsing_rights(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'helpers/endorsing_rights')
+                              'helpers/endorsing_rights')
 
-    def test_chain_block_helpers_levels_in_current_cycle(self, sandbox):
+    def test_chain_block_helpers_levels_in_current_cycle(self,
+                                                         sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'helpers/levels_in_current_cycle')
+                              'helpers/levels_in_current_cycle')
 
-    def test_chain_block_live_blocks(self, sandbox):
+    def test_chain_block_live_blocks(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'live_blocks')
+                              'live_blocks')
 
-    def test_chain_block_metadata(self, sandbox):
+    def test_chain_block_metadata(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'metadata')
+                              'metadata')
 
-    def test_chain_block_operation_hashes(self, sandbox):
+    def test_chain_block_operation_hashes(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'operation_hashes')
+                              'operation_hashes')
 
-    def test_add_transactions(self, sandbox):
+    def test_add_transactions(self, sandbox: Sandbox):
         sandbox.client(1).transfer(1.000, 'bootstrap1', 'bootstrap2')
         sandbox.client(2).transfer(1.000, 'bootstrap3', 'bootstrap4')
         sandbox.client(1).endorse('bootstrap1')
         sandbox.client(1).bake('bootstrap1', BAKE_ARGS)
         time.sleep(3)
 
-    def test_chain_block_operation_hashes_list_offset(self, sandbox):
+    def test_chain_block_operation_hashes_list_offset(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
                               f'operation_hashes/{LIST_OFFSET}')
 
-    def test_chain_block_operation_hashes_list_operation(self, sandbox):
+    def test_chain_block_operation_hashes_list_operation(self,
+                                                         sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
                               f'operation_hashes/{LIST_OFFSET}/'
                               f'{OPERATION_OFFSET}')
 
-    def test_chain_block_operations(self, sandbox):
+    def test_chain_block_operations(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'operations')
+                              'operations')
 
-    def test_chain_block_operations_list(self, sandbox):
+    def test_chain_block_operations_list(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
                               f'operations/{LIST_OFFSET}')
 
-    def test_chain_block_operations_list_operation(self, sandbox):
+    def test_chain_block_operations_list_operation(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
                               f'operations/{LIST_OFFSET}/'
                               f'{OPERATION_OFFSET}')
 
-    def test_chain_block_votes_ballot_list(self, sandbox):
+    def test_chain_block_votes_ballot_list(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
                               f'votes/ballot_list')
 
-    def test_chain_block_votes_ballots(self, sandbox):
+    def test_chain_block_votes_ballots(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'votes/ballots')
+                              'votes/ballots')
 
-    def test_chain_block_votes_current_period_kind(self, sandbox):
+    def test_chain_block_votes_current_period_kind(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
                               'votes/current_period_kind')
 
-    def test_chain_block_votes_current_proposal(self, sandbox):
+    def test_chain_block_votes_current_proposal(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
                               'votes/current_proposal')
 
-    def test_chain_block_votes_current_quorum(self, sandbox):
+    def test_chain_block_votes_current_quorum(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
                               'votes/current_quorum')
 
-    def test_chain_block_votes_listings(self, sandbox):
+    def test_chain_block_votes_listings(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'votes/listings')
+                              'votes/listings')
 
-    def test_chain_block_votes_proposals(self, sandbox):
+    def test_chain_block_votes_proposals(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'votes/proposals')
+                              'votes/proposals')
 
-    def test_stat_gc(self, sandbox):
+    def test_stat_gc(self, sandbox: Sandbox):
         assert sandbox.client(1).rpc('get', "/stats/gc")
 
-    def test_stat_memory(self, sandbox):
+    def test_stat_memory(self, sandbox: Sandbox):
         assert sandbox.client(1).rpc('get', "/stats/memory")
+
+    def test_chain_is_bootstrapped(self, sandbox: Sandbox):
+        assert sandbox.client(1).rpc('get', "/chains/main/is_bootstrapped")
+
+
+class TestDeprecatedRPCs:
+    def test_chain_block_context_contract_delegatable(self,
+                                                      sandbox: Sandbox,
+                                                      session: dict):
+        for contract_id in session["implicit_accounts"]:
+            with utils.assert_run_failure(r"Did not find service"):
+                sandbox.client(1).rpc('get',
+                                      f'/chains/{CHAIN_ID}/blocks/'
+                                      f'{BLOCK_ID}/context/contracts/'
+                                      f'{contract_id}/delegatable')
+
+    def test_chain_block_context_contract_spendable(self, sandbox: Sandbox,
+                                                    session: dict):
+        accounts = session["originated_accounts"] + \
+            session["implicit_accounts"]
+        for contract_id in accounts:
+            with utils.assert_run_failure(r"Did not find service"):
+                sandbox.client(1).rpc('get',
+                                      f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
+                                      f'context/contracts/{contract_id}/'
+                                      'spendable')

@@ -23,6 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Misc.Syntax
 module Int_set = Set.Make (Compare.Int)
 
 type t = {
@@ -39,9 +40,8 @@ type t = {
     (Signature.Public_key.t * int list * bool) Signature.Public_key_hash.Map.t;
   fees : Tez_repr.t;
   rewards : Tez_repr.t;
-  block_gas : Z.t;
+  block_gas : Gas_limit_repr.Arith.fp;
   operation_gas : Gas_limit_repr.t;
-  internal_gas : Gas_limit_repr.internal_gas;
   storage_space_to_pay : Z.t option;
   allocated_contracts : int option;
   origination_nonce : Contract_repr.origination_nonce option;
@@ -132,12 +132,10 @@ let internal_nonce_already_recorded ctxt k =
 let set_current_fitness ctxt fitness = {ctxt with fitness}
 
 let add_fees ctxt fees =
-  Lwt.return Tez_repr.(ctxt.fees +? fees)
-  >>=? fun fees -> return {ctxt with fees}
+  Tez_repr.(ctxt.fees +? fees) >|? fun fees -> {ctxt with fees}
 
 let add_rewards ctxt rewards =
-  Lwt.return Tez_repr.(ctxt.rewards +? rewards)
-  >>=? fun rewards -> return {ctxt with rewards}
+  Tez_repr.(ctxt.rewards +? rewards) >|? fun rewards -> {ctxt with rewards}
 
 let add_deposit ctxt delegate deposit =
   let previous =
@@ -147,12 +145,12 @@ let add_deposit ctxt delegate deposit =
     | None ->
         Tez_repr.zero
   in
-  Lwt.return Tez_repr.(previous +? deposit)
-  >>=? fun deposit ->
+  Tez_repr.(previous +? deposit)
+  >|? fun deposit ->
   let deposits =
     Signature.Public_key_hash.Map.add delegate deposit ctxt.deposits
   in
-  return {ctxt with deposits}
+  {ctxt with deposits}
 
 let get_deposits ctxt = ctxt.deposits
 
@@ -169,7 +167,7 @@ let () =
     ~id:"undefined_operation_nonce"
     ~title:"Ill timed access to the origination nonce"
     ~description:
-      "An origination was attemped out of the scope of a manager operation"
+      "An origination was attempted out of the scope of a manager operation"
     empty
     (function Undefined_operation_nonce -> Some () | _ -> None)
     (fun () -> Undefined_operation_nonce)
@@ -212,37 +210,26 @@ let () =
     (function Gas_limit_too_high -> Some () | _ -> None)
     (fun () -> Gas_limit_too_high)
 
-let check_gas_limit ctxt remaining =
+let check_gas_limit ctxt (remaining : 'a Gas_limit_repr.Arith.t) =
   if
-    Compare.Z.(remaining > ctxt.constants.hard_gas_limit_per_operation)
-    || Compare.Z.(remaining < Z.zero)
+    Gas_limit_repr.Arith.(
+      remaining > ctxt.constants.hard_gas_limit_per_operation
+      || remaining < zero)
   then error Gas_limit_too_high
-  else ok ()
+  else ok_unit
 
-let set_gas_limit ctxt remaining =
-  {
-    ctxt with
-    operation_gas = Limited {remaining};
-    internal_gas = Gas_limit_repr.internal_gas_zero;
-  }
+let set_gas_limit ctxt (remaining : 'a Gas_limit_repr.Arith.t) =
+  let remaining = Gas_limit_repr.Arith.fp remaining in
+  {ctxt with operation_gas = Limited {remaining}}
 
 let set_gas_unlimited ctxt = {ctxt with operation_gas = Unaccounted}
 
 let consume_gas ctxt cost =
-  Gas_limit_repr.consume
-    ctxt.block_gas
-    ctxt.operation_gas
-    ctxt.internal_gas
-    cost
-  >>? fun (block_gas, operation_gas, internal_gas) ->
-  ok {ctxt with block_gas; operation_gas; internal_gas}
+  Gas_limit_repr.raw_consume ctxt.block_gas ctxt.operation_gas cost
+  >>? fun (block_gas, operation_gas) -> ok {ctxt with block_gas; operation_gas}
 
 let check_enough_gas ctxt cost =
-  Gas_limit_repr.check_enough
-    ctxt.block_gas
-    ctxt.operation_gas
-    ctxt.internal_gas
-    cost
+  Gas_limit_repr.raw_check_enough ctxt.block_gas ctxt.operation_gas cost
 
 let gas_level ctxt = ctxt.operation_gas
 
@@ -251,9 +238,9 @@ let block_gas_level ctxt = ctxt.block_gas
 let gas_consumed ~since ~until =
   match (gas_level since, gas_level until) with
   | (Limited {remaining = before}, Limited {remaining = after}) ->
-      Z.sub before after
+      Gas_limit_repr.Arith.sub before after
   | (_, _) ->
-      Z.zero
+      Gas_limit_repr.Arith.zero
 
 let init_storage_space_to_pay ctxt =
   match ctxt.storage_space_to_pay with
@@ -289,9 +276,11 @@ let clear_storage_space_to_pay ctxt =
         storage_space_to_pay,
         allocated_contracts )
 
+type missing_key_kind = Get | Set | Del | Copy
+
 type storage_error =
   | Incompatible_protocol_version of string
-  | Missing_key of string list * [`Get | `Set | `Del | `Copy]
+  | Missing_key of string list * missing_key_kind
   | Existing_key of string list
   | Corrupted_data of string list
 
@@ -312,7 +301,7 @@ let storage_error_encoding =
            (req
               "function"
               (string_enum
-                 [("get", `Get); ("set", `Set); ("del", `Del); ("copy", `Copy)])))
+                 [("get", Get); ("set", Set); ("del", Del); ("copy", Copy)])))
         (function Missing_key (key, f) -> Some (key, f) | _ -> None)
         (fun (key, f) -> Missing_key (key, f));
       case
@@ -334,19 +323,19 @@ let pp_storage_error ppf = function
         ppf
         "Found a context with an unexpected version '%s'."
         version
-  | Missing_key (key, `Get) ->
+  | Missing_key (key, Get) ->
       Format.fprintf ppf "Missing key '%s'." (String.concat "/" key)
-  | Missing_key (key, `Set) ->
+  | Missing_key (key, Set) ->
       Format.fprintf
         ppf
         "Cannot set undefined key '%s'."
         (String.concat "/" key)
-  | Missing_key (key, `Del) ->
+  | Missing_key (key, Del) ->
       Format.fprintf
         ppf
         "Cannot delete undefined key '%s'."
         (String.concat "/" key)
-  | Missing_key (key, `Copy) ->
+  | Missing_key (key, Copy) ->
       Format.fprintf
         ppf
         "Cannot copy undefined key '%s'."
@@ -378,7 +367,7 @@ let () =
     (function Storage_error err -> Some err | _ -> None)
     (fun err -> Storage_error err)
 
-let storage_error err = fail (Storage_error err)
+let storage_error err = error (Storage_error err)
 
 (* Initialization *********************************************************)
 
@@ -398,21 +387,21 @@ let protocol_param_key = ["protocol_parameters"]
 
 let get_first_level ctxt =
   Context.get ctxt first_level_key
-  >>= function
+  >|= function
   | None ->
-      storage_error (Missing_key (first_level_key, `Get))
+      storage_error (Missing_key (first_level_key, Get))
   | Some bytes -> (
     match Data_encoding.Binary.of_bytes Raw_level_repr.encoding bytes with
     | None ->
         storage_error (Corrupted_data first_level_key)
     | Some level ->
-        return level )
+        ok level )
 
 let set_first_level ctxt level =
   let bytes =
     Data_encoding.Binary.to_bytes_exn Raw_level_repr.encoding level
   in
-  Context.set ctxt first_level_key bytes >>= fun ctxt -> return ctxt
+  Context.set ctxt first_level_key bytes >|= ok
 
 type error += Failed_to_parse_parameter of MBytes.t
 
@@ -460,7 +449,7 @@ let get_proto_param ctxt =
         fail (Failed_to_parse_parameter bytes)
     | Some json -> (
         Context.del ctxt protocol_param_key
-        >>= fun ctxt ->
+        >|= fun ctxt ->
         match Data_encoding.Json.destruct Parameters_repr.encoding json with
         | exception (Data_encoding.Json.Cannot_destruct _ as exn) ->
             Format.kasprintf
@@ -471,7 +460,7 @@ let get_proto_param ctxt =
               Data_encoding.Json.pp
               json
         | param ->
-            return (param, ctxt) ) )
+            ok (param, ctxt) ) )
 
 let set_constants ctxt constants =
   let bytes =
@@ -483,7 +472,7 @@ let set_constants ctxt constants =
 
 let get_constants ctxt =
   Context.get ctxt constants_key
-  >>= function
+  >|= function
   | None ->
       failwith "Internal error: cannot read constants in context."
   | Some bytes -> (
@@ -493,36 +482,36 @@ let get_constants ctxt =
     | None ->
         failwith "Internal error: cannot parse constants in context."
     | Some constants ->
-        return constants )
+        ok constants )
 
 let patch_constants ctxt f =
   let constants = f ctxt.constants in
   set_constants ctxt.context constants
-  >>= fun context -> Lwt.return {ctxt with context; constants}
+  >|= fun context -> {ctxt with context; constants}
 
 let check_inited ctxt =
   Context.get ctxt version_key
-  >>= function
+  >|= function
   | None ->
       failwith "Internal error: un-initialized context."
   | Some bytes ->
       let s = MBytes.to_string bytes in
-      if Compare.String.(s = version_value) then return_unit
+      if Compare.String.(s = version_value) then ok_unit
       else storage_error (Incompatible_protocol_version s)
 
 let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
-  Lwt.return (Raw_level_repr.of_int32 level)
-  >>=? fun level ->
-  Lwt.return (Fitness_repr.to_int64 fitness)
-  >>=? fun fitness ->
+  Raw_level_repr.of_int32 level
+  >>?= fun level ->
+  Fitness_repr.to_int64 fitness
+  >>?= fun fitness ->
   check_inited ctxt
   >>=? fun () ->
   get_constants ctxt
   >>=? fun constants ->
   get_first_level ctxt
-  >>=? fun first_level ->
+  >|=? fun first_level ->
   let level =
-    Level_repr.from_raw
+    Level_repr.level_from_raw
       ~first_level
       ~blocks_per_cycle:constants.Constants_repr.blocks_per_cycle
       ~blocks_per_voting_period:
@@ -530,35 +519,31 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
       ~blocks_per_commitment:constants.Constants_repr.blocks_per_commitment
       level
   in
-  return
-    {
-      context = ctxt;
-      constants;
-      level;
-      predecessor_timestamp;
-      timestamp;
-      fitness;
-      first_level;
-      allowed_endorsements = Signature.Public_key_hash.Map.empty;
-      included_endorsements = 0;
-      fees = Tez_repr.zero;
-      rewards = Tez_repr.zero;
-      deposits = Signature.Public_key_hash.Map.empty;
-      operation_gas = Unaccounted;
-      internal_gas = Gas_limit_repr.internal_gas_zero;
-      storage_space_to_pay = None;
-      allocated_contracts = None;
-      block_gas = constants.Constants_repr.hard_gas_limit_per_block;
-      origination_nonce = None;
-      temporary_big_map = Z.sub Z.zero Z.one;
-      internal_nonce = 0;
-      internal_nonces_used = Int_set.empty;
-    }
+  {
+    context = ctxt;
+    constants;
+    level;
+    predecessor_timestamp;
+    timestamp;
+    fitness;
+    first_level;
+    allowed_endorsements = Signature.Public_key_hash.Map.empty;
+    included_endorsements = 0;
+    fees = Tez_repr.zero;
+    rewards = Tez_repr.zero;
+    deposits = Signature.Public_key_hash.Map.empty;
+    operation_gas = Unaccounted;
+    storage_space_to_pay = None;
+    allocated_contracts = None;
+    block_gas =
+      Gas_limit_repr.Arith.fp constants.Constants_repr.hard_gas_limit_per_block;
+    origination_nonce = None;
+    temporary_big_map = Z.sub Z.zero Z.one;
+    internal_nonce = 0;
+    internal_nonces_used = Int_set.empty;
+  }
 
-type previous_protocol =
-  | Genesis of Parameters_repr.t
-  | Alpha_previous
-  | Carthage_006
+type previous_protocol = Genesis of Parameters_repr.t | Carthage_006
 
 let check_and_update_protocol_version ctxt =
   Context.get ctxt version_key
@@ -572,38 +557,40 @@ let check_and_update_protocol_version ctxt =
               failwith "Internal error: previously initialized context."
             else if Compare.String.(s = "genesis") then
               get_proto_param ctxt
-              >>=? fun (param, ctxt) -> return (Genesis param, ctxt)
-            else if Compare.String.(s = "alpha_previous") then
-              return (Alpha_previous, ctxt)
+              >|=? fun (param, ctxt) -> (Genesis param, ctxt)
             else if Compare.String.(s = "carthage_006") then
               return (Carthage_006, ctxt)
-            else storage_error (Incompatible_protocol_version s))
+            else Lwt.return @@ storage_error (Incompatible_protocol_version s))
   >>=? fun (previous_proto, ctxt) ->
   Context.set ctxt version_key (MBytes.of_string version_value)
-  >>= fun ctxt -> return (previous_proto, ctxt)
+  >|= fun ctxt -> ok (previous_proto, ctxt)
 
 let prepare_first_block ~level ~timestamp ~fitness ctxt =
   check_and_update_protocol_version ctxt
   >>=? fun (previous_proto, ctxt) ->
   ( match previous_proto with
   | Genesis param ->
-      Lwt.return (Raw_level_repr.of_int32 level)
-      >>=? fun first_level ->
+      Raw_level_repr.of_int32 level
+      >>?= fun first_level ->
       set_first_level ctxt first_level
-      >>=? fun ctxt ->
-      set_constants ctxt param.constants >>= fun ctxt -> return ctxt
-  | Alpha_previous | Carthage_006 ->
-      return ctxt )
+      >>=? fun ctxt -> set_constants ctxt param.constants >|= ok
+  | Carthage_006 ->
+      get_constants ctxt
+      >>=? fun constants ->
+      let constants =
+        {constants with cost_per_byte = Tez_repr.of_mutez_exn 250L}
+      in
+      set_constants ctxt constants >>= fun ctxt -> return ctxt )
   >>=? fun ctxt ->
   prepare ctxt ~level ~predecessor_timestamp:timestamp ~timestamp ~fitness
-  >>=? fun ctxt -> return (previous_proto, ctxt)
+  >|=? fun ctxt -> (previous_proto, ctxt)
 
 let activate ({context = c; _} as s) h =
-  Updater.activate c h >>= fun c -> Lwt.return {s with context = c}
+  Updater.activate c h >|= fun c -> {s with context = c}
 
 let fork_test_chain ({context = c; _} as s) protocol expiration =
   Updater.fork_test_chain c ~protocol ~expiration
-  >>= fun c -> Lwt.return {s with context = c}
+  >|= fun c -> {s with context = c}
 
 (* Generic context ********************************************************)
 
@@ -669,8 +656,7 @@ let dir_mem ctxt k = Context.dir_mem ctxt.context k
 
 let get ctxt k =
   Context.get ctxt.context k
-  >>= function
-  | None -> storage_error (Missing_key (k, `Get)) | Some v -> return v
+  >|= function None -> storage_error (Missing_key (k, Get)) | Some v -> ok v
 
 let get_option ctxt k = Context.get ctxt.context k
 
@@ -679,38 +665,35 @@ let set ctxt k v =
   Context.mem ctxt.context k
   >>= function
   | false ->
-      storage_error (Missing_key (k, `Set))
+      Lwt.return @@ storage_error (Missing_key (k, Set))
   | true ->
-      Context.set ctxt.context k v
-      >>= fun context -> return {ctxt with context}
+      Context.set ctxt.context k v >|= fun context -> ok {ctxt with context}
 
 (* Verify that the k is not present before inserting *)
 let init ctxt k v =
   Context.mem ctxt.context k
   >>= function
   | true ->
-      storage_error (Existing_key k)
+      Lwt.return @@ storage_error (Existing_key k)
   | false ->
-      Context.set ctxt.context k v
-      >>= fun context -> return {ctxt with context}
+      Context.set ctxt.context k v >|= fun context -> ok {ctxt with context}
 
 (* Does not verify that the key is present or not *)
 let init_set ctxt k v =
-  Context.set ctxt.context k v
-  >>= fun context -> Lwt.return {ctxt with context}
+  Context.set ctxt.context k v >|= fun context -> {ctxt with context}
 
 (* Verify that the key is present before deleting *)
 let delete ctxt k =
   Context.mem ctxt.context k
   >>= function
   | false ->
-      storage_error (Missing_key (k, `Del))
+      Lwt.return @@ storage_error (Missing_key (k, Del))
   | true ->
-      Context.del ctxt.context k >>= fun context -> return {ctxt with context}
+      Context.del ctxt.context k >|= fun context -> ok {ctxt with context}
 
 (* Do not verify before deleting *)
 let remove ctxt k =
-  Context.del ctxt.context k >>= fun context -> Lwt.return {ctxt with context}
+  Context.del ctxt.context k >|= fun context -> {ctxt with context}
 
 let set_option ctxt k = function
   | None ->
@@ -719,16 +702,15 @@ let set_option ctxt k = function
       init_set ctxt k v
 
 let remove_rec ctxt k =
-  Context.remove_rec ctxt.context k
-  >>= fun context -> Lwt.return {ctxt with context}
+  Context.remove_rec ctxt.context k >|= fun context -> {ctxt with context}
 
 let copy ctxt ~from ~to_ =
   Context.copy ctxt.context ~from ~to_
-  >>= function
+  >|= function
   | None ->
-      storage_error (Missing_key (from, `Copy))
+      storage_error (Missing_key (from, Copy))
   | Some context ->
-      return {ctxt with context}
+      ok {ctxt with context}
 
 let fold ctxt k ~init ~f = Context.fold ctxt.context k ~init ~f
 

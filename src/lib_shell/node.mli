@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-[@@@ocaml.warning "-30"]
-
 type t
 
 type config = {
@@ -33,6 +31,7 @@ type config = {
   sandboxed_chain_name : Distributed_db_version.Name.t;
   user_activated_upgrades : User_activated.upgrades;
   user_activated_protocol_overrides : User_activated.protocol_overrides;
+  data_dir : string;
   store_root : string;
   context_root : string;
   protocol_root : string;
@@ -45,48 +44,23 @@ type config = {
       (** If [false], testchain related messages will be ignored. *)
 }
 
-and peer_validator_limits = {
-  new_head_request_timeout : Time.System.Span.t;
-  block_header_timeout : Time.System.Span.t;
-  block_operations_timeout : Time.System.Span.t;
-  protocol_timeout : Time.System.Span.t;
-  worker_limits : Worker_types.limits;
-}
+val default_peer_validator_limits : Peer_validator.limits
 
-and prevalidator_limits = {
-  max_refused_operations : int;
-  operation_timeout : Time.System.Span.t;
-  worker_limits : Worker_types.limits;
-  operations_batch_size : int;
-}
+val default_prevalidator_limits : Prevalidator.limits
 
-and block_validator_limits = {
-  protocol_timeout : Time.System.Span.t;
-  worker_limits : Worker_types.limits;
-}
+val default_block_validator_limits : Block_validator.limits
 
-and chain_validator_limits = {
-  bootstrap_threshold : int;
-  worker_limits : Worker_types.limits;
-}
-
-val default_peer_validator_limits : peer_validator_limits
-
-val default_prevalidator_limits : prevalidator_limits
-
-val default_block_validator_limits : block_validator_limits
-
-val default_chain_validator_limits : chain_validator_limits
+val default_chain_validator_limits : Chain_validator.limits
 
 val create :
   ?sandboxed:bool ->
   ?sandbox_parameters:Data_encoding.json ->
   singleprocess:bool ->
   config ->
-  peer_validator_limits ->
-  block_validator_limits ->
-  prevalidator_limits ->
-  chain_validator_limits ->
+  Peer_validator.limits ->
+  Block_validator.limits ->
+  Prevalidator.limits ->
+  Chain_validator.limits ->
   History_mode.t option ->
   t tzresult Lwt.t
 

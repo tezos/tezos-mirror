@@ -1,14 +1,13 @@
+from typing import Iterator
 import pytest
 from tools import constants, paths, utils
 from launchers.sandbox import Sandbox
 
 
 @pytest.fixture(scope="class")
-def sandbox():
+def sandbox() -> Iterator[Sandbox]:
     """Example of sandbox fixture."""
-    with Sandbox(paths.TEZOS_HOME,
-                 constants.IDENTITIES,
-                 constants.GENESIS_PK) as sandbox:
+    with Sandbox(paths.TEZOS_HOME, constants.IDENTITIES) as sandbox:
         sandbox.add_node(0, params=constants.NODE_PARAMS)
         utils.activate_alpha(sandbox.client(0))
         sandbox.add_node(1, params=constants.NODE_PARAMS)
@@ -18,7 +17,7 @@ def sandbox():
 
 
 @pytest.fixture(scope="class")
-def session():
+def session() -> Iterator[dict]:
     """Example of dictionary fixture. Used for keeping data between tests."""
     yield {}
 
@@ -26,15 +25,22 @@ def session():
 @pytest.mark.incremental
 class TestExample:
 
-    def test_wait_sync_proto(self, sandbox):
+    def test_wait_sync_proto(self, sandbox: Sandbox, session: dict):
+        session['head_hash'] = sandbox.client(0).get_head()['hash']
         clients = sandbox.all_clients()
         for client in clients:
             proto = constants.ALPHA
             assert utils.check_protocol(client, proto)
 
-    def test_transfer(self, sandbox, session):
+    def test_transfer(self, sandbox: Sandbox, session: dict):
         receipt = sandbox.client(0).transfer(500, 'bootstrap1', 'bootstrap3')
         session['operation_hash'] = receipt.operation_hash
+
+    @pytest.mark.timeout(5)
+    def test_inclusion(self, sandbox: Sandbox, session: dict):
+        operation_hash = session['operation_hash']
+        sandbox.client(0).wait_for_inclusion(operation_hash,
+                                             branch=session['head_hash'])
 
     # TODO The next test fails due to a bug. It runs
     #
@@ -49,6 +55,6 @@ class TestExample:
     #
     @pytest.mark.skip
     @pytest.mark.timeout(5)
-    def test_inclusion(self, sandbox, session):
+    def test_inclusion_check_previous(self, sandbox: Sandbox, session: dict):
         operation_hash = session['operation_hash']
         sandbox.client(0).wait_for_inclusion(operation_hash, check_previous=2)

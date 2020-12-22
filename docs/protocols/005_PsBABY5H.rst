@@ -1,4 +1,4 @@
-.. This file is only referenced in a blogpost
+.. This file is only referenced in a blog post
 
 :orphan:
 

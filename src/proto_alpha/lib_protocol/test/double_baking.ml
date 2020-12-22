@@ -34,24 +34,23 @@ open Alpha_context
 (****************************************************************)
 
 let get_first_different_baker baker bakers =
-  return
-  @@ List.find
-       (fun baker' -> Signature.Public_key_hash.( <> ) baker baker')
-       bakers
+  List.find
+    (fun baker' -> Signature.Public_key_hash.( <> ) baker baker')
+    bakers
 
 let get_first_different_bakers ctxt =
   Context.get_bakers ctxt
-  >>=? fun bakers ->
+  >|=? fun bakers ->
   let baker_1 = List.hd bakers in
   get_first_different_baker baker_1 (List.tl bakers)
-  >>=? fun baker_2 -> return (baker_1, baker_2)
+  |> fun baker_2 -> (baker_1, baker_2)
 
 let get_first_different_endorsers ctxt =
   Context.get_endorsers ctxt
-  >>=? fun endorsers ->
+  >|=? fun endorsers ->
   let endorser_1 = (List.hd endorsers).delegate in
   let endorser_2 = (List.hd (List.tl endorsers)).delegate in
-  return (endorser_1, endorser_2)
+  (endorser_1, endorser_2)
 
 (** Bake two block at the same level using the same policy (i.e. same
     baker) *)
@@ -62,7 +61,7 @@ let block_fork ?policy contracts b =
   Op.transaction (B b) contract_a contract_b Alpha_context.Tez.one_cent
   >>=? fun operation ->
   Block.bake ?policy ~operation b
-  >>=? fun blk_a -> Block.bake ?policy b >>=? fun blk_b -> return (blk_a, blk_b)
+  >>=? fun blk_a -> Block.bake ?policy b >|=? fun blk_b -> (blk_a, blk_b)
 
 (****************************************************************)
 (*                        Tests                                 *)
@@ -79,7 +78,7 @@ let valid_double_baking_evidence () =
   block_fork ~policy:(By_priority 0) contracts b
   >>=? fun (blk_a, blk_b) ->
   Op.double_baking (B blk_a) blk_a.header blk_b.header
-  >>=? fun operation ->
+  |> fun operation ->
   Block.bake ~policy:(Excluding [priority_0_baker]) ~operation blk_a
   >>=? fun blk ->
   (* Check that the frozen deposit, the fees and rewards are removed *)
@@ -102,7 +101,7 @@ let same_blocks () =
   Block.bake b
   >>=? fun ba ->
   Op.double_baking (B ba) ba.header ba.header
-  >>=? fun operation ->
+  |> fun operation ->
   Block.bake ~operation ba
   >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
@@ -122,7 +121,7 @@ let different_levels () =
   Block.bake blk_b
   >>=? fun blk_b_2 ->
   Op.double_baking (B blk_a) blk_a.header blk_b_2.header
-  >>=? fun operation ->
+  |> fun operation ->
   Block.bake ~operation blk_a
   >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
@@ -139,7 +138,7 @@ let too_early_double_baking_evidence () =
   block_fork ~policy:(By_priority 0) contracts b
   >>=? fun (blk_a, blk_b) ->
   Op.double_baking (B b) blk_a.header blk_b.header
-  >>=? fun operation ->
+  |> fun operation ->
   Block.bake ~operation b
   >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
@@ -163,7 +162,7 @@ let too_late_double_baking_evidence () =
     (1 -- (preserved_cycles + 1))
   >>=? fun blk ->
   Op.double_baking (B blk) blk_a.header blk_b.header
-  >>=? fun operation ->
+  |> fun operation ->
   Block.bake ~operation blk
   >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
@@ -184,7 +183,7 @@ let different_delegates () =
   Block.bake ~policy:(By_account baker_2) b
   >>=? fun blk_b ->
   Op.double_baking (B blk_a) blk_a.header blk_b.header
-  >>=? fun operation ->
+  |> fun operation ->
   Block.bake ~operation blk_a
   >>= fun e ->
   Assert.proto_error ~loc:__LOC__ e (function
@@ -209,7 +208,7 @@ let wrong_signer () =
   header_custom_signer baker_1 baker_2 b
   >>=? fun header_b ->
   Op.double_baking (B blk_a) blk_a.header header_b
-  >>=? fun operation ->
+  |> fun operation ->
   Block.bake ~operation blk_a
   >>= fun e ->
   Assert.proto_error ~loc:__LOC__ e (function

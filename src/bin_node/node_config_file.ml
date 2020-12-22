@@ -24,11 +24,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-[@@@ocaml.warning "-30"]
-
-let ( // ) = Filename.concat
+open Filename.Infix
 
 let home = try Sys.getenv "HOME" with Not_found -> "/root"
+
+let data_dir_env_name = "TEZOS_NODE_DIR"
 
 let default_data_dir = home // ".tezos-node"
 
@@ -63,8 +63,8 @@ let make_blockchain_network ~alias ~chain_name ?old_chain_name
     genesis;
     genesis_parameters;
     chain_name = of_string chain_name;
-    old_chain_name = Option.map old_chain_name ~f:of_string;
-    incompatible_chain_name = Option.map incompatible_chain_name ~f:of_string;
+    old_chain_name = Option.map of_string old_chain_name;
+    incompatible_chain_name = Option.map of_string incompatible_chain_name;
     sandboxed_chain_name = of_string sandboxed_chain_name;
     user_activated_upgrades =
       List.map
@@ -79,6 +79,8 @@ let make_blockchain_network ~alias ~chain_name ?old_chain_name
   }
 
 let blockchain_network_mainnet =
+  let giganode_1 = "116.202.172.21" in
+  let giganode_2 = "95.216.45.62" in
   make_blockchain_network
     ~alias:"mainnet"
     {
@@ -100,24 +102,7 @@ let blockchain_network_mainnet =
     ~user_activated_protocol_overrides:
       [ ( "PsBABY5HQTSkA4297zNHfsZNKtxULfL18y95qb3m53QJiXGmrbU",
           "PsBabyM1eUXZseaJdmXFApDSBqj8YBfwELoxZHHW77EMcAbbwAS" ) ]
-    ~default_bootstrap_peers:["boot.tzbeta.net"]
-
-let blockchain_network_carthagenet =
-  make_blockchain_network
-    ~alias:"carthagenet"
-    {
-      time = Time.Protocol.of_notation_exn "2019-11-28T13:02:13Z";
-      block =
-        Block_hash.of_b58check_exn
-          "BLockGenesisGenesisGenesisGenesisGenesisd6f5afWyME7";
-      protocol =
-        Protocol_hash.of_b58check_exn
-          "PtYuensgYBb3G3x1hLLbCmcav8ue8Kyd2khADcL5LsT5R1hcXex";
-    }
-    ~chain_name:"TEZOS_ALPHANET_CARTHAGE_2019-11-28T13:02:13Z"
-    ~sandboxed_chain_name:"SANDBOXED_TEZOS"
-    ~default_bootstrap_peers:
-      ["34.76.169.218"; "34.90.24.160"; "carthagenet.kaml.fr"; "104.248.136.94"]
+    ~default_bootstrap_peers:["boot.tzbeta.net"; giganode_1; giganode_2]
 
 let blockchain_network_delphinet =
   make_blockchain_network
@@ -148,6 +133,39 @@ let blockchain_network_delphinet =
         "delphinet.kaml.fr";
         "13.53.41.201" ]
 
+let blockchain_network_edonet =
+  make_blockchain_network
+    ~alias:"edonet"
+    {
+      time = Time.Protocol.of_notation_exn "2020-11-30T12:00:00Z";
+      block =
+        Block_hash.of_b58check_exn
+          "BLockGenesisGenesisGenesisGenesisGenesis2431bbUwV2a";
+      protocol =
+        Protocol_hash.of_b58check_exn
+          "PtYuensgYBb3G3x1hLLbCmcav8ue8Kyd2khADcL5LsT5R1hcXex";
+    }
+    ~genesis_parameters:
+      {
+        context_key = "sandbox_parameter";
+        values =
+          `O
+            [ ( "genesis_pubkey",
+                `String
+                  "edpkugeDwmwuwyyD3Q5enapgEYDxZLtEUFFSrvVwXASQMVEqsvTqWu" ) ];
+      }
+    ~chain_name:"TEZOS_EDONET_2020-11-30T12:00:00Z"
+    ~sandboxed_chain_name:"SANDBOXED_TEZOS"
+    ~default_bootstrap_peers:
+      [ "51.75.246.56:9733";
+        "edonet.tezos.co.il";
+        "46.245.179.161:9733";
+        "edonet.smartpy.io";
+        "188.40.128.216:29732";
+        "51.79.165.131";
+        "edonet.boot.tezostaquito.io";
+        "95.216.228.228:9733" ]
+
 let blockchain_network_sandbox =
   make_blockchain_network
     ~alias:"sandbox"
@@ -160,6 +178,17 @@ let blockchain_network_sandbox =
         Protocol_hash.of_b58check_exn
           "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im";
     }
+    ~genesis_parameters:
+      (* Genesis public key corresponds to the following private key:
+         unencrypted:edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6 *)
+      {
+        context_key = "sandbox_parameter";
+        values =
+          `O
+            [ ( "genesis_pubkey",
+                `String
+                  "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2" ) ];
+      }
     ~chain_name:"TEZOS"
     ~sandboxed_chain_name:"SANDBOXED_TEZOS"
 
@@ -229,8 +258,8 @@ let blockchain_network_encoding : blockchain_network Data_encoding.t =
 let builtin_blockchain_networks_with_tags =
   [ (1, blockchain_network_sandbox);
     (4, blockchain_network_mainnet);
-    (6, blockchain_network_carthagenet);
-    (9, blockchain_network_delphinet) ]
+    (9, blockchain_network_delphinet);
+    (11, blockchain_network_edonet) ]
   |> List.map (fun (tag, network) ->
          match network.alias with
          | None ->
@@ -294,7 +323,7 @@ and p2p = {
   limits : P2p.limits;
   disable_mempool : bool;
   enable_testchain : bool;
-  greylisting_config : P2p_point_state.Info.greylisting_config;
+  reconnection_config : P2p_point_state.Info.reconnection_config;
 }
 
 and rpc = {
@@ -307,10 +336,10 @@ and rpc = {
 and tls = {cert : string; key : string}
 
 and shell = {
-  block_validator_limits : Node.block_validator_limits;
-  prevalidator_limits : Node.prevalidator_limits;
-  peer_validator_limits : Node.peer_validator_limits;
-  chain_validator_limits : Node.chain_validator_limits;
+  block_validator_limits : Block_validator.limits;
+  prevalidator_limits : Prevalidator.limits;
+  peer_validator_limits : Peer_validator.limits;
+  chain_validator_limits : Chain_validator.limits;
   history_mode : History_mode.t option;
 }
 
@@ -334,8 +363,6 @@ let default_p2p_limits : P2p.limits =
     incoming_app_message_queue_size = None;
     incoming_message_queue_size = None;
     outgoing_message_queue_size = None;
-    known_points_history_size = 500;
-    known_peer_ids_history_size = 500;
     max_known_points = Some (400, 300);
     max_known_peer_ids = Some (400, 300);
     swap_linger = Time.System.Span.of_seconds_exn 30.;
@@ -352,7 +379,7 @@ let default_p2p =
     limits = default_p2p_limits;
     disable_mempool = false;
     enable_testchain = false;
-    greylisting_config = P2p_point_state.Info.default_greylisting_config;
+    reconnection_config = P2p_point_state.Info.default_reconnection_config;
   }
 
 let default_rpc =
@@ -398,8 +425,6 @@ let limit : P2p.limits Data_encoding.t =
            incoming_app_message_queue_size;
            incoming_message_queue_size;
            outgoing_message_queue_size;
-           known_points_history_size;
-           known_peer_ids_history_size;
            max_known_points;
            max_known_peer_ids;
            swap_linger;
@@ -421,8 +446,6 @@ let limit : P2p.limits Data_encoding.t =
             incoming_app_message_queue_size,
             incoming_message_queue_size,
             outgoing_message_queue_size,
-            known_points_history_size,
-            known_peer_ids_history_size,
             max_known_points ) ),
         (max_known_peer_ids, greylist_timeout, maintenance_idle_time) ))
     (fun ( ( ( connection_timeout,
@@ -442,8 +465,6 @@ let limit : P2p.limits Data_encoding.t =
                incoming_app_message_queue_size,
                incoming_message_queue_size,
                outgoing_message_queue_size,
-               known_points_history_size,
-               known_peer_ids_history_size,
                max_known_points ) ),
            (max_known_peer_ids, greylist_timeout, maintenance_idle_time) ) ->
       {
@@ -464,8 +485,6 @@ let limit : P2p.limits Data_encoding.t =
         incoming_app_message_queue_size;
         incoming_message_queue_size;
         outgoing_message_queue_size;
-        known_points_history_size;
-        known_peer_ids_history_size;
         max_known_points;
         max_known_peer_ids;
         swap_linger;
@@ -535,7 +554,7 @@ let limit : P2p.limits Data_encoding.t =
                 "swap-linger"
                 Time.System.Span.encoding
                 default_p2p_limits.swap_linger))
-          (obj10
+          (obj8
              (opt "binary-chunks-size" uint8)
              (dft
                 "read-buffer-size"
@@ -547,17 +566,12 @@ let limit : P2p.limits Data_encoding.t =
              (opt "incoming-app-message-queue-size" int31)
              (opt "incoming-message-queue-size" int31)
              (opt "outgoing-message-queue-size" int31)
-             (dft
-                "known_points_history_size"
-                uint16
-                default_p2p_limits.known_points_history_size)
-             (dft
-                "known_peer_ids_history_size"
-                uint16
-                default_p2p_limits.known_points_history_size)
              (opt "max_known_points" (tup2 uint16 uint16))))
        (obj3
-          (opt "max_known_peer_ids" (tup2 uint16 uint16))
+          (opt
+             "max_known_peer_ids"
+             ~description:"max and target size for the known address table."
+             (tup2 uint16 uint16))
           (dft
              "greylist-timeout"
              ~description:"GC delay for the greylists tables, in seconds."
@@ -582,7 +596,7 @@ let p2p =
            limits;
            disable_mempool;
            enable_testchain;
-           greylisting_config } ->
+           reconnection_config } ->
       ( expected_pow,
         bootstrap_peers,
         listen_addr,
@@ -591,7 +605,7 @@ let p2p =
         limits,
         disable_mempool,
         enable_testchain,
-        greylisting_config ))
+        reconnection_config ))
     (fun ( expected_pow,
            bootstrap_peers,
            listen_addr,
@@ -600,7 +614,7 @@ let p2p =
            limits,
            disable_mempool,
            enable_testchain,
-           greylisting_config ) ->
+           reconnection_config ) ->
       {
         expected_pow;
         bootstrap_peers;
@@ -610,7 +624,7 @@ let p2p =
         limits;
         disable_mempool;
         enable_testchain;
-        greylisting_config;
+        reconnection_config;
       })
     (obj9
        (dft
@@ -666,15 +680,17 @@ let p2p =
             "If set to [true], the node will spawn a testchain during the \
              protocol's testing voting period. Default value is [false]. It \
              is disabled to decrease the node storage usage and computation \
-             by droping the validation of the test network blocks."
+             by dropping the validation of the test network blocks."
           bool
           false)
        (let open P2p_point_state.Info in
        dft
          "greylisting_config"
-         ~description:"The greylisting policy."
-         greylisting_config_encoding
-         default_greylisting_config))
+         ~description:
+           "The reconnection policy regulates the frequency with which the \
+            node tries to reconnect to an old known peer."
+         reconnection_config_encoding
+         default_reconnection_config))
 
 let rpc : rpc Data_encoding.t =
   let open Data_encoding in
@@ -758,7 +774,7 @@ let timeout_encoding = Time.System.Span.encoding
 let block_validator_limits_encoding =
   let open Data_encoding in
   conv
-    (fun {Node.protocol_timeout; worker_limits} ->
+    (fun {Block_validator.protocol_timeout; worker_limits} ->
       (protocol_timeout, worker_limits))
     (fun (protocol_timeout, worker_limits) ->
       {protocol_timeout; worker_limits})
@@ -775,7 +791,7 @@ let block_validator_limits_encoding =
 let prevalidator_limits_encoding =
   let open Data_encoding in
   conv
-    (fun { Node.operation_timeout;
+    (fun { Prevalidator.operation_timeout;
            max_refused_operations;
            operations_batch_size;
            worker_limits } ->
@@ -811,7 +827,7 @@ let peer_validator_limits_encoding =
   let open Data_encoding in
   let default_limits = default_shell.peer_validator_limits in
   conv
-    (fun { Node.block_header_timeout;
+    (fun { Peer_validator.block_header_timeout;
            block_operations_timeout;
            protocol_timeout;
            new_head_request_timeout;
@@ -855,22 +871,71 @@ let peer_validator_limits_encoding =
           default_limits.worker_limits.backlog_size
           default_limits.worker_limits.backlog_level))
 
+let synchronisation_heuristic_encoding default_latency default_threshold =
+  let open Data_encoding in
+  conv
+    (fun {Chain_validator.latency; threshold} -> (latency, threshold))
+    (fun (latency, threshold) -> {latency; threshold})
+    (obj2
+       (dft
+          "latency"
+          ~description:
+            "[latency] is the time interval (in seconds) used to determine if \
+             a peer is synchronized with a chain. For instance, a peer whose \
+             known head has a timestamp T is considered synchronized if T >= \
+             now - latency. This parameter depends on the baking rate and the \
+             latency of the network."
+          uint16
+          default_latency)
+       (dft
+          "synchronisation_threshold"
+          ~description:
+            "The minimal number of peers this peer should be synchronized \
+             with in order to be bootstrapped."
+          uint8
+          default_threshold))
+
 let chain_validator_limits_encoding =
   let open Data_encoding in
   conv
-    (fun {Node.bootstrap_threshold; worker_limits} ->
-      (bootstrap_threshold, worker_limits))
-    (fun (bootstrap_threshold, worker_limits) ->
-      {bootstrap_threshold; worker_limits})
+    (fun {Chain_validator.synchronisation; worker_limits} ->
+      (synchronisation, worker_limits))
+    (fun (synchronisation, worker_limits) -> {synchronisation; worker_limits})
     (merge_objs
-       (obj1
-          (dft
-             "bootstrap_threshold"
-             ~description:
-               "Set the number of peers with whom a chain synchronization \
-                must be completed to bootstrap the node."
-             uint8
-             default_shell.chain_validator_limits.bootstrap_threshold))
+       (* Use a union to support both the deprecated
+          bootstrap_threshold and the new synchronisation_threshold
+          options when parsing.  When printing, use the new
+          synchronisation_threshold option. *)
+       (union
+          [ case
+              ~title:"synchronisation_heuristic_encoding"
+              Json_only
+              (synchronisation_heuristic_encoding
+                 default_shell.chain_validator_limits.synchronisation.latency
+                 default_shell.chain_validator_limits.synchronisation.threshold)
+              (fun x -> Some x)
+              (fun x -> x);
+            case
+              ~title:"legacy_bootstrap_threshold_encoding"
+              Json_only
+              (obj1
+                 (dft
+                    "bootstrap_threshold"
+                    ~description:
+                      "[DEPRECATED] Set the number of peers with whom a chain \
+                       synchronisation must be completed to bootstrap the \
+                       node."
+                    uint8
+                    4))
+              (fun _ -> None) (* This is used for legacy *)
+              (fun x ->
+                Chain_validator.
+                  {
+                    threshold = x;
+                    latency =
+                      default_shell.chain_validator_limits.synchronisation
+                        .latency;
+                  }) ])
        (worker_limits_encoding
           default_shell.chain_validator_limits.worker_limits.backlog_size
           default_shell.chain_validator_limits.worker_limits.backlog_level))
@@ -987,6 +1052,63 @@ let () =
     (function Invalid_content (p, e) -> Some (p, e) | _ -> None)
     (fun (p, e) -> Invalid_content (p, e))
 
+module Event = struct
+  include Internal_event.Simple
+
+  let section = ["node"; "main"]
+
+  let level = Internal_event.Warning
+
+  let cannot_convert_to_ipv4 =
+    Internal_event.Simple.declare_1
+      ~section
+      ~level
+      ~name:"cannot_convert_to_ipv4"
+      ~msg:"failed to convert {addr} to an ipv4 address"
+      ~pp1:(fun ppf -> Format.fprintf ppf "%S")
+      ("addr", Data_encoding.string)
+
+  let cannot_resolve_listening_addr =
+    Internal_event.Simple.declare_1
+      ~section
+      ~level
+      ~name:"cannot_resolve_listening_addr"
+      ~msg:"failed to resolve {addr}"
+      ~pp1:(fun ppf -> Format.fprintf ppf "%S")
+      ("addr", Data_encoding.string)
+
+  let cannot_parse_listening_addr =
+    Internal_event.Simple.declare_2
+      ~section
+      ~level
+      ~name:"cannot_parse_listening_addr"
+      ~msg:"failed to parse {addr}: {msg}"
+      ~pp1:(fun ppf -> Format.fprintf ppf "%S")
+      ("addr", Data_encoding.string)
+      ~pp2:(fun ppf -> Format.fprintf ppf "%s")
+      ("msg", Data_encoding.string)
+
+  let cannot_resolve_discovery_addr =
+    Internal_event.Simple.declare_1
+      ~section
+      ~level
+      ~name:"cannot_resolve_discovery_addr"
+      ~msg:"failed to resolve {addr}"
+      ~pp1:(fun ppf -> Format.fprintf ppf "%S")
+      ("addr", Data_encoding.string)
+
+  let cannot_parse_discovery_addr =
+    Internal_event.Simple.declare_2
+      ~section
+      ~level
+      ~name:"cannot_parse_discovery_addr"
+      ~msg:"failed to parse {addr}: {msg}"
+      ~pp1:(fun ppf -> Format.fprintf ppf "%S")
+      ("addr", Data_encoding.string)
+      ~pp2:(fun ppf -> Format.fprintf ppf "%s")
+      ("msg", Data_encoding.string)
+end
+
 let string_of_json_encoding_error exn =
   Format.asprintf "%a" (Json_encoding.print_error ?print_unknown:None) exn
 
@@ -1022,25 +1144,24 @@ let update ?data_dir ?min_connections ?expected_connections ?max_connections
     ?expected_pow ?bootstrap_peers ?listen_addr ?discovery_addr
     ?(rpc_listen_addrs = []) ?(private_mode = false) ?(disable_mempool = false)
     ?(enable_testchain = false) ?(cors_origins = []) ?(cors_headers = [])
-    ?rpc_tls ?log_output ?bootstrap_threshold ?history_mode ?network cfg =
-  let data_dir = Option.unopt ~default:cfg.data_dir data_dir in
+    ?rpc_tls ?log_output ?synchronisation_threshold ?history_mode ?network
+    ?latency cfg =
+  let data_dir = Option.value ~default:cfg.data_dir data_dir in
   Node_data_version.ensure_data_dir data_dir
   >>=? fun () ->
-  let peer_table_size =
-    Option.map peer_table_size ~f:(fun i -> (i, i / 4 * 3))
-  in
+  let peer_table_size = Option.map (fun i -> (i, i / 4 * 3)) peer_table_size in
   let unopt_list ~default = function [] -> default | l -> l in
   let limits : P2p.limits =
     {
       cfg.p2p.limits with
       min_connections =
-        Option.unopt ~default:cfg.p2p.limits.min_connections min_connections;
+        Option.value ~default:cfg.p2p.limits.min_connections min_connections;
       expected_connections =
-        Option.unopt
+        Option.value
           ~default:cfg.p2p.limits.expected_connections
           expected_connections;
       max_connections =
-        Option.unopt ~default:cfg.p2p.limits.max_connections max_connections;
+        Option.value ~default:cfg.p2p.limits.max_connections max_connections;
       max_download_speed =
         Option.first_some max_download_speed cfg.p2p.limits.max_download_speed;
       max_upload_speed =
@@ -1049,21 +1170,21 @@ let update ?data_dir ?min_connections ?expected_connections ?max_connections
         Option.first_some peer_table_size cfg.p2p.limits.max_known_points;
       max_known_peer_ids =
         Option.first_some peer_table_size cfg.p2p.limits.max_known_peer_ids;
-      binary_chunks_size = Option.map ~f:(fun x -> x lsl 10) binary_chunks_size;
+      binary_chunks_size = Option.map (fun x -> x lsl 10) binary_chunks_size;
     }
   in
   let p2p : p2p =
     {
-      expected_pow = Option.unopt ~default:cfg.p2p.expected_pow expected_pow;
+      expected_pow = Option.value ~default:cfg.p2p.expected_pow expected_pow;
       bootstrap_peers =
-        Option.unopt ~default:cfg.p2p.bootstrap_peers bootstrap_peers;
+        Option.value ~default:cfg.p2p.bootstrap_peers bootstrap_peers;
       listen_addr = Option.first_some listen_addr cfg.p2p.listen_addr;
       discovery_addr = Option.first_some discovery_addr cfg.p2p.discovery_addr;
       private_mode = cfg.p2p.private_mode || private_mode;
       limits;
       disable_mempool = cfg.p2p.disable_mempool || disable_mempool;
       enable_testchain = cfg.p2p.enable_testchain || enable_testchain;
-      greylisting_config = cfg.p2p.greylisting_config;
+      reconnection_config = cfg.p2p.reconnection_config;
     }
   and rpc : rpc =
     {
@@ -1073,27 +1194,49 @@ let update ?data_dir ?min_connections ?expected_connections ?max_connections
       tls = Option.first_some rpc_tls cfg.rpc.tls;
     }
   and log : Lwt_log_sink_unix.cfg =
-    {cfg.log with output = Option.unopt ~default:cfg.log.output log_output}
+    {cfg.log with output = Option.value ~default:cfg.log.output log_output}
   and shell : shell =
     {
       peer_validator_limits = cfg.shell.peer_validator_limits;
       block_validator_limits = cfg.shell.block_validator_limits;
       prevalidator_limits = cfg.shell.prevalidator_limits;
       chain_validator_limits =
-        Option.unopt_map
-          ~default:cfg.shell.chain_validator_limits
-          ~f:(fun bootstrap_threshold ->
-            {cfg.shell.chain_validator_limits with bootstrap_threshold})
-          bootstrap_threshold;
+        (let synchronisation : Chain_validator.synchronisation_limits =
+           {
+             latency =
+               Option.value
+                 ~default:
+                   cfg.shell.chain_validator_limits.synchronisation.latency
+                 latency;
+             threshold =
+               Option.value
+                 ~default:
+                   cfg.shell.chain_validator_limits.synchronisation.threshold
+                 synchronisation_threshold;
+           }
+         in
+         {cfg.shell.chain_validator_limits with synchronisation});
       history_mode = Option.first_some history_mode cfg.shell.history_mode;
     }
   in
   (* If --network is specified it overrides the "network" entry of the
      configuration file, which itself defaults to mainnet. *)
   let blockchain_network =
-    Option.unopt ~default:cfg.blockchain_network network
+    Option.value ~default:cfg.blockchain_network network
   in
   return {cfg with data_dir; p2p; rpc; log; shell; blockchain_network}
+
+let to_ipv4 ipv6_l =
+  let convert_or_warn (ipv6, port) =
+    let ipv4 = Ipaddr.v4_of_v6 ipv6 in
+    match ipv4 with
+    | None ->
+        Event.(emit cannot_convert_to_ipv4) (Ipaddr.V6.to_string ipv6)
+        >>= fun () -> Lwt.return_none
+    | Some ipv4 ->
+        Lwt.return_some (ipv4, port)
+  in
+  Lwt_list.filter_map_s convert_or_warn ipv6_l
 
 let resolve_addr ~default_addr ?default_port ?(passive = false) peer =
   let (addr, port) = P2p_point.Id.parse_addr_port peer in
@@ -1123,21 +1266,7 @@ let resolve_discovery_addrs discovery_addr =
     ~default_port:default_discovery_port
     ~passive:true
     discovery_addr
-  >>= fun addrs ->
-  let rec to_ipv4 acc = function
-    | [] ->
-        Lwt.return (List.rev acc)
-    | (ip, port) :: xs -> (
-      match Ipaddr.v4_of_v6 ip with
-      | Some v ->
-          to_ipv4 ((v, port) :: acc) xs
-      | None ->
-          Format.eprintf
-            "Warning: failed to convert %S to an ipv4 address@."
-            (Ipaddr.V6.to_string ip) ;
-          to_ipv4 acc xs )
-  in
-  to_ipv4 [] addrs
+  >>= fun addrs -> to_ipv4 addrs
 
 let resolve_listening_addrs listen_addr =
   resolve_addr
@@ -1166,14 +1295,12 @@ let check_listening_addrs config =
           resolve_listening_addrs addr
           >>= function
           | [] ->
-              Format.eprintf "Warning: failed to resolve %S\n@." addr ;
-              Lwt.return_unit
+              Event.(emit cannot_resolve_listening_addr) addr
           | _ :: _ ->
               Lwt.return_unit)
         (function
           | Invalid_argument msg ->
-              Format.eprintf "Warning: failed to parse %S:   %s\n@." addr msg ;
-              Lwt.return_unit
+              Event.(emit cannot_parse_listening_addr) (addr, msg)
           | exn ->
               Lwt.fail exn)
 
@@ -1187,14 +1314,12 @@ let check_discovery_addr config =
           resolve_discovery_addrs addr
           >>= function
           | [] ->
-              Format.eprintf "Warning: failed to resolve %S\n@." addr ;
-              Lwt.return_unit
+              Event.(emit cannot_resolve_discovery_addr) addr
           | _ :: _ ->
               Lwt.return_unit)
         (function
           | Invalid_argument msg ->
-              Format.eprintf "Warning: failed to parse %S:   %s\n@." addr msg ;
-              Lwt.return_unit
+              Event.(emit cannot_parse_discovery_addr) (addr, msg)
           | exn ->
               Lwt.fail exn)
 
@@ -1251,7 +1376,7 @@ let check_connections config =
   if config.p2p.limits.min_connections > config.p2p.limits.expected_connections
   then
     fail
-      "Error: The minumum number of connections is greater than the expected \
+      "Error: The minimum number of connections is greater than the expected \
        number of connections"
       config.p2p.limits.min_connections
       config.p2p.limits.expected_connections ;

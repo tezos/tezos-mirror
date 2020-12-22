@@ -28,7 +28,7 @@ hardware wallet.
 
    tezos-node run --rpc-addr [::] --private-mode \
                                   --no-bootstrap-peers \
-                                  --bootstrap-threshold=1 \
+                                  --synchronisation-threshold=1 \
                                   --connections 1 \
                                   --peer <public-node-ip>
 
@@ -192,7 +192,7 @@ writing your own configuration file if needed.
         their messages logged up to the debug level, whereas the rest of
         log sections will be logged up to the notice level. */
 
-        "rules": "client* -> debug, net -> debug, * -> notice",
+        "rules": "client* -> debug; net -> debug; * -> notice",
 
         /* Format for the log file, see
         http://ocsigen.org/lwt/dev/api/Lwt_log_core#2_Logtemplates. */
@@ -207,7 +207,12 @@ writing your own configuration file if needed.
          /* The number of peers to synchronize with
             before declaring the node 'bootstrapped'. */
 
-         "bootstrap_threshold": 4,
+         "synchronisation_threshold": 4,
+
+         /* Latency in seconds used for the synchronisation
+         heuristic. */
+
+         "latency": 120,
 
          /* The history mode configuration you want to run. */
          "history_mode": "full"
@@ -222,31 +227,29 @@ Environment for writing Michelson contracts
 Here is how to setup a practical environment for
 writing, editing and debugging Michelson programs.
 
-Install `Emacs <https://www.gnu.org/software/emacs/>`_ with
-the `deferred <https://github.com/kiwanami/emacs-deferred>`_ and
-`exec-path-from-shell
-<https://github.com/purcell/exec-path-from-shell>`_ packages.
-The packages can be installed from within Emacs with
-``M-x package-install``.
-The last package imports the shell path in Emacs and it is needed
-because we will run a sandboxed node.
+Install `Emacs <https://www.gnu.org/software/emacs/>`_ and configure
+it to use the `MELPA <https://melpa.org/#/getting-started>`_ package
+repository.
+
+Inside Emacs, install the ``michelson-mode`` package and its
+dependency `deferred <https://github.com/kiwanami/emacs-deferred>`_ by
+running ``M-x package-install-file``; the package file is located in
+the ``emacs`` folder of the Tezos code base.
 
 Set up the `Michelson mode
-<https://gitlab.com/tezos/tezos/tree/master/emacs>`_ by adding in
-your ``.emacs`` :
+<https://gitlab.com/tezos/tezos/tree/master/emacs>`_ to use the Tezos
+client in :ref:`mockup mode<mockup-mode>` (to typecheck Michelson
+scripts without interacting with a Tezos node) by adding in your
+``.emacs`` file:
 
 ::
 
-   (load "~/tezos/tezos/emacs/michelson-mode.el" nil t)
-   (setq michelson-client-command "tezos-client")
+   (setq michelson-client-command "tezos-client --base-dir /tmp/mockup --mode mockup --protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK")
    (setq michelson-alphanet nil)
 
 Note that the Michelson mode will be chosen automatically by Emacs for
 files with a ``.tz`` or ``.tez`` extension.
 
-Run a :ref:`sandboxed node<sandboxed-mode>` (and activate the Alpha
-protocol with ``tezos-activate-alpha``) so that useful information
-about the program can be displayed.
 We can now open our favourite contract ``emacs
 ./src/bin_client/test/contracts/attic/id.tz`` and, when moving the cursor on
 a Michelson instruction, in the bottom of the windows Emacs should
@@ -288,3 +291,40 @@ A useful command to debug a node that is not syncing is:
 ::
 
    tezos-admin-client p2p stat
+
+.. _tezos_binaries_signals_and_exit_codes:
+
+Tezos binaries: signals and exit codes
+--------------------------------------
+
+Signals:
+Upon receiving ``SIGINT`` (e.g., via Ctrl+C in an interactive session) or
+``SIGTERM`` (e.g., via ``systemctl stop``) the process will exit (with code 64 or
+255, see details below). Note that sending the same signal a second time (after
+a one (1) second grace period) will terminate the process immediately,
+interrupting the normal clean-up functions of clean-up (in this case the exit
+code will be 255).
+
+Exit codes:
+The meaning of exit codes is presented in the following table. The action column
+indicates a recommended course of action.
+
++-------------+----------------------------------------------------------------------------------+------------------------------------------------------------------+
+| exit code   |  meaning                                                                         | action                                                           |
++-------------+----------------------------------------------------------------------------------+------------------------------------------------------------------+
+| 0           | the process exited successfully                                                  | nothing                                                          |
++-------------+----------------------------------------------------------------------------------+------------------------------------------------------------------+
+| 1–125       | something went unexpectedly                                                      | check output/log to see if you forgot an argument or some such   |
++-------------+----------------------------------------------------------------------------------+------------------------------------------------------------------+
+| 126         | an exception was not handled                                                     | report a bug                                                     |
++-------------+----------------------------------------------------------------------------------+------------------------------------------------------------------+
+| 127         | the process received a signal (e.g., via Ctrl-C)                                 | nothing                                                          |
++-------------+----------------------------------------------------------------------------------+------------------------------------------------------------------+
+| 128         | the process was about to exit successfully but an error occurred during exit     | check output/logs, clean-up leftover files, open a bug report    |
++-------------+----------------------------------------------------------------------------------+------------------------------------------------------------------+
+| 129–253     | like 1–125 and an error occurred during exit                                     | check output/logs, clean-up leftover files, open a bug report    |
++-------------+----------------------------------------------------------------------------------+------------------------------------------------------------------+
+| 254         | like 126 and an error and an error occurred during exit                          | check output/logs, clean-up leftover files, open a bug report    |
++-------------+----------------------------------------------------------------------------------+------------------------------------------------------------------+
+| 255         | like 127 but an error and an error occurred during exit (e.g., ``kill -9``)      | check output/logs, clean-up leftover files                       |
++-------------+----------------------------------------------------------------------------------+------------------------------------------------------------------+

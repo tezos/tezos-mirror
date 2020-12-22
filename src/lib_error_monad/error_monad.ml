@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -30,18 +30,11 @@
 
 type error_category = [`Branch | `Temporary | `Permanent]
 
-include Core
-include Monad
+include TzCore
+include TzMonad
+module TzTrace = TzTrace
 
-module Make (Prefix : Sig.PREFIX) : sig
-  include Sig.CORE
-
-  include Sig.EXT with type error := error
-
-  include Sig.WITH_WRAPPED with type error := error
-end = struct
-  include Core_maker.Make (Prefix)
-end
+type 'error trace = 'error TzTrace.trace
 
 type error += Exn of exn
 
@@ -66,7 +59,7 @@ let generic_error fmt = Format.kasprintf (fun s -> error (Exn (Failure s))) fmt
 
 let failwith fmt = Format.kasprintf (fun s -> fail (Exn (Failure s))) fmt
 
-let error_exn s = Error [Exn s]
+let error_exn s = Error (TzTrace.make @@ Exn s)
 
 let trace_exn exn f = trace (Exn exn) f
 
@@ -103,29 +96,44 @@ let () =
     (function Canceled -> Some () | _ -> None)
     (fun () -> Canceled)
 
-let protect ?on_error ?canceler t =
-  let cancellation =
-    match canceler with
+let protect_no_canceler ?on_error t =
+  let res = Lwt.catch t (fun exn -> fail (Exn exn)) in
+  res
+  >>= function
+  | Ok _ ->
+      res
+  | Error trace -> (
+    match on_error with
     | None ->
-        Lwt_utils.never_ending ()
-    | Some canceler ->
-        Lwt_canceler.cancellation canceler >>= fun () -> fail Canceled
+        res
+    | Some on_error ->
+        Lwt.catch (fun () -> on_error trace) (fun exn -> fail (Exn exn)) )
+
+let protect_canceler ?on_error canceler t =
+  let cancellation =
+    Lwt_canceler.cancellation canceler >>= fun () -> fail Canceled
   in
   let res = Lwt.pick [cancellation; Lwt.catch t (fun exn -> fail (Exn exn))] in
   res
   >>= function
   | Ok _ ->
       res
-  | Error err -> (
-      let canceled =
-        Option.unopt_map canceler ~default:false ~f:Lwt_canceler.canceled
+  | Error trace -> (
+      let trace =
+        if Lwt_canceler.canceled canceler then TzTrace.make Canceled else trace
       in
-      let err = if canceled then [Canceled] else err in
       match on_error with
       | None ->
-          Lwt.return_error err
+          Lwt.return_error trace
       | Some on_error ->
-          Lwt.catch (fun () -> on_error err) (fun exn -> fail (Exn exn)) )
+          Lwt.catch (fun () -> on_error trace) (fun exn -> fail (Exn exn)) )
+
+let protect ?on_error ?canceler t =
+  match canceler with
+  | None ->
+      protect_no_canceler ?on_error t
+  | Some canceler ->
+      protect_canceler ?on_error canceler t
 
 type error += Timeout
 

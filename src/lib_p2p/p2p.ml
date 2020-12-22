@@ -37,9 +37,9 @@ type config = {
   peers_file : string;
   private_mode : bool;
   identity : P2p_identity.t;
-  proof_of_work_target : Crypto_box.target;
+  proof_of_work_target : Crypto_box.pow_target;
   trust_discovered_peers : bool;
-  greylisting_config : P2p_point_state.Info.greylisting_config;
+  reconnection_config : P2p_point_state.Info.reconnection_config;
 }
 
 type limits = {
@@ -60,9 +60,6 @@ type limits = {
   incoming_app_message_queue_size : int option;
   incoming_message_queue_size : int option;
   outgoing_message_queue_size : int option;
-  known_peer_ids_history_size : int;
-  (* TODO: remove these two fields *)
-  known_points_history_size : int;
   max_known_peer_ids : (int * int) option;
   max_known_points : (int * int) option;
   swap_linger : Time.System.Span.t;
@@ -70,10 +67,8 @@ type limits = {
 }
 
 let create_scheduler limits =
-  let max_upload_speed = Option.map limits.max_upload_speed ~f:(( * ) 1024) in
-  let max_download_speed =
-    Option.map limits.max_upload_speed ~f:(( * ) 1024)
-  in
+  let max_upload_speed = Option.map (( * ) 1024) limits.max_upload_speed in
+  let max_download_speed = Option.map (( * ) 1024) limits.max_upload_speed in
   P2p_io_scheduler.create
     ~read_buffer_size:limits.read_buffer_size
     ?max_upload_speed
@@ -103,7 +98,7 @@ let create_connect_handler config limits pool msg_cfg conn_meta_cfg io_sched
       proof_of_work_target = config.proof_of_work_target;
       listening_port = config.listening_port;
       private_mode = config.private_mode;
-      greylisting_config = config.greylisting_config;
+      reconnection_config = config.reconnection_config;
       min_connections = limits.min_connections;
       max_connections = limits.max_connections;
       max_incoming_connections = limits.max_incoming_connections;
@@ -199,7 +194,7 @@ module Real = struct
     (* There is a mutual recursion between an answerer and connect_handler,
        for the default answerer. Because of the swap request mechanism, the
        default answerer needs to initiate new connections using the
-       [P2p_connect_hander.connect] callback. *)
+       [P2p_connect_handler.connect] callback. *)
     let rec answerer =
       lazy
         ( if config.private_mode then P2p_protocol.create_private ()
@@ -262,7 +257,7 @@ module Real = struct
 
   let roll _net () = Lwt.return_unit (* TODO implement *)
 
-  (* returns when all workers have shutted down in the opposite
+  (* returns when all workers have shut down in the opposite
      creation order. *)
   let shutdown net () =
     lwt_log_notice "Shutting down the p2p's welcome worker..."
@@ -413,7 +408,7 @@ module Real = struct
 end
 
 module Fake = struct
-  let id = P2p_identity.generate (Crypto_box.make_target 0.)
+  let id = P2p_identity.generate_with_pow_target_0 ()
 
   let empty_stat =
     {
@@ -513,10 +508,6 @@ let check_limits =
     fail_2 c.max_incoming_connections "max-incoming-connections"
     >>=? fun () ->
     fail_2 c.read_buffer_size "read-buffer-size"
-    >>=? fun () ->
-    fail_2 c.known_peer_ids_history_size "known-peer-ids-history-size"
-    >>=? fun () ->
-    fail_2 c.known_points_history_size "known-points-history-size"
     >>=? fun () ->
     fail_1 c.swap_linger "swap-linger"
     >>=? fun () ->
@@ -655,9 +646,9 @@ let iter_connections net = net.iter_connections
 let on_new_connection net = net.on_new_connection
 
 let greylist_addr net addr =
-  Option.iter net.pool ~f:(fun pool -> P2p_pool.greylist_addr pool addr)
+  Option.iter (fun pool -> P2p_pool.greylist_addr pool addr) net.pool
 
 let greylist_peer net peer_id =
-  Option.iter net.pool ~f:(fun pool -> P2p_pool.greylist_peer pool peer_id)
+  Option.iter (fun pool -> P2p_pool.greylist_peer pool peer_id) net.pool
 
 let watcher net = Lwt_watcher.create_stream net.watcher

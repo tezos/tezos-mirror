@@ -4,6 +4,7 @@
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2018-2020 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2018-2020 Tarides <contact@tarides.com>                     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -43,6 +44,9 @@ val init :
   string ->
   index Lwt.t
 
+(** Close the index. Does not fail when the context is already closed. *)
+val close : index -> unit Lwt.t
+
 val compute_testchain_chain_id : Block_hash.t -> Chain_id.t
 
 val compute_testchain_genesis : Block_hash.t -> Block_hash.t
@@ -72,21 +76,17 @@ val get : context -> key -> value option Lwt.t
 
 val set : context -> key -> value -> t Lwt.t
 
-val del : context -> key -> t Lwt.t
-
 val remove_rec : context -> key -> t Lwt.t
 
 (** [copy] returns None if the [from] key is not bound *)
 val copy : context -> from:key -> to_:key -> context option Lwt.t
 
+type key_or_dir = [`Key of key | `Dir of key]
+
 (** [fold] iterates over elements under a path (not recursive). Iteration order
-    is undeterministic. *)
+    is nondeterministic. *)
 val fold :
-  context ->
-  key ->
-  init:'a ->
-  f:([`Key of key | `Dir of key] -> 'a -> 'a Lwt.t) ->
-  'a Lwt.t
+  context -> key -> init:'a -> f:(key_or_dir -> 'a -> 'a Lwt.t) -> 'a Lwt.t
 
 (** {2 Accessing and Updating Versions} *)
 
@@ -132,6 +132,18 @@ val fork_test_chain :
 
 val clear_test_chain : index -> Chain_id.t -> unit Lwt.t
 
+val get_predecessor_block_metadata_hash :
+  context -> Block_metadata_hash.t option Lwt.t
+
+val set_predecessor_block_metadata_hash :
+  context -> Block_metadata_hash.t -> context Lwt.t
+
+val get_predecessor_ops_metadata_hash :
+  context -> Operation_metadata_list_list_hash.t option Lwt.t
+
+val set_predecessor_ops_metadata_hash :
+  context -> Operation_metadata_list_list_hash.t -> context Lwt.t
+
 (** {2 Context dumping} *)
 
 module Pruned_block : sig
@@ -143,17 +155,17 @@ module Pruned_block : sig
 
   val encoding : t Data_encoding.t
 
-  val to_bytes : t -> MBytes.t
+  val to_bytes : t -> Bytes.t
 
-  val of_bytes : MBytes.t -> t option
+  val of_bytes : Bytes.t -> t option
 end
 
 module Block_data : sig
   type t = {block_header : Block_header.t; operations : Operation.t list list}
 
-  val to_bytes : t -> MBytes.t
+  val to_bytes : t -> Bytes.t
 
-  val of_bytes : MBytes.t -> t option
+  val of_bytes : Bytes.t -> t option
 
   val encoding : t Data_encoding.t
 end
@@ -164,6 +176,8 @@ module Protocol_data : sig
   and info = {author : string; message : string; timestamp : Time.Protocol.t}
 
   and data = {
+    predecessor_block_metadata_hash : Block_metadata_hash.t option;
+    predecessor_ops_metadata_hash : Operation_metadata_list_list_hash.t option;
     info : info;
     protocol_hash : Protocol_hash.t;
     test_chain_status : Test_chain_status.t;
@@ -171,11 +185,13 @@ module Protocol_data : sig
     parents : Context_hash.t list;
   }
 
-  val to_bytes : t -> MBytes.t
+  val to_bytes : t -> Bytes.t
 
-  val of_bytes : MBytes.t -> t option
+  val of_bytes : Bytes.t -> t option
 
   val encoding : t Data_encoding.t
+
+  val encoding_1_0_0 : t Data_encoding.t
 end
 
 val get_protocol_data_from_header :
@@ -185,6 +201,8 @@ val dump_contexts :
   index ->
   Block_header.t
   * Block_data.t
+  * Block_metadata_hash.t option
+  * Operation_metadata_hash.t list list option
   * History_mode.t
   * (Block_header.t ->
     (Pruned_block.t option * Protocol_data.t option) tzresult Lwt.t) ->
@@ -201,6 +219,8 @@ val restore_contexts :
   unit tzresult Lwt.t) ->
   ( Block_header.t
   * Block_data.t
+  * Block_metadata_hash.t option
+  * Operation_metadata_hash.t list list option
   * History_mode.t
   * Block_header.t option
   * Block_hash.t list
@@ -217,6 +237,8 @@ val validate_context_hash_consistency_and_commit :
   message:string ->
   author:string ->
   parents:Context_hash.t list ->
+  predecessor_block_metadata_hash:Block_metadata_hash.t option ->
+  predecessor_ops_metadata_hash:Operation_metadata_list_list_hash.t option ->
   index:index ->
   bool Lwt.t
 

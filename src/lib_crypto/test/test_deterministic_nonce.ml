@@ -23,12 +23,20 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:    Crypto
+    Invocation:   dune build @src/lib_crypto/runtest
+    Subject:      On hash functions with deterministic nonce
+*)
+
+(** Deterministic nonce generation using HMAC-SHA256 *)
 let test_hash_matches (module X : S.SIGNATURE) () =
   let (_, _, sk) = X.generate_key () in
   let data = Bytes.of_string "ce input sa pun eu aici oare?" in
   let nonce = X.deterministic_nonce sk data in
   let nonce_hash = X.deterministic_nonce_hash sk data in
-  let hashed_nonce = Blake2B.hash_bytes [Bigstring.to_bytes nonce] in
+  let hashed_nonce = Blake2B.hash_bytes [nonce] in
   if nonce_hash <> Blake2B.to_bytes hashed_nonce then
     Alcotest.failf
       "the hash of deterministic_nonce is NOT deterministic_nonce_hash"

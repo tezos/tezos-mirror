@@ -30,5 +30,6 @@ class local_ctxt :
   string
   -> bool
   -> Registration.mockup_environment
+  -> Chain_id.t
   -> Tezos_protocol_environment.rpc_context
   -> RPC_context.json

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -290,7 +291,10 @@ let preapply ~user_activated_upgrades ~user_activated_protocol_overrides
   Prevalidation.create ~protocol_data ~predecessor ~timestamp ()
   >>=? fun validation_state ->
   Lwt_list.fold_left_s
-    (fun (acc_validation_result, acc_validation_state) operations ->
+    (fun ( acc_validation_passes,
+           acc_validation_result_rev,
+           acc_validation_state )
+         operations ->
       Lwt_list.fold_left_s
         (fun (acc_validation_result, acc_validation_state) op ->
           match Prevalidation.parse op with
@@ -313,16 +317,20 @@ let preapply ~user_activated_upgrades ~user_activated_protocol_overrides
         }
       in
       Lwt.return
-        (acc_validation_result @ [new_validation_result], new_validation_state))
-    ([], validation_state)
+        ( acc_validation_passes + 1,
+          new_validation_result :: acc_validation_result_rev,
+          new_validation_state ))
+    (0, [], validation_state)
     operations
+  >>= fun (validation_passes, validation_result_list_rev, validation_state) ->
+  Lwt.return (List.rev validation_result_list_rev, validation_state)
   >>= fun (validation_result_list, validation_state) ->
   let operations_hash =
     Operation_list_list_hash.compute
-      (List.map
+      (List.rev_map
          (fun r ->
            Operation_list_hash.compute (List.map fst r.Preapply_result.applied))
-         validation_result_list)
+         validation_result_list_rev)
   in
   Prevalidation.status validation_state
   >>=? fun {block_result; _} ->
@@ -344,13 +352,14 @@ let preapply ~user_activated_upgrades ~user_activated_protocol_overrides
       pred_shell_header.proto_level
     else (pred_shell_header.proto_level + 1) mod 256
   in
+  let pred_block_hash = State.Block.hash predecessor in
   let shell_header : Block_header.shell_header =
     {
       level;
       proto_level;
-      predecessor = State.Block.hash predecessor;
+      predecessor = pred_block_hash;
       timestamp;
-      validation_passes = List.length validation_result_list;
+      validation_passes;
       operations_hash;
       fitness;
       context = Context_hash.zero (* place holder *);
@@ -362,7 +371,7 @@ let preapply ~user_activated_upgrades ~user_activated_protocol_overrides
     | None ->
         fail
           (Block_validator_errors.Unavailable_protocol
-             {block = State.Block.hash predecessor; protocol})
+             {block = pred_block_hash; protocol})
     | Some (module NewProto) ->
         let context = Shell_context.wrap_disk_context context in
         NewProto.init context shell_header
@@ -370,5 +379,43 @@ let preapply ~user_activated_upgrades ~user_activated_protocol_overrides
         let context = Shell_context.unwrap_disk_context context in
         return (context, message) )
   >>=? fun (context, message) ->
+  ( match Registered_protocol.get pred_protocol with
+  | None ->
+      fail
+        (Block_validator_errors.Unavailable_protocol
+           {block = pred_block_hash; protocol = pred_protocol})
+  | Some (module Proto) ->
+      return Proto.environment_version )
+  >>=? (function
+         | Protocol.V0 ->
+             return context
+         | Protocol.V1 -> (
+             State.Block.all_operations_metadata_hash predecessor
+             >>= (function
+                   | None
+                     when (State.Block.header predecessor).shell
+                            .validation_passes > 0 ->
+                       fail
+                       @@ Missing_operation_metadata_hashes pred_block_hash
+                   | None ->
+                       (* Operation metadata hash is not be set on testchain genesis
+                          block and activation block, even when they are using
+                          environment V1, they contain no operations. *)
+                       return context
+                   | Some hash ->
+                       Context.set_predecessor_ops_metadata_hash context hash
+                       >|= ok)
+             >>=? fun context ->
+             State.Block.metadata_hash predecessor
+             >>= function
+             | None ->
+                 (* Block metadata hash should always be set in environment V1. *)
+                 fail @@ Missing_block_metadata_hash pred_block_hash
+             | Some predecessor_block_metadata_hash ->
+                 Context.set_predecessor_block_metadata_hash
+                   context
+                   predecessor_block_metadata_hash
+                 >|= ok ))
+  >>=? fun context ->
   let context = Context.hash ?message ~time:timestamp context in
   return ({shell_header with context}, validation_result_list)

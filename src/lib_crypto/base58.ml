@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -121,7 +122,7 @@ let raw_decode ?(alphabet = Alphabet.default) s =
           None)
     (Some Z.zero)
     s
-  |> Option.map ~f:(fun res ->
+  |> Option.map (fun res ->
          let res = Z.to_bits res in
          let res_tzeros = count_trailing_char res '\000' in
          let len = String.length res - res_tzeros in
@@ -130,24 +131,21 @@ let raw_decode ?(alphabet = Alphabet.default) s =
          ^ String.init len (fun i -> res.[len - i - 1]))
 
 let checksum s =
-  let hash = Hacl.Hash.SHA256.(digest (digest (Bigstring.of_string s))) in
-  let res = Bytes.make 4 '\000' in
-  Bigstring.blit_to_bytes hash 0 res 0 4 ;
-  Bytes.to_string res
+  let hash = Hacl.Hash.SHA256.(digest (digest (Bytes.of_string s))) in
+  Bytes.sub_string hash 0 4
 
 (* Append a 4-bytes cryptographic checksum before encoding string s *)
 let safe_encode ?alphabet s = raw_encode ?alphabet (s ^ checksum s)
 
 let safe_decode ?alphabet s =
-  raw_decode ?alphabet s
-  |> Option.apply ~f:(fun s ->
-         let len = String.length s in
-         if len < 4 then None
-         else
-           (* only if the string is long enough to extract a checksum do we check it *)
-           let msg = String.sub s 0 (len - 4) in
-           let msg_hash = String.sub s (len - 4) 4 in
-           if msg_hash <> checksum msg then None else Some msg)
+  Option.bind (raw_decode ?alphabet s) (fun s ->
+      let len = String.length s in
+      if len < 4 then None
+      else
+        (* only if the string is long enough to extract a checksum do we check it *)
+        let msg = String.sub s 0 (len - 4) in
+        let msg_hash = String.sub s (len - 4) 4 in
+        if msg_hash <> checksum msg then None else Some msg)
 
 type data = ..
 
@@ -164,9 +162,8 @@ type 'a encoding = {
 let prefix {prefix; _} = prefix
 
 let simple_decode ?alphabet {prefix; of_raw; _} s =
-  safe_decode ?alphabet s
-  |> Option.apply ~f:(TzString.remove_prefix ~prefix)
-  |> Option.apply ~f:of_raw
+  let open TzOption in
+  safe_decode ?alphabet s >>= TzString.remove_prefix ~prefix >>= of_raw
 
 let simple_encode ?alphabet {prefix; to_raw; _} d =
   safe_encode ?alphabet (prefix ^ to_raw d)
@@ -252,9 +249,9 @@ struct
         | None ->
             find s encodings
         | Some msg ->
-            of_raw msg |> Option.map ~f:wrap )
+            of_raw msg |> Option.map wrap )
     in
-    safe_decode ?alphabet s |> Option.apply ~f:(fun s -> find s !encodings)
+    Option.bind (safe_decode ?alphabet s) (fun s -> find s !encodings)
 end
 
 type 'a resolver =
@@ -309,11 +306,11 @@ struct
                 in
                 resolver context msg
                 >|= fun msgs ->
-                TzList.filter_map
+                List.filter_map
                   (fun msg ->
                     let res = simple_encode encoding ?alphabet msg in
                     TzString.remove_prefix ~prefix:request res
-                    |> Option.map ~f:(fun _ -> res))
+                    |> Option.map (fun _ -> res))
                   msgs )
     in
     find request !resolvers
@@ -345,6 +342,14 @@ struct
 end
 
 module Prefix = struct
+  (* These encoded prefixes are computed using scripts/base58_prefix.py
+     $ ./scripts/base58_prefix.py tz1 20
+     36 434591 [6L, 161L, 159L]
+     $ dune utop src/lib_crypto
+     utop # Tezos_crypto.Base58.make_encoded_prefix "\006\161\159" 20 ;;
+     - : string * int = ("tz1", 36)
+   *)
+
   (* 32 *)
   let block_hash = "\001\052" (* B(51) *)
 
@@ -357,6 +362,14 @@ module Prefix = struct
   let protocol_hash = "\002\170" (* P(51) *)
 
   let context_hash = "\079\199" (* Co(52) *)
+
+  let block_metadata_hash = "\234\249" (* bm(52) *)
+
+  let operation_metadata_hash = "\005\183" (* r(51) *)
+
+  let operation_metadata_list_hash = "\134\039" (* Lr(52) *)
+
+  let operation_metadata_list_list_hash = "\029\159\182" (* LLr(53) *)
 
   (* 20 *)
   let ed25519_public_key_hash = "\006\161\159" (* tz1(36) *)
@@ -405,7 +418,11 @@ module Prefix = struct
   let generic_signature = "\004\130\043" (* sig(96) *)
 
   (* 4 *)
-  let chain_id = "\087\082\000"
+  let chain_id = "\087\082\000" (* Net(15) *)
 
-  (* Net(15) *)
+  (* 169 *)
+  let sapling_spending_key = "\011\237\020\092" (* sask(241) *)
+
+  (* 43 *)
+  let sapling_address = "\018\071\040\223" (* zet1(69) *)
 end

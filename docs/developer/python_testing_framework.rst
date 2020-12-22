@@ -15,6 +15,7 @@ It contains the following python packages.
 
 - ``daemons`` defines classes to run Tezos node and daemons,
 - ``client`` mainly defines the ``Client`` class, that provides a programmatic interface to a client,
+- ``codec`` defines a `Codec`` class, that provides a interface for `tezos-codec` binary,
 - ``launcher`` defines classes used to launch a nodes and daemons with specific settings,
 - ``tools`` contains utility functions and constants shared by the tests,
 - ``examples`` contains example of tests and scripts that run scenarios of interactions between tezos nodes and clients,
@@ -23,7 +24,7 @@ It contains the following python packages.
 
 They are organized in three layers.
 
-1. ``daemons`` and ``client``,
+1. ``daemons``, ``client`` and ``codec``,
 2. ``launchers``,
 3. ``tests``, ``examples``, ``tools``.
 
@@ -33,35 +34,29 @@ Installation
 Prerequisites:
 
 - A working environment (see `documentation <http://tezos.gitlab.io/introduction/howtoget.html#environment>`_) with the binaries compiled,
-- ``python`` (version >= 3.6),
 - A local copy of the tezos `repository <https://gitlab.com/tezos/tezos>`_
-- the ``pip`` package manager.
+- `python 3.8.5`. It is recommended to use `pyenv
+  <https://github.com/pyenv/pyenv>`_ to manage the python versions. If ``pyenv``
+  is used, you can use ``pyenv install 3.8.5`` followed by ``pyenv global 3.8.5`` to
+  set the python version to ``3.8.5`` globally. If you want to use ``python 3.8.5`` only in the
+  current shell, you can use ``pyenv shell 3.8.5``. Be sure ``eval $(pyenv init -)``
+  has been executed first during the shell session.
+- `poetry <https://python-poetry.org/>`_ to manage the python dependencies and
+  run the tests in a sandboxed python environment. All poetry commands are to be
+  run in ``tests_python``. Before running the tests for the first time, the
+  dependencies must be installed. To achieve this, run ``poetry install``.
 
-On some systems (e.g. Mac OS X), several versions of ``python`` coexist. You need to explicitly
-use ``python3`` and ``pip3`` (instead of `python` and `pip`).
 
-Python packages can be installed with
-
-::
-
-    cd PATH_TO_YOUR_TEZOS_DIR/tests_python
-    pip3 install -r requirements.txt
 
 Examples of test executions:
 
 ::
 
-    pytest examples/test_example.py  # simple test example
-    pytest -m "not slow"  # run all tests not marked as slow
-    pytest -s tests/test_injection.py  # run a specific test with traces
-    pytest  # run all tests
+    poetry run pytest examples/test_example.py  # simple test example
+    poetry run pytest -m "not slow"  # run all tests not marked as slow
+    poetry run pytest -s tests/test_injection.py  # run a specific test with traces
+    poetry run pytest  # run all tests
 
-On systems where python packages are installed locally (e.g. test server
-at Nomadic), you need to export the local python binaries path.
-
-::
-
-    export PATH=$PATH:~/.local/bin/
 
 A simple sandbox scenario
 -------------------------
@@ -106,8 +101,9 @@ a transfer operation.
         scenario()
 
 
-This can be run with ``python3 examples/example.py``. It should display all the
-clients commands and their results.
+This can be run with
+``PYTHONPATH=./:$PYTHONPATH poetry run python examples/example.py``.
+It should display all the clients commands and their results.
 
 The ``sandbox`` object allows users to add nodes, bakers or endorsers
 running in tezos sandboxed mode. Whenever a node has been added, one can
@@ -129,7 +125,7 @@ will run something like
 
     tezos-client -base-dir /tmp/tezos-client.be22ya16 -addr 127.0.0.1 -port 18730 transfer 500 from bootstrap1 to bootstrap3
 
-``receipt`` is an object of type ``client_ouput.TransferResult`` which gives
+``receipt`` is an object of type ``client_output.TransferResult`` which gives
 access to some data of the ``tezos-client`` output.
 
 Alternatively, one can always construct the command manually:
@@ -169,7 +165,7 @@ Running tests
 Useful options
 """"""""""""""
 
-``pytest`` has a variety of launching options. Conventient options include:
+``pytest`` has a variety of launching options. Convenient options include:
 
 - ``-v`` display test names,
 - ``-x`` stop at first failure,
@@ -208,23 +204,38 @@ needed, but sometimes we want to stop at first failure using ``-x``, and some
 tests require the server logs to be saved (``--log-dir=tmp/``) as they check some assertions in the
 logs at some point in the test.
 
-To run a specifc test, we usually want client and server traces
+To run a specific test, we usually want client and server traces
 (``-s --log-dir=tmp/``).
 
 ::
 
     # Launch a simple test without capturing stdout
-    > pytest -s examples/test_example.py
+    > poetry run pytest -s examples/test_example.py
     # run all tests about vote
-    > pytest -m "vote"
+    > poetry run pytest -m "vote"
     # run all vote and non-slow tests
-    > pytest -m "vote and not slow"
+    > poetry run pytest -m "vote and not slow"
     # run module test_voting.py, display all output, save server logs in tmp
-    > pytest -s tests/test_voting.py --log-dir=tmp
+    > poetry run pytest -s tests/test_voting.py --log-dir=tmp
     # run all tests using a daemon
-    > pytest -m "endorser or baker"
+    > poetry run pytest -m "endorser or baker"
     # run everything
-    > pytest
+    > poetry run pytest
+
+Pre-commit hook
+"""""""""""""""
+
+The `pre-commit <https://git-scm.com/book/en/v2/Customizing-Git-Git-Hooks>`_
+hook located in ``scripts/pre_commit/pre_commit.py``
+executes modified python tests automatically. It looks for staged files
+(the default) or modified files (if ``--unstaged`` is passed) in
+``tests_python/tests`` and calls ``pytest`` on those files. This avoids
+pushing commits that will break the CI. It is also handy to execute
+the relevant subset of tests by calling
+``./scripts/pre_commit/pre_commit.py [--unstaged]`` manually.
+
+We refer to the header of ``pre_commit.py`` and its ``--help`` flag
+for additional instructions.
 
 Anatomy of a test
 ~~~~~~~~~~~~~~~~~
@@ -251,11 +262,11 @@ The following ``test_example.py`` is the ``pytest`` counterpart of the first exa
     def sandbox():
         """Example of sandbox fixture."""
         with Sandbox(paths.TEZOS_HOME,
-                    constants.IDENTITIES,
-                    constants.GENESIS_PK) as sandbox:
-            sandbox.add_node(0)
+                     constants.IDENTITIES,
+                     constants.GENESIS_PK) as sandbox:
+            sandbox.add_node(0, params=constants.NODE_PARAMS)
             utils.activate_alpha(sandbox.client(0))
-            sandbox.add_node(1)
+            sandbox.add_node(1, params=constants.NODE_PARAMS)
             sandbox.add_baker(0, 'bootstrap5', proto=constants.ALPHA_DAEMON)
             yield sandbox
             assert sandbox.are_daemons_alive()
@@ -270,19 +281,22 @@ The following ``test_example.py`` is the ``pytest`` counterpart of the first exa
     @pytest.mark.incremental
     class TestExample:
 
-        def test_wait_sync_proto(self, sandbox):
+        def test_wait_sync_proto(self, sandbox, session):
+            session['head_hash'] = sandbox.client(0).get_head()['hash']
             clients = sandbox.all_clients()
             for client in clients:
-                proto = "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
+                proto = constants.ALPHA
                 assert utils.check_protocol(client, proto)
 
         def test_transfer(self, sandbox, session):
             receipt = sandbox.client(0).transfer(500, 'bootstrap1', 'bootstrap3')
             session['operation_hash'] = receipt.operation_hash
 
+        @pytest.mark.timeout(5)
         def test_inclusion(self, sandbox, session):
             operation_hash = session['operation_hash']
-            sandbox.client(0).wait_for_inclusion(operation_hash)
+            sandbox.client(0).wait_for_inclusion(operation_hash,
+                                                 branch=session['head_hash'])
 
 In this example, we defined the fixtures in the same module, but they are
 generally shared between tests and put in ``conftest.py``.
@@ -291,7 +305,7 @@ Currently, all tests scenarios in the test suite are defined as classes,
 consisting of a sequence of methods that are run incrementally (as
 specified with the annotation ``@pytest.mark.incremental``). Classes are
 used to define the scope of a fixture, and a unit of incremental
-testing sequence. We don't directly instanciate them, or use ``self``.
+testing sequence. We don't directly instantiate them, or use ``self``.
 
 Data between methods are shared using a dictionary ``session``. For instance,
 we save the result of the ``transfer`` operation, and retrieve it in the next
@@ -304,10 +318,10 @@ The list of fixtures available is given by
 
 ::
 
-    pytest --fixtures
+    poetry run pytest --fixtures
 
 Most fixtures are defined in ``conftest.py``.
-The most general fixture is ``sandbox``. It allows to instanciate an arbitrary
+The most general fixture is ``sandbox``. It allows to instantiate an arbitrary
 number of nodes and daemons. Other fixtures, such as ``client``,
 are specialized versions (slightly more convenient than using
 ``sandbox`` directly). Fixtures can be defined directly in a module defining a
@@ -379,8 +393,8 @@ Methods ``add_node``, ``add_baker`` and ``add_endorser`` have an optional
 parameter ``branch`` that points to a subdirectory where binaries are to be
 looked for.
 
-2. The ``SandboxMultibranch`` launcher is instanciated by map from ids to
-branches. Then everytime we launch a node or a daemon the actual binary will
+2. The ``SandboxMultibranch`` launcher is instantiated by map from ids to
+branches. Then every time we launch a node or a daemon the actual binary will
 be selected according to the map.
 
 Tests using specific revisions are in ``tests/multibranch`` and aren't run by
@@ -461,7 +475,7 @@ Run the test with
 ::
 
     # mkdir tmp
-    pytest tests/multibranch/test_baker_endorser_mb.py --log-dir=tmp
+    poetry run pytest tests/multibranch/test_baker_endorser_mb.py --log-dir=tmp
 
 Example 2: A full voting scenario ``test_voting_full.py``
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""
@@ -488,7 +502,7 @@ It can be run with
 
 ::
 
-    pytest tests/multibranch/test_baker_endorser_mb.py`
+    poetry run pytest tests/multibranch/test_baker_endorser_mb.py`
 
 Note: this test uses only one revision but it can't run
 on branch ``master`` as we need an extra protocol with bakers.
@@ -535,7 +549,7 @@ If the logs need to be updated, pass ``--regtest-reset`` to ``pytest``:
 
 ::
 
-    pytest --regtest-reset <test-file>
+    poetry run pytest --regtest-reset <test-file>
 
 The resulting changes should be committed after thoroughly verifying
 that they are as expected.
@@ -567,7 +581,7 @@ flag as described above:
 
 .. code-block:: bash
 
-    $ pytest --regtest-reset tests_python/tests/test_regtest.py
+    $ poetry run pytest --regtest-reset tests_python/tests/test_regtest.py
 
 We find the generated test log in ``tests_python/tests/_regtest_outputs/test_regtest.TestDemonstrateRegtest\:\:test_hash_regtest.out``:
 
@@ -634,7 +648,7 @@ Known issues
   termination,
 
 - One some occasions, the ``timeout`` marker doesn't play well with
-  blocking client commmands. for instance, this may not stop the test if
+  blocking client commands. for instance, this may not stop the test if
   ``wait_for_inclusion`` is stuck.
 
 ::
@@ -651,8 +665,16 @@ cleaned up.
 
     @pytest.mark.timeout(5, method='thread')
 
-See discussion `here <https://pypi.org/project/pytest-timeout/>`_.
+See discussion `here <https://pypi.org/project/pytest-timeout/>`__.
 
 To avoid this issue, one can use polling functions
 such as ``utils.check_contains_operations(client, [op_hash])``
 instead of using blocking commands.
+
+Adding new dependencies
+-----------------------
+
+Dependencies are managed by poetry in the file pyproject.toml. See `here <https://python-poetry.org/docs/pyproject/>`__.
+The file ``poetry.lock`` is generated by running ``poetry lock``, and must never be changed manually.
+The resulting ``poetry.lock`` and its generator ``pyproject.toml`` must be
+copied in `this repository <https://gitlab.com/tezos/opam-repository>`__.

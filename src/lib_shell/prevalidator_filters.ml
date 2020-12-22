@@ -64,4 +64,4 @@ let register (module Filter : FILTER) =
   assert (not (Protocol_hash.Table.mem table Filter.Proto.hash)) ;
   Protocol_hash.Table.add table Filter.Proto.hash (module Filter)
 
-let find = Protocol_hash.Table.find_opt table
+let find = Protocol_hash.Table.find table

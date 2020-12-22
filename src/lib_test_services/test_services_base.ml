@@ -72,4 +72,6 @@ let lwt_assert_catch (p : unit -> 'a Lwt.t) (e : exn) =
 
 let contains (type a) (m : a testable) str (x : a) (ls : a list) : unit =
   let (module M) = m in
-  assert_true str (List.exists (M.equal x) ls)
+  let (module L) = list m in
+  if not @@ List.exists (M.equal x) ls then
+    failf "%s. Could not find %a in %a" str M.pp x L.pp ls

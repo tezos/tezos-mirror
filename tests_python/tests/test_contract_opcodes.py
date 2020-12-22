@@ -1,9 +1,11 @@
 from os import path
+
 import pytest
-from tools.paths import OPCODES_CONTRACT_PATH, \
-    MINI_SCENARIOS_CONTRACT_PATH
-from tools.utils import assert_run_failure, assert_run_script_success, \
-    assert_run_script_failwith
+
+from tools.client_regression import ClientRegression
+from tools.paths import MINI_SCENARIOS_CONTRACT_PATH, OPCODES_CONTRACT_PATH
+from tools.utils import (assert_run_failure, assert_run_script_failwith,
+                         assert_run_script_success)
 
 
 @pytest.mark.slow
@@ -58,6 +60,13 @@ class TestContractOpcodes:
             ('slice.tz', 'Some "Foo"', 'Pair 1 3', 'None'),
             ('slice.tz', 'Some "Foo"', 'Pair 1 1', '(Some "o")'),
 
+            # Stress-test the failure case of slice for a
+            # non-trivial gas consumption
+            ('slice.tz',
+             'Some' + '"' + 'Foo' * 2000 + '"',
+             'Pair 1 10000',
+             'None'),
+
             # Slice bytes
             ('slice_bytes.tz', 'None', 'Pair 0 1', 'None'),
             ('slice_bytes.tz', 'Some 0xaabbcc', 'Pair 0 0', '(Some 0x)'),
@@ -66,6 +75,13 @@ class TestContractOpcodes:
             ('slice_bytes.tz', 'Some 0xaabbcc', 'Pair 1 2', '(Some 0xbbcc)'),
             ('slice_bytes.tz', 'Some 0xaabbcc', 'Pair 1 3', 'None'),
             ('slice_bytes.tz', 'Some 0xaabbcc', 'Pair 1 1', '(Some 0xbb)'),
+
+            # Stress-test the failure case of slice for a
+            # non-trivial gas  consumption
+            ('slice_bytes.tz',
+             'Some 0x' + 'aabbcc' * 2000,
+             'Pair 1 10000',
+             'None'),
 
             # Identity on pairs
             ('pair_id.tz', 'None', '(Pair True False)',
@@ -604,24 +620,29 @@ class TestContractOpcodes:
             ('pexec_2.tz', "{ 0 ; 1 ; 2 ; 3}", '4', "{ 0 ; 7 ; 14 ; 21 }"),
 
             # Test CHAIN_ID
-            ('chain_id_store.tz', 'None', 'Unit', '(Some 0x7a06a770)'),
+            ('chain_id_store.tz', 'None', 'Unit', '(Some "NetXdQprcVkpaWU")'),
+            ('chain_id_store.tz', '(Some 0x7a06a770)', 'Unit',
+             '(Some "NetXdQprcVkpaWU")'),
+            ('chain_id_store.tz', '(Some "NetXdQprcVkpaWU")', 'Unit',
+             '(Some "NetXdQprcVkpaWU")'),
 
             # Test SELF
             ('self_with_entrypoint.tz', 'Unit', 'Left (Left 0)', 'Unit'),
             ('self_with_default_entrypoint.tz', 'Unit', 'Unit', 'Unit')
         ])
     def test_contract_input_output(self,
-                                   client_regtest,
-                                   contract,
-                                   param,
-                                   storage,
-                                   expected):
+                                   client_regtest: ClientRegression,
+                                   contract: str,
+                                   param: str,
+                                   storage: str,
+                                   expected: str):
         client = client_regtest
-        if contract.endswith('.tz'):
-            contract = path.join(OPCODES_CONTRACT_PATH, contract)
-            run_script_res = client.run_script(contract, param,
-                                               storage, None, True)
-            assert run_script_res.storage == expected
+        assert contract.endswith('.tz'), \
+            "test contract should have .tz extension"
+        contract = path.join(OPCODES_CONTRACT_PATH, contract)
+        run_script_res = client.run_script(contract, param,
+                                           storage, None, True)
+        assert run_script_res.storage == expected
 
     @pytest.mark.parametrize(
         "contract,param,storage,expected,big_map_diff",
@@ -686,12 +707,12 @@ class TestContractOpcodes:
               ['Set map(0)["2"] to "two"']])
         ])
     def test__big_map_contract_io(self,
-                                  client_regtest,
-                                  contract,
-                                  param,
-                                  storage,
-                                  expected,
-                                  big_map_diff):
+                                  client_regtest: ClientRegression,
+                                  contract: str,
+                                  param: str,
+                                  storage: str,
+                                  expected: str,
+                                  big_map_diff: str):
         client = client_regtest
         contract = path.join(OPCODES_CONTRACT_PATH, contract)
         run_script_res = client.run_script(contract, param, storage,
@@ -751,11 +772,11 @@ class TestContractOpcodes:
               ['Unset map(0)["1"]']])
         ])
     def test_big_map_magic(self,
-                           client_regtest,
-                           storage,
-                           param,
-                           expected,
-                           big_map_diff):
+                           client_regtest: ClientRegression,
+                           storage: str,
+                           param: str,
+                           expected: str,
+                           big_map_diff: str):
         client = client_regtest
         contract = path.join(MINI_SCENARIOS_CONTRACT_PATH,
                              'big_map_magic.tz')
@@ -764,7 +785,7 @@ class TestContractOpcodes:
         assert run_script_res.storage == expected
         assert run_script_res.big_map_diff == big_map_diff
 
-    def test_packunpack(self, client_regtest):
+    def test_packunpack(self, client_regtest: ClientRegression):
         """Test PACK/UNPACK and binary format."""
         client = client_regtest
         assert_run_script_success(
@@ -784,7 +805,7 @@ class TestContractOpcodes:
             '0070009000102000000060001000200030004)'
         )
 
-    def test_check_signature(self, client_regtest):
+    def test_check_signature(self, client_regtest: ClientRegression):
         client = client_regtest
         sig = 'edsigu3QszDjUpeqYqbvhyRxMpVFamEnvm9FYnt7YiiNt' \
               + '9nmjYfh8ZTbsybZ5WnBkhA7zfHsRVyuTnRsGLR6fNHt1Up1FxgyRtF'
@@ -801,7 +822,8 @@ class TestContractOpcodes:
             '"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"'
         )
 
-    def test_hash_consistency_michelson_cli(self, client_regtest):
+    def test_hash_consistency_michelson_cli(self,
+                                            client_regtest: ClientRegression):
         client = client_regtest
         hash_result = client.hash(
             '(Pair 22220000000 (Pair "2017-12-13T04:49:00Z" 034))',
@@ -830,31 +852,29 @@ class TestContractOpcodes:
             ('mul_overflow.tz', 'Unit', 'Right Unit')
         ])
     def test_arithmetic_overflow(self,
-                                 client_regtest_scrubbed,
-                                 contract,
-                                 param,
-                                 storage):
+                                 client_regtest_scrubbed: ClientRegression,
+                                 contract: str,
+                                 param: str,
+                                 storage: str):
         client = client_regtest_scrubbed
         contract = path.join(OPCODES_CONTRACT_PATH, contract)
 
-        def cmd():
+        with assert_run_failure(r'unexpected arithmetic overflow'):
             client.run_script(contract, param, storage)
-        assert_run_failure(cmd, r'unexpected arithmetic overflow')
 
     @pytest.mark.skip(reason="Bug in annotation system")
-    def test_fails_annotated_set_car_cdr(self, client_regtest):
+    def test_fails_annotated_set_car_cdr(self,
+                                         client_regtest: ClientRegression):
         """Tests the SET_CAR and SET_CDR instructions."""
         client = client_regtest
 
-        def cmd():
+        with assert_run_failure(r'The two annotations do not match'):
             client.run_script(path.join(OPCODES_CONTRACT_PATH, 'set_car.tz'),
                               '(Pair %wrong %field "hello" 0)',
                               '""')
-        assert_run_failure(cmd, r'The two annotations do not match')
 
-    @pytest.mark.skip(reason="To be fixed in next protocol")
     @pytest.mark.parametrize(
-        "contract,param,storage,expected",
+        "contract,storage,param,expected",
         [   # FORMAT: assert_output contract_file storage input expected_result
             # Mapping over maps
             ('map_map_sideeffect.tz',
@@ -866,12 +886,12 @@ class TestContractOpcodes:
              '(Pair { Elt "bar" 20 ; Elt "foo" 16 } 36)')
         ])
     def test_map_map_sideeffect(self,
-                                client_regtest,
-                                contract,
-                                param,
-                                storage,
-                                expected):
+                                client_regtest: ClientRegression,
+                                contract: str,
+                                param: str,
+                                storage: str,
+                                expected: str):
         client = client_regtest
         contract = path.join(OPCODES_CONTRACT_PATH, contract)
-        run_script_res = client.run_script(contract, param, storage)
+        run_script_res = client.run_script(contract, storage, param)
         assert run_script_res.storage == expected

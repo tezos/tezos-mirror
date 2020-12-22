@@ -61,4 +61,4 @@
 
  )
  (action (with-stdout-to %{targets} (chdir %{workspace_root}}
-          (run %{exe:../sigs_packer/sigs_packer.exe} %{deps})))))
+          (run %{libexec:tezos-protocol-environment-packer:s_packer} "sigs" %{deps})))))

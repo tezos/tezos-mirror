@@ -95,37 +95,32 @@ struct
         assert false
 
   let public_key pk_uri =
-    Remote.public_key
-      (Client_keys.make_pk_uri (key (pk_uri : pk_uri :> Uri.t)))
+    Client_keys.make_pk_uri (key (pk_uri : pk_uri :> Uri.t))
+    >>=? Remote.public_key
 
   let public_key_hash pk_uri =
-    Remote.public_key_hash
-      (Client_keys.make_pk_uri (key (pk_uri : pk_uri :> Uri.t)))
+    Client_keys.make_pk_uri (key (pk_uri : pk_uri :> Uri.t))
+    >>=? Remote.public_key_hash
 
   let import_secret_key ~io:_ = public_key_hash
 
-  let neuterize sk_uri =
-    return (Client_keys.make_pk_uri (sk_uri : sk_uri :> Uri.t))
+  let neuterize sk_uri = Client_keys.make_pk_uri (sk_uri : sk_uri :> Uri.t)
 
   let sign ?watermark sk_uri msg =
-    Remote.sign
-      ?watermark
-      (Client_keys.make_sk_uri (key (sk_uri : sk_uri :> Uri.t)))
-      msg
+    Client_keys.make_sk_uri (key (sk_uri : sk_uri :> Uri.t))
+    >>=? fun sk_uri -> Remote.sign ?watermark sk_uri msg
 
   let deterministic_nonce sk_uri msg =
-    Remote.deterministic_nonce
-      (Client_keys.make_sk_uri (key (sk_uri : sk_uri :> Uri.t)))
-      msg
+    Client_keys.make_sk_uri (key (sk_uri : sk_uri :> Uri.t))
+    >>=? fun sk_uri -> Remote.deterministic_nonce sk_uri msg
 
   let deterministic_nonce_hash sk_uri msg =
-    Remote.deterministic_nonce_hash
-      (Client_keys.make_sk_uri (key (sk_uri : sk_uri :> Uri.t)))
-      msg
+    Client_keys.make_sk_uri (key (sk_uri : sk_uri :> Uri.t))
+    >>=? fun sk_uri -> Remote.deterministic_nonce_hash sk_uri msg
 
   let supports_deterministic_nonces sk_uri =
-    Remote.supports_deterministic_nonces
-      (Client_keys.make_sk_uri (key (sk_uri : sk_uri :> Uri.t)))
+    Client_keys.make_sk_uri (key (sk_uri : sk_uri :> Uri.t))
+    >>=? Remote.supports_deterministic_nonces
 end
 
 let make_sk sk =
@@ -212,21 +207,30 @@ let () =
     (fun s -> Invalid_remote_signer s)
 
 let parse_base_uri s =
-  trace (Invalid_remote_signer s)
-  @@
-  try
-    let uri = Uri.of_string s in
+  (* FIXME: documentation for [Uri.of_string] doesn't mention any exception.
+      However, from reading the code it seems like [Not_found] can be raised
+      (via some internal call to [Re.exec]. *)
+  match Uri.of_string s with
+  (* We keep [Invalid_argument] but this needs investigation because of the
+      above comment *)
+  | exception Invalid_argument msg ->
+      generic_error "Malformed URI: %s" msg
+  | exception Not_found ->
+      generic_error "Malformed URI"
+  | uri -> (
     match Uri.scheme uri with
     | Some "http" ->
-        return uri
+        Ok uri
     | Some "https" ->
-        return uri
+        Ok uri
     | Some "tcp" ->
-        return uri
+        Ok uri
     | Some "unix" ->
-        return uri
+        Ok uri
     | Some scheme ->
-        failwith "Unknown scheme: %s" scheme
+        generic_error "Unknown scheme: %s" scheme
     | None ->
-        failwith "Unknown scheme: <empty>"
-  with Invalid_argument msg -> failwith "Malformed URI: %s" msg
+        generic_error "Unknown scheme: <empty>" )
+
+let parse_base_uri s =
+  parse_base_uri s |> record_trace (Invalid_remote_signer s) |> Lwt.return

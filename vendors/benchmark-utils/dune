@@ -1,0 +1,5 @@
+(library
+  (public_name benchmark-utils)
+  (name benchmark_utils)
+  (c_names time_stub)
+  (flags (:standard -w -9-32 -safe-string)))

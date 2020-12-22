@@ -39,7 +39,11 @@ let set_int64 = Bytes.set_int64_be
 
 let get_int64 = Bytes.get_int64_be
 
+let set_uint8 = Bytes.set_uint8
+
 let get_uint8 = Bytes.get_uint8
+
+let set_uint16 = Bytes.set_uint16_be
 
 let get_uint16 = Bytes.get_uint16_be
 

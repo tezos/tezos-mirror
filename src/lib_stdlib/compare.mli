@@ -59,7 +59,29 @@ module Char : S with type t = char
 
 module Bool : S with type t = bool
 
-module Int : S with type t = int
+module Int : sig
+  type t = int
+
+  external ( = ) : int -> int -> bool = "%equal"
+
+  external ( <> ) : int -> int -> bool = "%notequal"
+
+  external ( < ) : int -> int -> bool = "%lessthan"
+
+  external ( > ) : int -> int -> bool = "%greaterthan"
+
+  external ( <= ) : int -> int -> bool = "%lessequal"
+
+  external ( >= ) : int -> int -> bool = "%greaterequal"
+
+  external compare : int -> int -> int = "%compare"
+
+  val max : int -> int -> int
+
+  val min : int -> int -> int
+
+  val equal : int -> int -> bool
+end
 
 module Int32 : S with type t = int32
 
@@ -72,6 +94,8 @@ module Uint64 : S with type t = int64
 module Float : S with type t = float
 
 module String : S with type t = string
+
+module Bytes : S with type t = bytes
 
 module Z : S with type t = Z.t
 

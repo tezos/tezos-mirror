@@ -3,7 +3,7 @@
 How to run Tezos
 ================
 
-In this section we discuss how to take part in the protocol that runs
+In this section, we discuss how to take part in the protocol that runs
 the network.
 There are two main ways to participate in the consensus, delegating
 your coins and running a delegate.
@@ -97,7 +97,7 @@ come from the delegate's account.
 If a delegate runs out of funds to deposit it won't be able to bake or
 endorse. Other than being a missed opportunity for them, this has also
 negative consequences on the network.
-Missing baking slots slows the network, as it is necessary to wait one
+Missing baking slots slows the network, as it is necessary to wait for one
 minute for the baker at priority 2 to bake, while missing endorsements
 reduce the fitness of the chain, making it more susceptible to forks.
 Running out of funds can happen if a delegate is *over-delegated*,
@@ -113,16 +113,16 @@ Expected rights, deposits and rewards
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Let's assume we have 1 roll, we want to estimate our chances to bake
-or endorse in order to prepare the funds for our deposits.
+or endorse to prepare the funds for our deposits.
 Our chances depend on how many rolls are currently active in the
 network, once we know that we can estimate how many blocks and
 endorsements we could be assigned in a cycle.
-The number of active rolls can be computed with two RPCs, first we
-list all the active delegates with ``delegates?active``, then we sum
-all their ``stacking_balance`` and we simply divide by the size of a
+The number of active rolls can be computed with two RPCs. First, we
+list all the active delegates with ``delegates?active``. Then, we sum
+all their ``stacking_balance``. Finally, we simply divide by the size of a
 roll, 8kꜩ.
 At the time of writing, on Betanet the number of active rolls is ~30k
-so for each block we know that the chance that we get selected for
+so for each block, we know that the chance that we get selected for
 baking is ``1/30k`` while for endorsing is 32 times that.
 Given that every draw is with replacement, the distribution that
 describes our chances of being selected is the binomial with
@@ -133,10 +133,10 @@ we draw, in our case in a cycle the draws for baking are ``n_b =
 Moreover we could extend ``n`` to cover ``preserved_cycles = 5``.
 Once we have ``p`` and ``n``, the expected number of times that we
 might get selected is ``p * n`` (the mean of the distribution).
-Over many cycles our chances will fall around the mean, in some cycles
+Over many cycles, our chances will fall around the mean, in some cycles,
 we might get unlucky and be assigned fewer rights, but in some cycles we might
 get lucky and be assigned more rights!
-Clearly we would like to plan ahead and have enough deposits to cover
+Clearly, we would like to plan and have enough deposits to cover
 also the "lucky" cycles so we need to compute a sort of "maximum"
 number of rights that is safe for `most cases`.
 We can compute this maximum using the inverse of Cumulative
@@ -145,7 +145,7 @@ confidence that we can put to 95%.
 There a simple `Python
 script <https://gitlab.com/paracetamolo/utils/blob/master/estimated-rights.py>`_
 that does the computation for us and returns the deposits and rewards,
-expected and maximum, for a cycle and for `preserved_cycles`.
+expected and maximum, for a cycle and `preserved_cycles`.
 
 ::
 
@@ -178,15 +178,15 @@ expected and maximum, for a cycle and for `preserved_cycles`.
     mean 10.92 + 43.69
     max  32.00 + 60.00
 
-As a rule of thumb if we want to have a very high confidence that we
+As a rule of thumb if we want to have very high confidence that we
 won't miss any opportunity we should have around ~3kꜩ for deposits,
-on the other hand the expected returns will probably be around ~10ꜩ per cycle.
+on the other hand, the expected returns will probably be around ~10ꜩ per cycle.
 
 After ``preserved_cycles``, not only does the delegate take back control of
 its frozen deposits, but it also receives the rewards for its hard work
 which amount to 16ꜩ to bake a block and ``2ꜩ / <block_priority>`` for
 endorsing a block.
-Additionally a baker also receives the fees of the operations it
+Additionally, a baker also receives the fees of the operations it
 included in its blocks.
 While fees are unfrozen after ``preserved_cycles`` like deposits and
 rewards, they participate in the staking balance of the delegate
@@ -198,7 +198,7 @@ immediately after the block has been baked.
 Register and check your rights
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-In order to run a delegate you first need to register as one using
+To run a delegate, you first need to register as one using
 your implicit account::
 
    tezos-client register key bob as delegate
@@ -234,7 +234,7 @@ it simply by re-registering again like above.
 Baker
 ~~~~~
 
-The baker is a daemon that once connected to an account, computes the
+The baker is a daemon that, once connected to an account, computes the
 baking rights for that account, collects transactions from the mempool
 and bakes a block.
 Note that the baker is the only program that needs direct access to
@@ -248,7 +248,7 @@ baking for user *bob*::
 Endorser
 ~~~~~~~~
 
-The endorser is a daemon that once connected to an account, computes
+The endorser is a daemon that, once connected to an account, computes
 the endorsing rights for that account and, upon reception of a new
 block, verifies the validity of the block and emits an endorsement
 operation.
@@ -271,7 +271,7 @@ chains and looks for:
 
 Upon finding such irregularity, it will emit respectively a
 double-baking or double-endorsing denunciation operation, which will
-cause the offender to loose its security deposit.
+cause the offender to lose its security deposit.
 
 ::
 
@@ -280,7 +280,7 @@ cause the offender to loose its security deposit.
 Remember that having two bakers or endorsers running connected to the
 same account could lead to double baking/endorsing and the loss of all
 your bonds.
-If you are worried about availability of your node when it is its turn to
+If you are worried about the availability of your node when it is its turn to
 bake/endorse, there are other ways than duplicating your credentials.
 **Never** use the same account on two daemons.
 
@@ -289,11 +289,12 @@ Docker
 ~~~~~~
 
 The docker image runs the daemons by default for all your keys.
-To know if you baked, just run::
+Assuming you run on Carthagenet, to know if you baked, just run::
 
     ./carthagenet.sh baker log
     ./carthagenet.sh endorser log
 
+(replace ``carthagenet.sh`` with ``mainnet.sh`` for Mainnet).
 You should see lines such as::
 
     Injected block BLxzbB7PBW1axq for bootstrap5 after BLSrg4dXzL2aqq  (level 1381, slot 0, fitness 00::0000000000005441, operations 21)

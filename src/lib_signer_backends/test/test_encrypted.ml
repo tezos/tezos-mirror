@@ -7,13 +7,20 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(** Testing
+    -------
+    Component:    Remote-signature Backends
+    Invocation:   dune build @src/lib_signer_backends/runtest
+    Subject:      On secret keys and URIs.
+*)
+
 open Error_monad
 
 let loops = 10
 
 let passwords =
   List.map
-    Bigstring.of_string
+    Bytes.unsafe_of_string
     [ "ahThie5H";
       "aVah7eid";
       "Hihohh1n";
@@ -55,7 +62,7 @@ let fake_ctx () =
       Format.kasprintf (fun _ -> return "")
 
     method prompt_password : type a.
-        (a, Bigstring.t tzresult) Client_context.lwt_format -> a =
+        (a, Bytes.t tzresult) Client_context.lwt_format -> a =
       Format.kasprintf (fun _ ->
           (* return Bigstring.empty *)
           match distributed with
@@ -69,7 +76,7 @@ let fake_ctx () =
   end
 
 let make_sk_uris =
-  List.map (fun path ->
+  map_p (fun path ->
       Client_keys.make_sk_uri (Uri.make ~scheme:"encrypted" ~path ()))
 
 let ed25519_sks =
@@ -117,7 +124,8 @@ let test_vectors () =
     (fun (sks, encrypted_sks) ->
       let ctx = fake_ctx () in
       let sks = List.map Signature.Secret_key.of_b58check_exn sks in
-      map_s (decrypt ctx) encrypted_sks
+      encrypted_sks
+      >>=? map_s (decrypt ctx)
       >>=? fun decs ->
       assert (decs = sks) ;
       return_unit)
@@ -142,11 +150,22 @@ let test_random algo =
   in
   inner 0
 
+(** For each of the algorithms [Ed25519; Secp256k1; P256], creates a
+    dummy context. It randomly generates a Base58-encoded secret key,
+    then encrypts it into a URI and decrypts it. It it asserted that
+    the secret key is preserved after Base58-decoding comparison. This
+    process is repeated 10 times.
+*)
 let test_random _switch () =
   iter_s test_random Signature.[Ed25519; Secp256k1; P256]
   >>= function
   | Ok _ -> Lwt.return_unit | Error _ -> Lwt.fail_with "test_random"
 
+(** For each of the algorithms [Ed25519; Secp256k1; P256], creates a
+    dummy context, uses it to decrypt a list of secret key URIs
+    [...__sks_encrypted]. It is asserted that the decrypted keys shall
+    match the list [..._sks]. 
+*)
 let test_vectors _switch () =
   test_vectors ()
   >>= function
@@ -156,4 +175,6 @@ let tests =
   [ Alcotest_lwt.test_case "random_roundtrip" `Quick test_random;
     Alcotest_lwt.test_case "vectors_decrypt" `Quick test_vectors ]
 
-let () = Alcotest.run "tezos-signer-backends" [("encrypted", tests)]
+let () =
+  Alcotest_lwt.run "tezos-signer-backends" [("encrypted", tests)]
+  |> Lwt_main.run

@@ -1,4 +1,5 @@
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
+import sys
 import subprocess
 import os
 import tempfile
@@ -10,13 +11,36 @@ from . import utils
 TERM_TIMEOUT = 10
 
 
+def _run_and_print(cmd):
+    cmd_str = utils.format_command(cmd)
+    print(cmd_str)
+    completed_process = subprocess.run(cmd, capture_output=True, text=True,
+                                       check=False)
+    stdout = completed_process.stdout
+    stderr = completed_process.stderr
+    if stdout:
+        print(stdout)
+    if stderr:
+        print(stderr, file=sys.stderr)
+    completed_process.check_returncode()
+
+
 class Node:
-    """Forks a tezos node and manages its persistent state.
+    """Wrapper for the tezos-node command.
+
+    This class manages the persistent state of a tezos-node
+    (the node directory) and provides an API which wraps the node commands.
+
+    Most commands are intended to be used synchronously, for instance:
+    - tezos-node identity generate
+    - tezos-node upgrade storage
+
+    tezos-node run is intended to be used asynchronously and forks a
+    subprocess.
 
     Typical use.
 
     node = Node(node_bin,
-                sandbox_file,
                 p2p_port=p2p_node,
                 rpc_port=rpc_node,
                 peers=peers_rpc,
@@ -36,7 +60,6 @@ class Node:
 
     def __init__(self,
                  node: str,
-                 sandbox_file: str = None,
                  expected_pow: float = 0.0,
                  node_dir: str = None,
                  use_tls: Tuple[str, str] = None,
@@ -46,6 +69,7 @@ class Node:
                  rpc_port: int = 8732,
                  peers: List[int] = None,
                  log_levels: Dict[str, str] = None,
+                 singleprocess: bool = False,
                  env: Dict[str, str] = None):
 
         """Creates a new Popen instance for a tezos-node, and manages context.
@@ -57,8 +81,6 @@ class Node:
         Creates a temporary node directory unless provided  by caller.
         Generate node identity.
         """
-        if sandbox_file:
-            assert os.path.isfile(sandbox_file), f'{sandbox_file} not a file'
         assert os.path.isfile(node), f'{node} not a file'
         assert node_dir is None or os.path.isdir(node_dir), (f'{node_dir} not '
                                                              f'a dir')
@@ -76,14 +98,9 @@ class Node:
         self.node = node
         self._params = params
         self._run_called_before = False
-
-        node_run = [node,
-                    'run',
-                    '--data-dir', node_dir,
-                    '--no-bootstrap-peers']
-        if sandbox_file:
-            node_run.append(f'--sandbox={sandbox_file}')
-        node_run.extend(params)
+        singleprocess_opt = ['--singleprocess'] if singleprocess else []
+        node_run = [node, 'run', '--data-dir', node_dir,
+                    '--no-bootstrap-peers'] + singleprocess_opt + params
 
         if peers is not None:
             for peer in peers:
@@ -103,7 +120,7 @@ class Node:
             new_env['TEZOS_LOG'] = lwt_log
         self._new_env = new_env
         self._node_run = node_run
-        self._process = None
+        self._process = None  # type: Optional[subprocess.Popen]
 
     def run(self):
         node_run_str = utils.format_command(self._node_run)
@@ -133,9 +150,7 @@ class Node:
                             (f'{self.node_dir}/tezos.crt,'
                              f'{self.node_dir}/tezos.key')]
 
-        node_config_str = utils.format_command(node_config)
-        print(node_config_str)
-        subprocess.run(node_config, check=True)
+        _run_and_print(node_config)
 
     def init_id(self):
         node_identity = [self.node,
@@ -143,9 +158,7 @@ class Node:
                          'generate',
                          str(self.expected_pow),
                          '--data-dir', self.node_dir]
-        node_identity_str = utils.format_command(node_identity)
-        print(node_identity_str)
-        subprocess.run(node_identity, check=True)
+        _run_and_print(node_identity)
         if self.use_tls:
             with open(f'{self.node_dir}/tezos.crt', 'w+') as file:
                 file.write(self.use_tls[0])
@@ -155,54 +168,59 @@ class Node:
     def upgrade_storage(self):
         node_upgrade = [self.node, 'upgrade', 'storage', '--data-dir',
                         self.node_dir]
-        print(utils.format_command(node_upgrade))
-        subprocess.run(node_upgrade, check=True)
+        _run_and_print(node_upgrade)
 
     def snapshot_export(self, file, params=None):
         if params is None:
             params = []
-        params = [f'--data-dir', self.node_dir] + params
+        params = ['--data-dir', self.node_dir] + params
         snapshot_cmd = ([self.node, 'snapshot',
                          'export'] + list(params) + [file])
-        print(utils.format_command(snapshot_cmd))
-        subprocess.run(snapshot_cmd, check=True)
+        _run_and_print(snapshot_cmd)
 
     def snapshot_import(self, file, params=None):
         if params is None:
             params = []
-        params = [f'--data-dir', self.node_dir] + params
+        params = ['--data-dir', self.node_dir] + params
         snapshot_cmd = ([self.node, 'snapshot',
                          'import'] + list(params) + [file])
-        print(utils.format_command(snapshot_cmd))
-        subprocess.run(snapshot_cmd, check=True)
+        _run_and_print(snapshot_cmd)
 
     def reconstruct(self, params=None):
         if params is None:
             params = []
-        params = [f'--data-dir', self.node_dir] + params
+        params = ['--data-dir', self.node_dir] + params
         reconstruct_cmd = ([self.node, 'reconstruct'] + list(params))
-        print(utils.format_command(reconstruct_cmd))
-        subprocess.run(reconstruct_cmd, check=True)
+        _run_and_print(reconstruct_cmd)
 
     def cleanup(self):
         """Remove node directory (only if generated by constructor)"""
         if self._temp_dir:
             shutil.rmtree(self.node_dir)
 
-    def terminate(self):
-        assert self._process
-        return self._process.terminate()
+    def terminate(self) -> None:
+        """Send SIGTERM to node, do nothing if node hasn't been run yet"""
+        if self._process is not None:
+            self._process.terminate()
 
-    def kill(self):
-        assert self._process
-        return self._process.terminate()
+    def kill(self) -> None:
+        """Send SIGKILL to node, do nothing if node hasn't been run yet"""
+        if self._process is not None:
+            self._process.kill()
 
-    def terminate_or_kill(self):
+    def terminate_or_kill(self) -> None:
+        """Try to terminate node gently (SIGTERM) and kill it (SIGKILL)
+
+        if the node is still running after TERM_TIMEOUT. Do nothing
+        if node hasn't been run yet.
+        """
+        if self._process is None:
+            return
         self._process.terminate()
         try:
-            return self._process.wait(timeout=TERM_TIMEOUT)
+            self._process.wait(timeout=TERM_TIMEOUT)
         except subprocess.TimeoutExpired:
-            return self._process.kill()
+            self._process.kill()
 
     def poll(self):
         assert self._process

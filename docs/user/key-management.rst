@@ -31,25 +31,19 @@ Tezos Wallet app
 ~~~~~~~~~~~~~~~~
 
 Now on the client we can import the keys (make sure the device is
-in the Tezos Wallet app):
-
-::
+in the Tezos Wallet app)::
 
    ./tezos-client list connected ledgers
 
 You can follow the instructions to import the ledger private key and
 you can choose between the root or a derived address.
-We can confirm the addition by listing known addresses.
-
-::
+We can confirm the addition by listing known addresses::
 
    ./tezos-client import secret key my_ledger ledger://tz1XXXXXXXXXX
    ./tezos-client list known addresses
 
 Optional: we can check that our ledger signs correctly using the
-following command and confirming on the device:
-
-::
+following command and confirming on the device::
 
    tezos-client show ledger path ledger://tz1XXXXXXXXXX
 
@@ -72,13 +66,13 @@ only to bake for increasing levels.
 This prevents signing blocks at levels below the latest
 block signed.
 
-If you have tried the app on some network (Zeronet, Mainnet,...) and want to use it on another
-network you might need to reset this level with the command:
+If you have tried the app on some network (Zeronet, Mainnet,...) and want to
+use it on another network you might need to reset this level with the command::
 
-::
+   tezos-client setup ledger to bake for my_ledger
 
-   tezos-client set ledger high watermark for ledger://tz1XXXXXXXXXX to 0
-
+More details can be found on the `Tezos Ledger app
+<https://github.com/obsidiansystems/ledger-app-tezos>`_.
 
 .. _signer:
 
@@ -146,7 +140,7 @@ signer and it is not used as a Tezos account.
 
 All request are now signed with the *vps* key thus you are
 guaranteed authenticity and integrity.
-This set up **does not guarantee confidentiality**, an evesdropper can
+This set up **does not guarantee confidentiality**, an eavesdropper can
 see the transactions that you sign but on a public blockchain this is
 less of a concern.
 You can still use the ``https`` scheme or the tunnel to encrypt your
@@ -195,8 +189,6 @@ We strongly advice you to first **make a backup** and then
 transfer your tokens to a new pair of keys imported from a ledger (see
 :ref:`ledger`).
 
-Check the balance with:
-
-::
+Check the balance with::
 
     tezos-client get balance for alice

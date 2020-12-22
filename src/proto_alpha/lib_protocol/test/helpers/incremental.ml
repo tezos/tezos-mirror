@@ -43,6 +43,8 @@ let header {header; _} = header
 
 let rev_tickets {rev_tickets; _} = rev_tickets
 
+let validation_state {state; _} = state
+
 let level st = st.header.shell.level
 
 let rpc_context st =
@@ -56,6 +58,8 @@ let rpc_context st =
 let rpc_ctxt =
   new Environment.proto_rpc_context_of_directory rpc_context rpc_services
 
+let alpha_ctxt st = st.state.ctxt
+
 let begin_construction ?(priority = 0) ?timestamp ?seed_nonce_hash
     ?(policy = Block.By_priority priority) (predecessor : Block.t) =
   Block.get_next_baker ~policy predecessor
@@ -68,7 +72,7 @@ let begin_construction ?(priority = 0) ?timestamp ?seed_nonce_hash
   >>=? fun real_timestamp ->
   Account.find delegate
   >>=? fun delegate ->
-  let timestamp = Option.unopt ~default:real_timestamp timestamp in
+  let timestamp = Option.value ~default:real_timestamp timestamp in
   let contents = Block.Forge.contents ~priority ?seed_nonce_hash () in
   let protocol_data = {Block_header.contents; signature = Signature.zero} in
   let header =
@@ -97,18 +101,10 @@ let begin_construction ?(priority = 0) ?timestamp ?seed_nonce_hash
     ~timestamp
     ~protocol_data
     ()
-  >>= fun state ->
-  Lwt.return (Environment.wrap_error state)
-  >>=? fun state ->
-  return
-    {
-      predecessor;
-      state;
-      rev_operations = [];
-      rev_tickets = [];
-      header;
-      delegate;
-    }
+  >|= fun state ->
+  Environment.wrap_error state
+  >|? fun state ->
+  {predecessor; state; rev_operations = []; rev_tickets = []; header; delegate}
 
 let detect_script_failure :
     type kind. kind Apply_results.operation_metadata -> _ =
@@ -151,46 +147,53 @@ let detect_script_failure :
   in
   fun {contents} -> detect_script_failure contents
 
-let add_operation ?expect_failure st op =
+let add_operation ?expect_apply_failure ?expect_failure st op =
   let open Apply_results in
   apply_operation st.state op
-  >>= fun x ->
-  Lwt.return (Environment.wrap_error x)
-  >>=? function
-  | (state, (Operation_metadata result as metadata)) ->
-      Lwt.return @@ detect_script_failure result
-      >>= fun result ->
-      ( match expect_failure with
-      | None ->
-          Lwt.return result
-      | Some f -> (
-        match result with
-        | Ok _ ->
-            failwith "Error expected while adding operation"
-        | Error e ->
-            f e ) )
-      >>=? fun () ->
-      return
-        {
-          st with
-          state;
-          rev_operations = op :: st.rev_operations;
-          rev_tickets = metadata :: st.rev_tickets;
-        }
-  | (state, (No_operation_metadata as metadata)) ->
-      return
-        {
-          st with
-          state;
-          rev_operations = op :: st.rev_operations;
-          rev_tickets = metadata :: st.rev_tickets;
-        }
+  >|= Environment.wrap_error
+  >>= fun result ->
+  match (expect_apply_failure, result) with
+  | (Some _, Ok _) ->
+      failwith "Error expected while adding operation"
+  | (Some f, Error err) ->
+      f err >|=? fun () -> st
+  | (None, result) -> (
+      result
+      >>?= fun result ->
+      match result with
+      | (state, (Operation_metadata result as metadata)) ->
+          detect_script_failure result
+          |> fun result ->
+          ( match expect_failure with
+          | None ->
+              Lwt.return result
+          | Some f -> (
+            match result with
+            | Ok _ ->
+                failwith "Error expected while adding operation"
+            | Error e ->
+                f e ) )
+          >|=? fun () ->
+          {
+            st with
+            state;
+            rev_operations = op :: st.rev_operations;
+            rev_tickets = metadata :: st.rev_tickets;
+          }
+      | (state, (No_operation_metadata as metadata)) ->
+          return
+            {
+              st with
+              state;
+              rev_operations = op :: st.rev_operations;
+              rev_tickets = metadata :: st.rev_tickets;
+            } )
 
 let finalize_block st =
   finalize_block st.state
-  >>= fun x ->
-  Lwt.return (Environment.wrap_error x)
-  >>=? fun (result, _) ->
+  >|= fun x ->
+  Environment.wrap_error x
+  >|? fun (result, _) ->
   let operations = List.rev st.rev_operations in
   let operations_hash =
     Operation_list_list_hash.compute
@@ -209,4 +212,4 @@ let finalize_block st =
     }
   in
   let hash = Block_header.hash header in
-  return {Block.hash; header; operations; context = result.context}
+  {Block.hash; header; operations; context = result.context}

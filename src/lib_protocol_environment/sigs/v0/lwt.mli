@@ -44,9 +44,9 @@
     waiting for some event to happen.
 
     Lwt threads are cooperative in the sense that switching to another
-    thread is awlays explicit (with {!wakeup} or {!wakeup_exn}). When a
+    thread is always explicit (with {!wakeup} or {!wakeup_exn}). When a
     thread is running, it executes as much as possible, and then
-    returns (a value or an eror) or sleeps.
+    returns (a value or an error) or sleeps.
 
     Note that inside a Lwt thread, exceptions must be raised with
     {!fail} instead of [raise]. Also the [try ... with ...]
@@ -156,7 +156,7 @@ val return_false : bool t
 
 (* val wrap : (unit -> 'a) -> 'a t *)
 (*   (\** [wrap f] calls [f] and transform the result into a monad. If [f] *)
-(*       raise an exception, it is catched by Lwt. *)
+(*       raise an exception, it is caught by Lwt. *)
 
 (*       This is actually the same as: *)
 
@@ -171,7 +171,7 @@ val return_false : bool t
 (* val wrap1 : ('a -> 'b) -> 'a -> 'b t *)
 (*   (\** [wrap1 f x] applies [f] on [x] and returns the result as a *)
 (*       thread. If the application of [f] to [x] raise an exception it *)
-(*       is catched and a thread is returned. *)
+(*       is caught and a thread is returned. *)
 
 (*       Note that you must use {!wrap} instead of {!wrap1} if the *)
 (*       evaluation of [x] may raise an exception. *)
@@ -202,14 +202,14 @@ val return_false : bool t
 
 (* val choose : 'a t list -> 'a t *)
 (*   (\** [choose l] behaves as the first thread in [l] to terminate.  If *)
-(*       several threads are already terminated, one is choosen at *)
+(*       several threads are already terminated, one is chosen at *)
 (*       random. *)
 
 (*       Note: {!choose} leaves the local values of the current thread *)
 (*       unchanged. *\) *)
 
 (* val nchoose : 'a t list -> 'a list t *)
-(*   (\** [nchoose l] returns the value of all that have succcessfully *)
+(*   (\** [nchoose l] returns the value of all that have successfully *)
 (*       terminated. If all threads are sleeping, it waits for at least *)
 (*       one to terminates. If one the threads of [l] fails, [nchoose] *)
 (*       fails with the same exception. *)
@@ -218,7 +218,7 @@ val return_false : bool t
 (*       unchanged. *\) *)
 
 (* val nchoose_split : 'a t list -> ('a list * 'a t list) t *)
-(*   (\** [nchoose_split l] does the same as {!nchoose} but also retrurns *)
+(*   (\** [nchoose_split l] does the same as {!nchoose} but also returns *)
 (*       the list of threads that have not yet terminated. *\) *)
 
 (** [join l] waits for all threads in [l] to terminate. If one of
@@ -420,7 +420,7 @@ val ( <&> ) : unit t -> unit t -> unit t
 (* val register_pause_notifier : (int -> unit) -> unit *)
 (*   (\** [register_pause_notifier f] register a function [f] that will be *)
 (*       called each time pause is called. The parameter passed to [f] is *)
-(*       the new number of threads paused. It is usefull to be able to *)
+(*       the new number of threads paused. It is useful to be able to *)
 (*       call {!wakeup_paused} when there is no scheduler *\) *)
 
 (* (\** {2 Misc} *\) *)

@@ -53,6 +53,23 @@ let pp ppf motive =
   | Unknown_motive error_code ->
       Format.fprintf ppf "Rejected for unknown reason, code (%i)" error_code
 
+let pp_short ppf motive =
+  match motive with
+  | No_motive ->
+      Format.fprintf ppf "No motive"
+  | Too_many_connections ->
+      Format.fprintf ppf "Too many connections"
+  | Already_connected ->
+      Format.fprintf ppf "Already connected"
+  | Unknown_chain_name ->
+      Format.fprintf ppf "Unknown chain name"
+  | Deprecated_distributed_db_version ->
+      Format.fprintf ppf "Deprecated ddb version"
+  | Deprecated_p2p_version ->
+      Format.fprintf ppf "Deprecated p2p version"
+  | Unknown_motive error_code ->
+      Format.fprintf ppf "unknown code (%i)" error_code
+
 let encoding =
   let open Data_encoding in
   conv

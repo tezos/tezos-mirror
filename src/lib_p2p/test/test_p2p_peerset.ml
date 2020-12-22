@@ -23,6 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:    P2P
+    Invocation:   dune build @src/lib_p2p/test/runtest_p2p_peerset
+    Subject:      On banning peers and usage of Access Control Lists (ACL)
+                  using FIFO caches filled with peers' ids.
+*)
+
 include Internal_event.Legacy_logging.Make (struct
   let name = "test-p2p-banned_peers"
 end)
@@ -31,52 +39,71 @@ let assert_equal_bool ~msg a b = if a <> b then Alcotest.fail msg
 
 let a s = P2p_peer.Id.hash_string [s]
 
+(** An empty ACL (built as a FIFO cache) initially contains no peer. *)
 let test_empty _ =
   let peers = List.map a ["foo"; "bar"; "baz"] in
-  let empty = P2p_acl.PeerLRUCache.create 10 in
+  let empty = P2p_acl.PeerFIFOCache.create 10 in
   List.iter
     (fun peer ->
       assert_equal_bool
         ~msg:__LOC__
         false
-        (P2p_acl.PeerLRUCache.mem empty peer))
+        (P2p_acl.PeerFIFOCache.mem empty peer))
     peers
 
+(** From an empty ACL cache, we successively add "foo", "bar", "baz". *)
 let test_add _ =
   let peers = List.map a ["foo"; "bar"; "baz"] in
-  let set = P2p_acl.PeerLRUCache.create 10 in
-  List.iter (fun peer -> P2p_acl.PeerLRUCache.add set peer) peers ;
+  let set = P2p_acl.PeerFIFOCache.create 10 in
+  List.iter (fun peer -> P2p_acl.PeerFIFOCache.add set peer) peers ;
   List.iter
     (fun peer ->
-      assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerLRUCache.mem set peer))
+      assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerFIFOCache.mem set peer))
     peers
 
+(** From an empty ACL cache, we successively add "foo", "bar", "baz".
+    We test that "bar" exists, then remove it. Hence, it does not exist
+    in the cache anymore.
+*)
 let test_remove _ =
   let peers = List.map a ["foo"; "bar"; "baz"] in
-  let set = P2p_acl.PeerLRUCache.create 10 in
-  List.iter (fun peer -> P2p_acl.PeerLRUCache.add set peer) peers ;
-  assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerLRUCache.mem set (a "bar")) ;
-  P2p_acl.PeerLRUCache.remove set (a "bar") ;
-  assert_equal_bool ~msg:__LOC__ false (P2p_acl.PeerLRUCache.mem set (a "bar"))
+  let set = P2p_acl.PeerFIFOCache.create 10 in
+  List.iter (fun peer -> P2p_acl.PeerFIFOCache.add set peer) peers ;
+  assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerFIFOCache.mem set (a "bar")) ;
+  P2p_acl.PeerFIFOCache.remove set (a "bar") ;
+  assert_equal_bool
+    ~msg:__LOC__
+    false
+    (P2p_acl.PeerFIFOCache.mem set (a "bar"))
 
+(** An initial cache of size 3 is filled with 3 peer ids. Additionaly,
+    we add "foo" and "zor", hence they are cached but not for "bar"
+    anymore. "baz" is the FIFO head and so on...
+*)
 let test_LRU_overflow _ =
   let peers = List.map a ["foo"; "bar"; "baz"] in
-  let set = P2p_acl.PeerLRUCache.create 3 in
-  List.iter (fun peer -> P2p_acl.PeerLRUCache.add set peer) peers ;
-  P2p_acl.PeerLRUCache.add set (a "foo") ;
-  P2p_acl.PeerLRUCache.add set (a "zor") ;
-  assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerLRUCache.mem set (a "zor")) ;
-  assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerLRUCache.mem set (a "foo")) ;
-  assert_equal_bool ~msg:__LOC__ false (P2p_acl.PeerLRUCache.mem set (a "bar")) ;
-  assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerLRUCache.mem set (a "baz")) ;
-  P2p_acl.PeerLRUCache.add set (a "baz") ;
-  P2p_acl.PeerLRUCache.add set (a "baz") ;
-  P2p_acl.PeerLRUCache.add set (a "baz") ;
-  P2p_acl.PeerLRUCache.add set (a "qux") ;
-  assert_equal_bool ~msg:__LOC__ false (P2p_acl.PeerLRUCache.mem set (a "foo")) ;
-  assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerLRUCache.mem set (a "zor")) ;
-  assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerLRUCache.mem set (a "baz")) ;
-  assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerLRUCache.mem set (a "qux"))
+  let set = P2p_acl.PeerFIFOCache.create 3 in
+  List.iter (fun peer -> P2p_acl.PeerFIFOCache.add set peer) peers ;
+  P2p_acl.PeerFIFOCache.add set (a "foo") ;
+  P2p_acl.PeerFIFOCache.add set (a "zor") ;
+  assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerFIFOCache.mem set (a "zor")) ;
+  assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerFIFOCache.mem set (a "foo")) ;
+  assert_equal_bool
+    ~msg:__LOC__
+    false
+    (P2p_acl.PeerFIFOCache.mem set (a "bar")) ;
+  assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerFIFOCache.mem set (a "baz")) ;
+  P2p_acl.PeerFIFOCache.add set (a "baz") ;
+  P2p_acl.PeerFIFOCache.add set (a "baz") ;
+  P2p_acl.PeerFIFOCache.add set (a "baz") ;
+  P2p_acl.PeerFIFOCache.add set (a "qux") ;
+  assert_equal_bool
+    ~msg:__LOC__
+    false
+    (P2p_acl.PeerFIFOCache.mem set (a "foo")) ;
+  assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerFIFOCache.mem set (a "zor")) ;
+  assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerFIFOCache.mem set (a "baz")) ;
+  assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerFIFOCache.mem set (a "qux"))
 
 let () =
   Alcotest.run

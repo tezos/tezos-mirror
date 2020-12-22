@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018 Nomadic Labs. <nomadic@tezcore.com>                    *)
+(* Copyright (c) 2018 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -56,7 +56,7 @@ type block_error =
   | Cannot_parse_block_header
   | Economic_protocol_error of error list
 
-let block_error_encoding =
+let block_error_encoding error_encoding =
   let open Data_encoding in
   union
     [ case
@@ -221,7 +221,16 @@ let block_error_encoding =
         ~title:"Cannot_parse_block_header"
         (obj1 (req "error" (constant "cannot_parse_bock_header")))
         (function Cannot_parse_block_header -> Some () | _ -> None)
-        (fun () -> Cannot_parse_block_header) ]
+        (fun () -> Cannot_parse_block_header);
+      case
+        (Tag 14)
+        ~title:"Economic_protocol_error"
+        (obj2
+           (req "error" (constant "economic_protocol_error"))
+           (req "trace" (list error_encoding)))
+        (function
+          | Economic_protocol_error trace -> Some ((), trace) | _ -> None)
+        (fun ((), trace) -> Economic_protocol_error trace) ]
 
 let pp_block_error ppf = function
   | Cannot_parse_operation oph ->
@@ -338,7 +347,7 @@ let validation_process_error_encoding =
       case
         (Tag 2)
         ~title:"Protocol_dynlink_failure"
-        (obj1 (req "pretocol_dynlink_failure" string))
+        (obj1 (req "protocol_dynlink_failure" string))
         (function Protocol_dynlink_failure msg -> Some msg | _ -> None)
         (fun msg -> Protocol_dynlink_failure msg) ]
 
@@ -361,12 +370,13 @@ type error +=
       found : Operation_list_list_hash.t;
     }
   | Failed_to_checkout_context of Context_hash.t
+  | Failed_to_get_live_blocks of Block_hash.t
   | System_error of {errno : string; fn : string; msg : string}
   | Missing_test_protocol of Protocol_hash.t
   | Validation_process_failed of validation_process_error
 
 let () =
-  Error_monad.register_error_kind
+  Error_monad.register_recursive_error_kind
     `Permanent
     ~id:"validator.invalid_block"
     ~title:"Invalid block"
@@ -379,10 +389,11 @@ let () =
         block
         pp_block_error
         error)
-    Data_encoding.(
-      merge_objs
-        (obj1 (req "invalid_block" Block_hash.encoding))
-        block_error_encoding)
+    (fun error_encoding ->
+      Data_encoding.(
+        merge_objs
+          (obj1 (req "invalid_block" Block_hash.encoding))
+          (block_error_encoding error_encoding)))
     (function
       | Invalid_block {block; error} -> Some (block, error) | _ -> None)
     (fun (block, error) -> Invalid_block {block; error}) ;
@@ -453,6 +464,20 @@ let () =
     (function Failed_to_checkout_context h -> Some h | _ -> None)
     (fun h -> Failed_to_checkout_context h) ;
   Error_monad.register_error_kind
+    `Permanent
+    ~id:"Block_validator_process.failed_to_get_live_block"
+    ~title:"Fail to get live blocks"
+    ~description:"Unable to get live blocks from a given hash"
+    ~pp:(fun ppf (hash : Block_hash.t) ->
+      Format.fprintf
+        ppf
+        "@[Failed to get live blocks from block hash %a@]"
+        Block_hash.pp
+        hash)
+    Data_encoding.(obj1 (req "hash" Block_hash.encoding))
+    (function Failed_to_get_live_blocks h -> Some h | _ -> None)
+    (fun h -> Failed_to_get_live_blocks h) ;
+  Error_monad.register_error_kind
     `Temporary
     ~id:"Validator_process.system_error_while_validating"
     ~title:"Failed to validate block because of a system error"
@@ -487,11 +512,11 @@ let () =
     `Temporary
     ~id:"validator.validation_process_failed"
     ~title:"Validation process failed"
-    ~description:"Failed to validate block using exteranl validation process."
+    ~description:"Failed to validate block using external validation process."
     ~pp:(fun ppf error ->
       Format.fprintf
         ppf
-        "Failed to validate block using exteranl validation process. %a"
+        "Failed to validate block using external validation process. %a"
         pp_validation_process_error
         error)
     Data_encoding.(obj1 (req "error" validation_process_error_encoding))

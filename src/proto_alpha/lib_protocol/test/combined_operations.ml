@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 (** Multiple operations can be grouped in one ensuring their
-    derministic application.
+    deterministic application.
 
     If an invalid operation is present in this group of operation, the
     previous applied operations are backtracked leaving the context
@@ -36,7 +36,6 @@
 
 open Protocol
 open Test_tez
-open Test_utils
 
 let ten_tez = Tez.of_int 10
 
@@ -141,17 +140,15 @@ let multiple_origination_and_delegation () =
   >>?= fun origination_burn ->
   Tez.(origination_burn *? Int64.of_int n)
   >>?= fun origination_total_cost ->
-  Lwt.return
-    ( Tez.( *? ) Op.dummy_script_cost 10L
-    >>? Tez.( +? ) (Tez.of_int (10 * n))
-    >>? Tez.( +? ) origination_total_cost )
-  >>=? fun total_cost ->
+  Tez.( *? ) Op.dummy_script_cost 10L
+  >>? Tez.( +? ) (Tez.of_int (10 * n))
+  >>? Tez.( +? ) origination_total_cost
+  >>?= fun total_cost ->
   Assert.balance_was_debited ~loc:__LOC__ (I inc) c1 c1_old_balance total_cost
   >>=? fun () ->
   iter_s
     (fun c -> Assert.balance_is ~loc:__LOC__ (I inc) c (Tez.of_int 10))
     new_contracts
-  >>=? fun () -> return_unit
 
 let expect_balance_too_low = function
   | Environment.Ecoproto_error (Contract_storage.Balance_too_low _) :: _ ->
@@ -161,7 +158,7 @@ let expect_balance_too_low = function
         "Contract should not have a sufficient balance : operation expected \
          to fail."
 
-(** Groups three operations, the midlle one failing.
+(** Groups three operations, the middle one failing.
     Checks that the receipt is consistent.
     Variant without fees. *)
 let failing_operation_in_the_middle () =
@@ -217,7 +214,7 @@ let failing_operation_in_the_middle () =
   Assert.balance_is ~loc:__LOC__ (I inc) c2 c2_old_balance
   >>=? fun () -> return_unit
 
-(** Groups three operations, the midlle one failing.
+(** Groups three operations, the middle one failing.
     Checks that the receipt is consistent.
     Variant with fees, that should be spent even in case of failure. *)
 let failing_operation_in_the_middle_with_fees () =
@@ -279,6 +276,55 @@ let failing_operation_in_the_middle_with_fees () =
   Assert.balance_is ~loc:__LOC__ (I inc) c2 c2_old_balance
   >>=? fun () -> return_unit
 
+let expect_wrong_signature list =
+  if
+    List.exists
+      (function
+        | Environment.Ecoproto_error Apply.Inconsistent_sources ->
+            true
+        | _ ->
+            false)
+      list
+  then return_unit
+  else
+    failwith
+      "Packed operation has invalid source in the middle : operation expected \
+       to fail."
+
+let wrong_signature_in_the_middle () =
+  Context.init 2
+  >>=? fun (blk, contracts) ->
+  let c1 = List.nth contracts 0 in
+  let c2 = List.nth contracts 1 in
+  Op.transaction ~fee:Tez.one (B blk) c1 c2 Tez.one
+  >>=? fun op1 ->
+  Op.transaction ~fee:Tez.one (B blk) c2 c1 Tez.one
+  >>=? fun op2 ->
+  Incremental.begin_construction blk
+  >>=? fun inc ->
+  (* Make legit transfers, performing reveals *)
+  Incremental.add_operation inc op1
+  >>=? fun inc ->
+  Incremental.add_operation inc op2
+  >>=? fun inc ->
+  (* Cook transactions for actual test *)
+  Op.transaction ~fee:Tez.one (I inc) c1 c2 Tez.one
+  >>=? fun op1 ->
+  Op.transaction ~fee:Tez.one (I inc) c1 c2 Tez.one
+  >>=? fun op2 ->
+  Op.transaction ~fee:Tez.one (I inc) c1 c2 Tez.one
+  >>=? fun op3 ->
+  Op.transaction ~fee:Tez.one (I inc) c2 c1 Tez.one
+  >>=? fun spurious_operation ->
+  let operations = [op1; op2; op3] in
+  Op.combine_operations ~spurious_operation ~source:c1 (I inc) operations
+  >>=? fun operation ->
+  Incremental.add_operation
+    ~expect_apply_failure:expect_wrong_signature
+    inc
+    operation
+  >>=? fun _inc -> return_unit
+
 let tests =
   [ Test.tztest "multiple transfers" `Quick multiple_transfers;
     Test.tztest
@@ -292,4 +338,8 @@ let tests =
     Test.tztest
       "Failing operation in the middle (with fees)"
       `Quick
-      failing_operation_in_the_middle_with_fees ]
+      failing_operation_in_the_middle_with_fees;
+    Test.tztest
+      "Failing operation (wrong manager in the middle of a pack)"
+      `Quick
+      wrong_signature_in_the_middle ]

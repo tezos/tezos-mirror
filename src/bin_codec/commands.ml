@@ -34,7 +34,7 @@ let id_parameter =
       | Some record ->
           return record
       | None ->
-          cctxt#error "Unkown encoding id: %s" id)
+          cctxt#error "Unknown encoding id: %s" id)
 
 let json_parameter =
   parameter (fun (cctxt : #Client_context.printer) file_or_data ->
@@ -71,7 +71,7 @@ let commands () =
              ~pp_sep:Format.pp_print_cut
              (fun ppf (id, desc) ->
                let desc =
-                 Option.unopt ~default:"No description available." desc
+                 Option.value ~default:"No description available." desc
                in
                Format.fprintf
                  ppf

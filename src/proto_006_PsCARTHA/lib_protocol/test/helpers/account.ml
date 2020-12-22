@@ -36,7 +36,6 @@ type account = t
 let known_accounts = Signature.Public_key_hash.Table.create 17
 
 let new_account ?seed () =
-  let seed = Option.map ~f:Bigstring.of_bytes seed in
   let (pkh, pk, sk) = Signature.generate_key ?seed () in
   let account = {pkh; pk; sk} in
   Signature.Public_key_hash.Table.add known_accounts pkh account ;
@@ -48,9 +47,11 @@ let add_account ({pkh; _} as account) =
 let activator_account = new_account ()
 
 let find pkh =
-  try return (Signature.Public_key_hash.Table.find known_accounts pkh)
-  with Not_found ->
-    failwith "Missing account: %a" Signature.Public_key_hash.pp pkh
+  match Signature.Public_key_hash.Table.find known_accounts pkh with
+  | Some k ->
+      return k
+  | None ->
+      failwith "Missing account: %a" Signature.Public_key_hash.pp pkh
 
 let find_alternate pkh =
   let exception Found of t in
@@ -88,7 +89,6 @@ let commitment_secret =
     "aaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbb"
 
 let new_commitment ?seed () =
-  let seed = Option.map ~f:Bigstring.of_bytes seed in
   let (pkh, pk, sk) = Signature.generate_key ?seed ~algo:Ed25519 () in
   let unactivated_account = {pkh; pk; sk} in
   let open Commitment_repr in

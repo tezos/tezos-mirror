@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 let () =
-  Alcotest.run
+  Alcotest_lwt.run
     "tezos-storage"
     [("context", Test_context.tests); ("raw_store", Test_raw_store.tests)]
+  |> Lwt_main.run

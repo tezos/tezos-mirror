@@ -56,6 +56,9 @@ let commands () =
   let trace_stack_switch =
     switch ~long:"trace-stack" ~doc:"show the stack after each step" ()
   in
+  let zero_loc_switch =
+    switch ~short:'z' ~long:"zero-loc" ~doc:"replace location with \"0\"" ()
+  in
   let amount_arg =
     Client_proto_args.tez_arg
       ~parameter:"amount"
@@ -95,22 +98,78 @@ let commands () =
     | Some gas ->
         return gas
   in
-  let data_parameter =
-    Clic.parameter (fun _ data ->
-        Lwt.return
-          ( Micheline_parser.no_parsing_error
-          @@ Michelson_v1_parser.parse_expression data ))
+  let parse_expr expr =
+    Lwt.return @@ Micheline_parser.no_parsing_error
+    @@ Michelson_v1_parser.parse_expression expr
+  in
+  let data_parameter = parameter (fun _ data -> parse_expr data) in
+  let data_type_arg =
+    arg
+      ~doc:"the given data will be type-checked against this type"
+      ~short:'t'
+      ~long:"type"
+      ~placeholder:"unit"
+      data_parameter
   in
   let bytes_parameter ~name ~desc =
-    Clic.param ~name ~desc Client_proto_args.bytes_parameter
+    param ~name ~desc Client_proto_args.bytes_parameter
   in
   let signature_parameter =
-    Clic.parameter (fun _cctxt s ->
+    parameter (fun _cctxt s ->
         match Signature.of_b58check_opt s with
         | Some s ->
             return s
         | None ->
             failwith "Not given a valid signature")
+  in
+  let convert_input_format_param =
+    param
+      ~name:"input_format"
+      ~desc:"format of the input for conversion"
+      (parameter
+         ~autocomplete:(fun _ -> return ["michelson"; "json"; "binary"])
+         (fun _ s ->
+           match String.lowercase_ascii s with
+           | "michelson" ->
+               return `Michelson
+           | "json" ->
+               return `JSON
+           | "binary" ->
+               return `Binary
+           | _ ->
+               failwith
+                 "invalid input format, expecting one of \"michelson\", \
+                  \"json\" or \"binary\"."))
+  in
+  let convert_output_format_param =
+    param
+      ~name:"output_format"
+      ~desc:"format of the conversion output"
+      (parameter
+         ~autocomplete:(fun _ ->
+           return ["michelson"; "json"; "binary"; "ocaml"])
+         (fun _ s ->
+           match String.lowercase_ascii s with
+           | "michelson" ->
+               return `Michelson
+           | "json" ->
+               return `JSON
+           | "binary" ->
+               return `Binary
+           | "ocaml" ->
+               return `OCaml
+           | _ ->
+               failwith
+                 "invalid output format, expecting one of \"michelson\", \
+                  \"json\", \"binary\" or \"ocaml\"."))
+  in
+  let file_or_literal_param =
+    param
+      ~name:"source"
+      ~desc:"literal or a path to a file"
+      (parameter (fun cctxt s ->
+           cctxt#read_file s
+           >>= function Ok v -> return v | Error _ -> return s))
   in
   [ command
       ~group
@@ -160,17 +219,17 @@ let commands () =
       ( prefixes ["run"; "script"]
       @@ Program.source_param
       @@ prefixes ["on"; "storage"]
-      @@ Clic.param ~name:"storage" ~desc:"the storage data" data_parameter
+      @@ param ~name:"storage" ~desc:"the storage data" data_parameter
       @@ prefixes ["and"; "input"]
-      @@ Clic.param ~name:"input" ~desc:"the input data" data_parameter
+      @@ param ~name:"input" ~desc:"the input data" data_parameter
       @@ stop )
       (fun (trace_exec, amount, source, payer, no_print_source, gas, entrypoint)
            program
            storage
            input
            cctxt ->
-        let source = Option.map ~f:snd source in
-        let payer = Option.map ~f:snd payer in
+        let source = Option.map snd source in
+        let payer = Option.map snd payer in
         Lwt.return @@ Micheline_parser.no_parsing_error program
         >>=? fun program ->
         let show_source = not no_print_source in
@@ -259,9 +318,9 @@ let commands () =
       ~desc:"Ask the node to typecheck a data expression."
       (args2 no_print_source_flag custom_gas_flag)
       ( prefixes ["typecheck"; "data"]
-      @@ Clic.param ~name:"data" ~desc:"the data to typecheck" data_parameter
+      @@ param ~name:"data" ~desc:"the data to typecheck" data_parameter
       @@ prefixes ["against"; "type"]
-      @@ Clic.param ~name:"type" ~desc:"the expected type" data_parameter
+      @@ param ~name:"type" ~desc:"the expected type" data_parameter
       @@ stop )
       (fun (no_print_source, custom_gas) data ty cctxt ->
         resolve_max_gas cctxt cctxt#block custom_gas
@@ -300,9 +359,9 @@ let commands () =
          `SHA256` or `SHA512` instruction."
       (args1 custom_gas_flag)
       ( prefixes ["hash"; "data"]
-      @@ Clic.param ~name:"data" ~desc:"the data to hash" data_parameter
+      @@ param ~name:"data" ~desc:"the data to hash" data_parameter
       @@ prefixes ["of"; "type"]
-      @@ Clic.param ~name:"type" ~desc:"type of the data" data_parameter
+      @@ param ~name:"type" ~desc:"type of the data" data_parameter
       @@ stop )
       (fun custom_gas data typ cctxt ->
         resolve_max_gas cctxt cctxt#block custom_gas
@@ -350,7 +409,7 @@ let commands () =
       ~desc:
         "Parse a byte sequence (in hexadecimal notation) as a data \
          expression, as per Michelson instruction `UNPACK`."
-      Clic.no_options
+      no_options
       ( prefixes ["unpack"; "michelson"; "data"]
       @@ bytes_parameter ~name:"bytes" ~desc:"the packed data to parse"
       @@ stop )
@@ -398,7 +457,7 @@ let commands () =
       @@ prefixes ["was"; "signed"; "by"]
       @@ Client_keys.Public_key.alias_param ~name:"key"
       @@ prefixes ["to"; "produce"]
-      @@ Clic.param
+      @@ param
            ~name:"signature"
            ~desc:"the signature to check"
            signature_parameter
@@ -415,14 +474,14 @@ let commands () =
         | true ->
             if quiet then return_unit
             else
-              cctxt#message "Signature check successfull."
+              cctxt#message "Signature check successful."
               >>= fun () -> return_unit);
     command
       ~group
       ~desc:"Ask the type of an entrypoint of a script."
       (args2 emacs_mode_switch no_print_source_flag)
       ( prefixes ["get"; "script"; "entrypoint"; "type"; "of"]
-      @@ Clic.string ~name:"entrypoint" ~desc:"the entrypoint to describe"
+      @@ string ~name:"entrypoint" ~desc:"the entrypoint to describe"
       @@ prefixes ["for"]
       @@ Program.source_param @@ stop )
       (fun (emacs_mode, no_print_source) entrypoint program cctxt ->
@@ -502,7 +561,7 @@ let commands () =
     command
       ~group
       ~desc:
-        "Ask the node to list the unreachable pathsin a script's parameter \
+        "Ask the node to list the unreachable paths in a script's parameter \
          type."
       (args2 emacs_mode_switch no_print_source_flag)
       ( prefixes ["get"; "script"; "unreachable"; "paths"; "for"]
@@ -554,4 +613,188 @@ let commands () =
             ( Michelson_v1_printer.print_expr_unwrapped ppf program.expanded
               : unit ))
           ()
-        >>= fun () -> return_unit) ]
+        >>= fun () -> return_unit);
+    command
+      ~desc:
+        "Conversion of Michelson script from Micheline, JSON or binary to \
+         Micheline, JSON, binary or OCaml"
+      (args1 zero_loc_switch)
+      ( prefixes ["convert"; "script"]
+      @@ file_or_literal_param @@ prefix "from" @@ convert_input_format_param
+      @@ prefix "to" @@ convert_output_format_param @@ stop )
+      (fun zero_loc
+           expr_string
+           from_format
+           to_format
+           (cctxt : Protocol_client_context.full) ->
+        ( match from_format with
+        | `Michelson ->
+            let program = Michelson_v1_parser.parse_toplevel expr_string in
+            Lwt.return @@ Micheline_parser.no_parsing_error program
+            >>=? fun program ->
+            typecheck_program
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              program
+            >>= (function
+                  | Error _ as res ->
+                      print_typecheck_result
+                        ~emacs:false
+                        ~show_types:true
+                        ~print_source_on_error:true
+                        program
+                        res
+                        cctxt
+                  | Ok _ ->
+                      return_unit)
+            >>=? fun () -> return program.expanded
+        | `JSON -> (
+          match Data_encoding.Json.from_string expr_string with
+          | Error err ->
+              cctxt#error "%s" err
+          | Ok json ->
+              return
+              @@ Data_encoding.Json.destruct
+                   Alpha_context.Script.expr_encoding
+                   json )
+        | `Binary -> (
+            bytes_of_prefixed_string expr_string
+            >>=? fun bytes ->
+            match
+              Data_encoding.Binary.of_bytes_opt
+                Alpha_context.Script.expr_encoding
+                bytes
+            with
+            | None ->
+                failwith "Could not decode bytes"
+            | Some expr ->
+                return expr ) )
+        >>=? fun (expression : Alpha_context.Script.expr) ->
+        let output =
+          match to_format with
+          | `Michelson ->
+              Micheline_printer.printable
+                Michelson_v1_primitives.string_of_prim
+                expression
+              |> Format.asprintf "%a" Micheline_printer.print_expr
+          | `JSON ->
+              Data_encoding.Json.(
+                construct Alpha_context.Script.expr_encoding expression
+                |> to_string)
+          | `Binary ->
+              Format.asprintf
+                "0x%s"
+                ( Data_encoding.Binary.(
+                    to_bytes_exn Alpha_context.Script.expr_encoding expression)
+                |> Hex.of_bytes |> Hex.show )
+          | `OCaml ->
+              Michelson_v1_printer.micheline_string_of_expression
+                ~zero_loc
+                expression
+        in
+        cctxt#message "%s" output >>= fun () -> return_unit);
+    command
+      ~desc:
+        "Conversion of Micheline expression from Micheline, JSON or binary to \
+         Micheline, JSON, binary or OCaml"
+      (args2 zero_loc_switch data_type_arg)
+      ( prefixes ["convert"; "data"]
+      @@ file_or_literal_param @@ prefix "from" @@ convert_input_format_param
+      @@ prefix "to" @@ convert_output_format_param @@ stop )
+      (fun (zero_loc, data_ty)
+           data_string
+           from_format
+           to_format
+           (cctxt : Protocol_client_context.full) ->
+        let micheline_of_expr expr =
+          Micheline_printer.printable
+            Michelson_v1_primitives.string_of_prim
+            expr
+          |> Format.asprintf "%a" Micheline_printer.print_expr
+        in
+        let typecheck_parsed ~data ~ty =
+          Client_proto_programs.typecheck_data
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            ~data
+            ~ty
+            ()
+          >>= function
+          | Error errs ->
+              failwith
+                "%a"
+                (Michelson_v1_error_reporter.report_errors
+                   ~details:false
+                   ~show_source:false
+                   ?parsed:None)
+                errs
+          | Ok _gas ->
+              return data.expanded
+        in
+        let typecheck_expr ~expr ~ty =
+          let data_string = micheline_of_expr expr in
+          parse_expr data_string >>=? fun data -> typecheck_parsed ~data ~ty
+        in
+        ( match from_format with
+        | `Michelson -> (
+            parse_expr data_string
+            >>=? fun data ->
+            match data_ty with
+            | Some ty ->
+                typecheck_parsed ~data ~ty
+            | None ->
+                return data.expanded )
+        | `JSON -> (
+          match Data_encoding.Json.from_string data_string with
+          | Error err ->
+              cctxt#error "%s" err
+          | Ok json -> (
+              return
+              @@ Data_encoding.Json.destruct
+                   Alpha_context.Script.expr_encoding
+                   json
+              >>=? fun expr ->
+              match data_ty with
+              | None ->
+                  return expr
+              | Some ty ->
+                  typecheck_expr ~expr ~ty ) )
+        | `Binary -> (
+            bytes_of_prefixed_string data_string
+            >>=? fun bytes ->
+            match
+              Data_encoding.Binary.of_bytes_opt
+                Alpha_context.Script.expr_encoding
+                bytes
+            with
+            | None ->
+                failwith "Could not decode bytes"
+            | Some expr -> (
+              match data_ty with
+              | None ->
+                  return expr
+              | Some ty ->
+                  typecheck_expr ~expr ~ty ) ) )
+        >>=? fun (expression : Alpha_context.Script.expr) ->
+        let output =
+          match to_format with
+          | `Michelson ->
+              micheline_of_expr expression
+          | `JSON ->
+              Data_encoding.Json.(
+                construct Alpha_context.Script.expr_encoding expression
+                |> to_string)
+          | `Binary ->
+              Format.asprintf
+                "0x%s"
+                ( Data_encoding.Binary.(
+                    to_bytes_exn Alpha_context.Script.expr_encoding expression)
+                |> Hex.of_bytes |> Hex.show )
+          | `OCaml ->
+              Michelson_v1_printer.micheline_string_of_expression
+                ~zero_loc
+                expression
+        in
+        cctxt#message "%s" output >>= fun () -> return_unit) ]

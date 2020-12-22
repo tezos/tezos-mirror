@@ -1,5 +1,6 @@
 import pytest
 from tools import constants
+from client.client import Client
 
 
 @pytest.fixture(scope="class")
@@ -14,5 +15,5 @@ def client(sandbox):
 class TestTLS:
     """Test voting protocol with manual baking, 4 blocks per voting period."""
 
-    def test_bootstrapped(self, client):
+    def test_bootstrapped(self, client: Client):
         assert client.bootstrapped()

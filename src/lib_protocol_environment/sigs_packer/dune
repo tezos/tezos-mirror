@@ -1,9 +1,0 @@
-(executable
- (name sigs_packer)
- (public_name tezos-protocol-environment-sigs.packer)
- (package tezos-protocol-environment-sigs))
-
-(alias
- (name runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

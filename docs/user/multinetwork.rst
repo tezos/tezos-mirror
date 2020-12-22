@@ -1,3 +1,5 @@
+.. _multinetwork:
+
 Multinetwork Node
 =================
 
@@ -17,12 +19,6 @@ their own networks for various reasons. Networks differ in various ways:
 
 - they may have had user-activated upgrades or user-activated protocol overrides
   to change the protocol without going through the voting process.
-
-The current ``master`` branch is capable of connecting to multiple networks,
-including Mainnet and the Carthagenet test network. By contrast,
-the ``mainnet`` branch is only capable of connecting to Mainnet,
-the ``carthagenet`` branch is only capable of connecting to Carthagenet,
-and so on. The goal is to remove the need for such branches.
 
 By default, the multinetwork node connects to Mainnet.
 To connect to other networks, you can either use one of the
@@ -48,6 +44,10 @@ the following built-in networks:
 - ``sandbox``
 
 - ``carthagenet``
+
+- ``delphinet``
+
+- ``dalphanet`` (only available in the ``dalpha-release`` branch)
 
 If you did not initialize your node configuration, or if your configuration
 file contains no ``network`` field, the node assumes you want to run Mainnet.
@@ -112,9 +112,9 @@ user-activated upgrades (see `Alias Versus Explicit Configuration`_).
   the same network name).
 
 - ``old_chain_name`` is usually the same as ``chain_name``, except for networks
-  which were renamed.
+  that were renamed.
 
-- ``incompatible_chain_name`` is a name which must be different than ``chain_name``
+- ``incompatible_chain_name`` is a name which must be different from ``chain_name``
   and ``old_chain_name``. It is thus ensured to be incompatible. It is used for testing
   purposes.
 
@@ -193,7 +193,7 @@ of the network and not its parameters, it will automatically use the updated val
 
 However, if you configure `Custom Networks`_, the configuration file will
 no longer contain an alias such as ``mainnet`` or ``carthagenet``. Instead,
-it will explicitely contain the list of bootstrap peers, user-activated upgrades
+it will explicitly contain the list of bootstrap peers, user-activated upgrades
 and user-activated protocol overrides that you specify. This means that when
 you update your node, updates to built-in network parameters will have no effect.
 

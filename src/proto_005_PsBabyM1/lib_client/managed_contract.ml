@@ -211,12 +211,12 @@ let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
   | None ->
       return_none )
   >>=? fun parameters ->
-  let parameters = Option.unopt ~default:d_unit parameters in
+  let parameters = Option.value ~default:d_unit parameters in
   let lambda =
     let destination =
       Data_encoding.Binary.to_bytes_exn Contract.encoding destination
     in
-    let (`Hex destination) = MBytes.to_hex destination in
+    let (`Hex destination) = Hex.of_bytes destination in
     Format.asprintf
       "{ DROP ; NIL operation ;PUSH address 0x%s; CONTRACT %s %a; \
        ASSERT_SOME;PUSH mutez %a ;PUSH %a %a;TRANSFER_TOKENS ; CONS }"

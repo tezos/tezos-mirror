@@ -42,3 +42,13 @@ val encrypt :
   #Client_context.io ->
   Signature.secret_key ->
   Client_keys.sk_uri tzresult Lwt.t
+
+val encrypt_sapling_key :
+  #Client_context.io ->
+  Tezos_sapling.Core.Wallet.Spending_key.t ->
+  Client_keys.sapling_uri tzresult Lwt.t
+
+val decrypt_sapling_key :
+  #Client_context.io ->
+  Client_keys.sapling_uri ->
+  Tezos_sapling.Core.Wallet.Spending_key.t tzresult Lwt.t

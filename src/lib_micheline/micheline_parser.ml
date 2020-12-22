@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018 Nomadic Labs. <nomadic@tezcore.com>                    *)
+(* Copyright (c) 2018 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -737,7 +737,7 @@ and do_check ?(toplevel = false) errors = function
       else
         (* In a sequence or in the arguments of a primitive, we
            require all items to be aligned, but we relax the rule to
-           allow consecutive items to be writtem on the same line. *)
+           allow consecutive items to be written on the same line. *)
         let rec in_line_or_aligned prev_start_line errors = function
           | [] ->
               errors

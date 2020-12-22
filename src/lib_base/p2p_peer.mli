@@ -28,7 +28,8 @@ module Map = Id.Map
 module Set = Id.Set
 module Table = Id.Table
 
-module Error_table : Error_table.S with type key = Table.key
+module Error_table :
+  Tezos_lwt_result_stdlib.Lwtreslib.Hashtbl.S_LWT with type key = Table.key
 
 module Filter : sig
   type t = Accepted | Running | Disconnected

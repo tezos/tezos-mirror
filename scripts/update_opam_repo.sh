@@ -66,7 +66,7 @@ for opam in $opams; do
     dir=$(dirname $opam)
     file=$(basename $opam)
     package=${file%.opam}
-    packages=$packages,$package
+    packages=$packages,$package.dev
     mkdir -p "$tmp_dir"/packages/$package/$package.dev
 
     ## HACK: For some reason, `opam admin list/filter` do not follow
@@ -87,13 +87,12 @@ done
 
 ## Filtering unrequired packages
 cd $tmp_dir
-
 git reset --hard "$full_opam_repository_tag"
-opam admin filter --yes \
-     --resolve $packages,ocaml,ocaml-base-compiler,odoc,opam-depext,js_of_ocaml-ppx,reactiveData,opam-ed
+opam admin filter --yes --resolve \
+  $packages,ocaml,ocaml-base-compiler,odoc,opam-depext,js_of_ocaml-ppx,reactiveData,opam-ed
 
 ## Adding useful compiler variants
-for variant in afl flambda fp fp+flambda ; do
+for variant in afl flambda fp fp+flambda spacetime ; do
     git checkout packages/ocaml-variants/ocaml-variants.$ocaml_version+$variant
 done
 

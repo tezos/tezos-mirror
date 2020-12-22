@@ -55,7 +55,7 @@ let compose_parameters {converter = c1; autocomplete = a1'}
   }
 
 let map_parameter ~f {converter; autocomplete} =
-  {converter = (fun ctx s -> converter ctx s >>|? f); autocomplete}
+  {converter = (fun ctx s -> converter ctx s >|=? f); autocomplete}
 
 type label = {long : string; short : char option}
 
@@ -129,12 +129,12 @@ type error +=
 
 type error += Bad_option_argument : string * 'ctx command option -> error
 
-type error += Multiple_occurences : string * 'ctx command option -> error
+type error += Multiple_occurrences : string * 'ctx command option -> error
 
 type error += Extra_arguments : string list * 'ctx command -> error
 
 let trim s =
-  (* config-file wokaround *)
+  (* config-file workaround *)
   TzString.split '\n' s |> List.map String.trim |> String.concat "\n"
 
 let print_desc ppf doc =
@@ -533,8 +533,8 @@ let setup_formatter ppf format verbosity =
           let format =
             match !ansi_stack with
             | (pfg, pbg, pb, pu) :: _ ->
-                ( Option.unopt ~default:pfg fg,
-                  Option.unopt ~default:pbg bg,
+                ( Option.value ~default:pfg fg,
+                  Option.value ~default:pbg bg,
                   pb || b,
                   pu || u )
             | [] ->
@@ -846,9 +846,9 @@ let parse_arg :
         return_none
     | Some [s] ->
         trace (Bad_option_argument ("--" ^ long, command)) (converter ctx s)
-        >>|? fun x -> Some x
+        >|=? fun x -> Some x
     | Some (_ :: _) ->
-        fail (Multiple_occurences ("--" ^ long, command)) )
+        fail (Multiple_occurrences ("--" ^ long, command)) )
   | DefArg {label = {long; short = _}; kind = {converter; _}; default; _} -> (
       converter ctx default
       >>= fun default ->
@@ -868,7 +868,7 @@ let parse_arg :
       | Some [s] ->
           trace (Bad_option_argument (long, command)) (converter ctx s)
       | Some (_ :: _) ->
-          fail (Multiple_occurences (long, command)) )
+          fail (Multiple_occurrences (long, command)) )
   | Switch {label = {long; short = _}; _} -> (
     match TzString.Map.find_opt long args_dict with
     | None | Some [] ->
@@ -876,7 +876,7 @@ let parse_arg :
     | Some [_] ->
         return_true
     | Some (_ :: _) ->
-        fail (Multiple_occurences (long, command)) )
+        fail (Multiple_occurrences (long, command)) )
   | Constant c ->
       return c
 
@@ -895,7 +895,7 @@ let rec parse_args :
   | AddArg (arg, rest) ->
       parse_arg ?command arg args_dict ctx
       >>=? fun arg ->
-      parse_args ?command rest args_dict ctx >>|? fun rest -> (arg, rest)
+      parse_args ?command rest args_dict ctx >|=? fun rest -> (arg, rest)
 
 let empty_args_dict = TzString.Map.empty
 
@@ -1024,7 +1024,7 @@ let make_args_dict_filter ?command spec args =
     (make_arities_dict spec TzString.Map.empty)
     (TzString.Map.empty, [])
     args
-  >>|? fun (dict, remaining) -> (dict, List.rev remaining)
+  >|=? fun (dict, remaining) -> (dict, List.rev remaining)
 
 let ( >> ) arg1 arg2 = AddArg (arg1, arg2)
 
@@ -1622,24 +1622,23 @@ let insert_in_dispatch_tree : type ctx. ctx tree -> ctx command -> ctx tree =
       type a ictx. (ctx -> ictx) -> ctx tree -> (a, ictx) params -> ctx tree =
    fun conv t c ->
     let insert_tree t c = insert_tree conv t c in
+    let map_autocomplete autocomplete =
+      Option.map (fun a c -> a (conv c)) autocomplete
+    in
     match (t, c) with
     | (TEmpty, Stop) ->
         TStop command
     | (TEmpty, Seq (_, _, {autocomplete; _})) ->
-        TSeq (command, Option.map autocomplete ~f:(fun a c -> a (conv c)))
+        TSeq (command, map_autocomplete autocomplete)
     | (TEmpty, Param (_, _, param, next)) ->
         let autocomplete = access_autocomplete param in
-        let autocomplete =
-          Option.map autocomplete ~f:(fun a c -> a (conv c))
-        in
+        let autocomplete = map_autocomplete autocomplete in
         TParam {tree = insert_tree TEmpty next; stop = None; autocomplete}
     | (TEmpty, Prefix (n, next)) ->
         TPrefix {stop = None; prefix = [(n, insert_tree TEmpty next)]}
     | (TStop cmd, Param (_, _, param, next)) ->
         let autocomplete = access_autocomplete param in
-        let autocomplete =
-          Option.map autocomplete ~f:(fun a c -> a (conv c))
-        in
+        let autocomplete = map_autocomplete autocomplete in
         if not (has_options cmd) then
           TParam
             {tree = insert_tree TEmpty next; stop = Some cmd; autocomplete}
@@ -1732,7 +1731,7 @@ let find_command tree initial_arguments =
         then fail (Help (Some command))
         else
           make_args_dict_filter ~command spec remaining
-          >>|? fun (dict, remaining) ->
+          >|=? fun (dict, remaining) ->
           (command, dict, List.rev_append acc remaining)
     | (TPrefix {stop = Some cmd; _}, []) ->
         return (cmd, empty_args_dict, initial_arguments)
@@ -1830,7 +1829,7 @@ let complete_options (type ctx) continuation args args_spec ind (ctx : ctx) =
     match args with
     | _ when ind = 0 ->
         continuation args 0
-        >>|? fun cont_args -> cont_args @ remaining_spec seen args_spec
+        >|=? fun cont_args -> cont_args @ remaining_spec seen args_spec
     | [] ->
         Stdlib.failwith "cli_entries internal autocomplete error"
     | arg :: tl ->
@@ -1840,7 +1839,7 @@ let complete_options (type ctx) continuation args args_spec ind (ctx : ctx) =
           match (arity, tl) with
           | (0, args) when ind = 0 ->
               continuation args 0
-              >>|? fun cont_args -> remaining_spec seen args_spec @ cont_args
+              >|=? fun cont_args -> remaining_spec seen args_spec @ cont_args
           | (0, args) ->
               help args (ind - 1) seen
           | (1, _) when ind = 1 ->
@@ -1864,7 +1863,7 @@ let complete_next_tree cctxt = function
         @ List.map fst prefix )
   | TSeq (command, autocomplete) ->
       complete_func autocomplete cctxt
-      >>|? fun completions -> completions @ list_command_args command
+      >|=? fun completions -> completions @ list_command_args command
   | TParam {autocomplete; _} ->
       complete_func autocomplete cctxt
   | TStop command ->
@@ -1899,12 +1898,12 @@ let autocompletion ~script ~cur_arg ~prev_arg ~args ~global_options commands
         None
     | hd :: tl ->
         if hd = prev_arg then
-          Some (Option.unopt ~default:(n + 1) (ind (n + 1) tl))
+          Some (Option.value ~default:(n + 1) (ind (n + 1) tl))
         else ind (n + 1) tl
   in
   ( if prev_arg = script then
     complete_next_tree cctxt tree
-    >>|? fun command_completions ->
+    >|=? fun command_completions ->
     let (Argument {spec; _}) = global_options in
     list_args spec @ command_completions
   else
@@ -1919,7 +1918,7 @@ let autocompletion ~script ~cur_arg ~prev_arg ~args ~global_options commands
           spec
           index
           cctxt )
-  >>|? fun completions ->
+  >|=? fun completions ->
   List.filter
     (fun completion ->
       Re.Str.(string_match (regexp_string cur_arg) completion 0))
@@ -2061,31 +2060,19 @@ let pp_cli_errors ppf ~executable_name ~global_options ~default errs =
           ppf
           "Command line option @{<opt>%s@} expects an argument."
           arg ;
-        Some
-          (Option.unopt_map
-             ~f:(fun command -> [Ex command])
-             ~default:[]
-             command)
+        Some (Option.fold ~some:(fun command -> [Ex command]) ~none:[] command)
     | Bad_option_argument (arg, command) ->
         Format.fprintf
           ppf
           "Wrong value for command line option @{<opt>%s@}."
           arg ;
-        Some
-          (Option.unopt_map
-             ~f:(fun command -> [Ex command])
-             ~default:[]
-             command)
-    | Multiple_occurences (arg, command) ->
+        Some (Option.fold ~some:(fun command -> [Ex command]) ~none:[] command)
+    | Multiple_occurrences (arg, command) ->
         Format.fprintf
           ppf
           "Command line option @{<opt>%s@} appears multiple times."
           arg ;
-        Some
-          (Option.unopt_map
-             ~f:(fun command -> [Ex command])
-             ~default:[]
-             command)
+        Some (Option.fold ~some:(fun command -> [Ex command]) ~none:[] command)
     | No_manual_entry [keyword] ->
         Format.fprintf
           ppf
@@ -2104,11 +2091,7 @@ let pp_cli_errors ppf ~executable_name ~global_options ~default errs =
         Some []
     | Unknown_option (option, command) ->
         Format.fprintf ppf "Unexpected command line option @{<opt>%s@}." option ;
-        Some
-          (Option.unopt_map
-             ~f:(fun command -> [Ex command])
-             ~default:[]
-             command)
+        Some (Option.fold ~some:(fun command -> [Ex command]) ~none:[] command)
     | Extra_arguments (extra, command) ->
         Format.(
           fprintf

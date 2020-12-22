@@ -131,15 +131,13 @@ let raw_encoding =
   let open Data_encoding in
   conv to_bytes of_bytes_exn (Fixed.bytes size)
 
-let hash h = Int32.to_int (TzEndian.get_int32 (to_bytes h) 0)
-
 let of_block_hash bh = hash_bytes [Block_hash.to_bytes bh]
 
-include Compare.Make (struct
-  type nonrec t = t
+include (Compare.String : Compare.S with type t := t)
 
-  let compare = String.compare
-end)
+let hash = Stdlib.Hashtbl.hash
+
+let seeded_hash = Stdlib.Hashtbl.seeded_hash
 
 include Helpers.Make (struct
   type nonrec t = t
@@ -157,4 +155,6 @@ include Helpers.Make (struct
   let equal = equal
 
   let hash = hash
+
+  let seeded_hash = seeded_hash
 end)

@@ -41,6 +41,12 @@
 module type CYCLIC_GROUP = sig
   type t
 
+  val pp : Format.formatter -> t -> unit
+
+  include Compare.S with type t := t
+
+  include S.RAW_DATA with type t := t
+
   include S.B58_DATA with type t := t
 
   include S.ENCODER with type t := t
@@ -56,8 +62,6 @@ module type CYCLIC_GROUP = sig
   val g2 : t
 
   val ( * ) : t -> t -> t
-
-  val ( = ) : t -> t -> bool
 
   val pow : t -> Z_m.t -> t
 
@@ -83,7 +87,19 @@ module type PVSS = sig
 
   module Clear_share : ENCODED
 
-  module Public_key : ENCODED
+  module Public_key : sig
+    type t
+
+    val pp : Format.formatter -> t -> unit
+
+    include Compare.S with type t := t
+
+    include S.RAW_DATA with type t := t
+
+    include S.B58_DATA with type t := t
+
+    include S.ENCODER with type t := t
+  end
 
   module Secret_key : sig
     include ENCODED
@@ -97,12 +113,12 @@ module type PVSS = sig
 
   (** Lets a dealer share a secret with a set of participant by breaking it into
       pieces, encrypting it with the participant's public keys, and publishing
-      these encrypted shares. Any t participants can reconstruct the secret. A
-      zero-knowledge proof is produced showing that the  dealer correctly
-      followed the protocol, making the protocol publicly verifiable. *)
+      these encrypted shares. Any t = threshold participants can reconstruct the
+      secret. A zero-knowledge proof is produced showing that the  dealer
+      correctly followed the protocol, making the protocol publicly verifiable. *)
   val dealer_shares_and_proof :
     secret:Secret_key.t ->
-    t:int ->
+    threshold:int ->
     public_keys:Public_key.t list ->
     Encrypted_share.t list * Commitment.t list * proof
 

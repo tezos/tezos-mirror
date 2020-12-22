@@ -1,19 +1,22 @@
 (executables
- (names test_error_tables)
+ (names test_recursive_registration)
  (libraries tezos-error-monad
+            data-encoding
             lwt.unix
             alcotest-lwt)
  (flags (:standard -open Tezos_error_monad)))
 
-(alias
- (name buildtest)
- (deps test_error_tables.exe))
+(rule
+ (alias buildtest)
+ (deps test_recursive_registration.exe)
+ (action (progn)))
 
-(alias
- (name runtest_error_tables)
- (action (run %{exe:test_error_tables.exe})))
+(rule
+ (alias runtest_recursive_registration)
+ (action (run %{exe:test_recursive_registration.exe})))
 
-(alias
- (name runtest)
+(rule
+ (alias runtest)
  (package tezos-error-monad)
- (deps (alias runtest_error_tables)))
+ (deps (alias runtest_recursive_registration))
+ (action (progn)))

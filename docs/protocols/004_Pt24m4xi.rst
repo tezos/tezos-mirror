@@ -95,7 +95,7 @@ Breaking changes
     contract's code) and prevents some possible future optimisations.
 
     It also prevents the creation of non spendable non scripted contracts,
-    which was mostly a design flaw that could let people inadvertantly lock funds.
+    which was mostly a design flaw that could let people inadvertently lock funds.
 
     This is done by checking the flag in the origination operation rather
     than removing it so the change is lighter for third party software.

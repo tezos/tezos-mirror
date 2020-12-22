@@ -85,20 +85,20 @@ Certificate:
                     4f:27
                 Exponent: 65537 (0x10001)
         X509v3 extensions:
-            X509v3 Basic Constraints: 
+            X509v3 Basic Constraints:
                 CA:FALSE
-            X509v3 Subject Key Identifier: 
+            X509v3 Subject Key Identifier:
                 B4:C2:AB:C3:F6:64:80:94:43:46:7F:40:25:E4:D1:CF:01:33:44:DA
-            X509v3 Authority Key Identifier: 
+            X509v3 Authority Key Identifier:
                 keyid:5E:27:08:3B:81:1D:FA:05:CC:D3:94:D4:2B:9B:92:5B:3B:F9:EA:A1
                 DirName:/CN=Easy-RSA CA
                 serial:D5:46:5A:8E:8B:18:BD:2B
 
-            X509v3 Extended Key Usage: 
+            X509v3 Extended Key Usage:
                 TLS Web Server Authentication
-            X509v3 Key Usage: 
+            X509v3 Key Usage:
                 Digital Signature, Key Encipherment
-            X509v3 Subject Alternative Name: 
+            X509v3 Subject Alternative Name:
                 DNS:tezos
     Signature Algorithm: sha256WithRSAEncryption
          2f:23:1a:9e:42:72:2b:57:ec:26:04:a2:a0:22:f3:31:0e:12:
@@ -181,7 +181,7 @@ EOF
     fi
 
     [ -f "${node_dir}/identity.json" ] || $node identity generate "$expected_pow" --data-dir "$node_dir"
-    $node run --network "sandbox" --data-dir "$node_dir" "${peers[@]}" "$sandbox_param" "$@" &
+    $node run --synchronisation-threshold 0 --network "sandbox" --data-dir "$node_dir" "${peers[@]}" "$sandbox_param" "$@" &
     node_pids+=("$!")
 
 }

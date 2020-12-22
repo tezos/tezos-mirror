@@ -23,29 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module PeerLRUCache : Ring.TABLE with type v = P2p_peer.Id.t = struct
-  module Cache = Lru_cache.Make (P2p_peer.Id.Table)
-
-  type t = unit Cache.t
-
-  type v = Cache.key
-
-  let create capacity = Cache.create ~capacity
-
-  let add cache peer_id = Cache.push cache peer_id ()
-
-  let mem cache peer_id = Cache.is_cached cache peer_id
-
-  let remove cache peer_id = Cache.remove cache peer_id
-
-  let clear cache = Cache.clear cache
-
-  let elements cache = Cache.bindings cache |> List.map fst
-end
+module PeerFIFOCache : Ringo.CACHE_SET with type elt = P2p_peer.Id.t =
+  ( val Ringo.set_maker ~replacement:FIFO ~overflow:Strong ~accounting:Precise
+      : Ringo.SET_MAKER )
+    (P2p_peer.Id)
 
 module PatriciaTree (V : HashPtree.Value) = struct
   module M = HashPtree.Make_BE_int2_64 (V)
-  module Bits = HashPtree.Int2_64
 
   type t = M.t
 
@@ -77,12 +61,18 @@ module PatriciaTree (V : HashPtree.Value) = struct
   let mem key t = M.mem (key_of_ipv6 key) t
 
   let key_mask_to_prefix key mask =
-    Ipaddr.V6.Prefix.of_netmask (key_to_ipv6 mask) (key_to_ipv6 key)
+    Ipaddr.V6.Prefix.of_netmask
+      ~netmask:(key_to_ipv6 mask)
+      ~address:(key_to_ipv6 key)
 
   let fold f t acc =
     let f key mask value acc =
-      let prefix = key_mask_to_prefix key mask in
-      f prefix value acc
+      match key_mask_to_prefix key mask with
+      | Ok prefix ->
+          f prefix value acc
+      | Error _ ->
+          (* TODO: print error? *)
+          acc
     in
     M.fold f t acc
 
@@ -126,7 +116,7 @@ end)
 
 type t = {
   mutable greylist_ips : IpSet.t;
-  greylist_peers : PeerLRUCache.t;
+  greylist_peers : PeerFIFOCache.t;
   banned_ips : unit IpTable.t;
   banned_peers : unit P2p_peer.Table.t;
 }
@@ -134,9 +124,9 @@ type t = {
 let create size =
   {
     greylist_ips = IpSet.empty;
-    greylist_peers = PeerLRUCache.create size;
+    greylist_peers = PeerFIFOCache.create size;
     banned_ips = IpTable.create 53;
-    banned_peers = P2p_peer.Table.create 53;
+    banned_peers = P2p_peer.Table.create ~random:true 53;
   }
 
 (* Check if an ip is banned. Priority is given to the static
@@ -150,20 +140,20 @@ let unban_addr acl addr =
 
 (* Check if [peer_id] is in either of the banned/greylisted
    collections. Caveat Emptor: it might be possible for a peer to have
-   its ip adress banned, but not its ID. *)
+   its ip address banned, but not its ID. *)
 let banned_peer acl peer_id =
   P2p_peer.Table.mem acl.banned_peers peer_id
-  || PeerLRUCache.mem acl.greylist_peers peer_id
+  || PeerFIFOCache.mem acl.greylist_peers peer_id
 
 let unban_peer acl peer_id =
   P2p_peer.Table.remove acl.banned_peers peer_id ;
-  PeerLRUCache.remove acl.greylist_peers peer_id
+  PeerFIFOCache.remove acl.greylist_peers peer_id
 
 let clear acl =
   acl.greylist_ips <- IpSet.empty ;
   P2p_peer.Table.clear acl.banned_peers ;
   IpTable.clear acl.banned_ips ;
-  PeerLRUCache.clear acl.greylist_peers
+  PeerFIFOCache.clear acl.greylist_peers
 
 module IPGreylist = struct
   let add acl addr time =
@@ -196,7 +186,7 @@ module PeerBlacklist = struct
 end
 
 module PeerGreylist = struct
-  let add acl peer_id = PeerLRUCache.add acl.greylist_peers peer_id
+  let add acl peer_id = PeerFIFOCache.add acl.greylist_peers peer_id
 
-  let mem acl peer_id = PeerLRUCache.mem acl.greylist_peers peer_id
+  let mem acl peer_id = PeerFIFOCache.mem acl.greylist_peers peer_id
 end

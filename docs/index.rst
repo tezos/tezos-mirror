@@ -22,6 +22,10 @@ protocol and the nodes should adapt and upgrade.
 
 The source code of Tezos is placed under the MIT Open Source License.
 
+Latest Release
+--------------
+
+The current version of Tezos is :ref:`version-7`.
 
 The Community
 -------------
@@ -37,7 +41,7 @@ The Community
     - https://teztracker.everstake.one
     - https://tzkt.io (Baking focused Explorer)
     - https://arronax.io
-    - https://mininax.cryptonomic.tech/mainnet
+    - https://mininax.io
     - https://baking-bad.org (Reward Tracker)
     - https://better-call.dev (Smart-contract Explorer)
 
@@ -100,6 +104,7 @@ in the :ref:`introduction <howtoget>`.
 
    user/key-management
    user/sandbox
+   user/mockup
    user/history_modes
    user/snapshots
    user/various
@@ -113,6 +118,8 @@ in the :ref:`introduction <howtoget>`.
    whitedoc/the_big_picture
    whitedoc/p2p
    whitedoc/validation
+   whitedoc/sync
+   whitedoc/micheline
    whitedoc/michelson
    whitedoc/proof_of_stake
    whitedoc/voting
@@ -130,10 +137,13 @@ in the :ref:`introduction <howtoget>`.
    developer/testing
    developer/flextesa
    developer/python_testing_framework
+   developer/tezt
    developer/proposal_testing
    developer/profiling
+   developer/snoop
    developer/contributing
    developer/merge_team
+   developer/guidelines
 
 .. toctree::
    :maxdepth: 2
@@ -143,6 +153,7 @@ in the :ref:`introduction <howtoget>`.
    protocols/004_Pt24m4xi
    protocols/005_babylon
    protocols/006_carthage
+   protocols/008_edo
 
 .. toctree::
    :maxdepth: 2
@@ -154,6 +165,8 @@ in the :ref:`introduction <howtoget>`.
    releases/october-2019
    releases/december-2019
    releases/january-2020
+   releases/version-7
+   releases/version-8
 
 .. toctree::
    :maxdepth: 2
@@ -163,6 +176,7 @@ in the :ref:`introduction <howtoget>`.
    api/api-inline
    api/cli-commands
    api/rpc
+   api/openapi
    api/errors
    api/p2p
 

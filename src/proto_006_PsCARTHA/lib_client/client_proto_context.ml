@@ -66,10 +66,7 @@ let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
       return_none )
   >>=? fun parameters ->
   let parameters =
-    Option.unopt_map
-      ~f:Script.lazy_expr
-      ~default:Script.unit_parameter
-      parameters
+    Option.fold ~some:Script.lazy_expr ~none:Script.unit_parameter parameters
   in
   let contents = Transaction {amount; parameters; destination; entrypoint} in
   Injection.inject_manager_operation
@@ -191,7 +188,7 @@ let list_contract_labels cctxt ~chain ~block =
       let h_b58 = Contract.to_b58check h in
       return (nm, h_b58, kind))
     contracts
-  >>|? List.rev
+  >|=? List.rev
 
 let message_added_contract (cctxt : #full) name =
   cctxt#message "Contract memorized as %s." name
@@ -338,10 +335,10 @@ let read_key key =
   | Some t ->
       (* TODO: unicode normalization (NFKD)... *)
       let passphrase =
-        Bigstring.(concat "" [of_string key.email; of_string key.password])
+        Bytes.(cat (of_string key.email) (of_string key.password))
       in
       let sk = Bip39.to_seed ~passphrase t in
-      let sk = Bigstring.sub_bytes sk 0 32 in
+      let sk = Bytes.sub sk 0 32 in
       let sk : Signature.Secret_key.t =
         Ed25519
           (Data_encoding.Binary.of_bytes_exn Ed25519.Secret_key.encoding sk)
@@ -399,9 +396,10 @@ let activate_account (cctxt : #full) ~chain ~block ?confirmations ?dry_run
        Ed25519.Public_key_hash.pp
        key.pkh)
   >>=? fun () ->
-  let pk_uri = Tezos_signer_backends.Unencrypted.make_pk pk in
+  Tezos_signer_backends.Unencrypted.make_pk pk
+  >>=? fun pk_uri ->
   ( if encrypted then Tezos_signer_backends.Encrypted.encrypt cctxt sk
-  else return (Tezos_signer_backends.Unencrypted.make_sk sk) )
+  else Tezos_signer_backends.Unencrypted.make_sk sk )
   >>=? fun sk_uri ->
   Client_keys.register_key cctxt ?force (pkh, pk_uri, sk_uri) name
   >>=? fun () ->
@@ -525,7 +523,7 @@ let submit_ballot ?dry_run ?verbose_signing (cctxt : #full) ~chain ~block
 
 let pp_operation formatter (a : Alpha_block_services.operation) =
   match (a.receipt, a.protocol_data) with
-  | (Apply_results.Operation_metadata omd, Operation_data od) -> (
+  | (Some (Apply_results.Operation_metadata omd), Operation_data od) -> (
     match Apply_results.kind_equal_list od.contents omd.contents with
     | Some Apply_results.Eq ->
         Operation_result.pp_operation_result
@@ -533,6 +531,10 @@ let pp_operation formatter (a : Alpha_block_services.operation) =
           (od.contents, omd.contents)
     | None ->
         Stdlib.failwith "Unexpected result." )
+  | (None, _) ->
+      Stdlib.failwith
+        "Pruned metadata: the operation receipt was removed accordingly to \
+         the node's history mode."
   | _ ->
       Stdlib.failwith "Unexpected result."
 

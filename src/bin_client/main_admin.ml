@@ -38,8 +38,4 @@ let select_commands _ _ =
          Client_rpc_commands.commands;
          Client_event_logging_commands.commands () ])
 
-let () =
-  Client_main_run.run
-    ~log:(Log.fatal_error "%s")
-    (module Client_config)
-    ~select_commands
+let () = Client_main_run.run (module Client_config) ~select_commands

@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018 Nomadic Labs. <nomadic@tezcore.com>                    *)
+(* Copyright (c) 2018 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -44,7 +44,7 @@ module type V0 = sig
        and type Context_hash.t = Context_hash.t
        and type Protocol_hash.t = Protocol_hash.t
        and type Time.t = Time.Protocol.t
-       and type MBytes.t = MBytes.t
+       and type MBytes.t = Tezos_protocol_environment_structs.V0.M.MBytes.t
        and type Operation.shell_header = Operation.shell_header
        and type Operation.t = Operation.t
        and type Block_header.shell_header = Block_header.shell_header
@@ -104,6 +104,12 @@ end)
 () =
 struct
   include Stdlib
+
+  (* The modules provided in the [_struct.V0.M] pack are meant specifically to
+     shadow modules from [Stdlib]/[Base]/etc. with backwards compatible
+     versions. Thus we open the module, hiding the incompatible, newer modules.
+  *)
+  open Tezos_protocol_environment_structs.V0.M
   module Pervasives = Stdlib
   module Compare = Compare
   module List = List
@@ -120,29 +126,20 @@ struct
     module LE = EndianString.LittleEndian
   end
 
-  module Set = Set
-  module Map = Map
+  module Set = Stdlib.Set
+  module Map = Stdlib.Map
   module Int32 = Int32
   module Int64 = Int64
   module Nativeint = Nativeint
   module Buffer = Buffer
   module Format = Format
-
-  module Option = struct
-    include Tezos_stdlib.Option
-
-    (* For compatibility with sigs.v1. It is not used and it shouldn't be used. *)
-    let try_with f = try Some (f ()) with _ -> None
-  end
-
+  module Option = Option
   module MBytes = MBytes
 
   module Raw_hashes = struct
-    let conv f x = Bigstring.to_bytes (f (Bigstring.of_bytes x))
+    let sha256 = Hacl.Hash.SHA256.digest
 
-    let sha256 msg = conv Hacl.Hash.SHA256.digest msg
-
-    let sha512 msg = conv Hacl.Hash.SHA512.digest msg
+    let sha512 = Hacl.Hash.SHA512.digest
 
     let blake2b msg = Blake2B.to_bytes (Blake2B.hash_bytes [msg])
   end
@@ -350,7 +347,7 @@ struct
 
     module type HASHABLE = Tezos_base.S.HASHABLE
 
-    module type MINIMAL_HASH = S.MINIMAL_HASH
+    module type MINIMAL_HASH = Tezos_crypto.S.MINIMAL_HASH
 
     module type B58_DATA = sig
       type t
@@ -388,9 +385,9 @@ struct
       val rpc_arg : t RPC_arg.t
     end
 
-    module type SET = Tezos_base.S.SET
+    module type SET = S.SET
 
-    module type MAP = Tezos_base.S.MAP
+    module type MAP = S.MAP
 
     module type INDEXES = sig
       type t
@@ -406,13 +403,13 @@ struct
       val path_length : int
 
       module Set : sig
-        include Set.S with type elt = t
+        include SET with type elt = t
 
         val encoding : t Data_encoding.t
       end
 
       module Map : sig
-        include Map.S with type key = t
+        include MAP with type key = t
 
         val encoding : 'a Data_encoding.t -> 'a t Data_encoding.t
       end
@@ -540,7 +537,12 @@ struct
     type error_category = [`Branch | `Temporary | `Permanent]
 
     include Error_core
-    include Tezos_error_monad.Monad_maker.Make (Error_core)
+    module Local_monad = Tezos_error_monad.Monad_maker.Make (TzTrace)
+    include Local_monad
+    include Tezos_error_monad.Monad_ext_maker.Make (Error_core) (TzTrace)
+              (Local_monad)
+
+    let ( >>|? ) = ( >|=? ) (* for backward compatibility *)
   end
 
   let () =
@@ -875,6 +877,8 @@ struct
     let register_resolver = Base58.register_resolver
 
     let complete ctxt s = Base58.complete ctxt s
+
+    let del = remove_rec
   end
 
   module Lift (P : Updater.PROTOCOL) = struct
@@ -922,6 +926,8 @@ struct
     let finalize_block c = finalize_block c >|= wrap_error
 
     let init c bh = init c bh >|= wrap_error
+
+    let environment_version = Protocol.V0
   end
 
   class ['chain, 'block] proto_rpc_context (t : Tezos_rpc.RPC_context.t)

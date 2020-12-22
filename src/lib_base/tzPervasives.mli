@@ -31,38 +31,37 @@ module Error_monad : module type of struct
   include Tezos_error_monad.Error_monad
 end
 
-include module type of struct
-  include Tezos_rpc
-end
+include module type of Tezos_rpc
 
-include module type of struct
-  include Tezos_clic
-end
+include module type of Tezos_clic
 
-include module type of struct
-  include Tezos_crypto
-end
+include module type of Tezos_crypto
 
 module Data_encoding = Data_encoding
+module Seq = Tezos_lwt_result_stdlib.Lwtreslib.Seq
+module Map = Tezos_lwt_result_stdlib.Lwtreslib.Map
+module Set = Tezos_lwt_result_stdlib.Lwtreslib.Set
+module Hashtbl = Tezos_lwt_result_stdlib.Lwtreslib.Hashtbl
+
+module Option : sig
+  include module type of Option
+
+  include module type of Tezos_stdlib.TzOption
+end
 
 module List : sig
-  include module type of struct
-    include List
-  end
+  include module type of List
 
-  include module type of struct
-    include Tezos_stdlib.TzList
-  end
+  include module type of Tezos_stdlib.TzList
 end
 
 module String : sig
-  include module type of struct
-    include String
-  end
+  include module type of String
 
-  include module type of struct
-    include Tezos_stdlib.TzString
-  end
+  include module type of Tezos_stdlib.TzString
+
+  module Hashtbl :
+    Tezos_lwt_result_stdlib.Lwtreslib.Hashtbl.SeededS with type key = t
 end
 
 module Time = Time
@@ -87,12 +86,16 @@ module P2p_rejection = P2p_rejection
 module Distributed_db_version = Distributed_db_version
 module Network_version = Network_version
 
-include module type of struct
-  include Utils.Infix
-end
+include module type of Utils.Infix
 
-include module type of struct
-  include Tezos_error_monad.Error_monad
-end
+include module type of Tezos_error_monad.Error_monad
 
 module Internal_event = Internal_event
+
+module Filename : sig
+  include module type of Filename
+
+  module Infix : sig
+    val ( // ) : string -> string -> string
+  end
+end

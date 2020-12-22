@@ -17,9 +17,7 @@ def scenario(contract, storage, time_between_blocks, proto):
         assert os.path.isfile(contract), f'{contract} is not a file'
     if storage is None:
         storage = 'unit'
-    with Sandbox(paths.TEZOS_HOME,
-                 constants.IDENTITIES,
-                 constants.GENESIS_PK) as sandbox:
+    with Sandbox(paths.TEZOS_HOME, constants.IDENTITIES) as sandbox:
         parameters = dict(constants.PARAMETERS)
         parameters["time_between_blocks"] = [str(time_between_blocks), "0"]
 

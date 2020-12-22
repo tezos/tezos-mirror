@@ -107,7 +107,7 @@ val private_node : ('msg, 'meta) t -> bool
     - [P2p_errors.Myself] if both hosts are the same peer *)
 val authenticate :
   canceler:Lwt_canceler.t ->
-  proof_of_work_target:Crypto_box.target ->
+  proof_of_work_target:Crypto_box.pow_target ->
   incoming:bool ->
   P2p_io_scheduler.connection ->
   P2p_point.Id.t ->
@@ -117,11 +117,11 @@ val authenticate :
   'meta P2p_params.conn_meta_config ->
   ('meta P2p_connection.Info.t * 'meta authenticated_connection) tzresult Lwt.t
 
-(** [kick ac motive alts] sends a [Nack] message with the rejection
+(** [nack ac motive alts] sends a [Nack] message with the rejection
     [motive] and a list of proposed
     alternative points to the remote peer, notifying it
     that its connection is rejected. It then closes the connection. *)
-val kick :
+val nack :
   'meta authenticated_connection ->
   P2p_rejection.t ->
   P2p_point.Id.t list ->
@@ -129,7 +129,7 @@ val kick :
 
 (** [Accepts] sends an [Ack message] to the remote peer and wait for an [Ack]
     from the remote peer to complete session set up. This can fail with errors:
-    - [P2p_errors.Rejected_socket_connection] on connection closed 
+    - [P2p_errors.Rejected_socket_connection] on connection closed
     - [P2p_errors.Rejected_by_nack] if [Nack] is received
     - [P2p_errors.Invalid_auth] thrown if [P2p_error.Decipher_error] *)
 val accept :
@@ -163,14 +163,6 @@ val write_now : ('msg, 'meta) t -> 'msg -> bool tzresult
 val write_sync : ('msg, 'meta) t -> 'msg -> unit tzresult Lwt.t
 
 (** {2 Input functions} *)
-
-(** [is_readable conn] is [true] iff [conn] internal read queue is not
-    empty. *)
-val is_readable : ('msg, 'meta) t -> bool
-
-(** (Cancelable) [wait_readable conn] returns when [conn]'s internal
-    read queue becomes readable (i.e. not empty). *)
-val wait_readable : ('msg, 'meta) t -> unit tzresult Lwt.t
 
 (** [read conn msg] returns when [msg] has successfully been popped
     from [conn]'s internal read queue or fails with a corresponding

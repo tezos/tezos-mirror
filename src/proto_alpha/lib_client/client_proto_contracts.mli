@@ -39,6 +39,9 @@ module ContractAlias : sig
     ('a, (#Client_context.wallet as 'wallet)) params ->
     (string * Contract.t -> 'a, 'wallet) params
 
+  val find_destination :
+    #Client_context.wallet -> string -> (string * Contract.t) tzresult Lwt.t
+
   val destination_param :
     ?name:string ->
     ?desc:string ->

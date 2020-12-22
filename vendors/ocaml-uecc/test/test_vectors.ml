@@ -1,17 +1,17 @@
 open Uecc
 open Vectors
 
-let bigstring_of_hex hex_str =
-  Cstruct.(to_bigarray (of_hex hex_str))
+let bytes_of_hex hex_str =
+  Cstruct.(to_bytes (of_hex hex_str))
 
 let msgs =
-  List.map bigstring_of_hex msgs
+  List.map bytes_of_hex msgs
 
 let keys =
   List.map begin fun (sk, pk) ->
     match
-      sk_of_bytes secp256r1 (bigstring_of_hex sk),
-      pk_of_bytes secp256r1 (bigstring_of_hex pk) with
+      sk_of_bytes (bytes_of_hex sk),
+      pk_of_bytes (bytes_of_hex pk) with
     | Some (sk, pk), Some pk' when pk = pk' -> sk, pk
     | _ -> failwith "invalid key"
   end keys
@@ -19,9 +19,9 @@ let keys =
 let sigs =
   List.map begin fun block ->
     List.map begin fun (r, s) ->
-      let r = bigstring_of_hex r in
-      let s = bigstring_of_hex s in
-      Bigstring.concat "" [r; s]
+      let r = bytes_of_hex r in
+      let s = bytes_of_hex s in
+      Bytes.cat r s
     end block
   end sigs
 

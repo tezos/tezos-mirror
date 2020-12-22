@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -52,6 +53,10 @@ type error += Block_not_invalid of Block_hash.t
 
 type error += Inconsistent_hash of Context_hash.t * Context_hash.t
 
+type error += Missing_block_metadata_hash of Block_hash.t
+
+type error += Missing_operation_metadata_hashes of Block_hash.t
+
 (******************* Bootstrap pipeline errors ****************************)
 
 type error += Invalid_locator of P2p_peer.Id.t * Block_locator.t
@@ -64,6 +69,8 @@ type protocol_error = Compilation_failed | Dynlinking_failed
 
 type error +=
   | Invalid_protocol of {hash : Protocol_hash.t; error : protocol_error}
+
+type error += Cannot_load_protocol of Protocol_hash.t
 
 (********************* Peer validator errors ******************************)
 

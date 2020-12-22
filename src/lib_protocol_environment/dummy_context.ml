@@ -28,7 +28,7 @@ module M = struct
 
   type key = string list
 
-  type value = MBytes.t
+  type value = Bytes.t
 
   let mem _ _ = assert false
 
@@ -40,9 +40,9 @@ module M = struct
 
   let copy _ ~from:_ ~to_:_ = assert false
 
-  let del _ _ = assert false
-
   let remove_rec _ _ = assert false
+
+  type key_or_dir = [`Key of key | `Dir of key]
 
   let fold _ _ ~init:_ ~f:_ = assert false
 

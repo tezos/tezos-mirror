@@ -23,9 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let lwt_emit = Node_data_version_state.lwt_emit
-
-let ( // ) = Filename.concat
+open Filename.Infix
 
 type t = string
 
@@ -155,6 +153,63 @@ let () =
           None)
     (fun (expected, actual) -> Data_dir_needs_upgrade {expected; actual})
 
+module Events = struct
+  open Internal_event.Simple
+
+  let section = ["node_data_version"]
+
+  let dir_is_up_to_date =
+    declare_0
+      ~section
+      ~level:Notice
+      ~name:"dir_is_up_to_date"
+      ~msg:"node data dir is up-to-date"
+      ()
+
+  let upgrading_node =
+    declare_2
+      ~section
+      ~level:Notice
+      ~name:"upgrading_node"
+      ~msg:"upgrading data directory from {old_version} to {new_version}"
+      ~pp1:Format.pp_print_string
+      ("old_version", Data_encoding.string)
+      ~pp2:Format.pp_print_string
+      ("new_version", Data_encoding.string)
+
+  let update_success =
+    declare_0
+      ~section
+      ~level:Notice
+      ~name:"update_success"
+      ~msg:"the node data dir is now up-to-date"
+      ()
+
+  let aborting_upgrade =
+    declare_1
+      ~section
+      ~level:Notice
+      ~name:"aborting_upgrade"
+      ~msg:"failed to upgrade storage: {error}"
+      ~pp1:Error_monad.pp_print_error
+      ("error", Error_monad.trace_encoding)
+
+  let upgrade_status =
+    declare_2
+      ~section
+      ~level:Notice
+      ~name:"upgrade_status"
+      ~msg:
+        "current version: {current_version}, available version: \
+         {available_version}"
+      ~pp1:Format.pp_print_string
+      ("current_version", Data_encoding.string)
+      ~pp2:Format.pp_print_string
+      ("available_version", Data_encoding.string)
+
+  let emit = Internal_event.Simple.emit
+end
+
 let version_file data_dir = Filename.concat data_dir version_file_name
 
 let clean_directory files =
@@ -244,22 +299,18 @@ let upgrade_data_dir data_dir =
   ensure_data_dir false data_dir
   >>=? function
   | None ->
-      lwt_emit Dir_is_up_to_date >>= fun () -> return_unit
+      Events.(emit dir_is_up_to_date ()) >>= fun () -> return_unit
   | Some (version, upgrade) -> (
-      lwt_emit (Upgrading_node (version, data_version))
+      Events.(emit upgrading_node (version, data_version))
       >>= fun () ->
       upgrade ~data_dir
       >>= function
       | Ok () ->
           write_version_file data_dir
-          >>=? fun () -> lwt_emit Update_success >>= fun () -> return_unit
+          >>=? fun () ->
+          Events.(emit update_success ()) >>= fun () -> return_unit
       | Error e ->
-          Format.kasprintf
-            (fun errs -> lwt_emit (Aborting_upgrade errs))
-            "%a"
-            Error_monad.pp_print_error
-            e
-          >>= fun () -> return_unit )
+          Events.(emit aborting_upgrade e) >>= fun () -> return_unit )
 
 let ensure_data_dir ?(bare = false) data_dir =
   ensure_data_dir bare data_dir
@@ -272,16 +323,5 @@ let ensure_data_dir ?(bare = false) data_dir =
 let upgrade_status data_dir =
   read_version_file (version_file data_dir)
   >>=? fun data_dir_version ->
-  let upgradable_status =
-    match List.assoc_opt data_dir_version upgradable_data_version with
-    | Some _upgr ->
-        true
-    | None ->
-        false
-  in
-  let available_version =
-    if upgradable_status then Some data_version else None
-  in
-  lwt_emit
-    (Upgrade_status (upgradable_status, data_dir_version, available_version))
+  Events.(emit upgrade_status (data_dir_version, data_version))
   >>= fun () -> return_unit

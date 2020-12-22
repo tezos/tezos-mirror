@@ -47,7 +47,7 @@ module Configuration_directory = struct
       ~content:
         (sprintf
            "--config-file %s --private-mode --no-bootstrap-peers %s  \
-            --bootstrap-threshold 0 --connections %d --sandbox %s"
+            --synchronisation-threshold 0 --connections %d --sandbox %s"
            (absolutize node_config)
            ( List.map peers ~f:(sprintf "--peer 127.0.0.1:%d")
            |> String.concat ~sep:" " )

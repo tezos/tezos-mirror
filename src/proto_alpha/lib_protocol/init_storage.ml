@@ -52,8 +52,6 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
       Storage.Block_priority.init ctxt 0
       >>=? fun ctxt ->
       Vote_storage.freeze_listings ctxt >>=? fun ctxt -> return ctxt
-  | Alpha_previous ->
-      return ctxt
   | Carthage_006 ->
       return ctxt
 

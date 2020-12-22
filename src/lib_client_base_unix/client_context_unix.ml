@@ -125,11 +125,14 @@ class unix_prompter : Client_context.prompter =
           return line)
 
     method prompt_password : type a.
-        (a, Bigstring.t tzresult) Client_context.lwt_format -> a =
+        (a, Bytes.t tzresult) Client_context.lwt_format -> a =
       Format.kasprintf (fun msg ->
           print_string msg ;
-          let line = Lwt_utils_unix.getpass () in
-          return (Bigstring.of_string line))
+          let line =
+            if Unix.isatty Unix.stdin then Lwt_utils_unix.getpass ()
+            else read_line ()
+          in
+          return (Bytes.of_string line))
   end
 
 class unix_logger ~base_dir : Client_context.printer =
@@ -141,7 +144,7 @@ class unix_logger ~base_dir : Client_context.printer =
     | "stderr" ->
         prerr_endline msg ; Lwt.return_unit
     | log ->
-        let ( // ) = Filename.concat in
+        let open Filename.Infix in
         Lwt_utils_unix.create_dir (base_dir // "logs" // log)
         >>= fun () ->
         Lwt_io.with_file
@@ -157,6 +160,8 @@ class unix_logger ~base_dir : Client_context.printer =
 class unix_ui : Client_context.ui =
   object
     method sleep f = Lwt_unix.sleep f
+
+    method exit : 'a. int -> 'a = fun i -> Lwt_exit.exit_and_raise i
 
     method now = Tezos_stdlib_unix.Systime_os.now
   end
@@ -183,7 +188,7 @@ class unix_full ~base_dir ~chain ~block ~confirmations ~password_filename
     method confirmations = confirmations
   end
 
-class unix_mockup ~base_dir ~mem_only ~mockup_env ~rpc_context :
+class unix_mockup ~base_dir ~mem_only ~mockup_env ~chain_id ~rpc_context :
   Client_context.full =
   object
     inherit unix_logger ~base_dir
@@ -194,11 +199,11 @@ class unix_mockup ~base_dir ~mem_only ~mockup_env ~rpc_context :
 
     inherit
       Tezos_mockup.RPC_client.local_ctxt
-        base_dir mem_only mockup_env rpc_context
+        base_dir mem_only mockup_env chain_id rpc_context
 
     inherit unix_ui
 
-    method chain = `Main
+    method chain = `Hash chain_id
 
     method block = `Head 0
 

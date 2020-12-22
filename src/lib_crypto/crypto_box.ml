@@ -33,33 +33,27 @@ type public_key = public Box.key
 
 type channel_key = Box.combined Box.key
 
-type nonce = Bigstring.t
+type nonce = Bytes.t
 
-type target = Z.t
+type pow_target = Z.t
 
 module Secretbox = struct
-  include Secretbox
+  include Hacl.Secretbox
 
-  let box_noalloc key nonce msg = box ~key ~nonce ~msg ~cmsg:msg
-
-  let box_open_noalloc key nonce cmsg = box_open ~key ~nonce ~cmsg ~msg:cmsg
-
-  let box key msg nonce =
+  let secretbox key msg nonce =
     let msglen = Bytes.length msg in
-    let cmsg = Bigstring.make (msglen + zerobytes) '\x00' in
-    Bigstring.blit_of_bytes msg 0 cmsg zerobytes msglen ;
-    box ~key ~nonce ~msg:cmsg ~cmsg ;
-    Bigstring.sub cmsg boxzerobytes (msglen + zerobytes - boxzerobytes)
+    let cmsg = Bytes.create (msglen + tagbytes) in
+    secretbox ~key ~nonce ~msg ~cmsg ;
+    cmsg
 
-  let box_open key cmsg nonce =
-    let cmsglen = Bigstring.length cmsg in
-    let msg = Bigstring.make (cmsglen + boxzerobytes) '\x00' in
-    Bigstring.blit cmsg 0 msg boxzerobytes cmsglen ;
-    match box_open ~key ~nonce ~cmsg:msg ~msg with
+  let secretbox_open key cmsg nonce =
+    let cmsglen = Bytes.length cmsg in
+    let msg = Bytes.create (cmsglen - tagbytes) in
+    match secretbox_open ~key ~nonce ~cmsg ~msg with
     | false ->
         None
     | true ->
-        Some (Bigstring.sub_bytes msg zerobytes (cmsglen - boxzerobytes))
+        Some msg
 end
 
 module Public_key_hash =
@@ -77,18 +71,15 @@ module Public_key_hash =
 
 let () = Base58.check_encoded_prefix Public_key_hash.b58check_encoding "id" 30
 
-let hash pk =
-  Public_key_hash.hash_bytes [Bigstring.to_bytes (Box.unsafe_to_bytes pk)]
+let hash pk = Public_key_hash.hash_bytes [Box.unsafe_to_bytes pk]
 
-let zerobytes = Box.zerobytes
-
-let boxzerobytes = Box.boxzerobytes
+let tag_length = Box.tagbytes
 
 let random_keypair () =
   let (pk, sk) = Box.keypair () in
   (sk, pk, hash pk)
 
-let zero_nonce = Bigstring.make Nonce.bytes '\x00'
+let zero_nonce = Bytes.make Nonce.size '\x00'
 
 let random_nonce = Nonce.gen
 
@@ -96,8 +87,8 @@ let increment_nonce = Nonce.increment
 
 let generate_nonce bytes_list =
   let hash = Blake2B.hash_bytes bytes_list in
-  let s = Bigstring.of_bytes (Blake2B.to_bytes hash) in
-  Nonce.of_bytes_exn @@ Bigstring.sub s 0 Nonce.bytes
+  let s = Blake2B.to_bytes hash in
+  Nonce.of_bytes_exn @@ Bytes.sub s 0 Nonce.size
 
 let init_to_resp_seed = Bytes.of_string "Init -> Resp"
 
@@ -118,39 +109,27 @@ let generate_nonces ~incoming ~sent_msg ~recv_msg =
 
 let precompute sk pk = Box.dh pk sk
 
-let fast_box_noalloc k nonce bmsg =
-  let msg = Bigstring.of_bytes bmsg in
-  Box.box ~k ~nonce ~msg ~cmsg:msg ;
-  Bigstring.blit_to_bytes msg 0 bmsg 0 (Bytes.length bmsg)
+let fast_box_noalloc k nonce tag buf = Box.box_noalloc ~k ~nonce ~buf ~tag
 
-let fast_box_open_noalloc k nonce bcmsg =
-  let cmsg = Bigstring.of_bytes bcmsg in
-  if Box.box_open ~k ~nonce ~cmsg ~msg:cmsg then (
-    Bigstring.blit_to_bytes cmsg 0 bcmsg 0 (Bytes.length bcmsg) ;
-    true )
-  else false
+let fast_box_open_noalloc k nonce tag buf =
+  Box.box_open_noalloc ~k ~nonce ~buf ~tag
 
-let fast_box k msg nonce =
-  let msglen = Bigstring.length msg in
-  let cmsg = Bigstring.make (msglen + zerobytes) '\x00' in
-  Bigstring.blit msg 0 cmsg zerobytes msglen ;
-  Box.box ~k ~nonce ~msg:cmsg ~cmsg ;
+let fast_box k nonce msg =
+  let cmsg = Bytes.create (Bytes.length msg + tag_length) in
+  Box.box ~k ~nonce ~msg ~cmsg ;
   cmsg
 
-let fast_box_open k cmsg nonce =
-  let cmsglen = Bigstring.length cmsg in
-  let msg = Bigstring.make cmsglen '\x00' in
-  match Box.box_open ~k ~nonce ~cmsg ~msg with
-  | false ->
-      None
-  | true ->
-      Some (Bigstring.sub msg zerobytes (cmsglen - zerobytes))
+let fast_box_open k nonce cmsg =
+  let cmsglen = Bytes.length cmsg in
+  assert (cmsglen >= tag_length) ;
+  let msg = Bytes.create (cmsglen - tag_length) in
+  if Box.box_open ~k ~nonce ~cmsg ~msg then Some msg else None
 
-let compare_target hash target =
+let compare_pow_target hash pow_target =
   let hash = Z.of_bits (Blake2B.to_string hash) in
-  Z.compare hash target <= 0
+  Z.compare hash pow_target <= 0
 
-let make_target f =
+let make_pow_target f =
   if f < 0. || 256. < f then invalid_arg "Cryptobox.target_of_float" ;
   let (frac, shift) = modf f in
   let shift = int_of_float shift in
@@ -166,43 +145,65 @@ let make_target f =
       (Z.pred @@ Z.shift_left Z.one (202 - shift))
   else Z.shift_right m (shift - 202)
 
-let default_target = make_target 24.
+let default_pow_target = make_pow_target 24.
 
-let check_proof_of_work pk nonce target =
-  let hash =
-    Blake2B.hash_bytes
-      [Bigstring.to_bytes (Box.unsafe_to_bytes pk); Bigstring.to_bytes nonce]
-  in
-  compare_target hash target
+let target_0 = make_pow_target 0.
 
-let generate_proof_of_work ?max pk target =
-  let may_interupt =
-    match max with
-    | None ->
-        fun _ -> ()
-    | Some max ->
-        fun cpt -> if max < cpt then raise Not_found
-  in
-  let rec loop nonce cpt =
-    may_interupt cpt ;
-    if check_proof_of_work pk nonce target then nonce
-    else loop (Nonce.increment nonce) (cpt + 1)
+let check_proof_of_work pk nonce pow_target =
+  let hash = Blake2B.hash_bytes [Box.unsafe_to_bytes pk; nonce] in
+  compare_pow_target hash pow_target
+
+(* This is the non-yielding function to generate an identity. It performs a
+   bounded number of attempts ([n]). This function is not exported. Instead, the
+   wrapper below, [generate_proof_of_work], uses this function repeatedly but it
+   intersperses calls to [Lwt.pause] to yield explicitly. *)
+let generate_proof_of_work_n_attempts n pk pow_target =
+  let rec loop nonce attempts =
+    if attempts > n then raise Not_found
+    else if check_proof_of_work pk nonce pow_target then nonce
+    else loop (Nonce.increment nonce) (attempts + 1)
   in
   loop (random_nonce ()) 0
 
-let public_key_to_bytes pk = Bigstring.to_bytes (Box.unsafe_to_bytes pk)
+let generate_proof_of_work_with_target_0 pk =
+  generate_proof_of_work_n_attempts 1 pk target_0
 
-let public_key_of_bytes buf = Box.unsafe_pk_of_bytes (Bigstring.of_bytes buf)
+let rec generate_proof_of_work ?(yield_every = 10000) ?max pk pow_target =
+  let open Lwt.Infix in
+  match max with
+  | None -> (
+    try
+      let pow = generate_proof_of_work_n_attempts yield_every pk pow_target in
+      Lwt.return pow
+    with Not_found ->
+      Lwt.pause ()
+      >>= fun () -> generate_proof_of_work ~yield_every pk pow_target )
+  | Some max -> (
+      if max <= 0 then Lwt.apply raise Not_found
+      else
+        let attempts = min max yield_every in
+        try
+          let pow = generate_proof_of_work_n_attempts attempts pk pow_target in
+          Lwt.return pow
+        with Not_found ->
+          Lwt.pause ()
+          >>= fun () ->
+          let max = max - attempts in
+          generate_proof_of_work ~yield_every ~max pk pow_target )
+
+let public_key_to_bytes pk = Bytes.copy (Box.unsafe_to_bytes pk)
+
+let public_key_of_bytes buf = Box.unsafe_pk_of_bytes (Bytes.copy buf)
 
 let public_key_size = Box.pkbytes
 
-let secret_key_to_bytes sk = Bigstring.to_bytes (Box.unsafe_to_bytes sk)
+let secret_key_to_bytes sk = Bytes.copy (Box.unsafe_to_bytes sk)
 
-let secret_key_of_bytes buf = Box.unsafe_sk_of_bytes (Bigstring.of_bytes buf)
+let secret_key_of_bytes buf = Box.unsafe_sk_of_bytes (Bytes.copy buf)
 
 let secret_key_size = Box.skbytes
 
-let nonce_size = Nonce.bytes
+let nonce_size = Nonce.size
 
 let public_key_encoding =
   let open Data_encoding in
@@ -212,9 +213,7 @@ let secret_key_encoding =
   let open Data_encoding in
   conv secret_key_to_bytes secret_key_of_bytes (Fixed.bytes secret_key_size)
 
-let nonce_encoding =
-  let open Data_encoding in
-  conv Bigstring.to_bytes Bigstring.of_bytes (Fixed.bytes nonce_size)
+let nonce_encoding = Fixed.bytes nonce_size
 
 let neuterize : secret_key -> public_key = Box.neuterize
 

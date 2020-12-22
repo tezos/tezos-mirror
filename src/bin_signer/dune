@@ -3,6 +3,7 @@
  (public_names tezos-signer)
  (package tezos-signer)
  (libraries tezos-base
+            tezos-base.unix
             tezos-client-base
             tezos-client-base-unix
             tezos-client-commands
@@ -22,7 +23,7 @@
                    -open Tezos_stdlib_unix
                    -open Tezos_stdlib)))
 
-(alias
- (name runtest_lint)
+(rule
+ (alias runtest_lint)
  (deps (glob_files *.ml{,i}))
  (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

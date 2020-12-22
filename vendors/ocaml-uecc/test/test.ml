@@ -5,32 +5,15 @@ let nb_iterations = 10
 
 let checki = check int
 
-let test_sksize () =
-  checki __LOC__ 21 (sk_size secp160r1) ;
-  checki __LOC__ 24 (sk_size secp192r1) ;
-  checki __LOC__ 28 (sk_size secp224r1) ;
-  checki __LOC__ 32 (sk_size secp256r1) ;
-  checki __LOC__ 32 (sk_size secp256k1) ;
-  ()
-
-let test_pksize () =
-  checki __LOC__ 40 (pk_size secp160r1) ;
-  checki __LOC__ 48 (pk_size secp192r1) ;
-  checki __LOC__ 56 (pk_size secp224r1) ;
-  checki __LOC__ 64 (pk_size secp256r1) ;
-  checki __LOC__ 64 (pk_size secp256k1) ;
-  ()
-
-let test_export_curve curve =
-  match keypair curve with
+let test_export_p256 () =
+  match keypair () with
   | None -> assert false
   | Some (sk, pk) ->
       let sk_bytes = to_bytes ~compress:false sk in
       let pk_bytes = to_bytes ~compress:false pk in
-      checki __LOC__ (sk_size curve) (Bigstring.length sk_bytes) ;
-      checki __LOC__ (pk_size curve + 1) (Bigstring.length pk_bytes) ;
-      match sk_of_bytes curve sk_bytes,
-            pk_of_bytes curve pk_bytes with
+      checki __LOC__ sk_size (Bytes.length sk_bytes) ;
+      checki __LOC__ (pk_size + 1) (Bytes.length pk_bytes) ;
+      match sk_of_bytes sk_bytes, pk_of_bytes pk_bytes with
       | Some (sk', pk'), Some pk'' ->
           assert (equal sk sk') ;
           assert (equal pk pk') ;
@@ -38,29 +21,21 @@ let test_export_curve curve =
           assert (equal pk' pk') ;
       | _ -> assert false
 
-let test_export_curve curve =
+let test_export_p256 () =
   for _i = 0 to nb_iterations - 1 do
-    test_export_curve curve
+    test_export_p256 ()
   done
 
-let test_export () =
-  test_export_curve secp160r1 ;
-  test_export_curve secp192r1 ;
-  test_export_curve secp224r1 ;
-  test_export_curve secp256r1 ;
-  test_export_curve secp256k1 ;
-  ()
-
-let test_export_curve_compressed curve =
-  match keypair curve with
+let test_export_p256_compressed () =
+  match keypair () with
   | None -> assert false
   | Some (sk, pk) ->
       let sk_bytes = to_bytes sk in
       let pk_bytes = to_bytes pk in
-      checki __LOC__ (sk_size curve) (Bigstring.length sk_bytes) ;
-      checki __LOC__ (compressed_size curve) (Bigstring.length pk_bytes) ;
-      match sk_of_bytes curve sk_bytes,
-            pk_of_bytes curve pk_bytes with
+      checki __LOC__ sk_size (Bytes.length sk_bytes) ;
+      checki __LOC__ compressed_size (Bytes.length pk_bytes) ;
+      match sk_of_bytes sk_bytes,
+            pk_of_bytes pk_bytes with
       | Some (sk', pk'), Some pk'' ->
           assert (equal sk sk') ;
           assert (equal pk pk') ;
@@ -68,20 +43,12 @@ let test_export_curve_compressed curve =
           assert (equal pk' pk') ;
       | _ -> assert false
 
-let test_export_curve_compressed curve =
+let test_export_p256_compressed () =
   for _i = 0 to nb_iterations - 1 do
-    test_export_curve_compressed curve
+    test_export_p256_compressed ()
   done
 
-let test_export_compressed () =
-  test_export_curve_compressed secp160r1 ;
-  test_export_curve_compressed secp192r1 ;
-  test_export_curve_compressed secp224r1 ;
-  test_export_curve_compressed secp256r1 ;
-  test_export_curve_compressed secp256k1 ;
-  ()
-
-let test_keypair_curve curve =
+let test_keypair_p256 curve =
   match keypair curve with
   | None -> assert false
   | Some (sk, pk) ->
@@ -90,52 +57,21 @@ let test_keypair_curve curve =
       let pk' = neuterize sk in
       assert (equal pk pk')
 
-let test_keypair_curve curve =
+let test_keypair_p256 curve =
   for _i = 0 to nb_iterations - 1 do
-    test_keypair_curve curve
+    test_keypair_p256 curve
   done
-
-let test_keypair () =
-  test_keypair_curve secp160r1 ;
-  test_keypair_curve secp192r1 ;
-  test_keypair_curve secp224r1 ;
-  test_keypair_curve secp256r1 ;
-  test_keypair_curve secp256k1 ;
-  ()
-
-let test_dh_curve curve =
-  match keypair curve, keypair curve with
-  | Some (sk, pk), Some (sk', pk') ->
-      begin match dh sk pk', dh sk' pk with
-        | Some secret, Some secret' ->
-            assert (Bigstring.equal secret secret')
-        | _ -> assert false
-      end
-  | _ -> assert false
-
-let test_dh_curve curve =
-  for _i = 0 to nb_iterations - 1 do
-    test_dh_curve curve
-  done
-
-let test_dh () =
-  test_dh_curve secp160r1 ;
-  test_dh_curve secp192r1 ;
-  test_dh_curve secp224r1 ;
-  test_dh_curve secp256r1 ;
-  test_dh_curve secp256k1 ;
-  ()
 
 let msg =
-  Bigstring.of_string "Voulez-vous coucher avec moi, ce soir ?"
+  Bytes.of_string "Voulez-vous coucher avec moi, ce soir ?"
 
-let test_sign_curve curve =
-  match keypair curve with
+let test_sign_p256 () =
+  match keypair () with
   | None -> assert false
   | Some (sk, pk) ->
-      let signature = Bigstring.create (pk_size curve) in
+      let signature = Bytes.create pk_size in
       begin match write_sign sk signature ~msg with
-        | nb_written when nb_written = (pk_size curve) ->
+        | nb_written when nb_written = pk_size ->
             assert (verify pk ~msg ~signature)
         | _ -> assert false
       end ;
@@ -144,27 +80,15 @@ let test_sign_curve curve =
       | Some signature ->
           assert (verify pk ~msg ~signature)
 
-let test_sign_curve curve =
+let test_sign_p256 () =
   for _i = 0 to nb_iterations - 1 do
-    test_sign_curve curve
+    test_sign_p256 ()
   done
 
-let test_sign () =
-  test_sign_curve secp160r1 ;
-  test_sign_curve secp192r1 ;
-  test_sign_curve secp224r1 ;
-  test_sign_curve secp256r1 ;
-  test_sign_curve secp256k1 ;
-  ()
-
 let basic = [
-  "sksize", `Quick, test_sksize ;
-  "pksize", `Quick, test_pksize ;
-  "export", `Quick, test_export ;
-  "export_compressed", `Quick, test_export_compressed ;
-  "keypair", `Quick, test_keypair ;
-  "dh", `Quick, test_dh ;
-  (* "sign", `Quick, test_sign ; *)
+  "export", `Quick, test_export_p256 ;
+  "export_compressed", `Quick, test_export_p256_compressed ;
+  "keypair", `Quick, test_keypair_p256 ;
 ]
 
 let () =

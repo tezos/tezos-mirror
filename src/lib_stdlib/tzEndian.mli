@@ -41,7 +41,11 @@ val get_int64 : bytes -> int -> int64
 
 val get_uint8 : bytes -> int -> int
 
+val set_uint8 : bytes -> int -> int -> unit
+
 val get_uint16 : bytes -> int -> int
+
+val set_uint16 : bytes -> int -> int -> unit
 
 val set_double : bytes -> int -> float -> unit
 

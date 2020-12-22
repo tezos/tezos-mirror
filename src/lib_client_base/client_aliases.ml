@@ -45,6 +45,8 @@ module type Alias = sig
 
   type fresh_param
 
+  val encoding : t Data_encoding.t
+
   val load : #Client_context.wallet -> (string * t) list tzresult Lwt.t
 
   val set : #Client_context.wallet -> (string * t) list -> unit tzresult Lwt.t
@@ -54,6 +56,8 @@ module type Alias = sig
   val find_opt : #Client_context.wallet -> string -> t option tzresult Lwt.t
 
   val rev_find : #Client_context.wallet -> t -> string option tzresult Lwt.t
+
+  val rev_find_all : #Client_context.wallet -> t -> string list tzresult Lwt.t
 
   val name : #Client_context.wallet -> t -> string tzresult Lwt.t
 
@@ -125,29 +129,30 @@ module Alias (Entity : Entity) = struct
     | Error _ -> return_nil | Ok list -> return (List.map fst list)
 
   let find_opt (wallet : #wallet) name =
-    load wallet
-    >>=? fun list ->
-    try return_some (List.assoc name list) with Not_found -> return_none
+    load wallet >|=? fun list -> List.assoc_opt name list
 
   let find (wallet : #wallet) name =
     load wallet
     >>=? fun list ->
-    try return (List.assoc name list)
-    with Not_found -> failwith "no %s alias named %s" Entity.name name
+    match List.assoc_opt name list with
+    | Some v ->
+        return v
+    | None ->
+        failwith "no %s alias named %s" Entity.name name
 
   let rev_find (wallet : #wallet) v =
     load wallet
-    >>=? fun list ->
-    try return_some (List.find (fun (_, v') -> v = v') list |> fst)
-    with Not_found -> return_none
+    >|=? fun list ->
+    Option.map fst @@ List.find_opt (fun (_, v') -> v = v') list
 
-  let mem (wallet : #wallet) name =
+  let rev_find_all (wallet : #wallet) v =
     load wallet
     >>=? fun list ->
-    try
-      ignore (List.assoc name list) ;
-      return_true
-    with Not_found -> return_false
+    return
+      (List.filter_map (fun (n, v') -> if v = v' then Some n else None) list)
+
+  let mem (wallet : #wallet) name =
+    load wallet >|=? fun list -> List.mem_assoc name list
 
   let add ~force (wallet : #wallet) name value =
     let keep = ref false in

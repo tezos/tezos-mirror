@@ -123,8 +123,7 @@ struct
         ()
         ()
 
-    let neuterize uri =
-      return (Client_keys.make_pk_uri (uri : sk_uri :> Uri.t))
+    let neuterize uri = Client_keys.make_pk_uri (uri : sk_uri :> Uri.t)
 
     let public_key_hash uri =
       public_key uri

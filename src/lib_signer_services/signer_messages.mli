@@ -49,7 +49,7 @@ module Deterministic_nonce : sig
   module Request : Authenticated_request
 
   module Response : sig
-    type t = Bigstring.t
+    type t = Bytes.t
 
     val encoding : t Data_encoding.t
   end

@@ -131,14 +131,31 @@ let rec create_dir ?(perm = 0o755) dir =
           Stdlib.failwith "Not a directory" )
 
 let safe_close fd =
-  Lwt.catch (fun () -> Lwt_unix.close fd) (fun _ -> Lwt.return_unit)
+  Lwt.catch
+    (fun () -> Lwt_unix.close fd >>= fun () -> return_unit)
+    (fun exc -> fail (Exn exc))
 
 let create_file ?(perm = 0o644) name content =
   Lwt_unix.openfile name Unix.[O_TRUNC; O_CREAT; O_WRONLY] perm
   >>= fun fd ->
-  Lwt.finalize
+  Lwt.try_bind
     (fun () -> Lwt_unix.write_string fd content 0 (String.length content))
-    (fun () -> safe_close fd)
+    (fun v ->
+      safe_close fd
+      >>= function
+      | Error trace ->
+          Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace ;
+          Lwt.return v
+      | Ok () ->
+          Lwt.return v)
+    (fun exc ->
+      safe_close fd
+      >>= function
+      | Error trace ->
+          Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace ;
+          raise exc
+      | Ok () ->
+          raise exc)
 
 let read_file fn = Lwt_io.with_file fn ~mode:Input (fun ch -> Lwt_io.read ch)
 
@@ -160,7 +177,7 @@ let getaddrinfo ~passive ~node ~service =
     (AI_SOCKTYPE SOCK_STREAM :: (if passive then [AI_PASSIVE] else []))
   >>= fun addr ->
   let points =
-    TzList.filter_map (fun {ai_addr; _} -> of_sockaddr ai_addr) addr
+    List.filter_map (fun {ai_addr; _} -> of_sockaddr ai_addr) addr
   in
   Lwt.return points
 
@@ -214,162 +231,6 @@ let with_tempdir name f =
   Lwt_unix.mkdir base_dir 0o700
   >>= fun () ->
   Lwt.finalize (fun () -> f base_dir) (fun () -> remove_dir base_dir)
-
-module Socket = struct
-  type addr =
-    | Unix of string
-    | Tcp of string * string * Unix.getaddrinfo_option list
-
-  let handle_litteral_ipv6 host =
-    (* To strip '[' and ']' when a litteral IPv6 is provided *)
-    match Ipaddr.of_string host with
-    | Error (`Msg _) ->
-        host
-    | Ok ipaddr ->
-        Ipaddr.to_string ipaddr
-
-  let connect ?(timeout = !default_net_timeout) = function
-    | Unix path ->
-        let addr = Lwt_unix.ADDR_UNIX path in
-        let sock = Lwt_unix.socket PF_UNIX SOCK_STREAM 0 in
-        Lwt_unix.connect sock addr >>= fun () -> return sock
-    | Tcp (host, service, opts) -> (
-        let host = handle_litteral_ipv6 host in
-        Lwt_unix.getaddrinfo host service opts
-        >>= function
-        | [] ->
-            failwith "could not resolve host '%s'" host
-        | addrs ->
-            let rec try_connect acc = function
-              | [] ->
-                  Lwt.return
-                    (Error
-                       ( failure "could not connect to '%s'" host
-                       :: List.rev acc ))
-              | {Unix.ai_family; ai_socktype; ai_protocol; ai_addr; _} :: addrs
-                -> (
-                  let sock =
-                    Lwt_unix.socket ai_family ai_socktype ai_protocol
-                  in
-                  protect
-                    ~on_error:(fun e ->
-                      Lwt_unix.close sock >>= fun () -> Lwt.return_error e)
-                    (fun () ->
-                      Lwt_unix.with_timeout
-                        (Ptime.Span.to_float_s timeout)
-                        (fun () ->
-                          Lwt_unix.connect sock ai_addr
-                          >>= fun () -> return sock))
-                  >>= function
-                  | Ok sock ->
-                      return sock
-                  | Error e ->
-                      try_connect (e @ acc) addrs )
-            in
-            try_connect [] addrs )
-
-  let with_connection ?timeout addr f =
-    connect ?timeout addr
-    >>=? fun conn ->
-    protect
-      (fun () -> f conn >>=? fun a -> safe_close conn >>= fun () -> return a)
-      ~on_error:(fun e -> safe_close conn >>= fun () -> Lwt.return (Error e))
-
-  let bind ?(backlog = 10) = function
-    | Unix path ->
-        let addr = Lwt_unix.ADDR_UNIX path in
-        let sock = Lwt_unix.socket PF_UNIX SOCK_STREAM 0 in
-        Lwt_unix.bind sock addr
-        >>= fun () ->
-        Lwt_unix.listen sock backlog ;
-        return [sock]
-    | Tcp (host, service, opts) -> (
-        Lwt_unix.getaddrinfo
-          (handle_litteral_ipv6 host)
-          service
-          (AI_PASSIVE :: opts)
-        >>= function
-        | [] ->
-            failwith "could not resolve host '%s'" host
-        | addrs ->
-            let do_bind {Unix.ai_family; ai_socktype; ai_protocol; ai_addr; _}
-                =
-              let sock = Lwt_unix.socket ai_family ai_socktype ai_protocol in
-              Lwt_unix.setsockopt sock SO_REUSEADDR true ;
-              Lwt_unix.bind sock ai_addr
-              >>= fun () ->
-              Lwt_unix.listen sock backlog ;
-              return sock
-            in
-            map_s do_bind addrs )
-
-  type error += Encoding_error | Decoding_error
-
-  let () =
-    register_error_kind
-      `Permanent
-      ~id:"signer.encoding_error"
-      ~title:"Encoding_error"
-      ~description:"Error while encoding a remote signer message"
-      ~pp:(fun ppf () ->
-        Format.fprintf ppf "Could not encode a remote signer message")
-      Data_encoding.empty
-      (function Encoding_error -> Some () | _ -> None)
-      (fun () -> Encoding_error) ;
-    register_error_kind
-      `Permanent
-      ~id:"signer.decoding_error"
-      ~title:"Decoding_error"
-      ~description:"Error while decoding a remote signer message"
-      ~pp:(fun ppf () ->
-        Format.fprintf ppf "Could not decode a remote signer message")
-      Data_encoding.empty
-      (function Decoding_error -> Some () | _ -> None)
-      (fun () -> Decoding_error)
-
-  let message_len_size = 2
-
-  let send fd encoding message =
-    let encoded_message_len = Data_encoding.Binary.length encoding message in
-    fail_unless
-      (encoded_message_len < 1 lsl (message_len_size * 8))
-      Encoding_error
-    >>=? fun () ->
-    (* len is the length of int16 plus the length of the message we want to send *)
-    let len = message_len_size + encoded_message_len in
-    let buf = Bytes.create len in
-    match
-      Data_encoding.Binary.write_opt
-        encoding
-        message
-        buf
-        message_len_size
-        encoded_message_len
-    with
-    | None ->
-        fail Encoding_error
-    | Some last ->
-        fail_unless (last = len) Encoding_error
-        >>=? fun () ->
-        (* we set the beginning of the buf with the length of what is next *)
-        TzEndian.set_int16 buf 0 encoded_message_len ;
-        protect (fun () -> write_bytes fd buf >|= ok)
-
-  let recv ?timeout fd encoding =
-    let header_buf = Bytes.create message_len_size in
-    protect (fun () ->
-        read_bytes ?timeout ~len:message_len_size fd header_buf >|= ok)
-    >>=? fun () ->
-    let len = TzEndian.get_uint16 header_buf 0 in
-    let buf = Bytes.create len in
-    protect (fun () -> read_bytes ?timeout ~len fd buf >|= ok)
-    >>=? fun () ->
-    match Data_encoding.Binary.read_opt encoding buf 0 len with
-    | None ->
-        fail Decoding_error
-    | Some (read_len, message) ->
-        if read_len <> len then fail Decoding_error else return message
-end
 
 let rec retry ?(log = fun _ -> Lwt.return_unit) ?(n = 5) ?(sleep = 1.) f =
   f ()

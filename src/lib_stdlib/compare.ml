@@ -116,11 +116,53 @@ module Bool = Make (struct
   let compare = Stdlib.compare
 end)
 
-module Int = Make (struct
+module Int = struct
   type t = int
 
-  let compare = Stdlib.compare
-end)
+  (**
+
+     Integer comparisons are ubiquitous and must be efficiently
+     compiled. The OCaml compiler provides the following builtin
+     externals to make sure that aliases to integer comparisons are
+     properly detected.
+
+     Moving from the generic comparison, which ultimately calls the C
+     function caml_compare, to these builtins divides execution time
+     by one or two orders of magnitude.
+
+     This optimization is especially important in critical routines
+     like the gas update and the check for the gas exhaustion of the
+     Michelson runtime.
+
+
+     References:
+     -----------
+     - https://gitlab.com/-/snippets/2031392
+     - https://tarides.com/blog/2019-09-13-decompress-experiences-with-ocaml-optimization
+     - https://blog.janestreet.com/the-perils-of-polymorphic-compare/
+
+  *)
+
+  external ( = ) : int -> int -> bool = "%equal"
+
+  external ( <> ) : int -> int -> bool = "%notequal"
+
+  external ( < ) : int -> int -> bool = "%lessthan"
+
+  external ( > ) : int -> int -> bool = "%greaterthan"
+
+  external ( <= ) : int -> int -> bool = "%lessequal"
+
+  external ( >= ) : int -> int -> bool = "%greaterequal"
+
+  external compare : int -> int -> int = "%compare"
+
+  let equal = ( = )
+
+  let max x y = if x >= y then x else y
+
+  let min x y = if x <= y then x else y
+end
 
 module Int32 = Make (Int32)
 module Int64 = Make (Int64)
@@ -180,4 +222,5 @@ module Float = Make (struct
 end)
 
 module String = Make (String)
+module Bytes = Make (Bytes)
 module Z = Make (Z)

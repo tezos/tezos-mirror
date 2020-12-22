@@ -256,13 +256,13 @@ module type INDEXES = sig
   val path_length : int
 
   module Set : sig
-    include Stdlib.Set.S with type elt = t
+    include SET with type elt = t
 
     val encoding : t Data_encoding.t
   end
 
   module Map : sig
-    include Stdlib.Map.S with type key = t
+    include MAP with type key = t
 
     val encoding : 'a Data_encoding.t -> 'a t Data_encoding.t
   end

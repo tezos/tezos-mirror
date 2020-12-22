@@ -115,7 +115,7 @@ and _ contents =
       fee : Tez_repr.tez;
       counter : counter;
       operation : 'kind manager_operation;
-      gas_limit : Z.t;
+      gas_limit : Gas_limit_repr.Arith.integral;
       storage_limit : Z.t;
     }
       -> 'kind Kind.manager contents
@@ -201,9 +201,6 @@ type error += Missing_signature (* `Permanent *)
 type error += Invalid_signature (* `Permanent *)
 
 val check_signature :
-  Signature.Public_key.t -> Chain_id.t -> _ operation -> unit tzresult Lwt.t
-
-val check_signature_sync :
   Signature.Public_key.t -> Chain_id.t -> _ operation -> unit tzresult
 
 val internal_operation_encoding : packed_internal_operation Data_encoding.t

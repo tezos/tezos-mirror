@@ -162,7 +162,7 @@ struct
       let v0_encoding = status_encoding in
       With_version.(encoding ~name (first_version v0_encoding))
 
-    let pp ppf (status : t) =
+    let pp ~short:_ ppf (status : t) =
       Format.fprintf ppf "%a" (pp Static.worker_name) status.data
 
     let doc = "Worker status."
@@ -173,8 +173,10 @@ struct
           level
       | Request _ ->
           Internal_event.Debug
-      | Terminated | Timeout | Started _ ->
+      | Timeout ->
           Internal_event.Notice
+      | Terminated | Started _ ->
+          Internal_event.Info
       | Crashed _ ->
           Internal_event.Error
       | Triggering_shutdown ->

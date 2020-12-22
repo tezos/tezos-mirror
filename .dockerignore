@@ -6,6 +6,7 @@ __pycache__
 **/*.pyc
 
 _build
+_build_rust
 _opam
 _docker_build
 docs/_build
@@ -31,7 +32,7 @@ docs/api/rpc.rst
 docs/api/p2p.rst
 
 src/bin_client/test/LOG.*
-_coverage_output
+_coverage_output/*.coverage
 _coverage_report
 
 **/*.install
@@ -44,6 +45,10 @@ _coverage_report
 **/*.orig
 
 .idea
+# .venv directories are created by poetry if the option in-project is set to
+# true.
+**/.venv
+**/.mypy_cache/
 
 ## Not in .gitignore
 

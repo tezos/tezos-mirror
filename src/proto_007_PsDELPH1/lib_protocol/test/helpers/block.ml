@@ -65,7 +65,7 @@ let get_next_baker_by_priority priority block =
     ~all:true
     ~max_priority:(priority + 1)
     block
-  >>|? fun bakers ->
+  >|=? fun bakers ->
   let {Alpha_services.Delegate.Baking_rights.delegate = pkh; timestamp; _} =
     List.find
       (fun {Alpha_services.Delegate.Baking_rights.priority = p; _} ->
@@ -80,7 +80,7 @@ let get_next_baker_by_account pkh block =
     ~delegates:[pkh]
     ~max_priority:256
     block
-  >>|? fun bakers ->
+  >|=? fun bakers ->
   let { Alpha_services.Delegate.Baking_rights.delegate = pkh;
         timestamp;
         priority;
@@ -91,7 +91,7 @@ let get_next_baker_by_account pkh block =
 
 let get_next_baker_excluding excludes block =
   Alpha_services.Delegate.Baking_rights.get rpc_ctxt ~max_priority:256 block
-  >>|? fun bakers ->
+  >|=? fun bakers ->
   let { Alpha_services.Delegate.Baking_rights.delegate = pkh;
         timestamp;
         priority;
@@ -124,7 +124,7 @@ let get_endorsing_power b =
             b
             op
             Chain_id.zero
-          >>|? fun endorsement_power -> acc + endorsement_power
+          >|=? fun endorsement_power -> acc + endorsement_power
       | _ ->
           return acc)
     0
@@ -139,7 +139,7 @@ module Forge = struct
   }
 
   let default_proof_of_work_nonce =
-    MBytes.create Constants.proof_of_work_nonce_size
+    Bytes.create Constants.proof_of_work_nonce_size
 
   let make_contents ?(proof_of_work_nonce = default_proof_of_work_nonce)
       ~priority ~seed_nonce_hash () =
@@ -166,7 +166,7 @@ module Forge = struct
 
   let sign_header {baker; shell; contents} =
     Account.find baker
-    >>|? fun delegate ->
+    >|=? fun delegate ->
     let unsigned_bytes =
       Data_encoding.Binary.to_bytes_exn
         Block_header.unsigned_encoding
@@ -186,7 +186,7 @@ module Forge = struct
     >>=? fun (pkh, priority, _timestamp) ->
     Alpha_services.Delegate.Minimal_valid_time.get rpc_ctxt pred priority 0
     >>=? fun expected_timestamp ->
-    let timestamp = Option.unopt ~default:expected_timestamp timestamp in
+    let timestamp = Option.value ~default:expected_timestamp timestamp in
     let level = Int32.succ pred.header.shell.level in
     ( match Fitness_repr.to_int64 pred.header.shell.fitness with
     | Ok old_fitness ->
@@ -195,12 +195,12 @@ module Forge = struct
         assert false )
     |> fun fitness ->
     Alpha_services.Helpers.current_level ~offset:1l rpc_ctxt pred
-    >>|? (function
+    >|=? (function
            | {expected_commitment = true; _} ->
                Some (fst (Proto_Nonce.generate ()))
            | {expected_commitment = false; _} ->
                None)
-    >>|? fun seed_nonce_hash ->
+    >|=? fun seed_nonce_hash ->
     let hashes = List.map Operation.hash_packed operations in
     let operations_hash =
       Operation_list_list_hash.compute [Operation_list_hash.compute hashes]
@@ -263,11 +263,11 @@ let initial_context ?(with_commitments = false) constants header
   in
   Tezos_protocol_environment.Context.(
     let empty = Memory_context.empty in
-    set empty ["version"] (MBytes.of_string "genesis")
+    set empty ["version"] (Bytes.of_string "genesis")
     >>= fun ctxt -> set ctxt protocol_param_key proto_params)
   >>= fun ctxt ->
   Main.init ctxt header >|= Environment.wrap_error
-  >>|? fun {context; _} -> context
+  >|=? fun {context; _} -> context
 
 let genesis_with_parameters parameters =
   let hash =
@@ -290,11 +290,11 @@ let genesis_with_parameters parameters =
   in
   Tezos_protocol_environment.Context.(
     let empty = Memory_context.empty in
-    set empty ["version"] (MBytes.of_string "genesis")
+    set empty ["version"] (Bytes.of_string "genesis")
     >>= fun ctxt -> set ctxt protocol_param_key proto_params)
   >>= fun ctxt ->
   Main.init ctxt shell >|= Environment.wrap_error
-  >>|? fun {context; _} ->
+  >|=? fun {context; _} ->
   {
     hash;
     header = {shell; protocol_data = {contents; signature = Signature.zero}};
@@ -311,13 +311,13 @@ let genesis ?with_commitments ?endorsers_per_block ?initial_endorsers
   let open Tezos_protocol_007_PsDELPH1_parameters in
   let constants = Default_parameters.constants_test in
   let endorsers_per_block =
-    Option.unopt ~default:constants.endorsers_per_block endorsers_per_block
+    Option.value ~default:constants.endorsers_per_block endorsers_per_block
   in
   let initial_endorsers =
-    Option.unopt ~default:constants.initial_endorsers initial_endorsers
+    Option.value ~default:constants.initial_endorsers initial_endorsers
   in
   let min_proposal_quorum =
-    Option.unopt ~default:constants.min_proposal_quorum min_proposal_quorum
+    Option.value ~default:constants.min_proposal_quorum min_proposal_quorum
   in
   let constants =
     {
@@ -329,7 +329,6 @@ let genesis ?with_commitments ?endorsers_per_block ?initial_endorsers
   in
   (* Check there is at least one roll *)
   ( try
-      let open Test_utils in
       fold_left_s
         (fun acc (_, amount) ->
           Environment.wrap_error @@ Tez_repr.( +? ) acc amount
@@ -357,7 +356,7 @@ let genesis ?with_commitments ?endorsers_per_block ?initial_endorsers
   in
   let contents = Forge.make_contents ~priority:0 ~seed_nonce_hash:None () in
   initial_context ?with_commitments constants shell initial_accounts
-  >>|? fun context ->
+  >|=? fun context ->
   {
     hash;
     header = {shell; protocol_data = {contents; signature = Signature.zero}};
@@ -387,7 +386,7 @@ let apply header ?(operations = []) pred =
   Main.finalize_block vstate
   >|=? fun (validation, _result) -> validation.context)
   >|= Environment.wrap_error
-  >>|? fun context ->
+  >|=? fun context ->
   let hash = Block_header.hash header in
   {hash; header; operations; context}
 

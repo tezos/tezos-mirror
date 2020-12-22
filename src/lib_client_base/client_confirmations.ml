@@ -51,7 +51,7 @@ let wait_for_operation_inclusion (ctxt : #Client_context.full) ~chain
           if the `hash` contains the operation in list `i` at position `j`
           and if `hash` denotes the `n-th` predecessors of the block. *)
   let blocks : ((Block_hash.t * int * int) * int) option Block_hash.Table.t =
-    Block_hash.Table.create confirmations
+    Block_hash.Table.create ~random:true confirmations
   in
   (* Fetch _all_ the 'unknown' predecessors af a block. *)
   let fetch_predecessors (hash, header) =
@@ -86,7 +86,10 @@ let wait_for_operation_inclusion (ctxt : #Client_context.full) ~chain
   let process hash header =
     let block = `Hash (hash, 0) in
     let predecessor = header.Tezos_base.Block_header.predecessor in
-    match Block_hash.Table.find blocks predecessor with
+    let pred_block =
+      Option.unopt_exn Not_found @@ Block_hash.Table.find blocks predecessor
+    in
+    match pred_block with
     | Some (block_with_op, n) ->
         ctxt#answer
           "Operation received %d confirmations as of block: %a"
@@ -132,7 +135,7 @@ let wait_for_operation_inclusion (ctxt : #Client_context.full) ~chain
               ctxt#error
                 "The operation %a is outdated and may never be included in \
                  the chain.@,\
-                 We recommand to use an external block explorer."
+                 We recommend to use an external block explorer."
                 Operation_hash.pp
                 operation_hash
               >>= fun () -> Lwt.fail (Outdated operation_hash)
@@ -189,7 +192,7 @@ let wait_for_operation_inclusion (ctxt : #Client_context.full) ~chain
               failwith "..."
           | Some (hash, _) -> (
               stop () ;
-              match Block_hash.Table.find_opt blocks hash with
+              match Block_hash.Table.find blocks hash with
               | None | Some None ->
                   assert false
               | Some (Some (hash, _)) ->
@@ -250,19 +253,26 @@ let lookup_operation_in_previous_blocks (ctxt : #Client_context.full) ~chain
   in
   loop 0
 
-let wait_for_bootstrapped (ctxt : #Client_context.full) =
+let wait_for_bootstrapped ?(retry = fun f x -> f x)
+    (ctxt : #Client_context.full) =
   let display = ref false in
-  Lwt.async (fun () ->
+  Lwt_utils.dont_wait
+    (fun exc ->
+      let (_ : unit Lwt.t) =
+        ctxt#error "Uncaught exception: %s\n%!" (Printexc.to_string exc)
+        >>= fun () -> ctxt#error "Progress not monitored anymore\n%!"
+      in
+      ())
+    (fun () ->
       ctxt#sleep 0.3
       >>= fun () ->
       if not !display then (
-        ctxt#answer
-          "Waiting for the node to be bootstrapped before injection..."
+        ctxt#answer "Waiting for the node to be bootstrapped..."
         >>= fun () ->
         display := true ;
         Lwt.return_unit )
       else Lwt.return_unit) ;
-  Monitor_services.bootstrapped ctxt
+  retry Monitor_services.bootstrapped ctxt
   >>=? fun (stream, _stop) ->
   Lwt_stream.iter_s
     (fun (hash, time) ->
@@ -279,5 +289,4 @@ let wait_for_bootstrapped (ctxt : #Client_context.full) =
     stream
   >>= fun () ->
   display := true ;
-  ctxt#answer "Node is bootstrapped, ready for injecting operations."
-  >>= fun () -> return_unit
+  ctxt#answer "Node is bootstrapped." >>= fun () -> return_unit

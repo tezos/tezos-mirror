@@ -69,6 +69,13 @@ val get_balance :
   Contract.t ->
   Tez.t tzresult Lwt.t
 
+val build_delegate_operation :
+  ?fee:Tez.t ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:Z.t ->
+  public_key_hash option ->
+  Kind.delegation Injection.annotated_manager_operation
+
 val set_delegate :
   #Protocol_client_context.full ->
   chain:Shell_services.chain ->
@@ -126,6 +133,18 @@ val originate_contract :
   unit ->
   (Kind.origination Kind.manager Injection.result * Contract.t) tzresult Lwt.t
 
+val parse_arg_transfer : string option -> Script.lazy_expr tzresult Lwt.t
+
+val build_transaction_operation :
+  amount:Tez.t ->
+  parameters:Script.lazy_expr ->
+  ?entrypoint:string ->
+  ?fee:Tez.t ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:Z.t ->
+  Contract.t ->
+  Kind.transaction Injection.annotated_manager_operation
+
 val transfer :
   #Protocol_client_context.full ->
   chain:Shell_services.chain ->
@@ -149,6 +168,13 @@ val transfer :
   unit ->
   (Kind.transaction Kind.manager Injection.result * Contract.t list) tzresult
   Lwt.t
+
+val build_reveal_operation :
+  ?fee:Tez.t ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:Z.t ->
+  public_key ->
+  Kind.reveal Injection.annotated_manager_operation
 
 val reveal :
   #Protocol_client_context.full ->
@@ -176,6 +202,19 @@ type activation_key = {
 }
 
 val activation_key_encoding : activation_key Data_encoding.t
+
+type batch_transfer_operation = {
+  destination : string;
+  fee : string option;
+  gas_limit : Gas.Arith.integral option;
+  storage_limit : Z.t option;
+  amount : string;
+  arg : string option;
+  entrypoint : string option;
+}
+
+val batch_transfer_operation_encoding :
+  batch_transfer_operation Data_encoding.t
 
 val activate_account :
   #Protocol_client_context.full ->

@@ -36,7 +36,7 @@ The voting procedure works as follows:
   At the end of a testing_vote period if participation reaches the quorum
   and the proposal has a super-majority in favor, we proceed to a testing
   period. Otherwise we go back to a proposal period.
-- `Testing period`: a test chain is forked for 48 hours to test a
+- `Testing period`: a test chain is forked for the entire testing period to ensure a
   correct migration of the context.
   At the end of a testing period we move to a promotion_vote period.
 - `Promotion_vote period`: delegates can cast one vote to promote or not the

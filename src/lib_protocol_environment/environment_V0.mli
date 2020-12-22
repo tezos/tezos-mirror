@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018 Nomadic Labs. <nomadic@tezcore.com>                    *)
+(* Copyright (c) 2018 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -44,7 +44,7 @@ module type V0 = sig
        and type Context_hash.t = Context_hash.t
        and type Protocol_hash.t = Protocol_hash.t
        and type Time.t = Time.Protocol.t
-       and type MBytes.t = MBytes.t
+       and type MBytes.t = Tezos_protocol_environment_structs.V0.M.MBytes.t
        and type Operation.shell_header = Operation.shell_header
        and type Operation.t = Operation.t
        and type Block_header.shell_header = Block_header.shell_header

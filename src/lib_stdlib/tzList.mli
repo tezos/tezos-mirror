@@ -58,9 +58,6 @@ end
 (** [select n l] is ([n]th element of [l], [l] without that element) *)
 val select : int -> 'a list -> 'a * 'a list
 
-(** [filter_map f l] is [[y for x in l where (f x) = Some y]] *)
-val filter_map : ('a -> 'b option) -> 'a list -> 'b list
-
 (** [rev_sub l n] is [List.rev l] capped to max [n] elements *)
 val rev_sub : 'a list -> int -> 'a list
 

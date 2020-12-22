@@ -32,11 +32,6 @@ let () =
     exit 1 )
 
 let () =
-  let log s = Node_logging.fatal_error "%s" s in
-  Lwt_exit.exit_on ~log Sys.sigint ;
-  Lwt_exit.exit_on ~log Sys.sigterm
-
-let () =
   if Filename.basename Sys.argv.(0) = Updater.compiler_name then (
     try
       Tezos_protocol_compiler.Compiler.main
@@ -48,7 +43,23 @@ let () =
 
 let () =
   if Filename.basename Sys.argv.(0) = "tezos-validator" then (
-    try Stdlib.exit (Lwt_main.run @@ Validator.main ())
+    try
+      let is_valid_directory =
+        Array.length Sys.argv = 3
+        && Sys.argv.(1) = "--socket-dir"
+        && Sys.file_exists Sys.argv.(2)
+        && Sys.is_directory Sys.argv.(2)
+      in
+      if not is_valid_directory then
+        invalid_arg
+          "Invalid arguments provided for the validator: expected \
+           'tezos-validator --socket-dir <dir>'." ;
+      Stdlib.exit
+        (Lwt_main.run
+           ( Lwt_exit.wrap_and_exit
+             @@ Validator.main ~socket_dir:Sys.argv.(2) ()
+           >>= function
+           | Ok () -> Lwt_exit.exit_and_wait 0 | Error _ -> Lwt.return 1 ))
     with exn ->
       Format.eprintf "%a\n%!" Opterrors.report_error exn ;
       Stdlib.exit 1 )
@@ -85,6 +96,21 @@ let commands =
     Node_snapshot_command.cmd;
     Node_reconstruct_command.cmd ]
 
+(* This call is not strictly necessary as the parameters are initialized
+   lazily the first time a Sapling operation (validation or forging) is
+   done. This is what the client does.
+   For a long running binary however it is important to make sure that the
+   parameters files are there at the start and avoid failing much later while
+   validating an operation. Plus paying this cost upfront means that the first
+   validation will not be more expensive. *)
+let () =
+  try Tezos_sapling.Core.Validator.init_params ()
+  with exn ->
+    Printf.eprintf
+      "Failed to initialize Zcash parameters: %s"
+      (Printexc.to_string exn) ;
+    exit 1
+
 let () =
   Random.self_init () ;
   match Cmdliner.Term.eval_choice (term, info) commands with
@@ -93,6 +119,6 @@ let () =
   | `Help ->
       exit 0
   | `Version ->
-      exit 1
+      exit 0
   | `Ok () ->
       exit 0

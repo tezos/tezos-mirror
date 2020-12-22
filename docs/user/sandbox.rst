@@ -9,6 +9,10 @@ helper scripts:
 -  ``./src/bin_node/tezos-sandboxed-node.sh``
 -  ``./src/bin_client/tezos-init-sandboxed-client.sh``
 
+For the moment these scripts are expected to be run on the ``master``
+branch (see :ref:`Build from sources<build_from_sources>`; in
+particular, use ``git checkout master`` instead of ``git checkout
+latest-release``).
 
 Run a sandboxed node
 ~~~~~~~~~~~~~~~~~~~~
@@ -113,7 +117,7 @@ binary.
 Tune protocol Alpha parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The ``tezos-active-alpha`` alias uses parameters from
+The ``tezos-activate-alpha`` alias uses parameters from
 ``scripts/protocol_parameters.json`` to activate protocol Alpha. It can
 be useful to tune these parameters when you need to debug something,
 for example, change the number of blocks per cycle, the time between

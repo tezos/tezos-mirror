@@ -26,7 +26,24 @@
 
 type t
 
-type limits = {bootstrap_threshold : int; worker_limits : Worker_types.limits}
+(** Constants parameterizing the bootstrap heuristics. *)
+type synchronisation_limits = {
+  latency : int;
+      (** [latency] is the time interval (seconds) used to determine
+          if a node is synchronized with a chain. For instance, a node that
+          knows head with timestamp T is synchronized if T >= now -
+          max_latency. This parameter depends on the baking rate and the
+          latency of the network. *)
+  threshold : int;
+      (** [threshold] determines the number of peers the synchronization
+     heuristic looks at to determine if the node is synchronized or
+     not.  *)
+}
+
+type limits = {
+  synchronisation : synchronisation_limits;
+  worker_limits : Worker_types.limits;
+}
 
 val create :
   start_prevalidator:bool ->
@@ -43,11 +60,21 @@ val create :
   limits ->
   t tzresult Lwt.t
 
-val bootstrapped : t -> unit Lwt.t
-
 val chain_id : t -> Chain_id.t
 
 val chain_state : t -> State.Chain.t
+
+val sync_status : t -> Synchronisation_heuristic.status
+
+(** Wait for the `synchronisation_status` to be
+   `Synchronised`. Subsequent calls return immediately. In other
+   words, once a node is bootstrapped, it remains bootstrapped until
+   it terminates (except if [force_bootstrapped] is used). *)
+val bootstrapped : t -> unit Lwt.t
+
+val is_bootstrapped : t -> bool
+
+val force_bootstrapped : t -> bool -> unit
 
 val prevalidator : t -> Prevalidator.t option
 
@@ -61,7 +88,7 @@ val validate_block :
   Block_hash.t ->
   Block_header.t ->
   Operation.t list list ->
-  State.Block.t option tzresult Lwt.t
+  unit tzresult Lwt.t
 
 val shutdown : t -> unit Lwt.t
 

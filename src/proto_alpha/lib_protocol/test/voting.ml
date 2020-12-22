@@ -24,7 +24,6 @@
 (*****************************************************************************)
 
 open Protocol
-open Test_utils
 
 (* missing stuff in Alpha_context.Vote *)
 let ballots_zero = Alpha_context.Vote.{yay = 0l; nay = 0l; pass = 0l}
@@ -108,7 +107,7 @@ let mk_contracts_from_pkh pkh_list =
 (* get the list of delegates and the list of their rolls from listings *)
 let get_delegates_and_rolls_from_listings b =
   Context.Vote.get_listings (B b)
-  >>=? fun l -> return (mk_contracts_from_pkh (List.map fst l), List.map snd l)
+  >|=? fun l -> (mk_contracts_from_pkh (List.map fst l), List.map snd l)
 
 (* compute the rolls of each delegate *)
 let get_rolls b delegates loc =
@@ -313,9 +312,10 @@ let test_successful_vote num_delegates () =
       | _ ->
           false)
   >>=? fun () ->
-  fold_left_s (fun v acc -> return Int32.(add v acc)) 0l rolls_p2
-  >>=? fun rolls_sum ->
-  (* # of Yays in ballots matches rolls of the delegate *)
+  (* Allocate votes from weight (rolls) of active delegates *)
+  List.fold_left (fun acc v -> Int32.(add v acc)) 0l rolls_p2
+  |> fun rolls_sum ->
+  (* # of Yay rolls in ballots matches votes of the delegates *)
   Context.Vote.get_ballots (B b)
   >>=? fun v ->
   Assert.equal
@@ -440,8 +440,8 @@ let test_successful_vote num_delegates () =
   >>=? fun operations ->
   Block.bake ~operations b
   >>=? fun b ->
-  fold_left_s (fun v acc -> return Int32.(add v acc)) 0l rolls_p4
-  >>=? fun rolls_sum ->
+  List.fold_left (fun acc v -> Int32.(add v acc)) 0l rolls_p4
+  |> fun rolls_sum ->
   (* # of Yays in ballots matches rolls of the delegate *)
   Context.Vote.get_ballots (B b)
   >>=? fun v ->
@@ -491,8 +491,8 @@ let test_successful_vote num_delegates () =
    return the first k active delegates with which one can have quorum, that is:
    their roll sum divided by the total roll sum is bigger than pr_ema_weight/den *)
 let get_smallest_prefix_voters_for_quorum active_delegates active_rolls =
-  fold_left_s (fun v acc -> return Int32.(add v acc)) 0l active_rolls
-  >>=? fun active_rolls_sum ->
+  List.fold_left (fun acc v -> Int32.(add v acc)) 0l active_rolls
+  |> fun active_rolls_sum ->
   let rec loop delegates rolls sum selected =
     match (delegates, rolls) with
     | ([], []) ->
@@ -507,7 +507,7 @@ let get_smallest_prefix_voters_for_quorum active_delegates active_rolls =
     | (_, _) ->
         []
   in
-  return (loop active_delegates active_rolls 0 [])
+  loop active_delegates active_rolls 0 []
 
 let get_expected_participation_ema rolls voter_rolls old_participation_ema =
   (* formula to compute the updated participation_ema *)
@@ -516,14 +516,14 @@ let get_expected_participation_ema rolls voter_rolls old_participation_ema =
     + (pr_num * participation) )
     / den
   in
-  fold_left_s (fun v acc -> return Int32.(add v acc)) 0l rolls
-  >>=? fun rolls_sum ->
-  fold_left_s (fun v acc -> return Int32.(add v acc)) 0l voter_rolls
-  >>=? fun voter_rolls_sum ->
+  List.fold_left (fun acc v -> Int32.(add v acc)) 0l rolls
+  |> fun rolls_sum ->
+  List.fold_left (fun acc v -> Int32.(add v acc)) 0l voter_rolls
+  |> fun voter_rolls_sum ->
   let participation =
     Int32.to_int voter_rolls_sum * percent_mul / Int32.to_int rolls_sum
   in
-  return (get_updated_participation_ema old_participation_ema participation)
+  get_updated_participation_ema old_participation_ema participation
 
 (* if not enough quorum -- get_updated_participation_ema < pr_ema_weight/den -- in testing vote,
    go back to proposal period *)
@@ -566,7 +566,7 @@ let test_not_enough_quorum_in_testing_vote num_delegates () =
   get_delegates_and_rolls_from_listings b
   >>=? fun (delegates_p2, rolls_p2) ->
   get_smallest_prefix_voters_for_quorum delegates_p2 rolls_p2
-  >>=? fun voters ->
+  |> fun voters ->
   (* take the first two voters out so there cannot be quorum *)
   let voters_without_quorum = List.tl voters in
   get_rolls b voters_without_quorum __LOC__
@@ -595,7 +595,7 @@ let test_not_enough_quorum_in_testing_vote num_delegates () =
     rolls_p2
     voters_rolls_in_testing_vote
     initial_participation_ema
-  >>=? fun expected_participation_ema ->
+  |> fun expected_participation_ema ->
   Context.Vote.get_participation_ema b
   >>=? fun new_participation_ema ->
   (* assert the formula to calculate participation_ema is correct *)
@@ -642,7 +642,7 @@ let test_not_enough_quorum_in_promotion_vote num_delegates () =
   get_delegates_and_rolls_from_listings b
   >>=? fun (delegates_p2, rolls_p2) ->
   get_smallest_prefix_voters_for_quorum delegates_p2 rolls_p2
-  >>=? fun voters ->
+  |> fun voters ->
   let open Alpha_context in
   (* all voters vote, for yays;
        no nays, so supermajority is satisfied *)
@@ -678,7 +678,7 @@ let test_not_enough_quorum_in_promotion_vote num_delegates () =
   get_delegates_and_rolls_from_listings b
   >>=? fun (delegates_p4, rolls_p4) ->
   get_smallest_prefix_voters_for_quorum delegates_p4 rolls_p4
-  >>=? fun voters ->
+  |> fun voters ->
   (* take the first voter out so there cannot be quorum *)
   let voters_without_quorum = List.tl voters in
   get_rolls b voters_without_quorum __LOC__
@@ -695,7 +695,7 @@ let test_not_enough_quorum_in_promotion_vote num_delegates () =
   Block.bake_n (Int32.to_int blocks_per_voting_period - 1) b
   >>=? fun b ->
   get_expected_participation_ema rolls_p4 voter_rolls initial_participation_ema
-  >>=? fun expected_participation_ema ->
+  |> fun expected_participation_ema ->
   Context.Vote.get_participation_ema b
   >>=? fun new_participation_ema ->
   (* assert the formula to calculate participation_ema is correct *)
@@ -935,7 +935,7 @@ let test_supermajority_in_testing_vote supermajority () =
   (* beginning of testing_vote period, denoted by _p2;
      take a snapshot of the active delegates and their rolls from listings *)
   get_delegates_and_rolls_from_listings b
-  >>=? fun (delegates_p2, _olls_p2) ->
+  >>=? fun (delegates_p2, _rolls_p2) ->
   (* supermajority means [num_yays / (num_yays + num_nays) >= s_num / s_den],
      which is equivalent with [num_yays >= num_nays * s_num / (s_den - s_num)] *)
   let num_delegates = List.length delegates_p2 in

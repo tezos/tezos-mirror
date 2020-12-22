@@ -20,7 +20,7 @@ code { DUP; CAR;
                    { RENAME @previous_balance;
                      AMOUNT; ADD; SOME; SWAP; UPDATE; NIL operation; PAIR }
                    { DIP{ AMOUNT; SOME }; UPDATE; NIL operation; PAIR }}
-               # Withdrawl
+               # Withdrawal
                { DUP; DUP; DUP; DUP;
                  # Check signature on data
                  CAR %from;
@@ -49,6 +49,6 @@ code { DUP; CAR;
                                 SWAP; DUP; CDAR %withdraw_amount;
                                 # Execute the transfer
                                 DIP{ CAR %from; HASH_KEY @from_hash; IMPLICIT_ACCOUNT @from_account}; UNIT;
-                                TRANSFER_TOKENS @widthdraw_transfer_op;
+                                TRANSFER_TOKENS @withdraw_transfer_op;
                                 NIL operation; SWAP; CONS;
                                 PAIR }}}}

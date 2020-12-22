@@ -1,7 +1,9 @@
 import os
+from typing import List
 import subprocess
 import pytest
 from tools import utils, paths, constants
+from client.client import Client
 
 
 @pytest.fixture(scope="class")
@@ -27,7 +29,7 @@ class TestInjectionAndActivation:
         assert os.path.isfile(COMPILER)
         assert os.path.isdir(PROTO)
 
-    def test_compute_hash(self, session):
+    def test_compute_hash(self, session: dict):
         cmd = [COMPILER, '-hash-only', PROTO]
         res = subprocess.run(cmd, universal_newlines=True, check=True,
                              stdout=subprocess.PIPE)
@@ -35,22 +37,22 @@ class TestInjectionAndActivation:
         assert len(proto_hash) == 51
         session['proto_hash'] = proto_hash
 
-    def test_injection(self, clients):
+    def test_injection(self, clients: List[Client]):
         clients[0].inject_protocol(PROTO)
 
-    def test_check_injected(self, clients, session):
+    def test_check_injected(self, clients: List[Client], session: dict):
         proto = session['proto_hash']
         protos = clients[0].list_protocols()
         assert proto in protos
 
-    def test_activation(self, clients, session):
+    def test_activation(self, clients: List[Client], session: dict):
         proto = session['proto_hash']
-        parameters = {}
+        parameters = {}  # type: dict
         res = clients[0].activate_protocol_json(proto, parameters,
                                                 key='activator', fitness='1')
         assert res.block_hash
 
-    def test_check_protocol(self, clients, session):
+    def test_check_protocol(self, clients: List[Client], session: dict):
         proto = session['proto_hash']
         for client in clients:
             assert utils.check_protocol(client, proto, params=PARAMS)
@@ -68,24 +70,24 @@ def client(sandbox):
 class TestActivation:
     """ Protocol activation (protocol already linked to the node) """
 
-    def test_proto_known(self, client):
+    def test_proto_known(self, client: Client):
         res = client.list_protocols()
         assert 'ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp' in res
 
-    def test_first_protocol(self, client):
+    def test_first_protocol(self, client: Client):
         proto = 'PrihK96nBAFSxVL1GLJTVhu9YnzkMFiBeuJRPA8NwuZVZCE1L6i'
         assert client.get_protocol() == proto
 
-    def test_activate_demo(self, client):
+    def test_activate_demo(self, client: Client):
         proto = 'ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp'
-        parameters = {}
+        parameters = {}  # type: dict
         res = client.activate_protocol_json(proto, parameters, key='activator',
                                             fitness='1')
         assert res.block_hash
 
-    def test_level1(self, client):
+    def test_level1(self, client: Client):
         assert client.get_level(params=PARAMS) == 1
 
-    def test_protocol_genesis(self, client):
+    def test_protocol_genesis(self, client: Client):
         proto = 'ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im'
         assert client.get_protocol(params=PARAMS) == proto

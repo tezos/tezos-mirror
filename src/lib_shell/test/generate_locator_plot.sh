@@ -1,4 +1,4 @@
-#!/bin/bash
+#! /usr/bin/env bash
 
 # plots the output of 'dune build @runtest_locator'
 

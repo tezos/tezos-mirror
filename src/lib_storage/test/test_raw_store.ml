@@ -29,7 +29,7 @@ let ( >>= ) = Lwt.bind
 
 let ( >|= ) = Lwt.( >|= )
 
-let ( // ) = Filename.concat
+open Filename.Infix
 
 let wrap_store_init f _ () =
   Lwt_utils_unix.with_tempdir "tezos_test_" (fun base_dir ->

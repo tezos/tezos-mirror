@@ -173,7 +173,7 @@ module Event_filter = struct
             fun l -> Some (l :: s))
       None
       levels_in_order
-    |> Option.unopt_exn (Failure "level_at_least not found")
+    |> TzOption.unopt_exn (Failure "level_at_least not found")
     |> level_in
 end
 
@@ -229,24 +229,24 @@ module Sink_implementation : Internal_event.SINK with type t = t = struct
   let configure uri =
     let event_filter =
       let name_res =
-        Uri.get_query_param' uri "name-matches" |> Option.unopt ~default:[]
+        Uri.get_query_param' uri "name-matches" |> Option.value ~default:[]
       in
       let names =
-        Uri.get_query_param' uri "name" |> Option.unopt ~default:[]
+        Uri.get_query_param' uri "name" |> Option.value ~default:[]
       in
       let levels =
-        Option.(
+        TzOption.(
           Uri.get_query_param uri "level-at-least"
           >>= Internal_event.Level.of_string
           >>= fun l ->
           (* some (fun all more -> all [Event_filter.level_at_least l ; more ]) *)
-          some [Event_filter.level_at_least l])
-        |> Option.unopt ~default:[]
+          Some [Event_filter.level_at_least l])
+        |> Option.value ~default:[]
       in
       let sections =
         let somes =
           Uri.get_query_param' uri "section"
-          |> Option.unopt ~default:[]
+          |> Option.value ~default:[]
           |> List.map (fun s ->
                  Internal_event.Section.make_sanitized
                    (String.split_on_char '.' s))
@@ -337,7 +337,8 @@ module Sink_implementation : Internal_event.SINK with type t = t = struct
         in
         lwt_bad_citizen_hack :=
           (file_path, event_json) :: !lwt_bad_citizen_hack ;
-        output_json file_path event_json ~pp:(fun fmt () -> M.pp fmt forced)
+        output_json file_path event_json ~pp:(fun fmt () ->
+            M.pp ~short:false fmt forced)
         >>=? fun () ->
         lwt_bad_citizen_hack :=
           List.filter (fun (f, _) -> f <> file_path) !lwt_bad_citizen_hack ;
@@ -397,7 +398,7 @@ module Query = struct
     in
     iter init
 
-  let ( // ) = Filename.concat
+  open TzFilename.Infix
 
   module Time_constraint = struct
     type op = [`Lt | `Le | `Ge | `Gt]

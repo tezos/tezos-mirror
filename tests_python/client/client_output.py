@@ -1,6 +1,7 @@
 """Structured representation of client output."""
 import json
 import re
+from enum import auto, Enum, unique
 from typing import List, Dict
 
 # TODO This is incomplete. Add additional attributes and result classes as
@@ -13,6 +14,14 @@ class InvalidClientOutput(Exception):
     def __init__(self, client_output: str):
         super().__init__(self)
         self.client_output = client_output
+
+
+class InvalidExitCode(Exception):
+    """Raised when client existed with unexpected exit code."""
+
+    def __init__(self, exit_code: int):
+        super().__init__(self)
+        self.exit_code = exit_code
 
 
 class EndorseResult:
@@ -61,9 +70,7 @@ class GetReceiptResult:
 
 
 class GetAddressesResult:
-    """Result of 'list known addresses' operation.
-
-    """
+    """Result of 'list known addresses' operation."""
 
     def __init__(self, client_output: str):
 
@@ -81,6 +88,13 @@ class RunScriptResult:
         if match is None:
             raise InvalidClientOutput(client_output)
         self.storage = match.groups()[0]
+
+        # read operation output
+        self.internal_operations = None
+        pattern = r"(?s)emitted operations\n\s*(.*)\n  big_map diff"
+        match = re.search(pattern, client_output)
+        if match is not None:
+            self.internal_operations = match.group(1)
 
         # read map diff output
         self.big_map_diff = []  # type: List
@@ -131,6 +145,29 @@ class BakeForResult:
         if match is None:
             raise InvalidClientOutput(client_output)
         self.block_hash = match.groups()[0]
+
+
+class ShowAddressResult:
+    """Result of a 'show address' command."""
+
+    def __init__(self, client_output: str):
+        pattern = r"Hash: ?(\w+)"
+        match = re.search(pattern, client_output)
+        if match is None:
+            raise InvalidClientOutput(client_output)
+        self.hash = match.groups()[0]
+        pattern = r"Public Key: ?(\w+)"
+        match = re.search(pattern, client_output)
+        if match is None:
+            self.public_key = None
+        else:
+            self.public_key = match.groups()[0]
+        pattern = r"Secret Key: ?(\w+:\w+)"
+        match = re.search(pattern, client_output)
+        if match is None:
+            self.secret_key = None
+        else:
+            self.secret_key = match.groups()[0]
 
 
 class ActivationResult:
@@ -238,8 +275,8 @@ def extract_rpc_answer(client_output: str) -> dict:
     can be retrieved from the InvalidClientOutput exception"""
     try:
         return json.loads(client_output)
-    except json.JSONDecodeError:
-        raise InvalidClientOutput(client_output)
+    except json.JSONDecodeError as json_decode_error:
+        raise InvalidClientOutput(client_output) from json_decode_error
 
 
 def extract_balance(client_output: str) -> float:
@@ -250,8 +287,8 @@ def extract_balance(client_output: str) -> float:
         if match is None:
             raise InvalidClientOutput(client_output)
         return float(match.groups()[0])
-    except Exception:
-        raise InvalidClientOutput(client_output)
+    except Exception as exception:
+        raise InvalidClientOutput(client_output) from exception
 
 
 def extract_protocols(client_output: str) -> List[str]:
@@ -311,3 +348,77 @@ class P2pStatResult:
         points_list = (parse_point(line) for line in lines[k+1:])
         for addr, peer_id, is_connected, is_trusted in points_list:
             self.points[addr] = PointInfo(peer_id, is_connected, is_trusted)
+
+
+class GetContractEntrypointTypeResult():
+    """Result of a 'get contract entrypoint type of' command."""
+
+    def __init__(self, client_output: str):
+        pattern = r"Entrypoint .*?: (.*)\n"
+        match = re.search(pattern, client_output)
+        if match is None:
+            raise InvalidClientOutput(client_output)
+        self.entrypoint_type = match.groups()[0]
+
+
+class ListMockupProtocols:
+    """Result of 'list mockup protocols' query."""
+
+    def __init__(self, client_output: str):
+        pattern = re.compile(r"^(\w+)$", re.MULTILINE)
+        self.mockup_protocols = re.findall(pattern, client_output)
+
+
+@unique
+class CreateMockupResult(Enum):
+    """
+        Possible behaviors of `tezos-client create mockup`
+    """
+
+    ALREADY_INITIALIZED = auto()
+    DIR_NOT_EMPTY = auto()
+    OK = auto()
+
+    def to_return_code(self) -> int:
+        """ The expected return code of the client when 'self' is returned """
+        if self == CreateMockupResult.OK:
+            return 0
+        return 1
+
+
+class CreateMockup:
+    """Result of 'create mockup' command."""
+
+    def __init__(self, client_stdout: str, client_stderr: str, exit_code):
+        self.client_stdout = client_stdout
+        self.exit_code = exit_code
+        self.create_mockup_result = None
+        self.chain_id = None
+        match = re.search(r"Chain id is (.*)", self.client_stdout)
+        if match is not None:
+            self.chain_id = match.group(1)
+
+        # an element of outputs contains:
+        # - a pattern that we expect the output to contain
+        # - the output channel itself (stdout/stderr)
+        #   aka, where to look for the pattern
+        # - the result to set in self.create_mockup_result
+        outputs = [
+            (r"^  \S+ is not empty, please specify a fresh base directory$",
+             client_stderr, CreateMockupResult.DIR_NOT_EMPTY),
+            (r"^  \S+ is already initialized as a mockup directory$",
+             client_stderr, CreateMockupResult.ALREADY_INITIALIZED),
+            (r"^Created mockup client base dir in \S+$", client_stdout,
+             CreateMockupResult.OK),
+        ]
+
+        for outp in outputs:
+            pattern = re.compile(outp[0], re.MULTILINE)
+            out_channel = outp[1]
+            result = outp[2]
+            expected_exit_code = result.to_return_code()
+            if re.search(pattern, out_channel) is not None:
+                self.create_mockup_result = result
+                if exit_code != expected_exit_code:
+                    raise InvalidExitCode(exit_code)
+                return

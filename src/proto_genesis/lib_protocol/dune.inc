@@ -66,8 +66,8 @@ include Tezos_raw_protocol_genesis.Main
  (libraries tezos_protocol_environment_genesis)
  (library_flags (:standard -linkall))
  (flags (:standard -nopervasives -nostdlib
-                   -w +a-4-6-7-9-29-32-40..42-44-45-48
-                   -warn-error -a+8
+                   -w +a-4-6-7-9-29-32-40..42-44-45-48-60-67
+                   -warn-error +a
                    -open Tezos_protocol_environment_genesis__Environment
                    -open Pervasives
                    -open Error_monad))
@@ -88,8 +88,8 @@ include Tezos_raw_protocol_genesis.Main
       tezos-protocol-environment
       tezos-protocol-environment-sigs
       tezos_raw_protocol_genesis)
- (flags -w "+a-4-6-7-9-29-40..42-44-45-48"
-        -warn-error "-a+8"
+ (flags -w "+a-4-6-7-9-29-40..42-44-45-48-60-67"
+        -warn-error "+a"
         -nopervasives)
  (modules Protocol))
 
@@ -100,8 +100,8 @@ include Tezos_raw_protocol_genesis.Main
       tezos-protocol-environment
       tezos-protocol-environment-sigs
       tezos_raw_protocol_genesis)
- (flags -w "+a-4-6-7-9-29-40..42-44-45-48"
-        -warn-error "-a+8"
+ (flags -w "+a-4-6-7-9-29-40..42-44-45-48-60-67"
+        -warn-error "+a"
         -nopervasives)
  (modules Functor))
 
@@ -112,19 +112,26 @@ include Tezos_raw_protocol_genesis.Main
  (libraries tezos-protocol-genesis
             tezos-protocol-updater
             tezos-protocol-environment)
- (flags (:standard -w +a-4-6-7-9-29-32-40..42-44-45-48
-                   -warn-error -a+8))
+ (flags (:standard -w +a-4-6-7-9-29-32-40..42-44-45-48-60-67
+                   -warn-error +a))
  (modules Registerer))
 
-(alias
- (name runtest_compile_protocol)
+(rule
+ (alias runtest_compile_protocol)
+ (deps
+   data.ml
+   services.ml
+   main.mli main.ml
+  (:src_dir TEZOS_PROTOCOL))
  (action (run %{bin:tezos-protocol-compiler} -no-hash-check .)))
 
-(alias
- (name runtest_sandbox)
- (deps .tezos_protocol_genesis.objs/native/tezos_protocol_genesis.cmx))
+(rule
+ (alias runtest_sandbox)
+ (deps .tezos_protocol_genesis.objs/native/tezos_protocol_genesis.cmx)
+ (action (progn)))
 
-(alias
- (name runtest)
+(rule
+ (alias runtest)
  (package tezos-protocol-genesis)
- (deps (alias runtest_sandbox)))
+ (deps (alias runtest_sandbox))
+ (action (progn)))

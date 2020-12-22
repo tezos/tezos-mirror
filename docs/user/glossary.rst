@@ -8,6 +8,14 @@ the second one concerns the Alpha protocol, which is the current
 Tezos
 -----
 
+_`Block`
+    A block is a collection of several Operations_. The operations_ are located
+    in the payload of the block which is specific to the `Economic Protocol`_.
+
+    Along with the payload, the block includes a header which contains
+    `protocol`-agnostic data. It consists of generic information such as the
+    block predecessor's hash and the block's timestamp.
+
 _`Context`
     The state of the blockchain. The context is defined by the
     `Economic Protocol`_ and typically includes information such as
@@ -17,14 +25,6 @@ _`Context`
     The Context is modified by Operations_. For example, an
     operation_ can transfer tez from one account_ to another, which modifies the
     part of the context that tracks account_ credit.
-
-_`Block`
-    A block is a collection of several Operations_. The operations_ are located
-    in the payload of the block which is specific to the `Economic Protocol`_.
-
-    Along with the payload, the block includes a header which contains metadata.
-    The metadata is agnostic to the `economic protocol`_. It consists of generic
-    information such as the block predecessor, a time stamp, etc.
 
 _`Economic protocol`
     The economic protocol is the application that runs on top of the blockchain

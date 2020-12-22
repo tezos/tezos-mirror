@@ -1,4 +1,4 @@
-#!/bin/bash
+#! /usr/bin/env bash
 # run test at most NUM times, exit at first failure
 
 if [ $# -ne 2 ] || [ "$1" -le 0 ] || [ ! -f $2 ]; then
@@ -18,7 +18,7 @@ for i in $(seq 1 $NUM)
 do
     rm -f tmp/*
     echo Execution $i/$NUM
-    if ! pytest $TEST --log-dir=tmp --tb=short -v; then
+    if ! poetry run pytest $TEST --log-dir=tmp --tb=short -v; then
         exit 1
     fi
 done

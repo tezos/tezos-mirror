@@ -24,7 +24,6 @@
 (*****************************************************************************)
 
 open Protocol
-open Test_utils
 open Test_tez
 
 let ten_tez = Tez.of_int 10

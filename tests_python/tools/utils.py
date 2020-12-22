@@ -1,9 +1,10 @@
 """ Utility functions to check time-dependent assertions in the tests.
 Assertions are retried to avoid using arbitrary time constants in test.
 """
-from typing import Any, Callable, List, \
-    Pattern
+import datetime
+from typing import Any, List
 import hashlib
+import contextlib
 import json
 import os
 import re
@@ -15,7 +16,8 @@ import ed25519
 import pyblake2
 import requests
 from client.client import Client
-from client.client_output import BakeForResult, RunScriptResult
+from client.client_output import (BakeForResult, RunScriptResult,
+                                  InvalidClientOutput)
 
 from . import constants
 
@@ -69,14 +71,26 @@ def check_protocol(client: Client, proto: str,
     return res['next_protocol'] == proto
 
 
+@retry(timeout=1., attempts=20)
+def check_two_chains(client: Client) -> bool:
+    main_id = client.rpc('get', 'chains/main/chain_id')
+    try:
+        test_id = client.rpc('get', 'chains/test/chain_id')
+        return test_id != main_id
+    except InvalidClientOutput:
+        return False
+
+
 @retry(timeout=2., attempts=10)
-def check_level(client: Client, level) -> bool:
-    return client.get_level() == level
+def check_level(client: Client, level, chain: str = 'main') -> bool:
+    return client.get_level(chain=chain) == level
 
 
-@retry(timeout=1., attempts=10)
-def check_level_greater_than(client: Client, level) -> bool:
-    return client.get_level() >= level
+@retry(timeout=2., attempts=10)
+def check_level_greater_than(client: Client,
+                             level,
+                             chain: str = 'main') -> bool:
+    return client.get_level(chain=chain) >= level
 
 
 @retry(timeout=2., attempts=20)
@@ -97,17 +111,39 @@ def synchronize(clients: List[Client], max_diff: int = 2) -> bool:
     return max(levels) - min(levels) <= max_diff
 
 
-def get_block_per_level(client: Client, level: int) -> dict:
-    """ Return the block at a given level, level must be less or equal than
-        current head. If the level is higher than the current, it will fail"""
+@retry(timeout=2, attempts=2)
+def check_is_bootstrapped(client: Client, chain: str = 'main') -> bool:
+    return client.is_bootstrapped(chain)
+
+
+def get_block_at_level(client: Client, level: int) -> dict:
+    """ Return the block at a given level, level must be less or equal
+        than the current head. If the level is higher than the
+        current, it will fail"""
     block = client.rpc('get', f'/chains/main/blocks/{level}')
+    return block
+
+
+def get_block_header_at_level(client: Client, level: int) -> dict:
+    """ Return the block header at a given level, level must be less
+        or equal than the current head. If the level is higher than
+        the current, it will fail"""
+    block = client.rpc('get', f'/chains/main/blocks/{level}/header')
+    return block
+
+
+def get_block_metadata_at_level(client: Client, level: int) -> dict:
+    """ Return the block metadata at a given level, level must be less
+        or equal than the current head. If the level is higher than
+        the current, it will fail"""
+    block = client.rpc('get', f'/chains/main/blocks/{level}/metadata')
     return block
 
 
 def get_block_hash(client: Client, level: int) -> str:
     """Return block hash at given level, level must be less or equal
-       than current head."""
-    block_hash = get_block_per_level(client, level)['hash']
+       than the current head"""
+    block_hash = get_block_at_level(client, level)['hash']
     assert isinstance(block_hash, str)
     return str(block_hash)
 
@@ -158,17 +194,26 @@ def check_logs_counts(logs: List[str], pattern: str) -> int:
 
 
 def activate_alpha(client, parameters=None, timestamp=None,
+                   activate_in_the_past=False,
                    proto=constants.ALPHA):
+    """Activates a protocol.
+
+    If `activate_in_the_past` is True, protocol is activated with a timestamp
+    one year in the past."""
     if parameters is None:
         parameters = constants.PARAMETERS
-    client.activate_protocol_json(proto, parameters, timestamp=timestamp)
+    delay = None
+    if activate_in_the_past:
+        delay = datetime.timedelta(seconds=3600 * 24 * 365)
+    client.activate_protocol_json(proto, parameters, timestamp=timestamp,
+                                  delay=delay)
 
 
 def pprint(json_data: dict) -> None:
     print(json.dumps(json_data, indent=4, sort_keys=True))
 
 
-def rpc(server: str, port: int, verb: str, path: str, data: dict = None,
+def rpc(server: str, port: int, verb: str, path: str, data: Any = None,
         headers: dict = None):
     """Calls a REST API
 
@@ -285,31 +330,48 @@ def mutez_of_tez(tez: float):
     return int(tez*1000000)
 
 
-def assert_run_failure(code: Callable,
-                       pattern: Pattern[Any],
-                       mode='stderr') -> None:
-    """Executes [code()] and expects the code to fail and raise
-    [subprocess.CalledProcessError]. If so, the [pattern] is searched
-    in stderr. If it is found, returns True; else returns False.
-    """
-    try:
-        code()
-        assert False, "Code ran without throwing exception"
-    except subprocess.CalledProcessError as caught_exc:
-        exc = caught_exc
+@contextlib.contextmanager
+def assert_run_failure(pattern: str,
+                       mode: str = 'stderr'):
+    """Context manager that checks enclosed code fails with expected error.
 
-    stdout_output = exc.args[2]
-    stderr_output = exc.args[3]
-    data = []  # type: List[str]
-    if mode == 'stderr':
-        data = stderr_output.split('\n')
-    else:
-        data = stdout_output.split('\n')
-    for line in data:
-        if re.search(pattern, line):
-            return
-    data_pretty = "\n".join(data)
-    assert False, f"Could not find '{pattern}' in {data_pretty}"
+    This context manager checks the contextualized code (in the [with]
+    statement) raises [subprocess.CalledProcessError] exception, and
+    that the called process stdout or stderr matches [pattern].
+
+    It fails with an [assert False] otherwise.
+
+    Args:
+        pattern (Pattern): the pattern that the process output should match
+        mode (str): if [mode = stderr], try to match process stderr, otherwise
+                    stdout
+
+    Note: the contextualized code must fork a subprocess using
+          [subprocess.run] and make sure [capture_output=True].
+    """
+    # TODO this is similar to the pytest context manager [pytest.raises]
+    #      that we already use in some tests. See if we can only use one
+    #      construct.
+
+    try:
+        yield None
+        assert False, "Code ran without throwing exception"
+    except subprocess.CalledProcessError as exc:
+        stdout_output = exc.stdout
+        stderr_output = exc.stderr
+        data = []  # type: List[str]
+        if mode == 'stderr':
+            data = stderr_output.split('\n')
+        else:
+            data = stdout_output.split('\n')
+        for line in data:
+            if re.search(pattern, line):
+                return
+        data_pretty = "\n".join(data)
+        assert False, f"Could not find '{pattern}' in '{data_pretty}'"
+    except Exception as exc:  # pylint: disable=broad-except
+        assert_msg = f'Expected CalledProcessError but got {type(exc)}'
+        assert False, assert_msg
 
 
 def assert_storage_contains(client: Client,
@@ -336,8 +398,11 @@ def init_with_transfer(client: Client,
                        contract: str,
                        initial_storage: str,
                        amount: float,
-                       sender: str):
-    client.originate(contract_name_of_file(contract), amount,
+                       sender: str,
+                       contract_name: str = None):
+    if contract_name is None:
+        contract_name = contract_name_of_file(contract)
+    client.originate(contract_name, amount,
                      sender, contract,
                      ['-init', initial_storage, '--burn-cap', '10'])
     bake(client)
@@ -361,21 +426,28 @@ def assert_run_script_failwith(client: Client,
                                contract: str,
                                param: str,
                                storage: str) -> None:
-    def cmd():
-        client.run_script(contract, param, storage, None, True)
 
-    assert_run_failure(cmd, re.compile(r'script reached FAILWITH instruction'))
+    pattern = 'script reached FAILWITH instruction'
+    with assert_run_failure(pattern):
+        client.run_script(contract, param, storage, None, True)
 
 
 def assert_typecheck_data_failure(
         client: Client,
         data: str,
         typ: str,
-        err: Pattern[Any] = re.compile(r'ill-typed data')) -> None:
-    def cmd():
+        err: str = 'ill-typed data') -> None:
+    with assert_run_failure(err):
         client.typecheck_data(data, typ)
 
-    assert_run_failure(cmd, err)
+
+def assert_typecheck_failure(
+        client: Client,
+        script: str,
+        err: str = 'ill-typed script',
+        file: bool = True) -> None:
+    with assert_run_failure(err):
+        client.typecheck(script, file=file)
 
 
 def client_output_converter(pre):
@@ -389,6 +461,14 @@ def client_output_converter(pre):
        For example, a timestamp such as 2019-09-23T10:59:00Z is
        replaced by [TIMESTAMP].
     """
+
+    # Scrub constants
+    pre = re.sub(r'"proof_of_work_nonce": "\w{16}"',
+                 '"proof_of_work_nonce": "[NONCE]"', pre)
+    pre = re.sub(r'"context": "\w{52}"', '"context": "[CONTEXT]"', pre)
+    pre = re.sub(r'"level": \d+', '"level": [LEVEL]', pre)
+    pre = re.sub(r'"priority": \d+', '"priority": "[PRIORITY]"', pre)
+    pre = re.sub(r'"fitness": \[.*\]', '"fitness": "[FITNESS]"', pre)
 
     # Scrub hashes
     pre = re.sub(r'sig\w{93}', '[SIGNATURE]', pre)
@@ -408,14 +488,6 @@ def client_output_converter(pre):
     pre = re.sub(r'Injected block \w{12}', 'Injected block [BLOCK_HASH]', pre)
     pre = re.sub(r'Expected counter: \w+',
                  'Expected counter: [EXPECTED_COUNTER]', pre)
-
-    # Scrub constants
-    pre = re.sub(r'"proof_of_work_nonce": "\w{16}"',
-                 '"proof_of_work_nonce": "[NONCE]"', pre)
-    pre = re.sub(r'"context": "\w{52}"', '"context": "[CONTEXT]"', pre)
-    pre = re.sub(r'"level": \d+', '"level": [LEVEL]', pre)
-    pre = re.sub(r'"priority": \d+', '"priority": "[PRIORITY]"', pre)
-    pre = re.sub(r'"fitness": \[.*\]', '"fitness": "[FITNESS]"', pre)
 
     # Scrub timestamps
     pre = re.sub(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z', '[TIMESTAMP]', pre)
@@ -437,7 +509,6 @@ def assert_transfer_failwith(client: Client,
                              sender: str,
                              receiver: str,
                              args) -> None:
-    def cmd():
+    pattern = 'script reached FAILWITH instruction'
+    with assert_run_failure(pattern):
         client.transfer(amount, sender, receiver, args)
-
-    assert_run_failure(cmd, re.compile(r'script reached FAILWITH instruction'))

@@ -68,35 +68,59 @@ module Logging = struct
   let tag = Tag.def ~doc:"Identity" "pk_alias" Format.pp_print_text
 end
 
-let uri_encoding = Data_encoding.(conv Uri.to_string Uri.of_string string)
+let uri_encoding =
+  let to_uri s =
+    let o = Uri.of_string s in
+    match Uri.scheme o with
+    | None ->
+        Stdlib.failwith "Key URI needs a scheme"
+    | Some _ ->
+        o
+  in
+  Data_encoding.(conv Uri.to_string to_uri string)
 
 type pk_uri = Uri.t
 
-let make_pk_uri (x : Uri.t) : pk_uri =
+module Pk_uri_hashtbl = Hashtbl.Make (struct
+  type t = pk_uri
+
+  let equal = Uri.equal
+
+  let hash = Hashtbl.hash
+end)
+
+let make_pk_uri (x : Uri.t) : pk_uri tzresult Lwt.t =
   match Uri.scheme x with
   | None ->
-      Stdlib.failwith "PK_URI needs a scheme"
+      failwith "Error while parsing URI: PK_URI needs a scheme"
   | Some _ ->
-      x
+      return x
 
 type sk_uri = Uri.t
 
-let make_sk_uri (x : Uri.t) : sk_uri =
+let make_sk_uri (x : Uri.t) : sk_uri tzresult Lwt.t =
   match Uri.scheme x with
   | None ->
-      Stdlib.failwith "SK_URI needs a scheme"
+      failwith "Error while parsing URI: SK_URI needs a scheme"
+  | Some _ ->
+      return x
+
+type sapling_uri = Uri.t
+
+let make_sapling_uri (x : Uri.t) : sapling_uri =
+  match Uri.scheme x with
+  | None ->
+      Stdlib.failwith "SAPLING_URI needs a scheme"
   | Some _ ->
       x
 
 let pk_uri_parameter () =
-  Clic.parameter (fun _ s ->
-      try return (make_pk_uri @@ Uri.of_string s)
-      with Failure s -> failwith "Error while parsing URI: %s" s)
+  Clic.parameter (fun _ s -> make_pk_uri @@ Uri.of_string s)
 
 let pk_uri_param ?name ?desc params =
-  let name = Option.unopt ~default:"uri" name in
+  let name = Option.value ~default:"uri" name in
   let desc =
-    Option.unopt
+    Option.value
       ~default:
         "public key\n\
          Varies from one scheme to the other.\n\
@@ -106,14 +130,12 @@ let pk_uri_param ?name ?desc params =
   Clic.param ~name ~desc (pk_uri_parameter ()) params
 
 let sk_uri_parameter () =
-  Clic.parameter (fun _ s ->
-      try return (make_sk_uri @@ Uri.of_string s)
-      with Failure s -> failwith "Error while parsing URI: %s" s)
+  Clic.parameter (fun _ s -> make_sk_uri @@ Uri.of_string s)
 
 let sk_uri_param ?name ?desc params =
-  let name = Option.unopt ~default:"uri" name in
+  let name = Option.value ~default:"uri" name in
   let desc =
-    Option.unopt
+    Option.value
       ~default:
         "secret key\n\
          Varies from one scheme to the other.\n\
@@ -125,9 +147,9 @@ let sk_uri_param ?name ?desc params =
 module Secret_key = Client_aliases.Alias (struct
   let name = "secret_key"
 
-  type t = Uri.t
+  type t = sk_uri
 
-  let of_source s = return (Uri.of_string s)
+  let of_source s = make_sk_uri @@ Uri.of_string s
 
   let to_source t = return (Uri.to_string t)
 
@@ -137,9 +159,10 @@ end)
 module Public_key = Client_aliases.Alias (struct
   let name = "public_key"
 
-  type t = Uri.t * Signature.Public_key.t option
+  type t = pk_uri * Signature.Public_key.t option
 
-  let of_source s = return (Uri.of_string s, None)
+  let of_source s =
+    make_pk_uri @@ Uri.of_string s >>=? fun pk_uri -> return (pk_uri, None)
 
   let to_source (t, _) = return (Uri.to_string t)
 
@@ -160,6 +183,44 @@ module Public_key = Client_aliases.Alias (struct
              (req "key" Signature.Public_key.encoding))
           (function (uri, Some key) -> Some (uri, key) | (_, None) -> None)
           (fun (uri, key) -> (uri, Some key)) ]
+end)
+
+type sapling_key = {
+  sk : sapling_uri;
+  (* zip32 derivation path *)
+  path : int32 list;
+  (* index of the next address to generate *)
+  address_index : Tezos_sapling.Core.Client.Viewing_key.index;
+}
+
+module Sapling_key = Client_aliases.Alias (struct
+  module S = Tezos_sapling.Core.Client
+
+  let name = "sapling_key"
+
+  type t = sapling_key
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun k -> (k.sk, k.path, k.address_index))
+      (fun (sk, path, address_index) -> {sk; path; address_index})
+      (obj3
+         (req "sk" uri_encoding)
+         (req "path" (list int32))
+         (req "address_index" S.Viewing_key.index_encoding))
+
+  let of_source s =
+    let open Data_encoding in
+    match Json.from_string s with
+    | Error _ ->
+        failwith "corrupted wallet"
+    | Ok s ->
+        return (Json.destruct encoding s)
+
+  let to_source k =
+    let open Data_encoding in
+    return @@ Json.to_string (Json.construct encoding k)
 end)
 
 module type SIGNER = sig
@@ -190,28 +251,28 @@ module type SIGNER = sig
     Bytes.t ->
     Signature.t tzresult Lwt.t
 
-  val deterministic_nonce : sk_uri -> Bytes.t -> Bigstring.t tzresult Lwt.t
+  val deterministic_nonce : sk_uri -> Bytes.t -> Bytes.t tzresult Lwt.t
 
   val deterministic_nonce_hash : sk_uri -> Bytes.t -> Bytes.t tzresult Lwt.t
 
   val supports_deterministic_nonces : sk_uri -> bool tzresult Lwt.t
 end
 
-let signers_table : (string, (module SIGNER)) Hashtbl.t = Hashtbl.create 13
+let signers_table : (module SIGNER) String.Hashtbl.t = String.Hashtbl.create 13
 
 let register_signer signer =
   let module Signer = (val signer : SIGNER) in
-  Hashtbl.replace signers_table Signer.scheme signer
+  String.Hashtbl.replace signers_table Signer.scheme signer
 
 let find_signer_for_key ~scheme =
-  match Hashtbl.find_opt signers_table scheme with
+  match String.Hashtbl.find signers_table scheme with
   | None ->
       fail (Unregistered_key_scheme scheme)
   | Some signer ->
       return signer
 
 let registered_signers () : (string * (module SIGNER)) list =
-  Hashtbl.fold (fun k v acc -> (k, v) :: acc) signers_table []
+  String.Hashtbl.fold (fun k v acc -> (k, v) :: acc) signers_table []
 
 type error += Signature_mismatch of sk_uri
 
@@ -282,7 +343,7 @@ let sign cctxt ?watermark sk_uri buf =
 
 let append cctxt ?watermark loc buf =
   sign cctxt ?watermark loc buf
-  >>|? fun signature -> Signature.concat buf signature
+  >|=? fun signature -> Signature.concat buf signature
 
 let check ?watermark pk_uri signature buf =
   public_key pk_uri
@@ -309,12 +370,24 @@ let register_key cctxt ?(force = false) (public_key_hash, pk_uri, sk_uri)
   Public_key_hash.add ~force cctxt name public_key_hash
   >>=? fun () -> return_unit
 
+(* This function is used to chose between two aliases associated
+   to the same key hash; if we know the secret key for one of them
+   we take it, otherwise if we know the public key for one of them
+   we take it. *)
+let join_keys keys1_opt keys2 =
+  match (keys1_opt, keys2) with
+  | (Some (_, Some _, None), (_, None, None)) ->
+      keys1_opt
+  | (Some (_, _, Some _), _) ->
+      keys1_opt
+  | _ ->
+      Some keys2
+
 let raw_get_key (cctxt : #Client_context.wallet) pkh =
-  Public_key_hash.rev_find cctxt pkh
-  >>=? (function
-         | None ->
-             failwith "no keys for the source contract manager"
-         | Some n ->
+  Public_key_hash.rev_find_all cctxt pkh
+  >>=? (fun names ->
+         fold_left_s
+           (fun keys_opt n ->
              Secret_key.find_opt cctxt n
              >>=? fun sk_uri ->
              Public_key.find_opt cctxt n
@@ -328,9 +401,16 @@ let raw_get_key (cctxt : #Client_context.wallet) pkh =
                         >>=? fun pk ->
                         Public_key.update cctxt n (pk_uri, Some pk)
                         >>=? fun () -> return_some pk)
-             >>=? fun pk -> return (n, pk, sk_uri))
+             >>=? fun pk -> return @@ join_keys keys_opt (n, pk, sk_uri))
+           None
+           names
+         >>=? function
+         | None ->
+             failwith "no keys for the source contract manager"
+         | Some keys ->
+             return keys)
   >>= function
-  | (Ok (_, None, None) | Error _) as initial_result -> (
+  | (Ok (_, _, None) | Error _) as initial_result -> (
       (* try to lookup for a remote key *)
       find_signer_for_key ~scheme:"remote"
       >>=? (fun signer ->

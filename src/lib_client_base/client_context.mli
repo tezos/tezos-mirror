@@ -43,7 +43,7 @@ class type prompter =
   object
     method prompt : ('a, string tzresult) lwt_format -> 'a
 
-    method prompt_password : ('a, Bigstring.t tzresult) lwt_format -> 'a
+    method prompt_password : ('a, Bytes.t tzresult) lwt_format -> 'a
   end
 
 class type io =
@@ -103,6 +103,8 @@ class type io_rpcs =
 class type ui =
   object
     method sleep : float -> unit Lwt.t
+
+    method exit : int -> 'a
 
     method now : unit -> Ptime.t
   end

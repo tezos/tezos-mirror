@@ -168,8 +168,8 @@ let commands () =
            storage
            input
            cctxt ->
-        let source = Option.map ~f:snd source in
-        let payer = Option.map ~f:snd payer in
+        let source = Option.map snd source in
+        let payer = Option.map snd payer in
         Lwt.return @@ Micheline_parser.no_parsing_error program
         >>=? fun program ->
         let show_source = not no_print_source in
@@ -412,5 +412,5 @@ let commands () =
         | true ->
             if quiet then return_unit
             else
-              cctxt#message "Signature check successfull."
+              cctxt#message "Signature check successful."
               >>= fun () -> return_unit) ]

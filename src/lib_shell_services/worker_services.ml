@@ -41,7 +41,7 @@ module Prevalidators = struct
                 (req
                    "information"
                    (Worker_types.worker_information_encoding RPC_error.encoding))
-                (req "pipelines" int8)))
+                (req "pipelines" int16)))
         RPC_path.(root / "workers" / "prevalidators")
 
     let state =
@@ -144,7 +144,7 @@ module Chain_validators = struct
                 (req
                    "information"
                    (Worker_types.worker_information_encoding RPC_error.encoding))
-                (req "pipelines" int8)))
+                (req "pipelines" int16)))
         RPC_path.(root / "workers" / "chain_validators")
 
     let state =

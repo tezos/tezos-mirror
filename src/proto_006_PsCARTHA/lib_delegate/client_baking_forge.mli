@@ -28,8 +28,8 @@ open Alpha_context
 
 (** [generate_seed_nonce ()] is a random nonce that is typically used
     in block headers. When baking, bakers generate random nonces whose
-    hash is commited in the block they bake. They will typically
-    reveal the aforementionned nonce during the next cycle. *)
+    hash is committed in the block they bake. They will typically
+    reveal the aforementioned nonce during the next cycle. *)
 val generate_seed_nonce : unit -> Nonce.t
 
 (** [inject_block cctxt blk ?force ~priority ~timestamp ~fitness
@@ -63,7 +63,7 @@ type error += Failed_to_preapply of Tezos_base.Operation.t * error list
 
     * Baking priority: If [`Auto] is used, it will be computed from
       the public key hash of the specified contract, optionally capped
-      to a maximum value, and optionnaly restricting for free baking slot.
+      to a maximum value, and optionally restricting for free baking slot.
 
     * Timestamp: If [?timestamp] is set, and is compatible with the
       computed baking priority, it will be used. Otherwise, it will be

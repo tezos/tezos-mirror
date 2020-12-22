@@ -24,11 +24,12 @@
 (*****************************************************************************)
 
 let () =
-  Alcotest.run
+  Alcotest_lwt.run
     "protocol_alpha"
     [ ("transfer", Transfer.tests);
       ("origination", Origination.tests);
       ("activation", Activation.tests);
+      ("revelation", Reveal.tests);
       ("endorsement", Endorsement.tests);
       ("double endorsement", Double_endorsement.tests);
       ("double baking", Double_baking.tests);
@@ -38,4 +39,10 @@ let () =
       ("rolls", Rolls.tests);
       ("combined", Combined_operations.tests);
       ("qty", Qty.tests);
-      ("voting", Voting.tests) ]
+      ("voting", Voting.tests);
+      ("interpretation", Interpretation.tests);
+      ("typechecking", Typechecking.tests);
+      ("gas properties", Gas_properties.tests);
+      ("fixed point computation", Fixed_point.tests);
+      ("gas cost functions", Gas_costs.tests) ]
+  |> Lwt_main.run

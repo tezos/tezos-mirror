@@ -35,7 +35,7 @@ let builtin_commands =
       no_options
       (fixed ["list"; "understood"; "protocols"])
       (fun () (cctxt : #Client_context.full) ->
-        Lwt_list.iter_s
+        Seq.iter_s
           (fun (ver, _) -> cctxt#message "%a" Protocol_hash.pp_short ver)
           (Client_commands.get_versions ())
         >>= fun () -> return_unit) ]
@@ -168,14 +168,19 @@ let setup_http_rpc_client_config parsed_args base_dir rpc_config =
        ~base_dir
        ~rpc_config
 
-let setup_mockup_rpc_client_config (args : Client_config.cli_args) base_dir =
+let setup_mockup_rpc_client_config
+    (cctxt : Tezos_client_base.Client_context.full)
+    (args : Client_config.cli_args) base_dir =
   let in_memory_mockup (args : Client_config.cli_args) =
     match args.protocol with
     | None ->
-        Tezos_mockup.Persistence.default_mockup_context ()
-    | Some proto_hash ->
+        Tezos_mockup.Persistence.default_mockup_context cctxt
+    | Some protocol_hash ->
         Tezos_mockup.Persistence.init_mockup_context_by_protocol_hash
-          proto_hash
+          ~cctxt
+          ~protocol_hash
+          ~constants_overrides_json:None
+          ~bootstrap_accounts_json:None
   in
   let base_dir_class = Tezos_mockup.Persistence.classify_base_dir base_dir in
   ( match base_dir_class with
@@ -187,32 +192,16 @@ let setup_mockup_rpc_client_config (args : Client_config.cli_args) base_dir =
       in_memory_mockup args >>=? fun res -> return (res, mem_only)
   | Tezos_mockup.Persistence.Base_dir_is_mockup ->
       let mem_only = false in
-      Tezos_mockup.Persistence.get_mockup_context_from_disk ~base_dir
-      >>=? fun (((module Mockup_environment), _) as res) ->
-      ( match args.protocol with
-      | None ->
-          return_unit
-      | Some desired_protocol ->
-          if
-            Protocol_hash.equal
-              Mockup_environment.protocol_hash
-              desired_protocol
-          then return_unit
-          else
-            failwith
-              "Protocol %a was requested via --protocol\n\
-               yet the mockup at %s was initialized with %a"
-              Protocol_hash.pp_short
-              Mockup_environment.protocol_hash
-              base_dir
-              Protocol_hash.pp_short
-              desired_protocol )
-      >>=? fun () -> return (res, mem_only) )
-  >>=? fun ((mockup_env, rpc_context), mem_only) ->
-  return (new unix_mockup ~base_dir ~mem_only ~mockup_env ~rpc_context)
+      Tezos_mockup.Persistence.get_mockup_context_from_disk
+        ~base_dir
+        ~protocol_hash:args.protocol
+      >>=? fun res -> return (res, mem_only) )
+  >>=? fun ((mockup_env, (chain_id, rpc_context)), mem_only) ->
+  return
+    (new unix_mockup ~base_dir ~mem_only ~mockup_env ~chain_id ~rpc_context)
 
-let setup_client_config (parsed_args : Client_config.cli_args option) base_dir
-    rpc_config =
+let setup_client_config (cctxt : Tezos_client_base.Client_context.full)
+    (parsed_args : Client_config.cli_args option) base_dir rpc_config =
   match parsed_args with
   | None ->
       setup_http_rpc_client_config parsed_args base_dir rpc_config
@@ -221,7 +210,7 @@ let setup_client_config (parsed_args : Client_config.cli_args option) base_dir
     | Client_config.Mode_client ->
         setup_http_rpc_client_config parsed_args base_dir rpc_config
     | Client_config.Mode_mockup ->
-        setup_mockup_rpc_client_config args base_dir )
+        setup_mockup_rpc_client_config cctxt args base_dir )
 
 (* Main (lwt) entry *)
 let main (module C : M) ~select_commands =
@@ -261,15 +250,16 @@ let main (module C : M) ~select_commands =
   >>= fun () ->
   Lwt.catch
     (fun () ->
-      C.parse_config_args
-        (new unix_full
-           ~chain:C.default_chain
-           ~block:C.default_block
-           ~confirmations:None
-           ~password_filename:None
-           ~base_dir:C.default_base_dir
-           ~rpc_config:RPC_client_unix.default_config)
-        original_args
+      let full =
+        new unix_full
+          ~chain:C.default_chain
+          ~block:C.default_block
+          ~confirmations:None
+          ~password_filename:None
+          ~base_dir:C.default_base_dir
+          ~rpc_config:RPC_client_unix.default_config
+      in
+      C.parse_config_args full original_args
       >>=? (fun (parsed, remaining) ->
              let parsed_config_file = parsed.Client_config.parsed_config_file
              and parsed_args = parsed.Client_config.parsed_args
@@ -290,14 +280,13 @@ let main (module C : M) ~select_commands =
                  match parsed_config_file with
                  | None ->
                      RPC_client_unix.default_config
-                 | Some parsed_config_file ->
+                 | Some cfg ->
                      {
                        RPC_client_unix.default_config with
-                       host =
-                         parsed_config_file.Client_config.Cfg_file.node_addr;
-                       port =
-                         parsed_config_file.Client_config.Cfg_file.node_port;
-                       tls = parsed_config_file.Client_config.Cfg_file.tls;
+                       endpoint =
+                         Option.value
+                           cfg.endpoint
+                           ~default:Client_config.default_endpoint;
                      }
                in
                match parsed_args with
@@ -321,7 +310,7 @@ let main (module C : M) ~select_commands =
                | None ->
                    rpc_config
              in
-             setup_client_config parsed_args base_dir rpc_config
+             setup_client_config full parsed_args base_dir rpc_config
              >>=? fun client_config ->
              setup_remote_signer
                (module C)
@@ -405,12 +394,10 @@ let main (module C : M) ~select_commands =
   Internal_event_unix.close () >>= fun () -> Lwt.return retcode
 
 (* Where all the user friendliness starts *)
-let run ?log (module M : M)
+let run (module M : M)
     ~(select_commands :
        RPC_client_unix.http_ctxt ->
        Client_config.cli_args ->
        Client_context.full Clic.command list tzresult Lwt.t) =
-  Lwt_exit.exit_on ?log Sys.sigint ;
-  Lwt_exit.exit_on ?log Sys.sigterm ;
-  Stdlib.exit @@ Lwt_main.run @@ Lwt_exit.wrap_promise
+  Stdlib.exit @@ Lwt_main.run @@ Lwt_exit.wrap_and_forward
   @@ main (module M) ~select_commands

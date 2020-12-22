@@ -34,17 +34,27 @@ val init_arg : (string, full) Clic.arg
 
 val fee_arg : (Tez.t option, full) Clic.arg
 
+val default_fee_arg : (Tez.t option, full) Clic.arg
+
 val counter_arg : (Z.t option, full) Clic.arg
 
-val gas_limit_arg : (Z.t option, full) Clic.arg
+val gas_limit_arg : (Gas.Arith.integral option, full) Clic.arg
+
+val default_gas_limit_arg : (Gas.Arith.integral option, full) Clic.arg
 
 val storage_limit_arg : (Z.t option, full) Clic.arg
 
+val default_storage_limit_arg : (Z.t option, full) Clic.arg
+
 val arg_arg : (string option, full) Clic.arg
+
+val default_arg_arg : (string option, full) Clic.arg
 
 val source_arg : (string option, full) Clic.arg
 
 val entrypoint_arg : (string option, full) Clic.arg
+
+val default_entrypoint_arg : (string option, full) Clic.arg
 
 val delegate_arg : (Signature.Public_key_hash.t option, full) Clic.arg
 
@@ -52,9 +62,9 @@ val max_priority_arg : (int option, full) Clic.arg
 
 val minimal_fees_arg : (Tez.tez, full) Clic.arg
 
-val minimal_nanotez_per_gas_unit_arg : (Z.t, full) Clic.arg
+val minimal_nanotez_per_gas_unit_arg : (Q.t, full) Clic.arg
 
-val minimal_nanotez_per_byte_arg : (Z.t, full) Clic.arg
+val minimal_nanotez_per_byte_arg : (Q.t, full) Clic.arg
 
 val force_low_fee_arg : (bool, full) Clic.arg
 
@@ -100,5 +110,7 @@ end
 val int_parameter : (int, full) Clic.parameter
 
 val string_parameter : (string, full) Clic.parameter
+
+val bytes_of_prefixed_string : string -> Bytes.t tzresult Lwt.t
 
 val bytes_parameter : (Bytes.t, full) Clic.parameter

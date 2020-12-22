@@ -1,0 +1,17 @@
+(library
+ (name tezos_protocol_environment_packer)
+ (public_name tezos-protocol-environment-packer)
+ (modules))
+
+(executable
+ (name s_packer))
+
+(install
+  (section libexec)
+  (package tezos-protocol-environment-packer)
+  (files (s_packer.exe as s_packer)))
+
+(rule
+ (alias runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

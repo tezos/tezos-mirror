@@ -169,7 +169,7 @@ let pp_rpc_error ppf err =
   | Bad_request msg ->
       Format.fprintf
         ppf
-        "@[<v 2>Oups! It looks like we forged an invalid HTTP request.@,%s@]"
+        "@[<v 2>Oops! It looks like we forged an invalid HTTP request.@,%s@]"
         msg
   | Method_not_allowed meths ->
       Format.fprintf
@@ -230,7 +230,7 @@ let pp_rpc_error ppf err =
         ppf
         "@[<v 2>The server refused connection to host \"%s\", please check \
          the node settings for CORS allowed origins.@]"
-        (Option.unopt ~default:"" host)
+        (Option.value ~default:"" host)
 
 let () =
   register_error_kind

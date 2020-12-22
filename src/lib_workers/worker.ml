@@ -191,13 +191,13 @@ module type T = sig
     'b tzresult Lwt.t
 
   (** Exports the canceler to allow cancellation of other tasks when this
-      worker is shutdowned or when it dies. *)
+      worker is shut down or when it dies. *)
   val canceler : _ t -> Lwt_canceler.t
 
   (** Triggers a worker termination. *)
   val trigger_shutdown : _ t -> unit
 
-  (** Recod an event in the backlog. *)
+  (** Record an event in the backlog. *)
   val record_event : _ t -> Event.t -> unit
 
   (** Record an event and make sure it is logged. *)
@@ -249,6 +249,14 @@ struct
   module Types = Types
   module Logger = Logger
 
+  module Nametbl = Hashtbl.MakeSeeded (struct
+    type t = Name.t
+
+    let hash = Hashtbl.seeded_hash
+
+    let equal = Name.equal
+  end)
+
   let base_name = String.concat "-" Name.base
 
   type message = Message : 'a Request.t * 'a tzresult Lwt.u option -> message
@@ -290,7 +298,7 @@ struct
     mutable (* only for init *) worker : unit Lwt.t;
     mutable (* only for init *) state : Types.state option;
     buffer : 'kind buffer;
-    event_log : (Internal_event.level * Event.t Ring.t) list;
+    event_log : (Internal_event.level * Event.t Ringo.Ring.t) list;
     canceler : Lwt_canceler.t;
     name : Name.t;
     id : int;
@@ -304,7 +312,7 @@ struct
   and 'kind table = {
     buffer_kind : 'kind buffer_kind;
     mutable last_id : int;
-    instances : (Name.t, 'kind t) Hashtbl.t;
+    instances : 'kind t Nametbl.t;
   }
 
   let queue_item ?u r = (Systime_os.now (), Message (r, u))
@@ -397,7 +405,10 @@ struct
 
     let push_request_now (w : infinite queue t) request =
       let (Queue_buffer message_queue) = w.buffer in
-      Lwt_pipe.push_now_exn message_queue (queue_item request)
+      if Lwt_pipe.is_closed message_queue then ()
+      else
+        (* Queues are infinite so the push always succeeds *)
+        assert (Lwt_pipe.push_now message_queue (queue_item request))
 
     let try_push_request_now (w : bounded queue t) request =
       let (Bounded_buffer message_queue) = w.buffer in
@@ -457,7 +468,7 @@ struct
     | Bounded_buffer message_queue ->
         close_queue message_queue
     | Dropbox_buffer message_box ->
-        ( try Option.iter ~f:wakeup (Lwt_dropbox.peek message_box)
+        ( try Option.iter wakeup (Lwt_dropbox.peek message_box)
           with Lwt_dropbox.Closed -> () ) ;
         Lwt_dropbox.close message_box
 
@@ -507,7 +518,7 @@ struct
     lwt_emit w (Logger.WorkerEvent (evt, Event.level evt))
     >>= fun () ->
     if Event.level evt >= w.limits.backlog_level then
-      Ring.add (List.assoc (Event.level evt) w.event_log) evt ;
+      Ringo.Ring.add (List.assoc (Event.level evt) w.event_log) evt ;
     Lwt.return_unit
 
   let record_event w evt = Lwt.ignore_result (log_event w evt)
@@ -536,7 +547,7 @@ struct
   end
 
   let create_table buffer_kind =
-    {buffer_kind; last_id = 0; instances = Hashtbl.create 10}
+    {buffer_kind; last_id = 0; instances = Nametbl.create ~random:true 10}
 
   let worker_loop (type kind) handlers (w : kind t) =
     let (module Handlers : HANDLERS with type self = kind t) = handlers in
@@ -553,12 +564,12 @@ struct
       Lwt_canceler.cancel w.canceler
       >>= fun () ->
       w.status <- Closed (t0, Systime_os.now (), errs) ;
-      Hashtbl.remove w.table.instances w.name ;
       Handlers.on_close w
       >>= fun () ->
+      Nametbl.remove w.table.instances w.name ;
       w.state <- None ;
       Lwt.ignore_result
-        ( List.iter (fun (_, ring) -> Ring.clear ring) w.event_log ;
+        ( List.iter (fun (_, ring) -> Ringo.Ring.clear ring) w.event_log ;
           Lwt.return_unit ) ;
       Lwt.return_unit
     in
@@ -659,7 +670,7 @@ struct
       if name_s = "" then base_name
       else Format.asprintf "%s_%s" base_name name_s
     in
-    if Hashtbl.mem table.instances name then
+    if Nametbl.mem table.instances name then
       invalid_arg
         (Format.asprintf "Worker.launch: duplicate worker %s" full_name)
     else
@@ -684,7 +695,7 @@ struct
         let levels =
           Internal_event.[Debug; Info; Notice; Warning; Error; Fatal]
         in
-        List.map (fun l -> (l, Ring.create limits.backlog_size)) levels
+        List.map (fun l -> (l, Ringo.Ring.create limits.backlog_size)) levels
       in
       let w =
         {
@@ -704,7 +715,7 @@ struct
           status = Launching (Systime_os.now ());
         }
       in
-      Hashtbl.add table.instances name w ;
+      Nametbl.add table.instances name w ;
       ( if id_name = base_name then lwt_emit w (Started None)
       else lwt_emit w (Started (Some name_s)) )
       >>= fun () ->
@@ -752,7 +763,9 @@ struct
   let pending_requests q = Queue.pending_requests q
 
   let last_events w =
-    List.map (fun (level, ring) -> (level, Ring.elements ring)) w.event_log
+    List.map
+      (fun (level, ring) -> (level, Ringo.Ring.elements ring))
+      w.event_log
 
   let status {status; _} = status
 
@@ -760,7 +773,7 @@ struct
 
   let information (type a) (w : a t) =
     {
-      Worker_types.instances_number = Hashtbl.length w.table.instances;
+      Worker_types.instances_number = Nametbl.length w.table.instances;
       wstatus = w.status;
       queue_length =
         ( match w.buffer with
@@ -775,10 +788,14 @@ struct
   let view w = Types.view (state w) w.parameters
 
   let list {instances; _} =
-    Hashtbl.fold (fun n w acc -> (n, w) :: acc) instances []
+    Nametbl.fold (fun n w acc -> (n, w) :: acc) instances []
 
-  let find_opt {instances; _} = Hashtbl.find_opt instances
+  let find_opt {instances; _} = Nametbl.find instances
 
   (* TODO? add a list of cancelers for nested protection ? *)
   let protect {canceler; _} ?on_error f = protect ?on_error ~canceler f
+
+  let () =
+    Internal_event.register_section
+      (Internal_event.Section.make_sanitized Name.base)
 end

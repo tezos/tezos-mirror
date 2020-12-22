@@ -189,6 +189,10 @@ module P2p_event = struct
     | Rejecting_request of P2p_point.Id.t * Id.t * P2p_peer_id.t
     | Request_rejected of P2p_point.Id.t * (Id.t * P2p_peer_id.t) option
     | Connection_established of Id.t * P2p_peer_id.t
+    | Bootstrap_received of {source : P2p_peer_id.t}
+    | Bootstrap_sent of {source : P2p_peer_id.t}
+    | Advertise_received of {source : P2p_peer_id.t}
+    | Advertise_sent of {source : P2p_peer_id.t}
     | Swap_request_received of {source : P2p_peer_id.t}
     | Swap_ack_received of {source : P2p_peer_id.t}
     | Swap_request_sent of {source : P2p_peer_id.t}
@@ -236,6 +240,18 @@ module P2p_event = struct
     | Connection_established (_, pi) ->
         Format.pp_print_string ppf "Connection_established " ;
         P2p_peer_id.pp ppf pi
+    | Bootstrap_received {source} ->
+        Format.pp_print_string ppf "Bootstrap_received " ;
+        P2p_peer_id.pp ppf source
+    | Bootstrap_sent {source} ->
+        Format.pp_print_string ppf "Bootstrap_sent " ;
+        P2p_peer_id.pp ppf source
+    | Advertise_received {source} ->
+        Format.pp_print_string ppf "Advertise_received " ;
+        P2p_peer_id.pp ppf source
+    | Advertise_sent {source} ->
+        Format.pp_print_string ppf "Advertise_sent " ;
+        P2p_peer_id.pp ppf source
     | Swap_request_received {source} ->
         Format.pp_print_string ppf "Swap_request_received " ;
         P2p_peer_id.pp ppf source
@@ -468,7 +484,41 @@ module P2p_event = struct
                 "swap_failure"
                 (obj1 (req "source" P2p_peer_id.encoding)))
              (function Swap_failure {source} -> Some source | _ -> None)
-             (fun source -> Swap_failure {source}) ]
+             (fun source -> Swap_failure {source});
+           case
+             (Tag 22)
+             ~title:"Bootstrap_sent"
+             (branch_encoding
+                "bootstrap_sent"
+                (obj1 (req "source" P2p_peer_id.encoding)))
+             (function Bootstrap_sent {source} -> Some source | _ -> None)
+             (fun source -> Bootstrap_sent {source});
+           case
+             (Tag 23)
+             ~title:"Bootstrap_received"
+             (branch_encoding
+                "bootstrap_received"
+                (obj1 (req "source" P2p_peer_id.encoding)))
+             (function
+               | Bootstrap_received {source} -> Some source | _ -> None)
+             (fun source -> Bootstrap_received {source});
+           case
+             (Tag 24)
+             ~title:"Advertise_sent"
+             (branch_encoding
+                "advertise_sent"
+                (obj1 (req "source" P2p_peer_id.encoding)))
+             (function Advertise_sent {source} -> Some source | _ -> None)
+             (fun source -> Advertise_sent {source});
+           case
+             (Tag 25)
+             ~title:"Advertise_received"
+             (branch_encoding
+                "advertise_received"
+                (obj1 (req "source" P2p_peer_id.encoding)))
+             (function
+               | Advertise_received {source} -> Some source | _ -> None)
+             (fun source -> Advertise_received {source}) ]
 end
 
 let () =

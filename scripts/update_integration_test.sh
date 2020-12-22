@@ -9,41 +9,51 @@ src_dir="$(dirname "$script_dir")"
 
 tmp=$(mktemp)
 
-sed -z 's/^\(.*##BEGIN_INTEGRATION_PYTHON##\n\).*\(\n##END_INTEGRATION_PYTHON##.*\)$/\1/' "$src_dir/.gitlab-ci.yml" > $tmp
+csplit --quiet --prefix="$tmp" "$src_dir/.gitlab-ci.yml" /##BEGIN_INTEGRATION_PYTHON##/+1
+mv "$tmp"00 "$tmp"
+rm "$tmp"0*
 
-for test in tests_python/tests/test_*.py; do
-    testname=${test##tests_python/tests/test_}
-    testname=${testname%%.py}
-    cat >> $tmp <<EOF
+for test in $(find tests_python/tests/ -name 'test_*.py' | LC_COLLATE=C sort); do
+    case "$test" in
+      */multibranch/*)
+        # skip multibranch tests for now
+        ;;
+      *)
+        testname=${test##*/test_}
+        testname=${testname%%.py}
+        cat >> $tmp <<EOF
 integration:$testname:
   <<: *integration_python_definition
   script:
-    - pytest $test -s --log-dir=tmp
+    - poetry run pytest ${test#tests_python/} -s --log-dir=tmp
   stage: test
 
 EOF
+    esac
 done
 
 cat >> $tmp <<EOF
 integration:examples_forge_transfer:
-  <<: *integration_definition
+  <<: *integration_python_definition
   script:
-    - PYTHONPATH=tests_python/ python3 tests_python/examples/forge_transfer.py
+    - PYTHONPATH=\$PYTHONPATH:./ poetry run python examples/forge_transfer.py
   stage: test
 
 integration:examples_example:
-  <<: *integration_definition
+  <<: *integration_python_definition
   script:
-    - PYTHONPATH=tests_python/ python3 tests_python/examples/example.py
+    - PYTHONPATH=\$PYTHONPATH:./ poetry run python examples/example.py
   stage: test
 
 integration:examples_test_example:
-  <<: *integration_definition
+  <<: *integration_python_definition
   script:
-    - pytest tests_python/examples/test_example.py
+    - PYTHONPATH=./ poetry run pytest examples/test_example.py
   stage: test
 EOF
 
-sed -z 's/^\(.*##BEGIN_INTEGRATION_PYTHON##\n\).*\(\n##END_INTEGRATION_PYTHON##.*\)$/\2/' "$src_dir/.gitlab-ci.yml" >> $tmp
+csplit --quiet --prefix="$tmp" "$src_dir/.gitlab-ci.yml" %##END_INTEGRATION_PYTHON##%
+cat "$tmp"00 >> "$tmp"
+rm "$tmp"0*
 
 mv $tmp "$src_dir/.gitlab-ci.yml"

@@ -24,9 +24,77 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Internal_event.Legacy_logging.Make (struct
-  let name = "p2p.discovery"
-end)
+module Events = struct
+  include Internal_event.Simple
+
+  let section = ["p2p"; "discovery"]
+
+  let create_socket =
+    declare_0
+      ~section
+      ~name:"create_socket"
+      ~msg:"Error creating a socket"
+      ~level:Debug
+      ()
+
+  let message_received =
+    declare_0
+      ~section
+      ~name:"message_received"
+      ~msg:"Received discovery message"
+      ~level:Debug
+      ()
+
+  let parse_error =
+    declare_1
+      ~section
+      ~name:"parse_error"
+      ~msg:"Failed to parse ({address})"
+      ~level:Debug
+      ("address", Data_encoding.string)
+
+  let register_new =
+    declare_2
+      ~section
+      ~name:"too_many_connections"
+      ~msg:"Registering new point {address}:{port}"
+      ~level:Notice
+      ("address", P2p_addr.encoding)
+      ("port", Data_encoding.int16)
+
+  let unexpected_error =
+    declare_2
+      ~section
+      ~name:"unexpected_error"
+      ~msg:"Unexpected error in {worker} worker: {error}"
+      ~level:Error
+      ("worker", Data_encoding.string)
+      ("error", Error_monad.trace_encoding)
+
+  let unexpected_exit =
+    declare_0
+      ~section
+      ~name:"unexpected_exit"
+      ~msg:"Answer worker exited unexpectedly"
+      ~level:Error
+      ()
+
+  let broadcast_message =
+    declare_0
+      ~section
+      ~name:"broadcast_message"
+      ~msg:"Broadcasting discovery message"
+      ~level:Debug
+      ()
+
+  let broadcast_error =
+    declare_0
+      ~section
+      ~name:"broadcast_error"
+      ~msg:"Error broadcasting a discovery request"
+      ~level:Debug
+      ()
+end
 
 type pool = Pool : ('msg, 'meta, 'meta_conn) P2p_pool.t -> pool
 
@@ -57,15 +125,20 @@ module Answer = struct
       (fun () ->
         let socket = Lwt_unix.socket PF_INET SOCK_DGRAM 0 in
         Lwt_canceler.on_cancel st.canceler (fun () ->
-            Lwt_utils_unix.safe_close socket) ;
+            Lwt_utils_unix.safe_close socket
+            >>= function
+            | Error trace ->
+                Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace ;
+                Lwt.return_unit
+            | Ok () ->
+                Lwt.return_unit) ;
         Lwt_unix.setsockopt socket SO_BROADCAST true ;
         Lwt_unix.setsockopt socket SO_REUSEADDR true ;
         let addr =
           Lwt_unix.ADDR_INET (Unix.inet_addr_any, st.discovery_port)
         in
         Lwt_unix.bind socket addr >>= fun () -> Lwt.return socket)
-      (fun exn ->
-        lwt_debug "Error creating a socket" >>= fun () -> Lwt.fail exn)
+      (fun exn -> Events.(emit create_socket) () >>= fun () -> Lwt.fail exn)
 
   let loop st =
     protect ~canceler:st.canceler (fun () ->
@@ -77,8 +150,7 @@ module Answer = struct
       protect ~canceler:st.canceler (fun () ->
           Lwt_unix.recvfrom socket buf 0 Message.length []
           >>= fun content ->
-          lwt_debug "Received discovery message..."
-          >>= fun () -> return content)
+          Events.(emit message_received) () >>= fun () -> return content)
       >>=? function
       | (len, Lwt_unix.ADDR_INET (remote_addr, _))
         when Compare.Int.equal len Message.length -> (
@@ -89,14 +161,10 @@ module Answer = struct
             let s_addr = Unix.string_of_inet_addr remote_addr in
             match P2p_addr.of_string_opt s_addr with
             | None ->
-                lwt_debug "Failed to parse %S\n@." s_addr >>= fun () -> aux ()
+                Events.(emit parse_error) s_addr >>= fun () -> aux ()
             | Some addr ->
                 let (Pool pool) = st.pool in
-                lwt_log_info
-                  "Registering new point %a:%d"
-                  P2p_addr.pp
-                  addr
-                  remote_port
+                Events.(emit register_new) (addr, remote_port)
                 >>= fun () ->
                 P2p_pool.register_new_point
                   ~trusted:st.trust_discovered_peers
@@ -117,13 +185,10 @@ module Answer = struct
     | Error (Canceled :: _) ->
         Lwt.return_unit
     | Error err ->
-        lwt_log_error
-          "@[<v 2>Unexpected error in answer worker@ %a@]"
-          pp_print_error
-          err
+        Events.(emit unexpected_error) ("answer", err)
         >>= fun () -> Lwt_canceler.cancel st.canceler
     | Ok () ->
-        lwt_log_error "@[<v 2>Unexpected exit in answer worker@]"
+        Events.(emit unexpected_exit) ()
         >>= fun () -> Lwt_canceler.cancel st.canceler
 
   let create my_peer_id pool ~trust_discovered_peers ~discovery_port =
@@ -176,17 +241,30 @@ module Sender = struct
       (fun () ->
         let socket = Lwt_unix.(socket PF_INET SOCK_DGRAM 0) in
         Lwt_canceler.on_cancel st.canceler (fun () ->
-            Lwt_utils_unix.safe_close socket) ;
+            Lwt_utils_unix.safe_close socket
+            >>= function
+            | Error trace ->
+                Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace ;
+                Lwt.return_unit
+            | Ok () ->
+                Lwt.return_unit) ;
         Lwt_unix.setsockopt socket Lwt_unix.SO_BROADCAST true ;
         let broadcast_ipv4 = Ipaddr_unix.V4.to_inet_addr st.discovery_addr in
         let addr = Lwt_unix.ADDR_INET (broadcast_ipv4, st.discovery_port) in
         Lwt_unix.connect socket addr
         >>= fun () ->
-        lwt_debug "Broadcasting discovery message..."
+        Events.(emit broadcast_message) ()
         >>= fun () ->
         Lwt_unix.sendto socket msg 0 Message.length [] addr
-        >>= fun _len -> Lwt_utils_unix.safe_close socket)
-      (fun _exn -> lwt_debug "Error broadcasting a discovery request")
+        >>= fun _len ->
+        Lwt_utils_unix.safe_close socket
+        >>= function
+        | Error trace ->
+            Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace ;
+            Lwt.return_unit
+        | Ok () ->
+            Lwt.return_unit)
+      (fun _exn -> Events.(emit broadcast_error) ())
 
   let rec worker_loop sender_config st =
     protect ~canceler:st.canceler (fun () ->
@@ -211,10 +289,7 @@ module Sender = struct
     | Error (Canceled :: _) ->
         Lwt.return_unit
     | Error err ->
-        lwt_log_error
-          "@[<v 2>Unexpected error in sender worker@ %a@]"
-          pp_print_error
-          err
+        Events.(emit unexpected_error) ("sender", err)
         >>= fun () -> Lwt_canceler.cancel st.canceler
 
   let create my_peer_id pool ~listening_port ~discovery_port ~discovery_addr =

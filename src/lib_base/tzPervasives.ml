@@ -30,6 +30,15 @@ include Tezos_clic
 include Tezos_crypto
 include Tezos_micheline
 module Data_encoding = Data_encoding
+module Seq = Tezos_lwt_result_stdlib.Lwtreslib.Seq
+module Map = Tezos_lwt_result_stdlib.Lwtreslib.Map
+module Set = Tezos_lwt_result_stdlib.Lwtreslib.Set
+module Hashtbl = Tezos_lwt_result_stdlib.Lwtreslib.Hashtbl
+
+module Option = struct
+  include Option
+  include Tezos_stdlib.TzOption
+end
 
 module List = struct
   include List
@@ -39,6 +48,14 @@ end
 module String = struct
   include String
   include Tezos_stdlib.TzString
+
+  module Hashtbl = Tezos_lwt_result_stdlib.Lwtreslib.Hashtbl.MakeSeeded (struct
+    type t = string
+
+    let equal = String.equal
+
+    let hash = Hashtbl.seeded_hash
+  end)
 end
 
 module Time = Time
@@ -65,3 +82,8 @@ module Network_version = Network_version
 include Utils.Infix
 include Error_monad
 module Internal_event = Internal_event
+
+module Filename = struct
+  include Stdlib.Filename
+  include Tezos_stdlib.TzFilename
+end

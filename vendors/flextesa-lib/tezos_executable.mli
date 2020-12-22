@@ -1,5 +1,5 @@
 (** This module wraps the type ['kind t] around the notion of
-    tezos-excutable: a path to a binary with tezos-specific properties. *)
+    tezos-executable: a path to a binary with tezos-specific properties. *)
 
 (** Helper functions to construct exec-style command lines for
     ["tezos-*"] applications. *)

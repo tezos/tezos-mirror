@@ -23,12 +23,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:    Micheline
+    Invocation:   dune build @src/lib_micheline/runtest
+    Dependencies: src/lib_micheline/test/assert.ml
+    Subject:      Lexing and parsing functions for Micheline terms.
+*)
+
 (****************************************************************************)
 (* Token value   *)
 (****************************************************************************)
 
 open Assert.Compat
 
+(** Asserts that an input [given] will generate some output [expected] *)
 let assert_tokenize ~loc given expected =
   match Micheline_parser.tokenize given with
   | (tokens, []) ->
@@ -37,14 +46,18 @@ let assert_tokenize ~loc given expected =
   | (_, _) ->
       failwith "%s - Cannot tokenize %s" loc given
 
-let assert_tokenize_error ~loc given expected =
+(** Asserts that the token produced by the input [given] is not
+   present in the [forbidden_tokens] list. *)
+let assert_tokenize_error ~loc given forbidden_tokens =
   match Micheline_parser.tokenize given with
   | (tokens, []) ->
       let tokens_got = List.map (fun x -> x.Micheline_parser.token) tokens in
-      Assert.not_equal_tokens ~loc tokens_got expected
+      Assert.not_equal_tokens ~loc tokens_got forbidden_tokens
   | (_, _) ->
       return_unit
 
+(** Basic tokenizing of strings, bytes, integers, identifiers,
+   annotations, comments. *)
 let test_tokenize_basic () =
   (* String *)
   assert_tokenize ~loc:__LOC__ "\"abc\"" [String "abc"]
@@ -238,9 +251,7 @@ let test_tokenize_basic () =
   assert_tokenize_error ~loc:__LOC__ "(" [Close_paren]
   >>=? fun () -> assert_tokenize_error ~loc:__LOC__ ")" [Open_paren]
 
-(*********************)
-(* One line contracts *)
-
+(** Tokenizing simple one-line contracts (not including parsing). *)
 let test_one_line_contract () =
   assert_tokenize
     ~loc:__LOC__
@@ -282,9 +293,7 @@ let test_one_line_contract () =
     "}{}{}{"
     [Close_brace; Open_brace; Close_brace; Open_brace; Close_brace; Open_brace]
 
-(*********************************)
-(* Conditional contracts *)
-
+(** Tokenizing conditional contracts (not including parsing). *)
 let test_condition_contract () =
   assert_tokenize
     ~loc:__LOC__
@@ -388,7 +397,7 @@ let assert_toplevel_parsing ~loc source expected =
         >>=? fun () ->
         iter2_p (Assert.equal ~loc) ast expected >>=? fun () -> return_unit )
 
-let assert_toplevel_parsing_error ~loc source expected =
+let assert_toplevel_parsing_error ~loc source forbidden_tokens =
   match Micheline_parser.tokenize source with
   | (_, _ :: _) ->
       return_unit
@@ -398,10 +407,13 @@ let assert_toplevel_parsing_error ~loc source expected =
         return_unit
     | (ast, []) ->
         let ast = List.map Micheline.strip_locations ast in
-        let expected = List.map Micheline.strip_locations expected in
-        Assert.equal ~loc (List.length ast) (List.length expected)
-        >>=? fun () -> iter2_p (Assert.not_equal ~loc) ast expected )
+        let forbidden_tokens =
+          List.map Micheline.strip_locations forbidden_tokens
+        in
+        Assert.equal ~loc (List.length ast) (List.length forbidden_tokens)
+        >>=? fun () -> iter2_p (Assert.not_equal ~loc) ast forbidden_tokens )
 
+(** Parse basic terms (not including type-checking). *)
 let test_basic_parsing () =
   assert_toplevel_parsing
     ~loc:__LOC__
@@ -516,10 +528,10 @@ let test_basic_parsing () =
   >>=? fun () ->
   assert_toplevel_parsing
     ~loc:__LOC__
-    "LAMDA @name int int {}"
+    "LAMBDA @name int int {}"
     [ Prim
         ( (),
-          "LAMDA",
+          "LAMBDA",
           [Prim ((), "int", [], []); Prim ((), "int", [], []); Seq ((), [])],
           ["@name"] ) ]
   >>=? fun () ->
@@ -534,6 +546,7 @@ let test_basic_parsing () =
           ],
           [] ) ]
 
+(** Parses a contract with conditional IF. *)
 let test_condition_contract_parsing () =
   assert_toplevel_parsing
     ~loc:__LOC__
@@ -555,12 +568,13 @@ let test_condition_contract_parsing () =
                 ] ) ],
           [] ) ]
 
+(** Parses a contract which appends two lists. *)
 let test_list_append_parsing () =
   assert_toplevel_parsing
     ~loc:__LOC__
     "parameter (pair (list int)(list int));return (list int);storage \
-     unit;code { CAR; DUP; DIP{CDR}; CAR;NIL int; SWAP;LAMDA (pair int (list \
-     int))(list int){DUP; CAR; DIP {CDR}; CONS};REDUCE;LAMDA (pair int (list \
+     unit;code { CAR; DUP; DIP{CDR}; CAR;NIL int; SWAP;LAMBDA (pair int (list \
+     int))(list int){DUP; CAR; DIP {CDR}; CONS};REDUCE;LAMBDA (pair int (list \
      int))(list int){DUP; CAR; DIP{CDR}; CONS};UNIT; SWAP; PAIR}"
     [ Prim
         ( (),
@@ -588,7 +602,7 @@ let test_list_append_parsing () =
                   Prim ((), "SWAP", [], []);
                   Prim
                     ( (),
-                      "LAMDA",
+                      "LAMBDA",
                       [ Prim
                           ( (),
                             "pair",
@@ -611,7 +625,7 @@ let test_list_append_parsing () =
                   Prim ((), "REDUCE", [], []);
                   Prim
                     ( (),
-                      "LAMDA",
+                      "LAMBDA",
                       [ Prim
                           ( (),
                             "pair",
@@ -653,6 +667,7 @@ let assert_expression_parsing ~loc source expected =
         let expected = Micheline.strip_locations expected in
         Assert.equal ~loc ast expected )
 
+(** Parses Michelson-expressions. *)
 let test_parses_expression () =
   (* String *)
   assert_expression_parsing
@@ -687,7 +702,8 @@ let wrap (n, f) =
       >>= function Ok () -> Lwt.return_unit | Error err -> Lwt.fail_with err)
 
 let () =
-  Alcotest.run
+  Alcotest_lwt.run
     ~argv:[|""|]
     "tezos-lib-micheline"
     [("micheline", List.map wrap tests)]
+  |> Lwt_main.run

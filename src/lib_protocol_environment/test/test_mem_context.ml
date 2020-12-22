@@ -23,26 +23,40 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:    Protocol Environment
+    Invocation:   dune build @src/lib_protocol_environment/runtest
+    Dependencies: src/lib_protocol_environment/test/assert.ml
+    Subject:      Low-level operations on memory contexts.
+*)
+
 (** Context creation *)
 
+(*
+  Genesis -- block2 -- block3a
+                  \
+                   \-- block3b
+*)
+
 let create_block2 ctxt =
-  Context.set ctxt ["a"; "b"] (MBytes.of_string "Novembre")
+  Context.set ctxt ["a"; "b"] (Bytes.of_string "Novembre")
   >>= fun ctxt ->
-  Context.set ctxt ["a"; "c"] (MBytes.of_string "Juin")
+  Context.set ctxt ["a"; "c"] (Bytes.of_string "Juin")
   >>= fun ctxt ->
-  Context.set ctxt ["version"] (MBytes.of_string "0.0")
+  Context.set ctxt ["version"] (Bytes.of_string "0.0")
   >>= fun ctxt -> Lwt.return ctxt
 
 let create_block3a ctxt =
-  Context.del ctxt ["a"; "b"]
+  Context.remove_rec ctxt ["a"; "b"]
   >>= fun ctxt ->
-  Context.set ctxt ["a"; "d"] (MBytes.of_string "Mars")
+  Context.set ctxt ["a"; "d"] (Bytes.of_string "Mars")
   >>= fun ctxt -> Lwt.return ctxt
 
 let create_block3b ctxt =
-  Context.del ctxt ["a"; "c"]
+  Context.remove_rec ctxt ["a"; "c"]
   >>= fun ctxt ->
-  Context.set ctxt ["a"; "d"] (MBytes.of_string "Février")
+  Context.set ctxt ["a"; "d"] (Bytes.of_string "Février")
   >>= fun ctxt -> Lwt.return ctxt
 
 type t = {
@@ -64,8 +78,14 @@ let wrap_context_init f _ () =
 
 (** Simple test *)
 
-let c = function None -> None | Some s -> Some (MBytes.to_string s)
+let c = function None -> None | Some s -> Some (Bytes.to_string s)
 
+(** Restore the context applied until [block2]. It is asserted that
+    the following key-values are present:
+    - (["version"], ["0.0"])
+    - (["a"; "b"], ["Novembre"])
+    - [(["a"; "c"], "Juin")]
+*)
 let test_simple {block2 = ctxt; _} =
   Context.get ctxt ["version"]
   >>= fun version ->
@@ -78,6 +98,14 @@ let test_simple {block2 = ctxt; _} =
   Assert.equal_string_option ~msg:__LOC__ (Some "Juin") (c juin) ;
   Lwt.return_unit
 
+(** Restore the context applied until [block3a]. It is asserted that
+    the following key-values are present:
+    - (["version"], ["0.0"])
+    - (["a"; "c"], ["Juin"])
+    - (["a"; "d"], ["Mars"])
+    Additionally, the key ["a"; "b"] is associated with nothing as it
+    has been removed by block [block3a].
+*)
 let test_continuation {block3a = ctxt; _} =
   Context.get ctxt ["version"]
   >>= fun version ->
@@ -93,6 +121,14 @@ let test_continuation {block3a = ctxt; _} =
   Assert.equal_string_option ~msg:__LOC__ (Some "Mars") (c mars) ;
   Lwt.return_unit
 
+(** Restore the context applied until [block3b]. It is asserted that
+    the following key-values are present:
+    - (["version"], ["0.0"])
+    - (["a"; "b"], ["Novembre"])
+    - (["a"; "d"], ["Février"])
+    Additionally, the key ["a"; "c"] is associated with nothing as it
+    has been removed by block [block3b].
+*)
 let test_fork {block3b = ctxt; _} =
   Context.get ctxt ["version"]
   >>= fun version ->
@@ -108,18 +144,21 @@ let test_fork {block3b = ctxt; _} =
   Assert.equal_string_option ~msg:__LOC__ (Some "Février") (c mars) ;
   Lwt.return_unit
 
+(** Restore the context at [genesis] and explicitly replay
+    setting/getting key-values.
+*)
 let test_replay {genesis = ctxt0; _} =
-  Context.set ctxt0 ["version"] (MBytes.of_string "0.0")
+  Context.set ctxt0 ["version"] (Bytes.of_string "0.0")
   >>= fun ctxt1 ->
-  Context.set ctxt1 ["a"; "b"] (MBytes.of_string "Novembre")
+  Context.set ctxt1 ["a"; "b"] (Bytes.of_string "Novembre")
   >>= fun ctxt2 ->
-  Context.set ctxt2 ["a"; "c"] (MBytes.of_string "Juin")
+  Context.set ctxt2 ["a"; "c"] (Bytes.of_string "Juin")
   >>= fun ctxt3 ->
-  Context.set ctxt3 ["a"; "d"] (MBytes.of_string "July")
+  Context.set ctxt3 ["a"; "d"] (Bytes.of_string "July")
   >>= fun ctxt4a ->
-  Context.set ctxt3 ["a"; "d"] (MBytes.of_string "Juillet")
+  Context.set ctxt3 ["a"; "d"] (Bytes.of_string "Juillet")
   >>= fun ctxt4b ->
-  Context.set ctxt4a ["a"; "b"] (MBytes.of_string "November")
+  Context.set ctxt4a ["a"; "b"] (Bytes.of_string "November")
   >>= fun ctxt5a ->
   Context.get ctxt4a ["a"; "b"]
   >>= fun novembre ->
@@ -147,16 +186,19 @@ let fold_keys s k ~init ~f =
 
 let keys t = fold_keys t ~init:[] ~f:(fun k acc -> Lwt.return (k :: acc))
 
+(** Restore the context at [genesis] and fold upon a context a series
+    of key prefixes using {!Context.fold}.
+*)
 let test_fold {genesis = ctxt; _} =
-  Context.set ctxt ["a"; "b"] (MBytes.of_string "Novembre")
+  Context.set ctxt ["a"; "b"] (Bytes.of_string "Novembre")
   >>= fun ctxt ->
-  Context.set ctxt ["a"; "c"] (MBytes.of_string "Juin")
+  Context.set ctxt ["a"; "c"] (Bytes.of_string "Juin")
   >>= fun ctxt ->
-  Context.set ctxt ["a"; "d"; "e"] (MBytes.of_string "Septembre")
+  Context.set ctxt ["a"; "d"; "e"] (Bytes.of_string "Septembre")
   >>= fun ctxt ->
-  Context.set ctxt ["f"] (MBytes.of_string "Avril")
+  Context.set ctxt ["f"] (Bytes.of_string "Avril")
   >>= fun ctxt ->
-  Context.set ctxt ["g"; "h"] (MBytes.of_string "Avril")
+  Context.set ctxt ["g"; "h"] (Bytes.of_string "Avril")
   >>= fun ctxt ->
   keys ctxt []
   >>= fun l ->

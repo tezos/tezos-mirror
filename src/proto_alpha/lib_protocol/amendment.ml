@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Alpha_context
+open Misc.Syntax
 
 (** Returns the proposal submitted by the most delegates.
     Returns None in case of a tie, if proposal quorum is below required
@@ -95,7 +96,7 @@ let check_approval_and_update_participation_ema ctxt =
     Int32.(div (add (mul 8l participation_ema) (mul 2l participation)) 10l)
   in
   Vote.set_participation_ema ctxt new_participation_ema
-  >>=? fun ctxt -> return (ctxt, outcome)
+  >|=? fun ctxt -> (ctxt, outcome)
 
 (** Implements the state machine of the amendment procedure.
     Note that [freeze_listings], that computes the vote weight of each delegate,
@@ -138,8 +139,7 @@ let start_new_voting_period ctxt =
         Vote.get_current_proposal ctxt
         >>=? fun proposal ->
         fork_test_chain ctxt proposal expiration
-        >>= fun ctxt ->
-        Vote.set_current_period_kind ctxt Testing >>=? fun ctxt -> return ctxt
+        >>= fun ctxt -> Vote.set_current_period_kind ctxt Testing
       else
         Vote.clear_current_proposal ctxt
         >>=? fun ctxt ->
@@ -148,9 +148,7 @@ let start_new_voting_period ctxt =
         Vote.set_current_period_kind ctxt Proposal >>=? fun ctxt -> return ctxt
   | Testing ->
       Vote.freeze_listings ctxt
-      >>=? fun ctxt ->
-      Vote.set_current_period_kind ctxt Promotion_vote
-      >>=? fun ctxt -> return ctxt
+      >>=? fun ctxt -> Vote.set_current_period_kind ctxt Promotion_vote
   | Promotion_vote ->
       check_approval_and_update_participation_ema ctxt
       >>=? fun (ctxt, approved) ->
@@ -268,8 +266,8 @@ let rec longer_than l n =
           longer_than rest (n - 1)
 
 let record_proposals ctxt delegate proposals =
-  (match proposals with [] -> fail Empty_proposal | _ :: _ -> return_unit)
-  >>=? fun () ->
+  (match proposals with [] -> error Empty_proposal | _ :: _ -> ok_unit)
+  >>?= fun () ->
   Vote.get_current_period_kind ctxt
   >>=? function
   | Proposal ->
@@ -278,15 +276,14 @@ let record_proposals ctxt delegate proposals =
       if in_listings then
         Vote.recorded_proposal_count_for_delegate ctxt delegate
         >>=? fun count ->
-        fail_when
+        error_when
           (longer_than proposals (Constants.max_proposals_per_delegate - count))
           Too_many_proposals
-        >>=? fun () ->
+        >>?= fun () ->
         fold_left_s
           (fun ctxt proposal -> Vote.record_proposal ctxt proposal delegate)
           ctxt
           proposals
-        >>=? fun ctxt -> return ctxt
       else fail Unauthorized_proposal
   | Testing_vote | Testing | Promotion_vote ->
       fail Unexpected_proposal
@@ -297,14 +294,14 @@ let record_ballot ctxt delegate proposal ballot =
   | Testing_vote | Promotion_vote ->
       Vote.get_current_proposal ctxt
       >>=? fun current_proposal ->
-      fail_unless
+      error_unless
         (Protocol_hash.equal proposal current_proposal)
         Invalid_proposal
-      >>=? fun () ->
+      >>?= fun () ->
       Vote.has_recorded_ballot ctxt delegate
       >>= fun has_ballot ->
-      fail_when has_ballot Unauthorized_ballot
-      >>=? fun () ->
+      error_when has_ballot Unauthorized_ballot
+      >>?= fun () ->
       Vote.in_listings ctxt delegate
       >>= fun in_listings ->
       if in_listings then Vote.record_ballot ctxt delegate ballot

@@ -33,11 +33,6 @@ end)
 
 open Logging
 
-(* Just proving a point *)
-let[@warning "-32"] time_protocol__is__protocol_time :
-    Alpha_context.Timestamp.t -> Time.Protocol.t =
- fun x -> x
-
 (* The index of the different components of the protocol's validation passes *)
 (* TODO: ideally, we would like this to be more abstract and possibly part of
    the protocol, while retaining the generality of lists *)
@@ -55,9 +50,11 @@ let default_max_priority = 64
 let default_minimal_fees =
   match Tez.of_mutez 100L with None -> assert false | Some t -> t
 
-let default_minimal_nanotez_per_gas_unit = Z.of_int 100
+let default_minimal_nanotez_per_gas_unit = Q.of_int 100
 
-let default_minimal_nanotez_per_byte = Z.of_int 1000
+let default_minimal_nanotez_per_byte = Q.of_int 1000
+
+let default_retry_counter = 5
 
 type slot =
   Time.Protocol.t * (Client_baking_blocks.block_info * int * public_key_hash)
@@ -74,17 +71,19 @@ type state = {
   (* Minimal operation fee required to include an operation in a block *)
   minimal_fees : Tez.t;
   (* Minimal operation fee per gas required to include an operation in a block *)
-  minimal_nanotez_per_gas_unit : Z.t;
+  minimal_nanotez_per_gas_unit : Q.t;
   (* Minimal operation fee per byte required to include an operation in a block *)
-  minimal_nanotez_per_byte : Z.t;
+  minimal_nanotez_per_byte : Q.t;
   (* truly mutable *)
   mutable best_slot : slot option;
+  mutable retry_counter : int;
 }
 
 let create_state ?(minimal_fees = default_minimal_fees)
     ?(minimal_nanotez_per_gas_unit = default_minimal_nanotez_per_gas_unit)
-    ?(minimal_nanotez_per_byte = default_minimal_nanotez_per_byte) context_path
-    index nonces_location delegates constants =
+    ?(minimal_nanotez_per_byte = default_minimal_nanotez_per_byte)
+    ?(retry_counter = default_retry_counter) context_path index nonces_location
+    delegates constants =
   {
     context_path;
     index;
@@ -95,6 +94,7 @@ let create_state ?(minimal_fees = default_minimal_fees)
     minimal_nanotez_per_gas_unit;
     minimal_nanotez_per_byte;
     best_slot = None;
+    retry_counter;
   }
 
 let get_delegates cctxt state =
@@ -264,12 +264,13 @@ let get_manager_operation_gas_and_fee op =
     (fun ((total_fee, total_gas) as acc) -> function
       | Contents (Manager_operation {fee; gas_limit; _}) ->
           (Lwt.return @@ Environment.wrap_error @@ Tez.(total_fee +? fee))
-          >>=? fun total_fee -> return (total_fee, Z.add total_gas gas_limit)
-      | _ -> return acc)
-    (Tez.zero, Z.zero)
+          >>=? fun total_fee ->
+          return (total_fee, Gas.Arith.add total_gas gas_limit) | _ ->
+          return acc)
+    (Tez.zero, Gas.Arith.zero)
     l
 
-(* Sort operation consisdering potential gas and storage usage.
+(* Sort operation considering potential gas and storage usage.
    Weight = fee / (max ( (size/size_total), (gas/gas_total))) *)
 let sort_manager_operations ~max_size ~hard_gas_limit_per_block ~minimal_fees
     ~minimal_nanotez_per_gas_unit ~minimal_nanotez_per_byte
@@ -277,10 +278,13 @@ let sort_manager_operations ~max_size ~hard_gas_limit_per_block ~minimal_fees
   let compute_weight op (fee, gas) =
     let size = Data_encoding.Binary.length Operation.encoding op in
     let size_f = Q.of_int size in
-    let gas_f = Q.of_bigint gas in
+    let gas_f = Q.of_bigint (Gas.Arith.integral_to_z gas) in
     let fee_f = Q.of_int64 (Tez.to_mutez fee) in
     let size_ratio = Q.(size_f / Q.of_int max_size) in
-    let gas_ratio = Q.(gas_f / Q.of_bigint hard_gas_limit_per_block) in
+    let gas_ratio =
+      Q.(
+        gas_f / Q.of_bigint (Gas.Arith.integral_to_z hard_gas_limit_per_block))
+    in
     (size, gas, Q.(fee_f / max size_ratio gas_ratio))
   in
   filter_map_s
@@ -290,21 +294,22 @@ let sort_manager_operations ~max_size ~hard_gas_limit_per_block ~minimal_fees
       if Tez.(fee < minimal_fees) then return_none
       else
         let ((size, gas, _ratio) as weight) = compute_weight op (fee, gas) in
-        let open Environment in
         let fees_in_nanotez =
-          Z.mul (Z.of_int64 (Tez.to_mutez fee)) (Z.of_int 1000)
+          Q.mul (Q.of_int64 (Tez.to_mutez fee)) (Q.of_int 1000)
         in
         let enough_fees_for_gas =
           let minimal_fees_in_nanotez =
-            Z.mul minimal_nanotez_per_gas_unit gas
+            Q.mul
+              minimal_nanotez_per_gas_unit
+              (Q.of_bigint @@ Gas.Arith.integral_to_z gas)
           in
-          Z.compare minimal_fees_in_nanotez fees_in_nanotez <= 0
+          Q.compare minimal_fees_in_nanotez fees_in_nanotez <= 0
         in
         let enough_fees_for_size =
           let minimal_fees_in_nanotez =
-            Z.mul minimal_nanotez_per_byte (Z.of_int size)
+            Q.mul minimal_nanotez_per_byte (Q.of_int size)
           in
-          Z.compare minimal_fees_in_nanotez fees_in_nanotez <= 0
+          Q.compare minimal_fees_in_nanotez fees_in_nanotez <= 0
         in
         if enough_fees_for_size && enough_fees_for_gas then
           return_some (op, weight)
@@ -353,11 +358,11 @@ let trim_manager_operations ~max_size ~hard_gas_limit_per_block
   List.fold_left
     (fun (total_size, total_gas, (good_ops, bad_ops)) (op, (size, gas)) ->
       let new_size = total_size + size in
-      let new_gas = Z.(total_gas + gas) in
-      if new_size > max_size || Z.gt new_gas hard_gas_limit_per_block then
-        (new_size, new_gas, (good_ops, op :: bad_ops))
+      let new_gas = Gas.Arith.(add total_gas gas) in
+      if new_size > max_size || Gas.Arith.(new_gas > hard_gas_limit_per_block)
+      then (new_size, new_gas, (good_ops, op :: bad_ops))
       else (new_size, new_gas, (op :: good_ops, bad_ops)))
-    (0, Z.zero, ([], []))
+    (0, Gas.Arith.zero, ([], []))
     manager_operations
   |> fun (_, _, (good_ops, bad_ops)) ->
   (* We keep the overflowing operations, it may be used for client-side validation *)
@@ -540,20 +545,19 @@ let merge_preapps (old : error Preapply_result.t)
 let error_of_op (result : error Preapply_result.t) op =
   let op = forge op in
   let h = Tezos_base.Operation.hash op in
-  try
-    Some
-      (Failed_to_preapply (op, snd @@ Operation_hash.Map.find h result.refused))
-  with Not_found -> (
-    try
-      Some
-        (Failed_to_preapply
-           (op, snd @@ Operation_hash.Map.find h result.branch_refused))
-    with Not_found -> (
-      try
-        Some
-          (Failed_to_preapply
-             (op, snd @@ Operation_hash.Map.find h result.branch_delayed))
-      with Not_found -> None ) )
+  match Operation_hash.Map.find h result.refused with
+  | Some (_, trace) ->
+      Some (Failed_to_preapply (op, trace))
+  | None -> (
+    match Operation_hash.Map.find h result.branch_refused with
+    | Some (_, trace) ->
+        Some (Failed_to_preapply (op, trace))
+    | None -> (
+      match Operation_hash.Map.find h result.branch_delayed with
+      | Some (_, trace) ->
+          Some (Failed_to_preapply (op, trace))
+      | None ->
+          None ) )
 
 let filter_and_apply_operations cctxt state ~chain ~block block_info ~priority
     ?protocol_data
@@ -810,7 +814,7 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
       (List.nth operations anonymous_index)
       (List.nth quota anonymous_index)
   in
-  (* Size/Gas check already occured in classify operations *)
+  (* Size/Gas check already occurred in classify operations *)
   let managers = List.nth operations managers_index in
   let operations = [endorsements; votes; anonymous; managers] in
   ( match context_path with
@@ -858,6 +862,7 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
           minimal_fees = default_minimal_fees;
           minimal_nanotez_per_gas_unit = default_minimal_nanotez_per_gas_unit;
           minimal_nanotez_per_byte = default_minimal_nanotez_per_byte;
+          retry_counter = default_retry_counter;
         }
       in
       filter_and_apply_operations
@@ -1134,13 +1139,11 @@ let build_block cctxt ~user_activated_upgrades state seed_nonce_hash
             -% t event "new_head_received")
       >>= fun () -> return_none
   | Some (operations, timestamp) -> (
-      let hard_gas_limit_per_block =
-        state.constants.parametric.hard_gas_limit_per_block
-      in
       classify_operations
         cctxt
         ~chain
-        ~hard_gas_limit_per_block
+        ~hard_gas_limit_per_block:
+          state.constants.parametric.hard_gas_limit_per_block
         ~minimal_fees:state.minimal_fees
         ~minimal_nanotez_per_gas_unit:state.minimal_nanotez_per_gas_unit
         ~minimal_nanotez_per_byte:state.minimal_nanotez_per_byte
@@ -1428,7 +1431,7 @@ let compute_best_slot_on_current_level ?max_priority
         Tag.DSL.(
           fun f ->
             let max_priority =
-              Option.unopt ~default:default_max_priority max_priority
+              Option.value ~default:default_max_priority max_priority
             in
             f "No slot found at level %a (max_priority = %d)"
             -% t event "no_slot_found" -% a level_tag level
@@ -1512,7 +1515,7 @@ let reveal_potential_nonces (cctxt : #Client_context.full) constants ~chain
               | Ok () ->
                   (* If some nonces are to be revealed it means:
                    - We entered a new cycle and we can clear old nonces ;
-                   - A revelation was not included yet in the cycle beggining.
+                   - A revelation was not included yet in the cycle beginning.
                    So, it is safe to only filter outdated_nonces there *)
                   Client_baking_nonces.filter_outdated_nonces
                     cctxt
@@ -1579,11 +1582,30 @@ let create (cctxt : #Protocol_client_context.full) ~user_activated_upgrades
   in
   let timeout_k cctxt state () =
     bake cctxt ~user_activated_upgrades ~chain state
-    >>=? fun () ->
-    (* Stopping the timeout and waiting for the next block *)
-    state.best_slot <- None ;
-    return_unit
+    >>= function
+    | Error err ->
+        if state.retry_counter = 0 then (
+          (* Stop the timeout and wait for the next block *)
+          state.best_slot <- None ;
+          state.retry_counter <- default_retry_counter ;
+          Lwt.return (Error err) )
+        else
+          lwt_log_error
+            Tag.DSL.(
+              fun f ->
+                f "Retrying after baking error %a"
+                -% t event "retrying_on_error"
+                -% a errs_tag err)
+          >>= fun () ->
+          state.retry_counter <- pred state.retry_counter ;
+          return_unit
+    | Ok () ->
+        (* Stop the timeout and wait for the next block *)
+        state.best_slot <- None ;
+        state.retry_counter <- default_retry_counter ;
+        return_unit
   in
+  let finalizer state = Context.close state.index in
   Client_baking_scheduling.main
     ~name:"baker"
     ~cctxt
@@ -1593,3 +1615,4 @@ let create (cctxt : #Protocol_client_context.full) ~user_activated_upgrades
     ~compute_timeout
     ~timeout_k
     ~event_k
+    ~finalizer

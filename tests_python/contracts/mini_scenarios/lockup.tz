@@ -8,7 +8,7 @@ code { CDR;                      # Ignore the parameter
        IF {FAIL} {};             # Fail if it is too soon
        DUP;                      # Duplicate the storage value
        # this must be on the bottom of the stack for us to call transfer tokens
-       CDR;                      # Ignore the timestamp, focussing in on the tranfser data
+       CDR;                      # Ignore the timestamp, focussing in on the transfer data
        DUP;                      # Duplicate the transfer information
        CAR;                      # Get the amount of the transfer on top of the stack
        DIP{CDR};                 # Put the contract underneath it

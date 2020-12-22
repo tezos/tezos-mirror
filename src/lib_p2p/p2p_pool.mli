@@ -38,7 +38,7 @@
 (** {1 Pool management} *)
 
 (** The type of a pool of connections, parametrized by, resp., the type
-    of messages and the meta-informations associated to an identity and
+    of messages and the meta-information associated to an identity and
     a connection. *)
 type ('msg, 'peer, 'conn) t
 
@@ -114,7 +114,7 @@ val register_new_point :
 (** [register_list_of_new_point ?trusted medium source pool point_list]
 o    registers all points of the list as new points.
     [medium] and  [source] are for logging purpose. [medium] should indicate
-    through which medium the points have been acquiered (
+    through which medium the points have been acquired (
     advertisement, Nack, ..)  and [source] is the id of the peer which
     sent the list.
  *)
@@ -162,7 +162,7 @@ module Connection : sig
       - connections to private peers if [no_private] is set to [true]
       - connection [conn]
       - connections to peers who didn't provide a listening port at
-        session-establishement *)
+        session-establishment *)
   val random_addr :
     ?different_than:('msg, 'peer, 'conn) P2p_conn.t ->
     no_private:bool ->
@@ -215,7 +215,7 @@ module Peers : sig
 
   (** [ban t peer_id] blacklists this peer_id and terminates connection
       (if any). *)
-  val ban : ('msg, 'peer, 'conn) t -> P2p_peer.Id.t -> unit
+  val ban : ('msg, 'peer, 'conn) t -> P2p_peer.Id.t -> unit Lwt.t
 
   (** [unban t peer_id] removes this peer_id from the black list. *)
   val unban : ('msg, 'peer, 'conn) t -> P2p_peer.Id.t -> unit
@@ -275,7 +275,7 @@ module Points : sig
   (** [ban t point_id] marks the address of this point_id as blacked-listed.
       it disconnects all connections to this address. This [port_id]'s port is
       ignored. *)
-  val ban : ('msg, 'peer, 'conn) t -> P2p_point.Id.t -> unit
+  val ban : ('msg, 'peer, 'conn) t -> P2p_point.Id.t -> unit Lwt.t
 
   (* TODO this isn't consistent with greylist functions where only an addr is
      provided). *)

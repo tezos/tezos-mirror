@@ -41,7 +41,7 @@ val miss_signed_endorsement :
 
 val transaction :
   ?fee:Tez.tez ->
-  ?gas_limit:Z.t ->
+  ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?parameters:Script.lazy_expr ->
   ?entrypoint:string ->
@@ -58,7 +58,8 @@ val delegation :
   public_key_hash option ->
   Operation.packed tzresult Lwt.t
 
-val revelation : Context.t -> public_key -> Operation.packed tzresult Lwt.t
+val revelation :
+  ?fee:Tez.tez -> Context.t -> public_key -> Operation.packed tzresult Lwt.t
 
 val origination :
   ?counter:Z.t ->
@@ -68,7 +69,7 @@ val origination :
   ?public_key:public_key ->
   ?credit:Tez.tez ->
   ?fee:Tez.tez ->
-  ?gas_limit:Z.t ->
+  ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   Context.t ->
   Contract.contract ->
@@ -80,13 +81,13 @@ val double_endorsement :
   Context.t ->
   Kind.endorsement Operation.t ->
   Kind.endorsement Operation.t ->
-  Operation.packed tzresult Lwt.t
+  Operation.packed
 
 val double_baking :
   Context.t ->
   Block_header.block_header ->
   Block_header.block_header ->
-  Operation.packed tzresult Lwt.t
+  Operation.packed
 
 val activation :
   Context.t ->
@@ -97,6 +98,7 @@ val activation :
 val combine_operations :
   ?public_key:public_key ->
   ?counter:counter ->
+  ?spurious_operation:packed_operation ->
   source:Contract.t ->
   Context.t ->
   packed_operation list ->
@@ -104,7 +106,7 @@ val combine_operations :
 
 (** Reveals a seed_nonce that was previously committed at a certain level *)
 val seed_nonce_revelation :
-  Context.t -> Raw_level.t -> Nonce.t -> Operation.packed tzresult Lwt.t
+  Context.t -> Raw_level.t -> Nonce.t -> Operation.packed
 
 (** Propose a list of protocol hashes during the approval voting *)
 val proposals :

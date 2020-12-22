@@ -37,8 +37,8 @@ class Baker(subprocess.Popen):
         assert os.path.isdir(base_dir), f'{base_dir} not a dir'
         if params is None:
             params = []
-        cmd = [baker, '-base-dir', base_dir, '-addr', '127.0.0.1', '-port',
-               str(rpc_port)]
+        endpoint = f'http://127.0.0.1:{rpc_port}'
+        cmd = [baker, '-base-dir', base_dir, '-endpoint', endpoint]
         cmd.extend(params)
         cmd.extend(['run', 'with', 'local', 'node', node_dir, account])
         cmd_string = utils.format_command(cmd)

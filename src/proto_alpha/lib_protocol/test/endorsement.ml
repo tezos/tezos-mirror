@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Endorsing a block adds an extra layer of confidence to the Tezos's
+(** Endorsing a block adds an extra layer of confidence to the Tezos'
     PoS algorithm. The block endorsing operation must be included in
     the following block. Each endorser possess a number of slots
     corresponding to their priority. After [preserved_cycles], a reward
@@ -32,7 +32,6 @@
 
 open Protocol
 open Alpha_context
-open Test_utils
 open Test_tez
 
 (****************************************************************)
@@ -62,7 +61,7 @@ let get_expected_deposit ctxt ~baker ~endorsing_power =
   endorsement_deposit +? baking_deposit >>?= fun deposit -> return deposit
 
 (* [baker] is true if the [pkh] has also baked the current block, in
-   which case correspoding deposit and reward should be ajusted *)
+   which case corresponding deposit and reward should be adjusted *)
 let assert_endorser_balance_consistency ~loc ?(priority = 0) ?(baker = false)
     ~endorsing_power ctxt pkh initial_balance =
   let contract = Contract.implicit_contract pkh in
@@ -143,11 +142,10 @@ let max_endorsement () =
       Context.Contract.balance (B b) (Contract.implicit_contract delegate)
       >>=? fun balance ->
       Op.endorsement ~delegate (B b) ()
-      >>=? fun op ->
-      return
-        ( delegate :: delegates,
-          Operation.pack op :: ops,
-          (List.length endorser.slots, balance) :: balances ))
+      >|=? fun op ->
+      ( delegate :: delegates,
+        Operation.pack op :: ops,
+        (List.length endorser.slots, balance) :: balances ))
     ([], [], [])
     endorsers
   >>=? fun (delegates, ops, previous_balances) ->
@@ -214,7 +212,7 @@ let consistent_priorities () =
             ~endorsing_power:(List.length endorser.slots)
             endorser.delegate
             balance
-          >>=? fun () -> return (b, used_pkhes))
+          >|=? fun () -> (b, used_pkhes))
     (b, Signature.Public_key_hash.Set.empty)
     priorities
   >>=? fun _b -> return_unit
@@ -278,11 +276,9 @@ let reward_retrieval_two_endorsers () =
     (B b)
     (Contract.implicit_contract endorser2.delegate)
   >>=? fun balance2 ->
-  Lwt.return
-    Tez.(
-      endorsement_security_deposit
-      *? Int64.of_int (List.length endorser1.slots))
-  >>=? fun security_deposit1 ->
+  Tez.(
+    endorsement_security_deposit *? Int64.of_int (List.length endorser1.slots))
+  >>?= fun security_deposit1 ->
   (* endorser1 endorses the genesis block in cycle 0 *)
   Op.endorsement ~delegate:endorser1.delegate (B b) ()
   >>=? fun operation1 ->
@@ -335,11 +331,9 @@ let reward_retrieval_two_endorsers () =
   in
   let endorser2 = List.find same_endorser2 endorsers in
   (* No exception raised: in sandboxed mode endorsers do not change between blocks *)
-  Lwt.return
-    Tez.(
-      endorsement_security_deposit
-      *? Int64.of_int (List.length endorser2.slots))
-  >>=? fun security_deposit2 ->
+  Tez.(
+    endorsement_security_deposit *? Int64.of_int (List.length endorser2.slots))
+  >>?= fun security_deposit2 ->
   (* endorser2 endorses the last block in cycle 0 *)
   Op.endorsement ~delegate:endorser2.delegate (B b) ()
   >>=? fun operation2 ->
@@ -447,7 +441,7 @@ let invalid_endorsement_level () =
   Context.init 5
   >>=? fun (b, _) ->
   Context.get_level (B b)
-  >>=? fun genesis_level ->
+  >>?= fun genesis_level ->
   Block.bake b
   >>=? fun b ->
   Op.endorsement ~level:genesis_level (B b) ()
@@ -488,8 +482,7 @@ let not_enough_for_deposit () =
   Context.init 5 ~endorsers_per_block:1
   >>=? fun (b_init, contracts) ->
   Error_monad.map_s
-    (fun c ->
-      Context.Contract.manager (B b_init) c >>=? fun m -> return (m, c))
+    (fun c -> Context.Contract.manager (B b_init) c >|=? fun m -> (m, c))
     contracts
   >>=? fun managers ->
   Block.bake b_init
@@ -559,7 +552,7 @@ let endorsement_threshold () =
       let seconds =
         Int64.(sub (of_string (Timestamp.to_seconds_string timestamp)) 1L)
       in
-      match Timestamp.of_seconds (Int64.to_string seconds) with
+      match Timestamp.of_seconds_string (Int64.to_string seconds) with
       | None ->
           failwith "timestamp to/from string manipulation failed"
       | Some timestamp ->
@@ -598,10 +591,10 @@ let test_fitness_gap () =
   >>=? fun (b, _) ->
   ( match Fitness_repr.to_int64 b.header.shell.fitness with
   | Ok fitness ->
-      return (Int64.to_int fitness)
+      Int64.to_int fitness
   | Error _ ->
       assert false )
-  >>=? fun fitness ->
+  |> fun fitness ->
   Context.get_endorser (B b)
   >>=? fun (delegate, _slots) ->
   Op.endorsement ~delegate (B b) ()
@@ -611,13 +604,13 @@ let test_fitness_gap () =
   >>=? fun b ->
   ( match Fitness_repr.to_int64 b.header.shell.fitness with
   | Ok new_fitness ->
-      return (Int64.to_int new_fitness - fitness)
+      Int64.to_int new_fitness - fitness
   | Error _ ->
       assert false )
-  >>=? fun res ->
+  |> fun res ->
   (* in Emmy+, the fitness increases by 1, so the difference between
      the fitness at level 1 and at level 0 is 1, independently if the
-     number fo endorements (here 1) *)
+     number fo endorsements (here 1) *)
   Assert.equal_int ~loc:__LOC__ res 1 >>=? fun () -> return_unit
 
 let tests =

@@ -25,7 +25,6 @@
 
 open Protocol
 open Alpha_context
-open Test_utils
 open Test_tez
 
 (*********************************************************************)
@@ -42,7 +41,7 @@ open Test_tez
        destination contract.
 
     2- Check the equivalent of the balance of the source/destination
-       contract before and after transfer is valided.
+       contract before and after transfer is validated.
 
    This function returns a pair:
    - A block that added a valid operation
@@ -76,7 +75,7 @@ let transfer_and_check_balances ?(with_burn = false) ~loc b ?(fee = Tez.zero)
   Assert.balance_was_debited ~loc (I b) src bal_src amount_fee_maybe_burn
   >>=? fun () ->
   Assert.balance_was_credited ~loc (I b) dst bal_dst amount
-  >>=? fun () -> return (b, op)
+  >|=? fun () -> (b, op)
 
 (**
    [transfer_to_itself_and_check_balances b fee contract amount]
@@ -101,8 +100,7 @@ let transfer_to_itself_and_check_balances ~loc b ?(fee = Tez.zero) contract
   >>=? fun op ->
   Incremental.add_operation b op
   >>=? fun b ->
-  Assert.balance_was_debited ~loc (I b) contract bal fee
-  >>=? fun () -> return (b, op)
+  Assert.balance_was_debited ~loc (I b) contract bal fee >|=? fun () -> (b, op)
 
 (**
    [n_transactions n b fee source dest amount]
@@ -117,7 +115,7 @@ let n_transactions n b ?fee source dest amount =
   fold_left_s
     (fun b _ ->
       transfer_and_check_balances ~loc:__LOC__ b ?fee source dest amount
-      >>=? fun (b, _) -> return b)
+      >|=? fun (b, _) -> b)
     b
     (1 -- n)
 
@@ -129,10 +127,10 @@ let ten_tez = Tez.of_int 10
 
 let register_two_contracts () =
   Context.init 2
-  >>=? fun (b, contracts) ->
+  >|=? fun (b, contracts) ->
   let contract_1 = List.nth contracts 0 in
   let contract_2 = List.nth contracts 1 in
-  return (b, contract_1, contract_2)
+  (b, contract_1, contract_2)
 
 (** compute half of the balance and divided by nth
     times *)
@@ -140,8 +138,7 @@ let register_two_contracts () =
 let two_nth_of_balance incr contract nth =
   Context.Contract.balance (I incr) contract
   >>=? fun balance ->
-  Tez.( /? ) balance nth
-  >>?= fun res -> Tez.( *? ) res 2L >>?= fun balance -> return balance
+  Lwt.return (Tez.( /? ) balance nth >>? fun res -> Tez.( *? ) res 2L)
 
 (********************)
 (** Single transfer *)
@@ -206,7 +203,7 @@ let transfer_zero_implicit () =
           false)
 
 (********************)
-(** Transfer to originted contract *)
+(** Transfer to originated contract *)
 
 (********************)
 
@@ -297,7 +294,7 @@ let missing_transaction () =
     - implicit to implicit
     - implicit to originated
     - originated to implicit
-    - originted to originted *)
+    - originated to originated *)
 
 (********************)
 
@@ -705,7 +702,7 @@ let tests =
     Test.tztest "transfers to itself" `Quick transfers_to_self;
     (* missing operation *)
     Test.tztest "missing transaction" `Quick missing_transaction;
-    (* transfer from/to implicit/originted contracts*)
+    (* transfer from/to implicit/originated contracts*)
     Test.tztest
       "transfer from an implicit to implicit contract "
       `Quick
