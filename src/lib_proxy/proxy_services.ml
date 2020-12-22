@@ -42,14 +42,6 @@ end
 module Hashtbl = Stdlib.Hashtbl
 
 module BlockToHash (S : Registration.Proxy_sig) : BLOCK_TO_HASH = struct
-  let raw_hash_of_block (block : Tezos_shell_services.Block_services.block) :
-      Block_hash.t option =
-    match block with
-    | `Hash (h, 0) ->
-        Some h
-    | `Alias (_, _) | `Genesis | `Head _ | `Level _ | `Hash (_, _) ->
-        None
-
   let table = Hashtbl.create 17
 
   let add chain block hash = Hashtbl.add table (chain, block) hash
@@ -57,7 +49,7 @@ module BlockToHash (S : Registration.Proxy_sig) : BLOCK_TO_HASH = struct
   let hash_of_block (rpc_context : #RPC_context.simple)
       (chain : Tezos_shell_services.Shell_services.chain)
       (block : Tezos_shell_services.Block_services.block) =
-    match raw_hash_of_block block with
+    match Light.hash_of_block block with
     | Some h ->
         (* Block is defined by its hash *)
         return_some h
@@ -93,6 +85,8 @@ module BlockToHash (S : Registration.Proxy_sig) : BLOCK_TO_HASH = struct
             Hashtbl.add table (chain, block) hash ;
             return_some hash )
 end
+
+type mode = Light of Light.sources | Proxy
 
 let build_directory (printer : Tezos_client_base.Client_context.printer)
     (rpc_context : RPC_context.json)

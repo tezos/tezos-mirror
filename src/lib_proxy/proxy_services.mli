@@ -23,36 +23,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Code related to the light mode that is not protocol-dependent.
-    See `src/proto_*/lib_client/light.ml` files for protocol-dependent code. *)
+(** Whether using the light mode mode or the proxy mode (remenber that
+    the light mode is a (more complex) instance of the proxy mode)*)
+type mode = Light of Light.sources | Proxy
 
-type sources_config = private {
-  min_agreement : float;
-      (** A float between 0 (exclusive) and 1 (inclusive), representing
-          the minimum percentage of endpoints that must agree on data
-          for said data to be accepted. Pass 1 to require all enpoints
-          to agree (the default). *)
-  uris : Uri.t list;
-}
-
-type sources = private {
-  min_agreement : float;
-      (** A float between 0 (exclusive) and 1 (inclusive), representing
-          the minimum percentage of endpoints that must agree on data
-          for said data to be accepted. Pass 1 to require all enpoints
-          to agree (the default). *)
-  endpoints : (Uri.t * RPC_context.simple) list;
-}
-
-val destruct_sources_config :
-  Data_encoding.json -> (sources_config, string) result
-
-(** [sources_config_to_sources f config] transforms the value [config]
-    (which was obtained by parsing the CLI) into a value used
-    by core algorithms of the light mode. *)
-val sources_config_to_sources :
-  sources_config -> (Uri.t -> RPC_context.simple) -> sources
-
-(** [None] if the given block is symbolic, otherwise it's concrete hash *)
-val hash_of_block :
-  Tezos_shell_services.Block_services.block -> Block_hash.t option
+(** [build_directory printer rpc_context mode env] returns the directory
+    of RPCs that is served locally by the proxy mode
+    and the light mode. [printer] is used for logging. [rpc_context] is
+    used to perform RPCs to distant endpoints. [mode] specifiees whether
+    to use the proxy mode or the light mode. [env] is a protocol-specific
+    module used to create the context passed when executing a RPC. *)
+val build_directory :
+  Tezos_client_base.Client_context.printer ->
+  RPC_context.json ->
+  Registration.proxy_environment ->
+  unit RPC_directory.t

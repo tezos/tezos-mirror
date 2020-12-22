@@ -81,3 +81,11 @@ let sources_config_to_sources sources_config rpc_context_builder =
     List.map (fun u -> (u, rpc_context_builder u)) sources_config.uris
   in
   {min_agreement = sources_config.min_agreement; endpoints}
+
+let hash_of_block (block : Tezos_shell_services.Block_services.block) :
+    Block_hash.t option =
+  match block with
+  | `Hash (h, 0) ->
+      Some h
+  | `Alias (_, _) | `Genesis | `Head _ | `Level _ | `Hash (_, _) ->
+      None
