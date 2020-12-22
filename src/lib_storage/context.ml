@@ -106,15 +106,24 @@ end = struct
                Error_monad.pp_print_error
                err))
 
-  let short_hash t = Irmin.Type.(short_hash string (H.to_raw_string t))
+  let short_hash_string = Irmin.Type.(unstage (short_hash string))
+
+  let short_hash_staged =
+    Irmin.Type.stage
+    @@ fun ?seed t -> short_hash_string ?seed (H.to_raw_string t)
 
   let t : t Irmin.Type.t =
     Irmin.Type.map
-      ~cli:(pp, of_string)
+      ~pp
+      ~of_string
       Irmin.Type.(string_of (`Fixed H.digest_size))
-      ~short_hash
+      ~short_hash:short_hash_staged
       H.of_raw_string
       H.to_raw_string
+
+  let short_hash =
+    let f = short_hash_string ?seed:None in
+    fun t -> f (H.to_raw_string t)
 
   let hash_size = H.digest_size
 
@@ -131,9 +140,13 @@ module Node = struct
 
     type entry = {kind : kind; name : M.step; node : Hash.t}
 
+    let s = Irmin.Type.(string_of `Int64)
+
+    let pre_hash_v = Irmin.Type.(unstage (pre_hash s))
+
     (* Irmin 1.4 uses int64 to store string lengths *)
     let step_t =
-      let pre_hash = Irmin.Type.(pre_hash (string_of `Int64)) in
+      let pre_hash = Irmin.Type.(stage @@ fun x -> pre_hash_v x) in
       Irmin.Type.like M.step_t ~pre_hash
 
     let metadata_t =
@@ -177,14 +190,16 @@ module Node = struct
 
     let import t = List.map import_entry (M.list t)
 
-    let pre_hash entries = Irmin.Type.pre_hash entries_t entries
+    let pre_hash_entries = Irmin.Type.(unstage (pre_hash entries_t))
+
+    let pre_hash entries = pre_hash_entries entries
   end
 
   include M
 
   let pre_hash_v1 x = V1.pre_hash (V1.import x)
 
-  let t = Irmin.Type.(like t ~pre_hash:pre_hash_v1)
+  let t = Irmin.Type.(like t ~pre_hash:(stage @@ fun x -> pre_hash_v1 x))
 end
 
 module Commit = struct
@@ -192,19 +207,23 @@ module Commit = struct
   module V1 = Irmin.Private.Commit.V1 (M)
   include M
 
-  let pre_hash_v1 t = Irmin.Type.pre_hash V1.t (V1.import t)
+  let pre_hash_v1_t = Irmin.Type.(unstage (pre_hash V1.t))
 
-  let t = Irmin.Type.like t ~pre_hash:pre_hash_v1
+  let pre_hash_v1 t = pre_hash_v1_t (V1.import t)
+
+  let t = Irmin.Type.(like t ~pre_hash:(stage @@ fun x -> pre_hash_v1 x))
 end
 
 module Contents = struct
   type t = string
 
-  let pre_hash_v1 x =
-    let ty = Irmin.Type.(pair (string_of `Int64) unit) in
-    Irmin.Type.(pre_hash ty) (x, ())
+  let ty = Irmin.Type.(pair (string_of `Int64) unit)
 
-  let t = Irmin.Type.(like ~pre_hash:pre_hash_v1 string)
+  let pre_hash_ty = Irmin.Type.(unstage (pre_hash ty))
+
+  let pre_hash_v1 x = pre_hash_ty (x, ())
+
+  let t = Irmin.Type.(like string ~pre_hash:(stage @@ fun x -> pre_hash_v1 x))
 
   let merge = Irmin.Merge.(idempotent (Irmin.Type.option t))
 end
@@ -216,12 +235,19 @@ module Conf = struct
 end
 
 module Store =
-  Irmin_pack.Make_ext (Conf) (Irmin.Metadata.None) (Contents)
+  Irmin_pack.Make_ext
+    (struct
+      let io_version = `V1
+    end)
+    (Conf)
+    (Irmin.Metadata.None)
+    (Contents)
     (Irmin.Path.String_list)
     (Irmin.Branch.String)
     (Hash)
     (Node)
     (Commit)
+
 module P = Store.Private
 
 type index = {
@@ -289,10 +315,10 @@ let unshallow context =
   P.Repo.batch context.index.repo (fun x y _ ->
       List.iter_s
         (fun (s, k) ->
-          match k with
-          | `Contents ->
+          match Store.Tree.destruct k with
+          | `Contents _ ->
               Lwt.return ()
-          | `Node ->
+          | `Node _ ->
               Store.Tree.get_tree context.tree [s]
               >>= fun tree ->
               Store.save_tree ~clear:true context.index.repo x y tree
@@ -372,12 +398,12 @@ let fold ctxt key ~init ~f =
   Store.Tree.list ctxt.tree (data_key key)
   >>= fun keys ->
   List.fold_left_s
-    (fun acc (name, kind) ->
+    (fun acc (name, t) ->
       let key =
-        match kind with
-        | `Contents ->
+        match Store.Tree.destruct t with
+        | `Contents _ ->
             `Key (key @ [name])
-        | `Node ->
+        | `Node _ ->
             `Dir (key @ [name])
       in
       f key acc)
@@ -826,11 +852,14 @@ module Dumpable_context = struct
     >>= fun keys ->
     keys
     |> List.sort (fun (a, _) (b, _) -> String.compare a b)
-    |> List.map_s (fun (key, value_kind) ->
-           Store.Tree.get_tree tree [key]
-           >|= fun value ->
-           let value_hash = tree_hash value in
-           {key; value; value_kind; value_hash})
+    |> List.map_s (fun (key, value) ->
+           Store.Tree.kind value []
+           >|= function
+           | None ->
+               assert false (* The value must exist in the tree *)
+           | Some value_kind ->
+               let value_hash = tree_hash value in
+               {key; value; value_kind; value_hash})
     >|= fun bindings -> Store.Tree.clear tree ; bindings
 
   module Hashtbl = Hashtbl.MakeSeeded (struct
