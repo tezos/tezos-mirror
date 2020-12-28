@@ -78,6 +78,10 @@ let small_enough z =
 
 let mul_safe x = if small_enough x then Some x else None
 
+(* If [x] is positive, shifting to the right will produce a number
+   which is positive and is less than [x]. *)
+let shift_right x y = (x :> int) lsr y
+
 let mul x y =
   (* assert (x >= 0 && y >= 0); *)
   match x with

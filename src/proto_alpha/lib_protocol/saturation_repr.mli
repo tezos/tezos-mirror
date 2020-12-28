@@ -96,6 +96,10 @@ val max : 'a t -> 'a t -> 'a t
 
 val compare : 'a t -> 'b t -> int
 
+(** [shift_right x y] behaves like a logical shift of [x] by [y] bits
+   to the right. [y] must be between 0 and 63. *)
+val shift_right : 'a t -> int -> 'a t
+
 (** [mul x y] behaves like multiplication between native integers as
    long as its result stay below [saturated]. Otherwise, [mul] returns
    [saturated]. *)

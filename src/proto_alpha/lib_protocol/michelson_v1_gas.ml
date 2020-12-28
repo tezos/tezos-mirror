@@ -43,12 +43,7 @@ module Cost_of = struct
 
     let ( * ) = S.mul
 
-    let ( lsr ) (x : _ S.t) y =
-      match (x |> S.to_int) lsr y |> S.of_int_opt with
-      | None ->
-          S.saturated
-      | Some x ->
-          x
+    let ( lsr ) = S.shift_right
   end
 
   let z_bytes (z : Z.t) =
@@ -437,7 +432,7 @@ module Cost_of = struct
 
     (* model N_Mul_teznat *)
     let cost_N_Mul_teznat size =
-      let open Z_syntax in
+      let open S_syntax in
       safe_const 200 + (safe_const 133 * safe_int size)
 
     (* model N_Neg_bls12_381_fr *)

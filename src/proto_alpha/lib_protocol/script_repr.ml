@@ -136,7 +136,8 @@ let traversal_cost node =
 
 let cost_of_size (blocks, words) =
   let open Gas_limit_repr in
-  (S.max S.zero (S.sub blocks (safe_int 1)) *@ alloc_cost S.zero)
+  S.max (S.zero |> S.may_saturate) (S.sub blocks (safe_int 1))
+  *@ alloc_cost S.zero
   +@ alloc_cost words +@ step_cost blocks
 
 let cost_of_size_int pair = cost_of_size (convert_pair pair)
