@@ -23,31 +23,38 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:    Protocol
+    Invocation:   dune build @src/proto_alpha/lib_protocol/runtest
+    Subject:      Entrypoint
+*)
+
 let () =
   Alcotest_lwt.run
     "protocol_alpha"
-    [ ("transfer", Transfer.tests);
-      ("origination", Origination.tests);
-      ("activation", Activation.tests);
-      ("revelation", Reveal.tests);
-      ("endorsement", Endorsement.tests);
-      ("double endorsement", Double_endorsement.tests);
-      ("double baking", Double_baking.tests);
-      ("seed", Seed.tests);
-      ("baking", Baking.tests);
-      ("delegation", Delegation.tests);
-      ("rolls", Rolls.tests);
-      ("combined", Combined_operations.tests);
-      ("qty", Qty.tests);
-      ("voting", Voting.tests);
-      ("interpretation", Interpretation.tests);
-      ("typechecking", Typechecking.tests);
-      ("gas properties", Gas_properties.tests);
-      ("fixed point computation", Fixed_point.tests);
-      ("gas levels", Gas_levels.tests);
-      ("gas cost functions", Gas_costs.tests);
-      ("lazy storage diff", Lazy_storage_diff.tests);
+    [ ("transfer", Test_transfer.tests);
+      ("origination", Test_origination.tests);
+      ("activation", Test_activation.tests);
+      ("revelation", Test_reveal.tests);
+      ("endorsement", Test_endorsement.tests);
+      ("double endorsement", Test_double_endorsement.tests);
+      ("double baking", Test_double_baking.tests);
+      ("seed", Test_seed.tests);
+      ("baking", Test_baking.tests);
+      ("delegation", Test_delegation.tests);
+      ("rolls", Test_rolls.tests);
+      ("combined", Test_combined_operations.tests);
+      ("qty", Test_qty.tests);
+      ("voting", Test_voting.tests);
+      ("interpretation", Test_interpretation.tests);
+      ("typechecking", Test_typechecking.tests);
+      ("gas properties", Test_gas_properties.tests);
+      ("fixed point computation", Test_fixed_point.tests);
+      ("gas levels", Test_gas_levels.tests);
+      ("gas cost functions", Test_gas_costs.tests);
+      ("lazy storage diff", Test_lazy_storage_diff.tests);
       ("sapling", Test_sapling.tests);
       ("helpers rpcs", Test_helpers_rpcs.tests);
-      ("script deserialize gas", Script_gas.tests) ]
+      ("script deserialize gas", Test_script_gas.tests) ]
   |> Lwt_main.run

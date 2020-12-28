@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:  Protocol (gas properties)
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^gas properties$"
+    Subject:    Arithmetic properties around gas.
+*)
+
 open Protocol
 
 type cost_kind =
@@ -75,7 +82,8 @@ let random_cost_of_kind (cost_kind : cost_kind) =
 
 let random_cost () = random_cost_of_kind (random_cost_kind ())
 
-let free_neutral since =
+(** Consuming [Gas.free] is equivalent to consuming nothing. *)
+let test_free_neutral since =
   let open Alpha_context in
   let open Environment.Error_monad in
   let cost = random_cost () in
@@ -92,7 +100,9 @@ let free_neutral since =
   then ok_none
   else Ok (Some (cost, Gas.free))
 
-let consume_commutes since =
+(** Consuming [cost1] then [cost2] is equivalent to consuming
+    [Gas.(cost1 +@ cost2)]. *)
+let test_consume_commutes since =
   let open Alpha_context in
   let open Environment.Error_monad in
   let cost1 = random_cost () in
@@ -154,8 +164,8 @@ let tests =
   [ Test.tztest
       "Gas.free is a neutral element"
       `Quick
-      (check_property (loop_check free_neutral 1000));
+      (check_property (loop_check test_free_neutral 1000));
     Test.tztest
       "Gas.consume commutes"
       `Quick
-      (check_property (loop_check consume_commutes 1000)) ]
+      (check_property (loop_check test_consume_commutes 1000)) ]

@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:  Protocol (Helpers RPCs)
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^helpers rpcs$"
+    Subject:    On RPCs.
+*)
+
 open Protocol
 open Alpha_context
 

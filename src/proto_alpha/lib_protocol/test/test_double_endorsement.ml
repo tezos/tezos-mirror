@@ -23,8 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Double endorsement evidence operation may happen when an endorser
-    endorsed two different blocks on the same level. *)
+(** Testing
+    -------
+    Component:    Protocol (double endorsement)
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^double endorsement$"
+    Subject:      Double endorsement evidence operation may happen when an
+                  endorser endorsed two different blocks on the same level.
+*)
 
 open Protocol
 open Alpha_context
@@ -66,7 +71,7 @@ let block_fork b =
 (** Simple scenario where two endorsements are made from the same
     delegate and exposed by a double_endorsement operation. Also verify
     that punishment is operated. *)
-let valid_double_endorsement_evidence () =
+let test_valid_double_endorsement_evidence () =
   Context.init 2
   >>=? fun (b, _) ->
   block_fork b
@@ -100,9 +105,9 @@ let valid_double_endorsement_evidence () =
 (*  The following test scenarios are supposed to raise errors.  *)
 (****************************************************************)
 
-(** Check that an invalid double endorsement operation that exposes a valid
-    endorsement fails. *)
-let invalid_double_endorsement () =
+(** Check that an invalid double endorsement operation that exposes a
+    valid endorsement fails. *)
+let test_invalid_double_endorsement () =
   Context.init 10
   >>=? fun (b, _) ->
   Block.bake b
@@ -123,7 +128,7 @@ let invalid_double_endorsement () =
 
 (** Check that a double endorsement added at the same time as a double
     endorsement operation fails. *)
-let too_early_double_endorsement_evidence () =
+let test_too_early_double_endorsement_evidence () =
   Context.init 2
   >>=? fun (b, _) ->
   block_fork b
@@ -146,7 +151,7 @@ let too_early_double_endorsement_evidence () =
 
 (** Check that after [preserved_cycles + 1], it is not possible
     to create a double_endorsement anymore. *)
-let too_late_double_endorsement_evidence () =
+let test_too_late_double_endorsement_evidence () =
   Context.init 2
   >>=? fun (b, _) ->
   Context.get_constants (B b)
@@ -174,9 +179,9 @@ let too_late_double_endorsement_evidence () =
       | _ ->
           false)
 
-(** Check that an invalid double endorsement evidence that expose two
+(** Check that an invalid double endorsement evidence that exposes two
     endorsements made by two different endorsers fails. *)
-let different_delegates () =
+let test_different_delegates () =
   Context.init 2
   >>=? fun (b, _) ->
   Block.bake b
@@ -210,7 +215,7 @@ let different_delegates () =
 
 (** Check that a double endorsement evidence that exposes a ill-formed
     endorsement fails. *)
-let wrong_delegate () =
+let test_wrong_delegate () =
   Context.init ~endorsers_per_block:1 2
   >>=? fun (b, contracts) ->
   List.map_es (Context.Contract.manager (B b)) contracts
@@ -245,18 +250,18 @@ let tests =
   [ Test.tztest
       "valid double endorsement evidence"
       `Quick
-      valid_double_endorsement_evidence;
+      test_valid_double_endorsement_evidence;
     Test.tztest
       "invalid double endorsement evidence"
       `Quick
-      invalid_double_endorsement;
+      test_invalid_double_endorsement;
     Test.tztest
       "too early double endorsement evidence"
       `Quick
-      too_early_double_endorsement_evidence;
+      test_too_early_double_endorsement_evidence;
     Test.tztest
       "too late double endorsement evidence"
       `Quick
-      too_late_double_endorsement_evidence;
-    Test.tztest "different delegates" `Quick different_delegates;
-    Test.tztest "wrong delegate" `Quick wrong_delegate ]
+      test_too_late_double_endorsement_evidence;
+    Test.tztest "different delegates" `Quick test_different_delegates;
+    Test.tztest "wrong delegate" `Quick test_wrong_delegate ]

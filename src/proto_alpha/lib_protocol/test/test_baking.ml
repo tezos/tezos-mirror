@@ -24,10 +24,28 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:    Protocol (baking)
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^baking$"
+    Subject:      Rewards and bakers. Tests based on RPCs.
+*)
+
 open Protocol
 open Alpha_context
 
-(** Tests for [bake_n] and [bake_until_end_cycle]. *)
+(** Verify the level is correctly computed when the first cycle is
+    passed and after baking a certain fixed number of blocks (10 for
+    the moment). The result should be [blocks_per_cycle + 10] where
+    [blocks_per_cycle] comes from the constants of the selected
+    protocol.
+
+    IMPROVEMENTS:
+    - Randomize the number of cycle.
+    - Randomize the number of accounts created at the beginning
+    - Randomize the blocks per cycle.
+    - Randomize the number of blocks baked after the n cycles baked
+      previously. *)
 let test_cycle () =
   Context.init 5
   >>=? fun (b, _) ->
@@ -35,8 +53,6 @@ let test_cycle () =
   >>=? fun csts ->
   let blocks_per_cycle = csts.parametric.blocks_per_cycle in
   let pp fmt x = Format.fprintf fmt "%ld" x in
-  (* Tests that [bake_until_cycle_end] returns a block at
-     level [blocks_per_cycle]. *)
   Block.bake b
   >>=? fun b ->
   Block.bake_until_cycle_end b
@@ -51,7 +67,6 @@ let test_cycle () =
     (Alpha_context.Raw_level.to_int32 curr_level)
     blocks_per_cycle
   >>=? fun () ->
-  (* Tests that [bake_n n] bakes [n] blocks. *)
   Context.get_level (B b)
   >>?= fun l ->
   Block.bake_n 10 b
@@ -66,8 +81,8 @@ let test_cycle () =
     (Alpha_context.Raw_level.to_int32 curr_level)
     (Int32.add (Alpha_context.Raw_level.to_int32 l) 10l)
 
-(** Check that after baking and/or endorsing a block the baker and the
-    endorsers get their reward *)
+(** After baking and/or endorsing a block, the baker and the endorsers
+    get their reward. *)
 let test_rewards_retrieval () =
   Context.init 256
   >>=? fun (b, _) ->
@@ -165,8 +180,8 @@ let test_rewards_retrieval () =
         real_endorsers)
     ranges
 
-(** Tests the baking and endorsing rewards formulas against a
-    precomputed table *)
+(** Checks the baking and endorsing rewards formulas against a precomputed
+    table. *)
 let test_rewards_formulas () =
   Context.init 1
   >>=? fun (b, _) ->
@@ -197,8 +212,8 @@ let test_rewards_formulas () =
 
 let wrap e = Lwt.return (Environment.wrap_error e)
 
-(* Check that the rewards formulas from Context are
-   equivalent with the ones from Baking *)
+(** Check that the rewards formulas from Context are equivalent with
+    the ones from Baking. *)
 let test_rewards_formulas_equivalence () =
   Context.init 1
   >>=? fun (b, _) ->
@@ -237,6 +252,7 @@ let test_rewards_formulas_equivalence () =
       >>=? fun reward2 -> Assert.equal_tez ~loc:__LOC__ reward1 reward2)
     ranges
 
+(** Test baking [n] cycles in a raw works smoothly. *)
 let test_bake_n_cycles n () =
   let open Block in
   let policy = By_priority 0 in
@@ -244,11 +260,8 @@ let test_bake_n_cycles n () =
   >>=? fun (block, _contracts) ->
   Block.bake_until_n_cycle_end ~policy n block >>=? fun _block -> return ()
 
-(* gets the voting power *)
-let get_voting_power block pkhash =
-  let ctxt = Context.B block in
-  Context.get_voting_power ctxt pkhash
-
+(** Check the voting power is constant between cycles when number of
+    rolls are constant and in presence of one account. *)
 let test_voting_power_cache () =
   let open Block in
   let policy = By_priority 0 in
@@ -258,7 +271,8 @@ let test_voting_power_cache () =
   >>=? fun bakers ->
   let baker = Option.get @@ List.hd bakers in
   let assert_voting_power n block =
-    get_voting_power block baker
+    let ctxt = Context.B block in
+    Context.get_voting_power ctxt baker
     >>=? fun voting_power ->
     Assert.equal_int ~loc:__LOC__ n (Int32.to_int voting_power)
   in

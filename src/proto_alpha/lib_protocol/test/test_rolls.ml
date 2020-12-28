@@ -23,6 +23,20 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:  Protocol (rolls)
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^rolls$"
+    Subject:    On rolls and baking rights.
+                A delegate has baking rights provided that it has at least
+                more than [token_per_rolls] tz of staking balance. This
+                balance corresponds to the quantity of tez that have been
+                delegated to it for baking rights. After a given number of
+                cycles where it has not made use of its baking rights, its
+                account will be deactivated for baker selection. To bake
+                again, it will have to re-activate its account.
+*)
+
 open Protocol
 open Alpha_context
 open Test_tez
@@ -46,7 +60,13 @@ let get_rolls ctxt delegate =
   >>=? function
   | None -> return_nil | Some head_roll -> traverse_rolls ctxt head_roll
 
-let check_rolls b (account : Account.t) =
+(** Baking rights consistency. Assert that the number of rolls for
+    [account]'s pkh - equals to the number of expected rolls, i.e.,
+    staking balance of [account] / (token_per_roll). As of protocol
+    version 007, token_per_roll = 8000. Note that the consistency is
+    verified against the value in the context, i.e. we are testing
+    Storage.Roll.Delegate_roll_list. We do not use RPCs here. *)
+let check_rolls (b : Block.t) (account : Account.t) =
   Context.get_constants (B b)
   >>=? fun constants ->
   Context.Delegate.info (B b) account.pkh
@@ -82,7 +102,11 @@ let check_no_rolls (b : Block.t) (account : Account.t) =
   get_rolls ctxt account.pkh
   >>=? fun rolls -> Assert.equal_int ~loc:__LOC__ (List.length rolls) 0
 
-let simple_staking_rights () =
+(** Create a block with two initialized contracts/accounts. Assert
+    that the first account has a staking balance that is equal to its
+    own balance, and that its staking rights are consistent
+    (check_rolls). *)
+let test_simple_staking_rights () =
   Context.init 2
   >>=? fun (b, accounts) ->
   let (a1, _a2) = account_pair accounts in
@@ -95,7 +119,11 @@ let simple_staking_rights () =
   Assert.equal_tez ~loc:__LOC__ balance info.staking_balance
   >>=? fun () -> check_rolls b m1
 
-let simple_staking_rights_after_baking () =
+(** Create a block with two initialized contracts/accounts. Bake
+    five blocks. Assert that the staking balance of the first account
+    equals to its balance. Then both accounts have consistent staking
+    rights. *)
+let test_simple_staking_rights_after_baking () =
   Context.init 2
   >>=? fun (b, accounts) ->
   let (a1, a2) = account_pair accounts in
@@ -151,7 +179,10 @@ let run_until_deactivation () =
   check_activate_staking_balance ~loc:__LOC__ ~deactivated:true b (a1, m1)
   >|=? fun () -> (b, ((a1, m1), balance_start), (a2, m2))
 
-let deactivation_then_bake () =
+(** From an initialized block with two contracts/accounts, the first
+    one is active then deactivated. After baking, check that the
+    account is active again. Baking rights are ensured. *)
+let test_deactivation_then_bake () =
   run_until_deactivation ()
   >>=? fun ( b,
              ( ((_deactivated_contract, deactivated_account) as deactivated),
@@ -162,7 +193,10 @@ let deactivation_then_bake () =
   check_activate_staking_balance ~loc:__LOC__ ~deactivated:false b deactivated
   >>=? fun () -> check_rolls b deactivated_account
 
-let deactivation_then_self_delegation () =
+(** A deactivated account, after baking with self-delegation, is
+    active again. Preservation of its balance is tested. Baking rights
+    are ensured. *)
+let test_deactivation_then_self_delegation () =
   run_until_deactivation ()
   >>=? fun ( b,
              ( ((deactivated_contract, deactivated_account) as deactivated),
@@ -179,7 +213,10 @@ let deactivation_then_self_delegation () =
   Assert.equal_tez ~loc:__LOC__ start_balance balance
   >>=? fun () -> check_rolls b deactivated_account
 
-let deactivation_then_empty_then_self_delegation () =
+(** A deactivated account, which is emptied (into a newly created sink
+    account), then self-delegated, becomes activated. Its balance is
+    zero. Baking rights are ensured. *)
+let test_deactivation_then_empty_then_self_delegation () =
   run_until_deactivation ()
   >>=? fun ( b,
              ( ((deactivated_contract, deactivated_account) as deactivated),
@@ -217,7 +254,10 @@ let deactivation_then_empty_then_self_delegation () =
   Assert.equal_tez ~loc:__LOC__ Tez.zero balance
   >>=? fun () -> check_rolls b deactivated_account
 
-let deactivation_then_empty_then_self_delegation_then_recredit () =
+(** A deactivated account, which is emptied, then self-delegated, then
+    re-credited of the sunk amount, becomes active again. Staking
+    rights remain consistent. *)
+let test_deactivation_then_empty_then_self_delegation_then_recredit () =
   run_until_deactivation ()
   >>=? fun ( b,
              ( ((deactivated_contract, deactivated_account) as deactivated),
@@ -258,7 +298,13 @@ let deactivation_then_empty_then_self_delegation_then_recredit () =
   Assert.equal_tez ~loc:__LOC__ amount balance
   >>=? fun () -> check_rolls b deactivated_account
 
-let delegation () =
+(** Initialize a block with two contracts/accounts. A third new
+    account is also created. The first account is self-delegated. First
+    account sends to third one the amount of 0.5 tez. The third account
+    has no delegate and is consistent for baking rights. Then, it is
+    self-delegated and is supposed to be activated. Again, consistency
+    for baking rights are preserved for the first and third accounts. *)
+let test_delegation () =
   Context.init 2
   >>=? fun (b, accounts) ->
   let (a1, a2) = account_pair accounts in
@@ -300,22 +346,22 @@ let delegation () =
   >>=? fun () -> check_rolls b m3 >>=? fun () -> check_rolls b m1
 
 let tests =
-  [ Test.tztest "simple staking rights" `Quick simple_staking_rights;
+  [ Test.tztest "simple staking rights" `Quick test_simple_staking_rights;
     Test.tztest
       "simple staking rights after baking"
       `Quick
-      simple_staking_rights_after_baking;
-    Test.tztest "deactivation then bake" `Quick deactivation_then_bake;
+      test_simple_staking_rights_after_baking;
+    Test.tztest "deactivation then bake" `Quick test_deactivation_then_bake;
     Test.tztest
       "deactivation then self delegation"
       `Quick
-      deactivation_then_self_delegation;
+      test_deactivation_then_self_delegation;
     Test.tztest
       "deactivation then empty then self delegation"
       `Quick
-      deactivation_then_empty_then_self_delegation;
+      test_deactivation_then_empty_then_self_delegation;
     Test.tztest
       "deactivation then empty then self delegation then recredit"
       `Quick
-      deactivation_then_empty_then_self_delegation_then_recredit;
-    Test.tztest "delegation" `Quick delegation ]
+      test_deactivation_then_empty_then_self_delegation_then_recredit;
+    Test.tztest "delegation" `Quick test_delegation ]

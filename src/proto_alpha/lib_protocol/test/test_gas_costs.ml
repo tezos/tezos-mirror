@@ -23,12 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:  Protocol (gas costs)
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^gas cost functions$"
+    Subject:    Gas costs
+                Current limitations: for maps, sets & compare, we only test
+                integer comparable keys.
+*)
+
 open Protocol
 open Script_ir_translator
-
-(* Basic tests related to costs.
-   Current limitations: for maps, sets & compare, we only test integer
-   comparable keys. *)
 
 let dummy_list = list_cons 42 list_empty
 
@@ -228,7 +233,8 @@ let cast_cost_to_z (c : Alpha_context.Gas.cost) : Z.t =
   Data_encoding.Binary.to_bytes_exn Alpha_context.Gas.cost_encoding c
   |> Data_encoding.Binary.of_bytes_exn Data_encoding.z
 
-let check_cost_reprs_are_all_positive list () =
+(** Checks that all costs are positive values. *)
+let test_cost_reprs_are_all_positive list () =
   List.iter_es
     (fun (cost_name, cost) ->
       if Z.gt cost Z.zero then return_unit
@@ -239,26 +245,27 @@ let check_cost_reprs_are_all_positive list () =
              (Failure (Format.asprintf "Gas cost test \"%s\" failed" cost_name))))
     list
 
-let check_costs_are_all_positive list () =
+(** Checks that all costs are positive values. *)
+let test_costs_are_all_positive list () =
   let list =
     List.map (fun (cost_name, cost) -> (cost_name, cast_cost_to_z cost)) list
   in
-  check_cost_reprs_are_all_positive list ()
+  test_cost_reprs_are_all_positive list ()
 
 let tests =
   [ Test.tztest
       "Positivity of interpreter costs"
       `Quick
-      (check_costs_are_all_positive all_interpreter_costs);
+      (test_costs_are_all_positive all_interpreter_costs);
     Test.tztest
       "Positivity of typechecking costs"
       `Quick
-      (check_costs_are_all_positive all_parsing_costs);
+      (test_costs_are_all_positive all_parsing_costs);
     Test.tztest
       "Positivity of unparsing costs"
       `Quick
-      (check_costs_are_all_positive all_unparsing_costs);
+      (test_costs_are_all_positive all_unparsing_costs);
     Test.tztest
       "Positivity of io costs"
       `Quick
-      (check_cost_reprs_are_all_positive all_io_costs) ]
+      (test_cost_reprs_are_all_positive all_io_costs) ]

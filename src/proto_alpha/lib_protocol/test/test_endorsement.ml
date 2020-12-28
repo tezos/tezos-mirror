@@ -23,12 +23,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Endorsing a block adds an extra layer of confidence to the Tezos'
-    PoS algorithm. The block endorsing operation must be included in
-    the following block. Each endorser possess a number of slots
-    corresponding to their priority. After [preserved_cycles], a reward
-    is given to the endorser. This reward depends on the priority of
-    the block that contains the endorsements. *)
+(** Testing
+    -------
+    Component:  Protocol (endorsement)
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^endorsement$"
+    Subject:    Endorsing a block adds an extra layer of confidence to the
+                Tezos' PoS algorithm. The block endorsing operation must be
+                included in the following block. Each endorser possesses a
+                number of slots corresponding to their priority. After
+                [preserved_cycles], a reward is given to the endorser. This
+                reward depends on the priority of the block that contains
+                the endorsements.
+*)
 
 open Protocol
 open Alpha_context
@@ -97,8 +103,8 @@ let endorsing_power endorsers =
 (*                      Tests                                   *)
 (****************************************************************)
 
-(** Apply a single endorsement from the slot 0 endorser *)
-let simple_endorsement () =
+(** Apply a single endorsement from the slot 0 endorser. *)
+let test_simple_endorsement () =
   Context.init 5
   >>=? fun (b, _) ->
   Context.get_endorser (B b)
@@ -122,7 +128,7 @@ let simple_endorsement () =
 
 (** Apply a maximum number of endorsements. An endorser can be
     selected twice. *)
-let max_endorsement () =
+let test_max_endorsement () =
   let endorsers_per_block = 16 in
   Context.init ~endorsers_per_block 32
   >>=? fun (b, _) ->
@@ -167,8 +173,9 @@ let max_endorsement () =
     delegates
     previous_balances
 
-(** Check every that endorsers' balances are consistent with different priorities *)
-let consistent_priorities () =
+(** Check that every endorsers' balances are consistent with different
+    priorities. *)
+let test_consistent_priorities () =
   let priorities = 0 -- 64 in
   Context.init 64
   >>=? fun (b, _) ->
@@ -221,8 +228,9 @@ let consistent_priorities () =
     priorities
   >>=? fun _b -> return_unit
 
-(** Check that after [preserved_cycles] cycles the endorser gets his reward *)
-let reward_retrieval () =
+(** Check that after [preserved_cycles] number of cycles the endorser
+    gets his reward. *)
+let test_reward_retrieval () =
   Context.init 5
   >>=? fun (b, _) ->
   Context.get_constants (B b)
@@ -258,10 +266,10 @@ let reward_retrieval () =
     balance
     reward
 
-(** Check that after [preserved_cycles] cycles endorsers get their
-    reward. Two endorsers are used and they endorse in different
+(** Check that after [preserved_cycles] number of cycles endorsers get
+    their reward. Two endorsers are used and they endorse in different
     cycles. *)
-let reward_retrieval_two_endorsers () =
+let test_reward_retrieval_two_endorsers () =
   Context.init 5
   >>=? fun (b, _) ->
   Context.get_constants (B b)
@@ -363,7 +371,7 @@ let reward_retrieval_two_endorsers () =
     balance2
     security_deposit2
   >>=? fun () ->
-  (* bake [preserved_cycles] cycles *)
+  (* bake [preserved_cycles] number of cycles *)
   List.fold_left_es
     (fun b _ ->
       Assert.balance_was_debited
@@ -419,8 +427,8 @@ let reward_retrieval_two_endorsers () =
 (****************************************************************)
 
 (** Wrong endorsement predecessor : apply an endorsement with an
-    incorrect block predecessor *)
-let wrong_endorsement_predecessor () =
+    incorrect block predecessor. *)
+let test_wrong_endorsement_predecessor () =
   Context.init 5
   >>=? fun (b, _) ->
   Context.get_endorser (B b)
@@ -438,9 +446,9 @@ let wrong_endorsement_predecessor () =
       | _ ->
           false)
 
-(** Invalid_endorsement_level : apply an endorsement with an incorrect
-    level (i.e. the predecessor level) *)
-let invalid_endorsement_level () =
+(** Invalid_endorsement_level: apply an endorsement with an incorrect
+    level (i.e. the predecessor level). *)
+let test_invalid_endorsement_level () =
   Context.init 5
   >>=? fun (b, _) ->
   Context.get_level (B b)
@@ -458,8 +466,9 @@ let invalid_endorsement_level () =
       | _ ->
           false)
 
-(** Duplicate endorsement : apply an endorsement that has already been done *)
-let duplicate_endorsement () =
+(** Duplicate endorsement : apply an endorsement that has already been
+    done. *)
+let test_duplicate_endorsement () =
   Context.init 5
   >>=? fun (b, _) ->
   Incremental.begin_construction b
@@ -480,8 +489,8 @@ let duplicate_endorsement () =
       | _ ->
           false)
 
-(** Apply a single endorsement from the slot 0 endorser *)
-let not_enough_for_deposit () =
+(** Apply a single endorsement from the slot 0 endorser. *)
+let test_not_enough_for_deposit () =
   Context.init 5 ~endorsers_per_block:1
   >>=? fun (b_init, contracts) ->
   List.map_es
@@ -531,8 +540,8 @@ let not_enough_for_deposit () =
       | _ ->
           false)
 
-(* check that a block with not enough endorsement cannot be baked *)
-let endorsement_threshold () =
+(** Check that a block with not enough endorsement cannot be baked. *)
+let test_endorsement_threshold () =
   let initial_endorsers = 28 in
   let num_accounts = 100 in
   Context.init ~initial_endorsers num_accounts
@@ -590,6 +599,7 @@ let endorsement_threshold () =
     b
   >>= fun _ -> return_unit
 
+(** Fitness gap *)
 let test_fitness_gap () =
   let num_accounts = 5 in
   Context.init num_accounts
@@ -619,21 +629,24 @@ let test_fitness_gap () =
   Assert.equal_int ~loc:__LOC__ res 1 >>=? fun () -> return_unit
 
 let tests =
-  [ Test.tztest "Simple endorsement" `Quick simple_endorsement;
-    Test.tztest "Maximum endorsement" `Quick max_endorsement;
-    Test.tztest "Consistent priorities" `Quick consistent_priorities;
-    Test.tztest "Reward retrieval" `Quick reward_retrieval;
+  [ Test.tztest "Simple endorsement" `Quick test_simple_endorsement;
+    Test.tztest "Maximum endorsement" `Quick test_max_endorsement;
+    Test.tztest "Consistent priorities" `Quick test_consistent_priorities;
+    Test.tztest "Reward retrieval" `Quick test_reward_retrieval;
     Test.tztest
       "Reward retrieval two endorsers"
       `Quick
-      reward_retrieval_two_endorsers;
-    Test.tztest "Endorsement threshold" `Quick endorsement_threshold;
+      test_reward_retrieval_two_endorsers;
+    Test.tztest "Endorsement threshold" `Quick test_endorsement_threshold;
     Test.tztest "Fitness gap" `Quick test_fitness_gap;
     (* Fail scenarios *)
     Test.tztest
       "Wrong endorsement predecessor"
       `Quick
-      wrong_endorsement_predecessor;
-    Test.tztest "Invalid endorsement level" `Quick invalid_endorsement_level;
-    Test.tztest "Duplicate endorsement" `Quick duplicate_endorsement;
-    Test.tztest "Not enough for deposit" `Quick not_enough_for_deposit ]
+      test_wrong_endorsement_predecessor;
+    Test.tztest
+      "Invalid endorsement level"
+      `Quick
+      test_invalid_endorsement_level;
+    Test.tztest "Duplicate endorsement" `Quick test_duplicate_endorsement;
+    Test.tztest "Not enough for deposit" `Quick test_not_enough_for_deposit ]

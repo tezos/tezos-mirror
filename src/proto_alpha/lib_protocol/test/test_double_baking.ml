@@ -23,8 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Double baking evidence operation may happen when a baker
-    baked two different blocks on the same level. *)
+(** Testing
+    -------
+    Component:    Protocol (double baking)
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^double baking$"
+    Subject:      Double baking evidence operation may happen when a baker
+                  baked two different blocks on the same level.
+*)
 
 open Protocol
 open Alpha_context
@@ -53,7 +58,7 @@ let get_first_different_endorsers ctxt =
   Context.get_endorsers ctxt >|=? fun endorsers -> get_hd_hd endorsers
 
 (** Bake two block at the same level using the same policy (i.e. same
-    baker) *)
+    baker). *)
 let block_fork ?policy contracts b =
   let (contract_a, contract_b) = get_hd_hd contracts in
   Op.transaction (B b) contract_a contract_b Alpha_context.Tez.one_cent
@@ -66,8 +71,8 @@ let block_fork ?policy contracts b =
 (****************************************************************)
 
 (** Simple scenario where two blocks are baked by a same baker and
-    exposed by a double baking evidence operation *)
-let valid_double_baking_evidence () =
+    exposed by a double baking evidence operation. *)
+let test_valid_double_baking_evidence () =
   Context.init 2
   >>=? fun (b, contracts) ->
   Context.get_bakers (B b)
@@ -92,8 +97,9 @@ let valid_double_baking_evidence () =
 (*  The following test scenarios are supposed to raise errors.  *)
 (****************************************************************)
 
-(** Check that a double baking operation fails if it exposes the same two blocks *)
-let same_blocks () =
+(** Check that a double baking operation fails if it exposes the same two
+    blocks. *)
+let test_same_blocks () =
   Context.init 2
   >>=? fun (b, _contracts) ->
   Block.bake b
@@ -110,8 +116,8 @@ let same_blocks () =
   >>=? fun () -> return_unit
 
 (** Check that a double baking operation exposing two blocks with
-    different levels fails *)
-let different_levels () =
+    different levels fails. *)
+let test_different_levels () =
   Context.init 2
   >>=? fun (b, contracts) ->
   block_fork ~policy:(By_priority 0) contracts b
@@ -128,9 +134,9 @@ let different_levels () =
       | _ ->
           false)
 
-(** Check that a double baking operation exposing two yet to be baked
-    blocks fails *)
-let too_early_double_baking_evidence () =
+(** Check that a double baking operation exposing two yet-to-be-baked
+    blocks fails. *)
+let test_too_early_double_baking_evidence () =
   Context.init 2
   >>=? fun (b, contracts) ->
   block_fork ~policy:(By_priority 0) contracts b
@@ -146,8 +152,8 @@ let too_early_double_baking_evidence () =
           false)
 
 (** Check that after [preserved_cycles + 1], it is not possible to
-    create a double baking operation anymore *)
-let too_late_double_baking_evidence () =
+    create a double baking operation anymore. *)
+let test_too_late_double_baking_evidence () =
   Context.init 2
   >>=? fun (b, contracts) ->
   Context.get_constants (B b)
@@ -169,9 +175,9 @@ let too_late_double_baking_evidence () =
       | _ ->
           false)
 
-(** Check that an invalid double baking evidence that exposes two block
-    baking with same level made by different bakers fails *)
-let different_delegates () =
+(** Check that an invalid double baking evidence that exposes two
+    block baking with same level made by different bakers fails. *)
+let test_different_delegates () =
   Context.init 2
   >>=? fun (b, _) ->
   get_first_different_bakers (B b)
@@ -190,8 +196,8 @@ let different_delegates () =
       | _ ->
           false)
 
-let wrong_signer () =
-  (* Baker_2 bakes a block but baker signs it. *)
+(** Baker_2 bakes a block but baker signs it. *)
+let test_wrong_signer () =
   let header_custom_signer baker baker_2 b =
     Block.Forge.forge_header ~policy:(By_account baker_2) b
     >>=? fun header ->
@@ -219,17 +225,17 @@ let tests =
   [ Test.tztest
       "valid double baking evidence"
       `Quick
-      valid_double_baking_evidence;
+      test_valid_double_baking_evidence;
     (* Should fail*)
-    Test.tztest "same blocks" `Quick same_blocks;
-    Test.tztest "different levels" `Quick different_levels;
+    Test.tztest "same blocks" `Quick test_same_blocks;
+    Test.tztest "different levels" `Quick test_different_levels;
     Test.tztest
       "too early double baking evidence"
       `Quick
-      too_early_double_baking_evidence;
+      test_too_early_double_baking_evidence;
     Test.tztest
       "too late double baking evidence"
       `Quick
-      too_late_double_baking_evidence;
-    Test.tztest "different delegates" `Quick different_delegates;
-    Test.tztest "wrong delegate" `Quick wrong_signer ]
+      test_too_late_double_baking_evidence;
+    Test.tztest "different delegates" `Quick test_different_delegates;
+    Test.tztest "wrong delegate" `Quick test_wrong_signer ]

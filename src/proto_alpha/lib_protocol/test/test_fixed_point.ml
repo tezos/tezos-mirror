@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:  Protocol (fixed-point decimals)
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^fixed point computation$"
+    Subject:    On fixed-point decimal numbers.
+*)
+
 open Protocol
 
 exception Fixed_point_test_error of string
@@ -104,7 +111,9 @@ let arith_from_fp : (module Fixed_point_repr.Full) -> (module Arith) =
   end in
   (module Arith)
 
-let integral_tests decimals () =
+(** Roundtrips between [integral] and [Z.t] (for fixed-point
+    decimals). Floor and ceil preserve the integral part. *)
+let test_integral_tests decimals () =
   let module FP = Fixed_point_repr.Make (struct
     let decimals = decimals
   end) in
@@ -142,7 +151,8 @@ let integral_tests decimals () =
     (err "pp_integral(integral) = pp(fp(integral))")
   >>=? fun () -> basic_arith "integral arith" (arith_from_integral (module FP))
 
-let fp_zero () =
+(** With zero decimal. *)
+let test_fp_zero () =
   let decimals = 0 in
   let module FP = Fixed_point_repr.Make (struct
     let decimals = decimals
@@ -164,7 +174,8 @@ let fp_zero () =
   >>=? fun () ->
   basic_arith "fp (0 decimals) arith" (arith_from_fp (module FP))
 
-let fp_nonzero decimals () =
+(** With [decimals] decimal(s). *)
+let test_fp_nonzero decimals () =
   let module FP = Fixed_point_repr.Make (struct
     let decimals = decimals
   end) in
@@ -191,7 +202,10 @@ let fp_nonzero decimals () =
     FP.(ceil (add (fp (integral x)) (unsafe_fp Z.one)) = integral (Z.succ x))
     (err "ceil (x + eps) = x + 1")
 
-let fp_pp () =
+(** Checking the output of the pretty-printer [FF.pp] such that
+    fixed-point decimal values are converted to their correct string
+    output according to the number of decimals. *)
+let test_fp_pp () =
   let module FP = Fixed_point_repr.Make (struct
     let decimals = 3
   end) in
@@ -216,10 +230,10 @@ let fp_pp () =
   >>=? fun () -> fail_unless (FP.zero =:= "0") (err "0")
 
 let tests =
-  [ Test.tztest "Integral tests (0 decimals)" `Quick (integral_tests 0);
-    Test.tztest "Integral tests (1 decimals)" `Quick (integral_tests 1);
-    Test.tztest "Integral tests (10 decimals)" `Quick (integral_tests 10);
-    Test.tztest "FP tests (0 decimals)" `Quick fp_zero;
-    Test.tztest "FP tests (1 decimals)" `Quick (fp_nonzero 1);
-    Test.tztest "FP tests (3 decimals)" `Quick (fp_nonzero 3);
-    Test.tztest "FP pp tests (3 decimals)" `Quick fp_pp ]
+  [ Test.tztest "Integral tests (0 decimals)" `Quick (test_integral_tests 0);
+    Test.tztest "Integral tests (1 decimals)" `Quick (test_integral_tests 1);
+    Test.tztest "Integral tests (10 decimals)" `Quick (test_integral_tests 10);
+    Test.tztest "FP tests (0 decimals)" `Quick test_fp_zero;
+    Test.tztest "FP tests (1 decimals)" `Quick (test_fp_nonzero 1);
+    Test.tztest "FP tests (3 decimals)" `Quick (test_fp_nonzero 3);
+    Test.tztest "FP pp tests (3 decimals)" `Quick test_fp_pp ]

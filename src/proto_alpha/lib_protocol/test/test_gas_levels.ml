@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:  Protocol (Gas levels)
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^gas levels$"
+    Subject:    On gas consumption and exhaustion.
+*)
+
 open Test
 open Protocol
 open Raw_context
@@ -46,7 +53,7 @@ let dummy_context () =
     (block.context : Environment_context.Context.t)
   >|= Environment.wrap_error
 
-let detect_gas_exhaustion_in_fresh_context () =
+let test_detect_gas_exhaustion_in_fresh_context () =
   dummy_context ()
   >>=? fun context ->
   fail_unless
@@ -60,14 +67,14 @@ let make_context initial_operation_gas =
     ( Gas_limit_repr.Arith.integral_of_int initial_operation_gas
     |> set_gas_limit context )
 
-let detect_gas_exhaustion_when_operation_gas_hits_zero () =
+let test_detect_gas_exhaustion_when_operation_gas_hits_zero () =
   make_context 10
   >>=? fun context ->
   fail_unless
     (consume_gas context (Z.of_int max_int) |> failed)
     (err "Fail when consuming more than the remaining operation gas.")
 
-let detect_gas_exhaustion_when_block_gas_hits_zero () =
+let test_detect_gas_exhaustion_when_block_gas_hits_zero () =
   make_context max_int
   >>=? fun context ->
   fail_unless
@@ -95,21 +102,17 @@ let operation_gas_level context =
       (* because this function is called after [set_gas_limit]. *)
       assert false
 
-(*
-
-   Monitoring runs differently depending on the minimum between the
+(* Monitoring runs differently depending on the minimum between the
    operation gas level and the block gas level. Hence, we check that
-   in both situations, the gas levels are correctly reported.
+   in both situations, the gas levels are correctly reported. *)
+let test_monitor_operation_gas_level = monitor 100 operation_gas_level 90
 
-*)
-let monitor_operation_gas_level = monitor 100 operation_gas_level 90
-
-let monitor_operation_gas_level' =
+let test_monitor_operation_gas_level' =
   monitor max_int operation_gas_level (max_int - 10)
 
-let monitor_block_gas_level = monitor 100 block_gas_level 10399990
+let test_monitor_block_gas_level = monitor 100 block_gas_level 10399990
 
-let monitor_block_gas_level' = monitor max_int block_gas_level 10399990
+let test_monitor_block_gas_level' = monitor max_int block_gas_level 10399990
 
 let quick (what, how) = tztest what `Quick how
 
@@ -117,18 +120,18 @@ let tests =
   List.map
     quick
     [ ( "Detect gas exhaustion in fresh context",
-        detect_gas_exhaustion_in_fresh_context );
+        test_detect_gas_exhaustion_in_fresh_context );
       ( "Detect gas exhaustion when operation gas as hits zero",
-        detect_gas_exhaustion_when_operation_gas_hits_zero );
+        test_detect_gas_exhaustion_when_operation_gas_hits_zero );
       ( "Detect gas exhaustion when block gas as hits zero",
-        detect_gas_exhaustion_when_block_gas_hits_zero );
+        test_detect_gas_exhaustion_when_block_gas_hits_zero );
       ( "Each gas consumption impacts operation gas level (operation < block)",
-        monitor_operation_gas_level );
+        test_monitor_operation_gas_level );
       ( "Each gas consumption impacts operation gas level (block < operation)",
-        monitor_operation_gas_level' );
+        test_monitor_operation_gas_level' );
       ( "Each gas consumption has an impact on block gas level (operation < \
          block)",
-        monitor_block_gas_level );
+        test_monitor_block_gas_level );
       ( "Each gas consumption has an impact on block gas level (block < \
          operation)",
-        monitor_block_gas_level' ) ]
+        test_monitor_block_gas_level' ) ]

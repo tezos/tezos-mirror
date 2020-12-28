@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:  Protocol (revelation)
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^revelation$"
+    Subject:    On the reveal operation.
+*)
+
 (** Test for the [Reveal] operation. *)
 
 open Protocol
@@ -30,7 +37,7 @@ open Test_tez
 
 let ten_tez = Tez.of_int 10
 
-let simple_reveal () =
+let test_simple_reveal () =
   Context.init 1
   >>=? fun (blk, contracts) ->
   let c = Option.get @@ List.hd contracts in
@@ -54,7 +61,7 @@ let simple_reveal () =
   >|=? function
   | true -> () | false -> Stdlib.failwith "New contract revelation failed."
 
-let empty_account_on_reveal () =
+let test_empty_account_on_reveal () =
   Context.init 1
   >>=? fun (blk, contracts) ->
   let c = Option.get @@ List.hd contracts in
@@ -86,7 +93,7 @@ let empty_account_on_reveal () =
   | true ->
       Stdlib.failwith "Empty account still exists and is revealed."
 
-let not_enough_found_for_reveal () =
+let test_not_enough_found_for_reveal () =
   Context.init 1
   >>=? fun (blk, contracts) ->
   let c = Option.get @@ List.hd contracts in
@@ -113,9 +120,9 @@ let not_enough_found_for_reveal () =
           false)
 
 let tests =
-  [ Test.tztest "simple reveal" `Quick simple_reveal;
-    Test.tztest "empty account on reveal" `Quick empty_account_on_reveal;
+  [ Test.tztest "simple reveal" `Quick test_simple_reveal;
+    Test.tztest "empty account on reveal" `Quick test_empty_account_on_reveal;
     Test.tztest
       "not enough found for reveal"
       `Quick
-      not_enough_found_for_reveal ]
+      test_not_enough_found_for_reveal ]

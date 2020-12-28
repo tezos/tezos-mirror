@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:  Protocol (quantities)
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^qty$"
+    Subject:    On tez quantities.
+*)
+
 open Protocol
 
 let known_ok_tez_literals =
@@ -73,13 +80,7 @@ let fail_msg fmt = Format.kasprintf (fail "" "") fmt
 
 let default_printer _ = ""
 
-let equal ?(eq = ( = )) ?(prn = default_printer) ?(msg = "") x y =
-  if not (eq x y) then fail (prn x) (prn y) msg
-
-let is_none ?(msg = "") x = if x <> None then fail "None" "Some _" msg
-
-let is_some ?(msg = "") x = if x = None then fail "Some _" "None" msg
-
+(** Literals which are supposed to be parsed correctly. *)
 let test_known_tez_literals () =
   List.iter
     (fun (v, s) ->
@@ -105,17 +106,19 @@ let test_known_tez_literals () =
         | Some vs' ->
             vs'
       in
-      equal ~prn:Tez_repr.to_string vv vs ;
-      equal ~prn:Tez_repr.to_string vv vs' ;
-      equal ~prn:(fun s -> s) (Tez_repr.to_string vv) s)
+      assert (vv = vs) ;
+      assert (vv = vs') ;
+      assert (Tez_repr.to_string vv = s))
     known_ok_tez_literals ;
   List.iter
     (fun s ->
       let vs = Tez_repr.of_string s in
-      is_none ~msg:("Unexpected successful parsing of " ^ s) vs)
+      assert (vs = None))
     known_bad_tez_literals ;
   return_unit
 
+(** Randomly generated tez value which is printed into a string then
+    parsed again for their equality. *)
 let test_random_tez_literals () =
   for _ = 0 to 100_000 do
     let v = Random.int64 12L in
@@ -127,20 +130,20 @@ let test_random_tez_literals () =
     let vs = Tez_repr.of_string s in
     let s' = String.concat "" (String.split_on_char ',' s) in
     let vs' = Tez_repr.of_string s' in
-    is_some ~msg:("Could not parse " ^ s ^ " back") vs ;
-    is_some ~msg:("Could not parse " ^ s ^ " back") vs' ;
+    assert (vs <> None) ;
+    assert (vs' <> None) ;
     ( match vs with
     | None ->
         assert false
     | Some vs ->
         let rev = Tez_repr.to_int64 vs in
-        equal ~prn:Int64.to_string ~msg:(Tez_repr.to_string vv) v rev ) ;
+        assert (v = rev) ) ;
     match vs' with
     | None ->
         assert false
     | Some vs' ->
         let rev = Tez_repr.to_int64 vs' in
-        equal ~prn:Int64.to_string ~msg:(Tez_repr.to_string vv) v rev
+        assert (v = rev)
   done ;
   return_unit
 

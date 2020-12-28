@@ -23,10 +23,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
+(** Testing
+    -------
+    Component:  Protocol (Michelson serialization gas)
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^script deserialize gas$"
+    Subject:    Unit tests pertaining to the computation of serialization
+                and deserialization gas of Michelson terms.
+*)
 
-(* This file contains unit tests pertaining to the computation of
-   serialization and deserialization gas of Michelson terms. *)
+open Protocol
 
 module Tested_terms () = struct
   open Micheline
@@ -116,7 +121,7 @@ module Tested_terms () = struct
   let check_correctness () = Lwt.return @@ check_correctness ()
 end
 
-let check_property () =
+let test_check_property () =
   let module T = Tested_terms () in
   T.check_correctness ()
 
@@ -125,4 +130,4 @@ let tests =
       "Script_repr.minimal_deserialize_cost is a lower bound for full \
        deserialization cost"
       `Quick
-      check_property ]
+      test_check_property ]

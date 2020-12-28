@@ -23,16 +23,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The activation operation creates an implicit contract from a
-    registered commitment present in the context. It is parametrized by
-    a public key hash (pkh) and a secret.
+(** Testing
+    -------
+    Component:  Protocol (activation)
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^activation$"
+    Subject:    The activation operation creates an implicit contract from a
+                registered commitment present in the context. It is
+                parametrized by a public key hash (pkh) and a secret.
 
-    The commitments are composed of :
-    - a blinded pkh that can be revealed by the secret ;
-    - an amount.
+                The commitments are composed of :
+                - a blinded pkh that can be revealed by the secret ;
+                - an amount.
 
-    The commitments and the secrets are generated from
-    /scripts/create_genesis/create_genesis.py and should be coherent.
+                The commitments and the secrets are generated from
+                /scripts/create_genesis/create_genesis.py and should be
+                coherent.
 *)
 
 open Protocol
@@ -302,17 +307,21 @@ let secrets () =
         "zknAl3lrX2",
         "ettilrvh.zsrqrbud@tezos.example.org" ) ]
 
+(** Helper: Create a genesis block with predefined commitments,
+    accounts and balances. *)
 let activation_init () =
   Context.init ~with_commitments:true 1
   >|=? fun (b, cs) -> secrets () |> fun ss -> (b, cs, ss)
 
-let simple_init_with_commitments () =
+(** Verify the genesis block created by [activation_init] can be
+    baked. *)
+let test_simple_init_with_commitments () =
   activation_init ()
   >>=? fun (blk, _contracts, _secrets) ->
   Block.bake blk >>=? fun _ -> return_unit
 
 (** A single activation *)
-let single_activation () =
+let test_single_activation () =
   activation_init ()
   >>=? fun (blk, _contracts, secrets) ->
   let ({account; activation_code; amount = expected_amount; _} as _first_one) =
@@ -336,8 +345,8 @@ let single_activation () =
     (Contract.implicit_contract account)
     expected_amount
 
-(** 10 activations, one per bake *)
-let multi_activation_1 () =
+(** 10 activations, one per bake. *)
+let test_multi_activation_1 () =
   activation_init ()
   >>=? fun (blk, _contracts, secrets) ->
   List.fold_left_es
@@ -356,8 +365,8 @@ let multi_activation_1 () =
     secrets
   >>=? fun _ -> return_unit
 
-(** All in one bake *)
-let multi_activation_2 () =
+(** All of the 10 activations occur in one bake. *)
+let test_multi_activation_2 () =
   activation_init ()
   >>=? fun (blk, _contracts, secrets) ->
   List.fold_left_es
@@ -378,8 +387,8 @@ let multi_activation_2 () =
         expected_amount)
     secrets
 
-(** Transfer with activated account *)
-let activation_and_transfer () =
+(** Transfer with activated account. *)
+let test_activation_and_transfer () =
   activation_init ()
   >>=? fun (blk, contracts, secrets) ->
   let ({account; activation_code; _} as _first_one) =
@@ -408,8 +417,8 @@ let activation_and_transfer () =
     activated_amount_before
     half_amount
 
-(** Transfer to an unactivated account and then activating it *)
-let transfer_to_unactivated_then_activate () =
+(** Transfer to an unactivated account and then activating it. *)
+let test_transfer_to_unactivated_then_activate () =
   activation_init ()
   >>=? fun (blk, contracts, secrets) ->
   let ({account; activation_code; amount} as _first_one) =
@@ -448,9 +457,9 @@ let transfer_to_unactivated_then_activate () =
 (*  The following test scenarios are supposed to raise errors.  *)
 (****************************************************************)
 
-(** Invalid pkh activation : expected to fail as the context does not
-    contain any commitment *)
-let invalid_activation_with_no_commitments () =
+(** Invalid pkh activation: expected to fail as the context does not
+    contain any commitment. *)
+let test_invalid_activation_with_no_commitments () =
   Context.init 1
   >>=? fun (blk, _) ->
   let secrets = secrets () in
@@ -467,8 +476,8 @@ let invalid_activation_with_no_commitments () =
       | _ ->
           false)
 
-(** Wrong activation : wrong secret given in the operation *)
-let invalid_activation_wrong_secret () =
+(** Wrong activation: wrong secret given in the operation. *)
+let test_invalid_activation_wrong_secret () =
   activation_init ()
   >>=? fun (blk, _, secrets) ->
   let ({account; _} as _first_one) = Option.get @@ List.nth secrets 0 in
@@ -486,8 +495,8 @@ let invalid_activation_wrong_secret () =
           false)
 
 (** Invalid pkh activation : expected to fail as the context does not
-    contain an associated commitment *)
-let invalid_activation_inexistent_pkh () =
+    contain an associated commitment. *)
+let test_invalid_activation_inexistent_pkh () =
   activation_init ()
   >>=? fun (blk, _, secrets) ->
   let ({activation_code; _} as _first_one) = Option.get @@ List.hd secrets in
@@ -506,8 +515,8 @@ let invalid_activation_inexistent_pkh () =
           false)
 
 (** Invalid pkh activation : expected to fail as the commitment has
-    already been claimed *)
-let invalid_double_activation () =
+    already been claimed. *)
+let test_invalid_double_activation () =
   activation_init ()
   >>=? fun (blk, _, secrets) ->
   let ({account; activation_code; _} as _first_one) =
@@ -529,8 +538,8 @@ let invalid_double_activation () =
       | _ ->
           false)
 
-(** Transfer from an unactivated commitment account *)
-let invalid_transfer_from_unactivated_account () =
+(** Transfer from an unactivated commitment account. *)
+let test_invalid_transfer_from_unactivated_account () =
   activation_init ()
   >>=? fun (blk, contracts, secrets) ->
   let ({account; _} as _first_one) = Option.get @@ List.hd secrets in
@@ -552,26 +561,32 @@ let invalid_transfer_from_unactivated_account () =
           false)
 
 let tests =
-  [ Test.tztest "init with commitments" `Quick simple_init_with_commitments;
-    Test.tztest "single activation" `Quick single_activation;
-    Test.tztest "multi-activation one-by-one" `Quick multi_activation_1;
-    Test.tztest "multi-activation all at a time" `Quick multi_activation_2;
-    Test.tztest "activation and transfer" `Quick activation_and_transfer;
+  [ Test.tztest "init with commitments" `Quick test_simple_init_with_commitments;
+    Test.tztest "single activation" `Quick test_single_activation;
+    Test.tztest "multi-activation one-by-one" `Quick test_multi_activation_1;
+    Test.tztest "multi-activation all at a time" `Quick test_multi_activation_2;
+    Test.tztest "activation and transfer" `Quick test_activation_and_transfer;
     Test.tztest
       "transfer to unactivated account then activate"
       `Quick
-      transfer_to_unactivated_then_activate;
+      test_transfer_to_unactivated_then_activate;
     Test.tztest
       "invalid activation with no commitments"
       `Quick
-      invalid_activation_with_no_commitments;
+      test_invalid_activation_with_no_commitments;
     Test.tztest
       "invalid activation with commitments"
       `Quick
-      invalid_activation_inexistent_pkh;
-    Test.tztest "invalid double activation" `Quick invalid_double_activation;
-    Test.tztest "wrong activation code" `Quick invalid_activation_wrong_secret;
+      test_invalid_activation_inexistent_pkh;
+    Test.tztest
+      "invalid double activation"
+      `Quick
+      test_invalid_double_activation;
+    Test.tztest
+      "wrong activation code"
+      `Quick
+      test_invalid_activation_wrong_secret;
     Test.tztest
       "invalid transfer from unactivated account"
       `Quick
-      invalid_transfer_from_unactivated_account ]
+      test_invalid_transfer_from_unactivated_account ]

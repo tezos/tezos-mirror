@@ -23,16 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Multiple operations can be grouped in one ensuring their
-    deterministic application.
+(** Testing
+    -------
+    Component:  Protocol (combined operations)
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^combined$"
+    Subject:    Multiple operations can be grouped in one ensuring their
+                deterministic application.
 
-    If an invalid operation is present in this group of operation, the
-    previous applied operations are backtracked leaving the context
-    unchanged and the following operations are skipped. Fees attributed
-    to the operations are collected by the baker nonetheless.
+                If an invalid operation is present in this group of
+                operations, the previously applied operations are
+                backtracked leaving the context unchanged and the
+                following operations are skipped. Fees attributed to the
+                operations are collected by the baker nonetheless.
 
-    Only manager operations are allowed in multiple transactions.
-    They must all belong to the same manager as there is only one signature. *)
+                Only manager operations are allowed in multiple transactions.
+                They must all belong to the same manager as there is only one
+                signature.
+*)
 
 open Protocol
 open Test_tez
@@ -40,7 +47,7 @@ open Test_tez
 let ten_tez = Tez.of_int 10
 
 (** Groups ten transactions between the same parties. *)
-let multiple_transfers () =
+let test_multiple_transfers () =
   Context.init 3
   >>=? fun (blk, contracts) ->
   let (c1, c2, c3) =
@@ -74,7 +81,7 @@ let multiple_transfers () =
   >>=? fun () -> return_unit
 
 (** Groups ten delegated originations. *)
-let multiple_origination_and_delegation () =
+let test_multiple_origination_and_delegation () =
   Context.init 2
   >>=? fun (blk, contracts) ->
   let (c1, c2) =
@@ -162,7 +169,7 @@ let expect_balance_too_low = function
 (** Groups three operations, the middle one failing.
     Checks that the receipt is consistent.
     Variant without fees. *)
-let failing_operation_in_the_middle () =
+let test_failing_operation_in_the_middle () =
   Context.init 2
   >>=? fun (blk, contracts) ->
   let (c1, c2) =
@@ -219,7 +226,7 @@ let failing_operation_in_the_middle () =
 (** Groups three operations, the middle one failing.
     Checks that the receipt is consistent.
     Variant with fees, that should be spent even in case of failure. *)
-let failing_operation_in_the_middle_with_fees () =
+let test_failing_operation_in_the_middle_with_fees () =
   Context.init 2
   >>=? fun (blk, contracts) ->
   let (c1, c2) =
@@ -294,7 +301,7 @@ let expect_wrong_signature list =
       "Packed operation has invalid source in the middle : operation expected \
        to fail."
 
-let wrong_signature_in_the_middle () =
+let test_wrong_signature_in_the_middle () =
   Context.init 2
   >>=? function
   | (_, []) | (_, [_]) ->
@@ -330,20 +337,20 @@ let wrong_signature_in_the_middle () =
       >>=? fun _inc -> return_unit
 
 let tests =
-  [ Test.tztest "multiple transfers" `Quick multiple_transfers;
+  [ Test.tztest "multiple transfers" `Quick test_multiple_transfers;
     Test.tztest
       "multiple originations and delegations"
       `Quick
-      multiple_origination_and_delegation;
+      test_multiple_origination_and_delegation;
     Test.tztest
       "Failing operation in the middle"
       `Quick
-      failing_operation_in_the_middle;
+      test_failing_operation_in_the_middle;
     Test.tztest
       "Failing operation in the middle (with fees)"
       `Quick
-      failing_operation_in_the_middle_with_fees;
+      test_failing_operation_in_the_middle_with_fees;
     Test.tztest
       "Failing operation (wrong manager in the middle of a pack)"
       `Quick
-      wrong_signature_in_the_middle ]
+      test_wrong_signature_in_the_middle ]

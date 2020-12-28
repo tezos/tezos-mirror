@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:  Protocol (origination)
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^origination$"
+    Subject:    On originating contracts.
+*)
+
 open Protocol
 open Test_tez
 
@@ -114,8 +121,7 @@ let test_origination_balances ~loc:_ ?(fee = Tez.zero) ?(credit = Tez.zero) ()
   Assert.balance_is ~loc:__LOC__ (B b) new_contract credit
 
 (******************************************************)
-(** Tests *)
-
+(* Tests *)
 (******************************************************)
 
 (** compute half of the balance and divided it by nth times *)
@@ -125,27 +131,22 @@ let two_nth_of_balance incr contract nth =
   >>=? fun balance ->
   Lwt.return (Tez.( /? ) balance nth >>? fun res -> Tez.( *? ) res 2L)
 
-(*******************)
-(** Basic test *)
+(** Basic test. A contract is created as well as the newly originated
+    contract (called from origination operation). The balance
+    before/after are checked. *)
+let test_balances_simple () = test_origination_balances ~loc:__LOC__ ()
 
-(*******************)
-
-let balances_simple () = test_origination_balances ~loc:__LOC__ ()
-
-let balances_credit () =
+(** Same as [balances_simple] but credits 10 tez to the originated
+    contract (no fees). *)
+let test_balances_credit () =
   test_origination_balances ~loc:__LOC__ ~credit:ten_tez ()
 
-let balances_credit_fee () =
+(** Same as [balances_credit] with 10 tez fees. *)
+let test_balances_credit_fee () =
   test_origination_balances ~loc:__LOC__ ~credit:(Tez.of_int 2) ~fee:ten_tez ()
 
-let balances_undelegatable () = test_origination_balances ~loc:__LOC__ ()
-
-(*******************)
-(** ask source contract to pay a fee when originating a contract *)
-
-(*******************)
-
-let pay_fee () =
+(** Ask source contract to pay a fee when originating a contract. *)
+let test_pay_fee () =
   register_origination ~credit:(Tez.of_int 2) ~fee:ten_tez ()
   >>=? fun (_b, _contract, _new_contract) -> return_unit
 
@@ -154,13 +155,9 @@ let pay_fee () =
 
 (******************************************************)
 
-(*******************)
-(** create an originate contract where the contract
-    does not have enough tez to pay for the fee *)
-
-(*******************)
-
-let not_tez_in_contract_to_pay_fee () =
+(** Create an originate contract where the contract does not have
+    enough tez to pay for the fee. *)
+let test_not_tez_in_contract_to_pay_fee () =
   Context.init 2
   >>=? fun (b, contracts) ->
   let contract_1 = Option.get @@ List.nth contracts 0 in
@@ -195,11 +192,8 @@ let not_tez_in_contract_to_pay_fee () =
       | _ ->
           false)
 
-(***************************************************)
-(* set the endorser of the block as manager/delegate of the originated
-   account *)
-(***************************************************)
-
+(* Set the endorser of the block as manager/delegate of the originated
+   account. *)
 let register_contract_get_endorser () =
   Context.init 1
   >>=? fun (b, contracts) ->
@@ -209,12 +203,7 @@ let register_contract_get_endorser () =
   Context.get_endorser (I inc)
   >|=? fun (account_endorser, _slots) -> (inc, contract, account_endorser)
 
-(*******************)
-(** create multiple originated contracts and
-    ask contract to pay the fee *)
-
-(*******************)
-
+(* Create multiple originated contracts and ask contract to pay the fee. *)
 let n_originations n ?credit ?fee () =
   List.fold_left_es
     (fun new_contracts _ ->
@@ -223,17 +212,14 @@ let n_originations n ?credit ?fee () =
     []
     (1 -- n)
 
-let multiple_originations () =
+(** Create 100 originations. *)
+let test_multiple_originations () =
   n_originations 100 ~credit:(Tez.of_int 2) ~fee:ten_tez ()
   >>=? fun contracts ->
   Assert.equal_int ~loc:__LOC__ (List.length contracts) 100
 
-(*******************)
-(** cannot originate two contracts with the same context's counter *)
-
-(*******************)
-
-let counter () =
+(** Cannot originate two contracts with the same context's counter. *)
+let test_counter () =
   Context.init 1
   >>=? fun (b, contracts) ->
   let contract = Option.get @@ List.hd contracts in
@@ -256,14 +242,13 @@ let counter () =
 (******************************************************)
 
 let tests =
-  [ Test.tztest "balances_simple" `Quick balances_simple;
-    Test.tztest "balances_credit" `Quick balances_credit;
-    Test.tztest "balances_credit_fee" `Quick balances_credit_fee;
-    Test.tztest "balances_undelegatable" `Quick balances_undelegatable;
-    Test.tztest "pay_fee" `Quick pay_fee;
+  [ Test.tztest "balances_simple" `Quick test_balances_simple;
+    Test.tztest "balances_credit" `Quick test_balances_credit;
+    Test.tztest "balances_credit_fee" `Quick test_balances_credit_fee;
+    Test.tztest "pay_fee" `Quick test_pay_fee;
     Test.tztest
       "not enough tez in contract to pay fee"
       `Quick
-      not_tez_in_contract_to_pay_fee;
-    Test.tztest "multiple originations" `Quick multiple_originations;
-    Test.tztest "counter" `Quick counter ]
+      test_not_tez_in_contract_to_pay_fee;
+    Test.tztest "multiple originations" `Quick test_multiple_originations;
+    Test.tztest "counter" `Quick test_counter ]

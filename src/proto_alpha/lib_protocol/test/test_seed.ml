@@ -23,18 +23,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Tests about
-    - seed_nonce_hash included in some blocks
-    - revelation operation of seed_nonce that should correspond to each
-      seed_nonce_hash
+(** Testing
+    -------
+    Component:    Protocol (seed)
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^seed$"
+    Subject:      - seed_nonce_hash included in some blocks
+                  - revelation operation of seed_nonce that should correspond
+                  to each seed_nonce_hash
 *)
 
 open Protocol
 open Test_tez
 
-(** Tests that baking [blocks_per_commitment] blocks without a
-    [seed_nonce_hash] commitment fails with [Invalid_commitment] *)
-let no_commitment () =
+(** Baking [blocks_per_commitment] blocks without a [seed_nonce_hash]
+    commitment fails with [Invalid_commitment]. *)
+let test_no_commitment () =
   Context.init 5
   >>=? fun (b, _) ->
   Context.get_constants (B b)
@@ -64,16 +67,16 @@ let baking_reward ctxt (b : Block.t) =
   Context.get_baking_reward ctxt ~priority ~endorsing_power
 
 (** Choose a baker, denote it by id. In the first cycle, make id bake only once.
-    Test that:
-    - after id bakes with a commitment the bond is frozen and the reward allocated
+    Check that:
+    - after id bakes with a commitment the bond is frozen and the reward
+      allocated
     - when id reveals the nonce too early, there's an error
     - when id reveals at the right time but the wrong value, there's an error
     - when another baker reveals correctly, it receives the tip
     - revealing twice produces an error
     - after [preserved cycles] a committer that correctly revealed
-      receives back the bond and the reward
-*)
-let revelation_early_wrong_right_twice () =
+      receives back the bond and the reward. *)
+let test_revelation_early_wrong_right_twice () =
   let open Assert in
   Context.init 5
   >>=? fun (b, _) ->
@@ -218,12 +221,10 @@ let revelation_early_wrong_right_twice () =
   balance_is ~loc:__LOC__ (B b) id ~kind:Deposit Tez.zero
   >>=? fun () -> balance_is ~loc:__LOC__ (B b) id ~kind:Rewards Tez.zero
 
-(** Tests that:
-    - a committer at cycle 0, which doesn't reveal at cycle 1,
+(** - a committer at cycle 0, which doesn't reveal at cycle 1,
       at the end of the cycle 1 looses the bond and the reward
-    - revealing too late produces an error
-*)
-let revelation_missing_and_late () =
+    - revealing too late produces an error *)
+let test_revelation_missing_and_late () =
   let open Context in
   let open Assert in
   Context.init 5
@@ -284,12 +285,12 @@ let revelation_missing_and_late () =
           false)
 
 let tests =
-  [ Test.tztest "no commitment" `Quick no_commitment;
+  [ Test.tztest "no commitment" `Quick test_no_commitment;
     Test.tztest
       "revelation_early_wrong_right_twice"
       `Quick
-      revelation_early_wrong_right_twice;
+      test_revelation_early_wrong_right_twice;
     Test.tztest
       "revelation_missing_and_late"
       `Quick
-      revelation_missing_and_late ]
+      test_revelation_missing_and_late ]

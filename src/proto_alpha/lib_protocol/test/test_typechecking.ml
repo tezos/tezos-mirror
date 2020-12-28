@@ -1,3 +1,10 @@
+(** Testing
+    -------
+    Component:    Protocol (type-checking)
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^typechecking$"
+    Subject:      Type-checking
+*)
+
 open Protocol
 open Alpha_context
 open Script_interpreter
@@ -101,7 +108,8 @@ let read_file filename =
   let s = really_input_string ch (in_channel_length ch) in
   close_in ch ; s
 
-(* Check that the custom stack overflow exception is triggered when it should be *)
+(** Check that the custom stack overflow exception is triggered when
+   it should be. *)
 let test_typecheck_stack_overflow () =
   test_context ()
   >>=? fun ctxt ->

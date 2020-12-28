@@ -1,3 +1,11 @@
+(** Testing
+    -------
+    Component:    Protocol (interpretation)
+    Dependencies: src/proto_alpha/lib_protocol/script_interpreter.ml
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^interpretation$"
+    Subject:      Interpretation of Michelson scripts
+*)
+
 open Protocol
 open Alpha_context
 open Script_interpreter
@@ -68,7 +76,7 @@ let run_step ctxt code param =
     param
 
 (** Runs a script with an ill-typed parameter and verifies that a
-   Bad_contract_parameter error is returned *)
+    Bad_contract_parameter error is returned. *)
 let test_bad_contract_parameter () =
   test_context ()
   >>=? fun ctx ->
@@ -120,7 +128,6 @@ let test_stack_overflow () =
       Alcotest.failf "Unexpected error (%s)" __LOC__
 
 (** Test the encoding/decoding of script_interpreter.ml specific errors *)
-
 let test_json_roundtrip name testable enc v =
   let v' =
     Data_encoding.Json.destruct enc (Data_encoding.Json.construct enc v)
@@ -132,6 +139,7 @@ let test_json_roundtrip name testable enc v =
     v' ;
   return_unit
 
+(** Encoding/decoding of script_interpreter.ml specific errors. *)
 let test_json_roundtrip_err name e () =
   test_json_roundtrip
     name

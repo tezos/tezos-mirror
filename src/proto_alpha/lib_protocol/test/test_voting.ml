@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:  Protocol (voting)
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^voting$"
+    Subject:    On the voting process.
+*)
+
 open Protocol
 
 (* missing stuff in Alpha_context.Vote *)
@@ -195,6 +202,7 @@ let bake_until_first_block_of_next_period b =
   Context.Vote.get_current_period (B b)
   >>=? fun {remaining; _} -> Block.bake_n Int32.(add remaining one |> to_int) b
 
+(** A normal and successful vote sequence. *)
 let test_successful_vote num_delegates () =
   let open Alpha_context in
   let min_proposal_quorum = Int32.(of_int @@ (100_00 / num_delegates)) in
@@ -536,8 +544,9 @@ let get_expected_participation_ema rolls voter_rolls old_participation_ema =
   in
   get_updated_participation_ema old_participation_ema participation
 
-(* if not enough quorum -- get_updated_participation_ema < pr_ema_weight/den -- in testing vote,
-   go back to proposal period *)
+(** If not enough quorum
+    -- get_updated_participation_ema < pr_ema_weight/den --
+    in testing vote, go back to proposal period. *)
 let test_not_enough_quorum_in_testing_vote num_delegates () =
   let min_proposal_quorum = Int32.(of_int @@ (100_00 / num_delegates)) in
   Context.init ~min_proposal_quorum num_delegates
@@ -600,8 +609,9 @@ let test_not_enough_quorum_in_testing_vote num_delegates () =
     (Int32.to_int new_participation_ema)
   >>=? fun () -> return_unit
 
-(* if not enough quorum -- get_updated_participation_ema < pr_ema_weight/den -- in promotion vote,
-   go back to proposal period *)
+(** If not enough quorum
+   -- get_updated_participation_ema < pr_ema_weight/den --
+   In promotion vote, go back to proposal period. *)
 let test_not_enough_quorum_in_promotion_vote num_delegates () =
   let min_proposal_quorum = Int32.(of_int @@ (100_00 / num_delegates)) in
   Context.init ~min_proposal_quorum num_delegates
@@ -690,6 +700,8 @@ let test_not_enough_quorum_in_promotion_vote num_delegates () =
   >>=? fun () ->
   assert_listings_not_empty b ~loc:__LOC__ >>=? fun () -> return_unit
 
+(** Identical proposals (identified by their hash) must be counted as
+    one. *)
 let test_multiple_identical_proposals_count_as_one () =
   Context.init 1
   >>=? fun (b, delegates) ->
@@ -728,8 +740,8 @@ let test_multiple_identical_proposals_count_as_one () =
   | None ->
       failwith "%s - Missing proposal" __LOC__
 
-(* assumes the initial balance of allocated by Context.init is at
-   least 4 time the value of the tokens_per_roll constant *)
+(** Assume the initial balance of allocated by Context.init is at
+    least 4 times the value of the tokens_per_roll constant. *)
 let test_supermajority_in_proposal there_is_a_winner () =
   let min_proposal_quorum = 0l in
   Context.init ~min_proposal_quorum ~initial_balances:[1L; 1L; 1L] 10
@@ -797,6 +809,9 @@ let test_supermajority_in_proposal there_is_a_winner () =
   else assert_period ~expected_kind:Proposal b __LOC__ )
   >>=? fun () -> return_unit
 
+(** After one voting period, if [has_quorum] then the period kind must
+    have been the testing vote. Otherwise, it should have remained in
+    place in the proposal period. *)
 let test_quorum_in_proposal has_quorum () =
   let total_tokens = 32_000_000_000_000L in
   let half_tokens = Int64.div total_tokens 2L in
@@ -854,6 +869,8 @@ let test_quorum_in_proposal has_quorum () =
   else assert_period ~expected_kind:Proposal b __LOC__ )
   >>=? fun () -> return_unit
 
+(** If a supermajority is reached, then the voting period must be
+    reached. Otherwise, it remains in proposal period. *)
 let test_supermajority_in_testing_vote supermajority () =
   let min_proposal_quorum = Int32.(of_int @@ (100_00 / 100)) in
   Context.init ~min_proposal_quorum 100
@@ -906,7 +923,8 @@ let test_supermajority_in_testing_vote supermajority () =
   else assert_period ~expected_kind:Proposal b __LOC__ )
   >>=? fun () -> return_unit
 
-(* test also how the selection scales: all delegates propose max proposals *)
+(** Test also how the selection scales: all delegates propose max
+    proposals. *)
 let test_no_winning_proposal num_delegates () =
   let min_proposal_quorum = Int32.(of_int @@ (100_00 / num_delegates)) in
   Context.init ~min_proposal_quorum num_delegates
@@ -930,9 +948,9 @@ let test_no_winning_proposal num_delegates () =
   (* we stay in the same proposal period because no winning proposal *)
   assert_period ~expected_kind:Proposal b __LOC__ >>=? fun () -> return_unit
 
-(** Test that for the vote to pass with maximum possible participation_ema
-    (100%), it is sufficient for the vote quorum to be equal or greater than
-    the maximum quorum cap. *)
+(** Vote to pass with maximum possible participation_ema (100%), it is
+    sufficient for the vote quorum to be equal or greater than the
+    maximum quorum cap. *)
 let test_quorum_capped_maximum num_delegates () =
   let min_proposal_quorum = Int32.(of_int @@ (100_00 / num_delegates)) in
   Context.init ~min_proposal_quorum num_delegates
@@ -978,9 +996,9 @@ let test_quorum_capped_maximum num_delegates () =
   (* expect to move to testing because we have supermajority and enough quorum *)
   assert_period ~expected_kind:Testing b __LOC__
 
-(** Test that for the vote to pass with minimum possible participation_ema
-    (0%), it is sufficient for the vote quorum to be equal or greater than
-    the minimum quorum cap. *)
+(** Vote to pass with minimum possible participation_ema (0%), it is
+    sufficient for the vote quorum to be equal or greater than the
+    minimum quorum cap. *)
 let test_quorum_capped_minimum num_delegates () =
   let min_proposal_quorum = Int32.(of_int @@ (100_00 / num_delegates)) in
   Context.init ~min_proposal_quorum num_delegates

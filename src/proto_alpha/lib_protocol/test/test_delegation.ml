@@ -23,16 +23,29 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:  Protocol (delegation)
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^delegation$"
+    Subject:    - Properties on bootstrap contracts (self-delegation,
+                cannot delete/change their delegate (as opposed to contracts
+                not-being-delegate which can do these), bootstrap manager
+                as delegate during origination).
+                - Properties on delegation depending on whether delegate
+                keys registration, through origination and delegation.
+*)
+
 open Protocol
 open Alpha_context
 open Test_tez
 
-(**************************************************************************)
-(* bootstrap contracts *)
-(**************************************************************************)
-(* Bootstrap contracts are heavily used in other tests. It is helpful
-   to test some properties of these contracts, so we can correctly
-   interpret the other tests that use them. *)
+(*****************************************************************************)
+(* Bootstrap contracts
+   -------------------
+   Bootstrap contracts are heavily used in other tests. It is helpful to test
+   some properties of these contracts, so we can correctly interpret the other
+   tests that use them. *)
+(*****************************************************************************)
 
 let expect_error err = function
   | err0 :: _ when err = err0 ->
@@ -49,7 +62,7 @@ let expect_no_change_registered_delegate_pkh pkh = function
   | _ ->
       failwith "Delegate can not be deleted and operation should fail."
 
-(** bootstrap contracts delegate to themselves *)
+(** Bootstrap contracts delegate to themselves. *)
 let bootstrap_manager_is_bootstrap_delegate () =
   Context.init 1
   >>=? fun (b, bootstrap_contracts) ->
@@ -59,7 +72,7 @@ let bootstrap_manager_is_bootstrap_delegate () =
   Context.Contract.manager (B b) bootstrap0
   >>=? fun manager0 -> Assert.equal_pkh ~loc:__LOC__ delegate0 manager0.pkh
 
-(** bootstrap contracts cannot change their delegate *)
+(** Bootstrap contracts cannot change their delegate. *)
 let bootstrap_delegate_cannot_change ~fee () =
   Context.init 2
   >>=? fun (b, bootstrap_contracts) ->
@@ -102,7 +115,7 @@ let bootstrap_delegate_cannot_change ~fee () =
     (* fee has been debited *)
     Assert.balance_was_debited ~loc:__LOC__ (B b) bootstrap0 balance0 fee
 
-(** bootstrap contracts cannot delete their delegation *)
+(** Bootstrap contracts cannot delete their delegation. *)
 let bootstrap_delegate_cannot_be_removed ~fee () =
   Context.init 1
   >>=? fun (b, bootstrap_contracts) ->
@@ -140,7 +153,8 @@ let bootstrap_delegate_cannot_be_removed ~fee () =
     (* fee has been debited *)
     Assert.balance_was_debited ~loc:__LOC__ (I i) bootstrap balance fee
 
-(** contracts not registered as delegate can change their delegation *)
+(** Contracts not registered as delegate can change their
+    delegation. *)
 let delegate_can_be_changed_from_unregistered_contract ~fee () =
   Context.init 2
   >>=? fun (b, bootstrap_contracts) ->
@@ -193,7 +207,8 @@ let delegate_can_be_changed_from_unregistered_contract ~fee () =
     (* fee has been debited *)
     Assert.balance_was_debited ~loc:__LOC__ (I i) unregistered credit fee
 
-(** contracts not registered as delegate can delete their delegation *)
+(** Contracts not registered as delegate can delete their
+    delegation. *)
 let delegate_can_be_removed_from_unregistered_contract ~fee () =
   Context.init 1
   >>=? fun (b, bootstrap_contracts) ->
@@ -246,7 +261,7 @@ let delegate_can_be_removed_from_unregistered_contract ~fee () =
     (* fee has been debited *)
     Assert.balance_was_debited ~loc:__LOC__ (I i) unregistered credit fee
 
-(** bootstrap keys are already registered as delegate keys *)
+(** Bootstrap keys are already registered as delegate keys. *)
 let bootstrap_manager_already_registered_delegate ~fee () =
   Context.init 1
   >>=? fun (b, bootstrap_contracts) ->
@@ -282,8 +297,8 @@ let bootstrap_manager_already_registered_delegate ~fee () =
     (* fee has been debited *)
     Assert.balance_was_debited ~loc:__LOC__ (I i) impl_contract balance fee
 
-(** bootstrap manager can be set as delegate of an originated contract
-    (through origination operation) *)
+(** Bootstrap manager can be set as delegate of an originated contract
+    (through origination operation). *)
 let delegate_to_bootstrap_by_origination ~fee () =
   Context.init 1
   >>=? fun (b, bootstrap_contracts) ->
@@ -417,10 +432,10 @@ let tests_bootstrap_contracts =
       `Quick
       (delegate_to_bootstrap_by_origination ~fee:(Tez.of_int 10_000_000)) ]
 
-(**************************************************************************)
-(* delegate registration *)
-(**************************************************************************)
-(* A delegate is a pkh. Delegates must be registered. Registration is
+(*****************************************************************************)
+(* Delegate registration
+   ---------------------
+   A delegate is a pkh. Delegates must be registered. Registration is
    done via the self-delegation of the implicit contract corresponding
    to the pkh. The implicit contract must be credited when the
    self-delegation is done. Furthermore, trying to register an already
@@ -431,7 +446,6 @@ let tests_bootstrap_contracts =
    2- registered keys can be delegated to,
    3- registering an already registered key raises an error.
 
-
    We consider three scenarios for setting a delegate:
    - through origination,
    - through delegation when the implicit contract has no delegate yet,
@@ -439,38 +453,36 @@ let tests_bootstrap_contracts =
 
    We also test that emptying the implicit contract linked to a
    registered delegate key does not unregister the delegate key.
-*)
 
-(*
    Valid registration
-
+   ------------------
    Unregistered key:
-   - contract not credited and no self-delegation
-   - contract credited but no self-delegation
-   - contract not credited and self-delegation
+   - contract not credited and no self-delegation,
+   - contract credited but no self-delegation,
+   - contract not credited and self-delegation.
 
-Not credited:
-- no credit operation
-- credit operation of 1μꜩ and then debit operation of 1μꜩ
+   Not credited:
+   - no credit operation
+   - credit operation of 1μꜩ and then debit operation of 1μꜩ *)
+(*****************************************************************************)
 
-*)
+(* Part A.
+   Unregistered delegate keys cannot be used for delegation
 
-(** A- unregistered delegate keys cannot be used for delegation *)
+   Two main series of tests: without self-delegation and with a failed attempt at self-delegation:
 
-(* Two main series of tests: without self-delegation, and with a failed attempt at self-delegation
-   1- no self-delegation
-     a- no credit
-   - no token transfer
-   - credit of 1μꜩ and then debit of 1μꜩ
-     b- with credit of 1μꜩ.
-     For every scenario, we try three different ways of delegating:
-   - through origination (init origination)
-   - through delegation when no delegate was assigned (init delegation)
-   - through delegation when a delegate was assigned (switch delegation).
+  1/ no self-delegation
+     a/ no credit
+     - no token transfer
+     - credit of 1μꜩ and then debit of 1μꜩ
+     b/ with credit of 1μꜩ.
+       For every scenario, we try three different ways of delegating:
+     - through origination (init origination)
+     - through delegation when no delegate was assigned (init delegation)
+     - through delegation when a delegate was assigned (switch delegation).
 
-   2- Self-delegation fails if the contract has no credit. We try the
-   two possibilities of 1a for non-credited contracts.
-*)
+  2/ Self-delegation fails if the contract has no credit. We try the
+  two possibilities of 1a for non-credited contracts. *)
 
 let expect_unregistered_key pkh = function
   | Environment.Ecoproto_error (Roll_storage.Unregistered_delegate pkh0) :: _
@@ -479,9 +491,15 @@ let expect_unregistered_key pkh = function
   | _ ->
       failwith "Delegate key is not registered: operation should fail."
 
-(* A1: no self-delegation *)
-(* no token transfer, no self-delegation *)
-let unregistered_delegate_key_init_origination ~fee () =
+(* Part A. Section 1.
+   No self-delegation. *)
+
+(** No token transfer, no self-delegation.  Originated account. If
+    fees are higher than balance, [Balance_too_low] is
+    raised. Otherwise, it checks the correct exception is raised
+    (unregistered key), and the fees are still debited. Using RPCs, we
+    verify the contract has not been originated. *)
+let test_unregistered_delegate_key_init_origination ~fee () =
   Context.init 1
   >>=? fun (b, bootstrap_contracts) ->
   Incremental.begin_construction b
@@ -532,7 +550,11 @@ let unregistered_delegate_key_init_origination ~fee () =
         | _ ->
             false)
 
-let unregistered_delegate_key_init_delegation ~fee () =
+(** Delegation when delegate key is not assigned. Delegate account is
+    initialized. If fees are higher than initial credit (10 tez),
+    [Balance_too_low] is raised. Otherwise, fees are still debited. The
+    implicit contract has no delegate. *)
+let test_unregistered_delegate_key_init_delegation ~fee () =
   Context.init 1
   >>=? fun (b, bootstrap_contracts) ->
   Incremental.begin_construction b
@@ -582,7 +604,11 @@ let unregistered_delegate_key_init_delegation ~fee () =
         | _ ->
             false)
 
-let unregistered_delegate_key_switch_delegation ~fee () =
+(** Re-delegation when a delegate key was already assigned. If fees
+    are higher than initial credit (10 tez), [Balance_too_low] is
+    raised. Otherwise, fees are not debited and the implicit contract
+    delegate remains unchanged. *)
+let test_unregistered_delegate_key_switch_delegation ~fee () =
   Context.init 1
   >>=? fun (b, bootstrap_contracts) ->
   Incremental.begin_construction b
@@ -640,8 +666,9 @@ let unregistered_delegate_key_switch_delegation ~fee () =
     >>=? fun delegate_pkh_after ->
     Assert.equal_pkh ~loc:__LOC__ delegate_pkh delegate_pkh_after
 
-(* credit of some amount, no self-delegation *)
-let unregistered_delegate_key_init_origination_credit ~fee ~amount () =
+(** Same as [unregistered_delegate_key_init_origination] and credits
+    [amount], no self-delegation. *)
+let test_unregistered_delegate_key_init_origination_credit ~fee ~amount () =
   Context.init 1
   >>=? fun (b, bootstrap_contracts) ->
   Incremental.begin_construction b
@@ -692,7 +719,9 @@ let unregistered_delegate_key_init_origination_credit ~fee ~amount () =
         | _ ->
             false)
 
-let unregistered_delegate_key_init_delegation_credit ~fee ~amount () =
+(** Same as [unregistered_delegate_key_init_delegation] and credits
+    the amount [amount] of the implicit contract. *)
+let test_unregistered_delegate_key_init_delegation_credit ~fee ~amount () =
   Context.init 1
   >>=? fun (b, bootstrap_contracts) ->
   Incremental.begin_construction b
@@ -750,7 +779,9 @@ let unregistered_delegate_key_init_delegation_credit ~fee ~amount () =
         | _ ->
             false)
 
-let unregistered_delegate_key_switch_delegation_credit ~fee ~amount () =
+(** Same as in [unregistered_delegate_key_switch_delegation] and
+    credits the amount [amount] to the implicit contract. *)
+let test_unregistered_delegate_key_switch_delegation_credit ~fee ~amount () =
   Context.init 1
   >>=? fun (b, bootstrap_contracts) ->
   Incremental.begin_construction b
@@ -817,8 +848,10 @@ let unregistered_delegate_key_switch_delegation_credit ~fee ~amount () =
     Assert.not_equal_pkh ~loc:__LOC__ delegate unregistered_delegate_pkh
     >>=? fun () -> Assert.equal_pkh ~loc:__LOC__ delegate bootstrap_pkh
 
-(* a credit of some amount followed by a debit of the same amount, no self-delegation *)
-let unregistered_delegate_key_init_origination_credit_debit ~fee ~amount () =
+(** A credit of some amount followed by a debit of the same amount,
+    no self-delegation. *)
+let test_unregistered_delegate_key_init_origination_credit_debit ~fee ~amount
+    () =
   Context.init 1
   >>=? fun (b, bootstrap_contracts) ->
   Incremental.begin_construction b
@@ -876,7 +909,10 @@ let unregistered_delegate_key_init_origination_credit_debit ~fee ~amount () =
         | _ ->
             false)
 
-let unregistered_delegate_key_init_delegation_credit_debit ~amount ~fee () =
+(** Same as in [unregistered_delegate_key_init_delegation] but credits
+    then debits the amount [amount] to the implicit contract. *)
+let test_unregistered_delegate_key_init_delegation_credit_debit ~amount ~fee ()
+    =
   Context.init 1
   >>=? fun (b, bootstrap_contracts) ->
   Incremental.begin_construction b
@@ -939,7 +975,10 @@ let unregistered_delegate_key_init_delegation_credit_debit ~amount ~fee () =
         | _ ->
             false)
 
-let unregistered_delegate_key_switch_delegation_credit_debit ~fee ~amount () =
+(** Same as in [unregistered_delegate_key_switch_delegation] but
+    credits then debits the amount [amount] to the implicit contract. *)
+let test_unregistered_delegate_key_switch_delegation_credit_debit ~fee ~amount
+    () =
   Context.init 1
   >>=? fun (b, bootstrap_contracts) ->
   Incremental.begin_construction b
@@ -1010,8 +1049,11 @@ let unregistered_delegate_key_switch_delegation_credit_debit ~fee ~amount () =
     >>=? fun delegate ->
     Assert.not_equal_pkh ~loc:__LOC__ delegate unregistered_delegate_pkh
 
-(* A2- self-delegation to an empty contract fails *)
-let failed_self_delegation_no_transaction () =
+(* Part A. Section 2.
+   Self-delegation to an empty contract fails. *)
+
+(** Self-delegation with zero-balance contract should fail. *)
+let test_failed_self_delegation_no_transaction () =
   Context.init 1
   >>=? fun (b, _) ->
   Incremental.begin_construction b
@@ -1035,7 +1077,9 @@ let failed_self_delegation_no_transaction () =
       | _ ->
           false)
 
-let failed_self_delegation_emptied_implicit_contract amount () =
+(** Implicit contract is credited then debited of same amount (i.e.,
+    is emptied). Self-delegation fails. *)
+let test_failed_self_delegation_emptied_implicit_contract amount () =
   (* create an implicit contract *)
   Context.init 1
   >>=? fun (b, bootstrap_contracts) ->
@@ -1070,7 +1114,10 @@ let failed_self_delegation_emptied_implicit_contract amount () =
       | _ ->
           false)
 
-let emptying_delegated_implicit_contract_fails amount () =
+(** Implicit contract is credited with a non-zero quantity [amount]
+    tz, then it is delegated. The operation of debit of [amount] tz
+    should fail as the contract is already delegated. *)
+let test_emptying_delegated_implicit_contract_fails amount () =
   Context.init 1
   >>=? fun (b, bootstrap_contracts) ->
   Incremental.begin_construction b
@@ -1104,12 +1151,16 @@ let emptying_delegated_implicit_contract_fails amount () =
       | _ ->
           false)
 
-(** B- valid registration:
-    - credit implicit contract with some ꜩ + verification of balance
-    - self delegation + verification
-    - empty contract + verification of balance + verification of not being erased / self-delegation
-    - create delegator implicit contract w first implicit contract as delegate + verification of delegation *)
-let valid_delegate_registration_init_delegation_credit amount () =
+(* Part B.
+   - Valid registration:
+   - Credit implicit contract with some ꜩ + verification of balance
+   - Self delegation + verification
+   - Empty contract + verification of balance + verification of not being erased / self-delegation
+   - Create delegator implicit contract w first implicit contract as delegate + verification of delegation. *)
+
+(** Initialized account is credited of [amount] tz, then
+    self-delegated. *)
+let test_valid_delegate_registration_init_delegation_credit amount () =
   (* create an implicit contract *)
   Context.init 1
   >>=? fun (b, bootstrap_contracts) ->
@@ -1162,7 +1213,11 @@ let valid_delegate_registration_init_delegation_credit amount () =
   >>=? fun delegator_delegate ->
   Assert.equal_pkh ~loc:__LOC__ delegator_delegate delegate_pkh
 
-let valid_delegate_registration_switch_delegation_credit amount () =
+(** Create an implicit contract, credits with [amount]
+    tz. Self-delegates. Create another implicit contract with
+    bootstrap as delegate. Re-delegate it to the first implicit
+    contract. *)
+let test_valid_delegate_registration_switch_delegation_credit amount () =
   (* create an implicit contract *)
   Context.init 1
   >>=? fun (b, bootstrap_contracts) ->
@@ -1216,7 +1271,8 @@ let valid_delegate_registration_switch_delegation_credit amount () =
   >>=? fun delegator_delegate ->
   Assert.equal_pkh ~loc:__LOC__ delegator_delegate delegate_pkh
 
-let valid_delegate_registration_init_delegation_credit_debit amount () =
+(** Create an implicit contract. *)
+let test_valid_delegate_registration_init_delegation_credit_debit amount () =
   (* create an implicit contract *)
   Context.init 1
   >>=? fun (b, bootstrap_contracts) ->
@@ -1284,7 +1340,12 @@ let valid_delegate_registration_init_delegation_credit_debit amount () =
   >>=? fun delegator_delegate ->
   Assert.equal_pkh ~loc:__LOC__ delegator_delegate delegate_pkh
 
-let valid_delegate_registration_switch_delegation_credit_debit amount () =
+(** A created implicit contract is credited with [amount] tz, then is
+    self-delegated. It is emptied (fund back into bootstrap), and
+    should remain existing (as registered as delegate). Another created
+    implicit contract is delegated to bootstrap, then should be able to
+    be re-delegated to the latter contract. *)
+let test_valid_delegate_registration_switch_delegation_credit_debit amount () =
   (* create an implicit contract *)
   Context.init 1
   >>=? fun (b, bootstrap_contracts) ->
@@ -1348,10 +1409,12 @@ let valid_delegate_registration_switch_delegation_credit_debit amount () =
   >>=? fun delegator_delegate ->
   Assert.equal_pkh ~loc:__LOC__ delegator_delegate delegate_pkh
 
-(* with implicit contract with some credit *)
+(* Part C.
+   A second self-delegation should raise an [Active_delegate] error. *)
 
-(** C- a second self-delegation should raise an `Active_delegate` error *)
-let double_registration () =
+(** Second self-delegation should fail with implicit contract with
+    some credit. *)
+let test_double_registration () =
   Context.init 1
   >>=? fun (b, bootstrap_contracts) ->
   Incremental.begin_construction b
@@ -1383,8 +1446,9 @@ let double_registration () =
       | _ ->
           false)
 
-(* with implicit contract emptied after first self-delegation  *)
-let double_registration_when_empty () =
+(** Second self-delegation should fail with implicit contract emptied
+    after first self-delegation. *)
+let test_double_registration_when_empty () =
   Context.init 1
   >>=? fun (b, bootstrap_contracts) ->
   Incremental.begin_construction b
@@ -1423,8 +1487,9 @@ let double_registration_when_empty () =
       | _ ->
           false)
 
-(* with implicit contract emptied then recredited after first self-delegation  *)
-let double_registration_when_recredited () =
+(** Second self-delegation should fail with implicit contract emptied
+    then credited back after first self-delegation. *)
+let test_double_registration_when_recredited () =
   Context.init 1
   >>=? fun (b, bootstrap_contracts) ->
   Incremental.begin_construction b
@@ -1470,8 +1535,9 @@ let double_registration_when_recredited () =
       | _ ->
           false)
 
-(* self-delegation on unrevealed contract *)
-let unregistered_and_unrevealed_self_delegate_key_init_delegation ~fee () =
+(** Self-delegation on unrevealed contract. *)
+let test_unregistered_and_unrevealed_self_delegate_key_init_delegation ~fee ()
+    =
   Context.init 1
   >>=? fun (b, bootstrap_contracts) ->
   Incremental.begin_construction b
@@ -1505,8 +1571,8 @@ let unregistered_and_unrevealed_self_delegate_key_init_delegation ~fee () =
     >>=? fun i ->
     Assert.balance_was_debited ~loc:__LOC__ (I i) contract balance fee
 
-(* self-delegation on revealed but not registered contract *)
-let unregistered_and_revealed_self_delegate_key_init_delegation ~fee () =
+(** Self-delegation on revealed but not registered contract. *)
+let test_unregistered_and_revealed_self_delegate_key_init_delegation ~fee () =
   Context.init 1
   >>=? fun (b, bootstrap_contracts) ->
   Incremental.begin_construction b
@@ -1544,8 +1610,8 @@ let unregistered_and_revealed_self_delegate_key_init_delegation ~fee () =
     >>=? fun i ->
     Assert.balance_was_debited ~loc:__LOC__ (I i) contract balance fee
 
-(* self-delegation on revealed and registered contract *)
-let registered_self_delegate_key_init_delegation () =
+(** Self-delegation on revealed and registered contract. *)
+let test_registered_self_delegate_key_init_delegation () =
   Context.init 1
   >>=? fun (b, bootstrap_contracts) ->
   Incremental.begin_construction b
@@ -1590,196 +1656,200 @@ let tests_delegate_registration =
     Test.tztest
       "unregistered delegate key (origination, small fee)"
       `Quick
-      (unregistered_delegate_key_init_origination ~fee:Tez.one_mutez);
+      (test_unregistered_delegate_key_init_origination ~fee:Tez.one_mutez);
     Test.tztest
       "unregistered delegate key (origination, edge case fee)"
       `Quick
-      (unregistered_delegate_key_init_origination ~fee:(Tez.of_int 3_999_488));
+      (test_unregistered_delegate_key_init_origination
+         ~fee:(Tez.of_int 3_999_488));
     Test.tztest
       "unregistered delegate key (origination, large fee)"
       `Quick
-      (unregistered_delegate_key_init_origination ~fee:(Tez.of_int 10_000_000));
+      (test_unregistered_delegate_key_init_origination
+         ~fee:(Tez.of_int 10_000_000));
     Test.tztest
       "unregistered delegate key (init with delegation, small fee)"
       `Quick
-      (unregistered_delegate_key_init_delegation ~fee:Tez.one_mutez);
+      (test_unregistered_delegate_key_init_delegation ~fee:Tez.one_mutez);
     Test.tztest
       "unregistered delegate key (init with delegation, max fee)"
       `Quick
-      (unregistered_delegate_key_init_delegation ~fee:Tez.max_tez);
+      (test_unregistered_delegate_key_init_delegation ~fee:Tez.max_tez);
     Test.tztest
       "unregistered delegate key (switch with delegation, small fee)"
       `Quick
-      (unregistered_delegate_key_switch_delegation ~fee:Tez.one_mutez);
+      (test_unregistered_delegate_key_switch_delegation ~fee:Tez.one_mutez);
     Test.tztest
       "unregistered delegate key (switch with delegation, max fee)"
       `Quick
-      (unregistered_delegate_key_switch_delegation ~fee:Tez.max_tez);
+      (test_unregistered_delegate_key_switch_delegation ~fee:Tez.max_tez);
     (* credit/debit 1μꜩ, no self-delegation *)
     Test.tztest
       "unregistered delegate key - credit/debit 1μꜩ (origination, small fee)"
       `Quick
-      (unregistered_delegate_key_init_origination_credit_debit
+      (test_unregistered_delegate_key_init_origination_credit_debit
          ~fee:Tez.one_mutez
          ~amount:Tez.one_mutez);
     Test.tztest
       "unregistered delegate key - credit/debit 1μꜩ (origination, large fee)"
       `Quick
-      (unregistered_delegate_key_init_origination_credit_debit
+      (test_unregistered_delegate_key_init_origination_credit_debit
          ~fee:Tez.max_tez
          ~amount:Tez.one_mutez);
     Test.tztest
       "unregistered delegate key - credit/debit 1μꜩ (init with delegation, \
        small fee)"
       `Quick
-      (unregistered_delegate_key_init_delegation_credit_debit
+      (test_unregistered_delegate_key_init_delegation_credit_debit
          ~amount:Tez.one_mutez
          ~fee:Tez.one_mutez);
     Test.tztest
       "unregistered delegate key - credit/debit 1μꜩ (init with delegation, \
        large fee)"
       `Quick
-      (unregistered_delegate_key_init_delegation_credit_debit
+      (test_unregistered_delegate_key_init_delegation_credit_debit
          ~amount:Tez.one_mutez
          ~fee:Tez.max_tez);
     Test.tztest
       "unregistered delegate key - credit/debit 1μꜩ (switch with \
        delegation, small fee)"
       `Quick
-      (unregistered_delegate_key_switch_delegation_credit_debit
+      (test_unregistered_delegate_key_switch_delegation_credit_debit
          ~amount:Tez.one_mutez
          ~fee:Tez.one_mutez);
     Test.tztest
       "unregistered delegate key - credit/debit 1μꜩ (switch with \
        delegation, large fee)"
       `Quick
-      (unregistered_delegate_key_switch_delegation_credit_debit
+      (test_unregistered_delegate_key_switch_delegation_credit_debit
          ~amount:Tez.one_mutez
          ~fee:Tez.max_tez);
     (* credit 1μꜩ, no self-delegation *)
     Test.tztest
       "unregistered delegate key - credit 1μꜩ (origination, small fee)"
       `Quick
-      (unregistered_delegate_key_init_origination_credit
+      (test_unregistered_delegate_key_init_origination_credit
          ~fee:Tez.one_mutez
          ~amount:Tez.one_mutez);
     Test.tztest
       "unregistered delegate key - credit 1μꜩ (origination, edge case fee)"
       `Quick
-      (unregistered_delegate_key_init_origination_credit
+      (test_unregistered_delegate_key_init_origination_credit
          ~fee:(Tez.of_int 3_999_488)
          ~amount:Tez.one_mutez);
     Test.tztest
       "unregistered delegate key - credit 1μꜩ (origination, large fee)"
       `Quick
-      (unregistered_delegate_key_init_origination_credit
+      (test_unregistered_delegate_key_init_origination_credit
          ~fee:(Tez.of_int 10_000_000)
          ~amount:Tez.one_mutez);
     Test.tztest
       "unregistered delegate key - credit 1μꜩ (init with delegation, small \
        fee)"
       `Quick
-      (unregistered_delegate_key_init_delegation_credit
+      (test_unregistered_delegate_key_init_delegation_credit
          ~amount:Tez.one_mutez
          ~fee:Tez.one_mutez);
     Test.tztest
       "unregistered delegate key - credit 1μꜩ (init with delegation, large \
        fee)"
       `Quick
-      (unregistered_delegate_key_init_delegation_credit
+      (test_unregistered_delegate_key_init_delegation_credit
          ~amount:Tez.one_mutez
          ~fee:Tez.max_tez);
     Test.tztest
       "unregistered delegate key - credit 1μꜩ (switch with delegation, \
        small fee)"
       `Quick
-      (unregistered_delegate_key_switch_delegation_credit
+      (test_unregistered_delegate_key_switch_delegation_credit
          ~amount:Tez.one_mutez
          ~fee:Tez.one_mutez);
     Test.tztest
       "unregistered delegate key - credit 1μꜩ (switch with delegation, \
        large fee)"
       `Quick
-      (unregistered_delegate_key_switch_delegation_credit
+      (test_unregistered_delegate_key_switch_delegation_credit
          ~amount:Tez.one_mutez
          ~fee:Tez.max_tez);
     (* self delegation on unrevealed and unregistered contract *)
     Test.tztest
       "unregistered and unrevealed self-delegation (small fee)"
       `Quick
-      (unregistered_and_unrevealed_self_delegate_key_init_delegation
+      (test_unregistered_and_unrevealed_self_delegate_key_init_delegation
          ~fee:Tez.one_mutez);
     Test.tztest
       "unregistered and unrevealed self-delegation (large fee)"
       `Quick
-      (unregistered_and_unrevealed_self_delegate_key_init_delegation
+      (test_unregistered_and_unrevealed_self_delegate_key_init_delegation
          ~fee:Tez.max_tez);
     (* self delegation on unregistered contract *)
     Test.tztest
       "unregistered and revealed self-delegation (small fee)"
       `Quick
-      (unregistered_and_revealed_self_delegate_key_init_delegation
+      (test_unregistered_and_revealed_self_delegate_key_init_delegation
          ~fee:Tez.one_mutez);
     Test.tztest
       "unregistered and revealed self-delegation  large fee)"
       `Quick
-      (unregistered_and_revealed_self_delegate_key_init_delegation
+      (test_unregistered_and_revealed_self_delegate_key_init_delegation
          ~fee:Tez.max_tez);
     (* self delegation on registered contract *)
     Test.tztest
       "registered and revealed self-delegation"
       `Quick
-      registered_self_delegate_key_init_delegation;
+      test_registered_self_delegate_key_init_delegation;
     (*** unregistered delegate key: failed self-delegation ***)
     (* no token transfer, self-delegation *)
     Test.tztest
       "failed self-delegation: no transaction"
       `Quick
-      failed_self_delegation_no_transaction;
+      test_failed_self_delegation_no_transaction;
     (* credit 1μtz, debit 1μtz, self-delegation *)
     Test.tztest
       "failed self-delegation: credit & debit 1μꜩ"
       `Quick
-      (failed_self_delegation_emptied_implicit_contract Tez.one_mutez);
+      (test_failed_self_delegation_emptied_implicit_contract Tez.one_mutez);
     (* credit 1μtz, delegate, debit 1μtz *)
     Test.tztest
       "empty delegated contract is not deleted: credit 1μꜩ, delegate & \
        debit 1μꜩ"
       `Quick
-      (emptying_delegated_implicit_contract_fails Tez.one_mutez);
+      (test_emptying_delegated_implicit_contract_fails Tez.one_mutez);
     (*** valid registration ***)
     (* valid registration: credit 1 μꜩ, self delegation *)
     Test.tztest
       "valid delegate registration: credit 1μꜩ, self delegation (init with \
        delegation)"
       `Quick
-      (valid_delegate_registration_init_delegation_credit Tez.one_mutez);
+      (test_valid_delegate_registration_init_delegation_credit Tez.one_mutez);
     Test.tztest
       "valid delegate registration: credit 1μꜩ, self delegation (switch \
        with delegation)"
       `Quick
-      (valid_delegate_registration_switch_delegation_credit Tez.one_mutez);
+      (test_valid_delegate_registration_switch_delegation_credit Tez.one_mutez);
     (* valid registration: credit 1 μꜩ, self delegation, debit 1μꜩ *)
     Test.tztest
       "valid delegate registration: credit 1μꜩ, self delegation, debit \
        1μꜩ (init with delegation)"
       `Quick
-      (valid_delegate_registration_init_delegation_credit_debit Tez.one_mutez);
+      (test_valid_delegate_registration_init_delegation_credit_debit
+         Tez.one_mutez);
     Test.tztest
       "valid delegate registration: credit 1μꜩ, self delegation, debit \
        1μꜩ (switch with delegation)"
       `Quick
-      (valid_delegate_registration_switch_delegation_credit_debit Tez.one_mutez);
+      (test_valid_delegate_registration_switch_delegation_credit_debit
+         Tez.one_mutez);
     (*** double registration ***)
-    Test.tztest "double registration" `Quick double_registration;
+    Test.tztest "double registration" `Quick test_double_registration;
     Test.tztest
       "double registration when delegate account is emptied"
       `Quick
-      double_registration_when_empty;
+      test_double_registration_when_empty;
     Test.tztest
       "double registration when delegate account is emptied and then recredited"
       `Quick
-      double_registration_when_recredited ]
+      test_double_registration_when_recredited ]
 
 (******************************************************************************)
 (* Main                                                                       *)
