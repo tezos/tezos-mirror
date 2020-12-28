@@ -315,13 +315,7 @@ let rec print_params_detailed :
       | NoArgs ->
           ()
       | _ ->
-          Format.fprintf
-            ppf
-            "@,%a,%a"
-            print_options_detailed
-            spec
-            (print_params_detailed spec)
-            next )
+          Format.fprintf ppf "@,%a" (print_params_detailed spec) next )
   | Prefix (_, next) ->
       print_params_detailed spec ppf next
   | Param (n, desc, _, Stop) -> (
