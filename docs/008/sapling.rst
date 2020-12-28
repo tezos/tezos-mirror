@@ -455,7 +455,7 @@ unshielding.
    # bake a block to include it.
    # { } represents an empty Sapling state.
    tezos-client originate contract shielded-tez transferring 0 from bootstrap1 \
-   running src/lib_sapling/test/sapling_contract.tz \
+   running src/proto_008_PtEdoTez/lib_protocol/test/contracts/sapling_contract.tz \
    --init '{ }' --burn-cap 3 &
    tezos-client bake for bootstrap1
 
