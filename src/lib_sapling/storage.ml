@@ -356,7 +356,7 @@ module Make_Storage (C : Core_sig.Validator) = struct
 
     let size = Map.cardinal
 
-    let find_opt = Map.find_opt
+    let find_opt = Map.find
 
     let mem = Map.mem
 
@@ -382,7 +382,7 @@ module Make_Storage (C : Core_sig.Validator) = struct
 
     let get_from t pos =
       let rec aux pos acc =
-        match Map.find_opt pos t with
+        match Map.find pos t with
         | None ->
             acc
         | Some e ->

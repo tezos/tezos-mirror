@@ -94,13 +94,17 @@ let dummy_input anti_replay ctx dummy_witness root =
   Core.UTXO.{cv; nf; rk; proof_i; signature}
 
 let create_dummy_inputs n state anti_replay ctx =
+  (* assertion already checked by callers *)
+  assert (n >= 0) ;
   (* In order to get a valid witness we simply use the one of the first element *)
   let not_empty = S.mem state 0L in
-  if n > 0 && not_empty then
+  if not_empty then
     (* Doesn't make sense to create dummy_inputs with an empty storage *)
     let dummy_witness = S.get_witness state 0L in
     let root = S.get_root state in
-    List.init n (fun _ -> dummy_input anti_replay ctx dummy_witness root)
+    List.init ~when_negative_length:() n (fun _ ->
+        dummy_input anti_replay ctx dummy_witness root)
+    |> Result.get_ok
   else []
 
 let dummy_output pctx ~memo_size =
@@ -118,6 +122,16 @@ let dummy_output pctx ~memo_size =
 let forge_transaction ?(number_dummy_inputs = 0) ?(number_dummy_outputs = 0)
     (forge_inputs : Input.t list) (forge_outputs : output list)
     (sp : Core.Spending_key.t) (anti_replay : string) (state : S.state) =
+  if number_dummy_inputs < 0 then
+    raise
+      (Invalid_argument
+         "Tezos_sapling.Forge.forge_transaction: number_dummy_inputs is \
+          negative") ;
+  if number_dummy_outputs < 0 then
+    raise
+      (Invalid_argument
+         "Tezos_sapling.Forge.forge_transaction: number_dummy_outputs is \
+          negative") ;
   let memo_size = S.get_memo_size state in
   List.iter
     (fun forge_output ->
@@ -202,7 +216,10 @@ let forge_transaction ?(number_dummy_inputs = 0) ?(number_dummy_outputs = 0)
       in
       let inputs = real_inputs @ dummy_inputs in
       let dummy_outputs =
-        List.init number_dummy_outputs (fun _ -> dummy_output ctx ~memo_size)
+        List.init ~when_negative_length:() number_dummy_outputs (fun _ ->
+            dummy_output ctx ~memo_size)
+        |> Result.get_ok
+        (* checked at entrance of function *)
       in
       let outputs = real_outputs @ dummy_outputs in
       let binding_sig =
@@ -217,6 +234,16 @@ let forge_transaction ?(number_dummy_inputs = 0) ?(number_dummy_outputs = 0)
 let forge_shield_transaction ?(number_dummy_inputs = 0)
     ?(number_dummy_outputs = 0) (forge_outputs : output list) (balance : int64)
     (anti_replay : string) (state : S.state) =
+  if number_dummy_inputs < 0 then
+    raise
+      (Invalid_argument
+         "Tezos_sapling.Forge.forge_shield_transaction: number_dummy_inputs \
+          is negative") ;
+  if number_dummy_outputs < 0 then
+    raise
+      (Invalid_argument
+         "Tezos_sapling.Forge.forge_shield_transaction: number_dummy_outputs \
+          is negative") ;
   let memo_size = S.get_memo_size state in
   List.iter
     (fun forge_output ->
@@ -261,7 +288,10 @@ let forge_shield_transaction ?(number_dummy_inputs = 0)
         create_dummy_inputs number_dummy_inputs state anti_replay ctx
       in
       let dummy_outputs =
-        List.init number_dummy_outputs (fun _ -> dummy_output ctx ~memo_size)
+        List.init ~when_negative_length:() number_dummy_outputs (fun _ ->
+            dummy_output ctx ~memo_size)
+        |> Result.get_ok
+        (* checked at entrance of function *)
       in
       let outputs = real_outputs @ dummy_outputs in
       let binding_sig =
