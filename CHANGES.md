@@ -16,6 +16,9 @@ here either.
 
 - Fixed the return code of errors in the client calls to be non-zero.
 
+- Added a new multisig command to change keys and threshold
+  `set threshold of multisig contract ...`.
+
 ## Baker / Endorser / Accuser
 
 ## Protocol Compiler And Environment
