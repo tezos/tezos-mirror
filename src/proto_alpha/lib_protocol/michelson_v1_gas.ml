@@ -30,7 +30,7 @@ open Gas
 module S = Saturation_repr
 
 module Cost_of = struct
-  module Z_syntax = struct
+  module S_syntax = struct
     (* This is a good enough approximation. S.numbits 0 = 0 *)
     let log2 x =
       match S.of_int_opt (1 + Z.numbits (S.to_z x)) with
@@ -170,7 +170,7 @@ module Cost_of = struct
     (* model N_Blake2b *)
     (* Approximating 1.366428 x term *)
     let cost_N_Blake2b size =
-      let open Z_syntax in
+      let open S_syntax in
       let size = safe_int size in
       safe_int 500 + (size + (size lsr 2))
 
@@ -183,21 +183,21 @@ module Cost_of = struct
     (* model N_Check_signature_ed25519 *)
     (* Approximating 1.372685 x term *)
     let cost_N_Check_signature_ed25519 size =
-      let open Z_syntax in
+      let open S_syntax in
       let size = safe_int size in
       safe_const 270_000 + (size + (size lsr 2))
 
     (* model N_Check_signature_p256 *)
     (* Approximating 1.385771 x term *)
     let cost_N_Check_signature_p256 size =
-      let open Z_syntax in
+      let open S_syntax in
       let size = safe_int size in
       safe_const 600_000 + (size + (size lsr 2) + (size lsr 3))
 
     (* model N_Check_signature_secp256k1 *)
     (* Approximating 1.372411 x term *)
     let cost_N_Check_signature_secp256k1 size =
-      let open Z_syntax in
+      let open S_syntax in
       let size = safe_int size in
       safe_const 60_000 + (size + (size lsr 2))
 
@@ -250,7 +250,7 @@ module Cost_of = struct
     (* model N_Concat_string_pair *)
     (* Approximating 0.068808 x term *)
     let cost_N_Concat_string_pair size1 size2 =
-      let open Z_syntax in
+      let open S_syntax in
       let v0 = safe_int size1 + safe_int size2 in
       safe_int 80 + (v0 lsr 4)
 
@@ -300,7 +300,7 @@ module Cost_of = struct
       let q = size1 - size2 in
       if Compare.Int.(q < 0) then safe_const 300
       else
-        let open Z_syntax in
+        let open S_syntax in
         let v0 = safe_int q * safe_int size2 in
         safe_const 300 + (v0 lsr 10) + (v0 lsr 11) + (v0 lsr 13)
 
@@ -340,7 +340,7 @@ module Cost_of = struct
 
     (* model N_Keccak *)
     let cost_N_Keccak size =
-      let open Z_syntax in
+      let open S_syntax in
       safe_const 1_400 + (safe_const 30 * safe_int size)
 
     (* model N_Left *)
@@ -348,12 +348,12 @@ module Cost_of = struct
 
     (* model N_List_iter *)
     let cost_N_List_iter size =
-      let open Z_syntax in
+      let open S_syntax in
       safe_const 500 + (safe_const 7 * safe_int size)
 
     (* model N_List_map *)
     let cost_N_List_map size =
-      let open Z_syntax in
+      let open S_syntax in
       safe_const 500 + (safe_const 12 * safe_int size)
 
     (* model N_List_size *)
@@ -376,24 +376,24 @@ module Cost_of = struct
     (* model N_Map_get *)
     (* Approximating 0.057548 x term *)
     let cost_N_Map_get size1 size2 =
-      let open Z_syntax in
+      let open S_syntax in
       let v0 = size1 * log2 size2 in
       safe_const 80 + (v0 lsr 5) + (v0 lsr 6) + (v0 lsr 7)
 
     (* model N_Map_iter *)
     let cost_N_Map_iter size =
-      let open Z_syntax in
+      let open S_syntax in
       safe_const 80 + (safe_const 40 * safe_int size)
 
     (* model N_Map_map *)
     let cost_N_Map_map size =
-      let open Z_syntax in
+      let open S_syntax in
       safe_const 80 + (safe_const 761 * safe_int size)
 
     (* model N_Map_mem *)
     (* Approximating 0.058563 x term *)
     let cost_N_Map_mem size1 size2 =
-      let open Z_syntax in
+      let open S_syntax in
       let v0 = size1 * log2 size2 in
       safe_const 80 + (v0 lsr 5) + (v0 lsr 6) + (v0 lsr 7)
 
@@ -403,7 +403,7 @@ module Cost_of = struct
     (* model N_Map_update *)
     (* Approximating 0.119968 x term *)
     let cost_N_Map_update size1 size2 =
-      let open Z_syntax in
+      let open S_syntax in
       let v0 = size1 * log2 size2 in
       safe_const 80 + (v0 lsr 4) + (v0 lsr 5) + (v0 lsr 6) + (v0 lsr 7)
 
@@ -431,7 +431,7 @@ module Cost_of = struct
 
     (* model N_Mul_intint *)
     let cost_N_Mul_intint size1 size2 =
-      let open Z_syntax in
+      let open S_syntax in
       let a = S.add (safe_int size1) (safe_int size2) in
       safe_const 80 + (a * log2 a)
 
@@ -494,13 +494,13 @@ module Cost_of = struct
 
     (* model N_Set_iter *)
     let cost_N_Set_iter size =
-      let open Z_syntax in
+      let open S_syntax in
       safe_const 80 + (safe_const 36 * safe_int size)
 
     (* model N_Set_mem *)
     (* Approximating 0.059410 x term *)
     let cost_N_Set_mem size1 size2 =
-      let open Z_syntax in
+      let open S_syntax in
       let v0 = size1 * log2 (safe_int size2) in
       safe_const 80 + (v0 lsr 5) + (v0 lsr 6) + (v0 lsr 7) + (v0 lsr 8)
 
@@ -510,23 +510,23 @@ module Cost_of = struct
     (* model N_Set_update *)
     (* Approximating 0.126260 x term *)
     let cost_N_Set_update size1 size2 =
-      let open Z_syntax in
+      let open S_syntax in
       let v0 = size1 * log2 (safe_int size2) in
       safe_const 80 + (v0 lsr 3)
 
     (* model N_Sha256 *)
     let cost_N_Sha256 size =
-      let open Z_syntax in
+      let open S_syntax in
       safe_const 500 + (safe_const 5 * safe_int size)
 
     (* model N_Sha3 *)
     let cost_N_Sha3 size =
-      let open Z_syntax in
+      let open S_syntax in
       safe_const 1_400 + (safe_const 32 * safe_int size)
 
     (* model N_Sha512 *)
     let cost_N_Sha512 size =
-      let open Z_syntax in
+      let open S_syntax in
       safe_const 500 + (safe_const 3 * safe_int size)
 
     (* model N_Slice_string *)
@@ -723,7 +723,7 @@ module Cost_of = struct
 
     (* model CHECK_PRINTABLE *)
     let cost_CHECK_PRINTABLE size =
-      let open Z_syntax in
+      let open S_syntax in
       safe_const 14 + (safe_const 10 * safe_int size)
 
     (* model MERGE_TYPES
@@ -1035,7 +1035,7 @@ module Cost_of = struct
     let dupn n = atomic_step_cost (cost_N_DupN n)
 
     let sapling_verify_update ~inputs ~outputs =
-      let open Z_syntax in
+      let open S_syntax in
       atomic_step_cost
         ( safe_const 85_000
         + (safe_int inputs * safe_int 4)
