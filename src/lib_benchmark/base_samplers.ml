@@ -36,10 +36,8 @@ let range_encoding =
     (fun (min, max) -> {min; max})
     (obj2 (req "min" int31) (req "max" int31))
 
-(* samples in [min, max[ *)
-let sample_in_interval state ~range:{min; max} =
-  if max - min > 0 then min + Random.State.int state (max - min)
-  else if max - min = 0 then min
+let sample_in_interval ~range:{min; max} state =
+  if max - min >= 0 then min + Random.State.int state (max - min + 1)
   else invalid_arg "sample_in_interval"
 
 let uniform_bool = Random.State.bool
@@ -104,29 +102,27 @@ module Adversarial = struct
 
   (* Adversarial Z.t *)
   let integers state ~range ~n =
-    assert (n > 0) ;
+    if n <= 0 then invalid_arg "Base_samplers.Adversarial.integers" ;
     let common_prefix = string state ~range in
     let rand_suffix = salt state n in
     let elements =
-      List.init n (fun _ -> Z.of_bits (rand_suffix () ^ common_prefix))
+      Stdlib.List.init n (fun _ -> Z.of_bits (rand_suffix () ^ common_prefix))
     in
-    (common_prefix, elements)
+    (Z.of_bits common_prefix, elements)
 
   (* Adversarial strings *)
   let strings state ~range (n : int) =
-    assert (n > 0) ;
+    if n <= 0 then invalid_arg "Base_samplers.Adversarial.strings" ;
     let common_prefix = string state ~range in
-    let rand_suffix () = if Random.bool () then "\x00" else "\x01" in
+    let rand_suffix = salt state n in
     let elements =
-      List.init ~when_negative_length:() n (fun _ ->
-          common_prefix ^ rand_suffix ())
-      |> (* see [assert] above *) Result.get_ok
+      Stdlib.List.init n (fun _ -> common_prefix ^ rand_suffix ())
     in
     (common_prefix, elements)
 
   (* Adversarial bytes *)
   let bytes state ~range (n : int) =
-    assert (n > 0) ;
+    if n <= 0 then invalid_arg "Base_samplers.Adversarial.bytes" ;
     let (prefix, strs) = strings state ~range n in
     let p = Bytes.of_string prefix in
     let ls = List.map Bytes.of_string strs in

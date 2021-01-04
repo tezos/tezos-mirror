@@ -25,5 +25,5 @@
 
 let list state ~range ~sampler =
   let length = Base_samplers.sample_in_interval state ~range in
-  let list = List.init length (fun _i -> sampler ()) in
+  let list = Stdlib.List.init length (fun _i -> sampler ()) in
   (length, list)
