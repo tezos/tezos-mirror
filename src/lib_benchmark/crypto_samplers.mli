@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@tezos.com>                       *)
+(* Copyright (c) 2021 Nomadic Labs <contact@tezos.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,62 +23,37 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Primitives for sampling crypto-related data *)
+(** Functions for sampling (pk,pkh,sk) triplets.
+
+    This module provides an implementation for finite pools of random
+    (pk,pkh,sk) triplets. The pools grows to the target [size] as the user
+    samples from it. When the target size is reached, sampling is performed
+    in a round-robin fashion.
+ *)
 
 module type Param_S = sig
+  (** Maximal size of the key pool. *)
   val size : int
 
+  (** Algorithm to use for triplet generation. *)
   val algo : [`Algo of Signature.algo | `Default]
 end
 
 module type Finite_key_pool_S = sig
+  (** Sample a public key from the pool. *)
   val pk : Signature.public_key Base_samplers.sampler
 
+  (** Sample a public key hash from the pool. *)
   val pkh : Signature.public_key_hash Base_samplers.sampler
 
+  (** Sample a secret key from the pool. *)
   val sk : Signature.secret_key Base_samplers.sampler
 
+  (** Sample a (pkh, pk, sk) triplet from the pool. *)
   val all :
     (Signature.public_key_hash * Signature.public_key * Signature.secret_key)
     Base_samplers.sampler
 end
 
-module Make_finite_key_pool (Arg : Param_S) : Finite_key_pool_S = struct
-  let () = if Arg.size < 1 then invalid_arg "Make_finite_key_pool" else ()
-
-  (* Hardcoded bc not directly accessible through the Tezos_crypto API. *)
-  let minimal_seed_length = 32
-
-  let key_pool = Queue.create ()
-
-  let algo = match Arg.algo with `Default -> None | `Algo a -> Some a
-
-  let get_next state =
-    if Queue.length key_pool < Arg.size then (
-      let seed =
-        Base_samplers.uniform_bytes ~nbytes:minimal_seed_length state
-      in
-      let triple = Signature.generate_key ?algo ~seed () in
-      Queue.add triple key_pool ; triple )
-    else
-      match Queue.take_opt key_pool with
-      | None ->
-          (* Queue.length >= Arg.size >= 1 *)
-          assert false
-      | Some triple ->
-          Queue.add triple key_pool ; triple
-
-  let pk state =
-    let (_, pk, _) = get_next state in
-    pk
-
-  let pkh state =
-    let (pkh, _, _) = get_next state in
-    pkh
-
-  let sk state =
-    let (_, _, sk) = get_next state in
-    sk
-
-  let all = get_next
-end
+(** Create a finite key pool. *)
+module Make_finite_key_pool (Arg : Param_S) : Finite_key_pool_S

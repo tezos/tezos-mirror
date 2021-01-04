@@ -26,6 +26,8 @@
 (* ------------------------------------------------------------------------- *)
 (* Primitives for sampling basic data *)
 
+type 'a sampler = Random.State.t -> 'a
+
 (* range (inclusive) *)
 type range = {min : int; max : int}
 
@@ -44,30 +46,30 @@ let uniform_bool = Random.State.bool
 
 let uniform_byte state = Char.chr (Random.State.int state 256)
 
-let uniform_partial_byte state ~nbits : char =
+let uniform_partial_byte ~nbits state =
   if nbits < 1 || nbits > 8 then
     Stdlib.failwith "uniform_partial_byte: invalid argument"
   else
     let i = Random.State.int state 256 in
     Char.chr (i lsr (8 - nbits))
 
-let uniform_string state ~nbytes =
+let uniform_string ~nbytes state =
   String.init nbytes (fun _ -> uniform_byte state)
 
-let uniform_bytes state ~nbytes =
-  Bytes.unsafe_of_string (uniform_string state ~nbytes)
+let uniform_bytes ~nbytes state =
+  Bytes.unsafe_of_string (uniform_string ~nbytes state)
 
-let uniform_nat state ~nbytes : Z.t = Z.of_bits (uniform_string state ~nbytes)
+let uniform_nat ~nbytes state = Z.of_bits (uniform_string state ~nbytes)
 
-let uniform_int state ~nbytes : Z.t =
-  let n = uniform_nat state ~nbytes in
+let uniform_int ~nbytes state =
+  let n = uniform_nat ~nbytes state in
   if Random.State.bool state then Z.neg n else n
 
-let nat state ~range =
+let nat ~range state =
   let nbytes = sample_in_interval state ~range in
   uniform_nat state ~nbytes
 
-let int state ~range =
+let int ~range state =
   let nat = nat state ~range in
   let s = Random.State.bool state in
   if s then nat else Z.neg nat
@@ -77,15 +79,15 @@ let uniform_readable_ascii state =
   let i = Random.State.int state 93 in
   Char.chr (33 + i)
 
-let readable_ascii_string state ~range =
+let readable_ascii_string ~range state =
   let nbytes = sample_in_interval state ~range in
   String.escaped (String.init nbytes (fun _ -> uniform_byte state))
 
-let string state ~range =
+let string ~range state =
   let nbytes = sample_in_interval state ~range in
   uniform_string state ~nbytes
 
-let bytes state ~range =
+let bytes ~range state =
   let nbytes = sample_in_interval state ~range in
   uniform_bytes state ~nbytes
 
@@ -101,7 +103,7 @@ module Adversarial = struct
     fun () -> uniform_string state ~nbytes:salt_length
 
   (* Adversarial Z.t *)
-  let integers state ~range ~n =
+  let integers ~range ~n state =
     if n <= 0 then invalid_arg "Base_samplers.Adversarial.integers" ;
     let common_prefix = string state ~range in
     let rand_suffix = salt state n in
@@ -111,7 +113,7 @@ module Adversarial = struct
     (Z.of_bits common_prefix, elements)
 
   (* Adversarial strings *)
-  let strings state ~range (n : int) =
+  let strings ~range ~n state =
     if n <= 0 then invalid_arg "Base_samplers.Adversarial.strings" ;
     let common_prefix = string state ~range in
     let rand_suffix = salt state n in
@@ -121,9 +123,9 @@ module Adversarial = struct
     (common_prefix, elements)
 
   (* Adversarial bytes *)
-  let bytes state ~range (n : int) =
+  let bytes ~range ~n state =
     if n <= 0 then invalid_arg "Base_samplers.Adversarial.bytes" ;
-    let (prefix, strs) = strings state ~range n in
+    let (prefix, strs) = strings ~range ~n state in
     let p = Bytes.of_string prefix in
     let ls = List.map Bytes.of_string strs in
     (p, ls)
