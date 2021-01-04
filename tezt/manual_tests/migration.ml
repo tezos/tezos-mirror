@@ -151,7 +151,7 @@ let migration ?yes_node_path ?yes_wallet context protocol =
     | Protocol.Carthage ->
         ( RPC.Proto_007.get_current_level,
           RPC.Proto_007.get_levels_in_current_cycle )
-    | Delphi | Alpha ->
+    | Edo | Delphi | Alpha ->
         ( RPC.Proto_alpha.get_current_level,
           RPC.Proto_alpha.get_levels_in_current_cycle )
   in

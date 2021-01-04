@@ -24,11 +24,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = Alpha | Delphi | Carthage
+type t = Alpha | Edo | Delphi | Carthage
 
 let name = function
   | Alpha ->
       "Alpha"
+  | Edo ->
+      "Edo"
   | Delphi ->
       "Delphi"
   | Carthage ->
@@ -40,6 +42,8 @@ let tag protocol = String.lowercase_ascii (name protocol)
 let hash = function
   | Alpha ->
       "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
+  | Edo ->
+      "PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq"
   | Delphi ->
       "PsDELPH1Kxsxt8f9eWbxQeRxkjfbxoqM52jvs5Y5fBxWWh4ifpo"
   | Carthage ->
@@ -48,6 +52,8 @@ let hash = function
 let parameter_file = function
   | Alpha ->
       "src/proto_alpha/parameters/sandbox-parameters.json"
+  | Edo ->
+      "src/proto_008_PtEdoTez/parameters/sandbox-parameters.json"
   | Delphi ->
       "src/proto_007_PsDELPH1/parameters/sandbox-parameters.json"
   | Carthage ->
@@ -56,6 +62,8 @@ let parameter_file = function
 let accuser = function
   | Alpha ->
       "./tezos-accuser-alpha"
+  | Edo ->
+      "./tezos-accuser-008-PtEdoTez"
   | Delphi ->
       "./tezos-accuser-007-PsDELPH1"
   | Carthage ->
@@ -95,8 +103,10 @@ let next_protocol = function
   | Carthage ->
       Some Delphi
   | Delphi ->
+      Some Edo
+  | Edo ->
       Some Alpha
   | Alpha ->
       None
 
-let all_protocols = [Alpha; Delphi; Carthage]
+let all_protocols = [Alpha; Edo; Delphi; Carthage]
