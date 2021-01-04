@@ -391,6 +391,12 @@ integration:alpha_nonce_seed_revelation:
     - poetry run pytest tests_alpha/test_nonce_seed_revelation.py -s --log-dir=tmp
   stage: test
 
+integration:alpha_perf_endorsement:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_alpha/test_perf_endorsement.py -s --log-dir=tmp
+  stage: test
+
 integration:alpha_proxy:
   extends: .integration_python_template
   script:
