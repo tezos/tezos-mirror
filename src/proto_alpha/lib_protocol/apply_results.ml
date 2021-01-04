@@ -496,7 +496,7 @@ module Encoding = struct
           obj3
             (req "balance_updates" Receipt.balance_updates_encoding)
             (req "delegate" Signature.Public_key_hash.encoding)
-            (req "slots" (list uint8));
+            (req "slots" (list uint16));
         select =
           (function
           | Contents_result (Endorsement_result _ as op) -> Some op | _ -> None);
@@ -545,7 +545,7 @@ module Encoding = struct
           obj3
             (req "balance_updates" Receipt.balance_updates_encoding)
             (req "delegate" Signature.Public_key_hash.encoding)
-            (req "slots" (list uint8));
+            (req "slots" (list uint16));
         select =
           (function
           | Contents_result (Endorsement_with_slot_result _ as op) ->
