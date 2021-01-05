@@ -44,16 +44,16 @@ end
 
 let () = Base58.check_encoded_prefix Public_key_hash.b58check_encoding "tz3" 36
 
-open Hacl.P256
+open Uecc
 
 module Public_key = struct
-  type t = Hacl.public key
+  type t = public key
 
   let name = "P256.Public_key"
 
   let title = "A P256 public key"
 
-  let to_bytes = to_bytes
+  let to_bytes = to_bytes ~compress:true
 
   let to_string s = Bytes.to_string (to_bytes s)
 
@@ -61,7 +61,7 @@ module Public_key = struct
 
   let of_string_opt s = of_bytes_opt (Bytes.of_string s)
 
-  let size _ = pk_size
+  let size _ = compressed_size
 
   type Base58.data += Data of t
 
@@ -129,7 +129,7 @@ module Public_key = struct
 end
 
 module Secret_key = struct
-  type t = Hacl.secret key
+  type t = secret key
 
   let name = "P256.Secret_key"
 
@@ -137,11 +137,11 @@ module Secret_key = struct
 
   let size = sk_size
 
-  let to_bytes = to_bytes
+  let to_bytes = to_bytes ~compress:true
 
   let to_string s = Bytes.to_string (to_bytes s)
 
-  let of_bytes_opt = sk_of_bytes
+  let of_bytes_opt buf = Option.map fst (sk_of_bytes buf)
 
   let of_string_opt s = of_bytes_opt (Bytes.of_string s)
 
@@ -218,7 +218,7 @@ let name = "P256"
 
 let title = "A P256 signature"
 
-let size = size
+let size = pk_size
 
 let to_bytes s = Bytes.copy s
 
@@ -284,42 +284,41 @@ end)
 
 let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
 
-let zero = Bytes.make size '\000'
+let zero = of_bytes_exn (Bytes.make size '\000')
 
 let sign ?watermark sk msg =
   let msg =
     Blake2B.to_bytes @@ Blake2B.hash_bytes
     @@ match watermark with None -> [msg] | Some prefix -> [prefix; msg]
   in
-  sign ~sk ~msg
+  match sign sk msg with
+  | None ->
+      (* Will never happen in practice. This can only happen in case
+         of RNG error. *)
+      invalid_arg "P256.sign: internal error"
+  | Some signature ->
+      signature
 
 let check ?watermark pk signature msg =
   let msg =
     Blake2B.to_bytes @@ Blake2B.hash_bytes
     @@ match watermark with None -> [msg] | Some prefix -> [prefix; msg]
   in
-  verify ~pk ~msg ~signature
+  verify pk ~msg ~signature
 
-let generate_key ?seed () =
-  match seed with
+let generate_key ?(seed = Hacl.Rand.gen 32) () =
+  let seedlen = Bytes.length seed in
+  if seedlen < 32 then
+    invalid_arg
+      (Printf.sprintf
+         "P256.generate_key: seed must be at least 32 bytes long (was %d)"
+         seedlen) ;
+  match sk_of_bytes seed with
   | None ->
-      let (pk, sk) = keypair () in
-      (Public_key.hash pk, pk, sk)
-  | Some seed -> (
-      let seedlen = Bytes.length seed in
-      if seedlen < Secret_key.size then
-        invalid_arg
-          (Printf.sprintf
-             "P256.generate_key: seed must be at least %d bytes long (got %d)"
-             Secret_key.size
-             seedlen)
-      else
-        match sk_of_bytes (Bytes.sub seed 0 Secret_key.size) with
-        | None ->
-            invalid_arg "P256.generate_key: invalid seed"
-        | Some sk ->
-            let pk = neuterize sk in
-            (Public_key.hash pk, pk, sk) )
+      invalid_arg "P256.generate_key: invalid seed (very rare!)"
+  | Some (sk, pk) ->
+      let pkh = Public_key.hash pk in
+      (pkh, pk, sk)
 
 let deterministic_nonce sk msg =
   let key = Secret_key.to_bytes sk in

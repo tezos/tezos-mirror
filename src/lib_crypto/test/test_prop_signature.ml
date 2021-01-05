@@ -28,7 +28,7 @@
     Component:    Crypto
     Invocation:   dune build @src/lib_crypto/runtest
     Subject:      Property-tests over the interface S.SIGNATURE and its
-                  instantiations Ed25519, P256 and Secp256k1.
+                  instantiations Ed25519 and Secp256k1.
 *)
 
 module Signature_Properties (Desc : sig
@@ -56,13 +56,6 @@ module Ed25519_Props =
     end)
     (Ed25519)
 
-module P256_Props =
-  Signature_Properties
-    (struct
-      let name = "P256"
-    end)
-    (P256)
-
 module Secp256k1_Props =
   Signature_Properties
     (struct
@@ -72,7 +65,7 @@ module Secp256k1_Props =
 
 (** Test: instantiate Signature_Properties over Signature
     with algo in generate key respectively set to
-    Ed25519, Secp256k1, P256. *)
+    Ed25519, Secp256k1. *)
 let () =
   let open Signature in
   let f (algo, name) =
@@ -90,4 +83,4 @@ let () =
     in
     ()
   in
-  List.iter f [(Ed25519, "Ed25519"); (Secp256k1, "Secp256k1"); (P256, "P256")]
+  List.iter f [(Ed25519, "Ed25519"); (Secp256k1, "Secp256k1")]
