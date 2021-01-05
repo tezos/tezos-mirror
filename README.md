@@ -4,10 +4,10 @@ Data-encoding
 A library for encoding and decoding data. It offers a great degree of control over the layout of data. It supports json and binary serialisation/deserialisation.
 
 
-Use
----
+Usage
+-----
 
-For a type `t`, you can use the library's combinators to build a encoding `t
+For a type `t`, you can use the library's combinators to build an encoding `t
 encoding`. You can then use the various reading/writing functions with this
 encoding to serialise and deserialise values of the type `t`.
 
