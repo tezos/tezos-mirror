@@ -474,7 +474,6 @@ let get_block chain_state = function
         State.Block.read_predecessor
           chain_state
           ~pred:n
-          ~below_save_point:true
           (State.Block.hash head)
   | (`Alias (_, n) | `Hash (_, n)) as b ->
       ( match b with
@@ -508,25 +507,14 @@ let get_block chain_state = function
               State.Block.read_predecessor
                 chain_state
                 ~pred:target
-                ~below_save_point:true
                 (State.Block.hash head)
       else if n = 0 then
         Chain.genesis chain_state
         >>= fun genesis ->
         let genesis_hash = State.Block.hash genesis in
         if Block_hash.equal hash genesis_hash then Lwt.return_some genesis
-        else
-          State.Block.read_predecessor
-            chain_state
-            ~pred:0
-            ~below_save_point:true
-            hash
-      else
-        State.Block.read_predecessor
-          chain_state
-          ~pred:n
-          ~below_save_point:true
-          hash
+        else State.Block.read_predecessor chain_state ~pred:0 hash
+      else State.Block.read_predecessor chain_state ~pred:n hash
   | `Level i ->
       Chain.head chain_state
       >>= fun head ->
@@ -536,7 +524,6 @@ let get_block chain_state = function
         State.Block.read_predecessor
           chain_state
           ~pred:target
-          ~below_save_point:true
           (State.Block.hash head)
 
 let build_rpc_directory ~user_activated_upgrades
