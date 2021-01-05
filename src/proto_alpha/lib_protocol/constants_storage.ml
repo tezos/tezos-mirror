@@ -111,10 +111,6 @@ let endorsement_reward c =
   let constants = Raw_context.constants c in
   constants.endorsement_reward
 
-let test_chain_duration c =
-  let constants = Raw_context.constants c in
-  constants.test_chain_duration
-
 let quorum_min c =
   let constants = Raw_context.constants c in
   constants.quorum_min

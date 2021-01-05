@@ -131,15 +131,7 @@ let start_new_voting_period ctxt =
   | Testing_vote ->
       get_approval_and_update_participation_ema ctxt
       >>=? fun (ctxt, approved) ->
-      if approved then
-        let expiration =
-          Time.add
-            (Timestamp.current ctxt)
-            (Constants.test_chain_duration ctxt)
-        in
-        Vote.get_current_proposal ctxt
-        >>=? fun proposal ->
-        fork_test_chain ctxt proposal expiration >>= Voting_period.succ
+      if approved then Voting_period.succ ctxt
       else
         Vote.clear_current_proposal ctxt
         >>=? fun ctxt -> Voting_period.reset ctxt

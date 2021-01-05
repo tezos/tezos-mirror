@@ -103,8 +103,6 @@ type parametric = {
   endorsement_reward : Tez_repr.t list;
   cost_per_byte : Tez_repr.t;
   hard_storage_limit_per_operation : Z.t;
-  test_chain_duration : int64;
-  (* in seconds *)
   quorum_min : int32;
   quorum_max : int32;
   min_proposal_quorum : int32;
@@ -136,7 +134,12 @@ let parametric_encoding =
           ( c.endorsement_reward,
             c.cost_per_byte,
             c.hard_storage_limit_per_operation,
-            c.test_chain_duration,
+            0L,
+            (* At this position in the encoding we used to have a test
+               chain duration but it is not used anymore and should be
+               removed when this encoding is updated. When the test
+               chain was removed, we did not want to change the
+               encoding for retrocompatibility. *)
             c.quorum_min,
             c.quorum_max,
             c.min_proposal_quorum,
@@ -162,7 +165,7 @@ let parametric_encoding =
              ( endorsement_reward,
                cost_per_byte,
                hard_storage_limit_per_operation,
-               test_chain_duration,
+               _test_chain_duration,
                quorum_min,
                quorum_max,
                min_proposal_quorum,
@@ -189,7 +192,6 @@ let parametric_encoding =
         endorsement_reward;
         cost_per_byte;
         hard_storage_limit_per_operation;
-        test_chain_duration;
         quorum_min;
         quorum_max;
         min_proposal_quorum;

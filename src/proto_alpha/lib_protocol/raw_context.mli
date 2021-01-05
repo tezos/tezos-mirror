@@ -77,8 +77,6 @@ val prepare_first_block :
 
 val activate : context -> Protocol_hash.t -> t Lwt.t
 
-val fork_test_chain : context -> Protocol_hash.t -> Time.t -> t Lwt.t
-
 (** Returns the state of the database resulting of operations on its
     abstract view *)
 val recover : context -> Context.t

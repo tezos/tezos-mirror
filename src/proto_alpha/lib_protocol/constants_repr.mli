@@ -71,7 +71,6 @@ type parametric = {
   endorsement_reward : Tez_repr.t list;
   cost_per_byte : Tez_repr.t;
   hard_storage_limit_per_operation : Z.t;
-  test_chain_duration : int64;
   (* in seconds *)
   quorum_min : int32;
   quorum_max : int32;

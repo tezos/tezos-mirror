@@ -70,8 +70,6 @@ val baking_reward_per_endorsement : Raw_context.context -> Tez_repr.t list
 
 val endorsement_reward : Raw_context.context -> Tez_repr.t list
 
-val test_chain_duration : Raw_context.context -> int64
-
 val quorum_min : Raw_context.context -> int32
 
 val quorum_max : Raw_context.context -> int32

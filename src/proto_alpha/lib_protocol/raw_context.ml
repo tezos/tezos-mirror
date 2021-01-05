@@ -794,10 +794,6 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
 
 let activate ctxt h = Updater.activate (context ctxt) h >|= update_context ctxt
 
-let fork_test_chain ctxt protocol expiration =
-  Updater.fork_test_chain (context ctxt) ~protocol ~expiration
-  >|= update_context ctxt
-
 (* Generic context ********************************************************)
 
 type key = string list

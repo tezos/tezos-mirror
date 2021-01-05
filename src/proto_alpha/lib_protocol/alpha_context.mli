@@ -509,7 +509,6 @@ module Constants : sig
     endorsement_reward : Tez.t list;
     cost_per_byte : Tez.t;
     hard_storage_limit_per_operation : Z.t;
-    test_chain_duration : int64;
     quorum_min : int32;
     quorum_max : int32;
     min_proposal_quorum : int32;
@@ -564,8 +563,6 @@ module Constants : sig
   val block_security_deposit : context -> Tez.t
 
   val endorsement_security_deposit : context -> Tez.t
-
-  val test_chain_duration : context -> int64
 
   val quorum_min : context -> int32
 
@@ -1564,8 +1561,6 @@ val prepare :
 val finalize : ?commit_message:string -> context -> Updater.validation_result
 
 val activate : context -> Protocol_hash.t -> context Lwt.t
-
-val fork_test_chain : context -> Protocol_hash.t -> Time.t -> context Lwt.t
 
 val record_endorsement : context -> Signature.Public_key_hash.t -> context
 

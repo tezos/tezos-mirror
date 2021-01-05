@@ -265,8 +265,6 @@ let finalize ?commit_message:message c =
 
 let activate = Raw_context.activate
 
-let fork_test_chain = Raw_context.fork_test_chain
-
 let record_endorsement = Raw_context.record_endorsement
 
 let allowed_endorsements = Raw_context.allowed_endorsements
