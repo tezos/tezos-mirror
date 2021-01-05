@@ -272,7 +272,7 @@ let predecessor_n_raw store block_hash distance =
     in
     loop block_hash distance
 
-let predecessor_n ?(below_save_point = false) block_store block_hash distance =
+let predecessor_n block_store block_hash distance =
   Lwt.catch
     (fun () ->
       predecessor_n_raw block_store block_hash distance
@@ -280,8 +280,7 @@ let predecessor_n ?(below_save_point = false) block_store block_hash distance =
       | None ->
           Lwt.return_none
       | Some predecessor -> (
-          ( if below_save_point then Header.known (block_store, predecessor)
-          else Store.Block.Contents.known (block_store, predecessor) )
+          Header.known (block_store, predecessor)
           >>= function
           | false -> Lwt.return_none | true -> Lwt.return_some predecessor ))
     (fun _exn -> Lwt.return_none)
@@ -1045,9 +1044,9 @@ module Block = struct
           block.header
           checkpoint)
 
-  let read_predecessor chain_state ~pred ?(below_save_point = false) hash =
+  let read_predecessor chain_state ~pred hash =
     Shared.use chain_state.block_store (fun store ->
-        predecessor_n ~below_save_point store hash pred
+        predecessor_n store hash pred
         >>= fun hash_opt ->
         let new_hash_opt =
           match hash_opt with
@@ -1816,11 +1815,7 @@ let compute_locator_from_hash chain_state ?(max_size = max_locator_size)
           | Some level -> (
               let head_level = head_header.Block_header.shell.level in
               let distance = Int32.sub head_level level in
-              predecessor_n
-                ~below_save_point:true
-                block_store
-                head_hash
-                (Int32.to_int distance)
+              predecessor_n block_store head_hash (Int32.to_int distance)
               >>= function
               | None ->
                   Lwt.return chain_data.caboose
@@ -1830,14 +1825,10 @@ let compute_locator_from_hash chain_state ?(max_size = max_locator_size)
       let get_predecessor =
         match min_level with
         | None ->
-            predecessor_n ~below_save_point:true block_store
+            predecessor_n block_store
         | Some min_level -> (
             fun block_hash distance ->
-              predecessor_n
-                ~below_save_point:true
-                block_store
-                block_hash
-                distance
+              predecessor_n block_store block_hash distance
               >>= function
               | None ->
                   Lwt.return_none
@@ -1900,7 +1891,6 @@ let compute_protocol_locator chain_state ?max_size ~proto_level seed =
                 in
                 Shared.use chain_state.block_store (fun block_store ->
                     predecessor_n
-                      ~below_save_point:true
                       block_store
                       (Block.hash chain_data.current_head)
                       (Int32.to_int delta))
