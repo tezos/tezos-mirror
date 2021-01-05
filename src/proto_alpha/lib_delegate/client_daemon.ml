@@ -71,68 +71,10 @@ let rec retry_on_disconnection (cctxt : #Protocol_client_context.full) f =
   | Error err ->
       cctxt#error "Unexpected error: %a. Exiting..." pp_print_error err
 
-let monitor_fork_testchain (cctxt : #Protocol_client_context.full)
-    ~cleanup_nonces =
-  (* Waiting for the node to be synchronized *)
-  cctxt#message "Waiting for the test chain to be forked..."
-  >>= fun () ->
-  Shell_services.Monitor.active_chains cctxt
-  >>=? fun (stream, _) ->
-  let rec loop () =
-    Lwt_stream.next stream
-    >>= fun l ->
-    let testchain =
-      List.find_opt
-        (function Shell_services.Monitor.Active_test _ -> true | _ -> false)
-        l
-    in
-    match testchain with
-    | Some (Active_test {protocol; expiration_date; _})
-      when Protocol_hash.equal Protocol.hash protocol ->
-        let abort_daemon () =
-          cctxt#message
-            "Test chain's expiration date reached (%a)... Stopping the daemon."
-            Time.Protocol.pp_hum
-            expiration_date
-          >>= fun () ->
-          if cleanup_nonces then
-            (* Clean-up existing nonces *)
-            cctxt#with_lock (fun () ->
-                Client_baking_files.resolve_location cctxt ~chain:`Test `Nonce
-                >>=? fun nonces_location ->
-                Client_baking_nonces.(save cctxt nonces_location empty))
-          else return_unit >>=? fun () -> exit 0
-        in
-        let canceler = Lwt_canceler.create () in
-        Lwt_canceler.on_cancel canceler (fun () ->
-            abort_daemon () >>= function _ -> Lwt.return_unit) ;
-        let now = Time.System.(to_protocol (Systime_os.now ())) in
-        let delay = Int64.to_int (Time.Protocol.diff expiration_date now) in
-        if delay <= 0 then (* Testchain already expired... Retrying. *)
-          loop ()
-        else
-          let timeout =
-            Lwt_timeout.create delay (fun () ->
-                Lwt_canceler.cancel canceler |> ignore)
-          in
-          Lwt_timeout.start timeout ; return_unit
-    | None ->
-        loop ()
-    | Some _ ->
-        loop ()
-    (* Got a testchain for a different protocol, skipping *)
-  in
-  Lwt.pick
-    [(Lwt_exit.clean_up_starts >>= fun _ -> failwith "Interrupted..."); loop ()]
-  >>=? fun () -> cctxt#message "Test chain forked." >>= fun () -> return_unit
-
 module Endorser = struct
   let run (cctxt : #Protocol_client_context.full) ~chain ~delay ~keep_alive
       delegates =
     let process () =
-      ( if chain = `Test then monitor_fork_testchain cctxt ~cleanup_nonces:false
-      else return_unit )
-      >>=? fun () ->
       Client_baking_blocks.monitor_heads
         ~next_protocols:(Some [Protocol.hash])
         cctxt
@@ -156,9 +98,6 @@ module Baker = struct
     let process () =
       Config_services.user_activated_upgrades cctxt
       >>=? fun user_activated_upgrades ->
-      ( if chain = `Test then monitor_fork_testchain cctxt ~cleanup_nonces:true
-      else return_unit )
-      >>=? fun () ->
       Client_baking_blocks.monitor_heads
         ~next_protocols:(Some [Protocol.hash])
         cctxt
@@ -189,9 +128,6 @@ module Accuser = struct
   let run (cctxt : #Protocol_client_context.full) ~chain ~preserved_levels
       ~keep_alive =
     let process () =
-      ( if chain = `Test then monitor_fork_testchain cctxt ~cleanup_nonces:true
-      else return_unit )
-      >>=? fun () ->
       Client_baking_blocks.monitor_valid_blocks
         ~next_protocols:(Some [Protocol.hash])
         cctxt

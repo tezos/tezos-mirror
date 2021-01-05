@@ -43,6 +43,9 @@ let resolve_location (cctxt : #Client_context.full) ~chain (kind : 'a) :
   | `Main ->
       return basename
   | `Test ->
+      (* FIXME: dead code. Cannot be removed because the type
+                Chain_services.chain is common to all the
+                protocols. *)
       Chain_services.chain_id cctxt ~chain:`Test ()
       >>=? fun chain_id -> test_filename chain_id
   | `Hash chain_id ->

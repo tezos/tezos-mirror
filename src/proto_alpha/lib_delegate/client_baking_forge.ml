@@ -232,8 +232,6 @@ let inject_block cctxt ?(force = false) ?seed_nonce_hash ~chain ~shell_header
 
 type error += Failed_to_preapply of Tezos_base.Operation.t * error list
 
-type error += Forking_test_chain
-
 let () =
   register_error_kind
     `Permanent
@@ -758,17 +756,6 @@ let finalize_block_header shell_header ~timestamp validation_result operations
          operations)
   in
   let context = Shell_context.unwrap_disk_context context in
-  Context.get_test_chain context
-  >>= (function
-        | Not_running ->
-            return context
-        | Running {expiration; _} ->
-            if Time.Protocol.(expiration <= timestamp) then
-              Context.add_test_chain context Not_running >>= return
-            else return context
-        | Forking _ ->
-            fail Forking_test_chain)
-  >>=? fun context ->
   ( match predecessor_block_metadata_hash with
   | Some predecessor_block_metadata_hash ->
       Context.add_predecessor_block_metadata_hash
@@ -932,17 +919,6 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
           bi.predecessor_block_metadata_hash
           bi.predecessor_operations_metadata_hash
         >>= function
-        | Error (Forking_test_chain :: _) ->
-            Alpha_block_services.Helpers.Preapply.block
-              cctxt
-              ~chain
-              ~block
-              ~timestamp:min_valid_timestamp
-              ~sort
-              ~protocol_data
-              operations
-            >>=? fun (shell_header, _result) ->
-            return (shell_header, List.map (List.map forge) operations)
         | Error _ as errs ->
             Lwt.return errs
         | Ok shell_header ->
@@ -1301,15 +1277,6 @@ let build_block cctxt ~user_activated_upgrades state seed_nonce_hash
                 bi.predecessor_block_metadata_hash
                 bi.predecessor_operations_metadata_hash
               >>= function
-              | Error (Forking_test_chain :: _) ->
-                  shell_prevalidation
-                    cctxt
-                    ~chain
-                    ~block
-                    ~timestamp
-                    seed_nonce_hash
-                    operations
-                    slot
               | Error _ as errs ->
                   Lwt.return errs
               | Ok shell_header ->
