@@ -37,8 +37,8 @@ pages:
   artifacts:
     paths:
       - public/
-  only:
-    - master
+        #  only:
+        #    - master
   script:
     - opam install odoc
     - dune build @doc
