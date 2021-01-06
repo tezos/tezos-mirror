@@ -88,7 +88,7 @@ done
 ## Filtering unrequired packages
 cd $tmp_dir
 git reset --hard "$full_opam_repository_tag"
-opam admin filter --yes --resolve \
+OPAMSOLVERTIMEOUT=600 opam admin filter --yes --resolve \
   $packages,ocaml,ocaml-base-compiler,odoc,opam-depext,js_of_ocaml-ppx,reactiveData,opam-ed
 
 ## Adding useful compiler variants
