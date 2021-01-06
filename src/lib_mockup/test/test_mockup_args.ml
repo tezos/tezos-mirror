@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,10 +23,27 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Chain_id = struct
-  let of_string s = Chain_id.hash_string ~key:"mockup" [s]
+(** Testing
+    -------
+    Component:    Mockup args library
+    Invocation:   dune build @runtest_mockup_args
+    Subject:      Unit tests of the Mockup args library
+*)
 
-  let dummy = of_string "chain"
+open Tezos_mockup_registration.Mockup_args
 
-  let choose ~from_config_file = Option.value from_config_file ~default:dummy
-end
+let testable_chain_id =
+  Alcotest.testable Tezos_crypto.Chain_id.pp Tezos_crypto.Chain_id.( = )
+
+(** {!val:Chain_id.choose} uses the dummy value if no config file is specified *)
+let test_no_config_file_dummy () =
+  let expected = Chain_id.dummy in
+  let actual = Chain_id.choose ~from_config_file:None in
+  Alcotest.check testable_chain_id "default value is dummy" expected actual
+
+let tests =
+  [ ( "Chain_id.choose uses the dummy value if no config file is specified",
+      `Quick,
+      test_no_config_file_dummy ) ]
+
+let () = Alcotest.run "tezos-mockup" [("mockup_args", tests)]

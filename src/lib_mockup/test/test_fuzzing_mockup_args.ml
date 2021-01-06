@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,10 +23,27 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Chain_id = struct
-  let of_string s = Chain_id.hash_string ~key:"mockup" [s]
+(** Testing
+    -------
+    Component:    Mockup args library
+    Invocation:   dune build @runtest_fuzzing_mockup_args
+    Subject:      Fuzzing tests of the Mockup args library
+*)
 
-  let dummy = of_string "chain"
+open Tezos_mockup_registration.Mockup_args
 
-  let choose ~from_config_file = Option.value from_config_file ~default:dummy
-end
+let chain_id_gen = Crowbar.map [Crowbar.bytes] Chain_id.of_string
+
+(** {!val:Chain_id.choose} always prioritizes the config file over the default value *)
+let test_config_file_has_priority_over_default_value from_config_file_val =
+  let expected = from_config_file_val in
+  let actual = Chain_id.choose ~from_config_file:(Some from_config_file_val) in
+  Crowbar.check_eq ~pp:Tezos_crypto.Chain_id.pp expected actual
+
+let () =
+  Crowbar.add_test
+    ~name:
+      "Chain_id.choose always prioritizes the config file over the default \
+       value"
+    [chain_id_gen]
+    test_config_file_has_priority_over_default_value

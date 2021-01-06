@@ -25,7 +25,11 @@
 
 (** Initializes a wallet with bootstrap accounts (including secret keys).
     If the second argument is provided, it must be a path to a file
-    containing definitions of the bootstrap accounts in JSON format. *)
+    containing definitions of the bootstrap accounts in JSON format.
+    
+    Note: the default bootstrap accounts use the 'unencrypted' scheme so this
+    scheme must be registered already.
+    *)
 val populate :
   #Tezos_client_base.Client_context.io_wallet ->
   string option ->
