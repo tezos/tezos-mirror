@@ -90,7 +90,7 @@ let rec length : type x. x Encoding.t -> x -> int =
   | Tups {kind = `Dynamic; left; right} ->
       let (v1, v2) = value in
       length left v1 + length right v2
-  | Union {kind = `Dynamic; tag_size; cases} ->
+  | Union {kind = `Dynamic; tag_size; cases; _} ->
       let rec length_case = function
         | [] ->
             raise (Write_error No_case_matched)
@@ -131,7 +131,7 @@ let rec length : type x. x Encoding.t -> x -> int =
       length left v1 + length right v2
   | Obj (Opt {kind = `Variable; encoding = e; _}) -> (
     match value with None -> 0 | Some value -> length e value )
-  | Union {kind = `Variable; tag_size; cases} ->
+  | Union {kind = `Variable; tag_size; cases; _} ->
       let rec length_case = function
         | [] ->
             raise (Write_error No_case_matched)

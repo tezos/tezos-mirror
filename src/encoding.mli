@@ -73,6 +73,7 @@ type 'a desc =
   | Union : {
       kind : Kind.t;
       tag_size : Binary_size.tag_size;
+      tagged_cases : 'a case array;
       cases : 'a case list;
     }
       -> 'a desc
@@ -425,6 +426,10 @@ val case :
   ('t -> 'a option) ->
   ('a -> 't) ->
   't case
+
+val undefined_case : 'a case
+
+val is_undefined_case : 'a case -> bool
 
 val union : ?tag_size:[`Uint8 | `Uint16] -> 't case list -> 't encoding
 

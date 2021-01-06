@@ -279,20 +279,12 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
       read_variable_pair left right state
   | Conv {inj; encoding; _} ->
       inj (read_rec encoding state)
-  | Union {tag_size; cases; _} ->
+  | Union {tag_size; tagged_cases; _} ->
       let ctag = Atom.tag tag_size state in
-      let (Case {encoding; inj; _}) =
-        try
-          List.find
-            (function
-              | Case {tag = Tag tag; _} ->
-                  tag = ctag
-              | Case {tag = Json_only; _} ->
-                  false)
-            cases
-        with Not_found -> raise (Unexpected_tag ctag)
-      in
-      inj (read_rec encoding state)
+      if ctag >= Array.length tagged_cases then raise (Unexpected_tag ctag) ;
+      let (Case {inj; encoding; _} as case) = tagged_cases.(ctag) in
+      if is_undefined_case case then raise (Unexpected_tag ctag)
+      else inj (read_rec encoding state)
   | Dynamic_size {kind; encoding = e} ->
       let sz = Atom.int kind state in
       let remaining = check_remaining_bytes state sz in

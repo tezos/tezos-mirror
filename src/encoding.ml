@@ -112,6 +112,7 @@ type 'a desc =
   | Union : {
       kind : Kind.t;
       tag_size : Binary_size.tag_size;
+      tagged_cases : 'a case array;
       cases : 'a case list;
     }
       -> 'a desc
@@ -750,31 +751,63 @@ let obj10 f10 f9 f8 f7 f6 f5 f4 f3 f2 f1 =
 let tup10 f10 f9 f8 f7 f6 f5 f4 f3 f2 f1 =
   conv10 (tup10 f10 f9 f8 f7 f6 f5 f4 f3 f2 f1)
 
-let check_cases tag_size cases =
-  if cases = [] then invalid_arg "Data_encoding.union: empty list of cases." ;
+let undefined_encoding = delayed (fun _ -> assert false)
+
+let undefined_proj _ = None
+
+let undefined_inj _ = assert false
+
+let undefined_case : type a. a case =
+  Case
+    {
+      title = "<YOU SHOULD NEVER SEE THAT>";
+      description = None;
+      encoding = undefined_encoding;
+      proj = undefined_proj;
+      inj = undefined_inj;
+      tag = Tag (-1);
+    }
+
+let is_undefined_case c = c == undefined_case
+
+let check_tagged_cases tag_size tagged_cases =
   let max_tag = match tag_size with `Uint8 -> 256 | `Uint16 -> 256 * 256 in
-  let seen = Array.make max_tag false in
+  let max_used_tag =
+    List.fold_left
+      (fun m -> function Case {tag = Tag t; _} -> max t m | _ -> m)
+      (-1)
+      tagged_cases
+  in
+  let tagged_cases' = Array.make (max_used_tag + 1) undefined_case in
   List.iter
-    (fun (Case {tag; _}) ->
-      match tag with
-      | Json_only ->
-          ()
-      | Tag tag ->
-          if tag < 0 || max_tag <= tag then
-            Format.kasprintf invalid_arg "The tag %d is invalid." tag ;
-          if seen.(tag) then
-            Format.kasprintf
-              invalid_arg
-              "The tag %d appears twice in an union."
-              tag ;
-          seen.(tag) <- true)
-    cases
+    (function
+      | Case {tag; _} as case -> (
+        match tag with
+        | Json_only ->
+            assert false (* By union's call to List.partition. *)
+        | Tag tag ->
+            if tag < 0 || max_tag <= tag then
+              Format.kasprintf invalid_arg "The tag %d is invalid." tag ;
+            if not (is_undefined_case tagged_cases'.(tag)) then
+              Format.kasprintf
+                invalid_arg
+                "The tag %d appears twice in an union."
+                tag ;
+            tagged_cases'.(tag) <- case ))
+    tagged_cases ;
+  tagged_cases'
 
 let union ?(tag_size = `Uint8) cases =
-  check_cases tag_size cases ;
-  let kinds = List.map (fun (Case {encoding; _}) -> classify encoding) cases in
-  let kind = Kind.merge_list tag_size kinds in
-  make @@ Union {kind; tag_size; cases}
+  if cases = [] then invalid_arg "Data_encoding.union: empty list of cases."
+  else
+    let tagged_cases =
+      List.filter (fun (Case {tag; _}) -> tag <> Json_only) cases
+    in
+    let tagged_cases = check_tagged_cases tag_size tagged_cases in
+    let classify_case (Case {encoding; _}) = classify encoding in
+    let kinds = List.map classify_case cases in
+    let kind = Kind.merge_list tag_size kinds in
+    make @@ Union {kind; tag_size; tagged_cases; cases}
 
 let case ~title ?description tag encoding proj inj =
   Case {title; description; encoding; proj; inj; tag}

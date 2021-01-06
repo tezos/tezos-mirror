@@ -407,7 +407,7 @@ let describe (type x) (encoding : x Encoding.t) =
           fields None recursives references right.encoding
         in
         (fields1 @ fields2, references)
-    | Union {kind; tag_size; cases} ->
+    | Union {kind; tag_size; cases; _} ->
         let (name, references) =
           union None recursives references kind tag_size cases
         in
@@ -589,7 +589,7 @@ let describe (type x) (encoding : x Encoding.t) =
         let (fields, references) = fields None recursives references descr in
         let references = add_reference name (obj fields) references in
         (Ref name, references)
-    | Union {kind; tag_size; cases} ->
+    | Union {kind; tag_size; cases; _} ->
         let (name, references) =
           union ref_name recursives references kind tag_size cases
         in

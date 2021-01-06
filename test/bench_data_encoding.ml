@@ -23,7 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let bench ?(num_iterations = 1000) name thunk =
+let default_num_iterations = 1000
+
+let bench ?(num_iterations = default_num_iterations) name thunk =
   Gc.full_major () ;
   Gc.compact () ;
   let start_time = Sys.time () in
@@ -49,7 +51,7 @@ let read_stream encoding bytes =
   in
   loop bytes (Data_encoding.Binary.read_stream encoding)
 
-let bench_all ?(num_iterations = 1000) name encoding value =
+let bench_all ?(num_iterations = default_num_iterations) name encoding value =
   bench
     ~num_iterations
     ("writing " ^ name ^ " json")
@@ -129,7 +131,6 @@ let () =
   bench_all
     "10000_element_int_list"
     Data_encoding.(list int31)
-    ~num_iterations:1000
     (Array.to_list (Array.make 10000 0)) ;
   bench_all
     "option_element_int_list"
@@ -142,7 +143,7 @@ let () =
   let value =
     Array.to_list (Array.make 1000 (R (R (A "asdf", B true), F 1.0)))
   in
-  bench ~num_iterations:1000 "binary_encoding" (fun () ->
+  bench "binary_encoding" (fun () ->
       ignore @@ Data_encoding.Binary.to_bytes encoding value) ;
   bench_all
     "binary_encoding_large_list"

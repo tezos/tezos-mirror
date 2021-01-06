@@ -139,33 +139,27 @@ let rec lift_union : type a. a Encoding.t -> a Encoding.t =
   match e.encoding with
   | Conv {proj; inj; encoding = e; schema} -> (
     match lift_union e with
-    | {encoding = Union {kind; tag_size; cases}; _} ->
+    | {encoding = Union {kind; tag_size; tagged_cases; cases}; _} ->
+        let lift
+            (Case
+              {title; description; encoding; proj = proj'; inj = inj'; tag}) =
+          Case
+            {
+              encoding;
+              title;
+              description;
+              proj = (fun x -> proj' (proj x));
+              inj = (fun x -> inj (inj' x));
+              tag;
+            }
+        in
         make
         @@ Union
              {
                kind;
                tag_size;
-               cases =
-                 List.map
-                   (fun (Case
-                          {
-                            title;
-                            description;
-                            encoding;
-                            proj = proj';
-                            inj = inj';
-                            tag;
-                          }) ->
-                     Case
-                       {
-                         encoding;
-                         title;
-                         description;
-                         proj = (fun x -> proj' (proj x));
-                         inj = (fun x -> inj (inj' x));
-                         tag;
-                       })
-                   cases;
+               tagged_cases = Array.map lift tagged_cases;
+               cases = List.map lift cases;
              }
     | e ->
         make @@ Conv {proj; inj; encoding = e; schema} )
@@ -194,59 +188,49 @@ and lift_union_in_pair :
  fun b p e1 e2 ->
   let open Encoding in
   match (lift_union e1, lift_union e2) with
-  | (e1, {encoding = Union {tag_size; cases; _}; _}) ->
+  | (e1, {encoding = Union {tag_size; cases; tagged_cases; _}; _}) ->
+      let lift (Case {title; description; encoding = e2; proj; inj; tag}) =
+        Case
+          {
+            encoding = lift_union_in_pair b p e1 e2;
+            title;
+            description;
+            proj =
+              (fun (x, y) ->
+                match proj y with None -> None | Some y -> Some (x, y));
+            inj = (fun (x, y) -> (x, inj y));
+            tag;
+          }
+      in
       make
       @@ Union
            {
              kind = `Dynamic (* ignored *);
              tag_size;
-             cases =
-               List.map
-                 (fun (Case
-                        {title; description; encoding = e2; proj; inj; tag}) ->
-                   Case
-                     {
-                       encoding = lift_union_in_pair b p e1 e2;
-                       title;
-                       description;
-                       proj =
-                         (fun (x, y) ->
-                           match proj y with
-                           | None ->
-                               None
-                           | Some y ->
-                               Some (x, y));
-                       inj = (fun (x, y) -> (x, inj y));
-                       tag;
-                     })
-                 cases;
+             tagged_cases = Array.map lift tagged_cases;
+             cases = List.map lift cases;
            }
-  | ({encoding = Union {tag_size; cases; _}; _}, e2) ->
+  | ({encoding = Union {tag_size; tagged_cases; cases; _}; _}, e2) ->
+      let lift (Case {title; description; encoding = e1; proj; inj; tag}) =
+        Case
+          {
+            encoding = lift_union_in_pair b p e1 e2;
+            title;
+            description;
+            proj =
+              (fun (x, y) ->
+                match proj x with None -> None | Some x -> Some (x, y));
+            inj = (fun (x, y) -> (inj x, y));
+            tag;
+          }
+      in
       make
       @@ Union
            {
              kind = `Dynamic (* ignored *);
              tag_size;
-             cases =
-               List.map
-                 (fun (Case
-                        {title; description; encoding = e1; proj; inj; tag}) ->
-                   Case
-                     {
-                       encoding = lift_union_in_pair b p e1 e2;
-                       title;
-                       description;
-                       proj =
-                         (fun (x, y) ->
-                           match proj x with
-                           | None ->
-                               None
-                           | Some x ->
-                               Some (x, y));
-                       inj = (fun (x, y) -> (inj x, y));
-                       tag;
-                     })
-                 cases;
+             tagged_cases = Array.map lift tagged_cases;
+             cases = List.map lift cases;
            }
   | (e1, e2) ->
       b.build p e1 e2
