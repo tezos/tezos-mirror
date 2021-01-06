@@ -1,6 +1,6 @@
 (library
- (name tezos_filters_alpha)
- (public_name tezos-filters-alpha)
+ (name tezos_protocol_plugin_alpha)
+ (public_name tezos-protocol-plugin-alpha)
  (libraries tezos-base
             tezos-embedded-protocol-alpha
             tezos-protocol-alpha)

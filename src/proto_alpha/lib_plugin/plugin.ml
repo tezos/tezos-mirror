@@ -228,7 +228,7 @@ end
 module RPC = struct
   open Environment
 
-  let path = RPC_path.(open_root / "helpers")
+  let path = RPC_path.(open_root / "helpers" / "scripts")
 
   let unparsing_mode_encoding =
     let open Data_encoding in

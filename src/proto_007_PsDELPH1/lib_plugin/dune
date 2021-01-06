@@ -1,6 +1,6 @@
 (library
- (name tezos_filters_007_PsDELPH1)
- (public_name tezos-filters-007-PsDELPH1)
+ (name tezos_protocol_plugin_007_PsDELPH1)
+ (public_name tezos-protocol-plugin-007-PsDELPH1)
  (libraries tezos-base
             tezos-embedded-protocol-007-PsDELPH1
             tezos-protocol-007-PsDELPH1)

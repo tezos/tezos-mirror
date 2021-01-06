@@ -474,7 +474,7 @@ let commands () =
         let unparsing_mode =
           Option.value ~default:Script_ir_translator.Readable unparsing_mode
         in
-        Filter.RPC.normalize_data
+        Plugin.RPC.normalize_data
           cctxt
           (cctxt#chain, cctxt#block)
           ~legacy
