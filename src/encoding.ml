@@ -752,23 +752,22 @@ let tup10 f10 f9 f8 f7 f6 f5 f4 f3 f2 f1 =
 let check_cases tag_size cases =
   if cases = [] then invalid_arg "Data_encoding.union: empty list of cases." ;
   let max_tag = match tag_size with `Uint8 -> 256 | `Uint16 -> 256 * 256 in
-  ignore
-  @@ List.fold_left
-       (fun others (Case {tag; _}) ->
-         match tag with
-         | Json_only ->
-             others
-         | Tag tag ->
-             if List.mem tag others then
-               Format.kasprintf
-                 invalid_arg
-                 "The tag %d appears twice in an union."
-                 tag ;
-             if tag < 0 || max_tag <= tag then
-               Format.kasprintf invalid_arg "The tag %d is invalid." tag ;
-             tag :: others)
-       []
-       cases
+  let seen = Array.make max_tag false in
+  List.iter
+    (fun (Case {tag; _}) ->
+      match tag with
+      | Json_only ->
+          ()
+      | Tag tag ->
+          if tag < 0 || max_tag <= tag then
+            Format.kasprintf invalid_arg "The tag %d is invalid." tag ;
+          if seen.(tag) then
+            Format.kasprintf
+              invalid_arg
+              "The tag %d appears twice in an union."
+              tag ;
+          seen.(tag) <- true)
+    cases
 
 let union ?(tag_size = `Uint8) cases =
   check_cases tag_size cases ;
