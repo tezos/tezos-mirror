@@ -83,14 +83,14 @@ layer. It basically runs the ``accept(2)`` syscall and call
 that it is made aware of an incoming connection. From there, the pool
 will decide how this new connection must be handled.
 
-{Black, While, Grey}lists
+{Black, White, Grey}lists
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The welcome worker takes care of filtering all incoming connections using two
-static lists of addresses handled either by ``tezos-admin-client`` and a system
+static lists of addresses handled by ``tezos-admin-client`` and a system
 table that is handled automatically by the P2P layer. The node administrator can
-block or whitelist individual IP addresses, while the P2P layer is in charge of
-temporarily banning IP addresses and peers who misbehave. The delay to remove an
+block (blacklist) or enable (whitelist) individual IP addresses, while the P2P layer is in charge of
+temporarily banning (greylist) IP addresses and peers who misbehave. The delay to remove an
 IP address from the greylist table is defined by the configuration variable
 ``greylist_timeout``, while peers that are greylisted are periodically removed.
 The node administrator can also flush greylist tables with the
@@ -113,9 +113,9 @@ defined: ``target`` (min and max) and ``threshold`` (min and max).
 
 Given these bounds, the maintenance worker:
 
-* Will be triggered every two minutes, when asked by the shell, or
+* Will be triggered every two minutes, when asked by the shell, and
   when the minimum or maximum number of acceptable connections is
-  reached, whichever of these three cases happens first.
+  reached.
 
 * Will perform the following actions when triggered: if the number of
   connections is above ``max_threshold``, it will kill connections
@@ -124,5 +124,5 @@ Given these bounds, the maintenance worker:
   peers until it reaches at least ``min_target`` connections (and never
   more than ``max_target`` connections).
 
-The maintenance worker is also in charge of periodically run the
+The maintenance worker is also in charge of periodically running the
 greylists GC functions to unban IP addresses from the greylist.
