@@ -2,7 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -26,28 +25,41 @@
 
 (* Testing
    -------
-   Component: All
-   Invocation: make test-tezt
-   Subject: This file is the entrypoint of all Tezt tests. It dispatches to
-            other files.
- *)
+   Component:    P2p
+   Invocation:   make && dune exec tezt/tests/main.exe -- --file p2p.ml
+   Subject:      Integration tests of p2p layer.
+*)
 
-(* This module runs the tests implemented in all other modules of this directory.
-   Each module defines tests which are thematically related,
-   as functions to be called here. *)
+(* [wait_for_accepted_peer_ids] waits until the node connects to a peer for
+   which an expected [peer_id] was set. *)
+let wait_for_accepted_peer_ids node =
+  let filter _ = Some () in
+  Node.wait_for node "authenticate_status_peer_id_correct.v0" filter
 
-let register protocol =
-  Basic.register protocol ;
-  Bootstrap.register protocol ;
-  Synchronisation_heuristic.register protocol ;
-  Mockup.register protocol ;
-  Proxy.register protocol ;
-  Double_bake.register protocol
+(* Test.
 
-let () =
-  register Alpha ;
-  P2p.register Alpha ;
-  Bootstrap.register_protocol_independent () ;
-  Encoding.register () ;
-  (* Test.run () should be the last statement, don't register afterwards! *)
-  Test.run ()
+   We start two nodes. We connect one node with the other using the
+   `--peer` option and by setting an expected peer_id. To check that the nodes
+   are connected, we activate the protocol and check that the block 1 has been
+   propagated. *)
+let check_peer_option protocol =
+  Test.register
+    ~__FILE__
+    ~title:"check peer option"
+    ~tags:["p2p"; "cli"; "peer"]
+  @@ fun () ->
+  let* node_1 = Node.init [Synchronisation_threshold 0] in
+  let* client = Client.init ~node:node_1 () in
+  let* () = Client.activate_protocol ~protocol client in
+  let node_2 = Node.create [] in
+  let wait = wait_for_accepted_peer_ids node_2 in
+  let* () = Node.identity_generate node_2 in
+  let* () = Node.config_init node_2 [] in
+  let* () = Node.add_peer_with_id node_2 node_1 in
+  let* () = Node.run node_2 [] in
+  let* () = wait in
+  let* _ = Node.wait_for_level node_1 1
+  and* _ = Node.wait_for_level node_2 1 in
+  unit
+
+let register protocol = check_peer_option protocol
