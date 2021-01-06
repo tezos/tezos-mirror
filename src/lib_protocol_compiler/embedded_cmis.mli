@@ -31,4 +31,6 @@ val tezos_protocol_environment_sigs__V0_cmi : string
 
 val tezos_protocol_environment_sigs__V1_cmi : string
 
+val tezos_protocol_environment_sigs__V2_cmi : string
+
 val tezos_protocol_registerer__Registerer_cmi : string

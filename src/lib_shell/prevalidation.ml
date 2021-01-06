@@ -389,7 +389,7 @@ let preapply ~user_activated_upgrades ~user_activated_protocol_overrides
   >>=? (function
          | Protocol.V0 ->
              return context
-         | Protocol.V1 -> (
+         | Protocol.V1 | Protocol.V2 -> (
              State.Block.all_operations_metadata_hash predecessor
              >>= (function
                    | None

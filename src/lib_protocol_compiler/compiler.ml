@@ -94,7 +94,9 @@ let tezos_protocol_env =
     ( "Tezos_protocol_environment_sigs__V0",
       tezos_protocol_environment_sigs__V0_cmi );
     ( "Tezos_protocol_environment_sigs__V1",
-      tezos_protocol_environment_sigs__V1_cmi ) ]
+      tezos_protocol_environment_sigs__V1_cmi );
+    ( "Tezos_protocol_environment_sigs__V2",
+      tezos_protocol_environment_sigs__V2_cmi ) ]
 
 let register_env =
   let open Embedded_cmis in

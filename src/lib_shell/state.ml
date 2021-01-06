@@ -1198,7 +1198,7 @@ module Block = struct
               >|= ok
           | None -> (
             match env with
-            | V1 ->
+            | V1 | V2 ->
                 fail @@ Missing_block_metadata_hash predecessor
             | V0 ->
                 return_unit ) )
