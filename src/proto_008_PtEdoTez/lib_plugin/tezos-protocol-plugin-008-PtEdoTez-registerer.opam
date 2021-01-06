@@ -9,11 +9,11 @@ depends: [
   "tezos-tooling" { with-test }
   "dune" { >= "2.0" }
   "tezos-base"
-  "tezos-embedded-protocol-alpha"
+  "tezos-protocol-plugin-008-PtEdoTez"
   "tezos-shell"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos/Protocol: filters"
+synopsis: "Tezos/Protocol: protocol plugin registerer"
