@@ -110,7 +110,7 @@ let run (cctxt : #Protocol_client_context.rpc_context)
     ?entrypoint () =
   Chain_services.chain_id cctxt ~chain ()
   >>=? fun chain_id ->
-  Filter.RPC.run_code_normalized
+  Plugin.RPC.run_code_normalized
     cctxt
     (chain, block)
     ?gas
@@ -134,7 +134,7 @@ let trace (cctxt : #Protocol_client_context.rpc_context)
     ?entrypoint () =
   Chain_services.chain_id cctxt ~chain ()
   >>=? fun chain_id ->
-  Filter.RPC.trace_code_normalized
+  Plugin.RPC.trace_code_normalized
     cctxt
     (chain, block)
     ?gas

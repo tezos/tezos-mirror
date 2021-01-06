@@ -243,7 +243,7 @@ module RPC = struct
       (function Cannot_serialize_log_normalized -> Some () | _ -> None)
       (fun () -> Cannot_serialize_log_normalized)
 
-  let helpers_path = RPC_path.(open_root / "helpers")
+  let helpers_path = RPC_path.(open_root / "helpers" / "scripts")
 
   let contract_root =
     ( RPC_path.(open_root / "context" / "contracts")

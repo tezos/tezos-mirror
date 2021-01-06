@@ -24,9 +24,11 @@
 (*****************************************************************************)
 
 let () =
-  Prevalidator_filters.register (module Tezos_filters_alpha.Filter) ;
-  Prevalidator_filters.register (module Tezos_filters_007_PsDELPH1.Filter) ;
-  Prevalidator_filters.register (module Tezos_filters_008_PtEdoTez.Filter) ;
+  Prevalidator_filters.register (module Tezos_protocol_plugin_alpha.Plugin) ;
+  Prevalidator_filters.register
+    (module Tezos_protocol_plugin_007_PsDELPH1.Plugin) ;
+  Prevalidator_filters.register
+    (module Tezos_protocol_plugin_008_PtEdoTez.Plugin) ;
   ()
 
 (** Commands *)

@@ -304,7 +304,7 @@ let commands network () =
         let unparsing_mode =
           Option.value ~default:Script_ir_translator.Readable unparsing_mode
         in
-        Filter.RPC.get_storage_normalized
+        Plugin.RPC.get_storage_normalized
           cctxt
           (cctxt#chain, cctxt#block)
           ~contract
@@ -382,7 +382,7 @@ let commands network () =
         let unparsing_mode =
           Option.value ~default:Script_ir_translator.Readable unparsing_mode
         in
-        Filter.RPC.get_script_normalized
+        Plugin.RPC.get_script_normalized
           cctxt
           (cctxt#chain, cctxt#block)
           ~contract

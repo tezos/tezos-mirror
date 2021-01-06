@@ -12,7 +12,7 @@
             tezos-client-008-PtEdoTez
             tezos-client-commands
             tezos-rpc
-            tezos-filters-008-PtEdoTez)
+            tezos-protocol-plugin-008-PtEdoTez)
  (library_flags (:standard -linkall))
  (modules (:standard \ alpha_commands_registration))
  (flags (:standard -open Tezos_base__TzPervasives
@@ -23,7 +23,7 @@
                    -open Tezos_client_008_PtEdoTez
                    -open Tezos_client_commands
                    -open Tezos_rpc
-                   -open Tezos_filters_008_PtEdoTez)))
+                   -open Tezos_protocol_plugin_008_PtEdoTez)))
 
 (library
  (name tezos_client_008_PtEdoTez_commands_registration)
@@ -38,7 +38,7 @@
             tezos-client-008-PtEdoTez-commands
             tezos-client-sapling-008-PtEdoTez
             tezos-rpc
-            tezos-filters-008-PtEdoTez)
+            tezos-protocol-plugin-008-PtEdoTez)
  (library_flags (:standard -linkall))
  (modules alpha_commands_registration)
  (flags (:standard -open Tezos_base__TzPervasives
@@ -50,7 +50,7 @@
                    -open Tezos_client_008_PtEdoTez_commands
                    -open Tezos_client_sapling_008_PtEdoTez
                    -open Tezos_rpc
-                   -open Tezos_filters_008_PtEdoTez)))
+                   -open Tezos_protocol_plugin_008_PtEdoTez)))
 
 (rule
  (alias runtest_lint)
