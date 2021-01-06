@@ -196,3 +196,15 @@ _`Smart contract`
 _`Transaction`
     An operation_ to transfer tez between two accounts, or to run the code of a
     `smart contract`_.
+
+_`Voting period`
+    A generic term for any of the ``proposal``, ``testing_vote``, ``testing`` or
+    ``promotion_vote`` periods in the voting procedure when amending the
+    `economic protocol`_.
+
+_`Voting listings`
+    The list calculated at the beginning of each `voting period`_ that
+    contains the staking balance (in number of rolls) of each
+    delegate_ that owns at least one roll_ at that moment. The voting
+    listings reflects the weight of the vote emitted by each delegate_
+    when amending the `economic protocol`_.

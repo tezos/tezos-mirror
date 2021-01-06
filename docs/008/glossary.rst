@@ -197,12 +197,13 @@ _`Transaction`
     `smart contract`_.
 
 _`Voting period`
-    Any of the ``proposal``, ``testing_vote``, ``testing`` or ``promotion``
-    stages in the voting procedure when ammending the `economic protocol`_.
+    A generic term for any of the ``proposal``, ``testing_vote``, ``testing``,
+    ``promotion_vote`` or ``adoption`` periods in the voting procedure when
+    amending the `economic protocol`_.
 
 _`Voting listings`
-    The list calculated at the beginning of each `voting period`_ that contains
-    the staking balance (in number of rolls) of each delegate_ that owns more
-    than one roll_ at that moment. For each delegate_, The voting listings
-    reflects the weight of the vote emitted by the delegate_ when ammending the
-    `economic protocol`_.
+    The list calculated at the beginning of each `voting period`_ that
+    contains the staking balance (in number of rolls) of each
+    delegate_ that owns at least one roll_ at that moment. The voting
+    listings reflects the weight of the vote emitted by each delegate_
+    when amending the `economic protocol`_.
