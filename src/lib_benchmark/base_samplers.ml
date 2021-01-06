@@ -126,7 +126,7 @@ module Adversarial = struct
   let bytes ~range ~n state =
     if n <= 0 then invalid_arg "Base_samplers.Adversarial.bytes" ;
     let (prefix, strs) = strings ~range ~n state in
-    let p = Bytes.of_string prefix in
-    let ls = List.map Bytes.of_string strs in
+    let p = Bytes.unsafe_of_string prefix in
+    let ls = List.map Bytes.unsafe_of_string strs in
     (p, ls)
 end
