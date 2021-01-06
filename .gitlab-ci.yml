@@ -9,14 +9,14 @@
     - opam pin --no-action data-encoding .
     - opam depext data-encoding
     - opam install --deps-only data-encoding
-
-build:
-  extends: .build_template
-  stage: build
   cache:
     key: "$CI_COMMIT_REF_SLUG"
     paths:
       - _build
+
+build:
+  extends: .build_template
+  stage: build
   script:
     - dune build
 
@@ -31,9 +31,9 @@ test:
     - opam install --deps-only --with-test .
     - dune runtest
 
-documentation:
+pages:
   extends: .build_template
-  stage: documentation
+  stage: deploy
   artifacts:
     paths:
       - public/
