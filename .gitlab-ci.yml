@@ -31,14 +31,14 @@ test:
     - opam install --deps-only --with-test .
     - dune runtest
 
-pages:
+documentation:
   extends: .build_template
-  stage: deploy
+  stage: documentation
   artifacts:
     paths:
       - public/
-        #  only:
-        #    - master
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master"'
   script:
     - opam install odoc
     - dune build @doc
