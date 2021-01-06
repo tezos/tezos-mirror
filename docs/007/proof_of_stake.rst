@@ -220,13 +220,17 @@ around.
 Roll snapshots
 ~~~~~~~~~~~~~~
 
-Roll snapshots represent the state of rolls for a given block. Roll
-snapshots are taken every ``BLOCKS_PER_ROLL_SNAPSHOT`` = 256 blocks,
-which is 16 times per cycle. There is a tradeoff between memory
-consumption and economic efficiency. If roll snapshots are too frequent,
-they will consume a lot of memory. If they are too rare, strategic
-participants could purchase many tokens in anticipation of a snapshot
-and resell them right after.
+Roll snapshots represent the state of rolls for a given block.  Roll
+snapshots are taken at each level whose position within the cycle is
+one unit less than a multiple of ``BLOCKS_PER_ROLL_SNAPSHOT`` = 256;
+that is, at levels with cycle position 255, 511, ..., 4095.  Roll
+snapshots are therefore taken 16 times per cycle.
+
+There is a tradeoff between memory consumption and economic
+efficiency. If roll snapshots are too frequent, they will consume a
+lot of memory. If they are too rare, strategic participants could
+purchase many tokens in anticipation of a snapshot and resell them
+right after.
 
 Baking
 ~~~~~~
