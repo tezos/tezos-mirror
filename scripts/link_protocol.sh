@@ -133,9 +133,6 @@ duplicate_and_replace_only_1_occ -${pattern} -${replacement} \
                                  src/bin_node/dune
 duplicate_and_replace -${pattern} -${replacement} \
                       src/bin_node/tezos-node.opam
-duplicate_and_replace $(echo $pattern | sed 's/-/_/') \
-                      $(echo $replacement | sed 's/-/_/') \
-                      src/bin_node/node_config_command.ml
 duplicate_and_replace -${pattern} -${replacement} \
                       src/bin_validation/{dune,tezos-validator.opam}
 

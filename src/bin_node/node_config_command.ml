@@ -24,14 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let () =
-  Prevalidator_filters.register (module Tezos_protocol_plugin_alpha.Plugin) ;
-  Prevalidator_filters.register
-    (module Tezos_protocol_plugin_007_PsDELPH1.Plugin) ;
-  Prevalidator_filters.register
-    (module Tezos_protocol_plugin_008_PtEdoTez.Plugin) ;
-  ()
-
 (** Commands *)
 
 let show (args : Node_shared_arg.t) =

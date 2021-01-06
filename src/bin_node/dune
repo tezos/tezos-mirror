@@ -68,13 +68,15 @@
             (select void_for_linking-008-PtEdoTez from
               (tezos-embedded-protocol-008-PtEdoTez -> void_for_linking-008-PtEdoTez.empty)
               (-> void_for_linking-008-PtEdoTez.empty))
-            (select void_for_linking-007-PsDELPH1-protocol-plugin from
-              (tezos-protocol-plugin-007-PsDELPH1 -> void_for_linking-007-PsDELPH1-protocol-plugin.empty)
-              (-> void_for_linking-007-PsDELPH1-protocol-plugin.empty))
-            (select void_for_linking-008-PtEdoTez-protocol-plugin from
-              (tezos-protocol-plugin-008-PtEdoTez -> void_for_linking-008-PtEdoTez-protocol-plugin.empty)
-              (-> void_for_linking-008-PtEdoTez-protocol-plugin.empty))
-             tezos-protocol-plugin-alpha
+            (select void_for_linking-007-PsDELPH1-protocol-plugin-registerer from
+              (tezos-protocol-plugin-007-PsDELPH1-registerer -> void_for_linking-007-PsDELPH1-protocol-plugin-registerer.empty)
+              (-> void_for_linking-007-PsDELPH1-protocol-plugin-registerer.empty))
+            (select void_for_linking-008-PtEdoTez-protocol-plugin-registerer from
+              (tezos-protocol-plugin-008-PtEdoTez-registerer -> void_for_linking-008-PtEdoTez-protocol-plugin-registerer.empty)
+              (-> void_for_linking-008-PtEdoTez-protocol-plugin-registerer.empty))
+            (select void_for_linking-alpha-protocol-plugin-registerer from
+              (tezos-protocol-plugin-alpha-registerer -> void_for_linking-alpha-protocol-plugin-registerer.empty)
+              (-> void_for_linking-alpha-protocol-plugin-registerer.empty))
              cmdliner
              tls
              lwt-exit)
@@ -111,8 +113,9 @@
    (write-file void_for_linking-006-PsCARTHA.empty "")
    (write-file void_for_linking-007-PsDELPH1.empty "")
    (write-file void_for_linking-008-PtEdoTez.empty "")
-   (write-file void_for_linking-007-PsDELPH1-protocol-plugin.empty "")
-   (write-file void_for_linking-008-PtEdoTez-protocol-plugin.empty "")
+   (write-file void_for_linking-alpha-protocol-plugin-registerer.empty "")
+   (write-file void_for_linking-007-PsDELPH1-protocol-plugin-registerer.empty "")
+   (write-file void_for_linking-008-PtEdoTez-protocol-plugin-registerer.empty "")
 )))
 
 (install
