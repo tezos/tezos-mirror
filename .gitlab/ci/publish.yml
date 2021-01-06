@@ -1,4 +1,4 @@
-.build_release_template:
+.build_docker_release_template:
   image: docker:latest
   services:
     - docker:dind
@@ -26,7 +26,7 @@
   interruptible: false
 
 build_release:docker_amd64:
-  extends: .build_release_template
+  extends: .build_docker_release_template
   variables:
     DOCKER_DRIVER: overlay2
     IMAGE_ARCH_PREFIX: "amd64-"
@@ -34,14 +34,14 @@ build_release:docker_amd64:
     - safe_docker
 
 build_release:docker_arm64:
-  extends: .build_release_template
+  extends: .build_docker_release_template
   variables:
     DOCKER_DRIVER: overlay2
     IMAGE_ARCH_PREFIX: "arm64-"
   tags:
     - arm64
 
-build_release:static-x86-linux-binaries:
+.build_static_binaries_template:
   stage: build_release
   image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
   rules:
@@ -51,8 +51,8 @@ build_release:static-x86-linux-binaries:
       when: on_success
     - if: '$CI_COMMIT_TAG != null'
       when: on_success
-  script:
-    - sudo apk --no-cache --virtual add unzip wget eudev-dev autoconf automake libtool linux-headers upx binutils
+  before_script:
+    - sudo apk --no-cache --virtual add unzip wget eudev-dev autoconf automake libtool linux-headers binutils
     # TODO: include static version of this libraries to the default docker image
     - packaging/build/build-libusb-and-hidapi.sh
     # TODO: patch approach is very fragile, we should think about something
@@ -62,13 +62,62 @@ build_release:static-x86-linux-binaries:
     - dune install --prefix install_root
     # Strip debug symbols in binaries
     - find . -maxdepth 1 -type f ! -name "*.*" -exec strip --strip-debug {} \;
-    # Compress resulting binaries
-    - find . -maxdepth 1 -type f ! -name "*.*" -exec upx {} \;
   artifacts:
     paths:
       - install_root/bin/*
 
-release-static-binaries:
+build_release:static-x86_64-linux-binaries:
+  extends: .build_static_binaries_template
+  script:
+    - sudo apk --no-cache --virtual add upx
+    # Compress resulting binaries
+    - find . -maxdepth 1 -type f ! -name "*.*" -exec upx {} \;
+
+build_release:static-arm64-linux-binaries:
+  extends: .build_static_binaries_template
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master" && $CI_PROJECT_NAMESPACE == "tezos"'
+      when: on_success
+    - if: '$CI_COMMIT_BRANCH =~ /-release$/ && $CI_PROJECT_NAMESPACE == "tezos"'
+      when: on_success
+    - if: '$CI_COMMIT_TAG != null && $CI_PROJECT_NAMESPACE == "tezos"'
+      when: on_success
+  script:
+    - echo "No compression for now"
+  tags:
+    - arm64
+
+.release_static_binaries_template:
+  image: registry.gitlab.com/gitlab-org/release-cli
+  variables:
+    ARCH_PREFIX: ""
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /\A\d+\.\d+\.\d+\z/ && $CI_PROJECT_NAMESPACE == "tezos"'
+      when: on_success
+  variables:
+    PACKAGE_REGISTRY_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/tezos/${CI_COMMIT_TAG}"
+  stage: publish_release
+  script:
+    - apk --no-cache --virtual add bash jq curl
+    - scripts/release/upload-static-binaries-to-package-registry.sh "$ARCH_PREFIX"
+
+release-static-x86_64-binaries:
+  extends: .release_static_binaries_template
+  variables:
+    ARCH_PREFIX: "x86_64-"
+  dependencies:
+    - build_release:static-x86_64-linux-binaries
+
+release-static-arm64-binaries:
+  extends: .release_static_binaries_template
+  variables:
+    ARCH_PREFIX: "arm64-"
+  dependencies:
+    - build_release:static-arm64-linux-binaries
+  tags:
+    - arm64
+
+release-on-gitlab:
   image: registry.gitlab.com/gitlab-org/release-cli
   rules:
     - if: '$CI_COMMIT_TAG =~ /\A\d+\.\d+\.\d+\z/ && $CI_PROJECT_NAMESPACE == "tezos"'
@@ -76,12 +125,8 @@ release-static-binaries:
   variables:
     PACKAGE_REGISTRY_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/tezos/${CI_COMMIT_TAG}"
   stage: publish_release
-  dependencies:
-    - build_release:static-x86-linux-binaries
   script:
     - apk --no-cache --virtual add bash jq
-    - apk --no-cache --virtual add bash jq curl
-    - scripts/release/upload-static-binaries-to-package-registry.sh
     - scripts/release/create-release-with-static-binaries.sh
 
 merge-manifest:
