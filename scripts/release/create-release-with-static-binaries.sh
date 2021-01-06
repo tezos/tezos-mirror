@@ -6,14 +6,22 @@ set -euo pipefail
 
 assets=()
 for binary in "${binaries[@]}"; do
-    asset_json="$(jq -n --arg name "$binary" \
-                        --arg url "$PACKAGE_REGISTRY_URL/$binary" \
+    asset_json="$(jq -n --arg name "$binary (x86_64 Linux)" \
+                        --arg url "$PACKAGE_REGISTRY_URL/x86_64-$binary" \
+                        '{name: $name, url: $url}')"
+    assets+=("--assets-link=$asset_json")
+    asset_json="$(jq -n --arg name "$binary (arm64 Linux)" \
+                        --arg url "$PACKAGE_REGISTRY_URL/arm64-$binary" \
                         '{name: $name, url: $url}')"
     assets+=("--assets-link=$asset_json")
 done
 
-archive_url="$(jq -n --arg name "tezos-binaries.tar.gz" \
-                     --arg url "$PACKAGE_REGISTRY_URL/tezos-binaries.tar.gz" \
+archive_url="$(jq -n --arg name "x86_64-linux-tezos-binaries.tar.gz" \
+                     --arg url "$PACKAGE_REGISTRY_URL/x86_64-tezos-binaries.tar.gz" \
+                     '{name: $name, url: $url}')"
+assets+=("--assets-link=$archive_url")
+archive_url="$(jq -n --arg name "arm64-linux-tezos-binaries.tar.gz" \
+                     --arg url "$PACKAGE_REGISTRY_URL/arm64-tezos-binaries.tar.gz" \
                      '{name: $name, url: $url}')"
 assets+=("--assets-link=$archive_url")
 
