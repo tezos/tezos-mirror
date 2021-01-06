@@ -40,7 +40,7 @@ let range_encoding =
 
 let sample_in_interval ~range:{min; max} state =
   if max - min >= 0 then min + Random.State.int state (max - min + 1)
-  else invalid_arg "sample_in_interval"
+  else invalid_arg "Base_samplers.sample_in_interval"
 
 let uniform_bool = Random.State.bool
 
@@ -48,10 +48,9 @@ let uniform_byte state = Char.chr (Random.State.int state 256)
 
 let uniform_partial_byte ~nbits state =
   if nbits < 1 || nbits > 8 then
-    Stdlib.failwith "uniform_partial_byte: invalid argument"
-  else
-    let i = Random.State.int state 256 in
-    Char.chr (i lsr (8 - nbits))
+    invalid_arg "Base_samplers.uniform_partial_byte" ;
+  let i = Random.State.int state 256 in
+  Char.chr (i lsr (8 - nbits))
 
 let uniform_string ~nbytes state =
   String.init nbytes (fun _ -> uniform_byte state)
@@ -70,6 +69,7 @@ let nat ~range state =
   uniform_nat state ~nbytes
 
 let int ~range state =
+  if range.min < 0 then invalid_arg "Base_samplers.int" ;
   let nat = nat state ~range in
   let s = Random.State.bool state in
   if s then nat else Z.neg nat
@@ -80,14 +80,17 @@ let uniform_readable_ascii state =
   Char.chr (33 + i)
 
 let readable_ascii_string ~range state =
+  if range.min < 0 then invalid_arg "Base_samplers.readable_ascii_string" ;
   let nbytes = sample_in_interval state ~range in
   String.escaped (String.init nbytes (fun _ -> uniform_byte state))
 
 let string ~range state =
+  if range.min < 0 then invalid_arg "Base_samplers.string" ;
   let nbytes = sample_in_interval state ~range in
   uniform_string state ~nbytes
 
 let bytes ~range state =
+  if range.min < 0 then invalid_arg "Base_samplers.bytes" ;
   let nbytes = sample_in_interval state ~range in
   uniform_bytes state ~nbytes
 
@@ -105,6 +108,7 @@ module Adversarial = struct
   (* Adversarial Z.t *)
   let integers ~range ~n state =
     if n <= 0 then invalid_arg "Base_samplers.Adversarial.integers" ;
+    if range.min < 0 then invalid_arg "Base_samplers.Adversarial.integers" ;
     let common_prefix = string state ~range in
     let rand_suffix = salt state n in
     let elements =
@@ -115,6 +119,7 @@ module Adversarial = struct
   (* Adversarial strings *)
   let strings ~range ~n state =
     if n <= 0 then invalid_arg "Base_samplers.Adversarial.strings" ;
+    if range.min < 0 then invalid_arg "Base_samplers.Adversarial.strings" ;
     let common_prefix = string state ~range in
     let rand_suffix = salt state n in
     let elements =
@@ -125,6 +130,7 @@ module Adversarial = struct
   (* Adversarial bytes *)
   let bytes ~range ~n state =
     if n <= 0 then invalid_arg "Base_samplers.Adversarial.bytes" ;
+    if range.min < 0 then invalid_arg "Base_samplers.Adversarial.bytes" ;
     let (prefix, strs) = strings ~range ~n state in
     let p = Bytes.unsafe_of_string prefix in
     let ls = List.map Bytes.unsafe_of_string strs in

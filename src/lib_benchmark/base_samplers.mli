@@ -33,47 +33,74 @@ type range = {min : int; max : int}
 
 val range_encoding : range Data_encoding.t
 
-(** [sample_in_interval ~range] creates a sampler in the specified interval. *)
+(** [sample_in_interval ~range] creates a sampler in the specified interval.
+    @raise [Invalid_argument] if [range.max < range.min].
+ *)
 val sample_in_interval : range:range -> int sampler
 
 (** Samples a boolean uniformly at random *)
 val uniform_bool : bool sampler
 
-(** Samples the specified number of bits uniformly at random. *)
+(** Samples the specified number of bits uniformly at random.
+    @raise [Invalid_argument] if [nbits < 1 || nbits > 8].
+ *)
 val uniform_partial_byte : nbits:int -> char sampler
 
-(** Samples a string of length [nbytes] uniformly at random. *)
+(** Samples a string of length [nbytes] uniformly at random.
+    @raise [Invalid_argument] if [nbytes < 0].
+ *)
 val uniform_string : nbytes:int -> string sampler
 
-(** Samples bytes of length [nbytes] uniformly at random. *)
+(** Samples bytes of length [nbytes] uniformly at random.
+    @raise [Invalid_argument] if [nbytes < 0].
+ *)
 val uniform_bytes : nbytes:int -> bytes sampler
 
 (** Samples a non-negative big integer stored on [nbytes] bytes,
-    uniformly at random (modulo trailing zeroes) *)
+    uniformly at random (modulo trailing zeroes).
+    @raise [Invalid_argument] if [nbytes < 0].
+ *)
 val uniform_nat : nbytes:int -> Z.t sampler
 
 (** Samples a big integer stored on [nbytes] bytes, uniformly at
-    random (modulo trailing zeroes) *)
+    random (modulo trailing zeroes).
+    @raise [Invalid_argument] if [nbytes < 0].
+ *)
 val uniform_int : nbytes:int -> Z.t sampler
 
 (** Samples a size in bytes uniformly in [range] and then
-    samples a uniform non-negative big integer of this size.  *)
+    samples a uniform non-negative big integer of this size.
+    @raise [Invalid_argument] if [range.max < range.min]
+    or if [range.min < 0].
+ *)
 val nat : range:range -> Z.t sampler
 
 (** Samples a size in bytes uniformly in [range] and then
-    samples a uniform big integer of this size.  *)
+    samples a uniform big integer of this size.
+    @raise [Invalid_argument] if [range.max < range.min]
+    or if [range.min < 0].
+ *)
 val int : range:range -> Z.t sampler
 
 (** Samples a readable character. *)
 val uniform_readable_ascii : char sampler
 
-(** Samples a readable string with length sampled uniformly in [range]. *)
+(** Samples a readable string with length sampled uniformly in [range].
+    @raise [Invalid_argument] if [range.max < range.min]
+    or if [range.min < 0].
+ *)
 val readable_ascii_string : range:range -> string sampler
 
-(** Samples a string with length sampled uniformly in [range]. *)
+(** Samples a string with length sampled uniformly in [range].
+    @raise [Invalid_argument] if [range.max < range.min]
+    or if [range.min < 0].
+ *)
 val string : range:range -> string sampler
 
-(** Samples bytes with length sampled uniformly in [range]. *)
+(** Samples bytes with length sampled uniformly in [range].
+    @raise [Invalid_argument] if [range.max < range.min]
+    or if [range.min < 0].
+ *)
 val bytes : range:range -> bytes sampler
 
 (** Sampling of "adversarial" values in the sense that they exhibit the
@@ -82,6 +109,9 @@ val bytes : range:range -> bytes sampler
     These samplers generate pairs of a common prefix that has a size
     uniformly sampled in [range], and a list of [n] distinct (with high-probability)
     elements sharing this common prefix.
+
+    @raise [Invalid_argument] if [range.max < range.min]
+    or if [range.min < 0] or of [n <= 0].
  *)
 module Adversarial : sig
   val integers : range:range -> n:int -> (Z.t * Z.t list) sampler
