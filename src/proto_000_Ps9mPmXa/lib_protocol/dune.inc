@@ -95,11 +95,11 @@ include Tezos_raw_protocol_000_Ps9mPmXa.Main
 
 (library
  (name tezos_protocol_000_Ps9mPmXa_functor)
- (public_name tezos-protocol-000-Ps9mPmXa.functor)
+ (public_name tezos-protocol-functor-000-Ps9mPmXa)
  (libraries
       tezos-protocol-environment
       tezos-protocol-environment-sigs
-      tezos_raw_protocol_000_Ps9mPmXa)
+      tezos-protocol-000-Ps9mPmXa.raw)
  (flags -w "+a-4-6-7-9-29-40..42-44-45-48-60-67"
         -warn-error "+a"
         -nopervasives)

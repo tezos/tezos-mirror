@@ -387,11 +387,11 @@ include Tezos_raw_protocol_alpha.Main
 
 (library
  (name tezos_protocol_alpha_functor)
- (public_name tezos-protocol-alpha.functor)
+ (public_name tezos-protocol-functor-alpha)
  (libraries
       tezos-protocol-environment
       tezos-protocol-environment-sigs
-      tezos_raw_protocol_alpha)
+      tezos-protocol-alpha.raw)
  (flags -w "+a-4-6-7-9-29-40..42-44-45-48-60-67"
         -warn-error "+a"
         -nopervasives)

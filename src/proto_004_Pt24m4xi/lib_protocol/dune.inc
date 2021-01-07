@@ -355,11 +355,11 @@ include Tezos_raw_protocol_004_Pt24m4xi.Main
 
 (library
  (name tezos_protocol_004_Pt24m4xi_functor)
- (public_name tezos-protocol-004-Pt24m4xi.functor)
+ (public_name tezos-protocol-functor-004-Pt24m4xi)
  (libraries
       tezos-protocol-environment
       tezos-protocol-environment-sigs
-      tezos_raw_protocol_004_Pt24m4xi)
+      tezos-protocol-004-Pt24m4xi.raw)
  (flags -w "+a-4-6-7-9-29-40..42-44-45-48-60-67"
         -warn-error "+a"
         -nopervasives)

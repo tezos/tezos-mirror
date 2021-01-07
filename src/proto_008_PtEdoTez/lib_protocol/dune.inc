@@ -387,11 +387,11 @@ include Tezos_raw_protocol_008_PtEdoTez.Main
 
 (library
  (name tezos_protocol_008_PtEdoTez_functor)
- (public_name tezos-protocol-008-PtEdoTez.functor)
+ (public_name tezos-protocol-functor-008-PtEdoTez)
  (libraries
       tezos-protocol-environment
       tezos-protocol-environment-sigs
-      tezos_raw_protocol_008_PtEdoTez)
+      tezos-protocol-008-PtEdoTez.raw)
  (flags -w "+a-4-6-7-9-29-40..42-44-45-48-60-67"
         -warn-error "+a"
         -nopervasives)

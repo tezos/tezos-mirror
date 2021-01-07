@@ -95,11 +95,11 @@ include Tezos_raw_protocol_genesis_carthagenet.Main
 
 (library
  (name tezos_protocol_genesis_carthagenet_functor)
- (public_name tezos-protocol-genesis-carthagenet.functor)
+ (public_name tezos-protocol-functor-genesis-carthagenet)
  (libraries
       tezos-protocol-environment
       tezos-protocol-environment-sigs
-      tezos_raw_protocol_genesis_carthagenet)
+      tezos-protocol-genesis-carthagenet.raw)
  (flags -w "+a-4-6-7-9-29-40..42-44-45-48-60-67"
         -warn-error "+a"
         -nopervasives)

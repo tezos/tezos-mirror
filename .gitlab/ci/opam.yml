@@ -666,6 +666,81 @@ opam:tezos-protocol-environment-structs:
   variables:
     package: tezos-protocol-environment-structs
 
+opam:tezos-protocol-functor-000-Ps9mPmXa:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-functor-000-Ps9mPmXa
+
+opam:tezos-protocol-functor-001-PtCJ7pwo:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-functor-001-PtCJ7pwo
+
+opam:tezos-protocol-functor-002-PsYLVpVv:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-functor-002-PsYLVpVv
+
+opam:tezos-protocol-functor-003-PsddFKi3:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-functor-003-PsddFKi3
+
+opam:tezos-protocol-functor-004-Pt24m4xi:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-functor-004-Pt24m4xi
+
+opam:tezos-protocol-functor-005-PsBABY5H:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-functor-005-PsBABY5H
+
+opam:tezos-protocol-functor-005-PsBabyM1:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-functor-005-PsBabyM1
+
+opam:tezos-protocol-functor-006-PsCARTHA:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-functor-006-PsCARTHA
+
+opam:tezos-protocol-functor-007-PsDELPH1:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-functor-007-PsDELPH1
+
+opam:tezos-protocol-functor-008-PtEdoTez:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-functor-008-PtEdoTez
+
+opam:tezos-protocol-functor-alpha:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-functor-alpha
+
+opam:tezos-protocol-functor-demo-counter:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-functor-demo-counter
+
+opam:tezos-protocol-functor-demo-noops:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-functor-demo-noops
+
+opam:tezos-protocol-functor-genesis:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-functor-genesis
+
+opam:tezos-protocol-functor-genesis-carthagenet:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-functor-genesis-carthagenet
+
 opam:tezos-protocol-genesis:
   extends: .opam_template
   variables:

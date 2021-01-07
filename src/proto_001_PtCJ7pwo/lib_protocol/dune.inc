@@ -351,11 +351,11 @@ include Tezos_raw_protocol_001_PtCJ7pwo.Main
 
 (library
  (name tezos_protocol_001_PtCJ7pwo_functor)
- (public_name tezos-protocol-001-PtCJ7pwo.functor)
+ (public_name tezos-protocol-functor-001-PtCJ7pwo)
  (libraries
       tezos-protocol-environment
       tezos-protocol-environment-sigs
-      tezos_raw_protocol_001_PtCJ7pwo)
+      tezos-protocol-001-PtCJ7pwo.raw)
  (flags -w "+a-4-6-7-9-29-40..42-44-45-48-60-67"
         -warn-error "+a"
         -nopervasives)

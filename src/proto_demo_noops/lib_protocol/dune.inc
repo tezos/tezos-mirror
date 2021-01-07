@@ -87,11 +87,11 @@ include Tezos_raw_protocol_demo_noops.Main
 
 (library
  (name tezos_protocol_demo_noops_functor)
- (public_name tezos-protocol-demo-noops.functor)
+ (public_name tezos-protocol-functor-demo-noops)
  (libraries
       tezos-protocol-environment
       tezos-protocol-environment-sigs
-      tezos_raw_protocol_demo_noops)
+      tezos-protocol-demo-noops.raw)
  (flags -w "+a-4-6-7-9-29-40..42-44-45-48-60-67"
         -warn-error "+a"
         -nopervasives)

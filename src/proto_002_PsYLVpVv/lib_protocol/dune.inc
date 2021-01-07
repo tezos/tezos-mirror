@@ -351,11 +351,11 @@ include Tezos_raw_protocol_002_PsYLVpVv.Main
 
 (library
  (name tezos_protocol_002_PsYLVpVv_functor)
- (public_name tezos-protocol-002-PsYLVpVv.functor)
+ (public_name tezos-protocol-functor-002-PsYLVpVv)
  (libraries
       tezos-protocol-environment
       tezos-protocol-environment-sigs
-      tezos_raw_protocol_002_PsYLVpVv)
+      tezos-protocol-002-PsYLVpVv.raw)
  (flags -w "+a-4-6-7-9-29-40..42-44-45-48-60-67"
         -warn-error "+a"
         -nopervasives)
