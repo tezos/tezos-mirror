@@ -770,11 +770,12 @@ let undefined_case : type a. a case =
 
 let is_undefined_case c = c == undefined_case
 
-let check_tagged_cases tag_size tagged_cases =
-  let max_tag = match tag_size with `Uint8 -> 256 | `Uint16 -> 256 * 256 in
+let check_tagged_cases tagged_cases =
   let max_used_tag =
     List.fold_left
-      (fun m -> function Case {tag = Tag t; _} -> max t m | _ -> m)
+      (fun m (Case {tag; _}) ->
+        match tag with Tag t -> max t m | Json_only -> assert false
+        (* By union's call to List.filter. *))
       (-1)
       tagged_cases
   in
@@ -784,10 +785,8 @@ let check_tagged_cases tag_size tagged_cases =
       | Case {tag; _} as case -> (
         match tag with
         | Json_only ->
-            assert false (* By union's call to List.partition. *)
+            assert false (* By union's call to List.filter. *)
         | Tag tag ->
-            if tag < 0 || max_tag <= tag then
-              Format.kasprintf invalid_arg "The tag %d is invalid." tag ;
             if not (is_undefined_case tagged_cases'.(tag)) then
               Format.kasprintf
                 invalid_arg
@@ -800,10 +799,20 @@ let check_tagged_cases tag_size tagged_cases =
 let union ?(tag_size = `Uint8) cases =
   if cases = [] then invalid_arg "Data_encoding.union: empty list of cases."
   else
+    let max_tag = match tag_size with `Uint8 -> 256 | `Uint16 -> 256 * 256 in
     let tagged_cases =
-      List.filter (fun (Case {tag; _}) -> tag <> Json_only) cases
+      List.filter
+        (fun (Case {tag; _}) ->
+          match tag with
+          | Tag t ->
+              if t < 0 || max_tag <= t then
+                Format.kasprintf invalid_arg "The tag %d is invalid." t ;
+              true
+          | Json_only ->
+              false)
+        cases
     in
-    let tagged_cases = check_tagged_cases tag_size tagged_cases in
+    let tagged_cases = check_tagged_cases tagged_cases in
     let classify_case (Case {encoding; _}) = classify encoding in
     let kinds = List.map classify_case cases in
     let kind = Kind.merge_list tag_size kinds in
