@@ -1358,6 +1358,81 @@ opam:tezos-protocol-environment-structs:
   variables:
     package: tezos-protocol-environment-structs
 
+opam:tezos-protocol-functor-000-Ps9mPmXa:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-functor-000-Ps9mPmXa
+
+opam:tezos-protocol-functor-001-PtCJ7pwo:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-functor-001-PtCJ7pwo
+
+opam:tezos-protocol-functor-002-PsYLVpVv:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-functor-002-PsYLVpVv
+
+opam:tezos-protocol-functor-003-PsddFKi3:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-functor-003-PsddFKi3
+
+opam:tezos-protocol-functor-004-Pt24m4xi:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-functor-004-Pt24m4xi
+
+opam:tezos-protocol-functor-005-PsBABY5H:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-functor-005-PsBABY5H
+
+opam:tezos-protocol-functor-005-PsBabyM1:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-functor-005-PsBabyM1
+
+opam:tezos-protocol-functor-006-PsCARTHA:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-functor-006-PsCARTHA
+
+opam:tezos-protocol-functor-007-PsDELPH1:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-functor-007-PsDELPH1
+
+opam:tezos-protocol-functor-008-PtEdoTez:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-functor-008-PtEdoTez
+
+opam:tezos-protocol-functor-alpha:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-functor-alpha
+
+opam:tezos-protocol-functor-demo-counter:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-functor-demo-counter
+
+opam:tezos-protocol-functor-demo-noops:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-functor-demo-noops
+
+opam:tezos-protocol-functor-genesis:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-functor-genesis
+
+opam:tezos-protocol-functor-genesis-carthagenet:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-functor-genesis-carthagenet
+
 opam:tezos-protocol-genesis:
   <<: *opam_definition
   variables:

@@ -79,11 +79,11 @@ include Tezos_raw_protocol_%%LIB_VERSION%%.Main
 
 (library
  (name tezos_protocol_%%LIB_VERSION%%_functor)
- (public_name tezos-protocol-%%VERSION%%.functor)
+ (public_name tezos-protocol-functor-%%VERSION%%)
  (libraries
       tezos-protocol-environment
       tezos-protocol-environment-sigs
-      tezos_raw_protocol_%%LIB_VERSION%%)
+      tezos-protocol-%%VERSION%%.raw)
  (flags -w "+a-4-6-7-9-29-40..42-44-45-48-60-67"
         -warn-error "+a"
         -nopervasives)

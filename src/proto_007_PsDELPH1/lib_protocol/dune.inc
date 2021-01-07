@@ -367,11 +367,11 @@ include Tezos_raw_protocol_007_PsDELPH1.Main
 
 (library
  (name tezos_protocol_007_PsDELPH1_functor)
- (public_name tezos-protocol-007-PsDELPH1.functor)
+ (public_name tezos-protocol-functor-007-PsDELPH1)
  (libraries
       tezos-protocol-environment
       tezos-protocol-environment-sigs
-      tezos_raw_protocol_007_PsDELPH1)
+      tezos-protocol-007-PsDELPH1.raw)
  (flags -w "+a-4-6-7-9-29-40..42-44-45-48-60-67"
         -warn-error "+a"
         -nopervasives)

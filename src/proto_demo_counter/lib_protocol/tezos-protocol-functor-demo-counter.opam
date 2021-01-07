@@ -7,17 +7,18 @@ dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "dune" { >= "2.0" }
+  "tezos-protocol-demo-counter"
   "tezos-protocol-compiler"
 ]
 build: [
-  [
-    "%{tezos-protocol-compiler:lib}%/replace"
+  [ "%{tezos-protocol-compiler:lib}%/replace"
     "%{tezos-protocol-compiler:lib}%/dune_protocol.template"
     "dune"
     "%{tezos-protocol-compiler:lib}%/final_protocol_versions"
-    "007_PsDELPH1"
-  ]
-  ["dune" "build" "-p" name "-j" jobs]
-  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
+    "demo_counter" ]
+  [ "dune" "build" "-p" name "-j" jobs ]
 ]
-synopsis: "Tezos/Protocol: economic-protocol definition"
+run-test: [
+  [ "dune" "runtest" "-p" name "-j" jobs ]
+]
+synopsis: "Tezos/Protocol: demo_counter (economic-protocol definition parameterized by its environment implementation)"

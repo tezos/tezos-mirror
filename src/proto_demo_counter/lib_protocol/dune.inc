@@ -119,11 +119,11 @@ include Tezos_raw_protocol_demo_counter.Main
 
 (library
  (name tezos_protocol_demo_counter_functor)
- (public_name tezos-protocol-demo-counter.functor)
+ (public_name tezos-protocol-functor-demo-counter)
  (libraries
       tezos-protocol-environment
       tezos-protocol-environment-sigs
-      tezos_raw_protocol_demo_counter)
+      tezos-protocol-demo-counter.raw)
  (flags -w "+a-4-6-7-9-29-40..42-44-45-48-60-67"
         -warn-error "+a"
         -nopervasives)

@@ -355,11 +355,11 @@ include Tezos_raw_protocol_003_PsddFKi3.Main
 
 (library
  (name tezos_protocol_003_PsddFKi3_functor)
- (public_name tezos-protocol-003-PsddFKi3.functor)
+ (public_name tezos-protocol-functor-003-PsddFKi3)
  (libraries
       tezos-protocol-environment
       tezos-protocol-environment-sigs
-      tezos_raw_protocol_003_PsddFKi3)
+      tezos-protocol-003-PsddFKi3.raw)
  (flags -w "+a-4-6-7-9-29-40..42-44-45-48-60-67"
         -warn-error "+a"
         -nopervasives)

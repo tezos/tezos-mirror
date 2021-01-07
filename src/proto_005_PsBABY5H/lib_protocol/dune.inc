@@ -359,11 +359,11 @@ include Tezos_raw_protocol_005_PsBABY5H.Main
 
 (library
  (name tezos_protocol_005_PsBABY5H_functor)
- (public_name tezos-protocol-005-PsBABY5H.functor)
+ (public_name tezos-protocol-functor-005-PsBABY5H)
  (libraries
       tezos-protocol-environment
       tezos-protocol-environment-sigs
-      tezos_raw_protocol_005_PsBABY5H)
+      tezos-protocol-005-PsBABY5H.raw)
  (flags -w "+a-4-6-7-9-29-40..42-44-45-48-60-67"
         -warn-error "+a"
         -nopervasives)
