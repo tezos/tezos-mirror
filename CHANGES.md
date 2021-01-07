@@ -1,3 +1,29 @@
+# Version 8.1
+
+## Node
+
+- Mind the previously forgotten item about snapshots in the section
+  "Version 8.0rc2 > Node"
+
+- Fix a performance regression affecting serialization of tz3
+  signatures by reverting the P256 implementation to `uecc`.
+
+- Fixup allowing nodes in `--history-mode full` to answer to all new
+  messages to the distributed database protocol.
+
+## Client
+
+- As a consequence of moving back to `uecc`, revert for now the
+  ability to sign with tz3 addresses.
+
+## Miscellaneous
+
+- Allow building from sources with older version of git (used to
+  require 2.18)
+
+- Downgrade `mirage-crypto` dependency to avoid failure on startup
+  with `illegal instruction` on some hardware.
+
 # Version 8.0
 
 ## Node
@@ -28,6 +54,12 @@
 
 ## Node
 
+- Snapshots exported by a node using version 8 cannot be imported by a
+  node running version 7. This is because the new snapshots contain
+  additional information required by protocol Edo. On the other hand,
+  snapshots exported by a node using version 7 can be imported by a
+  node running version 8.
+
 - Added a new version (version 1) of the protocol environment.
   The environment is the set of functions and types that the economic protocol can use.
   Protocols up to Delphi used environment version 0.
@@ -44,8 +76,8 @@
 
 - The bootstrap pipeline no longer tries to concurrently download
   steps from other peers. The result is actually a more efficient
-  bootstrap, because those concurrent downloads resulted in the same
-  block headers being attempted to be downloaded several times. It
+  bootstrap, because those concurrent downloads resulted in multiple
+  attempts to download the same block headers. It
   also resulted in more memory usage than necessary.
 
 - Added six messages to the distributed database protocol and bumped
@@ -69,6 +101,9 @@
   was explicitely specified while the synchronisation threshold itself
   was not specified.
 
+- Added RPC `DELETE /network/greylist` to clear the greylist tables.
+  RPC `GET /network/greylist/clear` is now deprecated.
+
 ## Client
 
 - Added client command `import keys from mnemonic`, which allows to
@@ -85,7 +120,8 @@
   the `<DLGT>` field.
 
 - Fixed the `rpc` command that did not use the full path of the URL provided to `--endpoint`.
-  For instance, `--endpoint http://localhost:8732/node/rpc` actually meant
+  Before this, `--endpoint http://localhost:8732/node/rpc` would have been
+  equivalent to
   `--endpoint http://localhost:8732`.
 
 - Fixed an issue where the client would try to sign with a key for which
