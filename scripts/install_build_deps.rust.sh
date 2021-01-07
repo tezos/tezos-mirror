@@ -34,7 +34,9 @@ if ! [[ "$(rustc --version | cut -d' ' -f2)" == *"$rust_version"* ]]; then
     echo "\
 Wrong Rust version, run the following commands in your favorite shell:
 $ rustup toolchain install $rust_version
-$ rustup override set $rust_version"
+$ rustup override set $rust_version
+or force it by setting the variable RUST_VERSION to your installed version
+if you know what you are doing"
     exit 1
 fi
 
@@ -55,7 +57,6 @@ cd "${BUILD_DIR}"/opam-repository
 
 if [ ! -d .git ] ; then
   git init
-  git config --local protocol.version 2
   git remote add origin "$opam_repository_url"
 fi
 
