@@ -29,6 +29,32 @@ here either.
 
 ## Miscellaneous
 
+# Version 8.1
+
+## Node
+
+- Mind the previously forgotten item about snapshots in the section
+  "Version 8.0rc2 > Node"
+
+- Fix a performance regression affecting serialization of tz3
+  signatures by reverting the P256 implementation to `uecc`.
+
+- Fixup allowing nodes in `--history-mode full` to answer to all new
+  messages to the distributed database protocol.
+
+## Client
+
+- As a consequence of moving back to `uecc`, revert for now the
+  ability to sign with tz3 addresses.
+
+## Miscellaneous
+
+- Allow building from sources with older version of git (used to
+  require 2.18)
+
+- Downgrade `mirage-crypto` dependency to avoid failure on startup
+  with `illegal instruction` on some hardware.
+
 # Version 8.0
 
 ## Node
@@ -58,6 +84,12 @@ here either.
 # Version 8.0~rc2
 
 ## Node
+
+- Snapshots exported by a node using version 8 cannot be imported by a
+  node running version 7. This is because the new snapshots contain
+  additional information required by protocol Edo. On the other hand,
+  snapshots exported by a node using version 7 can be imported by a
+  node running version 8.
 
 - Added a new version (version 1) of the protocol environment.
   The environment is the set of functions and types that the economic protocol can use.

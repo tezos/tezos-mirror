@@ -1,6 +1,6 @@
 .. _version-8:
 
-Version 8.0
+Version 8.1
 ===========
 
 Version 8.0 contains a new version (V1) of the protocol
@@ -16,6 +16,10 @@ Edo. The release candidate contains the necessary configuration to
 join Edonet: just configure your node with
 ``tezos-node config init --network edonet``.
 
+Version 8.1 fixes a performance regression related to operations
+involving ``tz3`` addresses and several compilation problems in
+some contexts.
+
 Update Instructions
 -------------------
 
@@ -26,12 +30,40 @@ See :ref:`instructions to set up Rust<setup_rust>`.
 To update from sources::
 
   git fetch
-  git checkout v8.0
+  git checkout v8.1
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``v8.0`` Docker images of Tezos.
+If you are using Docker instead, use the ``v8.1`` Docker images of Tezos.
+
+Changelog — Version 8.1
+-----------------------
+
+Node
+~~~~
+
+- Fix a performance regression affecting serialization of tz3
+  signatures by reverting the P256 implementation to ``uecc``.
+
+- Fixup allowing nodes in ``--history-mode full`` to answer to all new
+  messages to the distributed database protocol.
+
+Client
+~~~~~~
+
+- As a consequence of moving back to ``uecc``, revert for now the
+  ability to sign with tz3 addresses.
+
+Miscellaneous
+~~~~~~~~~~~~~
+
+- Allow building from sources with older version of git (used to
+  require 2.18)
+
+- Downgrade ``mirage-crypto`` dependency to avoid failure on startup
+  with ``illegal instruction`` on some hardware.
+
 
 Changelog — Version 8.0
 -----------------------
@@ -77,6 +109,12 @@ Node
 
 - Removed the built-in configuration for Carthagenet, which ends its life on
   December 12th 2020. You can no longer configure your node with ``--network carthagenet``.
+
+- Snapshots exported by a node using version 8 cannot be imported by a
+  node running version 7. This is because the new snapshots contain
+  additional information required by protocol Edo. On the other hand,
+  snapshots exported by a node using version 7 can be imported by a
+  node running version 8.
 
 - The bootstrap pipeline no longer tries to concurrently download
   steps from other peers. The result is actually a more efficient
