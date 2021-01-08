@@ -652,6 +652,32 @@ let test_parse_comb_data () =
     (pair_ty nat_ty big_map_nat_nat_ty)
     (pair_prim [z_prim; id_prim; Seq (-1, [])])
 
+let test_parse_address () =
+  test_context_with_nat_nat_big_map ()
+  >>=? fun (ctxt, _big_map_id) ->
+  (* KT1% (empty entrypoint) *)
+  wrap_error_lwt
+    (Lwt.return (Contract.of_b58check "KT1FAKEFAKEFAKEFAKEFAKEFAKEFAKGGSE2x"))
+  >>=? fun kt1fake ->
+  test_parse_data
+    __LOC__
+    ctxt
+    (Address_t None)
+    (String (-1, "KT1FAKEFAKEFAKEFAKEFAKEFAKEFAKGGSE2x%"))
+    (kt1fake, "default")
+  >>=? fun ctxt ->
+  (* tz1% (empty entrypoint) *)
+  wrap_error_lwt
+    (Lwt.return (Contract.of_b58check "tz1fakefakefakefakefakefakefakcphLA5"))
+  >>=? fun tz1fake ->
+  test_parse_data
+    __LOC__
+    ctxt
+    (Address_t None)
+    (String (-1, "tz1fakefakefakefakefakefakefakcphLA5%"))
+    (tz1fake, "default")
+  >|=? fun _ctxt -> ()
+
 let test_unparse_data loc ctxt ty x ~expected_readable ~expected_optimized =
   wrap_error_lwt
     ( Script_ir_translator.unparse_data ctxt Script_ir_translator.Readable ty x
@@ -814,4 +840,5 @@ let tests =
       test_unparse_comb_comparable_type;
     Test.tztest "test comb data parsing" `Quick test_parse_comb_data;
     Test.tztest "test comb data unparsing" `Quick test_unparse_comb_data;
-    Test.tztest "test optimal comb data unparsing" `Quick test_optimal_comb ]
+    Test.tztest "test optimal comb data unparsing" `Quick test_optimal_comb;
+    Test.tztest "test parse address" `Quick test_parse_address ]

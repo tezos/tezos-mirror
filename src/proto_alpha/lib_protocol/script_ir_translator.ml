@@ -2778,6 +2778,8 @@ let parse_address ctxt = function
           if Compare.Int.(len > 31) then error (Entrypoint_name_too_long name)
           else
             match (String.sub s 0 pos, name) with
+            | (addr, "") ->
+                ok (addr, "default")
             | (_, "default") ->
                 error @@ Unexpected_annotation loc
             | addr_and_name ->
@@ -6328,7 +6330,14 @@ let unparse_timestamp ctxt mode t =
 
 let unparse_address ctxt mode (c, entrypoint) =
   Gas.consume ctxt Unparse_costs.contract
-  >|? fun ctxt ->
+  >>? fun ctxt ->
+  ( match entrypoint with
+  (* given parse_address, this should not happen *)
+  | "" ->
+      error Unparsing_invariant_violated
+  | _ ->
+      ok () )
+  >|? fun () ->
   match mode with
   | Optimized | Optimized_legacy ->
       let entrypoint =
