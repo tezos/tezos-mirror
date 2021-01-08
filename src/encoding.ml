@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -869,24 +870,46 @@ let option ty =
     ]
 
 let mu name ?title ?description fix =
-  let kind =
-    try
-      let precursor =
-        make @@ Mu {kind = `Dynamic; name; title; description; fix}
-      in
-      match classify @@ fix precursor with
-      | `Fixed _ | `Dynamic ->
-          `Dynamic
-      | `Variable ->
-          raise Exit
-    with Exit | _ (* TODO variability error *) ->
-      let precursor =
-        make @@ Mu {kind = `Variable; name; title; description; fix}
-      in
-      ignore (classify @@ fix precursor) ;
-      `Variable
+  (* The latest application of [fix] is memoized to avoid recomputing
+     it each time a value encoded by [mu] is processed. [fix] may
+     sometimes be applied to distinct arguments if the encoding is used
+     in different contexts. Hence, we remember the last input of [fix]
+     in the closure, so that we can recompute [fix] if this argument
+     has changed.
+
+     This partial memoization only takes a bounded amount of memory
+     and is useful because in practice we decode many values before
+     applying [fix] to a new argument. *)
+  let self = ref None in
+  let fix_f = fix in
+  let fix e =
+    match !self with
+    | Some (e0, e') when e == e0 ->
+        e'
+    | _ ->
+        let e' = fix_f e in
+        self := Some (e, e') ;
+        e'
   in
-  make @@ Mu {kind; name; title; description; fix}
+  (* Attempt to determine kind. Note that this can results in memoisation
+     misses: the [fix] function might be called multiple times. *)
+  try
+    let precursor =
+      make @@ Mu {kind = `Dynamic; name; title; description; fix}
+    in
+    let fixed_precursor = fix precursor in
+    match classify @@ fixed_precursor with
+    | `Fixed _ | `Dynamic ->
+        fixed_precursor
+    | `Variable ->
+        raise Exit
+  with Exit | _ (* TODO variability error *) ->
+    let precursor =
+      make @@ Mu {kind = `Variable; name; title; description; fix}
+    in
+    let fixed_precursor = fix precursor in
+    ignore (classify fixed_precursor) ;
+    fixed_precursor
 
 let result ok_enc error_enc =
   union

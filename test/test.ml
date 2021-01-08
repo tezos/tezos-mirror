@@ -35,4 +35,5 @@ let () =
       ("randomized", Randomized.tests);
       ("versioned", Versioned.tests);
       ("registration", Registrationed.tests);
+      ("mu", Mu.tests);
     ]

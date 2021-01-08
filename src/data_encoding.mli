@@ -581,7 +581,17 @@ module Encoding : sig
   (** Define different encodings for JSON and binary serialization. *)
   val splitted : json:'a encoding -> binary:'a encoding -> 'a encoding
 
-  (** Combinator for recursive encodings. *)
+  (** Combinator for recursive encodings.
+
+     Notice that the function passed to [mu] must be pure. Otherwise,
+     the behavior is unspecified.
+
+     A stateful recursive encoding can still be put under a [delayed]
+     combinator to make sure that a new encoding is generated each
+     time it is used. Caching the encoding generation when the state
+     has not changed is then the responsability of the client.
+
+  *)
   val mu :
     string ->
     ?title:string ->
