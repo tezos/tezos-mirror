@@ -1,4 +1,4 @@
-parameter (option key_hash);
+parameter (option baker_hash);
 storage unit;
 code {
        UNPAIR;

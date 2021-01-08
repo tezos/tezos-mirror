@@ -9,7 +9,7 @@ code { DUP;
                  { PUSH nat 1; SWAP; SUB; ABS; # Subtract 1. The ABS is to make it back into a nat
                    PUSH string "init"; # Storage type
                    PUSH mutez 5000000; # Starting balance
-                   NONE key_hash;
+                   NONE baker_hash;
                    CREATE_CONTRACT
                      { parameter string ;
                        storage string ;

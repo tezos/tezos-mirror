@@ -10,7 +10,7 @@ code { UNPAIR ;
          { DROP ;
            DUP ; CAR ;
            PUSH mutez 0 ;
-           NONE key_hash ;
+           NONE baker_hash ;
            CREATE_CONTRACT
              { parameter string ;
                storage (big_map string nat) ;

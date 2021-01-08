@@ -51,7 +51,7 @@
                 PAIR }
               { CAR ;
                 DUP ;
-                DIP { DIP { PUSH int 0 ; PUSH mutez 0 ; NONE key_hash } ;
+                DIP { DIP { PUSH int 0 ; PUSH mutez 0 ; NONE baker_hash } ;
                       DROP ;
                       CREATE_CONTRACT
                         { parameter (or (or (nat %add) (nat %sub)) (unit %default)) ;
