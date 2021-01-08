@@ -197,7 +197,7 @@ _`Transaction`
     `smart contract`_.
 
 _`Voting period`
-    Any of the ``proposal``, ``testing_vote``, ``testing`` or ``promotion``
+    Any of the ``proposal``, ``cooldown_vote``, ``cooldown`` or ``promotion``
     stages in the voting procedure when ammending the `economic protocol`_.
 
 _`Voting listings`

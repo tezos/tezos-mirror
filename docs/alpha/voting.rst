@@ -25,23 +25,23 @@ The voting procedure works as follows:
 
 - `Proposal period`: delegates can submit protocol amendment proposals using
   the `proposals` operation. At the end of a proposal period, the proposal with
-  most supporters is selected and we move to a testing_vote period.
+  most supporters is selected and we move to a cooldown_vote period.
   If there are no proposals, or a tie between proposals, a new proposal
   period starts. Each delegate can submit a maximum of 20 proposals,
   including duplicates.
-- `Testing_vote period`: delegates can cast one vote to test or not the winning
-  proposal using the `ballot` operation.
-  At the end of a testing_vote period if participation reaches the quorum
-  and the proposal has a super-majority in favor, we proceed to a testing
-  period. Otherwise we go back to a proposal period.
-- `Testing period`: a test chain is forked for the entire testing period to ensure a
-  correct migration of the context.
-  At the end of a testing period we move to a promotion_vote period.
-- `Promotion_vote period`: delegates can cast one vote to promote or not the
-  tested proposal using the `ballot` operation.
-  At the end of a promotion_vote period if participation reaches the quorum
-  and the tested proposal has a super-majority in favor, we proceed to
-  adoption period. Otherwise we go back to a proposal period.
+- `Cooldown_vote period`: delegates can cast one vote to pursue the
+  voting process or not with the winning proposal using the `ballot`
+  operation.  At the end of a cooldown_vote period if participation
+  reaches the quorum and the proposal has a super-majority in favor,
+  we proceed to a cooldown period. Otherwise we go back to a proposal
+  period.
+- `Cooldown period`: The only purpose of this period is to let some
+  time elapse before the promotion period.
+- `Promotion period`: delegates can cast one vote to promote or not
+   the proposal using the `ballot` operation.  At the end of a
+   promotion period if participation reaches the quorum and the
+   proposal has a super-majority in favor, we proceed to adoption
+   period. Otherwise we go back to a proposal period.
 - `Adoption period`: at the end of the period the proposal is activated
   as the new protocol and we go back to a proposal period.
 
@@ -135,7 +135,7 @@ in the following samples::
   PsNa6jTtsRfbGaNSoYXNTNM5A7c3Lji22Yf2ZhpFUjQFC17iZVp 400
 
   $ tezos-client show voting period
-  Current period: "testing_vote"
+  Current period: "cooldown_vote"
   Blocks remaining until end of period: 63
   Current proposal: PsNa6jTtsRfbGaNSoYXNTNM5A7c3Lji22Yf2ZhpFUjQFC17iZVp
   Ballots: { "yay": 400, "nay": 0, "pass": 0 }
@@ -143,7 +143,7 @@ in the following samples::
   Current in favor 400, needed supermajority 320
 
   $ tezos-client show voting period
-  Current period: "testing"
+  Current period: "cooldown"
   Blocks remaining until end of period: 64
   Current proposal: PsNa6jTtsRfbGaNSoYXNTNM5A7c3Lji22Yf2ZhpFUjQFC17iZVp
 
@@ -175,7 +175,7 @@ following two conditions:
 Submit ballots
 ~~~~~~~~~~~~~~
 
-During a voting period, being it a testing vote or a promotion vote,
+During a voting period, being it an exploration or a promotion period,
 ballots can be submitted once with::
 
     tezos-client submit ballot for <delegate> <proposal> <yay|nay|pass>
