@@ -44,3 +44,16 @@ let ballot_encoding =
   splitted
     ~binary:(conv to_int8 of_int8 int8)
     ~json:(string_enum [("yay", Yay); ("nay", Nay); ("pass", Pass)])
+
+let of_string str =
+  match String.lowercase_ascii str with
+  | "yay" | "yea" ->
+      Some Yay
+  | "nay" ->
+      Some Nay
+  | "pass" ->
+      Some Pass
+  | _ ->
+      None
+
+let to_string = function Yay -> "yay" | Nay -> "nay" | Pass -> "pass"

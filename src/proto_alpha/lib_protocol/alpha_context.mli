@@ -1173,6 +1173,10 @@ module Vote : sig
 
   type ballot = Yay | Nay | Pass
 
+  val of_string : string -> ballot option
+
+  val to_string : ballot -> string
+
   val get_voting_power_free : context -> baker_hash -> int32 tzresult Lwt.t
 
   val get_voting_power :
