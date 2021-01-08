@@ -29,7 +29,7 @@ How to Run Tests
 
 If you just want to run tests and see whether they succeed, run::
 
-    make tezt
+    make test-tezt
 
 If you need more control, get the list of command-line options as follows::
 
