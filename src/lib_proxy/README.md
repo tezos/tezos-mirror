@@ -25,7 +25,7 @@ At the high-level, the proxy mode consists of:
 ## `tezos-client` CLI
 
 The proxy mode is requested by passing `--mode proxy` to the client. For
-this, `src/lib_client/client_config.ml` contains a `Proxy_client` value.
+this, `src/lib_client/client_config.ml` contains a `Mode_proxy` value.
 
 This flag is inspected in `src/lib_client/client_main_run.ml` to build
 a `Client_context.full` instance whose underlying `RPC_context.json`
