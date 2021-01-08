@@ -24,6 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val current : Raw_context.context -> Int64.t
+val current : Raw_context.t -> Int64.t
 
-val increase : Raw_context.context -> Raw_context.t
+val increase : Raw_context.t -> Raw_context.t

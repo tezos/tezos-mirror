@@ -39,6 +39,7 @@
         "Lazy_storage_kind",
         "Receipt_repr",
 
+        "Raw_context_intf",
         "Raw_context",
         "Storage_costs",
         "Storage_sigs",

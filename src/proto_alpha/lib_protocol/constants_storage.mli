@@ -24,56 +24,55 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val preserved_cycles : Raw_context.context -> int
+val preserved_cycles : Raw_context.t -> int
 
-val blocks_per_cycle : Raw_context.context -> int32
+val blocks_per_cycle : Raw_context.t -> int32
 
-val blocks_per_commitment : Raw_context.context -> int32
+val blocks_per_commitment : Raw_context.t -> int32
 
-val blocks_per_roll_snapshot : Raw_context.context -> int32
+val blocks_per_roll_snapshot : Raw_context.t -> int32
 
-val blocks_per_voting_period : Raw_context.context -> int32
+val blocks_per_voting_period : Raw_context.t -> int32
 
-val time_between_blocks : Raw_context.context -> Period_repr.t list
+val time_between_blocks : Raw_context.t -> Period_repr.t list
 
-val endorsers_per_block : Raw_context.context -> int
+val endorsers_per_block : Raw_context.t -> int
 
-val initial_endorsers : Raw_context.context -> int
+val initial_endorsers : Raw_context.t -> int
 
-val delay_per_missing_endorsement : Raw_context.context -> Period_repr.t
+val delay_per_missing_endorsement : Raw_context.t -> Period_repr.t
 
 val hard_gas_limit_per_operation :
-  Raw_context.context -> Gas_limit_repr.Arith.integral
+  Raw_context.t -> Gas_limit_repr.Arith.integral
 
-val hard_gas_limit_per_block :
-  Raw_context.context -> Gas_limit_repr.Arith.integral
+val hard_gas_limit_per_block : Raw_context.t -> Gas_limit_repr.Arith.integral
 
-val cost_per_byte : Raw_context.context -> Tez_repr.t
+val cost_per_byte : Raw_context.t -> Tez_repr.t
 
-val hard_storage_limit_per_operation : Raw_context.context -> Z.t
+val hard_storage_limit_per_operation : Raw_context.t -> Z.t
 
-val proof_of_work_threshold : Raw_context.context -> int64
+val proof_of_work_threshold : Raw_context.t -> int64
 
-val tokens_per_roll : Raw_context.context -> Tez_repr.t
+val tokens_per_roll : Raw_context.t -> Tez_repr.t
 
-val michelson_maximum_type_size : Raw_context.context -> int
+val michelson_maximum_type_size : Raw_context.t -> int
 
-val seed_nonce_revelation_tip : Raw_context.context -> Tez_repr.t
+val seed_nonce_revelation_tip : Raw_context.t -> Tez_repr.t
 
-val origination_size : Raw_context.context -> int
+val origination_size : Raw_context.t -> int
 
-val block_security_deposit : Raw_context.context -> Tez_repr.t
+val block_security_deposit : Raw_context.t -> Tez_repr.t
 
-val endorsement_security_deposit : Raw_context.context -> Tez_repr.t
+val endorsement_security_deposit : Raw_context.t -> Tez_repr.t
 
-val baking_reward_per_endorsement : Raw_context.context -> Tez_repr.t list
+val baking_reward_per_endorsement : Raw_context.t -> Tez_repr.t list
 
-val endorsement_reward : Raw_context.context -> Tez_repr.t list
+val endorsement_reward : Raw_context.t -> Tez_repr.t list
 
-val quorum_min : Raw_context.context -> int32
+val quorum_min : Raw_context.t -> int32
 
-val quorum_max : Raw_context.context -> int32
+val quorum_max : Raw_context.t -> int32
 
-val min_proposal_quorum : Raw_context.context -> int32
+val min_proposal_quorum : Raw_context.t -> int32
 
-val parametric : Raw_context.context -> Constants_repr.parametric
+val parametric : Raw_context.t -> Constants_repr.parametric

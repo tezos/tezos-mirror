@@ -43,5 +43,4 @@ val prepare :
   predecessor_timestamp:Time.t ->
   timestamp:Time.t ->
   fitness:Fitness.t ->
-  (Raw_context.context * Receipt_repr.balance_updates) Error_monad.tzresult
-  Lwt.t
+  (Raw_context.t * Receipt_repr.balance_updates) Error_monad.tzresult Lwt.t

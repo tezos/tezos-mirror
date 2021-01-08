@@ -800,61 +800,11 @@ type key = string list
 
 type value = bytes
 
-module type T = sig
-  type t
-
-  type context = t
-
-  val mem : context -> key -> bool Lwt.t
-
-  val dir_mem : context -> key -> bool Lwt.t
-
-  val get : context -> key -> value tzresult Lwt.t
-
-  val get_option : context -> key -> value option Lwt.t
-
-  val init : context -> key -> value -> context tzresult Lwt.t
-
-  val set : context -> key -> value -> context tzresult Lwt.t
-
-  val init_set : context -> key -> value -> context Lwt.t
-
-  val set_option : context -> key -> value option -> context Lwt.t
-
-  val delete : context -> key -> context tzresult Lwt.t
-
-  val remove : context -> key -> context Lwt.t
-
-  val remove_rec : context -> key -> context Lwt.t
-
-  val copy : context -> from:key -> to_:key -> context tzresult Lwt.t
-
-  val fold :
-    context ->
-    key ->
-    init:'a ->
-    f:([`Key of key | `Dir of key] -> 'a -> 'a Lwt.t) ->
-    'a Lwt.t
-
-  val keys : context -> key -> key list Lwt.t
-
-  val fold_keys :
-    context -> key -> init:'a -> f:(key -> 'a -> 'a Lwt.t) -> 'a Lwt.t
-
-  val project : context -> root_context
-
-  val absolute_key : context -> key -> key
-
-  type error += Block_quota_exceeded
-
-  type error += Operation_quota_exceeded
-
-  val consume_gas : context -> Gas_limit_repr.cost -> context tzresult
-
-  val check_enough_gas : context -> Gas_limit_repr.cost -> unit tzresult
-
-  val description : context Storage_description.t
-end
+module type T =
+  Raw_context_intf.T
+    with type key := key
+     and type value := value
+     and type root_context := root_context
 
 let mem ctxt k = Context.mem (context ctxt) k
 
