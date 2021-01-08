@@ -64,13 +64,13 @@ let uniform_int ~nbytes state =
   let n = uniform_nat ~nbytes state in
   if Random.State.bool state then Z.neg n else n
 
-let nat ~range state =
-  let nbytes = sample_in_interval state ~range in
+let nat ~size state =
+  let nbytes = sample_in_interval state ~range:size in
   uniform_nat state ~nbytes
 
-let int ~range state =
-  if range.min < 0 then invalid_arg "Base_samplers.int" ;
-  let nat = nat state ~range in
+let int ~size state =
+  if size.min < 0 then invalid_arg "Base_samplers.int" ;
+  let nat = nat state ~size in
   let s = Random.State.bool state in
   if s then nat else Z.neg nat
 
@@ -79,19 +79,19 @@ let uniform_readable_ascii state =
   let i = Random.State.int state 93 in
   Char.chr (33 + i)
 
-let readable_ascii_string ~range state =
-  if range.min < 0 then invalid_arg "Base_samplers.readable_ascii_string" ;
-  let nbytes = sample_in_interval state ~range in
+let readable_ascii_string ~size state =
+  if size.min < 0 then invalid_arg "Base_samplers.readable_ascii_string" ;
+  let nbytes = sample_in_interval state ~range:size in
   String.escaped (String.init nbytes (fun _ -> uniform_byte state))
 
-let string ~range state =
-  if range.min < 0 then invalid_arg "Base_samplers.string" ;
-  let nbytes = sample_in_interval state ~range in
+let string ~size state =
+  if size.min < 0 then invalid_arg "Base_samplers.string" ;
+  let nbytes = sample_in_interval state ~range:size in
   uniform_string state ~nbytes
 
-let bytes ~range state =
-  if range.min < 0 then invalid_arg "Base_samplers.bytes" ;
-  let nbytes = sample_in_interval state ~range in
+let bytes ~size state =
+  if size.min < 0 then invalid_arg "Base_samplers.bytes" ;
+  let nbytes = sample_in_interval state ~range:size in
   uniform_bytes state ~nbytes
 
 (* ------------------------------------------------------------------------- *)
@@ -106,32 +106,34 @@ module Adversarial = struct
     fun () -> uniform_string state ~nbytes:salt_length
 
   (* Adversarial Z.t *)
-  let integers ~range ~n state =
-    if n <= 0 then invalid_arg "Base_samplers.Adversarial.integers" ;
-    if range.min < 0 then invalid_arg "Base_samplers.Adversarial.integers" ;
-    let common_prefix = string state ~range in
-    let rand_suffix = salt state n in
+  let integers ~prefix_size ~card state =
+    if card <= 0 then invalid_arg "Base_samplers.Adversarial.integers" ;
+    if prefix_size.min < 0 then
+      invalid_arg "Base_samplers.Adversarial.integers" ;
+    let common_prefix = string state ~size:prefix_size in
+    let rand_suffix = salt state card in
     let elements =
-      Stdlib.List.init n (fun _ -> Z.of_bits (rand_suffix () ^ common_prefix))
+      Stdlib.List.init card (fun _ ->
+          Z.of_bits (rand_suffix () ^ common_prefix))
     in
     (Z.of_bits common_prefix, elements)
 
   (* Adversarial strings *)
-  let strings ~range ~n state =
-    if n <= 0 then invalid_arg "Base_samplers.Adversarial.strings" ;
-    if range.min < 0 then invalid_arg "Base_samplers.Adversarial.strings" ;
-    let common_prefix = string state ~range in
-    let rand_suffix = salt state n in
+  let strings ~prefix_size ~card state =
+    if card <= 0 then invalid_arg "Base_samplers.Adversarial.strings" ;
+    if prefix_size.min < 0 then invalid_arg "Base_samplers.Adversarial.strings" ;
+    let common_prefix = string state ~size:prefix_size in
+    let rand_suffix = salt state card in
     let elements =
-      Stdlib.List.init n (fun _ -> common_prefix ^ rand_suffix ())
+      Stdlib.List.init card (fun _ -> common_prefix ^ rand_suffix ())
     in
     (common_prefix, elements)
 
   (* Adversarial bytes *)
-  let bytes ~range ~n state =
-    if n <= 0 then invalid_arg "Base_samplers.Adversarial.bytes" ;
-    if range.min < 0 then invalid_arg "Base_samplers.Adversarial.bytes" ;
-    let (prefix, strs) = strings ~range ~n state in
+  let bytes ~prefix_size ~card state =
+    if card <= 0 then invalid_arg "Base_samplers.Adversarial.bytes" ;
+    if prefix_size.min < 0 then invalid_arg "Base_samplers.Adversarial.bytes" ;
+    let (prefix, strs) = strings ~prefix_size ~card state in
     let p = Bytes.unsafe_of_string prefix in
     let ls = List.map Bytes.unsafe_of_string strs in
     (p, ls)

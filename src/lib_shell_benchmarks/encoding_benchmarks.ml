@@ -201,7 +201,7 @@ let chain_id_encoding =
     ~encoding:Chain_id.encoding
     ~generator:(fun rng_state ->
       Chain_id.hash_bytes
-        [Base_samplers.bytes ~range:{min = 32; max = 32} rng_state])
+        [Base_samplers.bytes ~size:{min = 32; max = 32} rng_state])
 
 let () = Registration.register chain_id_encoding
 
@@ -211,7 +211,7 @@ let chain_id_decoding =
     ~encoding:Chain_id.encoding
     ~generator:(fun rng_state ->
       Chain_id.hash_bytes
-        [Base_samplers.bytes ~range:{min = 32; max = 32} rng_state])
+        [Base_samplers.bytes ~size:{min = 32; max = 32} rng_state])
 
 let () = Registration.register chain_id_decoding
 
@@ -221,7 +221,7 @@ let chain_id_readable_encoding =
     ~to_string:Chain_id.to_b58check
     ~generator:(fun rng_state ->
       Chain_id.hash_bytes
-        [Base_samplers.bytes ~range:{min = 32; max = 32} rng_state])
+        [Base_samplers.bytes ~size:{min = 32; max = 32} rng_state])
 
 let () = Registration.register chain_id_readable_encoding
 
@@ -232,6 +232,6 @@ let chain_id_readable_decoding =
     ~from_string:Chain_id.of_b58check_exn
     ~generator:(fun rng_state ->
       Chain_id.hash_bytes
-        [Base_samplers.bytes ~range:{min = 32; max = 32} rng_state])
+        [Base_samplers.bytes ~size:{min = 32; max = 32} rng_state])
 
 let () = Registration.register chain_id_readable_decoding

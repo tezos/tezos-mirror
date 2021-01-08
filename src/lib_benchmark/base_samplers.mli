@@ -42,6 +42,8 @@ val sample_in_interval : range:range -> int sampler
 val uniform_bool : bool sampler
 
 (** Samples the specified number of bits uniformly at random.
+    The sampled bits are the [nbits] least significant ones in the
+    returned char.
     @raise [Invalid_argument] if [nbits < 1 || nbits > 8].
  *)
 val uniform_partial_byte : nbits:int -> char sampler
@@ -68,55 +70,55 @@ val uniform_nat : nbytes:int -> Z.t sampler
  *)
 val uniform_int : nbytes:int -> Z.t sampler
 
-(** Samples a size in bytes uniformly in [range] and then
+(** Samples a size in bytes uniformly in [size] and then
     samples a uniform non-negative big integer of this size.
-    @raise [Invalid_argument] if [range.max < range.min]
-    or if [range.min < 0].
+    @raise [Invalid_argument] if [size.max < size.min]
+    or if [size.min < 0].
  *)
-val nat : range:range -> Z.t sampler
+val nat : size:range -> Z.t sampler
 
-(** Samples a size in bytes uniformly in [range] and then
+(** Samples a size in bytes uniformly in [size] and then
     samples a uniform big integer of this size.
-    @raise [Invalid_argument] if [range.max < range.min]
-    or if [range.min < 0].
+    @raise [Invalid_argument] if [size.max < size.min]
+    or if [size.min < 0].
  *)
-val int : range:range -> Z.t sampler
+val int : size:range -> Z.t sampler
 
 (** Samples a readable character. *)
 val uniform_readable_ascii : char sampler
 
-(** Samples a readable string with length sampled uniformly in [range].
-    @raise [Invalid_argument] if [range.max < range.min]
+(** Samples a readable string with length sampled uniformly in [size].
+    @raise [Invalid_argument] if [size.max < size.min]
     or if [range.min < 0].
  *)
-val readable_ascii_string : range:range -> string sampler
+val readable_ascii_string : size:range -> string sampler
 
-(** Samples a string with length sampled uniformly in [range].
-    @raise [Invalid_argument] if [range.max < range.min]
-    or if [range.min < 0].
+(** Samples a string with length sampled uniformly in [size].
+    @raise [Invalid_argument] if [size.max < size.min]
+    or if [size.min < 0].
  *)
-val string : range:range -> string sampler
+val string : size:range -> string sampler
 
-(** Samples bytes with length sampled uniformly in [range].
-    @raise [Invalid_argument] if [range.max < range.min]
-    or if [range.min < 0].
+(** Samples bytes with length sampled uniformly in [size].
+    @raise [Invalid_argument] if [size.max < size.min]
+    or if [size.min < 0].
  *)
-val bytes : range:range -> bytes sampler
+val bytes : size:range -> bytes sampler
 
 (** Sampling of "adversarial" values in the sense that they exhibit the
     worst-case performance of the usual comparison functions.
 
     These samplers generate pairs of a common prefix that has a size
-    uniformly sampled in [range], and a list of [n] distinct (with high-probability)
+    uniformly sampled in [prefix_size], and a list of [card] distinct (with high-probability)
     elements sharing this common prefix.
 
-    @raise [Invalid_argument] if [range.max < range.min]
-    or if [range.min < 0] or of [n <= 0].
+    @raise [Invalid_argument] if [prefix_size.max < prefix_size.min]
+    or if [prefix_size.min < 0] or of [card <= 0].
  *)
 module Adversarial : sig
-  val integers : range:range -> n:int -> (Z.t * Z.t list) sampler
+  val integers : prefix_size:range -> card:int -> (Z.t * Z.t list) sampler
 
-  val strings : range:range -> n:int -> (string * string list) sampler
+  val strings : prefix_size:range -> card:int -> (string * string list) sampler
 
-  val bytes : range:range -> n:int -> (bytes * bytes list) sampler
+  val bytes : prefix_size:range -> card:int -> (bytes * bytes list) sampler
 end
