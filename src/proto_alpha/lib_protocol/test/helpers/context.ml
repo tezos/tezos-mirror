@@ -196,14 +196,14 @@ module Vote = struct
     Tezos_protocol_environment.Context.get_protocol b.context
 
   let get_participation_ema (b : Block.t) =
-    Environment.Context.get b.context ["votes"; "participation_ema"]
+    Environment.Context.find b.context ["votes"; "participation_ema"]
     >|= function
     | None -> assert false | Some bytes -> ok (TzEndian.get_int32 bytes 0)
 
   let set_participation_ema (b : Block.t) ema =
     let bytes = Bytes.make 4 '\000' in
     TzEndian.set_int32 bytes 0 ema ;
-    Environment.Context.set b.context ["votes"; "participation_ema"] bytes
+    Environment.Context.add b.context ["votes"; "participation_ema"] bytes
     >|= fun context -> {b with context}
 end
 

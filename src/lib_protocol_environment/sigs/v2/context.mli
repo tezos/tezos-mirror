@@ -26,26 +26,42 @@
 (** View over the context store, restricted to types, access and
     functional manipulation of an existing context. *)
 
+(* Copy/paste of Environment_context_inttf.S *)
+
+(** The type for database views. *)
 type t
 
-(** Keys in (kex x value) database implementations *)
+(** The type for database keys. *)
 type key = string list
 
-(** Values in (kex x value) database implementations *)
+(** The type for database values. *)
 type value = bytes
 
+(** {2 Getters} *)
+
+(** [mem t k] is true iff [k] is bound to a value in [t]. *)
 val mem : t -> key -> bool Lwt.t
 
-val dir_mem : t -> key -> bool Lwt.t
+(** [mem_tree t k] is like {!mem} but for trees. *)
+val mem_tree : t -> key -> bool Lwt.t
 
-val get : t -> key -> value option Lwt.t
+(** [find t k] is [Some v] if [k] is bound to [v] in [t] and [None]
+      otherwise. *)
+val find : t -> key -> value option Lwt.t
 
-val set : t -> key -> value -> t Lwt.t
+(** {2 Setters} *)
+
+(** [add t k v] is the database view where [k] is bound to [v] and
+      is similar to [t] for other keys. *)
+val add : t -> key -> value -> t Lwt.t
+
+(** [remove c k] removes any values and trees bound to [k] in [c]. *)
+val remove : t -> key -> t Lwt.t
+
+(** {2 Misc} *)
 
 (** [copy] returns None if the [from] key is not bound *)
 val copy : t -> from:key -> to_:key -> t option Lwt.t
-
-val remove_rec : t -> key -> t Lwt.t
 
 type key_or_dir = [`Key of key | `Dir of key]
 

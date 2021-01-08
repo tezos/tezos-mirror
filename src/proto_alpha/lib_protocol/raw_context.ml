@@ -596,7 +596,7 @@ let constants_key = [version; "constants"]
 let protocol_param_key = ["protocol_parameters"]
 
 let get_first_level ctxt =
-  Context.get ctxt first_level_key
+  Context.find ctxt first_level_key
   >|= function
   | None ->
       storage_error (Missing_key (first_level_key, Get))
@@ -611,7 +611,7 @@ let set_first_level ctxt level =
   let bytes =
     Data_encoding.Binary.to_bytes_exn Raw_level_repr.encoding level
   in
-  Context.set ctxt first_level_key bytes >|= ok
+  Context.add ctxt first_level_key bytes >|= ok
 
 type error += Failed_to_parse_parameter of bytes
 
@@ -649,7 +649,7 @@ let () =
     (fun (json, msg) -> Failed_to_decode_parameter (json, msg))
 
 let get_proto_param ctxt =
-  Context.get ctxt protocol_param_key
+  Context.find ctxt protocol_param_key
   >>= function
   | None ->
       failwith "Missing protocol parameters."
@@ -658,7 +658,7 @@ let get_proto_param ctxt =
     | None ->
         fail (Failed_to_parse_parameter bytes)
     | Some json -> (
-        Context.remove_rec ctxt protocol_param_key
+        Context.remove ctxt protocol_param_key
         >|= fun ctxt ->
         match Data_encoding.Json.destruct Parameters_repr.encoding json with
         | exception (Data_encoding.Json.Cannot_destruct _ as exn) ->
@@ -678,10 +678,10 @@ let set_constants ctxt constants =
       Constants_repr.parametric_encoding
       constants
   in
-  Context.set ctxt constants_key bytes
+  Context.add ctxt constants_key bytes
 
 let get_constants ctxt =
-  Context.get ctxt constants_key
+  Context.find ctxt constants_key
   >|= function
   | None ->
       failwith "Internal error: cannot read constants in context."
@@ -702,7 +702,7 @@ let patch_constants ctxt f =
   update_constants ctxt constants
 
 let check_inited ctxt =
-  Context.get ctxt version_key
+  Context.find ctxt version_key
   >|= function
   | None ->
       failwith "Internal error: un-initialized context."
@@ -759,7 +759,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
 type previous_protocol = Genesis of Parameters_repr.t | Edo_008
 
 let check_and_update_protocol_version ctxt =
-  Context.get ctxt version_key
+  Context.find ctxt version_key
   >>= (function
         | None ->
             failwith
@@ -774,7 +774,7 @@ let check_and_update_protocol_version ctxt =
             else if Compare.String.(s = "edo_008") then return (Edo_008, ctxt)
             else Lwt.return @@ storage_error (Incompatible_protocol_version s))
   >>=? fun (previous_proto, ctxt) ->
-  Context.set ctxt version_key (Bytes.of_string version_value)
+  Context.add ctxt version_key (Bytes.of_string version_value)
   >|= fun ctxt -> ok (previous_proto, ctxt)
 
 let prepare_first_block ~level ~timestamp ~fitness ctxt =
@@ -858,13 +858,13 @@ end
 
 let mem ctxt k = Context.mem (context ctxt) k
 
-let dir_mem ctxt k = Context.dir_mem (context ctxt) k
+let dir_mem ctxt k = Context.mem_tree (context ctxt) k
 
 let get ctxt k =
-  Context.get (context ctxt) k
+  Context.find (context ctxt) k
   >|= function None -> storage_error (Missing_key (k, Get)) | Some v -> ok v
 
-let get_option ctxt k = Context.get (context ctxt) k
+let get_option ctxt k = Context.find (context ctxt) k
 
 (* Verify that the k is present before modifying *)
 let set ctxt k v =
@@ -873,7 +873,7 @@ let set ctxt k v =
   | false ->
       Lwt.return @@ storage_error (Missing_key (k, Set))
   | true ->
-      Context.set (context ctxt) k v
+      Context.add (context ctxt) k v
       >|= fun context -> ok (update_context ctxt context)
 
 (* Verify that the k is not present before inserting *)
@@ -883,11 +883,11 @@ let init ctxt k v =
   | true ->
       Lwt.return @@ storage_error (Existing_key k)
   | false ->
-      Context.set (context ctxt) k v
+      Context.add (context ctxt) k v
       >|= fun context -> ok (update_context ctxt context)
 
 (* Does not verify that the key is present or not *)
-let init_set ctxt k v = Context.set (context ctxt) k v >|= update_context ctxt
+let init_set ctxt k v = Context.add (context ctxt) k v >|= update_context ctxt
 
 (* Verify that the key is present before deleting *)
 let delete ctxt k =
@@ -896,11 +896,11 @@ let delete ctxt k =
   | false ->
       Lwt.return @@ storage_error (Missing_key (k, Del))
   | true ->
-      Context.remove_rec (context ctxt) k
+      Context.remove (context ctxt) k
       >|= fun context -> ok (update_context ctxt context)
 
 (* Do not verify before deleting *)
-let remove ctxt k = Context.remove_rec (context ctxt) k >|= update_context ctxt
+let remove ctxt k = Context.remove (context ctxt) k >|= update_context ctxt
 
 let set_option ctxt k = function
   | None ->
@@ -908,8 +908,7 @@ let set_option ctxt k = function
   | Some v ->
       init_set ctxt k v
 
-let remove_rec ctxt k =
-  Context.remove_rec (context ctxt) k >|= update_context ctxt
+let remove_rec ctxt k = Context.remove (context ctxt) k >|= update_context ctxt
 
 let copy ctxt ~from ~to_ =
   Context.copy (context ctxt) ~from ~to_
