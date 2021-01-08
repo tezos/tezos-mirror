@@ -183,7 +183,7 @@ class TestManualBaking:
         assert level["cycle_position"] == level_info["cycle_position"]
         assert expected_commitment == level_info["expected_commitment"]
         assert period_index == period_info["voting_period"]["index"]
-        assert deprecated_period_kind == "testing_vote"
+        assert deprecated_period_kind == "exploration"
         assert period_position == period_info["position"]
         assert level["level_position"] == 7
         assert period_info["voting_period"]["index"] == 1
@@ -200,20 +200,20 @@ class TestManualBaking:
         expected = session['protos'][1]
         assert expected == client.get_current_proposal()
 
-    def test_bake_first_block_of_testing_vote_period(self, client: Client):
+    def test_bake_first_block_of_cooldown_vote_period(self, client: Client):
         # using the client it's not possible to add voting operation on the
         # first block of a voting period. This is to be fixed in a futur
         # protocol
         client.bake('bootstrap1', BAKE_ARGS)
         period_info = client.get_current_period()
         assert period_info["voting_period"]["index"] == 2
-        assert period_info["voting_period"]["kind"] == "testing_vote"
+        assert period_info["voting_period"]["kind"] == "exploration"
         assert period_info["voting_period"]["start_position"] == 8
         assert period_info["position"] == 0
         assert period_info["remaining"] == 3
 
     def test_submit_ballot(self, client: Client, session: dict):
-        # next block is going to be of 'testing_vote' kind
+        # next block is going to be of 'exploration' kind
         proto = session['protos'][1]
         for i in range(1, 4):
             client.submit_ballot(f'bootstrap{i}', proto, 'yay')
@@ -225,7 +225,7 @@ class TestManualBaking:
         level = client.get_current_level()
         assert level["level_position"] == 10
         assert period_info["voting_period"]["index"] == 2
-        assert period_info["voting_period"]["kind"] == "testing_vote"
+        assert period_info["voting_period"]["kind"] == "exploration"
         assert period_info["voting_period"]["start_position"] == 8
         assert period_info["position"] == 2
         assert period_info["remaining"] == 1
@@ -279,7 +279,7 @@ class TestManualBaking:
         assert period_position == period_info["position"]
         assert level["level_position"] == 11
         assert period_info["voting_period"]["index"] == 2
-        assert period_info["voting_period"]["kind"] == "testing_vote"
+        assert period_info["voting_period"]["kind"] == "exploration"
         assert period_info["voting_period"]["start_position"] == 8
         assert period_info["position"] == 3
         assert period_info["remaining"] == 0

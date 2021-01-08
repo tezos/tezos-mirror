@@ -1,7 +1,5 @@
 """
-This tests the migration from PROTO_A to PROTO_B. It also tests
-the test chain in the testing phase of the voting process, and the
-bootstrap heuristics.
+This tests the migration from PROTO_A to PROTO_B.
 """
 
 import datetime
@@ -148,36 +146,14 @@ class TestVotingFull:
             client.submit_ballot(listing["pkh"], PROTO_B, 'yay')
 
     @pytest.mark.timeout(60)
-    def test_wait_for_testing(self, sandbox: Sandbox):
+    def test_wait_for_cooldown(self, sandbox: Sandbox):
         for client in sandbox.all_clients():
             while client.get_level() <= 2 * BLOCKS_PER_VOTING_PERIOD + 1:
                 time.sleep(POLLING_TIME)
             assert client_get_current_period_kind(client) == 'testing'
 
-    def test_start_baker_testchain(self, sandbox: Sandbox):
-        sandbox.add_baker(
-            3, 'bootstrap1', proto=PROTO_B_DAEMON, params=['--chain', 'test']
-        )
-
-    def test_testchain_rpc(self, sandbox: Sandbox):
-        """Check all clients know both chains"""
-        for client in sandbox.all_clients():
-            assert utils.check_two_chains(client)
-
-    def test_testchain_transfer(self, sandbox: Sandbox):
-        client = sandbox.client(0)
-        client.transfer(10, 'bootstrap1', 'bootstrap2', chain='test')
-
-    def test_testchain_progress(self, sandbox: Sandbox):
-        """Make sure testchain is moving forward"""
-        client = sandbox.client(0)
-        level_testchain_before = client.get_level(chain='test')
-        assert utils.check_level_greater_than(
-            client, level_testchain_before + 1, chain='test'
-        )
-
     @pytest.mark.timeout(60)
-    def test_wait_for_promotion_vote_period(self, sandbox: Sandbox):
+    def test_wait_for_promotion_period(self, sandbox: Sandbox):
         client = sandbox.client(0)
         while client.get_level() <= 3 * BLOCKS_PER_VOTING_PERIOD + 1:
             time.sleep(POLLING_TIME)
