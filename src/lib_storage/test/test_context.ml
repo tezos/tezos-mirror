@@ -70,11 +70,11 @@ let create_block2 idx genesis_commit =
   | None ->
       Assert.fail_msg "checkout genesis_block"
   | Some ctxt ->
-      set ctxt ["a"; "b"] (Bytes.of_string "Novembre")
+      add ctxt ["a"; "b"] (Bytes.of_string "Novembre")
       >>= fun ctxt ->
-      set ctxt ["a"; "c"] (Bytes.of_string "Juin")
+      add ctxt ["a"; "c"] (Bytes.of_string "Juin")
       >>= fun ctxt ->
-      set ctxt ["version"] (Bytes.of_string "0.0") >>= fun ctxt -> commit ctxt
+      add ctxt ["version"] (Bytes.of_string "0.0") >>= fun ctxt -> commit ctxt
 
 let block3a =
   Block_hash.of_hex_exn
@@ -86,9 +86,9 @@ let create_block3a idx block2_commit =
   | None ->
       Assert.fail_msg "checkout block2"
   | Some ctxt ->
-      remove_rec ctxt ["a"; "b"]
+      remove ctxt ["a"; "b"]
       >>= fun ctxt ->
-      set ctxt ["a"; "d"] (Bytes.of_string "Mars") >>= fun ctxt -> commit ctxt
+      add ctxt ["a"; "d"] (Bytes.of_string "Mars") >>= fun ctxt -> commit ctxt
 
 let block3b =
   Block_hash.of_hex_exn
@@ -104,9 +104,9 @@ let create_block3b idx block2_commit =
   | None ->
       Assert.fail_msg "checkout block3b"
   | Some ctxt ->
-      remove_rec ctxt ["a"; "c"]
+      remove ctxt ["a"; "c"]
       >>= fun ctxt ->
-      set ctxt ["a"; "d"] (Bytes.of_string "Février")
+      add ctxt ["a"; "d"] (Bytes.of_string "Février")
       >>= fun ctxt -> commit ctxt
 
 type t = {
@@ -145,13 +145,13 @@ let test_simple {idx; block2; _} =
   | None ->
       Assert.fail_msg "checkout block2"
   | Some ctxt ->
-      get ctxt ["version"]
+      find ctxt ["version"]
       >>= fun version ->
       Assert.equal_string_option ~msg:__LOC__ (c version) (Some "0.0") ;
-      get ctxt ["a"; "b"]
+      find ctxt ["a"; "b"]
       >>= fun novembre ->
       Assert.equal_string_option (Some "Novembre") (c novembre) ;
-      get ctxt ["a"; "c"]
+      find ctxt ["a"; "c"]
       >>= fun juin ->
       Assert.equal_string_option ~msg:__LOC__ (Some "Juin") (c juin) ;
       Lwt.return_unit
@@ -162,16 +162,16 @@ let test_continuation {idx; block3a; _} =
   | None ->
       Assert.fail_msg "checkout block3a"
   | Some ctxt ->
-      get ctxt ["version"]
+      find ctxt ["version"]
       >>= fun version ->
       Assert.equal_string_option ~msg:__LOC__ (Some "0.0") (c version) ;
-      get ctxt ["a"; "b"]
+      find ctxt ["a"; "b"]
       >>= fun novembre ->
       Assert.is_none ~msg:__LOC__ (c novembre) ;
-      get ctxt ["a"; "c"]
+      find ctxt ["a"; "c"]
       >>= fun juin ->
       Assert.equal_string_option ~msg:__LOC__ (Some "Juin") (c juin) ;
-      get ctxt ["a"; "d"]
+      find ctxt ["a"; "d"]
       >>= fun mars ->
       Assert.equal_string_option ~msg:__LOC__ (Some "Mars") (c mars) ;
       Lwt.return_unit
@@ -182,16 +182,16 @@ let test_fork {idx; block3b; _} =
   | None ->
       Assert.fail_msg "checkout block3b"
   | Some ctxt ->
-      get ctxt ["version"]
+      find ctxt ["version"]
       >>= fun version ->
       Assert.equal_string_option ~msg:__LOC__ (Some "0.0") (c version) ;
-      get ctxt ["a"; "b"]
+      find ctxt ["a"; "b"]
       >>= fun novembre ->
       Assert.equal_string_option ~msg:__LOC__ (Some "Novembre") (c novembre) ;
-      get ctxt ["a"; "c"]
+      find ctxt ["a"; "c"]
       >>= fun juin ->
       Assert.is_none ~msg:__LOC__ (c juin) ;
-      get ctxt ["a"; "d"]
+      find ctxt ["a"; "d"]
       >>= fun mars ->
       Assert.equal_string_option ~msg:__LOC__ (Some "Février") (c mars) ;
       Lwt.return_unit
@@ -202,31 +202,31 @@ let test_replay {idx; genesis; _} =
   | None ->
       Assert.fail_msg "checkout genesis_block"
   | Some ctxt0 ->
-      set ctxt0 ["version"] (Bytes.of_string "0.0")
+      add ctxt0 ["version"] (Bytes.of_string "0.0")
       >>= fun ctxt1 ->
-      set ctxt1 ["a"; "b"] (Bytes.of_string "Novembre")
+      add ctxt1 ["a"; "b"] (Bytes.of_string "Novembre")
       >>= fun ctxt2 ->
-      set ctxt2 ["a"; "c"] (Bytes.of_string "Juin")
+      add ctxt2 ["a"; "c"] (Bytes.of_string "Juin")
       >>= fun ctxt3 ->
-      set ctxt3 ["a"; "d"] (Bytes.of_string "July")
+      add ctxt3 ["a"; "d"] (Bytes.of_string "July")
       >>= fun ctxt4a ->
-      set ctxt3 ["a"; "d"] (Bytes.of_string "Juillet")
+      add ctxt3 ["a"; "d"] (Bytes.of_string "Juillet")
       >>= fun ctxt4b ->
-      set ctxt4a ["a"; "b"] (Bytes.of_string "November")
+      add ctxt4a ["a"; "b"] (Bytes.of_string "November")
       >>= fun ctxt5a ->
-      get ctxt4a ["a"; "b"]
+      find ctxt4a ["a"; "b"]
       >>= fun novembre ->
       Assert.equal_string_option ~msg:__LOC__ (Some "Novembre") (c novembre) ;
-      get ctxt5a ["a"; "b"]
+      find ctxt5a ["a"; "b"]
       >>= fun november ->
       Assert.equal_string_option ~msg:__LOC__ (Some "November") (c november) ;
-      get ctxt5a ["a"; "d"]
+      find ctxt5a ["a"; "d"]
       >>= fun july ->
       Assert.equal_string_option ~msg:__LOC__ (Some "July") (c july) ;
-      get ctxt4b ["a"; "b"]
+      find ctxt4b ["a"; "b"]
       >>= fun novembre ->
       Assert.equal_string_option ~msg:__LOC__ (Some "Novembre") (c novembre) ;
-      get ctxt4b ["a"; "d"]
+      find ctxt4b ["a"; "d"]
       >>= fun juillet ->
       Assert.equal_string_option ~msg:__LOC__ (Some "Juillet") (c juillet) ;
       Lwt.return_unit
@@ -246,15 +246,15 @@ let test_fold {idx; genesis; _} =
   | None ->
       Assert.fail_msg "checkout genesis_block"
   | Some ctxt ->
-      set ctxt ["a"; "b"] (Bytes.of_string "Novembre")
+      add ctxt ["a"; "b"] (Bytes.of_string "Novembre")
       >>= fun ctxt ->
-      set ctxt ["a"; "c"] (Bytes.of_string "Juin")
+      add ctxt ["a"; "c"] (Bytes.of_string "Juin")
       >>= fun ctxt ->
-      set ctxt ["a"; "d"; "e"] (Bytes.of_string "Septembre")
+      add ctxt ["a"; "d"; "e"] (Bytes.of_string "Septembre")
       >>= fun ctxt ->
-      set ctxt ["f"] (Bytes.of_string "Avril")
+      add ctxt ["f"] (Bytes.of_string "Avril")
       >>= fun ctxt ->
-      set ctxt ["g"; "h"] (Bytes.of_string "Avril")
+      add ctxt ["g"; "h"] (Bytes.of_string "Avril")
       >>= fun ctxt ->
       keys ctxt []
       >>= fun l ->

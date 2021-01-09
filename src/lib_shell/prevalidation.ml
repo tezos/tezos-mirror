@@ -403,7 +403,7 @@ let preapply ~user_activated_upgrades ~user_activated_protocol_overrides
                           environment V1, they contain no operations. *)
                        return context
                    | Some hash ->
-                       Context.set_predecessor_ops_metadata_hash context hash
+                       Context.add_predecessor_ops_metadata_hash context hash
                        >|= ok)
              >>=? fun context ->
              State.Block.metadata_hash predecessor
@@ -412,7 +412,7 @@ let preapply ~user_activated_upgrades ~user_activated_protocol_overrides
                  (* Block metadata hash should always be set in environment V1. *)
                  fail @@ Missing_block_metadata_hash pred_block_hash
              | Some predecessor_block_metadata_hash ->
-                 Context.set_predecessor_block_metadata_hash
+                 Context.add_predecessor_block_metadata_hash
                    context
                    predecessor_block_metadata_hash
                  >|= ok ))

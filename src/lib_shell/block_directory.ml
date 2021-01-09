@@ -28,7 +28,7 @@ let rec read_partial_context context path depth =
   if depth = 0 then Lwt.return Block_services.Cut
   else
     (* try to read as file *)
-    Context.get context path
+    Context.find context path
     >>= function
     | Some v ->
         Lwt.return (Block_services.Key v)
@@ -297,7 +297,7 @@ let build_raw_rpc_directory ~user_activated_upgrades
       >>=? fun context ->
       Context.mem context path
       >>= fun mem ->
-      Context.dir_mem context path
+      Context.mem_tree context path
       >>= fun dir_mem ->
       if not (mem || dir_mem) then Lwt.fail Not_found
       else read_partial_context context path depth >>= fun dir -> return dir) ;

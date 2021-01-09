@@ -371,24 +371,24 @@ type value = bytes
 let mem ctxt key =
   Store.Tree.mem ctxt.tree (data_key key) >>= fun v -> Lwt.return v
 
-let dir_mem ctxt key =
+let mem_tree ctxt key =
   Store.Tree.mem_tree ctxt.tree (data_key key) >>= fun v -> Lwt.return v
 
-let raw_get ctxt key =
+let raw_find ctxt key =
   Store.Tree.find ctxt.tree key >|= Option.map Bytes.of_string
 
-let get t key = raw_get t (data_key key)
+let find t key = raw_find t (data_key key)
 
-let raw_set ctxt key data =
+let raw_add ctxt key data =
   let data = Bytes.to_string data in
   Store.Tree.add ctxt.tree key data >>= fun tree -> Lwt.return {ctxt with tree}
 
-let set t key data = raw_set t (data_key key) data
+let add t key data = raw_add t (data_key key) data
 
-let raw_del ctxt key =
+let raw_remove ctxt key =
   Store.Tree.remove ctxt.tree key >>= fun tree -> Lwt.return {ctxt with tree}
 
-let remove_rec ctxt key =
+let remove ctxt key =
   Store.Tree.remove ctxt.tree (data_key key)
   >>= fun tree -> Lwt.return {ctxt with tree}
 
@@ -422,19 +422,19 @@ let fold ctxt key ~init ~f =
 (*-- Predefined Fields -------------------------------------------------------*)
 
 let get_protocol v =
-  raw_get v current_protocol_key
+  raw_find v current_protocol_key
   >>= function
   | None ->
       assert false
   | Some data ->
       Lwt.return (Protocol_hash.of_bytes_exn data)
 
-let set_protocol v key =
+let add_protocol v key =
   let key = Protocol_hash.to_bytes key in
-  raw_set v current_protocol_key key
+  raw_add v current_protocol_key key
 
 let get_test_chain v =
-  raw_get v current_test_chain_key
+  raw_find v current_test_chain_key
   >>= function
   | None ->
       Lwt.fail (Failure "Unexpected error (Context.get_test_chain)")
@@ -449,17 +449,17 @@ let get_test_chain v =
     | Ok r ->
         Lwt.return r )
 
-let set_test_chain v id =
+let add_test_chain v id =
   let id = Data_encoding.Binary.to_bytes_exn Test_chain_status.encoding id in
-  raw_set v current_test_chain_key id
+  raw_add v current_test_chain_key id
 
-let del_test_chain v = raw_del v current_test_chain_key
+let remove_test_chain v = raw_remove v current_test_chain_key
 
 let fork_test_chain v ~protocol ~expiration =
-  set_test_chain v (Forking {protocol; expiration})
+  add_test_chain v (Forking {protocol; expiration})
 
-let get_predecessor_block_metadata_hash v =
-  raw_get v current_predecessor_block_metadata_hash_key
+let find_predecessor_block_metadata_hash v =
+  raw_find v current_predecessor_block_metadata_hash_key
   >>= function
   | None ->
       Lwt.return_none
@@ -474,14 +474,14 @@ let get_predecessor_block_metadata_hash v =
     | Some r ->
         Lwt.return_some r )
 
-let set_predecessor_block_metadata_hash v hash =
+let add_predecessor_block_metadata_hash v hash =
   let data =
     Data_encoding.Binary.to_bytes_exn Block_metadata_hash.encoding hash
   in
-  raw_set v current_predecessor_block_metadata_hash_key data
+  raw_add v current_predecessor_block_metadata_hash_key data
 
-let get_predecessor_ops_metadata_hash v =
-  raw_get v current_predecessor_ops_metadata_hash_key
+let find_predecessor_ops_metadata_hash v =
+  raw_find v current_predecessor_ops_metadata_hash_key
   >>= function
   | None ->
       Lwt.return_none
@@ -498,13 +498,13 @@ let get_predecessor_ops_metadata_hash v =
     | Some r ->
         Lwt.return_some r )
 
-let set_predecessor_ops_metadata_hash v hash =
+let add_predecessor_ops_metadata_hash v hash =
   let data =
     Data_encoding.Binary.to_bytes_exn
       Operation_metadata_list_list_hash.encoding
       hash
   in
-  raw_set v current_predecessor_ops_metadata_hash_key data
+  raw_add v current_predecessor_ops_metadata_hash_key data
 
 (*-- Initialisation ----------------------------------------------------------*)
 
@@ -528,9 +528,9 @@ let commit_genesis index ~chain_id ~time ~protocol =
   | Some patch_context ->
       patch_context ctxt )
   >>=? fun ctxt ->
-  set_protocol ctxt protocol
+  add_protocol ctxt protocol
   >>= fun ctxt ->
-  set_test_chain ctxt Not_running
+  add_test_chain ctxt Not_running
   >>= fun ctxt ->
   raw_commit ~time ~message:"Genesis" ctxt
   >>= fun commit ->
@@ -989,9 +989,9 @@ let get_protocol_data_from_header index block_header =
   >>= fun protocol_hash ->
   get_test_chain context
   >>= fun test_chain_status ->
-  get_predecessor_block_metadata_hash context
+  find_predecessor_block_metadata_hash context
   >>= fun predecessor_block_metadata_hash ->
-  get_predecessor_ops_metadata_hash context
+  find_predecessor_ops_metadata_hash context
   >>= fun predecessor_ops_metadata_hash ->
   data_node_hash context
   >>= fun data_key ->
@@ -1063,13 +1063,13 @@ let validate_context_hash_consistency_and_commit ~data_hash
       let parent = Store.of_private_commit index.repo commit in
       {index; tree = Store.Tree.empty; parents = [parent]}
     in
-    set_test_chain ctxt test_chain
+    add_test_chain ctxt test_chain
     >>= fun ctxt ->
-    set_protocol ctxt protocol_hash
+    add_protocol ctxt protocol_hash
     >>= fun ctxt ->
     ( match predecessor_block_metadata_hash with
     | Some predecessor_block_metadata_hash ->
-        set_predecessor_block_metadata_hash
+        add_predecessor_block_metadata_hash
           ctxt
           predecessor_block_metadata_hash
     | None ->
@@ -1077,7 +1077,7 @@ let validate_context_hash_consistency_and_commit ~data_hash
     >>= fun ctxt ->
     ( match predecessor_ops_metadata_hash with
     | Some predecessor_ops_metadata_hash ->
-        set_predecessor_ops_metadata_hash ctxt predecessor_ops_metadata_hash
+        add_predecessor_ops_metadata_hash ctxt predecessor_ops_metadata_hash
     | None ->
         Lwt.return ctxt )
     >>= fun ctxt ->

@@ -750,8 +750,7 @@ let finalize_block_header shell_header ~timestamp validation_result operations
             return context
         | Running {expiration; _} ->
             if Time.Protocol.(expiration <= timestamp) then
-              Context.set_test_chain context Not_running
-              >>= fun context -> return context
+              Context.add_test_chain context Not_running >>= return
             else return context
         | Forking _ ->
             fail Forking_test_chain)

@@ -117,7 +117,7 @@ let initialize_context_with_fan_out rng_state context fan_out depth
       (fun ctxt key ->
         let path = path @ [key] in
         let bytes = Base_samplers.uniform_bytes rng_state ~nbytes:8 in
-        Tezos_storage.Context.set ctxt path bytes >>= fun ctxt -> return ctxt)
+        Tezos_storage.Context.add ctxt path bytes >>= return)
       context
       keys
     >>=? fun context -> return (List.hd keys |> Option.get, context)
@@ -125,7 +125,7 @@ let initialize_context_with_fan_out rng_state context fan_out depth
   let rec loop context path depth =
     if depth = 0 then
       let bytes = Base_samplers.uniform_bytes rng_state ~nbytes:storage_size in
-      Tezos_storage.Context.set context path bytes
+      Tezos_storage.Context.add context path bytes
       >>= fun context -> return (context, path)
     else
       populate_dummy path fan_out

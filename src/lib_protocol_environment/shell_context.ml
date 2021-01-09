@@ -30,7 +30,21 @@ let ( >>= ) = Lwt.( >>= )
 
 type _ Context.kind += Shell : Tezos_storage.Context.t Context.kind
 
-let ops = (module Tezos_storage.Context : CONTEXT with type t = 'ctxt)
+module C = struct
+  include Tezos_storage.Context
+
+  let set = add
+
+  let get = find
+
+  let dir_mem = mem_tree
+
+  let remove_rec = remove
+
+  let set_protocol = add_protocol
+end
+
+let ops = (module C : CONTEXT with type t = 'ctxt)
 
 let checkout index context_hash =
   Tezos_storage.Context.checkout index context_hash

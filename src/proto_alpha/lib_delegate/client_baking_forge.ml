@@ -750,15 +750,14 @@ let finalize_block_header shell_header ~timestamp validation_result operations
             return context
         | Running {expiration; _} ->
             if Time.Protocol.(expiration <= timestamp) then
-              Context.set_test_chain context Not_running
-              >>= fun context -> return context
+              Context.add_test_chain context Not_running >>= return
             else return context
         | Forking _ ->
             fail Forking_test_chain)
   >>=? fun context ->
   ( match predecessor_block_metadata_hash with
   | Some predecessor_block_metadata_hash ->
-      Context.set_predecessor_block_metadata_hash
+      Context.add_predecessor_block_metadata_hash
         context
         predecessor_block_metadata_hash
   | None ->
@@ -766,7 +765,7 @@ let finalize_block_header shell_header ~timestamp validation_result operations
   >>= fun context ->
   ( match predecessor_ops_metadata_hash with
   | Some predecessor_ops_metadata_hash ->
-      Context.set_predecessor_ops_metadata_hash
+      Context.add_predecessor_ops_metadata_hash
         context
         predecessor_ops_metadata_hash
   | None ->
