@@ -17,7 +17,7 @@ keywords = ["tezos"]
 
 
 [tool.poetry.dependencies]
-python = "~3.8"
+python = "~3.9"
 
 base58check = "1.0.2"
 ed25519 = "1.4"

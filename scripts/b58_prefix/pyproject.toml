@@ -16,7 +16,7 @@ keywords = ["tezos"]
 
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.9"
 base58 = "*"
 fire = "*"
 pylint = "*"
