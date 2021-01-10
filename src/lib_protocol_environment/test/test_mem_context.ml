@@ -190,7 +190,7 @@ let keys t = fold_keys t ~init:[] ~f:(fun k acc -> Lwt.return (k :: acc))
 (** Restore the context at [genesis] and fold upon a context a series
     of key prefixes using {!Context.fold}.
 *)
-let test_fold {genesis = ctxt; _} =
+let test_fold_keys {genesis = ctxt; _} =
   Context.add ctxt ["a"; "b"] (Bytes.of_string "Novembre")
   >>= fun ctxt ->
   Context.add ctxt ["a"; "c"] (Bytes.of_string "Juin")
@@ -223,6 +223,165 @@ let test_fold {genesis = ctxt; _} =
   >>= fun l ->
   Assert.equal_string_list_list ~msg:__LOC__ [] l ;
   Lwt.return_unit
+
+let test_fold {genesis = ctxt; _} =
+  let foo1 = Bytes.of_string "foo1" in
+  let foo2 = Bytes.of_string "foo2" in
+  Context.add ctxt ["foo"; "toto"] foo1
+  >>= fun ctxt ->
+  Context.add ctxt ["foo"; "bar"; "toto"] foo2
+  >>= fun ctxt ->
+  let fold depth ecs ens =
+    Context.fold
+      ?depth
+      ctxt
+      []
+      ~f:(fun path tree (cs, ns) ->
+        match Context.Tree.kind tree with
+        | `Value _ ->
+            Lwt.return (path :: cs, ns)
+        | `Tree ->
+            Lwt.return (cs, path :: ns))
+      ~init:([], [])
+    >>= fun (cs, ns) ->
+    Assert.equal_string_list_list ~msg:__LOC__ ecs cs ;
+    Assert.equal_string_list_list ~msg:__LOC__ ens ns ;
+    Lwt.return ()
+  in
+  fold
+    None
+    [["foo"; "toto"]; ["foo"; "bar"; "toto"]]
+    [["foo"; "bar"]; ["foo"]; []]
+  >>= fun () ->
+  fold (Some (`Eq 0)) [] [[]]
+  >>= fun () ->
+  fold (Some (`Eq 1)) [] [["foo"]]
+  >>= fun () ->
+  fold (Some (`Eq 2)) [["foo"; "toto"]] [["foo"; "bar"]]
+  >>= fun () ->
+  fold (Some (`Lt 2)) [] [["foo"]; []]
+  >>= fun () ->
+  fold (Some (`Le 2)) [["foo"; "toto"]] [["foo"; "bar"]; ["foo"]; []]
+  >>= fun () ->
+  fold (Some (`Ge 2)) [["foo"; "toto"]; ["foo"; "bar"; "toto"]] [["foo"; "bar"]]
+  >>= fun () -> fold (Some (`Gt 2)) [["foo"; "bar"; "toto"]] []
+
+let steps =
+  ["00"; "01"; "02"; "03"; "05"; "06"; "07"; "09"; "0a"; "0b"; "0c";
+   "0e"; "0f"; "10"; "11"; "12"; "13"; "14"; "15"; "16"; "17"; "19";
+   "1a"; "1b"; "1c"; "1d"; "1e"; "1f"; "20"; "22"; "23"; "25"; "26";
+   "27"; "28"; "2a"; "2b"; "2f"; "30"; "31"; "32"; "33"; "35"; "36";
+   "37"; "3a"; "3b"; "3c"; "3d"; "3e"; "3f"; "40"; "42"; "43"; "45";
+   "46"; "47"; "48"; "4a"; "4b"; "4c"; "4e"; "4f"; "50"; "52"; "53";
+   "54"; "55"; "56"; "57"; "59"; "5b"; "5c"; "5f"; "60"; "61"; "62";
+   "63"; "64"; "65"; "66"; "67"; "69"; "6b"; "6c"; "6d"; "6e"; "6f";
+   "71"; "72"; "73"; "74"; "75"; "78"; "79"; "7a"; "7b"; "7c"; "7d";
+   "7e"; "80"; "82"; "83"; "84"; "85"; "86"; "88"; "8b"; "8c"; "8d";
+   "8f"; "92"; "93"; "94"; "96"; "97"; "99"; "9a"; "9b"; "9d"; "9e";
+   "9f"; "a0"; "a1"; "a2"; "a3"; "a4"; "a5"; "a6"; "a7"; "a8"; "aa";
+   "ab"; "ac"; "ad"; "ae"; "af"; "b0"; "b1"; "b2"; "b3"; "b4"; "b6";
+   "b8"; "b9"; "bb"; "bc"; "bf"; "c0"; "c1"; "c2"; "c3"; "c4"; "c5";
+   "c8"; "c9"; "cb"; "cc"; "cd"; "ce"; "d0"; "d1"; "d2"; "d4"; "d5";
+   "d7"; "d8"; "d9"; "da"; "e0"; "e3"; "e6"; "e8"; "e9"; "ea"; "ec";
+   "ee"; "ef"; "f0"; "f1"; "f5"; "f7"; "f8"; "f9"; "fb"; "fc"; "fd";
+   "fe"; "ff"]
+[@@ocamlformat "disable"]
+
+let bindings =
+  let zero = Bytes.make 10 '0' in
+  List.map (fun x -> (["root"; x], zero)) steps
+
+let test_fold_order {genesis = ctxt; _} =
+  Lwt_list.fold_left_s (fun ctxt (k, v) -> Context.add ctxt k v) ctxt bindings
+  >>= fun ctxt ->
+  (* check that folding over a in-memory checkout is ok. It would be
+     nice to test this on a checkout as well, but [Context] doesn't
+     expose the right hooks (yet?). *)
+  fold_keys ctxt ["root"] ~init:[] ~f:(fun k acc -> Lwt.return (k :: acc))
+  >>= fun bs ->
+  let bs = List.rev bs in
+  Assert.equal_string_list_list ~msg:__LOC__ (List.map fst bindings) bs ;
+  Lwt.return_unit
+
+let test_trees {genesis = ctxt; _} =
+  Context.Tree.fold
+    ~depth:(`Eq 1)
+    ~init:()
+    (Context.Tree.empty ctxt)
+    []
+    ~f:(fun k _ () ->
+      assert (List.length k = 1) ;
+      Assert.fail_msg "empty")
+  >>= fun () ->
+  let foo1 = Bytes.of_string "foo1" in
+  let foo2 = Bytes.of_string "foo2" in
+  Context.Tree.empty ctxt
+  |> fun v1 ->
+  Context.Tree.add v1 ["foo"; "toto"] foo1
+  >>= fun v1 ->
+  Context.Tree.add v1 ["foo"; "bar"; "toto"] foo2
+  >>= fun v1 ->
+  let fold depth ecs ens =
+    Context.Tree.fold
+      v1
+      ?depth
+      []
+      ~f:(fun path tree (cs, ns) ->
+        match Context.Tree.kind tree with
+        | `Value _ ->
+            Lwt.return (path :: cs, ns)
+        | `Tree ->
+            Lwt.return (cs, path :: ns))
+      ~init:([], [])
+    >>= fun (cs, ns) ->
+    Assert.equal_string_list_list ~msg:__LOC__ ecs cs ;
+    Assert.equal_string_list_list ~msg:__LOC__ ens ns ;
+    Lwt.return ()
+  in
+  fold
+    None
+    [["foo"; "toto"]; ["foo"; "bar"; "toto"]]
+    [["foo"; "bar"]; ["foo"]; []]
+  >>= fun () ->
+  fold (Some (`Eq 0)) [] [[]]
+  >>= fun () ->
+  fold (Some (`Eq 1)) [] [["foo"]]
+  >>= fun () ->
+  fold (Some (`Eq 2)) [["foo"; "toto"]] [["foo"; "bar"]]
+  >>= fun () ->
+  fold (Some (`Lt 2)) [] [["foo"]; []]
+  >>= fun () ->
+  fold (Some (`Le 2)) [["foo"; "toto"]] [["foo"; "bar"]; ["foo"]; []]
+  >>= fun () ->
+  fold (Some (`Ge 2)) [["foo"; "toto"]; ["foo"; "bar"; "toto"]] [["foo"; "bar"]]
+  >>= fun () ->
+  fold (Some (`Gt 2)) [["foo"; "bar"; "toto"]] []
+  >>= fun () ->
+  Context.Tree.remove v1 ["foo"; "bar"; "toto"]
+  >>= fun v1 ->
+  Context.Tree.find v1 ["foo"; "bar"; "toto"]
+  >>= fun v ->
+  Assert.equal_bytes_option ~msg:__LOC__ None v ;
+  Context.Tree.find v1 ["foo"; "toto"]
+  >>= fun v ->
+  Assert.equal_bytes_option ~msg:__LOC__ (Some foo1) v ;
+  Context.Tree.empty ctxt
+  |> fun v1 ->
+  Context.Tree.add v1 ["foo"; "1"] foo1
+  >>= fun v1 ->
+  Context.Tree.add v1 ["foo"; "2"] foo2
+  >>= fun v1 ->
+  Context.Tree.remove v1 ["foo"; "1"]
+  >>= fun v1 ->
+  Context.Tree.remove v1 ["foo"; "2"]
+  >>= fun v1 ->
+  Context.Tree.find v1 ["foo"; "1"]
+  >>= fun v ->
+  Assert.equal_bytes_option ~msg:__LOC__ None v ;
+  Context.Tree.remove v1 []
+  >>= fun v1 ->
+  Assert.equal_bool ~msg:__LOC__ true (Context.Tree.is_empty v1) ;
+  Lwt.return ()
 
 (* We now test the [keys] function.
  *
@@ -335,7 +494,10 @@ let tests =
     ("continuation", test_continuation);
     ("fork", test_fork);
     ("replay", test_replay);
-    ("fold", test_fold) ]
+    ("fold_keys", test_fold_keys);
+    ("fold", test_fold);
+    ("fold order", test_fold_order);
+    ("trees", test_trees) ]
 
 let domain_tests =
   [ ("domain0", test_domain0);
