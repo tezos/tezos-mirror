@@ -205,12 +205,12 @@ let parse_type_annot : Script.location -> string list -> unit tzresult =
 let parse_composed_type_annot :
     Script.location ->
     string list ->
-    (type_annot option * field_annot option * field_annot option) tzresult =
+    (field_annot option * field_annot option) tzresult =
  fun loc annot ->
   parse_annots loc annot >>? classify_annot loc >>? fun (vars, types, fields) ->
   error_unexpected_annot loc vars >>? fun () ->
-  get_one_annot loc types >>? fun t ->
-  get_two_annot loc fields >|? fun (f1, f2) -> (t, f1, f2)
+  get_one_annot loc types >>? fun _t ->
+  get_two_annot loc fields >|? fun (f1, f2) -> (f1, f2)
 
 let parse_field_annot :
     Script.location -> string list -> field_annot option tzresult =

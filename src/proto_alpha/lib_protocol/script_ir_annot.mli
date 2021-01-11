@@ -77,7 +77,7 @@ val parse_field_annot :
 val parse_composed_type_annot :
   Script.location ->
   string list ->
-  (type_annot option * field_annot option * field_annot option) tzresult
+  (field_annot option * field_annot option) tzresult
 
 (** Extract and remove a field annotation from a node *)
 val extract_field_annot :

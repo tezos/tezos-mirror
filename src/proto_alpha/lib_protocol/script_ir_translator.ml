@@ -1504,8 +1504,7 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_ty :
         (if legacy then
          (* legacy semantics with (broken) field annotations *)
          extract_field_annot ut >>? fun (ut, _some_constr) ->
-         parse_composed_type_annot loc annot
-         >>? fun (_ty_name, _none_constr, _) -> ok ut
+         parse_composed_type_annot loc annot >>? fun (_none_constr, _) -> ok ut
         else parse_type_annot loc annot >>? fun () -> ok ut)
         >>? fun ut ->
         parse_ty
@@ -1697,7 +1696,7 @@ let parse_storage_ty :
             remaining_storage
           >>? fun (Ex_ty remaining_storage, ctxt) ->
           parse_composed_type_annot loc storage_annot
-          >>? fun (_annot, map_field, storage_field) ->
+          >>? fun (map_field, storage_field) ->
           pair_t loc (big_map_ty, map_field) (remaining_storage, storage_field)
           >|? fun ty -> (Ex_ty ty, ctxt))
   | _ -> (parse_normal_storage_ty [@tailcall]) ctxt ~stack_depth ~legacy node
