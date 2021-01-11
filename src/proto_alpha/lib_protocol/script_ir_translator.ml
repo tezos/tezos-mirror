@@ -202,12 +202,8 @@ let rec unparse_comparable_ty_uncarbonated :
   | Address_key _meta -> Prim (loc, T_address, [], [])
   | Chain_id_key _meta -> Prim (loc, T_chain_id, [], [])
   | Pair_key (l, r, _meta) -> (
-      let tl =
-        add_field_annot None (unparse_comparable_ty_uncarbonated ~loc l)
-      in
-      let tr =
-        add_field_annot None (unparse_comparable_ty_uncarbonated ~loc r)
-      in
+      let tl = unparse_comparable_ty_uncarbonated ~loc l in
+      let tr = unparse_comparable_ty_uncarbonated ~loc r in
       (* Fold [pair a1 (pair ... (pair an-1 an))] into [pair a1 ... an] *)
       (* Note that the folding does not happen if the pair on the right has a
          field annotation because this annotation would be lost *)
@@ -215,12 +211,8 @@ let rec unparse_comparable_ty_uncarbonated :
       | Prim (_, T_pair, ts, []) -> Prim (loc, T_pair, tl :: ts, [])
       | _ -> Prim (loc, T_pair, [tl; tr], []))
   | Union_key (l, r, _meta) ->
-      let tl =
-        add_field_annot None (unparse_comparable_ty_uncarbonated ~loc l)
-      in
-      let tr =
-        add_field_annot None (unparse_comparable_ty_uncarbonated ~loc r)
-      in
+      let tl = unparse_comparable_ty_uncarbonated ~loc l in
+      let tr = unparse_comparable_ty_uncarbonated ~loc r in
       Prim (loc, T_or, [tl; tr], [])
   | Option_key (t, _meta) ->
       Prim (loc, T_option, [unparse_comparable_ty_uncarbonated ~loc t], [])
@@ -257,10 +249,8 @@ let rec unparse_ty_uncarbonated :
       prim (T_contract, [t], [])
   | Pair_t (utl, utr, _meta) ->
       let annot = [] in
-      let utl = unparse_ty_uncarbonated ~loc utl in
-      let tl = add_field_annot None utl in
-      let utr = unparse_ty_uncarbonated ~loc utr in
-      let tr = add_field_annot None utr in
+      let tl = unparse_ty_uncarbonated ~loc utl in
+      let tr = unparse_ty_uncarbonated ~loc utr in
       (* Fold [pair a1 (pair ... (pair an-1 an))] into [pair a1 ... an] *)
       (* Note that the folding does not happen if the pair on the right has an
          annotation because this annotation would be lost *)

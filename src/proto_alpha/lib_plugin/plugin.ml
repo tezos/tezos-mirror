@@ -1935,12 +1935,12 @@ module RPC = struct
         | Address_key _meta -> Prim (loc, T_address, [], [])
         | Chain_id_key _meta -> Prim (loc, T_chain_id, [], [])
         | Pair_key (l, r, _meta) ->
-            let tl = add_field_annot None (unparse_comparable_ty ~loc l) in
-            let tr = add_field_annot None (unparse_comparable_ty ~loc r) in
+            let tl = unparse_comparable_ty ~loc l in
+            let tr = unparse_comparable_ty ~loc r in
             Prim (loc, T_pair, [tl; tr], [])
         | Union_key (l, r, _meta) ->
-            let tl = add_field_annot None (unparse_comparable_ty ~loc l) in
-            let tr = add_field_annot None (unparse_comparable_ty ~loc r) in
+            let tl = unparse_comparable_ty ~loc l in
+            let tr = unparse_comparable_ty ~loc r in
             Prim (loc, T_or, [tl; tr], [])
         | Option_key (t, _meta) ->
             Prim (loc, T_option, [unparse_comparable_ty ~loc t], [])
@@ -1977,10 +1977,8 @@ module RPC = struct
             return (T_contract, [t], [])
         | Pair_t (utl, utr, _meta) ->
             let annot = [] in
-            let utl = unparse_ty ~loc utl in
-            let tl = add_field_annot None utl in
-            let utr = unparse_ty ~loc utr in
-            let tr = add_field_annot None utr in
+            let tl = unparse_ty ~loc utl in
+            let tr = unparse_ty ~loc utr in
             return (T_pair, [tl; tr], annot)
         | Union_t ((utl, l_field), (utr, r_field), _meta) ->
             let annot = [] in
