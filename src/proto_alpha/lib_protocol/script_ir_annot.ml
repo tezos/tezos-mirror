@@ -428,14 +428,8 @@ let var_annot_from_special :
   | None -> value_annot
 
 let parse_destr_annot :
-    Script.location ->
-    string list ->
-    default_accessor:field_annot option ->
-    field_name:field_annot option ->
-    pair_annot:var_annot option ->
-    value_annot:var_annot option ->
-    field_annot option tzresult =
- fun loc annot ~default_accessor:_ ~field_name:_ ~pair_annot:_ ~value_annot:_ ->
+    Script.location -> string list -> field_annot option tzresult =
+ fun loc annot ->
   parse_annots loc ~allow_special_var:true annot >>? classify_annot loc
   >>? fun (vars, types, fields) ->
   error_unexpected_annot loc types >>? fun () ->

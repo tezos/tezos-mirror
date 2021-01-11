@@ -3391,28 +3391,14 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       let unpair = {apply = (fun kinfo k -> IUnpair (kinfo, k))} in
       typed ctxt loc unpair (Item_t (a, Item_t (b, rest)))
   | ( Prim (loc, I_CAR, [], annot),
-      Item_t (Pair_t ((a, expected_field_annot, a_annot), _, _), rest) ) ->
-      parse_destr_annot
-        loc
-        annot
-        ~pair_annot:None
-        ~value_annot:a_annot
-        ~field_name:expected_field_annot
-        ~default_accessor:default_car_annot
-      >>?= fun field_annot ->
+      Item_t (Pair_t ((a, expected_field_annot, _a_annot), _, _), rest) ) ->
+      parse_destr_annot loc annot >>?= fun field_annot ->
       check_correct_field field_annot expected_field_annot >>?= fun () ->
       let car = {apply = (fun kinfo k -> ICar (kinfo, k))} in
       typed ctxt loc car (Item_t (a, rest))
   | ( Prim (loc, I_CDR, [], annot),
-      Item_t (Pair_t (_, (b, expected_field_annot, b_annot), _), rest) ) ->
-      parse_destr_annot
-        loc
-        annot
-        ~pair_annot:None
-        ~value_annot:b_annot
-        ~field_name:expected_field_annot
-        ~default_accessor:default_cdr_annot
-      >>?= fun field_annot ->
+      Item_t (Pair_t (_, (b, expected_field_annot, _b_annot), _), rest) ) ->
+      parse_destr_annot loc annot >>?= fun field_annot ->
       check_correct_field field_annot expected_field_annot >>?= fun () ->
       let cdr = {apply = (fun kinfo k -> ICdr (kinfo, k))} in
       typed ctxt loc cdr (Item_t (b, rest))
