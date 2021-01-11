@@ -2,6 +2,7 @@
  (names test_bits
         test_tzList
         test_tzString
+        test_fallbackArray
         test_lwt_pipe
         test_circular_buffer
         test_circular_buffer_fuzzy)
@@ -32,6 +33,10 @@
 (rule
  (alias runtest_tzString)
  (action (run %{exe:test_tzString.exe})))
+
+(rule
+ (alias runtest_fallbackArray)
+ (action (run %{exe:test_fallbackArray.exe})))
 
 (rule
  (alias runtest_lwt_pipe)
