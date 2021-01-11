@@ -61,8 +61,6 @@ val unparse_field_annot : field_annot option -> string list
 
 (** Conversion functions between different annotation kinds *)
 
-val field_to_var_annot : field_annot option -> var_annot option
-
 val type_to_var_annot : type_annot option -> var_annot option
 
 (** Converts a field annot option to an entrypoint.

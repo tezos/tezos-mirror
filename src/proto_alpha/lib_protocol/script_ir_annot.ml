@@ -73,10 +73,6 @@ let unparse_field_annot : field_annot option -> string list = function
   | None -> []
   | Some (Field_annot a) -> ["%" ^ (a :> string)]
 
-let field_to_var_annot : field_annot option -> var_annot option = function
-  | None -> None
-  | Some (Field_annot s) -> Some (Var_annot s)
-
 let type_to_var_annot : type_annot option -> var_annot option = function
   | None -> None
   | Some (Type_annot s) -> Some (Var_annot s)

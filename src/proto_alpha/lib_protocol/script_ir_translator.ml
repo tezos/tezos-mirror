@@ -3636,8 +3636,6 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       let k = ty_of_comparable_ty ck in
       check_kind [Seq_kind] body >>?= fun () ->
       parse_var_type_annot loc annot >>?= fun ty_name ->
-      let _k_name = field_to_var_annot default_key_annot in
-      let _e_name = field_to_var_annot default_elt_annot in
       pair_t loc (k, None) (elt, None) ~annot:None >>?= fun ty ->
       non_terminal_recursion
         ?type_logger
@@ -3682,8 +3680,6 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       Item_t (Map_t (comp_elt, element_ty, _), rest) ) -> (
       check_kind [Seq_kind] body >>?= fun () ->
       error_unexpected_annot loc annot >>?= fun () ->
-      let _k_name = field_to_var_annot default_key_annot in
-      let _e_name = field_to_var_annot default_elt_annot in
       let key = ty_of_comparable_ty comp_elt in
       pair_t loc (key, None) (element_ty, None) ~annot:None >>?= fun ty ->
       non_terminal_recursion
