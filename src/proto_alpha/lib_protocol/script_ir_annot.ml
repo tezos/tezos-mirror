@@ -384,39 +384,24 @@ let parse_var_annot :
   | Some _ as a -> a
   | None -> ( match default with Some a -> a | None -> None)
 
-let split_if_special ~loc v f =
+let split_if_special ~loc f =
   match f with
   | Some (Field_annot fa) when Non_empty_string.(fa = at) ->
       error (Unexpected_annotation loc)
-  | _ -> ok v
-
-let common_prefix v1 v2 =
-  match (v1, v2) with
-  | (Some (Var_annot s1), Some (Var_annot s2)) when Non_empty_string.(s1 = s2)
-    ->
-      v1
-  | (Some _, None) -> v1
-  | (None, Some _) -> v2
-  | (_, _) -> None
+  | _ -> ok ()
 
 let parse_constr_annot :
     Script.location ->
     string list ->
-    (var_annot option
-    * type_annot option
-    * field_annot option
-    * field_annot option)
-    tzresult =
+    (type_annot option * field_annot option * field_annot option) tzresult =
  fun loc annot ->
   parse_annots ~allow_special_field:true loc annot >>? classify_annot loc
   >>? fun (vars, types, fields) ->
-  get_one_annot loc vars >>? fun v ->
+  get_one_annot loc vars >>? fun (_v : var_annot option) ->
   get_one_annot loc types >>? fun t ->
   get_two_annot loc fields >>? fun (f1, f2) ->
-  split_if_special ~loc v f1 >>? fun v1 ->
-  split_if_special ~loc v f2 >|? fun v2 ->
-  let v = match v with None -> common_prefix v1 v2 | Some _ -> v in
-  (v, t, f1, f2)
+  split_if_special ~loc f1 >>? fun () ->
+  split_if_special ~loc f2 >|? fun () -> (t, f1, f2)
 
 let parse_two_var_annot :
     Script.location ->

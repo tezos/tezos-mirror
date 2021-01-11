@@ -194,11 +194,7 @@ val is_allowed_char : char -> bool
 val parse_constr_annot :
   Script.location ->
   string list ->
-  (var_annot option
-  * type_annot option
-  * field_annot option
-  * field_annot option)
-  tzresult
+  (type_annot option * field_annot option * field_annot option) tzresult
 
 val parse_two_var_annot :
   Script.location ->
