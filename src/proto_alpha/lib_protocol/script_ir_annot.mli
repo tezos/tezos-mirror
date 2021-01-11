@@ -93,10 +93,7 @@ val check_two_var_annot : Script.location -> string list -> unit tzresult
 val parse_destr_annot :
   Script.location -> string list -> field_annot option tzresult
 
-val parse_unpair_annot :
-  Script.location ->
-  string list ->
-  (field_annot option * field_annot option) tzresult
+val check_unpair_annot : Script.location -> string list -> unit tzresult
 
 val parse_entrypoint_annot :
   Script.location -> string list -> field_annot option tzresult
