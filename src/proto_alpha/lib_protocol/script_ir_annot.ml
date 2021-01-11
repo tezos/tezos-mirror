@@ -263,15 +263,15 @@ let ignore_special f =
 let parse_constr_annot :
     Script.location ->
     string list ->
-    (type_annot option * field_annot option * field_annot option) tzresult =
+    (field_annot option * field_annot option) tzresult =
  fun loc annot ->
   parse_annots ~allow_special_field:true loc annot >>? classify_annot loc
   >>? fun (vars, types, fields) ->
   get_one_annot loc vars >>? fun (_v : var_annot option) ->
-  get_one_annot loc types >>? fun t ->
+  get_one_annot loc types >>? fun (_t : type_annot option) ->
   get_two_annot loc fields >>? fun (f1, f2) ->
   ignore_special f1 >>? fun f1 ->
-  ignore_special f2 >|? fun f2 -> (t, f1, f2)
+  ignore_special f2 >|? fun f2 -> (f1, f2)
 
 let check_two_var_annot : Script.location -> string list -> unit tzresult =
  fun loc annot ->
