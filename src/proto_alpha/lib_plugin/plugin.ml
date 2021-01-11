@@ -1975,12 +1975,12 @@ module RPC = struct
         | Contract_t (ut, _meta) ->
             let t = unparse_ty ~loc ut in
             return (T_contract, [t], [])
-        | Pair_t ((utl, l_field), (utr, r_field), _meta) ->
+        | Pair_t (utl, utr, _meta) ->
             let annot = [] in
             let utl = unparse_ty ~loc utl in
-            let tl = add_field_annot l_field utl in
+            let tl = add_field_annot None utl in
             let utr = unparse_ty ~loc utr in
-            let tr = add_field_annot r_field utr in
+            let tr = add_field_annot None utr in
             return (T_pair, [tl; tr], annot)
         | Union_t ((utl, l_field), (utr, r_field), _meta) ->
             let annot = [] in
