@@ -2633,7 +2633,7 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
            ~stack_depth:(stack_depth + 1)
            ctxt
            ~legacy
-           (ta, lambda_arg_annot)
+           ta
            tr
            script_instr
   | (Lambda_t _, expr) ->
@@ -2919,18 +2919,11 @@ and[@coq_axiom_with_reason "gadt"] parse_returning :
     tc_context ->
     context ->
     legacy:bool ->
-    arg ty * var_annot option ->
+    arg ty ->
     ret ty ->
     Script.node ->
     ((arg, ret) lambda * context) tzresult Lwt.t =
- fun ?type_logger
-     ~stack_depth
-     tc_context
-     ctxt
-     ~legacy
-     (arg, _arg_annot)
-     ret
-     script_instr ->
+ fun ?type_logger ~stack_depth tc_context ctxt ~legacy arg ret script_instr ->
   parse_instr
     ?type_logger
     tc_context
@@ -4030,7 +4023,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         ~stack_depth:(stack_depth + 1)
         ctxt
         ~legacy
-        (arg, default_arg_annot)
+        arg
         ret
         code
       >>=? fun (lambda, ctxt) ->
@@ -4704,7 +4697,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
            ~legacy
            ?type_logger
            ~stack_depth:(stack_depth + 1)
-           (arg_type_full, None)
+           arg_type_full
            ret_type_full
            code_field)
       >>=? fun ( (Lam
@@ -5524,7 +5517,7 @@ let parse_code :
        ~legacy
        ~stack_depth:0
        ?type_logger
-       (arg_type_full, None)
+       arg_type_full
        ret_type_full
        code_field)
   >>=? fun (code, ctxt) ->
@@ -5654,7 +5647,7 @@ let typecheck_code :
       ~legacy
       ~stack_depth:0
       ?type_logger
-      (arg_type_full, None)
+      arg_type_full
       ret_type_full
       code_field
   in
