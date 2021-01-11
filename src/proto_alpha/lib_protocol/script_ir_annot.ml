@@ -65,10 +65,6 @@ let unparse_type_annot : type_annot option -> string list = function
   | None -> []
   | Some (Type_annot a) -> [":" ^ (a :> string)]
 
-let unparse_var_annot : var_annot option -> string list = function
-  | None -> []
-  | Some (Var_annot a) -> ["@" ^ (a :> string)]
-
 let unparse_field_annot : field_annot option -> string list = function
   | None -> []
   | Some (Field_annot a) -> ["%" ^ (a :> string)]

@@ -55,8 +55,6 @@ val default_key_annot : field_annot option
 
 val unparse_type_annot : type_annot option -> string list
 
-val unparse_var_annot : var_annot option -> string list
-
 val unparse_field_annot : field_annot option -> string list
 
 (** Converts a field annot option to an entrypoint.
