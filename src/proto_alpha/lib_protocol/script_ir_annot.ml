@@ -435,14 +435,12 @@ let parse_entrypoint_annot :
     Script.location ->
     ?default:var_annot option ->
     string list ->
-    (var_annot option * field_annot option) tzresult =
- fun loc ?default annot ->
+    field_annot option tzresult =
+ fun loc ?default:_ annot ->
   parse_annots loc annot >>? classify_annot loc >>? fun (vars, types, fields) ->
   error_unexpected_annot loc types >>? fun () ->
   get_one_annot loc fields >>? fun f ->
-  get_one_annot loc vars >|? function
-  | Some _ as a -> (a, f)
-  | None -> ( match default with Some a -> (a, f) | None -> (None, f))
+  get_one_annot loc vars >|? fun (_v : var_annot option) -> f
 
 let parse_var_type_annot :
     Script.location ->
