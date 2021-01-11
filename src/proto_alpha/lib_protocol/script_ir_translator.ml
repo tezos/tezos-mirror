@@ -994,8 +994,6 @@ let merge_types :
           merge_type_metadata tn1 tn2 >>$ fun tname ->
           merge_field_annot ~legacy l_field1 l_field2 >>$ fun l_field ->
           merge_field_annot ~legacy r_field1 r_field2 >>$ fun r_field ->
-          let _l_var = merge_var_annot None None in
-          let _r_var = merge_var_annot None None in
           help tal tbl >>$ fun (Eq, left_ty) ->
           help tar tbr >|$ fun (Eq, right_ty) ->
           ( (Eq : (ta ty, tb ty) eq),

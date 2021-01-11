@@ -91,9 +91,6 @@ val merge_field_annot :
   field_annot option ->
   (field_annot option, 'error_trace) result
 
-(** Merge variable annotations, does not fail ([None] if different). *)
-val merge_var_annot : var_annot option -> var_annot option -> var_annot option
-
 (** @return an error {!Unexpected_annotation} in the monad the list is not empty. *)
 val error_unexpected_annot : Script.location -> 'a list -> unit tzresult
 

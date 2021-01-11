@@ -127,13 +127,6 @@ let merge_field_annot :
               @@ Inconsistent_annotations
                    ("%" ^ (a1 :> string), "%" ^ (a2 :> string)))
 
-let merge_var_annot : var_annot option -> var_annot option -> var_annot option =
- fun annot1 annot2 ->
-  match (annot1, annot2) with
-  | (None, None) | (Some _, None) | (None, Some _) -> None
-  | (Some (Var_annot a1), Some (Var_annot a2)) ->
-      if Non_empty_string.(a1 = a2) then annot1 else None
-
 let error_unexpected_annot loc annot =
   match annot with
   | [] -> Result.return_unit
