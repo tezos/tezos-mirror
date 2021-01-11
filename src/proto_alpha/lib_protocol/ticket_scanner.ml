@@ -123,8 +123,8 @@ module Ticket_inspection = struct
     | Timestamp_key _ -> (k [@ocaml.tailcall]) False_ht
     | Chain_id_key _ -> (k [@ocaml.tailcall]) False_ht
     | Address_key _ -> (k [@ocaml.tailcall]) False_ht
-    | Pair_key ((_, _), (_, _), _) -> (k [@ocaml.tailcall]) False_ht
-    | Union_key (_, (_, _), _) -> (k [@ocaml.tailcall]) False_ht
+    | Pair_key (_, _, _) -> (k [@ocaml.tailcall]) False_ht
+    | Union_key (_, _, _) -> (k [@ocaml.tailcall]) False_ht
     | Option_key (_, _) -> (k [@ocaml.tailcall]) False_ht
 
   (* Short circuit pairing of two [has_tickets] values.
@@ -285,8 +285,8 @@ module Ticket_collection = struct
     | Timestamp_key _ -> (k [@ocaml.tailcall]) ctxt acc
     | Chain_id_key _ -> (k [@ocaml.tailcall]) ctxt acc
     | Address_key _ -> (k [@ocaml.tailcall]) ctxt acc
-    | Pair_key ((_, _), (_, _), _) -> (k [@ocaml.tailcall]) ctxt acc
-    | Union_key ((_, _), (_, _), _) -> (k [@ocaml.tailcall]) ctxt acc
+    | Pair_key (_, _, _) -> (k [@ocaml.tailcall]) ctxt acc
+    | Union_key (_, _, _) -> (k [@ocaml.tailcall]) ctxt acc
     | Option_key (_, _) -> (k [@ocaml.tailcall]) ctxt acc
 
   let tickets_of_set :

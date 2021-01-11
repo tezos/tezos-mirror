@@ -1388,7 +1388,7 @@ module Cost_of = struct
             (apply [@tailcall]) Gas.(acc +@ compare_timestamp x y) k
         | Address_key _ -> (apply [@tailcall]) Gas.(acc +@ compare_address) k
         | Chain_id_key _ -> (apply [@tailcall]) Gas.(acc +@ compare_chain_id) k
-        | Pair_key ((tl, _), (tr, _), _) ->
+        | Pair_key (tl, tr, _) ->
             (* Reasonable over-approximation of the cost of lexicographic comparison. *)
             let (xl, xr) = x in
             let (yl, yr) = y in
@@ -1398,7 +1398,7 @@ module Cost_of = struct
               yl
               Gas.(acc +@ compare_pair_tag)
               (Compare (tr, xr, yr, k))
-        | Union_key ((tl, _), (tr, _), _) -> (
+        | Union_key (tl, tr, _) -> (
             match (x, y) with
             | (L x, L y) ->
                 (compare [@tailcall]) tl x y Gas.(acc +@ compare_union_tag) k

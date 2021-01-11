@@ -64,17 +64,17 @@ let compare_comparable : type a. a comparable_ty -> a -> a -> int =
     | (Bytes_key _, x, y) -> (apply [@tailcall]) (Compare.Bytes.compare x y) k
     | (Chain_id_key _, x, y) ->
         (apply [@tailcall]) (Script_chain_id.compare x y) k
-    | (Pair_key ((tl, _), (tr, _), _), (lx, rx), (ly, ry)) ->
+    | (Pair_key (tl, tr, _), (lx, rx), (ly, ry)) ->
         (compare_comparable [@tailcall])
           tl
           (Compare_comparable (tr, rx, ry, k))
           lx
           ly
-    | (Union_key ((tl, _), _, _), L x, L y) ->
+    | (Union_key (tl, _, _), L x, L y) ->
         (compare_comparable [@tailcall]) tl k x y
     | (Union_key _, L _, R _) -> -1
     | (Union_key _, R _, L _) -> 1
-    | (Union_key (_, (tr, _), _), R x, R y) ->
+    | (Union_key (_, tr, _), R x, R y) ->
         (compare_comparable [@tailcall]) tr k x y
     | (Option_key _, None, None) -> (apply [@tailcall]) 0 k
     | (Option_key _, None, Some _) -> -1

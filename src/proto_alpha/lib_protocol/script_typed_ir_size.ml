@@ -58,9 +58,9 @@ let (comparable_ty_size, ty_size) =
     | Bool_key a -> ret_succ_adding accu (base_basic a)
     | Chain_id_key a -> ret_succ_adding accu (base_basic a)
     | Never_key a -> ret_succ_adding accu (base_basic a)
-    | Pair_key ((_ty1, _fa1), (_ty2, _fa2), a) ->
+    | Pair_key (_ty1, _ty2, a) ->
         ret_succ_adding accu @@ (base_compound a +! hh6w)
-    | Union_key ((_ty1, _fa1), (_ty2, _fa2), a) ->
+    | Union_key (_ty1, _ty2, a) ->
         ret_succ_adding accu @@ (base_compound a +! hh6w)
     | Option_key (_ty, a) ->
         ret_succ_adding accu @@ (base_compound a +! word_size)

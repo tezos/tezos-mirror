@@ -172,10 +172,12 @@ let rec ty_of_comparable_ty : type a. a comparable_ty -> a ty = function
   | Timestamp_key tname -> Timestamp_t tname
   | Address_key tname -> Address_t tname
   | Chain_id_key tname -> Chain_id_t tname
-  | Pair_key ((l, al), (r, ar), tname) ->
-      Pair_t ((ty_of_comparable_ty l, al), (ty_of_comparable_ty r, ar), tname)
-  | Union_key ((l, al), (r, ar), tname) ->
-      Union_t ((ty_of_comparable_ty l, al), (ty_of_comparable_ty r, ar), tname)
+  | Pair_key (l, r, tname) ->
+      Pair_t
+        ((ty_of_comparable_ty l, None), (ty_of_comparable_ty r, None), tname)
+  | Union_key (l, r, tname) ->
+      Union_t
+        ((ty_of_comparable_ty l, None), (ty_of_comparable_ty r, None), tname)
   | Option_key (t, tname) -> Option_t (ty_of_comparable_ty t, tname)
 
 let add_field_annot a = function
@@ -200,18 +202,26 @@ let rec unparse_comparable_ty_uncarbonated :
   | Timestamp_key _meta -> Prim (loc, T_timestamp, [], [])
   | Address_key _meta -> Prim (loc, T_address, [], [])
   | Chain_id_key _meta -> Prim (loc, T_chain_id, [], [])
-  | Pair_key ((l, al), (r, ar), _meta) -> (
-      let tl = add_field_annot al (unparse_comparable_ty_uncarbonated ~loc l) in
-      let tr = add_field_annot ar (unparse_comparable_ty_uncarbonated ~loc r) in
+  | Pair_key (l, r, _meta) -> (
+      let tl =
+        add_field_annot None (unparse_comparable_ty_uncarbonated ~loc l)
+      in
+      let tr =
+        add_field_annot None (unparse_comparable_ty_uncarbonated ~loc r)
+      in
       (* Fold [pair a1 (pair ... (pair an-1 an))] into [pair a1 ... an] *)
       (* Note that the folding does not happen if the pair on the right has a
          field annotation because this annotation would be lost *)
       match tr with
       | Prim (_, T_pair, ts, []) -> Prim (loc, T_pair, tl :: ts, [])
       | _ -> Prim (loc, T_pair, [tl; tr], []))
-  | Union_key ((l, al), (r, ar), _meta) ->
-      let tl = add_field_annot al (unparse_comparable_ty_uncarbonated ~loc l) in
-      let tr = add_field_annot ar (unparse_comparable_ty_uncarbonated ~loc r) in
+  | Union_key (l, r, _meta) ->
+      let tl =
+        add_field_annot None (unparse_comparable_ty_uncarbonated ~loc l)
+      in
+      let tr =
+        add_field_annot None (unparse_comparable_ty_uncarbonated ~loc r)
+      in
       Prim (loc, T_or, [tl; tr], [])
   | Option_key (t, _meta) ->
       Prim (loc, T_option, [unparse_comparable_ty_uncarbonated ~loc t], [])
@@ -346,14 +356,14 @@ let[@coq_axiom_with_reason "gadt"] rec comparable_ty_of_ty :
   | Timestamp_t tname -> ok (Timestamp_key tname, ctxt)
   | Address_t tname -> ok (Address_key tname, ctxt)
   | Chain_id_t tname -> ok (Chain_id_key tname, ctxt)
-  | Pair_t ((l, al), (r, ar), pname) ->
+  | Pair_t ((l, _al), (r, _ar), pname) ->
       comparable_ty_of_ty ctxt loc l >>? fun (lty, ctxt) ->
       comparable_ty_of_ty ctxt loc r >|? fun (rty, ctxt) ->
-      (Pair_key ((lty, al), (rty, ar), pname), ctxt)
-  | Union_t ((l, al), (r, ar), tname) ->
+      (Pair_key (lty, rty, pname), ctxt)
+  | Union_t ((l, _al), (r, _ar), tname) ->
       comparable_ty_of_ty ctxt loc l >>? fun (lty, ctxt) ->
       comparable_ty_of_ty ctxt loc r >|? fun (rty, ctxt) ->
-      (Union_key ((lty, al), (rty, ar), tname), ctxt)
+      (Union_key (lty, rty, tname), ctxt)
   | Option_t (tt, tname) ->
       comparable_ty_of_ty ctxt loc tt >|? fun (ty, ctxt) ->
       (Option_key (ty, tname), ctxt)
@@ -556,7 +566,7 @@ let unparse_option ~loc unparse_v ctxt = function
 
 let comparable_comb_witness2 :
     type t. t comparable_ty -> (t, unit -> unit -> unit) comb_witness = function
-  | Pair_key (_, (Pair_key _, _), _) -> Comb_Pair (Comb_Pair Comb_Any)
+  | Pair_key (_, Pair_key _, _) -> Comb_Pair (Comb_Pair Comb_Any)
   | Pair_key _ -> Comb_Pair Comb_Any
   | _ -> Comb_Any
 
@@ -594,12 +604,12 @@ let[@coq_axiom_with_reason "gadt"] rec unparse_comparable_data :
   | (Key_hash_key _, k) -> Lwt.return @@ unparse_key_hash ~loc ctxt mode k
   | (Chain_id_key _, chain_id) ->
       Lwt.return @@ unparse_chain_id ~loc ctxt mode chain_id
-  | (Pair_key ((tl, _), (tr, _), _), pair) ->
+  | (Pair_key (tl, tr, _), pair) ->
       let r_witness = comparable_comb_witness2 tr in
       let unparse_l ctxt v = unparse_comparable_data ~loc ctxt mode tl v in
       let unparse_r ctxt v = unparse_comparable_data ~loc ctxt mode tr v in
       unparse_pair ~loc unparse_l unparse_r ctxt mode r_witness pair
-  | (Union_key ((tl, _), (tr, _), _), v) ->
+  | (Union_key (tl, tr, _), v) ->
       let unparse_l ctxt v = unparse_comparable_data ~loc ctxt mode tl v in
       let unparse_r ctxt v = unparse_comparable_data ~loc ctxt mode tr v in
       unparse_union ~loc unparse_l unparse_r ctxt v
@@ -790,34 +800,28 @@ let rec merge_comparable_types :
         return (fun annot -> Chain_id_key annot) Eq annot_a annot_b
     | (Address_key annot_a, Address_key annot_b) ->
         return (fun annot -> Address_key annot) Eq annot_a annot_b
-    | ( Pair_key ((left_a, annot_left_a), (right_a, annot_right_a), annot_a),
-        Pair_key ((left_b, annot_left_b), (right_b, annot_right_b), annot_b) )
+    | (Pair_key (left_a, right_a, annot_a), Pair_key (left_b, right_b, annot_b))
       ->
         merge_type_metadata annot_a annot_b >>$ fun annot ->
-        merge_field_annot ~legacy annot_left_a annot_left_b
-        >>$ fun annot_left ->
-        merge_field_annot ~legacy annot_right_a annot_right_b
-        >>$ fun annot_right ->
+        merge_field_annot ~legacy None None >>$ fun _annot_left ->
+        merge_field_annot ~legacy None None >>$ fun _annot_right ->
         merge_comparable_types ~legacy ~error_details left_a left_b
         >>$ fun (Eq, left) ->
         merge_comparable_types ~legacy ~error_details right_a right_b
         >|$ fun (Eq, right) ->
         ( (Eq : (ta comparable_ty, tb comparable_ty) eq),
-          Pair_key ((left, annot_left), (right, annot_right), annot) )
-    | ( Union_key ((left_a, annot_left_a), (right_a, annot_right_a), annot_a),
-        Union_key ((left_b, annot_left_b), (right_b, annot_right_b), annot_b) )
-      ->
+          Pair_key (left, right, annot) )
+    | ( Union_key (left_a, right_a, annot_a),
+        Union_key (left_b, right_b, annot_b) ) ->
         merge_type_metadata annot_a annot_b >>$ fun annot ->
-        merge_field_annot ~legacy annot_left_a annot_left_b
-        >>$ fun annot_left ->
-        merge_field_annot ~legacy annot_right_a annot_right_b
-        >>$ fun annot_right ->
+        merge_field_annot ~legacy None None >>$ fun _annot_left ->
+        merge_field_annot ~legacy None None >>$ fun _annot_right ->
         merge_comparable_types ~legacy ~error_details left_a left_b
         >>$ fun (Eq, left) ->
         merge_comparable_types ~legacy ~error_details right_a right_b
         >|$ fun (Eq, right) ->
         ( (Eq : (ta comparable_ty, tb comparable_ty) eq),
-          Union_key ((left, annot_left), (right, annot_right), annot) )
+          Union_key (left, right, annot) )
     | (Option_key (ta, annot_a), Option_key (tb, annot_b)) ->
         merge_type_metadata annot_a annot_b >>$ fun annot ->
         merge_comparable_types ~legacy ~error_details ta tb >|$ fun (Eq, t) ->
@@ -1198,29 +1202,27 @@ let[@coq_struct "ty"] rec parse_comparable_ty :
         error (Invalid_arity (loc, prim, 0, List.length l))
     | Prim (loc, T_pair, left :: right, annot) ->
         check_type_annot loc annot >>? fun () ->
-        extract_field_annot left >>? fun (left, left_annot) ->
+        extract_field_annot left >>? fun (left, _left_annot) ->
         (match right with
         | [right] -> extract_field_annot right
         | right ->
             (* Unfold [pair t1 ... tn] as [pair t1 (... (pair tn-1 tn))] *)
             ok (Prim (loc, T_pair, right, []), None))
-        >>? fun (right, right_annot) ->
+        >>? fun (right, _right_annot) ->
         parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt right
         >>? fun (Ex_comparable_ty right, ctxt) ->
         parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt left
         >>? fun (Ex_comparable_ty left, ctxt) ->
-        pair_key loc (left, left_annot) (right, right_annot) >|? fun ty ->
-        (Ex_comparable_ty ty, ctxt)
+        pair_key loc left right >|? fun ty -> (Ex_comparable_ty ty, ctxt)
     | Prim (loc, T_or, [left; right], annot) ->
         check_type_annot loc annot >>? fun () ->
-        extract_field_annot left >>? fun (left, left_annot) ->
-        extract_field_annot right >>? fun (right, right_annot) ->
+        extract_field_annot left >>? fun (left, _left_annot) ->
+        extract_field_annot right >>? fun (right, _right_annot) ->
         parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt right
         >>? fun (Ex_comparable_ty right, ctxt) ->
         parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt left
         >>? fun (Ex_comparable_ty left, ctxt) ->
-        union_key loc (left, left_annot) (right, right_annot) >|? fun ty ->
-        (Ex_comparable_ty ty, ctxt)
+        union_key loc left right >|? fun ty -> (Ex_comparable_ty ty, ctxt)
     | Prim (loc, ((T_pair | T_or) as prim), l, _) ->
         error (Invalid_arity (loc, prim, 2, List.length l))
     | Prim (loc, T_option, [t], annot) ->
@@ -1961,8 +1963,7 @@ let parse_uint11 = parse_uint ~nb_bits:11
 (* This type is used to:
    - serialize and deserialize tickets when they are stored or transferred,
    - type the READ_TICKET instruction. *)
-let opened_ticket_type loc ty =
-  pair_3_key loc (address_key, None) (ty, None) (nat_key, None)
+let opened_ticket_type loc ty = pair_3_key loc address_key ty nat_key
 
 (* -- parse data of primitive types -- *)
 
@@ -2289,12 +2290,12 @@ let[@coq_axiom_with_reason "gadt"] rec parse_comparable_data :
       Lwt.return @@ traced_no_lwt @@ parse_chain_id ctxt expr
   | (Address_key _, expr) ->
       Lwt.return @@ traced_no_lwt @@ parse_address ctxt expr
-  | (Pair_key ((tl, _), (tr, _), _), expr) ->
+  | (Pair_key (tl, tr, _), expr) ->
       let r_witness = comparable_comb_witness1 tr in
       let parse_l ctxt v = parse_comparable_data ?type_logger ctxt tl v in
       let parse_r ctxt v = parse_comparable_data ?type_logger ctxt tr v in
       traced @@ parse_pair parse_l parse_r ctxt ~legacy r_witness expr
-  | (Union_key ((tl, _), (tr, _), _), expr) ->
+  | (Union_key (tl, tr, _), expr) ->
       let parse_l ctxt v = parse_comparable_data ?type_logger ctxt tl v in
       let parse_r ctxt v = parse_comparable_data ?type_logger ctxt tr v in
       traced @@ parse_union parse_l parse_r ctxt ~legacy expr
