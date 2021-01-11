@@ -49,6 +49,8 @@ module type CONTEXT = sig
 
   val set_protocol : t -> Protocol_hash.t -> t Lwt.t
 
+  val get_protocol : t -> Protocol_hash.t Lwt.t
+
   val fork_test_chain :
     t -> protocol:Protocol_hash.t -> expiration:Time.Protocol.t -> t Lwt.t
 end

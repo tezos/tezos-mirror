@@ -23,14 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module StringMap = TzString.Map
+module Local = Tezos_storage_memory.Context
 
 module M = struct
-  type key = string list
+  type key = Local.key
 
-  type value = Bytes.t
+  type value = Local.value
 
-  type tree = Dir of tree StringMap.t | Key of value
+  type tree = [`Value of bytes | `Tree of tree TzString.Map.t]
 
   module type ProxyDelegate = sig
     val proxy_dir_mem : key -> bool tzresult Lwt.t
@@ -42,11 +42,31 @@ module M = struct
 
   type proxy_delegate = (module ProxyDelegate)
 
-  (* When the option is [None], this instance of [M] should behave
-     like [Memory_context]. *)
-  type t = {proxy : proxy_delegate option; tree : tree}
+  (* When the [proxy] option is [None], this instance of [M] should
+     behave like [Memory_context]. *)
+  type t = {proxy : proxy_delegate option; local : Local.tree}
 
-  let empty = Dir StringMap.empty
+  let rec tree_size_aux acc = function
+    | `Value _ ->
+        acc + 1
+    | `Tree t ->
+        TzString.Map.fold (fun _ t acc -> tree_size_aux (acc + 1) t) t acc
+
+  let tree_size = tree_size_aux 0
+
+  let empty = `Tree TzString.Map.empty
+end
+
+module C = struct
+  type key = M.key
+
+  type value = M.value
+
+  type t = M.t
+
+  (* [root] is the root of the current subtree; [path] is the path
+     from the underlying local store. *)
+  type tree = {root : M.t; path : key}
 
   (** Generic pretty printing functions *)
   let pp_key ppf key =
@@ -80,210 +100,126 @@ module M = struct
         ("trace", Error_monad.trace_encoding)
   end
 
-  (* Useful for debugging *)
-  let rec _pp_tree ppf = function
-    | Key _b ->
-        Format.fprintf ppf "key:"
-    | Dir t ->
-        StringMap.iter
-          (fun k t -> Format.fprintf ppf "@[%s: @[%a@]@]" k _pp_tree t)
-          t
+  type elt = Key of value | Dir of Local.tree
 
-  let rec tree_size = function
-    | Key _ ->
-        1
-    | Dir t ->
-        StringMap.fold (fun _ t' i -> tree_size t' + i) t 0
+  let elt t = match Local.Tree.kind t with `Value v -> Key v | `Tree -> Dir t
 
-  let rec local_get m k =
-    match (k, m) with
-    | ([], m) ->
-        Some m
-    | (n :: k, Dir m) -> (
-      match StringMap.find_opt n m with
-      | Some res ->
-          local_get res k
-      | None ->
-          None )
-    | (_ :: _, Key _) ->
-        None
-
-  let raw_get m k =
-    match local_get m.tree k with
+  let raw_find (t : tree) k =
+    Local.find_tree t.root.local k
+    >>= function
+    | Some x ->
+        Lwt.return_some x
     | None -> (
         L.(S.emit proxy_context_missing) k
         >>= fun () ->
-        match m.proxy with
+        match t.root.proxy with
         | None ->
             Lwt.return_none
-        | Some proxy -> (
-            let (module ProxyDelegation) = proxy in
-            ProxyDelegation.proxy_get k
+        | Some (module ProxyDelegation) -> (
+            ProxyDelegation.proxy_get (t.path @ k)
             >>= function
             | Error err ->
                 L.(S.emit delegation_error ("get", err))
                 >>= fun () -> Lwt.return_none
             | Ok x ->
-                Lwt.return x ) )
-    | Some _ as v ->
-        Lwt.return v
+                Lwt.return (Option.map Local.Tree.of_raw x) ) )
 
-  let rec raw_set m k v =
-    (* This function returns the update it did. This is used in the
-       recursive cases to find out what to do. In case no update was
-       done, this allows to maximise persistence (keeping most part
-       of the existing structure).
-       
-       That is why, in the three base cases (the first three pipes below),
-       we check whether the value being put equals the value that is there
-       already (if any). If they are equal, no update needs to be done;
-       and hence None is returned.
-     *)
-    match (k, m, v) with
-    | ([], (Key _ as m), Some v) ->
-        if m = v then None else Some v
-    | ([], (Dir _ as m), Some v) ->
-        if m == v then None else Some v
-    | ([], (Key _ | Dir _), None) ->
-        Some empty
-    | (n :: k, Dir m, _) -> (
-      (* recursive case: inspect recursive modification *)
-      match
-        raw_set (Option.value ~default:empty (StringMap.find_opt n m)) k v
-      with
-      | None ->
-          None
-      | Some rm when rm = empty ->
-          Some (Dir (StringMap.remove n m))
-      | Some rm ->
-          Some (Dir (StringMap.add n rm m)) )
-    | (_ :: _, Key _, None) ->
-        None
-    | (_ :: _, Key _, Some _) ->
-        Stdlib.failwith "Proxy_context.set"
-
-  let raw_set m k v =
-    let u = raw_set m.tree k v in
-    match u with None -> None | Some u -> Some {m with tree = u}
-
-  let mem m k =
-    match local_get m.tree k with
-    | Some (Key _) ->
-        Lwt.return_true
-    | Some (Dir _) ->
-        Lwt.return_false
+  let raw_mem_aux kind (t : tree) k =
+    Local.find_tree t.root.local k
+    >|= Option.map Local.Tree.kind
+    >>= function
+    | Some (`Value _) ->
+        Lwt.return (kind = `Value)
+    | Some `Tree ->
+        Lwt.return (kind = `Tree)
     | None -> (
-      match m.proxy with
+      match t.root.proxy with
       | None ->
           Lwt.return_false
-      | Some proxy -> (
-          let (module ProxyDelegation) = proxy in
-          ProxyDelegation.proxy_mem k
+      | Some (module ProxyDelegation) -> (
+          let mem =
+            match kind with
+            | `Value ->
+                ProxyDelegation.proxy_mem
+            | `Tree ->
+                ProxyDelegation.proxy_dir_mem
+          in
+          mem (t.path @ k)
           >>= function
           | Error err ->
-              L.(S.emit delegation_error ("mem", err))
+              let msg =
+                match kind with `Value -> "mem" | `Tree -> "dir_mem"
+              in
+              L.(S.emit delegation_error (msg, err))
               >>= fun () -> Lwt.return_false
           | Ok x ->
               Lwt.return x ) )
 
-  let dir_mem m k =
-    match local_get m.tree k with
-    | Some (Key _) ->
-        Lwt.return_false
-    | Some (Dir _) ->
-        Lwt.return_true
-    | None -> (
-      match m.proxy with
-      | None ->
-          Lwt.return_false
-      | Some proxy -> (
-          let (module ProxyDelegation) = proxy in
-          ProxyDelegation.proxy_dir_mem k
-          >>= function
-          | Error err ->
-              L.(S.emit delegation_error ("dir_mem", err))
-              >>= fun () -> Lwt.return_false
-          | Ok x ->
-              Lwt.return x ) )
+  let raw_mem = raw_mem_aux `Value
 
-  let get m k =
-    raw_get m k
+  let raw_mem_tree = raw_mem_aux `Tree
+
+  let root t = {root = t; path = []}
+
+  let mem t k = raw_mem (root t) k
+
+  let mem_tree t k = raw_mem_tree (root t) k
+
+  let find t k =
+    raw_find (root t) k
+    >|= Option.map elt
+    >|= function Some (Key v) -> Some v | _ -> None
+
+  let find_tree t k = raw_find (root t) k
+
+  let add_tree (t : t) k v =
+    Local.add_tree t.local k v
+    >|= fun local -> if t.local == local then t else {t with local}
+
+  let add (t : t) k v =
+    Local.add t.local k v
+    >|= fun local -> if t.local == local then t else {t with local}
+
+  let remove (t : t) k =
+    Local.remove t.local k
+    >|= fun local -> if t.local == local then t else {t with local}
+
+  let set = add
+
+  let get = find
+
+  let dir_mem = mem_tree
+
+  let remove_rec = remove
+
+  let copy ctxt ~from ~to_ =
+    find_tree ctxt from
     >>= function
-    | Some (Dir _) | None ->
-        Lwt.return_none
-    | Some (Key v) ->
-        Lwt.return_some v
-
-  let set m k v =
-    match raw_set m k (Some (Key v)) with
-    | None ->
-        Lwt.return m
-    | Some m ->
-        Lwt.return m
-
-  let remove_rec m k =
-    match raw_set m k None with None -> Lwt.return m | Some m -> Lwt.return m
-
-  let copy m ~from ~to_ =
-    raw_get m from
-    >>= function
     | None ->
         Lwt.return_none
-    | Some v -> (
-        let pp_path =
-          Format.(
-            pp_print_list
-              ~pp_sep:(fun ppf () -> pp_print_string ppf " / ")
-              pp_print_string)
-        in
-        match raw_set m to_ (Some v) with
-        | Some _ as v ->
-            Lwt.return v
-        | None ->
-            Format.kasprintf
-              Lwt.fail_with
-              "Proxy_context.copy %a %a: The value is already set."
-              pp_path
-              from
-              pp_path
-              to_
-        | exception Failure s ->
-            Format.kasprintf
-              Lwt.fail_with
-              "Proxy_context.copy %a %a: Failed with %s"
-              pp_path
-              from
-              pp_path
-              to_
-              s )
+    | Some sub_tree ->
+        add_tree ctxt to_ sub_tree >>= Lwt.return_some
 
   type key_or_dir = [`Key of key | `Dir of key]
 
-  let fold m k ~init ~f =
-    raw_get m k
+  let fold ctxt root ~init ~f =
+    find_tree ctxt root
     >>= function
     | None ->
         Lwt.return init
-    | Some (Key _) ->
-        Lwt.return init
-    | Some (Dir m) ->
-        StringMap.fold
-          (fun n m acc ->
-            acc
-            >>= fun acc ->
-            match m with
-            | Key _ ->
-                f (`Key (k @ [n])) acc
-            | Dir _ ->
-                f (`Dir (k @ [n])) acc)
-          m
-          (Lwt.return init)
+    | Some t ->
+        Local.Tree.fold ~depth:(`Eq 1) t [] ~init ~f:(fun k t acc ->
+            let k = root @ k in
+            match Local.Tree.kind t with
+            | `Value _ ->
+                f (`Key k) acc
+            | `Tree ->
+                f (`Dir k) acc)
 
-  let current_protocol_key = ["protocol"]
+  let set_protocol (t : t) p =
+    Local.add_protocol t.local p >|= fun local -> {t with local}
 
-  let set_protocol v key =
-    raw_set v current_protocol_key (Some (Key (Protocol_hash.to_bytes key)))
-    |> function Some m -> Lwt.return m | None -> assert false
+  let get_protocol (t : t) = Local.get_protocol t.local
 
   let fork_test_chain c ~protocol:_ ~expiration:_ = Lwt.return c
 end
@@ -292,17 +228,17 @@ open Tezos_protocol_environment
 
 type _ Context.kind += Proxy : M.t Context.kind
 
-let ops = (module M : CONTEXT with type t = 'ctxt)
+let ops = (module C : CONTEXT with type t = 'ctxt)
 
 let empty proxy =
-  let ctxt = M.{proxy; tree = empty} in
+  let ctxt = M.{proxy; local = Local.empty} in
   Context.Context {ops; ctxt; kind = Proxy}
 
 let set_delegate : M.proxy_delegate -> Context.t -> Context.t =
- fun proxy (Context.Context {ops; ctxt; kind} : Context.t) ->
-  match kind with
+ fun proxy (Context.Context t) ->
+  match t.kind with
   | Proxy ->
-      let ctxt' = {ctxt with proxy = Some proxy} in
-      Context.Context {ops; ctxt = ctxt'; kind = Proxy}
+      let ctxt = {t.ctxt with proxy = Some proxy} in
+      Context.Context {t with ctxt}
   | _ ->
       assert false

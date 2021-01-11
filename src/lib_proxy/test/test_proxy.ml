@@ -35,10 +35,11 @@
 
 module StringMap = TzString.Map
 
-let rec nb_nodes =
-  let open Proxy_context.M in
-  function
-  | Key _ -> 1 | Dir dir -> StringMap.fold (fun _ v i -> i + nb_nodes v) dir 1
+let rec nb_nodes = function
+  | `Value _ ->
+      1
+  | `Tree dir ->
+      StringMap.fold (fun _ v i -> i + nb_nodes v) dir 1
 
 let nb_nodes = function None -> 0 | Some t -> nb_nodes t
 
@@ -73,10 +74,9 @@ let mock_proto_rpc () =
       in
       let rec mock_tree = function
         | [] ->
-            Proxy_context.M.Key Bytes.empty
+            `Value Bytes.empty
         | hd :: tail ->
-            Proxy_context.M.Dir
-              (StringMap.add hd (mock_tree tail) StringMap.empty)
+            `Tree (StringMap.add hd (mock_tree tail) StringMap.empty)
       in
       if please_error k then return_none
       else (

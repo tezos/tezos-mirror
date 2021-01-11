@@ -50,7 +50,7 @@ module type REQUESTS_TREE = sig
       If proxy_getter receives a request for A-D, there's no point doing
       a request, even if it's not there; because as A has been requested
       already; if A-D was available, it would be there already.
-  
+
       This is a crucial optimisation that reduces the number of .../raw/bytes
       RPC requests by 90% when executing baking_rights&?all=true locally,
       after the chain starts having more than a few cycles.

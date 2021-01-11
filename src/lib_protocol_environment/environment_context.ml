@@ -51,6 +51,8 @@ module type CONTEXT = sig
 
   val set_protocol : t -> Protocol_hash.t -> t Lwt.t
 
+  val get_protocol : t -> Protocol_hash.t Lwt.t
+
   val fork_test_chain :
     t -> protocol:Protocol_hash.t -> expiration:Time.Protocol.t -> t Lwt.t
 end
@@ -98,6 +100,9 @@ module Context = struct
       protocol_hash =
     Ops.set_protocol ctxt protocol_hash
     >>= fun ctxt -> Lwt.return (Context {ops; ctxt; kind})
+
+  let get_protocol (Context {ops = (module Ops); ctxt; _}) =
+    Ops.get_protocol ctxt
 
   let fork_test_chain (Context {ops = (module Ops) as ops; ctxt; kind})
       ~protocol ~expiration =

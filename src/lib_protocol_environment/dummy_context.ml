@@ -48,6 +48,8 @@ module M = struct
 
   let set_protocol _ _ = assert false
 
+  let get_protocol _ = assert false
+
   let fork_test_chain _ ~protocol:_ ~expiration:_ = assert false
 end
 

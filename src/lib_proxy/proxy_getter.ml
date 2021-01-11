@@ -66,7 +66,7 @@ let rec raw_context_to_tree
     Proxy_context.M.tree option =
   match raw with
   | Key (bytes : Bytes.t) ->
-      Some (Proxy_context.M.Key bytes)
+      Some (`Value bytes)
   | Cut ->
       None
   | Dir pairs ->
@@ -79,7 +79,7 @@ let rec raw_context_to_tree
             TzString.Map.add string u string_map
       in
       let dir = List.fold_left f TzString.Map.empty pairs in
-      if TzString.Map.is_empty dir then None else Some (Dir dir)
+      if TzString.Map.is_empty dir then None else Some (`Tree dir)
 
 type proxy_getter_input = {
   rpc_context : RPC_context.simple;
@@ -119,13 +119,13 @@ module Tree = struct
     match (k, m) with
     | ([], m) ->
         Some m
-    | (n :: k, Proxy_context.M.Dir m) -> (
+    | (n :: k, `Tree m) -> (
       match StringMap.find_opt n m with
       | Some res ->
           raw_get res k
       | None ->
           None )
-    | (_ :: _, Proxy_context.M.Key _) ->
+    | (_ :: _, `Value _) ->
         None
 
   let rec comb (k : StringMap.key list) (v : Proxy_context.M.tree) :
@@ -134,7 +134,7 @@ module Tree = struct
     | [] ->
         v
     | k_hd :: k_tail ->
-        Proxy_context.M.Dir (StringMap.singleton k_hd (comb k_tail v))
+        `Tree (StringMap.singleton k_hd (comb k_tail v))
 
   let rec set_leaf (m : Proxy_context.M.tree) (k : StringMap.key list)
       (v : Proxy_context.M.tree) =
@@ -143,9 +143,9 @@ module Tree = struct
         v
     | k_hd :: k_tail -> (
       match m with
-      | Key _ ->
+      | `Value _ ->
           assert false
-      | Dir map ->
+      | `Tree map ->
           let k_m =
             match StringMap.find_opt k_hd map with
             | None ->
@@ -153,7 +153,7 @@ module Tree = struct
             | Some k_hd_tree ->
                 set_leaf k_hd_tree k_tail v
           in
-          Proxy_context.M.Dir (StringMap.add k_hd k_m map) )
+          `Tree (StringMap.add k_hd k_m map) )
 end
 
 module type REQUESTS_TREE = sig
@@ -297,9 +297,9 @@ module Make (X : PROTO_RPC) : M = struct
     match tree_opt with
     | None ->
         return_false
-    | Some (Proxy_context.M.Key _) ->
+    | Some (`Value _) ->
         return_false
-    | Some (Proxy_context.M.Dir _) ->
+    | Some (`Tree _) ->
         return_true
 
   let proxy_mem pgi key =
@@ -308,8 +308,8 @@ module Make (X : PROTO_RPC) : M = struct
     match tree_opt with
     | None ->
         return_false
-    | Some (Proxy_context.M.Key _) ->
+    | Some (`Value _) ->
         return_true
-    | Some (Proxy_context.M.Dir _) ->
+    | Some (`Tree _) ->
         return_false
 end

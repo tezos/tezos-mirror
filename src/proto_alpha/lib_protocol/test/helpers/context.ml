@@ -193,9 +193,7 @@ module Vote = struct
     Alpha_services.Voting.current_proposal rpc_ctxt ctxt
 
   let get_protocol (b : Block.t) =
-    Tezos_protocol_environment.Context.get b.context ["protocol"]
-    >|= function
-    | None -> assert false | Some p -> Protocol_hash.of_bytes_exn p
+    Tezos_protocol_environment.Context.get_protocol b.context
 
   let get_participation_ema (b : Block.t) =
     Environment.Context.get b.context ["votes"; "participation_ema"]
