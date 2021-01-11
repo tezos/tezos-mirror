@@ -50,57 +50,13 @@ let some_var_annot_of_string_exn s =
 let some_field_annot_of_string_exn s =
   Some (Field_annot (Non_empty_string.of_string_exn s))
 
-let default_now_annot = some_var_annot_of_string_exn "now"
-
-let default_amount_annot = some_var_annot_of_string_exn "amount"
-
-let default_balance_annot = some_var_annot_of_string_exn "balance"
-
-let default_level_annot = some_var_annot_of_string_exn "level"
-
-let default_source_annot = some_var_annot_of_string_exn "source"
-
-let default_sender_annot = some_var_annot_of_string_exn "sender"
-
-let default_self_annot = some_var_annot_of_string_exn "self"
-
-let default_arg_annot = some_var_annot_of_string_exn "arg"
-
-let lambda_arg_annot = some_var_annot_of_string_exn "@arg"
-
 let default_param_annot = some_var_annot_of_string_exn "parameter"
 
 let default_storage_annot = some_var_annot_of_string_exn "storage"
 
-let default_car_annot = some_field_annot_of_string_exn "car"
-
-let default_cdr_annot = some_field_annot_of_string_exn "cdr"
-
-let default_contract_annot = some_field_annot_of_string_exn "contract"
-
-let default_addr_annot = some_field_annot_of_string_exn "address"
-
-let default_pack_annot = some_field_annot_of_string_exn "packed"
-
-let default_unpack_annot = some_field_annot_of_string_exn "unpacked"
-
-let default_slice_annot = some_field_annot_of_string_exn "slice"
-
 let default_elt_annot = some_field_annot_of_string_exn "elt"
 
 let default_key_annot = some_field_annot_of_string_exn "key"
-
-let default_hd_annot = some_field_annot_of_string_exn "hd"
-
-let default_tl_annot = some_field_annot_of_string_exn "tl"
-
-let default_some_annot = some_field_annot_of_string_exn "some"
-
-let default_left_annot = some_field_annot_of_string_exn "left"
-
-let default_right_annot = some_field_annot_of_string_exn "right"
-
-let default_sapling_state_annot = some_var_annot_of_string_exn "sapling"
 
 let default_sapling_balance_annot =
   some_var_annot_of_string_exn "sapling_balance"

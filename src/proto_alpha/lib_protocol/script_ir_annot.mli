@@ -41,59 +41,15 @@ end
 
 (** Default annotations *)
 
-val default_now_annot : var_annot option
-
-val default_amount_annot : var_annot option
-
-val default_balance_annot : var_annot option
-
-val default_level_annot : var_annot option
-
-val default_source_annot : var_annot option
-
-val default_sender_annot : var_annot option
-
-val default_self_annot : var_annot option
-
-val default_arg_annot : var_annot option
-
-val lambda_arg_annot : var_annot option
-
 val default_param_annot : var_annot option
 
 val default_storage_annot : var_annot option
 
-val default_sapling_state_annot : var_annot option
-
 val default_sapling_balance_annot : var_annot option
-
-val default_car_annot : field_annot option
-
-val default_cdr_annot : field_annot option
-
-val default_contract_annot : field_annot option
-
-val default_addr_annot : field_annot option
-
-val default_pack_annot : field_annot option
-
-val default_unpack_annot : field_annot option
-
-val default_slice_annot : field_annot option
 
 val default_elt_annot : field_annot option
 
 val default_key_annot : field_annot option
-
-val default_hd_annot : field_annot option
-
-val default_tl_annot : field_annot option
-
-val default_some_annot : field_annot option
-
-val default_left_annot : field_annot option
-
-val default_right_annot : field_annot option
 
 (** Unparse annotations to their string representation *)
 
