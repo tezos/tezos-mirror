@@ -59,7 +59,7 @@ val spawn :
   ?log_output:bool ->
   ?name:string ->
   ?color:Log.Color.t ->
-  ?env:(string * string) list ->
+  ?env:string Base.String_map.t ->
   ?hooks:hooks ->
   string ->
   string list ->
@@ -71,7 +71,7 @@ val spawn_with_stdin :
   ?log_output:bool ->
   ?name:string ->
   ?color:Log.Color.t ->
-  ?env:(string * string) list ->
+  ?env:string Base.String_map.t ->
   ?hooks:hooks ->
   string ->
   string list ->
@@ -105,12 +105,19 @@ val check_and_read_stdout : ?expect_failure:bool -> t -> string Lwt.t
     in which case fail if the process succeeds. *)
 val check_and_read_stderr : ?expect_failure:bool -> t -> string Lwt.t
 
+(** Wait until a process terminates and read both its standard output
+    and its standard error.
+
+    Fail the test if the process failed, unless [expect_failure],
+    in which case fail if the process succeeds. *)
+val check_and_read_both : ?expect_failure:bool -> t -> (string * string) Lwt.t
+
 (** Spawn a process, wait for it to terminate, and check its status. *)
 val run :
   ?log_status_on_exit:bool ->
   ?name:string ->
   ?color:Log.Color.t ->
-  ?env:(string * string) list ->
+  ?env:string Base.String_map.t ->
   ?expect_failure:bool ->
   string ->
   string list ->
@@ -136,7 +143,7 @@ val run_and_read_stdout :
   ?log_status_on_exit:bool ->
   ?name:string ->
   ?color:Log.Color.t ->
-  ?env:(string * string) list ->
+  ?env:string Base.String_map.t ->
   ?expect_failure:bool ->
   string ->
   string list ->
@@ -150,7 +157,7 @@ val run_and_read_stderr :
   ?log_status_on_exit:bool ->
   ?name:string ->
   ?color:Log.Color.t ->
-  ?env:(string * string) list ->
+  ?env:string Base.String_map.t ->
   ?expect_failure:bool ->
   string ->
   string list ->

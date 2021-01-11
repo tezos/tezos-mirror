@@ -100,3 +100,6 @@ let with_open_in file read_f =
 let read_file filename =
   let* ic = Lwt_io.open_file ~mode:Lwt_io.Input filename in
   Lwt_io.read ic
+
+module String_map = Map.Make (String)
+module String_set = Set.Make (String)

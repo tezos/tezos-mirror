@@ -100,6 +100,11 @@ type query_string = (string * string) list
 (** HTTP methods for RPCs. *)
 type meth = GET | PUT | POST | PATCH
 
+(** [rpc_path_query_to_string ["key1", "value1"; "key2", "value2")] ["seg1"; "seg2"]]
+    returns [/seg1/seg2?key1=value1&key2=value2] where seg1, seg2, key1, key2,
+    value1, and value2 have been appropriately encoded *)
+val rpc_path_query_to_string : ?query_string:query_string -> path -> string
+
 (** Use the client to call an RPC.
 
     Run [tezos-client rpc meth path?query_string with data].
@@ -118,6 +123,7 @@ val rpc :
 val spawn_rpc :
   ?node:Node.t ->
   ?hooks:Process.hooks ->
+  ?env:string String_map.t ->
   ?data:JSON.u ->
   ?query_string:query_string ->
   meth ->

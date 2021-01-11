@@ -25,7 +25,6 @@
 (*****************************************************************************)
 
 open Base
-module String_map = Map.Make (String)
 
 (* An [echo] represents the standard output or standard error output of a process.
    Those outputs are duplicated: one copy is automatically logged,
@@ -223,32 +222,44 @@ let handle_process ~log_output process =
   and* _ = wait process in
   unit
 
-let spawn_with_stdin ?(log_status_on_exit = true) ?(log_output = true) ?name
-    ?(color = Log.Color.FG.cyan) ?(env = []) ?hooks command arguments =
-  let name =
-    match name with None -> get_unique_name command | Some name -> name
+(** [parse_current_environment ()], given that the current environment
+    is "K1=V2; K2=V2" (see `export` in a terminal)
+    returns a map {K1->V1; K2->V2}. See [to_key_equal_value]
+    for a related function. *)
+let parse_current_environment : unit -> string String_map.t =
+ fun () ->
+  let parse_env_kv key_value : (string * string) option =
+    String.index_opt key_value '='
+    |> Option.map (fun i ->
+           ( Re.Str.string_before key_value i,
+             Re.Str.string_after key_value (i + 1) ))
   in
+  Unix.environment () |> Array.to_seq
+  |> Seq.filter_map parse_env_kv
+  |> String_map.of_seq
+
+(** [to_key_equal_value kv_map], given that kv_map is {K1->V1; K2->V2}
+    returns the array ["K1=V1"; "K2=V2"]. See [parse_current_environment]
+    for a related function *)
+let to_key_equal_value (kv_map : string String_map.t) : string array =
+  kv_map |> String_map.to_seq
+  |> Seq.map (fun (name, value) -> name ^ "=" ^ value)
+  |> Array.of_seq
+
+let spawn_with_stdin ?(log_status_on_exit = true) ?(log_output = true) ?name
+    ?(color = Log.Color.FG.cyan) ?(env = String_map.empty) ?hooks command
+    arguments =
+  let name = Option.value ~default:(get_unique_name command) name in
   Option.iter (fun hooks -> hooks.on_spawn command arguments) hooks ;
   Log.command ~color:Log.Color.bold ~prefix:name command arguments ;
-  let old_env =
-    let not_modified item =
-      match String.split_on_char '=' item with
-      | name :: _ ->
-          List.for_all (fun (new_name, _) -> name <> new_name) env
-      | _ ->
-          (* Weird. Let's remove this. *)
-          false
-    in
-    Unix.environment () |> Array.to_list |> List.filter not_modified
-    |> Array.of_list
+  let current_env = parse_current_environment () in
+  let merged_env =
+    (* Merge [current_env] and [env], choosing [env] on common keys: *)
+    String_map.union (fun _ _ new_val -> Some new_val) current_env env
   in
-  let new_env =
-    List.map (fun (name, value) -> name ^ "=" ^ value) env |> Array.of_list
-  in
-  let env = Array.append old_env new_env in
   let lwt_process =
     Lwt_process.open_process_full
-      ~env
+      ~env:(to_key_equal_value merged_env)
       (command, Array.of_list (command :: arguments))
   in
   let process =
@@ -366,6 +377,12 @@ let check_and_read ?expect_failure ~channel_getter process =
   let* () = check ?expect_failure process
   and* output = Lwt_io.read (channel_getter process) in
   return output
+
+let check_and_read_both ?expect_failure process =
+  let* () = check ?expect_failure process
+  and* out = Lwt_io.read (stdout process)
+  and* err = Lwt_io.read (stderr process) in
+  return (out, err)
 
 let check_and_read_stdout = check_and_read ~channel_getter:stdout
 

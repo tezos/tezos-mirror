@@ -128,3 +128,8 @@ val with_open_in : string -> (in_channel -> 'a) -> 'a
 
 (** [read_file filename] returns the full contents of file [filename] *)
 val read_file : string -> string Lwt.t
+
+(** {2 Common structures} *)
+
+module String_map : Map.S with type key = string
+module String_set : Set.S with type elt = string

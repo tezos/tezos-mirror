@@ -230,9 +230,6 @@ let check_tags tags =
          must be at most 32 character long.\n" ;
       exit 1
 
-module String_set = Set.Make (String)
-module String_map = Map.Make (String)
-
 let known_files = ref String_set.empty
 
 let known_titles = ref String_set.empty

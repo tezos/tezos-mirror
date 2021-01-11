@@ -72,7 +72,7 @@ let test_normalize_proxy ~protocol =
     ~title:(sf "%s: normalize data (proxy)" (Protocol.name protocol))
     ~tags:[Protocol.tag protocol; "proxy"; "normalize"; "data"]
   @@ fun () ->
-  let* client = Proxy.init ~protocol () in
+  let* (_, client) = Proxy.init ~protocol () in
   let* _ = execute_all_modes client in
   Lwt.return_unit
 
