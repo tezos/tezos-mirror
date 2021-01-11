@@ -73,10 +73,6 @@ let unparse_field_annot : field_annot option -> string list = function
   | None -> []
   | Some (Field_annot a) -> ["%" ^ (a :> string)]
 
-let type_to_var_annot : type_annot option -> var_annot option = function
-  | None -> None
-  | Some (Type_annot s) -> Some (Var_annot s)
-
 let field_annot_opt_to_entrypoint_strict ~loc = function
   | None -> Ok Entrypoint.default
   | Some (Field_annot a) -> Entrypoint.of_annot_strict ~loc a

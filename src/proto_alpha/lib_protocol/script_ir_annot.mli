@@ -59,10 +59,6 @@ val unparse_var_annot : var_annot option -> string list
 
 val unparse_field_annot : field_annot option -> string list
 
-(** Conversion functions between different annotation kinds *)
-
-val type_to_var_annot : type_annot option -> var_annot option
-
 (** Converts a field annot option to an entrypoint.
     An error is returned if the field annot is too long or is "default".
     [None] is converted to [Some default].
