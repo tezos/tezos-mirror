@@ -358,17 +358,13 @@ let check_correct_field :
              ("%" ^ (s1 :> string), "%" ^ (s2 :> string)))
 
 let parse_var_annot :
-    Script.location ->
-    ?default:var_annot option ->
-    string list ->
-    var_annot option tzresult =
- fun loc ?default annot ->
+    Script.location -> ?default:var_annot option -> string list -> unit tzresult
+    =
+ fun loc ?default:_ annot ->
   parse_annots loc annot >>? classify_annot loc >>? fun (vars, types, fields) ->
   error_unexpected_annot loc types >>? fun () ->
   error_unexpected_annot loc fields >>? fun () ->
-  get_one_annot loc vars >|? function
-  | Some _ as a -> a
-  | None -> ( match default with Some a -> a | None -> None)
+  get_one_annot loc vars >|? fun (_a : var_annot option) -> ()
 
 let split_if_special ~loc f =
   match f with
