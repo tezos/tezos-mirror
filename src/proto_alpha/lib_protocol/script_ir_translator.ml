@@ -4202,10 +4202,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       typed ctxt loc instr (Item_t (String_t tname, rest))
   | ( Prim (loc, I_SLICE, [], annot),
       Item_t (Nat_t _, Item_t (Nat_t _, Item_t (String_t tname, rest))) ) ->
-      parse_var_annot
-        ~default:(gen_access_annot None default_slice_annot)
-        loc
-        annot
+      parse_var_annot ~default:(gen_access_annot default_slice_annot) loc annot
       >>?= fun _annot ->
       let instr = {apply = (fun kinfo k -> ISlice_string (kinfo, k))} in
       let stack = Item_t (option_string'_t tname, rest) in
@@ -4232,10 +4229,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       typed ctxt loc instr stack
   | ( Prim (loc, I_SLICE, [], annot),
       Item_t (Nat_t _, Item_t (Nat_t _, Item_t (Bytes_t tname, rest))) ) ->
-      parse_var_annot
-        ~default:(gen_access_annot None default_slice_annot)
-        loc
-        annot
+      parse_var_annot ~default:(gen_access_annot default_slice_annot) loc annot
       >>?= fun _annot ->
       let instr = {apply = (fun kinfo k -> ISlice_bytes (kinfo, k))} in
       let stack = Item_t (option_bytes'_t tname, rest) in
@@ -4585,10 +4579,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         (* allow to pack contracts for hash/signature checks *) loc
         t
       >>?= fun () ->
-      parse_var_annot
-        loc
-        annot
-        ~default:(gen_access_annot None default_pack_annot)
+      parse_var_annot loc annot ~default:(gen_access_annot default_pack_annot)
       >>?= fun _annot ->
       let instr = {apply = (fun kinfo k -> IPack (kinfo, t, k))} in
       let stack = Item_t (bytes_t ~annot:None, rest) in
@@ -4603,10 +4594,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       typed ctxt loc instr stack
   (* protocol *)
   | (Prim (loc, I_ADDRESS, [], annot), Item_t (Contract_t _, rest)) ->
-      parse_var_annot
-        loc
-        annot
-        ~default:(gen_access_annot None default_addr_annot)
+      parse_var_annot loc annot ~default:(gen_access_annot default_addr_annot)
       >>?= fun _annot ->
       let instr = {apply = (fun kinfo k -> IAddress (kinfo, k))} in
       let stack = Item_t (address_t ~annot:None, rest) in
@@ -4634,7 +4622,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       parse_var_annot
         loc
         annot
-        ~default:(gen_access_annot None default_contract_annot)
+        ~default:(gen_access_annot default_contract_annot)
       >>?= fun _annot ->
       let instr =
         {

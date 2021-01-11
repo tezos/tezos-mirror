@@ -125,8 +125,7 @@ val field_annot_opt_eq_entrypoint_lax :
 val default_annot : default:'a option -> 'a option -> 'a option
 
 (** Generate annotation for field accesses, of the form [var.field1.field2] *)
-val gen_access_annot :
-  var_annot option -> field_annot option -> var_annot option
+val gen_access_annot : field_annot option -> var_annot option
 
 (** Merge type annotations.
     @return an error {!Inconsistent_type_annotations} if they are both present
