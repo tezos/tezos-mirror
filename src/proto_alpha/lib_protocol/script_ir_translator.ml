@@ -3188,7 +3188,6 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | (Prim (loc, I_MAP, [body], annot), Item_t (Option_t (t, _), rest)) -> (
       check_kind [Seq_kind] body >>?= fun () ->
       parse_var_type_annot loc annot >>?= fun (_ret_annot, opt_ty_name) ->
-      let _elt_annot = gen_access_annot None default_some_annot in
       non_terminal_recursion
         ?type_logger
         ~legacy
@@ -3225,7 +3224,6 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       check_kind [Seq_kind] bt >>?= fun () ->
       check_kind [Seq_kind] bf >>?= fun () ->
       error_unexpected_annot loc annot >>?= fun () ->
-      let _annot = gen_access_annot None default_some_annot in
       non_terminal_recursion ?type_logger tc_context ctxt ~legacy bt rest
       >>=? fun (btr, ctxt) ->
       let stack_ty = Item_t (t, rest) in
@@ -3443,16 +3441,10 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       let stack_ty = Item_t (ty, rest) in
       typed ctxt loc cons_right stack_ty
   | ( Prim (loc, I_IF_LEFT, [bt; bf], annot),
-      (Item_t (Union_t ((tl, l_field), (tr, r_field), _), rest) as bef) ) ->
+      (Item_t (Union_t ((tl, _l_field), (tr, _r_field), _), rest) as bef) ) ->
       check_kind [Seq_kind] bt >>?= fun () ->
       check_kind [Seq_kind] bf >>?= fun () ->
       error_unexpected_annot loc annot >>?= fun () ->
-      let _left_annot =
-        gen_access_annot None l_field ~default:default_left_annot
-      in
-      let _right_annot =
-        gen_access_annot None r_field ~default:default_right_annot
-      in
       non_terminal_recursion
         ?type_logger
         tc_context
@@ -3504,8 +3496,6 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       check_kind [Seq_kind] bt >>?= fun () ->
       check_kind [Seq_kind] bf >>?= fun () ->
       error_unexpected_annot loc annot >>?= fun () ->
-      let _hd_annot = gen_access_annot None default_hd_annot in
-      let _tl_annot = gen_access_annot None default_tl_annot in
       non_terminal_recursion
         ?type_logger
         tc_context
@@ -3539,7 +3529,6 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
     -> (
       check_kind [Seq_kind] body >>?= fun () ->
       parse_var_type_annot loc annot >>?= fun (_ret_annot, list_ty_name) ->
-      let _elt_annot = gen_access_annot None default_elt_annot in
       non_terminal_recursion
         ?type_logger
         tc_context
@@ -3576,7 +3565,6 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | (Prim (loc, I_ITER, [body], annot), Item_t (List_t (elt, _), rest)) -> (
       check_kind [Seq_kind] body >>?= fun () ->
       error_unexpected_annot loc annot >>?= fun () ->
-      let _elt_annot = gen_access_annot None default_elt_annot in
       non_terminal_recursion
         ?type_logger
         tc_context
@@ -3622,7 +3610,6 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | (Prim (loc, I_ITER, [body], annot), Item_t (Set_t (comp_elt, _), rest)) -> (
       check_kind [Seq_kind] body >>?= fun () ->
       error_unexpected_annot loc annot >>?= fun () ->
-      let _elt_annot = gen_access_annot None default_elt_annot in
       let elt = ty_of_comparable_ty comp_elt in
       non_terminal_recursion
         ?type_logger
@@ -4010,12 +3997,9 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           in
           typed_no_lwt ctxt loc instr rest)
   | ( Prim (loc, I_LOOP_LEFT, [body], annot),
-      (Item_t (Union_t ((tl, l_field), (tr, _), _), rest) as stack) ) -> (
+      (Item_t (Union_t ((tl, _l_field), (tr, _), _), rest) as stack) ) -> (
       check_kind [Seq_kind] body >>?= fun () ->
       parse_var_annot loc annot >>?= fun _annot ->
-      let _l_annot =
-        gen_access_annot None l_field ~default:default_left_annot
-      in
       non_terminal_recursion
         ?type_logger
         tc_context
@@ -4641,13 +4625,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | (Prim (loc, I_UNPACK, [ty], annot), Item_t (Bytes_t _, rest)) ->
       parse_packable_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy ty
       >>?= fun (Ex_ty t, ctxt) ->
-      parse_var_type_annot loc annot >>?= fun (annot, ty_name) ->
+      parse_var_type_annot loc annot >>?= fun (_annot, ty_name) ->
       option_t loc t ~annot:ty_name >>?= fun res_ty ->
-      let _annot =
-        default_annot
-          annot
-          ~default:(gen_access_annot None default_unpack_annot)
-      in
       let instr = {apply = (fun kinfo k -> IUnpack (kinfo, t, k))} in
       let stack = Item_t (res_ty, rest) in
       typed ctxt loc instr stack
