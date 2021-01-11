@@ -35,9 +35,6 @@ type type_annot = Type_annot of Non_empty_string.t [@@ocaml.unboxed]
 type field_annot = Field_annot of Non_empty_string.t [@@ocaml.unboxed]
 
 module FOR_TESTS = struct
-  let unsafe_type_annot_of_string s =
-    Type_annot (Non_empty_string.of_string_exn s)
-
   let unsafe_field_annot_of_string s =
     Field_annot (Non_empty_string.of_string_exn s)
 end
