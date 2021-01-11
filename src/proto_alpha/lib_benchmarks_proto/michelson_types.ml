@@ -100,7 +100,7 @@ let set k =
 
 (* pair type constructor*)
 let pair k1 k2 =
-  match pair_t (-1) (k1, None, None) (k2, None, None) ~annot:None with
+  match pair_t (-1) (k1, None) (k2, None) ~annot:None with
   | Error _ -> assert false
   | Ok t -> t
 

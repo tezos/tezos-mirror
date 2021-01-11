@@ -625,7 +625,7 @@ let rec dummy_type_generator size =
     | Ex_ty r ->
         let l = unit_t ~annot:None in
         Ex_ty
-          (match pair_t (-1) (l, None, None) (r, None, None) ~annot:None with
+          (match pair_t (-1) (l, None) (r, None) ~annot:None with
           | Error _ -> assert false
           | Ok t -> t)
 
