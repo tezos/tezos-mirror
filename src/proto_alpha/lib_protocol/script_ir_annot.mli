@@ -76,10 +76,6 @@ val check_composed_type_annot : Script.location -> string list -> unit tzresult
 val extract_field_annot :
   Script.node -> (Script.node * field_annot option) tzresult
 
-(** Check that field annotations match, used for field accesses. *)
-val check_correct_field :
-  field_annot option -> field_annot option -> unit tzresult
-
 (** Instruction annotations parsing *)
 
 (** Check a variable annotation. *)

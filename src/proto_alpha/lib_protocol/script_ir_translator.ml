@@ -3244,19 +3244,15 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       in
       typed ctxt loc comb_set after_stack_ty
   | (Prim (loc, I_UNPAIR, [], annot), Item_t (Pair_t (a, b, _), rest)) ->
-      parse_unpair_annot loc annot >>?= fun (field_a, field_b) ->
-      check_correct_field field_a None >>?= fun () ->
-      check_correct_field field_b None >>?= fun () ->
+      parse_unpair_annot loc annot >>?= fun (_field_a, _field_b) ->
       let unpair = {apply = (fun kinfo k -> IUnpair (kinfo, k))} in
       typed ctxt loc unpair (Item_t (a, Item_t (b, rest)))
   | (Prim (loc, I_CAR, [], annot), Item_t (Pair_t (a, _, _), rest)) ->
-      parse_destr_annot loc annot >>?= fun field_annot ->
-      check_correct_field field_annot None >>?= fun () ->
+      parse_destr_annot loc annot >>?= fun _field_annot ->
       let car = {apply = (fun kinfo k -> ICar (kinfo, k))} in
       typed ctxt loc car (Item_t (a, rest))
   | (Prim (loc, I_CDR, [], annot), Item_t (Pair_t (_, b, _), rest)) ->
-      parse_destr_annot loc annot >>?= fun field_annot ->
-      check_correct_field field_annot None >>?= fun () ->
+      parse_destr_annot loc annot >>?= fun _field_annot ->
       let cdr = {apply = (fun kinfo k -> ICdr (kinfo, k))} in
       typed ctxt loc cdr (Item_t (b, rest))
   (* unions *)
