@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -111,7 +112,7 @@ let updates_of_key_values ctxt key_values =
         wrap
           (Script_ir_translator.hash_comparable_data
              ctxt
-             (Script_typed_ir.int_key ~annot:None)
+             Script_typed_ir.int_key
              (Script_int_repr.of_int key))
       in
       return

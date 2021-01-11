@@ -1,3 +1,28 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2020-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
+
 (** Testing
     -------
     Component:    Protocol (interpretation)
@@ -104,7 +129,7 @@ let test_stack_overflow () =
   let stack = Bot_t in
   let descr kinstr = {kloc = 0; kbef = stack; kaft = stack; kinstr} in
   let kinfo = {iloc = -1; kstack_ty = stack} in
-  let kinfo' = {iloc = -1; kstack_ty = Item_t (bool_t ~annot:None, stack)} in
+  let kinfo' = {iloc = -1; kstack_ty = Item_t (bool_t, stack)} in
   let enorme_et_seq n =
     let rec aux n acc =
       if n = 0 then acc
@@ -133,10 +158,10 @@ let test_stack_overflow_in_lwt () =
   in
   let stack = Bot_t in
   let item ty s = Item_t (ty, s) in
-  let unit_t = unit_t ~annot:None in
-  let unit_k = unit_key ~annot:None in
-  let bool_t = bool_t ~annot:None in
-  big_map_t (-1) unit_k unit_t ~annot:None >>??= fun big_map_t ->
+  let unit_t = unit_t in
+  let unit_k = unit_key in
+  let bool_t = bool_t in
+  big_map_t (-1) unit_k unit_t >>??= fun big_map_t ->
   let descr kinstr = {kloc = 0; kbef = stack; kaft = stack; kinstr} in
   let kinfo s = {iloc = -1; kstack_ty = s} in
   let stack1 = item big_map_t Bot_t in

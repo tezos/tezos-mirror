@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -45,14 +45,11 @@ let forty_two_n = Alpha_context.Script_int.abs forty_two
 
 let dummy_set =
   let open Script_set in
-  update forty_two true (empty Script_typed_ir.(int_key ~annot:None))
+  update forty_two true (empty Script_typed_ir.int_key)
 
 let dummy_map =
   let open Script_map in
-  update
-    forty_two
-    (Some forty_two)
-    (empty Script_typed_ir.(int_key ~annot:None))
+  update forty_two (Some forty_two) (empty Script_typed_ir.int_key)
 
 let dummy_timestamp = Alpha_context.Script_timestamp.of_zint (Z.of_int 42)
 
@@ -67,7 +64,7 @@ let dummy_string =
   | Ok s -> s
   | Error _ -> assert false
 
-let dummy_ty = Script_typed_ir.never_t ~annot:None
+let dummy_ty = Script_typed_ir.never_t
 
 let free = ["balance"; "bool"; "parsing_unit"; "unparsing_unit"]
 
@@ -151,8 +148,7 @@ let all_interpreter_costs =
     ("dipn", dipn 42);
     ("dropn", dropn 42);
     ("neq", neq);
-    ( "compare",
-      compare Script_typed_ir.(int_key ~annot:None) forty_two forty_two );
+    ("compare", compare Script_typed_ir.int_key forty_two forty_two);
     ( "concat_string_precheck",
       concat_string_precheck Script_list.(cons "42" empty) );
     ("concat_string", concat_string (S.safe_int 42));
