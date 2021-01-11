@@ -3399,7 +3399,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         ~value_annot:a_annot
         ~field_name:expected_field_annot
         ~default_accessor:default_car_annot
-      >>?= fun (_annot, field_annot) ->
+      >>?= fun field_annot ->
       check_correct_field field_annot expected_field_annot >>?= fun () ->
       let car = {apply = (fun kinfo k -> ICar (kinfo, k))} in
       typed ctxt loc car (Item_t (a, rest))
@@ -3412,7 +3412,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         ~value_annot:b_annot
         ~field_name:expected_field_annot
         ~default_accessor:default_cdr_annot
-      >>?= fun (_annot, field_annot) ->
+      >>?= fun field_annot ->
       check_correct_field field_annot expected_field_annot >>?= fun () ->
       let cdr = {apply = (fun kinfo k -> ICdr (kinfo, k))} in
       typed ctxt loc cdr (Item_t (b, rest))

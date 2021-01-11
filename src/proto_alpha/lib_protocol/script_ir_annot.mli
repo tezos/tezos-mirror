@@ -208,7 +208,7 @@ val parse_destr_annot :
   field_name:field_annot option ->
   pair_annot:var_annot option ->
   value_annot:var_annot option ->
-  (var_annot option * field_annot option) tzresult
+  field_annot option tzresult
 
 val parse_unpair_annot :
   Script.location ->

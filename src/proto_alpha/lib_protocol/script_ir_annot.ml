@@ -434,18 +434,13 @@ let parse_destr_annot :
     field_name:field_annot option ->
     pair_annot:var_annot option ->
     value_annot:var_annot option ->
-    (var_annot option * field_annot option) tzresult =
- fun loc annot ~default_accessor ~field_name ~pair_annot ~value_annot ->
+    field_annot option tzresult =
+ fun loc annot ~default_accessor:_ ~field_name:_ ~pair_annot:_ ~value_annot:_ ->
   parse_annots loc ~allow_special_var:true annot >>? classify_annot loc
   >>? fun (vars, types, fields) ->
   error_unexpected_annot loc types >>? fun () ->
-  get_one_annot loc vars >>? fun v ->
-  get_one_annot loc fields >|? fun f ->
-  let default =
-    gen_access_annot pair_annot field_name ~default:default_accessor
-  in
-  let v = var_annot_from_special ~field_name ~default ~value_annot v in
-  (v, f)
+  get_one_annot loc vars >>? fun (_v : var_annot option) ->
+  get_one_annot loc fields
 
 let parse_unpair_annot :
     Script.location ->
