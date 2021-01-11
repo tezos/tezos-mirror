@@ -84,12 +84,13 @@ let mode_arg client =
   | Proxy _ ->
       ["--mode"; "proxy"]
 
-let spawn_command ?(admin = false) client command =
+let spawn_command ?node ?(admin = false) client command =
   Process.spawn
     ~name:client.name
     ~color:client.color
     (if admin then client.admin_path else client.path)
-  @@ base_dir_arg client @ command
+  @@ endpoint_arg ?node client @ mode_arg client @ base_dir_arg client
+  @ command
 
 let url_encode str =
   let buffer = Buffer.create (String.length str * 3) in
@@ -139,11 +140,7 @@ let spawn_rpc ?node ?data ?query_string meth path client =
   in
   let path = string_of_path path in
   let full_path = path ^ query_string in
-  spawn_command
-    client
-    ( endpoint_arg ?node client @ mode_arg client
-    @ ["rpc"; string_of_meth meth; full_path]
-    @ data )
+  spawn_command ?node client (["rpc"; string_of_meth meth; full_path] @ data)
 
 let rpc ?node ?data ?query_string meth path client =
   let* output =
@@ -154,6 +151,7 @@ let rpc ?node ?data ?query_string meth path client =
 
 let spawn_rpc_list ?node client =
   spawn_command
+    ?node
     client
     (endpoint_arg ?node client @ mode_arg client @ ["rpc"; "list"])
 
@@ -165,6 +163,7 @@ module Admin = struct
 
   let spawn_trust_address ?node ~peer client =
     spawn_command
+      ?node
       client
       ( endpoint_arg ?node client @ mode_arg client
       @ ["trust"; "address"; "127.0.0.1:" ^ string_of_int (Node.net_port peer)]
@@ -175,29 +174,22 @@ module Admin = struct
 
   let spawn_connect_address ?node ~peer client =
     spawn_command
+      ?node
       client
-      ( endpoint_arg ?node client @ mode_arg client
-      @ [ "connect";
-          "address";
-          "127.0.0.1:" ^ string_of_int (Node.net_port peer) ] )
+      ["connect"; "address"; "127.0.0.1:" ^ string_of_int (Node.net_port peer)]
 
   let connect_address ?node ~peer client =
     spawn_connect_address ?node ~peer client |> Process.check
 
   let spawn_kick_peer ?node ~peer client =
-    spawn_command
-      client
-      (endpoint_arg ?node client @ mode_arg client @ ["kick"; "peer"; peer])
+    spawn_command ?node client ["kick"; "peer"; peer]
 
   let kick_peer ?node ~peer client =
     spawn_kick_peer ?node ~peer client |> Process.check
 end
 
 let spawn_import_secret_key ?node client (key : Constant.key) =
-  spawn_command
-    client
-    ( endpoint_arg ?node client @ mode_arg client
-    @ ["import"; "secret"; "key"; key.alias; key.secret] )
+  spawn_command ?node client ["import"; "secret"; "key"; key.alias; key.secret]
 
 let import_secret_key ?node client key =
   spawn_import_secret_key ?node client key |> Process.check
@@ -221,22 +213,22 @@ let spawn_activate_protocol ?node ~protocol ?(fitness = 1)
           tm.tm_sec
   in
   spawn_command
+    ?node
     client
-    ( endpoint_arg ?node client @ mode_arg client
-    @ [ "activate";
-        "protocol";
-        Protocol.hash protocol;
-        "with";
-        "fitness";
-        string_of_int fitness;
-        "and";
-        "key";
-        key;
-        "and";
-        "parameters";
-        Protocol.parameter_file protocol;
-        "--timestamp";
-        timestamp ] )
+    [ "activate";
+      "protocol";
+      Protocol.hash protocol;
+      "with";
+      "fitness";
+      string_of_int fitness;
+      "and";
+      "key";
+      key;
+      "and";
+      "parameters";
+      Protocol.parameter_file protocol;
+      "--timestamp";
+      timestamp ]
 
 let activate_protocol ?node ~protocol ?fitness ?key ?timestamp ?timestamp_delay
     client =
@@ -253,10 +245,10 @@ let activate_protocol ?node ~protocol ?fitness ?key ?timestamp ?timestamp_delay
 let spawn_bake_for ?node ?(key = Constant.bootstrap1.alias)
     ?(minimal_timestamp = true) client =
   spawn_command
+    ?node
     client
-    ( endpoint_arg ?node client @ mode_arg client
-    @ "bake" :: "for" :: key
-      :: (if minimal_timestamp then ["--minimal-timestamp"] else []) )
+    ( "bake" :: "for" :: key
+    :: (if minimal_timestamp then ["--minimal-timestamp"] else []) )
 
 let bake_for ?node ?key ?minimal_timestamp client =
   spawn_bake_for ?node ?key ?minimal_timestamp client |> Process.check
@@ -264,18 +256,16 @@ let bake_for ?node ?key ?minimal_timestamp client =
 let spawn_transfer ?node ?wait ~amount ~giver ~receiver client =
   let wait_arg = match wait with None -> [] | Some w -> ["--wait"; w] in
   spawn_command
+    ?node
     client
-    ( endpoint_arg ?node client @ mode_arg client @ wait_arg
+    ( wait_arg
     @ ["transfer"; string_of_int amount; "from"; giver; "to"; receiver] )
 
 let transfer ?node ?wait ~amount ~giver ~receiver client =
   spawn_transfer ?node ?wait ~amount ~giver ~receiver client |> Process.check
 
 let spawn_get_balance_for ?node ~account client =
-  spawn_command
-    client
-    ( endpoint_arg ?node client @ mode_arg client
-    @ ["get"; "balance"; "for"; account] )
+  spawn_command ?node client ["get"; "balance"; "for"; account]
 
 let get_balance_for ?node ~account client =
   let extract_balance (client_output : string) : float =
@@ -339,8 +329,12 @@ let init ?path ?admin_path ?name ?color ?base_dir ?node () =
 
 let init_mockup ?path ?admin_path ?name ?color ?base_dir ?sync_mode ~protocol
     () =
+  (* The mockup's public documentation doesn't use `--mode mockup`
+     for `create mockup` (as it is not required). We wanna do the same here.
+     Hence `Client None` here: *)
   let client =
-    create_with_mode ?path ?admin_path ?name ?color ?base_dir Mockup
+    create_with_mode ?path ?admin_path ?name ?color ?base_dir (Client None)
   in
   let* () = create_mockup ?sync_mode ~protocol client in
-  return client
+  (* We want, however, to return a mockup client; hence the following: *)
+  set_mode Mockup client ; return client
