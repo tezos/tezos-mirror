@@ -213,6 +213,4 @@ val parse_entrypoint_annot :
   Script.location -> string list -> field_annot option tzresult
 
 val parse_var_type_annot :
-  Script.location ->
-  string list ->
-  (var_annot option * type_annot option) tzresult
+  Script.location -> string list -> type_annot option tzresult
