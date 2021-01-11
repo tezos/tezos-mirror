@@ -1244,6 +1244,13 @@ let[@coq_struct "ty"] rec parse_comparable_ty :
 
 type ex_ty = Ex_ty : 'a ty -> ex_ty
 
+type ex_parameter_ty_and_entrypoints =
+  | Ex_parameter_ty_and_entrypoints : {
+      arg_type : 'a ty;
+      root_name : field_annot option;
+    }
+      -> ex_parameter_ty_and_entrypoints
+
 let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_packable_ty
     :
     context ->
@@ -1920,6 +1927,20 @@ let well_formed_entrypoints (type full) (full : full ty) ~root_name =
     match first_unreachable with
     | None -> Result.return_unit
     | Some path -> error (Unreachable_entrypoint path)
+
+let parse_parameter_ty_and_entrypoints :
+    context ->
+    stack_depth:int ->
+    legacy:bool ->
+    root_name:field_annot option ->
+    Script.node ->
+    (ex_parameter_ty_and_entrypoints * context) tzresult =
+ fun ctxt ~stack_depth ~legacy ~root_name node ->
+  parse_parameter_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy node
+  >>? fun (Ex_ty arg_type, ctxt) ->
+  (if legacy then Result.return_unit
+  else well_formed_entrypoints ~root_name arg_type)
+  >|? fun () -> (Ex_parameter_ty_and_entrypoints {arg_type; root_name}, ctxt)
 
 let parse_uint ~nb_bits =
   assert (Compare.Int.(nb_bits >= 0 && nb_bits <= 30)) ;
@@ -4461,15 +4482,13 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       >>?= fun ({arg_type; storage_type; code_field; views; root_name}, ctxt) ->
       record_trace
         (Ill_formed_type (Some "parameter", canonical_code, location arg_type))
-        (parse_parameter_ty
+        (parse_parameter_ty_and_entrypoints
            ctxt
            ~stack_depth:(stack_depth + 1)
            ~legacy
+           ~root_name
            arg_type)
-      >>?= fun (Ex_ty arg_type, ctxt) ->
-      (if legacy then Result.return_unit
-      else well_formed_entrypoints ~root_name arg_type)
-      >>?= fun () ->
+      >>?= fun (Ex_parameter_ty_and_entrypoints {arg_type; root_name}, ctxt) ->
       record_trace
         (Ill_formed_type (Some "storage", canonical_code, location storage_type))
         (parse_storage_ty
@@ -5018,12 +5037,15 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
                   (* can only fail because of gas *)
                   parse_toplevel ctxt ~legacy:true code
                   >>? fun ({arg_type; root_name; _}, ctxt) ->
-                  parse_parameter_ty
+                  parse_parameter_ty_and_entrypoints
                     ctxt
                     ~stack_depth:(stack_depth + 1)
                     ~legacy:true
+                    ~root_name
                     arg_type
-                  >>? fun (Ex_ty targ, ctxt) ->
+                  >>? fun ( Ex_parameter_ty_and_entrypoints
+                              {arg_type = targ; root_name},
+                            ctxt ) ->
                   (* we don't check targ size here because it's a legacy contract code *)
                   Gas_monad.run ctxt
                   @@ find_entrypoint_for_type
@@ -5205,14 +5227,18 @@ let parse_contract_for_script :
                   | Error _ -> error (Invalid_contract (loc, contract))
                   | Ok ({arg_type; root_name; _}, ctxt) -> (
                       match
-                        parse_parameter_ty
+                        parse_parameter_ty_and_entrypoints
                           ctxt
                           ~stack_depth:0
                           ~legacy:true
+                          ~root_name
                           arg_type
                       with
                       | Error _ -> error (Invalid_contract (loc, contract))
-                      | Ok (Ex_ty targ, ctxt) -> (
+                      | Ok
+                          ( Ex_parameter_ty_and_entrypoints
+                              {arg_type = targ; root_name},
+                            ctxt ) -> (
                           (* we don't check targ size here because it's a legacy contract code *)
                           Gas_monad.run ctxt
                           @@ find_entrypoint_for_type
@@ -5251,11 +5277,13 @@ let parse_code :
   let arg_type_loc = location arg_type in
   record_trace
     (Ill_formed_type (Some "parameter", code, arg_type_loc))
-    (parse_parameter_ty ctxt ~stack_depth:0 ~legacy arg_type)
-  >>?= fun (Ex_ty arg_type, ctxt) ->
-  (if legacy then Result.return_unit
-  else well_formed_entrypoints ~root_name arg_type)
-  >>?= fun () ->
+    (parse_parameter_ty_and_entrypoints
+       ctxt
+       ~stack_depth:0
+       ~legacy
+       ~root_name
+       arg_type)
+  >>?= fun (Ex_parameter_ty_and_entrypoints {arg_type; root_name}, ctxt) ->
   let storage_type_loc = location storage_type in
   record_trace
     (Ill_formed_type (Some "storage", code, storage_type_loc))
@@ -5361,11 +5389,13 @@ let typecheck_code :
   let arg_type_loc = location arg_type in
   record_trace
     (Ill_formed_type (Some "parameter", code, arg_type_loc))
-    (parse_parameter_ty ctxt ~stack_depth:0 ~legacy arg_type)
-  >>?= fun (Ex_ty arg_type, ctxt) ->
-  (if legacy then Result.return_unit
-  else well_formed_entrypoints ~root_name arg_type)
-  >>?= fun () ->
+    (parse_parameter_ty_and_entrypoints
+       ctxt
+       ~stack_depth:0
+       ~legacy
+       ~root_name
+       arg_type)
+  >>?= fun (Ex_parameter_ty_and_entrypoints {arg_type; root_name}, ctxt) ->
   let storage_type_loc = location storage_type in
   record_trace
     (Ill_formed_type (Some "storage", code, storage_type_loc))
