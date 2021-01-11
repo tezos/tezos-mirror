@@ -1140,7 +1140,7 @@ let rec size_of_comparable_value : type a. a comparable_ty -> a -> Size.t =
    | Key_hash_key _ -> Size.key_hash v
    | Timestamp_key _ -> Size.timestamp v
    | Address_key _ -> Size.address v
-   | Pair_key ((leaf, _), (node, _), _) ->
+   | Pair_key (leaf, node, _) ->
        let (lv, rv) = v in
        let size =
          Size.add
@@ -1148,7 +1148,7 @@ let rec size_of_comparable_value : type a. a comparable_ty -> a -> Size.t =
            (size_of_comparable_value node rv)
        in
        Size.add size Size.one
-   | Union_key ((left, _), (right, _), _) ->
+   | Union_key (left, right, _) ->
        let size =
          match v with
          | L v -> size_of_comparable_value left v
