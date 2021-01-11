@@ -3050,7 +3050,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
             However, DROP is equivalent to DROP 1 so hinting at an arity of 1 makes sense. *)
       fail (Invalid_arity (loc, I_DROP, 1, List.length l))
   | (Prim (loc, I_DUP, [], annot), Item_t (v, rest)) ->
-      parse_var_annot loc annot ~default:None >>?= fun () ->
+      parse_var_annot loc annot >>?= fun () ->
       record_trace_eval
         (fun () ->
           let t = serialize_ty_for_error v in
@@ -3627,7 +3627,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       Item_t (v, Item_t (Bool_t _, Item_t (Set_t (elt, tname), rest))) ) ->
       check_item_ty ctxt (ty_of_comparable_ty elt) v loc I_UPDATE 1 3
       >>?= fun (Eq, _, ctxt) ->
-      parse_var_annot loc annot ~default:None >>?= fun () ->
+      parse_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> ISet_update (kinfo, k))} in
       (typed ctxt loc instr (Item_t (Set_t (elt, tname), rest))
         : ((a, s) judgement * context) tzresult Lwt.t)
@@ -3759,7 +3759,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       let k = ty_of_comparable_ty ck in
       check_item_ty ctxt vk k loc I_UPDATE 1 3 >>?= fun (Eq, _, ctxt) ->
       check_item_ty ctxt vv v loc I_UPDATE 2 3 >>?= fun (Eq, v, ctxt) ->
-      parse_var_annot loc annot ~default:None >>?= fun () ->
+      parse_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IMap_update (kinfo, k))} in
       (typed ctxt loc instr (Item_t (Map_t (ck, v, map_name), rest))
         : ((a, s) judgement * context) tzresult Lwt.t)
@@ -3771,7 +3771,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       let k = ty_of_comparable_ty ck in
       check_item_ty ctxt vk k loc I_GET_AND_UPDATE 1 3 >>?= fun (Eq, _, ctxt) ->
       check_item_ty ctxt vv v loc I_GET_AND_UPDATE 2 3 >>?= fun (Eq, v, ctxt) ->
-      parse_var_annot loc annot ~default:None >>?= fun () ->
+      parse_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IMap_get_and_update (kinfo, k))} in
       let stack =
         Item_t (Option_t (vv, vname), Item_t (Map_t (ck, v, map_name), rest))
@@ -3821,7 +3821,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       check_item_ty ctxt set_key k loc I_UPDATE 1 3 >>?= fun (Eq, _, ctxt) ->
       check_item_ty ctxt set_value map_value loc I_UPDATE 2 3
       >>?= fun (Eq, map_value, ctxt) ->
-      parse_var_annot loc annot ~default:None >>?= fun () ->
+      parse_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IBig_map_update (kinfo, k))} in
       let stack = Item_t (Big_map_t (map_key, map_value, map_name), rest) in
       (typed ctxt loc instr stack : ((a, s) judgement * context) tzresult Lwt.t)
@@ -3834,7 +3834,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       let k = ty_of_comparable_ty ck in
       check_item_ty ctxt vk k loc I_GET_AND_UPDATE 1 3 >>?= fun (Eq, _, ctxt) ->
       check_item_ty ctxt vv v loc I_GET_AND_UPDATE 2 3 >>?= fun (Eq, v, ctxt) ->
-      parse_var_annot loc annot ~default:None >>?= fun () ->
+      parse_var_annot loc annot >>?= fun () ->
       let instr =
         {apply = (fun kinfo k -> IBig_map_get_and_update (kinfo, k))}
       in
@@ -3845,8 +3845,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   (* Sapling *)
   | (Prim (loc, I_SAPLING_EMPTY_STATE, [memo_size], annot), rest) ->
       parse_memo_size memo_size >>?= fun memo_size ->
-      parse_var_annot loc annot ~default:default_sapling_state_annot
-      >>?= fun () ->
+      parse_var_annot loc annot >>?= fun () ->
       let instr =
         {apply = (fun kinfo k -> ISapling_empty_state (kinfo, memo_size, k))}
       in
@@ -4197,16 +4196,12 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       typed ctxt loc instr (Item_t (String_t tname, rest))
   | (Prim (loc, I_CONCAT, [], annot), Item_t (List_t (String_t tname, _), rest))
     ->
-      parse_var_annot ~default:None loc annot >>?= fun () ->
+      parse_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IConcat_string (kinfo, k))} in
       typed ctxt loc instr (Item_t (String_t tname, rest))
   | ( Prim (loc, I_SLICE, [], annot),
       Item_t (Nat_t _, Item_t (Nat_t _, Item_t (String_t tname, rest))) ) ->
-      parse_var_annot
-        ~default:(field_to_var_annot default_slice_annot)
-        loc
-        annot
-      >>?= fun () ->
+      parse_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> ISlice_string (kinfo, k))} in
       let stack = Item_t (option_string'_t tname, rest) in
       typed ctxt loc instr stack
@@ -4226,17 +4221,13 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       typed ctxt loc instr stack
   | (Prim (loc, I_CONCAT, [], annot), Item_t (List_t (Bytes_t tname, _), rest))
     ->
-      parse_var_annot ~default:None loc annot >>?= fun () ->
+      parse_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IConcat_bytes (kinfo, k))} in
       let stack = Item_t (Bytes_t tname, rest) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_SLICE, [], annot),
       Item_t (Nat_t _, Item_t (Nat_t _, Item_t (Bytes_t tname, rest))) ) ->
-      parse_var_annot
-        ~default:(field_to_var_annot default_slice_annot)
-        loc
-        annot
-      >>?= fun () ->
+      parse_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> ISlice_bytes (kinfo, k))} in
       let stack = Item_t (option_bytes'_t tname, rest) in
       typed ctxt loc instr stack
@@ -4323,7 +4314,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       let stack = Item_t (nat_t ~annot:None, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_ISNAT, [], annot), Item_t (Int_t _, rest)) ->
-      parse_var_annot loc annot ~default:None >>?= fun () ->
+      parse_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IIs_nat (kinfo, k))} in
       let stack = Item_t (option_nat_t, rest) in
       typed ctxt loc instr stack
@@ -4565,7 +4556,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       typed ctxt loc instr stack
   (* annotations *)
   | (Prim (loc, I_CAST, [cast_t], annot), Item_t (t, stack)) ->
-      parse_var_annot loc annot ~default:None >>?= fun () ->
+      parse_var_annot loc annot >>?= fun () ->
       parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy cast_t
       >>?= fun (Ex_ty cast_t, ctxt) ->
       ty_eq ~legacy ctxt loc cast_t t >>?= fun (Eq, ctxt) ->
@@ -4585,8 +4576,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         (* allow to pack contracts for hash/signature checks *) loc
         t
       >>?= fun () ->
-      parse_var_annot loc annot ~default:(field_to_var_annot default_pack_annot)
-      >>?= fun () ->
+      parse_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IPack (kinfo, t, k))} in
       let stack = Item_t (bytes_t ~annot:None, rest) in
       typed ctxt loc instr stack
@@ -4600,8 +4590,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       typed ctxt loc instr stack
   (* protocol *)
   | (Prim (loc, I_ADDRESS, [], annot), Item_t (Contract_t _, rest)) ->
-      parse_var_annot loc annot ~default:(field_to_var_annot default_addr_annot)
-      >>?= fun () ->
+      parse_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IAddress (kinfo, k))} in
       let stack = Item_t (address_t ~annot:None, rest) in
       typed ctxt loc instr stack
@@ -4625,11 +4614,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       parse_view_output_ty ctxt ~stack_depth:0 ~legacy output_ty
       >>?= fun (Ex_ty output_ty, ctxt) ->
       option_t output_ty_loc output_ty ~annot:None >>?= fun res_ty ->
-      parse_var_annot
-        loc
-        annot
-        ~default:(field_to_var_annot default_contract_annot)
-      >>?= fun () ->
+      parse_var_annot loc annot >>?= fun () ->
       let instr =
         {
           apply =
@@ -4747,12 +4732,12 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       in
       typed ctxt loc instr stack
   | (Prim (loc, I_NOW, [], annot), stack) ->
-      parse_var_annot loc annot ~default:default_now_annot >>?= fun () ->
+      parse_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> INow (kinfo, k))} in
       let stack = Item_t (timestamp_t ~annot:None, stack) in
       typed ctxt loc instr stack
   | (Prim (loc, I_AMOUNT, [], annot), stack) ->
-      parse_var_annot loc annot ~default:default_amount_annot >>?= fun () ->
+      parse_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IAmount (kinfo, k))} in
       let stack = Item_t (mutez_t ~annot:None, stack) in
       typed ctxt loc instr stack
@@ -4762,12 +4747,12 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       let stack = Item_t (chain_id_t ~annot:None, stack) in
       typed ctxt loc instr stack
   | (Prim (loc, I_BALANCE, [], annot), stack) ->
-      parse_var_annot loc annot ~default:default_balance_annot >>?= fun () ->
+      parse_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IBalance (kinfo, k))} in
       let stack = Item_t (mutez_t ~annot:None, stack) in
       typed ctxt loc instr stack
   | (Prim (loc, I_LEVEL, [], annot), stack) ->
-      parse_var_annot loc annot ~default:default_level_annot >>?= fun () ->
+      parse_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> ILevel (kinfo, k))} in
       let stack = Item_t (nat_t ~annot:None, stack) in
       typed ctxt loc instr stack
@@ -4784,12 +4769,12 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | (Prim (_, I_STEPS_TO_QUOTA, _, _), _) ->
       fail (Deprecated_instruction I_STEPS_TO_QUOTA)
   | (Prim (loc, I_SOURCE, [], annot), stack) ->
-      parse_var_annot loc annot ~default:default_source_annot >>?= fun () ->
+      parse_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> ISource (kinfo, k))} in
       let stack = Item_t (address_t ~annot:None, stack) in
       typed ctxt loc instr stack
   | (Prim (loc, I_SENDER, [], annot), stack) ->
-      parse_var_annot loc annot ~default:default_sender_annot >>?= fun () ->
+      parse_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> ISender (kinfo, k))} in
       let stack = Item_t (address_t ~annot:None, stack) in
       typed ctxt loc instr stack
@@ -4829,7 +4814,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
               let stack = Item_t (res_ty, stack) in
               typed_no_lwt ctxt loc instr stack )
   | (Prim (loc, I_SELF_ADDRESS, [], annot), stack) ->
-      parse_var_annot loc annot ~default:default_self_annot >>?= fun () ->
+      parse_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> ISelf_address (kinfo, k))} in
       let stack = Item_t (address_t ~annot:None, stack) in
       typed ctxt loc instr stack

@@ -175,9 +175,8 @@ val check_correct_field :
 
 (** Instruction annotations parsing *)
 
-(** Parse a variable annotation, replaced by a default value if [None]. *)
-val parse_var_annot :
-  Script.location -> ?default:var_annot option -> string list -> unit tzresult
+(** Parse a variable annotation. *)
+val parse_var_annot : Script.location -> string list -> unit tzresult
 
 val is_allowed_char : char -> bool
 

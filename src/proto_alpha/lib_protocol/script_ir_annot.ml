@@ -357,10 +357,8 @@ let check_correct_field :
           (Inconsistent_field_annotations
              ("%" ^ (s1 :> string), "%" ^ (s2 :> string)))
 
-let parse_var_annot :
-    Script.location -> ?default:var_annot option -> string list -> unit tzresult
-    =
- fun loc ?default:_ annot ->
+let parse_var_annot : Script.location -> string list -> unit tzresult =
+ fun loc annot ->
   parse_annots loc annot >>? classify_annot loc >>? fun (vars, types, fields) ->
   error_unexpected_annot loc types >>? fun () ->
   error_unexpected_annot loc fields >>? fun () ->
