@@ -717,7 +717,7 @@ end)
       let open Script_typed_ir in
       fun stack_ty ->
         match stack_ty with
-        | Item_t (ty, tl, _) ->
+        | Item_t (ty, tl) ->
             let* elt = value ty in
             let* tl = stack tl in
             return ((elt, tl) : a * b)

@@ -1484,7 +1484,7 @@ module RPC = struct
             (a, s) Script_typed_ir.stack_ty * (a * s) ->
             (Script.expr * string option) list tzresult Lwt.t = function
           | (Bot_t, (EmptyCell, EmptyCell)) -> return_nil
-          | (Item_t (ty, rest_ty, annot), (v, rest)) ->
+          | (Item_t (ty, rest_ty), (v, rest)) ->
               Script_ir_translator.unparse_data
                 ctxt
                 Unparsing_mode.unparsing_mode
@@ -1493,7 +1493,7 @@ module RPC = struct
               >>=? fun (data, _ctxt) ->
               unparse_stack (rest_ty, rest) >|=? fun rest ->
               let annot =
-                match Script_ir_annot.unparse_var_annot annot with
+                match Script_ir_annot.unparse_var_annot None with
                 | [] -> None
                 | [a] -> Some a
                 | _ -> assert false

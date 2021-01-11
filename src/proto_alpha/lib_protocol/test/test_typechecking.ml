@@ -872,7 +872,7 @@ let test_contract_not_packable () =
      ctxt
      ~legacy:false
      (Prim (0, I_UNPACK, [Prim (0, T_unit, [], [])], []))
-     (Item_t (Script_typed_ir.bytes_t ~annot:None, Bot_t, None))
+     (Item_t (Script_typed_ir.bytes_t ~annot:None, Bot_t))
    >>= function
    | Ok _ -> return_unit
    | Error _ -> Alcotest.failf "Could not parse UNPACK unit")
@@ -883,7 +883,7 @@ let test_contract_not_packable () =
     ctxt
     ~legacy:false
     (Prim (0, I_UNPACK, [contract_unit], []))
-    (Item_t (Script_typed_ir.bytes_t ~annot:None, Bot_t, None))
+    (Item_t (Script_typed_ir.bytes_t ~annot:None, Bot_t))
   >>= function
   | Ok _ ->
       Alcotest.failf

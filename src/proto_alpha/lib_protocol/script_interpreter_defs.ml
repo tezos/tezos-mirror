@@ -456,14 +456,14 @@ let rec kundip :
    formal argument to [v]. The type of [v] is represented by [ty]. *)
 let apply ctxt gas capture_ty capture lam =
   let (Lam (descr, expr)) = lam in
-  let (Item_t (full_arg_ty, _, _)) = descr.kbef in
+  let (Item_t (full_arg_ty, _)) = descr.kbef in
   let ctxt = update_context gas ctxt in
   unparse_data ctxt Optimized capture_ty capture >>=? fun (const_expr, ctxt) ->
   let loc = Micheline.dummy_location in
   unparse_ty ~loc ctxt capture_ty >>?= fun (ty_expr, ctxt) ->
   match full_arg_ty with
   | Pair_t ((capture_ty, _, _), (arg_ty, _, _), _) ->
-      let arg_stack_ty = Item_t (arg_ty, Bot_t, None) in
+      let arg_stack_ty = Item_t (arg_ty, Bot_t) in
       let full_descr =
         {
           kloc = descr.kloc;
@@ -474,7 +474,7 @@ let apply ctxt gas capture_ty capture lam =
              let kinfo_pair =
                {
                  iloc = descr.kloc;
-                 kstack_ty = Item_t (capture_ty, arg_stack_ty, None);
+                 kstack_ty = Item_t (capture_ty, arg_stack_ty);
                }
              in
              IConst (kinfo_const, capture, ICons_pair (kinfo_pair, descr.kinstr)));
