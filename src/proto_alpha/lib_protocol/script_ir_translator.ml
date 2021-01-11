@@ -186,20 +186,20 @@ let add_field_annot a = function
 let rec unparse_comparable_ty_uncarbonated :
     type a loc. loc:loc -> a comparable_ty -> loc Script.michelson_node =
  fun ~loc -> function
-  | Unit_key _meta -> Prim (loc, T_unit, [], unparse_type_annot None)
-  | Never_key _meta -> Prim (loc, T_never, [], unparse_type_annot None)
-  | Int_key _meta -> Prim (loc, T_int, [], unparse_type_annot None)
-  | Nat_key _meta -> Prim (loc, T_nat, [], unparse_type_annot None)
-  | Signature_key _meta -> Prim (loc, T_signature, [], unparse_type_annot None)
-  | String_key _meta -> Prim (loc, T_string, [], unparse_type_annot None)
-  | Bytes_key _meta -> Prim (loc, T_bytes, [], unparse_type_annot None)
-  | Mutez_key _meta -> Prim (loc, T_mutez, [], unparse_type_annot None)
-  | Bool_key _meta -> Prim (loc, T_bool, [], unparse_type_annot None)
-  | Key_hash_key _meta -> Prim (loc, T_key_hash, [], unparse_type_annot None)
-  | Key_key _meta -> Prim (loc, T_key, [], unparse_type_annot None)
-  | Timestamp_key _meta -> Prim (loc, T_timestamp, [], unparse_type_annot None)
-  | Address_key _meta -> Prim (loc, T_address, [], unparse_type_annot None)
-  | Chain_id_key _meta -> Prim (loc, T_chain_id, [], unparse_type_annot None)
+  | Unit_key _meta -> Prim (loc, T_unit, [], [])
+  | Never_key _meta -> Prim (loc, T_never, [], [])
+  | Int_key _meta -> Prim (loc, T_int, [], [])
+  | Nat_key _meta -> Prim (loc, T_nat, [], [])
+  | Signature_key _meta -> Prim (loc, T_signature, [], [])
+  | String_key _meta -> Prim (loc, T_string, [], [])
+  | Bytes_key _meta -> Prim (loc, T_bytes, [], [])
+  | Mutez_key _meta -> Prim (loc, T_mutez, [], [])
+  | Bool_key _meta -> Prim (loc, T_bool, [], [])
+  | Key_hash_key _meta -> Prim (loc, T_key_hash, [], [])
+  | Key_key _meta -> Prim (loc, T_key, [], [])
+  | Timestamp_key _meta -> Prim (loc, T_timestamp, [], [])
+  | Address_key _meta -> Prim (loc, T_address, [], [])
+  | Chain_id_key _meta -> Prim (loc, T_chain_id, [], [])
   | Pair_key ((l, al), (r, ar), _meta) -> (
       let tl = add_field_annot al (unparse_comparable_ty_uncarbonated ~loc l) in
       let tr = add_field_annot ar (unparse_comparable_ty_uncarbonated ~loc r) in
@@ -207,19 +207,14 @@ let rec unparse_comparable_ty_uncarbonated :
       (* Note that the folding does not happen if the pair on the right has a
          field annotation because this annotation would be lost *)
       match tr with
-      | Prim (_, T_pair, ts, []) ->
-          Prim (loc, T_pair, tl :: ts, unparse_type_annot None)
-      | _ -> Prim (loc, T_pair, [tl; tr], unparse_type_annot None))
+      | Prim (_, T_pair, ts, []) -> Prim (loc, T_pair, tl :: ts, [])
+      | _ -> Prim (loc, T_pair, [tl; tr], []))
   | Union_key ((l, al), (r, ar), _meta) ->
       let tl = add_field_annot al (unparse_comparable_ty_uncarbonated ~loc l) in
       let tr = add_field_annot ar (unparse_comparable_ty_uncarbonated ~loc r) in
-      Prim (loc, T_or, [tl; tr], unparse_type_annot None)
+      Prim (loc, T_or, [tl; tr], [])
   | Option_key (t, _meta) ->
-      Prim
-        ( loc,
-          T_option,
-          [unparse_comparable_ty_uncarbonated ~loc t],
-          unparse_type_annot None )
+      Prim (loc, T_option, [unparse_comparable_ty_uncarbonated ~loc t], [])
 
 let unparse_memo_size ~loc memo_size =
   let z = Sapling.Memo_size.unparse_to_z memo_size in
@@ -230,29 +225,29 @@ let rec unparse_ty_uncarbonated :
  fun ~loc ty ->
   let prim (name, args, annot) = Prim (loc, name, args, annot) in
   match ty with
-  | Unit_t _meta -> prim (T_unit, [], unparse_type_annot None)
-  | Int_t _meta -> prim (T_int, [], unparse_type_annot None)
-  | Nat_t _meta -> prim (T_nat, [], unparse_type_annot None)
-  | Signature_t _meta -> prim (T_signature, [], unparse_type_annot None)
-  | String_t _meta -> prim (T_string, [], unparse_type_annot None)
-  | Bytes_t _meta -> prim (T_bytes, [], unparse_type_annot None)
-  | Mutez_t _meta -> prim (T_mutez, [], unparse_type_annot None)
-  | Bool_t _meta -> prim (T_bool, [], unparse_type_annot None)
-  | Key_hash_t _meta -> prim (T_key_hash, [], unparse_type_annot None)
-  | Key_t _meta -> prim (T_key, [], unparse_type_annot None)
-  | Timestamp_t _meta -> prim (T_timestamp, [], unparse_type_annot None)
-  | Address_t _meta -> prim (T_address, [], unparse_type_annot None)
-  | Operation_t _meta -> prim (T_operation, [], unparse_type_annot None)
-  | Chain_id_t _meta -> prim (T_chain_id, [], unparse_type_annot None)
-  | Never_t _meta -> prim (T_never, [], unparse_type_annot None)
-  | Bls12_381_g1_t _meta -> prim (T_bls12_381_g1, [], unparse_type_annot None)
-  | Bls12_381_g2_t _meta -> prim (T_bls12_381_g2, [], unparse_type_annot None)
-  | Bls12_381_fr_t _meta -> prim (T_bls12_381_fr, [], unparse_type_annot None)
+  | Unit_t _meta -> prim (T_unit, [], [])
+  | Int_t _meta -> prim (T_int, [], [])
+  | Nat_t _meta -> prim (T_nat, [], [])
+  | Signature_t _meta -> prim (T_signature, [], [])
+  | String_t _meta -> prim (T_string, [], [])
+  | Bytes_t _meta -> prim (T_bytes, [], [])
+  | Mutez_t _meta -> prim (T_mutez, [], [])
+  | Bool_t _meta -> prim (T_bool, [], [])
+  | Key_hash_t _meta -> prim (T_key_hash, [], [])
+  | Key_t _meta -> prim (T_key, [], [])
+  | Timestamp_t _meta -> prim (T_timestamp, [], [])
+  | Address_t _meta -> prim (T_address, [], [])
+  | Operation_t _meta -> prim (T_operation, [], [])
+  | Chain_id_t _meta -> prim (T_chain_id, [], [])
+  | Never_t _meta -> prim (T_never, [], [])
+  | Bls12_381_g1_t _meta -> prim (T_bls12_381_g1, [], [])
+  | Bls12_381_g2_t _meta -> prim (T_bls12_381_g2, [], [])
+  | Bls12_381_fr_t _meta -> prim (T_bls12_381_fr, [], [])
   | Contract_t (ut, _meta) ->
       let t = unparse_ty_uncarbonated ~loc ut in
-      prim (T_contract, [t], unparse_type_annot None)
+      prim (T_contract, [t], [])
   | Pair_t ((utl, l_field), (utr, r_field), _meta) ->
-      let annot = unparse_type_annot None in
+      let annot = [] in
       let utl = unparse_ty_uncarbonated ~loc utl in
       let tl = add_field_annot l_field utl in
       let utr = unparse_ty_uncarbonated ~loc utr in
@@ -265,7 +260,7 @@ let rec unparse_ty_uncarbonated :
         | Prim (_, T_pair, ts, []) -> (T_pair, tl :: ts, annot)
         | _ -> (T_pair, [tl; tr], annot))
   | Union_t ((utl, l_field), (utr, r_field), _meta) ->
-      let annot = unparse_type_annot None in
+      let annot = [] in
       let utl = unparse_ty_uncarbonated ~loc utl in
       let tl = add_field_annot l_field utl in
       let utr = unparse_ty_uncarbonated ~loc utr in
@@ -274,40 +269,34 @@ let rec unparse_ty_uncarbonated :
   | Lambda_t (uta, utr, _meta) ->
       let ta = unparse_ty_uncarbonated ~loc uta in
       let tr = unparse_ty_uncarbonated ~loc utr in
-      prim (T_lambda, [ta; tr], unparse_type_annot None)
+      prim (T_lambda, [ta; tr], [])
   | Option_t (ut, _meta) ->
-      let annot = unparse_type_annot None in
+      let annot = [] in
       let ut = unparse_ty_uncarbonated ~loc ut in
       prim (T_option, [ut], annot)
   | List_t (ut, _meta) ->
       let t = unparse_ty_uncarbonated ~loc ut in
-      prim (T_list, [t], unparse_type_annot None)
+      prim (T_list, [t], [])
   | Ticket_t (ut, _meta) ->
       let t = unparse_comparable_ty_uncarbonated ~loc ut in
-      prim (T_ticket, [t], unparse_type_annot None)
+      prim (T_ticket, [t], [])
   | Set_t (ut, _meta) ->
       let t = unparse_comparable_ty_uncarbonated ~loc ut in
-      prim (T_set, [t], unparse_type_annot None)
+      prim (T_set, [t], [])
   | Map_t (uta, utr, _meta) ->
       let ta = unparse_comparable_ty_uncarbonated ~loc uta in
       let tr = unparse_ty_uncarbonated ~loc utr in
-      prim (T_map, [ta; tr], unparse_type_annot None)
+      prim (T_map, [ta; tr], [])
   | Big_map_t (uta, utr, _meta) ->
       let ta = unparse_comparable_ty_uncarbonated ~loc uta in
       let tr = unparse_ty_uncarbonated ~loc utr in
-      prim (T_big_map, [ta; tr], unparse_type_annot None)
+      prim (T_big_map, [ta; tr], [])
   | Sapling_transaction_t (memo_size, _meta) ->
-      prim
-        ( T_sapling_transaction,
-          [unparse_memo_size ~loc memo_size],
-          unparse_type_annot None )
+      prim (T_sapling_transaction, [unparse_memo_size ~loc memo_size], [])
   | Sapling_state_t (memo_size, _meta) ->
-      prim
-        ( T_sapling_state,
-          [unparse_memo_size ~loc memo_size],
-          unparse_type_annot None )
-  | Chest_key_t _meta -> prim (T_chest_key, [], unparse_type_annot None)
-  | Chest_t _meta -> prim (T_chest, [], unparse_type_annot None)
+      prim (T_sapling_state, [unparse_memo_size ~loc memo_size], [])
+  | Chest_key_t _meta -> prim (T_chest_key, [], [])
+  | Chest_t _meta -> prim (T_chest, [], [])
 
 let unparse_ty ~loc ctxt ty =
   Gas.consume ctxt (Unparse_costs.unparse_type ty) >|? fun ctxt ->

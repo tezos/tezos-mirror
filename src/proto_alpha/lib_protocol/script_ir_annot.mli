@@ -38,8 +38,6 @@ end
 
 (** Unparse annotations to their string representation *)
 
-val unparse_type_annot : type_annot option -> string list
-
 val unparse_field_annot : field_annot option -> string list
 
 (** Converts a field annot option to an entrypoint.

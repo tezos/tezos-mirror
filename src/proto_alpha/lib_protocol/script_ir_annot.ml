@@ -42,10 +42,6 @@ module FOR_TESTS = struct
     Field_annot (Non_empty_string.of_string_exn s)
 end
 
-let unparse_type_annot : type_annot option -> string list = function
-  | None -> []
-  | Some (Type_annot a) -> [":" ^ (a :> string)]
-
 let unparse_field_annot : field_annot option -> string list = function
   | None -> []
   | Some (Field_annot a) -> ["%" ^ (a :> string)]
