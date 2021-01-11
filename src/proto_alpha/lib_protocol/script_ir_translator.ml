@@ -4616,11 +4616,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       >>?= fun (Ex_ty t, ctxt) ->
       contract_t loc t ~annot:None >>?= fun contract_ty ->
       option_t loc contract_ty ~annot:None >>?= fun res_ty ->
-      parse_entrypoint_annot
-        loc
-        annot
-        ~default:(gen_access_annot None default_contract_annot)
-      >>?= fun entrypoint ->
+      parse_entrypoint_annot loc annot >>?= fun entrypoint ->
       Script_ir_annot.field_annot_opt_to_entrypoint_strict ~loc entrypoint
       >>?= fun entrypoint ->
       let instr =
@@ -4806,8 +4802,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       typed ctxt loc instr stack
   | (Prim (loc, (I_SELF as prim), [], annot), stack) ->
       Lwt.return
-        ( parse_entrypoint_annot loc annot ~default:default_self_annot
-        >>? fun entrypoint ->
+        ( parse_entrypoint_annot loc annot >>? fun entrypoint ->
           (match entrypoint with
           | None -> Ok Entrypoint.default
           | Some (Field_annot annot) -> Entrypoint.of_annot_lax annot)

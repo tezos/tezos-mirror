@@ -210,10 +210,7 @@ val parse_unpair_annot :
   (field_annot option * field_annot option) tzresult
 
 val parse_entrypoint_annot :
-  Script.location ->
-  ?default:var_annot option ->
-  string list ->
-  field_annot option tzresult
+  Script.location -> string list -> field_annot option tzresult
 
 val parse_var_type_annot :
   Script.location ->

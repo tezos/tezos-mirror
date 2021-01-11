@@ -432,11 +432,8 @@ let parse_unpair_annot :
   get_two_annot loc vars >>? fun (_vcar, _vcdr) -> get_two_annot loc fields
 
 let parse_entrypoint_annot :
-    Script.location ->
-    ?default:var_annot option ->
-    string list ->
-    field_annot option tzresult =
- fun loc ?default:_ annot ->
+    Script.location -> string list -> field_annot option tzresult =
+ fun loc annot ->
   parse_annots loc annot >>? classify_annot loc >>? fun (vars, types, fields) ->
   error_unexpected_annot loc types >>? fun () ->
   get_one_annot loc fields >>? fun f ->
