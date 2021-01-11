@@ -27,6 +27,7 @@
    v2/time.mli
    v2/option.mli
    v2/tzEndian.mli
+   v2/bits.mli
 
    v2/RPC_arg.mli
    v2/RPC_path.mli

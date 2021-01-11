@@ -1,5 +1,6 @@
 (executables
- (names test_tzList
+ (names test_bits
+        test_tzList
         test_tzString
         test_lwt_pipe
         test_circular_buffer
@@ -19,6 +20,10 @@
        test_tzString.exe
        test_lwt_pipe.exe)
  (action (progn)))
+
+(rule
+ (alias runtest_bits)
+ (action (run %{exe:test_bits.exe})))
 
 (rule
  (alias runtest_tzList)
@@ -43,7 +48,8 @@
 (rule
  (alias runtest)
  (package tezos-stdlib)
- (deps (alias runtest_tzList)
+ (deps (alias runtest_bits)
+       (alias runtest_tzList)
        (alias runtest_tzString)
        (alias runtest_lwt_pipe)
        (alias runtest_circular_buffer)
