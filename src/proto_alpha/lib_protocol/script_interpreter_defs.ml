@@ -462,7 +462,7 @@ let apply ctxt gas capture_ty capture lam =
   let loc = Micheline.dummy_location in
   unparse_ty ~loc ctxt capture_ty >>?= fun (ty_expr, ctxt) ->
   match full_arg_ty with
-  | Pair_t ((capture_ty, _, _), (arg_ty, _, _), _) ->
+  | Pair_t ((capture_ty, _), (arg_ty, _), _) ->
       let arg_stack_ty = Item_t (arg_ty, Bot_t) in
       let full_descr =
         {

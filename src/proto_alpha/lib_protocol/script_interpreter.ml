@@ -1075,8 +1075,8 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                         _script_view ) -> (
                       pair_t
                         kloc
-                        (input_ty, None, None)
-                        (storage_type, None, None)
+                        (input_ty, None)
+                        (storage_type, None)
                         ~annot:None
                       >>?= fun pair_ty ->
                       let open Gas_monad in

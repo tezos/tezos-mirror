@@ -1377,8 +1377,8 @@ and 'ty ty =
   | Address_t : address ty_metadata -> address ty
   | Bool_t : bool ty_metadata -> bool ty
   | Pair_t :
-      ('a ty * field_annot option * var_annot option)
-      * ('b ty * field_annot option * var_annot option)
+      ('a ty * field_annot option)
+      * ('b ty * field_annot option)
       * ('a, 'b) pair ty_metadata
       -> ('a, 'b) pair ty
   | Union_t :
@@ -1567,8 +1567,8 @@ val bool_t : annot:type_annot option -> bool ty
 
 val pair_t :
   Script.location ->
-  'a ty * field_annot option * var_annot option ->
-  'b ty * field_annot option * var_annot option ->
+  'a ty * field_annot option ->
+  'b ty * field_annot option ->
   annot:type_annot option ->
   ('a, 'b) pair ty tzresult
 
