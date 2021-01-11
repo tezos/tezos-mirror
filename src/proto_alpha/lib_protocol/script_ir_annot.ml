@@ -424,19 +424,8 @@ let parse_destr_annot :
 let parse_unpair_annot :
     Script.location ->
     string list ->
-    field_name_car:field_annot option ->
-    field_name_cdr:field_annot option ->
-    pair_annot:var_annot option ->
-    value_annot_car:var_annot option ->
-    value_annot_cdr:var_annot option ->
     (field_annot option * field_annot option) tzresult =
- fun loc
-     annot
-     ~field_name_car:_
-     ~field_name_cdr:_
-     ~pair_annot:_
-     ~value_annot_car:_
-     ~value_annot_cdr:_ ->
+ fun loc annot ->
   parse_annots loc ~allow_special_var:true annot >>? classify_annot loc
   >>? fun (vars, types, fields) ->
   error_unexpected_annot loc types >>? fun () ->

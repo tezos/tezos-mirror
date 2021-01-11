@@ -3373,19 +3373,11 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim (loc, I_UNPAIR, [], annot),
       Item_t
         ( Pair_t
-            ( (a, expected_field_annot_a, a_annot),
-              (b, expected_field_annot_b, b_annot),
+            ( (a, expected_field_annot_a, _a_annot),
+              (b, expected_field_annot_b, _b_annot),
               _ ),
           rest ) ) ->
-      parse_unpair_annot
-        loc
-        annot
-        ~pair_annot:None
-        ~value_annot_car:a_annot
-        ~value_annot_cdr:b_annot
-        ~field_name_car:expected_field_annot_a
-        ~field_name_cdr:expected_field_annot_b
-      >>?= fun (field_a, field_b) ->
+      parse_unpair_annot loc annot >>?= fun (field_a, field_b) ->
       check_correct_field field_a expected_field_annot_a >>?= fun () ->
       check_correct_field field_b expected_field_annot_b >>?= fun () ->
       let unpair = {apply = (fun kinfo k -> IUnpair (kinfo, k))} in
