@@ -34,6 +34,14 @@ val endorsement :
   unit ->
   Kind.endorsement Operation.t tzresult Lwt.t
 
+val endorsement_with_slot :
+  ?delegate:public_key_hash * int list ->
+  ?level:Raw_level.t ->
+  Context.t ->
+  ?signing_context:Context.t ->
+  unit ->
+  Kind.endorsement_with_slot Operation.t tzresult Lwt.t
+
 val miss_signed_endorsement :
   ?level:Raw_level.t ->
   Context.t ->
@@ -82,6 +90,7 @@ val double_endorsement :
   Context.t ->
   Kind.endorsement Operation.t ->
   Kind.endorsement Operation.t ->
+  slot:int ->
   Operation.packed
 
 val double_baking :

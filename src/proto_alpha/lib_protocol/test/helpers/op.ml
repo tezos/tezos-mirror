@@ -59,6 +59,37 @@ let endorsement ?delegate ?level ctxt ?(signing_context = ctxt) () =
       signing_context
       op )
 
+let endorsement_with_slot ?delegate ?level ctxt ?(signing_context = ctxt) () =
+  (match delegate with None -> Context.get_endorser ctxt | Some v -> return v)
+  >>=? fun (delegate_pkh, slots) ->
+  let slot = WithExceptions.Option.get ~loc:__LOC__ (List.hd slots) in
+  Account.find delegate_pkh
+  >>=? fun delegate ->
+  Lwt.return
+    ( ( match level with
+      | None ->
+          Context.get_level ctxt
+      | Some level ->
+          ok level )
+    >|? fun level ->
+    let op = Single (Endorsement {level}) in
+    let endorsement =
+      sign
+        ~watermark:Signature.(Endorsement Chain_id.zero)
+        delegate.sk
+        signing_context
+        op
+    in
+    ( {
+        shell = endorsement.shell;
+        protocol_data =
+          {
+            contents = Single (Endorsement_with_slot {endorsement; slot});
+            signature = None;
+          };
+      }
+      : Kind.endorsement_with_slot Operation.t ) )
+
 let sign ?watermark sk ctxt (Contents_list contents) =
   Operation.pack (sign ?watermark sk ctxt contents)
 
@@ -320,8 +351,8 @@ let activation ctxt (pkh : Signature.Public_key_hash.t) activation_code =
     protocol_data = Operation_data {contents; signature = None};
   }
 
-let double_endorsement ctxt op1 op2 =
-  let contents = Single (Double_endorsement_evidence {op1; op2}) in
+let double_endorsement ctxt op1 op2 ~slot =
+  let contents = Single (Double_endorsement_evidence {op1; op2; slot}) in
   let branch = Context.branch ctxt in
   {
     shell = {branch};

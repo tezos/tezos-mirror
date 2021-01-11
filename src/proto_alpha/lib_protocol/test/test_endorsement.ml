@@ -89,7 +89,7 @@ let assert_endorser_balance_consistency ~loc ?(priority = 0) ?(baker = false)
 let delegates_with_slots endorsers =
   List.map
     (fun (endorser : Delegate_services.Endorsing_rights.t) ->
-      endorser.delegate)
+      (endorser.delegate, endorser.slots))
     endorsers
 
 let endorsing_power endorsers =
@@ -109,7 +109,7 @@ let test_simple_endorsement () =
   >>=? fun (b, _) ->
   Context.get_endorser (B b)
   >>=? fun (delegate, slots) ->
-  Op.endorsement ~delegate (B b) ()
+  Op.endorsement_with_slot ~delegate:(delegate, slots) (B b) ()
   >>=? fun op ->
   Context.Contract.balance (B b) (Contract.implicit_contract delegate)
   >>=? fun initial_balance ->
@@ -149,7 +149,7 @@ let test_max_endorsement () =
       let delegate = endorser.delegate in
       Context.Contract.balance (B b) (Contract.implicit_contract delegate)
       >>=? fun balance ->
-      Op.endorsement ~delegate (B b) ()
+      Op.endorsement_with_slot ~delegate:(delegate, endorser.slots) (B b) ()
       >|=? fun op ->
       ( delegate :: delegates,
         Operation.pack op :: ops,
@@ -198,7 +198,10 @@ let test_consistent_priorities () =
             (B b)
             (Contract.implicit_contract endorser.delegate)
           >>=? fun balance ->
-          Op.endorsement ~delegate:endorser.delegate (B b) ()
+          Op.endorsement_with_slot
+            ~delegate:(endorser.delegate, endorser.slots)
+            (B b)
+            ()
           >>=? fun operation ->
           let operation = Operation.pack operation in
           Block.get_next_baker ~policy:(By_priority priority) b
@@ -239,7 +242,7 @@ let test_reward_retrieval () =
   >>=? fun (endorser, slots) ->
   Context.Contract.balance (B b) (Contract.implicit_contract endorser)
   >>=? fun balance ->
-  Op.endorsement ~delegate:endorser (B b) ()
+  Op.endorsement_with_slot ~delegate:(endorser, slots) (B b) ()
   >>=? fun operation ->
   let operation = Operation.pack operation in
   let policy = Block.Excluding [endorser] in
@@ -291,7 +294,10 @@ let test_reward_retrieval_two_endorsers () =
     endorsement_security_deposit *? Int64.of_int (List.length endorser1.slots))
   >>?= fun security_deposit1 ->
   (* endorser1 endorses the genesis block in cycle 0 *)
-  Op.endorsement ~delegate:endorser1.delegate (B b) ()
+  Op.endorsement_with_slot
+    ~delegate:(endorser1.delegate, endorser1.slots)
+    (B b)
+    ()
   >>=? fun operation1 ->
   let policy = Block.Excluding [endorser1.delegate; endorser2.delegate] in
   Block.get_next_baker ~policy b
@@ -349,7 +355,10 @@ let test_reward_retrieval_two_endorsers () =
     endorsement_security_deposit *? Int64.of_int (List.length endorser2.slots))
   >>?= fun security_deposit2 ->
   (* endorser2 endorses the last block in cycle 0 *)
-  Op.endorsement ~delegate:endorser2.delegate (B b) ()
+  Op.endorsement_with_slot
+    ~delegate:(endorser2.delegate, endorser2.slots)
+    (B b)
+    ()
   >>=? fun operation2 ->
   (* bake first block in cycle 1, include endorsement of endorser2 *)
   Block.bake ~policy ~operation:(Operation.pack operation2) b
@@ -429,16 +438,72 @@ let test_reward_retrieval_two_endorsers () =
 (*  The following test scenarios are supposed to raise errors.  *)
 (****************************************************************)
 
+(** Apply an endorsement without its slot bearing wrapper. *)
+let test_unwrapped_endorsement () =
+  Context.init 5
+  >>=? fun (b, _) ->
+  Context.get_endorser (B b)
+  >>=? fun (delegate, _slots) ->
+  Op.endorsement ~delegate (B b) ()
+  >>=? fun op ->
+  let policy = Block.Excluding [delegate] in
+  Block.bake ~policy ~operations:[Operation.pack op] b
+  >>= fun res ->
+  Assert.proto_error ~loc:__LOC__ res (function
+      | Apply.Unwrapped_endorsement ->
+          true
+      | _ ->
+          false)
+
+(** Apply an endorsement with a wrong slot in its slot bearing wrapper. *)
+let test_bad_slot_wrapper () =
+  Context.init 5
+  >>=? fun (b, _) ->
+  Context.get_endorser (B b)
+  >>=? fun (delegate, _slots) ->
+  Op.endorsement_with_slot ~delegate:(delegate, [2000]) (B b) ()
+  >>=? fun op ->
+  let policy = Block.Excluding [delegate] in
+  Block.bake ~policy ~operations:[Operation.pack op] b
+  >>= fun res ->
+  Assert.proto_error ~loc:__LOC__ res (function
+      | Baking.Invalid_endorsement_slot _ ->
+          true
+      | _ ->
+          false)
+
+(** Apply an endorsement with a negative slot in its slot bearing wrapper. *)
+let test_neg_slot_wrapper () =
+  Context.init 5
+  >>=? fun (b, _) ->
+  Context.get_endorser (B b)
+  >>=? fun (delegate, _slots) ->
+  Op.endorsement_with_slot ~delegate:(delegate, [-1]) (B b) ()
+  >>=? fun op ->
+  let policy = Block.Excluding [delegate] in
+  Lwt.catch
+    (fun () ->
+      Block.bake ~policy ~operations:[Operation.pack op] b
+      >>= fun _ ->
+      failwith
+        "negative slot wrapper should not be accepted by the binary format")
+    (function
+      | Data_encoding.Binary.Write_error _ -> return_unit | e -> Lwt.fail e)
+
 (** Wrong endorsement predecessor : apply an endorsement with an
     incorrect block predecessor. *)
 let test_wrong_endorsement_predecessor () =
   Context.init 5
   >>=? fun (b, _) ->
   Context.get_endorser (B b)
-  >>=? fun (genesis_endorser, _slots) ->
+  >>=? fun (genesis_endorser, slots) ->
   Block.bake b
   >>=? fun b' ->
-  Op.endorsement ~delegate:genesis_endorser ~signing_context:(B b) (B b') ()
+  Op.endorsement_with_slot
+    ~delegate:(genesis_endorser, slots)
+    ~signing_context:(B b)
+    (B b')
+    ()
   >>=? fun operation ->
   let operation = Operation.pack operation in
   Block.bake ~operation b'
@@ -458,7 +523,7 @@ let test_invalid_endorsement_level () =
   >>?= fun genesis_level ->
   Block.bake b
   >>=? fun b ->
-  Op.endorsement ~level:genesis_level (B b) ()
+  Op.endorsement_with_slot ~level:genesis_level (B b) ()
   >>=? fun operation ->
   let operation = Operation.pack operation in
   Block.bake ~operation b
@@ -476,12 +541,12 @@ let test_duplicate_endorsement () =
   >>=? fun (b, _) ->
   Incremental.begin_construction b
   >>=? fun inc ->
-  Op.endorsement (B b) ()
+  Op.endorsement_with_slot (B b) ()
   >>=? fun operation ->
   let operation = Operation.pack operation in
   Incremental.add_operation inc operation
   >>=? fun inc ->
-  Op.endorsement (B b) ()
+  Op.endorsement_with_slot (B b) ()
   >>=? fun operation ->
   let operation = Operation.pack operation in
   Incremental.add_operation inc operation
@@ -504,7 +569,7 @@ let test_not_enough_for_deposit () =
   >>=? fun b ->
   (* retrieve the level 2's endorser *)
   Context.get_endorser (B b)
-  >>=? fun (endorser, _slots) ->
+  >>=? fun (endorser, slots) ->
   let (_, contract_other_than_endorser) =
     WithExceptions.Option.get ~loc:__LOC__
     @@ List.find
@@ -530,7 +595,7 @@ let test_not_enough_for_deposit () =
   Block.bake ~operation:op_trans b_init
   >>=? fun b ->
   (* Endorse with a zero balance *)
-  Op.endorsement ~delegate:endorser (B b) ()
+  Op.endorsement_with_slot ~delegate:(endorser, slots) (B b) ()
   >>=? fun op_endo ->
   Block.bake
     ~policy:(Excluding [endorser])
@@ -561,7 +626,9 @@ let test_endorsement_threshold () =
       let crt_endorsers = List.take_n i endorsers in
       let endorsing_power = endorsing_power crt_endorsers in
       let delegates = delegates_with_slots crt_endorsers in
-      List.map_es (fun x -> Op.endorsement ~delegate:x (B b) ()) delegates
+      List.map_es
+        (fun x -> Op.endorsement_with_slot ~delegate:x (B b) ())
+        delegates
       >>=? fun ops ->
       Context.get_minimal_valid_time (B b) ~priority ~endorsing_power
       >>=? fun timestamp ->
@@ -591,7 +658,9 @@ let test_endorsement_threshold () =
   let priority = 0 in
   let endorsing_power = endorsing_power endorsers in
   let delegates = delegates_with_slots endorsers in
-  List.map_es (fun delegate -> Op.endorsement ~delegate (B b) ()) delegates
+  List.map_es
+    (fun delegate -> Op.endorsement_with_slot ~delegate (B b) ())
+    delegates
   >>=? fun ops ->
   Context.get_minimal_valid_time (B b) ~priority ~endorsing_power
   >>=? fun timestamp ->
@@ -614,8 +683,8 @@ let test_fitness_gap () =
       assert false )
   |> fun fitness ->
   Context.get_endorser (B b)
-  >>=? fun (delegate, _slots) ->
-  Op.endorsement ~delegate (B b) ()
+  >>=? fun (delegate, slots) ->
+  Op.endorsement_with_slot ~delegate:(delegate, slots) (B b) ()
   >>=? fun op ->
   (* bake at priority 0 succeed thanks to enough endorsements *)
   Block.bake ~policy:(By_priority 0) ~operations:[Operation.pack op] b
@@ -633,6 +702,18 @@ let test_fitness_gap () =
 
 let tests =
   [ Test_services.tztest "Simple endorsement" `Quick test_simple_endorsement;
+    Test_services.tztest
+      "Unwrapped endorsement"
+      `Quick
+      test_unwrapped_endorsement;
+    Test_services.tztest
+      "Endorsement wrongly wrapped"
+      `Quick
+      test_bad_slot_wrapper;
+    Test_services.tztest
+      "Endorsement wrapped with slot -1"
+      `Quick
+      test_neg_slot_wrapper;
     Test_services.tztest "Maximum endorsement" `Quick test_max_endorsement;
     Test_services.tztest
       "Consistent priorities"

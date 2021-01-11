@@ -77,15 +77,21 @@ let test_valid_double_endorsement_evidence () =
   block_fork b
   >>=? fun (blk_a, blk_b) ->
   Context.get_endorser (B blk_a)
-  >>=? fun (delegate, _slots) ->
+  >>=? fun (delegate, slots) ->
   Op.endorsement ~delegate (B blk_a) ()
   >>=? fun endorsement_a ->
   Op.endorsement ~delegate (B blk_b) ()
   >>=? fun endorsement_b ->
-  Block.bake ~operations:[Operation.pack endorsement_a] blk_a
+  Op.endorsement_with_slot ~delegate:(delegate, slots) (B blk_a) ()
+  >>=? fun endorsement_with_slot_a ->
+  Block.bake ~operations:[Operation.pack endorsement_with_slot_a] blk_a
   >>=? fun blk_a ->
   (* Block.bake ~operations:[endorsement_b] blk_b >>=? fun _ -> *)
-  Op.double_endorsement (B blk_a) endorsement_a endorsement_b
+  Op.double_endorsement
+    (B blk_a)
+    endorsement_a
+    endorsement_b
+    ~slot:(WithExceptions.Option.get ~loc:__LOC__ (List.hd slots))
   |> fun operation ->
   (* Bake with someone different than the bad endorser *)
   Context.get_bakers (B blk_a)
@@ -114,9 +120,11 @@ let test_invalid_double_endorsement () =
   >>=? fun b ->
   Op.endorsement (B b) ()
   >>=? fun endorsement ->
-  Block.bake ~operation:(Operation.pack endorsement) b
+  Op.endorsement_with_slot (B b) ()
+  >>=? fun endorsement_with_slot ->
+  Block.bake ~operation:(Operation.pack endorsement_with_slot) b
   >>=? fun b ->
-  Op.double_endorsement (B b) endorsement endorsement
+  Op.double_endorsement (B b) endorsement endorsement ~slot:0
   |> fun operation ->
   Block.bake ~operation b
   >>= fun res ->
@@ -134,12 +142,16 @@ let test_too_early_double_endorsement_evidence () =
   block_fork b
   >>=? fun (blk_a, blk_b) ->
   Context.get_endorser (B blk_a)
-  >>=? fun (delegate, _slots) ->
+  >>=? fun (delegate, slots) ->
   Op.endorsement ~delegate (B blk_a) ()
   >>=? fun endorsement_a ->
   Op.endorsement ~delegate (B blk_b) ()
   >>=? fun endorsement_b ->
-  Op.double_endorsement (B b) endorsement_a endorsement_b
+  Op.double_endorsement
+    (B b)
+    endorsement_a
+    endorsement_b
+    ~slot:(WithExceptions.Option.get ~loc:__LOC__ (List.hd slots))
   |> fun operation ->
   Block.bake ~operation b
   >>= fun res ->
@@ -159,7 +171,7 @@ let test_too_late_double_endorsement_evidence () =
   block_fork b
   >>=? fun (blk_a, blk_b) ->
   Context.get_endorser (B blk_a)
-  >>=? fun (delegate, _slots) ->
+  >>=? fun (delegate, slots) ->
   Op.endorsement ~delegate (B blk_a) ()
   >>=? fun endorsement_a ->
   Op.endorsement ~delegate (B blk_b) ()
@@ -169,7 +181,11 @@ let test_too_late_double_endorsement_evidence () =
     blk_a
     (1 -- (preserved_cycles + 1))
   >>=? fun blk ->
-  Op.double_endorsement (B blk) endorsement_a endorsement_b
+  Op.double_endorsement
+    (B blk)
+    endorsement_a
+    endorsement_b
+    ~slot:(WithExceptions.Option.get ~loc:__LOC__ (List.hd slots))
   |> fun operation ->
   Block.bake ~operation blk
   >>= fun res ->
@@ -192,23 +208,29 @@ let test_different_delegates () =
   >>=? fun (endorser_a, _a_slots) ->
   get_first_different_endorsers (B blk_b)
   >>=? fun (endorser_b1c, endorser_b2c) ->
-  let endorser_b =
+  let (endorser_b, b_slots) =
     if Signature.Public_key_hash.( = ) endorser_a endorser_b1c.delegate then
-      endorser_b2c.delegate
-    else endorser_b1c.delegate
+      (endorser_b2c.delegate, endorser_b2c.slots)
+    else (endorser_b1c.delegate, endorser_b1c.slots)
   in
   Op.endorsement ~delegate:endorser_a (B blk_a) ()
   >>=? fun e_a ->
   Op.endorsement ~delegate:endorser_b (B blk_b) ()
   >>=? fun e_b ->
-  Block.bake ~operation:(Operation.pack e_b) blk_b
+  Op.endorsement_with_slot ~delegate:(endorser_b, b_slots) (B blk_b) ()
+  >>=? fun e_ws_b ->
+  Block.bake ~operation:(Operation.pack e_ws_b) blk_b
   >>=? fun _ ->
-  Op.double_endorsement (B blk_b) e_a e_b
+  Op.double_endorsement
+    (B blk_b)
+    e_a
+    e_b
+    ~slot:(WithExceptions.Option.get ~loc:__LOC__ (List.hd b_slots))
   |> fun operation ->
   Block.bake ~operation blk_b
   >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
-      | Apply.Inconsistent_double_endorsement_evidence _ ->
+      | Baking.Unexpected_endorsement ->
           true
       | _ ->
           false)
@@ -226,7 +248,7 @@ let test_wrong_delegate () =
   block_fork b
   >>=? fun (blk_a, blk_b) ->
   Context.get_endorser (B blk_a)
-  >>=? fun (endorser_a, _a_slots) ->
+  >>=? fun (endorser_a, a_slots) ->
   Op.endorsement ~delegate:endorser_a (B blk_a) ()
   >>=? fun endorsement_a ->
   Context.get_endorser (B blk_b)
@@ -236,7 +258,11 @@ let test_wrong_delegate () =
   in
   Op.endorsement ~delegate (B blk_b) ()
   >>=? fun endorsement_b ->
-  Op.double_endorsement (B blk_b) endorsement_a endorsement_b
+  Op.double_endorsement
+    (B blk_b)
+    endorsement_a
+    endorsement_b
+    ~slot:(WithExceptions.Option.get ~loc:__LOC__ (List.hd a_slots))
   |> fun operation ->
   Block.bake ~operation blk_b
   >>= fun e ->
