@@ -383,14 +383,12 @@ let parse_constr_annot :
   split_if_special ~loc f1 >>? fun () ->
   split_if_special ~loc f2 >|? fun () -> (t, f1, f2)
 
-let parse_two_var_annot :
-    Script.location ->
-    string list ->
-    (var_annot option * var_annot option) tzresult =
+let parse_two_var_annot : Script.location -> string list -> unit tzresult =
  fun loc annot ->
   parse_annots loc annot >>? classify_annot loc >>? fun (vars, types, fields) ->
   error_unexpected_annot loc types >>? fun () ->
-  error_unexpected_annot loc fields >>? fun () -> get_two_annot loc vars
+  error_unexpected_annot loc fields >>? fun () ->
+  get_two_annot loc vars >|? fun (_a1, _a2) -> ()
 
 let parse_destr_annot :
     Script.location -> string list -> field_annot option tzresult =
