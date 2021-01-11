@@ -36,8 +36,6 @@ val default_balance_annot : var_annot option
 
 val default_level_annot : var_annot option
 
-val default_steps_annot : var_annot option
-
 val default_source_annot : var_annot option
 
 val default_sender_annot : var_annot option
@@ -62,8 +60,6 @@ val default_contract_annot : field_annot option
 
 val default_addr_annot : field_annot option
 
-val default_manager_annot : field_annot option
-
 val default_pack_annot : field_annot option
 
 val default_unpack_annot : field_annot option
@@ -83,8 +79,6 @@ val default_some_annot : field_annot option
 val default_left_annot : field_annot option
 
 val default_right_annot : field_annot option
-
-val default_binding_annot : field_annot option
 
 (** Unparse annotations to their string representation *)
 
@@ -141,11 +135,6 @@ val parse_type_annot : int -> string list -> type_annot option tzresult
 
 (** Parse a field annotation only. *)
 val parse_field_annot : int -> string list -> field_annot option tzresult
-
-(** Parse an annotation for composed types, of the form
-    [:ty_name %field] in any order. *)
-val parse_type_field_annot :
-  int -> string list -> (type_annot option * field_annot option) tzresult
 
 (** Parse an annotation for composed types, of the form
     [:ty_name %field1 %field2] in any order. *)
