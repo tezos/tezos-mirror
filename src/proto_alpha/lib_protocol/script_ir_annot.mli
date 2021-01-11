@@ -39,18 +39,6 @@ module FOR_TESTS : sig
   val unsafe_field_annot_of_string : string -> field_annot
 end
 
-(** Default annotations *)
-
-val default_param_annot : var_annot option
-
-val default_storage_annot : var_annot option
-
-val default_sapling_balance_annot : var_annot option
-
-val default_elt_annot : field_annot option
-
-val default_key_annot : field_annot option
-
 (** Unparse annotations to their string representation *)
 
 val unparse_type_annot : type_annot option -> string list

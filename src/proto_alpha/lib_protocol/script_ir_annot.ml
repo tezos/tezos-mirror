@@ -44,23 +44,6 @@ module FOR_TESTS = struct
     Field_annot (Non_empty_string.of_string_exn s)
 end
 
-let some_var_annot_of_string_exn s =
-  Some (Var_annot (Non_empty_string.of_string_exn s))
-
-let some_field_annot_of_string_exn s =
-  Some (Field_annot (Non_empty_string.of_string_exn s))
-
-let default_param_annot = some_var_annot_of_string_exn "parameter"
-
-let default_storage_annot = some_var_annot_of_string_exn "storage"
-
-let default_elt_annot = some_field_annot_of_string_exn "elt"
-
-let default_key_annot = some_field_annot_of_string_exn "key"
-
-let default_sapling_balance_annot =
-  some_var_annot_of_string_exn "sapling_balance"
-
 let unparse_type_annot : type_annot option -> string list = function
   | None -> []
   | Some (Type_annot a) -> [":" ^ (a :> string)]
