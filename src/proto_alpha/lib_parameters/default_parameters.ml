@@ -35,7 +35,7 @@ let constants_mainnet =
       blocks_per_voting_period = 20480l;
       time_between_blocks = List.map Period.of_seconds_exn [60L; 40L];
       minimal_block_delay = Period.of_seconds_exn 30L;
-      endorsers_per_block = 32;
+      endorsers_per_block = 256;
       hard_gas_limit_per_operation = Gas.Arith.(integral_of_int_exn 1_040_000);
       hard_gas_limit_per_block = Gas.Arith.(integral_of_int_exn 10_400_000);
       proof_of_work_threshold = Int64.(sub (shift_left 1L 46) 1L);
@@ -44,19 +44,19 @@ let constants_mainnet =
       seed_nonce_revelation_tip =
         (match Tez.(one /? 8L) with Ok c -> c | Error _ -> assert false);
       origination_size = 257;
-      block_security_deposit = Tez.(mul_exn one 512);
-      endorsement_security_deposit = Tez.(mul_exn one 64);
+      block_security_deposit = Tez.(mul_exn one 640);
+      endorsement_security_deposit = Tez.(mul_exn one_cent 250);
       baking_reward_per_endorsement =
-        Tez.[of_mutez_exn 1_250_000L; of_mutez_exn 187_500L];
-      endorsement_reward = Tez.[of_mutez_exn 1_250_000L; of_mutez_exn 833_333L];
+        Tez.[of_mutez_exn 78_125L; of_mutez_exn 11_719L];
+      endorsement_reward = Tez.[of_mutez_exn 78_125L; of_mutez_exn 52_083L];
       hard_storage_limit_per_operation = Z.of_int 60_000;
       cost_per_byte = Tez.of_mutez_exn 250L;
       quorum_min = 20_00l;
       (* quorum is in centile of a percentage *)
       quorum_max = 70_00l;
       min_proposal_quorum = 5_00l;
-      initial_endorsers = 24;
-      delay_per_missing_endorsement = Period.of_seconds_exn 8L;
+      initial_endorsers = 192;
+      delay_per_missing_endorsement = Period.of_seconds_exn 4L;
     }
 
 let constants_sandbox =
