@@ -263,14 +263,13 @@ let check_two_var_annot : Script.location -> string list -> unit tzresult =
   error_unexpected_annot loc fields >>? fun () ->
   get_two_annot loc vars >|? fun (_a1, _a2) -> ()
 
-let parse_destr_annot :
-    Script.location -> string list -> field_annot option tzresult =
+let check_destr_annot : Script.location -> string list -> unit tzresult =
  fun loc annot ->
   parse_annots loc ~allow_special_var:true annot >>? classify_annot loc
   >>? fun (vars, types, fields) ->
   error_unexpected_annot loc types >>? fun () ->
   get_one_annot loc vars >>? fun (_v : var_annot option) ->
-  get_one_annot loc fields
+  get_one_annot loc fields >|? fun (_f : field_annot option) -> ()
 
 let check_unpair_annot : Script.location -> string list -> unit tzresult =
  fun loc annot ->

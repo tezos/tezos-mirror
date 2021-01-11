@@ -3248,11 +3248,11 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       let unpair = {apply = (fun kinfo k -> IUnpair (kinfo, k))} in
       typed ctxt loc unpair (Item_t (a, Item_t (b, rest)))
   | (Prim (loc, I_CAR, [], annot), Item_t (Pair_t (a, _, _), rest)) ->
-      parse_destr_annot loc annot >>?= fun _field_annot ->
+      check_destr_annot loc annot >>?= fun () ->
       let car = {apply = (fun kinfo k -> ICar (kinfo, k))} in
       typed ctxt loc car (Item_t (a, rest))
   | (Prim (loc, I_CDR, [], annot), Item_t (Pair_t (_, b, _), rest)) ->
-      parse_destr_annot loc annot >>?= fun _field_annot ->
+      check_destr_annot loc annot >>?= fun () ->
       let cdr = {apply = (fun kinfo k -> ICdr (kinfo, k))} in
       typed ctxt loc cdr (Item_t (b, rest))
   (* unions *)
