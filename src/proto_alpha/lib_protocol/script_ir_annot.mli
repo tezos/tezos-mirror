@@ -68,12 +68,9 @@ val check_type_annot : Script.location -> string list -> unit tzresult
 val parse_field_annot :
   Script.location -> string list -> field_annot option tzresult
 
-(** Parse an annotation for composed types, of the form
+(** Check an annotation for composed types, of the form
     [:ty_name %field1 %field2] in any order. *)
-val parse_composed_type_annot :
-  Script.location ->
-  string list ->
-  (field_annot option * field_annot option) tzresult
+val check_composed_type_annot : Script.location -> string list -> unit tzresult
 
 (** Extract and remove a field annotation from a node *)
 val extract_field_annot :
