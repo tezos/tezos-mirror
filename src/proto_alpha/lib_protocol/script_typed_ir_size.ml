@@ -33,7 +33,7 @@ let script_string_size s = Script_string.to_string s |> string_size
 let sapling_memo_size_size = !!0
 
 let (comparable_ty_size, ty_size) =
-  let base {annot = _; size = _} = hh3w in
+  let base _meta = hh3w in
   let apply_comparable :
       type a. nodes_and_size -> a comparable_ty -> nodes_and_size =
    fun accu cty ->
