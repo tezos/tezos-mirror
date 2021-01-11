@@ -1367,11 +1367,7 @@ and 'ty ty =
   | Timestamp_t : Script_timestamp.t ty_metadata -> Script_timestamp.t ty
   | Address_t : address ty_metadata -> address ty
   | Bool_t : bool ty_metadata -> bool ty
-  | Pair_t :
-      ('a ty * field_annot option)
-      * ('b ty * field_annot option)
-      * ('a, 'b) pair ty_metadata
-      -> ('a, 'b) pair ty
+  | Pair_t : 'a ty * 'b ty * ('a, 'b) pair ty_metadata -> ('a, 'b) pair ty
   | Union_t :
       ('a ty * field_annot option)
       * ('b ty * field_annot option)
@@ -1556,11 +1552,7 @@ val address_t : address ty
 
 val bool_t : bool ty
 
-val pair_t :
-  Script.location ->
-  'a ty * field_annot option ->
-  'b ty * field_annot option ->
-  ('a, 'b) pair ty tzresult
+val pair_t : Script.location -> 'a ty -> 'b ty -> ('a, 'b) pair ty tzresult
 
 val union_t :
   Script.location ->

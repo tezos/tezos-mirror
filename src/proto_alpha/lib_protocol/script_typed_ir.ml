@@ -1288,11 +1288,7 @@ and 'ty ty =
   | Timestamp_t : Script_timestamp.t ty_metadata -> Script_timestamp.t ty
   | Address_t : address ty_metadata -> address ty
   | Bool_t : bool ty_metadata -> bool ty
-  | Pair_t :
-      ('a ty * field_annot option)
-      * ('b ty * field_annot option)
-      * ('a, 'b) pair ty_metadata
-      -> ('a, 'b) pair ty
+  | Pair_t : 'a ty * 'b ty * ('a, 'b) pair ty_metadata -> ('a, 'b) pair ty
   | Union_t :
       ('a ty * field_annot option)
       * ('b ty * field_annot option)
@@ -1831,9 +1827,9 @@ let address_t = Address_t {size = Type_size.one}
 
 let bool_t = Bool_t {size = Type_size.one}
 
-let pair_t loc (l, fannot_l) (r, fannot_r) =
+let pair_t loc l r =
   Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
-  Pair_t ((l, fannot_l), (r, fannot_r), {size})
+  Pair_t (l, r, {size})
 
 let union_t loc (l, fannot_l) (r, fannot_r) =
   Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
@@ -1859,23 +1855,20 @@ let option_nat_t = Option_t (nat_t, {size = Type_size.two})
 
 let option_pair_nat_nat_t =
   Option_t
-    ( Pair_t ((nat_t, None), (nat_t, None), {size = Type_size.three}),
-      {size = Type_size.four} )
+    (Pair_t (nat_t, nat_t, {size = Type_size.three}), {size = Type_size.four})
 
 let option_pair_nat_mutez_t =
   Option_t
-    ( Pair_t ((nat_t, None), (mutez_t, None), {size = Type_size.three}),
-      {size = Type_size.four} )
+    (Pair_t (nat_t, mutez_t, {size = Type_size.three}), {size = Type_size.four})
 
 let option_pair_mutez_mutez_t =
   Option_t
-    ( Pair_t ((mutez_t, None), (mutez_t, None), {size = Type_size.three}),
+    ( Pair_t (mutez_t, mutez_t, {size = Type_size.three}),
       {size = Type_size.four} )
 
 let option_pair_int_nat_t =
   Option_t
-    ( Pair_t ((int_t, None), (nat_t, None), {size = Type_size.three}),
-      {size = Type_size.four} )
+    (Pair_t (int_t, nat_t, {size = Type_size.three}), {size = Type_size.four})
 
 let list_t loc t =
   Type_size.compound1 loc (ty_size t) >|? fun size -> List_t (t, {size})
@@ -2157,8 +2150,7 @@ let (ty_traverse, comparable_ty_traverse) =
         (continue [@ocaml.tailcall]) accu
     | Ticket_t (cty, _) -> aux f accu cty continue
     | Chest_key_t _ | Chest_t _ -> (continue [@ocaml.tailcall]) accu
-    | Pair_t ((ty1, _), (ty2, _), _) ->
-        (next2' [@ocaml.tailcall]) f accu ty1 ty2 continue
+    | Pair_t (ty1, ty2, _) -> (next2' [@ocaml.tailcall]) f accu ty1 ty2 continue
     | Union_t ((ty1, _), (ty2, _), _) ->
         (next2' [@ocaml.tailcall]) f accu ty1 ty2 continue
     | Lambda_t (ty1, ty2, _) ->
@@ -2239,8 +2231,7 @@ let value_traverse (type t) (ty : (t ty, t comparable_ty) union) (x : t) init f
     | Bls12_381_g2_t _ | Bls12_381_fr_t _ | Chest_key_t _ | Chest_t _
     | Lambda_t (_, _, _) ->
         (return [@ocaml.tailcall]) ()
-    | Pair_t ((ty1, _), (ty2, _), _) ->
-        (next2 [@ocaml.tailcall]) ty1 ty2 (fst x) (snd x)
+    | Pair_t (ty1, ty2, _) -> (next2 [@ocaml.tailcall]) ty1 ty2 (fst x) (snd x)
     | Union_t ((ty1, _), (ty2, _), _) -> (
         match x with
         | L l -> (next [@ocaml.tailcall]) ty1 l

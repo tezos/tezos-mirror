@@ -161,7 +161,7 @@ module Ticket_inspection = struct
     | Timestamp_t _ -> (k [@ocaml.tailcall]) False_ht
     | Address_t _ -> (k [@ocaml.tailcall]) False_ht
     | Bool_t _ -> (k [@ocaml.tailcall]) False_ht
-    | Pair_t ((ty1, _), (ty2, _), _) ->
+    | Pair_t (ty1, ty2, _) ->
         (has_tickets_of_pair [@ocaml.tailcall])
           ty1
           ty2
@@ -318,7 +318,7 @@ module Ticket_collection = struct
     consume_gas_steps ctxt ~num_steps:1 >>?= fun ctxt ->
     match (hty, ty) with
     | (False_ht, _) -> (k [@ocaml.tailcall]) ctxt acc
-    | (Pair_ht (hty1, hty2), Pair_t ((ty1, _), (ty2, _), _)) ->
+    | (Pair_ht (hty1, hty2), Pair_t (ty1, ty2, _)) ->
         let (l, r) = x in
         (tickets_of_value [@ocaml.tailcall])
           ~include_lazy
