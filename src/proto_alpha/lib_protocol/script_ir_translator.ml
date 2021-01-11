@@ -178,10 +178,9 @@ let rec ty_of_comparable_ty : type a. a comparable_ty -> a ty = function
       Union_t ((ty_of_comparable_ty l, al), (ty_of_comparable_ty r, ar), tname)
   | Option_key (t, tname) -> Option_t (ty_of_comparable_ty t, tname)
 
-let add_field_annot a var = function
+let add_field_annot a = function
   | Prim (loc, prim, args, annots) ->
-      Prim
-        (loc, prim, args, annots @ unparse_field_annot a @ unparse_var_annot var)
+      Prim (loc, prim, args, annots @ unparse_field_annot a)
   | expr -> expr
 
 let rec unparse_comparable_ty_uncarbonated :
@@ -206,12 +205,8 @@ let rec unparse_comparable_ty_uncarbonated :
   | Chain_id_key meta ->
       Prim (loc, T_chain_id, [], unparse_type_annot meta.annot)
   | Pair_key ((l, al), (r, ar), meta) -> (
-      let tl =
-        add_field_annot al None (unparse_comparable_ty_uncarbonated ~loc l)
-      in
-      let tr =
-        add_field_annot ar None (unparse_comparable_ty_uncarbonated ~loc r)
-      in
+      let tl = add_field_annot al (unparse_comparable_ty_uncarbonated ~loc l) in
+      let tr = add_field_annot ar (unparse_comparable_ty_uncarbonated ~loc r) in
       (* Fold [pair a1 (pair ... (pair an-1 an))] into [pair a1 ... an] *)
       (* Note that the folding does not happen if the pair on the right has a
          field annotation because this annotation would be lost *)
@@ -220,12 +215,8 @@ let rec unparse_comparable_ty_uncarbonated :
           Prim (loc, T_pair, tl :: ts, unparse_type_annot meta.annot)
       | _ -> Prim (loc, T_pair, [tl; tr], unparse_type_annot meta.annot))
   | Union_key ((l, al), (r, ar), meta) ->
-      let tl =
-        add_field_annot al None (unparse_comparable_ty_uncarbonated ~loc l)
-      in
-      let tr =
-        add_field_annot ar None (unparse_comparable_ty_uncarbonated ~loc r)
-      in
+      let tl = add_field_annot al (unparse_comparable_ty_uncarbonated ~loc l) in
+      let tr = add_field_annot ar (unparse_comparable_ty_uncarbonated ~loc r) in
       Prim (loc, T_or, [tl; tr], unparse_type_annot meta.annot)
   | Option_key (t, meta) ->
       Prim
@@ -270,9 +261,9 @@ let rec unparse_ty_uncarbonated :
   | Pair_t ((utl, l_field), (utr, r_field), meta) ->
       let annot = unparse_type_annot meta.annot in
       let utl = unparse_ty_uncarbonated ~loc utl in
-      let tl = add_field_annot l_field None utl in
+      let tl = add_field_annot l_field utl in
       let utr = unparse_ty_uncarbonated ~loc utr in
-      let tr = add_field_annot r_field None utr in
+      let tr = add_field_annot r_field utr in
       (* Fold [pair a1 (pair ... (pair an-1 an))] into [pair a1 ... an] *)
       (* Note that the folding does not happen if the pair on the right has an
          annotation because this annotation would be lost *)
@@ -283,9 +274,9 @@ let rec unparse_ty_uncarbonated :
   | Union_t ((utl, l_field), (utr, r_field), meta) ->
       let annot = unparse_type_annot meta.annot in
       let utl = unparse_ty_uncarbonated ~loc utl in
-      let tl = add_field_annot l_field None utl in
+      let tl = add_field_annot l_field utl in
       let utr = unparse_ty_uncarbonated ~loc utr in
-      let tr = add_field_annot r_field None utr in
+      let tr = add_field_annot r_field utr in
       prim (T_or, [tl; tr], annot)
   | Lambda_t (uta, utr, meta) ->
       let ta = unparse_ty_uncarbonated ~loc uta in
@@ -5884,7 +5875,7 @@ let unparse_script ctxt mode
     (let loc = Micheline.dummy_location in
      unparse_ty ~loc ctxt arg_type >>? fun (arg_type, ctxt) ->
      unparse_ty ~loc ctxt storage_type >>? fun (storage_type, ctxt) ->
-     let arg_type = add_field_annot root_name None arg_type in
+     let arg_type = add_field_annot root_name arg_type in
      let open Micheline in
      let view name {input_ty; output_ty; view_code} views =
        Prim

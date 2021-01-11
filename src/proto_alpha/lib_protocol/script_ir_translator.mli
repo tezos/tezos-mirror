@@ -338,7 +338,6 @@ val parse_toplevel :
 
 val add_field_annot :
   Script_ir_annot.field_annot option ->
-  Script_ir_annot.var_annot option ->
   ('loc, 'prim) Micheline.node ->
   ('loc, 'prim) Micheline.node
 
