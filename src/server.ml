@@ -300,7 +300,7 @@ module Make (Encoding : Resto.ENCODING) = struct
       let path = Uri.path uri in
       lwt_log_info "(%s) receive request to %s" (Connection.to_string con) path
       >>= fun () ->
-      let path = path |> Resto.Utils.split_path |> List.map Uri.pct_decode in
+      let path = Resto.Utils.decode_split_path path in
       let req_headers = Request.headers req in
       ( match Request.meth req with
       | #Resto.meth when Internal.invalid_cors server.cors req_headers ->

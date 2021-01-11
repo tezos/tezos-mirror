@@ -41,9 +41,6 @@ module Make (Encoding : Resto.ENCODING) = struct
 
   let create (server : local_server) =
     ( module struct
-      let uri_to_path uri =
-        uri |> Uri.path |> Resto.Utils.split_path |> List.map Uri.pct_decode
-
       let ( >>=? ) = Lwt_result.( >>= )
 
       let ( >>? ) v f =

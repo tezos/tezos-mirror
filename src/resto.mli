@@ -10,6 +10,8 @@
 
 module Utils : sig
   val split_path : string -> string list
+
+  val decode_split_path : string -> string list
 end
 
 type meth = [`GET | `POST | `DELETE | `PUT | `PATCH]

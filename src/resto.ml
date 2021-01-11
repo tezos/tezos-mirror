@@ -25,6 +25,8 @@ module Utils = struct
       else do_component acc i (j + 1)
     in
     do_slashes [] 0
+
+  let decode_split_path path = path |> split_path |> List.map Uri.pct_decode
 end
 
 let bool_of_string s =
