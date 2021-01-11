@@ -75,9 +75,6 @@ val field_annot_opt_to_entrypoint_strict :
 val field_annot_opt_eq_entrypoint_lax :
   field_annot option -> Entrypoint.t -> bool
 
-(** Replace an annotation by its default value if it is [None] *)
-val default_annot : default:'a option -> 'a option -> 'a option
-
 (** Merge type annotations.
     @return an error {!Inconsistent_type_annotations} if they are both present
     and different, unless [legacy] *)

@@ -89,8 +89,6 @@ let field_annot_opt_eq_entrypoint_lax field_annot_opt entrypoint =
       | None -> false
       | Some a' -> Entrypoint.(a' = entrypoint))
 
-let default_annot ~default = function None -> default | annot -> annot
-
 let merge_type_annot :
     type error_trace.
     legacy:bool ->

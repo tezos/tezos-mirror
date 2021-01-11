@@ -404,40 +404,6 @@ let serialize_stack_for_error ctxt stack_ty =
   | Unaccounted -> unparse_stack_uncarbonated stack_ty
   | Limited _ -> []
 
-let name_of_ty : type a. a ty -> type_annot option = function
-  | Unit_t meta -> meta.annot
-  | Int_t meta -> meta.annot
-  | Nat_t meta -> meta.annot
-  | String_t meta -> meta.annot
-  | Bytes_t meta -> meta.annot
-  | Mutez_t meta -> meta.annot
-  | Bool_t meta -> meta.annot
-  | Key_hash_t meta -> meta.annot
-  | Key_t meta -> meta.annot
-  | Timestamp_t meta -> meta.annot
-  | Address_t meta -> meta.annot
-  | Signature_t meta -> meta.annot
-  | Operation_t meta -> meta.annot
-  | Chain_id_t meta -> meta.annot
-  | Never_t meta -> meta.annot
-  | Contract_t (_, meta) -> meta.annot
-  | Pair_t (_, _, meta) -> meta.annot
-  | Union_t (_, _, meta) -> meta.annot
-  | Lambda_t (_, _, meta) -> meta.annot
-  | Option_t (_, meta) -> meta.annot
-  | List_t (_, meta) -> meta.annot
-  | Ticket_t (_, meta) -> meta.annot
-  | Set_t (_, meta) -> meta.annot
-  | Map_t (_, _, meta) -> meta.annot
-  | Big_map_t (_, _, meta) -> meta.annot
-  | Bls12_381_g1_t meta -> meta.annot
-  | Bls12_381_g2_t meta -> meta.annot
-  | Bls12_381_fr_t meta -> meta.annot
-  | Sapling_state_t (_, meta) -> meta.annot
-  | Sapling_transaction_t (_, meta) -> meta.annot
-  | Chest_key_t meta -> meta.annot
-  | Chest_t meta -> meta.annot
-
 let unparse_unit ~loc ctxt () = ok (Prim (loc, D_Unit, [], []), ctxt)
 
 let unparse_int ~loc ctxt v = ok (Int (loc, Script_int.to_zint v), ctxt)
@@ -4649,16 +4615,6 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
            ~legacy
            storage_type)
       >>?= fun (Ex_ty storage_type, ctxt) ->
-      let _arg_annot =
-        default_annot
-          (type_to_var_annot (name_of_ty arg_type))
-          ~default:default_param_annot
-      in
-      let _storage_annot =
-        default_annot
-          (type_to_var_annot (name_of_ty storage_type))
-          ~default:default_storage_annot
-      in
       pair_t loc (arg_type, None) (storage_type, None) ~annot:None
       >>?= fun arg_type_full ->
       pair_t loc (list_operation_t, None) (storage_type, None) ~annot:None
@@ -5450,17 +5406,6 @@ let parse_code :
     (Ill_formed_type (Some "storage", code, storage_type_loc))
     (parse_storage_ty ctxt ~stack_depth:0 ~legacy storage_type)
   >>?= fun (Ex_ty storage_type, ctxt) ->
-  let _arg_annot =
-    default_annot
-      (type_to_var_annot (name_of_ty arg_type))
-      ~default:default_param_annot
-  in
-  let _storage_annot =
-    default_annot
-      (type_to_var_annot (name_of_ty storage_type))
-      ~default:default_storage_annot
-  in
-
   pair_t storage_type_loc (arg_type, None) (storage_type, None) ~annot:None
   >>?= fun arg_type_full ->
   pair_t
@@ -5576,16 +5521,6 @@ let typecheck_code :
     (Ill_formed_type (Some "storage", code, storage_type_loc))
     (parse_storage_ty ctxt ~stack_depth:0 ~legacy storage_type)
   >>?= fun (Ex_ty storage_type, ctxt) ->
-  let _arg_annot =
-    default_annot
-      (type_to_var_annot (name_of_ty arg_type))
-      ~default:default_param_annot
-  in
-  let _storage_annot =
-    default_annot
-      (type_to_var_annot (name_of_ty storage_type))
-      ~default:default_storage_annot
-  in
   pair_t storage_type_loc (arg_type, None) (storage_type, None) ~annot:None
   >>?= fun arg_type_full ->
   pair_t
