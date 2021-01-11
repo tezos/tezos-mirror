@@ -212,11 +212,7 @@ val parse_unpair_annot :
   pair_annot:var_annot option ->
   value_annot_car:var_annot option ->
   value_annot_cdr:var_annot option ->
-  (var_annot option
-  * var_annot option
-  * field_annot option
-  * field_annot option)
-  tzresult
+  (field_annot option * field_annot option) tzresult
 
 val parse_entrypoint_annot :
   Script.location ->

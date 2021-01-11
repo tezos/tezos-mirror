@@ -412,21 +412,6 @@ let parse_two_var_annot :
   error_unexpected_annot loc types >>? fun () ->
   error_unexpected_annot loc fields >>? fun () -> get_two_annot loc vars
 
-let var_annot_from_special :
-    field_name:field_annot option ->
-    default:var_annot option ->
-    value_annot:var_annot option ->
-    var_annot option ->
-    var_annot option =
- fun ~field_name ~default ~value_annot v ->
-  match v with
-  | Some (Var_annot va) -> (
-      match (va :> string) with
-      | "%" -> field_to_var_annot field_name
-      | "%%" -> default
-      | _ -> v)
-  | None -> value_annot
-
 let parse_destr_annot :
     Script.location -> string list -> field_annot option tzresult =
  fun loc annot ->
@@ -444,44 +429,18 @@ let parse_unpair_annot :
     pair_annot:var_annot option ->
     value_annot_car:var_annot option ->
     value_annot_cdr:var_annot option ->
-    (var_annot option
-    * var_annot option
-    * field_annot option
-    * field_annot option)
-    tzresult =
+    (field_annot option * field_annot option) tzresult =
  fun loc
      annot
-     ~field_name_car
-     ~field_name_cdr
-     ~pair_annot
-     ~value_annot_car
-     ~value_annot_cdr ->
+     ~field_name_car:_
+     ~field_name_cdr:_
+     ~pair_annot:_
+     ~value_annot_car:_
+     ~value_annot_cdr:_ ->
   parse_annots loc ~allow_special_var:true annot >>? classify_annot loc
   >>? fun (vars, types, fields) ->
   error_unexpected_annot loc types >>? fun () ->
-  get_two_annot loc vars >>? fun (vcar, vcdr) ->
-  get_two_annot loc fields >|? fun (fcar, fcdr) ->
-  let default_car =
-    gen_access_annot pair_annot field_name_car ~default:default_car_annot
-  in
-  let default_cdr =
-    gen_access_annot pair_annot field_name_cdr ~default:default_cdr_annot
-  in
-  let vcar =
-    var_annot_from_special
-      ~field_name:field_name_car
-      ~default:default_car
-      ~value_annot:value_annot_car
-      vcar
-  in
-  let vcdr =
-    var_annot_from_special
-      ~field_name:field_name_cdr
-      ~default:default_cdr
-      ~value_annot:value_annot_cdr
-      vcdr
-  in
-  (vcar, vcdr, fcar, fcdr)
+  get_two_annot loc vars >>? fun (_vcar, _vcdr) -> get_two_annot loc fields
 
 let parse_entrypoint_annot :
     Script.location ->

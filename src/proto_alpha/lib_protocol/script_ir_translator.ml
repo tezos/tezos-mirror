@@ -3385,7 +3385,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         ~value_annot_cdr:b_annot
         ~field_name_car:expected_field_annot_a
         ~field_name_cdr:expected_field_annot_b
-      >>?= fun (_annot_a, _annot_b, field_a, field_b) ->
+      >>?= fun (field_a, field_b) ->
       check_correct_field field_a expected_field_annot_a >>?= fun () ->
       check_correct_field field_b expected_field_annot_b >>?= fun () ->
       let unpair = {apply = (fun kinfo k -> IUnpair (kinfo, k))} in
