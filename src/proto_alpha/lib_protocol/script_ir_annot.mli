@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -52,16 +53,6 @@ val field_annot_opt_to_entrypoint_strict :
     When the field annot option is [None], the result is always [false]. *)
 val field_annot_opt_eq_entrypoint_lax :
   field_annot option -> Entrypoint.t -> bool
-
-(** Merge type annotations.
-    @return an error {!Inconsistent_type_annotations} if they are both present
-    and different, unless [legacy] *)
-val merge_type_annot :
-  legacy:bool ->
-  error_details:'error_trace Script_tc_errors.error_details ->
-  type_annot option ->
-  type_annot option ->
-  (type_annot option, 'error_trace) result
 
 (** Merge field annotations.
     @return an error {!Inconsistent_type_annotations} if they are both present

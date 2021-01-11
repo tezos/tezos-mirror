@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -60,27 +61,6 @@ let field_annot_opt_eq_entrypoint_lax field_annot_opt entrypoint =
       match Entrypoint.of_annot_lax_opt a with
       | None -> false
       | Some a' -> Entrypoint.(a' = entrypoint))
-
-let merge_type_annot :
-    type error_trace.
-    legacy:bool ->
-    error_details:error_trace error_details ->
-    type_annot option ->
-    type_annot option ->
-    (type_annot option, error_trace) result =
- fun ~legacy ~error_details annot1 annot2 ->
-  match (annot1, annot2) with
-  | (None, None) | (Some _, None) | (None, Some _) -> Result.return_none
-  | (Some (Type_annot a1), Some (Type_annot a2)) ->
-      if legacy || Non_empty_string.(a1 = a2) then ok annot1
-      else
-        Error
-          (match error_details with
-          | Fast -> Inconsistent_types_fast
-          | Informative ->
-              trace_of_error
-              @@ Inconsistent_annotations
-                   (":" ^ (a1 :> string), ":" ^ (a2 :> string)))
 
 let merge_field_annot :
     type error_trace.

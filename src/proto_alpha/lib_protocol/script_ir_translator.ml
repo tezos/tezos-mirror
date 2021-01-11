@@ -723,9 +723,8 @@ let merge_type_metadata :
     'a ty_metadata ->
     'b ty_metadata ->
     ('a ty_metadata, error_trace) result =
- fun ~legacy ~error_details {size = size_a} {size = size_b} ->
-  Type_size.merge ~error_details size_a size_b >>? fun size ->
-  merge_type_annot ~legacy ~error_details None None >|? fun _annot -> {size}
+ fun ~legacy:_ ~error_details {size = size_a} {size = size_b} ->
+  Type_size.merge ~error_details size_a size_b >|? fun size -> {size}
 
 let default_merge_type_error ty1 ty2 =
   let ty1 = serialize_ty_for_error ty1 in
@@ -4065,8 +4064,6 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim (loc, I_SUB, [], annot),
       Item_t (Timestamp_t _, Item_t (Timestamp_t _, rest)) ) ->
       check_var_annot loc annot >>?= fun () ->
-      merge_type_annot ~legacy ~error_details:Informative None None
-      >>?= fun _tname ->
       let instr = {apply = (fun kinfo k -> IDiff_timestamps (kinfo, k))} in
       let stack = Item_t (int_t, rest) in
       typed ctxt loc instr stack
