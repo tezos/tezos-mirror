@@ -94,7 +94,6 @@ type tc_context =
       storage_type : 'sto Script_typed_ir.ty;
       param_type : 'param Script_typed_ir.ty;
       root_name : Script_typed_ir.field_annot option;
-      legacy_create_contract_literal : bool;
     }
       -> tc_context
 
