@@ -94,9 +94,7 @@ let set k = match set_t (-1) k with Error _ -> assert false | Ok t -> t
 
 (* pair type constructor*)
 let pair k1 k2 =
-  match pair_t (-1) (k1, None) (k2, None) with
-  | Error _ -> assert false
-  | Ok t -> t
+  match pair_t (-1) k1 k2 with Error _ -> assert false | Ok t -> t
 
 (* union type constructor*)
 let union k1 k2 =

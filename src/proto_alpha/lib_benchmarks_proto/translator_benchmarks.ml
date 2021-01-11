@@ -624,10 +624,7 @@ let rec dummy_type_generator size =
     match dummy_type_generator (size - 2) with
     | Ex_ty r ->
         let l = unit_t in
-        Ex_ty
-          (match pair_t (-1) (l, None) (r, None) with
-          | Error _ -> assert false
-          | Ok t -> t)
+        Ex_ty (match pair_t (-1) l r with Error _ -> assert false | Ok t -> t)
 
 (* A dummy comparable type generator, sampling linear terms of a given size. *)
 let rec dummy_comparable_type_generator size =
