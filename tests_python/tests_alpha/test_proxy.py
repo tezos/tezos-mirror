@@ -7,9 +7,9 @@ import re
 import pytest
 from client.client import Client
 from client.client_output import extract_rpc_answer
-from tools import utils
-
 from tools.constants import ALPHA, ALPHA_DAEMON, CARTHAGE
+from . import protocol
+
 
 # Protocol-dependent stuff is these three constants:
 _OTHER_PROTO = CARTHAGE  # Needs to be different from _PROTO
@@ -62,7 +62,7 @@ def _update_node_to_protocol(sandbox, node_idx):
     # Vanilla client (not mockup, not proxy)
     node_client = sandbox.client(node_idx)
     # step 1
-    utils.activate_protocol(node_client, _PROTO)
+    protocol.activate(node_client)
     time.sleep(2)
     # step 2
     node_client.bake("bootstrap1")
