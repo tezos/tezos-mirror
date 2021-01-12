@@ -702,6 +702,7 @@ let rec kinstr_extra_size : type a s r f. (a, s, r, f) kinstr -> nodes_and_size
       | IIf_none {k; _} -> if_join k
       | IIf_left {k; _} -> if_join k
       (* Every instruction whose elaboration uses [merge_types],
+         TODO? merge_types has been replaced by ty_eq
          [check_item_ty], [comparable_of_ty], or [ty_of_comparable_ty]
          to create a type that is embedded in the IR. *)
       | IJoin_tickets (_, _, k) -> (

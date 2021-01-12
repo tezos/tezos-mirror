@@ -906,12 +906,12 @@ module Cost_of = struct
        Rerun benchmarks due to faster gas monad.
        With the the redesign of the gas-monad this needs to be benchmarked again.
     *)
-    (* model MERGE_TYPES
-       This is the estimated cost of one iteration of merge_types, extracted
-       and copied manually from the parameter fit for the MERGE_TYPES benchmark
+    (* model TY_EQ
+       This is the estimated cost of one iteration of ty_eq, extracted
+       and copied manually from the parameter fit for the TY_EQ benchmark
        (the model is parametric on the size of the type, which we don't have
        access to in O(1)). *)
-    let cost_MERGE_TYPES = S.safe_int 220
+    let cost_TY_EQ = S.safe_int 220
 
     (* model TYPECHECKING_CODE
        This is the cost of one iteration of parse_instr, extracted by hand from the
@@ -1673,7 +1673,7 @@ module Cost_of = struct
     let check_printable s =
       atomic_step_cost (cost_CHECK_PRINTABLE (String.length s))
 
-    let merge_cycle = atomic_step_cost cost_MERGE_TYPES
+    let merge_cycle = atomic_step_cost cost_TY_EQ
 
     let parse_type_cycle = atomic_step_cost cost_PARSE_TYPE
 

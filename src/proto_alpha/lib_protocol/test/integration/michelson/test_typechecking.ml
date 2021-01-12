@@ -160,7 +160,7 @@ let location = function
   | Seq (loc, _) ->
       loc
 
-let test_parse_ty ctxt node expected =
+let test_parse_ty (type exp) ctxt node (expected : exp Script_typed_ir.ty) =
   let legacy = false in
   let allow_lazy_storage = true in
   let allow_operation = true in
@@ -177,13 +177,13 @@ let test_parse_ty ctxt node expected =
         node
     >>? fun (Script_ir_translator.Ex_ty actual, ctxt) ->
       Gas_monad.run ctxt
-      @@ Script_ir_translator.merge_types
+      @@ Script_ir_translator.ty_eq
            ~error_details:Informative
            (location node)
            actual
            expected
-      >>? fun (eq_ty, ctxt) ->
-      eq_ty >|? fun (_eq, _ty) -> ctxt )
+      >>? fun (eq, ctxt) ->
+      eq >|? fun Eq -> ctxt )
 
 let field_annot = Script_ir_annot.FOR_TESTS.unsafe_field_annot_of_string
 

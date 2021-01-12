@@ -199,14 +199,12 @@ val big_map_get_and_update :
   (('value option * ('key, 'value) Script_typed_ir.big_map) * context) tzresult
   Lwt.t
 
-val merge_types :
+val ty_eq :
   error_details:'error_trace error_details ->
   Script.location ->
   'a Script_typed_ir.ty ->
   'b Script_typed_ir.ty ->
-  ( ('a Script_typed_ir.ty, 'b Script_typed_ir.ty) eq * 'a Script_typed_ir.ty,
-    'error_trace )
-  Gas_monad.t
+  (('a Script_typed_ir.ty, 'b Script_typed_ir.ty) eq, 'error_trace) Gas_monad.t
 
 (** {3 Parsing and Typechecking Michelson} *)
 val parse_comparable_data :
