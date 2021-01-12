@@ -9,12 +9,14 @@
  (libraries tezos-base
             tezos-stdlib-unix
             tezos-p2p
+            tezos-p2p-services
             alcotest-lwt)
  (flags (:standard -linkall
                    -open Tezos_base__TzPervasives
                    -open Tezos_stdlib_unix
                    -open Tezos_stdlib
-                   -open Tezos_p2p)))
+                   -open Tezos_p2p
+                   -open Tezos_p2p_services)))
 
 (rule
  (alias buildtest)
