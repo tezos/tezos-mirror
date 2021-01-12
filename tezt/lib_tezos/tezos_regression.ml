@@ -47,7 +47,7 @@ let hooks =
           else
             match arg with
             (* scrub client global options *)
-            | "--base-dir" | "-d" | "--endpoint" | "-E" ->
+            | "--base-dir" | "-d" | "--endpoint" | "-E" | "--sources" ->
                 (acc, true)
             | _ ->
                 (acc @ [replace_variables arg], false))

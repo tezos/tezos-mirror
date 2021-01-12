@@ -249,13 +249,7 @@ let test_context_suffix_no_rpc ~protocols =
     Test that [tezos-client --mode proxy --protocol P] fails
     when the endpoint's protocol is not [P].
  *)
-let test_wrong_proto =
-  Protocol.register_test
-    ~__FILE__
-    ~title:"(Proxy) Wrong proto"
-    ~tags:["proxy"; "bake"]
-  @@ fun protocol ->
-  let* (_, client) = init ~protocol () in
+let wrong_proto protocol client =
   let other_proto =
     match List.find_opt (( <> ) protocol) Protocol.all with
     | None ->
@@ -279,6 +273,19 @@ let test_wrong_proto =
   in
   if matches regexp stderr then return ()
   else Test.fail "Did not fail as expected: %s" stderr
+
+(** Test.
+    Test that [tezos-client --mode proxy --protocol P] fails
+    when the endpoint's protocol is not [P].
+ *)
+let test_wrong_proto =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Proxy) Wrong proto"
+    ~tags:["proxy"; "initialization"]
+  @@ fun protocol ->
+  let* (_, client) = init ~protocol () in
+  wrong_proto protocol client
 
 (** Test.
     Bake a few blocks in proxy mode.
@@ -349,9 +356,9 @@ module Location = struct
 
   type clients = {vanilla : Client.t; alternative : Client.t}
 
-  type alt_mode = Proxy (* | Light : later on *)
+  type alt_mode = Light | Proxy
 
-  let alt_mode_to_string = function Proxy -> "proxy"
+  let alt_mode_to_string = function Light -> "light" | Proxy -> "proxy"
 
   let chain_id = "main"
 
@@ -381,16 +388,35 @@ module Location = struct
 
   (** Calls [rpc get] on the given [client] but specifies an alternative
       environment to make sure the location where the RPC executes is
-      printed to output. *)
-  let rpc_get ?query_string client rpc_path =
-    let env = String_map.singleton "TEZOS_LOG" "proxy_rpc_ctxt->debug" in
+      printed to output. [tz_log] can be used to augment TEZOS_LOG
+      (useful for debugging). *)
+  let rpc_get ?(tz_log = []) ?query_string client rpc_path =
+    let (proxy_key, proxy_value) = ("proxy_rpc_ctxt", "debug") in
+    List.iter
+      (fun (k, v) ->
+        if k = proxy_key && v = proxy_value then
+          Test.fail
+            "TEZOS_LOG key %s bound both to '%s' and '%s': impossible to \
+             honor both"
+            proxy_key
+            proxy_value
+            v
+        else ())
+      tz_log ;
+    let value =
+      (proxy_key, proxy_value) :: tz_log
+      |> List.map (fun (k, v) -> Printf.sprintf "%s->%s" k v)
+      |> String.concat "; "
+    in
+    let env = String_map.singleton "TEZOS_LOG" value in
     Client.spawn_rpc ~env ?query_string Client.GET rpc_path client
     |> Process.check_and_read_both
 
   (** Check that executing [rpc get rpc_path] on client causes the RPC
-      to be executed on the given location ([expected_loc]) *)
-  let check_location alt_mode client rpc_path expected_loc =
-    let* (_, stderr) = rpc_get client rpc_path in
+      to be executed on the given location ([expected_loc]).
+      [tz_log] can be used to augment TEZOS_LOG (useful for debugging). *)
+  let check_location ?tz_log alt_mode client rpc_path expected_loc =
+    let* (_, stderr) = rpc_get ?tz_log client rpc_path in
     let actual_loc = parse_rpc_exec_location stderr rpc_path in
     if actual_loc <> expected_loc then
       Test.fail
@@ -401,7 +427,8 @@ module Location = struct
         (location_to_string actual_loc) ;
     Lwt.return_unit
 
-  let check_locations alt_mode client =
+  (* [tz_log] can be used to augment TEZOS_LOG (useful for debugging). *)
+  let check_locations ?tz_log alt_mode client =
     let paths_n_locations =
       [ ( ["chains"; chain_id; "blocks"; block_id; "context"; "delegates"],
           Local );
@@ -410,7 +437,7 @@ module Location = struct
     in
     Lwt_list.iter_s
       (fun (rpc_path, expected_loc) ->
-        check_location alt_mode client rpc_path expected_loc)
+        check_location ?tz_log alt_mode client rpc_path expected_loc)
       paths_n_locations
 
   let locations_tags alt_mode =
@@ -431,7 +458,7 @@ module Location = struct
   (** Check the output of [rpc get] on a number on RPC between two
       clients are equivalent. One of them is a vanilla client ([--mode client]) while the
       other client uses an alternative mode ([--mode proxy]). *)
-  let check_equivalence protocol alt_mode {vanilla; alternative} =
+  let check_equivalence ?tz_log protocol alt_mode {vanilla; alternative} =
     let alt_mode_string = alt_mode_to_string alt_mode in
     let compared =
       let add_rpc_path_prefix rpc_path =
@@ -464,8 +491,11 @@ module Location = struct
           (add_rpc_path_prefix ["votes"; "proposals"], []) ]
     in
     let perform (rpc_path, query_string) =
-      let* (vanilla_out, vanilla_err) = rpc_get ~query_string vanilla rpc_path
-      and* (alt_out, alt_err) = rpc_get ~query_string alternative rpc_path in
+      let* (vanilla_out, vanilla_err) =
+        rpc_get ?tz_log ~query_string vanilla rpc_path
+      and* (alt_out, alt_err) =
+        rpc_get ?tz_log ~query_string alternative rpc_path
+      in
       if vanilla_out <> alt_out then
         Test.fail
           "rpc get %s yields different results for the vanilla client and the \

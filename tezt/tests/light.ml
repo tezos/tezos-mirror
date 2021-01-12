@@ -28,6 +28,7 @@
    Component: Client - light mode
    Invokation: dune exec tezt/tests/main.exe -- --file light.ml
    Subject: Tests of the client's --mode light option
+   Dependencies: tezt/tests/proxy.ml
  *)
 
 open Lwt.Infix
@@ -77,7 +78,7 @@ let init_light ~protocol =
   (* Set mode again: back to light mode *)
   Client.set_mode mode_received client ;
   assert (Client.get_mode client |> is_light_mode) ;
-  return client
+  return (node0, client)
 
 let do_transfer ?(amount = Tez.one) ?(giver = Constant.bootstrap1.alias)
     ?(receiver = Constant.bootstrap2.alias) client =
@@ -90,7 +91,7 @@ let test_transfer =
     ~title:"(Light) transfer"
     ~tags:["light"; "client"; "transfer"]
   @@ fun protocol ->
-  let* client = init_light ~protocol in
+  let* (_, client) = init_light ~protocol in
   do_transfer client
 
 let test_bake =
@@ -99,7 +100,7 @@ let test_bake =
     ~title:"(Light) bake"
     ~tags:["light"; "client"; "bake"]
   @@ fun protocol ->
-  let* client = init_light ~protocol in
+  let* (_, client) = init_light ~protocol in
   let giver =
     match protocol with
     | Protocol.Edo ->
@@ -179,7 +180,7 @@ module NoUselessRpc = struct
       ~title:"(Light) No useless RPC call"
       ~tags:["light"; "rpc"; "get"]
     @@ fun protocol ->
-    let* client = init_light ~protocol in
+    let* (_, client) = init_light ~protocol in
     let paths =
       [ (["helpers"; "baking_rights"], []);
         (["helpers"; "baking_rights"], [("all", "true")]);
@@ -203,7 +204,52 @@ module NoUselessRpc = struct
       paths
 end
 
+(** Test.
+    Test that [tezos-client --mode light --sources ... --protocol P] fails
+    when the endpoint's protocol is not [P].
+ *)
+let test_wrong_proto =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Light) Wrong proto"
+    ~tags:["light"; "proto"]
+  @@ fun protocol ->
+  let* (_, client) = init_light ~protocol in
+  Proxy.wrong_proto protocol client
+
+let test_locations =
+  let open Proxy.Location in
+  let alt_mode = Light in
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Light) RPC get's location"
+    ~tags:(locations_tags alt_mode)
+  @@ fun protocol ->
+  let* (_, client) = init_light ~protocol in
+  check_locations alt_mode client
+
+let test_compare_light =
+  let open Proxy.Location in
+  let alt_mode = Light in
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Light) Compare RPC get"
+    ~tags:(compare_tags alt_mode)
+  @@ fun protocol ->
+  let* (node, light_client) = init_light ~protocol in
+  let* vanilla = Client.init ~node () in
+  let clients = {vanilla; alternative = light_client} in
+  let tz_log =
+    [ ("alpha.proxy_rpc", "debug");
+      ("light_mode", "debug");
+      ("proxy_getter", "debug") ]
+  in
+  check_equivalence ~tz_log protocol alt_mode clients
+
 let register ~protocols =
   test_transfer ~protocols ;
   test_bake ~protocols ;
-  NoUselessRpc.test ~protocols
+  NoUselessRpc.test ~protocols ;
+  test_wrong_proto ~protocols ;
+  test_locations ~protocols ;
+  test_compare_light ~protocols

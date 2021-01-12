@@ -42,24 +42,32 @@
    regression testing *)
 let hooks = Tezos_regression.hooks
 
-type client_mode_tag = Client | Mockup | Proxy
+type client_mode_tag = Client | Light | Proxy
 
 let client_mode_tag_to_suffix = function
   | Client ->
       "client"
-  | Mockup ->
-      "mockup"
+  | Light ->
+      "light"
   | Proxy ->
       "proxy"
 
-let client_mode_tag_to_mode client_mode_tag node : Client.mode =
+let create_client client_mode_tag : Client.t Lwt.t =
+  let node_args = Node.[Synchronisation_threshold 0; Connections 0] in
   match client_mode_tag with
   | Client ->
-      Client (Some node)
-  | Mockup ->
-      Mockup
+      let* node = Node.init node_args in
+      let* client = Client.init ~node () in
+      Client.set_mode (Client (Some node)) client ;
+      return client
+  | Light ->
+      let* (client, _) = Client.init_light () in
+      return client
   | Proxy ->
-      Proxy node
+      let* node = Node.init node_args in
+      let* client = Client.init ~node () in
+      Client.set_mode (Proxy node) client ;
+      return client
 
 (* A helper to register a RPC test environment with a node and a client for the
    given protocol version. *)
@@ -85,9 +93,7 @@ let check_rpc ~group_name ~protocols ~client_mode_tag
       @@ fun protocol ->
       (* Initialize a node with alpha protocol and data to be used for RPC calls.
          The log of the node is not captured in the regression output. *)
-      let* node = Node.init [Synchronisation_threshold 0; Connections 0] in
-      let* client = Client.init ~node () in
-      Client.set_mode (client_mode_tag_to_mode client_mode_tag node) client ;
+      let* client = create_client client_mode_tag in
       let* parameter_file =
         match parameter_overrides with
         | None ->
@@ -513,7 +519,7 @@ let register () =
           ("others", test_others, None) ]
       ()
   in
-  let modes = [Client; Proxy] in
+  let modes = [Client; Proxy; Light] in
   List.iter
     (fun mode ->
       register_alpha mode ;
