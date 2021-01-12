@@ -5,6 +5,7 @@
         test_p2p_peerset
         test_p2p_ipv6set
         test_p2p_banned_peers
+		  test_p2p_node
         )
  (libraries tezos-base
             tezos-stdlib-unix
@@ -26,6 +27,7 @@
        test_p2p_peerset.exe
        test_p2p_ipv6set.exe
        test_p2p_banned_peers.exe
+		 test_p2p_node.exe
        )
  (action (progn)))
 
@@ -77,6 +79,11 @@
  (action (run %{exe:test_p2p_banned_peers.exe} -v)))
 
 (rule
+ (alias runtest_p2p_node)
+ (locks /ports/49152-65535)
+ (action (run %{exe:test_p2p_node.exe})))
+
+(rule
  (alias runtest)
  (package tezos-p2p)
  (deps (alias runtest_p2p_socket_ipv4)
@@ -85,6 +92,7 @@
        (alias runtest_p2p_peerset)
        (alias runtest_p2p_ipv6set)
        (alias runtest_p2p_banned_peers)
+		 (alias runtest_p2p_node)
        )
  (action (progn)))
 
