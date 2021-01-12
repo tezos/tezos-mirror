@@ -34,6 +34,8 @@ let tezos_proxy_server = "./tezos-proxy-server"
 
 let tezos_codec = "./tezos-codec"
 
+let tezos_snoop = "./tezos-snoop"
+
 type key = {identity : string; alias : string; secret : string}
 
 let activator =
