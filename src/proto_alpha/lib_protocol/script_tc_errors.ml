@@ -112,13 +112,6 @@ type error += Bad_stack_length
 
 type error += Bad_stack_item of int
 
-type error += Inconsistent_annotations of string * string
-
-type error +=
-  | Inconsistent_type_annotations :
-      Script.location * Script.expr * Script.expr
-      -> error
-
 type error += Unexpected_annotation of Script.location
 
 type error += Ungrouped_annotations of Script.location

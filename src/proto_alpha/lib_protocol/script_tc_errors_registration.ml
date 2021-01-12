@@ -365,31 +365,6 @@ let () =
     (function
       | Bad_stack (loc, name, s, sty) -> Some (loc, (name, s, sty)) | _ -> None)
     (fun (loc, (name, s, sty)) -> Bad_stack (loc, name, s, sty)) ;
-  (* Inconsistent annotations *)
-  register_error_kind
-    `Permanent
-    ~id:"michelson_v1.inconsistent_annotations"
-    ~title:"Annotations inconsistent between branches"
-    ~description:"The annotations on two types could not be merged"
-    (obj2 (req "annot1" string) (req "annot2" string))
-    (function
-      | Inconsistent_annotations (annot1, annot2) -> Some (annot1, annot2)
-      | _ -> None)
-    (fun (annot1, annot2) -> Inconsistent_annotations (annot1, annot2)) ;
-  (* Inconsistent type annotations *)
-  register_error_kind
-    `Permanent
-    ~id:"michelson_v1.inconsistent_type_annotations"
-    ~title:"Types contain inconsistent annotations"
-    ~description:"The two types contain annotations that do not match"
-    (located
-       (obj2
-          (req "type1" Script.expr_encoding)
-          (req "type2" Script.expr_encoding)))
-    (function
-      | Inconsistent_type_annotations (loc, ty1, ty2) -> Some (loc, (ty1, ty2))
-      | _ -> None)
-    (fun (loc, (ty1, ty2)) -> Inconsistent_type_annotations (loc, ty1, ty2)) ;
   (* Unexpected annotation *)
   register_error_kind
     `Permanent
