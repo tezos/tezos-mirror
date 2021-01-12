@@ -950,31 +950,31 @@ let ty_eq :
   help ty1 ty2
  [@@coq_axiom_with_reason "non-top-level mutual recursion"]
 
-(* Same as merge_types but for stacks.
+(* Same as ty_eq but for stacks.
    A single error monad is used here because there is no need to
    recover from stack merging errors.  *)
-let rec merge_stacks :
+let rec stack_eq :
     type ta tb ts tu.
     Script.location ->
     context ->
     int ->
     (ta, ts) stack_ty ->
     (tb, tu) stack_ty ->
-    (((ta, ts) stack_ty, (tb, tu) stack_ty) eq * (ta, ts) stack_ty * context)
-    tzresult =
+    (((ta, ts) stack_ty, (tb, tu) stack_ty) eq * context) tzresult =
  fun loc ctxt lvl stack1 stack2 ->
   match (stack1, stack2) with
-  | (Bot_t, Bot_t) -> ok (Eq, Bot_t, ctxt)
+  | (Bot_t, Bot_t) -> ok (Eq, ctxt)
   | (Item_t (ty1, rest1), Item_t (ty2, rest2)) ->
       Gas_monad.run ctxt @@ ty_eq ~error_details:Informative loc ty1 ty2
       |> record_trace (Bad_stack_item lvl)
       >>? fun (eq, ctxt) ->
       eq >>? fun Eq ->
-      merge_stacks loc ctxt (lvl + 1) rest1 rest2 >|? fun (Eq, rest, ctxt) ->
-      ( (Eq : ((ta, ts) stack_ty, (tb, tu) stack_ty) eq),
-        Item_t (ty1, rest),
-        ctxt )
+      stack_eq loc ctxt (lvl + 1) rest1 rest2 >|? fun (Eq, ctxt) ->
+      ((Eq : ((ta, ts) stack_ty, (tb, tu) stack_ty) eq), ctxt)
   | (_, _) -> error Bad_stack_length
+
+let merge_stacks loc ctxt lvl stack1 stack2 =
+  stack_eq loc ctxt lvl stack1 stack2 >|? fun (eq, ctxt) -> (eq, stack1, ctxt)
 
 (* ---- Type checker results -------------------------------------------------*)
 
