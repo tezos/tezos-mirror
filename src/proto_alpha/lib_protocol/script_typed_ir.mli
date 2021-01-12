@@ -27,7 +27,6 @@
 
 open Alpha_context
 open Script_int
-open Script_ir_annot
 
 type step_constants = {
   source : Contract.t;
@@ -1392,11 +1391,7 @@ and 'ty ty =
   | Address_t : address ty_metadata -> address ty
   | Bool_t : bool ty_metadata -> bool ty
   | Pair_t : 'a ty * 'b ty * ('a, 'b) pair ty_metadata -> ('a, 'b) pair ty
-  | Union_t :
-      ('a ty * field_annot option)
-      * ('b ty * field_annot option)
-      * ('a, 'b) union ty_metadata
-      -> ('a, 'b) union ty
+  | Union_t : 'a ty * 'b ty * ('a, 'b) union ty_metadata -> ('a, 'b) union ty
   | Lambda_t :
       'arg ty * 'ret ty * ('arg, 'ret) lambda ty_metadata
       -> ('arg, 'ret) lambda ty
@@ -1578,11 +1573,7 @@ val bool_t : bool ty
 
 val pair_t : Script.location -> 'a ty -> 'b ty -> ('a, 'b) pair ty tzresult
 
-val union_t :
-  Script.location ->
-  'a ty * field_annot option ->
-  'b ty * field_annot option ->
-  ('a, 'b) union ty tzresult
+val union_t : Script.location -> 'a ty -> 'b ty -> ('a, 'b) union ty tzresult
 
 val union_bytes_bool_t : (Bytes.t, bool) union ty
 

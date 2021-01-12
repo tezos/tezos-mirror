@@ -175,8 +175,7 @@ let rec ty_of_comparable_ty : type a. a comparable_ty -> a ty = function
   | Pair_key (l, r, tname) ->
       Pair_t (ty_of_comparable_ty l, ty_of_comparable_ty r, tname)
   | Union_key (l, r, tname) ->
-      Union_t
-        ((ty_of_comparable_ty l, None), (ty_of_comparable_ty r, None), tname)
+      Union_t (ty_of_comparable_ty l, ty_of_comparable_ty r, tname)
   | Option_key (t, tname) -> Option_t (ty_of_comparable_ty t, tname)
 
 let rec unparse_comparable_ty_uncarbonated :
@@ -251,7 +250,7 @@ let rec unparse_ty_entrypoints_uncarbonated :
         match tr with
         | Prim (_, T_pair, ts, []) -> (T_pair, tl :: ts)
         | _ -> (T_pair, [tl; tr]))
-    | Union_t ((utl, _l_field), (utr, _r_field), _meta) ->
+    | Union_t (utl, utr, _meta) ->
         let (entrypoints_l, entrypoints_r) =
           match nested_entrypoints with
           | Entrypoints_None -> (no_entrypoints, no_entrypoints)
@@ -357,7 +356,7 @@ let[@coq_axiom_with_reason "gadt"] rec comparable_ty_of_ty :
       comparable_ty_of_ty ctxt loc l >>? fun (lty, ctxt) ->
       comparable_ty_of_ty ctxt loc r >|? fun (rty, ctxt) ->
       (Pair_key (lty, rty, pname), ctxt)
-  | Union_t ((l, _al), (r, _ar), tname) ->
+  | Union_t (l, r, tname) ->
       comparable_ty_of_ty ctxt loc l >>? fun (lty, ctxt) ->
       comparable_ty_of_ty ctxt loc r >|? fun (rty, ctxt) ->
       (Union_key (lty, rty, tname), ctxt)
@@ -683,8 +682,7 @@ let check_dupable_ty ctxt loc ty =
     | Chest_key_t _ -> return_unit
     | Ticket_t _ -> of_result (error (Unexpected_ticket loc))
     | Pair_t (ty_a, ty_b, _) -> aux loc ty_a >>$ fun () -> aux loc ty_b
-    | Union_t ((ty_a, _), (ty_b, _), _) ->
-        aux loc ty_a >>$ fun () -> aux loc ty_b
+    | Union_t (ty_a, ty_b, _) -> aux loc ty_a >>$ fun () -> aux loc ty_b
     | Lambda_t (_, _, _) ->
         (*
         Lambda are dupable as long as:
@@ -957,15 +955,13 @@ let merge_types :
           help tal tbl >>$ fun (Eq, left_ty) ->
           help tar tbr >|$ fun (Eq, right_ty) ->
           ((Eq : (ta ty, tb ty) eq), Pair_t (left_ty, right_ty, tname))
-      | ( Union_t ((tal, tal_annot), (tar, tar_annot), tn1),
-          Union_t ((tbl, tbl_annot), (tbr, tbr_annot), tn2) ) ->
+      | (Union_t (tal, tar, tn1), Union_t (tbl, tbr, tn2)) ->
           merge_type_metadata tn1 tn2 >>$ fun tname ->
-          merge_field_annot ~legacy tal_annot tbl_annot >>$ fun left_annot ->
-          merge_field_annot ~legacy tar_annot tbr_annot >>$ fun right_annot ->
+          merge_field_annot ~legacy None None >>$ fun _left_annot ->
+          merge_field_annot ~legacy None None >>$ fun _right_annot ->
           help tal tbl >>$ fun (Eq, left_ty) ->
           help tar tbr >|$ fun (Eq, right_ty) ->
-          ( (Eq : (ta ty, tb ty) eq),
-            Union_t ((left_ty, left_annot), (right_ty, right_annot), tname) )
+          ((Eq : (ta ty, tb ty) eq), Union_t (left_ty, right_ty, tname))
       | (Lambda_t (tal, tar, tn1), Lambda_t (tbl, tbr, tn2)) ->
           merge_type_metadata tn1 tn2 >>$ fun tname ->
           help tal tbl >>$ fun (Eq, left_ty) ->
@@ -1431,8 +1427,7 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
         | Don't_parse_entrypoints ->
             let (Ex_ty tl) = parsed_l in
             let (Ex_ty tr) = parsed_r in
-            union_t loc (tl, None) (tr, None) >|? fun ty ->
-            ((Ex_ty ty : ret), ctxt)
+            union_t loc tl tr >|? fun ty -> ((Ex_ty ty : ret), ctxt)
         | Parse_entrypoints ->
             let (Ex_parameter_ty_and_entrypoints
                   {arg_type = tl; entrypoints = left}) =
@@ -1442,7 +1437,7 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
                   {arg_type = tr; entrypoints = right}) =
               parsed_r
             in
-            union_t loc (tl, None) (tr, None) >|? fun arg_type ->
+            union_t loc tl tr >|? fun arg_type ->
             let entrypoints =
               {name; nested = Entrypoints_Union {left; right}}
             in
@@ -1780,7 +1775,7 @@ let check_packable ~legacy loc root =
     | Bls12_381_g2_t _ -> Result.return_unit
     | Bls12_381_fr_t _ -> Result.return_unit
     | Pair_t (l_ty, r_ty, _) -> check l_ty >>? fun () -> check r_ty
-    | Union_t ((l_ty, _), (r_ty, _), _) -> check l_ty >>? fun () -> check r_ty
+    | Union_t (l_ty, r_ty, _) -> check l_ty >>? fun () -> check r_ty
     | Option_t (v_ty, _) -> check v_ty
     | List_t (elt_ty, _) -> check elt_ty
     | Map_t (_, elt_ty, _) -> check elt_ty
@@ -1886,8 +1881,7 @@ let find_entrypoint (type full error_trace)
     match (ty, entrypoints) with
     | (_, {name = Some name; _}) when Entrypoint.(name = entrypoint) ->
         return ((fun e -> e), Ex_ty ty)
-    | ( Union_t ((tl, _al), (tr, _ar), _),
-        {nested = Entrypoints_Union {left; right}; _} ) -> (
+    | (Union_t (tl, tr, _), {nested = Entrypoints_Union {left; right}; _}) -> (
         find_entrypoint tl left entrypoint >??$ function
         | Ok (f, t) -> return ((fun e -> Prim (loc, D_Left, [f e], [])), t)
         | Error () ->
@@ -1953,8 +1947,7 @@ let well_formed_entrypoints (type full) (full : full ty) entrypoints =
       (prim list option * Entrypoint.Set.t) tzresult =
    fun t entrypoints path reachable acc ->
     match (t, entrypoints) with
-    | ( Union_t ((tl, _al), (tr, _ar), _),
-        {nested = Entrypoints_Union {left; right}; _} ) ->
+    | (Union_t (tl, tr, _), {nested = Entrypoints_Union {left; right}; _}) ->
         merge (D_Left :: path) tl left reachable acc
         >>? fun (acc, l_reachable) ->
         merge (D_Right :: path) tr right reachable acc
@@ -2575,7 +2568,7 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
       in
       traced @@ parse_pair parse_l parse_r ctxt ~legacy r_witness expr
   (* Unions *)
-  | (Union_t ((tl, _), (tr, _), _), expr) ->
+  | (Union_t (tl, tr, _), expr) ->
       let parse_l ctxt v =
         non_terminal_recursion ?type_logger ctxt ~legacy tl v
       in
@@ -3334,21 +3327,21 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | (Prim (loc, I_LEFT, [tr], annot), Item_t (tl, rest)) ->
       parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy tr
       >>?= fun (Ex_ty tr, ctxt) ->
-      parse_constr_annot loc annot >>?= fun (l_field, r_field) ->
+      parse_constr_annot loc annot >>?= fun (_l_field, _r_field) ->
       let cons_left = {apply = (fun kinfo k -> ICons_left (kinfo, k))} in
-      union_t loc (tl, l_field) (tr, r_field) >>?= fun ty ->
+      union_t loc tl tr >>?= fun ty ->
       let stack_ty = Item_t (ty, rest) in
       typed ctxt loc cons_left stack_ty
   | (Prim (loc, I_RIGHT, [tl], annot), Item_t (tr, rest)) ->
       parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy tl
       >>?= fun (Ex_ty tl, ctxt) ->
-      parse_constr_annot loc annot >>?= fun (l_field, r_field) ->
+      parse_constr_annot loc annot >>?= fun (_l_field, _r_field) ->
       let cons_right = {apply = (fun kinfo k -> ICons_right (kinfo, k))} in
-      union_t loc (tl, l_field) (tr, r_field) >>?= fun ty ->
+      union_t loc tl tr >>?= fun ty ->
       let stack_ty = Item_t (ty, rest) in
       typed ctxt loc cons_right stack_ty
   | ( Prim (loc, I_IF_LEFT, [bt; bf], annot),
-      (Item_t (Union_t ((tl, _l_field), (tr, _r_field), _), rest) as bef) ) ->
+      (Item_t (Union_t (tl, tr, _), rest) as bef) ) ->
       check_kind [Seq_kind] bt >>?= fun () ->
       check_kind [Seq_kind] bf >>?= fun () ->
       error_unexpected_annot loc annot >>?= fun () ->
@@ -3889,7 +3882,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           in
           typed_no_lwt ctxt loc instr rest)
   | ( Prim (loc, I_LOOP_LEFT, [body], annot),
-      (Item_t (Union_t ((tl, _l_field), (tr, _), _), rest) as stack) ) -> (
+      (Item_t (Union_t (tl, tr, _), rest) as stack) ) -> (
       check_kind [Seq_kind] body >>?= fun () ->
       check_var_annot loc annot >>?= fun () ->
       non_terminal_recursion
@@ -5516,8 +5509,7 @@ let list_entrypoints ctxt (type full) (full : full ty)
       tzresult =
    fun t entrypoints path reachable acc ->
     match (t, entrypoints) with
-    | ( Union_t ((tl, _al), (tr, _ar), _),
-        {nested = Entrypoints_Union {left; right}; _} ) ->
+    | (Union_t (tl, tr, _), {nested = Entrypoints_Union {left; right}; _}) ->
         merge (D_Left :: path) tl left reachable acc
         >>? fun (acc, l_reachable) ->
         merge (D_Right :: path) tr right reachable acc
@@ -5589,7 +5581,7 @@ let[@coq_axiom_with_reason "gadt"] rec unparse_data :
       let unparse_l ctxt v = non_terminal_recursion ctxt mode tl v in
       let unparse_r ctxt v = non_terminal_recursion ctxt mode tr v in
       unparse_pair ~loc unparse_l unparse_r ctxt mode r_witness pair
-  | (Union_t ((tl, _), (tr, _), _), v) ->
+  | (Union_t (tl, tr, _), v) ->
       let unparse_l ctxt v = non_terminal_recursion ctxt mode tl v in
       let unparse_r ctxt v = non_terminal_recursion ctxt mode tr v in
       unparse_union ~loc unparse_l unparse_r ctxt v
@@ -6066,7 +6058,7 @@ let rec has_lazy_storage : type t. t ty -> t has_lazy_storage =
   | Chest_key_t _ -> False_f
   | Chest_t _ -> False_f
   | Pair_t (l, r, _) -> aux2 (fun l r -> Pair_f (l, r)) l r
-  | Union_t ((l, _), (r, _), _) -> aux2 (fun l r -> Union_f (l, r)) l r
+  | Union_t (l, r, _) -> aux2 (fun l r -> Union_f (l, r)) l r
   | Option_t (t, _) -> aux1 (fun h -> Option_f h) t
   | List_t (t, _) -> aux1 (fun h -> List_f h) t
   | Map_t (_, t, _) -> aux1 (fun h -> Map_f h) t
@@ -6124,10 +6116,10 @@ let[@coq_axiom_with_reason "gadt"] extract_lazy_storage_updates ctxt mode
         aux ctxt mode ~temporary ids_to_copy acc tyr xr ~has_lazy_storage:hr
         >|=? fun (ctxt, xr, ids_to_copy, acc) ->
         (ctxt, (xl, xr), ids_to_copy, acc)
-    | (Union_f (has_lazy_storage, _), Union_t ((ty, _), (_, _), _), L x) ->
+    | (Union_f (has_lazy_storage, _), Union_t (ty, _, _), L x) ->
         aux ctxt mode ~temporary ids_to_copy acc ty x ~has_lazy_storage
         >|=? fun (ctxt, x, ids_to_copy, acc) -> (ctxt, L x, ids_to_copy, acc)
-    | (Union_f (_, has_lazy_storage), Union_t ((_, _), (ty, _), _), R x) ->
+    | (Union_f (_, has_lazy_storage), Union_t (_, ty, _), R x) ->
         aux ctxt mode ~temporary ids_to_copy acc ty x ~has_lazy_storage
         >|=? fun (ctxt, x, ids_to_copy, acc) -> (ctxt, R x, ids_to_copy, acc)
     | (Option_f has_lazy_storage, Option_t (ty, _), Some x) ->
@@ -6221,9 +6213,9 @@ let[@coq_axiom_with_reason "gadt"] rec fold_lazy_storage :
       | Fold_lazy_storage.Ok init ->
           fold_lazy_storage ~f ~init ctxt tyr xr ~has_lazy_storage:hr
       | Fold_lazy_storage.Error -> ok (init, ctxt))
-  | (Union_f (has_lazy_storage, _), Union_t ((ty, _), (_, _), _), L x) ->
+  | (Union_f (has_lazy_storage, _), Union_t (ty, _, _), L x) ->
       fold_lazy_storage ~f ~init ctxt ty x ~has_lazy_storage
-  | (Union_f (_, has_lazy_storage), Union_t ((_, _), (ty, _), _), R x) ->
+  | (Union_f (_, has_lazy_storage), Union_t (_, ty, _), R x) ->
       fold_lazy_storage ~f ~init ctxt ty x ~has_lazy_storage
   | (_, Option_t (_, _), None) -> ok (Fold_lazy_storage.Ok init, ctxt)
   | (Option_f has_lazy_storage, Option_t (ty, _), Some x) ->

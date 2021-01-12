@@ -167,7 +167,7 @@ module Ticket_inspection = struct
           ty2
           ~pair:(fun ht1 ht2 -> Pair_ht (ht1, ht2))
           k
-    | Union_t ((ty1, _), (ty2, _), _) ->
+    | Union_t (ty1, ty2, _) ->
         (has_tickets_of_pair [@ocaml.tailcall])
           ty1
           ty2
@@ -336,7 +336,7 @@ module Ticket_collection = struct
               r
               acc
               k)
-    | (Union_ht (htyl, htyr), Union_t ((tyl, _), (tyr, _), _)) -> (
+    | (Union_ht (htyl, htyr), Union_t (tyl, tyr, _)) -> (
         match x with
         | L v ->
             (tickets_of_value [@ocaml.tailcall])

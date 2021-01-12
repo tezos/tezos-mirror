@@ -27,7 +27,6 @@
 
 open Alpha_context
 open Script_int
-open Script_ir_annot
 
 (*
 
@@ -1304,11 +1303,7 @@ and 'ty ty =
   | Address_t : address ty_metadata -> address ty
   | Bool_t : bool ty_metadata -> bool ty
   | Pair_t : 'a ty * 'b ty * ('a, 'b) pair ty_metadata -> ('a, 'b) pair ty
-  | Union_t :
-      ('a ty * field_annot option)
-      * ('b ty * field_annot option)
-      * ('a, 'b) union ty_metadata
-      -> ('a, 'b) union ty
+  | Union_t : 'a ty * 'b ty * ('a, 'b) union ty_metadata -> ('a, 'b) union ty
   | Lambda_t :
       'arg ty * 'ret ty * ('arg, 'ret) lambda ty_metadata
       -> ('arg, 'ret) lambda ty
@@ -1846,12 +1841,11 @@ let pair_t loc l r =
   Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
   Pair_t (l, r, {size})
 
-let union_t loc (l, fannot_l) (r, fannot_r) =
+let union_t loc l r =
   Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
-  Union_t ((l, fannot_l), (r, fannot_r), {size})
+  Union_t (l, r, {size})
 
-let union_bytes_bool_t =
-  Union_t ((bytes_t, None), (bool_t, None), {size = Type_size.three})
+let union_bytes_bool_t = Union_t (bytes_t, bool_t, {size = Type_size.three})
 
 let lambda_t loc l r =
   Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
@@ -2166,7 +2160,7 @@ let (ty_traverse, comparable_ty_traverse) =
     | Ticket_t (cty, _) -> aux f accu cty continue
     | Chest_key_t _ | Chest_t _ -> (continue [@ocaml.tailcall]) accu
     | Pair_t (ty1, ty2, _) -> (next2' [@ocaml.tailcall]) f accu ty1 ty2 continue
-    | Union_t ((ty1, _), (ty2, _), _) ->
+    | Union_t (ty1, ty2, _) ->
         (next2' [@ocaml.tailcall]) f accu ty1 ty2 continue
     | Lambda_t (ty1, ty2, _) ->
         (next2' [@ocaml.tailcall]) f accu ty1 ty2 continue
@@ -2247,7 +2241,7 @@ let value_traverse (type t) (ty : (t ty, t comparable_ty) union) (x : t) init f
     | Lambda_t (_, _, _) ->
         (return [@ocaml.tailcall]) ()
     | Pair_t (ty1, ty2, _) -> (next2 [@ocaml.tailcall]) ty1 ty2 (fst x) (snd x)
-    | Union_t ((ty1, _), (ty2, _), _) -> (
+    | Union_t (ty1, ty2, _) -> (
         match x with
         | L l -> (next [@ocaml.tailcall]) ty1 l
         | R r -> (next [@ocaml.tailcall]) ty2 r)
