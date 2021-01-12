@@ -48,9 +48,6 @@ val field_annot_opt_to_entrypoint_strict :
 val field_annot_opt_eq_entrypoint_lax :
   field_annot option -> Entrypoint.t -> bool
 
-(** Converts an entrypoint to a field annot. *)
-val field_annot_of_entrypoint : Entrypoint.t -> field_annot
-
 (** Merge field annotations.
     @return an error {!Inconsistent_type_annotations} if they are both present
     and different, unless [legacy] *)

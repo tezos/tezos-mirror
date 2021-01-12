@@ -96,6 +96,11 @@ val to_string : t -> string
     Otherwise it is "%" followed by the entrypoint. *)
 val to_address_suffix : t -> string
 
+(** Converts an entrypoint to a string used as a field annotation of a
+    parameter union type. It is "%" followed by the entrypoint.
+    The default entrypoint is converted to "%default". *)
+val unparse_as_field_annot : t -> string
+
 (** Pretty-print an entrypoint *)
 val pp : Format.formatter -> t -> unit
 

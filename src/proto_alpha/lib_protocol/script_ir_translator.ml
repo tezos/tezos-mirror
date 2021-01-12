@@ -185,8 +185,10 @@ let add_field_annot a = function
   | expr -> expr
 
 let add_entrypoint_annot entrypoint expr =
-  let a = Option.map Script_ir_annot.field_annot_of_entrypoint entrypoint in
-  add_field_annot a expr
+  match (entrypoint, expr) with
+  | (Some name, Prim (loc, prim, args, annots)) ->
+      Prim (loc, prim, args, annots @ [Entrypoint.unparse_as_field_annot name])
+  | (_, expr) -> expr
 
 let rec unparse_comparable_ty_uncarbonated :
     type a loc. loc:loc -> a comparable_ty -> loc Script.michelson_node =

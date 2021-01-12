@@ -166,6 +166,8 @@ let to_string (name : t) = (name :> string)
 let to_address_suffix (name : t) =
   if is_default name then "" else "%" ^ (name :> string)
 
+let unparse_as_field_annot (name : t) = "%" ^ (name :> string)
+
 let of_string_lax_exn str =
   match of_string_lax' str with Ok name -> name | Error err -> invalid_arg err
 
