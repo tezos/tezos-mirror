@@ -19,6 +19,9 @@ here either.
 - Added a new multisig command to change keys and threshold
   `set threshold of multisig contract ...`.
 
+- Added a command to perform protocol migrations in persistent mockup mode
+  `migrate mockup to <protocol_hash>`
+
 ## Baker / Endorser / Accuser
 
 ## Protocol Compiler And Environment
