@@ -319,25 +319,15 @@ let unparse_parameter_ty ~loc ctxt ty ~entrypoints =
   Gas.consume ctxt (Unparse_costs.unparse_type ty) >|? fun ctxt ->
   (unparse_ty_entrypoints_uncarbonated ~loc ty entrypoints, ctxt)
 
-let[@coq_struct "function_parameter"] rec strip_var_annots = function
-  | (Int _ | String _ | Bytes _) as atom -> atom
-  | Seq (loc, args) -> Seq (loc, List.map strip_var_annots args)
-  | Prim (loc, name, args, annots) ->
-      let not_var_annot s = Compare.Char.(s.[0] <> '@') in
-      let annots = List.filter not_var_annot annots in
-      Prim (loc, name, List.map strip_var_annots args, annots)
-
 let serialize_ty_for_error ty =
   (*
     Types are bounded by [Constants.michelson_maximum_type_size], so
-    [unparse_ty_uncarbonated], [strip_var_annots], and [strip_locations] are
-    bounded in time.
+    [unparse_ty_uncarbonated] and [strip_locations] are bounded in time.
 
     It is hence OK to use them in errors that are not caught in the validation
     (only once in apply).
   *)
-  let ty = unparse_ty_uncarbonated ~loc:() ty in
-  Micheline.strip_locations (strip_var_annots ty)
+  unparse_ty_uncarbonated ~loc:() ty |> Micheline.strip_locations
 
 let[@coq_axiom_with_reason "gadt"] rec comparable_ty_of_ty :
     type a.
