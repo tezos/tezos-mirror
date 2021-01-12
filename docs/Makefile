@@ -9,6 +9,14 @@ DOCGENDIR     = doc_gen
 DOCERRORDIR   = $(DOCGENDIR)/errors
 DOCRPCDIR     = $(DOCGENDIR)/rpcs
 
+ALPHA_LONG   = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
+EDO_LONG     = PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq
+DELPHI_LONG  = PsDELPH1Kxsxt8f9eWbxQeRxkjfbxoqM52jvs5Y5fBxWWh4ifpo
+
+ALPHA_SHORT  = alpha
+EDO_SHORT    = 008-PtEdoTez
+DELPHI_SHORT = 007-PsDELPH1
+
 all: manuals odoc html redirects
 
 main:
@@ -16,15 +24,20 @@ main:
 
 manuals: main
     # alpha protocol
-	@../tezos-client -protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 008/tezos-client-alpha.html
-	@../tezos-baker-alpha man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 008/tezos-baker-alpha.html
-	@../tezos-endorser-alpha man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 008/tezos-endorser-alpha.html
-	@../tezos-accuser-alpha man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 008/tezos-accuser-alpha.html
+	@../tezos-client -protocol $(ALPHA_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-client-alpha.html
+	@../tezos-baker-$(ALPHA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-baker-alpha.html
+	@../tezos-endorser-$(ALPHA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-endorser-alpha.html
+	@../tezos-accuser-$(ALPHA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-accuser-alpha.html
+    # 008 (Edo) protocol
+	@../tezos-client -protocol $(EDO_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 008/tezos-client-008.html
+	@../tezos-baker-$(EDO_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 008/tezos-baker-008.html
+	@../tezos-endorser-$(EDO_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 008/tezos-endorser-008.html
+	@../tezos-accuser-$(EDO_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 008/tezos-accuser-008.html
     # 007 delphi
-	@../tezos-client -protocol PsDELPH1Kxsxt8f9eWbxQeRxkjfbxoqM52jvs5Y5fBxWWh4ifpo man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 007/tezos-client-007.html
-	@../tezos-baker-alpha man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 007/tezos-baker-007.html
-	@../tezos-endorser-alpha man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 007/tezos-endorser-007.html
-	@../tezos-accuser-alpha man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 007/tezos-accuser-007.html
+	@../tezos-client -protocol $(DELPHI_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 007/tezos-client-007.html
+	@../tezos-baker-$(DELPHI_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 007/tezos-baker-007.html
+	@../tezos-endorser-$(DELPHI_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 007/tezos-endorser-007.html
+	@../tezos-accuser-$(DELPHI_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 007/tezos-accuser-007.html
     # generic
 	@../tezos-admin-client man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-admin-client.html
 	@../tezos-signer man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-signer.html
