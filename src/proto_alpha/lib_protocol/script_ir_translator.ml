@@ -3186,7 +3186,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       Lwt.return @@ merge_branches ~legacy ctxt loc btr bfr {branch}
   (* pairs *)
   | (Prim (loc, I_PAIR, [], annot), Item_t (a, Item_t (b, rest))) ->
-      parse_constr_annot loc annot >>?= fun (_l_field, _r_field) ->
+      check_constr_annot loc annot >>?= fun () ->
       pair_t loc a b >>?= fun ty ->
       let stack_ty = Item_t (ty, rest) in
       let cons_pair = {apply = (fun kinfo k -> ICons_pair (kinfo, k))} in
@@ -3322,7 +3322,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | (Prim (loc, I_LEFT, [tr], annot), Item_t (tl, rest)) ->
       parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy tr
       >>?= fun (Ex_ty tr, ctxt) ->
-      parse_constr_annot loc annot >>?= fun (_l_field, _r_field) ->
+      check_constr_annot loc annot >>?= fun () ->
       let cons_left = {apply = (fun kinfo k -> ICons_left (kinfo, k))} in
       union_t loc tl tr >>?= fun ty ->
       let stack_ty = Item_t (ty, rest) in
@@ -3330,7 +3330,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | (Prim (loc, I_RIGHT, [tl], annot), Item_t (tr, rest)) ->
       parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy tl
       >>?= fun (Ex_ty tl, ctxt) ->
-      parse_constr_annot loc annot >>?= fun (_l_field, _r_field) ->
+      check_constr_annot loc annot >>?= fun () ->
       let cons_right = {apply = (fun kinfo k -> ICons_right (kinfo, k))} in
       union_t loc tl tr >>?= fun ty ->
       let stack_ty = Item_t (ty, rest) in

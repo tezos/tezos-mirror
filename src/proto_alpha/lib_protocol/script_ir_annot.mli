@@ -75,10 +75,7 @@ val check_var_annot : Script.location -> string list -> unit tzresult
 
 val is_allowed_char : char -> bool
 
-val parse_constr_annot :
-  Script.location ->
-  string list ->
-  (field_annot option * field_annot option) tzresult
+val check_constr_annot : Script.location -> string list -> unit tzresult
 
 val check_two_var_annot : Script.location -> string list -> unit tzresult
 
