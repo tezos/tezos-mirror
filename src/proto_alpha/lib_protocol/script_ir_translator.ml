@@ -821,14 +821,14 @@ let rec comparable_ty_eq :
                       (ty_of_comparable_ty ta)
                       (ty_of_comparable_ty tb))
 
-let merge_memo_sizes :
+let memo_size_eq :
     type error_trace.
     error_details:error_trace error_details ->
     Sapling.Memo_size.t ->
     Sapling.Memo_size.t ->
-    (Sapling.Memo_size.t, error_trace) result =
+    (unit, error_trace) result =
  fun ~error_details ms1 ms2 ->
-  if Sapling.Memo_size.equal ms1 ms2 then ok ms1
+  if Sapling.Memo_size.equal ms1 ms2 then Result.return_unit
   else
     Error
       (match error_details with
@@ -857,8 +857,8 @@ let merge_types :
            let ty2 = serialize_ty_for_error ty2 in
            Inconsistent_types (Some loc, ty1, ty2))
   in
-  let merge_memo_sizes ms1 ms2 =
-    Gas_monad.of_result (merge_memo_sizes ~error_details ms1 ms2)
+  let memo_size_eq ms1 ms2 =
+    Gas_monad.of_result (memo_size_eq ~error_details ms1 ms2)
   in
   let rec help :
       type ta tb.
@@ -940,11 +940,11 @@ let merge_types :
         let+ (Eq, ty) = help tva tvb in
         ((Eq : (ta ty, tb ty) eq), List_t (ty, meta1))
     | (Sapling_state_t ms1, Sapling_state_t ms2) ->
-        let+ ms = merge_memo_sizes ms1 ms2 in
-        (Eq, Sapling_state_t ms)
+        let+ () = memo_size_eq ms1 ms2 in
+        (Eq, Sapling_state_t ms1)
     | (Sapling_transaction_t ms1, Sapling_transaction_t ms2) ->
-        let+ ms = merge_memo_sizes ms1 ms2 in
-        (Eq, Sapling_transaction_t ms)
+        let+ () = memo_size_eq ms1 ms2 in
+        (Eq, Sapling_transaction_t ms1)
     | (Chest_t, Chest_t) -> return (Eq, Chest_t)
     | (Chest_key_t, Chest_key_t) -> return (Eq, Chest_key_t)
     | (_, _) ->
@@ -2735,11 +2735,11 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
           | None -> return (transaction, ctxt)
           | Some transac_memo_size ->
               Lwt.return
-                ( merge_memo_sizes
+                ( memo_size_eq
                     ~error_details:Informative
                     memo_size
                     transac_memo_size
-                >|? fun _ms -> (transaction, ctxt) ))
+                >|? fun () -> (transaction, ctxt) ))
       | None -> fail_parse_data ())
   | (Sapling_transaction_t _, expr) ->
       traced_fail (Invalid_kind (location expr, [Bytes_kind], kind expr))
@@ -2749,11 +2749,11 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
         Sapling.state_from_id ctxt id >>=? fun (state, ctxt) ->
         Lwt.return
           ( traced_no_lwt
-          @@ merge_memo_sizes
+          @@ memo_size_eq
                ~error_details:Informative
                memo_size
                state.Sapling.memo_size
-          >|? fun _memo_size -> (state, ctxt) )
+          >|? fun () -> (state, ctxt) )
       else traced_fail (Unexpected_forged_value loc)
   | (Sapling_state_t memo_size, Seq (_, [])) ->
       return (Sapling.empty_state ~memo_size (), ctxt)
@@ -3768,11 +3768,11 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       Item_t
         ( Sapling_transaction_t transaction_memo_size,
           Item_t ((Sapling_state_t state_memo_size as state_ty), rest) ) ) ->
-      merge_memo_sizes
+      memo_size_eq
         ~error_details:Informative
         state_memo_size
         transaction_memo_size
-      >>?= fun _memo_size ->
+      >>?= fun () ->
       let instr =
         {apply = (fun kinfo k -> ISapling_verify_update (kinfo, k))}
       in
