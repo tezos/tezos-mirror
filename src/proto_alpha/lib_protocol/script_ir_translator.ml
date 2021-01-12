@@ -1012,12 +1012,8 @@ let merge_branches :
       in
       record_trace_eval
         unmatched_branches
-        ( merge_stacks loc ctxt 1 aftbt aftbf >|? fun (Eq, merged_stack, ctxt) ->
-          ( Typed
-              (branch
-                 {dbt with aft = merged_stack}
-                 {dbf with aft = merged_stack}),
-            ctxt ) )
+        ( stack_eq loc ctxt 1 aftbt aftbf >|? fun (Eq, ctxt) ->
+          (Typed (branch dbt dbf), ctxt) )
   | (Failed {descr = descrt}, Failed {descr = descrf}) ->
       let descr ret = branch (descrt ret) (descrf ret) in
       ok (Failed {descr}, ctxt)
