@@ -39,10 +39,6 @@ module FOR_TESTS = struct
     Field_annot (Non_empty_string.of_string_exn s)
 end
 
-let unparse_field_annot : field_annot option -> string list = function
-  | None -> []
-  | Some (Field_annot a) -> ["%" ^ (a :> string)]
-
 let field_annot_opt_to_entrypoint_strict ~loc = function
   | None -> Ok Entrypoint.default
   | Some (Field_annot a) -> Entrypoint.of_annot_strict ~loc a

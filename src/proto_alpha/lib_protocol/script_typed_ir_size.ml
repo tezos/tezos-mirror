@@ -538,7 +538,15 @@ and kinstr_size :
     | ITransfer_tokens (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | IImplicit_account (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | ICreate_contract
-        {kinfo; storage_type; arg_type; lambda; root_name = _; views; k = _} ->
+        {
+          kinfo;
+          storage_type;
+          arg_type;
+          lambda;
+          entrypoints (* TODO? *) = _;
+          views;
+          k = _;
+        } ->
         let accu =
           ret_succ_adding
             (accu ++ ty_size storage_type ++ ty_size arg_type

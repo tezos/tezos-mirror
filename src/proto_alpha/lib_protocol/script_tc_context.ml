@@ -31,7 +31,7 @@ type callsite =
   | Toplevel : {
       storage_type : 'sto ty;
       param_type : 'param ty;
-      root_name : Alpha_context.Entrypoint.t option;
+      entrypoints : 'param Script_typed_ir.entrypoints;
     }
       -> callsite
   | View : callsite
@@ -41,8 +41,8 @@ type t = {callsite : callsite; in_lambda : in_lambda}
 
 let init callsite = {callsite; in_lambda = false}
 
-let toplevel ~storage_type ~param_type root_name =
-  init (Toplevel {storage_type; param_type; root_name})
+let toplevel ~storage_type ~param_type ~entrypoints =
+  init (Toplevel {storage_type; param_type; entrypoints})
 
 let view = init View
 

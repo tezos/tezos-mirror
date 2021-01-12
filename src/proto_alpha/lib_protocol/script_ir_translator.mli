@@ -74,7 +74,7 @@ type ex_ty = Ex_ty : 'a Script_typed_ir.ty -> ex_ty
 type ex_parameter_ty_and_entrypoints =
   | Ex_parameter_ty_and_entrypoints : {
       arg_type : 'a Script_typed_ir.ty;
-      root_name : Entrypoint.t option;
+      entrypoints : 'a Script_typed_ir.entrypoints;
     }
       -> ex_parameter_ty_and_entrypoints
 
@@ -100,7 +100,7 @@ type ('arg, 'storage) code = {
   arg_type : 'arg Script_typed_ir.ty;
   storage_type : 'storage Script_typed_ir.ty;
   views : Script_typed_ir.view Script_typed_ir.SMap.t;
-  root_name : Entrypoint.t option;
+  entrypoints : 'arg Script_typed_ir.entrypoints;
   code_size : Cache_memory_helpers.sint;
       (** This is an over-approximation of the value size in memory, in
          bytes, of the contract's static part, that is its source
@@ -348,16 +348,11 @@ val ty_of_comparable_ty :
 val parse_toplevel :
   context -> legacy:bool -> Script.expr -> (toplevel * context) tzresult Lwt.t
 
-val add_field_annot :
-  Script_ir_annot.field_annot option ->
-  ('loc, 'prim) Micheline.node ->
-  ('loc, 'prim) Micheline.node
-
 val unparse_parameter_ty :
   loc:'loc ->
   context ->
-  root_name:Entrypoint.t option ->
   'a Script_typed_ir.ty ->
+  entrypoints:'a Script_typed_ir.entrypoints ->
   ('loc Script.michelson_node * context) tzresult
 
 (** High-level function to typecheck a Michelson script. This function is not
@@ -426,14 +421,14 @@ val parse_contract_for_script :
 val find_entrypoint :
   error_details:'error_trace error_details ->
   't Script_typed_ir.ty ->
-  root_name:Entrypoint.t option ->
+  't Script_typed_ir.entrypoints ->
   Entrypoint.t ->
   ((Script.node -> Script.node) * ex_ty, 'error_trace) Gas_monad.t
 
 val list_entrypoints :
-  't Script_typed_ir.ty ->
   context ->
-  root_name:Entrypoint.t option ->
+  't Script_typed_ir.ty ->
+  't Script_typed_ir.entrypoints ->
   (Michelson_v1_primitives.prim list list
   * (Michelson_v1_primitives.prim list * Script.unlocated_michelson_node)
     Entrypoint.Map.t)

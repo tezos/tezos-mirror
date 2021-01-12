@@ -50,7 +50,7 @@ type callsite =
   | Toplevel : {
       storage_type : 'sto ty;
       param_type : 'param ty;
-      root_name : Entrypoint.t option;
+      entrypoints : 'param Script_typed_ir.entrypoints;
     }
       -> callsite
   | View : callsite
@@ -61,7 +61,10 @@ type t = {callsite : callsite; in_lambda : in_lambda}
 val init : callsite -> t
 
 val toplevel :
-  storage_type:'sto ty -> param_type:'param ty -> Entrypoint.t option -> t
+  storage_type:'sto ty ->
+  param_type:'param ty ->
+  entrypoints:'param Script_typed_ir.entrypoints ->
+  t
 
 val view : t
 

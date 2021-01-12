@@ -32,10 +32,6 @@ module FOR_TESTS : sig
   val unsafe_field_annot_of_string : string -> field_annot
 end
 
-(** Unparse annotations to their string representation *)
-
-val unparse_field_annot : field_annot option -> string list
-
 (** Converts a field annot option to an entrypoint.
     An error is returned if the field annot is too long or is "default".
     [None] is converted to [Some default].

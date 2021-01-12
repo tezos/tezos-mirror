@@ -2206,7 +2206,7 @@ module Registration_section = struct
                arg_type = unit;
                lambda;
                views = SMap.empty;
-               root_name = None;
+               entrypoints = no_entrypoints;
                k = halt (operation @$ address @$ bot);
              })
         ()

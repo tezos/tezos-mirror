@@ -1132,7 +1132,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
             arg_type;
             lambda = Lam (_, code);
             views;
-            root_name;
+            entrypoints;
             k;
             _;
           } ->
@@ -1146,7 +1146,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
             arg_type
             code
             views
-            root_name
+            entrypoints
             delegate
             credit
             init
@@ -1695,13 +1695,13 @@ let execute logger ctxt mode step_constants ~entrypoint ~internal
                  arg_type;
                  storage;
                  storage_type;
-                 root_name;
+                 entrypoints;
                  views;
                },
              ctxt ) ->
   Gas_monad.run
     ctxt
-    (find_entrypoint ~error_details:Informative arg_type ~root_name entrypoint)
+    (find_entrypoint ~error_details:Informative arg_type entrypoints entrypoint)
   >>?= fun (r, ctxt) ->
   record_trace (Bad_contract_parameter step_constants.self) r
   >>?= fun (box, _) ->
@@ -1752,7 +1752,7 @@ let execute logger ctxt mode step_constants ~entrypoint ~internal
      in
      let script =
        Ex_script
-         {code_size; code; arg_type; storage; storage_type; root_name; views}
+         {code_size; code; arg_type; storage; storage_type; entrypoints; views}
      in
      (* We consume gas after the fact in order to not have to instrument
         [script_size] (for efficiency).

@@ -527,20 +527,20 @@ let transfer (ctxt, sc) gas amount tp p destination entrypoint =
   let (gas, ctxt) = local_gas_counter_and_outdated_context ctxt in
   return (res, ctxt, gas)
 
-(* [create_contract (ctxt, sc) gas storage_ty param_ty code root_name
+(* [create_contract (ctxt, sc) gas storage_ty param_ty code entrypoints
    delegate credit init] creates an origination operation for a
-   contract represented by [code], with some [root_name], some initial
+   contract represented by [code], with some [entrypoints], some initial
    [credit] (taken to contract being executed), and an initial storage
    [init] of type [storage_ty]. The type of the new contract argument
    is [param_ty]. *)
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/1688
    Refactor the sharing part of unparse_script and create_contract *)
-let create_contract (ctxt, sc) gas storage_type param_type code views root_name
-    delegate credit init =
+let create_contract (ctxt, sc) gas storage_type param_type code views
+    entrypoints delegate credit init =
   let ctxt = update_context gas ctxt in
   let loc = Micheline.dummy_location in
-  unparse_parameter_ty ~loc ctxt param_type ~root_name
+  unparse_parameter_ty ~loc ctxt param_type ~entrypoints
   >>?= fun (unparsed_param_type, ctxt) ->
   unparse_ty ~loc ctxt storage_type >>?= fun (unparsed_storage_type, ctxt) ->
   let open Micheline in
