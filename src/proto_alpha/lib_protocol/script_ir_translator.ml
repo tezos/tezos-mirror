@@ -1179,13 +1179,13 @@ let[@coq_struct "ty"] rec parse_comparable_ty :
         error (Invalid_arity (loc, prim, 0, List.length l))
     | Prim (loc, T_pair, left :: right, annot) ->
         check_type_annot loc annot >>? fun () ->
-        extract_field_annot left >>? fun (left, _left_annot) ->
+        remove_field_annot left >>? fun left ->
         (match right with
-        | [right] -> extract_field_annot right
+        | [right] -> remove_field_annot right
         | right ->
             (* Unfold [pair t1 ... tn] as [pair t1 (... (pair tn-1 tn))] *)
-            ok (Prim (loc, T_pair, right, []), None))
-        >>? fun (right, _right_annot) ->
+            ok (Prim (loc, T_pair, right, [])))
+        >>? fun right ->
         parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt right
         >>? fun (Ex_comparable_ty right, ctxt) ->
         parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt left
@@ -1193,8 +1193,8 @@ let[@coq_struct "ty"] rec parse_comparable_ty :
         pair_key loc left right >|? fun ty -> (Ex_comparable_ty ty, ctxt)
     | Prim (loc, T_or, [left; right], annot) ->
         check_type_annot loc annot >>? fun () ->
-        extract_field_annot left >>? fun (left, _left_annot) ->
-        extract_field_annot right >>? fun (right, _right_annot) ->
+        remove_field_annot left >>? fun left ->
+        remove_field_annot right >>? fun right ->
         parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt right
         >>? fun (Ex_comparable_ty right, ctxt) ->
         parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt left
@@ -1357,7 +1357,7 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
           contract_t loc tl >|? fun ty -> return ctxt ty
         else error (Unexpected_contract loc)
     | Prim (loc, T_pair, utl :: utr, annot) ->
-        extract_field_annot utl >>? fun (utl, _left_field) ->
+        remove_field_annot utl >>? fun utl ->
         parse_ty
           ctxt
           ~stack_depth:(stack_depth + 1)
@@ -1370,11 +1370,11 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
           utl
         >>? fun (Ex_ty tl, ctxt) ->
         (match utr with
-        | [utr] -> extract_field_annot utr
+        | [utr] -> remove_field_annot utr
         | utr ->
             (* Unfold [pair t1 ... tn] as [pair t1 (... (pair tn-1 tn))] *)
-            ok (Prim (loc, T_pair, utr, []), None))
-        >>? fun (utr, _right_field) ->
+            ok (Prim (loc, T_pair, utr, [])))
+        >>? fun utr ->
         parse_ty
           ctxt
           ~stack_depth:(stack_depth + 1)
@@ -1391,8 +1391,8 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
     | Prim (loc, T_or, [utl; utr], annot) -> (
         (match ret with
         | Don't_parse_entrypoints ->
-            extract_field_annot utl >>? fun (utl, _left_constr) ->
-            extract_field_annot utr >|? fun (utr, _right_constr) -> (utl, utr)
+            remove_field_annot utl >>? fun utl ->
+            remove_field_annot utr >|? fun utr -> (utl, utr)
         | Parse_entrypoints -> ok (utl, utr))
         >>? fun (utl, utr) ->
         parse_ty
@@ -1447,7 +1447,7 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
     | Prim (loc, T_option, [ut], annot) ->
         (if legacy then
          (* legacy semantics with (broken) field annotations *)
-         extract_field_annot ut >>? fun (ut, _some_constr) ->
+         remove_field_annot ut >>? fun ut ->
          check_composed_type_annot loc annot >>? fun () -> ok ut
         else check_type_annot loc annot >>? fun () -> ok ut)
         >>? fun ut ->
@@ -5196,10 +5196,9 @@ and parse_toplevel :
 
                In the latter case we move it to the parameter type.
             *)
-            Script_ir_annot.extract_field_annot p >>? fun (_p, root_name) ->
-            match root_name with
-            | Some _ -> ok (p, pannot)
-            | None -> (
+            Script_ir_annot.has_field_annot p >>? function
+            | true -> ok (p, pannot)
+            | false -> (
                 match pannot with
                 | [single]
                   when legacy

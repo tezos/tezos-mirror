@@ -203,6 +203,14 @@ let extract_field_annot :
       >|? fun field_annot -> (Prim (loc, prim, args, annot), field_annot)
   | expr -> ok (expr, None)
 
+let has_field_annot node =
+  extract_field_annot node >|? function
+  | (_node, Some _) -> true
+  | (_node, None) -> false
+
+let remove_field_annot node =
+  extract_field_annot node >|? fun (node, _a) -> node
+
 let extract_entrypoint_annot :
     Script.node -> (Script.node * Entrypoint.t option) tzresult =
  fun node ->

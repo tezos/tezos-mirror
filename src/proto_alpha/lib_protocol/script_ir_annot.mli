@@ -60,9 +60,11 @@ val is_field_annot : Script.location -> string -> bool tzresult
     [:ty_name %field1 %field2] in any order. *)
 val check_composed_type_annot : Script.location -> string list -> unit tzresult
 
-(** Extract and remove a field annotation from a node *)
-val extract_field_annot :
-  Script.node -> (Script.node * field_annot option) tzresult
+(** Checks whether a node has a field annotation. *)
+val has_field_annot : Script.node -> bool tzresult
+
+(** Removes a field annotation from a node. *)
+val remove_field_annot : Script.node -> Script.node tzresult
 
 (** Extract and remove a field annotation as an entrypoint from a node *)
 val extract_entrypoint_annot :
