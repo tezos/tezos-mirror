@@ -39,16 +39,6 @@ end
 val field_annot_opt_to_entrypoint_strict :
   loc:Script.location -> field_annot option -> Entrypoint.t tzresult
 
-(** Merge field annotations.
-    @return an error {!Inconsistent_type_annotations} if they are both present
-    and different, unless [legacy] *)
-val merge_field_annot :
-  legacy:bool ->
-  error_details:'error_trace Script_tc_errors.error_details ->
-  field_annot option ->
-  field_annot option ->
-  (field_annot option, 'error_trace) result
-
 (** @return an error {!Unexpected_annotation} in the monad the list is not empty. *)
 val error_unexpected_annot : Script.location -> 'a list -> unit tzresult
 

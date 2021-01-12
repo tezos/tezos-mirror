@@ -43,27 +43,6 @@ let field_annot_opt_to_entrypoint_strict ~loc = function
   | None -> Ok Entrypoint.default
   | Some (Field_annot a) -> Entrypoint.of_annot_strict ~loc a
 
-let merge_field_annot :
-    type error_trace.
-    legacy:bool ->
-    error_details:error_trace error_details ->
-    field_annot option ->
-    field_annot option ->
-    (field_annot option, error_trace) result =
- fun ~legacy ~error_details annot1 annot2 ->
-  match (annot1, annot2) with
-  | (None, None) | (Some _, None) | (None, Some _) -> Result.return_none
-  | (Some (Field_annot a1), Some (Field_annot a2)) ->
-      if legacy || Non_empty_string.(a1 = a2) then ok annot1
-      else
-        Error
-          (match error_details with
-          | Fast -> Inconsistent_types_fast
-          | Informative ->
-              trace_of_error
-              @@ Inconsistent_annotations
-                   ("%" ^ (a1 :> string), "%" ^ (a2 :> string)))
-
 let error_unexpected_annot loc annot =
   match annot with
   | [] -> Result.return_unit

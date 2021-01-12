@@ -874,9 +874,6 @@ let merge_types :
              let ty2 = serialize_ty_for_error ty2 in
              Inconsistent_types (Some loc, ty1, ty2))
     in
-    let merge_field_annot ~legacy tn1 tn2 =
-      of_result (merge_field_annot ~legacy ~error_details tn1 tn2)
-    in
     let merge_memo_sizes ms1 ms2 =
       of_result (merge_memo_sizes ~error_details ms1 ms2)
     in
@@ -957,8 +954,6 @@ let merge_types :
           ((Eq : (ta ty, tb ty) eq), Pair_t (left_ty, right_ty, tname))
       | (Union_t (tal, tar, tn1), Union_t (tbl, tbr, tn2)) ->
           merge_type_metadata tn1 tn2 >>$ fun tname ->
-          merge_field_annot ~legacy None None >>$ fun _left_annot ->
-          merge_field_annot ~legacy None None >>$ fun _right_annot ->
           help tal tbl >>$ fun (Eq, left_ty) ->
           help tar tbr >|$ fun (Eq, right_ty) ->
           ((Eq : (ta ty, tb ty) eq), Union_t (left_ty, right_ty, tname))
