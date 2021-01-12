@@ -41,6 +41,7 @@ let connect ?(timeout = !Lwt_utils_unix.default_net_timeout) = function
   | Unix path ->
       let addr = Lwt_unix.ADDR_UNIX path in
       let sock = Lwt_unix.socket PF_UNIX SOCK_STREAM 0 in
+      Lwt_unix.set_close_on_exec sock ;
       Lwt_unix.connect sock addr >>= fun () -> return sock
   | Tcp (host, service, opts) -> (
       let host = handle_literal_ipv6 host in
@@ -57,6 +58,7 @@ let connect ?(timeout = !Lwt_utils_unix.default_net_timeout) = function
             | {Unix.ai_family; ai_socktype; ai_protocol; ai_addr; _} :: addrs
               -> (
                 let sock = Lwt_unix.socket ai_family ai_socktype ai_protocol in
+                Lwt_unix.set_close_on_exec sock ;
                 protect
                   ~on_error:(fun e ->
                     Lwt_unix.close sock >>= fun () -> Lwt.return_error e)
@@ -87,6 +89,7 @@ let bind ?(backlog = 10) = function
   | Unix path ->
       let addr = Lwt_unix.ADDR_UNIX path in
       let sock = Lwt_unix.socket PF_UNIX SOCK_STREAM 0 in
+      Lwt_unix.set_close_on_exec sock ;
       Lwt_unix.bind sock addr
       >>= fun () ->
       Lwt_unix.listen sock backlog ;
@@ -102,6 +105,7 @@ let bind ?(backlog = 10) = function
       | addrs ->
           let do_bind {Unix.ai_family; ai_socktype; ai_protocol; ai_addr; _} =
             let sock = Lwt_unix.socket ai_family ai_socktype ai_protocol in
+            Lwt_unix.set_close_on_exec sock ;
             Lwt_unix.setsockopt sock SO_REUSEADDR true ;
             Lwt_unix.bind sock ai_addr
             >>= fun () ->

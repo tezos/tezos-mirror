@@ -256,6 +256,7 @@ let make_socket socket_path = Unix.ADDR_UNIX socket_path
 
 let create_socket ~canceler =
   let socket = Lwt_unix.socket PF_UNIX SOCK_STREAM 0o000 in
+  Lwt_unix.set_close_on_exec socket ;
   Lwt_canceler.on_cancel canceler (fun () ->
       Lwt_utils_unix.safe_close socket >>= fun _ -> Lwt.return_unit) ;
   Lwt_unix.setsockopt socket SO_REUSEADDR true ;

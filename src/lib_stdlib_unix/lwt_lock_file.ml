@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -27,9 +28,13 @@ open Error_monad
 
 let create ?(close_on_exec = true) ?(unlink_on_exit = false) fn =
   protect (fun () ->
-      Lwt_unix.openfile fn Unix.[O_CREAT; O_WRONLY; O_TRUNC] 0o644
+      let flags =
+        let open Unix in
+        let flags = [O_TRUNC; O_CREAT; O_WRONLY] in
+        if close_on_exec then O_CLOEXEC :: flags else flags
+      in
+      Lwt_unix.openfile fn flags 0o644
       >>= fun fd ->
-      if close_on_exec then Lwt_unix.set_close_on_exec fd ;
       Lwt_unix.lockf fd Unix.F_TLOCK 0
       >>= fun () ->
       if unlink_on_exit then Lwt_main.at_exit (fun () -> Lwt_unix.unlink fn) ;
@@ -41,7 +46,7 @@ let is_locked fn =
   if not @@ Sys.file_exists fn then return_false
   else
     protect (fun () ->
-        Lwt_unix.openfile fn [Unix.O_RDONLY] 0o644
+        Lwt_unix.openfile fn Unix.[O_RDONLY; O_CLOEXEC] 0o644
         >>= fun fd ->
         Lwt.finalize
           (fun () ->

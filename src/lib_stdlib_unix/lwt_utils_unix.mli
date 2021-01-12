@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -55,7 +56,8 @@ val create_dir : ?perm:int -> string -> unit Lwt.t
 
 val read_file : string -> string Lwt.t
 
-val create_file : ?perm:int -> string -> string -> int Lwt.t
+val create_file :
+  ?close_on_exec:bool -> ?perm:int -> string -> string -> int Lwt.t
 
 val with_tempdir : string -> (string -> 'a Lwt.t) -> 'a Lwt.t
 

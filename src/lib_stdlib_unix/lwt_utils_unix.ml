@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -135,8 +136,13 @@ let safe_close fd =
     (fun () -> Lwt_unix.close fd >>= fun () -> return_unit)
     (fun exc -> fail (Exn exc))
 
-let create_file ?(perm = 0o644) name content =
-  Lwt_unix.openfile name Unix.[O_TRUNC; O_CREAT; O_WRONLY] perm
+let create_file ?(close_on_exec = true) ?(perm = 0o644) name content =
+  let flags =
+    let open Unix in
+    let flags = [O_TRUNC; O_CREAT; O_WRONLY] in
+    if close_on_exec then O_CLOEXEC :: flags else flags
+  in
+  Lwt_unix.openfile name flags perm
   >>= fun fd ->
   Lwt.try_bind
     (fun () -> Lwt_unix.write_string fd content 0 (String.length content))

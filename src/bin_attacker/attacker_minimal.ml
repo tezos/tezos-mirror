@@ -149,6 +149,7 @@ let identity = P2p_identity.generate Crypto_box.default_pow_target
 (* connect to the network, run an action and then disconnect *)
 let try_action addr port action =
   let socket = Lwt_unix.socket PF_INET6 SOCK_STREAM 0 in
+  Lwt_unix.set_close_on_exec socket ;
   let uaddr = Ipaddr_unix.V6.to_inet_addr addr in
   Lwt_unix.connect socket (Lwt_unix.ADDR_INET (uaddr, port))
   >>= fun () ->

@@ -1112,7 +1112,10 @@ let () =
 
 let dump_contexts idx datas ~filename =
   let file_init () =
-    Lwt_unix.openfile filename Lwt_unix.[O_WRONLY; O_CREAT; O_TRUNC] 0o666
+    Lwt_unix.openfile
+      filename
+      Lwt_unix.[O_WRONLY; O_CREAT; O_TRUNC; O_CLOEXEC]
+      0o666
     >>= return
   in
   Lwt.catch file_init (function
@@ -1127,7 +1130,7 @@ let dump_contexts idx datas ~filename =
 
 let restore_contexts idx ~filename k_store_pruned_block pipeline_validation =
   let file_init () =
-    Lwt_unix.openfile filename Lwt_unix.[O_RDONLY] 0o600 >>= return
+    Lwt_unix.openfile filename Lwt_unix.[O_RDONLY; O_CLOEXEC] 0o600 >>= return
   in
   Lwt.catch file_init (function
       | Unix.Unix_error (e, _, _) ->

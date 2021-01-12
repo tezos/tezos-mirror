@@ -124,6 +124,7 @@ module Answer = struct
     Lwt.catch
       (fun () ->
         let socket = Lwt_unix.socket PF_INET SOCK_DGRAM 0 in
+        Lwt_unix.set_close_on_exec socket ;
         Lwt_canceler.on_cancel st.canceler (fun () ->
             Lwt_utils_unix.safe_close socket
             >>= function

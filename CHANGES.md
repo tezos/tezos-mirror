@@ -29,6 +29,8 @@ here either.
 
 ## Miscellaneous
 
+- Make sure file decriptors are opened with the `O_CLOEXEC` flag.
+
 # Version 8.1
 
 ## Node
