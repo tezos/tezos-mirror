@@ -1259,41 +1259,8 @@ type ex_parameter_ty_and_entrypoints =
     }
       -> ex_parameter_ty_and_entrypoints
 
-let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_passable_ty
+let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
     :
-    context ->
-    stack_depth:int ->
-    legacy:bool ->
-    Script.node ->
-    (ex_ty * context) tzresult =
- fun ctxt ~stack_depth ~legacy ->
-  (parse_ty [@tailcall])
-    ctxt
-    ~stack_depth
-    ~legacy
-    ~allow_lazy_storage:true
-    ~allow_operation:false
-    ~allow_contract:true
-    ~allow_ticket:true
-
-and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_any_ty
-    :
-    context ->
-    stack_depth:int ->
-    legacy:bool ->
-    Script.node ->
-    (ex_ty * context) tzresult =
- fun ctxt ~stack_depth ~legacy ->
-  (parse_ty [@tailcall])
-    ctxt
-    ~stack_depth
-    ~legacy
-    ~allow_lazy_storage:true
-    ~allow_operation:true
-    ~allow_contract:true
-    ~allow_ticket:true
-
-and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_ty :
     context ->
     stack_depth:int ->
     legacy:bool ->
@@ -1554,6 +1521,40 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_ty :
                T_bls12_381_fr;
                T_ticket;
              ]
+
+and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_passable_ty
+    :
+    context ->
+    stack_depth:int ->
+    legacy:bool ->
+    Script.node ->
+    (ex_ty * context) tzresult =
+ fun ctxt ~stack_depth ~legacy ->
+  (parse_ty [@tailcall])
+    ctxt
+    ~stack_depth
+    ~legacy
+    ~allow_lazy_storage:true
+    ~allow_operation:false
+    ~allow_contract:true
+    ~allow_ticket:true
+
+and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_any_ty
+    :
+    context ->
+    stack_depth:int ->
+    legacy:bool ->
+    Script.node ->
+    (ex_ty * context) tzresult =
+ fun ctxt ~stack_depth ~legacy ->
+  (parse_ty [@tailcall])
+    ctxt
+    ~stack_depth
+    ~legacy
+    ~allow_lazy_storage:true
+    ~allow_operation:true
+    ~allow_contract:true
+    ~allow_ticket:true
 
 and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_big_map_ty
     ctxt ~stack_depth ~legacy big_map_loc args map_annot =
