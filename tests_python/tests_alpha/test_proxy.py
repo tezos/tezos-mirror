@@ -7,14 +7,13 @@ import re
 import pytest
 from client.client import Client
 from client.client_output import extract_rpc_answer
-from tools.constants import ALPHA, ALPHA_DAEMON, CARTHAGE
 from . import protocol
 
 
 # Protocol-dependent stuff is these three constants:
-_OTHER_PROTO = CARTHAGE  # Needs to be different from _PROTO
-_PROTO = ALPHA
-_PROTO_LOG_KEY = ALPHA_DAEMON
+_OTHER_PROTO = protocol.PREV_HASH
+_PROTO = protocol.HASH
+_PROTO_LOG_KEY = protocol.DAEMON
 
 _PROXY_RPC_LOG = {"TEZOS_LOG": f"{_PROTO_LOG_KEY}.proxy_rpc->debug"}
 _BLOCK_ID = "head"
