@@ -119,8 +119,6 @@ type error +=
       Script.location * Script.expr * Script.expr
       -> error
 
-type error += Inconsistent_field_annotations of string * string
-
 type error += Unexpected_annotation of Script.location
 
 type error += Ungrouped_annotations of Script.location
