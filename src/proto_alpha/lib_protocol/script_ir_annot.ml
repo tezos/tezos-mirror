@@ -39,10 +39,6 @@ module FOR_TESTS = struct
     Field_annot (Non_empty_string.of_string_exn s)
 end
 
-let field_annot_opt_to_entrypoint_strict ~loc = function
-  | None -> Ok Entrypoint.default
-  | Some (Field_annot a) -> Entrypoint.of_annot_strict ~loc a
-
 let error_unexpected_annot loc annot =
   match annot with
   | [] -> Result.return_unit
@@ -264,6 +260,11 @@ let parse_entrypoint_annot :
   error_unexpected_annot loc types >>? fun () ->
   get_one_annot loc fields >>? fun f ->
   get_one_annot loc vars >|? fun (_v : var_annot option) -> f
+
+let parse_entrypoint_annot_strict loc annot =
+  parse_entrypoint_annot loc annot >>? function
+  | None -> Ok Entrypoint.default
+  | Some (Field_annot a) -> Entrypoint.of_annot_strict ~loc a
 
 let check_var_type_annot : Script.location -> string list -> unit tzresult =
  fun loc annot ->

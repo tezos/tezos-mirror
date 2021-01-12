@@ -4468,9 +4468,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       >>?= fun (Ex_ty t, ctxt) ->
       contract_t loc t >>?= fun contract_ty ->
       option_t loc contract_ty >>?= fun res_ty ->
-      parse_entrypoint_annot loc annot >>?= fun entrypoint ->
-      Script_ir_annot.field_annot_opt_to_entrypoint_strict ~loc entrypoint
-      >>?= fun entrypoint ->
+      parse_entrypoint_annot_strict loc annot >>?= fun entrypoint ->
       let instr =
         {apply = (fun kinfo k -> IContract (kinfo, t, entrypoint, k))}
       in

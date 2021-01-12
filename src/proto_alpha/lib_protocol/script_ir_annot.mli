@@ -32,13 +32,6 @@ module FOR_TESTS : sig
   val unsafe_field_annot_of_string : string -> field_annot
 end
 
-(** Converts a field annot option to an entrypoint.
-    An error is returned if the field annot is too long or is "default".
-    [None] is converted to [Some default].
-*)
-val field_annot_opt_to_entrypoint_strict :
-  loc:Script.location -> field_annot option -> Entrypoint.t tzresult
-
 (** @return an error {!Unexpected_annotation} in the monad the list is not empty. *)
 val error_unexpected_annot : Script.location -> 'a list -> unit tzresult
 
@@ -87,5 +80,11 @@ val check_unpair_annot : Script.location -> string list -> unit tzresult
 
 val parse_entrypoint_annot :
   Script.location -> string list -> field_annot option tzresult
+
+(** Parses a field annotation and converts it to an entrypoint.
+    An error is returned if the annotation is too long or is "default".
+    An empty annotation is converted to "default". *)
+val parse_entrypoint_annot_strict :
+  Script.location -> string list -> Entrypoint.t tzresult
 
 val check_var_type_annot : Script.location -> string list -> unit tzresult
