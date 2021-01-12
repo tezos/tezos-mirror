@@ -540,10 +540,8 @@ let create_contract (ctxt, sc) gas storage_type param_type code views root_name
     delegate credit init =
   let ctxt = update_context gas ctxt in
   let loc = Micheline.dummy_location in
-  unparse_ty ~loc ctxt param_type >>?= fun (unparsed_param_type, ctxt) ->
-  let unparsed_param_type =
-    Script_ir_translator.add_field_annot root_name unparsed_param_type
-  in
+  unparse_parameter_ty ~loc ctxt param_type ~root_name
+  >>?= fun (unparsed_param_type, ctxt) ->
   unparse_ty ~loc ctxt storage_type >>?= fun (unparsed_storage_type, ctxt) ->
   let open Micheline in
   let view name {input_ty; output_ty; view_code} views =

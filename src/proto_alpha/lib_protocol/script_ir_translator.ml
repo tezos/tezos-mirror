@@ -305,6 +305,10 @@ let unparse_comparable_ty ~loc ctxt comp_ty =
   Gas.consume ctxt (Unparse_costs.unparse_comparable_type comp_ty)
   >|? fun ctxt -> (unparse_comparable_ty_uncarbonated ~loc comp_ty, ctxt)
 
+let unparse_parameter_ty ~loc ctxt ~root_name ty =
+  unparse_ty ~loc ctxt ty >|? fun (unparsed, ctxt) ->
+  (add_field_annot root_name unparsed, ctxt)
+
 let[@coq_struct "function_parameter"] rec strip_var_annots = function
   | (Int _ | String _ | Bytes _) as atom -> atom
   | Seq (loc, args) -> Seq (loc, List.map strip_var_annots args)
@@ -5760,9 +5764,9 @@ let unparse_script ctxt mode
   >>=? fun (storage, ctxt) ->
   Lwt.return
     (let loc = Micheline.dummy_location in
-     unparse_ty ~loc ctxt arg_type >>? fun (arg_type, ctxt) ->
+     unparse_parameter_ty ~loc ctxt arg_type ~root_name
+     >>? fun (arg_type, ctxt) ->
      unparse_ty ~loc ctxt storage_type >>? fun (storage_type, ctxt) ->
-     let arg_type = add_field_annot root_name arg_type in
      let open Micheline in
      let view name {input_ty; output_ty; view_code} views =
        Prim

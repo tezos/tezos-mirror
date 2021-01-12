@@ -341,6 +341,13 @@ val add_field_annot :
   ('loc, 'prim) Micheline.node ->
   ('loc, 'prim) Micheline.node
 
+val unparse_parameter_ty :
+  loc:'loc ->
+  context ->
+  root_name:Script_ir_annot.field_annot option ->
+  'a Script_typed_ir.ty ->
+  ('loc Script.michelson_node * context) tzresult
+
 (** High-level function to typecheck a Michelson script. This function is not
     used for validating operations but only for the [typecheck_code] RPC.
 
