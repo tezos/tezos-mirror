@@ -741,6 +741,16 @@ module List_cmd = struct
   let handler_bench_tags_all show_tags tags () =
     base_handler_bench (Registration.all_benchmarks_with_all_of tags) show_tags
 
+  let params_bench_tags_exact =
+    Clic.(
+      prefixes ["list"; "benchmarks"; "with"; "tags"; "exactly"]
+      @@ seq_of_param tag_param)
+
+  let handler_bench_tags_exact show_tags tags () =
+    base_handler_bench
+      (Registration.all_benchmarks_with_exactly tags)
+      show_tags
+
   let group = {Clic.name = "list"; title = "Commands for displaying lists"}
 
   let command_all_bench =
@@ -775,11 +785,20 @@ module List_cmd = struct
       params_bench_tags_all
       handler_bench_tags_all
 
+  let command_bench_tags_exact =
+    Clic.command
+      ~group
+      ~desc:"List all implemented benchmarks containing exactly the given tags"
+      option_show_tags
+      params_bench_tags_exact
+      handler_bench_tags_exact
+
   let commands =
     [ command_all_bench;
       command_all_tags;
       command_bench_tags_any;
-      command_bench_tags_all ]
+      command_bench_tags_all;
+      command_bench_tags_exact ]
 end
 
 let all_commands =
