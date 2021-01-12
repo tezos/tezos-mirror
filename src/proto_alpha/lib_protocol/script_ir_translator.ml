@@ -973,9 +973,6 @@ let rec stack_eq :
       ((Eq : ((ta, ts) stack_ty, (tb, tu) stack_ty) eq), ctxt)
   | (_, _) -> error Bad_stack_length
 
-let merge_stacks loc ctxt lvl stack1 stack2 =
-  stack_eq loc ctxt lvl stack1 stack2 >|? fun (eq, ctxt) -> (eq, stack1, ctxt)
-
 (* ---- Type checker results -------------------------------------------------*)
 
 type ('a, 's) judgement =
@@ -3108,7 +3105,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           in
           record_trace_eval
             invalid_map_body
-            ( merge_stacks loc ctxt 1 aft_rest rest >>? fun (Eq, rest, ctxt) ->
+            ( stack_eq loc ctxt 1 aft_rest rest >>? fun (Eq, ctxt) ->
               option_t loc ret >>? fun opt_ty ->
               let final_stack = Item_t (opt_ty, rest) in
               let hinfo = {iloc = loc; kstack_ty = Item_t (ret, aft_rest)} in
@@ -3403,8 +3400,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           in
           record_trace_eval
             invalid_map_body
-            ( merge_stacks loc ctxt 1 rest starting_rest
-            >>? fun (Eq, rest, ctxt) ->
+            ( stack_eq loc ctxt 1 rest starting_rest >>? fun (Eq, ctxt) ->
               let binfo = kinfo_of_descr kibody in
               let hinfo = {iloc = loc; kstack_ty = Item_t (ret, rest)} in
               let ibody = kibody.instr.apply binfo (IHalt hinfo) in
@@ -3450,8 +3446,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           in
           record_trace_eval
             invalid_iter_body
-            ( merge_stacks loc ctxt 1 aft rest
-            >>? fun (Eq, rest, ctxt) : ((a, s) judgement * context) tzresult ->
+            ( stack_eq loc ctxt 1 aft rest
+            >>? fun (Eq, ctxt) : ((a, s) judgement * context) tzresult ->
               typed_no_lwt ctxt loc (mk_list_iter ibody) rest )
       | Failed {descr} -> typed_no_lwt ctxt loc (mk_list_iter (descr rest)) rest
       )
@@ -3495,8 +3491,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           in
           record_trace_eval
             invalid_iter_body
-            ( merge_stacks loc ctxt 1 aft rest
-            >>? fun (Eq, rest, ctxt) : ((a, s) judgement * context) tzresult ->
+            ( stack_eq loc ctxt 1 aft rest
+            >>? fun (Eq, ctxt) : ((a, s) judgement * context) tzresult ->
               typed_no_lwt ctxt loc (mk_iset_iter ibody) rest )
       | Failed {descr} -> typed_no_lwt ctxt loc (mk_iset_iter (descr rest)) rest
       )
@@ -3552,8 +3548,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           in
           record_trace_eval
             invalid_map_body
-            ( merge_stacks loc ctxt 1 rest starting_rest
-            >>? fun (Eq, rest, ctxt) ->
+            ( stack_eq loc ctxt 1 rest starting_rest >>? fun (Eq, ctxt) ->
               let instr =
                 {
                   apply =
@@ -3608,8 +3603,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           in
           record_trace_eval
             invalid_iter_body
-            ( merge_stacks loc ctxt 1 aft rest
-            >>? fun (Eq, rest, ctxt) : ((a, s) judgement * context) tzresult ->
+            ( stack_eq loc ctxt 1 aft rest
+            >>? fun (Eq, ctxt) : ((a, s) judgement * context) tzresult ->
               typed_no_lwt ctxt loc (make_instr ibody) rest )
       | Failed {descr} -> typed_no_lwt ctxt loc (make_instr (descr rest)) rest)
   | (Prim (loc, I_MEM, [], annot), Item_t (vk, Item_t (Map_t (ck, _, _), rest)))
@@ -3811,8 +3806,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           in
           record_trace_eval
             unmatched_branches
-            ( merge_stacks loc ctxt 1 ibody.aft stack
-            >>? fun (Eq, _stack, ctxt) ->
+            ( stack_eq loc ctxt 1 ibody.aft stack >>? fun (Eq, ctxt) ->
               let instr =
                 {
                   apply =
@@ -3860,8 +3854,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           in
           record_trace_eval
             unmatched_branches
-            ( merge_stacks loc ctxt 1 ibody.aft stack
-            >>? fun (Eq, _stack, ctxt) ->
+            ( stack_eq loc ctxt 1 ibody.aft stack >>? fun (Eq, ctxt) ->
               let instr =
                 {
                   apply =
