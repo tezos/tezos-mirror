@@ -750,9 +750,6 @@ let rec merge_comparable_types :
     let merge_type_metadata meta_a meta_b =
       of_result @@ merge_type_metadata ~error_details meta_a meta_b
     in
-    let merge_field_annot ~legacy annot_a annot_b =
-      of_result @@ merge_field_annot ~legacy ~error_details annot_a annot_b
-    in
     let return f eq annot_a annot_b :
         ( (ta comparable_ty, tb comparable_ty) eq * ta comparable_ty,
           error_trace )
@@ -791,8 +788,6 @@ let rec merge_comparable_types :
     | (Pair_key (left_a, right_a, annot_a), Pair_key (left_b, right_b, annot_b))
       ->
         merge_type_metadata annot_a annot_b >>$ fun annot ->
-        merge_field_annot ~legacy None None >>$ fun _annot_left ->
-        merge_field_annot ~legacy None None >>$ fun _annot_right ->
         merge_comparable_types ~legacy ~error_details left_a left_b
         >>$ fun (Eq, left) ->
         merge_comparable_types ~legacy ~error_details right_a right_b
@@ -802,8 +797,6 @@ let rec merge_comparable_types :
     | ( Union_key (left_a, right_a, annot_a),
         Union_key (left_b, right_b, annot_b) ) ->
         merge_type_metadata annot_a annot_b >>$ fun annot ->
-        merge_field_annot ~legacy None None >>$ fun _annot_left ->
-        merge_field_annot ~legacy None None >>$ fun _annot_right ->
         merge_comparable_types ~legacy ~error_details left_a left_b
         >>$ fun (Eq, left) ->
         merge_comparable_types ~legacy ~error_details right_a right_b
@@ -952,8 +945,6 @@ let merge_types :
           ((Eq : (ta ty, tb ty) eq), Ticket_t (e, tname))
       | (Pair_t (tal, tar, tn1), Pair_t (tbl, tbr, tn2)) ->
           merge_type_metadata tn1 tn2 >>$ fun tname ->
-          merge_field_annot ~legacy None None >>$ fun _l_field ->
-          merge_field_annot ~legacy None None >>$ fun _r_field ->
           help tal tbl >>$ fun (Eq, left_ty) ->
           help tar tbr >|$ fun (Eq, right_ty) ->
           ((Eq : (ta ty, tb ty) eq), Pair_t (left_ty, right_ty, tname))
