@@ -1276,23 +1276,6 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_pa
     ~allow_contract:true
     ~allow_ticket:true
 
-and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_normal_storage_ty
-    :
-    context ->
-    stack_depth:int ->
-    legacy:bool ->
-    Script.node ->
-    (ex_ty * context) tzresult =
- fun ctxt ~stack_depth ~legacy ->
-  (parse_ty [@tailcall])
-    ctxt
-    ~stack_depth
-    ~legacy
-    ~allow_lazy_storage:true
-    ~allow_operation:false
-    ~allow_contract:legacy
-    ~allow_ticket:true
-
 and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_any_ty
     :
     context ->
@@ -1636,6 +1619,17 @@ let parse_view_output_ty ctxt ~stack_depth ~legacy node =
     ~allow_operation:false
     ~allow_contract:true
     ~allow_ticket:false
+    node
+
+let parse_normal_storage_ty ctxt ~stack_depth ~legacy node =
+  (parse_ty [@tailcall])
+    ctxt
+    ~stack_depth
+    ~legacy
+    ~allow_lazy_storage:true
+    ~allow_operation:false
+    ~allow_contract:legacy
+    ~allow_ticket:true
     node
 
 let parse_storage_ty :
