@@ -1259,27 +1259,7 @@ type ex_parameter_ty_and_entrypoints =
     }
       -> ex_parameter_ty_and_entrypoints
 
-let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_packable_ty
-    :
-    context ->
-    stack_depth:int ->
-    legacy:bool ->
-    Script.node ->
-    (ex_ty * context) tzresult =
- fun ctxt ~stack_depth ~legacy ->
-  (parse_ty [@tailcall])
-    ctxt
-    ~stack_depth
-    ~legacy
-    ~allow_lazy_storage:false
-    ~allow_operation:false
-    ~allow_contract:
-      legacy
-      (* type contract is forbidden in UNPACK because of
-         https://gitlab.com/tezos/tezos/-/issues/301 *)
-    ~allow_ticket:false
-
-and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_passable_ty
+let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_passable_ty
     :
     context ->
     stack_depth:int ->
@@ -1653,6 +1633,20 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_big_ma
     ~allow_contract:legacy
     ~allow_ticket:true
     value_ty
+
+let parse_packable_ty ctxt ~stack_depth ~legacy node =
+  (parse_ty [@tailcall])
+    ctxt
+    ~stack_depth
+    ~legacy
+    ~allow_lazy_storage:false
+    ~allow_operation:false
+    ~allow_contract:
+      legacy
+      (* type contract is forbidden in UNPACK because of
+         https://gitlab.com/tezos/tezos/-/issues/301 *)
+    ~allow_ticket:false
+    node
 
 let parse_storage_ty :
     context ->
