@@ -759,29 +759,17 @@ let default_merge_type_error ty1 ty2 =
   let ty2 = serialize_ty_for_error ty2 in
   Inconsistent_types (None, ty1, ty2)
 
-(* Takes two comparable types and simultaneously merge their annotations and
-   check that they represent the same type.
+(* Check that two comparable types are equal.
 
-   The result contains:
-   - an equality witness between the types of the two inputs
-   - the merged type
-   - an updated context (for gas consumption)
-
-   The tzresult monad is used at two levels: the inner tzresult
-   is used for tracking merge errors (types of different shapes
-   or annotation mismatches), the outer tzresult is used only
-   for gas consumption. Separating these two error cases like
-   this allows to recover from a type comparison error without
-   reverting the gas consumption.
+   The result is an equality witness between the types of the two inputs within
+   the gas monad (for gas consumption).
  *)
-let rec merge_comparable_types :
+let rec comparable_ty_eq :
     type ta tb error_trace.
     error_details:error_trace error_details ->
     ta comparable_ty ->
     tb comparable_ty ->
-    ( (ta comparable_ty, tb comparable_ty) eq * ta comparable_ty,
-      error_trace )
-    Gas_monad.t =
+    ((ta comparable_ty, tb comparable_ty) eq, error_trace) Gas_monad.t =
   let open Gas_monad in
   fun ~error_details ta tb ->
     let open Gas_monad.Syntax in
@@ -791,46 +779,37 @@ let rec merge_comparable_types :
     in
     match (ta, tb) with
     | (Unit_key, Unit_key) ->
-        return
-          ((Eq, Unit_key)
-            : (ta comparable_ty, tb comparable_ty) eq * ta comparable_ty)
-    | (Never_key, Never_key) -> return (Eq, Never_key)
-    | (Int_key, Int_key) -> return (Eq, Int_key)
-    | (Nat_key, Nat_key) -> return (Eq, Nat_key)
-    | (Signature_key, Signature_key) -> return (Eq, Signature_key)
-    | (String_key, String_key) -> return (Eq, String_key)
-    | (Bytes_key, Bytes_key) -> return (Eq, Bytes_key)
-    | (Mutez_key, Mutez_key) -> return (Eq, Mutez_key)
-    | (Bool_key, Bool_key) -> return (Eq, Bool_key)
-    | (Key_hash_key, Key_hash_key) -> return (Eq, Key_hash_key)
-    | (Key_key, Key_key) -> return (Eq, Key_key)
-    | (Timestamp_key, Timestamp_key) -> return (Eq, Timestamp_key)
-    | (Chain_id_key, Chain_id_key) -> return (Eq, Chain_id_key)
-    | (Address_key, Address_key) -> return (Eq, Address_key)
-    | (Tx_rollup_l2_address_key, Tx_rollup_l2_address_key) ->
-        return (Eq, Tx_rollup_l2_address_key)
+        return (Eq : (ta comparable_ty, tb comparable_ty) eq)
+    | (Never_key, Never_key) -> return Eq
+    | (Int_key, Int_key) -> return Eq
+    | (Nat_key, Nat_key) -> return Eq
+    | (Signature_key, Signature_key) -> return Eq
+    | (String_key, String_key) -> return Eq
+    | (Bytes_key, Bytes_key) -> return Eq
+    | (Mutez_key, Mutez_key) -> return Eq
+    | (Bool_key, Bool_key) -> return Eq
+    | (Key_hash_key, Key_hash_key) -> return Eq
+    | (Key_key, Key_key) -> return Eq
+    | (Timestamp_key, Timestamp_key) -> return Eq
+    | (Chain_id_key, Chain_id_key) -> return Eq
+    | (Address_key, Address_key) -> return Eq
+    | (Tx_rollup_l2_address_key, Tx_rollup_l2_address_key) -> return Eq
     | (Pair_key (left_a, right_a, meta_a), Pair_key (left_b, right_b, meta_b))
       ->
         let* () = type_metadata_eq meta_a meta_b in
-        let* (Eq, left) = merge_comparable_types ~error_details left_a left_b in
-        let+ (Eq, right) =
-          merge_comparable_types ~error_details right_a right_b
-        in
-        ( (Eq : (ta comparable_ty, tb comparable_ty) eq),
-          Pair_key (left, right, meta_a) )
+        let* Eq = comparable_ty_eq ~error_details left_a left_b in
+        let+ Eq = comparable_ty_eq ~error_details right_a right_b in
+        (Eq : (ta comparable_ty, tb comparable_ty) eq)
     | (Union_key (left_a, right_a, meta_a), Union_key (left_b, right_b, meta_b))
       ->
         let* () = type_metadata_eq meta_a meta_b in
-        let* (Eq, left) = merge_comparable_types ~error_details left_a left_b in
-        let+ (Eq, right) =
-          merge_comparable_types ~error_details right_a right_b
-        in
-        ( (Eq : (ta comparable_ty, tb comparable_ty) eq),
-          Union_key (left, right, meta_a) )
+        let* Eq = comparable_ty_eq ~error_details left_a left_b in
+        let+ Eq = comparable_ty_eq ~error_details right_a right_b in
+        (Eq : (ta comparable_ty, tb comparable_ty) eq)
     | (Option_key (ta, meta_a), Option_key (tb, meta_b)) ->
         let* () = type_metadata_eq meta_a meta_b in
-        let+ (Eq, t) = merge_comparable_types ~error_details ta tb in
-        ((Eq : (ta comparable_ty, tb comparable_ty) eq), Option_key (t, meta_a))
+        let+ Eq = comparable_ty_eq ~error_details ta tb in
+        (Eq : (ta comparable_ty, tb comparable_ty) eq)
     | (_, _) ->
         of_result
         @@ Error
@@ -856,7 +835,13 @@ let merge_memo_sizes :
       | Fast -> Inconsistent_types_fast
       | Informative -> trace_of_error @@ Inconsistent_memo_sizes (ms1, ms2))
 
-(* Same as merge_comparable_types but for any types *)
+(*  Check that two types are equal.
+
+    The result contains:
+    - an equality witness between the types of the two inputs,
+    - the merged type,
+    - an updated context (for gas consumption).
+*)
 let merge_types :
     type a b error_trace.
     error_details:error_trace error_details ->
@@ -912,21 +897,21 @@ let merge_types :
     | (Map_t (tal, tar, meta1), Map_t (tbl, tbr, meta2)) ->
         let* () = type_metadata_eq meta1 meta2 in
         let* (Eq, value) = help tar tbr in
-        let+ (Eq, tk) = merge_comparable_types ~error_details tal tbl in
-        ((Eq : (ta ty, tb ty) eq), Map_t (tk, value, meta1))
+        let+ Eq = comparable_ty_eq ~error_details tal tbl in
+        ((Eq : (ta ty, tb ty) eq), Map_t (tal, value, meta1))
     | (Big_map_t (tal, tar, meta1), Big_map_t (tbl, tbr, meta2)) ->
         let* () = type_metadata_eq meta1 meta2 in
         let* (Eq, value) = help tar tbr in
-        let+ (Eq, tk) = merge_comparable_types ~error_details tal tbl in
-        ((Eq : (ta ty, tb ty) eq), Big_map_t (tk, value, meta1))
+        let+ Eq = comparable_ty_eq ~error_details tal tbl in
+        ((Eq : (ta ty, tb ty) eq), Big_map_t (tal, value, meta1))
     | (Set_t (ea, meta1), Set_t (eb, meta2)) ->
         let* () = type_metadata_eq meta1 meta2 in
-        let+ (Eq, e) = merge_comparable_types ~error_details ea eb in
-        ((Eq : (ta ty, tb ty) eq), Set_t (e, meta1))
+        let+ Eq = comparable_ty_eq ~error_details ea eb in
+        ((Eq : (ta ty, tb ty) eq), Set_t (ea, meta1))
     | (Ticket_t (ea, meta1), Ticket_t (eb, meta2)) ->
         let* () = type_metadata_eq meta1 meta2 in
-        let+ (Eq, e) = merge_comparable_types ~error_details ea eb in
-        ((Eq : (ta ty, tb ty) eq), Ticket_t (e, meta1))
+        let+ Eq = comparable_ty_eq ~error_details ea eb in
+        ((Eq : (ta ty, tb ty) eq), Ticket_t (ea, meta1))
     | (Pair_t (tal, tar, meta1), Pair_t (tbl, tbr, meta2)) ->
         let* () = type_metadata_eq meta1 meta2 in
         let* (Eq, left_ty) = help tal tbl in
@@ -988,7 +973,7 @@ let ty_eq :
   >>? fun (eq_ty, ctxt) ->
   eq_ty >|? fun (eq, _ty) -> (eq, ctxt)
 
-(* Same as merge_comparable_types and merge_types but for stacks.
+(* Same as merge_types but for stacks.
    A single error monad is used here because there is no need to
    recover from stack merging errors.  *)
 let merge_stacks :
@@ -2703,9 +2688,9 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
                     >>? fun (Ex_ty btv, ctxt) ->
                     Gas_monad.run
                       ctxt
-                      (merge_comparable_types ~error_details:Informative tk btk)
-                    >>? fun (eq_ty, ctxt) ->
-                    eq_ty >>? fun (Eq, _ty) ->
+                      (comparable_ty_eq ~error_details:Informative tk btk)
+                    >>? fun (eq, ctxt) ->
+                    eq >>? fun Eq ->
                     ty_eq ctxt loc tv btv >>? fun (Eq, ctxt) ->
                     ok (Some id, ctxt) )
           else traced_fail (Unexpected_forged_value loc))
