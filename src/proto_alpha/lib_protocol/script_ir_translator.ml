@@ -744,7 +744,6 @@ let default_merge_type_error ty1 ty2 =
  *)
 let rec merge_comparable_types :
     type ta tb error_trace.
-    legacy:bool ->
     error_details:error_trace error_details ->
     ta comparable_ty ->
     tb comparable_ty ->
@@ -752,7 +751,7 @@ let rec merge_comparable_types :
       error_trace )
     Gas_monad.t =
   let open Gas_monad in
-  fun ~legacy ~error_details ta tb ->
+  fun ~error_details ta tb ->
     consume_gas Typecheck_costs.merge_cycle >>$ fun () ->
     let merge_type_metadata meta_a meta_b =
       of_result @@ merge_type_metadata ~error_details meta_a meta_b
@@ -795,24 +794,24 @@ let rec merge_comparable_types :
     | (Pair_key (left_a, right_a, annot_a), Pair_key (left_b, right_b, annot_b))
       ->
         merge_type_metadata annot_a annot_b >>$ fun annot ->
-        merge_comparable_types ~legacy ~error_details left_a left_b
+        merge_comparable_types ~error_details left_a left_b
         >>$ fun (Eq, left) ->
-        merge_comparable_types ~legacy ~error_details right_a right_b
+        merge_comparable_types ~error_details right_a right_b
         >|$ fun (Eq, right) ->
         ( (Eq : (ta comparable_ty, tb comparable_ty) eq),
           Pair_key (left, right, annot) )
     | ( Union_key (left_a, right_a, annot_a),
         Union_key (left_b, right_b, annot_b) ) ->
         merge_type_metadata annot_a annot_b >>$ fun annot ->
-        merge_comparable_types ~legacy ~error_details left_a left_b
+        merge_comparable_types ~error_details left_a left_b
         >>$ fun (Eq, left) ->
-        merge_comparable_types ~legacy ~error_details right_a right_b
+        merge_comparable_types ~error_details right_a right_b
         >|$ fun (Eq, right) ->
         ( (Eq : (ta comparable_ty, tb comparable_ty) eq),
           Union_key (left, right, annot) )
     | (Option_key (ta, annot_a), Option_key (tb, annot_b)) ->
         merge_type_metadata annot_a annot_b >>$ fun annot ->
-        merge_comparable_types ~legacy ~error_details ta tb >|$ fun (Eq, t) ->
+        merge_comparable_types ~error_details ta tb >|$ fun (Eq, t) ->
         ((Eq : (ta comparable_ty, tb comparable_ty) eq), Option_key (t, annot))
     | (_, _) ->
         of_result
@@ -836,9 +835,7 @@ let comparable_ty_eq :
     tb comparable_ty ->
     ((ta comparable_ty, tb comparable_ty) eq * context) tzresult =
  fun ctxt ta tb ->
-  Gas_monad.run
-    ctxt
-    (merge_comparable_types ~legacy:true ~error_details:Informative ta tb)
+  Gas_monad.run ctxt (merge_comparable_types ~error_details:Informative ta tb)
   >>? fun (eq_ty, ctxt) ->
   eq_ty >|? fun (eq, _ty) -> (eq, ctxt)
 
@@ -859,14 +856,13 @@ let merge_memo_sizes :
 (* Same as merge_comparable_types but for any types *)
 let merge_types :
     type a b error_trace.
-    legacy:bool ->
     error_details:error_trace error_details ->
     Script.location ->
     a ty ->
     b ty ->
     ((a ty, b ty) eq * a ty, error_trace) Gas_monad.t =
   let open Gas_monad in
-  fun ~legacy ~error_details loc ty1 ty2 ->
+  fun ~error_details loc ty1 ty2 ->
     let merge_type_metadata tn1 tn2 =
       of_result @@ merge_type_metadata ~error_details tn1 tn2
       |> Gas_monad.record_trace_eval ~error_details (fun () ->
@@ -930,22 +926,20 @@ let merge_types :
       | (Map_t (tal, tar, tn1), Map_t (tbl, tbr, tn2)) ->
           merge_type_metadata tn1 tn2 >>$ fun tname ->
           help tar tbr >>$ fun (Eq, value) ->
-          merge_comparable_types ~legacy ~error_details tal tbl
-          >|$ fun (Eq, tk) ->
+          merge_comparable_types ~error_details tal tbl >|$ fun (Eq, tk) ->
           ((Eq : (ta ty, tb ty) eq), Map_t (tk, value, tname))
       | (Big_map_t (tal, tar, tn1), Big_map_t (tbl, tbr, tn2)) ->
           merge_type_metadata tn1 tn2 >>$ fun tname ->
           help tar tbr >>$ fun (Eq, value) ->
-          merge_comparable_types ~legacy ~error_details tal tbl
-          >|$ fun (Eq, tk) ->
+          merge_comparable_types ~error_details tal tbl >|$ fun (Eq, tk) ->
           ((Eq : (ta ty, tb ty) eq), Big_map_t (tk, value, tname))
       | (Set_t (ea, tn1), Set_t (eb, tn2)) ->
           merge_type_metadata tn1 tn2 >>$ fun tname ->
-          merge_comparable_types ~legacy ~error_details ea eb >|$ fun (Eq, e) ->
+          merge_comparable_types ~error_details ea eb >|$ fun (Eq, e) ->
           ((Eq : (ta ty, tb ty) eq), Set_t (e, tname))
       | (Ticket_t (ea, tn1), Ticket_t (eb, tn2)) ->
           merge_type_metadata tn1 tn2 >>$ fun tname ->
-          merge_comparable_types ~legacy ~error_details ea eb >|$ fun (Eq, e) ->
+          merge_comparable_types ~error_details ea eb >|$ fun (Eq, e) ->
           ((Eq : (ta ty, tb ty) eq), Ticket_t (e, tname))
       | (Pair_t (tal, tar, tn1), Pair_t (tbl, tbr, tn2)) ->
           merge_type_metadata tn1 tn2 >>$ fun tname ->
@@ -1003,14 +997,13 @@ let merge_types :
 *)
 let ty_eq :
     type ta tb.
-    legacy:bool ->
     context ->
     Script.location ->
     ta ty ->
     tb ty ->
     ((ta ty, tb ty) eq * context) tzresult =
- fun ~legacy ctxt loc ta tb ->
-  Gas_monad.run ctxt @@ merge_types ~error_details:Informative ~legacy loc ta tb
+ fun ctxt loc ta tb ->
+  Gas_monad.run ctxt @@ merge_types ~error_details:Informative loc ta tb
   >>? fun (eq_ty, ctxt) ->
   eq_ty >|? fun (eq, _ty) -> (eq, ctxt)
 
@@ -1019,7 +1012,6 @@ let ty_eq :
    recover from stack merging errors.  *)
 let merge_stacks :
     type ta tb ts tu.
-    legacy:bool ->
     Script.location ->
     context ->
     int ->
@@ -1027,7 +1019,7 @@ let merge_stacks :
     (tb, tu) stack_ty ->
     (((ta, ts) stack_ty, (tb, tu) stack_ty) eq * (ta, ts) stack_ty * context)
     tzresult =
- fun ~legacy loc ->
+ fun loc ->
   let rec help :
       type ta tb ts tu.
       context ->
@@ -1040,8 +1032,7 @@ let merge_stacks :
     match (stack1, stack2) with
     | (Bot_t, Bot_t) -> ok (Eq, Bot_t, ctxt)
     | (Item_t (ty1, rest1), Item_t (ty2, rest2)) ->
-        Gas_monad.run ctxt
-        @@ merge_types ~error_details:Informative ~legacy loc ty1 ty2
+        Gas_monad.run ctxt @@ merge_types ~error_details:Informative loc ty1 ty2
         |> record_trace (Bad_stack_item lvl)
         >>? fun (eq_ty, ctxt) ->
         eq_ty >>? fun (Eq, ty) ->
@@ -1073,14 +1064,13 @@ type ('a, 's, 'b, 'u, 'c, 'v) branch = {
 
 let merge_branches :
     type a s b u c v.
-    legacy:bool ->
     context ->
     Script.location ->
     (a, s) judgement ->
     (b, u) judgement ->
     (a, s, b, u, c, v) branch ->
     ((c, v) judgement * context) tzresult =
- fun ~legacy ctxt loc btr bfr {branch} ->
+ fun ctxt loc btr bfr {branch} ->
   match (btr, bfr) with
   | (Typed ({aft = aftbt; _} as dbt), Typed ({aft = aftbf; _} as dbf)) ->
       let unmatched_branches () =
@@ -1090,8 +1080,7 @@ let merge_branches :
       in
       record_trace_eval
         unmatched_branches
-        ( merge_stacks ~legacy loc ctxt 1 aftbt aftbf
-        >|? fun (Eq, merged_stack, ctxt) ->
+        ( merge_stacks loc ctxt 1 aftbt aftbf >|? fun (Eq, merged_stack, ctxt) ->
           ( Typed
               (branch
                  {dbt with aft = merged_stack}
@@ -1895,7 +1884,7 @@ let find_entrypoint (type full error_trace)
              | Fast -> (Inconsistent_types_fast : error_trace)
              | Informative -> trace_of_error @@ No_such_entrypoint entrypoint)
 
-let find_entrypoint_for_type (type full exp error_trace) ~legacy ~error_details
+let find_entrypoint_for_type (type full exp error_trace) ~error_details
     ~(full : full ty) ~(expected : exp ty) entrypoints entrypoint loc :
     (Entrypoint.t * exp ty, error_trace) Gas_monad.t =
   let open Gas_monad in
@@ -1904,13 +1893,13 @@ let find_entrypoint_for_type (type full exp error_trace) ~legacy ~error_details
       match entrypoints.name with
       | Some e when Entrypoint.is_root e && Entrypoint.is_default entrypoint
         -> (
-          merge_types ~legacy ~error_details:Fast loc ty expected >??$ function
+          merge_types ~error_details:Fast loc ty expected >??$ function
           | Ok (Eq, ty) -> return (Entrypoint.default, (ty : exp ty))
           | Error Inconsistent_types_fast ->
-              merge_types ~legacy ~error_details loc full expected
-              >?$ fun (Eq, full) -> ok (Entrypoint.root, (full : exp ty)))
+              merge_types ~error_details loc full expected >?$ fun (Eq, full) ->
+              ok (Entrypoint.root, (full : exp ty)))
       | _ ->
-          merge_types ~legacy ~error_details loc ty expected >|$ fun (Eq, ty) ->
+          merge_types ~error_details loc ty expected >|$ fun (Eq, ty) ->
           (entrypoint, (ty : exp ty)))
 
 let well_formed_entrypoints (type full) (full : full ty) entrypoints =
@@ -2545,7 +2534,6 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
           let loc = location expr in
           parse_contract
             ~stack_depth:(stack_depth + 1)
-            ~legacy
             ctxt
             loc
             arg_ty
@@ -2692,7 +2680,7 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
                       (Micheline.root btv)
                     >>? fun (Ex_ty btv, ctxt) ->
                     comparable_ty_eq ctxt tk btk >>? fun (Eq, ctxt) ->
-                    ty_eq ~legacy:true ctxt loc tv btv >>? fun (Eq, ctxt) ->
+                    ty_eq ctxt loc tv btv >>? fun (Eq, ctxt) ->
                     ok (Some id, ctxt) )
           else traced_fail (Unexpected_forged_value loc))
       >|=? fun (id, ctxt) -> ({id; diff; key_type = tk; value_type = tv}, ctxt)
@@ -2839,7 +2827,7 @@ and parse_view_returning :
       | Item_t (ty, Bot_t) ->
           record_trace_eval
             (ill_type_view loc aft : unit -> _)
-            ( ty_eq ~legacy ctxt loc ty output_ty' >|? fun (Eq, ctxt) ->
+            ( ty_eq ctxt loc ty output_ty' >|? fun (Eq, ctxt) ->
               let view' = Ex_view (Lam (close_descr descr, view_code)) in
               (view', ctxt) )
       | _ -> error (ill_type_view loc aft ()))
@@ -2887,7 +2875,7 @@ and[@coq_axiom_with_reason "gadt"] parse_returning :
              let ret = serialize_ty_for_error ret in
              let stack_ty = serialize_stack_for_error ctxt stack_ty in
              Bad_return (loc, stack_ty, ret))
-           ( ty_eq ~legacy ctxt loc ty ret >|? fun (Eq, ctxt) ->
+           ( ty_eq ctxt loc ty ret >|? fun (Eq, ctxt) ->
              ((Lam (close_descr descr, script_instr) : (arg, ret) lambda), ctxt)
            )
   | (Typed {loc; aft = stack_ty; _}, ctxt) ->
@@ -2919,7 +2907,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
     @@ record_trace
          (Bad_stack_item n)
          ( Gas_monad.run ctxt
-         @@ merge_types ~legacy ~error_details:Informative loc exp got
+         @@ merge_types ~error_details:Informative loc exp got
          >>? fun (eq_ty, ctxt) ->
            eq_ty >|? fun (Eq, ty) -> ((Eq : (a, b) eq), (ty : a ty), ctxt) )
   in
@@ -3145,8 +3133,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           in
           record_trace_eval
             invalid_map_body
-            ( merge_stacks ~legacy loc ctxt 1 aft_rest rest
-            >>? fun (Eq, rest, ctxt) ->
+            ( merge_stacks loc ctxt 1 aft_rest rest >>? fun (Eq, rest, ctxt) ->
               option_t loc ret >>? fun opt_ty ->
               let final_stack = Item_t (opt_ty, rest) in
               let hinfo = {iloc = loc; kstack_ty = Item_t (ret, aft_rest)} in
@@ -3183,7 +3170,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         in
         {loc; instr = ifnone; bef; aft = ibt.aft}
       in
-      Lwt.return @@ merge_branches ~legacy ctxt loc btr bfr {branch}
+      Lwt.return @@ merge_branches ctxt loc btr bfr {branch}
   (* pairs *)
   | (Prim (loc, I_PAIR, [], annot), Item_t (a, Item_t (b, rest))) ->
       check_constr_annot loc annot >>?= fun () ->
@@ -3370,7 +3357,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         in
         {loc; instr; bef; aft = ibt.aft}
       in
-      Lwt.return @@ merge_branches ~legacy ctxt loc btr bfr {branch}
+      Lwt.return @@ merge_branches ctxt loc btr bfr {branch}
   (* lists *)
   | (Prim (loc, I_NIL, [t], annot), stack) ->
       parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy t
@@ -3414,7 +3401,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         in
         {loc; instr; bef; aft = ibt.aft}
       in
-      Lwt.return @@ merge_branches ~legacy ctxt loc btr bfr {branch}
+      Lwt.return @@ merge_branches ctxt loc btr bfr {branch}
   | (Prim (loc, I_SIZE, [], annot), Item_t (List_t _, rest)) ->
       check_var_type_annot loc annot >>?= fun () ->
       let list_size = {apply = (fun kinfo k -> IList_size (kinfo, k))} in
@@ -3441,7 +3428,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           in
           record_trace_eval
             invalid_map_body
-            ( merge_stacks ~legacy loc ctxt 1 rest starting_rest
+            ( merge_stacks loc ctxt 1 rest starting_rest
             >>? fun (Eq, rest, ctxt) ->
               let binfo = kinfo_of_descr kibody in
               let hinfo = {iloc = loc; kstack_ty = Item_t (ret, rest)} in
@@ -3488,7 +3475,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           in
           record_trace_eval
             invalid_iter_body
-            ( merge_stacks ~legacy loc ctxt 1 aft rest
+            ( merge_stacks loc ctxt 1 aft rest
             >>? fun (Eq, rest, ctxt) : ((a, s) judgement * context) tzresult ->
               typed_no_lwt ctxt loc (mk_list_iter ibody) rest )
       | Failed {descr} -> typed_no_lwt ctxt loc (mk_list_iter (descr rest)) rest
@@ -3533,7 +3520,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           in
           record_trace_eval
             invalid_iter_body
-            ( merge_stacks ~legacy loc ctxt 1 aft rest
+            ( merge_stacks loc ctxt 1 aft rest
             >>? fun (Eq, rest, ctxt) : ((a, s) judgement * context) tzresult ->
               typed_no_lwt ctxt loc (mk_iset_iter ibody) rest )
       | Failed {descr} -> typed_no_lwt ctxt loc (mk_iset_iter (descr rest)) rest
@@ -3590,7 +3577,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           in
           record_trace_eval
             invalid_map_body
-            ( merge_stacks ~legacy loc ctxt 1 rest starting_rest
+            ( merge_stacks loc ctxt 1 rest starting_rest
             >>? fun (Eq, rest, ctxt) ->
               let instr =
                 {
@@ -3646,7 +3633,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           in
           record_trace_eval
             invalid_iter_body
-            ( merge_stacks ~legacy loc ctxt 1 aft rest
+            ( merge_stacks loc ctxt 1 aft rest
             >>? fun (Eq, rest, ctxt) : ((a, s) judgement * context) tzresult ->
               typed_no_lwt ctxt loc (make_instr ibody) rest )
       | Failed {descr} -> typed_no_lwt ctxt loc (make_instr (descr rest)) rest)
@@ -3833,7 +3820,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         in
         {loc; instr; bef; aft = ibt.aft}
       in
-      Lwt.return @@ merge_branches ~legacy ctxt loc btr bfr {branch}
+      Lwt.return @@ merge_branches ctxt loc btr bfr {branch}
   | (Prim (loc, I_LOOP, [body], annot), (Item_t (Bool_t _, rest) as stack)) -> (
       check_kind [Seq_kind] body >>?= fun () ->
       error_unexpected_annot loc annot >>?= fun () ->
@@ -3850,7 +3837,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           in
           record_trace_eval
             unmatched_branches
-            ( merge_stacks ~legacy loc ctxt 1 ibody.aft stack
+            ( merge_stacks loc ctxt 1 ibody.aft stack
             >>? fun (Eq, _stack, ctxt) ->
               let instr =
                 {
@@ -3899,7 +3886,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           in
           record_trace_eval
             unmatched_branches
-            ( merge_stacks ~legacy loc ctxt 1 ibody.aft stack
+            ( merge_stacks loc ctxt 1 ibody.aft stack
             >>? fun (Eq, _stack, ctxt) ->
               let instr =
                 {
@@ -4428,7 +4415,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       check_var_annot loc annot >>?= fun () ->
       parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy cast_t
       >>?= fun (Ex_ty cast_t, ctxt) ->
-      ty_eq ~legacy ctxt loc cast_t t >>?= fun (Eq, ctxt) ->
+      ty_eq ctxt loc cast_t t >>?= fun (Eq, ctxt) ->
       let instr = {apply = (fun _ k -> k)} in
       let stack = Item_t (cast_t, stack) in
       (typed ctxt loc instr stack : ((a, s) judgement * context) tzresult Lwt.t)
@@ -4561,9 +4548,9 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       in
       trace (Ill_typed_contract (canonical_code, [])) views_result
       >>=? fun ctxt ->
-      ty_eq ~legacy ctxt loc arg arg_type_full >>?= fun (Eq, ctxt) ->
-      ty_eq ~legacy ctxt loc ret ret_type_full >>?= fun (Eq, ctxt) ->
-      ty_eq ~legacy ctxt loc storage_type ginit >>?= fun (Eq, ctxt) ->
+      ty_eq ctxt loc arg arg_type_full >>?= fun (Eq, ctxt) ->
+      ty_eq ctxt loc ret ret_type_full >>?= fun (Eq, ctxt) ->
+      ty_eq ctxt loc storage_type ginit >>?= fun (Eq, ctxt) ->
       let instr =
         {
           apply =
@@ -4820,8 +4807,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       Item_t (Pair_t ((Ticket_t _ as ty_a), (Ticket_t _ as ty_b), _), rest) )
     -> (
       check_var_annot loc annot >>?= fun () ->
-      Gas_monad.run ctxt
-      @@ merge_types ~legacy ~error_details:Informative loc ty_a ty_b
+      Gas_monad.run ctxt @@ merge_types ~error_details:Informative loc ty_a ty_b
       >>?= fun (eq_ty, ctxt) ->
       eq_ty >>?= fun (Eq, ty) ->
       match ty with
@@ -5039,14 +5025,13 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
 and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contract :
     type arg.
     stack_depth:int ->
-    legacy:bool ->
     context ->
     Script.location ->
     arg ty ->
     Destination.t ->
     entrypoint:Entrypoint.t ->
     (context * arg typed_contract) tzresult Lwt.t =
- fun ~stack_depth ~legacy ctxt loc arg contract ~entrypoint ->
+ fun ~stack_depth ctxt loc arg contract ~entrypoint ->
   match contract with
   | Contract contract -> (
       match Contract.is_implicit contract with
@@ -5054,7 +5039,7 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
           if Entrypoint.is_default entrypoint then
             (* An implicit account on the "default" entrypoint always exists and has type unit. *)
             Lwt.return
-              ( ty_eq ~legacy:true ctxt loc arg unit_t >|? fun (Eq, ctxt) ->
+              ( ty_eq ctxt loc arg unit_t >|? fun (Eq, ctxt) ->
                 let destination : Destination.t = Contract contract in
                 (ctxt, {arg_ty = arg; address = {destination; entrypoint}}) )
           else fail (No_such_entrypoint entrypoint)
@@ -5086,7 +5071,6 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
                   (* we don't check targ size here because it's a legacy contract code *)
                   Gas_monad.run ctxt
                   @@ find_entrypoint_for_type
-                       ~legacy
                        ~error_details:Informative
                        ~full:targ
                        ~expected:arg
@@ -5233,7 +5217,7 @@ let parse_contract_for_script :
             (* An implicit account on the "default" entrypoint always exists and has type unit. *)
             Lwt.return
               ( Gas_monad.run ctxt
-              @@ merge_types ~legacy:true ~error_details:Fast loc arg unit_t
+              @@ merge_types ~error_details:Fast loc arg unit_t
               >|? fun (eq_ty, ctxt) ->
                 match eq_ty with
                 | Ok (Eq, _ty) ->
@@ -5282,7 +5266,6 @@ let parse_contract_for_script :
                           (* we don't check targ size here because it's a legacy contract code *)
                           Gas_monad.run ctxt
                           @@ find_entrypoint_for_type
-                               ~legacy:false
                                ~error_details:Fast
                                ~full:targ
                                ~expected:arg
@@ -6294,8 +6277,8 @@ let unparse_code ctxt mode code =
   Global_constants_storage.expand ctxt (strip_locations code)
   >>=? fun (ctxt, code) -> unparse_code ~stack_depth:0 ctxt mode (root code)
 
-let parse_contract ~legacy context loc arg_ty contract ~entrypoint =
-  parse_contract ~stack_depth:0 ~legacy context loc arg_ty contract ~entrypoint
+let parse_contract context loc arg_ty contract ~entrypoint =
+  parse_contract ~stack_depth:0 context loc arg_ty contract ~entrypoint
 
 let parse_toplevel ctxt ~legacy toplevel =
   Global_constants_storage.expand ctxt toplevel >>=? fun (ctxt, toplevel) ->
@@ -6315,8 +6298,6 @@ let parse_ty = parse_ty ~stack_depth:0 ~ret:Don't_parse_entrypoints
 
 let parse_parameter_ty_and_entrypoints =
   parse_parameter_ty_and_entrypoints ~stack_depth:0
-
-let ty_eq ctxt = ty_eq ~legacy:true ctxt
 
 let[@coq_axiom_with_reason "gadt"] get_single_sapling_state ctxt ty x =
   let has_lazy_storage = has_lazy_storage ty in

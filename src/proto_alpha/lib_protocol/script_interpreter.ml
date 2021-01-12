@@ -1077,17 +1077,11 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                           let io_ty =
                             Script_ir_translator.merge_types
                               ~error_details:Fast
-                              ~legacy:true
                               kloc
                               aft_ty
                               output_ty
                             >>$ fun (out_eq, _ty) ->
-                            merge_types
-                              ~error_details:Fast
-                              ~legacy:true
-                              kloc
-                              bef_ty
-                              pair_ty
+                            merge_types ~error_details:Fast kloc bef_ty pair_ty
                             >|$ fun (in_eq, _ty) -> (out_eq, in_eq)
                           in
                           Gas_monad.run ctxt io_ty >>?= fun (eq, ctxt) ->

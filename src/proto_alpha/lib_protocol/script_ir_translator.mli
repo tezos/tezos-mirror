@@ -203,7 +203,6 @@ val ty_eq :
   (('ta Script_typed_ir.ty, 'tb Script_typed_ir.ty) eq * context) tzresult
 
 val merge_types :
-  legacy:bool ->
   error_details:'error_trace error_details ->
   Script.location ->
   'a Script_typed_ir.ty ->
@@ -402,7 +401,6 @@ val unparse_script :
   (Script.t * context) tzresult Lwt.t
 
 val parse_contract :
-  legacy:bool ->
   context ->
   Script.location ->
   'a Script_typed_ir.ty ->
