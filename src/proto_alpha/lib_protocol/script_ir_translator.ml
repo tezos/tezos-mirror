@@ -6297,6 +6297,9 @@ let parse_any_ty = parse_any_ty ~stack_depth:0
 
 let parse_ty = parse_ty ~stack_depth:0
 
+let parse_parameter_ty_and_entrypoints =
+  parse_parameter_ty_and_entrypoints ~stack_depth:0
+
 let ty_eq ctxt = ty_eq ~legacy:true ctxt
 
 let[@coq_axiom_with_reason "gadt"] get_single_sapling_state ctxt ty x =

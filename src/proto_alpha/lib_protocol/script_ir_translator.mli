@@ -71,6 +71,13 @@ type ex_comparable_ty =
 
 type ex_ty = Ex_ty : 'a Script_typed_ir.ty -> ex_ty
 
+type ex_parameter_ty_and_entrypoints =
+  | Ex_parameter_ty_and_entrypoints : {
+      arg_type : 'a Script_typed_ir.ty;
+      root_name : Script_ir_annot.field_annot option;
+    }
+      -> ex_parameter_ty_and_entrypoints
+
 type ex_stack_ty =
   | Ex_stack_ty : ('a, 's) Script_typed_ir.stack_ty -> ex_stack_ty
 
@@ -268,6 +275,13 @@ val parse_parameter_ty :
 
 val parse_comparable_ty :
   context -> Script.node -> (ex_comparable_ty * context) tzresult
+
+val parse_parameter_ty_and_entrypoints :
+  context ->
+  legacy:bool ->
+  root_name:Script_ir_annot.field_annot option ->
+  Script.node ->
+  (ex_parameter_ty_and_entrypoints * context) tzresult
 
 val parse_view_input_ty :
   context ->
