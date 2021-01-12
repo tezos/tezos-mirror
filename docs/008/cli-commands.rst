@@ -66,6 +66,7 @@ Accuser manual
          :file: tezos-accuser-alpha.html
 
 .. _benchmark_tool_manual:
+.. _benchmark_tool_manual_008:
 
 Benchmark tool manual
 =====================

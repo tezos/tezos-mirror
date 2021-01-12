@@ -160,6 +160,7 @@ _`Implicit account`
     signature scheme) and finally the hash of the public key.
 
 .. _glossary_michelson:
+.. _glossary_michelson_007:
 
 Michelson
     The built-in language used by a `smart contract`_.
@@ -187,7 +188,7 @@ _`Roll`
     will be given twice as many rights to bake.
 
 _`Smart contract`
-    Account_ which is associated to a :ref:`Michelson <glossary_michelson>` script. They are
+    Account_ which is associated to a :ref:`Michelson <glossary_michelson_007>` script. They are
     created with an explicit origination_ operation and are therefore
     sometimes called originated accounts. The address of a smart
     contract always starts with the letters ``KT1``.

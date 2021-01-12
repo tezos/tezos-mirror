@@ -1,5 +1,3 @@
-.. _voting_008:
-
 The Voting Process
 ==================
 
@@ -186,7 +184,7 @@ Other resources
 ~~~~~~~~~~~~~~~
 
 For more details on the client commands refer to the manual at
-:ref:`client_manual`.
+:ref:`client_manual_008`.
 
 For vote related RPCs check the :ref:`rpc_index_008` under the prefix
 ``vote/``.

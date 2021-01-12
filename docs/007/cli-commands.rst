@@ -13,6 +13,7 @@ using the following shell commands.
 
 
 .. _client_manual:
+.. _client_manual_007:
 
 Client manual
 =============
@@ -22,6 +23,7 @@ Client manual
 
 
 .. _admin_client_manual:
+.. _admin_client_manual_007:
 
 Admin-client manual
 ===================
@@ -31,6 +33,7 @@ Admin-client manual
 
 
 .. _signer_manual:
+.. _signer_manual_007:
 
 Signer manual
 =============
@@ -40,6 +43,7 @@ Signer manual
 
 
 .. _baker_manual:
+.. _baker_manual_007:
 
 Baker manual
 ============
@@ -49,6 +53,7 @@ Baker manual
 
 
 .. _endorser_manual:
+.. _endorser_manual_007:
 
 Endorser manual
 ===============
@@ -58,6 +63,7 @@ Endorser manual
 
 
 .. _accuser_manual:
+.. _accuser_manual_007:
 
 Accuser manual
 ==============

@@ -489,7 +489,7 @@ Core data types and notations
    intends to store large amounts of data in a map. They have higher
    gas costs than standard maps as data is lazily deserialized. A
    ``big_map`` cannot appear inside another ``big_map``. See the
-   section on :ref:``operations on big maps <OperationsOnBigMaps_008>``
+   section on :ref:`operations on big maps <OperationsOnBigMaps_008>`
    for a description of the syntax of values of type ``big_map (k)
    (t)`` and available operations.
 

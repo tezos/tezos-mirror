@@ -1,4 +1,5 @@
 .. _michelson:
+.. _michelson_007:
 
 Michelson: the language of Smart Contracts in Tezos
 ===================================================
@@ -277,7 +278,7 @@ constructors is fixed by this specification. Michelson does not let the
 programmer introduce its own types.
 
 Be aware that the syntax used in the specification may differ from
-the :ref:`concrete syntax <ConcreteSyntax>`. In particular
+the :ref:`concrete syntax <ConcreteSyntax_007>`. In particular
 some instructions are annotated with types that are not present in the
 concrete language because they are synthesized by the typechecker.
 
@@ -1567,6 +1568,7 @@ The parameter must be consistent with the one expected by the
 contract, unit for an account.
 
 .. _MichelsonSetDelegate:
+.. _MichelsonSetDelegate_007:
 
 -  ``SET_DELEGATE``: Set or withdraw the contract's delegation.
 
@@ -2042,9 +2044,11 @@ A typing rule can be inferred:
     > MAP_CD(\rest=[AD]+)R code / S   =>
         { DUP ; DIP { CDR ; MAP_C(\rest)R code } ; CAR ; PAIR } / S
 
+.. _ConcreteSyntax:
+.. _ConcreteSyntax_007:
+
 Concrete syntax
 ---------------
-.. _ConcreteSyntax:
 
 The concrete language is very close to the formal notation of the
 specification. Its structure is extremely simple: an expression in the
@@ -2432,7 +2436,7 @@ Primitive applications can receive one or many annotations.
 An annotation is a sequence of characters that matches the regular
 expression ``@%|@%%|%@|[@:%][_0-9a-zA-Z][_0-9a-zA-Z\.%@]*``.
 Note however that ``@%``, ``@%%`` and ``%@`` are
-:ref:`special annotations <SpecialAnnotations>` and are not allowed everywhere.
+:ref:`special annotations <SpecialAnnotations_007>` and are not allowed everywhere.
 
 Annotations come after the primitive name and before its potential arguments.
 
@@ -2589,9 +2593,11 @@ type (which can be changed). For instance the annotated typing rule for
    :: @l (list 'e) : 'A  ->  'A
       iff body :: [ @l.elt e' : 'A -> 'A ]
 
+.. _SpecialAnnotations:
+.. _SpecialAnnotations_007:
+
 Special annotations
 ~~~~~~~~~~~~~~~~~~~
-.. _SpecialAnnotations:
 
 The special variable annotations ``@%`` and ``@%%`` can be used on instructions
 ``CAR`` and ``CDR``. It means to use the accessed field name (if any) as
@@ -2859,7 +2865,7 @@ data include not only a description of the action to perform but also
 the address of the multisig contract and a counter that gets
 incremented at each successful call to the contract.
 
-The multisig commands of :ref:`Tezos command line client <client_manual>`
+The multisig commands of :ref:`Tezos command line client <client_manual_007>`
 use this
 smart contract. Moreover, `functional correctness of this contract has
 been verified
