@@ -1888,18 +1888,19 @@ let well_formed_entrypoints (type full) (full : full ty) ~root_name =
     match annot with
     | None ->
         ok
-          (if reachable then acc
-          else
-            match ty with
-            | Union_t _ -> acc
-            | _ -> (
-                match first_unreachable with
-                | None -> (Some (List.rev path), all)
-                | Some _ -> acc))
+          ( (if reachable then acc
+            else
+              match ty with
+              | Union_t _ -> acc
+              | _ -> (
+                  match first_unreachable with
+                  | None -> (Some (List.rev path), all)
+                  | Some _ -> acc)),
+            reachable )
     | Some (Field_annot name) ->
         Entrypoint.of_annot_lax name >>? fun name ->
         if Entrypoint.Set.mem name all then error (Duplicate_entrypoint name)
-        else ok (first_unreachable, Entrypoint.Set.add name all)
+        else ok ((first_unreachable, Entrypoint.Set.add name all), true)
   in
   let rec check :
       type t.
@@ -1911,19 +1912,11 @@ let well_formed_entrypoints (type full) (full : full ty) ~root_name =
    fun t path reachable acc ->
     match t with
     | Union_t ((tl, al), (tr, ar), _) ->
-        merge (D_Left :: path) al tl reachable acc >>? fun acc ->
-        merge (D_Right :: path) ar tr reachable acc >>? fun acc ->
-        check
-          tl
-          (D_Left :: path)
-          (match al with Some _ -> true | None -> reachable)
-          acc
-        >>? fun acc ->
-        check
-          tr
-          (D_Right :: path)
-          (match ar with Some _ -> true | None -> reachable)
-          acc
+        merge (D_Left :: path) al tl reachable acc >>? fun (acc, l_reachable) ->
+        merge (D_Right :: path) ar tr reachable acc
+        >>? fun (acc, r_reachable) ->
+        check tl (D_Left :: path) l_reachable acc >>? fun acc ->
+        check tr (D_Right :: path) r_reachable acc
     | _ -> ok acc
   in
   let (init, reachable) =
@@ -5449,25 +5442,25 @@ let list_entrypoints (type full) (full : full ty) ctxt ~root_name =
   let merge path annot (type t) (ty : t ty) reachable
       ((unreachables, all) as acc) =
     match annot with
-    | None -> (
+    | None ->
         ok
-        @@
-        if reachable then acc
-        else
-          match ty with
-          | Union_t _ -> acc
-          | _ -> (List.rev path :: unreachables, all))
-    | Some (Field_annot name) -> (
-        match Entrypoint.of_annot_lax_opt name with
+          ( (if reachable then acc
+            else
+              match ty with
+              | Union_t _ -> acc
+              | _ -> (List.rev path :: unreachables, all)),
+            reachable )
+    | Some (Field_annot name) ->
+        (match Entrypoint.of_annot_lax_opt name with
         | None -> ok (List.rev path :: unreachables, all)
         | Some name ->
             if Entrypoint.Map.mem name all then
               ok (List.rev path :: unreachables, all)
             else
-              unparse_ty ~loc:() ctxt ty >>? fun (unparsed_ty, _) ->
-              ok
-                ( unreachables,
-                  Entrypoint.Map.add name (List.rev path, unparsed_ty) all ))
+              unparse_ty ~loc:() ctxt ty >|? fun (unparsed_ty, _) ->
+              ( unreachables,
+                Entrypoint.Map.add name (List.rev path, unparsed_ty) all ))
+        >|? fun unreachable_all -> (unreachable_all, true)
   in
   let rec fold_tree :
       type t.
@@ -5482,19 +5475,11 @@ let list_entrypoints (type full) (full : full ty) ctxt ~root_name =
    fun t path reachable acc ->
     match t with
     | Union_t ((tl, al), (tr, ar), _) ->
-        merge (D_Left :: path) al tl reachable acc >>? fun acc ->
-        merge (D_Right :: path) ar tr reachable acc >>? fun acc ->
-        fold_tree
-          tl
-          (D_Left :: path)
-          (match al with Some _ -> true | None -> reachable)
-          acc
-        >>? fun acc ->
-        fold_tree
-          tr
-          (D_Right :: path)
-          (match ar with Some _ -> true | None -> reachable)
-          acc
+        merge (D_Left :: path) al tl reachable acc >>? fun (acc, l_reachable) ->
+        merge (D_Right :: path) ar tr reachable acc
+        >>? fun (acc, r_reachable) ->
+        fold_tree tl (D_Left :: path) l_reachable acc >>? fun acc ->
+        fold_tree tr (D_Right :: path) r_reachable acc
     | _ -> ok acc
   in
   unparse_ty ~loc:() ctxt full >>? fun (unparsed_full, _) ->
