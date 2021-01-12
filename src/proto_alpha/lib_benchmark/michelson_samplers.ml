@@ -382,7 +382,7 @@ end)
             let* (lsize, rsize) = pick_split (size - 1) in
             let* (Ex_ty left) = m_type ~size:lsize in
             let* (Ex_ty right) = m_type ~size:rsize in
-            match union_t (-1) (left, None) (right, None) with
+            match union_t (-1) left right with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
         | `TOption -> (
@@ -539,7 +539,7 @@ end)
               let* left_v = value left_t in
               let* right_v = value right_t in
               return (left_v, right_v))
-        | Union_t ((left_t, _), (right_t, _), _) ->
+        | Union_t (left_t, right_t, _) ->
             fun rng_state ->
               if Base_samplers.uniform_bool rng_state then
                 L (value left_t rng_state)
