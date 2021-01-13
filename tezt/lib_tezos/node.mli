@@ -144,9 +144,15 @@ val rpc_port : t -> int
 (** Get the data-dir of a node. *)
 val data_dir : t -> string
 
-(** Get the stderr channel of the node. If the node is not running, make the
-   test fail. *)
-val stderr : t -> Lwt_io.input_channel
+(** Wait until a node terminates and check its status. 
+ 
+    If the node is not running,
+    or if the process returns an exit code which is not [exit_code],
+    or if [msg] does not match the stderr output, fail the test.
+
+    If [exit_code] is not specified, any non-zero code is accepted.
+    If no [msg] is given, the stderr is ignored.*)
+val check_error : ?exit_code:int -> ?msg:Base.rex -> t -> unit Lwt.t
 
 (** Wait until a node terminates and return its status. If the node is not
    running, make the test fail. *)

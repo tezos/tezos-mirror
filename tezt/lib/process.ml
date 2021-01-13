@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -96,7 +96,7 @@ let get_echo_lwt_channel echo =
   match echo.lwt_channel with
   | None ->
       (* Impossible: [lwt_channel] is filled by [Some ...] immediately after the [echo]
-           is created by [create_echo]. *)
+         is created by [create_echo]. *)
       assert false
   | Some lwt_channel ->
       lwt_channel
@@ -209,9 +209,9 @@ let handle_process ~log_output process =
           Option.iter (fun hooks -> hooks.on_log line) process.hooks ) ;
         push_to_echo echo line ;
         (* TODO: here we assume that all lines end with "\n",
-             but it may not always be the case:
-             - there may be lines ending with "\r\n";
-             - the last line may not end with "\n" before the EOF. *)
+           but it may not always be the case:
+         - there may be lines ending with "\r\n";
+         - the last line may not end with "\n" before the EOF. *)
         push_to_echo echo "\n" ;
         handle_output name ch echo
   in
@@ -304,27 +304,32 @@ let kill process =
   Log.debug "Send SIGKILL to %s." process.name ;
   (process.lwt_process)#terminate
 
-exception
-  Failed of {
-    name : string;
-    command : string;
-    arguments : string list;
-    status : Unix.process_status;
-    expect_failure : bool;
-  }
+type failed_info = {
+  name : string;
+  command : string;
+  arguments : string list;
+  status : Unix.process_status;
+  expect_failure : bool;
+  reason : String.t option;
+}
+
+exception Failed of failed_info
 
 let () =
   Printexc.register_printer
   @@ function
-  | Failed {name; command; arguments; status; expect_failure} ->
+  | Failed {name; command; arguments; status; expect_failure; reason} ->
       let reason =
-        match status with
-        | WEXITED code ->
-            Printf.sprintf "exited with code %d" code
-        | WSIGNALED code ->
-            Printf.sprintf "was killed by signal %d" code
-        | WSTOPPED code ->
-            Printf.sprintf "was killed by signal %d" code
+        Option.value
+          ~default:
+            ( match status with
+            | WEXITED code ->
+                Printf.sprintf "exited with code %d" code
+            | WSIGNALED code ->
+                Printf.sprintf "was killed by signal %d" code
+            | WSTOPPED code ->
+                Printf.sprintf "was killed by signal %d" code )
+          reason
       in
       Some
         (Printf.sprintf
@@ -351,6 +356,7 @@ let check ?(expect_failure = false) process =
              arguments = process.arguments;
              status;
              expect_failure;
+             reason = None;
            })
 
 let run ?log_status_on_exit ?name ?color ?env ?expect_failure command arguments
@@ -371,7 +377,7 @@ let stdout process = get_echo_lwt_channel process.stdout
 
 let stderr process = get_echo_lwt_channel process.stderr
 
-let name process = process.name
+let name (process : t) = process.name
 
 let check_and_read ?expect_failure ~channel_getter process =
   let* () = check ?expect_failure process
@@ -401,3 +407,46 @@ let run_and_read_stderr ?log_status_on_exit ?name ?color ?env ?expect_failure
     spawn ?log_status_on_exit ?name ?color ?env command arguments
   in
   check_and_read_stdout ?expect_failure process
+
+let check_error ?exit_code ?msg process =
+  let* status = wait process in
+  let* err_msg = Lwt_io.read (stderr process) in
+  let error =
+    {
+      name = process.name;
+      command = process.command;
+      arguments = process.arguments;
+      status;
+      expect_failure = true;
+      reason = None;
+    }
+  in
+  match status with
+  | WEXITED n ->
+      if not (Option.fold ~none:(n <> 0) ~some:(( = ) n) exit_code) then
+        raise
+          (Failed
+             {
+               error with
+               reason =
+                 Some
+                   (Option.fold
+                      ~none:" with any non-zero code"
+                      ~some:(fun exit_code ->
+                        sf " with code %d but failed with code %d" exit_code n)
+                      exit_code);
+             }) ;
+      Option.iter
+        (fun msg ->
+          if err_msg =~! msg then
+            raise
+              (Failed
+                 {
+                   error with
+                   reason =
+                     Some (sf " but failed with stderr =~! %s" (show_rex msg));
+                 }))
+        msg ;
+      unit
+  | _ ->
+      raise (Failed error)

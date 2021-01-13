@@ -90,12 +90,12 @@ end
 open Parameters
 include Daemon.Make (Parameters)
 
-let stderr node =
+let check_error ?exit_code ?msg node =
   match node.status with
   | Not_running ->
       Test.fail "node %s is not running, it has no stderr" (name node)
   | Running {process; _} ->
-      Process.stderr process
+      Process.check_error ?exit_code ?msg process
 
 let wait node =
   match node.status with
