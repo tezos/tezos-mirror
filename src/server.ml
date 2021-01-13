@@ -279,9 +279,7 @@ module Make (Encoding : Resto.ENCODING) = struct
       let stream =
         Lwt_stream.from (fun () ->
             if not !running then Lwt.return None
-            else
-              s.Resto_directory.Answer.next ()
-              >|= function None -> None | Some x -> Some (to_string x))
+            else s.Resto_directory.Answer.next () >|= Option.map to_string)
       in
       let shutdown () =
         log_info "streamed connection closed %s" (Connection.to_string con) ;
