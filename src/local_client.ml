@@ -29,7 +29,7 @@ open Resto_cohttp_server
 module Make (Encoding : Resto.ENCODING) = struct
   module Directory = Resto_directory.Make (Encoding)
   module Media_type = Media_type.Make (Encoding)
-  module Server = Server.Make (Encoding)
+  module Server = Server.Make_internal_only (Encoding)
 
   type local_server = {
     root : unit Directory.directory;
