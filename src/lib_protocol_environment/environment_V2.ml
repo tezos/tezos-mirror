@@ -78,6 +78,8 @@ module type V2 = sig
        and type (+'m, 'pr, 'p, 'q, 'i, 'o) RPC_service.t =
             ('m, 'pr, 'p, 'q, 'i, 'o) RPC_service.t
        and type Error_monad.shell_error = Error_monad.error
+       and type 'shell_error Error_monad.shell_trace =
+            'shell_error Error_monad.trace
        and module Sapling = Tezos_sapling.Core.Validator
 
   type error += Ecoproto_error of Error_monad.error
@@ -719,6 +721,8 @@ struct
 
     type shell_error = Error_monad.error = ..
 
+    type 'shell_error shell_trace = 'shell_error Error_monad.trace
+
     type error_category = [`Branch | `Temporary | `Permanent]
 
     include Error_core
@@ -727,6 +731,10 @@ struct
     include Tezos_error_monad.Monad_ext_maker.Make (Error_core) (TzTrace)
               (Local_monad)
     include Error_monad_traversors
+
+    let make_trace_encoding e = TzTrace.encoding e
+
+    let pp_trace = pp_print_error
 
     type 'err trace = 'err TzTrace.trace
   end

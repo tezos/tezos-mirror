@@ -68,14 +68,16 @@ val get_registered_errors : unit -> error_info list
 
 (** MONAD : trace, monad, etc. *)
 
-(* This is concrete for backwards compatibility purpose. However:
-   - it MUST NEVER be empty
-   - it is not intended for general use (prefer {!error}, {!fail} and such). *)
-type 'err trace = 'err list
+type 'err trace
 
 type 'a tzresult = ('a, error trace) result
 
+val make_trace_encoding :
+  'error Data_encoding.t -> 'error trace Data_encoding.t
+
 val trace_encoding : error trace Data_encoding.t
+
+val pp_trace : Format.formatter -> error trace -> unit
 
 val result_encoding : 'a Data_encoding.t -> 'a tzresult Data_encoding.t
 
@@ -264,4 +266,6 @@ val both_e :
 
 type shell_error
 
-type 'a shell_tzresult = ('a, shell_error list) result
+type 'shell_error shell_trace
+
+type 'a shell_tzresult = ('a, shell_error shell_trace) result
