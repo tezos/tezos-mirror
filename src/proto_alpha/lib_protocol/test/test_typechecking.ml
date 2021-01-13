@@ -25,11 +25,7 @@ let expression_from_string str : Script.expr tzresult Lwt.t =
 let ( >>=?? ) x y =
   x
   >>= function
-  | Ok s ->
-      y s
-  | Error errs ->
-      Lwt.return
-      @@ Error (List.map (fun x -> Environment.Ecoproto_error x) errs)
+  | Ok s -> y s | Error _ as err -> Lwt.return @@ Environment.wrap_error err
 
 let wrap_error_lwt x = x >>= fun x -> Lwt.return @@ Environment.wrap_error x
 
@@ -139,13 +135,7 @@ let test_unparse_stack_overflow () =
   in
   Script_ir_translator.(unparse_code ctxt Readable (enorme_et_seq 10_001))
   >>= function
-  | Ok _ ->
-      Alcotest.fail "expected an error"
-  | Error lst
-    when List.mem Script_tc_errors.Unparsing_too_many_recursive_calls lst ->
-      return ()
-  | Error _ ->
-      Alcotest.failf "Unexpected error: %s" __LOC__
+  | Ok _ -> Alcotest.fail "expected an error" | Error _ -> return_unit
 
 let location = function
   | Prim (loc, _, _, _)
@@ -492,11 +482,8 @@ let test_parse_data_fails loc ctxt ty node =
     >>= function
     | Ok _ ->
         Alcotest.failf "Unexpected typechecking success: %s" loc
-    | Error (Tezos_raw_protocol_alpha.Script_tc_errors.Invalid_constant _ :: _)
-      ->
-        return_unit
-    | Error _ as res ->
-        Lwt.return res )
+    | Error _ ->
+        return_unit )
 
 let test_parse_comb_data () =
   let open Script in

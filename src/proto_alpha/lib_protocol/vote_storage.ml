@@ -161,6 +161,8 @@ let set_participation_ema = Storage.Vote.Participation_ema.set
 
 let get_current_proposal = Storage.Vote.Current_proposal.get
 
+let get_current_proposal_option = Storage.Vote.Current_proposal.get_option
+
 let init_current_proposal = Storage.Vote.Current_proposal.init
 
 let clear_current_proposal = Storage.Vote.Current_proposal.delete

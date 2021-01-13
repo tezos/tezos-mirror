@@ -44,6 +44,8 @@ let error_encoding =
             json)
        ~binary:Error_monad.error_encoding
 
+let trace_encoding = make_trace_encoding error_encoding
+
 type _ successful_manager_operation_result =
   | Reveal_result : {
       consumed_gas : Gas.Arith.fp;
@@ -82,8 +84,8 @@ type packed_successful_manager_operation_result =
 type 'kind manager_operation_result =
   | Applied of 'kind successful_manager_operation_result
   | Backtracked of
-      'kind successful_manager_operation_result * error list option
-  | Failed : 'kind Kind.manager * error list -> 'kind manager_operation_result
+      'kind successful_manager_operation_result * error trace option
+  | Failed : 'kind Kind.manager * error trace -> 'kind manager_operation_result
   | Skipped : 'kind Kind.manager -> 'kind manager_operation_result
 
 type packed_internal_operation_result =
@@ -135,7 +137,7 @@ module Manager_result = struct
                ~title:"Failed"
                (obj2
                   (req "status" (constant "failed"))
-                  (req "errors" (list error_encoding)))
+                  (req "errors" trace_encoding))
                (function Failed (_, errs) -> Some ((), errs) | _ -> None)
                (fun ((), errs) -> Failed (kind, errs));
              case
@@ -150,7 +152,7 @@ module Manager_result = struct
                (merge_objs
                   (obj2
                      (req "status" (constant "backtracked"))
-                     (opt "errors" (list error_encoding)))
+                     (opt "errors" trace_encoding))
                   encoding)
                (fun o ->
                  match o with

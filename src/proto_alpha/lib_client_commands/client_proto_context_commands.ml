@@ -375,12 +375,7 @@ let commands network () =
         | Some {code; storage = _} -> (
           match Script_repr.force_decode code with
           | Error errs ->
-              cctxt#error
-                "%a"
-                (Format.pp_print_list
-                   ~pp_sep:Format.pp_print_newline
-                   Environment.Error_monad.pp)
-                errs
+              cctxt#error "%a" Environment.Error_monad.pp_trace errs
           | Ok (code, _) ->
               let {Michelson_v1_parser.source; _} =
                 Michelson_v1_printer.unparse_toplevel code

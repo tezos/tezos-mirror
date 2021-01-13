@@ -103,6 +103,9 @@ val set_participation_ema :
 
 val get_current_proposal : Raw_context.t -> Protocol_hash.t tzresult Lwt.t
 
+val get_current_proposal_option :
+  Raw_context.t -> Protocol_hash.t option tzresult Lwt.t
+
 val init_current_proposal :
   Raw_context.t -> Protocol_hash.t -> Raw_context.t tzresult Lwt.t
 

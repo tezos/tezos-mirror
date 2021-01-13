@@ -13,11 +13,7 @@ open Script_interpreter
 let ( >>=?? ) x y =
   x
   >>= function
-  | Ok s ->
-      y s
-  | Error errs ->
-      Lwt.return
-      @@ Error (List.map (fun x -> Environment.Ecoproto_error x) errs)
+  | Ok s -> y s | Error _ as err -> Lwt.return @@ Environment.wrap_error err
 
 let test_context () =
   Context.init 3
@@ -119,13 +115,7 @@ let test_stack_overflow () =
   in
   run_step ctxt (enorme_et_seq 10_001) ()
   >>= function
-  | Ok _ ->
-      Alcotest.fail "expected an error"
-  | Error lst
-    when List.mem Script_interpreter.Michelson_too_many_recursive_calls lst ->
-      return ()
-  | Error _ ->
-      Alcotest.failf "Unexpected error (%s)" __LOC__
+  | Ok _ -> Alcotest.fail "expected an error" | Error _ -> return_unit
 
 (** Test the encoding/decoding of script_interpreter.ml specific errors *)
 let test_json_roundtrip name testable enc v =

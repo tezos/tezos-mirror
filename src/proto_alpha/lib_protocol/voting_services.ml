@@ -127,15 +127,7 @@ let register () =
   register0 S.proposals (fun ctxt () () -> Vote.get_proposals ctxt) ;
   register0 S.listings (fun ctxt () () -> Vote.get_listings ctxt >|= ok) ;
   register0 S.current_proposal (fun ctxt () () ->
-      (* this would be better implemented using get_option in get_current_proposal *)
-      Vote.get_current_proposal ctxt
-      >|= function
-      | Ok p ->
-          ok_some p
-      | Error (Raw_context.Storage_error (Missing_key _) :: _) ->
-          ok_none
-      | Error _ as e ->
-          e) ;
+      Vote.get_current_proposal_option ctxt) ;
   register0 S.total_voting_power (fun ctxt () () ->
       Vote.get_total_voting_power_free ctxt)
 

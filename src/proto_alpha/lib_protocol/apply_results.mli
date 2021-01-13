@@ -87,8 +87,8 @@ and packed_contents_result =
 and 'kind manager_operation_result =
   | Applied of 'kind successful_manager_operation_result
   | Backtracked of
-      'kind successful_manager_operation_result * error list option
-  | Failed : 'kind Kind.manager * error list -> 'kind manager_operation_result
+      'kind successful_manager_operation_result * error trace option
+  | Failed : 'kind Kind.manager * error trace -> 'kind manager_operation_result
   | Skipped : 'kind Kind.manager -> 'kind manager_operation_result
 [@@coq_force_gadt]
 

@@ -209,9 +209,7 @@ let test_failing_operation_in_the_middle () =
   | Contents_result
       (Manager_operation_result {operation_result = Backtracked _; _})
     :: Contents_result
-         (Manager_operation_result
-           { operation_result = Failed (_, [Contract_storage.Balance_too_low _]);
-             _ })
+         (Manager_operation_result {operation_result = Failed (_, _); _})
        :: Contents_result
             (Manager_operation_result {operation_result = Skipped _; _})
           :: _ ->
@@ -266,9 +264,7 @@ let test_failing_operation_in_the_middle_with_fees () =
   | Contents_result
       (Manager_operation_result {operation_result = Backtracked _; _})
     :: Contents_result
-         (Manager_operation_result
-           { operation_result = Failed (_, [Contract_storage.Balance_too_low _]);
-             _ })
+         (Manager_operation_result {operation_result = Failed (_, _); _})
        :: Contents_result
             (Manager_operation_result {operation_result = Skipped _; _})
           :: _ ->
