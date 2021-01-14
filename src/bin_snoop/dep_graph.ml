@@ -281,8 +281,10 @@ let get_free_variables (type workload) (model : workload Model.t)
     (workload : workload) : Free_variable.Set.t =
   let applied = Model.apply model workload in
   let module M = (val applied) in
-  let module R = M (Costlang.Free_variables) in
-  R.applied
+  let module T0 = Costlang.Fold_constants (Costlang.Free_variables) in
+  let module T1 = Costlang.Beta_normalize (T0) in
+  let module R = M (T1) in
+  T0.prj @@ T1.prj R.applied
 
 let add_names (state : string Solver.state) (filename : string)
     (names : Free_variable.Set.t) : string Solver.state =
