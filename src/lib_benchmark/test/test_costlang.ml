@@ -69,8 +69,8 @@ let test_pp_2 () =
 
 let test_pp_3 () =
   PP.applied_linear
-  = "((fun size1 -> fun size2 -> (free(const) + (free(v1) * (size1 + size2))) \
-     10) 33)"
+  = "((fun size1 -> fun size2 -> (free(const) + (free(v1) * (size1 + \
+     size2)))) 10) 33"
 
 (* Test evaluation *)
 let test_eval1 () =

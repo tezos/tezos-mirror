@@ -111,7 +111,7 @@ module Pp : S with type 'a repr = string and type size = string = struct
 
   let lam ~name f = Format.asprintf "fun %s -> %s" name (f name)
 
-  let app f arg = Format.asprintf "(%s %s)" f arg
+  let app f arg = Format.asprintf "(%s) %s" f arg
 
   let let_ ~name m f = Format.asprintf "let %s = %s in %s" name m (f name)
 
