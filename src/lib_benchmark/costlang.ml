@@ -625,7 +625,7 @@ functor
 
     let lt x y = {repr = X.lt x.repr y.repr; hash = -1; tag = fresh ()}
 
-    let eq x y = {repr = X.lt x.repr y.repr; hash = -1; tag = fresh ()}
+    let eq x y = {repr = X.eq x.repr y.repr; hash = -1; tag = fresh ()}
 
     (* The functions below are _not_ hash-consed. *)
     let shift_left x i =
@@ -723,7 +723,7 @@ functor
 
     let lt x y = lift2 X.lt x y
 
-    let eq x y = lift2 X.lt x y
+    let eq x y = lift2 X.eq x y
 
     let lam : name:string -> ('a repr -> 'b repr) -> ('a -> 'b) repr =
      fun ~name f ->
