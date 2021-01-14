@@ -330,16 +330,36 @@ let to_graph (solved : string Solver.solved list) =
   let g = G.create ~size:len () in
   let solved_to_file =
     List.fold_left
-      (fun map {Solver.provides; meta; _} ->
+      (fun map {Solver.provides; meta; dependencies} ->
         Fv_set.fold
           (fun free_var map ->
             match Fv_map.find free_var map with
             | None ->
-                Fv_map.add free_var meta.data map
-            | Some other_file ->
-                raise
-                  (Variable_solved_by_several_datasets
-                     {free_var; filename = meta.data; other_file}))
+                Format.eprintf
+                  "%s is set as data source to solve %a@."
+                  meta.data
+                  Free_variable.pp
+                  free_var ;
+                Fv_map.add free_var (meta.data, dependencies) map
+            | Some (other_file, other_deps) ->
+                Format.eprintf
+                  "%s is a potential alternative dataset to %s for %a@."
+                  meta.data
+                  other_file
+                  pp_print_set
+                  provides ;
+                let this_card = Fv_set.cardinal dependencies in
+                let other_card = Fv_set.cardinal other_deps in
+                if this_card < other_card then (
+                  Format.eprintf
+                    "Picking new dataset as it induces lower-dimensional \
+                     problem@." ;
+                  Fv_map.add free_var (meta.data, dependencies) map )
+                else (
+                  Format.eprintf
+                    "Keeping former dataset as it induces lower-dimensional \
+                     problem@." ;
+                  map ))
           provides
           map)
       Fv_map.empty
@@ -352,8 +372,8 @@ let to_graph (solved : string Solver.solved list) =
           match Fv_map.find dep solved_to_file with
           | None ->
               raise (Missing_file_for_free_variable {free_var = dep})
-          | Some dep_file ->
-              G.add_edge g meta.data dep_file)
+          | Some (dep_file, _) ->
+              G.add_edge g dep_file meta.data)
         dependencies)
     solved ;
   g
