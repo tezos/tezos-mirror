@@ -43,10 +43,24 @@
  (action
   (run %{exe:resto_test.exe})))
 
+(executable
+ (name local_client_test)
+ (modules local_client_test)
+ (libraries resto-directory resto-json
+   resto-cohttp-local-client resto-cohttp resto-cohttp-client resto-cohttp-server
+   json-data-encoding ezjsonm
+   lwt lwt.unix))
+
+(alias
+ (name runtest_local_client)
+ (action
+  (run %{exe:local_client_test.exe})))
+
 (alias
  (name runtest)
  (deps
   (alias runtest_resto)
   (alias runtest_ezresto)
   (alias runtest_acl_unit_test)
-  (alias runtest_acl_integration_test)))
+  (alias runtest_acl_integration_test)
+  (alias runtest_local_client)))
