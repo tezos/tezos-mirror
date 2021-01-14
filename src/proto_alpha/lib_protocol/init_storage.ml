@@ -27,11 +27,7 @@
 
 open Logging
 
-let migrate_baker :
-    Raw_context.t ->
-    Signature.Public_key_hash.t ->
-    Raw_context.t tzresult Lwt.t =
- fun ctxt baker_pkh ->
+let migrate_baker ctxt baker_pkh =
   Contract_storage.get_public_key
     ctxt
     (Contract_repr.implicit_contract baker_pkh)
@@ -144,7 +140,7 @@ let migrate_baker :
       Storage.Baker.Frozen_rewards.init (ctxt, to_) cycle rewards)
   >>=? fun ctxt ->
   Storage.Contract.Frozen_rewards_008.clear (ctxt, from_contract)
-  >>= fun ctxt -> return ctxt
+  >>= fun ctxt -> return (ctxt, (pk, pkh, baker_hash))
 
 (* This is the genesis protocol: initialise the state *)
 let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
@@ -180,6 +176,12 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
       Storage.Block_priority.init ctxt 0
       >>=? fun ctxt -> Vote_storage.update_listings ctxt
   | Edo_008 ->
+      let clear_tree ctxt key =
+        Raw_context.get_tree ctxt key
+        >>=? fun tree ->
+        Raw_context.Tree.clear tree;
+        return ctxt
+      in
       (* 1. Baker accounts migration *)
       lwt_log_notice "1. Baker accounts migration" >>= fun () ->
       let nonce =
@@ -189,11 +191,80 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
                calm up." ]
       in
       let ctxt = Raw_context.init_origination_nonce ctxt nonce in
-      Storage.Delegates_008.fold ctxt ~init:(ok ctxt) ~f:(fun baker_pkh acc ->
-          Lwt.return acc >>=? fun ctxt -> migrate_baker ctxt baker_pkh)
-      >>=? fun ctxt ->
+      Storage.Delegates_008.fold
+        ctxt
+        ~init:(ok (ctxt, []))
+        ~f:(fun baker_pkh acc ->
+          Lwt.return acc
+          >>=? fun (ctxt, bakers) ->
+          migrate_baker ctxt baker_pkh
+          >|=? fun (ctxt, baker) -> (ctxt, baker :: bakers))
+      >>=? fun (ctxt, bakers) ->
       Storage.Delegates_008.clear ctxt
       >>= fun ctxt ->
+      (* The number of the bakers are small (< 3000).  We keep them
+         in memory to speed up the migration *)
+      (* prepare leaves of baker hashes *)
+      let build_find_baker_hash_tree =
+        let module Map = Map.Make(Baker_hash) in
+        Lwt_list.fold_left_s (fun map (_,_,bh) ->
+            Raw_context.Tree.add
+              (Raw_context.Tree.empty ctxt)
+              []
+              (Data_encoding.Binary.to_bytes_exn Baker_hash.encoding bh)
+            >|= fun tree ->
+            Map.add bh tree map)
+          Map.empty bakers
+        >|= fun map ->
+        fun bh -> Map.find_opt bh map
+      in
+      build_find_baker_hash_tree >>= fun find_baker_hash_tree ->
+      let find_baker_hash =
+        let module Map = Map.Make (struct
+          type t = Signature.Public_key_hash.t
+
+          let compare = Signature.Public_key_hash.compare
+        end) in
+        let map =
+          List.fold_left
+            (fun m (_pk, pkh, baker_hash) -> Map.add pkh baker_hash m)
+            Map.empty
+            bakers
+        in
+        fun pkh -> Map.find_opt pkh map
+      in
+      let find_baker_hash_result pkh =
+        match find_baker_hash pkh with
+        | Some x ->
+            ok x
+        | None ->
+            let open Raw_context in
+            storage_error
+              (Missing_key
+                 ( ["baker"; "consensus_key_rev_index"]
+                   @ Signature.Public_key_hash.to_path pkh ["consensus_key_rev"],
+                   Get ))
+      in
+      (* public_key binary -> baker_hash *)
+      let find_baker_hash_by_pkhbytes =
+        let module Map = Map.Make (struct
+          type t = bytes
+          let compare = Compare.Bytes.compare
+        end) in
+        let map =
+          List.fold_left
+            (fun m (_, pkh, baker_hash) ->
+              let pkhbytes =
+                Data_encoding.Binary.to_bytes_exn
+                  Signature.Public_key_hash.encoding
+                  pkh
+              in
+              Map.add pkhbytes baker_hash m)
+            Map.empty
+            bakers
+        in
+        fun pkhbytes -> Map.find_opt pkhbytes map
+      in
       let current_cycle = Raw_context.(current_level ctxt).cycle in
       (* Take a snapshot of the consensus keys *)
       lwt_log_notice "Take a snapshot of the consensus keys" >>= fun () ->
@@ -208,46 +279,191 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
       >>=? fun ctxt ->
       (* Migrate storages with references to original baker pkhs *)
       (* Contract.Delegate *)
-      lwt_log_notice "Contract.Delegate" >>= fun () ->
-      Storage.Contract.Delegate_008.fold
+      lwt_log_notice
+        "Contract.Delegate + Contract.Inactive_delegate + \
+         Contract.Delegate_desactivation"
+      >>= fun () ->
+      let map_contracts_index ctxt ~init f =
+        let index_key = ["contracts"; "index"] in
+        Raw_context.get_tree ctxt index_key
+        >>=? fun index_tree ->
+        Raw_context.Tree.fold
+          index_tree
+          []
+          ~depth:(`Eq 7)
+          ~init:(0, index_tree, init)
+          ~f:(fun key tree (nmod, index_tree, acc) ->
+              f key tree acc
+              >>= fun (modified, tree, acc) ->
+              ( if modified then Raw_context.Tree.add_tree index_tree key tree
+              else Lwt.return index_tree )
+              >|= fun index_tree ->
+              ((if modified then nmod + 1 else nmod), index_tree, acc))
+        >>= fun (nmod, index_tree, acc) ->
+        Raw_context.update_tree ctxt index_key index_tree
+        >>=? fun ctxt ->
+        clear_tree ctxt index_key
+        >|=? fun ctxt ->
+        (ctxt, nmod, acc)
+      in
+      map_contracts_index
         ctxt
-        ~init:(ok ctxt)
-        ~f:(fun contract pkh acc ->
-          Lwt.return acc
-          >>=? fun ctxt ->
-          Storage.Baker.Consensus_key_rev.find ctxt pkh
-          >>=? function
-          | None ->
-              (* NOTE There's one contract
-                 "tz1gNQpjio7F5HsR9bs37vBYZXfbWpZ34tpL" that's not registered
-                 as baker, but because of a bug in protocol 001 it has two
-                 originated contracts delegated to it:
-                  - KT1LLKuQLmxciFUif4yt6UyXFqEE3235emHE
-                  - KT19MYkajshb4DnpDyNC37Qm7DCbPh5GP5Sg
-                 We drop the delegations here.
-              *)
-              Storage.Contract.Delegate_008.remove ctxt contract >|= ok
-          | Some baker_hash -> (
-              let migrate_delegate ctxt =
-                (* Because the path has not changed, this will override 008
-                   value *)
-                Storage.Contract.Delegate.update ctxt contract baker_hash
-              in
-              match Contract_repr.is_implicit contract with
-              | Some contract_pkh -> (
-                  (* Check this the contract is a baker *)
-                  Storage.Baker.Consensus_key_rev.find ctxt contract_pkh
-                  >>=? function
-                  | None ->
-                      migrate_delegate ctxt
-                  | Some _ ->
-                      (* Baker contracts are no longer self-delegated, so we
-                         don't migrate this relation, instead we delete it *)
-                      Storage.Contract.Delegate_008.remove ctxt contract >|= ok
-                  )
+        ~init:(0, [], [])
+        (fun key tree (delegates, inactive_bakers, desactivations) ->
+          let get_baker_res () =
+            let contract =
+              match Contract_repr.Index.of_path key with
               | None ->
-                  migrate_delegate ctxt ))
-      >>=? fun ctxt ->
+                  assert false
+              | Some contract ->
+                  contract
+            in
+            match Contract_repr.is_implicit contract with
+            | None ->
+                Error contract
+            | Some baker ->
+                Ok baker
+          in
+          let get_baker () =
+            match get_baker_res () with
+            | Error contract ->
+                let message =
+                  Format.asprintf
+                    "baker \"%a\" is not implicit account"
+                    Contract_repr.pp
+                    contract
+                in
+                failwith message
+            | Ok baker ->
+                baker
+          in
+          (* Contract.Delegate *)
+          let delegate_key = ["delegate"] in
+          Raw_context.Tree.find tree delegate_key
+          >>= (function
+                | None ->
+                    Lwt.return (false, tree, delegates)
+                | Some pkh_bytes ->
+                    let delegate =
+                      match find_baker_hash_by_pkhbytes pkh_bytes with
+                      | None ->
+                          (* NOTE There's one contract
+                             "tz1gNQpjio7F5HsR9bs37vBYZXfbWpZ34tpL" that's not registered
+                             as baker, but because of a bug in protocol 001 it has two
+                             originated contracts delegated to it:
+                              - KT1LLKuQLmxciFUif4yt6UyXFqEE3235emHE
+                              - KT19MYkajshb4DnpDyNC37Qm7DCbPh5GP5Sg
+                             We drop the delegations here.
+                          *)
+                          None
+                      | Some baker_hash -> (
+                        match get_baker_res () with
+                        | Error _ ->
+                            Some baker_hash
+                        | Ok contract_pkh -> (
+                          (* Check this the contract is a baker *)
+                          match find_baker_hash contract_pkh with
+                          | None ->
+                              Some baker_hash
+                          | Some _ ->
+                              (* Baker contracts are no longer self-delegated, so we
+                               don't migrate this relation, instead we delete it *)
+                              None ) )
+                    in
+                    let delegate_tree =
+                      Option.map (fun bh ->
+                          match find_baker_hash_tree bh with
+                          | None -> assert false (* never fails *)
+                          | Some bht -> bht) delegate
+                    in
+                    Raw_context.Tree.add_or_remove_tree
+                      tree delegate_key delegate_tree
+                    >|= fun tree -> (true, tree, delegates + 1))
+          >>= fun (modded, tree, delegates) ->
+          (* Contract.Inactive_delegate -> Baker.Inactive *)
+          let inactive_delegate_key = ["inactive_delegate"] in
+          Raw_context.Tree.find tree inactive_delegate_key
+          >>= (function
+                | None ->
+                    Lwt.return (modded, tree, inactive_bakers) (* no update *)
+                | Some _ (* "inited" *) -> (
+                    let baker = get_baker () in
+                    match find_baker_hash baker with
+                    | None ->
+                        assert false
+                    | Some migrated_baker -> (
+                        let inactive_bakers =
+                          migrated_baker :: inactive_bakers
+                        in
+                        Raw_context.Tree.remove_existing
+                          tree
+                          inactive_delegate_key
+                        >>= function
+                        | Error _ ->
+                            assert false
+                        | Ok tree ->
+                            Lwt.return (true, tree, inactive_bakers) ) ))
+          >>= fun (moded, tree, inactive_bakers) ->
+          (* Contract.Delegate_desactivation -> Baker.Inactive *)
+          let delegate_desactivation_key = ["delegate_desactivation"] in
+          Raw_context.Tree.find tree delegate_desactivation_key
+          >>= (function
+                | None ->
+                    Lwt.return (moded, tree, desactivations) (* no update *)
+                | Some cycle_bytes -> (
+                    let cycle =
+                      match
+                        Data_encoding.Binary.of_bytes
+                          Cycle_repr.encoding
+                          cycle_bytes
+                      with
+                      | None ->
+                          assert false
+                      | Some cycle ->
+                          cycle
+                    in
+                    let baker = get_baker () in
+                    match find_baker_hash baker with
+                    | None ->
+                        assert false
+                    | Some migrated_baker -> (
+                        let desactivations =
+                          (migrated_baker, cycle) :: desactivations
+                        in
+                        Raw_context.Tree.remove_existing
+                          tree
+                          delegate_desactivation_key
+                        >>= function
+                        | Error _ ->
+                            assert false
+                        | Ok tree ->
+                            Lwt.return (true, tree, desactivations) ) ))
+          >|= fun (moded, tree, desactivations) ->
+          (moded, tree, (delegates, inactive_bakers, desactivations)))
+      >>=? fun (ctxt, nmod, (delegates, inactive_bakers, desactivations)) ->
+      lwt_log_notice "%d contracts updated" nmod
+      >>= fun () ->
+      lwt_log_notice "%d Cotract.Delegate updated" delegates
+      >>= fun () ->
+      Lwt_list.fold_left_s
+        (fun ctxt baker_hash -> Storage.Baker.Inactive.add ctxt baker_hash)
+        ctxt
+        inactive_bakers
+      >>= fun ctxt ->
+      lwt_log_notice
+        "%d Contract.Inactive_delegate updated"
+        (List.length inactive_bakers)
+      >>= fun () ->
+      Lwt_list.fold_left_s
+        (fun ctxt (migrated_baker, cycle) ->
+          Storage.Baker.Deactivation.add ctxt migrated_baker cycle)
+        ctxt
+        desactivations
+      >>= fun ctxt ->
+      lwt_log_notice
+        "%d Contract.Delegate_desactivations updated"
+        (List.length desactivations)
+      >>= fun () ->
       (* Active_delegates_with_rolls -> Baker.Active_with_rolls *)
       lwt_log_notice "Active_delegates_with_rolls -> Baker.Active_with_rolls" >>= fun () ->
       Storage.Active_delegates_with_rolls_008.fold
@@ -256,10 +472,9 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
         ~f:(fun pkh acc ->
           Lwt.return acc
           >>=? fun ctxt ->
-          Storage.Baker.Consensus_key_rev.get ctxt pkh
+          Lwt.return (find_baker_hash_result pkh)
           >>=? fun baker ->
-          Storage.Baker.Active_with_rolls.add ctxt baker
-          >>= fun ctxt -> return ctxt)
+          Storage.Baker.Active_with_rolls.add ctxt baker >|= ok)
       >>=? fun ctxt ->
       Storage.Active_delegates_with_rolls_008.clear ctxt
       >>= fun ctxt ->
@@ -278,7 +493,7 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
           ~f:(fun pkh acc ->
             Lwt.return acc
             >>=? fun ctxt ->
-            Storage.Baker.Consensus_key_rev.get ctxt pkh
+            Lwt.return (find_baker_hash_result pkh)
             >>=? fun baker ->
             Storage.Baker.With_frozen_balance.add (ctxt, cycle) baker
             >>= fun ctxt -> return ctxt)
@@ -295,80 +510,87 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
       in
       migrate_frozen_balance ctxt current_cycle
       >>=? fun ctxt ->
-      (* Contract.Inactive_delegate -> Baker.Inactive *)
-      lwt_log_notice "Contract.Inactive_delegate -> Baker.Inactive" >>= fun () ->
-      Storage.Contract.Inactive_delegate_008.fold
-        ctxt
-        ~init:(ok ctxt)
-        ~f:(fun inactive_baker acc ->
-          Lwt.return acc
-          >>=? fun ctxt ->
-          match Contract_repr.is_implicit inactive_baker with
-          | None ->
-              let message =
-                Format.asprintf
-                  "inactive baker `Contract.Inactive_delegate_008` \"%a\" is \
-                   not implicit account"
-                  Contract_repr.pp
-                  inactive_baker
+      (* public_key binary -> baker_hash *)
+      let find_baker_hash_by_pkbytes =
+        let module Map = Map.Make (struct
+          type t = bytes
+
+          let compare = Compare.Bytes.compare
+        end) in
+        let map =
+          List.fold_left
+            (fun m (pk, _, baker_hash) ->
+              let pkbytes =
+                Data_encoding.Binary.to_bytes_exn
+                  Signature.Public_key.encoding
+                  pk
               in
-              failwith message
-          | Some baker ->
-              Storage.Baker.Consensus_key_rev.get ctxt baker
-              >>=? fun migrated_baker ->
-              Storage.Baker.Inactive.add ctxt migrated_baker
-              >>= fun ctxt -> return ctxt)
-      >>=? fun ctxt ->
-      Storage.Contract.Inactive_delegate_008.clear ctxt
-      >>= fun ctxt ->
-      (* Contract.Delegate_desactivation -> Baker.Inactive *)
-      lwt_log_notice "Contract.Delegate_desactivation -> Baker.Inactive" >>= fun () ->
-      Storage.Contract.Delegate_desactivation_008.fold
-        ctxt
-        ~init:(ok ctxt)
-        ~f:(fun baker cycle acc ->
-          Lwt.return acc
-          >>=? fun ctxt ->
-          match Contract_repr.is_implicit baker with
-          | None ->
-              let message =
-                Format.asprintf
-                  "inactive baker `Contract.Delegate_desactivation_008` \
-                   \"%a\" is not implicit account"
-                  Contract_repr.pp
-                  baker
-              in
-              failwith message
-          | Some baker ->
-              Storage.Baker.Consensus_key_rev.get ctxt baker
-              >>=? fun migrated_baker ->
-              Storage.Baker.Deactivation.init ctxt migrated_baker cycle)
-      >>=? fun ctxt ->
-      Storage.Contract.Delegate_desactivation_008.clear ctxt
-      >>= fun ctxt ->
+              Map.add pkbytes baker_hash m)
+            Map.empty
+            bakers
+        in
+        fun pkbytes -> Map.find_opt pkbytes map
+      in
+      let rewrite_rolls ctxt key depth =
+        Raw_context.get_tree ctxt []
+        >>=? fun root_tree ->
+        Raw_context.Tree.fold
+          root_tree
+          key
+          ~depth:(`Eq depth)
+          ~init:(0,Raw_context.Tree.empty ctxt)
+          ~f:(fun key pkbytes_tree (i,acc) ->
+              Raw_context.Tree.to_value pkbytes_tree
+              >>= function
+              | None -> assert false
+              | Some pkbytes ->
+                  match find_baker_hash_by_pkbytes pkbytes with
+                  | None ->
+                      assert false
+                  | Some baker_hash ->
+                      Raw_context.Tree.add_tree
+                        acc
+                        key
+                        (match find_baker_hash_tree baker_hash with
+                         | None -> assert false (* never fails *)
+                         | Some bht -> bht)
+                      >|= fun acc ->
+                      (i+1,acc))
+        >>= fun (i,tree_snapshot) ->
+        Raw_context.update_tree ctxt key tree_snapshot
+        >|=? fun ctxt ->
+        Raw_context.Tree.clear root_tree;
+        (i,ctxt)
+      in
       (* Roll.Owner *)
-      lwt_log_notice "Roll.Owner" >>= fun () ->
-      Storage.Roll.Owner_008.fold ctxt ~init:(ok ctxt) ~f:(fun roll pk acc ->
-          Lwt.return acc
-          >>=? fun ctxt ->
-          let pkh = Signature.Public_key.hash pk in
-          Storage.Baker.Consensus_key_rev.get ctxt pkh
-          >>=? fun baker ->
-          (* because the path has not changed, this will override 008 value *)
-          Storage.Roll.Owner.update ctxt roll baker)
-      >>=? fun ctxt ->
-      lwt_log_notice "Roll.Owner.Snapshot" >>= fun () ->
-      Storage.Roll.Owner_008.Snapshot.fold
+      lwt_log_notice "Roll.Owner"
+      >>= fun () ->
+      rewrite_rolls ctxt ["rolls"; "owner"; "current"] 3
+      >>=? fun (n,ctxt) ->
+      lwt_log_notice "Roll.Owner: %d" n
+      >>= fun () ->
+      lwt_log_notice "Roll.Owner.Snapshot"
+      >>= fun () ->
+      Raw_context.fold
+        ~depth:(`Eq 2)
         ctxt
-        ~init:(ok ctxt)
-        ~f:(fun key pk acc ->
+        ["rolls"; "owner"; "snapshot"]
+        ~init:[]
+        ~f:(fun k _ ks -> Lwt.return (k :: ks))
+      >>= fun ks ->
+      Lwt_list.fold_left_s
+        (fun acc k ->
           Lwt.return acc
           >>=? fun ctxt ->
-          let pkh = Signature.Public_key.hash pk in
-          Storage.Baker.Consensus_key_rev.get ctxt pkh
-          >>=? fun baker ->
-          (* because the path has not changed, this will override 008 value *)
-          Storage.Roll.Owner.Snapshot.update ctxt key baker)
+          lwt_log_notice "Roll.Owner.Snapshot %s" (String.concat "/" k)
+          >>= fun () ->
+          rewrite_rolls ctxt (["rolls"; "owner"; "snapshot"] @ k) 3
+          >>=? fun (n,ctxt) ->
+          lwt_log_notice "Roll.Owner.Snapshot %s: %d" (String.concat "/" k) n
+          >|= fun () ->
+          ok ctxt)
+        (ok ctxt)
+        ks
       >>=? fun ctxt ->
       (* Vote.Listings *)
       lwt_log_notice "Vote.Listings" >>= fun () ->
@@ -378,7 +600,7 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
         ~f:(fun pkh listings acc ->
           Lwt.return acc
           >>=? fun ctxt ->
-          Storage.Baker.Consensus_key_rev.get ctxt pkh
+          Lwt.return (find_baker_hash_result pkh)
           >>=? fun baker ->
           Storage.Vote.Listings_008.remove ctxt pkh
           >>= fun ctxt -> Storage.Vote.Listings.init ctxt baker listings)
@@ -391,7 +613,7 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
         ~f:(fun (proposal, pkh) acc ->
           Lwt.return acc
           >>=? fun ctxt ->
-          Storage.Baker.Consensus_key_rev.get ctxt pkh
+          Lwt.return (find_baker_hash_result pkh)
           >>=? fun baker ->
           Storage.Vote.Proposals_008.remove ctxt (proposal, pkh)
           >>= fun ctxt ->
@@ -406,7 +628,7 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
         ~f:(fun pkh count acc ->
           Lwt.return acc
           >>=? fun ctxt ->
-          Storage.Baker.Consensus_key_rev.get ctxt pkh
+          Lwt.return (find_baker_hash_result pkh)
           >>=? fun baker ->
           Storage.Vote.Proposals_count_008.remove ctxt pkh
           >>= fun ctxt -> Storage.Vote.Proposals_count.init ctxt baker count)
@@ -419,7 +641,7 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
         ~f:(fun pkh ballot acc ->
           Lwt.return acc
           >>=? fun ctxt ->
-          Storage.Baker.Consensus_key_rev.get ctxt pkh
+          Lwt.return (find_baker_hash_result pkh)
           >>=? fun baker ->
           Storage.Vote.Ballots_008.remove ctxt pkh
           >>= fun ctxt -> Storage.Vote.Ballots.init ctxt baker ballot)
@@ -435,7 +657,7 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
             >>=? fun ctxt ->
             ( match nonce with
             | Unrevealed {nonce_hash; delegate; rewards; fees} ->
-                Storage.Baker.Consensus_key_rev.get ctxt delegate
+                Lwt.return (find_baker_hash_result delegate)
                 >>=? fun baker ->
                 return
                   (Storage.Cycle.Unrevealed {nonce_hash; baker; rewards; fees})
