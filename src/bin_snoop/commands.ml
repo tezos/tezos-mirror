@@ -350,6 +350,7 @@ module Infer_cmd = struct
       override_files = None;
       report = NoReport;
       save_solution = None;
+      dot_file = None;
     }
 
   let set_print_problem print_problem options = {options with print_problem}
@@ -377,6 +378,8 @@ module Infer_cmd = struct
 
   let set_save_solution save_solution options = {options with save_solution}
 
+  let set_dot_file dot_file options = {options with dot_file}
+
   let list_solvers () =
     Printf.eprintf "ridge --ridge-alpha=<float>\n" ;
     Printf.eprintf "lasso --lasso-alpha=<float> --lasso-positive\n" ;
@@ -391,7 +394,8 @@ module Infer_cmd = struct
         lasso_positive,
         report,
         override_files,
-        save_solution ) model_name workload_data solver () =
+        save_solution,
+        dot_file ) model_name workload_data solver () =
     let options =
       default_infer_parameters_options
       |> set_print_problem print_problem
@@ -402,6 +406,7 @@ module Infer_cmd = struct
       |> set_report report
       |> set_override_files override_files
       |> set_save_solution save_solution
+      |> set_dot_file dot_file
     in
     commandline_outcome_ref :=
       Some (Infer {model_name; workload_data; solver; infer_opts = options}) ;
@@ -499,11 +504,23 @@ module Infer_cmd = struct
         ~long:"save-solution"
         ~placeholder:"filename"
         override_file_param
+
+    let dot_file_arg =
+      let override_file_param =
+        Clic.parameter (fun (_ : unit) parsed -> return parsed)
+      in
+      Clic.arg
+        ~doc:
+          "Specify file to which dependency graph will be saved in graphviz \
+           format"
+        ~long:"dot-file"
+        ~placeholder:"filename"
+        override_file_param
   end
 
   let options =
     let open Options in
-    Clic.args9
+    Clic.args10
       print_problem
       dump_csv_arg
       plot_arg
@@ -513,6 +530,7 @@ module Infer_cmd = struct
       report_arg
       override_arg
       save_solution_arg
+      dot_file_arg
 
   let model_param =
     Clic.param

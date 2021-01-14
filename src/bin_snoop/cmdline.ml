@@ -70,7 +70,9 @@ type infer_parameters_options = {
   (* Source of CSV files for overriding free variables *)
   report : report;
   (* LaTeX report parameters *)
-  save_solution : string option; (* Serialise solution to given file *)
+  save_solution : string option;
+  (* Serialise solution to given file *)
+  dot_file : string option; (* Export dependency graph to graphviz format *)
 }
 
 (* Outcome of command-line parsing. *)

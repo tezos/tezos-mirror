@@ -191,9 +191,16 @@ and infer_cmd_full_auto model_name workload_data solver
     | _ ->
         Some (Report.create_empty ~name:"Report")
   in
+  Option.iter
+    (fun filename ->
+      let oc = open_out filename in
+      Dep_graph.D.output_graph oc graph ;
+      close_out oc)
+    infer_opts.dot_file ;
   let (map, report) =
     Dep_graph.T.fold
       (fun workload_file (overrides_map, report) ->
+        Format.eprintf "Processing: %s@." workload_file ;
         let measure = Hashtbl.find measurements workload_file in
         let overrides var = Free_variable.Map.find var overrides_map in
         let (Measure.Measurement ((module Bench), m)) = measure in
