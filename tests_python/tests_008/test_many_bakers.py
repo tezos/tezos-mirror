@@ -23,7 +23,7 @@ class TestManyBakers:
             sandbox.add_baker(i, f'bootstrap{i + 1}', proto=protocol.DAEMON)
 
     def test_wait(self):
-        time.sleep(5)
+        time.sleep(10)
 
     def test_progress(self, sandbox: Sandbox):
         min_level = min(
