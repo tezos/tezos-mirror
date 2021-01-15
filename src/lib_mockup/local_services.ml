@@ -58,10 +58,10 @@ let () =
 (* Since we bypass the node but still use the RPC mechanism for procedure
    calls, we have to register some RPCs ourselves. *)
 
-(* [MENV] is a thin extension of [Registration.Mockup_sig] comprising some
+(* [MENV] is a thin extension of [Registration.MOCKUP] comprising some
  * parameters used in most functions. *)
 module type MENV = sig
-  include Registration.Mockup_sig
+  include Registration.MOCKUP
 
   val chain_id : Chain_id.t
 
@@ -319,6 +319,18 @@ module Make (E : MENV) = struct
   let with_chain chain k =
     check_chain chain
     >>= function Error errs -> RPC_answer.fail errs | Ok () -> k ()
+
+  let shell_header () =
+    Directory.prefix
+      (Tezos_rpc.RPC_path.prefix
+         (* /chains/<chain> *)
+         Tezos_shell_services.Chain_services.path
+         (* blocks/<block_id> *)
+         Block_services.path)
+    @@ Directory.register
+         Directory.empty
+         E.Block_services.S.Header.shell_header
+         (fun _prefix () () -> RPC_answer.return E.rpc_context.block_header)
 
   let block_hash () =
     let path =
@@ -688,7 +700,7 @@ module Make (E : MENV) = struct
            operation_data), but it's not that easy to do;
            because types of concerned variables depend on E,
            which cannot cross functions boundaries without putting all that in
-           Mockup_sig *)
+           MOCKUP *)
           Files.Mempool.exists ~dirname:E.base_dir
           >>= function
           | true ->
@@ -705,6 +717,7 @@ module Make (E : MENV) = struct
     Directory.empty
     |> merge (p2p ())
     |> merge (chain ())
+    |> merge (shell_header ())
     |> merge (monitor ())
     |> merge (protocols E.Protocol.hash)
     |> merge (block_hash ())

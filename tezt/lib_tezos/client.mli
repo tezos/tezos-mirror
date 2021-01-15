@@ -128,6 +128,14 @@ val rpc_list : ?node:Node.t -> t -> string Lwt.t
 (** Same as [rpc_list], but do not wait for the process to exit. *)
 val spawn_rpc_list : ?node:Node.t -> t -> Process.t
 
+(** Run [tezos-client rpc /chains/<chain>/blocks/<block>/header/shell]. *)
+val shell_header :
+  ?node:Node.t -> ?chain:string -> ?block:string -> t -> string Lwt.t
+
+(** Same as [shell_header], but do not wait for the process to exit. *)
+val spawn_shell_header :
+  ?node:Node.t -> ?chain:string -> ?block:string -> t -> Process.t
+
 (** {2 Admin Client Commands} *)
 
 module Admin : sig

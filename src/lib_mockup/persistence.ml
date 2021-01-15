@@ -75,7 +75,7 @@ let get_registered_mockup :
     | Some protocol_hash -> (
       match
         List.find_opt
-          (fun (module Mockup : Registration.Mockup_sig) ->
+          (fun (module Mockup : Registration.MOCKUP) ->
             Protocol_hash.equal protocol_hash Mockup.protocol_hash)
           mockup_environments
       with

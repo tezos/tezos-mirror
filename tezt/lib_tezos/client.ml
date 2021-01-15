@@ -164,6 +164,14 @@ let spawn_rpc_list ?node client =
 let rpc_list ?node client =
   spawn_rpc_list ?node client |> Process.check_and_read_stdout
 
+let spawn_shell_header ?node ?(chain = "main") ?(block = "head") client =
+  let path = ["chains"; chain; "blocks"; block; "header"; "shell"] in
+  spawn_rpc ?node GET path client
+
+let shell_header ?node ?chain ?block client =
+  spawn_shell_header ?node ?chain ?block client
+  |> Process.check_and_read_stdout
+
 module Admin = struct
   let spawn_command = spawn_command ~admin:true
 

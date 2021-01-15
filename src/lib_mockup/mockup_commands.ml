@@ -31,7 +31,7 @@ let group =
 let list_mockup_command_handler _ _ =
   let available = Registration.get_registered_environments () in
   List.iter
-    (fun (mockup : (module Registration.Mockup_sig)) ->
+    (fun (mockup : (module Registration.MOCKUP)) ->
       let module Mockup = (val mockup) in
       Format.printf "%a@." Protocol_hash.pp Mockup.protocol_hash)
     available ;

@@ -148,18 +148,35 @@ let default_mockup_parameters : mockup_protocol_parameters =
     constants = parameters.constants;
   }
 
-let default_mockup_protocol_constants : protocol_constants_overrides =
-  let default = default_mockup_parameters in
-  {
-    hard_gas_limit_per_operation =
-      Some default.constants.hard_gas_limit_per_operation;
-    hard_gas_limit_per_block = Some default.constants.hard_gas_limit_per_block;
-    hard_storage_limit_per_operation =
-      Some default.constants.hard_storage_limit_per_operation;
-    cost_per_byte = Some default.constants.cost_per_byte;
-    chain_id = Some Tezos_mockup_registration.Mockup_args.Chain_id.dummy;
-    timestamp = Some default_mockup_parameters.initial_timestamp;
-  }
+let default_mockup_protocol_constants
+    (cctxt : Tezos_client_base.Client_context.full) :
+    protocol_constants_overrides tzresult Lwt.t =
+  let cpctxt = new Protocol_client_context.wrap_full cctxt in
+  Protocol.Constants_services.all cpctxt (cpctxt#chain, cpctxt#block)
+  >>=? fun constants_t ->
+  let { Protocol.Alpha_context.Constants.hard_gas_limit_per_operation;
+        hard_gas_limit_per_block;
+        hard_storage_limit_per_operation;
+        cost_per_byte;
+        _ } =
+    constants_t.parametric
+  in
+  let to_chain_id_opt = function `Hash c -> Some c | _ -> None in
+  Shell_services.Blocks.Header.shell_header
+    cpctxt
+    ~chain:cpctxt#chain
+    ~block:cpctxt#block
+    ()
+  >>=? fun header ->
+  return
+    {
+      hard_gas_limit_per_operation = Some hard_gas_limit_per_operation;
+      hard_gas_limit_per_block = Some hard_gas_limit_per_block;
+      hard_storage_limit_per_operation = Some hard_storage_limit_per_operation;
+      cost_per_byte = Some cost_per_byte;
+      chain_id = to_chain_id_opt cpctxt#chain;
+      timestamp = Some header.timestamp;
+    }
 
 (* Use the wallet to convert a bootstrap account's public key
   into a parsed_account_repr secret key Uri *)
@@ -247,6 +264,7 @@ let apply_protocol_overrides (cctxt : Tezos_client_base.Client_context.full)
     || Option.is_some o.hard_gas_limit_per_block
     || Option.is_some o.hard_storage_limit_per_operation
     || Option.is_some o.cost_per_byte
+    || Option.is_some o.chain_id
   in
   ( if has_custom then
     let pp_opt_custom name pp ppf opt_value =
@@ -257,7 +275,7 @@ let apply_protocol_overrides (cctxt : Tezos_client_base.Client_context.full)
           Format.fprintf ppf "@[<h>%s: %a@]@," name pp value
     in
     cctxt#message
-      "@[<v>mockup client uses protocol overrides:@,%a%a%a%a@]@?"
+      "@[<v>mockup client uses protocol overrides:@,%a%a%a%a%a@]@?"
       (pp_opt_custom "hard_gas_limit_per_operation" Gas.Arith.pp_integral)
       o.hard_gas_limit_per_operation
       (pp_opt_custom "hard_gas_limit_per_block" Gas.Arith.pp_integral)
@@ -266,6 +284,8 @@ let apply_protocol_overrides (cctxt : Tezos_client_base.Client_context.full)
       o.hard_storage_limit_per_operation
       (pp_opt_custom "cost_per_byte" Tez.pp)
       o.cost_per_byte
+      (pp_opt_custom "chain_id" Chain_id.pp)
+      o.chain_id
   else Lwt.return_unit )
   >>= fun () ->
   return
@@ -464,7 +484,7 @@ let migrate :
 
 let () =
   let open Tezos_mockup_registration.Registration in
-  let module M : Mockup_sig = struct
+  let module M : MOCKUP = struct
     type parameters = mockup_protocol_parameters
 
     type protocol_constants = protocol_constants_overrides

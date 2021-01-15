@@ -23,14 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Type of a mockup environment *)
-
-(** Modules of this type should be prepared protocol-side and registered here to
-    become available to the mockup facility.  *)
-
 type mockup_context = Chain_id.t * Tezos_protocol_environment.rpc_context
 
-module type Mockup_sig = sig
+module type MOCKUP = sig
   type parameters
 
   type protocol_constants
@@ -39,13 +34,13 @@ module type Mockup_sig = sig
 
   val protocol_constants_encoding : protocol_constants Data_encoding.t
 
-  (** Content equivalent to the default value of --bootstrap-acounts *)
   val default_bootstrap_accounts :
     Tezos_client_base.Client_context.full -> string tzresult Lwt.t
 
   val default_parameters : parameters
 
-  val default_protocol_constants : protocol_constants
+  val default_protocol_constants :
+    Tezos_client_base.Client_context.full -> protocol_constants tzresult Lwt.t
 
   val protocol_hash : Protocol_hash.t
 
@@ -71,7 +66,7 @@ module type Mockup_sig = sig
   val migrate : mockup_context -> mockup_context tzresult Lwt.t
 end
 
-type mockup_environment = (module Mockup_sig)
+type mockup_environment = (module MOCKUP)
 
 let registered : mockup_environment list ref = ref []
 

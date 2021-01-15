@@ -36,6 +36,7 @@ here either.
 
 - Add `--version` flag
 
+- Fixed commands `--mode mockup config show` and `--mode mockup config init` which returned the default values rather than the actual ones.
 ## Baker / Endorser / Accuser
 
 - Add `--version` flag

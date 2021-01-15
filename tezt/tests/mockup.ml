@@ -46,6 +46,19 @@ let test_rpc_list ~protocol =
   let* _ = Client.rpc_list client in
   Lwt.return_unit
 
+(* Test.
+   Call `tezos-client rpc /chains/<chain_id>/blocks/<block_id>/header/shell` and check that return code is 0.
+ *)
+let test_rpc_header_shell ~protocol =
+  Test.register
+    ~__FILE__
+    ~title:(sf "%s: rpc header/shell (mockup)" (Protocol.name protocol))
+    ~tags:[Protocol.tag protocol; "mockup"; "client"; "rpc"]
+  @@ fun () ->
+  let* client = Client.init_mockup ~protocol () in
+  let* _ = Client.shell_header client in
+  Lwt.return_unit
+
 let transfer_data =
   (Constant.bootstrap1.alias, Tez.one, Constant.bootstrap2.alias)
 
@@ -327,4 +340,5 @@ let register protocol =
   test_transfer ~protocol ;
   test_simple_baking_event ~protocol ;
   test_multiple_baking ~protocol ;
+  test_rpc_header_shell ~protocol ;
   test_migration_transfer ()

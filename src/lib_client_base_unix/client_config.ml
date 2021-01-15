@@ -593,11 +593,13 @@ let config_show_mockup (cctxt : #Client_context.full)
     mockup_bootstrap_accounts
     bootstrap_accounts_string
   >>= fun () ->
+  Mockup.default_protocol_constants cctxt
+  >>=? fun protocol_constants ->
   cctxt#message
     "@[<v>Default value of --%s:@,%a@]"
     mockup_protocol_constants
     (json_pp Mockup.protocol_constants_encoding)
-    Mockup.default_protocol_constants
+    protocol_constants
   >>= return
 
 (* The implementation of ["config"; "init"] when --mode is "client" *)
@@ -639,10 +641,12 @@ let config_init_mockup cctxt protocol_hash_opt bootstrap_accounts_file
     mockup_bootstrap_accounts
     bootstrap_accounts_file
   >>= fun () ->
+  Mockup.default_protocol_constants cctxt
+  >>=? fun protocol_constants ->
   let string_to_write =
     Data_encoding.Json.construct
       Mockup.protocol_constants_encoding
-      Mockup.default_protocol_constants
+      protocol_constants
   in
   Lwt_utils_unix.Json.write_file protocol_constants_file string_to_write
   >>=? fun () ->
