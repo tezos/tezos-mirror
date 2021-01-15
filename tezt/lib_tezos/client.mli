@@ -216,8 +216,8 @@ val gen_and_show_keys : alias:string -> t -> Account.key Lwt.t
 val transfer :
   ?node:Node.t ->
   ?wait:string ->
-  ?args:string list ->
-  amount:int ->
+  ?burn_cap:Tez.t ->
+  amount:Tez.t ->
   giver:string ->
   receiver:string ->
   t ->
@@ -227,8 +227,8 @@ val transfer :
 val spawn_transfer :
   ?node:Node.t ->
   ?wait:string ->
-  ?args:string list ->
-  amount:int ->
+  ?burn_cap:Tez.t ->
+  amount:Tez.t ->
   giver:string ->
   receiver:string ->
   t ->
@@ -302,9 +302,9 @@ val originate_contract :
   ?node:Node.t ->
   ?wait:string ->
   ?init:string ->
-  ?burn_cap:int ->
+  ?burn_cap:Tez.t ->
   alias:string ->
-  amount:int ->
+  amount:Tez.t ->
   src:string ->
   prg:string ->
   t ->
@@ -315,9 +315,9 @@ val spawn_originate_contract :
   ?node:Node.t ->
   ?wait:string ->
   ?init:string ->
-  ?burn_cap:int ->
+  ?burn_cap:Tez.t ->
   alias:string ->
-  amount:int ->
+  amount:Tez.t ->
   src:string ->
   prg:string ->
   t ->

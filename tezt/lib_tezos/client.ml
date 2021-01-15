@@ -293,17 +293,20 @@ let gen_and_show_keys ~alias client =
   let* () = gen_keys ~alias client in
   show_address ~show_secret:true ~alias client
 
-let spawn_transfer ?node ?(wait = "none") ?(args = []) ~amount ~giver ~receiver
+let spawn_transfer ?node ?(wait = "none") ?burn_cap ~amount ~giver ~receiver
     client =
   spawn_command
     ?node
     client
     ( ["--wait"; wait]
-    @ ["transfer"; string_of_int amount; "from"; giver; "to"; receiver]
-    @ args )
+    @ ["transfer"; Tez.to_string amount; "from"; giver; "to"; receiver]
+    @ Option.fold
+        ~none:[]
+        ~some:(fun b -> ["--burn-cap"; Tez.to_string b])
+        burn_cap )
 
-let transfer ?node ?wait ?args ~amount ~giver ~receiver client =
-  spawn_transfer ?node ?wait ?args ~amount ~giver ~receiver client
+let transfer ?node ?wait ?burn_cap ~amount ~giver ~receiver client =
+  spawn_transfer ?node ?wait ?burn_cap ~amount ~giver ~receiver client
   |> Process.check
 
 let spawn_set_delegate ?node ?(wait = "none") ~src ~delegate client =
@@ -393,7 +396,7 @@ let spawn_originate_contract ?node ?(wait = "none") ?init ?burn_cap ~alias
         "contract";
         alias;
         "transferring";
-        Int.to_string amount;
+        Tez.to_string amount;
         "from";
         src;
         "running";
@@ -401,7 +404,7 @@ let spawn_originate_contract ?node ?(wait = "none") ?init ?burn_cap ~alias
     @ Option.fold ~none:[] ~some:(fun init -> ["--init"; init]) init
     @ Option.fold
         ~none:[]
-        ~some:(fun burn_cap -> ["--burn-cap"; string_of_int burn_cap])
+        ~some:(fun burn_cap -> ["--burn-cap"; Tez.to_string burn_cap])
         burn_cap )
 
 let originate_contract ?node ?wait ?init ?burn_cap ~alias ~amount ~src ~prg

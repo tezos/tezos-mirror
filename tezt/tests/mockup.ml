@@ -46,7 +46,8 @@ let test_rpc_list ~protocol =
   let* _ = Client.rpc_list client in
   Lwt.return_unit
 
-let transfer_data = (Constant.bootstrap1.alias, 1, Constant.bootstrap2.alias)
+let transfer_data =
+  (Constant.bootstrap1.alias, Tez.one, Constant.bootstrap2.alias)
 
 let test_balances_after_transfer giver amount receiver =
   let (giver_balance_before, giver_balance_after) = giver in
@@ -82,7 +83,11 @@ let test_transfer ~protocol =
   let* receiver_balance_before =
     Client.get_balance_for ~account:receiver client
   in
-  Log.info "About to transfer %d from %s to %s" amount giver receiver ;
+  Log.info
+    "About to transfer %s from %s to %s"
+    (Tez.to_string amount)
+    giver
+    receiver ;
   let* () = Client.transfer ~amount ~giver ~receiver client in
   let* giver_balance_after = Client.get_balance_for ~account:giver client in
   let* receiver_balance_after =
@@ -90,7 +95,7 @@ let test_transfer ~protocol =
   in
   test_balances_after_transfer
     (giver_balance_before, giver_balance_after)
-    (float_of_int amount)
+    (Tez.to_float amount)
     (receiver_balance_before, receiver_balance_after) ;
   return ()
 
@@ -106,7 +111,11 @@ let test_simple_baking_event ~protocol =
   let* client =
     Client.init_mockup ~sync_mode:Client.Asynchronous ~protocol ()
   in
-  Log.info "Transferring %d from %s to %s" amount giver receiver ;
+  Log.info
+    "Transferring %s from %s to %s"
+    (Tez.to_string amount)
+    giver
+    receiver ;
   let* () = Client.transfer ~amount ~giver ~receiver client in
   Log.info "Baking pending operations..." ;
   Client.bake_for ~key:giver client
@@ -125,10 +134,10 @@ let test_same_transfer_twice ~protocol =
     Client.init_mockup ~sync_mode:Client.Asynchronous ~protocol ()
   in
   let mempool_file = Client.base_dir client // "mockup" // "mempool.json" in
-  Log.info "Transfer %d from %s to %s" amount giver receiver ;
+  Log.info "Transfer %s from %s to %s" (Tez.to_string amount) giver receiver ;
   let* () = Client.transfer ~amount ~giver ~receiver client in
   let* mempool1 = read_file mempool_file in
-  Log.info "Transfer %d from %s to %s" amount giver receiver ;
+  Log.info "Transfer %s from %s to %s" (Tez.to_string amount) giver receiver ;
   let* () = Client.transfer ~amount ~giver ~receiver client in
   let* mempool2 = read_file mempool_file in
   Log.info "Checking that mempool is unchanged" ;
@@ -155,14 +164,13 @@ let test_transfer_same_participants ~protocol =
   let base_dir = Client.base_dir client in
   let mempool_file = base_dir // "mockup" // "mempool.json" in
   let thrashpool_file = base_dir // "mockup" // "trashpool.json" in
-  Log.info "Transfer %d from %s to %s" amount giver receiver ;
+  Log.info "Transfer %s from %s to %s" (Tez.to_string amount) giver receiver ;
   let* () = Client.transfer ~amount ~giver ~receiver client in
   let* mempool1 = read_file mempool_file in
-  Log.info "Transfer %d from %s to %s" (amount + 1) giver receiver ;
+  let amount = Tez.(amount + one) in
+  Log.info "Transfer %s from %s to %s" (Tez.to_string amount) giver receiver ;
   (* The next process is expected to fail *)
-  let process =
-    Client.spawn_transfer ~amount:(amount + 1) ~giver ~receiver client
-  in
+  let process = Client.spawn_transfer ~amount ~giver ~receiver client in
   let* status = Process.wait process in
   if status = Unix.WEXITED 0 then
     Test.fail "Last transfer was successful but was expected to fail ..." ;
@@ -195,6 +203,7 @@ let test_multiple_baking ~protocol =
   in
   Lwt_list.iteri_s
     (fun i amount ->
+      let amount = Tez.of_int amount in
       let* () = Client.transfer ~amount ~giver:alice ~receiver:bob client in
       let* () = Client.transfer ~amount ~giver:bob ~receiver:alice client in
       let* () = Client.bake_for ~key:baker client in

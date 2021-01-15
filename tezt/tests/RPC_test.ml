@@ -108,10 +108,10 @@ let test_contracts_alpha client =
   let bootstrap1 = "bootstrap1" in
   let* () =
     Client.transfer
-      ~amount:100
+      ~amount:Tez.(of_int 100)
       ~giver:bootstrap1
       ~receiver:simple_implicit_key.public_key_hash
-      ~args:["--burn-cap"; "0.257"]
+      ~burn_cap:Constant.implicit_account_burn
       client
   in
   let* () = Client.bake_for client in
@@ -139,10 +139,10 @@ let test_contracts_alpha client =
   in
   let* () =
     Client.transfer
-      ~amount:100
+      ~amount:Tez.(of_int 100)
       ~giver:bootstrap1
       ~receiver:delegated_implicit
-      ~args:["--burn-cap"; "0.257"]
+      ~burn_cap:Constant.implicit_account_burn
       client
   in
   let* () = Client.bake_for client in
@@ -206,11 +206,11 @@ let test_contracts_alpha client =
   let* originated_contract_simple =
     Client.originate_contract
       ~alias:"originated_contract_simple"
-      ~amount:0
+      ~amount:Tez.zero
       ~src:"bootstrap1"
       ~prg:"file:./tezt/tests/contracts/proto_alpha/str_id.tz"
       ~init:"Some \"initial storage\""
-      ~burn_cap:3
+      ~burn_cap:Tez.(of_int 3)
       client
   in
   let* () = Client.bake_for client in
@@ -220,11 +220,11 @@ let test_contracts_alpha client =
   let* originated_contract_advanced =
     Client.originate_contract
       ~alias:"originated_contract_advanced"
-      ~amount:0
+      ~amount:Tez.zero
       ~src:"bootstrap1"
       ~prg:"file:./tezt/tests/contracts/proto_alpha/big_map_entrypoints.tz"
       ~init:"Pair { Elt \"dup\" 0 } { Elt \"dup\" 1 ; Elt \"test\" 5 }"
-      ~burn_cap:3
+      ~burn_cap:Tez.(of_int 3)
       client
   in
   let* () = Client.bake_for client in
@@ -286,10 +286,10 @@ let test_contracts_007 client =
   let bootstrap1 = "bootstrap1" in
   let* () =
     Client.transfer
-      ~amount:100
+      ~amount:Tez.(of_int 100)
       ~giver:bootstrap1
       ~receiver:simple_implicit_key.public_key_hash
-      ~args:["--burn-cap"; "0.257"]
+      ~burn_cap:Constant.implicit_account_burn
       client
   in
   let* () = Client.bake_for client in
@@ -317,10 +317,10 @@ let test_contracts_007 client =
   in
   let* () =
     Client.transfer
-      ~amount:100
+      ~amount:Tez.(of_int 100)
       ~giver:bootstrap1
       ~receiver:delegated_implicit
-      ~args:["--burn-cap"; "0.257"]
+      ~burn_cap:Constant.implicit_account_burn
       client
   in
   let* () = Client.bake_for client in
@@ -383,11 +383,11 @@ let test_contracts_007 client =
   let* originated_contract_simple =
     Client.originate_contract
       ~alias:"originated_contract_simple"
-      ~amount:0
+      ~amount:Tez.zero
       ~src:"bootstrap1"
       ~prg:"file:./tezt/tests/contracts/proto_007/str_id.tz"
       ~init:"Some \"initial storage\""
-      ~burn_cap:3
+      ~burn_cap:Tez.(of_int 3)
       client
   in
   let* () = Client.bake_for client in
@@ -396,11 +396,11 @@ let test_contracts_007 client =
   let* originated_contract_advanced =
     Client.originate_contract
       ~alias:"originated_contract_advanced"
-      ~amount:0
+      ~amount:Tez.zero
       ~src:"bootstrap1"
       ~prg:"file:./tezt/tests/contracts/proto_007/big_map_entrypoints.tz"
       ~init:"Pair { Elt \"dup\" 0 } { Elt \"dup\" 1 ; Elt \"test\" 5 }"
-      ~burn_cap:3
+      ~burn_cap:Tez.(of_int 3)
       client
   in
   let* () = Client.bake_for client in

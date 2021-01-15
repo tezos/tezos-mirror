@@ -70,7 +70,7 @@ let transfer protocol =
   let* () =
     Client.transfer
       ~wait:"none"
-      ~amount:5
+      ~amount:Tez.(of_int 5)
       ~giver:"bootstrap1"
       ~receiver:"bootstrap2"
       client
@@ -81,7 +81,7 @@ let transfer protocol =
   let* () =
     Client.transfer
       ~wait:"none"
-      ~amount:10
+      ~amount:Tez.(of_int 10)
       ~giver:"bootstrap2"
       ~receiver:"bootstrap3"
       client

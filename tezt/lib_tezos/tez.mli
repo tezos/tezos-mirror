@@ -1,8 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
+(* Copyright (c) 2021 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,69 +23,32 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let tezos_client = "./tezos-client"
+(** Helpers for dealing with units of tez.
 
-let tezos_admin_client = "./tezos-admin-client"
+    Please note that none of the functions here perform any bounds checks. *)
 
-let tezos_node = "./tezos-node"
+(** A unit of tez *)
+type t
 
-let tezos_codec = "./tezos-codec"
+(** Make [t] from the whole number of tez. This doesn't perform any bounds
+    checks. *)
+val of_int : int -> t
 
-type key = {identity : string; alias : string; secret : string}
+(** Make [t] from the whole number of micro tez. This doesn't perform any bounds
+    checks. *)
+val of_mutez_int : int -> t
 
-let activator =
-  {
-    identity = "";
-    (* FIXME: could be computed *)
-    alias = "activator";
-    secret =
-      "unencrypted:edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6";
-  }
+(** 0 tez *)
+val zero : t
 
-let bootstrap1 =
-  {
-    identity = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
-    alias = "bootstrap1";
-    secret =
-      "unencrypted:edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh";
-  }
+(** 1 tez *)
+val one : t
 
-let bootstrap2 =
-  {
-    identity = "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN";
-    alias = "bootstrap2";
-    secret =
-      "unencrypted:edsk39qAm1fiMjgmPkw1EgQYkMzkJezLNewd7PLNHTkr6w9XA2zdfo";
-  }
+(** Convert [t] to a string. *)
+val to_string : t -> string
 
-let bootstrap3 =
-  {
-    identity = "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU";
-    alias = "bootstrap3";
-    secret =
-      "unencrypted:edsk4ArLQgBTLWG5FJmnGnT689VKoqhXwmDPBuGx3z4cvwU9MmrPZZ";
-  }
+(** Convert [t] to a float of tez. *)
+val to_float : t -> float
 
-let bootstrap4 =
-  {
-    identity = "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv";
-    alias = "bootstrap4";
-    secret =
-      "unencrypted:edsk2uqQB9AY4FvioK2YMdfmyMrer5R8mGFyuaLLFfSRo8EoyNdht3";
-  }
-
-let bootstrap5 =
-  {
-    identity = "tz1ddb9NMYHZi5UzPdzTZMYQQZoMub195zgv";
-    alias = "bootstrap5";
-    secret =
-      "unencrypted:edsk4QLrcijEffxV31gGdN2HU7UpyJjA8drFoNcmnB28n89YjPNRFm";
-  }
-
-let all_secret_keys =
-  [activator; bootstrap1; bootstrap2; bootstrap3; bootstrap4; bootstrap5]
-
-(** The default burn for an implicit account. *)
-let implicit_account_burn =
-  (* as per the "origination_size" constant *)
-  Tez.of_mutez_int 257_000
+(** Addition. This doesn't perform any bounds checks. *)
+val ( + ) : t -> t -> t
