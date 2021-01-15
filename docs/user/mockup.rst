@@ -40,13 +40,14 @@ following command:
 
     $ tezos-client list mockup protocols
 
-At the time of writing, two protocols are supported hence the output should
+At the time of writing, three protocols are supported hence the output should
 be the following (ignore the Warning if there is any):
 
 ::
 
     ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
-    PsCARTHAGazKbHtnKfLzQg3kms52kSRpgnDY982a9oYsSXRLQEb
+    PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq
+    PsDELPH1Kxsxt8f9eWbxQeRxkjfbxoqM52jvs5Y5fBxWWh4ifpo
 
 To create the mockup client state, issue the following command:
 
