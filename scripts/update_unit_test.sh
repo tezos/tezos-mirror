@@ -1,4 +1,4 @@
-#! /usr/bin/env bash
+#! /bin/bash
 
 # This script is for automatically updating the tests in `.gitlab-ci.yml`. This
 # script specifically updates the unit tests, the script

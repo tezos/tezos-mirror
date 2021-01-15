@@ -91,7 +91,6 @@ let populate (cctxt : #Tezos_client_base.Client_context.io_wallet)
           return accounts
       | exception _e ->
           failwith
-            "cannot read definitions of bootstrap accounts in %s because: %s"
-            accounts_file
-            (Printexc.to_string _e) ) )
+            "cannot read definitions of bootstrap accounts in %s"
+            accounts_file ) )
   >>=? List.iter_es (add_bootstrap_secret cctxt)
