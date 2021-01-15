@@ -165,6 +165,8 @@ While working on your branch to prepare a Merge Request, make sure you respect t
 -  If you add new functions to an interface, don’t forget to
    document the function in the interface (in the corresponding .mli file; or,
    if there is no .mli file, directly in the .ml file)
+-  If your MR introduces new dependencies to opam packages, follow the
+   :ref:`additional instructions <adding_new_dependencies>`.
 -  Check whether your changes need to be reflected in changes to the
    corresponding README file (the one in the directory of the patched
    files). If your changes concern several directories, check all the
@@ -274,6 +276,20 @@ any subitems represent the longer description of that commit)::
 
 **Beware**: No MR targeting the ``master`` should touch
 ``src/proto_alpha/lib_protocol`` (see :ref:`protocol MRs <protocol_mr>`)
+
+.. _adding_new_dependencies:
+
+Special case: MRs that introduce a new dependency
+-------------------------------------------------
+
+In the special case where your MR adds a new opam dependency or updates an
+existing opam dependency, you will need to follow
+:ref:`this additional dedicated guide <adding_new_opam_dependency>`.
+
+In the special case where your MR adds a new Python, Rust, Javascript, or other
+dependency, additional steps must also be followed. There is currently no
+dedicated guide. Do not hesitate to ask for help on the ``#devteam`` channel of
+the developer channel.
 
 .. _protocol_mr:
 
