@@ -5,18 +5,25 @@ import pytest
 from tools import utils, paths, constants
 from tools.utils import assert_run_failure
 from . import contract_paths
+from . import protocol
+
+PROTO = "008_PtEdoTez"
+CONTRACT_PATH = path.join(
+    paths.TEZOS_HOME, 'src', f'proto_{PROTO}', 'lib_protocol', 'test'
+)
+TX_AMOUNT = 100.0
 
 
 # TODO: Use a random valid memo size for shielded-tez and others
 @pytest.fixture
 def contract_path():
-    return f"{paths.TEZOS_HOME}/src/proto_alpha/lib_protocol/test"
+    return CONTRACT_PATH
 
 
 @pytest.fixture(scope="class")
 def sandbox(sandbox):
     sandbox.add_node(0, params=constants.NODE_PARAMS)
-    utils.activate_alpha(sandbox.client(0), activate_in_the_past=True)
+    protocol.activate(sandbox.client(0), activate_in_the_past=True)
     return sandbox
 
 
@@ -74,6 +81,18 @@ def non_originated_contract_name():
 @pytest.fixture
 def key_name():
     return "test_key_name"
+
+
+# here baker 'account' has baked a block and has sent 'tx_amount'
+def check_baker_balance(client, account, tx_amount):
+    parameters = dict(protocol.PARAMETERS)
+    initial_amount = float(parameters["bootstrap_accounts"][0][1])
+    deposit = float(parameters["block_security_deposit"])
+    # sender's balance without fees
+    expected_baker_balance = (initial_amount - deposit) / 1000000 - tx_amount
+    baker_balance = client.get_balance(account)
+    # the fees are assumed to be at most 1 tez
+    assert expected_baker_balance - 1 <= baker_balance <= expected_baker_balance
 
 
 @pytest.mark.client
@@ -235,10 +254,7 @@ class TestSaplingShieldedTez:
 
     @pytest.fixture
     def contract_path(self):
-        return (
-            f'{paths.TEZOS_HOME}src/proto_alpha/lib_protocol/test/'
-            'contracts/sapling_contract.tz'
-        )
+        return path.join(CONTRACT_PATH, 'contracts', 'sapling_contract.tz')
 
     @pytest.fixture
     def contract_name(self):
@@ -323,25 +339,23 @@ class TestSaplingShieldedTez:
 
     def test_shield_bob_address_0(self, client, session, contract_name):
         client.sapling_shield(
-            amount=100.0,
+            amount=TX_AMOUNT,
             src="bootstrap2",
             dest=session['bob_address_0'],
             contract=contract_name,
             args=["--burn-cap", "3.0"],
         )
         client.bake("bootstrap2", ["--minimal-timestamp"])
-        bootstrap2_balance = client.get_balance("bootstrap2")
-        # Fees
-        assert 3999387 <= bootstrap2_balance <= 3999388
+        check_baker_balance(client, "bootstrap2", TX_AMOUNT)
         bob_balance = client.sapling_get_balance(
             key_name="bob", contract_name=contract_name
         ).balance
-        assert bob_balance == 100
+        assert bob_balance == TX_AMOUNT
 
     def test_check_contract_balance_after_shielding(
         self, client, contract_name
     ):
-        assert client.get_balance(contract_name) == 100.0
+        assert client.get_balance(contract_name) == TX_AMOUNT
 
     def test_regenerate_bob_from_mnemonic(self, client, session):
         # Overwrite the old 'bob' key with one restored from the mnemonic.
@@ -390,7 +404,7 @@ class TestSaplingShieldedTez:
 
     def test_alice_shields_money(self, client, session, contract_name):
         client.sapling_shield(
-            amount=100.0,
+            amount=TX_AMOUNT,
             src="bootstrap3",
             dest=session['alice_address_0'],
             contract=contract_name,
@@ -400,13 +414,11 @@ class TestSaplingShieldedTez:
             ],
         )
         client.bake("bootstrap3", ["--minimal-timestamp"])
-        bootstrap3_balance = client.get_balance("bootstrap3")
-        assert bootstrap3_balance >= 3999387
-        assert bootstrap3_balance <= 3999388
+        check_baker_balance(client, "bootstrap3", TX_AMOUNT)
         alice_balance = client.sapling_get_balance(
             key_name="alice", contract_name=contract_name
         ).balance
-        assert alice_balance == 100.0
+        assert alice_balance == TX_AMOUNT
 
     @pytest.mark.parametrize(
         "transaction_file,use_json",
@@ -442,7 +454,7 @@ class TestSaplingShieldedTez:
     ):
         transaction_file = f'{tmpdir}/sapling_transaction0.bin'
         client.sapling_forge_transaction(
-            amount=100.0,
+            amount=TX_AMOUNT,
             src='alice',
             dest=session['bob_address_0'],
             contract=contract_name,
@@ -462,7 +474,7 @@ class TestSaplingShieldedTez:
         )
 
     @pytest.mark.parametrize(
-        "key_name,expected_balance", [("alice", 100.0), ("bob", 100.0)]
+        "key_name,expected_balance", [("alice", TX_AMOUNT), ("bob", TX_AMOUNT)]
     )
     def test_check_sapling_balances_post_forge_binary_format(
         self, client, contract_name, key_name, expected_balance
@@ -844,7 +856,7 @@ class TestSaplingDifferentMemosize:
         # Key was registered with a memo_size of 16, it should fail
         with assert_run_failure(r"Memo sizes of two sapling states"):
             client.sapling_shield(
-                amount=100.0,
+                amount=TX_AMOUNT,
                 src=implicit_account,
                 dest=address,
                 contract=contract_address,
@@ -882,7 +894,7 @@ class TestSaplingRightMemosize:
         # Should pass since memo-sizes are equal and message is
         # filled with 0's
         client.sapling_shield(
-            amount=100.0,
+            amount=TX_AMOUNT,
             src=implicit_account,
             dest=address,
             contract=contract_address,
@@ -899,7 +911,7 @@ class TestSaplingRightMemosize:
         )
         address_derived = client.sapling_gen_address(key_name='bob').address
         client.sapling_shield(
-            amount=100.0,
+            amount=TX_AMOUNT,
             src=implicit_account,
             dest=address_derived,
             contract=contract_address,
@@ -908,7 +920,7 @@ class TestSaplingRightMemosize:
         client.bake("bootstrap2", ["--minimal-timestamp"])
         # Now with a too short message
         client.sapling_shield(
-            amount=100.0,
+            amount=TX_AMOUNT,
             src=implicit_account,
             dest=address,
             contract=contract_address,
@@ -917,7 +929,7 @@ class TestSaplingRightMemosize:
         client.bake("bootstrap2", ["--minimal-timestamp"])
         # Now with a right length message
         client.sapling_shield(
-            amount=100.0,
+            amount=TX_AMOUNT,
             src=implicit_account,
             dest=address,
             contract=contract_address,
@@ -926,7 +938,7 @@ class TestSaplingRightMemosize:
         client.bake("bootstrap2", ["--minimal-timestamp"])
         # Now with a too long message
         client.sapling_shield(
-            amount=100.0,
+            amount=TX_AMOUNT,
             src=implicit_account,
             dest=address,
             contract=contract_address,
