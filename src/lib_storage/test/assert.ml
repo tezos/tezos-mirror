@@ -55,7 +55,15 @@ let make_equal_list eq prn ?(msg = "") x y =
           let fm = Printf.sprintf "%s (at index %d)" msg i in
           fail (prn hd_x) (prn hd_y) fm
     | (_ :: _, []) | ([], _ :: _) ->
-        let fm = Printf.sprintf "%s (lists of different sizes)" msg in
+        let fm =
+          Fmt.str
+            "%s (lists of different sizes: %a vs. %a)"
+            msg
+            Fmt.(Dump.list string)
+            (List.map prn x)
+            Fmt.(Dump.list string)
+            (List.map prn y)
+        in
         fail_msg "%s" fm
     | ([], []) ->
         ()

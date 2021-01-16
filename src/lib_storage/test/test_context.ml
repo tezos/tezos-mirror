@@ -38,8 +38,6 @@ let ( >>=! ) x f =
   | Ok x ->
       f x
 
-let ( >|= ) = Lwt.( >|= )
-
 open Filename.Infix
 
 (** Basic blocks *)
@@ -60,10 +58,6 @@ let chain_id = Chain_id.of_block_hash genesis_block
 
 let commit = commit ~time:Time.Protocol.epoch ~message:""
 
-let block2 =
-  Block_hash.of_hex_exn
-    (`Hex "2222222222222222222222222222222222222222222222222222222222222222")
-
 let create_block2 idx genesis_commit =
   checkout idx genesis_commit
   >>= function
@@ -76,10 +70,6 @@ let create_block2 idx genesis_commit =
       >>= fun ctxt ->
       add ctxt ["version"] (Bytes.of_string "0.0") >>= fun ctxt -> commit ctxt
 
-let block3a =
-  Block_hash.of_hex_exn
-    (`Hex "3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a")
-
 let create_block3a idx block2_commit =
   checkout idx block2_commit
   >>= function
@@ -89,14 +79,6 @@ let create_block3a idx block2_commit =
       remove ctxt ["a"; "b"]
       >>= fun ctxt ->
       add ctxt ["a"; "d"] (Bytes.of_string "Mars") >>= fun ctxt -> commit ctxt
-
-let block3b =
-  Block_hash.of_hex_exn
-    (`Hex "3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b")
-
-let block3c =
-  Block_hash.of_hex_exn
-    (`Hex "3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c")
 
 let create_block3b idx block2_commit =
   checkout idx block2_commit
