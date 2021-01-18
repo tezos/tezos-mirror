@@ -191,9 +191,9 @@ module Forge = struct
     >>=? fun expected_timestamp ->
     let timestamp = Option.value ~default:expected_timestamp timestamp in
     let level = Int32.succ pred.header.shell.level in
-    ( match Fitness_repr.to_int64 pred.header.shell.fitness with
+    ( match Fitness.to_int64 pred.header.shell.fitness with
     | Ok old_fitness ->
-        Fitness_repr.from_int64 (Int64.add (Int64.of_int 1) old_fitness)
+        Fitness.from_int64 (Int64.add (Int64.of_int 1) old_fitness)
     | Error _ ->
         assert false )
     |> fun fitness ->
@@ -231,7 +231,7 @@ end
 let protocol_param_key = ["protocol_parameters"]
 
 let check_constants_consistency constants =
-  let open Constants_repr in
+  let open Constants in
   let {blocks_per_cycle; blocks_per_commitment; blocks_per_roll_snapshot; _} =
     constants
   in
@@ -282,7 +282,7 @@ let genesis_with_parameters parameters =
       ~level:0l
       ~predecessor:hash
       ~timestamp:Time.Protocol.epoch
-      ~fitness:(Fitness_repr.from_int64 0L)
+      ~fitness:(Fitness.from_int64 0L)
       ~operations_hash:Operation_list_list_hash.zero
   in
   let contents = Forge.make_contents ~priority:0 ~seed_nonce_hash:None () in
@@ -308,7 +308,7 @@ let genesis_with_parameters parameters =
 (* if no parameter file is passed we check in the current directory
    where the test is run *)
 let genesis ?with_commitments ?endorsers_per_block ?initial_endorsers
-    ?min_proposal_quorum (initial_accounts : (Account.t * Tez_repr.t) list) =
+    ?min_proposal_quorum (initial_accounts : (Account.t * Tez.t) list) =
   if initial_accounts = [] then
     Stdlib.failwith "Must have one account with a roll to bake" ;
   let open Tezos_protocol_alpha_parameters in
@@ -335,10 +335,10 @@ let genesis ?with_commitments ?endorsers_per_block ?initial_endorsers
     (fun () ->
       List.fold_left_es
         (fun acc (_, amount) ->
-          Environment.wrap_error @@ Tez_repr.( +? ) acc amount
+          Environment.wrap_error @@ Tez.( +? ) acc amount
           >>?= fun acc ->
           if acc >= constants.tokens_per_roll then raise Exit else return acc)
-        Tez_repr.zero
+        Tez.zero
         initial_accounts
       >>=? fun _ ->
       failwith "Insufficient tokens in initial accounts to create one roll")
@@ -355,7 +355,7 @@ let genesis ?with_commitments ?endorsers_per_block ?initial_endorsers
       ~level:0l
       ~predecessor:hash
       ~timestamp:Time.Protocol.epoch
-      ~fitness:(Fitness_repr.from_int64 0L)
+      ~fitness:(Fitness.from_int64 0L)
       ~operations_hash:Operation_list_list_hash.zero
   in
   let contents = Forge.make_contents ~priority:0 ~seed_nonce_hash:None () in

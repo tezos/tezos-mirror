@@ -96,10 +96,10 @@ val genesis :
   ?endorsers_per_block:int ->
   ?initial_endorsers:int ->
   ?min_proposal_quorum:int32 ->
-  (Account.t * Tez_repr.tez) list ->
+  (Account.t * Tez.tez) list ->
   block tzresult Lwt.t
 
-val genesis_with_parameters : Parameters_repr.t -> block tzresult Lwt.t
+val genesis_with_parameters : Parameters.t -> block tzresult Lwt.t
 
 (** Applies a signed header and its operations to a block and
     obtains a new block *)

@@ -283,7 +283,7 @@ module Delegate = struct
     frozen_balance : Tez.t;
     frozen_balance_by_cycle : Delegate.frozen_balance Cycle.Map.t;
     staking_balance : Tez.t;
-    delegated_contracts : Contract_repr.t list;
+    delegated_contracts : Alpha_context.Contract.t list;
     delegated_balance : Tez.t;
     deactivated : bool;
     grace_period : Cycle.t;

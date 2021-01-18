@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Protocol
+open Alpha_context
 
 type t = {
   pkh : Signature.Public_key_hash.t;
@@ -66,15 +67,15 @@ let find_alternate pkh =
 
 let dummy_account = new_account ()
 
-let generate_accounts ?(initial_balances = []) n : (t * Tez_repr.t) list =
+let generate_accounts ?(initial_balances = []) n : (t * Tez.t) list =
   Signature.Public_key_hash.Table.clear known_accounts ;
-  let default_amount = Tez_repr.of_mutez_exn 4_000_000_000_000L in
+  let default_amount = Tez.of_mutez_exn 4_000_000_000_000L in
   let amount i =
     match List.nth_opt initial_balances i with
     | None ->
         default_amount
     | Some a ->
-        Tez_repr.of_mutez_exn a
+        Tez.of_mutez_exn a
   in
   List.map
     (fun i ->
@@ -91,10 +92,10 @@ let commitment_secret =
 let new_commitment ?seed () =
   let (pkh, pk, sk) = Signature.generate_key ?seed ~algo:Ed25519 () in
   let unactivated_account = {pkh; pk; sk} in
-  let open Commitment_repr in
+  let open Commitment in
   let pkh = match pkh with Ed25519 pkh -> pkh | _ -> assert false in
   let bpkh = Blinded_public_key_hash.of_ed25519_pkh commitment_secret pkh in
   Lwt.return
-    ( (Environment.wrap_error @@ Tez_repr.(one *? 4_000L))
+    ( (Environment.wrap_error @@ Tez.(one *? 4_000L))
     >|? fun amount ->
     (unactivated_account, {blinded_public_key_hash = bpkh; amount}) )

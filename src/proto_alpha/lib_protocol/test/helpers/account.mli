@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Protocol
+open Alpha_context
 
 type t = {
   pkh : Signature.Public_key_hash.t;
@@ -52,10 +53,9 @@ val find_alternate : Signature.Public_key_hash.t -> t
     [i]th value in the list [initial_balances] or otherwise
     4.000.000.000 tz (if the list is too short); and add them to the
     global account state *)
-val generate_accounts :
-  ?initial_balances:int64 list -> int -> (t * Tez_repr.t) list
+val generate_accounts : ?initial_balances:int64 list -> int -> (t * Tez.t) list
 
 val commitment_secret : Blinded_public_key_hash.activation_code
 
 val new_commitment :
-  ?seed:Bytes.t -> unit -> (account * Commitment_repr.t) tzresult Lwt.t
+  ?seed:Bytes.t -> unit -> (account * Commitment.t) tzresult Lwt.t
