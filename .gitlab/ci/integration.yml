@@ -385,6 +385,12 @@ integration:alpha_multinode_storage_reconstruction:
     - poetry run pytest tests_alpha/test_multinode_storage_reconstruction.py -s --log-dir=tmp
   stage: test
 
+integration:alpha_nonce_seed_revelation:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_alpha/test_nonce_seed_revelation.py -s --log-dir=tmp
+  stage: test
+
 integration:alpha_proxy:
   extends: .integration_python_template
   script:
