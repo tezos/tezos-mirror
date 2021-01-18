@@ -640,6 +640,8 @@ module Fitness : sig
   val current : context -> int64
 
   val to_int64 : fitness -> int64 tzresult
+
+  val from_int64 : int64 -> bytes list
 end
 
 module Nonce : sig
