@@ -1044,7 +1044,7 @@ module Delegate : sig
     context -> Signature.Public_key_hash.t -> Tez.t tzresult Lwt.t
 
   val delegated_contracts :
-    context -> Signature.Public_key_hash.t -> Contract_repr.t list Lwt.t
+    context -> Signature.Public_key_hash.t -> Contract.t list Lwt.t
 
   val delegated_balance :
     context -> Signature.Public_key_hash.t -> Tez.t tzresult Lwt.t
