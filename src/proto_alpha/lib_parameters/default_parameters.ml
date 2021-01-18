@@ -23,47 +23,44 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
+open Protocol.Alpha_context
 
 let constants_mainnet =
-  Constants_repr.
+  Constants.
     {
       preserved_cycles = 5;
       blocks_per_cycle = 4096l;
       blocks_per_commitment = 32l;
       blocks_per_roll_snapshot = 256l;
       blocks_per_voting_period = 20480l;
-      time_between_blocks = List.map Period_repr.of_seconds_exn [60L; 40L];
+      time_between_blocks = List.map Period.of_seconds_exn [60L; 40L];
       endorsers_per_block = 32;
-      hard_gas_limit_per_operation =
-        Gas_limit_repr.Arith.(integral_of_int 1_040_000);
-      hard_gas_limit_per_block =
-        Gas_limit_repr.Arith.(integral_of_int 10_400_000);
+      hard_gas_limit_per_operation = Gas.Arith.(integral_of_int 1_040_000);
+      hard_gas_limit_per_block = Gas.Arith.(integral_of_int 10_400_000);
       proof_of_work_threshold = Int64.(sub (shift_left 1L 46) 1L);
-      tokens_per_roll = Tez_repr.(mul_exn one 8_000);
+      tokens_per_roll = Tez.(mul_exn one 8_000);
       michelson_maximum_type_size = 1000;
       seed_nonce_revelation_tip =
-        (match Tez_repr.(one /? 8L) with Ok c -> c | Error _ -> assert false);
+        (match Tez.(one /? 8L) with Ok c -> c | Error _ -> assert false);
       origination_size = 257;
-      block_security_deposit = Tez_repr.(mul_exn one 512);
-      endorsement_security_deposit = Tez_repr.(mul_exn one 64);
+      block_security_deposit = Tez.(mul_exn one 512);
+      endorsement_security_deposit = Tez.(mul_exn one 64);
       baking_reward_per_endorsement =
-        Tez_repr.[of_mutez_exn 1_250_000L; of_mutez_exn 187_500L];
-      endorsement_reward =
-        Tez_repr.[of_mutez_exn 1_250_000L; of_mutez_exn 833_333L];
+        Tez.[of_mutez_exn 1_250_000L; of_mutez_exn 187_500L];
+      endorsement_reward = Tez.[of_mutez_exn 1_250_000L; of_mutez_exn 833_333L];
       hard_storage_limit_per_operation = Z.of_int 60_000;
-      cost_per_byte = Tez_repr.of_mutez_exn 250L;
+      cost_per_byte = Tez.of_mutez_exn 250L;
       test_chain_duration = Int64.mul 20480L 60L;
       quorum_min = 20_00l;
       (* quorum is in centile of a percentage *)
       quorum_max = 70_00l;
       min_proposal_quorum = 5_00l;
       initial_endorsers = 24;
-      delay_per_missing_endorsement = Period_repr.of_seconds_exn 8L;
+      delay_per_missing_endorsement = Period.of_seconds_exn 8L;
     }
 
 let constants_sandbox =
-  Constants_repr.
+  Constants.
     {
       constants_mainnet with
       preserved_cycles = 2;
@@ -71,24 +68,24 @@ let constants_sandbox =
       blocks_per_commitment = 4l;
       blocks_per_roll_snapshot = 4l;
       blocks_per_voting_period = 64l;
-      time_between_blocks = List.map Period_repr.of_seconds_exn [1L; 0L];
+      time_between_blocks = List.map Period.of_seconds_exn [1L; 0L];
       proof_of_work_threshold = Int64.of_int (-1);
       initial_endorsers = 1;
-      delay_per_missing_endorsement = Period_repr.of_seconds_exn 1L;
+      delay_per_missing_endorsement = Period.of_seconds_exn 1L;
     }
 
 let constants_test =
-  Constants_repr.
+  Constants.
     {
       constants_mainnet with
       blocks_per_cycle = 128l;
       blocks_per_commitment = 4l;
       blocks_per_roll_snapshot = 32l;
       blocks_per_voting_period = 256l;
-      time_between_blocks = List.map Period_repr.of_seconds_exn [1L; 0L];
+      time_between_blocks = List.map Period.of_seconds_exn [1L; 0L];
       proof_of_work_threshold = Int64.of_int (-1);
       initial_endorsers = 1;
-      delay_per_missing_endorsement = Period_repr.of_seconds_exn 1L;
+      delay_per_missing_endorsement = Period.of_seconds_exn 1L;
     }
 
 let bootstrap_accounts_strings =
@@ -98,14 +95,14 @@ let bootstrap_accounts_strings =
     "edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU";
     "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n" ]
 
-let bootstrap_balance = Tez_repr.of_mutez_exn 4_000_000_000_000L
+let bootstrap_balance = Tez.of_mutez_exn 4_000_000_000_000L
 
 let bootstrap_accounts =
   List.map
     (fun s ->
       let public_key = Signature.Public_key.of_b58check_exn s in
       let public_key_hash = Signature.Public_key.hash public_key in
-      Parameters_repr.
+      Parameters.
         {
           public_key_hash;
           public_key = Some public_key;
@@ -136,17 +133,15 @@ let commitments =
   | Error err ->
       raise (Failure err)
   | Ok json ->
-      Data_encoding.Json.destruct
-        (Data_encoding.list Commitment_repr.encoding)
-        json
+      Data_encoding.Json.destruct (Data_encoding.list Commitment.encoding) json
 
 let make_bootstrap_account (pkh, pk, amount) =
-  Parameters_repr.{public_key_hash = pkh; public_key = Some pk; amount}
+  Parameters.{public_key_hash = pkh; public_key = Some pk; amount}
 
 let parameters_of_constants ?(bootstrap_accounts = bootstrap_accounts)
     ?(bootstrap_contracts = []) ?(with_commitments = false) constants =
   let commitments = if with_commitments then commitments else [] in
-  Parameters_repr.
+  Parameters.
     {
       bootstrap_accounts;
       bootstrap_contracts;
@@ -157,4 +152,4 @@ let parameters_of_constants ?(bootstrap_accounts = bootstrap_accounts)
     }
 
 let json_of_parameters parameters =
-  Data_encoding.Json.construct Parameters_repr.encoding parameters
+  Data_encoding.Json.construct Parameters.encoding parameters
