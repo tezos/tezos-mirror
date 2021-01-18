@@ -153,11 +153,14 @@ type key = string list
 
 type value = bytes
 
+type tree
+
 module type T =
   Raw_context_intf.T
     with type root := root
      and type key := key
      and type value := value
+     and type tree := tree
 
 include T with type t := t
 
