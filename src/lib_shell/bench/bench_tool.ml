@@ -25,9 +25,9 @@
 
 module Helpers_Nonce = Nonce
 open Protocol
-open Parameters_repr
-open Constants_repr
 open Alpha_context
+open Parameters
+open Constants
 
 (** Args *)
 
@@ -36,7 +36,7 @@ type args = {
   mutable seed : int;
   mutable accounts : int;
   mutable nb_commitments : int;
-  mutable params : Parameters_repr.t;
+  mutable params : Parameters.t;
 }
 
 let default_args =
@@ -70,7 +70,7 @@ let parse_param_file name =
   else
     Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file name
     >>=? fun json ->
-    match Data_encoding.Json.destruct Parameters_repr.encoding json with
+    match Data_encoding.Json.destruct Parameters.encoding json with
     | exception exn ->
         failwith "Parameters : Invalid JSON file - %a" Error_monad.pp_exn exn
     | param ->
@@ -152,7 +152,7 @@ let list_shuffle l =
 type gen_state = {
   mutable possible_transfers : (Account.t * Account.t) list;
   mutable remaining_transfers : (Account.t * Account.t) list;
-  mutable remaining_activations : (Account.t * Commitment_repr.t) list;
+  mutable remaining_activations : (Account.t * Commitment.t) list;
   mutable nonce_to_reveal : (Cycle.t * Raw_level.t * Nonce.t) list;
 }
 
@@ -317,10 +317,9 @@ let init () =
   (* TODO : distribute the tokens randomly *)
   (* Right now, we split half of 80.000 rolls between generated accounts *)
   (* TODO : ensure we don't overflow with the underlying commitments *)
-  Tez_repr.(
+  Tez.(
     Lwt.return @@ Environment.wrap_error
-    @@ args.params.Parameters_repr.constants.Constants_repr.tokens_per_roll
-       *? 80_000L
+    @@ (args.params.Parameters.constants.Constants.tokens_per_roll *? 80_000L)
     >>=? fun total_amount ->
     Lwt.return @@ Environment.wrap_error @@ (total_amount /? 2L)
     >>=? fun amount ->
@@ -382,7 +381,7 @@ let init () =
   in
   let parameters =
     {
-      Parameters_repr.bootstrap_accounts;
+      Parameters.bootstrap_accounts;
       bootstrap_contracts = [];
       commitments;
       constants;
@@ -417,8 +416,8 @@ let init () =
         "[DEBUG] Constants : %a\n%!"
         Data_encoding.Json.pp
         (Data_encoding.Json.construct
-           Constants_repr.parametric_encoding
-           parameters.Parameters_repr.constants)) ;
+           Constants.parametric_encoding
+           parameters.Parameters.constants)) ;
   let print_block block =
     let open Block in
     Format.printf
