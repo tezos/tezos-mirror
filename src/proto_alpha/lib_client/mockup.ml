@@ -23,21 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Protocol.Alpha_context
+
 (* ------------------------------------------------------------------------- *)
 (* Mockup protocol parameters *)
 
 type mockup_protocol_parameters = {
   initial_timestamp : Time.Protocol.t;
-  bootstrap_accounts : Protocol.Parameters_repr.bootstrap_account list;
-  bootstrap_contracts : Protocol.Parameters_repr.bootstrap_contract list;
-  constants : Protocol.Constants_repr.parametric;
+  bootstrap_accounts : Parameters.bootstrap_account list;
+  bootstrap_contracts : Parameters.bootstrap_contract list;
+  constants : Constants.parametric;
 }
 
 type protocol_constants_overrides = {
-  hard_gas_limit_per_operation : Protocol.Gas_limit_repr.Arith.integral option;
-  hard_gas_limit_per_block : Protocol.Gas_limit_repr.Arith.integral option;
+  hard_gas_limit_per_operation : Gas.Arith.integral option;
+  hard_gas_limit_per_block : Gas.Arith.integral option;
   hard_storage_limit_per_operation : Z.t option;
-  cost_per_byte : Protocol.Tez_repr.t option;
+  cost_per_byte : Tez.t option;
   chain_id : Chain_id.t option;
   timestamp : Time.Protocol.t option;
 }
@@ -45,14 +47,12 @@ type protocol_constants_overrides = {
 type parsed_account_repr = {
   name : string;
   sk_uri : Client_keys.sk_uri;
-  amount : Protocol.Tez_repr.t;
+  amount : Tez.t;
 }
 
 let parsed_account_repr_pp ppf account =
   let open Format in
-  let format_amount ppf value =
-    fprintf ppf "amount:%a" Protocol.Tez_repr.pp value
-  in
+  let format_amount ppf value = fprintf ppf "amount:%a" Tez.pp value in
   fprintf
     ppf
     "@[<v>name:%s@,sk_uri:%s@,%a@]"
@@ -61,10 +61,9 @@ let parsed_account_repr_pp ppf account =
     format_amount
     account.amount
 
-let bootstrap_account_encoding :
-    Protocol.Parameters_repr.bootstrap_account Data_encoding.t =
+let bootstrap_account_encoding : Parameters.bootstrap_account Data_encoding.t =
   let open Data_encoding in
-  let open Protocol.Parameters_repr in
+  let open Parameters in
   conv
     (fun {public_key_hash; public_key; amount} ->
       (public_key_hash, public_key, amount))
@@ -73,19 +72,19 @@ let bootstrap_account_encoding :
     (obj3
        (req "public_key_hash" Signature.Public_key_hash.encoding)
        (opt "public_key" Signature.Public_key.encoding)
-       (req "amount" Protocol.Tez_repr.encoding))
+       (req "amount" Tez.encoding))
 
-let bootstrap_contract_encoding :
-    Protocol.Parameters_repr.bootstrap_contract Data_encoding.t =
+let bootstrap_contract_encoding : Parameters.bootstrap_contract Data_encoding.t
+    =
   let open Data_encoding in
-  let open Protocol.Parameters_repr in
+  let open Parameters in
   conv
     (fun {delegate; amount; script} -> (delegate, amount, script))
     (fun (delegate, amount, script) -> {delegate; amount; script})
     (obj3
        (req "delegate" Signature.Public_key_hash.encoding)
-       (req "amount" Protocol.Tez_repr.encoding)
-       (req "script" Protocol.Script_repr.encoding))
+       (req "amount" Tez.encoding)
+       (req "script" Script.encoding))
 
 let mockup_protocol_parameters_encoding :
     mockup_protocol_parameters Data_encoding.t =
@@ -103,7 +102,7 @@ let mockup_protocol_parameters_encoding :
        (req "initial_timestamp" Time.Protocol.encoding)
        (req "bootstrap_accounts" (list bootstrap_account_encoding))
        (req "bootstrap_contracts" (list bootstrap_contract_encoding))
-       (req "constants" Protocol.Constants_repr.parametric_encoding))
+       (req "constants" Constants.parametric_encoding))
 
 let protocol_constants_overrides_encoding =
   let open Data_encoding in
@@ -130,14 +129,10 @@ let protocol_constants_overrides_encoding =
         timestamp;
       })
     (obj6
-       (opt
-          "hard_gas_limit_per_operation"
-          Protocol.Gas_limit_repr.Arith.z_integral_encoding)
-       (opt
-          "hard_gas_limit_per_block"
-          Protocol.Gas_limit_repr.Arith.z_integral_encoding)
+       (opt "hard_gas_limit_per_operation" Gas.Arith.z_integral_encoding)
+       (opt "hard_gas_limit_per_block" Gas.Arith.z_integral_encoding)
        (opt "hard_storage_limit_per_operation" z)
-       (opt "cost_per_byte" Protocol.Tez_repr.encoding)
+       (opt "cost_per_byte" Tez.encoding)
        (opt "chain_id" Chain_id.encoding)
        (opt "initial_timestamp" Time.Protocol.encoding))
 
@@ -169,7 +164,7 @@ let default_mockup_protocol_constants : protocol_constants_overrides =
 (* Use the wallet to convert a bootstrap account's public key
   into a parsed_account_repr secret key Uri *)
 let bootstrap_account_to_parsed_account_repr cctxt
-    (bootstrap_account : Protocol.Parameters_repr.bootstrap_account) =
+    (bootstrap_account : Parameters.bootstrap_account) =
   Client_keys.get_key cctxt bootstrap_account.public_key_hash
   >>=? fun (name, _, sk_uri) ->
   return {name; sk_uri; amount = bootstrap_account.amount}
@@ -182,7 +177,7 @@ let parsed_account_repr_encoding =
     (obj3
        (req "name" string)
        (req "sk_uri" Client_keys.Secret_key.encoding)
-       (req "amount" Protocol.Tez_repr.encoding))
+       (req "amount" Tez.encoding))
 
 let mockup_default_bootstrap_accounts
     (cctxt : Tezos_client_base.Client_context.full) : string tzresult Lwt.t =
@@ -207,8 +202,7 @@ let mockup_default_bootstrap_accounts
           match tz_balance with
           | Ok balance -> (
               let tez_repr =
-                Protocol.Tez_repr.of_mutez
-                @@ Protocol.Alpha_context.Tez.to_mutez balance
+                Tez.of_mutez @@ Protocol.Alpha_context.Tez.to_mutez balance
               in
               match tez_repr with
               | None ->
@@ -247,8 +241,7 @@ let protocol_constants_no_overrides =
   }
 
 let apply_protocol_overrides (cctxt : Tezos_client_base.Client_context.full)
-    (o : protocol_constants_overrides) (c : Protocol.Constants_repr.parametric)
-    =
+    (o : protocol_constants_overrides) (c : Constants.parametric) =
   let has_custom =
     Option.is_some o.hard_gas_limit_per_operation
     || Option.is_some o.hard_gas_limit_per_block
@@ -265,17 +258,13 @@ let apply_protocol_overrides (cctxt : Tezos_client_base.Client_context.full)
     in
     cctxt#message
       "@[<v>mockup client uses protocol overrides:@,%a%a%a%a@]@?"
-      (pp_opt_custom
-         "hard_gas_limit_per_operation"
-         Protocol.Gas_limit_repr.Arith.pp_integral)
+      (pp_opt_custom "hard_gas_limit_per_operation" Gas.Arith.pp_integral)
       o.hard_gas_limit_per_operation
-      (pp_opt_custom
-         "hard_gas_limit_per_block"
-         Protocol.Gas_limit_repr.Arith.pp_integral)
+      (pp_opt_custom "hard_gas_limit_per_block" Gas.Arith.pp_integral)
       o.hard_gas_limit_per_block
       (pp_opt_custom "hard_storage_limit_per_operation" Z.pp_print)
       o.hard_storage_limit_per_operation
-      (pp_opt_custom "cost_per_byte" Protocol.Tez_repr.pp)
+      (pp_opt_custom "cost_per_byte" Tez.pp)
       o.cost_per_byte
   else Lwt.return_unit )
   >>= fun () ->
@@ -304,7 +293,7 @@ let to_bootstrap_account repr =
   >>=? fun public_key ->
   let public_key_hash = Signature.Public_key.hash public_key in
   return
-    Protocol.Parameters_repr.
+    Parameters.
       {public_key_hash; public_key = Some public_key; amount = repr.amount}
 
 (* ------------------------------------------------------------------------- *)
@@ -399,7 +388,7 @@ let mem_init :
       ~level:0l
       ~predecessor:hash
       ~timestamp
-      ~fitness:(Protocol.Fitness_repr.from_int64 0L)
+      ~fitness:(Fitness.from_int64 0L)
       ~operations_hash:Operation_list_list_hash.zero
   in
   apply_protocol_overrides cctxt protocol_overrides parameters.constants
