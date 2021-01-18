@@ -74,6 +74,10 @@ module Tez : sig
   val of_mutez : int64 -> tez option
 
   val to_mutez : tez -> int64
+
+  val of_mutez_exn : int64 -> t
+
+  val mul_exn : t -> int -> t
 end
 
 module Period : sig
@@ -84,6 +88,8 @@ module Period : sig
   val rpc_arg : period RPC_arg.arg
 
   val of_seconds : int64 -> period tzresult
+
+  val of_seconds_exn : int64 -> period
 
   val to_seconds : period -> int64
 
@@ -1509,6 +1515,8 @@ module Commitment : sig
     blinded_public_key_hash : Blinded_public_key_hash.t;
     amount : Tez.tez;
   }
+
+  val encoding : t Data_encoding.t
 
   val get_opt :
     context -> Blinded_public_key_hash.t -> Tez.t option tzresult Lwt.t
