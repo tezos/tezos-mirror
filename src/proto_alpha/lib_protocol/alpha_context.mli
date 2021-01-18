@@ -1585,3 +1585,28 @@ val get_rewards : context -> Tez.t
 val get_deposits : context -> Tez.t Signature.Public_key_hash.Map.t
 
 val description : context Storage_description.t
+
+module Parameters : sig
+  type bootstrap_account = {
+    public_key_hash : public_key_hash;
+    public_key : public_key option;
+    amount : Tez.t;
+  }
+
+  type bootstrap_contract = {
+    delegate : public_key_hash;
+    amount : Tez.t;
+    script : Script.t;
+  }
+
+  type t = {
+    bootstrap_accounts : bootstrap_account list;
+    bootstrap_contracts : bootstrap_contract list;
+    commitments : Commitment.t list;
+    constants : Constants.parametric;
+    security_deposit_ramp_up_cycles : int option;
+    no_reward_cycles : int option;
+  }
+
+  val encoding : t Data_encoding.t
+end

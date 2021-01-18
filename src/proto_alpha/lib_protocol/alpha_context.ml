@@ -296,3 +296,5 @@ let get_fees = Raw_context.get_fees
 let get_rewards = Raw_context.get_rewards
 
 let description = Raw_context.description
+
+module Parameters = Parameters_repr
