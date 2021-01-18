@@ -93,7 +93,7 @@ let monitor initial_operation_level gas_level expectation () =
     ( match consume_gas context (S.safe_int 10000) (* in milligas. *) with
     | Ok context ->
         let remaining = gas_level context in
-        remaining = integral_of_int_exn expectation
+        remaining = integral_of_int_exn (expectation context)
     | _ ->
         false )
     (err "Monitor operation gas at each gas consumption")
@@ -109,15 +109,22 @@ let operation_gas_level context =
 (* Monitoring runs differently depending on the minimum between the
    operation gas level and the block gas level. Hence, we check that
    in both situations, the gas levels are correctly reported. *)
-
-let test_monitor_operation_gas_level = monitor 100 operation_gas_level 90
+let test_monitor_operation_gas_level =
+  monitor 100 operation_gas_level (fun _ -> 90)
 
 let test_monitor_operation_gas_level' =
-  monitor opg operation_gas_level (opg - 10)
+  monitor opg operation_gas_level (fun _ -> opg - 10)
 
-let test_monitor_block_gas_level = monitor 100 block_gas_level 10399990
+let block_limit ctxt =
+  let constants = Raw_context.constants ctxt in
+  let integral_limit = constants.Constants_repr.hard_gas_limit_per_block in
+  Z.to_int (Gas_limit_repr.Arith.integral_to_z integral_limit)
 
-let test_monitor_block_gas_level' = monitor opg block_gas_level 10399990
+let test_monitor_block_gas_level =
+  monitor 100 block_gas_level (fun ctxt -> block_limit ctxt - 10)
+
+let test_monitor_block_gas_level' =
+  monitor opg block_gas_level (fun ctxt -> block_limit ctxt - 10)
 
 let quick (what, how) = Test_services.tztest what `Quick how
 
