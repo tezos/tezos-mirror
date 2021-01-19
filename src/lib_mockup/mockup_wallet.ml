@@ -89,8 +89,9 @@ let populate (cctxt : #Tezos_client_base.Client_context.io_wallet)
       match Data_encoding.Json.destruct bootstrap_secrets_encoding json with
       | accounts ->
           return accounts
-      | exception _e ->
+      | exception e ->
           failwith
-            "cannot read definitions of bootstrap accounts in %s"
-            accounts_file ) )
+            "cannot read definitions of bootstrap accounts in %s because: %s"
+            accounts_file
+            (Printexc.to_string e) ) )
   >>=? List.iter_es (add_bootstrap_secret cctxt)

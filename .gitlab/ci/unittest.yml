@@ -48,10 +48,12 @@ unit:alltest:
     - scripts/test_wrapper.sh src/lib_benchmark benchmark
     - scripts/test_wrapper.sh src/lib_clic clic
     - scripts/test_wrapper.sh src/lib_client_base client_base
+    - scripts/test_wrapper.sh src/lib_client_base_unix client_base_unix
     - scripts/test_wrapper.sh src/lib_crypto crypto
     - scripts/test_wrapper.sh src/lib_error_monad error_monad
     - scripts/test_wrapper.sh src/lib_lwt_result_stdlib lwt_result_stdlib
     - scripts/test_wrapper.sh src/lib_micheline micheline
+    - scripts/test_wrapper.sh src/lib_mockup mockup
     - scripts/test_wrapper.sh src/lib_p2p p2p
     - scripts/test_wrapper.sh src/lib_protocol_compiler protocol_compiler
     - scripts/test_wrapper.sh src/lib_protocol_environment protocol_environment

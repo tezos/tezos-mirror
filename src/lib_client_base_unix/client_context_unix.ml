@@ -157,6 +157,15 @@ class unix_logger ~base_dir : Client_context.printer =
     inherit Client_context.simple_printer log
   end
 
+class unix_io_wallet ~base_dir ~password_filename : Client_context.io_wallet =
+  object
+    inherit unix_wallet ~base_dir ~password_filename
+
+    inherit unix_logger ~base_dir
+
+    inherit unix_prompter
+  end
+
 class unix_ui : Client_context.ui =
   object
     method sleep f = Lwt_unix.sleep f
