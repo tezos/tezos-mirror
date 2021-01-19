@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 (** An implementation of {!Tezos_base.Internal_event.SINK} which
-    writes the events as JSON into a single file-descriptor.
+    writes the events as JSON or pretty printed into a single file-descriptor.
 
     It is registered with the URI scheme ["file-descriptor-path"] to
     output to a file or
@@ -35,10 +35,11 @@
 
     - ["level-at-least"] the minimal log-level that the sink will
       output (see {!Tezos_event_logging.Internal_event.level}).
-    - ["format"] the output format used to separate JSON records:
-      acceptable values are ["one-per-line"] (the default), and
+    - ["format"] the output format used;
+      acceptable values are ["one-per-line"] (the default),
       ["netstring"] (see {{:https://en.wikipedia.org/wiki/Netstring}The
-      Netstring format}).
+      Netstring format}) (both to separate JSON records), {i or} ["pp"] to
+      output the events pretty-printed.
 
     Options available only for ["file-descriptor-path://"]:
 

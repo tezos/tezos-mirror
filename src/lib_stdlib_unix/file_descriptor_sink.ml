@@ -27,10 +27,10 @@ open Error_monad
 
 type t = {
   output : Lwt_unix.file_descr;
-  format : [`One_per_line | `Netstring];
+  format : [`One_per_line | `Netstring | `Pp];
   (* Hopefully temporary hack to handle event which are emitted with
      the non-cooperative log functions in `Legacy_logging`: *)
-  lwt_bad_citizen_hack : Data_encoding.json list ref;
+  lwt_bad_citizen_hack : string list ref;
   level_at_least : Internal_event.Level.t;
 }
 
@@ -85,6 +85,7 @@ end) : Internal_event.SINK with type t = t = struct
     in
     (match Uri.get_query_param uri "format" with
     | Some "netstring" -> return `Netstring
+    | Some "pp" -> return `Pp
     | None | Some "one-per-line" -> return `One_per_line
     | Some other -> fail_parsing "Unknown format: %S" other)
     >>=? fun format ->
@@ -135,14 +136,7 @@ end) : Internal_event.SINK with type t = t = struct
 
   let write_mutex = Lwt_mutex.create ()
 
-  let output_one output format event_json =
-    let to_write =
-      match format with
-      | `One_per_line -> Ezjsonm.value_to_string ~minify:true event_json ^ "\n"
-      | `Netstring ->
-          let bytes = Ezjsonm.value_to_string ~minify:true event_json in
-          Fmt.str "%d:%s," (String.length bytes) bytes
-    in
+  let output_one output to_write =
     protect (fun () ->
         Lwt_mutex.with_lock write_mutex (fun () ->
             Lwt_utils_unix.write_string output to_write)
@@ -156,11 +150,36 @@ end) : Internal_event.SINK with type t = t = struct
     let level = M.level forced_event in
     if Internal_event.Level.compare level level_at_least >= 0 then (
       let wrapped_event = wrap now section forced_event in
-      let event_json =
-        Data_encoding.Json.construct (wrapped_encoding M.encoding) wrapped_event
+      let to_write =
+        let json () =
+          Data_encoding.Json.construct
+            (wrapped_encoding M.encoding)
+            wrapped_event
+        in
+        match format with
+        | `Pp ->
+            let s =
+              String.map
+                (function '\n' -> ' ' | c -> c)
+                (Format.asprintf "%a" (M.pp ~short:false) forced_event)
+            in
+            Format.asprintf
+              "%a - %s/%s: %s\n"
+              (Ptime.pp_rfc3339 ~frac_s:3 ())
+              (match Ptime.of_float_s wrapped_event.time_stamp with
+              | Some s -> s
+              | None -> Ptime.min)
+              (Internal_event.Section.to_string_list wrapped_event.section
+              |> String.concat ".")
+              M.name
+              s
+        | `One_per_line -> Ezjsonm.value_to_string ~minify:true (json ()) ^ "\n"
+        | `Netstring ->
+            let bytes = Ezjsonm.value_to_string ~minify:true (json ()) in
+            Fmt.str "%d:%s," (String.length bytes) bytes
       in
-      lwt_bad_citizen_hack := event_json :: !lwt_bad_citizen_hack ;
-      output_one output format event_json >>= function
+      lwt_bad_citizen_hack := to_write :: !lwt_bad_citizen_hack ;
+      output_one output to_write >>= function
       | Error [Exn (Unix.Unix_error (Unix.EBADF, _, _))] ->
           (* The file descriptor was closed before the event arrived,
              ignore it. *)
@@ -168,13 +187,13 @@ end) : Internal_event.SINK with type t = t = struct
       | Error _ as err -> Lwt.return err
       | Ok () ->
           lwt_bad_citizen_hack :=
-            List.filter (( = ) event_json) !lwt_bad_citizen_hack ;
+            List.filter (( = ) to_write) !lwt_bad_citizen_hack ;
           return_unit)
     else return_unit
 
-  let close {lwt_bad_citizen_hack; output; format; _} =
+  let close {lwt_bad_citizen_hack; output; _} =
     List.iter_es
-      (fun event_json -> output_one output format event_json)
+      (fun event_string -> output_one output event_string)
       !lwt_bad_citizen_hack
     >>=? fun () ->
     Lwt_unix.close output >>= fun () -> return_unit
