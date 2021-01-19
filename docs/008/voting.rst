@@ -68,7 +68,7 @@ the current participation with the following coefficients::
   newQ = oldQ * 8/10 + participation * 2/10
 
 More details can be found in the file
-``src/proto_alpha/lib_protocol/amendment.ml``.
+``src/proto_008_PtEdoTez/lib_protocol/amendment.ml``.
 
 Operations
 ----------
@@ -117,7 +117,7 @@ The pass vote allows a delegate to not influence a vote but still
 allowing it to reach quorum.
 
 More details can be found, as for all operations, in
-``src/proto_alpha/lib_protocol/operation_repr.ml``.
+``src/proto_008_PtEdoTez/lib_protocol/operation_repr.ml``.
 The binary format is described by ``tezos-client describe unsigned
 operation``.
 
