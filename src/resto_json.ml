@@ -212,7 +212,7 @@ end
 module Ezjsonm = struct
   type t = Json_repr.Ezjsonm.value
 
-  let construct = Json_encoding.construct
+  let construct enc v = Json_encoding.construct enc v
 
   let destruct = Json_encoding.destruct
 end
@@ -222,7 +222,7 @@ module Bson = struct
 
   type t = Repr.value
 
-  let construct = Json_encoding.construct
+  let construct enc v = Json_encoding.construct enc v
 
   let destruct = Json_encoding.destruct
 end
