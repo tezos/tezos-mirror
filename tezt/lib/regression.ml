@@ -51,6 +51,7 @@ let replace_variables string =
     [ ("tz[123]\\w{33}", "[PUBLIC_KEY_HASH]");
       ("edpk\\w{50}", "[PUBLIC_KEY]");
       ("KT1\\w{33}", "[CONTRACT_HASH]");
+      ("SG1\\w{33}", "[BAKER_HASH]");
       ("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z", "[TIMESTAMP]") ]
   in
   List.fold_left
