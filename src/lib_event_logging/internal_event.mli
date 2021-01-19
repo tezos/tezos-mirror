@@ -450,8 +450,9 @@ module All_sinks : sig
       scheme and calls {!configure}. *)
   val activate : Uri.t -> unit tzresult Lwt.t
 
-  (** Call [close] on all the active sinks. *)
-  val close : unit -> unit tzresult Lwt.t
+  (** Call [close] on all the sinks, except the ones matching the
+      predicate [?except] (default: all of them). *)
+  val close : ?except:(Uri.t -> bool) -> unit -> unit tzresult Lwt.t
 
   (** Display the state of registered/active sinks. *)
   val pp_state : Format.formatter -> unit -> unit

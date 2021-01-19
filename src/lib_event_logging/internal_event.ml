@@ -300,16 +300,24 @@ module All_sinks = struct
         active := act :: !active ;
         return_unit
 
-  let close () =
+  let close ?(except = fun _ -> false) () =
     let close_one (type a) sink definition =
       let module S = (val definition : SINK with type t = a) in
       S.close sink
     in
-    let sinks_to_close = !active in
-    active := [] ;
+    let next_list = ref [] in
+    let gc_list = ref [] in
+    List.iter
+      (fun act ->
+        match act with
+        | Active {configuration; _} when except configuration ->
+            next_list := act :: !next_list
+        | _ -> gc_list := act :: !gc_list)
+      !active ;
+    active := !next_list ;
     List.iter_es
-      (fun (Active {sink; definition; _}) -> close_one sink definition)
-      sinks_to_close
+      (function Active {sink; definition; _} -> close_one sink definition)
+      !gc_list
 
   let handle def section v =
     let handle (type a) sink definition =

@@ -48,6 +48,10 @@ module Configuration = struct
     protect (fun () -> return (Data_encoding.Json.destruct encoding json))
 
   let apply {activate} = List.iter_es Internal_event.All_sinks.activate activate
+
+  let reapply config =
+    let except u = Uri.scheme u = Some "lwt-log" in
+    Internal_event.All_sinks.close ~except () >>=? fun () -> apply config
 end
 
 let env_var_name = "TEZOS_EVENTS_CONFIG"
