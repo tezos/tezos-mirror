@@ -49,6 +49,11 @@ here either.
 - Add `--version` flag
 
 - Fixed commands `--mode mockup config show` and `--mode mockup config init` which returned the default values rather than the actual ones.
+
+- Replaced command `check that <bytes> was signed by <pkh>` by `check that bytes
+  <bytes> were signed by <pkh>` to differentiate from new command `check that
+  message <string> was signed by <pkh>`
+
 ## Baker / Endorser / Accuser
 
 - Add `--version` flag
