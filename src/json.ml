@@ -91,6 +91,7 @@ let bytes_jsont =
         kind =
           String
             {
+              str_format = None;
               pattern = Some "^[a-zA-Z0-9]+$";
               min_length = 0;
               max_length = None;

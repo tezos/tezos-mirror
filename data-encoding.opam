@@ -10,8 +10,8 @@ depends: [
   "dune" { >= "1.7" }
   "ezjsonm"
   "zarith"
-  "json-data-encoding" { = "0.8" }
-  "json-data-encoding-bson" { = "0.8" }
+  "json-data-encoding" { = "0.9.1" }
+  "json-data-encoding-bson" { = "0.9.1" }
   "alcotest" { with-test }
   "crowbar" { with-test }
 ]
