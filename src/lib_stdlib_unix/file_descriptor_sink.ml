@@ -196,7 +196,9 @@ end) : Internal_event.SINK with type t = t = struct
       (fun event_string -> output_one output event_string)
       !lwt_bad_citizen_hack
     >>=? fun () ->
-    Lwt_unix.close output >>= fun () -> return_unit
+    match K.kind with
+    | `Path -> Lwt_unix.close output >>= fun () -> return_unit
+    | `Stdout | `Stderr -> return_unit
 end
 
 module Sink_implementation_path = Make_sink (struct
