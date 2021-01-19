@@ -19,7 +19,6 @@ from launchers.sandbox import Sandbox
 from client.client import Client
 from client.client_output import CreateMockupResult
 
-from tools.constants import MOCKUP_PROTOCOLS
 from . import protocol
 
 _BA_FLAG = "bootstrap-accounts"
@@ -40,8 +39,7 @@ def test_list_mockup_protocols(sandbox: Sandbox):
 
 
 @pytest.mark.client
-@pytest.mark.parametrize('proto', MOCKUP_PROTOCOLS)
-def test_create_mockup_dir_exists_nonempty(sandbox: Sandbox, proto: str):
+def test_create_mockup_dir_exists_nonempty(sandbox: Sandbox):
     """Executes `tezos-client --base-dir /tmp/mdir create mockup`
     when /tmp/mdir is a non empty directory which is NOT a mockup
     directory. The call must fail.
@@ -52,7 +50,7 @@ def test_create_mockup_dir_exists_nonempty(sandbox: Sandbox, proto: str):
             handle.write("")
         unmanaged_client = sandbox.create_client(base_dir=base_dir)
         res = unmanaged_client.create_mockup(
-            protocol=proto, check=False
+            protocol=protocol.HASH, check=False
         ).create_mockup_result
         assert res == CreateMockupResult.DIR_NOT_EMPTY
 
@@ -72,24 +70,15 @@ def test_retrieve_addresses(mockup_client: Client):
     }
 
 
-def _get_mockup_proto(mockup_client):
-    """ The current protocol of a mockup client """
-    json_data = mockup_client.rpc(
-        verb="get", path="/chains/main/blocks/head/protocols"
-    )
-    return json_data["protocol"]
-
-
 @pytest.mark.client
 def test_create_mockup_already_initialized(mockup_client: Client):
     """Executes `tezos-client --base-dir /tmp/mdir create mockup`
     when /tmp/mdir is not fresh.
     The call must fail.
     """
-    proto = _get_mockup_proto(mockup_client)
     # mockup was created already by fixture, try to create it second time:
     res = mockup_client.create_mockup(
-        protocol=proto, check=False
+        protocol=protocol.HASH, check=False
     ).create_mockup_result
     # it should fail:
     assert res == CreateMockupResult.ALREADY_INITIALIZED
@@ -116,7 +105,6 @@ def test_transfer(mockup_client: Client):
     assert receiver_balance_after == receiver_balance_before + transferred
 
 
-@pytest.mark.parametrize('proto', MOCKUP_PROTOCOLS)
 # It's impossible to guess values of chain_id, these ones have been
 # obtained by looking at the output of `compute chain id from seed`
 @pytest.mark.parametrize(
@@ -134,7 +122,7 @@ def test_transfer(mockup_client: Client):
 )
 @pytest.mark.client
 def test_create_mockup_custom_constants(
-    sandbox: Sandbox, proto: str, chain_id: str, initial_timestamp: str
+    sandbox: Sandbox, chain_id: str, initial_timestamp: str
 ):
     """Tests `tezos-client create mockup` --protocols-constants  argument
     The call must succeed.
@@ -159,7 +147,7 @@ def test_create_mockup_custom_constants(
         json_file.flush()
         unmanaged_client = sandbox.create_client(base_dir=base_dir)
         res = unmanaged_client.create_mockup(
-            protocol=proto, protocol_constants_file=json_file.name
+            protocol=protocol.HASH, protocol_constants_file=json_file.name
         ).create_mockup_result
         assert res == CreateMockupResult.OK
 
@@ -197,8 +185,7 @@ def _create_accounts_list():
 
 
 @pytest.mark.client
-@pytest.mark.parametrize('proto', MOCKUP_PROTOCOLS)
-def test_create_mockup_custom_bootstrap_accounts(sandbox: Sandbox, proto: str):
+def test_create_mockup_custom_bootstrap_accounts(sandbox: Sandbox):
     """Tests `tezos-client create mockup` --bootstrap-accounts argument
     The call must succeed.
     """
@@ -215,7 +202,7 @@ def test_create_mockup_custom_bootstrap_accounts(sandbox: Sandbox, proto: str):
         # Follow pattern of mockup_client fixture:
         unmanaged_client = sandbox.create_client(base_dir=base_dir)
         res = unmanaged_client.create_mockup(
-            protocol=proto, bootstrap_accounts_file=json_file.name
+            protocol=protocol.HASH, bootstrap_accounts_file=json_file.name
         ).create_mockup_result
         assert res == CreateMockupResult.OK
         mock_client = sandbox.create_client(base_dir=base_dir, mode="mockup")
@@ -226,8 +213,7 @@ def test_create_mockup_custom_bootstrap_accounts(sandbox: Sandbox, proto: str):
 
 
 @pytest.mark.client
-@pytest.mark.parametrize('proto', MOCKUP_PROTOCOLS)
-def test_transfer_bad_base_dir(sandbox: Sandbox, proto: str):
+def test_transfer_bad_base_dir(sandbox: Sandbox):
     """Executes `tezos-client --base-dir /tmp/mdir create mockup`
     when /tmp/mdir looks like a dubious base directory.
     Checks that a warning is printed.
@@ -235,7 +221,7 @@ def test_transfer_bad_base_dir(sandbox: Sandbox, proto: str):
     try:
         unmanaged_client = sandbox.create_client()
         res = unmanaged_client.create_mockup(
-            protocol=proto
+            protocol=protocol.HASH
         ).create_mockup_result
         assert res == CreateMockupResult.OK
         base_dir = unmanaged_client.base_dir
@@ -269,8 +255,7 @@ def test_config_show_mockup(mockup_client: Client):
     """Executes `tezos-client --mode mockup config show` in
     a state where it should succeed.
     """
-    proto = _get_mockup_proto(mockup_client)
-    mockup_client.run_generic(["--protocol", proto, "config", "show"])
+    mockup_client.run_generic(["--protocol", protocol.HASH, "config", "show"])
 
 
 @pytest.mark.client
@@ -296,7 +281,6 @@ def test_config_init_mockup(mockup_client: Client):
     """Executes `tezos-client config init mockup` in
     a state where it should succeed.
     """
-    proto = _get_mockup_proto(mockup_client)
     # We cannot use NamedTemporaryFile because `config init mockup`
     # does not overwrite files. Because NamedTemporaryFile creates the file
     # it would make the test fail.
@@ -306,7 +290,7 @@ def test_config_init_mockup(mockup_client: Client):
     mockup_client.run(
         [
             "--protocol",
-            proto,
+            protocol.HASH,
             "config",
             "init",
             f"--{_BA_FLAG}",
@@ -334,12 +318,11 @@ def test_config_init_mockup_fail(mockup_client: Client):
     (the default base directory could contain sensitive data,
      such as private keys)
     """
-    proto = _get_mockup_proto(mockup_client)
     ba_json_file = tempfile.mktemp(prefix='tezos-bootstrap-accounts')
     pc_json_file = tempfile.mktemp(prefix='tezos-proto-consts')
     cmd = [
         "--protocol",
-        proto,
+        protocol.HASH,
         "config",
         "init",
         f"--{_BA_FLAG}",
@@ -383,15 +366,13 @@ def _get_state_using_config_init_mockup(mock_client: Client) -> Tuple[str, str]:
     Note that because this a mockup specific operation, the `mock_client`
     parameter must be in mockup mode; do not give a vanilla client.
     """
-    proto = _get_mockup_proto(mock_client)
-
     ba_json_file = tempfile.mktemp(prefix='tezos-bootstrap-accounts')
     pc_json_file = tempfile.mktemp(prefix='tezos-proto-consts')
 
     mock_client.run(
         [
             "--protocol",
-            proto,
+            protocol.HASH,
             "config",
             "init",
             f"--{_BA_FLAG}",
@@ -451,14 +432,12 @@ def _get_state_using_config_show_mockup(mock_client: Client) -> Tuple[str, str]:
         pc_json = string[proto_constants_index + len(tagline2) + 1 :]
         return (bc_json, pc_json)
 
-    proto = _get_mockup_proto(mock_client)
-    stdout = mock_client.run(["--protocol", proto, "config", "show"])
+    stdout = mock_client.run(["--protocol", protocol.HASH, "config", "show"])
     return _parse_config_init_output(stdout)
 
 
 def _test_create_mockup_init_show_roundtrip(
     sandbox: Sandbox,
-    proto: str,
     read_initial_state,
     read_final_state,
     bootstrap_json: Optional[str] = None,
@@ -497,7 +476,7 @@ def _test_create_mockup_init_show_roundtrip(
             # Follow pattern of mockup_client fixture:
             unmanaged_client = sandbox.create_client(base_dir=base_dir)
             res = unmanaged_client.create_mockup(
-                protocol=proto,
+                protocol=protocol.HASH,
                 bootstrap_accounts_file=ba_file,
                 protocol_constants_file=pc_file,
             ).create_mockup_result
@@ -539,7 +518,7 @@ def _test_create_mockup_init_show_roundtrip(
             # Follow pattern of mockup_client fixture:
             unmanaged_client = sandbox.create_client(base_dir=base_dir)
             res = unmanaged_client.create_mockup(
-                protocol=proto,
+                protocol=protocol.HASH,
                 protocol_constants_file=pc_json_file.name,
                 bootstrap_accounts_file=ba_json_file.name,
             ).create_mockup_result
@@ -571,7 +550,6 @@ def _test_create_mockup_init_show_roundtrip(
 
 
 @pytest.mark.client
-@pytest.mark.parametrize('proto', MOCKUP_PROTOCOLS)
 @pytest.mark.parametrize(
     'initial_bootstrap_accounts', [None, json.dumps(_create_accounts_list())]
 )
@@ -597,7 +575,6 @@ def _test_create_mockup_init_show_roundtrip(
 )
 def test_create_mockup_config_show_init_roundtrip(
     sandbox: Sandbox,
-    proto: str,
     initial_bootstrap_accounts,
     protocol_constants,
     read_initial_state,
@@ -616,7 +593,6 @@ def test_create_mockup_config_show_init_roundtrip(
     """
     _test_create_mockup_init_show_roundtrip(
         sandbox,
-        proto,
         read_initial_state,
         read_final_state,
         initial_bootstrap_accounts,

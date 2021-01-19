@@ -93,9 +93,6 @@ EDO = "PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq"
 EDO_DAEMON = "008-PtEdoTez"
 EDO_PARAMETERS = get_parameters("008_PtEdoTez")
 
-# Protocols supported by the mockup mode
-MOCKUP_PROTOCOLS = [ALPHA, CARTHAGE, DELPHI]
-
 TEZOS_CRT = """
 Certificate:
     Data:

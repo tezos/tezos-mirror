@@ -261,8 +261,8 @@ def nodeless_client():
     client.cleanup()
 
 
-@pytest.fixture(params=constants.MOCKUP_PROTOCOLS)
-def mockup_client(request, sandbox: Sandbox) -> Iterator[Client]:
+@pytest.fixture
+def mockup_client(sandbox: Sandbox) -> Iterator[Client]:
     """
     Returns a mockup client with its persistent directory created
 
@@ -279,7 +279,7 @@ def mockup_client(request, sandbox: Sandbox) -> Iterator[Client]:
     with tempfile.TemporaryDirectory(prefix='tezos-client.') as base_dir:
         unmanaged_client = sandbox.create_client(base_dir=base_dir)
         res = unmanaged_client.create_mockup(
-            protocol=request.param
+            protocol=protocol.HASH
         ).create_mockup_result
         assert res == CreateMockupResult.OK
         yield sandbox.create_client(base_dir=base_dir, mode="mockup")
