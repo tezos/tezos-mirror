@@ -292,7 +292,7 @@ let test_contracts_007 client =
       ~burn_cap:Constant.implicit_account_burn
       client
   in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for client ~key:"bootstrap1" in
   let* () = test_implicit_contract simple_implicit_key.public_key_hash in
   let* () =
     Lwt_list.iter_s
@@ -323,11 +323,11 @@ let test_contracts_007 client =
       ~burn_cap:Constant.implicit_account_burn
       client
   in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for client ~key:"bootstrap1" in
   let* () =
     Client.set_delegate ~src:delegated_implicit ~delegate:bootstrap1 client
   in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for client ~key:"bootstrap1" in
   let* () = test_implicit_contract delegated_implicit_key.public_key_hash in
   let* _ =
     RPC.Proto_007.Contract.get_delegate
@@ -390,7 +390,7 @@ let test_contracts_007 client =
       ~burn_cap:Tez.(of_int 3)
       client
   in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for client ~key:"bootstrap1" in
   let* () = test_originated_contract originated_contract_simple in
   (* A smart contract with a big map and entrypoints *)
   let* originated_contract_advanced =
@@ -403,7 +403,7 @@ let test_contracts_007 client =
       ~burn_cap:Tez.(of_int 3)
       client
   in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for client ~key:"bootstrap1" in
   let* () = test_originated_contract originated_contract_advanced in
   let unique_big_map_key =
     Ezjsonm.value_from_string
@@ -667,7 +667,7 @@ let test_votes_007 client =
   (* initialize data *)
   let proto_hash = "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp" in
   let* () = Client.submit_proposals ~proto_hash client in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for client ~key:"bootstrap1" in
   (* RPC calls *)
   let* _ = RPC.Proto_007.Votes.get_ballot_list ~hooks client in
   let* _ = RPC.Proto_007.Votes.get_ballots ~hooks client in
@@ -677,12 +677,12 @@ let test_votes_007 client =
   let* _ = RPC.Proto_007.Votes.get_listings ~hooks client in
   let* _ = RPC.Proto_007.Votes.get_proposals ~hooks client in
   (* bake to testing vote period and submit some ballots *)
-  let* () = Client.bake_for client in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for client ~key:"bootstrap1" in
+  let* () = Client.bake_for client ~key:"bootstrap1" in
   let* () = Client.submit_ballot ~key:"bootstrap1" ~proto_hash Yay client in
   let* () = Client.submit_ballot ~key:"bootstrap2" ~proto_hash Nay client in
   let* () = Client.submit_ballot ~key:"bootstrap3" ~proto_hash Pass client in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for client ~key:"bootstrap1" in
   (* RPC calls again *)
   let* _ = RPC.Proto_007.Votes.get_ballot_list ~hooks client in
   let* _ = RPC.Proto_007.Votes.get_ballots ~hooks client in
