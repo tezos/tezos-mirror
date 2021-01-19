@@ -73,7 +73,7 @@ let env_version_encoding =
              V2
          | _ ->
              failwith "unexpected environment version")
-       int16
+       uint16
 
 let encoding =
   let open Data_encoding in
