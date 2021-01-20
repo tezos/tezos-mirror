@@ -35,6 +35,11 @@
 
     - ["level-at-least"] the minimal log-level that the sink will
       output (see {!Tezos_event_logging.Internal_event.level}).
+    - ["section-prefix"] can be given many times and defines a list of pairs
+      ["<section-prefix>:<level-threshold>"] which can be used to setup more
+      precise filters. ["level-at-least=info"] is understood as
+      ["section-prefix=:info"] (the empty section prefix matches all
+      sections).
     - ["format"] the output format used;
       acceptable values are ["one-per-line"] (the default),
       ["netstring"] (see {{:https://en.wikipedia.org/wiki/Netstring}The

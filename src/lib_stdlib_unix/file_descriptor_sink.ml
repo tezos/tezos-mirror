@@ -31,7 +31,10 @@ type t = {
   (* Hopefully temporary hack to handle event which are emitted with
      the non-cooperative log functions in `Legacy_logging`: *)
   lwt_bad_citizen_hack : string list ref;
-  level_at_least : Internal_event.Level.t;
+  filter :
+    [ `Level_at_least of Internal_event.Level.t
+    | `Per_section_prefix of
+      (Internal_event.Section.t * Internal_event.Level.t) list ];
 }
 
 let hostname =
@@ -74,15 +77,63 @@ end) : Internal_event.SINK with type t = t = struct
     | `Stderr -> "file-descriptor-stderr"
 
   let configure uri =
-    let level_at_least =
-      let ( >?? ) = Option.bind in
-      Uri.get_query_param uri "level-at-least"
-      >?? Internal_event.Level.of_string
-      |> Option.value ~default:Internal_event.Level.default
-    in
     let fail_parsing fmt =
       Format.kasprintf (failwith "Parsing URI: %s: %s" (Uri.to_string uri)) fmt
     in
+    let section_prefixes =
+      let all =
+        List.filter_map
+          (function ("section-prefix", l) -> Some l | _ -> None)
+          (Uri.query uri)
+      in
+      match all with [] -> None | more -> Some (List.concat more)
+    in
+    (match (Uri.get_query_param uri "level-at-least", section_prefixes) with
+    | (None, None) -> return (`Level_at_least Internal_event.Level.default)
+    | (Some l, None) -> (
+        match Internal_event.Level.of_string l with
+        | Some l -> return (`Level_at_least l)
+        | None -> fail_parsing "Wrong level: %S" l)
+    | (base_level, Some l) -> (
+        try
+          let sections =
+            let parse_section s =
+              match String.split_on_char ':' s with
+              | [one] ->
+                  ( Internal_event.Section.make_sanitized
+                      (String.split_on_char '.' one),
+                    Internal_event.Level.default )
+              | [one; two] ->
+                  let lvl =
+                    match Internal_event.Level.of_string two with
+                    | Some s -> s
+                    | None ->
+                        Fmt.failwith "Wrong level name: %S in argument %S" two s
+                  in
+                  let section =
+                    match one with
+                    | "" -> Internal_event.Section.empty
+                    | _ ->
+                        Internal_event.Section.make_sanitized
+                          (String.split_on_char '.' one)
+                  in
+                  (section, lvl)
+              | _ -> Fmt.failwith "Wrong section-level entry: %S" s
+            in
+            let pairs = List.map parse_section l in
+            match base_level with
+            | None -> pairs
+            | Some lvl -> (
+                match Internal_event.Level.of_string lvl with
+                | Some l -> (Internal_event.Section.empty, l) :: pairs
+                | None ->
+                    Fmt.failwith
+                      "Wrong level name %S in level-at-least argument"
+                      lvl)
+          in
+          return (`Per_section_prefix sections)
+        with Failure s -> fail_parsing "%s" s))
+    >>=? fun filter ->
     (match Uri.get_query_param uri "format" with
     | Some "netstring" -> return `Netstring
     | Some "pp" -> return `Pp
@@ -131,7 +182,7 @@ end) : Internal_event.SINK with type t = t = struct
     | `Stdout -> return Lwt_unix.stdout
     | `Stderr -> return Lwt_unix.stderr)
     >>=? fun output ->
-    let t = {output; lwt_bad_citizen_hack = ref []; level_at_least; format} in
+    let t = {output; lwt_bad_citizen_hack = ref []; filter; format} in
     return t
 
   let write_mutex = Lwt_mutex.create ()
@@ -142,13 +193,57 @@ end) : Internal_event.SINK with type t = t = struct
             Lwt_utils_unix.write_string output to_write)
         >>= fun () -> return_unit)
 
-  let handle (type a) {output; lwt_bad_citizen_hack; level_at_least; format; _}
-      m ?(section = Internal_event.Section.empty) (v : unit -> a) =
+  let handle (type a) {output; lwt_bad_citizen_hack; filter; format; _} m
+      ?(section = Internal_event.Section.empty) (v : unit -> a) =
     let module M = (val m : Internal_event.EVENT_DEFINITION with type t = a) in
     let now = Unix.gettimeofday () in
     let forced_event = v () in
     let level = M.level forced_event in
-    if Internal_event.Level.compare level level_at_least >= 0 then (
+    let filter_run =
+      match filter with
+      | `Level_at_least level_at_least ->
+          Internal_event.Level.compare level level_at_least >= 0
+      | `Per_section_prefix kvl ->
+          List.exists
+            (fun (prefix, lvl) ->
+              Internal_event.(
+                Section.is_prefix ~prefix section
+                && Level.compare level lvl >= 0))
+            kvl
+    in
+    let debugf fmt =
+      Fmt.kstr
+        (fun s ->
+          if format = `Pp then output_one output (Fmt.str "//debug: %s\n" s)
+          else return_unit)
+        fmt
+    in
+    (* TODO: remove this whole debug section? *)
+    (if true then return_unit
+    else
+      debugf
+        "filter: %s Vs %s/%s@%s bad-citizens: %d"
+        (match filter with
+        | `Per_section_prefix l ->
+            Fmt.str
+              "[sections: %s]"
+              (List.map
+                 (fun (k, v) ->
+                   Fmt.str
+                     "(sec %a -> %s)"
+                     Fmt.Dump.(list string)
+                     (Internal_event.Section.to_string_list k)
+                     (Internal_event.Level.to_string v))
+                 l
+              |> String.concat " ")
+        | `Level_at_least l ->
+            Fmt.str "[level: %s]" (Internal_event.Level.to_string l))
+        (Internal_event.Section.to_string_list section |> String.concat ".")
+        M.name
+        (Internal_event.Level.to_string level)
+        (List.length !lwt_bad_citizen_hack))
+    >>=? fun () ->
+    if filter_run then (
       let wrapped_event = wrap now section forced_event in
       let to_write =
         let json () =
