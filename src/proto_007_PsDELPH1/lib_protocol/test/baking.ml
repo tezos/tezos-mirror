@@ -237,16 +237,16 @@ let test_rewards_formulas_equivalence () =
     ranges
 
 let tests =
-  [ Test.tztest "cycle" `Quick test_cycle;
-    Test.tztest
+  [ Test_services.tztest "cycle" `Quick test_cycle;
+    Test_services.tztest
       "test rewards are correctly accounted for"
       `Slow
       test_rewards_retrieval;
-    Test.tztest
+    Test_services.tztest
       "test rewards formula for various input values"
       `Quick
       test_rewards_formulas;
-    Test.tztest
+    Test_services.tztest
       "check equivalence of rewards formulas"
       `Quick
       test_rewards_formulas_equivalence ]

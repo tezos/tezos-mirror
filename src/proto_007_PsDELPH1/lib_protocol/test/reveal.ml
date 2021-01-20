@@ -27,6 +27,7 @@
 
 open Protocol
 open Test_tez
+open Tezos_test_services
 
 let ten_tez = Tez.of_int 10
 
@@ -113,9 +114,12 @@ let not_enough_found_for_reveal () =
           false)
 
 let tests =
-  [ Test.tztest "simple reveal" `Quick simple_reveal;
-    Test.tztest "empty account on reveal" `Quick empty_account_on_reveal;
-    Test.tztest
+  [ Test_services.tztest "simple reveal" `Quick simple_reveal;
+    Test_services.tztest
+      "empty account on reveal"
+      `Quick
+      empty_account_on_reveal;
+    Test_services.tztest
       "not enough found for reveal"
       `Quick
       not_enough_found_for_reveal ]

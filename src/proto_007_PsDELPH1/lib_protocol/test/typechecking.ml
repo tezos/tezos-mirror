@@ -107,11 +107,11 @@ let test_unparse_stack_overflow () =
       Alcotest.failf "Unexpected error: %s" __LOC__
 
 let tests =
-  [ Test.tztest
+  [ Test_services.tztest
       "test typecheck stack overflow error"
       `Quick
       test_typecheck_stack_overflow;
-    Test.tztest
+    Test_services.tztest
       "test unparsing stack overflow error"
       `Quick
       test_typecheck_stack_overflow ]

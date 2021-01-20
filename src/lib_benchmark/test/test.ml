@@ -40,15 +40,3 @@ let tztest_nolwt name speed f =
       with exn ->
         Format.printf "Uncaught exception %s" (Printexc.to_string exn) ;
         Lwt.fail Alcotest.Test_error)
-
-let tztest name speed f =
-  Alcotest_lwt.test_case name speed (fun _sw () ->
-      f ()
-      >>= function
-      | Ok () ->
-          Lwt.return_unit
-      | Error err ->
-          Tezos_stdlib_unix.Internal_event_unix.close ()
-          >>= fun () ->
-          Format.printf "@.%a@." pp_print_error err ;
-          Lwt.fail Alcotest.Test_error)

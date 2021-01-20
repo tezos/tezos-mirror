@@ -133,5 +133,11 @@ let on_diffs f () = List.iter f diffs_list ; return_unit
 
 (* Marked Slow because they take 5 to 10 seconds and are unlikely to change *)
 let tests =
-  [ Test.tztest "conversion roundtrip" `Slow (on_diffs conversion_roundtrip);
-    Test.tztest "encoding roundtrip" `Slow (on_diffs encoding_roundtrip) ]
+  [ Test_services.tztest
+      "conversion roundtrip"
+      `Slow
+      (on_diffs conversion_roundtrip);
+    Test_services.tztest
+      "encoding roundtrip"
+      `Slow
+      (on_diffs encoding_roundtrip) ]

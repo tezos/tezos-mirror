@@ -240,6 +240,7 @@ let () =
     "tezos-proxy"
     [ ( "all",
         [ Alcotest_lwt.test_case "RequestsTree" `Quick test_tree;
-          Test.tztest "test do_rpc->None" `Quick test_do_rpc_none;
-          Test.tztest "test do_rpc" `Quick test_do_rpc_no_longer_key ] ) ]
+          Test_services.tztest "test do_rpc->None" `Quick test_do_rpc_none;
+          Test_services.tztest "test do_rpc" `Quick test_do_rpc_no_longer_key
+        ] ) ]
   |> Lwt_main.run

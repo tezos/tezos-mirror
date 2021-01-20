@@ -175,17 +175,17 @@ let encoding encoder () =
   join_ep (List.map check_encode_decode [0; 7373737373; max_int - 1])
 
 let tests =
-  [ Test.tztest "Addition" `Quick add;
-    Test.tztest "Subtraction" `Quick sub;
-    Test.tztest "Multiplication" `Quick mul;
-    Test.tztest "Multiplication (fast version)" `Quick mul_fast;
-    Test.tztest "Scale fast" `Quick scale_fast;
-    Test.tztest "Conversion from Z" `Quick of_z_opt;
-    Test.tztest
+  [ Test_services.tztest "Addition" `Quick add;
+    Test_services.tztest "Subtraction" `Quick sub;
+    Test_services.tztest "Multiplication" `Quick mul;
+    Test_services.tztest "Multiplication (fast version)" `Quick mul_fast;
+    Test_services.tztest "Scale fast" `Quick scale_fast;
+    Test_services.tztest "Conversion from Z" `Quick of_z_opt;
+    Test_services.tztest
       "Encoding through z"
       `Quick
       (encoding Saturation_repr.z_encoding);
-    Test.tztest
+    Test_services.tztest
       "Encoding through n"
       `Quick
       (encoding Saturation_repr.n_encoding) ]

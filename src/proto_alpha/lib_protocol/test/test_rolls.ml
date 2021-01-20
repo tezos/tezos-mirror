@@ -346,22 +346,28 @@ let test_delegation () =
   >>=? fun () -> check_rolls b m3 >>=? fun () -> check_rolls b m1
 
 let tests =
-  [ Test.tztest "simple staking rights" `Quick test_simple_staking_rights;
-    Test.tztest
+  [ Test_services.tztest
+      "simple staking rights"
+      `Quick
+      test_simple_staking_rights;
+    Test_services.tztest
       "simple staking rights after baking"
       `Quick
       test_simple_staking_rights_after_baking;
-    Test.tztest "deactivation then bake" `Quick test_deactivation_then_bake;
-    Test.tztest
+    Test_services.tztest
+      "deactivation then bake"
+      `Quick
+      test_deactivation_then_bake;
+    Test_services.tztest
       "deactivation then self delegation"
       `Quick
       test_deactivation_then_self_delegation;
-    Test.tztest
+    Test_services.tztest
       "deactivation then empty then self delegation"
       `Quick
       test_deactivation_then_empty_then_self_delegation;
-    Test.tztest
+    Test_services.tztest
       "deactivation then empty then self delegation then recredit"
       `Quick
       test_deactivation_then_empty_then_self_delegation_then_recredit;
-    Test.tztest "delegation" `Quick test_delegation ]
+    Test_services.tztest "delegation" `Quick test_delegation ]

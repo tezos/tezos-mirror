@@ -768,20 +768,29 @@ let test_optimal_comb () =
   >>=? fun _ctxt -> return_unit
 
 let tests =
-  [ Test.tztest
+  [ Test_services.tztest
       "test typecheck stack overflow error"
       `Quick
       test_typecheck_stack_overflow;
-    Test.tztest
+    Test_services.tztest
       "test unparsing stack overflow error"
       `Quick
       test_typecheck_stack_overflow;
-    Test.tztest "test comb type parsing" `Quick test_parse_comb_type;
-    Test.tztest "test comb type unparsing" `Quick test_unparse_comb_type;
-    Test.tztest
+    Test_services.tztest "test comb type parsing" `Quick test_parse_comb_type;
+    Test_services.tztest
+      "test comb type unparsing"
+      `Quick
+      test_unparse_comb_type;
+    Test_services.tztest
       "test comb comparable type unparsing"
       `Quick
       test_unparse_comb_comparable_type;
-    Test.tztest "test comb data parsing" `Quick test_parse_comb_data;
-    Test.tztest "test comb data unparsing" `Quick test_unparse_comb_data;
-    Test.tztest "test optimal comb data unparsing" `Quick test_optimal_comb ]
+    Test_services.tztest "test comb data parsing" `Quick test_parse_comb_data;
+    Test_services.tztest
+      "test comb data unparsing"
+      `Quick
+      test_unparse_comb_data;
+    Test_services.tztest
+      "test optimal comb data unparsing"
+      `Quick
+      test_optimal_comb ]

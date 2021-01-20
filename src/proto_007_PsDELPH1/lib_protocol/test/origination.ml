@@ -25,6 +25,7 @@
 
 open Protocol
 open Test_tez
+open Tezos_test_services
 
 let ten_tez = Tez.of_int 10
 
@@ -260,14 +261,14 @@ let counter () =
 (******************************************************)
 
 let tests =
-  [ Test.tztest "balances_simple" `Quick balances_simple;
-    Test.tztest "balances_credit" `Quick balances_credit;
-    Test.tztest "balances_credit_fee" `Quick balances_credit_fee;
-    Test.tztest "balances_undelegatable" `Quick balances_undelegatable;
-    Test.tztest "pay_fee" `Quick pay_fee;
-    Test.tztest
+  [ Test_services.tztest "balances_simple" `Quick balances_simple;
+    Test_services.tztest "balances_credit" `Quick balances_credit;
+    Test_services.tztest "balances_credit_fee" `Quick balances_credit_fee;
+    Test_services.tztest "balances_undelegatable" `Quick balances_undelegatable;
+    Test_services.tztest "pay_fee" `Quick pay_fee;
+    Test_services.tztest
       "not enough tez in contract to pay fee"
       `Quick
       not_tez_in_contract_to_pay_fee;
-    Test.tztest "multiple originations" `Quick multiple_originations;
-    Test.tztest "counter" `Quick counter ]
+    Test_services.tztest "multiple originations" `Quick multiple_originations;
+    Test_services.tztest "counter" `Quick counter ]

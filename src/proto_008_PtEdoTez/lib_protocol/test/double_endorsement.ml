@@ -253,21 +253,21 @@ let wrong_delegate () =
           false)
 
 let tests =
-  [ Test.tztest
+  [ Test_services.tztest
       "valid double endorsement evidence"
       `Quick
       valid_double_endorsement_evidence;
-    Test.tztest
+    Test_services.tztest
       "invalid double endorsement evidence"
       `Quick
       invalid_double_endorsement;
-    Test.tztest
+    Test_services.tztest
       "too early double endorsement evidence"
       `Quick
       too_early_double_endorsement_evidence;
-    Test.tztest
+    Test_services.tztest
       "too late double endorsement evidence"
       `Quick
       too_late_double_endorsement_evidence;
-    Test.tztest "different delegates" `Quick different_delegates;
-    Test.tztest "wrong delegate" `Quick wrong_delegate ]
+    Test_services.tztest "different delegates" `Quick different_delegates;
+    Test_services.tztest "wrong delegate" `Quick wrong_delegate ]

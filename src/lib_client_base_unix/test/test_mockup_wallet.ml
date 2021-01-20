@@ -35,21 +35,7 @@ open Tezos_error_monad.Error_monad
 open Tezos_stdlib_unix
 open Tezos_client_base
 open Tezos_client_base_unix
-
-(** Wraps an alcotest so that it prints correcly errors from the Error_monad. *)
-let tztest (name : string) (speed : Alcotest.speed_level)
-    (f : unit -> (unit, error list) result Lwt.t) : unit Alcotest_lwt.test_case
-    =
-  Alcotest_lwt.test_case name speed (fun _sw () ->
-      f ()
-      >>= function
-      | Ok () ->
-          Lwt.return_unit
-      | Error err ->
-          Tezos_stdlib_unix.Internal_event_unix.close ()
-          >>= fun () ->
-          Format.printf "@\n%a@." pp_print_error err ;
-          Lwt.fail Alcotest.Test_error)
+open Tezos_test_services
 
 let default_bootstrap_accounts_names =
   List.map (fun i -> "bootstrap" ^ string_of_int i) (1 -- 5)
@@ -108,10 +94,10 @@ let validate_accounts_names key_list accounts_names =
     (List.map (fun (name, _, _, _) -> name) key_list)
     accounts_names
 
-(** When no bootstrap accounts file is provided, then the wallet is 
+(** When no bootstrap accounts file is provided, then the wallet is
     populated with the default bootstrap accounts *)
 let test_no_bootstrap_accounts_file_populates_defaults =
-  tztest
+  Test_services.tztest
     "When no bootstrap accounts file is provided, then the wallet is \
      populated with the default bootstrap accounts"
     `Quick
@@ -136,7 +122,7 @@ let test_no_bootstrap_accounts_file_populates_defaults =
 (** When a valid bootstrap accounts file is provided, then the wallet is
     populated with its content *)
 let test_with_valid_bootstrap_accounts_file_populates =
-  tztest
+  Test_services.tztest
     "When a valid bootstrap accounts file is provided, then the wallet is \
      populated with its content"
     `Quick

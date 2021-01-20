@@ -330,20 +330,20 @@ let wrong_signature_in_the_middle () =
   >>=? fun _inc -> return_unit
 
 let tests =
-  [ Test.tztest "multiple transfers" `Quick multiple_transfers;
-    Test.tztest
+  [ Test_services.tztest "multiple transfers" `Quick multiple_transfers;
+    Test_services.tztest
       "multiple originations and delegations"
       `Quick
       multiple_origination_and_delegation;
-    Test.tztest
+    Test_services.tztest
       "Failing operation in the middle"
       `Quick
       failing_operation_in_the_middle;
-    Test.tztest
+    Test_services.tztest
       "Failing operation in the middle (with fees)"
       `Quick
       failing_operation_in_the_middle_with_fees;
-    Test.tztest
+    Test_services.tztest
       "Failing operation (wrong manager in the middle of a pack)"
       `Quick
       wrong_signature_in_the_middle ]

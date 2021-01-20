@@ -573,32 +573,44 @@ let test_invalid_transfer_from_unactivated_account () =
           false)
 
 let tests =
-  [ Test.tztest "init with commitments" `Quick test_simple_init_with_commitments;
-    Test.tztest "single activation" `Quick test_single_activation;
-    Test.tztest "multi-activation one-by-one" `Quick test_multi_activation_1;
-    Test.tztest "multi-activation all at a time" `Quick test_multi_activation_2;
-    Test.tztest "activation and transfer" `Quick test_activation_and_transfer;
-    Test.tztest
+  [ Test_services.tztest
+      "init with commitments"
+      `Quick
+      test_simple_init_with_commitments;
+    Test_services.tztest "single activation" `Quick test_single_activation;
+    Test_services.tztest
+      "multi-activation one-by-one"
+      `Quick
+      test_multi_activation_1;
+    Test_services.tztest
+      "multi-activation all at a time"
+      `Quick
+      test_multi_activation_2;
+    Test_services.tztest
+      "activation and transfer"
+      `Quick
+      test_activation_and_transfer;
+    Test_services.tztest
       "transfer to unactivated account then activate"
       `Quick
       test_transfer_to_unactivated_then_activate;
-    Test.tztest
+    Test_services.tztest
       "invalid activation with no commitments"
       `Quick
       test_invalid_activation_with_no_commitments;
-    Test.tztest
+    Test_services.tztest
       "invalid activation with commitments"
       `Quick
       test_invalid_activation_inexistent_pkh;
-    Test.tztest
+    Test_services.tztest
       "invalid double activation"
       `Quick
       test_invalid_double_activation;
-    Test.tztest
+    Test_services.tztest
       "wrong activation code"
       `Quick
       test_invalid_activation_wrong_secret;
-    Test.tztest
+    Test_services.tztest
       "invalid transfer from unactivated account"
       `Quick
       test_invalid_transfer_from_unactivated_account ]

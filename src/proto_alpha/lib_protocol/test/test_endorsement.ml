@@ -632,24 +632,36 @@ let test_fitness_gap () =
   Assert.equal_int ~loc:__LOC__ res 1 >>=? fun () -> return_unit
 
 let tests =
-  [ Test.tztest "Simple endorsement" `Quick test_simple_endorsement;
-    Test.tztest "Maximum endorsement" `Quick test_max_endorsement;
-    Test.tztest "Consistent priorities" `Quick test_consistent_priorities;
-    Test.tztest "Reward retrieval" `Quick test_reward_retrieval;
-    Test.tztest
+  [ Test_services.tztest "Simple endorsement" `Quick test_simple_endorsement;
+    Test_services.tztest "Maximum endorsement" `Quick test_max_endorsement;
+    Test_services.tztest
+      "Consistent priorities"
+      `Quick
+      test_consistent_priorities;
+    Test_services.tztest "Reward retrieval" `Quick test_reward_retrieval;
+    Test_services.tztest
       "Reward retrieval two endorsers"
       `Quick
       test_reward_retrieval_two_endorsers;
-    Test.tztest "Endorsement threshold" `Quick test_endorsement_threshold;
-    Test.tztest "Fitness gap" `Quick test_fitness_gap;
+    Test_services.tztest
+      "Endorsement threshold"
+      `Quick
+      test_endorsement_threshold;
+    Test_services.tztest "Fitness gap" `Quick test_fitness_gap;
     (* Fail scenarios *)
-    Test.tztest
+    Test_services.tztest
       "Wrong endorsement predecessor"
       `Quick
       test_wrong_endorsement_predecessor;
-    Test.tztest
+    Test_services.tztest
       "Invalid endorsement level"
       `Quick
       test_invalid_endorsement_level;
-    Test.tztest "Duplicate endorsement" `Quick test_duplicate_endorsement;
-    Test.tztest "Not enough for deposit" `Quick test_not_enough_for_deposit ]
+    Test_services.tztest
+      "Duplicate endorsement"
+      `Quick
+      test_duplicate_endorsement;
+    Test_services.tztest
+      "Not enough for deposit"
+      `Quick
+      test_not_enough_for_deposit ]

@@ -216,10 +216,16 @@ let fp_pp () =
   >>=? fun () -> fail_unless (FP.zero =:= "0") (err "0")
 
 let tests =
-  [ Test.tztest "Integral tests (0 decimals)" `Quick (integral_tests 0);
-    Test.tztest "Integral tests (1 decimals)" `Quick (integral_tests 1);
-    Test.tztest "Integral tests (10 decimals)" `Quick (integral_tests 10);
-    Test.tztest "FP tests (0 decimals)" `Quick fp_zero;
-    Test.tztest "FP tests (1 decimals)" `Quick (fp_nonzero 1);
-    Test.tztest "FP tests (3 decimals)" `Quick (fp_nonzero 3);
-    Test.tztest "FP pp tests (3 decimals)" `Quick fp_pp ]
+  [ Test_services.tztest "Integral tests (0 decimals)" `Quick (integral_tests 0);
+    Test_services.tztest
+      "Integral tests (1 decimals)"
+      `Quick
+      (integral_tests 1);
+    Test_services.tztest
+      "Integral tests (10 decimals)"
+      `Quick
+      (integral_tests 10);
+    Test_services.tztest "FP tests (0 decimals)" `Quick fp_zero;
+    Test_services.tztest "FP tests (1 decimals)" `Quick (fp_nonzero 1);
+    Test_services.tztest "FP tests (3 decimals)" `Quick (fp_nonzero 3);
+    Test_services.tztest "FP pp tests (3 decimals)" `Quick fp_pp ]

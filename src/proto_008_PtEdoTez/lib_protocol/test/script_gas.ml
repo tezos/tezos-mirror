@@ -122,7 +122,7 @@ let check_property () =
   T.check_correctness ()
 
 let tests =
-  [ Test.tztest
+  [ Test_services.tztest
       "Script_repr.minimal_deserialize_cost is a lower bound for full \
        deserialization cost"
       `Quick

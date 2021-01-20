@@ -69,4 +69,4 @@ let test_baking_rights () =
   assert (List.for_all (fun {level; _} -> level = espected_level) rights) ;
   return_unit
 
-let tests = [Test.tztest "baking_rights" `Quick test_baking_rights]
+let tests = [Test_services.tztest "baking_rights" `Quick test_baking_rights]

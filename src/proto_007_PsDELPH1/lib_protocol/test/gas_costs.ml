@@ -25,6 +25,7 @@
 
 open Protocol
 open Script_ir_translator
+open Tezos_test_services
 
 (* Basic tests related to costs.
    Current limitations: for maps, sets & compare, we only test integer
@@ -247,19 +248,19 @@ let check_costs_are_all_positive list () =
   check_cost_reprs_are_all_positive list ()
 
 let tests =
-  [ Test.tztest
+  [ Test_services.tztest
       "Positivity of interpreter costs"
       `Quick
       (check_costs_are_all_positive all_interpreter_costs);
-    Test.tztest
+    Test_services.tztest
       "Positivity of typechecking costs"
       `Quick
       (check_costs_are_all_positive all_parsing_costs);
-    Test.tztest
+    Test_services.tztest
       "Positivity of unparsing costs"
       `Quick
       (check_costs_are_all_positive all_unparsing_costs);
-    Test.tztest
+    Test_services.tztest
       "Positivity of io costs"
       `Quick
       (check_cost_reprs_are_all_positive all_io_costs) ]

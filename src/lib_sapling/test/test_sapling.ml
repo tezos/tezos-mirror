@@ -1,4 +1,5 @@
 open Tezos_error_monad.Error_monad
+open Tezos_test_services
 module R = Rustzcash
 
 let test_get_memo_size () =
@@ -429,25 +430,12 @@ let test_replay () =
   Example.Validator.verify_update t1 state wrong_string
   >>= function Error _ -> return_unit | _ -> assert false
 
-(* Wraps an alcotest so that it prints correctly errors from the Error_monad. *)
-let tztest name speed f =
-  Alcotest_lwt.test_case name speed (fun _sw () ->
-      f ()
-      >>= function
-      | Ok () ->
-          Lwt.return_unit
-      | Error err ->
-          Tezos_stdlib_unix.Internal_event_unix.close ()
-          >>= fun () ->
-          Format.printf "@.%a@." pp_print_error err ;
-          Lwt.fail Alcotest.Test_error)
-
 let tests =
   [ Alcotest_lwt.test_case_sync "test_get_memo_size" `Quick test_get_memo_size;
     Alcotest_lwt.test_case_sync "full_transaction" `Quick test_full_transaction;
     Alcotest_lwt.test_case_sync "proof_raw" `Quick test_proof_raw;
-    tztest "forge" `Quick test_forge;
-    tztest "simple_client" `Quick test_simple_client;
-    tztest "anti-replay" `Quick test_replay ]
+    Test_services.tztest "forge" `Quick test_forge;
+    Test_services.tztest "simple_client" `Quick test_simple_client;
+    Test_services.tztest "anti-replay" `Quick test_replay ]
 
 let () = Alcotest_lwt.run "sapling" [("sapling", tests)] |> Lwt_main.run

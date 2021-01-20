@@ -1210,56 +1210,59 @@ let test_voting_power_updated_each_voting_period () =
     block
 
 let tests =
-  [ Test.tztest "voting successful_vote" `Quick (test_successful_vote 137);
-    Test.tztest
+  [ Test_services.tztest
+      "voting successful_vote"
+      `Quick
+      (test_successful_vote 137);
+    Test_services.tztest
       "voting testing vote, not enough quorum"
       `Quick
       (test_not_enough_quorum_in_testing_vote 245);
-    Test.tztest
+    Test_services.tztest
       "voting promotion vote, not enough quorum"
       `Quick
       (test_not_enough_quorum_in_promotion_vote 432);
-    Test.tztest
+    Test_services.tztest
       "voting counting double proposal"
       `Quick
       test_multiple_identical_proposals_count_as_one;
-    Test.tztest
+    Test_services.tztest
       "voting proposal, with supermajority"
       `Quick
       (test_supermajority_in_proposal true);
-    Test.tztest
+    Test_services.tztest
       "voting proposal, without supermajority"
       `Quick
       (test_supermajority_in_proposal false);
-    Test.tztest
+    Test_services.tztest
       "voting proposal, with quorum"
       `Quick
       (test_quorum_in_proposal true);
-    Test.tztest
+    Test_services.tztest
       "voting proposal, without quorum"
       `Quick
       (test_quorum_in_proposal false);
-    Test.tztest
+    Test_services.tztest
       "voting testing vote, with supermajority"
       `Quick
       (test_supermajority_in_testing_vote true);
-    Test.tztest
+    Test_services.tztest
       "voting testing vote, without supermajority"
       `Quick
       (test_supermajority_in_testing_vote false);
-    Test.tztest
+    Test_services.tztest
       "voting proposal, no winning proposal"
       `Quick
       (test_no_winning_proposal 400);
-    Test.tztest
+    Test_services.tztest
       "voting quorum, quorum capped maximum"
       `Quick
       (test_quorum_capped_maximum 400);
-    Test.tztest
+    Test_services.tztest
       "voting quorum, quorum capped minimum"
       `Quick
       (test_quorum_capped_minimum 401);
-    Test.tztest
+    Test_services.tztest
       "voting power updated in each voting period"
       `Quick
       test_voting_power_updated_each_voting_period ]
