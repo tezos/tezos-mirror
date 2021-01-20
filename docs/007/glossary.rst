@@ -38,6 +38,9 @@ _`Economic protocol`
 _`Fitness`
     See score_.
 
+_`Mempool`
+   A pool (set) of operations_ maintained by a node_ and not yet included in a block_.
+
 _`Node`
     A peer in the P2P network. It maintains a local state and propagates blocks
     and operations_.
