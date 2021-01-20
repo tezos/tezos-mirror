@@ -305,19 +305,24 @@ module All_sinks = struct
       let module S = (val definition : SINK with type t = a) in
       S.close sink
     in
-    let next_list = ref [] in
-    let gc_list = ref [] in
-    List.iter
-      (fun act ->
-        match act with
-        | Active {configuration; _} when except configuration ->
-            next_list := act :: !next_list
-        | _ -> gc_list := act :: !gc_list)
-      !active ;
-    active := !next_list ;
-    List.iter_es
-      (function Active {sink; definition; _} -> close_one sink definition)
-      !gc_list
+    (* We want to filter the list in one Lwt-go (atomically), and only then
+       call close on the ones that are being deleted. *)
+    let (next_active, to_close_list) =
+      List.partition
+        (fun act ->
+          match act with Active {configuration; _} -> except configuration)
+        !active
+    in
+    active := next_active ;
+    (* We don't want one failure to prevent the attempt at closing as many
+       sinks as possible, so we record all errors and combine them: *)
+    List.fold_left_s
+      (fun current -> function
+        | Active {sink; definition; _} ->
+            close_one sink definition >>= fun close_result ->
+            Lwt.return (Error_monad.join_e [current; close_result]))
+      (Ok ())
+      to_close_list
 
   let handle def section v =
     let handle (type a) sink definition =
