@@ -39,15 +39,9 @@ open Error_monad
 
 (** {3 Events Definitions and Registration } *)
 
-type level =
-  | Debug
-  | Info
-  | Notice
-  | Warning
-  | Error
-  | Fatal
-      (** The relative importance of a particular event (compatible with
+(** The relative importance of a particular event (compatible with
     traditional logging systems, cf. {!Lwt_log_core.level}). *)
+type level = Debug | Info | Notice | Warning | Error | Fatal
 
 (** Module to manipulate values of type {!level}.  *)
 module Level : sig
