@@ -63,6 +63,7 @@ let () =
   Protocol_limits.register ~protocols:[Alpha] ;
   Protocol_migration.register ~migrate_from ~migrate_to ;
   User_activated_upgrade.register ~migrate_from ~migrate_to ;
+  Rpc_config_logging.register ~protocols:[Alpha] ;
   Protocol_table_update.register ~migrate_from ~migrate_to ;
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/1823
      the "Baking" test does not have a documentation.
