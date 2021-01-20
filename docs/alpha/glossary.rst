@@ -90,14 +90,16 @@ _`Baker`
     Baking_ rights are distributed to different accounts based on their
     available balance. Only a node_ that handles an account_ with baking_ rights
     is allowed to bake; blocks created by another node_ are invalid.
+    The baker selects transactions from the mempool_ to be included in the block_
+	it bakes.
 
     Using the tools provided by Nomadic Labs, baking_ is handled by a
     separate binary.
 
-_`Baking`/_`Endorsement rights`
+_`Baking`/_`Endorsing rights`
     A delegate_ is allowed to bake/endorse a block_ if he holds the
-    baking/endorsement right for that block_. At the start of a Cycle_,
-    baking and endorsement rights are computed for all the block_ heights in the
+    baking/endorsing right for that block_. At the start of a Cycle_,
+    baking and endorsing rights are computed for all the block_ heights in the
     cycle_, based on the proportion of Rolls owned by each accounts.
 
     For each block_ height, there are several accounts that are allowed to bake.
@@ -119,7 +121,7 @@ _`Cycle`
 
 _`Delegate`
     An `Implicit account`_ to which an account_ has delegated their baking_ and
-    `endorsement rights`_. The Baking_ rights and `Endorsement rights`_ are
+    `endorsing rights`_. The baking_ rights and `endorsing rights`_ are
     calculated based on the total balance of tez that an account_ has been
     delegated to.
 
@@ -138,10 +140,9 @@ _`Double baking`
 
 _`Endorser`
     When a block_ is created and propagated on the network, nodes that have
-    `Endorsement rights`_ for the matching block_ height can emit an endorsement
+    `endorsing rights`_ for the matching block_ height can emit an endorsement
     operation_. The accounts that emit the block_ are the endorsers of the block_.
-    The endorsement operations_ can be included in the next block_ to increase
-    the block_'s Score_.
+    Endorsement operations_ are included in the next block_.
 
     Using the tools provided by Nomadic Labs, endorsement is handled by a
     separate binary.
