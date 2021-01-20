@@ -881,6 +881,10 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
       set_cycle_eras ctxt [cycle_era]
       >>=? fun ctxt -> add_constants ctxt param.constants >|= ok
   | Edo_008 ->
+      get_first_level ctxt
+      >>=? fun first_level ->
+      Context.remove ctxt first_level_key
+      >>= fun ctxt ->
       get_previous_protocol_constants ctxt
       >>= fun c ->
       let time_between_blocks_at_first_priority =
@@ -901,10 +905,20 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
                 then 1L
                 else (Int64.div time_between_blocks_at_first_priority) 2L );
             preserved_cycles = c.preserved_cycles;
-            blocks_per_cycle = c.blocks_per_cycle;
-            blocks_per_commitment = c.blocks_per_commitment;
-            blocks_per_roll_snapshot = c.blocks_per_roll_snapshot;
-            blocks_per_voting_period = c.blocks_per_voting_period;
+            blocks_per_cycle =
+              ( if mainnet_constants then Int32.mul 2l c.blocks_per_cycle
+              else c.blocks_per_cycle );
+            blocks_per_commitment =
+              ( if mainnet_constants then Int32.mul 2l c.blocks_per_commitment
+              else c.blocks_per_commitment );
+            blocks_per_roll_snapshot =
+              ( if mainnet_constants then
+                Int32.mul 2l c.blocks_per_roll_snapshot
+              else c.blocks_per_roll_snapshot );
+            blocks_per_voting_period =
+              ( if mainnet_constants then
+                Int32.mul 2l c.blocks_per_voting_period
+              else c.blocks_per_voting_period );
             time_between_blocks = c.time_between_blocks;
             endorsers_per_block = 256;
             hard_gas_limit_per_operation = c.hard_gas_limit_per_operation;
@@ -934,7 +948,26 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
               else c.delay_per_missing_endorsement );
           }
       in
-      add_constants ctxt constants >|= ok )
+      add_constants ctxt constants
+      >>= fun ctxt ->
+      let first_cycle_era =
+        Level_repr.
+          {
+            first_level;
+            blocks_per_cycle = c.blocks_per_cycle;
+            blocks_per_commitment = c.blocks_per_commitment;
+          }
+      in
+      let second_cycle_era =
+        Level_repr.
+          {
+            first_level =
+              Raw_level_repr.of_int32_exn (Int32.succ (Int32.succ level));
+            blocks_per_cycle = constants.blocks_per_cycle;
+            blocks_per_commitment = constants.blocks_per_commitment;
+          }
+      in
+      set_cycle_eras ctxt [first_cycle_era; second_cycle_era] )
   >>=? fun ctxt ->
   prepare ctxt ~level ~predecessor_timestamp:timestamp ~timestamp ~fitness
   >|=? fun ctxt -> (previous_proto, ctxt)
