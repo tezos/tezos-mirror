@@ -291,26 +291,33 @@ let register () =
   register1 S.frozen_balance (fun ctxt pkh () () ->
       Baker.is_consensus_key ctxt pkh
       >>=? function
-      | None -> raise Not_found | Some baker -> Baker.frozen_balance ctxt baker) ;
+      | None ->
+          (* if the given key is not a baker, return zero *)
+          return Tez.zero
+      | Some baker ->
+          Baker.frozen_balance ctxt baker) ;
   register1 S.frozen_balance_by_cycle (fun ctxt baker () () ->
       Baker.is_consensus_key ctxt baker
       >>=? function
       | None ->
-          raise Not_found
+          (* if the given key is not a baker, return empty map *)
+          return Cycle.Map.empty
       | Some baker ->
           Baker.frozen_balance_by_cycle ctxt baker >>= return) ;
   register1 S.staking_balance (fun ctxt baker () () ->
       Baker.is_consensus_key ctxt baker
       >>=? function
       | None ->
-          raise Not_found
+          (* if the given key is not a baker, return zero *)
+          return Tez.zero
       | Some baker ->
           Baker.staking_balance ctxt baker) ;
   register1 S.delegated_contracts (fun ctxt baker () () ->
       Baker.is_consensus_key ctxt baker
       >>=? function
       | None ->
-          raise Not_found
+          (* if the given key is not a baker, return empty list *)
+          return []
       | Some baker ->
           Baker.delegated_contracts ctxt baker >>= return) ;
   register1 S.delegated_balance (fun ctxt baker () () ->
@@ -323,7 +330,11 @@ let register () =
   register1 S.deactivated (fun ctxt baker () () ->
       Baker.is_consensus_key ctxt baker
       >>=? function
-      | None -> raise Not_found | Some baker -> Baker.deactivated ctxt baker) ;
+      | None ->
+          (* if the given key is not a baker, return false *)
+          return_false
+      | Some baker ->
+          Baker.deactivated ctxt baker) ;
   register1 S.grace_period (fun ctxt baker () () ->
       Baker.is_consensus_key ctxt baker
       >>=? function
@@ -332,6 +343,7 @@ let register () =
       Baker.is_consensus_key ctxt baker
       >>=? function
       | None ->
-          raise Not_found
+          (* if the given key is not a baker, return zero *)
+          return 0l
       | Some baker ->
           Vote.get_voting_power_free ctxt baker)
