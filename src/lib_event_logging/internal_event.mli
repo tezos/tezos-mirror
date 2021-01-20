@@ -76,6 +76,9 @@ module Section : sig
   (** Make the equivalent {!Lwt_log} section.  *)
   val to_lwt_log : t -> Lwt_log_core.section
 
+  (** [is_prefix ~prefix p] checks that [p] starts with [~prefix].  *)
+  val is_prefix : prefix:t -> t -> bool
+
   val encoding : t Data_encoding.t
 
   val to_string_list : t -> string list

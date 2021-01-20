@@ -102,6 +102,8 @@ module Section : sig
 
   val to_lwt_log : t -> Lwt_log_core.section
 
+  val is_prefix : prefix:t -> t -> bool
+
   val encoding : t Data_encoding.t
 
   val to_string_list : t -> string list
@@ -141,6 +143,20 @@ end = struct
   let to_string_list s = s.path
 
   let to_lwt_log s = s.lwt_log_section
+
+  let is_prefix ~prefix main =
+    try
+      let _ =
+        List.fold_left
+          (fun prev elt ->
+            match prev with
+            | t :: q when String.equal t elt -> q
+            | _ -> raise Not_found)
+          main.path
+          prefix.path
+      in
+      true
+    with Not_found -> false
 
   let encoding =
     let open Data_encoding in
