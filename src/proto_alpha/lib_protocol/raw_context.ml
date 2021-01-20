@@ -843,7 +843,8 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
             time_between_blocks = c.time_between_blocks;
             endorsers_per_block = 256;
             hard_gas_limit_per_operation = c.hard_gas_limit_per_operation;
-            hard_gas_limit_per_block = c.hard_gas_limit_per_block;
+            hard_gas_limit_per_block =
+              Gas_limit_repr.Arith.(integral_of_int_exn 5_200_000);
             proof_of_work_threshold = c.proof_of_work_threshold;
             tokens_per_roll = c.tokens_per_roll;
             michelson_maximum_type_size = c.michelson_maximum_type_size;
