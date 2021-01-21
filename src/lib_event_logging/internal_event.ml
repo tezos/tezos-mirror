@@ -1256,31 +1256,20 @@ module Legacy_logging = struct
     module Event = Make (Definition)
 
     let emit_async level fmt ?tags =
-      (* Prevent massive calls to kasprintf *)
-      let log_section = Section.to_lwt_log section in
-      if should_log ~level ~sink_level:(Lwt_log_core.Section.level log_section)
-      then
-        Format.kasprintf
-          (fun message ->
-            Lwt.ignore_result
-              (Event.emit ~section (fun () ->
-                   Definition.make ?tags level message)))
-          fmt
-      else Format.ifprintf Format.std_formatter fmt
+      Format.kasprintf
+        (fun message ->
+          Lwt.ignore_result
+            (Event.emit ~section (fun () -> Definition.make ?tags level message)))
+        fmt
 
     let emit_lwt level fmt ?tags =
-      (* Prevent massive calls to kasprintf *)
-      let log_section = Section.to_lwt_log section in
-      if should_log ~level ~sink_level:(Lwt_log_core.Section.level log_section)
-      then
-        Format.kasprintf
-          (fun message ->
-            Event.emit ~section (fun () -> Definition.make ?tags level message)
-            >>= function
-            | Ok () -> Lwt.return_unit
-            | Error el -> Format.kasprintf Lwt.fail_with "%a" pp_print_trace el)
-          fmt
-      else Format.ikfprintf (fun _ -> Lwt.return_unit) Format.std_formatter fmt
+      Format.kasprintf
+        (fun message ->
+          Event.emit ~section (fun () -> Definition.make ?tags level message)
+          >>= function
+          | Ok () -> Lwt.return_unit
+          | Error el -> Format.kasprintf Lwt.fail_with "%a" pp_print_trace el)
+        fmt
   end
 
   module Make (P : sig
