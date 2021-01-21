@@ -47,3 +47,19 @@ New Features
   related types and opcode. It's allows a smart contract to include a
   countermeasure against Block Producer Extractable Value.  More infos
   in docs/alpha/timelock.rst
+
+Michelson onchain views
+-----------------------
+
+:ref:`Views <MichelsonViews_alpha>` are a new mechanism for contracts calls that:
+
+
+- are read-only: they may depend on the contract storage but cannot modify it nor emit operations (but they can call other views),
+- take arguments as input in addition to the contract storage,
+- return results as output,
+- are synchronous: the result is immediately available on the stack of the caller contract.
+
+There are two added Michelson primitives: ``VIEW`` (instruction) and ``view`` (top-level keyword).
+
+- `TZIP <https://gitlab.com/tezos/tzip/-/merge_requests/169>`__
+- `MR <https://gitlab.com/tezos/tezos/-/merge_requests/2359>`__
