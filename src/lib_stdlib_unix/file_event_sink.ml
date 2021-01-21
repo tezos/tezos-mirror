@@ -166,17 +166,19 @@ module Event_filter = struct
 
   let level_at_least lvl =
     List.fold_left
-      (function
-        | None -> (
-            function l when l = lvl -> Some [l] | _ -> None )
-        | Some s ->
-            fun l -> Some (l :: s))
-      None
+      (fun acc l ->
+        match acc with
+        | [] ->
+            if l = lvl then [l] else []
+        | _ :: _ as acc ->
+            l :: acc)
+      []
       levels_in_order
-    |> Option.fold_f
-         ~none:(fun () -> raise (Failure "level_at_least not found"))
-         ~some:Fun.id
-    |> level_in
+    |> function
+    | [] ->
+        raise (Failure "level_at_least not found")
+    | _ :: _ as levels ->
+        level_in levels
 end
 
 type t = {
