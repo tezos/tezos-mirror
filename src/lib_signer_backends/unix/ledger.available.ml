@@ -23,11 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Events = Signer_events
 open Client_keys
-
-include Internal_event.Legacy_logging.Make (struct
-  let name = "client.signer.ledger"
-end)
 
 module Bip32_path = struct
   let hard = Int32.logor 0x8000_0000l
@@ -110,28 +107,22 @@ module Ledger_commands = struct
     let pp =
       Format.make_formatter
         (fun s ofs lgth -> Buffer.add_substring buf s ofs lgth)
-        (fun () ->
-          debug "%s%!" (Buffer.contents buf) ;
-          Buffer.clear buf)
+        (fun () -> Buffer.clear buf)
     in
     let res = f pp in
-    lwt_debug "%!"
-    >>= fun () ->
     match res with Error err -> fail (LedgerError err) | Ok v -> return v
 
   let get_version ~device_info h =
     let buf = Buffer.create 100 in
     let pp = Format.formatter_of_buffer buf in
     let version = Ledgerwallet_tezos.get_version ~pp h in
-    debug "%s" (Buffer.contents buf) ;
     match version with
     | Error e ->
-        warn
-          "WARNING:@ The device at [%s] is not a Tezos application@ %a"
-          device_info.Hidapi.path
-          Ledgerwallet.Transport.pp_error
-          e ;
-        return_none
+        Events.(emit ledger_not_tezos)
+          ( device_info.Hidapi.path,
+            Format.asprintf "@[Ledger %a@]" Ledgerwallet.Transport.pp_error e
+          )
+        >>= fun () -> return_none
     | Ok version ->
         ( if (version.major, version.minor) < (1, 4) then
           failwith
@@ -142,12 +133,11 @@ module Ledger_commands = struct
         >>=? fun () ->
         wrap_ledger_cmd (fun pp -> Ledgerwallet_tezos.get_git_commit ~pp h)
         >>=? fun git_commit ->
-        log_info
-          "Found a %a application at [%s] (git-description: %S)"
-          Ledgerwallet_tezos.Version.pp
-          version
-          device_info.path
-          git_commit ;
+        Events.(emit ledger_found_application)
+          ( Format.asprintf "%a" Ledgerwallet_tezos.Version.pp version,
+            device_info.path,
+            git_commit )
+        >>= fun () ->
         let cleaned_up =
           (* The ledger sends a NUL-terminated C-String: *)
           if git_commit.[String.length git_commit - 1] = '\x00' then
@@ -558,17 +548,18 @@ let use_ledger ?(filter : Filter.t = `None) f =
     Hidapi.enumerate ~vendor_id ~product_id:product_id_nano_s ()
     @ Hidapi.enumerate ~vendor_id ~product_id:product_id_nano_x ()
   in
-  debug
-    "Found %d Ledger(s) %s"
-    (List.length ledgers)
-    (String.concat
-       " -- "
-       (List.map
-          Hidapi.(
-            fun l -> Printf.sprintf "(%04x, %04x)" l.vendor_id l.product_id)
-          ledgers)) ;
+  Events.(emit ledger_found)
+    ( List.length ledgers,
+      String.concat
+        " -- "
+        (List.map
+           Hidapi.(
+             fun l -> Printf.sprintf "(%04x, %04x)" l.vendor_id l.product_id)
+           ledgers) )
+  >>= fun () ->
   let process_device device_info f =
-    log_info "Processing Ledger at path [%s]" device_info.Hidapi.path ;
+    Events.(emit ledger_processing) device_info.Hidapi.path
+    >>= fun () ->
     (* HID interfaces get the number 0
        (cf. https://github.com/LedgerHQ/ledger-nano-s/issues/48)
        *BUT* on MacOSX the Hidapi library does not report the interface-number

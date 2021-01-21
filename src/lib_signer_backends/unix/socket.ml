@@ -23,10 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Internal_event.Legacy_logging.Make (struct
-  let name = "client.signer.socket"
-end)
-
+module Events = Signer_events
 open Client_keys
 open Signer_messages
 
@@ -86,10 +83,7 @@ struct
       | Error trace as e when List.mem (Exn Lwt_unix.Timeout) trace ->
           if n = 0 then Lwt.return e
           else
-            lwt_log_error
-              "Remote signer timeout, retrying %d more time(s)"
-              (pred n)
-            >>= fun () -> loop (pred n)
+            Events.(emit signer_timeout) (pred n) >>= fun () -> loop (pred n)
       | Error _ as e ->
           Lwt.return e
       | Ok v ->

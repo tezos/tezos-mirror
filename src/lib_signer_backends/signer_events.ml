@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,50 +23,52 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Client_keys
+include Internal_event.Simple
 
-type error += NoLedgerSupport
+let section = ["client"; "signer"; "socket"]
 
-let () =
-  register_error_kind
-    `Permanent
-    ~id:"signer.ledger"
-    ~title:"No Ledger support"
-    ~description:
-      "This client has been compiled without support for Ledger Nano device"
-    ~pp:(fun ppf () ->
-      Format.fprintf
-        ppf
-        "This client has been compiled without support for Ledger Nano device")
-    Data_encoding.empty
-    (function NoLedgerSupport -> Some () | _ -> None)
-    (fun () -> NoLedgerSupport)
+let signer_timeout =
+  declare_1
+    ~section
+    ~name:"signer_timeout"
+    ~msg:"Remote signer timeout, retrying {retry} more time(s)"
+    ~level:Error
+    ("retry", Data_encoding.int8)
 
-(** The implementation of the “signer-plugin.” *)
-module Signer_implementation : Client_keys.SIGNER = struct
-  let scheme = "no_ledger"
+let ledger_not_tezos =
+  declare_2
+    ~section
+    ~name:"ledger_not_tezos"
+    ~msg:"The device at [{position}] is not a Tezos application {error}"
+    ~level:Warning
+    ("position", Data_encoding.string)
+    ("error", Data_encoding.string)
 
-  let title = "Fake signer when Ledger Nano device support is disabled"
+let ledger_found_application =
+  declare_3
+    ~section
+    ~name:"ledger_found_application"
+    ~msg:
+      "Found a {version} application at [{position}] (git-description: \
+       {commit})"
+    ~level:Info
+    ("version", Data_encoding.string)
+    ("position", Data_encoding.string)
+    ("commit", Data_encoding.string)
 
-  let description =
-    "In order to communicate with a Ledger Nano, recompile with \
-     ledgerwallet-tezos library installed"
+let ledger_found =
+  declare_2
+    ~section
+    ~name:"ledger_found"
+    ~msg:"Found {number} Ledger(s) {info}"
+    ~level:Debug
+    ("number", Data_encoding.int8)
+    ("info", Data_encoding.string)
 
-  let neuterize _sk = fail NoLedgerSupport
-
-  let public_key _sk_uri = fail NoLedgerSupport
-
-  let public_key_hash _sk_uri = fail NoLedgerSupport
-
-  let import_secret_key ~io:_ _pk_uri = fail NoLedgerSupport
-
-  let sign ?watermark:_k _sk_uri _msg = fail NoLedgerSupport
-
-  let deterministic_nonce _sk_uri _msg = fail NoLedgerSupport
-
-  let deterministic_nonce_hash _sk_uri _msg = fail NoLedgerSupport
-
-  let supports_deterministic_nonces _ = return_false
-end
-
-let commands () = []
+let ledger_processing =
+  declare_1
+    ~section
+    ~name:"ledger_processing"
+    ~msg:"Processing Ledger at path [{position}]"
+    ~level:Info
+    ("position", Data_encoding.string)
