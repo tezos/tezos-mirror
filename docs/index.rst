@@ -157,6 +157,7 @@ in the :ref:`introduction <howtoget>`.
 
    010/michelson
    010/proof_of_stake
+   009/consensus
    010/sapling
    010/voting
    010/glossary
