@@ -23,8 +23,38 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Internal_event.Legacy_logging.Make_semantic (struct
-  let name = "node.state"
-end)
+include Internal_event.Simple
 
-let chain_id = Tag.def ~doc:"Chain ID" "chain_id" Chain_id.pp
+let section = ["node"; "state"]
+
+let missing_pruned_contents =
+  declare_1
+    ~section
+    ~name:"missing_pruned_contents"
+    ~msg:"cannot find pruned contents of block {block_hash}"
+    ~level:Error
+    ("block_hash", Block_hash.encoding)
+
+let pop_block =
+  declare_1
+    ~section
+    ~name:"pop_block"
+    ~msg:"pop_block {block_hash}"
+    ~level:Debug
+    ("block_hash", Block_hash.encoding)
+
+let push_block =
+  declare_1
+    ~section
+    ~name:"push_block"
+    ~msg:"push_block {block_hash}"
+    ~level:Debug
+    ("block_hash", Block_hash.encoding)
+
+let destroy_state =
+  declare_1
+    ~section
+    ~name:"destroy_state"
+    ~msg:"destroy {chain_id}"
+    ~level:Debug
+    ("chain_id", Chain_id.encoding)

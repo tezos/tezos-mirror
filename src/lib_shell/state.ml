@@ -26,7 +26,7 @@
 
 [@@@ocaml.warning "-30"]
 
-open State_logging
+module Events = State_events
 open Validation_errors
 
 module Shared = struct
@@ -420,12 +420,7 @@ let store_header_and_prune_block store block_hash =
             | true ->
                 Lwt.return_unit
             | false ->
-                State_logging.lwt_log_error
-                  Tag.DSL.(
-                    fun f ->
-                      f "@[cannot find pruned contents of block %a@]"
-                      -% t event "missing_pruned_contents"
-                      -% a Block_hash.Logging.tag block_hash) ))
+                Events.(emit missing_pruned_contents) block_hash ))
   >>= fun () -> prune_block store block_hash
 
 let delete_block store block_hash =
@@ -935,9 +930,7 @@ module Chain = struct
         Locked_block.acceptable chain_data header)
 
   let destroy state chain =
-    lwt_debug
-      Tag.DSL.(
-        fun f -> f "destroy %a" -% t event "destroy" -% a chain_id (id chain))
+    Events.(emit destroy_state (id chain))
     >>= fun () ->
     Shared.use state.global_data (fun {global_store; chains; _} ->
         Chain_id.Table.remove chains (id chain) ;

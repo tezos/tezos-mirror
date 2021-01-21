@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open State_logging
+module Events = State_events
 
 let genesis chain_state =
   let genesis = State.Chain.genesis chain_state in
@@ -71,11 +71,7 @@ let locked_set_head chain_store data block live_blocks live_operations =
     let hash = State.Block.hash block in
     if Block_hash.equal hash ancestor then Lwt.return_unit
     else
-      lwt_debug
-        Tag.DSL.(
-          fun f ->
-            f "pop_block %a" -% t event "pop_block"
-            -% a Block_hash.Logging.tag hash)
+      Events.(emit pop_block hash)
       >>= fun () ->
       Store.Chain_data.In_main_branch.remove (chain_store, hash)
       >>= fun () ->
@@ -89,11 +85,7 @@ let locked_set_head chain_store data block live_blocks live_operations =
   in
   let push_block pred_hash block =
     let hash = State.Block.hash block in
-    lwt_debug
-      Tag.DSL.(
-        fun f ->
-          f "push_block %a" -% t event "push_block"
-          -% a Block_hash.Logging.tag hash)
+    Events.(emit push_block hash)
     >>= fun () ->
     Store.Chain_data.In_main_branch.store (chain_store, pred_hash) hash
     >>= fun () -> Lwt.return hash
