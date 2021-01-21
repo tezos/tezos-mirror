@@ -24,10 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Log = Internal_event.Legacy_logging.Make (struct
-  let name = "admin-client.main"
-end)
-
 let select_commands _ _ =
   return
     (List.flatten

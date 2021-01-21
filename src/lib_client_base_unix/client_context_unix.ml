@@ -24,10 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Internal_event.Legacy_logging.Make_semantic (struct
-  let name = "client.context.unix"
-end)
-
 class unix_wallet ~base_dir ~password_filename : Client_context.wallet =
   object (self)
     method load_passwords =

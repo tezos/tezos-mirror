@@ -24,10 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Log = Internal_event.Legacy_logging.Make (struct
-  let name = "client.main"
-end)
-
 open Client_config
 
 let disable_disclaimer =
