@@ -22,8 +22,3 @@
  (deps rpc_doc.exe
        p2p_doc.exe)
  (action (progn)))
-
-(rule
- (alias runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

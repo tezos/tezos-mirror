@@ -82,8 +82,3 @@
                    -open Tezos_baking_010_PtGRANAD
                    -open Tezos_baking_010_PtGRANAD_commands
                    -open Tezos_rpc)))
-
-(rule
- (alias runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

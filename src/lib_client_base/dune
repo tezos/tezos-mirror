@@ -16,8 +16,3 @@
  (deps    (:exe gen/bip39_generator.exe)
           gen/bip39_english.txt)
  (action  (run %{exe} %{targets})))
-
-(rule
- (alias runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

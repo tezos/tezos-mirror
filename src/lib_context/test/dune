@@ -18,8 +18,3 @@
  (alias runtest)
  (package tezos-context)
  (action (chdir %{workspace_root} (run %{exe:test.exe}))))
-
-(rule
- (alias runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

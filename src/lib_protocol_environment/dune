@@ -33,8 +33,3 @@
             tezos-protocol-environment
             tezos-context)
  (modules Shell_context))
-
-(rule
- (alias runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

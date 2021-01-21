@@ -11,8 +11,3 @@
                    -open Tezos_baking_009_PsFLoren_commands
                    -open Tezos_stdlib_unix
                    -open Tezos_client_base_unix)))
-
-(rule
- (alias runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

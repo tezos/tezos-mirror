@@ -13,8 +13,3 @@
                    -open Tezos_client_base
                    -open Tezos_protocol_005_PsBabyM1
                    -open Tezos_rpc)))
-
-(rule
- (alias runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

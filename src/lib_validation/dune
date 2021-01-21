@@ -14,8 +14,3 @@
                    -open Tezos_shell_services
                    -open Tezos_protocol_updater
                    -open Tezos_stdlib_unix)))
-
-(rule
- (alias runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

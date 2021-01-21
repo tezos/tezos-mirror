@@ -16,8 +16,3 @@
                    -open Tezos_client_010_PtGRANAD_commands
                    -open Tezos_protocol_010_PtGRANAD
                    -open Tezos_protocol_environment_010_PtGRANAD)))
-
-(alias
- (name runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

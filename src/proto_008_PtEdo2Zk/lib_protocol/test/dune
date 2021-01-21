@@ -47,8 +47,3 @@
  (package tezos-protocol-008-PtEdo2Zk-tests)
  (deps (alias runtest_proto_008_PtEdo2Zk))
  (action (progn)))
-
-(rule
- (alias runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

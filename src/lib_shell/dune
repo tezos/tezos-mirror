@@ -31,8 +31,3 @@
                    -open Tezos_workers
                    -open Tezos_validation
 		   -open Tezos_version)))
-
-(rule
- (alias runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

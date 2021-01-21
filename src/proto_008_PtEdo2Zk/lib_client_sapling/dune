@@ -16,8 +16,3 @@
                    -open Tezos_client_008_PtEdo2Zk_commands
                    -open Tezos_protocol_008_PtEdo2Zk
                    -open Tezos_protocol_environment_008_PtEdo2Zk)))
-
-(alias
- (name runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))
