@@ -23,6 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Events = Store_events
 open Store_sigs
 
 module Make_value (V : ENCODED_VALUE) = struct
@@ -43,10 +44,8 @@ module Make_value (V : ENCODED_VALUE) = struct
     | Ok b ->
         b
     | Error we ->
-        Store_logging.log_error
-          "Exception while serializing value %a"
-          Data_encoding.Binary.pp_write_error
-          we ;
+        (* this debug event is asyncronous, and we don't have lwt here *)
+        Events.(emit__dont_wait__use_with_care serializing_error we) ;
         Bytes.create 0
 end
 
