@@ -320,7 +320,7 @@ do). The reward is ``ENDORSEMENT_REWARD[p']``, where
 is as above.  That is, a delegate endorsing a block of priority 0
 will be rewarded ``e * 1.25`` ꜩ, with ``e`` the number of endorsement
 slots attributed to the delegate for this level. Moreover, endorsing
-blocks of priority 1 or higher will be rewarded ``e * 0.8333333``
+blocks of priority 1 or higher will be rewarded ``e * 0.833333``
 ꜩ.
 
 Security deposits
