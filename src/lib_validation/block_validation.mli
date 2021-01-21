@@ -44,7 +44,7 @@ val may_patch_protocol :
   Tezos_protocol_environment.validation_result Lwt.t
 
 val update_testchain_status :
-  Context.t -> Block_header.t -> Time.Protocol.t -> Context.t tzresult Lwt.t
+  Context.t -> Block_header.t -> Time.Protocol.t -> Context.t Lwt.t
 
 (** [init_test_chain] must only be called on a forking block. *)
 val init_test_chain :

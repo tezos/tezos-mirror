@@ -60,11 +60,11 @@ let update_testchain_status ctxt predecessor_header timestamp =
   Context.get_test_chain ctxt
   >>= function
   | Not_running ->
-      return ctxt
+      Lwt.return ctxt
   | Running {expiration; _} ->
       if Time.Protocol.(expiration <= timestamp) then
-        Context.add_test_chain ctxt Not_running >>= return
-      else return ctxt
+        Context.add_test_chain ctxt Not_running
+      else Lwt.return ctxt
   | Forking {protocol; expiration} ->
       let predecessor_hash = Block_header.hash predecessor_header in
       let genesis = Context.compute_testchain_genesis predecessor_hash in
@@ -73,7 +73,6 @@ let update_testchain_status ctxt predecessor_header timestamp =
       Context.add_test_chain
         ctxt
         (Running {chain_id; genesis; protocol; expiration})
-      >>= return
 
 let is_testchain_forking ctxt =
   Context.get_test_chain ctxt
@@ -300,7 +299,7 @@ module Make (Proto : Registered_protocol.T) = struct
       predecessor_context
       predecessor_block_header
       block_header.shell.timestamp
-    >>=? fun context ->
+    >>= fun context ->
     parse_operations block_hash operations
     >>=? fun operations ->
     ( match predecessor_block_metadata_hash with

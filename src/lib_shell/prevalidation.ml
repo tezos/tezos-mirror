@@ -143,7 +143,7 @@ struct
       predecessor_context
       predecessor_header
       timestamp
-    >>=? fun predecessor_context ->
+    >>= fun predecessor_context ->
     ( match protocol_data with
     | None ->
         return_none
