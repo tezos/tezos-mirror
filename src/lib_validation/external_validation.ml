@@ -51,6 +51,7 @@ type request =
       forked_header : Block_header.t;
     }
   | Terminate
+  | Reconfigure_event_logging of Internal_event_unix.Configuration.t
 
 let request_pp ppf = function
   | Init -> Format.fprintf ppf "process handshake"
@@ -75,6 +76,8 @@ let request_pp ppf = function
         Block_hash.pp_short
         (Block_header.hash forked_header)
   | Terminate -> Format.fprintf ppf "terminate validation process"
+  | Reconfigure_event_logging _ ->
+      Format.fprintf ppf "reconfigure event logging"
 
 let magic = Bytes.of_string "TEZOS_FORK_VALIDATOR_MAGIC_0"
 
@@ -185,7 +188,9 @@ let request_encoding =
         (obj1 (req "chain_id" Chain_id.encoding))
         (function
           | Commit_genesis {chain_id} -> Some chain_id
-          | Init | Validate _ | Fork_test_chain _ | Terminate -> None)
+          | Init | Validate _ | Fork_test_chain _ | Terminate
+          | Reconfigure_event_logging _ ->
+              None)
         (fun chain_id -> Commit_genesis {chain_id});
       case
         (Tag 3)
@@ -205,6 +210,13 @@ let request_encoding =
         unit
         (function Terminate -> Some () | _ -> None)
         (fun () -> Terminate);
+      (* Tag 5 was ["restore_integrity"]. *)
+      case
+        (Tag 6)
+        ~title:"reconfigure_event_logging"
+        Internal_event_unix.Configuration.encoding
+        (function Reconfigure_event_logging c -> Some c | _ -> None)
+        (fun c -> Reconfigure_event_logging c);
     ]
 
 let send pin encoding data =

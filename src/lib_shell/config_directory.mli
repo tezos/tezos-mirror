@@ -26,5 +26,6 @@
 val build_rpc_directory :
   user_activated_upgrades:User_activated.upgrades ->
   user_activated_protocol_overrides:User_activated.protocol_overrides ->
+  mainchain_validator:Chain_validator.t ->
   Store.t ->
   unit RPC_directory.t

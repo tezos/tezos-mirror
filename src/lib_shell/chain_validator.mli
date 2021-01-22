@@ -79,6 +79,9 @@ val chain_db : t -> Distributed_db.chain_db
 
 val child : t -> t option
 
+val reconfigure_event_logging :
+  t -> Internal_event_unix.Configuration.t -> unit tzresult Lwt.t
+
 val validate_block :
   t ->
   ?force:bool ->
