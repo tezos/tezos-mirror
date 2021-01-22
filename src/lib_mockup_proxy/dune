@@ -7,6 +7,8 @@
    tezos-client-base
    tezos-protocol-environment
    tezos-rpc-http
+   resto-cohttp-self-serving-client
+   tezos-rpc-http-client
    tezos-shell-services)
  (flags (:standard
   -open Tezos_base__TzPervasives)))

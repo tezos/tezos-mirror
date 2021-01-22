@@ -24,11 +24,11 @@
 (*****************************************************************************)
 
 type rpc_error =
-  | Rpc_generic_error of string option
+  | Rpc_generic_error
   (* This case is caught by the proxy mode: when it is raised, the proxy
      delegates to the node *)
   | Rpc_not_found of string option
-  | Rpc_unauthorized of string option
+  | Rpc_unauthorized
   | Rpc_unexpected_type_of_failure
   | Rpc_cannot_parse_path
   | Rpc_cannot_parse_query
@@ -46,6 +46,6 @@ type error += Local_RPC_error of rpc_error
     tzresult Lwt.t monad at the point where it is caught (with Lwt.catch). *)
 exception Rpc_dir_creation_failure of tztrace
 
-(** The class [local_ctxt directory] creates
+(** The function [local_ctxt directory] creates
     an RPC context that executes RPCs locally. *)
-class local_ctxt : unit RPC_directory.t -> RPC_context.json
+val local_ctxt : unit RPC_directory.t -> RPC_context.json

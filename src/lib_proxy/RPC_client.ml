@@ -56,7 +56,7 @@ class http_local_ctxt (printer : Tezos_client_base.Client_context.printer)
   (http_ctxt : RPC_context.json) (proxy_env : Registration.proxy_environment) :
   RPC_context.json =
   let local_ctxt =
-    new Tezos_mockup_proxy.RPC_client.local_ctxt
+    Tezos_mockup_proxy.RPC_client.local_ctxt
       (Proxy_services.build_directory printer http_ctxt proxy_env)
   in
   let writer = function

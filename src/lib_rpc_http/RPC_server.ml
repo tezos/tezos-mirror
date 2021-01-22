@@ -33,3 +33,5 @@ module RPC_logging = Internal_event.Legacy_logging.Make (struct
 end)
 
 include Resto_cohttp_server.Server.Make (RPC_encoding) (RPC_logging)
+
+(* include (M.Make (RPC_logging)) *)
