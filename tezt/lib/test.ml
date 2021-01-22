@@ -162,7 +162,7 @@ let really_run ~iteration title f =
       true
   in
   if kept_temp then
-    Log.report "Temporary files can be found in: %s" Temp.main_dir ;
+    Log.report "Temporary files can be found in: %s" (Temp.main_dir ()) ;
   (* Resolve all pending promises so that they won't do anything
      (like raise [Canceled]) during the next test. *)
   let* () =

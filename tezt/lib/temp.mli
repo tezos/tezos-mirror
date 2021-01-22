@@ -25,18 +25,18 @@
 
 (** Temporary files for tests. *)
 
-(** Main temporary directory, e.g. ["/tmp/tezt-1234"].
+(** Main temporary directory, e.g. ["/tmp/tezt-1234/1"].
 
     Don't use it directly to create files, use [file] or [dir] instead.
     Use this value only in messages to users. *)
-val main_dir : string
+val main_dir : unit -> string
 
 (** Get a temporary file name.
 
     For instance:
-    - [file "hello.ml"] may return something like ["/tmp/tezt-1234/hello.ml"];
-    - [file "some/dir/hello.ml"] may return ["/tmp/tezt-1234/some/dir/hello.ml"];
-    - [file "/dir/hello.ml"] may return ["/tmp/tezt-1234/dir/hello.ml"].
+    - [file "hello.ml"] may return something like ["/tmp/tezt-1234/1/hello.ml"];
+    - [file "some/dir/hello.ml"] may return ["/tmp/tezt-1234/1/some/dir/hello.ml"];
+    - [file "/dir/hello.ml"] may return ["/tmp/tezt-1234/1/dir/hello.ml"].
 
     This function also creates the directory (and its parents) needed to host the
     resulting file.

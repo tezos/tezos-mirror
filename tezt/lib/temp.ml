@@ -34,11 +34,21 @@ let dirs = ref []
 
 let files = ref []
 
-let main_dir =
-  Filename.get_temp_dir_name () // ("tezt-" ^ string_of_int (Unix.getpid ()))
+let next_name = ref 0
+
+let base_main_dir = "tezt-" ^ string_of_int (Unix.getpid ())
+
+let fresh_main_dir () =
+  let index = !next_name in
+  incr next_name ;
+  Filename.get_temp_dir_name () // base_main_dir // string_of_int index
+
+let main_dir_ref = ref @@ fresh_main_dir ()
+
+let main_dir () = !main_dir_ref
 
 let file_aux ?(perms = 0o755) base_name =
-  let filename = main_dir // base_name in
+  let filename = main_dir () // base_name in
   let rec create_parent filename =
     let parent = Filename.dirname filename in
     if String.length parent < String.length filename then (
@@ -82,7 +92,9 @@ let rec remove_recursively filename =
     Unix.rmdir filename )
   else Sys.remove filename
 
-let start () = allowed := true
+let start () =
+  main_dir_ref := fresh_main_dir () ;
+  allowed := true
 
 let clean_up () =
   allowed := false ;
