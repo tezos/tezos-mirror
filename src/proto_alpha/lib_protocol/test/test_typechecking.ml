@@ -135,7 +135,26 @@ let test_unparse_stack_overflow () =
   in
   Script_ir_translator.(unparse_code ctxt Readable (enorme_et_seq 10_001))
   >>= function
-  | Ok _ -> Alcotest.fail "expected an error" | Error _ -> return_unit
+  | Ok _ ->
+      Alcotest.fail "expected an error"
+  | Error trace ->
+      let trace_string =
+        Format.asprintf "%a" Environment.Error_monad.pp_trace trace
+      in
+      let expect_id = "michelson_v1.unparsing_stack_overflow" in
+      let expect_descrfiption =
+        "Too many recursive calls were needed for unparsing"
+      in
+      if
+        Astring.String.is_infix ~affix:expect_id trace_string
+        && Astring.String.is_infix ~affix:expect_descrfiption trace_string
+      then return_unit
+      else
+        Alcotest.failf
+          "Unexpected error (%s) at %s"
+          trace_string
+          __LOC__
+          return_unit
 
 let location = function
   | Prim (loc, _, _, _)
@@ -482,8 +501,24 @@ let test_parse_data_fails loc ctxt ty node =
     >>= function
     | Ok _ ->
         Alcotest.failf "Unexpected typechecking success: %s" loc
-    | Error _ ->
-        return_unit )
+    | Error trace ->
+        let trace_string =
+          Format.asprintf "%a" Environment.Error_monad.pp_trace trace
+        in
+        let expect_id = "michelson_v1.invalid_constant" in
+        let expect_descrfiption =
+          "A data expression was invalid for its expected type."
+        in
+        if
+          Astring.String.is_infix ~affix:expect_id trace_string
+          && Astring.String.is_infix ~affix:expect_descrfiption trace_string
+        then return_unit
+        else
+          Alcotest.failf
+            "Unexpected error (%s) at %s"
+            trace_string
+            __LOC__
+            return_unit )
 
 let test_parse_comb_data () =
   let open Script in

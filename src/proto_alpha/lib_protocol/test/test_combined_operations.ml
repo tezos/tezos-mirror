@@ -209,11 +209,17 @@ let test_failing_operation_in_the_middle () =
   | Contents_result
       (Manager_operation_result {operation_result = Backtracked _; _})
     :: Contents_result
-         (Manager_operation_result {operation_result = Failed (_, _); _})
+         (Manager_operation_result {operation_result = Failed (_, trace); _})
        :: Contents_result
             (Manager_operation_result {operation_result = Skipped _; _})
           :: _ ->
-      ()
+      let trace_string =
+        Format.asprintf "%a" Environment.Error_monad.pp_trace trace
+      in
+      let expect =
+        Format.asprintf "Balance of contract %a too low" Context.Contract.pp c1
+      in
+      assert (Astring.String.is_infix ~affix:expect trace_string)
   | _ ->
       assert false ) ;
   Assert.balance_is ~loc:__LOC__ (I inc) c1 c1_old_balance
@@ -264,11 +270,17 @@ let test_failing_operation_in_the_middle_with_fees () =
   | Contents_result
       (Manager_operation_result {operation_result = Backtracked _; _})
     :: Contents_result
-         (Manager_operation_result {operation_result = Failed (_, _); _})
+         (Manager_operation_result {operation_result = Failed (_, trace); _})
        :: Contents_result
             (Manager_operation_result {operation_result = Skipped _; _})
           :: _ ->
-      ()
+      let trace_string =
+        Format.asprintf "%a" Environment.Error_monad.pp_trace trace
+      in
+      let expect =
+        Format.asprintf "Balance of contract %a too low" Context.Contract.pp c1
+      in
+      assert (Astring.String.is_infix ~affix:expect trace_string)
   | _ ->
       assert false ) ;
   (* In the presence of a failure, all the fees are collected. Even for skipped operations. *)

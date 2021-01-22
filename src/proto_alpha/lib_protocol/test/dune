@@ -9,7 +9,8 @@
             tezos-client-base
             tezos-protocol-alpha-parameters
             tezos-test-services
-            tezos-sapling)
+            tezos-sapling
+            astring)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_micheline
                    -open Tezos_client_alpha
