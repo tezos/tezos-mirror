@@ -211,38 +211,6 @@ end) : Internal_event.SINK with type t = t = struct
                 && Level.compare level lvl >= 0))
             kvl
     in
-    let debugf fmt =
-      Fmt.kstr
-        (fun s ->
-          if format = `Pp then output_one output (Fmt.str "//debug: %s\n" s)
-          else return_unit)
-        fmt
-    in
-    (* TODO: remove this whole debug section? *)
-    (if true then return_unit
-    else
-      debugf
-        "filter: %s Vs %s/%s@%s bad-citizens: %d"
-        (match filter with
-        | `Per_section_prefix l ->
-            Fmt.str
-              "[sections: %s]"
-              (List.map
-                 (fun (k, v) ->
-                   Fmt.str
-                     "(sec %a -> %s)"
-                     Fmt.Dump.(list string)
-                     (Internal_event.Section.to_string_list k)
-                     (Internal_event.Level.to_string v))
-                 l
-              |> String.concat " ")
-        | `Level_at_least l ->
-            Fmt.str "[level: %s]" (Internal_event.Level.to_string l))
-        (Internal_event.Section.to_string_list section |> String.concat ".")
-        M.name
-        (Internal_event.Level.to_string level)
-        (List.length !lwt_bad_citizen_hack))
-    >>=? fun () ->
     if filter_run then (
       let wrapped_event = wrap now section forced_event in
       let to_write =
@@ -258,8 +226,9 @@ end) : Internal_event.SINK with type t = t = struct
                 (function '\n' -> ' ' | c -> c)
                 (Format.asprintf "%a" (M.pp ~short:false) forced_event)
             in
+            (* See https://tools.ietf.org/html/rfc5424#section-6 *)
             Format.asprintf
-              "%a - %s/%s: %s\n"
+              "%a [%s%s] %s\n"
               (Ptime.pp_rfc3339 ~frac_s:3 ())
               (match Ptime.of_float_s wrapped_event.time_stamp with
               | Some s -> s
