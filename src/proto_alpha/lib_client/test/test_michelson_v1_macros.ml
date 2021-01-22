@@ -1040,15 +1040,9 @@ let test_unexpand_map_car () =
            Prim (zero_loc, "PAIR", [], ["%"; "%@"]) ] ))
 
 (***********************************************************************)
-(*BUG: DIIP and the test with MAP_CDR: or any map with "D" inside fail *)
+(*BUG: the test with MAP_CDR or any map with "D" inside fail *)
 
-let test_unexpand_diip () =
-  let code = Seq (zero_loc, [Prim (zero_loc, "CAR", [], [])]) in
-  assert_unexpansion
-    (Prim (zero_loc, "DIIP", [code], []))
-    (Prim (zero_loc, "DIP", [Int (zero_loc, Z.of_int 2); code], []))
-
-let test_unexpand_map_cdr () =
+let _test_unexpand_map_cdr () =
   let code = Seq (zero_loc, [Prim (zero_loc, "CAR", [], [])]) in
   assert_unexpansion
     (Seq
@@ -1061,7 +1055,7 @@ let test_unexpand_map_cdr () =
            Prim (zero_loc, "PAIR", [], []) ] ))
     (Prim (zero_loc, "MAP_CDR", [code], []))
 
-let test_unexpand_map_caadr () =
+let _test_unexpand_map_caadr () =
   let code = [Seq (zero_loc, [Prim (zero_loc, "CAR", [], [])])] in
   let map_cdr =
     Seq
@@ -1100,7 +1094,7 @@ let test_unexpand_map_caadr () =
            Prim (zero_loc, "SWAP", [], []);
            Prim (zero_loc, "PAIR", [], ["%@"; "%@"]) ] ))
 
-let test_unexpand_map_cdadr () =
+let _test_unexpand_map_cdadr () =
   let code = [Seq (zero_loc, [Prim (zero_loc, "CAR", [], [])])] in
   let map_cdr =
     Seq
@@ -1137,6 +1131,12 @@ let test_unexpand_map_cdadr () =
            Prim (zero_loc, "CAR", [], ["@%%"]);
            Prim (zero_loc, "PAIR", [], ["%@"; "%@"]) ] ))
     (Prim (zero_loc, "MAP_CDADR", code, []))
+
+let test_unexpand_diip () =
+  let code = Seq (zero_loc, [Prim (zero_loc, "CAR", [], [])]) in
+  assert_unexpansion
+    (Prim (zero_loc, "DIIP", [code], []))
+    (Prim (zero_loc, "DIP", [Int (zero_loc, Z.of_int 2); code], []))
 
 (** Unexpanding "DIP { DIP { DIP { DUP }; SWAP"
     yields      "DIIP { DIP { DUP }; SWAP }"
@@ -1255,12 +1255,14 @@ let tests =
       fun _ -> Lwt.return (test_unexpand_carn_cdrn ()) );
     ("set_car unexpansion", fun _ -> Lwt.return (test_unexpand_set_car ()));
     ("set_cdr unexpansion", fun _ -> Lwt.return (test_unexpand_set_cdr ()));
+    ("set_cdar unexpansion", fun _ -> Lwt.return (test_unexpand_set_cdar ()));
     ("set_cadr unexpansion", fun _ -> Lwt.return (test_unexpand_set_cadr ()));
     ( "set_car annot unexpansion",
       fun _ -> Lwt.return (test_unexpand_set_car_annot ()) );
     ( "set_cdr annot unexpansion",
       fun _ -> Lwt.return (test_unexpand_set_cdr_annot ()) );
     ("map_car unexpansion", fun _ -> Lwt.return (test_unexpand_map_car ()));
+    ("diip unexpansion", fun _ -> Lwt.return (test_unexpand_diip ()));
     ( "diip_duup1 unexpansion",
       fun _ -> Lwt.return (test_unexpand_diip_duup1 ()) );
     ( "diip_duup2 unexpansion",

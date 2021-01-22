@@ -241,6 +241,9 @@ let () =
     [ ( "all",
         [ Alcotest_lwt.test_case "RequestsTree" `Quick test_tree;
           Test_services.tztest "test do_rpc->None" `Quick test_do_rpc_none;
-          Test_services.tztest "test do_rpc" `Quick test_do_rpc_no_longer_key
-        ] ) ]
+          Test_services.tztest "test do_rpc" `Quick test_do_rpc_no_longer_key;
+          Test_services.tztest
+            "test split key triggers"
+            `Quick
+            test_split_key_triggers ] ) ]
   |> Lwt_main.run

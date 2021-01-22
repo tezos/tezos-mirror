@@ -181,7 +181,7 @@ let tests =
   [ Alcotest_lwt.test_case "add_remove" `Quick test_add_remove;
     Alcotest_lwt.test_case "add_add" `Quick test_add_add;
     Alcotest_lwt.test_case "length" `Quick test_length;
-    Alcotest_lwt.test_case "self_clean" `Quick test_length;
+    Alcotest_lwt.test_case "self_clean" `Quick test_self_clean;
     Alcotest_lwt.test_case "order" `Quick test_order ]
 
 let () = Alcotest_lwt.run "hashtbl" [("hashtbl-lwt", tests)] |> Lwt_main.run

@@ -834,7 +834,7 @@ let tests =
     Test_services.tztest
       "test unparsing stack overflow error"
       `Quick
-      test_typecheck_stack_overflow;
+      test_unparse_stack_overflow;
     Test_services.tztest "test comb type parsing" `Quick test_parse_comb_type;
     Test_services.tztest
       "test comb type unparsing"
