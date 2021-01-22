@@ -101,8 +101,8 @@ val copy : context -> from:key -> to_:key -> context option Lwt.t
 
 type key_or_dir = [`Key of key | `Dir of key]
 
-(** [fold] iterates over elements under a path (not recursive). Iteration order
-    is nondeterministic. *)
+(** [fold] iterates over elements under a path (not recursive).
+    Elements are traversed in lexical order of keys. *)
 val fold :
   context -> key -> init:'a -> f:(key_or_dir -> 'a -> 'a Lwt.t) -> 'a Lwt.t
 
