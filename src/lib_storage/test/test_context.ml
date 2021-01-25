@@ -240,6 +240,33 @@ let fold_keys s k ~init ~f =
 
 let keys t = fold_keys t ~init:[] ~f:(fun k acc -> Lwt.return (k :: acc))
 
+let compare_key (x, _) (y, _) = String.compare x y
+
+let steps =
+  ["00"; "01"; "02"; "03"; "05"; "06"; "07"; "09"; "0a"; "0b"; "0c";
+   "0e"; "0f"; "10"; "11"; "12"; "13"; "14"; "15"; "16"; "17"; "19";
+   "1a"; "1b"; "1c"; "1d"; "1e"; "1f"; "20"; "22"; "23"; "25"; "26";
+   "27"; "28"; "2a"; "2b"; "2f"; "30"; "31"; "32"; "33"; "35"; "36";
+   "37"; "3a"; "3b"; "3c"; "3d"; "3e"; "3f"; "40"; "42"; "43"; "45";
+   "46"; "47"; "48"; "4a"; "4b"; "4c"; "4e"; "4f"; "50"; "52"; "53";
+   "54"; "55"; "56"; "57"; "59"; "5b"; "5c"; "5f"; "60"; "61"; "62";
+   "63"; "64"; "65"; "66"; "67"; "69"; "6b"; "6c"; "6d"; "6e"; "6f";
+   "71"; "72"; "73"; "74"; "75"; "78"; "79"; "7a"; "7b"; "7c"; "7d";
+   "7e"; "80"; "82"; "83"; "84"; "85"; "86"; "88"; "8b"; "8c"; "8d";
+   "8f"; "92"; "93"; "94"; "96"; "97"; "99"; "9a"; "9b"; "9d"; "9e";
+   "9f"; "a0"; "a1"; "a2"; "a3"; "a4"; "a5"; "a6"; "a7"; "a8"; "aa";
+   "ab"; "ac"; "ad"; "ae"; "af"; "b0"; "b1"; "b2"; "b3"; "b4"; "b6";
+   "b8"; "b9"; "bb"; "bc"; "bf"; "c0"; "c1"; "c2"; "c3"; "c4"; "c5";
+   "c8"; "c9"; "cb"; "cc"; "cd"; "ce"; "d0"; "d1"; "d2"; "d4"; "d5";
+   "d7"; "d8"; "d9"; "da"; "e0"; "e3"; "e6"; "e8"; "e9"; "ea"; "ec";
+   "ee"; "ef"; "f0"; "f1"; "f5"; "f7"; "f8"; "f9"; "fb"; "fc"; "fd";
+   "fe"; "ff"]
+[@@ocamlformat "disable"]
+
+let bindings =
+  let zero = Bytes.make 10 '0' in
+  List.map (fun x -> (["root"; x], zero)) steps
+
 let test_fold {idx; genesis; _} =
   checkout idx genesis
   >>= function
@@ -277,6 +304,16 @@ let test_fold {idx; genesis; _} =
       keys ctxt ["i"]
       >>= fun l ->
       Assert.equal_string_list_list ~msg:__LOC__ [] l ;
+      Lwt_list.fold_left_s (fun ctxt (k, v) -> add ctxt k v) ctxt bindings
+      >>= fun ctxt ->
+      commit ctxt
+      >>= fun h ->
+      checkout_exn idx h
+      >>= fun ctxt ->
+      fold_keys ctxt ["root"] ~init:[] ~f:(fun k acc -> Lwt.return (k :: acc))
+      >>= fun bs ->
+      let bs = List.rev bs in
+      Assert.equal_string_list_list ~msg:__LOC__ (List.map fst bindings) bs ;
       Lwt.return_unit
 
 let test_dump {idx; block3b; _} =
