@@ -177,6 +177,7 @@ in the :ref:`introduction <howtoget>`.
    developer/contributing
    developer/merge_team
    developer/guidelines
+   README
 
 .. toctree::
    :maxdepth: 2
@@ -206,7 +207,6 @@ in the :ref:`introduction <howtoget>`.
    :maxdepth: 2
    :caption: APIs:
 
-   README
    api/api-inline
    api/openapi
    api/errors

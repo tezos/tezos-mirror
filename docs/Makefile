@@ -17,6 +17,9 @@ ALPHA_SHORT  = alpha
 EDO_SHORT    = 008-PtEdoTez
 DELPHI_SHORT = 007-PsDELPH1
 
+SCRIPTSDIR		= scripts
+CHECKXREFS		= $(SCRIPTSDIR)/check_proto_xrefs.py
+
 all: manuals odoc html redirects
 
 main:
@@ -61,6 +64,10 @@ linkcheck:
 .PHONY: redirectcheck
 redirectcheck:
 	@cd $$(pwd)/.. ; ./src/tooling/lint.sh --check-redirects
+
+xrefscheck:
+	$(CHECKXREFS) 007
+	$(CHECKXREFS) -l 008
 
 api/errors.rst: $(DOCERRORDIR)/error_doc.ml
 	@cd .. && dune build docs/$(DOCERRORDIR)/error_doc.exe
