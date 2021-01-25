@@ -124,7 +124,12 @@ module Id = struct
 
   let encoding =
     let open Data_encoding in
-    def "p2p_point.id" ~description:"Identifier for a peer point"
+    check_size
+      ( 4 (* Uint30 that gives the size of the encoded string *)
+      + (8 (*number of IPv6 chunks *) * (*size of IPv6 chunks*) 4)
+      + (*IPv6 chunk separators*) 7 + (*optional enclosing bracket*) 2
+      + (*port separator*) 1 + (*size of port number*) 5 )
+    @@ def "p2p_point.id" ~description:"Identifier for a peer point"
     @@ conv to_string of_string_exn string
 
   let rpc_arg =
