@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,27 +23,20 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This is for use *within* the data encoding library only. Instead, you should
-    use the corresponding module intended for use: {!Data_encoding.Binary}. *)
+type t = int
 
-type writer_state
+let none = -1
 
-val make_writer_state :
-  bytes -> offset:int -> allowed_bytes:int -> writer_state option
+let some i =
+  assert (i >= 0) ;
+  i
 
-val write :
-  'a Encoding.t -> 'a -> writer_state -> (int, Binary_error.write_error) result
+let is_none t = t = none
 
-val write_opt : 'a Encoding.t -> 'a -> writer_state -> int option
+let is_some t = t <> none
 
-val write_exn : 'a Encoding.t -> 'a -> writer_state -> int
+let fold ~none:default ~some t = if t = none then default else some t
 
-val to_bytes :
-  ?buffer_size:int ->
-  'a Encoding.t ->
-  'a ->
-  (Bytes.t, Binary_error.write_error) result
-
-val to_bytes_opt : ?buffer_size:int -> 'a Encoding.t -> 'a -> Bytes.t option
-
-val to_bytes_exn : ?buffer_size:int -> 'a Encoding.t -> 'a -> Bytes.t
+let get t =
+  assert (is_some t) ;
+  t

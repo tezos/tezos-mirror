@@ -845,17 +845,32 @@ module Binary : sig
       variable-size encodings. *)
   val read_stream : ?init:Binary_stream.t -> 'a Encoding.t -> 'a status
 
-  (** [write enc v buf ofs len] writes the binary representation of [v]
-      as described by to [enc], in  [buf] starting at the offset [ofs]
-      and writing at most [len] bytes. The function returns the offset
-      of first unwritten bytes, or returns [None] in case of failure.
+  (** The internal state that writers handle. It is presented explicitely as an
+      abstract type so that you must use the constructor to obtain it. The
+      constructor ({!make_writer_state}) performs basic bound checks. *)
+  type writer_state
+
+  (** [make_writer_state buffer ~offset ~allowed_bytes] is
+      [None] if [allowed_bytes < 0],
+      [None] if [allowed_bytes > length buffer - offset],
+      [Some _] otherwise. *)
+  val make_writer_state :
+    bytes -> offset:int -> allowed_bytes:int -> writer_state option
+
+  (** [write enc v state]
+      where [Some state] is [make_writer_state buffer ~offset ~allowed_bytes]
+      writes the binary [enc] representation of [v] onto [buffer] starting at
+      [offset]. The function will fail (returning [Error _]) if the encoding
+      would use more than [allowed_bytes].
+
+      The function returns the offset of first unwritten bytes, or returns
+      [Error _] in case of failure.
       In the latter case, some data might have been written on the buffer. *)
-  val write :
-    'a Encoding.t -> 'a -> Bytes.t -> int -> int -> (int, write_error) result
+  val write : 'a Encoding.t -> 'a -> writer_state -> (int, write_error) result
 
-  val write_opt : 'a Encoding.t -> 'a -> Bytes.t -> int -> int -> int option
+  val write_opt : 'a Encoding.t -> 'a -> writer_state -> int option
 
-  val write_exn : 'a Encoding.t -> 'a -> Bytes.t -> int -> int -> int
+  val write_exn : 'a Encoding.t -> 'a -> writer_state -> int
 
   (** [of_bytes enc buf] is equivalent to [read enc buf 0 (length buf)].
       The function fails if the buffer is not fully read. *)
@@ -868,15 +883,17 @@ module Binary : sig
   val of_bytes_exn : 'a Encoding.t -> Bytes.t -> 'a
 
   (** [to_bytes enc v] is the equivalent of [write env buf 0 len]
-      where [buf] is a newly allocated buffer of the expected
-      length [len] (see [length env v]).
-      The parameter [buffer_size] controls the initial size of [buf]. *)
+      where [buf] is a newly allocated buffer.
+      The parameter [buffer_size] controls the initial size of [buf].
+
+      @raise [Invalid_argument] if [buffer_size < 0]. *)
   val to_bytes :
     ?buffer_size:int -> 'a Encoding.t -> 'a -> (Bytes.t, write_error) result
 
   val to_bytes_opt : ?buffer_size:int -> 'a Encoding.t -> 'a -> Bytes.t option
 
   (** [to_bytes_exn enc v] is equivalent to [to_bytes enc v], except
+
       @raise [Write_error] instead of returning [None] in case of error. *)
   val to_bytes_exn : ?buffer_size:int -> 'a Encoding.t -> 'a -> Bytes.t
 

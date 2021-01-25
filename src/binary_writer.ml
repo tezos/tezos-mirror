@@ -25,26 +25,34 @@
 
 open Binary_error
 
-let raise error = raise (Write_error error)
+let raise error = Stdlib.raise (Write_error error)
 
 (** Imperative state of the binary writer. *)
-type state = {
+type writer_state = {
   mutable buffer : Bytes.t;  (** The buffer where to write. *)
   mutable offset : int;
       (** The offset of the next byte to be written in [buffer]. *)
-  mutable allowed_bytes : int option;
+  mutable allowed_bytes : Uint_option.t;
       (** Maximum number of bytes that are allowed to be write in [buffer]
-      (after [offset]) before to fail (None = unlimited). *)
+      (after [offset]) before to fail (unless it is [unlimited_bytes]). *)
 }
 
+let make_writer_state buffer ~offset ~allowed_bytes =
+  if allowed_bytes < 0 || allowed_bytes >= Bytes.length buffer - offset then
+    None
+  else
+    let allowed_bytes = Uint_option.some allowed_bytes in
+    Some {buffer; offset; allowed_bytes}
+
+let unlimited_bytes = Uint_option.is_none
+
+let limited_bytes = Uint_option.is_some
+
 let check_allowed_bytes state size =
-  match state.allowed_bytes with
-  | Some len when len < size ->
-      raise Size_limit_exceeded
-  | Some len ->
-      state.allowed_bytes <- Some (len - size)
-  | None ->
-      ()
+  if limited_bytes state.allowed_bytes then (
+    let allowed_bytes = Uint_option.get state.allowed_bytes in
+    if allowed_bytes < size then raise Size_limit_exceeded ;
+    state.allowed_bytes <- Uint_option.(some (allowed_bytes - size)) )
 
 (** [may_resize state size] will first ensure there is enough
     space in [state.buffer] for writing [size] bytes (starting at
@@ -212,7 +220,7 @@ module Atom = struct
 end
 
 (** Main recursive writing function. *)
-let rec write_rec : type a. a Encoding.t -> state -> a -> unit =
+let rec write_rec : type a. a Encoding.t -> writer_state -> a -> unit =
  fun e state value ->
   let open Encoding in
   match e.encoding with
@@ -332,66 +340,90 @@ let rec write_rec : type a. a Encoding.t -> state -> a -> unit =
   | Delayed f ->
       write_rec (f ()) state value
 
-and write_with_limit : type a. int -> a Encoding.t -> state -> a -> unit =
+and write_with_limit : type a. int -> a Encoding.t -> writer_state -> a -> unit
+    =
  fun limit e state value ->
   (* backup the current limit *)
   let old_limit = state.allowed_bytes in
   (* install the new limit (only if smaller than the current limit) *)
   let limit =
-    match state.allowed_bytes with
-    | None ->
-        limit
-    | Some old_limit ->
-        min old_limit limit
+    if unlimited_bytes state.allowed_bytes then limit
+    else
+      let old_limit = Uint_option.get state.allowed_bytes in
+      min old_limit limit
   in
-  state.allowed_bytes <- Some limit ;
+  state.allowed_bytes <- Uint_option.some limit ;
   write_rec e state value ;
   (* restore the previous limit (minus the read bytes) *)
-  match old_limit with
-  | None ->
-      state.allowed_bytes <- None
-  | Some old_limit ->
-      let remaining =
-        match state.allowed_bytes with None -> assert false | Some len -> len
-      in
-      let read = limit - remaining in
-      state.allowed_bytes <- Some (old_limit - read)
+  if unlimited_bytes old_limit then state.allowed_bytes <- Uint_option.none
+  else
+    let remaining = Uint_option.get state.allowed_bytes in
+    let read = limit - remaining in
+    state.allowed_bytes <- Uint_option.(some (get old_limit - read))
 
 (** ******************** *)
 
 (** Various entry points *)
 
-let write_exn e v buffer offset len =
-  (* By hardcoding [allowed_bytes] with the buffer length,
-       we ensure that [write] will never reallocate the buffer. *)
-  let state = {buffer; offset; allowed_bytes = Some len} in
-  write_rec e state v ; state.offset
+let write_exn e v state = write_rec e state v ; state.offset
 
-let write e v buffer offset len =
-  try Ok (write_exn e v buffer offset len) with Write_error err -> Error err
+let write e v state =
+  try Ok (write_exn e v state) with Write_error err -> Error err
 
-let write_opt e v buffer offset len =
-  try Some (write_exn e v buffer offset len) with Write_error _ -> None
+let write_opt e v state =
+  try Some (write_exn e v state) with Write_error _ -> None
 
 let to_bytes_exn ?(buffer_size = 128) e v =
   match Encoding.classify e with
   | `Fixed n ->
       (* Preallocate the complete buffer *)
       let state =
-        {buffer = Bytes.create n; offset = 0; allowed_bytes = Some n}
+        {
+          buffer = Bytes.create n;
+          offset = 0;
+          allowed_bytes = Uint_option.some n;
+        }
       in
       write_rec e state v ; state.buffer
   | `Dynamic | `Variable ->
       (* Preallocate a minimal buffer and let's not hardcode a
          limit to its extension. *)
       let state =
-        {buffer = Bytes.create buffer_size; offset = 0; allowed_bytes = None}
+        {
+          buffer = Bytes.create buffer_size;
+          offset = 0;
+          allowed_bytes = Uint_option.none;
+        }
       in
       write_rec e state v ;
       Bytes.sub state.buffer 0 state.offset
 
 let to_bytes_opt ?buffer_size e v =
+  Option.iter
+    (fun buffer_size ->
+      if buffer_size < 0 then
+        Stdlib.raise
+          (Invalid_argument
+             "Data_encoding.Binary_writer.to_bytes_opt: negative length"))
+    buffer_size ;
   try Some (to_bytes_exn ?buffer_size e v) with Write_error _ -> None
 
 let to_bytes ?buffer_size e v =
+  Option.iter
+    (fun buffer_size ->
+      if buffer_size < 0 then
+        Stdlib.raise
+          (Invalid_argument
+             "Data_encoding.Binary_writer.to_bytes: negative length"))
+    buffer_size ;
   try Ok (to_bytes_exn ?buffer_size e v) with Write_error err -> Error err
+
+let to_bytes_exn ?buffer_size e v =
+  Option.iter
+    (fun buffer_size ->
+      if buffer_size < 0 then
+        Stdlib.raise
+          (Invalid_argument
+             "Data_encoding.Binary_writer.to_bytes: negative length"))
+    buffer_size ;
+  to_bytes_exn ?buffer_size e v

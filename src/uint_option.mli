@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,27 +23,39 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This is for use *within* the data encoding library only. Instead, you should
-    use the corresponding module intended for use: {!Data_encoding.Binary}. *)
+(**
 
-type writer_state
+   Optional non-negative integers can be represented by an [int]
+   provided that [None] is encoded as [-1] and [Some x] is encoded by
+   [x]. This module provides a type abstraction to maintain this
+   invariant.
 
-val make_writer_state :
-  bytes -> offset:int -> allowed_bytes:int -> writer_state option
+   This optimized representation avoids the allocation of a block in
+   the heap and also removes one indirection when reading such an
+   optional non-negative integer.
 
-val write :
-  'a Encoding.t -> 'a -> writer_state -> (int, Binary_error.write_error) result
+   @raise [Assert_failure] when assumptions are broken. This module is meant to
+   be used internally only, covered by an extensive test-suite with assertion
+   checks on, and packaged with assertion checks off.
 
-val write_opt : 'a Encoding.t -> 'a -> writer_state -> int option
+*)
 
-val write_exn : 'a Encoding.t -> 'a -> writer_state -> int
+type t = private int
 
-val to_bytes :
-  ?buffer_size:int ->
-  'a Encoding.t ->
-  'a ->
-  (Bytes.t, Binary_error.write_error) result
+(** An absent non-negative integer. *)
+val none : t
 
-val to_bytes_opt : ?buffer_size:int -> 'a Encoding.t -> 'a -> Bytes.t option
+(** [some x] assumes that [x] is non-negative. *)
+val some : int -> t
 
-val to_bytes_exn : ?buffer_size:int -> 'a Encoding.t -> 'a -> Bytes.t
+(** [is_none x] returns [x] iff [x] is an absent non-negative integer. *)
+val is_none : t -> bool
+
+(** [is_some x] returns [x] iff [x] is a non-negative integer. *)
+val is_some : t -> bool
+
+(** [fold ~none:d some:f x = d] if [x] is absent and [f i] if [x = some i]. *)
+val fold : none:'a -> some:(int -> 'a) -> t -> 'a
+
+(** [get x] returns [i] assuming that [x = some i]. *)
+val get : t -> int
