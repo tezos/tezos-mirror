@@ -27,27 +27,37 @@
 module Bounded_encoding = struct
   open Data_encoding
 
-  let block_header_max_size = ref (Some (8 * 1024 * 1024))
+  let block_header_max_size = ref (8 * 1024 * 1024)
+
+  let block_locator_max_length = ref 1000
 
   (* FIXME: arbitrary *)
 
   let block_header_cache =
-    ref (Block_header.bounded_encoding ?max_size:!block_header_max_size ())
+    ref (Block_header.bounded_encoding ~max_size:!block_header_max_size ())
 
   let block_locator_cache =
     ref
       (Block_locator.bounded_encoding
-         ?max_header_size:!block_header_max_size
+         ~max_header_size:!block_header_max_size
+         ~max_length:!block_locator_max_length
          ())
 
   let update_block_header_encoding () =
     block_header_cache :=
-      Block_header.bounded_encoding ?max_size:!block_header_max_size () ;
+      Block_header.bounded_encoding ~max_size:!block_header_max_size () ;
     block_locator_cache :=
-      Block_locator.bounded_encoding ?max_header_size:!block_header_max_size ()
+      Block_locator.bounded_encoding
+        ~max_header_size:!block_header_max_size
+        ~max_length:!block_locator_max_length
+        ()
 
   let set_block_header_max_size max =
     block_header_max_size := max ;
+    update_block_header_encoding ()
+
+  let set_block_locator_max_length max =
+    block_locator_max_length := max ;
     update_block_header_encoding ()
 
   let block_header = delayed (fun () -> !block_header_cache)

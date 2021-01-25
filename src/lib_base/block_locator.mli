@@ -57,7 +57,7 @@ val pp_short : Format.formatter -> t -> unit
 val encoding : t Data_encoding.t
 
 val bounded_encoding :
-  ?max_header_size:int -> ?max_length:int -> unit -> t Data_encoding.t
+  max_header_size:int -> max_length:int -> unit -> t Data_encoding.t
 
 (** Argument to the seed used to randomize the locator. *)
 type seed = {sender_id : P2p_peer.Id.t; receiver_id : P2p_peer.Id.t}
