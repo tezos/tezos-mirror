@@ -37,11 +37,6 @@ opam:benchmark-utils:
   variables:
     package: benchmark-utils
 
-opam:bls12-381:
-  extends: .opam_template
-  variables:
-    package: bls12-381
-
 opam:flextesa:
   extends: .opam_template
   variables:
