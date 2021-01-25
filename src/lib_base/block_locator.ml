@@ -70,14 +70,14 @@ let encoding =
        (req "current_head" (dynamic_size Block_header.encoding))
        (req "history" (Variable.list Block_hash.encoding))
 
-let bounded_encoding ?max_header_size ?max_length () =
+let bounded_encoding ~max_header_size ~max_length () =
   let open Data_encoding in
   obj2
     (req
        "current_head"
        (dynamic_size
-          (Block_header.bounded_encoding ?max_size:max_header_size ())))
-    (req "history" (Variable.list ?max_length Block_hash.encoding))
+          (Block_header.bounded_encoding ~max_size:max_header_size ())))
+    (req "history" (Variable.list ~max_length Block_hash.encoding))
 
 type seed = {sender_id : P2p_peer.Id.t; receiver_id : P2p_peer.Id.t}
 

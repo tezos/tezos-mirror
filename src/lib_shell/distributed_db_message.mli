@@ -59,7 +59,9 @@ val cfg : Distributed_db_version.Name.t -> t P2p_params.message_config
 val pp_json : Format.formatter -> t -> unit
 
 module Bounded_encoding : sig
-  val set_block_header_max_size : int option -> unit
+  val set_block_header_max_size : int -> unit
+
+  val set_block_locator_max_length : int -> unit
 
   val set_operation_max_size : int option -> unit
 
