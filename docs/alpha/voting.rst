@@ -25,13 +25,13 @@ The voting procedure works as follows:
 
 - `Proposal period`: delegates can submit protocol amendment proposals using
   the `proposals` operation. At the end of a proposal period, the proposal with
-  most supporters is selected and we move to a cooldown_vote period.
+  most supporters is selected and we move to a exploration period.
   If there are no proposals, or a tie between proposals, a new proposal
   period starts. Each delegate can submit a maximum of 20 proposals,
   including duplicates.
-- `Cooldown_vote period`: delegates can cast one vote to pursue the
+- `Exploration period`: delegates can cast one vote to pursue the
   voting process or not with the winning proposal using the `ballot`
-  operation.  At the end of a cooldown_vote period if participation
+  operation.  At the end of a exploration period if participation
   reaches the quorum and the proposal has a super-majority in favor,
   we proceed to a cooldown period. Otherwise we go back to a proposal
   period.
@@ -135,7 +135,7 @@ in the following samples::
   PsNa6jTtsRfbGaNSoYXNTNM5A7c3Lji22Yf2ZhpFUjQFC17iZVp 400
 
   $ tezos-client show voting period
-  Current period: "cooldown_vote"
+  Current period: "exploration"
   Blocks remaining until end of period: 63
   Current proposal: PsNa6jTtsRfbGaNSoYXNTNM5A7c3Lji22Yf2ZhpFUjQFC17iZVp
   Ballots: { "yay": 400, "nay": 0, "pass": 0 }
