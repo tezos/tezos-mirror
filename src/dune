@@ -50,9 +50,8 @@
 (library
  (name resto_cohttp_self_serving_client)
  (public_name resto-cohttp-self-serving-client)
- (libraries resto resto-directory resto-acl
-            resto-cohttp resto-cohttp-client resto-cohttp-server
-            uri lwt)
+ (libraries resto resto-directory resto-acl resto-cohttp resto-cohttp-client
+   resto-cohttp-server uri lwt)
  (modules self_serving_client)
  (flags
   (:standard -open Resto_cohttp -open Resto_cohttp_client -open Resto_acl)))

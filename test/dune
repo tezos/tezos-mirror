@@ -23,8 +23,8 @@
 (executable
  (name acl_integration_test)
  (modules acl_integration_test)
- (libraries lwt lwt.unix json-data-encoding ezjsonm cohttp
-   cohttp-lwt cohttp-lwt-unix resto-json resto resto-acl resto-cohttp-server
+ (libraries lwt lwt.unix json-data-encoding ezjsonm cohttp cohttp-lwt
+   cohttp-lwt-unix resto-json resto resto-acl resto-cohttp-server
    resto-cohttp-client))
 
 (alias
@@ -46,10 +46,9 @@
 (executable
  (name self_serving_client_test)
  (modules self_serving_client_test)
- (libraries resto-directory resto-json
-   resto-cohttp-self-serving-client resto-cohttp resto-cohttp-client resto-cohttp-server
-   json-data-encoding ezjsonm
-   lwt lwt.unix))
+ (libraries resto-directory resto-json resto-cohttp-self-serving-client
+   resto-cohttp resto-cohttp-client resto-cohttp-server json-data-encoding
+   ezjsonm lwt lwt.unix))
 
 (alias
  (name runtest_self_serving_client)
