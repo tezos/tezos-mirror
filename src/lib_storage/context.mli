@@ -28,13 +28,19 @@
 
 (** Tezos - Versioned, block indexed (key x value) store *)
 
-(** A block-indexed (key x value) store directory.  *)
-type index
+(** {2 Generic interface} *)
 
-(** A (key x value) store for a given block. *)
-type t
+module type S = sig
+  (** @inline *)
+  include Context_intf.S
+end
+
+include S
 
 type context = t
+
+(** A block-indexed (key x value) store directory.  *)
+type index
 
 (** Open or initialize a versioned store at a given path. *)
 val init :
@@ -64,47 +70,6 @@ val commit_genesis :
 
 val commit_test_chain_genesis :
   context -> Block_header.t -> Block_header.t Lwt.t
-
-(** {2 Generic interface} *)
-
-(** The type for context keys. *)
-type key = string list
-
-(** The type for context values. *)
-type value = bytes
-
-(** [mem t k] is an Lwt promise that resolves to true iff [k] is bound
-   to a value in [t]. *)
-val mem : context -> key -> bool Lwt.t
-
-(** [mem_tree t k] is like {!mem} but for trees. *)
-val mem_tree : context -> key -> bool Lwt.t
-
-(** [find t k] is an Lwt promise that resolves to [v] if [Some k] is
-    bound to the value [v] in [t] and [None] otherwise. *)
-val find : context -> key -> value option Lwt.t
-
-(** [add t k v] is an Lwt promise that resolves to [c] such that:
-
-    - [k] is bound to [v] in [c];
-    - and [c] is similar to [t] otherwise. *)
-val add : context -> key -> value -> t Lwt.t
-
-(** [remove t k v] is an Lwt promise that resolves to [c] such that:
-
-    - [k] is unbound in [c];
-    - and [c] is similar to [t] otherwise. *)
-val remove : context -> key -> t Lwt.t
-
-(** [copy] returns None if the [from] key is not bound *)
-val copy : context -> from:key -> to_:key -> context option Lwt.t
-
-type key_or_dir = [`Key of key | `Dir of key]
-
-(** [fold] iterates over elements under a path (not recursive).
-    Elements are traversed in lexical order of keys. *)
-val fold :
-  context -> key -> init:'a -> f:(key_or_dir -> 'a -> 'a Lwt.t) -> 'a Lwt.t
 
 (** {2 Accessing and Updating Versions} *)
 

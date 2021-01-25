@@ -34,12 +34,12 @@ let rec read_partial_context context path depth =
         Lwt.return (Block_services.Key v)
     | None ->
         (* try to read as directory *)
-        Context.fold context path ~init:[] ~f:(fun k acc ->
-            match k with
-            | `Key [] | `Dir [] ->
+        Context.fold ~depth:(`Eq 1) context path ~init:[] ~f:(fun k _ acc ->
+            match path @ k with
+            | [] ->
                 (* This is an invariant of {!Context.fold} *)
                 assert false
-            | `Key (khd :: ktl as k) | `Dir (khd :: ktl as k) ->
+            | khd :: ktl as k ->
                 read_partial_context context k (depth - 1)
                 >>= fun v ->
                 let k = List.last khd ktl in

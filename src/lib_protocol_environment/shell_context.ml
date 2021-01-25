@@ -42,6 +42,25 @@ module C = struct
   let remove_rec = remove
 
   let set_protocol = add_protocol
+
+  let copy ctxt ~from ~to_ =
+    find_tree ctxt from
+    >>= function
+    | None ->
+        Lwt.return_none
+    | Some sub_tree ->
+        add_tree ctxt to_ sub_tree >>= Lwt.return_some
+
+  type key_or_dir = [`Key of key | `Dir of key]
+
+  let fold t root ~init ~f =
+    fold ~depth:(`Eq 1) t root ~init ~f:(fun k t acc ->
+        let k = root @ k in
+        match Tree.kind t with
+        | `Value _ ->
+            f (`Key k) acc
+        | `Tree ->
+            f (`Dir k) acc)
 end
 
 let ops = (module C : CONTEXT with type t = 'ctxt)
