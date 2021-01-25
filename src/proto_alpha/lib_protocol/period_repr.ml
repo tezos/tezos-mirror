@@ -35,8 +35,8 @@ let rpc_arg = RPC_arg.int64
 
 let pp ppf v = Format.fprintf ppf "%Ld" v
 
-type error += (* `Permanent *)
-                Malformed_period | Invalid_arg
+(* `Permanent *)
+type error += Malformed_period | Invalid_arg | Period_overflow
 
 let () =
   let open Data_encoding in
@@ -59,7 +59,17 @@ let () =
     ~pp:(fun ppf () -> Format.fprintf ppf "Invalid arg")
     empty
     (function Invalid_arg -> Some () | _ -> None)
-    (fun () -> Invalid_arg)
+    (fun () -> Invalid_arg) ;
+  let title = "Period overflow" in
+  register_error_kind
+    `Permanent
+    ~id:"period_overflow"
+    ~title
+    ~description:"Last operation generated an integer overflow."
+    ~pp:(fun ppf () -> Format.fprintf ppf "%s" title)
+    empty
+    (function Period_overflow -> Some () | _ -> None)
+    (fun () -> Period_overflow)
 
 let of_seconds t =
   if Compare.Int64.(t >= 0L) then ok t else error Malformed_period
@@ -74,13 +84,21 @@ let of_seconds_exn t =
       invalid_arg "Period.of_seconds_exn"
 
 let mult i p =
-  (* TODO check overflow *)
   if Compare.Int32.(i < 0l) then error Invalid_arg
-  else ok (Int64.mul (Int64.of_int32 i) p)
+  else
+    let i64 = Int64.of_int32 i in
+    let mul64 = Int64.mul i64 p in
+    (* check for overflow *)
+    if Compare.Int64.(i64 <> 0L) && Compare.Int64.(Int64.div mul64 i64 <> p)
+    then error Period_overflow
+    else ok mul64
 
 let add p1 p2 =
-  (* TODO check overflow *)
-  ok (Int64.add p1 p2)
+  let add64 = Int64.add p1 p2 in
+  (* check for overflow *)
+  if Compare.Int64.(add64 < p1) || Compare.Int64.(add64 < p2) then
+    error Period_overflow
+  else ok (Int64.add p1 p2)
 
 let zero = of_seconds_exn 0L
 
@@ -90,4 +108,4 @@ let one_minute = of_seconds_exn 60L
 
 let one_hour = of_seconds_exn 3600L
 
-let compare p1 p2 = Compare.Int64.compare p1 p2
+let compare = Compare.Int64.compare
