@@ -29,16 +29,19 @@ open Resto_cohttp_client
 (** [Make(Encoding)] returns a module that provides
     an instance of [Client.CALL] in its [launch] function.
     The [Client.CALL] instance is meant to be passed to [Client.Make]
-    to obtain a local client.
+    to obtain a local, self-serving client: a client that is their own server.
 
-    A local client is a client that performs RPCs on its own, without
-    the need for a server. This can be used for testing,
-    for example for mocking a distant server;
+    A local, self-serving client is a client that performs RPCs on its own,
+    without the need for a server. It does not open connections, sockets, files
+    nor any such resource. Instead, it serves itself in-memory.
+
+    This can be used for testing, for example for mocking a distant server;
     or in the case where some functionalities can either be provided
     locally or by a distant server.
 
-    A local client works the same as a server, except that its ACLs cannot
-    be changed after constructing it (as opposed to [Server.Make.set_acl]). *)
+    A local, self-serving client works the same as a server, except that its
+    ACLs cannot be changed after constructing it (as opposed to
+    [Server.Make.set_acl]). *)
 module Make (Encoding : Resto.ENCODING) : sig
   val launch :
     ?cors:Cors.t ->
