@@ -138,6 +138,18 @@ let test_simple {idx; block2; _} =
       Assert.equal_string_option ~msg:__LOC__ (Some "Juin") (c juin) ;
       Lwt.return_unit
 
+let test_list {idx; block2; _} =
+  checkout idx block2
+  >>= function
+  | None ->
+      Assert.fail_msg "checkout block2"
+  | Some ctxt ->
+      list ctxt ["a"]
+      >>= fun ls ->
+      let ls = List.sort compare (List.map fst ls) in
+      Assert.equal_string_list ~msg:__LOC__ ["b"; "c"] ls ;
+      Lwt.return_unit
+
 let test_continuation {idx; block3a; _} =
   checkout idx block3a
   >>= function
@@ -223,8 +235,6 @@ let fold_keys s root ~init ~f =
 
 let keys t = fold_keys t ~init:[] ~f:(fun k acc -> Lwt.return (k :: acc))
 
-let compare_key (x, _) (y, _) = String.compare x y
-
 let steps =
   ["00"; "01"; "02"; "03"; "05"; "06"; "07"; "09"; "0a"; "0b"; "0c";
    "0e"; "0f"; "10"; "11"; "12"; "13"; "14"; "15"; "16"; "17"; "19";
@@ -250,7 +260,7 @@ let bindings =
   let zero = Bytes.make 10 '0' in
   List.map (fun x -> (["root"; x], zero)) steps
 
-let test_fold {idx; genesis; _} =
+let test_fold_keys {idx; genesis; _} =
   checkout idx genesis
   >>= function
   | None ->
@@ -298,6 +308,154 @@ let test_fold {idx; genesis; _} =
       let bs = List.rev bs in
       Assert.equal_string_list_list ~msg:__LOC__ (List.map fst bindings) bs ;
       Lwt.return_unit
+
+let test_fold {idx; genesis; _} =
+  checkout idx genesis
+  >>= function
+  | None ->
+      Assert.fail_msg "checkout genesis_block"
+  | Some ctxt ->
+      let foo1 = Bytes.of_string "foo1" in
+      let foo2 = Bytes.of_string "foo2" in
+      add ctxt ["foo"; "toto"] foo1
+      >>= fun ctxt ->
+      add ctxt ["foo"; "bar"; "toto"] foo2
+      >>= fun ctxt ->
+      let fold depth ecs ens =
+        fold ?depth ctxt [] ~init:([], []) ~f:(fun path t (cs, ns) ->
+            match Tree.kind t with
+            | `Tree ->
+                Lwt.return (cs, path :: ns)
+            | `Value _ ->
+                Lwt.return (path :: cs, ns))
+        >>= fun (cs, ns) ->
+        Assert.equal_string_list_list ~msg:__LOC__ ecs cs ;
+        Assert.equal_string_list_list ~msg:__LOC__ ens ns ;
+        Lwt.return ()
+      in
+      fold
+        None
+        [["foo"; "toto"]; ["foo"; "bar"; "toto"]]
+        [["foo"; "bar"]; ["foo"]; []]
+      >>= fun () ->
+      fold (Some (`Eq 0)) [] [[]]
+      >>= fun () ->
+      fold (Some (`Eq 1)) [] [["foo"]]
+      >>= fun () ->
+      fold (Some (`Eq 2)) [["foo"; "toto"]] [["foo"; "bar"]]
+      >>= fun () ->
+      fold (Some (`Lt 2)) [] [["foo"]; []]
+      >>= fun () ->
+      fold (Some (`Le 2)) [["foo"; "toto"]] [["foo"; "bar"]; ["foo"]; []]
+      >>= fun () ->
+      fold
+        (Some (`Ge 2))
+        [["foo"; "toto"]; ["foo"; "bar"; "toto"]]
+        [["foo"; "bar"]]
+      >>= fun () -> fold (Some (`Gt 2)) [["foo"; "bar"; "toto"]] []
+
+let test_trees {idx; genesis; _} =
+  checkout idx genesis
+  >>= function
+  | None ->
+      Assert.fail_msg "checkout genesis_block"
+  | Some ctxt ->
+      Tree.fold ~depth:(`Eq 1) ~init:() (Tree.empty ctxt) [] ~f:(fun k _ () ->
+          assert (List.length k = 1) ;
+          Assert.fail_msg "empty")
+      >>= fun () ->
+      let foo1 = Bytes.of_string "foo1" in
+      let foo2 = Bytes.of_string "foo2" in
+      Tree.empty ctxt
+      |> fun v1 ->
+      Tree.add v1 ["foo"; "toto"] foo1
+      >>= fun v1 ->
+      Tree.add v1 ["foo"; "bar"; "toto"] foo2
+      >>= fun v1 ->
+      let fold depth ecs ens =
+        Tree.fold v1 ?depth [] ~init:([], []) ~f:(fun path t (cs, ns) ->
+            match Tree.kind t with
+            | `Tree ->
+                Lwt.return (cs, path :: ns)
+            | `Value _ ->
+                Lwt.return (path :: cs, ns))
+        >>= fun (cs, ns) ->
+        Assert.equal_string_list_list ~msg:__LOC__ ecs cs ;
+        Assert.equal_string_list_list ~msg:__LOC__ ens ns ;
+        Lwt.return ()
+      in
+      fold
+        None
+        [["foo"; "toto"]; ["foo"; "bar"; "toto"]]
+        [["foo"; "bar"]; ["foo"]; []]
+      >>= fun () ->
+      fold (Some (`Eq 0)) [] [[]]
+      >>= fun () ->
+      fold (Some (`Eq 1)) [] [["foo"]]
+      >>= fun () ->
+      fold (Some (`Eq 2)) [["foo"; "toto"]] [["foo"; "bar"]]
+      >>= fun () ->
+      fold (Some (`Lt 2)) [] [["foo"]; []]
+      >>= fun () ->
+      fold (Some (`Le 2)) [["foo"; "toto"]] [["foo"; "bar"]; ["foo"]; []]
+      >>= fun () ->
+      fold
+        (Some (`Ge 2))
+        [["foo"; "toto"]; ["foo"; "bar"; "toto"]]
+        [["foo"; "bar"]]
+      >>= fun () ->
+      fold (Some (`Gt 2)) [["foo"; "bar"; "toto"]] []
+      >>= fun () ->
+      Tree.remove v1 ["foo"; "bar"; "toto"]
+      >>= fun v1 ->
+      Tree.find v1 ["foo"; "bar"; "toto"]
+      >>= fun v ->
+      Assert.equal_bytes_option ~msg:__LOC__ None v ;
+      Tree.find v1 ["foo"; "toto"]
+      >>= fun v ->
+      Assert.equal_bytes_option ~msg:__LOC__ (Some foo1) v ;
+      Tree.empty ctxt
+      |> fun v1 ->
+      Tree.add v1 ["foo"; "1"] foo1
+      >>= fun v1 ->
+      Tree.add v1 ["foo"; "2"] foo2
+      >>= fun v1 ->
+      Tree.remove v1 ["foo"; "1"]
+      >>= fun v1 ->
+      Tree.remove v1 ["foo"; "2"]
+      >>= fun v1 ->
+      Tree.find v1 ["foo"; "1"]
+      >>= fun v ->
+      Assert.equal_bytes_option ~msg:__LOC__ None v ;
+      Tree.remove v1 []
+      >>= fun v1 ->
+      Assert.equal_bool ~msg:__LOC__ true (Tree.is_empty v1) ;
+      Lwt.return ()
+
+let test_raw {idx; genesis; _} =
+  checkout idx genesis
+  >>= function
+  | None ->
+      Assert.fail_msg "checkout genesis_block"
+  | Some ctxt ->
+      let foo1 = Bytes.of_string "foo1" in
+      let foo2 = Bytes.of_string "foo2" in
+      add ctxt ["foo"; "toto"] foo1
+      >>= fun ctxt ->
+      add ctxt ["foo"; "bar"; "toto"] foo2
+      >>= fun ctxt ->
+      find_tree ctxt []
+      >>= fun tree ->
+      let tree = Option.get tree in
+      Tree.to_raw tree
+      >>= fun raw ->
+      let a = TzString.Map.singleton "toto" (`Value foo1) in
+      let b = TzString.Map.singleton "toto" (`Value foo2) in
+      let c = TzString.Map.add "bar" (`Tree b) a in
+      let d = TzString.Map.singleton "foo" (`Tree c) in
+      let e = `Tree d in
+      Assert.equal_raw_tree ~msg:__LOC__ e raw ;
+      Lwt.return ()
 
 let test_dump {idx; block3b; _} =
   Lwt_utils_unix.with_tempdir "tezos_test_" (fun base_dir2 ->
@@ -368,10 +526,14 @@ let test_dump {idx; block3b; _} =
 
 let tests : (string * (t -> unit Lwt.t)) list =
   [ ("simple", test_simple);
+    ("list", test_list);
     ("continuation", test_continuation);
     ("fork", test_fork);
     ("replay", test_replay);
+    ("fold_keys", test_fold_keys);
     ("fold", test_fold);
+    ("trees", test_trees);
+    ("raw", test_raw);
     ("dump", test_dump) ]
 
 let tests =
