@@ -47,6 +47,8 @@ val of_seconds_exn : int64 -> period
 
 val add : period -> period -> period tzresult
 
+val ( +? ) : period -> period -> period tzresult
+
 val mult : int32 -> period -> period tzresult
 
 val zero : period

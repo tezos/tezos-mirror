@@ -100,6 +100,8 @@ let add p1 p2 =
     error Period_overflow
   else ok (Int64.add p1 p2)
 
+let ( +? ) = add
+
 let zero = of_seconds_exn 0L
 
 let one_second = of_seconds_exn 1L
