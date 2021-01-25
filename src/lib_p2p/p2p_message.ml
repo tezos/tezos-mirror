@@ -34,7 +34,9 @@ type 'msg t =
 
 let encoding msg_encoding =
   let open Data_encoding in
-  dynamic_size
+  check_size (100 * 1024 * 1024)
+  (*Very high, arbitrary upper bound for message encodings  *)
+  @@ dynamic_size
   (* MAX SIZE:
      4(size of size info)
      + MAX SIZE of encoding *)
@@ -65,7 +67,7 @@ let encoding msg_encoding =
                    + 7(IPv6 chunk separators)
                    + 1(port separator)
                    + 5(size of port number))
-              = 2102
+              = 4502
            *)
            case
              (Tag 0x03)
