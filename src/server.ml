@@ -50,19 +50,17 @@ end
 
 let ( >>=? ) = Lwt_result.bind
 
-module Make_internal_only (Encoding : Resto.ENCODING) = struct
+module Make_selfserver (Encoding : Resto.ENCODING) = struct
   open Cohttp
   module Service = Resto.MakeService (Encoding)
   module Directory = Resto_directory.Make (Encoding)
   module Media_type = Media_type.Make (Encoding)
 
-  module Internal = struct
+  module Media = struct
     type medias = {
       media_types : Media_type.t list;
       default_media_type : string * Media_type.t;
     }
-
-    let default_agent = "OCaml-Resto"
 
     let default_media_type media_types =
       match Media_type.first_complete_media media_types with
@@ -70,18 +68,6 @@ module Make_internal_only (Encoding : Resto.ENCODING) = struct
           invalid_arg "Resto_directory_cohttp.launch(empty media type list)"
       | Some ((l, r), m) ->
           (l ^ "/" ^ r, m)
-
-    let invalid_cors (cors : Cors.t) headers =
-      cors.allowed_origins <> [] && not (Cors.check_host headers cors)
-
-    let invalid_cors_response agent =
-      let headers =
-        Cohttp.Header.init_with
-          (Format.asprintf "X-%s-CORS-Error" agent)
-          "invalid host"
-      in
-      Lwt.return_ok
-        (Response.make ~headers ~status:`Forbidden (), Cohttp_lwt.Body.empty)
 
     let input_media_type ?headers medias =
       match headers with
@@ -118,6 +104,24 @@ module Make_internal_only (Encoding : Resto.ENCODING) = struct
               Error `Not_acceptable
           | Some media_type ->
               Ok media_type ) )
+  end
+
+  module Agent = struct
+    let default_agent = "OCaml-Resto"
+  end
+
+  module Handlers = struct
+    let invalid_cors (cors : Cors.t) headers =
+      cors.allowed_origins <> [] && not (Cors.check_host headers cors)
+
+    let invalid_cors_response agent =
+      let headers =
+        Cohttp.Header.init_with
+          (Format.asprintf "X-%s-CORS-Error" agent)
+          "invalid host"
+      in
+      Lwt.return_ok
+        (Response.make ~headers ~status:`Forbidden (), Cohttp_lwt.Body.empty)
 
     let handle_error medias
         (error :
@@ -173,7 +177,7 @@ module Make_internal_only (Encoding : Resto.ENCODING) = struct
               s )
       | `Not_acceptable ->
           let accepted_encoding =
-            Media_type.acceptable_encoding medias.media_types
+            Media_type.acceptable_encoding medias.Media.media_types
           in
           ( Response.make ~status:`Not_acceptable (),
             Cohttp_lwt.Body.of_string accepted_encoding )
@@ -262,7 +266,7 @@ module Make_internal_only (Encoding : Resto.ENCODING) = struct
 end
 
 module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
-  include Make_internal_only (Encoding)
+  include Make_selfserver (Encoding)
   open Cohttp
   open Log
 
@@ -270,7 +274,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
     root : unit Directory.directory;
     mutable streams : (unit -> unit) ConnectionMap.t;
     cors : Cors.t;
-    medias : Internal.medias;
+    medias : Media.medias;
     stopper : unit Lwt.u;
     mutable acl : Acl.t;
     agent : string;
@@ -304,19 +308,19 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
     let path = Resto.Utils.decode_split_path path in
     let req_headers = Request.headers req in
     ( match Request.meth req with
-    | #Resto.meth when Internal.invalid_cors server.cors req_headers ->
-        Internal.invalid_cors_response server.agent
+    | #Resto.meth when Handlers.invalid_cors server.cors req_headers ->
+        Handlers.invalid_cors_response server.agent
     | #Resto.meth as meth -> (
         Directory.lookup server.root () meth path
         >>=? fun (Directory.Service s) ->
-        Internal.input_media_type ~headers:req_headers server.medias
+        Media.input_media_type ~headers:req_headers server.medias
         >>? fun input_media_type ->
         lwt_debug
           "(%s) input media type %s"
           (Connection.to_string con)
           (Media_type.name input_media_type)
         >>= fun () ->
-        Internal.output_content_media_type ~headers:req_headers server.medias
+        Media.output_content_media_type ~headers:req_headers server.medias
         >>? fun (output_content_type, output_media_type) ->
         ( match
             Resto.Query.parse
@@ -377,7 +381,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
           | `Not_found _
           | `Conflict _
           | `Error _ ) as a ->
-            Internal.handle_rpc_answer ~headers output error a
+            Handlers.handle_rpc_answer ~headers output error a
         | `OkStream o ->
             let body = create_stream server con output o in
             let encoding = Transfer.Chunked in
@@ -388,7 +392,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
         (* TODO ??? *)
         Lwt.return_error `Not_implemented
     | `OPTIONS ->
-        Internal.handle_options server.root server.cors req_headers path
+        Handlers.handle_options server.root server.cors req_headers path
         >>= fun res ->
         lwt_log_info "(%s) RPC preflight" (Connection.to_string con)
         >>= fun () -> Lwt.return res
@@ -398,16 +402,16 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
     | Ok answer ->
         Lwt.return answer
     | Error err ->
-        Lwt.return @@ Internal.handle_error server.medias err
+        Lwt.return @@ Handlers.handle_error server.medias err
 
   (* Promise a running RPC server. *)
 
   let launch ?(host = "::") ?(cors = Cors.default)
-      ?(agent = Internal.default_agent) ?(acl = Acl.Allow_all {except = []})
+      ?(agent = Agent.default_agent) ?(acl = Acl.Allow_all {except = []})
       ~media_types mode root =
-    let default_media_type = Internal.default_media_type media_types in
+    let default_media_type = Media.default_media_type media_types in
     let (stop, stopper) = Lwt.wait () in
-    let medias : Internal.medias = {media_types; default_media_type} in
+    let medias : Media.medias = {media_types; default_media_type} in
     let server =
       {
         root;

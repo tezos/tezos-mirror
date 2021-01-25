@@ -29,17 +29,17 @@ open Resto_cohttp_server
 module Make (Encoding : Resto.ENCODING) = struct
   module Directory = Resto_directory.Make (Encoding)
   module Media_type = Media_type.Make (Encoding)
-  module Server = Server.Make_internal_only (Encoding)
+  module Server = Server.Make_selfserver (Encoding)
 
-  type local_server = {
+  type self_server = {
     root : unit Directory.directory;
     cors : Cors.t;
-    medias : Server.Internal.medias;
+    medias : Server.Media.medias;
     acl : Acl.t;
     agent : string;
   }
 
-  let create (server : local_server) =
+  let create (server : self_server) =
     ( module struct
       let ( >>=? ) = Lwt_result.( >>= )
 
@@ -53,9 +53,9 @@ module Make (Encoding : Resto.ENCODING) = struct
       let call ~headers ?body meth uri path =
         Directory.lookup server.root () meth path
         >>=? fun (Directory.Service s) ->
-        Server.Internal.input_media_type server.medias ~headers
+        Server.Media.input_media_type server.medias ~headers
         >>? fun input_media_type ->
-        Server.Internal.output_content_media_type server.medias ~headers
+        Server.Media.output_content_media_type server.medias ~headers
         >>? fun (_output_content_type, output_media_type) ->
         ( match
             Resto.Query.parse
@@ -103,7 +103,7 @@ module Make (Encoding : Resto.ENCODING) = struct
               | `Not_found _
               | `Conflict _
               | `Error _ ) as a ->
-                Server.Internal.handle_rpc_answer ~headers output error a
+                Server.Handlers.handle_rpc_answer ~headers output error a
             | `OkStream o ->
                 let body = create_stream output o in
                 let encoding = Cohttp.Transfer.Chunked in
@@ -111,32 +111,30 @@ module Make (Encoding : Resto.ENCODING) = struct
                   ( Cohttp.Response.make ~status:`OK ~encoding ~headers (),
                     Cohttp_lwt.Body.of_stream body ) )
         | Error err ->
-            Lwt.return_ok @@ Server.Internal.handle_error server.medias err
+            Lwt.return_ok @@ Server.Handlers.handle_error server.medias err
 
       let call ?headers ?body (meth : Cohttp.Code.meth) uri =
-        let module Internal = Server.Internal in
         let path = uri |> Uri.path |> Resto.Utils.decode_split_path in
         let headers = Option.value headers ~default:(Cohttp.Header.init ()) in
         ( match meth with
-        | #Resto.meth when Internal.invalid_cors server.cors headers ->
-            Internal.invalid_cors_response server.agent
+        | #Resto.meth when Server.Handlers.invalid_cors server.cors headers ->
+            Server.Handlers.invalid_cors_response server.agent
         | #Resto.meth as meth ->
             call ~headers ?body meth uri path
         | `OPTIONS ->
-            Internal.handle_options server.root server.cors headers path
+            Server.Handlers.handle_options server.root server.cors headers path
         | _ ->
             Lwt.return_error `Not_implemented )
         >>= function
         | Ok a ->
             Lwt.return a
         | Error err ->
-            Lwt.return @@ Server.Internal.handle_error server.medias err
+            Lwt.return @@ Server.Handlers.handle_error server.medias err
     end : Client.CALL )
 
-  let launch ?(cors = Cors.default) ?(agent = Server.Internal.default_agent)
+  let launch ?(cors = Cors.default) ?(agent = Server.Agent.default_agent)
       ?(acl = Acl.Allow_all {except = []}) ~media_types root =
-    let default_media_type = Server.Internal.default_media_type media_types in
-    let medias : Server.Internal.medias = {media_types; default_media_type} in
-    let local_server = {root; cors; medias; agent; acl} in
-    create local_server
+    let default_media_type = Server.Media.default_media_type media_types in
+    let medias : Server.Media.medias = {media_types; default_media_type} in
+    create {root; cors; medias; agent; acl}
 end

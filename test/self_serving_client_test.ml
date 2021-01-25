@@ -25,9 +25,11 @@
 
 open Resto
 module Encoding = Resto_json.Encoding
-module Server = Resto_cohttp_server.Server
 module Media_type = Resto_cohttp.Media_type.Make (Encoding)
-module Local_client = Resto_cohttp_local_client.Local_client.Make (Encoding)
+
+module Self_serving_client =
+  Resto_cohttp_self_serving_client.Self_serving_client.Make (Encoding)
+
 include Resto_directory.Make (Encoding)
 module Service = MakeService (Resto_json.Encoding)
 open Service
@@ -95,7 +97,8 @@ let add_service =
     ~error:Json_encoding.empty
     Path.(root / "foo" /: Arg.int / "add")
 
-let mk_server = Local_client.launch ?cors:None ?agent:None ~media_types
+let mk_self_server dir =
+  Self_serving_client.launch ?cors:None ?agent:None ~media_types dir
 
 let rec repeat i json = if i <= 0 then [] else json :: repeat (i - 1) json
 
@@ -113,7 +116,7 @@ let code_of_response (response : Cohttp.Response.t) =
   Cohttp.Code.code_of_status response.status
 
 let () =
-  let (module S) = mk_server dir in
+  let (module S) = mk_self_server dir in
   let module C = Resto_cohttp_client.Client.Make (Encoding) (S) in
   let test0 () =
     (* Test a valid call *)

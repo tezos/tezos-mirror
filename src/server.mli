@@ -32,7 +32,7 @@ module type LOGGING = sig
   val lwt_log_error : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
 end
 
-module Make_internal_only (Encoding : Resto.ENCODING) : sig
+module Make (Encoding : Resto.ENCODING) (Log : LOGGING) : sig
   module Media_type : module type of struct
     include Media_type.Make (Encoding)
   end
@@ -41,20 +41,46 @@ module Make_internal_only (Encoding : Resto.ENCODING) : sig
     include Resto_directory.Make (Encoding)
   end
 
-  module Internal : sig
+  (** A handle on the server worker. *)
+  type server
+
+  (** Promise a running RPC server.*)
+  val launch :
+    ?host:string ->
+    ?cors:Cors.t ->
+    ?agent:string ->
+    ?acl:Acl.t ->
+    media_types:Media_type.t list ->
+    Conduit_lwt_unix.server ->
+    unit Directory.t ->
+    server Lwt.t
+
+  (* configure the access list for this server *)
+  val set_acl : server -> Acl.t -> unit
+
+  (** Kill an RPC server. *)
+  val shutdown : server -> unit Lwt.t
+end
+
+(** [Make_selfserver] is a functor that produces only the machinery necessary
+    for local use. Specifically, it produces the values and types needed for the
+    [Self_serving_client]. *)
+module Make_selfserver (Encoding : Resto.ENCODING) : sig
+  module Media_type : module type of struct
+    include Media_type.Make (Encoding)
+  end
+
+  module Directory : module type of struct
+    include Resto_directory.Make (Encoding)
+  end
+
+  module Media : sig
     type medias = {
       media_types : Media_type.t list;
       default_media_type : string * Media_type.t;
     }
 
-    val default_agent : string
-
     val default_media_type : Media_type.t list -> string * Media_type.t
-
-    val invalid_cors : Resto_cohttp.Cors.t -> Cohttp.Header.t -> bool
-
-    val invalid_cors_response :
-      string -> (Cohttp.Response.t * Cohttp_lwt.Body.t, 'a) Result.result Lwt.t
 
     val input_media_type :
       ?headers:Cohttp.Header.t ->
@@ -65,9 +91,20 @@ module Make_internal_only (Encoding : Resto.ENCODING) : sig
       ?headers:Cohttp.Header.t ->
       medias ->
       (string * Media_type.t, [> `Not_acceptable]) Result.result
+  end
+
+  module Agent : sig
+    val default_agent : string
+  end
+
+  module Handlers : sig
+    val invalid_cors : Resto_cohttp.Cors.t -> Cohttp.Header.t -> bool
+
+    val invalid_cors_response :
+      string -> (Cohttp.Response.t * Cohttp_lwt.Body.t, 'a) Result.result Lwt.t
 
     val handle_error :
-      medias ->
+      Media.medias ->
       [< `Cannot_parse_body of string
       | `Cannot_parse_path of string list * Resto.Arg.descr * string
       | `Cannot_parse_query of string
@@ -103,34 +140,4 @@ module Make_internal_only (Encoding : Resto.ENCODING) : sig
       Result.result
       Lwt.t
   end
-end
-
-module Make (Encoding : Resto.ENCODING) (Log : LOGGING) : sig
-  module Media_type : module type of struct
-    include Media_type.Make (Encoding)
-  end
-
-  module Directory : module type of struct
-    include Resto_directory.Make (Encoding)
-  end
-
-  (** A handle on the server worker. *)
-  type server
-
-  (** Promise a running RPC server.*)
-  val launch :
-    ?host:string ->
-    ?cors:Cors.t ->
-    ?agent:string ->
-    ?acl:Acl.t ->
-    media_types:Media_type.t list ->
-    Conduit_lwt_unix.server ->
-    unit Directory.t ->
-    server Lwt.t
-
-  (* configure the access list for this server *)
-  val set_acl : server -> Acl.t -> unit
-
-  (** Kill an RPC server. *)
-  val shutdown : server -> unit Lwt.t
 end
