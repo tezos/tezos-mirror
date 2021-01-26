@@ -166,7 +166,7 @@ Fifth, still in your local copy of Tezos, **update the variables in the**
 the variables ``build_deps_image_name`` to
 ``registry.gitlab.com/<your-organisation>/opam-repository`` and
 ``opam_repository_url`` to
-``https://gitlab.com/<your-organisation>/opam-repository.git``. Commit
+``https://gitlab.com/<your-organisation>/opam-repository``. Commit
 this change with a title that makes it obvious that it is temporary and
 needs to be removed before being merged – e.g., by using one of the
 following prefix TEMPORARY, WIP, HACK, TOBEREMOVED.

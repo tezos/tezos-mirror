@@ -13,9 +13,10 @@ full_opam_repository_tag=521b2b782c6e74f8e02e08b3bb4d7aef68428651
 
 ## opam_repository is an additional, tezos-specific opam repository.
 ## This value MUST be the same as `build_deps_image_version` in `.gitlab-ci.yml
-opam_repository_tag=8b65efc0fbe6a3c7f267516a764557df05bcc3fe
-opam_repository_url=https://gitlab.com/tezos/opam-repository.git
-opam_repository=$opam_repository_url\#$opam_repository_tag
+opam_repository_tag=308602d50d0741831b2deac4e570745feb7007fb
+opam_repository_url=https://gitlab.com/tezos/opam-repository
+opam_repository_git=$opam_repository_url.git
+opam_repository=$opam_repository_git\#$opam_repository_tag
 
 ## Other variables, used both in Makefile and scripts
 COVERAGE_OUTPUT=_coverage_output
