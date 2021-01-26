@@ -4,13 +4,7 @@ import json
 import sys
 
 from typing import List
-
-
-def format_command(cmd: List[str]) -> str:
-    color_code = '\033[34m'
-    endc = '\033[0m'
-    cmd_str = " ".join(cmd)
-    return f'{color_code}# {cmd_str}{endc}'
+from process.process_utils import format_command
 
 
 class Codec:

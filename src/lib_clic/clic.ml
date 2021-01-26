@@ -831,7 +831,9 @@ let usage_internal ppf ~executable_name ~global_options ?(highlights = [])
      @{<kwd>command@} [@{<opt>command options@}]@}@}@,\
      @{<command>@{<commandline>%s @{<opt>--help@} (for global options)@}@}@,\
      @{<command>@{<commandline>%s [@{<opt>global options@}] @{<kwd>command@} \
-     @{<opt>--help@} (for command options)@}@}@}@,\
+     @{<opt>--help@} (for command options)@}@}@,\
+     @{<command>@{<commandline>%s @{<opt>--version@} (for version \
+     information)@}@}@}@,\
      @,\
      @{<title>To browse the documentation@}@,\
      @{<list>@{<command>@{<commandline>%s [@{<opt>global options@}] \
@@ -841,6 +843,7 @@ let usage_internal ppf ~executable_name ~global_options ?(highlights = [])
      @,\
      @{<title>Global options (must come before the command)@}@,\
      @{<commanddoc>%a@}%a%a@}@."
+    executable_name
     executable_name
     executable_name
     executable_name
@@ -961,11 +964,20 @@ let rec make_arities_dict :
       | Constant _c ->
           make_arities_dict rest acc )
 
+type error += Version : error
+
 type error += Help : 'a command option -> error
 
 let check_help_flag ?command = function
   | ("-h" | "--help") :: _ ->
       fail (Help command)
+  | _ ->
+      return_unit
+
+let check_version_flag = function
+  (* No "-v", it is taken by man output verbosity *)
+  | "--version" :: _ ->
+      fail Version
   | _ ->
       return_unit
 
@@ -979,6 +991,8 @@ let add_occurrence long value acc =
 let make_args_dict_consume ?command spec args =
   let rec make_args_dict completing arities acc args =
     check_help_flag ?command args
+    >>=? fun () ->
+    check_version_flag args
     >>=? fun () ->
     match args with
     | [] ->

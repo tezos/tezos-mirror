@@ -1,7 +1,7 @@
 from typing import List
 import os
 import subprocess
-from . import utils
+from process import process_utils
 
 
 # Timeout before killing an endorser which doesn't react to SIGTERM
@@ -39,9 +39,9 @@ class Endorser(subprocess.Popen):
         endpoint = f'http://127.0.0.1:{rpc_port}'
         cmd = [endorser, '-base-dir', base_dir, '-endpoint', endpoint]
         cmd.extend(params)
-        cmd_string = utils.format_command(cmd)
+        cmd_string = process_utils.format_command(cmd)
         print(cmd_string)
-        stdout, stderr = utils.prepare_log(cmd, log_file)
+        stdout, stderr = process_utils.prepare_log(cmd, log_file)
         subprocess.Popen.__init__(
             self, cmd, stdout=stdout, stderr=stderr
         )  # type: ignore

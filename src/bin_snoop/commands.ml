@@ -868,6 +868,10 @@ let (list_solvers, list_models) =
   match result with
   | Ok global_options ->
       global_options
+  | Error [Clic.Version] ->
+      let version = Tezos_version.Bin_version.version_string in
+      Format.printf "%s\n" version ;
+      exit 0
   | Error [Clic.Help command] ->
       Clic.usage
         Format.std_formatter

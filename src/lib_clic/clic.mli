@@ -508,8 +508,11 @@ val restore_formatter : Format.formatter -> formatter_state -> unit
 
 (** {2 Parsing and error reporting} *)
 
-(** Help error (not really an error), thrown by {!dispatch} and {!parse_initial_options}. *)
+(** Help error (not really an error), thrown by {!dispatch} and {!parse_global_options}. *)
 type error += Help : _ command option -> error
+
+(** Version error (not really an error), thrown by {!parse_global_options}. *)
+type error += Version : error
 
 (** Find and call the applicable command on the series of arguments.
     @raise [Failure] if the command list would be ambiguous. *)

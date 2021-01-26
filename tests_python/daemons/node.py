@@ -6,14 +6,14 @@ import sys
 import tempfile
 from typing import Dict, List, Optional, Tuple
 
-from . import utils
+from process import process_utils
 
 # Timeout before killing a node which doesn't react to SIGTERM
 TERM_TIMEOUT = 10
 
 
 def _run_and_print(cmd):
-    cmd_str = utils.format_command(cmd)
+    cmd_str = process_utils.format_command(cmd)
     print(cmd_str)
     completed_process = subprocess.run(
         cmd, capture_output=True, text=True, check=False
@@ -142,11 +142,11 @@ class Node:
         self._process = None  # type: Optional[subprocess.Popen]
 
     def run(self):
-        node_run_str = utils.format_command(self._node_run)
+        node_run_str = process_utils.format_command(self._node_run)
         print(node_run_str)
         # overwrite old log on on first invocation only
         overwrite_log = not self._run_called_before
-        stdout, stderr = utils.prepare_log(
+        stdout, stderr = process_utils.prepare_log(
             self._node_run, self.log_file, overwrite_log
         )
         self._process = subprocess.Popen(

@@ -23,6 +23,7 @@
  (public_name tezos-protocol-compiler)
  (libraries tezos-base
             tezos-base.unix
+            tezos-version
             tezos-protocol-environment-sigs
             tezos-stdlib-unix
             compiler-libs.common

@@ -8,16 +8,8 @@ import tempfile
 import time
 from typing import Any, List, Optional, Tuple
 
+from process.process_utils import format_command
 from . import client_output
-
-
-def format_command(cmd: List[str]) -> str:
-    # TODO the displayed command may not be 'shell' ready, for instance
-    # Michelson string parameters may requires additional quotes
-    color_code = '\033[34m'
-    endc = '\033[0m'
-    cmd_str = " ".join(cmd)
-    return f'{color_code}# {cmd_str}{endc}'
 
 
 class Client:

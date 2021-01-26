@@ -138,6 +138,10 @@ let main commands =
        >>= (function
              | Ok () ->
                  Lwt.return 0
+             | Error [Clic.Version] ->
+                 let version = Tezos_version.Bin_version.version_string in
+                 Format.printf "%s\n" version ;
+                 Lwt.return 0
              | Error [Clic.Help command] ->
                  Clic.usage
                    Format.std_formatter

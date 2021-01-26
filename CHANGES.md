@@ -22,11 +22,19 @@ here either.
 - Added a command to perform protocol migrations in persistent mockup mode
   `migrate mockup to <protocol_hash>`
 
+- Add `--version` flag
+
 ## Baker / Endorser / Accuser
+
+- Add `--version` flag
 
 ## Protocol Compiler And Environment
 
+- Add `--version` flag
+
 ## Codec
+
+- Add `--version` flag
 
 ## Docker Images
 

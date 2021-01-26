@@ -8,7 +8,6 @@ from typing import (
 )
 
 
-# TODO factorize with client.format_command
 # TODO format on 80 chars, starting on newline
 def format_command(cmd: List[str], color=True) -> str:
     color_code = '\033[34m'
