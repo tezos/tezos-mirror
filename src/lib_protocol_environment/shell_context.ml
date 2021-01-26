@@ -33,14 +33,6 @@ type _ Context.kind += Shell : Tezos_storage.Context.t Context.kind
 module C = struct
   include Tezos_storage.Context
 
-  let set = add
-
-  let get = find
-
-  let dir_mem = mem_tree
-
-  let remove_rec = remove
-
   let set_protocol = add_protocol
 
   let copy ctxt ~from ~to_ =

@@ -40,14 +40,14 @@ module Context = struct
 
   let mem (Context {ops = (module Ops); ctxt; _}) key = Ops.mem ctxt key
 
-  let set (Context {ops = (module Ops) as ops; ctxt; kind}) key value =
-    Ops.set ctxt key value
+  let add (Context {ops = (module Ops) as ops; ctxt; kind}) key value =
+    Ops.add ctxt key value
     >>= fun ctxt -> Lwt.return (Context {ops; ctxt; kind})
 
-  let dir_mem (Context {ops = (module Ops); ctxt; _}) key =
-    Ops.dir_mem ctxt key
+  let mem_tree (Context {ops = (module Ops); ctxt; _}) key =
+    Ops.mem_tree ctxt key
 
-  let get (Context {ops = (module Ops); ctxt; _}) key = Ops.get ctxt key
+  let find (Context {ops = (module Ops); ctxt; _}) key = Ops.find ctxt key
 
   let copy (Context {ops = (module Ops) as ops; ctxt; kind}) ~from ~to_ =
     Ops.copy ctxt ~from ~to_
@@ -57,9 +57,8 @@ module Context = struct
     | None ->
         Lwt.return_none
 
-  let remove_rec (Context {ops = (module Ops) as ops; ctxt; kind}) key =
-    Ops.remove_rec ctxt key
-    >>= fun ctxt -> Lwt.return (Context {ops; ctxt; kind})
+  let remove (Context {ops = (module Ops) as ops; ctxt; kind}) key =
+    Ops.remove ctxt key >>= fun ctxt -> Lwt.return (Context {ops; ctxt; kind})
 
   type key_or_dir = [`Key of key | `Dir of key]
 

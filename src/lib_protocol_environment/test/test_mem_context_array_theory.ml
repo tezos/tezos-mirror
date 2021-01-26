@@ -106,7 +106,7 @@ let safe_set m k v =
   in
   (* If any_prefix_mem m k holds, Context.set will throw an exception; hence: *)
   any_prefix_mem m k
-  >>= function true -> Crowbar.bad_test () | false -> Context.set m k v
+  >>= function true -> Crowbar.bad_test () | false -> Context.add m k v
 
 (* We generate contexts by starting from a fresh one and
    doing a sequence of calls to Context.set *)
@@ -152,7 +152,7 @@ let test_get_set (ctxt, (k, v)) =
       ( safe_set ctxt k v
       >>= fun ctxt' ->
       (* Read value at k *)
-      Context.get ctxt' k )
+      Context.find ctxt' k )
   in
   match at_k with
   | None ->
@@ -175,8 +175,8 @@ let test_get_set_other (ctxt, (k1, v)) =
   let check_key k2 =
     if k1 = k2 then ()
     else
-      let v_before = Lwt_main.run @@ Context.get ctxt k2 in
-      let v_after = Lwt_main.run @@ Context.get ctxt' k2 in
+      let v_before = Lwt_main.run @@ Context.find ctxt k2 in
+      let v_after = Lwt_main.run @@ Context.find ctxt' k2 in
       Crowbar.check_eq ~pp:value_opt v_before v_after
   in
   List.iter check_key keys

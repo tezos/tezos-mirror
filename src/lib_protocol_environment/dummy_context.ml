@@ -32,15 +32,15 @@ module M = struct
 
   let mem _ _ = assert false
 
-  let dir_mem _ _ = assert false
+  let mem_tree _ _ = assert false
 
-  let get _ _ = assert false
+  let find _ _ = assert false
 
-  let set _ _ _ = assert false
+  let add _ _ _ = assert false
 
   let copy _ ~from:_ ~to_:_ = assert false
 
-  let remove_rec _ _ = assert false
+  let remove _ _ = assert false
 
   type key_or_dir = [`Key of key | `Dir of key]
 

@@ -110,7 +110,7 @@ let initial_context (rpc_context : RPC_context.json)
   end in
   let empty = Proxy_context.empty @@ Some (module N) in
   let version_value = "alpha_current" in
-  Tezos_protocol_environment.Context.set
+  Tezos_protocol_environment.Context.add
     empty
     ["version"]
     (Bytes.of_string version_value)

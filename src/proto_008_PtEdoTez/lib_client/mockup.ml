@@ -368,8 +368,8 @@ let initial_context (header : Block_header.shell_header)
   in
   Tezos_protocol_environment.Context.(
     let empty = Memory_context.empty in
-    set empty ["version"] (Bytes.of_string "genesis")
-    >>= fun ctxt -> set ctxt ["protocol_parameters"] proto_params)
+    add empty ["version"] (Bytes.of_string "genesis")
+    >>= fun ctxt -> add ctxt ["protocol_parameters"] proto_params)
   >>= fun ctxt ->
   Protocol.Main.init ctxt header
   >|= Protocol.Environment.wrap_error

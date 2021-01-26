@@ -40,23 +40,23 @@
 *)
 
 let create_block2 ctxt =
-  Context.set ctxt ["a"; "b"] (Bytes.of_string "Novembre")
+  Context.add ctxt ["a"; "b"] (Bytes.of_string "Novembre")
   >>= fun ctxt ->
-  Context.set ctxt ["a"; "c"] (Bytes.of_string "Juin")
+  Context.add ctxt ["a"; "c"] (Bytes.of_string "Juin")
   >>= fun ctxt ->
-  Context.set ctxt ["version"] (Bytes.of_string "0.0")
+  Context.add ctxt ["version"] (Bytes.of_string "0.0")
   >>= fun ctxt -> Lwt.return ctxt
 
 let create_block3a ctxt =
-  Context.remove_rec ctxt ["a"; "b"]
+  Context.remove ctxt ["a"; "b"]
   >>= fun ctxt ->
-  Context.set ctxt ["a"; "d"] (Bytes.of_string "Mars")
+  Context.add ctxt ["a"; "d"] (Bytes.of_string "Mars")
   >>= fun ctxt -> Lwt.return ctxt
 
 let create_block3b ctxt =
-  Context.remove_rec ctxt ["a"; "c"]
+  Context.remove ctxt ["a"; "c"]
   >>= fun ctxt ->
-  Context.set ctxt ["a"; "d"] (Bytes.of_string "Février")
+  Context.add ctxt ["a"; "d"] (Bytes.of_string "Février")
   >>= fun ctxt -> Lwt.return ctxt
 
 type t = {
@@ -87,13 +87,13 @@ let c = function None -> None | Some s -> Some (Bytes.to_string s)
     - [(["a"; "c"], "Juin")]
 *)
 let test_simple {block2 = ctxt; _} =
-  Context.get ctxt ["version"]
+  Context.find ctxt ["version"]
   >>= fun version ->
   Assert.equal_string_option ~msg:__LOC__ (c version) (Some "0.0") ;
-  Context.get ctxt ["a"; "b"]
+  Context.find ctxt ["a"; "b"]
   >>= fun novembre ->
   Assert.equal_string_option (Some "Novembre") (c novembre) ;
-  Context.get ctxt ["a"; "c"]
+  Context.find ctxt ["a"; "c"]
   >>= fun juin ->
   Assert.equal_string_option ~msg:__LOC__ (Some "Juin") (c juin) ;
   Lwt.return_unit
@@ -107,16 +107,16 @@ let test_simple {block2 = ctxt; _} =
     has been removed by block [block3a].
 *)
 let test_continuation {block3a = ctxt; _} =
-  Context.get ctxt ["version"]
+  Context.find ctxt ["version"]
   >>= fun version ->
   Assert.equal_string_option ~msg:__LOC__ (Some "0.0") (c version) ;
-  Context.get ctxt ["a"; "b"]
+  Context.find ctxt ["a"; "b"]
   >>= fun novembre ->
   Assert.is_none ~msg:__LOC__ (c novembre) ;
-  Context.get ctxt ["a"; "c"]
+  Context.find ctxt ["a"; "c"]
   >>= fun juin ->
   Assert.equal_string_option ~msg:__LOC__ (Some "Juin") (c juin) ;
-  Context.get ctxt ["a"; "d"]
+  Context.find ctxt ["a"; "d"]
   >>= fun mars ->
   Assert.equal_string_option ~msg:__LOC__ (Some "Mars") (c mars) ;
   Lwt.return_unit
@@ -130,16 +130,16 @@ let test_continuation {block3a = ctxt; _} =
     has been removed by block [block3b].
 *)
 let test_fork {block3b = ctxt; _} =
-  Context.get ctxt ["version"]
+  Context.find ctxt ["version"]
   >>= fun version ->
   Assert.equal_string_option ~msg:__LOC__ (Some "0.0") (c version) ;
-  Context.get ctxt ["a"; "b"]
+  Context.find ctxt ["a"; "b"]
   >>= fun novembre ->
   Assert.equal_string_option ~msg:__LOC__ (Some "Novembre") (c novembre) ;
-  Context.get ctxt ["a"; "c"]
+  Context.find ctxt ["a"; "c"]
   >>= fun juin ->
   Assert.is_none ~msg:__LOC__ (c juin) ;
-  Context.get ctxt ["a"; "d"]
+  Context.find ctxt ["a"; "d"]
   >>= fun mars ->
   Assert.equal_string_option ~msg:__LOC__ (Some "Février") (c mars) ;
   Lwt.return_unit
@@ -148,31 +148,31 @@ let test_fork {block3b = ctxt; _} =
     setting/getting key-values.
 *)
 let test_replay {genesis = ctxt0; _} =
-  Context.set ctxt0 ["version"] (Bytes.of_string "0.0")
+  Context.add ctxt0 ["version"] (Bytes.of_string "0.0")
   >>= fun ctxt1 ->
-  Context.set ctxt1 ["a"; "b"] (Bytes.of_string "Novembre")
+  Context.add ctxt1 ["a"; "b"] (Bytes.of_string "Novembre")
   >>= fun ctxt2 ->
-  Context.set ctxt2 ["a"; "c"] (Bytes.of_string "Juin")
+  Context.add ctxt2 ["a"; "c"] (Bytes.of_string "Juin")
   >>= fun ctxt3 ->
-  Context.set ctxt3 ["a"; "d"] (Bytes.of_string "July")
+  Context.add ctxt3 ["a"; "d"] (Bytes.of_string "July")
   >>= fun ctxt4a ->
-  Context.set ctxt3 ["a"; "d"] (Bytes.of_string "Juillet")
+  Context.add ctxt3 ["a"; "d"] (Bytes.of_string "Juillet")
   >>= fun ctxt4b ->
-  Context.set ctxt4a ["a"; "b"] (Bytes.of_string "November")
+  Context.add ctxt4a ["a"; "b"] (Bytes.of_string "November")
   >>= fun ctxt5a ->
-  Context.get ctxt4a ["a"; "b"]
+  Context.find ctxt4a ["a"; "b"]
   >>= fun novembre ->
   Assert.equal_string_option ~msg:__LOC__ (Some "Novembre") (c novembre) ;
-  Context.get ctxt5a ["a"; "b"]
+  Context.find ctxt5a ["a"; "b"]
   >>= fun november ->
   Assert.equal_string_option ~msg:__LOC__ (Some "November") (c november) ;
-  Context.get ctxt5a ["a"; "d"]
+  Context.find ctxt5a ["a"; "d"]
   >>= fun july ->
   Assert.equal_string_option ~msg:__LOC__ (Some "July") (c july) ;
-  Context.get ctxt4b ["a"; "b"]
+  Context.find ctxt4b ["a"; "b"]
   >>= fun novembre ->
   Assert.equal_string_option ~msg:__LOC__ (Some "Novembre") (c novembre) ;
-  Context.get ctxt4b ["a"; "d"]
+  Context.find ctxt4b ["a"; "d"]
   >>= fun juillet ->
   Assert.equal_string_option ~msg:__LOC__ (Some "Juillet") (c juillet) ;
   Lwt.return_unit
@@ -190,15 +190,15 @@ let keys t = fold_keys t ~init:[] ~f:(fun k acc -> Lwt.return (k :: acc))
     of key prefixes using {!Context.fold}.
 *)
 let test_fold {genesis = ctxt; _} =
-  Context.set ctxt ["a"; "b"] (Bytes.of_string "Novembre")
+  Context.add ctxt ["a"; "b"] (Bytes.of_string "Novembre")
   >>= fun ctxt ->
-  Context.set ctxt ["a"; "c"] (Bytes.of_string "Juin")
+  Context.add ctxt ["a"; "c"] (Bytes.of_string "Juin")
   >>= fun ctxt ->
-  Context.set ctxt ["a"; "d"; "e"] (Bytes.of_string "Septembre")
+  Context.add ctxt ["a"; "d"; "e"] (Bytes.of_string "Septembre")
   >>= fun ctxt ->
-  Context.set ctxt ["f"] (Bytes.of_string "Avril")
+  Context.add ctxt ["f"] (Bytes.of_string "Avril")
   >>= fun ctxt ->
-  Context.set ctxt ["g"; "h"] (Bytes.of_string "Avril")
+  Context.add ctxt ["g"; "h"] (Bytes.of_string "Avril")
   >>= fun ctxt ->
   keys ctxt []
   >>= fun l ->
@@ -276,11 +276,11 @@ let test_domain0 () =
   let k2 = ["b"] in
   let k3 = ["c"] in
   let ctxt = Memory_context.empty in
-  Context.set ctxt k1 b0
+  Context.add ctxt k1 b0
   >>= fun ctxt ->
-  Context.set ctxt k2 b0
+  Context.add ctxt k2 b0
   >>= fun ctxt ->
-  Context.set ctxt k3 b0
+  Context.add ctxt k3 b0
   >>= fun ctxt ->
   let expected_domain = [k1; k2; k3] |> StringListSet.of_list in
   domain ctxt
@@ -294,9 +294,9 @@ let test_domain1 () =
   let k1 = ["a"; "b"] in
   let k2 = ["a"; "c"; "d"] in
   let ctxt = Memory_context.empty in
-  Context.set ctxt k1 b0
+  Context.add ctxt k1 b0
   >>= fun ctxt ->
-  Context.set ctxt k2 b0
+  Context.add ctxt k2 b0
   >>= fun ctxt ->
   let expected_domain = [k1; k2] |> StringListSet.of_list in
   domain ctxt
@@ -312,13 +312,13 @@ let test_domain2 () =
   let k3 = ["a"; "c"; "e"] in
   let k4 = ["x"] in
   let ctxt = Memory_context.empty in
-  Context.set ctxt k1 b0
+  Context.add ctxt k1 b0
   >>= fun ctxt ->
-  Context.set ctxt k2 b0
+  Context.add ctxt k2 b0
   >>= fun ctxt ->
-  Context.set ctxt k3 b0
+  Context.add ctxt k3 b0
   >>= fun ctxt ->
-  Context.set ctxt k4 b0
+  Context.add ctxt k4 b0
   >>= fun ctxt ->
   let expected_domain = [k1; k2; k3; k4] |> StringListSet.of_list in
   domain ctxt

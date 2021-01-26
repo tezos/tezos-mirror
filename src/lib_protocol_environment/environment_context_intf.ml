@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Tarides <contact@tarides.com>                          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -32,15 +33,17 @@ module type S = sig
 
   val mem : t -> key -> bool Lwt.t
 
-  val dir_mem : t -> key -> bool Lwt.t
+  val mem_tree : t -> key -> bool Lwt.t
 
-  val get : t -> key -> value option Lwt.t
+  val find : t -> key -> value option Lwt.t
 
-  val set : t -> key -> value -> t Lwt.t
+  val add : t -> key -> value -> t Lwt.t
+
+  val remove : t -> key -> t Lwt.t
+
+  (** {2 Misc} *)
 
   val copy : t -> from:key -> to_:key -> t option Lwt.t
-
-  val remove_rec : t -> key -> t Lwt.t
 
   type key_or_dir = [`Key of key | `Dir of key]
 

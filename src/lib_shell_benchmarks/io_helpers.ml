@@ -107,7 +107,7 @@ let prepare_base_dir base_dir =
 (* This function updates the context with random bytes at a given depth. *)
 let initialize_key rng_state context path storage_size =
   let bytes = Base_samplers.uniform_bytes rng_state ~nbytes:storage_size in
-  Tezos_protocol_environment.Context.set context path bytes
+  Tezos_protocol_environment.Context.add context path bytes
 
 let commit_and_reload base_dir index context =
   commit context

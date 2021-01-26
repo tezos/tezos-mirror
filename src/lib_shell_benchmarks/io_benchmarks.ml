@@ -260,7 +260,7 @@ module Context_size_dependent_read_bench : Benchmark.S = struct
     let closure context =
       match
         Lwt_main.run
-          (Tezos_protocol_environment.Context.get context random_key)
+          (Tezos_protocol_environment.Context.find context random_key)
       with
       | Some _ ->
           ()
@@ -321,7 +321,7 @@ module Context_size_dependent_write_bench : Benchmark.S = struct
   let tags = ["io"]
 
   let write_storage context key bytes =
-    Lwt_main.run (Tezos_protocol_environment.Context.set context key bytes)
+    Lwt_main.run (Tezos_protocol_environment.Context.add context key bytes)
 
   let make_bench rng_state cfg () =
     let insertions =
@@ -588,7 +588,7 @@ module Irmin_pack_read_bench : Benchmark.S = struct
       Io_stats.pp
       stats ;
     let closure context =
-      match Lwt_main.run (Context.get context target_key) with
+      match Lwt_main.run (Context.find context target_key) with
       | Some _ ->
           ()
       | None ->
@@ -729,7 +729,7 @@ module Irmin_pack_write_bench : Benchmark.S = struct
   let models = [("io_write", write_access)]
 
   let write_storage context key bytes =
-    Lwt_main.run (Context.set context key bytes)
+    Lwt_main.run (Context.add context key bytes)
 
   let make_bench rng_state (cfg : config) () =
     let insertions =
@@ -884,7 +884,7 @@ module Read_random_key_bench : Benchmark.S = struct
       finalizer () ; result
     in
     let closure context =
-      match Lwt_main.run (Context.get context key) with
+      match Lwt_main.run (Context.find context key) with
       | Some _ ->
           ()
       | None ->
@@ -1010,7 +1010,7 @@ module Write_random_keys_bench : Benchmark.S = struct
   let models = [("io_write", write_access)]
 
   let write_storage context key bytes =
-    Lwt_main.run (Context.set context key bytes)
+    Lwt_main.run (Context.add context key bytes)
 
   let make_bench rng_state (cfg : config) (keys : (string list * int) Seq.t) ()
       =

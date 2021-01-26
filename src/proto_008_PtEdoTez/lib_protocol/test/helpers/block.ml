@@ -266,8 +266,8 @@ let initial_context ?(with_commitments = false) constants header
   in
   Tezos_protocol_environment.Context.(
     let empty = Memory_context.empty in
-    set empty ["version"] (Bytes.of_string "genesis")
-    >>= fun ctxt -> set ctxt protocol_param_key proto_params)
+    add empty ["version"] (Bytes.of_string "genesis")
+    >>= fun ctxt -> add ctxt protocol_param_key proto_params)
   >>= fun ctxt ->
   Main.init ctxt header >|= Environment.wrap_error
   >|=? fun {context; _} -> context
@@ -293,8 +293,8 @@ let genesis_with_parameters parameters =
   in
   Tezos_protocol_environment.Context.(
     let empty = Memory_context.empty in
-    set empty ["version"] (Bytes.of_string "genesis")
-    >>= fun ctxt -> set ctxt protocol_param_key proto_params)
+    add empty ["version"] (Bytes.of_string "genesis")
+    >>= fun ctxt -> add ctxt protocol_param_key proto_params)
   >>= fun ctxt ->
   Main.init ctxt shell >|= Environment.wrap_error
   >|=? fun {context; _} ->

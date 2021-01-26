@@ -26,14 +26,6 @@
 module M = struct
   include Tezos_storage_memory.Context
 
-  let set = add
-
-  let get = find
-
-  let dir_mem = mem_tree
-
-  let remove_rec = remove
-
   let copy ctxt ~from ~to_ =
     find_tree ctxt from
     >>= function

@@ -866,6 +866,14 @@ struct
   module Context = struct
     include Context
 
+    let set = add
+
+    let get = find
+
+    let dir_mem = mem_tree
+
+    let remove_rec = remove
+
     let fold_keys s k ~init ~f =
       let rec loop k acc =
         fold s k ~init:acc ~f:(fun file acc ->
@@ -879,7 +887,7 @@ struct
 
     let complete ctxt s = Base58.complete ctxt s
 
-    let del = remove_rec
+    let del = remove
   end
 
   module Lift (P : Updater.PROTOCOL) = struct

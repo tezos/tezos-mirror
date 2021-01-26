@@ -91,7 +91,7 @@ let load_tree context key =
     Context.fold context key ~init:tree ~f:(fun key_or_dir tree ->
         match key_or_dir with
         | `Key path -> (
-            Context.get context path
+            Context.find context path
             >>= function
             | None ->
                 Stdlib.failwith "key with no data"
