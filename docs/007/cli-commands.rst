@@ -1,3 +1,6 @@
+.. _cli_commands:
+.. _cli_commands_007:
+
 **********************
 Command Line Interface
 **********************
@@ -11,6 +14,9 @@ using the following shell commands.
    tezos-client -protocol ProtoALphaALph man -verbosity 3
    tezos-admin-client man -verbosity 3
 
+The rest of this page documents the protocol-dependent tools.
+The protocol-independent tools are documented :ref:`here <cli_commands_shell>`.
+
 
 .. _client_manual:
 .. _client_manual_007:
@@ -20,26 +26,6 @@ Client manual
 
 .. raw:: html
          :file: tezos-client-007.html
-
-
-.. _admin_client_manual:
-.. _admin_client_manual_007:
-
-Admin-client manual
-===================
-
-.. raw:: html
-         :file: ../api/tezos-admin-client.html
-
-
-.. _signer_manual:
-.. _signer_manual_007:
-
-Signer manual
-=============
-
-.. raw:: html
-         :file: ../api/tezos-signer.html
 
 
 .. _baker_manual:

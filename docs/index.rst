@@ -119,8 +119,9 @@ in the :ref:`introduction <howtoget>`.
    shell/sync
    shell/p2p
    shell/p2p_api
-   shell/rpc
    shell/micheline
+   shell/cli-commands
+   shell/rpc
 
 .. toctree::
    :maxdepth: 2
