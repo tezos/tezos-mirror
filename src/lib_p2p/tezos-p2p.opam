@@ -14,7 +14,7 @@ depends: [
   "alcotest-lwt" { with-test & >= "1.1.0" }
   "lwt"
   "lwt-watcher" { = "0.1" }
-  "lwt-canceler" { = "0.2" }
+  "lwt-canceler" { >= "0.3" & < "0.4" }
   "ringo" { = "0.5" }
 ]
 build: [
