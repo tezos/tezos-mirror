@@ -30,6 +30,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    period_repr.mli period_repr.ml
    time_repr.mli time_repr.ml
    fixed_point_repr.mli fixed_point_repr.ml
+   saturation_repr.mli saturation_repr.ml
    gas_limit_repr.mli gas_limit_repr.ml
    constants_repr.ml
    fitness_repr.ml
@@ -114,6 +115,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    period_repr.mli period_repr.ml
    time_repr.mli time_repr.ml
    fixed_point_repr.mli fixed_point_repr.ml
+   saturation_repr.mli saturation_repr.ml
    gas_limit_repr.mli gas_limit_repr.ml
    constants_repr.ml
    fitness_repr.ml
@@ -198,6 +200,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    period_repr.mli period_repr.ml
    time_repr.mli time_repr.ml
    fixed_point_repr.mli fixed_point_repr.ml
+   saturation_repr.mli saturation_repr.ml
    gas_limit_repr.mli gas_limit_repr.ml
    constants_repr.ml
    fitness_repr.ml
@@ -302,6 +305,7 @@ include Tezos_raw_protocol_alpha.Main
    Period_repr
    Time_repr
    Fixed_point_repr
+   Saturation_repr
    Gas_limit_repr
    Constants_repr
    Fitness_repr
@@ -422,6 +426,7 @@ include Tezos_raw_protocol_alpha.Main
    period_repr.mli period_repr.ml
    time_repr.mli time_repr.ml
    fixed_point_repr.mli fixed_point_repr.ml
+   saturation_repr.mli saturation_repr.ml
    gas_limit_repr.mli gas_limit_repr.ml
    constants_repr.ml
    fitness_repr.ml

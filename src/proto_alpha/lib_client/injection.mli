@@ -107,6 +107,8 @@ val inject_operation :
   ?verbose_signing:bool ->
   fee_parameter:fee_parameter ->
   ?compute_fee:bool ->
+  unspecified_gas_limit:bool ->
+  unspecified_storage_limit:bool ->
   'kind contents_list ->
   'kind result_list tzresult Lwt.t
 

@@ -34,6 +34,10 @@ open Test
 open Protocol
 open Raw_context
 
+(* This value is supposed to be larger than the block gas level limit
+   but not saturated. *)
+let opg = max_int / 10000
+
 exception Gas_levels_test_error of string
 
 let err x = Exn (Gas_levels_test_error x)
@@ -57,28 +61,28 @@ let test_detect_gas_exhaustion_in_fresh_context () =
   dummy_context ()
   >>=? fun context ->
   fail_unless
-    (consume_gas context (Z.of_int max_int) |> succeed)
+    (consume_gas context (Z.of_int opg) |> succeed)
     (err "In a fresh context, gas consumption is unlimited.")
 
 let make_context initial_operation_gas =
   dummy_context ()
   >>=? fun context ->
   return
-    ( Gas_limit_repr.Arith.integral_of_int initial_operation_gas
+    ( Gas_limit_repr.Arith.integral_of_int_exn initial_operation_gas
     |> set_gas_limit context )
 
 let test_detect_gas_exhaustion_when_operation_gas_hits_zero () =
   make_context 10
   >>=? fun context ->
   fail_unless
-    (consume_gas context (Z.of_int max_int) |> failed)
+    (consume_gas context (Z.of_int opg) |> failed)
     (err "Fail when consuming more than the remaining operation gas.")
 
 let test_detect_gas_exhaustion_when_block_gas_hits_zero () =
-  make_context max_int
+  make_context opg
   >>=? fun context ->
   fail_unless
-    (consume_gas context (Z.of_int max_int) |> failed)
+    (consume_gas context (Z.of_int opg) |> failed)
     (err "Fail when consuming more than the remaining block gas.")
 
 let monitor initial_operation_level gas_level expectation () =
@@ -89,7 +93,7 @@ let monitor initial_operation_level gas_level expectation () =
     ( match consume_gas context (Z.of_int 10000) (* in milligas. *) with
     | Ok context ->
         let remaining = gas_level context in
-        remaining = integral_of_int expectation
+        remaining = integral_of_int_exn expectation
     | _ ->
         false )
     (err "Monitor operation gas at each gas consumption")
@@ -105,14 +109,15 @@ let operation_gas_level context =
 (* Monitoring runs differently depending on the minimum between the
    operation gas level and the block gas level. Hence, we check that
    in both situations, the gas levels are correctly reported. *)
+
 let test_monitor_operation_gas_level = monitor 100 operation_gas_level 90
 
 let test_monitor_operation_gas_level' =
-  monitor max_int operation_gas_level (max_int - 10)
+  monitor opg operation_gas_level (opg - 10)
 
 let test_monitor_block_gas_level = monitor 100 block_gas_level 10399990
 
-let test_monitor_block_gas_level' = monitor max_int block_gas_level 10399990
+let test_monitor_block_gas_level' = monitor opg block_gas_level 10399990
 
 let quick (what, how) = tztest what `Quick how
 

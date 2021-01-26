@@ -141,7 +141,7 @@ let check_property prop () =
   let ctxt =
     Alpha_context.Gas.set_limit
       state.ctxt
-      Alpha_context.Gas.Arith.(fp (integral_of_int 100_000_000))
+      Alpha_context.Gas.Arith.(fp (integral_of_int_exn 100_000_000))
   in
   let result = prop ctxt in
   match result with

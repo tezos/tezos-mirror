@@ -14,6 +14,7 @@
         "Period_repr",
         "Time_repr",
         "Fixed_point_repr",
+        "Saturation_repr",
         "Gas_limit_repr",
         "Constants_repr",
         "Fitness_repr",

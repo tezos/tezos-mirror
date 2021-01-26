@@ -52,6 +52,7 @@ let () =
       ("gas properties", Test_gas_properties.tests);
       ("fixed point computation", Test_fixed_point.tests);
       ("gas levels", Test_gas_levels.tests);
+      ("saturation arithmetic", Test_saturation.tests);
       ("gas cost functions", Test_gas_costs.tests);
       ("lazy storage diff", Test_lazy_storage_diff.tests);
       ("sapling", Test_sapling.tests);

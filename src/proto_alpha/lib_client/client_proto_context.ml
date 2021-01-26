@@ -119,11 +119,7 @@ let reveal cctxt ~chain ~block ?confirmations ?dry_run ?verbose_signing ?branch
     ~source ~src_pk ~src_sk ?fee ~fee_parameter () =
   let contents =
     Injection.Single_manager
-      (build_reveal_operation
-         ?fee
-         ~gas_limit:(Gas.Arith.integral_of_int ~-1)
-         ~storage_limit:Z.zero
-         src_pk)
+      (build_reveal_operation ?fee ~storage_limit:Z.zero src_pk)
   in
   Injection.inject_manager_operation
     cctxt
@@ -429,6 +425,8 @@ let inject_activate_operation cctxt ~chain ~block ?confirmations ?dry_run alias
     ~block
     ~fee_parameter:Injection.dummy_fee_parameter
     contents
+    ~unspecified_gas_limit:false
+    ~unspecified_storage_limit:false
   >>=? fun (oph, op, result) ->
   ( match confirmations with
   | None ->
@@ -570,6 +568,8 @@ let submit_proposals ?dry_run ?verbose_signing (cctxt : #full) ~chain ~block
     ~src_sk
     contents
     ?verbose_signing
+    ~unspecified_gas_limit:false
+    ~unspecified_storage_limit:false
 
 let submit_ballot ?dry_run ?verbose_signing (cctxt : #full) ~chain ~block
     ?confirmations ~src_sk source proposal ballot =
@@ -588,6 +588,8 @@ let submit_ballot ?dry_run ?verbose_signing (cctxt : #full) ~chain ~block
     ~src_sk
     contents
     ?verbose_signing
+    ~unspecified_gas_limit:false
+    ~unspecified_storage_limit:false
 
 let pp_operation formatter (a : Alpha_block_services.operation) =
   match (a.receipt, a.protocol_data) with

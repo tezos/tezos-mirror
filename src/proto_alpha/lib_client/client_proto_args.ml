@@ -254,8 +254,7 @@ let gas_limit_kind =
   parameter (fun _ s ->
       try
         let v = Z.of_string s in
-        assert (Compare.Z.(v >= Z.zero)) ;
-        return (Gas.Arith.integral v)
+        return (Gas.Arith.integral_exn v)
       with _ -> failwith "invalid gas limit (must be a positive number)")
 
 let gas_limit_arg =
