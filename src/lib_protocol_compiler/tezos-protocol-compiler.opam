@@ -12,6 +12,7 @@ depends: [
   "dune" { >= "2.0" }
   "base-unix"
   "tezos-base"
+  "tezos-version"
   "tezos-protocol-environment"
   "tezos-protocol-environment-sigs"
   "tezos-stdlib-unix"
