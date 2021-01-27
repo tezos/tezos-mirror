@@ -457,6 +457,46 @@ let test_raw {idx; genesis; _} =
       Assert.equal_raw_tree ~msg:__LOC__ e raw ;
       Lwt.return ()
 
+let string n = String.make n 'a'
+
+let test_encoding {idx; genesis; _} =
+  checkout idx genesis
+  >>= function
+  | None ->
+      Assert.fail_msg "checkout genesis_block"
+  | Some ctxt ->
+      let foo1 = Bytes.of_string "foo1" in
+      let foo2 = Bytes.of_string "foo2" in
+      add ctxt ["a"; string 7] foo1
+      >>= fun ctxt ->
+      add ctxt ["a"; string 8] foo2
+      >>= fun ctxt ->
+      add ctxt [string 16] foo2
+      >>= fun ctxt ->
+      add ctxt [string 32] foo2
+      >>= fun ctxt ->
+      add ctxt [string 64] foo2
+      >>= fun ctxt ->
+      add ctxt [string 127] foo2
+      >>= fun ctxt ->
+      commit ctxt
+      >>= fun h ->
+      Assert.equal_context_hash
+        ~msg:__LOC__
+        (Context_hash.of_b58check_exn
+           "CoWJsL2ehZ39seTr8inBCJb5tVjW8KGNweJ5cvuVq51mAASrRmim")
+        h ;
+      add ctxt [string 255] foo2
+      >>= fun ctxt ->
+      commit ctxt
+      >>= fun h ->
+      Assert.equal_context_hash
+        ~msg:__LOC__
+        (Context_hash.of_b58check_exn
+           "CoVexcEHMXmSA2k42aNc5MCDtVJFRs3CC6vcQWYwFoj7EFsBPw1c")
+        h ;
+      Lwt.return ()
+
 let test_dump {idx; block3b; _} =
   Lwt_utils_unix.with_tempdir "tezos_test_" (fun base_dir2 ->
       let dumpfile = base_dir2 // "dump" in
@@ -534,7 +574,8 @@ let tests : (string * (t -> unit Lwt.t)) list =
     ("fold", test_fold);
     ("trees", test_trees);
     ("raw", test_raw);
-    ("dump", test_dump) ]
+    ("dump", test_dump);
+    ("encoding", test_encoding) ]
 
 let tests =
   List.map
