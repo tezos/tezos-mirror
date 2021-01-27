@@ -398,11 +398,21 @@ let init ctx id ~memo_size =
 
 (* Gas costs for apply_diff. *)
 let sapling_apply_diff_cost ~inputs ~outputs =
-  Z.add
-    (Z.of_int 1_300_000)
-    (Z.add
-       (Z.mul (Z.of_int inputs) (Z.of_int 5_000))
-       (Z.mul (Z.of_int outputs) (Z.of_int 55_000)))
+  let open Saturation_repr in
+  let mul_safe_int x =
+    Option.bind (of_int_opt x) mul_safe
+    |> function
+    | None ->
+        (* Since you can read below that x is always less than 2147483648. *)
+        assert false
+    | Some x ->
+        x
+  in
+  add
+    (safe_int 1_300_000)
+    (add
+       (scale_fast (mul_safe_int 5_000) (safe_int inputs))
+       (scale_fast (mul_safe_int 55_000) (safe_int outputs)))
 
 (** Applies a diff to a state id stored in the context. Updates Commitments,
     Ciphertexts and Nullifiers using the diff and updates the Roots using the
@@ -413,7 +423,6 @@ let apply_diff ctx id diff =
   let nb_nullifiers = List.length diff.nullifiers in
   let sapling_cost =
     sapling_apply_diff_cost ~inputs:nb_nullifiers ~outputs:nb_commitments
-    |> Saturation_repr.of_z_opt |> Saturation_repr.saturate_if_undef
   in
   Raw_context.consume_gas ctx sapling_cost
   >>?= fun ctx ->
