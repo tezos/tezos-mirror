@@ -15,7 +15,7 @@ sanity:
         echo "${build_deps_image_version} != ${opam_repository_tag}" ;
         exit 1 ;
       fi
-    - scripts/test_wrapper.sh shell "scripts/check_opam_test.sh" check_opam_test
+    - scripts/check_opam_test.sh
     # Ensures that the local poetry.lock and pyproject.toml are synchronized
     # with those of the base image.    - diff tests_python/poetry.lock /home/tezos/poetry.lock
     - diff tests_python/pyproject.toml /home/tezos/pyproject.toml
