@@ -94,9 +94,22 @@ module Make (Encoding : Resto.ENCODING) = struct
                     Cohttp.Transfer.Fixed (Int64.of_int (String.length s)) )
             in
             match answer with
-            | ( `Ok _
-              | `Created _
-              | `No_content
+            | (`Ok _ | `Created _) as a ->
+                Lwt.return_ok
+                @@ Server.Handlers.handle_rpc_answer ~headers output a
+            | `OkChunk v ->
+                (* When in self-serving mode, there is no point in
+                   constructing a sequence just to mash it all together, we
+                   ignore Chunk *)
+                Lwt.return_ok
+                @@ Server.Handlers.handle_rpc_answer ~headers output (`Ok v)
+            | `OkStream o ->
+                let body = create_stream output o in
+                let encoding = Cohttp.Transfer.Chunked in
+                Lwt.return_ok
+                  ( Cohttp.Response.make ~status:`OK ~encoding ~headers (),
+                    Cohttp_lwt.Body.of_stream body )
+            | ( `No_content
               | `Unauthorized _
               | `Forbidden _
               | `Gone _
@@ -104,23 +117,7 @@ module Make (Encoding : Resto.ENCODING) = struct
               | `Conflict _
               | `Error _ ) as a ->
                 Lwt.return_ok
-                @@ Server.Handlers.handle_rpc_answer ~headers output error a
-            | `OkChunk v ->
-                (* When in self-serving mode, there is no point in
-                   constructing a sequence just to mash it all together, we
-                   ignore Chunk *)
-                Lwt.return_ok
-                @@ Server.Handlers.handle_rpc_answer
-                     ~headers
-                     output
-                     error
-                     (`Ok v)
-            | `OkStream o ->
-                let body = create_stream output o in
-                let encoding = Cohttp.Transfer.Chunked in
-                Lwt.return_ok
-                  ( Cohttp.Response.make ~status:`OK ~encoding ~headers (),
-                    Cohttp_lwt.Body.of_stream body ) )
+                @@ Server.Handlers.handle_rpc_answer_error ~headers error a )
         | Error err ->
             Lwt.return_ok @@ Server.Handlers.handle_error server.medias err
 

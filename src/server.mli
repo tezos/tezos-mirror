@@ -117,15 +117,18 @@ module Make_selfserver (Encoding : Resto.ENCODING) : sig
     val handle_rpc_answer :
       ?headers:Cohttp.Header.t ->
       ('o -> string) ->
+      [< `Created of string option | `Ok of 'o] ->
+      Cohttp_lwt_unix.Response.t * Cohttp_lwt.Body.t
+
+    val handle_rpc_answer_error :
+      ?headers:Cohttp.Header.t ->
       ('e -> Cohttp_lwt.Body.t * Cohttp.Transfer.encoding) ->
       [< `Conflict of 'e
-      | `Created of string option
       | `Error of 'e
       | `Forbidden of 'e
       | `Gone of 'e
       | `No_content
       | `Not_found of 'e
-      | `Ok of 'o
       | `Unauthorized of 'e ] ->
       Cohttp_lwt_unix.Response.t * Cohttp_lwt.Body.t
 

@@ -214,7 +214,7 @@ module Make_selfserver (Encoding : Resto.ENCODING) = struct
       | `Not_found ->
           (Response.make ~status:`Not_found (), Cohttp_lwt.Body.empty)
 
-    let handle_rpc_answer ?headers output error answer =
+    let handle_rpc_answer ?headers output answer =
       match answer with
       | `Ok o ->
           let body = output o in
@@ -231,6 +231,9 @@ module Make_selfserver (Encoding : Resto.ENCODING) = struct
                 Header.add headers "location" s
           in
           (Response.make ~status:`Created ~headers (), Cohttp_lwt.Body.empty)
+
+    let handle_rpc_answer_error ?headers error answer =
+      match answer with
       | `No_content ->
           (Response.make ~status:`No_content (), Cohttp_lwt.Body.empty)
       | `Unauthorized e ->
@@ -402,17 +405,9 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
                 Transfer.Fixed (Int64.of_int (String.length s)) )
         in
         match answer with
-        | ( `Ok _
-          | `Created _
-          | `No_content
-          | `Unauthorized _
-          | `Forbidden _
-          | `Gone _
-          | `Not_found _
-          | `Conflict _
-          | `Error _ ) as a ->
+        | (`Ok _ | `Created _) as a ->
             lwt_return_ok_response
-            @@ Handlers.handle_rpc_answer ~headers output error a
+            @@ Handlers.handle_rpc_answer ~headers output a
         | `OkChunk _ as a ->
             Lwt.return_ok
               (`Expert
@@ -422,7 +417,16 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
             let encoding = Transfer.Chunked in
             lwt_return_ok_response
               ( Response.make ~status:`OK ~encoding ~headers (),
-                Cohttp_lwt.Body.of_stream body ) )
+                Cohttp_lwt.Body.of_stream body )
+        | ( `No_content
+          | `Unauthorized _
+          | `Forbidden _
+          | `Gone _
+          | `Not_found _
+          | `Conflict _
+          | `Error _ ) as a ->
+            lwt_return_ok_response
+            @@ Handlers.handle_rpc_answer_error ~headers error a )
     | `HEAD ->
         (* TODO ??? *)
         Lwt.return_error `Not_implemented
