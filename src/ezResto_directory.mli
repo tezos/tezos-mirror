@@ -17,7 +17,7 @@ open EzResto
 module Answer : sig
   (** Return type for service handler
 
-      Note about the three distinct [300]-code constructor:
+      Note about the three distinct [200]-code constructor:
       - [`Ok] is for RPCs that return a value that the server should encode as
         one blob of data. This should be the most common answer for successful
         returns of simple, reasonably-sized values.
@@ -25,7 +25,7 @@ module Answer : sig
         as chunks: multiple blobs, the concatenation of which represents the
         data. This should be reserved for values that can be fairly large
         (typically over 4Kb, but this threshold may vary depending on your
-        setup). Data is then transfered using chunked transfer encoding.
+        setup). Data is then transferred using chunked transfer encoding.
       - [`OkStream] is for RPCs that return a stream of values, not all of which
         are determined at the time of call. *)
   type ('o, 'e) t =
@@ -44,7 +44,7 @@ module Answer : sig
   and 'a stream = {next : unit -> 'a option Lwt.t; shutdown : unit -> unit}
 end
 
-(** Possible error while registring services. *)
+(** Possible error while registering services. *)
 type step =
   | Static of string
   | Dynamic of Arg.descr
@@ -218,6 +218,6 @@ val register_dynamic_directory3 :
   ('a -> 'b -> 'c -> directory Lwt.t) ->
   directory
 
-(** Registring a description service. *)
+(** Registering a description service. *)
 val register_describe_directory_service :
   directory -> EzResto.description_service -> directory
