@@ -140,14 +140,12 @@ module Node = struct
 
     type entry = {kind : kind; name : M.step; node : Hash.t}
 
-    let s = Irmin.Type.(string_of `Int64)
+    (* Irmin 1.4 uses int8 to store filename lengths.
 
-    let pre_hash_v = Irmin.Type.(unstage (pre_hash s))
-
-    (* Irmin 1.4 uses int64 to store string lengths *)
-    let step_t =
-      let pre_hash = Irmin.Type.(stage @@ fun x -> pre_hash_v x) in
-      Irmin.Type.like M.step_t ~pre_hash
+       Irmin 2 use a variable-size encoding for strings; this is using int8
+       for strings of size stricly less than 128 (e.g. 2^7) which happen to
+       be the case for all filenames ever produced by Irmin 1.4. *)
+    let step_t = Irmin.Type.string
 
     let metadata_t =
       let some = "\255\000\000\000\000\000\000\000" in
