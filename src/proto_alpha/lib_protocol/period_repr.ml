@@ -23,18 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = Int64.t
-
-type period = t
-
-include (Compare.Int64 : Compare.S with type t := t)
-
-let encoding = Data_encoding.int64
-
-let rpc_arg = RPC_arg.int64
-
-let pp ppf v = Format.fprintf ppf "%Ld" v
-
 (* `Permanent *)
 type error += Malformed_period | Invalid_arg | Period_overflow
 
@@ -71,43 +59,106 @@ let () =
     (function Period_overflow -> Some () | _ -> None)
     (fun () -> Period_overflow)
 
-let of_seconds t =
-  if Compare.Int64.(t >= 0L) then ok t else error Malformed_period
+(* Internal module implementing natural numbers using int64. These are different
+   from usual (wrapping up) unsigned integers in that if one overflows the
+   representation bounds for int64 through [add] or [mul], a [None] value is
+   returned *)
+module Internal : sig
+  type t = private int64
 
-let to_seconds t = t
+  val create : int64 -> t option
+
+  val zero : t
+
+  val one : t
+
+  val mul : t -> t -> t option
+
+  val add : t -> t -> t option
+
+  val encoding : t Data_encoding.t
+
+  val rpc_arg : t RPC_arg.arg
+
+  val pp : Format.formatter -> t -> unit
+
+  include Compare.S with type t := t
+end = struct
+  type t = Int64.t
+
+  let encoding = Data_encoding.int64
+
+  let rpc_arg = RPC_arg.int64
+
+  let pp ppf v = Format.fprintf ppf "%Ld" v
+
+  include (Compare.Int64 : Compare.S with type t := t)
+
+  let zero = 0L
+
+  let one = 1L
+
+  let create t = if t >= zero then Some t else None
+
+  (* The create function is not used in the [mul] and [add] below to not add
+     extra Some | None pattern matching to handle since the overflow checks are
+     generic and apply as well to negative as positive integers .
+
+    To handle overflows, both [add] and [mul] return option types. [None] is
+     returned on detected overflow, [Some value] when everything went well. *)
+  let mul a b =
+    if a <> zero then
+      let res = Int64.mul a b in
+      if Int64.div res a <> b then None else Some res
+    else Some zero
+
+  let add a b =
+    let res = Int64.add a b in
+    if res < a || res < b then None else Some res
+end
+
+include Internal
+
+type period = Internal.t
+
+let to_seconds (t : Internal.t) = (t :> int64)
+
+let of_seconds secs =
+  match Internal.create secs with
+  | Some v ->
+      ok v
+  | None ->
+      error Malformed_period
 
 let of_seconds_exn t =
-  match of_seconds t with
-  | Ok t ->
+  match Internal.create t with
+  | Some t ->
       t
-  | _ ->
+  | None ->
       invalid_arg "Period.of_seconds_exn"
 
 let mult i p =
-  if Compare.Int32.(i < 0l) then error Invalid_arg
-  else
-    let i64 = Int64.of_int32 i in
-    let mul64 = Int64.mul i64 p in
-    (* check for overflow *)
-    if Compare.Int64.(i64 <> 0L) && Compare.Int64.(Int64.div mul64 i64 <> p)
-    then error Period_overflow
-    else ok mul64
+  match Internal.create (Int64.of_int32 i) with
+  | None ->
+      error Invalid_arg
+  | Some iper -> (
+    match Internal.mul iper p with
+    | None ->
+        error Period_overflow
+    | Some res ->
+        ok res )
 
 let add p1 p2 =
-  let add64 = Int64.add p1 p2 in
-  (* check for overflow *)
-  if Compare.Int64.(add64 < p1) || Compare.Int64.(add64 < p2) then
-    error Period_overflow
-  else ok (Int64.add p1 p2)
+  match Internal.add p1 p2 with
+  | None ->
+      error Period_overflow
+  | Some res ->
+      ok res
 
 let ( +? ) = add
 
-let zero = of_seconds_exn 0L
-
-let one_second = of_seconds_exn 1L
+let one_second = Internal.one
 
 let one_minute = of_seconds_exn 60L
 
 let one_hour = of_seconds_exn 3600L
-
-let compare = Compare.Int64.compare
