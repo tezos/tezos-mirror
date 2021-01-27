@@ -141,13 +141,6 @@ module Arith = struct
     | None ->
         fatally_saturated_z x
 
-  let safe_fp x =
-    match of_int_opt (Z.to_int x) with
-    | Some int ->
-        int
-    | None ->
-        Saturation_repr.saturated
-
   let sub_opt = Saturation_repr.sub_opt
 end
 
