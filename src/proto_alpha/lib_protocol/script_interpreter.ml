@@ -776,9 +776,7 @@ let rec step_bounded :
       (* The cost for this fold_left has been paid upfront *)
       let total_length =
         List.fold_left
-          (fun acc s ->
-            let len = S.of_int_opt (String.length s) |> S.saturate_if_undef in
-            S.add acc len)
+          (fun acc s -> S.add acc (S.safe_int (String.length s)))
           S.zero
           ss.elements
       in
@@ -805,9 +803,7 @@ let rec step_bounded :
       (* The cost for this fold_left has been paid upfront *)
       let total_length =
         List.fold_left
-          (fun acc s ->
-            let len = S.of_int_opt (Bytes.length s) |> S.saturate_if_undef in
-            S.add acc len)
+          (fun acc s -> S.add acc (S.safe_int (Bytes.length s)))
           S.zero
           ss.elements
       in
