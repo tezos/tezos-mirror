@@ -31,13 +31,35 @@ type integral_tag
 
 module S = Saturation_repr
 
+(*
+
+   When a saturated integer is sufficiently small (i.e. strictly less
+   than 2147483648), we can assign it the type [mul_safe S.t] to use
+   it within fast multiplications, named [S.scale_fast] and
+   [S.mul_fast].
+
+   The following function allows such type assignment but may raise an
+   exception if the assumption is wrong.  Therefore, [assert_mul_safe]
+   should only be used to define toplevel values, so that these
+   exceptions can only occur during startup.
+
+*)
+let assert_mul_safe x =
+  match S.mul_safe x with None -> assert false | Some x -> x
+
+(*
+
+   Similarly as [assert_mul_safe], [safe_const] must only be applied
+   to integer literals that are small enough for fast multiplications.
+
+*)
 let safe_const x =
-  match S.(Option.bind (of_int_opt x) mul_safe) with
+  match S.of_int_opt x with
   | None ->
-      (* because [safe_const] is always called with small enough constants. *)
+      (* Since [safe_const] is only applied to small integers: *)
       assert false
   | Some x ->
-      x
+      assert_mul_safe x
 
 let scaling_factor = safe_const 1000
 
@@ -168,17 +190,22 @@ let cost_encoding = S.z_encoding
 
 let pp_cost fmt z = S.pp fmt z
 
-let allocation_weight = S.(mul_fast scaling_factor (safe_const 2))
+let allocation_weight =
+  S.(mul_fast scaling_factor (safe_const 2)) |> assert_mul_safe
 
 let step_weight = scaling_factor
 
-let read_base_weight = S.(mul_fast scaling_factor (safe_const 100))
+let read_base_weight =
+  S.(mul_fast scaling_factor (safe_const 100)) |> assert_mul_safe
 
-let write_base_weight = S.(mul_fast scaling_factor (safe_const 160))
+let write_base_weight =
+  S.(mul_fast scaling_factor (safe_const 160)) |> assert_mul_safe
 
-let byte_read_weight = S.(mul_fast scaling_factor (safe_const 10))
+let byte_read_weight =
+  S.(mul_fast scaling_factor (safe_const 10)) |> assert_mul_safe
 
-let byte_written_weight = S.(mul_fast scaling_factor (safe_const 15))
+let byte_written_weight =
+  S.(mul_fast scaling_factor (safe_const 15)) |> assert_mul_safe
 
 let cost_to_milligas (cost : cost) : Arith.fp = cost
 
@@ -186,17 +213,9 @@ let raw_consume gas_counter cost =
   let gas = cost_to_milligas cost in
   Arith.sub_opt gas_counter gas
 
-let alloc_cost n = S.mul allocation_weight S.(add n (safe_const 1))
+let alloc_cost n = S.scale_fast allocation_weight S.(add n (safe_const 1))
 
-let alloc_bytes_cost n =
-  match S.of_int_opt ((n + 7) / 8) with
-  | None ->
-      (* Since [n] is supposed to be positive, the following case should
-         never occur. In case this assumption does not hold, we return
-         [saturated], which is always a safe cost. *)
-      S.saturated
-  | Some x ->
-      alloc_cost x
+let alloc_bytes_cost n = S.safe_int ((n + 7) / 8)
 
 let atomic_step_cost : 'a S.t -> cost = S.may_saturate
 
@@ -205,10 +224,10 @@ let step_cost n = S.mul step_weight n
 let free = S.zero |> S.may_saturate
 
 let read_bytes_cost n =
-  S.add read_base_weight (S.mul byte_read_weight (S.safe_int n))
+  S.add read_base_weight (S.scale_fast byte_read_weight (S.safe_int n))
 
 let write_bytes_cost n =
-  S.add write_base_weight (S.mul byte_written_weight (S.safe_int n))
+  S.add write_base_weight (S.scale_fast byte_written_weight (S.safe_int n))
 
 let ( +@ ) x y = S.add x y
 
