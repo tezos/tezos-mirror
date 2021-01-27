@@ -44,15 +44,27 @@ let wchunk oc (item, offset, length) =
     Lwt_io.write_from_string_exactly oc "\r\n" 0 2
     >>= fun () -> Lwt_io.flush oc
 
+let rec drain seq =
+  match seq () with
+  | Seq.Nil ->
+      Lwt.return_unit
+  | Seq.Cons (_, seq) ->
+      Lwt.pause () >>= fun () -> (drain [@ocaml.tailcall]) seq
+
 let rec wseq ic oc seq =
   match seq () with
   | Seq.Nil ->
       Lwt_io.write_from_string_exactly oc "0\r\n\r\n" 0 5
-      >>= fun () -> Lwt_io.flush oc >>= fun () -> Lwt_io.close ic
+      >>= fun () -> Lwt_io.flush oc
   | Seq.Cons (chunk, seq) ->
-      wchunk oc chunk
-      >>= fun () ->
-      Lwt.pause () >>= fun () -> (wseq [@ocaml.tailcall]) ic oc seq
+      Lwt.try_bind
+        (fun () -> wchunk oc chunk)
+        (fun () ->
+          Lwt.pause () >>= fun () -> (wseq [@ocaml.tailcall]) ic oc seq)
+        (fun exc -> drain seq >>= fun () -> raise exc)
+
+let wseq ic oc seq =
+  Lwt.finalize (fun () -> wseq ic oc seq) (fun () -> Lwt_io.close ic)
 
 module type LOGGING = sig
   val debug : ('a, Format.formatter, unit, unit) format4 -> 'a
