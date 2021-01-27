@@ -106,7 +106,8 @@ val shift_right : 'a t -> int -> 'a t
 val mul : _ t -> _ t -> may_saturate t
 
 (** [mul_safe x] returns a [mul_safe t] only if [x] does not trigger
-    overflows when multiplied with another [mul_safe t]. *)
+    overflows when multiplied with another [mul_safe t]. More precisely,
+    [x] is safe for fast multiplications if [x < 2147483648]. *)
 val mul_safe : _ t -> mul_safe t option
 
 (** [mul_fast x y] exploits the fact that [x] and [y] are known not to
