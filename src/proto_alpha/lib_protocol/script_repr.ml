@@ -100,9 +100,7 @@ let seq_node_size_nonrec args =
 
 module S = Saturation_repr
 
-let safe_int x = S.of_int_opt x |> S.saturate_if_undef
-
-let convert_pair (i1, i2) = (safe_int i1, safe_int i2)
+let convert_pair (i1, i2) = (S.safe_int i1, S.safe_int i2)
 
 let rec node_size node =
   let open Micheline in
@@ -136,7 +134,7 @@ let traversal_cost node =
 
 let cost_of_size (blocks, words) =
   let open Gas_limit_repr in
-  S.max (S.zero |> S.may_saturate) (S.sub blocks (safe_int 1))
+  S.max (S.zero |> S.may_saturate) (S.sub blocks (S.safe_int 1))
   *@ alloc_cost S.zero
   +@ alloc_cost words +@ step_cost blocks
 
@@ -260,7 +258,8 @@ and micheline_nodes_list subterms acc k =
 
 let micheline_nodes node = micheline_nodes node 0 (fun x -> x)
 
-let cost_MICHELINE_STRIP_LOCATIONS size = S.mul (safe_int size) (safe_int 100)
+let cost_MICHELINE_STRIP_LOCATIONS size =
+  S.mul (S.safe_int size) (S.safe_int 100)
 
 let strip_locations_cost node =
   let nodes = micheline_nodes node in

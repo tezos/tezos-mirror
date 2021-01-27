@@ -37,13 +37,6 @@ let safe_const x =
   | Some x ->
       x
 
-let safe_int x =
-  match Saturation_repr.(of_int_opt x) with
-  | None ->
-      Saturation_repr.saturated
-  | Some x ->
-      x
-
 let scaling_factor = safe_const 1000
 
 module Arith = struct
@@ -213,10 +206,12 @@ let step_cost n = S.mul step_weight n
 let free = S.zero |> S.may_saturate
 
 let read_bytes_cost n =
-  S.add read_base_weight (S.mul byte_read_weight (safe_int n))
+  S.add read_base_weight (S.mul byte_read_weight (Saturation_repr.safe_int n))
 
 let write_bytes_cost n =
-  S.add write_base_weight (S.mul byte_written_weight (safe_int n))
+  S.add
+    write_base_weight
+    (S.mul byte_written_weight (Saturation_repr.safe_int n))
 
 let ( +@ ) x y = S.add x y
 
