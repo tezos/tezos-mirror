@@ -35,7 +35,7 @@ let max_anon_ops_per_block = 132
 
 let max_proposals_per_delegate = 20
 
-let max_operation_data_length = 16 * 1024 (* 16kB *)
+let max_operation_data_length = 32 * 1024 (* 32kB *)
 
 type fixed = {
   proof_of_work_nonce_size : int;

@@ -230,3 +230,35 @@ class TestRememberContract:
             client.remember_contract(
                 contract_name, non_originated_contract_address, force=False
             )
+
+    # Test operation size.
+    def test_operation_size_originate_byte_contract(self, client: Client):
+        contract = path.join(CONTRACT_PATH, 'opcodes', 'bytes.tz')
+        client.remember('bytes', contract)
+        client.typecheck(contract)
+        client.originate(
+            'bytes', 1000, 'bootstrap1', contract, ['--burn-cap', '0.295']
+        )
+        client.bake('bootstrap1', BAKE_ARGS)
+
+    # Test that operations under 16KB can be injected in the node.
+    def test_operation_size_small(self, client: Client):
+        bytesArg = "0x" + ("00" * 6 * 1024) # 6 KB of data.
+
+        client.transfer(10, 'bootstrap1', 'bytes', ['--arg', bytesArg])
+        client.bake('bootstrap1', BAKE_ARGS)
+
+    # Test that operations between 16KB and 32KB can be injected in the node.
+    def test_operation_size_medium(self, client: Client):
+        bytesArg = "0x" + ("00" * 24 * 1024) # 24 KB of data.
+
+        client.transfer(10, 'bootstrap1', 'bytes', ['--arg', bytesArg])
+        client.bake('bootstrap1', BAKE_ARGS)
+
+    # Test that operations above 32KB fail to be injected.
+    def test_operation_size_oversized(self, client: Client):
+        bytesArg = "0x" + ("00" * 36 * 1024) # 36 KB of data.
+
+        with pytest.raises(Exception):
+            client.transfer(10, 'bootstrap1', 'bytes', ['--arg', bytesArg])
+         
