@@ -44,24 +44,24 @@ module S = Saturation_repr
    exceptions can only occur during startup.
 
 *)
-let assert_mul_safe x =
+let assert_mul_safe_exn x =
   match S.mul_safe x with None -> assert false | Some x -> x
 
 (*
 
-   Similarly as [assert_mul_safe], [safe_const] must only be applied
+   Similarly as [assert_mul_safe_exn], [safe_const_exn] must only be applied
    to integer literals that are small enough for fast multiplications.
 
 *)
-let safe_const x =
+let safe_const_exn x =
   match S.of_int_opt x with
   | None ->
-      (* Since [safe_const] is only applied to small integers: *)
+      (* Since [safe_const_exn] is only applied to small integers: *)
       assert false
   | Some x ->
-      assert_mul_safe x
+      assert_mul_safe_exn x
 
-let scaling_factor = safe_const 1000
+let scaling_factor = safe_const_exn 1000
 
 module Arith = struct
   type 'a t = S.may_saturate S.t
@@ -191,21 +191,21 @@ let cost_encoding = S.z_encoding
 let pp_cost fmt z = S.pp fmt z
 
 let allocation_weight =
-  S.(mul_fast scaling_factor (safe_const 2)) |> assert_mul_safe
+  S.(mul_fast scaling_factor (safe_const_exn 2)) |> assert_mul_safe_exn
 
 let step_weight = scaling_factor
 
 let read_base_weight =
-  S.(mul_fast scaling_factor (safe_const 100)) |> assert_mul_safe
+  S.(mul_fast scaling_factor (safe_const_exn 100)) |> assert_mul_safe_exn
 
 let write_base_weight =
-  S.(mul_fast scaling_factor (safe_const 160)) |> assert_mul_safe
+  S.(mul_fast scaling_factor (safe_const_exn 160)) |> assert_mul_safe_exn
 
 let byte_read_weight =
-  S.(mul_fast scaling_factor (safe_const 10)) |> assert_mul_safe
+  S.(mul_fast scaling_factor (safe_const_exn 10)) |> assert_mul_safe_exn
 
 let byte_written_weight =
-  S.(mul_fast scaling_factor (safe_const 15)) |> assert_mul_safe
+  S.(mul_fast scaling_factor (safe_const_exn 15)) |> assert_mul_safe_exn
 
 let cost_to_milligas (cost : cost) : Arith.fp = cost
 
@@ -213,7 +213,7 @@ let raw_consume gas_counter cost =
   let gas = cost_to_milligas cost in
   Arith.sub_opt gas_counter gas
 
-let alloc_cost n = S.scale_fast allocation_weight S.(add n (safe_const 1))
+let alloc_cost n = S.scale_fast allocation_weight S.(add n (safe_const_exn 1))
 
 let alloc_bytes_cost n = S.safe_int ((n + 7) / 8)
 
@@ -233,4 +233,4 @@ let ( +@ ) x y = S.add x y
 
 let ( *@ ) x y = S.mul x y
 
-let alloc_mbytes_cost n = alloc_cost (safe_const 12) +@ alloc_bytes_cost n
+let alloc_mbytes_cost n = alloc_cost (safe_const_exn 12) +@ alloc_bytes_cost n
