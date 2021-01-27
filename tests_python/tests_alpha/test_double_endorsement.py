@@ -79,15 +79,12 @@ class TestDoubleEndorsement:
         client = sandbox.client(1)
         head_hash = client.get_head()['hash']
 
-        def transform_endorsement(end):
-            return {
-                'branch': end['branch'],
-                'operations': end['contents'][0],
-                'signature': end['signature'],
-            }
+        # Extract the `Endorsement` ops and the slot out of the
+        # `Endorsement_with_slot` ops
+        endorsement1 = session['endorsement1']['contents'][0]['endorsement']
+        endorsement2 = session['endorsement2']['contents'][0]['endorsement']
+        slot = session['endorsement1']['contents'][0]['slot']
 
-        endorsement1 = transform_endorsement(session['endorsement1'])
-        endorsement2 = transform_endorsement(session['endorsement2'])
         operation = {
             'branch': head_hash,
             'contents': [
@@ -95,6 +92,7 @@ class TestDoubleEndorsement:
                     'kind': 'double_endorsement_evidence',
                     'op1': endorsement1,
                     'op2': endorsement2,
+                    'slot': slot,
                 }
             ],
         }
