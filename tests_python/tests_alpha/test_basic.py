@@ -243,22 +243,126 @@ class TestRememberContract:
 
     # Test that operations under 16KB can be injected in the node.
     def test_operation_size_small(self, client: Client):
-        bytesArg = "0x" + ("00" * 6 * 1024) # 6 KB of data.
+        bytes_arg = "0x" + ("00" * 6 * 1024)  # 6 KB of data.
 
-        client.transfer(10, 'bootstrap1', 'bytes', ['--arg', bytesArg])
+        client.transfer(10, 'bootstrap1', 'bytes', ['--arg', bytes_arg])
         client.bake('bootstrap1', BAKE_ARGS)
 
     # Test that operations between 16KB and 32KB can be injected in the node.
     def test_operation_size_medium(self, client: Client):
-        bytesArg = "0x" + ("00" * 24 * 1024) # 24 KB of data.
+        bytes_arg = "0x" + ("00" * 24 * 1024)  # 24 KB of data.
 
-        client.transfer(10, 'bootstrap1', 'bytes', ['--arg', bytesArg])
+        client.transfer(10, 'bootstrap1', 'bytes', ['--arg', bytes_arg])
         client.bake('bootstrap1', BAKE_ARGS)
 
     # Test that operations above 32KB fail to be injected.
     def test_operation_size_oversized(self, client: Client):
-        bytesArg = "0x" + ("00" * 36 * 1024) # 36 KB of data.
+        bytes_arg = "0x" + ("00" * 36 * 1024)  # 36 KB of data.
 
-        with pytest.raises(Exception):
-            client.transfer(10, 'bootstrap1', 'bytes', ['--arg', bytesArg])
-         
+        expected_error = "Oversized operation"
+        with assert_run_failure(expected_error):
+            client.transfer(10, 'bootstrap1', 'bytes', ['--arg', bytes_arg])
+
+    # Test operation size with various data types.
+    def test_operation_size_originate_munch_contract(self, client: Client):
+        contract = path.join(CONTRACT_PATH, 'opcodes', 'munch.tz')
+        client.remember('munch', contract)
+        client.typecheck(contract)
+        client.originate(
+            'munch', 1000, 'bootstrap1', contract, ['--burn-cap', '0.295']
+        )
+        client.bake('bootstrap1', BAKE_ARGS)
+
+    # Test that a large operation under 32KB can be injected in the node
+    # (variant using a lambda with deep nesting).
+    def test_operation_size_with_lambda_ok(self, client: Client):
+        # Each pair of braces is encoded on 5 bytes so this takes
+        # 5 * 6 * 1024 = 30 KB < 32KB
+        big_arg = ("{" * 6 * 1024) + ("}" * 6 * 1024)
+
+        client.transfer(
+            10,
+            'bootstrap1',
+            'munch',
+            ['--arg', big_arg, "--entrypoint", "lambda"],
+        )
+        client.bake('bootstrap1', BAKE_ARGS)
+
+    # Test that a large operation over 32KB cannot be injected in the node,
+    # and the error is not a stack overflow
+    # (variant using a lambda with deep nesting).
+    def test_operation_size_with_lambda_fail(self, client: Client):
+        # Each pair of braces is encoded on 5 bytes so this takes
+        # 5 * 7 * 1024 = 35 KB > 32KB
+        big_arg = ("{" * 7 * 1024) + ("}" * 7 * 1024)
+
+        expected_error = "Oversized operation"
+        with assert_run_failure(expected_error):
+            client.transfer(
+                10,
+                'bootstrap1',
+                'munch',
+                ['--arg', big_arg, "--entrypoint", "lambda"],
+            )
+
+    # Test that a large operation under 32KB can be injected in the node
+    # (variant using a long list).
+    def test_operation_size_with_list_ok(self, client: Client):
+        # Each element in the list takes 2 bytes so about 30KB in total
+        big_arg = "{" + ("0; " * 15 * 1024) + "}"
+
+        client.transfer(
+            10,
+            'bootstrap1',
+            'munch',
+            ['--arg', big_arg, "--entrypoint", "list_nat"],
+        )
+        client.bake('bootstrap1', BAKE_ARGS)
+
+    # Test that a large operation over 32KB cannot be injected in the node,
+    # and the error is not a stack overflow
+    # (variant using a long list).
+    def test_operation_size_with_list_fail(self, client: Client):
+        # Each element in the list takes 2 bytes so about 34KB in total
+        big_arg = "{" + ("0; " * 17 * 1024) + "}"
+
+        expected_error = "Oversized operation"
+        with assert_run_failure(expected_error):
+            client.transfer(
+                10,
+                'bootstrap1',
+                'munch',
+                ['--arg', big_arg, "--entrypoint", "list_nat"],
+            )
+
+    # Test that a large operation under 32KB can be injected in the node
+    # (variant using a big nat).
+    def test_operation_size_with_nat_ok(self, client: Client):
+        # The encoding for nat uses a byte to encode 7 bits of the number
+        # so the size of 2 ** (7 * n) is about n bytes
+        big_arg = 2 ** (7 * 30 * 1024)
+
+        client.transfer(
+            10,
+            'bootstrap1',
+            'munch',
+            ['--arg', f"{big_arg}", "--entrypoint", "nat"],
+        )
+        client.bake('bootstrap1', BAKE_ARGS)
+
+    # Test that a large operation over 32KB cannot be injected in the node,
+    # and the error is not a stack overflow
+    # (variant using a big nat).
+    def test_operation_size_with_nat_fail(self, client: Client):
+        # The encoding for nat uses a byte to encode 7 bits of the number
+        # so the size of 2 ** (7 * n) is about n bytes
+        big_arg = 2 ** (7 * 33 * 1024)
+
+        expected_error = "Oversized operation"
+        with assert_run_failure(expected_error):
+            client.transfer(
+                10,
+                'bootstrap1',
+                'munch',
+                ['--arg', f"{big_arg}", "--entrypoint", "nat"],
+            )
