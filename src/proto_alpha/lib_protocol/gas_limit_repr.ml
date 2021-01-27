@@ -221,7 +221,7 @@ let atomic_step_cost : 'a S.t -> cost = S.may_saturate
 
 let step_cost n = S.scale_fast step_weight n
 
-let free = S.zero |> S.may_saturate
+let free = S.zero
 
 let read_bytes_cost n =
   S.add read_base_weight (S.scale_fast byte_read_weight (S.safe_int n))

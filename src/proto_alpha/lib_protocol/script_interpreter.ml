@@ -779,7 +779,7 @@ let rec step_bounded :
           (fun acc s ->
             let len = S.of_int_opt (String.length s) |> S.saturate_if_undef in
             S.add acc len)
-          (S.zero |> S.may_saturate)
+          S.zero
           ss.elements
       in
       Gas.consume ctxt (Interp_costs.concat_string total_length)
@@ -808,7 +808,7 @@ let rec step_bounded :
           (fun acc s ->
             let len = S.of_int_opt (Bytes.length s) |> S.saturate_if_undef in
             S.add acc len)
-          (S.zero |> S.may_saturate)
+          S.zero
           ss.elements
       in
       Gas.consume ctxt (Interp_costs.concat_string total_length)

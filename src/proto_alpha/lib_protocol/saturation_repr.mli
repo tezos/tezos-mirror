@@ -70,7 +70,7 @@ val may_saturate : _ t -> may_saturate t
 val to_int : 'a t -> int
 
 (** 0 *)
-val zero : mul_safe t
+val zero : _ t
 
 (** 2^62 - 1 *)
 val saturated : may_saturate t
