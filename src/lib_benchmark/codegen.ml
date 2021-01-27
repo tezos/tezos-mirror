@@ -35,8 +35,13 @@ type solution = float Free_variable.Map.t
 
 let load_solution (fn : string) : solution =
   let infile = open_in fn in
-  let res = Marshal.from_channel infile in
-  close_in infile ; res
+  try
+    let res = Marshal.from_channel infile in
+    close_in infile ; res
+  with exn ->
+    close_in infile ;
+    Format.eprintf "Codegen.load_solution: could not load %s@." fn ;
+    raise exn
 
 let save_solution (s : solution) (fn : string) =
   let outfile = open_out fn in
