@@ -406,25 +406,18 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
               | Ok body ->
                   s.handler query body >>= Lwt.return_ok ) )
         >>=? fun answer ->
-        let output = output_media_type.construct s.types.output
-        and output_seq = output_media_type.construct_seq s.types.output
-        and error = function
-          | None ->
-              (Cohttp_lwt.Body.empty, Transfer.Fixed 0L)
-          | Some e ->
-              let s = output_media_type.construct s.types.error e in
-              ( Cohttp_lwt.Body.of_string s,
-                Transfer.Fixed (Int64.of_int (String.length s)) )
-        in
         match answer with
         | (`Ok _ | `Created _) as a ->
+            let output = output_media_type.construct s.types.output in
             lwt_return_ok_response
             @@ Handlers.handle_rpc_answer ~headers output a
         | `OkChunk _ as a ->
+            let output_seq = output_media_type.construct_seq s.types.output in
             Lwt.return_ok
               (`Expert
                 (Handlers.handle_rpc_answer_chunk ~headers output_seq a))
         | `OkStream o ->
+            let output = output_media_type.construct s.types.output in
             let body = create_stream server con output o in
             let encoding = Transfer.Chunked in
             lwt_return_ok_response
@@ -437,6 +430,14 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
           | `Not_found _
           | `Conflict _
           | `Error _ ) as a ->
+            let error = function
+              | None ->
+                  (Cohttp_lwt.Body.empty, Transfer.Fixed 0L)
+              | Some e ->
+                  let s = output_media_type.construct s.types.error e in
+                  ( Cohttp_lwt.Body.of_string s,
+                    Transfer.Fixed (Int64.of_int (String.length s)) )
+            in
             lwt_return_ok_response
             @@ Handlers.handle_rpc_answer_error ~headers error a )
     | `HEAD ->
@@ -507,7 +508,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
              | Not_found ->
                  let status = `Not_found in
                  let body = Cohttp_lwt.Body.empty in
-                 Lwt.return (`Response (Response.make ~status (), body))
+                 lwt_return_response (Response.make ~status (), body)
              | exn ->
                  let headers = Header.init () in
                  let headers =
@@ -517,8 +518,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
                  let body =
                    Cohttp_lwt.Body.of_string (Printexc.to_string exn)
                  in
-                 Lwt.return
-                   (`Response (Response.make ~status ~headers (), body)))
+                 lwt_return_response (Response.make ~status ~headers (), body))
        in
        Cohttp_lwt_unix.Server.create
          ~stop
