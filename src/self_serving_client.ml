@@ -94,7 +94,7 @@ module Make (Encoding : Resto.ENCODING) = struct
                     Cohttp.Transfer.Fixed (Int64.of_int (String.length s)) )
             in
             match answer with
-            | (`Ok _ | `Created _) as a ->
+            | (`Ok _ | `No_content | `Created _) as a ->
                 Lwt.return_ok
                 @@ Server.Handlers.handle_rpc_answer ~headers output a
             | `OkChunk v ->
@@ -109,8 +109,7 @@ module Make (Encoding : Resto.ENCODING) = struct
                 Lwt.return_ok
                   ( Cohttp.Response.make ~status:`OK ~encoding ~headers (),
                     Cohttp_lwt.Body.of_stream body )
-            | ( `No_content
-              | `Unauthorized _
+            | ( `Unauthorized _
               | `Forbidden _
               | `Gone _
               | `Not_found _

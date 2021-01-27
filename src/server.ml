@@ -233,6 +233,8 @@ module Make_selfserver (Encoding : Resto.ENCODING) = struct
           let encoding = Transfer.Fixed (Int64.of_int (String.length body)) in
           ( Response.make ~status:`OK ~encoding ?headers (),
             Cohttp_lwt.Body.of_string body )
+      | `No_content ->
+          (Response.make ~status:`No_content (), Cohttp_lwt.Body.empty)
       | `Created s ->
           let headers = Header.init () in
           let headers =
@@ -246,8 +248,6 @@ module Make_selfserver (Encoding : Resto.ENCODING) = struct
 
     let handle_rpc_answer_error ?headers error answer =
       match answer with
-      | `No_content ->
-          (Response.make ~status:`No_content (), Cohttp_lwt.Body.empty)
       | `Unauthorized e ->
           let (body, encoding) = error e in
           let status = `Unauthorized in
@@ -407,7 +407,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
                   s.handler query body >>= Lwt.return_ok ) )
         >>=? fun answer ->
         match answer with
-        | (`Ok _ | `Created _) as a ->
+        | (`Ok _ | `No_content | `Created _) as a ->
             let output = output_media_type.construct s.types.output in
             lwt_return_ok_response
             @@ Handlers.handle_rpc_answer ~headers output a
@@ -423,8 +423,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
             lwt_return_ok_response
               ( Response.make ~status:`OK ~encoding ~headers (),
                 Cohttp_lwt.Body.of_stream body )
-        | ( `No_content
-          | `Unauthorized _
+        | ( `Unauthorized _
           | `Forbidden _
           | `Gone _
           | `Not_found _

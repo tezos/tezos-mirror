@@ -118,7 +118,7 @@ module Make_selfserver (Encoding : Resto.ENCODING) : sig
     val handle_rpc_answer :
       ?headers:Cohttp.Header.t ->
       ('o -> string) ->
-      [< `Created of string option | `Ok of 'o] ->
+      [< `Created of string option | `No_content | `Ok of 'o] ->
       Cohttp_lwt_unix.Response.t * Cohttp_lwt.Body.t
 
     val handle_rpc_answer_error :
@@ -128,7 +128,6 @@ module Make_selfserver (Encoding : Resto.ENCODING) : sig
       | `Error of 'e
       | `Forbidden of 'e
       | `Gone of 'e
-      | `No_content
       | `Not_found of 'e
       | `Unauthorized of 'e ] ->
       Cohttp_lwt_unix.Response.t * Cohttp_lwt.Body.t
