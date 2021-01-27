@@ -63,6 +63,8 @@ let sub c i =
   let r = Int32.sub c (Int32.of_int i) in
   if Compare.Int32.(r < 0l) then None else Some r
 
+let diff = Int32.sub
+
 let to_int32 i = i
 
 let of_int32_exn l =

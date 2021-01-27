@@ -33,15 +33,12 @@ let from_raw c ?offset l =
     | Some o ->
         Raw_level_repr.(of_int32_exn (Int32.add (to_int32 l) o))
   in
-  let constants = Raw_context.constants c in
-  let first_level = Raw_context.first_level c in
-  Level_repr.level_from_raw
-    ~first_level
-    ~blocks_per_cycle:constants.Constants_repr.blocks_per_cycle
-    ~blocks_per_commitment:constants.Constants_repr.blocks_per_commitment
-    l
+  let cycle_eras = Raw_context.cycle_eras c in
+  Level_repr.level_from_raw ~cycle_eras l
 
-let root c = Level_repr.root_level (Raw_context.first_level c)
+let root c =
+  let first_cycle_era = List.hd (Raw_context.cycle_eras c) in
+  Level_repr.root_level first_cycle_era.first_level
 
 let succ c (l : Level_repr.t) = from_raw c (Raw_level_repr.succ l.level)
 
@@ -62,17 +59,37 @@ let previous ctxt =
   | Some p ->
       p
 
-let first_level_in_cycle ctxt c =
-  let constants = Raw_context.constants ctxt in
-  let first_level = Raw_context.first_level ctxt in
-  from_raw
-    ctxt
-    (Raw_level_repr.of_int32_exn
-       (Int32.add
-          (Raw_level_repr.to_int32 first_level)
-          (Int32.mul
-             constants.Constants_repr.blocks_per_cycle
-             (Cycle_repr.to_int32 c))))
+let first_level_in_cycle ctxt cycle =
+  let cycle_eras = Raw_context.cycle_eras ctxt in
+  let first_level_in_cycle' first_cycle_in_era cycle_era =
+    let cycle_position = Cycle_repr.diff cycle first_cycle_in_era in
+    let first_level_offset =
+      Int32.mul cycle_era.blocks_per_cycle cycle_position
+    in
+    from_raw ctxt ~offset:first_level_offset cycle_era.first_level
+  in
+  let rec aux first_cycle_in_era = function
+    | first_cycle_era :: (second_cycle_era :: _ as tail) ->
+        let number_of_cycles_in_era =
+          Int32.div
+            (Raw_level_repr.diff
+               second_cycle_era.first_level
+               first_cycle_era.first_level)
+            first_cycle_era.blocks_per_cycle
+          |> Int32.to_int
+        in
+        let next_first_cycle_in_era =
+          Cycle_repr.add first_cycle_in_era number_of_cycles_in_era
+        in
+        if Compare.Int32.(Cycle_repr.diff cycle next_first_cycle_in_era >= 0l)
+        then aux next_first_cycle_in_era tail
+        else first_level_in_cycle' first_cycle_in_era first_cycle_era
+    | [cycle_era] ->
+        first_level_in_cycle' first_cycle_in_era cycle_era
+    | [] ->
+        assert false
+  in
+  aux Cycle_repr.root cycle_eras
 
 let last_level_in_cycle ctxt c =
   match pred ctxt (first_level_in_cycle ctxt (Cycle_repr.succ c)) with

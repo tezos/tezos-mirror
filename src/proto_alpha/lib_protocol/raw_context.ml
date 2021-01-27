@@ -81,7 +81,7 @@ type gas_counter_status =
 type back = {
   context : Context.t;
   constants : Constants_repr.parametric;
-  first_level : Raw_level_repr.t;
+  cycle_eras : Level_repr.cycle_era list;
   level : Level_repr.t;
   predecessor_timestamp : Time.t;
   timestamp : Time.t;
@@ -133,7 +133,7 @@ let[@inline] current_timestamp ctxt = ctxt.back.timestamp
 
 let[@inline] current_fitness ctxt = ctxt.back.fitness
 
-let[@inline] first_level ctxt = ctxt.back.first_level
+let[@inline] cycle_eras ctxt = ctxt.back.cycle_eras
 
 let[@inline] constants ctxt = ctxt.back.constants
 
@@ -587,12 +587,16 @@ let version_value = "alpha_current"
 
 let version = "v1"
 
+(* DEPRECATED: remove after activation of G *)
 let first_level_key = [version; "first_level"]
+
+let cycle_eras_key = [version; "cycle_eras"]
 
 let constants_key = [version; "constants"]
 
 let protocol_param_key = ["protocol_parameters"]
 
+(* DEPRECATED: remove after activation of G *)
 let get_first_level ctxt =
   Context.find ctxt first_level_key
   >|= function
@@ -605,11 +609,56 @@ let get_first_level ctxt =
     | Some level ->
         ok level )
 
-let set_first_level ctxt level =
-  let bytes =
-    Data_encoding.Binary.to_bytes_exn Raw_level_repr.encoding level
+let get_cycle_eras ctxt =
+  Context.find ctxt cycle_eras_key
+  >|= function
+  | None ->
+      storage_error (Missing_key (cycle_eras_key, Get))
+  | Some bytes -> (
+    match
+      Data_encoding.Binary.of_bytes
+        (Data_encoding.list Level_repr.cycle_era_encoding)
+        bytes
+    with
+    | None ->
+        storage_error (Corrupted_data cycle_eras_key)
+    | Some cycle_eras ->
+        ok cycle_eras )
+
+type error += Failed_to_set_cycle_eras
+
+let () =
+  register_error_kind
+    `Temporary
+    ~id:"context.failed_to_set_cycle_eras"
+    ~title:"Failed to set cycle eras"
+    ~description:"The cycles eras are not valid: non-increase first levels."
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "The cycles eras are not valid: non-increase first levels.")
+    Data_encoding.empty
+    (function Failed_to_set_cycle_eras -> Some () | _ -> None)
+    (fun () -> Failed_to_set_cycle_eras)
+
+let check_increasing_first_levels cycle_eras =
+  let first_levels =
+    List.map (fun era -> era.Level_repr.first_level) cycle_eras
   in
-  Context.add ctxt first_level_key bytes >|= ok
+  let sorted = List.sort Raw_level_repr.compare first_levels in
+  let module CompareList = Compare.List (Raw_level_repr) in
+  if CompareList.(first_levels = sorted) then return_unit
+  else fail Failed_to_set_cycle_eras
+
+let set_cycle_eras ctxt cycle_eras =
+  check_increasing_first_levels cycle_eras
+  >>=? fun () ->
+  let bytes =
+    Data_encoding.Binary.to_bytes_exn
+      (Data_encoding.list Level_repr.cycle_era_encoding)
+      cycle_eras
+  in
+  Context.add ctxt cycle_eras_key bytes >|= ok
 
 type error += Failed_to_parse_parameter of bytes
 
@@ -710,6 +759,19 @@ let check_inited ctxt =
       if Compare.String.(s = version_value) then ok_unit
       else storage_error (Incompatible_protocol_version s)
 
+let check_cycle_eras (cycle_eras : Level_repr.cycle_era list)
+    (constants : Constants_repr.parametric) =
+  match List.rev cycle_eras with
+  | last_era :: _ ->
+      assert (
+        Compare.Int32.(last_era.blocks_per_cycle = constants.blocks_per_cycle)
+      ) ;
+      assert (
+        Compare.Int32.(
+          last_era.blocks_per_commitment = constants.blocks_per_commitment) )
+  | [] ->
+      assert false
+
 let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
   Raw_level_repr.of_int32 level
   >>?= fun level ->
@@ -719,15 +781,10 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
   >>=? fun () ->
   get_constants ctxt
   >>=? fun constants ->
-  get_first_level ctxt
-  >|=? fun first_level ->
-  let level =
-    Level_repr.level_from_raw
-      ~first_level
-      ~blocks_per_cycle:constants.Constants_repr.blocks_per_cycle
-      ~blocks_per_commitment:constants.Constants_repr.blocks_per_commitment
-      level
-  in
+  get_cycle_eras ctxt
+  >|=? fun cycle_eras ->
+  check_cycle_eras cycle_eras constants ;
+  let level = Level_repr.level_from_raw ~cycle_eras level in
   {
     gas_counter =
       Gas_limit_repr.Arith.fp constants.Constants_repr.hard_gas_limit_per_block;
@@ -739,7 +796,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
         predecessor_timestamp;
         timestamp;
         fitness;
-        first_level;
+        cycle_eras;
         allowed_endorsements = Signature.Public_key_hash.Map.empty;
         included_endorsements = 0;
         fees = Tez_repr.zero;
@@ -813,7 +870,15 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
   | Genesis param ->
       Raw_level_repr.of_int32 level
       >>?= fun first_level ->
-      set_first_level ctxt first_level
+      let cycle_era =
+        Level_repr.
+          {
+            first_level;
+            blocks_per_cycle = param.constants.blocks_per_cycle;
+            blocks_per_commitment = param.constants.blocks_per_commitment;
+          }
+      in
+      set_cycle_eras ctxt [cycle_era]
       >>=? fun ctxt -> add_constants ctxt param.constants >|= ok
   | Edo_008 ->
       get_previous_protocol_constants ctxt
