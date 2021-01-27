@@ -219,7 +219,7 @@ let alloc_bytes_cost n = S.safe_int ((n + 7) / 8)
 
 let atomic_step_cost : 'a S.t -> cost = S.may_saturate
 
-let step_cost n = S.mul step_weight n
+let step_cost n = S.scale_fast step_weight n
 
 let free = S.zero |> S.may_saturate
 
