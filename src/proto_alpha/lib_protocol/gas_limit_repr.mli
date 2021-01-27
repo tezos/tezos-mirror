@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Saturation_repr
-
 module Arith : Fixed_point_repr.Full
 
 type t = Unaccounted | Limited of {remaining : Arith.fp}
@@ -33,7 +31,7 @@ val encoding : t Data_encoding.encoding
 
 val pp : Format.formatter -> t -> unit
 
-type cost = may_saturate Saturation_repr.t
+type cost = Saturation_repr.may_saturate Saturation_repr.t
 
 val cost_encoding : cost Data_encoding.encoding
 
