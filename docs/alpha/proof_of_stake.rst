@@ -262,8 +262,8 @@ Endorsements
 ~~~~~~~~~~~~
 
 To each level, we associate a list of ``ENDORSERS_PER_BLOCK`` =
-32 *endorsers*. Endorsers are drawn similarly as bakers, by randomly
-selecting 32 active rolls with replacement.
+256 *endorsers*. Endorsers are drawn similarly as bakers, by randomly
+selecting 256 active rolls with replacement.
 
 Each endorser verifies the last block that was baked, say at the level
 ``n``, and emits an endorsement operation. The endorsement operations
