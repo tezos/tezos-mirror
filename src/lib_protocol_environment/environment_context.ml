@@ -25,37 +25,7 @@
 
 open Error_monad
 
-module type CONTEXT = sig
-  type t
-
-  type key = string list
-
-  type value = Bytes.t
-
-  val mem : t -> key -> bool Lwt.t
-
-  val dir_mem : t -> key -> bool Lwt.t
-
-  val get : t -> key -> value option Lwt.t
-
-  val set : t -> key -> value -> t Lwt.t
-
-  val copy : t -> from:key -> to_:key -> t option Lwt.t
-
-  val remove_rec : t -> key -> t Lwt.t
-
-  type key_or_dir = [`Key of key | `Dir of key]
-
-  val fold :
-    t -> key -> init:'a -> f:(key_or_dir -> 'a -> 'a Lwt.t) -> 'a Lwt.t
-
-  val set_protocol : t -> Protocol_hash.t -> t Lwt.t
-
-  val get_protocol : t -> Protocol_hash.t Lwt.t
-
-  val fork_test_chain :
-    t -> protocol:Protocol_hash.t -> expiration:Time.Protocol.t -> t Lwt.t
-end
+module type CONTEXT = Environment_context_intf.S
 
 module Context = struct
   type key = string list
