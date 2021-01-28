@@ -279,22 +279,34 @@ endorsement slots covered by the contained endorsement
 operations. (In the code base, the number of filled endorsement slots
 is called the block's endorsing power.)
 
-Minimal block delays
-~~~~~~~~~~~~~~~~~~~~
+Minimal block delay formula
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A block is valid only if its timestamp has a minimal delay with
-respect to the previous block’s timestamp. The minimal delay is given
-by the following expression: ``TIME_BETWEEN_BLOCKS[0] +
-TIME_BETWEEN_BLOCKS[1] * p +`` ``DELAY_PER_MISSING_ENDORSEMENT * MAX
-(0, INITIAL_ENDORSERS - e)`` where ``TIME_BETWEEN_BLOCKS[0]`` = 60
+A block is valid only if its timestamp has a minimal delay with respect to the
+previous block’s timestamp. For a block with priority ``p`` and containing ``e``
+endorsements, the minimal delay is given by the following formula:
+
+``if p = 0 and e >= 3*ENDORSERS_PER_BLOCK/5``
+``then MINIMAL_BLOCK_DELAY``
+``else TIME_BETWEEN_BLOCKS[0] + TIME_BETWEEN_BLOCKS[1] * p``
+``+ DELAY_PER_MISSING_ENDORSEMENT * MAX
+(0, INITIAL_ENDORSERS - e)``
+
+where ``MINIMAL_BLOCK_DELAY`` = 30 seconds, ``TIME_BETWEEN_BLOCKS[0]`` = 60
 seconds, ``TIME_BETWEEN_BLOCKS[1]`` = 40 seconds,
-``DELAY_PER_MISSING_ENDORSEMENT`` = 8 seconds, ``INITIAL_ENDORSERS`` =
-24, ``p`` is the block's priority at which the block was baked, and
-``e`` is the number of endorsements the block contains. That is, the
-higher the priority and the fewer endorsements a block carries the
-longer it takes before it can be considered valid. However, if the
-block contains more than ``INITIAL_ENDORSERS`` then there is no time
-penalty.
+``DELAY_PER_MISSING_ENDORSEMENT`` = 4 seconds, and ``INITIAL_ENDORSERS`` =
+192.
+
+The formula says that:
+
+-  if the block is baked at priority 0 and it contains at least 60% of
+   the endorsements (namely, at least 153 endorsements) then the
+   minimal delay is 30 seconds;
+-  otherwise, the higher the priority and the fewer endorsements a
+   block carries with respect to the 192 endorsements threshold, the
+   longer it takes before it can be considered valid, where the delay
+   of 60 seconds is incremented by 40 seconds with each missed priority
+   and with 4 seconds with each missed endorsement.
 
 Rewards
 ~~~~~~~
@@ -351,7 +363,7 @@ Inflation
 Inflation from block rewards and endorsement reward is at most
 ``ENDORSERS_PER_BLOCK`` \* (``ENDORSEMENT_REWARD[0]`` +
 ``BAKING_REWARD_PER_ENDORSEMENT[0]``) =
-80 ꜩ. This means at most 5.51% annual inflation.
+40 ꜩ. This means at most 5.51% annual inflation.
 
 Random seed
 ~~~~~~~~~~~
