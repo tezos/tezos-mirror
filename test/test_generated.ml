@@ -262,6 +262,21 @@ let map_string s : testable =
     let pp = Crowbar.pp_string
   end )
 
+let map_string_with_check_size s slack : testable =
+  ( module struct
+    type t = string
+
+    let v = s
+
+    let ding =
+      let open Data_encoding in
+      check_size
+        (String.length s + Data_encoding__Binary_size.uint30 + slack)
+        string
+
+    let pp = Crowbar.pp_string
+  end )
+
 let map_bytes s : testable =
   ( module struct
     type t = Bytes.t
@@ -908,6 +923,140 @@ let map_union (t1 : testable) (t2 : testable) b : testable =
           Crowbar.pp ppf "@[<hv 1>(B %a)@]" T2.pp v2
   end )
 
+let map_union_more (t1 : testable) (t2 : testable) c : testable =
+  let module T1 = (val t1) in
+  let module T2 = (val t2) in
+  ( module struct
+    type t = A of T1.t | B of T2.t | C | D of (T1.t * T2.t * unit)
+
+    let a_ding =
+      let open Data_encoding in
+      obj1 (req "A" T1.ding)
+
+    let a_tag = Data_encoding.Tag 22
+
+    let b_ding =
+      let open Data_encoding in
+      obj1 (req "B" T2.ding)
+
+    let b_tag = Data_encoding.Tag 23
+
+    let c_ding = Data_encoding.constant "THIS"
+
+    let c_tag = Data_encoding.Tag 60
+
+    let d_ding =
+      let open Data_encoding in
+      obj2 (req "left" (dyn_if_not T2.ding)) (req "right" T1.ding)
+
+    let d_tag = Data_encoding.Tag 4
+
+    let ding =
+      let open Data_encoding in
+      union
+        [
+          case
+            ~title:"A"
+            a_tag
+            a_ding
+            (function A v -> Some v | _ -> None)
+            (fun v -> A v);
+          case
+            ~title:"B"
+            b_tag
+            b_ding
+            (function B v -> Some v | _ -> None)
+            (fun v -> B v);
+          case
+            ~title:"C"
+            c_tag
+            c_ding
+            (function C -> Some () | _ -> None)
+            (fun () -> C);
+          case
+            ~title:"D"
+            d_tag
+            d_ding
+            (function D (v1, v2, ()) -> Some (v2, v1) | _ -> None)
+            (fun (v2, v1) -> D (v1, v2, ()));
+        ]
+
+    let v =
+      match c with
+      | 0 ->
+          A T1.v
+      | 1 ->
+          B T2.v
+      | 2 ->
+          C
+      | 3 ->
+          D (T1.v, T2.v, ())
+      | _ ->
+          assert false
+
+    let pp ppf = function
+      | A v1 ->
+          Crowbar.pp ppf "@[<hv 1>(A %a)@]" T1.pp v1
+      | B v2 ->
+          Crowbar.pp ppf "@[<hv 1>(B %a)@]" T2.pp v2
+      | C ->
+          Crowbar.pp ppf "@[<hv 1>(C)@]"
+      | D (v1, v2, ()) ->
+          Crowbar.pp ppf "@[<hv 1>(D (%a, %a, ()))@]" T1.pp v1 T2.pp v2
+  end )
+
+let mu_name_ref = ref 0
+
+let map_union_mu (t1 : testable) (t2 : testable) depth : testable =
+  let module T1 = (val t1) in
+  let module T2 = (val t2) in
+  let mu_name = "union-mu-" ^ string_of_int !mu_name_ref in
+  incr mu_name_ref ;
+  ( module struct
+    type t = A of T1.t | B of (T2.t * t)
+
+    let t1_ding =
+      let open Data_encoding in
+      obj1 (req "A" T1.ding)
+
+    let t2_ding self =
+      let open Data_encoding in
+      obj2 (req "B" (dyn_if_not T2.ding)) (req "CONS" self)
+
+    let ding =
+      let open Data_encoding in
+      mu mu_name
+      @@ fun self ->
+      dynamic_size
+      @@ union
+           [
+             case
+               ~title:"A"
+               (Tag 0)
+               t1_ding
+               (function A v -> Some v | B _ -> None)
+               (fun v -> A v);
+             case
+               ~title:"B"
+               (Tag 1)
+               (t2_ding self)
+               (function A _ -> None | B (v, t) -> Some (v, t))
+               (fun (v, t) -> B (v, t));
+           ]
+
+    let v =
+      let rec make depth =
+        if depth <= 0 then A T1.v else B (T2.v, make (depth - 1))
+      in
+      make depth
+
+    let rec pp ppf = function
+      | A v1 ->
+          Crowbar.pp ppf "@[<hv 1>(A %a)@]" T1.pp v1
+      | B (v2, t) ->
+          Crowbar.pp ppf "@[<hv 1>(B (%a, %a))@]" T2.pp v2 pp t
+  end )
+
 let map_matching (t1 : testable) (t2 : testable) b : testable =
   let module T1 = (val t1) in
   let module T2 = (val t2) in
@@ -1023,6 +1172,20 @@ let map_matching_3 (t1 : testable) (t2 : testable) (t3 : testable) i : testable
           Crowbar.pp ppf "@[<hv 1>(B %a)@]" T3.pp v3
   end )
 
+let map_check_size (t : testable) slack : testable =
+  let module T = (val t) in
+  match Data_encoding__Encoding.classify T.ding with
+  | `Dynamic | `Variable ->
+      Crowbar.bad_test ()
+  | `Fixed fixed_size ->
+      ( module struct
+        include T
+
+        let ding =
+          let open Data_encoding in
+          check_size (fixed_size + slack) ding
+      end )
+
 let testable_printer : testable Crowbar.printer =
  fun ppf (t : testable) ->
   let module T = (val t) in
@@ -1069,6 +1232,7 @@ let gen =
             map [float; float; float] map_range_float;
             map [bool] map_bool;
             map [short_string] map_string;
+            map [short_string; uint8] map_string_with_check_size;
             map [short_mbytes] map_bytes;
             map [float] map_float;
             map [short_string1] map_fixed_string;
@@ -1100,8 +1264,12 @@ let gen =
            map [g; list g] (fun t ts -> map_variable_array t (Array.of_list ts));
         *)
               map [g; g; bool] map_union;
+            map [g; g; range 4] map_union_more;
             map [g; g; bool] map_matching;
             map [g; g; g; range 3] map_matching_3;
+            map [g; const 0] map_check_size;
+            map [g; uint8] map_check_size;
+            map [g; g; range 4] map_union_mu;
           ])
   in
   with_printer testable_printer g
@@ -1159,7 +1327,7 @@ let roundtrip_json pp ding v =
   in
   Crowbar.check_eq ~pp v vv
 
-let roundtrip_binary pp ding v =
+let roundtrip_binary_to_bytes pp ding v =
   let bin =
     try Data_encoding.Binary.to_bytes_exn ding v
     with Data_encoding.Binary.Write_error we ->
@@ -1184,16 +1352,62 @@ let roundtrip_binary pp ding v =
   in
   Crowbar.check_eq ~pp v vv
 
+let roundtrip_binary_write pp ding v slack =
+  let size = Data_encoding.Binary.length ding v in
+  let buffer = Bytes.create (size + slack) in
+  let state =
+    Option.get
+    @@ Data_encoding.Binary.make_writer_state
+         buffer
+         ~offset:0
+         ~allowed_bytes:size
+  in
+  let written =
+    try Data_encoding.Binary.write_exn ding v state
+    with Data_encoding.Binary.Write_error we ->
+      Format.kasprintf
+        Crowbar.fail
+        "Cannot construct: %a (%a)"
+        pp
+        v
+        Data_encoding.Binary.pp_write_error
+        we
+  in
+  Crowbar.check_eq written size ;
+  let (read, vv) =
+    try Data_encoding.Binary.read_exn ding buffer 0 size
+    with Data_encoding.Binary.Read_error re ->
+      Format.kasprintf
+        Crowbar.fail
+        "Cannot destruct: %a (%a)"
+        pp
+        v
+        Data_encoding.Binary.pp_read_error
+        re
+  in
+  Crowbar.check_eq read size ; Crowbar.check_eq ~pp v vv
+
 (* Setting up the actual tests *)
 let test_testable_json (testable : testable) =
   let module T = (val testable) in
   roundtrip_json T.pp T.ding T.v
 
-let test_testable_binary (testable : testable) =
+let test_testable_binary_to_bytes (testable : testable) =
   let module T = (val testable) in
-  roundtrip_binary T.pp T.ding T.v
+  roundtrip_binary_to_bytes T.pp T.ding T.v
+
+let test_testable_binary_write (testable : testable) slack =
+  let module T = (val testable) in
+  roundtrip_binary_write T.pp T.ding T.v slack
 
 let () =
-  Crowbar.add_test ~name:"binary roundtrips" [gen] test_testable_binary ;
+  Crowbar.add_test
+    ~name:"binary (to_bytes) roundtrips"
+    [gen]
+    test_testable_binary_to_bytes ;
+  Crowbar.add_test
+    ~name:"binary (write) roundtrips"
+    [gen; Crowbar.uint8]
+    test_testable_binary_write ;
   Crowbar.add_test ~name:"json roundtrips" [gen] test_testable_json ;
   ()
