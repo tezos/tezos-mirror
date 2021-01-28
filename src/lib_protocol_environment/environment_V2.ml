@@ -133,7 +133,7 @@ struct
   module Int64 = Int64
   module Buffer = Buffer
   module Format = Format
-  module Option = Tezos_base.TzPervasives.Option
+  module Option = Option
 
   module Raw_hashes = struct
     let sha256 = Hacl.Hash.SHA256.digest
