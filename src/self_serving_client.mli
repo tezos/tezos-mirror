@@ -23,9 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Resto_cohttp
-open Resto_cohttp_client
-
 (** [Make(Encoding)] returns a module that provides
     an instance of [Client.CALL] in its [launch] function.
     The [Client.CALL] instance is meant to be passed to [Client.Make]
@@ -42,7 +39,9 @@ open Resto_cohttp_client
     A local, self-serving client works the same as a server, except that its
     ACLs cannot be changed after constructing it (as opposed to
     [Server.Make.set_acl]). *)
-module Make (Encoding : Resto.ENCODING) : sig
+module Make
+    (Encoding : Resto.ENCODING)
+    (Log : Resto_cohttp_server.Server.LOGGING) : sig
   val launch :
     ?cors:Cors.t ->
     ?agent:string ->

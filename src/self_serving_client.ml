@@ -26,10 +26,10 @@
 open Lwt.Infix
 open Resto_cohttp_server
 
-module Make (Encoding : Resto.ENCODING) = struct
+module Make (Encoding : Resto.ENCODING) (Log : Server.LOGGING) = struct
   module Directory = Resto_directory.Make (Encoding)
   module Media_type = Media_type.Make (Encoding)
-  module Server = Server.Make_selfserver (Encoding)
+  module Server = Server.Make_selfserver (Encoding) (Log)
 
   type self_server = {
     root : unit Directory.directory;
@@ -96,13 +96,17 @@ module Make (Encoding : Resto.ENCODING) = struct
             match answer with
             | (`Ok _ | `No_content | `Created _) as a ->
                 Lwt.return_ok
-                @@ Server.Handlers.handle_rpc_answer ~headers output a
+                @@ Server.Handlers.handle_rpc_answer "local" ~headers output a
             | `OkChunk v ->
                 (* When in self-serving mode, there is no point in
                    constructing a sequence just to mash it all together, we
                    ignore Chunk *)
                 Lwt.return_ok
-                @@ Server.Handlers.handle_rpc_answer ~headers output (`Ok v)
+                @@ Server.Handlers.handle_rpc_answer
+                     "local"
+                     ~headers
+                     output
+                     (`Ok v)
             | `OkStream o ->
                 let body = create_stream output o in
                 let encoding = Cohttp.Transfer.Chunked in
@@ -116,7 +120,11 @@ module Make (Encoding : Resto.ENCODING) = struct
               | `Conflict _
               | `Error _ ) as a ->
                 Lwt.return_ok
-                @@ Server.Handlers.handle_rpc_answer_error ~headers error a )
+                @@ Server.Handlers.handle_rpc_answer_error
+                     "local"
+                     ~headers
+                     error
+                     a )
         | Error err ->
             Lwt.return_ok @@ Server.Handlers.handle_error server.medias err
 

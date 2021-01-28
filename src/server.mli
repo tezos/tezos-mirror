@@ -66,7 +66,7 @@ end
 (** [Make_selfserver] is a functor that produces only the machinery necessary
     for local use. Specifically, it produces the values and types needed for the
     [Self_serving_client]. *)
-module Make_selfserver (Encoding : Resto.ENCODING) : sig
+module Make_selfserver (Encoding : Resto.ENCODING) (Log : LOGGING) : sig
   module Media_type : module type of struct
     include Media_type.Make (Encoding)
   end
@@ -116,13 +116,17 @@ module Make_selfserver (Encoding : Resto.ENCODING) : sig
       Cohttp.Response.t * Cohttp_lwt.Body.t
 
     val handle_rpc_answer :
-      ?headers:Cohttp.Header.t ->
+      string ->
+      ?headers:(* connection identifier for logging *)
+               Cohttp.Header.t ->
       ('o -> string) ->
       [< `Created of string option | `No_content | `Ok of 'o] ->
       Cohttp_lwt_unix.Response.t * Cohttp_lwt.Body.t
 
     val handle_rpc_answer_error :
-      ?headers:Cohttp.Header.t ->
+      string ->
+      ?headers:(* connection identifier for logging *)
+               Cohttp.Header.t ->
       ('e -> Cohttp_lwt.Body.t * Cohttp.Transfer.encoding) ->
       [< `Conflict of 'e
       | `Error of 'e
