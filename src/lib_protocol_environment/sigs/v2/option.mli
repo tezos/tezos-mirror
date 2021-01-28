@@ -1,85 +1,7 @@
-(**************************************************************************)
-(*                                                                        *)
-(*                                 OCaml                                  *)
-(*                                                                        *)
-(*                         The OCaml programmers                          *)
-(*                                                                        *)
-(*   Copyright 2018 Institut National de Recherche en Informatique et     *)
-(*     en Automatique.                                                    *)
-(*                                                                        *)
-(*   All rights reserved.  This file is distributed under the terms of    *)
-(*   the GNU Lesser General Public License version 2.1, with the          *)
-(*   special exception on linking described in the file LICENSE.          *)
-(*                                                                        *)
-(**************************************************************************)
-
-(** Option values.
-
-    Option values explicitly indicate the presence or absence of a value.
-
-    @since 4.08 *)
-
-(** {1:options Options} *)
-
-type 'a t = 'a option = None | Some of 'a (**)
-(** The type for option values. Either [None] or a value [Some v]. *)
-
-val none : 'a option
-(** [none] is [None]. *)
-
-val some : 'a -> 'a option
-(** [some v] is [Some v]. *)
-
-val value : 'a option -> default:'a -> 'a
-(** [value o ~default] is [v] if [o] is [Some v] and [default] otherwise. *)
-
-val bind : 'a option -> ('a -> 'b option) -> 'b option
-(** [bind o f] is [f v] if [o] is [Some v] and [None] if [o] is [None]. *)
-
-val join : 'a option option -> 'a option
-(** [join oo] is [Some v] if [oo] is [Some (Some v)] and [None] otherwise. *)
-
-val map : ('a -> 'b) -> 'a option -> 'b option
-(** [map f o] is [None] if [o] is [None] and [Some (f v)] is [o] is [Some v]. *)
-
-val fold : none:'a -> some:('b -> 'a) -> 'b option -> 'a
-(** [fold ~none ~some o] is [none] if [o] is [None] and [some v] if [o] is
-    [Some v]. *)
-
-val iter : ('a -> unit) -> 'a option -> unit
-(** [iter f o] is [f v] if [o] is [Some v] and [()] otherwise. *)
-
-(** {1:preds Predicates and comparisons} *)
-
-val is_none : 'a option -> bool
-(** [is_none o] is [true] iff [o] is [None]. *)
-
-val is_some : 'a option -> bool
-(** [is_some o] is [true] iff [o] is [Some o]. *)
-
-val equal : ('a -> 'a -> bool) -> 'a option -> 'a option -> bool
-(** [equal eq o0 o1] is [true] iff [o0] and [o1] are both [None] or if
-    they are [Some v0] and [Some v1] and [eq v0 v1] is [true]. *)
-
-val compare : ('a -> 'a -> int) -> 'a option -> 'a option -> int
-(** [compare cmp o0 o1] is a total order on options using [cmp] to compare
-    values wrapped by [Some _]. [None] is smaller than [Some _] values. *)
-
-(** {1:convert Converting} *)
-
-val to_result : none:'e -> 'a option -> ('a, 'e) result
-(** [to_result ~none o] is [Ok v] if [o] is [Some v] and [Error none]
-    otherwise. *)
-
-val to_list : 'a option -> 'a list
-(** [to_list o] is [[]] if [o] is [None] and [[v]] if [o] is [Some v]. *)
-
-
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -101,20 +23,86 @@ val to_list : 'a option -> 'a list
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [x >>= f] is an infix notation for [apply ~f x] *)
-val ( >>= ) : 'a option -> ('a -> 'b option) -> 'b option
+(** Signature from Lwtreslib's option module *)
 
-(** [x >>| f] is an infix notation for [map ~f x] *)
-val ( >>| ) : 'a option -> ('a -> 'b) -> 'b option
+type 'a t = 'a option = None | Some of 'a
 
-(** First input of form [Some x], or [None] if both are [None] *)
-val first_some : 'a option -> 'a option -> 'a option
+val none : 'a option
 
-(** [pp ~default pp fmt x] pretty-print value [x] using [pp]
-    or [default] (["None"] by default) string if there is no value. *)
-val pp :
-  ?default:string ->
-  (Format.formatter -> 'a -> unit) ->
-  Format.formatter ->
+val none_e : ('a option, 'trace) result
+
+val none_s : 'a option Lwt.t
+
+val none_es : ('a option, 'trace) result Lwt.t
+
+val some : 'a -> 'a option
+
+val some_unit : unit option
+
+val some_nil : 'a list option
+
+val some_e : 'a -> ('a option, 'trace) result
+
+val some_s : 'a -> 'a option Lwt.t
+
+val some_es : 'a -> ('a option, 'trace) result Lwt.t
+
+val value : 'a option -> default:'a -> 'a
+
+val value_e : 'a option -> error:'trace -> ('a, 'trace) result
+
+val value_f : 'a option -> default:(unit -> 'a) -> 'a
+
+val value_fe : 'a option -> error:(unit -> 'trace) -> ('a, 'trace) result
+
+val bind : 'a option -> ('a -> 'b option) -> 'b option
+
+val join : 'a option option -> 'a option
+
+val either : 'a option -> 'a option -> 'a option
+
+val map : ('a -> 'b) -> 'a option -> 'b option
+
+val map_s : ('a -> 'b Lwt.t) -> 'a option -> 'b option Lwt.t
+
+val map_e :
+  ('a -> ('b, 'trace) result) -> 'a option -> ('b option, 'trace) result
+
+val map_es :
+  ('a -> ('b, 'trace) result Lwt.t) ->
   'a option ->
-  unit
+  ('b option, 'trace) result Lwt.t
+
+val fold : none:'a -> some:('b -> 'a) -> 'b option -> 'a
+
+val fold_s : none:'a -> some:('b -> 'a Lwt.t) -> 'b option -> 'a Lwt.t
+
+val fold_f : none:(unit -> 'a) -> some:('b -> 'a) -> 'b option -> 'a
+
+val iter : ('a -> unit) -> 'a option -> unit
+
+val iter_s : ('a -> unit Lwt.t) -> 'a option -> unit Lwt.t
+
+val iter_e :
+  ('a -> (unit, 'trace) result) -> 'a option -> (unit, 'trace) result
+
+val iter_es :
+  ('a -> (unit, 'trace) result Lwt.t) ->
+  'a option ->
+  (unit, 'trace) result Lwt.t
+
+val is_none : 'a option -> bool
+
+val is_some : 'a option -> bool
+
+val equal : ('a -> 'a -> bool) -> 'a option -> 'a option -> bool
+
+val compare : ('a -> 'a -> int) -> 'a option -> 'a option -> int
+
+val to_result : none:'trace -> 'a option -> ('a, 'trace) result
+
+val of_result : ('a, 'e) result -> 'a option
+
+val to_list : 'a option -> 'a list
+
+val to_seq : 'a option -> 'a Stdlib.Seq.t

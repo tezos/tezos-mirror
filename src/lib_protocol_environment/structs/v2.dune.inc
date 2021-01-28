@@ -15,7 +15,6 @@
    v2/protocol_hash.ml
    v2/context_hash.ml
    v2/error_monad_traversors.ml
-   v2/option.ml
  )
 
 (action (with-stdout-to %{targets} (chdir %{workspace_root}}
