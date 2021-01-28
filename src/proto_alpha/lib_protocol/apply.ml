@@ -965,7 +965,7 @@ let check_manager_signature ctxt chain_id (op : _ Kind.manager contents_list)
         ok (source, source_key)
     | Some (manager, manager_key) ->
         if Signature.Public_key_hash.equal source manager then
-          ok (source, Option.first_some manager_key source_key)
+          ok (source, Option.either manager_key source_key)
         else error Inconsistent_sources
   in
   let rec find_source :

@@ -259,7 +259,7 @@ module Manager_result = struct
                lazy_storage_diff ) ->
         assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
         let lazy_storage_diff =
-          Option.first_some lazy_storage_diff legacy_lazy_storage_diff
+          Option.either lazy_storage_diff legacy_lazy_storage_diff
         in
         Transaction_result
           {
@@ -330,7 +330,7 @@ module Manager_result = struct
                lazy_storage_diff ) ->
         assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
         let lazy_storage_diff =
-          Option.first_some lazy_storage_diff legacy_lazy_storage_diff
+          Option.either lazy_storage_diff legacy_lazy_storage_diff
         in
         Origination_result
           {

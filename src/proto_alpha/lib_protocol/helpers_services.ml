@@ -92,7 +92,7 @@ module Scripts = struct
                     legacy_lazy_storage_diff,
                     lazy_storage_diff ) ->
                let lazy_storage_diff =
-                 Option.first_some lazy_storage_diff legacy_lazy_storage_diff
+                 Option.either lazy_storage_diff legacy_lazy_storage_diff
                in
                (storage, operations, lazy_storage_diff))
              (obj4
@@ -122,7 +122,7 @@ module Scripts = struct
                     legacy_lazy_storage_diff,
                     lazy_storage_diff ) ->
                let lazy_storage_diff =
-                 Option.first_some lazy_storage_diff legacy_lazy_storage_diff
+                 Option.either lazy_storage_diff legacy_lazy_storage_diff
                in
                (storage, operations, trace, lazy_storage_diff))
              (obj5
