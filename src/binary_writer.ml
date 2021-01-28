@@ -38,7 +38,7 @@ type writer_state = {
 }
 
 let make_writer_state buffer ~offset ~allowed_bytes =
-  if allowed_bytes < 0 || allowed_bytes >= Bytes.length buffer - offset then
+  if allowed_bytes < 0 || allowed_bytes > Bytes.length buffer - offset then
     None
   else
     let allowed_bytes = Uint_option.some allowed_bytes in
