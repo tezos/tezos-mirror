@@ -833,7 +833,7 @@ module type T = sig
     context ->
     key ->
     init:'a ->
-    f:(Context.key_or_dir -> 'a -> 'a Lwt.t) ->
+    f:([`Key of key | `Dir of key] -> 'a -> 'a Lwt.t) ->
     'a Lwt.t
 
   val keys : context -> key -> key list Lwt.t
@@ -911,18 +911,32 @@ let set_option ctxt k = function
 let remove_rec ctxt k = Context.remove (context ctxt) k >|= update_context ctxt
 
 let copy ctxt ~from ~to_ =
-  Context.copy (context ctxt) ~from ~to_
-  >|= function
+  Context.find_tree (context ctxt) from
+  >>= function
   | None ->
-      storage_error (Missing_key (from, Copy))
-  | Some context ->
-      ok (update_context ctxt context)
+      Lwt.return @@ storage_error (Missing_key (from, Copy))
+  | Some sub_tree ->
+      Context.add_tree (context ctxt) to_ sub_tree
+      >|= fun context -> ok (update_context ctxt context)
 
-let fold ctxt k ~init ~f = Context.fold (context ctxt) k ~init ~f
+let fold ctxt root ~init ~f =
+  Context.fold ~depth:(`Eq 1) (context ctxt) root ~init ~f:(fun k v acc ->
+      match Context.Tree.kind v with
+      | `Value _ ->
+          f (`Key (root @ k)) acc
+      | `Tree ->
+          f (`Dir (root @ k)) acc)
 
-let keys ctxt k = Context.keys (context ctxt) k
+let fold_keys ctxt root ~init ~f =
+  Context.fold (context ctxt) root ~init ~f:(fun k v acc ->
+      match Context.Tree.kind v with
+      | `Value _ ->
+          f (root @ k) acc
+      | `Tree ->
+          Lwt.return acc)
 
-let fold_keys ctxt k ~init ~f = Context.fold_keys (context ctxt) k ~init ~f
+let keys ctxt k =
+  fold_keys ctxt k ~init:[] ~f:(fun k acc -> Lwt.return (k :: acc))
 
 let project x = x
 

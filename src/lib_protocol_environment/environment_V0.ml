@@ -874,12 +874,31 @@ struct
 
     let remove_rec = remove
 
-    let fold_keys s k ~init ~f =
-      let rec loop k acc =
-        fold s k ~init:acc ~f:(fun file acc ->
-            match file with `Key k -> f k acc | `Dir k -> loop k acc)
-      in
-      loop k init
+    let copy ctxt ~from ~to_ =
+      find_tree ctxt from
+      >>= function
+      | None ->
+          Lwt.return_none
+      | Some sub_tree ->
+          add_tree ctxt to_ sub_tree >>= Lwt.return_some
+
+    let fold_keys s root ~init ~f =
+      Context.fold s root ~init ~f:(fun k v acc ->
+          let k = root @ k in
+          match Tree.kind v with
+          | `Value _ ->
+              f k acc
+          | `Tree ->
+              Lwt.return acc)
+
+    let fold t root ~init ~f =
+      Context.fold ~depth:(`Eq 1) t root ~init ~f:(fun k v acc ->
+          let k = root @ k in
+          match Tree.kind v with
+          | `Value _ ->
+              f (`Key k) acc
+          | `Tree ->
+              f (`Dir k) acc)
 
     let keys t = fold_keys t ~init:[] ~f:(fun k acc -> Lwt.return (k :: acc))
 

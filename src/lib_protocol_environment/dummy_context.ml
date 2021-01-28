@@ -30,21 +30,41 @@ module M = struct
 
   type value = Bytes.t
 
-  let mem _ _ = assert false
+  type tree = |
 
-  let mem_tree _ _ = assert false
+  module Tree = struct
+    let hash _ = assert false
 
-  let find _ _ = assert false
+    let empty _ = assert false
 
-  let add _ _ _ = assert false
+    let equal _ _ = assert false
 
-  let copy _ ~from:_ ~to_:_ = assert false
+    let is_empty _ = assert false
 
-  let remove _ _ = assert false
+    let mem _ _ = assert false
 
-  type key_or_dir = [`Key of key | `Dir of key]
+    let kind _ = assert false
 
-  let fold _ _ ~init:_ ~f:_ = assert false
+    let find _ _ = assert false
+
+    let add _ _ _ = assert false
+
+    let remove _ _ = assert false
+
+    let mem_tree _ _ = assert false
+
+    let find_tree _ _ = assert false
+
+    let add_tree _ _ = assert false
+
+    let clear ?depth:_ _ = assert false
+
+    let list _ ?offset:_ ?length:_ _ = assert false
+
+    let fold ?depth:_ _ _ ~init:_ ~f:_ = assert false
+  end
+
+  include Tree
 
   let set_protocol _ _ = assert false
 
@@ -54,9 +74,8 @@ module M = struct
 end
 
 open Tezos_protocol_environment
+include Environment_context.Register (M)
 
-type _ Context.kind += Faked : unit Context.kind
-
-let ops = (module M : CONTEXT with type t = 'ctxt)
-
-let empty = Context.Context {ops; ctxt = (); kind = Faked}
+let empty =
+  Context.Context
+    {ops; ctxt = (); kind = Context; equality_witness; impl_name = "dummy"}

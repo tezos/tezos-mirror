@@ -25,6 +25,6 @@
 
 open Tezos_protocol_environment
 
-type _ Context.kind += Faked : unit Context.kind
+type _ Context.kind += Context : unit Context.kind
 
 val empty : Context.t

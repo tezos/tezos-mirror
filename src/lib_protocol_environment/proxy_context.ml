@@ -64,9 +64,8 @@ module C = struct
 
   type t = M.t
 
-  (* [root] is the root of the current subtree; [path] is the path
-     from the underlying local store. *)
-  type tree = {root : M.t; path : key}
+  (* [tree] is the tree available under [/data/<path>]. *)
+  type tree = {proxy : M.proxy_delegate option; path : key; tree : Local.tree}
 
   (** Generic pretty printing functions *)
   let pp_key ppf key =
@@ -105,14 +104,14 @@ module C = struct
   let elt t = match Local.Tree.kind t with `Value v -> Key v | `Tree -> Dir t
 
   let raw_find (t : tree) k =
-    Local.find_tree t.root.local k
+    Local.Tree.find_tree t.tree k
     >>= function
     | Some x ->
         Lwt.return_some x
     | None -> (
         L.(S.emit proxy_context_missing) k
         >>= fun () ->
-        match t.root.proxy with
+        match t.proxy with
         | None ->
             Lwt.return_none
         | Some (module ProxyDelegation) -> (
@@ -125,7 +124,7 @@ module C = struct
                 Lwt.return (Option.map Local.Tree.of_raw x) ) )
 
   let raw_mem_aux kind (t : tree) k =
-    Local.find_tree t.root.local k
+    Local.Tree.find_tree t.tree k
     >|= Option.map Local.Tree.kind
     >>= function
     | Some (`Value _) ->
@@ -133,7 +132,7 @@ module C = struct
     | Some `Tree ->
         Lwt.return (kind = `Tree)
     | None -> (
-      match t.root.proxy with
+      match t.proxy with
       | None ->
           Lwt.return_false
       | Some (module ProxyDelegation) -> (
@@ -159,21 +158,34 @@ module C = struct
 
   let raw_mem_tree = raw_mem_aux `Tree
 
-  let root t = {root = t; path = []}
+  (* The tree under /data *)
+  let data_tree (t : t) =
+    Local.find_tree t.local []
+    >|= function
+    | None ->
+        {proxy = t.proxy; path = []; tree = Local.Tree.empty t.local}
+    | Some tree ->
+        {proxy = t.proxy; path = []; tree}
 
-  let mem t k = raw_mem (root t) k
+  let mem t k = data_tree t >>= fun tree -> raw_mem tree k
 
-  let mem_tree t k = raw_mem_tree (root t) k
+  let mem_tree t k = data_tree t >>= fun tree -> raw_mem_tree tree k
 
   let find t k =
-    raw_find (root t) k
-    >|= Option.map elt
+    data_tree t
+    >>= fun tree ->
+    raw_find tree k >|= Option.map elt
     >|= function Some (Key v) -> Some v | _ -> None
 
-  let find_tree t k = raw_find (root t) k
+  let find_tree t k =
+    data_tree t
+    >>= fun tree ->
+    raw_find tree k
+    >|= function
+    | None -> None | Some tree -> Some {proxy = t.proxy; path = k; tree}
 
-  let add_tree (t : t) k v =
-    Local.add_tree t.local k v
+  let add_tree (t : t) k (v : tree) =
+    Local.add_tree t.local k v.tree
     >|= fun local -> if t.local == local then t else {t with local}
 
   let add (t : t) k v =
@@ -184,29 +196,28 @@ module C = struct
     Local.remove t.local k
     >|= fun local -> if t.local == local then t else {t with local}
 
-  let copy ctxt ~from ~to_ =
-    find_tree ctxt from
-    >>= function
-    | None ->
-        Lwt.return_none
-    | Some sub_tree ->
-        add_tree ctxt to_ sub_tree >>= Lwt.return_some
+  let raw_list (t : tree) ?offset ?length k =
+    Local.Tree.list t.tree ?offset ?length k
+    >|= fun ls ->
+    List.fold_left
+      (fun acc (k, tree) ->
+        let v = {proxy = t.proxy; path = t.path @ [k]; tree} in
+        (k, v) :: acc)
+      []
+      (List.rev ls)
 
-  type key_or_dir = [`Key of key | `Dir of key]
+  let list t ?offset ?length k =
+    data_tree t >>= fun tree -> raw_list tree ?offset ?length k
 
-  let fold ctxt root ~init ~f =
-    find_tree ctxt root
+  let fold ?depth (t : t) root ~init ~f =
+    find_tree t root
     >>= function
     | None ->
         Lwt.return init
-    | Some t ->
-        Local.Tree.fold ~depth:(`Eq 1) t [] ~init ~f:(fun k t acc ->
-            let k = root @ k in
-            match Local.Tree.kind t with
-            | `Value _ ->
-                f (`Key k) acc
-            | `Tree ->
-                f (`Dir k) acc)
+    | Some tr ->
+        Local.Tree.fold ?depth tr.tree [] ~init ~f:(fun k tree acc ->
+            let tree = {proxy = t.proxy; path = root @ k; tree} in
+            f k tree acc)
 
   let set_protocol (t : t) p =
     Local.add_protocol t.local p >|= fun local -> {t with local}
@@ -214,23 +225,78 @@ module C = struct
   let get_protocol (t : t) = Local.get_protocol t.local
 
   let fork_test_chain c ~protocol:_ ~expiration:_ = Lwt.return c
+
+  module Tree = struct
+    let empty t = {proxy = None; path = []; tree = Local.Tree.empty t.M.local}
+
+    let equal x y = Local.Tree.equal x.tree y.tree
+
+    let hash x = Local.Tree.hash x.tree
+
+    let is_empty t = Local.Tree.is_empty t.tree
+
+    let add t k v =
+      Local.Tree.add t.tree k v
+      >|= fun tree -> if tree == t.tree then t else {t with tree}
+
+    let add_tree t k v =
+      Local.Tree.add_tree t.tree k v.tree
+      >|= fun tree -> if tree == t.tree then t else {t with tree}
+
+    let mem = raw_mem
+
+    let mem_tree = raw_mem_tree
+
+    let find t k =
+      raw_find t k
+      >|= function
+      | None ->
+          None
+      | Some tree -> (
+        match Local.Tree.kind tree with `Value v -> Some v | `Tree -> None )
+
+    let find_tree t k =
+      raw_find t k
+      >|= function
+      | None ->
+          None
+      | Some tree ->
+          if k = [] then Some t
+          else Some {proxy = t.proxy; path = t.path @ k; tree}
+
+    let remove t k =
+      Local.Tree.remove t.tree k
+      >|= fun tree -> if tree == t.tree then t else {t with tree}
+
+    let fold ?depth (t : tree) k ~init ~f =
+      Local.Tree.fold ?depth t.tree k ~init ~f:(fun k tree acc ->
+          let tree = {proxy = t.proxy; path = t.path @ k; tree} in
+          f k tree acc)
+
+    let kind t = Local.Tree.kind t.tree
+
+    let list = raw_list
+
+    let clear ?depth t = Local.Tree.clear ?depth t.tree
+  end
 end
 
 open Tezos_protocol_environment
+include Environment_context.Register (C)
 
-type _ Context.kind += Proxy : M.t Context.kind
-
-let ops = (module C : CONTEXT with type t = 'ctxt)
+let impl_name = "proxy"
 
 let empty proxy =
   let ctxt = M.{proxy; local = Local.empty} in
-  Context.Context {ops; ctxt; kind = Proxy}
+  Context.Context {ops; ctxt; kind = Context; equality_witness; impl_name}
 
 let set_delegate : M.proxy_delegate -> Context.t -> Context.t =
  fun proxy (Context.Context t) ->
   match t.kind with
-  | Proxy ->
+  | Context ->
       let ctxt = {t.ctxt with proxy = Some proxy} in
       Context.Context {t with ctxt}
   | _ ->
-      assert false
+      Environment_context.err_implementation_mismatch
+        ~expected:impl_name
+        ~got:t.impl_name

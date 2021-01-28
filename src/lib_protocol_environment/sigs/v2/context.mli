@@ -26,50 +26,141 @@
 (** View over the context store, restricted to types, access and
     functional manipulation of an existing context. *)
 
-(* Copy/paste of Environment_context_inttf.S *)
+(* Copy/paste of Environment_context_sigs.Context.S *)
 
-(** The type for database views. *)
-type t
+module type VIEW = sig
+  (** The type for context views. *)
+  type t
 
-(** The type for database keys. *)
-type key = string list
+  (** The type for context keys. *)
+  type key
 
-(** The type for database values. *)
-type value = bytes
+  (** The type for context values. *)
+  type value
 
-(** {2 Getters} *)
+  (** The type for context trees. *)
+  type tree
 
-(** [mem t k] is true iff [k] is bound to a value in [t]. *)
-val mem : t -> key -> bool Lwt.t
+  (** {2 Getters} *)
 
-(** [mem_tree t k] is like {!mem} but for trees. *)
-val mem_tree : t -> key -> bool Lwt.t
+  (** [mem t k] is an Lwt promise that resolves to [true] iff [k] is bound
+      to a value in [t]. *)
+  val mem : t -> key -> bool Lwt.t
 
-(** [find t k] is [Some v] if [k] is bound to [v] in [t] and [None]
-      otherwise. *)
-val find : t -> key -> value option Lwt.t
+  (** [mem_tree t k] is like {!mem} but for trees. *)
+  val mem_tree : t -> key -> bool Lwt.t
 
-(** {2 Setters} *)
+  (** [find t k] is an Lwt promise that resolves to [Some v] if [k] is
+      bound to the value [v] in [t] and [None] otherwise. *)
+  val find : t -> key -> value option Lwt.t
 
-(** [add t k v] is the database view where [k] is bound to [v] and
-      is similar to [t] for other keys. *)
-val add : t -> key -> value -> t Lwt.t
+  (** [find_tree t k] is like {!find} but for trees. *)
+  val find_tree : t -> key -> tree option Lwt.t
 
-(** [remove c k] removes any values and trees bound to [k] in [c]. *)
-val remove : t -> key -> t Lwt.t
+  (** [list t key] is the list of files and sub-nodes stored under [k] in [t].
+      The result order is not specified but is stable.
 
-(** {2 Misc} *)
+      [offset] and [length] are used for pagination. *)
+  val list :
+    t -> ?offset:int -> ?length:int -> key -> (string * tree) list Lwt.t
 
-(** [copy] returns None if the [from] key is not bound *)
-val copy : t -> from:key -> to_:key -> t option Lwt.t
+  (** {2 Setters} *)
 
-type key_or_dir = [`Key of key | `Dir of key]
+  (** [add t k v] is an Lwt promise that resolves to [c] such that:
 
-val fold : t -> key -> init:'a -> f:(key_or_dir -> 'a -> 'a Lwt.t) -> 'a Lwt.t
+    - [k] is bound to [v] in [c];
+    - and [c] is similar to [t] otherwise.
 
-val keys : t -> key -> key list Lwt.t
+    If [k] was already bound in [t] to a value that is physically equal
+    to [v], the result of the function is a promise that resolves to
+    [t]. Otherwise, the previous binding of [k] in [t] disappears. *)
+  val add : t -> key -> value -> t Lwt.t
 
-val fold_keys : t -> key -> init:'a -> f:(key -> 'a -> 'a Lwt.t) -> 'a Lwt.t
+  (** [add_tree] is like {!add} but for trees. *)
+  val add_tree : t -> key -> tree -> t Lwt.t
+
+  (** [remove t k v] is an Lwt promise that resolves to [c] such that:
+
+    - [k] is unbound in [c];
+    - and [c] is similar to [t] otherwise. *)
+  val remove : t -> key -> t Lwt.t
+
+  (** {2 Folding} *)
+
+  (** [fold ?depth t root ~init ~f] recursively folds over the trees
+      and values of [t]. The [f] callbacks are called with a key relative
+      to [root]. [f] is never called with an empty key for values; i.e.,
+      folding over a value is a no-op.
+
+      Elements are traversed in lexical order of keys.
+
+      The depth is 0-indexed. If [depth] is set (by default it is not), then [f]
+      is only called when the conditions described by the parameter is true:
+
+      - [Eq d] folds over nodes and contents of depth exactly [d].
+      - [Lt d] folds over nodes and contents of depth strictly less than [d].
+      - [Le d] folds over nodes and contents of depth less than or equal to [d].
+      - [Gt d] folds over nodes and contents of depth strictly more than [d].
+      - [Ge d] folds over nodes and contents of depth more than or equal to [d]. *)
+  val fold :
+    ?depth:[`Eq of int | `Le of int | `Lt of int | `Ge of int | `Gt of int] ->
+    t ->
+    key ->
+    init:'a ->
+    f:(key -> tree -> 'a -> 'a Lwt.t) ->
+    'a Lwt.t
+end
+
+module type TREE = sig
+  (** [Tree] provides immutable, in-memory partial mirror of the
+      context, with lazy reads and delayed writes.
+
+      Trees are immutable and non-persistent (they disappear if the
+      host crash), held in memory for efficiency, where reads are done
+      lazily and writes are done only when needed, e.g. on
+      [Context.commit]. If a key is modified twice, only the last
+      value will be written to disk on commit. *)
+
+  (** The type for context views. *)
+  type t
+
+  (** The type for context trees. *)
+  type tree
+
+  (** [empty _] is the empty tree. *)
+  val empty : t -> tree
+
+  (** [is_empty t] is true iff [t] is [empty _]. *)
+  val is_empty : tree -> bool
+
+  (** [kind t] is [t]'s kind. It's either a tree node or a leaf
+      value. *)
+  val kind : tree -> [`Value of bytes | `Tree]
+
+  (** [hash t] is [t]'s Merkle hash. *)
+  val hash : tree -> Context_hash.t
+
+  (** [equal x y] is true iff [x] and [y] have the same Merkle hash. *)
+  val equal : tree -> tree -> bool
+
+  include VIEW with type t := tree and type tree := tree
+
+  (** {2 Caches} *)
+
+  (** [clear ?depth t] clears all caches in the tree [t] for subtrees with a
+      depth higher than [depth]. If [depth] is not set, all of the subtrees are
+      cleared. *)
+  val clear : ?depth:int -> tree -> unit
+end
+
+include VIEW with type key = string list and type value = bytes
+
+module Tree :
+  TREE
+    with type t := t
+     and type key := key
+     and type value := value
+     and type tree := tree
 
 val register_resolver :
   'a Base58.encoding -> (t -> string -> 'a list Lwt.t) -> unit

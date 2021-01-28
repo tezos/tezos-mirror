@@ -44,4 +44,12 @@ module Make_tree (DB : DB) : sig
        and type tree := DB.tree
 
   val empty : _ -> DB.tree
+
+  type raw = [`Value of bytes | `Tree of raw TzString.Map.t]
+
+  val raw_encoding : raw Data_encoding.t
+
+  val to_raw : DB.tree -> raw Lwt.t
+
+  val of_raw : raw -> DB.tree
 end

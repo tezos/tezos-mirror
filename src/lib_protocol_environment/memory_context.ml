@@ -26,25 +26,6 @@
 module M = struct
   include Tezos_storage_memory.Context
 
-  let copy ctxt ~from ~to_ =
-    find_tree ctxt from
-    >>= function
-    | None ->
-        Lwt.return_none
-    | Some sub_tree ->
-        add_tree ctxt to_ sub_tree >>= Lwt.return_some
-
-  type key_or_dir = [`Key of key | `Dir of key]
-
-  let fold t root ~init ~f =
-    fold ~depth:(`Eq 1) t root ~init ~f:(fun k t acc ->
-        let k = root @ k in
-        match Tree.kind t with
-        | `Value _ ->
-            f (`Key k) acc
-        | `Tree ->
-            f (`Dir k) acc)
-
   let set_protocol = add_protocol
 
   let fork_test_chain c ~protocol:_ ~expiration:_ = Lwt.return c
@@ -54,20 +35,27 @@ open Tezos_protocol_environment
 
 type t = M.t
 
-type _ Context.kind += Memory : t Context.kind
+include Environment_context.Register (M)
 
-let ops = (module M : CONTEXT with type t = 'ctxt)
+let impl_name = "memory"
 
 let empty =
   let ctxt = M.empty in
-  Context.Context {ops; ctxt; kind = Memory}
+  Context.Context {ops; ctxt; kind = Context; equality_witness; impl_name}
 
 let project : Context.t -> t =
- fun (Context.Context {ctxt; kind; _} : Context.t) ->
-  match kind with Memory -> ctxt | _ -> assert false
+ fun (Context.Context t) ->
+  match t.kind with
+  | Context ->
+      t.ctxt
+  | _ ->
+      Environment_context.err_implementation_mismatch
+        ~expected:impl_name
+        ~got:t.impl_name
 
 let inject : t -> Context.t =
- fun ctxt -> Context.Context {ops; ctxt; kind = Memory}
+ fun ctxt ->
+  Context.Context {ops; ctxt; kind = Context; equality_witness; impl_name}
 
 let encoding : Context.t Data_encoding.t =
   let open Data_encoding in

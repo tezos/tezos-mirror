@@ -87,21 +87,17 @@ let tree_statistics key_map =
   {total = !nodes; keys = !keys; dirs = !dirs; degrees; depths; sizes}
 
 let load_tree context key =
-  let rec load_tree context key tree =
-    Context.fold context key ~init:tree ~f:(fun key_or_dir tree ->
-        match key_or_dir with
-        | `Key path -> (
-            Context.find context path
-            >>= function
-            | None ->
-                Stdlib.failwith "key with no data"
-            | Some bytes ->
-                let len = Bytes.length bytes in
-                Lwt.return (Io_helpers.Key_map.insert path len tree) )
-        | `Dir path ->
-            load_tree context path tree)
-  in
-  load_tree context key Io_helpers.Key_map.empty
+  Context.fold
+    context
+    key
+    ~init:Io_helpers.Key_map.empty
+    ~f:(fun path t tree ->
+      match Context.Tree.kind t with
+      | `Value bytes ->
+          let len = Bytes.length bytes in
+          Lwt.return (Io_helpers.Key_map.insert path len tree)
+      | `Tree ->
+          Lwt.return tree)
 
 let context_statistics base_dir context_hash =
   let (context, index) =

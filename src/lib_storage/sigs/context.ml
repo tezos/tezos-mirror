@@ -142,21 +142,6 @@ module type TREE = sig
 
   include VIEW with type t := tree and type tree := tree
 
-  (** {2 Data Encoding} *)
-
-  (** The type for in-memory, raw contexts. *)
-  type raw = [`Value of bytes | `Tree of raw TzString.Map.t]
-
-  (** [raw_encoding] is the data encoding for raw trees. *)
-  val raw_encoding : raw Data_encoding.t
-
-  (** [to_raw t] is an Lwt promise that resolves to a raw tree
-        equivalent to [t]. *)
-  val to_raw : tree -> raw Lwt.t
-
-  (** [of_raw t] is the tree equivalent to the raw tree [t]. *)
-  val of_raw : raw -> tree
-
   (** {2 Caches} *)
 
   (** [clear ?depth t] clears all caches in the tree [t] for subtrees with a
@@ -168,10 +153,27 @@ end
 module type S = sig
   include VIEW with type key = string list and type value = bytes
 
-  module Tree :
-    TREE
-      with type t := t
-       and type key := key
-       and type value := value
-       and type tree := tree
+  module Tree : sig
+    include
+      TREE
+        with type t := t
+         and type key := key
+         and type value := value
+         and type tree := tree
+
+    (** {2 Data Encoding} *)
+
+    (** The type for in-memory, raw contexts. *)
+    type raw = [`Value of bytes | `Tree of raw TzString.Map.t]
+
+    (** [raw_encoding] is the data encoding for raw trees. *)
+    val raw_encoding : raw Data_encoding.t
+
+    (** [to_raw t] is an Lwt promise that resolves to a raw tree
+        equivalent to [t]. *)
+    val to_raw : tree -> raw Lwt.t
+
+    (** [of_raw t] is the tree equivalent to the raw tree [t]. *)
+    val of_raw : raw -> tree
+  end
 end

@@ -24,31 +24,25 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module type VIEW = sig
+  (** @inline *)
+  include Tezos_storage_sigs.Context.VIEW
+end
+
+module type TREE = sig
+  (** @inline *)
+  include Tezos_storage_sigs.Context.TREE
+end
+
 module type S = sig
-  type t
+  include VIEW with type key = string list and type value = bytes
 
-  type key = string list
-
-  type value = Bytes.t
-
-  val mem : t -> key -> bool Lwt.t
-
-  val mem_tree : t -> key -> bool Lwt.t
-
-  val find : t -> key -> value option Lwt.t
-
-  val add : t -> key -> value -> t Lwt.t
-
-  val remove : t -> key -> t Lwt.t
-
-  (** {2 Misc} *)
-
-  val copy : t -> from:key -> to_:key -> t option Lwt.t
-
-  type key_or_dir = [`Key of key | `Dir of key]
-
-  val fold :
-    t -> key -> init:'a -> f:(key_or_dir -> 'a -> 'a Lwt.t) -> 'a Lwt.t
+  module Tree :
+    TREE
+      with type t := t
+       and type key := key
+       and type value := value
+       and type tree := tree
 
   val set_protocol : t -> Protocol_hash.t -> t Lwt.t
 

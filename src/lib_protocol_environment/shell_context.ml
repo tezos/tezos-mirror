@@ -25,54 +25,40 @@
 
 open Tezos_protocol_environment
 open Context
-
-let ( >>= ) = Lwt.( >>= )
-
-type _ Context.kind += Shell : Tezos_storage.Context.t Context.kind
+open Lwt.Infix
 
 module C = struct
   include Tezos_storage.Context
 
   let set_protocol = add_protocol
-
-  let copy ctxt ~from ~to_ =
-    find_tree ctxt from
-    >>= function
-    | None ->
-        Lwt.return_none
-    | Some sub_tree ->
-        add_tree ctxt to_ sub_tree >>= Lwt.return_some
-
-  type key_or_dir = [`Key of key | `Dir of key]
-
-  let fold t root ~init ~f =
-    fold ~depth:(`Eq 1) t root ~init ~f:(fun k t acc ->
-        let k = root @ k in
-        match Tree.kind t with
-        | `Value _ ->
-            f (`Key k) acc
-        | `Tree ->
-            f (`Dir k) acc)
 end
 
-let ops = (module C : CONTEXT with type t = 'ctxt)
+include Environment_context.Register (C)
+
+let impl_name = "shell"
 
 let checkout index context_hash =
   Tezos_storage.Context.checkout index context_hash
-  >>= function
+  >|= function
   | Some ctxt ->
-      Lwt.return_some (Context.Context {ops; ctxt; kind = Shell})
+      Some
+        (Context.Context
+           {ops; ctxt; kind = Context; equality_witness; impl_name})
   | None ->
-      Lwt.return_none
+      None
 
 let checkout_exn index context_hash =
   Tezos_storage.Context.checkout_exn index context_hash
-  >>= fun ctxt -> Lwt.return (Context.Context {ops; ctxt; kind = Shell})
+  >|= fun ctxt ->
+  Context.Context {ops; ctxt; kind = Context; equality_witness; impl_name}
 
-let wrap_disk_context ctxt = Context.Context {ops; ctxt; kind = Shell}
+let wrap_disk_context ctxt =
+  Context.Context {ops; ctxt; kind = Context; equality_witness; impl_name}
 
 let unwrap_disk_context : t -> Tezos_storage.Context.t = function
-  | Context.Context {ctxt; kind = Shell; _} ->
+  | Context.Context {ctxt; kind = Context; _} ->
       ctxt
-  | _ ->
-      assert false
+  | Context.Context t ->
+      Environment_context.err_implementation_mismatch
+        ~expected:impl_name
+        ~got:t.impl_name

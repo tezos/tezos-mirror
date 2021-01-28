@@ -64,7 +64,7 @@ module M : sig
   type t
 end
 
-type _ Context.kind += Proxy : M.t Context.kind
+type _ Context.kind += Context : M.t Context.kind
 
 (** Constructs an empty context, possibly giving the delegate (the function
     querying the endpoint) right away.

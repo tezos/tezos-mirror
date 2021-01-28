@@ -217,7 +217,7 @@ module type T = sig
     context ->
     key ->
     init:'a ->
-    f:(Context.key_or_dir -> 'a -> 'a Lwt.t) ->
+    f:([`Key of key | `Dir of key] -> 'a -> 'a Lwt.t) ->
     'a Lwt.t
 
   (** Recursively list all subkeys of a given key. *)

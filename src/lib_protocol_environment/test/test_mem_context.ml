@@ -177,12 +177,13 @@ let test_replay {genesis = ctxt0; _} =
   Assert.equal_string_option ~msg:__LOC__ (Some "Juillet") (c juillet) ;
   Lwt.return_unit
 
-let fold_keys s k ~init ~f =
-  let rec loop k acc =
-    Context.fold s k ~init:acc ~f:(fun file acc ->
-        match file with `Key k -> f k acc | `Dir k -> loop k acc)
-  in
-  loop k init
+let fold_keys s root ~init ~f =
+  Context.fold s root ~init ~f:(fun k v acc ->
+      match Context.Tree.kind v with
+      | `Value _ ->
+          f (root @ k) acc
+      | `Tree ->
+          Lwt.return acc)
 
 let keys t = fold_keys t ~init:[] ~f:(fun k acc -> Lwt.return (k :: acc))
 

@@ -26,7 +26,7 @@
 open Tezos_protocol_environment
 open Tezos_crypto
 
-type _ Context.kind += Shell : Tezos_storage.Context.t Context.kind
+type _ Context.kind += Context : Tezos_storage.Context.t Context.kind
 
 val checkout :
   Tezos_storage.Context.index -> Context_hash.t -> Context.t option Lwt.t
