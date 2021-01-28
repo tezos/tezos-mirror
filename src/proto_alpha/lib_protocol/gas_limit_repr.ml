@@ -215,7 +215,7 @@ let raw_consume gas_counter cost =
 
 let alloc_cost n = S.scale_fast allocation_weight S.(add n (safe_const_exn 1))
 
-let alloc_bytes_cost n = S.safe_int ((n + 7) / 8)
+let alloc_bytes_cost n = alloc_cost (S.safe_int ((n + 7) / 8))
 
 let atomic_step_cost : 'a S.t -> cost = S.may_saturate
 
