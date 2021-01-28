@@ -314,28 +314,28 @@ Rewards
 Baking a block gives a block reward of ``e *
 BAKING_REWARD_PER_ENDORSEMENT[p']`` plus all fees paid by the
 transactions contained in the block, where
-``BAKING_REWARD_PER_ENDORSEMENT`` = ``[1.250ꜩ, 0.1875ꜩ]``,
+``BAKING_REWARD_PER_ENDORSEMENT`` = ``[0.078125ꜩ, 0.011719ꜩ]``,
 ``e`` is the number of endorsements the block contains, ``p`` is the
 priority at which the block was baked, and ``p'`` is 0 if ``p`` is
 0 and is 1 if ``p`` is bigger than 0.  That is, a delegate
-producing a block of priority 0 will be rewarded ``e * 1.25``
+producing a block of priority 0 will be rewarded ``e * 0.078125``
 ꜩ. If a delegate produces a block at priority 1 or higher, then
-the reward is ``e * 0.1875`` ꜩ.
+the reward is ``e * 0.011719`` ꜩ.
 
 Endorsers also receive a reward (at the same time as block creators
 do). The reward is ``ENDORSEMENT_REWARD[p']``, where
-``ENDORSEMENT_REWARD`` = ``[1.250ꜩ, 0.833333ꜩ]``, where ``p'``
+``ENDORSEMENT_REWARD`` = ``[0.078125ꜩ, 0.052083ꜩ]``, where ``p'``
 is as above.  That is, a delegate endorsing a block of priority 0
-will be rewarded ``e * 1.25`` ꜩ, with ``e`` the number of endorsement
+will be rewarded ``e * 0.078125`` ꜩ, with ``e`` the number of endorsement
 slots attributed to the delegate for this level. Moreover, endorsing
-blocks of priority 1 or higher will be rewarded ``e * 0.8333333``
+blocks of priority 1 or higher will be rewarded ``e * 0.052083``
 ꜩ.
 
 Security deposits
 ~~~~~~~~~~~~~~~~~
 
-The cost of a security deposit is ``BLOCK_SECURITY_DEPOSIT`` = 512 ꜩ
-per block created and ``ENDORSEMENT_SECURITY_DEPOSIT`` = 64 ꜩ per
+The cost of a security deposit is ``BLOCK_SECURITY_DEPOSIT`` = 640 ꜩ
+per block created and ``ENDORSEMENT_SECURITY_DEPOSIT`` = 2.5 ꜩ per
 endorsement slot.
 
 Each delegate key has an associated security deposit account.
