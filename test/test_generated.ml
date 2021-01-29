@@ -1352,6 +1352,31 @@ let roundtrip_binary_to_bytes pp ding v =
   in
   Crowbar.check_eq ~pp v vv
 
+let roundtrip_binary_to_string pp ding v =
+  let bin =
+    try Data_encoding.Binary.to_string_exn ding v
+    with Data_encoding.Binary.Write_error we ->
+      Format.kasprintf
+        Crowbar.fail
+        "Cannot construct: %a (%a)"
+        pp
+        v
+        Data_encoding.Binary.pp_write_error
+        we
+  in
+  let vv =
+    try Data_encoding.Binary.of_string_exn ding bin
+    with Data_encoding.Binary.Read_error re ->
+      Format.kasprintf
+        Crowbar.fail
+        "Cannot destruct: %a (%a)"
+        pp
+        v
+        Data_encoding.Binary.pp_read_error
+        re
+  in
+  Crowbar.check_eq ~pp v vv
+
 let roundtrip_binary_write pp ding v slack =
   let size = Data_encoding.Binary.length ding v in
   let buffer = Bytes.create (size + slack) in
@@ -1397,18 +1422,29 @@ let test_testable_binary_to_bytes (testable : testable) =
   let module T = (val testable) in
   roundtrip_binary_to_bytes T.pp T.ding T.v
 
+let test_testable_binary_to_string (testable : testable) =
+  let module T = (val testable) in
+  roundtrip_binary_to_string T.pp T.ding T.v
+
 let test_testable_binary_write (testable : testable) slack =
   let module T = (val testable) in
   roundtrip_binary_write T.pp T.ding T.v slack
 
 let () =
   Crowbar.add_test
-    ~name:"binary (to_bytes) roundtrips"
+    ~name:"binary (to_bytes/of_bytes) roundtrips"
     [gen]
     test_testable_binary_to_bytes ;
   Crowbar.add_test
-    ~name:"binary (write) roundtrips"
+    ~name:"binary (to_string/of_string) roundtrips"
+    [gen]
+    test_testable_binary_to_string ;
+  Crowbar.add_test
+    ~name:"binary (write/read) roundtrips"
     [gen; Crowbar.uint8]
     test_testable_binary_write ;
-  Crowbar.add_test ~name:"json roundtrips" [gen] test_testable_json ;
+  Crowbar.add_test
+    ~name:"json (construct/destruct) roundtrips"
+    [gen]
+    test_testable_json ;
   ()
