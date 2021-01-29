@@ -28,14 +28,14 @@
 
 val read :
   'a Encoding.t ->
-  Bytes.t ->
+  string ->
   int ->
   int ->
   (int * 'a, Binary_error_types.read_error) result
 
-val read_opt : 'a Encoding.t -> Bytes.t -> int -> int -> (int * 'a) option
+val read_opt : 'a Encoding.t -> string -> int -> int -> (int * 'a) option
 
-val read_exn : 'a Encoding.t -> Bytes.t -> int -> int -> int * 'a
+val read_exn : 'a Encoding.t -> string -> int -> int -> int * 'a
 
 val of_bytes :
   'a Encoding.t -> Bytes.t -> ('a, Binary_error_types.read_error) result
@@ -43,3 +43,10 @@ val of_bytes :
 val of_bytes_opt : 'a Encoding.t -> Bytes.t -> 'a option
 
 val of_bytes_exn : 'a Encoding.t -> Bytes.t -> 'a
+
+val of_string :
+  'a Encoding.t -> string -> ('a, Binary_error_types.read_error) result
+
+val of_string_opt : 'a Encoding.t -> string -> 'a option
+
+val of_string_exn : 'a Encoding.t -> string -> 'a

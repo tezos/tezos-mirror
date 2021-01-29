@@ -934,11 +934,11 @@ module Binary : sig
       [len] bytes. This function also returns the offset of the first
       unread bytes in the [buf]. *)
   val read :
-    'a Encoding.t -> Bytes.t -> int -> int -> (int * 'a, read_error) result
+    'a Encoding.t -> string -> int -> int -> (int * 'a, read_error) result
 
-  val read_opt : 'a Encoding.t -> Bytes.t -> int -> int -> (int * 'a) option
+  val read_opt : 'a Encoding.t -> string -> int -> int -> (int * 'a) option
 
-  val read_exn : 'a Encoding.t -> Bytes.t -> int -> int -> int * 'a
+  val read_exn : 'a Encoding.t -> string -> int -> int -> int * 'a
 
   (** Return type for the function [read_stream]. *)
   type 'ret status =
@@ -989,6 +989,14 @@ module Binary : sig
   (** [of_bytes_exn enc buf] is equivalent to [of_bytes], except
       @raise [Read_error] instead of returning [None] in case of error. *)
   val of_bytes_exn : 'a Encoding.t -> Bytes.t -> 'a
+
+  (** [of_string enc buf] is like [of_bytes enc buf] but it reads bytes from a
+      string. *)
+  val of_string : 'a Encoding.t -> string -> ('a, read_error) result
+
+  val of_string_opt : 'a Encoding.t -> string -> 'a option
+
+  val of_string_exn : 'a Encoding.t -> string -> 'a
 
   (** [to_bytes enc v] is the equivalent of [write env buf 0 len]
       where [buf] is a newly allocated buffer.

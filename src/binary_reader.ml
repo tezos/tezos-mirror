@@ -28,7 +28,7 @@ open Binary_error_types
 let raise e = raise (Read_error e)
 
 type state = {
-  buffer : Bytes.t;
+  buffer : string;
   mutable offset : int;
   mutable remaining_bytes : int;
   mutable allowed_bytes : int option;
@@ -56,32 +56,32 @@ let read_atom size conv state =
 
 (** Reader for all the atomic types. *)
 module Atom = struct
-  let uint8 = read_atom Binary_size.uint8 TzEndian.get_uint8
+  let uint8 = read_atom Binary_size.uint8 TzEndian.get_uint8_string
 
-  let uint16 = read_atom Binary_size.int16 TzEndian.get_uint16
+  let uint16 = read_atom Binary_size.int16 TzEndian.get_uint16_string
 
-  let int8 = read_atom Binary_size.int8 TzEndian.get_int8
+  let int8 = read_atom Binary_size.int8 TzEndian.get_int8_string
 
-  let int16 = read_atom Binary_size.int16 TzEndian.get_int16
+  let int16 = read_atom Binary_size.int16 TzEndian.get_int16_string
 
-  let int32 = read_atom Binary_size.int32 TzEndian.get_int32
+  let int32 = read_atom Binary_size.int32 TzEndian.get_int32_string
 
-  let int64 = read_atom Binary_size.int64 TzEndian.get_int64
+  let int64 = read_atom Binary_size.int64 TzEndian.get_int64_string
 
-  let float = read_atom Binary_size.float TzEndian.get_double
+  let float = read_atom Binary_size.float TzEndian.get_double_string
 
   let bool state = int8 state <> 0
 
   let uint30 =
     read_atom Binary_size.uint30
     @@ fun buffer ofs ->
-    let v = Int32.to_int (TzEndian.get_int32 buffer ofs) in
+    let v = Int32.to_int (TzEndian.get_int32_string buffer ofs) in
     if v < 0 then raise (Invalid_int {min = 0; v; max = (1 lsl 30) - 1}) ;
     v
 
   let int31 =
     read_atom Binary_size.int31
-    @@ fun buffer ofs -> Int32.to_int (TzEndian.get_int32 buffer ofs)
+    @@ fun buffer ofs -> Int32.to_int (TzEndian.get_int32_string buffer ofs)
 
   let int = function
     | `Int31 ->
@@ -174,10 +174,11 @@ module Atom = struct
     arr.(index)
 
   let fixed_length_bytes length =
-    read_atom length @@ fun buf ofs -> Bytes.sub buf ofs length
+    read_atom length
+    @@ fun buf ofs -> Bytes.unsafe_of_string @@ String.sub buf ofs length
 
   let fixed_length_string length =
-    read_atom length @@ fun buf ofs -> Bytes.sub_string buf ofs length
+    read_atom length @@ fun buf ofs -> String.sub buf ofs length
 
   let tag = function `Uint8 -> uint8 | `Uint16 -> uint16
 end
@@ -381,8 +382,8 @@ let read encoding buffer ofs len =
 let read_opt encoding buffer ofs len =
   try Some (read_exn encoding buffer ofs len) with Read_error _ -> None
 
-let of_bytes_exn encoding buffer =
-  let len = Bytes.length buffer in
+let of_string_exn encoding buffer =
+  let len = String.length buffer in
   let state =
     {buffer; offset = 0; remaining_bytes = len; allowed_bytes = None}
   in
@@ -390,8 +391,17 @@ let of_bytes_exn encoding buffer =
   if state.offset <> len then raise Extra_bytes ;
   v
 
+let of_string encoding buffer =
+  try Ok (of_string_exn encoding buffer) with Read_error err -> Error err
+
+let of_string_opt encoding buffer =
+  try Some (of_string_exn encoding buffer) with Read_error _ -> None
+
+let of_bytes_exn encoding buffer =
+  of_string_exn encoding (Bytes.unsafe_to_string buffer)
+
 let of_bytes encoding buffer =
-  try Ok (of_bytes_exn encoding buffer) with Read_error err -> Error err
+  of_string encoding (Bytes.unsafe_to_string buffer)
 
 let of_bytes_opt encoding buffer =
-  try Some (of_bytes_exn encoding buffer) with Read_error _ -> None
+  of_string_opt encoding (Bytes.unsafe_to_string buffer)
