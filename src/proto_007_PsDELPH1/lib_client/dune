@@ -8,7 +8,8 @@
             tezos-mockup-registration
             tezos-rpc
             tezos-signer-backends
-            tezos-protocol-007-PsDELPH1-parameters)
+            tezos-protocol-007-PsDELPH1-parameters
+            tezos-protocol-plugin-007-PsDELPH1)
  (library_flags (:standard -linkall))
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_shell_services
