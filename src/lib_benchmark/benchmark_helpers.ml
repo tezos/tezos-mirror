@@ -24,19 +24,20 @@
 (*****************************************************************************)
 
 let load_json file =
-  try
-    let json =
-      Lwt_main.run (Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file file)
-    in
-    match json with
-    | Error _e ->
-        Format.eprintf "load_json (%s): failed" file ;
-        exit 1
-    | Ok json ->
-        json
-  with Unix.Unix_error (Unix.ENOENT, _, _) ->
-    Format.eprintf "load_json: file %s not found, exiting" file ;
-    exit 1
+  let ic =
+    try open_in file
+    with Sys_error _ ->
+      Format.eprintf "load_json: file %s not found, exiting" file ;
+      exit 1
+  in
+  let json =
+    try Ezjsonm.from_channel ic
+    with Ezjsonm.Parse_error _ ->
+      close_in ic ;
+      Format.eprintf "load_json: file %s could not be parsed, exiting" file ;
+      exit 1
+  in
+  close_in ic ; json
 
 let make_progress_printer fmtr total message =
   let counter = ref 1 in
