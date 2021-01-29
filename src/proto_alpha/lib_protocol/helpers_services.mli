@@ -115,6 +115,13 @@ module Scripts : sig
     unparsing_mode:Script_ir_translator.unparsing_mode ->
     Script.expr shell_tzresult Lwt.t
 
+  val normalize_script :
+    'a #RPC_context.simple ->
+    'a ->
+    script:Script.expr ->
+    unparsing_mode:Script_ir_translator.unparsing_mode ->
+    Script.expr shell_tzresult Lwt.t
+
   val run_operation :
     'a #RPC_context.simple ->
     'a ->

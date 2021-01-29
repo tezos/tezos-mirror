@@ -217,6 +217,18 @@ module Scripts = struct
         ~query:RPC_query.empty
         RPC_path.(path / "normalize_data")
 
+    let normalize_script =
+      RPC_service.post_service
+        ~description:
+          "Normalizes a Michelson script using the requested unparsing mode"
+        ~input:
+          (obj2
+             (req "script" Script.expr_encoding)
+             (req "unparsing_mode" unparsing_mode_encoding))
+        ~output:(obj1 (req "normalized" Script.expr_encoding))
+        ~query:RPC_query.empty
+        RPC_path.(path / "normalize_script")
+
     let run_operation =
       RPC_service.post_service
         ~description:"Run an operation without signature checks"
@@ -553,6 +565,13 @@ module Scripts = struct
         >>=? fun (data, ctxt) ->
         Script_ir_translator.unparse_data ctxt unparsing_mode typ data
         >|=? fun (normalized, _ctxt) -> Micheline.strip_locations normalized) ;
+    register0 S.normalize_script (fun ctxt () (script, unparsing_mode) ->
+        let ctxt = Gas.set_unlimited ctxt in
+        Script_ir_translator.unparse_code
+          ctxt
+          unparsing_mode
+          (Micheline.root script)
+        >|=? fun (normalized, _ctxt) -> Micheline.strip_locations normalized) ;
     register0
       S.run_operation
       (fun ctxt
@@ -775,6 +794,14 @@ module Scripts = struct
       block
       ()
       (data, ty, unparsing_mode, legacy)
+
+  let normalize_script ctxt block ~script ~unparsing_mode =
+    RPC_context.make_call0
+      S.normalize_script
+      ctxt
+      block
+      ()
+      (script, unparsing_mode)
 
   let run_operation ctxt block ~op ~chain_id =
     RPC_context.make_call0 S.run_operation ctxt block () (op, chain_id)
