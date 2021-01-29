@@ -355,6 +355,16 @@ class Client:
             cmd += ['--legacy']
         return self.run(cmd)
 
+    def normalize_script(
+        self, script: str, mode: str = None, file: bool = True
+    ) -> str:
+        if file:
+            assert os.path.isfile(script), f'{script} is not a file'
+        cmd = ['normalize', 'script', script]
+        if mode is not None:
+            cmd += ['--unparsing-mode', mode]
+        return self.run(cmd)
+
     def sign(self, data: str, identity: str) -> str:
         cmd = ['sign', 'bytes', data, 'for', identity]
         return client_output.SignatureResult(self.run(cmd)).sig
