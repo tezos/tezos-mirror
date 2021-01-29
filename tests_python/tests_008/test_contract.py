@@ -1377,13 +1377,29 @@ class TestSelfAddressTransfer:
 class TestNormalize:
     """Regression tests for the "normalize data" command."""
 
-    def test_normalize(self, client_regtest_scrubbed):
+    modes = [None, 'Readable', 'Optimized', 'Optimized_legacy']
+
+    @pytest.mark.parametrize('mode', modes)
+    def test_normalize_unparsing_mode(self, client_regtest_scrubbed, mode):
         client = client_regtest_scrubbed
         input_data = (
             '{Pair 0 3 6 9; Pair 1 (Pair 4 (Pair 7 10)); {2; 5; 8; 11}}'
         )
         input_type = 'list (pair nat nat nat nat)'
-        client.normalize(input_data, input_type)
-        client.normalize(input_data, input_type, 'Readable')
-        client.normalize(input_data, input_type, 'Optimized')
-        client.normalize(input_data, input_type, 'Optimized_legacy')
+        client.normalize(input_data, input_type, mode=mode)
+
+    def test_normalize_legacy_flag(self, client_regtest_scrubbed):
+        client = client_regtest_scrubbed
+        input_data = '{Elt %a 0 1}'
+        input_type = 'map nat nat'
+        client.normalize(input_data, input_type, legacy=True)
+        error_pattern = 'unexpected annotation.'
+        with utils.assert_run_failure(error_pattern):
+            client.normalize(input_data, input_type, legacy=False)
+
+    @pytest.mark.parametrize('mode', modes)
+    def test_normalize_script(self, client_regtest_scrubbed, mode):
+        client = client_regtest_scrubbed
+        path = os.path.join(CONTRACT_PATH, 'opcodes', 'comb-literals.tz')
+        client.normalize_script(path, mode=mode)
+
