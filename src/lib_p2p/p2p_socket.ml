@@ -247,7 +247,9 @@ module Ack = struct
     let nack_encoding =
       obj2
         (req "nack_motive" P2p_rejection.encoding)
-        (req "nack_list" (Data_encoding.list P2p_point.Id.encoding))
+        (req
+           "nack_list"
+           (Data_encoding.list ~max_length:100 P2p_point.Id.encoding))
     in
     let ack_case tag =
       case

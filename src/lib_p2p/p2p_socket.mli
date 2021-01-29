@@ -120,7 +120,9 @@ val authenticate :
 (** [nack ac motive alts] sends a [Nack] message with the rejection
     [motive] and a list of proposed
     alternative points to the remote peer, notifying it
-    that its connection is rejected. It then closes the connection. *)
+    that its connection is rejected. It then closes the connection.
+
+    [alts] must contain less than 100 points or you will be greylisted *)
 val nack :
   'meta authenticated_connection ->
   P2p_rejection.t ->

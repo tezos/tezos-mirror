@@ -310,7 +310,8 @@ let raw_authenticate t ?point_info canceler fd point =
       t.log (Rejecting_request (point, info.id_point, info.peer_id)) ;
       Events.(emit authenticate_status ("nack", point, info.peer_id))
       >>= fun () ->
-      P2p_pool.list_known_points ~ignore_private:true t.pool
+      P2p_pool.list_known_points ~ignore_private:true ~size:50 t.pool
+      (* Never send more than 100 points, you would be greylisted *)
       >>= fun point_list ->
       P2p_socket.nack auth_fd motive point_list
       >>= fun () ->
