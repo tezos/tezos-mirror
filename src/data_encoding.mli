@@ -1005,6 +1005,20 @@ module Binary : sig
       @raise [Write_error] instead of returning [None] in case of error. *)
   val to_bytes_exn : ?buffer_size:int -> 'a Encoding.t -> 'a -> Bytes.t
 
+  (** [to_string enc v] is like [to_bytes] but it returns a string.
+
+      Note: [to_string enc v] is always equal to
+      [Bytes.to_string (to_bytes enc v)] but more efficient.
+
+      @raise [Invalid_argument] if [buffer_size < 0]. *)
+  val to_string :
+    ?buffer_size:int -> 'a Encoding.t -> 'a -> (string, write_error) result
+
+  val to_string_opt : ?buffer_size:int -> 'a Encoding.t -> 'a -> string option
+
+  (** @raise [Write_error] instead of returning [None] in case of error. *)
+  val to_string_exn : ?buffer_size:int -> 'a Encoding.t -> 'a -> string
+
   val describe : 'a Encoding.t -> Binary_schema.t
 end
 

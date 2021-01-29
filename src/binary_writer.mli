@@ -50,3 +50,13 @@ val to_bytes :
 val to_bytes_opt : ?buffer_size:int -> 'a Encoding.t -> 'a -> Bytes.t option
 
 val to_bytes_exn : ?buffer_size:int -> 'a Encoding.t -> 'a -> Bytes.t
+
+val to_string :
+  ?buffer_size:int ->
+  'a Encoding.t ->
+  'a ->
+  (string, Binary_error_types.write_error) result
+
+val to_string_opt : ?buffer_size:int -> 'a Encoding.t -> 'a -> string option
+
+val to_string_exn : ?buffer_size:int -> 'a Encoding.t -> 'a -> string

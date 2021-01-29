@@ -416,3 +416,12 @@ let to_bytes_exn ?buffer_size e v =
              "Data_encoding.Binary_writer.to_bytes: negative length"))
     buffer_size ;
   to_bytes_exn ?buffer_size e v
+
+let to_string_opt ?buffer_size e v =
+  Option.map Bytes.unsafe_to_string (to_bytes_opt ?buffer_size e v)
+
+let to_string ?buffer_size e v =
+  Result.map Bytes.unsafe_to_string (to_bytes ?buffer_size e v)
+
+let to_string_exn ?buffer_size e v =
+  Bytes.unsafe_to_string (to_bytes_exn ?buffer_size e v)
