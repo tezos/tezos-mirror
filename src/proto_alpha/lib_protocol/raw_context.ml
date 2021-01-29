@@ -826,6 +826,7 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
             first_time_between_blocks )
         |> Period_repr.to_seconds
       in
+      let mainnet_constants = Compare.Int.(c.initial_endorsers = 24) in
       let constants =
         Constants_repr.
           {
@@ -840,7 +841,7 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
             blocks_per_roll_snapshot = c.blocks_per_roll_snapshot;
             blocks_per_voting_period = c.blocks_per_voting_period;
             time_between_blocks = c.time_between_blocks;
-            endorsers_per_block = c.endorsers_per_block;
+            endorsers_per_block = 256;
             hard_gas_limit_per_operation = c.hard_gas_limit_per_operation;
             hard_gas_limit_per_block = c.hard_gas_limit_per_block;
             proof_of_work_threshold = c.proof_of_work_threshold;
@@ -848,18 +849,23 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
             michelson_maximum_type_size = c.michelson_maximum_type_size;
             seed_nonce_revelation_tip = c.seed_nonce_revelation_tip;
             origination_size = c.origination_size;
-            block_security_deposit = c.block_security_deposit;
-            endorsement_security_deposit = c.endorsement_security_deposit;
-            baking_reward_per_endorsement = c.baking_reward_per_endorsement;
-            endorsement_reward = c.endorsement_reward;
+            block_security_deposit = Tez_repr.(mul_exn one 640);
+            endorsement_security_deposit = Tez_repr.(mul_exn one_cent 250);
+            baking_reward_per_endorsement =
+              Tez_repr.[of_mutez_exn 78_125L; of_mutez_exn 11_719L];
+            endorsement_reward =
+              Tez_repr.[of_mutez_exn 78_125L; of_mutez_exn 52_083L];
             hard_storage_limit_per_operation =
               c.hard_storage_limit_per_operation;
             cost_per_byte = c.cost_per_byte;
             quorum_min = c.quorum_min;
             quorum_max = c.quorum_max;
             min_proposal_quorum = c.min_proposal_quorum;
-            initial_endorsers = c.initial_endorsers;
-            delay_per_missing_endorsement = c.delay_per_missing_endorsement;
+            initial_endorsers =
+              (if mainnet_constants then 192 else c.initial_endorsers);
+            delay_per_missing_endorsement =
+              ( if mainnet_constants then Period_repr.of_seconds_exn 4L
+              else c.delay_per_missing_endorsement );
           }
       in
       add_constants ctxt constants >|= ok )
