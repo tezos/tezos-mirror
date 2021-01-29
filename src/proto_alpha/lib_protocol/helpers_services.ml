@@ -27,6 +27,8 @@ open Alpha_context
 
 type error += Cannot_parse_operation (* `Branch *)
 
+type error += Cannot_serialize_log
+
 let () =
   register_error_kind
     `Branch
@@ -36,7 +38,18 @@ let () =
     ~pp:(fun ppf () -> Format.fprintf ppf "The operation cannot be parsed")
     Data_encoding.unit
     (function Cannot_parse_operation -> Some () | _ -> None)
-    (fun () -> Cannot_parse_operation)
+    (fun () -> Cannot_parse_operation) ;
+  (* Cannot serialize log *)
+  register_error_kind
+    `Temporary
+    ~id:"michelson_v1.cannot_serialize_log"
+    ~title:"Not enough gas to serialize execution trace"
+    ~description:
+      "Execution trace with stacks was to big to be serialized with the \
+       provided gas"
+    Data_encoding.empty
+    (function Cannot_serialize_log -> Some () | _ -> None)
+    (fun () -> Cannot_serialize_log)
 
 let parse_operation (op : Operation.raw) =
   match
@@ -54,19 +67,6 @@ module Scripts = struct
     open Data_encoding
 
     let path = RPC_path.(path / "scripts")
-
-    let run_code_input_encoding =
-      obj10
-        (req "script" Script.expr_encoding)
-        (req "storage" Script.expr_encoding)
-        (req "input" Script.expr_encoding)
-        (req "amount" Tez.encoding)
-        (req "balance" Tez.encoding)
-        (req "chain_id" Chain_id.encoding)
-        (opt "source" Contract.encoding)
-        (opt "payer" Contract.encoding)
-        (opt "gas" Gas.Arith.z_integral_encoding)
-        (dft "entrypoint" string "default")
 
     let unparsing_mode_encoding =
       let open Script_ir_translator in
@@ -93,6 +93,21 @@ module Scripts = struct
             (function
               | Optimized_legacy -> Some () | Readable | Optimized -> None)
             (fun () -> Optimized_legacy) ]
+
+    let run_code_input_encoding =
+      merge_objs
+        (obj10
+           (req "script" Script.expr_encoding)
+           (req "storage" Script.expr_encoding)
+           (req "input" Script.expr_encoding)
+           (req "amount" Tez.encoding)
+           (req "balance" Tez.encoding)
+           (req "chain_id" Chain_id.encoding)
+           (opt "source" Contract.encoding)
+           (opt "payer" Contract.encoding)
+           (opt "gas" Gas.Arith.z_integral_encoding)
+           (dft "entrypoint" string "default"))
+        (obj1 (opt "unparsing_mode" unparsing_mode_encoding))
 
     let trace_encoding =
       def "scripted.trace" @@ list
@@ -271,22 +286,11 @@ module Scripts = struct
         RPC_path.(path / "entrypoints")
   end
 
-  module Traced_interpreter = struct
-    type error += Cannot_serialize_log
+  module type UNPARSING_MODE = sig
+    val unparsing_mode : Script_ir_translator.unparsing_mode
+  end
 
-    let () =
-      (* Cannot serialize log *)
-      register_error_kind
-        `Temporary
-        ~id:"michelson_v1.cannot_serialize_log"
-        ~title:"Not enough gas to serialize execution trace"
-        ~description:
-          "Execution trace with stacks was to big to be serialized with the \
-           provided gas"
-        Data_encoding.empty
-        (function Cannot_serialize_log -> Some () | _ -> None)
-        (fun () -> Cannot_serialize_log)
-
+  module Traced_interpreter (Unparsing_mode : UNPARSING_MODE) = struct
     type log_element =
       | Log :
           context * Script.location * 'a * 'a Script_typed_ir.stack_ty
@@ -302,7 +306,11 @@ module Scripts = struct
         | (Empty_t, ()) ->
             return_nil
         | (Item_t (ty, rest_ty, annot), (v, rest)) ->
-            Script_ir_translator.unparse_data ctxt Readable ty v
+            Script_ir_translator.unparse_data
+              ctxt
+              Unparsing_mode.unparsing_mode
+              ty
+              v
             >>=? fun (data, _ctxt) ->
             unparse_stack (rest_ty, rest)
             >|=? fun rest ->
@@ -340,14 +348,14 @@ module Scripts = struct
         >>=? fun res -> return (Some (List.rev res))
     end
 
-    let execute ctxt mode step_constants ~script ~entrypoint ~parameter =
+    let execute ctxt step_constants ~script ~entrypoint ~parameter =
       let module Logger = Trace_logger () in
       let open Script_interpreter in
       let logger = (module Logger : STEP_LOGGER) in
       execute
         ~logger
         ctxt
-        mode
+        Unparsing_mode.unparsing_mode
         step_constants
         ~script
         ~entrypoint
@@ -409,17 +417,19 @@ module Scripts = struct
       S.run_code
       (fun ctxt
            ()
-           ( code,
-             storage,
-             parameter,
-             amount,
-             balance,
-             chain_id,
-             source,
-             payer,
-             gas,
-             entrypoint )
+           ( ( code,
+               storage,
+               parameter,
+               amount,
+               balance,
+               chain_id,
+               source,
+               payer,
+               gas,
+               entrypoint ),
+             unparsing_mode )
            ->
+        let unparsing_mode = Option.value ~default:Readable unparsing_mode in
         let storage = Script.lazy_expr storage in
         let code = Script.lazy_expr code in
         originate_dummy_contract ctxt {storage; code} balance
@@ -449,7 +459,7 @@ module Scripts = struct
         in
         Script_interpreter.execute
           ctxt
-          Readable
+          unparsing_mode
           step_constants
           ~script:{storage; code}
           ~entrypoint
@@ -461,17 +471,19 @@ module Scripts = struct
       S.trace_code
       (fun ctxt
            ()
-           ( code,
-             storage,
-             parameter,
-             amount,
-             balance,
-             chain_id,
-             source,
-             payer,
-             gas,
-             entrypoint )
+           ( ( code,
+               storage,
+               parameter,
+               amount,
+               balance,
+               chain_id,
+               source,
+               payer,
+               gas,
+               entrypoint ),
+             unparsing_mode )
            ->
+        let unparsing_mode = Option.value ~default:Readable unparsing_mode in
         let storage = Script.lazy_expr storage in
         let code = Script.lazy_expr code in
         originate_dummy_contract ctxt {storage; code} balance
@@ -499,9 +511,12 @@ module Scripts = struct
           let open Script_interpreter in
           {source; payer; self = dummy_contract; amount; chain_id}
         in
-        Traced_interpreter.execute
+        let module Unparsing_mode = struct
+          let unparsing_mode = unparsing_mode
+        end in
+        let module Interp = Traced_interpreter (Unparsing_mode) in
+        Interp.execute
           ctxt
-          Readable
           step_constants
           ~script:{storage; code}
           ~entrypoint
@@ -737,41 +752,43 @@ module Scripts = struct
               map
               [] ) ))
 
-  let run_code ctxt block ?gas ?(entrypoint = "default") ~script ~storage
-      ~input ~amount ~balance ~chain_id ~source ~payer =
+  let run_code ctxt block ?unparsing_mode ?gas ?(entrypoint = "default")
+      ~script ~storage ~input ~amount ~balance ~chain_id ~source ~payer =
     RPC_context.make_call0
       S.run_code
       ctxt
       block
       ()
-      ( script,
-        storage,
-        input,
-        amount,
-        balance,
-        chain_id,
-        source,
-        payer,
-        gas,
-        entrypoint )
+      ( ( script,
+          storage,
+          input,
+          amount,
+          balance,
+          chain_id,
+          source,
+          payer,
+          gas,
+          entrypoint ),
+        unparsing_mode )
 
-  let trace_code ctxt block ?gas ?(entrypoint = "default") ~script ~storage
-      ~input ~amount ~balance ~chain_id ~source ~payer =
+  let trace_code ctxt block ?unparsing_mode ?gas ?(entrypoint = "default")
+      ~script ~storage ~input ~amount ~balance ~chain_id ~source ~payer =
     RPC_context.make_call0
       S.trace_code
       ctxt
       block
       ()
-      ( script,
-        storage,
-        input,
-        amount,
-        balance,
-        chain_id,
-        source,
-        payer,
-        gas,
-        entrypoint )
+      ( ( script,
+          storage,
+          input,
+          amount,
+          balance,
+          chain_id,
+          source,
+          payer,
+          gas,
+          entrypoint ),
+        unparsing_mode )
 
   let typecheck_code ctxt block ?gas ?legacy ~script =
     RPC_context.make_call0 S.typecheck_code ctxt block () (script, gas, legacy)

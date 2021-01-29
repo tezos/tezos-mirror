@@ -220,7 +220,7 @@ let commands () =
     command
       ~group
       ~desc:"Ask the node to run a script."
-      (args8
+      (args9
          trace_stack_switch
          amount_arg
          balance_arg
@@ -228,7 +228,8 @@ let commands () =
          payer_arg
          no_print_source_flag
          custom_gas_flag
-         entrypoint_arg)
+         entrypoint_arg
+         (unparsing_mode_arg ~default:"Readable"))
       ( prefixes ["run"; "script"]
       @@ Program.source_param
       @@ prefixes ["on"; "storage"]
@@ -243,7 +244,8 @@ let commands () =
              payer,
              no_print_source,
              gas,
-             entrypoint )
+             entrypoint,
+             unparsing_mode )
            program
            storage
            input
@@ -263,6 +265,7 @@ let commands () =
             ~program
             ~storage
             ~input
+            ~unparsing_mode
             ?source
             ?payer
             ?gas
@@ -280,6 +283,7 @@ let commands () =
             ~program
             ~storage
             ~input
+            ~unparsing_mode
             ?source
             ?payer
             ?gas

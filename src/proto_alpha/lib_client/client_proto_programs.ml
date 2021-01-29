@@ -105,7 +105,9 @@ let run (cctxt : #Protocol_client_context.rpc_context)
     ~(chain : Chain_services.chain) ~block ?(amount = Tez.fifty_cents) ~balance
     ~(program : Michelson_v1_parser.parsed)
     ~(storage : Michelson_v1_parser.parsed)
-    ~(input : Michelson_v1_parser.parsed) ?source ?payer ?gas ?entrypoint () =
+    ~(input : Michelson_v1_parser.parsed)
+    ~(unparsing_mode : Script_ir_translator.unparsing_mode) ?source ?payer ?gas
+    ?entrypoint () =
   Chain_services.chain_id cctxt ~chain ()
   >>=? fun chain_id ->
   Alpha_services.Helpers.Scripts.run_code
@@ -113,6 +115,7 @@ let run (cctxt : #Protocol_client_context.rpc_context)
     (chain, block)
     ?gas
     ?entrypoint
+    ~unparsing_mode
     ~script:program.expanded
     ~storage:storage.expanded
     ~input:input.expanded
@@ -126,7 +129,9 @@ let trace (cctxt : #Protocol_client_context.rpc_context)
     ~(chain : Chain_services.chain) ~block ?(amount = Tez.fifty_cents) ~balance
     ~(program : Michelson_v1_parser.parsed)
     ~(storage : Michelson_v1_parser.parsed)
-    ~(input : Michelson_v1_parser.parsed) ?source ?payer ?gas ?entrypoint () =
+    ~(input : Michelson_v1_parser.parsed)
+    ~(unparsing_mode : Script_ir_translator.unparsing_mode) ?source ?payer ?gas
+    ?entrypoint () =
   Chain_services.chain_id cctxt ~chain ()
   >>=? fun chain_id ->
   Alpha_services.Helpers.Scripts.trace_code
@@ -134,6 +139,7 @@ let trace (cctxt : #Protocol_client_context.rpc_context)
     (chain, block)
     ?gas
     ?entrypoint
+    ~unparsing_mode
     ~script:program.expanded
     ~storage:storage.expanded
     ~input:input.expanded

@@ -27,6 +27,8 @@ open Alpha_context
 
 type error += Cannot_parse_operation (* `Branch *)
 
+type error += Cannot_serialize_log
+
 val current_level :
   'a #RPC_context.simple ->
   ?offset:int32 ->
@@ -40,13 +42,10 @@ val levels_in_current_cycle :
   (Raw_level.t * Raw_level.t) shell_tzresult Lwt.t
 
 module Scripts : sig
-  module Traced_interpreter : sig
-    type error += Cannot_serialize_log
-  end
-
   val run_code :
     'a #RPC_context.simple ->
     'a ->
+    ?unparsing_mode:Script_ir_translator.unparsing_mode ->
     ?gas:Gas.Arith.integral ->
     ?entrypoint:string ->
     script:Script.expr ->
@@ -64,6 +63,7 @@ module Scripts : sig
   val trace_code :
     'a #RPC_context.simple ->
     'a ->
+    ?unparsing_mode:Script_ir_translator.unparsing_mode ->
     ?gas:Gas.Arith.integral ->
     ?entrypoint:string ->
     script:Script.expr ->
