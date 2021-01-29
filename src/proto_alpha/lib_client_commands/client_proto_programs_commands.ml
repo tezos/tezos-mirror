@@ -460,6 +460,36 @@ let commands () =
             >>= fun () -> return_unit);
     command
       ~group
+      ~desc:"Ask the node to normalize a script."
+      (args1 (unparsing_mode_arg ~default:"Readable"))
+      (prefixes ["normalize"; "script"] @@ Program.source_param @@ stop)
+      (fun unparsing_mode program cctxt ->
+        Lwt.return @@ Micheline_parser.no_parsing_error program
+        >>=? fun program ->
+        Alpha_services.Helpers.Scripts.normalize_script
+          cctxt
+          (cctxt#chain, cctxt#block)
+          ~script:program.expanded
+          ~unparsing_mode
+        >>= function
+        | Ok program ->
+            cctxt#message
+              "%a"
+              (fun ppf () ->
+                (Michelson_v1_printer.print_expr_unwrapped ppf program : unit))
+              ()
+            >>= fun () -> return_unit
+        | Error errs ->
+            cctxt#warning
+              "%a"
+              (Michelson_v1_error_reporter.report_errors
+                 ~details:false
+                 ~show_source:false
+                 ?parsed:None)
+              errs
+            >>= fun () -> cctxt#error "ill-typed script");
+    command
+      ~group
       ~desc:"Ask the node to normalize a data expression."
       (args2 (unparsing_mode_arg ~default:"Readable") legacy_switch)
       ( prefixes ["normalize"; "data"]
