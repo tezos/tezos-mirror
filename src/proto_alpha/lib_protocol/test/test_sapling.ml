@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (Sapling)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^sapling$"
+    Invocation: cd src/proto_alpha/lib_protocol/test
+                dune exec ./main.exe -- test "^sapling$"
     Subject:    On the privacy-preserving library Sapling
 *)
 

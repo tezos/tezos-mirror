@@ -25,8 +25,8 @@
 
 (* Testing
    -------
-   Component:    P2p
-   Invocation:   make && dune exec tezt/tests/main.exe -- --file p2p.ml
+   Component:    P2P
+   Invocation:   dune exec tezt/tests/main.exe -- --file p2p.ml
    Subject:      Integration tests of p2p layer.
 *)
 

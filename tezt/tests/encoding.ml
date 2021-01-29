@@ -26,7 +26,7 @@
 (* Testing
    -------
    Component: encoding tests
-   Invocation: [dune exec tezt/tests/main.exe encoding]
+   Invocation: dune exec tezt/tests/main.exe encoding
 
                To only run the regression tests:
                [dune exec tezt/tests/main.exe encoding regression]
@@ -42,7 +42,7 @@
 
             The other test checks that the [tezos-codec] can successfully dump
             the list of encodings.
-  *)
+*)
 
 let check_dump_encodings () =
   Test.register

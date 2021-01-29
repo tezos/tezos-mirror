@@ -26,7 +26,7 @@
 (* Testing
    -------
    Component: RPC regression tests
-   Invocation: [dune exec tezt/tests/main.exe rpc regression]
+   Invocation: dune exec tezt/tests/main.exe rpc regression
 
                Note that to reset the regression outputs, one can use
                the [--reset-regressions] option. When doing so, it is

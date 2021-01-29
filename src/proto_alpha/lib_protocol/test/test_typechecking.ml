@@ -1,7 +1,8 @@
 (** Testing
     -------
     Component:    Protocol (type-checking)
-    Invocation:   dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^typechecking$"
+    Invocation:   cd src/proto_alpha/lib_protocol/test
+                  dune exec ./main.exe -- test "^typechecking$"
     Subject:      Type-checking
 *)
 
