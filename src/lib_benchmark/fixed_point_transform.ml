@@ -37,6 +37,11 @@ type options = {
   max_relative_error : float;
       (** Percentage of admissible relative error when casting floats to ints  *)
   cast_mode : cast_mode;
+  inverse_scaling : int;
+      (** The constant prettification will consider 1/inverse_scaling digits to
+          be not significant. *)
+  resolution : int;
+      (** Resolution of the grid using when prettifying constants.  *)
 }
 
 (* Handling bad floating point values.  *)
@@ -54,8 +59,15 @@ exception Bad_floating_point_number of fp_error
 exception Codegen_error of fixed_point_transform_error
 
 (* ------------------------------------------------------------------------- *)
+
 let default_options =
-  {precision = 3; max_relative_error = 0.1; cast_mode = Round}
+  {
+    precision = 3;
+    max_relative_error = 0.1;
+    cast_mode = Round;
+    inverse_scaling = 3;
+    resolution = 5;
+  }
 
 (* ------------------------------------------------------------------------- *)
 (* Printers, encodings, etc. *)
@@ -110,14 +122,18 @@ let cast_mode_encoding =
 let options_encoding =
   let open Data_encoding in
   conv
-    (fun {precision; max_relative_error; cast_mode} ->
-      (precision, max_relative_error, cast_mode))
-    (fun (precision, max_relative_error, cast_mode) ->
-      {precision; max_relative_error; cast_mode})
-    (obj3
+    (fun {precision; max_relative_error; cast_mode; inverse_scaling; resolution}
+         ->
+      (precision, max_relative_error, cast_mode, inverse_scaling, resolution))
+    (fun (precision, max_relative_error, cast_mode, inverse_scaling, resolution)
+         ->
+      {precision; max_relative_error; cast_mode; inverse_scaling; resolution})
+    (obj5
        (req "precision" int31)
        (req "max_relative_error" float)
-       (req "cast_mode" cast_mode_encoding))
+       (req "cast_mode" cast_mode_encoding)
+       (req "inverse_scaling" int31)
+       (req "resolution" int31))
 
 (* ------------------------------------------------------------------------- *)
 (* Error registration *)
@@ -150,6 +166,25 @@ let () =
           Some s
       | _ ->
           None)
+
+(* ------------------------------------------------------------------------- *)
+(* Constant prettification *)
+
+let rec log10 x =
+  if x <= 0 then invalid_arg "log10"
+  else if x <= 10 then 1
+  else 1 + log10 (x / 10)
+
+let rec pow x n =
+  if n < 0 then invalid_arg "pow"
+  else if n = 0 then 1
+  else if n = 1 then x
+  else x * pow x (n - 1)
+
+let snap_to_grid ~inverse_scaling ~resolution x =
+  let not_significant = log10 x / inverse_scaling in
+  let grid = resolution * pow 10 not_significant in
+  grid * (1 + (x / grid))
 
 (* ------------------------------------------------------------------------- *)
 (* Helpers *)
@@ -291,18 +326,24 @@ module Fixed_point_arithmetic (Lang : Fixed_point_lang_sig) = struct
 end
 
 (* ------------------------------------------------------------------------- *)
-(* [Convert_floats] approximates floating point constants by integer ones. *)
+(* [Prettify_constants] map float and int constants to an integer grid. *)
 
-module Convert_floats (P : sig
+module Prettify_constants (P : sig
   val options : options
 end)
 (X : Costlang.S) :
   Costlang.S with type 'a repr = 'a X.repr and type size = X.size = struct
-  let {max_relative_error; cast_mode; _} = P.options
+  let {max_relative_error; cast_mode; inverse_scaling; resolution; _} =
+    P.options
 
   include X
 
-  let float f = X.int (cast_safely_to_int max_relative_error cast_mode f)
+  let int i = X.int (snap_to_grid ~inverse_scaling ~resolution i)
+
+  let float f =
+    let int = cast_safely_to_int max_relative_error cast_mode f in
+    let pretty_int = snap_to_grid ~inverse_scaling ~resolution int in
+    X.int pretty_int
 end
 
 (* [Convert_mult] approximates multiplications of the form [float * term] or
@@ -327,7 +368,7 @@ end = struct
 
   module FPA = Fixed_point_arithmetic (X)
 
-  let {precision; max_relative_error; cast_mode} = P.options
+  let {precision; max_relative_error; cast_mode; _} = P.options
 
   let cast_safely_to_int = cast_safely_to_int max_relative_error
 
@@ -428,4 +469,4 @@ end
 module Apply (P : sig
   val options : options
 end) : Costlang.Transform =
-  functor (X : Costlang.S) -> Convert_mult (P) (Convert_floats (P) (X))
+  functor (X : Costlang.S) -> Convert_mult (P) (Prettify_constants (P) (X))
