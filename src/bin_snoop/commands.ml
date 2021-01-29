@@ -629,23 +629,27 @@ module Codegen_cmd = struct
       | None ->
           No_transform
       | Some json_file -> (
-          let json = Benchmark_helpers.load_json json_file in
-          try
-            Fixed_point_transform
-              (Data_encoding.Json.destruct
-                 Fixed_point_transform.options_encoding
-                 json)
-          with _ ->
-            Format.eprintf
-              "Could not parse fixed-point transform parameters; aborting@." ;
-            Format.eprintf "Here's a well-formed file:@." ;
-            Format.eprintf
-              "%a@."
-              Data_encoding.Json.pp
-              (Data_encoding.Json.construct
-                 Fixed_point_transform.options_encoding
-                 Fixed_point_transform.default_options) ;
-            exit 1 )
+        try
+          let json =
+            let ic = open_in json_file in
+            let json = Ezjsonm.from_channel ic in
+            close_in ic ; json
+          in
+          Fixed_point_transform
+            (Data_encoding.Json.destruct
+               Fixed_point_transform.options_encoding
+               json)
+        with _ ->
+          Format.eprintf
+            "Could not parse fixed-point transform parameters; aborting@." ;
+          Format.eprintf "Here's a well-formed file:@." ;
+          Format.eprintf
+            "%a@."
+            Data_encoding.Json.pp
+            (Data_encoding.Json.construct
+               Fixed_point_transform.options_encoding
+               Fixed_point_transform.default_options) ;
+          exit 1 )
     in
     commandline_outcome_ref :=
       Some (Codegen {solution; model_name; codegen_options}) ;
