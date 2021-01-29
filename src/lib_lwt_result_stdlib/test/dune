@@ -7,7 +7,9 @@
   test_fuzzing_list
   test_fuzzing_set
  )
- (libraries tezos-lwt-result-stdlib
+ (libraries
+            tezos-lwt-result-stdlib
+            tezos-lwt-result-stdlib.traces
             tezos-error-monad
             lwt.unix
             alcotest-lwt

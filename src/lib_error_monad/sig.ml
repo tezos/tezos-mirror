@@ -188,6 +188,20 @@ module type TRACE = sig
   *)
   val cons : 'error -> 'error trace -> 'error trace
 
+  (** [cons_list error errors] is the sequential composition of all the errors
+      passed as parameters. It is equivalent to folding [cons] over
+      [List.rev error :: errors] but more efficient.
+
+      Note that [error] and [errors] are separated as parameters to enforce that
+      empty traces cannot be constructed. The recommended use is:
+{[
+   match all_errors with
+   | [] -> Ok () (* or something else depending on the context *)
+   | error :: errors -> Error (cons_list error errors)
+]}
+  *)
+  val cons_list : 'error -> 'error list -> 'error trace
+
   (** [conp t1 t2] (construct parallel) construct a parallel trace. This is for
       tracing events/failure/things that happen concurrently, in parallel, or
       simply independently of each other. E.g.,
@@ -202,6 +216,20 @@ module type TRACE = sig
       ]
   *)
   val conp : 'error trace -> 'error trace -> 'error trace
+
+  (** [conp_list trace traces] is the parallel composition of all the traces
+      passed as parameters. It is equivalent to [List.fold_left conp trace traces]
+      but more efficient.
+
+      Note that [trace] and [traces] are separated as parameters to enforce that
+      empty traces cannot be constructed. The recommended use is:
+{[
+   match all_traces with
+   | [] -> Ok () (* or something else depending on the context *)
+   | trace :: traces -> Error (conp_list trace traces)
+]}
+  *)
+  val conp_list : 'err trace -> 'err trace list -> 'err trace
 
   (** [pp_print] pretty-prints a trace of errors *)
   val pp_print :

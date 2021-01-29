@@ -44,18 +44,32 @@
 
 *)
 
-module Seq : module type of Lib.Seq
+module Trace = Tezos_error_monad.Error_monad.TzTrace
 
-module Set : module type of Lib.Set
+module Monad : Traced_sigs.Monad.S with type 'error trace = 'error Trace.trace
 
-module Map : module type of Lib.Map
+module Hashtbl :
+  Traced_sigs.Hashtbl.LWTRESLIB_TRACED_HASHTBL_S
+    with type 'error trace := 'error Trace.trace
 
-module Hashtbl : module type of Lib.Hashtbl
+module List :
+  Traced_sigs.List.LWTRESLIB_TRACED_LIST_S
+    with type 'error trace := 'error Trace.trace
 
-module List : module type of Lib.List
+module Map :
+  Traced_sigs.Map.LWTRESLIB_TRACED_MAP_S
+    with type 'error trace := 'error Trace.trace
 
-module Option : module type of Lib.Option
+module Option : Traced_sigs.Option.S
 
-module Result : module type of Lib.Result
+module Result : Traced_sigs.Result.S
 
-module WithExceptions : module type of Lib.WithExceptions
+module Seq :
+  Traced_sigs.Seq.LWTRESLIB_TRACED_SEQ_S
+    with type 'error trace := 'error Trace.trace
+
+module Set :
+  Traced_sigs.Set.LWTRESLIB_TRACED_SET_S
+    with type 'error trace := 'error Trace.trace
+
+module WithExceptions : Traced_sigs.WithExceptions.S

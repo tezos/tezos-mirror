@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Lwtreslib.Seq.Monad
+open Support.Lib.Monad
 
 let assert_eq_s pa pb =
   let open Lwt.Infix in
@@ -47,11 +47,11 @@ let assert_err_p e =
   let open Lwt.Infix in
   e
   >>= fun e ->
-  assert (e = Error (make ())) ;
+  assert (e = Error (Support.Test_trace.make ())) ;
   Lwt.return_unit
 
 module ListGen = struct
-  include Lwtreslib.List
+  include Support.Lib.List
 
   let rec down n : int t = if n < 0 then [] else n :: down (pred n)
 

@@ -23,11 +23,5 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Seq = Lib.Seq
-module Set = Lib.Set
-module Map = Lib.Map
-module Hashtbl = Lib.Hashtbl
-module List = Lib.List
-module Option = Lib.Option
-module Result = Lib.Result
-module WithExceptions = Lib.WithExceptions
+module Trace = Tezos_error_monad.Error_monad.TzTrace
+include Traced_structs.Structs.Make (Trace)

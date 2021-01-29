@@ -28,7 +28,7 @@ open Test_fuzzing_tests
 module SeqWithBase = struct
   type 'a elt = 'a
 
-  include Lwtreslib.Seq
+  include Support.Lib.Seq
 
   let of_list = List.to_seq
 

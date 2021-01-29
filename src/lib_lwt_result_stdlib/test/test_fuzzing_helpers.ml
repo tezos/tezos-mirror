@@ -23,8 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Lwt.Infix
-open Lwtreslib.Seq.Monad
+open Support.Lib.Monad
 
 let rec log_pause n =
   if n <= 0 then Lwt.return_unit
@@ -260,7 +259,7 @@ end
 module IterESOf = struct
   let fn r fn y =
     r := fn !r y ;
-    return_unit
+    unit_es
 
   let fn_e r fn y = Lwt.return @@ fn !r y >|=? fun t -> r := t
 
@@ -276,7 +275,7 @@ end
 module IteriESOf = struct
   let fn r fn i y =
     r := fn !r (fn i y) ;
-    return_unit
+    unit_es
 
   let fn_e r fn i y =
     Lwt.return @@ fn i y
@@ -296,7 +295,7 @@ end
 module Iter2ESOf = struct
   let fn r fn x y =
     r := fn x y ;
-    return_unit
+    unit_es
 
   let fn_e r fn x y = Lwt.return @@ fn x y >|=? fun t -> r := t
 
@@ -353,6 +352,11 @@ module MapEPOf = struct
 
   let fn_es const fn elt =
     fn const elt >>= function Ok ok -> return ok | Error err -> fail err
+
+  let fn_ep const fn elt =
+    fn const elt
+    >>= function
+    | Ok ok -> return ok | Error err -> fail (Support.Test_trace.make err)
 end
 
 module Map2ESOf = struct

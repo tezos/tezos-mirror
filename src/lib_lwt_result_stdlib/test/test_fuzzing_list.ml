@@ -28,7 +28,7 @@ open Test_fuzzing_tests
 module ListWithBase = struct
   type 'a elt = 'a
 
-  include Lwtreslib.List
+  include Support.Lib.List
 
   let of_list = Fun.id
 

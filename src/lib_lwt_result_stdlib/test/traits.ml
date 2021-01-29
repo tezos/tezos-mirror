@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Lwtreslib.Seq.Monad
+type 'error trace = 'error Support.Lib.Monad.trace
 
 module type BASE = sig
   val name : string

@@ -25,8 +25,7 @@
 
 open Traits
 open Test_fuzzing_helpers
-open Lwt.Infix
-open Lwtreslib.Seq.Monad
+open Support.Lib.Monad
 
 (* In the following, in order to reduce the time, output and complexity and
    testing, we only test for the most general case (i.e., when testing an
@@ -44,7 +43,7 @@ open Lwtreslib.Seq.Monad
    person debugging the code to write additional specialised tests. *)
 
 module TestIterFold (M : sig
-  include BASE with type 'a elt := int
+  include Traits.BASE with type 'a elt := int
 
   include Traits.ITER_SEQUENTIAL with type 'a elt := int and type 'a t := int t
 
@@ -156,8 +155,8 @@ struct
       [Fn.arith_es; one; many]
       (fun fn const input ->
         let input = M.of_list input in
-        let fn = MapEPOf.fn_es const fn in
-        eq_es (M.map_ep fn input >|=? M.rev) (M.rev_map_ep fn input))
+        let fn = MapEPOf.fn_ep const fn in
+        eq_es (M.map_es fn input >|=? M.rev) (M.rev_map_ep fn input))
 end
 
 module TestIterAgainstStdlibList (M : sig

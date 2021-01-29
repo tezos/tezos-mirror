@@ -23,9 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_error_monad.Error_monad
+open Support.Lib.Monad
 
-module IntLwtHashtbl = Lwtreslib.Hashtbl.Make_Lwt (struct
+module IntLwtHashtbl = Support.Lib.Hashtbl.Make_Lwt (struct
   type t = int
 
   let equal x y = x = y

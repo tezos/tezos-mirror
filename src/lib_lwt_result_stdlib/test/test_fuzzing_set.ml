@@ -25,8 +25,8 @@
 
 open Test_fuzzing_tests
 
-module IntSet : Lwtreslib.Set.S with type elt = int = struct
-  include Lwtreslib.Set.Make (Int)
+module IntSet : Support.Lib.Set.S with type elt = int = struct
+  include Support.Lib.Set.Make (Int)
 end
 
 module SetWithBase = struct
@@ -41,7 +41,8 @@ module SetWithBase = struct
   type _alias_t = IntSet.t
 
   module IntSet :
-    Lwtreslib.Set.S with type elt := _alias_elt and type t := _alias_t = struct
+    Support.Lib.Set.S with type elt := _alias_elt and type t := _alias_t =
+  struct
     include IntSet
   end
 

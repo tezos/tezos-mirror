@@ -34,7 +34,7 @@ module type GEN = sig
 end
 
 module SeqGen = struct
-  include Lwtreslib.Seq
+  include Support.Lib.Seq
 
   let rec down n : int t =
    fun () -> if n < 0 then Nil else Cons (n, down (pred n))
@@ -46,7 +46,7 @@ module SeqGen = struct
 end
 
 module ListGen = struct
-  include Lwtreslib.List
+  include Support.Lib.List
 
   let rec down n : int t = if n < 0 then [] else n :: down (pred n)
 

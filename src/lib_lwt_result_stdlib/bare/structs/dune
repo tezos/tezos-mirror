@@ -1,0 +1,9 @@
+(library
+ (name bare_structs)
+ (public_name tezos-lwt-result-stdlib.bare.structs)
+ (libraries lwt tezos-lwt-result-stdlib.bare.sigs))
+
+(rule
+ (alias runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))
