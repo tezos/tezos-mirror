@@ -3035,6 +3035,7 @@ Full grammar
       | LOOP_LEFT { <instruction> ... }
       | LAMBDA <type> <type> { <instruction> ... }
       | EXEC
+      | APPLY
       | DIP { <instruction> ... }
       | DIP <natural number constant> { <instruction> ... }
       | FAILWITH
