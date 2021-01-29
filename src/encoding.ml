@@ -81,6 +81,19 @@ end
 
 type case_tag = Tag of int | Json_only
 
+(* [case_tag_internal] is an optimised representation of case_tag. The
+   idea is to encode values of type [case_tag] to remove a level of
+   indirection. *)
+type case_tag_internal = Uint_option.t
+
+let json_only = Uint_option.none
+
+let make_tag = Uint_option.some
+
+let is_tag = Uint_option.is_some
+
+let get_tag = Uint_option.get
+
 type 'a desc =
   | Null : unit desc
   | Empty : unit desc
@@ -113,6 +126,7 @@ type 'a desc =
       kind : Kind.t;
       tag_size : Binary_size.tag_size;
       tagged_cases : 'a case array;
+      match_case : 'a -> match_result;
       cases : 'a case list;
     }
       -> 'a desc
@@ -185,9 +199,11 @@ and 'a case =
       encoding : 'a t;
       proj : 't -> 'a option;
       inj : 'a -> 't;
-      tag : case_tag;
+      tag : case_tag_internal;
     }
       -> 't case
+
+and match_result = Matched : int * 'b t * 'b -> match_result
 
 and 'a t = {
   encoding : 'a desc;
@@ -765,61 +781,93 @@ let undefined_case : type a. a case =
       encoding = undefined_encoding;
       proj = undefined_proj;
       inj = undefined_inj;
-      tag = Tag (-1);
+      tag = Uint_option.none;
     }
 
 let is_undefined_case c = c == undefined_case
 
-let check_tagged_cases tagged_cases =
+let valid_tag tag_size t =
+  let max_tag = Binary_size.max_int tag_size in
+  if t > max_tag then
+    Format.kasprintf
+      invalid_arg
+      "The tag %d is invalid because it should be less than %d."
+      t
+      max_tag
+
+let matching ?(tag_size = `Uint8) match_case cases =
+  if cases = [] then invalid_arg "Data_encoding.union: empty list of cases." ;
+  let tagged_cases_list =
+    List.filter
+      (fun (Case {tag; _}) ->
+        is_tag tag
+        &&
+        ( valid_tag tag_size (get_tag tag) ;
+          true ))
+      cases
+  in
+  (* In [tagged_cases_list] all tags are [some] so [get] cannot fail *)
   let max_used_tag =
     List.fold_left
-      (fun m (Case {tag; _}) ->
-        match tag with Tag t -> max t m | Json_only -> assert false
-        (* By union's call to List.filter. *))
+      (fun m (Case {tag; _}) -> max (Uint_option.get tag) m)
       (-1)
-      tagged_cases
+      tagged_cases_list
   in
-  let tagged_cases' = Array.make (max_used_tag + 1) undefined_case in
+  let tagged_cases = Array.make (max_used_tag + 1) undefined_case in
   List.iter
-    (function
-      | Case {tag; _} as case -> (
-        match tag with
-        | Json_only ->
-            assert false (* By union's call to List.filter. *)
-        | Tag tag ->
-            if not (is_undefined_case tagged_cases'.(tag)) then
-              Format.kasprintf
-                invalid_arg
-                "The tag %d appears twice in an union."
-                tag ;
-            tagged_cases'.(tag) <- case ))
-    tagged_cases ;
-  tagged_cases'
+    (fun (Case {tag; _} as case) ->
+      let tag = Uint_option.get tag in
+      if not (is_undefined_case tagged_cases.(tag)) then
+        Format.kasprintf
+          invalid_arg
+          "The tag %d appears twice in an union."
+          tag ;
+      tagged_cases.(tag) <- case)
+    tagged_cases_list ;
+  let classify_case (Case {encoding; _}) = classify encoding in
+  let kinds = List.map classify_case cases in
+  let kind = Kind.merge_list tag_size kinds in
+  make @@ Union {kind; tag_size; tagged_cases; match_case; cases}
 
 let union ?(tag_size = `Uint8) cases =
-  if cases = [] then invalid_arg "Data_encoding.union: empty list of cases."
-  else
-    let max_tag = match tag_size with `Uint8 -> 256 | `Uint16 -> 256 * 256 in
-    let tagged_cases =
-      List.filter
-        (fun (Case {tag; _}) ->
-          match tag with
-          | Tag t ->
-              if t < 0 || max_tag <= t then
-                Format.kasprintf invalid_arg "The tag %d is invalid." t ;
-              true
-          | Json_only ->
-              false)
-        cases
+  let match_case =
+    let acases =
+      Array.of_list @@ List.filter (fun (Case {tag; _}) -> is_tag tag) cases
     in
-    let tagged_cases = check_tagged_cases tagged_cases in
-    let classify_case (Case {encoding; _}) = classify encoding in
-    let kinds = List.map classify_case cases in
-    let kind = Kind.merge_list tag_size kinds in
-    make @@ Union {kind; tag_size; tagged_cases; cases}
+    fun x ->
+      let rec find i =
+        if i >= Array.length acases then
+          raise Binary_error_types.(Write_error No_case_matched)
+        else
+          let (Case {tag; encoding; proj; _}) = acases.(i) in
+          match proj x with
+          | None ->
+              find (i + 1)
+          | Some v ->
+              (* By definition of [acases], the following [get] cannot fail. *)
+              Matched (Uint_option.get tag, encoding, v)
+      in
+      find 0
+  in
+  matching ~tag_size match_case cases
 
 let case ~title ?description tag encoding proj inj =
+  let tag =
+    match tag with
+    | Tag t ->
+        if t < 0 then
+          raise (Invalid_argument "Data_encoding.tag: negative tag")
+        else make_tag t
+    | Json_only ->
+        json_only
+  in
   Case {title; description; encoding; proj; inj; tag}
+
+let matched ?(tag_size : [`Uint8 | `Uint16] = `Uint8) tag encoding v =
+  if tag < 0 then
+    raise (Invalid_argument "Data_encoding.matched: negative tag") ;
+  valid_tag tag_size tag ;
+  Matched (tag, encoding, v)
 
 let rec is_nullable : type t. t encoding -> bool =
  fun e ->

@@ -268,12 +268,9 @@ let describe (type x) (encoding : x Encoding.t) =
     let cases =
       List.sort (fun (t1, _) (t2, _) -> (compare : int -> int -> int) t1 t2)
       @@ List.fold_left
-           (fun acc case ->
-             match case with
-             | Case {tag = Json_only; _} ->
-                 acc
-             | Case {tag = Tag tag; _} ->
-                 (tag, case) :: acc)
+           (fun acc (Case {tag; _} as case) ->
+             if Uint_option.is_some tag then (Uint_option.get tag, case) :: acc
+             else acc)
            []
            cases
     in

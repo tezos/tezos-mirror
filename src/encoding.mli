@@ -42,6 +42,9 @@ end
 
 type case_tag = Tag of int | Json_only
 
+(* [none] is [Json_only], [some t] is [Tag t] *)
+type case_tag_internal = Uint_option.t
+
 type 'a desc =
   | Null : unit desc
   | Empty : unit desc
@@ -74,6 +77,7 @@ type 'a desc =
       kind : Kind.t;
       tag_size : Binary_size.tag_size;
       tagged_cases : 'a case array;
+      match_case : 'a -> match_result;
       cases : 'a case list;
     }
       -> 'a desc
@@ -146,7 +150,7 @@ and 'a case =
       encoding : 'a t;
       proj : 't -> 'a option;
       inj : 'a -> 't;
-      tag : case_tag;
+      tag : case_tag_internal;
     }
       -> 't case
 
@@ -154,6 +158,8 @@ and 'a t = {
   encoding : 'a desc;
   mutable json_encoding : 'a Json_encoding.encoding option;
 }
+
+and match_result = Matched : int * 'b t * 'b -> match_result
 
 type 'a encoding = 'a t
 
@@ -427,11 +433,20 @@ val case :
   ('a -> 't) ->
   't case
 
+val matched :
+  ?tag_size:[`Uint8 | `Uint16] -> int -> 'a encoding -> 'a -> match_result
+
 val undefined_case : 'a case
 
 val is_undefined_case : 'a case -> bool
 
 val union : ?tag_size:[`Uint8 | `Uint16] -> 't case list -> 't encoding
+
+val matching :
+  ?tag_size:[`Uint8 | `Uint16] ->
+  ('t -> match_result) ->
+  't case list ->
+  't encoding
 
 val def :
   string -> ?title:string -> ?description:string -> 'a encoding -> 'a encoding

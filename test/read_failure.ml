@@ -201,7 +201,7 @@ let all_ranged_float minimum maximum =
 
 let test_bounded_string_list =
   let expected = function
-    | Data_encoding__Binary_error.Read_error Size_limit_exceeded ->
+    | Data_encoding__Binary_error_types.Read_error Size_limit_exceeded ->
         true
     | _ ->
         false

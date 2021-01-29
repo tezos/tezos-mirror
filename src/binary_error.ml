@@ -23,20 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type read_error =
-  | Not_enough_data
-  | Extra_bytes
-  | No_case_matched
-  | Unexpected_tag of int
-  | Invalid_size of int
-  | Invalid_int of {min : int; v : int; max : int}
-  | Invalid_float of {min : float; v : float; max : float}
-  | Trailing_zero
-  | Size_limit_exceeded
-  | List_too_long
-  | Array_too_long
+open Binary_error_types
 
-let read_error_encoding =
+let read_error_encoding : read_error Encoding.t =
   let open Encoding in
   union
     [
@@ -56,7 +45,7 @@ let read_error_encoding =
         (Tag 2)
         ~title:"No case matched"
         empty
-        (function No_case_matched -> Some () | _ -> None)
+        (function (No_case_matched : read_error) -> Some () | _ -> None)
         (fun () -> No_case_matched);
       case
         (Tag 3)
@@ -75,14 +64,20 @@ let read_error_encoding =
         ~title:"Invalid int"
         (obj3 (req "min" int31) (req "v" int31) (req "max" int31))
         (function
-          | Invalid_int {min; v; max} -> Some (min, v, max) | _ -> None)
+          | (Invalid_int {min; v; max} : read_error) ->
+              Some (min, v, max)
+          | _ ->
+              None)
         (fun (min, v, max) -> Invalid_int {min; v; max});
       case
         (Tag 6)
         ~title:"Invalid float"
         (obj3 (req "min" float) (req "v" float) (req "max" float))
         (function
-          | Invalid_float {min; v; max} -> Some (min, v, max) | _ -> None)
+          | (Invalid_float {min; v; max} : read_error) ->
+              Some (min, v, max)
+          | _ ->
+              None)
         (fun (min, v, max) -> Invalid_float {min; v; max});
       case
         (Tag 7)
@@ -94,19 +89,19 @@ let read_error_encoding =
         (Tag 8)
         ~title:"Size limit exceeded"
         empty
-        (function Size_limit_exceeded -> Some () | _ -> None)
+        (function (Size_limit_exceeded : read_error) -> Some () | _ -> None)
         (fun () -> Size_limit_exceeded);
       case
         (Tag 9)
         ~title:"List too long"
         empty
-        (function List_too_long -> Some () | _ -> None)
+        (function (List_too_long : read_error) -> Some () | _ -> None)
         (fun () -> List_too_long);
       case
         (Tag 10)
         ~title:"Array too long"
         empty
-        (function Array_too_long -> Some () | _ -> None)
+        (function (Array_too_long : read_error) -> Some () | _ -> None)
         (fun () -> Array_too_long);
     ]
 
@@ -133,19 +128,6 @@ let pp_read_error ppf = function
       Format.fprintf ppf "List length limit exceeded"
   | Array_too_long ->
       Format.fprintf ppf "Array length limit exceeded"
-
-exception Read_error of read_error
-
-type write_error =
-  | Size_limit_exceeded
-  | No_case_matched
-  | Invalid_int of {min : int; v : int; max : int}
-  | Invalid_float of {min : float; v : float; max : float}
-  | Invalid_bytes_length of {expected : int; found : int}
-  | Invalid_string_length of {expected : int; found : int}
-  | Invalid_natural
-  | List_too_long
-  | Array_too_long
 
 let write_error_encoding =
   let open Encoding in
@@ -244,5 +226,3 @@ let pp_write_error ppf = function
       Format.fprintf ppf "List length limit exceeded"
   | Array_too_long ->
       Format.fprintf ppf "Array length limit exceeded"
-
-exception Write_error of write_error

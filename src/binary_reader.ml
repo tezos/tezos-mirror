@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Binary_error
+open Binary_error_types
 
 let raise e = raise (Read_error e)
 

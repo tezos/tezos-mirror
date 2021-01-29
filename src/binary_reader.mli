@@ -31,13 +31,14 @@ val read :
   Bytes.t ->
   int ->
   int ->
-  (int * 'a, Binary_error.read_error) result
+  (int * 'a, Binary_error_types.read_error) result
 
 val read_opt : 'a Encoding.t -> Bytes.t -> int -> int -> (int * 'a) option
 
 val read_exn : 'a Encoding.t -> Bytes.t -> int -> int -> int * 'a
 
-val of_bytes : 'a Encoding.t -> Bytes.t -> ('a, Binary_error.read_error) result
+val of_bytes :
+  'a Encoding.t -> Bytes.t -> ('a, Binary_error_types.read_error) result
 
 val of_bytes_opt : 'a Encoding.t -> Bytes.t -> 'a option
 

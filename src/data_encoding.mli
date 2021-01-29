@@ -460,6 +460,38 @@ module Encoding : sig
 
   type case_tag = Tag of int | Json_only
 
+  (** A sum descriptor can be optimized by providing a specific
+     [matching_function] which efficiently determines in which case
+     some value of type ['a] falls.
+
+     Note that in general you should use a total function (i.e., one defined
+     over the whole of the ['a] type) for the [matching_function]. However, in
+     the case where you have a good reason to use a partial function, you should
+     raise {!No_case_matched} in the dead branches. Reasons why you may want to
+     do so include:
+     - ['a] is an open variant and you will complete the matching function
+       later, and
+     - there is a code invariant that guarantees that ['a] is not fully
+       inhabited.
+     *)
+  type 'a matching_function = 'a -> match_result
+
+  and match_result
+
+  (** [matched t e u] represents the fact that a value is tagged with [t] and
+      carries the payload [u] which can be encoded with [e].
+
+      The optional argument [tag_size] must match the one passed to the
+      {!matching} function [matched] is called inside of.
+
+      An example is given in the documentation of {!matching}.
+
+      @raise [Invalid_argument] if [t < 0]
+
+      @raise [Invalid_argument] if [t] does not fit in [tag_size] *)
+  val matched :
+    ?tag_size:[`Uint8 | `Uint16] -> int -> 'a encoding -> 'a -> match_result
+
   (** Encodes a variant constructor. Takes the encoding for the specific
       parameters, a recognizer function that will extract the parameters
       in case the expected case of the variant is being serialized, and
@@ -469,8 +501,11 @@ module Encoding : sig
       An optional tag gives a name to a case and should be used to maintain
       compatibility.
 
-      An optional name for the case can be provided,
-      which is used in the binary documentation. *)
+      An optional name for the case can be provided, which is used in the binary
+      documentation.
+
+      @raise [Invalid_argument] if [case_tag] is [Tag t] with [t < 0]
+      *)
   val case :
     title:string ->
     ?description:string ->
@@ -482,15 +517,88 @@ module Encoding : sig
 
   (** Create a single encoding from a series of cases.
 
-      In JSON, all cases are tried one after the other. The caller must
-      check for collisions.
+     In JSON, all cases are tried one after the other using the [case list]. The
+     caller is responsible for avoiding collisions. If there are collisions
+     (i.e., if multiple cases produce the same JSON output) then the encoding
+     and decoding processes might not be inverse of each other. In other words,
+     [destruct e (construct e v)] may not be equal to [v].
 
-      In binary, a prefix tag is added to discriminate quickly between
-      cases. The default is [`Uint8] and you must use a [`Uint16] if you are
-      going to have more than 256 cases.
+     In binary, a prefix tag is added to discriminate quickly between
+     cases. The default is [`Uint8] and you must use a [`Uint16] if
+     you are going to have more than 256 cases.
 
-      @raise Invalid_argument if it is given the empty list
-      or if there are more cases than can fit in the tag size. *)
+     The matching function is used during binary encoding of a value
+     [v] to efficiently determine which of the cases corresponds to
+     [v]. The case list is used during decoding to reconstruct a value based on
+     the encoded tag. (Decoding is optimised internally: tag look-up has a
+     constant cost.)
+
+     The caller is responsible for ensuring that the [matching_function] and the
+     [case list] describe the same encoding. If they describe different
+     encodings, then the decoding and encoding processes will not be inverses of
+     each others. In other words, [of_bytes e (to_bytes e v)] will not be equal
+     to [v].
+
+     If you do not wish to be responsible for this, you can use the unoptimised
+     {!union} that uses a [case list] only (see below). Beware that in {!union}
+     the complexity of the encoding is linear in the number of cases.
+
+     Following: a basic example use. Note that the [matching_function] uses the
+     same tags, payload conversions, and payload encoding as the [case list].
+
+{[
+type t = A of string | B of int * int | C
+let encoding_t =
+  (* Tags and payload encodings for each constructors *)
+  let a_tag = 0 and a_encoding = string in
+  let b_tag = 1 and b_encoding = obj2 (req "x" int) (req "y" int) in
+  let c_tag = 2 and c_encoding = unit in
+  matching
+    (* optimised encoding function *)
+    (function
+       | A s -> matched a_tag a_encoding s
+       | B (x, y) -> matched b_tag b_encoding (x, y)
+       | C -> matched c_tag c_encoding ())
+    (* decoding case list *)
+    [
+       case ~title:"A"
+         (Tag a_tag)
+         a_encoding
+         (function A s -> Some s | _ -> None) (fun s -> A s);
+       case ~title:"B"
+         (Tag b_tag)
+         b_encoding
+         (function B (x, y) -> Some (x, y) | _ -> None) (fun (x, y) -> B (x, y));
+       case ~title:"C"
+         (Tag c_tag)
+         c_encoding
+         (function C -> Some () | _ -> None) (fun () -> C);
+    ]
+]}
+
+     @raise [Invalid_argument] if it is given an empty [case list]
+
+     @raise [Invalid_argument] if there are more than one [case] with the same
+     [tag] in the [case list]
+
+     @raise [Invalid_argument] if there are more cases in the [case list] than
+     can fit in the [tag_size] *)
+  val matching :
+    ?tag_size:[`Uint8 | `Uint16] ->
+    't matching_function ->
+    't case list ->
+    't encoding
+
+  (** Same as matching except that the matching function is
+      a linear traversal of the cases.
+
+     @raise [Invalid_argument] if it is given an empty [case list]
+
+     @raise [Invalid_argument] if there are more than one [case] with the same
+     [tag] in the [case list]
+
+     @raise [Invalid_argument] if there are more cases in the [case list] than
+     can fit in the [tag_size] *)
   val union : ?tag_size:[`Uint8 | `Uint16] -> 't case list -> 't encoding
 
   (** {3 Predicates over descriptors} *)

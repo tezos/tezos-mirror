@@ -139,7 +139,9 @@ let rec lift_union : type a. a Encoding.t -> a Encoding.t =
   match e.encoding with
   | Conv {proj; inj; encoding = e; schema} -> (
     match lift_union e with
-    | {encoding = Union {kind; tag_size; tagged_cases; cases}; _} ->
+    | {encoding = Union {kind; tag_size; tagged_cases; cases; match_case}; _}
+      ->
+        let match_case x = match_case (proj x) in
         let lift
             (Case
               {title; description; encoding; proj = proj'; inj = inj'; tag}) =
@@ -159,6 +161,7 @@ let rec lift_union : type a. a Encoding.t -> a Encoding.t =
                kind;
                tag_size;
                tagged_cases = Array.map lift tagged_cases;
+               match_case;
                cases = List.map lift cases;
              }
     | e ->
@@ -188,7 +191,13 @@ and lift_union_in_pair :
  fun b p e1 e2 ->
   let open Encoding in
   match (lift_union e1, lift_union e2) with
-  | (e1, {encoding = Union {tag_size; cases; tagged_cases; _}; _}) ->
+  | (e1, {encoding = Union {tag_size; match_case; cases; tagged_cases; _}; _})
+    ->
+      let match_case (x, y) =
+        match match_case y with
+        | Matched (tag, e2, v) ->
+            Matched (tag, lift_union_in_pair b p e1 e2, (x, v))
+      in
       let lift (Case {title; description; encoding = e2; proj; inj; tag}) =
         Case
           {
@@ -208,9 +217,16 @@ and lift_union_in_pair :
              kind = `Dynamic (* ignored *);
              tag_size;
              tagged_cases = Array.map lift tagged_cases;
+             match_case;
              cases = List.map lift cases;
            }
-  | ({encoding = Union {tag_size; tagged_cases; cases; _}; _}, e2) ->
+  | ({encoding = Union {tag_size; tagged_cases; match_case; cases; _}; _}, e2)
+    ->
+      let match_case (x, y) =
+        match match_case x with
+        | Matched (tag, e1, v) ->
+            Matched (tag, lift_union_in_pair b p e1 e2, (v, y))
+      in
       let lift (Case {title; description; encoding = e1; proj; inj; tag}) =
         Case
           {
@@ -230,6 +246,7 @@ and lift_union_in_pair :
              kind = `Dynamic (* ignored *);
              tag_size;
              tagged_cases = Array.map lift tagged_cases;
+             match_case;
              cases = List.map lift cases;
            }
   | (e1, e2) ->

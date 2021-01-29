@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Binary_error
+open Binary_error_types
 
 let n_length value =
   let bits = Z.numbits value in
@@ -90,20 +90,6 @@ let rec length : type x. x Encoding.t -> x -> int =
   | Tups {kind = `Dynamic; left; right} ->
       let (v1, v2) = value in
       length left v1 + length right v2
-  | Union {kind = `Dynamic; tag_size; cases; _} ->
-      let rec length_case = function
-        | [] ->
-            raise (Write_error No_case_matched)
-        | Case {tag = Json_only; _} :: tl ->
-            length_case tl
-        | Case {encoding = e; proj; _} :: tl -> (
-          match proj value with
-          | None ->
-              length_case tl
-          | Some value ->
-              Binary_size.tag_size tag_size + length e value )
-      in
-      length_case cases
   | Mu {kind = `Dynamic; fix; _} ->
       length (fix e) value
   | Obj (Opt {kind = `Dynamic; encoding = e; _}) -> (
@@ -131,22 +117,13 @@ let rec length : type x. x Encoding.t -> x -> int =
       length left v1 + length right v2
   | Obj (Opt {kind = `Variable; encoding = e; _}) -> (
     match value with None -> 0 | Some value -> length e value )
-  | Union {kind = `Variable; tag_size; cases; _} ->
-      let rec length_case = function
-        | [] ->
-            raise (Write_error No_case_matched)
-        | Case {tag = Json_only; _} :: tl ->
-            length_case tl
-        | Case {encoding = e; proj; _} :: tl -> (
-          match proj value with
-          | None ->
-              length_case tl
-          | Some value ->
-              Binary_size.tag_size tag_size + length e value )
-      in
-      length_case cases
   | Mu {kind = `Variable; fix; _} ->
       length (fix e) value
+  (* Variable or Dynamic we don't care for those constructors *)
+  | Union {kind = `Dynamic | `Variable; tag_size; match_case; _} ->
+      let (Matched (tag, e, value)) = match_case value in
+      assert (tag <= Binary_size.max_int tag_size) ;
+      Binary_size.tag_size tag_size + length e value
   (* Recursive*)
   | Obj (Req {encoding = e; _}) ->
       length e value

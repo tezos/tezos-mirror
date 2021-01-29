@@ -26,6 +26,8 @@
 module Encoding = struct
   include Encoding
 
+  type 'a matching_function = 'a -> match_result
+
   let splitted ~json ~binary = raw_splitted ~json:(Json.convert json) ~binary
 
   let assoc enc =
@@ -138,6 +140,7 @@ module Bson = Bson
 module Binary_schema = Binary_schema
 
 module Binary = struct
+  include Binary_error_types
   include Binary_error
   include Binary_length
   include Binary_writer

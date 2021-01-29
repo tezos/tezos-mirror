@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -26,27 +26,30 @@
 (** This is for use *within* the data encoding library only. Instead, you should
     use the corresponding module intended for use: {!Data_encoding.Binary}. *)
 
-type writer_state
+type read_error =
+  | Not_enough_data
+  | Extra_bytes
+  | No_case_matched
+  | Unexpected_tag of int
+  | Invalid_size of int
+  | Invalid_int of {min : int; v : int; max : int}
+  | Invalid_float of {min : float; v : float; max : float}
+  | Trailing_zero
+  | Size_limit_exceeded
+  | List_too_long
+  | Array_too_long
 
-val make_writer_state :
-  bytes -> offset:int -> allowed_bytes:int -> writer_state option
+exception Read_error of read_error
 
-val write :
-  'a Encoding.t ->
-  'a ->
-  writer_state ->
-  (int, Binary_error_types.write_error) result
+type write_error =
+  | Size_limit_exceeded
+  | No_case_matched
+  | Invalid_int of {min : int; v : int; max : int}
+  | Invalid_float of {min : float; v : float; max : float}
+  | Invalid_bytes_length of {expected : int; found : int}
+  | Invalid_string_length of {expected : int; found : int}
+  | Invalid_natural
+  | List_too_long
+  | Array_too_long
 
-val write_opt : 'a Encoding.t -> 'a -> writer_state -> int option
-
-val write_exn : 'a Encoding.t -> 'a -> writer_state -> int
-
-val to_bytes :
-  ?buffer_size:int ->
-  'a Encoding.t ->
-  'a ->
-  (Bytes.t, Binary_error_types.write_error) result
-
-val to_bytes_opt : ?buffer_size:int -> 'a Encoding.t -> 'a -> Bytes.t option
-
-val to_bytes_exn : ?buffer_size:int -> 'a Encoding.t -> 'a -> Bytes.t
+exception Write_error of write_error

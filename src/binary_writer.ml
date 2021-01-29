@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Binary_error
+open Binary_error_types
 
 let raise error = Stdlib.raise (Write_error error)
 
@@ -303,21 +303,10 @@ let rec write_rec : type a. a Encoding.t -> writer_state -> a -> unit =
       write_rec left state v1 ; write_rec right state v2
   | Conv {encoding = e; proj; _} ->
       write_rec e state (proj value)
-  | Union {tag_size; cases; _} ->
-      let rec write_case = function
-        | [] ->
-            raise No_case_matched
-        | Case {tag = Json_only; _} :: tl ->
-            write_case tl
-        | Case {encoding = e; proj; tag = Tag tag; _} :: tl -> (
-          match proj value with
-          | None ->
-              write_case tl
-          | Some value ->
-              Atom.tag tag_size state tag ;
-              write_rec e state value )
-      in
-      write_case cases
+  | Union {tag_size; match_case; _} ->
+      let (Matched (tag, e, value)) = match_case value in
+      Atom.tag tag_size state tag ;
+      write_rec e state value
   | Dynamic_size {kind; encoding = e} ->
       let initial_offset = state.offset in
       (* place holder for [size] *)

@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Binary_error
+open Binary_error_types
 
 let raise e = raise (Read_error e)
 
@@ -376,11 +376,8 @@ let rec read_rec :
       @@ fun (ctag, state) ->
       match
         List.find_opt
-          (function
-            | Case {tag = Tag tag; _} ->
-                tag = ctag
-            | Case {tag = Json_only; _} ->
-                false)
+          (fun (Case {tag; _}) ->
+            Uint_option.fold tag ~none:false ~some:(fun tag -> tag = ctag))
           cases
       with
       | None ->

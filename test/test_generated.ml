@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -866,6 +867,162 @@ let map_merge_tups (t1 : testable) (t2 : testable) : testable =
     let pp ppf (v1, v2) = Crowbar.pp ppf "@[<hv 1>(%a, %a)@]" T1.pp v1 T2.pp v2
   end )
 
+let map_union (t1 : testable) (t2 : testable) b : testable =
+  let module T1 = (val t1) in
+  let module T2 = (val t2) in
+  ( module struct
+    type t = A of T1.t | B of T2.t
+
+    let t1_ding =
+      let open Data_encoding in
+      obj1 (req "A" T1.ding)
+
+    let t2_ding =
+      let open Data_encoding in
+      obj1 (req "B" T2.ding)
+
+    let ding =
+      let open Data_encoding in
+      union
+        [
+          case
+            ~title:"A"
+            (Tag 0)
+            t1_ding
+            (function A v -> Some v | B _ -> None)
+            (fun v -> A v);
+          case
+            ~title:"B"
+            (Tag 1)
+            t2_ding
+            (function A _ -> None | B v -> Some v)
+            (fun v -> B v);
+        ]
+
+    let v = if b then A T1.v else B T2.v
+
+    let pp ppf = function
+      | A v1 ->
+          Crowbar.pp ppf "@[<hv 1>(A %a)@]" T1.pp v1
+      | B v2 ->
+          Crowbar.pp ppf "@[<hv 1>(B %a)@]" T2.pp v2
+  end )
+
+let map_matching (t1 : testable) (t2 : testable) b : testable =
+  let module T1 = (val t1) in
+  let module T2 = (val t2) in
+  ( module struct
+    type t = A of T1.t | B of T2.t
+
+    let t1_ding =
+      let open Data_encoding in
+      obj1 (req "A" T1.ding)
+
+    let t2_ding =
+      let open Data_encoding in
+      obj1 (req "B" T2.ding)
+
+    let ding =
+      let open Data_encoding in
+      matching
+        (function A v -> matched 0 t1_ding v | B v -> matched 1 t2_ding v)
+        [
+          case
+            ~title:"A"
+            (Tag 0)
+            t1_ding
+            (function A v -> Some v | B _ -> None)
+            (fun v -> A v);
+          case
+            ~title:"B"
+            (Tag 1)
+            t2_ding
+            (function A _ -> None | B v -> Some v)
+            (fun v -> B v);
+        ]
+
+    let v = if b then A T1.v else B T2.v
+
+    let pp ppf = function
+      | A v1 ->
+          Crowbar.pp ppf "@[<hv 1>(A %a)@]" T1.pp v1
+      | B v2 ->
+          Crowbar.pp ppf "@[<hv 1>(B %a)@]" T2.pp v2
+  end )
+
+let map_matching_3 (t1 : testable) (t2 : testable) (t3 : testable) i : testable
+    =
+  let module T1 = (val t1) in
+  let module T2 = (val t2) in
+  let module T3 = (val t3) in
+  ( module struct
+    type t = A of T1.t | B of T2.t | C of T3.t
+
+    let t1_ding =
+      let open Data_encoding in
+      obj2 (req "A" T1.ding) (req "noop" unit)
+
+    let t2_ding =
+      let open Data_encoding in
+      obj2 (req "B" T2.ding) (dft "never" uint8 0)
+
+    let t3_ding =
+      let open Data_encoding in
+      obj1 (req "C" T3.ding)
+
+    let ding =
+      let open Data_encoding in
+      matching
+        (function
+          | A v ->
+              matched 0 t1_ding (v, ())
+          | B v ->
+              matched 12 t2_ding (v, 2)
+          | C v ->
+              matched 128 t3_ding v)
+        [
+          case
+            ~title:"A"
+            (Tag 0)
+            t1_ding
+            (function A v -> Some (v, ()) | _ -> None)
+            (fun (v, ()) -> A v);
+          case
+            ~title:"B"
+            (Tag 12)
+            t2_ding
+            (function B v -> Some (v, 2) | _ -> None)
+            (fun (v, x) ->
+              assert (x = 2) ;
+              B v);
+          case
+            ~title:"C"
+            (Tag 128)
+            t3_ding
+            (function C v -> Some v | _ -> None)
+            (fun v -> C v);
+        ]
+
+    let v =
+      match i with
+      | 0 ->
+          A T1.v
+      | 1 ->
+          B T2.v
+      | 2 ->
+          C T3.v
+      | _ ->
+          assert false
+
+    let pp ppf = function
+      | A v1 ->
+          Crowbar.pp ppf "@[<hv 1>(A %a)@]" T1.pp v1
+      | B v2 ->
+          Crowbar.pp ppf "@[<hv 1>(B %a)@]" T2.pp v2
+      | C v3 ->
+          Crowbar.pp ppf "@[<hv 1>(B %a)@]" T3.pp v3
+  end )
+
 let testable_printer : testable Crowbar.printer =
  fun ppf (t : testable) ->
   let module T = (val t) in
@@ -933,7 +1090,7 @@ let gen =
                 map_merge_tups (map_tup2 t1 t2) (map_tup1 t3));
             map [g; g; g] (fun t1 t2 t3 ->
                 map_merge_tups (map_tup1 t1) (map_tup2 t2 t3));
-              (* NOTE: we cannot use lists/arrays for now. They require the
+            (* NOTE: we cannot use lists/arrays for now. They require the
            data-inside to be homogeneous (e.g., same rangedness of ranged
            numbers) which we cannot guarantee right now. This can be fixed once
            we update Crowbar and get access to the new `dynamic_bind` generator
@@ -942,7 +1099,9 @@ let gen =
            map [g; list g] map_variable_list;
            map [g; list g] (fun t ts -> map_variable_array t (Array.of_list ts));
         *)
-            
+              map [g; g; bool] map_union;
+            map [g; g; bool] map_matching;
+            map [g; g; g; range 3] map_matching_3;
           ])
   in
   with_printer testable_printer g
