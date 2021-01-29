@@ -17,6 +17,7 @@ depends: [
   "tezos-proxy"
   "tezos-signer-backends"
   "tezos-protocol-alpha-parameters"
+  "tezos-protocol-plugin-alpha"
   "alcotest-lwt" { with-test & >= "1.1.0" }
 ]
 build: [

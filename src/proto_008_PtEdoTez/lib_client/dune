@@ -8,9 +8,9 @@
             tezos-mockup-registration
             tezos-proxy
             tezos-rpc
-            tezos-protocol-plugin-008-PtEdoTez
             tezos-signer-backends
-            tezos-protocol-008-PtEdoTez-parameters)
+            tezos-protocol-008-PtEdoTez-parameters
+            tezos-protocol-plugin-008-PtEdoTez)
  (library_flags (:standard -linkall))
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_shell_services

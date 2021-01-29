@@ -9,7 +9,8 @@
             tezos-proxy
             tezos-rpc
             tezos-signer-backends
-            tezos-protocol-alpha-parameters)
+            tezos-protocol-alpha-parameters
+            tezos-protocol-plugin-alpha)
  (library_flags (:standard -linkall))
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_shell_services
