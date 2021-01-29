@@ -1396,3 +1396,9 @@ class TestNormalize:
         error_pattern = 'unexpected annotation.'
         with utils.assert_run_failure(error_pattern):
             client.normalize(input_data, input_type, legacy=False)
+
+    @pytest.mark.parametrize('mode', modes)
+    def test_normalize_script(self, client_regtest_scrubbed, mode):
+        client = client_regtest_scrubbed
+        path = os.path.join(CONTRACT_PATH, 'opcodes', 'comb-literals.tz')
+        client.normalize_script(path, mode=mode)
