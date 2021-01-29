@@ -243,6 +243,156 @@ module RPC = struct
       (function Cannot_serialize_log_normalized -> Some () | _ -> None)
       (fun () -> Cannot_serialize_log_normalized)
 
+  module Unparse_types = struct
+    (* Same as the unparsing functions for types in Script_ir_translator but
+       does not consume gas and never folds (pair a (pair b c)) *)
+
+    open Script_ir_translator
+    open Micheline
+    open Michelson_v1_primitives
+    open Script_ir_annot
+    open Script_typed_ir
+
+    let rec unparse_comparable_ty : type a. a comparable_ty -> Script.node =
+      function
+      | Unit_key tname ->
+          Prim (-1, T_unit, [], unparse_type_annot tname)
+      | Never_key tname ->
+          Prim (-1, T_never, [], unparse_type_annot tname)
+      | Int_key tname ->
+          Prim (-1, T_int, [], unparse_type_annot tname)
+      | Nat_key tname ->
+          Prim (-1, T_nat, [], unparse_type_annot tname)
+      | Signature_key tname ->
+          Prim (-1, T_signature, [], unparse_type_annot tname)
+      | String_key tname ->
+          Prim (-1, T_string, [], unparse_type_annot tname)
+      | Bytes_key tname ->
+          Prim (-1, T_bytes, [], unparse_type_annot tname)
+      | Mutez_key tname ->
+          Prim (-1, T_mutez, [], unparse_type_annot tname)
+      | Bool_key tname ->
+          Prim (-1, T_bool, [], unparse_type_annot tname)
+      | Key_hash_key tname ->
+          Prim (-1, T_key_hash, [], unparse_type_annot tname)
+      | Key_key tname ->
+          Prim (-1, T_key, [], unparse_type_annot tname)
+      | Timestamp_key tname ->
+          Prim (-1, T_timestamp, [], unparse_type_annot tname)
+      | Address_key tname ->
+          Prim (-1, T_address, [], unparse_type_annot tname)
+      | Chain_id_key tname ->
+          Prim (-1, T_chain_id, [], unparse_type_annot tname)
+      | Pair_key ((l, al), (r, ar), pname) ->
+          let tl = add_field_annot al None (unparse_comparable_ty l) in
+          let tr = add_field_annot ar None (unparse_comparable_ty r) in
+          Prim (-1, T_pair, [tl; tr], unparse_type_annot pname)
+      | Union_key ((l, al), (r, ar), tname) ->
+          let tl = add_field_annot al None (unparse_comparable_ty l) in
+          let tr = add_field_annot ar None (unparse_comparable_ty r) in
+          Prim (-1, T_or, [tl; tr], unparse_type_annot tname)
+      | Option_key (t, tname) ->
+          Prim
+            (-1, T_option, [unparse_comparable_ty t], unparse_type_annot tname)
+
+    let unparse_memo_size memo_size =
+      let z = Alpha_context.Sapling.Memo_size.unparse_to_z memo_size in
+      Int (-1, z)
+
+    let rec unparse_ty : type a. a ty -> Script.node =
+     fun ty ->
+      let return (name, args, annot) = Prim (-1, name, args, annot) in
+      match ty with
+      | Unit_t tname ->
+          return (T_unit, [], unparse_type_annot tname)
+      | Int_t tname ->
+          return (T_int, [], unparse_type_annot tname)
+      | Nat_t tname ->
+          return (T_nat, [], unparse_type_annot tname)
+      | Signature_t tname ->
+          return (T_signature, [], unparse_type_annot tname)
+      | String_t tname ->
+          return (T_string, [], unparse_type_annot tname)
+      | Bytes_t tname ->
+          return (T_bytes, [], unparse_type_annot tname)
+      | Mutez_t tname ->
+          return (T_mutez, [], unparse_type_annot tname)
+      | Bool_t tname ->
+          return (T_bool, [], unparse_type_annot tname)
+      | Key_hash_t tname ->
+          return (T_key_hash, [], unparse_type_annot tname)
+      | Key_t tname ->
+          return (T_key, [], unparse_type_annot tname)
+      | Timestamp_t tname ->
+          return (T_timestamp, [], unparse_type_annot tname)
+      | Address_t tname ->
+          return (T_address, [], unparse_type_annot tname)
+      | Operation_t tname ->
+          return (T_operation, [], unparse_type_annot tname)
+      | Chain_id_t tname ->
+          return (T_chain_id, [], unparse_type_annot tname)
+      | Never_t tname ->
+          return (T_never, [], unparse_type_annot tname)
+      | Bls12_381_g1_t tname ->
+          return (T_bls12_381_g1, [], unparse_type_annot tname)
+      | Bls12_381_g2_t tname ->
+          return (T_bls12_381_g2, [], unparse_type_annot tname)
+      | Bls12_381_fr_t tname ->
+          return (T_bls12_381_fr, [], unparse_type_annot tname)
+      | Contract_t (ut, tname) ->
+          let t = unparse_ty ut in
+          return (T_contract, [t], unparse_type_annot tname)
+      | Pair_t ((utl, l_field, l_var), (utr, r_field, r_var), tname) ->
+          let annot = unparse_type_annot tname in
+          let utl = unparse_ty utl in
+          let tl = add_field_annot l_field l_var utl in
+          let utr = unparse_ty utr in
+          let tr = add_field_annot r_field r_var utr in
+          return (T_pair, [tl; tr], annot)
+      | Union_t ((utl, l_field), (utr, r_field), tname) ->
+          let annot = unparse_type_annot tname in
+          let utl = unparse_ty utl in
+          let tl = add_field_annot l_field None utl in
+          let utr = unparse_ty utr in
+          let tr = add_field_annot r_field None utr in
+          return (T_or, [tl; tr], annot)
+      | Lambda_t (uta, utr, tname) ->
+          let ta = unparse_ty uta in
+          let tr = unparse_ty utr in
+          return (T_lambda, [ta; tr], unparse_type_annot tname)
+      | Option_t (ut, tname) ->
+          let annot = unparse_type_annot tname in
+          let ut = unparse_ty ut in
+          return (T_option, [ut], annot)
+      | List_t (ut, tname) ->
+          let t = unparse_ty ut in
+          return (T_list, [t], unparse_type_annot tname)
+      | Ticket_t (ut, tname) ->
+          let t = unparse_comparable_ty ut in
+          return (T_ticket, [t], unparse_type_annot tname)
+      | Set_t (ut, tname) ->
+          let t = unparse_comparable_ty ut in
+          return (T_set, [t], unparse_type_annot tname)
+      | Map_t (uta, utr, tname) ->
+          let ta = unparse_comparable_ty uta in
+          let tr = unparse_ty utr in
+          return (T_map, [ta; tr], unparse_type_annot tname)
+      | Big_map_t (uta, utr, tname) ->
+          let ta = unparse_comparable_ty uta in
+          let tr = unparse_ty utr in
+          return (T_big_map, [ta; tr], unparse_type_annot tname)
+      | Sapling_transaction_t (memo_size, tname) ->
+          return
+            ( T_sapling_transaction,
+              [unparse_memo_size memo_size],
+              unparse_type_annot tname )
+      | Sapling_state_t (memo_size, tname) ->
+          return
+            ( T_sapling_state,
+              [unparse_memo_size memo_size],
+              unparse_type_annot tname )
+  end
+
   let helpers_path = RPC_path.(open_root / "helpers" / "scripts")
 
   let contract_root =
@@ -333,6 +483,17 @@ module RPC = struct
       ~output:(obj1 (req "normalized" Script.expr_encoding))
       ~query:RPC_query.empty
       RPC_path.(helpers_path / "normalize_script")
+
+  let normalize_type =
+    let open Data_encoding in
+    RPC_service.post_service
+      ~description:
+        "Normalizes some Michelson type by expanding `pair a b c` as `pair a \
+         (pair b c)"
+      ~input:(obj1 (req "type" Script.expr_encoding))
+      ~output:(obj1 (req "normalized" Script.expr_encoding))
+      ~query:RPC_query.empty
+      RPC_path.(helpers_path / "normalize_type")
 
   let get_storage_normalized =
     let open Data_encoding in
@@ -522,6 +683,21 @@ module RPC = struct
           unparsing_mode
           (Micheline.root script)
         >|=? fun (normalized, _ctxt) -> Micheline.strip_locations normalized) ;
+    register0 normalize_type (fun ctxt () typ ->
+        let open Script_ir_translator in
+        let ctxt = Gas.set_unlimited ctxt in
+        (* Unfortunately, Script_ir_translator.parse_any_ty is not exported *)
+        Script_ir_translator.parse_ty
+          ctxt
+          ~legacy:true
+          ~allow_lazy_storage:true
+          ~allow_operation:true
+          ~allow_contract:true
+          ~allow_ticket:true
+          (Micheline.root typ)
+        >>?= fun (Ex_ty typ, _ctxt) ->
+        let normalized = Unparse_types.unparse_ty typ in
+        return @@ Micheline.strip_locations normalized) ;
     (* Patched RPC: get_storage *)
     register1 get_storage_normalized (fun ctxt contract () unparsing_mode ->
         Contract.get_script ctxt contract
@@ -768,6 +944,9 @@ module RPC = struct
       block
       ()
       (script, unparsing_mode)
+
+  let normalize_type ctxt block ~ty =
+    RPC_context.make_call0 normalize_type ctxt block () ty
 
   let get_storage_normalized ctxt block ~contract ~unparsing_mode =
     RPC_context.make_call1
