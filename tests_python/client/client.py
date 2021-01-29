@@ -434,6 +434,10 @@ class Client:
             cmd += ['--unparsing-mode', mode]
         return self.run(cmd)
 
+    def normalize_type(self, typ: str) -> str:
+        cmd = ['normalize', 'type', typ]
+        return self.run(cmd)
+
     def sign(self, data: str, identity: str) -> str:
         cmd = ['sign', 'bytes', data, 'for', identity]
         return client_output.SignatureResult(self.run(cmd)).sig
