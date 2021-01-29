@@ -1020,14 +1020,15 @@ let shell_prevalidation (cctxt : #Protocol_client_context.full) ~chain ~block
 let remove_hash_and_filter_outdated_endorsements expected_level ops =
   List.filter_map
     (function
-      | ( _,
-          ({
-             Alpha_context.protocol_data =
-               Operation_data {contents = Single (Endorsement {level}); _};
-             _;
-           } as op) ) ->
+      | ( ( _,
+            ({
+               Alpha_context.protocol_data =
+                 Operation_data {contents = Single (Endorsement {level}); _};
+               _;
+             } as op) ),
+          _ ) ->
           if Raw_level.equal expected_level level then Some op else None
-      | (_, op) -> Some op)
+      | ((_, op), _) -> Some op)
     ops
 
 (** [fetch_operations] retrieve the operations present in the

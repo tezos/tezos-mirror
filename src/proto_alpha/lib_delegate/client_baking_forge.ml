@@ -967,32 +967,36 @@ let shell_prevalidation (cctxt : #Protocol_client_context.full) ~chain ~block
       return_some
         (bi, priority, shell_header, raw_ops, delegate, seed_nonce_hash)
 
-let remove_hash_and_filter_outdated_endorsements expected_level ops =
+let extract_op_and_filter_outdated_endorsements expected_level ops =
   List.filter_map
     (function
-      | ( _,
-          ({
-             Alpha_context.protocol_data =
-               Operation_data
-                 {
-                   contents =
-                     Single
-                       (Endorsement_with_slot
-                         {
-                           endorsement =
-                             {
-                               protocol_data =
-                                 {contents = Single (Endorsement {level; _}); _};
-                               _;
-                             };
-                           _;
-                         });
-                   _;
-                 };
-             _;
-           } as op) ) ->
+      | ( ( _,
+            ({
+               Alpha_context.protocol_data =
+                 Operation_data
+                   {
+                     contents =
+                       Single
+                         (Endorsement_with_slot
+                           {
+                             endorsement =
+                               {
+                                 protocol_data =
+                                   {
+                                     contents = Single (Endorsement {level; _});
+                                     _;
+                                   };
+                                 _;
+                               };
+                             _;
+                           });
+                     _;
+                   };
+               _;
+             } as op) ),
+          _ ) ->
           if Raw_level.equal expected_level level then Some op else None
-      | (_, op) -> Some op)
+      | ((_, op), _) -> Some op)
     ops
 
 (** [fetch_operations] retrieve the operations present in the
@@ -1033,7 +1037,7 @@ let fetch_operations (cctxt : #Protocol_client_context.full) ~chain state
   | Some current_mempool ->
       let operations =
         ref
-          (remove_hash_and_filter_outdated_endorsements
+          (extract_op_and_filter_outdated_endorsements
              head.Client_baking_blocks.level
              current_mempool)
       in
@@ -1092,7 +1096,7 @@ let fetch_operations (cctxt : #Protocol_client_context.full) ~chain state
         | `Event (Some op_list) ->
             last_get_event := None ;
             let op_list =
-              remove_hash_and_filter_outdated_endorsements head.level op_list
+              extract_op_and_filter_outdated_endorsements head.level op_list
             in
             notify_endorsement_arrival op_list >>= fun () ->
             let added_endorsing_power =
@@ -1106,7 +1110,7 @@ let fetch_operations (cctxt : #Protocol_client_context.full) ~chain state
             (* Retrieve the remaining operations present in the stream
                before block construction *)
             let remaining_operations =
-              remove_hash_and_filter_outdated_endorsements
+              extract_op_and_filter_outdated_endorsements
                 head.level
                 (List.flatten (Lwt_stream.get_available operation_stream))
             in

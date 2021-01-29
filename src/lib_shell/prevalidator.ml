@@ -777,19 +777,23 @@ module Make
              let (op_stream, stopper) =
                Lwt_watcher.create_stream operation_stream
              in
+
              (* Convert ops *)
-             let map_op (hash, op) =
+             let map_op error (hash, op) =
                match Prevalidation.parse_unsafe op.Operation.proto with
                | Error _ -> None
                | Ok protocol_data ->
-                   Some (hash, Proto.{shell = op.shell; protocol_data})
+                   Some (hash, Proto.{shell = op.shell; protocol_data}, error)
              in
-             let fold_op hash (op, _error) acc =
-               match map_op (hash, op) with Some op -> op :: acc | None -> acc
+             let fold_op hash (op, error) acc =
+               match map_op error (hash, op) with
+               | Some op -> op :: acc
+               | None -> acc
              in
              (* First call : retrieve the current set of op from the mempool *)
              let applied =
-               if params#applied then List.filter_map map_op applied_rev else []
+               if params#applied then List.filter_map (map_op []) applied_rev
+               else []
              in
              let refused =
                if params#refused then
@@ -814,6 +818,7 @@ module Make
              in
              let current_mempool =
                List.concat [applied; refused; branch_refused; branch_delayed]
+               |> List.map (fun (hash, op, errors) -> ((hash, op), errors))
              in
              let current_mempool = ref (Some current_mempool) in
              let filter_result = function
@@ -831,7 +836,16 @@ module Make
                    Lwt_stream.get op_stream >>= function
                    | Some (kind, hash, shell, protocol_data)
                      when filter_result kind ->
-                       Lwt.return_some [(hash, {Proto.shell; protocol_data})]
+                       let errors =
+                         match kind with
+                         | `Applied -> []
+                         | `Branch_delayed errors
+                         | `Branch_refused errors
+                         | `Refused errors ->
+                             errors
+                       in
+                       Lwt.return_some
+                         [((hash, {Proto.shell; protocol_data}), errors)]
                    | Some _ -> next ()
                    | None -> Lwt.return_none)
              in
