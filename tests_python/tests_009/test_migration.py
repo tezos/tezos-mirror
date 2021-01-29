@@ -1,13 +1,10 @@
-import datetime
-import json
-import os
 import time
-from typing import List
 
 import pytest
 
 from launchers.sandbox import Sandbox
-from tools import constants, paths, utils
+from tools import constants, utils
+from . import protocol
 
 BAKE_ARGS = [
     '--minimal-fees',
@@ -20,41 +17,28 @@ BAKE_ARGS = [
     '512',
     '--minimal-timestamp',
 ]
-PROTO_A = constants.EDO
-PROTO_A_DAEMON = constants.EDO_DAEMON
-PROTO_A_PATH = f"proto_{PROTO_A_DAEMON.replace('-','_')}"
-PROTO_B = constants.ALPHA
 
-PARAMETERS_FILE = (
-    f'{paths.TEZOS_HOME}src/{PROTO_A_PATH}/parameters/' 'test-parameters.json'
-)
-assert os.path.isfile(PARAMETERS_FILE), (
-    f'{PARAMETERS_FILE}'
-    ' cannot be found; please first run'
-    ' `make` in {paths.TEZOS_HOME}.'
-)
-with open(PARAMETERS_FILE) as f:
-    PARAMETERS = dict(json.load(f))
 MIGRATION_LEVEL = 3
 BAKER = 'bootstrap1'
-
 BAKER_PKH = constants.IDENTITIES[BAKER]['identity']
-DEPOSIT_RECEIPTS = [
-    {"kind": "contract", "contract": BAKER_PKH, "change": "-512000000"},
+DEPOSIT = protocol.PARAMETERS["block_security_deposit"]
+
+PREV_DEPOSIT_RECEIPTS = [
+    {"kind": "contract", "contract": BAKER_PKH, "change": "-" + DEPOSIT},
     {
         "kind": "freezer",
         "category": "deposits",
         "delegate": BAKER_PKH,
         "cycle": 0,
-        "change": "512000000",
+        "change": DEPOSIT,
     },
 ]
-# in Alpha protocol, the "origin" field is added
-ALPHA_DEPOSIT_RECEIPTS = [
+# in protocol 009, the "origin" field is added
+DEPOSIT_RECEIPTS = [
     {
         "kind": "contract",
         "contract": BAKER_PKH,
-        "change": "-512000000",
+        "change": "-" + DEPOSIT,
         "origin": "block",
     },
     {
@@ -62,11 +46,13 @@ ALPHA_DEPOSIT_RECEIPTS = [
         "category": "deposits",
         "delegate": BAKER_PKH,
         "cycle": 0,
-        "change": "512000000",
+        "change": DEPOSIT,
         "origin": "block",
     },
 ]
-MIGRATION_RECEIPTS: List[object] = [
+
+
+MIGRATION_RECEIPTS = [
     {
         "kind": "contract",
         "contract": 'tz1abmz7jiCV2GH2u81LRrGgAFFgvQgiDiaf',
@@ -74,6 +60,7 @@ MIGRATION_RECEIPTS: List[object] = [
         "origin": "migration",
     },
 ]
+
 
 # configure user-activate-upgrade at MIGRATION_LEVEL to test migration
 NODE_CONFIG = {
@@ -89,7 +76,7 @@ NODE_CONFIG = {
         'chain_name': 'TEZOS',
         'sandboxed_chain_name': 'SANDBOXED_TEZOS',
         'user_activated_upgrades': [
-            {'level': MIGRATION_LEVEL, 'replacement_protocol': PROTO_B}
+            {'level': MIGRATION_LEVEL, 'replacement_protocol': protocol.HASH}
         ],
     }
 }
@@ -98,15 +85,28 @@ NODE_CONFIG = {
 @pytest.fixture(scope="class")
 def client(sandbox):
     sandbox.add_node(0, node_config=NODE_CONFIG)
-    delay = datetime.timedelta(seconds=3600 * 24 * 365)
-    sandbox.client(0).activate_protocol_json(PROTO_A, PARAMETERS, delay=delay)
-
+    protocol.activate(
+        sandbox.client(0),
+        proto=protocol.PREV_HASH,
+        parameters=protocol.PREV_PARAMETERS,
+        activate_in_the_past=True,
+    )
     yield sandbox.client(0)
 
 
 @pytest.mark.incremental
 class TestMigration:
-    """Test migration from PROTO_A to PROTO_B."""
+    """Test migration from PROTO_A (the previous protocol) to PROTO_B (the
+    current protocol).
+
+    After migration, test snapshots:
+        - node0: activate PROTO_A, migrate to PROTO_B, bake, export
+                 a snapshot in full and rolling modes, and terminate
+        - node1: import full, bake
+        - node2: import rolling, sync, bake
+        - node3: reconstruct full, sync, bake
+        - all 4 are synced
+    """
 
     def test_init(self, client):
         # 1: genesis block
@@ -116,10 +116,10 @@ class TestMigration:
     def test_activate(self, client, sandbox):
         # 2: activated PROTO_A
         client.bake(BAKER, BAKE_ARGS)
-        assert client.get_protocol() == PROTO_A
+        assert client.get_protocol() == protocol.PREV_HASH
         assert sandbox.client(0).get_head()['header']['proto'] == 1
         metadata = client.get_metadata()
-        assert metadata['balance_updates'] == DEPOSIT_RECEIPTS
+        assert metadata['balance_updates'] == PREV_DEPOSIT_RECEIPTS
         # PROTO_A is using env. V1, metadata hashes should be present
         _ops_metadata_hash = client.get_operations_metadata_hash()
         _block_metadata_hash = client.get_block_metadata_hash()
@@ -128,8 +128,8 @@ class TestMigration:
         # 3: last block of PROTO_A, runs migration code (MIGRATION_LEVEL)
         client.bake(BAKER, BAKE_ARGS)
         metadata = client.get_metadata()
-        assert metadata['next_protocol'] == PROTO_B
-        assert metadata['balance_updates'] == DEPOSIT_RECEIPTS
+        assert metadata['next_protocol'] == protocol.HASH
+        assert metadata['balance_updates'] == PREV_DEPOSIT_RECEIPTS
         # PROTO_B is using env. V1, metadata hashes should be present
         _ops_metadata_hash = client.get_operations_metadata_hash()
         _block_metadata_hash = client.get_block_metadata_hash()
@@ -138,13 +138,13 @@ class TestMigration:
     def test_new_proto(self, client, sandbox):
         # 4: first block of PROTO_B
         client.bake(BAKER, BAKE_ARGS)
-        assert client.get_protocol() == PROTO_B
+        assert client.get_protocol() == protocol.HASH
         assert sandbox.client(0).get_head()['header']['proto'] == 2
 
         # check that migration balance update appears in receipts
         metadata = client.get_metadata()
         assert metadata['balance_updates'] == (
-            MIGRATION_RECEIPTS + ALPHA_DEPOSIT_RECEIPTS
+            MIGRATION_RECEIPTS + DEPOSIT_RECEIPTS
         )
         _ops_metadata_hash = client.get_operations_metadata_hash()
         _block_metadata_hash = client.get_block_metadata_hash()
@@ -153,10 +153,10 @@ class TestMigration:
         # 5: second block of PROTO_B
         client.bake(BAKER, BAKE_ARGS)
         metadata = client.get_metadata()
-        assert metadata['balance_updates'] == ALPHA_DEPOSIT_RECEIPTS
+        assert metadata['balance_updates'] == DEPOSIT_RECEIPTS
 
     def test_terminate_node0(self, client, sandbox: Sandbox, session: dict):
-        # # to export rolling snapshot, we need to be at level > 60
+        # to export rolling snapshot, we need to be at level > 60
         # (see `max_operations_ttl`)
         level = client.get_head()['header']['level']
         for _ in range(60 - level + 1):

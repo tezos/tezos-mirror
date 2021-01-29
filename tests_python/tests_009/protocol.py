@@ -10,8 +10,12 @@ PREV_PARAMETERS = constants.EDO_PARAMETERS
 
 
 def activate(
-    client, parameters=PARAMETERS, timestamp=None, activate_in_the_past=False
+    client,
+    parameters=PARAMETERS,
+    proto=HASH,
+    timestamp=None,
+    activate_in_the_past=False,
 ):
     utils.activate_protocol(
-        client, HASH, parameters, timestamp, activate_in_the_past
+        client, proto, parameters, timestamp, activate_in_the_past
     )
