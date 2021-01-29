@@ -25,10 +25,7 @@
 
 (** Implementation of Tezos context fully in memory. *)
 
-(** The type for in-memory contexts. *)
-type t
-
-include Tezos_storage_sigs.Context.S with type t := t and type tree = t
+include Tezos_storage_sigs.Context.S
 
 val empty : t
 

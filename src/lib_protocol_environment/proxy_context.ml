@@ -44,7 +44,7 @@ module M = struct
 
   (* When the [proxy] option is [None], this instance of [M] should
      behave like [Memory_context]. *)
-  type t = {proxy : proxy_delegate option; local : Local.tree}
+  type t = {proxy : proxy_delegate option; local : Local.t}
 
   let rec tree_size_aux acc = function
     | `Value _ ->
