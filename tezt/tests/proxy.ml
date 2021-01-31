@@ -30,6 +30,16 @@
    Subject: Basic tests of the client's --mode proxy.
   *)
 
+(** Returns a proxy client *)
+let init ~protocol () =
+  let* node = Node.init [Synchronisation_threshold 0] in
+  let* client = Client.init ~node () in
+  let* () = Client.activate_protocol ~protocol client in
+  Log.info "Activated protocol." ;
+  Client.set_mode (Proxy node) client ;
+  let* () = Client.bake_for client in
+  Log.info "Baked 1 block." ; Lwt.return client
+
 (* Test.
    Bake a few blocks in proxy mode.
  *)
@@ -59,14 +69,7 @@ let transfer protocol =
     ~title:(Printf.sprintf "transfer (%s)" (Protocol.name protocol))
     ~tags:[Protocol.tag protocol; "proxy"; "transfer"]
   @@ fun () ->
-  let* node = Node.init [Synchronisation_threshold 0] in
-  let* client = Client.init ~node () in
-  let* () = Client.activate_protocol ~protocol client in
-  Log.info "Activated protocol." ;
-  Client.set_mode (Proxy node) client ;
-  let* () = Client.bake_for client in
-  let* () = Client.bake_for client in
-  Log.info "Baked 1 block." ;
+  let* client = init ~protocol () in
   let* () =
     Client.transfer
       ~wait:"none"
