@@ -27,6 +27,8 @@ type mode = Client of Node.t option | Mockup | Proxy of Node.t
 
 type mockup_sync_mode = Asynchronous | Synchronous
 
+type normalize_mode = Readable | Optimized | Optimized_legacy
+
 type t = {
   path : string;
   admin_path : string;
@@ -437,6 +439,30 @@ let originate_contract ?node ?wait ?init ?burn_cap ~alias ~amount ~src ~prg
         client_output
   | Some hash ->
       return hash
+
+let spawn_normalize_data ?mode ?(legacy = false) ~data ~typ client =
+  let mode_to_string = function
+    | Readable ->
+        "Readable"
+    | Optimized ->
+        "Optimized"
+    | Optimized_legacy ->
+        "Optimized_legacy"
+  in
+  let mode_cmd =
+    Option.map mode_to_string mode
+    |> Option.map (fun s -> ["--unparsing-mode"; s])
+  in
+  let cmd =
+    ["normalize"; "data"; data; "of"; "type"; typ]
+    @ Option.value ~default:[] mode_cmd
+    @ if legacy then ["--legacy"] else []
+  in
+  spawn_command client cmd
+
+let normalize_data ?mode ?legacy ~data ~typ client =
+  spawn_normalize_data ?mode ?legacy ~data ~typ client
+  |> Process.check_and_read_stdout
 
 let spawn_list_mockup_protocols client =
   spawn_command client (mode_arg client @ ["list"; "mockup"; "protocols"])

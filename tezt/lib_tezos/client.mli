@@ -34,6 +34,9 @@ type mode = Client of Node.t option | Mockup | Proxy of Node.t
     - [Synchronous] is the default mode (no flag passed to [create mockup]). *)
 type mockup_sync_mode = Asynchronous | Synchronous
 
+(** The mode argument of the client's 'normalize data' command *)
+type normalize_mode = Readable | Optimized | Optimized_legacy
+
 (** Tezos client states. *)
 type t
 
@@ -328,6 +331,24 @@ val spawn_originate_contract :
   amount:Tez.t ->
   src:string ->
   prg:string ->
+  t ->
+  Process.t
+
+(** Run [tezos-client normalize data .. of type ...]*)
+val normalize_data :
+  ?mode:normalize_mode ->
+  ?legacy:bool ->
+  data:string ->
+  typ:string ->
+  t ->
+  string Lwt.t
+
+(** Same as [normalize_data], but do not wait for the process to exit. *)
+val spawn_normalize_data :
+  ?mode:normalize_mode ->
+  ?legacy:bool ->
+  data:string ->
+  typ:string ->
   t ->
   Process.t
 

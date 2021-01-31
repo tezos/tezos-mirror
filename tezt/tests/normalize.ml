@@ -1,8 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
+(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -26,31 +25,58 @@
 
 (* Testing
    -------
-   Component: All
-   Invocation: make test-tezt
-   Subject: This file is the entrypoint of all Tezt tests. It dispatches to
-            other files.
- *)
+   Component: Client - normalize command
+   Invocation: dune exec tezt/tests/main.exe -- --file normalize.ml
+   Subject: Test the client's command 'normalize data .. of type ...'
+  *)
 
-(* This module runs the tests implemented in all other modules of this directory.
-   Each module defines tests which are thematically related,
-   as functions to be called here. *)
+let data = "{Pair 0 3 6 9; Pair 1 (Pair 4 (Pair 7 10)); {2; 5; 8; 11}}"
+
+let typ = "list (pair nat nat nat nat)"
+
+let normalize_modes =
+  let open Client in
+  [Readable; Optimized; Optimized_legacy]
+
+let execute_all_modes client =
+  let legacy = true in
+  Lwt_list.map_s
+    (fun mode -> Client.normalize_data ~mode ~legacy ~data ~typ client)
+    normalize_modes
+
+let test_normalize_vanilla ~protocol =
+  Test.register
+    ~__FILE__
+    ~title:(sf "%s: normalize data" (Protocol.name protocol))
+    ~tags:[Protocol.tag protocol; "normalize"; "data"]
+  @@ fun () ->
+  let* node = Node.init [] in
+  let* client = Client.init ~node () in
+  let* () = Client.activate_protocol ~protocol client in
+  let* _ = execute_all_modes client in
+  Lwt.return_unit
+
+let test_normalize_mockup ~protocol =
+  Test.register
+    ~__FILE__
+    ~title:(sf "%s: normalize data (mockup)" (Protocol.name protocol))
+    ~tags:[Protocol.tag protocol; "mockup"; "normalize"; "data"]
+  @@ fun () ->
+  let* client = Client.init_mockup ~protocol () in
+  let* _ = execute_all_modes client in
+  Lwt.return_unit
+
+let test_normalize_proxy ~protocol =
+  Test.register
+    ~__FILE__
+    ~title:(sf "%s: normalize data (proxy)" (Protocol.name protocol))
+    ~tags:[Protocol.tag protocol; "proxy"; "normalize"; "data"]
+  @@ fun () ->
+  let* client = Proxy.init ~protocol () in
+  let* _ = execute_all_modes client in
+  Lwt.return_unit
 
 let register protocol =
-  Basic.register protocol ;
-  Bootstrap.register protocol ;
-  Synchronisation_heuristic.register protocol ;
-  Mockup.register protocol ;
-  Normalize.register protocol ;
-  Proxy.register protocol ;
-  Double_bake.register protocol
-
-let () =
-  register Alpha ;
-  P2p.register Alpha ;
-  Bootstrap.register_protocol_independent () ;
-  Cli_tezos.register_protocol_independent () ;
-  Encoding.register () ;
-  RPC_test.register () ;
-  (* Test.run () should be the last statement, don't register afterwards! *)
-  Test.run ()
+  test_normalize_vanilla ~protocol ;
+  test_normalize_mockup ~protocol ;
+  test_normalize_proxy ~protocol
