@@ -130,7 +130,7 @@ val ka_derivepublic : diversifier -> esk -> epk
 
 (** Creates the spend sig for an input. The sighash argument is the hash of
     the input ie. cv,cm,...
-    The has to be generated using generate_r
+    This has to be generated using [generate_r]
 
     @raise [Assert_failure] if the underlying binding in rust indicates a failure,
     which only happens if the arguments are not valid representations for their

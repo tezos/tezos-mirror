@@ -302,12 +302,15 @@ module Raw = struct
             random_diversifier ()
       in
       let diversifier = random_diversifier () in
-      (* A random ivk is 32 bytes with the first 5 bits set to 0 *)
+      (* A random ivk is 32 bytes with the first 5 bits set to 0 (if in big
+         endian). As ivk is encoded in little endian, we apply the mask on the
+         last byte.
+      *)
       let rand = Hacl.Rand.gen 32 in
       let mask = 0b00000111 in
-      let int = Char.code @@ Bytes.get rand 0 in
+      let int = Char.code @@ Bytes.get rand (32 - 1) in
       let int_masked = int land mask in
-      Bytes.set rand 0 (Char.chr int_masked) ;
+      Bytes.set rand (32 - 1) (Char.chr int_masked) ;
       let ivk = R.to_ivk rand in
       let pkd = R.ivk_to_pkd ivk diversifier in
       {diversifier; pkd}

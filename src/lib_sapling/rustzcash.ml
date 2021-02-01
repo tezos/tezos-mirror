@@ -133,10 +133,12 @@ module T : Rustzcash_sig.T = struct
     x
 
   let to_nsk x =
+    (* A scalar of Jubjub *)
     assert (Bytes.length x = 32) ;
     x
 
   let to_ask x =
+    (* A scalar of Jubjub *)
     assert (Bytes.length x = 32) ;
     x
 
@@ -145,6 +147,7 @@ module T : Rustzcash_sig.T = struct
     x
 
   let to_ovk x =
+    (* Can be any random 32 bytes, 5.6.6 *)
     assert (Bytes.length x = 32) ;
     x
 
