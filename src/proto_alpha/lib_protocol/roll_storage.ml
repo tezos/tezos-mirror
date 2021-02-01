@@ -198,19 +198,6 @@ let baking_rights_owner c level ~priority =
 let endorsement_rights_owner c level ~slot =
   Random.owner c "endorsement" level slot
 
-let traverse_rolls ctxt head =
-  let rec loop acc roll =
-    Storage.Roll.Successor.get_option ctxt roll
-    >>=? function
-    | None -> return (List.rev acc) | Some next -> loop (next :: acc) next
-  in
-  loop [head] head
-
-let get_rolls ctxt delegate =
-  Storage.Roll.Delegate_roll_list.get_option ctxt delegate
-  >>=? function
-  | None -> return_nil | Some head_roll -> traverse_rolls ctxt head_roll
-
 let count_rolls ctxt delegate =
   Storage.Roll.Delegate_roll_list.get_option ctxt delegate
   >>=? function

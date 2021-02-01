@@ -214,16 +214,30 @@ module Contract : sig
     Raw_context.t tzresult Lwt.t
 end
 
+(**
+   [delegate_pubkey ctxt delegate] returns the public key of
+   [delegate] found in context [ctxt] if there exists a registered
+   contract.
+*)
 val delegate_pubkey :
   Raw_context.t ->
   Signature.Public_key_hash.t ->
   Signature.Public_key.t tzresult Lwt.t
 
-val get_rolls :
-  Raw_context.t ->
-  Signature.Public_key_hash.t ->
-  Roll_repr.t list tzresult Lwt.t
+(**
+   [count_rolls ctxt delegate] returns the number of rolls held by
+   [delegate] in context [ctxt].
+*)
+val count_rolls :
+  Raw_context.t -> Signature.Public_key_hash.t -> int tzresult Lwt.t
 
+(**
+   [get_change ctxt delegate] returns the amount of change held by
+   [delegate] in context [ctxt]. The change is the part of the staking
+   balance of a delegate that is not part of a roll, i.e., the amount
+   of staking balance (smaller than the value of a roll) not being
+   taken into account for baking rights computation.
+*)
 val get_change :
   Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
 
@@ -240,6 +254,10 @@ val get_change :
 val update_tokens_per_roll :
   Raw_context.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t
 
+(**
+   [get_contract_delegate ctxt contract] returns the public key hash
+   of the delegate whose contract is [contract] in context [ctxt].
+*)
 val get_contract_delegate :
   Raw_context.t ->
   Contract_repr.t ->

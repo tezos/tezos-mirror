@@ -1512,8 +1512,8 @@ module Roll : sig
 
   val delegate_pubkey : context -> public_key_hash -> public_key tzresult Lwt.t
 
-  val get_rolls :
-    context -> Signature.Public_key_hash.t -> roll list tzresult Lwt.t
+  val count_rolls :
+    context -> Signature.Public_key_hash.t -> int tzresult Lwt.t
 
   val get_change :
     context -> Signature.Public_key_hash.t -> Tez.t tzresult Lwt.t

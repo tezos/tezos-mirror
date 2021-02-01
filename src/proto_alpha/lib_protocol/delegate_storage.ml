@@ -581,13 +581,12 @@ let grace_period ctxt delegate =
 
 let staking_balance ctxt delegate =
   let token_per_rolls = Constants_storage.tokens_per_roll ctxt in
-  Roll_storage.get_rolls ctxt delegate
+  Roll_storage.count_rolls ctxt delegate
   >>=? fun rolls ->
   Roll_storage.get_change ctxt delegate
   >>=? fun change ->
-  let rolls = Int64.of_int (List.length rolls) in
   Lwt.return
-    ( Tez_repr.(token_per_rolls *? rolls)
+    ( Tez_repr.(token_per_rolls *? Int64.of_int rolls)
     >>? fun balance -> Tez_repr.(balance +? change) )
 
 let delegated_balance ctxt delegate =
