@@ -471,3 +471,9 @@ val classify_desc : 'a desc -> [`Fixed of int | `Dynamic | `Variable]
 
 val raw_splitted :
   json:'a Json_encoding.encoding -> binary:'a encoding -> 'a encoding
+
+(**/**)
+
+val is_nullable : 'a encoding -> bool
+
+val is_zeroable : 'a encoding -> bool
