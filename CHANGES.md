@@ -12,6 +12,8 @@ here either.
 
 ## Node
 
+- Cap the number of expected connections to `100` on the command line
+
 - Fixes a bug that launched the prevalidator when the node was not
   bootstrapped.
 
