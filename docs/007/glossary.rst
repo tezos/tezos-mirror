@@ -91,7 +91,7 @@ _`Baker`
     available balance. Only a node_ that handles an account_ with baking_ rights
     is allowed to bake; blocks created by another node_ are invalid.
     The baker selects transactions from the mempool_ to be included in the block_
-	it bakes.
+    it bakes.
 
     Using the tools provided by Nomadic Labs, baking_ is handled by a
     separate binary.
