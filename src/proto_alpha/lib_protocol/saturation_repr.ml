@@ -78,6 +78,22 @@ let small_enough z =
 
 let mul_safe x = if small_enough x then Some x else None
 
+let mul_safe_exn x =
+  match mul_safe x with
+  | None ->
+      failwith (Format.sprintf "mul_safe_exn: %d must be below 2147483648" x)
+  | Some x ->
+      x
+
+let mul_safe_of_int_exn x =
+  Option.bind (of_int_opt x) mul_safe
+  |> function
+  | None ->
+      failwith
+        (Format.sprintf "mul_safe_of_int_exn: %d must be below 2147483648" x)
+  | Some x ->
+      x
+
 (* If [x] is positive, shifting to the right will produce a number
    which is positive and is less than [x]. *)
 let shift_right x y = (x :> int) lsr y

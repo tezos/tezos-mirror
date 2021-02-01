@@ -31,37 +31,7 @@ type integral_tag
 
 module S = Saturation_repr
 
-(*
-
-   When a saturated integer is sufficiently small (i.e. strictly less
-   than 2147483648), we can assign it the type [mul_safe S.t] to use
-   it within fast multiplications, named [S.scale_fast] and
-   [S.mul_fast].
-
-   The following function allows such type assignment but may raise an
-   exception if the assumption is wrong.  Therefore, [assert_mul_safe]
-   should only be used to define toplevel values, so that these
-   exceptions can only occur during startup.
-
-*)
-let assert_mul_safe_exn x =
-  match S.mul_safe x with None -> assert false | Some x -> x
-
-(*
-
-   Similarly as [assert_mul_safe_exn], [safe_const_exn] must only be applied
-   to integer literals that are small enough for fast multiplications.
-
-*)
-let safe_const_exn x =
-  match S.of_int_opt x with
-  | None ->
-      (* Since [safe_const_exn] is only applied to small integers: *)
-      assert false
-  | Some x ->
-      assert_mul_safe_exn x
-
-let scaling_factor = safe_const_exn 1000
+let scaling_factor = S.mul_safe_of_int_exn 1000
 
 module Arith = struct
   type 'a t = S.may_saturate S.t
@@ -191,21 +161,21 @@ let cost_encoding = S.z_encoding
 let pp_cost fmt z = S.pp fmt z
 
 let allocation_weight =
-  S.(mul_fast scaling_factor (safe_const_exn 2)) |> assert_mul_safe_exn
+  S.(mul_fast scaling_factor (S.mul_safe_of_int_exn 2)) |> S.mul_safe_exn
 
 let step_weight = scaling_factor
 
 let read_base_weight =
-  S.(mul_fast scaling_factor (safe_const_exn 100)) |> assert_mul_safe_exn
+  S.(mul_fast scaling_factor (S.mul_safe_of_int_exn 100)) |> S.mul_safe_exn
 
 let write_base_weight =
-  S.(mul_fast scaling_factor (safe_const_exn 160)) |> assert_mul_safe_exn
+  S.(mul_fast scaling_factor (S.mul_safe_of_int_exn 160)) |> S.mul_safe_exn
 
 let byte_read_weight =
-  S.(mul_fast scaling_factor (safe_const_exn 10)) |> assert_mul_safe_exn
+  S.(mul_fast scaling_factor (S.mul_safe_of_int_exn 10)) |> S.mul_safe_exn
 
 let byte_written_weight =
-  S.(mul_fast scaling_factor (safe_const_exn 15)) |> assert_mul_safe_exn
+  S.(mul_fast scaling_factor (S.mul_safe_of_int_exn 15)) |> S.mul_safe_exn
 
 let cost_to_milligas (cost : cost) : Arith.fp = cost
 
@@ -213,7 +183,8 @@ let raw_consume gas_counter cost =
   let gas = cost_to_milligas cost in
   Arith.sub_opt gas_counter gas
 
-let alloc_cost n = S.scale_fast allocation_weight S.(add n (safe_const_exn 1))
+let alloc_cost n =
+  S.scale_fast allocation_weight S.(add n (S.mul_safe_of_int_exn 1))
 
 let alloc_bytes_cost n = alloc_cost (S.safe_int ((n + 7) / 8))
 
@@ -233,4 +204,5 @@ let ( +@ ) x y = S.add x y
 
 let ( *@ ) x y = S.mul x y
 
-let alloc_mbytes_cost n = alloc_cost (safe_const_exn 12) +@ alloc_bytes_cost n
+let alloc_mbytes_cost n =
+  alloc_cost (S.mul_safe_of_int_exn 12) +@ alloc_bytes_cost n

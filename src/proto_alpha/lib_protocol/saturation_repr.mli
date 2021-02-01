@@ -155,6 +155,24 @@ val of_int_opt : int -> may_saturate t option
     and [None] otherwise. *)
 val of_z_opt : Z.t -> may_saturate t option
 
+(** When a saturated integer is sufficiently small (i.e. strictly less
+   than 2147483648), we can assign it the type [mul_safe S.t] to use
+   it within fast multiplications, named [S.scale_fast] and
+   [S.mul_fast].
+
+   The following function allows such type assignment but may raise an
+   exception if the assumption is wrong.  Therefore, [mul_safe_exn]
+   should only be used to define toplevel values, so that these
+   exceptions can only occur during startup.
+ *)
+val mul_safe_exn : may_saturate t -> mul_safe t
+
+(** [mul_safe_of_int_exn x] is the composition of [of_int_opt] and
+   [mul_safe] in the option monad. This function raises [Invalid_argument]
+   if [x] is not safe. This function should be used on integer literals
+   that are obviously [mul_safe]. *)
+val mul_safe_of_int_exn : int -> mul_safe t
+
 (** [saturate_if_undef o] is [saturated] if [o] is [None] and [x] if [o = Some
    x]. *)
 val saturate_if_undef : may_saturate t option -> may_saturate t
