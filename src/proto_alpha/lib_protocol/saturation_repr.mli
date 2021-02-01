@@ -173,10 +173,6 @@ val mul_safe_exn : may_saturate t -> mul_safe t
    that are obviously [mul_safe]. *)
 val mul_safe_of_int_exn : int -> mul_safe t
 
-(** [saturate_if_undef o] is [saturated] if [o] is [None] and [x] if [o = Some
-   x]. *)
-val saturate_if_undef : may_saturate t option -> may_saturate t
-
 (** [safe_int x] is [of_int_opt x |> saturate_if_undef]. *)
 val safe_int : int -> may_saturate t
 
