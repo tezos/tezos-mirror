@@ -76,7 +76,7 @@ module Arith = struct
 
   let add = S.add
 
-  let zero = S.(may_saturate zero)
+  let zero = S.zero
 
   let min = S.min
 
