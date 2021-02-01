@@ -79,11 +79,8 @@ let small_enough z =
 let mul_safe x = if small_enough x then Some x else None
 
 let mul_safe_exn x =
-  match mul_safe x with
-  | None ->
-      failwith (Format.sprintf "mul_safe_exn: %d must be below 2147483648" x)
-  | Some x ->
-      x
+  if small_enough x then x
+  else failwith (Format.sprintf "mul_safe_exn: %d must be below 2147483648" x)
 
 let mul_safe_of_int_exn x =
   Option.bind (of_int_opt x) mul_safe
