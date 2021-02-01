@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,62 +24,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Alpha_context
+(* This is the genesis protocol: initialise the state *)
+val prepare_first_block :
+  Context.t ->
+  typecheck:(Raw_context.t ->
+            Script_repr.t ->
+            ((Script_repr.t * Lazy_storage_diff.diffs option) * Raw_context.t)
+            Error_monad.tzresult
+            Lwt.t) ->
+  level:int32 ->
+  timestamp:Time.t ->
+  fitness:Fitness.t ->
+  (Raw_context.t, Error_monad.error Error_monad.trace) Pervasives.result Lwt.t
 
-type rpc_context = {
-  block_hash : Block_hash.t;
-  block_header : Block_header.shell_header;
-  context : Alpha_context.t;
-}
-
-let rpc_init ({block_hash; block_header; context} : Updater.rpc_context) =
-  let level = block_header.level in
-  let timestamp = block_header.timestamp in
-  let fitness = block_header.fitness in
-  Alpha_context.prepare
-    ~level
-    ~predecessor_timestamp:timestamp
-    ~timestamp
-    ~fitness
-    context
-  >|=? fun (context, _balance_updates) -> {block_hash; block_header; context}
-
-let rpc_services =
-  ref (RPC_directory.empty : Updater.rpc_context RPC_directory.t)
-
-let register0_fullctxt s f =
-  rpc_services :=
-    RPC_directory.register !rpc_services s (fun ctxt q i ->
-        rpc_init ctxt >>=? fun ctxt -> f ctxt q i)
-
-let register0 s f = register0_fullctxt s (fun {context; _} -> f context)
-
-let register0_noctxt s f =
-  rpc_services := RPC_directory.register !rpc_services s (fun _ q i -> f q i)
-
-let register1_fullctxt s f =
-  rpc_services :=
-    RPC_directory.register !rpc_services s (fun (ctxt, arg) q i ->
-        rpc_init ctxt >>=? fun ctxt -> f ctxt arg q i)
-
-let register1 s f = register1_fullctxt s (fun {context; _} x -> f context x)
-
-let register2_fullctxt s f =
-  rpc_services :=
-    RPC_directory.register !rpc_services s (fun ((ctxt, arg1), arg2) q i ->
-        rpc_init ctxt >>=? fun ctxt -> f ctxt arg1 arg2 q i)
-
-let register2 s f =
-  register2_fullctxt s (fun {context; _} a1 a2 q i -> f context a1 a2 q i)
-
-let get_rpc_services () =
-  let p =
-    RPC_directory.map
-      (fun c ->
-        rpc_init c >|= function Error _ -> assert false | Ok c -> c.context)
-      (Storage_description.build_directory Alpha_context.description)
-  in
-  RPC_directory.register_dynamic_directory
-    !rpc_services
-    RPC_path.(open_root / "context" / "raw" / "json")
-    (fun _ -> Lwt.return p)
+val prepare :
+  Context.t ->
+  level:Int32.t ->
+  predecessor_timestamp:Time.t ->
+  timestamp:Time.t ->
+  fitness:Fitness.t ->
+  (Raw_context.context * Receipt_repr.balance_updates) Error_monad.tzresult
+  Lwt.t

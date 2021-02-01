@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,62 +24,64 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Alpha_context
+val version_number_004 : string
 
-type rpc_context = {
-  block_hash : Block_hash.t;
-  block_header : Block_header.shell_header;
-  context : Alpha_context.t;
+val version_number : string
+
+val proof_of_work_nonce_size : int
+
+val nonce_length : int
+
+val max_anon_ops_per_block : int
+
+val max_proposals_per_delegate : int
+
+val max_operation_data_length : int
+
+type fixed = {
+  proof_of_work_nonce_size : int;
+  nonce_length : int;
+  max_anon_ops_per_block : int;
+  max_operation_data_length : int;
+  max_proposals_per_delegate : int;
 }
 
-let rpc_init ({block_hash; block_header; context} : Updater.rpc_context) =
-  let level = block_header.level in
-  let timestamp = block_header.timestamp in
-  let fitness = block_header.fitness in
-  Alpha_context.prepare
-    ~level
-    ~predecessor_timestamp:timestamp
-    ~timestamp
-    ~fitness
-    context
-  >|=? fun (context, _balance_updates) -> {block_hash; block_header; context}
+val fixed_encoding : fixed Data_encoding.encoding
 
-let rpc_services =
-  ref (RPC_directory.empty : Updater.rpc_context RPC_directory.t)
+val fixed : fixed
 
-let register0_fullctxt s f =
-  rpc_services :=
-    RPC_directory.register !rpc_services s (fun ctxt q i ->
-        rpc_init ctxt >>=? fun ctxt -> f ctxt q i)
+type parametric = {
+  preserved_cycles : int;
+  blocks_per_cycle : int32;
+  blocks_per_commitment : int32;
+  blocks_per_roll_snapshot : int32;
+  blocks_per_voting_period : int32;
+  time_between_blocks : Period_repr.t list;
+  endorsers_per_block : int;
+  hard_gas_limit_per_operation : Gas_limit_repr.Arith.integral;
+  hard_gas_limit_per_block : Gas_limit_repr.Arith.integral;
+  proof_of_work_threshold : int64;
+  tokens_per_roll : Tez_repr.t;
+  michelson_maximum_type_size : int;
+  seed_nonce_revelation_tip : Tez_repr.t;
+  origination_size : int;
+  block_security_deposit : Tez_repr.t;
+  endorsement_security_deposit : Tez_repr.t;
+  baking_reward_per_endorsement : Tez_repr.t list;
+  endorsement_reward : Tez_repr.t list;
+  cost_per_byte : Tez_repr.t;
+  hard_storage_limit_per_operation : Z.t;
+  test_chain_duration : int64;
+  (* in seconds *)
+  quorum_min : int32;
+  quorum_max : int32;
+  min_proposal_quorum : int32;
+  initial_endorsers : int;
+  delay_per_missing_endorsement : Period_repr.t;
+}
 
-let register0 s f = register0_fullctxt s (fun {context; _} -> f context)
+val parametric_encoding : parametric Data_encoding.encoding
 
-let register0_noctxt s f =
-  rpc_services := RPC_directory.register !rpc_services s (fun _ q i -> f q i)
+type t = {fixed : fixed; parametric : parametric}
 
-let register1_fullctxt s f =
-  rpc_services :=
-    RPC_directory.register !rpc_services s (fun (ctxt, arg) q i ->
-        rpc_init ctxt >>=? fun ctxt -> f ctxt arg q i)
-
-let register1 s f = register1_fullctxt s (fun {context; _} x -> f context x)
-
-let register2_fullctxt s f =
-  rpc_services :=
-    RPC_directory.register !rpc_services s (fun ((ctxt, arg1), arg2) q i ->
-        rpc_init ctxt >>=? fun ctxt -> f ctxt arg1 arg2 q i)
-
-let register2 s f =
-  register2_fullctxt s (fun {context; _} a1 a2 q i -> f context a1 a2 q i)
-
-let get_rpc_services () =
-  let p =
-    RPC_directory.map
-      (fun c ->
-        rpc_init c >|= function Error _ -> assert false | Ok c -> c.context)
-      (Storage_description.build_directory Alpha_context.description)
-  in
-  RPC_directory.register_dynamic_directory
-    !rpc_services
-    RPC_path.(open_root / "context" / "raw" / "json")
-    (fun _ -> Lwt.return p)
+val encoding : t Data_encoding.encoding

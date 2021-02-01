@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,62 +24,58 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Alpha_context
+val preserved_cycles : Raw_context.context -> int
 
-type rpc_context = {
-  block_hash : Block_hash.t;
-  block_header : Block_header.shell_header;
-  context : Alpha_context.t;
-}
+val blocks_per_cycle : Raw_context.context -> int32
 
-let rpc_init ({block_hash; block_header; context} : Updater.rpc_context) =
-  let level = block_header.level in
-  let timestamp = block_header.timestamp in
-  let fitness = block_header.fitness in
-  Alpha_context.prepare
-    ~level
-    ~predecessor_timestamp:timestamp
-    ~timestamp
-    ~fitness
-    context
-  >|=? fun (context, _balance_updates) -> {block_hash; block_header; context}
+val blocks_per_commitment : Raw_context.context -> int32
 
-let rpc_services =
-  ref (RPC_directory.empty : Updater.rpc_context RPC_directory.t)
+val blocks_per_roll_snapshot : Raw_context.context -> int32
 
-let register0_fullctxt s f =
-  rpc_services :=
-    RPC_directory.register !rpc_services s (fun ctxt q i ->
-        rpc_init ctxt >>=? fun ctxt -> f ctxt q i)
+val blocks_per_voting_period : Raw_context.context -> int32
 
-let register0 s f = register0_fullctxt s (fun {context; _} -> f context)
+val time_between_blocks : Raw_context.context -> Period_repr.t list
 
-let register0_noctxt s f =
-  rpc_services := RPC_directory.register !rpc_services s (fun _ q i -> f q i)
+val endorsers_per_block : Raw_context.context -> int
 
-let register1_fullctxt s f =
-  rpc_services :=
-    RPC_directory.register !rpc_services s (fun (ctxt, arg) q i ->
-        rpc_init ctxt >>=? fun ctxt -> f ctxt arg q i)
+val initial_endorsers : Raw_context.context -> int
 
-let register1 s f = register1_fullctxt s (fun {context; _} x -> f context x)
+val delay_per_missing_endorsement : Raw_context.context -> Period_repr.t
 
-let register2_fullctxt s f =
-  rpc_services :=
-    RPC_directory.register !rpc_services s (fun ((ctxt, arg1), arg2) q i ->
-        rpc_init ctxt >>=? fun ctxt -> f ctxt arg1 arg2 q i)
+val hard_gas_limit_per_operation :
+  Raw_context.context -> Gas_limit_repr.Arith.integral
 
-let register2 s f =
-  register2_fullctxt s (fun {context; _} a1 a2 q i -> f context a1 a2 q i)
+val hard_gas_limit_per_block :
+  Raw_context.context -> Gas_limit_repr.Arith.integral
 
-let get_rpc_services () =
-  let p =
-    RPC_directory.map
-      (fun c ->
-        rpc_init c >|= function Error _ -> assert false | Ok c -> c.context)
-      (Storage_description.build_directory Alpha_context.description)
-  in
-  RPC_directory.register_dynamic_directory
-    !rpc_services
-    RPC_path.(open_root / "context" / "raw" / "json")
-    (fun _ -> Lwt.return p)
+val cost_per_byte : Raw_context.context -> Tez_repr.t
+
+val hard_storage_limit_per_operation : Raw_context.context -> Z.t
+
+val proof_of_work_threshold : Raw_context.context -> int64
+
+val tokens_per_roll : Raw_context.context -> Tez_repr.t
+
+val michelson_maximum_type_size : Raw_context.context -> int
+
+val seed_nonce_revelation_tip : Raw_context.context -> Tez_repr.t
+
+val origination_size : Raw_context.context -> int
+
+val block_security_deposit : Raw_context.context -> Tez_repr.t
+
+val endorsement_security_deposit : Raw_context.context -> Tez_repr.t
+
+val baking_reward_per_endorsement : Raw_context.context -> Tez_repr.t list
+
+val endorsement_reward : Raw_context.context -> Tez_repr.t list
+
+val test_chain_duration : Raw_context.context -> int64
+
+val quorum_min : Raw_context.context -> int32
+
+val quorum_max : Raw_context.context -> int32
+
+val min_proposal_quorum : Raw_context.context -> int32
+
+val parametric : Raw_context.context -> Constants_repr.parametric

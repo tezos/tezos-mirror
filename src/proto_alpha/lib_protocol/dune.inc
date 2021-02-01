@@ -21,10 +21,10 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
  (deps
    misc.mli misc.ml
    storage_description.mli storage_description.ml
-   state_hash.ml
-   nonce_hash.ml
-   script_expr_hash.ml
-   contract_hash.ml
+   state_hash.mli state_hash.ml
+   nonce_hash.mli nonce_hash.ml
+   script_expr_hash.mli script_expr_hash.ml
+   contract_hash.mli contract_hash.ml
    blinded_public_key_hash.mli blinded_public_key_hash.ml
    tez_repr.mli tez_repr.ml
    period_repr.mli period_repr.ml
@@ -32,8 +32,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    fixed_point_repr.mli fixed_point_repr.ml
    saturation_repr.mli saturation_repr.ml
    gas_limit_repr.mli gas_limit_repr.ml
-   constants_repr.ml
-   fitness_repr.ml
+   constants_repr.mli constants_repr.ml
+   fitness_repr.mli fitness_repr.ml
    raw_level_repr.mli raw_level_repr.ml
    cycle_repr.mli cycle_repr.ml
    level_repr.mli level_repr.ml
@@ -59,7 +59,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
    storage.mli storage.ml
-   constants_storage.ml
+   constants_storage.mli constants_storage.ml
    level_storage.mli level_storage.ml
    nonce_storage.mli nonce_storage.ml
    seed_storage.mli seed_storage.ml
@@ -69,11 +69,11 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    lazy_storage_diff.mli lazy_storage_diff.ml
    contract_storage.mli contract_storage.ml
    bootstrap_storage.mli bootstrap_storage.ml
-   fitness_storage.ml
+   fitness_storage.mli fitness_storage.ml
    voting_period_storage.mli voting_period_storage.ml
    vote_storage.mli vote_storage.ml
    commitment_storage.mli commitment_storage.ml
-   init_storage.ml
+   init_storage.mli init_storage.ml
    fees_storage.mli fees_storage.ml
    sapling_validator.ml
    alpha_context.mli alpha_context.ml
@@ -82,13 +82,13 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    michelson_v1_gas.mli michelson_v1_gas.ml
    script_ir_annot.mli script_ir_annot.ml
    script_ir_translator.mli script_ir_translator.ml
-   script_tc_errors_registration.ml
+   script_tc_errors_registration.mli script_tc_errors_registration.ml
    script_interpreter.mli script_interpreter.ml
    baking.mli baking.ml
    amendment.mli amendment.ml
    apply_results.mli apply_results.ml
-   apply.ml
-   services_registration.ml
+   apply.mli apply.ml
+   services_registration.mli services_registration.ml
    constants_services.mli constants_services.ml
    sapling_services.ml
    contract_services.mli contract_services.ml
@@ -107,10 +107,10 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
  (deps
    misc.mli misc.ml
    storage_description.mli storage_description.ml
-   state_hash.ml
-   nonce_hash.ml
-   script_expr_hash.ml
-   contract_hash.ml
+   state_hash.mli state_hash.ml
+   nonce_hash.mli nonce_hash.ml
+   script_expr_hash.mli script_expr_hash.ml
+   contract_hash.mli contract_hash.ml
    blinded_public_key_hash.mli blinded_public_key_hash.ml
    tez_repr.mli tez_repr.ml
    period_repr.mli period_repr.ml
@@ -118,8 +118,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    fixed_point_repr.mli fixed_point_repr.ml
    saturation_repr.mli saturation_repr.ml
    gas_limit_repr.mli gas_limit_repr.ml
-   constants_repr.ml
-   fitness_repr.ml
+   constants_repr.mli constants_repr.ml
+   fitness_repr.mli fitness_repr.ml
    raw_level_repr.mli raw_level_repr.ml
    cycle_repr.mli cycle_repr.ml
    level_repr.mli level_repr.ml
@@ -145,7 +145,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
    storage.mli storage.ml
-   constants_storage.ml
+   constants_storage.mli constants_storage.ml
    level_storage.mli level_storage.ml
    nonce_storage.mli nonce_storage.ml
    seed_storage.mli seed_storage.ml
@@ -155,11 +155,11 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    lazy_storage_diff.mli lazy_storage_diff.ml
    contract_storage.mli contract_storage.ml
    bootstrap_storage.mli bootstrap_storage.ml
-   fitness_storage.ml
+   fitness_storage.mli fitness_storage.ml
    voting_period_storage.mli voting_period_storage.ml
    vote_storage.mli vote_storage.ml
    commitment_storage.mli commitment_storage.ml
-   init_storage.ml
+   init_storage.mli init_storage.ml
    fees_storage.mli fees_storage.ml
    sapling_validator.ml
    alpha_context.mli alpha_context.ml
@@ -168,13 +168,13 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    michelson_v1_gas.mli michelson_v1_gas.ml
    script_ir_annot.mli script_ir_annot.ml
    script_ir_translator.mli script_ir_translator.ml
-   script_tc_errors_registration.ml
+   script_tc_errors_registration.mli script_tc_errors_registration.ml
    script_interpreter.mli script_interpreter.ml
    baking.mli baking.ml
    amendment.mli amendment.ml
    apply_results.mli apply_results.ml
-   apply.ml
-   services_registration.ml
+   apply.mli apply.ml
+   services_registration.mli services_registration.ml
    constants_services.mli constants_services.ml
    sapling_services.ml
    contract_services.mli contract_services.ml
@@ -193,10 +193,10 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
  (deps
    misc.mli misc.ml
    storage_description.mli storage_description.ml
-   state_hash.ml
-   nonce_hash.ml
-   script_expr_hash.ml
-   contract_hash.ml
+   state_hash.mli state_hash.ml
+   nonce_hash.mli nonce_hash.ml
+   script_expr_hash.mli script_expr_hash.ml
+   contract_hash.mli contract_hash.ml
    blinded_public_key_hash.mli blinded_public_key_hash.ml
    tez_repr.mli tez_repr.ml
    period_repr.mli period_repr.ml
@@ -204,8 +204,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    fixed_point_repr.mli fixed_point_repr.ml
    saturation_repr.mli saturation_repr.ml
    gas_limit_repr.mli gas_limit_repr.ml
-   constants_repr.ml
-   fitness_repr.ml
+   constants_repr.mli constants_repr.ml
+   fitness_repr.mli fitness_repr.ml
    raw_level_repr.mli raw_level_repr.ml
    cycle_repr.mli cycle_repr.ml
    level_repr.mli level_repr.ml
@@ -231,7 +231,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
    storage.mli storage.ml
-   constants_storage.ml
+   constants_storage.mli constants_storage.ml
    level_storage.mli level_storage.ml
    nonce_storage.mli nonce_storage.ml
    seed_storage.mli seed_storage.ml
@@ -241,11 +241,11 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    lazy_storage_diff.mli lazy_storage_diff.ml
    contract_storage.mli contract_storage.ml
    bootstrap_storage.mli bootstrap_storage.ml
-   fitness_storage.ml
+   fitness_storage.mli fitness_storage.ml
    voting_period_storage.mli voting_period_storage.ml
    vote_storage.mli vote_storage.ml
    commitment_storage.mli commitment_storage.ml
-   init_storage.ml
+   init_storage.mli init_storage.ml
    fees_storage.mli fees_storage.ml
    sapling_validator.ml
    alpha_context.mli alpha_context.ml
@@ -254,13 +254,13 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    michelson_v1_gas.mli michelson_v1_gas.ml
    script_ir_annot.mli script_ir_annot.ml
    script_ir_translator.mli script_ir_translator.ml
-   script_tc_errors_registration.ml
+   script_tc_errors_registration.mli script_tc_errors_registration.ml
    script_interpreter.mli script_interpreter.ml
    baking.mli baking.ml
    amendment.mli amendment.ml
    apply_results.mli apply_results.ml
-   apply.ml
-   services_registration.ml
+   apply.mli apply.ml
+   services_registration.mli services_registration.ml
    constants_services.mli constants_services.ml
    sapling_services.ml
    contract_services.mli contract_services.ml
@@ -421,10 +421,10 @@ include Tezos_raw_protocol_alpha.Main
  (deps
    misc.mli misc.ml
    storage_description.mli storage_description.ml
-   state_hash.ml
-   nonce_hash.ml
-   script_expr_hash.ml
-   contract_hash.ml
+   state_hash.mli state_hash.ml
+   nonce_hash.mli nonce_hash.ml
+   script_expr_hash.mli script_expr_hash.ml
+   contract_hash.mli contract_hash.ml
    blinded_public_key_hash.mli blinded_public_key_hash.ml
    tez_repr.mli tez_repr.ml
    period_repr.mli period_repr.ml
@@ -432,8 +432,8 @@ include Tezos_raw_protocol_alpha.Main
    fixed_point_repr.mli fixed_point_repr.ml
    saturation_repr.mli saturation_repr.ml
    gas_limit_repr.mli gas_limit_repr.ml
-   constants_repr.ml
-   fitness_repr.ml
+   constants_repr.mli constants_repr.ml
+   fitness_repr.mli fitness_repr.ml
    raw_level_repr.mli raw_level_repr.ml
    cycle_repr.mli cycle_repr.ml
    level_repr.mli level_repr.ml
@@ -459,7 +459,7 @@ include Tezos_raw_protocol_alpha.Main
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
    storage.mli storage.ml
-   constants_storage.ml
+   constants_storage.mli constants_storage.ml
    level_storage.mli level_storage.ml
    nonce_storage.mli nonce_storage.ml
    seed_storage.mli seed_storage.ml
@@ -469,11 +469,11 @@ include Tezos_raw_protocol_alpha.Main
    lazy_storage_diff.mli lazy_storage_diff.ml
    contract_storage.mli contract_storage.ml
    bootstrap_storage.mli bootstrap_storage.ml
-   fitness_storage.ml
+   fitness_storage.mli fitness_storage.ml
    voting_period_storage.mli voting_period_storage.ml
    vote_storage.mli vote_storage.ml
    commitment_storage.mli commitment_storage.ml
-   init_storage.ml
+   init_storage.mli init_storage.ml
    fees_storage.mli fees_storage.ml
    sapling_validator.ml
    alpha_context.mli alpha_context.ml
@@ -482,13 +482,13 @@ include Tezos_raw_protocol_alpha.Main
    michelson_v1_gas.mli michelson_v1_gas.ml
    script_ir_annot.mli script_ir_annot.ml
    script_ir_translator.mli script_ir_translator.ml
-   script_tc_errors_registration.ml
+   script_tc_errors_registration.mli script_tc_errors_registration.ml
    script_interpreter.mli script_interpreter.ml
    baking.mli baking.ml
    amendment.mli amendment.ml
    apply_results.mli apply_results.ml
-   apply.ml
-   services_registration.ml
+   apply.mli apply.ml
+   services_registration.mli services_registration.ml
    constants_services.mli constants_services.ml
    sapling_services.ml
    contract_services.mli contract_services.ml
