@@ -586,6 +586,18 @@ let read_and_patch_config_file ?(may_override_network = false)
     in
     return (cfg_peers @ peers) )
   >>=? fun bootstrap_peers ->
+  Option.iter_es
+    (fun connections ->
+      fail_when
+        (connections > 100)
+        (Invalid_command_line_arguments
+           "The number of expected connections is limited to `100`. This \
+            maximum cap may be overridden by manually modifying the \
+            configuration file. However, this should be done carefully. \
+            Exceeding this number of connections may degrade the performance \
+            of your node."))
+    connections
+  >>=? fun () ->
   (* when `--connections` is used,
      override all the bounds defined in the configuration file. *)
   let ( synchronisation_threshold,
