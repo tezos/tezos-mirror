@@ -221,6 +221,8 @@ module T : Rustzcash_sig.T = struct
 
   let to_ivk x =
     assert (Bytes.length x = 32) ;
+    (* The first 5 bits of the last byte must be zero because it is a number on 251 bits *)
+    assert (int_of_char (Bytes.get x (32 - 1)) <= 7) ;
     x
 
   let to_expanded_spending_key x =
