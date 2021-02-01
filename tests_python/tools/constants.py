@@ -221,4 +221,4 @@ A high-number of connections helps triggering the maintenance process
  ensures all nodes are bootstrapped when they start, which can avoid
  some spurious deadlocks (e.g. a node not broadcasting its head).
 """
-NODE_PARAMS = ['--connections', '500', '--synchronisation-threshold', '0']
+NODE_PARAMS = ['--connections', '100', '--synchronisation-threshold', '0']

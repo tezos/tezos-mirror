@@ -47,7 +47,7 @@ def node_params(threshold=0):
         '--synchronisation-threshold',
         str(threshold),
         '--connections',
-        '500',
+        '100',
         '--enable-testchain',
     ]
 
