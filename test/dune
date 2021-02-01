@@ -1,11 +1,13 @@
 (executables
- (names test test_generated test_legacy_compatibility test_json_stream test_json_stream_sizes bench_data_encoding)
+ (names test test_generated test_legacy_compatibility test_json_stream
+   test_json_stream_sizes bench_data_encoding)
  (libraries data_encoding zarith alcotest crowbar)
  (flags :standard))
 
 (alias
  (name buildtest)
- (deps test.exe test_generated.exe test_legacy_compatibility.exe test_json_stream.exe test_json_stream_sizes.exe bench_data_encoding.exe))
+ (deps test.exe test_generated.exe test_legacy_compatibility.exe
+   test_json_stream.exe test_json_stream_sizes.exe bench_data_encoding.exe))
 
 (alias
  (name runtest_test)

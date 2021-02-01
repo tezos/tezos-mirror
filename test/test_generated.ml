@@ -216,11 +216,22 @@ let test_full_and_v_binary_write (full_and_v : full_and_v) slack =
       let module Full = (val full) in
       roundtrip_binary_write Full.pp Full.encoding v slack
 
-
 let () =
   let open Crowbar in
-  add_test ~name:"binary roundtrips (write/read)" [gen; uint8] test_full_and_v_binary_write ;
-  add_test ~name:"binary roundtrips (to_/of_bytes)" [gen] test_full_and_v_binary_to_bytes ;
-  add_test ~name:"binary roundtrips (to_/of_string)" [gen] test_full_and_v_binary_to_string ;
-  add_test ~name:"json roundtrips (construct/destruct)" [gen] test_full_and_v_json ;
+  add_test
+    ~name:"binary roundtrips (write/read)"
+    [gen; uint8]
+    test_full_and_v_binary_write ;
+  add_test
+    ~name:"binary roundtrips (to_/of_bytes)"
+    [gen]
+    test_full_and_v_binary_to_bytes ;
+  add_test
+    ~name:"binary roundtrips (to_/of_string)"
+    [gen]
+    test_full_and_v_binary_to_string ;
+  add_test
+    ~name:"json roundtrips (construct/destruct)"
+    [gen]
+    test_full_and_v_json ;
   ()

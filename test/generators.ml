@@ -140,8 +140,10 @@ let rec is_nullable : type a. a ty -> bool = function
       is_nullable ty
   | Tup2 (tya, tyb) ->
       is_nullable tya && is_nullable tyb
-  | Union1 _ -> false
-  | Union2 _ | Matching2 _ -> false
+  | Union1 _ ->
+      false
+  | Union2 _ | Matching2 _ ->
+      false
 
 let rec is_variable : type a. a ty -> bool = function
   | Null ->
@@ -190,7 +192,8 @@ let rec is_variable : type a. a ty -> bool = function
       is_variable ty
   | Tup2 (tya, tyb) ->
       is_variable tya && is_variable tyb
-  | Union1 tya -> is_variable tya
+  | Union1 tya ->
+      is_variable tya
   | Union2 (tya, tyb) ->
       is_variable tya || is_variable tyb
   | Matching2 (tya, tyb) ->
@@ -216,8 +219,9 @@ let rec fixed_size : type a. a ty -> int option = function
   | Int31 ->
       Some Data_encoding__Binary_size.int31
   | RangedInt (low, high) ->
-      Some Data_encoding__Binary_size.(integer_to_size @@ range_to_size
-      ~minimum:low ~maximum:high)
+      Some
+        Data_encoding__Binary_size.(
+          integer_to_size @@ range_to_size ~minimum:low ~maximum:high)
   | Int32 ->
       Some Data_encoding__Binary_size.int32
   | Int64 ->
@@ -244,15 +248,15 @@ let rec fixed_size : type a. a ty -> int option = function
       fixed_size ty
   | Tup2 (tya, tyb) ->
       let ( >>? ) = Stdlib.Option.bind in
-      fixed_size tya >>? fun a ->
-      fixed_size tyb >>? fun b ->
-      Some (a + b)
+      fixed_size tya >>? fun a -> fixed_size tyb >>? fun b -> Some (a + b)
   | Union1 tya ->
       let ( >>? ) = Stdlib.Option.bind in
-      fixed_size tya >>? fun a ->
-      Some (a + Data_encoding__Binary_size.tag_size `Uint8)
+      fixed_size tya
+      >>? fun a -> Some (a + Data_encoding__Binary_size.tag_size `Uint8)
   | Union2 _ | Matching2 _ ->
-      None (* actually Some if both sizes are same fixed size *)
+      None
+
+(* actually Some if both sizes are same fixed size *)
 
 let rec is_zeroable : type a. a ty -> bool = function
   | Null ->
@@ -301,8 +305,10 @@ let rec is_zeroable : type a. a ty -> bool = function
       is_zeroable ty
   | Tup2 (tya, tyb) ->
       is_zeroable tya && is_zeroable tyb
-  | Union1 _ -> false
-  | Union2 _ | Matching2 _ -> false
+  | Union1 _ ->
+      false
+  | Union2 _ | Matching2 _ ->
+      false
 
 (* TODO:
    | RangedFloat : float * float -> float ty
@@ -404,21 +410,18 @@ let any_ty_gen =
             map [g] (fun (AnyTy ty) -> AnyTy (Option ty));
             map [g; g] (fun (AnyTy ty_ok) (AnyTy ty_error) ->
                 AnyTy (Result (ty_ok, ty_error)));
-            map [g] (fun (AnyTy ty_both) ->
-                AnyTy (Result (ty_both, ty_both)));
+            map [g] (fun (AnyTy ty_both) -> AnyTy (Result (ty_both, ty_both)));
             map [g] (fun (AnyTy ty) -> AnyTy (List ty));
             map [g] (fun (AnyTy ty) -> AnyTy (Array ty));
             map [g] (fun (AnyTy ty) -> AnyTy (Dynamic_size ty));
             map [g] (fun (AnyTy ty) -> AnyTy (Tup1 ty));
             map [g; g] (fun (AnyTy ty_a) (AnyTy ty_b) ->
                 AnyTy (Tup2 (ty_a, ty_b)));
-            map [g] (fun (AnyTy ty_both) ->
-                AnyTy (Tup2 (ty_both, ty_both)));
+            map [g] (fun (AnyTy ty_both) -> AnyTy (Tup2 (ty_both, ty_both)));
             map [g] (fun (AnyTy ty_a) -> AnyTy (Union1 ty_a));
             map [g; g] (fun (AnyTy ty_a) (AnyTy ty_b) ->
                 AnyTy (Union2 (ty_a, ty_b)));
-            map [g] (fun (AnyTy ty_both) ->
-                AnyTy (Union2 (ty_both, ty_both)));
+            map [g] (fun (AnyTy ty_both) -> AnyTy (Union2 (ty_both, ty_both)));
             map [g; g] (fun (AnyTy ty_a) (AnyTy ty_b) ->
                 AnyTy (Matching2 (ty_a, ty_b)));
             map [g] (fun (AnyTy ty_both) ->
@@ -854,13 +857,10 @@ let full_result : type a b. a full -> b full -> (a, b) result full =
           Crowbar.pp ppf "ok(%a)" Fulla.pp a
       | Error b ->
           Crowbar.pp ppf "error(%a)" Fullb.pp b
-
   end )
 
-
-let full_union1
-: type a. a full -> a full
-= fun fulla ->
+let full_union1 : type a. a full -> a full =
+ fun fulla ->
   let module Fulla = (val fulla) in
   ( module struct
     type t = Fulla.t
@@ -876,14 +876,7 @@ let full_union1
     let encoding =
       let open Data_encoding in
       union
-        [
-          case
-            ~title:"A"
-            (Tag 0)
-            a_ding
-            (function v -> Some v)
-            (fun v -> v);
-        ]
+        [case ~title:"A" (Tag 0) a_ding (function v -> Some v) (fun v -> v)]
 
     let gen = Fulla.gen
 
@@ -892,9 +885,8 @@ let full_union1
           Crowbar.pp ppf "@[<hv 1>(Union1 %a)@]" Fulla.pp v1
   end )
 
-let full_union2
-: type a b. a full -> b full -> (a, b) either full
-= fun fulla fullb ->
+let full_union2 : type a b. a full -> b full -> (a, b) either full =
+ fun fulla fullb ->
   let module Fulla = (val fulla) in
   let module Fullb = (val fullb) in
   ( module struct
@@ -902,10 +894,14 @@ let full_union2
 
     let ty = Union2 (Fulla.ty, Fullb.ty)
 
-    let eq x y = match x, y with
-    | Left _, Right _ | Right _, Left _ -> false
-    | Left x, Left y -> Fulla.eq x y
-    | Right x, Right y -> Fullb.eq x y
+    let eq x y =
+      match (x, y) with
+      | (Left _, Right _) | (Right _, Left _) ->
+          false
+      | (Left x, Left y) ->
+          Fulla.eq x y
+      | (Right x, Right y) ->
+          Fullb.eq x y
 
     let a_ding =
       let open Data_encoding in
@@ -934,8 +930,9 @@ let full_union2
         ]
 
     let gen =
-       let open Crowbar in
-       map [bool; Fulla.gen; Fullb.gen] (fun choice a b -> if choice then Left a else Right b)
+      let open Crowbar in
+      map [bool; Fulla.gen; Fullb.gen] (fun choice a b ->
+          if choice then Left a else Right b)
 
     let pp ppf = function
       | Left v1 ->
@@ -946,9 +943,8 @@ let full_union2
 
 (* TODO: test recursive-sum. How to get a `_ ty`? a `_ full`? *)
 
-let full_matching2
-: type a b. a full -> b full -> (a, b) either full
-= fun fulla fullb ->
+let full_matching2 : type a b. a full -> b full -> (a, b) either full =
+ fun fulla fullb ->
   let module Fulla = (val fulla) in
   let module Fullb = (val fullb) in
   ( module struct
@@ -956,10 +952,14 @@ let full_matching2
 
     let ty = Matching2 (Fulla.ty, Fullb.ty)
 
-    let eq x y = match x, y with
-    | Left _, Right _ | Right _, Left _ -> false
-    | Left x, Left y -> Fulla.eq x y
-    | Right x, Right y -> Fullb.eq x y
+    let eq x y =
+      match (x, y) with
+      | (Left _, Right _) | (Right _, Left _) ->
+          false
+      | (Left x, Left y) ->
+          Fulla.eq x y
+      | (Right x, Right y) ->
+          Fullb.eq x y
 
     let a_ding =
       let open Data_encoding in
@@ -972,7 +972,8 @@ let full_matching2
     let encoding =
       let open Data_encoding in
       matching
-        (function Left v -> matched 0 a_ding v | Right v -> matched 1 b_ding v)
+        (function
+          | Left v -> matched 0 a_ding v | Right v -> matched 1 b_ding v)
         [
           case
             ~title:"A"
@@ -989,8 +990,9 @@ let full_matching2
         ]
 
     let gen =
-       let open Crowbar in
-       map [bool; Fulla.gen; Fullb.gen] (fun choice a b -> if choice then Left a else Right b)
+      let open Crowbar in
+      map [bool; Fulla.gen; Fullb.gen] (fun choice a b ->
+          if choice then Left a else Right b)
 
     let pp ppf = function
       | Left v1 ->
