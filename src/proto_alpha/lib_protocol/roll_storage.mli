@@ -79,7 +79,7 @@ val cycle_end : Raw_context.t -> Cycle_repr.t -> Raw_context.t tzresult Lwt.t
    [snapshot_rolls ctxt] creates roll snapshots for cycle
    [c = level + preserved_cycles + 2]. The returned context is such that:
 
-   1. the snapshot index assiciated to cycle [c] is incremented,
+   1. the snapshot index associated to cycle [c] is incremented,
    2. the rolls' owners are copied and associated to the snapshot id
       [(c,index)] (where [index] is the current snapshot index of cycle [c]),
    3. the last roll for cycle [c], and snapshot [index] is set to be the next
@@ -88,7 +88,7 @@ val cycle_end : Raw_context.t -> Cycle_repr.t -> Raw_context.t tzresult Lwt.t
 val snapshot_rolls : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
 (**
-   [fold ctxt f init] folds [f] on the list of all rolls from [Roll_rept.first]
+   [fold ctxt f init] folds [f] on the list of all rolls from [Roll_repr.first]
    to [Storage.Next.Roll] of the context [ctxt]. Only rolls which have owners
    are considered, rolls without owners are skipped. The first parameter of [f]
    is a roll [r], the second parameter of [f] is the owner of [r], and the last
