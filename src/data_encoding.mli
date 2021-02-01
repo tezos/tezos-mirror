@@ -989,6 +989,8 @@ module Binary : sig
       does not depends of the value itself. *)
   val fixed_length : 'a Encoding.t -> int option
 
+  val maximum_length : 'a Encoding.t -> int option
+
   val fixed_length_exn : 'a Encoding.t -> int
 
   (** [read enc buf ofs len] tries to reconstruct a value from the

@@ -435,15 +435,6 @@ let make_string ty gen encoding : string full =
 
 let full_string : string full = make_string String string Data_encoding.string
 
-let full_string_with_check_size : string full =
-  make_string
-    String
-    short_string
-    Data_encoding.(
-      check_size
-        (5 (* max lenght of short string *) + Data_encoding__Binary_size.uint30)
-        string)
-
 let full_fixed_string n : string full =
   make_string
     (FixedString n)
@@ -887,15 +878,13 @@ let full_mu_matching : type a. a full -> a list full =
         v
   end )
 
-(* TODO: check `has_max_size` rather than `classify->Fixed` (e.g., `int option`
-   has a max size but is not fixed size. *)
 let full_check_size : type a. a full -> a full =
  fun full ->
   let module Full = (val full) in
-  match Data_encoding.classify Full.encoding with
-  | `Dynamic | `Variable ->
+  match Data_encoding.Binary.maximum_length Full.encoding with
+  | None ->
       Crowbar.bad_test ()
-  | `Fixed size ->
+  | Some size ->
       ( module struct
         include Full
 
@@ -1002,3 +991,9 @@ let gen : full_and_v Crowbar.gen =
       let full = full_of_ty ty in
       let module Full = (val full) in
       map [Full.gen] (fun v -> FullAndV (full, v)))
+
+type any_full = AnyFull : 'a full -> any_full
+
+let gen_full : any_full Crowbar.gen =
+  let open Crowbar in
+  map [any_ty_gen] (fun (AnyTy ty) -> AnyFull (full_of_ty ty))

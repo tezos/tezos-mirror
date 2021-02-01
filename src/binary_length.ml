@@ -160,3 +160,122 @@ let fixed_length_exn e =
       n
   | None ->
       invalid_arg "Data_encoding.Binary.fixed_length_exn"
+
+let rec maximum_length : type a. a Encoding.t -> int option =
+ fun e ->
+  let ( >>? ) = Option.bind in
+  let ( >|? ) x f = Option.map f x in
+  let open Encoding in
+  match e.encoding with
+  (* Fixed *)
+  | Null ->
+      Some 0
+  | Empty ->
+      Some 0
+  | Constant _ ->
+      Some 0
+  | Bool ->
+      Some Binary_size.bool
+  | Int8 ->
+      Some Binary_size.int8
+  | Uint8 ->
+      Some Binary_size.uint8
+  | Int16 ->
+      Some Binary_size.int16
+  | Uint16 ->
+      Some Binary_size.uint16
+  | Int31 ->
+      Some Binary_size.int31
+  | Int32 ->
+      Some Binary_size.int32
+  | Int64 ->
+      Some Binary_size.int64
+  | N ->
+      None
+  | Z ->
+      None
+  | RangedInt {minimum; maximum} ->
+      Some
+        ( Binary_size.integer_to_size
+        @@ Binary_size.range_to_size ~minimum ~maximum )
+  | Float ->
+      Some Binary_size.float
+  | RangedFloat _ ->
+      Some Binary_size.float
+  | Bytes (`Fixed n) ->
+      Some n
+  | String (`Fixed n) ->
+      Some n
+  | Padded (e, n) ->
+      maximum_length e >|? fun s -> s + n
+  | String_enum (_, arr) ->
+      Some (Binary_size.integer_to_size @@ Binary_size.enum_size arr)
+  | Objs {kind = `Fixed n; _} ->
+      Some n
+  | Tups {kind = `Fixed n; _} ->
+      Some n
+  | Union {kind = `Fixed n; _} ->
+      Some n
+  (* Dynamic *)
+  | Obj (Opt {kind = `Dynamic; encoding = e; _}) ->
+      maximum_length e >|? fun s -> s + Binary_size.uint8
+  (* Variable *)
+  | Ignore ->
+      Some 0
+  | Bytes `Variable ->
+      None
+  | String `Variable ->
+      None
+  | Array (Some max_length, e) ->
+      maximum_length e >|? fun s -> s * max_length
+  | Array (None, _) ->
+      None
+  | List (Some max_length, e) ->
+      maximum_length e >|? fun s -> s * max_length
+  | List (None, _) ->
+      None
+  | Obj (Opt {kind = `Variable; encoding = e; _}) ->
+      maximum_length e
+  (* Variable or Dynamic we don't care for those constructors *)
+  | Union {kind = `Dynamic | `Variable; tag_size; cases; _} ->
+      List.fold_left
+        (fun acc (Case {encoding = e; _}) ->
+          acc >>? fun acc -> maximum_length e >|? fun s -> Stdlib.max acc s)
+        (Some 0)
+        cases
+      >|? fun s -> s + Binary_size.tag_size tag_size
+  | Objs {kind = `Dynamic | `Variable; left; right} ->
+      maximum_length left >>? fun l -> maximum_length right >|? fun r -> l + r
+  | Tups {kind = `Dynamic | `Variable; left; right} ->
+      maximum_length left >>? fun l -> maximum_length right >|? fun r -> l + r
+  | Mu _ ->
+      (* There could be bounded-size uses of Mu but it's unreasonable to expect
+         to detect them statically this way. Use `check_size` around the mu to
+         translate user-invariants into static encoding invariants *)
+      None
+  (* Recursive*)
+  | Obj (Req {encoding = e; _}) ->
+      maximum_length e
+  | Obj (Dft {encoding = e; _}) ->
+      maximum_length e
+  | Tup e ->
+      maximum_length e
+  | Conv {encoding = e; _} ->
+      maximum_length e
+  | Describe {encoding = e; _} ->
+      maximum_length e
+  | Splitted {encoding = e; _} ->
+      maximum_length e
+  | Dynamic_size {kind; encoding = e} ->
+      maximum_length e >|? fun s -> s + Binary_size.integer_to_size kind
+  | Check_size {limit; encoding = e} ->
+      (* NOTE: it is possible that the statically-provable maximum size exceeds
+         the dynamically checked limit. But the difference might be explained by
+         subtle invariants that do not appear in the encoding. *)
+      Some
+        (Option.fold
+           (maximum_length e)
+           ~some:(fun s -> min s limit)
+           ~none:limit)
+  | Delayed f ->
+      maximum_length (f ())

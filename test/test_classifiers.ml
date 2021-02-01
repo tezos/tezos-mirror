@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,17 +23,66 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This is for use *within* the data encoding library only. Instead, you should
-    use the corresponding module intended for use: {!Data_encoding.Binary}. *)
+open Generators
 
-val length : 'a Encoding.t -> 'a -> int
+let () =
+  let open Data_encoding in
+  let ding = option int64 in
+  let expect =
+    Data_encoding__Binary_size.uint8 (* tag *)
+    + max 0 Data_encoding__Binary_size.int64
+  in
+  match Binary.maximum_length ding with
+  | None ->
+      assert false
+  | Some n ->
+      assert (n = expect)
 
-val fixed_length : 'a Encoding.t -> int option
+let () =
+  let open Data_encoding in
+  let ding = list ~max_length:10 (result int64 (Fixed.string 10)) in
+  let expect =
+    Data_encoding__Binary_size.uint30 (* dynamic size *)
+    + 10 (* max number of elements in the list *)
+      * ( Data_encoding__Binary_size.uint8 (* tag *)
+        + max Data_encoding__Binary_size.int64 10 (* fixed-string size *) )
+  in
+  match Binary.maximum_length ding with
+  | None ->
+      assert false
+  | Some n ->
+      assert (n = expect)
 
-val maximum_length : 'a Encoding.t -> int option
+let is_fixed_has_max ding =
+  match Data_encoding.classify ding with
+  | `Variable | `Dynamic ->
+      ()
+  | `Fixed n ->
+      Crowbar.check_eq (Data_encoding.Binary.maximum_length ding) (Some n)
 
-val fixed_length_exn : 'a Encoding.t -> int
+let has_no_max_is_dyn_or_var ding =
+  match Data_encoding.Binary.maximum_length ding with
+  | Some _ ->
+      ()
+  | None -> (
+    match Data_encoding.classify ding with
+    | `Variable | `Dynamic ->
+        ()
+    | `Fixed _ ->
+        Crowbar.fail "Encoding without a maximum length has a fixed length" )
 
-val z_length : Z.t -> int
+let () =
+  Crowbar.add_test
+    ~name:"classify->maximum-length"
+    [gen_full]
+    (fun (AnyFull full) ->
+      let module Full = (val full) in
+      is_fixed_has_max Full.encoding)
 
-val n_length : Z.t -> int
+let () =
+  Crowbar.add_test
+    ~name:"maximum-length->classify"
+    [gen_full]
+    (fun (AnyFull full) ->
+      let module Full = (val full) in
+      has_no_max_is_dyn_or_var Full.encoding)
