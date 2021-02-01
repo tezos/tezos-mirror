@@ -29,3 +29,7 @@ to Edo.
 - Increase max_operation_size constant of the protocol from 16KB to 32KB.
 
   This has the effect of slightly more than doubling the maximum size of a smart contract, but also allows for larger operations in general.
+
+- Proto: endorsement and double endorsing evidence operations now contain an additional slot field; the slot should be the smallest among the endorser's slots.
+
+  MR: https://gitlab.com/tezos/tezos/-/merge_requests/2471
