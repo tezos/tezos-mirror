@@ -91,6 +91,8 @@ be documented here either.
 ## Miscellaneous
 
 - Make sure file descriptors are opened with the `O_CLOEXEC` flag.
+- Sapling: fix dummy address generator (set correctly the last 5 bits to 0
+  instead of the first 5 bits).
 
 # Version 8.2
 
