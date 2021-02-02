@@ -436,8 +436,6 @@ val case :
 val matched :
   ?tag_size:[`Uint8 | `Uint16] -> int -> 'a encoding -> 'a -> match_result
 
-val undefined_case : 'a case
-
 val is_undefined_case : 'a case -> bool
 
 val union : ?tag_size:[`Uint8 | `Uint16] -> 't case list -> 't encoding
