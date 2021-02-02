@@ -1,6 +1,6 @@
 (executables
- (names test_mockup_args test_fuzzing_mockup_args)
- (libraries tezos_mockup_registration tezos-test-services crowbar alcotest
+ (names test_mockup_args test_fuzzing_mockup_args test_persistence)
+ (libraries tezos_mockup tezos_mockup_registration tezos-test-services crowbar alcotest
    alcotest-lwt)
  (flags
   (:standard -open Tezos_base__TzPervasives)))
@@ -16,9 +16,15 @@
   (run %{exe:test_fuzzing_mockup_args.exe})))
 
 (rule
+ (alias runtest_persistence)
+ (action
+  (run %{exe:test_persistence.exe})))
+
+(rule
  (alias runtest)
  (package tezos-mockup)
  (deps
   (alias runtest_mockup_args)
-  (alias runtest_fuzzing_mockup_args))
+  (alias runtest_fuzzing_mockup_args)
+  (alias runtest_persistence))
  (action (progn)))
