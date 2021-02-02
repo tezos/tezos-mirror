@@ -3,6 +3,8 @@
 build-and-test:
   image: ocaml/opam2:alpine-3.10-ocaml-4.08
   script:
+    - opam repository set-url default https://opam.ocaml.org
+    - opam update
     - opam lint .
     - sudo apk --no-cache add m4
     - opam install ocamlformat.0.10
@@ -34,6 +36,8 @@ pages:
   only:
   - master
   script:
+    - opam repository set-url default https://opam.ocaml.org
+    - opam update
     - sudo apk --no-cache add m4
     - opam pin --no-action ezresto-directory.dev .
     - opam pin --no-action ezresto.dev .
