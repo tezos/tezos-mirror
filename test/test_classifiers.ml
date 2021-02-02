@@ -56,20 +56,9 @@ let () =
 let is_fixed_has_max ding =
   match Data_encoding.classify ding with
   | `Variable | `Dynamic ->
-      ()
+      Crowbar.bad_test ()
   | `Fixed n ->
       Crowbar.check_eq (Data_encoding.Binary.maximum_length ding) (Some n)
-
-let has_no_max_is_dyn_or_var ding =
-  match Data_encoding.Binary.maximum_length ding with
-  | Some _ ->
-      ()
-  | None -> (
-    match Data_encoding.classify ding with
-    | `Variable | `Dynamic ->
-        ()
-    | `Fixed _ ->
-        Crowbar.fail "Encoding without a maximum length has a fixed length" )
 
 let () =
   Crowbar.add_test
@@ -79,6 +68,17 @@ let () =
       let module Full = (val full) in
       is_fixed_has_max Full.encoding)
 
+let has_no_max_is_dyn_or_var ding =
+  match Data_encoding.Binary.maximum_length ding with
+  | Some _ ->
+      Crowbar.bad_test ()
+  | None -> (
+    match Data_encoding.classify ding with
+    | `Variable | `Dynamic ->
+        ()
+    | `Fixed _ ->
+        Crowbar.fail "Encoding without a maximum length has a fixed length" )
+
 let () =
   Crowbar.add_test
     ~name:"maximum-length->classify"
@@ -86,3 +86,24 @@ let () =
     (fun (AnyFull full) ->
       let module Full = (val full) in
       has_no_max_is_dyn_or_var Full.encoding)
+
+let check_size_doesnt_increase_max_len ding checked_size =
+  match Data_encoding.Binary.maximum_length ding with
+  | None ->
+      let checked_ding = Data_encoding.check_size checked_size ding in
+      Crowbar.check_eq
+        (Data_encoding.Binary.maximum_length checked_ding)
+        (Some checked_size)
+  | Some n ->
+      let checked_ding = Data_encoding.check_size checked_size ding in
+      Crowbar.check_eq
+        (Data_encoding.Binary.maximum_length checked_ding)
+        (Some (min n checked_size))
+
+let () =
+  Crowbar.add_test
+    ~name:"maximum-length(check_size)"
+    [gen_full; Crowbar.uint16]
+    (fun (AnyFull full) checked_size ->
+      let module Full = (val full) in
+      check_size_doesnt_increase_max_len Full.encoding checked_size)
