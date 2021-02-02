@@ -24,14 +24,14 @@
 (*****************************************************************************)
 
 (** The voting period kinds are ordered as follows:
-    Proposal -> Testing_vote -> Testing -> Promotion_vote -> Adoption.
+    Proposal -> Testing_vote -> Testing -> Promotion -> Adoption.
     This order is the one used be the function [succ] below.
  *)
 type kind =
   | Proposal  (** protocols can be proposed *)
-  | Testing_vote  (** a proposal can be voted *)
-  | Testing  (** winning proposal is forked on a testnet *)
-  | Promotion_vote  (** activation can be voted *)
+  | Exploration  (** a proposal can be voted *)
+  | Cooldown  (** a delay before the second vote of the Promotion period. *)
+  | Promotion  (** activation can be voted *)
   | Adoption  (** a delay before activation *)
 
 val kind_encoding : kind Data_encoding.t

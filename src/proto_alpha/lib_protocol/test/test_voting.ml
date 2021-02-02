@@ -328,28 +328,28 @@ let test_successful_vote num_delegates () =
       | _ ->
           false)
   >>=? fun () ->
-  (* first block of testing_vote period *)
+  (* first block of exploration period *)
   bake_until_first_block_of_next_period b
   >>=? fun b ->
-  (* next block is first block of Testing_vote *)
-  assert_period ~expected_kind:Testing_vote ~expected_index:1l b __LOC__
+  (* next block is first block of exploration *)
+  assert_period ~expected_kind:Exploration ~expected_index:1l b __LOC__
   >>=? fun () ->
   assert_listings_not_empty b ~loc:__LOC__
   >>=? fun () ->
-  (* listings must be populated in proposal period before moving to testing_vote period *)
+  (* listings must be populated in proposal period before moving to exploration period *)
   assert_listings_not_empty b ~loc:__LOC__
   >>=? fun () ->
-  (* beginning of testing_vote period, denoted by _p2;
+  (* beginning of exploration period, denoted by _p2;
      take a snapshot of the active delegates and their rolls from listings *)
   get_delegates_and_rolls_from_listings b
   >>=? fun (delegates_p2, rolls_p2) ->
-  (* no proposals during testing_vote period *)
+  (* no proposals during exploration period *)
   Context.Vote.get_proposals (B b)
   >>=? fun ps ->
   ( if Environment.Protocol_hash.Map.is_empty ps then return_unit
   else failwith "%s - Unexpected proposals" __LOC__ )
   >>=? fun () ->
-  (* current proposal must be set during testing_vote period *)
+  (* current proposal must be set during exploration period *)
   Context.Vote.get_current_proposal (B b)
   >>=? (function
          | Some v ->
@@ -408,12 +408,12 @@ let test_successful_vote num_delegates () =
                      failwith "%s - Wrong ballot" __LOC__)
                delegates_p2)
   >>=? fun () ->
-  (* skip to testing period *)
+  (* skip to cooldown period *)
   bake_until_first_block_of_next_period b
   >>=? fun b ->
-  assert_period ~expected_index:2l ~expected_kind:Testing b __LOC__
+  assert_period ~expected_index:2l ~expected_kind:Cooldown b __LOC__
   >>=? fun () ->
-  (* no ballots in testing period *)
+  (* no ballots in cooldown period *)
   Context.Vote.get_ballots (B b)
   >>=? fun v ->
   Assert.equal
@@ -424,31 +424,31 @@ let test_successful_vote num_delegates () =
     v
     ballots_zero
   >>=? fun () ->
-  (* listings must be populated in testing period before moving to promotion_vote period *)
+  (* listings must be populated in cooldown period before moving to promotion_vote period *)
   assert_listings_not_empty b ~loc:__LOC__
   >>=? fun () ->
-  (* skip to promotion_vote period *)
+  (* skip to promotion period *)
   bake_until_first_block_of_next_period b
   >>=? fun b ->
-  assert_period ~expected_kind:Promotion_vote ~expected_index:3l b __LOC__
+  assert_period ~expected_kind:Promotion ~expected_index:3l b __LOC__
   >>=? fun () ->
   assert_listings_not_empty b ~loc:__LOC__
   >>=? fun () ->
   (* period 3 *)
-  (* listings must be populated in promotion_vote period *)
+  (* listings must be populated in promotion period *)
   assert_listings_not_empty b ~loc:__LOC__
   >>=? fun () ->
-  (* beginning of promotion_vote period, denoted by _p4;
+  (* beginning of promotion period, denoted by _p4;
      take a snapshot of the active delegates and their rolls from listings *)
   get_delegates_and_rolls_from_listings b
   >>=? fun (delegates_p4, rolls_p4) ->
-  (* no proposals during promotion_vote period *)
+  (* no proposals during promotion period *)
   Context.Vote.get_proposals (B b)
   >>=? fun ps ->
   ( if Environment.Protocol_hash.Map.is_empty ps then return_unit
   else failwith "%s - Unexpected proposals" __LOC__ )
   >>=? fun () ->
-  (* current proposal must be set during promotion_vote period *)
+  (* current proposal must be set during promotion period *)
   Context.Vote.get_current_proposal (B b)
   >>=? (function
          | Some v ->
@@ -496,7 +496,7 @@ let test_successful_vote num_delegates () =
                      failwith "%s - Wrong ballot" __LOC__)
                delegates_p4)
   >>=? fun () ->
-  (* skip to end of promotion_vote period and activation*)
+  (* skip to end of promotion period and activation*)
   bake_until_first_block_of_next_period b
   >>=? fun b ->
   assert_period ~expected_kind:Adoption ~expected_index:4l b __LOC__
@@ -562,8 +562,8 @@ let get_expected_participation_ema rolls voter_rolls old_participation_ema =
 
 (** If not enough quorum
     -- get_updated_participation_ema < pr_ema_weight/den --
-    in testing vote, go back to proposal period. *)
-let test_not_enough_quorum_in_testing_vote num_delegates () =
+    in exploration, go back to proposal period. *)
+let test_not_enough_quorum_in_exploration num_delegates () =
   let min_proposal_quorum = Int32.(of_int @@ (100_00 / num_delegates)) in
   Context.init ~min_proposal_quorum num_delegates
   >>=? fun (b, delegates) ->
@@ -578,15 +578,15 @@ let test_not_enough_quorum_in_testing_vote num_delegates () =
   >>=? fun ops ->
   Block.bake ~operations:[ops] b
   >>=? fun b ->
-  (* skip to vote_testing period *)
+  (* skip to exploration period *)
   bake_until_first_block_of_next_period b
   >>=? fun b ->
-  (* we moved to a testing_vote period with one proposal *)
-  assert_period ~expected_kind:Testing_vote b __LOC__
+  (* we moved to an exploration period with one proposal *)
+  assert_period ~expected_kind:Exploration b __LOC__
   >>=? fun () ->
   Context.Vote.get_participation_ema b
   >>=? fun initial_participation_ema ->
-  (* beginning of testing_vote period, denoted by _p2;
+  (* beginning of exploration period, denoted by _p2;
      take a snapshot of the active delegates and their rolls from listings *)
   get_delegates_and_rolls_from_listings b
   >>=? fun (delegates_p2, rolls_p2) ->
@@ -599,7 +599,7 @@ let test_not_enough_quorum_in_testing_vote num_delegates () =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.tl voters
   in
   get_rolls b voters_without_quorum __LOC__
-  >>=? fun voters_rolls_in_testing_vote ->
+  >>=? fun voters_rolls_in_exploration ->
   (* all voters_without_quorum vote, for yays;
      no nays, so supermajority is satisfied *)
   List.map_es
@@ -617,7 +617,7 @@ let test_not_enough_quorum_in_testing_vote num_delegates () =
   (* check participation_ema update *)
   get_expected_participation_ema
     rolls_p2
-    voters_rolls_in_testing_vote
+    voters_rolls_in_exploration
     initial_participation_ema
   |> fun expected_participation_ema ->
   Context.Vote.get_participation_ema b
@@ -631,8 +631,8 @@ let test_not_enough_quorum_in_testing_vote num_delegates () =
 
 (** If not enough quorum
    -- get_updated_participation_ema < pr_ema_weight/den --
-   In promotion vote, go back to proposal period. *)
-let test_not_enough_quorum_in_promotion_vote num_delegates () =
+   In promotion period, go back to proposal period. *)
+let test_not_enough_quorum_in_promotion num_delegates () =
   let min_proposal_quorum = Int32.(of_int @@ (100_00 / num_delegates)) in
   Context.init ~min_proposal_quorum num_delegates
   >>=? fun (b, delegates) ->
@@ -645,13 +645,13 @@ let test_not_enough_quorum_in_promotion_vote num_delegates () =
   >>=? fun ops ->
   Block.bake ~operations:[ops] b
   >>=? fun b ->
-  (* skip to vote_testing period *)
+  (* skip to exploration period *)
   bake_until_first_block_of_next_period b
   >>=? fun b ->
-  (* we moved to a testing_vote period with one proposal *)
-  assert_period ~expected_kind:Testing_vote b __LOC__
+  (* we moved to an exploration period with one proposal *)
+  assert_period ~expected_kind:Exploration b __LOC__
   >>=? fun () ->
-  (* beginning of testing_vote period, denoted by _p2;
+  (* beginning of exploration period, denoted by _p2;
      take a snapshot of the active delegates and their rolls from listings *)
   get_delegates_and_rolls_from_listings b
   >>=? fun (delegates_p2, rolls_p2) ->
@@ -668,19 +668,19 @@ let test_not_enough_quorum_in_promotion_vote num_delegates () =
   >>=? fun operations ->
   Block.bake ~operations b
   >>=? fun b ->
-  (* skip to first block testing period *)
+  (* skip to first block cooldown period *)
   bake_until_first_block_of_next_period b
   >>=? fun b ->
-  (* we move to testing because we have supermajority and enough quorum *)
-  assert_period ~expected_kind:Testing b __LOC__
+  (* we move to cooldown because we have supermajority and enough quorum *)
+  assert_period ~expected_kind:Cooldown b __LOC__
   >>=? fun () ->
-  (* skip to first block of promotion_vote period *)
+  (* skip to first block of promotion period *)
   bake_until_first_block_of_next_period b
   >>=? fun b ->
-  assert_period ~expected_kind:Promotion_vote b __LOC__
+  assert_period ~expected_kind:Promotion b __LOC__
   (* bake_until_first_block_of_next_period ~offset:1l b
    * >>=? fun b ->
-   * assert_period ~expected_kind:Promotion_vote b __LOC__ *)
+   * assert_period ~expected_kind:Promotion b __LOC__ *)
   >>=? fun () ->
   Context.Vote.get_participation_ema b
   >>=? fun initial_participation_ema ->
@@ -706,7 +706,7 @@ let test_not_enough_quorum_in_promotion_vote num_delegates () =
   >>=? fun operations ->
   Block.bake ~operations b
   >>=? fun b ->
-  (* skip to end of promotion_vote period *)
+  (* skip to end of promotion period *)
   bake_until_first_block_of_next_period b
   >>=? fun b ->
   get_expected_participation_ema rolls_p4 voter_rolls initial_participation_ema
@@ -831,14 +831,13 @@ let test_supermajority_in_proposal there_is_a_winner () =
   bake_until_first_block_of_next_period b
   >>=? fun b ->
   (* we remain in the proposal period when there is no winner,
-     otherwise we move to the testing vote period *)
-  ( if there_is_a_winner then
-    assert_period ~expected_kind:Testing_vote b __LOC__
+     otherwise we move to the exploration period *)
+  ( if there_is_a_winner then assert_period ~expected_kind:Exploration b __LOC__
   else assert_period ~expected_kind:Proposal b __LOC__ )
   >>=? fun () -> return_unit
 
 (** After one voting period, if [has_quorum] then the period kind must
-    have been the testing vote. Otherwise, it should have remained in
+    have been the cooldown vote. Otherwise, it should have remained in
     place in the proposal period. *)
 let test_quorum_in_proposal has_quorum () =
   let total_tokens = 32_000_000_000_000L in
@@ -892,14 +891,14 @@ let test_quorum_in_proposal has_quorum () =
   bake_until_first_block_of_next_period b
   >>=? fun b ->
   (* we remain in the proposal period when there is no quorum,
-     otherwise we move to the testing vote period *)
-  ( if has_quorum then assert_period ~expected_kind:Testing_vote b __LOC__
+     otherwise we move to the cooldown vote period *)
+  ( if has_quorum then assert_period ~expected_kind:Exploration b __LOC__
   else assert_period ~expected_kind:Proposal b __LOC__ )
   >>=? fun () -> return_unit
 
 (** If a supermajority is reached, then the voting period must be
     reached. Otherwise, it remains in proposal period. *)
-let test_supermajority_in_testing_vote supermajority () =
+let test_supermajority_in_exploration supermajority () =
   let min_proposal_quorum = Int32.(of_int @@ (100_00 / 100)) in
   Context.init ~min_proposal_quorum 100
   >>=? fun (b, delegates) ->
@@ -911,8 +910,8 @@ let test_supermajority_in_testing_vote supermajority () =
   >>=? fun b ->
   bake_until_first_block_of_next_period b
   >>=? fun b ->
-  (* move to testing_vote *)
-  assert_period ~expected_kind:Testing_vote b __LOC__
+  (* move to exploration *)
+  assert_period ~expected_kind:Exploration b __LOC__
   >>=? fun () ->
   (* assert our proposal won *)
   Context.Vote.get_current_proposal (B b)
@@ -923,7 +922,7 @@ let test_supermajority_in_testing_vote supermajority () =
          | None ->
              failwith "%s - Missing proposal" __LOC__)
   >>=? fun () ->
-  (* beginning of testing_vote period, denoted by _p2;
+  (* beginning of exploration period, denoted by _p2;
      take a snapshot of the active delegates and their rolls from listings *)
   get_delegates_and_rolls_from_listings b
   >>=? fun (delegates_p2, _rolls_p2) ->
@@ -947,7 +946,7 @@ let test_supermajority_in_testing_vote supermajority () =
   >>=? fun b ->
   bake_until_first_block_of_next_period b
   >>=? fun b ->
-  ( if supermajority then assert_period ~expected_kind:Testing b __LOC__
+  ( if supermajority then assert_period ~expected_kind:Cooldown b __LOC__
   else assert_period ~expected_kind:Proposal b __LOC__ )
   >>=? fun () -> return_unit
 
@@ -970,7 +969,7 @@ let test_no_winning_proposal num_delegates () =
   >>=? fun ops_list ->
   Block.bake ~operations:ops_list b
   >>=? fun b ->
-  (* skip to testing_vote period *)
+  (* skip to exploration period *)
   bake_until_first_block_of_next_period b
   >>=? fun b ->
   (* we stay in the same proposal period because no winning proposal *)
@@ -1001,11 +1000,11 @@ let test_quorum_capped_maximum num_delegates () =
   >>=? fun ops ->
   Block.bake ~operations:[ops] b
   >>=? fun b ->
-  (* skip to vote_testing period *)
+  (* skip to exploration period *)
   bake_until_first_block_of_next_period b
   >>=? fun b ->
-  (* we moved to a testing_vote period with one proposal *)
-  assert_period ~expected_kind:Testing_vote b __LOC__
+  (* we moved to an exploration period with one proposal *)
+  assert_period ~expected_kind:Exploration b __LOC__
   >>=? fun () ->
   (* take percentage of the delegates equal or greater than quorum_max *)
   let minimum_to_pass =
@@ -1023,8 +1022,8 @@ let test_quorum_capped_maximum num_delegates () =
   (* skip to next period *)
   bake_until_first_block_of_next_period b
   >>=? fun b ->
-  (* expect to move to testing because we have supermajority and enough quorum *)
-  assert_period ~expected_kind:Testing b __LOC__
+  (* expect to move to cooldown because we have supermajority and enough quorum *)
+  assert_period ~expected_kind:Cooldown b __LOC__
 
 (** Vote to pass with minimum possible participation_ema (0%), it is
     sufficient for the vote quorum to be equal or greater than the
@@ -1051,11 +1050,11 @@ let test_quorum_capped_minimum num_delegates () =
   >>=? fun ops ->
   Block.bake ~operations:[ops] b
   >>=? fun b ->
-  (* skip to vote_testing period *)
+  (* skip to exploration period *)
   bake_until_first_block_of_next_period b
   >>=? fun b ->
-  (* we moved to a testing_vote period with one proposal *)
-  assert_period ~expected_kind:Testing_vote b __LOC__
+  (* we moved to an exploration period with one proposal *)
+  assert_period ~expected_kind:Exploration b __LOC__
   >>=? fun () ->
   (* take percentage of the delegates equal or greater than quorum_min *)
   let minimum_to_pass =
@@ -1073,8 +1072,8 @@ let test_quorum_capped_minimum num_delegates () =
   (* skip to next period *)
   bake_until_first_block_of_next_period b
   >>=? fun b ->
-  (* expect to move to testing because we have supermajority and enough quorum *)
-  assert_period ~expected_kind:Testing b __LOC__
+  (* expect to move to cooldown because we have supermajority and enough quorum *)
+  assert_period ~expected_kind:Cooldown b __LOC__
 
 (* gets the voting power *)
 let get_voting_power block pkhash =
@@ -1233,13 +1232,13 @@ let tests =
       `Quick
       (test_successful_vote 137);
     Test_services.tztest
-      "voting testing vote, not enough quorum"
+      "voting cooldown, not enough quorum"
       `Quick
-      (test_not_enough_quorum_in_testing_vote 245);
+      (test_not_enough_quorum_in_exploration 245);
     Test_services.tztest
-      "voting promotion vote, not enough quorum"
+      "voting promotion, not enough quorum"
       `Quick
-      (test_not_enough_quorum_in_promotion_vote 432);
+      (test_not_enough_quorum_in_promotion 432);
     Test_services.tztest
       "voting counting double proposal"
       `Quick
@@ -1261,13 +1260,13 @@ let tests =
       `Quick
       (test_quorum_in_proposal false);
     Test_services.tztest
-      "voting testing vote, with supermajority"
+      "voting cooldown, with supermajority"
       `Quick
-      (test_supermajority_in_testing_vote true);
+      (test_supermajority_in_exploration true);
     Test_services.tztest
-      "voting testing vote, without supermajority"
+      "voting cooldown, without supermajority"
       `Quick
-      (test_supermajority_in_testing_vote false);
+      (test_supermajority_in_exploration false);
     Test_services.tztest
       "voting proposal, no winning proposal"
       `Quick

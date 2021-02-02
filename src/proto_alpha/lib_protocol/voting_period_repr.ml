@@ -23,17 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type kind = Proposal | Testing_vote | Testing | Promotion_vote | Adoption
+type kind = Proposal | Exploration | Cooldown | Promotion | Adoption
 
 let string_of_kind = function
   | Proposal ->
       "proposal"
-  | Testing_vote ->
-      "testing_vote"
-  | Testing ->
-      "testing"
-  | Promotion_vote ->
-      "promotion_vote"
+  | Exploration ->
+      "exploration"
+  | Cooldown ->
+      "cooldown"
+  | Promotion ->
+      "promotion"
   | Adoption ->
       "adoption"
 
@@ -51,22 +51,22 @@ let kind_encoding =
         (fun () -> Proposal);
       case
         (Tag 1)
-        ~title:"Testing_vote"
-        (constant "testing_vote")
-        (function Testing_vote -> Some () | _ -> None)
-        (fun () -> Testing_vote);
+        ~title:"exploration"
+        (constant "exploration")
+        (function Exploration -> Some () | _ -> None)
+        (fun () -> Exploration);
       case
         (Tag 2)
-        ~title:"Testing"
-        (constant "testing")
-        (function Testing -> Some () | _ -> None)
-        (fun () -> Testing);
+        ~title:"Cooldown"
+        (constant "cooldown")
+        (function Cooldown -> Some () | _ -> None)
+        (fun () -> Cooldown);
       case
         (Tag 3)
-        ~title:"Promotion_vote"
-        (constant "promotion_vote")
-        (function Promotion_vote -> Some () | _ -> None)
-        (fun () -> Promotion_vote);
+        ~title:"Promotion"
+        (constant "promotion")
+        (function Promotion -> Some () | _ -> None)
+        (fun () -> Promotion);
       case
         (Tag 4)
         ~title:"Adoption"
@@ -76,12 +76,12 @@ let kind_encoding =
 
 let succ_kind = function
   | Proposal ->
-      Testing_vote
-  | Testing_vote ->
-      Testing
-  | Testing ->
-      Promotion_vote
-  | Promotion_vote ->
+      Exploration
+  | Exploration ->
+      Cooldown
+  | Cooldown ->
+      Promotion
+  | Promotion ->
       Adoption
   | Adoption ->
       Proposal

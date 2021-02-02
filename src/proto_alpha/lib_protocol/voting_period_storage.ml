@@ -47,7 +47,7 @@
 
   - Output context:
 
-       voting_period = { kind = Testing_vote;
+       voting_period = { kind = Exploration;
                          index = i + 1;
                          start_position = n + 1}
 

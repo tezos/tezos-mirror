@@ -49,7 +49,7 @@ val is_last_block : Raw_context.t -> bool tzresult Lwt.t
    called after the finalization of the block.
    For this reason when used by the RPC `votes/current_period_kind` gives an
    unintuitive result: after the validation of the last block of a voting period
-   (e.g. proposal), it returns the kind of the next period (e.g. testing_vote).
+   (e.g. proposal), it returns the kind of the next period (e.g. exploration).
    To fix this, at least part of the current vote finalization should be moved
    at the beginning of the block validation.
    For retro-compatibility, we keep this function but we provide two new fixed

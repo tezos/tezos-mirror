@@ -1059,7 +1059,7 @@ module Delegate : sig
 end
 
 module Voting_period : sig
-  type kind = Proposal | Testing_vote | Testing | Promotion_vote | Adoption
+  type kind = Proposal | Exploration | Cooldown | Promotion | Adoption
 
   val kind_encoding : kind Data_encoding.encoding
 

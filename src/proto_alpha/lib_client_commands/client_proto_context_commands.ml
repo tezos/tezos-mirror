@@ -1544,11 +1544,10 @@ let commands network () =
                 cctxt
               >>=? fun info ->
               ( match info.current_period_kind with
-              | Testing_vote | Promotion_vote ->
+              | Exploration | Promotion ->
                   return_unit
               | _ ->
-                  cctxt#error "Not in a Testing_vote or Promotion_vote period"
-              )
+                  cctxt#error "Not in Exploration or Promotion period" )
               >>=? fun () ->
               submit_ballot
                 cctxt
@@ -1589,7 +1588,7 @@ let commands network () =
             | None ->
                 cctxt#message "The current proposal has already been cleared."
             (* The proposal is cleared on the last block of adoption period, and
-               also on the last block of the testing_vote and promotion_vote
+               also on the last block of the exploration and promotion
                periods when the proposal is not approved *)
             | Some proposal ->
                 cctxt#message "Current proposal: %a" Protocol_hash.pp proposal
@@ -1620,7 +1619,7 @@ let commands network () =
               else
                 cctxt#message "The proposals have already been cleared."
                 >>= fun () -> return_unit
-          | Testing_vote | Promotion_vote ->
+          | Exploration | Promotion ->
               print_proposal info.current_proposal
               >>= fun () ->
               (* the ballots are cleared on the last block of these periods *)
@@ -1643,7 +1642,7 @@ let commands network () =
               else
                 cctxt#message "The ballots have already been cleared."
                 >>= fun () -> return_unit
-          | Testing ->
+          | Cooldown ->
               print_proposal info.current_proposal >>= fun () -> return_unit
           | Adoption ->
               print_proposal info.current_proposal >>= fun () -> return_unit)

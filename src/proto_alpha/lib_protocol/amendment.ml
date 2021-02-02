@@ -128,16 +128,16 @@ let start_new_voting_period ctxt =
           Voting_period.reset ctxt
       | Some proposal ->
           Vote.init_current_proposal ctxt proposal >>=? Voting_period.succ )
-  | Testing_vote ->
+  | Exploration ->
       get_approval_and_update_participation_ema ctxt
       >>=? fun (ctxt, approved) ->
       if approved then Voting_period.succ ctxt
       else
         Vote.clear_current_proposal ctxt
         >>=? fun ctxt -> Voting_period.reset ctxt
-  | Testing ->
+  | Cooldown ->
       Voting_period.succ ctxt
-  | Promotion_vote ->
+  | Promotion ->
       get_approval_and_update_participation_ema ctxt
       >>=? fun (ctxt, approved) ->
       if approved then Voting_period.succ ctxt
@@ -268,13 +268,13 @@ let record_proposals ctxt delegate proposals =
           ctxt
           proposals
       else fail Unauthorized_proposal
-  | Testing_vote | Testing | Promotion_vote | Adoption ->
+  | Exploration | Cooldown | Promotion | Adoption ->
       fail Unexpected_proposal
 
 let record_ballot ctxt delegate proposal ballot =
   Voting_period.get_current_kind ctxt
   >>=? function
-  | Testing_vote | Promotion_vote ->
+  | Exploration | Promotion ->
       Vote.get_current_proposal ctxt
       >>=? fun current_proposal ->
       error_unless
@@ -289,7 +289,7 @@ let record_ballot ctxt delegate proposal ballot =
       >>= fun in_listings ->
       if in_listings then Vote.record_ballot ctxt delegate ballot
       else fail Unauthorized_ballot
-  | Testing | Proposal | Adoption ->
+  | Cooldown | Proposal | Adoption ->
       fail Unexpected_ballot
 
 let may_start_new_voting_period ctxt =
