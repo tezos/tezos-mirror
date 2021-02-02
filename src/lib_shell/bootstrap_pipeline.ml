@@ -143,8 +143,8 @@ type t = {
 
 (** A block is NOT acceptable if one of the following holds:
 
-    - The timestamp of the block is more than 15 seconds ahead in the
-   future.
+    - The timestamp of the block is more than s seconds in the
+   future, where s is specified by the module Clock_drift.
 
     - The block is at the same level as the checkpoint, but they are
    different.
