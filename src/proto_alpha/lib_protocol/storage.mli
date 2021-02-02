@@ -39,7 +39,7 @@ open Storage_sigs
 module Block_priority : sig
   val get : Raw_context.t -> int tzresult Lwt.t
 
-  val set : Raw_context.t -> int -> Raw_context.t tzresult Lwt.t
+  val update : Raw_context.t -> int -> Raw_context.t tzresult Lwt.t
 
   val init : Raw_context.t -> int -> Raw_context.t tzresult Lwt.t
 end
@@ -115,7 +115,7 @@ module Contract : sig
   module Global_counter : sig
     val get : Raw_context.t -> Z.t tzresult Lwt.t
 
-    val set : Raw_context.t -> Z.t -> Raw_context.t tzresult Lwt.t
+    val update : Raw_context.t -> Z.t -> Raw_context.t tzresult Lwt.t
 
     val init : Raw_context.t -> Z.t -> Raw_context.t tzresult Lwt.t
   end
@@ -234,7 +234,7 @@ module Big_map : sig
 
   val list : Raw_context.t -> id list Lwt.t
 
-  val remove_rec : Raw_context.t -> id -> Raw_context.t Lwt.t
+  val remove : Raw_context.t -> id -> Raw_context.t Lwt.t
 
   val copy : Raw_context.t -> from:id -> to_:id -> Raw_context.t tzresult Lwt.t
 
@@ -278,9 +278,9 @@ module Sapling : sig
     val init : Raw_context.t -> Raw_context.t tzresult Lwt.t
   end
 
-  val remove_rec : Raw_context.t -> id -> Raw_context.t Lwt.t
-
   val copy : Raw_context.t -> from:id -> to_:id -> Raw_context.t tzresult Lwt.t
+
+  val remove : Raw_context.t -> id -> Raw_context.t Lwt.t
 
   module Total_bytes :
     Indexed_data_storage
@@ -452,7 +452,8 @@ module Seed : sig
 
     val get : Raw_context.t -> Cycle_repr.t -> Seed_repr.seed tzresult Lwt.t
 
-    val delete : Raw_context.t -> Cycle_repr.t -> Raw_context.t tzresult Lwt.t
+    val remove_existing :
+      Raw_context.t -> Cycle_repr.t -> Raw_context.t tzresult Lwt.t
   end
 end
 

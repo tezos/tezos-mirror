@@ -1324,12 +1324,12 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
       let blinded_pkh =
         Blinded_public_key_hash.of_ed25519_pkh activation_code pkh
       in
-      Commitment.get_opt ctxt blinded_pkh
+      Commitment.find ctxt blinded_pkh
       >>=? function
       | None ->
           fail (Invalid_activation {pkh})
       | Some amount ->
-          Commitment.delete ctxt blinded_pkh
+          Commitment.remove_existing ctxt blinded_pkh
           >>=? fun ctxt ->
           let contract = Contract.implicit_contract (Signature.Ed25519 pkh) in
           Contract.(credit ctxt contract amount)

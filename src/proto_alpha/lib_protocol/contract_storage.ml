@@ -559,11 +559,11 @@ let delete c contract =
   | Some _ ->
       Delegate_storage.remove c contract
       >>=? fun c ->
-      Storage.Contract.Balance.delete c contract
+      Storage.Contract.Balance.remove_existing c contract
       >>=? fun c ->
-      Storage.Contract.Manager.delete c contract
+      Storage.Contract.Manager.remove_existing c contract
       >>=? fun c ->
-      Storage.Contract.Counter.delete c contract
+      Storage.Contract.Counter.remove_existing c contract
       >>=? fun c ->
       Storage.Contract.Code.remove c contract
       >>=? fun (c, _, _) ->
@@ -573,7 +573,7 @@ let delete c contract =
       >>= fun c -> Storage.Contract.Used_storage_space.remove c contract >|= ok
 
 let allocated c contract =
-  Storage.Contract.Balance.get_option c contract
+  Storage.Contract.Balance.find c contract
   >>=? function None -> return_false | Some _ -> return_true
 
 let exists c contract =
@@ -629,18 +629,18 @@ let increment_counter c manager =
   let contract = Contract_repr.implicit_contract manager in
   Storage.Contract.Global_counter.get c
   >>=? fun global_counter ->
-  Storage.Contract.Global_counter.set c (Z.succ global_counter)
+  Storage.Contract.Global_counter.update c (Z.succ global_counter)
   >>=? fun c ->
   Storage.Contract.Counter.get c contract
   >>=? fun contract_counter ->
-  Storage.Contract.Counter.set c contract (Z.succ contract_counter)
+  Storage.Contract.Counter.update c contract (Z.succ contract_counter)
 
-let get_script_code c contract = Storage.Contract.Code.get_option c contract
+let get_script_code c contract = Storage.Contract.Code.find c contract
 
 let get_script c contract =
-  Storage.Contract.Code.get_option c contract
+  Storage.Contract.Code.find c contract
   >>=? fun (c, code) ->
-  Storage.Contract.Storage.get_option c contract
+  Storage.Contract.Storage.find c contract
   >>=? fun (c, storage) ->
   match (code, storage) with
   | (None, None) ->
@@ -651,7 +651,7 @@ let get_script c contract =
       failwith "get_script"
 
 let get_storage ctxt contract =
-  Storage.Contract.Storage.get_option ctxt contract
+  Storage.Contract.Storage.find ctxt contract
   >>=? function
   | (ctxt, None) ->
       return (ctxt, None)
@@ -663,7 +663,7 @@ let get_storage ctxt contract =
 
 let get_counter c manager =
   let contract = Contract_repr.implicit_contract manager in
-  Storage.Contract.Counter.get_option c contract
+  Storage.Contract.Counter.find c contract
   >>=? function
   | None -> (
     match Contract_repr.is_implicit contract with
@@ -676,7 +676,7 @@ let get_counter c manager =
 
 let get_manager_key c manager =
   let contract = Contract_repr.implicit_contract manager in
-  Storage.Contract.Manager.get_option c contract
+  Storage.Contract.Manager.find c contract
   >>=? function
   | None ->
       failwith "get_manager_key"
@@ -687,7 +687,7 @@ let get_manager_key c manager =
 
 let is_manager_key_revealed c manager =
   let contract = Contract_repr.implicit_contract manager in
-  Storage.Contract.Manager.get_option c contract
+  Storage.Contract.Manager.find c contract
   >>=? function
   | None ->
       return_false
@@ -706,11 +706,11 @@ let reveal_manager_key c manager public_key =
       let actual_hash = Signature.Public_key.hash public_key in
       if Signature.Public_key_hash.equal actual_hash v then
         let v = Manager_repr.Public_key public_key in
-        Storage.Contract.Manager.set c contract v
+        Storage.Contract.Manager.update c contract v
       else fail (Inconsistent_hash (public_key, v, actual_hash))
 
 let get_balance c contract =
-  Storage.Contract.Balance.get_option c contract
+  Storage.Contract.Balance.find c contract
   >>=? function
   | None -> (
     match Contract_repr.is_implicit contract with
@@ -733,14 +733,14 @@ let update_script_storage c contract storage lazy_storage_diff =
   let storage = Script_repr.lazy_expr storage in
   update_script_lazy_storage c lazy_storage_diff
   >>=? fun (c, lazy_storage_size_diff) ->
-  Storage.Contract.Storage.set c contract storage
+  Storage.Contract.Storage.update c contract storage
   >>=? fun (c, size_diff) ->
   Storage.Contract.Used_storage_space.get c contract
   >>=? fun previous_size ->
   let new_size =
     Z.add previous_size (Z.add lazy_storage_size_diff (Z.of_int size_diff))
   in
-  Storage.Contract.Used_storage_space.set c contract new_size
+  Storage.Contract.Used_storage_space.update c contract new_size
 
 let spend c contract amount =
   Storage.Contract.Balance.get c contract
@@ -749,7 +749,7 @@ let spend c contract amount =
   | Error _ ->
       fail (Balance_too_low (contract, balance, amount))
   | Ok new_balance -> (
-      Storage.Contract.Balance.set c contract new_balance
+      Storage.Contract.Balance.update c contract new_balance
       >>=? fun c ->
       Roll_storage.Contract.remove_amount c contract amount
       >>=? fun c ->
@@ -781,7 +781,7 @@ let credit c contract amount =
       ( error_unless target_has_code (Empty_transaction contract)
       >|? fun () -> c ) )
   >>=? fun c ->
-  Storage.Contract.Balance.get_option c contract
+  Storage.Contract.Balance.find c contract
   >>=? function
   | None -> (
     match Contract_repr.is_implicit contract with
@@ -792,7 +792,7 @@ let credit c contract amount =
   | Some balance ->
       Tez_repr.(amount +? balance)
       >>?= fun balance ->
-      Storage.Contract.Balance.set c contract balance
+      Storage.Contract.Balance.update c contract balance
       >>=? fun c -> Roll_storage.Contract.add_amount c contract amount
 
 let init c =
@@ -800,11 +800,11 @@ let init c =
   >>=? fun c -> Lazy_storage_diff.init c
 
 let used_storage_space c contract =
-  Storage.Contract.Used_storage_space.get_option c contract
+  Storage.Contract.Used_storage_space.find c contract
   >|=? Option.value ~default:Z.zero
 
 let paid_storage_space c contract =
-  Storage.Contract.Paid_storage_space.get_option c contract
+  Storage.Contract.Paid_storage_space.find c contract
   >|=? Option.value ~default:Z.zero
 
 let set_paid_storage_space_and_return_fees_to_pay c contract new_storage_space
@@ -814,5 +814,5 @@ let set_paid_storage_space_and_return_fees_to_pay c contract new_storage_space
   if Compare.Z.(already_paid_space >= new_storage_space) then return (Z.zero, c)
   else
     let to_pay = Z.sub new_storage_space already_paid_space in
-    Storage.Contract.Paid_storage_space.set c contract new_storage_space
+    Storage.Contract.Paid_storage_space.update c contract new_storage_space
     >|=? fun c -> (to_pay, c)

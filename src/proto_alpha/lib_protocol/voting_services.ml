@@ -127,7 +127,7 @@ let register () =
   register0 S.proposals (fun ctxt () () -> Vote.get_proposals ctxt) ;
   register0 S.listings (fun ctxt () () -> Vote.get_listings ctxt >|= ok) ;
   register0 S.current_proposal (fun ctxt () () ->
-      Vote.get_current_proposal_option ctxt) ;
+      Vote.find_current_proposal ctxt) ;
   register0 S.total_voting_power (fun ctxt () () ->
       Vote.get_total_voting_power_free ctxt)
 

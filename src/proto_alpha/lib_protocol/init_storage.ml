@@ -65,7 +65,7 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
 let prepare ctxt ~level ~predecessor_timestamp ~timestamp ~fitness =
   Raw_context.prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt
   >>=? fun ctxt ->
-  Storage.Pending_migration_balance_updates.get_option ctxt
+  Storage.Pending_migration_balance_updates.find ctxt
   >>=? function
   | Some balance_updates ->
       Storage.Pending_migration_balance_updates.remove ctxt

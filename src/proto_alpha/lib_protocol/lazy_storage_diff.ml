@@ -38,7 +38,7 @@ module type Total_bytes = sig
 
   val get : Raw_context.t -> id -> Z.t tzresult Lwt.t
 
-  val set : Raw_context.t -> id -> Z.t -> Raw_context.t tzresult Lwt.t
+  val update : Raw_context.t -> id -> Z.t -> Raw_context.t tzresult Lwt.t
 end
 
 (** Operations to be defined on a lazy storage type. *)
@@ -71,7 +71,7 @@ module type OPS = sig
     Raw_context.t -> from:Id.t -> to_:Id.t -> Raw_context.t tzresult Lwt.t
 
   (** Deep deletion. *)
-  val remove_rec : Raw_context.t -> Id.t -> Raw_context.t Lwt.t
+  val remove : Raw_context.t -> Id.t -> Raw_context.t Lwt.t
 end
 
 module Big_map = struct
@@ -112,7 +112,7 @@ module Big_map = struct
         in
         (ctxt, Z.of_int ~-freed)
     | Some v ->
-        Storage.Big_map.Contents.init_set (ctxt, id) key_hash v
+        Storage.Big_map.Contents.add (ctxt, id) key_hash v
         >|=? fun (ctxt, size_diff, existed) ->
         let size_diff =
           if existed then size_diff else size_diff + bytes_size_for_big_map_key
@@ -235,7 +235,7 @@ let apply_updates :
   else
     OPS.Total_bytes.get ctxt id
     >>=? fun size ->
-    OPS.Total_bytes.set ctxt id (Z.add size updates_size)
+    OPS.Total_bytes.update ctxt id (Z.add size updates_size)
     >|=? fun ctxt -> (ctxt, updates_size)
 
 (**
@@ -288,11 +288,11 @@ let apply_diff :
   match diff with
   | Remove ->
       if OPS.Id.is_temp id then
-        OPS.remove_rec ctxt id >|= fun ctxt -> ok (ctxt, Z.zero)
+        OPS.remove ctxt id >|= fun ctxt -> ok (ctxt, Z.zero)
       else
         OPS.Total_bytes.get ctxt id
         >>=? fun size ->
-        OPS.remove_rec ctxt id
+        OPS.remove ctxt id
         >>= fun ctxt ->
         return (ctxt, Z.neg (Z.add size OPS.bytes_size_for_empty))
   | Update {init; updates} ->
@@ -386,7 +386,7 @@ let cleanup_temporaries ctxt =
       Lwt_list.fold_left_s
         (fun ctxt (_tag, Lazy_storage_kind.Ex_Kind k) ->
           let (module OPS) = get_ops k in
-          Lazy_storage_kind.Temp_ids.fold_s k OPS.remove_rec temp_ids ctxt)
+          Lazy_storage_kind.Temp_ids.fold_s k OPS.remove temp_ids ctxt)
         ctxt
         Lazy_storage_kind.all
       >|= fun ctxt -> (ctxt, Lazy_storage_kind.Temp_ids.init))

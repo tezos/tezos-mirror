@@ -220,7 +220,7 @@ module Contract = struct
 
     let mem = I.mem
 
-    let delete = I.delete
+    let remove_existing = I.remove_existing
 
     let remove = I.remove
 
@@ -242,8 +242,8 @@ module Contract = struct
       Lwt.return
         (consume_deserialize_gas ctxt value >|? fun ctxt -> (ctxt, value))
 
-    let get_option ctxt contract =
-      I.get_option ctxt contract
+    let find ctxt contract =
+      I.find ctxt contract
       >>=? fun (ctxt, value_opt) ->
       Lwt.return
       @@
@@ -253,25 +253,25 @@ module Contract = struct
       | Some value ->
           consume_deserialize_gas ctxt value >|? fun ctxt -> (ctxt, value_opt)
 
-    let set ctxt contract value =
+    let update ctxt contract value =
       consume_serialize_gas ctxt value
-      >>?= fun ctxt -> I.set ctxt contract value
+      >>?= fun ctxt -> I.update ctxt contract value
 
-    let set_option ctxt contract value_opt =
+    let add_or_remove ctxt contract value_opt =
       match value_opt with
       | None ->
-          I.set_option ctxt contract None
+          I.add_or_remove ctxt contract None
       | Some value ->
           consume_serialize_gas ctxt value
-          >>?= fun ctxt -> I.set_option ctxt contract value_opt
+          >>?= fun ctxt -> I.add_or_remove ctxt contract value_opt
 
     let init ctxt contract value =
       consume_serialize_gas ctxt value
       >>?= fun ctxt -> I.init ctxt contract value
 
-    let init_set ctxt contract value =
+    let add ctxt contract value =
       consume_serialize_gas ctxt value
-      >>?= fun ctxt -> I.init_set ctxt contract value
+      >>?= fun ctxt -> I.add ctxt contract value
   end
 
   module Code = Make_carbonated_map_expr (struct
@@ -332,7 +332,8 @@ module Big_map = struct
     let incr ctxt =
       get ctxt
       >>=? fun i ->
-      set ctxt (Lazy_storage_kind.Big_map.Id.next i) >|=? fun ctxt -> (ctxt, i)
+      update ctxt (Lazy_storage_kind.Big_map.Id.next i)
+      >|=? fun ctxt -> (ctxt, i)
 
     let init ctxt = init ctxt Lazy_storage_kind.Big_map.Id.init
   end
@@ -391,7 +392,7 @@ module Big_map = struct
 
   let list = Indexed_context.keys
 
-  let remove_rec ctxt n = Indexed_context.remove_rec ctxt n
+  let remove ctxt n = Indexed_context.remove ctxt n
 
   let copy ctxt ~from ~to_ = Indexed_context.copy ctxt ~from ~to_
 
@@ -448,17 +449,17 @@ module Big_map = struct
 
     let mem = I.mem
 
-    let delete = I.delete
+    let remove_existing = I.remove_existing
 
     let remove = I.remove
 
-    let set = I.set
+    let update = I.update
 
-    let set_option = I.set_option
+    let add_or_remove = I.add_or_remove
 
     let init = I.init
 
-    let init_set = I.init_set
+    let add = I.add
 
     let consume_deserialize_gas ctxt value =
       Raw_context.consume_gas ctxt (Script_repr.deserialized_cost value)
@@ -469,8 +470,8 @@ module Big_map = struct
       Lwt.return
         (consume_deserialize_gas ctxt value >|? fun ctxt -> (ctxt, value))
 
-    let get_option ctxt contract =
-      I.get_option ctxt contract
+    let find ctxt contract =
+      I.find ctxt contract
       >>=? fun (ctxt, value_opt) ->
       Lwt.return
       @@
@@ -501,7 +502,7 @@ module Sapling = struct
     let incr ctxt =
       get ctxt
       >>=? fun i ->
-      set ctxt (Lazy_storage_kind.Sapling_state.Id.next i)
+      update ctxt (Lazy_storage_kind.Sapling_state.Id.next i)
       >|=? fun ctxt -> (ctxt, i)
 
     let init ctxt = init ctxt Lazy_storage_kind.Sapling_state.Id.init
@@ -519,7 +520,7 @@ module Sapling = struct
          end))
          (Make_index (Index))
 
-  let remove_rec ctxt n = Indexed_context.remove_rec ctxt n
+  let remove ctxt n = Indexed_context.remove ctxt n
 
   let copy ctxt ~from ~to_ = Indexed_context.copy ctxt ~from ~to_
 
@@ -588,7 +589,7 @@ module Sapling = struct
       (Sapling.Hash)
 
   let commitments_init ctx id =
-    Indexed_context.Raw_context.remove_rec (ctx, id) ["commitments"]
+    Indexed_context.Raw_context.remove (ctx, id) ["commitments"]
     >|= fun (ctx, _id) -> ctx
 
   module Ciphertexts =
@@ -634,7 +635,7 @@ module Sapling = struct
       (Sapling.Ciphertext)
 
   let ciphertexts_init ctx id =
-    Indexed_context.Raw_context.remove_rec (ctx, id) ["commitments"]
+    Indexed_context.Raw_context.remove (ctx, id) ["commitments"]
     >|= fun (ctx, _id) -> ctx
 
   module Nullifiers_size =
@@ -734,11 +735,11 @@ module Sapling = struct
          end))
 
   let nullifiers_init ctx id =
-    Nullifiers_size.init_set (ctx, id) Int64.zero
+    Nullifiers_size.add (ctx, id) Int64.zero
     >>= fun ctx ->
-    Indexed_context.Raw_context.remove_rec (ctx, id) ["nullifiers_ordered"]
+    Indexed_context.Raw_context.remove (ctx, id) ["nullifiers_ordered"]
     >>= fun (ctx, id) ->
-    Indexed_context.Raw_context.remove_rec (ctx, id) ["nullifiers_hashed"]
+    Indexed_context.Raw_context.remove (ctx, id) ["nullifiers_hashed"]
     >|= fun (ctx, _id) -> ctx
 
   module Roots =
@@ -1146,23 +1147,22 @@ module Seed = struct
 
     let get ctxt (l : Level_repr.t) = Cycle.Nonce.get (ctxt, l.cycle) l.level
 
-    let get_option ctxt (l : Level_repr.t) =
-      Cycle.Nonce.get_option (ctxt, l.cycle) l.level
+    let find ctxt (l : Level_repr.t) = Cycle.Nonce.find (ctxt, l.cycle) l.level
 
-    let set ctxt (l : Level_repr.t) v =
-      Cycle.Nonce.set (ctxt, l.cycle) l.level v
+    let update ctxt (l : Level_repr.t) v =
+      Cycle.Nonce.update (ctxt, l.cycle) l.level v
 
     let init ctxt (l : Level_repr.t) v =
       Cycle.Nonce.init (ctxt, l.cycle) l.level v
 
-    let init_set ctxt (l : Level_repr.t) v =
-      Cycle.Nonce.init_set (ctxt, l.cycle) l.level v
+    let add ctxt (l : Level_repr.t) v =
+      Cycle.Nonce.add (ctxt, l.cycle) l.level v
 
-    let set_option ctxt (l : Level_repr.t) v =
-      Cycle.Nonce.set_option (ctxt, l.cycle) l.level v
+    let add_or_remove ctxt (l : Level_repr.t) v =
+      Cycle.Nonce.add_or_remove (ctxt, l.cycle) l.level v
 
-    let delete ctxt (l : Level_repr.t) =
-      Cycle.Nonce.delete (ctxt, l.cycle) l.level
+    let remove_existing ctxt (l : Level_repr.t) =
+      Cycle.Nonce.remove_existing (ctxt, l.cycle) l.level
 
     let remove ctxt (l : Level_repr.t) =
       Cycle.Nonce.remove (ctxt, l.cycle) l.level

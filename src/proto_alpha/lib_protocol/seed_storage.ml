@@ -81,10 +81,10 @@ let compute_for_cycle c ~revealed cycle =
         Storage.Seed.Nonce.get c level
         >>=? function
         | Revealed nonce ->
-            Storage.Seed.Nonce.delete c level
+            Storage.Seed.Nonce.remove_existing c level
             >|=? fun c -> (c, Seed_repr.nonce random_seed nonce, unrevealed)
         | Unrevealed u ->
-            Storage.Seed.Nonce.delete c level
+            Storage.Seed.Nonce.remove_existing c level
             >|=? fun c -> (c, random_seed, u :: unrevealed)
       in
       Storage.Seed.For_cycle.get c previous_cycle
@@ -115,7 +115,7 @@ let for_cycle ctxt cycle =
     (Unknown {oldest; cycle; latest})
   >>?= fun () -> Storage.Seed.For_cycle.get ctxt cycle
 
-let clear_cycle c cycle = Storage.Seed.For_cycle.delete c cycle
+let clear_cycle c cycle = Storage.Seed.For_cycle.remove_existing c cycle
 
 let init ctxt =
   let preserved = Constants_storage.preserved_cycles ctxt in

@@ -24,13 +24,12 @@
 (*****************************************************************************)
 
 let recorded_proposal_count_for_delegate ctxt proposer =
-  Storage.Vote.Proposals_count.get_option ctxt proposer
-  >|=? Option.value ~default:0
+  Storage.Vote.Proposals_count.find ctxt proposer >|=? Option.value ~default:0
 
 let record_proposal ctxt proposal proposer =
   recorded_proposal_count_for_delegate ctxt proposer
   >>=? fun count ->
-  Storage.Vote.Proposals_count.init_set ctxt proposer (count + 1)
+  Storage.Vote.Proposals_count.add ctxt proposer (count + 1)
   >>= fun ctxt -> Storage.Vote.Proposals.add ctxt (proposal, proposer) >|= ok
 
 let get_proposals ctxt =
@@ -105,13 +104,13 @@ let update_listings ctxt =
   Roll_storage.fold ctxt (ctxt, 0l) ~f:(fun _roll delegate (ctxt, total) ->
       (* TODO use snapshots *)
       let delegate = Signature.Public_key.hash delegate in
-      Storage.Vote.Listings.get_option ctxt delegate
+      Storage.Vote.Listings.find ctxt delegate
       >|=? Option.value ~default:0l
       >>=? fun count ->
-      Storage.Vote.Listings.init_set ctxt delegate (Int32.succ count)
+      Storage.Vote.Listings.add ctxt delegate (Int32.succ count)
       >|= fun ctxt -> ok (ctxt, Int32.succ total))
   >>=? fun (ctxt, total) ->
-  Storage.Vote.Listings_size.init_set ctxt total >>= fun ctxt -> return ctxt
+  Storage.Vote.Listings_size.add ctxt total >>= fun ctxt -> return ctxt
 
 let listing_size = Storage.Vote.Listings_size.get
 
@@ -120,7 +119,7 @@ let in_listings = Storage.Vote.Listings.mem
 let get_listings = Storage.Vote.Listings.bindings
 
 let get_voting_power_free ctxt owner =
-  Storage.Vote.Listings.get_option ctxt owner >|=? Option.value ~default:0l
+  Storage.Vote.Listings.find ctxt owner >|=? Option.value ~default:0l
 
 (* This function bypasses the carbonated functors to account for gas consumption.
    This is a temporary situation intended to be fixed by adding the right
@@ -131,7 +130,7 @@ let get_voting_power ctxt owner =
   (* Accessing an int32 at /votes/listings/pkh *)
   consume_gas ctxt (Storage_costs.read_access ~path_length:3 ~read_bytes:4)
   >>?= fun ctxt ->
-  Storage.Vote.Listings.get_option ctxt owner
+  Storage.Vote.Listings.find ctxt owner
   >|=? function None -> (ctxt, 0l) | Some power -> (ctxt, power)
 
 let get_total_voting_power_free = listing_size
@@ -157,15 +156,15 @@ let get_current_quorum ctxt =
 
 let get_participation_ema = Storage.Vote.Participation_ema.get
 
-let set_participation_ema = Storage.Vote.Participation_ema.set
+let set_participation_ema = Storage.Vote.Participation_ema.update
 
 let get_current_proposal = Storage.Vote.Current_proposal.get
 
-let get_current_proposal_option = Storage.Vote.Current_proposal.get_option
+let find_current_proposal = Storage.Vote.Current_proposal.find
 
 let init_current_proposal = Storage.Vote.Current_proposal.init
 
-let clear_current_proposal = Storage.Vote.Current_proposal.delete
+let clear_current_proposal = Storage.Vote.Current_proposal.remove_existing
 
 let init ctxt ~start_position =
   (* participation EMA is in centile of a percentage *)

@@ -71,8 +71,6 @@ module Make_subcontext (R : REGISTER) (C : Raw_context.T) (N : NAME) :
   Raw_context.T with type t = C.t = struct
   type t = C.t
 
-  type context = t
-
   let name_length = List.length N.name
 
   let to_key k = N.name @ k
@@ -81,25 +79,23 @@ module Make_subcontext (R : REGISTER) (C : Raw_context.T) (N : NAME) :
 
   let mem t k = C.mem t (to_key k)
 
-  let dir_mem t k = C.dir_mem t (to_key k)
-
   let get t k = C.get t (to_key k)
 
-  let get_option t k = C.get_option t (to_key k)
+  let find t k = C.find t (to_key k)
+
+  let mem_tree t k = C.mem_tree t (to_key k)
+
+  let add t k v = C.add t (to_key k) v
 
   let init t k v = C.init t (to_key k) v
 
-  let set t k v = C.set t (to_key k) v
+  let update t k v = C.update t (to_key k) v
 
-  let init_set t k v = C.init_set t (to_key k) v
+  let add_or_remove t k v = C.add_or_remove t (to_key k) v
 
-  let set_option t k v = C.set_option t (to_key k) v
-
-  let delete t k = C.delete t (to_key k)
+  let remove_existing t k = C.remove_existing t (to_key k)
 
   let remove t k = C.remove t (to_key k)
-
-  let remove_rec t k = C.remove_rec t (to_key k)
 
   let copy t ~from ~to_ = C.copy t ~from:(to_key from) ~to_:(to_key to_)
 
@@ -152,8 +148,8 @@ struct
     let key = C.absolute_key t N.name in
     Lwt.return (of_bytes ~key b)
 
-  let get_option t =
-    C.get_option t N.name
+  let find t =
+    C.find t N.name
     >|= function
     | None ->
         ok_none
@@ -163,16 +159,16 @@ struct
 
   let init t v = C.init t N.name (to_bytes v) >|=? fun t -> C.project t
 
-  let set t v = C.set t N.name (to_bytes v) >|=? fun t -> C.project t
+  let update t v = C.update t N.name (to_bytes v) >|=? fun t -> C.project t
 
-  let init_set t v = C.init_set t N.name (to_bytes v) >|= fun t -> C.project t
+  let add t v = C.add t N.name (to_bytes v) >|= fun t -> C.project t
 
-  let set_option t v =
-    C.set_option t N.name (Option.map to_bytes v) >|= fun t -> C.project t
+  let add_or_remove t v =
+    C.add_or_remove t N.name (Option.map to_bytes v) >|= fun t -> C.project t
 
   let remove t = C.remove t N.name >|= fun t -> C.project t
 
-  let delete t = C.delete t N.name >|=? fun t -> C.project t
+  let remove_existing t = C.remove_existing t N.name >|=? fun t -> C.project t
 
   let () =
     let open Storage_description in
@@ -180,7 +176,7 @@ struct
       if R.ghost then Storage_description.create () else C.description
     in
     register_value
-      ~get:get_option
+      ~get:find
       (register_named_subcontext description N.name)
       V.encoding
 end
@@ -235,13 +231,11 @@ module Make_data_set_storage (C : Raw_context.T) (I : INDEX) :
 
   let mem s i = C.mem s (I.to_path i [])
 
-  let add s i = C.init_set s (I.to_path i []) inited >|= fun t -> C.project t
+  let add s i = C.add s (I.to_path i []) inited >|= fun t -> C.project t
 
-  let del s i = C.remove s (I.to_path i []) >|= fun t -> C.project t
+  let remove s i = C.remove s (I.to_path i []) >|= fun t -> C.project t
 
-  let set s i = function true -> add s i | false -> del s i
-
-  let clear s = C.remove_rec s [] >|= fun t -> C.project t
+  let clear s = C.remove s [] >|= fun t -> C.project t
 
   let fold s ~init ~f =
     let rec dig i path acc =
@@ -305,8 +299,8 @@ module Make_indexed_data_storage (C : Raw_context.T) (I : INDEX) (V : VALUE) :
     let key = C.absolute_key s (I.to_path i []) in
     Lwt.return (of_bytes ~key b)
 
-  let get_option s i =
-    C.get_option s (I.to_path i [])
+  let find s i =
+    C.find s (I.to_path i [])
     >|= function
     | None ->
         ok_none
@@ -314,24 +308,25 @@ module Make_indexed_data_storage (C : Raw_context.T) (I : INDEX) (V : VALUE) :
         let key = C.absolute_key s (I.to_path i []) in
         of_bytes ~key b >|? fun v -> Some v
 
-  let set s i v =
-    C.set s (I.to_path i []) (to_bytes v) >|=? fun t -> C.project t
+  let update s i v =
+    C.update s (I.to_path i []) (to_bytes v) >|=? fun t -> C.project t
 
   let init s i v =
     C.init s (I.to_path i []) (to_bytes v) >|=? fun t -> C.project t
 
-  let init_set s i v =
-    C.init_set s (I.to_path i []) (to_bytes v) >|= fun t -> C.project t
+  let add s i v =
+    C.add s (I.to_path i []) (to_bytes v) >|= fun t -> C.project t
 
-  let set_option s i v =
-    C.set_option s (I.to_path i []) (Option.map to_bytes v)
+  let add_or_remove s i v =
+    C.add_or_remove s (I.to_path i []) (Option.map to_bytes v)
     >|= fun t -> C.project t
 
   let remove s i = C.remove s (I.to_path i []) >|= fun t -> C.project t
 
-  let delete s i = C.delete s (I.to_path i []) >|=? fun t -> C.project t
+  let remove_existing s i =
+    C.remove_existing s (I.to_path i []) >|=? fun t -> C.project t
 
-  let clear s = C.remove_rec s [] >|= fun t -> C.project t
+  let clear s = C.remove s [] >|= fun t -> C.project t
 
   let fold_keys s ~init ~f =
     let rec dig i path acc =
@@ -379,7 +374,7 @@ module Make_indexed_data_storage (C : Raw_context.T) (I : INDEX) (V : VALUE) :
     register_value
       ~get:(fun c ->
         let (c, k) = unpack c in
-        get_option c k)
+        find c k)
       (register_indexed_subcontext
          ~list:(fun c -> keys c >|= ok)
          C.description
@@ -414,7 +409,7 @@ struct
       (Storage_costs.read_access ~path_length:(List.length key) ~read_bytes:0)
 
   let existing_size c i =
-    C.get_option c (len_key i)
+    C.find c (len_key i)
     >|= function
     | None ->
         ok (0, false)
@@ -465,7 +460,7 @@ struct
     let key = C.absolute_key s (data_key i) in
     Lwt.return (of_bytes ~key b >|? fun v -> (C.project s, v))
 
-  let get_option s i =
+  let find s i =
     let key = data_key i in
     consume_mem_gas s key
     >>?= fun s ->
@@ -474,12 +469,12 @@ struct
     if exists then get s i >|=? fun (s, v) -> (s, Some v)
     else return (C.project s, None)
 
-  let set s i v =
+  let update s i v =
     existing_size s i
     >>=? fun (prev_size, _) ->
-    consume_serialize_write_gas C.set s i v
+    consume_serialize_write_gas C.update s i v
     >>=? fun (s, bytes) ->
-    C.set s (data_key i) bytes
+    C.update s (data_key i) bytes
     >|=? fun t ->
     let size_diff = Bytes.length bytes - prev_size in
     (C.project t, size_diff)
@@ -492,13 +487,13 @@ struct
     let size = Bytes.length bytes in
     (C.project t, size)
 
-  let init_set s i v =
-    let init_set s i v = C.init_set s i v >|= ok in
+  let add s i v =
+    let add s i v = C.add s i v >|= ok in
     existing_size s i
     >>=? fun (prev_size, existed) ->
-    consume_serialize_write_gas init_set s i v
+    consume_serialize_write_gas add s i v
     >>=? fun (s, bytes) ->
-    init_set s (data_key i) bytes
+    add s (data_key i) bytes
     >|=? fun t ->
     let size_diff = Bytes.length bytes - prev_size in
     (C.project t, size_diff, existed)
@@ -511,14 +506,15 @@ struct
     >>=? fun s ->
     remove s (data_key i) >|=? fun t -> (C.project t, prev_size, existed)
 
-  let delete s i =
+  let remove_existing s i =
     existing_size s i
     >>=? fun (prev_size, _) ->
-    consume_remove_gas C.delete s i
-    >>=? fun s -> C.delete s (data_key i) >|=? fun t -> (C.project t, prev_size)
+    consume_remove_gas C.remove_existing s i
+    >>=? fun s ->
+    C.remove_existing s (data_key i) >|=? fun t -> (C.project t, prev_size)
 
-  let set_option s i v =
-    match v with None -> remove s i | Some v -> init_set s i v
+  let add_or_remove s i v =
+    match v with None -> remove s i | Some v -> add s i v
 
   let fold_keys_unaccounted s ~init ~f =
     let rec dig i path acc =
@@ -559,7 +555,7 @@ struct
     register_value (* TODO export consumed gas ?? *)
       ~get:(fun c ->
         let (c, k) = unpack c in
-        get_option c k >|=? fun (_, v) -> v)
+        find c k >|=? fun (_, v) -> v)
       (register_indexed_subcontext
          ~list:(fun c -> keys_unaccounted c >|= ok)
          C.description
@@ -598,7 +594,7 @@ module Make_carbonated_data_set_storage (C : Raw_context.T) (I : INDEX) :
 
   let init s i = M.init s i ()
 
-  let del s i = M.remove s i
+  let remove s i = M.remove s i
 
   let fold_keys_unaccounted = M.fold_keys_unaccounted
 end
@@ -637,13 +633,13 @@ module Make_indexed_data_snapshotable_storage
 
   let snapshot_path id = snapshot_name @ Snapshot_index.to_path id []
 
-  let snapshot_exists s id = C.dir_mem s (snapshot_path id)
+  let snapshot_exists s id = C.mem_tree s (snapshot_path id)
 
   let snapshot s id =
     C.copy s ~from:data_name ~to_:(snapshot_path id) >|=? fun t -> C.project t
 
   let delete_snapshot s id =
-    C.remove_rec s (snapshot_path id) >|= fun t -> C.project t
+    C.remove s (snapshot_path id) >|= fun t -> C.project t
 end
 
 module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
@@ -659,7 +655,7 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
 
   type 'a ipath = 'a I.ipath
 
-  let clear t = C.remove_rec t [] >|= fun t -> C.project t
+  let clear t = C.remove t [] >|= fun t -> C.project t
 
   let fold_keys t ~init ~f =
     let rec dig i path acc =
@@ -683,7 +679,7 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
 
   let list t k = C.fold t k ~init:[] ~f:(fun k acc -> Lwt.return (k :: acc))
 
-  let remove_rec t k = C.remove_rec t (I.to_path k [])
+  let remove t k = C.remove t (I.to_path k [])
 
   let copy t ~from ~to_ =
     C.copy t ~from:(I.to_path from []) ~to_:(I.to_path to_ [])
@@ -701,8 +697,6 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
   module Raw_context = struct
     type t = C.t I.ipath
 
-    type context = t
-
     let to_key i k = I.to_path i k
 
     let of_key k = Misc.remove_elem_from_list I.path_length k
@@ -711,45 +705,41 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
       let (t, i) = unpack c in
       C.mem t (to_key i k)
 
-    let dir_mem c k =
+    let mem_tree c k =
       let (t, i) = unpack c in
-      C.dir_mem t (to_key i k)
+      C.mem_tree t (to_key i k)
 
     let get c k =
       let (t, i) = unpack c in
       C.get t (to_key i k)
 
-    let get_option c k =
+    let find c k =
       let (t, i) = unpack c in
-      C.get_option t (to_key i k)
+      C.find t (to_key i k)
 
     let init c k v =
       let (t, i) = unpack c in
       C.init t (to_key i k) v >|=? fun t -> pack t i
 
-    let set c k v =
+    let update c k v =
       let (t, i) = unpack c in
-      C.set t (to_key i k) v >|=? fun t -> pack t i
+      C.update t (to_key i k) v >|=? fun t -> pack t i
 
-    let init_set c k v =
+    let add c k v =
       let (t, i) = unpack c in
-      C.init_set t (to_key i k) v >|= fun t -> pack t i
+      C.add t (to_key i k) v >|= fun t -> pack t i
 
-    let set_option c k v =
+    let add_or_remove c k v =
       let (t, i) = unpack c in
-      C.set_option t (to_key i k) v >|= fun t -> pack t i
+      C.add_or_remove t (to_key i k) v >|= fun t -> pack t i
 
-    let delete c k =
+    let remove_existing c k =
       let (t, i) = unpack c in
-      C.delete t (to_key i k) >|=? fun t -> pack t i
+      C.remove_existing t (to_key i k) >|=? fun t -> pack t i
 
     let remove c k =
       let (t, i) = unpack c in
       C.remove t (to_key i k) >|= fun t -> pack t i
-
-    let remove_rec c k =
-      let (t, i) = unpack c in
-      C.remove_rec t (to_key i k) >|= fun t -> pack t i
 
     let copy c ~from ~to_ =
       let (t, i) = unpack c in
@@ -830,7 +820,7 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
           >|= List.flatten
       | d :: ds -> (
           if Compare.Int.(i >= I.path_length) then invalid_arg "IO.resolve" ;
-          C.dir_mem t (prefix @ [d])
+          C.mem_tree t (prefix @ [d])
           >>= function
           | true -> loop (i + 1) (prefix @ [d]) ds | false -> Lwt.return_nil )
     in
@@ -848,18 +838,16 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
     let mem s i = Raw_context.mem (pack s i) N.name
 
     let add s i =
-      Raw_context.init_set (pack s i) N.name inited
+      Raw_context.add (pack s i) N.name inited
       >|= fun c ->
       let (s, _) = unpack c in
       C.project s
 
-    let del s i =
+    let remove s i =
       Raw_context.remove (pack s i) N.name
       >|= fun c ->
       let (s, _) = unpack c in
       C.project s
-
-    let set s i = function true -> add s i | false -> del s i
 
     let clear s =
       fold_keys s ~init:s ~f:(fun i s ->
@@ -910,8 +898,8 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
       let key = Raw_context.absolute_key (pack s i) N.name in
       Lwt.return (of_bytes ~key b)
 
-    let get_option s i =
-      Raw_context.get_option (pack s i) N.name
+    let find s i =
+      Raw_context.find (pack s i) N.name
       >|= function
       | None ->
           ok_none
@@ -919,8 +907,8 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
           let key = Raw_context.absolute_key (pack s i) N.name in
           of_bytes ~key b >|? fun v -> Some v
 
-    let set s i v =
-      Raw_context.set (pack s i) N.name (to_bytes v)
+    let update s i v =
+      Raw_context.update (pack s i) N.name (to_bytes v)
       >|=? fun c ->
       let (s, _) = unpack c in
       C.project s
@@ -931,14 +919,14 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
       let (s, _) = unpack c in
       C.project s
 
-    let init_set s i v =
-      Raw_context.init_set (pack s i) N.name (to_bytes v)
+    let add s i v =
+      Raw_context.add (pack s i) N.name (to_bytes v)
       >|= fun c ->
       let (s, _) = unpack c in
       C.project s
 
-    let set_option s i v =
-      Raw_context.set_option (pack s i) N.name (Option.map to_bytes v)
+    let add_or_remove s i v =
+      Raw_context.add_or_remove (pack s i) N.name (Option.map to_bytes v)
       >|= fun c ->
       let (s, _) = unpack c in
       C.project s
@@ -949,8 +937,8 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
       let (s, _) = unpack c in
       C.project s
 
-    let delete s i =
-      Raw_context.delete (pack s i) N.name
+    let remove_existing s i =
+      Raw_context.remove_existing (pack s i) N.name
       >|=? fun c ->
       let (s, _) = unpack c in
       C.project s
@@ -982,7 +970,7 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
       register_value
         ~get:(fun c ->
           let (c, k) = unpack c in
-          get_option c k)
+          find c k)
         (register_named_subcontext Raw_context.description N.name)
         V.encoding
   end
@@ -1010,7 +998,7 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
         (Storage_costs.read_access ~path_length ~read_bytes:0)
 
     let existing_size c =
-      Raw_context.get_option c len_name
+      Raw_context.find c len_name
       >|= function
       | None ->
           ok (0, false)
@@ -1051,7 +1039,7 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
       let key = Raw_context.absolute_key c data_name in
       Lwt.return (of_bytes ~key b >|? fun v -> (Raw_context.project c, v))
 
-    let get_option s i =
+    let find s i =
       consume_mem_gas (pack s i)
       >>?= fun c ->
       let (s, _) = unpack c in
@@ -1060,12 +1048,12 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
       if exists then get s i >|=? fun (s, v) -> (s, Some v)
       else return (C.project s, None)
 
-    let set s i v =
+    let update s i v =
       existing_size (pack s i)
       >>=? fun (prev_size, _) ->
-      consume_write_gas Raw_context.set (pack s i) v
+      consume_write_gas Raw_context.update (pack s i) v
       >>=? fun (c, bytes) ->
-      Raw_context.set c data_name bytes
+      Raw_context.update c data_name bytes
       >|=? fun c ->
       let size_diff = Bytes.length bytes - prev_size in
       (Raw_context.project c, size_diff)
@@ -1078,13 +1066,13 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
       let size = Bytes.length bytes in
       (Raw_context.project c, size)
 
-    let init_set s i v =
-      let init_set c k v = Raw_context.init_set c k v >|= ok in
+    let add s i v =
+      let add c k v = Raw_context.add c k v >|= ok in
       existing_size (pack s i)
       >>=? fun (prev_size, existed) ->
-      consume_write_gas init_set (pack s i) v
+      consume_write_gas add (pack s i) v
       >>=? fun (c, bytes) ->
-      init_set c data_name bytes
+      add c data_name bytes
       >|=? fun c ->
       let size_diff = Bytes.length bytes - prev_size in
       (Raw_context.project c, size_diff, existed)
@@ -1098,16 +1086,16 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
       remove c data_name
       >|=? fun c -> (Raw_context.project c, prev_size, existed)
 
-    let delete s i =
+    let remove_existing s i =
       existing_size (pack s i)
       >>=? fun (prev_size, _) ->
-      consume_remove_gas Raw_context.delete (pack s i)
+      consume_remove_gas Raw_context.remove_existing (pack s i)
       >>=? fun c ->
-      Raw_context.delete c data_name
+      Raw_context.remove_existing c data_name
       >|=? fun c -> (Raw_context.project c, prev_size)
 
-    let set_option s i v =
-      match v with None -> remove s i | Some v -> init_set s i v
+    let add_or_remove s i v =
+      match v with None -> remove s i | Some v -> add s i v
 
     let () =
       let open Storage_description in
@@ -1115,7 +1103,7 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
       register_value
         ~get:(fun c ->
           let (c, k) = unpack c in
-          get_option c k >|=? fun (_, v) -> v)
+          find c k >|=? fun (_, v) -> v)
         (register_named_subcontext Raw_context.description N.name)
         V.encoding
   end
@@ -1147,17 +1135,17 @@ struct
 
   let get ctxt k = C.get ctxt (K.wrap k)
 
-  let get_option ctxt k = C.get_option ctxt (K.wrap k)
+  let find ctxt k = C.find ctxt (K.wrap k)
 
-  let set ctxt k v = C.set ctxt (K.wrap k) v
+  let update ctxt k v = C.update ctxt (K.wrap k) v
 
   let init ctxt k v = C.init ctxt (K.wrap k) v
 
-  let init_set ctxt k v = C.init_set ctxt (K.wrap k) v
+  let add ctxt k v = C.add ctxt (K.wrap k) v
 
-  let set_option ctxt k v = C.set_option ctxt (K.wrap k) v
+  let add_or_remove ctxt k v = C.add_or_remove ctxt (K.wrap k) v
 
-  let delete ctxt k = C.delete ctxt (K.wrap k)
+  let remove_existing ctxt k = C.remove_existing ctxt (K.wrap k)
 
   let remove ctxt k = C.remove ctxt (K.wrap k)
 

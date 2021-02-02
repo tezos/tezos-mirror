@@ -124,23 +124,23 @@ let init ctxt ~typecheck ?ramp_up_cycles ?no_reward_cycles accounts contracts =
 
 let cycle_end ctxt last_cycle =
   let next_cycle = Cycle_repr.succ last_cycle in
-  Storage.Ramp_up.Rewards.get_option ctxt next_cycle
+  Storage.Ramp_up.Rewards.find ctxt next_cycle
   >>=? (function
          | None ->
              return ctxt
          | Some (baking_reward_per_endorsement, endorsement_reward) ->
-             Storage.Ramp_up.Rewards.delete ctxt next_cycle
+             Storage.Ramp_up.Rewards.remove_existing ctxt next_cycle
              >>=? fun ctxt ->
              Raw_context.patch_constants ctxt (fun c ->
                  {c with baking_reward_per_endorsement; endorsement_reward})
              >|= ok)
   >>=? fun ctxt ->
-  Storage.Ramp_up.Security_deposits.get_option ctxt next_cycle
+  Storage.Ramp_up.Security_deposits.find ctxt next_cycle
   >>=? function
   | None ->
       return ctxt
   | Some (block_security_deposit, endorsement_security_deposit) ->
-      Storage.Ramp_up.Security_deposits.delete ctxt next_cycle
+      Storage.Ramp_up.Security_deposits.remove_existing ctxt next_cycle
       >>=? fun ctxt ->
       Raw_context.patch_constants ctxt (fun c ->
           {c with block_security_deposit; endorsement_security_deposit})

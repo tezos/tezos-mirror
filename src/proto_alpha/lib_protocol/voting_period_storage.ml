@@ -76,7 +76,7 @@
   https://gitlab.com/metastatedev/tezos/-/merge_requests/333
  *)
 
-let set_current = Storage.Vote.Current_period.set
+let set_current = Storage.Vote.Current_period.update
 
 let get_current = Storage.Vote.Current_period.get
 
@@ -90,7 +90,7 @@ let init_first_period ctxt ~start_position =
 let common ctxt =
   get_current ctxt
   >>=? fun current_period ->
-  Storage.Vote.Pred_period_kind.set ctxt current_period.kind
+  Storage.Vote.Pred_period_kind.update ctxt current_period.kind
   >|=? fun ctxt ->
   let start_position =
     (* because we are preparing the voting period for the next block we need to

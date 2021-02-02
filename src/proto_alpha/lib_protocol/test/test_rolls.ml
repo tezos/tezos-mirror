@@ -47,7 +47,7 @@ let wrap e = Lwt.return (Environment.wrap_error e)
 
 let traverse_rolls ctxt head =
   let rec loop acc roll =
-    Storage.Roll.Successor.get_option ctxt roll
+    Storage.Roll.Successor.find ctxt roll
     >>= wrap
     >>=? function
     | None -> return (List.rev acc) | Some next -> loop (next :: acc) next
@@ -55,7 +55,7 @@ let traverse_rolls ctxt head =
   loop [head] head
 
 let get_rolls ctxt delegate =
-  Storage.Roll.Delegate_roll_list.get_option ctxt delegate
+  Storage.Roll.Delegate_roll_list.find ctxt delegate
   >>= wrap
   >>=? function
   | None -> return_nil | Some head_roll -> traverse_rolls ctxt head_roll

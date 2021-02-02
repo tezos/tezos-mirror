@@ -23,9 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let get_opt = Storage.Commitments.get_option
+let find = Storage.Commitments.find
 
-let delete = Storage.Commitments.delete
+let remove_existing = Storage.Commitments.remove_existing
 
 let init ctxt commitments =
   let init_commitment ctxt Commitment_repr.{blinded_public_key_hash; amount} =

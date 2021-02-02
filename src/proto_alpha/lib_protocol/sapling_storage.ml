@@ -115,7 +115,7 @@ end = struct
   let get_root_height ctx id node height =
     assert_node node height ;
     assert_height height ;
-    Storage.Sapling.Commitments.get_option (ctx, id) node
+    Storage.Sapling.Commitments.find (ctx, id) node
     >|=? function
     | (ctx, None) ->
         let hash = H.uncommitted height in
@@ -175,14 +175,14 @@ end = struct
           >|=? fun (ctx, size_r, hr) -> (ctx, size_r, hl, hr) )
         >>=? fun (ctx, size_children, hl, hr) ->
         let h = H.merkle_hash ~height hl hr in
-        Storage.Sapling.Commitments.init_set (ctx, id) node h
+        Storage.Sapling.Commitments.add (ctx, id) node h
         >|=? fun (ctx, size, _existing) -> (ctx, size + size_children, h)
 
   let rec fold_from_height ctx id node ~pos ~f ~acc height =
     assert_node node height ;
     assert_height height ;
     assert_pos pos height ;
-    Storage.Sapling.Commitments.get_option (ctx, id) node
+    Storage.Sapling.Commitments.find (ctx, id) node
     (* we don't count gas for this function, it is called only by RPC *)
     >>=? function
     | (_ctx, None) ->
@@ -240,7 +240,7 @@ module Ciphertexts = struct
 
   let get_from ctx id offset =
     let rec aux (ctx, acc) pos =
-      Storage.Sapling.Ciphertexts.get_option (ctx, id) pos
+      Storage.Sapling.Ciphertexts.find (ctx, id) pos
       >>=? fun (ctx, c) ->
       match c with
       | None ->
@@ -278,12 +278,12 @@ module Nullifiers = struct
       nfs
       (ctx, nf_start_pos, Z.zero)
     >>=? fun (ctx, nf_end_pos, size) ->
-    Storage.Sapling.Nullifiers_size.set (ctx, id) nf_end_pos
+    Storage.Sapling.Nullifiers_size.update (ctx, id) nf_end_pos
     >|=? fun ctx -> (ctx, size)
 
   let get_from ctx id offset =
     let rec aux acc pos =
-      Storage.Sapling.Nullifiers_ordered.get_option (ctx, id) pos
+      Storage.Sapling.Nullifiers_ordered.find (ctx, id) pos
       >>=? function
       | None ->
           return @@ List.rev acc
@@ -349,14 +349,15 @@ module Roots = struct
     if Raw_level_repr.(stored_level = level) then
       (* if there is another add during the same level, it will over-write on
          the same position  *)
-      Storage.Sapling.Roots.init_set (ctx, id) pos root >|= ok
+      Storage.Sapling.Roots.add (ctx, id) pos root >|= ok
     else
       (* it's the first add for this level *)
-      Storage.Sapling.Roots_level.set (ctx, id) level
+      (* TODO(samoht): why is it using [update] and not [init] then? *)
+      Storage.Sapling.Roots_level.update (ctx, id) level
       >>=? fun ctx ->
       let pos = Int32.rem (Int32.succ pos) size in
-      Storage.Sapling.Roots_pos.set (ctx, id) pos
-      >>=? fun ctx -> Storage.Sapling.Roots.init_set (ctx, id) pos root >|= ok
+      Storage.Sapling.Roots_pos.update (ctx, id) pos
+      >>=? fun ctx -> Storage.Sapling.Roots.add (ctx, id) pos root >|= ok
 end
 
 (** This type links the permanent state stored in the context at the specified
@@ -385,9 +386,9 @@ let rpc_arg = Storage.Sapling.rpc_arg
 let get_memo_size ctx id = Storage.Sapling.Memo_size.get (ctx, id)
 
 let init ctx id ~memo_size =
-  Storage.Sapling.Memo_size.init_set (ctx, id) memo_size
+  Storage.Sapling.Memo_size.add (ctx, id) memo_size
   >>= fun ctx ->
-  Storage.Sapling.Commitments_size.init_set (ctx, id) Int64.zero
+  Storage.Sapling.Commitments_size.add (ctx, id) Int64.zero
   >>= fun ctx ->
   Commitments.init ctx id
   >>= fun ctx ->
@@ -419,7 +420,7 @@ let apply_diff ctx id diff =
   let cms = List.rev_map fst diff.commitments_and_ciphertexts in
   Commitments.add ctx id cms cm_start_pos
   >>=? fun (ctx, size) ->
-  Storage.Sapling.Commitments_size.set
+  Storage.Sapling.Commitments_size.update
     (ctx, id)
     (Int64.add cm_start_pos (Int64.of_int nb_commitments))
   >>=? fun ctx ->

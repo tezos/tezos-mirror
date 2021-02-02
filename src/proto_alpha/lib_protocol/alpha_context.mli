@@ -1165,7 +1165,7 @@ module Vote : sig
 
   val get_current_proposal : context -> proposal tzresult Lwt.t
 
-  val get_current_proposal_option : context -> proposal option tzresult Lwt.t
+  val find_current_proposal : context -> proposal option tzresult Lwt.t
 
   val init_current_proposal : context -> proposal -> context tzresult Lwt.t
 
@@ -1524,10 +1524,11 @@ module Commitment : sig
 
   val encoding : t Data_encoding.t
 
-  val get_opt :
+  val find :
     context -> Blinded_public_key_hash.t -> Tez.t option tzresult Lwt.t
 
-  val delete : context -> Blinded_public_key_hash.t -> context tzresult Lwt.t
+  val remove_existing :
+    context -> Blinded_public_key_hash.t -> context tzresult Lwt.t
 end
 
 module Bootstrap : sig

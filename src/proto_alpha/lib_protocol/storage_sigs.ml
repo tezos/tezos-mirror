@@ -48,7 +48,7 @@ module type Single_data_storage = sig
   (** Retrieves the value from the storage bucket ; returns [None] if
       the data is not initialized, or {!Storage_helpers.Storage_error}
       if the deserialisation fails *)
-  val get_option : context -> value option tzresult Lwt.t
+  val find : context -> value option tzresult Lwt.t
 
   (** Allocates the storage bucket and initializes it ; returns a
       {!Storage_error Existing_key} if the bucket exists *)
@@ -56,21 +56,21 @@ module type Single_data_storage = sig
 
   (** Updates the content of the bucket ; returns a {!Storage_Error
       Missing_key} if the value does not exists *)
-  val set : context -> value -> Raw_context.t tzresult Lwt.t
+  val update : context -> value -> Raw_context.t tzresult Lwt.t
 
   (** Allocates the data and initializes it with a value ; just
       updates it if the bucket exists *)
-  val init_set : context -> value -> Raw_context.t Lwt.t
+  val add : context -> value -> Raw_context.t Lwt.t
 
   (** When the value is [Some v], allocates the data and initializes
       it with [v] ; just updates it if the bucket exists. When the
       value is [None], delete the storage bucket when the value ; does
       nothing if the bucket does not exists. *)
-  val set_option : context -> value option -> Raw_context.t Lwt.t
+  val add_or_remove : context -> value option -> Raw_context.t Lwt.t
 
   (** Delete the storage bucket ; returns a {!Storage_error
       Missing_key} if the bucket does not exists *)
-  val delete : context -> Raw_context.t tzresult Lwt.t
+  val remove_existing : context -> Raw_context.t tzresult Lwt.t
 
   (** Removes the storage bucket and its contents ; does nothing if
       the bucket does not exists *)
@@ -101,7 +101,7 @@ module type Single_carbonated_data_storage = sig
       if the deserialisation fails.
       Consumes [Gas_repr.read_bytes_cost <size of the value>] if present
       or [Gas_repr.read_bytes_cost Z.zero]. *)
-  val get_option : context -> (Raw_context.t * value option) tzresult Lwt.t
+  val find : context -> (Raw_context.t * value option) tzresult Lwt.t
 
   (** Allocates the storage bucket and initializes it ; returns a
       {!Storage_error Missing_key} if the bucket exists.
@@ -113,15 +113,14 @@ module type Single_carbonated_data_storage = sig
       Existing_key} if the value does not exists.
       Consumes [Gas_repr.write_bytes_cost <size of the new value>].
       Returns the difference from the old to the new size. *)
-  val set : context -> value -> (Raw_context.t * int) tzresult Lwt.t
+  val update : context -> value -> (Raw_context.t * int) tzresult Lwt.t
 
   (** Allocates the data and initializes it with a value ; just
       updates it if the bucket exists.
       Consumes [Gas_repr.write_bytes_cost <size of the new value>].
       Returns the difference from the old (maybe 0) to the new size, and a boolean
       indicating if a value was already associated to this key. *)
-  val init_set :
-    context -> value -> (Raw_context.t * int * bool) tzresult Lwt.t
+  val add : context -> value -> (Raw_context.t * int * bool) tzresult Lwt.t
 
   (** When the value is [Some v], allocates the data and initializes
       it with [v] ; just updates it if the bucket exists. When the
@@ -130,14 +129,14 @@ module type Single_carbonated_data_storage = sig
       Consumes the same gas cost as either {!remove} or {!init_set}.
       Returns the difference from the old (maybe 0) to the new size, and a boolean
       indicating if a value was already associated to this key. *)
-  val set_option :
+  val add_or_remove :
     context -> value option -> (Raw_context.t * int * bool) tzresult Lwt.t
 
   (** Delete the storage bucket ; returns a {!Storage_error
       Missing_key} if the bucket does not exists.
       Consumes [Gas_repr.write_bytes_cost Z.zero].
       Returns the freed size. *)
-  val delete : context -> (Raw_context.t * int) tzresult Lwt.t
+  val remove_existing : context -> (Raw_context.t * int) tzresult Lwt.t
 
   (** Removes the storage bucket and its contents ; does nothing if
       the bucket does not exists.
@@ -171,11 +170,11 @@ module type Non_iterable_indexed_data_storage = sig
   (** Retrieve a value from the storage bucket at a given key ;
       returns [None] if the value is not set ; returns {!Storage_error
       Corrupted_data} if the deserialisation fails. *)
-  val get_option : context -> key -> value option tzresult Lwt.t
+  val find : context -> key -> value option tzresult Lwt.t
 
   (** Updates the content of a bucket ; returns A {!Storage_Error
       Missing_key} if the value does not exists. *)
-  val set : context -> key -> value -> Raw_context.t tzresult Lwt.t
+  val update : context -> key -> value -> Raw_context.t tzresult Lwt.t
 
   (** Allocates a storage bucket at the given key and initializes it ;
       returns a {!Storage_error Existing_key} if the bucket exists. *)
@@ -183,17 +182,17 @@ module type Non_iterable_indexed_data_storage = sig
 
   (** Allocates a storage bucket at the given key and initializes it
       with a value ; just updates it if the bucket exists. *)
-  val init_set : context -> key -> value -> Raw_context.t Lwt.t
+  val add : context -> key -> value -> Raw_context.t Lwt.t
 
   (** When the value is [Some v], allocates the data and initializes
       it with [v] ; just updates it if the bucket exists. When the
       value is [None], delete the storage bucket when the value ; does
       nothing if the bucket does not exists. *)
-  val set_option : context -> key -> value option -> Raw_context.t Lwt.t
+  val add_or_remove : context -> key -> value option -> Raw_context.t Lwt.t
 
   (** Delete a storage bucket and its contents ; returns a
       {!Storage_error Missing_key} if the bucket does not exists. *)
-  val delete : context -> key -> Raw_context.t tzresult Lwt.t
+  val remove_existing : context -> key -> Raw_context.t tzresult Lwt.t
 
   (** Removes a storage bucket and its contents ; does nothing if the
       bucket does not exists. *)
@@ -228,15 +227,14 @@ module type Non_iterable_indexed_carbonated_data_storage = sig
       Corrupted_data} if the deserialisation fails.
       Consumes [Gas_repr.read_bytes_cost <size of the value>] if present
       or [Gas_repr.read_bytes_cost Z.zero]. *)
-  val get_option :
-    context -> key -> (Raw_context.t * value option) tzresult Lwt.t
+  val find : context -> key -> (Raw_context.t * value option) tzresult Lwt.t
 
   (** Updates the content of a bucket ; returns A {!Storage_Error
       Missing_key} if the value does not exists.
       Consumes serialization cost.
       Consumes [Gas_repr.write_bytes_cost <size of the new value>].
       Returns the difference from the old to the new size. *)
-  val set : context -> key -> value -> (Raw_context.t * int) tzresult Lwt.t
+  val update : context -> key -> value -> (Raw_context.t * int) tzresult Lwt.t
 
   (** Allocates a storage bucket at the given key and initializes it ;
       returns a {!Storage_error Existing_key} if the bucket exists.
@@ -251,7 +249,7 @@ module type Non_iterable_indexed_carbonated_data_storage = sig
       Consumes [Gas_repr.write_bytes_cost <size of the new value>].
       Returns the difference from the old (maybe 0) to the new size, and a boolean
       indicating if a value was already associated to this key. *)
-  val init_set :
+  val add :
     context -> key -> value -> (Raw_context.t * int * bool) tzresult Lwt.t
 
   (** When the value is [Some v], allocates the data and initializes
@@ -262,7 +260,7 @@ module type Non_iterable_indexed_carbonated_data_storage = sig
       Consumes the same gas cost as either {!remove} or {!init_set}.
       Returns the difference from the old (maybe 0) to the new size, and a boolean
       indicating if a value was already associated to this key. *)
-  val set_option :
+  val add_or_remove :
     context ->
     key ->
     value option ->
@@ -272,7 +270,7 @@ module type Non_iterable_indexed_carbonated_data_storage = sig
       {!Storage_error Missing_key} if the bucket does not exists.
       Consumes [Gas_repr.write_bytes_cost Z.zero].
       Returns the freed size. *)
-  val delete : context -> key -> (Raw_context.t * int) tzresult Lwt.t
+  val remove_existing : context -> key -> (Raw_context.t * int) tzresult Lwt.t
 
   (** Removes a storage bucket and its contents ; does nothing if the
       bucket does not exists.
@@ -343,10 +341,7 @@ module type Data_set_storage = sig
   val add : context -> elt -> Raw_context.t Lwt.t
 
   (** Removes a elt of the set ; does nothing if not a member *)
-  val del : context -> elt -> Raw_context.t Lwt.t
-
-  (** Adds/Removes a elt of the set *)
-  val set : context -> elt -> bool -> Raw_context.t Lwt.t
+  val remove : context -> elt -> Raw_context.t Lwt.t
 
   (** Returns the elements of the set, deserialized in a list in no
       particular order. *)
@@ -374,14 +369,14 @@ module type Carbonated_data_set_storage = sig
 
   (** Adds an elt as a member of the set.
       Consumes [Gas_repr.write_bytes_cost <size of the new value>].
-      Returns the difference from the old (maybe 0) to the new size. *)
+      Returns the the new size. *)
   val init : context -> elt -> (Raw_context.t * int) tzresult Lwt.t
 
   (** Removes an elt from the set ; does nothing if not a member.
       Consumes [Gas_repr.write_bytes_cost Z.zero].
       Returns the freed size, and a boolean
       indicating if a value was already associated to this key. *)
-  val del : context -> elt -> (Raw_context.t * int * bool) tzresult Lwt.t
+  val remove : context -> elt -> (Raw_context.t * int * bool) tzresult Lwt.t
 
   val fold_keys_unaccounted :
     context -> init:'acc -> f:(elt -> 'acc -> 'acc Lwt.t) -> 'acc Lwt.t
@@ -418,7 +413,7 @@ module type Indexed_raw_context = sig
 
   val resolve : context -> string list -> key list Lwt.t
 
-  val remove_rec : context -> key -> context Lwt.t
+  val remove : context -> key -> context Lwt.t
 
   val copy : context -> from:key -> to_:key -> context tzresult Lwt.t
 

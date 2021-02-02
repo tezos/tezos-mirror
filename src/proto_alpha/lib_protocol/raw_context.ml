@@ -109,9 +109,7 @@ type back = {
 *)
 type t = {gas_counter : Gas_limit_repr.Arith.fp; back : back}
 
-type context = t
-
-type root_context = t
+type root = t
 
 (*
 
@@ -672,7 +670,7 @@ let get_proto_param ctxt =
         | param ->
             ok (param, ctxt) ) )
 
-let set_constants ctxt constants =
+let add_constants ctxt constants =
   let bytes =
     Data_encoding.Binary.to_bytes_exn
       Constants_repr.parametric_encoding
@@ -696,7 +694,7 @@ let get_constants ctxt =
 
 let patch_constants ctxt f =
   let constants = f (constants ctxt) in
-  set_constants (context ctxt) constants
+  add_constants (context ctxt) constants
   >|= fun context ->
   let ctxt = update_context ctxt context in
   update_constants ctxt constants
@@ -785,7 +783,7 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
       Raw_level_repr.of_int32 level
       >>?= fun first_level ->
       set_first_level ctxt first_level
-      >>=? fun ctxt -> set_constants ctxt param.constants >|= ok
+      >>=? fun ctxt -> add_constants ctxt param.constants >|= ok
   | Edo_008 ->
       return ctxt )
   >>=? fun ctxt ->
@@ -802,63 +800,58 @@ type value = bytes
 
 module type T =
   Raw_context_intf.T
-    with type key := key
+    with type root := root
+     and type key := key
      and type value := value
-     and type root_context := root_context
 
 let mem ctxt k = Context.mem (context ctxt) k
 
-let dir_mem ctxt k = Context.mem_tree (context ctxt) k
+let mem_tree ctxt k = Context.mem_tree (context ctxt) k
 
 let get ctxt k =
   Context.find (context ctxt) k
   >|= function None -> storage_error (Missing_key (k, Get)) | Some v -> ok v
 
-let get_option ctxt k = Context.find (context ctxt) k
+let find ctxt k = Context.find (context ctxt) k
 
-(* Verify that the k is present before modifying *)
-let set ctxt k v =
-  Context.mem (context ctxt) k
-  >>= function
-  | false ->
-      Lwt.return @@ storage_error (Missing_key (k, Set))
-  | true ->
-      Context.add (context ctxt) k v
-      >|= fun context -> ok (update_context ctxt context)
+let add ctxt k v = Context.add (context ctxt) k v >|= update_context ctxt
 
-(* Verify that the k is not present before inserting *)
 let init ctxt k v =
   Context.mem (context ctxt) k
   >>= function
   | true ->
       Lwt.return @@ storage_error (Existing_key k)
-  | false ->
+  | _ ->
       Context.add (context ctxt) k v
       >|= fun context -> ok (update_context ctxt context)
 
-(* Does not verify that the key is present or not *)
-let init_set ctxt k v = Context.add (context ctxt) k v >|= update_context ctxt
+let update ctxt k v =
+  Context.mem (context ctxt) k
+  >>= function
+  | false ->
+      Lwt.return @@ storage_error (Missing_key (k, Set))
+  | _ ->
+      Context.add (context ctxt) k v
+      >|= fun context -> ok (update_context ctxt context)
 
 (* Verify that the key is present before deleting *)
-let delete ctxt k =
+let remove_existing ctxt k =
   Context.mem (context ctxt) k
   >>= function
   | false ->
       Lwt.return @@ storage_error (Missing_key (k, Del))
-  | true ->
+  | _ ->
       Context.remove (context ctxt) k
       >|= fun context -> ok (update_context ctxt context)
 
 (* Do not verify before deleting *)
 let remove ctxt k = Context.remove (context ctxt) k >|= update_context ctxt
 
-let set_option ctxt k = function
+let add_or_remove ctxt k = function
   | None ->
       remove ctxt k
   | Some v ->
-      init_set ctxt k v
-
-let remove_rec ctxt k = Context.remove (context ctxt) k >|= update_context ctxt
+      add ctxt k v
 
 let copy ctxt ~from ~to_ =
   Context.find_tree (context ctxt) from

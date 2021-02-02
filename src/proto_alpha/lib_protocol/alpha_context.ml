@@ -187,12 +187,12 @@ module Big_map = struct
 
   let mem c m k = Storage.Big_map.Contents.mem (c, m) k
 
-  let get_opt c m k = Storage.Big_map.Contents.get_option (c, m) k
+  let get_opt c m k = Storage.Big_map.Contents.find (c, m) k
 
   let exists c id =
     Raw_context.consume_gas c (Gas_limit_repr.read_bytes_cost Z.zero)
     >>?= fun c ->
-    Storage.Big_map.Key_type.get_option c id
+    Storage.Big_map.Key_type.find c id
     >>=? fun kt ->
     match kt with
     | None ->
@@ -244,7 +244,7 @@ end
 module Global = struct
   let get_block_priority = Storage.Block_priority.get
 
-  let set_block_priority = Storage.Block_priority.set
+  let set_block_priority = Storage.Block_priority.update
 end
 
 let prepare_first_block = Init_storage.prepare_first_block

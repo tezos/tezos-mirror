@@ -51,9 +51,7 @@ val storage_error : storage_error -> 'a tzresult
     ({!Context.t}) along with some in-memory values (gas, etc.). *)
 type t
 
-type context = t
-
-type root_context = t
+type root = t
 
 (** Retrieves the state of the database and gives its abstract view.
     It also returns wether this is the first block validated
@@ -64,7 +62,7 @@ val prepare :
   timestamp:Time.t ->
   fitness:Fitness.t ->
   Context.t ->
-  context tzresult Lwt.t
+  t tzresult Lwt.t
 
 type previous_protocol = Genesis of Parameters_repr.t | Edo_008
 
@@ -73,51 +71,48 @@ val prepare_first_block :
   timestamp:Time.t ->
   fitness:Fitness.t ->
   Context.t ->
-  (previous_protocol * context) tzresult Lwt.t
+  (previous_protocol * t) tzresult Lwt.t
 
-val activate : context -> Protocol_hash.t -> t Lwt.t
+val activate : t -> Protocol_hash.t -> t Lwt.t
 
 (** Returns the state of the database resulting of operations on its
     abstract view *)
-val recover : context -> Context.t
+val recover : t -> Context.t
 
-val current_level : context -> Level_repr.t
+val current_level : t -> Level_repr.t
 
-val predecessor_timestamp : context -> Time.t
+val predecessor_timestamp : t -> Time.t
 
-val current_timestamp : context -> Time.t
+val current_timestamp : t -> Time.t
 
-val current_fitness : context -> Int64.t
+val current_fitness : t -> Int64.t
 
-val set_current_fitness : context -> Int64.t -> t
+val set_current_fitness : t -> Int64.t -> t
 
-val constants : context -> Constants_repr.parametric
+val constants : t -> Constants_repr.parametric
 
 val patch_constants :
-  context ->
-  (Constants_repr.parametric -> Constants_repr.parametric) ->
-  context Lwt.t
+  t -> (Constants_repr.parametric -> Constants_repr.parametric) -> t Lwt.t
 
-val first_level : context -> Raw_level_repr.t
+val first_level : t -> Raw_level_repr.t
 
 (** Increment the current block fee stash that will be credited to baker's
     frozen_fees account at finalize_application *)
-val add_fees : context -> Tez_repr.t -> context tzresult
+val add_fees : t -> Tez_repr.t -> t tzresult
 
 (** Increment the current block reward stash that will be credited to baker's
     frozen_fees account at finalize_application *)
-val add_rewards : context -> Tez_repr.t -> context tzresult
+val add_rewards : t -> Tez_repr.t -> t tzresult
 
 (** Increment the current block deposit stash for a specific delegate. All the
     delegates' frozen_deposit accounts are credited at finalize_application *)
-val add_deposit :
-  context -> Signature.Public_key_hash.t -> Tez_repr.t -> context tzresult
+val add_deposit : t -> Signature.Public_key_hash.t -> Tez_repr.t -> t tzresult
 
-val get_fees : context -> Tez_repr.t
+val get_fees : t -> Tez_repr.t
 
-val get_rewards : context -> Tez_repr.t
+val get_rewards : t -> Tez_repr.t
 
-val get_deposits : context -> Tez_repr.t Signature.Public_key_hash.Map.t
+val get_deposits : t -> Tez_repr.t Signature.Public_key_hash.Map.t
 
 type error += Gas_limit_too_high (* `Permanent *)
 
@@ -160,51 +155,50 @@ type value = bytes
 
 module type T =
   Raw_context_intf.T
-    with type key := key
+    with type root := root
+     and type key := key
      and type value := value
-     and type root_context := root_context
 
-include T with type t := t and type context := context
+include T with type t := t
 
 (** Initialize the local nonce used for preventing a script to
     duplicate an internal operation to replay it. *)
-val reset_internal_nonce : context -> context
+val reset_internal_nonce : t -> t
 
 (** Increments the internal operation nonce. *)
-val fresh_internal_nonce : context -> (context * int) tzresult
+val fresh_internal_nonce : t -> (t * int) tzresult
 
 (** Mark an internal operation nonce as taken. *)
-val record_internal_nonce : context -> int -> context
+val record_internal_nonce : t -> int -> t
 
 (** Check is the internal operation nonce has been taken. *)
-val internal_nonce_already_recorded : context -> int -> bool
+val internal_nonce_already_recorded : t -> int -> bool
 
 (** Returns a map where to each endorser's pkh is associated the list of its
     endorsing slots (in decreasing order) for a given level. *)
 val allowed_endorsements :
-  context ->
+  t ->
   (Signature.Public_key.t * int list * bool) Signature.Public_key_hash.Map.t
 
 (** Keep track of the number of endorsements that are included in a block *)
-val included_endorsements : context -> int
+val included_endorsements : t -> int
 
 (** Initializes the map of allowed endorsements, this function must only be
     called once. *)
 val init_endorsements :
-  context ->
+  t ->
   (Signature.Public_key.t * int list * bool) Signature.Public_key_hash.Map.t ->
-  context
+  t
 
 (** Marks an endorsement in the map as used. *)
-val record_endorsement : context -> Signature.Public_key_hash.t -> context
+val record_endorsement : t -> Signature.Public_key_hash.t -> t
 
 val fold_map_temporary_lazy_storage_ids :
-  context ->
+  t ->
   (Lazy_storage_kind.Temp_ids.t -> Lazy_storage_kind.Temp_ids.t * 'res) ->
-  context * 'res
+  t * 'res
 
 val map_temporary_lazy_storage_ids_s :
-  context ->
-  (Lazy_storage_kind.Temp_ids.t ->
-  (context * Lazy_storage_kind.Temp_ids.t) Lwt.t) ->
-  context Lwt.t
+  t ->
+  (Lazy_storage_kind.Temp_ids.t -> (t * Lazy_storage_kind.Temp_ids.t) Lwt.t) ->
+  t Lwt.t
