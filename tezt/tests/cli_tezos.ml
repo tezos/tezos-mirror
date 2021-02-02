@@ -2,7 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,32 +23,50 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Testing
-   -------
-   Component: All
-   Invocation: make test-tezt
-   Subject: This file is the entrypoint of all Tezt tests. It dispatches to
-            other files.
- *)
+let cap = 100
 
-(* This module runs the tests implemented in all other modules of this directory.
-   Each module defines tests which are thematically related,
-   as functions to be called here. *)
+let check_connections_below_cap () =
+  Test.register
+    ~__FILE__
+    ~title:"CLI under connections cap"
+    ~tags:["cli"; "connections"]
+  @@ fun () ->
+  let* _node = Node.init [Connections cap] in
+  unit
 
-let register protocol =
-  Basic.register protocol ;
-  Bootstrap.register protocol ;
-  Synchronisation_heuristic.register protocol ;
-  Mockup.register protocol ;
-  Proxy.register protocol ;
-  Double_bake.register protocol
+let on_terminate resolver status =
+  match status with
+  | Unix.WEXITED x when x = 1 ->
+      Lwt.wakeup resolver ()
+  | _ ->
+      ()
 
-let () =
-  register Alpha ;
-  P2p.register Alpha ;
-  Bootstrap.register_protocol_independent () ;
-  Cli_tezos.register_protocol_independent () ;
-  Encoding.register () ;
-  RPC_test.register () ;
-  (* Test.run () should be the last statement, don't register afterwards! *)
-  Test.run ()
+let check_connections_above_cap () =
+  Test.register
+    ~__FILE__
+    ~title:"CLI above connections cap"
+    ~tags:["cli"; "connections"; "bad"]
+  @@ fun () ->
+  let (has_failed, on_failure) = Lwt.task () in
+  let node = Node.create [] in
+  let* _node =
+    Node.run
+      ~on_terminate:(on_terminate on_failure)
+      node
+      [Connections (cap * 2)]
+  in
+  let is_ready_p =
+    let* () = Node.wait_for_ready node in
+    Lwt.return_true
+  in
+  let has_failed_p =
+    let* () = has_failed in
+    Lwt.return_false
+  in
+  let* is_ready = Lwt.pick [is_ready_p; has_failed_p] in
+  if is_ready then Test.fail "The node should fail and should not be ready"
+  else unit
+
+let register_protocol_independent () =
+  check_connections_below_cap () ;
+  check_connections_above_cap ()
