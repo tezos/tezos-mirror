@@ -319,6 +319,32 @@ class TestRememberContract:
         )
         client.bake('bootstrap1', BAKE_ARGS)
 
+    def test_operation_size_with_list_syntax_error(self, client: Client):
+        # Each element in the list takes 2 bytes so about 30KB in total
+        big_arg = "{" + ("0; " * 15 * 1024) + "'foo;'" + "}"
+
+        expected_error = "transfer simulation failed"
+        with assert_run_failure(expected_error):
+            client.transfer(
+                10,
+                'bootstrap1',
+                'munch',
+                ['--arg', big_arg, "--entrypoint", "list_nat"],
+            )
+
+    def test_operation_size_with_list_ill_typed(self, client: Client):
+        # Each element in the list takes 2 bytes so about 30KB in total
+        big_arg = "{" + ("0; " * 15 * 1024) + "Unit;" + "}"
+
+        expected_error = "transfer simulation failed"
+        with assert_run_failure(expected_error):
+            client.transfer(
+                10,
+                'bootstrap1',
+                'munch',
+                ['--arg', big_arg, "--entrypoint", "list_nat"],
+            )
+
     # Test that a large operation over 32KB cannot be injected in the node,
     # and the error is not a stack overflow
     # (variant using a long list).
