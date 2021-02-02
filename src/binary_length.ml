@@ -154,13 +154,6 @@ let fixed_length e =
   | `Dynamic | `Variable ->
       None
 
-let fixed_length_exn e =
-  match fixed_length e with
-  | Some n ->
-      n
-  | None ->
-      invalid_arg "Data_encoding.Binary.fixed_length_exn"
-
 let rec maximum_length : type a. a Encoding.t -> int option =
  fun e ->
   let ( >>? ) = Option.bind in

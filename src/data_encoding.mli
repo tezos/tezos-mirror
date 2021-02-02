@@ -985,13 +985,34 @@ module Binary : sig
   val length : 'a Encoding.t -> 'a -> int
 
   (** Returns the size of the binary representation that the given
-      encoding might produce, only when the size of the representation
-      does not depends of the value itself. *)
+      encoding might produce, only when this size does not depends of the value
+      itself.
+
+      E.g., [fixed_length (tup2 int64 (Fixed.string 2))] is [Some _]
+
+      E.g., [fixed_length (result int64 (Fixed.string 2))] is [None]
+
+      E.g., [fixed_length (list (tup2 int64 (Fixed.string 2)))] is [None] *)
   val fixed_length : 'a Encoding.t -> int option
 
-  val maximum_length : 'a Encoding.t -> int option
+  (** Returns the maximum size of the binary representation that the given
+      encoding might produce, only when this maximum size does not depends of
+      the value itself.
 
-  val fixed_length_exn : 'a Encoding.t -> int
+      E.g., [maximum_length (tup2 int64 (Fixed.string 2))] is [Some _]
+
+      E.g., [maximum_length (result int64 (Fixed.string 2))] is [Some _]
+
+      E.g., [maximum_length (list (tup2 int64 (Fixed.string 2)))] is [None]
+
+      Note that the function assumes that recursive encodings (build using [mu])
+      are used for recursive data types. As a result, [maximum_length] will
+      return [None] if given a recursive encoding.
+
+      If there are static guarantees about the maximum size of the
+      representation for values of a given type, you can wrap your encoding in
+      [check_size]. This will cause [maximum_length] to return [Some _]. *)
+  val maximum_length : 'a Encoding.t -> int option
 
   (** [read enc buf ofs len] tries to reconstruct a value from the
       bytes in [buf] starting at offset [ofs] and reading at most
