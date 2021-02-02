@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -327,7 +327,7 @@ let add_peer_with_id node peer =
   add_argument node (Peer peer) ;
   Lwt.return_unit
 
-let run node arguments =
+let run ?(on_terminate = fun _ -> ()) node arguments =
   ( match node.status with
   | Not_running ->
       ()
@@ -338,7 +338,8 @@ let run node arguments =
     "run" :: "--data-dir" :: node.persistent_state.data_dir
     :: make_arguments arguments
   in
-  let on_terminate _ =
+  let on_terminate status =
+    on_terminate status ;
     (* Cancel all [Ready] event listeners. *)
     trigger_ready node None ;
     (* Cancel all [Level_at_least] event listeners. *)

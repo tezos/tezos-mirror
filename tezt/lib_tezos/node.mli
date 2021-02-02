@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -169,7 +169,11 @@ val spawn_config_init : t -> argument list -> Process.t
 
     The resulting promise is fulfilled as soon as the node has been spawned.
     It continues running in the background. *)
-val run : t -> argument list -> unit Lwt.t
+val run :
+  ?on_terminate:(Unix.process_status -> unit) ->
+  t ->
+  argument list ->
+  unit Lwt.t
 
 (** {2 Events} *)
 
