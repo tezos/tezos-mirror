@@ -26,6 +26,16 @@ here either.
 - Fixes a bug where any event would allocate more memory than needed
   when it were not to be printed.
 
+- Extend the mechanism of mempool plugins to a more general notion of
+  protocol plugins for the shell.
+
+- Add a new protocol plugin for RPCs to extend the RPCs of the
+  protocol after injection.
+
+- Add new RPCs for Edo: `helpers/scripts/normalize_{data,script,type}`
+  and a `XXX/normalized` variant to each protocol RPC `XXX`
+  outputting Michelson expressions.
+
 ## Client
 
 - Fixed the return code of errors in the client calls to be non-zero.
