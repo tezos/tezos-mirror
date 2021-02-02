@@ -264,15 +264,22 @@ run it locally:
    tezos-client run script ./src/bin_client/test/contracts/attic/id.tz \
                 on storage '"hello"' and input '"world"'
 
+.. _configure_logging:
 
-Debugging
----------
+Logging
+-------
 
-It is possible to set independent log levels for different logging
-sections in Tezos, as well as specifying an output file for logging. See
-the description of log parameters above as well as documentation under
-the DEBUG section displayed by `tezos-node run –-help`.
+It is possible to set independent log levels for different components in the Tezos node, as well as specifying an output file for logging.
+This can be done in two different ways:
 
+- by defining log parameters in the configuration file (see :ref:`node-conf`)
+- by setting the environment variable ``TEZOS_LOG`` before starting the node.
+
+The list of the Tezos components that can be logged and the syntax for the logging options can be found in the DEBUG section displayed by ``tezos-node run --help``:
+
+.. literalinclude:: ../api/tezos-node-run.txt
+    :start-after: DEBUG
+    :end-before: OPTIONS
 
 .. _tezos-admin-client:
 

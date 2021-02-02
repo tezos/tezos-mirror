@@ -156,9 +156,23 @@ internet. With the following command, it is available uniquely on the
 
 The node listens by default on port ``9732`` so it is advisable to
 open incoming connections to that port.
-You can read more about the :ref:`node configuration <node-conf>` and
-its :ref:`private mode <private-mode>`.
 
+Node configuration
+~~~~~~~~~~~~~~~~~~
+
+Many options of the node can be configured when running the node:
+
+- RPC parameters (e.g. the port number for listening to RPC requests using option ``--rpc-addr``)
+- The directory where the node stores local data (using option ``--data-dir``)
+- Network parameters (e.g. the number of connections to peers, using option ``--connections``)
+- Validator and mempool parameters
+- :ref:`Logging options <configure_logging>`.
+
+The list of configurable options can be obtained using the following command::
+
+    tezos-node run --help
+
+You can read more about the :ref:`node configuration <node-conf>` and its :ref:`private mode <private-mode>`.
 
 Client
 ------

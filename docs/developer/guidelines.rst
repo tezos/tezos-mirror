@@ -114,10 +114,6 @@ administrator of possible problems and errors:
 - ``Error`` level are all those events that require an intervention of the node
   administrator or that signal some exceptional circumstance.
 
-It's also important to notice that from the node administrator's point of view,
-it is possible to choose a specific log level for a given component
-by setting the environment variable ``TEZOS_LOG`` accordingly while running the node.
-
 Code formatting
 ---------------
 

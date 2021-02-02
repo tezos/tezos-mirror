@@ -46,6 +46,7 @@ manuals: main
 	@../tezos-signer man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-signer.html
 	@../tezos-codec man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-codec.html
 	@../tezos-snoop man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-snoop.html
+	../tezos-node run --help | sed "s#\(.\)$$(echo "\010")\1#\1#g; s#_$$(echo "\010")##g" > api/tezos-node-run.txt
 
 .PHONY: odoc
 odoc: main
@@ -103,4 +104,4 @@ html: Makefile api/errors.rst rpc p2p
 clean:
 	@-rm -Rf "$(BUILDDIR)"
 	@-rm -Rf api/errors.rst 007/rpc.rst 008/rpc.rst shell/rpc.rst shell/p2p_api.rst
-	@-rm -Rf api/tezos-*.html 007/tezos-*.html 008/tezos-*.html
+	@-rm -Rf api/tezos-*.html api/tezos-*.txt 007/tezos-*.html 008/tezos-*.html
