@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Local := Tezos_storage_memory.Context
+
 (** The size of a tree, for logging *)
 val raw_context_size : Tezos_shell_services.Block_services.raw_context -> int
 
@@ -75,19 +77,21 @@ module RequestsTree : REQUESTS_TREE
 module type M = sig
   (** Whether the key is mapped to a directory *)
   val proxy_dir_mem :
-    Proxy.proxy_getter_input -> Proxy_context.M.key -> bool tzresult Lwt.t
+    Proxy.proxy_getter_input -> Local.key -> bool tzresult Lwt.t
 
   (** The value to which a key maps *)
   val proxy_get :
-    Proxy.proxy_getter_input ->
-    Proxy_context.M.key ->
-    Proxy_context.M.tree option tzresult Lwt.t
+    Proxy.proxy_getter_input -> Local.key -> Local.tree option tzresult Lwt.t
 
   (** Whether the key is mapped to a value *)
-  val proxy_mem :
-    Proxy.proxy_getter_input -> Proxy_context.M.key -> bool tzresult Lwt.t
+  val proxy_mem : Proxy.proxy_getter_input -> Local.key -> bool tzresult Lwt.t
 end
 
 (** Functor to obtain the implementation of [M] for the proxy
     mode (as opposed to the light mode implementation) *)
 module MakeProxy (X : Proxy_proto.PROTO_RPC) : M
+
+(** Exposed for testing purpose only, you should not use it directly *)
+module Internal : sig
+  module Tree : Proxy.TREE with type t = Local.tree with type key = Local.key
+end

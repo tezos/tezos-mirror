@@ -42,7 +42,7 @@ module M : sig
 
   type value = Bytes.t (* as in environment_context.mli *)
 
-  type tree = [`Value of bytes | `Tree of tree TzString.Map.t]
+  type tree = Tezos_storage_memory.Context.tree
 
   module type ProxyDelegate = sig
     (** Whether [mem] would return Some Dir _ *)
@@ -56,8 +56,6 @@ module M : sig
   end
 
   type proxy_delegate = (module ProxyDelegate)
-
-  val tree_size : tree -> int
 
   val empty : tree
 

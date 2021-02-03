@@ -34,27 +34,32 @@
     a mock of [PROTO_RPC]. It tests the basic behavior of the API. *)
 
 module StringMap = TzString.Map
+module Local = Tezos_storage_memory.Context
 
-let rec nb_nodes = function
-  | `Value _ ->
-      1
-  | `Tree dir ->
-      StringMap.fold (fun _ v i -> i + nb_nodes v) dir 1
+(** Alias to make "empty list" intention more explicit *)
+let tree_root = []
 
-let nb_nodes = function None -> 0 | Some t -> nb_nodes t
+let tree_testable = Alcotest.testable Local.Tree.pp Local.Tree.equal
+
+let nb_nodes = function
+  | None ->
+      Lwt.return 0
+  | Some tree ->
+      Local.Tree.fold tree tree_root ~init:0 ~f:(fun _ _ acc ->
+          Lwt.return (acc + 1))
 
 module type MOCKED_PROTO_RPC = sig
   include Tezos_proxy.Proxy_proto.PROTO_RPC
 
-  val calls : Proxy_context.M.key Stack.t
+  val calls : Local.key Stack.t
 end
 
 (** Setup mocks *)
 let mock_proto_rpc () =
   ( module struct
-    let calls : Proxy_context.M.key Stack.t = Stack.create ()
+    let calls : Local.key Stack.t = Stack.create ()
 
-    let split_key (k : Proxy_context.M.key) =
+    let split_key (k : Local.key) =
       match k with
       (* These constants are used in tests below *)
       | "split" :: "key" :: "trigger_now!" :: tail ->
@@ -62,7 +67,7 @@ let mock_proto_rpc () =
       | _ ->
           None
 
-    let do_rpc _chain_n_block (k : Proxy_context.M.key) =
+    let do_rpc _chain_n_block (k : Local.key) =
       let rec mock_raw_context = function
         | [] ->
             Tezos_shell_services.Block_services.Key Bytes.empty
@@ -140,15 +145,17 @@ let test_do_rpc_no_longer_key () =
   let module MockedGetter = Tezos_proxy.Proxy_getter.MakeProxy (MockedProtoRPC) in
   MockedGetter.proxy_get mock_input ["A"; "b"; "1"]
   >>=? fun a_b_1_tree_opt ->
+  nb_nodes a_b_1_tree_opt
+  >>= fun nb_nodes_a_b_1_tree_opt ->
   lwt_assert_true
     "A;b;1 is mapped to tree of size 4"
-    (nb_nodes a_b_1_tree_opt = 4)
+    (nb_nodes_a_b_1_tree_opt = 4)
   >>= fun _ ->
   let a_b_1_tree = WithExceptions.Option.get ~loc:__LOC__ a_b_1_tree_opt in
   MockedGetter.proxy_get mock_input ["A"; "b"; "1"]
   >>=? fun a_b_1_tree_opt' ->
   let a_b_1_tree' = WithExceptions.Option.get ~loc:__LOC__ a_b_1_tree_opt' in
-  lwt_assert_true "Tree is physically cached" (a_b_1_tree == a_b_1_tree')
+  lwt_check tree_testable "Tree is always the same" a_b_1_tree a_b_1_tree'
   >>= fun _ ->
   lwt_assert_true "Done one RPC" (Stack.length MockedProtoRPC.calls = 1)
   >>= fun _ ->
@@ -160,7 +167,11 @@ let test_do_rpc_no_longer_key () =
   MockedGetter.proxy_get mock_input ["A"; "b"; "1"]
   >>=? fun a_b_1_tree_opt' ->
   let a_b_1_tree' = WithExceptions.Option.get ~loc:__LOC__ a_b_1_tree_opt' in
-  lwt_assert_true "Orthogonal tree stayed the same" (a_b_1_tree == a_b_1_tree')
+  lwt_check
+    tree_testable
+    "Orthogonal tree stayed the same"
+    a_b_1_tree
+    a_b_1_tree'
   >>= fun _ ->
   MockedGetter.proxy_get mock_input ["A"]
   >>= fun _ ->
@@ -178,11 +189,15 @@ let test_do_rpc_no_longer_key () =
      We can hence check that A;b;1 was affected by witnessing it's None now. *)
   MockedGetter.proxy_get mock_input ["A"; "b"; "1"]
   >>=? fun a_b_1_tree_opt' ->
-  lwt_assert_true "A;b;1 tree is now missing" (nb_nodes a_b_1_tree_opt' = 0)
+  nb_nodes a_b_1_tree_opt'
+  >>= fun nb_nodes_a_b_1_tree_opt' ->
+  lwt_assert_true "A;b;1 tree is now missing" (nb_nodes_a_b_1_tree_opt' = 0)
   >>= fun _ ->
-  Stdlib.print_endline @@ string_of_int @@ nb_nodes a_opt ;
+  nb_nodes a_opt
+  >>= fun nb_nodes_a_opt ->
+  Stdlib.print_endline @@ string_of_int @@ nb_nodes_a_opt ;
   (* Size is 2 because mock_tree returns a tree rooted with a Dir, it's normal *)
-  lwt_assert_true "A is mapped to tree of size 2" (nb_nodes a_opt = 2)
+  lwt_assert_true "A is mapped to tree of size 2" (nb_nodes_a_opt = 2)
   >>= fun _ -> return_unit
 
 let test_split_key_triggers () =
@@ -194,11 +209,11 @@ let test_split_key_triggers () =
   >>= fun _ ->
   lwt_assert_true "Done one RPC" (Stack.length MockedProtoRPC.calls = 1)
   >>= fun _ ->
-  lwt_assert_true
+  lwt_check
+    Alcotest.(list string)
     "Done split;key;trigger_now!, not the longer key"
-    ( Stack.copy MockedProtoRPC.calls
-    |> Stack.pop
-    = ["split"; "key"; "trigger_now!"] )
+    (Stack.copy MockedProtoRPC.calls |> Stack.pop)
+    ["split"; "key"; "trigger_now!"]
   >>= fun _ -> return_unit
 
 let () =
@@ -206,7 +221,6 @@ let () =
     "tezos-proxy"
     [ ( "all",
         [ Alcotest_lwt.test_case "RequestsTree" `Quick test_tree;
-          Test_services.tztest "test do_rpc->None" `Quick test_do_rpc_none;
           Test_services.tztest "test do_rpc" `Quick test_do_rpc_no_longer_key;
           Test_services.tztest
             "test split key triggers"

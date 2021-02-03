@@ -171,7 +171,7 @@ module type S = sig
          and type tree := tree
 
     (** [pp] is the pretty-printer for trees. *)
-    val pp : tree Fmt.t
+    val pp : Format.formatter -> tree -> unit
 
     (** {2 Data Encoding} *)
 

@@ -45,7 +45,7 @@ module type S = sig
          and type value := value
          and type tree := tree
 
-    val pp : tree Fmt.t
+    val pp : Format.formatter -> tree -> unit
   end
 
   val set_protocol : t -> Protocol_hash.t -> t Lwt.t

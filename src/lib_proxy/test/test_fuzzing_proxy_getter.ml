@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,48 +23,46 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Code that is used both by protocol-dependent code
-    and by other code. Note that we don't want this code
-    in proxy_proto.ml because it's independent from the protocol
-    and we neither want this code in proxy_getter.ml, because
-    it would create a cyclic dependency between proxy_proto.ml
-    and proxy_getter.ml *)
+(** Testing
+    -------
+    Component:    Proxy getter
+    Invocation:   dune build @src/lib_proxy/runtest
+    Subject:      Fuzzing tests of internals of the client's --mode proxy
+*)
 
 module Local = Tezos_storage_memory.Context
+module Proxy_getter = Tezos_proxy.Proxy_getter
 
-type proxy_getter_input = {
-  rpc_context : RPC_context.simple;
-  chain : Tezos_shell_services.Block_services.chain;
-  block : Tezos_shell_services.Block_services.block;
-}
+let tree_path_gen = Crowbar.list Crowbar.bytes
 
-(** The result of setting a leaf. A mutation if done in place, otherwise
-    a fresh value. We need this type because the proxy implementation
-    returns a value whereas the light mode's implementation
-    performs a mutation (because of Irmin under the hood). *)
-type 'a update = Mutation | Value of 'a
+let leaf_data_gen = Crowbar.map [Crowbar.bytes] Bytes.of_string
 
-module type TREE = sig
-  type t
+(** [Tree.set_leaf] then [Tree.get] should return the inserted data *)
+let test_set_leaf_get (tree_path : string list) leaf_data =
+  let module Tree = Proxy_getter.Internal.Tree in
+  let expected = leaf_data in
+  let actual_lwt =
+    Tree.set_leaf
+      Tree.empty
+      tree_path
+      (Tezos_shell_services.Block_services.Key leaf_data)
+    >>= (function
+          | Ok (Value updated_tree) ->
+              Tree.get updated_tree tree_path
+          | _ ->
+              assert false)
+    >>= function
+    | None ->
+        assert false
+    | Some result_tree -> (
+        Local.Tree.to_value result_tree
+        >|= function None -> assert false | Some bytes -> bytes )
+  in
+  let actual = Lwt_main.run actual_lwt in
+  Crowbar.check_eq expected actual
 
-  type key
-
-  val empty : t
-
-  val get : t -> key -> Proxy_context.M.tree option Lwt.t
-
-  val set_leaf :
-    t ->
-    key ->
-    Tezos_shell_services.Block_services.raw_context ->
-    t update tzresult Lwt.t
-end
-
-(** Module used by implementations of [Proxy_getter.M]. *)
-module type CORE = sig
-  (* Get the data associated to the given key *)
-  val get : Local.key -> Local.tree option Lwt.t
-
-  (* Retrieves the data for the given key *)
-  val do_rpc : proxy_getter_input -> Local.key -> unit tzresult Lwt.t
-end
+let () =
+  Crowbar.add_test
+    ~name:"[Tree.set_leaf] then [Tree.get] should return the inserted data"
+    [tree_path_gen; leaf_data_gen]
+    test_set_leaf_get

@@ -30,7 +30,7 @@ module M = struct
 
   type value = Local.value
 
-  type tree = [`Value of bytes | `Tree of tree TzString.Map.t]
+  type tree = Local.tree
 
   module type ProxyDelegate = sig
     val proxy_dir_mem : key -> bool tzresult Lwt.t
@@ -46,15 +46,7 @@ module M = struct
      behave like [Memory_context]. *)
   type t = {proxy : proxy_delegate option; local : Local.t}
 
-  let rec tree_size_aux acc = function
-    | `Value _ ->
-        acc + 1
-    | `Tree t ->
-        TzString.Map.fold (fun _ t acc -> tree_size_aux (acc + 1) t) t acc
-
-  let tree_size = tree_size_aux 0
-
-  let empty = `Tree TzString.Map.empty
+  let empty = Local.Tree.empty Local.empty
 end
 
 module C = struct
@@ -122,7 +114,7 @@ module C = struct
                 L.(S.emit delegation_error ("get", err))
                 >>= fun () -> Lwt.return_none
             | Ok x ->
-                Lwt.return (Option.map Local.Tree.of_raw x) ) )
+                Lwt.return x ) )
 
   let raw_mem_aux kind (t : tree) k =
     Local.Tree.find_tree t.tree k

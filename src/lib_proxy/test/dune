@@ -1,10 +1,11 @@
 (executables
- (names test_proxy)
+ (names test_proxy test_fuzzing_proxy_getter)
  (libraries
   tezos-base
   tezos-stdlib-unix
   tezos-proxy
   tezos-test-services
+  crowbar
   alcotest-lwt)
  (flags
   (:standard -open Tezos_base__TzPervasives -open Tezos_test_services)))
@@ -15,8 +16,14 @@
   (run %{exe:test_proxy.exe})))
 
 (rule
+ (alias runtest_proxy_fuzzing)
+ (action
+  (run %{exe:test_fuzzing_proxy_getter.exe})))
+
+(rule
  (alias runtest)
  (package tezos-proxy)
  (deps
-  (alias runtest_proxy))
+  (alias runtest_proxy)
+  (alias runtest_proxy_fuzzing))
  (action progn))
