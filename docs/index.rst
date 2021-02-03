@@ -126,6 +126,7 @@ in the :ref:`introduction <howtoget>`.
    user/multisig
    user/fa12
    user/various
+   user/logging
 
 .. toctree::
    :maxdepth: 2
@@ -199,6 +200,7 @@ in the :ref:`introduction <howtoget>`.
    developer/entering_alpha
    developer/protocol_environment
    developer/protocol_environment_upgrade
+   developer/event_logging_framework
    developer/testing_index
    developer/profiling
    developer/snoop
