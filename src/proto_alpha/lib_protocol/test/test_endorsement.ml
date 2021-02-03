@@ -455,7 +455,7 @@ let test_unwrapped_endorsement () =
       | _ ->
           false)
 
-(** Apply an endorsement with a wrong slot in its slot bearing wrapper. *)
+(** Apply an endorsement with an invalid slot in its slot bearing wrapper. *)
 let test_bad_slot_wrapper () =
   Context.init 5
   >>=? fun (b, _) ->
@@ -489,6 +489,39 @@ let test_neg_slot_wrapper () =
         "negative slot wrapper should not be accepted by the binary format")
     (function
       | Data_encoding.Binary.Write_error _ -> return_unit | e -> Lwt.fail e)
+
+(** Apply an endorsement with a non-normalized slot in its slot bearing wrapper. *)
+let test_non_normalized_slot_wrapper () =
+  Context.init 5
+  >>=? fun (b, _) ->
+  Context.get_endorsers (B b)
+  >>=? fun endorsers ->
+  (* find an endorsers with more than 1 slot *)
+  let endorser =
+    WithExceptions.Option.get ~loc:__LOC__
+    @@ List.find
+         (fun endorser ->
+           List.length endorser.Delegate_services.Endorsing_rights.slots > 1)
+         endorsers
+  in
+  let (delegate, slots) = (endorser.delegate, endorser.slots) in
+  (* the first slot should be the smallest slot *)
+  Assert.equal_int
+    ~loc:__LOC__
+    (WithExceptions.Option.get ~loc:__LOC__ @@ List.hd endorser.slots)
+    ( WithExceptions.Option.get ~loc:__LOC__
+    @@ List.hd (List.sort compare endorser.slots) )
+  >>=? fun () ->
+  Op.endorsement_with_slot ~delegate:(delegate, List.rev slots) (B b) ()
+  >>=? fun op ->
+  let policy = Block.Excluding [delegate] in
+  Block.bake ~policy ~operations:[Operation.pack op] b
+  >>= fun res ->
+  Assert.proto_error ~loc:__LOC__ res (function
+      | Baking.Unexpected_endorsement_slot _ ->
+          true
+      | _ ->
+          false)
 
 (** Wrong endorsement predecessor : apply an endorsement with an
     incorrect block predecessor. *)
@@ -707,13 +740,17 @@ let tests =
       `Quick
       test_unwrapped_endorsement;
     Test_services.tztest
-      "Endorsement wrongly wrapped"
+      "Endorsement wrapped with invalid slot"
       `Quick
       test_bad_slot_wrapper;
     Test_services.tztest
       "Endorsement wrapped with slot -1"
       `Quick
       test_neg_slot_wrapper;
+    Test_services.tztest
+      "Endorsement wrapped with non-normalized slot"
+      `Quick
+      test_non_normalized_slot_wrapper;
     Test_services.tztest "Maximum endorsement" `Quick test_max_endorsement;
     Test_services.tztest
       "Consistent priorities"
