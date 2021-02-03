@@ -13,7 +13,7 @@ build: [
 
 depends: [
   "ocaml" { >= "4.08" }
-  "dune" { >= "1.7" }
+  "dune" { >= "1.11" }
   "uri" {>= "1.9.0" }
   "resto-cohttp-client" {= version }
   "resto-cohttp-server" {= version }

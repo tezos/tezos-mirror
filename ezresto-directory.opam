@@ -13,7 +13,7 @@ build: [
 
 depends: [
   "ocaml" { >= "4.08" }
-  "dune" { >= "1.7" }
+  "dune" { >= "1.11" }
   "ezresto" {= version }
   "resto-directory" {= version }
   "resto" {= version }
