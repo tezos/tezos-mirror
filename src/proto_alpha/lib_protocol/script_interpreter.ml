@@ -198,6 +198,7 @@ let rec interp_stack_prefix_preserving_operation :
       >|=? fun (rest', result) -> ((v, rest'), result)
   | (Rest, v) ->
       f v
+ [@@coq_axiom_with_reason "gadt"]
 
 type step_constants = {
   source : Contract.t;
@@ -1446,6 +1447,7 @@ let rec step_bounded :
         else None
       in
       logged_return ((result, rest), ctxt)
+ [@@coq_axiom_with_reason "gadt"]
 
 let step :
     type b a.
@@ -1471,6 +1473,7 @@ let interp :
   Log.log_interp ctxt code stack ;
   step logger ctxt step_constants code stack
   >|=? fun ((ret, ()), ctxt) -> (ret, ctxt)
+ [@@coq_axiom_with_reason "gadt"]
 
 (* ---- contract handling ---------------------------------------------------*)
 let execute logger ctxt mode step_constants ~entrypoint ~internal

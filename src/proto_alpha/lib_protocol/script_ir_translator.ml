@@ -2703,6 +2703,7 @@ let find_entrypoint_for_type (type full exp) ~legacy ~(full : full ty)
       >>? fun (_, Ex_ty ty) ->
       merge_types ~legacy ctxt loc ty expected
       >>? fun (Eq, ty, ctxt) -> ok (ctxt, entrypoint, (ty : exp ty))
+  [@@coq_axiom_with_reason "cast on err"]
 
 module Entrypoints = Set.Make (String)
 
@@ -6630,6 +6631,7 @@ let list_entrypoints (type full) (full : full ty) ctxt ~root_name =
         (Entrypoints_map.singleton name ([], unparsed_full), true)
   in
   fold_tree full [] reachable ([], init)
+  [@@coq_axiom_with_reason "unsupported syntax"]
 
 (* ---- Unparsing (Typed IR -> Untyped expressions) --------------------------*)
 
