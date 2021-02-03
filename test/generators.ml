@@ -341,7 +341,11 @@ let full_rangedint low high : int full =
   assert (low < high) ;
   make_int
     (RangedInt (low, high))
-    Crowbar.(map [range (high - low)] (fun v -> v + low))
+    Crowbar.(
+      if low < 0 && high > 0 then
+        (* special casing this avoids overflow on 32bit machines *)
+        choose [range high; map [range (-low)] (fun v -> -v)]
+      else map [range (high - low)] (fun v -> v + low))
     (Data_encoding.ranged_int low high)
 
 let full_int32 : int32 full =
