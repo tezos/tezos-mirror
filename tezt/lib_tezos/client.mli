@@ -219,6 +219,7 @@ val bake_for :
   ?mempool:string ->
   ?force:bool ->
   ?context_path:string ->
+  ?protocol:Protocol.t ->
   t ->
   unit Lwt.t
 
@@ -230,6 +231,7 @@ val spawn_bake_for :
   ?mempool:string ->
   ?force:bool ->
   ?context_path:string ->
+  ?protocol:Protocol.t ->
   t ->
   Process.t
 

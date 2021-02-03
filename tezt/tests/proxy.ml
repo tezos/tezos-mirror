@@ -42,6 +42,40 @@ let init ~protocol () =
   Lwt.return (node, client)
 
 (** Test.
+    Test that [tezos-client --mode proxy --protocol P] fails
+    when the endpoint's protocol is not [P].
+ *)
+let test_wrong_proto protocol =
+  Test.register
+    ~__FILE__
+    ~title:(Printf.sprintf "wrong proto (%s)" (Protocol.name protocol))
+    ~tags:[Protocol.tag protocol; "proxy"; "bake"]
+  @@ fun () ->
+  let* node = Node.init [] in
+  let* client = Client.init ~node () in
+  let* () = Client.activate_protocol ~protocol client in
+  Log.info "Activated protocol." ;
+  let* () = Client.bake_for client in
+  Log.info "Baked once: the protocol is now %s." (Protocol.name protocol) ;
+  Client.set_mode (Proxy node) client ;
+  let other_proto = List.find (( <> ) protocol) Protocol.all_protocols in
+  let* stderr =
+    Client.spawn_bake_for ~protocol:other_proto client
+    |> Process.check_and_read_stderr ~expect_failure:true
+  in
+  let matches re s = try Re.Str.search_forward re s 0 >= 0 with _ -> false in
+  let regexp =
+    Re.Str.regexp
+    @@ Format.sprintf
+         "Protocol passed to the proxy (%s) and protocol of the node (%s) \
+          differ"
+         (Protocol.hash other_proto)
+         (Protocol.hash protocol)
+  in
+  if matches regexp stderr then return ()
+  else Test.fail "Did not fail as expected: %s" stderr
+
+(** Test.
     Bake a few blocks in proxy mode.
  *)
 let test_bake protocol =
@@ -307,5 +341,6 @@ end
 let register protocol =
   test_bake protocol ;
   test_transfer protocol ;
+  test_wrong_proto protocol ;
   Location.test_locations_proxy protocol ;
   Location.test_compare_proxy protocol

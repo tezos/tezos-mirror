@@ -272,19 +272,22 @@ let activate_protocol ?node ~protocol ?fitness ?key ?timestamp ?timestamp_delay
   |> Process.check
 
 let spawn_bake_for ?node ?(key = Constant.bootstrap1.alias)
-    ?(minimal_timestamp = true) ?mempool ?force ?context_path client =
+    ?(minimal_timestamp = true) ?mempool ?force ?context_path ?protocol client
+    =
   spawn_command
     ?node
     client
     ( ["bake"; "for"; key]
     @ (if minimal_timestamp then ["--minimal-timestamp"] else [])
-    @ ( match mempool with
-      | None ->
-          []
-      | Some mempool_json ->
-          ["--mempool"; mempool_json] )
+    @ Option.fold
+        ~none:[]
+        ~some:(fun mempool_json -> ["--mempool"; mempool_json])
+        mempool
     @ (match force with None | Some false -> [] | Some true -> ["--force"])
-    @ match context_path with None -> [] | Some path -> ["--context"; path] )
+    @ Option.fold ~none:[] ~some:(fun path -> ["--context"; path]) context_path
+    )
+  @ Option.fold ~none:[] ~some:(fun p ->
+        ["--protocol"; Protocol.hash p] protocol)
 
 let bake_for ?node ?key ?minimal_timestamp ?mempool ?force ?context_path client
     =
@@ -295,6 +298,7 @@ let bake_for ?node ?key ?minimal_timestamp ?mempool ?force ?context_path client
     ?mempool
     ?force
     ?context_path
+    ?protocol
     client
   |> Process.check
 

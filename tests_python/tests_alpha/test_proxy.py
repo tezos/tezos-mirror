@@ -1,12 +1,13 @@
 """ This file tests the proxy mode (tezos-client --mode proxy)
 """
+import re
 import time
 from typing import List, Tuple
-import re
+
 import pytest
 from client.client import Client
-from . import protocol
 
+from . import protocol
 
 # Protocol-dependent stuff is these three constants:
 _OTHER_PROTO = protocol.PREV_HASH
@@ -66,21 +67,6 @@ def proxy_client(sandbox):
     sandbox.init_client(result, node)
 
     return result  # Test depending on this fixture executes here
-
-
-def test_wrong_proto(proxy_client):
-    """Test that tezos-client --mode proxy --protocol P fails
-    when the endpoint's protocol is NOT P"""
-    # The chosen protocol must differ from the protocol
-    # initialized by the proxy_client fixture
-    cmd = ["--protocol", _OTHER_PROTO, "bake", "for", "bootstrap1"]
-    (_, stderr, return_code) = proxy_client.run_generic(cmd, check=False)
-    assert return_code != 0
-    err_msg = (
-        f"Protocol passed to the proxy ({_OTHER_PROTO})"
-        + f" and protocol of the node ({_PROTO}) differ"
-    )
-    assert err_msg in stderr
 
 
 @pytest.mark.slow
