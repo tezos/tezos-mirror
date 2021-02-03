@@ -81,9 +81,37 @@ module type V2 = sig
             'shell_error Error_monad.trace
        and module Sapling = Tezos_sapling.Core.Validator
 
+  (** An [Ecoproto_error e] is a shell error that carry a protocol error.
+
+      Each protocol has its own error-monad (instantiated when this module here
+      is applied) with a fresh extensible error type. This protocol-specific
+      error type is incompatible with the shell's. The [Ecoproto_error]
+      constructor belongs to the shell's error type and it carries the errors of
+      the protocol's specific error type back into the shell's.
+
+      The function [wrap_tz*] below provide wrappers for three different levels:
+      errors, traces, and tzresults. They are used within the implementation of
+      the environment to translate some return values from the protocol's error
+      monad into the shell's. They are exported because they can be useful for
+      writing tests for the protocol (i.e., for the tests located in
+      [src/proto_*/lib_protocol/test/]) and for writing protocol-specific
+      support libraries and binaries (i.e., for the code in
+      [src/proto_*/lib_{client,delegate,etc.}]). *)
   type error += Ecoproto_error of Error_monad.error
 
-  val wrap_error : 'a Error_monad.tzresult -> 'a tzresult
+  (** [wrap_tzerror e] is a shell error wrapping the protocol error [e].
+      (It is [Ecoproto_error e].) *)
+  val wrap_tzerror : Error_monad.error -> error
+
+  (** [wrap_tztrace t] is a shell trace composed of the wrapped errors of the
+      protocol trace [t]. *)
+  val wrap_tztrace : Error_monad.error Error_monad.trace -> error trace
+
+  (** [wrap_tzresult r] is a shell tzresult that carries the same result as or a
+      wrapped trace of the protocol tzresult [r].
+      (It is [Ok x] if [r] is [Ok x], it is [Error (wrap_tztrace t)] if [r] is
+      [Error t].) *)
+  val wrap_tzresult : 'a Error_monad.tzresult -> 'a tzresult
 
   module Lift (P : Updater.PROTOCOL) :
     PROTOCOL
