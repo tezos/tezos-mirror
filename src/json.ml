@@ -92,7 +92,9 @@ let bytes_jsont =
           String
             {
               str_format = None;
-              pattern = Some "^[a-zA-Z0-9]+$";
+              (* hex encoding uses two hex-digits for each byte, leading to the
+                 following regexp *)
+              pattern = Some "^([a-zA-Z0-9][a-zA-Z0-9])*$";
               min_length = 0;
               max_length = None;
             };
@@ -102,9 +104,11 @@ let bytes_jsont =
   in
   conv
     ~schema
-    Hex.of_bytes
-    (wrap_error Hex.to_bytes)
-    (conv (fun (`Hex h) -> h) (fun h -> `Hex h) string)
+    (fun h ->
+      let (`Hex s) = Hex.of_bytes h in
+      s)
+    (fun h -> wrap_error Hex.to_bytes (`Hex h))
+    string
 
 let check_utf8 s =
   Uutf.String.fold_utf_8
