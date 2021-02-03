@@ -239,7 +239,7 @@ module Encoding = struct
         }
           -> 'kind case
 
-    let reveal_case =
+    let[@coq_axiom_with_reason "gadt"] reveal_case =
       MCase
         {
           tag = 0;
@@ -277,7 +277,7 @@ module Encoding = struct
             (fun s -> Some s)
             (fun s -> s) ]
 
-    let transaction_case =
+    let[@coq_axiom_with_reason "gadt"] transaction_case =
       MCase
         {
           tag = 1;
@@ -316,7 +316,7 @@ module Encoding = struct
               Transaction {amount; destination; parameters; entrypoint});
         }
 
-    let origination_case =
+    let[@coq_axiom_with_reason "gadt"] origination_case =
       MCase
         {
           tag = 2;
@@ -346,7 +346,7 @@ module Encoding = struct
               Origination {credit; delegate; script; preorigination = None});
         }
 
-    let delegation_case =
+    let[@coq_axiom_with_reason "gadt"] delegation_case =
       MCase
         {
           tag = 3;
@@ -401,7 +401,7 @@ module Encoding = struct
         inj = (fun level -> Endorsement {level});
       }
 
-  let endorsement_encoding =
+  let[@coq_axiom_with_reason "gadt"] endorsement_encoding =
     let make (Case {tag; name; encoding; select = _; proj; inj}) =
       case (Tag tag) name encoding (fun o -> Some (proj o)) (fun x -> inj x)
     in
@@ -426,7 +426,7 @@ module Encoding = struct
                   @@ union [make endorsement_case] ))
                (varopt "signature" Signature.encoding)))
 
-  let seed_nonce_revelation_case =
+  let[@coq_axiom_with_reason "gadt"] seed_nonce_revelation_case =
     Case
       {
         tag = 1;
@@ -442,7 +442,8 @@ module Encoding = struct
         inj = (fun (level, nonce) -> Seed_nonce_revelation {level; nonce});
       }
 
-  let endorsement_with_slot_case : Kind.endorsement_with_slot case =
+  let[@coq_axiom_with_reason "gadt"] endorsement_with_slot_case :
+      Kind.endorsement_with_slot case =
     Case
       {
         tag = 10;
@@ -462,8 +463,8 @@ module Encoding = struct
             Endorsement_with_slot {endorsement; slot});
       }
 
-  let double_endorsement_evidence_case : Kind.double_endorsement_evidence case
-      =
+  let[@coq_axiom_with_reason "gadt"] double_endorsement_evidence_case :
+      Kind.double_endorsement_evidence case =
     Case
       {
         tag = 2;
@@ -487,7 +488,7 @@ module Encoding = struct
             Double_endorsement_evidence {op1; op2; slot});
       }
 
-  let double_baking_evidence_case =
+  let[@coq_axiom_with_reason "gadt"] double_baking_evidence_case =
     Case
       {
         tag = 3;
@@ -503,7 +504,7 @@ module Encoding = struct
         inj = (fun (bh1, bh2) -> Double_baking_evidence {bh1; bh2});
       }
 
-  let activate_account_case =
+  let[@coq_axiom_with_reason "gadt"] activate_account_case =
     Case
       {
         tag = 4;
@@ -522,7 +523,7 @@ module Encoding = struct
           (fun (id, activation_code) -> Activate_account {id; activation_code});
       }
 
-  let proposals_case =
+  let[@coq_axiom_with_reason "gadt"] proposals_case =
     Case
       {
         tag = 5;
@@ -542,7 +543,7 @@ module Encoding = struct
             Proposals {source; period; proposals});
       }
 
-  let ballot_case =
+  let[@coq_axiom_with_reason "gadt"] ballot_case =
     Case
       {
         tag = 6;
@@ -593,7 +594,7 @@ module Encoding = struct
     Manager_operation
       {source; fee; counter; gas_limit; storage_limit; operation}
 
-  let make_manager_case tag (type kind)
+  let[@coq_axiom_with_reason "gadt"] make_manager_case tag (type kind)
       (Manager_operations.MCase mcase : kind Manager_operations.case) =
     Case
       {
