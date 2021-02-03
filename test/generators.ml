@@ -28,9 +28,9 @@ let char = Crowbar.map [Crowbar.uint8] Char.chr
 let int31 : int Crowbar.gen =
   let open Crowbar in
   map [int32] (fun i32 ->
-      let i = Int32.to_int i32 in
-      guard (-(1 lsl 30) <= i && i <= (1 lsl 30) - 1) ;
-      i)
+      let open Int32 in
+      guard (neg (shift_left 1l 30) <= i32 && i32 <= sub (shift_left 1l 30) 1l) ;
+      Int32.to_int i32)
 
 let string = Crowbar.bytes
 
