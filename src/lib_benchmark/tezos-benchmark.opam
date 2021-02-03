@@ -13,7 +13,7 @@ depends: [
   "tezos-stdlib-unix"
   "tezos-micheline"
   "tezos-clic"
-  "data-encoding"
+  "data-encoding" { >= "0.3" & < "0.4" }
   "staTz"
   "benchmark-utils"
   "pyml-plot"

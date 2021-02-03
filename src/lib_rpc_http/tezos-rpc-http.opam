@@ -9,8 +9,8 @@ depends: [
   "tezos-tooling" { with-test }
   "dune" { >= "2.0" }
   "tezos-base"
-  "resto-directory" { = "0.5" }
-  "resto-cohttp" { = "0.5" }
+  "resto-directory" { >= "0.6" & < "0.7" }
+  "resto-cohttp" { >= "0.6" & < "0.7" }
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

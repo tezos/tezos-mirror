@@ -9,9 +9,9 @@ depends: [
   "tezos-tooling" { with-test }
   "dune" { >= "2.0" }
   "tezos-error-monad"
-  "data-encoding" { = "0.2" }
-  "resto" { = "0.5" }
-  "resto-directory" { = "0.5" }
+  "data-encoding" { >= "0.3" & < "0.4" }
+  "resto" { >= "0.6" & < "0.7" }
+  "resto-directory" { >= "0.6" & < "0.7" }
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
