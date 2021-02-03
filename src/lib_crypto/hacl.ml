@@ -578,12 +578,5 @@ module P256 : SIGNATURE = struct
 
   let verify ~pk:(Pk pk) ~msg ~signature =
     if Bytes.length signature <> size then false
-    else
-      (* Temporary: use [Uecc] verify function to prevent performance
-         regression. *)
-      match Uecc.pk_of_bytes pk with
-      | Some pk ->
-          Uecc.verify pk ~msg ~signature
-      | None ->
-          false
+    else Hacl.P256.verify pk msg signature
 end
