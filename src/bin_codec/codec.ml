@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let () = Additional_registrations.force_linking ()
+
 let commands = Commands.commands ()
 
 let home = try Sys.getenv "HOME" with Not_found -> "/tmp"

@@ -63,6 +63,7 @@ be documented here either.
 ## Codec
 
 - Add `--version` flag
+- Register N and Z
 
 ## Docker Images
 
