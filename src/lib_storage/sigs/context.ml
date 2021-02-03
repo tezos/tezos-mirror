@@ -170,6 +170,9 @@ module type S = sig
          and type value := value
          and type tree := tree
 
+    (** [pp] is the pretty-printer for trees. *)
+    val pp : tree Fmt.t
+
     (** {2 Data Encoding} *)
 
     (** The type for in-memory, raw contexts. *)

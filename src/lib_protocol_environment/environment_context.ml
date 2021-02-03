@@ -162,6 +162,8 @@ module Context = struct
 
   (* Tree *)
   module Tree = struct
+    let pp ppf (Tree {ops = (module Ops); tree; _}) = Ops.Tree.pp ppf tree
+
     let hash (Tree {ops = (module Ops); tree; _}) = Ops.Tree.hash tree
 
     let kind (Tree {ops = (module Ops); tree; _}) = Ops.Tree.kind tree

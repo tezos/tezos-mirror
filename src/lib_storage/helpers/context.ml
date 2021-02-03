@@ -38,6 +38,8 @@ module type DB =
 module Make_tree (Store : DB) = struct
   include Store.Tree
 
+  let pp = Irmin.Type.pp Store.tree_t
+
   let empty _ = Store.Tree.empty
 
   let equal = Irmin.Type.(unstage (equal Store.tree_t))

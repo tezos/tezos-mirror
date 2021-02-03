@@ -37,12 +37,16 @@ end
 module type S = sig
   include VIEW with type key = string list and type value = bytes
 
-  module Tree :
-    TREE
-      with type t := t
-       and type key := key
-       and type value := value
-       and type tree := tree
+  module Tree : sig
+    include
+      TREE
+        with type t := t
+         and type key := key
+         and type value := value
+         and type tree := tree
+
+    val pp : tree Fmt.t
+  end
 
   val set_protocol : t -> Protocol_hash.t -> t Lwt.t
 

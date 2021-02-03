@@ -232,6 +232,8 @@ module C = struct
   let fork_test_chain c ~protocol:_ ~expiration:_ = Lwt.return c
 
   module Tree = struct
+    let pp ppf t = Local.Tree.pp ppf t.tree
+
     let empty t = {proxy = None; path = []; tree = Local.Tree.empty t.M.local}
 
     let equal x y = Local.Tree.equal x.tree y.tree

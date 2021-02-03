@@ -43,6 +43,8 @@ module Make_tree (DB : DB) : sig
        and type value := DB.contents
        and type tree := DB.tree
 
+  val pp : DB.tree Fmt.t
+
   val empty : _ -> DB.tree
 
   val of_value : _ -> DB.contents -> DB.tree Lwt.t

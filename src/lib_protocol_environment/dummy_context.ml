@@ -33,6 +33,8 @@ module M = struct
   type tree = |
 
   module Tree = struct
+    let pp _ _ = assert false
+
     let hash _ = assert false
 
     let empty _ = assert false
