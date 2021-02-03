@@ -56,6 +56,13 @@ module Ed25519_Props =
     end)
     (Ed25519)
 
+module P256_Props =
+  Signature_Properties
+    (struct
+      let name = "P256"
+    end)
+    (P256_hacl)
+
 module Secp256k1_Props =
   Signature_Properties
     (struct
@@ -65,7 +72,7 @@ module Secp256k1_Props =
 
 (** Test: instantiate Signature_Properties over Signature
     with algo in generate key respectively set to
-    Ed25519, Secp256k1. *)
+    Ed25519, Secp256k1, P256. *)
 let () =
   let open Signature in
   let f (algo, name) =
@@ -83,4 +90,10 @@ let () =
     in
     ()
   in
-  List.iter f [(Ed25519, "Ed25519"); (Secp256k1, "Secp256k1")]
+  List.iter
+    f
+    [ (Ed25519, "Ed25519");
+      (Secp256k1, "Secp256k1")
+      (* TODO uncomment this once signature.ml moved to hacl for p256 *)
+      (* ; (P256, "P256") *)
+     ]
