@@ -36,6 +36,8 @@ type error += Unexpected_endorsement (* `Permanent *)
 
 type error += Invalid_endorsement_slot of int (* `Permanent *)
 
+type error += Unexpected_endorsement_slot of int (* `Permanent *)
+
 type error +=
   | Invalid_block_signature of Block_hash.t * Signature.Public_key_hash.t
 
@@ -138,7 +140,20 @@ let () =
         v)
     Data_encoding.(obj1 (req "slot" uint16))
     (function Invalid_endorsement_slot v -> Some v | _ -> None)
-    (fun v -> Invalid_endorsement_slot v)
+    (fun v -> Invalid_endorsement_slot v) ;
+  register_error_kind
+    `Permanent
+    ~id:"baking.unexpected_endorsement_slot"
+    ~title:"Endorsement slot not the smallest possible"
+    ~description:"The endorsement slot provided is not the smallest possible."
+    ~pp:(fun ppf v ->
+      Format.fprintf
+        ppf
+        "Endorsement slot %d provided is not the smallest possible."
+        v)
+    Data_encoding.(obj1 (req "slot" uint16))
+    (function Unexpected_endorsement_slot v -> Some v | _ -> None)
+    (fun v -> Unexpected_endorsement_slot v)
 
 let minimal_time c priority pred_timestamp =
   let priority = Int32.of_int priority in
@@ -262,8 +277,8 @@ let baking_priorities c level =
   f 0
 
 let endorsement_rights ctxt level =
-  fold_left_s
-    (fun acc slot ->
+  fold_right_s
+    (fun slot acc ->
       Roll.endorsement_rights_owner ctxt level ~slot
       >|=? fun pk ->
       let pkh = Signature.Public_key.hash pk in
@@ -275,8 +290,8 @@ let endorsement_rights ctxt level =
             (pk, slot :: slots, used)
       in
       Signature.Public_key_hash.Map.add pkh right acc)
-    Signature.Public_key_hash.Map.empty
     (0 --> (Constants.endorsers_per_block ctxt - 1))
+    Signature.Public_key_hash.Map.empty
 
 let check_endorsement_rights ctxt chain_id ~slot
     (op : Kind.endorsement Operation.t) =
@@ -302,7 +317,10 @@ let check_endorsement_rights ctxt chain_id ~slot
         | None ->
             fail Unexpected_endorsement (* unexpected *)
         | Some (_pk, slots, v) ->
-            return (pkh, slots, v) )
+            error_unless
+              Compare.Int.(slot = List.hd slots)
+              (Unexpected_endorsement_slot slot)
+            >>?= fun () -> return (pkh, slots, v) )
 
 let select_delegate delegate delegate_list max_priority =
   let rec loop acc l n =

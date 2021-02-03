@@ -178,7 +178,7 @@ val record_internal_nonce : t -> int -> t
 val internal_nonce_already_recorded : t -> int -> bool
 
 (** Returns a map where to each endorser's pkh is associated the list of its
-    endorsing slots (in decreasing order) for a given level. *)
+    endorsing slots (in increasing order) for a given level. *)
 val allowed_endorsements :
   t ->
   (Signature.Public_key.t * int list * bool) Signature.Public_key_hash.Map.t
