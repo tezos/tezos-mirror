@@ -38,19 +38,19 @@ tezt/_regressions/rpc/alpha.others.out
 
 ./tezos-client rpc get /chains/main/blocks/head/helpers/endorsing_rights
 [ { "level": 1, "delegate": "[PUBLIC_KEY_HASH]",
-    "slots": [ 31, 24, 23, 19, 17, 13, 2 ],
+    "slots": [ 2, 13, 17, 19, 23, 24, 31 ],
     "estimated_time": "[TIMESTAMP]" },
   { "level": 1, "delegate": "[PUBLIC_KEY_HASH]",
-    "slots": [ 22, 20, 15, 11, 6, 4, 0 ],
+    "slots": [ 0, 4, 6, 11, 15, 20, 22 ],
     "estimated_time": "[TIMESTAMP]" },
   { "level": 1, "delegate": "[PUBLIC_KEY_HASH]",
-    "slots": [ 28, 25, 18, 10, 8, 7, 1 ],
+    "slots": [ 1, 7, 8, 10, 18, 25, 28 ],
     "estimated_time": "[TIMESTAMP]" },
   { "level": 1, "delegate": "[PUBLIC_KEY_HASH]",
-    "slots": [ 30, 27, 16, 12, 5, 3 ],
+    "slots": [ 3, 5, 12, 16, 27, 30 ],
     "estimated_time": "[TIMESTAMP]" },
   { "level": 1, "delegate": "[PUBLIC_KEY_HASH]",
-    "slots": [ 29, 26, 21, 14, 9 ],
+    "slots": [ 9, 14, 21, 26, 29 ],
     "estimated_time": "[TIMESTAMP]" } ]
 
 ./tezos-client rpc get /chains/main/blocks/head/helpers/levels_in_current_cycle
