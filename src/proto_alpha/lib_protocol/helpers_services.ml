@@ -879,8 +879,9 @@ module Forge = struct
              {priority; seed_nonce_hash; proof_of_work_nonce}))
 
   module Manager = struct
-    let operations ctxt block ~branch ~source ?sourcePubKey ~counter ~fee
-        ~gas_limit ~storage_limit operations =
+    let[@coq_axiom_with_reason "cast on e"] operations ctxt block ~branch
+        ~source ?sourcePubKey ~counter ~fee ~gas_limit ~storage_limit
+        operations =
       Contract_services.manager_key ctxt block source
       >>= function
       | Error _ as e ->

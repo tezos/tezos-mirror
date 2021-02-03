@@ -293,7 +293,7 @@ let endorsement_rights ctxt level =
     (0 --> (Constants.endorsers_per_block ctxt - 1))
     Signature.Public_key_hash.Map.empty
 
-let check_endorsement_rights ctxt chain_id ~slot
+let[@coq_axiom_with_reason "gadt"] check_endorsement_rights ctxt chain_id ~slot
     (op : Kind.endorsement Operation.t) =
   if
     Compare.Int.(slot < 0 (* should not happen because of binary format *))
