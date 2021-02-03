@@ -497,10 +497,7 @@ module P256 : SIGNATURE = struct
         Pk pk
     | Sk sk ->
         let pk = Bytes.create pk_size_raw in
-        let pk_computed_ok = pk_of_sk sk pk in
-        if not (pk_computed_ok && valid_pk pk) then
-          failwith "P256.neuterize: failure" ;
-        Pk pk
+        if pk_of_sk sk pk then Pk pk else failwith "P256.neuterize: failure"
 
   (* This function accepts a buffer representing a public key in either the
    * compressed or the uncompressed form. *)
