@@ -53,7 +53,7 @@ module Cost_of = struct
 
   (* Upper-bound on the time to compare the given value.
      For now, returns size in bytes, but this could get more complicated... *)
-  let rec size_of_comparable :
+  let[@coq_axiom_with_reason "gadt"] rec size_of_comparable :
       type a. a Script_typed_ir.comparable_ty -> a -> S.may_saturate S.t =
    fun wit v ->
     match (wit, v) with
@@ -1083,8 +1083,8 @@ module Cost_of = struct
 
     let compare_chain_id = atomic_step_cost (S.safe_int 30)
 
-    let rec compare : type a. a Script_typed_ir.comparable_ty -> a -> a -> cost
-        =
+    let[@coq_axiom_with_reason "gadt"] rec compare :
+        type a. a Script_typed_ir.comparable_ty -> a -> a -> cost =
      fun ty x y ->
       match ty with
       | Unit_key _ ->
