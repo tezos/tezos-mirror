@@ -47,9 +47,9 @@ module Shielded_tez : sig
 end = struct
   include Tez
 
-  let ( +? ) a b = a +? b |> Environment.wrap_error
+  let ( +? ) a b = a +? b |> Environment.wrap_tzresult
 
-  let ( -? ) a b = a -? b |> Environment.wrap_error
+  let ( -? ) a b = a -? b |> Environment.wrap_tzresult
 
   let of_tez t =
     let i = Tez.to_mutez t in

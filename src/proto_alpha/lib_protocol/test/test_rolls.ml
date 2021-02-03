@@ -43,7 +43,7 @@ open Test_tez
 
 let account_pair = function [a1; a2] -> (a1, a2) | _ -> assert false
 
-let wrap e = Lwt.return (Environment.wrap_error e)
+let wrap e = Lwt.return (Environment.wrap_tzresult e)
 
 let traverse_rolls ctxt head =
   let rec loop acc roll =

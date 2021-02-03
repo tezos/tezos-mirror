@@ -73,13 +73,12 @@ let expand_all source ast errors =
     | Error () ->
         invalid_arg "Michelson_v1_parser.expand_all"
   in
-  match
-    Environment.wrap_error (Michelson_v1_primitives.prims_of_strings expanded)
-  with
+  match Michelson_v1_primitives.prims_of_strings expanded with
   | Ok expanded ->
       ( {source; unexpanded; expanded; expansion_table; unexpansion_table},
         errors @ expansion_errors )
   | Error errs ->
+      let errs = Environment.wrap_tztrace errs in
       ( {
           source;
           unexpanded;

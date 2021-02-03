@@ -31,7 +31,8 @@ type error += Failed_to_checkout_context
 
 type error += Invalid_context
 
-let ( >>=?? ) x k = x >>= fun x -> Lwt.return (Environment.wrap_error x) >>=? k
+let ( >>=?? ) x k =
+  x >>= fun x -> Lwt.return (Environment.wrap_tzresult x) >>=? k
 
 let () =
   register_error_kind

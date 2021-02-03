@@ -13,7 +13,10 @@ open Script_interpreter
 let ( >>=?? ) x y =
   x
   >>= function
-  | Ok s -> y s | Error _ as err -> Lwt.return @@ Environment.wrap_error err
+  | Ok s ->
+      y s
+  | Error err ->
+      Lwt.return @@ Error (Environment.wrap_tztrace err)
 
 let test_context () =
   Context.init 3

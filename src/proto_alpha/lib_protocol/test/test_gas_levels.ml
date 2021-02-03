@@ -55,7 +55,7 @@ let dummy_context () =
     ~timestamp:Time.Protocol.epoch
     ~fitness:[]
     (block.context : Environment_context.Context.t)
-  >|= Environment.wrap_error
+  >|= Environment.wrap_tzresult
 
 let test_detect_gas_exhaustion_in_fresh_context () =
   dummy_context ()

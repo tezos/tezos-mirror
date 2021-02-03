@@ -26,9 +26,12 @@ let expression_from_string str : Script.expr tzresult Lwt.t =
 let ( >>=?? ) x y =
   x
   >>= function
-  | Ok s -> y s | Error _ as err -> Lwt.return @@ Environment.wrap_error err
+  | Ok s ->
+      y s
+  | Error err ->
+      Lwt.return @@ Error (Environment.wrap_tztrace err)
 
-let wrap_error_lwt x = x >>= fun x -> Lwt.return @@ Environment.wrap_error x
+let wrap_error_lwt x = x >>= fun x -> Lwt.return @@ Environment.wrap_tzresult x
 
 let test_context () =
   Context.init 3
@@ -171,7 +174,7 @@ let test_parse_ty ctxt node expected =
   let allow_operation = true in
   let allow_contract = true in
   let allow_ticket = true in
-  Environment.wrap_error
+  Environment.wrap_tzresult
     ( Script_ir_translator.parse_ty
         ctxt
         ~legacy
@@ -268,7 +271,7 @@ let test_parse_comb_type () =
   >>?= fun _ -> return_unit
 
 let test_unparse_ty loc ctxt expected ty =
-  Environment.wrap_error
+  Environment.wrap_tzresult
     ( Script_ir_translator.unparse_ty ctxt ty
     >>? fun (actual, ctxt) ->
     if actual = expected then ok ctxt
@@ -386,7 +389,7 @@ let test_unparse_comb_type () =
 let test_unparse_comparable_ty loc ctxt expected ty =
   (* unparse_comparable_ty is not exported, the simplest way to call it is to
      call parse_ty on a set type *)
-  Environment.wrap_error
+  Environment.wrap_tzresult
     ( Script_ir_translator.unparse_ty ctxt (Set_t (ty, None))
     >>? fun (actual, ctxt) ->
     if actual = Prim (-1, T_set, [expected], []) then ok ctxt

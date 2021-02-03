@@ -210,7 +210,7 @@ let test_rewards_formulas () =
       >>=? fun () -> return_unit)
     ranges
 
-let wrap e = Lwt.return (Environment.wrap_error e)
+let wrap e = Lwt.return (Environment.wrap_tzresult e)
 
 (** Check that the rewards formulas from Context are equivalent with
     the ones from Baking. *)

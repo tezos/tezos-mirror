@@ -102,7 +102,7 @@ let begin_construction ?(priority = 0) ?timestamp ?seed_nonce_hash
     ~protocol_data
     ()
   >|= fun state ->
-  Environment.wrap_error state
+  Environment.wrap_tzresult state
   >|? fun state ->
   {predecessor; state; rev_operations = []; rev_tickets = []; header; delegate}
 
@@ -126,9 +126,9 @@ let detect_script_failure :
             (* there must be another error for this to happen *)
             Ok ()
         | Backtracked (_, Some errs) ->
-            Environment.wrap_error (Error errs)
+            Error (Environment.wrap_tztrace errs)
         | Failed (_, errs) ->
-            Environment.wrap_error (Error errs)
+            Error (Environment.wrap_tztrace errs)
       in
       List.fold_left
         (fun acc (Internal_operation_result (_, r)) ->
@@ -150,7 +150,7 @@ let detect_script_failure :
 let add_operation ?expect_apply_failure ?expect_failure st op =
   let open Apply_results in
   apply_operation st.state op
-  >|= Environment.wrap_error
+  >|= Environment.wrap_tzresult
   >>= fun result ->
   match (expect_apply_failure, result) with
   | (Some _, Ok _) ->
@@ -192,7 +192,7 @@ let add_operation ?expect_apply_failure ?expect_failure st op =
 let finalize_block st =
   finalize_block st.state
   >|= fun x ->
-  Environment.wrap_error x
+  Environment.wrap_tzresult x
   >|? fun (result, _) ->
   let operations = List.rev st.rev_operations in
   let operations_hash =

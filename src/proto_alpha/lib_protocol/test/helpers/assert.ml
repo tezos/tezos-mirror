@@ -104,7 +104,7 @@ let balance_is ~loc b contract ?(kind = Contract.Main) expected =
     [Rewards] for the others. *)
 let balance_was_operated ~operand ~loc b contract ?(kind = Contract.Main)
     old_balance amount =
-  operand old_balance amount |> Environment.wrap_error
+  operand old_balance amount |> Environment.wrap_tzresult
   >>?= fun expected -> balance_is ~loc b contract ~kind expected
 
 let balance_was_credited =

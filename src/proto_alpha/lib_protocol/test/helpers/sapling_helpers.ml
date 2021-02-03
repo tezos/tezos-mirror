@@ -36,7 +36,7 @@ module Common = struct
   let int_of_memo_size ms =
     Alpha_context.Sapling.Memo_size.unparse_to_z ms |> Z.to_int
 
-  let wrap e = Lwt.return (Environment.wrap_error e)
+  let wrap e = Lwt.return (Environment.wrap_tzresult e)
 
   let assert_true res = res >|=? fun res -> assert res
 

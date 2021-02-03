@@ -261,7 +261,7 @@ let get_manager_operation_gas_and_fee op =
   List.fold_left_es
     (fun ((total_fee, total_gas) as acc) -> function
       | Contents (Manager_operation {fee; gas_limit; _}) ->
-          (Lwt.return @@ Environment.wrap_error @@ Tez.(total_fee +? fee))
+          (Lwt.return @@ Environment.wrap_tzresult @@ Tez.(total_fee +? fee))
           >>=? fun total_fee ->
           return (total_fee, Gas.Arith.add total_gas gas_limit) | _ ->
           return acc)
@@ -955,7 +955,7 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
         -% a timestamp_tag (Time.System.of_protocol_exn timestamp)
         -% a fitness_tag shell_header.fitness)
   >>= fun () ->
-  ( match Environment.wrap_error (Raw_level.of_int32 shell_header.level) with
+  ( match Environment.wrap_tzresult (Raw_level.of_int32 shell_header.level) with
   | Ok level ->
       return level
   | Error errs as err ->

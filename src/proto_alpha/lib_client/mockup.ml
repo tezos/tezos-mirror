@@ -366,7 +366,7 @@ let initial_context (header : Block_header.shell_header)
     >>= fun ctxt -> add ctxt ["protocol_parameters"] proto_params)
   >>= fun ctxt ->
   Protocol.Main.init ctxt header
-  >|= Protocol.Environment.wrap_error
+  >|= Protocol.Environment.wrap_tzresult
   >>=? fun {context; _} -> return context
 
 let mem_init :
@@ -472,7 +472,7 @@ let migrate :
     rpc_context
   in
   Protocol.Main.init context block_header
-  >|= Protocol.Environment.wrap_error
+  >|= Protocol.Environment.wrap_tzresult
   >>=? fun {context; _} ->
   let rpc_context =
     {Tezos_protocol_environment.block_hash; block_header; context}

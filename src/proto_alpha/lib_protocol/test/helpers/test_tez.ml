@@ -31,13 +31,13 @@ open Environment
 module Tez = struct
   include Tez
 
-  let ( +? ) t1 t2 = t1 +? t2 |> wrap_error
+  let ( +? ) t1 t2 = t1 +? t2 |> wrap_tzresult
 
-  let ( -? ) t1 t2 = t1 -? t2 |> wrap_error
+  let ( -? ) t1 t2 = t1 -? t2 |> wrap_tzresult
 
-  let ( *? ) t1 t2 = t1 *? t2 |> wrap_error
+  let ( *? ) t1 t2 = t1 *? t2 |> wrap_tzresult
 
-  let ( /? ) t1 t2 = t1 /? t2 |> wrap_error
+  let ( /? ) t1 t2 = t1 /? t2 |> wrap_tzresult
 
   let ( + ) t1 t2 =
     match t1 +? t2 with

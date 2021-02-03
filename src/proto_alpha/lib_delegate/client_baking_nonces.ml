@@ -165,8 +165,8 @@ let get_unrevealed_nonces cctxt location nonces =
           get_block_level_opt cctxt ~chain ~block:(`Hash (hash, 0))
           >>= function
           | Some level -> (
-              Lwt.return (Environment.wrap_error (Raw_level.of_int32 level))
-              >>=? fun level ->
+              Environment.wrap_tzresult (Raw_level.of_int32 level)
+              >>?= fun level ->
               Alpha_services.Nonce.get cctxt (chain, `Head 0) level
               >>=? function
               | Missing nonce_hash when Nonce.check_hash nonce nonce_hash ->
