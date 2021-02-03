@@ -27,3 +27,8 @@ v0.6:
 * Added ACL module to allow/deny access to entry points based on path matching
 * The boolean parameter now accepts an empty string, in which case the value is 
   considered `true`
+* Added support for self-serving client
+* Added support for chunking answers
+* Allow to specify agent-string
+* More tests and better documentation
+* More logging with better level settings
