@@ -45,8 +45,25 @@ let register protocol =
   Proxy.register protocol ;
   Double_bake.register protocol
 
+let register_mockup () =
+  (* Support for Mockup in Carthage was removed in https://gitlab.com/tezos/tezos/-/merge_requests/2502 *)
+  let supported_mockup_protocols =
+    Protocol.all_protocols |> List.filter (fun p -> p <> Protocol.Carthage)
+  in
+  List.iter Mockup.register supported_mockup_protocols
+
+let register_proxy () =
+  (* Support for Proxy in Carthage was removed in https://gitlab.com/tezos/tezos/-/merge_requests/2502 *)
+  let supported_proxy_protocols =
+    Protocol.all_protocols |> List.filter (fun p -> p <> Protocol.Carthage)
+  in
+  List.iter Proxy.register supported_proxy_protocols
+
 let () =
   register Alpha ;
+  register_mockup () ;
+  Mockup.register_protocol_agnostic () ;
+  register_proxy () ;
   P2p.register Alpha ;
   Bootstrap.register_protocol_independent () ;
   Cli_tezos.register_protocol_independent () ;
