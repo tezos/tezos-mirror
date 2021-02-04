@@ -623,33 +623,36 @@ module Codegen_cmd = struct
   (* ------------------------------------------------------------------------- *)
   (* Handling options for the "generate code" command *)
 
+  let load_fixed_point_parameters json_file =
+    try
+      let json =
+        let ic = open_in json_file in
+        let json = Ezjsonm.from_channel ic in
+        close_in ic ; json
+      in
+      Fixed_point_transform
+        (Data_encoding.Json.destruct
+           Fixed_point_transform.options_encoding
+           json)
+    with _ ->
+      Format.eprintf
+        "Could not parse fixed-point transform parameters; aborting@." ;
+      Format.eprintf "Here's a well-formed file:@." ;
+      Format.eprintf
+        "%a@."
+        Data_encoding.Json.pp
+        (Data_encoding.Json.construct
+           Fixed_point_transform.options_encoding
+           Fixed_point_transform.default_options) ;
+      exit 1
+
   let codegen_handler json solution model_name () =
     let codegen_options =
       match json with
       | None ->
           No_transform
-      | Some json_file -> (
-        try
-          let json =
-            let ic = open_in json_file in
-            let json = Ezjsonm.from_channel ic in
-            close_in ic ; json
-          in
-          Fixed_point_transform
-            (Data_encoding.Json.destruct
-               Fixed_point_transform.options_encoding
-               json)
-        with _ ->
-          Format.eprintf
-            "Could not parse fixed-point transform parameters; aborting@." ;
-          Format.eprintf "Here's a well-formed file:@." ;
-          Format.eprintf
-            "%a@."
-            Data_encoding.Json.pp
-            (Data_encoding.Json.construct
-               Fixed_point_transform.options_encoding
-               Fixed_point_transform.default_options) ;
-          exit 1 )
+      | Some json_file ->
+          load_fixed_point_parameters json_file
     in
     commandline_outcome_ref :=
       Some (Codegen {solution; model_name; codegen_options}) ;
@@ -691,7 +694,48 @@ module Codegen_cmd = struct
   let group = {Clic.name = "codegen"; title = "Command for generating code"}
 
   let command =
-    Clic.command ~group ~desc:"Code generation" options params codegen_handler
+    Clic.command
+      ~group
+      ~desc:"Generate code for a specific model"
+      options
+      params
+      codegen_handler
+end
+
+module Codegen_all_cmd = struct
+  include Codegen_cmd
+
+  let codegen_all_handler json solution matching () =
+    let codegen_options =
+      match json with
+      | None ->
+          No_transform
+      | Some json_file ->
+          load_fixed_point_parameters json_file
+    in
+    commandline_outcome_ref :=
+      Some (Codegen_all {solution; matching; codegen_options}) ;
+    return ()
+
+  let params =
+    Clic.(
+      prefixes ["generate"; "code"; "using"; "solution"]
+      @@ string
+           ~name:"SOLUTION-FILE"
+           ~desc:
+             "File containing solution, as obtained using the --save-solution \
+              switch"
+      @@ prefixes ["for"; "all"; "models"; "matching"]
+      @@ string ~name:"REGEXP" ~desc:"Regular expression on model names"
+      @@ stop)
+
+  let command =
+    Clic.command
+      ~group
+      ~desc:"Generate code for all models matching regexp"
+      options
+      params
+      codegen_all_handler
 end
 
 module List_cmd = struct
@@ -827,7 +871,8 @@ let all_commands =
   [ Benchmark_cmd.command;
     Infer_cmd.command;
     Cull_outliers_cmd.command;
-    Codegen_cmd.command ]
+    Codegen_cmd.command;
+    Codegen_all_cmd.command ]
   @ List_cmd.commands
   @ Registration.all_custom_commands ()
 

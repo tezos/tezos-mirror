@@ -95,6 +95,11 @@ type command =
       model_name : string;
       codegen_options : codegen_options;
     }
+  | Codegen_all of {
+      solution : string;
+      matching : string;
+      codegen_options : codegen_options;
+    }
   | No_command
 
 (* -------------------------------------------------------------------------- *)

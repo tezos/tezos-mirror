@@ -369,7 +369,7 @@ let codegen_cmd solution model_name codegen_options =
   | None ->
       Format.eprintf "Model %s not found, exiting@." model_name ;
       exit 1
-  | Some (Model.For_codegen model) ->
+  | Some model ->
       let transform =
         match codegen_options with
         | Cmdline.No_transform ->
@@ -395,7 +395,27 @@ let codegen_cmd solution model_name codegen_options =
         | Some s ->
             s
       in
-      Format.printf "let model_%s = %s@." model_name code
+      Format.printf "let model_%s = %a@." model_name Codegen.pp_expr code
+
+let codegen_all_cmd solution regexp codegen_options =
+  let () = Format.eprintf "regexp: %s@." regexp in
+  let regexp = Str.regexp regexp in
+  let ok (name, _) = Str.string_match regexp name 0 in
+  let sol = Codegen.load_solution solution in
+  let models = List.filter ok (Registration.all_registered_models ()) in
+  let transform =
+    match codegen_options with
+    | Cmdline.No_transform ->
+        ((module Costlang.Identity) : Costlang.transform)
+    | Cmdline.Fixed_point_transform options ->
+        let module P = struct
+          let options = options
+        end in
+        let module Transform = Fixed_point_transform.Apply (P) in
+        ((module Transform) : Costlang.transform)
+  in
+  let result = Codegen.codegen_module models sol transform in
+  Codegen.pp_structure_item Format.std_formatter result
 
 (* -------------------------------------------------------------------------- *)
 (* Entrypoint *)
@@ -428,4 +448,6 @@ let () =
     | Cmdline.Infer {model_name; workload_data; solver; infer_opts} ->
         infer_cmd model_name workload_data solver infer_opts
     | Cmdline.Codegen {solution; model_name; codegen_options} ->
-        codegen_cmd solution model_name codegen_options )
+        codegen_cmd solution model_name codegen_options
+    | Cmdline.Codegen_all {solution; matching; codegen_options} ->
+        codegen_all_cmd solution matching codegen_options )
