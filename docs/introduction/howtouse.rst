@@ -26,23 +26,42 @@ bound to. For instance, ``tezos-baker-006-PsCARTHA`` is the baker
 for the Carthage protocol. See also the `Node Protocol`_ section below.
 
 
-Read The Friendly Manual
-------------------------
+Read The Manual
+---------------
 
 The manual of each binary can be obtained with the command ``man`` and
-the verbosity can be increased with ``-v``.
-To use one specific command, type the command without arguments to see
-possible completions and options.
-It is also possible to search a keyword in the manual with ``man
-keyword``.
-The full documentation is also available online :ref:`client_manual`.
+the verbosity can be increased with ``-v``::
 
-::
+    tezos-client man -v 3
 
-   tezos-client man -v 3
-   tezos-client transfer
+It is also possible to search a keyword in the manual with ``man <keyword>``::
+
    tezos-client man set
 
+To use one specific command, type the command without arguments to see
+possible completions and options::
+
+   tezos-client transfer
+
+However, beware that the commands available on the client depend on the specific
+protocol run by the node. For instance, ``transfer`` is not available when
+the node runs the genesis protocol, which may happen for a few minutes when
+launching a node for the first time, or when the client is not connected to a
+node. In the last case, the above command generates a warning::
+
+    Warning:
+      Failed to acquire the protocol version from the node
+
+To get the manual of a command for a protocol other than that used by the node (or even when not connected to a node), use the option ``--protocol``, e.g.::
+
+    tezos-client --protocol ProtoALphaALph man transfer
+
+Note that you can get the list of protocols known to the client with::
+
+    tezos-client list understood protocols
+
+The full command line documentation of the Tezos client is also available
+online: :ref:`client_manual`.
 
 Node
 ----
@@ -190,8 +209,8 @@ chain (time is in UTC so it may differ from your local time)::
 
    tezos-client get timestamp
 
-Beware that the commands available on the client depend on the specific
-protocol run by the node. For instance, `get timestamp` isn't available when
+However, recall that the commands available on the client depend on the specific
+protocol run by the node. For instance, ``get timestamp`` isn't available when
 the node runs the genesis protocol, which may happen for a few minutes when
 launching a node for the first time.
 
