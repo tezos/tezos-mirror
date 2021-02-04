@@ -30,45 +30,46 @@ let () =
   let open Data_encoding in
   Registration.register
     ~pp:Z.pp_print
-    (def "Z" ~description:"Arbitrary precision integers" z) ;
+    (def "ground.Z" ~description:"Arbitrary precision integers" z) ;
   Registration.register
     ~pp:Z.pp_print
-    (def "N" ~description:"Arbitrary precision natural numbers" n)
+    (def "ground.N" ~description:"Arbitrary precision natural numbers" n)
 
 let () =
   (* zero-length encodings *)
   let open Data_encoding in
-  Registration.register (def "unit" unit) ;
+  Registration.register (def "ground.unit" unit) ;
   Registration.register
-    (def "empty" ~description:"An empty (0-field) object or tuple" empty) ;
-  Registration.register (def "null" ~description:"A null value" null)
+    (def "ground.empty" ~description:"An empty (0-field) object or tuple" empty) ;
+  Registration.register (def "ground.null" ~description:"A null value" null)
 
 let () =
   (* integers of various sizes encodings *)
   let open Data_encoding in
   Registration.register
-    (def "uint8" ~description:"Unsigned 8 bit integers" uint8) ;
-  Registration.register (def "int8" ~description:"Signed 8 bit integers" int8) ;
+    (def "ground.uint8" ~description:"Unsigned 8 bit integers" uint8) ;
   Registration.register
-    (def "uint16" ~description:"Unsigned 16 bit integers" uint16) ;
+    (def "ground.int8" ~description:"Signed 8 bit integers" int8) ;
   Registration.register
-    (def "int16" ~description:"Signed 16 bit integers" int16) ;
+    (def "ground.uint16" ~description:"Unsigned 16 bit integers" uint16) ;
   Registration.register
-    (def "int31" ~description:"Signed 31 bit integers" int31) ;
+    (def "ground.int16" ~description:"Signed 16 bit integers" int16) ;
   Registration.register
-    (def "int32" ~description:"Signed 32 bit integers" int32) ;
+    (def "ground.int31" ~description:"Signed 31 bit integers" int31) ;
   Registration.register
-    (def "int64" ~description:"Signed 64 bit integers" int64)
+    (def "ground.int32" ~description:"Signed 32 bit integers" int32) ;
+  Registration.register
+    (def "ground.int64" ~description:"Signed 64 bit integers" int64)
 
 let () =
   (* string encodings *)
   let open Data_encoding in
-  Registration.register (def "string" string) ;
-  Registration.register (def "bytes" bytes)
+  Registration.register (def "ground.string" string) ;
+  Registration.register (def "ground.bytes" bytes)
 
 let () =
   (* misc other ground encodings *)
   let open Data_encoding in
-  Registration.register (def "bool" ~description:"Boolean values" bool) ;
+  Registration.register (def "ground.bool" ~description:"Boolean values" bool) ;
   Registration.register
-    (def "float" ~description:"Floating point numbers" float)
+    (def "ground.float" ~description:"Floating point numbers" float)
