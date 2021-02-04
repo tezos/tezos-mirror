@@ -39,7 +39,7 @@
 let test_rpc_list ~protocol =
   Test.register
     ~__FILE__
-    ~title:(sf "%s: rpc list (mockup)" (Protocol.name protocol))
+    ~title:(sf "(%s) (Mockup) RPC list" (Protocol.name protocol))
     ~tags:[Protocol.tag protocol; "mockup"; "client"; "rpc"]
   @@ fun () ->
   let* client = Client.init_mockup ~protocol () in
@@ -87,7 +87,7 @@ let test_balances_after_transfer giver amount receiver =
 let test_transfer ~protocol =
   Test.register
     ~__FILE__
-    ~title:(sf "%s: mockup transfer" (Protocol.name protocol))
+    ~title:(sf "(%s) (Mockup) Transfer" (Protocol.name protocol))
     ~tags:[Protocol.tag protocol; "mockup"; "client"; "transfer"]
   @@ fun () ->
   let (giver, amount, receiver) = transfer_data in
@@ -116,7 +116,7 @@ let test_simple_baking_event ~protocol =
   Test.register
     ~__FILE__
     ~title:
-      (sf "transfer (mockup / asynchronous / %s)" (Protocol.name protocol))
+      (sf "(%s) (Mockup) Transfer (asynchronous)" (Protocol.name protocol))
     ~tags:
       ["mockup"; "client"; "transfer"; Protocol.tag protocol; "asynchronous"]
   @@ fun () ->
@@ -137,8 +137,9 @@ let test_same_transfer_twice ~protocol =
   Test.register
     ~__FILE__
     ~title:
-      ( "same-transfer-twice (mockup / asynchronous / " ^ Protocol.name protocol
-      ^ ")" )
+      (sf
+         "(%s) (Mockup) Same transfer twice (asynchronous)"
+         (Protocol.name protocol))
     ~tags:
       ["mockup"; "client"; "transfer"; Protocol.tag protocol; "asynchronous"]
   @@ fun () ->
@@ -165,8 +166,9 @@ let test_transfer_same_participants ~protocol =
   Test.register
     ~__FILE__
     ~title:
-      ( "transfer-same-participants (mockup / asynchronous / "
-      ^ Protocol.name protocol ^ ")" )
+      (sf
+         "(%s) (Mockup) Transfer same participants (asynchronous)"
+         (Protocol.name protocol))
     ~tags:
       ["mockup"; "client"; "transfer"; Protocol.tag protocol; "asynchronous"]
   @@ fun () ->
@@ -205,8 +207,9 @@ let test_multiple_baking ~protocol =
   Test.register
     ~__FILE__
     ~title:
-      ( "multi-transfer/multi-baking (mockup / asynchronous / "
-      ^ Protocol.name protocol ^ ")" )
+      (sf
+         "(%s) (Mockup) Multi transfer/multi baking (asynchronous)"
+         (Protocol.name protocol))
     ~tags:
       ["mockup"; "client"; "transfer"; Protocol.tag protocol; "asynchronous"]
   @@ fun () ->
@@ -276,7 +279,7 @@ let test_migration ?(migration_spec : (Protocol.t * Protocol.t) option)
     ~pre_migration ~post_migration ~info () =
   Test.register
     ~__FILE__
-    ~title:(Printf.sprintf "migration (mockup, %s)" info)
+    ~title:(sf "(Mockup) Migration (%s)" info)
     ~tags:["mockup"; "migration"]
     (fun () ->
       match migration_spec with

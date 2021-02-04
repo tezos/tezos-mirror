@@ -48,7 +48,7 @@ let init ~protocol () =
 let test_wrong_proto protocol =
   Test.register
     ~__FILE__
-    ~title:(Printf.sprintf "wrong proto (%s)" (Protocol.name protocol))
+    ~title:(sf "(%s) (Proxy) Wrong proto" (Protocol.name protocol))
     ~tags:[Protocol.tag protocol; "proxy"; "bake"]
   @@ fun () ->
   let* node = Node.init [] in
@@ -81,7 +81,7 @@ let test_wrong_proto protocol =
 let test_bake protocol =
   Test.register
     ~__FILE__
-    ~title:(Printf.sprintf "bake (%s)" (Protocol.name protocol))
+    ~title:(sf "(%s) (Proxy) Bake" (Protocol.name protocol))
     ~tags:[Protocol.tag protocol; "proxy"; "bake"]
   @@ fun () ->
   let* node = Node.init [] in
@@ -101,7 +101,7 @@ let test_bake protocol =
 let test_transfer protocol =
   Test.register
     ~__FILE__
-    ~title:(Printf.sprintf "transfer (%s)" (Protocol.name protocol))
+    ~title:(sf "(%s) (Proxy) Transfer" (Protocol.name protocol))
     ~tags:[Protocol.tag protocol; "proxy"; "transfer"]
   @@ fun () ->
   let* (_, client) = init ~protocol () in
@@ -211,9 +211,6 @@ module Location = struct
         check_location alt_mode client rpc_path expected_loc)
       paths_n_locations
 
-  let locations_title protocol =
-    Printf.sprintf "rpc get's location (%s)" (Protocol.name protocol)
-
   let locations_tags alt_mode protocol =
     [ Protocol.tag protocol;
       alt_mode_to_string alt_mode;
@@ -227,7 +224,7 @@ module Location = struct
     let alt_mode = Proxy in
     Test.register
       ~__FILE__
-      ~title:(locations_title protocol)
+      ~title:(sf "(%s) (Proxy) RPC get's location" (Protocol.name protocol))
       ~tags:(locations_tags alt_mode protocol)
     @@ fun () ->
     let* (_, client) = init ~protocol () in
@@ -316,9 +313,6 @@ module Location = struct
     in
     Lwt_list.iter_s perform compared
 
-  let compare_title protocol =
-    Printf.sprintf "compare rpc get (%s)" (Protocol.name protocol)
-
   let compare_tags alt_mode protocol =
     [Protocol.tag protocol; alt_mode_to_string alt_mode; "rpc"; "get"]
 
@@ -329,7 +323,7 @@ module Location = struct
     let alt_mode = Proxy in
     Test.register
       ~__FILE__
-      ~title:(compare_title protocol)
+      ~title:(sf "(%s) (Proxy) Compare RPC get" (Protocol.name protocol))
       ~tags:(compare_tags alt_mode protocol)
     @@ fun () ->
     let* (node, alternative) = init ~protocol () in
