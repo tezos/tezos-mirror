@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:    Micheline
+    Invocation:   dune build @src/lib_benchmark/lib_micheline_rewriting/runtest_test_rewriting
+    Subject:      Rewriting
+*)
+
 open Tezos_micheline_rewriting
 open Tezos_protocol_alpha.Protocol
 
@@ -369,4 +376,5 @@ let rewritten_script =
   in
   Format.asprintf "%a" Micheline_printer.print_expr_unwrapped script
 
+(** Test that the rewritten script is as expected. *)
 let () = assert (rewritten_script_oracle = rewritten_script)
