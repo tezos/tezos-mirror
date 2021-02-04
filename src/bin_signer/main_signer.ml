@@ -24,10 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Log = Internal_event.Legacy_logging.Make (struct
-  let name = "signer.main"
-end)
-
 let default_tcp_host =
   match Sys.getenv_opt "TEZOS_SIGNER_TCP_HOST" with
   | None ->

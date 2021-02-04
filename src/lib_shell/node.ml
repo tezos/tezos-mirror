@@ -163,10 +163,6 @@ let may_update_checkpoint chain_state checkpoint history_mode =
           State.Chain.set_checkpoint_then_purge_rolling chain_state checkpoint
       )
 
-module Local_logging = Internal_event.Legacy_logging.Make_semantic (struct
-  let name = "node.worker"
-end)
-
 (* These protocols are linked with the node and
    do not have their actual hash on purpose. *)
 let test_protocol_hashes =
