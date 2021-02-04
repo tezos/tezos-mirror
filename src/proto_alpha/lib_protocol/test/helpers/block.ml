@@ -308,7 +308,9 @@ let genesis_with_parameters parameters =
 (* if no parameter file is passed we check in the current directory
    where the test is run *)
 let genesis ?with_commitments ?endorsers_per_block ?initial_endorsers
-    ?min_proposal_quorum (initial_accounts : (Account.t * Tez.t) list) =
+    ?min_proposal_quorum ?time_between_blocks ?minimal_block_delay
+    ?delay_per_missing_endorsement
+    (initial_accounts : (Account.t * Tez.t) list) =
   if initial_accounts = [] then
     Stdlib.failwith "Must have one account with a roll to bake" ;
   let open Tezos_protocol_alpha_parameters in
@@ -322,12 +324,26 @@ let genesis ?with_commitments ?endorsers_per_block ?initial_endorsers
   let min_proposal_quorum =
     Option.value ~default:constants.min_proposal_quorum min_proposal_quorum
   in
+  let time_between_blocks =
+    Option.value ~default:constants.time_between_blocks time_between_blocks
+  in
+  let minimal_block_delay =
+    Option.value ~default:constants.minimal_block_delay minimal_block_delay
+  in
+  let delay_per_missing_endorsement =
+    Option.value
+      ~default:constants.delay_per_missing_endorsement
+      delay_per_missing_endorsement
+  in
   let constants =
     {
       constants with
       endorsers_per_block;
       initial_endorsers;
       min_proposal_quorum;
+      time_between_blocks;
+      minimal_block_delay;
+      delay_per_missing_endorsement;
     }
   in
   (* Check there is at least one roll *)

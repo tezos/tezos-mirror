@@ -37,6 +37,7 @@ let () =
       ("origination", Test_origination.tests);
       ("activation", Test_activation.tests);
       ("revelation", Test_reveal.tests);
+      ("baking module", Test_baking_module.tests);
       ("endorsement", Test_endorsement.tests);
       ("double endorsement", Test_double_endorsement.tests);
       ("double baking", Test_double_baking.tests);

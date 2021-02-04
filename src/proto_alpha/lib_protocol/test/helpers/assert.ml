@@ -67,6 +67,25 @@ let equal_int ~loc (a : int) (b : int) =
 let not_equal_int ~loc (a : int) (b : int) =
   not_equal ~loc ( = ) "Integers are equal" Format.pp_print_int a b
 
+(* int64 *)
+let equal_int64 ~loc (a : int64) (b : int64) =
+  equal
+    ~loc
+    ( = )
+    "Integers aren't equal"
+    Format.pp_print_string
+    (Int64.to_string a)
+    (Int64.to_string b)
+
+let not_equal_int64 ~loc (a : int64) (b : int64) =
+  not_equal
+    ~loc
+    ( = )
+    "Integers are equal"
+    Format.pp_print_string
+    (Int64.to_string a)
+    (Int64.to_string b)
+
 (* bool *)
 let equal_bool ~loc (a : bool) (b : bool) =
   equal ~loc ( = ) "Booleans aren't equal" Format.pp_print_bool a b

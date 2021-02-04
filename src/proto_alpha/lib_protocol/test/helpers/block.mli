@@ -96,6 +96,9 @@ val genesis :
   ?endorsers_per_block:int ->
   ?initial_endorsers:int ->
   ?min_proposal_quorum:int32 ->
+  ?time_between_blocks:Period.t list ->
+  ?minimal_block_delay:Period.t ->
+  ?delay_per_missing_endorsement:Period.t ->
   (Account.t * Tez.tez) list ->
   block tzresult Lwt.t
 

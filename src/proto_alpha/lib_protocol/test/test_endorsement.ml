@@ -680,8 +680,7 @@ let test_endorsement_threshold () =
             b
           >>= fun b2 ->
           Assert.proto_error ~loc:__LOC__ b2 (function
-              | Baking.Timestamp_too_early _
-              | Apply.Not_enough_endorsements_for_priority _ ->
+              | Baking.Timestamp_too_early _ ->
                   true
               | _ ->
                   false))

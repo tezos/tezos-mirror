@@ -134,5 +134,8 @@ val init :
   ?initial_balances:int64 list ->
   ?initial_endorsers:int ->
   ?min_proposal_quorum:int32 ->
+  ?time_between_blocks:Period.t list ->
+  ?minimal_block_delay:Period.t ->
+  ?delay_per_missing_endorsement:Period.t ->
   int ->
   (Block.t * Alpha_context.Contract.t list) tzresult Lwt.t
