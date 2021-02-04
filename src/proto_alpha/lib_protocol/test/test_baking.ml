@@ -84,7 +84,9 @@ let test_cycle () =
 (** After baking and/or endorsing a block, the baker and the endorsers
     get their reward. *)
 let test_rewards_retrieval () =
-  Context.init 256
+  let endorsers_per_block = 32 in
+  (* we want to have sufficient accounts so that find_block succeeds *)
+  Context.init (endorsers_per_block * 10) ~endorsers_per_block
   >>=? fun (b, _) ->
   Context.get_constants (B b)
   >>=? fun Constants.
@@ -94,7 +96,7 @@ let test_rewards_retrieval () =
                    endorsement_security_deposit;
                    _ };
                _ } ->
-  (* find block with 32 different endorsers *)
+  (* find block with endorsers_per_block different endorsers *)
   let open Alpha_services.Delegate.Endorsing_rights in
   let rec find_block b =
     Context.get_endorsers (B b)
@@ -115,7 +117,7 @@ let test_rewards_retrieval () =
   Context.get_endorsers (B good_b)
   >>=? fun endorsers ->
   (* test 3 different priorities, too long otherwise *)
-  let block_priorities = 0 -- 10 in
+  let block_priorities = 0 -- 2 in
   let included_endorsements = 0 -- endorsers_per_block in
   let ranges = List.product block_priorities included_endorsements in
   List.iter_es
