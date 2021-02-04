@@ -19,6 +19,7 @@ depends: [
   "pyml-plot"
   "conf-autoconf"
   "hashcons"
+  "ocaml-migrate-parsetree"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

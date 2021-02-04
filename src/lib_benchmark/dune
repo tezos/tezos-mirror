@@ -9,6 +9,7 @@
             staTz
             benchmark-utils
             pyml-plot ;; because of Matrix module... pyml-plot should be split further
+            ocaml-migrate-parsetree
             )
  (flags (:standard
                  -open Tezos_base__TzPervasives
