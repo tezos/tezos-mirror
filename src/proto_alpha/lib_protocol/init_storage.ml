@@ -25,7 +25,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* open Logging *)
+open Logging
 
 let migrate_baker :
     Raw_context.t ->
@@ -181,6 +181,7 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
       >>=? fun ctxt -> Vote_storage.update_listings ctxt
   | Edo_008 ->
       (* 1. Baker accounts migration *)
+      lwt_log_notice "1. Baker accounts migration" >>= fun () ->
       let nonce =
         Operation_hash.hash_bytes
           [ Bytes.of_string
@@ -195,8 +196,10 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
       >>= fun ctxt ->
       let current_cycle = Raw_context.(current_level ctxt).cycle in
       (* Take a snapshot of the consensus keys *)
+      lwt_log_notice "Take a snapshot of the consensus keys" >>= fun () ->
       Storage.Baker.Consensus_key.snapshot ctxt current_cycle
       >>=? fun ctxt ->
+      lwt_log_notice "Take another snapshot of the consensus keys" >>= fun () ->
       (* Because the migration runs on the last block of a predecessor protocol,
          we also need to take the snapshot for the following cycle, otherwise
          the baker process which looks-up consensus for the future block would
@@ -205,6 +208,7 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
       >>=? fun ctxt ->
       (* Migrate storages with references to original baker pkhs *)
       (* Contract.Delegate *)
+      lwt_log_notice "Contract.Delegate" >>= fun () ->
       Storage.Contract.Delegate_008.fold
         ctxt
         ~init:(ok ctxt)
@@ -245,6 +249,7 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
                   migrate_delegate ctxt ))
       >>=? fun ctxt ->
       (* Active_delegates_with_rolls -> Baker.Active_with_rolls *)
+      lwt_log_notice "Active_delegates_with_rolls -> Baker.Active_with_rolls" >>= fun () ->
       Storage.Active_delegates_with_rolls_008.fold
         ctxt
         ~init:(ok ctxt)
@@ -260,6 +265,7 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
       >>= fun ctxt ->
       let preserved = Constants_storage.preserved_cycles ctxt in
       (* Delegates_with_frozen_balance -> Baker.With_frozen_balance *)
+      lwt_log_notice "Delegates_with_frozen_balance -> Baker.With_frozen_balance" >>= fun () ->
       let rec migrate_frozen_balance ctxt cycle =
         lwt_log_notice
           "migrating bakers with frozen balance for cycle %a"
@@ -290,6 +296,7 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
       migrate_frozen_balance ctxt current_cycle
       >>=? fun ctxt ->
       (* Contract.Inactive_delegate -> Baker.Inactive *)
+      lwt_log_notice "Contract.Inactive_delegate -> Baker.Inactive" >>= fun () ->
       Storage.Contract.Inactive_delegate_008.fold
         ctxt
         ~init:(ok ctxt)
@@ -315,6 +322,7 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
       Storage.Contract.Inactive_delegate_008.clear ctxt
       >>= fun ctxt ->
       (* Contract.Delegate_desactivation -> Baker.Inactive *)
+      lwt_log_notice "Contract.Delegate_desactivation -> Baker.Inactive" >>= fun () ->
       Storage.Contract.Delegate_desactivation_008.fold
         ctxt
         ~init:(ok ctxt)
@@ -339,6 +347,7 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
       Storage.Contract.Delegate_desactivation_008.clear ctxt
       >>= fun ctxt ->
       (* Roll.Owner *)
+      lwt_log_notice "Roll.Owner" >>= fun () ->
       Storage.Roll.Owner_008.fold ctxt ~init:(ok ctxt) ~f:(fun roll pk acc ->
           Lwt.return acc
           >>=? fun ctxt ->
@@ -348,6 +357,7 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
           (* because the path has not changed, this will override 008 value *)
           Storage.Roll.Owner.update ctxt roll baker)
       >>=? fun ctxt ->
+      lwt_log_notice "Roll.Owner.Snapshot" >>= fun () ->
       Storage.Roll.Owner_008.Snapshot.fold
         ctxt
         ~init:(ok ctxt)
@@ -361,6 +371,7 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
           Storage.Roll.Owner.Snapshot.update ctxt key baker)
       >>=? fun ctxt ->
       (* Vote.Listings *)
+      lwt_log_notice "Vote.Listings" >>= fun () ->
       Storage.Vote.Listings_008.fold
         ctxt
         ~init:(ok ctxt)
@@ -373,6 +384,7 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
           >>= fun ctxt -> Storage.Vote.Listings.init ctxt baker listings)
       >>=? fun ctxt ->
       (* Vote.Proposals *)
+      lwt_log_notice "Vote.Proposals" >>= fun () ->
       Storage.Vote.Proposals_008.fold
         ctxt
         ~init:(ok ctxt)
@@ -387,6 +399,7 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
           >>= fun ctxt -> return ctxt)
       >>=? fun ctxt ->
       (* Vote.Proposals_count *)
+      lwt_log_notice "Vote.Proposals_count" >>= fun () ->
       Storage.Vote.Proposals_count_008.fold
         ctxt
         ~init:(ok ctxt)
@@ -399,6 +412,7 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
           >>= fun ctxt -> Storage.Vote.Proposals_count.init ctxt baker count)
       >>=? fun ctxt ->
       (* Vote.Ballots *)
+      lwt_log_notice "Vote.Ballots" >>= fun () ->
       Storage.Vote.Ballots_008.fold
         ctxt
         ~init:(ok ctxt)
@@ -411,6 +425,7 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
           >>= fun ctxt -> Storage.Vote.Ballots.init ctxt baker ballot)
       >>=? fun ctxt ->
       (* Storage.Seed.Nonce *)
+      lwt_log_notice "Storage.Seed.Nonce" >>= fun () ->
       let rec migrate_cycle_nonce ctxt cycle =
         Storage.Cycle_008.Nonce.fold
           (ctxt, cycle)
@@ -440,6 +455,7 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
       migrate_cycle_nonce ctxt current_cycle
       >>=? fun ctxt ->
       (* 2. balance update receipts for baker migration *)
+      lwt_log_notice "2. balance update receipts for baker migration" >>= fun () ->
       Storage.Baker.Consensus_key_rev.fold
         ctxt
         ~init:(ok [])
@@ -466,6 +482,7 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
          in the migration should use the [Receipt_repr.Protocol_migration]
          as their [update_origin].
       *)
+      lwt_log_notice "Add balance updates receipts" >>= fun () ->
       let balance_updates = [] in
       Storage.Pending_migration_balance_updates.init
         ctxt
