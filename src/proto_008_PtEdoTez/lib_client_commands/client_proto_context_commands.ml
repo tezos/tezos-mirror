@@ -296,14 +296,11 @@ let commands network () =
     command
       ~group
       ~desc:"Get the storage of a contract."
-      (args1 unparsing_mode_arg)
+      (args1 (unparsing_mode_arg ~default:"Readable"))
       ( prefixes ["get"; "contract"; "storage"; "for"]
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop )
       (fun unparsing_mode (_, contract) (cctxt : Protocol_client_context.full) ->
-        let unparsing_mode =
-          Option.value ~default:Script_ir_translator.Readable unparsing_mode
-        in
         Plugin.RPC.get_storage_normalized
           cctxt
           (cctxt#chain, cctxt#block)
@@ -344,7 +341,7 @@ let commands network () =
     command
       ~group
       ~desc:"Get a value in a big map."
-      (args1 unparsing_mode_arg)
+      (args1 (unparsing_mode_arg ~default:"Readable"))
       ( prefixes ["get"; "element"]
       @@ Clic.param
            ~name:"key"
@@ -358,9 +355,6 @@ let commands network () =
            int_parameter
       @@ stop )
       (fun unparsing_mode key id (cctxt : Protocol_client_context.full) ->
-        let unparsing_mode =
-          Option.value ~default:Script_ir_translator.Readable unparsing_mode
-        in
         get_big_map_value
           cctxt
           ~chain:cctxt#chain
@@ -374,14 +368,11 @@ let commands network () =
     command
       ~group
       ~desc:"Get the code of a contract."
-      (args1 unparsing_mode_arg)
+      (args1 (unparsing_mode_arg ~default:"Readable"))
       ( prefixes ["get"; "contract"; "code"; "for"]
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop )
       (fun unparsing_mode (_, contract) (cctxt : Protocol_client_context.full) ->
-        let unparsing_mode =
-          Option.value ~default:Script_ir_translator.Readable unparsing_mode
-        in
         Plugin.RPC.get_script_normalized
           cctxt
           (cctxt#chain, cctxt#block)

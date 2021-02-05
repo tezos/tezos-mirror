@@ -116,4 +116,4 @@ val bytes_of_prefixed_string : string -> Bytes.t tzresult Lwt.t
 val bytes_parameter : (Bytes.t, full) Clic.parameter
 
 val unparsing_mode_arg :
-  (Script_ir_translator.unparsing_mode option, full) Clic.arg
+  default:string -> (Script_ir_translator.unparsing_mode, full) Clic.arg

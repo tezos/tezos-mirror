@@ -461,7 +461,7 @@ let commands () =
     command
       ~group
       ~desc:"Ask the node to normalize a data expression."
-      (args2 unparsing_mode_arg legacy_switch)
+      (args2 (unparsing_mode_arg ~default:"Readable") legacy_switch)
       ( prefixes ["normalize"; "data"]
       @@ param
            ~name:"data"
@@ -471,9 +471,6 @@ let commands () =
       @@ param ~name:"type" ~desc:"type of the data expression" data_parameter
       @@ stop )
       (fun (unparsing_mode, legacy) data typ cctxt ->
-        let unparsing_mode =
-          Option.value ~default:Script_ir_translator.Readable unparsing_mode
-        in
         Plugin.RPC.normalize_data
           cctxt
           (cctxt#chain, cctxt#block)
