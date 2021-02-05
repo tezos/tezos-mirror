@@ -258,13 +258,12 @@ let get_manager_operation_gas_and_fee op =
   let {protocol_data = Operation_data {contents; _}; _} = op in
   let open Operation in
   let l = to_list (Contents_list contents) in
-  List.fold_left_es
+  List.fold_left_e
     (fun ((total_fee, total_gas) as acc) -> function
       | Contents (Manager_operation {fee; gas_limit; _}) ->
-          (Lwt.return @@ Environment.wrap_tzresult @@ Tez.(total_fee +? fee))
-          >>=? fun total_fee ->
-          return (total_fee, Gas.Arith.add total_gas gas_limit) | _ ->
-          return acc)
+          (Environment.wrap_tzresult @@ Tez.(total_fee +? fee))
+          >>? fun total_fee -> ok (total_fee, Gas.Arith.add total_gas gas_limit)
+      | _ -> ok acc)
     (Tez.zero, Gas.Arith.zero)
     l
 
@@ -285,11 +284,11 @@ let sort_manager_operations ~max_size ~hard_gas_limit_per_block ~minimal_fees
     in
     (size, gas, Q.(fee_f / max size_ratio gas_ratio))
   in
-  List.filter_map_es
+  List.filter_map_e
     (fun op ->
       get_manager_operation_gas_and_fee op
-      >>=? fun (fee, gas) ->
-      if Tez.(fee < minimal_fees) then return_none
+      >>? fun (fee, gas) ->
+      if Tez.(fee < minimal_fees) then ok_none
       else
         let ((size, gas, _ratio) as weight) = compute_weight op (fee, gas) in
         let fees_in_nanotez =
@@ -309,13 +308,12 @@ let sort_manager_operations ~max_size ~hard_gas_limit_per_block ~minimal_fees
           in
           Q.compare minimal_fees_in_nanotez fees_in_nanotez <= 0
         in
-        if enough_fees_for_size && enough_fees_for_gas then
-          return_some (op, weight)
-        else return_none)
+        if enough_fees_for_size && enough_fees_for_gas then ok_some (op, weight)
+        else ok_none)
     operations
-  >>=? fun operations ->
+  >>? fun operations ->
   (* We sort by the biggest weight *)
-  return
+  ok
     (List.sort
        (fun (_, (_, _, w)) (_, (_, _, w')) -> Q.compare w' w)
        operations)
@@ -345,14 +343,14 @@ let retain_operations_up_to_quota operations quota =
 
 let trim_manager_operations ~max_size ~hard_gas_limit_per_block
     manager_operations =
-  List.map_es
+  List.map_e
     (fun op ->
       get_manager_operation_gas_and_fee op
-      >>=? fun (_fee, gas) ->
+      >>? fun (_fee, gas) ->
       let size = Data_encoding.Binary.length Operation.encoding op in
-      return (op, (size, gas)))
+      ok (op, (size, gas)))
     manager_operations
-  >>=? fun manager_operations ->
+  >>? fun manager_operations ->
   List.fold_left
     (fun (total_size, total_gas, (good_ops, bad_ops)) (op, (size, gas)) ->
       let new_size = total_size + size in
@@ -364,7 +362,7 @@ let trim_manager_operations ~max_size ~hard_gas_limit_per_block
     manager_operations
   |> fun (_, _, (good_ops, bad_ops)) ->
   (* We keep the overflowing operations, it may be used for client-side validation *)
-  return (List.rev good_ops, List.rev bad_ops)
+  ok (List.rev good_ops, List.rev bad_ops)
 
 (* We classify operations, sort managers operation by interest and add bad ones at the end *)
 (* Hypothesis : we suppose that the received manager operations have a valid gas_limit *)
@@ -382,43 +380,51 @@ let classify_operations (cctxt : #Protocol_client_context.full) ~chain ~block
     ~minimal_nanotez_per_byte (ops : packed_operation list) =
   Alpha_block_services.live_blocks cctxt ~chain ~block ()
   >>=? fun live_blocks ->
-  (* Remove operations that are too old *)
-  let ops =
-    List.filter
-      (fun {shell = {branch; _}; _} -> Block_hash.Set.mem branch live_blocks)
-      ops
+  let t =
+    (* Remove operations that are too old *)
+    let ops =
+      List.filter
+        (fun {shell = {branch; _}; _} -> Block_hash.Set.mem branch live_blocks)
+        ops
+    in
+    let validation_passes_len = List.length Main.validation_passes in
+    let t = Array.make validation_passes_len [] in
+    List.iter
+      (fun (op : packed_operation) ->
+        List.iter
+          (fun pass -> t.(pass) <- op :: t.(pass))
+          (Main.acceptable_passes op))
+      ops ;
+    Array.map List.rev t
   in
-  let validation_passes_len = List.length Main.validation_passes in
-  let t = Array.make validation_passes_len [] in
-  List.iter
-    (fun (op : packed_operation) ->
-      List.iter
-        (fun pass -> t.(pass) <- op :: t.(pass))
-        (Main.acceptable_passes op))
-    ops ;
-  let t = Array.map List.rev t in
-  (* Retrieve the optimist maximum paying manager operations *)
-  let manager_operations = t.(managers_index) in
-  let {Environment.Updater.max_size; _} =
-    WithExceptions.Option.get ~loc:__LOC__
-    @@ List.nth Main.validation_passes managers_index
+  let overflowing_manager_operations =
+    (* Retrieve the optimist maximum paying manager operations *)
+    let manager_operations = t.(managers_index) in
+    let {Environment.Updater.max_size; _} =
+      WithExceptions.Option.get ~loc:__LOC__
+      @@ List.nth Main.validation_passes managers_index
+    in
+    sort_manager_operations
+      ~max_size
+      ~hard_gas_limit_per_block
+      ~minimal_fees
+      ~minimal_nanotez_per_gas_unit
+      ~minimal_nanotez_per_byte
+      manager_operations
+    >>? fun ordered_operations ->
+    (* Greedy heuristic *)
+    trim_manager_operations
+      ~max_size
+      ~hard_gas_limit_per_block
+      (List.map fst ordered_operations)
+    >>? fun (desired_manager_operations, overflowing_manager_operations) ->
+    t.(managers_index) <- desired_manager_operations ;
+    ok overflowing_manager_operations
   in
-  sort_manager_operations
-    ~max_size
-    ~hard_gas_limit_per_block
-    ~minimal_fees
-    ~minimal_nanotez_per_gas_unit
-    ~minimal_nanotez_per_byte
-    manager_operations
-  >>=? fun ordered_operations ->
-  (* Greedy heuristic *)
-  trim_manager_operations
-    ~max_size
-    ~hard_gas_limit_per_block
-    (List.map fst ordered_operations)
-  >>=? fun (desired_manager_operations, overflowing_manager_operations) ->
-  t.(managers_index) <- desired_manager_operations ;
-  return (Array.to_list t, overflowing_manager_operations)
+  Lwt.return
+    ( overflowing_manager_operations
+    >>? fun overflowing_manager_operations ->
+    ok (Array.to_list t, overflowing_manager_operations) )
 
 let forge (op : Operation.packed) : Operation.raw =
   {
@@ -696,12 +702,14 @@ let filter_and_apply_operations cctxt state ~chain ~block block_info ~priority
       (List.rev anonymous)
       (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth quota anonymous_index)
   in
-  trim_manager_operations
-    ~max_size:
-      (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth quota managers_index)
-        .max_size
-    ~hard_gas_limit_per_block
-    managers
+  Lwt.return
+  @@ trim_manager_operations
+       ~max_size:
+         ( WithExceptions.Option.get ~loc:__LOC__
+         @@ List.nth quota managers_index )
+           .max_size
+       ~hard_gas_limit_per_block
+       managers
   >>=? fun (accepted_managers, _overflowing_managers) ->
   (* Retrieve the correct index order *)
   let accepted_managers =
@@ -955,17 +963,18 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
         -% a timestamp_tag (Time.System.of_protocol_exn timestamp)
         -% a fitness_tag shell_header.fitness)
   >>= fun () ->
-  ( match Environment.wrap_tzresult (Raw_level.of_int32 shell_header.level) with
+  ( match Raw_level.of_int32 shell_header.level with
   | Ok level ->
       return level
-  | Error errs as err ->
+  | Error errs ->
+      let errs = Environment.wrap_tztrace errs in
       lwt_log_error
         Tag.DSL.(
           fun f ->
             f "Error on raw_level conversion : %a"
             -% t event "block_injection_failed"
             -% a errs_tag errs)
-      >>= fun () -> Lwt.return err )
+      >>= fun () -> Lwt.return_error errs )
   >>=? fun level ->
   inject_block
     cctxt
