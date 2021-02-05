@@ -569,3 +569,51 @@ module P2p_io_scheduler = struct
       ~level:Info
       ()
 end
+
+module P2p_pool = struct
+  include Internal_event.Simple
+
+  let section = ["p2p"; "pool"]
+
+  let get_points =
+    declare_3
+      ~section
+      ~name:"get_points"
+      ~msg:"getting points from {medium} of {source}: {point_list}"
+      ~level:Debug
+      ("medium", Data_encoding.string)
+      ("source", P2p_peer.Id.encoding)
+      ("point_list", Data_encoding.list P2p_point.Id.encoding)
+
+  let create_pool =
+    declare_1
+      ~section
+      ~name:"create_pool"
+      ~msg:"create pool: known points {point_list}"
+      ~level:Debug
+      ("point_list", Data_encoding.list P2p_point.Id.encoding)
+
+  let parse_error =
+    declare_1
+      ~section
+      ~name:"parse_error_peers"
+      ~msg:"failed to parse peers file: {error}"
+      ~level:Error
+      ("error", Error_monad.trace_encoding)
+
+  let saving_metadata =
+    declare_1
+      ~section
+      ~name:"save_metadata"
+      ~msg:"saving metadata in {file}"
+      ~level:Info
+      ("file", Data_encoding.string)
+
+  let save_peers_error =
+    declare_1
+      ~section
+      ~name:"save_error_peers"
+      ~msg:"failed to save peers file: {error}"
+      ~level:Error
+      ("error", Error_monad.trace_encoding)
+end

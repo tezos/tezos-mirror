@@ -32,9 +32,7 @@
 
 (* TODO allow to track "requested peer_ids" when we reconnect to a point. *)
 
-include Internal_event.Legacy_logging.Make (struct
-  let name = "p2p.pool"
-end)
+module Event = P2p_events.P2p_pool
 
 type config = {
   identity : P2p_identity.t;
@@ -168,13 +166,7 @@ let register_new_point ?trusted t point =
   else None
 
 let register_list_of_new_points ?trusted ~medium ~source t point_list =
-  debug
-    "Getting points from %s of %a: %a"
-    medium
-    P2p_peer.Id.pp
-    source
-    P2p_point.Id.pp_list
-    point_list ;
+  Event.(emit__dont_wait__use_with_care get_points) (medium, source, point_list) ;
   let f point = register_new_point ?trusted t point |> ignore in
   List.iter f point_list
 
@@ -513,15 +505,9 @@ let create config peer_meta_config triggers ~log =
     peer_meta_config.peer_meta_encoding
   >>= function
   | Ok peer_ids ->
-      debug
-        "create pool: known points %a"
-        (fun ppf known_points ->
-          P2p_point.Table.iter
-            (fun id _ ->
-              P2p_point.Id.pp ppf id ;
-              Format.pp_print_string ppf " ")
-            known_points)
-        pool.known_points ;
+      Event.(emit create_pool)
+        (pool.known_points |> P2p_point.Table.to_seq_keys |> List.of_seq)
+      >>= fun () ->
       List.iter
         (fun peer_info ->
           let peer_id = P2p_peer_state.Info.peer_id peer_info in
@@ -534,11 +520,10 @@ let create config peer_meta_config triggers ~log =
         peer_ids ;
       Lwt.return pool
   | Error err ->
-      log_error "@[Failed to parse peers file:@ %a@]" pp_print_error err ;
-      Lwt.return pool
+      Event.(emit parse_error) err >>= fun () -> Lwt.return pool
 
 let destroy {config; peer_meta_config; known_peer_ids; known_points; _} =
-  lwt_log_info "Saving metadata in %s" config.peers_file
+  Event.(emit saving_metadata) config.peers_file
   >>= fun () ->
   P2p_peer_state.Info.File.save
     config.peers_file
@@ -546,8 +531,7 @@ let destroy {config; peer_meta_config; known_peer_ids; known_points; _} =
     (P2p_peer.Table.fold (fun _ a b -> a :: b) known_peer_ids [])
   >>= (function
         | Error err ->
-            log_error "@[Failed to save peers file:@ %a@]" pp_print_error err ;
-            Lwt.return_unit
+            Event.(emit save_peers_error) err >>= fun () -> Lwt.return_unit
         | Ok () ->
             Lwt.return_unit)
   >>= fun () ->
